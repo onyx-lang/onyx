@@ -49,42 +49,45 @@ package core
 #load "./misc/arg_parse"
 #load "./misc/method_ops"
 
-#if runtime.runtime == .Wasi || runtime.runtime == .Onyx {
+#load "./time/date"
+#load "./encoding/base64"
+
+#load "./runtime/common"
+
+#if runtime.platform.Supports_Files {
     #load "./os/file"
-    #load "./os/os"
+}
+
+#if runtime.platform.Supports_Directories {
     #load "./os/dir"
 }
 
-#if runtime.runtime == .Onyx   {
-    #load "./runtime/onyx_run"
+#if runtime.platform.Supports_Os {
+    #load "./os/os"
+}
 
+#if runtime.platform.Supports_Processes {
     #load "./os/process"
-    #load "./time/time"
-    #load "./time/date"
+}
 
+#if runtime.platform.Supports_Time {
+    #load "./time/time"
+}
+
+#if runtime.platform.Supports_Networking {
     #load "./net/net"
     #load "./net/tcp"
+}
 
-    #load "./onyx/fs"
-    #load "./onyx/cptr"
-    #load "./onyx/cbindgen"
-    #load "./onyx/fault_handling"
-}
-#if runtime.runtime == .Wasi   {
-    #load "./wasi/wasi"
-    #load "./runtime/wasi"
-    #load "./wasi/clock"
-    #load "./wasi/env"
-    #load "./wasi/wasi_fs"
-}
-#if runtime.runtime == .Js     { #load "./runtime/js" }
-#if runtime.runtime != .Custom {
+#if runtime.platform.Supports_Type_Info {
     #load "./runtime/info/helper"
     #load "./io/stdio"
-
-    #load "./encoding/base64"
-    #load "./encoding/csv"
     #load "./misc/any_utils"
+    #load "./encoding/csv"
+}
+
+#if runtime.platform.Supports_Threads && runtime.Multi_Threading_Enabled {
+    #load "./threads/thread"
 }
 
 #if runtime.Multi_Threading_Enabled {
@@ -95,6 +98,25 @@ package core
     #load "./sync/semaphore"
     #load "./sync/barrier"
     #load "./sync/once"
+}
 
-    #load "./threads/thread"
+
+//
+// Load platform files
+//
+
+#if runtime.runtime == .Onyx {
+    #load "./runtime/platform/onyx/platform"
+
+    #load "./onyx/cptr"
+    #load "./onyx/cbindgen"
+    #load "./onyx/fault_handling"
+}
+
+#if runtime.runtime == .Wasi   {
+    #load "./runtime/platform/wasi/platform"
+}
+
+#if runtime.runtime == .Js {
+    #load "./runtime/platform/js/platform"
 }

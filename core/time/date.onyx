@@ -16,8 +16,11 @@ Date :: struct {
         return .{ year, month - 1, day };
     }
 
-    today :: () -> Date {
-        return now()->as_date();
+
+    #if runtime.platform.Supports_Time {
+        today :: () -> Date {
+            return now()->as_date();
+        }
     }
 
     add_months :: (d: Date, days: i32) -> Date {

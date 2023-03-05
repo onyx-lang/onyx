@@ -1,8 +1,28 @@
-package runtime
-
-#load "core/runtime/common"
+package runtime.platform
 
 use core
+use runtime {
+    __runtime_initialize,
+    Multi_Threading_Enabled,
+    _thread_start,
+    _thread_exit
+}
+
+#load "./fs"
+
+
+// Platform supports
+Supports_Files :: true
+Supports_Directories :: true
+Supports_Os :: true
+Supports_Processes :: true
+Supports_Time :: true
+Supports_Networking :: true
+Supports_Type_Info :: true
+Supports_Threads :: true
+
+
+#library "onyx_runtime"
 
 #local {
     __stdout: os.File;
@@ -27,38 +47,54 @@ __read_from_input :: (buffer: [] u8) -> i32 {
     return read;
 }
 
-#library "onyx_runtime"
+
+ProcessData :: #distinct u64
 
 #foreign "onyx_runtime" {
-    __file_get_standard :: (fd: i32, out: ^fs.FileData) -> bool ---
-
+    // Arguments
     __args_get       :: (argv: ^^u8, arg_buf: ^u8) -> void ---
     __args_sizes_get :: (argc: ^i32, arg_buf_size: ^i32) -> void ---
 
+    // OS
     __exit :: (status: i32) -> void ---
-
     __sleep :: (milliseconds: i32) -> void ---
 
+    // Time and sleep
     __time :: () -> u64 ---
+    __time_localtime :: (time: u64, tm: ^core.time.Timestamp) -> void ---
+    __time_gmtime    :: (time: u64, tm: ^core.time.Timestamp) -> void ---
+    __time_mktime    :: (tm: ^time.Timestamp) -> i64 ---
+    __time_strftime  :: (buf: [] u8, format: cstr, tm: ^time.Timestamp) -> u32 ---
+
+    // Processes
+    __process_spawn   :: (path: str, args: [] str, non_blocking_io: bool, starting_directory: str) -> ProcessData ---
+    __process_read    :: (handle: ProcessData, buffer: [] u8) -> i32 ---
+    __process_write   :: (handle: ProcessData, buffer: [] u8) -> i32 ---
+    __process_kill    :: (handle: ProcessData) -> bool ---
+    __process_wait    :: (handle: ProcessData) -> os.ProcessResult ---
+    __process_destroy :: (handle: ProcessData) -> void ---
+
+    // Misc
+    __file_get_standard :: (fd: i32, out: ^FileData) -> bool ---
 }
 
-#export "_start" () {
-    fd: fs.FileData;
+__start :: () {
+    fd: FileData;
     __file_get_standard(1, ^fd);
     __stdout = .{
-        .{ ^fs.__file_stream_vtable },
+        .{ ^__file_stream_vtable },
         fd
     };
     
     __file_get_standard(2, ^fd);
     __stderr = .{
-        .{ ^fs.__file_stream_vtable },
+        .{ ^__file_stream_vtable },
         fd
     };
 
     __file_get_standard(0, ^fd);
     __stdin = .{
-        .{ ^fs.__file_stream_vtable, .Block_On_Read },
+        .{ ^__file_stream_vtable, .Block_On_Read },
         fd
     };
 

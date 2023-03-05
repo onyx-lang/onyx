@@ -1,8 +1,14 @@
 package core.time
 
 use core {os, conv}
+use runtime.platform {
+    __time_gmtime,
+    __time_localtime,
+    __time_mktime,
+    __time_strftime
+}
 
-#if runtime.runtime != .Onyx {
+#if !runtime.platform.Supports_Time {
     #error "'core.time' should only be used with the Onyx runtime, for now.";
 }
 
@@ -325,15 +331,6 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: ^Timestamp) -> bool {
         }
 
         return false;
-    }
-}
-
-#local {
-    #foreign "onyx_runtime" {
-        __time_localtime :: (time: u64, tm: ^Timestamp) -> void ---
-        __time_gmtime    :: (time: u64, tm: ^Timestamp) -> void ---
-        __time_mktime    :: (tm: ^Timestamp) -> i64 ---
-        __time_strftime  :: (buf: [] u8, format: cstr, tm: ^Timestamp) -> u32 ---
     }
 }
 

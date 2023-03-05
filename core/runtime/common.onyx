@@ -2,6 +2,13 @@ package runtime
 
 use core
 use core.intrinsics.onyx { __initialize }
+use platform { __output_string }
+
+//
+// Export the __start function from the platform layer.
+// Every platform should define this, even if is it just '() {}'.
+#export "_start" platform.__start
+
 
 // The default assert handler. This assumes that __output_string
 // and __exit are defined in the 'runtime' package.

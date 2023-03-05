@@ -53,7 +53,7 @@ __flush_stdio :: () {
 
     ^stdio.print_stream
         |> io.buffer_stream_to_str()
-        |> runtime.__output_string();
+        |> runtime.platform.__output_string();
 
     ^stdio.print_stream |> io.stream_flush();
 }
@@ -92,17 +92,17 @@ printf :: (format: str, va: ..any) {
     print(conv.format_va(buffer, format, va, .{null, flush}));
 }
 
-#if #defined(runtime.__output_error) {
+#if #defined(runtime.platform.__output_error) {
     //
     // Prints to standard error, if available.
     eprintf :: (format: str, va: ..any) -> str {
         flush :: (_, to_output) => {
-            runtime.__output_error(to_output);
+            runtime.platform.__output_error(to_output);
             return true;
         }
 
         buffer: [1024] u8;
-        runtime.__output_error(conv.format_va(buffer, format, va, .{null, flush}));
+        runtime.platform.__output_error(conv.format_va(buffer, format, va, .{null, flush}));
     }
 }
 
@@ -141,9 +141,9 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
         temp[1] = map_to_ascii(val & 15);
         temp[2] = #char " ";
 
-        runtime.__output_string(~~temp);
+        runtime.platform.__output_string(~~temp);
 
-        if i % bytes_per_line == (bytes_per_line - 1) do runtime.__output_string("\n");
+        if i % bytes_per_line == (bytes_per_line - 1) do runtime.platform.__output_string("\n");
     }
 
 
@@ -180,7 +180,7 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
 #local stdio_vtable := io.Stream_Vtable.{
     read = (_: ^io.Stream, buffer: [] u8) -> (io.Error, u32) {
         __flush_stdio();
-        bytes_read := runtime.__read_from_input(buffer);
+        bytes_read := runtime.platform.__read_from_input(buffer);
         if bytes_read == 0 do return .ReadPending, 0;
         if bytes_read <  0 do return .EOF, 0;
 
@@ -190,7 +190,7 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
     read_byte = (_: ^io.Stream) -> (io.Error, u8) {
         __flush_stdio();
         buf: [1] u8;
-        bytes_read := runtime.__read_from_input(buf);
+        bytes_read := runtime.platform.__read_from_input(buf);
         if bytes_read <= 0 do return .EOF, 0;
 
         return .None, buf[0];

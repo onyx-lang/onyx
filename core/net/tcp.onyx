@@ -1,5 +1,9 @@
 package core.net
 
+#if !runtime.platform.Supports_Networking {
+    #error "Cannot include this file. Platform not supported.";
+}
+
 use core {sync, thread, array, memory, alloc, os, iter}
 
 #if !runtime.Multi_Threading_Enabled {

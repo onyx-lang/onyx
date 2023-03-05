@@ -41,7 +41,7 @@ spawn :: (t: ^Thread, data: ^$T, func: (^T) -> void) {
 
     stack_base := raw_alloc(alloc.heap_allocator, 1 << 20);
 
-    runtime.__spawn_thread(t.id, tls_base, stack_base, func, data);
+    runtime.platform.__spawn_thread(t.id, tls_base, stack_base, func, data);
 }
 
 //
@@ -54,7 +54,7 @@ join :: (t: ^Thread) {
             __atomic_wait(^t.id, t.id);
         } else {
             // To not completely kill the CPU.
-            runtime.__sleep(1);
+            runtime.platform.__sleep(1);
         }
     }
 }
@@ -65,7 +65,7 @@ join :: (t: ^Thread) {
 kill :: (t: ^Thread) -> i32 {
     if !t.alive do return -1;
 
-    ret := runtime.__kill_thread(t.id);
+    ret := runtime.platform.__kill_thread(t.id);
     if ret > 0 do __exited(t.id);
 
     return 1;

@@ -1,16 +1,23 @@
 package core.os
 
-#if runtime.runtime != .Onyx {
-    #error "This file can only be included in the 'onyx' runtime, because Wasi has not defined how to spawn and manage processes.";
+#if !runtime.platform.Supports_Processes {
+    #error "Cannot include this file. Platform not supported.";
 }
 
 use core {io}
+use runtime.platform {
+    __process_spawn,
+    __process_destroy,
+    __process_kill,
+    __process_read,
+    __process_write,
+    __process_wait,
+    ProcessData
+}
 
 Process :: struct {
-    Handle :: #distinct i64;
-
     use stream: io.Stream;
-    process_handle: Handle;
+    process_handle: ProcessData;
 }
 
 process_spawn :: (path: str, args: [] str, non_blocking_io := false, starting_directory := "") -> Process {
@@ -70,19 +77,10 @@ process_destroy :: (use p: ^Process) => {
     }
 }
 
-#local ProcessResult :: enum {
+ProcessResult :: enum {
     Success     :: 0x00;
     FailedToRun :: 0x01;
     Error       :: 0x02;
     InternalErr :: 0x03;
-}
-
-#foreign "onyx_runtime" {
-    __process_spawn   :: (path: str, args: [] str, non_blocking_io: bool, starting_directory: str) -> Process.Handle ---
-    __process_read    :: (handle: Process.Handle, buffer: [] u8) -> i32 ---
-    __process_write   :: (handle: Process.Handle, buffer: [] u8) -> i32 ---
-    __process_kill    :: (handle: Process.Handle) -> bool ---
-    __process_wait    :: (handle: Process.Handle) -> ProcessResult ---
-    __process_destroy :: (handle: Process.Handle) -> void ---
 }
 

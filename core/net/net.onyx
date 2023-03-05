@@ -1,5 +1,9 @@
 package core.net
 
+#if !runtime.platform.Supports_Networking {
+    #error "Cannot include this file. Platform not supported.";
+}
+
 use core
 
 Socket :: struct {
@@ -281,6 +285,11 @@ network_to_host :: #match #local {}
     }
 };
 
+//
+// This will be moved into the platform layer later.
+// I think this is most everything you would need, but
+// I need to see how WASI does sockets to see if this
+// makes sense as an abstraction.
 #foreign "onyx_runtime" {
     #package __net_create_socket :: (out_handle: ^Socket.Handle, domain: SocketDomain, type: SocketType) -> SocketError ---
     #package __net_close_socket  :: (handle: Socket.Handle)               -> void ---

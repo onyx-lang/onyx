@@ -1,10 +1,32 @@
-package runtime
+package runtime.platform
 
-#load "core/wasi/wasi"
-#load "core/runtime/common"
+#load "./wasi_defs"
+#load "./wasi_fs"
 
-use wasi
 use core
+use wasi {
+    IOVec, SubscriptionTagged, Subscription, Event, Size,
+    poll_oneoff, fd_write, fd_datasync, fd_read,
+    args_get, args_sizes_get,
+    proc_exit
+}
+use runtime {
+    __runtime_initialize,
+    Multi_Threading_Enabled,
+}
+
+
+// Platform supports
+Supports_Files :: true
+Supports_Directories :: true
+Supports_Os :: true
+Supports_Processes :: false
+Supports_Time :: false
+Supports_Networking :: false
+Supports_Type_Info :: true
+Supports_Threads :: false
+
+
 
 __output_string :: (s: str) -> u32 {
     STDOUT_FILENO :: 1
@@ -51,9 +73,8 @@ __sleep :: (milliseconds: u32) {
 }
 
 
-// The builtin _start proc.
 // Sets up everything needed for execution.
-#export "_start" () {
+__start :: () {
     __runtime_initialize();
     context.thread_id = 0;
 

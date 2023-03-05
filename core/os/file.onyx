@@ -1,7 +1,12 @@
 package core.os
 
+#if !runtime.platform.Supports_Files {
+    #error "Cannot include this file. Platform not supported.";
+}
+
 use core
-use runtime {fs}
+#local fs :: package runtime.platform
+
 
 FileError :: enum {
     None       :: 0x00;

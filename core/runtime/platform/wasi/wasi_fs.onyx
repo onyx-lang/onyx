@@ -1,4 +1,4 @@
-package runtime.fs
+package runtime.platform
 
 #local runtime :: package runtime
 #if runtime.runtime != .Wasi {
