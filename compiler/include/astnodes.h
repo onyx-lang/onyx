@@ -1606,6 +1606,7 @@ struct CompileOptions {
     const char* target_file;
     const char* documentation_file;
     const char* symbol_info_file;
+    const char* help_subcommand;
 
     b32 debug_enabled;
 

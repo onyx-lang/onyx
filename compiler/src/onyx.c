@@ -16,41 +16,57 @@
 
 Context context;
 
+#define DOCSTRING_HEADER "Onyx toolchain version " VERSION "\n" \
+    "\n" \
+    "The toolchain for the Onyx programming language, created by Brendan Hansen.\n" \
+    "\n"
 
-static const char* docstring = "Onyx toolchain version " VERSION "\n"
-    "\n"
-    "The toolchain for the Onyx programming language, created by Brendan Hansen.\n"
-    "\n"
+
+
+static const char* top_level_docstring = DOCSTRING_HEADER
     "Usage:\n"
-    "\tonyx compile [-o <target file>] [--verbose] <input files>\n"
-    "\tonyx check <input files>\n"
-#ifdef ENABLE_RUN_WITH_WASMER
-    "\tonyx run <input files> -- <args>\n"
-#endif
-    "\tonyx pkg\n"
-    // "\tonyx doc <input files>\n"
-    "\tonyx help\n"
+    "\tonyx <subcommand>\n"
     "\n"
-    "Compile Flags:\n"
-    "\t<input files>           List of initial files\n"
+    "Subcommands:\n"
+    "\thelp      Shows this help message. Use \"onyx help <subcommand>\".\n"
+    "\tbuild     Compiles an Onyx program into an executable.\n"
+#ifdef ENABLE_RUN_WITH_WASMER
+    "\trun       Compiles and runs an Onyx program, all at once.\n"
+#endif
+    "\tcheck     Checks syntax and types of an Onyx program.\n"
+    "\tpackage   Package manager\n";
+    // "\tdoc <input files>\n"
+
+static const char *build_docstring = DOCSTRING_HEADER
+    "Usage:\n"
+    "\tonyx %s <input files> [-o target_file] OPTIONS\n"
+    "\n"
+    "Required:\n"
+    "\t<input files>           One or more Onyx files to include in the program.\n"
+    "\n"
+    "Options:\n"
     "\t-o <target_file>        Specify the target file (default: out.wasm).\n"
     "\t   --output <target_file>\n"
+    "\t-I <dir>                Include a directory in the search path.\n"
     "\t--runtime, -r <runtime> Specifies the runtime. Can be: onyx, wasi, js, custom.\n"
+    "\t                        (default: onyx)\n"
     "\t--verbose, -V           Verbose output.\n"
     "\t           -VV          Very verbose output.\n"
     "\t           -VVV         Very very verbose output (to be used by compiler developers).\n"
+    "\t--no-std                Disable automatically including \"core/std\".\n"
     "\t--wasm-mvp              Use only WebAssembly MVP features.\n"
     "\t--multi-threaded        Enables multi-threading for this compilation.\n"
+    "\t                        Automatically enabled for \"onyx\" runtime.\n"
     "\t--tag                   Generates a C-Tag file.\n"
     "\t--syminfo <target_file> Generates a symbol resolution information file. Used by onyx-lsp.\n"
+    "\t--generate-foreign-info Generates information for #foreign blocks.\n"
     // "\t--doc <doc_file>\n"
-    "\t--generate-foreign-info\n"
     "\n"
-    "Developer flags:\n"
-    "\t--print-function-mappings Prints a mapping from WASM function index to source location.\n"
-    "\t--print-static-if-results Prints the conditional result of each #if statement. Useful for debugging.\n"
+    "Developer options:\n"
     "\t--no-colors               Disables colors in the error message.\n"
     "\t--no-file-contents        Disables '#file_contents' for security.\n"
+    "\t--print-function-mappings Prints a mapping from WASM function index to source location.\n"
+    "\t--print-static-if-results Prints the conditional result of each #if statement. Useful for debugging.\n"
     "\n";
 
 
@@ -74,6 +90,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .target_file = "out.wasm",
 
         .documentation_file = NULL,
+        .symbol_info_file   = NULL,
+        .help_subcommand    = NULL,
 
         .debug_enabled = 0,
 
@@ -103,16 +121,19 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     if (argc == 1) return options;
     i32 arg_parse_start = 1;
 
-    if (!strcmp(argv[1], "help"))     options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
-    if (!strcmp(argv[1], "compile") || !strcmp(argv[1], "build")) {
+    if (!strcmp(argv[1], "help")) {
+        options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
+        options.help_subcommand = argc > 2 ? argv[2] : NULL;
+    }
+    else if (!strcmp(argv[1], "compile") || !strcmp(argv[1], "build")) {
         options.action = ONYX_COMPILE_ACTION_COMPILE;
         arg_parse_start = 2;
     }
-    if (!strcmp(argv[1], "check")) {
+    else if (!strcmp(argv[1], "check")) {
         options.action = ONYX_COMPILE_ACTION_CHECK;
         arg_parse_start = 2;
     }
-    if (!strcmp(argv[1], "pkg") || !strcmp(argv[1], "package")) {
+    else if (!strcmp(argv[1], "pkg") || !strcmp(argv[1], "package")) {
         options.action = ONYX_COMPILE_ACTION_RUN;
         options.passthrough_argument_count = argc - 2;
         options.passthrough_argument_data  = &argv[2];
@@ -126,6 +147,11 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         arg_parse_start = 2;
     }
     #endif
+    else {
+        bh_printf("Unknown subcommand: '%s'\n", argv[1]);
+        bh_printf("Run \"onyx help\" for valid subcommands.\n");
+        exit(1);
+    }
 
     if (options.action != ONYX_COMPILE_ACTION_PRINT_HELP) {
         fori(i, arg_parse_start, argc) {
@@ -176,7 +202,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
                 else if (!strcmp(argv[i], "custom")) options.runtime = Runtime_Custom;
                 else {
                     bh_printf("WARNING: '%s' is not a valid runtime. Defaulting to 'onyx'.\n", argv[i]);
-                    options.runtime = Runtime_Wasi;
+                    options.runtime = Runtime_Onyx;
                 }
             }
             // else if (!strcmp(argv[i], "--doc")) {
@@ -239,7 +265,19 @@ static void compile_opts_free(CompileOptions* opts) {
     bh_arr_free(opts->included_folders);
 }
 
+static void print_subcommand_help(const char *subcommand) {
+    if (!strcmp(subcommand, "build")
+        || !strcmp(subcommand, "run")
+        || !strcmp(subcommand, "check")) {
+        bh_printf(build_docstring, subcommand);
+    }
 
+    else  {
+        bh_printf("Unknown subcommand: '%s'\n", subcommand);
+        bh_printf("Run \"onyx help\" for valid subcommands.\n");
+        exit(1);
+    }
+}
 
 
 
@@ -860,7 +898,14 @@ int main(int argc, char *argv[]) {
 
     CompilerProgress compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
     switch (compile_opts.action) {
-        case ONYX_COMPILE_ACTION_PRINT_HELP: bh_printf(docstring); return 1;
+        case ONYX_COMPILE_ACTION_PRINT_HELP: {
+            if (compile_opts.help_subcommand) {
+                print_subcommand_help(compile_opts.help_subcommand);
+            } else {
+                bh_printf(top_level_docstring);
+            }
+            return 1;
+        }
 
         case ONYX_COMPILE_ACTION_CHECK:
             compiler_progress = onyx_compile();

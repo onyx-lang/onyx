@@ -4141,12 +4141,15 @@ static void emit_export_directive(OnyxWasmModule* mod, AstDirectiveExport* expor
 
     token_toggle_end(export->export_name);
 
-    i64 idx = bh_imap_get(&mod->index_map, (u64) export->export);
+    AstTyped *the_export = (AstTyped *) strip_aliases((AstNode *) export->export);
+    assert(the_export);
+
+    i64 idx = bh_imap_get(&mod->index_map, (u64) the_export);
 
     WasmExport wasm_export;
     wasm_export.idx = (i32) idx;
 
-    switch (export->export->kind) {
+    switch (the_export->kind) {
         case Ast_Kind_Function: wasm_export.kind = WASM_FOREIGN_FUNCTION;
                                 break;
 

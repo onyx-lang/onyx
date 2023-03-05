@@ -1,5 +1,7 @@
 package core.encoding.base64
 
+use core {array}
+
 //
 // A simple Base64 encoding and decoding library. Currently
 // only supports base64 with + and / characters. A simple
@@ -12,7 +14,7 @@ package core.encoding.base64
 // from the allocator provided. It is the callers responsibilty
 // to free this memory.
 encode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
-    out := make([..] u8, allocator=allocator);
+    out := array.make(u8, allocator=allocator);
 
     for i: range.{0, data.count - 2, 3} {
         c1 := data[i + 0];
@@ -50,7 +52,7 @@ encode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
 decode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
     if data.count % 4 != 0 do return null_str;
 
-    out := make([..] u8, allocator=allocator);
+    out := array.make(u8, allocator=allocator);
 
     for i: range.{0, data.count, 4} {
         c1 := data[i + 0];
