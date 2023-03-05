@@ -541,8 +541,11 @@ format_any :: (output: ^Format_Output, formatting: ^Format, v: any) {
                     opt := cast(^?bool) v.data;
 
                     if opt.has_value {
+                        format := *formatting;
+                        format.quote_strings = true;
+
                         output->write("Some(");
-                        format_any(output, formatting, .{ ~~(cast(^u8) v.data + s.members[1].offset), s.members[1].type });
+                        format_any(output, ^format, .{ ~~(cast(^u8) v.data + s.members[1].offset), s.members[1].type });
                         output->write(")");
 
                     } else {

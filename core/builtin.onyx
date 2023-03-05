@@ -397,7 +397,12 @@ Iterator :: struct (Iter_Type: type_expr) {
 
 
 //
-// nocheckin DOCUMENT THIS
+// Optional represents the possibility of a value being empty, without
+// resorting to pointers and null-pointers. Most of the functionality
+// for Optional is defined in core/containers/optional.onyx. This
+// definition exists here because the compiler use it as the template
+// for types like '? i32'. In other words, '? i32' is equivalent to
+// 'Optional(i32)'.
 Optional :: struct (Value_Type: type_expr) {
     has_value: bool;
     value: Value_Type;
