@@ -164,7 +164,7 @@ file_logger_open :: (filename: str, allocator := context.allocator) -> Result(&F
         raw_free(allocator, file_logger.file);
         raw_free(allocator, file_logger);
 
-        return #from_enclosing .{ .Err, .{error = "Unable to open file for logging."} };
+        return return .{ .Err, .{error = "Unable to open file for logging."} };
     });
 
     return .{ .Ok, .{ value=file_logger } };

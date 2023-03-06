@@ -770,7 +770,7 @@ struct AstDirectiveSolidify {
 };
 
 // Intruction Node
-struct AstReturn        { AstNode_base; AstTyped* expr; b32 from_enclosing_scope: 1; };
+struct AstReturn        { AstNode_base; AstTyped* expr; u32 count; }; // Note: This count is one less than it should be, because internal codegen with macros would have to know about this and that is error prone.
 struct AstJump          { AstNode_base; JumpType jump; u32 count; };
 
 typedef struct QualifiedUse {

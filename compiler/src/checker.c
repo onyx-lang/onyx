@@ -138,15 +138,11 @@ static bh_arr(Type **) expected_return_type_stack = NULL;
 CheckStatus check_return(AstReturn* retnode) {
     Type ** expected_return_type;
     
-    if (retnode->from_enclosing_scope) {
-        if (bh_arr_length(expected_return_type_stack) <= 1) {
-            ERROR(retnode->token->pos, "#from_enclosing is not valid here, as this return statement is not inside of a do-block or expression macro.");
-        }
-
-        expected_return_type = expected_return_type_stack[bh_arr_length(expected_return_type_stack) - 2];
-    } else {
-        expected_return_type = expected_return_type_stack[bh_arr_length(expected_return_type_stack) - 1];
+    if (retnode->count >= (u32) bh_arr_length(expected_return_type_stack)) {
+        ERROR_(retnode->token->pos, "Too many repeated 'return's here. Expected a maximum of %d.",
+                bh_arr_length(expected_return_type_stack));
     }
+    expected_return_type = expected_return_type_stack[bh_arr_length(expected_return_type_stack) - retnode->count - 1];
 
     if (retnode->expr) {
         CHECK(expression, &retnode->expr);

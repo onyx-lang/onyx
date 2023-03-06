@@ -85,7 +85,7 @@ package core
         value := o;
         if value.has_value do return value.value;
 
-        return #from_enclosing .{};
+        return return .{};
     }
 
     catch :: macro (o: ?$T, body: Code) -> T {
@@ -125,7 +125,7 @@ package core
     value := opt;
     if value do return value.value;
 
-    return #from_enclosing .{};
+    return return .{};
 }
 
 

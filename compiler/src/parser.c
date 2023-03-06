@@ -1431,9 +1431,11 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
 static AstReturn* parse_return_stmt(OnyxParser* parser) {
     AstReturn* return_node = make_node(AstReturn, Ast_Kind_Return);
     return_node->token = expect_token(parser, Token_Type_Keyword_Return);
+    return_node->count = 0;
 
-    if (parse_possible_directive(parser, "from_enclosing")) {
-        return_node->from_enclosing_scope = 1;
+    while (parser->curr->type == Token_Type_Keyword_Return) {
+        consume_token(parser);
+        return_node->count += 1;
     }
 
     AstTyped* expr = NULL;
