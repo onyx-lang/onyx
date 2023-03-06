@@ -15,12 +15,12 @@ DirectoryEntry :: struct {
     name_length : u32;
     name_data   : [256] u8;
 
-    name :: (use dir: ^DirectoryEntry) => str.{ ~~name_data, name_length };
+    name :: (use dir: &DirectoryEntry) => str.{ ~~name_data, name_length };
 }
 
 dir_open :: (path: str) -> (Directory, bool) {
     dir: Directory;
-    success := fs.__dir_open(path, ^dir);
+    success := fs.__dir_open(path, &dir);
     return dir, success;
 }
 
@@ -28,7 +28,7 @@ dir_close :: (dir: Directory) {
     fs.__dir_close(dir);
 }
 
-dir_read :: (dir: Directory, out_entry: ^DirectoryEntry) -> bool {
+dir_read :: (dir: Directory, out_entry: &DirectoryEntry) -> bool {
     return fs.__dir_read(dir, out_entry);
 }
 
@@ -43,18 +43,18 @@ list_directory :: (path: str) -> Iterator(DirectoryEntry) {
         opened := false;
     }
 
-    next :: (use c: ^Context) -> (DirectoryEntry, bool) {
+    next :: (use c: &Context) -> (DirectoryEntry, bool) {
         if !opened do return .{}, false;
 
         entry: DirectoryEntry;
-        if !dir_read(dir, ^entry) {
+        if !dir_read(dir, &entry) {
             return .{}, false;
         }
 
         return entry, true;
     }
 
-    close :: (use c: ^Context) {
+    close :: (use c: &Context) {
         dir_close(dir);
         cfree(c);
     }

@@ -3,7 +3,7 @@ package core.array
 // [..] T == Array(T)
 //   where
 // Array :: struct (T: type_expr) {
-//     data      : ^T;
+//     data      : &T;
 //     count     : u32;
 //     capacity  : u32;
 //     allocator : Allocator;
@@ -17,36 +17,36 @@ make :: #match #local {}
 #overload
 make :: ($T: type_expr, capacity := 4, allocator := context.allocator) -> [..] T {
     arr : [..] T;
-    init(^arr, capacity, allocator);
+    init(&arr, capacity, allocator);
     return arr;
 }
 
 #overload
 make :: (base: [] $T, allocator := context.allocator) -> [..] T {
     arr: [..] T;
-    init(^arr, base.count, allocator);
-    for^ base do arr << *it;
+    init(&arr, base.count, allocator);
+    for& base do arr << *it;
     return arr;
 }
 
 #overload
-__make_overload :: macro (_: ^[..] $T, allocator := context.allocator) -> [..] T {
+__make_overload :: macro (_: &[..] $T, allocator := context.allocator) -> [..] T {
     return core.array.make(T, allocator=allocator);
 }
 
 #overload
-__make_overload :: macro (_: ^[..] $T, capacity: u32, allocator := context.allocator) -> [..] T {
+__make_overload :: macro (_: &[..] $T, capacity: u32, allocator := context.allocator) -> [..] T {
     return core.array.make(T, capacity, allocator);
 }
 
-init :: (arr: ^[..] $T, capacity := 4, allocator := context.allocator) {
+init :: (arr: &[..] $T, capacity := 4, allocator := context.allocator) {
     arr.count = 0;
     arr.capacity = capacity;
     arr.allocator = allocator;
     arr.data = raw_alloc(allocator, sizeof T * arr.capacity);
 }
 
-free :: (arr: ^[..] $T) {
+free :: (arr: &[..] $T) {
     arr.count = 0;
     arr.capacity = 0;
 
@@ -55,14 +55,14 @@ free :: (arr: ^[..] $T) {
 }
 
 #overload
-builtin.delete :: macro (x: ^[..] $T) {
+builtin.delete :: macro (x: &[..] $T) {
     core.array.free(x);
 }
 
 copy :: #match #locked {
-    (arr: ^[..] $T, allocator := context.allocator) -> [..] T {
+    (arr: &[..] $T, allocator := context.allocator) -> [..] T {
         new_arr : [..] T;
-        init(^new_arr, arr.count, allocator);
+        init(&new_arr, arr.count, allocator);
         new_arr.count = arr.count;
 
         for i: 0 .. arr.count do new_arr.data[i] = arr.data[i];
@@ -76,20 +76,20 @@ copy :: #match #locked {
     }
 }
 
-copy_range :: (arr: ^[..] $T, r: range, allocator := context.allocator) -> [..] T {
+copy_range :: (arr: &[..] $T, r: range, allocator := context.allocator) -> [..] T {
     new_arr : [..] T;
-    init(^new_arr, r.high - r.low, allocator);
+    init(&new_arr, r.high - r.low, allocator);
     new_arr.count = r.high - r.low;
 
     for i: r do new_arr.data[i] = arr.data[i];
     return new_arr;
 }
 
-clear :: (arr: ^[..] $T) {
+clear :: (arr: &[..] $T) {
     arr.count = 0;
 }
 
-ensure_capacity :: (arr: ^[..] $T, capacity: u32) -> bool {
+ensure_capacity :: (arr: &[..] $T, capacity: u32) -> bool {
     if arr.capacity >= capacity do return true;
     if arr.data == null do init(arr);
 
@@ -100,13 +100,13 @@ ensure_capacity :: (arr: ^[..] $T, capacity: u32) -> bool {
     return true;
 }
 
-alloc_one :: (arr: ^[..] $T) -> ^T {
+alloc_one :: (arr: &[..] $T) -> &T {
     if !ensure_capacity(arr, arr.count + 1) do return null;
     arr.count += 1;
-    return ^arr.data[arr.count - 1];
+    return &arr.data[arr.count - 1];
 }
 
-push :: (arr: ^[..] $T, x: T) -> bool {
+push :: (arr: &[..] $T, x: T) -> bool {
     if !ensure_capacity(arr, arr.count + 1) do return false;
     arr.data[arr.count] = x;
     arr.count += 1;
@@ -114,9 +114,9 @@ push :: (arr: ^[..] $T, x: T) -> bool {
 }
 
 // Semi-useful shortcut for adding something to an array.
-#operator << macro (arr: [..] $T, v: T) do core.array.push(^arr, v);
+#operator << macro (arr: [..] $T, v: T) do core.array.push(&arr, v);
 
-insert :: (arr: ^[..] $T, idx: u32, x: T) -> bool {
+insert :: (arr: &[..] $T, idx: u32, x: T) -> bool {
     if !ensure_capacity(arr, arr.count + 1) do return false;
 
     arr.count += 1;
@@ -129,7 +129,7 @@ insert :: (arr: ^[..] $T, idx: u32, x: T) -> bool {
     return true;
 }
 
-insert_empty :: (arr: ^[..] $T, idx: u32) -> bool {
+insert_empty :: (arr: &[..] $T, idx: u32) -> bool {
     if !ensure_capacity(arr, arr.count + 1) do return false;
 
     arr.count += 1;
@@ -141,7 +141,7 @@ insert_empty :: (arr: ^[..] $T, idx: u32) -> bool {
     return true;
 }
 
-remove :: (arr: ^[..] $T, elem: T) {
+remove :: (arr: &[..] $T, elem: T) {
     move := 0;
 
     while i := 0; i < arr.count - move {
@@ -154,7 +154,7 @@ remove :: (arr: ^[..] $T, elem: T) {
     arr.count -= move;
 }
 
-delete :: (arr: ^[..] $T, idx: u32) -> T {
+delete :: (arr: &[..] $T, idx: u32) -> T {
     if idx >= arr.count do return .{};
 
     to_return := arr.data[idx];
@@ -166,7 +166,7 @@ delete :: (arr: ^[..] $T, idx: u32) -> T {
     return to_return;
 }
 
-fast_delete :: (arr: ^[..] $T, idx: u32) -> T {
+fast_delete :: (arr: &[..] $T, idx: u32) -> T {
     if idx >= arr.count do return .{};
 
     to_return := arr.data[idx];
@@ -176,7 +176,7 @@ fast_delete :: (arr: ^[..] $T, idx: u32) -> T {
     return to_return;
 }
 
-pop :: (arr: ^[..] $T) -> T {
+pop :: (arr: &[..] $T) -> T {
     if arr.count == 0 do return .{};
 
     arr.count -= 1;
@@ -186,7 +186,7 @@ pop :: (arr: ^[..] $T) -> T {
 concat :: #match #local {}
 
 #overload
-concat :: (arr: ^[..] $T, other: [] T) {
+concat :: (arr: &[..] $T, other: [] T) {
     if !ensure_capacity(arr, arr.count + other.count) do return;
 
     core.memory.copy(arr.data + arr.count, other.data, other.count * sizeof T);
@@ -194,13 +194,13 @@ concat :: (arr: ^[..] $T, other: [] T) {
 }
 
 #overload
-concat :: (arr: ^[..] $T, other: Iterator(T)) {
+concat :: (arr: &[..] $T, other: Iterator(T)) {
     for other {
         push(arr, it);
     }
 }
 
-filter :: macro (arr: ^[..] $T, body: Code) {
+filter :: macro (arr: &[..] $T, body: Code) {
     move := 0;
 
     while i := 0; i < arr.count - move {
@@ -219,8 +219,8 @@ filter :: macro (arr: ^[..] $T, body: Code) {
     elem := arr[0];
 
     for i: 1 .. arr.count {
-        A := ^arr[i];
-        B := ^elem;
+        A := &arr[i];
+        B := &elem;
         if #unquote cmp {
             idx  = i;
             elem = arr[i];
@@ -289,13 +289,13 @@ get :: (arr: [] $T, idx: i32) -> T {
     return arr.data[idx];
 }
 
-get_ptr :: (arr: [] $T, idx: i32) -> ^T {
+get_ptr :: (arr: [] $T, idx: i32) -> &T {
     if arr.count == 0 do return null;
 
     while idx < 0          do idx += arr.count;
     while idx >= arr.count do idx -= arr.count;
 
-    return ^arr.data[idx];
+    return &arr.data[idx];
 }
 
 set :: (arr: [] $T, idx: i32, value: T) {
@@ -392,12 +392,12 @@ sort :: (arr: [] $T, cmp: (T, T) -> i32) -> [] T {
 }
 
 #overload
-sort :: (arr: [] $T, cmp: (^T, ^T) -> i32) -> [] T {
+sort :: (arr: [] $T, cmp: (&T, &T) -> i32) -> [] T {
     for i: 1 .. arr.count {
         j := i;
 
         while j > 0 {
-            if cmp(^arr.data[j - 1], ^arr.data[j]) > 0 {
+            if cmp(&arr.data[j - 1], &arr.data[j]) > 0 {
                 tmp := arr.data[j];
                 arr.data[j] = arr.data[j - 1];
                 arr.data[j - 1] = tmp;
@@ -414,7 +414,7 @@ sort :: (arr: [] $T, cmp: (^T, ^T) -> i32) -> [] T {
 
 quicksort :: #match #locked {
     (arr: [] $T, cmp: ( T,  T) -> i32) => { quicksort_impl(arr, cmp, 0, arr.count - 1); return arr; },
-    (arr: [] $T, cmp: (^T, ^T) -> i32) => { quicksort_impl(arr, cmp, 0, arr.count - 1); return arr; },
+    (arr: [] $T, cmp: (&T, &T) -> i32) => { quicksort_impl(arr, cmp, 0, arr.count - 1); return arr; },
 }
 
 #local {
@@ -447,12 +447,12 @@ quicksort :: #match #locked {
     }
 
     #overload
-    quicksort_partition :: (arr: [] $T, cmp: (^T, ^T) -> i32, lo, hi: i32) -> i32 {
-        pivot := ^arr[hi];
+    quicksort_partition :: (arr: [] $T, cmp: (&T, &T) -> i32, lo, hi: i32) -> i32 {
+        pivot := &arr[hi];
         i := lo - 1;
 
         for j: lo .. hi+1 {
-            if cmp(^arr[j], pivot) <= 0 {
+            if cmp(&arr[j], pivot) <= 0 {
                 i += 1;
                 tmp := arr[i];
                 arr[i] = arr[j];
@@ -466,7 +466,7 @@ quicksort :: #match #locked {
 
 // This assumes that the elements are sorted in some fashion,
 // such that equal elements would be next to each other.
-unique :: (arr: ^[] $T) {
+unique :: (arr: &[] $T) {
     idx := 0;
     while i := 0; i < arr.count - 1 {
         defer i += 1;
@@ -521,7 +521,7 @@ some :: macro (arr: [] $T, predicate: (T) -> bool) => #this_package.some(arr, #(
 
 #overload
 some :: macro (arr: [] $T/type_is_struct, predicate_body: Code) -> bool {
-    for ^ arr {
+    for & arr {
         if #unquote predicate_body do return true;
     }
     return false;
@@ -551,8 +551,8 @@ fill_range :: (arr: [] $T, r: range, value: T) {
 to_list :: (arr: [] $T, allocator := context.allocator) -> List(T) {
     new_list := list.make(T, allocator);
 
-    for ^it: arr {
-        list.push_end(^new_list, *it);
+    for &it: arr {
+        list.push_end(&new_list, *it);
     }
 
     return new_list;
@@ -572,7 +572,7 @@ find :: (arr: [] $T, value: T) -> i32 {
 #overload
 find :: macro (arr: [] $T/type_is_struct, pred: Code) -> i32 {
     for i: arr.count {
-        it := ^arr[i];
+        it := &arr[i];
         if #unquote pred do return i;
     }
 
@@ -589,8 +589,8 @@ find :: macro (arr: [] $T, pred: Code) -> i32 {
     return -1;
 }
 
-find_ptr :: (arr: [] $T, value: T) -> ^T {
-    for ^it: arr {
+find_ptr :: (arr: [] $T, value: T) -> &T {
+    for &it: arr {
         if value == *it do return it;
     }
 
@@ -598,24 +598,24 @@ find_ptr :: (arr: [] $T, value: T) -> ^T {
 }
 
 first :: #match #locked {
-    macro (arr: [] $T, predicate: (T) -> bool) -> ^T {
+    macro (arr: [] $T, predicate: (T) -> bool) -> &T {
         first :: first
         return first(arr, #(predicate(it)));
     },
 
-    macro (arr: [] $T/type_is_struct, predicate_body: Code) -> ^T {
-        for ^ arr {
+    macro (arr: [] $T/type_is_struct, predicate_body: Code) -> &T {
+        for & arr {
             if #unquote predicate_body do return it;
         }
 
         return null;
     },
 
-    macro (arr: [] $T, predicate_body: Code) -> ^T {
+    macro (arr: [] $T, predicate_body: Code) -> &T {
         // This is to preserve the semantics that "it" is
         // not a pointer (same as contains), when T is not a
         // structure.
-        for ^it_ptr: arr {
+        for &it_ptr: arr {
             it := *it_ptr;
             if #unquote predicate_body do return it_ptr;
         }
@@ -643,7 +643,7 @@ windows :: (arr: [] $T, width: i32) -> Iterator([] T) {
     use core {iter}
 
     return iter.generator(
-        ^.{ arr=arr, width=width, pos=0 },
+        &.{ arr=arr, width=width, pos=0 },
         ctx => {
             if ctx.pos + ctx.width < ctx.arr.count {
                 defer ctx.pos += 1;
@@ -659,7 +659,7 @@ chunks :: (arr: [] $T, width: i32) -> Iterator([] T) {
     use core {iter}
 
     return iter.generator(
-        ^.{ arr=arr, width=width, pos=0 },
+        &.{ arr=arr, width=width, pos=0 },
         ctx => {
             if ctx.pos < ctx.arr.count {
                 defer ctx.pos += ctx.width;

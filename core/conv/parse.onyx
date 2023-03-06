@@ -8,7 +8,7 @@ use core {map, string, array, math}
 parse_any :: #match {}
 
 #overload
-parse_any :: macro (v: ^$T, to_parse: str, string_allocator := context.allocator) -> bool {
+parse_any :: macro (v: &$T, to_parse: str, string_allocator := context.allocator) -> bool {
     return #this_package.parse_any(v, T, to_parse, string_allocator);
 }
 
@@ -23,7 +23,7 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
 
     switch data_type {
         case bool {
-            dest := cast(^bool) target;
+            dest := cast(&bool) target;
             *dest = false;
             if to_parse[0] == #char "t" || to_parse[0] == #char "T" {
                 *dest = true;
@@ -33,7 +33,7 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
 
         integer_case :: macro (T: type_expr) {
             case T {
-                dest := cast(^T) target;
+                dest := cast(&T) target;
                 *dest = cast(T) str_to_i64(to_parse);
                 return true;
             }
@@ -49,13 +49,13 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
         integer_case(u64);
 
         case f32 {
-            dest := cast(^f32) target;
+            dest := cast(&f32) target;
             *dest = ~~ str_to_f64(to_parse);
             return true;
         }
 
         case f64 {
-            dest := cast(^f64) target;
+            dest := cast(&f64) target;
             *dest = ~~ str_to_f64(to_parse);
             return true;
         }
@@ -64,10 +64,10 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
             if to_parse.count == 0       do return false;
             if to_parse[0] != #char "\"" do return false;
             line := to_parse;
-            string.advance(^line);
+            string.advance(&line);
 
-            dest := cast(^str) target;
-            *dest = string.read_until(^line, #char "\"") |> string.alloc_copy(string_allocator); // @BUG // This does not handle escaped strings!
+            dest := cast(&str) target;
+            *dest = string.read_until(&line, #char "\"") |> string.alloc_copy(string_allocator); // @BUG // This does not handle escaped strings!
             return true;
         }
 
@@ -75,12 +75,12 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
             if info.kind == .Enum {
                 // TEMPORARY this needs to look at the backing type for the
                 // enum in order to know how large this integer should be.
-                *cast(^u32) target = ~~ str_to_i64(to_parse);
+                *cast(&u32) target = ~~ str_to_i64(to_parse);
                 return true;
             }
 
             if info.kind == .Distinct {
-                d_info := cast(^Type_Info_Distinct) info;
+                d_info := cast(&Type_Info_Distinct) info;
                 return parse_any(target, d_info.base_type, to_parse, string_allocator);
             }
         }

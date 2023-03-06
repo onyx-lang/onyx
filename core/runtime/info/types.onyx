@@ -3,7 +3,7 @@
 
 package runtime.info
 
-type_table : [] ^Type_Info;
+type_table : [] &Type_Info;
 
 Type_Info :: struct {
     // This must match the order of the elements in onyxtypes.h
@@ -180,7 +180,7 @@ Type_Info_Distinct :: struct {
     name: str;
 }
 
-get_type_info :: (t: type_expr) -> ^Type_Info {
+get_type_info :: (t: type_expr) -> &Type_Info {
     // Grossness to get around the fact that type_exprs are not technically comparable, because in most
     // cases you should not compare them as the number assigned to them is arbitrary.
     if ~~t < cast(i32) 0 || ~~t >= cast(i32) type_table.count do return null;

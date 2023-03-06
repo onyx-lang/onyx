@@ -48,8 +48,8 @@ CSV_Column :: struct {
 
     //
     // Frees all data in a CSV.
-    delete :: (csv: ^CSV) {
-        delete(^csv.entries);
+    delete :: (csv: &CSV) {
+        delete(&csv.entries);
     }
 
     //
@@ -59,26 +59,26 @@ CSV_Column :: struct {
     // headers, and cross checked with the CSV_Column tag information.
     // Use this when the columns from your CSV have a different order
     // from the order of fields in the structure.
-    ingress_string :: (csv: ^CSV, contents: str, headers_present := true) -> bool {
+    ingress_string :: (csv: &CSV, contents: str, headers_present := true) -> bool {
         reader, stream := io.reader_from_string(contents);
         defer cfree(stream);
 
-        return csv->ingress(^reader, headers_present);
+        return csv->ingress(&reader, headers_present);
     }
     
     //
     // Ingests data from an Reader containing CSV data.
     // Uses the type of the CSV to know what columns should be expectd.
-    ingress :: (csv: ^CSV, reader: ^io.Reader, headers_present := true) -> bool {
+    ingress :: (csv: &CSV, reader: &io.Reader, headers_present := true) -> bool {
         Header :: struct {
             type: type_expr;
             offset: i32;
         }
 
         any_headers := make([..] Header);
-        defer delete(^any_headers);
+        defer delete(&any_headers);
 
-        output_type_info: ^Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
+        output_type_info: &Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
 
         if headers_present {
             header_line := reader->read_line(allocator=context.temp_allocator)
@@ -97,7 +97,7 @@ CSV_Column :: struct {
             }
 
         } else {
-            for ^member: output_type_info.members {
+            for &member: output_type_info.members {
                 any_headers << .{ member.type, member.offset };
             }
         }
@@ -108,13 +108,13 @@ CSV_Column :: struct {
             for entry: string.split_iter(line, #char ",")
                     |> iter.enumerate()
             {
-                header := ^any_headers[entry.index];
+                header := &any_headers[entry.index];
                 if header.offset == -1 do continue;
 
-                target := cast(^u8) ^out + header.offset;
+                target := cast(&u8) &out + header.offset;
 
                 if header.type == str {
-                    *cast(^str) target = string.alloc_copy(entry.value);
+                    *cast(&str) target = string.alloc_copy(entry.value);
                 } else {
                     conv.parse_any(target, header.type, entry.value);
                 }
@@ -128,11 +128,11 @@ CSV_Column :: struct {
     // Outputs data from a CSV into a Writer.
     // When `include_headers` is true, the first line outputted will be
     // the headers of the CSV, according to the CSV_Column tag information.
-    egress :: (csv: ^CSV, writer: ^io.Writer, include_headers := true) {
-        output_type_info: ^Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
+    egress :: (csv: &CSV, writer: &io.Writer, include_headers := true) {
+        output_type_info: &Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
 
         if include_headers {
-            for ^member: output_type_info.members {
+            for &member: output_type_info.members {
                 if !#first do io.write(writer, ",");
 
                 if tag := array.first(member.tags, #(it.type == CSV_Column)); tag {
@@ -145,11 +145,11 @@ CSV_Column :: struct {
             io.write(writer, "\n");
         }
 
-        for ^it: csv.entries {
-            for ^member: output_type_info.members {
+        for &it: csv.entries {
+            for &member: output_type_info.members {
                 if !#first do io.write(writer, ",");
 
-                io.write_format_va(writer, "{}", .[ .{cast(^u8) it + member.offset, member.type} ]);
+                io.write_format_va(writer, "{}", .[ .{cast(&u8) it + member.offset, member.type} ]);
             }
 
             io.write(writer, "\n");
@@ -163,7 +163,7 @@ CSV_Column :: struct {
 //
 
 @core.test.test.{"CSV Test"}
-(t: ^core.test.T) {
+(t: &core.test.T) {
     data := """first,second,third
 1,test 1,1.2
 2,test 2,2.4

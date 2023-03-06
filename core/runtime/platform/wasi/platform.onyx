@@ -33,7 +33,7 @@ __output_string :: (s: str) -> u32 {
 
     vec := IOVec.{ buf = cast(u32) s.data, len = s.count };
     tmp : Size;
-    fd_write(STDOUT_FILENO, ^vec, 1, ^tmp);
+    fd_write(STDOUT_FILENO, &vec, 1, &tmp);
     fd_datasync(STDOUT_FILENO);
     return tmp;
 }
@@ -45,7 +45,7 @@ __read_from_input :: (buffer: [] u8) -> i32 {
 
     vec := IOVec.{ buf = cast(i32) buffer.data, len = buffer.count };
     read: Size;
-    error := fd_read(STDIN_FILENO, ^vec, 1, ^read);
+    error := fd_read(STDIN_FILENO, &vec, 1, &read);
     if error != .Success do return -1;
 
     return read;
@@ -69,7 +69,7 @@ __sleep :: (milliseconds: u32) {
     event: Event;
     number_of_events: u32;
 
-    error_code := poll_oneoff(^subscription, ^event, 1, ^number_of_events);
+    error_code := poll_oneoff(&subscription, &event, 1, &number_of_events);
 }
 
 
@@ -84,7 +84,7 @@ __start :: () {
     } else {
         args : [] cstr;
         argv_buf_size : Size;
-        args_sizes_get(^args.count, ^argv_buf_size);
+        args_sizes_get(&args.count, &argv_buf_size);
 
         args = memory.make_slice(cstr, args.count);
         argv_buf := cast(cstr) calloc(argv_buf_size);
@@ -101,7 +101,7 @@ __start :: () {
         while i := cast(i32) (args.count - 1); i >= 0 {
             defer i -= 1;
 
-            args[i] = cast(cstr) (cast(^u32) args.data)[i];
+            args[i] = cast(cstr) (cast(&u32) args.data)[i];
         }
 
         (package main).main(args);

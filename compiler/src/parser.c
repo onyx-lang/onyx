@@ -413,9 +413,10 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        case '&':
         case '^': {
             AstAddressOf* aof_node = make_node(AstAddressOf, Ast_Kind_Address_Of);
-            aof_node->token = expect_token(parser, '^');
+            aof_node->token = parser->curr->type == '^' ? expect_token(parser, '^') : expect_token(parser, '&'); // HACK
             aof_node->expr  = parse_factor(parser);
 
             retval = (AstTyped *) aof_node;
@@ -1198,7 +1199,7 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
         for_node->no_close = 1;
     }
 
-    if (consume_token_if_next(parser, '^')) {
+    if (consume_token_if_next(parser, '^') || consume_token_if_next(parser, '&')) {
         for_node->by_pointer = 1;
     }
 
@@ -1509,7 +1510,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
             // fallthrough
         }
 
-        case '(': case '+': case '-': case '!': case '*': case '^':
+        case '(': case '+': case '-': case '!': case '*': case '^': case '&':
         case Token_Type_Literal_Integer:
         case Token_Type_Literal_Float:
         case Token_Type_Literal_String:
@@ -1847,10 +1848,12 @@ static AstType* parse_type(OnyxParser* parser) {
         if (parser->hit_unexpected_token) return root;
 
         switch ((u16) parser->curr->type) {
+            case '&':
             case '^': {
                 AstPointerType* new = make_node(AstPointerType, Ast_Kind_Pointer_Type);
                 new->flags |= Basic_Flag_Pointer;
-                new->token = expect_token(parser, '^');
+                // new->token = expect_token(parser, '^');
+                new->token = parser->curr->type == '^' ? expect_token(parser, '^') : expect_token(parser, '&'); // HACK
 
                 *next_insertion = (AstType *) new;
                 next_insertion = &new->elem;
@@ -3298,7 +3301,8 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 // These cases have to happen first because these are not necessarily "binary operators",
                 // they are just things that I want to be able to overload. []= is technically a ternary
                 // operator so all these things are horribly named anyway.
-                if (next_tokens_are(parser, 3, '^', '[', ']')) {
+                if (next_tokens_are(parser, 3, '^', '[', ']')
+                    || next_tokens_are(parser, 3, '&', '[', ']')) {
                     consume_tokens(parser, 3);
                     operator->operator = Binary_Op_Ptr_Subscript;
                     goto operator_determined;

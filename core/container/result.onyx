@@ -170,7 +170,7 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
         #unquote on_err;
     }
 
-    format :: (o: ^conv.Format_Output, format: ^conv.Format, res: ^Result($T, $E)) {
+    format :: (o: &conv.Format_Output, format: &conv.Format, res: &Result($T, $E)) {
         if res.status == .Ok {
             conv.format(o, "{}({\"})", res.status, res.__data.value);
         } else {

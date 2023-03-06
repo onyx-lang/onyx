@@ -1012,7 +1012,7 @@ const char* type_get_unique_name(Type* type) {
 
     switch (type->kind) {
         case Type_Kind_Basic: return type->Basic.name;
-        case Type_Kind_Pointer: return bh_aprintf(global_scratch_allocator, "^%s", type_get_unique_name(type->Pointer.elem));
+        case Type_Kind_Pointer: return bh_aprintf(global_scratch_allocator, "&%s", type_get_unique_name(type->Pointer.elem));
         case Type_Kind_Array: return bh_aprintf(global_scratch_allocator, "[%d] %s", type->Array.count, type_get_unique_name(type->Array.elem));
         case Type_Kind_Struct:
             if (type->Struct.name)
@@ -1078,7 +1078,7 @@ const char* type_get_name(Type* type) {
 
     switch (type->kind) {
         case Type_Kind_Basic: return type->Basic.name;
-        case Type_Kind_Pointer: return bh_aprintf(global_scratch_allocator, "^%s", type_get_name(type->Pointer.elem));
+        case Type_Kind_Pointer: return bh_aprintf(global_scratch_allocator, "&%s", type_get_name(type->Pointer.elem));
         case Type_Kind_Array: return bh_aprintf(global_scratch_allocator, "[%d] %s", type->Array.count, type_get_name(type->Array.elem));
 
         case Type_Kind_PolyStruct:

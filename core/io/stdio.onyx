@@ -37,9 +37,9 @@ package core
 // so you will likely never need to call it.
 __stdio_init :: () {
     stdio.print_stream = io.buffer_stream_make(2048, context.allocator);
-    stdio.print_writer = io.writer_make(^stdio.print_stream, 0);
+    stdio.print_writer = io.writer_make(&stdio.print_stream, 0);
 
-    stdio.stream = .{ vtable = ^stdio_vtable, flags = .Block_On_Read };
+    stdio.stream = .{ vtable = &stdio_vtable, flags = .Block_On_Read };
 
     stdio.auto_flush = true;
 }
@@ -47,15 +47,15 @@ __stdio_init :: () {
 
 //
 // Internal procedure to flush data from the print_stream to standard
-// output. Can be used directly, or through io.stream_flush(^stdio.stream);
+// output. Can be used directly, or through io.stream_flush(&stdio.stream);
 __flush_stdio :: () {
     if stdio.print_stream.data.count == 0 do return;
 
-    ^stdio.print_stream
+    &stdio.print_stream
         |> io.buffer_stream_to_str()
         |> runtime.platform.__output_string();
 
-    ^stdio.print_stream |> io.stream_flush();
+    &stdio.print_stream |> io.stream_flush();
 }
 
 //
@@ -64,12 +64,12 @@ __flush_stdio :: () {
 // that are sent directly to io.write.
 print :: #match #locked {
     (x: str) {
-        io.write(^stdio.print_writer, x);
+        io.write(&stdio.print_writer, x);
         if x[x.count - 1] == #char "\n" && stdio.auto_flush do __flush_stdio();
     },
 
-    (x)    => { io.write(^stdio.print_writer, x); },
-    (x, y) => { io.write(^stdio.print_writer, x, y); },
+    (x)    => { io.write(&stdio.print_writer, x); },
+    (x, y) => { io.write(&stdio.print_writer, x, y); },
 }
 
 //
@@ -83,7 +83,7 @@ println :: (x) => {
 // Standard formatted print to standard output.
 printf :: (format: str, va: ..any) {
     flush :: (_, to_output) => {
-        io.write(^stdio.print_writer, to_output);
+        io.write(&stdio.print_writer, to_output);
         __flush_stdio();
         return true;
     }
@@ -133,7 +133,7 @@ tprintf :: (format: str, va: ..any) -> str {
 __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
     temp: [3] u8;
 
-    u8_ptr := cast(^u8) ptr;
+    u8_ptr := cast(&u8) ptr;
     for i: byte_count {
         val := u8_ptr[i];
 
@@ -178,7 +178,7 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
 //
 // The v-table for the stream in stdio.
 #local stdio_vtable := io.Stream_Vtable.{
-    read = (_: ^io.Stream, buffer: [] u8) -> (io.Error, u32) {
+    read = (_: &io.Stream, buffer: [] u8) -> (io.Error, u32) {
         __flush_stdio();
         bytes_read := runtime.platform.__read_from_input(buffer);
         if bytes_read == 0 do return .ReadPending, 0;
@@ -187,7 +187,7 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
         return .None, bytes_read;
     },
 
-    read_byte = (_: ^io.Stream) -> (io.Error, u8) {
+    read_byte = (_: &io.Stream) -> (io.Error, u8) {
         __flush_stdio();
         buf: [1] u8;
         bytes_read := runtime.platform.__read_from_input(buf);
@@ -196,15 +196,15 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
         return .None, buf[0];
     },
 
-    write = (_: ^io.Stream, buffer: [] u8) -> (io.Error, u32) {
-        return io.stream_write(^stdio.print_stream, buffer);
+    write = (_: &io.Stream, buffer: [] u8) -> (io.Error, u32) {
+        return io.stream_write(&stdio.print_stream, buffer);
     },
 
-    write_byte = (_: ^io.Stream, byte: u8) -> io.Error {
-        return io.stream_write_byte(^stdio.print_stream, byte);
+    write_byte = (_: &io.Stream, byte: u8) -> io.Error {
+        return io.stream_write_byte(&stdio.print_stream, byte);
     },
 
-    flush = (_: ^io.Stream) -> io.Error {
+    flush = (_: &io.Stream) -> io.Error {
         __flush_stdio();
         return .None;
     }

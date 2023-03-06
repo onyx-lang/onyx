@@ -18,13 +18,13 @@ Random :: struct {
     //
     // Sets the seed of the random number generator
     set_seed :: #match {
-        (self: ^Random, s: u32) { self.seed = ~~s; },
-        (self: ^Random, s: u64) { self.seed =   s; },
+        (self: &Random, s: u32) { self.seed = ~~s; },
+        (self: &Random, s: u64) { self.seed =   s; },
     }
 
     //
     // Generates a random 32-bit integer.
-    int :: (self: ^Random) -> u32 {
+    int :: (self: &Random) -> u32 {
         s := self.seed * RANDOM_MULTIPLIER + RANDOM_INCREMENT;
         defer self.seed = s;
         return cast(u32) ((s >> 16) & ~~0xffffffff);
@@ -32,30 +32,30 @@ Random :: struct {
 
     //
     // Generates a random 32-bit integer between `lo` and `hi`.
-    between :: (self: ^Random, lo: i32, hi: i32) -> i32 {
+    between :: (self: &Random, lo: i32, hi: i32) -> i32 {
         return self->int() % (hi + 1 - lo) + lo;
     }
 
     //
     // Generates a random floating point number between `lo` and `hi`.
-    float :: (self: ^Random, lo := 0.0f, hi := 1.0f) -> f32 {
+    float :: (self: &Random, lo := 0.0f, hi := 1.0f) -> f32 {
         return (cast(f32) (self->int() % (1 << 20)) / cast(f32) (1 << 20)) * (hi - lo) + lo;
     }
 
     //
     // Returns a random element from a slice.
-    choice :: (self: ^Random, a: [] $T) -> T {
+    choice :: (self: &Random, a: [] $T) -> T {
         return a[self->between(0, a.count - 1)];
     }
 
     //
     // Returns a random string of length `bytes_long`. If `alpha_numeric` is
     // true, then the string will only consist of alpha-numeric characters.
-    string :: (self: ^Random, bytes_long: u32, alpha_numeric := false, allocator := context.allocator) -> str {
+    string :: (self: &Random, bytes_long: u32, alpha_numeric := false, allocator := context.allocator) -> str {
         memory :: package core.memory
 
         s := memory.make_slice(u8, bytes_long, allocator=allocator);
-        for^ s {
+        for& s {
             if alpha_numeric {
                 #persist alpha_numeral := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
                 *it = self->choice(alpha_numeral);

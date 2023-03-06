@@ -14,11 +14,11 @@ str_to_i64 :: #match #local {}
 str_to_i64 :: macro (s: str, base: u32 = 10) -> i64 {
     str_to_i64 :: str_to_i64;
     s_ := s;
-    return str_to_i64(^s_, base);
+    return str_to_i64(&s_, base);
 }
 
 #overload
-str_to_i64 :: (s: ^str, base: u32 = 10) -> i64 {
+str_to_i64 :: (s: &str, base: u32 = 10) -> i64 {
     use package core
 
     string.strip_leading_whitespace(s);
@@ -74,11 +74,11 @@ str_to_f64 :: #match #local {}
 str_to_f64 :: macro (s: str) -> f64 {
     str_to_f64 :: str_to_f64;
     s_ := s;
-    return str_to_f64(^s_);
+    return str_to_f64(&s_);
 }
 
 #overload
-str_to_f64 :: (s: ^str) -> f64 {
+str_to_f64 :: (s: &str) -> f64 {
     use package core
 
     string.strip_leading_whitespace(s);
@@ -118,7 +118,7 @@ str_to_f64 :: (s: ^str) -> f64 {
     return value;
 
 
-    parse_sign :: (s: ^str) -> f64 {
+    parse_sign :: (s: &str) -> f64 {
         switch s.data[0] {
             case #char "-" { string.advance(s, 1); return -1; }
             case #char "+" { string.advance(s, 1); return  1; }
@@ -126,7 +126,7 @@ str_to_f64 :: (s: ^str) -> f64 {
         }
     }
 
-    parse_digits :: (s: ^str) -> (f64, digit_count: i32) {
+    parse_digits :: (s: &str) -> (f64, digit_count: i32) {
         value: f64 = 0;
         count := 0;
         while s.count > 0 do switch s.data[0] {
@@ -155,7 +155,7 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
         n = -n;
     }
 
-    c := ^buf[buf.count - 1];
+    c := &buf[buf.count - 1];
     len := 0;
 
     BASE64_MAP := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
@@ -217,7 +217,7 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
 // Converts an unsigned number into a string using the buffer provided.
 // Behaves like i64_to_str.
 u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
-    c := ^buf[buf.count - 1];
+    c := &buf[buf.count - 1];
     len := 0;
 
     BASE64_MAP := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";

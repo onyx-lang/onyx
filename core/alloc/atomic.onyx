@@ -16,12 +16,12 @@ AtomicAllocator :: struct {
 make :: (a: Allocator) -> AtomicAllocator {
     atomic: AtomicAllocator = .{ a = a };
 
-    sync.mutex_init(^atomic.m);
+    sync.mutex_init(&atomic.m);
 
     return atomic;
 }
 
-make_allocator :: (atomic: ^AtomicAllocator) =>
+make_allocator :: (atomic: &AtomicAllocator) =>
     Allocator.{ atomic, atomic_alloc };
 
 #overload
@@ -29,8 +29,8 @@ core.alloc.as_allocator :: make_allocator
 
 
 #local
-atomic_alloc :: (atomic: ^AtomicAllocator, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
-    sync.scoped_mutex(^atomic.m);
+atomic_alloc :: (atomic: &AtomicAllocator, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+    sync.scoped_mutex(&atomic.m);
     return atomic.a.func(atomic.a.data, aa, size, align, oldptr);
 }
 

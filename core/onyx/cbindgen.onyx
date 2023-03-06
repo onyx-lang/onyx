@@ -76,25 +76,25 @@ generate_c_binding :: (use binding_config: Binding_Config) -> bool {
     wrote := false;
     for file: os.with_file(output_file, .Write) {
         writer := io.writer_make(file);
-        defer io.writer_free(^writer);
+        defer io.writer_free(&writer);
 
         fb := runtime.info.get_foreign_block(foreign_block);
 
-        write_file_introduction(^writer, preamble, fb.module_name);
+        write_file_introduction(&writer, preamble, fb.module_name);
 
         for fb.funcs {
             for impl: custom_implementations {
                 if impl.name == it.name {
-                    io.write(^writer, impl.impl);
-                    io.write(^writer, "\n");
+                    io.write(&writer, impl.impl);
+                    io.write(&writer, "\n");
                     continue continue;
                 }
             }
 
-            write_function_body(^writer, it, cast_map, name_map);
+            write_function_body(&writer, it, cast_map, name_map);
         }
 
-        write_library_block(^writer, fb.funcs);
+        write_library_block(&writer, fb.funcs);
         wrote = true;
     }
 
@@ -149,13 +149,13 @@ compile_c_file :: (
         }
 
         proc := os.process_spawn(Linux_Compiler, args);
-        defer os.process_destroy(^proc);
+        defer os.process_destroy(&proc);
 
-        proc_reader := io.reader_make(^proc);
-        output := io.read_all(^proc_reader);
-        defer memory.free_slice(^output);
+        proc_reader := io.reader_make(&proc);
+        output := io.read_all(&proc_reader);
+        defer memory.free_slice(&output);
 
-        exit := os.process_wait(^proc);
+        exit := os.process_wait(&proc);
         if exit != .Success {
             eprintf("Failed to compile {}\n", path);
             eprintf("{}\n", output);
@@ -171,7 +171,7 @@ compile_c_file :: (
 
 #local {
 
-    write_file_introduction :: (writer: ^io.Writer, preamble: [] str, name: str) {
+    write_file_introduction :: (writer: &io.Writer, preamble: [] str, name: str) {
         io.write_format(writer, "//\n");
         io.write_format(writer, "// THIS FILE WAS AUTOMATICALLY GENERATED.\n");
         io.write_format(writer, "//\n");
@@ -193,7 +193,7 @@ compile_c_file :: (
         use runtime.info;
 
         method_type := ff.type;
-        method_info := cast (^Type_Info_Function) get_type_info(method_type);
+        method_info := cast (&Type_Info_Function) get_type_info(method_type);
         assert(method_info.kind == .Function, "Expected function type.");
 
         io.write_format(writer, "ONYX_DEF({}, (", ff.name);
@@ -237,26 +237,26 @@ compile_c_file :: (
         param_num := 0;
         for method_info.parameter_types {
             if get_type_info(it).kind == .Slice {
-                io.write_format(^callw, "ONYX_PTR(P({}, i32)), P({}, i32)", param_num, param_num + 1);
+                io.write_format(&callw, "ONYX_PTR(P({}, i32)), P({}, i32)", param_num, param_num + 1);
                 param_num += 1;
 
             } elseif is_pointer(it) {
-                io.write_format(^callw, "ONYX_PTR(P({}, i32))", param_num);
+                io.write_format(&callw, "ONYX_PTR(P({}, i32))", param_num);
 
             } else {
                 matched := false;
-                for^ m: cast_map {
+                for& m: cast_map {
                     if m.type == it {
-                        io.write_format(^callw, "({}) P({}, {})", m.name, param_num, type_to_wasm_type(it));
+                        io.write_format(&callw, "({}) P({}, {})", m.name, param_num, type_to_wasm_type(it));
                         matched = true;
                         break;
                     }
                 }
                 
-                if !matched do io.write_format(^callw, "P({}, {})", param_num, type_to_wasm_type(it));
+                if !matched do io.write_format(&callw, "P({}, {})", param_num, type_to_wasm_type(it));
             }
 
-            io.write_format(^callw, ", ");
+            io.write_format(&callw, ", ");
             param_num += 1;
         }
 
@@ -304,11 +304,11 @@ compile_c_file :: (
             case .Function do assert(false, "Passing functions between wasm and c is not yet supported.");
             case .Array do return "i32";
             case .Slice do assert(false, "ASDFASDF");
-            case .Enum do return type_to_wasm_type((cast(^Type_Info_Enum) param_info).backing_type);
-            case .Distinct do return type_to_wasm_type((cast(^Type_Info_Distinct) param_info).base_type);
+            case .Enum do return type_to_wasm_type((cast(&Type_Info_Enum) param_info).backing_type);
+            case .Distinct do return type_to_wasm_type((cast(&Type_Info_Distinct) param_info).base_type);
 
             case .Struct {
-                s_info := cast(^Type_Info_Struct) param_info;
+                s_info := cast(&Type_Info_Struct) param_info;
                 
                 if s_info.constructed_from == cptr && for_return {
                     return "cptr";
@@ -355,11 +355,11 @@ compile_c_file :: (
             case .Function do assert(false, "Passing functions between wasm and c is not yet supported.");
             case .Array do return "WASM_I32";
             case .Slice do return "WASM_I32,WASM_I32";
-            case .Enum do return type_encoding((cast(^Type_Info_Enum) param_info).backing_type);
-            case .Distinct do return type_encoding((cast(^Type_Info_Distinct) param_info).base_type);
+            case .Enum do return type_encoding((cast(&Type_Info_Enum) param_info).backing_type);
+            case .Distinct do return type_encoding((cast(&Type_Info_Distinct) param_info).base_type);
 
             case .Struct {
-                s_info := cast(^Type_Info_Struct) param_info;
+                s_info := cast(&Type_Info_Struct) param_info;
                 if s_info.members.count == 1 {
                     return type_encoding(s_info.members[0].type);
                 }

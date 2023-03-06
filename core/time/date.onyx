@@ -74,12 +74,12 @@ Date :: struct {
 }
 
 @conv.Custom_Format_Proc.{ Date }
-(output: ^conv.Format_Output, format: ^conv.Format, date: ^Date) {
+(output: &conv.Format_Output, format: &conv.Format, date: &Date) {
     conv.format(output, "{}-{w2}-{w2}", date.year, date.month + 1, date.day);
 }
 
 @conv.Custom_Parse_Proc.{ Date }
-(d: ^Date, text: str, _: Allocator) -> bool {
+(d: &Date, text: str, _: Allocator) -> bool {
     year,  t  := string.bisect(text, #char "-");
     month, t' := string.bisect(t,    #char "-");
     day,   t' := string.bisect(t,    #char "-");

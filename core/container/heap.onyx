@@ -9,25 +9,25 @@ Heap :: struct (T: type_expr) {
 
 make :: ($T: type_expr, cmp: (T, T) -> i32 = null_proc) -> Heap(T) {
     h: Heap(T);
-    init(^h, cmp);
+    init(&h, cmp);
     return h;
 }
 
-init :: (use heap: ^Heap, cmp: (heap.T, heap.T) -> i32 = null_proc) {
-    array.init(^data);
+init :: (use heap: &Heap, cmp: (heap.T, heap.T) -> i32 = null_proc) {
+    array.init(&data);
     compare = cmp;
 }
 
-insert :: (use heap: ^Heap, v: heap.T) {
+insert :: (use heap: &Heap, v: heap.T) {
     data << v;
     shift_up(heap, data.count - 1);
 }
 
-#operator << macro (heap: Heap($T), v: T) do core.heap.insert(^heap, v);
+#operator << macro (heap: Heap($T), v: T) do core.heap.insert(&heap, v);
 
-remove_top :: (use heap: ^Heap) -> heap.T {
+remove_top :: (use heap: &Heap) -> heap.T {
     x := data[0];
-    array.fast_delete(^data, 0);
+    array.fast_delete(&data, 0);
     shift_down(heap, 0);
     return x;
 }
@@ -37,7 +37,7 @@ remove_top :: (use heap: ^Heap) -> heap.T {
     heap_lchild :: macro (index) => (index * 2) + 1
     heap_rchild :: macro (index) => (index * 2) + 2
 
-    shift_down :: (use heap: ^Heap, idx: i32) {
+    shift_down :: (use heap: &Heap, idx: i32) {
         while true {
             min_index := idx;
 
@@ -67,7 +67,7 @@ remove_top :: (use heap: ^Heap) -> heap.T {
         }
     }
 
-    shift_up :: (use heap: ^Heap, idx: i32) {
+    shift_up :: (use heap: &Heap, idx: i32) {
         while idx > 0 {
             parent := heap_parent(idx);
             if compare(data[parent], data[idx]) <= 0 do break;

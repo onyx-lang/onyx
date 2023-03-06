@@ -10,7 +10,7 @@ set  :: core.intrinsics.wasm.memory_fill
 
 //
 // Initializes a slice by allocating memory for it out of the allocator.
-alloc_slice :: (sl: ^[] $T, count: i32, allocator := context.allocator) {
+alloc_slice :: (sl: &[] $T, count: i32, allocator := context.allocator) {
     sl.data  = raw_alloc(allocator, sizeof T * count);
     sl.count = count;
 }
@@ -27,7 +27,7 @@ make_slice :: ($T: type_expr, count: i32, allocator := context.allocator) -> [] 
 //
 // Releases the memory for the slice, as well as setting the fields of the
 // slice to be 0 so it cannot be used again.
-free_slice :: (sl: ^[] $T, allocator := context.allocator) {
+free_slice :: (sl: &[] $T, allocator := context.allocator) {
     if sl.data == null do return;
 
     raw_free(allocator, sl.data);
@@ -51,7 +51,7 @@ copy_slice :: (sl: [] $T, allocator := context.allocator) -> [] T {
 align :: #match #local {}
 
 #overload
-align :: (size: ^u64, align: u64) {
+align :: (size: &u64, align: u64) {
     if *size % align != 0 {
         *size += align - (*size % align);
     }
@@ -69,16 +69,16 @@ align :: (size: u64, align: u64) -> u64 {
 //
 // Allows for make([] i32).
 #overload
-builtin.__make_overload :: macro (_: ^[] $T, count: u32, allocator := context.allocator) -> [] T {
+builtin.__make_overload :: macro (_: &[] $T, count: u32, allocator := context.allocator) -> [] T {
     ret := #this_package.make_slice(T, count, allocator);
     #this_package.set(ret.data, 0, sizeof T * count);
     return ret;
 }
 
 //
-// Allows for delete(^sl);
+// Allows for delete(&sl);
 #overload
-builtin.delete :: macro (x: ^[] $T) {
+builtin.delete :: macro (x: &[] $T) {
     #this_package.free_slice(x);
 }
 

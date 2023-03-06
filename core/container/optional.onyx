@@ -39,13 +39,13 @@ package core
     }
 
     #doc "Clears the value in the Optional, zeroing the memory of the value."
-    reset :: (o: ^?$T) {
+    reset :: (o: &?$T) {
         o.has_value = false;
-        core.memory.set(^o.value, 0, sizeof T);
+        core.memory.set(&o.value, 0, sizeof T);
     }
 
     #doc "Sets the value in the Optional."
-    set :: (o: ^?$T, value: T) {
+    set :: (o: &?$T, value: T) {
         o.has_value = true;
         o.value = value;
     }

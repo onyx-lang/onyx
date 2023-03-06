@@ -45,7 +45,7 @@ Test_Case :: struct {
     expected_file : str;
 }
 
-find_onyx_files :: (root: str, cases: ^[..] Test_Case) {
+find_onyx_files :: (root: str, cases: &[..] Test_Case) {
     for os.list_directory(root) {
         path_buffer: [512] u8;
         if string.ends_with(it->name(), ".onyx") {
@@ -88,8 +88,8 @@ Settings :: struct {
 }
 
 main :: (args) => {
-    arg_parse.arg_parse(args, ^settings);
-    printf("Using {p*}\n", ^settings);
+    arg_parse.arg_parse(args, &settings);
+    printf("Using {p*}\n", &settings);
 
     Execution_Context :: struct {
         // The executable to use when compiling
@@ -97,15 +97,15 @@ main :: (args) => {
         at_least_one_test_failed := false;
         compile_only := false;   // @Bug // why is this necessary? why is settings.compile_only false when in the thread code?
 
-        failed_tests: ^[..] str;
+        failed_tests: &[..] str;
         failed_tests_mutex: sync.Mutex;
     }
     exec_context := Execution_Context.{};
     exec_context.compile_only = settings.compile_only;
 
     failed_tests := make([..] str);
-    exec_context.failed_tests = ^failed_tests;
-    sync.mutex_init(^exec_context.failed_tests_mutex);
+    exec_context.failed_tests = &failed_tests;
+    sync.mutex_init(&exec_context.failed_tests_mutex);
 
     switch runtime.compiler_os {
         case .Linux {
@@ -116,9 +116,9 @@ main :: (args) => {
     }
 
     cases := array.make(Test_Case, capacity=256);
-    find_onyx_files(settings.test_folder, ^cases);
+    find_onyx_files(settings.test_folder, &cases);
 
-    iter.parallel_for(cases, settings.threads, ^exec_context) {
+    iter.parallel_for(cases, settings.threads, &exec_context) {
         // Weird macros mean I have to forward external names
         use core
         print_color :: print_color;
@@ -133,18 +133,18 @@ main :: (args) => {
         }
 
         proc := os.process_spawn(thread_data.onyx_cmd, args);
-        defer os.process_destroy(^proc);
+        defer os.process_destroy(&proc);
 
-        proc_reader := io.reader_make(^proc);
-        output := io.read_all(^proc_reader);
-        defer delete(^output);
+        proc_reader := io.reader_make(&proc);
+        output := io.read_all(&proc_reader);
+        defer delete(&output);
 
-        if exit := os.process_wait(^proc); exit != .Success {
+        if exit := os.process_wait(&proc); exit != .Success {
             // Error running the test case
             print_color(.Red, "[{}]  Error '{}' in test case {}.\n{}", context.thread_id, exit, it.source_file, output);
             thread_data.at_least_one_test_failed = true;
 
-            sync.critical_section(^thread_data.failed_tests_mutex) {
+            sync.critical_section(&thread_data.failed_tests_mutex) {
                 array.push(thread_data.failed_tests, it.source_file);
             }
 
@@ -155,7 +155,7 @@ main :: (args) => {
 
         for expected_file: os.with_file(it.expected_file) {
             expected_reader := io.reader_make(expected_file);
-            expected_output := io.read_all(^expected_reader);
+            expected_output := io.read_all(&expected_reader);
 
             if output != expected_output {
                 print_color(.Red, "[{}]  Output did not match for {}.\n", context.thread_id, it.source_file);
@@ -163,7 +163,7 @@ main :: (args) => {
                 printf("Got:\n{}\n", output);
                 thread_data.at_least_one_test_failed = true;
 
-                sync.critical_section(^thread_data.failed_tests_mutex) {
+                sync.critical_section(&thread_data.failed_tests_mutex) {
                     array.push(thread_data.failed_tests, it.source_file);
                 }
             }

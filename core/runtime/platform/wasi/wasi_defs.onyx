@@ -127,7 +127,7 @@ Rights :: enum #flags (u64) {
 FileDescriptor :: #type i32;
 
 IOVec :: struct {
-    buf : u32; // actually a ^u8, but WASM is 32-bit at the moment;
+    buf : u32; // actually a &u8, but WASM is 32-bit at the moment;
     len : u32;
 }
 
@@ -365,39 +365,39 @@ PrestatTagged :: struct {
 
 
 // FUNCTIONS
-args_get       :: (argv: ^^u8, argv_buf: ^u8) -> Errno #foreign "wasi_snapshot_preview1" "args_get"---
-args_sizes_get :: (argc: ^Size, argv_buf_size: ^Size) -> Errno #foreign "wasi_snapshot_preview1" "args_sizes_get" ---
+args_get       :: (argv: & &u8, argv_buf: &u8) -> Errno #foreign "wasi_snapshot_preview1" "args_get"---
+args_sizes_get :: (argc: &Size, argv_buf_size: &Size) -> Errno #foreign "wasi_snapshot_preview1" "args_sizes_get" ---
 
-environ_get       :: (environ: ^^u8, environ_buf: ^u8) -> Errno #foreign "wasi_snapshot_preview1" "environ_get" ---
-environ_sizes_get :: (environc: ^Size, environ_buf_size: ^Size) -> Errno #foreign "wasi_snapshot_preview1" "environ_sizes_get" ---
+environ_get       :: (environ: & &u8, environ_buf: &u8) -> Errno #foreign "wasi_snapshot_preview1" "environ_get" ---
+environ_sizes_get :: (environc: &Size, environ_buf_size: &Size) -> Errno #foreign "wasi_snapshot_preview1" "environ_sizes_get" ---
 
-clock_res_get  :: (id: ClockID, resolution: ^Timestamp) -> Errno #foreign "wasi_snapshot_preview1" "clock_res_get" ---
-clock_time_get :: (id: ClockID, precision: Timestamp, time: ^Timestamp) -> Errno #foreign "wasi_snapshot_preview1" "clock_time_get" ---
+clock_res_get  :: (id: ClockID, resolution: &Timestamp) -> Errno #foreign "wasi_snapshot_preview1" "clock_res_get" ---
+clock_time_get :: (id: ClockID, precision: Timestamp, time: &Timestamp) -> Errno #foreign "wasi_snapshot_preview1" "clock_time_get" ---
 
 fd_advise             :: (fd: FileDescriptor, offset: Filesize, len: Filesize, advice: Advice) -> Errno #foreign "wasi_snapshot_preview1" "fd_advise" ---
 fd_allocate           :: (fd: FileDescriptor, offset: Filesize, len: Filesize) -> Errno #foreign "wasi_snapshot_preview1" "fd_allocate" ---
 fd_close              :: (fd: FileDescriptor) -> Errno #foreign "wasi_snapshot_preview1" "fd_close" ---
 fd_datasync           :: (fd: FileDescriptor) -> Errno #foreign "wasi_snapshot_preview1" "fd_datasync" ---
-fd_fdstat_get         :: (fd: FileDescriptor, stat: ^FDStat) -> Errno #foreign "wasi_snapshot_preview1" "fd_fdstat_get" ---
+fd_fdstat_get         :: (fd: FileDescriptor, stat: &FDStat) -> Errno #foreign "wasi_snapshot_preview1" "fd_fdstat_get" ---
 fd_fdstat_set_flags   :: (fd: FileDescriptor, flags: FDFlags) -> Errno #foreign "wasi_snapshot_preview1" "fd_fdstat_set_flags" ---
 fd_fdstat_set_rights  :: (fd: FileDescriptor, rights_base: Rights, rights_inheriting: Rights) -> Errno #foreign "wasi_snapshot_preview1" "fd_fdstat_set_rights" ---
-fd_filestat_get       :: (fd: FileDescriptor, buf: ^FileStat) -> Errno #foreign "wasi_snapshot_preview1" "fd_filestat_get" ---
+fd_filestat_get       :: (fd: FileDescriptor, buf: &FileStat) -> Errno #foreign "wasi_snapshot_preview1" "fd_filestat_get" ---
 fd_filestat_set_size  :: (fd: FileDescriptor, size: Filesize) -> Errno #foreign "wasi_snapshot_preview1" "fd_filestat_set_size" ---
 fd_filestat_set_times :: (fd: FileDescriptor, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno #foreign "wasi_snapshot_preview1" "fd_filestat_set_times" ---
-fd_pread              :: (fd: FileDescriptor, iovs: ^IOVec, iovs_len: Size, offset: Filesize, nread: ^Size) -> Errno #foreign "wasi_snapshot_preview1" "fd_pread" ---
-fd_prestat_get        :: (fd: FileDescriptor, buf: ^PrestatTagged) -> Errno #foreign "wasi_snapshot_preview1" "fd_prestat_get" ---
+fd_pread              :: (fd: FileDescriptor, iovs: &IOVec, iovs_len: Size, offset: Filesize, nread: &Size) -> Errno #foreign "wasi_snapshot_preview1" "fd_pread" ---
+fd_prestat_get        :: (fd: FileDescriptor, buf: &PrestatTagged) -> Errno #foreign "wasi_snapshot_preview1" "fd_prestat_get" ---
 fd_prestat_dir_name   :: (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_snapshot_preview1" "fd_prestat_dir_name" ---
-fd_pwrite             :: (fd: FileDescriptor, iovs: ^IOVec, iovs_len: Size, offset: Filesize, nwritten: ^Size) -> Errno #foreign "wasi_snapshot_preview1" "fd_pwrite" ---
-fd_read               :: (fd: FileDescriptor, iovs: ^IOVec, iovs_len: Size, nread: ^Size) -> Errno #foreign "wasi_snapshot_preview1" "fd_read" ---
-fd_readdir            :: (fd: FileDescriptor, buf: ^u8, buf_len: Size, cookie: DirCookie, bufused: ^Size) -> Errno #foreign "wasi_snapshot_preview1" "fd_readdir" ---
+fd_pwrite             :: (fd: FileDescriptor, iovs: &IOVec, iovs_len: Size, offset: Filesize, nwritten: &Size) -> Errno #foreign "wasi_snapshot_preview1" "fd_pwrite" ---
+fd_read               :: (fd: FileDescriptor, iovs: &IOVec, iovs_len: Size, nread: &Size) -> Errno #foreign "wasi_snapshot_preview1" "fd_read" ---
+fd_readdir            :: (fd: FileDescriptor, buf: &u8, buf_len: Size, cookie: DirCookie, bufused: &Size) -> Errno #foreign "wasi_snapshot_preview1" "fd_readdir" ---
 fd_renumber           :: (fd: FileDescriptor, to: FileDescriptor) -> Errno #foreign "wasi_snapshot_preview1" "fd_renumber" ---
-fd_seek               :: (fd: FileDescriptor, offset: FileDelta, whence: Whence, newoffset: ^Filesize) -> Errno #foreign "wasi_snapshot_preview1" "fd_seek" ---
+fd_seek               :: (fd: FileDescriptor, offset: FileDelta, whence: Whence, newoffset: &Filesize) -> Errno #foreign "wasi_snapshot_preview1" "fd_seek" ---
 fd_sync               :: (fd: FileDescriptor) -> Errno #foreign "wasi_snapshot_preview1" "fd_sync" ---
-fd_tell               :: (fd: FileDescriptor, offset: ^Filesize) -> Errno #foreign "wasi_snapshot_preview1" "fd_tell" ---
-fd_write              :: (fd: FileDescriptor, iovs: ^IOVec, iovs_len: Size, nwritten: ^Size) -> Errno #foreign "wasi_snapshot_preview1" "fd_write" ---
+fd_tell               :: (fd: FileDescriptor, offset: &Filesize) -> Errno #foreign "wasi_snapshot_preview1" "fd_tell" ---
+fd_write              :: (fd: FileDescriptor, iovs: &IOVec, iovs_len: Size, nwritten: &Size) -> Errno #foreign "wasi_snapshot_preview1" "fd_write" ---
 
 path_create_directory   :: (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_snapshot_preview1" "path_create_directory" ---
-path_filestat_get       :: (fd: FileDescriptor, flags: LookupFlags, path: str, buf: ^FileStat) -> Errno #foreign "wasi_snapshot_preview1" "path_filestat_get" ---
+path_filestat_get       :: (fd: FileDescriptor, flags: LookupFlags, path: str, buf: &FileStat) -> Errno #foreign "wasi_snapshot_preview1" "path_filestat_get" ---
 path_filestat_set_times :: (fd: FileDescriptor, flags: LookupFlags, path: str, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno #foreign "wasi_snapshot_preview1" "path_filestat_set_times" ---
 
 path_link :: (fd: FileDescriptor, old_flags: LookupFlags, old_path: str, new_fd: FileDescriptor, new_path: str) -> Errno #foreign "wasi_snapshot_preview1" "path_link" ---
@@ -408,27 +408,27 @@ path_open :: (fd: FileDescriptor
     , fs_rights_base: Rights
     , fs_rights_inherting: Rights
     , fdflags: FDFlags
-    , opened_fd: ^FileDescriptor
+    , opened_fd: &FileDescriptor
     ) -> Errno
      #foreign "wasi_snapshot_preview1" "path_open" ---
 
-path_readlink :: (fd: FileDescriptor, path: str, buf: ^u8, buf_len: Size, bufused: ^Size) -> Errno #foreign "wasi_snapshot_preview1" "path_readlink" ---
+path_readlink :: (fd: FileDescriptor, path: str, buf: &u8, buf_len: Size, bufused: &Size) -> Errno #foreign "wasi_snapshot_preview1" "path_readlink" ---
 path_remove_directory :: (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_snapshot_preview1" "path_remove_directory" ---
 path_rename  :: (fd: FileDescriptor, old_path: str, new_fd: FileDescriptor, new_path: str) -> Errno #foreign "wasi_snapshot_preview1" "path_rename" ---
-path_symlink :: (old_path: ^u8, old_path_len: Size, fd: FileDescriptor, new_path: str) -> Errno #foreign "wasi_snapshot_preview1" "path_symlink" ---
+path_symlink :: (old_path: &u8, old_path_len: Size, fd: FileDescriptor, new_path: str) -> Errno #foreign "wasi_snapshot_preview1" "path_symlink" ---
 path_unlink_file :: (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_snapshot_preview1" "path_unlink_file" ---
 
-poll_oneoff :: (in: ^Subscription, out: ^Event, nsubscriptions: Size, nevents: ^Size) -> Errno #foreign "wasi_snapshot_preview1" "poll_oneoff" ---
+poll_oneoff :: (in: &Subscription, out: &Event, nsubscriptions: Size, nevents: &Size) -> Errno #foreign "wasi_snapshot_preview1" "poll_oneoff" ---
 
 proc_exit  :: (rval: ExitCode) -> void #foreign "wasi_snapshot_preview1" "proc_exit" ---
 proc_raise :: (sig: Signal) -> Errno #foreign "wasi_snapshot_preview1" "proc_raise" ---
 
 sched_yield :: () -> Errno #foreign "wasi_snapshot_preview1" "sched_yield" ---
 
-random_get :: (buf: ^u8, buf_len: Size) -> Errno #foreign "wasi_snapshot_preview1" "random_get" ---
+random_get :: (buf: &u8, buf_len: Size) -> Errno #foreign "wasi_snapshot_preview1" "random_get" ---
 
-sock_recv     :: (fd: FileDescriptor, ri_data: ^IOVec, ri_data_len: Size, ri_flags: RIFlags, ro_datalen: ^Size, ro_flags: ^ROFlags) -> Errno #foreign "wasi_snapshot_preview1" "sock_recv" ---
-sock_send     :: (fd: FileDescriptor, si_data: ^IOVec, ri_data_len: Size, si_flags: SIFlags, so_datalen: ^Size) -> Errno #foreign "wasi_snapshot_preview1" "sock_send" ---
+sock_recv     :: (fd: FileDescriptor, ri_data: &IOVec, ri_data_len: Size, ri_flags: RIFlags, ro_datalen: &Size, ro_flags: &ROFlags) -> Errno #foreign "wasi_snapshot_preview1" "sock_recv" ---
+sock_send     :: (fd: FileDescriptor, si_data: &IOVec, ri_data_len: Size, si_flags: SIFlags, so_datalen: &Size) -> Errno #foreign "wasi_snapshot_preview1" "sock_send" ---
 sock_shutdown :: (fd: FileDescriptor, how: SDFlags) -> Errno #foreign "wasi_snapshot_preview1" "sock_shutdown" ---
 
 
