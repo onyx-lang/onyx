@@ -944,6 +944,8 @@ static inline i32 get_precedence(BinaryOp kind) {
         
         case Binary_Op_Method_Call:     return 10;
 
+        case Binary_Op_Coalesce:        return 11;
+
         default:                        return -1;
     }
 }
@@ -990,6 +992,7 @@ static BinaryOp binary_op_from_token_type(TokenType t) {
         case Token_Type_Dot_Dot:           return Binary_Op_Range;
         case '[':                          return Binary_Op_Subscript;
         case Token_Type_Right_Arrow:       return Binary_Op_Method_Call;
+        case Token_Type_Question_Question: return Binary_Op_Coalesce;
         default: return Binary_Op_Count;
     }
 }

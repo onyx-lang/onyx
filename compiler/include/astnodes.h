@@ -342,6 +342,8 @@ typedef enum BinaryOp {
     Binary_Op_Subscript_Equals = 37,
     Binary_Op_Ptr_Subscript    = 38,
 
+    Binary_Op_Coalesce         = 39,
+
     Binary_Op_Count
 } BinaryOp;
 
