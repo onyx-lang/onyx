@@ -1442,6 +1442,28 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 onyx_report_error(operator->token->pos, Error_Critical, "This cannot be used as an operator overload.");
                 return Symres_Error;
             }
+            
+            // First try unary operator overloading
+            // CLEANUP This is not written well at all...
+            if (operator->operator == Binary_Op_Count) {
+                if (bh_arr_length(overload->params) != 1) {
+                    onyx_report_error(operator->token->pos, Error_Critical, "Expected exactly 1 argument for unary operator overload.");
+                    return Symres_Error;
+                }
+
+                UnaryOp unop = Unary_Op_Count;
+                switch (operator->operator_token->type) {
+                    case '?': unop = Unary_Op_Try; break;
+                }
+
+                if (unop == Unary_Op_Count) {
+                    onyx_report_error(operator->token->pos, Error_Critical, "Unknown operator.");
+                    return Symres_Error;
+                }
+
+                add_overload_option(&unary_operator_overloads[unop], operator->order, operator->overload);
+                return Symres_Success;
+            }
 
             if (operator->operator != Binary_Op_Subscript_Equals && bh_arr_length(overload->params) != 2) {
                 onyx_report_error(operator->token->pos, Error_Critical, "Expected exactly 2 arguments for binary operator overload.");

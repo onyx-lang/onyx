@@ -889,6 +889,17 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 break;
             }
 
+            case '?': {
+                AstUnaryOp* unop = make_node(AstUnaryOp, Ast_Kind_Unary_Op);
+                unop->token = expect_token(parser, '?');
+                unop->operation = Unary_Op_Try;
+
+                unop->expr = retval;
+
+                retval = (AstTyped *) unop;
+                break;
+            }
+
             default: goto factor_parsed;
         }
     }
@@ -3300,6 +3311,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
             else if (parse_possible_directive(parser, "operator")) {
                 AstDirectiveOperator *operator = make_node(AstDirectiveOperator, Ast_Kind_Directive_Operator);
                 operator->token = dir_token;
+                operator->operator_token = parser->curr;
 
                 // These cases have to happen first because these are not necessarily "binary operators",
                 // they are just things that I want to be able to overload. []= is technically a ternary
@@ -3322,11 +3334,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 consume_token(parser);
                 if (op == Binary_Op_Subscript) expect_token(parser, ']');    // #operator [] ... needs to consume the other ']'
 
-                if (op == Binary_Op_Count) {
-                    onyx_report_error(parser->curr->pos, Error_Critical, "Invalid binary operator.");
-                } else {
-                    operator->operator = op;
-                }
+                operator->operator = op;
 
               operator_determined:
                 if (parse_possible_directive(parser, "order")) {

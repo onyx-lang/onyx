@@ -117,7 +117,7 @@ b32 all_checks_are_final           = 1;
 b32 inside_for_iterator            = 0;
 bh_arr(AstFor *) for_node_stack    = NULL;
 static bh_imap __binop_impossible_cache[Binary_Op_Count];
-static AstCall __binop_maybe_overloaded;
+static AstCall __op_maybe_overloaded;
 
 
 #define STATEMENT_LEVEL 1
@@ -817,7 +817,7 @@ static void report_bad_binaryop(AstBinaryOp* binop) {
 }
 
 static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* third_argument) {
-    if (bh_arr_length(operator_overloads[binop->operation]) == 0) return &__binop_maybe_overloaded;
+    if (bh_arr_length(operator_overloads[binop->operation]) == 0) return &__op_maybe_overloaded;
 
     if (binop->overload_args == NULL || binop->overload_args->values[1] == NULL) {
         if (binop->overload_args == NULL) {
@@ -845,7 +845,6 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* thi
             binop->overload_args->values[0] = (AstTyped *) make_argument(context.ast_alloc, binop->left);
         }
 
-
         binop->overload_args->values[1] = (AstTyped *) make_argument(context.ast_alloc, binop->right);
         if (third_argument != NULL) binop->overload_args->values[2] = (AstTyped *) make_argument(context.ast_alloc, third_argument);
     }
@@ -861,6 +860,32 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* thi
     arguments_clone(&implicit_call->args, binop->overload_args);
     return implicit_call;
 }
+
+static AstCall* unaryop_try_operator_overload(AstUnaryOp* unop) {
+    if (bh_arr_length(unary_operator_overloads[unop->operation]) == 0) return &__op_maybe_overloaded;
+
+    if (unop->overload_args == NULL || unop->overload_args->values[0] == NULL) {
+        if (unop->overload_args == NULL) {
+            unop->overload_args = bh_alloc_item(context.ast_alloc, Arguments);
+            bh_arr_new(context.ast_alloc, unop->overload_args->values, 1);
+            bh_arr_set_length(unop->overload_args->values, 1);
+        }
+
+        unop->overload_args->values[0] = (AstTyped *) make_argument(context.ast_alloc, unop->expr);
+    }
+
+    AstTyped* overload = find_matching_overload_by_arguments(unary_operator_overloads[unop->operation], unop->overload_args);
+    if (overload == NULL || overload == (AstTyped *) &node_that_signals_a_yield) return (AstCall *) overload;
+
+    AstCall* implicit_call = onyx_ast_node_new(context.ast_alloc, sizeof(AstCall), Ast_Kind_Call);
+    implicit_call->token = unop->token;
+    implicit_call->callee = overload;
+    implicit_call->va_kind = VA_Kind_Not_VA;
+
+    arguments_clone(&implicit_call->args, unop->overload_args);
+    return implicit_call;
+}
+
 
 
 static CheckStatus assign_type_or_check(AstTyped **node, Type *type, OnyxToken *report_loc) {
@@ -1232,7 +1257,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
         if (implicit_call == (AstCall *) &node_that_signals_a_yield)
             YIELD(binop->token->pos, "Trying to resolve operator overload.");
 
-        if (implicit_call != NULL && implicit_call != &__binop_maybe_overloaded) {
+        if (implicit_call != NULL && implicit_call != &__op_maybe_overloaded) {
             // NOTE: Not a binary op
             implicit_call->next = binop->next;
             *pbinop = (AstBinaryOp *) implicit_call;
@@ -1241,7 +1266,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
             return Check_Success;
         }
 
-        if (cache_key && implicit_call != &__binop_maybe_overloaded) {
+        if (cache_key && implicit_call != &__op_maybe_overloaded) {
             bh_imap_put(&__binop_impossible_cache[binop->operation], cache_key, 1);
         }
     }
@@ -1373,6 +1398,21 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
     if (unaryop->operation != Unary_Op_Cast) {
         unaryop->type = unaryop->expr->type;
     }
+
+    if (unaryop->operation == Unary_Op_Try) {
+        AstCall* call = unaryop_try_operator_overload(unaryop);
+        if (call == (AstCall *) &node_that_signals_a_yield) YIELD(unaryop->token->pos, "Waiting on potential operator overload.");
+        if (call != NULL && call != &__op_maybe_overloaded) {
+            call->next = unaryop->next;
+            *(AstCall **) punop = call;
+
+            CHECK(call, (AstCall **) punop);
+            return Check_Success;
+        }
+
+        ERROR_(unaryop->token->pos, "'%s' does not support '?' operator.", type_get_name(unaryop->expr->type));
+    }
+
 
     if (unaryop->expr->flags & Ast_Flag_Comptime) {
         unaryop->flags |= Ast_Flag_Comptime;

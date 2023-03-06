@@ -121,6 +121,13 @@ package core
     return default;
 }
 
+#operator ? macro (opt: ?$T) -> T {
+    value := opt;
+    if value do return value.value;
+
+    return #from_enclosing .{};
+}
+
 
 #overload
 __implicit_bool_cast :: macro (o: ?$T) => o.has_value;

@@ -369,6 +369,7 @@ static IntrinsicMap builtin_intrinsics[] = {
 };
 
 bh_arr(OverloadOption) operator_overloads[Binary_Op_Count] = { 0 };
+bh_arr(OverloadOption) unary_operator_overloads[Unary_Op_Count] = { 0 };
 
 void initialize_builtins(bh_allocator a) {
     // HACK
@@ -489,6 +490,10 @@ void initialize_builtins(bh_allocator a) {
 
     fori (i, 0, Binary_Op_Count) {
         bh_arr_new(global_heap_allocator, operator_overloads[i], 4); 
+    }
+
+    fori (i, 0, Unary_Op_Count) {
+        bh_arr_new(global_heap_allocator, unary_operator_overloads[i], 4); 
     }
 
     IntrinsicMap* intrinsic = &builtin_intrinsics[0];
