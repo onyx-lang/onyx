@@ -25,20 +25,20 @@ BitIterator :: struct {
     value_idx: u32;
     bit_idx: i32;
 
-    next :: (b: ^BitIterator) -> u32 {
+    next :: (b: &BitIterator) -> u32 {
         v, _ := iter.take_one(b.iter, no_close=true);
         return v;
     }
 }
 
-bit_iterator :: (values: [] u8) -> ^BitIterator {
+bit_iterator :: (values: [] u8) -> &BitIterator {
     c := new(BitIterator);
     c.iter = .{ c, next, cfree };
     c.values = values;
     c.value_idx = 0;
     c.bit_idx = 7;
 
-    next :: (use c: ^BitIterator) -> (u32, bool) {
+    next :: (use c: &BitIterator) -> (u32, bool) {
         if value_idx >= values.count do return 0, false;
 
         defer {
@@ -58,7 +58,7 @@ bit_iterator :: (values: [] u8) -> ^BitIterator {
     return c;
 }
 
-read_bits :: (bit_provider: ^BitIterator, count: u32) -> u32 {
+read_bits :: (bit_provider: &BitIterator, count: u32) -> u32 {
     res := 0;
     for count {
         res *= 2;
@@ -83,10 +83,10 @@ Packet_Literal :: struct {
 
 Packet_Operator :: struct {
     use base: Packet;
-    subpackets: [] ^Packet;
+    subpackets: [] &Packet;
 }
 
-parse_packet :: (bit_provider: ^BitIterator) -> ^Packet {
+parse_packet :: (bit_provider: &BitIterator) -> &Packet {
     version := read_bits(bit_provider, 3);
     type    := read_bits(bit_provider, 3);
 
@@ -109,7 +109,7 @@ parse_packet :: (bit_provider: ^BitIterator) -> ^Packet {
         }
 
         case #default {
-            packets: [..] ^Packet;
+            packets: [..] &Packet;
 
             l_type := read_bits(bit_provider, 1);
             if l_type == 0 {
@@ -137,13 +137,13 @@ parse_packet :: (bit_provider: ^BitIterator) -> ^Packet {
     }
 }
 
-packet_sum_version :: (p: ^Packet) -> u64 {
+packet_sum_version :: (p: &Packet) -> u64 {
     switch p.type {
         case 4 do return ~~p.version;
 
         case #default {
             sum: u64;
-            for (cast (^Packet_Operator) p).subpackets {
+            for (cast (&Packet_Operator) p).subpackets {
                 sum += packet_sum_version(it);
             }
 
@@ -152,8 +152,8 @@ packet_sum_version :: (p: ^Packet) -> u64 {
     }
 }
 
-packet_reduce :: (p: ^Packet) -> u64 {
-    op := cast(^Packet_Operator) p;
+packet_reduce :: (p: &Packet) -> u64 {
+    op := cast(&Packet_Operator) p;
     switch p.type {
         case 0 {
             return array.fold(op.subpackets, cast(u64) 0, (x, y) => y + packet_reduce(x));
@@ -172,7 +172,7 @@ packet_reduce :: (p: ^Packet) -> u64 {
         }
         
         case 4 {
-            return (cast(^Packet_Literal) p).value;
+            return (cast(&Packet_Literal) p).value;
         }
 
         case 5 {
@@ -193,7 +193,7 @@ packet_reduce :: (p: ^Packet) -> u64 {
 main :: (args) => {
     for file: os.with_file("./tests/aoc-2021/input/day16.txt") {
         reader := io.reader_make(file);
-        line   := io.read_line(^reader, consume_newline=false, inplace=true);
+        line   := io.read_line(&reader, consume_newline=false, inplace=true);
 
         transmission: [..] u8;
         for i: range.{ 0, line.count, 2 } {

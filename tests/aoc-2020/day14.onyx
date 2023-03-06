@@ -31,7 +31,7 @@ BitmaskIter :: struct {
 
 bitmask_p2 :: (mask: Bitmask, val: u64) -> Iterator(u64) {
     iterator_next :: (data: rawptr) -> (u64, bool) {
-        bmi := cast(^BitmaskIter) data;
+        bmi := cast(&BitmaskIter) data;
         if bmi.done do return 0, false;
 
 		for ind: bmi.floating_indicies {
@@ -47,15 +47,15 @@ bitmask_p2 :: (mask: Bitmask, val: u64) -> Iterator(u64) {
     }
 
     iterator_close :: (data: rawptr) {
-        bmi := cast(^BitmaskIter) data;
-        array.free(^bmi.floating_indicies);
+        bmi := cast(&BitmaskIter) data;
+        array.free(&bmi.floating_indicies);
         cfree(bmi);
     }
 
     bmi := new(BitmaskIter);
     bmi.done = false;
 
-    array.init(^bmi.floating_indicies, 8);
+    array.init(&bmi.floating_indicies, 8);
 
 	v := val;
 	for i: 0 .. MASK_SIZE {
@@ -63,7 +63,7 @@ bitmask_p2 :: (mask: Bitmask, val: u64) -> Iterator(u64) {
 
 		if mask[i] == 2 {
             v &= ~(1 << cast(u64) i);
-			array.push(^bmi.floating_indicies, cast(u8) i);
+			array.push(&bmi.floating_indicies, cast(u8) i);
 		}
 	}
 
@@ -78,15 +78,15 @@ main :: (args: [] cstr) {
 	file := contents;
 
 	mem := map.make(u64, u64, default=0);
-	defer map.free(^mem);
+	defer map.free(&mem);
 
 	mask : Bitmask;
-	for ^m: mask do *m = 2;
+	for &m: mask do *m = 2;
 
 	while !string.empty(file) {
-		word := string.read_alphanum(^file);
+		word := string.read_alphanum(&file);
 		if string.equal(word, "mask") {
-            string.advance(^file, 3);
+            string.advance(&file, 3);
 
 			i := 35;
             m, file' := string.bisect(file, #char "\n");
@@ -101,22 +101,22 @@ main :: (args: [] cstr) {
 			}
 		}
 		elseif string.equal(word, "mem") {
-			string.advance(^file, 1);
+			string.advance(&file, 1);
 
-			addr := cast(u64, conv.parse_int(^file));
-			string.advance(^file, 4);
+			addr := cast(u64, conv.parse_int(&file));
+			string.advance(&file, 4);
 
-			val := cast(u64, conv.parse_int(^file));
+			val := cast(u64, conv.parse_int(&file));
 
 			// Part 1
-			// map.put(^mem, addr, bitmask_p1(mask, val));
+			// map.put(&mem, addr, bitmask_p1(mask, val));
 
 			// Part 2
             for real_addr: bitmask_p2(mask, addr) {
-                map.put(^mem, real_addr, val);
+                map.put(&mem, real_addr, val);
             }
 
-			string.advance_line(^file);
+			string.advance_line(&file);
 		}	
 	}	
 

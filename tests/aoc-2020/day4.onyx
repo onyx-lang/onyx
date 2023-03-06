@@ -3,7 +3,7 @@
 use package core
 
 // Returns the number of fields
-process_passport :: (contents: ^str) -> u32 {
+process_passport :: (contents: &str) -> u32 {
     field_count := 0;
 
     while true {
@@ -36,7 +36,7 @@ main :: (args: [] cstr) {
     while true {
         if contents.count == 0 do break;
 
-        field_count := process_passport(^contents);
+        field_count := process_passport(&contents);
         if field_count == 7 do valid_passports += 1;
     }
 

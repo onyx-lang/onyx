@@ -12,7 +12,7 @@ Board :: struct {
     won_on  : Cell;
 }
 
-board_score :: (use b: ^Board) => {
+board_score :: (use b: &Board) => {
     sum_of_unmarked := 0;
     for 25 do if !marked[it] do sum_of_unmarked += ~~cells[it];
     return sum_of_unmarked * ~~won_on;
@@ -22,30 +22,30 @@ main :: (args) => {
     for os.with_file("./tests/aoc-2021/input/day04.txt") {
         reader := io.reader_make(it);
 
-        numbers_line := io.read_line(^reader, inplace=true, consume_newline=true);
+        numbers_line := io.read_line(&reader, inplace=true, consume_newline=true);
         numbers_str  := string.split(numbers_line, #char ",");
         numbers := memory.make_slice(Cell, numbers_str.count);
         for numbers_str.count do numbers[it] = ~~ conv.parse_int(numbers_str[it]);
 
         boards: [..] Board;
-        while !io.reader_empty(^reader) {
-            array.insert_empty(^boards, boards.count);
-            board := ^boards[boards.count - 1];
+        while !io.reader_empty(&reader) {
+            array.insert_empty(&boards, boards.count);
+            board := &boards[boards.count - 1];
             board.has_won = false;
-            memory.set(^board.marked, 0, sizeof typeof board.marked);
+            memory.set(&board.marked, 0, sizeof typeof board.marked);
 
             for 25 {
-                board.cells[it] = ~~ io.read_u32(^reader);
+                board.cells[it] = ~~ io.read_u32(&reader);
             }
 
-            io.skip_whitespace(^reader);
+            io.skip_whitespace(&reader);
         }
 
-        winning_board: ^Board = null;
-        worst_board  : ^Board = null;
+        winning_board: &Board = null;
+        worst_board  : &Board = null;
 
         for called: numbers {
-            for ^ board: boards {
+            for & board: boards {
                 if board.has_won do continue;
 
                 // Whatever the last board we touch is must be the worst one.

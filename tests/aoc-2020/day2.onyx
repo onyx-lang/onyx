@@ -11,17 +11,17 @@ main :: (args: [] cstr) {
 
     valid := 0;
 
-    while !io.reader_empty(^reader) {
-        lo := io.read_u32(^reader);
+    while !io.reader_empty(&reader) {
+        lo := io.read_u32(&reader);
 
-        io.read_byte(^reader);
-        hi := io.read_u32(^reader);
+        io.read_byte(&reader);
+        hi := io.read_u32(&reader);
 
-        io.read_byte(^reader);
-        ch := io.read_byte(^reader);
+        io.read_byte(&reader);
+        ch := io.read_byte(&reader);
 
-        io.skip_bytes(^reader, 2);
-        pw := io.read_line(^reader);
+        io.skip_bytes(&reader, 2);
+        pw := io.read_line(&reader);
 
         // Part 1
         // count := 0;

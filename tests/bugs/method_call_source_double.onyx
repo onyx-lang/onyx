@@ -3,11 +3,11 @@
 use core
 
 Foo :: struct {
-    use vtable: ^VTable;
+    use vtable: &VTable;
     x: u32;
 
     VTable :: struct {
-        f: (^Foo) -> void;
+        f: (&Foo) -> void;
     }
 }
 
@@ -18,9 +18,9 @@ good_foo := Foo.VTable.{
     }
 }
 
-make_foo :: () -> ^Foo {
+make_foo :: () -> &Foo {
     foo := new(Foo);
-    foo.vtable = ^good_foo;
+    foo.vtable = &good_foo;
     foo.x = 1234;
 
     printf("Made foo!\n");
@@ -30,6 +30,6 @@ make_foo :: () -> ^Foo {
 main :: () {
     make_foo()->f();
 
-    Foo.{^good_foo, 5678}->f();
+    Foo.{&good_foo, 5678}->f();
 }
 

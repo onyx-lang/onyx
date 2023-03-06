@@ -2,9 +2,9 @@
 
 use package core
 
-part_1 :: (contents: ^str) -> u32 {
+part_1 :: (contents: &str) -> u32 {
     chars : [26] bool;
-    for ^ch: chars do *ch = false;
+    for &ch: chars do *ch = false;
 
     while true {
         line := string.read_until(contents, #char "\n");
@@ -20,9 +20,9 @@ part_1 :: (contents: ^str) -> u32 {
     return sum;
 }
 
-part_2 :: (contents: ^str) -> u32 {
+part_2 :: (contents: &str) -> u32 {
     chars : [26] u32;
-    for ^ch: chars do *ch = 0;
+    for &ch: chars do *ch = 0;
 
     person_count := 0;
     while true {
@@ -48,7 +48,7 @@ main :: (args: [] cstr) {
     while true {
         if contents.count == 0 do break;
 
-        unique := part_1(^contents);
+        unique := part_1(&contents);
         unique_sum += unique;
     }
 

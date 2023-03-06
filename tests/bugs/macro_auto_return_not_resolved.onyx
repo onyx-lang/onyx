@@ -17,5 +17,5 @@ main :: (args) => {
     S << Point.{ 2, 3 };
     S << Point.{ 1, 2 };
 
-    set.has(^S, Point.{ 1, 2 }) |> println();
+    set.has(&S, Point.{ 1, 2 }) |> println();
 }

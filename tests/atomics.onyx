@@ -21,8 +21,8 @@ test_var := 5678;
 print_from_other_thread :: (sd) => {
     // Creating high contention for the shared resource
     for i: 10000 {
-        sync.scoped_mutex(^shared_mutex);
-        for ^v: sd.arr {
+        sync.scoped_mutex(&shared_mutex);
+        for &v: sd.arr {
             *v += 1;
         }
     }
@@ -36,7 +36,7 @@ print_from_other_thread :: (sd) => {
 }
 
 main :: (args) => {
-    sync.mutex_init(^shared_mutex);
+    sync.mutex_init(&shared_mutex);
 
     test_var = 1234;
     println(test_var);
@@ -46,16 +46,16 @@ main :: (args) => {
     array.fill(sd.arr, 0);
 
     threads : [4] thread.Thread;
-    for ^t: threads {
-        thread.spawn(t, ^sd, print_from_other_thread);
+    for &t: threads {
+        thread.spawn(t, &sd, print_from_other_thread);
         printf("Spawned thread {}\n", t.id);
     }
 
-    memory.alloc_slice(^partial_arr, 10);
+    memory.alloc_slice(&partial_arr, 10);
     for i: 10 do partial_arr[i] = i;
 
     printf("Waiting...\n");
-    for ^t: threads {
+    for &t: threads {
         thread.join(t);
         printf("Thread {} joined!\n", t.id);
     }

@@ -14,27 +14,27 @@ main :: (args: [] cstr) {
     // Any changes to the implementation of Map should be tested on this
     // file to validate if they 1) work and 2) are faster.
     nums := map.make(u32, spoken_times, .{});
-    defer map.free(^nums);
+    defer map.free(&nums);
 
     turn := 1;
     last_num := 0;
 
     for n: initial_numbers {
-        map.put(^nums, n, .{ recent = turn });
+        map.put(&nums, n, .{ recent = turn });
         turn += 1;
         last_num = n;
     }
 
     while turn != 2021 {
-        st := map.get(^nums, last_num);
+        st := map.get(&nums, last_num);
 
         if st.previous == 0 do last_num = 0;
         else                do last_num = st.recent - st.previous;
 
-        st = map.get(^nums, last_num);
+        st = map.get(&nums, last_num);
         st.previous = st.recent;
         st.recent = turn;
-        map.put(^nums, last_num, st);
+        map.put(&nums, last_num, st);
 
         turn += 1;
     }

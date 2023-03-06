@@ -4,9 +4,9 @@ use package core
 
 count_ending_paths :: (nums: [..] u32) -> u64 {
     tally := array.make(u64, nums.count);
-    defer array.free(^tally);
+    defer array.free(&tally);
 
-    for ^t: tally do *t = 0;
+    for &t: tally do *t = 0;
     tally[nums.count - 1] = 1;
 
     while i := cast(i32) (nums.count - 2); i >= 0 {
@@ -28,20 +28,20 @@ main :: (args: [] cstr) {
     file := contents;
 
     nums := array.make(u32);
-    defer array.free(^nums);
+    defer array.free(&nums);
 
     while !string.empty(file) {
-        array.push(^nums, ~~ conv.parse_int(^file)); 
-        string.advance_line(^file);
+        array.push(&nums, ~~ conv.parse_int(&file)); 
+        string.advance_line(&file);
     }
 
     // Slight hack, but having 0 in the array makes both parts easier
-    array.push(^nums, 0);
+    array.push(&nums, 0);
 
     array.sort(nums, (a, b) => a - b);
 
     diffs: [3] u32;
-    for ^d: diffs do *d = 0;
+    for &d: diffs do *d = 0;
     for i: 1 .. nums.count do diffs[nums[i] - nums[i - 1] - 1] += 1;
     diffs[2] += 1;
 

@@ -28,14 +28,14 @@ foo :: (x: i32) -> i32 {
 
 cached_fib :: (n: u64) -> u64 {
     #persist cache : map.Map(u64, u64);
-    _ :: #init () { map.init(^cache); };
+    _ :: #init () { map.init(&cache); };
 
     if n <= 1 do return n;
 
-    if map.has(^cache, n) do return map.get(^cache, n);
+    if map.has(&cache, n) do return map.get(&cache, n);
 
     res := cached_fib(n - 1) + cached_fib(n - 2);
-    map.put(^cache, n, res);
+    map.put(&cache, n, res);
 
     print_cache_size();
 

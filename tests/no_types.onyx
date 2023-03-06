@@ -14,7 +14,7 @@ main :: () {
     };
 
     for 40 {
-        step_physics(^object, 0.01);
+        step_physics(&object, 0.01);
         printf("{}\n", object);
     }
 }

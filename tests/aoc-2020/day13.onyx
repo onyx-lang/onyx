@@ -40,32 +40,32 @@ main :: (args: [] cstr) {
 
     file := contents;
 
-    est := cast(u32, conv.parse_int(^file));
-    string.advance_line(^file);
+    est := cast(u32, conv.parse_int(&file));
+    string.advance_line(&file);
 
     buses := array.make(i64);
-    defer array.free(^buses);
+    defer array.free(&buses);
 
     rems := array.make(i64);
-    defer array.free(^rems);
+    defer array.free(&rems);
 
     offset: i64 = 0;
     while !string.empty(file) {
         if *file.data == #char "x" {
-            string.advance(^file, 2);
+            string.advance(&file, 2);
         } else {
-            bus := conv.parse_int(^file);
-            array.push(^buses, ~~bus);
-            array.push(^rems, bus - offset);
+            bus := conv.parse_int(&file);
+            array.push(&buses, ~~bus);
+            array.push(&rems, bus - offset);
 
-            string.advance(^file, 1);
+            string.advance(&file, 1);
         }
 
         offset += 1;
     }
 
     // Part 1
-    // min := array.fold(^buses, 0xffffffff, math.min);
+    // min := array.fold(&buses, 0xffffffff, math.min);
 
     // take_bus := 0;
     // depart   := 0;

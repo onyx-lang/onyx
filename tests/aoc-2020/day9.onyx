@@ -30,11 +30,11 @@ main :: (args: [] cstr) {
     file := contents;
 
     nums := array.make(u64, 32);
-    defer array.free(^nums);
+    defer array.free(&nums);
 
     while !string.empty(file) {
-        num := conv.parse_int(^file);
-        array.push(^nums, num);
+        num := conv.parse_int(&file);
+        array.push(&nums, num);
     }
 
     preamble_length :: 25;

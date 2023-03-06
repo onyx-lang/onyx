@@ -14,7 +14,7 @@ Die :: struct {
         return .{ 1, 0 };
     }    
 
-    roll :: (d: ^Die) -> u32 {
+    roll :: (d: &Die) -> u32 {
         defer d.value += 1;
         defer d.rolls += 1;
         return d.value;
@@ -27,7 +27,7 @@ Player :: struct {
 }
 
 #inject Player {
-    move :: (p: ^Player, squares: u32) {
+    move :: (p: &Player, squares: u32) {
         p.square += squares;
         p.square %= 10;
         
@@ -47,8 +47,8 @@ main :: () {
         _, s1 := string.bisect(l1, #char ":");
         _, s2 := string.bisect(l2, #char ":");
 
-        string.strip_whitespace(^s1);
-        string.strip_whitespace(^s2);
+        string.strip_whitespace(&s1);
+        string.strip_whitespace(&s2);
 
         p1.square = ~~ (conv.str_to_i64(s1) - 1);
         p2.square = ~~ (conv.str_to_i64(s2) - 1);
@@ -58,7 +58,7 @@ main :: () {
     losing_score: u32;
 
     while true {
-        play :: macro (player, opponent: ^Player) {
+        play :: macro (player, opponent: &Player) {
             r1 := die->roll();
             r2 := die->roll();
             r3 := die->roll();
@@ -71,8 +71,8 @@ main :: () {
             }
         }
 
-        play(^p1, ^p2);
-        play(^p2, ^p1);
+        play(&p1, &p2);
+        play(&p2, &p1);
     }
 
     println(losing_score * die.rolls);
@@ -159,7 +159,7 @@ calc_wins :: (p1, p2: Player, player_1_turn := true) -> (u64, u64) {
         w1, w2: u64;
         
         if player_1_turn {
-            for^ cases {
+            for& cases {
                 n1, n2 := calc_wins_memo(
                     p1->move(it.spaces),
                     p2,
@@ -171,7 +171,7 @@ calc_wins :: (p1, p2: Player, player_1_turn := true) -> (u64, u64) {
             }
 
         } else {
-            for^ cases {
+            for& cases {
                 n1, n2 := calc_wins_memo(
                     p1,
                     p2->move(it.spaces),
@@ -199,8 +199,8 @@ main :: () {
         _, s1 := string.bisect(l1, #char ":");
         _, s2 := string.bisect(l2, #char ":");
 
-        string.strip_whitespace(^s1);
-        string.strip_whitespace(^s2);
+        string.strip_whitespace(&s1);
+        string.strip_whitespace(&s2);
 
         p1.square = cast(i32) (conv.str_to_i64(s1) - 1);
         p2.square = cast(i32) (conv.str_to_i64(s2) - 1);

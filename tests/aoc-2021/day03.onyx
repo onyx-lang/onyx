@@ -4,7 +4,7 @@ PART :: 2
 
 use package core
 
-read_binary :: (r: ^io.Reader) -> i32 {
+read_binary :: (r: &io.Reader) -> i32 {
     n := 0;
 
     io.skip_whitespace(r);
@@ -30,8 +30,8 @@ main :: (args) => {
         reader := io.reader_make(it);
 
         nums: [..] i32;
-        while !io.reader_empty(^reader) {
-            nums << read_binary(^reader);
+        while !io.reader_empty(&reader) {
+            nums << read_binary(&reader);
         }
 
         num1 := 0;
@@ -48,8 +48,8 @@ main :: (args) => {
 
         printf("Part 1: {}\n", num1 * num2);
 
-        oxygen_array := array.copy(^nums);
-        co2_array    := array.copy(^nums);
+        oxygen_array := array.copy(&nums);
+        co2_array    := array.copy(&nums);
 
         filter_array :: macro (arr: [..] i32, index: i32, comparison: Code) {
             A := 0;
@@ -66,7 +66,7 @@ main :: (args) => {
                 defer i += 1;
 
                 if (arr[i] & (1 << index)) != expected {
-                    array.fast_delete(^arr, i);
+                    array.fast_delete(&arr, i);
                     i -= 1;
                 }
             }

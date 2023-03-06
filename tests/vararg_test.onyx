@@ -16,7 +16,7 @@ new_va_test :: (prefix: str, va: ..any) {
         // The right way to do it is this:
         // x := * misc.any_as(va[i], i32);
 
-        x := *cast(^i32, va[i].data);
+        x := *cast(&i32, va[i].data);
         println(x);
     }
 }

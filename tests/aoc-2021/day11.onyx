@@ -11,9 +11,9 @@ main :: (args) => {
         reader := io.reader_make(file);
 
         octopuses: [..] u32;
-        while !io.reader_empty(^reader) {
-            line := io.read_line(^reader, consume_newline=false, inplace=true);
-            io.skip_whitespace(^reader);
+        while !io.reader_empty(&reader) {
+            line := io.read_line(&reader, consume_newline=false, inplace=true);
+            io.skip_whitespace(&reader);
 
             for ch: line do octopuses << ~~(ch - #char "0");
         }
@@ -41,7 +41,7 @@ main :: (args) => {
         sync_step := 0;
         while true {
             step += 1;
-            for ^o: octopuses do *o += 1;
+            for &o: octopuses do *o += 1;
 
             #persist to_flash: Set(Pos);
             for y: 10 do for x: 10 {
@@ -50,7 +50,7 @@ main :: (args) => {
                 }
             }
 
-            for flash: iter.as_iter(^to_flash) {
+            for flash: iter.as_iter(&to_flash) {
                 for y: -1 .. 2 do for x: -1 .. 2 {
                     if y == 0 && x == 0 do continue;
 
@@ -60,7 +60,7 @@ main :: (args) => {
                 }
             }
 
-            for flash: iter.as_iter(^to_flash) {
+            for flash: iter.as_iter(&to_flash) {
                 set_octopus(flash.x, flash.y, 0);
                 if step <= 100 do flash_count += 1;
             }

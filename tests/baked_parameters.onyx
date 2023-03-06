@@ -8,7 +8,7 @@ count_to :: ($N: i32) {
 }
 
 alloc_slice :: ($T: type_expr, N: i32) -> [] T {
-    data := cast(^T) calloc(sizeof T * N);
+    data := cast(&T) calloc(sizeof T * N);
     return .{ data, N };
 }
 
@@ -25,27 +25,27 @@ main :: (args: [] cstr) {
     count_to(UP_TO);
 
     sl := alloc_slice(i32, 10);
-    for ^ sl do *it = 1234;
+    for & sl do *it = 1234;
 
     for sl do println(it);
 
 
     // This is so much cleaner than the alternative.
     ages := map.make(str, u32, default=0);
-    defer delete(^ages);
+    defer delete(&ages);
 
-    map.put(^ages, "Dwight", 32);
-    map.put(^ages, "Jim", 25);
-    map.put(^ages, "Pam", 24);
+    map.put(&ages, "Dwight", 32);
+    map.put(&ages, "Jim", 25);
+    map.put(&ages, "Pam", 24);
 
-    print_age :: (ages: ^map.Map(str, u32), name: str) {
+    print_age :: (ages: &map.Map(str, u32), name: str) {
         age := map.get(ages, name);
         printf("{}'s age is {}.\n", name, age);
     }
 
-    print_age(^ages, "Dwight");
-    print_age(^ages, "Jim");
-    print_age(^ages, "Pam");
-    print_age(^ages, "Michael");
+    print_age(&ages, "Dwight");
+    print_age(&ages, "Jim");
+    print_age(&ages, "Pam");
+    print_age(&ages, "Michael");
 }
 

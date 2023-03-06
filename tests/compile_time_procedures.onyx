@@ -21,7 +21,7 @@ test_vtable2 := Test_VTable.{
 
 
 Test_Thing :: struct {
-    vt : ^Test_VTable;
+    vt : &Test_VTable;
 
     data : i32;
 }
@@ -33,19 +33,19 @@ dummy := () { println("hello world!"); }
 main :: (args: [] cstr) {
     dummy();
 
-    t := Test_Thing.{ ^test_vtable1, 10 };
-    println(do_a_thing(^t));
+    t := Test_Thing.{ &test_vtable1, 10 };
+    println(do_a_thing(&t));
 
-    t.vt = ^test_vtable2;
-    println(do_a_thing(^t));
+    t.vt = &test_vtable2;
+    println(do_a_thing(&t));
 
     tmp_vt := Test_VTable.{ first = test_vtable1.second, second = test_vtable2.first, third = math.max_poly };
-    t.vt = ^tmp_vt;
-    println(do_a_thing(^t));
+    t.vt = &tmp_vt;
+    println(do_a_thing(&t));
 
     println(t.vt.first == test_vtable1.second);
 
-    do_a_thing :: (use t: ^Test_Thing) -> i32 {
+    do_a_thing :: (use t: &Test_Thing) -> i32 {
         if vt.second == null_proc || vt.first == null_proc do return data;
 
         res := data |> vt.second() |> vt.first();
