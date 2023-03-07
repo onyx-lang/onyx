@@ -280,10 +280,18 @@ format_va :: (output: &Format_Output, format: str, va: [] any) -> str {
                 continue;
             }
 
+            format_piece     := format[i .. i+1];
+            completed_format := false;
+
             i += 1;
             while true {
-                ch = format[i];
+                if i >= format.length {
+                    break;
+                }
+                
+                format_piece.length += 1;
 
+                ch = format[i];
                 switch ch {
                     case #char "*" {
                         i += 1;
@@ -364,12 +372,18 @@ format_va :: (output: &Format_Output, format: str, va: [] any) -> str {
                         arg := va[vararg_index];
                         vararg_index += 1;
                         format_any(output, &formatting, arg);
+                        completed_format = true;
 
-                        break break;
+                        continue continue;
                     }
 
                     case #default do break break;
                 }
+            }
+
+            if !completed_format {
+                output->write(format_piece);
+                continue;
             }
         }
 
@@ -379,8 +393,6 @@ format_va :: (output: &Format_Output, format: str, va: [] any) -> str {
                 i += 1;
                 continue;
             }
-
-            continue;
         }
 
         output->write(ch);
