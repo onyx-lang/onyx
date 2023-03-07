@@ -18,12 +18,12 @@ RingState :: struct {
 
 #local
 ring_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
-    ss := cast(^RingState) data;
+    ss := cast(&RingState) data;
 
     if aa == .Alloc {
         retval := null;
         if ss.curr + size < ss.size {
-            retval = cast(^u8) ss.base_ptr + ss.curr;
+            retval = cast(&u8) ss.base_ptr + ss.curr;
             ss.curr += size;
         }
         elseif size <= ss.size {
@@ -46,7 +46,7 @@ make :: (buffer: [] u8) -> RingState {
 }
 
 #match core.alloc.as_allocator make_allocator
-make_allocator :: (rs: ^RingState) -> Allocator {
+make_allocator :: (rs: &RingState) -> Allocator {
     return .{
         func = ring_alloc_proc,
         data = rs,

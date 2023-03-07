@@ -13,14 +13,14 @@ package core.alloc.pool
 
 PoolAllocator :: struct (Elem: type_expr) {
     buffer     : [] Elem;
-    first_free : ^Elem;
+    first_free : &Elem;
 
     alloc :: pool_alloc
     free  :: pool_free
 }
 
 #local
-pool_allocator_proc :: (pool: ^PoolAllocator($Elem), aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+pool_allocator_proc :: (pool: &PoolAllocator($Elem), aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     switch aa {
         case .Alloc {
             assert(size == sizeof Elem, "Allocating wrong size from pool allocator.");
@@ -41,18 +41,18 @@ pool_allocator_proc :: (pool: ^PoolAllocator($Elem), aa: AllocationAction, size:
     return null;
 }
 
-pool_alloc :: (pool: ^PoolAllocator($Elem)) -> ^Elem {
+pool_alloc :: (pool: &PoolAllocator($Elem)) -> &Elem {
     if pool.first_free == null do return null;
 
-    defer pool.first_free = cast(^Elem) *(cast(^rawptr) pool.first_free);
+    defer pool.first_free = cast(&Elem) *(cast(&rawptr) pool.first_free);
     return pool.first_free;
 }
 
-pool_free :: (pool: ^PoolAllocator($Elem), elem: ^Elem) {
+pool_free :: (pool: &PoolAllocator($Elem), elem: &Elem) {
     // @TODO
     // Add a check that the elem pointer is actually in the buffer?? 
     
-    *(cast(^rawptr) elem) = cast(rawptr) pool.first_free;
+    *(cast(&rawptr) elem) = cast(rawptr) pool.first_free;
     pool.first_free = elem;
 }
 
@@ -67,19 +67,19 @@ make :: (buffer: [] $Elem) -> PoolAllocator(Elem) {
     assert(sizeof Elem >= sizeof rawptr, "Cannot have a pool allocator of a type less than a rawptr in size.");
 
     for i: 0 .. buffer.count - 1 {
-        *(cast(^rawptr) ^buffer[i]) = cast(rawptr) ^buffer[i + 1];
+        *(cast(&rawptr) &buffer[i]) = cast(rawptr) &buffer[i + 1];
     }
 
-    *(cast(^rawptr) ^buffer[buffer.count - 1]) = null;
+    *(cast(&rawptr) &buffer[buffer.count - 1]) = null;
 
     return .{
         buffer     = buffer,
-        first_free = ^buffer[0],
+        first_free = &buffer[0],
     };
 }
 
 #match core.alloc.as_allocator make_allocator
-make_allocator :: (pool: ^PoolAllocator($Elem)) -> Allocator {
+make_allocator :: (pool: &PoolAllocator($Elem)) -> Allocator {
     return Allocator.{
         func = #solidify pool_allocator_proc { Elem = Elem },
         data = pool,

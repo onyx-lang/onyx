@@ -293,6 +293,9 @@ typedef enum UnaryOp {
     Unary_Op_Bitwise_Not,
     Unary_Op_Cast,
     Unary_Op_Auto_Cast,
+    Unary_Op_Try,
+
+    Unary_Op_Count,
 } UnaryOp;
 
 typedef enum BinaryOp {
@@ -341,6 +344,8 @@ typedef enum BinaryOp {
     Binary_Op_Subscript        = 36,
     Binary_Op_Subscript_Equals = 37,
     Binary_Op_Ptr_Subscript    = 38,
+
+    Binary_Op_Coalesce         = 39,
 
     Binary_Op_Count
 } BinaryOp;
@@ -600,7 +605,6 @@ struct AstTyped { AstTyped_base; };
 
 // Expression Nodes
 struct AstNamedValue    { AstTyped_base; AstTyped* value; };
-struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
 struct AstStrLit        { AstTyped_base; u64 data_id; u64 length; b32 is_cstr: 1; };
 struct AstLocal         { AstTyped_base; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
@@ -617,6 +621,14 @@ struct AstNumLit        {
 
     b32 was_hex_literal : 1;
     b32 was_char_literal : 1;
+};
+struct AstUnaryOp       {
+    AstTyped_base;
+    UnaryOp operation;
+
+    AstTyped *expr;
+
+    Arguments *overload_args;
 };
 struct AstBinaryOp      {
     AstTyped_base;
@@ -758,7 +770,7 @@ struct AstDirectiveSolidify {
 };
 
 // Intruction Node
-struct AstReturn        { AstNode_base; AstTyped* expr; b32 from_enclosing_scope: 1; };
+struct AstReturn        { AstNode_base; AstTyped* expr; u32 count; }; // Note: This count is one less than it should be, because internal codegen with macros would have to know about this and that is error prone.
 struct AstJump          { AstNode_base; JumpType jump; u32 count; };
 
 typedef struct QualifiedUse {
@@ -1317,6 +1329,7 @@ struct AstDirectiveOperator {
     AstNode_base;
 
     BinaryOp operator;
+    OnyxToken *operator_token;
 
     u64 order;
     AstTyped *overload;
@@ -1689,6 +1702,7 @@ extern Type     *builtin_vararg_type_type;
 extern AstTyped *builtin_context_variable;
 extern AstType  *builtin_allocator_type;
 extern AstType  *builtin_iterator_type;
+extern AstType  *builtin_optional_type;
 extern AstType  *builtin_callsite_type;
 extern AstType  *builtin_any_type;
 extern AstType  *builtin_code_type;
@@ -1721,6 +1735,7 @@ typedef Table(OnyxIntrinsic) IntrinsicTable;
 extern IntrinsicTable intrinsic_table;
 
 extern bh_arr(OverloadOption) operator_overloads[Binary_Op_Count];
+extern bh_arr(OverloadOption) unary_operator_overloads[Unary_Op_Count];
 
 void initialize_builtins(bh_allocator a);
 void initalize_special_globals();

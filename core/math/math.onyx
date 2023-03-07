@@ -136,7 +136,7 @@ atanh :: (t: $T) -> T {
 // are needed. Logarithms are implemented using a polynomial that is accurate in the range of
 // [1, 2], and then utilizes this identity for values outside of that range,
 //
-//      ln(x) = ln(2^n * v) = n * ln(2) + ln(v),   v is in [1, 2]
+//      ln(x) = ln(2&n * v) = n * ln(2) + ln(v),   v is in [1, 2]
 //
 
 // FIX: This definition is very wrong. It casts E to be whatever the type of the argument is,
@@ -345,7 +345,7 @@ is_nan :: #match #local {}
 #overload
 is_nan :: (x: f32) -> bool {
     v := x;
-    i := *cast(^u32) ^v;
+    i := *cast(&u32) &v;
     return (i & 0x7f800000) == 0x7f800000
         && (i & 0x007fffff) != 0;
 }
@@ -353,7 +353,7 @@ is_nan :: (x: f32) -> bool {
 #overload
 is_nan :: (x: f64) -> bool {
     v := x;
-    i := *cast(^u64) ^v;
+    i := *cast(&u64) &v;
     return (i & 0x7ff0000000000000) == 0x7ff0000000000000
         && (i & 0x000fffffffffffff) != 0;
 }
@@ -364,7 +364,7 @@ is_inf :: #match #local {}
 #overload
 is_inf :: (x: f32) -> bool {
     v := x;
-    i := *cast(^u32) ^v;
+    i := *cast(&u32) &v;
     return (i & 0x7f800000) == 0x7f800000
         && (i & 0x007fffff) == 0;
 }
@@ -372,7 +372,7 @@ is_inf :: (x: f32) -> bool {
 #overload
 is_inf :: (x: f64) -> bool {
     v := x;
-    i := *cast(^u64) ^v;
+    i := *cast(&u64) &v;
     return (i & 0x7ff0000000000000) == 0x7ff0000000000000
         && (i & 0x000fffffffffffff) == 0;
 }
@@ -388,7 +388,7 @@ is_inf :: (x: f64) -> bool {
 use core {test}
 
 @test.test.{"GCD works"}
-(t: ^test.T) {
+(t: &test.T) {
     t->assert(gcd(35, 18) == 1, "gcd(35, 18) == 1");
     t->assert(gcd(35, 15) == 5, "gcd(35, 15) == 5");
     t->assert(gcd(35, 21) == 7, "gcd(35, 21) == 7");

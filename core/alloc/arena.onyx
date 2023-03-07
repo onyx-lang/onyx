@@ -19,25 +19,25 @@ ArenaState :: Arena
 Arena :: struct {
     backing_allocator : Allocator;
 
-    first_arena   : ^ArenaBlock;
-    current_arena : ^ArenaBlock;
+    first_arena   : &ArenaBlock;
+    current_arena : &ArenaBlock;
     
     size       : u32;
     arena_size : u32;
 }
 
-ArenaBlock :: struct { next : ^ArenaBlock; }
+ArenaBlock :: struct { next : &ArenaBlock; }
 
 #local
 arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
-    alloc_arena := cast(^Arena) data;
+    alloc_arena := cast(&Arena) data;
 
     if aa == .Alloc {
         // An allocation of this size does not fit into a single arena,
         // so make a new "special" arena that only stores this allocation.
         if size > alloc_arena.arena_size - sizeof rawptr {
-            ret_arena := cast(^ArenaBlock) raw_alloc(alloc_arena.backing_allocator, size + sizeof rawptr);
-            new_arena := cast(^ArenaBlock) raw_alloc(alloc_arena.backing_allocator, alloc_arena.arena_size);
+            ret_arena := cast(&ArenaBlock) raw_alloc(alloc_arena.backing_allocator, size + sizeof rawptr);
+            new_arena := cast(&ArenaBlock) raw_alloc(alloc_arena.backing_allocator, alloc_arena.arena_size);
 
             if ret_arena == null || new_arena == null do return null;
 
@@ -49,7 +49,7 @@ arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, 
             
             alloc_arena.current_arena = new_arena;
 
-            return cast(rawptr) (cast(^u8) ret_arena + sizeof rawptr);
+            return cast(rawptr) (cast(&u8) ret_arena + sizeof rawptr);
         }
 
         if alloc_arena.size % align != 0 {
@@ -57,7 +57,7 @@ arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, 
         }
 
         if alloc_arena.size + size >= alloc_arena.arena_size {
-            new_arena := cast(^ArenaBlock) raw_alloc(alloc_arena.backing_allocator, alloc_arena.arena_size);
+            new_arena := cast(&ArenaBlock) raw_alloc(alloc_arena.backing_allocator, alloc_arena.arena_size);
             if new_arena == null do return null;
 
             alloc_arena.size = sizeof rawptr;
@@ -67,7 +67,7 @@ arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, 
             alloc_arena.current_arena = new_arena;
         }
 
-        retval := cast(rawptr) (cast(^u8) alloc_arena.current_arena + alloc_arena.size);
+        retval := cast(rawptr) (cast(&u8) alloc_arena.current_arena + alloc_arena.size);
         alloc_arena.size += size;
 
         return retval;
@@ -95,7 +95,7 @@ arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, 
 make :: (backing: Allocator, arena_size: u32) -> Arena {
     assert(arena_size >= 4, "Arena size was expected to be at least 4 bytes.");
     
-    initial_arena := cast(^ArenaBlock) raw_alloc(backing, arena_size);
+    initial_arena := cast(&ArenaBlock) raw_alloc(backing, arena_size);
     initial_arena.next = null;
 
     return Arena.{
@@ -109,14 +109,14 @@ make :: (backing: Allocator, arena_size: u32) -> Arena {
 }
 
 #match core.alloc.as_allocator make_allocator
-make_allocator :: (rs: ^Arena) -> Allocator {
+make_allocator :: (rs: &Arena) -> Allocator {
     return Allocator.{
         func = arena_alloc_proc,
         data = rs,
     };
 }
 
-free :: (arena: ^Arena) {
+free :: (arena: &Arena) {
     walker := arena.first_arena;
     trailer := walker;
     while walker != null {
@@ -131,7 +131,7 @@ free :: (arena: ^Arena) {
 }
 
 // Clears and frees every page, except for first page.
-clear :: (arena: ^Arena) {
+clear :: (arena: &Arena) {
     walker := arena.first_arena.next;
     while walker != null {
         next := walker.next;
@@ -142,7 +142,7 @@ clear :: (arena: ^Arena) {
     arena.size = sizeof rawptr;
 }
 
-get_allocated_arenas :: (arena: ^Arena) -> u32 {
+get_allocated_arenas :: (arena: &Arena) -> u32 {
     arenas := 0;
     walker := arena.first_arena;
     while walker != null {
@@ -153,7 +153,7 @@ get_allocated_arenas :: (arena: ^Arena) -> u32 {
     return arenas;
 }
 
-get_allocated_bytes :: (arena: ^Arena) -> u32 {
+get_allocated_bytes :: (arena: &Arena) -> u32 {
     return get_allocated_arenas(arena) * (arena.arena_size - 1) + arena.size;
 }
 
@@ -163,9 +163,9 @@ auto :: #match {
 
         a := arena.make(heap_allocator, size);
         old_allocator := #unquote dest;
-        (#unquote dest) = arena.make_allocator(^a);
+        (#unquote dest) = arena.make_allocator(&a);
         defer {
-            arena.free(^a);
+            arena.free(&a);
             (#unquote dest) = old_allocator;
         }
     },

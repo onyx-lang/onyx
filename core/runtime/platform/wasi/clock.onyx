@@ -10,13 +10,13 @@ use package wasi
 
 time :: () -> u64 {
     output_time: Timestamp;
-    clock_time_get(.Realtime, 500000, ^output_time);
+    clock_time_get(.Realtime, 500000, &output_time);
     return ~~(output_time / 1000000);
 }
 
 time_ns :: () -> u64 {
     output_time: Timestamp;
-    clock_time_get(.Realtime, 1, ^output_time);
+    clock_time_get(.Realtime, 1, &output_time);
     return ~~output_time;
 }
 
@@ -42,6 +42,6 @@ sleep :: #match {
         event: Event;
         number_of_events: u32;
 
-        error_code := poll_oneoff(^subscription, ^event, 1, ^number_of_events);
+        error_code := poll_oneoff(&subscription, &event, 1, &number_of_events);
     }
 }

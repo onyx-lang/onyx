@@ -14,7 +14,7 @@ main :: (args: [] cstr) {
         sum += *it;
     });
 
-    for it: bucket_array.as_iter(^ba) {
+    for it: bucket_array.as_iter(&ba) {
         printf("{}\n", it);
     }
 

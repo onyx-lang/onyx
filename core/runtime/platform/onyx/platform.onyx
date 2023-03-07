@@ -31,17 +31,17 @@ Supports_Threads :: true
 }
 
 __output_string :: (s: str) -> u32 {
-    err, wrote := io.stream_write(^__stdout, s);
+    err, wrote := io.stream_write(&__stdout, s);
     return wrote;
 }
 
 __output_error :: (s: str) -> u32 {
-    err, wrote := io.stream_write(^__stderr, s);
+    err, wrote := io.stream_write(&__stderr, s);
     return wrote;
 }
 
 __read_from_input :: (buffer: [] u8) -> i32 {
-    err, read := io.stream_read(^__stdin, buffer);
+    err, read := io.stream_read(&__stdin, buffer);
     if err == .ReadPending do return 0;
     if err != .None do return -1;
     return read;
@@ -52,8 +52,8 @@ ProcessData :: #distinct u64
 
 #foreign "onyx_runtime" {
     // Arguments
-    __args_get       :: (argv: ^^u8, arg_buf: ^u8) -> void ---
-    __args_sizes_get :: (argc: ^i32, arg_buf_size: ^i32) -> void ---
+    __args_get       :: (argv: & &u8, arg_buf: &u8) -> void ---
+    __args_sizes_get :: (argc: &i32, arg_buf_size: &i32) -> void ---
 
     // OS
     __exit :: (status: i32) -> void ---
@@ -61,10 +61,10 @@ ProcessData :: #distinct u64
 
     // Time and sleep
     __time :: () -> u64 ---
-    __time_localtime :: (time: u64, tm: ^core.time.Timestamp) -> void ---
-    __time_gmtime    :: (time: u64, tm: ^core.time.Timestamp) -> void ---
-    __time_mktime    :: (tm: ^time.Timestamp) -> i64 ---
-    __time_strftime  :: (buf: [] u8, format: cstr, tm: ^time.Timestamp) -> u32 ---
+    __time_localtime :: (time: u64, tm: &core.time.Timestamp) -> void ---
+    __time_gmtime    :: (time: u64, tm: &core.time.Timestamp) -> void ---
+    __time_mktime    :: (tm: &time.Timestamp) -> i64 ---
+    __time_strftime  :: (buf: [] u8, format: cstr, tm: &time.Timestamp) -> u32 ---
 
     // Processes
     __process_spawn   :: (path: str, args: [] str, non_blocking_io: bool, starting_directory: str) -> ProcessData ---
@@ -75,26 +75,26 @@ ProcessData :: #distinct u64
     __process_destroy :: (handle: ProcessData) -> void ---
 
     // Misc
-    __file_get_standard :: (fd: i32, out: ^FileData) -> bool ---
+    __file_get_standard :: (fd: i32, out: &FileData) -> bool ---
 }
 
 __start :: () {
     fd: FileData;
-    __file_get_standard(1, ^fd);
+    __file_get_standard(1, &fd);
     __stdout = .{
-        .{ ^__file_stream_vtable },
+        .{ &__file_stream_vtable },
         fd
     };
     
-    __file_get_standard(2, ^fd);
+    __file_get_standard(2, &fd);
     __stderr = .{
-        .{ ^__file_stream_vtable },
+        .{ &__file_stream_vtable },
         fd
     };
 
-    __file_get_standard(0, ^fd);
+    __file_get_standard(0, &fd);
     __stdin = .{
-        .{ ^__file_stream_vtable, .Block_On_Read },
+        .{ &__file_stream_vtable, .Block_On_Read },
         fd
     };
 
@@ -107,7 +107,7 @@ __start :: () {
     } else {
         args : [] cstr;
         argv_buf_size : i32;
-        __args_sizes_get(^args.count, ^argv_buf_size);
+        __args_sizes_get(&args.count, &argv_buf_size);
 
         args = memory.make_slice(cstr, args.count);
         argv_buf := cast(cstr) calloc(argv_buf_size);

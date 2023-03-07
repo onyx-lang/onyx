@@ -28,7 +28,7 @@ line_points :: (l: Line) -> Iterator(Point) {
     c.dx = 1 if l.x2 > l.x1 else -1 if l.x2 < l.x1 else 0;
     c.dy = 1 if l.y2 > l.y1 else -1 if l.y2 < l.y1 else 0;
 
-    next :: (use c: ^Context) -> (Point, bool) {
+    next :: (use c: &Context) -> (Point, bool) {
         if curr_t > max_t do return .{0,0}, false;
 
         defer curr_t += 1;
@@ -48,23 +48,23 @@ main :: (args) => {
 
         lines: [..] Line;
 
-        while !io.reader_empty(^reader) {
-            x1 := io.read_u32(^reader);
-            io.skip_bytes(^reader, 1);
-            y1 := io.read_u32(^reader);
-            io.skip_bytes(^reader, 4);
+        while !io.reader_empty(&reader) {
+            x1 := io.read_u32(&reader);
+            io.skip_bytes(&reader, 1);
+            y1 := io.read_u32(&reader);
+            io.skip_bytes(&reader, 4);
 
-            x2 := io.read_u32(^reader);
-            io.skip_bytes(^reader, 1);
-            y2 := io.read_u32(^reader);
-            io.skip_whitespace(^reader);
+            x2 := io.read_u32(&reader);
+            io.skip_bytes(&reader, 1);
+            y2 := io.read_u32(&reader);
+            io.skip_whitespace(&reader);
 
             lines << .{x1, y1, x2, y2};
         }
 
         point_count: Map(Point, u32);
 
-        for ^line: lines {
+        for &line: lines {
             for p: line_points(*line) {
                 if point_count->has(p) {
                     point_count[p] = point_count[p] + 1;
@@ -75,7 +75,7 @@ main :: (args) => {
         }
 
         count := 0;
-        for ^ point_count.entries {
+        for & point_count.entries {
             if it.value >= 2 do count += 1;
         }
 

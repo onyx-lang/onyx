@@ -20,7 +20,7 @@ main :: (args: [] cstr) {
 Something :: struct {
     member := cast(u32) 1234;
 
-    method :: (use s: ^Something) {
+    method :: (use s: &Something) {
         using_callsite(member);
     }
 }

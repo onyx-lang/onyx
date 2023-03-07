@@ -26,50 +26,50 @@ Semaphore :: struct {
 
 //
 // Initializes a semaphore with the specified value.
-semaphore_init :: (s: ^Semaphore, value: i32) {
+semaphore_init :: (s: &Semaphore, value: i32) {
     s.counter = value;
 
-    mutex_init(^s.mutex);
+    mutex_init(&s.mutex);
 }
 
 //
 // Destroys a semaphore.
-semaphore_destroy :: (s: ^Semaphore) {
-    mutex_destroy(^s.mutex);
+semaphore_destroy :: (s: &Semaphore) {
+    mutex_destroy(&s.mutex);
 }
 
 //
 // Increment the counter in a semaphore by `count`.
-semaphore_post :: (s: ^Semaphore, count := 1) {
+semaphore_post :: (s: &Semaphore, count := 1) {
     if count == 0 do return;
     
-    scoped_mutex(^s.mutex);
+    scoped_mutex(&s.mutex);
     s.counter += count;
 
     // @Bug
     // This is susceptible to starvation. Semaphores should have a queue
     // or something like that.
     #if runtime.Wait_Notify_Available {
-        __atomic_notify(^s.counter, maximum = count);
+        __atomic_notify(&s.counter, maximum = count);
     }
 }
 
 //
 // Waits until the thread is able to decrement one from the semaphore.
-semaphore_wait :: (s: ^Semaphore) {
+semaphore_wait :: (s: &Semaphore) {
     while true {
-        mutex_lock(^s.mutex);
+        mutex_lock(&s.mutex);
         if s.counter > 0 {
             s.counter -= 1;
 
-            mutex_unlock(^s.mutex);
+            mutex_unlock(&s.mutex);
             return;
 
         } else {
-            mutex_unlock(^s.mutex);
+            mutex_unlock(&s.mutex);
 
             #if runtime.Wait_Notify_Available {
-                __atomic_wait(^s.counter, 0);
+                __atomic_wait(&s.counter, 0);
             }
         }
     }

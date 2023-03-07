@@ -56,6 +56,7 @@ Type     *builtin_vararg_type_type;
 AstTyped *builtin_context_variable;
 AstType  *builtin_allocator_type;
 AstType  *builtin_iterator_type;
+AstType  *builtin_optional_type;
 AstType  *builtin_callsite_type;
 AstType  *builtin_any_type;
 AstType  *builtin_code_type;
@@ -368,6 +369,7 @@ static IntrinsicMap builtin_intrinsics[] = {
 };
 
 bh_arr(OverloadOption) operator_overloads[Binary_Op_Count] = { 0 };
+bh_arr(OverloadOption) unary_operator_overloads[Unary_Op_Count] = { 0 };
 
 void initialize_builtins(bh_allocator a) {
     // HACK
@@ -430,6 +432,12 @@ void initialize_builtins(bh_allocator a) {
         return;
     }
 
+    builtin_optional_type = (AstType *) symbol_raw_resolve(p->scope, "Optional");
+    if (builtin_optional_type == NULL) {
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Optional' struct not found in builtin package.");
+        return;
+    }
+
     builtin_callsite_type = (AstType *) symbol_raw_resolve(p->scope, "CallSite");
     if (builtin_callsite_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'CallSite' struct not found in builtin package.");
@@ -482,6 +490,10 @@ void initialize_builtins(bh_allocator a) {
 
     fori (i, 0, Binary_Op_Count) {
         bh_arr_new(global_heap_allocator, operator_overloads[i], 4); 
+    }
+
+    fori (i, 0, Unary_Op_Count) {
+        bh_arr_new(global_heap_allocator, unary_operator_overloads[i], 4); 
     }
 
     IntrinsicMap* intrinsic = &builtin_intrinsics[0];

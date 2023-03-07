@@ -57,7 +57,7 @@ BitField :: interface (t: $T) {
 Complex :: struct {
     x, y: f32;
 
-    format :: (output: ^conv.Format_Output, format: ^conv.Format, c: ^Complex) {
+    format :: (output: &conv.Format_Output, format: &conv.Format, c: &Complex) {
         conv.format(output, "{.2} + {.2}i", c.x, c.y);
     }
 }
@@ -76,7 +76,7 @@ consume :: macro (x: $T/iter.Iterable) => {
     // everything WAY more complicated.
     consume_inner :: #match {
         // Iterator over pointers get dereferenced
-        macro (iter: Iterator(^$T)) -> [..] T {
+        macro (iter: Iterator(&$T)) -> [..] T {
             arr := array.make(T);
             for iter do arr << *it;
             return arr;
@@ -105,7 +105,7 @@ main :: (args: [] cstr) {
     // println(bit_math(3.0, 4.0));
 
     a := consume(f32.[4,2,4,7,4]);
-    defer array.free(^a);
+    defer array.free(&a);
     println(a);
 
     consume(1 .. 10) |> println();

@@ -18,13 +18,13 @@ package core.alloc.gc
 
 GCState :: struct {
     backing_allocator: Allocator;
-    first: ^GCLink;
+    first: &GCLink;
 }
 
 #local
 GCLink :: struct {
-    prev: ^GCLink;
-    next: ^GCLink;
+    prev: &GCLink;
+    next: &GCLink;
     magic_number: u32;
 }
 
@@ -34,7 +34,7 @@ make :: (backing := context.allocator) -> GCState {
     return hs;
 }
 
-clear :: (hs: ^GCState) {
+clear :: (hs: &GCState) {
     while l := hs.first; l != null {
         n := l.next;
         raw_free(hs.backing_allocator, l);
@@ -45,7 +45,7 @@ clear :: (hs: ^GCState) {
 }
 
 #match core.alloc.as_allocator make_allocator
-make_allocator :: (hs: ^GCState) -> Allocator {
+make_allocator :: (hs: &GCState) -> Allocator {
     return Allocator.{
         func = gc_alloc_proc,
         data = hs
@@ -58,9 +58,9 @@ auto :: #match {
         
         gcs := gc.make();
         old_allocator := context.allocator;
-        context.allocator = core.alloc.as_allocator(^gcs);
+        context.allocator = core.alloc.as_allocator(&gcs);
         defer {
-            gc.clear(^gcs);
+            gc.clear(&gcs);
             context.allocator = old_allocator;
         }
     },
@@ -79,12 +79,12 @@ auto :: #match {
 #local
 GC_Link_Magic_Number :: 0x1337face
 
-#local gc_alloc_proc :: (data: ^GCState, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+#local gc_alloc_proc :: (data: &GCState, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
 
-    old: ^GCLink;
+    old: &GCLink;
 
     if oldptr != null {
-        old = (cast(^GCLink) oldptr) - 1;
+        old = (cast(&GCLink) oldptr) - 1;
 
         //
         // If this allocated space was not from an gc allocator,
@@ -108,7 +108,7 @@ GC_Link_Magic_Number :: 0x1337face
         }
     }
 
-    newptr: ^GCLink = data.backing_allocator.func(
+    newptr: &GCLink = data.backing_allocator.func(
         data.backing_allocator.data, aa,
         size + sizeof GCLink, align, old);
 

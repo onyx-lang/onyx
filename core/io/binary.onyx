@@ -3,29 +3,29 @@ package core.io
 use core
 
 BinaryWriter :: struct {
-    stream: ^Stream;
+    stream: &Stream;
 }
 
-binary_writer_make :: (s: ^Stream) -> BinaryWriter {
+binary_writer_make :: (s: &Stream) -> BinaryWriter {
     assert(s.vtable != null, "Stream vtable was not setup correctly.");
 
     return BinaryWriter.{ s };
 }
 
-binary_write_byte :: (use bw: ^BinaryWriter, byte: u8) {
+binary_write_byte :: (use bw: &BinaryWriter, byte: u8) {
     stream_write_byte(stream, byte);
 }
 
-binary_write :: (use bw: ^BinaryWriter, $T: type_expr, v: ^T) {
+binary_write :: (use bw: &BinaryWriter, $T: type_expr, v: &T) {
     stream_write(stream, .{ ~~ v, sizeof T });
 }
 
-binary_write_slice :: (use bw: ^BinaryWriter, sl: [] $T, output_size := false) {
+binary_write_slice :: (use bw: &BinaryWriter, sl: [] $T, output_size := false) {
     assert(false, "binary_write_slice is not working at the moment");
     if output_size do binary_write(bw, i32, sl.count);
 
     bytes := ([] u8).{
-        data = cast(^u8) ^sl.data[0],
+        data = cast(&u8) &sl.data[0],
         count = sizeof T * sl.count,
     };
 
@@ -37,28 +37,28 @@ binary_write_slice :: (use bw: ^BinaryWriter, sl: [] $T, output_size := false) {
 
 
 BinaryReader :: struct {
-    stream: ^Stream;
+    stream: &Stream;
 }
 
-binary_reader_make :: (s: ^Stream) -> BinaryReader {
+binary_reader_make :: (s: &Stream) -> BinaryReader {
     assert(s.vtable != null, "Stream vtable was not setup correctly.");
 
     return BinaryReader.{ s };
 }
 
-binary_read_byte :: (use br: ^BinaryReader) -> u8 {
+binary_read_byte :: (use br: &BinaryReader) -> u8 {
     _, byte := stream_read_byte(stream);
     return byte;
 }
 
-binary_read :: (use br: ^BinaryReader, $T: type_expr) -> T {
+binary_read :: (use br: &BinaryReader, $T: type_expr) -> T {
     buf: [sizeof T] u8;
     _, bytes_read := stream_read(stream, ~~ buf);
 
-    return *(cast(^T) buf);
+    return *(cast(&T) buf);
 }
 
-binary_read_slice :: (use br: ^BinaryReader,
+binary_read_slice :: (use br: &BinaryReader,
     $T: type_expr,
     size := 0, read_size := false,
     allocator := context.allocator) -> [] T {
@@ -72,5 +72,5 @@ binary_read_slice :: (use br: ^BinaryReader,
     sl := memory.make_slice(u8, size * sizeof T, allocator = allocator);
     _, bytes_read := stream_read(stream, sl);
 
-    return .{ data = cast(^T) sl.data, count = size };
+    return .{ data = cast(&T) sl.data, count = size };
 }

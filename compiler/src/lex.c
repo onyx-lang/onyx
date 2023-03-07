@@ -67,6 +67,7 @@ static const char* token_type_names[] = {
     ">>>=",
     "..",
     "~~",
+    "??",
 
     "TOKEN_TYPE_SYMBOL",
     "TOKEN_TYPE_LITERAL_STRING",
@@ -449,6 +450,10 @@ whitespace_skipped:
 
     case '~':
         LITERAL_TOKEN("~~",          0, Token_Type_Tilde_Tilde);
+        break;
+
+    case '?':
+        LITERAL_TOKEN("??",          0, Token_Type_Question_Question);
         break;
     }
 

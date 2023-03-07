@@ -354,6 +354,29 @@ static void parse_arguments(OnyxParser* parser, TokenType end_token, Arguments* 
     }
 }
 
+static AstCall* parse_function_call(OnyxParser *parser, AstTyped *callee) {
+    AstCall* call_node = make_node(AstCall, Ast_Kind_Call);
+    call_node->token = expect_token(parser, '(');
+    call_node->callee = callee;
+
+    arguments_initialize(&call_node->args);
+
+    parse_arguments(parser, ')', &call_node->args);
+
+    // Wrap expressions in AstArgument
+    bh_arr_each(AstTyped *, arg, call_node->args.values) {
+        if ((*arg) == NULL) continue;
+        *arg = (AstTyped *) make_argument(parser->allocator, *arg);
+    }
+
+    bh_arr_each(AstNamedValue *, named_value, call_node->args.named_values) {
+        if ((*named_value)->value == NULL) continue;
+        (*named_value)->value = (AstTyped *) make_argument(parser->allocator, (AstTyped *) (*named_value)->value);
+    }
+
+    return call_node;
+}
+
 static AstTyped* parse_factor(OnyxParser* parser) {
     AstTyped* retval = NULL;
 
@@ -413,9 +436,10 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        case '&':
         case '^': {
             AstAddressOf* aof_node = make_node(AstAddressOf, Ast_Kind_Address_Of);
-            aof_node->token = expect_token(parser, '^');
+            aof_node->token = parser->curr->type == '^' ? expect_token(parser, '^') : expect_token(parser, '&'); // HACK
             aof_node->expr  = parse_factor(parser);
 
             retval = (AstTyped *) aof_node;
@@ -568,6 +592,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        case '?':
         case '[': {
             AstType *type = parse_type(parser);
             retval = (AstTyped *) type;
@@ -850,27 +875,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
             case '(': {
                 if (!parser->parse_calls) goto factor_parsed;
-
-                AstCall* call_node = make_node(AstCall, Ast_Kind_Call);
-                call_node->token = expect_token(parser, '(');
-                call_node->callee = retval;
-
-                arguments_initialize(&call_node->args);
-
-                parse_arguments(parser, ')', &call_node->args);
-
-                // Wrap expressions in AstArgument
-                bh_arr_each(AstTyped *, arg, call_node->args.values) {
-                    if ((*arg) == NULL) continue;
-                    *arg = (AstTyped *) make_argument(parser->allocator, *arg);
-                }
-
-                bh_arr_each(AstNamedValue *, named_value, call_node->args.named_values) {
-                    if ((*named_value)->value == NULL) continue;
-                    (*named_value)->value = (AstTyped *) make_argument(parser->allocator, (AstTyped *) (*named_value)->value);
-                }
-
-                retval = (AstTyped *) call_node;
+                retval = (AstTyped *) parse_function_call(parser, retval);
                 break;
             }
 
@@ -884,6 +889,38 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 if_expression->false_expr = parse_expression(parser, 0);
 
                 retval = (AstTyped *) if_expression;
+                break;
+            }
+
+            case '?': {
+                AstUnaryOp* unop = make_node(AstUnaryOp, Ast_Kind_Unary_Op);
+                unop->token = expect_token(parser, '?');
+                unop->operation = Unary_Op_Try;
+
+                unop->expr = retval;
+
+                retval = (AstTyped *) unop;
+                break;
+            }
+
+            case Token_Type_Right_Arrow: {
+                AstBinaryOp* method_call = make_node(AstBinaryOp, Ast_Kind_Method_Call);
+                method_call->token = expect_token(parser, Token_Type_Right_Arrow);
+
+                method_call->left = retval;
+
+                OnyxToken *method_name = expect_token(parser, Token_Type_Symbol);
+                AstNode *method = make_symbol(context.ast_alloc, method_name);
+
+                if (parser->curr->type != '(') {
+                    // CLEANUP: This error message is horrendous.
+                    onyx_report_error(parser->curr->pos, Error_Critical, "Bad method call. Expected object->method(arguments), got something else.");
+                    break;
+                }
+
+                method_call->right = (AstTyped *) parse_function_call(parser, (AstTyped *) method);
+                
+                retval = (AstTyped *) method_call;
                 break;
             }
 
@@ -940,7 +977,7 @@ static inline i32 get_precedence(BinaryOp kind) {
 
         case Binary_Op_Modulus:         return 9;
         
-        case Binary_Op_Method_Call:     return 10;
+        case Binary_Op_Coalesce:        return 11;
 
         default:                        return -1;
     }
@@ -987,7 +1024,7 @@ static BinaryOp binary_op_from_token_type(TokenType t) {
         case Token_Type_Pipe:              return Binary_Op_Pipe;
         case Token_Type_Dot_Dot:           return Binary_Op_Range;
         case '[':                          return Binary_Op_Subscript;
-        case Token_Type_Right_Arrow:       return Binary_Op_Method_Call;
+        case Token_Type_Question_Question: return Binary_Op_Coalesce;
         default: return Binary_Op_Count;
     }
 }
@@ -1057,7 +1094,6 @@ static AstTyped* parse_expression(OnyxParser* parser, b32 assignment_allowed) {
 
         AstBinaryOp* bin_op;
         if      (bin_op_kind == Binary_Op_Pipe)        bin_op = make_node(AstBinaryOp, Ast_Kind_Pipe);
-        else if (bin_op_kind == Binary_Op_Method_Call) bin_op = make_node(AstBinaryOp, Ast_Kind_Method_Call);
         else if (bin_op_kind == Binary_Op_Range)       bin_op = (AstBinaryOp *) make_node(AstRangeLiteral, Ast_Kind_Range_Literal);
         else                                           bin_op = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
 
@@ -1197,7 +1233,7 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
         for_node->no_close = 1;
     }
 
-    if (consume_token_if_next(parser, '^')) {
+    if (consume_token_if_next(parser, '^') || consume_token_if_next(parser, '&')) {
         for_node->by_pointer = 1;
     }
 
@@ -1415,9 +1451,11 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
 static AstReturn* parse_return_stmt(OnyxParser* parser) {
     AstReturn* return_node = make_node(AstReturn, Ast_Kind_Return);
     return_node->token = expect_token(parser, Token_Type_Keyword_Return);
+    return_node->count = 0;
 
-    if (parse_possible_directive(parser, "from_enclosing")) {
-        return_node->from_enclosing_scope = 1;
+    while (parser->curr->type == Token_Type_Keyword_Return) {
+        consume_token(parser);
+        return_node->count += 1;
     }
 
     AstTyped* expr = NULL;
@@ -1508,7 +1546,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
             // fallthrough
         }
 
-        case '(': case '+': case '-': case '!': case '*': case '^':
+        case '(': case '+': case '-': case '!': case '*': case '^': case '&':
         case Token_Type_Literal_Integer:
         case Token_Type_Literal_Float:
         case Token_Type_Literal_String:
@@ -1846,10 +1884,12 @@ static AstType* parse_type(OnyxParser* parser) {
         if (parser->hit_unexpected_token) return root;
 
         switch ((u16) parser->curr->type) {
+            case '&':
             case '^': {
                 AstPointerType* new = make_node(AstPointerType, Ast_Kind_Pointer_Type);
                 new->flags |= Basic_Flag_Pointer;
-                new->token = expect_token(parser, '^');
+                // new->token = expect_token(parser, '^');
+                new->token = parser->curr->type == '^' ? expect_token(parser, '^') : expect_token(parser, '&'); // HACK
 
                 *next_insertion = (AstType *) new;
                 next_insertion = &new->elem;
@@ -1974,6 +2014,23 @@ static AstType* parse_type(OnyxParser* parser) {
             case Token_Type_Keyword_Typeof: {
                 *next_insertion = (AstType *) parse_typeof(parser);
                 next_insertion = NULL;
+                break;
+            }
+
+            case '?': {
+                assert(builtin_optional_type);
+
+                bh_arr(AstNode *) params = NULL;
+                bh_arr_new(global_heap_allocator, params, 1);
+                bh_arr_set_length(params, 1);
+
+                AstPolyCallType* pc_type = make_node(AstPolyCallType, Ast_Kind_Poly_Call_Type);
+                pc_type->token = expect_token(parser, '?');
+                pc_type->callee = builtin_optional_type;
+                pc_type->params = params;
+                *next_insertion = (AstType *) pc_type;
+
+                next_insertion = (AstType **) &params[0];
                 break;
             }
 
@@ -3276,11 +3333,13 @@ static void parse_top_level_statement(OnyxParser* parser) {
             else if (parse_possible_directive(parser, "operator")) {
                 AstDirectiveOperator *operator = make_node(AstDirectiveOperator, Ast_Kind_Directive_Operator);
                 operator->token = dir_token;
+                operator->operator_token = parser->curr;
 
                 // These cases have to happen first because these are not necessarily "binary operators",
                 // they are just things that I want to be able to overload. []= is technically a ternary
                 // operator so all these things are horribly named anyway.
-                if (next_tokens_are(parser, 3, '^', '[', ']')) {
+                if (next_tokens_are(parser, 3, '^', '[', ']')
+                    || next_tokens_are(parser, 3, '&', '[', ']')) {
                     consume_tokens(parser, 3);
                     operator->operator = Binary_Op_Ptr_Subscript;
                     goto operator_determined;
@@ -3297,11 +3356,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 consume_token(parser);
                 if (op == Binary_Op_Subscript) expect_token(parser, ']');    // #operator [] ... needs to consume the other ']'
 
-                if (op == Binary_Op_Count) {
-                    onyx_report_error(parser->curr->pos, Error_Critical, "Invalid binary operator.");
-                } else {
-                    operator->operator = op;
-                }
+                operator->operator = op;
 
               operator_determined:
                 if (parse_possible_directive(parser, "order")) {

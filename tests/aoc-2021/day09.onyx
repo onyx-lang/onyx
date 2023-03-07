@@ -3,7 +3,7 @@
 use package core
 
 Pos :: struct {x,y: i32;}
-#match hash.to_u32 (use p: Pos) => x * 13 ^ 17 * y;
+#match hash.to_u32 (use p: Pos) => x * 13 & 17 * y;
 #operator == (p1, p2: Pos) => p1.x == p2.x && p1.y == p2.y;
 
 Cell :: struct {
@@ -21,14 +21,14 @@ find_span :: macro (low: Pos) -> u32 {
 
     while queued.count != 0 {
         t := queued[0];
-        array.delete(^queued, 0);
+        array.delete(&queued, 0);
 
-        top := ^heightmap[t];
+        top := &heightmap[t];
         if top.height == 9 do continue;
 
         included << t;
 
-        array.clear(^potential);
+        array.clear(&potential);
         if t.x < width - 1 && top.dx < 0 {
             potential << Pos.{t.x+1,t.y};
         }
@@ -56,7 +56,7 @@ find_span :: macro (low: Pos) -> u32 {
     return included.count;
 }
 
-#match io.write (w: ^io.Writer, x: ^Map($K, $V)) {
+#match io.write (w: &io.Writer, x: &Map($K, $V)) {
     io.write(w, "{\n");
     for e: x.entries {
         io.write(w, "    {} => {}\n", e.key, e.value);
@@ -71,9 +71,9 @@ main :: (args) => {
         heightmap: Map(Pos, Cell);
 
         height, width := 0, 0;
-        while !io.reader_empty(^reader) {
-            line := io.read_line(^reader, consume_newline=false, inplace=true);
-            io.skip_whitespace(^reader);
+        while !io.reader_empty(&reader) {
+            line := io.read_line(&reader, consume_newline=false, inplace=true);
+            io.skip_whitespace(&reader);
 
             for line.count {
                 heightmap[Pos.{it, height}] = Cell.{cast(u32) (line[it] - #char "0")};
@@ -84,12 +84,12 @@ main :: (args) => {
         }
 
         for y: height - 1 do for x: width {
-            map.update(^heightmap, .{x,y}) {
+            map.update(&heightmap, .{x,y}) {
                 it.dy = it.height - heightmap[Pos.{x,y+1}].height;
             }
         }
         for x: width - 1 do for y: height {
-            map.update(^heightmap, .{x,y}) {
+            map.update(&heightmap, .{x,y}) {
                 it.dx = it.height - heightmap[Pos.{x+1,y}].height;
             }
         }
@@ -97,7 +97,7 @@ main :: (args) => {
         lowest: [..] Pos;
         risk_sum := 0;
         for y: height do for x: width {
-            h := ^heightmap[Pos.{x,y}];
+            h := &heightmap[Pos.{x,y}];
             if x < width  - 1 && h.dx >= 0 do continue;
             if y < height - 1 && h.dy >= 0 do continue;
 

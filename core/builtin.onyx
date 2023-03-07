@@ -27,7 +27,7 @@ package builtin
 // A string is simply a slice of bytes, and a c-string is a pointer
 // to byte, with a null-terminator ('\0') at the end.
 str  :: #type [] u8;
-cstr :: #type  ^ u8;
+cstr :: #type  & u8;
 
 
 
@@ -100,7 +100,7 @@ OnyxContext :: struct {
 
     // Defines what happens when `log()` is called. Defaults to a
     // logger that filters log messages by their severity.
-    logger         : Logger = .{ default_logger_proc, ^default_logger };
+    logger         : Logger = .{ default_logger_proc, &default_logger };
 
     // Defines what happens when an `assert()` check fails. Defaults
     // to printing the error and running an unreachable instruction,
@@ -121,12 +121,12 @@ OnyxContext :: struct {
 // Define helper methods for setting and retrieving the user_data
 // stored on the context.
 #inject OnyxContext {
-    set_user_data :: macro (c: ^OnyxContext, data: ^$T) {
+    set_user_data :: macro (c: &OnyxContext, data: &$T) {
         c.user_data = data;
         c.user_data_type = T;
     }
 
-    get_user_data :: macro (c: ^OnyxContext, $T: type_expr) -> ^T {
+    get_user_data :: macro (c: &OnyxContext, $T: type_expr) -> &T {
         if c.user_data_type != T do return null;
         return ~~ c.user_data;
     }
@@ -193,7 +193,7 @@ default_log_level :: (level: Log_Level) {
 }
 
 #if runtime.runtime != .Custom {
-    #local default_logger_proc :: (logger: ^Default_Logger, level: Log_Level, msg: str, module: str) {
+    #local default_logger_proc :: (logger: &Default_Logger, level: Log_Level, msg: str, module: str) {
         if level < logger.minimum_level do return;
 
         if module {
@@ -263,11 +263,11 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
     new :: #match #local {}
 
     #overload
-    new :: ($T: type_expr, allocator := context.allocator) -> ^T {
+    new :: ($T: type_expr, allocator := context.allocator) -> &T {
         use package core.intrinsics.onyx { __initialize }
         memory :: package core.memory
 
-        res := cast(^T) raw_alloc(allocator, sizeof T);
+        res := cast(&T) raw_alloc(allocator, sizeof T);
         memory.set(res, 0, sizeof T);
         __initialize(res);
 
@@ -287,11 +287,11 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
         memory.set(res, 0, size);
 
         if info.kind == .Struct {
-            s_info := cast(^type_info.Type_Info_Struct) info;
+            s_info := cast(&type_info.Type_Info_Struct) info;
             for s_info.members {
                 if it.default != null {
                     member_size := type_info.size_of(it.type);
-                    memory.copy(cast(^u8) res + it.offset, it.default, member_size);
+                    memory.copy(cast(&u8) res + it.offset, it.default, member_size);
                 }
             }
         }
@@ -307,12 +307,12 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 
     #overload
     make :: macro ($T: type_expr, allocator := context.allocator) => {
-        return __make_overload(cast(^T) null, allocator=allocator);
+        return __make_overload(cast(&T) null, allocator=allocator);
     }
 
     #overload
     make :: macro ($T: type_expr, n: u32, allocator := context.allocator) => {
-        return __make_overload(cast(^T) null, n, allocator=allocator);
+        return __make_overload(cast(&T) null, n, allocator=allocator);
     }
 
     make_temp :: #match #local {}
@@ -349,17 +349,17 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
         //
         // This is the fallback option for make. It simply allocates a zero-intialized
         // element of type T.
-        #order 1000 (_: ^$T, allocator := context.allocator) -> ^T {
+        #order 1000 (_: &$T, allocator := context.allocator) -> &T {
             memory :: package core.memory
 
-            res := cast(^T) raw_alloc(allocator, sizeof T);
+            res := cast(&T) raw_alloc(allocator, sizeof T);
             memory.set(res, 0, sizeof T);
             return res;
         },
     }
 
     delete :: #match {
-        #order 1000 macro (x: ^$T, allocator := context.allocator) {
+        #order 1000 macro (x: &$T, allocator := context.allocator) {
             if x != null do raw_free(allocator, x);
         }
     }
@@ -394,6 +394,20 @@ Iterator :: struct (Iter_Type: type_expr) {
     close:  (data: rawptr) -> void = null_proc;
     remove: (data: rawptr) -> void = null_proc;
 }
+
+
+//
+// Optional represents the possibility of a value being empty, without
+// resorting to pointers and null-pointers. Most of the functionality
+// for Optional is defined in core/containers/optional.onyx. This
+// definition exists here because the compiler use it as the template
+// for types like '? i32'. In other words, '? i32' is equivalent to
+// 'Optional(i32)'.
+Optional :: struct (Value_Type: type_expr) {
+    has_value: bool;
+    value: Value_Type;
+}
+
 
 
 //
@@ -547,7 +561,7 @@ any_package :: cast(package_id) 0
 // a similar construction to varargs in C/C++. Because it is incredibly unsafe
 // and not programmer friendly, this way of doing it has been deprecated in
 // favor of  using '..any', which provides type information along with the data.
-vararg :: #type ^struct {
+vararg :: #type &struct {
     data:  rawptr;
     count: i32;
 }

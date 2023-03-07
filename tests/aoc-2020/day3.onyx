@@ -19,19 +19,19 @@ main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day3.txt";
 
     forest := array.make(u8, 1024);
-    defer array.free(^forest);
+    defer array.free(&forest);
 
     width := 0;
     height := 0;
     while true {
-        line := string.read_until(^contents, #char "\n");
-        string.advance(^contents, 1);
+        line := string.read_until(&contents, #char "\n");
+        string.advance(&contents, 1);
         if line.count == 0 do break;
 
         width = line.count;
         height = height + 1;
 
-        for ch: line do array.push(^forest, ch);
+        for ch: line do array.push(&forest, ch);
     }
 
     lis := LineInterp.[

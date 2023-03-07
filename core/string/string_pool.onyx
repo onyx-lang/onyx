@@ -33,10 +33,10 @@ pool_make :: (maximum_string_length := 16384, allocator := context.allocator)
 
 //
 // Copies a string into the pool, returning the copied string.
-pool_add :: (sp: ^StringPool, s: str) -> str {
+pool_add :: (sp: &StringPool, s: str) -> str {
     if s.count > sp.arena.arena_size do return "";
 
-    allocator := alloc.as_allocator(^sp.arena);
+    allocator := alloc.as_allocator(&sp.arena);
 
     new_str := make(str, s.count, allocator);
     memory.copy(new_str.data, s.data, s.count);
@@ -45,14 +45,14 @@ pool_add :: (sp: ^StringPool, s: str) -> str {
 
 //
 // Clears all entries in the pool.
-pool_flush :: (sp: ^StringPool) {
-    arena.clear(^sp.arena);
+pool_flush :: (sp: &StringPool) {
+    arena.clear(&sp.arena);
 }
 
 //
 // Completely frees all memory in the pool.
-pool_free :: (sp: ^StringPool) {
-    arena.free(^sp.arena);
+pool_free :: (sp: &StringPool) {
+    arena.free(&sp.arena);
 }
 
 #overload

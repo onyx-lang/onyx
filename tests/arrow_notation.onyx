@@ -8,12 +8,12 @@ V2 :: struct {
 
     add :: (v1, v2: V2) => V2.{v1.x+v2.x, v1.y+v2.y};
 
-    add_inplace :: (v1: ^V2, v2: V2) {
+    add_inplace :: (v1: &V2, v2: V2) {
         v1.x += v2.x;
         v1.y += v2.y;
     }
 
-    format :: (output: ^conv.Format_Output, _: ^conv.Format, v: ^V2) {
+    format :: (output: &conv.Format_Output, _: &conv.Format, v: &V2) {
         conv.format(output, "({}, {})", v.x, v.y); 
     }
 }

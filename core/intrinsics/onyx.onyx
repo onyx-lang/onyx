@@ -4,7 +4,7 @@ package core.intrinsics.onyx
 // Special intrinsic function that initializes a value.
 // This is generally used on structure to execute their
 // default initializer expressions.
-__initialize :: (val: ^$T)      -> void #intrinsic ---
+__initialize :: (val: &$T)      -> void #intrinsic ---
 
 //
 // Helpful macro to create an initialized value.
@@ -13,6 +13,6 @@ init :: macro ($T: type_expr) -> T {
     __initialize :: __initialize
 
     val: T;
-    __initialize(^val);
+    __initialize(&val);
     return val;
 }

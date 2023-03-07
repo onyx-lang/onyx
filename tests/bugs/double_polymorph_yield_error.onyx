@@ -2,7 +2,7 @@
 
 use core
 
-q :: (v: ^$C, g: (^C) -> $T) {
+q :: (v: &$C, g: (&C) -> $T) {
     println(*v);
     println(g(v));
     println(T);
@@ -11,5 +11,5 @@ q :: (v: ^$C, g: (^C) -> $T) {
 main :: () {
     v := 5;
 
-    q(^v, _ => false);
+    q(&v, _ => false);
 }

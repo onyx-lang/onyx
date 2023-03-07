@@ -20,12 +20,12 @@ main :: (args) => {
 
         corrupted_score := 0;
         completion_scores: [..] u64;
-        while !io.reader_empty(^reader) {
-            line := io.read_line(^reader, consume_newline=false, inplace=true);
-            io.skip_whitespace(^reader);
+        while !io.reader_empty(&reader) {
+            line := io.read_line(&reader, consume_newline=false, inplace=true);
+            io.skip_whitespace(&reader);
 
             char_stack: [..] u8;
-            defer array.free(^char_stack);
+            defer array.free(&char_stack);
             for ch: line {
                 switch ch {
                     case #char "(", #char "[", #char "<", #char "{" {
@@ -33,7 +33,7 @@ main :: (args) => {
                     }
 
                     case #char ")", #char "]", #char ">", #char "}" {
-                        x := array.pop(^char_stack);
+                        x := array.pop(&char_stack);
                         if x != ch {
                             // printf("Expected '{}', found '{}' instead.\n", x, ch);
                             corrupted_score += score_map[ch];
@@ -48,7 +48,7 @@ main :: (args) => {
             complete_score: u64 = 0;
             while char_stack.count != 0 {
                 complete_score *= 5;
-                switch array.pop(^char_stack) {
+                switch array.pop(&char_stack) {
                     case #char ")" do complete_score += 1;
                     case #char "]" do complete_score += 2;
                     case #char "}" do complete_score += 3;

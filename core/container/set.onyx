@@ -38,32 +38,32 @@ Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
 
 make :: ($T: type_expr, default := T.{}, allocator := context.allocator) -> Set(T) {
     set : Set(T);
-    init(^set, default=default, allocator=allocator);
+    init(&set, default=default, allocator=allocator);
     return set;
 }
 
 #overload
-builtin.__make_overload :: macro (x: ^Set, allocator: Allocator) => core.set.make(x.Elem_Type, allocator = allocator);
+builtin.__make_overload :: macro (x: &Set, allocator: Allocator) => core.set.make(x.Elem_Type, allocator = allocator);
 
-init :: (set: ^Set($T), default := T.{}, allocator := context.allocator) {
+init :: (set: &Set($T), default := T.{}, allocator := context.allocator) {
     set.allocator = allocator;
     set.default_value = default;
 
-    memory.alloc_slice(^set.hashes, 8, allocator=allocator);
+    memory.alloc_slice(&set.hashes, 8, allocator=allocator);
     array.fill(set.hashes, -1);
 
-    array.init(^set.entries, 4, allocator=allocator); 
+    array.init(&set.entries, 4, allocator=allocator); 
 }
 
-free :: (use set: ^Set) {
-    memory.free_slice(^hashes, allocator=allocator);
-    array.free(^entries);
+free :: (use set: &Set) {
+    memory.free_slice(&hashes, allocator=allocator);
+    array.free(&entries);
 }
 
 #overload
 builtin.delete :: core.set.free
 
-insert :: (use set: ^Set, value: set.Elem_Type) {
+insert :: (use set: &Set, value: set.Elem_Type) {
     if hashes.data == null do init(set);
     lr := lookup(set, value);
 
@@ -75,31 +75,31 @@ insert :: (use set: ^Set, value: set.Elem_Type) {
     if full(set) do grow(set);
 }
 
-#operator << macro (set: Set($T), value: T) do core.set.insert(^set, value);
+#operator << macro (set: Set($T), value: T) do core.set.insert(&set, value);
 
-has :: (use set: ^Set, value: set.Elem_Type) -> bool {
+has :: (use set: &Set, value: set.Elem_Type) -> bool {
     lr := lookup(set, value);
     return lr.entry_index >= 0;
 }
 
-get :: (use set: ^Set, value: set.Elem_Type) -> set.Elem_Type {
+get :: (use set: &Set, value: set.Elem_Type) -> set.Elem_Type {
     lr := lookup(set, value);
     return entries[lr.entry_index].value if lr.entry_index >= 0 else set.Elem_Type.{};
 }
 
-get_ptr :: (use set: ^Set, value: set.Elem_Type) -> ^set.Elem_Type {
+get_ptr :: (use set: &Set, value: set.Elem_Type) -> &set.Elem_Type {
     lr := lookup(set, value);
-    return (^entries[lr.entry_index].value) if lr.entry_index >= 0 else null;
+    return (&entries[lr.entry_index].value) if lr.entry_index >= 0 else null;
 }
 
-get_opt :: (use set: ^Set, value: set.Elem_Type) -> Optional(set.Elem_Type) {
+get_opt :: (use set: &Set, value: set.Elem_Type) -> Optional(set.Elem_Type) {
     lr := lookup(set, value);
     if lr.entry_index >= 0 do return Optional.make(entries[lr.entry_index].value);
 
     return .{};
 }
 
-remove :: (use set: ^Set, value: set.Elem_Type) {
+remove :: (use set: &Set, value: set.Elem_Type) {
     lr := lookup(set, value);
     if lr.entry_index < 0 do return;
 
@@ -107,37 +107,37 @@ remove :: (use set: ^Set, value: set.Elem_Type) {
     else                   do entries[lr.entry_prev].next = entries[lr.entry_index].next;
 
     if lr.entry_index == entries.count - 1 {
-        array.pop(^entries);
+        array.pop(&entries);
         return;
     }
 
-    array.fast_delete(^entries, lr.entry_index);
+    array.fast_delete(&entries, lr.entry_index);
     last := lookup(set, entries[lr.entry_index].value);
     if last.entry_prev >= 0    do entries[last.entry_prev].next = lr.entry_index;
     else                       do hashes[last.hash_index] = lr.entry_index;
 }
 
-clear :: (use set: ^Set) {
+clear :: (use set: &Set) {
     array.fill(hashes, -1);
-    array.clear(^entries);
+    array.clear(&entries);
 }
 
-empty :: (use set: ^Set) -> bool {
+empty :: (use set: &Set) -> bool {
     return entries.count == 0;
 }
 
 #overload core.iter.as_iter as_iter
-as_iter :: (s: ^Set) =>
+as_iter :: (s: &Set) =>
     core.iter.generator(
-        ^.{ s = s, i = 0 },
+        &.{ s = s, i = 0 },
 
         (ctx) => {
             if ctx.i >= ctx.s.entries.count {
-                return (typeof ^ctx.s.entries.data.value).{}, false;
+                return (typeof &ctx.s.entries.data.value).{}, false;
             }
 
             defer ctx.i += 1;
-            return ^ctx.s.entries.data[ctx.i].value, true;
+            return &ctx.s.entries.data[ctx.i].value, true;
         });
 
 //
@@ -152,7 +152,7 @@ as_iter :: (s: ^Set) =>
         hash        : u32 = 0;
     }
 
-    lookup :: (use set: ^Set, value: set.Elem_Type) -> SetLookupResult {
+    lookup :: (use set: &Set, value: set.Elem_Type) -> SetLookupResult {
         lr := SetLookupResult.{};
 
         hash_value: u32 = hash.to_u32(value); // You cannot have a set of this type without defining a to_u32 hash.
@@ -173,22 +173,22 @@ as_iter :: (s: ^Set) =>
         return lr;
     }
 
-    full :: (use set: ^Set) => entries.count >= (hashes.count >> 2) * 3;
+    full :: (use set: &Set) => entries.count >= (hashes.count >> 2) * 3;
 
-    grow :: (use set: ^Set) {
+    grow :: (use set: &Set) {
         new_size := math.max(hashes.count << 1, 8);
         rehash(set, new_size);
     }
 
-    rehash :: (use set: ^Set, new_size: i32) {
-        memory.free_slice(^hashes, allocator);
+    rehash :: (use set: &Set, new_size: i32) {
+        memory.free_slice(&hashes, allocator);
         hashes = builtin.make([] u32, new_size, allocator=allocator);
         array.fill(hashes, -1);
 
-        for ^entry: entries do entry.next = -1;
+        for &entry: entries do entry.next = -1;
 
         index := 0;
-        for ^entry: entries {
+        for &entry: entries {
             defer index += 1;
 
             hash_index := entry.hash % hashes.count;

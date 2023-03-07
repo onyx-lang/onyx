@@ -2,7 +2,7 @@
 
 use package core
 
-parse_factor :: (file: ^str) -> u64 {
+parse_factor :: (file: &str) -> u64 {
 	string.strip_leading_whitespace(file);
 
 	switch *file.data {
@@ -25,7 +25,7 @@ parse_factor :: (file: ^str) -> u64 {
 	return 0;
 }
 
-parse_expression_add :: (file: ^str) -> u64 {
+parse_expression_add :: (file: &str) -> u64 {
 	string.strip_leading_whitespace(file);
 
 	left := parse_factor(file);
@@ -45,7 +45,7 @@ parse_expression_add :: (file: ^str) -> u64 {
 	return left;
 }
 
-parse_expression_mul :: (file: ^str) -> u64 {
+parse_expression_mul :: (file: &str) -> u64 {
     string.strip_leading_whitespace(file);
 
 	left := parse_expression_add(file);
@@ -71,7 +71,7 @@ main :: (args: [] cstr) {
 
 	total: u64 = 0;
 	while !string.empty(file) {
-		total += parse_expression_mul(^file);
+		total += parse_expression_mul(&file);
 	}
 
 	printf("Total: {}\n", total);

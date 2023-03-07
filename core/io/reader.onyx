@@ -11,7 +11,7 @@ package core.io
 use core {memory, math, array, iter}
 
 Reader :: struct {
-    stream: ^Stream;
+    stream: &Stream;
 
     buffer: [] u8;
     buffer_allocator: Allocator;
@@ -46,51 +46,51 @@ Reader :: struct {
     lines :: lines;
 }
 
-reader_make :: (s: ^Stream, buffer_size := 4096, allocator := context.allocator) -> Reader {
+reader_make :: (s: &Stream, buffer_size := 4096, allocator := context.allocator) -> Reader {
     assert(s.vtable != null, "Stream vtable was not setup correctly.");
 
     reader: Reader;
     reader.stream = s;
     reader.error = .None;
 
-    memory.alloc_slice(^reader.buffer, buffer_size, allocator);
+    memory.alloc_slice(&reader.buffer, buffer_size, allocator);
     reader.buffer_allocator = allocator;
 
-    reader_reset(^reader);
+    reader_reset(&reader);
 
     return reader;
 }
 
-reader_reset :: (use reader: ^Reader) {
+reader_reset :: (use reader: &Reader) {
     start, end = 0, 0;
     last_byte = #char "\0";
     done = false;
 }
 
 #overload delete :: reader_free
-reader_free :: (use reader: ^Reader) {
-    memory.free_slice(^buffer, buffer_allocator);
+reader_free :: (use reader: &Reader) {
+    memory.free_slice(&buffer, buffer_allocator);
 }
 
 // You need to free the StringStream from the context.allocator when you use this. For example,
 //      reader, stream := reader_from_string(s);
 //      defer cfree(stream);
-reader_from_string :: (s: str) -> (Reader, ^BufferStream) {
+reader_from_string :: (s: str) -> (Reader, &BufferStream) {
     stream_ptr := new(BufferStream);
     *stream_ptr = buffer_stream_make(s, fixed=true, write_enabled=false);
 
     return reader_make(stream_ptr), stream_ptr;
 }
 
-reader_get_buffered :: (use reader: ^Reader) -> i32 {
+reader_get_buffered :: (use reader: &Reader) -> i32 {
     return end - start;
 }
 
-reader_empty :: (use reader: ^Reader) -> bool {
+reader_empty :: (use reader: &Reader) -> bool {
     return done && reader_get_buffered(reader) == 0;
 }
 
-read_all :: (use reader: ^Reader, allocator := context.allocator) -> [] u8 {
+read_all :: (use reader: &Reader, allocator := context.allocator) -> [] u8 {
     output := array.make(u8, 128, allocator=allocator);
 
     while !reader_empty(reader) {
@@ -105,7 +105,7 @@ read_all :: (use reader: ^Reader, allocator := context.allocator) -> [] u8 {
 
         buffered := reader_get_buffered(reader);
         if buffered > 0 {
-            array.ensure_capacity(^output, output.count + buffered);
+            array.ensure_capacity(&output, output.count + buffered);
             memory.copy(output.data + output.count, buffer.data, buffered);
             output.count += buffered;
             start = end;
@@ -115,7 +115,7 @@ read_all :: (use reader: ^Reader, allocator := context.allocator) -> [] u8 {
     return output;
 }
 
-read_byte :: (use reader: ^Reader) -> u8 {
+read_byte :: (use reader: &Reader) -> u8 {
     while start == end {
         if reader_empty(reader) do return 0;
 
@@ -135,7 +135,7 @@ read_byte :: (use reader: ^Reader) -> u8 {
     return byte;
 }
 
-unread_byte :: (use reader: ^Reader) -> Error {
+unread_byte :: (use reader: &Reader) -> Error {
     if last_byte < 0 || (start == 0 && end > 0) {
         return .InvalidUnread;
     }
@@ -157,7 +157,7 @@ unread_byte :: (use reader: ^Reader) -> Error {
 // returns ReadPending, this function may only fill part / none
 // of the buffer. If the function exits with a .None error, the
 // buffer is filled completely.
-read_bytes :: (use reader: ^Reader, bytes: [] u8) -> (i32, Error) {
+read_bytes :: (use reader: &Reader, bytes: [] u8) -> (i32, Error) {
     n := bytes.count;
     if n == 0 {
         if reader_get_buffered(reader) > 0 do return 0, .None;
@@ -183,13 +183,13 @@ read_bytes :: (use reader: ^Reader, bytes: [] u8) -> (i32, Error) {
     return bytes.count, .None;
 }
 
-read_string :: (use reader: ^Reader, bytes := 1, allocator := context.allocator) -> str {
+read_string :: (use reader: &Reader, bytes := 1, allocator := context.allocator) -> str {
     buf := memory.make_slice(u8, bytes, allocator);
     bytes_read, err := read_bytes(reader, buf);
     return buf[0 .. bytes_read];
 };
 
-read_i32 :: (use reader: ^Reader) -> i32 {
+read_i32 :: (use reader: &Reader) -> i32 {
     n: i32 = 0;
 
     skip_whitespace(reader);
@@ -215,7 +215,7 @@ read_i32 :: (use reader: ^Reader) -> i32 {
     return n;
 }
 
-read_i64 :: (use reader: ^Reader) -> i64 {
+read_i64 :: (use reader: &Reader) -> i64 {
     n: i64 = 0;
 
     skip_whitespace(reader);
@@ -241,7 +241,7 @@ read_i64 :: (use reader: ^Reader) -> i64 {
     return n;
 }
 
-read_u32 :: (use reader: ^Reader) -> u32 {
+read_u32 :: (use reader: &Reader) -> u32 {
     n: u32 = 0;
 
     skip_whitespace(reader);
@@ -259,7 +259,7 @@ read_u32 :: (use reader: ^Reader) -> u32 {
     return n;
 }
 
-read_u64 :: (use reader: ^Reader) -> u64 {
+read_u64 :: (use reader: &Reader) -> u64 {
     n: u64 = 0;
 
     skip_whitespace(reader);
@@ -277,7 +277,7 @@ read_u64 :: (use reader: ^Reader) -> u64 {
     return n;
 }
 
-read_line :: (use reader: ^Reader, consume_newline := true, allocator := context.allocator, inplace := false) -> str {
+read_line :: (use reader: &Reader, consume_newline := true, allocator := context.allocator, inplace := false) -> str {
     //
     // Reading in place is special. It does not make a special allocation for the data,
     // instead just return a pointer to the internal data.
@@ -302,7 +302,7 @@ read_line :: (use reader: ^Reader, consume_newline := true, allocator := context
     }
 
     out: [..] u8;
-    array.init(^out, allocator=allocator);
+    array.init(&out, allocator=allocator);
 
     while done := false; !done {
         count := start;
@@ -316,7 +316,7 @@ read_line :: (use reader: ^Reader, consume_newline := true, allocator := context
         }
 
         if count != start {
-            array.ensure_capacity(^out, out.count + (count - start));
+            array.ensure_capacity(&out, out.count + (count - start));
             memory.copy(out.data + out.count, buffer.data + start, count - start);
             out.count += count - start;
             start = count;
@@ -333,7 +333,7 @@ read_line :: (use reader: ^Reader, consume_newline := true, allocator := context
     return out;
 }
 
-read_word :: (use reader: ^Reader, numeric_allowed := false, allocator := context.allocator, inplace := false) -> str {
+read_word :: (use reader: &Reader, numeric_allowed := false, allocator := context.allocator, inplace := false) -> str {
     skip_whitespace(reader);
     while reader_read_next_chunk(reader) == .ReadPending {
         skip_whitespace(reader);
@@ -368,7 +368,7 @@ read_word :: (use reader: ^Reader, numeric_allowed := false, allocator := contex
     }
 
     out: [..] u8;
-    array.init(^out, allocator=allocator);
+    array.init(&out, allocator=allocator);
 
     while done := false; !done {
         count := start;
@@ -387,7 +387,7 @@ read_word :: (use reader: ^Reader, numeric_allowed := false, allocator := contex
         }
 
         if count != start {
-            array.ensure_capacity(^out, out.count + (count - start));
+            array.ensure_capacity(&out, out.count + (count - start));
             memory.copy(out.data + out.count, buffer.data + start, count - start);
             out.count += count - start;
             start = count;
@@ -404,7 +404,7 @@ read_word :: (use reader: ^Reader, numeric_allowed := false, allocator := contex
     return out;
 }
 
-read_until :: (use reader: ^Reader, until: u8, skip: u32 = 0, allocator := context.allocator, consume_end := false, inplace := false) -> str {
+read_until :: (use reader: &Reader, until: u8, skip: u32 = 0, allocator := context.allocator, consume_end := false, inplace := false) -> str {
     //
     // Reading in place is special. It does not make a special allocation for the data,
     // instead just return a pointer to the internal data.
@@ -435,7 +435,7 @@ read_until :: (use reader: ^Reader, until: u8, skip: u32 = 0, allocator := conte
     }
 
     out: [..] u8;
-    array.init(^out, allocator=allocator);
+    array.init(&out, allocator=allocator);
 
     while done := false; !done {
         count := start;
@@ -455,7 +455,7 @@ read_until :: (use reader: ^Reader, until: u8, skip: u32 = 0, allocator := conte
         }
 
         if count != start {
-            array.ensure_capacity(^out, out.count + (count - start));
+            array.ensure_capacity(&out, out.count + (count - start));
             memory.copy(out.data + out.count, buffer.data + start, count - start);
             out.count += count - start;
             start = count;
@@ -472,7 +472,7 @@ read_until :: (use reader: ^Reader, until: u8, skip: u32 = 0, allocator := conte
     return out;
 }
 
-peek_byte :: (use reader: ^Reader, advance := 0) -> (u8, Error) {
+peek_byte :: (use reader: &Reader, advance := 0) -> (u8, Error) {
     if reader_empty(reader) do return 0, .EOF;
 
     if start == end {
@@ -488,7 +488,7 @@ peek_byte :: (use reader: ^Reader, advance := 0) -> (u8, Error) {
     return buffer[start + advance], .None;
 }
 
-advance_line :: (use reader: ^Reader) {
+advance_line :: (use reader: &Reader) {
     if reader_empty(reader) do return;
 
     while true {
@@ -505,7 +505,7 @@ advance_line :: (use reader: ^Reader) {
     }
 }
 
-skip_whitespace :: (use reader: ^Reader) {
+skip_whitespace :: (use reader: &Reader) {
     if reader_empty(reader) do return;
 
     while start < end {
@@ -525,7 +525,7 @@ skip_whitespace :: (use reader: ^Reader) {
     }
 }
 
-skip_bytes :: (use reader: ^Reader, bytes: u32) -> (skipped: i32, err: Error) {
+skip_bytes :: (use reader: &Reader, bytes: u32) -> (skipped: i32, err: Error) {
     if bytes == 0 do return 0, .None;
     if reader_empty(reader) do return 0, .EOF;
 
@@ -554,8 +554,8 @@ skip_bytes :: (use reader: ^Reader, bytes: u32) -> (skipped: i32, err: Error) {
     return 0, .None;
 }
 
-lines :: (r: ^Reader, inplace := false, allocator := context.allocator) =>
-    iter.generator(^.{
+lines :: (r: &Reader, inplace := false, allocator := context.allocator) =>
+    iter.generator(&.{
         r = r,
         inplace = inplace,
         allocator = allocator,
@@ -567,7 +567,7 @@ lines :: (r: ^Reader, inplace := false, allocator := context.allocator) =>
     });
 
 
-#local reader_consume_error :: (use reader: ^Reader) -> Error {
+#local reader_consume_error :: (use reader: &Reader) -> Error {
     defer error = .None;
     return error;
 }
@@ -584,7 +584,7 @@ lines :: (r: ^Reader, inplace := false, allocator := context.allocator) =>
 //       does mean that the reading process should stop and be tried again later.
 //     - The stream returns anything other than None. This error is silently stored
 //       and be fetched using reader_consume_error later.
-#local reader_read_next_chunk :: (use reader: ^Reader) -> Error {
+#local reader_read_next_chunk :: (use reader: &Reader) -> Error {
     if start > 0 {
         // This assumes that memory.copy behaves like memmove, in that the
         // buffer may overlap, but it should do the right thing.

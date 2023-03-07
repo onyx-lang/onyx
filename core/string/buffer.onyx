@@ -9,7 +9,7 @@ package core.string
 use core {math}
 
 String_Buffer :: struct {
-    data     : ^u8;
+    data     : &u8;
     count    : u32;
     capacity : u32;
 }
@@ -32,7 +32,7 @@ buffer_make :: (buffer_memory: [] u8, initial_str := null_str) -> String_Buffer 
     return buffer;
 }
 
-buffer_insert :: (use buffer: ^String_Buffer, position: i32, ch: u8) -> bool {
+buffer_insert :: (use buffer: &String_Buffer, position: i32, ch: u8) -> bool {
     if position >= capacity do return false;
     if count >= capacity do return false;
 
@@ -47,7 +47,7 @@ buffer_insert :: (use buffer: ^String_Buffer, position: i32, ch: u8) -> bool {
     return true;
 }
 
-buffer_append :: (use buffer: ^String_Buffer, end: str) -> bool {
+buffer_append :: (use buffer: &String_Buffer, end: str) -> bool {
     if count + end.count > capacity do return false;
 
     for i: end.count {
@@ -58,7 +58,7 @@ buffer_append :: (use buffer: ^String_Buffer, end: str) -> bool {
     return true;
 }
 
-buffer_delete :: (use buffer: ^String_Buffer, position: i32) -> bool {
+buffer_delete :: (use buffer: &String_Buffer, position: i32) -> bool {
     if position > capacity do return false;
     if position > count do return false;
     if count == 0 do return false;
@@ -74,8 +74,8 @@ buffer_delete :: (use buffer: ^String_Buffer, position: i32) -> bool {
     return true;
 }
 
-buffer_clear :: (use buffer: ^String_Buffer) {
+buffer_clear :: (use buffer: &String_Buffer) {
     count = 0;
 }
 
-buffer_to_str :: (use buffer: ^String_Buffer) -> str do return .{data, count};
+buffer_to_str :: (use buffer: &String_Buffer) -> str do return .{data, count};

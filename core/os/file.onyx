@@ -54,10 +54,10 @@ file_stat   :: fs.__file_stat
 remove_file :: fs.__file_remove
 rename_file :: fs.__file_rename
 
-get_contents_from_file :: (file: ^File) -> str {
+get_contents_from_file :: (file: &File) -> str {
     size := cast(u32) io.stream_size(file);
 
-    data := cast(^u8) raw_alloc(context.allocator, size);
+    data := cast(&u8) raw_alloc(context.allocator, size);
 
     _, prev_loc := io.stream_tell(file);
     io.stream_seek(file, 0, .Start);
@@ -79,11 +79,11 @@ open :: (path: str, mode := OpenMode.Read) -> Result(File, os.FileError) {
     if error != .None do return .{ .Err, .{error=error} };
 
     file.data = file_data;
-    file.vtable = ^fs.__file_stream_vtable;
+    file.vtable = &fs.__file_stream_vtable;
     return .{ .Ok, .{value=file} };
 }
 
-close :: (file: ^File) {
+close :: (file: &File) {
     fs.__file_close(file.data);
     file.stream.vtable = null;
 }
@@ -93,13 +93,13 @@ get_contents :: #match {
 
     (path: str) -> str {
         file := open(path, .Read)->or_return(null_str);
-        defer close(^file);
+        defer close(&file);
 
-        return get_contents(^file);
+        return get_contents(&file);
     }
 }
 
-with_file :: (path: str, mode := OpenMode.Read) -> Iterator(^File) {
+with_file :: (path: str, mode := OpenMode.Read) -> Iterator(&File) {
     Context :: struct {
         valid_file_stream := false;
 
@@ -112,15 +112,15 @@ with_file :: (path: str, mode := OpenMode.Read) -> Iterator(^File) {
         c.valid_file_stream = true;
     }
 
-    next :: (use c: ^Context) -> (^File, bool) {
+    next :: (use c: &Context) -> (&File, bool) {
         if !valid_file_stream do return null, false;
 
         defer valid_file_stream = false;
-        return ^file_stream, true;
+        return &file_stream, true;
     }
 
-    close_context :: (use c: ^Context) {
-        close(^file_stream);
+    close_context :: (use c: &Context) {
+        close(&file_stream);
         cfree(c);
     }
 
@@ -129,13 +129,13 @@ with_file :: (path: str, mode := OpenMode.Read) -> Iterator(^File) {
 
 is_file :: (path: str) -> bool {
     s: FileStat;
-    if !file_stat(path, ^s) do return false;
+    if !file_stat(path, &s) do return false;
     return s.type == .RegularFile;
 }
 
 is_directory :: (path: str) -> bool {
     s: FileStat;
-    if !file_stat(path, ^s) do return false;
+    if !file_stat(path, &s) do return false;
     return s.type == .Directory;
 }
 
@@ -146,14 +146,14 @@ is_directory :: (path: str) -> bool {
 //
 
 File_Logger :: struct {
-    file: ^File;
+    file: &File;
     filename: str;
     allocator: Allocator;
 
     old_logger: Logger;
 }
 
-file_logger_open :: (filename: str, allocator := context.allocator) -> Result(^File_Logger, str) {
+file_logger_open :: (filename: str, allocator := context.allocator) -> Result(&File_Logger, str) {
     file_logger := new(File_Logger, allocator);
     file_logger.allocator = allocator;
     file_logger.filename = filename;
@@ -164,18 +164,18 @@ file_logger_open :: (filename: str, allocator := context.allocator) -> Result(^F
         raw_free(allocator, file_logger.file);
         raw_free(allocator, file_logger);
 
-        return #from_enclosing .{ .Err, .{error = "Unable to open file for logging."} };
+        return return .{ .Err, .{error = "Unable to open file for logging."} };
     });
 
     return .{ .Ok, .{ value=file_logger } };
 }
 
-file_logger_use :: (logger: ^File_Logger) {
+file_logger_use :: (logger: &File_Logger) {
     logger.old_logger = context.logger;
     context.logger = .{ file_logger_proc, logger };
 }
 
-file_logger_close :: (logger: ^File_Logger) {
+file_logger_close :: (logger: &File_Logger) {
     if logger.old_logger.data {
         context.logger = logger.old_logger;
     }
@@ -187,12 +187,12 @@ file_logger_close :: (logger: ^File_Logger) {
 }
 
 #local
-file_logger_proc :: (logger: ^File_Logger, level: Log_Level, msg: str, module: str) {
+file_logger_proc :: (logger: &File_Logger, level: Log_Level, msg: str, module: str) {
     writer := io.writer_make(logger.file, 0);
 
     if module {
-        io.write_format(^writer, "[{}][{}] {}\n", level, module, msg);
+        io.write_format(&writer, "[{}][{}] {}\n", level, module, msg);
     } else {
-        io.write_format(^writer, "[{}] {}\n", level, msg);
+        io.write_format(&writer, "[{}] {}\n", level, msg);
     }
 }

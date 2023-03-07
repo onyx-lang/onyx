@@ -5,7 +5,7 @@ use package core
 main :: (args) => {
     for file: os.with_file("./tests/aoc-2021/input/day06.txt") {
         reader := io.reader_make(file);
-        start_str := io.read_all(^reader);
+        start_str := io.read_all(&reader);
 
         start_list := string.split(start_str, #char ",");
 

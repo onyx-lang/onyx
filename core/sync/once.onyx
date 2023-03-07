@@ -17,8 +17,8 @@ Once :: struct {
 //
 // Run a function with no arguments once.
 #overload
-Once.exec :: (o: ^Once, f: () -> $R) {
-    scoped_mutex(^o.mutex);
+Once.exec :: (o: &Once, f: () -> $R) {
+    scoped_mutex(&o.mutex);
     if o.done do return;
 
     o.done = true;
@@ -28,8 +28,8 @@ Once.exec :: (o: ^Once, f: () -> $R) {
 //
 // Run a function with one argument once.
 #overload
-Once.exec :: (o: ^Once, ctx: $Ctx, f: (Ctx) -> $R) {
-    scoped_mutex(^o.mutex);
+Once.exec :: (o: &Once, ctx: $Ctx, f: (Ctx) -> $R) {
+    scoped_mutex(&o.mutex);
     if o.done do return;
 
     o.done = true;

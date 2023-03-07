@@ -2,13 +2,13 @@ package runtime.info
 
 use core {io}
 
-write_type_name :: (writer: ^io.Writer, t: type_expr) {
+write_type_name :: (writer: &io.Writer, t: type_expr) {
     info := get_type_info(t);
     if info == null do return;
 
     switch info.kind {
         case .Basic {
-            basic := cast(^Type_Info_Basic) info;
+            basic := cast(&Type_Info_Basic) info;
 
             switch basic.basic_kind {
                 case .Void do io.write_str(writer, "void");
@@ -42,54 +42,54 @@ write_type_name :: (writer: ^io.Writer, t: type_expr) {
         }
 
         case .Pointer {
-            pointer := cast(^Type_Info_Pointer) info;
-            io.write_str(writer, "^");
+            pointer := cast(&Type_Info_Pointer) info;
+            io.write_str(writer, "&");
             write_type_name(writer, pointer.to);
         }
 
         case .Array {
-            arr := cast(^Type_Info_Array) info;
+            arr := cast(&Type_Info_Array) info;
             io.write_format(writer, "[{}] ", arr.count);
             write_type_name(writer, arr.of);
         }
 
         case .Slice {
-            slice := cast(^Type_Info_Slice) info;
+            slice := cast(&Type_Info_Slice) info;
             io.write_str(writer, "[] ");
             write_type_name(writer, slice.of);
         }
 
         case .Dynamic_Array {
-            dyn := cast(^Type_Info_Dynamic_Array) info;
+            dyn := cast(&Type_Info_Dynamic_Array) info;
             io.write_str(writer, "[..] ");
             write_type_name(writer, dyn.of);
         }
 
         case .Variadic_Argument {
-            va := cast(^Type_Info_Variadic_Argument) info;
+            va := cast(&Type_Info_Variadic_Argument) info;
             io.write_str(writer, "..");
             write_type_name(writer, va.of);
         }
 
         case .Enum {
-            e := cast(^Type_Info_Enum) info;
+            e := cast(&Type_Info_Enum) info;
             io.write_str(writer, e.name);
         }
 
         case .Struct {
-            s := cast(^Type_Info_Struct) info;
+            s := cast(&Type_Info_Struct) info;
             if s.name.count > 0 do io.write_str(writer, s.name);
             else                do io.write_str(writer, "<anonymous struct>");
         }
 
         case .Polymorphic_Struct {
-            s := cast(^Type_Info_Polymorphic_Struct) info;
+            s := cast(&Type_Info_Polymorphic_Struct) info;
             if s.name.count > 0 do io.write_str(writer, s.name);
             else                do io.write_str(writer, "<anonymous polymorphic struct>");
         }
 
         case .Compound {
-            comp := cast(^Type_Info_Compound) info;
+            comp := cast(&Type_Info_Compound) info;
             io.write_str(writer, "(");
 
             i := 0;
@@ -103,7 +103,7 @@ write_type_name :: (writer: ^io.Writer, t: type_expr) {
         }
 
         case .Function {
-            f := cast(^Type_Info_Function) info;
+            f := cast(&Type_Info_Function) info;
             io.write_str(writer, "(");
 
             i := 0;
@@ -119,7 +119,7 @@ write_type_name :: (writer: ^io.Writer, t: type_expr) {
         }            
 
         case .Distinct {
-            d := cast(^Type_Info_Distinct) info;
+            d := cast(&Type_Info_Distinct) info;
             io.write_str(writer, d.name);
         }
     }
@@ -137,7 +137,7 @@ size_of :: (t: type_expr) -> u32 {
 
     switch info.kind {
         case .Basic {
-            basic := cast(^Type_Info_Basic) info;
+            basic := cast(&Type_Info_Basic) info;
 
             switch basic.basic_kind {
                 case .Void do return 0;
@@ -156,7 +156,7 @@ size_of :: (t: type_expr) -> u32 {
         case .Pointer do return sizeof rawptr;
 
         case .Array {
-            arr := cast(^Type_Info_Array) info;
+            arr := cast(&Type_Info_Array) info;
             return size_of(arr.of) * arr.count;
         }
 
@@ -164,12 +164,12 @@ size_of :: (t: type_expr) -> u32 {
         case .Dynamic_Array do return sizeof [..] void;
         case .Variadic_Argument do return sizeof str;
         case .Enum {
-            e := cast(^Type_Info_Enum) info;
+            e := cast(&Type_Info_Enum) info;
             return e.size;
         }
 
         case .Struct {
-            s := cast(^Type_Info_Struct) info;
+            s := cast(&Type_Info_Struct) info;
             return s.size;
         }
 
@@ -180,7 +180,7 @@ size_of :: (t: type_expr) -> u32 {
         case .Function do return 4;
 
         case .Distinct {
-            d := cast(^Type_Info_Distinct) info;
+            d := cast(&Type_Info_Distinct) info;
             return size_of(d.base_type);
         }
     }
@@ -193,8 +193,8 @@ offset_of :: (T: type_expr, member_name: str) -> u32 {
     if info == null         do return 0;
     if info.kind != .Struct do return 0;
 
-    struct_info := cast(^Type_Info_Struct) info;
-    for ^m: struct_info.members {
+    struct_info := cast(&Type_Info_Struct) info;
+    for &m: struct_info.members {
         if m.name == member_name do return m.offset;
     }
 
@@ -202,12 +202,12 @@ offset_of :: (T: type_expr, member_name: str) -> u32 {
     return 0;
 }
 
-get_struct_member :: (S: type_expr, member_name: str) -> ^Type_Info_Struct.Member {
-    info := cast(^Type_Info_Struct) get_type_info(S);
+get_struct_member :: (S: type_expr, member_name: str) -> &Type_Info_Struct.Member {
+    info := cast(&Type_Info_Struct) get_type_info(S);
     if info == null do return null;
     if info.kind != .Struct do return null;
 
-    for^ info.members {
+    for& info.members {
         if it.name == member_name do return it;
     }
 
@@ -218,7 +218,7 @@ get_tags_for_member :: (S: type_expr, member_name: str) -> [] any {
     ti := get_type_info(S);
     if ti.kind != .Struct do return .[];
     
-    for ^ (cast(^Type_Info_Struct) ti).members {
+    for & (cast(&Type_Info_Struct) ti).members {
         if it.name == member_name {
             return it.tags;
         }
@@ -231,14 +231,14 @@ struct_constructed_from :: (struct_type: type_expr, base_type: type_expr) -> boo
     struct_info := get_type_info(struct_type);
     if struct_info.kind != .Struct do return false;
 
-    return (cast(^Type_Info_Struct) struct_info).constructed_from == base_type;
+    return (cast(&Type_Info_Struct) struct_info).constructed_from == base_type;
 }
 
 struct_inherits :: (struct_type: type_expr, base_type: type_expr) -> bool {
-    struct_info := cast(^Type_Info_Struct) get_type_info(struct_type);
+    struct_info := cast(&Type_Info_Struct) get_type_info(struct_type);
     if struct_info.kind != .Struct do return false;
 
-    first_member := ^struct_info.members[0];
+    first_member := &struct_info.members[0];
     return first_member.used && first_member.type == base_type;
 }
 
@@ -259,8 +259,8 @@ enum_name :: (value: $Backing_Type) -> str {
     info := get_type_info(Backing_Type);
     if info.kind != .Enum do return null_str;
 
-    etype := cast(^Type_Info_Enum) info;
-    for ^member: etype.members {
+    etype := cast(&Type_Info_Enum) info;
+    for &member: etype.members {
         if member.value == ~~value do return member.name;
     }
     
@@ -271,8 +271,8 @@ enum_value :: ($E: type_expr, name: str) -> E {
     info := get_type_info(E); 
     if info.kind != .Enum do return ~~0;
 
-    etype := cast(^Type_Info_Enum) info;
-    for ^member: etype.members {
+    etype := cast(&Type_Info_Enum) info;
+    for &member: etype.members {
         if member.name == name do return ~~member.value;
     }
 
@@ -280,7 +280,7 @@ enum_value :: ($E: type_expr, name: str) -> E {
 }
 
 enum_values :: (E: type_expr) -> [] Type_Info_Enum.Member {
-    info := cast(^Type_Info_Enum) get_type_info(E);
+    info := cast(&Type_Info_Enum) get_type_info(E);
     if info.kind != .Enum do return .[];
 
     return info.members;
@@ -292,34 +292,34 @@ get_struct_by_name :: (name: str) -> type_expr {
         defer index += 1;
         if it.kind != .Struct do continue;
 
-        if (cast(^Type_Info_Struct) it).name == name do return cast(type_expr) index;
+        if (cast(&Type_Info_Struct) it).name == name do return cast(type_expr) index;
     }
 
     return void;
 }
 
-get_struct_method :: (type: type_expr, method_name: str) -> ^any {
-    info := cast(^Type_Info_Struct) get_type_info(type);
+get_struct_method :: (type: type_expr, method_name: str) -> &any {
+    info := cast(&Type_Info_Struct) get_type_info(type);
     if info.kind != .Struct do return null;
 
     method := core.array.first(info.methods, #(it.name == method_name));
-    if method != null do return ^method.func;
+    if method != null do return &method.func;
     return null;
 }
 
-populate_struct_vtable :: (table: ^$Table_Type, struct_type: type_expr, safe := true) {
-    v_info := cast(^Type_Info_Struct) get_type_info(Table_Type);
+populate_struct_vtable :: (table: &$Table_Type, struct_type: type_expr, safe := true) {
+    v_info := cast(&Type_Info_Struct) get_type_info(Table_Type);
     if v_info.kind != .Struct do return;
 
-    for^ member: v_info.members {
+    for& member: v_info.members {
         if get_type_info(member.type).kind != .Function do continue;
 
         struct_method := get_struct_method(struct_type, member.name);
         if struct_method == null do continue;
         if safe && struct_method.type != member.type do continue;
 
-        dest := cast(^()->void) (cast(^u8) table + member.offset);
-        *dest = *cast(^()->void) struct_method.data;
+        dest := cast(&()->void) (cast(&u8) table + member.offset);
+        *dest = *cast(&()->void) struct_method.data;
     }
 }
 

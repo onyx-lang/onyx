@@ -33,14 +33,14 @@ main :: (args) => {
     for file: os.with_file("./tests/aoc-2021/input/day17.txt") {
         reader := io.reader_make(file);
 
-        io.skip_bytes(^reader, 15);
-        tx0 = io.read_i32(^reader);
-        io.skip_bytes(^reader, 2);
-        tx1 = io.read_i32(^reader);
-        io.skip_bytes(^reader, 4);
-        ty0 = io.read_i32(^reader);
-        io.skip_bytes(^reader, 2);
-        ty1 = io.read_i32(^reader);
+        io.skip_bytes(&reader, 15);
+        tx0 = io.read_i32(&reader);
+        io.skip_bytes(&reader, 2);
+        tx1 = io.read_i32(&reader);
+        io.skip_bytes(&reader, 4);
+        ty0 = io.read_i32(&reader);
+        io.skip_bytes(&reader, 2);
+        ty1 = io.read_i32(&reader);
     }
 
     max := 0;

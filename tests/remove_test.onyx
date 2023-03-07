@@ -8,7 +8,7 @@ main :: (args) => {
 
     println(x);
 
-    for iter.as_iter(^x) {
+    for iter.as_iter(&x) {
         if it % 2 == 0 {
             #remove;
         }

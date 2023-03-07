@@ -10,9 +10,9 @@ main :: (args) => {
 
         #if PART == 1 {
             horizontal, vertical := 0, 0;
-            while !io.reader_empty(^reader) {
-                parts := string.split(io.read_line(^reader, inplace=true), #char " ");
-                defer memory.free_slice(^parts);
+            while !io.reader_empty(&reader) {
+                parts := string.split(io.read_line(&reader, inplace=true), #char " ");
+                defer memory.free_slice(&parts);
 
                 value := cast(i32) conv.str_to_i64(parts[1]);
                 switch parts[0] {
@@ -28,9 +28,9 @@ main :: (args) => {
         #if PART == 2 {
             horizontal, vertical, aim : i64;
             horizontal, vertical, aim = 0, 0, 0;
-            while !io.reader_empty(^reader) {
-                parts := string.split(io.read_line(^reader, inplace=true), #char " ");
-                defer memory.free_slice(^parts);
+            while !io.reader_empty(&reader) {
+                parts := string.split(io.read_line(&reader, inplace=true), #char " ");
+                defer memory.free_slice(&parts);
 
                 value := conv.str_to_i64(parts[1]);
                 switch parts[0] {

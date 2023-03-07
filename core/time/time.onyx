@@ -44,7 +44,7 @@ Timestamp :: struct #size (sizeof u32 * 12) {
 }
 
 @conv.Custom_Format_Proc.{ Timestamp }
-(output: ^conv.Format_Output, format: ^conv.Format, time: ^Timestamp) {
+(output: &conv.Format_Output, format: &conv.Format, time: &Timestamp) {
     time_buf: [64] u8;
     to_output := strftime(time_buf, "%Y-%m-%d %H:%M:%S", time);
 
@@ -52,7 +52,7 @@ Timestamp :: struct #size (sizeof u32 * 12) {
 }
 
 @conv.Custom_Parse_Proc.{ Timestamp }
-(time: ^Timestamp, data: str, _: Allocator) -> bool {
+(time: &Timestamp, data: str, _: Allocator) -> bool {
     return strptime(data, "%Y-%m-%d %H:%M:%S", time);
 }
 
@@ -77,7 +77,7 @@ localtime :: __time_localtime
 #overload
 localtime :: (seconds: u64) -> Timestamp {
     t: Timestamp;
-    __time_localtime(seconds, ^t);
+    __time_localtime(seconds, &t);
     return t;
 }
 
@@ -90,12 +90,12 @@ gmtime :: __time_gmtime
 #overload
 gmtime :: (seconds: u64) -> Timestamp {
     t: Timestamp;
-    __time_gmtime(seconds, ^t);
+    __time_gmtime(seconds, &t);
     return t;
 }
 
 
-strftime :: (buf: [] u8, format: [] u8, tm: ^Timestamp) -> str {
+strftime :: (buf: [] u8, format: [] u8, tm: &Timestamp) -> str {
     f := cast(cstr) core.alloc.from_stack(format.length + 1);
     core.memory.copy(f, format.data, format.length);
     f[format.length] = 0;
@@ -104,7 +104,7 @@ strftime :: (buf: [] u8, format: [] u8, tm: ^Timestamp) -> str {
     return buf[0..len];
 }
 
-strptime :: (buf_: [] u8, format_: [] u8, tm: ^Timestamp) -> bool {
+strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
     use core
 
     #persist weekdays   := str.[ "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" ];
@@ -118,18 +118,18 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: ^Timestamp) -> bool {
         c := format[0];
         switch c {
             case #char "%" {
-                string.advance(^format);
+                string.advance(&format);
                 switch format[0] {
                     case #char "a", #char "A" {
                         for i: weekdays.count {
                             w := weekdays[i];
                             if string.equal_insensitive(w, buf[0 .. w.length]) {
-                                string.advance(^buf, w.length);
+                                string.advance(&buf, w.length);
                                 tm.wday = i;
                                 break break;
 
                             } elseif string.equal_insensitive(w[0 .. 3], buf[0 .. 3]) {
-                                string.advance(^buf, 3);
+                                string.advance(&buf, 3);
                                 tm.wday = i;
                                 break break;
                             }
@@ -143,12 +143,12 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: ^Timestamp) -> bool {
                         for i: monthnames.count {
                             m := monthnames[i];
                             if string.equal_insensitive(m, buf[0 .. m.length]) {
-                                string.advance(^buf, m.length);
+                                string.advance(&buf, m.length);
                                 tm.mon = i;
                                 break break;
 
                             } elseif string.equal_insensitive(m[0 .. 3], buf[0 .. 3]) {
-                                string.advance(^buf, 3);
+                                string.advance(&buf, 3);
                                 tm.mon = i;
                                 break break;
                             }
@@ -159,21 +159,21 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: ^Timestamp) -> bool {
                     }
 
                     case #char "d", #char "e" {
-                        working = parse_number_and_advance(^buf, ^tm.mday, 1, 31, 0);
+                        working = parse_number_and_advance(&buf, &tm.mday, 1, 31, 0);
                     }
 
                     case #char "D" {
-                        working = parse_number_and_advance(^buf, ^tm.mon, 1, 12, -1);
+                        working = parse_number_and_advance(&buf, &tm.mon, 1, 12, -1);
                         if !working do break;
 
                         if buf[0] == #char "/" {
-                            string.advance(^buf);
-                            working = parse_number_and_advance(^buf, ^tm.mday, 1, 31, 0);
+                            string.advance(&buf);
+                            working = parse_number_and_advance(&buf, &tm.mday, 1, 31, 0);
                             if !working do break;
 
                             if buf[0] == #char "/" {
-                                string.advance(^buf);
-                                working = parse_number_and_advance(^buf, ^tm.year, 0, 99, 0);
+                                string.advance(&buf);
+                                working = parse_number_and_advance(&buf, &tm.year, 0, 99, 0);
                                 if working && tm.year < 69 {
                                     tm.year += 100;
                                 }
@@ -181,21 +181,21 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: ^Timestamp) -> bool {
                         }
                     }
 
-                    case #char "H" do working = parse_number_and_advance(^buf, ^tm.hour, 0, 23, 0);
-                    case #char "I" do working = parse_number_and_advance(^buf, ^tm.hour, 1, 12, 0);
-                    case #char "j" do working = parse_number_and_advance(^buf, ^tm.yday, 1, 366, -1);
-                    case #char "m" do working = parse_number_and_advance(^buf, ^tm.mon, 1, 12, -1);
-                    case #char "M" do working = parse_number_and_advance(^buf, ^tm.min, 0, 59, 0);
-                    case #char "n", #char "t" do string.strip_leading_whitespace(^buf);
+                    case #char "H" do working = parse_number_and_advance(&buf, &tm.hour, 0, 23, 0);
+                    case #char "I" do working = parse_number_and_advance(&buf, &tm.hour, 1, 12, 0);
+                    case #char "j" do working = parse_number_and_advance(&buf, &tm.yday, 1, 366, -1);
+                    case #char "m" do working = parse_number_and_advance(&buf, &tm.mon, 1, 12, -1);
+                    case #char "M" do working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0);
+                    case #char "n", #char "t" do string.strip_leading_whitespace(&buf);
 
                     case #char "p" {
                         if string.equal_insensitive(buf[0 .. 2], "am") {
                             if tm.hour == 12 do tm.hour = 0;
-                            string.advance(^buf, 2);
+                            string.advance(&buf, 2);
 
                         } elseif string.equal_insensitive(buf[0 .. 2], "pm") {
                             if tm.hour < 12 do tm.hour += 12;
-                            string.advance(^buf, 2);
+                            string.advance(&buf, 2);
 
                         } else {
                             working = false;
@@ -203,30 +203,30 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: ^Timestamp) -> bool {
                     }
 
                     case #char "r" {
-                        working = parse_number_and_advance(^buf, ^tm.hour, 1, 12, 0);
+                        working = parse_number_and_advance(&buf, &tm.hour, 1, 12, 0);
                         if !working do break;
 
                         if buf[0] == #char ":" {
-                            string.advance(^buf);
+                            string.advance(&buf);
 
-                            working = parse_number_and_advance(^buf, ^tm.min, 0, 59, 0);
+                            working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0);
                             if !working do break;
 
                             if buf[0] == #char ":" {
-                                string.advance(^buf);
+                                string.advance(&buf);
 
-                                working = parse_number_and_advance(^buf, ^tm.sec, 0, 59, 0);
+                                working = parse_number_and_advance(&buf, &tm.sec, 0, 59, 0);
                                 if !working do break;
 
-                                string.strip_leading_whitespace(^buf);
+                                string.strip_leading_whitespace(&buf);
 
                                 if string.equal_insensitive(buf[0 .. 2], "am") {
                                     if tm.hour == 12 do tm.hour = 0;
-                                    string.advance(^buf, 2);
+                                    string.advance(&buf, 2);
 
                                 } elseif string.equal_insensitive(buf[0 .. 2], "pm") {
                                     if tm.hour < 12 do tm.hour += 12;
-                                    string.advance(^buf, 2);
+                                    string.advance(&buf, 2);
 
                                 } else {
                                     working = false;
@@ -236,41 +236,41 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: ^Timestamp) -> bool {
                     }
 
                     case #char "R" {
-                        working = parse_number_and_advance(^buf, ^tm.hour, 1, 12, 0);
+                        working = parse_number_and_advance(&buf, &tm.hour, 1, 12, 0);
                         if !working do break;
 
                         if buf[0] == #char ":" {
-                            string.advance(^buf);
+                            string.advance(&buf);
 
-                            working = parse_number_and_advance(^buf, ^tm.min, 0, 59, 0);
+                            working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0);
                         }
                     }
 
-                    case #char "S" do working = parse_number_and_advance(^buf, ^tm.sec, 0, 59, 0);
+                    case #char "S" do working = parse_number_and_advance(&buf, &tm.sec, 0, 59, 0);
 
                     case #char "T" {
-                        working = parse_number_and_advance(^buf, ^tm.hour, 1, 12, 0);
+                        working = parse_number_and_advance(&buf, &tm.hour, 1, 12, 0);
                         if !working do break;
 
                         if buf[0] == #char ":" {
-                            string.advance(^buf);
+                            string.advance(&buf);
 
-                            working = parse_number_and_advance(^buf, ^tm.min, 0, 59, 0);
+                            working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0);
                             if !working do break;
 
                             if buf[0] == #char ":" {
-                                string.advance(^buf);
+                                string.advance(&buf);
 
-                                working = parse_number_and_advance(^buf, ^tm.sec, 0, 59, 0);
+                                working = parse_number_and_advance(&buf, &tm.sec, 0, 59, 0);
                             }
                         }
                     }
 
-                    case #char "w" do working = parse_number_and_advance(^buf, ^tm.wday, 0, 6, 0);
-                    case #char "Y" do working = parse_number_and_advance(^buf, ^tm.year, 1900, 65535, -1900);
+                    case #char "w" do working = parse_number_and_advance(&buf, &tm.wday, 0, 6, 0);
+                    case #char "Y" do working = parse_number_and_advance(&buf, &tm.year, 1900, 65535, -1900);
 
                     case #char "y" {
-                        working = parse_number_and_advance(^buf, ^tm.year, 0, 99, 0);
+                        working = parse_number_and_advance(&buf, &tm.year, 0, 99, 0);
                         if working && tm.year < 69 {
                             tm.year += 100;
                         }
@@ -280,7 +280,7 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: ^Timestamp) -> bool {
                         if buf[0] != #char "%" {
                             working = false;
                         }
-                        string.advance(^buf);
+                        string.advance(&buf);
                     }
 
                     case #default {
@@ -290,7 +290,7 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: ^Timestamp) -> bool {
             }
 
             case #char " ", #char "\t", #char "\r", #char "\n", #char "\f", #char "\v" {
-                string.strip_leading_whitespace(^buf);
+                string.strip_leading_whitespace(&buf);
             }
 
             case #default {
@@ -298,19 +298,19 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: ^Timestamp) -> bool {
                     working = false;
 
                 } else {
-                    string.advance(^buf);
+                    string.advance(&buf);
                 }
             }
         }
 
-        string.advance(^format);
+        string.advance(&format);
     }
 
     return working;
 
     //
     // Helper function used above
-    parse_number_and_advance :: (buf: ^[] u8, result: ^i32, low, high, offset: i32) -> bool {
+    parse_number_and_advance :: (buf: &[] u8, result: &i32, low, high, offset: i32) -> bool {
         use core {string}
 
         n := 0;

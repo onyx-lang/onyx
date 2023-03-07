@@ -29,11 +29,11 @@ init :: () {
     heap_state.remaining_space = (memory_size() << 16) - cast(u32) __heap_start;
 
     use core.alloc { heap_allocator }
-    heap_allocator.data = ^heap_state;
+    heap_allocator.data = &heap_state;
     heap_allocator.func = heap_alloc_proc;
 
     #if runtime.Multi_Threading_Enabled {
-        sync.mutex_init(^heap_mutex);
+        sync.mutex_init(&heap_mutex);
     }
 }
 
@@ -60,7 +60,7 @@ get_freed_size :: () => {
 
     // The global heap state
     heap_state : struct {
-        free_list       : ^heap_freed_block;
+        free_list       : &heap_freed_block;
         next_alloc      : rawptr;
         remaining_space : u32;
     }
@@ -72,8 +72,8 @@ get_freed_size :: () => {
 
     heap_freed_block :: struct {
         use base: heap_block;
-        next : ^heap_freed_block;
-        prev : ^heap_freed_block;
+        next : &heap_freed_block;
+        prev : &heap_freed_block;
     }
 
     heap_allocated_block :: struct {
@@ -89,13 +89,13 @@ get_freed_size :: () => {
     heap_alloc :: (size_: u32, align: u32) -> rawptr {
         if size_ == 0 do return null;
 
-        #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(^heap_mutex);
+        #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(&heap_mutex);
 
         size := size_ + sizeof heap_block;
         size = math.max(size, sizeof heap_freed_block);
-        memory.align(~~^size, ~~align);
+        memory.align(~~&size, ~~align);
 
-        prev := ^heap_state.free_list;
+        prev := &heap_state.free_list;
         hb := heap_state.free_list;
 
         best_extra := 0xffffffff;
@@ -112,7 +112,7 @@ get_freed_size :: () => {
                 }
             }
 
-            prev = ^hb.next;
+            prev = &hb.next;
             hb = hb.next;
         }
 
@@ -123,7 +123,7 @@ get_freed_size :: () => {
             }
 
             if best.size - size >= Block_Split_Size {
-                new_block := cast(^heap_freed_block) (cast(uintptr) best + size);
+                new_block := cast(&heap_freed_block) (cast(uintptr) best + size);
                 new_block.size = best.size - size;
                 new_block.next = best.next;
                 new_block.prev = best.prev;
@@ -147,7 +147,7 @@ get_freed_size :: () => {
         }
 
         if size < heap_state.remaining_space {
-            ret := cast(^heap_allocated_block) heap_state.next_alloc;
+            ret := cast(&heap_allocated_block) heap_state.next_alloc;
             ret.size = size;
             ret.size |= Allocated_Flag;
             ret.magic_number = Alloc_Block_Magic_Number;
@@ -165,7 +165,7 @@ get_freed_size :: () => {
         }
         heap_state.remaining_space += new_pages << 16;
 
-        ret := cast(^heap_allocated_block) heap_state.next_alloc;
+        ret := cast(&heap_allocated_block) heap_state.next_alloc;
         ret.size = size;
         ret.size |= Allocated_Flag;
         ret.magic_number = Alloc_Block_Magic_Number;
@@ -178,9 +178,9 @@ get_freed_size :: () => {
 
     heap_free :: (ptr: rawptr) {
         #if Enable_Debug do assert(ptr != null, "Trying to free a null pointer.");
-        #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(^heap_mutex);
+        #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(&heap_mutex);
 
-        hb_ptr := cast(^heap_freed_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
+        hb_ptr := cast(&heap_freed_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
         #if Enable_Debug {
             // assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on free. This could be due to a double free, or using memory past were you allocated it.");
 
@@ -208,7 +208,7 @@ get_freed_size :: () => {
         }
 
         if cast(uintptr) hb_ptr + hb_ptr.size < cast(uintptr) heap_state.next_alloc {
-            next_block := cast(^heap_freed_block) (cast(uintptr) hb_ptr + hb_ptr.size);
+            next_block := cast(&heap_freed_block) (cast(uintptr) hb_ptr + hb_ptr.size);
 
             if next_block.size & Allocated_Flag == 0 && next_block.magic_number == Free_Block_Magic_Number {
                 hb_ptr.size += next_block.size;
@@ -233,7 +233,7 @@ get_freed_size :: () => {
         {
             walker := heap_state.free_list;
             while walker != null {
-                after_block := cast(^heap_freed_block) (cast(uintptr) walker + walker.size);
+                after_block := cast(&heap_freed_block) (cast(uintptr) walker + walker.size);
                 if after_block == hb_ptr {
                     hb_ptr.next = null;
                     hb_ptr.prev = null;
@@ -256,13 +256,13 @@ get_freed_size :: () => {
     heap_resize :: (ptr: rawptr, new_size_: u32, align: u32) -> rawptr {
         if ptr == null do return heap_alloc(new_size_, align);
 
-        #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(^heap_mutex);
+        #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(&heap_mutex);
 
         new_size := new_size_ + sizeof heap_block;
         new_size = math.max(new_size, sizeof heap_freed_block);
         new_size = ~~memory.align(cast(u64) new_size, ~~align);
 
-        hb_ptr := cast(^heap_allocated_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
+        hb_ptr := cast(&heap_allocated_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
         #if Enable_Debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on resize.");
         hb_ptr.size &= ~Allocated_Flag;
 
@@ -298,7 +298,7 @@ get_freed_size :: () => {
 
         hb_ptr.size |= Allocated_Flag;
         new_ptr := heap_alloc(new_size_, align);
-        #if runtime.Multi_Threading_Enabled do sync.mutex_lock(^heap_mutex);
+        #if runtime.Multi_Threading_Enabled do sync.mutex_lock(&heap_mutex);
         
         memory_copy(new_ptr, ptr, old_size - sizeof heap_block);
         heap_free(ptr);

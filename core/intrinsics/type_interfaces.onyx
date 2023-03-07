@@ -6,7 +6,7 @@ package core.intrinsics.types
 // Int: u8, .., u64  i8, .., i64
 // Float: f32 f64
 // Simd: v128 i8x16 i16x8 i32x4 i64x2 f32x4 f64x2
-// Pointer: ^T rawptr
+// Pointer: &T rawptr
 // Compound: array, slice, struct
 // Array: [$N] $T
 // Slice: [] $T

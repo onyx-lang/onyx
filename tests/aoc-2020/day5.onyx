@@ -6,13 +6,13 @@ main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day5.txt";
 
     vals := array.make(u32);
-    defer array.free(^vals);
+    defer array.free(&vals);
 
     max_val := 0;
 
     while true {
-        line := string.read_until(^contents, #char "\n");
-        string.advance(^contents);
+        line := string.read_until(&contents, #char "\n");
+        string.advance(&contents);
         if line.count == 0 do break;
 
         val := 0;
@@ -22,7 +22,7 @@ main :: (args: [] cstr) {
         }
 
         max_val = math.max(max_val, val);
-        array.push(^vals, val);
+        array.push(&vals, val);
     }
 
     missing := 0;

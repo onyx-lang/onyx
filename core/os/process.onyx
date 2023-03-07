@@ -24,20 +24,20 @@ process_spawn :: (path: str, args: [] str, non_blocking_io := false, starting_di
     handle := __process_spawn(path, args, non_blocking_io, starting_directory);
 
     return .{
-        .{ ^process_stream_vtable },
+        .{ &process_stream_vtable },
         handle,
     };
 }
 
-process_kill :: (use p: ^Process) -> bool {
+process_kill :: (use p: &Process) -> bool {
     return __process_kill(process_handle);
 }
 
-process_wait :: (use p: ^Process) => {
+process_wait :: (use p: &Process) => {
     return __process_wait(process_handle);
 }
 
-process_destroy :: (use p: ^Process) => {
+process_destroy :: (use p: &Process) => {
     __process_destroy(process_handle);
 }
 
@@ -48,7 +48,7 @@ process_destroy :: (use p: ^Process) => {
 }
 
 #local process_stream_vtable := io.Stream_Vtable.{
-    read = (use p: ^Process, buffer: [] u8) -> (io.Error, u32) {
+    read = (use p: &Process, buffer: [] u8) -> (io.Error, u32) {
         // Read from the process stdout
         if cast(i64) process_handle == 0 do return .BadFile, 0;
 
@@ -63,7 +63,7 @@ process_destroy :: (use p: ^Process) => {
         return .None, bytes_read;
     },
 
-    write = (use p: ^Process, buffer: [] u8) -> (io.Error, u32) {
+    write = (use p: &Process, buffer: [] u8) -> (io.Error, u32) {
         // Write to the process stdin
         if cast(i64) process_handle == 0 do return .BadFile, 0;
 
@@ -71,7 +71,7 @@ process_destroy :: (use p: ^Process) => {
         return .None, bytes_written;
     },
 
-    close = (use p: ^Process) -> io.Error {
+    close = (use p: &Process) -> io.Error {
         process_kill(p);
         return .None;
     }

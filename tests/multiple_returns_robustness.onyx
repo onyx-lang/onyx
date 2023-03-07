@@ -48,7 +48,7 @@ main :: (args: [] cstr) {
     array_print(farr);
 
     array_print :: (arr: [$N] $T) {
-        for ^e: arr {
+        for &e: arr {
             print(*e);
             print(" ");
         }

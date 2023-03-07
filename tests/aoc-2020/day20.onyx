@@ -66,7 +66,7 @@ reverse_binary :: (n_: u32, digits := TILE_DATA_WIDTH) -> u32 {
 
 build_edges :: (tile: [] bool, a := context.allocator) -> [] u32 {
 	edges : [..] u32;
-    array.init(^edges, 8, allocator=a);
+    array.init(&edges, 8, allocator=a);
 
 	for y: u32.[0, 9] {
 		edge := 0;
@@ -75,7 +75,7 @@ build_edges :: (tile: [] bool, a := context.allocator) -> [] u32 {
 			if tile[x + y * TILE_DATA_WIDTH] do edge |= 1;
 		}
 
-        array.push(^edges, edge);
+        array.push(&edges, edge);
 	}	
 
 	for x: u32.[0, 9] {
@@ -85,10 +85,10 @@ build_edges :: (tile: [] bool, a := context.allocator) -> [] u32 {
 			if tile[x + y * TILE_DATA_WIDTH] do edge |= 1;
 		}
 
-        array.push(^edges, edge);
+        array.push(&edges, edge);
 	}	
 
-	for i: 0 .. 4 do array.push(^edges, reverse_binary(edges[i]));
+	for i: 0 .. 4 do array.push(&edges, reverse_binary(edges[i]));
 
 	return edges.data[0 .. 8];
 }
@@ -106,7 +106,7 @@ side_relations := ([4] TO).[
     TO.[ TO.R90,   TO.FR270, TO.F,     TO.R180,   ],
 ];
 
-has_matching_edges :: (t1: ^Tile, t2: ^Tile) -> bool {
+has_matching_edges :: (t1: &Tile, t2: &Tile) -> bool {
     match := false;
 
 	for e_idx: 0 .. t1.edges.count / 2 do for e2_idx: 0 .. t2.edges.count {
@@ -126,7 +126,7 @@ has_matching_edges :: (t1: ^Tile, t2: ^Tile) -> bool {
 }
 
 // This assumes the `t` was in NORMAL orientation to begin with.
-apply_orientation :: (t: ^Tile, ori: TO) {
+apply_orientation :: (t: &Tile, ori: TO) {
     new_sides := t.edges_match;
 
     switch ori {
@@ -179,16 +179,16 @@ apply_orientation :: (t: ^Tile, ori: TO) {
     t.orientation = ori;
 }
 
-index_square_with_orientation :: (data: ^$T, ori: TO, size: i32, x: i32, y: i32) -> ^T {
+index_square_with_orientation :: (data: &$T, ori: TO, size: i32, x: i32, y: i32) -> &T {
     switch ori {
-        case TO.N     do return ^data[x + y * size];
-        case TO.R90   do return ^data[y + (size - 1 - x) * size];
-        case TO.R180  do return ^data[(size - 1 - x) + (size - 1 - y) * size];
-        case TO.R270  do return ^data[(size - 1 - y) + x * size];
-        case TO.F     do return ^data[x + (size - 1 - y) * size];
-        case TO.FR90  do return ^data[y + x * size];
-        case TO.FR180 do return ^data[(size - 1 - x) + y * size];
-        case TO.FR270 do return ^data[(size - 1 - y) + (size - 1 - x) * size];
+        case TO.N     do return &data[x + y * size];
+        case TO.R90   do return &data[y + (size - 1 - x) * size];
+        case TO.R180  do return &data[(size - 1 - x) + (size - 1 - y) * size];
+        case TO.R270  do return &data[(size - 1 - y) + x * size];
+        case TO.F     do return &data[x + (size - 1 - y) * size];
+        case TO.FR90  do return &data[y + x * size];
+        case TO.FR180 do return &data[(size - 1 - x) + y * size];
+        case TO.FR270 do return &data[(size - 1 - y) + (size - 1 - x) * size];
     }
 
     return null;
@@ -202,7 +202,7 @@ sea_monster := u8.[
     #char" ",#char"#",#char" ",#char" ",#char"#",#char" ",#char" ",#char"#",#char" ",#char" ",#char"#",#char" ",#char" ",#char"#",#char" ",#char" ",#char"#",#char" ",#char" ",#char" ",
 ];
 
-scan_for_monsters :: (forest: ^u8, ori: TO, width: u32, height: u32) -> bool {
+scan_for_monsters :: (forest: &u8, ori: TO, width: u32, height: u32) -> bool {
     found_monsters := false;
 
     for y: 0 .. height - sea_monster_height {
@@ -243,12 +243,12 @@ main :: (args: [] cstr) {
 	file := contents;	
 
 	tiles := array.make(Tile);
-	defer array.free(^tiles);
+	defer array.free(&tiles);
 
-    tile_map := map.make(u32, ^Tile, null);
-    defer map.free(^tile_map);
+    tile_map := map.make(u32, &Tile, null);
+    defer map.free(&tile_map);
 
-	tile_data := cast(^TileData) calloc(200 * sizeof TileData);
+	tile_data := cast(&TileData) calloc(200 * sizeof TileData);
 	defer cfree(tile_data);
 	
     // This ring allocator could technically overflow and start
@@ -256,15 +256,15 @@ main :: (args: [] cstr) {
     // should be more than enough space in the allocator to not
     // run into that problem... Hopefully.
 	tile_data_ring := alloc.ring.make(.{ ~~ tile_data, 200 * sizeof TileData });
-	tile_allocator := alloc.ring.make_allocator(^tile_data_ring);
+	tile_allocator := alloc.ring.make_allocator(&tile_data_ring);
 
 	while !string.empty(file) {
-		string.advance(^file, 5); // 'Tile '
-		id := cast(u32, conv.parse_int(^file));
+		string.advance(&file, 5); // 'Tile '
+		id := cast(u32, conv.parse_int(&file));
 
-		string.advance_line(^file);
+		string.advance_line(&file);
 
-		td := cast(^bool) raw_alloc(tile_allocator, sizeof TileData);
+		td := cast(&bool) raw_alloc(tile_allocator, sizeof TileData);
 
 		for y: 0 .. 10 {
 			line, file' := string.bisect(file, #char "\n");
@@ -277,17 +277,17 @@ main :: (args: [] cstr) {
 		tile_data := td[0 .. TILE_DATA_HEIGHT * TILE_DATA_WIDTH];
 		edges := build_edges(tile_data, tile_allocator);
 
-		array.push(^tiles, .{
+		array.push(&tiles, .{
 			id = id,
 			orientation = TO.N,
 			data = tile_data,
 			edges = edges,
 		});
 
-		string.advance_line(^file);
+		string.advance_line(&file);
 	}
 
-    for ^t: tiles do map.put(^tile_map, t.id, t);
+    for &t: tiles do map.put(&tile_map, t.id, t);
 
 	prod: u64 = 1;
     top_left_id := 0;
@@ -297,7 +297,7 @@ main :: (args: [] cstr) {
 
 		for j: 0 .. tiles.count {
 			if i == j do continue;
-			if has_matching_edges(^tiles[i], ^tiles[j]) {
+			if has_matching_edges(&tiles[i], &tiles[j]) {
 				matching_count += 1;
 			}
 		}
@@ -315,7 +315,7 @@ main :: (args: [] cstr) {
 	printf("Corner product: {}\n", prod);
 
     grid : [12 * 12] u32;
-    memory.set(^grid, 0, sizeof [12 * 12] u32);
+    memory.set(&grid, 0, sizeof [12 * 12] u32);
 
     tile_pos_state :: struct {
         match   : SideRelation;
@@ -323,36 +323,36 @@ main :: (args: [] cstr) {
         pos_y   : i32;
     }
     to_process := array.make(tile_pos_state);
-    defer array.free(^to_process);
+    defer array.free(&to_process);
     
-    array.push(^to_process, .{ .{ top_left_id, TO.F }, 0, 0 });
+    array.push(&to_process, .{ .{ top_left_id, TO.F }, 0, 0 });
     while to_process.count > 0 {
         tid := to_process[0];
-        array.delete(^to_process, 0);
+        array.delete(&to_process, 0);
 
         if grid[tid.pos_x + 12 * tid.pos_y] != 0 do continue;
         
-        tile_ptr := map.get(^tile_map, tid.match.tile);
+        tile_ptr := map.get(&tile_map, tid.match.tile);
         tile_ptr.pos_x = tid.pos_x;
         tile_ptr.pos_y = tid.pos_y;
         grid[tid.pos_x + 12 * tid.pos_y] = tid.match.tile;
 
         apply_orientation(tile_ptr, tid.match.ori);
 
-        if tile_ptr.edges_match.top.tile    != 0 do array.push(^to_process, .{ tile_ptr.edges_match.top,    tid.pos_x, tid.pos_y - 1 });
-        if tile_ptr.edges_match.bottom.tile != 0 do array.push(^to_process, .{ tile_ptr.edges_match.bottom, tid.pos_x, tid.pos_y + 1 });
-        if tile_ptr.edges_match.left.tile   != 0 do array.push(^to_process, .{ tile_ptr.edges_match.left,   tid.pos_x - 1, tid.pos_y });
-        if tile_ptr.edges_match.right.tile  != 0 do array.push(^to_process, .{ tile_ptr.edges_match.right,  tid.pos_x + 1, tid.pos_y });
+        if tile_ptr.edges_match.top.tile    != 0 do array.push(&to_process, .{ tile_ptr.edges_match.top,    tid.pos_x, tid.pos_y - 1 });
+        if tile_ptr.edges_match.bottom.tile != 0 do array.push(&to_process, .{ tile_ptr.edges_match.bottom, tid.pos_x, tid.pos_y + 1 });
+        if tile_ptr.edges_match.left.tile   != 0 do array.push(&to_process, .{ tile_ptr.edges_match.left,   tid.pos_x - 1, tid.pos_y });
+        if tile_ptr.edges_match.right.tile  != 0 do array.push(&to_process, .{ tile_ptr.edges_match.right,  tid.pos_x + 1, tid.pos_y });
     }
 
     forest : [12 * 8 * 12 * 8] u8;
     for y: 0 .. 12 {
         for x: 0 .. 12 {
-            tile := map.get(^tile_map, grid[y * 12 + x]);
+            tile := map.get(&tile_map, grid[y * 12 + x]);
 
             for fy: 0 .. 8 {
                 for fx: 0 .. 8 {
-                    res := *index_square_with_orientation(cast(^bool) tile.data.data, tile.orientation, 10, fx + 1, fy + 1);
+                    res := *index_square_with_orientation(cast(&bool) tile.data.data, tile.orientation, 10, fx + 1, fy + 1);
                     loc := (y * 12 * 8 * 8) + (fy * 12 * 8) + (x * 8) + fx;
                     if res do forest[loc] = #char "#";
                     else   do forest[loc] = #char ".";
@@ -362,7 +362,7 @@ main :: (args: [] cstr) {
     }
 
     for ori: .[ TO.N, TO.R90, TO.R180, TO.R270, TO.F, TO.FR90, TO.FR180, TO.FR270 ] {
-        if scan_for_monsters(cast(^u8) forest, ori, 12 * 8, 12 * 8) do break;
+        if scan_for_monsters(cast(&u8) forest, ori, 12 * 8, 12 * 8) do break;
     }
     
     safe_count := 0;

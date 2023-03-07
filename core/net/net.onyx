@@ -70,19 +70,19 @@ Socket_Address :: struct #size (8 + UNIX_SOCKET_PATH_LEN) {
     port: u16;
     addr: u32;
 
-    addr_as_str :: (use this: ^Socket_Address, allocator := context.allocator) -> str {
+    addr_as_str :: (use this: &Socket_Address, allocator := context.allocator) -> str {
         str_addr := ipv4_to_str(this.addr);
         return string.alloc_copy(str_addr, allocator=allocator);
     }
 }
 
-make_ipv4_address :: (out: ^Socket_Address, addr: u32, port: u16) {
+make_ipv4_address :: (out: &Socket_Address, addr: u32, port: u16) {
     out.family = ~~ SocketDomain.Inet;
     out.port = port;
     out.addr = addr;
 }
 
-make_unix_address :: (out: ^Socket_Address, path: str) {
+make_unix_address :: (out: &Socket_Address, path: str) {
     out.family = ~~ SocketDomain.Unix;
     out.port   = 0;
 
@@ -91,7 +91,7 @@ make_unix_address :: (out: ^Socket_Address, path: str) {
     // at the address where the addr field is in the Socket_Address.
     // We also have to append a null-terminator, as that is what will
     // be expected from any C function.
-    out_path := cast(^u8) ^out.addr;
+    out_path := cast(&u8) &out.addr;
     offset   := 0;
     while offset < math.min(path.count, UNIX_SOCKET_PATH_LEN - 1) {
         defer offset += 1;
@@ -107,21 +107,21 @@ socket_create :: (domain: SocketDomain, type: SocketType) -> (Socket, SocketErro
     s.type = type;
     s.family = domain;
 
-    err := __net_create_socket(^s.handle, domain, type);
+    err := __net_create_socket(&s.handle, domain, type);
     if err == .None {
-        s.vtable = ^__net_socket_vtable;
+        s.vtable = &__net_socket_vtable;
         s.flags |= .Block_On_Read;
     }
 
     return s, err;
 }
 
-socket_close :: (s: ^Socket) {
+socket_close :: (s: &Socket) {
     __net_close_socket(s.handle);
     s.vtable = null;
 }
 
-socket_setting :: (s: ^Socket, setting: SocketSetting, value: u32) {
+socket_setting :: (s: &Socket, setting: SocketSetting, value: u32) {
     __net_setting(s.handle, setting, value);
 
     if setting == .NonBlocking {
@@ -130,11 +130,11 @@ socket_setting :: (s: ^Socket, setting: SocketSetting, value: u32) {
     }
 }
 
-socket_is_alive :: (s: ^Socket) -> bool {
+socket_is_alive :: (s: &Socket) -> bool {
     return s.vtable != null;
 }
 
-socket_connect :: (s: ^Socket, host: str, port: u16 = 0) -> SocketError {
+socket_connect :: (s: &Socket, host: str, port: u16 = 0) -> SocketError {
     switch s.family {
         case .Inet do return __net_connect_ipv4(s.handle, host, port);
         case .Unix do return __net_connect_unix(s.handle, host);
@@ -142,25 +142,25 @@ socket_connect :: (s: ^Socket, host: str, port: u16 = 0) -> SocketError {
     }
 }
 
-socket_bind :: (s: ^Socket, bind_address: ^Socket_Address) -> bool {
+socket_bind :: (s: &Socket, bind_address: &Socket_Address) -> bool {
     return __net_bind(s.handle, bind_address);
 }
 
-socket_listen :: (s: ^Socket, backlog := 32) {
+socket_listen :: (s: &Socket, backlog := 32) {
     __net_listen(s.handle, backlog);
 }
 
-socket_shutdown :: (s: ^Socket, how: SocketShutdown) {
+socket_shutdown :: (s: &Socket, how: SocketShutdown) {
     __net_shutdown(s.handle, cast(u32) how);
 }
 
-socket_accept :: (s: ^Socket) -> (Socket, Socket_Address) {
+socket_accept :: (s: &Socket) -> (Socket, Socket_Address) {
     new_socket: Socket;
     new_addr: Socket_Address;
-    new_socket.handle = __net_accept(s.handle, ^new_addr);
+    new_socket.handle = __net_accept(s.handle, &new_addr);
 
     if cast(i32) new_socket.handle >= 0 {
-        new_socket.vtable = ^__net_socket_vtable;
+        new_socket.vtable = &__net_socket_vtable;
     }
 
     return new_socket, new_addr;
@@ -175,7 +175,7 @@ Socket_Poll_Status :: enum {
 // TODO: Cleanup this function. The stat_buff should be something that is at least
 // as big as the sockets array, and the timeout should be the last parameter because
 // it is not required.
-socket_poll_all :: (sockets: [] ^Socket, timeout := -1, stat_buff: [] Socket_Poll_Status = .[]) {
+socket_poll_all :: (sockets: [] &Socket, timeout := -1, stat_buff: [] Socket_Poll_Status = .[]) {
     if sockets.count > stat_buff.count do return;
 
     handles := alloc.array_from_stack(Socket.Handle, sockets.count);
@@ -186,18 +186,18 @@ socket_poll_all :: (sockets: [] ^Socket, timeout := -1, stat_buff: [] Socket_Pol
     __net_poll_recv(handles, timeout, stat_buff.data);
 }
 
-socket_send :: (s: ^Socket, data: [] u8) -> i32 {
+socket_send :: (s: &Socket, data: [] u8) -> i32 {
     sent := __net_send(s.handle, data);
     if sent < 0 { s.vtable = null; }
     return sent;
 }
 
-socket_sendto :: (s: ^Socket, data: [] u8, addr: ^Socket_Address) -> i32 {
+socket_sendto :: (s: &Socket, data: [] u8, addr: &Socket_Address) -> i32 {
     sent := __net_sendto(s.handle, data, addr);
     return sent;
 }
 
-socket_sendall :: (s: ^Socket, data: [] u8) {
+socket_sendall :: (s: &Socket, data: [] u8) {
     to_send := data;
 
     while to_send.count > 0 {
@@ -207,10 +207,10 @@ socket_sendall :: (s: ^Socket, data: [] u8) {
     }
 }
 
-socket_recv :: (s: ^Socket, maxlen := 1024, allocator := context.allocator) -> [] u8 {
+socket_recv :: (s: &Socket, maxlen := 1024, allocator := context.allocator) -> [] u8 {
     buffer := alloc.from_stack(maxlen);
     would_block: bool;
-    received := __net_recv(s.handle, .{ buffer, maxlen }, ^would_block);
+    received := __net_recv(s.handle, .{ buffer, maxlen }, &would_block);
     if received < 0 { 
         if !would_block do s.vtable = null;
         return .[];
@@ -222,20 +222,20 @@ socket_recv :: (s: ^Socket, maxlen := 1024, allocator := context.allocator) -> [
     return result;
 }
 
-socket_recv_into :: (s: ^Socket, buffer: [] u8) -> i32 {
+socket_recv_into :: (s: &Socket, buffer: [] u8) -> i32 {
     would_block: bool;
-    received := __net_recv(s.handle, buffer, ^would_block);
+    received := __net_recv(s.handle, buffer, &would_block);
     if received < 0 && !would_block do s.vtable = null;
     if would_block do return 0;
 
     return received;
 }
 
-socket_recvfrom :: (s: ^Socket, buffer: [] u8) -> (Socket_Address, i32) {
+socket_recvfrom :: (s: &Socket, buffer: [] u8) -> (Socket_Address, i32) {
     would_block: bool;
     sa: Socket_Address;
 
-    received := __net_recvfrom(s.handle, buffer, ^sa, ^would_block);
+    received := __net_recvfrom(s.handle, buffer, &sa, &would_block);
     if received < 0 && !would_block do s.vtable = null;
     if would_block do return sa, 0;
 
@@ -251,11 +251,11 @@ network_to_host :: #match #local {}
 #match network_to_host (x: u32) => __net_net_to_host_l(x);
 
 #local __net_socket_vtable := io.Stream_Vtable.{
-    read = (use s: ^Socket, buffer: [] u8) -> (io.Error, u32) {
+    read = (use s: &Socket, buffer: [] u8) -> (io.Error, u32) {
         if cast(i32) handle == 0 do return .BadFile, 0;
         
         would_block := false;
-        bytes_read := __net_recv(handle, buffer, ^would_block);
+        bytes_read := __net_recv(handle, buffer, &would_block);
         if bytes_read < 0 && !would_block do s.vtable = null;
 
         if would_block do return .ReadLater, bytes_read;
@@ -263,7 +263,7 @@ network_to_host :: #match #local {}
         return .None, bytes_read;
     },
 
-    write_byte = (use s: ^Socket, byte: u8) -> io.Error {
+    write_byte = (use s: &Socket, byte: u8) -> io.Error {
         if cast(i32) handle == 0 do return .BadFile;
 
         bytes_written := __net_send(handle, .[ byte ]);
@@ -271,7 +271,7 @@ network_to_host :: #match #local {}
         return .None;
     },
 
-    write = (use s: ^Socket, buffer: [] u8) -> (io.Error, u32) {
+    write = (use s: &Socket, buffer: [] u8) -> (io.Error, u32) {
         if cast(i32) handle == 0 do return .BadFile, 0;
         
         bytes_written := __net_send(handle, buffer);
@@ -279,7 +279,7 @@ network_to_host :: #match #local {}
         return .None, bytes_written;
     },
 
-    close = (use p: ^Socket) -> io.Error {
+    close = (use p: &Socket) -> io.Error {
         __net_close_socket(handle);
         return .None;
     }
@@ -291,20 +291,20 @@ network_to_host :: #match #local {}
 // I need to see how WASI does sockets to see if this
 // makes sense as an abstraction.
 #foreign "onyx_runtime" {
-    #package __net_create_socket :: (out_handle: ^Socket.Handle, domain: SocketDomain, type: SocketType) -> SocketError ---
+    #package __net_create_socket :: (out_handle: &Socket.Handle, domain: SocketDomain, type: SocketType) -> SocketError ---
     #package __net_close_socket  :: (handle: Socket.Handle)               -> void ---
     #package __net_setting       :: (handle: Socket.Handle, setting: SocketSetting, value: i32) -> void ---
-    #package __net_bind          :: (handle: Socket.Handle, bind_address: ^Socket_Address)    -> bool ---
+    #package __net_bind          :: (handle: Socket.Handle, bind_address: &Socket_Address)    -> bool ---
     #package __net_listen        :: (handle: Socket.Handle, backlog: i32) -> void ---
-    #package __net_accept        :: (handle: Socket.Handle, out_address: ^Socket_Address) -> Socket.Handle ---
+    #package __net_accept        :: (handle: Socket.Handle, out_address: &Socket_Address) -> Socket.Handle ---
     #package __net_connect_unix  :: (handle: Socket.Handle, path: str) -> SocketError ---
     #package __net_connect_ipv4  :: (handle: Socket.Handle, host: str, port: u16) -> SocketError ---
     #package __net_shutdown      :: (handle: Socket.Handle, how: u32) -> void ---
     #package __net_send          :: (handle: Socket.Handle, data: [] u8)  -> i32 ---
-    #package __net_sendto        :: (handle: Socket.Handle, data: [] u8, addr: ^Socket_Address)  -> i32 ---
-    #package __net_recv          :: (handle: Socket.Handle, data: [] u8, async_would_block: ^bool) -> i32 ---
-    #package __net_recvfrom      :: (handle: Socket.Handle, data: [] u8, out_recv_addr: ^Socket_Address, async_would_block: ^bool) -> i32 ---
-    #package __net_poll_recv     :: (handle: [] Socket.Handle, timeout: i32, out_statuses: ^Socket_Poll_Status) -> void ---
+    #package __net_sendto        :: (handle: Socket.Handle, data: [] u8, addr: &Socket_Address)  -> i32 ---
+    #package __net_recv          :: (handle: Socket.Handle, data: [] u8, async_would_block: &bool) -> i32 ---
+    #package __net_recvfrom      :: (handle: Socket.Handle, data: [] u8, out_recv_addr: &Socket_Address, async_would_block: &bool) -> i32 ---
+    #package __net_poll_recv     :: (handle: [] Socket.Handle, timeout: i32, out_statuses: &Socket_Poll_Status) -> void ---
 
     #package __net_host_to_net_s :: (s: u16) -> u16 ---
     #package __net_host_to_net_l :: (s: u32) -> u32 ---
@@ -326,8 +326,8 @@ str_to_ipv4 :: (ip: str) -> u32 {
 
     res: u32;
     for 4 {
-        octet := string.read_until(^ip_, #char ".");
-        string.advance(^ip_, 1);
+        octet := string.read_until(&ip_, #char ".");
+        string.advance(&ip_, 1);
 
         res = res << 8;
         res |= ~~(conv.str_to_i64(octet) & cast(i64) 0xFF);

@@ -141,7 +141,7 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
         res := r;
         if res.status == .Ok do return res.__data.value;
 
-        return #from_enclosing .{ .Err, .{ error = res.__data.error } };
+        return return .{ .Err, .{ error = res.__data.error } };
     }
 
     #doc """
@@ -152,14 +152,14 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
         res := r;
         if res.status == .Ok do return res.__data.value;
         
-        return #from_enclosing v;
+        return return v;
     }
 
     #doc """
         If result contains Err, the given code is run. This code is
         expected to either:
             - Return a good value with `return`
-            - Return an error value with `return #from_enclosing`
+            - Return an error value with `return return`
 
         This procedure is subject to change.
     """
@@ -170,7 +170,7 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
         #unquote on_err;
     }
 
-    format :: (o: ^conv.Format_Output, format: ^conv.Format, res: ^Result($T, $E)) {
+    format :: (o: &conv.Format_Output, format: &conv.Format, res: &Result($T, $E)) {
         if res.status == .Ok {
             conv.format(o, "{}({\"})", res.status, res.__data.value);
         } else {

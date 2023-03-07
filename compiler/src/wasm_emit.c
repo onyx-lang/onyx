@@ -3755,7 +3755,7 @@ EMIT_FUNC(return, AstReturn* ret) {
     bh_arr(WasmInstruction) code = *pcode;
 
     AstLocal* result_destination = NULL;
-    i64 jump_label = get_structured_jump_label(mod, Jump_Type_Return, ret->from_enclosing_scope ? 2 : 1);
+    i64 jump_label = get_structured_jump_label(mod, Jump_Type_Return, ret->count + 1);
 
     if (bh_arr_length(mod->return_location_stack) > 0 && jump_label >= 0) {
         result_destination = bh_arr_last(mod->return_location_stack);

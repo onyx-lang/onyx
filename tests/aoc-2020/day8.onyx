@@ -12,9 +12,9 @@ Instruction :: struct {
 }
 
 // Returns if the program successfully exited.
-get_acc_value :: (instrs: [..] Instruction, ret_acc: ^i32) -> bool {
+get_acc_value :: (instrs: [..] Instruction, ret_acc: &i32) -> bool {
     already_been := map.make(i32, bool, false);
-    defer map.free(^already_been);
+    defer map.free(&already_been);
 
     ip   := 0;
     acc  := 0;
@@ -25,8 +25,8 @@ get_acc_value :: (instrs: [..] Instruction, ret_acc: ^i32) -> bool {
             break;
         }
         
-        if map.has(^already_been, ip) do break;
-        map.put(^already_been, ip, true);
+        if map.has(&already_been, ip) do break;
+        map.put(&already_been, ip, true);
 
         switch instrs[ip].opcode {
             case OpCode.Nop do ip += 1;
@@ -48,17 +48,17 @@ main :: (args: [] cstr) {
     file := contents;
 
     instrs := array.make(Instruction, 32);
-    defer array.free(^instrs);
+    defer array.free(&instrs);
 
     while !string.empty(file) {
         word := file.data[0 .. 3];
-        string.advance(^file, 4);
+        string.advance(&file, 4);
 
         sign := file.data[0];
-        string.advance(^file, 1);
-        val := cast(i32) conv.parse_int(^file);
+        string.advance(&file, 1);
+        val := cast(i32) conv.parse_int(&file);
 
-        string.advance_line(^file);
+        string.advance_line(&file);
 
         if sign == #char "-" do val *= -1;
 
@@ -67,15 +67,15 @@ main :: (args: [] cstr) {
         elseif string.equal(word, "acc") do opcode = OpCode.Acc;
         elseif string.equal(word, "jmp") do opcode = OpCode.Jmp;
 
-        array.push(^instrs, .{ opcode, ~~val });
+        array.push(&instrs, .{ opcode, ~~val });
     }
 
     acc: i32;
-    for ^instr: instrs {
+    for &instr: instrs {
         if     instr.opcode == OpCode.Nop do instr.opcode = OpCode.Jmp;
         elseif instr.opcode == OpCode.Jmp do instr.opcode = OpCode.Nop;
 
-        if get_acc_value(instrs, ^acc) do break;
+        if get_acc_value(instrs, &acc) do break;
 
         if     instr.opcode == OpCode.Nop do instr.opcode = OpCode.Jmp;
         elseif instr.opcode == OpCode.Jmp do instr.opcode = OpCode.Nop;

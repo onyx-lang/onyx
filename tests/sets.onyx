@@ -6,15 +6,15 @@ main :: (args: [] cstr) {
 
     S := set.make(i32);
 
-    set.insert(^S, 5);
-    set.insert(^S, 5);
-    set.insert(^S, 6);
+    set.insert(&S, 5);
+    set.insert(&S, 5);
+    set.insert(&S, 6);
     for entry: S.entries do println(entry.value);
 
-    println(set.has(^S, 5));
+    println(set.has(&S, 5));
 
     println("--------------");
-    set.remove(^S, 5);
+    set.remove(&S, 5);
     for entry: S.entries do println(entry.value);
-    println(set.has(^S, 5));
+    println(set.has(&S, 5));
 }

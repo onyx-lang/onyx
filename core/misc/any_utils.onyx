@@ -17,11 +17,11 @@ use core { iter, array, string }
 // much of the rest of the standard library uses `as_...` for
 // conversion.
 as_any :: to_any
-to_any :: macro (x: ^$T) => any.{x, T};
+to_any :: macro (x: &$T) => any.{x, T};
 
-any_as :: (a: any, $T: type_expr) -> ^T {
+any_as :: (a: any, $T: type_expr) -> &T {
     if a.type != T do return null;
-    return cast(^T) a.data;
+    return cast(&T) a.data;
 }
 
 //
@@ -29,8 +29,8 @@ any_as :: (a: any, $T: type_expr) -> ^T {
 any_dereference :: (v: any) -> any {
     t := get_type_info(v.type);
     if t.kind == .Pointer {
-        p := cast(^Type_Info_Pointer) t;
-        return any.{*cast(^rawptr) v.data, p.to};
+        p := cast(&Type_Info_Pointer) t;
+        return any.{*cast(&rawptr) v.data, p.to};
     }
 
     return v;
@@ -45,7 +45,7 @@ any_subscript :: (v: any, index: i32) -> any {
     }
 
     return any.{
-        cast(^u8) base_ptr + get_type_info(elem_type).size * index,
+        cast(&u8) base_ptr + get_type_info(elem_type).size * index,
         elem_type
     };
 }
@@ -57,7 +57,7 @@ any_selector :: (v: any, member_name: str) -> any {
     if t.kind == .Struct {
         member := get_struct_member(v.type, member_name);
         if member != null {
-            return any.{cast(^u8) v.data + member.offset, member.type};
+            return any.{cast(&u8) v.data + member.offset, member.type};
         }
     }
 
@@ -75,11 +75,11 @@ any_nested_selector :: (v: any, member_name: str) -> any {
     member := get_struct_member(v.type, part_name);
     if member {
         if next_name {
-            return any_nested_selector(any.{cast(^u8) v.data + member.offset, member.type}, next_name);
+            return any_nested_selector(any.{cast(&u8) v.data + member.offset, member.type}, next_name);
         }
 
         return any.{
-            cast(^u8, v.data) + member.offset, member.type
+            cast(&u8, v.data) + member.offset, member.type
         };
     }
 
@@ -106,13 +106,13 @@ any_to_map :: (v: any) -> (Map(str, any), success: bool) {
         vals = any_dereference(vals);
     }
 
-    val_info := cast(^Type_Info_Struct) get_type_info(vals.type);
+    val_info := cast(&Type_Info_Struct) get_type_info(vals.type);
     if val_info.kind != .Struct {
         return .{}, false;
     }
 
     out: Map(str, any);
-    for ^ val_info.members {
+    for & val_info.members {
         out->put(it.name, any_selector(vals, it.name));
     }
 
@@ -128,7 +128,7 @@ any_iter :: (arr: any) -> Iterator(any) {
     }
 
     return iter.generator(
-        ^.{
+        &.{
             base_ptr  = base_ptr,
             elem_type = elem_type,
             elem_size = get_type_info(elem_type).size,
@@ -139,7 +139,7 @@ any_iter :: (arr: any) -> Iterator(any) {
         (ctx: $T) -> (any, bool) {
             if ctx.index < ctx.count {
                 defer ctx.index += 1;
-                return any.{ cast(^u8) ctx.base_ptr + ctx.elem_size * ctx.index, ctx.elem_type }, true;
+                return any.{ cast(&u8) ctx.base_ptr + ctx.elem_size * ctx.index, ctx.elem_type }, true;
             }
 
             return .{}, false;
@@ -154,13 +154,13 @@ any_as_array :: (arr: any) -> (rawptr, type_expr, u32) {
 
     switch info.kind {
         case .Array {
-            a := cast(^Type_Info_Array) info;
+            a := cast(&Type_Info_Array) info;
             return arr.data, a.of, a.count;
         }
 
         case .Slice, .Dynamic_Array, .Variadic_Argument {
-            a := cast(^array.Untyped_Array) arr.data;
-            return a.data, (cast(^Type_Info_Dynamic_Array) info).of, a.count;
+            a := cast(&array.Untyped_Array) arr.data;
+            return a.data, (cast(&Type_Info_Dynamic_Array) info).of, a.count;
         }
 
         case #default {

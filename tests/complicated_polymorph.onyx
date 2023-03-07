@@ -45,13 +45,13 @@ main :: (args: [] cstr) {
         }
 
         Guy :: struct {
-            best_friend: ^Guy;
+            best_friend: &Guy;
             favorite_color: Color;
         }
 
         nightmare :: (x: (typeof(z.best_friend), $K) -> void,
                       y: (typeof(x)) -> $R,
-                      z: ^$SomeType,
+                      z: &$SomeType,
                       w: R) {
             k := y(x);
         }
@@ -60,7 +60,7 @@ main :: (args: [] cstr) {
             printf("dummy1 got T={}, typeof(a.favorite_color)={}\n", a, typeof(b));
         }
 
-        dummy2 :: (f: (a: ^Guy, b: $C) -> void) -> C {
+        dummy2 :: (f: (a: &Guy, b: $C) -> void) -> C {
             printf("dummy2 got C={}\n", C);
 
             other_guy := new(Guy);

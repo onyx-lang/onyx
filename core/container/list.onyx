@@ -1,16 +1,16 @@
 package core.list
 
 ListElem :: struct (T: type_expr) {
-    next: ^ListElem(T) = null;
-    prev: ^ListElem(T) = null;
+    next: &ListElem(T) = null;
+    prev: &ListElem(T) = null;
     data: T;
 }
 
 List :: struct (Elem_Type: type_expr) {
     allocator: Allocator;
 
-    first: ^ListElem(Elem_Type) = null;
-    last:  ^ListElem(Elem_Type) = null;
+    first: &ListElem(Elem_Type) = null;
+    last:  &ListElem(Elem_Type) = null;
 }
 
 #inject List {
@@ -31,7 +31,7 @@ make :: ($T: type_expr, allocator := context.allocator) -> List(T) {
     return .{ allocator = allocator };
 }
 
-free :: (list: ^List) {
+free :: (list: &List) {
     elem := list.first;
     while elem != null {
         to_delete := elem;
@@ -40,7 +40,7 @@ free :: (list: ^List) {
     }
 }
 
-push_end :: (list: ^List, x: list.Elem_Type) {
+push_end :: (list: &List, x: list.Elem_Type) {
     new_elem := allocate_elem(list);
     new_elem.data = x;
 
@@ -51,7 +51,7 @@ push_end :: (list: ^List, x: list.Elem_Type) {
     if list.first == null do list.first = new_elem;
 }
 
-push_begin :: (list: ^List, x: list.Elem_Type) {
+push_begin :: (list: &List, x: list.Elem_Type) {
     new_elem := allocate_elem(list);
     new_elem.data = x;
 
@@ -62,7 +62,7 @@ push_begin :: (list: ^List, x: list.Elem_Type) {
     if list.last == null do list.last = new_elem;
 }
 
-pop_end :: (list: ^List($T), default: T = .{}) -> T {
+pop_end :: (list: &List($T), default: T = .{}) -> T {
     if list.last == null do return default;
 
     end := list.last;
@@ -73,7 +73,7 @@ pop_end :: (list: ^List($T), default: T = .{}) -> T {
     return end.data;
 }
 
-pop_begin :: (list: ^List($T), default: T = .{}) -> T {
+pop_begin :: (list: &List($T), default: T = .{}) -> T {
     if list.last == null do return default;
 
     begin := list.first;
@@ -84,7 +84,7 @@ pop_begin :: (list: ^List($T), default: T = .{}) -> T {
     return begin.data;
 }
 
-count :: (list: ^List) -> i32 {
+count :: (list: &List) -> i32 {
     c := 0;
     elem := list.first;
     while elem != null {
@@ -95,10 +95,10 @@ count :: (list: ^List) -> i32 {
     return c;
 }
 
-at :: (list: ^List, index: i32) -> ^T {
+at :: (list: &List, index: i32) -> &T {
     elem := list.first;
     while elem != null {
-        if index == 0 do return ^elem.data;
+        if index == 0 do return &elem.data;
         index -= 1;
         elem = elem.next;
     }
@@ -106,7 +106,7 @@ at :: (list: ^List, index: i32) -> ^T {
     return null;
 }
 
-contains :: (list: ^List, x: list.Elem_Type) -> bool {
+contains :: (list: &List, x: list.Elem_Type) -> bool {
     elem := list.first;
     while elem != null {
         if elem.data == x do return true;
@@ -116,7 +116,7 @@ contains :: (list: ^List, x: list.Elem_Type) -> bool {
     return false;
 }
 
-fold :: (list: ^List($T), init: $R, f: (T, R) -> R) -> R {
+fold :: (list: &List($T), init: $R, f: (T, R) -> R) -> R {
     val := init;
 
     link := list.first;
@@ -129,29 +129,29 @@ fold :: (list: ^List($T), init: $R, f: (T, R) -> R) -> R {
 }
 
 map :: #match #local {}
-#match map (list: ^List($T), f: (T) -> $R) -> List(R) {
+#match map (list: &List($T), f: (T) -> $R) -> List(R) {
     new_list := make(R, allocator=list.allocator);
     elem := list.first;
     while elem != null {
-        push_end(^new_list, f(elem.data));
+        push_end(&new_list, f(elem.data));
         elem = elem.next;
     }
 
     return new_list;
 }
 
-#match map (list: ^List($T), f: (^T) -> void) {
+#match map (list: &List($T), f: (&T) -> void) {
     elem := list.first;
     while elem != null {
-        f(^elem.data);
+        f(&elem.data);
         elem = elem.next;
     }
 }
 
 
 #match core.iter.as_iter as_iter
-as_iter :: (list: ^List) =>
-    core.iter.generator(^.{current = list.first}, (ctx) => {
+as_iter :: (list: &List) =>
+    core.iter.generator(&.{current = list.first}, (ctx) => {
         if ctx.current != null {
             defer ctx.current = ctx.current.next;
             return ctx.current.data, true;
@@ -160,4 +160,4 @@ as_iter :: (list: ^List) =>
         return .{}, false;
     });
 
-#local allocate_elem :: macro (list: ^List($T)) => new(ListElem(T), allocator=list.allocator);
+#local allocate_elem :: macro (list: &List($T)) => new(ListElem(T), allocator=list.allocator);

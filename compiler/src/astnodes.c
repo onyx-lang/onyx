@@ -131,6 +131,8 @@ const char *binaryop_string[Binary_Op_Count] = {
     "|>", "..", "->",
 
     "[]", "[]=", "^[]",
+    
+    "??"
 };
 
 const char* entity_state_strings[Entity_State_Count] = {

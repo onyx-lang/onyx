@@ -11,18 +11,6 @@ package core
 // used by Map and Set in their `get_opt` function. In theory, it should
 // be used in many more places, instead of returning `.{}`.
 
-#doc """
-    Optional(T) is a simply a structure with a flag of whether or not
-    the optional contains a value. When the `has_value` is true, the
-    `value` member will be populated with an initialized value.
-    Otherwise, `value` should be a zeroed buffer.
-"""
-@conv.Custom_Format.{ #solidify format {T=Value_Type} }
-Optional :: struct (Value_Type: type_expr) {
-    has_value: bool;
-    value: Value_Type;
-}
-
 #inject Optional {
     #doc """
         Helper procedure for creating an Optional with a value.
@@ -30,8 +18,8 @@ Optional :: struct (Value_Type: type_expr) {
         the type will be inferred from the parameter type.
     """
     make :: #match #locked {
-        ((x: $T) => Optional(T).{ has_value = true, value = x }),
-        ($T: type_expr, x: T) => (Optional(T).{ has_value = true, value = x })
+        ((x: $T) => (?T).{ has_value = true, value = x }),
+        ($T: type_expr, x: T) => ((?T).{ has_value = true, value = x })
     }
 
     #doc """
@@ -39,38 +27,38 @@ Optional :: struct (Value_Type: type_expr) {
         is mostly useless, because you can use `.{}` in type inferred
         places to avoid having to specify the type.
     """
-    empty :: macro (T: type_expr) => Optional(T).{}; 
+    empty :: macro (T: type_expr) => (?T).{}; 
 
     #doc """
         Extracts the value from the Optional, or uses a default if
         no value is present.
     """
-    value_or :: (o: Optional, default: o.Value_Type) -> o.Value_Type {
+    value_or :: (o: ?$T, default: T) -> T {
         if !o.has_value do return default;
         return o.value;
     }
 
     #doc "Clears the value in the Optional, zeroing the memory of the value."
-    reset :: (o: ^Optional) {
+    reset :: (o: &?$T) {
         o.has_value = false;
-        core.memory.set(^o.value, 0, sizeof o.Value_Type);
+        core.memory.set(&o.value, 0, sizeof T);
     }
 
     #doc "Sets the value in the Optional."
-    set :: (o: ^Optional, value: o.Value_Type) {
+    set :: (o: &?$T, value: T) {
         o.has_value = true;
         o.value = value;
     }
 
     #doc "Monadic chaining operation."
-    and_then :: (o: Optional($T), transform: (T) -> Optional($R)) -> Optional(R) {
-        if !o.has_value do return .{ false };
+    and_then :: (o: ?$T, transform: (T) -> ?$R) -> ?R {
+        if !o.has_value do return .{};
         return transform(o.value);
     }
 
     #doc "Changes the value inside the optional, if present."
-    transform :: (o: Optional($T), transform: (T) -> $R) -> Optional(R) {
-        if !o.has_value do return .{ false };
+    transform :: (o: ?$T, transform: (T) -> $R) -> ?R {
+        if !o.has_value do return .{};
         return Optional.make(transform(o.value));
     }
 
@@ -78,7 +66,7 @@ Optional :: struct (Value_Type: type_expr) {
         Like `value_or`, but instead of providing a value, you
         provide a function to generate a value.
     """
-    or_else :: (o: Optional($T), generate: () -> Optional(T)) -> Optional(T) {
+    or_else :: (o: ?$T, generate: () -> ?T) -> ?T {
         if o.has_value do return o;
         return generate();
     }
@@ -88,38 +76,59 @@ Optional :: struct (Value_Type: type_expr) {
         If not, an assertion is thrown and the context's assert
         handler must take care of it.
     """
-    unwrap :: (o: Optional) -> o.Value_Type {
+    unwrap :: (o: ?$T) -> T {
         if o.has_value do return o.value;
         assert(false, "Unwrapping empty Optional.");
     }
 
-    or_return :: macro (o: Optional($T)) -> T {
+    or_return :: macro (o: ?$T) -> T {
         value := o;
         if value.has_value do return value.value;
 
-        return #from_enclosing .{};
+        return return .{};
     }
 
-    hash :: (o: Optional($T/core.hash.Hashable)) -> u32 {
+    catch :: macro (o: ?$T, body: Code) -> T {
+        value := o;
+        if value.has_value do return value.value;
+
+        #unquote body;
+    }
+
+    hash :: (o: ?$T/core.hash.Hashable) -> u32 {
         if !o.has_value do return 0;
         return core.hash.to_u32(o.value);
     }
-
-    format :: (o: ^conv.Format_Output, format: ^conv.Format, opt: ^Optional($T)) {
-        if opt.has_value {
-            conv.format(o, "Some({\"})", opt.value);
-        } else {
-            o->write("None");
-        }
-    }
 }
 
-#operator == (o1, o2: Optional($T)) -> bool {
+#operator == (o1, o2: ?$T) -> bool {
     if o1.has_value != o2.has_value do return false;
     if !o1.has_value do return true;
     return o1.value == o2.value;
 }
 
+#operator ?? macro (opt: ?$T, default: T) -> T {
+    value := opt;
+    if value do return value.value;
+
+    return default;
+}
+
+#operator ?? macro (opt: ?$T, catch: Code) -> T {
+    value := opt;
+    if value do return value.value;
+
+    #unquote catch;
+}
+
+#operator ? macro (opt: ?$T) -> T {
+    value := opt;
+    if value do return value.value;
+
+    return return .{};
+}
+
+
 #overload
-__implicit_bool_cast :: macro (o: Optional) => o.has_value;
+__implicit_bool_cast :: macro (o: ?$T) => o.has_value;
 

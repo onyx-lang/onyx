@@ -32,32 +32,32 @@ Grammar :: struct {
     max_terminal     : u32;
 }
 
-grammar_init :: (use g: ^Grammar) {
-    array.init(^terminate_rules);
-    array.init(^unit_rules);
-    array.init(^production_rules);
+grammar_init :: (use g: &Grammar) {
+    array.init(&terminate_rules);
+    array.init(&unit_rules);
+    array.init(&production_rules);
 
     max_terminal = 0;
 }
 
-grammar_free :: (use g: ^Grammar) {
-    array.free(^terminate_rules);
-    array.free(^unit_rules);
-    array.free(^production_rules);
+grammar_free :: (use g: &Grammar) {
+    array.free(&terminate_rules);
+    array.free(&unit_rules);
+    array.free(&production_rules);
 }
 
-grammar_prepare :: (use g: ^Grammar) {
+grammar_prepare :: (use g: &Grammar) {
     // Not full-proof, but good enough for AOC.
-    for ^solo: unit_rules {
-        for ^prod: production_rules {
+    for &solo: unit_rules {
+        for &prod: production_rules {
             if prod.nt0 == solo.nt1 {
-                array.push(^production_rules, Prod.{ solo.nt0, prod.nt1, prod.nt2 });
+                array.push(&production_rules, Prod.{ solo.nt0, prod.nt1, prod.nt2 });
             }
         }
 
-        for ^unit: terminate_rules {
+        for &unit: terminate_rules {
             if unit.nt == solo.nt1 {
-                array.push(^terminate_rules, Term.{ solo.nt0, unit.t });
+                array.push(&terminate_rules, Term.{ solo.nt0, unit.t });
             } 
         }
     }
@@ -70,18 +70,18 @@ grammar_prepare :: (use g: ^Grammar) {
         terminate_rules[terminate_rules.count - 1].nt) + 1;
 }
 
-cyk_algorithm :: (use grammar: ^Grammar, input: str) -> bool {
+cyk_algorithm :: (use grammar: &Grammar, input: str) -> bool {
     dim_0 := input.count * max_terminal;
     dim_1 := max_terminal;
     dim_2 := 1;
 
     mem_size := sizeof bool * input.count * input.count * max_terminal;
-    T := cast(^bool) calloc(mem_size);
+    T := cast(&bool) calloc(mem_size);
     defer cfree(T);
     memory.set(T, ~~false, mem_size);
 
     for s: 0 .. input.count {
-        for ^term: terminate_rules {
+        for &term: terminate_rules {
             if term.t == input[s] {
                 T[0 * dim_0 + s * dim_1 + term.nt * dim_2] = true;
             }
@@ -91,7 +91,7 @@ cyk_algorithm :: (use grammar: ^Grammar, input: str) -> bool {
     for l: 1 .. input.count {
         for s: 0 .. input.count - l {
             for p: 1 .. l + 1 {
-                for ^prod: production_rules {
+                for &prod: production_rules {
                     if    T[(p - 1) * dim_0 + s       * dim_1 + prod.nt1 * dim_2]
                        && T[(l - p) * dim_0 + (s + p) * dim_1 + prod.nt2 * dim_2] {
                         T[l * dim_0 + s * dim_1 + prod.nt0 * dim_2] = true;
@@ -110,43 +110,43 @@ main :: (args: [] cstr) {
     file := contents;
 
     grammar : Grammar;
-    grammar_init(^grammar);
-    defer grammar_free(^grammar);
+    grammar_init(&grammar);
+    defer grammar_free(&grammar);
 
     while *file.data != #char "\n" {
-        nt0 := cast(u32, conv.parse_int(^file));
+        nt0 := cast(u32, conv.parse_int(&file));
 
-        string.advance(^file, 2); // ': '
+        string.advance(&file, 2); // ': '
 
         if *file.data == #char "\"" {
-            string.advance(^file, 1); // '"'
+            string.advance(&file, 1); // '"'
             t := file[0];
-            string.advance(^file, 1);
+            string.advance(&file, 1);
 
-            array.push(^grammar.terminate_rules, Term.{ nt0, t });
+            array.push(&grammar.terminate_rules, Term.{ nt0, t });
 
         } else {
             while true {
-                nt1 := cast(u32, conv.parse_int(^file));
+                nt1 := cast(u32, conv.parse_int(&file));
 
                 if *file.data == #char "\n" {
-                    array.push(^grammar.unit_rules, Unit.{ nt0, nt1 });
+                    array.push(&grammar.unit_rules, Unit.{ nt0, nt1 });
                     break;
 
                 } else {
-                    string.advance(^file, 1); // ' '
+                    string.advance(&file, 1); // ' '
 
                     if next_ch := *file.data; next_ch >= #char "0" && next_ch <= #char "9" {
-                        nt2 := cast(u32, conv.parse_int(^file));
-                        array.push(^grammar.production_rules, Prod.{ nt0, nt1, nt2 });
+                        nt2 := cast(u32, conv.parse_int(&file));
+                        array.push(&grammar.production_rules, Prod.{ nt0, nt1, nt2 });
 
-                        if *file.data == #char " " do string.advance(^file, 1);
+                        if *file.data == #char " " do string.advance(&file, 1);
                     } else {
-                        array.push(^grammar.unit_rules, Unit.{ nt0, nt1 });
+                        array.push(&grammar.unit_rules, Unit.{ nt0, nt1 });
                     }
 
                     if *file.data == #char "|" {
-                        string.advance(^file, 1); // ' |'
+                        string.advance(&file, 1); // ' |'
                     } else {
                         break;
                     }
@@ -154,16 +154,16 @@ main :: (args: [] cstr) {
             }
         }
 
-        string.advance_line(^file);
+        string.advance_line(&file);
     }
 
-    grammar_prepare(^grammar);
+    grammar_prepare(&grammar);
 
     valid_count := 0;
-    string.advance_line(^file);
+    string.advance_line(&file);
     while !string.empty(file) {
         line, file' := string.bisect(file, #char "\n");
-        if cyk_algorithm(^grammar, line) do valid_count += 1;
+        if cyk_algorithm(&grammar, line) do valid_count += 1;
     }
 
     printf("Valid count: {}\n", valid_count);

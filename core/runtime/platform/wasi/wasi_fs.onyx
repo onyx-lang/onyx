@@ -92,7 +92,7 @@ __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError)
             rights,
             rights,
             fd_flags,
-            ^file.fd);
+            &file.fd);
             err == .Success {
                 return file, .None;
         }
@@ -110,12 +110,12 @@ __file_close :: (file: FileData) -> os.FileError {
     return .None;
 }
 
-__file_stat :: (path: str, out: ^os.FileStat) -> bool {
+__file_stat :: (path: str, out: &os.FileStat) -> bool {
     fs: wasi.FileStat;
 
     exists := false;
     for .[3, 4] { // Trying both preopened directories
-        err := wasi.path_filestat_get(it, .SymLinkFollow, path, ^fs);
+        err := wasi.path_filestat_get(it, .SymLinkFollow, path, &fs);
         if err == .Success {
             exists = true;
             out.size = ~~ fs.size;
@@ -137,7 +137,7 @@ __file_exists :: (path: str) -> bool {
 
     exists := false;
     for .[3, 4] { // Trying both preopened directories
-        err := wasi.path_filestat_get(it, .SymLinkFollow, path, ^fs);
+        err := wasi.path_filestat_get(it, .SymLinkFollow, path, &fs);
         if err == .Success do exists = true;
     }
 
@@ -165,36 +165,36 @@ __file_rename :: (old_path: str, new_path: str) -> bool {
 }
 
 __file_stream_vtable := io.Stream_Vtable.{
-    seek = (use fs: ^os.File, to: i32, whence: io.SeekFrom) -> io.Error {
+    seek = (use fs: &os.File, to: i32, whence: io.SeekFrom) -> io.Error {
         // Currently, the new offset is just ignored.
         newoffset : wasi.Filesize;
-        error := wasi.fd_seek(data.fd, ~~ to, ~~ whence, ^newoffset);
+        error := wasi.fd_seek(data.fd, ~~ to, ~~ whence, &newoffset);
         if error != .Success do return .BadFile;
 
         return .None;
     },
 
-    tell = (use fs: ^os.File) -> (io.Error, u32) {
+    tell = (use fs: &os.File) -> (io.Error, u32) {
         location : wasi.Filesize;
-        error := wasi.fd_tell(data.fd, ^location);
+        error := wasi.fd_tell(data.fd, &location);
         if error != .Success do return .BadFile, 0;
 
         return .None, ~~location;
     },
 
-    read = (use fs: ^os.File, buffer: [] u8) -> (io.Error, u32) {
+    read = (use fs: &os.File, buffer: [] u8) -> (io.Error, u32) {
         bytes_read : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
-        error := wasi.fd_read(data.fd, ^vec, 1, ^bytes_read);
+        error := wasi.fd_read(data.fd, &vec, 1, &bytes_read);
         if error != .Success do return .BadFile, 0;
 
         return .None, bytes_read;
     },
 
-    read_at = (use fs: ^os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
+    read_at = (use fs: &os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
         bytes_read : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
-        error := wasi.fd_pread(data.fd, ^vec, 1, ~~at, ^bytes_read);
+        error := wasi.fd_pread(data.fd, &vec, 1, ~~at, &bytes_read);
 
         // FIX: Maybe report io.Error.OutOfBounds if the 'at' was out of bounds?
         if error != .Success do return .BadFile, 0;
@@ -202,29 +202,29 @@ __file_stream_vtable := io.Stream_Vtable.{
         return .None, bytes_read;
     },
 
-    read_byte = (use fs: ^os.File) -> (io.Error, u8) {
+    read_byte = (use fs: &os.File) -> (io.Error, u8) {
         bytes_read : wasi.Size;
         byte  : u8;
-        vec   := IOVec.{ buf = cast(u32) ^byte, len = 1};
-        error := wasi.fd_read(data.fd, ^vec, 1, ^bytes_read);
+        vec   := IOVec.{ buf = cast(u32) &byte, len = 1};
+        error := wasi.fd_read(data.fd, &vec, 1, &bytes_read);
         if error != .Success do return .BadFile, 0;
 
         return .None, byte;
     },
 
-    write = (use fs: ^os.File, buffer: [] u8) -> (io.Error, u32) {
+    write = (use fs: &os.File, buffer: [] u8) -> (io.Error, u32) {
         bytes_written : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
-        error := wasi.fd_write(data.fd, ^vec, 1, ^bytes_written);
+        error := wasi.fd_write(data.fd, &vec, 1, &bytes_written);
         if error != .Success do return .BadFile, 0;
 
         return .None, bytes_written;
     },
 
-    write_at = (use fs: ^os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
+    write_at = (use fs: &os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
         bytes_written : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
-        error := wasi.fd_pwrite(data.fd, ^vec, 1, ~~at, ^bytes_written);
+        error := wasi.fd_pwrite(data.fd, &vec, 1, ~~at, &bytes_written);
 
         // FIX: Maybe report io.Error.OutOfBounds if the 'at' was out of bounds?
         if error != .Success do return .BadFile, 0;
@@ -232,29 +232,29 @@ __file_stream_vtable := io.Stream_Vtable.{
         return .None, bytes_written;
     },
 
-    write_byte = (use fs: ^os.File, byte: u8) -> io.Error {
+    write_byte = (use fs: &os.File, byte: u8) -> io.Error {
         bytes_written : wasi.Size;
         byte_to_write := byte;
-        vec   := IOVec.{ buf = cast(u32) ^byte_to_write, len = 1 };
-        error := wasi.fd_write(data.fd, ^vec, 1, ^bytes_written);
+        vec   := IOVec.{ buf = cast(u32) &byte_to_write, len = 1 };
+        error := wasi.fd_write(data.fd, &vec, 1, &bytes_written);
         if error != .Success do return .BadFile;
 
         return .None;
     },
 
-    close = (use fs: ^os.File) -> io.Error {
+    close = (use fs: &os.File) -> io.Error {
         __file_close(data);
         return .None;
     },
 
-    flush = (use fs: ^os.File) -> io.Error {
+    flush = (use fs: &os.File) -> io.Error {
         wasi.fd_datasync(data.fd);
         return .None;
     },
 
-    size = (use fs: ^os.File) -> i32 {
+    size = (use fs: &os.File) -> i32 {
         file_stat: FileStat;
-        if wasi.fd_filestat_get(data.fd, ^file_stat) != .Success do return 0;
+        if wasi.fd_filestat_get(data.fd, &file_stat) != .Success do return 0;
 
         return ~~ file_stat.size;
     },
@@ -266,11 +266,11 @@ WasiDirectory :: struct {
     last_cookie: wasi.DirCookie;
 }
 
-DirectoryData :: ^WasiDirectory;
+DirectoryData :: &WasiDirectory;
 
-__dir_open :: (path: str, dir: ^DirectoryData) -> bool {
+__dir_open :: (path: str, dir: &DirectoryData) -> bool {
     dir_fd: FileDescriptor;
-    err := wasi.path_open(4, .SymLinkFollow, path, .Directory, ~~0xffffffff, ~~0xffffffff, .Sync, ^dir_fd);
+    err := wasi.path_open(4, .SymLinkFollow, path, .Directory, ~~0xffffffff, ~~0xffffffff, .Sync, &dir_fd);
     if err != .Success {
         return false;
     }
@@ -288,14 +288,14 @@ __dir_close :: (dir: DirectoryData) {
     cfree(dir);
 }
 
-__dir_read :: (dir: DirectoryData, out_entry: ^os.DirectoryEntry) -> bool {
+__dir_read :: (dir: DirectoryData, out_entry: &os.DirectoryEntry) -> bool {
     buffer: [512] u8;
     bufused: u32;
 
-    err := wasi.fd_readdir(dir.dir_fd, ~~buffer, 512, dir.last_cookie, ^bufused);
+    err := wasi.fd_readdir(dir.dir_fd, ~~buffer, 512, dir.last_cookie, &bufused);
     if err != .Success || bufused == 0 do return false;
 
-    dirent := cast(^wasi.DirEnt) buffer;
+    dirent := cast(&wasi.DirEnt) buffer;
     switch dirent.d_type {
         case .Unknown do out_entry.type = .Unknown;
         case .BlockDevice do out_entry.type = .Block;
@@ -308,8 +308,8 @@ __dir_read :: (dir: DirectoryData, out_entry: ^os.DirectoryEntry) -> bool {
 
     out_entry.identifier = ~~dirent.d_ino;
     out_entry.name_length = dirent.d_namlen;
-    memory.set(~~^out_entry.name_data, 0, 256);
-    memory.copy(~~^out_entry.name_data, ~~(dirent + 1), math.min(dirent.d_namlen, sizeof typeof out_entry.name_data));
+    memory.set(~~&out_entry.name_data, 0, 256);
+    memory.copy(~~&out_entry.name_data, ~~(dirent + 1), math.min(dirent.d_namlen, sizeof typeof out_entry.name_data));
 
     dir.last_cookie = dirent.d_next;
     return true;

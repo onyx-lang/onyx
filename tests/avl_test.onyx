@@ -3,15 +3,15 @@
 use package core
 
 main :: () {
-    tree: ^avl_tree.AVL_Tree(i32);
+    tree: &avl_tree.AVL_Tree(i32);
 
-    avl_tree.insert(^tree, 20);
-    avl_tree.insert(^tree, 5);
-    avl_tree.insert(^tree, 8);
-    avl_tree.insert(^tree, 25);
-    avl_tree.insert(^tree, 0);
-    avl_tree.insert(^tree, 15);
-    avl_tree.insert(^tree, 10);
+    avl_tree.insert(&tree, 20);
+    avl_tree.insert(&tree, 5);
+    avl_tree.insert(&tree, 8);
+    avl_tree.insert(&tree, 25);
+    avl_tree.insert(&tree, 0);
+    avl_tree.insert(&tree, 15);
+    avl_tree.insert(&tree, 10);
 
     avl_tree.print(tree);
     print("\n");

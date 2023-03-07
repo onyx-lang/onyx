@@ -10,7 +10,7 @@ Ship :: struct {
     fy : i32 = 0;
 }
 
-rotate_left :: (ship: ^Ship) {
+rotate_left :: (ship: &Ship) {
     ofx := ship.fx;
     ofy := ship.fy;
 
@@ -18,7 +18,7 @@ rotate_left :: (ship: ^Ship) {
     ship.fy = -ofx;
 }
 
-rotate_right :: (ship: ^Ship) {
+rotate_right :: (ship: &Ship) {
     ofx := ship.fx;
     ofy := ship.fy;
 
@@ -26,7 +26,7 @@ rotate_right :: (ship: ^Ship) {
     ship.fy = ofx;
 }
 
-turn_around :: (ship: ^Ship) {
+turn_around :: (ship: &Ship) {
     ship.fx = -ship.fx;
     ship.fy = -ship.fy;
 }
@@ -39,10 +39,10 @@ main :: (args: [] cstr) {
     ship := Ship.{ fx = 10, fy = -1 };
     while !string.empty(file) {
         dir := file[0];
-        string.advance(^file, 1);
+        string.advance(&file, 1);
 
-        val := cast(u32, conv.parse_int(^file));
-        string.advance_line(^file); 
+        val := cast(u32, conv.parse_int(&file));
+        string.advance_line(&file); 
         
         switch dir {
             case #char "N" do ship.fy -= val;
@@ -55,15 +55,15 @@ main :: (args: [] cstr) {
             }
 
             case #char "L" do switch val {
-                case 90 do rotate_left(^ship);
-                case 180 do turn_around(^ship);
-                case 270 do rotate_right(^ship);
+                case 90 do rotate_left(&ship);
+                case 180 do turn_around(&ship);
+                case 270 do rotate_right(&ship);
             }
 
             case #char "R" do switch val {
-                case 90 do rotate_right(^ship);
-                case 180 do turn_around(^ship);
-                case 270 do rotate_left(^ship);
+                case 90 do rotate_right(&ship);
+                case 180 do turn_around(&ship);
+                case 270 do rotate_left(&ship);
             }
         }
     }

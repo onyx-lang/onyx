@@ -10,7 +10,7 @@ package runtime.info
 
 foreign_block :: #distinct u32
 
-foreign_blocks: [] ^Foreign_Block;
+foreign_blocks: [] &Foreign_Block;
 
 Foreign_Block :: struct {
     module_name: str;
@@ -22,7 +22,7 @@ Foreign_Block :: struct {
     }
 }
 
-get_foreign_block :: (f: foreign_block) -> ^Foreign_Block {
+get_foreign_block :: (f: foreign_block) -> &Foreign_Block {
     if ~~f < cast(i32) 0 || ~~f >= cast(i32) foreign_blocks.count do return null;
 
     return foreign_blocks[cast(i32) f];

@@ -18,7 +18,7 @@ Foo :: struct {
     member1 := get_a_value(f32);
     member2 := get_a_value(i32);
     
-    get_member2_plus_three :: (foo: ^Foo) -> i32 {
+    get_member2_plus_three :: (foo: &Foo) -> i32 {
         return foo.member2 + 3;
     }
     
@@ -35,7 +35,7 @@ Foo2 :: struct {
         age  : i32;
     }
     
-    get_member2_plus_three :: (foo: ^$T) -> f32 {
+    get_member2_plus_three :: (foo: &$T) -> f32 {
         return foo.member2 + 3;
     }
     

@@ -8,12 +8,12 @@ main :: (args: [] cstr) {
     defer cfree(stream);
 
     nums := array.make(u32, 128);
-    defer array.free(^nums);
+    defer array.free(&nums);
 
     while num := 1; num > 0 {
         // This sets num to be 0 if there is no number
-        num = io.read_u32(^reader);
-        if num != 0 do array.push(^nums, num);
+        num = io.read_u32(&reader);
+        if num != 0 do array.push(&nums, num);
     }
 
     for i: nums do for j: nums do for k: nums {

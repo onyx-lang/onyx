@@ -58,7 +58,7 @@ __thread_initialize :: () {
 
     alloc.init_temp_allocator();
 
-    __initialize(^context);
+    __initialize(&context);
     context.allocator = alloc.heap_allocator;
     context.temp_allocator = alloc.temp_allocator;
     context.assert_handler = __assert_handler;

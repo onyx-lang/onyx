@@ -1039,6 +1039,16 @@ char* build_poly_struct_name(AstPolyStructType* ps_type, Type* cs_type) {
     char name_buf[256];
     fori (i, 0, 256) name_buf[i] = 0;
 
+
+    // Special case for `? T`
+    if (cs_type->Struct.constructed_from == builtin_optional_type) {
+        strncat(name_buf, "? ", 255);
+        strncat(name_buf, type_get_name(cs_type->Struct.poly_sln[0].type), 255);
+
+        return bh_aprintf(global_heap_allocator, "%s", name_buf);
+    }
+
+
     strncat(name_buf, ps_type->name, 255);
     strncat(name_buf, "(", 255);
     bh_arr_each(AstPolySolution, ptype, cs_type->Struct.poly_sln) {
@@ -1117,6 +1127,8 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
         Type* cs_type = type_build_from_ast(context.ast_alloc, (AstType *) concrete_struct);
         if (!cs_type) return NULL;
 
+        cs_type->Struct.constructed_from = (AstType *) ps_type;
+        
         if (cs_type->Struct.poly_sln == NULL) cs_type->Struct.poly_sln = bh_arr_copy(global_heap_allocator, slns);
         if (cs_type->Struct.name == NULL)     cs_type->Struct.name = build_poly_struct_name(ps_type, cs_type);
 

@@ -4,7 +4,7 @@ use package core
 
 count_iterator :: (lo: $T, hi: T, step: T = 1) -> Iterator(T) {
     return iter.generator(
-        ^.{ low = lo, high = hi, step = step, current = lo },
+        &.{ low = lo, high = hi, step = step, current = lo },
     
         (ctx) => {
             if ctx.current <= ctx.high {

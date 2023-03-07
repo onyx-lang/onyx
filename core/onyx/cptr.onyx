@@ -22,7 +22,7 @@ cptr :: struct (T: type_expr) {
 #inject cptr {
     //
     // Creates a new C-pointer from an Onyx pointer.
-    make :: macro (ptr: ^$T) -> cptr(T) {
+    make :: macro (ptr: &$T) -> cptr(T) {
         __cptr_make :: __cptr_make
         return .{ __cptr_make(ptr) };
     }
@@ -37,7 +37,7 @@ cptr :: struct (T: type_expr) {
         (this: cptr($T)) -> T {
             buf: [sizeof T] u8;
             __cptr_read(this.data, ~~buf, sizeof T);
-            return *cast(^T) buf;
+            return *cast(&T) buf;
         }
     }
 
@@ -64,7 +64,7 @@ cptr :: struct (T: type_expr) {
     //
     // This procedure attempts to convert a C-pointer back into an
     // Onyx pointer, if the pointer lives with the Onyx memory space.
-    to_rawptr :: (this: cptr($T)) -> ^T {
+    to_rawptr :: (this: cptr($T)) -> &T {
         // I'm treating NULL as more of a concept, than as an actual value here,
         // because if something returns a NULL pointer, it should logically map
         // to the same idea as 'null' in Onyx.
@@ -88,7 +88,7 @@ cptr :: struct (T: type_expr) {
         return elem->read();
     }
 
-    format :: (output: ^conv.Format_Output, format: ^conv.Format, p: ^cptr($T)) {
+    format :: (output: &conv.Format_Output, format: &conv.Format, p: &cptr($T)) {
         conv.format(output, "cptr({})[0x{b16}]", T, p.data);
     }
 }

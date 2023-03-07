@@ -58,7 +58,7 @@ IniParseError :: struct {
 // Parses an ini file into the variable given. Only structures
 // work with this procedure, as the structure provides the section
 // and value names.
-parse_ini_file :: macro (r: ^io.Reader, output_ptr: ^$T/type_is_struct) => {
+parse_ini_file :: macro (r: &io.Reader, output_ptr: &$T/type_is_struct) => {
     parse_ini_file_inner :: parse_ini_file_inner
 
     // No need to make the actual implementation polymorphic.
@@ -68,7 +68,7 @@ parse_ini_file :: macro (r: ^io.Reader, output_ptr: ^$T/type_is_struct) => {
 }
 
 #local
-parse_ini_file_inner :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, IniParseError) {
+parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, IniParseError) {
     info :: runtime.info
 
     line := 1;
@@ -85,8 +85,8 @@ parse_ini_file_inner :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, Ini
     if t := info.get_type_info(output_ptr.type); t.kind != .Pointer {
         error("Expected pointer type for parameter.");
     } else {
-        output.data = *cast(^rawptr) output_ptr.data;
-        output.type = (cast(^info.Type_Info_Pointer) t).to;
+        output.data = *cast(&rawptr) output_ptr.data;
+        output.type = (cast(&info.Type_Info_Pointer) t).to;
     }
 
     defer alloc.clear_temp_allocator();
@@ -109,14 +109,14 @@ parse_ini_file_inner :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, Ini
                 error(msg = aprintf("'{}' is not a valid section name.", stripped_section_name));
             }
 
-            active_item_ptr  = cast(^u8) output.data + member.offset;
+            active_item_ptr  = cast(&u8) output.data + member.offset;
             active_item_type = member.type;
 
             parse_method := info.get_struct_method(active_item_type, "parse_ini");
             if parse_method != null {
                 next_line();
 
-                f := *cast(^(rawptr, ^io.Reader) -> bool) parse_method.data;
+                f := *cast(&(rawptr, &io.Reader) -> bool) parse_method.data;
                 if !f(active_item_ptr, r) {
                     error(msg = aprintf("Failed parsing."));
                 }
@@ -137,7 +137,7 @@ parse_ini_file_inner :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, Ini
         assert(r->read_byte() == #char "=", "expected =");
 
         field := info.get_struct_member(active_item_type, string.strip_whitespace(field_name));
-        target := cast(^u8) active_item_ptr + field.offset;
+        target := cast(&u8) active_item_ptr + field.offset;
         value_string := r->read_until(#char "\n", allocator=context.temp_allocator);
         parsed_successfully := conv.parse_any(target, field.type, value_string);
 
@@ -146,7 +146,7 @@ parse_ini_file_inner :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, Ini
             // If the type is a string, then the value can be the entire line
             // of text. No need to force the quotes.
             if field.type == str {
-                *cast(^str) target = value_string
+                *cast(&str) target = value_string
                                   |> string.strip_whitespace()
                                   |> string.alloc_copy();
 
@@ -165,7 +165,7 @@ parse_ini_file_inner :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, Ini
 
 //
 // Outputs a two-level structure into an ini file. The inverse of `parse_ini_file`.
-write_ini_file :: macro (w: ^io.Writer, output: $T/type_is_struct) => {
+write_ini_file :: macro (w: &io.Writer, output: $T/type_is_struct) => {
     write_ini_file_inner :: write_ini_file_inner
 
     // See note above in parse_ini_file.
@@ -173,23 +173,23 @@ write_ini_file :: macro (w: ^io.Writer, output: $T/type_is_struct) => {
 }
 
 #local
-write_ini_file_inner :: (w: ^io.Writer, output: any) -> bool {
+write_ini_file_inner :: (w: &io.Writer, output: any) -> bool {
     info :: runtime.info
 
-    output_info := cast(^info.Type_Info_Struct) info.get_type_info(output.type);
+    output_info := cast(&info.Type_Info_Struct) info.get_type_info(output.type);
     if output_info.kind != .Struct do return false;
 
-    for^ output_info.members {
+    for& output_info.members {
         io.write_format(w, "[{}]\n", it.name);
         defer io.write(w, "\n");
 
-        member_info := cast(^info.Type_Info_Struct) info.get_type_info(it.type);
+        member_info := cast(&info.Type_Info_Struct) info.get_type_info(it.type);
         if member_info.kind != .Struct do continue;
 
-        member_data := cast(^u8) output.data + it.offset;
+        member_data := cast(&u8) output.data + it.offset;
 
         if write_method := info.get_struct_method(it.type, "write_ini"); write_method != null {
-            wm := *cast(^(rawptr, ^io.Writer) -> bool) write_method.data;
+            wm := *cast(&(rawptr, &io.Writer) -> bool) write_method.data;
             if !wm(member_data, w) {
                 return false;
             }
@@ -197,9 +197,9 @@ write_ini_file_inner :: (w: ^io.Writer, output: any) -> bool {
             continue;
         }
 
-        for^ prop: member_info.members {
+        for& prop: member_info.members {
             io.write_format_va(w, "{}={}\n", .[
-                .{^prop.name, str},
+                .{&prop.name, str},
                 .{member_data + prop.offset, prop.type}
             ]);
         }

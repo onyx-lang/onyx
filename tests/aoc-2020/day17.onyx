@@ -37,7 +37,7 @@ CubeState :: struct {
     next  := false;
 }
 
-get_neighbor_count :: (cubes: ^Map(CubePos, CubeState), pos: CubePos) -> u32 {
+get_neighbor_count :: (cubes: &Map(CubePos, CubeState), pos: CubePos) -> u32 {
     count := 0;
 
     for x: -1 .. 2 do for y: -1 .. 2 do for z: -1 .. 2 do for w: -1 .. 2 {
@@ -56,7 +56,7 @@ main :: (args: [] cstr) {
     file := contents;
 
     cubes := map.make(CubePos, CubeState, .{});
-    defer map.free(^cubes);
+    defer map.free(&cubes);
 
     z := 0;
     while !string.empty(file) {
@@ -64,7 +64,7 @@ main :: (args: [] cstr) {
 
         x := 0;
         for ch: line {
-            if ch == #char "#" do map.put(^cubes, .{ x, 0, z, 0 }, .{ alive = true });
+            if ch == #char "#" do map.put(&cubes, .{ x, 0, z, 0 }, .{ alive = true });
 
             x += 1;
         }
@@ -73,13 +73,13 @@ main :: (args: [] cstr) {
     }
 
     cubes_to_consider := array.make(CubePos);
-    defer array.free(^cubes_to_consider);
+    defer array.free(&cubes_to_consider);
 
     for i: 0 .. 6 {
-        for ^cube_entry: cubes.entries {
+        for &cube_entry: cubes.entries {
             if cube_entry.value.alive {
                 for x: -1 .. 2 do for y: -1 .. 2 do for z: -1 .. 2 do for w: -1 .. 2 {
-                    array.push(^cubes_to_consider, .{
+                    array.push(&cubes_to_consider, .{
                         cube_entry.key.x + x,
                         cube_entry.key.y + y,
                         cube_entry.key.z + z,
@@ -89,9 +89,9 @@ main :: (args: [] cstr) {
             }
         }
 
-        for ^cube: cubes_to_consider {
-            state  := map.get(^cubes, *cube);
-            ncount := get_neighbor_count(^cubes, *cube);
+        for &cube: cubes_to_consider {
+            state  := map.get(&cubes, *cube);
+            ncount := get_neighbor_count(&cubes, *cube);
             
             if state.alive {
                 state.next = ncount == 2 || ncount == 3;
@@ -99,20 +99,20 @@ main :: (args: [] cstr) {
                 state.next = ncount == 3;
             }
 
-            map.put(^cubes, *cube, state);
+            map.put(&cubes, *cube, state);
         }
 
-        for ^cube: cubes_to_consider {
-            state := map.get(^cubes, *cube);
+        for &cube: cubes_to_consider {
+            state := map.get(&cubes, *cube);
             state.alive = state.next;
-            map.put(^cubes, *cube, state);
+            map.put(&cubes, *cube, state);
         }
 
-        array.clear(^cubes_to_consider);
+        array.clear(&cubes_to_consider);
     }
 
     active_count := 0;
-    for ^cube_entry: cubes.entries do if cube_entry.value.alive do active_count += 1;
+    for &cube_entry: cubes.entries do if cube_entry.value.alive do active_count += 1;
 
     printf("Active count: {}\n", active_count);
 }
