@@ -644,9 +644,32 @@ bisect :: (s: str, substr: str) -> (str, str) {
     return s[0 .. index], s[index+substr.length .. s.length];
 }
 
+//
 // Used by dyn_str
-delete  :: core.array.delete
-append  :: core.array.concat
-clear   :: core.array.clear
-retreat :: core.array.pop
-insert  :: core.array.insert
+//
+
+delete  :: macro (x: &dyn_str, idx: u32) -> u8 {
+    return (package core.array).delete(x, idx);
+}
+
+append  :: macro (x: &dyn_str, other: str) {
+    (package core.array).concat(x, other);
+}
+
+clear   :: macro (x: &dyn_str) {
+    (package core.array).clear(x);
+}
+
+retreat :: macro (x: &dyn_str, chars := 1) {
+    (package core.array).pop(x, chars);
+}
+
+insert  :: #match #locked {
+    macro (x: &dyn_str, idx: u32, new_str: str) -> bool {
+        return (package core.array).insert(x, idx, new_str);
+    },
+
+    macro (x: &dyn_str, idx: u32, ch: u8) -> bool {
+        return (package core.array).insert(x, idx, ch);
+    }
+}

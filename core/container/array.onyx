@@ -120,6 +120,7 @@ insert :: #match #local {}
 
 #overload
 insert :: (arr: &[..] $T, idx: u32, x: T) -> bool {
+    if idx >= arr.count do return false;
     if !ensure_capacity(arr, arr.count + 1) do return false;
 
     arr.count += 1;
@@ -134,6 +135,7 @@ insert :: (arr: &[..] $T, idx: u32, x: T) -> bool {
 
 #overload
 insert :: (arr: &[..] $T, idx: u32, new_arr: [] T) -> bool {
+    if idx >= arr.count do return false;
     if !ensure_capacity(arr, arr.count + new_arr.count) do return false;
 
     arr.count += new_arr.count;
