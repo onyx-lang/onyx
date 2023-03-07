@@ -21,6 +21,10 @@ package core.string
     is_alphanum :: (c: u8) -> bool {
         return c->is_alpha() || c->is_num();
     }
+
+    is_whitespace :: (c: u8) -> bool {
+        return c == #char " " || c == #char "\n" || c == #char "\t" || c == #char "\v";
+    }
 }
 
 
