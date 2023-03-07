@@ -30,6 +30,6 @@ make_foo :: () -> &Foo {
 main :: () {
     make_foo()->f();
 
-    Foo.{&good_foo, 5678}->f();
+    (Foo.{&good_foo, 5678})->f();
 }
 

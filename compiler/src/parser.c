@@ -354,6 +354,29 @@ static void parse_arguments(OnyxParser* parser, TokenType end_token, Arguments* 
     }
 }
 
+static AstCall* parse_function_call(OnyxParser *parser, AstTyped *callee) {
+    AstCall* call_node = make_node(AstCall, Ast_Kind_Call);
+    call_node->token = expect_token(parser, '(');
+    call_node->callee = callee;
+
+    arguments_initialize(&call_node->args);
+
+    parse_arguments(parser, ')', &call_node->args);
+
+    // Wrap expressions in AstArgument
+    bh_arr_each(AstTyped *, arg, call_node->args.values) {
+        if ((*arg) == NULL) continue;
+        *arg = (AstTyped *) make_argument(parser->allocator, *arg);
+    }
+
+    bh_arr_each(AstNamedValue *, named_value, call_node->args.named_values) {
+        if ((*named_value)->value == NULL) continue;
+        (*named_value)->value = (AstTyped *) make_argument(parser->allocator, (AstTyped *) (*named_value)->value);
+    }
+
+    return call_node;
+}
+
 static AstTyped* parse_factor(OnyxParser* parser) {
     AstTyped* retval = NULL;
 
@@ -852,27 +875,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
             case '(': {
                 if (!parser->parse_calls) goto factor_parsed;
-
-                AstCall* call_node = make_node(AstCall, Ast_Kind_Call);
-                call_node->token = expect_token(parser, '(');
-                call_node->callee = retval;
-
-                arguments_initialize(&call_node->args);
-
-                parse_arguments(parser, ')', &call_node->args);
-
-                // Wrap expressions in AstArgument
-                bh_arr_each(AstTyped *, arg, call_node->args.values) {
-                    if ((*arg) == NULL) continue;
-                    *arg = (AstTyped *) make_argument(parser->allocator, *arg);
-                }
-
-                bh_arr_each(AstNamedValue *, named_value, call_node->args.named_values) {
-                    if ((*named_value)->value == NULL) continue;
-                    (*named_value)->value = (AstTyped *) make_argument(parser->allocator, (AstTyped *) (*named_value)->value);
-                }
-
-                retval = (AstTyped *) call_node;
+                retval = (AstTyped *) parse_function_call(parser, retval);
                 break;
             }
 
@@ -897,6 +900,27 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 unop->expr = retval;
 
                 retval = (AstTyped *) unop;
+                break;
+            }
+
+            case Token_Type_Right_Arrow: {
+                AstBinaryOp* method_call = make_node(AstBinaryOp, Ast_Kind_Method_Call);
+                method_call->token = expect_token(parser, Token_Type_Right_Arrow);
+
+                method_call->left = retval;
+
+                OnyxToken *method_name = expect_token(parser, Token_Type_Symbol);
+                AstNode *method = make_symbol(context.ast_alloc, method_name);
+
+                if (parser->curr->type != '(') {
+                    // CLEANUP: This error message is horrendous.
+                    onyx_report_error(parser->curr->pos, Error_Critical, "Bad method call. Expected object->method(arguments), got something else.");
+                    break;
+                }
+
+                method_call->right = (AstTyped *) parse_function_call(parser, (AstTyped *) method);
+                
+                retval = (AstTyped *) method_call;
                 break;
             }
 
@@ -953,8 +977,6 @@ static inline i32 get_precedence(BinaryOp kind) {
 
         case Binary_Op_Modulus:         return 9;
         
-        case Binary_Op_Method_Call:     return 10;
-
         case Binary_Op_Coalesce:        return 11;
 
         default:                        return -1;
@@ -1002,7 +1024,6 @@ static BinaryOp binary_op_from_token_type(TokenType t) {
         case Token_Type_Pipe:              return Binary_Op_Pipe;
         case Token_Type_Dot_Dot:           return Binary_Op_Range;
         case '[':                          return Binary_Op_Subscript;
-        case Token_Type_Right_Arrow:       return Binary_Op_Method_Call;
         case Token_Type_Question_Question: return Binary_Op_Coalesce;
         default: return Binary_Op_Count;
     }
@@ -1073,7 +1094,6 @@ static AstTyped* parse_expression(OnyxParser* parser, b32 assignment_allowed) {
 
         AstBinaryOp* bin_op;
         if      (bin_op_kind == Binary_Op_Pipe)        bin_op = make_node(AstBinaryOp, Ast_Kind_Pipe);
-        else if (bin_op_kind == Binary_Op_Method_Call) bin_op = make_node(AstBinaryOp, Ast_Kind_Method_Call);
         else if (bin_op_kind == Binary_Op_Range)       bin_op = (AstBinaryOp *) make_node(AstRangeLiteral, Ast_Kind_Range_Literal);
         else                                           bin_op = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
 

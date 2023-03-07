@@ -67,6 +67,7 @@ static const char* token_type_names[] = {
     ">>>=",
     "..",
     "~~",
+    "??",
 
     "TOKEN_TYPE_SYMBOL",
     "TOKEN_TYPE_LITERAL_STRING",
