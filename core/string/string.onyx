@@ -126,6 +126,16 @@ concat :: (into: &[..] u8, strings: ..str) -> str {
     return .{ into.data, into.count };
 }
 
+#overload
+concat :: (into: &[..] u8, chars: ..u8) -> str {
+    array.ensure_capacity(into, into.count + chars.count);
+    for c: chars {
+        memory.copy(into.data + into.count, cast(rawptr) &.[c], 1);
+        into.count += 1;
+    }
+    return .{ into.data, into.count };
+}
+
 
 contains :: #match #local {}
 

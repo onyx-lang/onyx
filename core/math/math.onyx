@@ -136,7 +136,7 @@ atanh :: (t: $T) -> T {
 // are needed. Logarithms are implemented using a polynomial that is accurate in the range of
 // [1, 2], and then utilizes this identity for values outside of that range,
 //
-//      ln(x) = ln(2&n * v) = n * ln(2) + ln(v),   v is in [1, 2]
+//      ln(x) = ln(2^n * v) = n * ln(2) + ln(v),   v is in [1, 2]
 //
 
 // FIX: This definition is very wrong. It casts E to be whatever the type of the argument is,
