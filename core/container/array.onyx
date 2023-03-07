@@ -116,6 +116,9 @@ push :: (arr: &[..] $T, x: T) -> bool {
 // Semi-useful shortcut for adding something to an array.
 #operator << macro (arr: [..] $T, v: T) do core.array.push(&arr, v);
 
+insert :: #match #local {}
+
+#overload
 insert :: (arr: &[..] $T, idx: u32, x: T) -> bool {
     if !ensure_capacity(arr, arr.count + 1) do return false;
 
@@ -126,6 +129,22 @@ insert :: (arr: &[..] $T, idx: u32, x: T) -> bool {
     }
 
     arr.data[idx] = x;
+    return true;
+}
+
+#overload
+insert :: (arr: &[..] $T, idx: u32, new_arr: [] T) -> bool {
+    if !ensure_capacity(arr, arr.count + new_arr.count) do return false;
+
+    arr.count += new_arr.count;
+    while i := arr.count; i > idx {
+        arr.data[i] = arr.data[i - 1];
+        i -= 1;
+    }
+
+    for i: 0 .. new_arr.count {
+        arr.data[i + idx] = new_arr[i];
+    }
     return true;
 }
 
@@ -176,10 +195,11 @@ fast_delete :: (arr: &[..] $T, idx: u32) -> T {
     return to_return;
 }
 
-pop :: (arr: &[..] $T) -> T {
+pop :: (arr: &[..] $T, n := 1) -> T {
     if arr.count == 0 do return .{};
 
-    arr.count -= 1;
+    c := core.math.min(n, arr.count);
+    arr.count -= n;
     return arr.data[arr.count];
 }
 

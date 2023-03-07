@@ -26,8 +26,9 @@ package builtin
 // The builtin string and C-string types.
 // A string is simply a slice of bytes, and a c-string is a pointer
 // to byte, with a null-terminator ('\0') at the end.
-str  :: #type [] u8;
-cstr :: #type  & u8;
+str     :: #type   [] u8;
+cstr    :: #type    & u8;
+dyn_str :: #type [..] u8;
 
 
 

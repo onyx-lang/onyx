@@ -644,3 +644,9 @@ bisect :: (s: str, substr: str) -> (str, str) {
     return s[0 .. index], s[index+substr.length .. s.length];
 }
 
+// Used by dyn_str
+delete  :: core.array.delete
+append  :: core.array.concat
+clear   :: core.array.clear
+retreat :: core.array.pop
+insert  :: core.array.insert
