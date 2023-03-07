@@ -1,0 +1,15 @@
+use core
+
+
+main :: () {
+    output: dyn_str;
+    defer string.free(&output);
+
+    string.append(&output, "Hello");
+    string.append(&output, "World");
+    string.append(&output, "!");
+
+    string.insert(&output, 5, ", ");
+
+    println(output);
+}

@@ -271,7 +271,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(str|cstr|type_expr|any)\b</string>
+					<string>\b(str|cstr|dyn_str|type_expr|any)\b</string>
 					<key>name</key>
 					<string>storage.type.onyx</string>
 				</dict>

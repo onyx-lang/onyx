@@ -140,7 +140,7 @@ insert :: (arr: &[..] $T, idx: u32, new_arr: [] T) -> bool {
 
     arr.count += new_arr.count;
     while i := arr.count; i > idx {
-        arr.data[i] = arr.data[i - 1];
+        arr.data[i] = arr.data[i - new_arr.count];
         i -= 1;
     }
 

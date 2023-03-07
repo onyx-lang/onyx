@@ -1,0 +1,10 @@
+use core
+
+main :: () {
+    printf("{\n");
+    printf("Hello{");
+    printf("}World\n");
+    printf("Hello{{}}World\n");
+    printf("}{hello}{\n", 123);
+    printf("}{b32}{\n", 123);
+}

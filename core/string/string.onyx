@@ -16,7 +16,10 @@ as_str :: macro (t: $T/HasAsStrMethod) -> str {
 
 
 
-free :: (s: str, allocator := context.allocator) do raw_free(allocator, s.data);
+free :: #match #locked {
+    (s: str, allocator := context.allocator) { raw_free(allocator, s.data); },
+    (s: &dyn_str) { core.array.free(s); },
+}
 
 alloc_copy :: (original: str, allocator := context.allocator) -> str {
     if original.count == 0 do return .{};

@@ -52,7 +52,7 @@
 (defconst onyx-typenames
   '("u64" "u32" "u16" "u8"
     "i64" "i32" "i16" "i8"
-    "f32" "f64" "str" "cstr" "any" "type_expr"
+    "f32" "f64" "str" "cstr" "dyn_str" "any" "type_expr"
     "bool" "void" "rawptr"
     "i8x16" "i16x8" "i32x4" "i64x2"
     "f32x4" "f64x2" "v128"))
