@@ -107,18 +107,18 @@ package core
     return o1.value == o2.value;
 }
 
-#operator ?? macro (opt: ?$T, catch: Code) -> T {
-    value := opt;
-    if value do return value.value;
-
-    #unquote catch;
-}
-
 #operator ?? macro (opt: ?$T, default: T) -> T {
     value := opt;
     if value do return value.value;
 
     return default;
+}
+
+#operator ?? macro (opt: ?$T, catch: Code) -> T {
+    value := opt;
+    if value do return value.value;
+
+    #unquote catch;
 }
 
 #operator ? macro (opt: ?$T) -> T {

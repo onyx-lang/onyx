@@ -32,6 +32,13 @@ on_heap :: macro (v: $V) -> &V {
     return out;
 }
 
+on_temp :: macro (v: $V) -> &V {
+    out := cast(&V) raw_alloc(context.temp_allocator, sizeof V);
+    core.memory.set(out, 0, sizeof V);
+    *out = v;
+    return out;
+}
+
 TEMPORARY_ALLOCATOR_SIZE :: 1 << 16; // 16Kb
 
 // The global heap allocator, set up upon program intialization.

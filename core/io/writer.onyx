@@ -11,6 +11,8 @@ use core {conv, string, memory}
 Writer :: struct {
     stream : &Stream;
 
+    error  : Error;
+
     buffer: [] u8;
     buffer_filled: u32;
 }
@@ -37,8 +39,17 @@ writer_free :: (w: &Writer) {
 writer_flush :: (w: &Writer) {
     if w.buffer_filled == 0 do return;
 
-    stream_write(w.stream, w.buffer[0 .. w.buffer_filled]);
+    err, bytes_wrote := stream_write(w.stream, w.buffer[0 .. w.buffer_filled]);
+    if err != .None {
+        w.error = err;
+    }
+
     w.buffer_filled = 0;
+}
+
+writer_consume_error :: (w: &Writer) -> Error {
+    defer w.error = .None;
+    return w.error;
 }
 
 writer_remaining_capacity :: (w: &Writer) -> u32 {
@@ -54,7 +65,10 @@ string_builder :: (allocator := context.allocator) -> (Writer, &BufferStream) {
 
 write_byte :: (use writer: &Writer, byte: u8) {
     if buffer.count == 0 {
-        stream_write_byte(stream, byte);
+        if err := stream_write_byte(stream, byte); err != .None {
+            writer.error = err;
+        }
+
     } else {
         if writer_remaining_capacity(writer) == 0 {
             writer_flush(writer);
@@ -67,7 +81,9 @@ write_byte :: (use writer: &Writer, byte: u8) {
 
 write_str :: (use writer: &Writer, s: str) {
     if buffer.count == 0 {
-        stream_write(stream, s);
+        if err := stream_write(stream, s); err != .None {
+            writer.error = err;
+        }
 
     } elseif writer_remaining_capacity(writer) > s.count {
         memory.copy(&buffer[buffer_filled], s.data, s.count);
@@ -75,7 +91,9 @@ write_str :: (use writer: &Writer, s: str) {
 
     } else {
         writer_flush(writer);
-        stream_write(stream, s);
+        if err := stream_write(stream, s); err != .None {
+            writer.error = err;
+        }
     }
 }
 
