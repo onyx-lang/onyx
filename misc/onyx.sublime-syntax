@@ -15,6 +15,9 @@ contexts:
     - match: '"'
       scope: punctuation.definition.string.begin.onyx
       push: double_quoted_string
+    - match: "'"
+      scope: punctuation.definition.string.begin.onyx
+      push: single_quoted_string
 
     # Comments begin with a '//' and finish at the end of the line
     - match: '//'
@@ -91,6 +94,14 @@ contexts:
     #   captures:
     #     1: variable
     #     2: variable
+
+  single_quoted_string:
+    - meta_scope: string.quoted.single.onyx
+    - match: '\\.'
+      scope: constant.character.escape.onyx
+    - match: "'"
+      scope: punctuation.definition.string.end.onyx
+      pop: true
 
   double_quoted_string:
     - meta_scope: string.quoted.double.onyx

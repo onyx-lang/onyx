@@ -47,10 +47,10 @@ multiple_declaration_improvements :: () {
     // You're trying to declare a new variable k, while using the old variable
     // s in the same declaration. To get around this issue, there is a special
     // syntax you can use that tell the compiler that s is a not a new
-    // variable, but the same one as above. You simple place a ' after the
+    // variable, but the same one as above. You simple place a ~ after the
     // variable that you want to reuse.
 
-    k, s' := multiple_returns();
+    k, s~ := multiple_returns();
     printf("k: {}\ns: {}\n\n", k, s);
 
     //

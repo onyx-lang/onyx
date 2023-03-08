@@ -605,6 +605,25 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        case Token_Type_Literal_Char: {
+            AstNumLit* char_lit = make_node(AstNumLit, Ast_Kind_NumLit);
+            char_lit->flags |= Ast_Flag_Comptime;
+            char_lit->type_node = (AstType *) &basic_type_int_unsized;
+            char_lit->token = expect_token(parser, Token_Type_Literal_Char);
+            char_lit->was_char_literal = 1;
+
+            i8 dest = '\0';
+            i32 length = string_process_escape_seqs((char *) &dest, char_lit->token->text, 1);
+            char_lit->value.i = (u32) dest;
+
+            if (length != 1) {
+                onyx_report_error(char_lit->token->pos, Error_Critical, "Expected only a single character in character literal.");
+            }
+
+            retval = (AstTyped *) char_lit;
+            break;
+        }
+
         case '#': {
             if (parse_possible_directive(parser, "file_contents")) {
                 AstFileContents* fc = make_node(AstFileContents, Ast_Kind_File_Contents);
@@ -1322,7 +1341,7 @@ static i32 parse_possible_compound_symbol_declaration(OnyxParser* parser, AstNod
     while (peek_token(token_offset)->type == Token_Type_Symbol) {
         token_offset += 1;
 
-        if (peek_token(token_offset)->type == '\'') token_offset += 1;
+        if (peek_token(token_offset)->type == '~') token_offset += 1;
 
         if (peek_token(token_offset)->type != ',') break;
         token_offset += 1;
@@ -1344,7 +1363,7 @@ static i32 parse_possible_compound_symbol_declaration(OnyxParser* parser, AstNod
         AstNode* sym_node = make_symbol(parser->allocator, local_sym);
         bh_arr_push(local_compound->exprs, (AstTyped *) sym_node);
 
-        if (!consume_token_if_next(parser, '\'')) {
+        if (!consume_token_if_next(parser, '~')) {
             AstLocal* new_local = make_local(parser->allocator, local_sym, NULL);
             if (prev_local == NULL) {
                 first_local = new_local;
@@ -1394,7 +1413,7 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
 
     // If the token after the symbol is a comma, assume this is a compound declaration.
     if (peek_token(1)->type == ',' ||
-        (peek_token(1)->type == '\'' && peek_token(2)->type == ',')) {
+        (peek_token(1)->type == '~' && peek_token(2)->type == ',')) {
         return parse_possible_compound_symbol_declaration(parser, ret);
     }
 

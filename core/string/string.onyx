@@ -651,6 +651,10 @@ bisect :: (s: str, substr: str) -> (str, str) {
 // Used by dyn_str
 //
 
+to_dyn_str :: (x: str, allocator := context.allocator) -> dyn_str {
+    return (package core.array).make(x, allocator);
+}
+
 delete  :: macro (x: &dyn_str, idx: u32) -> u8 {
     return (package core.array).delete(x, idx);
 }

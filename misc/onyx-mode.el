@@ -97,6 +97,8 @@
     ;; Strings
     ("\\\".*\\\"" . font-lock-string-face)
 
+    ("\\\'.*\\\'" . font-lock-string-face)
+
     ;; Numbers
     (,(onyx-wrap-word-rx onyx-number-rx) . font-lock-constant-face)
 

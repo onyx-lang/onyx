@@ -60,7 +60,7 @@ main :: (args: [] cstr) {
 
     z := 0;
     while !string.empty(file) {
-        line, file' := string.bisect(file, #char "\n");
+        line, file~ := string.bisect(file, #char "\n");
 
         x := 0;
         for ch: line {

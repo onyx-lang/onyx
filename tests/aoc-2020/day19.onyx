@@ -162,7 +162,7 @@ main :: (args: [] cstr) {
     valid_count := 0;
     string.advance_line(&file);
     while !string.empty(file) {
-        line, file' := string.bisect(file, #char "\n");
+        line, file~ := string.bisect(file, #char "\n");
         if cyk_algorithm(&grammar, line) do valid_count += 1;
     }
 

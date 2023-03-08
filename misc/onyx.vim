@@ -49,6 +49,7 @@ syn match onyxDirective         "\#[a-zA-Z_]\+"
 syn match onyxTag               "@[a-zA-Z0-9_]\+"
 
 syn region onyxString		    start=+"+ skip=+\\\\\|\\"+ end=+"\|$+ extend contains=@Spell
+syn region onyxString           start=+'+ skip=+\\\\\|\\'+ end=+'\|$+ extend contains=@Spell
 syn region onyxMultiString      start=+"""+ end=+"""+ extend contains=@Spell
 
 hi def link onyxKeyword          Statement

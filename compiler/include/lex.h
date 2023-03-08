@@ -74,6 +74,7 @@ typedef enum TokenType {
 
     Token_Type_Symbol,
     Token_Type_Literal_String,
+    Token_Type_Literal_Char,
     Token_Type_Literal_Integer,
     Token_Type_Literal_Float,
     Token_Type_Literal_True,

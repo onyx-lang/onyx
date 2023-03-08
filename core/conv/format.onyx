@@ -443,7 +443,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
         case u8 {
             value := *(cast(&u8) v.data);
 
-            if value > 31 {
+            if formatting.interpret_numbers {
                 output->write(value);
 
             } else {

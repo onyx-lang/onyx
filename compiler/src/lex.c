@@ -71,6 +71,7 @@ static const char* token_type_names[] = {
 
     "TOKEN_TYPE_SYMBOL",
     "TOKEN_TYPE_LITERAL_STRING",
+    "TOKEN_TYPE_LITERAL_CHAR",
     "TOKEN_TYPE_LITERAL_INTEGER",
     "TOKEN_TYPE_LITERAL_FLOAT",
     "true",
@@ -243,14 +244,15 @@ whitespace_skipped:
         goto token_parsed;
     }
 
-    // String literal
-    if (*tk.text == '"') {
+    // String/Character literal
+    if (*tk.text == '"' || *tk.text == '\'') {
         u64 len = 0;
         u64 slash_count = 0;
 
+        char ch = *tk.text;
         INCREMENT_CURR_TOKEN(tokenizer);
 
-        while (!(*tokenizer->curr == '"' && slash_count == 0)) {
+        while (!(*tokenizer->curr == ch && slash_count == 0)) {
             len++;
 
             // if (*tokenizer->curr == '\n') {
@@ -270,7 +272,7 @@ whitespace_skipped:
         INCREMENT_CURR_TOKEN(tokenizer);
 
         tk.text++;
-        tk.type = Token_Type_Literal_String;
+        tk.type = ch == '"' ? Token_Type_Literal_String : Token_Type_Literal_Char;
         tk.length = len;
         goto token_parsed;
     }

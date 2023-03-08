@@ -1,0 +1,20 @@
+use core
+
+
+main :: () {
+    s: dyn_str;
+    defer string.free(&s);
+
+    string.append(&s, .['a', 'z']);
+
+    println(s);
+
+
+
+    x := 'r' - 'a';
+    printf("{} is the {} of the alphabet.\n", 'r', x);
+
+    a_newline := '\n';
+    printf("{}", a_newline);
+    println("Something else");
+}

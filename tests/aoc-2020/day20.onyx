@@ -267,7 +267,7 @@ main :: (args: [] cstr) {
 		td := cast(&bool) raw_alloc(tile_allocator, sizeof TileData);
 
 		for y: 0 .. 10 {
-			line, file' := string.bisect(file, #char "\n");
+			line, file~ := string.bisect(file, #char "\n");
 
 			for x: 0 .. 10 {
 				td[x + y * TILE_DATA_WIDTH] = (line[x] == #char "#");
