@@ -134,19 +134,26 @@ rune_is_start :: (b: u8) -> bool {
     return rune_length_from_first_byte(b) > 1;
 }
 
-runes :: (s: str) -> Iterator(rune) {
+
+RuneIterValue :: struct {
+    rune: i32;
+    bytes: [] u8;
+}
+
+runes :: (s: str) -> Iterator(RuneIterValue) {
     return iter.generator(
         &.{ s = s },
         ctx => {
-            if string.empty(ctx.s) do return 0, false;
+            if string.empty(ctx.s) do return RuneIterValue.{}, false;
 
             r, len := decode_rune(ctx.s);
-            string.advance(&ctx.s, len);
+            defer string.advance(&ctx.s, len);
 
-            return r, true;
+            return .{ r, ctx.s[0..len] }, true;
         }            
     );
 }
+
 
 slice :: (s: str, low, high: i32) -> str {
     advanced := advance_rune(s, low);

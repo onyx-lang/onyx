@@ -11,8 +11,7 @@ main :: () {
     utf8.advance_rune(&tmp, 6);
 
     for utf8.runes(tmp) {
-        buf: [4] u8;
-        printf("{} ", utf8.encode_rune(buf, it));
+        printf("{} ", it.bytes);
     }
     print("\n");
 
