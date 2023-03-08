@@ -255,9 +255,11 @@ whitespace_skipped:
         while (!(*tokenizer->curr == ch && slash_count == 0)) {
             len++;
 
-            // if (*tokenizer->curr == '\n') {
-            //     onyx_report_error(tk.pos, "String literal not terminated by end of line.");
-            // }
+            if (*tokenizer->curr == '\n' && ch == '\'') {
+                tk.pos.length = (u16) len;
+                onyx_report_error(tk.pos, Error_Critical, "Character literal not terminated by end of line.");
+                break;
+            }
 
             if (*tokenizer->curr == '\\') {
                 slash_count += 1;
