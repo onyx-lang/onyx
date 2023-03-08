@@ -181,3 +181,16 @@ auto :: #match {
         return 0;
     }
 }
+
+auto_temp :: macro (body: Code) -> i32 {
+    use core.alloc {arena, heap_allocator}
+    a := arena.make(heap_allocator, 32 * 1024);
+
+    old_allocator := context.temp_allocator;
+    context.temp_allocator = arena.make_allocator(&a);
+
+    #unquote body;
+
+    arena.free(&a);
+    context.temp_allocator = old_allocator;
+}
