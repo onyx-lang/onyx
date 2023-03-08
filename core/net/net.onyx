@@ -275,7 +275,7 @@ network_to_host :: #match #local {}
         if cast(i32) handle == 0 do return .BadFile, 0;
         
         bytes_written := __net_send(handle, buffer);
-        if bytes_written < 0 { s.vtable = null; }
+        if bytes_written < 0 { s.vtable = null; return .EOF, 0; }
         return .None, bytes_written;
     },
 

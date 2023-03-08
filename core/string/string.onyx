@@ -659,8 +659,14 @@ delete  :: macro (x: &dyn_str, idx: u32) -> u8 {
     return (package core.array).delete(x, idx);
 }
 
-append  :: macro (x: &dyn_str, other: str) {
-    (package core.array).concat(x, other);
+append  :: #match {
+    macro (x: &dyn_str, other: str) {
+        (package core.array).concat(x, other);
+    }, 
+
+    macro (x: &dyn_str, other: u8) {
+        (package core.array).push(x, other);
+    }, 
 }
 
 clear   :: macro (x: &dyn_str) {
