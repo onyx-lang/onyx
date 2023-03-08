@@ -1,0 +1,22 @@
+use core
+use core.encoding {utf8}
+
+main :: () {
+    output: dyn_str;
+    for i: 0x1F0A0 .. 0x1F0E0 {
+        utf8.append_rune(&output, i);
+    }
+
+    tmp: str = output;
+    utf8.advance_rune(&tmp, 6);
+
+    for utf8.runes(tmp) {
+        buf: [4] u8;
+        printf("{} ", utf8.encode_rune(buf, it));
+    }
+    print("\n");
+
+    println(utf8.slice(output, 3, 10));
+
+    println(utf8.next_rune(tmp));
+}

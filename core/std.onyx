@@ -51,6 +51,7 @@ package core
 
 #load "./time/date"
 #load "./encoding/base64"
+#load "./encoding/utf8"
 
 #load "./runtime/common"
 
