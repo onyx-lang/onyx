@@ -12,4 +12,12 @@ main :: () {
     string.insert(&output, 5, ", ");
 
     println(output);
+
+
+    // `conv.format` appends to the dynamic string. Use
+    // `string.clear` to empty it first.
+    string.clear(&output);
+    conv.format(&output, "This is another {}.", "sentence");
+
+    println(output);
 }

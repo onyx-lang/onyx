@@ -181,7 +181,7 @@ Format :: struct {
 }
 
 #local
-flush_to_dynstr :: (dynstr: &[..] u8, to_write: str) => {
+flush_to_dyn_str :: (dynstr: &dyn_str, to_write: str) => {
     array.concat(dynstr, to_write);
     return true;
 }
@@ -210,25 +210,22 @@ format :: (output: &Format_Output, format: str, va: ..any) -> str {
 }
 
 #overload
-format :: (buffer: &[..] u8, format: str, va: ..any) {
-    buffer.count = buffer.capacity;
-    out := format_va(*buffer, format, ~~va);
-    buffer.count = out.count;
+format :: (format: str, va: ..any) -> str {
+    out := make(dyn_str);
+    return format_va(&out, format, ~~va);
 }
 
 #overload
-format :: (format: str, va: ..any) -> str {
-    buffer : [256] u8;
-    out    := make([..] u8);
+format :: (buffer: &dyn_str, format: str, va: ..any) -> str {
+    internal_buffer : [256] u8;
     output := Format_Output.{
-        ~~buffer, 0, buffer.count,
-        flush=.{ &out, flush_to_dynstr }
+        ~~internal_buffer, 0, internal_buffer.count,
+        flush=.{ buffer, flush_to_dyn_str }
     };
 
     final := format_va(&output, format, ~~va);
-    array.concat(&out, final);
-
-    return out;
+    string.concat(buffer, final);
+    return *buffer;
 }
 
 //
@@ -242,25 +239,22 @@ format_va :: (buffer: [] u8, format: str, va: [] any, flush := Format_Flush_Call
 }
 
 #overload
-format_va :: (buffer: &[..] u8, format: str, va: [] any, flush := Format_Flush_Callback.{}) {
-    buffer.count = buffer.capacity;
-    out := format_va(*buffer, format, va, flush);
-    buffer.count = out.count;
+format_va :: (format: [] u8, va: [] any, allocator := context.allocator) -> str {
+    out := make(dyn_str, allocator=allocator);
+    return format_va(&out, format, ~~va);
 }
 
 #overload
-format_va :: (format: [] u8, va: [] any, allocator := context.allocator) -> str {
-    buffer : [256] u8;
-    out    := make([..] u8, allocator=allocator);
+format_va :: (buffer: &dyn_str, format: str, va: [] any) -> str {
+    internal_buffer : [256] u8;
     output := Format_Output.{
-        ~~buffer, 0, buffer.count,
-        flush=.{ &out, flush_to_dynstr }
+        ~~internal_buffer, 0, internal_buffer.count,
+        flush=.{ buffer, flush_to_dyn_str }
     };
 
     final := format_va(&output, format, ~~va);
-    array.concat(&out, final);
-
-    return out;
+    string.concat(buffer, final);
+    return *buffer;
 }
 
 #overload
