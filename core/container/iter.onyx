@@ -479,9 +479,8 @@ generic_dynamic_array_as_iter :: (x: &[..] $T, $access: Code, $return_type: type
         current: u32;
     }
 
-    c := make(Context(T), allocator=context.temp_allocator);
+    c := new_temp(Context(T));
     c.arr = x;
-    c.current = 0;
 
     next :: (use _: &Context($T), $access: Code) => {
         if current < arr.count {
@@ -792,7 +791,7 @@ generator_no_copy :: (ctx: &$Ctx, gen: (&Ctx) -> ($T, bool), close: (&Ctx) -> vo
 
         close :: (use c: &Context($T)) {
             sync.mutex_destroy(&c.mutex);
-            delete(c);
+            cfree(c);
         }
 
         // This iterator's context is allocated from the heap because

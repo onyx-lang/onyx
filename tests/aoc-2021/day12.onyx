@@ -41,7 +41,7 @@ main :: (args) => {
         node_stack << .{ "start", 0, false };
 
         children_of :: (edges: &$T, name: str) -> Iterator(str) {
-            name_copy := make_temp(str);
+            name_copy := new_temp(str);
             *name_copy = name;
 
             return iter.concat(

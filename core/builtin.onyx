@@ -346,24 +346,9 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
     //
     // See core/container/array.onyx for an example.
     //
-    __make_overload :: #match {
-        //
-        // This is the fallback option for make. It simply allocates a zero-intialized
-        // element of type T.
-        #order 1000 (_: &$T, allocator := context.allocator) -> &T {
-            memory :: package core.memory
+    __make_overload :: #match {}
 
-            res := cast(&T) raw_alloc(allocator, sizeof T);
-            memory.set(res, 0, sizeof T);
-            return res;
-        },
-    }
-
-    delete :: #match {
-        #order 1000 macro (x: &$T, allocator := context.allocator) {
-            if x != null do raw_free(allocator, x);
-        }
-    }
+    delete :: #match {}
 }
 
 

@@ -19,7 +19,7 @@ SnailNum :: struct {
     allocator: Allocator;
 
     make :: () => {
-        return make(SnailNum, SnailNum.allocator);
+        return new(SnailNum, SnailNum.allocator);
     }
 
     make_pair :: (left, right: u32) => {
