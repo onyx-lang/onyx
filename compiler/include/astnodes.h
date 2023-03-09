@@ -1745,6 +1745,7 @@ void introduce_build_options(bh_allocator a);
 // NOTE: Useful not inlined functions
 AstTyped* ast_reduce(bh_allocator a, AstTyped* node);
 AstNode* ast_clone(bh_allocator a, void* n);
+AstNode* ast_clone_with_captured_entities(bh_allocator a, void* n, bh_arr(AstNode *)* ents);
 AstFunction* clone_function_header(bh_allocator a, AstFunction* func);
 void clone_function_body(bh_allocator a, AstFunction* dest, AstFunction* source);
 

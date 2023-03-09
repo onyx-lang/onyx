@@ -676,7 +676,10 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
     assert(template->type != NULL);
     assert(template->type->kind == Type_Kind_Function);
 
-    AstBlock* expansion = (AstBlock *) ast_clone(context.ast_alloc, template->body);
+    bh_arr(AstNode *) nodes_that_need_entities=NULL;
+    bh_arr_new(global_heap_allocator, nodes_that_need_entities, 4);
+
+    AstBlock* expansion = (AstBlock *) ast_clone_with_captured_entities(context.ast_alloc, template->body, &nodes_that_need_entities);
     expansion->rules = Block_Rule_Macro;
     expansion->scope = NULL;
     expansion->next = call->next;
@@ -720,7 +723,34 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
     if (template->poly_scope != NULL)
         scope_include(argument_scope, template->poly_scope, call->token->pos);
 
+    if (bh_arr_length(nodes_that_need_entities) > 0) {
+        // :CopyPaste from symres_function
+        bh_arr_each(AstNode *, node, nodes_that_need_entities) {
+            // This makes a lot of assumptions about how these nodes are being processed,
+            // and I don't want to start using this with other nodes without considering
+            // what the ramifications of that is.
+            assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents);
+
+            Scope *scope = argument_scope;
+
+            if ((*node)->kind == Ast_Kind_Static_If) {
+                AstIf *static_if = (AstIf *) *node;
+                assert(static_if->defined_in_scope);
+                scope = static_if->defined_in_scope;
+
+                if (template->poly_scope) {
+                    scope = scope_create(context.ast_alloc, scope, static_if->token->pos);
+                    scope_include(scope, template->poly_scope, static_if->token->pos);
+                }
+            }
+
+            add_entities_for_node(NULL, *node, scope, macro->entity->package);
+        }
+    }
+
     *(AstNode **) pcall = subst;
+
+    bh_arr_free(nodes_that_need_entities);
     return;
 }
 

@@ -122,6 +122,17 @@ static inline i32 ast_kind_to_size(AstNode* node) {
     return 0;
 }
 
+static bh_arr(AstNode *) captured_entities=NULL;
+
+AstNode* ast_clone_with_captured_entities(bh_allocator a, void* n, bh_arr(AstNode *)* ents) {
+    captured_entities = *ents;
+
+    AstNode* cloned = ast_clone(a, n);
+
+    *ents = captured_entities;
+    return cloned;
+}
+
 AstNode* ast_clone_list(bh_allocator a, void* n) {
     AstNode* node = (AstNode *) n;
     if (node == NULL) return NULL;
@@ -140,7 +151,6 @@ AstNode* ast_clone_list(bh_allocator a, void* n) {
     return root;
 }
 
-static bh_arr(AstNode *) captured_entities=NULL;
 #define E(ent) do { \
     assert(captured_entities); \
     ent->entity = NULL; \

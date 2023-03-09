@@ -143,9 +143,11 @@ EMIT_FUNC(initialize_type, Type* type, OnyxToken* where) {
         }
 
         default:
-            onyx_report_error(where->pos, Error_Critical,
-                    "Unable to initialize type, '%s'. The reason for this is largely due to the compiler not knowing what the initial value should be.",
-                    type_get_name(type)); 
+            //
+            // If none of the above, simply zero the buffer.
+            WIL(NULL, WI_I32_CONST, 0);
+            WIL(NULL, WI_I32_CONST, type_size_of(type));
+            emit_wasm_fill(mod, &code, NULL);
             break;
     }
 
