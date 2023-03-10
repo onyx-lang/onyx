@@ -1702,6 +1702,7 @@ static SymresStatus symres_foreign_block(AstForeignBlock *fb) {
             ent->function->foreign_name = ent->function->intrinsic_name; // Hmm... This might not be right?
             ent->function->foreign_module = fb->module_name;
             ent->function->is_foreign = 1;
+            ent->function->is_foreign_dyncall = fb->uses_dyncall;
             ent->function->entity = NULL;
             ent->function->entity_header = NULL;
             ent->function->entity_body = NULL;

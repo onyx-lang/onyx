@@ -77,28 +77,40 @@ typedef struct LinkLibraryContext {
 } LinkLibraryContext;
 
 
-static void *locate_symbol_in_dynamic_library(LinkLibraryContext *ctx, char *libname, char *sym) {
-    #ifdef _BH_LINUX
-    char *library_name = bh_lookup_file(libname, ".", ".so", 1, (const char **) ctx->library_paths, 1);
-    void* handle = dlopen(library_name, RTLD_LAZY);
+static void *locate_symbol_in_dynamic_library_raw(char *libname, char *sym) {
+#ifdef _BH_LINUX
+    void* handle = dlopen(libname, RTLD_LAZY);
     if (handle == NULL) {
         return NULL;
     }
 
     return dlsym(handle, sym);
-    #endif
+#endif
 
-    #ifdef _BH_WINDOWS
-    char *library_name = bh_lookup_file(libname, ".", ".dll", 1, (const char **) ctx->library_paths, 1);
-    HMODULE handle = LoadLibraryA(library_name);
+#ifdef _BH_WINDOWS
+    HMODULE handle = LoadLibraryA(libname);
     if (handle == NULL) {
         return NULL;
     }
 
     return GetProcAddress(handle, sym);
-    #endif
+#endif
 
     return NULL;
+}
+
+static void *locate_symbol_in_dynamic_library(LinkLibraryContext *ctx, char *libname, char *sym) {
+    char *library_name;
+
+    #ifdef _BH_LINUX
+    library_name = bh_lookup_file(libname, ".", ".so", 1, (const char **) ctx->library_paths, 1);
+    #endif
+
+    #ifdef _BH_WINDOWS
+    library_name = bh_lookup_file(libname, ".", ".dll", 1, (const char **) ctx->library_paths, 1);
+    #endif
+
+    return locate_symbol_in_dynamic_library_raw(library_name, sym);
 }
 
 typedef void *(*LinkLibraryer)(OnyxRuntime *runtime);
@@ -202,11 +214,12 @@ static wasm_trap_t *__wasm_dyncall(void *env, const wasm_val_vec_t *args, wasm_v
             case 'i':  dcArgInt(dcCallVM, args->data[arg_idx++].of.i32);               break;
             case 'l':  dcArgLongLong(dcCallVM, args->data[arg_idx++].of.i64);          break;
             case 'f':  dcArgFloat(dcCallVM, args->data[arg_idx++].of.f32);             break;
-            case 'd':  dcArgFloat(dcCallVM, args->data[arg_idx++].of.f64);             break;
-            case 'p':  dcArgPointer(dcCallVM, ONYX_PTR(args->data[arg_idx++].of.i32)); break;
-            case 'v':                                                                  break;
+            case 'd':  dcArgDouble(dcCallVM, args->data[arg_idx++].of.f64);            break;
+            case 'p':  dcArgPointer(dcCallVM, ONYX_PTR(args->data[arg_idx].of.i32)); arg_idx++; break;
+            case 'v':  arg_idx++;                                                      break;
             case 's':
-                dcArgPointer(dcCallVM, ONYX_PTR(args->data[arg_idx++].of.i32));
+                dcArgPointer(dcCallVM, ONYX_PTR(args->data[arg_idx].of.i32));
+                arg_idx++;
                 dcArgInt(dcCallVM, args->data[arg_idx++].of.i32);
                 break;
             default: assert(("bad dynamic call type", 0));
@@ -215,14 +228,15 @@ static wasm_trap_t *__wasm_dyncall(void *env, const wasm_val_vec_t *args, wasm_v
 
   arguments_placed:
     switch (ctx->types[0]) {
-        case 'i': res->data[0] = WASM_I32_VAL(dcCallInt(dcCallVM, ctx->func));       break;
-        case 'l': res->data[0] = WASM_I64_VAL(dcCallLongLong(dcCallVM, ctx->func));  break;
-        case 'f': res->data[0] = WASM_F32_VAL(dcCallFloat(dcCallVM, ctx->func));     break;
-        case 'd': res->data[0] = WASM_F64_VAL(dcCallDouble(dcCallVM, ctx->func));    break;
-        case 'p': res->data[0] = WASM_I64_VAL((u64) dcCallPointer(dcCallVM, ctx->func));   break;
-        case 'v': dcCallVoid(dcCallVM, ctx->func);
+        case 'i': res->data[0] = WASM_I32_VAL(dcCallInt(dcCallVM, ctx->func));           break;
+        case 'l': res->data[0] = WASM_I64_VAL(dcCallLongLong(dcCallVM, ctx->func));      break;
+        case 'f': res->data[0] = WASM_F32_VAL(dcCallFloat(dcCallVM, ctx->func));         break;
+        case 'd': res->data[0] = WASM_F64_VAL(dcCallDouble(dcCallVM, ctx->func));        break;
+        case 'p': res->data[0] = WASM_I64_VAL((u64) dcCallPointer(dcCallVM, ctx->func)); break;
+        case 'v': dcCallVoid(dcCallVM, ctx->func);                                       break;
     }
 
+    dcReset(dcCallVM);
     return NULL;
 }
 
@@ -239,24 +253,26 @@ static wasm_func_t *link_and_prepare_dyncall_function(
         dcMode(dcCallVM, DC_CALL_C_DEFAULT);
     }
 
-    char lib_name[256];
+    char lib_name[256] = {0};
     strncpy(lib_name, library_name.data, bh_min(256, library_name.size));
 
     u32 index;
-    char func_name[256];
+    char func_name[256] = {0};
     for (index = 0; index < function_name.size; index++) {
-        if (function_name.data[index] == ':') break;
+        if (function_name.data[index] == ':') {
+            index ++;
+            break;
+        }
+
         func_name[index] = function_name.data[index];
     }
-    func_name[index++] = '\0';
 
-    char dynamic_types[64];
-    for (; index < function_name.size; index++) {
-        dynamic_types[index] = function_name.data[index];
+    char dynamic_types[64] = {0};
+    for (u32 write_index = 0; index < function_name.size; write_index++, index++) {
+        dynamic_types[write_index] = function_name.data[index];
     }
-    dynamic_types[index] = '\0';
 
-    void (*func)() = locate_symbol_in_dynamic_library(lib_ctx, lib_name, func_name);
+    void (*func)() = locate_symbol_in_dynamic_library_raw(lib_name, func_name);
     if (!func) return NULL;
 
     wasm_functype_t *functype = wasm_externtype_as_functype(type);

@@ -3056,6 +3056,11 @@ static AstForeignBlock* parse_foreign_block(OnyxParser* parser, OnyxToken *token
     // :LinearTokenDependent
     AstForeignBlock *fb = make_node(AstForeignBlock, Ast_Kind_Foreign_Block);
     fb->token = token;
+
+    if (parse_possible_directive(parser, "dyncall")) {
+        fb->uses_dyncall = 1;
+    }
+
     fb->module_name = expect_token(parser, Token_Type_Literal_String);
 
     //

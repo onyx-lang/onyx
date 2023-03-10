@@ -1285,9 +1285,10 @@ struct AstFunction {
 
     bh_arr(AstNode *) nodes_that_need_entities_after_clone;
 
-    b32 is_exported  : 1;
-    b32 is_foreign   : 1;
-    b32 is_intrinsic : 1;
+    b32 is_exported        : 1;
+    b32 is_foreign         : 1;
+    b32 is_foreign_dyncall : 1;
+    b32 is_intrinsic       : 1;
 };
 
 struct AstPolyQuery {
@@ -1418,6 +1419,8 @@ struct AstForeignBlock {
     bh_arr(struct Entity *) captured_entities;
 
     u32 foreign_block_number;
+
+    b32 uses_dyncall : 1;
 };
 
 typedef struct EntityJobData {
