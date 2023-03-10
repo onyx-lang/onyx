@@ -5,6 +5,11 @@
 #include "onyx_library.h"
 #include "dyncall.h"
 
+#ifdef USE_DYNCALL
+    #include "dyncall.h"
+    static DCCallVM *dcCallVM;
+#endif
+
 #ifndef USE_OVM_DEBUGGER
     #include "wasmer.h"
 #endif
@@ -24,9 +29,6 @@ static bh_buffer         wasm_raw_bytes;
 wasm_instance_t*  wasm_instance;
 wasm_module_t*    wasm_module;
 wasm_memory_t*    wasm_memory;
-
-// @Temporary
-static DCCallVM *dcCallVM;
 
 OnyxRuntime wasm_runtime;
 
@@ -198,6 +200,8 @@ static void lookup_and_load_custom_libraries(LinkLibraryContext *ctx, bh_arr(Was
 }
 
 
+#ifdef USE_DYNCALL
+
 typedef struct DynCallContext {
     void (*func)();
     char types[64];
@@ -285,6 +289,8 @@ static wasm_func_t *link_and_prepare_dyncall_function(
     return wasm_func;
 }
 
+#endif // USE_DYNCALL
+
 static void onyx_print_trap(wasm_trap_t* trap) {
     wasm_message_t msg;
     wasm_trap_message(trap, &msg);
@@ -366,6 +372,7 @@ static b32 link_wasm_imports(
             }
         }
 
+#ifdef USE_DYNCALL
         if (wasm_name_starts_with(module_name, "dyncall:")) {
             wasm_name_t library_name = *module_name;
             library_name.data += 8;
@@ -387,6 +394,7 @@ static b32 link_wasm_imports(
             import = wasm_func_as_extern(wasm_func);
             goto import_found;
         }
+#endif
 
         bh_arr_each(WasmFuncDefinition **, library_funcs, linkable_functions) {
             WasmFuncDefinition **pcurrent_function = *library_funcs;
