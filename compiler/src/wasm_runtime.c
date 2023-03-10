@@ -3,7 +3,6 @@
 #include "astnodes.h"
 #include "wasm.h"
 #include "onyx_library.h"
-#include "dyncall.h"
 
 #ifdef USE_DYNCALL
     #include "dyncall.h"
