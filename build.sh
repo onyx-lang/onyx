@@ -2,6 +2,8 @@
 
 . ./settings.sh
 
+echo "Installing on '$(uname -a)'"
+
 echo "Installing core libs"
 [ -d "$CORE_DIR/core" ] && sudo rm -r "$CORE_DIR/core"
 sudo mkdir -p "$CORE_DIR"
