@@ -3,6 +3,7 @@
 #include "astnodes.h"
 #include "wasm.h"
 #include "onyx_library.h"
+#include "dyncall.h"
 
 #ifndef USE_OVM_DEBUGGER
     #include "wasmer.h"
@@ -24,6 +25,9 @@ wasm_instance_t*  wasm_instance;
 wasm_module_t*    wasm_module;
 wasm_memory_t*    wasm_memory;
 
+// @Temporary
+static DCCallVM *dcCallVM;
+
 OnyxRuntime wasm_runtime;
 
 b32 wasm_name_equals(const wasm_name_t* name1, const wasm_name_t* name2) {
@@ -35,6 +39,12 @@ b32 wasm_name_equals_string(const wasm_name_t* name1, const char* name2) {
     u32 name2_size = strlen(name2);
     if (name1->size != name2_size) return 0;
     return !strncmp(name1->data, name2, name1->size);
+}
+
+b32 wasm_name_starts_with(const wasm_name_t* name, const char *prefix) {
+    u32 prefix_size = strlen(prefix);
+    if (name->size < prefix_size) return 0;
+    return !strncmp(name->data, prefix, prefix_size);
 }
 
 wasm_extern_t* wasm_extern_lookup_by_name(wasm_module_t* module, wasm_instance_t* instance, const char* name) {
@@ -61,16 +71,39 @@ wasm_extern_t* wasm_extern_lookup_by_name(wasm_module_t* module, wasm_instance_t
     return exports.data[idx];
 }
 
-
-
-typedef void *(*LibraryLinker)(OnyxRuntime *runtime);
-
-typedef struct LibraryLinkContext {
+typedef struct LinkLibraryContext {
     bh_buffer wasm_bytes;
     bh_arr(char *) library_paths;
-} LibraryLinkContext;
+} LinkLibraryContext;
 
-static WasmFuncDefinition** onyx_load_library(LibraryLinkContext *ctx, char *name) {
+
+static void *locate_symbol_in_dynamic_library(LinkLibraryContext *ctx, char *libname, char *sym) {
+    #ifdef _BH_LINUX
+    char *library_name = bh_lookup_file(libname, ".", ".so", 1, (const char **) ctx->library_paths, 1);
+    void* handle = dlopen(library_name, RTLD_LAZY);
+    if (handle == NULL) {
+        return NULL;
+    }
+
+    return dlsym(handle, sym);
+    #endif
+
+    #ifdef _BH_WINDOWS
+    char *library_name = bh_lookup_file(libname, ".", ".dll", 1, (const char **) ctx->library_paths, 1);
+    HMODULE handle = LoadLibraryA(library_name);
+    if (handle == NULL) {
+        return NULL;
+    }
+
+    return GetProcAddress(handle, sym);
+    #endif
+
+    return NULL;
+}
+
+typedef void *(*LinkLibraryer)(OnyxRuntime *runtime);
+
+static WasmFuncDefinition** onyx_load_library(LinkLibraryContext *ctx, char *name) {
     #ifdef _BH_LINUX
         #define DIR_SEPARATOR '/'
     #endif
@@ -86,42 +119,17 @@ static WasmFuncDefinition** onyx_load_library(LibraryLinkContext *ctx, char *nam
     char *library_load_name_tmp = bh_bprintf("onyx_library_%s", library);
     char *library_load_name = alloca(strlen(library_load_name_tmp) + 1);
     strcpy(library_load_name, library_load_name_tmp);
-    LibraryLinker library_load;
 
-    #ifdef _BH_LINUX
-    char *library_name = bh_lookup_file(name, ".", ".so", 1, (const char **) ctx->library_paths, 1);
-    void* handle = dlopen(library_name, RTLD_LAZY);
-    if (handle == NULL) {
-        printf("ERROR LOADING LIBRARY %s: %s\n", name, dlerror());
-        return NULL;
-    }
-
-    library_load = (LibraryLinker) dlsym(handle, library_load_name);
+    LinkLibraryer library_load = locate_symbol_in_dynamic_library(ctx, name, library_load_name);
     if (library_load == NULL) {
         printf("ERROR RESOLVING '%s': %s\n", library_load_name, dlerror());
         return NULL;
     }
-    #endif
-
-    #ifdef _BH_WINDOWS
-    char *library_name = bh_lookup_file(name, ".", ".dll", 1, (const char **) ctx->library_paths, 1);
-    HMODULE handle = LoadLibraryA(library_name);
-    if (handle == NULL) {
-        printf("ERROR LOADING LIBRARY %s: %d\n", name, GetLastError());
-        return NULL;
-    }
-
-    library_load = (LibraryLinker) GetProcAddress(handle, library_load_name);
-    if (library_load == NULL) {
-        printf("ERROR RESOLVING '%s': %d\n", library_load_name, GetLastError());
-        return NULL;
-    }
-    #endif
 
     return library_load(runtime);
 }
 
-static void lookup_and_load_custom_libraries(LibraryLinkContext *ctx, bh_arr(WasmFuncDefinition **)* p_out) {
+static void lookup_and_load_custom_libraries(LinkLibraryContext *ctx, bh_arr(WasmFuncDefinition **)* p_out) {
     bh_arr(WasmFuncDefinition **) out = *p_out;
 
     bh_buffer wasm_bytes = ctx->wasm_bytes;
@@ -177,6 +185,90 @@ static void lookup_and_load_custom_libraries(LibraryLinkContext *ctx, bh_arr(Was
     *p_out = out;
 }
 
+
+typedef struct DynCallContext {
+    void (*func)();
+    char types[64];
+} DynCallContext;
+
+static wasm_trap_t *__wasm_dyncall(void *env, const wasm_val_vec_t *args, wasm_val_vec_t *res) {
+    DynCallContext *ctx = env;
+    dcReset(dcCallVM);
+
+    int arg_idx = 0;
+    for (int i = 1; i < 64; i++) {
+        switch (ctx->types[i]) {
+            case '\0': goto arguments_placed;
+            case 'i':  dcArgInt(dcCallVM, args->data[arg_idx++].of.i32);               break;
+            case 'l':  dcArgLongLong(dcCallVM, args->data[arg_idx++].of.i64);          break;
+            case 'f':  dcArgFloat(dcCallVM, args->data[arg_idx++].of.f32);             break;
+            case 'd':  dcArgFloat(dcCallVM, args->data[arg_idx++].of.f64);             break;
+            case 'p':  dcArgPointer(dcCallVM, ONYX_PTR(args->data[arg_idx++].of.i32)); break;
+            case 'v':                                                                  break;
+            case 's':
+                dcArgPointer(dcCallVM, ONYX_PTR(args->data[arg_idx++].of.i32));
+                dcArgInt(dcCallVM, args->data[arg_idx++].of.i32);
+                break;
+            default: assert(("bad dynamic call type", 0));
+        }
+    }
+
+  arguments_placed:
+    switch (ctx->types[0]) {
+        case 'i': res->data[0] = WASM_I32_VAL(dcCallInt(dcCallVM, ctx->func));       break;
+        case 'l': res->data[0] = WASM_I64_VAL(dcCallLongLong(dcCallVM, ctx->func));  break;
+        case 'f': res->data[0] = WASM_F32_VAL(dcCallFloat(dcCallVM, ctx->func));     break;
+        case 'd': res->data[0] = WASM_F64_VAL(dcCallDouble(dcCallVM, ctx->func));    break;
+        case 'p': res->data[0] = WASM_I64_VAL((u64) dcCallPointer(dcCallVM, ctx->func));   break;
+        case 'v': dcCallVoid(dcCallVM, ctx->func);
+    }
+
+    return NULL;
+}
+
+static wasm_func_t *link_and_prepare_dyncall_function(
+        wasm_externtype_t* type,
+        LinkLibraryContext *lib_ctx,
+        wasm_name_t library_name,
+        wasm_name_t function_name)
+{
+    //
+    // When using any dynamic functions, a DCCallVM has to be created.
+    if (!dcCallVM) {
+        dcCallVM = dcNewCallVM(4096);
+        dcMode(dcCallVM, DC_CALL_C_DEFAULT);
+    }
+
+    char lib_name[256];
+    strncpy(lib_name, library_name.data, bh_min(256, library_name.size));
+
+    u32 index;
+    char func_name[256];
+    for (index = 0; index < function_name.size; index++) {
+        if (function_name.data[index] == ':') break;
+        func_name[index] = function_name.data[index];
+    }
+    func_name[index++] = '\0';
+
+    char dynamic_types[64];
+    for (; index < function_name.size; index++) {
+        dynamic_types[index] = function_name.data[index];
+    }
+    dynamic_types[index] = '\0';
+
+    void (*func)() = locate_symbol_in_dynamic_library(lib_ctx, lib_name, func_name);
+    if (!func) return NULL;
+
+    wasm_functype_t *functype = wasm_externtype_as_functype(type);
+
+    DynCallContext* dcc = bh_alloc_item(bh_heap_allocator(), DynCallContext);
+    dcc->func = func;
+    memcpy(&dcc->types, dynamic_types, 64);
+
+    wasm_func_t *wasm_func = wasm_func_new_with_env(wasm_store, functype, &__wasm_dyncall, dcc, NULL);
+    return wasm_func;
+}
+
 static void onyx_print_trap(wasm_trap_t* trap) {
     wasm_message_t msg;
     wasm_trap_message(trap, &msg);
@@ -229,7 +321,11 @@ static void cleanup_wasm_objects() {
 //
 // This could be cleaned up a bit, as this function directly modifies various global variables.
 // Those being wasm_memory and wasm_imports.
-static b32 link_wasm_imports(bh_arr(WasmFuncDefinition **) linkable_functions, wasm_module_t *wasm_module) {
+static b32 link_wasm_imports(
+        bh_arr(WasmFuncDefinition **) linkable_functions,
+        LinkLibraryContext *lib_ctx,
+        wasm_module_t *wasm_module)
+{
     wasm_importtype_vec_t module_imports;
     wasm_module_imports(wasm_module, &module_imports);
 
@@ -252,6 +348,28 @@ static b32 link_wasm_imports(bh_arr(WasmFuncDefinition **) linkable_functions, w
                 import = wasm_memory_as_extern(wasm_memory);
                 goto import_found;
             }
+        }
+
+        if (wasm_name_starts_with(module_name, "dyncall:")) {
+            wasm_name_t library_name = *module_name;
+            library_name.data += 8;
+            library_name.size -= 8;
+
+            wasm_name_t function_name = *import_name;
+
+            wasm_func_t *wasm_func = link_and_prepare_dyncall_function(
+                    (wasm_externtype_t *) wasm_importtype_type(module_imports.data[i]),
+                    lib_ctx,
+                    library_name,
+                    function_name
+            );
+
+            if (!wasm_func) {
+                goto bad_import;
+            }
+
+            import = wasm_func_as_extern(wasm_func);
+            goto import_found;
         }
 
         bh_arr_each(WasmFuncDefinition **, library_funcs, linkable_functions) {
@@ -362,14 +480,10 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     bh_arr(WasmFuncDefinition **) linkable_functions = NULL;
     bh_arr_new(bh_heap_allocator(), linkable_functions, 4);
 
-    {
-        LibraryLinkContext lib_ctx;
-        lib_ctx.wasm_bytes = wasm_bytes;
-        lib_ctx.library_paths = NULL;
-        lookup_and_load_custom_libraries(&lib_ctx, &linkable_functions);
-
-        bh_arr_free(lib_ctx.library_paths);
-    }
+    LinkLibraryContext lib_ctx;
+    lib_ctx.wasm_bytes = wasm_bytes;
+    lib_ctx.library_paths = NULL;
+    lookup_and_load_custom_libraries(&lib_ctx, &linkable_functions);
 
     wasm_byte_vec_t wasm_data;
     wasm_data.size = wasm_bytes.length;
@@ -382,9 +496,11 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     }
 
     wasm_imports = (wasm_extern_vec_t) WASM_EMPTY_VEC;
-    if (!link_wasm_imports(linkable_functions, wasm_module)) {
+    if (!link_wasm_imports(linkable_functions, &lib_ctx, wasm_module)) {
         return 0;
     }
+
+    bh_arr_free(lib_ctx.library_paths);
 
     wasm_trap_t* traps = NULL;
 
