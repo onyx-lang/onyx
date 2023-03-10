@@ -74,12 +74,8 @@ arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, 
     }
 
     if aa == .Resize {
-        // An allocation of this size does not fit into a single arena.
-        if size > alloc_arena.arena_size - sizeof rawptr {
-            return null;
-        }
-
         newptr := arena_alloc_proc(data, .Alloc, size, align, oldptr);
+        if newptr == null do return null;
 
         // This is incorrect, but because there is not an "old size",
         // this is the best possible.

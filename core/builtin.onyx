@@ -361,18 +361,6 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
         T.destroy(x_);
         cfree(x_);
     }
-
-    #local
-    IsNotDoublePointer :: interface (t: $T) {
-        #not **t;
-    }
-
-    #overload #order 1001
-    delete :: macro (x: &$T/core.intrinsics.types.type_is_simple)
-        where IsNotDoublePointer(&T)
-    {
-        cfree(x);
-    }
 }
 
 

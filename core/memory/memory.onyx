@@ -78,7 +78,7 @@ builtin.__make_overload :: macro (_: &[] $T, count: u32, allocator := context.al
 //
 // Allows for delete(&sl);
 #overload
-builtin.delete :: macro (x: &[] $T) {
-    #this_package.free_slice(x);
+builtin.delete :: macro (x: &[] $T, allocator := context.allocator) {
+    #this_package.free_slice(x, allocator);
 }
 
