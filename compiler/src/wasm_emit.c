@@ -56,7 +56,7 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
             if (basic->size <= 4) return WASM_TYPE_INT32;
             if (basic->size == 8) return WASM_TYPE_INT64;
         }
-        if (basic->flags & Basic_Flag_Pointer) return WASM_TYPE_INT32;
+        if (basic->flags & Basic_Flag_Pointer) return WASM_TYPE_PTR;
         if (basic->flags & Basic_Flag_Float) {
             if (basic->size <= 4) return WASM_TYPE_FLOAT32;
             if (basic->size == 8) return WASM_TYPE_FLOAT64;
@@ -4119,16 +4119,65 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     debug_end_function(mod);
 }
 
+static char encode_type_as_dyncall_symbol(Type *t) {
+    if (type_struct_is_just_one_basic_value(t)) {
+        Type *inner = type_struct_is_just_one_basic_value(t);
+        return encode_type_as_dyncall_symbol(inner);
+    }
+
+    if (t->kind == Type_Kind_Slice)   return 's';
+    if (t->kind == Type_Kind_Pointer) return 'p';
+    if (t->kind == Type_Kind_Enum)    return encode_type_as_dyncall_symbol(t->Enum.backing);
+    if (t->kind == Type_Kind_Basic) {
+        TypeBasic* basic = &t->Basic;
+        if (basic->flags & Basic_Flag_Boolean) return 'i';
+        if (basic->flags & Basic_Flag_Integer) {
+            if (basic->size <= 4) return 'i';
+            if (basic->size == 8) return 'l';
+        }
+        if (basic->flags & Basic_Flag_Pointer) return 'p';
+        if (basic->flags & Basic_Flag_Float) {
+            if (basic->size <= 4) return 'f';
+            if (basic->size == 8) return 'd';
+        }
+        if (basic->flags & Basic_Flag_SIMD) return 'v';
+        if (basic->flags & Basic_Flag_Type_Index) return 'i';
+        if (basic->size == 0) return 'v';
+    }
+
+    return 'v';
+}
+
 static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
     if (!should_emit_function(fd)) return;
 
     i32 type_idx = generate_type_idx(mod, fd->type);
 
+    char *module, *name;
+
+    if (fd->is_foreign_dyncall) {
+        module = bh_aprintf(global_heap_allocator, "dyncall:%b", fd->foreign_module->text, fd->foreign_module->length);
+
+        char type_encoding[64] = {0};
+        type_encoding[0] = encode_type_as_dyncall_symbol(fd->type->Function.return_type);
+
+        int index = 1;
+        bh_arr_each(AstParam, param, fd->params) {
+            type_encoding[index++] = encode_type_as_dyncall_symbol(param->local->type);
+        }
+
+        name = bh_aprintf(global_heap_allocator, "%b:%s", fd->foreign_name->text, fd->foreign_name->length, type_encoding);
+
+    } else {
+        module = bh_aprintf(global_heap_allocator, "%b", fd->foreign_module->text, fd->foreign_module->length);
+        name = bh_aprintf(global_heap_allocator, "%b", fd->foreign_name->text, fd->foreign_name->length);
+    }
+
     WasmImport import = {
         .kind = WASM_FOREIGN_FUNCTION,
         .idx  = type_idx,
-        .mod  = bh_aprintf(global_heap_allocator, "%b", fd->foreign_module->text, fd->foreign_module->length),
-        .name = bh_aprintf(global_heap_allocator, "%b", fd->foreign_name->text, fd->foreign_name->length),
+        .mod  = module,
+        .name = name,
     };
 
     bh_arr_push(mod->imports, import);
