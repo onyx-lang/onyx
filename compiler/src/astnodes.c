@@ -756,18 +756,24 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // implicitly. This makes working with optionals barable.
     if (type_struct_constructed_from_poly_struct(type, builtin_optional_type)) {
         TypeMatch match = unify_node_and_type_(pnode, type->Struct.poly_sln[0].type, permanent);
-        if (match == TYPE_MATCH_SUCCESS && permanent) {
-            AstStructLiteral *opt_lit = make_optional_literal_some(context.ast_alloc, node, type);
+        if (match == TYPE_MATCH_SUCCESS) {
+            if (permanent) {
+                AstStructLiteral *opt_lit = make_optional_literal_some(context.ast_alloc, node, type);
 
-            *(AstStructLiteral **) pnode = opt_lit;
+                *(AstStructLiteral **) pnode = opt_lit;
+            }
+
             return TYPE_MATCH_SUCCESS;
         }
+        
+        if (match == TYPE_MATCH_YIELD) return TYPE_MATCH_YIELD;
     }
 
 
     // If the node is a numeric literal, try to convert it to the destination type.
     if (node->kind == Ast_Kind_NumLit) {
         if (convert_numlit_to_type((AstNumLit *) node, type)) return TYPE_MATCH_SUCCESS;
+        return TYPE_MATCH_FAILED;
     }
 
     // If the node is a compound expression, and it doesn't have a type created,
