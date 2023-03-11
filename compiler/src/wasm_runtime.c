@@ -135,7 +135,7 @@ static WasmFuncDefinition** onyx_load_library(LinkLibraryContext *ctx, char *nam
 
     LinkLibraryer library_load = locate_symbol_in_dynamic_library(ctx, name, library_load_name);
     if (library_load == NULL) {
-        printf("ERROR RESOLVING '%s': %s\n", library_load_name, dlerror());
+        printf("ERROR RESOLVING '%s'\n", library_load_name);
         return NULL;
     }
 
