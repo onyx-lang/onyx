@@ -751,6 +751,20 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         return legal ? TYPE_MATCH_SUCCESS : TYPE_MATCH_FAILED;
     }
 
+    // If the destination type is an optional, and the node's type is a value of
+    // the same underlying type, then we can construct an optional with a value
+    // implicitly. This makes working with optionals barable.
+    else if (type_struct_constructed_from_poly_struct(type, builtin_optional_type)) {
+        TypeMatch match = unify_node_and_type_(pnode, type->Struct.poly_sln[0].type, permanent);
+        if (match != TYPE_MATCH_SUCCESS) return match;
+
+        AstStructLiteral *opt_lit = make_optional_literal_some(context.ast_alloc, node, type);
+
+        *(AstStructLiteral **) pnode = opt_lit;
+        return TYPE_MATCH_SUCCESS;
+    }
+
+
     // If the node is a numeric literal, try to convert it to the destination type.
     else if (node->kind == Ast_Kind_NumLit) {
         if (convert_numlit_to_type((AstNumLit *) node, type)) return TYPE_MATCH_SUCCESS;
@@ -1430,6 +1444,7 @@ AstNumLit* make_bool_literal(bh_allocator a, b32 b) {
     AstNumLit* bl = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
     bl->flags |= Ast_Flag_Comptime;
     bl->type_node = (AstType *) &basic_type_bool;
+    bl->type = &basic_types[Basic_Kind_Bool];
 
     bl->value.i = b ? 1 : 0;
     return bl;
@@ -1538,6 +1553,21 @@ AstZeroValue* make_zero_value(bh_allocator a, OnyxToken* token, Type* type) {
     zero_value->type = type;
     return zero_value;
 }
+
+AstStructLiteral* make_optional_literal_some(bh_allocator a, AstTyped *expr, Type *opt_type) {
+    AstStructLiteral *opt_lit = onyx_ast_node_new(a, sizeof(AstStructLiteral), Ast_Kind_Struct_Literal);
+    opt_lit->token = expr->token;
+
+    arguments_initialize(&opt_lit->args);
+    arguments_ensure_length(&opt_lit->args, 2);
+    opt_lit->args.values[0] = make_bool_literal(a, 1);
+    opt_lit->args.values[1] = expr;
+
+    opt_lit->type = opt_type;
+    return opt_lit;
+}
+
+
 
 void arguments_initialize(Arguments* args) {
     if (args->values == NULL)       bh_arr_new(global_heap_allocator, args->values, 2);
