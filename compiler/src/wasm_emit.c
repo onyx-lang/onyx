@@ -4120,6 +4120,11 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 }
 
 static char encode_type_as_dyncall_symbol(Type *t) {
+    if (type_struct_is_just_one_basic_value(t)) {
+        Type *inner = type_struct_is_just_one_basic_value(t);
+        return encode_type_as_dyncall_symbol(inner);
+    }
+
     if (t->kind == Type_Kind_Slice)   return 's';
     if (t->kind == Type_Kind_Pointer) return 'p';
     if (t->kind == Type_Kind_Enum)    return encode_type_as_dyncall_symbol(t->Enum.backing);
