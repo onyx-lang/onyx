@@ -1783,19 +1783,20 @@ TypeMatch implicit_cast_to_bool(AstTyped **pnode);
 
 AstNode* strip_aliases(AstNode* node);
 
-AstNumLit*       make_bool_literal(bh_allocator, b32 b);
-AstNumLit*       make_int_literal(bh_allocator a, i64 value);
-AstNumLit*       make_float_literal(bh_allocator a, f64 value);
-AstRangeLiteral* make_range_literal(bh_allocator a, AstTyped* low, AstTyped* high);
-AstBinaryOp*     make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right);
-AstArgument*     make_argument(bh_allocator a, AstTyped* value);
-AstFieldAccess*  make_field_access(bh_allocator a, AstTyped* node, char* field);
-AstAddressOf*    make_address_of(bh_allocator a, AstTyped* node);
-AstLocal*        make_local(bh_allocator a, OnyxToken* token, AstType* type_node);
-AstLocal*        make_local_with_type(bh_allocator a, OnyxToken* token, Type* type);
-AstNode*         make_symbol(bh_allocator a, OnyxToken* sym);
-AstUnaryOp*      make_cast(bh_allocator a, AstTyped* expr, Type* to);
-AstZeroValue*    make_zero_value(bh_allocator a, OnyxToken *token, Type* type);
+AstNumLit*        make_bool_literal(bh_allocator, b32 b);
+AstNumLit*        make_int_literal(bh_allocator a, i64 value);
+AstNumLit*        make_float_literal(bh_allocator a, f64 value);
+AstRangeLiteral*  make_range_literal(bh_allocator a, AstTyped* low, AstTyped* high);
+AstBinaryOp*      make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right);
+AstArgument*      make_argument(bh_allocator a, AstTyped* value);
+AstFieldAccess*   make_field_access(bh_allocator a, AstTyped* node, char* field);
+AstAddressOf*     make_address_of(bh_allocator a, AstTyped* node);
+AstLocal*         make_local(bh_allocator a, OnyxToken* token, AstType* type_node);
+AstLocal*         make_local_with_type(bh_allocator a, OnyxToken* token, Type* type);
+AstNode*          make_symbol(bh_allocator a, OnyxToken* sym);
+AstUnaryOp*       make_cast(bh_allocator a, AstTyped* expr, Type* to);
+AstZeroValue*     make_zero_value(bh_allocator a, OnyxToken *token, Type* type);
+AstStructLiteral* make_optional_literal_some(bh_allocator a, AstTyped *expr, Type* opt_type);
 
 void arguments_initialize(Arguments* args);
 b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg, b32 insert_zero_values);
