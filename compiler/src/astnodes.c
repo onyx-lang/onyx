@@ -739,7 +739,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // [N] T  -> [] T
     // [..] T -> [] T
     // ..T    -> [] T
-    else if (node_type && type->kind == Type_Kind_Slice &&
+    if (node_type && type->kind == Type_Kind_Slice &&
         (node_type->kind == Type_Kind_Array || node_type->kind == Type_Kind_DynArray || node_type->kind == Type_Kind_VarArgs)) {
 
         char* dummy;
@@ -754,26 +754,26 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // If the destination type is an optional, and the node's type is a value of
     // the same underlying type, then we can construct an optional with a value
     // implicitly. This makes working with optionals barable.
-    else if (type_struct_constructed_from_poly_struct(type, builtin_optional_type)) {
+    if (type_struct_constructed_from_poly_struct(type, builtin_optional_type)) {
         TypeMatch match = unify_node_and_type_(pnode, type->Struct.poly_sln[0].type, permanent);
-        if (match != TYPE_MATCH_SUCCESS) return match;
+        if (match == TYPE_MATCH_SUCCESS && permanent) {
+            AstStructLiteral *opt_lit = make_optional_literal_some(context.ast_alloc, node, type);
 
-        AstStructLiteral *opt_lit = make_optional_literal_some(context.ast_alloc, node, type);
-
-        *(AstStructLiteral **) pnode = opt_lit;
-        return TYPE_MATCH_SUCCESS;
+            *(AstStructLiteral **) pnode = opt_lit;
+            return TYPE_MATCH_SUCCESS;
+        }
     }
 
 
     // If the node is a numeric literal, try to convert it to the destination type.
-    else if (node->kind == Ast_Kind_NumLit) {
+    if (node->kind == Ast_Kind_NumLit) {
         if (convert_numlit_to_type((AstNumLit *) node, type)) return TYPE_MATCH_SUCCESS;
     }
 
     // If the node is a compound expression, and it doesn't have a type created,
     // recursive call this function with the individual components of the compound
     // expression.
-    else if (node->kind == Ast_Kind_Compound) {
+    if (node->kind == Ast_Kind_Compound) {
         if (type->kind != Type_Kind_Compound) return TYPE_MATCH_FAILED;
 
         AstCompound* compound = (AstCompound *) node;
@@ -793,7 +793,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         return TYPE_MATCH_SUCCESS;
     }
 
-    else if (node->kind == Ast_Kind_If_Expression) {
+    if (node->kind == Ast_Kind_If_Expression) {
         AstIfExpression* if_expr = (AstIfExpression *) node;
 
         TypeMatch true_success  = unify_node_and_type_(&if_expr->true_expr,  type, permanent);
@@ -811,12 +811,12 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         }
     }
 
-    else if (node->kind == Ast_Kind_Alias) {
+    if (node->kind == Ast_Kind_Alias) {
         AstAlias* alias = (AstAlias *) node;
         return unify_node_and_type_(&alias->alias, type, permanent);
     }
 
-    else if (node->kind == Ast_Kind_Address_Of) {
+    if (node->kind == Ast_Kind_Address_Of) {
         AstAddressOf *address_of = (AstAddressOf *) node;
         if (address_of->can_be_removed) {
             if (!permanent) {
@@ -829,7 +829,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         }
     }
 
-    else if (node->kind == Ast_Kind_Zero_Value) {
+    if (node->kind == Ast_Kind_Zero_Value) {
         if (node_type == NULL) {
             node->type = type;
             return TYPE_MATCH_SUCCESS; // Shouldn't this be on the next line? And have node_type == node->type checked?
@@ -853,7 +853,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // Note, this should be the ONLY time this happens. All
     // other uses of checking polymorphic structures against
     // actual nodes strictly forbidden.
-    else if (type->kind == Type_Kind_PolyStruct) {
+    if (type->kind == Type_Kind_PolyStruct) {
         if (node_type->kind == Type_Kind_Struct) {
             if (node_type->Struct.constructed_from->type_id == type->id) {
                 return TYPE_MATCH_SUCCESS;
@@ -865,7 +865,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // This case enables to ability to have less values on the
     // left hand side of an assignment than what the right hand
     // side call would be returning.
-    else if (node_type->kind == Type_Kind_Compound) {
+    if (node_type->kind == Type_Kind_Compound) {
         AstCall *call = get_call_expr_from_node((AstNode *) node);
         if (!call) return TYPE_MATCH_FAILED;
 
@@ -1560,7 +1560,7 @@ AstStructLiteral* make_optional_literal_some(bh_allocator a, AstTyped *expr, Typ
 
     arguments_initialize(&opt_lit->args);
     arguments_ensure_length(&opt_lit->args, 2);
-    opt_lit->args.values[0] = make_bool_literal(a, 1);
+    opt_lit->args.values[0] = (AstTyped *) make_bool_literal(a, 1);
     opt_lit->args.values[1] = expr;
 
     opt_lit->type = opt_type;
