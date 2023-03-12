@@ -4145,6 +4145,10 @@ static char encode_type_as_dyncall_symbol(Type *t) {
         if (basic->size == 0) return 'v';
     }
 
+    if (t->kind == Type_Kind_Distinct) {
+        return encode_type_as_dyncall_symbol(t->Distinct.base_type);
+    }
+
     return 'v';
 }
 
