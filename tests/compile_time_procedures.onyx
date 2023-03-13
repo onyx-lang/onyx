@@ -39,7 +39,7 @@ main :: (args: [] cstr) {
     t.vt = &test_vtable2;
     println(do_a_thing(&t));
 
-    tmp_vt := Test_VTable.{ first = test_vtable1.second, second = test_vtable2.first, third = math.max_poly };
+    tmp_vt := Test_VTable.{ first = test_vtable1.second, second = test_vtable2.first, third = math.max };
     t.vt = &tmp_vt;
     println(do_a_thing(&t));
 

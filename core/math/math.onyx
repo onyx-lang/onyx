@@ -246,13 +246,13 @@ log :: (a: $T, base: $R) -> T {
 // they would be however, the fact that these overloads are intrinsic means they cannot
 // be reference from the element section and therefore cannot be passed around or used
 // as values.
-max :: #match #local { wasm.max_f32, wasm.max_f64, max_poly }
-max_poly :: (a: $T, b: T) -> T {
+max_fast :: #match #local { wasm.max_f32, wasm.max_f64 }
+max :: (a: $T, b: T) -> T {
     return a if a >= b else b;
 }
 
-min :: #match #local { wasm.min_f32, wasm.min_f64, min_poly }
-min_poly :: (a: $T, b: T) -> T {
+min_fast :: #match #local { wasm.min_f32, wasm.min_f64 }
+min :: (a: $T, b: T) -> T {
     return a if a <= b else b;
 }
 
@@ -267,8 +267,8 @@ sqrt_poly :: (x: $T) -> T {
     return ~~ wasm.sqrt_f64(~~ x);
 }
 
-abs :: #match #local { wasm.abs_f32, wasm.abs_f64, abs_poly }
-abs_poly :: (x: $T) -> T {
+abs_fast :: #match #local { wasm.abs_f32, wasm.abs_f64 }
+abs :: (x: $T) -> T {
     return x if x >= 0 else -x;
 }
 

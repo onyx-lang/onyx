@@ -26,7 +26,7 @@ global_arguments: struct {
 main :: (args: [] cstr) {
     config = .{};
 
-    arg_parse.arg_parse(args, ^global_arguments);
+    arg_parse.arg_parse(args, &global_arguments);
 
     command   := args[0] |> string.as_str();
     arguments := args[1..args.count];
@@ -42,7 +42,7 @@ main :: (args: [] cstr) {
     defer if loaded_config_file do store_config_file();
 
     command_procedures := runtime.info.get_procedures_with_tag(Command);
-    defer delete(^command_procedures);
+    defer delete(&command_procedures);
 
     command_tag := array.first(command_procedures, #(it.tag.command == command));
     if !command_tag {
@@ -60,7 +60,7 @@ main :: (args: [] cstr) {
     }
 
     assert(command_tag.type == #type ([] cstr) -> void, "BAD TYPE FOR COMMAND PROCEDURE!");
-    (*cast(^([] cstr) -> void) ^command_tag.func)(arguments);
+    (*cast(&([] cstr) -> void) &command_tag.func)(arguments);
 }
 
 Command :: struct {
@@ -79,7 +79,7 @@ run_help_command :: (args: [] cstr) {
     printf("Package dependency resolver and synchronizer for Onyx.\n\nUsage:\n");
 
     command_procedures := runtime.info.get_procedures_with_tag(Command);
-    defer delete(^command_procedures);
+    defer delete(&command_procedures);
     for command_procedures {
         printf("{}\n", it.tag.description);
         printf("        onyx pkg {} {}\n", it.tag.command, it.tag.arguments);
@@ -108,7 +108,7 @@ run_init_command :: (args: [] cstr) {
 
     printf("Creating new project manifest in {}.\n\n", global_arguments.config_file);
 
-    read_field :: macro (f: str, dest: ^$T, default: T) {
+    read_field :: macro (f: str, dest: &$T, default: T) {
         while true {
             print(f);
             line := r->read_line(consume_newline=true, allocator=context.temp_allocator)
@@ -122,19 +122,19 @@ run_init_command :: (args: [] cstr) {
             if conv.parse_any(dest, T, line, context.allocator) do break;
 
             if T == str {
-                *cast(^str) dest = string.alloc_copy(line);
+                *cast(&str) dest = string.alloc_copy(line);
                 break;
             }
         }
     }
 
     // @TODO // Validation for these fields.
-    r := io.reader_make(^stdio.stream);
-    read_field("Package name: ", ^config.metadata.name, "");
-    read_field("Package description: ", ^config.metadata.description, "");
-    read_field("Package url: ", ^config.metadata.url, "");
-    read_field("Package author: ", ^config.metadata.author, "");
-    read_field("Package version (0.0.1): ", ^config.metadata.version, .{0, 0, 1});
+    r := io.reader_make(&stdio.stream);
+    read_field("Package name: ", &config.metadata.name, "");
+    read_field("Package description: ", &config.metadata.description, "");
+    read_field("Package url: ", &config.metadata.url, "");
+    read_field("Package author: ", &config.metadata.author, "");
+    read_field("Package version (0.0.1): ", &config.metadata.version, .{0, 0, 1});
 }
 
 #tag Command.{ "add", "Add a new dependency to the project.", "package-url [version]",
@@ -156,7 +156,7 @@ run_add_command :: (args: [] cstr) {
 
     version: SemVer;
     if args.count > 1 {
-        if !conv.parse_any(^version, string.as_str(args[1])) {
+        if !conv.parse_any(&version, string.as_str(args[1])) {
             eprintf("Failed to parse version number given: {}\n", string.as_str(args[1]));
             return;
         }
@@ -196,7 +196,7 @@ run_remove_command :: (args: [] cstr) {
         return;
     }
 
-    for^ config.dependency_folders.folders.entries {
+    for& config.dependency_folders.folders.entries {
         if it.value == dep {
             config.dependencies.dependencies->delete(it.key);
             config.dependency_folders.folders->delete(it.key);
@@ -232,7 +232,7 @@ run_show_command :: (args: [] cstr) {
 // @Feature // Add "locked" dependencies that will never update?
 run_update_command :: (args: [] cstr) {
     printf("Updating dependencies to newest compatible versions.\n");
-    for^ config.dependencies.dependencies.entries {
+    for& config.dependencies.dependencies.entries {
         new_version := Git.get_latest_compatible_version(it.key, it.value);
 
         printf("{}: {} -> {}\n", it.key, it.value, new_version);
@@ -253,7 +253,7 @@ run_sync_command :: (args: [] cstr) {
         clean := false;
     }
     options: Sync_Options;
-    arg_parse.arg_parse(args, ^options);
+    arg_parse.arg_parse(args, &options);
 
     To_Install :: struct {
         use pack: Package;
@@ -264,18 +264,18 @@ run_sync_command :: (args: [] cstr) {
     dependencies_installed    := make(Map(str, SemVer));
     needed_dependency_folders := make([..] str);
     defer {
-        delete(^dependencies_to_install);
-        delete(^dependencies_installed);
-        delete(^needed_dependency_folders);
+        delete(&dependencies_to_install);
+        delete(&dependencies_installed);
+        delete(&needed_dependency_folders);
     }
 
-    for^ config.dependencies.dependencies.entries {
+    for& config.dependencies.dependencies.entries {
         dependencies_to_install << .{ .{it.key, it.value}, true };
     }
 
     while dependencies_to_install.count > 0 {
         alloc.clear_temp_allocator();
-        to_install := array.delete(^dependencies_to_install, 0);
+        to_install := array.delete(&dependencies_to_install, 0);
 
         if dependencies_installed->has(to_install.repo) {
             continue;
@@ -293,7 +293,7 @@ run_sync_command :: (args: [] cstr) {
         package_path := config.dependency_folders.folders[to_install.repo];
         for os.with_file(tprintf("{}/{}/onyx-pkg.ini", config.config.lib_source_directory, package_path)) {
             r := io.reader_make(it);
-            result, error := encoding.ini.parse_ini_file(^r, ^inner_config);
+            result, error := encoding.ini.parse_ini_file(&r, &inner_config);
 
             if result != .Success {
                 eprintf("Failed to parse onyx-pkg.ini in {}. Skipping...\n", to_install.repo);
@@ -306,7 +306,7 @@ run_sync_command :: (args: [] cstr) {
             continue;
         }
 
-        for^ inner_config.dependencies.dependencies.entries {
+        for& inner_config.dependencies.dependencies.entries {
             if dependencies_installed->has(it.key) {
                 if it.value->is_newer(dependencies_installed[it.key]) {
                     uninstall_package(.{it.key, it.value});
@@ -376,7 +376,7 @@ run_publish_command :: (args: [] cstr) {
         return;
     }
 
-    r := io.reader_make(^stdio.stream);
+    r := io.reader_make(&stdio.stream);
 
     while true {
         printf("Is this a m[a]jor, m[i]nor, or [p]atch release? or [c]ancel? (a/i/p/c) ");
@@ -430,7 +430,7 @@ run_list_versions :: (args: [] cstr) {
 
     pack      = Git.get_full_repo_uri(pack);
     versions := Git.get_available_versions(pack);
-    defer delete(^versions);
+    defer delete(&versions);
 
     array.sort(versions, SemVer.compare);
 
@@ -534,7 +534,7 @@ attempt_remove_native_library :: (package_folder: str) -> bool {
     inner_config: Config;
     for os.with_file(tprintf("{}/onyx-pkg.ini", package_folder)) {
         r := io.reader_make(it);
-        result, error := encoding.ini.parse_ini_file(^r, ^inner_config);
+        result, error := encoding.ini.parse_ini_file(&r, &inner_config);
 
         if result != .Success do return false;
         if string.empty(inner_config.native_library.library) do return false;
@@ -554,7 +554,7 @@ get_installed_version_of_package :: (package_path: str) -> SemVer {
     inner_config: Config;
     for os.with_file(tprintf("{}/{}/onyx-pkg.ini", config.config.lib_source_directory, package_path)) {
         r := io.reader_make(it);
-        result, error := encoding.ini.parse_ini_file(^r, ^inner_config);
+        result, error := encoding.ini.parse_ini_file(&r, &inner_config);
 
         if result == .Success {
             return inner_config.metadata.version;
@@ -568,7 +568,7 @@ run_native_library_installation :: (folder: str) -> bool {
     inner_config: Config;
     for os.with_file(tprintf("{}/{}/onyx-pkg.ini", config.config.lib_source_directory, folder)) {
         r := io.reader_make(it);
-        result, error := encoding.ini.parse_ini_file(^r, ^inner_config);
+        result, error := encoding.ini.parse_ini_file(&r, &inner_config);
 
         if result != .Success do return false;
         if string.empty(inner_config.native_library.build_cmd) do return true;
@@ -579,7 +579,7 @@ run_native_library_installation :: (folder: str) -> bool {
 
         installed_dest := tprintf("{}/{}", config.config.lib_source_directory, folder);
         build_proc     := os.process_spawn(cmd, args, starting_directory=installed_dest);
-        build_result   := os.process_wait(^build_proc);
+        build_result   := os.process_wait(&build_proc);
 
         if build_result != .Success {
             eprintf("Failed to build native library in {}.\n", folder);
@@ -611,14 +611,14 @@ run_command_and_forward_output :: (cmd: str) => {
     args  = args[1 .. args.count];
 
     run_proc := os.process_spawn(prog, args);
-    r := io.reader_make(^run_proc);
+    r := io.reader_make(&run_proc);
 
     while !(r->empty()) {
         line := r->read_line(consume_newline=true);
         print(line);
     }
 
-    return os.process_wait(^run_proc);
+    return os.process_wait(&run_proc);
 }
 
 build_package_file_to_load :: () {
@@ -630,9 +630,9 @@ build_package_file_to_load :: () {
 
     for os.with_file(filepath, .Write) {
         w := io.writer_make(it);
-        defer io.writer_free(^w);
+        defer io.writer_free(&w);
 
-        io.write(^w, """
+        io.write(&w, """
 //
 // THIS FILE WAS AUTOMATICALLY GENERATED BY onyx pkg.
 // DO NOT MODIFY UNLESS YOU KNOW WHAT YOU ARE DOING.
@@ -645,14 +645,14 @@ build_package_file_to_load :: () {
             dependency_repo := it.key;
             dependency_folder := config.dependency_folders.folders[dependency_repo];
 
-            io.write_format(^w,
+            io.write_format(&w,
                 "#load \"./{}/module.onyx\"\n",
                 dependency_folder);
         }
 
-        io.write(^w, "\n\n// NATIVE LIBRARY PATH\n");
+        io.write(&w, "\n\n// NATIVE LIBRARY PATH\n");
 
-        io.write_format(^w, "#library_path \"{}\"\n", config.config.lib_bin_directory);
+        io.write_format(&w, "#library_path \"{}\"\n", config.config.lib_bin_directory);
     }
 }
 
@@ -663,18 +663,18 @@ build_package_file_to_load :: () {
 SemVer :: struct {
     major, minor, patch: i32;
 
-    format :: (output: ^conv.Format_Output, formatting: ^conv.Format, semver: ^SemVer) {
+    format :: (output: &conv.Format_Output, formatting: &conv.Format, semver: &SemVer) {
         conv.format(output, "{}.{}.{}", semver.major, semver.minor, semver.patch);
     }
 
-    parse :: (semver: ^SemVer, to_parse_: str, _: Allocator) -> bool {
+    parse :: (semver: &SemVer, to_parse_: str, _: Allocator) -> bool {
         to_parse := to_parse_;
 
-        major := string.read_until(^to_parse, #char ".") |> conv.str_to_i64();
-        string.advance(^to_parse);
-        minor := string.read_until(^to_parse, #char ".") |> conv.str_to_i64();
-        string.advance(^to_parse);
-        patch := string.read_until(^to_parse, #char ".") |> conv.str_to_i64();
+        major := string.read_until(&to_parse, #char ".") |> conv.str_to_i64();
+        string.advance(&to_parse);
+        minor := string.read_until(&to_parse, #char ".") |> conv.str_to_i64();
+        string.advance(&to_parse);
+        patch := string.read_until(&to_parse, #char ".") |> conv.str_to_i64();
 
         if major == 0 && minor == 0 && patch == 0 do return false;
 
@@ -701,18 +701,18 @@ SemVer :: struct {
         return from.major == to.major;
     }
 
-    bump_major :: (use this: ^SemVer) {
+    bump_major :: (use this: &SemVer) {
         major += 1;
         minor  = 0;
         patch  = 0;
     }
 
-    bump_minor :: (use this: ^SemVer) {
+    bump_minor :: (use this: &SemVer) {
         minor += 1;
         patch  = 0;
     }
 
-    bump_patch :: (use this: ^SemVer) {
+    bump_patch :: (use this: &SemVer) {
         patch += 1;
     }
 }
@@ -737,7 +737,7 @@ Git :: struct {
         for Known_Repositories {
             r := tprintf(it, repo);
             git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", r]);
-            if os.process_wait(^git_proc) == .Success {
+            if os.process_wait(&git_proc) == .Success {
                 return r |> string.alloc_copy();
             }
         }
@@ -749,21 +749,21 @@ Git :: struct {
         versions := make([..] SemVer);
 
         git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", repo]);
-        r := io.reader_make(^git_proc);
+        r := io.reader_make(&git_proc);
         for r->lines(inplace=true) {
             last_slash := string.last_index_of(it, #char "/");
             tag_name   := it[last_slash+1 .. it.count-1];
 
             if tag_name[0] != #char "v" do continue;
-            string.advance(^tag_name);
+            string.advance(&tag_name);
 
             version: SemVer;
-            if conv.parse_any(^version, tag_name) {
+            if conv.parse_any(&version, tag_name) {
                 versions << version;
             }
         }
 
-        os.process_wait(^git_proc);
+        os.process_wait(&git_proc);
 
         return versions;
     }
@@ -773,7 +773,7 @@ Git :: struct {
         if versions.count == 0 {
             return .{0, 0, 0};
         }
-        defer delete(^versions);
+        defer delete(&versions);
 
         array.sort(versions, SemVer.compare);
         latest := versions[0];
@@ -785,7 +785,7 @@ Git :: struct {
         if versions.count == 0 {
             return .{0, 0, 0};
         }
-        defer delete(^versions);
+        defer delete(&versions);
 
         array.sort(versions, SemVer.compare);
         for versions {
@@ -804,7 +804,7 @@ Git :: struct {
 
         // Use 'git clone' to clone the bare minimum amount to get the released version.
         git_proc    := os.process_spawn(git_path, .["clone", "--depth", "1", "-b", version_str, repo, full_dest]);
-        result      := os.process_wait(^git_proc);
+        result      := os.process_wait(&git_proc);
 
         if result == .Success {
             install_dest: str;
@@ -819,7 +819,7 @@ Git :: struct {
                 successfully_parsed := false;
                 for os.with_file(tprintf("{}/onyx-pkg.ini", full_dest)) {
                     r := io.reader_make(it);
-                    result, error := encoding.ini.parse_ini_file(^r, ^new_config);
+                    result, error := encoding.ini.parse_ini_file(&r, &new_config);
 
                     if result == .Success {
                         successfully_parsed = true;
@@ -866,7 +866,7 @@ Git :: struct {
     publish_version :: () -> bool {
         run_command :: macro (cmd: str, args: [] str) {
             p := os.process_spawn(cmd, args);
-            if os.process_wait(^p) != .Success {
+            if os.process_wait(&p) != .Success {
                 return false;
             }
         }
@@ -926,7 +926,7 @@ Config :: struct {
     dependency_folders: Dependency_Folders;
 }
 
-#local parse_dependencies :: (dependencies: ^Config.Dependencies, r: ^io.Reader) -> bool {
+#local parse_dependencies :: (dependencies: &Config.Dependencies, r: &io.Reader) -> bool {
     while true {
         r->skip_whitespace();
         if r->is_empty() do return true;
@@ -938,22 +938,22 @@ Config :: struct {
 
         version_str := r->read_until(#char "\n") |> string.strip_trailing_whitespace();
         version: SemVer;
-        conv.parse_any(^version, version_str);
+        conv.parse_any(&version, version_str);
         dependencies.dependencies[dep] = version;
     }
 
     return true;
 }
 
-#local write_dependencies :: (dependencies: ^Config.Dependencies, w: ^io.Writer) -> bool {
-    for^ dependencies.dependencies.entries {
+#local write_dependencies :: (dependencies: &Config.Dependencies, w: &io.Writer) -> bool {
+    for& dependencies.dependencies.entries {
         io.write_format(w, "{}={}\n", it.key, it.value);
     }
 
     return true;
 }
 
-#local parse_dependency_folders :: (dependencies: ^Config.Dependency_Folders, r: ^io.Reader) -> bool {
+#local parse_dependency_folders :: (dependencies: &Config.Dependency_Folders, r: &io.Reader) -> bool {
     while true {
         r->skip_whitespace();
         if r->is_empty() do return true;
@@ -970,8 +970,8 @@ Config :: struct {
     return true;
 }
 
-#local write_dependency_folders :: (dependencies: ^Config.Dependency_Folders, w: ^io.Writer) -> bool {
-    for^ dependencies.folders.entries {
+#local write_dependency_folders :: (dependencies: &Config.Dependency_Folders, w: &io.Writer) -> bool {
+    for& dependencies.folders.entries {
         io.write_format(w, "{}={}\n", it.key, it.value);
     }
 
@@ -988,7 +988,7 @@ load_config_file :: () -> bool {
     reader, stream := io.reader_from_string(file_data);
     defer cfree(stream);
 
-    result, error := encoding.ini.parse_ini_file(^reader, ^config);
+    result, error := encoding.ini.parse_ini_file(&reader, &config);
     if result != .Success {
         eprintf("{w5} | {}\n", error.line, error.msg);
         return false;
@@ -1000,9 +1000,9 @@ load_config_file :: () -> bool {
 store_config_file :: () -> bool {
     for os.with_file(global_arguments.config_file, .Write) {
         writer := io.writer_make(it);
-        defer io.writer_free(^writer);
+        defer io.writer_free(&writer);
 
-        return encoding.ini.write_ini_file(^writer, config);
+        return encoding.ini.write_ini_file(&writer, config);
     }
 }
 
