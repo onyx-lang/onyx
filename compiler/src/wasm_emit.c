@@ -4263,25 +4263,26 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
     if (index != -1) {
         StrLitInfo sti = mod->string_literals[index].value;
         strlit->data_id = sti.data_id;
-        strlit->length  = sti.len;
+        strlit->length  = sti.len + (strlit->is_cstr ? 1 : 0);
 
         bh_free(global_heap_allocator, strdata);
         return;
     }
     
     // :ProperLinking
-    u32 actual_length = length + (strlit->is_cstr ? 1 : 0);
+    // The length used here is one greater than the string length, because
+    // we DO want to include the null-terminator in the outputted string.
     WasmDatum datum = {
         .alignment = 1,
-        .length = actual_length,
+        .length = length + 1,
         .data = strdata,
     };
 
     strlit->data_id = emit_data_entry(mod, &datum);
-    strlit->length  = length;
+    strlit->length  = length + (strlit->is_cstr ? 1 : 0);
 
     // :ProperLinking
-    shput(mod->string_literals, (char *) strdata, ((StrLitInfo) { strlit->data_id, strlit->length }));
+    shput(mod->string_literals, (char *) strdata, ((StrLitInfo) { strlit->data_id, length }));
 }
 
 static u32 emit_data_entry(OnyxWasmModule *mod, WasmDatum *datum) {
