@@ -235,6 +235,14 @@ log :: (a: $T, base: $R) -> T {
     return ~~(ln(cast(f32) a) / ln(cast(f32) base));
 }
 
+ilog2 :: #match #local {}
+
+#overload
+ilog2 :: (a: u32) -> u32 {
+    return 31 - wasm.clz_i32(a);
+}
+
+#overload
 ilog2 :: (a: u64) -> u64 {
     return 63 - wasm.clz_i64(a);
 }
