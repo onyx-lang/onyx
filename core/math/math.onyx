@@ -235,6 +235,9 @@ log :: (a: $T, base: $R) -> T {
     return ~~(ln(cast(f32) a) / ln(cast(f32) base));
 }
 
+ilog2 :: (a: u64) -> u64 {
+    return 63 - wasm.clz_i64(a);
+}
 
 
 
