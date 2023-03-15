@@ -21,7 +21,6 @@ GCState :: struct {
     first: &GCLink;
 }
 
-#local
 GCLink :: struct {
     prev: &GCLink;
     next: &GCLink;
@@ -37,7 +36,12 @@ make :: (backing := context.allocator) -> GCState {
 clear :: (hs: &GCState) {
     while l := hs.first; l != null {
         n := l.next;
-        raw_free(hs.backing_allocator, l);
+
+        if l.magic_number == GC_Link_Magic_Number {
+            l.magic_number = 0;
+            raw_free(hs.backing_allocator, l);
+        }
+
         l = n;
     }
 
@@ -76,8 +80,10 @@ auto :: #match {
 }
 
 
-#local
-GC_Link_Magic_Number :: 0x1337face
+
+GC_Manually_Free_Magic_Number :: 0xface1337
+
+#local GC_Link_Magic_Number :: 0x1337face
 
 #local gc_alloc_proc :: (data: &GCState, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
 
@@ -108,6 +114,10 @@ GC_Link_Magic_Number :: 0x1337face
         }
     }
 
+    //                                                   \/
+    // HEAP DATA              | GCLINK                   | Your actual allocation
+    // POINTERS MAGIC NUMBERS | prev, next, magic_number | bytes of data...
+
     newptr: &GCLink = data.backing_allocator.func(
         data.backing_allocator.data, aa,
         size + sizeof GCLink, align, old);
@@ -128,3 +138,15 @@ GC_Link_Magic_Number :: 0x1337face
 
     return newptr + 1;
 }
+
+untrack :: (ptr: rawptr) -> bool {
+    link := (cast(&GCLink) ptr) - 1;
+
+    if link.magic_number != GC_Link_Magic_Number {
+        return false;
+    }
+
+    link.magic_number = GC_Manually_Free_Magic_Number;
+    return true;
+}
+

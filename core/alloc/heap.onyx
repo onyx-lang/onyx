@@ -178,12 +178,20 @@ get_freed_size :: () => {
 
     heap_free :: (ptr: rawptr) {
         #if Enable_Debug do assert(ptr != null, "Trying to free a null pointer.");
+        
+        hb_ptr := cast(&heap_freed_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
+
+        //
+        // If this block was originally allocated from the GC space,
+        // and then marked an "manually managed", we can free the block
+        // as normal here, but we have to go back some more bytes.
+        if hb_ptr.magic_number == core.alloc.gc.GC_Manually_Free_Magic_Number  {
+            hb_ptr = ~~(cast(uintptr) (cast(&core.alloc.gc.GCLink, ptr) - 1) - sizeof heap_allocated_block);
+        }
+
         #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(&heap_mutex);
 
-        hb_ptr := cast(&heap_freed_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
         #if Enable_Debug {
-            // assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on free. This could be due to a double free, or using memory past were you allocated it.");
-
             if cast(uintptr) hb_ptr < cast(uintptr) __heap_start {
                 log(.Error, "Core", "FREEING STATIC DATA");
                 return;
