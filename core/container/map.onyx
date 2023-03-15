@@ -6,7 +6,7 @@ use core.intrinsics.onyx { __initialize }
 //
 // Map is a generic hash-map implementation that uses chaining.
 // Values can be of any type. Keys must of a type that supports
-// the core.hash.to_u32, and the '==' operator.
+// the core.hash.hash, and the '==' operator.
 //
 @conv.Custom_Format.{ #solidify format_map {K=Key_Type, V=Value_Type} }
 Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Type) {
@@ -28,11 +28,11 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
 
 #local ValidKey :: interface (t: $T) {
     // In order to use a certain type as a key in a Map, you must
-    // provide an implementation of core.hash.to_u32() for that type,
+    // provide an implementation of core.hash.hash() for that type,
     // and you must provide an operator overload for ==.
 
-    { hash.to_u32(t) } -> u32;
-    { t == t         } -> bool;
+    { hash.hash(t) } -> u32;
+    { t == t       } -> bool;
 }
 
 #inject Map {
@@ -312,7 +312,7 @@ as_iter :: (m: &Map) =>
         if hashes.data == null do init(map);
         lr := MapLookupResult.{};
 
-        hash_value: u32 = hash.to_u32(key);
+        hash_value: u32 = hash.hash(key);
         lr.hash = hash_value;
 
         lr.hash_index = hash_value % hashes.count;

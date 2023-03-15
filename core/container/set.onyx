@@ -3,7 +3,7 @@ package core.set
 use core {array, hash, memory, math, Optional}
 
 #local SetValue :: interface (t: $T) {
-    { hash.to_u32(t) } -> u32;
+    { hash.hash(t) } -> u32;
     { t == t } -> bool;
 }
 
@@ -155,7 +155,7 @@ as_iter :: (s: &Set) =>
     lookup :: (use set: &Set, value: set.Elem_Type) -> SetLookupResult {
         lr := SetLookupResult.{};
 
-        hash_value: u32 = hash.to_u32(value); // You cannot have a set of this type without defining a to_u32 hash.
+        hash_value: u32 = hash.hash(value); // You cannot have a set of this type without defining a hash function.
         lr.hash = hash_value;
 
         lr.hash_index = hash_value % hashes.count;

@@ -24,10 +24,10 @@ Pair :: struct (First_Type: type_expr, Second_Type: type_expr) {
 }
 
 #overload
-core.hash.to_u32 :: (p: Pair($First_Type/hash.Hashable, $Second_Type/hash.Hashable)) => {
+core.hash.hash :: (p: Pair($First_Type/hash.Hashable, $Second_Type/hash.Hashable)) => {
     h := 7;
-    h += h << 5 + hash.to_u32(p.first);
-    h += h << 5 + hash.to_u32(p.second);
+    h += h << 5 + hash.hash(p.first);
+    h += h << 5 + hash.hash(p.second);
     return h;
 }
 

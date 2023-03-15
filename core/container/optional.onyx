@@ -97,7 +97,7 @@ package core
 
     hash :: (o: ?$T/core.hash.Hashable) -> u32 {
         if !o.has_value do return 0;
-        return core.hash.to_u32(o.value);
+        return core.hash.hash(o.value);
     }
 }
 

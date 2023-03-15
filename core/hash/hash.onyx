@@ -37,7 +37,7 @@ hash :: #match -> u32 {
         for ch: key do hash += (hash << 5) + ~~ch;
         return hash;
     },
-    (key: type_expr) -> u32 { return to_u32(cast(u32) key); },
+    (key: type_expr) -> u32 { return hash(cast(u32) key); },
     (key: bool)   -> u32 { return 1 if key else 0; },
 
     #order 10000
