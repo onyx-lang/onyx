@@ -1,0 +1,224 @@
+package core.encoding.osad
+
+
+use core {io, string, array, memory}
+use runtime {
+    type_info :: info
+}
+
+//
+// Onyx Serialize and Deseralize
+//
+
+
+//
+// Serialize
+//
+
+
+serialize :: #match #local {}
+
+#overload
+serialize :: (v: any) -> ? [] u8 {
+    writer, stream := io.string_builder();
+    defer cfree(stream);
+
+    if !serialize(any.{v.data, v.type}, &writer) {
+        delete(stream);
+        return .{};
+    }
+
+    return string.as_str(stream);
+}
+
+#overload
+serialize :: (v: any, w: &io.Writer) -> bool {
+    info := type_info.get_type_info(v.type);
+
+    switch info.kind {
+        // Cannot serialize a pointer.
+        case .Pointer {
+            log(.Debug, "Core", "OSAD: Cannot serialize a pointer.");
+            return false;
+        }
+
+        case .Basic {
+            if v.type == rawptr {
+                log(.Debug, "Core", "OSAD: Cannot serialize a pointer.");
+                return false;
+            }
+
+            // Output the raw bytes of the primitive type.
+            io.write_str(w, str.{ v.data, info.size });
+        }
+
+        case .Function {
+            log(.Debug, "Core", "OSAD: Cannot serialize a function.");
+            return false;
+        }
+
+        case .Array {
+            a_info := cast(&type_info.Type_Info_Array, info);
+
+            base: &u8 = ~~v.data;
+            elem_size := type_info.size_of(a_info.of);
+
+            for a_info.count {
+                try(serialize(any.{base + elem_size * it, a_info.of}, w));
+            }
+        }
+
+        case .Slice, .Dynamic_Array {
+            s_info := cast(&type_info.Type_Info_Slice, info);
+
+            untyped_slice := cast(&array.Untyped_Array, v.data);
+            base: &u8 = untyped_slice.data;
+            count:    = untyped_slice.count;
+            elem_size := type_info.size_of(s_info.of);
+
+            output_u32(w, count);
+            for count {
+                try(serialize(any.{base + elem_size * it, s_info.of}, w));
+            }
+        }
+
+        case .Enum {
+            e_info := cast(&type_info.Type_Info_Enum, info);
+            try(serialize(any.{ v.data, e_info.backing_type }, w));
+        }
+
+        case .Distinct {
+            d_info := cast(&type_info.Type_Info_Distinct, info);
+            try(serialize(any.{ v.data, d_info.base_type }, w));
+        }
+
+        case .Struct {
+            s_info := cast(&type_info.Type_Info_Struct, info);
+
+            base: &u8 = ~~v.data;
+
+            for& member: s_info.members {
+                try(serialize(any.{ base + member.offset, member.type }, w));
+            }
+        }
+    }
+
+    return true;
+
+
+    output_u32 :: macro (w: &io.Writer, i: u32) {
+        v := i;
+        io.write_str(w, str.{ ~~&v, 4 });
+    }
+}
+
+
+//
+// Deserialize
+//
+
+deserialize :: #match #local {}
+
+#overload
+deserialize :: ($T: type_expr, s: str) -> ?T {
+    reader, stream := io.reader_from_string(s);
+    defer cfree(stream);
+
+    target: T;
+    if !deserialize(&target, T, &reader) {
+        // This could leak memory if we partially deserialized something.
+        return .{};
+    }
+
+    return target;
+}
+
+#overload
+deserialize :: (target: rawptr, type: type_expr, r: &io.Reader) -> bool {
+    info := type_info.get_type_info(type);
+
+    switch info.kind {
+        case .Pointer {
+            log(.Debug, "Core", "OSAD: Cannot deserialize a pointer.");
+            return false;
+        }
+
+        case .Function {
+            log(.Debug, "Core", "OSAD: Cannot deserialize a function.");
+            return false;
+        }
+
+        case .Basic {
+            bytes, err := io.read_bytes(r, .{ target, info.size });
+            assert(err == .None, "Deserialize expected to be able to read all the bytes.");
+        }
+
+        case .Enum {
+            e_info := cast(&type_info.Type_Info_Enum, info);
+            try(deserialize(target, e_info.backing_type, r));
+        }
+
+        case .Distinct {
+            d_info := cast(&type_info.Type_Info_Distinct, info);
+            try(deserialize(target, d_info.base_type, r));
+        }
+
+        case .Array {
+            a_info := cast(&type_info.Type_Info_Array, info);
+
+            base: &u8 = target;
+            elem_size := type_info.size_of(a_info.of);
+
+            for a_info.count {
+                try(deserialize(base + it * elem_size, a_info.of, r));
+            }
+        }
+
+        case .Slice, .Dynamic_Array {
+            s_info := cast(&type_info.Type_Info_Slice, info);
+            elem_size := type_info.size_of(s_info.of);
+
+            count := read_u32(r);
+
+            untyped_slice := cast(&array.Untyped_Array, target);
+            untyped_slice.count = count;
+            untyped_slice.data = raw_alloc(context.allocator, elem_size * count);
+            memory.set(untyped_slice.data, 0, elem_size * count);
+
+            if info.kind == .Dynamic_Array {
+                untyped_slice.capacity = count;
+                untyped_slice.allocator = context.allocator;
+            }
+
+            base: &u8 = untyped_slice.data;
+
+            for count {
+                try(deserialize(base + it * elem_size, s_info.of, r));
+            }
+        }
+
+        case .Struct {
+            s_info := cast(&type_info.Type_Info_Struct, info);
+
+            base: &u8 = target;
+
+            for& member: s_info.members {
+                try(deserialize(base + member.offset, member.type, r));
+            }
+        }
+    }
+
+    return true;
+
+    read_u32 :: macro (r: &io.Reader) -> u32 {
+        dest: u32;
+        io.read_bytes(r, str.{~~&dest, 4});
+        return dest;
+    }
+}
+
+
+#local
+try :: macro (x: $T) {
+    if !x do return false;
+}

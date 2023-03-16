@@ -1,0 +1,33 @@
+use core
+use core.encoding {osad}
+
+Foo :: struct {
+    nums: [] i32;
+    bar: Bar;
+}
+
+Bar :: struct {
+    name: str;
+    foos: [] Foo;
+}
+
+main :: () {
+    f := Foo.{
+        nums = .[2, 3, 5, 7, 11],
+        bar = .{
+            name = "Joe",
+            foos = .[
+                .{ .[ 1, 2, 3 ], .{} },
+                .{ .[ 4, 5, 6 ], .{} },
+            ]
+        }
+    };
+
+    s := osad.serialize(f)->unwrap();
+
+    new_f := osad.deserialize(Foo, s)->unwrap();
+
+
+    printf("{p}\n", f);
+    printf("{p}\n", new_f);
+}
