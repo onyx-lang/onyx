@@ -3,6 +3,7 @@
 #include "utils.h"
 #include "astnodes.h"
 #include "errors.h"
+#include "doc.h"
 
 // :EliminatingSymres - notes the places where too much work is being done in symbol resolution
 
@@ -1781,6 +1782,10 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Binding: {
             symbol_introduce(current_scope, ent->binding->token, ent->binding->node);
             track_declaration_for_tags((AstNode *) ent->binding);
+
+            if (context.doc_info) {
+                onyx_docs_submit(context.doc_info, ent->binding);
+            }
 
             package_reinsert_use_packages(ent->package);
             next_state = Entity_State_Finalized;

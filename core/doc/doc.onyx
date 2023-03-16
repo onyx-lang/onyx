@@ -46,9 +46,16 @@ Doc_Package :: struct {
     subpackages: [] Id;
 }
 
+Doc_Visibility :: enum {
+    Public  :: 1;
+    Package :: 2;
+    Local   :: 3;
+}
+
 Doc_Procedure :: struct {
     name: str;
 
+    visibility: Doc_Visibility;
     package_id: Doc_Package.Id;
     location: Doc_Location;
 
@@ -59,5 +66,14 @@ Doc_Procedure :: struct {
         Is_Foreign :: 2;
     }
     flags: Flags;
+
+    params: [] Doc_Procedure_Param;
+    return_type: str;   // TODO: Make this not a string
+}
+
+Doc_Procedure_Param :: struct {
+    name: str;
+    type: str;          // TODO: Make this not a string
+    default_value: str;
 }
 

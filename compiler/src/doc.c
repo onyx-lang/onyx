@@ -142,6 +142,18 @@ void onyx_docs_emit_symbol_info(const char *dest) {
 // Onyx Documentation Format
 //
 
+void onyx_docs_submit(OnyxDocInfo *docs, AstBinding *binding) {
+    AstNode *node = binding->node;
+    if (node->kind == Ast_Kind_Function) {
+        AstFunction *func = (void *) node;
+        if (!func->generated_from && func->intrinsic_name
+            && binding->entity && binding->entity->package) {
+
+            bh_arr_push(docs->procedures, binding);
+        }
+    }
+}
+
 #define Doc_Magic_Bytes "ODOC"
 
 static void write_cstring(bh_buffer *buffer, const char *data) {
@@ -179,6 +191,9 @@ void onyx_docs_emit_odoc(const char *dest) {
     bh_buffer_write_u32(&doc_buffer, 0);
     bh_buffer_write_u32(&doc_buffer, 0);
 
+    Table(u32) file_ids = NULL;
+    u32 next_file_id = 0;
+
     //
     // Package Info
     // 
@@ -212,26 +227,47 @@ void onyx_docs_emit_odoc(const char *dest) {
     bh_buffer_write_u32(&doc_buffer, 0);
 
     u32 proc_count = 0;
-    bh_arr(AstFunction *) procs = context.doc_info->procedures;
-    bh_arr_each(AstFunction *, pfunc, procs) {
-        AstFunction *func = *pfunc;
-
+    bh_arr(AstBinding *) procs = context.doc_info->procedures;
+    bh_arr_each(AstBinding *, pbind, procs) {
+        AstFunction *func = (void *) (*pbind)->node;
         if (!func->intrinsic_name) continue;
 
-        write_string(&doc_buffer, func->intrinsic_name->length, func->intrinsic_name->text);
-        assert(func->entity_header && func->entity_header->package);
+        // TODO: Add polymorphic procedure support
+        if (func->kind != Ast_Kind_Function) continue;
 
-        bh_buffer_write_u32(&doc_buffer, func->entity_header->package->id - 1);
+        write_string(&doc_buffer, (*pbind)->token->length, (*pbind)->token->text);
+        // assert(func->entity_header && func->entity_header->package);
+        
+        u32 visibility = 1;
+        if ((*pbind)->flags & Ast_Flag_Private_Package) visibility = 2;
+        if ((*pbind)->flags & Ast_Flag_Private_File)    visibility = 3;
+        bh_buffer_write_u32(&doc_buffer, visibility);
 
-        // TODO: Location
-        bh_buffer_write_u32(&doc_buffer, 0);
-        bh_buffer_write_u32(&doc_buffer, 0);
-        bh_buffer_write_u32(&doc_buffer, 0);
+        bh_buffer_write_u32(&doc_buffer, (*pbind)->entity->package->id - 1);
+
+        OnyxFilePos pos = (*pbind)->token->pos;
+        if (shgeti(file_ids, pos.filename) == -1) {
+            shput(file_ids, pos.filename, next_file_id);
+            next_file_id++;
+        }
+
+        bh_buffer_write_u32(&doc_buffer, file_ids[shgeti(file_ids, pos.filename)].value);
+        bh_buffer_write_u32(&doc_buffer, pos.line);
+        bh_buffer_write_u32(&doc_buffer, pos.column);
 
         write_cstring(&doc_buffer, "");
 
         // TODO: Flags
         bh_buffer_write_u32(&doc_buffer, 0);
+
+        bh_buffer_write_u32(&doc_buffer, bh_arr_length(func->params));
+        bh_arr_each(AstParam, param, func->params) {
+            write_string(&doc_buffer, param->local->token->length, param->local->token->text);
+            write_cstring(&doc_buffer, type_get_name(param->local->type));
+            write_cstring(&doc_buffer, "");
+        }
+
+        write_cstring(&doc_buffer, type_get_name(type_build_from_ast(context.ast_alloc, func->return_type)));
 
         proc_count++;
     }
@@ -244,7 +280,13 @@ void onyx_docs_emit_odoc(const char *dest) {
     //
     *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 8)) = doc_buffer.length;
 
-    bh_buffer_write_u32(&doc_buffer, 0);
+    bh_buffer_write_u32(&doc_buffer, shlenu(file_ids));
+    fori (i, 0, shlen(file_ids)) {
+        const char *key = file_ids[i].key;
+        
+        bh_buffer_write_u32(&doc_buffer, 0);
+        write_cstring(&doc_buffer, key);
+    }
 
 
     bh_file_write(&doc_file, doc_buffer.data, doc_buffer.length);

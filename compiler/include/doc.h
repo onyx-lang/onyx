@@ -6,6 +6,7 @@
 
 // Onyx Documentation generation
 
+void onyx_docs_submit(OnyxDocInfo *docs, AstBinding *binding);
 void onyx_docs_emit_odoc(const char *dest);
 
 

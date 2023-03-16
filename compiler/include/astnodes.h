@@ -1603,7 +1603,7 @@ enum Runtime {
 
 
 typedef struct OnyxDocInfo {
-    bh_arr(AstFunction *) procedures;
+    bh_arr(AstBinding *) procedures;
 } OnyxDocInfo;
 
 
