@@ -799,9 +799,9 @@ static void parse_instruction(build_context *ctx) {
         case 0x65: ovm_code_builder_add_binop(&ctx->builder, OVM_TYPED_INSTR(OVMI_LE, OVM_TYPE_F64)); break;
         case 0x66: ovm_code_builder_add_binop(&ctx->builder, OVM_TYPED_INSTR(OVMI_GE, OVM_TYPE_F64)); break;
 
-        case 0x67: ovm_code_builder_add_binop(&ctx->builder, OVM_TYPED_INSTR(OVMI_CLZ, OVM_TYPE_I32)); break;
-        case 0x68: ovm_code_builder_add_binop(&ctx->builder, OVM_TYPED_INSTR(OVMI_CTZ, OVM_TYPE_I32)); break;
-        case 0x69: ovm_code_builder_add_binop(&ctx->builder, OVM_TYPED_INSTR(OVMI_POPCNT, OVM_TYPE_I32)); break;
+        case 0x67: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_CLZ, OVM_TYPE_I32)); break;
+        case 0x68: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_CTZ, OVM_TYPE_I32)); break;
+        case 0x69: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_POPCNT, OVM_TYPE_I32)); break;
         case 0x6A: ovm_code_builder_add_binop(&ctx->builder, OVM_TYPED_INSTR(OVMI_ADD, OVM_TYPE_I32)); break;
         case 0x6B: ovm_code_builder_add_binop(&ctx->builder, OVM_TYPED_INSTR(OVMI_SUB, OVM_TYPE_I32)); break;
         case 0x6C: ovm_code_builder_add_binop(&ctx->builder, OVM_TYPED_INSTR(OVMI_MUL, OVM_TYPE_I32)); break;
