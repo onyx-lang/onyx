@@ -455,6 +455,20 @@ from_array :: (arr: [] $T/type_is_struct) => generator(
 );
 
 #overload
+from_array :: (arr: [] $T, by_pointer: bool) => generator(
+    &.{ data = arr.data, count = arr.count, current = 0 },
+
+    ctx => {
+        if ctx.current < ctx.count {
+            defer ctx.current += 1;
+            return &ctx.data[ctx.current], true;
+        }
+
+        return null, false;
+    }
+);
+
+#overload
 from_array :: (arr: [] $T) => generator(
     &.{ data = arr.data, count = arr.count, current = 0 },
 

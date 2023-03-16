@@ -860,7 +860,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // other uses of checking polymorphic structures against
     // actual nodes strictly forbidden.
     if (type->kind == Type_Kind_PolyStruct) {
-        if (node_type->kind == Type_Kind_Struct) {
+        if (node_type && node_type->kind == Type_Kind_Struct) {
             if (node_type->Struct.constructed_from->type_id == type->id) {
                 return TYPE_MATCH_SUCCESS;
             }
@@ -871,7 +871,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // This case enables to ability to have less values on the
     // left hand side of an assignment than what the right hand
     // side call would be returning.
-    if (node_type->kind == Type_Kind_Compound) {
+    if (node_type && node_type->kind == Type_Kind_Compound) {
         AstCall *call = get_call_expr_from_node((AstNode *) node);
         if (!call) return TYPE_MATCH_FAILED;
 
