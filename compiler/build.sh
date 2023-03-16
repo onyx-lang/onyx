@@ -30,7 +30,7 @@ FLAGS="$FLAGS -DENABLE_RUN_WITH_WASMER -DUSE_DYNCALL"
 sudo mkdir -p "$BIN_DIR"
 
 echo "Compiling onyx..."
-$CC -o "../bin/onyx" \
+$CC -o "../bin/onyxa" \
     $FLAGS \
     "-DCORE_INSTALLATION=\"$CORE_DIR\"" \
     $INCLUDES \

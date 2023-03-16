@@ -17,6 +17,10 @@ Doc_Header :: struct {
     
     program_name: str;
     build_time: u32;
+
+    packages_info_start: u32;
+    entities_info_start: u32;
+    files_info_start: u32;
 }
 
 Doc_File :: struct {
@@ -35,6 +39,7 @@ Doc_Location :: struct {
 Doc_Package :: struct {
     Id :: #distinct i32
 
+    id: Id;
     name: str;             // i.e. 'io'
     qualified_name: str;   // i.e. 'core.io'
 

@@ -144,84 +144,15 @@ void onyx_docs_emit_symbol_info(const char *dest) {
 
 #define Doc_Magic_Bytes "ODOC"
 
-
-struct Doc_String {
-    u32 offset;
-    u32 length;
-};
-
-struct Doc_Array {
-    u32 offset;
-    u32 length;
-};
-
-struct Doc_Header {
-    u8  magic_bytes[4];
-    u32 version;
-
-    struct Doc_String program_name;
-    u32 build_time;
-};
-
-struct Doc_File {
-    u32 package_id;
-    struct Doc_String name;
-};
-
-struct Doc_Location {
-    u32 file_id;
-    i32 line;
-    i32 col;
-};
-
-struct Doc_Package {
-    struct Doc_String name;
-    struct Doc_String qualified_name;
-    
-    struct Doc_Array subpackages;
-};
-
-enum Doc_Entity_Kind {
-    Entity_Kind_Procedure = 1,
-};
-
-struct Doc_Entity {
-    enum Doc_Entity_Kind kind;
-
-    u32 package_id;
-    struct Doc_Location location;
-
-    struct Doc_String name;
-    struct Doc_String notes;
-};
-
-struct Doc {
-    struct Doc_Header header;
-
-    struct Doc_Array packages;
-    struct Doc_Array entities;
-    struct Doc_Array files;
-};
-
-
-typedef struct DocGenerator {
-    bh_buffer string_buffer;
-} DocGenerator;
-
-void doc_gen_init(DocGenerator *gen) {
-    bh_buffer_init(&gen->string_buffer, global_heap_allocator, 256);
+static void write_cstring(bh_buffer *buffer, const char *data) {
+    i32 len = strlen(data);
+    bh_buffer_write_u32(buffer, len);
+    bh_buffer_append(buffer, data, len);
 }
 
-void doc_gen_deinit(DocGenerator *gen) {
-    bh_buffer_free(&gen->string_buffer);
-}
-
-u32 doc_gen_add_string(DocGenerator *gen, char *data, u32 len) {
-    u32 offset = gen->string_buffer.length;
-
-    bh_buffer_append(&gen->string_buffer, data, len);
-
-    return offset;
+static void write_string(bh_buffer *buffer, i32 len, char *data) {
+    bh_buffer_write_u32(buffer, len);
+    bh_buffer_append(buffer, data, len);
 }
 
 void onyx_docs_emit_odoc(const char *dest) {
@@ -231,33 +162,64 @@ void onyx_docs_emit_odoc(const char *dest) {
         return;
     }
 
-    DocGenerator gen;
-    doc_gen_init(&gen);
 
-    struct Doc final_doc;
+    bh_buffer doc_buffer;
+    bh_buffer_init(&doc_buffer, global_heap_allocator, 16 * 1024);
 
-    memcpy(final_doc.header.magic_bytes, Doc_Magic_Bytes, 4);
-    final_doc.header.version = 1;
+    bh_buffer_append(&doc_buffer, Doc_Magic_Bytes, 4);
+    bh_buffer_write_u32(&doc_buffer, 1);
 
-    char *program_name = context.options->target_file;
-    u32 program_name_len = strlen(program_name);
-    final_doc.header.program_name.offset = doc_gen_add_string(&gen, program_name, program_name_len);
-    final_doc.header.program_name.length = program_name_len;
+    const char *program_name = context.options->target_file;
+    write_cstring(&doc_buffer, program_name);
 
-    final_doc.header.build_time = bh_time_curr() / 1000;
+    bh_buffer_write_u32(&doc_buffer, bh_time_curr() / 1000);
 
-    final_doc.packages.offset = 0;
-    final_doc.packages.length = 0;
+    int offset_table_index = doc_buffer.length;
+    bh_buffer_write_u32(&doc_buffer, 0);
+    bh_buffer_write_u32(&doc_buffer, 0);
+    bh_buffer_write_u32(&doc_buffer, 0);
 
-    final_doc.entities.offset = 0;
-    final_doc.entities.length = 0;
+    //
+    // Package Info
+    // 
+    *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 0)) = doc_buffer.length;
 
-    final_doc.files.offset = 0;
-    final_doc.files.length = 0;
+    Table(Package *) packages = (void *) context.packages;
+    bh_buffer_write_u32(&doc_buffer, shlenu(packages));
+    fori (i, 0, shlen(packages)) {
+        char *package_qualified_name = packages[i].key;
+        Package *p = packages[i].value;
 
-    bh_file_write(&doc_file, &final_doc, sizeof(struct Doc));
+        // We want 0-based package id's, because they are going
+        // to serve as indicies into the array.
+        bh_buffer_write_u32(&doc_buffer, p->id - 1);
 
-    doc_gen_deinit(&gen);
+        write_cstring(&doc_buffer, p->name);
+        write_cstring(&doc_buffer, package_qualified_name);
+
+        bh_buffer_write_u32(&doc_buffer, bh_arr_length(p->sub_packages));
+        fori (j, 0, bh_arr_length(p->sub_packages)) {
+            bh_buffer_write_u32(&doc_buffer, (u32) p->sub_packages[j]);
+        }
+    }
+
+    //
+    // Entity Info
+    //
+    *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 4)) = doc_buffer.length;
+
+    bh_buffer_write_u32(&doc_buffer, 0);
+
+
+    //
+    // File Info
+    //
+    *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 8)) = doc_buffer.length;
+
+    bh_buffer_write_u32(&doc_buffer, 0);
+
+
+    bh_file_write(&doc_file, doc_buffer.data, doc_buffer.length);
     bh_file_close(&doc_file);
 }
 
