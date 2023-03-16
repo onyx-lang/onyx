@@ -194,21 +194,49 @@ void onyx_docs_emit_odoc(const char *dest) {
         // to serve as indicies into the array.
         bh_buffer_write_u32(&doc_buffer, p->id - 1);
 
-        write_cstring(&doc_buffer, p->name);
+        write_cstring(&doc_buffer, p->unqualified_name);
         write_cstring(&doc_buffer, package_qualified_name);
 
         bh_buffer_write_u32(&doc_buffer, bh_arr_length(p->sub_packages));
         fori (j, 0, bh_arr_length(p->sub_packages)) {
-            bh_buffer_write_u32(&doc_buffer, (u32) p->sub_packages[j]);
+            bh_buffer_write_u32(&doc_buffer, (u32) p->sub_packages[j] - 1);
         }
     }
 
     //
-    // Entity Info
+    // Procedure Info
     //
     *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 4)) = doc_buffer.length;
 
+    u32 proc_count_patch = doc_buffer.length;
     bh_buffer_write_u32(&doc_buffer, 0);
+
+    u32 proc_count = 0;
+    bh_arr(AstFunction *) procs = context.doc_info->procedures;
+    bh_arr_each(AstFunction *, pfunc, procs) {
+        AstFunction *func = *pfunc;
+
+        if (!func->intrinsic_name) continue;
+
+        write_string(&doc_buffer, func->intrinsic_name->length, func->intrinsic_name->text);
+        assert(func->entity_header && func->entity_header->package);
+
+        bh_buffer_write_u32(&doc_buffer, func->entity_header->package->id - 1);
+
+        // TODO: Location
+        bh_buffer_write_u32(&doc_buffer, 0);
+        bh_buffer_write_u32(&doc_buffer, 0);
+        bh_buffer_write_u32(&doc_buffer, 0);
+
+        write_cstring(&doc_buffer, "");
+
+        // TODO: Flags
+        bh_buffer_write_u32(&doc_buffer, 0);
+
+        proc_count++;
+    }
+
+    *((u32 *) bh_pointer_add(doc_buffer.data, proc_count_patch)) = proc_count;
 
 
     //

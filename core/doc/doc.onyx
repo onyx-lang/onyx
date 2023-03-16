@@ -3,9 +3,9 @@ package core.doc
 Doc :: struct {
     header: Doc_Header;
 
-    packages: [] Doc_Package;
-    entities: [] Doc_Entity;
-    files:    [] Doc_File;
+    packages:   [] Doc_Package;
+    procedures: [] Doc_Procedure;
+    files:      [] Doc_File;
 }
 
 
@@ -19,7 +19,7 @@ Doc_Header :: struct {
     build_time: u32;
 
     packages_info_start: u32;
-    entities_info_start: u32;
+    procedures_info_start: u32;
     files_info_start: u32;
 }
 
@@ -46,18 +46,18 @@ Doc_Package :: struct {
     subpackages: [] Id;
 }
 
-
-Doc_Entity_Kind :: enum {
-    Procedure :: 1;
-}
-
-Doc_Entity :: struct {
-    kind: Doc_Entity_Kind;
+Doc_Procedure :: struct {
+    name: str;
 
     package_id: Doc_Package.Id;
     location: Doc_Location;
 
-    name: str;
     notes: str;
+
+    Flags :: enum #flags (u32) {
+        Is_Macro   :: 1;
+        Is_Foreign :: 2;
+    }
+    flags: Flags;
 }
 

@@ -1564,6 +1564,7 @@ void emit_entity(Entity* ent);
 
 struct Package {
     char *name;
+    char *unqualified_name;
 
     Scope *scope;
     Scope *private_scope;
@@ -1599,6 +1600,11 @@ enum Runtime {
     Runtime_Js      = 3,
     Runtime_Custom  = 4,
 };
+
+
+typedef struct OnyxDocInfo {
+    bh_arr(AstFunction *) procedures;
+} OnyxDocInfo;
 
 
 typedef struct CompileOptions CompileOptions;
@@ -1658,6 +1664,7 @@ struct Context {
     bh_arr(AstNode *) tag_locations;
 
     struct SymbolInfoTable *symbol_info;
+    struct OnyxDocInfo     *doc_info;
 
     u32 cycle_almost_detected : 2;
     b32 cycle_detected : 1;

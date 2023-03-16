@@ -397,6 +397,11 @@ static void context_init(CompileOptions* opts) {
         bh_arr_new(global_heap_allocator, context.symbol_info->symbols_resolutions, 128);
         sh_new_arena(context.symbol_info->files);
     }
+
+    if (context.options->documentation_file) {
+        context.doc_info = bh_alloc_item(global_heap_allocator, OnyxDocInfo);
+        bh_arr_new(global_heap_allocator, context.doc_info->procedures, 128);
+    }
 }
 
 static void context_free() {

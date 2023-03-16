@@ -2924,6 +2924,11 @@ CheckStatus check_function_header(AstFunction* func) {
     func->type = type_build_function_type(context.ast_alloc, func);
     if (func->type == NULL) YIELD(func->token->pos, "Waiting for function type to be constructed");
 
+    // TODO nocheckin move this.
+    if (context.doc_info && func->entity_header && !func->generated_from) {
+        bh_arr_push(context.doc_info->procedures, func);
+    }
+
     return Check_Success;
 }
 
