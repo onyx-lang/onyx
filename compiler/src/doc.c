@@ -267,7 +267,7 @@ void onyx_docs_emit_odoc(const char *dest) {
             write_cstring(&doc_buffer, "");
         }
 
-        write_cstring(&doc_buffer, type_get_name(type_build_from_ast(context.ast_alloc, func->return_type)));
+        write_cstring(&doc_buffer, type_get_name(func->type->Function.return_type));
 
         proc_count++;
     }
