@@ -400,6 +400,7 @@ static void context_init(CompileOptions* opts) {
 
     if (context.options->documentation_file) {
         context.doc_info = bh_alloc_item(global_heap_allocator, OnyxDocInfo);
+        memset(context.doc_info, 0, sizeof(OnyxDocInfo));
         bh_arr_new(global_heap_allocator, context.doc_info->procedures, 128);
     }
 }

@@ -62,13 +62,17 @@ Doc_Procedure :: struct {
     notes: str;
 
     Flags :: enum #flags (u32) {
-        Is_Macro   :: 1;
-        Is_Foreign :: 2;
+        Is_Macro      :: 1;
+        Is_Foreign    :: 2;
+        Is_Overloaded :: 4;
     }
     flags: Flags;
 
     params: [] Doc_Procedure_Param;
     return_type: str;   // TODO: Make this not a string
+
+    // Only used if this is an overloaded procedure
+    overloads: [] Doc_Procedure;
 }
 
 Doc_Procedure_Param :: struct {
