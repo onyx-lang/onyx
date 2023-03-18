@@ -294,6 +294,9 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
 
         case Ast_Kind_Symbol:
         case Ast_Kind_Param:
+            if (node->flags & Ast_Flag_Symbol_Is_PolyVar)
+                bh_buffer_write_byte(buffer, '$');
+                
             bh_buffer_append(buffer, node->token->text, node->token->length);
             return;
     }

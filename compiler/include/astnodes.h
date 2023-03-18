@@ -287,6 +287,8 @@ typedef enum AstFlags {
     Ast_Flag_Dead                  = BH_BIT(22),
 
     Ast_Flag_Extra_Field_Access    = BH_BIT(23),
+
+    Ast_Flag_Symbol_Is_PolyVar     = BH_BIT(24),
 } AstFlags;
 
 typedef enum UnaryOp {

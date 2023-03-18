@@ -1799,6 +1799,7 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
 
     AstNode* symbol_node = make_node(AstNode, Ast_Kind_Symbol);
     symbol_node->token = expect_token(parser, Token_Type_Symbol);
+    symbol_node->flags |= Ast_Flag_Symbol_Is_PolyVar;
 
     AstNode *implicit_interface = NULL;
     if (consume_token_if_next(parser, '/')) {
