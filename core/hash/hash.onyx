@@ -6,19 +6,19 @@ package core.hash
 // core.hash.hash instead.
 to_u32 :: hash
 
-//
-// This overloaded procedure defines how to hash something.
-// It is used throughout the standard library to hash values.
-// There are many overloads to it in the standard library, and
-// more can be added using #overload. Or, a hash method can be
-// defined for a structure or distinct type.
-//
-//     Person :: struct {
-//         hash :: (p: Person) {
-//             return // ...
-//         }
-//     }
-//
+#doc """
+    This overloaded procedure defines how to hash something.
+    It is used throughout the standard library to hash values.
+    There are many overloads to it in the standard library, and
+    more can be added using #overload. Or, a hash method can be
+    defined for a structure or distinct type.
+   
+        Person :: struct {
+            hash :: (p: Person) {
+                return // ...
+            }
+        }
+"""
 hash :: #match -> u32 {
     // Does this need to have a higher precedence value?
     // Because if I wanted to have a custom type as the key

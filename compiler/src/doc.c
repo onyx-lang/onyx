@@ -337,6 +337,14 @@ static void write_entity_header(bh_buffer *buffer, AstBinding *binding, OnyxFile
 
 static b32 write_doc_procedure(bh_buffer *buffer, AstBinding *binding, AstNode *proc);
 
+static void write_doc_notes(bh_buffer *buffer, AstBinding *binding) {
+    if (!binding || !binding->documentation) {
+        write_cstring(buffer, "");
+    } else {
+        write_string(buffer, binding->documentation->length, binding->documentation->text);
+    }
+}
+
 static b32 write_doc_function(bh_buffer *buffer, AstBinding *binding, AstNode *proc) {
     AstFunction *func = (void *) proc;
     if (func->kind == Ast_Kind_Macro) {
@@ -346,7 +354,7 @@ static b32 write_doc_function(bh_buffer *buffer, AstBinding *binding, AstNode *p
     write_entity_header(buffer, binding, func->token->pos);
 
     // Notes
-    write_cstring(buffer, "");
+    write_doc_notes(buffer, binding);
 
     // Flags
     bh_buffer_write_u32(buffer, proc->kind == Ast_Kind_Macro ? Doc_Procedure_Flag_Macro : 0);
@@ -378,7 +386,7 @@ static b32 write_doc_overloaded_function(bh_buffer *buffer, AstBinding *binding,
     write_entity_header(buffer, binding, ofunc->token->pos);
 
     // Notes
-    write_cstring(buffer, "");
+    write_doc_notes(buffer, binding);
 
     // Flags
     bh_buffer_write_u32(buffer, Doc_Procedure_Flag_Overloaded);
@@ -414,7 +422,7 @@ static b32 write_doc_polymorphic_proc(bh_buffer *buffer, AstBinding *binding, As
     write_entity_header(buffer, binding, func->token->pos);
     
     // Notes
-    write_cstring(buffer, "");
+    write_doc_notes(buffer, binding);
 
     // Flags
     bh_buffer_write_u32(buffer, proc->kind == Ast_Kind_Macro ? Doc_Procedure_Flag_Macro : 0);

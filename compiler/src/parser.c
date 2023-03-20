@@ -3525,7 +3525,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 // This is a future feature I want to add to the language, proper docstrings.
                 // For now (and so I start documenting thing...), #doc can be used anywhere
                 // at top level, followed by a string to add a doc string.
-                expect_token(parser, Token_Type_Literal_String);
+                parser->last_documentation_token = expect_token(parser, Token_Type_Literal_String);
                 return;
             }
             else {
@@ -3566,6 +3566,11 @@ static void parse_top_level_statement(OnyxParser* parser) {
 submit_binding_to_entities:
     {
         if (!binding) return;
+
+        if (parser->last_documentation_token) {
+            binding->documentation = parser->last_documentation_token;
+            parser->last_documentation_token = NULL;
+        }
 
         //
         // If this binding is inside an #inject block,
@@ -3717,6 +3722,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     parser.tag_depth = 0;
     parser.overload_count = 0;
     parser.injection_point = NULL;
+    parser.last_documentation_token = NULL;
 
     parser.polymorph_context = (PolymorphicContext) {
         .root_node = NULL,
