@@ -1017,6 +1017,7 @@ b32 potentially_convert_function_to_polyproc(AstFunction *func) {
             name_token->pos  = pcall->token->pos;
 
             pp.poly_sym = make_symbol(context.ast_alloc, name_token);
+            pp.poly_sym->flags |= Ast_Flag_Symbol_Is_PolyVar;
             bh_arr_push(pcall->params, pp.poly_sym);
             bh_arr_push(func->poly_params, pp);
             param_idx ++;

@@ -45,6 +45,7 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
         package->unqualified_name = pac_name + bh_str_last_index_of(pac_name, '.');
         package->use_package_entities = NULL;
         package->id = next_package_id++;
+        package->parent_id = -1;
         bh_arr_new(global_heap_allocator, package->sub_packages, 4);
 
         if (!strcmp(pac_name, "builtin")) {

@@ -2809,6 +2809,7 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
         new_token->pos = param->token->pos;
 
         AstNode* type_node = make_symbol(parser->allocator, new_token);
+        type_node->flags |= Ast_Flag_Symbol_Is_PolyVar;
         bh_arr_push(poly_params, type_node);
     }
 
@@ -3589,6 +3590,8 @@ submit_binding_to_entities:
         if (binding->flags & Ast_Flag_Private_File)
             target_scope = parser->file_scope;
 
+        binding->flags |= Ast_Flag_Binding_Isnt_Captured;
+
         ENTITY_SUBMIT_IN_SCOPE(binding, target_scope);
     }
 }
@@ -3653,6 +3656,7 @@ static Package* parse_file_package(OnyxParser* parser) {
 
         strncat(aggregate_name, (*symbol)->text, 2047);
         Package* newpackage = package_lookup_or_create(aggregate_name, context.global_scope, parser->allocator, package_node->token->pos);
+        newpackage->parent_id = prevpackage ? prevpackage->id : 0xffffffff;
 
         AstPackage* pnode = make_node(AstPackage, Ast_Kind_Package);
         pnode->token = *symbol;

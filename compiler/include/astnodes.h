@@ -289,6 +289,8 @@ typedef enum AstFlags {
     Ast_Flag_Extra_Field_Access    = BH_BIT(23),
 
     Ast_Flag_Symbol_Is_PolyVar     = BH_BIT(24),
+
+    Ast_Flag_Binding_Isnt_Captured = BH_BIT(25),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -1575,6 +1577,7 @@ struct Package {
 
     // NOTE: id's of the sub-packages
     bh_arr(u32) sub_packages;
+    i32 parent_id;
 
     // NOTE: This tracks all of the 'use package' statements of this package throughout
     // the code base. This is used when a static if clears and new symbols are introduced.

@@ -144,6 +144,7 @@ void onyx_docs_emit_symbol_info(const char *dest) {
 
 void onyx_docs_submit(OnyxDocInfo *docs, AstBinding *binding) {
     if (!binding->entity || !binding->entity->package) return;
+    if (!(binding->flags & Ast_Flag_Binding_Isnt_Captured)) return;
 
     AstNode *node = binding->node;
     if (node->kind == Ast_Kind_Function) {
@@ -207,6 +208,11 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
             } else {
                 bh_buffer_write_string(buffer, ((AstBasicType *) node)->basic_type->Basic.name);
             }
+            return;
+
+        case Ast_Kind_Address_Of:
+            bh_buffer_write_string(buffer, "&");
+            write_type_node(buffer, ((AstAddressOf *) node)->expr);
             return;
 
         case Ast_Kind_Pointer_Type:
@@ -422,7 +428,11 @@ static b32 write_doc_polymorphic_proc(bh_buffer *buffer, AstBinding *binding, As
     bh_arr_each(AstParam, param, func->params) {
         bh_buffer_clear(&param_type_buf);
 
-        write_string(buffer, param->local->token->length, param->local->token->text);
+        if (param->is_baked)
+            write_cstring(buffer, bh_bprintf("$%b", param->local->token->text, param->local->token->length));
+        else 
+            write_string(buffer, param->local->token->length, param->local->token->text);
+
         write_type_node(&param_type_buf, param->local->type_node);
         write_string(buffer, param_type_buf.length, param_type_buf.data);
         write_cstring(buffer, "");
@@ -504,6 +514,8 @@ void onyx_docs_emit_odoc(const char *dest) {
 
         write_cstring(&doc_buffer, p->unqualified_name);
         write_cstring(&doc_buffer, package_qualified_name);
+
+        bh_buffer_write_u32(&doc_buffer, p->parent_id);
 
         bh_buffer_write_u32(&doc_buffer, bh_arr_length(p->sub_packages));
         fori (j, 0, bh_arr_length(p->sub_packages)) {

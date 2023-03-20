@@ -43,6 +43,7 @@ Doc_Package :: struct {
     name: str;             // i.e. 'io'
     qualified_name: str;   // i.e. 'core.io'
 
+    parent: Id;
     subpackages: [] Id;
 }
 
