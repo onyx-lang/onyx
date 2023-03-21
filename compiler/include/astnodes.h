@@ -289,6 +289,7 @@ typedef enum AstFlags {
     Ast_Flag_Extra_Field_Access    = BH_BIT(23),
 
     Ast_Flag_Symbol_Is_PolyVar     = BH_BIT(24),
+    Ast_Flag_Poly_Call_From_Auto   = BH_BIT(24),
 
     Ast_Flag_Binding_Isnt_Captured = BH_BIT(25),
 } AstFlags;

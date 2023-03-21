@@ -10,11 +10,12 @@ to_u32 :: hash
     This overloaded procedure defines how to hash something.
     It is used throughout the standard library to hash values.
     There are many overloads to it in the standard library, and
-    more can be added using #overload. Or, a hash method can be
-    defined for a structure or distinct type.
+    more can be added using #overload.
+
+    Alternatively, a hash method can be defined for a structure or distinct type.
    
         Person :: struct {
-            hash :: (p: Person) {
+            hash :: (p: Person) -> u32 {
                 return // ...
             }
         }

@@ -244,7 +244,15 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
             return;
 
         case Ast_Kind_Poly_Call_Type:
+            if (((AstPolyCallType *) node)->callee == (AstNode *) builtin_optional_type) {
+                bh_buffer_write_string(buffer, "? ");
+                write_type_node(buffer, ((AstPolyCallType *) node)->params[0]);
+                return;
+            }
+
             write_type_node(buffer, ((AstPolyCallType *) node)->callee);
+            if (node->flags & Ast_Flag_Poly_Call_From_Auto) return;
+
             bh_buffer_write_byte(buffer, '(');
 
             bh_arr_each(AstNode *, param, ((AstPolyCallType *) node)->params) {

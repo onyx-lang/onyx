@@ -1000,6 +1000,7 @@ b32 potentially_convert_function_to_polyproc(AstFunction *func) {
         AstPolyCallType* pcall = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
         pcall->callee = *apv->replace;
         pcall->token = pcall->callee->token;
+        pcall->flags |= Ast_Flag_Poly_Call_From_Auto;
         bh_arr_new(global_heap_allocator, pcall->params, apv->variable_count);
 
         if (apv->base_type->kind == Ast_Kind_Poly_Struct_Type) {

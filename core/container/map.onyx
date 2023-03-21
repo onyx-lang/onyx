@@ -193,16 +193,16 @@ delete :: (use map: &Map, key: map.Key_Type) {
 }
 
 #doc """
-   Helper macro that finds a value by the key, and if it exists,
-   runs the code, providing an `it` variable that is a pointer
-   to the value.
-  
-       m: Map(str, i32);
-       m->update("test") {
-           *it += 10;
-       }
-   or:
-       m->update("test", #(*it += 10));
+Helper macro that finds a value by the key, and if it exists,
+runs the code, providing an `it` variable that is a pointer
+to the value.
+
+    m: Map(str, i32);
+    m->update("test") {
+        *it += 10;
+    }
+or:
+    m->update("test", #(*it += 10));
 """  
 update :: macro (map: ^Map, key: map.Key_Type, body: Code) {
     lookup_ :: lookup
