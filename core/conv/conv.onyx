@@ -4,10 +4,11 @@ Enable_Custom_Formatters :: true
 
 use core {string, math}
 
-//
-// Converts a string into an integer. Works with positive and
-// negative integers. If given a pointer to a string, will
-// modify the string to extract the integer part.
+#doc """
+    Converts a string into an integer. Works with positive and
+    negative integers. If given a pointer to a string, will
+    modify the string to extract the integer part.
+"""
 str_to_i64 :: #match #local {}
 
 #overload
@@ -66,8 +67,7 @@ str_to_i64 :: (s: &str, base: u32 = 10) -> i64 {
 }
 
 
-//
-// Converts a string to a floating point number.
+#doc "Converts a string to a floating point number."
 str_to_f64 :: #match #local {}
 
 #overload
@@ -143,11 +143,12 @@ str_to_f64 :: (s: &str) -> f64 {
 }
 
 
-//
-// Converts an integer into a string using the buffer provided.
-// Supports upto base 64. If prefix is true, binary numbers are
-// prefixed with '0b' and hexadecimal numbers are prefixed with
-// '0x'.
+#doc """
+    Converts an integer into a string using the buffer provided.
+    Supports upto base 64. If prefix is true, binary numbers are
+    prefixed with '0b' and hexadecimal numbers are prefixed with
+    '0x'.
+"""
 i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
     is_neg := false;
     if n < 0 && base == 10 {
@@ -213,9 +214,10 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
 }
 
 
-//
-// Converts an unsigned number into a string using the buffer provided.
-// Behaves like i64_to_str.
+#doc """
+    Converts an unsigned number into a string using the buffer provided.
+    Behaves like i64_to_str.
+"""
 u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
     c: [&] u8 = &buf[buf.count - 1];
     len := 0;
@@ -268,12 +270,13 @@ u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
     return str.{ data = c + 1, count = len };
 }
 
-//
-// Converts a floating point number into a string, using
-// the buffer provided.
-//
-// This is better than what used to be, but still relies on converting the integer
-// part of the float to an integer, which could overflow.
+#doc """
+    Converts a floating point number into a string, using
+    the buffer provided.
+   
+    This is better than what used to be, but still relies on converting the integer
+    part of the float to an integer, which could overflow.
+"""
 f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
     if math.is_nan(f) {
         return format(buf, "NaN");

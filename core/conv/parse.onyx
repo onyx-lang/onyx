@@ -2,9 +2,10 @@ package core.conv
 
 use core {map, string, array, math}
 
-//
-// Parses many different types from a string into a value.
-// Uses a custom parser if one has been specified for the type given.
+#doc """
+    Parses many different types from a string into a value.
+    Uses a custom parser if one has been specified for the type given.
+"""
 parse_any :: #match {}
 
 #overload

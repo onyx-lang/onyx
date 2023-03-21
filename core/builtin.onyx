@@ -58,16 +58,17 @@ range :: struct {
 // casts to all other pointer types.
 null :: cast(rawptr) 0
 
-//
-// `null_proc` is a special function that breaks the normal rules of type
-// checking. `null_proc`, or any procedure marked with `#null`, is assignable
-// to any function type, regardless of if the types match. For example,
-//
-//     f: (i32) -> i32 = null_proc;
-//
-// Even though `null_proc` is a `() -> void` function, it bypasses that check
-// and gets assigned to `f`. If f is called, there will be a runtime exception.
-// This is by design.
+#doc """
+    `null_proc` is a special function that breaks the normal rules of type
+    checking. `null_proc`, or any procedure marked with `#null`, is assignable
+    to any function type, regardless of if the types match. For example,
+    
+        f: (i32) -> i32 = null_proc;
+    
+    Even though `null_proc` is a `() -> void` function, it bypasses that check
+    and gets assigned to `f`. If f is called, there will be a runtime exception.
+    This is by design.
+"""
 null_proc :: () -> void #null ---
 
 //
@@ -364,28 +365,29 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 }
 
 
-//
-// Represents a generic "iterator" or "generator" of a specific
-// type. Can be used in a for-loop natively.
-//
-// `data` is used for contextual information and is passed to
-// the `next`, `close`, and `remove` procedures.
-//
-// `next` is used to extract the next value out of the iterator.
-// It returns the next value, and a continuation flag. If the
-// flag is false, the value should be ignored and iteration should
-// stop.
-//
-// `close` should called when the iterator has ended. This is
-// done automatically in for-loops, and in the `core.iter` library.
-// In for-loops, `close` is called no matter which way the for-loop
-// exits (`break`, `return`, etc). Using this rule, iterator can
-// be used to create "resources" that automatically close when you
-// are done with them.
-//
-// `remove` is used to tell the iterator to remove the last value
-// returned from some underlying data store. Invoked automatically
-// using the `#remove` directive in a for-loop.
+#doc """
+   Represents a generic "iterator" or "generator" of a specific
+   type. Can be used in a for-loop natively.
+   
+   `data` is used for contextual information and is passed to
+   the `next`, `close`, and `remove` procedures.
+   
+   `next` is used to extract the next value out of the iterator.
+   It returns the next value, and a continuation flag. If the
+   flag is false, the value should be ignored and iteration should
+   stop.
+   
+   `close` should called when the iterator has ended. This is
+   done automatically in for-loops, and in the `core.iter` library.
+   In for-loops, `close` is called no matter which way the for-loop
+   exits (`break`, `return`, etc). Using this rule, iterator can
+   be used to create "resources" that automatically close when you
+   are done with them.
+   
+   `remove` is used to tell the iterator to remove the last value
+   returned from some underlying data store. Invoked automatically
+   using the `#remove` directive in a for-loop.
+"""
 Iterator :: struct (Iter_Type: type_expr) {
     data:   rawptr;
     next:   (data: rawptr) -> (Iter_Type, bool);
@@ -394,13 +396,14 @@ Iterator :: struct (Iter_Type: type_expr) {
 }
 
 
-//
-// Optional represents the possibility of a value being empty, without
-// resorting to pointers and null-pointers. Most of the functionality
-// for Optional is defined in core/containers/optional.onyx. This
-// definition exists here because the compiler use it as the template
-// for types like '? i32'. In other words, '? i32' is equivalent to
-// 'Optional(i32)'.
+#doc """
+    Optional represents the possibility of a value being empty, without
+    resorting to pointers and null-pointers. Most of the functionality
+    for Optional is defined in core/containers/optional.onyx. This
+    definition exists here because the compiler use it as the template
+    for types like '? i32'. In other words, '? i32' is equivalent to
+    'Optional(i32)'.
+"""
 Optional :: struct (Value_Type: type_expr) {
     has_value: bool;
     value: Value_Type;
@@ -408,11 +411,12 @@ Optional :: struct (Value_Type: type_expr) {
 
 
 
-//
-// This structure represents the result of a '#callsite' expression. Currently,
-// #callsite is only valid (and parsed) as a default value for a procedure parameter.
-// It allows the function to get the address of the calling site, which can be
-// used for error printing, unique hashes, and much more.
+#doc """
+    This structure represents the result of a '#callsite' expression. Currently,
+    #callsite is only valid (and parsed) as a default value for a procedure parameter.
+    It allows the function to get the address of the calling site, which can be
+    used for error printing, unique hashes, and much more.
+"""
 CallSite :: struct {
     file   : str;
     line   : u32;
@@ -420,31 +424,34 @@ CallSite :: struct {
 }
 
 
-//
-// This structure is used to represent any value in the language.
-// It contains a pointer to the data, and the type of the value.
-// Using the `core.misc` library, you can easily manipulate `any`s
-// and build runtime polymorphism.
+#doc """
+    This structure is used to represent any value in the language.
+    It contains a pointer to the data, and the type of the value.
+    Using the `core.misc` library, you can easily manipulate `any`s
+    and build runtime polymorphism.
+"""
 any :: struct {
     data: rawptr;
     type: type_expr;
 }
 
-//
-// Represents a code block that can be passed around at compile-time.
-// This is commonly used with macros or polymorphic procedures to create
-// very power extensions to the syntax.
+#doc """
+    Represents a code block that can be passed around at compile-time.
+    This is commonly used with macros or polymorphic procedures to create
+    very power extensions to the syntax.
+"""
 Code :: struct {_:i32;}
 
 
-//
-// Define aliases for common datastructures in the core library, if the core library is available.
-// I'm on the fence about keeping this, as the programmer may want to use these names for their own
-// structures, but for the moment I don't see any harm. I'm also thinking about removing the '[..]'
-// syntax for dynamic arrays and just make them like Map's and Set's, i.e. Array(T). This would
-// remove some confusion around the 3 different array types as dynamic arrays would clearly just be
-// normal structures. With the recent addition of macros and iterators, there really wouldn't be much
-// difference anyway.
+#doc """
+    Define aliases for common datastructures in the core library, if the core library is available.
+    I'm on the fence about keeping this, as the programmer may want to use these names for their own
+    structures, but for the moment I don't see any harm. I'm also thinking about removing the '[..]'
+    syntax for dynamic arrays and just make them like Map's and Set's, i.e. Array(T). This would
+    remove some confusion around the 3 different array types as dynamic arrays would clearly just be
+    normal structures. With the recent addition of macros and iterators, there really wouldn't be much
+    difference anyway.
+"""
 #if #defined((package core.map).Map) {
     Map :: (package core.map).Map;
 }
@@ -454,26 +461,30 @@ Code :: struct {_:i32;}
 }
 
 
-//
-// This procedure is a special compiler generated procedure that initializes all the data segments
-// in the program. It should only be called once, by the main thread, at the start of execution. It
-// is undefined behaviour if it is called more than once.
+#doc """
+    This procedure is a special compiler generated procedure that initializes all the data segments
+    in the program. It should only be called once, by the main thread, at the start of execution. It
+    is undefined behaviour if it is called more than once.
+"""
 __initialize_data_segments :: () -> void ---
 
-//
-// This is also a special compiler generated procedure that calls all procedures specified with
-// #init, in the specified order. It should theoretically only be called once on the main thread.
+#doc """
+    This is a special compiler generated procedure that calls all procedures specified with `#init`
+    in the specified order. It should theoretically only be called once on the main thread.
+"""
 __run_init_procedures :: () -> void ---
 
-//
-// This overloaded procedure allow you to define an implicit rule for how to convert any value
-// into a boolean. A default is provided for ALL pointer types and array types, but this can
-// be used for structures or distinct types.
+#doc """
+    This overloaded procedure allow you to define an implicit rule for how to convert any value
+    into a boolean. A default is provided for ALL pointer types and array types, but this can
+    be used for structures or distinct types.
+"""
 __implicit_bool_cast :: #match -> bool {}
 
-//
-// Defines all options for changing the memory layout, imports and exports,
-// and more of an Onyx binary.
+#doc """
+    Defines all options for changing the memory layout, imports and exports,
+    and more of an Onyx binary.
+"""
 Link_Options :: struct {
     // By default the memory layout of a binary is:
     //   reserved | static-data | stack | heap
@@ -527,15 +538,16 @@ Link_Options :: struct {
 }
 
 
-//
-// Special type used to represent a package at runtime.
-// For example,
-//
-//     x: package_id = package main
-//
-// Currently, there is not much you can do with this; it is
-// only used by the runtime.info library if you want to filter
-// tags based on which package they are coming from.
+#doc """
+    Special type used to represent a package at runtime.
+    For example,
+   
+        x: package_id = package main
+   
+    Currently, there is not much you can do with this; it is
+    only used by the runtime.info library if you want to filter
+    tags based on which package they are coming from.
+"""
 package_id :: #distinct u32
 
 //
