@@ -165,6 +165,10 @@ void onyx_docs_submit(OnyxDocInfo *docs, AstBinding *binding) {
     if (node->kind == Ast_Kind_Overloaded_Function) {
         bh_arr_push(docs->procedures, binding);
     }
+
+    if (node->kind == Ast_Kind_Struct_Type) {
+        bh_arr_push(docs->structures, binding);
+    }
 }
 
 #define Doc_Magic_Bytes "ODOC"
@@ -319,6 +323,14 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
     if (node) bh_buffer_write_string(buffer, onyx_ast_node_kind_string(node->kind));
 }
 
+static void write_doc_notes(bh_buffer *buffer, AstBinding *binding) {
+    if (!binding || !binding->documentation) {
+        write_cstring(buffer, "");
+    } else {
+        write_string(buffer, binding->documentation->length, binding->documentation->text);
+    }
+}
+
 static void write_entity_header(bh_buffer *buffer, AstBinding *binding, OnyxFilePos location) {
     if (!binding) {
         bh_buffer_write_u32(buffer, 0);
@@ -341,17 +353,12 @@ static void write_entity_header(bh_buffer *buffer, AstBinding *binding, OnyxFile
 
     // Location
     write_location(buffer, location);
+
+    // Notes
+    write_doc_notes(buffer, binding);
 }
 
 static b32 write_doc_procedure(bh_buffer *buffer, AstBinding *binding, AstNode *proc);
-
-static void write_doc_notes(bh_buffer *buffer, AstBinding *binding) {
-    if (!binding || !binding->documentation) {
-        write_cstring(buffer, "");
-    } else {
-        write_string(buffer, binding->documentation->length, binding->documentation->text);
-    }
-}
 
 static b32 write_doc_function(bh_buffer *buffer, AstBinding *binding, AstNode *proc) {
     AstFunction *func = (void *) proc;
@@ -360,9 +367,6 @@ static b32 write_doc_function(bh_buffer *buffer, AstBinding *binding, AstNode *p
     }
 
     write_entity_header(buffer, binding, func->token->pos);
-
-    // Notes
-    write_doc_notes(buffer, binding);
 
     // Flags
     bh_buffer_write_u32(buffer, proc->kind == Ast_Kind_Macro ? Doc_Procedure_Flag_Macro : 0);
@@ -392,9 +396,6 @@ static b32 write_doc_overloaded_function(bh_buffer *buffer, AstBinding *binding,
     build_all_overload_options(ofunc->overloads, &all_overloads);
 
     write_entity_header(buffer, binding, ofunc->token->pos);
-
-    // Notes
-    write_doc_notes(buffer, binding);
 
     // Flags
     bh_buffer_write_u32(buffer, Doc_Procedure_Flag_Overloaded);
@@ -428,9 +429,6 @@ static b32 write_doc_polymorphic_proc(bh_buffer *buffer, AstBinding *binding, As
     }
 
     write_entity_header(buffer, binding, func->token->pos);
-    
-    // Notes
-    write_doc_notes(buffer, binding);
 
     // Flags
     bh_buffer_write_u32(buffer, proc->kind == Ast_Kind_Macro ? Doc_Procedure_Flag_Macro : 0);
@@ -489,6 +487,28 @@ static b32 write_doc_procedure(bh_buffer *buffer, AstBinding *binding, AstNode *
     return 0;
 }
 
+static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *node) {
+    AstStructType *struct_node = (void *) node;
+
+    write_entity_header(buffer, binding, node->token->pos);
+
+    Type *struct_type = struct_node->stcache;
+    assert(struct_type);
+
+    bh_buffer_write_u32(buffer, bh_arr_length(struct_type->Struct.memarr));
+    bh_arr_each(StructMember*, pmem, struct_type->Struct.memarr) {
+        StructMember* mem = *pmem;
+
+        write_cstring(buffer, mem->name);
+        write_cstring(buffer, type_get_name(mem->type));
+        write_cstring(buffer, "");
+
+        bh_buffer_write_u32(buffer, 0);
+    }
+
+    return 1;
+}
+
 void onyx_docs_emit_odoc(const char *dest) {
     bh_file doc_file;
     if (bh_file_create(&doc_file, dest) != BH_FILE_ERROR_NONE) {
@@ -509,6 +529,7 @@ void onyx_docs_emit_odoc(const char *dest) {
     bh_buffer_write_u32(&doc_buffer, bh_time_curr() / 1000);
 
     int offset_table_index = doc_buffer.length;
+    bh_buffer_write_u32(&doc_buffer, 0);
     bh_buffer_write_u32(&doc_buffer, 0);
     bh_buffer_write_u32(&doc_buffer, 0);
     bh_buffer_write_u32(&doc_buffer, 0);
@@ -559,9 +580,28 @@ void onyx_docs_emit_odoc(const char *dest) {
 
 
     //
-    // File Info
+    // Structure Info
     //
     *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 8)) = doc_buffer.length;
+
+    u32 struct_count_patch = doc_buffer.length;
+    bh_buffer_write_u32(&doc_buffer, 0);
+
+    u32 struct_count = 0;
+    bh_arr(AstBinding *) structs = context.doc_info->structures;
+    bh_arr_each(AstBinding *, pbind, structs) {
+        if (write_doc_structure(&doc_buffer, *pbind, (*pbind)->node)) {
+            struct_count++;
+        }
+    }
+
+    *((u32 *) bh_pointer_add(doc_buffer.data, struct_count_patch)) = struct_count;
+
+
+    //
+    // File Info
+    //
+    *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 12)) = doc_buffer.length;
 
     bh_buffer_write_u32(&doc_buffer, shlenu(context.doc_info->file_ids));
     fori (i, 0, shlen(context.doc_info->file_ids)) {

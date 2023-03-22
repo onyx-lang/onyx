@@ -5,6 +5,7 @@ Doc :: struct {
 
     packages:   [] Doc_Package;
     procedures: [] Doc_Procedure;
+    structures: [] Doc_Structure;
     files:      [] Doc_File;
 }
 
@@ -20,6 +21,7 @@ Doc_Header :: struct {
 
     packages_info_start: u32;
     procedures_info_start: u32;
+    structures_info_start: u32;
     files_info_start: u32;
 }
 
@@ -47,13 +49,7 @@ Doc_Package :: struct {
     subpackages: [] Id;
 }
 
-Doc_Visibility :: enum {
-    Public  :: 1;
-    Package :: 2;
-    Local   :: 3;
-}
-
-Doc_Procedure :: struct {
+Doc_Entity :: struct {
     name: str;
 
     visibility: Doc_Visibility;
@@ -61,7 +57,17 @@ Doc_Procedure :: struct {
     location: Doc_Location;
 
     notes: str;
+}
 
+Doc_Visibility :: enum {
+    Public  :: 1;
+    Package :: 2;
+    Local   :: 3;
+}
+
+Doc_Procedure :: struct {
+    use base: Doc_Entity;
+    
     Flags :: enum #flags (u32) {
         Is_Macro      :: 1;
         Is_Foreign    :: 2;
@@ -80,5 +86,22 @@ Doc_Procedure_Param :: struct {
     name: str;
     type: str;          // TODO: Make this not a string
     default_value: str;
+}
+
+Doc_Structure :: struct {
+    use base: Doc_Entity;
+
+    members: [] Doc_Structure_Member;
+}
+
+Doc_Structure_Member :: struct {
+    name: str;
+    type: str;          // TODO: Make this not a string
+    default_value: str;
+
+    Flags :: enum #flags {
+        Is_Used;
+    }
+    flags: Flags;
 }
 
