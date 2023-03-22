@@ -412,10 +412,10 @@ Optional :: struct (Value_Type: type_expr) {
 
 
 #doc """
-    This structure represents the result of a '#callsite' expression. Currently,
-    #callsite is only valid (and parsed) as a default value for a procedure parameter.
-    It allows the function to get the address of the calling site, which can be
-    used for error printing, unique hashes, and much more.
+    This structure represents the result of a '#callsite' expression. Currently, #callsite
+    is only valid (and parsed) as a default value for a procedure parameter. It allows
+    the function to get the address of the calling site, which can be used for error
+    printing, unique hashes, and much more.
 """
 CallSite :: struct {
     file   : str;

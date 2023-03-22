@@ -3,10 +3,11 @@ package core.doc
 Doc :: struct {
     header: Doc_Header;
 
-    packages:   [] Doc_Package;
-    procedures: [] Doc_Procedure;
-    structures: [] Doc_Structure;
-    files:      [] Doc_File;
+    packages:     [] Doc_Package;
+    procedures:   [] Doc_Procedure;
+    structures:   [] Doc_Structure;
+    enumerations: [] Doc_Enum;
+    files:        [] Doc_File;
 }
 
 
@@ -22,6 +23,7 @@ Doc_Header :: struct {
     packages_info_start: u32;
     procedures_info_start: u32;
     structures_info_start: u32;
+    enumerations_info_start: u32;
     files_info_start: u32;
 }
 
@@ -106,3 +108,18 @@ Doc_Structure_Member :: struct {
     flags: Flags;
 }
 
+Doc_Enum :: struct {
+    use base: Doc_Entity;
+
+    values: [] Doc_Enum_Value;
+
+    Flags :: enum #flags {
+        Is_Flags;
+    }
+    flags: Flags;
+}
+
+Doc_Enum_Value :: struct {
+    name: str;
+    value: u64;
+}

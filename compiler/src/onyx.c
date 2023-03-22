@@ -403,6 +403,7 @@ static void context_init(CompileOptions* opts) {
         memset(context.doc_info, 0, sizeof(OnyxDocInfo));
         bh_arr_new(global_heap_allocator, context.doc_info->procedures, 128);
         bh_arr_new(global_heap_allocator, context.doc_info->structures, 128);
+        bh_arr_new(global_heap_allocator, context.doc_info->enumerations, 128);
     }
 }
 

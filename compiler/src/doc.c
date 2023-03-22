@@ -173,6 +173,10 @@ void onyx_docs_submit(OnyxDocInfo *docs, AstBinding *binding) {
     if (node->kind == Ast_Kind_Poly_Struct_Type) {
         bh_arr_push(docs->structures, binding);
     }
+
+    if (node->kind == Ast_Kind_Enum_Type) {
+        bh_arr_push(docs->enumerations, binding);
+    }
 }
 
 #define Doc_Magic_Bytes "ODOC"
@@ -554,6 +558,45 @@ static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *
     return 1;
 }
 
+static b32 write_doc_enum(bh_buffer *buffer, AstBinding *binding, AstNode *node) {
+    AstEnumType *enum_node = (void *) node;
+
+    write_entity_header(buffer, binding, node->token->pos);
+
+    bh_buffer_write_u32(buffer, bh_arr_length(enum_node->values));
+    bh_arr_each(AstEnumValue *, pvalue, enum_node->values) {
+        AstEnumValue * value = *pvalue;
+
+        write_string(buffer, value->token->length, value->token->text);
+
+        assert(value->value->kind == Ast_Kind_NumLit);
+        AstNumLit *num = (AstNumLit *) value->value;
+        bh_buffer_write_u64(buffer, num->value.l);
+    }
+
+    bh_buffer_write_u32(buffer, enum_node->is_flags ? 1 : 0);
+
+    return 1;
+}
+
+static void write_doc_entity_array(bh_buffer *buffer, bh_arr(AstBinding *) arr,
+    b32 (*write_doc)(bh_buffer *buffer, AstBinding *, AstNode*),
+    u32 offset_write_location) {
+    *((u32 *) bh_pointer_add(buffer->data, offset_write_location)) = buffer->length;
+
+    u32 count_patch = buffer->length;
+    bh_buffer_write_u32(buffer, 0);
+
+    u32 count = 0;
+    bh_arr_each(AstBinding *, pbind, arr) {
+        if (write_doc(buffer, *pbind, (*pbind)->node)) {
+            count++;
+        }
+    }
+
+    *((u32 *) bh_pointer_add(buffer->data, count_patch)) = count;
+}
+
 void onyx_docs_emit_odoc(const char *dest) {
     bh_file doc_file;
     if (bh_file_create(&doc_file, dest) != BH_FILE_ERROR_NONE) {
@@ -574,6 +617,7 @@ void onyx_docs_emit_odoc(const char *dest) {
     bh_buffer_write_u32(&doc_buffer, bh_time_curr() / 1000);
 
     int offset_table_index = doc_buffer.length;
+    bh_buffer_write_u32(&doc_buffer, 0);
     bh_buffer_write_u32(&doc_buffer, 0);
     bh_buffer_write_u32(&doc_buffer, 0);
     bh_buffer_write_u32(&doc_buffer, 0);
@@ -608,45 +652,25 @@ void onyx_docs_emit_odoc(const char *dest) {
     //
     // Procedure Info
     //
-    *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 4)) = doc_buffer.length;
-
-    u32 proc_count_patch = doc_buffer.length;
-    bh_buffer_write_u32(&doc_buffer, 0);
-
-    u32 proc_count = 0;
-    bh_arr(AstBinding *) procs = context.doc_info->procedures;
-    bh_arr_each(AstBinding *, pbind, procs) {
-        if (write_doc_procedure(&doc_buffer, *pbind, (*pbind)->node)) {
-            proc_count++;
-        }
-    }
-
-    *((u32 *) bh_pointer_add(doc_buffer.data, proc_count_patch)) = proc_count;
+    write_doc_entity_array(&doc_buffer, context.doc_info->procedures, write_doc_procedure, offset_table_index + 4);
 
 
     //
     // Structure Info
     //
-    *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 8)) = doc_buffer.length;
+    write_doc_entity_array(&doc_buffer, context.doc_info->structures, write_doc_structure, offset_table_index + 8);
 
-    u32 struct_count_patch = doc_buffer.length;
-    bh_buffer_write_u32(&doc_buffer, 0);
 
-    u32 struct_count = 0;
-    bh_arr(AstBinding *) structs = context.doc_info->structures;
-    bh_arr_each(AstBinding *, pbind, structs) {
-        if (write_doc_structure(&doc_buffer, *pbind, (*pbind)->node)) {
-            struct_count++;
-        }
-    }
-
-    *((u32 *) bh_pointer_add(doc_buffer.data, struct_count_patch)) = struct_count;
+    //
+    // Enum Info
+    //
+    write_doc_entity_array(&doc_buffer, context.doc_info->enumerations, write_doc_enum, offset_table_index + 12);
 
 
     //
     // File Info
     //
-    *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 12)) = doc_buffer.length;
+    *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 16)) = doc_buffer.length;
 
     bh_buffer_write_u32(&doc_buffer, shlenu(context.doc_info->file_ids));
     fori (i, 0, shlen(context.doc_info->file_ids)) {
