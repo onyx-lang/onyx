@@ -169,6 +169,10 @@ void onyx_docs_submit(OnyxDocInfo *docs, AstBinding *binding) {
     if (node->kind == Ast_Kind_Struct_Type) {
         bh_arr_push(docs->structures, binding);
     }
+
+    if (node->kind == Ast_Kind_Poly_Struct_Type) {
+        bh_arr_push(docs->structures, binding);
+    }
 }
 
 #define Doc_Magic_Bytes "ODOC"
@@ -488,22 +492,63 @@ static b32 write_doc_procedure(bh_buffer *buffer, AstBinding *binding, AstNode *
 }
 
 static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *node) {
-    AstStructType *struct_node = (void *) node;
+    if (node->kind == Ast_Kind_Struct_Type) {
+        AstStructType *struct_node = (void *) node;
 
-    write_entity_header(buffer, binding, node->token->pos);
+        write_entity_header(buffer, binding, node->token->pos);
 
-    Type *struct_type = struct_node->stcache;
-    assert(struct_type);
+        Type *struct_type = struct_node->stcache;
+        assert(struct_type);
 
-    bh_buffer_write_u32(buffer, bh_arr_length(struct_type->Struct.memarr));
-    bh_arr_each(StructMember*, pmem, struct_type->Struct.memarr) {
-        StructMember* mem = *pmem;
+        bh_buffer_write_u32(buffer, bh_arr_length(struct_type->Struct.memarr));
+        bh_arr_each(StructMember*, pmem, struct_type->Struct.memarr) {
+            StructMember* mem = *pmem;
 
-        write_cstring(buffer, mem->name);
-        write_cstring(buffer, type_get_name(mem->type));
-        write_cstring(buffer, "");
+            write_cstring(buffer, mem->name);
+            write_cstring(buffer, type_get_name(mem->type));
+            write_cstring(buffer, "");
 
+            bh_buffer_write_u32(buffer, 0);
+        }
+
+        // Polymorph parameters
         bh_buffer_write_u32(buffer, 0);
+    }
+    else if (node->kind == Ast_Kind_Poly_Struct_Type) {
+        AstPolyStructType *poly_struct_node = (void *) node;
+        AstStructType *struct_node = poly_struct_node->base_struct;
+
+        write_entity_header(buffer, binding, node->token->pos);
+
+        bh_buffer type_buf;
+        bh_buffer_init(&type_buf, global_scratch_allocator, 256);
+
+        bh_buffer_write_u32(buffer, bh_arr_length(struct_node->members));
+        bh_arr_each(AstStructMember *, psmem, struct_node->members) {
+            AstStructMember *smem = *psmem;
+
+            bh_buffer_clear(&type_buf);
+            write_type_node(&type_buf, smem->type_node);
+
+            write_string(buffer, smem->token->length, smem->token->text);
+            write_string(buffer, type_buf.length, type_buf.data);
+            write_cstring(buffer, "");
+
+            bh_buffer_write_u32(buffer, smem->is_used ? 1 : 0);
+        }
+
+        // Polymorph parameters
+        bh_buffer_write_u32(buffer, bh_arr_length(poly_struct_node->poly_params));
+        bh_arr_each(AstPolyStructParam, param, poly_struct_node->poly_params) {
+            bh_buffer_clear(&type_buf);
+            write_type_node(&type_buf, param->type_node);
+
+            write_string(buffer, param->token->length, param->token->text);
+            write_string(buffer, type_buf.length, type_buf.data);
+            write_cstring(buffer, "");
+        }
+
+        bh_buffer_free(&type_buf);
     }
 
     return 1;

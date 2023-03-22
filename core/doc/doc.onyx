@@ -75,14 +75,14 @@ Doc_Procedure :: struct {
     }
     flags: Flags;
 
-    params: [] Doc_Procedure_Param;
+    params: [] Doc_Param;
     return_type: str;   // TODO: Make this not a string
 
     // Only used if this is an overloaded procedure
     overloads: [] Doc_Procedure;
 }
 
-Doc_Procedure_Param :: struct {
+Doc_Param :: struct {
     name: str;
     type: str;          // TODO: Make this not a string
     default_value: str;
@@ -92,6 +92,7 @@ Doc_Structure :: struct {
     use base: Doc_Entity;
 
     members: [] Doc_Structure_Member;
+    polymorph_arguments: [] Doc_Param;
 }
 
 Doc_Structure_Member :: struct {
