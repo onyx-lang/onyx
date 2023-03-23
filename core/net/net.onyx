@@ -91,7 +91,7 @@ make_unix_address :: (out: &Socket_Address, path: str) {
     // at the address where the addr field is in the Socket_Address.
     // We also have to append a null-terminator, as that is what will
     // be expected from any C function.
-    out_path := cast(&u8) &out.addr;
+    out_path := cast([&] u8) &out.addr;
     offset   := 0;
     while offset < math.min(path.count, UNIX_SOCKET_PATH_LEN - 1) {
         defer offset += 1;

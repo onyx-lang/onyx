@@ -57,7 +57,7 @@ rename_file :: fs.__file_rename
 get_contents_from_file :: (file: &File) -> str {
     size := cast(u32) io.stream_size(file);
 
-    data := cast(&u8) raw_alloc(context.allocator, size);
+    data := cast([&] u8) raw_alloc(context.allocator, size);
 
     _, prev_loc := io.stream_tell(file);
     io.stream_seek(file, 0, .Start);

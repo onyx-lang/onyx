@@ -16,13 +16,13 @@ as_allocator :: #match {
 from_stack :: macro (size: u32) -> rawptr {
     // This should do something about the alignment...
     // Everything so far has assume that the stack is aligned to 16 bytes.
-    defer __stack_top = ~~(cast(&u8) __stack_top + size);
+    defer __stack_top = ~~(cast([&]u8) __stack_top + size);
     return __stack_top;
 }
 
 array_from_stack :: macro ($T: type_expr, size: u32) -> [] T {
-    defer __stack_top = ~~(cast(&u8) __stack_top + size * sizeof T);
-    return (cast(&T) __stack_top)[0 .. size];
+    defer __stack_top = ~~(cast([&]u8) __stack_top + size * sizeof T);
+    return (cast([&]T) __stack_top)[0 .. size];
 }
 
 on_heap :: macro (v: $V) -> &V {

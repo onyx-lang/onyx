@@ -30,7 +30,7 @@ main :: (args) => {
         rules: [..] Rule;
         while !io.reader_empty(&reader) {
             r: Rule;
-            io.read_bytes(&reader, .{cast(&u8) &r.pair, 2});
+            io.read_bytes(&reader, .{cast([&] u8) &r.pair, 2});
             io.skip_bytes(&reader, 4);
             r.insert = io.read_byte(&reader);
 

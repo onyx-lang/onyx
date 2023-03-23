@@ -155,7 +155,7 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
         n = -n;
     }
 
-    c := &buf[buf.count - 1];
+    c: [&] u8 = ~~&buf[buf.count - 1];
     len := 0;
 
     BASE64_MAP := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
@@ -163,21 +163,21 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
     while n > 0 {
         m := cast(u64) n % base;
 
-        *c = BASE64_MAP[cast(u32) m];
+        c[0] = BASE64_MAP[cast(u32) m];
         len += 1;
         c -= 1;
 
         n /= base;
 
     } else {
-        *c = #char "0";
+        c[0] = #char "0";
         len += 1;
         c -= 1;
     }
 
     if min_length > 0 && len < min_length {
         for i: min_length - len {
-            *c = #char "0";
+            c[0] = #char "0";
             len += 1;
             c -= 1;
         }
@@ -185,26 +185,26 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
 
     if prefix {
         if base == 16 {
-            *c = #char "x";
+            c[0] = #char "x";
             len += 1;
             c -= 1;
-            *c = #char "0";
+            c[0] = #char "0";
             len += 1;
             c -= 1;
         }
 
         if base == 2 {
-            *c = #char "b";
+            c[0] = #char "b";
             len += 1;
             c -= 1;
-            *c = #char "0";
+            c[0] = #char "0";
             len += 1;
             c -= 1;
         }
     }
 
     if is_neg {
-        *c = #char "-";
+        c[0] = #char "-";
         len += 1;
         c -= 1;
     }
@@ -217,7 +217,7 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
 // Converts an unsigned number into a string using the buffer provided.
 // Behaves like i64_to_str.
 u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
-    c := &buf[buf.count - 1];
+    c: [&] u8 = ~~&buf[buf.count - 1];
     len := 0;
 
     BASE64_MAP := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
@@ -225,21 +225,21 @@ u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
     while n > 0 {
         m := cast(u64) n % base;
 
-        *c = BASE64_MAP[cast(u32) m];
+        c[0] = BASE64_MAP[cast(u32) m];
         len += 1;
         c -= 1;
 
         n /= base;
 
     } else {
-        *c = #char "0";
+        c[0] = #char "0";
         len += 1;
         c -= 1;
     }
 
     if min_length > 0 && len < min_length {
         for i: min_length - len {
-            *c = #char "0";
+            c[0] = #char "0";
             len += 1;
             c -= 1;
         }
@@ -247,19 +247,19 @@ u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
 
     if prefix {
         if base == 16 {
-            *c = #char "x";
+            c[0] = #char "x";
             len += 1;
             c -= 1;
-            *c = #char "0";
+            c[0] = #char "0";
             len += 1;
             c -= 1;
         }
 
         if base == 2 {
-            *c = #char "b";
+            c[0] = #char "b";
             len += 1;
             c -= 1;
-            *c = #char "0";
+            c[0] = #char "0";
             len += 1;
             c -= 1;
         }

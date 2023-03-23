@@ -47,6 +47,12 @@ write_type_name :: (writer: &io.Writer, t: type_expr) {
             write_type_name(writer, pointer.to);
         }
 
+        case .Multi_Pointer {
+            pointer := cast(&Type_Info_Multi_Pointer) info;
+            io.write_str(writer, "[&] ");
+            write_type_name(writer, pointer.to);
+        }
+
         case .Array {
             arr := cast(&Type_Info_Array) info;
             io.write_format(writer, "[{}] ", arr.count);

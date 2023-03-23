@@ -60,7 +60,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
         case .Array {
             a_info := cast(&type_info.Type_Info_Array, info);
 
-            base: &u8 = ~~v.data;
+            base: [&] u8 = ~~v.data;
             elem_size := type_info.size_of(a_info.of);
 
             for a_info.count {
@@ -72,8 +72,8 @@ serialize :: (v: any, w: &io.Writer) -> bool {
             s_info := cast(&type_info.Type_Info_Slice, info);
 
             untyped_slice := cast(&array.Untyped_Array, v.data);
-            base: &u8 = untyped_slice.data;
-            count:    = untyped_slice.count;
+            base: [&] u8 = untyped_slice.data;
+            count:       = untyped_slice.count;
             elem_size := type_info.size_of(s_info.of);
 
             output_u32(w, count);
@@ -95,7 +95,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
         case .Struct {
             s_info := cast(&type_info.Type_Info_Struct, info);
 
-            base: &u8 = ~~v.data;
+            base: [&] u8 = ~~v.data;
 
             for& member: s_info.members {
                 try(serialize(any.{ base + member.offset, member.type }, w));
@@ -166,7 +166,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader) -> bool {
         case .Array {
             a_info := cast(&type_info.Type_Info_Array, info);
 
-            base: &u8 = target;
+            base: [&] u8 = target;
             elem_size := type_info.size_of(a_info.of);
 
             for a_info.count {
@@ -190,7 +190,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader) -> bool {
                 untyped_slice.allocator = context.allocator;
             }
 
-            base: &u8 = untyped_slice.data;
+            base: [&] u8 = untyped_slice.data;
 
             for count {
                 try(deserialize(base + it * elem_size, s_info.of, r));
@@ -200,7 +200,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader) -> bool {
         case .Struct {
             s_info := cast(&type_info.Type_Info_Struct, info);
 
-            base: &u8 = target;
+            base: [&] u8 = target;
 
             for& member: s_info.members {
                 try(deserialize(base + member.offset, member.type, r));

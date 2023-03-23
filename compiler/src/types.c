@@ -41,6 +41,7 @@ Type basic_types[] = {
 // TODO: Document this!!
        bh_imap type_map;
 static bh_imap type_pointer_map;
+static bh_imap type_multi_pointer_map;
 static bh_imap type_array_map;
 static bh_imap type_slice_map;
 static bh_imap type_dynarr_map;
@@ -65,12 +66,13 @@ static void type_register(Type* type) {
 }
 
 void types_init() {
-    bh_imap_init(&type_map,         global_heap_allocator, 255);
-    bh_imap_init(&type_pointer_map, global_heap_allocator, 255);
-    bh_imap_init(&type_array_map,   global_heap_allocator, 255);
-    bh_imap_init(&type_slice_map,   global_heap_allocator, 255);
-    bh_imap_init(&type_dynarr_map,  global_heap_allocator, 255);
-    bh_imap_init(&type_vararg_map,  global_heap_allocator, 255);
+    bh_imap_init(&type_map,               global_heap_allocator, 255);
+    bh_imap_init(&type_pointer_map,       global_heap_allocator, 255);
+    bh_imap_init(&type_multi_pointer_map, global_heap_allocator, 255);
+    bh_imap_init(&type_array_map,         global_heap_allocator, 255);
+    bh_imap_init(&type_slice_map,         global_heap_allocator, 255);
+    bh_imap_init(&type_dynarr_map,        global_heap_allocator, 255);
+    bh_imap_init(&type_vararg_map,        global_heap_allocator, 255);
     sh_new_arena(type_func_map);
 
     fori (i, 0, Basic_Kind_Count) type_register(&basic_types[i]);
@@ -112,7 +114,7 @@ b32 types_are_compatible_(Type* t1, Type* t2, b32 recurse_pointers) {
                 if (t1->Basic.kind == Basic_Kind_V128 || t2->Basic.kind == Basic_Kind_V128) return 1;
             }
 
-            if (t1->Basic.kind == Basic_Kind_Rawptr && type_is_pointer(t2)) {
+            if (t1->Basic.kind == Basic_Kind_Rawptr && (type_is_pointer(t2) || type_is_multi_pointer(t2))) {
                 return 1;
             }
             break;
@@ -133,6 +135,21 @@ b32 types_are_compatible_(Type* t1, Type* t2, b32 recurse_pointers) {
                 }
             }
 
+            if (t2->kind == Type_Kind_Basic && t2->Basic.kind == Basic_Kind_Rawptr) return 1;
+
+            break;
+        }
+
+        case Type_Kind_MultiPointer: {
+            // Multi-pointer decays to pointer
+            // [&] u8 -> &u8
+            if (t2->kind == Type_Kind_Pointer) {
+                if (!recurse_pointers) return 1;
+
+                if (types_are_compatible(t1->MultiPointer.elem, t2->Pointer.elem)) return 1;
+            }
+
+            // Multi-pointer decays to rawptr
             if (t2->kind == Type_Kind_Basic && t2->Basic.kind == Basic_Kind_Rawptr) return 1;
 
             break;
@@ -223,6 +240,7 @@ u32 type_size_of(Type* type) {
 
     switch (type->kind) {
         case Type_Kind_Basic:    return type->Basic.size;
+        case Type_Kind_MultiPointer:
         case Type_Kind_Pointer:  return POINTER_SIZE;
         case Type_Kind_Function: return 4;
         case Type_Kind_Array:    return type->Array.size;
@@ -242,6 +260,7 @@ u32 type_alignment_of(Type* type) {
 
     switch (type->kind) {
         case Type_Kind_Basic:    return type->Basic.alignment;
+        case Type_Kind_MultiPointer:
         case Type_Kind_Pointer:  return POINTER_SIZE;
         case Type_Kind_Function: return 4;
         case Type_Kind_Array:    return type_alignment_of(type->Array.elem);
@@ -263,6 +282,13 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
         case Ast_Kind_Pointer_Type: {
             Type *inner_type = type_build_from_ast_inner(alloc, ((AstPointerType *) type_node)->elem, 1);
             Type *ptr_type = type_make_pointer(alloc, inner_type);
+            if (ptr_type) ptr_type->ast_type = type_node;
+            return ptr_type;
+        }
+
+        case Ast_Kind_Multi_Pointer_Type: {
+            Type *inner_type = type_build_from_ast_inner(alloc, ((AstMultiPointerType *) type_node)->elem, 1);
+            Type *ptr_type = type_make_multi_pointer(alloc, inner_type);
             if (ptr_type) ptr_type->ast_type = type_node;
             return ptr_type;
         }
@@ -832,6 +858,29 @@ Type* type_make_pointer(bh_allocator alloc, Type* to) {
     }
 }
 
+Type* type_make_multi_pointer(bh_allocator alloc, Type* to) {
+    if (to == NULL) return NULL;
+    if (to == (Type *) &node_that_signals_failure) return to;
+
+    assert(to->id > 0);
+    u64 ptr_id = bh_imap_get(&type_multi_pointer_map, to->id);
+    if (ptr_id > 0) {
+        Type* ptr_type = (Type *) bh_imap_get(&type_map, ptr_id);
+        return ptr_type;
+
+    } else {
+        Type* ptr_type = type_create(Type_Kind_MultiPointer, alloc, 0);
+        ptr_type->MultiPointer.base.flags |= Basic_Flag_Pointer;
+        ptr_type->MultiPointer.base.size = POINTER_SIZE;
+        ptr_type->MultiPointer.elem = to;
+
+        type_register(ptr_type);
+        bh_imap_put(&type_multi_pointer_map, to->id, ptr_type->id);
+
+        return ptr_type;
+    }
+}
+
 Type* type_make_array(bh_allocator alloc, Type* to, u32 count) {
     if (to == NULL) return NULL;
     if (to == (Type *) &node_that_signals_failure) return to;
@@ -871,7 +920,7 @@ Type* type_make_slice(bh_allocator alloc, Type* of) {
         type_register(slice_type);
         bh_imap_put(&type_slice_map, of->id, slice_type->id);
 
-        type_make_pointer(alloc, of);
+        type_make_multi_pointer(alloc, of);
         slice_type->Slice.elem = of;
 
         return slice_type;
@@ -893,7 +942,7 @@ Type* type_make_dynarray(bh_allocator alloc, Type* of) {
         type_register(dynarr);
         bh_imap_put(&type_dynarr_map, of->id, dynarr->id);
 
-        type_make_pointer(alloc, of);
+        type_make_multi_pointer(alloc, of);
         dynarr->DynArray.elem = of;
 
         return dynarr;
@@ -915,7 +964,7 @@ Type* type_make_varargs(bh_allocator alloc, Type* of) {
         type_register(va_type);
         bh_imap_put(&type_vararg_map, of->id, va_type->id);
 
-        type_make_pointer(alloc, of);
+        type_make_multi_pointer(alloc, of);
         va_type->VarArgs.elem = of;
 
         return va_type;
@@ -1013,6 +1062,7 @@ const char* type_get_unique_name(Type* type) {
     switch (type->kind) {
         case Type_Kind_Basic: return type->Basic.name;
         case Type_Kind_Pointer: return bh_aprintf(global_scratch_allocator, "&%s", type_get_unique_name(type->Pointer.elem));
+        case Type_Kind_MultiPointer: return bh_aprintf(global_scratch_allocator, "[&] %s", type_get_unique_name(type->Pointer.elem));
         case Type_Kind_Array: return bh_aprintf(global_scratch_allocator, "[%d] %s", type->Array.count, type_get_unique_name(type->Array.elem));
         case Type_Kind_Struct:
             if (type->Struct.name)
@@ -1079,6 +1129,7 @@ const char* type_get_name(Type* type) {
     switch (type->kind) {
         case Type_Kind_Basic: return type->Basic.name;
         case Type_Kind_Pointer: return bh_aprintf(global_scratch_allocator, "&%s", type_get_name(type->Pointer.elem));
+        case Type_Kind_MultiPointer: return bh_aprintf(global_scratch_allocator, "[&] %s", type_get_name(type->Pointer.elem));
         case Type_Kind_Array: return bh_aprintf(global_scratch_allocator, "[%d] %s", type->Array.count, type_get_name(type->Array.elem));
 
         case Type_Kind_PolyStruct:
@@ -1153,11 +1204,12 @@ u32 type_get_alignment_log2(Type* type) {
 Type* type_get_contained_type(Type* type) {
     if (type == NULL) return NULL;
     switch (type->kind) {
-        case Type_Kind_Pointer:  return type->Pointer.elem;
-        case Type_Kind_Array:    return type->Array.elem;
-        case Type_Kind_Slice:    return type->Slice.elem;
-        case Type_Kind_DynArray: return type->DynArray.elem;
-        case Type_Kind_VarArgs:  return type->VarArgs.elem;
+        case Type_Kind_Pointer:      return type->Pointer.elem;
+        case Type_Kind_MultiPointer: return type->MultiPointer.elem;
+        case Type_Kind_Array:        return type->Array.elem;
+        case Type_Kind_Slice:        return type->Slice.elem;
+        case Type_Kind_DynArray:     return type->DynArray.elem;
+        case Type_Kind_VarArgs:      return type->VarArgs.elem;
         default: return NULL;
     }
 }
@@ -1206,7 +1258,7 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
             fori (i, 0, (i64) (sizeof(slice_members) / sizeof(StructMember))) {
                 if (strcmp(slice_members[i].name, member) == 0) {
                     *smem = slice_members[i];
-                    if (smem->idx == 0) smem->type = type_make_pointer(context.ast_alloc, type->Slice.elem);
+                    if (smem->idx == 0) smem->type = type_make_multi_pointer(context.ast_alloc, type->Slice.elem);
 
                     return 1;
                 }
@@ -1218,7 +1270,7 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
             fori (i, 0, (i64) (sizeof(array_members) / sizeof(StructMember))) {
                 if (strcmp(array_members[i].name, member) == 0) {
                     *smem = array_members[i];
-                    if (smem->idx == 0) smem->type = type_make_pointer(context.ast_alloc, type->DynArray.elem);
+                    if (smem->idx == 0) smem->type = type_make_multi_pointer(context.ast_alloc, type->DynArray.elem);
                     if (smem->idx == 3) smem->type = type_build_from_ast(context.ast_alloc, builtin_allocator_type);
 
                     return 1;
@@ -1250,7 +1302,7 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
             if (idx > 2) return 0;
 
             *smem = slice_members[idx];
-            if (smem->idx == 0) smem->type = type_make_pointer(context.ast_alloc, type->Slice.elem);
+            if (smem->idx == 0) smem->type = type_make_multi_pointer(context.ast_alloc, type->Slice.elem);
 
             return 1;
         }
@@ -1259,7 +1311,7 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
             if (idx > 4) return 0;
 
             *smem = array_members[idx];
-            if (idx == 0) smem->type = type_make_pointer(context.ast_alloc, type->DynArray.elem);
+            if (idx == 0) smem->type = type_make_multi_pointer(context.ast_alloc, type->DynArray.elem);
             if (idx == 3) smem->type = type_build_from_ast(context.ast_alloc, builtin_allocator_type);
 
             return 1;
@@ -1284,7 +1336,7 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
         case Type_Kind_Slice:
         case Type_Kind_VarArgs: {
             if (idx == 0) {
-                two->type = type_make_pointer(context.ast_alloc, type->Slice.elem);
+                two->type = type_make_multi_pointer(context.ast_alloc, type->Slice.elem);
                 two->offset = 0;
             }
             if (idx == 1) {
@@ -1296,7 +1348,7 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
         }
         case Type_Kind_DynArray: {
             if (idx == 0) {
-                two->type = type_make_pointer(context.ast_alloc, type->DynArray.elem);
+                two->type = type_make_multi_pointer(context.ast_alloc, type->DynArray.elem);
                 two->offset = 0;
             }
             if (idx == 1) {
@@ -1365,6 +1417,11 @@ i32 type_get_idx_of_linear_member_with_offset(Type* type, u32 offset) {
 b32 type_is_pointer(Type* type) {
     if (type == NULL) return 0;
     return type->kind == Type_Kind_Pointer;
+}
+
+b32 type_is_multi_pointer(Type* type) {
+    if (type == NULL) return 0;
+    return type->kind == Type_Kind_MultiPointer;
 }
 
 b32 type_is_rawptr(Type* type) {
@@ -1438,7 +1495,8 @@ b32 type_results_in_void(Type* type) {
 
 b32 type_is_array_accessible(Type* type) {
     if (type == NULL) return 0;
-    if (type_is_pointer(type)) return 1;
+    // if (type_is_pointer(type)) return 1;
+    if (type_is_multi_pointer(type)) return 1;
     if (type->kind == Type_Kind_Array) return 1;
     if (type->kind == Type_Kind_Slice) return 1;
     if (type->kind == Type_Kind_DynArray) return 1;

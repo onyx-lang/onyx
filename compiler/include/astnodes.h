@@ -60,6 +60,7 @@
     NODE(Type)                 \
     NODE(BasicType)            \
     NODE(PointerType)          \
+    NODE(MultiPointerType)     \
     NODE(FunctionType)         \
     NODE(ArrayType)            \
     NODE(SliceType)            \
@@ -158,6 +159,7 @@ typedef enum AstKind {
     Ast_Kind_Type,
     Ast_Kind_Basic_Type,
     Ast_Kind_Pointer_Type,
+    Ast_Kind_Multi_Pointer_Type,
     Ast_Kind_Function_Type,
     Ast_Kind_Array_Type,
     Ast_Kind_Slice_Type,
@@ -924,6 +926,7 @@ struct AstArrayType     { AstType_base; AstType* elem; AstTyped *count_expr; };
 struct AstSliceType     { AstType_base; AstType* elem; };
 struct AstDynArrType    { AstType_base; AstType* elem; };
 struct AstVarArgType    { AstType_base; AstType* elem; };
+struct AstMultiPointerType { AstType_base; AstType* elem; };
 struct AstFunctionType  {
     AstType_base;
 

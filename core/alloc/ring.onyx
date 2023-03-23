@@ -23,7 +23,7 @@ ring_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, o
     if aa == .Alloc {
         retval := null;
         if ss.curr + size < ss.size {
-            retval = cast(&u8) ss.base_ptr + ss.curr;
+            retval = cast([&] u8) ss.base_ptr + ss.curr;
             ss.curr += size;
         }
         elseif size <= ss.size {

@@ -27,7 +27,7 @@ package builtin
 // A string is simply a slice of bytes, and a c-string is a pointer
 // to byte, with a null-terminator ('\0') at the end.
 str     :: #type   [] u8;
-cstr    :: #type    & u8;
+cstr    :: #type  [&] u8;
 dyn_str :: #type [..] u8;
 
 
@@ -292,7 +292,7 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
             for s_info.members {
                 if it.default != null {
                     member_size := type_info.size_of(it.type);
-                    memory.copy(cast(&u8) res + it.offset, it.default, member_size);
+                    memory.copy(cast([&] u8) res + it.offset, it.default, member_size);
                 }
             }
         }

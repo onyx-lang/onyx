@@ -58,6 +58,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Type: return sizeof(AstType);
         case Ast_Kind_Basic_Type: return sizeof(AstBasicType);
         case Ast_Kind_Pointer_Type: return sizeof(AstPointerType);
+        case Ast_Kind_Multi_Pointer_Type: return sizeof(AstMultiPointerType);
         case Ast_Kind_Function_Type: return sizeof(AstFunctionType) + ((AstFunctionType *) node)->param_count * sizeof(AstType *);
         case Ast_Kind_Array_Type: return sizeof(AstArrayType);
         case Ast_Kind_Slice_Type: return sizeof(AstSliceType);
@@ -328,6 +329,10 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
         case Ast_Kind_Pointer_Type:
             C(AstPointerType, elem);
+            break;
+
+        case Ast_Kind_Multi_Pointer_Type:
+            C(AstMultiPointerType, elem);
             break;
 
         case Ast_Kind_Array_Type:

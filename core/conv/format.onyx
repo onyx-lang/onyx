@@ -122,7 +122,7 @@ Custom_Parse_Proc :: struct {
 // When the internal buffer is filled, `flush` is called to empty the
 // buffer to the final destination.
 Format_Output :: struct {
-    data: &u8;
+    data: [&] u8;
     count: u32;
     capacity: u32;
 
@@ -551,7 +551,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                         format.quote_strings = true;
 
                         output->write("Some(");
-                        format_any(output, &format, .{ ~~(cast(&u8) v.data + s.members[1].offset), s.members[1].type });
+                        format_any(output, &format, .{ ~~(cast([&] u8) v.data + s.members[1].offset), s.members[1].type });
                         output->write(")");
 
                     } else {
@@ -586,7 +586,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                         output->write(member.name);
                         output->write(" = ");
 
-                        format_any(output, &format, .{ ~~(cast(&u8) v.data + member.offset), member.type });
+                        format_any(output, &format, .{ ~~(cast([&] u8) v.data + member.offset), member.type });
                     }
                 }
                 
@@ -612,7 +612,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 output->write("]");
             }
 
-            if info.kind == .Pointer {
+            if info.kind == .Pointer || info.kind == .Multi_Pointer {
                 value := *(cast(&rawptr) v.data);
 
                 ibuf : [128] u8;
@@ -645,7 +645,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                         for _: format.indentation do output->write(#char " ");
                     }
 
-                    format_any(output, &format, .{ ~~(cast(&u8) data + get_type_info(a.of).size * i), a.of });
+                    format_any(output, &format, .{ ~~(cast([&] u8) data + get_type_info(a.of).size * i), a.of });
                 }
 
 
@@ -669,7 +669,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 for i: a.count {
                     if i != 0 do output->write(", ");
 
-                    format_any(output, formatting, .{ ~~(cast(&u8) data + get_type_info(a.of).size * i), a.of });
+                    format_any(output, formatting, .{ ~~(cast([&] u8) data + get_type_info(a.of).size * i), a.of });
                 }
 
                 output->write(" ]");

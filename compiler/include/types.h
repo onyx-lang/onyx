@@ -104,7 +104,14 @@ typedef enum StructProcessingStatus {
 
 #define TYPE_KINDS \
     TYPE_KIND(Basic, TypeBasic)                                   \
-    TYPE_KIND(Pointer, struct { TypeBasic base; Type *elem; })    \
+    TYPE_KIND(Pointer, struct {                                   \
+        TypeBasic base;                                           \
+        Type *elem;                                               \
+    })                                                            \
+    TYPE_KIND(MultiPointer, struct {                              \
+        TypeBasic base;                                           \
+        Type *elem;                                               \
+    })                                                            \
     TYPE_KIND(Function, struct {                                  \
         Type *return_type;                                        \
         u16 param_count;                                          \
@@ -207,6 +214,7 @@ Type* type_build_function_type(bh_allocator alloc, struct AstFunction* func);
 Type* type_build_compound_type(bh_allocator alloc, struct AstCompound* compound);
 
 Type* type_make_pointer(bh_allocator alloc, Type* to);
+Type* type_make_multi_pointer(bh_allocator alloc, Type* to);
 Type* type_make_array(bh_allocator alloc, Type* to, u32 count);
 Type* type_make_slice(bh_allocator alloc, Type* of);
 Type* type_make_dynarray(bh_allocator alloc, Type* of);
@@ -231,6 +239,7 @@ i32 type_get_idx_of_linear_member_with_offset(Type* type, u32 offset);
 b32 type_struct_is_simple(Type* type);
 
 b32 type_is_pointer(Type* type);
+b32 type_is_multi_pointer(Type* type);
 b32 type_is_rawptr(Type* type);
 b32 type_is_array(Type* tyoe);
 b32 type_is_struct(Type* type);

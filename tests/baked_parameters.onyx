@@ -8,7 +8,7 @@ count_to :: ($N: i32) {
 }
 
 alloc_slice :: ($T: type_expr, N: i32) -> [] T {
-    data := cast(&T) calloc(sizeof T * N);
+    data := cast([&] T) calloc(sizeof T * N);
     return .{ data, N };
 }
 

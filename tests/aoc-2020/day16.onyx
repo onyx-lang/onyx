@@ -19,7 +19,7 @@ field_valid :: (use field: &Field, n: u32) -> bool {
 
 total_scanning_error := 0;
 
-read_ticket_and_validate :: (file: &str, fields: [..] Field, ticket_store: &u32) -> bool {
+read_ticket_and_validate :: (file: &str, fields: [..] Field, ticket_store: [&] u32) -> bool {
 	retval := true;
 
 	for i: 0 .. fields.count {
@@ -86,7 +86,7 @@ main :: (args: [] cstr) {
 
 	while !string.empty(file) {
 		array.ensure_capacity(&ticket_data, ticket_data.count + fields.count);
-		if read_ticket_and_validate(&file, fields, &ticket_data[ticket_data.count]) {
+		if read_ticket_and_validate(&file, fields, ~~ &ticket_data[ticket_data.count]) {
 			ticket_data.count += fields.count;
 		}
 	}

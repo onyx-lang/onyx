@@ -49,7 +49,7 @@ arg_parse :: (c_args: [] cstr, output: any) -> bool {
 
                 switch member.type {
                     case bool {
-                        *(cast(&bool) (cast(&u8) data_base + member.offset)) = !*(cast(&bool) (cast(&u8) data_base + member.offset));
+                        *(cast(&bool) (cast([&] u8) data_base + member.offset)) = !*(cast(&bool) (cast([&] u8) data_base + member.offset));
                     }
 
                     case i32 {
@@ -57,14 +57,14 @@ arg_parse :: (c_args: [] cstr, output: any) -> bool {
                         if !success do return false;
 
                         value := conv.str_to_i64(value_str);
-                        *(cast(&i32) (cast(&u8) data_base + member.offset)) = ~~value;
+                        *(cast(&i32) (cast([&] u8) data_base + member.offset)) = ~~value;
                     }
 
                     case str {
                         value, success := iter.take_one(arg_iter, no_close=true);
                         if !success do return false;
 
-                        *(cast(&str) (cast(&u8) data_base + member.offset)) = value;
+                        *(cast(&str) (cast([&] u8) data_base + member.offset)) = value;
                     }
 
                     case #default {

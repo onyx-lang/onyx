@@ -281,6 +281,17 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
                 break;
             }
 
+            case Ast_Kind_Multi_Pointer_Type: {
+                if (elem.actual->kind != Type_Kind_MultiPointer) break;
+
+                bh_arr_push(elem_queue, ((PolySolveElem) {
+                    .type_expr = ((AstMultiPointerType *) elem.type_expr)->elem,
+                    .kind = PSK_Type,
+                    .actual = elem.actual->MultiPointer.elem,
+                }));
+                break;
+            }
+
             case Ast_Kind_Address_Of: {
                 if (elem.actual->kind != Type_Kind_Pointer) break;
 

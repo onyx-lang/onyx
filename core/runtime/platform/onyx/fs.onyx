@@ -97,7 +97,7 @@ __file_stream_vtable := io.Stream_Vtable.{
     write_byte = (use fs: &os.File, byte: u8) -> io.Error {
         b := byte;
         bytes_wrote: u64;
-        error := __file_write(data, .{ &b, 1 }, &bytes_wrote);
+        error := __file_write(data, .{ ~~&b, 1 }, &bytes_wrote);
         return error;
     },
 
