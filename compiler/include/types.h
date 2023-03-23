@@ -45,13 +45,14 @@ enum BasicFlag {
     Basic_Flag_Unsigned         = BH_BIT(2),
     Basic_Flag_Float            = BH_BIT(3),
     Basic_Flag_Pointer          = BH_BIT(4),
+    Basic_Flag_Multi_Pointer    = BH_BIT(7),
 
     Basic_Flag_SIMD             = BH_BIT(5),
 
     Basic_Flag_Type_Index       = BH_BIT(6),
 
     Basic_Flag_Numeric          = Basic_Flag_Integer | Basic_Flag_Float,
-    Basic_Flag_Ordered          = Basic_Flag_Integer | Basic_Flag_Float | Basic_Flag_Pointer,
+    Basic_Flag_Ordered          = Basic_Flag_Integer | Basic_Flag_Float | Basic_Flag_Pointer | Basic_Flag_Multi_Pointer,
     Basic_Flag_Equality         = Basic_Flag_Ordered | Basic_Flag_Type_Index | Basic_Flag_Boolean,
     Basic_Flag_Constant_Type    = Basic_Flag_Boolean | Basic_Flag_Numeric | Basic_Flag_Pointer,
     Basic_Flag_Numeric_Ordered  = Basic_Flag_Numeric | Basic_Flag_Ordered,

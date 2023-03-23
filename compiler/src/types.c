@@ -871,6 +871,7 @@ Type* type_make_multi_pointer(bh_allocator alloc, Type* to) {
     } else {
         Type* ptr_type = type_create(Type_Kind_MultiPointer, alloc, 0);
         ptr_type->MultiPointer.base.flags |= Basic_Flag_Pointer;
+        ptr_type->MultiPointer.base.flags |= Basic_Flag_Multi_Pointer;
         ptr_type->MultiPointer.base.size = POINTER_SIZE;
         ptr_type->MultiPointer.elem = to;
 
