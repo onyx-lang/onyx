@@ -155,7 +155,7 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
         n = -n;
     }
 
-    c: [&] u8 = ~~&buf[buf.count - 1];
+    c: [&] u8 = &buf[buf.count - 1];
     len := 0;
 
     BASE64_MAP := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
@@ -217,7 +217,7 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
 // Converts an unsigned number into a string using the buffer provided.
 // Behaves like i64_to_str.
 u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
-    c: [&] u8 = ~~&buf[buf.count - 1];
+    c: [&] u8 = &buf[buf.count - 1];
     len := 0;
 
     BASE64_MAP := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";

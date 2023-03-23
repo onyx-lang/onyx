@@ -56,7 +56,7 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
 
         case f64 {
             dest := cast(&f64) target;
-            *dest = ~~ str_to_f64(to_parse);
+            *dest = str_to_f64(to_parse);
             return true;
         }
 

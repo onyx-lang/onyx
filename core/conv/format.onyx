@@ -252,7 +252,7 @@ format_va :: (buffer: &dyn_str, format: str, va: [] any) -> str {
         flush=.{ buffer, flush_to_dyn_str }
     };
 
-    final := format_va(&output, format, ~~va);
+    final := format_va(&output, format, va);
     string.concat(buffer, final);
     return *buffer;
 }
@@ -339,7 +339,7 @@ format_va :: (output: &Format_Output, format: str, va: [] any) -> str {
                             i += 1;
                         }
 
-                        formatting.minimum_width = ~~digits;
+                        formatting.minimum_width = digits;
                     }
 
                     case #char "!" {
@@ -551,7 +551,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                         format.quote_strings = true;
 
                         output->write("Some(");
-                        format_any(output, &format, .{ ~~(cast([&] u8) v.data + s.members[1].offset), s.members[1].type });
+                        format_any(output, &format, .{ cast([&] u8) v.data + s.members[1].offset, s.members[1].type });
                         output->write(")");
 
                     } else {
@@ -586,7 +586,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                         output->write(member.name);
                         output->write(" = ");
 
-                        format_any(output, &format, .{ ~~(cast([&] u8) v.data + member.offset), member.type });
+                        format_any(output, &format, .{ cast([&] u8) v.data + member.offset, member.type });
                     }
                 }
                 
@@ -645,7 +645,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                         for _: format.indentation do output->write(#char " ");
                     }
 
-                    format_any(output, &format, .{ ~~(cast([&] u8) data + get_type_info(a.of).size * i), a.of });
+                    format_any(output, &format, .{ cast([&] u8) data + get_type_info(a.of).size * i, a.of });
                 }
 
 
@@ -669,7 +669,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 for i: a.count {
                     if i != 0 do output->write(", ");
 
-                    format_any(output, formatting, .{ ~~(cast([&] u8) data + get_type_info(a.of).size * i), a.of });
+                    format_any(output, formatting, .{ cast([&] u8) data + get_type_info(a.of).size * i, a.of });
                 }
 
                 output->write(" ]");

@@ -135,6 +135,15 @@ b32 types_are_compatible_(Type* t1, Type* t2, b32 recurse_pointers) {
                 }
             }
 
+            // Pointers promote to multi-pointers
+            // &u8 -> [&] u8
+            if (t2->kind == Type_Kind_MultiPointer) {
+                if (!recurse_pointers) return 1;
+
+                if (types_are_compatible(t1->Pointer.elem, t2->Pointer.elem)) return 1;
+            }
+
+            // Pointer decays to rawptr
             if (t2->kind == Type_Kind_Basic && t2->Basic.kind == Basic_Kind_Rawptr) return 1;
 
             break;
