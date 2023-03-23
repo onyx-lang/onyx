@@ -324,7 +324,7 @@ populate_struct_vtable :: (table: &$Table_Type, struct_type: type_expr, safe := 
         if struct_method == null do continue;
         if safe && struct_method.type != member.type do continue;
 
-        dest := cast(&()->void) (cast(&u8) table + member.offset);
+        dest := cast(&()->void) (cast([&] u8) table + member.offset);
         *dest = *cast(&()->void) struct_method.data;
     }
 }
