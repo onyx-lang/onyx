@@ -276,12 +276,12 @@ as_iter :: (m: &Map) =>
         &.{ m = m, i = 0 },
 
         ctx => {
-            if ctx.i >= ctx.m.entries.count {
-                return (typeof ctx.m.entries.data).{}, false;
+            if ctx.i < ctx.m.entries.count {
+                defer ctx.i += 1;
+                return &ctx.m.entries.data[ctx.i], true;
             }
 
-            defer ctx.i += 1;
-            return &ctx.m.entries.data[ctx.i], true;
+            return .{}, false;
         });
 
 
