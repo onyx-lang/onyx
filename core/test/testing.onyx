@@ -1,6 +1,11 @@
 package core.test
 
-use core {array, string, printf}
+#import core
+#import core.array
+#import core.string
+#import runtime
+
+use core {printf}
 
 #doc """
     Test tag. Use this to mark a function as a test.

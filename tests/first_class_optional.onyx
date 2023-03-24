@@ -1,4 +1,5 @@
-use core
+#import core
+use core {println}
 
 foo :: (x: ?i32) -> i32 {
     return x? + 10;

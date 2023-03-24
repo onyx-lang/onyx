@@ -3,6 +3,10 @@ package runtime.platform
 #load "./wasi_defs"
 #load "./wasi_fs"
 
+#import core
+#import wasi
+#import runtime
+
 use core
 use wasi {
     IOVec, SubscriptionTagged, Subscription, Event, Size,

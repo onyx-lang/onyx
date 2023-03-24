@@ -1,6 +1,11 @@
 package core.conv
 
-use core {map, string, array, math}
+#import core.map
+#import core.string
+#import core.array
+#import core.math
+#import core.io
+#import runtime
 
 #package {
     custom_formatters: Map(type_expr, #type (&Format_Output, &Format, rawptr) -> void);
@@ -401,8 +406,7 @@ format_va :: (output: &Format_Output, format: str, va: [] any) -> str {
 // If a custom formatter is specified for the type, that is used instead.
 // This procedure is generally not used directly; instead, through format or format_va.
 format_any :: (output: &Format_Output, formatting: &Format, v: any) {
-    use package runtime.info
-    array :: package core.array;
+    use runtime.info;
 
     //
     // Dereference the any if the '*' format specifier was given.
@@ -521,8 +525,6 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
 
         case type_expr {
             value := *(cast(&type_expr) v.data);
-
-            io :: package core.io
 
             buf : [256] u8;          
 

@@ -1,5 +1,7 @@
 package core.alloc.ring
 
+#import core
+
 // This allocator is great for temporary memory, such as returning
 // a pointer from a function, or storing a formatted string. The
 // memory allocated using this allocator does not need to be freed.

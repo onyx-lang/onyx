@@ -1,6 +1,13 @@
 package core.map
 
-use core {array, hash, memory, math, conv, Optional}
+#import core
+#import core.array
+#import core.hash
+#import core.memory
+#import core.math
+#import core.conv
+
+use core {Optional}
 use core.intrinsics.onyx { __initialize }
 
 //

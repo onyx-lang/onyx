@@ -2,7 +2,8 @@ package core.conv
 
 Enable_Custom_Formatters :: true
 
-use core {string, math}
+#import core.string
+#import core.math
 
 //
 // Converts a string into an integer. Works with positive and
@@ -19,8 +20,6 @@ str_to_i64 :: macro (s: str, base: u32 = 10) -> i64 {
 
 #overload
 str_to_i64 :: (s: &str, base: u32 = 10) -> i64 {
-    use package core
-
     string.strip_leading_whitespace(s);
 
     value: i64 = 0;
@@ -79,8 +78,6 @@ str_to_f64 :: macro (s: str) -> f64 {
 
 #overload
 str_to_f64 :: (s: &str) -> f64 {
-    use package core
-
     string.strip_leading_whitespace(s);
 
     sign := parse_sign(s);

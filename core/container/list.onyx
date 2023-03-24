@@ -1,5 +1,7 @@
 package core.list
 
+#import core
+
 ListElem :: struct (T: type_expr) {
     next: &ListElem(T) = null;
     prev: &ListElem(T) = null;

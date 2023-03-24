@@ -8,7 +8,10 @@ package core.io
 // reader could not, like 'read the next line',
 // or 'read until a period'.
 
-use core {memory, math, array, iter}
+#import core.memory
+#import core.math
+#import core.array
+#import core.iter
 
 Reader :: struct {
     stream: &Stream;

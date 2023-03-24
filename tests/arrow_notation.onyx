@@ -1,6 +1,9 @@
 #load "core/std"
 
-use core
+#import core
+#import core.conv
+
+use core {println}
 
 #tag conv.Custom_Format.{format}
 V2 :: struct {

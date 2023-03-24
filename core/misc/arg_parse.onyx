@@ -22,7 +22,13 @@ package core.arg_parse
 // false and are true if one or more of the option values are present.
 //
 
-use core
+#import core
+#import core.iter
+#import core.conv
+#import core.string
+#import runtime
+
+use core {printf}
 
 arg_parse :: (c_args: [] cstr, output: any) -> bool {
     arg_iter := iter.as_iter(c_args)

@@ -1,5 +1,7 @@
 package core.array
 
+#import core
+
 // [..] T == Array(T)
 //   where
 // Array :: struct (T: type_expr) {
@@ -31,12 +33,12 @@ make :: (base: [] $T, allocator := context.allocator) -> [..] T {
 
 #overload
 __make_overload :: macro (_: &[..] $T, allocator := context.allocator) -> [..] T {
-    return core.array.make(T, allocator=allocator);
+    return #this_package.make(T, allocator=allocator);
 }
 
 #overload
 __make_overload :: macro (_: &[..] $T, capacity: u32, allocator := context.allocator) -> [..] T {
-    return core.array.make(T, capacity, allocator);
+    return #this_package.make(T, capacity, allocator);
 }
 
 init :: (arr: &[..] $T, capacity := 4, allocator := context.allocator) {
@@ -56,7 +58,7 @@ free :: (arr: &[..] $T) {
 
 #overload
 builtin.delete :: macro (x: &[..] $T) {
-    core.array.free(x);
+    #this_package.free(x);
 }
 
 copy :: #match #locked {
@@ -114,7 +116,7 @@ push :: (arr: &[..] $T, x: T) -> bool {
 }
 
 // Semi-useful shortcut for adding something to an array.
-#operator << macro (arr: [..] $T, v: T) do core.array.push(&arr, v);
+#operator << macro (arr: [..] $T, v: T) do #this_package.push(&arr, v);
 
 insert :: #match #local {}
 

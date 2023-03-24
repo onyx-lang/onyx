@@ -1,5 +1,10 @@
 package core.misc
 
+#import runtime
+#import core.iter
+#import core.array
+#import core.string
+
 use runtime.info {
     get_type_info,
     Type_Info_Pointer,
@@ -10,8 +15,6 @@ use runtime.info {
 
     get_struct_member
 }
-
-use core { iter, array, string }
 
 // Either to_any or as_any will work. I prefer `as_any` because
 // much of the rest of the standard library uses `as_...` for

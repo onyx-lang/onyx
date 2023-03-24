@@ -1,5 +1,7 @@
 package core.alloc.pool
 
+#import core
+
 // A pool allocator is an O(1) allocator that is capable of allocating and freeing.
 // It is able to do both in constant time because it maintains a linked list of all
 // the free elements in the pool. When an element is requested the first element of

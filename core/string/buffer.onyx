@@ -6,7 +6,7 @@
 
 package core.string
 
-use core {math}
+#import core.math
 
 String_Buffer :: struct {
     data     : [&] u8;

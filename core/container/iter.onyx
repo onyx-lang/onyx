@@ -1,6 +1,12 @@
 package core.iter
 
-use core {memory, alloc, array, Pair}
+#import core
+#import core.memory
+#import core.alloc
+#import core.array
+#import runtime
+
+use core {Pair}
 use core.intrinsics.types {type_is_struct}
 
 

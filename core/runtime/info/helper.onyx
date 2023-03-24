@@ -1,6 +1,7 @@
 package runtime.info
 
-use core {io}
+#import core
+#import core.io
 
 write_type_name :: (writer: &io.Writer, t: type_expr) {
     info := get_type_info(t);

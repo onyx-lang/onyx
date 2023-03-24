@@ -4,6 +4,9 @@ package core.net
     #error "Cannot include this file. Platform not supported.";
 }
 
+#import core
+#import runtime
+
 use core
 
 Socket :: struct {

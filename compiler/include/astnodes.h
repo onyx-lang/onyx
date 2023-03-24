@@ -107,6 +107,7 @@
     NODE(ForeignBlock)         \
                                \
     NODE(Package)              \
+    NODE(Import)               \
                                \
     NODE(ZeroValue)
 
@@ -132,6 +133,7 @@ typedef enum AstKind {
     Ast_Kind_Load_Path,
     Ast_Kind_Load_All,
     Ast_Kind_Library_Path,
+    Ast_Kind_Import,
     Ast_Kind_Memres,
 
     Ast_Kind_Binding,
@@ -1170,6 +1172,13 @@ struct AstPackage {
     Package* package;
 };
 
+struct AstImport {
+    AstNode_base;
+
+    AstPackage *imported_package;
+};
+
+
 //
 // Polymorphic procedures
 //
@@ -1458,6 +1467,7 @@ typedef enum EntityType {
     Entity_Type_Load_File,
     Entity_Type_Binding,
     Entity_Type_Use_Package,
+    Entity_Type_Import,
     Entity_Type_Static_If,
     Entity_Type_String_Literal,
     Entity_Type_File_Contents,
@@ -1511,6 +1521,7 @@ typedef struct Entity {
     union {
         AstDirectiveError     *error;
         AstInclude            *include;
+        AstImport             *import;
         AstBinding            *binding;
         AstIf                 *static_if;
         AstFunction           *function;

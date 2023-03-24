@@ -4,6 +4,8 @@ package core.alloc.log
 // prints every allocation/deallocation made by that 
 // allocator.
 
+#import core
+
 #local
 Allocation_Action_Strings := str.[
     " alloc",

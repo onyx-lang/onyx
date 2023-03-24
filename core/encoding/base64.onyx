@@ -1,6 +1,6 @@
 package core.encoding.base64
 
-use core {array}
+#import core.array
 
 //
 // A simple Base64 encoding and decoding library. Currently

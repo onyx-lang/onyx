@@ -1,5 +1,11 @@
 package builtin
 
+#import runtime
+
+#if #defined(package core) {
+    #import core
+}
+
 //
 // Explanation of `package builtin`
 //

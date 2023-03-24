@@ -1,5 +1,4 @@
-#load "core/std"
-
+#import core
 use core
 
 Foo :: struct {

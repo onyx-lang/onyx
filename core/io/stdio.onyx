@@ -6,6 +6,8 @@
 // in anyway.
 package core
 
+#import runtime
+
 
 //
 // Ensure this file did not get included in a custom runtime, as it is

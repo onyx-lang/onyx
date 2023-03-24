@@ -1768,6 +1768,17 @@ static SymresStatus symres_file_contents(AstFileContents* fc) {
     return Symres_Success;
 }
 
+static SymresStatus symres_import(AstImport* import) {
+    SYMRES(package, import->imported_package);
+
+    symbol_introduce(
+            current_entity->scope,
+            bh_arr_last(import->imported_package->path),
+            (AstNode *) import->imported_package);
+
+    return Symres_Complete;
+}
+
 void symres_entity(Entity* ent) {
     current_entity = ent;
     if (ent->scope) scope_enter(ent->scope);
@@ -1804,6 +1815,9 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Use:                     ss = symres_use(ent->use);
                                                   next_state = Entity_State_Finalized;
                                                   break;
+
+        case Entity_Type_Import:                  ss = symres_import(ent->import); break;
+
 
         case Entity_Type_Polymorphic_Proc:        ss = symres_polyproc(ent->poly_proc);
                                                   next_state = Entity_State_Finalized;

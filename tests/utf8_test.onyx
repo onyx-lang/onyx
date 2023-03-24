@@ -1,5 +1,8 @@
-use core
-use core.encoding {utf8}
+#import core
+#import core.encoding.utf8
+#import runtime
+
+use core {print, println, printf}
 
 #inject runtime.vars.Enable_Heap_Debug :: true
 

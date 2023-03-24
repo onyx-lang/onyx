@@ -1,5 +1,7 @@
 package core.string
 
+#import core
+
 use core
 
 #doc "Generic procedure for turning something into a string."

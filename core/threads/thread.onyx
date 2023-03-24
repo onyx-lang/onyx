@@ -1,5 +1,8 @@
 package core.thread
 
+#import core
+#import runtime
+
 use core
 use core.intrinsics.atomics
 

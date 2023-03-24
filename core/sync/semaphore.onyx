@@ -1,5 +1,8 @@
 package core.sync
 
+#import runtime
+#import core
+
 use core.intrinsics.atomics
 
 //

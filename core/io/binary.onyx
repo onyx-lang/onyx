@@ -1,6 +1,7 @@
 package core.io
 
-use core
+#import core.memory
+
 
 BinaryWriter :: struct {
     stream: &Stream;

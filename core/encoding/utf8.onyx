@@ -1,6 +1,8 @@
 package core.encoding.utf8
 
-use core {string, array, iter}
+#import core.string
+#import core.array
+#import core.iter
 
 rune :: i32
 

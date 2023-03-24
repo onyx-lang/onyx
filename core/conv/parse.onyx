@@ -1,6 +1,10 @@
 package core.conv
 
-use core {map, string, array, math}
+#import core.map
+#import core.string
+#import core.array
+#import core.math
+#import runtime
 
 //
 // Parses many different types from a string into a value.

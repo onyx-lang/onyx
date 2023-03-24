@@ -1,5 +1,8 @@
 package runtime.platform
 
+#import core
+#import runtime
+
 use core
 use runtime {
     __runtime_initialize,

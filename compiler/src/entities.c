@@ -400,6 +400,14 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             break;
         }
 
+        case Ast_Kind_Import: {
+            ent.type = Entity_Type_Import;
+            ent.import = (AstImport *) node;
+            ent.state = Entity_State_Resolve_Symbols;
+            ENTITY_INSERT(ent);
+            break;
+        }
+
         default: {
             ent.type = Entity_Type_Expression;
             ent.expr = (AstTyped *) node;

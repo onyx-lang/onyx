@@ -1,5 +1,7 @@
 package runtime
 
+#import core
+
 use core
 use core.intrinsics.onyx { __initialize }
 use platform { __output_string }

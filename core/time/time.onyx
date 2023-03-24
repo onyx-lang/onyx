@@ -1,6 +1,10 @@
 package core.time
 
-use core {os, conv}
+#import core
+#import core.os
+#import core.conv
+#import runtime
+
 use runtime.platform {
     __time_gmtime,
     __time_localtime,

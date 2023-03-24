@@ -5,6 +5,9 @@
 
 #load "core/std"
 
+#import core
+#import runtime
+
 use core
 use core.intrinsics.onyx { init }
 
