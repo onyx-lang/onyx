@@ -301,6 +301,7 @@ compile_c_file :: (
             }
 
             case .Pointer do return "i32"; // This will also have to depend on the pointer size...
+            case .Multi_Pointer do return "i32"; // This will also have to depend on the pointer size...
             case .Function do assert(false, "Passing functions between wasm and c is not yet supported.");
             case .Array do return "i32";
             case .Slice do assert(false, "ASDFASDF");
@@ -352,6 +353,7 @@ compile_c_file :: (
             }
 
             case .Pointer do return "WASM_I32"; // This will also have to depend on the pointer size...
+            case .Multi_Pointer do return "WASM_I32"; // This will also have to depend on the pointer size...
             case .Function do assert(false, "Passing functions between wasm and c is not yet supported.");
             case .Array do return "WASM_I32";
             case .Slice do return "WASM_I32,WASM_I32";

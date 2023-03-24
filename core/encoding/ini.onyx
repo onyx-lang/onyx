@@ -109,7 +109,7 @@ parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, Ini
                 error(msg = aprintf("'{}' is not a valid section name.", stripped_section_name));
             }
 
-            active_item_ptr  = cast(&u8) output.data + member.offset;
+            active_item_ptr  = cast([&] u8) output.data + member.offset;
             active_item_type = member.type;
 
             parse_method := info.get_struct_method(active_item_type, "parse_ini");
@@ -137,7 +137,7 @@ parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, Ini
         assert(r->read_byte() == #char "=", "expected =");
 
         field := info.get_struct_member(active_item_type, string.strip_whitespace(field_name));
-        target := cast(&u8) active_item_ptr + field.offset;
+        target := cast([&] u8) active_item_ptr + field.offset;
         value_string := r->read_until(#char "\n", allocator=context.temp_allocator);
         parsed_successfully := conv.parse_any(target, field.type, value_string);
 
@@ -186,7 +186,7 @@ write_ini_file_inner :: (w: &io.Writer, output: any) -> bool {
         member_info := cast(&info.Type_Info_Struct) info.get_type_info(it.type);
         if member_info.kind != .Struct do continue;
 
-        member_data := cast(&u8) output.data + it.offset;
+        member_data := cast([&] u8) output.data + it.offset;
 
         if write_method := info.get_struct_method(it.type, "write_ini"); write_method != null {
             wm := *cast(&(rawptr, &io.Writer) -> bool) write_method.data;

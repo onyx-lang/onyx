@@ -134,7 +134,7 @@ write_type_name :: (writer: &io.Writer, t: type_expr) {
 is_pointer :: (t: type_expr) -> bool {
     if t == rawptr do return true;
     info := get_type_info(t);
-    return info.kind == .Pointer;
+    return info.kind == .Pointer || info.kind == .Multi_Pointer;
 }
 
 size_of :: (t: type_expr) -> u32 {
