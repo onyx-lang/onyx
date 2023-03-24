@@ -940,6 +940,14 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
                 continue; 
             }
 
+            // In the debug info, multi-pointers are just pointers.
+            if (type->kind == Type_Kind_MultiPointer) {
+                output_unsigned_integer(2, &section_buff);
+                output_unsigned_integer(1, &section_buff);
+                output_unsigned_integer(type->Pointer.elem->id, &section_buff);
+                continue; 
+            }
+
             if (type->kind == Type_Kind_Enum) {
                 output_unsigned_integer(8, &section_buff);
                 output_unsigned_integer(type->Enum.backing->id, &section_buff);

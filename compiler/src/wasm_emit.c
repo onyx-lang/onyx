@@ -48,6 +48,7 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
     if (type->kind == Type_Kind_Pointer)  return WASM_TYPE_PTR;
     if (type->kind == Type_Kind_Array)    return WASM_TYPE_PTR;
     if (type->kind == Type_Kind_Function) return WASM_TYPE_FUNC;
+    if (type->kind == Type_Kind_MultiPointer) return WASM_TYPE_PTR;
 
     if (type->kind == Type_Kind_Basic) {
         TypeBasic* basic = &type->Basic;
@@ -91,6 +92,7 @@ static b32 local_is_wasm_local(AstTyped* local) {
     if (local->type->kind == Type_Kind_Enum && local->type->Enum.backing->kind == Type_Kind_Basic) return 1;
     if (local->type->kind == Type_Kind_Distinct && local->type->Distinct.base_type->kind == Type_Kind_Basic) return 1;
     if (local->type->kind == Type_Kind_Pointer) return 1;
+    if (local->type->kind == Type_Kind_MultiPointer) return 1;
     return 0;
 }
 
@@ -972,7 +974,7 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     u32 alignment = type_get_alignment_log2(type);
 
     i32 store_size  = type_size_of(type);
-    i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
+    i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer || type->kind == Type_Kind_MultiPointer;
 
     if (is_basic && (type->Basic.flags & Basic_Flag_Pointer)) {
         WID(NULL, WI_I32_STORE, ((WasmInstructionData) { 2, offset }));
@@ -1082,7 +1084,7 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     assert(type);
 
     i32 load_size   = type_size_of(type);
-    i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
+    i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer || type->kind == Type_Kind_MultiPointer;
 
     WasmInstructionType instr = WI_NOP;
     i32 alignment = type_get_alignment_log2(type);
@@ -2699,19 +2701,19 @@ EMIT_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
     }
 
     if (source_expr->kind == Ast_Kind_Subscript
-        && source_expr->type->kind != Type_Kind_Pointer) {
+        && source_expr->type->kind != Type_Kind_Pointer && source_expr->type->kind != Type_Kind_MultiPointer) {
         u64 o2 = 0;
         emit_subscript_location(mod, &code, (AstSubscript *) source_expr, &o2);
         offset += o2;
 
     } else if ((source_expr->kind == Ast_Kind_Local || source_expr->kind == Ast_Kind_Param)
-        && source_expr->type->kind != Type_Kind_Pointer) {
+        && source_expr->type->kind != Type_Kind_Pointer && source_expr->type->kind != Type_Kind_MultiPointer) {
         u64 o2 = 0;
         emit_local_location(mod, &code, (AstLocal *) source_expr, &o2);
         offset += o2;
 
     } else if (source_expr->kind == Ast_Kind_Memres
-        && source_expr->type->kind != Type_Kind_Pointer) {
+        && source_expr->type->kind != Type_Kind_Pointer && source_expr->type->kind != Type_Kind_MultiPointer) {
         emit_memory_reservation_location(mod, &code, (AstMemRes *) source_expr);
 
     } else {
@@ -4127,6 +4129,7 @@ static char encode_type_as_dyncall_symbol(Type *t) {
 
     if (t->kind == Type_Kind_Slice)   return 's';
     if (t->kind == Type_Kind_Pointer) return 'p';
+    if (t->kind == Type_Kind_MultiPointer) return 'p';
     if (t->kind == Type_Kind_Enum)    return encode_type_as_dyncall_symbol(t->Enum.backing);
     if (t->kind == Type_Kind_Basic) {
         TypeBasic* basic = &t->Basic;

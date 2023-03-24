@@ -90,7 +90,7 @@ GC_Manually_Free_Magic_Number :: 0xface1337
     old: &GCLink;
 
     if oldptr != null {
-        old = (cast(&GCLink) oldptr) - 1;
+        old = (cast([&] GCLink) oldptr) - 1;
 
         //
         // If this allocated space was not from an gc allocator,
@@ -136,11 +136,11 @@ GC_Manually_Free_Magic_Number :: 0xface1337
         }
     }
 
-    return newptr + 1;
+    return cast([&] GCLink, newptr) + 1;
 }
 
 untrack :: (ptr: rawptr) -> bool {
-    link := (cast(&GCLink) ptr) - 1;
+    link: &GCLink = (cast([&] GCLink) ptr) - 1;
 
     if link.magic_number != GC_Link_Magic_Number {
         return false;

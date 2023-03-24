@@ -5,7 +5,7 @@ use package core
 parse_factor :: (file: &str) -> u64 {
 	string.strip_leading_whitespace(file);
 
-	switch *file.data {
+	switch file.data[0] {
 		case #char "0" .. #char "9" {
 			return conv.parse_int(file);
 		}
@@ -31,7 +31,7 @@ parse_expression_add :: (file: &str) -> u64 {
 	left := parse_factor(file);
 
 	string.strip_leading_whitespace(file);
-	while *file.data == #char "+" {
+	while file.data[0] == #char "+" {
 		op    := file.data[0];
         string.advance(file, 1);
 
@@ -51,7 +51,7 @@ parse_expression_mul :: (file: &str) -> u64 {
 	left := parse_expression_add(file);
 
     string.strip_leading_whitespace(file);
-	while *file.data == #char "*" {
+	while file.data[0] == #char "*" {
 		op    := file.data[0];
         string.advance(file, 1);
 

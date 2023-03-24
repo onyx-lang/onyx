@@ -133,7 +133,7 @@ as_iter :: (s: &Set) =>
 
         (ctx) => {
             if ctx.i >= ctx.s.entries.count {
-                return (typeof &ctx.s.entries.data.value).{}, false;
+                return (typeof &ctx.s.entries.data[0].value).{}, false;
             }
 
             defer ctx.i += 1;

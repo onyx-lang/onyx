@@ -182,6 +182,7 @@ static SymresStatus symres_type(AstType** type) {
         case Ast_Kind_Slice_Type:   SYMRES(type, &((AstSliceType *) *type)->elem); break;
         case Ast_Kind_DynArr_Type:  SYMRES(type, &((AstDynArrType *) *type)->elem); break;
         case Ast_Kind_VarArg_Type:  SYMRES(type, &((AstVarArgType *) *type)->elem); break;
+        case Ast_Kind_Multi_Pointer_Type: SYMRES(type, &((AstMultiPointerType *) *type)->elem); break;
 
         case Ast_Kind_Function_Type: {
             AstFunctionType* ftype = (AstFunctionType *) *type;

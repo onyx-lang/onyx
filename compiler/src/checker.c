@@ -1027,8 +1027,8 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
 
 static b32 binary_op_is_allowed(BinaryOp operation, Type* type) {
     static const u8 binop_allowed[Binary_Op_Count] = {
-        /* Add */             Basic_Flag_Numeric | Basic_Flag_Pointer,
-        /* Minus */           Basic_Flag_Numeric | Basic_Flag_Pointer,
+        /* Add */             Basic_Flag_Numeric | Basic_Flag_Multi_Pointer,
+        /* Minus */           Basic_Flag_Numeric | Basic_Flag_Multi_Pointer,
         /* Multiply */        Basic_Flag_Numeric,
         /* Divide */          Basic_Flag_Numeric,
         /* Modulus */         Basic_Flag_Integer,
@@ -1071,10 +1071,11 @@ static b32 binary_op_is_allowed(BinaryOp operation, Type* type) {
 
     enum BasicFlag effective_flags = 0;
     switch (type->kind) {
-        case Type_Kind_Basic:    effective_flags = type->Basic.flags;  break;
-        case Type_Kind_Pointer:  effective_flags = Basic_Flag_Pointer; break;
-        case Type_Kind_Enum:     effective_flags = Basic_Flag_Integer; break;
-        case Type_Kind_Function: effective_flags = Basic_Flag_Equality; break;
+        case Type_Kind_Basic:        effective_flags = type->Basic.flags;  break;
+        case Type_Kind_Pointer:      effective_flags = Basic_Flag_Pointer; break;
+        case Type_Kind_MultiPointer: effective_flags = Basic_Flag_Multi_Pointer; break;
+        case Type_Kind_Enum:         effective_flags = Basic_Flag_Integer; break;
+        case Type_Kind_Function:     effective_flags = Basic_Flag_Equality; break;
     }
 
     return (binop_allowed[operation] & effective_flags) != 0;
@@ -1290,13 +1291,13 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     }
 
     // NOTE: Handle basic pointer math.
-    if (type_is_pointer(binop->left->type)) {
+    if (type_is_multi_pointer(binop->left->type)) {
         if (binop->operation != Binary_Op_Add && binop->operation != Binary_Op_Minus) goto bad_binaryop;
 
         resolve_expression_type(binop->right);
         if (!type_is_integer(binop->right->type)) goto bad_binaryop;
 
-        AstNumLit* numlit = make_int_literal(context.ast_alloc, type_size_of(binop->left->type->Pointer.elem));
+        AstNumLit* numlit = make_int_literal(context.ast_alloc, type_size_of(binop->left->type->MultiPointer.elem));
         numlit->token = binop->right->token;
         numlit->type = binop->right->type;
 
@@ -1518,6 +1519,10 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         }
     }
     sl->flags |= Ast_Flag_Has_Been_Checked;
+
+    if (!type_is_ready_for_lookup(sl->type)) {
+        YIELD(sl->token->pos, "Waiting for structure type to be ready.");
+    }
 
     AstTyped** actual = sl->args.values;
     StructMember smem;

@@ -111,7 +111,7 @@ CSV_Column :: struct {
                 header := &any_headers[entry.index];
                 if header.offset == -1 do continue;
 
-                target := cast(&u8) &out + header.offset;
+                target := cast([&] u8) &out + header.offset;
 
                 if header.type == str {
                     *cast(&str) target = string.alloc_copy(entry.value);

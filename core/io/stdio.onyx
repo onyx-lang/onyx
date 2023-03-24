@@ -133,7 +133,7 @@ tprintf :: (format: str, va: ..any) -> str {
 __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
     temp: [3] u8;
 
-    u8_ptr := cast(&u8) ptr;
+    u8_ptr := cast([&] u8) ptr;
     for i: byte_count {
         val := u8_ptr[i];
 

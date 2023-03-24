@@ -186,7 +186,7 @@ get_freed_size :: () => {
         // and then marked an "manually managed", we can free the block
         // as normal here, but we have to go back some more bytes.
         if hb_ptr.magic_number == core.alloc.gc.GC_Manually_Free_Magic_Number  {
-            hb_ptr = ~~(cast(uintptr) (cast(&core.alloc.gc.GCLink, ptr) - 1) - sizeof heap_allocated_block);
+            hb_ptr = ~~(cast(uintptr) (cast([&] core.alloc.gc.GCLink, ptr) - 1) - sizeof heap_allocated_block);
         }
 
         #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(&heap_mutex);

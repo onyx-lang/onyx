@@ -1923,6 +1923,13 @@ static AstType* parse_type(OnyxParser* parser) {
                     new = make_node(AstSliceType, Ast_Kind_Slice_Type);
                     new->token = open_bracket;
 
+                } else if (parser->curr->type == '&' || parser->curr->type == '^') {
+                    consume_token(parser);
+
+                    new = make_node(AstMultiPointerType, Ast_Kind_Multi_Pointer_Type);
+                    new->flags |= Basic_Flag_Pointer;
+                    new->token = open_bracket;
+
                 } else if (parser->curr->type == Token_Type_Dot_Dot) {
                     new = make_node(AstDynArrType, Ast_Kind_DynArr_Type);
                     new->token = open_bracket;

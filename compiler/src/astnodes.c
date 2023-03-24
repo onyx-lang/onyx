@@ -36,6 +36,7 @@ static const char* ast_node_names[] = {
     "TYPE",
     "BASIC_TYPE",
     "POINTER_TYPE",
+    "MULTI POINTER TYPE",
     "FUNCTION_TYPE",
     "ARRAY TYPE",
     "SLICE TYPE",
@@ -1355,7 +1356,8 @@ TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
     AstTyped *node = *pnode;
 
     if ((node->type->kind == Type_Kind_Basic && node->type->Basic.kind == Basic_Kind_Rawptr)
-        || (node->type->kind == Type_Kind_Pointer)) {
+        || (node->type->kind == Type_Kind_Pointer)
+        || (node->type->kind == Type_Kind_MultiPointer)) {
         AstNumLit *zero = make_int_literal(context.ast_alloc, 0);
         zero->type = &basic_types[Basic_Kind_Rawptr];
 

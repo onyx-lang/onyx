@@ -69,6 +69,15 @@ static u64 build_type_table(OnyxWasmModule* module) {
                 break;
             }
 
+            case Type_Kind_MultiPointer: {
+                table_info[type_idx] = table_buffer.length;
+                bh_buffer_write_u32(&table_buffer, type->kind);
+                bh_buffer_write_u32(&table_buffer, type_size_of(type));
+                bh_buffer_write_u32(&table_buffer, type_alignment_of(type));
+                bh_buffer_write_u32(&table_buffer, type->MultiPointer.elem->id);
+                break;
+            }
+
             case Type_Kind_Array: {
                 table_info[type_idx] = table_buffer.length;
                 bh_buffer_write_u32(&table_buffer, type->kind);

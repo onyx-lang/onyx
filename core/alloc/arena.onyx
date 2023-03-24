@@ -49,7 +49,7 @@ arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, 
             
             alloc_arena.current_arena = new_arena;
 
-            return cast(rawptr) (cast(&u8) ret_arena + sizeof rawptr);
+            return cast(rawptr) (cast([&] u8) ret_arena + sizeof rawptr);
         }
 
         if alloc_arena.size % align != 0 {
@@ -67,7 +67,7 @@ arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, 
             alloc_arena.current_arena = new_arena;
         }
 
-        retval := cast(rawptr) (cast(&u8) alloc_arena.current_arena + alloc_arena.size);
+        retval := cast(rawptr) (cast([&] u8) alloc_arena.current_arena + alloc_arena.size);
         alloc_arena.size += size;
 
         return retval;

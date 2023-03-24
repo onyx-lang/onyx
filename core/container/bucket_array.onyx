@@ -11,8 +11,8 @@ Bucket_Array :: struct (T: type_expr) {
 
     Bucket :: struct (T: type_expr) {
         count : i32;
-        data : &T; // Actually an array of elements_per_bucket things, but putting that
-                   // that into the type system makes these cumbersome to work with.
+        data : [&] T; // Actually an array of elements_per_bucket things, but putting that
+                      // that into the type system makes these cumbersome to work with.
     }
 }
 

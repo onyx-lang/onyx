@@ -45,7 +45,7 @@ any_subscript :: (v: any, index: i32) -> any {
     }
 
     return any.{
-        cast(&u8) base_ptr + get_type_info(elem_type).size * index,
+        cast([&] u8) base_ptr + get_type_info(elem_type).size * index,
         elem_type
     };
 }
@@ -57,7 +57,7 @@ any_selector :: (v: any, member_name: str) -> any {
     if t.kind == .Struct {
         member := get_struct_member(v.type, member_name);
         if member != null {
-            return any.{cast(&u8) v.data + member.offset, member.type};
+            return any.{cast([&] u8) v.data + member.offset, member.type};
         }
     }
 
@@ -75,11 +75,11 @@ any_nested_selector :: (v: any, member_name: str) -> any {
     member := get_struct_member(v.type, part_name);
     if member {
         if next_name {
-            return any_nested_selector(any.{cast(&u8) v.data + member.offset, member.type}, next_name);
+            return any_nested_selector(any.{cast([&] u8) v.data + member.offset, member.type}, next_name);
         }
 
         return any.{
-            cast(&u8, v.data) + member.offset, member.type
+            cast([&] u8, v.data) + member.offset, member.type
         };
     }
 
@@ -139,7 +139,7 @@ any_iter :: (arr: any) -> Iterator(any) {
         (ctx: $T) -> (any, bool) {
             if ctx.index < ctx.count {
                 defer ctx.index += 1;
-                return any.{ cast(&u8) ctx.base_ptr + ctx.elem_size * ctx.index, ctx.elem_type }, true;
+                return any.{ cast([&] u8) ctx.base_ptr + ctx.elem_size * ctx.index, ctx.elem_type }, true;
             }
 
             return .{}, false;
