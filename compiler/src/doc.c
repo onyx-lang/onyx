@@ -218,7 +218,7 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
             if (((AstBasicType *) node)->basic_type == &type_auto_return) {
                 bh_buffer_write_string(buffer, "#auto");
             } else {
-                bh_buffer_write_string(buffer, ((AstBasicType *) node)->basic_type->Basic.name);
+                bh_buffer_write_string(buffer, (char *) ((AstBasicType *) node)->basic_type->Basic.name);
             }
             return;
 
@@ -256,7 +256,7 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
             return;
 
         case Ast_Kind_Poly_Call_Type:
-            if (((AstPolyCallType *) node)->callee == (AstNode *) builtin_optional_type) {
+            if (((AstPolyCallType *) node)->callee == (AstType *) builtin_optional_type) {
                 bh_buffer_write_string(buffer, "? ");
                 write_type_node(buffer, ((AstPolyCallType *) node)->params[0]);
                 return;
@@ -328,7 +328,7 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
     }
 
   unknown_case:
-    if (node) bh_buffer_write_string(buffer, onyx_ast_node_kind_string(node->kind));
+    if (node) bh_buffer_write_string(buffer, (char *) onyx_ast_node_kind_string(node->kind));
 }
 
 static void write_doc_notes(bh_buffer *buffer, AstBinding *binding) {
