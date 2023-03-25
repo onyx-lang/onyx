@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+#import core {*}
 
 key_arena : alloc.arena.ArenaState;
 key_alloc : Allocator;

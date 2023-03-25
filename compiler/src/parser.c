@@ -1494,18 +1494,16 @@ static AstReturn* parse_return_stmt(OnyxParser* parser) {
     return return_node;
 }
 
-static AstNode* parse_use_stmt(OnyxParser* parser) {
-    OnyxToken* use_token = expect_token(parser, Token_Type_Keyword_Use);
-    AstUse* use_node = make_node(AstUse, Ast_Kind_Use);
-    use_node->token = use_token;
-    use_node->expr = parse_expression(parser, 1);
-    if (!use_node->expr) return NULL;
-
+static b32 parse_use_stmt_internal(OnyxParser* parser, AstUse* use_node) {
     if (consume_token_if_next(parser, '{')) {
-        bh_arr_new(global_heap_allocator, use_node->only, 4);
+        if (next_tokens_are(parser, 2, '*', '}')) {
+            consume_tokens(parser, 2);
+            return 1;
+        }
 
+        bh_arr_new(global_heap_allocator, use_node->only, 4);
         while (!consume_token_if_next(parser, '}')) {
-            if (parser->hit_unexpected_token) return NULL;
+            if (parser->hit_unexpected_token) return 0;
 
             QualifiedUse qu;
             qu.as_name = expect_token(parser, Token_Type_Symbol);
@@ -1522,6 +1520,18 @@ static AstNode* parse_use_stmt(OnyxParser* parser) {
                 expect_token(parser, ',');
         }
     }
+
+    return 1;
+}
+
+static AstNode* parse_use_stmt(OnyxParser* parser) {
+    OnyxToken* use_token = expect_token(parser, Token_Type_Keyword_Use);
+    AstUse* use_node = make_node(AstUse, Ast_Kind_Use);
+    use_node->token = use_token;
+    use_node->expr = parse_expression(parser, 1);
+    if (!use_node->expr) return NULL;
+
+    if (!parse_use_stmt_internal(parser, use_node)) return NULL;
 
     if (use_node->expr->kind == Ast_Kind_Package) {
         ENTITY_SUBMIT(use_node);
@@ -3666,6 +3676,17 @@ static AstImport* parse_import_statement(OnyxParser* parser, OnyxToken *token) {
     if (!parse_package_name(parser, package_node)) return NULL;
 
     import_node->imported_package = package_node;
+
+    if (parser->curr->type == '{') {
+        AstUse *use_node = make_node(AstUse, Ast_Kind_Use);
+        use_node->token = parser->curr;
+        use_node->expr = (AstTyped *) package_node;
+
+        if (!parse_use_stmt_internal(parser, use_node)) return NULL;
+
+        import_node->implicit_use_node = use_node;
+        ENTITY_SUBMIT(use_node);
+    }
 
     return import_node;
 }

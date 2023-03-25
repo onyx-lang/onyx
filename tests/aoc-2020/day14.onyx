@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+#import core {*}
 
 MASK_SIZE :: 36
 Bitmask :: [MASK_SIZE] u8;

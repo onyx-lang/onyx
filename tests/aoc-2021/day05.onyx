@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+#import core {*}
 
 Line :: struct {
     x1, y1: i32;

@@ -1176,6 +1176,8 @@ struct AstImport {
     AstNode_base;
 
     AstPackage *imported_package;
+
+    AstUse *implicit_use_node;
 };
 
 

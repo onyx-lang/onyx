@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+#import core {*}
 
 power_mod :: (base: u32, exp: u32, mod: u32) -> u32 {
     t: u64 = 1;

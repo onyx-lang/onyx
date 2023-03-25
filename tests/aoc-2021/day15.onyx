@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+#import core {*}
 
 queued :: struct { x, y: i32; cost: i32; };
 #operator == (u1, u2: queued) => u1.x == u2.x && u1.y == u2.y;

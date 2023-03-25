@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+#import core {*}
 
 Communative_Pair :: struct (T: type_expr) where hash.Hashable(T) {
     a, b: T;

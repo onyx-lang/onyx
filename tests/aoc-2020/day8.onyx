@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+#import core {*}
 
 OpCode :: enum (u16) {
     Nop; Acc; Jmp;

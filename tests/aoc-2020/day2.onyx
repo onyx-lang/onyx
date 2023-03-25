@@ -2,7 +2,7 @@ package main
 
 #load "core/std"
 
-use package core
+#import core {*}
 
 main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day2.txt";

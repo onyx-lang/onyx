@@ -1,5 +1,5 @@
 #load "core/std"
-use package core
+#import core {*}
 
 Person_Vtable :: struct {
     greet: (&Person) -> void;

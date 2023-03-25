@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+#import core {*}
 
 main :: (args: [] cstr) {
     println(#defined(stdio));

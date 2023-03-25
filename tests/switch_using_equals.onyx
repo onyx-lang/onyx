@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+#import core {*}
 
 Vector2 :: struct { x, y: i32; }
 #operator == macro (v1: Vector2, v2: Vector2) => v1.x == v2.x && v1.y == v2.y;

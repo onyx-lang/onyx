@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+#import core {*}
 
 part_1 :: (contents: &str) -> u32 {
     chars : [26] bool;

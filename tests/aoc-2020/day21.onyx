@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+#import core {*}
 
 /*
 	What questions the data layout needs to answer easily:

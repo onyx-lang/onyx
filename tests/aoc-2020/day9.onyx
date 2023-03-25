@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+#import core {*}
 
 find_contiguous_subarray_with_sum :: (nums: [..] u64, sum: u64) -> (i32, i32) {
     start := 0;
