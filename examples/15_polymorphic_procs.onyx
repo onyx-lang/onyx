@@ -59,7 +59,8 @@ compose :: (a: $A, f: (A) -> $B, g: (B) -> $C) -> C {
 
 #load "core/std"
 
-use package core
+#import core
+use core
 
 main :: (args: [] cstr) {
 }

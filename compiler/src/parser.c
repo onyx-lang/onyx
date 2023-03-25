@@ -566,6 +566,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         }
 
         case Token_Type_Keyword_Package: {
+            onyx_report_warning(peek_token(-1)->pos, "Use of deprecated feature: package expression.");
             retval = (AstTyped *) parse_package_expression(parser);
             break;
         }
@@ -1498,6 +1499,7 @@ static AstNode* parse_use_stmt(OnyxParser* parser) {
     AstUse* use_node = make_node(AstUse, Ast_Kind_Use);
     use_node->token = use_token;
     use_node->expr = parse_expression(parser, 1);
+    if (!use_node->expr) return NULL;
 
     if (consume_token_if_next(parser, '{')) {
         bh_arr_new(global_heap_allocator, use_node->only, 4);
@@ -1723,6 +1725,14 @@ static AstNode* parse_statement(OnyxParser* parser) {
                 AstDirectiveRemove *remove = make_node(AstDirectiveRemove, Ast_Kind_Directive_Remove);
                 remove->token = parser->curr - 2;
                 retval = (AstNode *) remove;
+                break;
+            }
+
+            if (parse_possible_directive(parser, "import")) {
+                // :LinearTokenDependent
+                retval = (AstNode *) parse_import_statement(parser, parser->curr - 2);
+                ENTITY_SUBMIT(retval);
+                needs_semicolon = 0;
                 break;
             }
 

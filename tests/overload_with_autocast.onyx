@@ -1,6 +1,7 @@
 #load "core/std"
 
-use package core
+#import core
+use core {println}
 
 overloaded :: #match {
     (x: str, y: i32) do println("Called str, i32"); ,

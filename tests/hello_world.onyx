@@ -2,7 +2,8 @@ package main
 
 #load "core/std"
 
-use package core
+#import core
+use core
 
 main :: (args: [] cstr) {
     println("Hello, World!");

@@ -1,6 +1,7 @@
 #load "core/std"
 
-use package core
+#import core
+use core {println, printf}
 
 some_function :: () -> f32 {
     println("In some function!");

@@ -2,10 +2,6 @@ package builtin
 
 #import runtime
 
-#if #defined(package core) {
-    #import core
-}
-
 //
 // Explanation of `package builtin`
 //
@@ -201,6 +197,8 @@ default_log_level :: (level: Log_Level) {
 
 #if runtime.runtime != .Custom {
     #local default_logger_proc :: (logger: &Default_Logger, level: Log_Level, msg: str, module: str) {
+        #import core;
+
         if level < logger.minimum_level do return;
 
         if module {
@@ -267,12 +265,14 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 // This cannot be used in a custom runtime, as the other core
 // packages are not included.
 #if runtime.runtime != .Custom {
+    #import core
+    #import core.memory
+
     new :: #match #local {}
 
     #overload
     new :: ($T: type_expr, allocator := context.allocator) -> &T {
-        use package core.intrinsics.onyx { __initialize }
-        memory :: package core.memory
+        use core.intrinsics.onyx { __initialize }
 
         res := cast(&T) raw_alloc(allocator, sizeof T);
         memory.set(res, 0, sizeof T);
@@ -283,8 +283,7 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 
     #overload
     new :: (T: type_expr, allocator := context.allocator) -> rawptr {
-        memory :: package core.memory
-        type_info :: package runtime.info
+        type_info :: runtime.info
 
         info := type_info.get_type_info(T);
         size := type_info.size_of(T);
@@ -451,12 +450,12 @@ Code :: struct {_:i32;}
 // remove some confusion around the 3 different array types as dynamic arrays would clearly just be
 // normal structures. With the recent addition of macros and iterators, there really wouldn't be much
 // difference anyway.
-#if #defined((package core.map).Map) {
-    Map :: (package core.map).Map;
+#if #defined(core.map.Map) {
+    Map :: core.map.Map;
 }
 
-#if #defined((package core.set).Set) {
-    Set :: (package core.set).Set;
+#if #defined(core.set.Set) {
+    Set :: core.set.Set;
 }
 
 

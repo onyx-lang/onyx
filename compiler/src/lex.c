@@ -38,7 +38,6 @@ static const char* token_type_names[] = {
     "macro",
     "interface",
     "where",
-    "import",
     "", // end
 
     "->",

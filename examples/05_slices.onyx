@@ -7,7 +7,8 @@
 
 #load "core/std"
 
-use package core
+#import core
+use core
 
 main :: (args: [] cstr) {
     // A dummy array to demonstrate.

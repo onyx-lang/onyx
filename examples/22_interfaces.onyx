@@ -135,6 +135,6 @@ main :: (args) => {
 }
 
 #load "core/std"
-
-use package core
-use package core.intrinsics.onyx
+#import core
+use core
+use core.intrinsics.onyx

@@ -974,6 +974,10 @@ static SymresStatus symres_statement(AstNode** stmt, b32 *remove) {
             SYMRES(use, (AstUse *) *stmt);
             break;
 
+        case Ast_Kind_Import:
+            if (remove) *remove = 1;
+            break;
+
         default: SYMRES(expression, (AstTyped **) stmt); break;
     }
 

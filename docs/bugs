@@ -125,7 +125,7 @@ List of known bugs:
     use_package_breaking :: () {
         println("Test 1");
 
-        use package foo
+        use foo
 
         println("Test 2");
     }

@@ -16,7 +16,8 @@
 
 #load "core/std"
 
-use package core
+#import core
+use core
 
 main :: (args: [] cstr) {
     // Here are the uses of 'use' currently.
@@ -25,15 +26,15 @@ main :: (args: [] cstr) {
         // You can 'use' a package. You hopefully already knew this.
         // This brings in all the symbols from the core.alloc package into
         // this scope.
-        use package core.alloc
+        use core.alloc
 
         // You can also restrict and partially rename the symbols that collide
-        use package core.string { string_free :: free }
+        use core.string { string_free :: free }
     }
 
     {
         // You can also 'use' a package that is a subpackage of another package. Here, 'string'
-        // is a subpackage of 'core' and the above 'use package core' makes this package
+        // is a subpackage of 'core' and the above 'use core' makes this package
         // available for you to write code like 'string.equal(...)'. However, because it is
         // a namespace, you can 'use' it.
         use string

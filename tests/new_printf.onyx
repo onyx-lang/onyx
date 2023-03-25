@@ -1,7 +1,7 @@
 #load "core/std"
 
-use package core
+#import core
 
 main :: (args: [] cstr) {
-    printf("{} {} {{}} {} {.1} {.5} {}\n", 123, "Test", false, 12.34, 12.3456789, [..] map.Map(i32, str));
+    core.printf("{} {} {{}} {} {.1} {.5} {}\n", 123, "Test", false, 12.34, 12.3456789, [..] map.Map(i32, str));
 }

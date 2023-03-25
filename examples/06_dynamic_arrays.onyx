@@ -9,7 +9,8 @@
 
 #load "core/std"
 
-use package core
+#import core
+use core
 
 main :: (args: [] cstr) {
     // Declaring dynamic arrays in Onyx looks like this. The

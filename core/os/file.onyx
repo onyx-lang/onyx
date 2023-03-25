@@ -9,7 +9,8 @@ package core.os
 
 use core
 
-#local fs :: package runtime.platform
+
+#local fs :: runtime.platform
 
 
 FileError :: enum {

@@ -1,6 +1,8 @@
 #load "core/std"
 
-use package core
+#import core
+#import core.io
+use core {println}
 
 main :: (args: [] cstr) {
     some_string := "This is a test string that can be read.\n\n\n\n\n\n1234 4567";

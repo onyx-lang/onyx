@@ -117,6 +117,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Directive_Remove: return sizeof(AstDirectiveRemove);
         case Ast_Kind_Directive_First: return sizeof(AstDirectiveFirst);
         case Ast_Kind_Directive_Export_Name: return sizeof(AstDirectiveExportName);
+        case Ast_Kind_Import: return sizeof(AstImport);
         case Ast_Kind_Count: return 0;
     }
 

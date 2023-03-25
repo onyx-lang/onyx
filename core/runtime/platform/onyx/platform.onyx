@@ -2,6 +2,7 @@ package runtime.platform
 
 #import core
 #import runtime
+#import main
 
 use core
 use runtime {
@@ -104,8 +105,8 @@ __start :: () {
     __runtime_initialize();
     context.thread_id = 0;
 
-    #if (typeof (package main).main) == #type () -> void {
-        (package main).main();
+    #if (typeof main.main) == #type () -> void {
+        main.main();
 
     } else {
         args : [] cstr;
@@ -116,7 +117,7 @@ __start :: () {
         argv_buf := cast(cstr) calloc(argv_buf_size);
         __args_get(args.data, argv_buf);
 
-        (package main).main(args);
+        main.main(args);
     }
 
     __flush_stdio();

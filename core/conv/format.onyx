@@ -21,7 +21,7 @@ custom_formatters_initialized :: #init () {
     map.init(&custom_parsers,    default=null_proc);
 
     #if Enable_Custom_Formatters {
-        use package runtime.info;
+        use runtime.info;
 
         for type_idx: type_table.count {
             type := type_table[type_idx];

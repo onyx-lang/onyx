@@ -1,6 +1,7 @@
 #load "core/std"
 
-use package core
+#import core
+use core
 
 foo :: () -> (i32, i32) {
     return 50, 60;
