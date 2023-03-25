@@ -78,7 +78,7 @@ static AstBinding*    parse_top_level_binding(OnyxParser* parser, OnyxToken* sym
 static void           parse_top_level_statement(OnyxParser* parser);
 static AstPackage*    parse_package_expression(OnyxParser* parser);
 static void           parse_top_level_statements_until(OnyxParser* parser, TokenType tt);
-static AstImport*     parse_import_statement(OnyxParser* parser, OnyxToken *token);
+static void           parse_import_statement(OnyxParser* parser, OnyxToken *token);
 
 static void consume_token(OnyxParser* parser) {
     if (parser->hit_unexpected_token) return;
@@ -1740,8 +1740,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
 
             if (parse_possible_directive(parser, "import")) {
                 // :LinearTokenDependent
-                retval = (AstNode *) parse_import_statement(parser, parser->curr - 2);
-                ENTITY_SUBMIT(retval);
+                parse_import_statement(parser, parser->curr - 2);
                 needs_semicolon = 0;
                 break;
             }
@@ -3548,8 +3547,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 return;
             }
             else if (parse_possible_directive(parser, "import")) {
-                AstImport *import = parse_import_statement(parser, dir_token);
-                ENTITY_SUBMIT(import);
+                parse_import_statement(parser, dir_token);
                 return;
             }
             else {
@@ -3663,32 +3661,31 @@ static AstPackage* parse_package_expression(OnyxParser* parser) {
     return package_node;
 }
 
-static AstImport* parse_import_statement(OnyxParser* parser, OnyxToken *token) {
-    AstImport* import_node = make_node(AstImport, Ast_Kind_Import);
-    import_node->flags |= Ast_Flag_Comptime;
-    import_node->token = token;
-    
+static void parse_import_statement(OnyxParser* parser, OnyxToken *token) {
     AstPackage* package_node = make_node(AstPackage, Ast_Kind_Package);
     package_node->flags |= Ast_Flag_Comptime;
     package_node->type_node = builtin_package_id_type;
     package_node->token = token;
 
-    if (!parse_package_name(parser, package_node)) return NULL;
-
-    import_node->imported_package = package_node;
+    if (!parse_package_name(parser, package_node)) return;
 
     if (parser->curr->type == '{') {
         AstUse *use_node = make_node(AstUse, Ast_Kind_Use);
-        use_node->token = parser->curr;
+        use_node->token = token;
         use_node->expr = (AstTyped *) package_node;
 
-        if (!parse_use_stmt_internal(parser, use_node)) return NULL;
+        if (!parse_use_stmt_internal(parser, use_node)) return;
 
-        import_node->implicit_use_node = use_node;
         ENTITY_SUBMIT(use_node);
-    }
 
-    return import_node;
+    } else {
+        AstImport* import_node = make_node(AstImport, Ast_Kind_Import);
+        import_node->flags |= Ast_Flag_Comptime;
+        import_node->token = token;
+        import_node->imported_package = package_node;
+
+        ENTITY_SUBMIT(import_node);
+    }
 }
 
 static Package* parse_file_package(OnyxParser* parser) {
