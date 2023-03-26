@@ -1,5 +1,4 @@
-#import core
-use core
+use core {package, *}
 
 q :: (v: &$C, g: (&C) -> $T) {
     println(*v);

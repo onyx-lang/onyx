@@ -2,9 +2,7 @@
 
 PART :: 2
 
-#import core
-
-use core
+use core {package, *}
 use core.alloc {arena}
 
 num_allocator: Allocator;

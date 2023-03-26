@@ -1,7 +1,6 @@
 package runtime.platform
 
-#import core
-use core
+#import core {*}
 
 FileData :: #distinct i64
 DirectoryData :: #distinct u64

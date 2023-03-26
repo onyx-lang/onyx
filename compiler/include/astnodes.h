@@ -48,7 +48,6 @@
                                \
     NODE(Return)               \
     NODE(Jump)                 \
-    NODE(Use)                  \
                                \
     NODE(Block)                \
     NODE(IfWhile)              \
@@ -208,7 +207,7 @@ typedef enum AstKind {
     Ast_Kind_For,
     Ast_Kind_While,
     Ast_Kind_Jump,
-    Ast_Kind_Use,
+    // Ast_Kind_Use,
     Ast_Kind_Defer,
     Ast_Kind_Switch,
     Ast_Kind_Switch_Case,
@@ -777,16 +776,16 @@ struct AstDirectiveSolidify {
 struct AstReturn        { AstNode_base; AstTyped* expr; u32 count; }; // Note: This count is one less than it should be, because internal codegen with macros would have to know about this and that is error prone.
 struct AstJump          { AstNode_base; JumpType jump; u32 count; };
 
-typedef struct QualifiedUse {
-    OnyxToken* symbol_name;
-    OnyxToken* as_name;
-} QualifiedUse;
-struct AstUse           {
-    AstNode_base;
-
-    AstTyped* expr;
-    bh_arr(QualifiedUse) only;
-};
+// typedef struct QualifiedUse {
+//     OnyxToken* symbol_name;
+//     OnyxToken* as_name;
+// } QualifiedUse;
+// struct AstUse           {
+//     AstNode_base;
+// 
+//     AstTyped* expr;
+//     bh_arr(QualifiedUse) only;
+// };
 
 // Structure Nodes
 struct AstBlock         {
@@ -1172,12 +1171,30 @@ struct AstPackage {
     Package* package;
 };
 
+typedef struct QualifiedImport {
+    OnyxToken* symbol_name;
+    OnyxToken* as_name;
+} QualifiedImport;
+
 struct AstImport {
     AstNode_base;
 
     AstPackage *imported_package;
 
-    AstUse *implicit_use_node;
+    bh_arr(QualifiedImport) only;
+
+    // When true, it means a list of imports
+    // was specified and the top-level package
+    // should not be imported.
+    b32 specified_imports;
+
+    // When true, even if a list of specified
+    // imports was given, the package name should
+    // also be imported.
+    //
+    //     use core {package, *}
+    //
+    b32 also_import_package;
 };
 
 
@@ -1540,7 +1557,6 @@ typedef struct Entity {
         AstPolyQuery          *poly_query;
         AstForeignBlock       *foreign_block;
         AstMacro              *macro;
-        AstUse                *use;
         AstInterface          *interface;
         AstConstraint         *constraint;
         AstDirectiveLibrary   *library;

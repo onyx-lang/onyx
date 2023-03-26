@@ -4,10 +4,8 @@ package core.os
     #error "Cannot include this file. Platform not supported.";
 }
 
-#import core
-#import runtime
-
-use core
+use core {*}
+use runtime
 
 
 #local fs :: runtime.platform

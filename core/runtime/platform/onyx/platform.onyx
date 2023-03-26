@@ -1,11 +1,9 @@
 package runtime.platform
 
-#import core
-#import runtime
-#import main
-
-use core
+use main
+use core {package, *}
 use runtime {
+    package,
     __runtime_initialize,
     Multi_Threading_Enabled,
     _thread_start,

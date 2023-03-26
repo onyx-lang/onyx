@@ -1,5 +1,7 @@
 package core.memory
 
+use core
+
 //
 // Re-exports the memory_copy intrinsics. Behaves like memmove() in C.
 copy :: core.intrinsics.wasm.memory_copy

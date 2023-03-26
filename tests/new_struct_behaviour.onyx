@@ -71,11 +71,12 @@ main :: (args: [] cstr) {
     {
         BasicallyANamespace.function_3();
 
-        use BasicallyANamespace;
-        function_2();
+        // TODO: Revisit this test case when `use struct` is added.
+        // use BasicallyANamespace;
+        BasicallyANamespace.function_2();
 
-        use SubNamespace;
-        function_4();
+        // use SubNamespace;
+        BasicallyANamespace.SubNamespace.function_4();
     }
 
 

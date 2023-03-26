@@ -1,10 +1,10 @@
 package core.encoding.osad
 
-#import core.io
-#import core.string
-#import core.array
-#import core.memory
-#import runtime
+use core.io
+use core.string
+use core.array
+use core.memory
+use runtime
 
 use runtime {
     type_info :: info

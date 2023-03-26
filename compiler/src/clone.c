@@ -100,7 +100,6 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_For: return sizeof(AstFor);
         case Ast_Kind_While: return sizeof(AstIfWhile);
         case Ast_Kind_Jump: return sizeof(AstJump);
-        case Ast_Kind_Use: return sizeof(AstUse);
         case Ast_Kind_Defer: return sizeof(AstDefer);
         case Ast_Kind_Switch: return sizeof(AstSwitch);
         case Ast_Kind_Switch_Case: return sizeof(AstSwitchCase);
@@ -523,10 +522,6 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             dc->phase = Constraint_Phase_Waiting_To_Be_Queued;
             break;
         }
-
-        case Ast_Kind_Use:
-            C(AstUse, expr);
-            break;
 
         case Ast_Kind_Directive_Solidify: {
             AstDirectiveSolidify* dd = (AstDirectiveSolidify *) nn;

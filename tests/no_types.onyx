@@ -2,10 +2,7 @@
 // No types are written throughout this entire program.
 //
 
-#load "core/std"
-
-#import core
-use core
+use core {*}
 
 main :: () {
     object := .{

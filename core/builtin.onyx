@@ -197,7 +197,7 @@ default_log_level :: (level: Log_Level) {
 
 #if runtime.runtime != .Custom {
     #local default_logger_proc :: (logger: &Default_Logger, level: Log_Level, msg: str, module: str) {
-        #import core;
+        use core;
 
         if level < logger.minimum_level do return;
 
@@ -265,8 +265,8 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 // This cannot be used in a custom runtime, as the other core
 // packages are not included.
 #if runtime.runtime != .Custom {
-    #import core
-    #import core.memory
+    use core
+    use core.memory
 
     new :: #match #local {}
 

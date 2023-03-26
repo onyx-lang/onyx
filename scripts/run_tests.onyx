@@ -5,10 +5,8 @@
 
 #load "core/std"
 
-#import core
-#import runtime
-
-use core
+use runtime
+use core {package, *}
 use core.intrinsics.onyx { init }
 
 Color :: enum {
@@ -123,7 +121,7 @@ main :: (args) => {
 
     iter.parallel_for(cases, settings.threads, &exec_context) {
         // Weird macros mean I have to forward external names
-        use core
+        use core {*}
         print_color :: print_color;
 
         args: [] str;

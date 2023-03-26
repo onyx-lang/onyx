@@ -84,7 +84,7 @@ static const char* ast_node_names[] = {
     "FOR",
     "WHILE",
     "JUMP",
-    "USE",
+    // "USE",
     "DEFER",
     "SWITCH",
     "CASE",

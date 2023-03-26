@@ -1,7 +1,7 @@
 package core.math
 
-#import core
-#import core.intrinsics.wasm
+use core
+use core.intrinsics.wasm
 
 // Things that are useful in any math library:
 //  - Trigonometry

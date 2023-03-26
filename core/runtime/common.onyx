@@ -1,10 +1,8 @@
 package runtime
 
-#import core
-
-use core
+use core {package, *}
 use core.intrinsics.onyx { __initialize }
-use platform { __output_string }
+use runtime.platform { __output_string }
 
 //
 // Export the __start function from the platform layer.

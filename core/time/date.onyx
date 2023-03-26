@@ -1,8 +1,7 @@
 package core.time
 
-#import core
-#import runtime
-use core
+use core {package, *}
+use runtime
 
 Date :: struct {
     year: i32;

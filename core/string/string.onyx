@@ -1,8 +1,6 @@
 package core.string
 
-#import core
-
-use core
+use core {package, *}
 
 #doc "Generic procedure for turning something into a string."
 as_str :: #match -> str {}

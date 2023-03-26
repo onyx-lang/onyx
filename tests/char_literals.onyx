@@ -1,5 +1,4 @@
-#import core
-use core
+use core {*}
 
 
 main :: () {

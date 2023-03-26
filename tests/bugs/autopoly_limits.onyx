@@ -1,5 +1,4 @@
-#import core
-use core
+use core {package, *}
 
 f :: ctx => {
     x, y := 123, 456.0f;

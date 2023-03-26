@@ -299,19 +299,6 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             break;
         }
 
-        case Ast_Kind_Use: {
-            if (((AstUse *) node)->expr->kind == Ast_Kind_Package) {
-                ent.state = Entity_State_Resolve_Symbols;
-                ent.type = Entity_Type_Use_Package;
-            } else {
-                ent.type = Entity_Type_Use;
-            }
-
-            ent.use = (AstUse *) node;
-            ENTITY_INSERT(ent);
-            break;
-        }
-
         case Ast_Kind_Memres: {
             ent.type = Entity_Type_Memory_Reservation_Type;
             ent.mem_res = (AstMemRes *) node;

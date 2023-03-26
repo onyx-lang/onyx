@@ -1,5 +1,4 @@
-#import core
-use core
+use core {package, *}
 
 Foo :: struct {
     use vtable: &VTable;
