@@ -1194,7 +1194,16 @@ struct AstImport {
     //
     //     use core {package, *}
     //
-    b32 also_import_package;
+    b32 import_package_itself;
+
+    // Set to be the symbol that the package will
+    // be imported as. If NULL, the last token of
+    // the package path is used. The following
+    // imports the core package as C.
+    // 
+    //     use core { C :: package }
+    //
+    OnyxToken *qualified_package_name;
 };
 
 

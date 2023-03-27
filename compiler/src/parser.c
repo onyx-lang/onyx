@@ -3619,14 +3619,23 @@ static void parse_import_statement(OnyxParser* parser, OnyxToken *token) {
     import_node->flags |= Ast_Flag_Comptime;
     import_node->token = token;
     import_node->imported_package = package_node;
-    import_node->also_import_package = 1;
+    import_node->import_package_itself = 1;
 
     if (consume_token_if_next(parser, '{')) {
         import_node->specified_imports = 1;
-        import_node->also_import_package = 0;
+        import_node->import_package_itself = 0;
 
-        if (consume_token_if_next(parser, Token_Type_Keyword_Package)) {
-            import_node->also_import_package = 1;
+        if (next_tokens_are(parser, 4, Token_Type_Symbol, ':', ':', Token_Type_Keyword_Package)) {
+            import_node->qualified_package_name = expect_token(parser, Token_Type_Symbol);
+            consume_tokens(parser, 3);
+
+            import_node->import_package_itself = 1;
+            if (parser->curr->type != '}')
+                expect_token(parser, ',');
+        }
+
+        else if (consume_token_if_next(parser, Token_Type_Keyword_Package)) {
+            import_node->import_package_itself = 1;
             if (parser->curr->type != '}')
                 expect_token(parser, ',');
         }
