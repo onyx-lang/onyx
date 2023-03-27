@@ -207,7 +207,6 @@ typedef enum AstKind {
     Ast_Kind_For,
     Ast_Kind_While,
     Ast_Kind_Jump,
-    // Ast_Kind_Use,
     Ast_Kind_Defer,
     Ast_Kind_Switch,
     Ast_Kind_Switch_Case,
@@ -775,17 +774,6 @@ struct AstDirectiveSolidify {
 // Intruction Node
 struct AstReturn        { AstNode_base; AstTyped* expr; u32 count; }; // Note: This count is one less than it should be, because internal codegen with macros would have to know about this and that is error prone.
 struct AstJump          { AstNode_base; JumpType jump; u32 count; };
-
-// typedef struct QualifiedUse {
-//     OnyxToken* symbol_name;
-//     OnyxToken* as_name;
-// } QualifiedUse;
-// struct AstUse           {
-//     AstNode_base;
-// 
-//     AstTyped* expr;
-//     bh_arr(QualifiedUse) only;
-// };
 
 // Structure Nodes
 struct AstBlock         {

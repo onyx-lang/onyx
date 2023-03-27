@@ -55,16 +55,8 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
 
         shput(context.packages, pac_name, package);
 
-        // if (!charset_contains(pac_name, '.')) {
-        //     AstPackage* package_node = onyx_ast_node_new(alloc, sizeof(AstPackage), Ast_Kind_Package);
-        //     package_node->package_name = package->name;
-        //     package_node->package = package;
-        //     package_node->type_node = builtin_package_id_type;
-        //     package_node->flags |= Ast_Flag_Comptime;
-
-        //     symbol_raw_introduce(context.global_scope, pac_name, pos, (AstNode *) package_node);
-        // }
-
+        // The builtin package is special. The 'builtin' symbol will be
+        // accessible even if you do not `use builtin`.
         if (!strcmp(pac_name, "builtin")) {
             AstPackage* package_node = onyx_ast_node_new(alloc, sizeof(AstPackage), Ast_Kind_Package);
             package_node->package_name = package->name;
