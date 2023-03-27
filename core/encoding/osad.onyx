@@ -1,7 +1,11 @@
 package core.encoding.osad
 
+use core.io
+use core.string
+use core.array
+use core.memory
+use runtime
 
-use core {io, string, array, memory}
 use runtime {
     type_info :: info
 }

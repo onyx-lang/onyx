@@ -1,4 +1,10 @@
+use core.string
+use core.conv
 use core
+
+use core {
+    println
+}
 
 
 main :: () {

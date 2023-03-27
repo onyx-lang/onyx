@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+use core {*}
 
 base16_to_hex :: (s: str) -> u32 {
     res := 0;

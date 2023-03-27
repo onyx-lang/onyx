@@ -1,7 +1,8 @@
 package core.thread
 
-use core
-use core.intrinsics.atomics
+use runtime
+use core {*}
+use core.intrinsics.atomics {*}
 
 #package {
     thread_mutex   : sync.Mutex;

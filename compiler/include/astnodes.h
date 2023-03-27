@@ -48,7 +48,6 @@
                                \
     NODE(Return)               \
     NODE(Jump)                 \
-    NODE(Use)                  \
                                \
     NODE(Block)                \
     NODE(IfWhile)              \
@@ -107,6 +106,7 @@
     NODE(ForeignBlock)         \
                                \
     NODE(Package)              \
+    NODE(Import)               \
                                \
     NODE(ZeroValue)
 
@@ -132,6 +132,7 @@ typedef enum AstKind {
     Ast_Kind_Load_Path,
     Ast_Kind_Load_All,
     Ast_Kind_Library_Path,
+    Ast_Kind_Import,
     Ast_Kind_Memres,
 
     Ast_Kind_Binding,
@@ -206,7 +207,6 @@ typedef enum AstKind {
     Ast_Kind_For,
     Ast_Kind_While,
     Ast_Kind_Jump,
-    Ast_Kind_Use,
     Ast_Kind_Defer,
     Ast_Kind_Switch,
     Ast_Kind_Switch_Case,
@@ -775,17 +775,6 @@ struct AstDirectiveSolidify {
 struct AstReturn        { AstNode_base; AstTyped* expr; u32 count; }; // Note: This count is one less than it should be, because internal codegen with macros would have to know about this and that is error prone.
 struct AstJump          { AstNode_base; JumpType jump; u32 count; };
 
-typedef struct QualifiedUse {
-    OnyxToken* symbol_name;
-    OnyxToken* as_name;
-} QualifiedUse;
-struct AstUse           {
-    AstNode_base;
-
-    AstTyped* expr;
-    bh_arr(QualifiedUse) only;
-};
-
 // Structure Nodes
 struct AstBlock         {
     AstNode_base;
@@ -1170,6 +1159,42 @@ struct AstPackage {
     Package* package;
 };
 
+typedef struct QualifiedImport {
+    OnyxToken* symbol_name;
+    OnyxToken* as_name;
+} QualifiedImport;
+
+struct AstImport {
+    AstNode_base;
+
+    AstPackage *imported_package;
+
+    bh_arr(QualifiedImport) only;
+
+    // When true, it means a list of imports
+    // was specified and the top-level package
+    // should not be imported.
+    b32 specified_imports;
+
+    // When true, even if a list of specified
+    // imports was given, the package name should
+    // also be imported.
+    //
+    //     use core {package, *}
+    //
+    b32 import_package_itself;
+
+    // Set to be the symbol that the package will
+    // be imported as. If NULL, the last token of
+    // the package path is used. The following
+    // imports the core package as C.
+    // 
+    //     use core { C :: package }
+    //
+    OnyxToken *qualified_package_name;
+};
+
+
 //
 // Polymorphic procedures
 //
@@ -1458,6 +1483,7 @@ typedef enum EntityType {
     Entity_Type_Load_File,
     Entity_Type_Binding,
     Entity_Type_Use_Package,
+    Entity_Type_Import,
     Entity_Type_Static_If,
     Entity_Type_String_Literal,
     Entity_Type_File_Contents,
@@ -1511,6 +1537,7 @@ typedef struct Entity {
     union {
         AstDirectiveError     *error;
         AstInclude            *include;
+        AstImport             *import;
         AstBinding            *binding;
         AstIf                 *static_if;
         AstFunction           *function;
@@ -1527,7 +1554,6 @@ typedef struct Entity {
         AstPolyQuery          *poly_query;
         AstForeignBlock       *foreign_block;
         AstMacro              *macro;
-        AstUse                *use;
         AstInterface          *interface;
         AstConstraint         *constraint;
         AstDirectiveLibrary   *library;

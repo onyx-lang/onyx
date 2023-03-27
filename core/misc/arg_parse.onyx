@@ -22,14 +22,18 @@ package core.arg_parse
 // false and are true if one or more of the option values are present.
 //
 
-use core
+use core {package, printf}
+use core.iter
+use core.conv
+use core.string
+use runtime
 
 arg_parse :: (c_args: [] cstr, output: any) -> bool {
     arg_iter := iter.as_iter(c_args)
              |> iter.map(string.from_cstr);
     defer arg_iter.close(arg_iter.data);
 
-    use runtime.info;
+    use runtime.info {*};
 
     ptr_type := cast(&Type_Info_Pointer) get_type_info(output.type);
     if ptr_type.kind != .Pointer do return false;

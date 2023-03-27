@@ -4,7 +4,9 @@ package core.os
     #error "Cannot include this file. Platform not supported.";
 }
 
-use core {string}
+use core.string
+use runtime
+
 #local fs :: runtime.platform
 
 Directory :: fs.DirectoryData;

@@ -1,5 +1,7 @@
 package core
 
+use runtime
+
 
 #load "./alloc/alloc"
 #load "./memory/memory"

@@ -9,7 +9,15 @@ package core.encoding.csv
 // it ergonomic to work with.
 //
 
-use core {string, array, iter, conv, io}
+use core
+use core.string
+use core.array
+use core.iter
+use core.conv
+use core.io
+use core.test
+use runtime
+
 use core.misc {any_as}
 use runtime.info {
     get_type_info,
@@ -162,8 +170,8 @@ CSV_Column :: struct {
 // Example and test case
 //
 
-@core.test.test.{"CSV Test"}
-(t: &core.test.T) {
+@test.test.{"CSV Test"}
+(t: &test.T) {
     data := """first,second,third
 1,test 1,1.2
 2,test 2,2.4

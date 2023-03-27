@@ -6,7 +6,7 @@
 
 #load "core/std"
 
-use package core
+use core {package, *}
 
 main :: (args: [] cstr) {
     // Currently, for loops can iterate over five kinds of data structures in Onyx:

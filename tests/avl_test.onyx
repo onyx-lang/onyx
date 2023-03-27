@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+use core {*}
 
 main :: () {
     tree: &avl_tree.AVL_Tree(i32);

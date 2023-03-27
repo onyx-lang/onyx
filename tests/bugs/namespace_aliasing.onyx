@@ -1,5 +1,5 @@
 #load "core/std"
-use package core
+use core {*}
 
 SomeNamespace :: struct {
     foo :: () {
@@ -15,8 +15,9 @@ main :: (args) => {
     }
 
     {
-        use SomeNamespace;
+        // This is no longer a feature, and cannot be used anymore
+        //     use SomeNamespace;
 
-        foo();
+        SomeNamespace.foo();
     }
 }

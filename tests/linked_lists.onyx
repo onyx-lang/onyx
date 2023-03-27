@@ -1,4 +1,7 @@
 use core
+use core.list
+
+use core {println}
 
 main :: () {
     l := list.make(i32);

@@ -1,6 +1,8 @@
 package core.sync
 
-use core.intrinsics.atomics
+use runtime
+use core
+use core.intrinsics.atomics {*}
 use core.thread { Thread_ID }
 
 //

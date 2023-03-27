@@ -1,5 +1,7 @@
 package core.alloc.arena
 
+use core
+
 // This allocator is mostly used for making many fixed-size
 // allocation (i.e. allocations that will not need to change
 // in size, such as game entities or position structs). The

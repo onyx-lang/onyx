@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+use core {*}
 
 TILE_DATA_WIDTH  :: 10
 TILE_DATA_HEIGHT :: 10

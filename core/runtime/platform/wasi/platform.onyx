@@ -4,6 +4,10 @@ package runtime.platform
 #load "./wasi_fs"
 
 use core
+use wasi
+use runtime
+
+use core
 use wasi {
     IOVec, SubscriptionTagged, Subscription, Event, Size,
     poll_oneoff, fd_write, fd_datasync, fd_read,

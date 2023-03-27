@@ -32,13 +32,13 @@ package core.encoding.ini
 //     display_name=Player
 //
 
-use core {
-    alloc, conv, string, io,
-    aprintf
-}
-use core.intrinsics.types {
-    type_is_struct
-}
+use core.alloc
+use core.conv
+use core.string
+use core.io
+
+use core { aprintf }
+use core.intrinsics.types { type_is_struct }
 
 //
 // Represents if the parsing was successful or encountered an error.

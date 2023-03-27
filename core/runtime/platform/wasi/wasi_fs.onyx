@@ -1,14 +1,16 @@
 package runtime.platform
 
-#local runtime :: package runtime
+use runtime
+use core
+use wasi
+
+use core
+
 #if runtime.runtime != .Wasi {
     #error "The file system library is currently only available on the WASI runtime, and should only be included if that is the chosen runtime."
 }
 
-use package core
-
-#local wasi :: package wasi
-use package wasi {
+use wasi {
     FileDescriptor,
     FDFlags, OFlags, Rights,
     LookupFlags, Errno,

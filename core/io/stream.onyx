@@ -1,6 +1,7 @@
 package core.io
 
 use core
+use core {*}
 
 Stream :: struct {
     use vtable : &Stream_Vtable;

@@ -1,6 +1,4 @@
-#load "core/std"
-
-use package core
+use core {package, *}
 
 GameOfSeats :: struct {
     width  : u32;

@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+use core {*}
 
 Point :: struct {
     x, y : i32;

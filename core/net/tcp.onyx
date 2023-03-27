@@ -4,7 +4,14 @@ package core.net
     #error "Cannot include this file. Platform not supported.";
 }
 
-use core {sync, thread, array, memory, alloc, os, iter}
+use core.sync
+use core.thread
+use core.array
+use core.memory
+use core.alloc
+use core.os
+use core.iter
+use runtime
 
 #if !runtime.Multi_Threading_Enabled {
     #error "Expected multi-threading to be enabled for TCP server.";
@@ -365,7 +372,7 @@ wait_to_get_client_messages :: (use server: &TCP_Server) -> [] &TCP_Server.Clien
         }
     }
 
-    status_buffer := alloc.array_from_stack(core.net.Socket_Poll_Status, client_count);
+    status_buffer := alloc.array_from_stack(Socket_Poll_Status, client_count);
     socket_poll_all(cast([] &Socket) active_clients, pulse_time_ms, status_buffer);
 
     recv_clients: [..] &TCP_Server.Client;

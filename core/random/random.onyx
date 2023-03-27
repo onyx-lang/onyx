@@ -1,5 +1,7 @@
 package core.random
 
+use core
+
 //
 // The state of a random number generator.
 Random :: struct {
@@ -52,7 +54,7 @@ Random :: struct {
     // Returns a random string of length `bytes_long`. If `alpha_numeric` is
     // true, then the string will only consist of alpha-numeric characters.
     string :: (self: &Random, bytes_long: u32, alpha_numeric := false, allocator := context.allocator) -> str {
-        memory :: package core.memory
+        use core.memory
 
         s := memory.make_slice(u8, bytes_long, allocator=allocator);
         for& s {

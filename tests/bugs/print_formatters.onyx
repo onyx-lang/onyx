@@ -1,4 +1,5 @@
 use core
+use core {printf}
 
 main :: () {
     printf("{\n");

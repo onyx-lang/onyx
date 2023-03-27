@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+use core {*}
 
 count_to :: ($N: i32) {
     for i: 0 .. N do printf("{} ", i);

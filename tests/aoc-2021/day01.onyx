@@ -1,6 +1,8 @@
 #load "core/std"
 
-use package core
+use core.io
+use core.os
+use core {printf}
 
 count_increasing :: (arr: [] $T) -> u32 {
     increased_count := 0;
