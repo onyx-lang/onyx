@@ -1,8 +1,8 @@
 #load "core/std"
 
-#import core
-#import core.io
-#import core.array
+use core
+use core.io
+use core.array
 use core {printf}
 
 main :: (args: [] cstr) {

@@ -6,7 +6,7 @@ package core.alloc.atomic
 // is not needed for the general purpose heap allocator,
 // as that already has a thread-safe implementation.
 
-#import core.sync
+use core.sync
 
 AtomicAllocator :: struct {
     a: Allocator;

@@ -1,6 +1,6 @@
 #load "core/std"
 
-#import core {*}
+use core {*}
 
 main :: (args: [] cstr) {
     ba := bucket_array.make(i32, 4);

@@ -1,7 +1,7 @@
 #load "core/std"
 
-#import core
-#import core.io
+use core
+use core.io
 use core {println}
 
 main :: (args: [] cstr) {

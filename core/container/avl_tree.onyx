@@ -1,7 +1,7 @@
 package core.avl_tree
 
-#import core
-#import core.math
+use core
+use core.math
 
 AVL_Tree :: struct (T: type_expr) {
     data: T;

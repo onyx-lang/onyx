@@ -1,6 +1,6 @@
 package builtin
 
-#import runtime
+use runtime
 
 //
 // Explanation of `package builtin`

@@ -1,8 +1,8 @@
 #load "core/std"
 #load "core/intrinsics/atomics"
 
-#import core {*}
-#import core.intrinsics.atomics {*}
+use core {*}
+use core.intrinsics.atomics {*}
 
 Shared_Data :: struct {
     arr: [] i32;

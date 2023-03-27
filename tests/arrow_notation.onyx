@@ -1,7 +1,7 @@
 #load "core/std"
 
-#import core
-#import core.conv
+use core
+use core.conv
 
 use core {println}
 

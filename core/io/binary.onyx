@@ -1,6 +1,6 @@
 package core.io
 
-#import core.memory
+use core.memory
 
 
 BinaryWriter :: struct {

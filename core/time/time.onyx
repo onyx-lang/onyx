@@ -1,9 +1,9 @@
 package core.time
 
-#import core
-#import core.os
-#import core.conv
-#import runtime
+use core
+use core.os
+use core.conv
+use runtime
 
 use runtime.platform {
     __time_gmtime,

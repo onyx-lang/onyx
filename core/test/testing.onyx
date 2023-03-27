@@ -1,9 +1,9 @@
 package core.test
 
-#import core
-#import core.array
-#import core.string
-#import runtime
+use core
+use core.array
+use core.string
+use runtime
 
 use core {printf}
 

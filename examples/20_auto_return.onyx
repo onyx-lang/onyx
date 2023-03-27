@@ -43,6 +43,5 @@ main :: (args: [] cstr) {
 }
 
 #load "core/std"
-#import core
-use core
+use core {*}
 

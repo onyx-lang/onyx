@@ -1,8 +1,8 @@
 package runtime.platform
 
-#import runtime
-#import core
-#import wasi
+use runtime
+use core
+use wasi
 
 use core
 

@@ -1,6 +1,6 @@
 package core.alloc.arena
 
-#import core
+use core
 
 // This allocator is mostly used for making many fixed-size
 // allocation (i.e. allocations that will not need to change

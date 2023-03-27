@@ -1,8 +1,8 @@
 package core.io
 
-#import core.conv
-#import core.string
-#import core.memory
+use core.conv
+use core.string
+use core.memory
 
 // io.Writer is a buffered-writer. The important thing to not forget
 // when using io.Writer is that it has to be flushed when you are done

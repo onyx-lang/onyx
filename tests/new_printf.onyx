@@ -1,6 +1,6 @@
 #load "core/std"
 
-#import core {printf, map}
+use core {printf, map}
 
 main :: (args: [] cstr) {
     printf("{} {} {{}} {} {.1} {.5} {}\n", 123, "Test", false, 12.34, 12.3456789, [..] map.Map(i32, str));

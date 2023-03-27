@@ -2,7 +2,7 @@
 
 #load "core/std"
 
-#import core {*}
+use core {*}
 
 
 Vec3 :: struct {

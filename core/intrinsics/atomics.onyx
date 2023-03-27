@@ -1,7 +1,7 @@
 package core.intrinsics.atomics
 
 #local {
-    #import runtime
+    use runtime
 
     #if !runtime.Multi_Threading_Enabled {
         #error "Multi-threading is not enabled so you cannot include the 'core.intrinsics.atomics' package."

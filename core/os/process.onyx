@@ -4,8 +4,8 @@ package core.os
     #error "Cannot include this file. Platform not supported.";
 }
 
-#import core.io
-#import runtime
+use core.io
+use runtime
 
 use runtime.platform {
     __process_spawn,

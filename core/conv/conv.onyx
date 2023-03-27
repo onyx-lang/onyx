@@ -2,8 +2,8 @@ package core.conv
 
 Enable_Custom_Formatters :: true
 
-#import core.string
-#import core.math
+use core.string
+use core.math
 
 //
 // Converts a string into an integer. Works with positive and

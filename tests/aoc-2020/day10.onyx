@@ -1,6 +1,6 @@
 #load "core/std"
 
-#import core {*}
+use core {*}
 
 count_ending_paths :: (nums: [..] u32) -> u64 {
     tally := array.make(u64, nums.count);

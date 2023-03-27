@@ -6,8 +6,7 @@
 
 #load "core/std"
 
-#import core
-use core
+use core {*}
 
 main :: (args: [] cstr) {
     // To declare a simple, use the enum keyword.

@@ -1,5 +1,5 @@
-#import core
-#import core.encoding.base64
+use core
+use core.encoding.base64
 
 decode_test :: () {
     for .[

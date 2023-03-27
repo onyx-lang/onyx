@@ -45,5 +45,4 @@ main :: (args) => {
 }
 
 #load "core/std"
-#import core
-use core
+use core {*}

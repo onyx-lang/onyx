@@ -1691,13 +1691,6 @@ static AstNode* parse_statement(OnyxParser* parser) {
                 break;
             }
 
-            if (parse_possible_directive(parser, "import")) {
-                // :LinearTokenDependent
-                parse_import_statement(parser, parser->curr - 2);
-                needs_semicolon = 0;
-                break;
-            }
-
             if (next_tokens_are(parser, 2, '#', Token_Type_Symbol)) {
                 retval = (AstNode *) parse_factor(parser);
                 break;
@@ -3499,10 +3492,6 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 expect_token(parser, Token_Type_Literal_String);
                 return;
             }
-            else if (parse_possible_directive(parser, "import")) {
-                parse_import_statement(parser, dir_token);
-                return;
-            }
             else {
                 OnyxToken* directive_token = expect_token(parser, '#');
                 OnyxToken* symbol_token = parser->curr;
@@ -3619,6 +3608,10 @@ static void parse_import_statement(OnyxParser* parser, OnyxToken *token) {
     package_node->flags |= Ast_Flag_Comptime;
     package_node->type_node = builtin_package_id_type;
     package_node->token = token;
+
+    if (peek_token(0)->type == Token_Type_Keyword_Package) {
+        package_node->token = expect_token(parser, Token_Type_Keyword_Package);
+    }
 
     if (!parse_package_name(parser, package_node)) return;
 

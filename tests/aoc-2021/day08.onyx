@@ -1,7 +1,7 @@
 PART :: 2
 #load "core/std"
 
-#import core {*}
+use core {*}
 
 // Encoded segments
 //

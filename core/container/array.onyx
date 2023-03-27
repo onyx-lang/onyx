@@ -1,6 +1,6 @@
 package core.array
 
-#import core
+use core
 
 // [..] T == Array(T)
 //   where

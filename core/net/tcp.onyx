@@ -4,14 +4,14 @@ package core.net
     #error "Cannot include this file. Platform not supported.";
 }
 
-#import core.sync
-#import core.thread
-#import core.array
-#import core.memory
-#import core.alloc
-#import core.os
-#import core.iter
-#import runtime
+use core.sync
+use core.thread
+use core.array
+use core.memory
+use core.alloc
+use core.os
+use core.iter
+use runtime
 
 #if !runtime.Multi_Threading_Enabled {
     #error "Expected multi-threading to be enabled for TCP server.";

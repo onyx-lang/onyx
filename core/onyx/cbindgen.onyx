@@ -41,8 +41,8 @@ package cbindgen
 
 #if #defined (runtime.Generated_Foreign_Info) {
 
-#import core
-#import runtime
+use core
+use runtime
 
 #if runtime.compiler_os == .Linux {
     #if #defined (runtime.vars.CC) {

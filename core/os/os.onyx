@@ -1,6 +1,6 @@
 package core.os
 
-#import runtime
+use runtime
 
 #if !runtime.platform.Supports_Os {
     #error "Cannot include this file. Platform not supported.";

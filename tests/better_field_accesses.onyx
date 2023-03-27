@@ -1,6 +1,6 @@
 #load "core/std"
 
-#import core {*}
+use core {*}
 
 Foo :: struct {
     x, y: i32;

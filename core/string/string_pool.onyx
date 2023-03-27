@@ -1,8 +1,8 @@
 package core.string
 
-#import core.alloc
-#import core.alloc.arena
-#import core.memory
+use core.alloc
+use core.alloc.arena
+use core.memory
 
 //
 // Many times, storing strings is annoying because you need

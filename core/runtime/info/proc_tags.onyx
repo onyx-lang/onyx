@@ -1,7 +1,7 @@
 
 package runtime.info
 
-#import core.array
+use core.array
 
 tagged_procedures: [] &Tagged_Procedure
 

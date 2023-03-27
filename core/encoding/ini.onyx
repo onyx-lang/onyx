@@ -32,10 +32,10 @@ package core.encoding.ini
 //     display_name=Player
 //
 
-#import core.alloc
-#import core.conv
-#import core.string
-#import core.io
+use core.alloc
+use core.conv
+use core.string
+use core.io
 
 use core { aprintf }
 use core.intrinsics.types { type_is_struct }

@@ -16,7 +16,7 @@ package core.alloc.gc
 //       // Every allocation here will automatically be freed
 //   }
 
-#import core
+use core
 
 GCState :: struct {
     backing_allocator: Allocator;

@@ -1,5 +1,5 @@
-#import core
-#import core.list
+use core
+use core.list
 
 use core {println}
 

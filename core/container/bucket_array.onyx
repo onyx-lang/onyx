@@ -2,9 +2,9 @@
 
 package core.bucket_array
 
-#import core
-#import core.array
-#import core.iter
+use core
+use core.array
+use core.iter
 
 Bucket_Array :: struct (T: type_expr) {
     allocator : Allocator;

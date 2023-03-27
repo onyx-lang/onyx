@@ -1,6 +1,6 @@
-#import core
-#import core.encoding.utf8
-#import runtime
+use core
+use core.encoding.utf8
+use runtime
 
 use core {print, println, printf}
 

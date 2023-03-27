@@ -1,6 +1,6 @@
-#import core.string
-#import core.conv
-#import core
+use core.string
+use core.conv
+use core
 
 use core {
     println

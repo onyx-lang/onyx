@@ -1,6 +1,6 @@
 package core.list
 
-#import core
+use core
 
 ListElem :: struct (T: type_expr) {
     next: &ListElem(T) = null;

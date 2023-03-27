@@ -1,7 +1,6 @@
 #load "core/std"
 
-#import core
-use core
+use core {*}
 
 main :: (args: [] cstr) {
     // Onyx does not have map type built into the language semantics,

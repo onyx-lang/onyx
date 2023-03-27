@@ -1,6 +1,6 @@
 package core
 
-#import runtime
+use runtime
 
 
 #load "./alloc/alloc"

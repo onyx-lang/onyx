@@ -1,9 +1,9 @@
 package core.misc
 
-#import runtime
-#import core.iter
-#import core.array
-#import core.string
+use runtime
+use core.iter
+use core.array
+use core.string
 
 use runtime.info {
     get_type_info,

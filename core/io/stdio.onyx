@@ -6,7 +6,7 @@
 // in anyway.
 package core
 
-#import runtime
+use runtime
 
 
 //

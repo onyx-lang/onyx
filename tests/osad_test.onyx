@@ -1,5 +1,5 @@
-#import core
-#import core.encoding.osad
+use core
+use core.encoding.osad
 
 use core {printf}
 

@@ -34,8 +34,7 @@
 
 #load "core/std"
 
-#import core
-use core
+use core {*}
 
 main :: (args: [] cstr) {
     // See the overloaded procedure defined below.
@@ -95,7 +94,7 @@ print_type :: #match {
 Person :: struct { name: str; age: i32; }
 
 // The overload option for hashing a person:
-#match (package core).hash.to_u32 (use p: Person) -> u32 {
+#match hash.to_u32 (use p: Person) -> u32 {
     return hash.to_u32(name) * 16239563 + age;
 }
 

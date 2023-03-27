@@ -1,5 +1,5 @@
 #load "core/std"
-#import core {*}
+use core {*}
 
 SomeNamespace :: struct {
     foo :: () {

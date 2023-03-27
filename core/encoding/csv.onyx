@@ -9,14 +9,14 @@ package core.encoding.csv
 // it ergonomic to work with.
 //
 
-#import core
-#import core.string
-#import core.array
-#import core.iter
-#import core.conv
-#import core.io
-#import core.test
-#import runtime
+use core
+use core.string
+use core.array
+use core.iter
+use core.conv
+use core.io
+use core.test
+use runtime
 
 use core.misc {any_as}
 use runtime.info {

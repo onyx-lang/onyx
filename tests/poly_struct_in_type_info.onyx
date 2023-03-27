@@ -1,7 +1,7 @@
 #load "core/std"
 
-#import core {*}
-#import runtime.info
+use core {*}
+use runtime.info
 
 Base :: struct (T: type_expr) {
     const: i32;

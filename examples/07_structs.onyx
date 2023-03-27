@@ -7,8 +7,7 @@
 
 #load "core/std"
 
-#import core
-use core
+use core {*}
 
 main :: (args: [] cstr) {
 
