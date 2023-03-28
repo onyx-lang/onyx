@@ -24,7 +24,9 @@ use runtime
 
 #load "./math/math"
 #load "./random/random"
+
 #load "./hash/hash"
+#load "./hash/md5"
 
 #load "./string/string"
 #load "./string/buffer"

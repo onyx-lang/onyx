@@ -182,8 +182,8 @@ read_bytes :: (use reader: &Reader, bytes: [] u8) -> (i32, Error) {
         start += to_write;
     }
 
-    last_byte = cast(i32) bytes[bytes.count - 1];
-    return bytes.count, .None;
+    last_byte = cast(i32) bytes[write_index - 1];
+    return write_index, .None;
 }
 
 read_string :: (use reader: &Reader, bytes := 1, allocator := context.allocator) -> str {

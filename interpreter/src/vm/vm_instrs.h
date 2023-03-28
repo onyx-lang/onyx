@@ -100,10 +100,39 @@ OVM_OP_INTEGER_EXEC(sar, >>)
     VAL(instr->r).ctype = func( VAL(instr->a).ctype, VAL(instr->b).ctype ); \
     VAL(instr->r).type = t;
 
-OVMI_INSTR_EXEC(rotl_i32) { OVM_OP(OVM_TYPE_I32, __rold, u32); NEXT_OP; }
-OVMI_INSTR_EXEC(rotl_i64) { OVM_OP(OVM_TYPE_I64, __rolq, u64); NEXT_OP; }
-OVMI_INSTR_EXEC(rotr_i32) { OVM_OP(OVM_TYPE_I32, __rord, u32); NEXT_OP; }
-OVMI_INSTR_EXEC(rotr_i64) { OVM_OP(OVM_TYPE_I64, __rorq, u64); NEXT_OP; }
+#ifndef ROTATION_FUNCTIONS
+#define ROTATION_FUNCTIONS
+
+static inline u32 rotl32(u32 value, u32 count) {
+    const unsigned int mask = 0xFF;
+    count &= mask;
+    return (value << count) | (value >> (-count & mask));
+}
+
+static inline u64 rotl64(u64 value, u32 count) {
+    const unsigned int mask = 0xFF;
+    count &= mask;
+    return (value << count) | (value >> (-count & mask));
+}
+
+static inline u32 rotr32(u32 value, u32 count) {
+    const unsigned int mask = 0xFF;
+    count &= mask;
+    return (value >> count) | (value << (-count & mask));
+}
+
+static inline u64 rotr64(u64 value, u32 count) {
+    const unsigned int mask = 0xFF;
+    count &= mask;
+    return (value >> count) | (value << (-count & mask));
+}
+
+#endif
+
+OVMI_INSTR_EXEC(rotl_i32) { OVM_OP(OVM_TYPE_I32, rotl32, u32); NEXT_OP; }
+OVMI_INSTR_EXEC(rotl_i64) { OVM_OP(OVM_TYPE_I64, rotl64, u64); NEXT_OP; }
+OVMI_INSTR_EXEC(rotr_i32) { OVM_OP(OVM_TYPE_I32, rotr32, u32); NEXT_OP; }
+OVMI_INSTR_EXEC(rotr_i64) { OVM_OP(OVM_TYPE_I64, rotr64, u64); NEXT_OP; }
 
 OVM_OP_FLOAT_EXEC(min, bh_min)
 OVM_OP_FLOAT_EXEC(max, bh_max)
