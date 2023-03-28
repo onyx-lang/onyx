@@ -8,8 +8,10 @@ package core
 // helper methods that make it easier to work with Results.
 //
 
+use core
+use core.conv
 
-use core {Optional, conv}
+use core {Optional}
 
 #doc """
     Result(T, E) is a structure that represents either an Ok value

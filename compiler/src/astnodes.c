@@ -9,6 +9,7 @@ static const char* ast_node_names[] = {
     "INCLUDE FOLDER",
     "INCLUDE ALL IN FOLDER",
     "INCLUDE LIBRARY PATH",
+    "IMPORT",
     "MEMORY RESERVATION",
 
     "BINDING",
@@ -83,7 +84,6 @@ static const char* ast_node_names[] = {
     "FOR",
     "WHILE",
     "JUMP",
-    "USE",
     "DEFER",
     "SWITCH",
     "CASE",
@@ -1540,7 +1540,7 @@ AstLocal* make_local_with_type(bh_allocator a, OnyxToken* token, Type* type) {
 }
 
 AstNode* make_symbol(bh_allocator a, OnyxToken* sym) {
-    AstNode* symbol = onyx_ast_node_new(a, sizeof(AstNode), Ast_Kind_Symbol);
+    AstNode* symbol = onyx_ast_node_new(a, sizeof(AstTyped), Ast_Kind_Symbol);
     symbol->token = sym;
     return symbol;
 }

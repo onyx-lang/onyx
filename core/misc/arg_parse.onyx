@@ -1,6 +1,10 @@
 package core.arg_parse
 
-use core
+use core {package, printf}
+use core.iter
+use core.conv
+use core.string
+use runtime
 
 #doc """
     This is currently a very basic argument parsing library.
@@ -28,7 +32,7 @@ arg_parse :: (c_args: [] cstr, output: any) -> bool {
              |> iter.map(string.from_cstr);
     defer arg_iter.close(arg_iter.data);
 
-    use runtime.info;
+    use runtime.info {*};
 
     ptr_type := cast(&Type_Info_Pointer) get_type_info(output.type);
     if ptr_type.kind != .Pointer do return false;

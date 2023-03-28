@@ -2,7 +2,9 @@
 
 package core.bucket_array
 
-use core {array, iter}
+use core
+use core.array
+use core.iter
 
 Bucket_Array :: struct (T: type_expr) {
     allocator : Allocator;
@@ -83,7 +85,7 @@ push :: (use b: &Bucket_Array($T), elem: T) -> bool {
     }
 }
 
-#operator << macro (b: Bucket_Array($T), elem: T) do core.bucket_array.push(&b, elem);
+#operator << macro (b: Bucket_Array($T), elem: T) do #this_package.push(&b, elem);
 
 pop :: (use b: &Bucket_Array($T)) {
     last_bucket := &buckets[buckets.count - 1];

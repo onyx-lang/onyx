@@ -1,6 +1,6 @@
 package core.string
 
-use core
+use core {package, *}
 
 #doc "Generic procedure for turning something into a string."
 as_str :: #match -> str {}
@@ -652,37 +652,45 @@ bisect :: (s: str, substr: str) -> (str, str) {
 //
 
 to_dyn_str :: (x: str, allocator := context.allocator) -> dyn_str {
-    return (package core.array).make(x, allocator);
+    use core.array
+    return array.make(x, allocator);
 }
 
 delete  :: macro (x: &dyn_str, idx: u32) -> u8 {
-    return (package core.array).delete(x, idx);
+    use core.array
+    return array.delete(x, idx);
 }
 
 append  :: #match {
     macro (x: &dyn_str, other: str) {
-        (package core.array).concat(x, other);
+        use core.array
+        array.concat(x, other);
     }, 
 
     macro (x: &dyn_str, other: u8) {
-        (package core.array).push(x, other);
+        use core.array
+        array.push(x, other);
     }, 
 }
 
 clear   :: macro (x: &dyn_str) {
-    (package core.array).clear(x);
+    use core.array
+    array.clear(x);
 }
 
 retreat :: macro (x: &dyn_str, chars := 1) {
-    (package core.array).pop(x, chars);
+    use core.array
+    array.pop(x, chars);
 }
 
 insert  :: #match #locked {
     macro (x: &dyn_str, idx: u32, new_str: str) -> bool {
-        return (package core.array).insert(x, idx, new_str);
+        use core.array
+        return array.insert(x, idx, new_str);
     },
 
     macro (x: &dyn_str, idx: u32, ch: u8) -> bool {
-        return (package core.array).insert(x, idx, ch);
+        use core.array
+        return array.insert(x, idx, ch);
     }
 }

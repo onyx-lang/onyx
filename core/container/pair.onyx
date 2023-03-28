@@ -1,5 +1,6 @@
 package core
 
+
 //
 // A `Pair` represents a pair of values of heterogenous types.
 // This structure does not do much on its own; however, it
@@ -24,7 +25,7 @@ Pair :: struct (First_Type: type_expr, Second_Type: type_expr) {
 }
 
 #overload
-core.hash.hash :: (p: Pair($First_Type/hash.Hashable, $Second_Type/hash.Hashable)) => {
+hash.hash :: (p: Pair($First_Type/hash.Hashable, $Second_Type/hash.Hashable)) => {
     h := 7;
     h += h << 5 + hash.hash(p.first);
     h += h << 5 + hash.hash(p.second);

@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core { println }
+use core { println }
 
 main :: (args: [] cstr) {
     // These functions will be used to demo the pipe operator.

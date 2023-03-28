@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+use core {*}
 
 Pos :: struct {x,y: i32;}
 #match hash.to_u32 (use p: Pos) => x * 13 & 17 * y;

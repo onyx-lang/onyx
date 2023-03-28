@@ -1,5 +1,10 @@
 package core.misc
 
+use runtime
+use core.iter
+use core.array
+use core.string
+
 use runtime.info {
     get_type_info,
     Type_Info_Pointer,
@@ -10,8 +15,6 @@ use runtime.info {
 
     get_struct_member
 }
-
-use core { iter, array, string }
 
 // Either to_any or as_any will work. I prefer `as_any` because
 // much of the rest of the standard library uses `as_...` for
@@ -120,7 +123,7 @@ any_to_map :: (v: any) -> (Map(str, any), success: bool) {
 any_iter :: (arr: any) -> Iterator(any) {
     base_ptr, elem_type, count := any_as_array(arr);
     if count == 0 {
-        return .{ null, ((_) => any.{}, false) };
+        return .{ null, ((_: rawptr) => any.{}, false) };
     }
 
     return iter.generator(

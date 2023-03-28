@@ -1,6 +1,6 @@
 #load "core/std"
 
-use core
+use core {package, *}
 
 OverloadsEqual :: interface (t: $T) {
     { T.equals(t, t) } -> bool;

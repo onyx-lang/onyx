@@ -1102,8 +1102,9 @@ char* build_poly_struct_name(AstPolyStructType* ps_type, Type* cs_type) {
 }
 
 Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed) {
-    // @Cleanup
-    assert(ps_type->scope != NULL);
+    if (ps_type->scope == NULL) {
+        return NULL;
+    }
 
     if (ps_type->concrete_structs == NULL) {
         sh_new_arena(ps_type->concrete_structs);

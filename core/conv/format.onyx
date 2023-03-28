@@ -1,6 +1,11 @@
 package core.conv
 
-use core {map, string, array, math}
+use core.map
+use core.string
+use core.array
+use core.math
+use core.io
+use runtime
 
 #package {
     custom_formatters: Map(type_expr, #type (&Format_Output, &Format, rawptr) -> void);
@@ -17,7 +22,7 @@ custom_formatters_initialized :: #init () {
     map.init(&custom_parsers,    default=null_proc);
 
     #if Enable_Custom_Formatters {
-        use package runtime.info;
+        use runtime.info {*};
 
         for type_idx: type_table.count {
             type := type_table[type_idx];
@@ -408,8 +413,7 @@ format_va :: (output: &Format_Output, format: str, va: [] any) -> str {
     This procedure is generally not used directly; instead, through format or format_va.
 """
 format_any :: (output: &Format_Output, formatting: &Format, v: any) {
-    use package runtime.info
-    array :: package core.array;
+    use runtime.info {*};
 
     //
     // Dereference the any if the '*' format specifier was given.
@@ -528,8 +532,6 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
 
         case type_expr {
             value := *(cast(&type_expr) v.data);
-
-            io :: package core.io
 
             buf : [256] u8;          
 

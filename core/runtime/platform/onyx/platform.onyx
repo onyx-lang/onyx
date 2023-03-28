@@ -1,7 +1,9 @@
 package runtime.platform
 
-use core
+use main
+use core {package, *}
 use runtime {
+    package,
     __runtime_initialize,
     Multi_Threading_Enabled,
     _thread_start,
@@ -101,8 +103,8 @@ __start :: () {
     __runtime_initialize();
     context.thread_id = 0;
 
-    #if (typeof (package main).main) == #type () -> void {
-        (package main).main();
+    #if (typeof main.main) == #type () -> void {
+        main.main();
 
     } else {
         args : [] cstr;
@@ -113,7 +115,7 @@ __start :: () {
         argv_buf := cast(cstr) calloc(argv_buf_size);
         __args_get(args.data, argv_buf);
 
-        (package main).main(args);
+        main.main(args);
     }
 
     __flush_stdio();

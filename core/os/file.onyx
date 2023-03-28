@@ -4,8 +4,11 @@ package core.os
     #error "Cannot include this file. Platform not supported.";
 }
 
-use core
-#local fs :: package runtime.platform
+use core {*}
+use runtime
+
+
+#local fs :: runtime.platform
 
 
 FileError :: enum {

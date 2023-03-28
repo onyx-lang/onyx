@@ -1,5 +1,7 @@
 package core.memory
 
+use core
+
 //
 // Re-exports the memory_copy intrinsics. Behaves like memmove() in C.
 copy :: core.intrinsics.wasm.memory_copy
@@ -69,7 +71,7 @@ align :: (size: u64, align: u64) -> u64 {
 //
 // Allows for make([] i32).
 #overload
-builtin.__make_overload :: macro (_: &[] $T, count: u32, allocator := context.allocator) -> [] T {
+__make_overload :: macro (_: &[] $T, count: u32, allocator := context.allocator) -> [] T {
     ret := #this_package.make_slice(T, count, allocator);
     #this_package.set(ret.data, 0, sizeof T * count);
     return ret;

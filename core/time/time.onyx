@@ -1,6 +1,10 @@
 package core.time
 
-use core {os, conv}
+use core
+use core.os
+use core.conv
+use runtime
+
 use runtime.platform {
     __time_gmtime,
     __time_localtime,
@@ -105,7 +109,7 @@ strftime :: (buf: [] u8, format: [] u8, tm: &Timestamp) -> str {
 }
 
 strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
-    use core
+    use core {*}
 
     #persist weekdays   := str.[ "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" ];
     #persist monthnames := str.[ "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december" ];

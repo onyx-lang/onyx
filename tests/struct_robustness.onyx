@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+use core {*}
 
 main :: (args: [] cstr) {
 
@@ -26,11 +26,10 @@ main :: (args: [] cstr) {
 
         ss: SimpleStruct = SimpleStruct.{ 41, 67, "Steve" };
 
-        use ss;
         printf("SimpleStruct<{}, {}>({}, {}, {})\n",
             sizeof SimpleStruct,
             alignof SimpleStruct,
-            cast(u32) age, height, name);
+            cast(u32) ss.age, ss.height, ss.name);
     }
 
     test_simple_union :: () {

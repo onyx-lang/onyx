@@ -1,5 +1,8 @@
 package core.alloc.heap
 
+use runtime
+use core
+
 
 // This is the implementation for the general purpose heap allocator.
 // It is a simple bump allocator, with a free list. It is not very good

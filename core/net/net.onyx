@@ -4,7 +4,8 @@ package core.net
     #error "Cannot include this file. Platform not supported.";
 }
 
-use core
+use core {*}
+use runtime
 
 Socket :: struct {
     Handle :: #distinct i32

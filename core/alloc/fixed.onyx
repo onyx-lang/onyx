@@ -1,5 +1,7 @@
 package core.alloc.fixed
 
+use core
+
 // This allocator is very simple and always returns the same pointer,
 // unless too much memory is asked for, in which case it returns null.
 //
