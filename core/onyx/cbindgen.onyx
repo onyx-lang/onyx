@@ -11,14 +11,15 @@ package cbindgen
 // #load "core/std"
 // #load "./module"
 //
-// use core
+// use core {*}
+// use your_module
 //
 // main :: () {
 //     path := module_path(#file);
 //     c_file_path := string.concat(path, "temporary.c");
 //     success := cbindgen.generate_c_binding(.{
 //         output_file            = c_file_path,
-//         foreign_block          = something.foreign_block,
+//         foreign_block          = your_module.foreign_block,
 //         cast_map               = .[],
 //         custom_implementations = .[],
 //         preamble               = .[
@@ -39,10 +40,12 @@ package cbindgen
 // }
 //
 
+use runtime
+
 #if #defined (runtime.Generated_Foreign_Info) {
 
-use core
-use runtime
+use core {package, *}
+use simd {*}
 
 #if runtime.compiler_os == .Linux {
     #if #defined (runtime.vars.CC) {
@@ -53,8 +56,6 @@ use runtime
 }
 
 
-use core
-use simd
 
 Cast_Mapping :: struct {
     type: type_expr;
@@ -193,7 +194,7 @@ compile_c_file :: (
     }
 
     write_function_body :: (writer, ff, cast_map, name_map) => {
-        use runtime.info;
+        use runtime.info {*};
 
         method_type := ff.type;
         method_info := cast (&Type_Info_Function) get_type_info(method_type);
@@ -232,7 +233,7 @@ compile_c_file :: (
     }
 
     print_body :: (writer, method_name, method_info, cast_map) => {
-        use runtime.info;
+        use runtime.info {*};
         callw, call := io.string_builder();
         defer io.buffer_stream_free(call);
         defer cfree(call);
@@ -278,7 +279,7 @@ compile_c_file :: (
     }
 
     type_to_wasm_type :: (t: type_expr, for_return := false) -> str {
-        use runtime.info;
+        use runtime.info {*};
 
         param_info := get_type_info(t);
         switch param_info.kind {
@@ -330,7 +331,7 @@ compile_c_file :: (
     }
 
     type_encoding :: (t: type_expr) -> str {
-        use runtime.info;
+        use runtime.info {*};
 
         param_info := get_type_info(t);
         switch param_info.kind {

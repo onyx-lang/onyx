@@ -39,6 +39,7 @@ use core.io
 
 use core { aprintf }
 use core.intrinsics.types { type_is_struct }
+use runtime
 
 //
 // Represents if the parsing was successful or encountered an error.

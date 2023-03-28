@@ -565,7 +565,9 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         }
 
         case Token_Type_Keyword_Package: {
-            onyx_report_warning(peek_token(-1)->pos, "Use of deprecated feature: package expression.");
+            if (!parser->allow_package_expressions)
+                onyx_report_warning(peek_token(-1)->pos, "Use of deprecated feature: package expression.");
+
             retval = (AstTyped *) parse_package_expression(parser);
             break;
         }
@@ -738,9 +740,11 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 defined->token = parser->curr - 1;
                 defined->type_node = (AstType *) &basic_type_bool;
 
+                parser->allow_package_expressions = 1;
                 expect_token(parser, '(');
                 defined->expr = parse_expression(parser, 0);
                 expect_token(parser, ')');
+                parser->allow_package_expressions = 0;
 
                 retval = (AstTyped *) defined;
                 break;
@@ -3746,6 +3750,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     parser.tag_depth = 0;
     parser.overload_count = 0;
     parser.injection_point = NULL;
+    parser.allow_package_expressions = 0;
 
     parser.polymorph_context = (PolymorphicContext) {
         .root_node = NULL,
