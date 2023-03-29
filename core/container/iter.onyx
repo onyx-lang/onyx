@@ -16,6 +16,7 @@ use core.intrinsics.types {type_is_struct}
 #inject Iterator {
     filter :: filter;
     map :: map;
+    flatMap :: flatMap;
     zip :: zip;
 
     take_one :: take_one;
@@ -195,6 +196,75 @@ map :: (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> $R) =>
         mi => { close(mi.iterator); })
 
 
+#doc """
+    Transforms every value that comes out of an iterator
+    using the transform function into a new iterator, from
+    which subsequent values will be output.
+
+        iter.flatMap(iter.as_iter(1 .. 5), x => iter.as_iter(1 .. x+1))
+        // 1, 1, 2, 1, 2, 3, 1, 2, 3, 4
+"""
+flatMap :: #match #local {}
+
+#overload
+flatMap :: (it: Iterator($T), transform: (T) -> Iterator($R)) =>
+    generator(
+        &.{ iterator = it, transform = transform, inner_iter = Iterator(R).{}, get_new_inner = true },
+
+        mi => {
+            while true {
+                if mi.get_new_inner {
+                    mi.get_new_inner = false;
+                    t, outer := next(mi.iterator);
+                    if !outer do break;
+
+                    mi.inner_iter = mi.transform(t);
+                }
+
+                value, cont := next(mi.inner_iter);
+                if cont {
+                    return value, true;
+                }
+
+                mi.get_new_inner = true;
+            }
+
+            return .{}, false;
+        },
+
+        mi => { close(mi.iterator); })
+
+#overload
+flatMap :: (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> Iterator($R)) =>
+    generator(
+        &.{ iterator = it, transform = transform, inner_iter = Iterator(R).{}, get_new_inner = true, ctx = ctx },
+
+        mi => {
+            while true {
+                if mi.get_new_inner {
+                    mi.get_new_inner = false;
+                    t, outer := next(mi.iterator);
+                    if !outer do break;
+
+                    mi.inner_iter = mi.transform(t, mi.ctx);
+                }
+
+                value, cont := next(mi.inner_iter);
+                if cont {
+                    return value, true;
+                }
+
+                mi.get_new_inner = true;
+            }
+
+            return .{}, false;
+        },
+
+        mi => { close(mi.iterator); })
+
+
+
+
 #doc "Only yields the first `count` values, then closes."
 take :: (it: Iterator($T), count: u32) -> Iterator(T) {
     return generator(
@@ -363,6 +433,18 @@ concat :: (iters: ..Iterator($T)) -> Iterator(T) {
 #doc "Yields the same value indefinitely. Useful with `iter.zip`."
 const :: (value: $T) -> Iterator(T) {
     return generator(&.{ v = value }, c => (c.v, true));
+}
+
+#doc "Yields a single value, then stops."
+single :: (value: $T) -> Iterator(T) {
+    return generator(&.{ v = value, yielded = false }, c => {
+        if !c.yielded {
+            c.yielded = true;
+            return c.v, true;
+        }
+
+        return .{}, false;
+    });
 }
 
 
