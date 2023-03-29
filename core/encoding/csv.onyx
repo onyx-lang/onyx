@@ -24,29 +24,27 @@ use runtime.info {
     Type_Info_Struct
 }
 
-//
-// Represents data from a CSV file of a particular type.
+#doc "Represents data from a CSV file of a particular type."
 CSV :: struct (Output_Type: type_expr) {
     entries: [..] Output_Type;
 }
 
-//
-// Tag-type used to tell the ingress and egress methods what
-// the column name of a particular data element should be.
-//
-// Data :: struct {
-//     @CSV_Column.{"Actual Column Name"}
-//     variable_name: str;
-// }
+#doc """
+    Tag-type used to tell the ingress and egress methods what
+    the column name of a particular data element should be.
+
+        Data :: struct {
+            @CSV_Column.{"Actual Column Name"}
+            variable_name: str;
+        }
+"""
 CSV_Column :: struct {
     name: str;
 }
 
-//
-// Define methods used with the CSV structure.
+#doc "Define methods used with the CSV structure."
 #inject CSV {
-    //
-    // Create and initialize a CSV with no elements.
+    #doc "Create and initialize a CSV with no elements."
     make :: ($T: type_expr) => {
         r := CSV(T).{};
         r.entries = make(typeof r.entries);
@@ -54,19 +52,19 @@ CSV_Column :: struct {
         return r;
     }
 
-    //
-    // Frees all data in a CSV.
+    #doc "Frees all data in a CSV."
     delete :: (csv: &CSV) {
         delete(&csv.entries);
     }
 
-    //
-    // Ingests data from a string representing CSV data.
-    // Uses the type of the CSV to know what columns should be expected.
-    // If `headers_presents` is true, the first line will be treated as
-    // headers, and cross checked with the CSV_Column tag information.
-    // Use this when the columns from your CSV have a different order
-    // from the order of fields in the structure.
+    #doc """
+        Ingests data from a string representing CSV data.
+        Uses the type of the CSV to know what columns should be expected.
+        If `headers_presents` is true, the first line will be treated as
+        headers, and cross checked with the CSV_Column tag information.
+        Use this when the columns from your CSV have a different order
+        from the order of fields in the structure.
+    """
     ingress_string :: (csv: &CSV, contents: str, headers_present := true) -> bool {
         reader, stream := io.reader_from_string(contents);
         defer cfree(stream);
@@ -74,9 +72,10 @@ CSV_Column :: struct {
         return csv->ingress(&reader, headers_present);
     }
     
-    //
-    // Ingests data from an Reader containing CSV data.
-    // Uses the type of the CSV to know what columns should be expectd.
+    #doc """
+        Ingests data from a Reader containing CSV data.
+        Uses the type of the CSV to know what columns should be expectd.
+    """
     ingress :: (csv: &CSV, reader: &io.Reader, headers_present := true) -> bool {
         Header :: struct {
             type: type_expr;
@@ -132,10 +131,11 @@ CSV_Column :: struct {
         }
     }
 
-    //
-    // Outputs data from a CSV into a Writer.
-    // When `include_headers` is true, the first line outputted will be
-    // the headers of the CSV, according to the CSV_Column tag information.
+    #doc """
+        Outputs data from a CSV into a Writer.
+        When `include_headers` is true, the first line outputted will be
+        the headers of the CSV, according to the CSV_Column tag information.
+    """
     egress :: (csv: &CSV, writer: &io.Writer, include_headers := true) {
         output_type_info: &Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
 

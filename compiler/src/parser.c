@@ -714,7 +714,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 while (!consume_token_if_next(parser, '}')) {
                     if (parser->hit_unexpected_token) break;
 
-                    AstNode* poly_var = make_node(AstNode, Ast_Kind_Symbol);
+                    AstNode* poly_var = (void *) make_node(AstTyped, Ast_Kind_Symbol);
                     poly_var->token = expect_token(parser, Token_Type_Symbol);
 
                     expect_token(parser, '=');
@@ -1464,9 +1464,9 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
         // INVESTIGATE: I don't know why, but appearantly, this has to be a
         // symbol node, not a direct link to the local. There is an error about
         // being unable to resolve the type of the local if it is immediately set.
-        AstNode* left_symbol = make_node(AstNode, Ast_Kind_Symbol);
+        AstTyped* left_symbol = make_node(AstTyped, Ast_Kind_Symbol);
         left_symbol->token = symbol;
-        assignment->left = (AstTyped *) left_symbol;
+        assignment->left = left_symbol;
     }
 
     return 1;
@@ -1767,8 +1767,9 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
 
     consume_token(parser);
 
-    AstNode* symbol_node = make_node(AstNode, Ast_Kind_Symbol);
+    AstTyped* symbol_node = make_node(AstTyped, Ast_Kind_Symbol);
     symbol_node->token = expect_token(parser, Token_Type_Symbol);
+    symbol_node->flags |= Ast_Flag_Symbol_Is_PolyVar;
 
     AstNode *implicit_interface = NULL;
     if (consume_token_if_next(parser, '/')) {
@@ -1781,7 +1782,7 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
     if (pv != NULL) {
         bh_arr_push(pv, ((AstPolyParam) {
             .kind     = PPK_Poly_Type,
-            .poly_sym = symbol_node,
+            .poly_sym = (AstNode *) symbol_node,
             .implicit_interface = implicit_interface,
 
             // These will be filled out by function_params()
@@ -1929,7 +1930,7 @@ static AstType* parse_type(OnyxParser* parser) {
             }
 
             case Token_Type_Symbol: {
-                AstNode* symbol_node = make_node(AstNode, Ast_Kind_Symbol);
+                AstTyped* symbol_node = make_node(AstTyped, Ast_Kind_Symbol);
                 symbol_node->token = expect_token(parser, Token_Type_Symbol);
 
                 *next_insertion = (AstType *) symbol_node;
@@ -2778,6 +2779,7 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
         new_token->pos = param->token->pos;
 
         AstNode* type_node = make_symbol(parser->allocator, new_token);
+        type_node->flags |= Ast_Flag_Symbol_Is_PolyVar;
         bh_arr_push(poly_params, type_node);
     }
 
@@ -2892,7 +2894,7 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
 
     AstType* backing = (AstType *) &basic_type_u32;
     if (consume_token_if_next(parser, '(')) {
-        AstNode* backing_sym = make_node(AstNode, Ast_Kind_Symbol);
+        AstTyped* backing_sym = make_node(AstTyped, Ast_Kind_Symbol);
         backing_sym->token = expect_token(parser, Token_Type_Symbol);
         backing = (AstType *) backing_sym;
 
@@ -3439,6 +3441,10 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 inject->token = dir_token;
                 inject->full_loc = injection_point;
                 inject->to_inject = parse_top_level_expression(parser);
+                if (parser->last_documentation_token) {
+                    inject->documentation = parser->last_documentation_token;
+                    parser->last_documentation_token = NULL;
+                }
                 
                 ENTITY_SUBMIT(inject);
                 return;
@@ -3493,7 +3499,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 // This is a future feature I want to add to the language, proper docstrings.
                 // For now (and so I start documenting thing...), #doc can be used anywhere
                 // at top level, followed by a string to add a doc string.
-                expect_token(parser, Token_Type_Literal_String);
+                parser->last_documentation_token = expect_token(parser, Token_Type_Literal_String);
                 return;
             }
             else {
@@ -3535,6 +3541,11 @@ submit_binding_to_entities:
     {
         if (!binding) return;
 
+        if (parser->last_documentation_token) {
+            binding->documentation = parser->last_documentation_token;
+            parser->last_documentation_token = NULL;
+        }
+
         //
         // If this binding is inside an #inject block,
         // swap the binding node for an injection node
@@ -3546,6 +3557,7 @@ submit_binding_to_entities:
             injection->dest = parser->injection_point;
             injection->symbol = binding->token;
             injection->to_inject = (AstTyped *) binding->node;
+            injection->documentation = binding->documentation;
 
             ENTITY_SUBMIT(injection);
             return;
@@ -3557,6 +3569,8 @@ submit_binding_to_entities:
             target_scope = parser->package->private_scope;
         if (binding->flags & Ast_Flag_Private_File)
             target_scope = parser->file_scope;
+
+        binding->flags |= Ast_Flag_Binding_Isnt_Captured;
 
         ENTITY_SUBMIT_IN_SCOPE(binding, target_scope);
     }
@@ -3690,6 +3704,7 @@ static Package* parse_file_package(OnyxParser* parser) {
 
         strncat(aggregate_name, (*symbol)->text, 2047);
         Package* newpackage = package_lookup_or_create(aggregate_name, context.global_scope, parser->allocator, package_node->token->pos);
+        newpackage->parent_id = prevpackage ? prevpackage->id : 0xffffffff;
 
         AstPackage* pnode = make_node(AstPackage, Ast_Kind_Package);
         pnode->token = *symbol;
@@ -3698,7 +3713,7 @@ static Package* parse_file_package(OnyxParser* parser) {
         pnode->flags |= Ast_Flag_Comptime;
 
         if (prevpackage != NULL) {
-            symbol_subpackage_introduce(prevpackage->scope, (*symbol)->text, pnode);
+            symbol_subpackage_introduce(prevpackage, (*symbol)->text, pnode);
             package_reinsert_use_packages(prevpackage);
         }
 
@@ -3750,6 +3765,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     parser.tag_depth = 0;
     parser.overload_count = 0;
     parser.injection_point = NULL;
+    parser.last_documentation_token = NULL;
     parser.allow_package_expressions = 0;
 
     parser.polymorph_context = (PolymorphicContext) {

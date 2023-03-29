@@ -3,6 +3,7 @@
 #include "utils.h"
 #include "astnodes.h"
 #include "errors.h"
+#include "doc.h"
 
 // :EliminatingSymres - notes the places where too much work is being done in symbol resolution
 
@@ -1450,10 +1451,13 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             AstBinding *binding = onyx_ast_node_new(context.ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
             binding->token = inject->symbol;
             binding->node = (AstNode *) inject->to_inject;
+            binding->documentation = inject->documentation;
 
             Package *pac = NULL;
             if (inject->dest->kind == Ast_Kind_Package) {
                 pac = ((AstPackage *) inject->dest)->package;
+            } else {
+                pac = current_entity->package;
             }
 
             add_entities_for_node(NULL, (AstNode *) binding, scope, pac);
@@ -1729,6 +1733,10 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Binding: {
             symbol_introduce(current_scope, ent->binding->token, ent->binding->node);
             track_declaration_for_tags((AstNode *) ent->binding);
+
+            if (context.doc_info) {
+                onyx_docs_submit(context.doc_info, ent->binding);
+            }
 
             package_reinsert_use_packages(ent->package);
             next_state = Entity_State_Finalized;

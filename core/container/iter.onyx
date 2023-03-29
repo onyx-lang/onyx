@@ -16,6 +16,7 @@ use core.intrinsics.types {type_is_struct}
 #inject Iterator {
     filter :: filter;
     map :: map;
+    flatMap :: flatMap;
     zip :: zip;
 
     take_one :: take_one;
@@ -34,29 +35,31 @@ use core.intrinsics.types {type_is_struct}
 
 
 
-//
-// The standard function to convert something to an Iterator.
-// For-loops currently do not use this function to determine
-// how to iterate over something unknown, but that could be
-// a feature down the line.
+#doc """
+    The standard function to convert something to an Iterator.
+    For-loops currently do not use this function to determine
+    how to iterate over something unknown, but that could be
+    a feature down the line.
+"""
 as_iter :: #match -> Iterator {}
 
-//
-// Helper interface to test if something can be passed to
-// as_iter successfully.
+#doc """
+    Helper interface to test if something can be passed to
+    as_iter successfully.
+"""
 Iterable :: interface (t: $T) {
     { as_iter(t) } -> Iterator;
 }
 
-//
-// Helper function to get the next value out of an iterator.
+#doc "Helper function to get the next value out of an iterator."
 next :: (it: Iterator) -> (it.Iter_Type, bool) {
     return it.next(it.data);
 }
 
-//
-// Helper function to close an iterator, if a close function
-// is defined.
+#doc """
+    Helper function to close an iterator, if a close function
+    is defined.
+"""
 close :: (it: Iterator) {
     if it.close != null_proc {
         it.close(it.data);
@@ -108,8 +111,7 @@ HasAsIter :: interface (t: $T) {
 // Most of these procedures come in two variants,
 // one that takes a context paramter, and one that does not.
 
-//
-// Only yields the values for which the predicate is true.
+#doc "Only yields the values for which the predicate is true."
 filter :: #match #local {}
 
 #overload
@@ -155,9 +157,10 @@ filter :: (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool) =>
         fi => { close(fi.iterator); });
 
 
-//
-// Transforms every value that comes out of an iterator
-// using the transform function.
+#doc """
+    Transforms every value that comes out of an iterator
+    using the transform function.
+"""
 map :: #match #local {}
 
 #overload
@@ -193,8 +196,76 @@ map :: (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> $R) =>
         mi => { close(mi.iterator); })
 
 
-//
-// Only yields the first `count` values, then closes.
+#doc """
+    Transforms every value that comes out of an iterator
+    using the transform function into a new iterator, from
+    which subsequent values will be output.
+
+        iter.flatMap(iter.as_iter(1 .. 5), x => iter.as_iter(1 .. x+1))
+        // 1, 1, 2, 1, 2, 3, 1, 2, 3, 4
+"""
+flatMap :: #match #local {}
+
+#overload
+flatMap :: (it: Iterator($T), transform: (T) -> Iterator($R)) =>
+    generator(
+        &.{ iterator = it, transform = transform, inner_iter = Iterator(R).{}, get_new_inner = true },
+
+        mi => {
+            while true {
+                if mi.get_new_inner {
+                    mi.get_new_inner = false;
+                    t, outer := next(mi.iterator);
+                    if !outer do break;
+
+                    mi.inner_iter = mi.transform(t);
+                }
+
+                value, cont := next(mi.inner_iter);
+                if cont {
+                    return value, true;
+                }
+
+                mi.get_new_inner = true;
+            }
+
+            return .{}, false;
+        },
+
+        mi => { close(mi.iterator); })
+
+#overload
+flatMap :: (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> Iterator($R)) =>
+    generator(
+        &.{ iterator = it, transform = transform, inner_iter = Iterator(R).{}, get_new_inner = true, ctx = ctx },
+
+        mi => {
+            while true {
+                if mi.get_new_inner {
+                    mi.get_new_inner = false;
+                    t, outer := next(mi.iterator);
+                    if !outer do break;
+
+                    mi.inner_iter = mi.transform(t, mi.ctx);
+                }
+
+                value, cont := next(mi.inner_iter);
+                if cont {
+                    return value, true;
+                }
+
+                mi.get_new_inner = true;
+            }
+
+            return .{}, false;
+        },
+
+        mi => { close(mi.iterator); })
+
+
+
+
+#doc "Only yields the first `count` values, then closes."
 take :: (it: Iterator($T), count: u32) -> Iterator(T) {
     return generator(
         &.{ iterator = it, remaining = count },
@@ -212,8 +283,7 @@ take :: (it: Iterator($T), count: u32) -> Iterator(T) {
 }
 
 
-//
-// Yields values while the predicate returns true.
+#doc "Yields values while the predicate returns true."
 take_while :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
     return generator(
         &.{ iterator = it, predicate = predicate },
@@ -229,8 +299,7 @@ take_while :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
 }
 
 
-//
-// Discards the first `count` values and yields all remaining values,
+#doc "Discards the first `count` values and yields all remaining values."
 skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
     return generator(
         &.{ iterator = it, to_skip = count, skipped = false },
@@ -253,8 +322,7 @@ skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
 }
 
 
-//
-// Discards values while the predicate is true, then yields all values.
+#doc "Discards values while the predicate is true, then yields all values."
 skip_while :: #match #local {}
 
 #overload
@@ -310,9 +378,10 @@ skip_while :: (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool) -> Iter
 }
 
 
-//
-// Combines two iterators into one by yielding a Pair of
-// the value from each of the iterators.
+#doc """
+    Combines two iterators into one by yielding a Pair of
+    the value from each of the iterators.
+"""
 zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R)) -> Iterator(Pair(T, R)) {
     return generator(
         &.{ left_iter = left_iterator, right_iter = right_iterator },
@@ -328,9 +397,11 @@ zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R)) -> Iterator(P
 }
 
 
-//
-// Combines iterators by first yielding all values from
-// one, then yielding all values from the next, and so on.
+
+#doc """
+    Combines iterators by first yielding all values from
+    one, then yielding all values from the next, and so on.
+"""
 concat :: (iters: ..Iterator($T)) -> Iterator(T) {
     return generator(
         &.{
@@ -359,16 +430,29 @@ concat :: (iters: ..Iterator($T)) -> Iterator(T) {
         });
 }
 
-//
-// Yields the same value indefinitely. Useful with iter.zip.
+#doc "Yields the same value indefinitely. Useful with `iter.zip`."
 const :: (value: $T) -> Iterator(T) {
     return generator(&.{ v = value }, c => (c.v, true));
 }
 
+#doc "Yields a single value, then stops."
+single :: (value: $T) -> Iterator(T) {
+    return generator(&.{ v = value, yielded = false }, c => {
+        if !c.yielded {
+            c.yielded = true;
+            return c.v, true;
+        }
 
-//
-// Yields a value that contains: 1) the value from the iterator,
-// and 2) an incrementing integer.
+        return .{}, false;
+    });
+}
+
+
+#doc """
+    Yields a value that contains:
+        1) the value from the iterator,
+        2) an incrementing integer.
+"""
 enumerate :: #match #local {}
 
 #overload
@@ -400,23 +484,26 @@ enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Va
 
 
 
-//
-// Extract the next value out of an iterator. Closes it when
-// the iterator is out of values, if no_close is false.
+#doc """
+    Extract the next value out of an iterator. Closes it when
+    the iterator is out of values, if no_close is false.
+"""
 take_one :: (it: Iterator($T), no_close := false) -> (T, bool) {
     ret, cont := next(it);
     if !cont && !no_close { close(it); }
     return ret, cont;
 }
 
-// Macro that allows you to extract elements from an iterator in a simple way:
-//
-// value: i32;
-// iterator: Iterator(i32) = ...;
-//
-// if #(value) << iterator {
-//     ...iterater closed...
-// }
+#doc """
+    Macro that allows you to extract elements from an iterator in a simple way:
+    
+    value: i32;
+    iterator: Iterator(i32) = ...;
+    
+    if #(value) << iterator {
+        ...iterater closed...
+    }
+"""
 #operator << macro (dest: Code, it: Iterator($T)) -> bool {
     take_one :: take_one
 
@@ -435,15 +522,16 @@ take_one :: (it: Iterator($T), no_close := false) -> (T, bool) {
 #overload
 as_iter :: from_array
 
-//
-// `from_array` has two almost identical implementations,
-// but the details are important here. Normally, `from_array`
-// returns an iterator by value, unless the array is of
-// structures, then it returns an iterator by pointer.
-// This seems weird, but in practice it is closer to what
-// you want, as you don't want to have to copy every structure
-// out of the array. While for primitives, you don't want to
-// dereference it everywhere.
+#doc """
+    `from_array` has two almost identical implementations,
+    but the details are important here. Normally, `from_array`
+    returns an iterator by value, unless the array is of
+    structures, then it returns an iterator by pointer.
+    This seems weird, but in practice it is closer to what
+    you want, as you don't want to have to copy every structure
+    out of the array. While for primitives, you don't want to
+    dereference it everywhere.
+"""
 from_array :: #match #local {}
 
 #overload
@@ -489,9 +577,10 @@ from_array :: (arr: [] $T) => generator(
 );
 
 
-//
-// Iterators created from pointers to dynamic arrays are
-// special, because they support the #remove directive.
+#doc """
+    Iterators created from pointers to dynamic arrays are
+    special, because they support the #remove directive.
+"""
 #local
 generic_dynamic_array_as_iter :: (x: &[..] $T, $access: Code, $return_type: type_expr) => {
     Context :: struct (T: type_expr) {
@@ -569,10 +658,11 @@ as_iter :: (r: range) => generator(
 // Iterator reducing
 //
 
-//
-// Incremently calls `combine` on the yielded value and the
-// accumulated value, producing a new accumulated value. Returns
-// the final accumulated value.
+#doc """
+    Incremently calls `combine` on the yielded value and the
+    accumulated value, producing a new accumulated value. Returns
+    the final accumulated value.
+"""
 fold :: #match #local {}
 
 #overload
@@ -589,8 +679,7 @@ fold :: (it: Iterator($T), initial_value: $R, combine: (T, R) -> R) -> R {
 }
 
 
-//
-// Returns how many times the `cond` was true.
+#doc "Returns how many times the `cond` was true."
 count :: #match #local {}
 
 #overload
@@ -606,8 +695,7 @@ count :: (it: Iterator($T), cond: (T) -> bool) -> i32 {
 
 
 
-//
-// Returns if `cond` returned true for *any* yielded value.
+#doc "Returns if `cond` returned true for *any* yielded value."
 some :: #match #local {}
 
 #overload
@@ -621,8 +709,7 @@ some :: (it: Iterator($T), cond: (T) -> bool) -> bool {
 }
 
 
-//
-// Returns if `cond` returned true for *all* yielded values.
+#doc "Returns if `cond` returned true for *all* yielded values."
 every :: #match #local {}
 
 #overload
@@ -636,9 +723,10 @@ every :: (it: Iterator($T), cond: (T) -> bool) -> bool {
 }
 
 
-//
-// Places all yielded values into a dynamically allocated array,
-// using the allocator provided (context.allocator by default).
+#doc """
+    Places all yielded values into a dynamically allocated array,
+    using the allocator provided (context.allocator by default).
+"""
 to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
     arr := array.make(T, allocator=allocator);
     for v: it do array.push(&arr, v);
@@ -647,17 +735,18 @@ to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
 }
 
 
-//
-// Produces an iterator that first yields all values from the
-// first iterable, combined with the first yield value from the
-// second iterable. Then, steps the second iterable, and repeats.
-//
-// For example,
-//
-//      iter.prod(1 .. 4, 1 .. 3)
-//
-// Would yield:
-//      (1, 1), (2, 1), (3, 1), (1, 2), (2, 2), (3, 2)
+#doc """
+    Produces an iterator that first yields all values from the
+    first iterable, combined with the first yield value from the
+    second iterable. Then, steps the second iterable, and repeats.
+   
+    For example,
+   
+         iter.prod(1 .. 4, 1 .. 3)
+   
+    Would yield:
+         (1, 1), (2, 1), (3, 1), (1, 2), (2, 2), (3, 2)
+"""
 prod :: #match #local {}
 
 #overload
@@ -697,14 +786,15 @@ prod :: (x: $I1/Iterable, y_iter: Iterator($Y)) => {
 }
 
 
-//
-// Simple iterator comprehensions, in the same vein
-// as Pythons comprehension syntax.
-// 
-// Python:
-//     results = [it * 2 for it in [1, 2, 3, 4, 5]]
-// Onyx:
-//     results := iter.comp(u32.[1, 2, 3, 4, 5], #(it * 2));
+#doc """
+    Simple iterator comprehensions, in the same vein
+    as Pythons comprehension syntax.
+    
+    Python:
+        results = [it * 2 for it in [1, 2, 3, 4, 5]]
+    Onyx:
+        results := iter.comp(u32.[1, 2, 3, 4, 5], #(it * 2));
+"""
 comp :: #match #local {}
 
 #overload
@@ -733,13 +823,14 @@ comp :: macro (i: $I/Iterable, value: Code) =>
     #this_package.comp(#this_package.as_iter(i), value);
 
 
-//
-// Using the polymorph solving system, you can write type
-// free versions of arbitrary iterators. This is used
-// heavily by many of the functions defined above.
-//
-// Maybe at some point an alternate allocator would be good
-// for this? For now, I think the temporary allocator is sufficient.
+#doc """
+    Using the polymorph solving system, you can write type
+    free versions of arbitrary iterators. This is used
+    heavily by many of the functions defined above.
+    
+    Maybe at some point an alternate allocator would be good
+    for this? For now, I think the temporary allocator is sufficient.
+"""
 generator :: #match #local {}
 
 #overload
@@ -826,14 +917,14 @@ generator_no_copy :: (ctx: &$Ctx, gen: (&Ctx) -> ($T, bool), close: (&Ctx) -> vo
         return .{c, #solidify next {T=it.Iter_Type}, #solidify close {T=it.Iter_Type}};
     }
 
-    //
-    // Allows you to easily write a parallelized for-loop over an iterator.
-    // For example,
-    //
-    //     iter.parallel_for(1 .. 100, 4, &.{}) {
-    //         printf("Thread {} has {}!\n", context.thread_id, it);
-    //     }
-    //
+    #doc """
+        Allows you to easily write a parallelized for-loop over an iterator.
+        For example,
+        
+            iter.parallel_for(1 .. 100, 4, &.{}) {
+                printf("Thread {} has {}!\n", context.thread_id, it);
+            }
+    """
     parallel_for :: #match #local {}
 
     #overload

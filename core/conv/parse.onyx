@@ -6,9 +6,10 @@ use core.array
 use core.math
 use runtime
 
-//
-// Parses many different types from a string into a value.
-// Uses a custom parser if one has been specified for the type given.
+#doc """
+    Parses many different types from a string into a value.
+    Uses a custom parser if one has been specified for the type given.
+"""
 parse_any :: #match {}
 
 #overload

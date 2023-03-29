@@ -77,8 +77,9 @@ print :: #match #locked {
 //
 // Helper procedure that prints something, then prints a newline.
 println :: (x) => {
-    print(x);
-    print("\n");
+    use core
+    core.print(x);
+    core.print("\n");
 }
 
 //

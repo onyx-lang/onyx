@@ -24,7 +24,9 @@ use runtime
 
 #load "./math/math"
 #load "./random/random"
+
 #load "./hash/hash"
+#load "./hash/md5"
 
 #load "./string/string"
 #load "./string/buffer"
@@ -57,6 +59,8 @@ use runtime
 #load "./encoding/osad"
 
 #load "./runtime/common"
+
+#load "./doc/doc"
 
 #if runtime.platform.Supports_Files {
     #load "./os/file"

@@ -287,6 +287,11 @@ typedef enum AstFlags {
     Ast_Flag_Dead                  = BH_BIT(22),
 
     Ast_Flag_Extra_Field_Access    = BH_BIT(23),
+
+    Ast_Flag_Symbol_Is_PolyVar     = BH_BIT(24),
+    Ast_Flag_Poly_Call_From_Auto   = BH_BIT(24),
+
+    Ast_Flag_Binding_Isnt_Captured = BH_BIT(25),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -1031,7 +1036,7 @@ struct AstDistinctType {
 };
 
 // Top level nodes
-struct AstBinding       { AstTyped_base; AstNode* node; };
+struct AstBinding       { AstTyped_base; AstNode* node; OnyxToken *documentation; };
 struct AstAlias         { AstTyped_base; AstTyped* alias; };
 struct AstInclude       { AstNode_base;  AstTyped* name_node; char* name; };
 struct AstInjection     {
@@ -1040,6 +1045,7 @@ struct AstInjection     {
     AstTyped* to_inject;
     AstTyped* dest;
     OnyxToken *symbol;
+    OnyxToken *documentation;
 };
 struct AstMemRes        {
     AstTyped_base;
@@ -1095,6 +1101,8 @@ struct AstOverloadedFunction {
 
     AstType *expected_return_node;
     Type    *expected_return_type;
+
+    AstBinding *original_binding_to_node;
 
     b32 locked : 1;
     b32 only_local_functions : 1;
@@ -1313,6 +1321,8 @@ struct AstFunction {
 
     bh_arr(AstNode *) nodes_that_need_entities_after_clone;
 
+    AstBinding *original_binding_to_node;
+
     b32 is_exported        : 1;
     b32 is_foreign         : 1;
     b32 is_foreign_dyncall : 1;
@@ -1430,6 +1440,8 @@ struct AstMacro {
     AstTyped_base;
 
     AstTyped* body;
+
+    AstBinding *original_binding_to_node;
 };
 
 struct AstDirectiveLibrary {
@@ -1590,11 +1602,16 @@ void emit_entity(Entity* ent);
 
 struct Package {
     char *name;
+    char *unqualified_name;
 
     Scope *scope;
     Scope *private_scope;
 
     u32 id;
+
+    // NOTE: id's of the sub-packages
+    bh_arr(u32) sub_packages;
+    i32 parent_id;
 
     // NOTE: This tracks all of the 'use package' statements of this package throughout
     // the code base. This is used when a static if clears and new symbols are introduced.
@@ -1622,6 +1639,16 @@ enum Runtime {
     Runtime_Js      = 3,
     Runtime_Custom  = 4,
 };
+
+
+typedef struct OnyxDocInfo {
+    bh_arr(AstBinding *) procedures;
+    bh_arr(AstBinding *) structures;
+    bh_arr(AstBinding *) enumerations;
+
+    Table(u32) file_ids;
+    u32 next_file_id;
+} OnyxDocInfo;
 
 
 typedef struct CompileOptions CompileOptions;
@@ -1681,6 +1708,7 @@ struct Context {
     bh_arr(AstNode *) tag_locations;
 
     struct SymbolInfoTable *symbol_info;
+    struct OnyxDocInfo     *doc_info;
 
     u32 cycle_almost_detected : 2;
     b32 cycle_detected : 1;

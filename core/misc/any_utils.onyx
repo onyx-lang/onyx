@@ -27,8 +27,7 @@ any_as :: (a: any, $T: type_expr) -> &T {
     return cast(&T) a.data;
 }
 
-//
-// Dereference a pointer any.
+#doc "Dereference a pointer any."
 any_dereference :: (v: any) -> any {
     t := get_type_info(v.type);
     if t.kind == .Pointer {
@@ -39,8 +38,8 @@ any_dereference :: (v: any) -> any {
     return v;
 }
 
-//
-// Subscript an array-like any.
+
+#doc "Subscript an array-like any."
 any_subscript :: (v: any, index: i32) -> any {
     base_ptr, elem_type, count := any_as_array(v);
     if index >= count || index < 0 {
@@ -53,8 +52,7 @@ any_subscript :: (v: any, index: i32) -> any {
     };
 }
 
-//
-// Select a member from an any.
+#doc "Select a member from an any."
 any_selector :: (v: any, member_name: str) -> any {
     t := get_type_info(v.type);
     if t.kind == .Struct {
@@ -67,8 +65,7 @@ any_selector :: (v: any, member_name: str) -> any {
     return .{null, void};
 }
 
-//
-// This selector works with selecting "foo.bar.joe"
+#doc "Like `any_selector`, but works with selecting \"foo.bar.joe\"."
 any_nested_selector :: (v: any, member_name: str) -> any {
     t := get_type_info(v.type);
     if t.kind != .Struct do return .{};
@@ -89,20 +86,20 @@ any_nested_selector :: (v: any, member_name: str) -> any {
     return .{null, void};
 }
 
-//
-// Convert a structure or pointer to a structure to a Map with
-// keys representing the fields of the structure, and values
-// representing the value of each field.
-//
-//     T :: struct {
-//         x := 123;
-//         y := "test";
-//     }
-//     
-//     m := any_to_map(T.{});
-//
-// `m` would have two keys, "x" and "y".
-//
+#doc """
+    Convert a structure or pointer to a structure to a Map with
+    keys representing the fields of the structure, and values
+    representing the value of each field.
+   
+        T :: struct {
+            x := 123;
+            y := "test";
+        }
+        
+        m := any_to_map(T.{});
+   
+    `m` would have two keys, "x" and "y".
+"""
 any_to_map :: (v: any) -> (Map(str, any), success: bool) {
     vals := v;
     if get_type_info(vals.type).kind == .Pointer {
@@ -122,8 +119,7 @@ any_to_map :: (v: any) -> (Map(str, any), success: bool) {
     return out, true;
 }
 
-//
-// Creates an iterator out of an array-like any.
+#doc "Creates an iterator out of an array-like any."
 any_iter :: (arr: any) -> Iterator(any) {
     base_ptr, elem_type, count := any_as_array(arr);
     if count == 0 {

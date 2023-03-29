@@ -335,6 +335,7 @@ BH_ALLOCATOR_PROC(bh_scratch_allocator_proc);
 b32 bh_str_starts_with(char* str, char* start);
 b32 bh_str_ends_with(char* str, char* end);
 b32 bh_str_contains(char *str, char *needle);
+u32 bh_str_last_index_of(char *str, char needle);
 char* bh_strdup(bh_allocator a, char* str);
 
 
@@ -1490,6 +1491,21 @@ b32 bh_str_contains(char *str, char *needle) {
     }
 
     return 0;
+}
+
+u32 bh_str_last_index_of(char *str, char needle) {
+    u32 count = strlen(str);
+    char *end = str + count - 1;
+
+    while (end != str) {
+        if (*end == needle) break;
+        count -= 1;
+        end--;
+    }
+
+    if (end == str) count = 0;
+
+    return count;
 }
 
 char* bh_strdup(bh_allocator a, char* str) {

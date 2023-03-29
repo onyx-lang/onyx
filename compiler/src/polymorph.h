@@ -1000,6 +1000,7 @@ b32 potentially_convert_function_to_polyproc(AstFunction *func) {
         AstPolyCallType* pcall = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
         pcall->callee = *apv->replace;
         pcall->token = pcall->callee->token;
+        pcall->flags |= Ast_Flag_Poly_Call_From_Auto;
         bh_arr_new(global_heap_allocator, pcall->params, apv->variable_count);
 
         if (apv->base_type->kind == Ast_Kind_Poly_Struct_Type) {
@@ -1017,6 +1018,7 @@ b32 potentially_convert_function_to_polyproc(AstFunction *func) {
             name_token->pos  = pcall->token->pos;
 
             pp.poly_sym = make_symbol(context.ast_alloc, name_token);
+            pp.poly_sym->flags |= Ast_Flag_Symbol_Is_PolyVar;
             bh_arr_push(pcall->params, pp.poly_sym);
             bh_arr_push(func->poly_params, pp);
             param_idx ++;

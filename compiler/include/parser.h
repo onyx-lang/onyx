@@ -47,6 +47,11 @@ typedef struct OnyxParser {
     // in other files.
     u32 overload_count;
 
+    // Used by `#doc` directives to store their documentation
+    // string. This is then used by binding nodes to capture
+    // documentation.
+    OnyxToken *last_documentation_token;
+
     u16 tag_depth : 16;
 
     b32 hit_unexpected_token : 1;
