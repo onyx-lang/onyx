@@ -75,6 +75,23 @@ stream_read_byte :: (use s: &Stream) -> (Error, u8) {
     return vtable.read_byte(s);
 }
 
+stream_read_until_full :: (use s: &Stream, buffer: [] u8) -> (Error, u32) {
+    if vtable == null do return .NoVtable, 0;
+    if vtable.read == null_proc do return .NotImplemented, 0;
+
+    bytes_read := 0;
+    while bytes_read < buffer.count {
+        err, r := vtable.read(s, buffer[bytes_read .. buffer.length]);
+        bytes_read += r;
+
+        if err != .ReadPending && err != .ReadLater && err != .None {
+            return err, bytes_read;
+        }
+    }
+
+    return .None, bytes_read;
+}
+
 stream_write :: (use s: &Stream, buffer: [] u8) -> (Error, u32) {
     if vtable == null do return .NoVtable, 0;
     if vtable.write == null_proc do return .NotImplemented, 0;
