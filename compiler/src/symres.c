@@ -1451,10 +1451,13 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             AstBinding *binding = onyx_ast_node_new(context.ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
             binding->token = inject->symbol;
             binding->node = (AstNode *) inject->to_inject;
+            binding->documentation = inject->documentation;
 
             Package *pac = NULL;
             if (inject->dest->kind == Ast_Kind_Package) {
                 pac = ((AstPackage *) inject->dest)->package;
+            } else {
+                pac = current_entity->package;
             }
 
             add_entities_for_node(NULL, (AstNode *) binding, scope, pac);

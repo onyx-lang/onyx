@@ -144,25 +144,48 @@ void onyx_docs_emit_symbol_info(const char *dest) {
 
 void onyx_docs_submit(OnyxDocInfo *docs, AstBinding *binding) {
     if (!binding->entity || !binding->entity->package) return;
-    if (!(binding->flags & Ast_Flag_Binding_Isnt_Captured)) return;
 
     AstNode *node = binding->node;
+    if (!(binding->flags & Ast_Flag_Binding_Isnt_Captured)) {
+        if (node->kind == Ast_Kind_Function) {
+            ((AstFunction *) node)->original_binding_to_node = binding;
+        }
+
+        if (node->kind == Ast_Kind_Macro) {
+            ((AstMacro *) node)->original_binding_to_node = binding;
+        }
+
+        if (node->kind == Ast_Kind_Polymorphic_Proc) {
+            ((AstFunction *) node)->original_binding_to_node = binding;
+        }
+
+        if (node->kind == Ast_Kind_Overloaded_Function) {
+            ((AstOverloadedFunction *) node)->original_binding_to_node = binding;
+        }
+
+        return;   
+    }
+
     if (node->kind == Ast_Kind_Function) {
         AstFunction *func = (void *) node;
         if (!func->generated_from) {
+            func->original_binding_to_node = binding;
             bh_arr_push(docs->procedures, binding);
         }
     }
 
     if (node->kind == Ast_Kind_Macro) {
+        ((AstMacro *) node)->original_binding_to_node = binding;
         bh_arr_push(docs->procedures, binding);
     }
 
     if (node->kind == Ast_Kind_Polymorphic_Proc) {
+        ((AstFunction *) node)->original_binding_to_node = binding;
         bh_arr_push(docs->procedures, binding);
     }
 
     if (node->kind == Ast_Kind_Overloaded_Function) {
+        ((AstOverloadedFunction *) node)->original_binding_to_node = binding;
         bh_arr_push(docs->procedures, binding);
     }
 
@@ -496,8 +519,11 @@ static b32 write_doc_procedure(bh_buffer *buffer, AstBinding *binding, AstNode *
 }
 
 static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *node) {
+    Scope *method_scope = NULL;
+
     if (node->kind == Ast_Kind_Struct_Type) {
         AstStructType *struct_node = (void *) node;
+        method_scope = get_scope_from_node((AstNode *) struct_node);
 
         write_entity_header(buffer, binding, node->token->pos);
 
@@ -520,6 +546,8 @@ static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *
     }
     else if (node->kind == Ast_Kind_Poly_Struct_Type) {
         AstPolyStructType *poly_struct_node = (void *) node;
+        method_scope = get_scope_from_node((AstNode *) poly_struct_node);
+
         AstStructType *struct_node = poly_struct_node->base_struct;
 
         write_entity_header(buffer, binding, node->token->pos);
@@ -554,6 +582,35 @@ static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *
 
         bh_buffer_free(&type_buf);
     }
+
+    u32 count_patch = buffer->length;
+    bh_buffer_write_u32(buffer, 0);
+
+    u32 method_count = 0;
+    fori (i, 0, shlen(method_scope->symbols)) {
+        AstFunction* node = (AstFunction *) strip_aliases(method_scope->symbols[i].value);
+        if (node->kind != Ast_Kind_Function
+            && node->kind != Ast_Kind_Polymorphic_Proc
+            && node->kind != Ast_Kind_Overloaded_Function
+            && node->kind != Ast_Kind_Macro)
+            continue;
+
+        assert(node->entity);
+        assert(node->entity->function == node);
+
+        AstBinding *binding = NULL;
+        switch (node->kind) {
+            case Ast_Kind_Polymorphic_Proc:
+            case Ast_Kind_Function:            binding = node->original_binding_to_node; break;
+            case Ast_Kind_Macro:               binding = ((AstMacro *) node)->original_binding_to_node; break;
+            case Ast_Kind_Overloaded_Function: binding = ((AstOverloadedFunction *) node)->original_binding_to_node; break;
+        }
+
+        method_count++;
+        write_doc_procedure(buffer, binding, (AstNode *) node);
+    }
+
+    *((u32 *) bh_pointer_add(buffer->data, count_patch)) = method_count;
 
     return 1;
 }

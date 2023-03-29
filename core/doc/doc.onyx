@@ -95,6 +95,8 @@ Doc_Structure :: struct {
 
     members: [] Doc_Structure_Member;
     polymorph_arguments: [] Doc_Param;
+
+    methods: [] Doc_Procedure;
 }
 
 Doc_Structure_Member :: struct {

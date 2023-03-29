@@ -3441,6 +3441,10 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 inject->token = dir_token;
                 inject->full_loc = injection_point;
                 inject->to_inject = parse_top_level_expression(parser);
+                if (parser->last_documentation_token) {
+                    inject->documentation = parser->last_documentation_token;
+                    parser->last_documentation_token = NULL;
+                }
                 
                 ENTITY_SUBMIT(inject);
                 return;
@@ -3553,6 +3557,7 @@ submit_binding_to_entities:
             injection->dest = parser->injection_point;
             injection->symbol = binding->token;
             injection->to_inject = (AstTyped *) binding->node;
+            injection->documentation = binding->documentation;
 
             ENTITY_SUBMIT(injection);
             return;

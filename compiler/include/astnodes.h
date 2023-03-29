@@ -1045,6 +1045,7 @@ struct AstInjection     {
     AstTyped* to_inject;
     AstTyped* dest;
     OnyxToken *symbol;
+    OnyxToken *documentation;
 };
 struct AstMemRes        {
     AstTyped_base;
@@ -1100,6 +1101,8 @@ struct AstOverloadedFunction {
 
     AstType *expected_return_node;
     Type    *expected_return_type;
+
+    AstBinding *original_binding_to_node;
 
     b32 locked : 1;
     b32 only_local_functions : 1;
@@ -1318,6 +1321,8 @@ struct AstFunction {
 
     bh_arr(AstNode *) nodes_that_need_entities_after_clone;
 
+    AstBinding *original_binding_to_node;
+
     b32 is_exported        : 1;
     b32 is_foreign         : 1;
     b32 is_foreign_dyncall : 1;
@@ -1435,6 +1440,8 @@ struct AstMacro {
     AstTyped_base;
 
     AstTyped* body;
+
+    AstBinding *original_binding_to_node;
 };
 
 struct AstDirectiveLibrary {

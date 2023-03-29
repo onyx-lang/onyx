@@ -127,17 +127,17 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
         If result contains Err, the error is returned from the enclosing
         procedure. Otherwise, the Ok value is returned.
 
-        f :: () -> Result(i32, str) {
-            Result.return_err("Oh no...");
-        }
-
-        g :: () -> Result(str, str) {
-            // This returns from g with the error returned from f.
-            v := f()->forward_err();
-            println(v);
-
-           Result.return_ok("Success!");
-        }
+            f :: () -> Result(i32, str) {
+                Result.return_err("Oh no...");
+            }
+            
+            g :: () -> Result(str, str) {
+                // This returns from g with the error returned from f.
+                v := f()->forward_err();
+                println(v);
+                
+                Result.return_ok("Success!");
+            }
     """
     forward_err :: macro (r: Result($T, $E)) -> T {
         res := r;
@@ -160,8 +160,8 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
     #doc """
         If result contains Err, the given code is run. This code is
         expected to either:
-            - Return a good value with `return`
-            - Return an error value with `return return`
+        - Return a good value with `return`
+        - Return an error value with `return return`
 
         This procedure is subject to change.
     """
