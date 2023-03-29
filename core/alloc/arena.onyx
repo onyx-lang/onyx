@@ -128,7 +128,7 @@ free :: (arena: &Arena) {
     arena.size          = 0;
 }
 
-// Clears and frees every page, except for first page.
+#doc "Clears and frees every page, except for first page."
 clear :: (arena: &Arena) {
     walker := arena.first_arena.next;
     while walker != null {

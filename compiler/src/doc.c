@@ -341,6 +341,14 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
             bh_buffer_write_string(buffer, "_TYPEOF_");
             return;
 
+        case Ast_Kind_Alias:
+            write_type_node(buffer, ((AstAlias *) node)->alias);
+            return;
+
+        case Ast_Kind_Type_Alias:
+            write_type_node(buffer, ((AstTypeAlias *) node)->to);
+            return;
+
         case Ast_Kind_Symbol:
         case Ast_Kind_Param:
             if (node->flags & Ast_Flag_Symbol_Is_PolyVar)
