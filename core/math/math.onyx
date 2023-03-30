@@ -249,6 +249,18 @@ ilog2 :: (a: u64) -> u64 {
 }
 
 
+fmod :: #match #local {}
+
+#overload
+fmod :: (x, y: f64) -> f64 {
+    return x - trunc(x / y) * y;
+}
+
+#overload
+fmod :: (x, y: f32) -> f32 {
+    return x - trunc(x / y) * y;
+}
+
 
 // These function are overloaded in order to use the builtin WASM intrinsics for the
 // operation first, and then default to a polymorphic function that works on any type.
