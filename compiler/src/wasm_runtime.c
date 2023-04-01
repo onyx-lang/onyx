@@ -6,6 +6,7 @@
 
 #ifdef USE_DYNCALL
     #include "dyncall.h"
+    #include "dyncall_callback.h"
     static DCCallVM *dcCallVM;
 #endif
 
@@ -225,6 +226,7 @@ static wasm_trap_t *__wasm_dyncall(void *env, const wasm_val_vec_t *args, wasm_v
                 arg_idx++;
                 dcArgInt(dcCallVM, args->data[arg_idx++].of.i32);
                 break;
+
             default: assert(("bad dynamic call type", 0));
         }
     }

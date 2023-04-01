@@ -4121,38 +4121,37 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     debug_end_function(mod);
 }
 
-static char encode_type_as_dyncall_symbol(Type *t) {
+static void encode_type_as_dyncall_symbol(char *out, Type *t) {
     if (type_struct_is_just_one_basic_value(t)) {
         Type *inner = type_struct_is_just_one_basic_value(t);
-        return encode_type_as_dyncall_symbol(inner);
+        encode_type_as_dyncall_symbol(out, inner);
     }
 
-    if (t->kind == Type_Kind_Slice)   return 's';
-    if (t->kind == Type_Kind_Pointer) return 'p';
-    if (t->kind == Type_Kind_MultiPointer) return 'p';
-    if (t->kind == Type_Kind_Enum)    return encode_type_as_dyncall_symbol(t->Enum.backing);
-    if (t->kind == Type_Kind_Basic) {
+    else if (t->kind == Type_Kind_Slice) strncat(out, "s", 64);
+    else if (t->kind == Type_Kind_Pointer) strncat(out, "p", 64);
+    else if (t->kind == Type_Kind_MultiPointer) strncat(out, "p", 64);
+    else if (t->kind == Type_Kind_Enum) encode_type_as_dyncall_symbol(out, t->Enum.backing);
+    else if (t->kind == Type_Kind_Basic) {
         TypeBasic* basic = &t->Basic;
-        if (basic->flags & Basic_Flag_Boolean) return 'i';
-        if (basic->flags & Basic_Flag_Integer) {
-            if (basic->size <= 4) return 'i';
-            if (basic->size == 8) return 'l';
+        if (basic->flags & Basic_Flag_Boolean) strncat(out, "i", 64);
+        else if (basic->flags & Basic_Flag_Integer) {
+            if (basic->size <= 4) strncat(out, "i", 64);
+            if (basic->size == 8) strncat(out, "l", 64);
         }
-        if (basic->flags & Basic_Flag_Pointer) return 'p';
-        if (basic->flags & Basic_Flag_Float) {
-            if (basic->size <= 4) return 'f';
-            if (basic->size == 8) return 'd';
+        else if (basic->flags & Basic_Flag_Pointer) strncat(out, "p", 64);
+        else if (basic->flags & Basic_Flag_Float) {
+            if (basic->size <= 4) strncat(out, "f", 64);
+            if (basic->size == 8) strncat(out, "d", 64);
         }
-        if (basic->flags & Basic_Flag_SIMD) return 'v';
-        if (basic->flags & Basic_Flag_Type_Index) return 'i';
-        if (basic->size == 0) return 'v';
+        else if (basic->flags & Basic_Flag_SIMD) strncat(out, "v", 64);
+        else if (basic->flags & Basic_Flag_Type_Index) strncat(out, "i", 64);
+        else strncat(out, "v", 64);
+    }
+    else if (t->kind == Type_Kind_Distinct) {
+        encode_type_as_dyncall_symbol(out, t->Distinct.base_type);
     }
 
-    if (t->kind == Type_Kind_Distinct) {
-        return encode_type_as_dyncall_symbol(t->Distinct.base_type);
-    }
-
-    return 'v';
+    else strncat(out, "v", 64);
 }
 
 static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
@@ -4165,12 +4164,11 @@ static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
     if (fd->is_foreign_dyncall) {
         module = bh_aprintf(global_heap_allocator, "dyncall:%b", fd->foreign_module->text, fd->foreign_module->length);
 
-        char type_encoding[64] = {0};
-        type_encoding[0] = encode_type_as_dyncall_symbol(fd->type->Function.return_type);
+        char type_encoding[65] = {0};
+        encode_type_as_dyncall_symbol(type_encoding, fd->type->Function.return_type);
 
-        int index = 1;
         bh_arr_each(AstParam, param, fd->params) {
-            type_encoding[index++] = encode_type_as_dyncall_symbol(param->local->type);
+            encode_type_as_dyncall_symbol(type_encoding, param->local->type);
         }
 
         name = bh_aprintf(global_heap_allocator, "%b:%s", fd->foreign_name->text, fd->foreign_name->length, type_encoding);
