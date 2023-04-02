@@ -2615,8 +2615,8 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
         }
 
         else if (parse_possible_directive(parser, "foreign")) {
-            func_def->foreign_module = expect_token(parser, Token_Type_Literal_String);
-            func_def->foreign_name   = expect_token(parser, Token_Type_Literal_String);
+            func_def->foreign.module_name = parse_expression(parser, 0);
+            func_def->foreign.import_name = parse_expression(parser, 0);
 
             func_def->is_foreign = 1;
         }
@@ -3040,7 +3040,7 @@ static AstForeignBlock* parse_foreign_block(OnyxParser* parser, OnyxToken *token
         fb->uses_dyncall = 1;
     }
 
-    fb->module_name = expect_token(parser, Token_Type_Literal_String);
+    fb->module_name = parse_expression(parser, 0);
 
     //
     // This has a fun implication that there cannot be foreign blocks in the builtin

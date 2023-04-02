@@ -583,6 +583,11 @@ struct Arguments {
     i32 used_argument_count;
 };
 
+typedef struct ForeignReference {
+    AstTyped *module_name;
+    AstTyped *import_name;
+} ForeignReference;
+
 
 // Base Nodes
 #define AstNode_base \
@@ -1064,8 +1069,7 @@ struct AstGlobal        {
 
     char* name;
 
-    OnyxToken* foreign_module;
-    OnyxToken* foreign_name;
+    ForeignReference foreign;
 };
 struct AstParam {
     // HACK CLEANUP: This does not need to have a local buried inside of it.
@@ -1294,11 +1298,7 @@ struct AstFunction {
     union {
         OnyxToken* intrinsic_name;
 
-        // NOTE: Used when the function is declared as foreign
-        struct {
-            OnyxToken* foreign_module;
-            OnyxToken* foreign_name;
-        };
+        ForeignReference foreign;
     };
 
     struct Entity* entity_header;
@@ -1455,7 +1455,7 @@ struct AstForeignBlock {
     AstTyped_base;
 
     Scope* scope;
-    OnyxToken *module_name;
+    AstTyped *module_name;
     bh_arr(struct Entity *) captured_entities;
 
     u32 foreign_block_number;
@@ -1844,6 +1844,7 @@ AstNumLit*        make_bool_literal(bh_allocator, b32 b);
 AstNumLit*        make_int_literal(bh_allocator a, i64 value);
 AstNumLit*        make_float_literal(bh_allocator a, f64 value);
 AstRangeLiteral*  make_range_literal(bh_allocator a, AstTyped* low, AstTyped* high);
+AstStrLit*        make_string_literal(bh_allocator a, OnyxToken *token);
 AstBinaryOp*      make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right);
 AstArgument*      make_argument(bh_allocator a, AstTyped* value);
 AstFieldAccess*   make_field_access(bh_allocator a, AstTyped* node, char* field);

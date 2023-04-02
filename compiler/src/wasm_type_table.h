@@ -662,9 +662,10 @@ static u64 build_foreign_blocks(OnyxWasmModule* module) {
             AstFunction *func = (AstFunction *) fb->scope->symbols[i].value;
             if (func->kind != Ast_Kind_Function) continue;
 
+            OnyxToken *import_name = func->foreign.import_name->token;
             u32 func_name_base = foreign_buffer.length;
-            u32 func_name_length = func->foreign_name->length;
-            bh_buffer_append(&foreign_buffer, func->foreign_name->text, func_name_length);
+            u32 func_name_length = import_name->length;
+            bh_buffer_append(&foreign_buffer, import_name->text, func_name_length);
 
             name_offsets[funcs_length] = func_name_base;
             name_lengths[funcs_length] = func_name_length;
@@ -681,9 +682,10 @@ static u64 build_foreign_blocks(OnyxWasmModule* module) {
             bh_buffer_write_u32(&foreign_buffer, func_types[i]);
         }
 
+        OnyxToken *module_name = fb->module_name->token;
         u32 name_base = foreign_buffer.length;
-        u32 name_length = fb->module_name->length;
-        bh_buffer_append(&foreign_buffer, fb->module_name->text, name_length);
+        u32 name_length = module_name->length;
+        bh_buffer_append(&foreign_buffer, module_name->text, name_length);
         bh_buffer_align(&foreign_buffer, 8);
 
         foreign_info[index] = foreign_buffer.length;

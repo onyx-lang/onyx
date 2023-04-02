@@ -1,5 +1,3 @@
-#load "core/std"
-
 use core {*}
 
 Cell :: u8
@@ -29,8 +27,7 @@ main :: (args) => {
 
         boards: [..] Board;
         while !io.reader_empty(&reader) {
-            array.insert_empty(&boards, boards.count);
-            board := &boards[boards.count - 1];
+            board := array.alloc_one(&boards);
             board.has_won = false;
             memory.set(&board.marked, 0, sizeof typeof board.marked);
 

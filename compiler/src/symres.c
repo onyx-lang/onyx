@@ -1017,6 +1017,11 @@ SymresStatus symres_function_header(AstFunction* func) {
         SYMRES(expression, (AstTyped **) &func->deprecated_warning);
     }
 
+    if (func->foreign.import_name) {
+        SYMRES(expression, &func->foreign.module_name);
+        SYMRES(expression, &func->foreign.import_name);
+    }
+
     scope_leave();
 
     return Symres_Success;
@@ -1592,6 +1597,13 @@ static SymresStatus symres_foreign_block(AstForeignBlock *fb) {
     if (fb->scope == NULL)
         fb->scope = scope_create(context.ast_alloc, current_scope, fb->token->pos);
 
+    SYMRES(expression, &fb->module_name);
+
+    if (fb->module_name->kind != Ast_Kind_StrLit) {
+        onyx_report_error(fb->token->pos, Error_Critical, "Expected module name to be a compile-time string literal.");
+        return Symres_Error;
+    }
+
     bh_arr_each(Entity *, pent, fb->captured_entities) {
         Entity *ent = *pent;
         if (ent->type == Entity_Type_Function_Header) {
@@ -1600,8 +1612,8 @@ static SymresStatus symres_foreign_block(AstForeignBlock *fb) {
                 return Symres_Error;
             }
 
-            ent->function->foreign_name = ent->function->intrinsic_name; // Hmm... This might not be right?
-            ent->function->foreign_module = fb->module_name;
+            ent->function->foreign.import_name = make_string_literal(context.ast_alloc, ent->function->intrinsic_name);
+            ent->function->foreign.module_name = fb->module_name;
             ent->function->is_foreign = 1;
             ent->function->is_foreign_dyncall = fb->uses_dyncall;
             ent->function->entity = NULL;

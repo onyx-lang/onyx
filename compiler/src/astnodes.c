@@ -1488,6 +1488,14 @@ AstRangeLiteral* make_range_literal(bh_allocator a, AstTyped* low, AstTyped* hig
     return rl;
 }
 
+AstStrLit* make_string_literal(bh_allocator a, OnyxToken *token) {
+    AstStrLit *str = onyx_ast_node_new(a, sizeof(AstStrLit), Ast_Kind_StrLit);
+    str->flags |= Ast_Flag_Comptime;
+    str->type_node = builtin_string_type;
+    str->token = token;
+    return str;
+}
+
 AstBinaryOp* make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right) {
     AstBinaryOp* binop_node = onyx_ast_node_new(a, sizeof(AstBinaryOp), Ast_Kind_Binary_Op);
     binop_node->left  = left;

@@ -4160,9 +4160,11 @@ static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
     i32 type_idx = generate_type_idx(mod, fd->type);
 
     char *module, *name;
+    OnyxToken *foreign_module = fd->foreign.module_name->token;
+    OnyxToken *foreign_import = fd->foreign.import_name->token;
 
     if (fd->is_foreign_dyncall) {
-        module = bh_aprintf(global_heap_allocator, "dyncall:%b", fd->foreign_module->text, fd->foreign_module->length);
+        module = bh_aprintf(global_heap_allocator, "dyncall:%b", foreign_module->text, foreign_module->length);
 
         char type_encoding[65] = {0};
         encode_type_as_dyncall_symbol(type_encoding, fd->type->Function.return_type);
@@ -4171,11 +4173,11 @@ static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
             encode_type_as_dyncall_symbol(type_encoding, param->local->type);
         }
 
-        name = bh_aprintf(global_heap_allocator, "%b:%s", fd->foreign_name->text, fd->foreign_name->length, type_encoding);
+        name = bh_aprintf(global_heap_allocator, "%b:%s", foreign_import->text, foreign_import->length, type_encoding);
 
     } else {
-        module = bh_aprintf(global_heap_allocator, "%b", fd->foreign_module->text, fd->foreign_module->length);
-        name = bh_aprintf(global_heap_allocator, "%b", fd->foreign_name->text, fd->foreign_name->length);
+        module = bh_aprintf(global_heap_allocator, "%b", foreign_module->text, foreign_module->length);
+        name = bh_aprintf(global_heap_allocator, "%b", foreign_import->text, foreign_import->length);
     }
 
     WasmImport import = {

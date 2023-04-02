@@ -2924,6 +2924,11 @@ CheckStatus check_function_header(AstFunction* func) {
     func->type = type_build_function_type(context.ast_alloc, func);
     if (func->type == NULL) YIELD(func->token->pos, "Waiting for function type to be constructed");
 
+    if (func->foreign.import_name) { 
+        CHECK(expression, &func->foreign.module_name);
+        CHECK(expression, &func->foreign.import_name);
+    }
+
     return Check_Success;
 }
 
