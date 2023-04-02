@@ -27,6 +27,7 @@ use runtime
 
 #load "./hash/hash"
 #load "./hash/md5"
+#load "./hash/sha256"
 
 #load "./string/string"
 #load "./string/buffer"
