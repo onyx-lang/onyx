@@ -3710,6 +3710,7 @@ static Package* parse_file_package(OnyxParser* parser) {
         pnode->token = *symbol;
         pnode->package = newpackage;
         pnode->package_name = newpackage->name;
+        pnode->type_node = builtin_package_id_type;
         pnode->flags |= Ast_Flag_Comptime;
 
         if (prevpackage != NULL) {
