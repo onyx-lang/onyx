@@ -58,6 +58,10 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
     as_iter :: as_iter
 }
 
+#inject builtin {
+    Map :: Map;
+}
+
 
 #doc """
    Allows for creation of a Map using make().

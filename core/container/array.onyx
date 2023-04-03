@@ -14,8 +14,16 @@ use core
 // ---------------------------------
 //           Dynamic Arrays
 // ---------------------------------
+
+#doc """
+    Creates a new dynamic array.
+"""
 make :: #match #local {}
 
+#doc """
+    Creates a dynamic array of type `T` with an initial capacity of `capacity`,
+    from the `allocator`.
+"""
 #overload
 make :: ($T: type_expr, capacity := 4, allocator := context.allocator) -> [..] T {
     arr : [..] T;
@@ -23,6 +31,9 @@ make :: ($T: type_expr, capacity := 4, allocator := context.allocator) -> [..] T
     return arr;
 }
 
+#doc """
+    Creates a new dynamic array as a *copy* of the provided array.
+"""
 #overload
 make :: (base: [] $T, allocator := context.allocator) -> [..] T {
     arr: [..] T;
@@ -41,6 +52,7 @@ __make_overload :: macro (_: &[..] $T, capacity: u32, allocator := context.alloc
     return #this_package.make(T, capacity, allocator);
 }
 
+#doc "Initializes a dynamic array."
 init :: (arr: &[..] $T, capacity := 4, allocator := context.allocator) {
     arr.count = 0;
     arr.capacity = capacity;
@@ -48,6 +60,7 @@ init :: (arr: &[..] $T, capacity := 4, allocator := context.allocator) {
     arr.data = raw_alloc(allocator, sizeof T * arr.capacity);
 }
 
+#doc "Frees a dynamic array."
 free :: (arr: &[..] $T) {
     arr.count = 0;
     arr.capacity = 0;
@@ -78,6 +91,13 @@ copy :: #match #locked {
     }
 }
 
+#doc """
+    Copies a sub-array of a dynamic-array.
+
+        arr := array.make(.[ 2, 3, 5, 7, 11 ]);
+        sub := array.copy_range(&arr, 2 .. 5);
+        println(sub); // 5, 7, 11
+"""
 copy_range :: (arr: &[..] $T, r: range, allocator := context.allocator) -> [..] T {
     new_arr : [..] T;
     init(&new_arr, r.high - r.low, allocator);
@@ -87,10 +107,20 @@ copy_range :: (arr: &[..] $T, r: range, allocator := context.allocator) -> [..] 
     return new_arr;
 }
 
+#doc """
+    Clears a dynamic array.
+
+    Note: This does not clear or free the memory for the dynamic array.
+"""
 clear :: (arr: &[..] $T) {
     arr.count = 0;
 }
 
+#doc """
+    Resizes a dynamic array if it does not have enough capacity.
+
+    If this procedure returns `true`, `arr.capacity` will be greater than or equal to `capacity`.
+"""
 ensure_capacity :: (arr: &[..] $T, capacity: u32) -> bool {
     if arr.capacity >= capacity do return true;
     if arr.data == null do init(arr);
@@ -102,12 +132,18 @@ ensure_capacity :: (arr: &[..] $T, capacity: u32) -> bool {
     return true;
 }
 
+#doc """
+    Appends a zeroed-element to the end of the array, and returns a pointer to it.
+"""
 alloc_one :: (arr: &[..] $T) -> &T {
     if !ensure_capacity(arr, arr.count + 1) do return null;
     arr.count += 1;
     return &arr.data[arr.count - 1];
 }
 
+#doc """
+    Appends `x` to the end of the array.
+"""
 push :: (arr: &[..] $T, x: T) -> bool {
     if !ensure_capacity(arr, arr.count + 1) do return false;
     arr.data[arr.count] = x;
@@ -118,6 +154,12 @@ push :: (arr: &[..] $T, x: T) -> bool {
 // Semi-useful shortcut for adding something to an array.
 #operator << macro (arr: [..] $T, v: T) do #this_package.push(&arr, v);
 
+
+#doc """
+    Inserts element(s) into the middle of the array at `idx`.
+
+    If `idx >= arr.count`, nothing happens.
+"""
 insert :: #match #local {}
 
 #overload
@@ -152,7 +194,11 @@ insert :: (arr: &[..] $T, idx: u32, new_arr: [] T) -> bool {
     return true;
 }
 
+#doc """
+    Inserts a zeroed-element at `idx`.
+"""
 insert_empty :: (arr: &[..] $T, idx: u32) -> bool {
+    if idx >= arr.count do return false;
     if !ensure_capacity(arr, arr.count + 1) do return false;
 
     arr.count += 1;
@@ -164,6 +210,11 @@ insert_empty :: (arr: &[..] $T, idx: u32) -> bool {
     return true;
 }
 
+#doc """
+    Removes all instances of `elem` from the array.
+
+    Uses `==` to test for equality.
+"""
 remove :: (arr: &[..] $T, elem: T) {
     move := 0;
 
@@ -177,6 +228,11 @@ remove :: (arr: &[..] $T, elem: T) {
     arr.count -= move;
 }
 
+#doc """
+    Removes the element at index `idx` from the array and returns it.
+
+    Maintains order of the array.
+"""
 delete :: (arr: &[..] $T, idx: u32) -> T {
     if idx >= arr.count do return .{};
 
@@ -189,6 +245,11 @@ delete :: (arr: &[..] $T, idx: u32) -> T {
     return to_return;
 }
 
+#doc """
+    Removes the element at index `idx` from the array and returns it.
+
+    Order is not guaranteed to be preserved.
+"""
 fast_delete :: (arr: &[..] $T, idx: u32) -> T {
     if idx >= arr.count do return .{};
 
@@ -199,6 +260,11 @@ fast_delete :: (arr: &[..] $T, idx: u32) -> T {
     return to_return;
 }
 
+#doc """
+    Removes `n` elements from the end of the array.
+
+    `n` by default is 1.
+"""
 pop :: (arr: &[..] $T, n := 1) -> T {
     if arr.count == 0 do return .{};
 
@@ -207,6 +273,10 @@ pop :: (arr: &[..] $T, n := 1) -> T {
     return arr.data[arr.count];
 }
 
+
+#doc """
+    Appends elements from another array or iterator to the end of the array.
+"""
 concat :: #match #local {}
 
 #overload
@@ -224,6 +294,15 @@ concat :: (arr: &[..] $T, other: Iterator(T)) {
     }
 }
 
+#doc """
+    Removes all elements for which the given predicate does not hold.
+
+    Use `it` to refer to the current element being tested.
+
+        arr := array.make(.[ 1, 2, 3, 4, 5 ]);
+        array.filter(&arr, #(it % 2 == 0));
+        println(arr); // 2, 4
+"""
 filter :: macro (arr: &[..] $T, body: Code) {
     move := 0;
 

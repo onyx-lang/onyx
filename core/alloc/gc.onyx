@@ -16,7 +16,7 @@ package core.alloc.gc
 //       // Every allocation here will automatically be freed
 //   }
 
-use core
+use core {package, *}
 
 GCState :: struct {
     backing_allocator: Allocator;
@@ -60,11 +60,11 @@ make_allocator :: (hs: &GCState) -> Allocator {
 
 auto :: #match {
     macro () {
-        use core.alloc {gc}
+        use core.alloc {package, gc}
         
         gcs := gc.make();
         old_allocator := context.allocator;
-        context.allocator = core.alloc.as_allocator(&gcs);
+        context.allocator = alloc.as_allocator(&gcs);
         defer {
             gc.clear(&gcs);
             context.allocator = old_allocator;

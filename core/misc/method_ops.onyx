@@ -1,5 +1,7 @@
 package core
 
+use runtime
+
 //
 // This file defines an optional language feature called method operators.
 // Instead of defining an operator overload using the #operator directive,

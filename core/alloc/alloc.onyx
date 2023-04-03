@@ -45,6 +45,8 @@ array_from_stack :: macro ($T: type_expr, size: u32) -> [] T {
         }
 """
 on_heap :: macro (v: $V) -> &V {
+    use core
+
     out := cast(&V) raw_alloc(context.allocator, sizeof V);
     core.memory.set(out, 0, sizeof V);
     *out = v;
@@ -55,6 +57,8 @@ on_heap :: macro (v: $V) -> &V {
     Like `alloc.on_heap`, but allocates on the temporary allocator.
 """
 on_temp :: macro (v: $V) -> &V {
+    use core
+
     out := cast(&V) raw_alloc(context.temp_allocator, sizeof V);
     core.memory.set(out, 0, sizeof V);
     *out = v;

@@ -42,6 +42,10 @@ Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
     as_iter  :: as_iter
 }
 
+#inject builtin {
+    Set :: Set;
+}
+
 make :: ($T: type_expr, default := T.{}, allocator := context.allocator) -> Set(T) {
     set : Set(T);
     init(&set, default=default, allocator=allocator);
