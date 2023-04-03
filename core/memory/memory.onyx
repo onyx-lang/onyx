@@ -19,32 +19,16 @@ alloc_slice :: (sl: &[] $T, count: i32, allocator := context.allocator) {
 
 //
 // Constructs an intialized slice of `T` with `count` elements from the allocator.
-make_slice :: ($T: type_expr, count: i32, allocator := context.allocator) -> [] T {
-    return .{
-        data = raw_alloc(allocator, sizeof T * count),
-        count = count
-    };
-}
+make_slice :: core.slice.make
 
 //
 // Releases the memory for the slice, as well as setting the fields of the
 // slice to be 0 so it cannot be used again.
-free_slice :: (sl: &[] $T, allocator := context.allocator) {
-    if sl.data == null do return;
-
-    raw_free(allocator, sl.data);
-    sl.data = null;
-    sl.count = 0;
-}
+free_slice :: core.slice.free
 
 //
 // Copies a slice into a new slice, allocated from the allocator.
-copy_slice :: (sl: [] $T, allocator := context.allocator) -> [] T {
-    data := raw_alloc(allocator, sl.count * sizeof T);
-    copy(data, sl.data, sl.count * sizeof T);
-
-    return .{ data = data, count = sl.count };
-}
+copy_slice :: core.slice.copy
 
 //
 // Aligns a number to the next multiple of `align`. Can be used
@@ -66,21 +50,3 @@ align :: (size: u64, align: u64) -> u64 {
     }
     return size;
 }
-
-
-//
-// Allows for make([] i32).
-#overload
-__make_overload :: macro (_: &[] $T, count: u32, allocator := context.allocator) -> [] T {
-    ret := #this_package.make_slice(T, count, allocator);
-    #this_package.set(ret.data, 0, sizeof T * count);
-    return ret;
-}
-
-//
-// Allows for delete(&sl);
-#overload
-builtin.delete :: macro (x: &[] $T, allocator := context.allocator) {
-    #this_package.free_slice(x, allocator);
-}
-

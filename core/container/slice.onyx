@@ -1,0 +1,504 @@
+package core.slice
+
+use core.intrinsics.types {type_is_struct}
+use core.memory
+
+//
+// [] $T == Slice(T)
+//   where
+// Slice :: struct (T: type_expr) {
+//     data: &T;
+//     count: u32;
+// }
+//
+
+make :: ($T: type_expr, length: u32, allocator := context.allocator) -> [] T {
+    data := raw_alloc(allocator, sizeof T * length);
+    memory.set(data, 0, sizeof T * length);
+    return .{ data, length };
+}
+
+init :: (sl: &[] $T, length: u32, allocator := context.allocator) -> [] T {
+    sl.count = length;
+    sl.data = raw_alloc(allocator, sizeof T * length);
+    memory.set(sl.data, 0, sizeof T * length);
+}
+
+free :: (sl: &[] $T, allocator := context.allocator) {
+    if sl.data == null do return;
+
+    raw_free(allocator, sl.data);
+    sl.data = null;
+    sl.count = 0;
+}
+
+//
+// Allows for make([] i32).
+#overload
+__make_overload :: macro (_: &[] $T, count: u32, allocator := context.allocator) -> [] T {
+    use core.memory
+
+    ret := #this_package.make(T, count, allocator);
+    memory.set(ret.data, 0, sizeof T * count);
+    return ret;
+}
+
+//
+// Allows for delete(&sl);
+#overload
+builtin.delete :: macro (x: &[] $T, allocator := context.allocator) {
+    #this_package.free(x, allocator);
+}
+
+
+copy :: (sl: [] $T, allocator := context.allocator) -> [] T {
+    data := raw_alloc(allocator, sl.count * sizeof T);
+    memory.copy(data, sl.data, sl.count * sizeof T);
+
+    return .{ data = data, count = sl.count };
+}
+
+
+transplant :: (arr: [] $T, old_index: i32, new_index: i32) -> bool {
+    if old_index < 0 || old_index >= arr.count do return false;
+    if new_index < 0 || new_index >= arr.count do return false;
+    if old_index == new_index do return true;
+
+    value := arr.data[old_index];
+
+    if old_index < new_index { // Moving forward
+        while i := old_index; i < new_index {
+            defer i += 1;
+            arr.data[i] = arr.data[i + 1];
+        }
+
+    } else { // Moving backward
+        while i := old_index; i > new_index {
+            defer i -= 1;
+            arr.data[i] = arr.data[i - 1];
+        }
+    }
+
+    arr.data[new_index] = value;
+    return true;
+}
+
+get :: (arr: [] $T, idx: i32) -> T {
+    if arr.count == 0 do return .{};
+
+    while idx < 0          do idx += arr.count;
+    while idx >= arr.count do idx -= arr.count;
+
+    return arr.data[idx];
+}
+
+get_ptr :: (arr: [] $T, idx: i32) -> &T {
+    if arr.count == 0 do return null;
+
+    while idx < 0          do idx += arr.count;
+    while idx >= arr.count do idx -= arr.count;
+
+    return &arr.data[idx];
+}
+
+set :: (arr: [] $T, idx: i32, value: T) {
+    if arr.count == 0 do return;
+
+    while idx < 0          do idx += arr.count;
+    while idx >= arr.count do idx -= arr.count;
+
+    arr.data[idx] = value;
+}
+
+contains :: #match #locked {
+    macro (arr: [] $T, $cmp: Code) -> bool {
+        for it: arr do if #unquote cmp do return true;
+        return false;
+    },
+
+    // Uses '==' to compare for equality.
+    (arr: [] $T, x: T) -> bool {
+        for it: arr do if it == x do return true;
+        return false;
+    }
+}
+
+// Tests if array is empty.
+// Normally this is unneeded, as arrays have a 'truthiness'
+// that depends on their count. For example, instead of saying:
+//     if array.empty(arr) { ... }
+// You can simply say:
+//     if !arr { ... }
+empty :: (arr: [] $T) => arr.count == 0;
+
+// Uses '+' to sum.
+sum :: (arr: [] $T, start: T = 0) -> T {
+    sum := start;
+    for it: arr do sum += it;
+    return sum;
+}
+
+// Uses '*' to multiply.
+product :: (arr: [] $T, start: T = 1) -> T {
+    prod := start;
+    for it: arr do prod *= it;
+    return prod;
+}
+
+// Uses '+' to add the elements together.
+// Then use '/ i32' to divide by the number of elements.
+// Both of these are assumed to work.
+average :: (arr: [] $T) -> T {
+    sum := cast(T) 0;
+    for it: *arr do sum += it;
+
+    return sum / cast(T) arr.count;
+}
+
+reverse :: (arr: [] $T) {
+    for i: arr.count / 2 {
+        tmp := arr[i];
+        arr[i] = arr[arr.count - 1 - i];
+        arr[arr.count - 1 - i] = tmp;
+    }
+}
+
+//
+// Simple insertion sort
+//    cmp should return >0 if left > right
+// Returns the array to be used in '|>' chaining.
+// NOT A COPY OF THE ARRAY.
+//
+sort :: #match #local {}
+
+#overload
+sort :: (arr: [] $T, cmp: (T, T) -> i32) -> [] T {
+    for i: 1 .. arr.count {
+        x := arr.data[i];
+        j := i - 1;
+
+        // @ShortCircuitLogicalOps
+        // This is written this way because '&&' does not short circuit right now.
+        while j >= 0 {
+            if cmp(arr.data[j], x) > 0 {
+                arr.data[j + 1] = arr.data[j];
+                j -= 1;
+            } else {
+                break;
+            }
+        }
+
+        arr.data[j + 1] = x;
+    }
+
+    return arr;
+}
+
+#overload
+sort :: (arr: [] $T, cmp: (&T, &T) -> i32) -> [] T {
+    for i: 1 .. arr.count {
+        j := i;
+
+        while j > 0 {
+            if cmp(&arr.data[j - 1], &arr.data[j]) > 0 {
+                tmp := arr.data[j];
+                arr.data[j] = arr.data[j - 1];
+                arr.data[j - 1] = tmp;
+
+                j -= 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    return arr;
+}
+
+quicksort :: #match #locked {
+    (arr: [] $T, cmp: ( T,  T) -> i32) => { quicksort_impl(arr, cmp, 0, arr.count - 1); return arr; },
+    (arr: [] $T, cmp: (&T, &T) -> i32) => { quicksort_impl(arr, cmp, 0, arr.count - 1); return arr; },
+}
+
+#local {
+    quicksort_impl :: (arr: [] $T, cmp: $PredicateFunction, lo, hi: i32) {
+        if lo < 0 || hi < 0 do return;
+        if lo >= hi do return;
+
+        pivot := quicksort_partition(arr, cmp, lo, hi);
+        quicksort_impl(arr, cmp, lo, pivot - 1);
+        quicksort_impl(arr, cmp, pivot + 1, hi);
+    }
+
+    quicksort_partition :: #match #local {}
+
+    #overload
+    quicksort_partition :: (arr: [] $T, cmp: (T, T) -> i32, lo, hi: i32) -> i32 {
+        pivot := arr[hi];
+        i := lo - 1;
+
+        for j: lo .. hi+1 {
+            if cmp(arr[j], pivot) <= 0 {
+                i += 1;
+                tmp := arr[i];
+                arr[i] = arr[j];
+                arr[j] = tmp;
+            }
+        }
+
+        return i;
+    }
+
+    #overload
+    quicksort_partition :: (arr: [] $T, cmp: (&T, &T) -> i32, lo, hi: i32) -> i32 {
+        pivot := &arr[hi];
+        i := lo - 1;
+
+        for j: lo .. hi+1 {
+            if cmp(&arr[j], pivot) <= 0 {
+                i += 1;
+                tmp := arr[i];
+                arr[i] = arr[j];
+                arr[j] = tmp;
+            }
+        }
+
+        return i;
+    }
+}
+
+// This assumes that the elements are sorted in some fashion,
+// such that equal elements would be next to each other.
+unique :: (arr: &[] $T) {
+    idx := 0;
+    while i := 0; i < arr.count - 1 {
+        defer i += 1;
+
+        if idx != i {
+            arr.data[idx] = arr.data[i];
+        }
+
+        if !(arr.data[i] == arr.data[i + 1]) {
+            idx += 1;
+        }
+    }
+
+    arr.data[idx] = arr.data[arr.count - 1];
+    arr.count = idx + 1;
+}
+
+
+fold :: #match #local {}
+
+#overload
+fold :: (arr: [] $T, init: $R, f: (T, R) -> R) -> R {
+    val := init;
+    for it: arr do val = f(it, val);
+    return val;
+}
+
+#overload
+fold :: macro (arr: [] $T, init: $R, body: Code) -> R {
+    acc := init;
+    for it: arr do acc = #unquote body;
+    return acc;
+}
+
+every :: #match #local {}
+
+#overload
+every :: macro (arr: [] $T, predicate: (T) -> bool) => #this_package.every(arr, #(predicate(it)));
+
+#overload
+every :: macro (arr: [] $T, predicate_body: Code) -> bool {
+    for arr {
+        if !(#unquote predicate_body) do return false;
+    }
+    return true;
+}
+
+some :: #match #local {}
+
+#overload
+some :: macro (arr: [] $T, predicate: (T) -> bool) => #this_package.some(arr, #(predicate(it)));
+
+#overload
+some :: macro (arr: [] $T/type_is_struct, predicate_body: Code) -> bool {
+    for & arr {
+        if #unquote predicate_body do return true;
+    }
+    return false;
+}
+
+#overload
+some :: macro (arr: [] $T, predicate_body: Code) -> bool {
+    for arr {
+        if #unquote predicate_body do return true;
+    }
+    return false;
+}
+
+fill :: (arr: [] $T, value: T) {
+    for i: arr.count {
+        arr[i] = value;
+    }
+}
+
+fill_range :: (arr: [] $T, r: range, value: T) {
+    for i: r {
+        if i >= arr.count || i < 0 do continue;
+        arr[i] = value;
+    }
+}
+
+to_list :: (arr: [] $T, allocator := context.allocator) -> List(T) {
+    new_list := list.make(T, allocator);
+
+    for &it: arr {
+        list.push_end(&new_list, *it);
+    }
+
+    return new_list;
+}
+
+find :: #match #local {}
+
+#overload
+find :: (arr: [] $T, value: T) -> i32 {
+    for i: arr.count {
+        if value == arr.data[i] do return i;
+    }
+
+    return -1;
+}
+
+#overload
+find :: macro (arr: [] $T/type_is_struct, pred: Code) -> i32 {
+    for i: arr.count {
+        it := &arr[i];
+        if #unquote pred do return i;
+    }
+
+    return -1;
+}
+
+#overload
+find :: macro (arr: [] $T, pred: Code) -> i32 {
+    for i: arr.count {
+        it := arr[i];
+        if #unquote pred do return i;
+    }
+
+    return -1;
+}
+
+find_ptr :: (arr: [] $T, value: T) -> &T {
+    for &it: arr {
+        if value == *it do return it;
+    }
+
+    return null;
+}
+
+first :: #match #locked {
+    macro (arr: [] $T, predicate: (T) -> bool) -> &T {
+        first :: first
+        return first(arr, #(predicate(it)));
+    },
+
+    macro (arr: [] $T/type_is_struct, predicate_body: Code) -> &T {
+        for & arr {
+            if #unquote predicate_body do return it;
+        }
+
+        return null;
+    },
+
+    macro (arr: [] $T, predicate_body: Code) -> &T {
+        // This is to preserve the semantics that "it" is
+        // not a pointer (same as contains), when T is not a
+        // structure.
+        for &it_ptr: arr {
+            it := *it_ptr;
+            if #unquote predicate_body do return it_ptr;
+        }
+
+        return null;
+    }
+}
+
+count_where :: #match #local {}
+
+#overload
+count_where :: macro (arr: [] $T, predicate: (T) -> bool) => #this_package.count_where(arr, #(predicate(it)));
+
+#overload
+count_where :: macro (arr: [] $T, predicate_body: Code) -> u32 {
+    count: u32 = 0;
+    for arr {
+        if #unquote predicate_body do count += 1;
+    }
+    return count;
+}
+
+
+windows :: (arr: [] $T, width: i32) -> Iterator([] T) {
+    use core {iter}
+
+    return iter.generator(
+        &.{ arr=arr, width=width, pos=0 },
+        ctx => {
+            if ctx.pos + ctx.width < ctx.arr.count {
+                defer ctx.pos += 1;
+                return ctx.arr.data[ctx.pos .. ctx.pos+ctx.width], true;
+            }
+
+            return .{}, false;
+        }
+    );
+}
+
+chunks :: (arr: [] $T, width: i32) -> Iterator([] T) {
+    use core {iter}
+
+    return iter.generator(
+        &.{ arr=arr, width=width, pos=0 },
+        ctx => {
+            if ctx.pos < ctx.arr.count {
+                defer ctx.pos += ctx.width;
+
+                end := core.math.min(ctx.pos+ctx.width, ctx.arr.count);
+                return ctx.arr.data[ctx.pos .. end], true;
+            }
+
+            return .{}, false;
+        }
+    );
+}
+
+
+#local fold_idx_elem :: (arr: [] $T, $cmp: Code) -> (i32, T) {
+    idx  := 0;
+    elem := arr[0];
+
+    for i: 1 .. arr.count {
+        A := &arr[i];
+        B := &elem;
+        if #unquote cmp {
+            idx  = i;
+            elem = arr[i];
+        }
+    }
+
+    return idx, elem;
+}
+
+greatest :: macro (arr: [] $T) -> (i32, T) {
+    fold_idx_elem :: fold_idx_elem
+    return fold_idx_elem(arr, #(*A > *B));
+}
+
+least :: macro (arr: [] $T) -> (i32, T) {
+    fold_idx_elem :: fold_idx_elem
+    return fold_idx_elem(arr, #(*A < *B));
+}

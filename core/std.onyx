@@ -17,6 +17,7 @@ use runtime
 #load "./container/pair"
 #load "./container/optional"
 #load "./container/result"
+#load "./container/slice"
 
 #load "./conv/conv"
 #load "./conv/format"
