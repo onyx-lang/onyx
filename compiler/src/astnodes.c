@@ -155,6 +155,7 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Load File",
     "Binding (Declaration)",
     "Use Package",
+    "Import",
     "Static If",
     "String Literal",
     "File Contents",

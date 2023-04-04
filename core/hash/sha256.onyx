@@ -148,12 +148,14 @@ do_cycle :: (self: &Hasher, data: [] u8) {
     self.state[7] += h;
 }
 
-CH   :: macro (x, y, z: u32) => (x & y) ^ (~x & z);
-MAJ  :: macro (x, y, z: u32) => (x & y) ^ (x & z) ^ (y & z);
-EP0  :: macro (x: u32) => wasm.rotr_i32(x, 2) ^ wasm.rotr_i32(x, 13) ^ wasm.rotr_i32(x, 22);
-EP1  :: macro (x: u32) => wasm.rotr_i32(x, 6) ^ wasm.rotr_i32(x, 11) ^ wasm.rotr_i32(x, 25);
-SIG0 :: macro (x: u32) => wasm.rotr_i32(x, 7) ^ wasm.rotr_i32(x, 18) ^ ((x) >> 3);
-SIG1 :: macro (x: u32) => wasm.rotr_i32(x, 17) ^ wasm.rotr_i32(x, 19) ^ ((x) >> 10);
+#local {
+    CH   :: macro (x, y, z: u32) => (x & y) ^ (~x & z);
+    MAJ  :: macro (x, y, z: u32) => (x & y) ^ (x & z) ^ (y & z);
+    EP0  :: macro (x: u32) => wasm.rotr_i32(x, 2) ^ wasm.rotr_i32(x, 13) ^ wasm.rotr_i32(x, 22);
+    EP1  :: macro (x: u32) => wasm.rotr_i32(x, 6) ^ wasm.rotr_i32(x, 11) ^ wasm.rotr_i32(x, 25);
+    SIG0 :: macro (x: u32) => wasm.rotr_i32(x, 7) ^ wasm.rotr_i32(x, 18) ^ ((x) >> 3);
+    SIG1 :: macro (x: u32) => wasm.rotr_i32(x, 17) ^ wasm.rotr_i32(x, 19) ^ ((x) >> 10);
+}
 
 #local
 k := u32.[

@@ -1686,7 +1686,7 @@ static SymresStatus symres_import(AstImport* import) {
 
     if (import->import_package_itself) {
         OnyxToken *name = bh_arr_last(package->path);
-        name = import->qualified_package_name ?: name;    // Had to find somewhere to use the Elvis operator in the codebase :)
+        name = import->qualified_package_name ? import->qualified_package_name : name;
 
         symbol_introduce(
                 current_entity->scope,
