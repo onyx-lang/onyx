@@ -3322,8 +3322,11 @@ CheckStatus check_constraint(AstConstraint *constraint) {
                     }
 
                     TYPE_CHECK(&ic->expr, ic->expected_type) {
-                        if (!ic->invert_condition)
+                        if (!ic->invert_condition) {
+                            ic->error_msg = bh_aprintf(global_heap_allocator, "Expected expression to be of type %s, got expression of type %s.",
+                                    type_get_name(ic->expected_type), type_get_name(ic->expr->type));
                             goto constraint_error;
+                        }
                     }
                 }
 
@@ -3370,13 +3373,16 @@ CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFi
                     }
 
                     OnyxFilePos error_pos;
+                    char *error_msg = NULL;
                     if (constraint->exprs) {
                         error_pos = constraint->exprs[constraint->expr_idx].expr->token->pos;
+                        error_msg = constraint->exprs[constraint->expr_idx].error_msg;
                     } else {
                         error_pos = constraint->interface->token->pos;
                     }
 
                     onyx_report_error(error_pos, Error_Critical, "Failed to satisfy constraint where %s.", constraint_map);
+                    if (error_msg) onyx_report_error(error_pos, Error_Critical, error_msg);
                     onyx_report_error(constraint->token->pos, Error_Critical, "Here is where the interface was used.");
                     onyx_report_error(pos, Error_Critical, "Here is the code that caused this constraint to be checked.");
 

@@ -1123,6 +1123,8 @@ typedef struct InterfaceConstraint {
     AstType  *expected_type_expr;
     Type     *expected_type;
 
+    char *error_msg;
+
     b32 invert_condition: 1;
 } InterfaceConstraint;
 
