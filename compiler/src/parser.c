@@ -848,10 +848,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                     onyx_report_error((parser->curr - 2)->pos, Error_Critical, "#Self is only allowed in an #inject block.");
                 }
 
-                AstAlias* alias = make_node(AstAlias, Ast_Kind_Alias);
-                alias->token = parser->injection_point->token;
-                alias->alias = parser->injection_point;
-                retval = (AstTyped *) alias;
+                retval = (AstTyped *) parser->injection_point;
                 break;
             }
 
@@ -2069,7 +2066,6 @@ static AstTypeOf* parse_typeof(OnyxParser* parser) {
 static void struct_type_create_scope(OnyxParser *parser, AstStructType *s_node) {
     if (!s_node->scope) {
         s_node->scope = scope_create(context.ast_alloc, parser->current_scope, s_node->token->pos);
-        parser->current_scope = s_node->scope;
 
         if (bh_arr_length(parser->current_symbol_stack) == 0) {
             s_node->scope->name = "<anonymous>";
@@ -2091,6 +2087,10 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     s_node->token = s_token;
 
     flush_stored_tags(parser, &s_node->meta_tags);
+
+    struct_type_create_scope(parser, s_node);
+    Scope *scope_to_restore_parser_to = parser->current_scope;
+    Scope *scope_symbols_in_structures_should_be_bound_to = s_node->scope;
 
     // Parse polymorphic parameters
     if (consume_token_if_next(parser, '(')) {
@@ -2119,6 +2119,8 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         poly_struct->token = s_token;
         poly_struct->poly_params = poly_params;
         poly_struct->base_struct = s_node;
+        poly_struct->scope = s_node->scope;
+        s_node->scope = NULL;
     }
 
     // Parse constraints clause
@@ -2153,8 +2155,8 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     }
 
     expect_token(parser, '{');
-
-    struct_type_create_scope(parser, s_node);
+    
+    parser->current_scope = scope_symbols_in_structures_should_be_bound_to;
 
     b32 member_is_used = 0;
     bh_arr(OnyxToken *) member_list_temp = NULL;
@@ -2258,7 +2260,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         }
     }
 
-    if (s_node->scope) parser->current_scope = parser->current_scope->parent;
+    parser->current_scope = scope_to_restore_parser_to;
 
     bh_arr_free(member_list_temp);
 
@@ -3411,10 +3413,9 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 return;
             }
             else if (parse_possible_directive(parser, "inject")) {
-                AstTyped *injection_point;
-                parser->parse_calls = 0;
-                injection_point = parse_expression(parser, 0);
-                parser->parse_calls = 1;
+                AstAlias *injection_point = make_node(AstAlias, Ast_Kind_Alias);
+                injection_point->alias = parse_expression(parser, 0);
+                injection_point->token = injection_point->alias->token;
 
                 if (peek_token(0)->type == '{') {
                     if (parser->injection_point) {
@@ -3422,7 +3423,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                         return;
                     }
 
-                    parser->injection_point = injection_point;
+                    parser->injection_point = (AstTyped *) injection_point;
 
                     expect_token(parser, '{');
                     parse_top_level_statements_until(parser, '}');
@@ -3439,7 +3440,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
                 AstInjection *inject = make_node(AstInjection, Ast_Kind_Injection);
                 inject->token = dir_token;
-                inject->full_loc = injection_point;
+                inject->full_loc = (AstTyped *) injection_point;
                 inject->to_inject = parse_top_level_expression(parser);
                 if (parser->last_documentation_token) {
                     inject->documentation = parser->last_documentation_token;

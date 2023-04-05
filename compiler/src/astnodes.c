@@ -1704,7 +1704,7 @@ AstPolyCallType* convert_call_to_polycall(AstCall* call) {
     pct->token = call->token;
     pct->__unused = call->next;
     pct->callee = (AstType *) call->callee;
-    pct->params = (AstNode **) call->args.values;
+    pct->params = (AstNode **) bh_arr_copy(global_heap_allocator, call->args.values);
     bh_arr_each(AstNode *, pp, pct->params) {
         if ((*pp)->kind == Ast_Kind_Argument) {
             *pp = (AstNode *) (*(AstArgument **) pp)->value;

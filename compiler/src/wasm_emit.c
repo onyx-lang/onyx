@@ -3198,7 +3198,12 @@ EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
         }
 
         default: {
-            onyx_report_error(expr->token->pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
+            if (expr->token) {
+                onyx_report_error(expr->token->pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
+            } else {
+                OnyxFilePos pos = {0};
+                onyx_report_error(pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
+            }
             break;
         }
     }

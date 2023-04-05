@@ -112,7 +112,7 @@ CSV_Column :: struct {
         for line: reader->lines(allocator = context.temp_allocator) {
             out: csv.Output_Type;
 
-            for entry: string.split_iter(line, #char ",")
+            for entry: string.split_iter(string.strip_trailing_whitespace(line), #char ",")
                     |> iter.enumerate()
             {
                 header := &any_headers[entry.index];
@@ -157,7 +157,7 @@ CSV_Column :: struct {
             for &member: output_type_info.members {
                 if !#first do io.write(writer, ",");
 
-                io.write_format_va(writer, "{}", .[ .{cast(&u8) it + member.offset, member.type} ]);
+                io.write_format_va(writer, "{}", .[ .{cast([&] u8) it + member.offset, member.type} ]);
             }
 
             io.write(writer, "\n");

@@ -131,6 +131,7 @@ const char* token_name(TokenType tkn_type) {
 void token_toggle_end(OnyxToken* tkn) {
     static char backup = 0;
     char tmp = tkn->text[tkn->length];
+    assert(backup == '\0' || tmp == '\0'); // Sanity check
     tkn->text[tkn->length] = backup;
     backup = tmp;
 }

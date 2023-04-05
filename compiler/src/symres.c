@@ -115,13 +115,8 @@ static SymresStatus symres_struct_type(AstStructType* s_node) {
     s_node->flags |= Ast_Flag_Type_Is_Resolved;
     s_node->flags |= Ast_Flag_Comptime;
 
-    if (s_node->scope) {
-        assert(s_node->entity);
-        assert(s_node->entity->scope);
-        s_node->scope->parent = s_node->entity->scope;
-
-        scope_enter(s_node->scope);
-    }
+    assert(s_node->scope);
+    scope_enter(s_node->scope);
     
     if (s_node->min_size_)      SYMRES(expression, &s_node->min_size_);
     if (s_node->min_alignment_) SYMRES(expression, &s_node->min_alignment_);
@@ -210,10 +205,7 @@ static SymresStatus symres_type(AstType** type) {
 
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* pst_node = (AstPolyStructType *) *type;
-
-            if (pst_node->scope == NULL) {
-                pst_node->scope = scope_create(context.ast_alloc, pst_node->entity->scope, pst_node->token->pos);
-            }
+            assert(pst_node->scope);
             break;
         }
 
@@ -1430,43 +1422,21 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             if (inject->dest == NULL) {
                 if (inject->full_loc == NULL) return Symres_Error;
 
-                if (inject->full_loc->kind != Ast_Kind_Field_Access) {
+                AstTyped *full_loc = (AstTyped *) strip_aliases((AstNode *) inject->full_loc);
+
+                if (full_loc->kind != Ast_Kind_Field_Access) {
                     onyx_report_error(inject->token->pos, Error_Critical, "#inject expects a dot (a.b) expression for the injection point.");
                     return Symres_Error;
                 }
 
-                AstFieldAccess *acc = (AstFieldAccess *) inject->full_loc;
+                AstFieldAccess *acc = (AstFieldAccess *) full_loc;
                 inject->dest = acc->expr;
                 inject->symbol = acc->token;
             }
 
             SYMRES(expression, &inject->dest);
             SYMRES(expression, &inject->to_inject);
-
-            Scope *scope = get_scope_from_node_or_create((AstNode *) inject->dest);
-            if (scope == NULL) {
-                if (context.cycle_almost_detected >= 1) {
-                    onyx_report_error(inject->token->pos, Error_Critical, "Cannot #inject here.");
-                    return Symres_Error;
-                }
-
-                return Symres_Yield_Macro;
-            }
-
-            AstBinding *binding = onyx_ast_node_new(context.ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
-            binding->token = inject->symbol;
-            binding->node = (AstNode *) inject->to_inject;
-            binding->documentation = inject->documentation;
-
-            Package *pac = NULL;
-            if (inject->dest->kind == Ast_Kind_Package) {
-                pac = ((AstPackage *) inject->dest)->package;
-            } else {
-                pac = current_entity->package;
-            }
-
-            add_entities_for_node(NULL, (AstNode *) binding, scope, pac);
-            return Symres_Complete;
+            break;
         }
 
         case Ast_Kind_Directive_This_Package: {
@@ -1612,7 +1582,7 @@ static SymresStatus symres_foreign_block(AstForeignBlock *fb) {
                 return Symres_Error;
             }
 
-            ent->function->foreign.import_name = make_string_literal(context.ast_alloc, ent->function->intrinsic_name);
+            ent->function->foreign.import_name = (AstTyped *) make_string_literal(context.ast_alloc, ent->function->intrinsic_name);
             ent->function->foreign.module_name = fb->module_name;
             ent->function->is_foreign = 1;
             ent->function->is_foreign_dyncall = fb->uses_dyncall;

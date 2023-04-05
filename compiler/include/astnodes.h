@@ -999,6 +999,7 @@ struct AstPolyCallType {
     AstType_base;
 
     AstType* callee;
+    Type *resolved_type;
 
     // NOTE: These nodes can be either AstTypes, or AstTyped expressions.
     bh_arr(AstNode *) params;

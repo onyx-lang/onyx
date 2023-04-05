@@ -118,6 +118,7 @@ b32 inside_for_iterator            = 0;
 bh_arr(AstFor *) for_node_stack    = NULL;
 static bh_imap __binop_impossible_cache[Binary_Op_Count];
 static AstCall __op_maybe_overloaded;
+static Entity *current_entity = NULL;
 
 
 #define STATEMENT_LEVEL 1
@@ -1960,6 +1961,7 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     n = try_symbol_raw_resolve_from_type(field->expr->type, field->field);
 
     type_node = field->expr->type->ast_type;
+    if (!n) n = try_symbol_raw_resolve_from_node((AstNode *) field->expr, field->field);
     if (!n) n = try_symbol_raw_resolve_from_node((AstNode *) type_node, field->field);
 
     if (n) {
@@ -1980,15 +1982,21 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         return Check_Yield_Macro;
     }
 
+    char* type_name = (char *) node_get_type_name(field->expr);
+    if (field->expr->type == &basic_types[Basic_Kind_Type_Index]) {
+        Type *actual_type = type_build_from_ast(context.ast_alloc, (AstType *) field->expr);
+        type_name = (char *) type_get_name(actual_type);
+    }
+
     if (!type_node) goto closest_not_found;
 
     char* closest = find_closest_symbol_in_node((AstNode *) type_node, field->field);
     if (closest) {
-        ERROR_(field->token->pos, "Field '%s' does not exists on '%s'. Did you mean '%s'?", field->field, node_get_type_name(field->expr), closest);
+        ERROR_(field->token->pos, "Field '%s' does not exists on '%s'. Did you mean '%s'?", field->field, type_name, closest);
     }
 
   closest_not_found:
-    ERROR_(field->token->pos, "Field '%s' does not exists on '%s'.", field->field, node_get_type_name(field->expr));
+    ERROR_(field->token->pos, "Field '%s' does not exists on '%s'.", field->field, type_name);
 }
 
 CheckStatus check_method_call(AstBinaryOp** pmcall) {
@@ -2568,7 +2576,7 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* ofunc) {
     build_all_overload_options(ofunc->overloads, &all_overloads);
 
     bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
-        AstTyped* node = (AstTyped *) entry->key;
+        AstTyped* node = (AstTyped *) strip_aliases((AstNode *) entry->key);
         if (node->kind == Ast_Kind_Overloaded_Function) continue;
 
         if (   node->kind != Ast_Kind_Function
@@ -3189,6 +3197,33 @@ CheckStatus check_process_directive(AstNode* directive) {
         return Check_Success;
     }
 
+    if (directive->kind == Ast_Kind_Injection) {
+        AstInjection *inject = (AstInjection *) directive;
+        if (!node_is_type((AstNode *) inject->dest)) {
+            CHECK(expression, &inject->dest);
+        }
+
+        Scope *scope = get_scope_from_node_or_create((AstNode *) inject->dest);
+        if (scope == NULL) {
+            YIELD_ERROR(inject->token->pos, "Cannot #inject here.");
+        }
+
+        AstBinding *binding = onyx_ast_node_new(context.ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
+        binding->token = inject->symbol;
+        binding->node = (AstNode *) inject->to_inject;
+        binding->documentation = inject->documentation;
+
+        Package *pac = NULL;
+        if (inject->dest->kind == Ast_Kind_Package) {
+            pac = ((AstPackage *) inject->dest)->package;
+        } else {
+            pac = current_entity->package;
+        }
+
+        add_entities_for_node(NULL, (AstNode *) binding, scope, pac);
+        return Check_Complete;
+    }
+
     return Check_Success;
 }
 
@@ -3508,6 +3543,7 @@ CheckStatus check_arbitrary_job(EntityJobData *job) {
 
 void check_entity(Entity* ent) {
     CheckStatus cs = Check_Success;
+    current_entity = ent;
 
     switch (ent->type) {
         case Entity_Type_Foreign_Function_Header:

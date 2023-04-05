@@ -279,13 +279,25 @@ all_types_peeled_off:
             // Temporarily disable the parent scope so that you can't access things
             // "above" the structures scope. This leads to unintended behavior, as when
             // you are accessing a static element on a structure, you don't expect to
-            // bleed to the top level scope.
+            // bleed to the top level scope. This code is currently very GROSS, and
+            // should be refactored soon.
             AstNode *result = NULL;
             if (stype->scope) {
-                Scope *tmp_parent = stype->scope->parent;
-                stype->scope->parent = NULL;
+                Scope **tmp_parent;
+                Scope *tmp_parent_backup;
+                if (stype->stcache && stype->stcache->Struct.constructed_from) {
+                    // Structs scope -> Poly Solution Scope -> Poly Struct Scope -> Enclosing Scope
+                    tmp_parent = &stype->scope->parent->parent->parent;
+                } else {
+                    tmp_parent = &stype->scope->parent;
+                }
+
+                tmp_parent_backup = *tmp_parent;
+                *tmp_parent = NULL;
+
                 result = symbol_raw_resolve(stype->scope, symbol);
-                stype->scope->parent = tmp_parent;
+
+                *tmp_parent = tmp_parent_backup;
             }
 
             if (result == NULL && stype->stcache != NULL) {
@@ -307,13 +319,16 @@ all_types_peeled_off:
         }
 
         case Ast_Kind_Poly_Struct_Type: {
-            AstStructType* stype = ((AstPolyStructType *) node)->base_struct;
+            AstPolyStructType* stype = ((AstPolyStructType *) node);
             return symbol_raw_resolve(stype->scope, symbol);
         }
 
         case Ast_Kind_Poly_Call_Type: {
-            AstNode* callee = (AstNode *) ((AstPolyCallType *) node)->callee;
-            return try_symbol_raw_resolve_from_node(callee, symbol);
+            AstPolyCallType* pctype = (AstPolyCallType *) node;
+            if (pctype->resolved_type) {
+                return try_symbol_raw_resolve_from_node((AstNode*) pctype->resolved_type->ast_type, symbol);
+            }
+            return NULL;
         }
 
         case Ast_Kind_Distinct_Type: {
@@ -1259,8 +1274,16 @@ all_types_peeled_off:
 
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* pstype = (AstPolyStructType *) node;
-            AstStructType* stype = pstype->base_struct;
-            return &stype->scope;
+            return &pstype->scope;
+        }
+
+        case Ast_Kind_Poly_Call_Type: {
+            AstPolyCallType* pctype = (AstPolyCallType *) node;
+            Type *t = type_build_from_ast(context.ast_alloc, (AstType *) pctype);
+            if (t) {
+                return &((AstStructType *) t->ast_type)->scope;
+            }
+            return NULL;
         }
 
         case Ast_Kind_Distinct_Type: {

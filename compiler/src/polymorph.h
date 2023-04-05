@@ -963,12 +963,13 @@ b32 potentially_convert_function_to_polyproc(AstFunction *func) {
         b32 done = 0;
         while (!done && param_type) {
             switch (param_type->kind) {
-                case Ast_Kind_Pointer_Type: to_replace = &((AstPointerType *) *to_replace)->elem;  param_type = ((AstPointerType *) param_type)->elem;  break;
-                case Ast_Kind_Array_Type:   to_replace = &((AstArrayType *)   *to_replace)->elem;  param_type = ((AstArrayType *)   param_type)->elem;  break;
-                case Ast_Kind_Slice_Type:   to_replace = &((AstSliceType *)   *to_replace)->elem;  param_type = ((AstSliceType *)   param_type)->elem;  break;
-                case Ast_Kind_DynArr_Type:  to_replace = &((AstDynArrType *)  *to_replace)->elem;  param_type = ((AstDynArrType *)  param_type)->elem;  break;
-                case Ast_Kind_Alias:                                                               param_type = (AstType *) ((AstAlias *) param_type)->alias; break;
-                case Ast_Kind_Type_Alias:                                                          param_type = ((AstTypeAlias *)   param_type)->to;    break;
+                case Ast_Kind_Pointer_Type:       to_replace = &((AstPointerType *)      *to_replace)->elem;  param_type = ((AstPointerType *) param_type)->elem;  break;
+                case Ast_Kind_Multi_Pointer_Type: to_replace = &((AstMultiPointerType *) *to_replace)->elem;  param_type = ((AstMultiPointerType *) param_type)->elem;  break;
+                case Ast_Kind_Array_Type:         to_replace = &((AstArrayType *)        *to_replace)->elem;  param_type = ((AstArrayType *)   param_type)->elem;  break;
+                case Ast_Kind_Slice_Type:         to_replace = &((AstSliceType *)        *to_replace)->elem;  param_type = ((AstSliceType *)   param_type)->elem;  break;
+                case Ast_Kind_DynArr_Type:        to_replace = &((AstDynArrType *)       *to_replace)->elem;  param_type = ((AstDynArrType *)  param_type)->elem;  break;
+                case Ast_Kind_Alias:                                                                          param_type = (AstType *) ((AstAlias *) param_type)->alias; break;
+                case Ast_Kind_Type_Alias:                                                                     param_type = ((AstTypeAlias *)   param_type)->to;    break;
                 case Ast_Kind_Poly_Struct_Type: {
                     AutoPolymorphVariable apv;
                     apv.idx = param_idx;
@@ -1003,7 +1004,9 @@ b32 potentially_convert_function_to_polyproc(AstFunction *func) {
         pcall->flags |= Ast_Flag_Poly_Call_From_Auto;
         bh_arr_new(global_heap_allocator, pcall->params, apv->variable_count);
 
-        if (apv->base_type->kind == Ast_Kind_Poly_Struct_Type) {
+        AstType *dealiased_base_type = (AstType *) strip_aliases((AstNode *) apv->base_type);
+
+        if (dealiased_base_type->kind == Ast_Kind_Poly_Struct_Type) {
             pp.type_expr = (AstType *) pcall;
         } else {
             pp.type_expr = apv->base_type;
@@ -1106,6 +1109,8 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
         return NULL;
     }
 
+    assert(!ps_type->base_struct->scope);
+
     if (ps_type->concrete_structs == NULL) {
         sh_new_arena(ps_type->concrete_structs);
     }
@@ -1153,6 +1158,7 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
     insert_poly_slns_into_scope(sln_scope, slns);
 
     AstStructType* concrete_struct = (AstStructType *) ast_clone(context.ast_alloc, ps_type->base_struct);
+    concrete_struct->scope = scope_create(context.ast_alloc, sln_scope, ps_type->token->pos);
     concrete_struct->polymorphic_error_loc = pos;
     BH_MASK_SET(concrete_struct->flags, !error_if_failed, Ast_Flag_Header_Check_No_Error);
 

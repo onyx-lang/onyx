@@ -449,6 +449,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 token_toggle_end((*member)->token);
                 if (shgeti(s_type->Struct.members, (*member)->token->text) != -1) {
                     onyx_report_error((*member)->token->pos, Error_Critical, "Duplicate struct member, '%s'.", (*member)->token->text);
+                    token_toggle_end((*member)->token);
                     return NULL;
                 }
 
@@ -602,6 +603,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             if (!concrete) return NULL;
             if (concrete == (Type *) &node_that_signals_failure) return concrete;
             concrete->Struct.constructed_from = (AstType *) ps_type;
+            pc_type->resolved_type = concrete;
             return concrete;
         }
 
