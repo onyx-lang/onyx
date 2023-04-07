@@ -1,0 +1,63 @@
+package core.encoding.json
+#allow_stale_code
+
+use core {*}
+
+decode :: (data: str, allocator := context.allocator, print_errors := true) -> Json {
+    json: Json;
+    json.allocator = allocator;
+    json.root = cast(Value) null;
+
+    root, err := parse(data, allocator);
+    if err.kind != .None && print_errors {
+        switch err.kind {
+            case .EOF do printf("Reached EOF\n");
+            case .Illegal_Character do printf("Illegal Character: {}\n", err.pos);
+            case .String_Unterminated do printf("Unterminated String: {}\n", err.pos);
+            case .Unexpected_Token do printf("Unexpected Token: {}\n", err.pos);
+        }
+
+        return json;
+    }
+
+    json.root = root;
+    return json;
+}
+
+#local
+_Decode_Error :: struct {
+    errmsg: str;
+    pos:    Position;
+}
+
+Decode_Error :: #distinct ^_Decode_Error;
+
+#inject Decode_Error {
+    has_error :: (this: Decode_Error) => cast(^_Decode_Error) this != null;
+    message   :: (this: Decode_Error) => (cast(^_Decode_Error) this).errmsg;
+    position  :: (this: Decode_Error) => (cast(^_Decode_Error) this).pos;
+}
+
+decode_with_error :: (data: str, allocator := context.allocator) -> (Json, Decode_Error) {
+    json: Json;
+    json.allocator = allocator;
+    json.root = null_value();
+
+    root, err := parse(data, allocator);
+
+    if err.kind != .None {
+        decode_error := new_temp(_Decode_Error);
+        decode_error.pos = err.pos;
+        switch err.kind {
+            case .EOF                  do decode_error.errmsg = "Reached EOF";
+            case .Illegal_Character    do decode_error.errmsg = "Illegal Character";
+            case .String_Unterminated  do decode_error.errmsg = "Unterminated String";
+            case .Unexpected_Token     do decode_error.errmsg = "Unexpected Token";
+        }
+
+        return json, Decode_Error.{decode_error};
+    }
+
+    json.root = root;
+    return json, Decode_Error.{null};
+}

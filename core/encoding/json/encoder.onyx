@@ -1,0 +1,451 @@
+package core.encoding.json
+#allow_stale_code
+
+use core {package, *}
+use runtime
+use runtime.info {*}
+use core.encoding.json
+
+Encoding_Error :: enum {
+    None;
+    Unsupported_Type;
+}
+
+encode_string :: (v: $T, allocator := context.allocator) -> (str, Encoding_Error) {
+    stream := io.buffer_stream_make(256);
+    writer := io.writer_make(^stream, 0);
+    defer io.buffer_stream_free(^stream);
+
+    err := encode(^writer, v);
+    if err != .None {
+        return "", err;
+    }
+
+    s := string.alloc_copy(io.buffer_stream_to_str(^stream), allocator);
+    return s, .None;
+}
+
+//
+// This could be changed to use the "any" type now, which would allow for any type to be
+// represented as a json value. However, this eliminates the control that you get from
+// this way.
+//
+encode :: #match {
+    (w: ^io.Writer, v: i32) -> Encoding_Error {
+        io.write_i32(w, ~~v);
+        return .None;
+    },
+
+    (w: ^io.Writer, v: i64) -> Encoding_Error {
+        io.write_i64(w, ~~v);
+        return .None;
+    },
+
+    (w: ^io.Writer, v: f32) -> Encoding_Error {
+        io.write_f32(w, ~~v);
+        return .None;
+    },
+
+    (w: ^io.Writer, v: f64) -> Encoding_Error {
+        io.write_f64(w, ~~v);
+        return .None;
+    },
+
+    (w: ^io.Writer, v: str) -> Encoding_Error {
+        io.write_escaped_str(w, v);
+        return .None;
+    },
+
+    (w: ^io.Writer, v: [] $T) -> Encoding_Error {
+        io.write_byte(w, #char "[");
+
+        for i: v.count {
+            if i > 0 do io.write_byte(w, #char ",");
+
+            err := encode(w, v[i]);
+            if err != .None do return err;
+        }
+
+        io.write_byte(w, #char "]");
+        return .None;
+    },
+
+    (w: ^io.Writer, v: [..] $T) -> Encoding_Error {
+        io.write_byte(w, #char "[");
+
+        for i: v.count {
+            if i > 0 do io.write_byte(w, #char ",");
+
+            err := encode(w, v[i]);
+            if err != .None do return err;
+        }
+
+        io.write_byte(w, #char "]");
+        return .None;
+    },
+
+    (w: ^io.Writer, v: Map(str, $T)) -> Encoding_Error {
+        io.write_byte(w, #char "{");
+
+        for i: v.entries.count {
+            if i > 0 do io.write_byte(w, #char ",");
+            entry := ^v.entries[i];
+
+            io.write_escaped_str(w, entry.key);
+            io.write_byte(w, #char ":");
+
+            err := encode(w, entry.value);
+            if err != .None do return err;
+        }
+
+        io.write_byte(w, #char "}");
+        return .None;
+    },
+
+    (w: ^io.Writer, v: Value) -> Encoding_Error {
+        switch (cast(^_Value) v).type {
+            case .Null    do io.write_str(w, "null");
+            case .Bool    do io.write(w, v->as_bool());
+            case .Integer do io.write(w, v->as_int());
+            case .Float   do io.write(w, v->as_float());
+            case .String  do   encode(w, v->as_str());
+            case .Array   do   encode(w, v->as_array());
+
+            case .Object {
+                io.write_byte(w, #char "{");
+                obj := cast(^_Value_Object) cast(^_Value) v;
+
+                for i: obj.object_.count {
+                    if i > 0 do io.write_byte(w, #char ",");
+
+                    io.write_escaped_str(w, obj.object_[i].key);
+                    io.write_byte(w, #char ":");
+
+                    err := encode(w, obj.object_[i].value);
+                    if err != .None do return err;
+                }
+
+                io.write_byte(w, #char "}");
+            }
+
+            case #default {
+                return .Unsupported_Type;
+            }
+        }
+
+        return .None;
+    },
+
+    // This is disabled because I would prefer to have a compile time error for an unsupported type,
+    // as opposed to a error to check programatically.
+    //
+    // // Inserted after any of the #match directives
+    // #order 1000 (w: ^io.Writer, v: $T) -> Encoding_Error {
+    //     return .Unsupported_Type;
+    // }
+}
+
+
+#overload #order 10000
+encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
+    use runtime.info {*}
+
+    info := get_type_info(data.type);
+
+    switch info.kind {
+        case .Basic {
+            io.write_format_va(w, "{}", .[data]);
+        }
+
+        case .Array {
+            io.write(w, "[");
+
+            a := cast(^Type_Info_Array) info;
+            arr := data.data;
+
+            for i: a.count {
+                if i != 0 do io.write(w, ",");
+
+                encode(w, any.{ ~~(cast([^] u8) arr + get_type_info(a.of).size * i), a.of });
+            }
+
+            io.write(w, "]");
+        }
+
+        case .Slice, .Dynamic_Array {
+            if data.type == str {
+                io.write_format_va(w, "{\"}", .[data]);
+                break;
+            }
+
+            io.write(w, "[");
+
+            a := cast(^Type_Info_Dynamic_Array) info;
+            arr := cast(^core.array.Untyped_Array) data.data;
+            data  := arr.data;
+            count := arr.count;
+
+            for i: count {
+                if i != 0 do io.write(w, ",");
+
+                encode(w, any.{ ~~(cast([^] u8) data + get_type_info(a.of).size * i), a.of });
+            }
+
+            io.write(w, "]");
+        }
+
+        case .Distinct {
+            if data.type == Value {
+                encode(w, *cast(^Value) data.data);
+                return .None;
+            }
+
+            d := cast(^Type_Info_Distinct) info;
+            encode(w, any.{ data.data, d.base_type });
+        }
+
+        case .Struct {
+            s := cast(^runtime.info.Type_Info_Struct) info;
+
+            io.write(w, "{");
+
+            for ^member: s.members {
+                key := member.name;
+                if tag := array.first(member.tags, #(it.type == Custom_Key)); tag != null {
+                    key = (cast(^Custom_Key) tag.data).key;
+                }
+
+                if tag := array.first(member.tags, #(it.type == type_expr)); tag != null {
+                    if *cast(^type_expr, tag.data) == Ignore {
+                        continue;
+                    }
+                }
+
+                if !#first do io.write(w, ",");
+                encode(w, key);
+
+                io.write(w, ":");
+                encode(w, any.{ ~~(cast([^] u8) data.data + member.offset), member.type });
+            }
+            io.write(w, "}");
+        }
+
+        case #default {
+            return .Unsupported_Type;
+        }
+    }
+}
+
+
+
+//
+// Use this to change the name of the key in
+// a JSON object to use for populating a structure member.
+//
+// Foo :: struct {
+//     @json.Custom_Key.{"other_key"}
+//     x: u32;
+// }
+Custom_Key :: struct {key: str;}
+
+
+//
+// Use this to ignore a field when parsing/formatting
+// a JSON object.
+//
+// Foo :: struct {
+//     @json.Ignore
+//     x: u32;
+// }
+Ignore :: #distinct void
+
+
+from_any :: #match #local {}
+
+#overload
+from_any :: macro (in: ^$T, allocator := context.allocator) -> Value {
+    from_any :: from_any
+    return from_any(T, in, allocator);
+}
+
+#overload
+from_any :: (type: type_expr, in: rawptr, allocator := context.allocator) -> Value {
+    use runtime.info;
+
+    t_info := get_type_info(type);
+    switch t_info.kind {
+        case .Basic do switch type {
+            // These functions handle the cases where the types do
+            // not match, so no additional checks are needed here.
+            case bool     { v := new(_Value_Bool, allocator);    v.bool_  =    *cast(^bool) in; return Value.{v}; }
+            case i32, u32 { v := new(_Value_Integer, allocator); v.int_   = ~~ *cast(^i32)  in; return Value.{v}; }
+            case i64, u64 { v := new(_Value_Integer, allocator); v.int_   =    *cast(^i64)  in; return Value.{v}; }
+            case f32      { v := new(_Value_Float, allocator);   v.float_ = ~~ *cast(^f32)  in; return Value.{v}; }
+            case f64      { v := new(_Value_Float, allocator);   v.float_ =    *cast(^f64)  in; return Value.{v}; }
+        }
+
+        case .Array {
+            a_info := cast(^Type_Info_Array) t_info;
+
+            v := new(_Value_Array, allocator);
+            array.init(^v.array_, a_info.count, allocator);
+
+            for i: a_info.count {
+                v.array_ << from_any(a_info.of, cast([^] u8) in + size_of(a_info.of) * i);
+            }
+
+            return Value.{v};
+        }
+
+        case .Slice, .Dynamic_Array {
+            // Strings are handled differently
+            if type == str {
+                v := new(_Value_String, allocator);
+                v.str_ = string.alloc_copy(*cast(^str) in, allocator);
+                return Value.{v};
+            }
+
+            s_info := cast(^Type_Info_Slice) t_info;
+            s := cast(^core.array.Untyped_Array) in;
+
+            v := new(_Value_Array, allocator);
+            array.init(^v.array_, s.count, allocator);
+
+            for i: s.count {
+                v.array_ << from_any(s_info.of, cast([^] u8) s.data + size_of(s_info.of) * i);
+            }
+
+            return Value.{v};
+        }
+
+        case .Struct {
+            s_info := cast(^Type_Info_Struct) t_info;
+
+            v := new(_Value_Object, allocator);
+            array.init(^v.object_, s_info.members.count, allocator);
+
+            for^ member: s_info.members {
+                key := member.name;
+                if tag := array.first(member.tags, #(it.type == Custom_Key)); tag != null {
+                    key = (cast(^Custom_Key) tag.data).key;
+                }
+
+                if tag := array.first(member.tags, #(it.type == type_expr)); tag != null {
+                    if *cast(^type_expr, tag.data) == Ignore {
+                        continue;
+                    }
+                }
+
+                json.set(Value.{v}, key, from_any(member.type, cast([^] u8) in + member.offset), dont_copy_key=true);
+            }
+
+            return Value.{v};
+        }
+
+        case .Distinct {
+            if type == Value {
+                return *cast(^Value) in;
+            }
+
+            d_info := cast(^Type_Info_Distinct) t_info;
+            return from_any(d_info.base_type, in);
+        }
+    }
+
+    return null_value();
+}
+
+
+
+to_any :: as_any
+
+as_any :: #match #local {}
+
+#overload
+as_any :: macro (value: Value, out: ^$T) {
+    #this_package.to_any(value, T, out);
+}
+
+#overload
+as_any :: (value: Value, type: type_expr, out: rawptr) {
+    use runtime.info;
+
+    t_info := get_type_info(type);
+    switch t_info.kind {
+        case .Basic do switch type {
+            // These functions handle the cases where the types do
+            // not match, so no additional checks are needed here.
+            case bool     do *cast(^bool) out =    value->as_bool();
+            case i32, u32 do *cast(^i32)  out = ~~(value->as_int());
+            case i64, u64 do *cast(^i64)  out =    value->as_int();
+            case f32      do *cast(^f32)  out = ~~(value->as_float());
+            case f64      do *cast(^f64)  out =    value->as_float();
+        }
+
+        case .Array {
+            a_info := cast(^Type_Info_Array) t_info;
+
+            for i: a_info.count {
+                to_any(value[i], a_info.of, cast([^] u8) out + size_of(a_info.of) * i);
+            }
+        }
+
+        case .Slice {
+            // Strings are handled differently
+            if type == str {
+                *cast(^str) out = string.alloc_copy(value->as_str());
+                return;
+            }
+
+            s_info := cast(^Type_Info_Slice) t_info;
+            s := cast(^core.array.Untyped_Array) out;
+
+            if s.count == 0 {
+                if s.data != null {
+                    return;
+                }
+
+                to_copy := value->as_array();
+
+                size := size_of(s_info.of) * to_copy.count;
+                s.data = raw_alloc(context.allocator, size);
+                memory.set(s.data, 0, size);
+
+                s.count = to_copy.count;
+            }
+
+            for i: s.count {
+                to_any(value[i], s_info.of, cast([^] u8) s.data + size_of(s_info.of) * i);
+            }
+        }
+
+        case .Struct {
+            s_info := cast(^Type_Info_Struct) t_info;
+
+            for^ member: s_info.members {
+                key := member.name;
+                if tag := array.first(member.tags, #(it.type == Custom_Key)); tag != null {
+                    key = (cast(^Custom_Key) tag.data).key;
+                }
+
+                if tag := array.first(member.tags, #(it.type == type_expr)); tag != null {
+                    if *cast(^type_expr, tag.data) == Ignore {
+                        continue;
+                    }
+                }
+
+                to_any(value[key], member.type, cast([^] u8) out + member.offset);
+            }
+        }
+
+        case .Distinct {
+            if type == Value {
+                *cast(^Value) out = value;
+                return;
+            }
+
+            d_info := cast(^Type_Info_Distinct) t_info;
+            to_any(value, d_info.base_type, out);
+        }
+    }
+}
