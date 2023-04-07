@@ -3784,6 +3784,10 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
 }
 
 void onyx_parser_free(OnyxParser* parser) {
+    bh_arr_free(parser->alternate_entity_placement_stack);
+    bh_arr_free(parser->current_symbol_stack);
+    bh_arr_free(parser->scope_flags);
+    bh_arr_free(parser->stored_tags);
 }
 
 void onyx_parse(OnyxParser *parser) {
@@ -3793,6 +3797,13 @@ void onyx_parse(OnyxParser *parser) {
     parser->package = parse_file_package(parser);
     parser->file_scope = scope_create(parser->allocator, parser->package->private_scope, parser->tokenizer->tokens[0].pos);
     parser->current_scope = parser->file_scope;
+
+    if (parse_possible_directive(parser, "allow_stale_code")
+        && !parser->package->is_included_somewhere
+        && !context.options->no_stale_code) {
+        bh_arr_new(global_heap_allocator, parser->package->buffered_entities, 32);
+        bh_arr_push(parser->alternate_entity_placement_stack, &parser->package->buffered_entities);
+    }
 
     parse_top_level_statements_until(parser, Token_Type_End_Stream);
 

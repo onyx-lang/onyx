@@ -1,4 +1,5 @@
 package core.doc
+#allow_stale_code
 
 Doc :: struct {
     header: Doc_Header;

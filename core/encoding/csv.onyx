@@ -1,4 +1,5 @@
 package core.encoding.csv
+#allow_stale_code
 
 //
 // A simple CSV parsing and encoding library.

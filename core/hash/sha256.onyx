@@ -1,4 +1,5 @@
 package core.hash.sha256
+#allow_stale_code
 
 use core {memory}
 use core.intrinsics.wasm {wasm :: package}

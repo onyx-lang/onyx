@@ -1620,6 +1620,12 @@ struct Package {
     // the code base. This is used when a static if clears and new symbols are introduced.
     // 'use package' statements have to be reevaluated to pull in the new symbols.
     bh_arr(Entity *) use_package_entities;
+
+    // NOTE: These are entities that are stored in packages marked with `#allow_stale_code`.
+    // These entities are flushed to the entity heap when the package has been explicit used
+    // somewhere.
+    bh_arr(Entity *) buffered_entities;
+    b32 is_included_somewhere : 1;
 };
 
 typedef enum CompileAction CompileAction;
@@ -1670,6 +1676,7 @@ struct CompileOptions {
     b32 use_multi_threading   : 1;
     b32 generate_foreign_info : 1;
     b32 no_std                : 1;
+    b32 no_stale_code         : 1;
 
     b32 generate_tag_file         : 1;
     b32 generate_symbol_info_file : 1;

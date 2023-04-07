@@ -1,4 +1,5 @@
 package core.encoding.ini
+#allow_stale_code
 
 //
 // This library allows for parsing and formatting a simple 'ini' like
