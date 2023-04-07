@@ -1,4 +1,5 @@
 package core.test
+#allow_stale_code
 
 use core
 use core.array

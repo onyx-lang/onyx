@@ -1,4 +1,5 @@
 package core.encoding.base64
+#allow_stale_code
 
 use core.array
 

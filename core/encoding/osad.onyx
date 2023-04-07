@@ -1,4 +1,5 @@
 package core.encoding.osad
+#allow_stale_code
 
 use core.io
 use core.string

@@ -1,4 +1,5 @@
 package core.hash.md5
+#allow_stale_code
 
 use core {io, memory, conv}
 use core.intrinsics.wasm {rotl_i32}

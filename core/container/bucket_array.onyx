@@ -1,6 +1,7 @@
 // @Incomplete // This implementation is not functional at all but is something I want to get around to adding.
 
 package core.bucket_array
+#allow_stale_code
 
 use core
 use core.array

@@ -97,6 +97,19 @@ void package_reinsert_use_packages(Package* package) {
     bh_arr_set_length(package->use_package_entities, 0);
 }
 
+void package_mark_as_used(Package* package) {
+    if (!package) return;
+    if (package->is_included_somewhere) return;
+    package->is_included_somewhere = 1;
+    
+    bh_arr_each(Entity *, pent, package->buffered_entities) {
+        entity_heap_insert_existing(&context.entities, *pent);
+    }
+
+    bh_arr_clear(package->buffered_entities);
+}
+
+
 
 //
 // Scoping

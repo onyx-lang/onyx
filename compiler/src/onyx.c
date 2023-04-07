@@ -60,6 +60,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     "\t--doc <doc_file>        Generates an O-DOC file, a.k.a an Onyx documentation file. Used by onyx-doc-gen.\n"
     "\t--tag                   Generates a C-Tag file.\n"
     "\t--syminfo <target_file> Generates a symbol resolution information file. Used by onyx-lsp.\n"
+    "\t--no-stale-code         Disables use of `#allow_stale_code` directive\n"
     "\t--generate-foreign-info\n"
     "\n"
     "Developer options:\n"
@@ -83,6 +84,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .use_post_mvp_features   = 1,
         .use_multi_threading     = 0,
         .no_std                  = 0,
+        .no_stale_code           = 0,
 
         .runtime = Runtime_Onyx,
 
@@ -190,6 +192,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--no-std")) {
                 options.no_std = 1;
+            }
+            else if (!strcmp(argv[i], "--no-stale-code")) {
+                options.no_stale_code = 1;
             }
             else if (!strcmp(argv[i], "-I")) {
                 bh_arr_push(options.included_folders, argv[++i]);

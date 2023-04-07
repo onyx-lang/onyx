@@ -1121,6 +1121,7 @@ static SymresStatus symres_package(AstPackage* package) {
     }
 
     if (package->package) {
+        package_mark_as_used(package->package);
         return Symres_Success;
     } else {
         if (report_unresolved_symbols) {
