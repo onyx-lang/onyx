@@ -17,7 +17,7 @@ Pair :: struct (First_Type: type_expr, Second_Type: type_expr) {
 }
 
 #inject Pair {
-    make :: macro (x: $X, y: $Y) => Pair(X, Y).{x, y};
+    make :: macro (x: $X, y: $Y) => #this_package.Pair(X, Y).{x, y};
 
     _format :: (output: &conv.Format_Output, format: &conv.Format, p: &Pair($First_Type, $Second_Type)) {
         conv.format(output, "({}, {})", p.first, p.second);
