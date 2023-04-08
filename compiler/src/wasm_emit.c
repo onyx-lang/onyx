@@ -2337,6 +2337,11 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
         case ONYX_INTRINSIC_F64_MAX:      WI(call->token, WI_F64_MAX); break;
         case ONYX_INTRINSIC_F64_COPYSIGN: WI(call->token, WI_F64_COPYSIGN); break;
 
+        case ONYX_INTRINSIC_I32_REINTERPRET_F32: WI(call->token, WI_I32_REINTERPRET_F32); break;
+        case ONYX_INTRINSIC_I64_REINTERPRET_F64: WI(call->token, WI_I64_REINTERPRET_F64); break;
+        case ONYX_INTRINSIC_F32_REINTERPRET_I32: WI(call->token, WI_F32_REINTERPRET_I32); break;
+        case ONYX_INTRINSIC_F64_REINTERPRET_I64: WI(call->token, WI_F64_REINTERPRET_I64); break;
+
         case ONYX_INTRINSIC_I8X16_CONST:
         case ONYX_INTRINSIC_V128_CONST:   SIMD_INT_CONST_INTRINSIC(u8, 16);   break;
         case ONYX_INTRINSIC_I16X8_CONST:  SIMD_INT_CONST_INTRINSIC(u16, 8);   break;

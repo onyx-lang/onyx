@@ -160,6 +160,11 @@ static IntrinsicMap builtin_intrinsics[] = {
     { "max_f64",      ONYX_INTRINSIC_F64_MAX },
     { "copysign_f64", ONYX_INTRINSIC_F64_COPYSIGN },
 
+    { "reinterpret_f32", ONYX_INTRINSIC_I32_REINTERPRET_F32 },
+    { "reinterpret_f64", ONYX_INTRINSIC_I64_REINTERPRET_F64 },
+    { "reinterpret_i32", ONYX_INTRINSIC_F32_REINTERPRET_I32 },
+    { "reinterpret_i64", ONYX_INTRINSIC_F64_REINTERPRET_I64 },
+
 
     // SIMD Intrinsics
     { "v128_const", ONYX_INTRINSIC_V128_CONST },
