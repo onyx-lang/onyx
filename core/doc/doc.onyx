@@ -4,11 +4,12 @@ package core.doc
 Doc :: struct {
     header: Doc_Header;
 
-    packages:     [] Doc_Package;
-    procedures:   [] Doc_Procedure;
-    structures:   [] Doc_Structure;
-    enumerations: [] Doc_Enum;
-    files:        [] Doc_File;
+    packages:       [] Doc_Package;
+    procedures:     [] Doc_Procedure;
+    structures:     [] Doc_Structure;
+    enumerations:   [] Doc_Enum;
+    distinct_types: [] Doc_Distinct_Type; 
+    files:          [] Doc_File;
 }
 
 
@@ -25,6 +26,7 @@ Doc_Header :: struct {
     procedures_info_start: u32;
     structures_info_start: u32;
     enumerations_info_start: u32;
+    distinct_types_info_start: u32;
     files_info_start: u32;
 }
 
@@ -130,3 +132,12 @@ Doc_Enum_Value :: struct {
     name: str;
     value: u64;
 }
+
+Doc_Distinct_Type :: struct {
+    use base: Doc_Entity;
+
+    wrapped_type: str; // TODO: Make this not a string
+
+    methods: [] Doc_Procedure;
+}
+

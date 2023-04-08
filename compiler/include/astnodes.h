@@ -1658,6 +1658,7 @@ typedef struct OnyxDocInfo {
     bh_arr(AstBinding *) procedures;
     bh_arr(AstBinding *) structures;
     bh_arr(AstBinding *) enumerations;
+    bh_arr(AstBinding *) distinct_types;
 
     Table(u32) file_ids;
     u32 next_file_id;

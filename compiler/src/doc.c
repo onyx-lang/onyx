@@ -200,6 +200,10 @@ void onyx_docs_submit(OnyxDocInfo *docs, AstBinding *binding) {
     if (node->kind == Ast_Kind_Enum_Type) {
         bh_arr_push(docs->enumerations, binding);
     }
+
+    if (node->kind == Ast_Kind_Distinct_Type) {
+        bh_arr_push(docs->distinct_types, binding);
+    }
 }
 
 #define Doc_Magic_Bytes "ODOC"
@@ -397,6 +401,8 @@ static void write_entity_header(bh_buffer *buffer, AstBinding *binding, OnyxFile
     write_doc_notes(buffer, binding);
 }
 
+static b32 write_doc_procedure(bh_buffer *buffer, AstBinding *binding, AstNode *proc);
+
 static void write_doc_constraints(bh_buffer *buffer, ConstraintContext *constraints, bh_arr(AstPolyParam) poly_params) {
     bh_buffer tmp_buffer;
     bh_buffer_init(&tmp_buffer, global_scratch_allocator, 256);
@@ -451,7 +457,40 @@ static void write_doc_constraints(bh_buffer *buffer, ConstraintContext *constrai
     bh_buffer_free(&tmp_buffer);
 }
 
-static b32 write_doc_procedure(bh_buffer *buffer, AstBinding *binding, AstNode *proc);
+static void write_doc_methods(bh_buffer *buffer, Scope *method_scope) {
+    u32 count_patch = buffer->length;
+    bh_buffer_write_u32(buffer, 0);
+
+    if (method_scope == NULL) {
+        return;
+    }
+
+    u32 method_count = 0;
+    fori (i, 0, shlen(method_scope->symbols)) {
+        AstFunction* node = (AstFunction *) strip_aliases(method_scope->symbols[i].value);
+        if (node->kind != Ast_Kind_Function
+            && node->kind != Ast_Kind_Polymorphic_Proc
+            && node->kind != Ast_Kind_Overloaded_Function
+            && node->kind != Ast_Kind_Macro)
+            continue;
+
+        assert(node->entity);
+        assert(node->entity->function == node);
+
+        AstBinding *binding = NULL;
+        switch (node->kind) {
+            case Ast_Kind_Polymorphic_Proc:
+            case Ast_Kind_Function:            binding = node->original_binding_to_node; break;
+            case Ast_Kind_Macro:               binding = ((AstMacro *) node)->original_binding_to_node; break;
+            case Ast_Kind_Overloaded_Function: binding = ((AstOverloadedFunction *) node)->original_binding_to_node; break;
+        }
+
+        method_count++;
+        write_doc_procedure(buffer, binding, (AstNode *) node);
+    }
+
+    *((u32 *) bh_pointer_add(buffer->data, count_patch)) = method_count;
+}
 
 static b32 write_doc_function(bh_buffer *buffer, AstBinding *binding, AstNode *proc) {
     AstFunction *func = (void *) proc;
@@ -659,34 +698,7 @@ static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *
         bh_buffer_free(&type_buf);
     }
 
-    u32 count_patch = buffer->length;
-    bh_buffer_write_u32(buffer, 0);
-
-    u32 method_count = 0;
-    fori (i, 0, shlen(method_scope->symbols)) {
-        AstFunction* node = (AstFunction *) strip_aliases(method_scope->symbols[i].value);
-        if (node->kind != Ast_Kind_Function
-            && node->kind != Ast_Kind_Polymorphic_Proc
-            && node->kind != Ast_Kind_Overloaded_Function
-            && node->kind != Ast_Kind_Macro)
-            continue;
-
-        assert(node->entity);
-        assert(node->entity->function == node);
-
-        AstBinding *binding = NULL;
-        switch (node->kind) {
-            case Ast_Kind_Polymorphic_Proc:
-            case Ast_Kind_Function:            binding = node->original_binding_to_node; break;
-            case Ast_Kind_Macro:               binding = ((AstMacro *) node)->original_binding_to_node; break;
-            case Ast_Kind_Overloaded_Function: binding = ((AstOverloadedFunction *) node)->original_binding_to_node; break;
-        }
-
-        method_count++;
-        write_doc_procedure(buffer, binding, (AstNode *) node);
-    }
-
-    *((u32 *) bh_pointer_add(buffer->data, count_patch)) = method_count;
+    write_doc_methods(buffer, method_scope);
 
     return 1;
 }
@@ -708,6 +720,22 @@ static b32 write_doc_enum(bh_buffer *buffer, AstBinding *binding, AstNode *node)
     }
 
     bh_buffer_write_u32(buffer, enum_node->is_flags ? 1 : 0);
+
+    return 1;
+}
+
+static b32 write_doc_distinct_type(bh_buffer *buffer, AstBinding *binding, AstNode *node) {
+    AstDistinctType *distinct_node = (void *) node;
+
+    write_entity_header(buffer, binding, node->token->pos);
+
+    bh_buffer type_buf;
+    bh_buffer_init(&type_buf, global_scratch_allocator, 256);
+    write_type_node(&type_buf, distinct_node->base_type);
+    write_string(buffer, type_buf.length, type_buf.data);
+    bh_buffer_free(&type_buf);
+
+    write_doc_methods(buffer, distinct_node->scope);
 
     return 1;
 }
@@ -750,6 +778,7 @@ void onyx_docs_emit_odoc(const char *dest) {
     bh_buffer_write_u32(&doc_buffer, bh_time_curr() / 1000);
 
     int offset_table_index = doc_buffer.length;
+    bh_buffer_write_u32(&doc_buffer, 0);
     bh_buffer_write_u32(&doc_buffer, 0);
     bh_buffer_write_u32(&doc_buffer, 0);
     bh_buffer_write_u32(&doc_buffer, 0);
@@ -801,9 +830,15 @@ void onyx_docs_emit_odoc(const char *dest) {
 
 
     //
+    // Distinct Types Info
+    //
+    write_doc_entity_array(&doc_buffer, context.doc_info->distinct_types, write_doc_distinct_type, offset_table_index + 16);
+
+
+    //
     // File Info
     //
-    *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 16)) = doc_buffer.length;
+    *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 20)) = doc_buffer.length;
 
     bh_buffer_write_u32(&doc_buffer, shlenu(context.doc_info->file_ids));
     fori (i, 0, shlen(context.doc_info->file_ids)) {
