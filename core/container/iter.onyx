@@ -16,7 +16,7 @@ use core.intrinsics.types {type_is_struct}
 #inject Iterator {
     filter :: filter;
     map :: map;
-    flatMap :: flatMap;
+    flat_map :: flat_map;
     zip :: zip;
 
     take_one :: take_one;
@@ -201,13 +201,13 @@ map :: (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> $R) =>
     using the transform function into a new iterator, from
     which subsequent values will be output.
 
-        iter.flatMap(iter.as_iter(1 .. 5), x => iter.as_iter(1 .. x+1))
+        iter.flat_map(iter.as_iter(1 .. 5), x => iter.as_iter(1 .. x+1))
         // 1, 1, 2, 1, 2, 3, 1, 2, 3, 4
 """
-flatMap :: #match #local {}
+flat_map :: #match #local {}
 
 #overload
-flatMap :: (it: Iterator($T), transform: (T) -> Iterator($R)) =>
+flat_map :: (it: Iterator($T), transform: (T) -> Iterator($R)) =>
     generator(
         &.{ iterator = it, transform = transform, inner_iter = Iterator(R).{}, get_new_inner = true },
 
@@ -235,7 +235,7 @@ flatMap :: (it: Iterator($T), transform: (T) -> Iterator($R)) =>
         mi => { close(mi.iterator); })
 
 #overload
-flatMap :: (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> Iterator($R)) =>
+flat_map :: (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> Iterator($R)) =>
     generator(
         &.{ iterator = it, transform = transform, inner_iter = Iterator(R).{}, get_new_inner = true, ctx = ctx },
 
