@@ -83,6 +83,8 @@ Doc_Procedure :: struct {
 
     // Only used if this is an overloaded procedure
     overloads: [] Doc_Procedure;
+
+    constraints: [] str;
 }
 
 Doc_Param :: struct {
@@ -96,6 +98,8 @@ Doc_Structure :: struct {
 
     members: [] Doc_Structure_Member;
     polymorph_arguments: [] Doc_Param;
+
+    constraints: [] str;
 
     methods: [] Doc_Procedure;
 }

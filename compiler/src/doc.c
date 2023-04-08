@@ -397,6 +397,60 @@ static void write_entity_header(bh_buffer *buffer, AstBinding *binding, OnyxFile
     write_doc_notes(buffer, binding);
 }
 
+static void write_doc_constraints(bh_buffer *buffer, ConstraintContext *constraints, bh_arr(AstPolyParam) poly_params) {
+    bh_buffer tmp_buffer;
+    bh_buffer_init(&tmp_buffer, global_scratch_allocator, 256);
+
+    u32 constraint_count_patch = buffer->length;
+    bh_buffer_write_u32(buffer, 0);
+
+    u32 constraint_count = 0;
+    bh_arr_each(AstConstraint *, pconstraint, constraints->constraints) {
+        AstConstraint *constraint = *pconstraint;
+
+        bh_buffer_clear(&tmp_buffer);
+        write_type_node(&tmp_buffer, constraint->interface);
+        bh_buffer_write_string(&tmp_buffer, "(");
+
+        bh_arr_each(AstType *, ptype_arg, constraint->type_args) {
+            if (ptype_arg != constraint->type_args) {
+                bh_buffer_write_string(&tmp_buffer, ", ");
+            }
+
+            AstType *type_arg = *ptype_arg;
+            write_type_node(&tmp_buffer, type_arg);
+        }
+
+        bh_buffer_write_string(&tmp_buffer, ")");
+        write_string(buffer, tmp_buffer.length, tmp_buffer.data);
+
+        constraint_count += 1;
+    }
+
+    if (poly_params) {
+        bh_arr_each(AstPolyParam, poly_param, poly_params) {
+            if (!poly_param->implicit_interface) continue;
+
+            bh_buffer_clear(&tmp_buffer);
+            write_type_node(&tmp_buffer, poly_param->implicit_interface);
+            bh_buffer_write_string(&tmp_buffer, "(");
+
+            poly_param->poly_sym->flags &= ~Ast_Flag_Symbol_Is_PolyVar;
+            write_type_node(&tmp_buffer, poly_param->poly_sym);
+            poly_param->poly_sym->flags |= Ast_Flag_Symbol_Is_PolyVar;
+
+            bh_buffer_write_string(&tmp_buffer, ")");
+            write_string(buffer, tmp_buffer.length, tmp_buffer.data);
+
+            constraint_count += 1;
+        }
+    }
+
+    *((u32 *) bh_pointer_add(buffer->data, constraint_count_patch)) = constraint_count;
+
+    bh_buffer_free(&tmp_buffer);
+}
+
 static b32 write_doc_procedure(bh_buffer *buffer, AstBinding *binding, AstNode *proc);
 
 static b32 write_doc_function(bh_buffer *buffer, AstBinding *binding, AstNode *proc) {
@@ -422,6 +476,9 @@ static b32 write_doc_function(bh_buffer *buffer, AstBinding *binding, AstNode *p
     write_cstring(buffer, type_get_name(func->type->Function.return_type));
 
     // Overload procs
+    bh_buffer_write_u32(buffer, 0);
+
+    // Constraints
     bh_buffer_write_u32(buffer, 0);
 
     return 1;
@@ -456,6 +513,9 @@ static b32 write_doc_overloaded_function(bh_buffer *buffer, AstBinding *binding,
     }
 
     *((u32 *) bh_pointer_add(buffer->data, proc_count_patch)) = proc_count;
+
+    // Constraints
+    bh_buffer_write_u32(buffer, 0);
 
     bh_imap_free(&all_overloads);
     return 1;
@@ -501,6 +561,8 @@ static b32 write_doc_polymorphic_proc(bh_buffer *buffer, AstBinding *binding, As
     // Overload procs
     bh_buffer_write_u32(buffer, 0);
 
+    // Constraints
+    write_doc_constraints(buffer, &func->constraints, func->poly_params);
     return 1;
 }
 
@@ -551,6 +613,9 @@ static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *
 
         // Polymorph parameters
         bh_buffer_write_u32(buffer, 0);
+
+        // Constraints
+        write_doc_constraints(buffer, &struct_node->constraints, NULL);
     }
     else if (node->kind == Ast_Kind_Poly_Struct_Type) {
         AstPolyStructType *poly_struct_node = (void *) node;
@@ -587,6 +652,9 @@ static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *
             write_string(buffer, type_buf.length, type_buf.data);
             write_cstring(buffer, "");
         }
+
+        // Constraints
+        write_doc_constraints(buffer, &struct_node->constraints, NULL);
 
         bh_buffer_free(&type_buf);
     }
