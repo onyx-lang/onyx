@@ -12,18 +12,42 @@ use core.memory
 // }
 //
 
+#doc """
+    Creates a zeroed slice of type `T` and length `length`, using the allocator provided.
+
+        use core {slice, println}
+
+        sl := slice.make(i32, 10);
+        println(sl);
+        // 0 0 0 0 0 0 0 0 0 0
+"""
 make :: ($T: type_expr, length: u32, allocator := context.allocator) -> [] T {
     data := raw_alloc(allocator, sizeof T * length);
     memory.set(data, 0, sizeof T * length);
     return .{ data, length };
 }
 
+#doc """
+    Initializes a slice of type `T` to have a length of `length`, using the allocator provided.
+
+        use core {slice, println}
+
+        sl: [] i32;
+        slice.init(&sl, 10);
+        println(sl);
+        // 0 0 0 0 0 0 0 0 0 0
+"""
 init :: (sl: &[] $T, length: u32, allocator := context.allocator) -> [] T {
     sl.count = length;
     sl.data = raw_alloc(allocator, sizeof T * length);
     memory.set(sl.data, 0, sizeof T * length);
 }
 
+#doc """
+    Frees the data inside the slice.
+    The slice is taken by pointer because this procedure also sets the data pointer to `null`, and the length to `0`,
+    to prevent accidental future use of the slice.
+"""
 free :: (sl: &[] $T, allocator := context.allocator) {
     if sl.data == null do return;
 
@@ -51,6 +75,9 @@ builtin.delete :: macro (x: &[] $T, allocator := context.allocator) {
 }
 
 
+#doc """
+    Copies a slice to a new slice, allocated from the provided allocator.
+"""
 copy :: (sl: [] $T, allocator := context.allocator) -> [] T {
     data := raw_alloc(allocator, sl.count * sizeof T);
     memory.copy(data, sl.data, sl.count * sizeof T);
@@ -59,6 +86,19 @@ copy :: (sl: [] $T, allocator := context.allocator) -> [] T {
 }
 
 
+#doc """
+    Moves an element to a new index, ensuring that order of other elements is retained.
+
+        use core {slice, println}
+
+        arr := i32.[1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+        // Move element at index 4 to index 8
+        slice.transplant(arr, 4, 8);
+
+        println(arr);
+        // 1 2 3 4 6 7 8 9 5 10
+"""
 transplant :: (arr: [] $T, old_index: i32, new_index: i32) -> bool {
     if old_index < 0 || old_index >= arr.count do return false;
     if new_index < 0 || new_index >= arr.count do return false;
@@ -83,6 +123,9 @@ transplant :: (arr: [] $T, old_index: i32, new_index: i32) -> bool {
     return true;
 }
 
+#doc """
+    Get an element from a slice, with negative and wrap-around indexing.
+"""
 get :: (arr: [] $T, idx: i32) -> T {
     if arr.count == 0 do return .{};
 
@@ -92,6 +135,9 @@ get :: (arr: [] $T, idx: i32) -> T {
     return arr.data[idx];
 }
 
+#doc """
+    Get a pointer to an element from a slice, with negative and wrap-around indexing.
+"""
 get_ptr :: (arr: [] $T, idx: i32) -> &T {
     if arr.count == 0 do return null;
 
@@ -101,6 +147,9 @@ get_ptr :: (arr: [] $T, idx: i32) -> &T {
     return &arr.data[idx];
 }
 
+#doc """
+    Set a value in a slice, with negative and wrap-around indexing.
+"""
 set :: (arr: [] $T, idx: i32, value: T) {
     if arr.count == 0 do return;
 
@@ -116,38 +165,45 @@ contains :: #match #locked {
         return false;
     },
 
-    // Uses '==' to compare for equality.
     (arr: [] $T, x: T) -> bool {
         for it: arr do if it == x do return true;
         return false;
     }
 }
 
-// Tests if array is empty.
-// Normally this is unneeded, as arrays have a 'truthiness'
-// that depends on their count. For example, instead of saying:
-//     if array.empty(arr) { ... }
-// You can simply say:
-//     if !arr { ... }
+#doc """
+    Tests if the slice is empty.
+
+    Normally this is unneeded, as arrays have a 'truthiness'
+    that depends on their count. For example, instead of saying:
+
+        if slice.empty(arr) { ... }
+
+    You can simply say:
+
+        if !arr { ... }
+"""
 empty :: (arr: [] $T) => arr.count == 0;
 
-// Uses '+' to sum.
+#doc "Uses `+` to sum all elements in the slice."
 sum :: (arr: [] $T, start: T = 0) -> T {
     sum := start;
     for it: arr do sum += it;
     return sum;
 }
 
-// Uses '*' to multiply.
+#doc "Uses `*` to multiply all elements in the slice."
 product :: (arr: [] $T, start: T = 1) -> T {
     prod := start;
     for it: arr do prod *= it;
     return prod;
 }
 
-// Uses '+' to add the elements together.
-// Then use '/ i32' to divide by the number of elements.
-// Both of these are assumed to work.
+#doc """
+    Uses `+` to add the elements together.
+    Then use `/ i32` to divide by the number of elements.
+    Both of these are assumed to work.
+"""
 average :: (arr: [] $T) -> T {
     sum := cast(T) 0;
     for it: *arr do sum += it;
@@ -155,6 +211,9 @@ average :: (arr: [] $T) -> T {
     return sum / cast(T) arr.count;
 }
 
+#doc """
+    Reverses a slice in-place.
+"""
 reverse :: (arr: [] $T) {
     for i: arr.count / 2 {
         tmp := arr[i];
@@ -163,12 +222,15 @@ reverse :: (arr: [] $T) {
     }
 }
 
-//
-// Simple insertion sort
-//    cmp should return >0 if left > right
-// Returns the array to be used in '|>' chaining.
-// NOT A COPY OF THE ARRAY.
-//
+#doc """
+    Simple insertion sort.
+    
+    `cmp` should return greater-than 0 if `left > right`.
+
+    Returns the array to be used in '|>' chaining.
+
+    **Not a copy of the slice.**
+"""
 sort :: #match #local {}
 
 #overload
@@ -215,6 +277,11 @@ sort :: (arr: [] $T, cmp: (&T, &T) -> i32) -> [] T {
     return arr;
 }
 
+#doc """
+    Quicksort a slice.
+
+    `cmp` should return greater-than 0 if `left > right`.
+"""
 quicksort :: #match #locked {
     (arr: [] $T, cmp: ( T,  T) -> i32) => { quicksort_impl(arr, cmp, 0, arr.count - 1); return arr; },
     (arr: [] $T, cmp: (&T, &T) -> i32) => { quicksort_impl(arr, cmp, 0, arr.count - 1); return arr; },
@@ -267,8 +334,13 @@ quicksort :: #match #locked {
     }
 }
 
-// This assumes that the elements are sorted in some fashion,
-// such that equal elements would be next to each other.
+#doc """
+    Shrinks a slice, removing all duplicates of elements, using `==`
+    to compare elements.
+
+    This assumes that the elements are sorted in some fashion,
+    such that equal elements would be next to each other.
+"""
 unique :: (arr: &[] $T) {
     idx := 0;
     while i := 0; i < arr.count - 1 {
@@ -288,6 +360,19 @@ unique :: (arr: &[] $T) {
 }
 
 
+#doc """
+    Reduces a slice down to a single value, using successive calls to `f`, or invokations of the `body`.
+
+        use core {slice, println}
+
+        arr := i32.[1, 2, 3, 4, 5];
+
+        slice.fold(arr, 0, (it, acc) => it + acc) |> println();
+
+        // OR
+
+        slice.fold(arr, 0, #(it + acc)) |> println();
+"""
 fold :: #match #local {}
 
 #overload
@@ -304,6 +389,9 @@ fold :: macro (arr: [] $T, init: $R, body: Code) -> R {
     return acc;
 }
 
+#doc """
+    Returns `true` if *every* element in the slice meets the predicate test.
+"""
 every :: #match #local {}
 
 #overload
@@ -317,6 +405,9 @@ every :: macro (arr: [] $T, predicate_body: Code) -> bool {
     return true;
 }
 
+#doc """
+    Returns `true` if *at least one* element in the slice meets the predicate test.
+"""
 some :: #match #local {}
 
 #overload
@@ -338,12 +429,18 @@ some :: macro (arr: [] $T, predicate_body: Code) -> bool {
     return false;
 }
 
+#doc """
+    Sets all elements in a slice to be `value`.
+"""
 fill :: (arr: [] $T, value: T) {
     for i: arr.count {
         arr[i] = value;
     }
 }
 
+#doc """
+    Sets all elements in the range to be `value`.
+"""
 fill_range :: (arr: [] $T, r: range, value: T) {
     for i: r {
         if i >= arr.count || i < 0 do continue;
@@ -351,6 +448,9 @@ fill_range :: (arr: [] $T, r: range, value: T) {
     }
 }
 
+#doc """
+    Converts a slice to a linked list.
+"""
 to_list :: (arr: [] $T, allocator := context.allocator) -> List(T) {
     new_list := list.make(T, allocator);
 
@@ -361,6 +461,11 @@ to_list :: (arr: [] $T, allocator := context.allocator) -> List(T) {
     return new_list;
 }
 
+#doc """
+    Returns the index of the first element that matches the predicate.
+
+    Returns `-1` if no matching element is found.
+"""
 find :: #match #local {}
 
 #overload
@@ -392,6 +497,11 @@ find :: macro (arr: [] $T, pred: Code) -> i32 {
     return -1;
 }
 
+#doc """
+    Returns a pointer to the first element that equals `value`, compared using `==`.
+
+    Returns `null` if no matching element is found.
+"""
 find_ptr :: (arr: [] $T, value: T) -> &T {
     for &it: arr {
         if value == *it do return it;
@@ -427,6 +537,9 @@ first :: #match #locked {
     }
 }
 
+#doc """
+    Returns the number of elements for which the predicate is true.
+"""
 count_where :: #match #local {}
 
 #overload
@@ -442,6 +555,9 @@ count_where :: macro (arr: [] $T, predicate_body: Code) -> u32 {
 }
 
 
+#doc """
+    Creates an iterator of a sliding window over the elements of the slice, with width `width`.
+"""
 windows :: (arr: [] $T, width: i32) -> Iterator([] T) {
     use core {iter}
 
@@ -458,6 +574,10 @@ windows :: (arr: [] $T, width: i32) -> Iterator([] T) {
     );
 }
 
+#doc """
+    Creates an iterator of chunks over the elements of the slice.
+    Each chunk has size `width`, with the last chunk having size `arr.count % width`.
+"""
 chunks :: (arr: [] $T, width: i32) -> Iterator([] T) {
     use core {iter}
 
@@ -493,11 +613,17 @@ chunks :: (arr: [] $T, width: i32) -> Iterator([] T) {
     return idx, elem;
 }
 
+#doc """
+    Returns the largest element in the array, using `>` to compare.
+"""
 greatest :: macro (arr: [] $T) -> (i32, T) {
     fold_idx_elem :: fold_idx_elem
     return fold_idx_elem(arr, #(*A > *B));
 }
 
+#doc """
+    Returns the smallest element in the array, using `<` to compare.
+"""
 least :: macro (arr: [] $T) -> (i32, T) {
     fold_idx_elem :: fold_idx_elem
     return fold_idx_elem(arr, #(*A < *B));
