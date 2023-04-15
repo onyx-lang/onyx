@@ -1449,11 +1449,6 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         // If there are no given arguments to a structure literal, it is treated as a 'zero-value',
         // and can be used to create a completely zeroed value of any type.
         if (bh_arr_length(sl->args.values) == 0 && bh_arr_length(sl->args.named_values) == 0) {
-            if (sl->type->kind == Type_Kind_Basic &&
-                sl->type->Basic.kind == Basic_Kind_Void) {
-                ERROR(sl->token->pos, "Cannot produce a zero-value for 'void' type.");
-            }
-
             AstZeroValue *zv = make_zero_value(context.ast_alloc, sl->token, sl->type);
             bh_arr_push(sl->args.values, (AstTyped *) zv);
 
@@ -3352,7 +3347,7 @@ CheckStatus check_constraint(AstConstraint *constraint) {
 
                         } else {
                             onyx_errors_enable();
-                            YIELD(ic->expected_type_expr->token->pos, "Waiting on expected type expression to be resolved.");
+                            YIELD_ERROR(ic->expected_type_expr->token->pos, "Waiting on expected type expression to be resolved.");
                         }
                     }
 

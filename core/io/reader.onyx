@@ -33,6 +33,7 @@ Reader :: struct {
     read_byte :: read_byte;
     unread_byte :: unread_byte;
     read_bytes :: read_bytes;
+    read_fill_buffer :: read_fill_buffer;
     read_string :: read_string;
     read_i32 :: read_i32;
     read_i64 :: read_i64;
@@ -190,7 +191,29 @@ read_string :: (use reader: &Reader, bytes := 1, allocator := context.allocator)
     buf := memory.make_slice(u8, bytes, allocator);
     bytes_read, err := read_bytes(reader, buf);
     return buf[0 .. bytes_read];
-};
+}
+
+read_fill_buffer :: (use reader: &Reader, bytes: [] u8) -> Error {
+    n := bytes.count;
+    if n == 0 {
+        if reader_get_buffered(reader) > 0 do return .None;
+        return reader_consume_error(reader);
+    }
+
+    write_index := 0;
+    while n > 0 && !reader_empty(reader) {
+        reader_read_next_chunk(reader);
+
+        to_write := math.min(n, end);
+        memory.copy(bytes.data + write_index, buffer.data, to_write);
+        n -= to_write;
+        write_index += to_write;
+        start += to_write;
+    }
+
+    last_byte = cast(i32) bytes[write_index - 1];
+    return (.None) if !reader_empty(reader) else .EOF;
+}
 
 read_i32 :: (use reader: &Reader) -> i32 {
     n: i32 = 0;

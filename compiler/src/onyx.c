@@ -66,6 +66,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     "Developer options:\n"
     "\t--no-colors               Disables colors in the error message.\n"
     "\t--no-file-contents        Disables '#file_contents' for security.\n"
+    "\t--show-all-errors         Print all errors (can result in many consequencial errors from a single error)"
     "\t--print-function-mappings Prints a mapping from WASM function index to source location.\n"
     "\t--print-static-if-results Prints the conditional result of each #if statement. Useful for debugging.\n"
     "\n";
@@ -85,6 +86,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .use_multi_threading     = 0,
         .no_std                  = 0,
         .no_stale_code           = 0,
+        .show_all_errors         = 0,
 
         .runtime = Runtime_Onyx,
 
@@ -195,6 +197,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--no-stale-code")) {
                 options.no_stale_code = 1;
+            }
+            else if (!strcmp(argv[i], "--show-all-errors")) {
+                options.show_all_errors = 1;
             }
             else if (!strcmp(argv[i], "-I")) {
                 bh_arr_push(options.included_folders, argv[++i]);

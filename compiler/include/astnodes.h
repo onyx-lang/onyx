@@ -1682,6 +1682,7 @@ struct CompileOptions {
     b32 generate_foreign_info : 1;
     b32 no_std                : 1;
     b32 no_stale_code         : 1;
+    b32 show_all_errors       : 1;
 
     b32 generate_tag_file         : 1;
     b32 generate_symbol_info_file : 1;

@@ -154,7 +154,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader) -> bool {
         }
 
         case .Basic {
-            bytes, err := io.read_bytes(r, .{ target, info.size });
+            err := io.read_fill_buffer(r, .{ target, info.size });
             assert(err == .None, "Deserialize expected to be able to read all the bytes.");
         }
 
@@ -217,7 +217,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader) -> bool {
 
     read_u32 :: macro (r: &io.Reader) -> u32 {
         dest: u32;
-        io.read_bytes(r, str.{~~&dest, 4});
+        io.read_fill_buffer(r, str.{~~&dest, 4});
         return dest;
     }
 }

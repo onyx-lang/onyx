@@ -64,7 +64,7 @@ void onyx_errors_print() {
 
     OnyxErrorRank last_rank = errors.errors[0].rank;
     bh_arr_each(OnyxError, err, errors.errors) {
-        if (last_rank != err->rank) break;
+        if (!context.options->show_all_errors && last_rank != err->rank) break;
 
         if (err->pos.filename) {
             bh_file_contents file_contents = { 0 };

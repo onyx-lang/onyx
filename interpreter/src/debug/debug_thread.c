@@ -96,6 +96,10 @@ static void resume_thread(debug_thread_state_t *thread) {
     sem_post(&thread->wait_semaphore);
 }
 
+static void resume_thread_slow(debug_thread_state_t *thread) {
+    sem_post(&thread->wait_semaphore);
+}
+
 static u32 get_stack_frame_instruction_pointer(debug_state_t *debug, debug_thread_state_t *thread, ovm_stack_frame_t *frame) {
     ovm_func_t *func = frame->func;
 
@@ -248,7 +252,7 @@ static DEBUG_COMMAND_HANDLER(debug_command_step) {
     if (granularity == 2) {
         ON_THREAD(thread_id) {
             (*thread)->run_count = 1;
-            resume_thread(*thread);
+            resume_thread_slow(*thread);
         }
     }
 

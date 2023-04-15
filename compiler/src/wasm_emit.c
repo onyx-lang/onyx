@@ -3919,6 +3919,10 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_nod
         WID(NULL, WI_I32_CONST, mod->null_proc_func_idx);
 
     } else {
+        if (type == &basic_types[Basic_Kind_Void]) {
+            return;
+        }
+
         WasmType wt = onyx_type_to_wasm_type(type);
         if (wt == WASM_TYPE_VOID) {
             onyx_report_error(where->pos, Error_Critical, "Cannot produce a zero-value for this type.");

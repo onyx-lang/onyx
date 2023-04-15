@@ -99,13 +99,16 @@ printf :: (format: str, va: ..any) {
     //
     // Prints to standard error, if available.
     eprintf :: (format: str, va: ..any) -> str {
-        flush :: (_, to_output) => {
-            runtime.platform.__output_error(to_output);
-            return true;
-        }
-
         buffer: [1024] u8;
-        runtime.platform.__output_error(conv.format_va(buffer, format, va, .{null, flush}));
+        runtime.platform.__output_error(
+            conv.format_va(buffer, format, va, .{
+                null,
+                (ctx: rawptr, to_output: str) -> bool {
+                    runtime.platform.__output_error(to_output);
+                    return true;
+                }
+            })
+        );
     }
 }
 
