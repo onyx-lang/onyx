@@ -583,7 +583,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
         case Ast_Kind_Do_Block:
             C(AstDoBlock, block);
-            ((AstDoBlock *) nn)->type_node = (AstType *) &basic_type_auto_return;
+            C(AstDoBlock, type_node);
             break;
 
         case Ast_Kind_File_Contents:

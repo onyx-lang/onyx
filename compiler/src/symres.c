@@ -633,6 +633,7 @@ static SymresStatus symres_expression(AstTyped** expr) {
 
         case Ast_Kind_Do_Block: {
             Scope* old_current_scope = current_scope;
+            SYMRES(type, &(*expr)->type_node);
             SYMRES(block, ((AstDoBlock *) *expr)->block);
             current_scope = old_current_scope;
             break;

@@ -363,6 +363,16 @@ static AstCall* parse_function_call(OnyxParser *parser, AstTyped *callee) {
 
     parse_arguments(parser, ')', &call_node->args);
 
+    while (consume_token_if_next(parser, '!')) {
+        AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
+        code_block->token = parser->curr;
+        code_block->type_node = builtin_code_type;
+
+        code_block->code = (AstNode *) parse_block(parser, 1, NULL);
+        ((AstBlock *) code_block->code)->rules = Block_Rule_Code_Block;
+        bh_arr_push(call_node->args.values, (AstTyped *) code_block);
+    }
+
     // Wrap expressions in AstArgument
     bh_arr_each(AstTyped *, arg, call_node->args.values) {
         if ((*arg) == NULL) continue;
@@ -582,6 +592,10 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             AstDoBlock* do_block = make_node(AstDoBlock, Ast_Kind_Do_Block);
             do_block->token = do_token;
             do_block->type_node = (AstType *) &basic_type_auto_return;
+
+            if (consume_token_if_next(parser, Token_Type_Right_Arrow)) {
+                do_block->type_node = parse_type(parser);
+            }
 
             if (parser->curr->type != '{') {
                 onyx_report_error(parser->curr->pos, Error_Critical, "Expected '{' after 'do', got '%s'.", token_name(parser->curr->type));

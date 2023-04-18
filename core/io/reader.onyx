@@ -212,7 +212,12 @@ read_fill_buffer :: (use reader: &Reader, bytes: [] u8) -> Error {
     }
 
     last_byte = cast(i32) bytes[write_index - 1];
-    return (.None) if !reader_empty(reader) else .EOF;
+
+    if reader_empty(reader) && n > 0 {
+        return .EOF;
+    }
+
+    return .None;
 }
 
 read_i32 :: (use reader: &Reader) -> i32 {
