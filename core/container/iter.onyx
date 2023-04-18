@@ -31,6 +31,7 @@ use core.intrinsics.types {type_is_struct}
     count :: count;
     some :: some;
     every :: every;
+    collect :: to_array;
 }
 
 

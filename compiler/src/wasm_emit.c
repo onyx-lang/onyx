@@ -3769,8 +3769,18 @@ EMIT_FUNC(return, AstReturn* ret) {
     AstLocal* result_destination = NULL;
     i64 jump_label = get_structured_jump_label(mod, Jump_Type_Return, ret->count + 1);
 
+    //
+    // If this is return statement if an inner return of a `do` block,
+    // we have to get the result destination out of the return location stack.
+    // This can be computed as the -ret->count element.
+    //
+    //      2 | return from second do
+    //      1 | return from first do
+    //      0 | return from function
+    //
     if (bh_arr_length(mod->return_location_stack) > 0 && jump_label >= 0) {
-        result_destination = bh_arr_last(mod->return_location_stack);
+        i32 len = bh_arr_length(mod->return_location_stack);
+        result_destination = mod->return_location_stack[len - ret->count - 1];
     }
 
     // If we have an expression to return, we see if it should be placed on the linear memory stack, or the WASM stack.
