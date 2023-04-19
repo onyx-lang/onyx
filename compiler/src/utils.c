@@ -1494,7 +1494,7 @@ b32 maybe_create_capture_builder_for_function_expression(AstTyped **pexpr) {
     builder->token = func->captures->token - 1;
 
     builder->func = (void *) func;
-    builder->type = builder->func->type;
+    // builder->type = builder->func->type;
     builder->captures = func->captures;
 
     bh_arr_new(context.ast_alloc, builder->capture_values, bh_arr_length(builder->captures->captures));

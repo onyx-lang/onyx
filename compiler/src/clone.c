@@ -467,6 +467,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
             df->return_type = (AstType *) ast_clone(a, sf->return_type);
             df->body = (AstBlock *) ast_clone(a, sf->body);
+            df->captures = (AstCaptureBlock *) ast_clone(a, sf->captures);
 
             df->nodes_that_need_entities_after_clone = captured_entities;
             captured_entities = NULL;
@@ -607,8 +608,6 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             bh_arr_each(AstCaptureLocal *, expr, cs->captures) {
                 bh_arr_push(cd->captures, (AstCaptureLocal *) ast_clone(a, (AstNode *) *expr));
             }
-
-            cd->is_legal = 0;
             break;
         }
 

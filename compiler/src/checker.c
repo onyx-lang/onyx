@@ -2241,6 +2241,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_Capture_Builder: {
             AstCaptureBuilder *builder = (void *) expr;
+            builder->type = get_expression_type(builder->func);
 
             fori (i, 0, bh_arr_length(builder->capture_values)) {
                 if (!builder->captures->captures[i]->type) {

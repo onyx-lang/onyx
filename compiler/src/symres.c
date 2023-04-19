@@ -841,11 +841,6 @@ static SymresStatus symres_directive_insert(AstDirectiveInsert* insert) {
 }
 
 static SymresStatus symres_capture_block(AstCaptureBlock *block) {
-    if (!block->is_legal) {
-        onyx_report_error(block->token->pos, Error_Critical, "#capture block is not allowed here.");
-        return Symres_Error;
-    }
-
     bh_arr_each(AstCaptureLocal *, capture, block->captures) {
         SYMRES(type, &(*capture)->type_node);
     }
@@ -898,12 +893,6 @@ static SymresStatus symres_statement(AstNode** stmt, b32 *remove) {
             break;
 
         case Ast_Kind_Import:
-            if (remove) *remove = 1;
-            break;
-
-        case Ast_Kind_Capture_Block:
-            SYMRES(capture_block, (AstCaptureBlock *) *stmt);
-
             if (remove) *remove = 1;
             break;
 
@@ -1047,6 +1036,15 @@ SymresStatus symres_function_header(AstFunction* func) {
         bh_arr_set_length(func->nodes_that_need_entities_after_clone, 0);
     }
 
+    if (func->captures) {
+        if (!(func->flags & Ast_Flag_Function_Is_Lambda)) {
+            onyx_report_error(func->captures->token->pos, Error_Critical, "This procedure cannot capture values as it is not defined in an expression.");
+            return Symres_Error;
+        }
+        
+        SYMRES(capture_block, func->captures);
+    }
+
     SYMRES(type, &func->return_type);
 
     if (func->deprecated_warning) {
@@ -1132,14 +1130,6 @@ SymresStatus symres_function(AstFunction* func) {
         }
 
         func->flags |= Ast_Flag_Has_Been_Symres;
-    }
-
-    if (func->body && func->body->body && func->body->body->kind == Ast_Kind_Capture_Block) {
-        func->captures = (void *) func->body->body;
-
-        if (func->flags & Ast_Flag_Function_Is_Lambda) {
-            ((AstCaptureBlock *) func->body->body)->is_legal = 1;
-        }
     }
 
     SYMRES(block, func->body);
