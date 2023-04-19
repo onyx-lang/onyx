@@ -117,6 +117,8 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Directive_First: return sizeof(AstDirectiveFirst);
         case Ast_Kind_Directive_Export_Name: return sizeof(AstDirectiveExportName);
         case Ast_Kind_Import: return sizeof(AstImport);
+        case Ast_Kind_Capture_Block: return sizeof(AstCaptureBlock);
+        case Ast_Kind_Capture_Local: return sizeof(AstCaptureLocal);
         case Ast_Kind_Count: return 0;
     }
 
@@ -593,6 +595,25 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
         case Ast_Kind_Directive_Export_Name:
             C(AstDirectiveExportName, func);
+            break;
+
+        case Ast_Kind_Capture_Block: {
+            AstCaptureBlock* cd = (AstCaptureBlock *) nn;
+            AstCaptureBlock* cs = (AstCaptureBlock *) node;
+
+            cd->captures = NULL;
+            bh_arr_new(global_heap_allocator, cd->captures, bh_arr_length(cs->captures));
+
+            bh_arr_each(AstCaptureLocal *, expr, cs->captures) {
+                bh_arr_push(cd->captures, (AstCaptureLocal *) ast_clone(a, (AstNode *) *expr));
+            }
+
+            cd->is_legal = 0;
+            break;
+        }
+
+        case Ast_Kind_Capture_Local:
+            C(AstCaptureLocal, type_node);
             break;
     }
 

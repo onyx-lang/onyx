@@ -524,6 +524,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
         case Token_Type_Symbol: {
             if (parse_possible_quick_function_definition(parser, &retval)) {
+                retval->flags |= Ast_Flag_Function_Is_Lambda;
                 ENTITY_SUBMIT(retval);
                 break;
             }
@@ -1705,6 +1706,34 @@ static AstNode* parse_statement(OnyxParser* parser) {
                 AstDirectiveRemove *remove = make_node(AstDirectiveRemove, Ast_Kind_Directive_Remove);
                 remove->token = parser->curr - 2;
                 retval = (AstNode *) remove;
+                break;
+            }
+
+            if (parse_possible_directive(parser, "capture")) {
+                // :LinearTokenDependent
+                AstCaptureBlock *captures = make_node(AstCaptureBlock, Ast_Kind_Capture_Block);
+                captures->token = parser->curr - 2;
+
+                bh_arr_new(global_heap_allocator, captures->captures, 2);
+
+                expect_token(parser, '{');
+                while (!consume_token_if_next(parser, '}')) {
+                    if (parser->hit_unexpected_token) break;
+
+                    AstCaptureLocal *capture = make_node(AstCaptureLocal, Ast_Kind_Capture_Local);
+                    capture->token = expect_token(parser, Token_Type_Symbol);
+
+                    expect_token(parser, ':');
+                    capture->type_node = parse_type(parser);
+
+                    bh_arr_push(captures->captures, capture);
+
+                    if (peek_token(0)->type != '}')
+                        expect_token(parser, ',');
+                }
+
+                retval = (AstNode *) captures;
+                needs_semicolon = 0;
                 break;
             }
 

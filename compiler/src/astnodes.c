@@ -108,6 +108,9 @@ static const char* ast_node_names[] = {
     "MACRO",
     "DO BLOCK",
 
+    "CAPTURE BLOCK",
+    "CAPTURE LOCAL",
+
     "FOREIGN BLOCK",
     "ZERO VALUE",
     

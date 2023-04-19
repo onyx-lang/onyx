@@ -103,6 +103,9 @@
     NODE(DirectiveInsert)      \
     NODE(Macro)                \
                                \
+    NODE(CaptureBlock)         \
+    NODE(CaptureLocal)         \
+                               \
     NODE(ForeignBlock)         \
                                \
     NODE(Package)              \
@@ -230,6 +233,9 @@ typedef enum AstKind {
     Ast_Kind_Directive_Insert,
     Ast_Kind_Macro,
     Ast_Kind_Do_Block,
+
+    Ast_Kind_Capture_Block,
+    Ast_Kind_Capture_Local,
 
     Ast_Kind_Foreign_Block,
 
@@ -1332,10 +1338,28 @@ struct AstFunction {
 
     AstBinding *original_binding_to_node;
 
+    AstCaptureBlock *captures;
+
     b32 is_exported        : 1;
     b32 is_foreign         : 1;
     b32 is_foreign_dyncall : 1;
     b32 is_intrinsic       : 1;
+};
+
+struct AstCaptureBlock {
+    AstNode_base;
+
+    bh_arr(AstCaptureLocal *) captures;
+
+    u32 total_size_in_bytes;
+
+    b32 is_legal : 1;
+};
+
+struct AstCaptureLocal {
+    AstTyped_base;
+
+    u32 offset;
 };
 
 struct AstPolyQuery {

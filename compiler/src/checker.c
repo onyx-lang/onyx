@@ -2251,6 +2251,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Switch_Case: break;
         case Ast_Kind_Foreign_Block: break;
         case Ast_Kind_Zero_Value: break;
+        case Ast_Kind_Capture_Local: break;
 
         default:
             retval = Check_Error;
@@ -2419,6 +2420,21 @@ CheckStatus check_directive_export_name(AstDirectiveExportName *ename) {
     return Check_Success;
 }
 
+CheckStatus check_capture_block(AstCaptureBlock *block) {
+    block->total_size_in_bytes = 0;
+
+    bh_arr_each(AstCaptureLocal *, capture, block->captures) {
+        CHECK(expression, (AstTyped **) capture);
+
+        assert((*capture)->type);
+
+        (*capture)->offset = block->total_size_in_bytes;
+        block->total_size_in_bytes += type_size_of((*capture)->type);
+    }
+
+    return Check_Success;
+}
+
 CheckStatus check_statement(AstNode** pstmt) {
     AstNode* stmt = *pstmt;
 
@@ -2549,7 +2565,15 @@ CheckStatus check_function(AstFunction* func) {
     if (for_node_stack) bh_arr_clear(for_node_stack);
 
     if (func->body) {
-        CheckStatus status = check_block(func->body);
+        CheckStatus status = Check_Success;
+        if (func->captures) {
+            status = check_capture_block(func->captures);
+        }
+
+        if (status == Check_Success) {
+            status = check_block(func->body);
+        }
+
         if (status == Check_Error && func->generated_from && context.cycle_detected == 0)
             ERROR(func->generated_from->pos, "Error in polymorphic procedure generated from this location.");
 
