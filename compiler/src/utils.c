@@ -1070,6 +1070,7 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
                 assert(arg_arr[arg_pos]->kind == Ast_Kind_Argument);
                 TypeMatch tm = unify_node_and_type_(&arg_arr[arg_pos]->value, formal_params[arg_pos], permanent);
                 if (tm == TYPE_MATCH_YIELD) return tm;
+                if (tm == TYPE_MATCH_SPECIAL) return tm;
                 if (tm == TYPE_MATCH_FAILED) {
                     if (error != NULL) {
                         error->pos = arg_arr[arg_pos]->token->pos;

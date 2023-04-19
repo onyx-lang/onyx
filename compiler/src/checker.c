@@ -52,6 +52,7 @@
     TypeMatch type_name;                                                                        \
     type_name = unify_node_and_type(expr, type);                                                \
     if (type_name == TYPE_MATCH_YIELD) YIELD((*expr)->token->pos, "Waiting on type checking."); \
+    if (type_name == TYPE_MATCH_SPECIAL) return Check_Return_To_Symres;                         \
     if (type_name == TYPE_MATCH_FAILED)
 
 #define CONCAT(a, b) a##_##b
@@ -787,6 +788,10 @@ CheckStatus check_call(AstCall** pcall) {
     if (tm == TYPE_MATCH_FAILED) {
         onyx_submit_error(error);
         return Check_Error;
+    }
+
+    if (tm == TYPE_MATCH_SPECIAL) {
+        return Check_Return_To_Symres;
     }
 
     if (tm == TYPE_MATCH_YIELD) YIELD(call->token->pos, "Waiting on argument type checking.");

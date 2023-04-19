@@ -696,6 +696,13 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         node = *pnode;
     }
 
+    if (node->kind == Ast_Kind_Function) {
+        if (maybe_create_capture_builder_for_function_expression(pnode)) {
+            return TYPE_MATCH_SPECIAL;
+        }
+    }
+
+
     // HACK: NullProcHack
     // The null_proc matches any procedure, and because of that, will cause a runtime error if you
     // try to call it.
