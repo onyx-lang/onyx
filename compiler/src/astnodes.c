@@ -110,6 +110,7 @@ static const char* ast_node_names[] = {
 
     "CAPTURE BLOCK",
     "CAPTURE LOCAL",
+    "CAPTURE BUILDER",
 
     "FOREIGN BLOCK",
     "ZERO VALUE",

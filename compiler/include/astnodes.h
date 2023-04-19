@@ -105,6 +105,7 @@
                                \
     NODE(CaptureBlock)         \
     NODE(CaptureLocal)         \
+    NODE(CaptureBuilder)       \
                                \
     NODE(ForeignBlock)         \
                                \
@@ -236,6 +237,7 @@ typedef enum AstKind {
 
     Ast_Kind_Capture_Block,
     Ast_Kind_Capture_Local,
+    Ast_Kind_Capture_Builder,
 
     Ast_Kind_Foreign_Block,
 
@@ -1362,6 +1364,15 @@ struct AstCaptureLocal {
     u32 offset;
 };
 
+struct AstCaptureBuilder {
+    AstTyped_base;
+
+    AstTyped *func;
+    AstCaptureBlock *captures;
+
+    bh_arr(AstTyped *) capture_values;
+};
+
 struct AstPolyQuery {
     AstNode_base;
 
@@ -1797,6 +1808,7 @@ extern AstGlobal builtin_heap_start;
 extern AstGlobal builtin_stack_top;
 extern AstGlobal builtin_tls_base;
 extern AstGlobal builtin_tls_size;
+extern AstGlobal builtin_closure_base;
 extern AstType  *builtin_string_type;
 extern AstType  *builtin_cstring_type;
 extern AstType  *builtin_range_type;
@@ -1818,6 +1830,7 @@ extern AstType  *foreign_block_type;
 extern AstTyped *tagged_procedures_node;
 extern AstFunction *builtin_initialize_data_segments;
 extern AstFunction *builtin_run_init_procedures;
+extern AstFunction *builtin_closure_block_allocate;
 extern bh_arr(AstFunction *) init_procedures;
 extern AstOverloadedFunction *builtin_implicit_bool_cast;
 
@@ -1964,6 +1977,7 @@ static inline b32 is_lval(AstNode* node) {
         || (node->kind == Ast_Kind_Subscript)
         || (node->kind == Ast_Kind_Field_Access)
         || (node->kind == Ast_Kind_Memres)
+        || (node->kind == Ast_Kind_Capture_Local)
         || (node->kind == Ast_Kind_Constraint_Sentinel)) // Bit of a hack, but this makes constraints like 'T->foo()' work.
         return 1;
 

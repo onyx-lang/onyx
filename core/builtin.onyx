@@ -470,6 +470,15 @@ __run_init_procedures :: () -> void ---
 __implicit_bool_cast :: #match -> bool {}
 
 #doc """
+    Internal procedure to allocate space for the captures in a closure. This will be soon
+    changed to a configurable way, but for now it simply allocates out of the heap allocator.
+"""
+__closure_block_allocate :: (size: i32) -> rawptr {
+    return raw_alloc(context.allocator, size);
+}
+
+
+#doc """
     Defines all options for changing the memory layout, imports and exports,
     and more of an Onyx binary.
 """

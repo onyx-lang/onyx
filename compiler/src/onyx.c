@@ -384,6 +384,7 @@ static void context_init(CompileOptions* opts) {
     add_entities_for_node(NULL, (AstNode *) &builtin_heap_start, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_tls_base, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_tls_size, context.global_scope, NULL);
+    add_entities_for_node(NULL, (AstNode *) &builtin_closure_base, context.global_scope, NULL);
 
     // NOTE: Add all files passed by command line to the queue
     bh_arr_each(const char *, filename, opts->files) {

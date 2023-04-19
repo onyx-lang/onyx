@@ -38,14 +38,16 @@ AstBasicType basic_type_auto_return = { Ast_Kind_Basic_Type, 0, &simd_token, NUL
 
 OnyxToken builtin_package_token = { Token_Type_Symbol, 7, "builtin ", { 0 } };
 
-static OnyxToken builtin_heap_start_token = { Token_Type_Symbol, 12, "__heap_start ", { 0 } };
-static OnyxToken builtin_stack_top_token  = { Token_Type_Symbol, 11, "__stack_top ",  { 0 } };
-static OnyxToken builtin_tls_base_token   = { Token_Type_Symbol, 10, "__tls_base ",  { 0 } };
-static OnyxToken builtin_tls_size_token   = { Token_Type_Symbol, 10, "__tls_size ",  { 0 } };
+static OnyxToken builtin_heap_start_token  = { Token_Type_Symbol, 12, "__heap_start ", { 0 } };
+static OnyxToken builtin_stack_top_token   = { Token_Type_Symbol, 11, "__stack_top ",  { 0 } };
+static OnyxToken builtin_tls_base_token    = { Token_Type_Symbol, 10, "__tls_base ",  { 0 } };
+static OnyxToken builtin_tls_size_token    = { Token_Type_Symbol, 10, "__tls_size ",  { 0 } };
+static OnyxToken builtin_closure_base_token = { Token_Type_Symbol, 14, "__closure_base ",  { 0 } };
 AstGlobal builtin_heap_start  = { Ast_Kind_Global, Ast_Flag_Const, &builtin_heap_start_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
 AstGlobal builtin_stack_top   = { Ast_Kind_Global, 0, &builtin_stack_top_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
 AstGlobal builtin_tls_base    = { Ast_Kind_Global, 0, &builtin_tls_base_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
 AstGlobal builtin_tls_size    = { Ast_Kind_Global, 0, &builtin_tls_size_token, NULL, NULL, (AstType *) &basic_type_u32, NULL };
+AstGlobal builtin_closure_base = { Ast_Kind_Global, 0, &builtin_closure_base_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
 
 AstType  *builtin_string_type;
 AstType  *builtin_cstring_type;
@@ -69,6 +71,7 @@ AstType     *foreign_block_type = NULL;
 AstTyped    *tagged_procedures_node = NULL;
 AstFunction *builtin_initialize_data_segments = NULL;
 AstFunction *builtin_run_init_procedures = NULL;
+AstFunction *builtin_closure_block_allocate = NULL;
 bh_arr(AstFunction *) init_procedures = NULL;
 AstOverloadedFunction *builtin_implicit_bool_cast;
 
@@ -100,6 +103,7 @@ const BuiltinSymbol builtin_symbols[] = {
     { "builtin", "__stack_top",  (AstNode *) &builtin_stack_top },
     { "builtin", "__tls_base",   (AstNode *) &builtin_tls_base },
     { "builtin", "__tls_size",   (AstNode *) &builtin_tls_size },
+    { "builtin", "__closure_base",   (AstNode *) &builtin_closure_base },
 
     { NULL, NULL, NULL },
 };
@@ -478,6 +482,15 @@ void initialize_builtins(bh_allocator a) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__implicit_bool_cast' #match procedure not found.");
         return;
     }
+
+    builtin_closure_block_allocate = (AstFunction *) symbol_raw_resolve(p->scope, "__closure_block_allocate");
+    if (builtin_closure_block_allocate == NULL || builtin_closure_block_allocate->kind != Ast_Kind_Function) {
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__closure_block_allocate' procedure not found.");
+        return;
+    }
+    // HACK
+    builtin_closure_block_allocate->flags |= Ast_Flag_Function_Used;
+
 
     builtin_link_options_type = (AstType *) symbol_raw_resolve(p->scope, "Link_Options");
     if (builtin_link_options_type == NULL) {

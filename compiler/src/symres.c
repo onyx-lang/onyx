@@ -73,6 +73,7 @@ static SymresStatus symres_static_if(AstIf* static_if);
 static SymresStatus symres_macro(AstMacro* macro);
 static SymresStatus symres_constraint(AstConstraint* constraint);
 static SymresStatus symres_polyquery(AstPolyQuery *query);
+static SymresStatus symres_capture_builder(AstCaptureBuilder *builder);
 
 static void scope_enter(Scope* new_scope) {
     current_scope = new_scope;
@@ -659,6 +660,8 @@ static SymresStatus symres_expression(AstTyped** expr) {
             break;
         }
 
+        case Ast_Kind_Capture_Builder: SYMRES(capture_builder, (AstCaptureBuilder *) *expr); break;
+
         default: break;
     }
 
@@ -849,6 +852,23 @@ static SymresStatus symres_capture_block(AstCaptureBlock *block) {
 
     bh_arr_each(AstCaptureLocal *, capture, block->captures) {
         symbol_introduce(current_scope, (*capture)->token, (AstNode *) *capture);
+    }
+
+    return Symres_Success;
+}
+
+static SymresStatus symres_capture_builder(AstCaptureBuilder *builder) {
+    fori (i, bh_arr_length(builder->capture_values), bh_arr_length(builder->captures->captures)) {
+        OnyxToken *token = builder->captures->captures[i]->token;
+        AstTyped *resolved = (AstTyped *) symbol_resolve(current_scope, token);
+        if (!resolved) {
+            // Should this do a yield? In there any case that that would make sense?
+            onyx_report_error(token->pos, Error_Critical, "'%b' is not found in the enclosing scope.",
+                    token->text, token->length);
+            return Symres_Error;
+        }
+
+        bh_arr_push(builder->capture_values, resolved);
     }
 
     return Symres_Success;

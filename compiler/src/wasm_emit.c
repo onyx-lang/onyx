@@ -516,6 +516,7 @@ EMIT_FUNC(intrinsic_call,                  AstCall* call);
 EMIT_FUNC(subscript_location,              AstSubscript* sub, u64* offset_return);
 EMIT_FUNC(field_access_location,           AstFieldAccess* field, u64* offset_return);
 EMIT_FUNC(local_location,                  AstLocal* local, u64* offset_return);
+EMIT_FUNC(capture_local_location,          AstCaptureLocal *capture, u64 *offset_return);
 EMIT_FUNC(memory_reservation_location,     AstMemRes* memres);
 EMIT_FUNC(location_return_offset,          AstTyped* expr, u64* offset_return);
 EMIT_FUNC(location,                        AstTyped* expr);
@@ -2123,7 +2124,9 @@ EMIT_FUNC(call, AstCall* call) {
 
     } else {
         emit_expression(mod, &code, call->callee);
-        WI(NULL, WI_DROP);
+        
+        u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_closure_base);
+        WIL(NULL, WI_GLOBAL_SET, global_closure_base_idx);
 
         i32 type_idx = generate_type_idx(mod, call->callee->type);
         WID(NULL, WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
@@ -2784,6 +2787,16 @@ EMIT_FUNC(local_location, AstLocal* local, u64* offset_return) {
     *pcode = code;
 }
 
+EMIT_FUNC(capture_local_location, AstCaptureLocal *capture, u64 *offset_return) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    WIL(NULL, WI_LOCAL_GET, mod->closure_base_idx);
+
+    *offset_return = capture->offset;
+
+    *pcode = code;
+}
+
 EMIT_FUNC(compound_load, Type* type, u64 offset, i32 ignored_value_count) {
     bh_arr(WasmInstruction) code = *pcode;
     i32 mem_count = type_linear_member_count(type);
@@ -3213,6 +3226,12 @@ EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
             break;
         }
 
+        case Ast_Kind_Capture_Local: {
+            AstCaptureLocal *capture = (AstCaptureLocal *) expr;
+            emit_capture_local_location(mod, &code, capture, offset_return);
+            break;
+        }
+
         default: {
             if (expr->token) {
                 onyx_report_error(expr->token->pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
@@ -3376,6 +3395,32 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
             WID(NULL, WI_I32_CONST, elemidx);
             WIL(NULL, WI_I32_CONST, 0);
+            break;
+        }
+
+        case Ast_Kind_Capture_Builder: {
+            AstCaptureBuilder *builder = (AstCaptureBuilder *) expr;
+            
+            assert(builder->func->kind == Ast_Kind_Function);
+            i32 elemidx = get_element_idx(mod, (AstFunction *) builder->func);
+            WID(NULL, WI_I32_CONST, elemidx);
+
+            // Allocate the block
+            WIL(NULL, WI_I32_CONST, builder->captures->total_size_in_bytes);
+            i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) builtin_closure_block_allocate);
+            WIL(NULL, WI_CALL, func_idx);
+
+            u64 capture_block_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+            WIL(NULL, WI_LOCAL_TEE, capture_block_ptr);
+            
+            // Populate the block
+            fori (i, 0, bh_arr_length(builder->capture_values)) {
+                WIL(NULL, WI_LOCAL_GET, capture_block_ptr);
+                emit_expression(mod, &code, builder->capture_values[i]);
+                emit_store_instruction(mod, &code, builder->capture_values[i]->type, builder->captures->captures[i]->offset);
+            }
+            
+            local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
             break;
         }
 
@@ -3644,8 +3689,10 @@ EMIT_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_Capture_Local: {
-            printf("HANDLE CAPTURE LOCAL!!!\n");
-            assert(0);
+            AstCaptureLocal* capture = (AstCaptureLocal *) expr;
+            u64 offset = 0;
+            emit_capture_local_location(mod, &code, capture, &offset);
+            emit_load_instruction(mod, &code, capture->type, offset);
             break;
         }
 
@@ -4122,6 +4169,17 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
         mod->stack_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
         debug_function_set_ptr_idx(mod, func_idx, mod->stack_base_idx);
+
+        if (fd->captures) {
+            mod->closure_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+
+            debug_emit_instruction(mod, NULL);
+            debug_emit_instruction(mod, NULL);
+
+            u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_closure_base);
+            bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_GLOBAL_GET, { .l = global_closure_base_idx } }));
+            bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_LOCAL_SET,  { .l = mod->closure_base_idx } }));
+        }
 
         // Generate code
         emit_function_body(mod, &wasm_func.code, fd);
@@ -4707,6 +4765,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 
         .stack_top_ptr = NULL,
         .stack_base_idx = 0,
+
+        .closure_base_idx = 0,
 
         .foreign_function_count = 0,
 
