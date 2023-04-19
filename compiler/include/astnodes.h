@@ -292,6 +292,8 @@ typedef enum AstFlags {
     Ast_Flag_Poly_Call_From_Auto   = BH_BIT(24),
 
     Ast_Flag_Binding_Isnt_Captured = BH_BIT(25),
+
+    Ast_Flag_Function_Is_Lambda    = BH_BIT(26)
 } AstFlags;
 
 typedef enum UnaryOp {

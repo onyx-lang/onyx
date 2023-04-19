@@ -2587,6 +2587,8 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* ofunc) {
             return Check_Error;
         }
 
+        node->flags &= ~Ast_Flag_Function_Is_Lambda;
+
         if (node->kind == Ast_Kind_Function) {
             AstFunction* func = (AstFunction *) node;
 

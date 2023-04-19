@@ -393,10 +393,12 @@ static AstTyped* parse_factor(OnyxParser* parser) {
     switch ((u16) parser->curr->type) {
         case '(': {
             if (parse_possible_function_definition(parser, &retval)) {
+                retval->flags |= Ast_Flag_Function_Is_Lambda;
                 ENTITY_SUBMIT(retval);
                 break;
             }
             if (parse_possible_quick_function_definition(parser, &retval)) {
+                retval->flags |= Ast_Flag_Function_Is_Lambda;
                 ENTITY_SUBMIT(retval);
                 break;
             }
@@ -3160,6 +3162,7 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
             if (func->intrinsic_name == NULL) func->intrinsic_name = symbol;
 
             func->name = generate_name_within_scope(parser, symbol);
+            func->flags &= ~Ast_Flag_Function_Is_Lambda;
             break;
         }
 
