@@ -1421,6 +1421,8 @@ struct AstCallSite {
     AstStrLit* filename;
     AstNumLit* line;
     AstNumLit* column;
+
+    b32 collapsed : 1;
 };
 
 // Represents a "pastable" block of code.

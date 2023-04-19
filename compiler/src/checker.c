@@ -722,6 +722,8 @@ CheckStatus check_call(AstCall** pcall) {
 
         if ((*arg_value)->kind == Ast_Kind_Call_Site) {
             AstCallSite* callsite = (AstCallSite *) ast_clone(context.ast_alloc, *arg_value);
+            if (callsite->collapsed) continue;
+
             callsite->callsite_token = call->token;
 
             // HACK CLEANUP
@@ -747,6 +749,7 @@ CheckStatus check_call(AstCall** pcall) {
             convert_numlit_to_type(callsite->line,   &basic_types[Basic_Kind_U32]);
             convert_numlit_to_type(callsite->column, &basic_types[Basic_Kind_U32]);
 
+            callsite->collapsed = 1;
             *arg_value = (AstTyped *) callsite;
         }
     }

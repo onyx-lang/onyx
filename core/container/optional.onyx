@@ -30,6 +30,16 @@ package core
     empty :: macro (T: type_expr) => (?T).{}; 
 
     #doc """
+        Converts a pointer to an optional by defining `null` to be `None`,
+        and a non-null pointer to be `Some`. This dereferences the valid
+        pointer to return the data stored at the pointer's address.
+    """
+    from_ptr :: macro (p: &$T) -> ?T {
+        if p do return *p;
+        return .{};
+    }
+
+    #doc """
         Extracts the value from the Optional, or uses a default if
         no value is present.
     """
