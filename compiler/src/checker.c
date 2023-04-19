@@ -2158,17 +2158,6 @@ CheckStatus check_expression(AstTyped** pexpr) {
             break;
 
         case Ast_Kind_Function:
-            // NOTE: Will need something like this at some point
-            // AstFunction* func = (AstFunction *) expr;
-            // bh_arr_each(AstParam, param, func->params) {
-            //     if (param->default_value != NULL) {
-            //         onyx_message_add(Msg_Type_Literal,
-            //                 func->token->pos,
-            //                 "cannot use functions with default parameters in this way");
-            //         retval = 1;
-            //         break;
-            //     }
-            // }
             if (expr->type == NULL)
                 YIELD(expr->token->pos, "Waiting for function type to be resolved.");
 

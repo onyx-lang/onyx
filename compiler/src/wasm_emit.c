@@ -47,7 +47,7 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
     if (type->kind == Type_Kind_Distinct) return onyx_type_to_wasm_type(type->Distinct.base_type);
     if (type->kind == Type_Kind_Pointer)  return WASM_TYPE_PTR;
     if (type->kind == Type_Kind_Array)    return WASM_TYPE_PTR;
-    if (type->kind == Type_Kind_Function) return WASM_TYPE_FUNC;
+    if (type->kind == Type_Kind_Function) return WASM_TYPE_VOID;
     if (type->kind == Type_Kind_MultiPointer) return WASM_TYPE_PTR;
 
     if (type->kind == Type_Kind_Basic) {
@@ -967,7 +967,7 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     if (type->kind == Type_Kind_Struct)   type = type_struct_is_just_one_basic_value(type);
     if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
     if (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
-    if (type->kind == Type_Kind_Function) type = &basic_types[Basic_Kind_U32];
+    if (type->kind == Type_Kind_Function) assert(5678 && 0);
 
     assert(type);
 
@@ -1079,7 +1079,7 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     if (type->kind == Type_Kind_Struct)   type = type_struct_is_just_one_basic_value(type);
     if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
     if (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
-    if (type->kind == Type_Kind_Function) type = &basic_types[Basic_Kind_U32];
+    if (type->kind == Type_Kind_Function) assert(1234 && 0);
 
     assert(type);
 
@@ -1411,8 +1411,11 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     u64 iterator_close_func  = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
     u64 iterator_remove_func = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
     u64 iterator_done_bool   = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    WI(for_node->token, WI_DROP);
     WIL(for_node->token, WI_LOCAL_SET, iterator_remove_func);
+    WI(for_node->token, WI_DROP);
     WIL(for_node->token, WI_LOCAL_SET, iterator_close_func);
+    WI(for_node->token, WI_DROP);
     WIL(for_node->token, WI_LOCAL_SET, iterator_next_func);
     WIL(for_node->token, WI_LOCAL_SET, iterator_data_ptr);
 
@@ -1826,7 +1829,14 @@ EMIT_FUNC(binop, AstBinaryOp* binop) {
     }
 
     emit_expression(mod, &code, binop->left);
+    if (binop->left->type->kind == Type_Kind_Function) { // nocheckin
+        WI(NULL, WI_DROP);
+    }
+
     emit_expression(mod, &code, binop->right);
+    if (binop->right->type->kind == Type_Kind_Function) { // nocheckin
+        WI(NULL, WI_DROP);
+    }
 
     WI(binop->token, binop_instr);
 
@@ -2113,6 +2123,7 @@ EMIT_FUNC(call, AstCall* call) {
 
     } else {
         emit_expression(mod, &code, call->callee);
+        WI(NULL, WI_DROP);
 
         i32 type_idx = generate_type_idx(mod, call->callee->type);
         WID(NULL, WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
@@ -3364,6 +3375,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
             i32 elemidx = get_element_idx(mod, (AstFunction *) expr);
 
             WID(NULL, WI_I32_CONST, elemidx);
+            WIL(NULL, WI_I32_CONST, 0);
             break;
         }
 
@@ -3628,6 +3640,12 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Directive_Export_Name: {
             AstDirectiveExportName *ename = (AstDirectiveExportName *) expr;
             emit_expression(mod, &code, (AstTyped *) ename->name);
+            break;
+        }
+
+        case Ast_Kind_Capture_Local: {
+            printf("HANDLE CAPTURE LOCAL!!!\n");
+            assert(0);
             break;
         }
 
@@ -3927,6 +3945,7 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_nod
 
     } else if (type->kind == Type_Kind_Function) {
         WID(NULL, WI_I32_CONST, mod->null_proc_func_idx);
+        WIL(NULL, WI_I32_CONST, 0);
 
     } else {
         if (type == &basic_types[Basic_Kind_Void]) {
