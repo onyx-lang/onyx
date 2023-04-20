@@ -3777,6 +3777,12 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
         return;
     }
 
+    if (to->kind == Type_Kind_Basic && from->kind == Type_Kind_Function) {
+        WI(NULL, WI_DROP);
+        *pcode = code;
+        return;
+    }
+
     i32 fromidx = -1, toidx = -1;
     if (from->Basic.flags & Basic_Flag_Pointer || from->kind == Type_Kind_Array) {
         fromidx = 10;

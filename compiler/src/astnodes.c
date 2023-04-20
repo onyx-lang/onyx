@@ -1297,6 +1297,11 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
         return 0;
     }
 
+    if (from->kind == Type_Kind_Function) {
+        *err_msg = "Can only cast a function to a 'u32'.";
+        return to == &basic_types[Basic_Kind_U32];
+    }
+
     if (   (type_is_simd(to) && !type_is_simd(from))
         || (!type_is_simd(to) && type_is_simd(from))) {
         *err_msg = "Can only perform a SIMD cast between SIMD types.";
