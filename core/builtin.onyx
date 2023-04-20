@@ -474,7 +474,7 @@ __implicit_bool_cast :: #match -> bool {}
     changed to a configurable way, but for now it simply allocates out of the heap allocator.
 """
 __closure_block_allocate :: (size: i32) -> rawptr {
-    return raw_alloc(context.allocator, size);
+    return raw_alloc(context.temp_allocator, size);
 }
 
 
