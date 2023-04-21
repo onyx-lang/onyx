@@ -122,7 +122,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     core_installation = CORE_INSTALLATION;
     #endif
     #ifdef _BH_WINDOWS
-    core_installation = bh_alloc_array(global_heap_allocator, u8, 512);
+    core_installation = bh_alloc_array(alloc, u8, 512);
     GetEnvironmentVariableA("ONYX_PATH", core_installation, 512);
     #endif
 
@@ -151,7 +151,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         options.passthrough_argument_data  = &argv[2];
         arg_parse_start = argc;
 
-        bh_arr_push(options.files, bh_aprintf(global_heap_allocator, "%s/tools/onyx-pkg.onyx", core_installation));
+        bh_arr_push(options.files, bh_aprintf(alloc, "%s/tools/onyx-pkg.onyx", core_installation));
     }
     #ifdef ENABLE_RUN_WITH_WASMER
     else if (!strcmp(argv[1], "run")) {
@@ -322,6 +322,9 @@ static Entity *runtime_info_proc_tags_entity;
 
 static void context_init(CompileOptions* opts) {
     types_init();
+    prepare_builtins();
+
+    memset(&context, 0, sizeof context);
 
     context.options = opts;
     context.cycle_detected = 0;
@@ -428,8 +431,6 @@ static void context_init(CompileOptions* opts) {
 static void context_free() {
     bh_arena_free(&context.ast_arena);
     bh_arr_free(context.loaded_files);
-
-    compile_opts_free(context.options);
 }
 
 static void parse_source_file(bh_file_contents* file_contents) {
@@ -558,10 +559,6 @@ static b32 process_entity(Entity* ent) {
                    (u32) ent->micro_attempts);
     }
 
-    // CLEANUP: There should be a nicer way to track if the builtins have
-    // already been initialized.
-    static b32 builtins_initialized = 0;
-
     EntityState before_state = ent->state;
     switch (before_state) {
         case Entity_State_Error:
@@ -584,8 +581,8 @@ static b32 process_entity(Entity* ent) {
             break;
 
         case Entity_State_Parse:
-            if (!builtins_initialized) {
-                builtins_initialized = 1;
+            if (!context.builtins_initialized) {
+                context.builtins_initialized = 1;
                 initialize_builtins(context.ast_alloc);
                 introduce_build_options(context.ast_alloc);
             }
@@ -906,23 +903,29 @@ static b32 onyx_run() {
 }
 #endif
 
-bh_managed_heap mh;
+static bh_managed_heap mh;
 
-int main(int argc, char *argv[]) {
-
+CompilerProgress do_compilation(CompileOptions *compile_opts) {
     bh_scratch_init(&global_scratch, bh_heap_allocator(), 256 * 1024); // NOTE: 256 KiB
     global_scratch_allocator = bh_scratch_allocator(&global_scratch);
 
-    // SPEED: This used to be a managed heap allocator where all allocations
-    // were tracked and would be automatically freed at the end of execution.
-    // I don't know why I ever did that because that is the job of the operating
-    // system when a process exits.
-    // global_heap_allocator = bh_heap_allocator();
-    bh_managed_heap_init(&mh);
-    global_heap_allocator = bh_managed_heap_allocator(&mh);
+    // bh_managed_heap_init(&mh);
+    // global_heap_allocator = bh_managed_heap_allocator(&mh);
+    global_heap_allocator = bh_heap_allocator();
+    context_init(compile_opts);
 
-    CompileOptions compile_opts = compile_opts_parse(global_heap_allocator, argc, argv);
-    context_init(&compile_opts);
+    return onyx_compile();
+}
+
+void cleanup_compilation() {
+    context_free();
+
+    bh_scratch_free(&global_scratch);
+    // bh_managed_heap_free(&mh);
+}
+
+int main(int argc, char *argv[]) {
+    CompileOptions compile_opts = compile_opts_parse(bh_heap_allocator(), argc, argv);
 
     CompilerProgress compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
     switch (compile_opts.action) {
@@ -936,11 +939,11 @@ int main(int argc, char *argv[]) {
         }
 
         case ONYX_COMPILE_ACTION_CHECK:
-            compiler_progress = onyx_compile();
+            compiler_progress = do_compilation(&compile_opts);
             break;
 
         case ONYX_COMPILE_ACTION_COMPILE:
-            compiler_progress = onyx_compile();
+            compiler_progress = do_compilation(&compile_opts);
             if (compiler_progress == ONYX_COMPILER_PROGRESS_SUCCESS) {
                 onyx_flush_module();
             }
@@ -948,7 +951,7 @@ int main(int argc, char *argv[]) {
 
         #ifdef ENABLE_RUN_WITH_WASMER
         case ONYX_COMPILE_ACTION_RUN:
-            compiler_progress = onyx_compile();
+            compiler_progress = do_compilation(&compile_opts);
             if (compiler_progress == ONYX_COMPILER_PROGRESS_SUCCESS) {
                 if (!onyx_run()) {
                     compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
@@ -969,21 +972,13 @@ int main(int argc, char *argv[]) {
     }
 
     switch (compiler_progress) {
-        case ONYX_COMPILER_PROGRESS_ERROR:
-            break;
-
         case ONYX_COMPILER_PROGRESS_FAILED_OUTPUT:
             bh_printf_err("Failed to open file for writing: '%s'\n", compile_opts.target_file);
             break;
-
-        case ONYX_COMPILER_PROGRESS_SUCCESS:
-            break;
     }
 
-    context_free();
-
-    bh_scratch_free(&global_scratch);
-    bh_managed_heap_free(&mh);
+    cleanup_compilation();
+    compile_opts_free(&compile_opts);
 
     return compiler_progress != ONYX_COMPILER_PROGRESS_SUCCESS;
 }

@@ -3,6 +3,8 @@
 // such as procedure definitions, string literals, struct definitions
 // and declarations to be introduced into scopes.
 
+#define BH_INTERNAL_ALLOCATOR (global_heap_allocator)
+
 #include "parser.h"
 #include "lex.h"
 #include "errors.h"

@@ -376,6 +376,33 @@ static IntrinsicMap builtin_intrinsics[] = {
 bh_arr(OverloadOption) operator_overloads[Binary_Op_Count] = { 0 };
 bh_arr(OverloadOption) unary_operator_overloads[Unary_Op_Count] = { 0 };
 
+void prepare_builtins() {
+    builtin_string_type = NULL;
+    builtin_cstring_type = NULL;
+    builtin_range_type = NULL;
+    builtin_range_type_type = NULL;
+    builtin_vararg_type = NULL;
+    builtin_vararg_type_type = NULL;
+    builtin_context_variable = NULL;
+    builtin_allocator_type = NULL;
+    builtin_iterator_type = NULL;
+    builtin_optional_type = NULL;
+    builtin_callsite_type = NULL;
+    builtin_any_type = NULL;
+    builtin_code_type = NULL;
+    builtin_link_options_type = NULL;
+    builtin_package_id_type = NULL;
+
+    type_table_node = NULL;
+    foreign_blocks_node = NULL;
+    foreign_block_type = NULL;
+    tagged_procedures_node = NULL;
+    builtin_initialize_data_segments = NULL;
+    builtin_run_init_procedures = NULL;
+    init_procedures = NULL;
+    builtin_implicit_bool_cast = NULL;
+}
+
 void initialize_builtins(bh_allocator a) {
     // HACK
     builtin_package_token.text = bh_strdup(global_heap_allocator, builtin_package_token.text);
@@ -491,17 +518,21 @@ void initialize_builtins(bh_allocator a) {
         return;
     }
 
+    init_procedures = NULL;
     bh_arr_new(global_heap_allocator, init_procedures, 4);
 
     fori (i, 0, Binary_Op_Count) {
+        operator_overloads[i] = NULL;
         bh_arr_new(global_heap_allocator, operator_overloads[i], 4); 
     }
 
     fori (i, 0, Unary_Op_Count) {
+        unary_operator_overloads[i] = NULL;
         bh_arr_new(global_heap_allocator, unary_operator_overloads[i], 4); 
     }
 
     IntrinsicMap* intrinsic = &builtin_intrinsics[0];
+    intrinsic_table = NULL;
     while (intrinsic->name != NULL) {
         shput(intrinsic_table, intrinsic->name, intrinsic->intrinsic);
         intrinsic++;

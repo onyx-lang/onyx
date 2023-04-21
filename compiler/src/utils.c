@@ -1,3 +1,4 @@
+#define BH_INTERNAL_ALLOCATOR (global_heap_allocator)
 #define BH_DEBUG
 
 #include "utils.h"
@@ -18,7 +19,6 @@ bh_allocator global_heap_allocator;
 //
 // Program info and packages
 //
-static u64 next_package_id = 1;
 
 Package* package_lookup(char* package_name) {
     i32 index = shgeti(context.packages, package_name);
@@ -44,7 +44,7 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
         package->name = pac_name;
         package->unqualified_name = pac_name + bh_str_last_index_of(pac_name, '.');
         package->use_package_entities = NULL;
-        package->id = next_package_id++;
+        package->id = ++context.next_package_id;
         package->parent_id = -1;
         bh_arr_new(global_heap_allocator, package->sub_packages, 4);
 
@@ -114,11 +114,10 @@ void package_mark_as_used(Package* package) {
 //
 // Scoping
 //
-static u64 next_scope_id = 1;
 
 Scope* scope_create(bh_allocator a, Scope* parent, OnyxFilePos created_at) {
     Scope* scope = bh_alloc_item(a, Scope);
-    scope->id = next_scope_id++;
+    scope->id = ++context.next_scope_id;
     scope->parent = parent;
     scope->created_at = created_at;
     scope->name = NULL;

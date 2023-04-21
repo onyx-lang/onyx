@@ -1667,6 +1667,18 @@ typedef struct OnyxDocInfo {
 } OnyxDocInfo;
 
 
+typedef struct CheckerData {
+    b32 expression_types_must_be_known;
+    b32 all_checks_are_final;
+    b32 inside_for_iterator;
+    bh_arr(AstFor *) for_node_stack;
+    bh_imap __binop_impossible_cache[Binary_Op_Count];
+    AstCall __op_maybe_overloaded;
+    Entity *current_entity;
+    bh_arr(Type **) expected_return_type_stack;
+} CheckerData;
+
+
 typedef struct CompileOptions CompileOptions;
 struct CompileOptions {
     bh_allocator allocator;
@@ -1728,8 +1740,14 @@ struct Context {
     struct SymbolInfoTable *symbol_info;
     struct OnyxDocInfo     *doc_info;
 
+    CheckerData checker;
+    u32 next_package_id;
+    u32 next_scope_id;
+
     u32 cycle_almost_detected : 2;
     b32 cycle_detected : 1;
+
+    b32 builtins_initialized : 1;
 };
 
 extern Context context;
@@ -1815,6 +1833,7 @@ extern IntrinsicTable intrinsic_table;
 extern bh_arr(OverloadOption) operator_overloads[Binary_Op_Count];
 extern bh_arr(OverloadOption) unary_operator_overloads[Unary_Op_Count];
 
+void prepare_builtins();
 void initialize_builtins(bh_allocator a);
 void initalize_special_globals();
 void introduce_build_options(bh_allocator a);
