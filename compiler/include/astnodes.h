@@ -105,7 +105,6 @@
                                \
     NODE(CaptureBlock)         \
     NODE(CaptureLocal)         \
-    NODE(CaptureBuilder)       \
                                \
     NODE(ForeignBlock)         \
                                \
@@ -237,7 +236,6 @@ typedef enum AstKind {
 
     Ast_Kind_Capture_Block,
     Ast_Kind_Capture_Local,
-    Ast_Kind_Capture_Builder,
 
     Ast_Kind_Foreign_Block,
 
@@ -301,7 +299,8 @@ typedef enum AstFlags {
 
     Ast_Flag_Binding_Isnt_Captured = BH_BIT(25),
 
-    Ast_Flag_Function_Is_Lambda    = BH_BIT(26)
+    Ast_Flag_Function_Is_Lambda    = BH_BIT(26),
+    Ast_Flag_Function_Is_Lambda_Inside_PolyProc = BH_BIT(27),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -1341,6 +1340,7 @@ struct AstFunction {
     AstBinding *original_binding_to_node;
 
     AstCaptureBlock *captures;
+    Scope *scope_to_lookup_captured_values;
 
     b32 is_exported        : 1;
     b32 is_foreign         : 1;
@@ -1359,16 +1359,9 @@ struct AstCaptureBlock {
 struct AstCaptureLocal {
     AstTyped_base;
 
+    AstTyped *captured_value;
+
     u32 offset;
-};
-
-struct AstCaptureBuilder {
-    AstTyped_base;
-
-    AstTyped *func;
-    AstCaptureBlock *captures;
-
-    bh_arr(AstTyped *) capture_values;
 };
 
 struct AstPolyQuery {

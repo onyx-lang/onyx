@@ -41,7 +41,5 @@ u32 levenshtein_distance(const char *str1, const char *str2);
 char *find_closest_symbol_in_scope_and_parents(Scope *scope, char *sym);
 char *find_closest_symbol_in_node(AstNode *node, char *sym);
 
-b32 maybe_create_capture_builder_for_function_expression(AstTyped **pexpr);
-
 extern AstTyped node_that_signals_a_yield;
 extern AstTyped node_that_signals_failure;

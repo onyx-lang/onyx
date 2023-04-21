@@ -3391,22 +3391,17 @@ EMIT_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_Function: {
-            i32 elemidx = get_element_idx(mod, (AstFunction *) expr);
+            AstFunction *func = (AstFunction *) expr;
+            i32 elemidx = get_element_idx(mod, func);
 
             WID(NULL, WI_I32_CONST, elemidx);
-            WIL(NULL, WI_I32_CONST, 0);
-            break;
-        }
-
-        case Ast_Kind_Capture_Builder: {
-            AstCaptureBuilder *builder = (AstCaptureBuilder *) expr;
-            
-            assert(builder->func->kind == Ast_Kind_Function);
-            i32 elemidx = get_element_idx(mod, (AstFunction *) builder->func);
-            WID(NULL, WI_I32_CONST, elemidx);
+            if (!func->captures) {
+                WIL(NULL, WI_I32_CONST, 0);
+                break;
+            }
 
             // Allocate the block
-            WIL(NULL, WI_I32_CONST, builder->captures->total_size_in_bytes);
+            WIL(NULL, WI_I32_CONST, func->captures->total_size_in_bytes);
             i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) builtin_closure_block_allocate);
             WIL(NULL, WI_CALL, func_idx);
 
@@ -3414,10 +3409,10 @@ EMIT_FUNC(expression, AstTyped* expr) {
             WIL(NULL, WI_LOCAL_TEE, capture_block_ptr);
             
             // Populate the block
-            fori (i, 0, bh_arr_length(builder->capture_values)) {
+            bh_arr_each(AstCaptureLocal *, capture, func->captures->captures) {
                 WIL(NULL, WI_LOCAL_GET, capture_block_ptr);
-                emit_expression(mod, &code, builder->capture_values[i]);
-                emit_store_instruction(mod, &code, builder->capture_values[i]->type, builder->captures->captures[i]->offset);
+                emit_expression(mod, &code, (*capture)->captured_value);
+                emit_store_instruction(mod, &code, (*capture)->captured_value->type, (*capture)->offset);
             }
             
             local_raw_free(mod->local_alloc, WASM_TYPE_PTR);

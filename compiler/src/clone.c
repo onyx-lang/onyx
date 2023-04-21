@@ -448,21 +448,26 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
         case Ast_Kind_Function:
         case Ast_Kind_Polymorphic_Proc: {
-            if (clone_depth > 1) {
-                clone_depth--;
-                return node;
-            }
-
             AstFunction* df = (AstFunction *) nn;
             AstFunction* sf = (AstFunction *) node;
 
-            convert_polyproc_to_function(df);
+            if (clone_depth > 1) {
+                if ((node->flags & Ast_Flag_Function_Is_Lambda) == 0 || !sf->captures) {
+                    clone_depth--;
+                    return node;
+                }
+            }
+            else {
+                convert_polyproc_to_function(df);
+            }
 
             if (sf->is_foreign) return node;
             assert(df->scope == NULL);
 
             df->nodes_that_need_entities_after_clone = NULL;
             bh_arr_new(global_heap_allocator, df->nodes_that_need_entities_after_clone, 1);
+
+            bh_arr(AstNode *) old_captured_entities = captured_entities;
             captured_entities = df->nodes_that_need_entities_after_clone;
 
             df->return_type = (AstType *) ast_clone(a, sf->return_type);
@@ -470,7 +475,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             df->captures = (AstCaptureBlock *) ast_clone(a, sf->captures);
 
             df->nodes_that_need_entities_after_clone = captured_entities;
-            captured_entities = NULL;
+            captured_entities = old_captured_entities;
 
             df->params = NULL;
             bh_arr_new(context.ast_alloc, df->params, bh_arr_length(sf->params));
@@ -504,6 +509,12 @@ AstNode* ast_clone(bh_allocator a, void* n) {
                 bh_arr_each(AstTyped *, pexpr, sf->tags) {
                     bh_arr_push(df->tags, (AstTyped *) ast_clone(a, (AstNode *) *pexpr));
                 }    
+            }
+
+            if (clone_depth > 1) {
+                sf->flags |= Ast_Flag_Function_Is_Lambda_Inside_PolyProc;
+                df->flags &= ~Ast_Flag_Function_Is_Lambda_Inside_PolyProc;
+                E(df);
             }
 
             break;

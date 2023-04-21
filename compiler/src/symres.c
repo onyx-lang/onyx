@@ -12,9 +12,6 @@ static Scope*       current_scope    = NULL;
 static b32 report_unresolved_symbols = 1;
 static b32 resolved_a_symbol         = 0;
 
-// Everything related to waiting on is imcomplete at the moment.
-static Entity* waiting_on         = NULL;
-
 static Entity* current_entity = NULL;
 
 #define SYMRES(kind, ...) do { \
@@ -73,7 +70,6 @@ static SymresStatus symres_static_if(AstIf* static_if);
 static SymresStatus symres_macro(AstMacro* macro);
 static SymresStatus symres_constraint(AstConstraint* constraint);
 static SymresStatus symres_polyquery(AstPolyQuery *query);
-static SymresStatus symres_capture_builder(AstCaptureBuilder *builder);
 
 static void scope_enter(Scope* new_scope) {
     current_scope = new_scope;
@@ -576,7 +572,20 @@ static SymresStatus symres_expression(AstTyped** expr) {
             (*expr)->type_node = builtin_range_type;
             break;
 
+        case Ast_Kind_Polymorphic_Proc:
+            if (((AstFunction *) *expr)->captures) {
+                ((AstFunction *) *expr)->scope_to_lookup_captured_values = current_scope;
+            }
+            break;
+
         case Ast_Kind_Function:
+            if (((AstFunction *) *expr)->captures) {
+                ((AstFunction *) *expr)->scope_to_lookup_captured_values = current_scope;
+            }
+
+            SYMRES(type, &(*expr)->type_node);
+            break;
+
         case Ast_Kind_NumLit:
             SYMRES(type, &(*expr)->type_node);
             break;
@@ -659,8 +668,6 @@ static SymresStatus symres_expression(AstTyped** expr) {
             SYMRES(expression, (AstTyped **) &ename->func);
             break;
         }
-
-        case Ast_Kind_Capture_Builder: SYMRES(capture_builder, (AstCaptureBuilder *) *expr); break;
 
         default: break;
     }
@@ -840,22 +847,11 @@ static SymresStatus symres_directive_insert(AstDirectiveInsert* insert) {
     return Symres_Success;
 }
 
-static SymresStatus symres_capture_block(AstCaptureBlock *block) {
+static SymresStatus symres_capture_block(AstCaptureBlock *block, Scope *captured_scope) {
     bh_arr_each(AstCaptureLocal *, capture, block->captures) {
-        SYMRES(type, &(*capture)->type_node);
-    }
+        OnyxToken *token = (*capture)->token;
+        AstTyped *resolved = (AstTyped *) symbol_resolve(captured_scope, token);
 
-    bh_arr_each(AstCaptureLocal *, capture, block->captures) {
-        symbol_introduce(current_scope, (*capture)->token, (AstNode *) *capture);
-    }
-
-    return Symres_Success;
-}
-
-static SymresStatus symres_capture_builder(AstCaptureBuilder *builder) {
-    fori (i, bh_arr_length(builder->capture_values), bh_arr_length(builder->captures->captures)) {
-        OnyxToken *token = builder->captures->captures[i]->token;
-        AstTyped *resolved = (AstTyped *) symbol_resolve(current_scope, token);
         if (!resolved) {
             // Should this do a yield? In there any case that that would make sense?
             onyx_report_error(token->pos, Error_Critical, "'%b' is not found in the enclosing scope.",
@@ -863,7 +859,11 @@ static SymresStatus symres_capture_builder(AstCaptureBuilder *builder) {
             return Symres_Error;
         }
 
-        bh_arr_push(builder->capture_values, resolved);
+        (*capture)->captured_value = resolved;
+    }
+
+    bh_arr_each(AstCaptureLocal *, capture, block->captures) {
+        symbol_introduce(current_scope, (*capture)->token, (AstNode *) *capture);
     }
 
     return Symres_Success;
@@ -973,6 +973,17 @@ static SymresStatus symres_block(AstBlock* block) {
 SymresStatus symres_function_header(AstFunction* func) {
     func->flags |= Ast_Flag_Comptime;
 
+    if (func->captures && !func->scope_to_lookup_captured_values) {
+        if (!(func->flags & Ast_Flag_Function_Is_Lambda)) {
+            onyx_report_error(func->captures->token->pos, Error_Critical, "This procedure cannot capture values as it is not defined in an expression.");
+            return Symres_Error;
+        }
+
+        if (func->flags & Ast_Flag_Function_Is_Lambda_Inside_PolyProc) return Symres_Complete;
+
+        return Symres_Yield_Macro;
+    }
+
     if (func->scope == NULL)
         func->scope = scope_create(context.ast_alloc, current_scope, func->token->pos);
 
@@ -1014,7 +1025,8 @@ SymresStatus symres_function_header(AstFunction* func) {
             // This makes a lot of assumptions about how these nodes are being processed,
             // and I don't want to start using this with other nodes without considering
             // what the ramifications of that is.
-            assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents);
+            assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents
+                    || (*node)->kind == Ast_Kind_Function || (*node)->kind == Ast_Kind_Polymorphic_Proc);
 
             // Need to current_scope->parent because current_scope is the function body scope.
             Scope *scope = current_scope->parent;
@@ -1037,12 +1049,7 @@ SymresStatus symres_function_header(AstFunction* func) {
     }
 
     if (func->captures) {
-        if (!(func->flags & Ast_Flag_Function_Is_Lambda)) {
-            onyx_report_error(func->captures->token->pos, Error_Critical, "This procedure cannot capture values as it is not defined in an expression.");
-            return Symres_Error;
-        }
-        
-        SYMRES(capture_block, func->captures);
+        SYMRES(capture_block, func->captures, func->scope_to_lookup_captured_values);
     }
 
     SYMRES(type, &func->return_type);
@@ -1064,6 +1071,7 @@ SymresStatus symres_function_header(AstFunction* func) {
 SymresStatus symres_function(AstFunction* func) {
     if (func->entity_header && func->entity_header->state < Entity_State_Check_Types) return Symres_Yield_Macro;
     if (func->kind == Ast_Kind_Polymorphic_Proc) return Symres_Complete;
+    if (func->flags & Ast_Flag_Function_Is_Lambda_Inside_PolyProc) return Symres_Complete;
     assert(func->scope);
 
     scope_enter(func->scope);

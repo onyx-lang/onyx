@@ -1482,23 +1482,3 @@ void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved) {
 }
 
 
-
-b32 maybe_create_capture_builder_for_function_expression(AstTyped **pexpr) {
-    AstFunction *func = (void *) *pexpr;
-
-    if (!(func->flags & Ast_Flag_Function_Is_Lambda)) return 0;
-    if (!func->captures) return 0;
-
-    AstCaptureBuilder *builder = onyx_ast_node_new(context.ast_alloc, sizeof(AstCaptureBuilder), Ast_Kind_Capture_Builder);
-    builder->token = func->captures->token - 1;
-
-    builder->func = (void *) func;
-    // builder->type = builder->func->type;
-    builder->captures = func->captures;
-
-    bh_arr_new(context.ast_alloc, builder->capture_values, bh_arr_length(builder->captures->captures));
-
-    *((void **) pexpr) = builder;
-    return 1;
-}
-

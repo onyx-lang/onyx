@@ -2402,9 +2402,6 @@ static AstCaptureBlock *parse_capture_list(OnyxParser* parser, TokenType end_tok
         AstCaptureLocal *capture = make_node(AstCaptureLocal, Ast_Kind_Capture_Local);
         capture->token = expect_token(parser, Token_Type_Symbol);
 
-        expect_token(parser, ':');
-        capture->type_node = parse_type(parser);
-
         bh_arr_push(captures->captures, capture);
 
         if (peek_token(0)->type != end_token)
@@ -2427,8 +2424,8 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
 
     OnyxToken* symbol;
     while (!consume_token_if_next(parser, ')')) {
-        if (consume_token_if_next(parser, '|') && !func->captures) {
-            func->captures = parse_capture_list(parser, '|');
+        if (consume_token_if_next(parser, '[') && !func->captures) {
+            func->captures = parse_capture_list(parser, ']');
             consume_token_if_next(parser, ',');
             continue;
         }
@@ -2730,25 +2727,13 @@ static b32 parse_possible_function_definition_no_consume(OnyxParser* parser) {
         b32 is_params = (parser->curr + 1) == matching_paren;
         OnyxToken* tmp_token = parser->curr;
         while (!is_params && tmp_token < matching_paren) {
-            if (tmp_token->type == '|') {
-                tmp_token++;
-                while (tmp_token->type != '|' && tmp_token < matching_paren) {
-                    tmp_token++;
-                }
-                tmp_token++;
-            }
-
             if (tmp_token->type == ':') is_params = 1;
 
             tmp_token++;
         }
 
-        if (peek_token(1)->type == '|' && (matching_paren - 1)->type == '|') {
-            OnyxToken* tmp_token = parser->curr + 1;
-            while (!is_params && tmp_token < matching_paren - 1) {
-                if (tmp_token->type == ':') is_params = 1;
-                tmp_token++;
-            }
+        if (peek_token(1)->type == '[' && (matching_paren - 1)->type == ']') {
+            is_params = 1;
         }
 
         return is_params;
@@ -2814,8 +2799,8 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
         while (!consume_token_if_next(parser, ')')) {
             if (parser->hit_unexpected_token) return 0;
 
-            if (consume_token_if_next(parser, '|') && !captures) {
-                captures = parse_capture_list(parser, '|');
+            if (consume_token_if_next(parser, '[') && !captures) {
+                captures = parse_capture_list(parser, ']');
 
             } else {
                 QuickParam param = { 0 };

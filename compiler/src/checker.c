@@ -2157,9 +2157,6 @@ CheckStatus check_expression(AstTyped** pexpr) {
                 YIELD(expr->token->pos, "Waiting for function type to be resolved.");
 
             expr->flags |= Ast_Flag_Function_Used;
-            if (maybe_create_capture_builder_for_function_expression(pexpr)) {
-                retval = Check_Return_To_Symres;
-            }
             break;
 
         case Ast_Kind_Directive_Solidify:
@@ -2228,22 +2225,9 @@ CheckStatus check_expression(AstTyped** pexpr) {
             YIELD(expr->token->pos, "Waiting to resolve #this_package.");
             break;
 
-        case Ast_Kind_Capture_Builder: {
-            AstCaptureBuilder *builder = (void *) expr;
-            builder->type = get_expression_type(builder->func);
-
-            fori (i, 0, bh_arr_length(builder->capture_values)) {
-                if (!builder->captures->captures[i]->type) {
-                    YIELD(expr->token->pos, "Waiting to know capture value types.");
-                }
-
-                TYPE_CHECK(&builder->capture_values[i], builder->captures->captures[i]->type) {
-                    ERROR_(builder->captures->captures[i]->token->pos, "Type mismatch for this captured value. Expected '%s', got '%s'.",
-                            type_get_name(builder->captures->captures[i]->type), type_get_name(builder->capture_values[i]->type));
-                }
-            }
+        case Ast_Kind_Capture_Local:
+            expr->type = ((AstCaptureLocal *) expr)->captured_value->type;
             break;
-        }
 
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;
@@ -2255,7 +2239,6 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Switch_Case: break;
         case Ast_Kind_Foreign_Block: break;
         case Ast_Kind_Zero_Value: break;
-        case Ast_Kind_Capture_Local: break;
 
         default:
             retval = Check_Error;

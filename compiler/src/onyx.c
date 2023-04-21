@@ -542,11 +542,12 @@ static b32 process_entity(Entity* ent) {
     if (context.options->verbose_output == 3) {
         if (ent->expr && ent->expr->token)
             snprintf(verbose_output_buffer, 511,
-                    "%20s | %24s (%d, %d) | %s:%i:%i \n",
+                    "%20s | %24s (%d, %d) | %5d | %s:%i:%i \n",
                    entity_state_strings[ent->state],
                    entity_type_strings[ent->type],
                    (u32) ent->macro_attempts,
                    (u32) ent->micro_attempts,
+                   ent->id,
                    ent->expr->token->pos.filename,
                    ent->expr->token->pos.line,
                    ent->expr->token->pos.column);
