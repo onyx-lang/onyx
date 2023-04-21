@@ -3,9 +3,11 @@
 // such as procedure definitions, string literals, struct definitions
 // and declarations to be introduced into scopes.
 
+#define BH_INTERNAL_ALLOCATOR (global_heap_allocator)
+
+#include "parser.h"
 #include "lex.h"
 #include "errors.h"
-#include "parser.h"
 #include "utils.h"
 
 #define make_node(nclass, kind)             onyx_ast_node_new(parser->allocator, sizeof(nclass), kind)
@@ -3849,6 +3851,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     bh_arr_new(global_heap_allocator, parser.current_symbol_stack, 4);
     bh_arr_new(global_heap_allocator, parser.scope_flags, 4);
     bh_arr_new(global_heap_allocator, parser.stored_tags, 4);
+    bh_arr_new(global_heap_allocator, parser.current_function_stack, 4);
 
     return parser;
 }
@@ -3858,6 +3861,7 @@ void onyx_parser_free(OnyxParser* parser) {
     bh_arr_free(parser->current_symbol_stack);
     bh_arr_free(parser->scope_flags);
     bh_arr_free(parser->stored_tags);
+    bh_arr_free(parser->current_function_stack);
 }
 
 void onyx_parse(OnyxParser *parser) {

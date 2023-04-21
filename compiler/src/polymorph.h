@@ -991,6 +991,8 @@ b32 potentially_convert_function_to_polyproc(AstFunction *func) {
 
     if (bh_arr_length(auto_vars) == 0) return 0;
 
+    bh_arr_new(global_heap_allocator, func->poly_params, bh_arr_length(auto_vars));
+
     param_idx = 0;
     bh_arr_each(AutoPolymorphVariable, apv, auto_vars) {
         AstPolyParam pp;

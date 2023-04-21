@@ -1,3 +1,4 @@
+#define BH_INTERNAL_ALLOCATOR (global_heap_allocator)
 #define BH_DEBUG
 #include "parser.h"
 #include "utils.h"
@@ -112,15 +113,6 @@ CheckStatus check_polyquery(AstPolyQuery *query);
 CheckStatus check_directive_first(AstDirectiveFirst *first);
 CheckStatus check_directive_export_name(AstDirectiveExportName *ename);
 
-// HACK HACK HACK
-b32 expression_types_must_be_known = 0;
-b32 all_checks_are_final           = 1;
-b32 inside_for_iterator            = 0;
-bh_arr(AstFor *) for_node_stack    = NULL;
-static bh_imap __binop_impossible_cache[Binary_Op_Count];
-static AstCall __op_maybe_overloaded;
-static Entity *current_entity = NULL;
-
 
 #define STATEMENT_LEVEL 1
 #define EXPRESSION_LEVEL 2
@@ -134,17 +126,14 @@ static inline void fill_in_type(AstTyped* node) {
     }
 }
 
-// HACK: This should be baked into a structure, not a global variable.
-static bh_arr(Type **) expected_return_type_stack = NULL;
-
 CheckStatus check_return(AstReturn* retnode) {
     Type ** expected_return_type;
     
-    if (retnode->count >= (u32) bh_arr_length(expected_return_type_stack)) {
+    if (retnode->count >= (u32) bh_arr_length(context.checker.expected_return_type_stack)) {
         ERROR_(retnode->token->pos, "Too many repeated 'return's here. Expected a maximum of %d.",
-                bh_arr_length(expected_return_type_stack));
+                bh_arr_length(context.checker.expected_return_type_stack));
     }
-    expected_return_type = expected_return_type_stack[bh_arr_length(expected_return_type_stack) - retnode->count - 1];
+    expected_return_type = context.checker.expected_return_type_stack[bh_arr_length(context.checker.expected_return_type_stack) - retnode->count - 1];
 
     if (retnode->expr) {
         CHECK(expression, &retnode->expr);
@@ -354,22 +343,22 @@ CheckStatus check_for(AstFor* fornode) {
 
 
 fornode_expr_checked:
-    bh_arr_push(for_node_stack, fornode);
+    bh_arr_push(context.checker.for_node_stack, fornode);
 
-    old_inside_for_iterator = inside_for_iterator;
-    inside_for_iterator = 0;
+    old_inside_for_iterator = context.checker.inside_for_iterator;
+    context.checker.inside_for_iterator = 0;
     iter_type = fornode->iter->type;
     if (type_struct_constructed_from_poly_struct(iter_type, builtin_iterator_type)) {
-        inside_for_iterator = 1;
+        context.checker.inside_for_iterator = 1;
     }
 
     do {
         CheckStatus cs = check_block(fornode->stmt);
-        inside_for_iterator = old_inside_for_iterator;
+        context.checker.inside_for_iterator = old_inside_for_iterator;
         if (cs > Check_Errors_Start) return cs;
     } while(0);
 
-    bh_arr_pop(for_node_stack);
+    bh_arr_pop(context.checker.for_node_stack);
     return Check_Success;
 }
 
@@ -822,7 +811,7 @@ static void report_bad_binaryop(AstBinaryOp* binop) {
 }
 
 static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* third_argument) {
-    if (bh_arr_length(operator_overloads[binop->operation]) == 0) return &__op_maybe_overloaded;
+    if (bh_arr_length(operator_overloads[binop->operation]) == 0) return &context.checker.__op_maybe_overloaded;
 
     if (binop->overload_args == NULL || binop->overload_args->values[1] == NULL) {
         if (binop->overload_args == NULL) {
@@ -834,12 +823,12 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* thi
         if (binop_is_assignment(binop->operation)) {
             binop->overload_args->values[0] = (AstTyped *) make_address_of(context.ast_alloc, binop->left);
 
-            u32 current_all_checks_are_final = all_checks_are_final;
-            all_checks_are_final = 0;
+            u32 current_all_checks_are_final = context.checker.all_checks_are_final;
+            context.checker.all_checks_are_final = 0;
             u32 current_checking_level_store = current_checking_level;
             CheckStatus cs = check_address_of((AstAddressOf **) &binop->overload_args->values[0]);
             current_checking_level = current_checking_level_store;
-            all_checks_are_final   = current_all_checks_are_final;
+            context.checker.all_checks_are_final   = current_all_checks_are_final;
 
             if (cs == Check_Yield_Macro)      return (AstCall *) &node_that_signals_a_yield;
             if (cs == Check_Error)            return NULL;
@@ -867,7 +856,7 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* thi
 }
 
 static AstCall* unaryop_try_operator_overload(AstUnaryOp* unop) {
-    if (bh_arr_length(unary_operator_overloads[unop->operation]) == 0) return &__op_maybe_overloaded;
+    if (bh_arr_length(unary_operator_overloads[unop->operation]) == 0) return &context.checker.__op_maybe_overloaded;
 
     if (unop->overload_args == NULL || unop->overload_args->values[0] == NULL) {
         if (unop->overload_args == NULL) {
@@ -1236,7 +1225,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
         binop->flags |= Ast_Flag_Comptime;
     }
 
-    if (expression_types_must_be_known) {
+    if (context.checker.expression_types_must_be_known) {
         if (binop->left->type == NULL || binop->right->type == NULL) {
             ERROR(binop->token->pos, "Internal compiler error: one of the operands types is unknown here.");
         }
@@ -1247,13 +1236,13 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
 
         u64 cache_key = 0;
         if (binop->left->type && binop->right->type) {
-            if (!__binop_impossible_cache[binop->operation].hashes) {
-                bh_imap_init(&__binop_impossible_cache[binop->operation], global_heap_allocator, 256);
+            if (!context.checker.__binop_impossible_cache[binop->operation].hashes) {
+                bh_imap_init(&context.checker.__binop_impossible_cache[binop->operation], global_heap_allocator, 256);
             }
 
             cache_key = ((u64) (binop->left->type->id) << 32ll) | (u64) binop->right->type->id;
 
-            if (bh_imap_has(&__binop_impossible_cache[binop->operation], cache_key)) {
+            if (bh_imap_has(&context.checker.__binop_impossible_cache[binop->operation], cache_key)) {
                 goto definitely_not_op_overload;
             }
         }
@@ -1263,7 +1252,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
         if (implicit_call == (AstCall *) &node_that_signals_a_yield)
             YIELD(binop->token->pos, "Trying to resolve operator overload.");
 
-        if (implicit_call != NULL && implicit_call != &__op_maybe_overloaded) {
+        if (implicit_call != NULL && implicit_call != &context.checker.__op_maybe_overloaded) {
             // NOTE: Not a binary op
             implicit_call->next = binop->next;
             *pbinop = (AstBinaryOp *) implicit_call;
@@ -1272,8 +1261,8 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
             return Check_Success;
         }
 
-        if (cache_key && implicit_call != &__op_maybe_overloaded) {
-            bh_imap_put(&__binop_impossible_cache[binop->operation], cache_key, 1);
+        if (cache_key && implicit_call != &context.checker.__op_maybe_overloaded) {
+            bh_imap_put(&context.checker.__binop_impossible_cache[binop->operation], cache_key, 1);
         }
     }
 
@@ -1345,7 +1334,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
          binop->type = &basic_types[Basic_Kind_Bool];
     }
 
-    if (all_checks_are_final) {
+    if (context.checker.all_checks_are_final) {
         binop->flags |= Ast_Flag_Has_Been_Checked;
 
         if (binop->flags & Ast_Flag_Comptime) {
@@ -1408,7 +1397,7 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
     if (unaryop->operation == Unary_Op_Try) {
         AstCall* call = unaryop_try_operator_overload(unaryop);
         if (call == (AstCall *) &node_that_signals_a_yield) YIELD(unaryop->token->pos, "Waiting on potential operator overload.");
-        if (call != NULL && call != &__op_maybe_overloaded) {
+        if (call != NULL && call != &context.checker.__op_maybe_overloaded) {
             call->next = unaryop->next;
             *(AstCall **) punop = call;
 
@@ -1694,14 +1683,14 @@ CheckStatus check_do_block(AstDoBlock** pdoblock) {
 
     fill_in_type((AstTyped *) doblock);
 
-    bh_arr_push(expected_return_type_stack, &doblock->type);
+    bh_arr_push(context.checker.expected_return_type_stack, &doblock->type);
 
     doblock->block->rules = Block_Rule_Do_Block;
     CHECK(block, doblock->block);
 
     if (doblock->type == &type_auto_return) doblock->type = &basic_types[Basic_Kind_Void];
 
-    bh_arr_pop(expected_return_type_stack);
+    bh_arr_pop(context.checker.expected_return_type_stack);
 
     doblock->flags |= Ast_Flag_Has_Been_Checked;
     return Check_Success;
@@ -2352,7 +2341,7 @@ CheckStatus check_directive_solidify(AstDirectiveSolidify** psolid) {
 }
 
 CheckStatus check_remove_directive(AstDirectiveRemove *remove) {
-    if (!inside_for_iterator) {
+    if (!context.checker.inside_for_iterator) {
         ERROR(remove->token->pos, "#remove is only allowed in the body of a for-loop over an iterator.");
     }
 
@@ -2360,11 +2349,11 @@ CheckStatus check_remove_directive(AstDirectiveRemove *remove) {
 }
 
 CheckStatus check_directive_first(AstDirectiveFirst *first) {
-    if (bh_arr_length(for_node_stack) == 0) {
+    if (bh_arr_length(context.checker.for_node_stack) == 0) {
         ERROR(first->token->pos, "#first is only allowed in the body of a for-loop.");
     }
 
-    first->for_node = bh_arr_last(for_node_stack);
+    first->for_node = bh_arr_last(context.checker.for_node_stack);
     assert(first->for_node);
 
     first->for_node->has_first = 1;
@@ -2572,11 +2561,11 @@ CheckStatus check_function(AstFunction* func) {
         }
     }
 
-    bh_arr_clear(expected_return_type_stack);
-    bh_arr_push(expected_return_type_stack, &func->type->Function.return_type);
+    bh_arr_clear(context.checker.expected_return_type_stack);
+    bh_arr_push(context.checker.expected_return_type_stack, &func->type->Function.return_type);
 
-    inside_for_iterator = 0;
-    if (for_node_stack) bh_arr_clear(for_node_stack);
+    context.checker.inside_for_iterator = 0;
+    if (context.checker.for_node_stack) bh_arr_clear(context.checker.for_node_stack);
 
     if (func->body) {
         CheckStatus status = Check_Success;
@@ -2596,8 +2585,8 @@ CheckStatus check_function(AstFunction* func) {
         }
     }
 
-    if (*bh_arr_last(expected_return_type_stack) == &type_auto_return) {
-        *bh_arr_last(expected_return_type_stack) = &basic_types[Basic_Kind_Void];
+    if (*bh_arr_last(context.checker.expected_return_type_stack) == &type_auto_return) {
+        *bh_arr_last(context.checker.expected_return_type_stack) = &basic_types[Basic_Kind_Void];
     }
 
     func->flags |= Ast_Flag_Has_Been_Checked;
@@ -3123,9 +3112,9 @@ CheckStatus check_type(AstType** ptype) {
 }
 
 CheckStatus check_static_if(AstIf* static_if) {
-    expression_types_must_be_known = 1;
+    context.checker.expression_types_must_be_known = 1;
     CheckStatus result = check_expression(&static_if->cond);
-    expression_types_must_be_known = 0;
+    context.checker.expression_types_must_be_known = 0;
     if (result == Check_Yield_Macro) return Check_Yield_Macro;
 
     if (result > Check_Errors_Start || !(static_if->cond->flags & Ast_Flag_Comptime)) {
@@ -3255,7 +3244,7 @@ CheckStatus check_process_directive(AstNode* directive) {
         if (inject->dest->kind == Ast_Kind_Package) {
             pac = ((AstPackage *) inject->dest)->package;
         } else {
-            pac = current_entity->package;
+            pac = context.checker.current_entity->package;
         }
 
         add_entities_for_node(NULL, (AstNode *) binding, scope, pac);
@@ -3581,7 +3570,8 @@ CheckStatus check_arbitrary_job(EntityJobData *job) {
 
 void check_entity(Entity* ent) {
     CheckStatus cs = Check_Success;
-    current_entity = ent;
+    context.checker.current_entity = ent;
+    context.checker.all_checks_are_final = 1;
 
     switch (ent->type) {
         case Entity_Type_Foreign_Function_Header:
