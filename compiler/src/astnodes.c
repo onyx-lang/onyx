@@ -1745,6 +1745,6 @@ b32 resolve_intrinsic_interface_constraint(AstConstraint *constraint) {
                                                           || type->kind == Type_Kind_Slice
                                                           || type->kind == Type_Kind_DynArray
                                                           || type->kind == Type_Kind_Struct;
-
+    if (!strcmp(interface->name, "type_is_function")) return type->kind == Type_Kind_Function;
     return 0;
 }

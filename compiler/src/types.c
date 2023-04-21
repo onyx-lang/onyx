@@ -251,13 +251,13 @@ u32 type_size_of(Type* type) {
         case Type_Kind_Basic:    return type->Basic.size;
         case Type_Kind_MultiPointer:
         case Type_Kind_Pointer:  return POINTER_SIZE;
-        case Type_Kind_Function: return 2 * POINTER_SIZE;
+        case Type_Kind_Function: return 4 + 4 + POINTER_SIZE;
         case Type_Kind_Array:    return type->Array.size;
         case Type_Kind_Struct:   return type->Struct.size;
         case Type_Kind_Enum:     return type_size_of(type->Enum.backing);
         case Type_Kind_Slice:    return POINTER_SIZE * 2; // HACK: These should not have to be 16 bytes in size, they should only have to be 12,
         case Type_Kind_VarArgs:  return POINTER_SIZE * 2; // but there are alignment issues right now with that so I decided to not fight it and just make them 16 bytes in size.
-        case Type_Kind_DynArray: return POINTER_SIZE + 8 + 4 * POINTER_SIZE; // data (8), count (4), capacity (4), allocator { func (8), data (8) }
+        case Type_Kind_DynArray: return POINTER_SIZE + 8 + 8 + 2 * POINTER_SIZE; // data (8), count (4), capacity (4), allocator { func (4 + 4 + 8), data (8) }
         case Type_Kind_Compound: return type->Compound.size;
         case Type_Kind_Distinct: return type_size_of(type->Distinct.base_type);
         default:                 return 0;
@@ -1253,8 +1253,9 @@ static const StructMember array_members[] = {
 };
 
 static const StructMember func_members[] = {
-    { 0,            0, &basic_types[Basic_Kind_U32],    "__funcidx",   NULL, NULL, -1, 0, 0 },
-    { POINTER_SIZE, 1, &basic_types[Basic_Kind_Rawptr], "data",   NULL, NULL, -1, 0, 0 },
+    { 0,                0, &basic_types[Basic_Kind_U32],    "__funcidx",    NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE,     1, &basic_types[Basic_Kind_Rawptr], "closure",      NULL, NULL, -1, 0, 0 },
+    { 2 * POINTER_SIZE, 2, &basic_types[Basic_Kind_U32],    "closure_size", NULL, NULL, -1, 0, 0 },
 };
 
 b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
@@ -1344,7 +1345,7 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
         }
 
         case Type_Kind_Function: {
-            if (idx > 2) return 0;
+            if (idx > 3) return 0;
 
             *smem = func_members[idx];
             return 1;
@@ -1359,7 +1360,7 @@ i32 type_linear_member_count(Type* type) {
     switch (type->kind) {
         case Type_Kind_Slice:
         case Type_Kind_VarArgs:  return 2;
-        case Type_Kind_Function: return 2;
+        case Type_Kind_Function: return 3;
         case Type_Kind_Compound: return bh_arr_length(type->Compound.linear_members);
         default: return 1;
     }
@@ -1417,6 +1418,10 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
                 two->type = &basic_types[Basic_Kind_Rawptr];
                 two->offset = POINTER_SIZE;
             }
+            if (idx == 2) {
+                two->type = &basic_types[Basic_Kind_U32];
+                two->offset = 2 * POINTER_SIZE;
+            }
             return 1;
 
         default: {
@@ -1456,6 +1461,7 @@ i32 type_get_idx_of_linear_member_with_offset(Type* type, u32 offset) {
         case Type_Kind_Function: {
             if (offset == 0) return 0;
             if (offset == POINTER_SIZE) return 1;
+            if (offset == POINTER_SIZE * 2) return 2;
             return -1;
         }
         default:
@@ -1538,9 +1544,6 @@ b32 type_is_simd(Type* type) {
 b32 type_results_in_void(Type* type) {
     return (type == NULL)
         || (type->kind == Type_Kind_Basic && type->Basic.kind == Basic_Kind_Void);
-        // || (   (type->kind == Type_Kind_Function)
-        //     && (type->Function.return_type->kind == Type_Kind_Basic)
-        //     && (type->Function.return_type->Basic.kind == Basic_Kind_Void));
 }
 
 b32 type_is_array_accessible(Type* type) {
@@ -1586,7 +1589,7 @@ u32 type_structlike_mem_count(Type* type) {
         case Type_Kind_Struct:   return type->Struct.mem_count;
         case Type_Kind_Slice:    return 2;
         case Type_Kind_VarArgs:  return 2;
-        case Type_Kind_Function: return 2;
+        case Type_Kind_Function: return 3;
         case Type_Kind_DynArray: return 4;
         default: return 0;
     }
