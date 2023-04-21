@@ -4715,6 +4715,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(alloc, module.elems, 4);
     bh_arr_new(alloc, module.libraries, 4);
     bh_arr_new(alloc, module.library_paths, 4);
+    bh_arr_new(alloc, module.for_remove_info, 4);
 
     bh_arr_new(global_heap_allocator, module.return_location_stack, 4);
     bh_arr_new(global_heap_allocator, module.structured_jump_target, 16);

@@ -11,6 +11,10 @@
     #endif
 #endif
 
+#ifndef BH_INTERNAL_ALLOCATOR
+    #define BH_INTERNAL_ALLOCATOR (bh_heap_allocator())
+#endif
+
 
 // NOTE: For lseek64
 #define _LARGEFILE64_SOURCE
@@ -481,6 +485,11 @@ bh_dir bh_dir_open(char* path);
 b32    bh_dir_read(bh_dir dir, bh_dirent* out);
 void   bh_dir_close(bh_dir dir);
 
+
+
+b32 bh_wait_for_changes_in_directories(u32 count, char ** paths);
+
+
 #endif
 
 
@@ -602,7 +611,7 @@ typedef struct bh__arr {
 #define bh_arr(T)                    T*
 #define bh__arrhead(arr)             (((bh__arr *)(arr)) - 1)
 
-#define bh_arr_allocator(arr)        (arr ? bh__arrhead(arr)->allocator : bh_heap_allocator())
+#define bh_arr_allocator(arr)        (arr ? bh__arrhead(arr)->allocator : BH_INTERNAL_ALLOCATOR)
 #define bh_arr_length(arr)           (arr ? bh__arrhead(arr)->length : 0)
 #define bh_arr_capacity(arr)         (arr ? bh__arrhead(arr)->capacity : 0)
 #define bh_arr_size(arr)             (arr ? bh__arrhead(arr)->capacity * sizeof(*(arr)) : 0)
@@ -1943,7 +1952,7 @@ char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_su
         else
             bh_snprintf(path, 512, "%s%s", relative_to, fn + 2);
 
-        if (bh_file_exists(path)) return bh_path_get_full_name(path, bh_heap_allocator());
+        if (bh_file_exists(path)) return bh_path_get_full_name(path, BH_INTERNAL_ALLOCATOR);
 
         return fn;
     }
@@ -1955,7 +1964,7 @@ char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_su
             else
                 bh_snprintf(path, 512, "%s%s", *folder, fn);
 
-            if (bh_file_exists(path)) return bh_path_get_full_name(path, bh_heap_allocator());
+            if (bh_file_exists(path)) return bh_path_get_full_name(path, BH_INTERNAL_ALLOCATOR);
         }
     }
 
