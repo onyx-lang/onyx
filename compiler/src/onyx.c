@@ -885,7 +885,7 @@ static b32 onyx_run_module(bh_buffer code_buffer) {
 }
 
 static b32 onyx_run_wasm_file(const char *filename) {
-    bh_file_contents contents = bh_file_read_contents(global_heap_allocator, filename);
+    bh_file_contents contents = bh_file_read_contents(bh_heap_allocator(), filename);
 
     bh_buffer code_buffer;
     code_buffer.data = contents.data;
