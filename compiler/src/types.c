@@ -1613,6 +1613,7 @@ b32 type_is_sl_constructable(Type* type) {
         case Type_Kind_Struct:   return 1;
         case Type_Kind_Slice:    return 1;
         case Type_Kind_DynArray: return 1;
+        case Type_Kind_Function: return 1;
         default: return 0;
     }
 }
