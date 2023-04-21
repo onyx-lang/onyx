@@ -1,10 +1,8 @@
 package runtime.platform
 
 use runtime
-use core
+use core {package, *}
 use wasi
-
-use core
 
 #if runtime.runtime != .Wasi {
     #error "The file system library is currently only available on the WASI runtime, and should only be included if that is the chosen runtime."
@@ -311,7 +309,7 @@ __dir_read :: (dir: DirectoryData, out_entry: &os.DirectoryEntry) -> bool {
     out_entry.identifier = ~~dirent.d_ino;
     out_entry.name_length = dirent.d_namlen;
     memory.set(~~&out_entry.name_data, 0, 256);
-    memory.copy(~~&out_entry.name_data, ~~(dirent + 1), math.min(dirent.d_namlen, sizeof typeof out_entry.name_data));
+    memory.copy(~~&out_entry.name_data, ~~(cast([&] wasi.DirEnt, dirent) + 1), math.min(dirent.d_namlen, sizeof typeof out_entry.name_data));
 
     dir.last_cookie = dirent.d_next;
     return true;
