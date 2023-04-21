@@ -451,8 +451,17 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             AstFunction* df = (AstFunction *) nn;
             AstFunction* sf = (AstFunction *) node;
 
+            // Check if we are cloning a function inside of a function.
             if (clone_depth > 1) {
-                if ((node->flags & Ast_Flag_Function_Is_Lambda) == 0 || !sf->captures) {
+                // If we are, and the inner function has a scope, this means that
+                // the inner function does not capture anything, and is not polymorphic.
+                // Therefore, it should be treated as a normal function and not cloned
+                // inside of this function.
+                // 
+                // If the inner function does not have a scope, that means that it is
+                // either polymorphic and/or it has captures. In either case, we have
+                // to clone the function internally below.
+                if (df->scope != NULL) {
                     clone_depth--;
                     return node;
                 }
@@ -509,6 +518,10 @@ AstNode* ast_clone(bh_allocator a, void* n) {
                 bh_arr_each(AstTyped *, pexpr, sf->tags) {
                     bh_arr_push(df->tags, (AstTyped *) ast_clone(a, (AstNode *) *pexpr));
                 }    
+            }
+
+            if (df->kind == Ast_Kind_Polymorphic_Proc) {
+                df->scope_to_lookup_captured_values = NULL;
             }
 
             if (clone_depth > 1) {

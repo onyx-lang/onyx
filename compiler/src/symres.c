@@ -973,12 +973,12 @@ static SymresStatus symres_block(AstBlock* block) {
 SymresStatus symres_function_header(AstFunction* func) {
     func->flags |= Ast_Flag_Comptime;
 
-    if (func->captures && !func->scope_to_lookup_captured_values) {
-        if (!(func->flags & Ast_Flag_Function_Is_Lambda)) {
-            onyx_report_error(func->captures->token->pos, Error_Critical, "This procedure cannot capture values as it is not defined in an expression.");
-            return Symres_Error;
-        }
+    if (!(func->flags & Ast_Flag_Function_Is_Lambda) && func->captures) {
+        onyx_report_error(func->captures->token->pos, Error_Critical, "This procedure cannot capture values as it is not defined in an expression.");
+        return Symres_Error;
+    }
 
+    if (func->captures && !func->scope_to_lookup_captured_values) {
         if (func->flags & Ast_Flag_Function_Is_Lambda_Inside_PolyProc) return Symres_Complete;
 
         return Symres_Yield_Macro;
@@ -1028,7 +1028,7 @@ SymresStatus symres_function_header(AstFunction* func) {
             assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents
                     || (*node)->kind == Ast_Kind_Function || (*node)->kind == Ast_Kind_Polymorphic_Proc);
 
-            // Need to current_scope->parent because current_scope is the function body scope.
+            // Need to use current_scope->parent because current_scope is the function body scope.
             Scope *scope = current_scope->parent;
 
             if ((*node)->kind == Ast_Kind_Static_If) {
@@ -1048,12 +1048,6 @@ SymresStatus symres_function_header(AstFunction* func) {
         bh_arr_set_length(func->nodes_that_need_entities_after_clone, 0);
     }
 
-    if (func->captures) {
-        SYMRES(capture_block, func->captures, func->scope_to_lookup_captured_values);
-    }
-
-    SYMRES(type, &func->return_type);
-
     if (func->deprecated_warning) {
         SYMRES(expression, (AstTyped **) &func->deprecated_warning);
     }
@@ -1062,6 +1056,12 @@ SymresStatus symres_function_header(AstFunction* func) {
         SYMRES(expression, &func->foreign.module_name);
         SYMRES(expression, &func->foreign.import_name);
     }
+
+    if (func->captures) {
+        SYMRES(capture_block, func->captures, func->scope_to_lookup_captured_values);
+    }
+
+    SYMRES(type, &func->return_type);
 
     scope_leave();
 
@@ -1374,6 +1374,8 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             }
 
             SYMRES(expression, (AstTyped **) &add_overload->overload);
+            add_overload->overload->flags &= ~Ast_Flag_Function_Is_Lambda;
+
             add_overload_option(&ofunc->overloads, add_overload->order, add_overload->overload);
             break;
         }
@@ -1388,6 +1390,8 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 onyx_report_error(operator->token->pos, Error_Critical, "This cannot be used as an operator overload.");
                 return Symres_Error;
             }
+
+            overload->flags &= ~Ast_Flag_Function_Is_Lambda;
             
             // First try unary operator overloading
             // CLEANUP This is not written well at all...
