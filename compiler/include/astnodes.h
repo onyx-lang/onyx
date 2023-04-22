@@ -1362,6 +1362,7 @@ struct AstCaptureLocal {
     AstTyped *captured_value;
 
     u32 offset;
+    b32 by_reference: 1;
 };
 
 struct AstPolyQuery {

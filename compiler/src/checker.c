@@ -2225,9 +2225,20 @@ CheckStatus check_expression(AstTyped** pexpr) {
             YIELD(expr->token->pos, "Waiting to resolve #this_package.");
             break;
 
-        case Ast_Kind_Capture_Local:
-            expr->type = ((AstCaptureLocal *) expr)->captured_value->type;
+        case Ast_Kind_Capture_Local: {
+            AstCaptureLocal *cl = (AstCaptureLocal *) expr;
+            if (cl->by_reference) {
+                if (!is_lval((AstNode *) cl->captured_value)) {
+                    ERROR_(cl->token->pos, "Cannot pass '%b' by pointer because it is not an l-value.", cl->token->text, cl->token->length);
+                }
+
+                expr->type = type_make_pointer(context.ast_alloc, cl->captured_value->type);
+
+            } else {
+                expr->type = cl->captured_value->type;
+            }
             break;
+        }
 
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;

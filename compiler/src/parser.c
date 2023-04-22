@@ -2400,6 +2400,9 @@ static AstCaptureBlock *parse_capture_list(OnyxParser* parser, TokenType end_tok
         if (parser->hit_unexpected_token) break;
 
         AstCaptureLocal *capture = make_node(AstCaptureLocal, Ast_Kind_Capture_Local);
+
+        if (consume_token_if_next(parser, '&')) capture->by_reference = 1;
+
         capture->token = expect_token(parser, Token_Type_Symbol);
 
         bh_arr_push(captures->captures, capture);

@@ -3418,8 +3418,14 @@ EMIT_FUNC(expression, AstTyped* expr) {
             // Populate the block
             bh_arr_each(AstCaptureLocal *, capture, func->captures->captures) {
                 WIL(NULL, WI_LOCAL_GET, capture_block_ptr);
-                emit_expression(mod, &code, (*capture)->captured_value);
-                emit_store_instruction(mod, &code, (*capture)->captured_value->type, (*capture)->offset);
+
+                if ((*capture)->by_reference) {
+                    emit_location(mod, &code, (*capture)->captured_value);
+                } else {
+                    emit_expression(mod, &code, (*capture)->captured_value);
+                }
+
+                emit_store_instruction(mod, &code, (*capture)->type, (*capture)->offset);
             }
             
             local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
