@@ -251,7 +251,7 @@ u32 type_size_of(Type* type) {
         case Type_Kind_Basic:    return type->Basic.size;
         case Type_Kind_MultiPointer:
         case Type_Kind_Pointer:  return POINTER_SIZE;
-        case Type_Kind_Function: return 4 + 4 + POINTER_SIZE;
+        case Type_Kind_Function: return 3 * POINTER_SIZE;
         case Type_Kind_Array:    return type->Array.size;
         case Type_Kind_Struct:   return type->Struct.size;
         case Type_Kind_Enum:     return type_size_of(type->Enum.backing);
@@ -1345,7 +1345,7 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
         }
 
         case Type_Kind_Function: {
-            if (idx > 3) return 0;
+            if (idx > 2) return 0;
 
             *smem = func_members[idx];
             return 1;

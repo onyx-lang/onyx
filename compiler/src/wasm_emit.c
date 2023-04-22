@@ -4510,6 +4510,8 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
     case Ast_Kind_Function: {
         AstFunction* func = (AstFunction *) node;
         CE(u32, 0) = get_element_idx(ctx->module, func);
+        CE(u32, 4) = 0;
+        CE(u32, 8) = 0;
         break;
     }
 

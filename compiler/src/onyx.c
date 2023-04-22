@@ -964,6 +964,8 @@ int main(int argc, char *argv[]) {
 
         #ifdef ENABLE_RUN_WITH_WASMER
         case ONYX_COMPILE_ACTION_RUN_WASM:
+            global_heap_allocator = bh_heap_allocator();
+            context_init(&compile_opts);
             compiler_progress = ONYX_COMPILER_PROGRESS_SUCCESS;
             if (!onyx_run_wasm_file(context.options->target_file)) {
                 compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
