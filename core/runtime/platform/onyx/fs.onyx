@@ -27,9 +27,6 @@ DirectoryData :: #distinct u64
         __dir_read   :: (dir: DirectoryData, out_entry: &os.DirectoryEntry) -> bool ---
         __dir_create :: (path: str) -> bool ---
         __dir_remove :: (path: str) -> bool ---
-
-
-        __enable_non_blocking_stdin :: () -> void ---
     }
 }
 

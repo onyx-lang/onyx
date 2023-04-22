@@ -7,7 +7,7 @@ Communative_Pair :: struct (T: type_expr) where hash.Hashable(T) {
 }
 
 #match hash.to_u32 (p: Communative_Pair($T)) => {
-    return hash.to_u32(p.a) * 13 + hash.to_u32(p.b) * 17;
+    return hash.to_u32(p.a) * hash.to_u32(p.b);
 }
 
 #operator == (p1, p2: Communative_Pair($T)) => {

@@ -210,12 +210,3 @@ ONYX_DEF(__file_rename, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
 #endif
 }
 
-#ifdef _BH_LINUX
-ONYX_DEF(__enable_non_blocking_stdin, (), ()) {
-    int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
-    flags |= O_NONBLOCK;
-    fcntl(STDIN_FILENO, F_SETFL, flags);
-
-    return NULL;
-}
-#endif

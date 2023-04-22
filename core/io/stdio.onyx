@@ -187,8 +187,7 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
     read = (_: &io.Stream, buffer: [] u8) -> (io.Error, u32) {
         __flush_stdio();
         bytes_read := runtime.platform.__read_from_input(buffer);
-        if bytes_read == 0 do return .ReadPending, 0;
-        if bytes_read <  0 do return .EOF, 0;
+        if bytes_read <= 0 do return .EOF, 0;
 
         return .None, bytes_read;
     },

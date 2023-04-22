@@ -51,7 +51,7 @@ static i32 onyx_run_thread(void *data) {
     i32 thread_id = thread->id;
 
     { // Call the _thread_start procedure
-        wasm_val_t args[]    = {
+        wasm_val_t args[7]    = {
             WASM_I32_VAL(thread_id),
             WASM_I32_VAL(thread->tls_base),
             WASM_I32_VAL(thread->stack_base),
