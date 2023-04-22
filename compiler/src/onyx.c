@@ -395,6 +395,7 @@ static void context_init(CompileOptions* opts) {
     add_entities_for_node(NULL, (AstNode *) &builtin_heap_start, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_tls_base, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_tls_size, context.global_scope, NULL);
+    add_entities_for_node(NULL, (AstNode *) &builtin_closure_base, context.global_scope, NULL);
 
     // NOTE: Add all files passed by command line to the queue
     bh_arr_each(const char *, filename, opts->files) {
@@ -541,11 +542,12 @@ static b32 process_entity(Entity* ent) {
     if (context.options->verbose_output == 3) {
         if (ent->expr && ent->expr->token)
             snprintf(verbose_output_buffer, 511,
-                    "%20s | %24s (%d, %d) | %s:%i:%i \n",
+                    "%20s | %24s (%d, %d) | %5d | %s:%i:%i \n",
                    entity_state_strings[ent->state],
                    entity_type_strings[ent->type],
                    (u32) ent->macro_attempts,
                    (u32) ent->micro_attempts,
+                   ent->id,
                    ent->expr->token->pos.filename,
                    ent->expr->token->pos.line,
                    ent->expr->token->pos.column);
@@ -883,7 +885,7 @@ static b32 onyx_run_module(bh_buffer code_buffer) {
 }
 
 static b32 onyx_run_wasm_file(const char *filename) {
-    bh_file_contents contents = bh_file_read_contents(global_heap_allocator, filename);
+    bh_file_contents contents = bh_file_read_contents(bh_heap_allocator(), filename);
 
     bh_buffer code_buffer;
     code_buffer.data = contents.data;
@@ -962,6 +964,8 @@ int main(int argc, char *argv[]) {
 
         #ifdef ENABLE_RUN_WITH_WASMER
         case ONYX_COMPILE_ACTION_RUN_WASM:
+            global_heap_allocator = bh_heap_allocator();
+            context_init(&compile_opts);
             compiler_progress = ONYX_COMPILER_PROGRESS_SUCCESS;
             if (!onyx_run_wasm_file(context.options->target_file)) {
                 compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;

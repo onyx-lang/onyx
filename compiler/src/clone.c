@@ -117,6 +117,8 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Directive_First: return sizeof(AstDirectiveFirst);
         case Ast_Kind_Directive_Export_Name: return sizeof(AstDirectiveExportName);
         case Ast_Kind_Import: return sizeof(AstImport);
+        case Ast_Kind_Capture_Block: return sizeof(AstCaptureBlock);
+        case Ast_Kind_Capture_Local: return sizeof(AstCaptureLocal);
         case Ast_Kind_Count: return 0;
     }
 
@@ -446,28 +448,43 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
         case Ast_Kind_Function:
         case Ast_Kind_Polymorphic_Proc: {
-            if (clone_depth > 1) {
-                clone_depth--;
-                return node;
-            }
-
             AstFunction* df = (AstFunction *) nn;
             AstFunction* sf = (AstFunction *) node;
 
-            convert_polyproc_to_function(df);
+            // Check if we are cloning a function inside of a function.
+            if (clone_depth > 1) {
+                // If we are, and the inner function has a scope, this means that
+                // the inner function does not capture anything, and is not polymorphic.
+                // Therefore, it should be treated as a normal function and not cloned
+                // inside of this function.
+                // 
+                // If the inner function does not have a scope, that means that it is
+                // either polymorphic and/or it has captures. In either case, we have
+                // to clone the function internally below.
+                if (df->scope != NULL) {
+                    clone_depth--;
+                    return node;
+                }
+            }
+            else {
+                convert_polyproc_to_function(df);
+            }
 
             if (sf->is_foreign) return node;
             assert(df->scope == NULL);
 
             df->nodes_that_need_entities_after_clone = NULL;
             bh_arr_new(global_heap_allocator, df->nodes_that_need_entities_after_clone, 1);
+
+            bh_arr(AstNode *) old_captured_entities = captured_entities;
             captured_entities = df->nodes_that_need_entities_after_clone;
 
             df->return_type = (AstType *) ast_clone(a, sf->return_type);
             df->body = (AstBlock *) ast_clone(a, sf->body);
+            df->captures = (AstCaptureBlock *) ast_clone(a, sf->captures);
 
             df->nodes_that_need_entities_after_clone = captured_entities;
-            captured_entities = NULL;
+            captured_entities = old_captured_entities;
 
             df->params = NULL;
             bh_arr_new(context.ast_alloc, df->params, bh_arr_length(sf->params));
@@ -501,6 +518,16 @@ AstNode* ast_clone(bh_allocator a, void* n) {
                 bh_arr_each(AstTyped *, pexpr, sf->tags) {
                     bh_arr_push(df->tags, (AstTyped *) ast_clone(a, (AstNode *) *pexpr));
                 }    
+            }
+
+            if (df->kind == Ast_Kind_Polymorphic_Proc) {
+                df->scope_to_lookup_captured_values = NULL;
+            }
+
+            if (clone_depth > 1) {
+                sf->flags |= Ast_Flag_Function_Is_Lambda_Inside_PolyProc;
+                df->flags &= ~Ast_Flag_Function_Is_Lambda_Inside_PolyProc;
+                E(df);
             }
 
             break;
@@ -593,6 +620,23 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
         case Ast_Kind_Directive_Export_Name:
             C(AstDirectiveExportName, func);
+            break;
+
+        case Ast_Kind_Capture_Block: {
+            AstCaptureBlock* cd = (AstCaptureBlock *) nn;
+            AstCaptureBlock* cs = (AstCaptureBlock *) node;
+
+            cd->captures = NULL;
+            bh_arr_new(global_heap_allocator, cd->captures, bh_arr_length(cs->captures));
+
+            bh_arr_each(AstCaptureLocal *, expr, cs->captures) {
+                bh_arr_push(cd->captures, (AstCaptureLocal *) ast_clone(a, (AstNode *) *expr));
+            }
+            break;
+        }
+
+        case Ast_Kind_Capture_Local:
+            C(AstCaptureLocal, type_node);
             break;
     }
 

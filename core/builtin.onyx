@@ -102,6 +102,10 @@ OnyxContext :: struct {
     // start of the main loop of your program.
     temp_allocator : Allocator;
 
+    // The procedure to call when allocating space for a closure.
+    // The default is to allocate using the `temp_allocator`.
+    closure_allocate: (size: i32) -> rawptr = default_closure_allocate;
+
     // Defines what happens when `log()` is called. Defaults to a
     // logger that filters log messages by their severity.
     logger         : Logger = .{ default_logger_proc, &default_logger };
@@ -116,7 +120,6 @@ OnyxContext :: struct {
     thread_id      : i32;
 
     // Allows you to place any data on the context that you want to.
-    // Generally used in place a closure mechanism.
     user_data: rawptr;
     user_data_type: type_expr;
 }
@@ -213,6 +216,11 @@ default_log_level :: (level: Log_Level) {
     #local default_logger_proc :: (data: rawptr, level: Log_Level, msg: str, module: str) {
         // In a custom runtime, there is no way to know how to log something.
     }
+}
+
+
+#local default_closure_allocate :: (size: i32) -> rawptr {
+    return raw_alloc(context.temp_allocator, size);
 }
 
 
@@ -468,6 +476,15 @@ __run_init_procedures :: () -> void ---
     be used for structures or distinct types.
 """
 __implicit_bool_cast :: #match -> bool {}
+
+#doc """
+    Internal procedure to allocate space for the captures in a closure. This will be soon
+    changed to a configurable way, but for now it simply allocates out of the heap allocator.
+"""
+__closure_block_allocate :: (size: i32) -> rawptr {
+    return context.closure_allocate(size);
+}
+
 
 #doc """
     Defines all options for changing the memory layout, imports and exports,

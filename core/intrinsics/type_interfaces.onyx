@@ -10,6 +10,7 @@ package core.intrinsics.types
 // Compound: array, slice, struct
 // Array: [$N] $T
 // Slice: [] $T
+// Function: () -> void
 
 type_is_bool     :: interface (t: $T) #intrinsic
 type_is_int      :: interface (t: $T) #intrinsic
@@ -23,4 +24,5 @@ type_is_array    :: interface (t: $T) #intrinsic
 type_is_slice    :: interface (t: $T) #intrinsic
 type_is_struct   :: interface (t: $T) #intrinsic
 type_is_compound :: interface (t: $T) #intrinsic
+type_is_function :: interface (t: $T) #intrinsic
 

@@ -53,6 +53,7 @@
     TypeMatch type_name;                                                                        \
     type_name = unify_node_and_type(expr, type);                                                \
     if (type_name == TYPE_MATCH_YIELD) YIELD((*expr)->token->pos, "Waiting on type checking."); \
+    if (type_name == TYPE_MATCH_SPECIAL) return Check_Return_To_Symres;                         \
     if (type_name == TYPE_MATCH_FAILED)
 
 #define CONCAT(a, b) a##_##b
@@ -776,6 +777,10 @@ CheckStatus check_call(AstCall** pcall) {
     if (tm == TYPE_MATCH_FAILED) {
         onyx_submit_error(error);
         return Check_Error;
+    }
+
+    if (tm == TYPE_MATCH_SPECIAL) {
+        return Check_Return_To_Symres;
     }
 
     if (tm == TYPE_MATCH_YIELD) YIELD(call->token->pos, "Waiting on argument type checking.");
@@ -1745,6 +1750,7 @@ CheckStatus check_address_of(AstAddressOf** paof) {
             && expr->kind != Ast_Kind_Field_Access
             && expr->kind != Ast_Kind_Memres
             && expr->kind != Ast_Kind_Local
+            && expr->kind != Ast_Kind_Capture_Local
             && expr->kind != Ast_Kind_Constraint_Sentinel
             && !node_is_addressable_literal((AstNode *) expr))
             || (expr->flags & Ast_Flag_Cannot_Take_Addr) != 0) {
@@ -2147,17 +2153,6 @@ CheckStatus check_expression(AstTyped** pexpr) {
             break;
 
         case Ast_Kind_Function:
-            // NOTE: Will need something like this at some point
-            // AstFunction* func = (AstFunction *) expr;
-            // bh_arr_each(AstParam, param, func->params) {
-            //     if (param->default_value != NULL) {
-            //         onyx_message_add(Msg_Type_Literal,
-            //                 func->token->pos,
-            //                 "cannot use functions with default parameters in this way");
-            //         retval = 1;
-            //         break;
-            //     }
-            // }
             if (expr->type == NULL)
                 YIELD(expr->token->pos, "Waiting for function type to be resolved.");
 
@@ -2229,6 +2224,21 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Directive_This_Package:
             YIELD(expr->token->pos, "Waiting to resolve #this_package.");
             break;
+
+        case Ast_Kind_Capture_Local: {
+            AstCaptureLocal *cl = (AstCaptureLocal *) expr;
+            if (cl->by_reference) {
+                if (!is_lval((AstNode *) cl->captured_value)) {
+                    ERROR_(cl->token->pos, "Cannot pass '%b' by pointer because it is not an l-value.", cl->token->text, cl->token->length);
+                }
+
+                expr->type = type_make_pointer(context.ast_alloc, cl->captured_value->type);
+
+            } else {
+                expr->type = cl->captured_value->type;
+            }
+            break;
+        }
 
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;
@@ -2408,6 +2418,20 @@ CheckStatus check_directive_export_name(AstDirectiveExportName *ename) {
     return Check_Success;
 }
 
+CheckStatus check_capture_block(AstCaptureBlock *block) {
+    block->total_size_in_bytes = 0;
+
+    bh_arr_each(AstCaptureLocal *, capture, block->captures) {
+        CHECK(expression, (AstTyped **) capture);
+        if (!(*capture)->type) YIELD((*capture)->token->pos, "Waiting to resolve captures type.");
+
+        (*capture)->offset = block->total_size_in_bytes;
+        block->total_size_in_bytes += type_size_of((*capture)->type);
+    }
+
+    return Check_Success;
+}
+
 CheckStatus check_statement(AstNode** pstmt) {
     AstNode* stmt = *pstmt;
 
@@ -2538,7 +2562,15 @@ CheckStatus check_function(AstFunction* func) {
     if (context.checker.for_node_stack) bh_arr_clear(context.checker.for_node_stack);
 
     if (func->body) {
-        CheckStatus status = check_block(func->body);
+        CheckStatus status = Check_Success;
+        if (func->captures) {
+            status = check_capture_block(func->captures);
+        }
+
+        if (status == Check_Success) {
+            status = check_block(func->body);
+        }
+
         if (status == Check_Error && func->generated_from && context.cycle_detected == 0)
             ERROR(func->generated_from->pos, "Error in polymorphic procedure generated from this location.");
 
@@ -2575,6 +2607,8 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* ofunc) {
             bh_imap_free(&all_overloads);
             return Check_Error;
         }
+
+        node->flags &= ~Ast_Flag_Function_Is_Lambda;
 
         if (node->kind == Ast_Kind_Function) {
             AstFunction* func = (AstFunction *) node;

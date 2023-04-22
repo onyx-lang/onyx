@@ -12,9 +12,6 @@ static Scope*       current_scope    = NULL;
 static b32 report_unresolved_symbols = 1;
 static b32 resolved_a_symbol         = 0;
 
-// Everything related to waiting on is imcomplete at the moment.
-static Entity* waiting_on         = NULL;
-
 static Entity* current_entity = NULL;
 
 #define SYMRES(kind, ...) do { \
@@ -575,7 +572,20 @@ static SymresStatus symres_expression(AstTyped** expr) {
             (*expr)->type_node = builtin_range_type;
             break;
 
+        case Ast_Kind_Polymorphic_Proc:
+            if (((AstFunction *) *expr)->captures) {
+                ((AstFunction *) *expr)->scope_to_lookup_captured_values = current_scope;
+            }
+            break;
+
         case Ast_Kind_Function:
+            if (((AstFunction *) *expr)->captures) {
+                ((AstFunction *) *expr)->scope_to_lookup_captured_values = current_scope;
+            }
+
+            SYMRES(type, &(*expr)->type_node);
+            break;
+
         case Ast_Kind_NumLit:
             SYMRES(type, &(*expr)->type_node);
             break;
@@ -837,6 +847,28 @@ static SymresStatus symres_directive_insert(AstDirectiveInsert* insert) {
     return Symres_Success;
 }
 
+static SymresStatus symres_capture_block(AstCaptureBlock *block, Scope *captured_scope) {
+    bh_arr_each(AstCaptureLocal *, capture, block->captures) {
+        OnyxToken *token = (*capture)->token;
+        AstTyped *resolved = (AstTyped *) symbol_resolve(captured_scope, token);
+
+        if (!resolved) {
+            // Should this do a yield? In there any case that that would make sense?
+            onyx_report_error(token->pos, Error_Critical, "'%b' is not found in the enclosing scope.",
+                    token->text, token->length);
+            return Symres_Error;
+        }
+
+        (*capture)->captured_value = resolved;
+    }
+
+    bh_arr_each(AstCaptureLocal *, capture, block->captures) {
+        symbol_introduce(current_scope, (*capture)->token, (AstNode *) *capture);
+    }
+
+    return Symres_Success;
+}
+
 static SymresStatus symres_statement(AstNode** stmt, b32 *remove) {
     if (remove) *remove = 0;
 
@@ -941,6 +973,17 @@ static SymresStatus symres_block(AstBlock* block) {
 SymresStatus symres_function_header(AstFunction* func) {
     func->flags |= Ast_Flag_Comptime;
 
+    if (!(func->flags & Ast_Flag_Function_Is_Lambda) && func->captures) {
+        onyx_report_error(func->captures->token->pos, Error_Critical, "This procedure cannot capture values as it is not defined in an expression.");
+        return Symres_Error;
+    }
+
+    if (func->captures && !func->scope_to_lookup_captured_values) {
+        if (func->flags & Ast_Flag_Function_Is_Lambda_Inside_PolyProc) return Symres_Complete;
+
+        return Symres_Yield_Macro;
+    }
+
     if (func->scope == NULL)
         func->scope = scope_create(context.ast_alloc, current_scope, func->token->pos);
 
@@ -982,9 +1025,10 @@ SymresStatus symres_function_header(AstFunction* func) {
             // This makes a lot of assumptions about how these nodes are being processed,
             // and I don't want to start using this with other nodes without considering
             // what the ramifications of that is.
-            assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents);
+            assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents
+                    || (*node)->kind == Ast_Kind_Function || (*node)->kind == Ast_Kind_Polymorphic_Proc);
 
-            // Need to current_scope->parent because current_scope is the function body scope.
+            // Need to use current_scope->parent because current_scope is the function body scope.
             Scope *scope = current_scope->parent;
 
             if ((*node)->kind == Ast_Kind_Static_If) {
@@ -1004,8 +1048,6 @@ SymresStatus symres_function_header(AstFunction* func) {
         bh_arr_set_length(func->nodes_that_need_entities_after_clone, 0);
     }
 
-    SYMRES(type, &func->return_type);
-
     if (func->deprecated_warning) {
         SYMRES(expression, (AstTyped **) &func->deprecated_warning);
     }
@@ -1015,6 +1057,12 @@ SymresStatus symres_function_header(AstFunction* func) {
         SYMRES(expression, &func->foreign.import_name);
     }
 
+    if (func->captures) {
+        SYMRES(capture_block, func->captures, func->scope_to_lookup_captured_values);
+    }
+
+    SYMRES(type, &func->return_type);
+
     scope_leave();
 
     return Symres_Success;
@@ -1023,6 +1071,7 @@ SymresStatus symres_function_header(AstFunction* func) {
 SymresStatus symres_function(AstFunction* func) {
     if (func->entity_header && func->entity_header->state < Entity_State_Check_Types) return Symres_Yield_Macro;
     if (func->kind == Ast_Kind_Polymorphic_Proc) return Symres_Complete;
+    if (func->flags & Ast_Flag_Function_Is_Lambda_Inside_PolyProc) return Symres_Complete;
     assert(func->scope);
 
     scope_enter(func->scope);
@@ -1325,6 +1374,8 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             }
 
             SYMRES(expression, (AstTyped **) &add_overload->overload);
+            add_overload->overload->flags &= ~Ast_Flag_Function_Is_Lambda;
+
             add_overload_option(&ofunc->overloads, add_overload->order, add_overload->overload);
             break;
         }
@@ -1339,6 +1390,8 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 onyx_report_error(operator->token->pos, Error_Critical, "This cannot be used as an operator overload.");
                 return Symres_Error;
             }
+
+            overload->flags &= ~Ast_Flag_Function_Is_Lambda;
             
             // First try unary operator overloading
             // CLEANUP This is not written well at all...
