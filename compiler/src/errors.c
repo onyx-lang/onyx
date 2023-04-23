@@ -1,16 +1,13 @@
 #include "errors.h"
 #include "utils.h"
 
-OnyxErrors errors;
-static b32 errors_enabled = 1;
-
 void onyx_errors_init(bh_arr(bh_file_contents)* files) {
-    errors.file_contents = files;
+    context.errors.file_contents = files;
 
-    bh_arena_init(&errors.msg_arena, global_heap_allocator, 16 * 1024);
-    errors.msg_alloc = bh_arena_allocator(&errors.msg_arena);
+    bh_arena_init(&context.errors.msg_arena, global_heap_allocator, 16 * 1024);
+    context.errors.msg_alloc = bh_arena_allocator(&context.errors.msg_arena);
 
-    bh_arr_new(global_heap_allocator, errors.errors, 4);
+    bh_arr_new(global_heap_allocator, context.errors.errors, 4);
 }
 
 static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
@@ -60,15 +57,15 @@ void onyx_errors_print() {
     //
     //                                      - brendanfh   2020/09/03
 
-    qsort(errors.errors, bh_arr_length(errors.errors), sizeof(OnyxError), errors_sort);
+    qsort(context.errors.errors, bh_arr_length(context.errors.errors), sizeof(OnyxError), errors_sort);
 
-    OnyxErrorRank last_rank = errors.errors[0].rank;
-    bh_arr_each(OnyxError, err, errors.errors) {
+    OnyxErrorRank last_rank = context.errors.errors[0].rank;
+    bh_arr_each(OnyxError, err, context.errors.errors) {
         if (!context.options->show_all_errors && last_rank != err->rank) break;
 
         if (err->pos.filename) {
             bh_file_contents file_contents = { 0 };
-            bh_arr_each(bh_file_contents, fc, *errors.file_contents) {
+            bh_arr_each(bh_file_contents, fc, *context.errors.file_contents) {
                 if (!strcmp(fc->filename, err->pos.filename)) {
                     file_contents = *fc;
                     break;
@@ -86,24 +83,24 @@ void onyx_errors_print() {
 }
 
 void onyx_errors_enable() {
-    errors_enabled = 1;
+    context.errors_enabled = 1;
 }
 
 void onyx_errors_disable() {
     if (context.cycle_detected) {
-        errors_enabled = 1;
+        context.errors_enabled = 1;
         return;
     }
     
-    errors_enabled = 0;
+    context.errors_enabled = 0;
 }
 
 b32 onyx_errors_are_enabled() {
-    return errors_enabled;
+    return context.errors_enabled;
 }
 
 b32 onyx_has_errors() {
-    bh_arr_each(OnyxError, err, errors.errors) {
+    bh_arr_each(OnyxError, err, context.errors.errors) {
         if (err->rank >= Error_Waiting_On) return 1;
     }
 
@@ -113,17 +110,17 @@ b32 onyx_has_errors() {
 void onyx_clear_errors() {
     if (context.cycle_detected) return;
 
-    bh_arr_set_length(errors.errors, 0);
+    bh_arr_set_length(context.errors.errors, 0);
 }
 
 void onyx_submit_error(OnyxError error) {
-    if (!errors_enabled) return;
+    if (!context.errors_enabled) return;
 
-    bh_arr_push(errors.errors, error);
+    bh_arr_push(context.errors.errors, error);
 }
 
 void onyx_report_error(OnyxFilePos pos, OnyxErrorRank rank, char * format, ...) {
-    if (!errors_enabled) return;
+    if (!context.errors_enabled) return;
 
     va_list vargs;
     va_start(vargs, format);
@@ -133,17 +130,17 @@ void onyx_report_error(OnyxFilePos pos, OnyxErrorRank rank, char * format, ...) 
     OnyxError err = {
         .pos = pos,
         .rank = rank,
-        .text = bh_strdup(errors.msg_alloc, msg),
+        .text = bh_strdup(context.errors.msg_alloc, msg),
     };
 
-    bh_arr_push(errors.errors, err);
+    bh_arr_push(context.errors.errors, err);
 }
 
 void onyx_submit_warning(OnyxError error) {
-    if (!errors_enabled) return;
+    if (!context.errors_enabled) return;
 
     bh_file_contents file_contents = { 0 };
-    bh_arr_each(bh_file_contents, fc, *errors.file_contents) {
+    bh_arr_each(bh_file_contents, fc, *context.errors.file_contents) {
         if (!strcmp(fc->filename, error.pos.filename)) {
             file_contents = *fc;
             break;
@@ -155,7 +152,7 @@ void onyx_submit_warning(OnyxError error) {
 
 // This definitely doesn't do what I thought it did?
 void onyx_report_warning(OnyxFilePos pos, char* format, ...) {
-    if (!errors_enabled) return;
+    if (!context.errors_enabled) return;
 
     va_list vargs;
     va_start(vargs, format);
@@ -165,15 +162,15 @@ void onyx_report_warning(OnyxFilePos pos, char* format, ...) {
     OnyxError err = {
         .pos = pos,
         .rank = Error_Warning,
-        .text = bh_strdup(errors.msg_alloc, msg),
+        .text = bh_strdup(context.errors.msg_alloc, msg),
     };
 
-    bh_arr_push(errors.errors, err);
+    bh_arr_push(context.errors.errors, err);
 
     /*
 
     bh_file_contents file_contents = { 0 };
-    bh_arr_each(bh_file_contents, fc, *errors.file_contents) {
+    bh_arr_each(bh_file_contents, fc, *context.errors.file_contents) {
         if (!strcmp(fc->filename, pos.filename)) {
             file_contents = *fc;
             break;

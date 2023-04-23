@@ -405,6 +405,21 @@ void prepare_builtins() {
     builtin_run_init_procedures = NULL;
     init_procedures = NULL;
     builtin_implicit_bool_cast = NULL;
+
+    basic_type_void.scope = NULL;
+    basic_type_bool.scope = NULL;
+    basic_type_i8.scope = NULL;
+    basic_type_u8.scope = NULL;
+    basic_type_i16.scope = NULL;
+    basic_type_u16.scope = NULL;
+    basic_type_i32.scope = NULL;
+    basic_type_u32.scope = NULL;
+    basic_type_i64.scope = NULL;
+    basic_type_u64.scope = NULL;
+    basic_type_f32.scope = NULL;
+    basic_type_f64.scope = NULL;
+    basic_type_rawptr.scope = NULL;
+    basic_type_type_expr.scope = NULL;
 }
 
 void initialize_builtins(bh_allocator a) {

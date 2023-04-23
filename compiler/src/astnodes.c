@@ -1359,8 +1359,6 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
 
 
 
-static bh_imap implicit_cast_to_bool_cache;
-
 TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
     AstTyped *node = *pnode;
 
@@ -1402,21 +1400,21 @@ TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
         return TYPE_MATCH_SUCCESS;
     }
     
-    if (implicit_cast_to_bool_cache.entries == NULL) {
-        bh_imap_init(&implicit_cast_to_bool_cache, global_heap_allocator, 8);
+    if (context.caches.implicit_cast_to_bool_cache.entries == NULL) {
+        bh_imap_init(&context.caches.implicit_cast_to_bool_cache, global_heap_allocator, 8);
     }
 
-    if (!bh_imap_has(&implicit_cast_to_bool_cache, (u64) node)) {
+    if (!bh_imap_has(&context.caches.implicit_cast_to_bool_cache, (u64) node)) {
         AstArgument *implicit_arg = make_argument(context.ast_alloc, node);
         
         Arguments *args = bh_alloc_item(context.ast_alloc, Arguments);
         bh_arr_new(context.ast_alloc, args->values, 1);
         bh_arr_push(args->values, (AstTyped *) implicit_arg);
 
-        bh_imap_put(&implicit_cast_to_bool_cache, (u64) node, (u64) args);
+        bh_imap_put(&context.caches.implicit_cast_to_bool_cache, (u64) node, (u64) args);
     }
     
-    Arguments *args = (Arguments *) bh_imap_get(&implicit_cast_to_bool_cache, (u64) node);
+    Arguments *args = (Arguments *) bh_imap_get(&context.caches.implicit_cast_to_bool_cache, (u64) node);
     AstFunction *overload = (AstFunction *) find_matching_overload_by_arguments(builtin_implicit_bool_cast->overloads, args);
 
     if (overload == NULL)                                       return TYPE_MATCH_FAILED;
@@ -1429,7 +1427,7 @@ TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
     implicit_call->args.values = args->values;
 
     *(AstCall **) pnode = implicit_call;
-    bh_imap_delete(&implicit_cast_to_bool_cache, (u64) node);
+    bh_imap_delete(&context.caches.implicit_cast_to_bool_cache, (u64) node);
 
     return TYPE_MATCH_YIELD;
 }

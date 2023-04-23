@@ -1050,13 +1050,15 @@ BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc) {
     } break;
 
     case bh_allocator_action_resize: {
-        bh_imap_delete(&mh->ptrs, (u64) prev_memory);
 #if defined(_BH_WINDOWS)
         retval = _aligned_realloc(prev_memory, size, alignment);
 #elif defined(_BH_LINUX)
         retval = realloc(prev_memory, size);
 #endif
-        bh_imap_put(&mh->ptrs, (u64) retval, 1);
+        if (prev_memory != retval) {
+            bh_imap_delete(&mh->ptrs, (u64) prev_memory);
+            bh_imap_put(&mh->ptrs, (u64) retval, 1);
+        }
     } break;
 
     case bh_allocator_action_free: {

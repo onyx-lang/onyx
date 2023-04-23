@@ -1707,6 +1707,10 @@ typedef struct CheckerData {
     bh_arr(Type **) expected_return_type_stack;
 } CheckerData;
 
+typedef struct ContextCaches {
+    bh_imap implicit_cast_to_bool_cache;
+} ContextCaches; 
+
 
 typedef struct CompileOptions CompileOptions;
 struct CompileOptions {
@@ -1770,6 +1774,10 @@ struct Context {
     struct OnyxDocInfo     *doc_info;
 
     CheckerData checker;
+    ContextCaches caches;
+    OnyxErrors errors;
+    b32 errors_enabled;
+
     u32 next_package_id;
     u32 next_scope_id;
 

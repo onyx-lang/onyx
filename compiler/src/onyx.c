@@ -326,6 +326,9 @@ static void context_init(CompileOptions* opts) {
 
     memset(&context, 0, sizeof context);
 
+    // HACK
+    special_global_entities_remaining = 3;
+
     context.options = opts;
     context.cycle_detected = 0;
     context.cycle_almost_detected = 0;
