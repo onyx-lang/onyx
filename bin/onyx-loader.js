@@ -15,7 +15,7 @@ window.ONYX_MODULES.push({
 
     exit: function() { debugger; },
 
-    spawn_thread: function(id, tls_base, stack_base, funcidx, dataptr) {
+    spawn_thread: function(id, tls_base, stack_base, funcidx, closureptr, closuresize, dataptr) {
         try {
             let needed_imports = {};
 
@@ -31,14 +31,16 @@ window.ONYX_MODULES.push({
 
             window.ONYX_WORKERS[id] = new Worker(window.ONYX_THREAD_SCRIPT);
             window.ONYX_WORKERS[id].postMessage({
-                thread_id  : id,
-                memory     : window.ONYX_MEMORY,
-                wasm_bytes : window.ONYX_BYTES,
-                funcidx    : funcidx,
-                dataptr    : dataptr,
-                imports    : needed_imports,
-                tls_base   : tls_base,
-                stack_base : stack_base
+                thread_id   : id,
+                memory      : window.ONYX_MEMORY,
+                wasm_bytes  : window.ONYX_BYTES,
+                funcidx     : funcidx,
+                closureptr  : closureptr,
+                closuresize : closuresize,
+                dataptr     : dataptr,
+                imports     : needed_imports,
+                tls_base    : tls_base,
+                stack_base  : stack_base
             });
 
             return 1;

@@ -35,7 +35,8 @@ package core
         pointer to return the data stored at the pointer's address.
     """
     from_ptr :: macro (p: &$T) -> ?T {
-        if p do return *p;
+        p_ := p;
+        if p_ do return *p_;
         return .{};
     }
 
