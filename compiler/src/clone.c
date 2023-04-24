@@ -524,7 +524,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
                 df->scope_to_lookup_captured_values = NULL;
             }
 
-            if (clone_depth > 1) {
+            if (clone_depth > 1 && captured_entities) {
                 sf->flags |= Ast_Flag_Function_Is_Lambda_Inside_PolyProc;
                 df->flags &= ~Ast_Flag_Function_Is_Lambda_Inside_PolyProc;
                 E(df);
