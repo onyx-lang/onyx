@@ -970,13 +970,13 @@ static void onyx_watch(CompileOptions *compile_opts) {
         char time_buf[128] = {0};
         time_t now = time(NULL);
         strftime(time_buf, 128, "%X", localtime(&now));
-        bh_printf("\e[1;1H\e[30;104m [BUILT] %s \e[0m", time_buf);
+        bh_printf("\e[1;1H\e[30;105m Onyx " VERSION " \e[30;104m Built %s \e[0m", time_buf);
 
         i32 errors = bh_arr_length(context.errors.errors);
         if (errors == 0) {
-            bh_printf("\e[30;102m [ERRORS] 0 \e[0m");
+            bh_printf("\e[30;102m Errors 0 \e[0m");
         } else {
-            bh_printf("\e[30;101m [ERRORS] %d \e[0m", errors);
+            bh_printf("\e[30;101m Error%s %d \e[0m", bh_num_plural(errors), errors);
         }
 
         watches = bh_file_watch_new();

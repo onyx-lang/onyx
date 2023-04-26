@@ -8,6 +8,9 @@ package core.alloc
 #load "./logging"
 #load "./gc"
 
+use core.memory
+use core.intrinsics.types {type_is_function}
+
 as_allocator :: #match {
     macro (a: Allocator) => a
 }
@@ -63,6 +66,19 @@ on_temp :: macro (v: $V) -> &V {
     core.memory.set(out, 0, sizeof V);
     *out = v;
     return out;
+}
+
+#doc """
+    Copies the internal closure data of a function to the provided allocator,
+    and returns the new closed function.
+"""
+copy_closure :: (f: $F/type_is_function, a: Allocator) -> F {
+    if !f.closure do return f;
+
+    new_closure := raw_alloc(a, f.closure_size);
+    memory.copy(new_closure, f.closure, f.closure_size);
+
+    return F.{ f.__funcidx, new_closure, f.closure_size };
 }
 
 TEMPORARY_ALLOCATOR_SIZE :: 1 << 16; // 16Kb
