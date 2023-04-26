@@ -58,24 +58,27 @@ static Type* type_create(TypeKind kind, bh_allocator a, u32 extra_type_pointer_c
 }
 
 static void type_register(Type* type) {
-    static u32 next_unique_id = 1;
-    type->id = next_unique_id++;
+    type->id = ++context.next_type_id;
     if (type->ast_type) type->ast_type->type_id = type->id;
 
     bh_imap_put(&type_map, type->id, (u64) type);
 }
 
 void types_init() {
-    bh_imap_init(&type_map,               global_heap_allocator, 255);
-    bh_imap_init(&type_pointer_map,       global_heap_allocator, 255);
-    bh_imap_init(&type_multi_pointer_map, global_heap_allocator, 255);
-    bh_imap_init(&type_array_map,         global_heap_allocator, 255);
-    bh_imap_init(&type_slice_map,         global_heap_allocator, 255);
-    bh_imap_init(&type_dynarr_map,        global_heap_allocator, 255);
-    bh_imap_init(&type_vararg_map,        global_heap_allocator, 255);
+#define MAKE_MAP(x) (memset(&x, 0, sizeof(x)), bh_imap_init(&x, global_heap_allocator, 255))
+    MAKE_MAP(type_map);
+    MAKE_MAP(type_pointer_map);
+    MAKE_MAP(type_multi_pointer_map);
+    MAKE_MAP(type_array_map);
+    MAKE_MAP(type_slice_map);
+    MAKE_MAP(type_dynarr_map);
+    MAKE_MAP(type_vararg_map);
+
+    type_func_map = NULL;
     sh_new_arena(type_func_map);
 
     fori (i, 0, Basic_Kind_Count) type_register(&basic_types[i]);
+#undef MAKE_MAP
 }
 
 void types_dump_type_info() {

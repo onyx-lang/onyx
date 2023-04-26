@@ -3,9 +3,6 @@
 #include "utils.h"
 #include "errors.h"
 
-u64 lexer_lines_processed = 0;
-u64 lexer_tokens_processed = 0;
-
 static const char* token_type_names[] = {
     "TOKEN_TYPE_UNKNOWN",
     "TOKEN_TYPE_END_STREAM",
@@ -513,8 +510,8 @@ void onyx_lex_tokens(OnyxTokenizer* tokenizer) {
         tk = onyx_get_token(tokenizer);
     } while (tk->type != Token_Type_End_Stream);
 
-    lexer_lines_processed += tokenizer->line_number - 1;
-    lexer_tokens_processed += bh_arr_length(tokenizer->tokens);
+    context.lexer_lines_processed += tokenizer->line_number - 1;
+    context.lexer_tokens_processed += bh_arr_length(tokenizer->tokens);
 }
 
 b32 token_equals(OnyxToken* tkn1, OnyxToken* tkn2) {

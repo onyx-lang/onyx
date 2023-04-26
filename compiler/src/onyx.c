@@ -321,10 +321,10 @@ static Entity *runtime_info_foreign_entity;
 static Entity *runtime_info_proc_tags_entity;
 
 static void context_init(CompileOptions* opts) {
+    memset(&context, 0, sizeof context);
+
     types_init();
     prepare_builtins();
-
-    memset(&context, 0, sizeof context);
 
     // HACK
     special_global_entities_remaining = 3;
@@ -393,6 +393,12 @@ static void context_init(CompileOptions* opts) {
             .include = create_load(context.ast_alloc, "core/runtime/info/proc_tags"),
         }));
     }
+
+    builtin_heap_start.entity = NULL;
+    builtin_stack_top.entity = NULL;
+    builtin_tls_base.entity = NULL;
+    builtin_tls_size.entity = NULL;
+    builtin_closure_base.entity = NULL;
 
     add_entities_for_node(NULL, (AstNode *) &builtin_stack_top, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_heap_start, context.global_scope, NULL);
@@ -796,8 +802,8 @@ static i32 onyx_compile() {
         // TODO: Replace these with bh_printf when padded formatting is added.
         printf("\nStatistics:\n");
         printf("    Time taken: %lf seconds\n", (double) duration / 1000);
-        printf("    Processed %ld lines (%f lines/second).\n", lexer_lines_processed, ((f32) 1000 * lexer_lines_processed) / (duration));
-        printf("    Processed %ld tokens (%f tokens/second).\n", lexer_tokens_processed, ((f32) 1000 * lexer_tokens_processed) / (duration));
+        printf("    Processed %ld lines (%f lines/second).\n", context.lexer_lines_processed, ((f32) 1000 * context.lexer_lines_processed) / (duration));
+        printf("    Processed %ld tokens (%f tokens/second).\n", context.lexer_tokens_processed, ((f32) 1000 * context.lexer_tokens_processed) / (duration));
         printf("\n");
     }
 
@@ -914,9 +920,9 @@ CompilerProgress do_compilation(CompileOptions *compile_opts) {
     bh_scratch_init(&global_scratch, bh_heap_allocator(), 256 * 1024); // NOTE: 256 KiB
     global_scratch_allocator = bh_scratch_allocator(&global_scratch);
 
-    // bh_managed_heap_init(&mh);
-    // global_heap_allocator = bh_managed_heap_allocator(&mh);
-    global_heap_allocator = bh_heap_allocator();
+    bh_managed_heap_init(&mh);
+    global_heap_allocator = bh_managed_heap_allocator(&mh);
+    // global_heap_allocator = bh_heap_allocator();
     context_init(compile_opts);
 
     return onyx_compile();
@@ -926,7 +932,7 @@ void cleanup_compilation() {
     context_free();
 
     bh_scratch_free(&global_scratch);
-    // bh_managed_heap_free(&mh);
+    bh_managed_heap_free(&mh);
 }
 
 int main(int argc, char *argv[]) {

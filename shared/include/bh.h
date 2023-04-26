@@ -815,8 +815,15 @@ void bh_imap_clear(bh_imap* imap);
 
 
 // MANAGED HEAP ALLOCATOR
+static const u64 bh_managed_heap_magic_number = 0x1337cafedeadbeef;
+
+typedef struct bh_managed_heap__link {
+    struct bh_managed_heap__link *prev, *next;
+    u64 magic_number;
+} bh_managed_heap__link;
+
 typedef struct bh_managed_heap {
-    bh_imap ptrs;
+    bh_managed_heap__link *first;
 } bh_managed_heap;
 
 void bh_managed_heap_init(bh_managed_heap* mh);
@@ -1007,19 +1014,26 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc) {
 
 // MANAGED HEAP ALLOCATOR IMPLEMENTATION
 void bh_managed_heap_init(bh_managed_heap* mh) {
-    bh_imap_init(&mh->ptrs, bh_heap_allocator(), 512);
+    mh->first = NULL;
 }
 
 void bh_managed_heap_free(bh_managed_heap* mh) {
-    bh_arr_each(bh__imap_entry, p, mh->ptrs.entries) {
+    bh_managed_heap__link *l = mh->first;
+    while (l) {
+        bh_managed_heap__link *n = l->next;
+        if (l->magic_number == bh_managed_heap_magic_number) {
+            l->magic_number = 0;
 #if defined(_BH_WINDOWS)
-        _aligned_free((void *) p->key);
+            _aligned_free((void *) l);
 #elif defined(_BH_LINUX)
-        free((void *) p->key);
+            free((void *) l);
 #endif
+        }
+
+        l = n;
     }
 
-    bh_imap_free(&mh->ptrs);
+    mh->first = NULL;
 }
 
 bh_allocator bh_managed_heap_allocator(bh_managed_heap* mh) {
@@ -1031,47 +1045,45 @@ bh_allocator bh_managed_heap_allocator(bh_managed_heap* mh) {
 
 BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc) {
     bh_managed_heap* mh = (bh_managed_heap *) data;
-    ptr retval = NULL;
 
-    switch (action) {
-    case bh_allocator_action_alloc: {
-#if defined(_BH_WINDOWS)
-        retval = _aligned_malloc(size, alignment);
-#elif defined(_BH_LINUX)
-        i32 success = posix_memalign(&retval, alignment, size);
-#endif
+    bh_managed_heap__link *old = NULL;
+    if (prev_memory) {
+        old = ((bh_managed_heap__link *) prev_memory) - 1;
 
-        if (flags & bh_allocator_flag_clear && retval != NULL) {
-            memset(retval, 0, size);
+        if (old->magic_number != bh_managed_heap_magic_number) {
+            return bh_heap_allocator_proc(NULL, action, size, alignment, prev_memory, flags);
         }
-
-        if (retval != NULL)
-            bh_imap_put(&mh->ptrs, (u64) retval, 1);
-    } break;
-
-    case bh_allocator_action_resize: {
-#if defined(_BH_WINDOWS)
-        retval = _aligned_realloc(prev_memory, size, alignment);
-#elif defined(_BH_LINUX)
-        retval = realloc(prev_memory, size);
-#endif
-        if (prev_memory != retval) {
-            bh_imap_delete(&mh->ptrs, (u64) prev_memory);
-            bh_imap_put(&mh->ptrs, (u64) retval, 1);
-        }
-    } break;
-
-    case bh_allocator_action_free: {
-        bh_imap_delete(&mh->ptrs, (u64) prev_memory);
-#if defined(_BH_WINDOWS)
-        _aligned_free(prev_memory);
-#elif defined(_BH_LINUX)
-        free(prev_memory);
-#endif
-    } break;
     }
 
-    return retval;
+    if (old && (action == bh_allocator_action_resize || action == bh_allocator_action_free)) {
+        if (old->prev) {
+            old->prev->next = old->next;
+        } else {
+            mh->first = old->next;
+        }
+
+        if (old->next) {
+            old->next->prev = old->prev;
+        }
+    }
+
+    bh_managed_heap__link *newptr = bh_heap_allocator_proc(NULL, action, size + sizeof(*old), alignment, old, flags);
+    
+    if (action == bh_allocator_action_alloc || action == bh_allocator_action_resize) {
+        if (newptr) {
+            newptr->magic_number = bh_managed_heap_magic_number;
+            newptr->next = mh->first;
+            newptr->prev = NULL;
+
+            if (mh->first != NULL) {
+                mh->first->prev = newptr;
+            }
+
+            mh->first = newptr;
+        }
+    }
+
+    return newptr + 1;
 }
 
 

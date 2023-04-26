@@ -36,8 +36,6 @@ AstBasicType basic_type_v128  = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_
 Type         type_auto_return = { 0 };
 AstBasicType basic_type_auto_return = { Ast_Kind_Basic_Type, 0, &simd_token, NULL, NULL, 0, NULL, &type_auto_return };
 
-OnyxToken builtin_package_token = { Token_Type_Symbol, 7, "builtin ", { 0 } };
-
 static OnyxToken builtin_heap_start_token  = { Token_Type_Symbol, 12, "__heap_start ", { 0 } };
 static OnyxToken builtin_stack_top_token   = { Token_Type_Symbol, 11, "__stack_top ",  { 0 } };
 static OnyxToken builtin_tls_base_token    = { Token_Type_Symbol, 10, "__tls_base ",  { 0 } };
@@ -423,9 +421,6 @@ void prepare_builtins() {
 }
 
 void initialize_builtins(bh_allocator a) {
-    // HACK
-    builtin_package_token.text = bh_strdup(global_heap_allocator, builtin_package_token.text);
-
     BuiltinSymbol* bsym = (BuiltinSymbol *) &builtin_symbols[0];
     while (bsym->sym != NULL) {
         if (bsym->package == NULL)

@@ -1780,6 +1780,11 @@ struct Context {
 
     u32 next_package_id;
     u32 next_scope_id;
+    u32 next_type_id;
+    u32 next_entity_id;
+
+    u64 lexer_lines_processed;
+    u64 lexer_tokens_processed;
 
     u32 cycle_almost_detected : 2;
     b32 cycle_detected : 1;
@@ -1821,7 +1826,6 @@ extern AstBasicType basic_type_v128;
 extern Type type_auto_return;
 extern AstBasicType basic_type_auto_return;
 
-extern OnyxToken builtin_package_token;
 extern AstGlobal builtin_heap_start;
 extern AstGlobal builtin_stack_top;
 extern AstGlobal builtin_tls_base;

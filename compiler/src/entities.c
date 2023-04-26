@@ -74,14 +74,12 @@ void entity_heap_init(EntityHeap* entities) {
     bh_arena_init(&entities->entity_arena, global_heap_allocator, 32 * 1024);
 }
 
-static u32 next_entity_id = 0;
-
 // Allocates the entity in the entity heap. Don't quite feel this is necessary...
 Entity* entity_heap_register(EntityHeap* entities, Entity e) {
     bh_allocator alloc = bh_arena_allocator(&entities->entity_arena);
     Entity* entity = bh_alloc_item(alloc, Entity);
     *entity = e;
-    entity->id = next_entity_id++;
+    entity->id = context.next_entity_id++;
     entity->macro_attempts = 0;
     entity->micro_attempts = 0;
     entity->entered_in_queue = 0;
