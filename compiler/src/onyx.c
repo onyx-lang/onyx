@@ -42,6 +42,7 @@ static const char* top_level_docstring = DOCSTRING_HEADER
     "\trun       Compiles and runs an Onyx program, all at once.\n"
 #endif
     "\tcheck     Checks syntax and types of an Onyx program.\n"
+    "\twatch     Continuously rebuilds an Onyx program on file changes.\n"
     "\tpackage   Package manager\n";
     // "\tdoc <input files>\n"
 
@@ -156,6 +157,12 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     #ifdef ENABLE_RUN_WITH_WASMER
     else if (!strcmp(argv[1], "run")) {
         options.action = ONYX_COMPILE_ACTION_RUN;
+        arg_parse_start = 2;
+    }
+    #endif
+    #ifdef _BH_LINUX
+    else if (!strcmp(argv[1], "watch")) {
+        options.action = ONYX_COMPILE_ACTION_WATCH;
         arg_parse_start = 2;
     }
     #endif
@@ -286,7 +293,8 @@ static void compile_opts_free(CompileOptions* opts) {
 static void print_subcommand_help(const char *subcommand) {
     if (!strcmp(subcommand, "build")
         || !strcmp(subcommand, "run")
-        || !strcmp(subcommand, "check")) {
+        || !strcmp(subcommand, "check")
+        || !strcmp(subcommand, "watch")) {
         bh_printf(build_docstring, subcommand);
     }
 
@@ -935,6 +943,66 @@ void cleanup_compilation() {
     bh_managed_heap_free(&mh);
 }
 
+#ifdef _BH_LINUX
+
+#include <signal.h>
+
+static bh_file_watch watches;
+
+static void onyx_watch_stop(int sig) {
+    bh_file_watch_stop(&watches);
+}
+
+static void onyx_watch(CompileOptions *compile_opts) {
+    signal(SIGINT, onyx_watch_stop);
+
+    b32 running_watch = 1;
+
+    do {
+        bh_printf("\e[2J\e[?25l\n");
+        bh_printf("\e[3;1H");
+
+        if (do_compilation(compile_opts) == ONYX_COMPILER_PROGRESS_SUCCESS) {
+            onyx_flush_module();
+            bh_printf("\e[92mNo errors.\n");
+        }
+
+        char time_buf[128] = {0};
+        time_t now = time(NULL);
+        strftime(time_buf, 128, "%X", localtime(&now));
+        bh_printf("\e[1;1H\e[30;104m [BUILT] %s \e[0m", time_buf);
+
+        i32 errors = bh_arr_length(context.errors.errors);
+        if (errors == 0) {
+            bh_printf("\e[30;102m [ERRORS] 0 \e[0m");
+        } else {
+            bh_printf("\e[30;101m [ERRORS] %d \e[0m", errors);
+        }
+
+        watches = bh_file_watch_new();
+
+        bh_arr_each(bh_file_contents, file, context.loaded_files) {
+            bh_file_watch_add(&watches, file->filename);
+        }
+
+        cleanup_compilation();
+
+        if (!bh_file_watch_wait(&watches)) {
+            running_watch = 0;
+        }
+
+        bh_file_watch_free(&watches);
+    } while(running_watch);
+
+        
+    bh_printf("\e[2J\e[1;1H\e[?25h\n");
+}
+
+#endif
+
+
+
+
 int main(int argc, char *argv[]) {
     CompileOptions compile_opts = compile_opts_parse(bh_heap_allocator(), argc, argv);
 
@@ -958,6 +1026,10 @@ int main(int argc, char *argv[]) {
             if (compiler_progress == ONYX_COMPILER_PROGRESS_SUCCESS) {
                 onyx_flush_module();
             }
+            break;
+
+        case ONYX_COMPILE_ACTION_WATCH:
+            onyx_watch(&compile_opts);
             break;
 
         #ifdef ENABLE_RUN_WITH_WASMER

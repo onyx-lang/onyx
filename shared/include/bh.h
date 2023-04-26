@@ -37,6 +37,8 @@
     #include <unistd.h>
     #include <dirent.h>
     #include <pthread.h>
+    #include <sys/inotify.h>
+    #include <sys/select.h>
 #endif
 
 #include <stdlib.h>
@@ -487,7 +489,25 @@ void   bh_dir_close(bh_dir dir);
 
 
 
-b32 bh_wait_for_changes_in_directories(u32 count, char ** paths);
+#ifdef _BH_LINUX
+    typedef struct bh_file_watch {
+        int inotify_fd;
+        int kill_pipe[2];
+
+        fd_set fds;
+    } bh_file_watch;
+#endif
+#ifdef _BH_WINDOWS
+    // TODO: Make these work on Windows
+    typedef u32 bh_file_watch;
+#endif
+
+bh_file_watch bh_file_watch_new();
+void bh_file_watch_free(bh_file_watch *w);
+void bh_file_watch_add(bh_file_watch *w, const char *filename);
+b32 bh_file_watch_wait(bh_file_watch *w);
+void bh_file_watch_stop(bh_file_watch *w);
+
 
 
 #endif
@@ -2094,6 +2114,55 @@ void bh_dir_close(bh_dir dir) {
 }
 
 #undef DIR_SEPARATOR
+
+#ifdef _BH_LINUX
+
+bh_file_watch bh_file_watch_new() {
+    // TODO: Proper error checking
+    bh_file_watch w;
+    assert(pipe(w.kill_pipe) != -1);
+
+    assert((w.inotify_fd = inotify_init()) != -1);
+
+    FD_ZERO(&w.fds);
+    FD_SET(w.inotify_fd, &w.fds);
+    FD_SET(w.kill_pipe[0], &w.fds);
+
+    return w;
+}
+
+void bh_file_watch_free(bh_file_watch *w) {
+    close(w->inotify_fd);
+    close(w->kill_pipe[0]);
+    close(w->kill_pipe[1]);
+}
+
+void bh_file_watch_add(bh_file_watch *w, const char *filename) {
+    inotify_add_watch(w->inotify_fd, filename, IN_MODIFY);
+}
+
+b32 bh_file_watch_wait(bh_file_watch *w) {
+    select(FD_SETSIZE, &w->fds, NULL, NULL, NULL);
+
+    if (FD_ISSET(w->kill_pipe[0], &w->fds)) {
+        char buf;
+        read(w->kill_pipe[0], &buf, sizeof(buf));
+        return 0;
+    }
+    
+    FD_ZERO(&w->fds);
+    FD_SET(w->inotify_fd, &w->fds);
+    FD_SET(w->kill_pipe[0], &w->fds);
+
+    return 1;
+}
+
+void bh_file_watch_stop(bh_file_watch *w) {
+    char buf = 'a';
+    write(w->kill_pipe[1], &buf, 1);
+}
+
+#endif // ifdef _BH_LINUX
 
 #endif // ifndef BH_NO_FILE
 
