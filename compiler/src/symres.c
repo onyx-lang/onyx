@@ -339,18 +339,22 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
             token_toggle_end((*fa)->token);
 
             AstPackage *package = (AstPackage *) strip_aliases((AstNode *) (*fa)->expr);
+            char *package_name = "unknown (compiler bug)";
+            if (package && package->package) {
+                package_name = package->package->name;
+            }
 
             if (closest) {
                 onyx_report_error((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Did you mean '%s'?",
                     (*fa)->token->text,
                     (*fa)->token->length,
-                    package->package->name,
+                    package_name,
                     closest);
             } else {
                 onyx_report_error((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Perhaps it is defined in a file that wasn't loaded?",
                     (*fa)->token->text,
                     (*fa)->token->length,
-                    package->package->name);
+                    package_name);
             }
             return Symres_Error;
 

@@ -133,6 +133,7 @@ AstNode* ast_clone_with_captured_entities(bh_allocator a, void* n, bh_arr(AstNod
     AstNode* cloned = ast_clone(a, n);
 
     *ents = captured_entities;
+    captured_entities = NULL;
     return cloned;
 }
 
