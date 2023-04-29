@@ -50,3 +50,11 @@ align :: (size: u64, align: u64) -> u64 {
     }
     return size;
 }
+
+#overload
+align :: (size: u32, align: u32) -> u32 {
+    if size % align != 0 {
+        size += align - (size % align);
+    }
+    return size;
+}

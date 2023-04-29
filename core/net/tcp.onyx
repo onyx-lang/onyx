@@ -107,8 +107,6 @@ TCP_Server :: struct {
     clients: [] &Client;
     client_count: u32; // max clients is stored as clients.count.
 
-    listener_thread: thread.Thread;
-
     alive         := true;
     pulse_time_ms := 500;
 
@@ -184,7 +182,6 @@ tcp_server_stop :: (use server: &TCP_Server) {
     }
 
     server.socket->close();
-    thread.kill(&listener_thread);
 }
 
 tcp_server_pulse :: (use server: &TCP_Server) -> bool {

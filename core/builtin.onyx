@@ -263,6 +263,12 @@ raw_free :: (use a: Allocator, ptr: rawptr) {
     func(data, AllocationAction.Free, 0, 0, ptr);
 }
 
+#inject Allocator {
+    alloc :: raw_alloc
+    resize :: raw_resize
+    free :: raw_free
+}
+
 //
 // Helper function to allocate/free using allocator in the context structure.
 calloc  :: (size: u32)              => raw_alloc(context.allocator, size);
