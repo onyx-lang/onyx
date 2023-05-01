@@ -1,8 +1,11 @@
 // @Incomplete // This implementation is not functional at all but is something I want to get around to adding.
 
 package core.bucket_array
+#allow_stale_code
 
-use core {array, iter}
+use core
+use core.array
+use core.iter
 
 Bucket_Array :: struct (T: type_expr) {
     allocator : Allocator;
@@ -11,8 +14,8 @@ Bucket_Array :: struct (T: type_expr) {
 
     Bucket :: struct (T: type_expr) {
         count : i32;
-        data : &T; // Actually an array of elements_per_bucket things, but putting that
-                   // that into the type system makes these cumbersome to work with.
+        data : [&] T; // Actually an array of elements_per_bucket things, but putting that
+                      // that into the type system makes these cumbersome to work with.
     }
 }
 
@@ -83,7 +86,7 @@ push :: (use b: &Bucket_Array($T), elem: T) -> bool {
     }
 }
 
-#operator << macro (b: Bucket_Array($T), elem: T) do core.bucket_array.push(&b, elem);
+#operator << macro (b: Bucket_Array($T), elem: T) do #this_package.push(&b, elem);
 
 pop :: (use b: &Bucket_Array($T)) {
     last_bucket := &buckets[buckets.count - 1];

@@ -6,10 +6,10 @@
 
 package core.string
 
-use core {math}
+use core.math
 
 String_Buffer :: struct {
-    data     : &u8;
+    data     : [&] u8;
     count    : u32;
     capacity : u32;
 }

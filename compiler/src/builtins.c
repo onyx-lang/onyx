@@ -36,16 +36,16 @@ AstBasicType basic_type_v128  = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_
 Type         type_auto_return = { 0 };
 AstBasicType basic_type_auto_return = { Ast_Kind_Basic_Type, 0, &simd_token, NULL, NULL, 0, NULL, &type_auto_return };
 
-OnyxToken builtin_package_token = { Token_Type_Symbol, 7, "builtin ", { 0 } };
-
-static OnyxToken builtin_heap_start_token = { Token_Type_Symbol, 12, "__heap_start ", { 0 } };
-static OnyxToken builtin_stack_top_token  = { Token_Type_Symbol, 11, "__stack_top ",  { 0 } };
-static OnyxToken builtin_tls_base_token   = { Token_Type_Symbol, 10, "__tls_base ",  { 0 } };
-static OnyxToken builtin_tls_size_token   = { Token_Type_Symbol, 10, "__tls_size ",  { 0 } };
+static OnyxToken builtin_heap_start_token  = { Token_Type_Symbol, 12, "__heap_start ", { 0 } };
+static OnyxToken builtin_stack_top_token   = { Token_Type_Symbol, 11, "__stack_top ",  { 0 } };
+static OnyxToken builtin_tls_base_token    = { Token_Type_Symbol, 10, "__tls_base ",  { 0 } };
+static OnyxToken builtin_tls_size_token    = { Token_Type_Symbol, 10, "__tls_size ",  { 0 } };
+static OnyxToken builtin_closure_base_token = { Token_Type_Symbol, 14, "__closure_base ",  { 0 } };
 AstGlobal builtin_heap_start  = { Ast_Kind_Global, Ast_Flag_Const, &builtin_heap_start_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
 AstGlobal builtin_stack_top   = { Ast_Kind_Global, 0, &builtin_stack_top_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
 AstGlobal builtin_tls_base    = { Ast_Kind_Global, 0, &builtin_tls_base_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
 AstGlobal builtin_tls_size    = { Ast_Kind_Global, 0, &builtin_tls_size_token, NULL, NULL, (AstType *) &basic_type_u32, NULL };
+AstGlobal builtin_closure_base = { Ast_Kind_Global, 0, &builtin_closure_base_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
 
 AstType  *builtin_string_type;
 AstType  *builtin_cstring_type;
@@ -69,6 +69,7 @@ AstType     *foreign_block_type = NULL;
 AstTyped    *tagged_procedures_node = NULL;
 AstFunction *builtin_initialize_data_segments = NULL;
 AstFunction *builtin_run_init_procedures = NULL;
+AstFunction *builtin_closure_block_allocate = NULL;
 bh_arr(AstFunction *) init_procedures = NULL;
 AstOverloadedFunction *builtin_implicit_bool_cast;
 
@@ -100,6 +101,7 @@ const BuiltinSymbol builtin_symbols[] = {
     { "builtin", "__stack_top",  (AstNode *) &builtin_stack_top },
     { "builtin", "__tls_base",   (AstNode *) &builtin_tls_base },
     { "builtin", "__tls_size",   (AstNode *) &builtin_tls_size },
+    { "builtin", "__closure_base",   (AstNode *) &builtin_closure_base },
 
     { NULL, NULL, NULL },
 };
@@ -159,6 +161,11 @@ static IntrinsicMap builtin_intrinsics[] = {
     { "min_f64",      ONYX_INTRINSIC_F64_MIN },
     { "max_f64",      ONYX_INTRINSIC_F64_MAX },
     { "copysign_f64", ONYX_INTRINSIC_F64_COPYSIGN },
+
+    { "reinterpret_f32", ONYX_INTRINSIC_I32_REINTERPRET_F32 },
+    { "reinterpret_f64", ONYX_INTRINSIC_I64_REINTERPRET_F64 },
+    { "reinterpret_i32", ONYX_INTRINSIC_F32_REINTERPRET_I32 },
+    { "reinterpret_i64", ONYX_INTRINSIC_F64_REINTERPRET_I64 },
 
 
     // SIMD Intrinsics
@@ -371,10 +378,49 @@ static IntrinsicMap builtin_intrinsics[] = {
 bh_arr(OverloadOption) operator_overloads[Binary_Op_Count] = { 0 };
 bh_arr(OverloadOption) unary_operator_overloads[Unary_Op_Count] = { 0 };
 
-void initialize_builtins(bh_allocator a) {
-    // HACK
-    builtin_package_token.text = bh_strdup(global_heap_allocator, builtin_package_token.text);
+void prepare_builtins() {
+    builtin_string_type = NULL;
+    builtin_cstring_type = NULL;
+    builtin_range_type = NULL;
+    builtin_range_type_type = NULL;
+    builtin_vararg_type = NULL;
+    builtin_vararg_type_type = NULL;
+    builtin_context_variable = NULL;
+    builtin_allocator_type = NULL;
+    builtin_iterator_type = NULL;
+    builtin_optional_type = NULL;
+    builtin_callsite_type = NULL;
+    builtin_any_type = NULL;
+    builtin_code_type = NULL;
+    builtin_link_options_type = NULL;
+    builtin_package_id_type = NULL;
 
+    type_table_node = NULL;
+    foreign_blocks_node = NULL;
+    foreign_block_type = NULL;
+    tagged_procedures_node = NULL;
+    builtin_initialize_data_segments = NULL;
+    builtin_run_init_procedures = NULL;
+    init_procedures = NULL;
+    builtin_implicit_bool_cast = NULL;
+
+    basic_type_void.scope = NULL;
+    basic_type_bool.scope = NULL;
+    basic_type_i8.scope = NULL;
+    basic_type_u8.scope = NULL;
+    basic_type_i16.scope = NULL;
+    basic_type_u16.scope = NULL;
+    basic_type_i32.scope = NULL;
+    basic_type_u32.scope = NULL;
+    basic_type_i64.scope = NULL;
+    basic_type_u64.scope = NULL;
+    basic_type_f32.scope = NULL;
+    basic_type_f64.scope = NULL;
+    basic_type_rawptr.scope = NULL;
+    basic_type_type_expr.scope = NULL;
+}
+
+void initialize_builtins(bh_allocator a) {
     BuiltinSymbol* bsym = (BuiltinSymbol *) &builtin_symbols[0];
     while (bsym->sym != NULL) {
         if (bsym->package == NULL)
@@ -474,6 +520,15 @@ void initialize_builtins(bh_allocator a) {
         return;
     }
 
+    builtin_closure_block_allocate = (AstFunction *) symbol_raw_resolve(p->scope, "__closure_block_allocate");
+    if (builtin_closure_block_allocate == NULL || builtin_closure_block_allocate->kind != Ast_Kind_Function) {
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__closure_block_allocate' procedure not found.");
+        return;
+    }
+    // HACK
+    builtin_closure_block_allocate->flags |= Ast_Flag_Function_Used;
+
+
     builtin_link_options_type = (AstType *) symbol_raw_resolve(p->scope, "Link_Options");
     if (builtin_link_options_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Link_Options' type not found.");
@@ -486,17 +541,21 @@ void initialize_builtins(bh_allocator a) {
         return;
     }
 
+    init_procedures = NULL;
     bh_arr_new(global_heap_allocator, init_procedures, 4);
 
     fori (i, 0, Binary_Op_Count) {
+        operator_overloads[i] = NULL;
         bh_arr_new(global_heap_allocator, operator_overloads[i], 4); 
     }
 
     fori (i, 0, Unary_Op_Count) {
+        unary_operator_overloads[i] = NULL;
         bh_arr_new(global_heap_allocator, unary_operator_overloads[i], 4); 
     }
 
     IntrinsicMap* intrinsic = &builtin_intrinsics[0];
+    intrinsic_table = NULL;
     while (intrinsic->name != NULL) {
         shput(intrinsic_table, intrinsic->name, intrinsic->intrinsic);
         intrinsic++;

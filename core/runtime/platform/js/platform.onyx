@@ -1,10 +1,13 @@
 package runtime.platform
 
-use core
+use core {package, *}
+use runtime
 use runtime {
     __runtime_initialize,
     Multi_Threading_Enabled,
 }
+
+use main
 
 // Platform supports
 Supports_Files :: false
@@ -15,6 +18,7 @@ Supports_Time :: false
 Supports_Networking :: false
 Supports_Type_Info :: true
 Supports_Threads :: true
+Supports_Env_Vars :: false
 
 __output_string   :: (s: str)      -> u32  #foreign "host" "print_str" ---
 __output_error    :: (s: str)      -> u32  #foreign "host" "print_str" ---
@@ -26,12 +30,12 @@ __start :: () {
     __runtime_initialize();
     context.thread_id = 0;
 
-    #if (typeof (package main).main) == #type () -> void {
-        (package main).main();
+    #if (typeof main.main) == #type () -> void {
+        main.main();
 
     } else {
         args: [] cstr = .{ null, 0 };
-        (package main).main(args);
+        main.main(args);
     }
 
     __flush_stdio();

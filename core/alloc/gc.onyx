@@ -16,6 +16,8 @@ package core.alloc.gc
 //       // Every allocation here will automatically be freed
 //   }
 
+use core {package, *}
+
 GCState :: struct {
     backing_allocator: Allocator;
     first: &GCLink;
@@ -58,11 +60,11 @@ make_allocator :: (hs: &GCState) -> Allocator {
 
 auto :: #match {
     macro () {
-        use core.alloc {gc}
+        use core.alloc {package, gc}
         
         gcs := gc.make();
         old_allocator := context.allocator;
-        context.allocator = core.alloc.as_allocator(&gcs);
+        context.allocator = alloc.as_allocator(&gcs);
         defer {
             gc.clear(&gcs);
             context.allocator = old_allocator;
@@ -90,7 +92,7 @@ GC_Manually_Free_Magic_Number :: 0xface1337
     old: &GCLink;
 
     if oldptr != null {
-        old = (cast(&GCLink) oldptr) - 1;
+        old = (cast([&] GCLink) oldptr) - 1;
 
         //
         // If this allocated space was not from an gc allocator,
@@ -136,11 +138,11 @@ GC_Manually_Free_Magic_Number :: 0xface1337
         }
     }
 
-    return newptr + 1;
+    return cast([&] GCLink, newptr) + 1;
 }
 
 untrack :: (ptr: rawptr) -> bool {
-    link := (cast(&GCLink) ptr) - 1;
+    link: &GCLink = (cast([&] GCLink) ptr) - 1;
 
     if link.magic_number != GC_Link_Magic_Number {
         return false;

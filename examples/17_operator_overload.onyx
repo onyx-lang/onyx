@@ -1,5 +1,5 @@
 #load "core/std"
-use package core
+use core {*}
 
 // Operator overloading allows you to define what it means to perform
 // a binary operation between two types. In Onyx, they are defined in

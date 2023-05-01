@@ -1,10 +1,12 @@
 // Currently, these symbols are dumped in the 'core' namespace, which means
-// most programs that just 'use package core' can access all of them, which
+// most programs that just 'use core' can access all of them, which
 // is convenient; However, it doesn't hurt to wonder if they should be the
 // 'core.io' package so these would become like 'io.printf(...)'. Of course,
-// you could always still do 'use package core.io', which would bring these
+// you could always still do 'use core.io', which would bring these
 // in anyway.
 package core
+
+use runtime
 
 
 //
@@ -75,34 +77,38 @@ print :: #match #locked {
 //
 // Helper procedure that prints something, then prints a newline.
 println :: (x) => {
-    print(x);
-    print("\n");
+    use core
+    core.print(x);
+    core.print("\n");
 }
 
 //
 // Standard formatted print to standard output.
 printf :: (format: str, va: ..any) {
-    flush :: (_, to_output) => {
-        io.write(&stdio.print_writer, to_output);
-        __flush_stdio();
-        return true;
-    }
-
     buffer: [1024] u8;
-    print(conv.format_va(buffer, format, va, .{null, flush}));
+    print(conv.format_va(buffer, format, va, .{ null,
+        (_: rawptr, to_output: str) -> bool {
+            io.write(&stdio.print_writer, to_output);
+            __flush_stdio();
+            return true;
+        }
+    }));
 }
 
 #if #defined(runtime.platform.__output_error) {
     //
     // Prints to standard error, if available.
     eprintf :: (format: str, va: ..any) -> str {
-        flush :: (_, to_output) => {
-            runtime.platform.__output_error(to_output);
-            return true;
-        }
-
         buffer: [1024] u8;
-        runtime.platform.__output_error(conv.format_va(buffer, format, va, .{null, flush}));
+        runtime.platform.__output_error(
+            conv.format_va(buffer, format, va, .{
+                null,
+                (ctx: rawptr, to_output: str) -> bool {
+                    runtime.platform.__output_error(to_output);
+                    return true;
+                }
+            })
+        );
     }
 }
 
@@ -133,7 +139,7 @@ tprintf :: (format: str, va: ..any) -> str {
 __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
     temp: [3] u8;
 
-    u8_ptr := cast(&u8) ptr;
+    u8_ptr := cast([&] u8) ptr;
     for i: byte_count {
         val := u8_ptr[i];
 
@@ -181,8 +187,7 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
     read = (_: &io.Stream, buffer: [] u8) -> (io.Error, u32) {
         __flush_stdio();
         bytes_read := runtime.platform.__read_from_input(buffer);
-        if bytes_read == 0 do return .ReadPending, 0;
-        if bytes_read <  0 do return .EOF, 0;
+        if bytes_read <= 0 do return .EOF, 0;
 
         return .None, bytes_read;
     },

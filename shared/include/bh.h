@@ -11,6 +11,10 @@
     #endif
 #endif
 
+#ifndef BH_INTERNAL_ALLOCATOR
+    #define BH_INTERNAL_ALLOCATOR (bh_heap_allocator())
+#endif
+
 
 // NOTE: For lseek64
 #define _LARGEFILE64_SOURCE
@@ -33,6 +37,8 @@
     #include <unistd.h>
     #include <dirent.h>
     #include <pthread.h>
+    #include <sys/inotify.h>
+    #include <sys/select.h>
 #endif
 
 #include <stdlib.h>
@@ -335,6 +341,7 @@ BH_ALLOCATOR_PROC(bh_scratch_allocator_proc);
 b32 bh_str_starts_with(char* str, char* start);
 b32 bh_str_ends_with(char* str, char* end);
 b32 bh_str_contains(char *str, char *needle);
+u32 bh_str_last_index_of(char *str, char needle);
 char* bh_strdup(bh_allocator a, char* str);
 
 
@@ -480,6 +487,29 @@ bh_dir bh_dir_open(char* path);
 b32    bh_dir_read(bh_dir dir, bh_dirent* out);
 void   bh_dir_close(bh_dir dir);
 
+
+
+#ifdef _BH_LINUX
+    typedef struct bh_file_watch {
+        int inotify_fd;
+        int kill_pipe[2];
+
+        fd_set fds;
+    } bh_file_watch;
+#endif
+#ifdef _BH_WINDOWS
+    // TODO: Make these work on Windows
+    typedef u32 bh_file_watch;
+#endif
+
+bh_file_watch bh_file_watch_new();
+void bh_file_watch_free(bh_file_watch *w);
+void bh_file_watch_add(bh_file_watch *w, const char *filename);
+b32 bh_file_watch_wait(bh_file_watch *w);
+void bh_file_watch_stop(bh_file_watch *w);
+
+
+
 #endif
 
 
@@ -601,7 +631,7 @@ typedef struct bh__arr {
 #define bh_arr(T)                    T*
 #define bh__arrhead(arr)             (((bh__arr *)(arr)) - 1)
 
-#define bh_arr_allocator(arr)        (arr ? bh__arrhead(arr)->allocator : bh_heap_allocator())
+#define bh_arr_allocator(arr)        (arr ? bh__arrhead(arr)->allocator : BH_INTERNAL_ALLOCATOR)
 #define bh_arr_length(arr)           (arr ? bh__arrhead(arr)->length : 0)
 #define bh_arr_capacity(arr)         (arr ? bh__arrhead(arr)->capacity : 0)
 #define bh_arr_size(arr)             (arr ? bh__arrhead(arr)->capacity * sizeof(*(arr)) : 0)
@@ -805,8 +835,15 @@ void bh_imap_clear(bh_imap* imap);
 
 
 // MANAGED HEAP ALLOCATOR
+static const u64 bh_managed_heap_magic_number = 0x1337cafedeadbeef;
+
+typedef struct bh_managed_heap__link {
+    struct bh_managed_heap__link *prev, *next;
+    u64 magic_number;
+} bh_managed_heap__link;
+
 typedef struct bh_managed_heap {
-    bh_imap ptrs;
+    bh_managed_heap__link *first;
 } bh_managed_heap;
 
 void bh_managed_heap_init(bh_managed_heap* mh);
@@ -997,19 +1034,26 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc) {
 
 // MANAGED HEAP ALLOCATOR IMPLEMENTATION
 void bh_managed_heap_init(bh_managed_heap* mh) {
-    bh_imap_init(&mh->ptrs, bh_heap_allocator(), 512);
+    mh->first = NULL;
 }
 
 void bh_managed_heap_free(bh_managed_heap* mh) {
-    bh_arr_each(bh__imap_entry, p, mh->ptrs.entries) {
+    bh_managed_heap__link *l = mh->first;
+    while (l) {
+        bh_managed_heap__link *n = l->next;
+        if (l->magic_number == bh_managed_heap_magic_number) {
+            l->magic_number = 0;
 #if defined(_BH_WINDOWS)
-        _aligned_free((void *) p->key);
+            _aligned_free((void *) l);
 #elif defined(_BH_LINUX)
-        free((void *) p->key);
+            free((void *) l);
 #endif
+        }
+
+        l = n;
     }
 
-    bh_imap_free(&mh->ptrs);
+    mh->first = NULL;
 }
 
 bh_allocator bh_managed_heap_allocator(bh_managed_heap* mh) {
@@ -1021,45 +1065,45 @@ bh_allocator bh_managed_heap_allocator(bh_managed_heap* mh) {
 
 BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc) {
     bh_managed_heap* mh = (bh_managed_heap *) data;
-    ptr retval = NULL;
 
-    switch (action) {
-    case bh_allocator_action_alloc: {
-#if defined(_BH_WINDOWS)
-        retval = _aligned_malloc(size, alignment);
-#elif defined(_BH_LINUX)
-        i32 success = posix_memalign(&retval, alignment, size);
-#endif
+    bh_managed_heap__link *old = NULL;
+    if (prev_memory) {
+        old = ((bh_managed_heap__link *) prev_memory) - 1;
 
-        if (flags & bh_allocator_flag_clear && retval != NULL) {
-            memset(retval, 0, size);
+        if (old->magic_number != bh_managed_heap_magic_number) {
+            return bh_heap_allocator_proc(NULL, action, size, alignment, prev_memory, flags);
         }
-
-        if (retval != NULL)
-            bh_imap_put(&mh->ptrs, (u64) retval, 1);
-    } break;
-
-    case bh_allocator_action_resize: {
-        bh_imap_delete(&mh->ptrs, (u64) prev_memory);
-#if defined(_BH_WINDOWS)
-        retval = _aligned_realloc(prev_memory, size, alignment);
-#elif defined(_BH_LINUX)
-        retval = realloc(prev_memory, size);
-#endif
-        bh_imap_put(&mh->ptrs, (u64) retval, 1);
-    } break;
-
-    case bh_allocator_action_free: {
-        bh_imap_delete(&mh->ptrs, (u64) prev_memory);
-#if defined(_BH_WINDOWS)
-        _aligned_free(prev_memory);
-#elif defined(_BH_LINUX)
-        free(prev_memory);
-#endif
-    } break;
     }
 
-    return retval;
+    if (old && (action == bh_allocator_action_resize || action == bh_allocator_action_free)) {
+        if (old->prev) {
+            old->prev->next = old->next;
+        } else {
+            mh->first = old->next;
+        }
+
+        if (old->next) {
+            old->next->prev = old->prev;
+        }
+    }
+
+    bh_managed_heap__link *newptr = bh_heap_allocator_proc(NULL, action, size + sizeof(*old), alignment, old, flags);
+    
+    if (action == bh_allocator_action_alloc || action == bh_allocator_action_resize) {
+        if (newptr) {
+            newptr->magic_number = bh_managed_heap_magic_number;
+            newptr->next = mh->first;
+            newptr->prev = NULL;
+
+            if (mh->first != NULL) {
+                mh->first->prev = newptr;
+            }
+
+            mh->first = newptr;
+        }
+    }
+
+    return newptr + 1;
 }
 
 
@@ -1490,6 +1534,21 @@ b32 bh_str_contains(char *str, char *needle) {
     }
 
     return 0;
+}
+
+u32 bh_str_last_index_of(char *str, char needle) {
+    u32 count = strlen(str);
+    char *end = str + count - 1;
+
+    while (end != str) {
+        if (*end == needle) break;
+        count -= 1;
+        end--;
+    }
+
+    if (end == str) count = 0;
+
+    return count;
 }
 
 char* bh_strdup(bh_allocator a, char* str) {
@@ -1927,7 +1986,7 @@ char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_su
         else
             bh_snprintf(path, 512, "%s%s", relative_to, fn + 2);
 
-        if (bh_file_exists(path)) return bh_path_get_full_name(path, bh_heap_allocator());
+        if (bh_file_exists(path)) return bh_path_get_full_name(path, BH_INTERNAL_ALLOCATOR);
 
         return fn;
     }
@@ -1939,7 +1998,7 @@ char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_su
             else
                 bh_snprintf(path, 512, "%s%s", *folder, fn);
 
-            if (bh_file_exists(path)) return bh_path_get_full_name(path, bh_heap_allocator());
+            if (bh_file_exists(path)) return bh_path_get_full_name(path, BH_INTERNAL_ALLOCATOR);
         }
     }
 
@@ -2055,6 +2114,55 @@ void bh_dir_close(bh_dir dir) {
 }
 
 #undef DIR_SEPARATOR
+
+#ifdef _BH_LINUX
+
+bh_file_watch bh_file_watch_new() {
+    // TODO: Proper error checking
+    bh_file_watch w;
+    assert(pipe(w.kill_pipe) != -1);
+
+    assert((w.inotify_fd = inotify_init()) != -1);
+
+    FD_ZERO(&w.fds);
+    FD_SET(w.inotify_fd, &w.fds);
+    FD_SET(w.kill_pipe[0], &w.fds);
+
+    return w;
+}
+
+void bh_file_watch_free(bh_file_watch *w) {
+    close(w->inotify_fd);
+    close(w->kill_pipe[0]);
+    close(w->kill_pipe[1]);
+}
+
+void bh_file_watch_add(bh_file_watch *w, const char *filename) {
+    inotify_add_watch(w->inotify_fd, filename, IN_MODIFY);
+}
+
+b32 bh_file_watch_wait(bh_file_watch *w) {
+    select(FD_SETSIZE, &w->fds, NULL, NULL, NULL);
+
+    if (FD_ISSET(w->kill_pipe[0], &w->fds)) {
+        char buf;
+        (void) read(w->kill_pipe[0], &buf, sizeof(buf));
+        return 0;
+    }
+    
+    FD_ZERO(&w->fds);
+    FD_SET(w->inotify_fd, &w->fds);
+    FD_SET(w->kill_pipe[0], &w->fds);
+
+    return 1;
+}
+
+void bh_file_watch_stop(bh_file_watch *w) {
+    char buf = 'a';
+    (void) write(w->kill_pipe[1], &buf, 1);
+}
+
+#endif // ifdef _BH_LINUX
 
 #endif // ifndef BH_NO_FILE
 

@@ -2,7 +2,7 @@ package main
 
 #load "core/std"
 
-use package core;
+use core {*};
 
 old_va_test :: (prefix: str, va: ..i32) {
     println(prefix);

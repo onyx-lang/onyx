@@ -1,6 +1,7 @@
 package runtime.info
 
-use core {io}
+use core
+use core.io
 
 write_type_name :: (writer: &io.Writer, t: type_expr) {
     info := get_type_info(t);
@@ -44,6 +45,12 @@ write_type_name :: (writer: &io.Writer, t: type_expr) {
         case .Pointer {
             pointer := cast(&Type_Info_Pointer) info;
             io.write_str(writer, "&");
+            write_type_name(writer, pointer.to);
+        }
+
+        case .Multi_Pointer {
+            pointer := cast(&Type_Info_Multi_Pointer) info;
+            io.write_str(writer, "[&] ");
             write_type_name(writer, pointer.to);
         }
 
@@ -128,7 +135,7 @@ write_type_name :: (writer: &io.Writer, t: type_expr) {
 is_pointer :: (t: type_expr) -> bool {
     if t == rawptr do return true;
     info := get_type_info(t);
-    return info.kind == .Pointer;
+    return info.kind == .Pointer || info.kind == .Multi_Pointer;
 }
 
 size_of :: (t: type_expr) -> u32 {
@@ -318,14 +325,16 @@ populate_struct_vtable :: (table: &$Table_Type, struct_type: type_expr, safe := 
         if struct_method == null do continue;
         if safe && struct_method.type != member.type do continue;
 
-        dest := cast(&()->void) (cast(&u8) table + member.offset);
+        dest := cast(&()->void) (cast([&] u8) table + member.offset);
         *dest = *cast(&()->void) struct_method.data;
     }
 }
 
 for_all_types :: macro (body: Code) {
+    use runtime
+
     for runtime.info.type_table.count {
-        type_info := (package runtime.info).type_table[it];
+        type_info := runtime.info.type_table[it];
         type_idx  : type_expr = ~~ it;
 
         #unquote body;

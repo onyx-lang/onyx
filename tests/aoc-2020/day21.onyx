@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+use core {*}
 
 /*
 	What questions the data layout needs to answer easily:
@@ -51,7 +51,7 @@ main :: (args: [] cstr) {
         array.init(&food.ingredients, 16);
         array.init(&food.allergens);
 
-        while *file.data != #char "(" {
+        while file[0] != #char "(" {
             ingredient_name := string.read_alphanum(&file);
             string.advance(&file, 1); // ' '
 
@@ -70,9 +70,9 @@ main :: (args: [] cstr) {
 
         string.advance(&file, 10); // '(contains '
 
-        while *file.data != #char ")" {
+        while file[0] != #char ")" {
             allergen_name := string.read_alphanum(&file);
-            if *file.data == #char "," do string.advance(&file, 2); // ', '
+            if file[0] == #char "," do string.advance(&file, 2); // ', '
 
             array.push(&food.allergens, allergen_name);
 

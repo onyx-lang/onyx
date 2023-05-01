@@ -47,7 +47,8 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
     if (type->kind == Type_Kind_Distinct) return onyx_type_to_wasm_type(type->Distinct.base_type);
     if (type->kind == Type_Kind_Pointer)  return WASM_TYPE_PTR;
     if (type->kind == Type_Kind_Array)    return WASM_TYPE_PTR;
-    if (type->kind == Type_Kind_Function) return WASM_TYPE_FUNC;
+    if (type->kind == Type_Kind_Function) return WASM_TYPE_VOID;
+    if (type->kind == Type_Kind_MultiPointer) return WASM_TYPE_PTR;
 
     if (type->kind == Type_Kind_Basic) {
         TypeBasic* basic = &type->Basic;
@@ -91,6 +92,7 @@ static b32 local_is_wasm_local(AstTyped* local) {
     if (local->type->kind == Type_Kind_Enum && local->type->Enum.backing->kind == Type_Kind_Basic) return 1;
     if (local->type->kind == Type_Kind_Distinct && local->type->Distinct.base_type->kind == Type_Kind_Basic) return 1;
     if (local->type->kind == Type_Kind_Pointer) return 1;
+    if (local->type->kind == Type_Kind_MultiPointer) return 1;
     return 0;
 }
 
@@ -514,6 +516,7 @@ EMIT_FUNC(intrinsic_call,                  AstCall* call);
 EMIT_FUNC(subscript_location,              AstSubscript* sub, u64* offset_return);
 EMIT_FUNC(field_access_location,           AstFieldAccess* field, u64* offset_return);
 EMIT_FUNC(local_location,                  AstLocal* local, u64* offset_return);
+EMIT_FUNC(capture_local_location,          AstCaptureLocal *capture, u64 *offset_return);
 EMIT_FUNC(memory_reservation_location,     AstMemRes* memres);
 EMIT_FUNC(location_return_offset,          AstTyped* expr, u64* offset_return);
 EMIT_FUNC(location,                        AstTyped* expr);
@@ -965,14 +968,14 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     if (type->kind == Type_Kind_Struct)   type = type_struct_is_just_one_basic_value(type);
     if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
     if (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
-    if (type->kind == Type_Kind_Function) type = &basic_types[Basic_Kind_U32];
+    if (type->kind == Type_Kind_Function) assert(5678 && 0);
 
     assert(type);
 
     u32 alignment = type_get_alignment_log2(type);
 
     i32 store_size  = type_size_of(type);
-    i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
+    i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer || type->kind == Type_Kind_MultiPointer;
 
     if (is_basic && (type->Basic.flags & Basic_Flag_Pointer)) {
         WID(NULL, WI_I32_STORE, ((WasmInstructionData) { 2, offset }));
@@ -1077,12 +1080,12 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     if (type->kind == Type_Kind_Struct)   type = type_struct_is_just_one_basic_value(type);
     if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
     if (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
-    if (type->kind == Type_Kind_Function) type = &basic_types[Basic_Kind_U32];
+    if (type->kind == Type_Kind_Function) assert(1234 && 0);
 
     assert(type);
 
     i32 load_size   = type_size_of(type);
-    i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
+    i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer || type->kind == Type_Kind_MultiPointer;
 
     WasmInstructionType instr = WI_NOP;
     i32 alignment = type_get_alignment_log2(type);
@@ -1409,8 +1412,14 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     u64 iterator_close_func  = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
     u64 iterator_remove_func = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
     u64 iterator_done_bool   = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    WI(for_node->token, WI_DROP);
+    WI(for_node->token, WI_DROP);
     WIL(for_node->token, WI_LOCAL_SET, iterator_remove_func);
+    WI(for_node->token, WI_DROP);
+    WI(for_node->token, WI_DROP);
     WIL(for_node->token, WI_LOCAL_SET, iterator_close_func);
+    WI(for_node->token, WI_DROP);
+    WI(for_node->token, WI_DROP);
     WIL(for_node->token, WI_LOCAL_SET, iterator_next_func);
     WIL(for_node->token, WI_LOCAL_SET, iterator_data_ptr);
 
@@ -1824,7 +1833,16 @@ EMIT_FUNC(binop, AstBinaryOp* binop) {
     }
 
     emit_expression(mod, &code, binop->left);
+    if (binop->left->type->kind == Type_Kind_Function) { // nocheckin
+        WI(NULL, WI_DROP);
+        WI(NULL, WI_DROP);
+    }
+
     emit_expression(mod, &code, binop->right);
+    if (binop->right->type->kind == Type_Kind_Function) { // nocheckin
+        WI(NULL, WI_DROP);
+        WI(NULL, WI_DROP);
+    }
 
     WI(binop->token, binop_instr);
 
@@ -2111,6 +2129,10 @@ EMIT_FUNC(call, AstCall* call) {
 
     } else {
         emit_expression(mod, &code, call->callee);
+        
+        u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_closure_base);
+        WI(NULL, WI_DROP);
+        WIL(NULL, WI_GLOBAL_SET, global_closure_base_idx);
 
         i32 type_idx = generate_type_idx(mod, call->callee->type);
         WID(NULL, WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
@@ -2334,6 +2356,11 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
         case ONYX_INTRINSIC_F64_MIN:      WI(call->token, WI_F64_MIN); break;
         case ONYX_INTRINSIC_F64_MAX:      WI(call->token, WI_F64_MAX); break;
         case ONYX_INTRINSIC_F64_COPYSIGN: WI(call->token, WI_F64_COPYSIGN); break;
+
+        case ONYX_INTRINSIC_I32_REINTERPRET_F32: WI(call->token, WI_I32_REINTERPRET_F32); break;
+        case ONYX_INTRINSIC_I64_REINTERPRET_F64: WI(call->token, WI_I64_REINTERPRET_F64); break;
+        case ONYX_INTRINSIC_F32_REINTERPRET_I32: WI(call->token, WI_F32_REINTERPRET_I32); break;
+        case ONYX_INTRINSIC_F64_REINTERPRET_I64: WI(call->token, WI_F64_REINTERPRET_I64); break;
 
         case ONYX_INTRINSIC_I8X16_CONST:
         case ONYX_INTRINSIC_V128_CONST:   SIMD_INT_CONST_INTRINSIC(u8, 16);   break;
@@ -2699,19 +2726,19 @@ EMIT_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
     }
 
     if (source_expr->kind == Ast_Kind_Subscript
-        && source_expr->type->kind != Type_Kind_Pointer) {
+        && source_expr->type->kind != Type_Kind_Pointer && source_expr->type->kind != Type_Kind_MultiPointer) {
         u64 o2 = 0;
         emit_subscript_location(mod, &code, (AstSubscript *) source_expr, &o2);
         offset += o2;
 
     } else if ((source_expr->kind == Ast_Kind_Local || source_expr->kind == Ast_Kind_Param)
-        && source_expr->type->kind != Type_Kind_Pointer) {
+        && source_expr->type->kind != Type_Kind_Pointer && source_expr->type->kind != Type_Kind_MultiPointer) {
         u64 o2 = 0;
         emit_local_location(mod, &code, (AstLocal *) source_expr, &o2);
         offset += o2;
 
     } else if (source_expr->kind == Ast_Kind_Memres
-        && source_expr->type->kind != Type_Kind_Pointer) {
+        && source_expr->type->kind != Type_Kind_Pointer && source_expr->type->kind != Type_Kind_MultiPointer) {
         emit_memory_reservation_location(mod, &code, (AstMemRes *) source_expr);
 
     } else {
@@ -2762,6 +2789,16 @@ EMIT_FUNC(local_location, AstLocal* local, u64* offset_return) {
 
         *offset_return += local_offset;
     }
+
+    *pcode = code;
+}
+
+EMIT_FUNC(capture_local_location, AstCaptureLocal *capture, u64 *offset_return) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    WIL(NULL, WI_LOCAL_GET, mod->closure_base_idx);
+
+    *offset_return = capture->offset;
 
     *pcode = code;
 }
@@ -3195,8 +3232,19 @@ EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
             break;
         }
 
+        case Ast_Kind_Capture_Local: {
+            AstCaptureLocal *capture = (AstCaptureLocal *) expr;
+            emit_capture_local_location(mod, &code, capture, offset_return);
+            break;
+        }
+
         default: {
-            onyx_report_error(expr->token->pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
+            if (expr->token) {
+                onyx_report_error(expr->token->pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
+            } else {
+                OnyxFilePos pos = {0};
+                onyx_report_error(pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
+            }
             break;
         }
     }
@@ -3349,9 +3397,40 @@ EMIT_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_Function: {
-            i32 elemidx = get_element_idx(mod, (AstFunction *) expr);
+            AstFunction *func = (AstFunction *) expr;
+            i32 elemidx = get_element_idx(mod, func);
 
             WID(NULL, WI_I32_CONST, elemidx);
+            if (!func->captures) {
+                WIL(NULL, WI_PTR_CONST, 0);
+                WIL(NULL, WI_I32_CONST, 0);
+                break;
+            }
+
+            // Allocate the block
+            WIL(NULL, WI_I32_CONST, func->captures->total_size_in_bytes);
+            i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) builtin_closure_block_allocate);
+            WIL(NULL, WI_CALL, func_idx);
+
+            u64 capture_block_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+            WIL(NULL, WI_LOCAL_TEE, capture_block_ptr);
+            
+            // Populate the block
+            bh_arr_each(AstCaptureLocal *, capture, func->captures->captures) {
+                WIL(NULL, WI_LOCAL_GET, capture_block_ptr);
+
+                if ((*capture)->by_reference) {
+                    emit_location(mod, &code, (*capture)->captured_value);
+                } else {
+                    emit_expression(mod, &code, (*capture)->captured_value);
+                }
+
+                emit_store_instruction(mod, &code, (*capture)->type, (*capture)->offset);
+            }
+            
+            local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+
+            WIL(NULL, WI_I32_CONST, func->captures->total_size_in_bytes);
             break;
         }
 
@@ -3619,6 +3698,14 @@ EMIT_FUNC(expression, AstTyped* expr) {
             break;
         }
 
+        case Ast_Kind_Capture_Local: {
+            AstCaptureLocal* capture = (AstCaptureLocal *) expr;
+            u64 offset = 0;
+            emit_capture_local_location(mod, &code, capture, &offset);
+            emit_load_instruction(mod, &code, capture->type, offset);
+            break;
+        }
+
         default:
             bh_printf("Unhandled case: %d\n", expr->kind);
             DEBUG_HERE;
@@ -3700,6 +3787,13 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
         return;
     }
 
+    if (to->kind == Type_Kind_Basic && from->kind == Type_Kind_Function) {
+        WI(NULL, WI_DROP);
+        WI(NULL, WI_DROP);
+        *pcode = code;
+        return;
+    }
+
     i32 fromidx = -1, toidx = -1;
     if (from->Basic.flags & Basic_Flag_Pointer || from->kind == Type_Kind_Array) {
         fromidx = 10;
@@ -3757,8 +3851,18 @@ EMIT_FUNC(return, AstReturn* ret) {
     AstLocal* result_destination = NULL;
     i64 jump_label = get_structured_jump_label(mod, Jump_Type_Return, ret->count + 1);
 
+    //
+    // If this is return statement if an inner return of a `do` block,
+    // we have to get the result destination out of the return location stack.
+    // This can be computed as the -ret->count element.
+    //
+    //      2 | return from second do
+    //      1 | return from first do
+    //      0 | return from function
+    //
     if (bh_arr_length(mod->return_location_stack) > 0 && jump_label >= 0) {
-        result_destination = bh_arr_last(mod->return_location_stack);
+        i32 len = bh_arr_length(mod->return_location_stack);
+        result_destination = mod->return_location_stack[len - ret->count - 1];
     }
 
     // If we have an expression to return, we see if it should be placed on the linear memory stack, or the WASM stack.
@@ -3905,8 +4009,14 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_nod
 
     } else if (type->kind == Type_Kind_Function) {
         WID(NULL, WI_I32_CONST, mod->null_proc_func_idx);
+        WIL(NULL, WI_I32_CONST, 0);
+        WIL(NULL, WI_I32_CONST, 0);
 
     } else {
+        if (type == &basic_types[Basic_Kind_Void]) {
+            return;
+        }
+
         WasmType wt = onyx_type_to_wasm_type(type);
         if (wt == WASM_TYPE_VOID) {
             onyx_report_error(where->pos, Error_Critical, "Cannot produce a zero-value for this type.");
@@ -4078,6 +4188,17 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         mod->stack_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
         debug_function_set_ptr_idx(mod, func_idx, mod->stack_base_idx);
 
+        if (fd->captures) {
+            mod->closure_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+
+            debug_emit_instruction(mod, NULL);
+            debug_emit_instruction(mod, NULL);
+
+            u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_closure_base);
+            bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_GLOBAL_GET, { .l = global_closure_base_idx } }));
+            bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_LOCAL_SET,  { .l = mod->closure_base_idx } }));
+        }
+
         // Generate code
         emit_function_body(mod, &wasm_func.code, fd);
 
@@ -4119,37 +4240,37 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     debug_end_function(mod);
 }
 
-static char encode_type_as_dyncall_symbol(Type *t) {
+static void encode_type_as_dyncall_symbol(char *out, Type *t) {
     if (type_struct_is_just_one_basic_value(t)) {
         Type *inner = type_struct_is_just_one_basic_value(t);
-        return encode_type_as_dyncall_symbol(inner);
+        encode_type_as_dyncall_symbol(out, inner);
     }
 
-    if (t->kind == Type_Kind_Slice)   return 's';
-    if (t->kind == Type_Kind_Pointer) return 'p';
-    if (t->kind == Type_Kind_Enum)    return encode_type_as_dyncall_symbol(t->Enum.backing);
-    if (t->kind == Type_Kind_Basic) {
+    else if (t->kind == Type_Kind_Slice) strncat(out, "s", 64);
+    else if (t->kind == Type_Kind_Pointer) strncat(out, "p", 64);
+    else if (t->kind == Type_Kind_MultiPointer) strncat(out, "p", 64);
+    else if (t->kind == Type_Kind_Enum) encode_type_as_dyncall_symbol(out, t->Enum.backing);
+    else if (t->kind == Type_Kind_Basic) {
         TypeBasic* basic = &t->Basic;
-        if (basic->flags & Basic_Flag_Boolean) return 'i';
-        if (basic->flags & Basic_Flag_Integer) {
-            if (basic->size <= 4) return 'i';
-            if (basic->size == 8) return 'l';
+        if (basic->flags & Basic_Flag_Boolean) strncat(out, "i", 64);
+        else if (basic->flags & Basic_Flag_Integer) {
+            if (basic->size <= 4) strncat(out, "i", 64);
+            if (basic->size == 8) strncat(out, "l", 64);
         }
-        if (basic->flags & Basic_Flag_Pointer) return 'p';
-        if (basic->flags & Basic_Flag_Float) {
-            if (basic->size <= 4) return 'f';
-            if (basic->size == 8) return 'd';
+        else if (basic->flags & Basic_Flag_Pointer) strncat(out, "p", 64);
+        else if (basic->flags & Basic_Flag_Float) {
+            if (basic->size <= 4) strncat(out, "f", 64);
+            if (basic->size == 8) strncat(out, "d", 64);
         }
-        if (basic->flags & Basic_Flag_SIMD) return 'v';
-        if (basic->flags & Basic_Flag_Type_Index) return 'i';
-        if (basic->size == 0) return 'v';
+        else if (basic->flags & Basic_Flag_SIMD) strncat(out, "v", 64);
+        else if (basic->flags & Basic_Flag_Type_Index) strncat(out, "i", 64);
+        else strncat(out, "v", 64);
+    }
+    else if (t->kind == Type_Kind_Distinct) {
+        encode_type_as_dyncall_symbol(out, t->Distinct.base_type);
     }
 
-    if (t->kind == Type_Kind_Distinct) {
-        return encode_type_as_dyncall_symbol(t->Distinct.base_type);
-    }
-
-    return 'v';
+    else strncat(out, "v", 64);
 }
 
 static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
@@ -4158,23 +4279,24 @@ static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
     i32 type_idx = generate_type_idx(mod, fd->type);
 
     char *module, *name;
+    OnyxToken *foreign_module = fd->foreign.module_name->token;
+    OnyxToken *foreign_import = fd->foreign.import_name->token;
 
     if (fd->is_foreign_dyncall) {
-        module = bh_aprintf(global_heap_allocator, "dyncall:%b", fd->foreign_module->text, fd->foreign_module->length);
+        module = bh_aprintf(global_heap_allocator, "dyncall:%b", foreign_module->text, foreign_module->length);
 
-        char type_encoding[64] = {0};
-        type_encoding[0] = encode_type_as_dyncall_symbol(fd->type->Function.return_type);
+        char type_encoding[65] = {0};
+        encode_type_as_dyncall_symbol(type_encoding, fd->type->Function.return_type);
 
-        int index = 1;
         bh_arr_each(AstParam, param, fd->params) {
-            type_encoding[index++] = encode_type_as_dyncall_symbol(param->local->type);
+            encode_type_as_dyncall_symbol(type_encoding, param->local->type);
         }
 
-        name = bh_aprintf(global_heap_allocator, "%b:%s", fd->foreign_name->text, fd->foreign_name->length, type_encoding);
+        name = bh_aprintf(global_heap_allocator, "%b:%s", foreign_import->text, foreign_import->length, type_encoding);
 
     } else {
-        module = bh_aprintf(global_heap_allocator, "%b", fd->foreign_module->text, fd->foreign_module->length);
-        name = bh_aprintf(global_heap_allocator, "%b", fd->foreign_name->text, fd->foreign_name->length);
+        module = bh_aprintf(global_heap_allocator, "%b", foreign_module->text, foreign_module->length);
+        name = bh_aprintf(global_heap_allocator, "%b", foreign_import->text, foreign_import->length);
     }
 
     WasmImport import = {
@@ -4394,6 +4516,8 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
     case Ast_Kind_Function: {
         AstFunction* func = (AstFunction *) node;
         CE(u32, 0) = get_element_idx(ctx->module, func);
+        CE(u32, 4) = 0;
+        CE(u32, 8) = 0;
         break;
     }
 
@@ -4662,6 +4786,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .stack_top_ptr = NULL,
         .stack_base_idx = 0,
 
+        .closure_base_idx = 0,
+
         .foreign_function_count = 0,
 
         .null_proc_func_idx = -1,
@@ -4688,6 +4814,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(alloc, module.elems, 4);
     bh_arr_new(alloc, module.libraries, 4);
     bh_arr_new(alloc, module.library_paths, 4);
+    bh_arr_new(alloc, module.for_remove_info, 4);
 
     bh_arr_new(global_heap_allocator, module.return_location_stack, 4);
     bh_arr_new(global_heap_allocator, module.structured_jump_target, 16);

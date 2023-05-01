@@ -8,8 +8,10 @@ package core
 // helper methods that make it easier to work with Results.
 //
 
+use core
+use core.conv
 
-use core {Optional, conv}
+use core {Optional}
 
 #doc """
     Result(T, E) is a structure that represents either an Ok value
@@ -125,17 +127,17 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
         If result contains Err, the error is returned from the enclosing
         procedure. Otherwise, the Ok value is returned.
 
-        f :: () -> Result(i32, str) {
-            Result.return_err("Oh no...");
-        }
-
-        g :: () -> Result(str, str) {
-            // This returns from g with the error returned from f.
-            v := f()->forward_err();
-            println(v);
-
-           Result.return_ok("Success!");
-        }
+            f :: () -> Result(i32, str) {
+                Result.return_err("Oh no...");
+            }
+            
+            g :: () -> Result(str, str) {
+                // This returns from g with the error returned from f.
+                v := f()->forward_err();
+                println(v);
+                
+                Result.return_ok("Success!");
+            }
     """
     forward_err :: macro (r: Result($T, $E)) -> T {
         res := r;
@@ -158,8 +160,8 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
     #doc """
         If result contains Err, the given code is run. This code is
         expected to either:
-            - Return a good value with `return`
-            - Return an error value with `return return`
+        - Return a good value with `return`
+        - Return an error value with `return return`
 
         This procedure is subject to change.
     """
@@ -189,3 +191,12 @@ __implicit_bool_cast :: macro (r: Result($O, $E)) => r.status == .Ok;
 
     return return .{ .Err, .{ error = res.__data.error } };
 }
+
+#operator ?? macro (r: Result($T, $E), v: T) -> T {
+    r_ = r;
+    if r_.status == .Ok do return r_.__data.value;
+
+    return v;
+}
+
+

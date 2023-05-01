@@ -1,5 +1,10 @@
 package core.misc
 
+use runtime
+use core.iter
+use core.array
+use core.string
+
 use runtime.info {
     get_type_info,
     Type_Info_Pointer,
@@ -10,8 +15,6 @@ use runtime.info {
 
     get_struct_member
 }
-
-use core { iter, array, string }
 
 // Either to_any or as_any will work. I prefer `as_any` because
 // much of the rest of the standard library uses `as_...` for
@@ -24,8 +27,7 @@ any_as :: (a: any, $T: type_expr) -> &T {
     return cast(&T) a.data;
 }
 
-//
-// Dereference a pointer any.
+#doc "Dereference a pointer any."
 any_dereference :: (v: any) -> any {
     t := get_type_info(v.type);
     if t.kind == .Pointer {
@@ -36,8 +38,8 @@ any_dereference :: (v: any) -> any {
     return v;
 }
 
-//
-// Subscript an array-like any.
+
+#doc "Subscript an array-like any."
 any_subscript :: (v: any, index: i32) -> any {
     base_ptr, elem_type, count := any_as_array(v);
     if index >= count || index < 0 {
@@ -45,27 +47,25 @@ any_subscript :: (v: any, index: i32) -> any {
     }
 
     return any.{
-        cast(&u8) base_ptr + get_type_info(elem_type).size * index,
+        cast([&] u8) base_ptr + get_type_info(elem_type).size * index,
         elem_type
     };
 }
 
-//
-// Select a member from an any.
+#doc "Select a member from an any."
 any_selector :: (v: any, member_name: str) -> any {
     t := get_type_info(v.type);
     if t.kind == .Struct {
         member := get_struct_member(v.type, member_name);
         if member != null {
-            return any.{cast(&u8) v.data + member.offset, member.type};
+            return any.{cast([&] u8) v.data + member.offset, member.type};
         }
     }
 
     return .{null, void};
 }
 
-//
-// This selector works with selecting "foo.bar.joe"
+#doc "Like `any_selector`, but works with selecting \"foo.bar.joe\"."
 any_nested_selector :: (v: any, member_name: str) -> any {
     t := get_type_info(v.type);
     if t.kind != .Struct do return .{};
@@ -75,31 +75,31 @@ any_nested_selector :: (v: any, member_name: str) -> any {
     member := get_struct_member(v.type, part_name);
     if member {
         if next_name {
-            return any_nested_selector(any.{cast(&u8) v.data + member.offset, member.type}, next_name);
+            return any_nested_selector(any.{cast([&] u8) v.data + member.offset, member.type}, next_name);
         }
 
         return any.{
-            cast(&u8, v.data) + member.offset, member.type
+            cast([&] u8, v.data) + member.offset, member.type
         };
     }
 
     return .{null, void};
 }
 
-//
-// Convert a structure or pointer to a structure to a Map with
-// keys representing the fields of the structure, and values
-// representing the value of each field.
-//
-//     T :: struct {
-//         x := 123;
-//         y := "test";
-//     }
-//     
-//     m := any_to_map(T.{});
-//
-// `m` would have two keys, "x" and "y".
-//
+#doc """
+    Convert a structure or pointer to a structure to a Map with
+    keys representing the fields of the structure, and values
+    representing the value of each field.
+   
+        T :: struct {
+            x := 123;
+            y := "test";
+        }
+        
+        m := any_to_map(T.{});
+   
+    `m` would have two keys, "x" and "y".
+"""
 any_to_map :: (v: any) -> (Map(str, any), success: bool) {
     vals := v;
     if get_type_info(vals.type).kind == .Pointer {
@@ -119,12 +119,11 @@ any_to_map :: (v: any) -> (Map(str, any), success: bool) {
     return out, true;
 }
 
-//
-// Creates an iterator out of an array-like any.
+#doc "Creates an iterator out of an array-like any."
 any_iter :: (arr: any) -> Iterator(any) {
     base_ptr, elem_type, count := any_as_array(arr);
     if count == 0 {
-        return .{ null, ((_) => any.{}, false) };
+        return .{ null, ((_: rawptr) => any.{}, false) };
     }
 
     return iter.generator(
@@ -139,7 +138,7 @@ any_iter :: (arr: any) -> Iterator(any) {
         (ctx: $T) -> (any, bool) {
             if ctx.index < ctx.count {
                 defer ctx.index += 1;
-                return any.{ cast(&u8) ctx.base_ptr + ctx.elem_size * ctx.index, ctx.elem_type }, true;
+                return any.{ cast([&] u8) ctx.base_ptr + ctx.elem_size * ctx.index, ctx.elem_type }, true;
             }
 
             return .{}, false;

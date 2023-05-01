@@ -3,6 +3,7 @@
 #include "utils.h"
 #include "astnodes.h"
 #include "errors.h"
+#include "doc.h"
 
 // :EliminatingSymres - notes the places where too much work is being done in symbol resolution
 
@@ -10,9 +11,6 @@
 static Scope*       current_scope    = NULL;
 static b32 report_unresolved_symbols = 1;
 static b32 resolved_a_symbol         = 0;
-
-// Everything related to waiting on is imcomplete at the moment.
-static Entity* waiting_on         = NULL;
 
 static Entity* current_entity = NULL;
 
@@ -53,7 +51,6 @@ static SymresStatus symres_while(AstIfWhile* whilenode);
 static SymresStatus symres_for(AstFor* fornode);
 static SymresStatus symres_case(AstSwitchCase *casenode);
 static SymresStatus symres_switch(AstSwitch* switchnode);
-static SymresStatus symres_use(AstUse* use);
 static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid);
 static SymresStatus symres_directive_defined(AstDirectiveDefined** pdefined);
 static SymresStatus symres_directive_insert(AstDirectiveInsert* insert);
@@ -115,13 +112,8 @@ static SymresStatus symres_struct_type(AstStructType* s_node) {
     s_node->flags |= Ast_Flag_Type_Is_Resolved;
     s_node->flags |= Ast_Flag_Comptime;
 
-    if (s_node->scope) {
-        assert(s_node->entity);
-        assert(s_node->entity->scope);
-        s_node->scope->parent = s_node->entity->scope;
-
-        scope_enter(s_node->scope);
-    }
+    assert(s_node->scope);
+    scope_enter(s_node->scope);
     
     if (s_node->min_size_)      SYMRES(expression, &s_node->min_size_);
     if (s_node->min_alignment_) SYMRES(expression, &s_node->min_alignment_);
@@ -182,6 +174,7 @@ static SymresStatus symres_type(AstType** type) {
         case Ast_Kind_Slice_Type:   SYMRES(type, &((AstSliceType *) *type)->elem); break;
         case Ast_Kind_DynArr_Type:  SYMRES(type, &((AstDynArrType *) *type)->elem); break;
         case Ast_Kind_VarArg_Type:  SYMRES(type, &((AstVarArgType *) *type)->elem); break;
+        case Ast_Kind_Multi_Pointer_Type: SYMRES(type, &((AstMultiPointerType *) *type)->elem); break;
 
         case Ast_Kind_Function_Type: {
             AstFunctionType* ftype = (AstFunctionType *) *type;
@@ -209,10 +202,7 @@ static SymresStatus symres_type(AstType** type) {
 
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* pst_node = (AstPolyStructType *) *type;
-
-            if (pst_node->scope == NULL) {
-                pst_node->scope = scope_create(context.ast_alloc, pst_node->entity->scope, pst_node->token->pos);
-            }
+            assert(pst_node->scope);
             break;
         }
 
@@ -349,18 +339,22 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
             token_toggle_end((*fa)->token);
 
             AstPackage *package = (AstPackage *) strip_aliases((AstNode *) (*fa)->expr);
+            char *package_name = "unknown (compiler bug)";
+            if (package && package->package) {
+                package_name = package->package->name;
+            }
 
             if (closest) {
                 onyx_report_error((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Did you mean '%s'?",
                     (*fa)->token->text,
                     (*fa)->token->length,
-                    package->package->name,
+                    package_name,
                     closest);
             } else {
                 onyx_report_error((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Perhaps it is defined in a file that wasn't loaded?",
                     (*fa)->token->text,
                     (*fa)->token->length,
-                    package->package->name);
+                    package_name);
             }
             return Symres_Error;
 
@@ -582,7 +576,20 @@ static SymresStatus symres_expression(AstTyped** expr) {
             (*expr)->type_node = builtin_range_type;
             break;
 
+        case Ast_Kind_Polymorphic_Proc:
+            if (((AstFunction *) *expr)->captures) {
+                ((AstFunction *) *expr)->scope_to_lookup_captured_values = current_scope;
+            }
+            break;
+
         case Ast_Kind_Function:
+            if (((AstFunction *) *expr)->captures) {
+                ((AstFunction *) *expr)->scope_to_lookup_captured_values = current_scope;
+            }
+
+            SYMRES(type, &(*expr)->type_node);
+            break;
+
         case Ast_Kind_NumLit:
             SYMRES(type, &(*expr)->type_node);
             break;
@@ -640,6 +647,7 @@ static SymresStatus symres_expression(AstTyped** expr) {
 
         case Ast_Kind_Do_Block: {
             Scope* old_current_scope = current_scope;
+            SYMRES(type, &(*expr)->type_node);
             SYMRES(block, ((AstDoBlock *) *expr)->block);
             current_scope = old_current_scope;
             break;
@@ -787,108 +795,6 @@ static SymresStatus symres_switch(AstSwitch* switchnode) {
     return Symres_Success;
 }
 
-static SymresStatus symres_use(AstUse* use) {
-    SYMRES(expression, &use->expr);
-
-    AstTyped *use_expr = (AstTyped *) strip_aliases((AstNode *) use->expr);
-
-    Scope* used_scope = NULL;
-
-    // :EliminatingSymres
-    if (use_expr->kind == Ast_Kind_Package) {
-        AstPackage* package = (AstPackage *) use_expr;
-        SYMRES(package, package);
-
-        if (!use->entity) {
-            add_entities_for_node(NULL, (AstNode *) use, current_scope, NULL);
-        }
-
-        package_track_use_package(package->package, use->entity);
-        used_scope = package->package->scope;
-    }
-
-    if (use_expr->kind == Ast_Kind_Foreign_Block) {
-        AstForeignBlock* fb = (AstForeignBlock *) use_expr;
-        if (fb->entity->state <= Entity_State_Resolve_Symbols) return Symres_Yield_Macro;
-
-        used_scope = fb->scope;
-    }
-
-    if (use_expr->kind == Ast_Kind_Enum_Type) {
-        AstEnumType* et = (AstEnumType *) use_expr;
-        used_scope = et->scope;
-    }
-
-    if (use_expr->kind == Ast_Kind_Struct_Type) {
-        AstStructType* st = (AstStructType *) use_expr;
-        if (!st->scope) return Symres_Success;
-
-        used_scope = st->scope;
-    }
-
-    if (used_scope) {
-        if (used_scope == current_scope) return Symres_Success;
-
-        if (use->only == NULL) {
-            OnyxFilePos pos = { 0 };
-            if (use->token != NULL)
-                pos = use->token->pos;
-
-            scope_include(current_scope, used_scope, pos);
-
-        } else {
-            bh_arr_each(QualifiedUse, qu, use->only) {
-                AstNode* thing = symbol_resolve(used_scope, qu->symbol_name);
-                if (thing == NULL) { // :SymresStall
-                    if (report_unresolved_symbols) {
-                        onyx_report_error(qu->symbol_name->pos, Error_Critical, 
-                                "The symbol '%b' was not found in the used scope.",
-                                qu->symbol_name->text, qu->symbol_name->length);
-                        return Symres_Error;
-                    } else {
-                        return Symres_Yield_Macro;
-                    }
-                }
-
-                symbol_introduce(current_scope, qu->as_name, thing);
-            }
-        }
-
-        return Symres_Success;
-    }
-
-    if (use_expr->type_node == NULL && use_expr->type == NULL) goto cannot_use;
-
-    // :EliminatingSymres
-    AstType* effective_type = use_expr->type_node;
-    if (effective_type->kind == Ast_Kind_Pointer_Type)
-        effective_type = ((AstPointerType *) effective_type)->elem;
-
-    if (effective_type->kind == Ast_Kind_Struct_Type ||
-            effective_type->kind == Ast_Kind_Poly_Call_Type) {
-
-        if (use_expr->type == NULL)
-            use_expr->type = type_build_from_ast(context.ast_alloc, use_expr->type_node);
-        if (use_expr->type == NULL) goto cannot_use;
-
-        Type* st = use_expr->type;
-        if (st->kind == Type_Kind_Pointer)
-            st = st->Pointer.elem;
-
-        fori (i, 0, shlen(st->Struct.members)) {
-            StructMember* value = st->Struct.members[i].value;
-            AstFieldAccess* fa = make_field_access(context.ast_alloc, use_expr, value->name);
-            symbol_raw_introduce(current_scope, value->name, use->token->pos, (AstNode *) fa);
-        }
-
-        return Symres_Success;
-    }
-
-cannot_use:
-    onyx_report_error(use->token->pos, Error_Critical, "Cannot use this because its type is unknown.");
-    return Symres_Error;
-}
-
 static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
     AstDirectiveSolidify* solid = *psolid;
 
@@ -945,6 +851,28 @@ static SymresStatus symres_directive_insert(AstDirectiveInsert* insert) {
     return Symres_Success;
 }
 
+static SymresStatus symres_capture_block(AstCaptureBlock *block, Scope *captured_scope) {
+    bh_arr_each(AstCaptureLocal *, capture, block->captures) {
+        OnyxToken *token = (*capture)->token;
+        AstTyped *resolved = (AstTyped *) symbol_resolve(captured_scope, token);
+
+        if (!resolved) {
+            // Should this do a yield? In there any case that that would make sense?
+            onyx_report_error(token->pos, Error_Critical, "'%b' is not found in the enclosing scope.",
+                    token->text, token->length);
+            return Symres_Error;
+        }
+
+        (*capture)->captured_value = resolved;
+    }
+
+    bh_arr_each(AstCaptureLocal *, capture, block->captures) {
+        symbol_introduce(current_scope, (*capture)->token, (AstNode *) *capture);
+    }
+
+    return Symres_Success;
+}
+
 static SymresStatus symres_statement(AstNode** stmt, b32 *remove) {
     if (remove) *remove = 0;
 
@@ -968,9 +896,8 @@ static SymresStatus symres_statement(AstNode** stmt, b32 *remove) {
             SYMRES(local, (AstLocal **) stmt);
             break;
 
-        case Ast_Kind_Use:
+        case Ast_Kind_Import:
             if (remove) *remove = 1;
-            SYMRES(use, (AstUse *) *stmt);
             break;
 
         default: SYMRES(expression, (AstTyped **) stmt); break;
@@ -1050,6 +977,17 @@ static SymresStatus symres_block(AstBlock* block) {
 SymresStatus symres_function_header(AstFunction* func) {
     func->flags |= Ast_Flag_Comptime;
 
+    if (!(func->flags & Ast_Flag_Function_Is_Lambda) && func->captures) {
+        onyx_report_error(func->captures->token->pos, Error_Critical, "This procedure cannot capture values as it is not defined in an expression.");
+        return Symres_Error;
+    }
+
+    if (func->captures && !func->scope_to_lookup_captured_values) {
+        if (func->flags & Ast_Flag_Function_Is_Lambda_Inside_PolyProc) return Symres_Complete;
+
+        return Symres_Yield_Macro;
+    }
+
     if (func->scope == NULL)
         func->scope = scope_create(context.ast_alloc, current_scope, func->token->pos);
 
@@ -1091,9 +1029,10 @@ SymresStatus symres_function_header(AstFunction* func) {
             // This makes a lot of assumptions about how these nodes are being processed,
             // and I don't want to start using this with other nodes without considering
             // what the ramifications of that is.
-            assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents);
+            assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents
+                    || (*node)->kind == Ast_Kind_Function || (*node)->kind == Ast_Kind_Polymorphic_Proc);
 
-            // Need to current_scope->parent because current_scope is the function body scope.
+            // Need to use current_scope->parent because current_scope is the function body scope.
             Scope *scope = current_scope->parent;
 
             if ((*node)->kind == Ast_Kind_Static_If) {
@@ -1113,11 +1052,20 @@ SymresStatus symres_function_header(AstFunction* func) {
         bh_arr_set_length(func->nodes_that_need_entities_after_clone, 0);
     }
 
-    SYMRES(type, &func->return_type);
-
     if (func->deprecated_warning) {
         SYMRES(expression, (AstTyped **) &func->deprecated_warning);
     }
+
+    if (func->foreign.import_name) {
+        SYMRES(expression, &func->foreign.module_name);
+        SYMRES(expression, &func->foreign.import_name);
+    }
+
+    if (func->captures) {
+        SYMRES(capture_block, func->captures, func->scope_to_lookup_captured_values);
+    }
+
+    SYMRES(type, &func->return_type);
 
     scope_leave();
 
@@ -1127,6 +1075,7 @@ SymresStatus symres_function_header(AstFunction* func) {
 SymresStatus symres_function(AstFunction* func) {
     if (func->entity_header && func->entity_header->state < Entity_State_Check_Types) return Symres_Yield_Macro;
     if (func->kind == Ast_Kind_Polymorphic_Proc) return Symres_Complete;
+    if (func->flags & Ast_Flag_Function_Is_Lambda_Inside_PolyProc) return Symres_Complete;
     assert(func->scope);
 
     scope_enter(func->scope);
@@ -1226,6 +1175,7 @@ static SymresStatus symres_package(AstPackage* package) {
     }
 
     if (package->package) {
+        package_mark_as_used(package->package);
         return Symres_Success;
     } else {
         if (report_unresolved_symbols) {
@@ -1428,6 +1378,8 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             }
 
             SYMRES(expression, (AstTyped **) &add_overload->overload);
+            add_overload->overload->flags &= ~Ast_Flag_Function_Is_Lambda;
+
             add_overload_option(&ofunc->overloads, add_overload->order, add_overload->overload);
             break;
         }
@@ -1442,6 +1394,8 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 onyx_report_error(operator->token->pos, Error_Critical, "This cannot be used as an operator overload.");
                 return Symres_Error;
             }
+
+            overload->flags &= ~Ast_Flag_Function_Is_Lambda;
             
             // First try unary operator overloading
             // CLEANUP This is not written well at all...
@@ -1527,40 +1481,21 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             if (inject->dest == NULL) {
                 if (inject->full_loc == NULL) return Symres_Error;
 
-                if (inject->full_loc->kind != Ast_Kind_Field_Access) {
+                AstTyped *full_loc = (AstTyped *) strip_aliases((AstNode *) inject->full_loc);
+
+                if (full_loc->kind != Ast_Kind_Field_Access) {
                     onyx_report_error(inject->token->pos, Error_Critical, "#inject expects a dot (a.b) expression for the injection point.");
                     return Symres_Error;
                 }
 
-                AstFieldAccess *acc = (AstFieldAccess *) inject->full_loc;
+                AstFieldAccess *acc = (AstFieldAccess *) full_loc;
                 inject->dest = acc->expr;
                 inject->symbol = acc->token;
             }
 
             SYMRES(expression, &inject->dest);
             SYMRES(expression, &inject->to_inject);
-
-            Scope *scope = get_scope_from_node_or_create((AstNode *) inject->dest);
-            if (scope == NULL) {
-                if (context.cycle_almost_detected >= 1) {
-                    onyx_report_error(inject->token->pos, Error_Critical, "Cannot #inject here.");
-                    return Symres_Error;
-                }
-
-                return Symres_Yield_Macro;
-            }
-
-            AstBinding *binding = onyx_ast_node_new(context.ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
-            binding->token = inject->symbol;
-            binding->node = (AstNode *) inject->to_inject;
-
-            Package *pac = NULL;
-            if (inject->dest->kind == Ast_Kind_Package) {
-                pac = ((AstPackage *) inject->dest)->package;
-            }
-
-            add_entities_for_node(NULL, (AstNode *) binding, scope, pac);
-            return Symres_Complete;
+            break;
         }
 
         case Ast_Kind_Directive_This_Package: {
@@ -1691,6 +1626,13 @@ static SymresStatus symres_foreign_block(AstForeignBlock *fb) {
     if (fb->scope == NULL)
         fb->scope = scope_create(context.ast_alloc, current_scope, fb->token->pos);
 
+    SYMRES(expression, &fb->module_name);
+
+    if (fb->module_name->kind != Ast_Kind_StrLit) {
+        onyx_report_error(fb->token->pos, Error_Critical, "Expected module name to be a compile-time string literal.");
+        return Symres_Error;
+    }
+
     bh_arr_each(Entity *, pent, fb->captured_entities) {
         Entity *ent = *pent;
         if (ent->type == Entity_Type_Function_Header) {
@@ -1699,8 +1641,8 @@ static SymresStatus symres_foreign_block(AstForeignBlock *fb) {
                 return Symres_Error;
             }
 
-            ent->function->foreign_name = ent->function->intrinsic_name; // Hmm... This might not be right?
-            ent->function->foreign_module = fb->module_name;
+            ent->function->foreign.import_name = (AstTyped *) make_string_literal(context.ast_alloc, ent->function->intrinsic_name);
+            ent->function->foreign.module_name = fb->module_name;
             ent->function->is_foreign = 1;
             ent->function->is_foreign_dyncall = fb->uses_dyncall;
             ent->function->entity = NULL;
@@ -1767,6 +1709,58 @@ static SymresStatus symres_file_contents(AstFileContents* fc) {
     return Symres_Success;
 }
 
+static SymresStatus symres_import(AstImport* import) {
+    AstPackage* package = import->imported_package;
+    SYMRES(package, package);
+
+    if (import->import_package_itself) {
+        OnyxToken *name = bh_arr_last(package->path);
+        name = import->qualified_package_name ? import->qualified_package_name : name;
+
+        symbol_introduce(
+                current_entity->scope,
+                name,
+                (AstNode *) package);
+    }
+
+    if (import->specified_imports) {
+        package_track_use_package(package->package, import->entity);
+
+        Scope *import_scope = package->package->scope;
+        if (import_scope == current_scope) return Symres_Complete;
+
+        // use X { * }
+        if (import->only == NULL) {
+            OnyxFilePos pos = import->token->pos;
+            scope_include(current_scope, import_scope, pos);
+            return Symres_Complete;
+        }
+
+
+        // use X { a, b, c }
+        bh_arr_each(QualifiedImport, qi, import->only) {
+            AstNode* imported = symbol_resolve(import_scope, qi->symbol_name);
+            if (imported == NULL) { // :SymresStall
+                if (report_unresolved_symbols) {
+                    // TODO: Change package->name to package->qualified_name when
+                    // merged with the documentation generation branch.
+                    onyx_report_error(qi->symbol_name->pos, Error_Critical, 
+                            "The symbol '%b' was not found the package '%s'.",
+                            qi->symbol_name->text, qi->symbol_name->length, package->package->name);
+
+                    return Symres_Error;
+                } else {
+                    return Symres_Yield_Macro;
+                }
+            }
+
+            symbol_introduce(current_scope, qi->as_name, imported);
+        }
+    }
+
+    return Symres_Complete;
+}
+
 void symres_entity(Entity* ent) {
     current_entity = ent;
     if (ent->scope) scope_enter(ent->scope);
@@ -1780,6 +1774,10 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Binding: {
             symbol_introduce(current_scope, ent->binding->token, ent->binding->node);
             track_declaration_for_tags((AstNode *) ent->binding);
+
+            if (context.doc_info) {
+                onyx_docs_submit(context.doc_info, ent->binding);
+            }
 
             package_reinsert_use_packages(ent->package);
             next_state = Entity_State_Finalized;
@@ -1799,10 +1797,8 @@ void symres_entity(Entity* ent) {
 
         case Entity_Type_Global_Header:           ss = symres_global(ent->global); break;
 
-        case Entity_Type_Use_Package:
-        case Entity_Type_Use:                     ss = symres_use(ent->use);
-                                                  next_state = Entity_State_Finalized;
-                                                  break;
+        case Entity_Type_Import:                  ss = symres_import(ent->import); break;
+
 
         case Entity_Type_Polymorphic_Proc:        ss = symres_polyproc(ent->poly_proc);
                                                   next_state = Entity_State_Finalized;

@@ -9,6 +9,7 @@ static const char* ast_node_names[] = {
     "INCLUDE FOLDER",
     "INCLUDE ALL IN FOLDER",
     "INCLUDE LIBRARY PATH",
+    "IMPORT",
     "MEMORY RESERVATION",
 
     "BINDING",
@@ -36,6 +37,7 @@ static const char* ast_node_names[] = {
     "TYPE",
     "BASIC_TYPE",
     "POINTER_TYPE",
+    "MULTI POINTER TYPE",
     "FUNCTION_TYPE",
     "ARRAY TYPE",
     "SLICE TYPE",
@@ -82,7 +84,6 @@ static const char* ast_node_names[] = {
     "FOR",
     "WHILE",
     "JUMP",
-    "USE",
     "DEFER",
     "SWITCH",
     "CASE",
@@ -106,6 +107,9 @@ static const char* ast_node_names[] = {
     "DIRECTIVE INSERT",
     "MACRO",
     "DO BLOCK",
+
+    "CAPTURE BLOCK",
+    "CAPTURE LOCAL",
 
     "FOREIGN BLOCK",
     "ZERO VALUE",
@@ -154,6 +158,7 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Load File",
     "Binding (Declaration)",
     "Use Package",
+    "Import",
     "Static If",
     "String Literal",
     "File Contents",
@@ -1284,6 +1289,11 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
         return 0;
     }
 
+    if (from->kind == Type_Kind_Function) {
+        *err_msg = "Can only cast a function to a 'u32'.";
+        return to == &basic_types[Basic_Kind_U32];
+    }
+
     if (   (type_is_simd(to) && !type_is_simd(from))
         || (!type_is_simd(to) && type_is_simd(from))) {
         *err_msg = "Can only perform a SIMD cast between SIMD types.";
@@ -1349,13 +1359,12 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
 
 
 
-static bh_imap implicit_cast_to_bool_cache;
-
 TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
     AstTyped *node = *pnode;
 
     if ((node->type->kind == Type_Kind_Basic && node->type->Basic.kind == Basic_Kind_Rawptr)
-        || (node->type->kind == Type_Kind_Pointer)) {
+        || (node->type->kind == Type_Kind_Pointer)
+        || (node->type->kind == Type_Kind_MultiPointer)) {
         AstNumLit *zero = make_int_literal(context.ast_alloc, 0);
         zero->type = &basic_types[Basic_Kind_Rawptr];
 
@@ -1391,21 +1400,21 @@ TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
         return TYPE_MATCH_SUCCESS;
     }
     
-    if (implicit_cast_to_bool_cache.entries == NULL) {
-        bh_imap_init(&implicit_cast_to_bool_cache, global_heap_allocator, 8);
+    if (context.caches.implicit_cast_to_bool_cache.entries == NULL) {
+        bh_imap_init(&context.caches.implicit_cast_to_bool_cache, global_heap_allocator, 8);
     }
 
-    if (!bh_imap_has(&implicit_cast_to_bool_cache, (u64) node)) {
+    if (!bh_imap_has(&context.caches.implicit_cast_to_bool_cache, (u64) node)) {
         AstArgument *implicit_arg = make_argument(context.ast_alloc, node);
         
         Arguments *args = bh_alloc_item(context.ast_alloc, Arguments);
         bh_arr_new(context.ast_alloc, args->values, 1);
         bh_arr_push(args->values, (AstTyped *) implicit_arg);
 
-        bh_imap_put(&implicit_cast_to_bool_cache, (u64) node, (u64) args);
+        bh_imap_put(&context.caches.implicit_cast_to_bool_cache, (u64) node, (u64) args);
     }
     
-    Arguments *args = (Arguments *) bh_imap_get(&implicit_cast_to_bool_cache, (u64) node);
+    Arguments *args = (Arguments *) bh_imap_get(&context.caches.implicit_cast_to_bool_cache, (u64) node);
     AstFunction *overload = (AstFunction *) find_matching_overload_by_arguments(builtin_implicit_bool_cast->overloads, args);
 
     if (overload == NULL)                                       return TYPE_MATCH_FAILED;
@@ -1418,7 +1427,7 @@ TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
     implicit_call->args.values = args->values;
 
     *(AstCall **) pnode = implicit_call;
-    bh_imap_delete(&implicit_cast_to_bool_cache, (u64) node);
+    bh_imap_delete(&context.caches.implicit_cast_to_bool_cache, (u64) node);
 
     return TYPE_MATCH_YIELD;
 }
@@ -1486,6 +1495,14 @@ AstRangeLiteral* make_range_literal(bh_allocator a, AstTyped* low, AstTyped* hig
     return rl;
 }
 
+AstStrLit* make_string_literal(bh_allocator a, OnyxToken *token) {
+    AstStrLit *str = onyx_ast_node_new(a, sizeof(AstStrLit), Ast_Kind_StrLit);
+    str->flags |= Ast_Flag_Comptime;
+    str->type_node = builtin_string_type;
+    str->token = token;
+    return str;
+}
+
 AstBinaryOp* make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right) {
     AstBinaryOp* binop_node = onyx_ast_node_new(a, sizeof(AstBinaryOp), Ast_Kind_Binary_Op);
     binop_node->left  = left;
@@ -1538,7 +1555,7 @@ AstLocal* make_local_with_type(bh_allocator a, OnyxToken* token, Type* type) {
 }
 
 AstNode* make_symbol(bh_allocator a, OnyxToken* sym) {
-    AstNode* symbol = onyx_ast_node_new(a, sizeof(AstNode), Ast_Kind_Symbol);
+    AstNode* symbol = onyx_ast_node_new(a, sizeof(AstTyped), Ast_Kind_Symbol);
     symbol->token = sym;
     return symbol;
 }
@@ -1693,7 +1710,7 @@ AstPolyCallType* convert_call_to_polycall(AstCall* call) {
     pct->token = call->token;
     pct->__unused = call->next;
     pct->callee = (AstType *) call->callee;
-    pct->params = (AstNode **) call->args.values;
+    pct->params = (AstNode **) bh_arr_copy(global_heap_allocator, call->args.values);
     bh_arr_each(AstNode *, pp, pct->params) {
         if ((*pp)->kind == Ast_Kind_Argument) {
             *pp = (AstNode *) (*(AstArgument **) pp)->value;
@@ -1726,6 +1743,6 @@ b32 resolve_intrinsic_interface_constraint(AstConstraint *constraint) {
                                                           || type->kind == Type_Kind_Slice
                                                           || type->kind == Type_Kind_DynArray
                                                           || type->kind == Type_Kind_Struct;
-
+    if (!strcmp(interface->name, "type_is_function")) return type->kind == Type_Kind_Function;
     return 0;
 }

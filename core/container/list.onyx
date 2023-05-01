@@ -1,4 +1,7 @@
 package core.list
+#allow_stale_code
+
+use core
 
 ListElem :: struct (T: type_expr) {
     next: &ListElem(T) = null;

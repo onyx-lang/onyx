@@ -4,7 +4,13 @@ package core.net
     #error "Cannot include this file. Platform not supported.";
 }
 
-use core {sync, thread, array, memory, alloc, os, iter}
+use core.thread
+use core.array
+use core.memory
+use core.alloc
+use core.os
+use core.iter
+use runtime
 
 #if !runtime.Multi_Threading_Enabled {
     #error "Expected multi-threading to be enabled for TCP server.";
@@ -18,8 +24,6 @@ TCP_Connection :: struct {
     event_allocator: Allocator;
     events: [..] TCP_Event;
     event_cursor := 0;
-
-    event_mutex: sync.Mutex;
 }
 
 TCP_Event :: struct {
@@ -101,11 +105,7 @@ TCP_Server :: struct {
 
     client_allocator: Allocator;
     clients: [] &Client;
-
-    // max clients is stored as clients.count.
-    client_count: u32;
-
-    listener_thread: thread.Thread;
+    client_count: u32; // max clients is stored as clients.count.
 
     alive         := true;
     pulse_time_ms := 500;
@@ -159,39 +159,7 @@ tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> &TCP_S
     server.clients = make([] &TCP_Server.Client, max_clients, allocator=allocator);
     array.fill(server.clients, null);
 
-    sync.mutex_init(&server.event_mutex);
-
     return server;
-}
-
-#local tcp_server_listener :: (use server: &TCP_Server) {
-    while server.alive {
-        if server.client_count == server.clients.count {
-            os.sleep(1);
-            continue;
-        }
-
-        client_socket, client_addr := socket->accept();
-        if !client_socket.vtable {
-            continue;
-        }
-
-        client := new(TCP_Server.Client, allocator=client_allocator);
-        client.state = .Alive;
-        client.socket = client_socket;
-        client.address = client_addr;
-
-        for& clients do if *it == null { *it = client; break; }
-        server.client_count += 1;
-
-        conn_event := new(TCP_Event.Connection, allocator=server.event_allocator);
-        conn_event.address = &client.address;
-        conn_event.client = client;
-
-        sync.critical_section(&server.event_mutex) {
-            server.events << .{ .Connection, conn_event }; // @Threading
-        }
-    }
 }
 
 tcp_server_listen :: (use server: &TCP_Server, port: u16) -> bool {
@@ -200,7 +168,7 @@ tcp_server_listen :: (use server: &TCP_Server, port: u16) -> bool {
     if !(socket->bind(&sa)) do return false;
 
     socket->listen();
-    thread.spawn(&listener_thread, server, tcp_server_listener);
+    socket->setting(.NonBlocking, 1);
     return true;
 }
 
@@ -214,10 +182,30 @@ tcp_server_stop :: (use server: &TCP_Server) {
     }
 
     server.socket->close();
-    thread.kill(&listener_thread);
 }
 
 tcp_server_pulse :: (use server: &TCP_Server) -> bool {
+    //
+    // Check for new connection
+    client_socket, client_addr := socket->accept();
+    if client_socket.vtable {
+        client := new(TCP_Server.Client, allocator=client_allocator);
+        client.state = .Alive;
+        client.socket = client_socket;
+        client.address = client_addr;
+
+        for& clients do if *it == null { *it = client; break; }
+        server.client_count += 1;
+
+        conn_event := new(TCP_Event.Connection, allocator=server.event_allocator);
+        conn_event.address = &client.address;
+        conn_event.client = client;
+
+        server.events << .{ .Connection, conn_event };
+    }
+
+    // 
+    // Process dead clients
     for& clients {
         client := *it;
         if !client do continue;
@@ -277,18 +265,14 @@ tcp_server_pulse :: (use server: &TCP_Server) -> bool {
             data_event.client  = it;
             data_event.address = &it.address;
             data_event.contents = memory.copy_slice(msg_buffer[0 .. bytes_read], allocator=server.event_allocator);
-            sync.critical_section(&server.event_mutex) {
-                server.events << .{ .Data, data_event }; // @Threading // See comment above.
-            }
+            server.events << .{ .Data, data_event };
 
         } elseif !it.recv_ready_event_present {
             it.recv_ready_event_present = true;
             ready_event := new(TCP_Event.Ready, allocator=server.event_allocator);
             ready_event.client  = it;
             ready_event.address = &it.address;
-            sync.critical_section(&server.event_mutex) {
-                server.events << .{ .Ready, ready_event }; // @Threading // See comment above.
-            }
+            server.events << .{ .Ready, ready_event };
         }
     }
 
@@ -298,9 +282,7 @@ tcp_server_pulse :: (use server: &TCP_Server) -> bool {
             disconnect_event := new(TCP_Event.Disconnection, allocator=server.event_allocator);
             disconnect_event.client  = it;
             disconnect_event.address = &it.address;
-            sync.critical_section(&server.event_mutex) {
-                server.events << .{ .Disconnection, disconnect_event }; // @Threading // See comment above.
-            }
+            server.events << .{ .Disconnection, disconnect_event };
         }
     }
 
@@ -365,7 +347,7 @@ wait_to_get_client_messages :: (use server: &TCP_Server) -> [] &TCP_Server.Clien
         }
     }
 
-    status_buffer := alloc.array_from_stack(core.net.Socket_Poll_Status, client_count);
+    status_buffer := alloc.array_from_stack(Socket_Poll_Status, client_count);
     socket_poll_all(cast([] &Socket) active_clients, pulse_time_ms, status_buffer);
 
     recv_clients: [..] &TCP_Server.Client;

@@ -47,10 +47,18 @@ typedef struct OnyxParser {
     // in other files.
     u32 overload_count;
 
+    // Used by `#doc` directives to store their documentation
+    // string. This is then used by binding nodes to capture
+    // documentation.
+    OnyxToken *last_documentation_token;
+
     u16 tag_depth : 16;
 
     b32 hit_unexpected_token : 1;
     b32 parse_calls : 1;
+
+    // Currently, package expressions are only allowed in certain places.
+    b32 allow_package_expressions : 1;
 } OnyxParser;
 
 const char* onyx_ast_node_kind_string(AstKind kind);

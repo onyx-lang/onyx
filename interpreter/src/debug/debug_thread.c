@@ -96,6 +96,10 @@ static void resume_thread(debug_thread_state_t *thread) {
     sem_post(&thread->wait_semaphore);
 }
 
+static void resume_thread_slow(debug_thread_state_t *thread) {
+    sem_post(&thread->wait_semaphore);
+}
+
 static u32 get_stack_frame_instruction_pointer(debug_state_t *debug, debug_thread_state_t *thread, ovm_stack_frame_t *frame) {
     ovm_func_t *func = frame->func;
 
@@ -248,7 +252,7 @@ static DEBUG_COMMAND_HANDLER(debug_command_step) {
     if (granularity == 2) {
         ON_THREAD(thread_id) {
             (*thread)->run_count = 1;
-            resume_thread(*thread);
+            resume_thread_slow(*thread);
         }
     }
 
@@ -539,6 +543,7 @@ static void process_command(debug_state_t *debug, struct msg_parse_ctx_t *ctx) {
     u32 command_id = parse_int(debug, ctx);
 
     if (command_id >= sizeof(command_handlers) / sizeof(command_handlers[0])) {
+        printf("[ERROR] Unrecognized command id %x\n", command_id);
         send_response_header(debug, msg_id);
         return;
     }
@@ -575,7 +580,7 @@ void *__debug_thread_entry(void * data) {
     unlink(local_addr.sun_path);                     // TODO: Remove this line for the same reason.
     int len = strlen(local_addr.sun_path) + sizeof(local_addr.sun_family);
     bind(debug->listen_socket_fd, (struct sockaddr *)&local_addr, len);
-    
+
     //
     // Currently, there can only be 1 connected debugger instance at a time.
     listen(debug->listen_socket_fd, 1);

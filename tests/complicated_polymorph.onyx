@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+use core {*}
 
 main :: (args: [] cstr) {
     baked_proc :: (x: $T, $func: (T) -> typeof x) -> T {

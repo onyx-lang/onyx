@@ -11,16 +11,17 @@ Type_Info :: struct {
         Invalid            :: 0x00; // Unused
         Basic              :: 0x01;
         Pointer            :: 0x02;
-        Function           :: 0x03;
-        Struct             :: 0x04;
-        Polymorphic_Struct :: 0x05;
-        Compound           :: 0x06;
-        Array              :: 0x07;
-        Slice              :: 0x08;
-        Dynamic_Array      :: 0x09;
-        Variadic_Argument  :: 0x0a;
-        Enum               :: 0x0b;
-        Distinct           :: 0x0c;
+        Multi_Pointer      :: 0x03;
+        Function           :: 0x04;
+        Struct             :: 0x05;
+        Polymorphic_Struct :: 0x06;
+        Compound           :: 0x07;
+        Array              :: 0x08;
+        Slice              :: 0x09;
+        Dynamic_Array      :: 0x0A;
+        Variadic_Argument  :: 0x0B;
+        Enum               :: 0x0C;
+        Distinct           :: 0x0D;
     }
 
     kind := Kind.Invalid;
@@ -69,6 +70,13 @@ Type_Info_Basic :: struct {
 }
 
 Type_Info_Pointer :: struct {
+    use base : Type_Info;
+
+    // @Rename
+    to: type_expr;
+}
+
+Type_Info_Multi_Pointer :: struct {
     use base : Type_Info;
 
     // @Rename

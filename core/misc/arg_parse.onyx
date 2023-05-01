@@ -1,35 +1,38 @@
 package core.arg_parse
 
-//
-// This is currently a very basic argument parsing library.
-// The options are given through a structure like so:
-//
-//     Options :: struct {
-//         @"--option_1"
-//         option_1: str;
-//     
-//         @"--option_2", "-o2"
-//         option_2: bool;
-//     }
-//
-//     main :: (args) => {
-//         o: Options;
-//         arg_parse.arg_parse(args, &o);
-//     }
-//
-// Options that are strings and integers expect an argument after
-// them to specify their value. Options that are bool default to
-// false and are true if one or more of the option values are present.
-//
+use core {package, printf}
+use core.iter
+use core.conv
+use core.string
+use runtime
 
-use core
-
+#doc """
+    This is currently a very basic argument parsing library.
+    The options are given through a structure like so:
+   
+        Options :: struct {
+            @"--option_1"
+            option_1: str;
+        
+            @"--option_2", "-o2"
+            option_2: bool;
+        }
+   
+        main :: (args) => {
+            o: Options;
+            arg_parse.arg_parse(args, &o);
+        }
+   
+    Options that are strings and integers expect an argument after
+    them to specify their value. Options that are bool default to
+    false and are true if one or more of the option values are present.
+""" 
 arg_parse :: (c_args: [] cstr, output: any) -> bool {
     arg_iter := iter.as_iter(c_args)
              |> iter.map(string.from_cstr);
     defer arg_iter.close(arg_iter.data);
 
-    use runtime.info;
+    use runtime.info {*};
 
     ptr_type := cast(&Type_Info_Pointer) get_type_info(output.type);
     if ptr_type.kind != .Pointer do return false;
@@ -49,7 +52,7 @@ arg_parse :: (c_args: [] cstr, output: any) -> bool {
 
                 switch member.type {
                     case bool {
-                        *(cast(&bool) (cast(&u8) data_base + member.offset)) = !*(cast(&bool) (cast(&u8) data_base + member.offset));
+                        *(cast(&bool) (cast([&] u8) data_base + member.offset)) = !*(cast(&bool) (cast([&] u8) data_base + member.offset));
                     }
 
                     case i32 {
@@ -57,14 +60,14 @@ arg_parse :: (c_args: [] cstr, output: any) -> bool {
                         if !success do return false;
 
                         value := conv.str_to_i64(value_str);
-                        *(cast(&i32) (cast(&u8) data_base + member.offset)) = ~~value;
+                        *(cast(&i32) (cast([&] u8) data_base + member.offset)) = ~~value;
                     }
 
                     case str {
                         value, success := iter.take_one(arg_iter, no_close=true);
                         if !success do return false;
 
-                        *(cast(&str) (cast(&u8) data_base + member.offset)) = value;
+                        *(cast(&str) (cast([&] u8) data_base + member.offset)) = value;
                     }
 
                     case #default {

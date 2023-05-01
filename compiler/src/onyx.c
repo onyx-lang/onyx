@@ -1,4 +1,12 @@
 // #define BH_DEBUG
+
+extern struct bh_allocator global_heap_allocator;
+
+#define STBDS_REALLOC(_,p,s) (bh_resize(global_heap_allocator, p, s))
+#define STBDS_FREE(_,p) (bh_free(global_heap_allocator, p))
+
+#define BH_INTERNAL_ALLOCATOR (global_heap_allocator)
+
 #define BH_DEFINE
 #define BH_NO_TABLE
 #define STB_DS_IMPLEMENTATION
@@ -34,6 +42,7 @@ static const char* top_level_docstring = DOCSTRING_HEADER
     "\trun       Compiles and runs an Onyx program, all at once.\n"
 #endif
     "\tcheck     Checks syntax and types of an Onyx program.\n"
+    "\twatch     Continuously rebuilds an Onyx program on file changes.\n"
     "\tpackage   Package manager\n";
     // "\tdoc <input files>\n"
 
@@ -57,14 +66,16 @@ static const char *build_docstring = DOCSTRING_HEADER
     "\t--wasm-mvp              Use only WebAssembly MVP features.\n"
     "\t--multi-threaded        Enables multi-threading for this compilation.\n"
     "\t                        Automatically enabled for \"onyx\" runtime.\n"
+    "\t--doc <doc_file>        Generates an O-DOC file, a.k.a an Onyx documentation file. Used by onyx-doc-gen.\n"
     "\t--tag                   Generates a C-Tag file.\n"
     "\t--syminfo <target_file> Generates a symbol resolution information file. Used by onyx-lsp.\n"
-    "\t--generate-foreign-info Generates information for #foreign blocks.\n"
-    // "\t--doc <doc_file>\n"
+    "\t--no-stale-code         Disables use of `#allow_stale_code` directive\n"
+    "\t--generate-foreign-info\n"
     "\n"
     "Developer options:\n"
     "\t--no-colors               Disables colors in the error message.\n"
     "\t--no-file-contents        Disables '#file_contents' for security.\n"
+    "\t--show-all-errors         Print all errors (can result in many consequencial errors from a single error)"
     "\t--print-function-mappings Prints a mapping from WASM function index to source location.\n"
     "\t--print-static-if-results Prints the conditional result of each #if statement. Useful for debugging.\n"
     "\n";
@@ -83,6 +94,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .use_post_mvp_features   = 1,
         .use_multi_threading     = 0,
         .no_std                  = 0,
+        .no_stale_code           = 0,
+        .show_all_errors         = 0,
 
         .runtime = Runtime_Onyx,
 
@@ -110,7 +123,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     core_installation = CORE_INSTALLATION;
     #endif
     #ifdef _BH_WINDOWS
-    core_installation = bh_alloc_array(global_heap_allocator, u8, 512);
+    core_installation = bh_alloc_array(alloc, u8, 512);
     GetEnvironmentVariableA("ONYX_PATH", core_installation, 512);
     #endif
 
@@ -139,11 +152,17 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         options.passthrough_argument_data  = &argv[2];
         arg_parse_start = argc;
 
-        bh_arr_push(options.files, bh_aprintf(global_heap_allocator, "%s/tools/onyx-pkg.onyx", core_installation));
+        bh_arr_push(options.files, bh_aprintf(alloc, "%s/tools/onyx-pkg.onyx", core_installation));
     }
     #ifdef ENABLE_RUN_WITH_WASMER
     else if (!strcmp(argv[1], "run")) {
         options.action = ONYX_COMPILE_ACTION_RUN;
+        arg_parse_start = 2;
+    }
+    #endif
+    #ifdef _BH_LINUX
+    else if (!strcmp(argv[1], "watch")) {
+        options.action = ONYX_COMPILE_ACTION_WATCH;
         arg_parse_start = 2;
     }
     #endif
@@ -191,6 +210,12 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             else if (!strcmp(argv[i], "--no-std")) {
                 options.no_std = 1;
             }
+            else if (!strcmp(argv[i], "--no-stale-code")) {
+                options.no_stale_code = 1;
+            }
+            else if (!strcmp(argv[i], "--show-all-errors")) {
+                options.show_all_errors = 1;
+            }
             else if (!strcmp(argv[i], "-I")) {
                 bh_arr_push(options.included_folders, argv[++i]);
             }
@@ -205,9 +230,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
                     options.runtime = Runtime_Onyx;
                 }
             }
-            // else if (!strcmp(argv[i], "--doc")) {
-            //     options.documentation_file = argv[++i];
-            // }
+            else if (!strcmp(argv[i], "--doc")) {
+                options.documentation_file = argv[++i];
+            }
             else if (!strcmp(argv[i], "--tag")) {
                 options.generate_tag_file = 1;
             }
@@ -268,7 +293,8 @@ static void compile_opts_free(CompileOptions* opts) {
 static void print_subcommand_help(const char *subcommand) {
     if (!strcmp(subcommand, "build")
         || !strcmp(subcommand, "run")
-        || !strcmp(subcommand, "check")) {
+        || !strcmp(subcommand, "check")
+        || !strcmp(subcommand, "watch")) {
         bh_printf(build_docstring, subcommand);
     }
 
@@ -303,7 +329,13 @@ static Entity *runtime_info_foreign_entity;
 static Entity *runtime_info_proc_tags_entity;
 
 static void context_init(CompileOptions* opts) {
+    memset(&context, 0, sizeof context);
+
     types_init();
+    prepare_builtins();
+
+    // HACK
+    special_global_entities_remaining = 3;
 
     context.options = opts;
     context.cycle_detected = 0;
@@ -370,10 +402,17 @@ static void context_init(CompileOptions* opts) {
         }));
     }
 
+    builtin_heap_start.entity = NULL;
+    builtin_stack_top.entity = NULL;
+    builtin_tls_base.entity = NULL;
+    builtin_tls_size.entity = NULL;
+    builtin_closure_base.entity = NULL;
+
     add_entities_for_node(NULL, (AstNode *) &builtin_stack_top, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_heap_start, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_tls_base, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_tls_size, context.global_scope, NULL);
+    add_entities_for_node(NULL, (AstNode *) &builtin_closure_base, context.global_scope, NULL);
 
     // NOTE: Add all files passed by command line to the queue
     bh_arr_each(const char *, filename, opts->files) {
@@ -397,13 +436,19 @@ static void context_init(CompileOptions* opts) {
         bh_arr_new(global_heap_allocator, context.symbol_info->symbols_resolutions, 128);
         sh_new_arena(context.symbol_info->files);
     }
+
+    if (context.options->documentation_file) {
+        context.doc_info = bh_alloc_item(global_heap_allocator, OnyxDocInfo);
+        memset(context.doc_info, 0, sizeof(OnyxDocInfo));
+        bh_arr_new(global_heap_allocator, context.doc_info->procedures, 128);
+        bh_arr_new(global_heap_allocator, context.doc_info->structures, 128);
+        bh_arr_new(global_heap_allocator, context.doc_info->enumerations, 128);
+    }
 }
 
 static void context_free() {
     bh_arena_free(&context.ast_arena);
     bh_arr_free(context.loaded_files);
-
-    compile_opts_free(context.options);
 }
 
 static void parse_source_file(bh_file_contents* file_contents) {
@@ -514,11 +559,12 @@ static b32 process_entity(Entity* ent) {
     if (context.options->verbose_output == 3) {
         if (ent->expr && ent->expr->token)
             snprintf(verbose_output_buffer, 511,
-                    "%20s | %24s (%d, %d) | %s:%i:%i \n",
+                    "%20s | %24s (%d, %d) | %5d | %s:%i:%i \n",
                    entity_state_strings[ent->state],
                    entity_type_strings[ent->type],
                    (u32) ent->macro_attempts,
                    (u32) ent->micro_attempts,
+                   ent->id,
                    ent->expr->token->pos.filename,
                    ent->expr->token->pos.line,
                    ent->expr->token->pos.column);
@@ -531,10 +577,6 @@ static b32 process_entity(Entity* ent) {
                    (u32) ent->macro_attempts,
                    (u32) ent->micro_attempts);
     }
-
-    // CLEANUP: There should be a nicer way to track if the builtins have
-    // already been initialized.
-    static b32 builtins_initialized = 0;
 
     EntityState before_state = ent->state;
     switch (before_state) {
@@ -558,8 +600,8 @@ static b32 process_entity(Entity* ent) {
             break;
 
         case Entity_State_Parse:
-            if (!builtins_initialized) {
-                builtins_initialized = 1;
+            if (!context.builtins_initialized) {
+                context.builtins_initialized = 1;
                 initialize_builtins(context.ast_alloc);
                 introduce_build_options(context.ast_alloc);
             }
@@ -768,8 +810,8 @@ static i32 onyx_compile() {
         // TODO: Replace these with bh_printf when padded formatting is added.
         printf("\nStatistics:\n");
         printf("    Time taken: %lf seconds\n", (double) duration / 1000);
-        printf("    Processed %ld lines (%f lines/second).\n", lexer_lines_processed, ((f32) 1000 * lexer_lines_processed) / (duration));
-        printf("    Processed %ld tokens (%f tokens/second).\n", lexer_tokens_processed, ((f32) 1000 * lexer_tokens_processed) / (duration));
+        printf("    Processed %ld lines (%f lines/second).\n", context.lexer_lines_processed, ((f32) 1000 * context.lexer_lines_processed) / (duration));
+        printf("    Processed %ld tokens (%f tokens/second).\n", context.lexer_tokens_processed, ((f32) 1000 * context.lexer_tokens_processed) / (duration));
         printf("\n");
     }
 
@@ -779,6 +821,10 @@ static i32 onyx_compile() {
 
     if (context.options->generate_symbol_info_file) {
         onyx_docs_emit_symbol_info(context.options->symbol_info_file);
+    }
+
+    if (context.options->documentation_file != NULL) {
+        onyx_docs_emit_odoc(context.options->documentation_file);
     }
 
     return ONYX_COMPILER_PROGRESS_SUCCESS;
@@ -842,12 +888,6 @@ static CompilerProgress onyx_flush_module() {
 
     bh_file_close(&output_file);
 
-    // if (context.options->documentation_file != NULL) {
-    //     OnyxDocumentation docs = onyx_docs_generate();
-    //     docs.format = Doc_Format_Human;
-    //     onyx_docs_emit(&docs, context.options->documentation_file);
-    // }
-
     return ONYX_COMPILER_PROGRESS_SUCCESS;
 }
 
@@ -862,7 +902,7 @@ static b32 onyx_run_module(bh_buffer code_buffer) {
 }
 
 static b32 onyx_run_wasm_file(const char *filename) {
-    bh_file_contents contents = bh_file_read_contents(global_heap_allocator, filename);
+    bh_file_contents contents = bh_file_read_contents(bh_heap_allocator(), filename);
 
     bh_buffer code_buffer;
     code_buffer.data = contents.data;
@@ -882,19 +922,89 @@ static b32 onyx_run() {
 }
 #endif
 
-int main(int argc, char *argv[]) {
+static bh_managed_heap mh;
 
+CompilerProgress do_compilation(CompileOptions *compile_opts) {
     bh_scratch_init(&global_scratch, bh_heap_allocator(), 256 * 1024); // NOTE: 256 KiB
     global_scratch_allocator = bh_scratch_allocator(&global_scratch);
 
-    // SPEED: This used to be a managed heap allocator where all allocations
-    // were tracked and would be automatically freed at the end of execution.
-    // I don't know why I ever did that because that is the job of the operating
-    // system when a process exits.
-    global_heap_allocator = bh_heap_allocator();
+    bh_managed_heap_init(&mh);
+    global_heap_allocator = bh_managed_heap_allocator(&mh);
+    // global_heap_allocator = bh_heap_allocator();
+    context_init(compile_opts);
 
-    CompileOptions compile_opts = compile_opts_parse(global_heap_allocator, argc, argv);
-    context_init(&compile_opts);
+    return onyx_compile();
+}
+
+void cleanup_compilation() {
+    context_free();
+
+    bh_scratch_free(&global_scratch);
+    bh_managed_heap_free(&mh);
+}
+
+#ifdef _BH_LINUX
+
+#include <signal.h>
+
+static bh_file_watch watches;
+
+static void onyx_watch_stop(int sig) {
+    bh_file_watch_stop(&watches);
+}
+
+static void onyx_watch(CompileOptions *compile_opts) {
+    signal(SIGINT, onyx_watch_stop);
+
+    b32 running_watch = 1;
+
+    do {
+        bh_printf("\e[2J\e[?25l\n");
+        bh_printf("\e[3;1H");
+
+        if (do_compilation(compile_opts) == ONYX_COMPILER_PROGRESS_SUCCESS) {
+            onyx_flush_module();
+            bh_printf("\e[92mNo errors.\n");
+        }
+
+        char time_buf[128] = {0};
+        time_t now = time(NULL);
+        strftime(time_buf, 128, "%X", localtime(&now));
+        bh_printf("\e[1;1H\e[30;105m Onyx " VERSION " \e[30;104m Built %s \e[0m", time_buf);
+
+        i32 errors = bh_arr_length(context.errors.errors);
+        if (errors == 0) {
+            bh_printf("\e[30;102m Errors 0 \e[0m");
+        } else {
+            bh_printf("\e[30;101m Error%s %d \e[0m", bh_num_plural(errors), errors);
+        }
+
+        watches = bh_file_watch_new();
+
+        bh_arr_each(bh_file_contents, file, context.loaded_files) {
+            bh_file_watch_add(&watches, file->filename);
+        }
+
+        cleanup_compilation();
+
+        if (!bh_file_watch_wait(&watches)) {
+            running_watch = 0;
+        }
+
+        bh_file_watch_free(&watches);
+    } while(running_watch);
+
+        
+    bh_printf("\e[2J\e[1;1H\e[?25h\n");
+}
+
+#endif
+
+
+
+
+int main(int argc, char *argv[]) {
+    CompileOptions compile_opts = compile_opts_parse(bh_heap_allocator(), argc, argv);
 
     CompilerProgress compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
     switch (compile_opts.action) {
@@ -908,19 +1018,23 @@ int main(int argc, char *argv[]) {
         }
 
         case ONYX_COMPILE_ACTION_CHECK:
-            compiler_progress = onyx_compile();
+            compiler_progress = do_compilation(&compile_opts);
             break;
 
         case ONYX_COMPILE_ACTION_COMPILE:
-            compiler_progress = onyx_compile();
+            compiler_progress = do_compilation(&compile_opts);
             if (compiler_progress == ONYX_COMPILER_PROGRESS_SUCCESS) {
                 onyx_flush_module();
             }
             break;
 
+        case ONYX_COMPILE_ACTION_WATCH:
+            onyx_watch(&compile_opts);
+            break;
+
         #ifdef ENABLE_RUN_WITH_WASMER
         case ONYX_COMPILE_ACTION_RUN:
-            compiler_progress = onyx_compile();
+            compiler_progress = do_compilation(&compile_opts);
             if (compiler_progress == ONYX_COMPILER_PROGRESS_SUCCESS) {
                 if (!onyx_run()) {
                     compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
@@ -931,6 +1045,8 @@ int main(int argc, char *argv[]) {
 
         #ifdef ENABLE_RUN_WITH_WASMER
         case ONYX_COMPILE_ACTION_RUN_WASM:
+            global_heap_allocator = bh_heap_allocator();
+            context_init(&compile_opts);
             compiler_progress = ONYX_COMPILER_PROGRESS_SUCCESS;
             if (!onyx_run_wasm_file(context.options->target_file)) {
                 compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
@@ -941,21 +1057,13 @@ int main(int argc, char *argv[]) {
     }
 
     switch (compiler_progress) {
-        case ONYX_COMPILER_PROGRESS_ERROR:
-            break;
-
         case ONYX_COMPILER_PROGRESS_FAILED_OUTPUT:
             bh_printf_err("Failed to open file for writing: '%s'\n", compile_opts.target_file);
             break;
-
-        case ONYX_COMPILER_PROGRESS_SUCCESS:
-            break;
     }
 
-    context_free();
-
-    bh_scratch_free(&global_scratch);
-    // bh_managed_heap_free(&global_heap);
+    cleanup_compilation();
+    compile_opts_free(&compile_opts);
 
     return compiler_progress != ONYX_COMPILER_PROGRESS_SUCCESS;
 }

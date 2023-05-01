@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+use core {*}
 
 dumb :: (it: Iterator, m: &Map) {
     println(it.Iter_Type);

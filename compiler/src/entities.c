@@ -74,14 +74,12 @@ void entity_heap_init(EntityHeap* entities) {
     bh_arena_init(&entities->entity_arena, global_heap_allocator, 32 * 1024);
 }
 
-static u32 next_entity_id = 0;
-
 // Allocates the entity in the entity heap. Don't quite feel this is necessary...
 Entity* entity_heap_register(EntityHeap* entities, Entity e) {
     bh_allocator alloc = bh_arena_allocator(&entities->entity_arena);
     Entity* entity = bh_alloc_item(alloc, Entity);
     *entity = e;
-    entity->id = next_entity_id++;
+    entity->id = context.next_entity_id++;
     entity->macro_attempts = 0;
     entity->micro_attempts = 0;
     entity->entered_in_queue = 0;
@@ -94,10 +92,16 @@ void entity_heap_insert_existing(EntityHeap* entities, Entity* e) {
 
     if (entities->entities == NULL) {
         bh_arr_new(global_heap_allocator, entities->entities, 128);
+        bh_arr_new(global_heap_allocator, entities->quick_unsorted_entities, 128);
     }
 
-    bh_arr_push(entities->entities, e);
-    eh_shift_up(entities, bh_arr_length(entities->entities) - 1);
+    if (e->state <= Entity_State_Introduce_Symbols) {
+        bh_arr_push(entities->quick_unsorted_entities, e);
+    } else {
+        bh_arr_push(entities->entities, e);
+        eh_shift_up(entities, bh_arr_length(entities->entities) - 1);
+    }
+
     e->entered_in_queue = 1;
 
     entities->state_count[e->state]++;
@@ -112,6 +116,10 @@ Entity* entity_heap_insert(EntityHeap* entities, Entity e) {
 }
 
 Entity* entity_heap_top(EntityHeap* entities) {
+    if (bh_arr_length(entities->quick_unsorted_entities) > 0) {
+        return entities->quick_unsorted_entities[0];
+    }
+
     return entities->entities[0];
 }
 
@@ -130,14 +138,26 @@ void entity_heap_change_top(EntityHeap* entities, Entity* new_top) {
 }
 
 void entity_heap_remove_top(EntityHeap* entities) {
-    entities->state_count[entities->entities[0]->state]--;
-    entities->type_count[entities->entities[0]->type]--;
-    entities->all_count[entities->entities[0]->state][entities->entities[0]->type]--;
-    entities->entities[0]->entered_in_queue = 0;
+    Entity *e;
 
-    entities->entities[0] = entities->entities[bh_arr_length(entities->entities) - 1];
-    bh_arr_pop(entities->entities);
-    eh_shift_down(entities, 0);
+    if (bh_arr_length(entities->quick_unsorted_entities) > 0) {
+        e = entities->quick_unsorted_entities[0];
+    } else {
+        e = entities->entities[0];
+    }
+
+    entities->state_count[e->state]--;
+    entities->type_count[e->type]--;
+    entities->all_count[e->state][e->type]--;
+    e->entered_in_queue = 0;
+
+    if (bh_arr_length(entities->quick_unsorted_entities) > 0) {
+        bh_arr_fastdelete(entities->quick_unsorted_entities, 0);
+    } else {
+        entities->entities[0] = entities->entities[bh_arr_length(entities->entities) - 1];
+        bh_arr_pop(entities->entities);
+        eh_shift_down(entities, 0);
+    }
 }
 
 void entity_change_type(EntityHeap* entities, Entity *ent, EntityType new_type) {
@@ -299,19 +319,6 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             break;
         }
 
-        case Ast_Kind_Use: {
-            if (((AstUse *) node)->expr->kind == Ast_Kind_Package) {
-                ent.state = Entity_State_Resolve_Symbols;
-                ent.type = Entity_Type_Use_Package;
-            } else {
-                ent.type = Entity_Type_Use;
-            }
-
-            ent.use = (AstUse *) node;
-            ENTITY_INSERT(ent);
-            break;
-        }
-
         case Ast_Kind_Memres: {
             ent.type = Entity_Type_Memory_Reservation_Type;
             ent.mem_res = (AstMemRes *) node;
@@ -395,6 +402,14 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         case Ast_Kind_Foreign_Block: {
             ent.type = Entity_Type_Foreign_Block;
             ent.foreign_block = (AstForeignBlock *) node;
+            ent.state = Entity_State_Resolve_Symbols;
+            ENTITY_INSERT(ent);
+            break;
+        }
+
+        case Ast_Kind_Import: {
+            ent.type = Entity_Type_Import;
+            ent.import = (AstImport *) node;
             ent.state = Entity_State_Resolve_Symbols;
             ENTITY_INSERT(ent);
             break;

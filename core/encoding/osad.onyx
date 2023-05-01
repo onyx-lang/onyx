@@ -1,7 +1,12 @@
 package core.encoding.osad
+#allow_stale_code
 
+use core.io
+use core.string
+use core.array
+use core.memory
+use runtime
 
-use core {io, string, array, memory}
 use runtime {
     type_info :: info
 }
@@ -60,7 +65,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
         case .Array {
             a_info := cast(&type_info.Type_Info_Array, info);
 
-            base: &u8 = ~~v.data;
+            base: [&] u8 = ~~v.data;
             elem_size := type_info.size_of(a_info.of);
 
             for a_info.count {
@@ -72,8 +77,8 @@ serialize :: (v: any, w: &io.Writer) -> bool {
             s_info := cast(&type_info.Type_Info_Slice, info);
 
             untyped_slice := cast(&array.Untyped_Array, v.data);
-            base: &u8 = untyped_slice.data;
-            count:    = untyped_slice.count;
+            base: [&] u8 = untyped_slice.data;
+            count:       = untyped_slice.count;
             elem_size := type_info.size_of(s_info.of);
 
             output_u32(w, count);
@@ -95,7 +100,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
         case .Struct {
             s_info := cast(&type_info.Type_Info_Struct, info);
 
-            base: &u8 = ~~v.data;
+            base: [&] u8 = ~~v.data;
 
             for& member: s_info.members {
                 try(serialize(any.{ base + member.offset, member.type }, w));
@@ -120,12 +125,12 @@ serialize :: (v: any, w: &io.Writer) -> bool {
 deserialize :: #match #local {}
 
 #overload
-deserialize :: ($T: type_expr, s: str) -> ?T {
+deserialize :: ($T: type_expr, s: str, allocator := context.allocator) -> ?T {
     reader, stream := io.reader_from_string(s);
     defer cfree(stream);
 
     target: T;
-    if !deserialize(&target, T, &reader) {
+    if !deserialize(&target, T, &reader, allocator) {
         // This could leak memory if we partially deserialized something.
         return .{};
     }
@@ -134,7 +139,7 @@ deserialize :: ($T: type_expr, s: str) -> ?T {
 }
 
 #overload
-deserialize :: (target: rawptr, type: type_expr, r: &io.Reader) -> bool {
+deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := context.allocator) -> bool {
     info := type_info.get_type_info(type);
 
     switch info.kind {
@@ -149,28 +154,28 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader) -> bool {
         }
 
         case .Basic {
-            bytes, err := io.read_bytes(r, .{ target, info.size });
+            err := io.read_fill_buffer(r, .{ target, info.size });
             assert(err == .None, "Deserialize expected to be able to read all the bytes.");
         }
 
         case .Enum {
             e_info := cast(&type_info.Type_Info_Enum, info);
-            try(deserialize(target, e_info.backing_type, r));
+            try(deserialize(target, e_info.backing_type, r, allocator));
         }
 
         case .Distinct {
             d_info := cast(&type_info.Type_Info_Distinct, info);
-            try(deserialize(target, d_info.base_type, r));
+            try(deserialize(target, d_info.base_type, r, allocator));
         }
 
         case .Array {
             a_info := cast(&type_info.Type_Info_Array, info);
 
-            base: &u8 = target;
+            base: [&] u8 = target;
             elem_size := type_info.size_of(a_info.of);
 
             for a_info.count {
-                try(deserialize(base + it * elem_size, a_info.of, r));
+                try(deserialize(base + it * elem_size, a_info.of, r, allocator));
             }
         }
 
@@ -182,28 +187,28 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader) -> bool {
 
             untyped_slice := cast(&array.Untyped_Array, target);
             untyped_slice.count = count;
-            untyped_slice.data = raw_alloc(context.allocator, elem_size * count);
+            untyped_slice.data = raw_alloc(allocator, elem_size * count);
             memory.set(untyped_slice.data, 0, elem_size * count);
 
             if info.kind == .Dynamic_Array {
                 untyped_slice.capacity = count;
-                untyped_slice.allocator = context.allocator;
+                untyped_slice.allocator = allocator;
             }
 
-            base: &u8 = untyped_slice.data;
+            base: [&] u8 = untyped_slice.data;
 
             for count {
-                try(deserialize(base + it * elem_size, s_info.of, r));
+                try(deserialize(base + it * elem_size, s_info.of, r, allocator));
             }
         }
 
         case .Struct {
             s_info := cast(&type_info.Type_Info_Struct, info);
 
-            base: &u8 = target;
+            base: [&] u8 = target;
 
             for& member: s_info.members {
-                try(deserialize(base + member.offset, member.type, r));
+                try(deserialize(base + member.offset, member.type, r, allocator));
             }
         }
     }
@@ -212,7 +217,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader) -> bool {
 
     read_u32 :: macro (r: &io.Reader) -> u32 {
         dest: u32;
-        io.read_bytes(r, str.{~~&dest, 4});
+        io.read_fill_buffer(r, str.{~~&dest, 4});
         return dest;
     }
 }

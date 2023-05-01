@@ -1,5 +1,7 @@
 use core
-use core.encoding {osad}
+use core.encoding.osad
+
+use core {printf}
 
 Foo :: struct {
     nums: [] i32;

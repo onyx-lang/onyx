@@ -1,7 +1,10 @@
 package core.alloc.fixed
 
-// This allocator is very simple and always returns the same pointer,
-// unless too much memory is asked for, in which case it returns null.
+use core
+
+// This allocator is very simple. It is simply a bump allocator from
+// a fixed size buffer. It cannot free or resize, and will return null
+// when it has used all memory in the buffer given to it.
 //
 // This kind of allocator is useful for temporary string building or
 // similar circumstances, where you know that the needed memory size
@@ -10,32 +13,32 @@ package core.alloc.fixed
 // can continue to use the same code that does allocations like normal,
 // but can get the speed increase of a simple allocation strategy.
 
-FixedAllocatorData :: struct {
-    ptr  : rawptr;
-    size : u32;
+FixedAllocator :: struct {
+    buffer: [] u8;
+    end: u32;
 }
 
 #local
 fixed_allocator_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
-    fa_data := cast(&FixedAllocatorData) data;  
+    fa_data := cast(&FixedAllocator) data;  
 
     if aa != .Alloc do return null;
-    if size > fa_data.size do return null;
+    if size > fa_data.buffer.count - fa_data.end do return null;
+
+    aligned_end := cast(u32) core.memory.align(fa_data.end, align);
+    defer fa_data.end = aligned_end + size;
     
-    return fa_data.ptr;
+    return fa_data.buffer.data + aligned_end;
 }
 
-make :: (ptr: rawptr, size: u32) -> FixedAllocatorData {
-    return FixedAllocatorData.{
-        ptr  = ptr,
-        size = size,
-    };
-}
+make :: (buffer: [] u8) => FixedAllocator.{ buffer, 0 }
 
 #match core.alloc.as_allocator make_allocator
-make_allocator :: (fa_data: &FixedAllocatorData) -> Allocator {
-    return Allocator.{
-        func = fixed_allocator_proc,
-        data = fa_data,
-    };
+make_allocator :: (fa_data: &FixedAllocator) => Allocator.{
+    func = fixed_allocator_proc,
+    data = fa_data,
+}
+
+reset :: (data: &FixedAllocator) {
+    data.end = 0;
 }

@@ -45,13 +45,14 @@ enum BasicFlag {
     Basic_Flag_Unsigned         = BH_BIT(2),
     Basic_Flag_Float            = BH_BIT(3),
     Basic_Flag_Pointer          = BH_BIT(4),
+    Basic_Flag_Multi_Pointer    = BH_BIT(7),
 
     Basic_Flag_SIMD             = BH_BIT(5),
 
     Basic_Flag_Type_Index       = BH_BIT(6),
 
     Basic_Flag_Numeric          = Basic_Flag_Integer | Basic_Flag_Float,
-    Basic_Flag_Ordered          = Basic_Flag_Integer | Basic_Flag_Float | Basic_Flag_Pointer,
+    Basic_Flag_Ordered          = Basic_Flag_Integer | Basic_Flag_Float | Basic_Flag_Pointer | Basic_Flag_Multi_Pointer,
     Basic_Flag_Equality         = Basic_Flag_Ordered | Basic_Flag_Type_Index | Basic_Flag_Boolean,
     Basic_Flag_Constant_Type    = Basic_Flag_Boolean | Basic_Flag_Numeric | Basic_Flag_Pointer,
     Basic_Flag_Numeric_Ordered  = Basic_Flag_Numeric | Basic_Flag_Ordered,
@@ -104,7 +105,14 @@ typedef enum StructProcessingStatus {
 
 #define TYPE_KINDS \
     TYPE_KIND(Basic, TypeBasic)                                   \
-    TYPE_KIND(Pointer, struct { TypeBasic base; Type *elem; })    \
+    TYPE_KIND(Pointer, struct {                                   \
+        TypeBasic base;                                           \
+        Type *elem;                                               \
+    })                                                            \
+    TYPE_KIND(MultiPointer, struct {                              \
+        TypeBasic base;                                           \
+        Type *elem;                                               \
+    })                                                            \
     TYPE_KIND(Function, struct {                                  \
         Type *return_type;                                        \
         u16 param_count;                                          \
@@ -207,6 +215,7 @@ Type* type_build_function_type(bh_allocator alloc, struct AstFunction* func);
 Type* type_build_compound_type(bh_allocator alloc, struct AstCompound* compound);
 
 Type* type_make_pointer(bh_allocator alloc, Type* to);
+Type* type_make_multi_pointer(bh_allocator alloc, Type* to);
 Type* type_make_array(bh_allocator alloc, Type* to, u32 count);
 Type* type_make_slice(bh_allocator alloc, Type* of);
 Type* type_make_dynarray(bh_allocator alloc, Type* of);
@@ -231,6 +240,7 @@ i32 type_get_idx_of_linear_member_with_offset(Type* type, u32 offset);
 b32 type_struct_is_simple(Type* type);
 
 b32 type_is_pointer(Type* type);
+b32 type_is_multi_pointer(Type* type);
 b32 type_is_rawptr(Type* type);
 b32 type_is_array(Type* tyoe);
 b32 type_is_struct(Type* type);

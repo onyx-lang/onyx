@@ -1,6 +1,9 @@
 #load "core/std"
 
-use package core
+use core
+use core.io
+use core.array
+use core {printf}
 
 main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day1.txt";

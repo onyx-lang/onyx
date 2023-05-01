@@ -4,10 +4,12 @@ package core.alloc.log
 // prints every allocation/deallocation made by that 
 // allocator.
 
+use core
+
 #local
 Allocation_Action_Strings := str.[
-    " alloc",
-    "  free",
+    "alloc",
+    "free",
     "resize",
 ];
 
@@ -17,8 +19,8 @@ logging_allocator_proc :: (data: rawptr, aa: AllocationAction, size: u32, align:
     res := allocator.func(allocator.data, aa, size, align, oldptr);
 
     use core { tprintf }
-    msg := tprintf("{} with size {}, align {}, oldptr {} returns {}\n",
-        Allocation_Action_Strings[cast(u32) aa], size, align, oldptr, res);
+    msg := tprintf("{} = {}(size={}, align={}, oldptr={})",
+        res, Allocation_Action_Strings[cast(u32) aa], size, align, oldptr);
 
     log(.Info, "Core", msg);
 

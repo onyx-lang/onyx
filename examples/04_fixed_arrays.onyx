@@ -17,7 +17,7 @@
 
 #load "core/std"
 
-use package core
+use core {*}
 
 main :: (args: [] cstr) {
     // The following declares a fixed-size array of 10 i32s on the stack. Currently,

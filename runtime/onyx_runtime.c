@@ -48,10 +48,6 @@ ONYX_LIBRARY {
     ONYX_FUNC(__file_get_standard)
     ONYX_FUNC(__file_rename)
 
-#ifdef _BH_LINUX
-    ONYX_FUNC(__enable_non_blocking_stdin)
-#endif
-
     ONYX_FUNC(__dir_open)
     ONYX_FUNC(__dir_read)
     ONYX_FUNC(__dir_close)
@@ -74,6 +70,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(__exit)
     ONYX_FUNC(__sleep)
     ONYX_FUNC(__time)
+    ONYX_FUNC(__lookup_env)
     ONYX_FUNC(__register_cleanup)
 
     ONYX_FUNC(__time_localtime)

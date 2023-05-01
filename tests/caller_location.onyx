@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+use core {*}
 
 using_callsite :: (value: $T, site := #callsite) {
     println(value);
@@ -25,4 +25,4 @@ Something :: struct {
     }
 }
 
-#local runtime :: package runtime
+use runtime

@@ -58,6 +58,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Type: return sizeof(AstType);
         case Ast_Kind_Basic_Type: return sizeof(AstBasicType);
         case Ast_Kind_Pointer_Type: return sizeof(AstPointerType);
+        case Ast_Kind_Multi_Pointer_Type: return sizeof(AstMultiPointerType);
         case Ast_Kind_Function_Type: return sizeof(AstFunctionType) + ((AstFunctionType *) node)->param_count * sizeof(AstType *);
         case Ast_Kind_Array_Type: return sizeof(AstArrayType);
         case Ast_Kind_Slice_Type: return sizeof(AstSliceType);
@@ -99,7 +100,6 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_For: return sizeof(AstFor);
         case Ast_Kind_While: return sizeof(AstIfWhile);
         case Ast_Kind_Jump: return sizeof(AstJump);
-        case Ast_Kind_Use: return sizeof(AstUse);
         case Ast_Kind_Defer: return sizeof(AstDefer);
         case Ast_Kind_Switch: return sizeof(AstSwitch);
         case Ast_Kind_Switch_Case: return sizeof(AstSwitchCase);
@@ -116,6 +116,9 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Directive_Remove: return sizeof(AstDirectiveRemove);
         case Ast_Kind_Directive_First: return sizeof(AstDirectiveFirst);
         case Ast_Kind_Directive_Export_Name: return sizeof(AstDirectiveExportName);
+        case Ast_Kind_Import: return sizeof(AstImport);
+        case Ast_Kind_Capture_Block: return sizeof(AstCaptureBlock);
+        case Ast_Kind_Capture_Local: return sizeof(AstCaptureLocal);
         case Ast_Kind_Count: return 0;
     }
 
@@ -130,6 +133,7 @@ AstNode* ast_clone_with_captured_entities(bh_allocator a, void* n, bh_arr(AstNod
     AstNode* cloned = ast_clone(a, n);
 
     *ents = captured_entities;
+    captured_entities = NULL;
     return cloned;
 }
 
@@ -330,6 +334,10 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             C(AstPointerType, elem);
             break;
 
+        case Ast_Kind_Multi_Pointer_Type:
+            C(AstMultiPointerType, elem);
+            break;
+
         case Ast_Kind_Array_Type:
             C(AstArrayType, count_expr);
             C(AstArrayType, elem);
@@ -441,28 +449,43 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
         case Ast_Kind_Function:
         case Ast_Kind_Polymorphic_Proc: {
-            if (clone_depth > 1) {
-                clone_depth--;
-                return node;
-            }
-
             AstFunction* df = (AstFunction *) nn;
             AstFunction* sf = (AstFunction *) node;
 
-            convert_polyproc_to_function(df);
+            // Check if we are cloning a function inside of a function.
+            if (clone_depth > 1) {
+                // If we are, and the inner function has a scope, this means that
+                // the inner function does not capture anything, and is not polymorphic.
+                // Therefore, it should be treated as a normal function and not cloned
+                // inside of this function.
+                // 
+                // If the inner function does not have a scope, that means that it is
+                // either polymorphic and/or it has captures. In either case, we have
+                // to clone the function internally below.
+                if (df->scope != NULL) {
+                    clone_depth--;
+                    return node;
+                }
+            }
+            else {
+                convert_polyproc_to_function(df);
+            }
 
             if (sf->is_foreign) return node;
             assert(df->scope == NULL);
 
             df->nodes_that_need_entities_after_clone = NULL;
             bh_arr_new(global_heap_allocator, df->nodes_that_need_entities_after_clone, 1);
+
+            bh_arr(AstNode *) old_captured_entities = captured_entities;
             captured_entities = df->nodes_that_need_entities_after_clone;
 
             df->return_type = (AstType *) ast_clone(a, sf->return_type);
             df->body = (AstBlock *) ast_clone(a, sf->body);
+            df->captures = (AstCaptureBlock *) ast_clone(a, sf->captures);
 
             df->nodes_that_need_entities_after_clone = captured_entities;
-            captured_entities = NULL;
+            captured_entities = old_captured_entities;
 
             df->params = NULL;
             bh_arr_new(context.ast_alloc, df->params, bh_arr_length(sf->params));
@@ -498,6 +521,16 @@ AstNode* ast_clone(bh_allocator a, void* n) {
                 }    
             }
 
+            if (df->kind == Ast_Kind_Polymorphic_Proc) {
+                df->scope_to_lookup_captured_values = NULL;
+            }
+
+            if (clone_depth > 1 && captured_entities) {
+                sf->flags |= Ast_Flag_Function_Is_Lambda_Inside_PolyProc;
+                df->flags &= ~Ast_Flag_Function_Is_Lambda_Inside_PolyProc;
+                E(df);
+            }
+
             break;
         }
 
@@ -517,10 +550,6 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             dc->phase = Constraint_Phase_Waiting_To_Be_Queued;
             break;
         }
-
-        case Ast_Kind_Use:
-            C(AstUse, expr);
-            break;
 
         case Ast_Kind_Directive_Solidify: {
             AstDirectiveSolidify* dd = (AstDirectiveSolidify *) nn;
@@ -582,7 +611,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
         case Ast_Kind_Do_Block:
             C(AstDoBlock, block);
-            ((AstDoBlock *) nn)->type_node = (AstType *) &basic_type_auto_return;
+            C(AstDoBlock, type_node);
             break;
 
         case Ast_Kind_File_Contents:
@@ -592,6 +621,23 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
         case Ast_Kind_Directive_Export_Name:
             C(AstDirectiveExportName, func);
+            break;
+
+        case Ast_Kind_Capture_Block: {
+            AstCaptureBlock* cd = (AstCaptureBlock *) nn;
+            AstCaptureBlock* cs = (AstCaptureBlock *) node;
+
+            cd->captures = NULL;
+            bh_arr_new(global_heap_allocator, cd->captures, bh_arr_length(cs->captures));
+
+            bh_arr_each(AstCaptureLocal *, expr, cs->captures) {
+                bh_arr_push(cd->captures, (AstCaptureLocal *) ast_clone(a, (AstNode *) *expr));
+            }
+            break;
+        }
+
+        case Ast_Kind_Capture_Local:
+            C(AstCaptureLocal, type_node);
             break;
     }
 

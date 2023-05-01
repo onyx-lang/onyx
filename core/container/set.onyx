@@ -1,6 +1,12 @@
 package core.set
 
-use core {array, hash, memory, math, Optional}
+use core
+use core.array
+use core.hash
+use core.memory
+use core.math
+
+use core {Optional}
 
 #local SetValue :: interface (t: $T) {
     { hash.hash(t) } -> u32;
@@ -36,6 +42,10 @@ Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
     as_iter  :: as_iter
 }
 
+#inject builtin {
+    Set :: Set;
+}
+
 make :: ($T: type_expr, default := T.{}, allocator := context.allocator) -> Set(T) {
     set : Set(T);
     init(&set, default=default, allocator=allocator);
@@ -43,7 +53,7 @@ make :: ($T: type_expr, default := T.{}, allocator := context.allocator) -> Set(
 }
 
 #overload
-builtin.__make_overload :: macro (x: &Set, allocator: Allocator) => core.set.make(x.Elem_Type, allocator = allocator);
+builtin.__make_overload :: macro (x: &Set, allocator: Allocator) => #this_package.make(x.Elem_Type, allocator = allocator);
 
 init :: (set: &Set($T), default := T.{}, allocator := context.allocator) {
     set.allocator = allocator;
@@ -61,7 +71,7 @@ free :: (use set: &Set) {
 }
 
 #overload
-builtin.delete :: core.set.free
+builtin.delete :: #this_package.free
 
 insert :: (use set: &Set, value: set.Elem_Type) {
     if hashes.data == null do init(set);
@@ -75,7 +85,7 @@ insert :: (use set: &Set, value: set.Elem_Type) {
     if full(set) do grow(set);
 }
 
-#operator << macro (set: Set($T), value: T) do core.set.insert(&set, value);
+#operator << macro (set: Set($T), value: T) do #this_package.insert(&set, value);
 
 has :: (use set: &Set, value: set.Elem_Type) -> bool {
     lr := lookup(set, value);
@@ -133,7 +143,7 @@ as_iter :: (s: &Set) =>
 
         (ctx) => {
             if ctx.i >= ctx.s.entries.count {
-                return (typeof &ctx.s.entries.data.value).{}, false;
+                return (typeof &ctx.s.entries.data[0].value).{}, false;
             }
 
             defer ctx.i += 1;

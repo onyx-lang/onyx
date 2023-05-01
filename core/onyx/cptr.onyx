@@ -70,7 +70,7 @@ cptr :: struct (T: type_expr) {
         // to the same idea as 'null' in Onyx.
         if this.data == 0 do return null;
 
-        wasm :: package core.intrinsics.wasm
+        use core.intrinsics.wasm
         // Using 1 instead of 0 because a null pointer (0) converts
         // to the memory address 0, not the base address for the WASM
         // memory.

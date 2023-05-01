@@ -51,3 +51,8 @@ sqrt_f64     :: (val: f64) -> f64 #intrinsic ---
 min_f64      :: (lhs: f64, rhs: f64) -> f64 #intrinsic ---
 max_f64      :: (lhs: f64, rhs: f64) -> f64 #intrinsic ---
 copysign_f64 :: (lhs: f64, rhs: f64) -> f64 #intrinsic ---
+
+reinterpret_f32 :: (val: f32) -> i32 #intrinsic ---
+reinterpret_f64 :: (val: f64) -> i64 #intrinsic ---
+reinterpret_i32 :: (val: i32) -> f32 #intrinsic ---
+reinterpret_i64 :: (val: i64) -> f64 #intrinsic ---

@@ -1,6 +1,7 @@
 #load "core/std"
-use package core
-info :: package runtime.info
+
+use core {*}
+use runtime.info
 
 Base :: struct (T: type_expr) {
     const: i32;

@@ -1,5 +1,7 @@
 package builtin
 
+use runtime
+
 //
 // Explanation of `package builtin`
 //
@@ -27,7 +29,7 @@ package builtin
 // A string is simply a slice of bytes, and a c-string is a pointer
 // to byte, with a null-terminator ('\0') at the end.
 str     :: #type   [] u8;
-cstr    :: #type    & u8;
+cstr    :: #type  [&] u8;
 dyn_str :: #type [..] u8;
 
 
@@ -58,16 +60,17 @@ range :: struct {
 // casts to all other pointer types.
 null :: cast(rawptr) 0
 
-//
-// `null_proc` is a special function that breaks the normal rules of type
-// checking. `null_proc`, or any procedure marked with `#null`, is assignable
-// to any function type, regardless of if the types match. For example,
-//
-//     f: (i32) -> i32 = null_proc;
-//
-// Even though `null_proc` is a `() -> void` function, it bypasses that check
-// and gets assigned to `f`. If f is called, there will be a runtime exception.
-// This is by design.
+#doc """
+    `null_proc` is a special function that breaks the normal rules of type
+    checking. `null_proc`, or any procedure marked with `#null`, is assignable
+    to any function type, regardless of if the types match. For example,
+    
+        f: (i32) -> i32 = null_proc;
+    
+    Even though `null_proc` is a `() -> void` function, it bypasses that check
+    and gets assigned to `f`. If f is called, there will be a runtime exception.
+    This is by design.
+"""
 null_proc :: () -> void #null ---
 
 //
@@ -99,6 +102,10 @@ OnyxContext :: struct {
     // start of the main loop of your program.
     temp_allocator : Allocator;
 
+    // The procedure to call when allocating space for a closure.
+    // The default is to allocate using the `temp_allocator`.
+    closure_allocate: (size: i32) -> rawptr = default_closure_allocate;
+
     // Defines what happens when `log()` is called. Defaults to a
     // logger that filters log messages by their severity.
     logger         : Logger = .{ default_logger_proc, &default_logger };
@@ -113,7 +120,6 @@ OnyxContext :: struct {
     thread_id      : i32;
 
     // Allows you to place any data on the context that you want to.
-    // Generally used in place a closure mechanism.
     user_data: rawptr;
     user_data_type: type_expr;
 }
@@ -195,6 +201,8 @@ default_log_level :: (level: Log_Level) {
 
 #if runtime.runtime != .Custom {
     #local default_logger_proc :: (logger: &Default_Logger, level: Log_Level, msg: str, module: str) {
+        use core;
+
         if level < logger.minimum_level do return;
 
         if module {
@@ -208,6 +216,11 @@ default_log_level :: (level: Log_Level) {
     #local default_logger_proc :: (data: rawptr, level: Log_Level, msg: str, module: str) {
         // In a custom runtime, there is no way to know how to log something.
     }
+}
+
+
+#local default_closure_allocate :: (size: i32) -> rawptr {
+    return raw_alloc(context.temp_allocator, size);
 }
 
 
@@ -250,6 +263,12 @@ raw_free :: (use a: Allocator, ptr: rawptr) {
     func(data, AllocationAction.Free, 0, 0, ptr);
 }
 
+#inject Allocator {
+    alloc :: raw_alloc
+    resize :: raw_resize
+    free :: raw_free
+}
+
 //
 // Helper function to allocate/free using allocator in the context structure.
 calloc  :: (size: u32)              => raw_alloc(context.allocator, size);
@@ -261,12 +280,14 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 // This cannot be used in a custom runtime, as the other core
 // packages are not included.
 #if runtime.runtime != .Custom {
+    use core
+    use core.memory
+
     new :: #match #local {}
 
     #overload
     new :: ($T: type_expr, allocator := context.allocator) -> &T {
-        use package core.intrinsics.onyx { __initialize }
-        memory :: package core.memory
+        use core.intrinsics.onyx { __initialize }
 
         res := cast(&T) raw_alloc(allocator, sizeof T);
         memory.set(res, 0, sizeof T);
@@ -277,8 +298,7 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 
     #overload
     new :: (T: type_expr, allocator := context.allocator) -> rawptr {
-        memory :: package core.memory
-        type_info :: package runtime.info
+        type_info :: runtime.info
 
         info := type_info.get_type_info(T);
         size := type_info.size_of(T);
@@ -292,7 +312,7 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
             for s_info.members {
                 if it.default != null {
                     member_size := type_info.size_of(it.type);
-                    memory.copy(cast(&u8) res + it.offset, it.default, member_size);
+                    memory.copy(cast([&] u8) res + it.offset, it.default, member_size);
                 }
             }
         }
@@ -364,28 +384,29 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 }
 
 
-//
-// Represents a generic "iterator" or "generator" of a specific
-// type. Can be used in a for-loop natively.
-//
-// `data` is used for contextual information and is passed to
-// the `next`, `close`, and `remove` procedures.
-//
-// `next` is used to extract the next value out of the iterator.
-// It returns the next value, and a continuation flag. If the
-// flag is false, the value should be ignored and iteration should
-// stop.
-//
-// `close` should called when the iterator has ended. This is
-// done automatically in for-loops, and in the `core.iter` library.
-// In for-loops, `close` is called no matter which way the for-loop
-// exits (`break`, `return`, etc). Using this rule, iterator can
-// be used to create "resources" that automatically close when you
-// are done with them.
-//
-// `remove` is used to tell the iterator to remove the last value
-// returned from some underlying data store. Invoked automatically
-// using the `#remove` directive in a for-loop.
+#doc """
+   Represents a generic "iterator" or "generator" of a specific
+   type. Can be used in a for-loop natively.
+   
+   `data` is used for contextual information and is passed to
+   the `next`, `close`, and `remove` procedures.
+   
+   `next` is used to extract the next value out of the iterator.
+   It returns the next value, and a continuation flag. If the
+   flag is false, the value should be ignored and iteration should
+   stop.
+   
+   `close` should called when the iterator has ended. This is
+   done automatically in for-loops, and in the `core.iter` library.
+   In for-loops, `close` is called no matter which way the for-loop
+   exits (`break`, `return`, etc). Using this rule, iterator can
+   be used to create "resources" that automatically close when you
+   are done with them.
+   
+   `remove` is used to tell the iterator to remove the last value
+   returned from some underlying data store. Invoked automatically
+   using the `#remove` directive in a for-loop.
+"""
 Iterator :: struct (Iter_Type: type_expr) {
     data:   rawptr;
     next:   (data: rawptr) -> (Iter_Type, bool);
@@ -394,13 +415,14 @@ Iterator :: struct (Iter_Type: type_expr) {
 }
 
 
-//
-// Optional represents the possibility of a value being empty, without
-// resorting to pointers and null-pointers. Most of the functionality
-// for Optional is defined in core/containers/optional.onyx. This
-// definition exists here because the compiler use it as the template
-// for types like '? i32'. In other words, '? i32' is equivalent to
-// 'Optional(i32)'.
+#doc """
+    Optional represents the possibility of a value being empty, without
+    resorting to pointers and null-pointers. Most of the functionality
+    for Optional is defined in core/containers/optional.onyx. This
+    definition exists here because the compiler use it as the template
+    for types like '? i32'. In other words, '? i32' is equivalent to
+    'Optional(i32)'.
+"""
 Optional :: struct (Value_Type: type_expr) {
     has_value: bool;
     value: Value_Type;
@@ -408,11 +430,12 @@ Optional :: struct (Value_Type: type_expr) {
 
 
 
-//
-// This structure represents the result of a '#callsite' expression. Currently,
-// #callsite is only valid (and parsed) as a default value for a procedure parameter.
-// It allows the function to get the address of the calling site, which can be
-// used for error printing, unique hashes, and much more.
+#doc """
+    This structure represents the result of a '#callsite' expression. Currently, #callsite
+    is only valid (and parsed) as a default value for a procedure parameter. It allows
+    the function to get the address of the calling site, which can be used for error
+    printing, unique hashes, and much more.
+"""
 CallSite :: struct {
     file   : str;
     line   : u32;
@@ -420,60 +443,59 @@ CallSite :: struct {
 }
 
 
-//
-// This structure is used to represent any value in the language.
-// It contains a pointer to the data, and the type of the value.
-// Using the `core.misc` library, you can easily manipulate `any`s
-// and build runtime polymorphism.
+#doc """
+    This structure is used to represent any value in the language.
+    It contains a pointer to the data, and the type of the value.
+    Using the `core.misc` library, you can easily manipulate `any`s
+    and build runtime polymorphism.
+"""
 any :: struct {
     data: rawptr;
     type: type_expr;
 }
 
-//
-// Represents a code block that can be passed around at compile-time.
-// This is commonly used with macros or polymorphic procedures to create
-// very power extensions to the syntax.
+#doc """
+    Represents a code block that can be passed around at compile-time.
+    This is commonly used with macros or polymorphic procedures to create
+    very power extensions to the syntax.
+"""
 Code :: struct {_:i32;}
 
 
-//
-// Define aliases for common datastructures in the core library, if the core library is available.
-// I'm on the fence about keeping this, as the programmer may want to use these names for their own
-// structures, but for the moment I don't see any harm. I'm also thinking about removing the '[..]'
-// syntax for dynamic arrays and just make them like Map's and Set's, i.e. Array(T). This would
-// remove some confusion around the 3 different array types as dynamic arrays would clearly just be
-// normal structures. With the recent addition of macros and iterators, there really wouldn't be much
-// difference anyway.
-#if #defined((package core.map).Map) {
-    Map :: (package core.map).Map;
-}
 
-#if #defined((package core.set).Set) {
-    Set :: (package core.set).Set;
-}
-
-
-//
-// This procedure is a special compiler generated procedure that initializes all the data segments
-// in the program. It should only be called once, by the main thread, at the start of execution. It
-// is undefined behaviour if it is called more than once.
+#doc """
+    This procedure is a special compiler generated procedure that initializes all the data segments
+    in the program. It should only be called once, by the main thread, at the start of execution. It
+    is undefined behaviour if it is called more than once.
+"""
 __initialize_data_segments :: () -> void ---
 
-//
-// This is also a special compiler generated procedure that calls all procedures specified with
-// #init, in the specified order. It should theoretically only be called once on the main thread.
+#doc """
+    This is a special compiler generated procedure that calls all procedures specified with `#init`
+    in the specified order. It should theoretically only be called once on the main thread.
+"""
 __run_init_procedures :: () -> void ---
 
-//
-// This overloaded procedure allow you to define an implicit rule for how to convert any value
-// into a boolean. A default is provided for ALL pointer types and array types, but this can
-// be used for structures or distinct types.
+#doc """
+    This overloaded procedure allow you to define an implicit rule for how to convert any value
+    into a boolean. A default is provided for ALL pointer types and array types, but this can
+    be used for structures or distinct types.
+"""
 __implicit_bool_cast :: #match -> bool {}
 
-//
-// Defines all options for changing the memory layout, imports and exports,
-// and more of an Onyx binary.
+#doc """
+    Internal procedure to allocate space for the captures in a closure. This will be soon
+    changed to a configurable way, but for now it simply allocates out of the heap allocator.
+"""
+__closure_block_allocate :: (size: i32) -> rawptr {
+    return context.closure_allocate(size);
+}
+
+
+#doc """
+    Defines all options for changing the memory layout, imports and exports,
+    and more of an Onyx binary.
+"""
 Link_Options :: struct {
     // By default the memory layout of a binary is:
     //   reserved | static-data | stack | heap
@@ -527,15 +549,16 @@ Link_Options :: struct {
 }
 
 
-//
-// Special type used to represent a package at runtime.
-// For example,
-//
-//     x: package_id = package main
-//
-// Currently, there is not much you can do with this; it is
-// only used by the runtime.info library if you want to filter
-// tags based on which package they are coming from.
+#doc """
+    Special type used to represent a package at runtime.
+    For example,
+   
+        x: package_id = package main
+   
+    Currently, there is not much you can do with this; it is
+    only used by the runtime.info library if you want to filter
+    tags based on which package they are coming from.
+"""
 package_id :: #distinct u32
 
 //

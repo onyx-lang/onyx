@@ -1,6 +1,12 @@
 package core.test
+#allow_stale_code
 
-use core {array, string, printf}
+use core
+use core.array
+use core.string
+use runtime
+
+use core {printf}
 
 #doc """
     Test tag. Use this to mark a function as a test.

@@ -1,10 +1,15 @@
 package core.conv
 
-use core {map, string, array, math}
+use core.map
+use core.string
+use core.array
+use core.math
+use runtime
 
-//
-// Parses many different types from a string into a value.
-// Uses a custom parser if one has been specified for the type given.
+#doc """
+    Parses many different types from a string into a value.
+    Uses a custom parser if one has been specified for the type given.
+"""
 parse_any :: #match {}
 
 #overload
@@ -18,7 +23,7 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
         return custom_parsers[data_type](target, to_parse, string_allocator);
     }
 
-    use runtime.info;
+    use runtime.info {*};
     info := get_type_info(data_type);
 
     switch data_type {
@@ -56,7 +61,7 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
 
         case f64 {
             dest := cast(&f64) target;
-            *dest = ~~ str_to_f64(to_parse);
+            *dest = str_to_f64(to_parse);
             return true;
         }
 

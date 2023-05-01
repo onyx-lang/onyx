@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+use core {*}
 
 key_arena : alloc.arena.ArenaState;
 key_alloc : Allocator;
@@ -110,7 +110,7 @@ main :: (args: [] cstr) {
     defer array.free(&player2);
 
     string.advance_line(&file); // 'Player 1:'
-    while *file.data != #char "\n" {
+    while file[0] != #char "\n" {
         card := cast(u32, conv.parse_int(&file));
         array.push(&player1, card);
 

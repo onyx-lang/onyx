@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+use core {*}
 
 TILE_DATA_WIDTH  :: 10
 TILE_DATA_HEIGHT :: 10
@@ -179,7 +179,7 @@ apply_orientation :: (t: &Tile, ori: TO) {
     t.orientation = ori;
 }
 
-index_square_with_orientation :: (data: &$T, ori: TO, size: i32, x: i32, y: i32) -> &T {
+index_square_with_orientation :: (data: [&] $T, ori: TO, size: i32, x: i32, y: i32) -> &T {
     switch ori {
         case TO.N     do return &data[x + y * size];
         case TO.R90   do return &data[y + (size - 1 - x) * size];
@@ -202,7 +202,7 @@ sea_monster := u8.[
     #char" ",#char"#",#char" ",#char" ",#char"#",#char" ",#char" ",#char"#",#char" ",#char" ",#char"#",#char" ",#char" ",#char"#",#char" ",#char" ",#char"#",#char" ",#char" ",#char" ",
 ];
 
-scan_for_monsters :: (forest: &u8, ori: TO, width: u32, height: u32) -> bool {
+scan_for_monsters :: (forest: [&] u8, ori: TO, width: u32, height: u32) -> bool {
     found_monsters := false;
 
     for y: 0 .. height - sea_monster_height {
@@ -264,7 +264,7 @@ main :: (args: [] cstr) {
 
 		string.advance_line(&file);
 
-		td := cast(&bool) raw_alloc(tile_allocator, sizeof TileData);
+		td := cast([&] bool) raw_alloc(tile_allocator, sizeof TileData);
 
 		for y: 0 .. 10 {
 			line, file~ := string.bisect(file, #char "\n");
@@ -352,7 +352,7 @@ main :: (args: [] cstr) {
 
             for fy: 0 .. 8 {
                 for fx: 0 .. 8 {
-                    res := *index_square_with_orientation(cast(&bool) tile.data.data, tile.orientation, 10, fx + 1, fy + 1);
+                    res := *index_square_with_orientation(cast([&] bool) tile.data.data, tile.orientation, 10, fx + 1, fy + 1);
                     loc := (y * 12 * 8 * 8) + (fy * 12 * 8) + (x * 8) + fx;
                     if res do forest[loc] = #char "#";
                     else   do forest[loc] = #char ".";
@@ -362,7 +362,7 @@ main :: (args: [] cstr) {
     }
 
     for ori: .[ TO.N, TO.R90, TO.R180, TO.R270, TO.F, TO.FR90, TO.FR180, TO.FR270 ] {
-        if scan_for_monsters(cast(&u8) forest, ori, 12 * 8, 12 * 8) do break;
+        if scan_for_monsters(cast([&] u8) forest, ori, 12 * 8, 12 * 8) do break;
     }
     
     safe_count := 0;

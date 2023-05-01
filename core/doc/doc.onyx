@@ -1,0 +1,143 @@
+package core.doc
+#allow_stale_code
+
+Doc :: struct {
+    header: Doc_Header;
+
+    packages:       [] Doc_Package;
+    procedures:     [] Doc_Procedure;
+    structures:     [] Doc_Structure;
+    enumerations:   [] Doc_Enum;
+    distinct_types: [] Doc_Distinct_Type; 
+    files:          [] Doc_File;
+}
+
+
+Doc_Magic_Bytes :: "ODOC"
+
+Doc_Header :: struct {
+    magic_bytes: [4] u8;
+    version: u32;
+    
+    program_name: str;
+    build_time: u32;
+
+    packages_info_start: u32;
+    procedures_info_start: u32;
+    structures_info_start: u32;
+    enumerations_info_start: u32;
+    distinct_types_info_start: u32;
+    files_info_start: u32;
+}
+
+Doc_File :: struct {
+    Id :: #distinct i32
+
+    package_id: Doc_Package.Id;
+    name: str;
+}
+
+Doc_Location :: struct {
+    file_id: Doc_File.Id;
+    line: i32;
+    col: i32;
+}
+
+Doc_Package :: struct {
+    Id :: #distinct i32
+
+    id: Id;
+    name: str;             // i.e. 'io'
+    qualified_name: str;   // i.e. 'core.io'
+
+    parent: Id;
+    subpackages: [] Id;
+}
+
+Doc_Entity :: struct {
+    name: str;
+
+    visibility: Doc_Visibility;
+    package_id: Doc_Package.Id;
+    location: Doc_Location;
+
+    notes: str;
+}
+
+Doc_Visibility :: enum {
+    Public  :: 1;
+    Package :: 2;
+    Local   :: 3;
+}
+
+Doc_Procedure :: struct {
+    use base: Doc_Entity;
+    
+    Flags :: enum #flags (u32) {
+        Is_Macro      :: 1;
+        Is_Foreign    :: 2;
+        Is_Overloaded :: 4;
+    }
+    flags: Flags;
+
+    params: [] Doc_Param;
+    return_type: str;   // TODO: Make this not a string
+
+    // Only used if this is an overloaded procedure
+    overloads: [] Doc_Procedure;
+
+    constraints: [] str;
+}
+
+Doc_Param :: struct {
+    name: str;
+    type: str;          // TODO: Make this not a string
+    default_value: str;
+}
+
+Doc_Structure :: struct {
+    use base: Doc_Entity;
+
+    members: [] Doc_Structure_Member;
+    polymorph_arguments: [] Doc_Param;
+
+    constraints: [] str;
+
+    methods: [] Doc_Procedure;
+}
+
+Doc_Structure_Member :: struct {
+    name: str;
+    type: str;          // TODO: Make this not a string
+    default_value: str;
+
+    Flags :: enum #flags {
+        Is_Used;
+    }
+    flags: Flags;
+}
+
+Doc_Enum :: struct {
+    use base: Doc_Entity;
+
+    values: [] Doc_Enum_Value;
+
+    Flags :: enum #flags {
+        Is_Flags;
+    }
+    flags: Flags;
+}
+
+Doc_Enum_Value :: struct {
+    name: str;
+    value: u64;
+}
+
+Doc_Distinct_Type :: struct {
+    use base: Doc_Entity;
+
+    wrapped_type: str; // TODO: Make this not a string
+
+    methods: [] Doc_Procedure;
+}
+

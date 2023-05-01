@@ -1,6 +1,6 @@
 #load "core/std"
 
-use package core
+use core {*}
 
 count_iterator :: (lo: $T, hi: T, step: T = 1) -> Iterator(T) {
     return iter.generator(

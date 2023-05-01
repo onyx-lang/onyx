@@ -1,6 +1,7 @@
 package core.math
 
-use core.intrinsics {wasm}
+use core
+use core.intrinsics.wasm
 
 // Things that are useful in any math library:
 //  - Trigonometry
@@ -247,6 +248,18 @@ ilog2 :: (a: u64) -> u64 {
     return 63 - wasm.clz_i64(a);
 }
 
+
+fmod :: #match #local {}
+
+#overload
+fmod :: (x, y: f64) -> f64 {
+    return x - trunc(x / y) * y;
+}
+
+#overload
+fmod :: (x, y: f32) -> f32 {
+    return x - trunc(x / y) * y;
+}
 
 
 // These function are overloaded in order to use the builtin WASM intrinsics for the

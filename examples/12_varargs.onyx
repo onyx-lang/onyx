@@ -17,7 +17,7 @@
 
 #load "core/std"
 
-use package core
+use core {*}
 
 main :: (args: [] cstr) {
 

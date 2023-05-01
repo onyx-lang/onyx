@@ -1,8 +1,6 @@
 PART :: 2
 
-#load "core/std"
-
-use package core
+use core {*}
 
 main :: (args) => {
     for file: os.with_file("tests/aoc-2021/input/day02.txt") {

@@ -4,6 +4,9 @@ package runtime.platform
 #load "./wasi_fs"
 
 use core
+use wasi
+use runtime
+
 use wasi {
     IOVec, SubscriptionTagged, Subscription, Event, Size,
     poll_oneoff, fd_write, fd_datasync, fd_read,
@@ -13,6 +16,9 @@ use wasi {
 use runtime {
     __runtime_initialize,
     Multi_Threading_Enabled,
+}
+use core { 
+    __flush_stdio
 }
 
 
@@ -25,7 +31,7 @@ Supports_Time :: false
 Supports_Networking :: false
 Supports_Type_Info :: true
 Supports_Threads :: false
-
+Supports_Env_Vars :: true
 
 
 __output_string :: (s: str) -> u32 {
@@ -86,7 +92,7 @@ __start :: () {
         argv_buf_size : Size;
         args_sizes_get(&args.count, &argv_buf_size);
 
-        args = memory.make_slice(cstr, args.count);
+        args = core.memory.make_slice(cstr, args.count);
         argv_buf := cast(cstr) calloc(argv_buf_size);
         args_get(args.data, argv_buf);
 
@@ -101,7 +107,7 @@ __start :: () {
         while i := cast(i32) (args.count - 1); i >= 0 {
             defer i -= 1;
 
-            args[i] = cast(cstr) (cast(&u32) args.data)[i];
+            args[i] = cast(cstr) (cast([&] u32) args.data)[i];
         }
 
         (package main).main(args);

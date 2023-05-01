@@ -6,7 +6,7 @@ package core.clock
     #error "'core.clock' is only available with the 'wasi' or 'onyx' runtimes.";
 }
 
-use package wasi
+use wasi {package, *}
 
 time :: () -> u64 {
     output_time: Timestamp;

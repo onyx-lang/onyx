@@ -1,6 +1,9 @@
 package core.encoding.utf8
+#allow_stale_code
 
-use core {string, array, iter}
+use core.string
+use core.array
+use core.iter
 
 rune :: i32
 

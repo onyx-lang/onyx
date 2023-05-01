@@ -1,4 +1,5 @@
 package core.io.binary
+#allow_stale_code
 
 // NOTE: This is a very experimental and not well put together package.
 // The primary reason it exists is because I was working on reading TTF

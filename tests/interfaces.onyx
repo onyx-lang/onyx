@@ -1,6 +1,12 @@
 #load "core/std"
 
-use package core
+use core
+use core.hash
+use core.conv
+use core.array
+use core.iter
+
+use core {println, printf}
 
 Hashable :: interface (t :$T) {
     { hash.to_u32(t) } -> u32;

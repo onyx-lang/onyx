@@ -48,7 +48,6 @@
                                \
     NODE(Return)               \
     NODE(Jump)                 \
-    NODE(Use)                  \
                                \
     NODE(Block)                \
     NODE(IfWhile)              \
@@ -60,6 +59,7 @@
     NODE(Type)                 \
     NODE(BasicType)            \
     NODE(PointerType)          \
+    NODE(MultiPointerType)     \
     NODE(FunctionType)         \
     NODE(ArrayType)            \
     NODE(SliceType)            \
@@ -103,9 +103,13 @@
     NODE(DirectiveInsert)      \
     NODE(Macro)                \
                                \
+    NODE(CaptureBlock)         \
+    NODE(CaptureLocal)         \
+                               \
     NODE(ForeignBlock)         \
                                \
     NODE(Package)              \
+    NODE(Import)               \
                                \
     NODE(ZeroValue)
 
@@ -131,6 +135,7 @@ typedef enum AstKind {
     Ast_Kind_Load_Path,
     Ast_Kind_Load_All,
     Ast_Kind_Library_Path,
+    Ast_Kind_Import,
     Ast_Kind_Memres,
 
     Ast_Kind_Binding,
@@ -158,6 +163,7 @@ typedef enum AstKind {
     Ast_Kind_Type,
     Ast_Kind_Basic_Type,
     Ast_Kind_Pointer_Type,
+    Ast_Kind_Multi_Pointer_Type,
     Ast_Kind_Function_Type,
     Ast_Kind_Array_Type,
     Ast_Kind_Slice_Type,
@@ -204,7 +210,6 @@ typedef enum AstKind {
     Ast_Kind_For,
     Ast_Kind_While,
     Ast_Kind_Jump,
-    Ast_Kind_Use,
     Ast_Kind_Defer,
     Ast_Kind_Switch,
     Ast_Kind_Switch_Case,
@@ -228,6 +233,9 @@ typedef enum AstKind {
     Ast_Kind_Directive_Insert,
     Ast_Kind_Macro,
     Ast_Kind_Do_Block,
+
+    Ast_Kind_Capture_Block,
+    Ast_Kind_Capture_Local,
 
     Ast_Kind_Foreign_Block,
 
@@ -285,6 +293,14 @@ typedef enum AstFlags {
     Ast_Flag_Dead                  = BH_BIT(22),
 
     Ast_Flag_Extra_Field_Access    = BH_BIT(23),
+
+    Ast_Flag_Symbol_Is_PolyVar     = BH_BIT(24),
+    Ast_Flag_Poly_Call_From_Auto   = BH_BIT(24),
+
+    Ast_Flag_Binding_Isnt_Captured = BH_BIT(25),
+
+    Ast_Flag_Function_Is_Lambda    = BH_BIT(26),
+    Ast_Flag_Function_Is_Lambda_Inside_PolyProc = BH_BIT(27),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -384,6 +400,10 @@ typedef enum OnyxIntrinsic {
     ONYX_INTRINSIC_F64_MIN,   ONYX_INTRINSIC_F64_MAX,
     ONYX_INTRINSIC_F64_COPYSIGN,
 
+    ONYX_INTRINSIC_I32_REINTERPRET_F32,
+    ONYX_INTRINSIC_I64_REINTERPRET_F64,
+    ONYX_INTRINSIC_F32_REINTERPRET_I32,
+    ONYX_INTRINSIC_F64_REINTERPRET_I64,
 
 
     ONYX_INTRINSIC_V128_CONST,
@@ -575,6 +595,11 @@ struct Arguments {
     // How many arguments were not baked.
     i32 used_argument_count;
 };
+
+typedef struct ForeignReference {
+    AstTyped *module_name;
+    AstTyped *import_name;
+} ForeignReference;
 
 
 // Base Nodes
@@ -773,17 +798,6 @@ struct AstDirectiveSolidify {
 struct AstReturn        { AstNode_base; AstTyped* expr; u32 count; }; // Note: This count is one less than it should be, because internal codegen with macros would have to know about this and that is error prone.
 struct AstJump          { AstNode_base; JumpType jump; u32 count; };
 
-typedef struct QualifiedUse {
-    OnyxToken* symbol_name;
-    OnyxToken* as_name;
-} QualifiedUse;
-struct AstUse           {
-    AstNode_base;
-
-    AstTyped* expr;
-    bh_arr(QualifiedUse) only;
-};
-
 // Structure Nodes
 struct AstBlock         {
     AstNode_base;
@@ -924,6 +938,7 @@ struct AstArrayType     { AstType_base; AstType* elem; AstTyped *count_expr; };
 struct AstSliceType     { AstType_base; AstType* elem; };
 struct AstDynArrType    { AstType_base; AstType* elem; };
 struct AstVarArgType    { AstType_base; AstType* elem; };
+struct AstMultiPointerType { AstType_base; AstType* elem; };
 struct AstFunctionType  {
     AstType_base;
 
@@ -997,6 +1012,7 @@ struct AstPolyCallType {
     AstType_base;
 
     AstType* callee;
+    Type *resolved_type;
 
     // NOTE: These nodes can be either AstTypes, or AstTyped expressions.
     bh_arr(AstNode *) params;
@@ -1039,7 +1055,7 @@ struct AstDistinctType {
 };
 
 // Top level nodes
-struct AstBinding       { AstTyped_base; AstNode* node; };
+struct AstBinding       { AstTyped_base; AstNode* node; OnyxToken *documentation; };
 struct AstAlias         { AstTyped_base; AstTyped* alias; };
 struct AstInclude       { AstNode_base;  AstTyped* name_node; char* name; };
 struct AstInjection     {
@@ -1048,6 +1064,7 @@ struct AstInjection     {
     AstTyped* to_inject;
     AstTyped* dest;
     OnyxToken *symbol;
+    OnyxToken *documentation;
 };
 struct AstMemRes        {
     AstTyped_base;
@@ -1066,8 +1083,7 @@ struct AstGlobal        {
 
     char* name;
 
-    OnyxToken* foreign_module;
-    OnyxToken* foreign_name;
+    ForeignReference foreign;
 };
 struct AstParam {
     // HACK CLEANUP: This does not need to have a local buried inside of it.
@@ -1104,6 +1120,8 @@ struct AstOverloadedFunction {
     AstType *expected_return_node;
     Type    *expected_return_type;
 
+    AstBinding *original_binding_to_node;
+
     b32 locked : 1;
     b32 only_local_functions : 1;
 };
@@ -1118,6 +1136,8 @@ typedef struct InterfaceConstraint {
     AstTyped *expr;
     AstType  *expected_type_expr;
     Type     *expected_type;
+
+    char *error_msg;
 
     b32 invert_condition: 1;
 } InterfaceConstraint;
@@ -1166,6 +1186,42 @@ struct AstPackage {
 
     Package* package;
 };
+
+typedef struct QualifiedImport {
+    OnyxToken* symbol_name;
+    OnyxToken* as_name;
+} QualifiedImport;
+
+struct AstImport {
+    AstNode_base;
+
+    AstPackage *imported_package;
+
+    bh_arr(QualifiedImport) only;
+
+    // When true, it means a list of imports
+    // was specified and the top-level package
+    // should not be imported.
+    b32 specified_imports;
+
+    // When true, even if a list of specified
+    // imports was given, the package name should
+    // also be imported.
+    //
+    //     use core {package, *}
+    //
+    b32 import_package_itself;
+
+    // Set to be the symbol that the package will
+    // be imported as. If NULL, the last token of
+    // the package path is used. The following
+    // imports the core package as C.
+    // 
+    //     use core { C :: package }
+    //
+    OnyxToken *qualified_package_name;
+};
+
 
 //
 // Polymorphic procedures
@@ -1258,11 +1314,7 @@ struct AstFunction {
     union {
         OnyxToken* intrinsic_name;
 
-        // NOTE: Used when the function is declared as foreign
-        struct {
-            OnyxToken* foreign_module;
-            OnyxToken* foreign_name;
-        };
+        ForeignReference foreign;
     };
 
     struct Entity* entity_header;
@@ -1285,10 +1337,32 @@ struct AstFunction {
 
     bh_arr(AstNode *) nodes_that_need_entities_after_clone;
 
+    AstBinding *original_binding_to_node;
+
+    AstCaptureBlock *captures;
+    Scope *scope_to_lookup_captured_values;
+
     b32 is_exported        : 1;
     b32 is_foreign         : 1;
     b32 is_foreign_dyncall : 1;
     b32 is_intrinsic       : 1;
+};
+
+struct AstCaptureBlock {
+    AstNode_base;
+
+    bh_arr(AstCaptureLocal *) captures;
+
+    u32 total_size_in_bytes;
+};
+
+struct AstCaptureLocal {
+    AstTyped_base;
+
+    AstTyped *captured_value;
+
+    u32 offset;
+    b32 by_reference: 1;
 };
 
 struct AstPolyQuery {
@@ -1376,6 +1450,8 @@ struct AstCallSite {
     AstStrLit* filename;
     AstNumLit* line;
     AstNumLit* column;
+
+    b32 collapsed : 1;
 };
 
 // Represents a "pastable" block of code.
@@ -1402,6 +1478,8 @@ struct AstMacro {
     AstTyped_base;
 
     AstTyped* body;
+
+    AstBinding *original_binding_to_node;
 };
 
 struct AstDirectiveLibrary {
@@ -1415,7 +1493,7 @@ struct AstForeignBlock {
     AstTyped_base;
 
     Scope* scope;
-    OnyxToken *module_name;
+    AstTyped *module_name;
     bh_arr(struct Entity *) captured_entities;
 
     u32 foreign_block_number;
@@ -1455,6 +1533,7 @@ typedef enum EntityType {
     Entity_Type_Load_File,
     Entity_Type_Binding,
     Entity_Type_Use_Package,
+    Entity_Type_Import,
     Entity_Type_Static_If,
     Entity_Type_String_Literal,
     Entity_Type_File_Contents,
@@ -1508,6 +1587,7 @@ typedef struct Entity {
     union {
         AstDirectiveError     *error;
         AstInclude            *include;
+        AstImport             *import;
         AstBinding            *binding;
         AstIf                 *static_if;
         AstFunction           *function;
@@ -1524,7 +1604,6 @@ typedef struct Entity {
         AstPolyQuery          *poly_query;
         AstForeignBlock       *foreign_block;
         AstMacro              *macro;
-        AstUse                *use;
         AstInterface          *interface;
         AstConstraint         *constraint;
         AstDirectiveLibrary   *library;
@@ -1535,6 +1614,7 @@ typedef struct Entity {
 typedef struct EntityHeap {
     bh_arena entity_arena;
     bh_arr(Entity *) entities;
+    bh_arr(Entity *) quick_unsorted_entities;
     i32 next_id;
 
     i32 state_count[Entity_State_Count];
@@ -1561,16 +1641,27 @@ void emit_entity(Entity* ent);
 
 struct Package {
     char *name;
+    char *unqualified_name;
 
     Scope *scope;
     Scope *private_scope;
 
     u32 id;
 
+    // NOTE: id's of the sub-packages
+    bh_arr(u32) sub_packages;
+    i32 parent_id;
+
     // NOTE: This tracks all of the 'use package' statements of this package throughout
     // the code base. This is used when a static if clears and new symbols are introduced.
     // 'use package' statements have to be reevaluated to pull in the new symbols.
     bh_arr(Entity *) use_package_entities;
+
+    // NOTE: These are entities that are stored in packages marked with `#allow_stale_code`.
+    // These entities are flushed to the entity heap when the package has been explicit used
+    // somewhere.
+    bh_arr(Entity *) buffered_entities;
+    b32 is_included_somewhere : 1;
 };
 
 typedef enum CompileAction CompileAction;
@@ -1579,6 +1670,7 @@ enum CompileAction {
     ONYX_COMPILE_ACTION_CHECK,
     ONYX_COMPILE_ACTION_RUN,
     ONYX_COMPILE_ACTION_RUN_WASM,
+    ONYX_COMPILE_ACTION_WATCH,
     ONYX_COMPILE_ACTION_DOCUMENT,
     ONYX_COMPILE_ACTION_PRINT_HELP,
 };
@@ -1593,6 +1685,33 @@ enum Runtime {
     Runtime_Js      = 3,
     Runtime_Custom  = 4,
 };
+
+
+typedef struct OnyxDocInfo {
+    bh_arr(AstBinding *) procedures;
+    bh_arr(AstBinding *) structures;
+    bh_arr(AstBinding *) enumerations;
+    bh_arr(AstBinding *) distinct_types;
+
+    Table(u32) file_ids;
+    u32 next_file_id;
+} OnyxDocInfo;
+
+
+typedef struct CheckerData {
+    b32 expression_types_must_be_known;
+    b32 all_checks_are_final;
+    b32 inside_for_iterator;
+    bh_arr(AstFor *) for_node_stack;
+    bh_imap __binop_impossible_cache[Binary_Op_Count];
+    AstCall __op_maybe_overloaded;
+    Entity *current_entity;
+    bh_arr(Type **) expected_return_type_stack;
+} CheckerData;
+
+typedef struct ContextCaches {
+    bh_imap implicit_cast_to_bool_cache;
+} ContextCaches; 
 
 
 typedef struct CompileOptions CompileOptions;
@@ -1611,6 +1730,8 @@ struct CompileOptions {
     b32 use_multi_threading   : 1;
     b32 generate_foreign_info : 1;
     b32 no_std                : 1;
+    b32 no_stale_code         : 1;
+    b32 show_all_errors       : 1;
 
     b32 generate_tag_file         : 1;
     b32 generate_symbol_info_file : 1;
@@ -1652,9 +1773,25 @@ struct Context {
     bh_arr(AstNode *) tag_locations;
 
     struct SymbolInfoTable *symbol_info;
+    struct OnyxDocInfo     *doc_info;
+
+    CheckerData checker;
+    ContextCaches caches;
+    OnyxErrors errors;
+    b32 errors_enabled;
+
+    u32 next_package_id;
+    u32 next_scope_id;
+    u32 next_type_id;
+    u32 next_entity_id;
+
+    u64 lexer_lines_processed;
+    u64 lexer_tokens_processed;
 
     u32 cycle_almost_detected : 2;
     b32 cycle_detected : 1;
+
+    b32 builtins_initialized : 1;
 };
 
 extern Context context;
@@ -1691,11 +1828,11 @@ extern AstBasicType basic_type_v128;
 extern Type type_auto_return;
 extern AstBasicType basic_type_auto_return;
 
-extern OnyxToken builtin_package_token;
 extern AstGlobal builtin_heap_start;
 extern AstGlobal builtin_stack_top;
 extern AstGlobal builtin_tls_base;
 extern AstGlobal builtin_tls_size;
+extern AstGlobal builtin_closure_base;
 extern AstType  *builtin_string_type;
 extern AstType  *builtin_cstring_type;
 extern AstType  *builtin_range_type;
@@ -1717,6 +1854,7 @@ extern AstType  *foreign_block_type;
 extern AstTyped *tagged_procedures_node;
 extern AstFunction *builtin_initialize_data_segments;
 extern AstFunction *builtin_run_init_procedures;
+extern AstFunction *builtin_closure_block_allocate;
 extern bh_arr(AstFunction *) init_procedures;
 extern AstOverloadedFunction *builtin_implicit_bool_cast;
 
@@ -1740,6 +1878,7 @@ extern IntrinsicTable intrinsic_table;
 extern bh_arr(OverloadOption) operator_overloads[Binary_Op_Count];
 extern bh_arr(OverloadOption) unary_operator_overloads[Unary_Op_Count];
 
+void prepare_builtins();
 void initialize_builtins(bh_allocator a);
 void initalize_special_globals();
 void introduce_build_options(bh_allocator a);
@@ -1787,6 +1926,7 @@ AstNumLit*        make_bool_literal(bh_allocator, b32 b);
 AstNumLit*        make_int_literal(bh_allocator a, i64 value);
 AstNumLit*        make_float_literal(bh_allocator a, f64 value);
 AstRangeLiteral*  make_range_literal(bh_allocator a, AstTyped* low, AstTyped* high);
+AstStrLit*        make_string_literal(bh_allocator a, OnyxToken *token);
 AstBinaryOp*      make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right);
 AstArgument*      make_argument(bh_allocator a, AstTyped* value);
 AstFieldAccess*   make_field_access(bh_allocator a, AstTyped* node, char* field);
@@ -1862,6 +2002,7 @@ static inline b32 is_lval(AstNode* node) {
         || (node->kind == Ast_Kind_Subscript)
         || (node->kind == Ast_Kind_Field_Access)
         || (node->kind == Ast_Kind_Memres)
+        || (node->kind == Ast_Kind_Capture_Local)
         || (node->kind == Ast_Kind_Constraint_Sentinel)) // Bit of a hack, but this makes constraints like 'T->foo()' work.
         return 1;
 

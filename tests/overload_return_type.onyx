@@ -1,5 +1,6 @@
 
 use core
+use core { println }
 
 main :: () {
     overloaded_proc(i32.{}) |> println();

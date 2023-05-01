@@ -2,11 +2,14 @@
 
 . ../settings.sh
 
+# Enable Dynamic call
+USE_DYNCALL=1
+
 # Temporary flag
 ENABLE_DEBUG_INFO=1
 
 C_FILES="onyx astnodes builtins checker clone doc entities errors lex parser symres types utils wasm_emit wasm_runtime "
-LIBS="-L$CORE_DIR/lib -l$RUNTIME_LIBRARY -Wl,-rpath=$CORE_DIR/lib:./ -lpthread -ldl -lm ../shared/lib/linux_$ARCH/lib/libdyncall_s.a"
+LIBS="-L$CORE_DIR/lib -l$RUNTIME_LIBRARY -Wl,-rpath=$CORE_DIR/lib:./ -lpthread -ldl -lm"
 INCLUDES="-I./include -I../shared/include -I../shared/include/dyncall"
 
 WARNINGS='-Wimplicit -Wmisleading-indentation -Wparentheses -Wsequence-point -Wreturn-type -Wshift-negative-value -Wunused-but-set-parameter -Wunused-but-set-variable -Wunused-function -Wunused-label -Wmaybe-uninitialized -Wsign-compare -Wstrict-overflow -Wduplicated-branches -Wduplicated-cond -Wtrigraphs -Waddress -Wlogical-op'
@@ -25,7 +28,12 @@ if [ "$ENABLE_DEBUG_INFO" = "1" ]; then
     FLAGS="$FLAGS -DENABLE_DEBUG_INFO"
 fi
 
-FLAGS="$FLAGS -DENABLE_RUN_WITH_WASMER -DUSE_DYNCALL"
+FLAGS="$FLAGS -DENABLE_RUN_WITH_WASMER"
+
+if [ "$USE_DYNCALL" = "1" ]; then
+    LIBS="$LIBS ../shared/lib/linux_$ARCH/lib/libdyncall_s.a ../shared/lib/linux_$ARCH/lib/libdyncallback_s.a"
+    FLAGS="$FLAGS -DUSE_DYNCALL"
+fi
 
 sudo mkdir -p "$BIN_DIR"
 

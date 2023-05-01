@@ -940,6 +940,14 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
                 continue; 
             }
 
+            // In the debug info, multi-pointers are just pointers.
+            if (type->kind == Type_Kind_MultiPointer) {
+                output_unsigned_integer(2, &section_buff);
+                output_unsigned_integer(1, &section_buff);
+                output_unsigned_integer(type->Pointer.elem->id, &section_buff);
+                continue; 
+            }
+
             if (type->kind == Type_Kind_Enum) {
                 output_unsigned_integer(8, &section_buff);
                 output_unsigned_integer(type->Enum.backing->id, &section_buff);
@@ -978,6 +986,18 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
             //     continue;
             // }
 
+            if (type->kind == Type_Kind_Function) {
+                output_unsigned_integer(6, &section_buff);
+                output_unsigned_integer(type->Function.param_count, &section_buff);
+
+                fori (i, 0, (i32) type->Function.param_count) {
+                    output_unsigned_integer(type->Function.params[i]->id, &section_buff);
+                }
+
+                output_unsigned_integer(type->Function.return_type->id, &section_buff);
+                continue;
+            }
+
             if (type_is_structlike_strict(type)) {
                 output_unsigned_integer(3, &section_buff);
 
@@ -995,18 +1015,6 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
                     output_name(smem.name, strlen(smem.name), &section_buff);
                 }
 
-                continue;
-            }
-
-            if (type->kind == Type_Kind_Function) {
-                output_unsigned_integer(6, &section_buff);
-                output_unsigned_integer(type->Function.param_count, &section_buff);
-
-                fori (i, 0, (i32) type->Function.param_count) {
-                    output_unsigned_integer(type->Function.params[i]->id, &section_buff);
-                }
-
-                output_unsigned_integer(type->Function.return_type->id, &section_buff);
                 continue;
             }
 

@@ -1,13 +1,13 @@
 #load "core/std"
 
-use package core
+use core {*}
 
 Communative_Pair :: struct (T: type_expr) where hash.Hashable(T) {
     a, b: T;
 }
 
 #match hash.to_u32 (p: Communative_Pair($T)) => {
-    return hash.to_u32(p.a) * 13 + hash.to_u32(p.b) * 17;
+    return hash.to_u32(p.a) * hash.to_u32(p.b);
 }
 
 #operator == (p1, p2: Communative_Pair($T)) => {
@@ -41,17 +41,14 @@ main :: (args) => {
         node_stack << .{ "start", 0, false };
 
         children_of :: (edges: &$T, name: str) -> Iterator(str) {
-            name_copy := new_temp(str);
-            *name_copy = name;
-
             return iter.concat(
                 iter.as_iter(edges)
-                |> iter.filter(name_copy, (x, n) => x.a == *n)
-                |> iter.map(x => x.b),
+                ->filter((x, [name]) => x.a == name)
+                ->map(x => x.b),
 
                 iter.as_iter(edges)
-                |> iter.filter(name_copy, (x, n) => x.b == *n)
-                |> iter.map(x => x.a)
+                ->filter((x, [name]) => x.b == name)
+                ->map(x => x.a)
             );
         }
 

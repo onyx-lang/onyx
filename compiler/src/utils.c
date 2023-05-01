@@ -1,3 +1,4 @@
+#define BH_INTERNAL_ALLOCATOR (global_heap_allocator)
 #define BH_DEBUG
 
 #include "utils.h"
@@ -18,7 +19,6 @@ bh_allocator global_heap_allocator;
 //
 // Program info and packages
 //
-static u64 next_package_id = 1;
 
 Package* package_lookup(char* package_name) {
     i32 index = shgeti(context.packages, package_name);
@@ -42,8 +42,11 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
         pac_name[strlen(package_name)] = '\0';
 
         package->name = pac_name;
+        package->unqualified_name = pac_name + bh_str_last_index_of(pac_name, '.');
         package->use_package_entities = NULL;
-        package->id = next_package_id++;
+        package->id = ++context.next_package_id;
+        package->parent_id = -1;
+        bh_arr_new(global_heap_allocator, package->sub_packages, 4);
 
         if (!strcmp(pac_name, "builtin")) {
             package->private_scope = scope_create(alloc, context.global_scope, pos);
@@ -55,7 +58,9 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
 
         shput(context.packages, pac_name, package);
 
-        if (!charset_contains(pac_name, '.')) {
+        // The builtin package is special. The 'builtin' symbol will be
+        // accessible even if you do not `use builtin`.
+        if (!strcmp(pac_name, "builtin")) {
             AstPackage* package_node = onyx_ast_node_new(alloc, sizeof(AstPackage), Ast_Kind_Package);
             package_node->package_name = package->name;
             package_node->package = package;
@@ -92,15 +97,27 @@ void package_reinsert_use_packages(Package* package) {
     bh_arr_set_length(package->use_package_entities, 0);
 }
 
+void package_mark_as_used(Package* package) {
+    if (!package) return;
+    if (package->is_included_somewhere) return;
+    package->is_included_somewhere = 1;
+    
+    bh_arr_each(Entity *, pent, package->buffered_entities) {
+        entity_heap_insert_existing(&context.entities, *pent);
+    }
+
+    bh_arr_clear(package->buffered_entities);
+}
+
+
 
 //
 // Scoping
 //
-static u64 next_scope_id = 1;
 
 Scope* scope_create(bh_allocator a, Scope* parent, OnyxFilePos created_at) {
     Scope* scope = bh_alloc_item(a, Scope);
-    scope->id = next_scope_id++;
+    scope->id = ++context.next_scope_id;
     scope->parent = parent;
     scope->created_at = created_at;
     scope->name = NULL;
@@ -153,15 +170,22 @@ void symbol_builtin_introduce(Scope* scope, char* sym, AstNode *node) {
     shput(scope->symbols, sym, node);
 }
 
-void symbol_subpackage_introduce(Scope* scope, char* sym, AstPackage* package) {
+void symbol_subpackage_introduce(Package* parent, char* sym, AstPackage* subpackage) {
+    Scope *scope = parent->scope;
+
     i32 index = shgeti(scope->symbols, sym);
     if (index != -1) {
         AstNode* maybe_package = scope->symbols[index].value;
         
         // CLEANUP: Make this assertion an actual error message.
         assert(maybe_package->kind == Ast_Kind_Package);
+
     } else {
-        shput(scope->symbols, sym, (AstNode *) package);
+        shput(scope->symbols, sym, (AstNode *) subpackage);
+
+        // Parent: parent->id
+        // Child:  subpackage->package->id
+        bh_arr_push(parent->sub_packages, subpackage->package->id);
     }
 }
 
@@ -267,13 +291,25 @@ all_types_peeled_off:
             // Temporarily disable the parent scope so that you can't access things
             // "above" the structures scope. This leads to unintended behavior, as when
             // you are accessing a static element on a structure, you don't expect to
-            // bleed to the top level scope.
+            // bleed to the top level scope. This code is currently very GROSS, and
+            // should be refactored soon.
             AstNode *result = NULL;
             if (stype->scope) {
-                Scope *tmp_parent = stype->scope->parent;
-                stype->scope->parent = NULL;
+                Scope **tmp_parent;
+                Scope *tmp_parent_backup;
+                if (stype->stcache && stype->stcache->Struct.constructed_from) {
+                    // Structs scope -> Poly Solution Scope -> Poly Struct Scope -> Enclosing Scope
+                    tmp_parent = &stype->scope->parent->parent->parent;
+                } else {
+                    tmp_parent = &stype->scope->parent;
+                }
+
+                tmp_parent_backup = *tmp_parent;
+                *tmp_parent = NULL;
+
                 result = symbol_raw_resolve(stype->scope, symbol);
-                stype->scope->parent = tmp_parent;
+
+                *tmp_parent = tmp_parent_backup;
             }
 
             if (result == NULL && stype->stcache != NULL) {
@@ -295,13 +331,16 @@ all_types_peeled_off:
         }
 
         case Ast_Kind_Poly_Struct_Type: {
-            AstStructType* stype = ((AstPolyStructType *) node)->base_struct;
+            AstPolyStructType* stype = ((AstPolyStructType *) node);
             return symbol_raw_resolve(stype->scope, symbol);
         }
 
         case Ast_Kind_Poly_Call_Type: {
-            AstNode* callee = (AstNode *) ((AstPolyCallType *) node)->callee;
-            return try_symbol_raw_resolve_from_node(callee, symbol);
+            AstPolyCallType* pctype = (AstPolyCallType *) node;
+            if (pctype->resolved_type) {
+                return try_symbol_raw_resolve_from_node((AstNode*) pctype->resolved_type->ast_type, symbol);
+            }
+            return NULL;
         }
 
         case Ast_Kind_Distinct_Type: {
@@ -1030,6 +1069,7 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
                 assert(arg_arr[arg_pos]->kind == Ast_Kind_Argument);
                 TypeMatch tm = unify_node_and_type_(&arg_arr[arg_pos]->value, formal_params[arg_pos], permanent);
                 if (tm == TYPE_MATCH_YIELD) return tm;
+                if (tm == TYPE_MATCH_SPECIAL) return tm;
                 if (tm == TYPE_MATCH_FAILED) {
                     if (error != NULL) {
                         error->pos = arg_arr[arg_pos]->token->pos;
@@ -1247,8 +1287,16 @@ all_types_peeled_off:
 
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* pstype = (AstPolyStructType *) node;
-            AstStructType* stype = pstype->base_struct;
-            return &stype->scope;
+            return &pstype->scope;
+        }
+
+        case Ast_Kind_Poly_Call_Type: {
+            AstPolyCallType* pctype = (AstPolyCallType *) node;
+            Type *t = type_build_from_ast(context.ast_alloc, (AstType *) pctype);
+            if (t) {
+                return &((AstStructType *) t->ast_type)->scope;
+            }
+            return NULL;
         }
 
         case Ast_Kind_Distinct_Type: {
@@ -1432,3 +1480,5 @@ void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved) {
 
     bh_arr_push(syminfo->symbols_resolutions, res);
 }
+
+

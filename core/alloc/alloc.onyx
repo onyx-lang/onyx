@@ -8,35 +8,77 @@ package core.alloc
 #load "./logging"
 #load "./gc"
 
+use core.memory
+use core.intrinsics.types {type_is_function}
+
 as_allocator :: #match {
     macro (a: Allocator) => a
 }
 
-// This is similar to alloca in C.
+#doc """
+    Allocates memory from the stack. This is similar to `alloca` in C.
+
+    **DO NOT USE THIS IN A LOOP! You cannot free memory allocated off the stack.**
+"""
 from_stack :: macro (size: u32) -> rawptr {
     // This should do something about the alignment...
     // Everything so far has assume that the stack is aligned to 16 bytes.
-    defer __stack_top = ~~(cast(&u8) __stack_top + size);
+    defer __stack_top = cast([&]u8, __stack_top) + size;
     return __stack_top;
 }
 
+#doc """
+    Allocates memory from the stack to form a slice of `T` with length `size`.
+
+    **DO NOT USE THIS IN A LOOP! You cannot free memory allocated off the stack.**
+"""
 array_from_stack :: macro ($T: type_expr, size: u32) -> [] T {
-    defer __stack_top = ~~(cast(&u8) __stack_top + size * sizeof T);
-    return (cast(&T) __stack_top)[0 .. size];
+    defer __stack_top = cast([&]u8, __stack_top) + size * sizeof T;
+    return (cast([&]T) __stack_top)[0 .. size];
 }
 
+#doc """
+    Moves a value on to the heap. Useful for cases like this:
+
+        f :: () -> &Foo {
+            return alloc.on_heap(Foo.{
+                name = "...",
+                age  = 42
+            });
+        }
+"""
 on_heap :: macro (v: $V) -> &V {
+    use core
+
     out := cast(&V) raw_alloc(context.allocator, sizeof V);
     core.memory.set(out, 0, sizeof V);
     *out = v;
     return out;
 }
 
+#doc """
+    Like `alloc.on_heap`, but allocates on the temporary allocator.
+"""
 on_temp :: macro (v: $V) -> &V {
+    use core
+
     out := cast(&V) raw_alloc(context.temp_allocator, sizeof V);
     core.memory.set(out, 0, sizeof V);
     *out = v;
     return out;
+}
+
+#doc """
+    Copies the internal closure data of a function to the provided allocator,
+    and returns the new closed function.
+"""
+copy_closure :: (f: $F/type_is_function, a: Allocator) -> F {
+    if !f.closure do return f;
+
+    new_closure := raw_alloc(a, f.closure_size);
+    memory.copy(new_closure, f.closure, f.closure_size);
+
+    return F.{ f.__funcidx, new_closure, f.closure_size };
 }
 
 TEMPORARY_ALLOCATOR_SIZE :: 1 << 16; // 16Kb

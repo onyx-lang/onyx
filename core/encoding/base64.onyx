@@ -1,6 +1,7 @@
 package core.encoding.base64
+#allow_stale_code
 
-use core {array}
+use core.array
 
 //
 // A simple Base64 encoding and decoding library. Currently
@@ -9,10 +10,11 @@ use core {array}
 // standards.
 //
 
-//
-// Encodes the given data in base64 into a new buffer, allocated
-// from the allocator provided. It is the callers responsibilty
-// to free this memory.
+#doc """
+    Encodes the given data in base64 into a new buffer, allocated
+    from the allocator provided. It is the callers responsibilty
+    to free this memory.
+"""
 encode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
     out := array.make(u8, allocator=allocator);
 
@@ -46,9 +48,10 @@ encode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
     return out;
 }
 
-//
-// Decodes the given base64 data into a new buffer, allocated
-// from the allocator provided.
+#doc """
+    Decodes the given base64 data into a new buffer, allocated
+    from the allocator provided.
+"""
 decode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
     if data.count % 4 != 0 do return null_str;
 
