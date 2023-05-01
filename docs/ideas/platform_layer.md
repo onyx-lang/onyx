@@ -127,3 +127,13 @@ this document will serve as that "header file"
 - `__process_destroy(handle: ProcessData) -> void`
 
 ### Values
+
+
+## Environment Variables
+
+### Procedures
+- `__get_all_env() -> [] Pair(str, str)`
+- `__get_env(key: str) -> str`
+
+
+
