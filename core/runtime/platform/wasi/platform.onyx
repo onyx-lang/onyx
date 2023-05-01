@@ -31,7 +31,7 @@ Supports_Time :: false
 Supports_Networking :: false
 Supports_Type_Info :: true
 Supports_Threads :: false
-
+Supports_Env_Vars :: true
 
 
 __output_string :: (s: str) -> u32 {

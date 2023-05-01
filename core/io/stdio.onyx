@@ -85,14 +85,14 @@ println :: (x) => {
 //
 // Standard formatted print to standard output.
 printf :: (format: str, va: ..any) {
-    flush :: (_, to_output) => {
-        io.write(&stdio.print_writer, to_output);
-        __flush_stdio();
-        return true;
-    }
-
     buffer: [1024] u8;
-    print(conv.format_va(buffer, format, va, .{null, flush}));
+    print(conv.format_va(buffer, format, va, .{ null,
+        (_: rawptr, to_output: str) -> bool {
+            io.write(&stdio.print_writer, to_output);
+            __flush_stdio();
+            return true;
+        }
+    }));
 }
 
 #if #defined(runtime.platform.__output_error) {

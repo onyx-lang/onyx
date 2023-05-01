@@ -11,6 +11,7 @@ use runtime {
 }
 
 #load "./fs"
+#load "./env"
 
 
 // Platform supports
@@ -22,6 +23,7 @@ Supports_Time :: true
 Supports_Networking :: true
 Supports_Type_Info :: true
 Supports_Threads :: true
+Supports_Env_Vars :: true
 
 
 #library "onyx_runtime"

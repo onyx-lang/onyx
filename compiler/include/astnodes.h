@@ -1614,6 +1614,7 @@ typedef struct Entity {
 typedef struct EntityHeap {
     bh_arena entity_arena;
     bh_arr(Entity *) entities;
+    bh_arr(Entity *) quick_unsorted_entities;
     i32 next_id;
 
     i32 state_count[Entity_State_Count];

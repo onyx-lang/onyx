@@ -92,10 +92,16 @@ void entity_heap_insert_existing(EntityHeap* entities, Entity* e) {
 
     if (entities->entities == NULL) {
         bh_arr_new(global_heap_allocator, entities->entities, 128);
+        bh_arr_new(global_heap_allocator, entities->quick_unsorted_entities, 128);
     }
 
-    bh_arr_push(entities->entities, e);
-    eh_shift_up(entities, bh_arr_length(entities->entities) - 1);
+    if (e->state <= Entity_State_Introduce_Symbols) {
+        bh_arr_push(entities->quick_unsorted_entities, e);
+    } else {
+        bh_arr_push(entities->entities, e);
+        eh_shift_up(entities, bh_arr_length(entities->entities) - 1);
+    }
+
     e->entered_in_queue = 1;
 
     entities->state_count[e->state]++;
@@ -110,6 +116,10 @@ Entity* entity_heap_insert(EntityHeap* entities, Entity e) {
 }
 
 Entity* entity_heap_top(EntityHeap* entities) {
+    if (bh_arr_length(entities->quick_unsorted_entities) > 0) {
+        return entities->quick_unsorted_entities[0];
+    }
+
     return entities->entities[0];
 }
 
@@ -128,14 +138,26 @@ void entity_heap_change_top(EntityHeap* entities, Entity* new_top) {
 }
 
 void entity_heap_remove_top(EntityHeap* entities) {
-    entities->state_count[entities->entities[0]->state]--;
-    entities->type_count[entities->entities[0]->type]--;
-    entities->all_count[entities->entities[0]->state][entities->entities[0]->type]--;
-    entities->entities[0]->entered_in_queue = 0;
+    Entity *e;
 
-    entities->entities[0] = entities->entities[bh_arr_length(entities->entities) - 1];
-    bh_arr_pop(entities->entities);
-    eh_shift_down(entities, 0);
+    if (bh_arr_length(entities->quick_unsorted_entities) > 0) {
+        e = entities->quick_unsorted_entities[0];
+    } else {
+        e = entities->entities[0];
+    }
+
+    entities->state_count[e->state]--;
+    entities->type_count[e->type]--;
+    entities->all_count[e->state][e->type]--;
+    e->entered_in_queue = 0;
+
+    if (bh_arr_length(entities->quick_unsorted_entities) > 0) {
+        bh_arr_fastdelete(entities->quick_unsorted_entities, 0);
+    } else {
+        entities->entities[0] = entities->entities[bh_arr_length(entities->entities) - 1];
+        bh_arr_pop(entities->entities);
+        eh_shift_down(entities, 0);
+    }
 }
 
 void entity_change_type(EntityHeap* entities, Entity *ent, EntityType new_type) {

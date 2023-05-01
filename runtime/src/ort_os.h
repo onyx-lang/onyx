@@ -54,6 +54,35 @@ ONYX_DEF(__time, (), (WASM_I64)) {
 }
 
 
+ONYX_DEF(__lookup_env, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+
+    #ifdef _BH_LINUX
+    char *key_ptr = ONYX_PTR(params->data[0].of.i32);
+    int   key_len = params->data[1].of.i32;
+    char *out_ptr = ONYX_PTR(params->data[2].of.i32);
+    int   out_len = params->data[3].of.i32;
+
+    char key[512] = {0};
+    key_len = bh_min(key_len, 511);
+    strncpy(key, key_ptr, key_len);
+    key[key_len] = 0;
+
+    char * value = getenv(key);
+    if (!value) {
+        results->data[0] = WASM_I32_VAL(0);
+    } else {
+        out_len = bh_min(out_len, strlen(value));
+        memcpy(out_ptr, value, out_len);
+        results->data[0] = WASM_I32_VAL(out_len);
+    }
+    #endif
+
+    #ifdef _BH_WINDOWS
+    results->data[0] = WASM_I32_VAL(0);
+    #endif
+    return NULL;
+}
+
 
 
 

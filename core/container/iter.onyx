@@ -32,6 +32,7 @@ use core.intrinsics.types {type_is_struct}
     some :: some;
     every :: every;
     collect :: to_array;
+    collect_map :: to_map;
 }
 
 
@@ -733,6 +734,16 @@ to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
     for v: it do array.push(&arr, v);
 
     return arr;
+}
+
+#doc """
+"""
+to_map :: (it: Iterator(Pair($K, $V)), allocator := context.allocator) -> Map(K, V) {
+    m := builtin.make(Map(K, V), allocator=allocator);
+    for p: it {
+        m->put(p.first, p.second);
+    }
+    return m;
 }
 
 
