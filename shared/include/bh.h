@@ -2146,7 +2146,7 @@ b32 bh_file_watch_wait(bh_file_watch *w) {
 
     if (FD_ISSET(w->kill_pipe[0], &w->fds)) {
         char buf;
-        read(w->kill_pipe[0], &buf, sizeof(buf));
+        (void) read(w->kill_pipe[0], &buf, sizeof(buf));
         return 0;
     }
     
@@ -2159,7 +2159,7 @@ b32 bh_file_watch_wait(bh_file_watch *w) {
 
 void bh_file_watch_stop(bh_file_watch *w) {
     char buf = 'a';
-    write(w->kill_pipe[1], &buf, 1);
+    (void) write(w->kill_pipe[1], &buf, 1);
 }
 
 #endif // ifdef _BH_LINUX
