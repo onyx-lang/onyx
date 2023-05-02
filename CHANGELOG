@@ -1,3 +1,20 @@
+Release XXX
+-----------
+
+Additions:
+* News `logo-new-256.ico` for favicon on website.
+
+Removals:
+
+Changes:
+
+Bugfixes:
+* Fixed missing `use core` in `optional.onyx`.
+    - Fixes `Optional.reset` and `Optional.hash`
+
+
+
+
 Release v0.1.0
 --------------
 This release contains MANY CHANGES because I am terrible at keeping up to date with a
