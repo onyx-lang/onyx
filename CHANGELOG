@@ -11,7 +11,7 @@ Changes:
 Bugfixes:
 * Fixed missing `use core` in `optional.onyx`.
     - Fixes `Optional.reset` and `Optional.hash`
-
+* Fixed missing newline in `onyx help build` documentation.
 
 
 
