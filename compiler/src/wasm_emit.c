@@ -201,7 +201,7 @@ static inline b32 should_emit_function(AstFunction* fd) {
     // NOTE: Don't output functions that are not used, only if
     // they are also not exported.
     if ((fd->flags & Ast_Flag_Function_Used) == 0) {
-        if (fd->is_exported || bh_arr_length(fd->tags) > 0) {
+        if (fd->is_exported || (bh_arr_length(fd->tags) > 0 && !fd->is_foreign)) {
             return 1;
         } else {
             return 0;

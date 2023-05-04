@@ -2547,14 +2547,6 @@ CheckStatus check_function(AstFunction* func) {
     if (func->entity_header && func->entity_header->state < Entity_State_Code_Gen)
         YIELD(func->token->pos, "Waiting for procedure header to pass type-checking");
 
-    bh_arr_each(AstTyped *, pexpr, func->tags) {
-        CHECK(expression, pexpr);
-
-        if (((*pexpr)->flags & Ast_Flag_Comptime) == 0) {
-            ERROR((*pexpr)->token->pos, "#tag expressions should be compile time known.");
-        }
-    }
-
     bh_arr_clear(context.checker.expected_return_type_stack);
     bh_arr_push(context.checker.expected_return_type_stack, &func->type->Function.return_type);
 
@@ -2947,6 +2939,14 @@ CheckStatus check_function_header(AstFunction* func) {
         CHECK(expression, (AstTyped **) &func->deprecated_warning);
         if (func->deprecated_warning->kind != Ast_Kind_StrLit) {
             ERROR(func->token->pos, "Expected deprecation warning to be a string literal.");
+        }
+    }
+
+    bh_arr_each(AstTyped *, pexpr, func->tags) {
+        CHECK(expression, pexpr);
+
+        if (((*pexpr)->flags & Ast_Flag_Comptime) == 0) {
+            ERROR((*pexpr)->token->pos, "#tag expressions should be compile time known.");
         }
     }
 
