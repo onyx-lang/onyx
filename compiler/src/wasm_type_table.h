@@ -621,6 +621,7 @@ static u64 build_foreign_blocks(OnyxWasmModule* module) {
     bh_arr_new(global_heap_allocator, base_patch_locations, 256);
 
 #define PATCH (bh_arr_push(base_patch_locations, foreign_buffer.length))
+#define PATCH_AT(x) (bh_arr_push(base_patch_locations, (x)))
 #define WRITE_PTR(val) \
     bh_buffer_align(&foreign_buffer, POINTER_SIZE); \
     PATCH; \
@@ -644,6 +645,12 @@ static u64 build_foreign_blocks(OnyxWasmModule* module) {
     bh_buffer foreign_buffer;
     bh_buffer_init(&foreign_buffer, global_heap_allocator, 4096);
 
+    u32 foreign_info_data_id = NEXT_DATA_ID(module);
+
+    ConstExprContext constexpr_ctx;
+    constexpr_ctx.module = module;
+    constexpr_ctx.data_id = foreign_info_data_id;
+
     // 
     // This is necessary because 0 is an invalid offset to store in this
     // buffer, as 0 will map to NULL. This could be a single byte insertion,
@@ -659,6 +666,8 @@ static u64 build_foreign_blocks(OnyxWasmModule* module) {
         u32 *name_offsets = bh_alloc_array(global_scratch_allocator, u32, shlen(fb->scope->symbols));
         u32 *name_lengths = bh_alloc_array(global_scratch_allocator, u32, shlen(fb->scope->symbols));
         u32 *func_types   = bh_alloc_array(global_scratch_allocator, u32, shlen(fb->scope->symbols));
+        u32 *tag_offsets  = bh_alloc_array(global_scratch_allocator, u32, shlen(fb->scope->symbols));
+        u32 *tag_lengths  = bh_alloc_array(global_scratch_allocator, u32, shlen(fb->scope->symbols));
 
         fori (i, 0, shlen(fb->scope->symbols)) {
             AstFunction *func = (AstFunction *) fb->scope->symbols[i].value;
@@ -668,6 +677,40 @@ static u64 build_foreign_blocks(OnyxWasmModule* module) {
             u32 func_name_base = foreign_buffer.length;
             u32 func_name_length = import_name->length;
             bh_buffer_append(&foreign_buffer, import_name->text, func_name_length);
+
+            tag_offsets[funcs_length] = 0;
+            tag_lengths[funcs_length] = 0;
+            if (func->tags) {
+                u32 tag_count = bh_arr_length(func->tags);
+
+                bh_buffer_grow(&foreign_buffer, foreign_buffer.length + POINTER_SIZE * 2 * tag_count);
+                u32 tag_array_offset = foreign_buffer.length;
+                u32 *tag_array = (u32 *) (foreign_buffer.data + tag_array_offset);
+                foreign_buffer.length += POINTER_SIZE * 2 * tag_count;
+
+                int i = 0;
+                bh_arr_each(AstTyped *, ptag, func->tags) {
+                    AstTyped *tag = *ptag;
+                    assert(tag);
+                    assert(tag->type);
+
+                    u32 size = type_size_of(tag->type);
+                    bh_buffer_align(&foreign_buffer, type_alignment_of(tag->type));
+                    tag_array[i * 2 + 0] = foreign_buffer.length;
+                    tag_array[i * 2 + 1] = tag->type->id;
+                    PATCH_AT(tag_array_offset + i * POINTER_SIZE * 2);
+                    
+                    bh_buffer_grow(&foreign_buffer, foreign_buffer.length + size);
+                    constexpr_ctx.data = foreign_buffer.data;
+                    assert(emit_constexpr_(&constexpr_ctx, tag, foreign_buffer.length));
+                    foreign_buffer.length += size;
+
+                    i++;
+                }
+
+                tag_offsets[funcs_length] = tag_array_offset;
+                tag_lengths[funcs_length] = tag_count;
+            }
 
             name_offsets[funcs_length] = func_name_base;
             name_lengths[funcs_length] = func_name_length;
@@ -682,6 +725,7 @@ static u64 build_foreign_blocks(OnyxWasmModule* module) {
             bh_buffer_align(&foreign_buffer, POINTER_SIZE);
             WRITE_SLICE(name_offsets[i], name_lengths[i]);
             bh_buffer_write_u32(&foreign_buffer, func_types[i]);
+            WRITE_SLICE(tag_offsets[i], tag_lengths[i]);
         }
 
         OnyxToken *module_name = fb->module_name->token;
@@ -707,6 +751,7 @@ static u64 build_foreign_blocks(OnyxWasmModule* module) {
         .data = foreign_buffer.data,
     };
     emit_data_entry(module, &foreign_info_data);
+    assert(foreign_info_data.id == foreign_info_data_id);
 
     bh_arr_each(u32, patch_loc, base_patch_locations) {
         DatumPatchInfo patch;
