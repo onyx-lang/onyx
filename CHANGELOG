@@ -2,7 +2,9 @@ Release XXX
 -----------
 
 Additions:
-* News `logo-new-256.ico` for favicon on website.
+* Ability to have tags on `#foreign` block procedures.
+    - This will enable the creation different binding generators, such jsbindgen.
+* New `logo-new-256.ico` for favicon on website.
 
 Removals:
 
