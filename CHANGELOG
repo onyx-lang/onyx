@@ -9,6 +9,8 @@ Additions:
 Removals:
 
 Changes:
+* Undefined function imports in `onyx run` no longer cause an immediate error.
+    - Instead, an error is produced when the function is called.
 
 Bugfixes:
 * Fixed missing `use core` in `optional.onyx`.

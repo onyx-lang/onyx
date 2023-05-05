@@ -341,6 +341,12 @@ static void cleanup_wasm_objects() {
     if (wasm_engine) wasm_engine_delete(wasm_engine);
 }
 
+static wasm_trap_t *__error_on_call(void *env, const wasm_val_vec_t *args, wasm_val_vec_t *results) {
+    printf("Attempted to invoke imported function with no defintion, '%s'\n", (char *) env);
+    exit(1);
+    return NULL;
+}
+
 //
 // This could be cleaned up a bit, as this function directly modifies various global variables.
 // Those being wasm_memory and wasm_imports.
@@ -421,7 +427,20 @@ static b32 link_wasm_imports(
             }
         }
 
-        goto bad_import;
+        //
+        // If no matching function is not found, do not produce an error. Instead
+        // make an empty function with the correct type that will produce an error
+        // and crash when it is called. This enables safely having undefined references
+        // in the program, so long as they are not called. It also enables binding
+        // generators like `jsbindgen`, as during the generation, the imported functions
+        // will not be called.
+        {
+            char *funcname = bh_aprintf(bh_heap_allocator(), "%b.%b", module_name->data, module_name->size, import_name->data, import_name->size);
+
+            wasm_functype_t *wasm_functype = wasm_externtype_as_functype(wasm_importtype_type(module_imports.data[i]));
+            wasm_func_t* wasm_func = wasm_func_new_with_env(wasm_store, wasm_functype, __error_on_call, funcname, NULL);
+            import = wasm_func_as_extern(wasm_func);
+        }
 
     import_found:
         wasm_imports.data[i] = import;
