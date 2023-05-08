@@ -27,6 +27,10 @@
 #define WASM_TYPE_VOID    0x00
 
 static b32 onyx_type_is_stored_in_memory(Type *type) {
+    if (type->kind == Type_Kind_Distinct) {
+        type = type->Distinct.base_type;
+    }
+
     if (type_struct_is_just_one_basic_value(type)) return 0;
 
     return type->kind == Type_Kind_Struct
@@ -965,10 +969,11 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
         return;
     }
 
+    if (type->kind == Type_Kind_Function) assert(5678 && 0);
     if (type->kind == Type_Kind_Struct)   type = type_struct_is_just_one_basic_value(type);
     if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
-    if (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
-    if (type->kind == Type_Kind_Function) assert(5678 && 0);
+
+    while (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
 
     assert(type);
 
@@ -1079,8 +1084,9 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
 
     if (type->kind == Type_Kind_Struct)   type = type_struct_is_just_one_basic_value(type);
     if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
-    if (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
     if (type->kind == Type_Kind_Function) assert(1234 && 0);
+
+    while (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
 
     assert(type);
 

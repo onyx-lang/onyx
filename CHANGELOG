@@ -4,6 +4,8 @@ Release XXX
 Additions:
 * Ability to have tags on `#foreign` block procedures.
     - This will enable the creation different binding generators, such jsbindgen.
+* `#distinct` types can now be made over any type.
+    - Used to be only primitives.
 * New `logo-new-256.ico` for favicon on website.
 
 Removals:

@@ -1210,6 +1210,34 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
 
     if (from_->id == to_->id) return 1;
 
+    if (to->kind == Type_Kind_Distinct) {
+        if (types_are_compatible(to->Distinct.base_type, from)) {
+            return 1;
+        }
+
+        if (from->kind == Type_Kind_Distinct && types_are_compatible(to, from->Distinct.base_type)) {
+            return 1;
+        }
+
+        *err_msg = "Cannot convert from a distinct type to the wrong destination type.";
+        return 0;
+    }
+
+    if (from->kind == Type_Kind_Distinct) {
+        if (types_are_compatible(from->Distinct.base_type, to)) {
+            return 1;
+        }
+
+        if (to->kind == Type_Kind_Distinct && types_are_compatible(from, to->Distinct.base_type)) {
+            return 1;
+        }
+
+        *err_msg = "Cannot convert to a distinct type from the wrong destination type.";
+        return 0;
+    }
+
+
+
     if (from->kind == Type_Kind_Enum) from = from->Enum.backing;
     if (to->kind == Type_Kind_Enum) to = to->Enum.backing;
 
@@ -1242,26 +1270,6 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_VarArgs) {
         if (!types_are_compatible(to->Slice.elem, from->VarArgs.elem)) {
             *err_msg = "Variadic argument to slice cast is not valid here because the types are different.";
-            return 0;
-        } else {
-            return 1;
-        }
-    }
-
-    if (to->kind == Type_Kind_Distinct) {
-        if (!types_are_compatible(to->Distinct.base_type, from)) {
-            // :BadErrorMessage
-            *err_msg = "Cannot convert to a distinct type using the wrong base type.";
-            return 0;
-        } else {
-            return 1;
-        }
-    }
-
-    if (from->kind == Type_Kind_Distinct) {
-        if (!types_are_compatible(from->Distinct.base_type, to)) {
-            // :BadErrorMessage
-            *err_msg = "Cannot convert from a distinct type to the wrong destination type.";
             return 0;
         } else {
             return 1;
