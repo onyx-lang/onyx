@@ -18,6 +18,7 @@ Bugfixes:
 * Fixed missing `use core` in `optional.onyx`.
     - Fixes `Optional.reset` and `Optional.hash`
 * Fixed missing newline in `onyx help build` documentation.
+* Fixed WASI compilation due to misconfigured environment code.
 
 
 
