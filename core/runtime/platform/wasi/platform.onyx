@@ -2,10 +2,12 @@ package runtime.platform
 
 #load "./wasi_defs"
 #load "./wasi_fs"
+#load "./wasi_env"
 
 use core
 use wasi
 use runtime
+use main { MAIN_PKG :: package }
 
 use wasi {
     IOVec, SubscriptionTagged, Subscription, Event, Size,
@@ -84,8 +86,8 @@ __start :: () {
     __runtime_initialize();
     context.thread_id = 0;
 
-    #if (typeof (package main).main) == #type () -> void {
-        (package main).main();
+    #if (typeof MAIN_PKG.main) == #type () -> void {
+        MAIN_PKG.main();
 
     } else {
         args : [] cstr;
@@ -110,7 +112,7 @@ __start :: () {
             args[i] = cast(cstr) (cast([&] u32) args.data)[i];
         }
 
-        (package main).main(args);
+        MAIN_PKG.main(args);
     }
 
     __flush_stdio();

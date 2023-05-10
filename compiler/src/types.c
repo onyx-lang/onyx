@@ -1594,6 +1594,7 @@ u32 type_structlike_mem_count(Type* type) {
         case Type_Kind_VarArgs:  return 2;
         case Type_Kind_Function: return 3;
         case Type_Kind_DynArray: return 4;
+        case Type_Kind_Distinct: return 1;
         default: return 0;
     }
 }
