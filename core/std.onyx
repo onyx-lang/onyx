@@ -52,6 +52,8 @@ use runtime
 
 #load "./test/testing"
 
+#load "./time/time"
+
 #load "./misc/arg_parse"
 #load "./misc/method_ops"
 
@@ -81,9 +83,6 @@ use runtime
     #load "./os/process"
 }
 
-#if runtime.platform.Supports_Time {
-    #load "./time/time"
-}
 
 #if runtime.platform.Supports_Networking {
     #load "./net/net"

@@ -13,7 +13,8 @@ use wasi {
     IOVec, SubscriptionTagged, Subscription, Event, Size,
     poll_oneoff, fd_write, fd_datasync, fd_read,
     args_get, args_sizes_get,
-    proc_exit
+    proc_exit,
+    clock_time_get, Timestamp
 }
 use runtime {
     __runtime_initialize,
@@ -29,7 +30,7 @@ Supports_Files :: true
 Supports_Directories :: true
 Supports_Os :: true
 Supports_Processes :: false
-Supports_Time :: false
+Supports_Time :: true
 Supports_Networking :: false
 Supports_Type_Info :: true
 Supports_Threads :: false
@@ -78,6 +79,16 @@ __sleep :: (milliseconds: u32) {
     number_of_events: u32;
 
     error_code := poll_oneoff(&subscription, &event, 1, &number_of_events);
+}
+
+__time :: () -> i64 {
+    time: Timestamp;
+    if clock_time_get(.Realtime, 1, &time) != .Success {
+        return 0;
+    }
+
+    // Need to return in milliseconds, not nanoseconds.
+    return time / 1000000;
 }
 
 

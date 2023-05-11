@@ -2,19 +2,10 @@ package core.time
 
 use core
 use core.os
+use core.io
+use core.string
 use core.conv
 use runtime
-
-use runtime.platform {
-    __time_gmtime,
-    __time_localtime,
-    __time_mktime,
-    __time_strftime
-}
-
-#if !runtime.platform.Supports_Time {
-    #error "'core.time' should only be used with the Onyx runtime, for now.";
-}
 
 //
 // This structure has to match the 'struct tm'
@@ -67,21 +58,21 @@ now :: () -> Timestamp {
     //
     // Localtime operates on seconds, while os.time
     // returns milliseconds.
-    return localtime(current_time / 1000);
+    return gmtime(current_time / 1000);
 }
 
-to_epoch :: __time_mktime
+to_epoch :: tm_to_time
 
 
 localtime :: #match #local {}
 
 #overload
-localtime :: __time_localtime
+localtime :: time_to_tm
 
 #overload
 localtime :: (seconds: u64) -> Timestamp {
     t: Timestamp;
-    __time_localtime(seconds, &t);
+    localtime(seconds, &t);
     return t;
 }
 
@@ -89,30 +80,97 @@ localtime :: (seconds: u64) -> Timestamp {
 gmtime :: #match #local {}
 
 #overload
-gmtime :: __time_gmtime
+gmtime :: time_to_tm
 
 #overload
 gmtime :: (seconds: u64) -> Timestamp {
     t: Timestamp;
-    __time_gmtime(seconds, &t);
+    gmtime(seconds, &t);
     return t;
 }
 
 
-strftime :: (buf: [] u8, format: [] u8, tm: &Timestamp) -> str {
-    f := cast(cstr) core.alloc.from_stack(format.length + 1);
-    core.memory.copy(f, format.data, format.length);
-    f[format.length] = 0;
+#local weekdays   := str.[ "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" ];
+#local monthnames := str.[ "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december" ];
 
-    len := __time_strftime(buf, f, tm);
-    return buf[0..len];
+strftime :: (buf: [] u8, format_: [] u8, tm: &Timestamp) -> str {
+    s := io.buffer_stream_make(buf, fixed=true);
+    w := io.writer_make(&s, 0);
+
+    format := format_;
+
+    while format.length > 0 {
+        c := format[0];
+        switch c {
+            case '%' {
+                string.advance(&format);
+                switch format[0] {
+                    case 'A', 'a' {
+                        day := weekdays[tm.wday];
+                        len := 3 if format[0] == 'a' else day.length;
+
+                        io.write_format(&w, "{}{}", day[0]->to_upper(), day[1..len]);
+                    }
+
+                    case 'B', 'b', 'h' {
+                        mon := monthnames[tm.mon];
+                        len := 3 if format[0] != 'B' else mon.length;
+
+                        io.write_format(&w, "{}{}", mon[0]->to_upper(), mon[1..len]);
+                    }
+
+                    case 'd', 'e' {
+                        io.write_format(&w, "{}", tm.mday);
+                    }
+
+                    case 'D' {
+                        io.write_format(&w, "{}/{}/{}", tm.mon + 1, tm.mday, tm.year - 100 if tm.year >= 100 else tm.year);
+                    }
+
+                    case 'H' do io.write_format(&w, "{w2}", tm.hour);
+                    case 'I' do io.write_format(&w, "{w2}", hour_to_12h(tm.hour));
+                    case 'j' do io.write_format(&w, "{}", tm.yday + 1);
+                    case 'm' do io.write_format(&w, "{}", tm.mon + 1);
+                    case 'M' do io.write_format(&w, "{w2}", tm.min);
+                    case 'p' do io.write(&w, "am" if tm.hour < 12 else "pm");
+
+                    case 'r' {
+                        io.write_format(&w, "{w2}:{w2}:{w2} {}", hour_to_12h(tm.hour), tm.min, tm.sec,
+                            "am" if tm.hour < 12 else "pm");
+                    }
+
+                    case 'R' {
+                        io.write_format(&w, "{w2}:{w2}", tm.hour, tm.min);
+                    }
+
+                    case 'S' do io.write_format(&w, "{w2}", tm.sec);
+                    case 'T' do io.write_format(&w, "{w2}:{w2}:{w2}", tm.hour, tm.min, tm.sec);
+                    case 'w' do io.write_format(&w, "{}", tm.wday);
+                    case 'Y' do io.write_format(&w, "{}", tm.year + 1900);
+                    case 'y' do io.write_format(&w, "{w2}", tm.year - 100 if tm.year >= 100 else tm.year);
+                    case '%' do io.write(&w, "%");
+                }
+            }
+
+            case #default {
+                io.write(&w, c);
+            }
+        }
+
+        string.advance(&format);
+    }
+
+    hour_to_12h :: (h: i32) -> i32 {
+        if h == 0 do return 12;
+        if h <= 12 do return h;
+        return h - 12;
+    }
+
+    return string.as_str(&s);
 }
 
 strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
     use core {*}
-
-    #persist weekdays   := str.[ "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" ];
-    #persist monthnames := str.[ "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december" ];
 
     buf := buf_;
     format := format_;
@@ -336,5 +394,65 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
 
         return false;
     }
+}
+
+#local
+time_to_tm :: (ts: i64, tm: &Timestamp) {
+    leapyear :: (year) => year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+
+    #persist year_lengths := ([12] i64).[
+        i64.[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
+        i64.[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
+    ];
+
+    year := 1970;
+    dayclock := ts % 86400;
+    dayno := ts / 86400;
+
+    tm.sec = ~~(dayclock % 60);
+    tm.min = ~~((dayclock % 3600) / 60);
+    tm.hour = ~~(dayclock / 3600);
+    tm.wday = ~~((dayno + 4) % 7);
+    while true {
+        yearsize := 366 if leapyear(year) else 365;
+        if dayno >= ~~yearsize {
+            dayno -= ~~yearsize;
+            year += 1;
+        } else {
+            break;
+        }
+    }
+
+    tm.year = ~~(year - 1900);
+    tm.yday = ~~dayno;
+
+    mon := 0;
+    year_length: [] i64 = year_lengths[1 if leapyear(year) else 0];
+    while dayno >= year_length[mon] {
+        dayno -= year_length[mon];
+        mon   += 1;
+    }
+    tm.mon = ~~mon;
+    tm.mday = ~~(dayno + 1);
+    tm.isdst = 0;
+}
+
+#local
+tm_to_time :: (tm: &Timestamp) -> i64 {
+    y := cast(i64, tm.year + 1900);
+    m := cast(i64, tm.mon + 1);
+    if m <= 2 {
+        y -= 1;
+        m += 12;
+    }
+    d := cast(i64, tm.mday);
+    h := cast(i64, tm.hour);
+    mi := cast(i64, tm.min);
+    s := cast(i64, tm.sec);
+
+    return (365 * y + y / 4 - y / 100 + y / 400 + 3 * (m + 1) / 5 + 30 * m + d - 719561) * 86400
+        + 3600 * h
+        + 60 * mi
+        + s;
 }
 
