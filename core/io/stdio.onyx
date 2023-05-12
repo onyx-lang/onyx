@@ -66,6 +66,8 @@ __flush_stdio :: () {
 // that are sent directly to io.write.
 print :: #match #locked {
     (x: str) {
+        if !x do return;
+
         io.write(&stdio.print_writer, x);
         if x[x.count - 1] == #char "\n" && stdio.auto_flush do __flush_stdio();
     },

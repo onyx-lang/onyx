@@ -540,8 +540,15 @@ Link_Options :: struct {
         IMPORT_MEMORY_DEFAULT :: true;
         IMPORT_MEMORY_MODULE_NAME_DEFAULT :: "onyx";
         IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: "memory";
+    }
 
-    } else {
+    #if runtime.runtime == .Wasi && runtime.Multi_Threading_Enabled {
+        IMPORT_MEMORY_DEFAULT :: true;
+        IMPORT_MEMORY_MODULE_NAME_DEFAULT :: "env";
+        IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: "memory";
+    }
+
+    #if !#defined(IMPORT_MEMORY_DEFAULT) {
         IMPORT_MEMORY_DEFAULT :: false;
         IMPORT_MEMORY_MODULE_NAME_DEFAULT :: "";
         IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: "";

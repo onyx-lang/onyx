@@ -4957,7 +4957,7 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
             .kind   = WASM_FOREIGN_MEMORY,
             .min    = options->memory_min_size,
             .max    = options->memory_max_size, // NOTE: Why not use all 4 Gigs of memory?
-            .shared = context.options->runtime == Runtime_Js,
+            .shared = context.options->use_multi_threading && context.options->runtime != Runtime_Onyx,
 
             .mod    = options->import_memory_module_name,
             .name   = options->import_memory_import_name,

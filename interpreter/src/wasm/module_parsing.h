@@ -133,7 +133,7 @@ static void parse_type_section(build_context *ctx) {
 }
 
 static wasm_limits_t parse_limits(build_context *ctx) {
-    bool maximum_present = CONSUME_BYTE(ctx) == 0x01;
+    bool maximum_present = CONSUME_BYTE(ctx) & 0x01;
 
     wasm_limits_t limits;
     limits.min = uleb128_to_uint(ctx->binary.data, &ctx->offset);

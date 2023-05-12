@@ -33,7 +33,7 @@ Supports_Processes :: false
 Supports_Time :: true
 Supports_Networking :: false
 Supports_Type_Info :: true
-Supports_Threads :: false
+Supports_Threads :: true
 Supports_Env_Vars :: true
 
 
@@ -128,4 +128,36 @@ __start :: () {
 
     __flush_stdio();
 }
+
+
+#if runtime.Multi_Threading_Enabled {
+    #local ThreadData :: struct {
+        id: i32;
+        tls_base, stack_base: rawptr;
+        func: (data: rawptr) -> void;
+        data: rawptr;
+    }
+
+    __spawn_thread :: (
+        id: i32,
+        tls_base, stack_base: rawptr,
+        func: (data: rawptr) -> void, data: rawptr) -> void
+    {
+        thread_data := core.alloc.on_heap(ThreadData.{
+            id, tls_base, stack_base, func, data
+        });
+
+        wasi.thread_spawn(thread_data);
+    }
+
+    // Currently, WASI does not provide a way to kill a thread preemptively.
+    __kill_thread :: (id: i32) => 0
+
+    #export "wasi_thread_start"
+    (wasi_tid: u32, use td: &ThreadData) {
+        runtime._thread_start(id, tls_base, stack_base, func, data);
+        runtime._thread_exit(id);
+    }
+}
+
 
