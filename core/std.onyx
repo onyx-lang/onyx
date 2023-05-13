@@ -73,6 +73,7 @@ use runtime
 
 #if runtime.platform.Supports_Directories {
     #load "./os/dir"
+    #load "./os/path"
 }
 
 #if runtime.platform.Supports_Os {

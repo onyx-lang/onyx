@@ -1,0 +1,27 @@
+package core.os
+
+use runtime
+use core.string
+use core.conv
+
+#if runtime.compiler_os == .Windows {
+    PATH_SEP :: '\\'
+} else {
+    PATH_SEP :: '/'
+}
+
+path_join :: (parent: str, child: str, allocator := context.temp_allocator) -> str {
+    out := make(dyn_str, allocator=allocator);
+    if parent[parent.length - 1] == PATH_SEP {
+        return conv.format(&out, "{}{}", parent, child);
+    } else {
+        return conv.format(&out, "{}{}{}", parent, PATH_SEP, child);
+    }
+}
+
+path_basename :: (path: str) -> str {
+    start := string.last_index_of(path, PATH_SEP);
+    end   := string.last_index_of(path, '.');
+    return path[start + 1 .. end];
+}
+
