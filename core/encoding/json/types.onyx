@@ -98,6 +98,39 @@ Value :: #distinct ^_Value
         return m;
     }
 
+    as_array_iter :: (v: Value) -> Iterator(Value) {
+        if cast(rawptr) v == null           do return iter.empty(Value);
+        if (cast(^_Value) v).type != .Array do return iter.empty(Value);
+
+        return iter.generator(
+            &.{ arr = cast(&_Value_Array, cast(&_Value, v)).array_, index = 0 },
+            ctx => {
+                if ctx.index < ctx.arr.count {
+                    defer ctx.index += 1;
+                    return ctx.arr[ctx.index], true;
+                }
+                return .{}, false;
+            }
+        );
+    }
+
+    as_map_iter :: (v: Value) -> Iterator(Pair(str, Value)) {
+        if cast(rawptr) v == null            do return iter.empty(Pair(str, Value));
+        if (cast(^_Value) v).type != .Object do return iter.empty(Pair(str, Value));
+
+        return iter.generator(
+            &.{ obj = cast(&_Value_Object, cast(&_Value, v)).object_, index = 0 },
+            ctx => {
+                if ctx.index < ctx.obj.count {
+                    defer ctx.index += 1;
+                    v := &ctx.obj[ctx.index];
+                    return Pair.make(v.key, v.value), true;
+                }
+                return .{}, false;
+            }
+        );
+    }
+
     is_null :: (v: Value) -> bool {
         if cast(rawptr) v == null do return true;
         return cast(^_Value) v == ^_null_value || (cast(^_Value) v).type == .Null;
