@@ -68,6 +68,19 @@ close :: (it: Iterator) {
     }
 }
 
+
+#doc """
+    Helper function to create an iterator of a type that does not produce an values.
+"""
+empty :: ($T: type_expr) -> Iterator(T) {
+    return .{
+        // CLEANUP: Fix the compiler bug that makes this not able to a closure.
+        next = #solidify ($T: type_expr, _: rawptr) -> (T, bool) {
+            return .{}, false;
+        } { T = T }
+    };
+}
+
 //
 // Implicit iterator creation
 //
