@@ -10,6 +10,9 @@ Additions:
     - Used to be only primitives.
 * New `logo-new-256.ico` for favicon on website.
 * `u8.to_upper` and `u8.to_lower`
+* `iter.empty`
+* `json.Value->as_array_iter()`, `json.Value->as_map_iter()`
+* `onyx pkg new` for creating a project from a template
 
 Removals:
 
