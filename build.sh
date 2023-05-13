@@ -11,7 +11,9 @@ sudo cp -r ./core/ "$CORE_DIR"
 
 
 sudo mkdir -p "$CORE_DIR/tools"
+sudo mkdir -p "$CORE_DIR/tools/pkg_templates"
 sudo cp ./scripts/onyx-pkg.onyx "$CORE_DIR/tools"
+sudo cp ./scripts/default.json "$CORE_DIR/tools/pkg_templates"
 
 # This is a development feature to allow for quickly reinstalling core libraries
 # without have to recompile the entire compiler

@@ -1,0 +1,28 @@
+{
+    "variables": {
+        "name": {
+            "type": "string",
+            "description": "Name of the project"
+        },
+        "description": {
+            "type": "string",
+            "description": "Description of the project"
+        },
+        "url": {
+            "type": "string",
+            "description": "Git repository for project"
+        },
+        "author": {
+            "type": "string",
+            "description": "Author name"
+        }
+    },
+    "files": {
+        ".gitignore": "*.wasm",
+        "onyx-lsp.ini": "[lsp]\nmode=project\nonyxFiles=src/main.onyx\nworkingDir=.",
+        "onyx-pkg.ini": "[metadata]\nname={{name}}\ndescription={{description}}\nurl={{url}}\nauthor={{author}}\nversion=0.0.1\n",
+        "src": {
+            "main.onyx": "use core {*}\n\nmain :: () {\n    println(\"Hello Onyx!\");\n}\n"
+        }
+    }
+}

@@ -11,6 +11,19 @@ Known_Repositories :: str.[
     "git://onyxlang.io/repo/{}"
 ]
 
+
+//
+// NOTE: This returns a string that ends with the path separator.
+Template_Directory :: () -> str {
+    // TODO: Write a path library for this...
+    path_sep := '/';
+    if runtime.compiler_os == .Windows do path_sep = '\\';
+
+    file := #file;
+    path := file[0 .. string.last_index_of(file, path_sep)];
+    return aprintf("{}{}pkg_templates{}", path, path_sep, path_sep);
+}
+
 Version :: SemVer.{0, 1, 1}
 
 
@@ -469,12 +482,104 @@ run_test_command :: (args: [] cstr) {
     }
 }
 
-#tag Command.{ "new", "Create a new project in the current directory." }
+#tag Command.{
+    "new", "Create a new project from a template in the current directory.", "[template_name] | --list",
+"""
+template_name    Template name to create. Set to 'default' if unspecified.
+
+""",
+    require_config_file = false
+}
 run_new_command :: (args: [] cstr) {
-    // Create onyx-pkg.ini
-    // Create onyx-lsp.ini
-    // Create src/main.onyx
-    // Create .gitignore
+    if args.count >= 1 {
+        if string.as_str(args[0]) == "--list" {
+            printf("List of installed templates\n");
+            for os.list_directory(Template_Directory()) {
+                if !string.ends_with(it->name(), ".json") do continue;
+
+                printf("    {}\n", os.path_basename(it->name()));
+            }
+            return;
+        }
+    }
+
+    if os.list_directory(".")->count(x => true) > 0 {
+        error_print("Refusing to initialize project in non-empty directory.\n");
+        return;
+    }
+
+    template_name := "default";
+
+    if args.count >= 1 {
+        template_name = string.as_str(args[0]);
+    }
+
+    template_dir := Template_Directory();
+    template_file := tprintf("{}{}.json", template_dir, template_name);
+    if !os.file_exists(template_file) {
+        error_print("Template '{}' not found in {}\n", template_name, template_dir);
+        return;
+    }
+
+    use core.encoding {json}
+    template, err := json.decode_with_error(os.get_contents(template_file));
+    if err->has_error() {
+        error_print("Failed to parse template file.\n");
+        print(err->message());
+        return;
+    }
+
+    vars := make(Map(str, str));
+    input := io.reader_make(&stdio.stream);
+
+    template_variables := template.root["variables"]->as_map();
+    for template_variables->as_iter() {
+        assert(it.value["type"]->as_str() == "string", "Only string types are supported right now in template variables.");
+
+        printf("{}: ", it.value["description"]->as_str());
+        line := input->read_line(consume_newline=true, allocator=context.temp_allocator)
+                |> string.strip_whitespace();
+
+        vars->put(it.key, line);
+    }
+
+    populate_directory(".", template.root["files"], &vars);
+
+    populate_directory :: (dir: str, files: json.Value, vars: &Map(str, str)) {
+        for files->as_map_iter() {
+            destination := os.path_join(dir, it.first);
+            switch it.second->type() {
+                case .String {
+                    info_print("Creating", tprintf("{}\n", destination));
+
+                    contents := process_contents(it.second->as_str(), vars);
+                    for os.with_file(destination, .Write) {
+                        io.stream_write(it, contents);
+                    }
+                }
+
+                case .Object {
+                    os.dir_create(destination);
+                    populate_directory(destination, it.second, vars);
+                }
+            }
+        }
+    }
+
+    process_contents :: (contents: str, vars: &Map(str, str)) -> str {
+        output: dyn_str;
+
+        to_process := contents;
+        while to_process {
+            to_output, to_process~ := string.bisect(to_process, "{{");
+            string.append(&output, to_output);
+
+            var_name, to_process~ := string.bisect(to_process, "}}");
+            string.append(&output, vars->get(var_name));
+        }
+
+        return output;
+    }
 }
 
 
@@ -592,13 +697,15 @@ run_native_library_installation :: (folder: str) -> (bool, str) {
 
         {
             build_proc     := os.process_spawn(cmd, args, starting_directory=installed_dest);
+            build_result   := os.process_wait(&build_proc);
+
             build_reader := io.reader_make(&build_proc);
             defer io.reader_free(&build_reader);
+            build_info := build_reader->read_all();
 
-            build_result   := os.process_wait(&build_proc);
             if build_result != .Success {
                 error_print("Failed to build native library in {}.\n", folder);
-                return false, build_reader->read_all();
+                return false, build_info;
             }
         }
 
