@@ -22,6 +22,9 @@ Changes:
 * API for time remains the same, but reduced dependencies on external time things,
     like strftime, localtime and mktime.
 * Ergnomic improvements to `onyx pkg`.
+* Not relying on time for random number seeding, if cryptographic random number generation is possible.
+    - Using `getrandom` on Linux, and `BcryptGenRandom` on Windows.
+    - Using `random_get` on WASI.
 
 Bugfixes:
 * Fixed missing `use core` in `optional.onyx`.

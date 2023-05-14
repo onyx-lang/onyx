@@ -70,6 +70,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(__sleep)
     ONYX_FUNC(__time)
     ONYX_FUNC(__lookup_env)
+    ONYX_FUNC(__random_get)
     ONYX_FUNC(__register_cleanup)
 
     ONYX_FUNC(__net_create_socket)

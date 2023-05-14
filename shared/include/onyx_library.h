@@ -84,6 +84,8 @@ typedef struct WasmFuncDefinition {
     } \
     struct WasmFuncDefinition *ONYX_MODULE_NAME_GEN(ONYX_LIBRARY_NAME)[] =
 
+#define WASM_PTR WASM_I32
+
 // Shorter names
 #ifndef ONYX_NO_SHORT_NAMES
 #undef  BOOL
@@ -96,7 +98,7 @@ typedef struct WasmFuncDefinition {
 #define LONG WASM_I64
 #define FLOAT WASM_F32
 #define DOUBLE WASM_F64
-#define PTR WASM_I32
+#define PTR WASM_PTR
 #endif
 
 #define ONYX_PTR(p) ((void*) (p != 0 ? (runtime->wasm_memory_data(runtime->wasm_memory) + p) : NULL))

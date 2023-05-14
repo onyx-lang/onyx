@@ -14,7 +14,8 @@ use wasi {
     poll_oneoff, fd_write, fd_datasync, fd_read,
     args_get, args_sizes_get,
     proc_exit,
-    clock_time_get, Timestamp
+    clock_time_get, Timestamp,
+    random_get,
 }
 use runtime {
     __runtime_initialize,
@@ -89,6 +90,10 @@ __time :: () -> i64 {
 
     // Need to return in milliseconds, not nanoseconds.
     return time / 1000000;
+}
+
+__random_get :: (buf: [] u8) {
+    random_get(buf.data, buf.length);
 }
 
 

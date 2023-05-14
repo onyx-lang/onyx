@@ -53,6 +53,7 @@ typedef HANDLE HGLOBAL;
 typedef HANDLE HLOCAL;
 typedef HANDLE GLOBALHANDLE;
 typedef HANDLE LOCALHANDLE;
+typedef HANDLE BCRYPT_ALG_HANDLE;
 typedef void *HGDIOBJ;
 
 #define DECLARE_HANDLE(name) typedef HANDLE name
@@ -442,3 +443,23 @@ GB_DLL_IMPORT short WINAPI htons(short hostshort);
 GB_DLL_IMPORT int   WINAPI htonl(int   hostint);
 GB_DLL_IMPORT short WINAPI ntohs(short netshort);
 GB_DLL_IMPORT int   WINAPI ntohl(int   netint);
+
+
+GB_DLL_IMPORT NTSTATUS BCryptGenRandom(
+    BCRYPT_ALG_HANDLE hAlgorithm,
+    unsigned char *   pbBuffer,
+    unsigned long     cbBuffer,
+    unsigned long     wFlags
+);
+
+GB_DLL_IMPORT NTSTATUS BCryptOpenAlgorithmProvider(
+    BCRYPT_ALG_HANDLE *phAlgorithm,
+    const wchar_t *    pszAlgId,
+    const wchar_t *    pszImplementation,
+    unsigned long      dwFlags
+);
+
+GB_DLL_IMPORT NTSTATUS BCryptCloseAlgorithmProvider(
+    BCRYPT_ALG_HANDLE hAlgorithm,
+    unsigned long     dwFlags
+);

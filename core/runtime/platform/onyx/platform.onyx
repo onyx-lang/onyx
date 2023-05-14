@@ -76,6 +76,7 @@ ProcessData :: #distinct u64
 
     // Misc
     __file_get_standard :: (fd: i32, out: &FileData) -> bool ---
+    __random_get        :: (buf: [] u8) -> void ---
 }
 
 __start :: () {
