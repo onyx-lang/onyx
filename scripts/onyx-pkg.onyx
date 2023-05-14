@@ -67,6 +67,7 @@ main :: (args: [] cstr) {
     if command_tag.tag.require_config_file {
         if !load_config_file() {
             error_print("Failed to open {}.\n", global_arguments.config_file);
+            info_print("", "Is this the root directory of an Onyx project?\n");
             os.exit(1);
         }
 
@@ -483,9 +484,11 @@ run_test_command :: (args: [] cstr) {
 }
 
 #tag Command.{
-    "new", "Create a new project from a template in the current directory.", "[template_name] | --list",
+    "new", "Create a new project from a template in the current directory.", "(template_name | --list) [directory]",
 """
-template_name    Template name to create. Set to 'default' if unspecified.
+template_name    Template name to create.
+
+directory        Directory in which to place the new package. Defaults to '.'.
 
 """,
     require_config_file = false
@@ -503,15 +506,20 @@ run_new_command :: (args: [] cstr) {
         }
     }
 
-    if os.list_directory(".")->count(x => true) > 0 {
-        error_print("Refusing to initialize project in non-empty directory.\n");
-        return;
-    }
-
     template_name := "default";
+    directory     := ".";
 
     if args.count >= 1 {
         template_name = string.as_str(args[0]);
+    }
+
+    if args.count >= 2 {
+        directory = string.as_str(args[1]);
+    }
+
+    if os.list_directory(directory)->count(x => true) > 0 {
+        error_print("Refusing to initialize project in non-empty directory.\n");
+        return;
     }
 
     template_dir := Template_Directory();
@@ -543,7 +551,27 @@ run_new_command :: (args: [] cstr) {
         vars->put(it.key, line);
     }
 
-    populate_directory(".", template.root["files"], &vars);
+    if !os.dir_exists(directory) {
+        os.dir_create(directory);
+    }
+
+    populate_directory(directory, template.root["files"], &vars);
+
+    for template.root["commands"]->as_array_iter() {
+        command := it->as_str();
+        info_print("Running", "{}\n", command);
+
+        args := string.split(command, ' ', context.temp_allocator);
+        cmd  := args[0];
+        args  = args[1 .. args.count];
+
+        run_proc   := os.process_spawn(cmd, args, starting_directory=directory);
+        run_result := os.process_wait(&run_proc);
+
+        if run_result != .Success {
+            error_print("Failed to run '{}'\n", command);
+        }
+    }
 
     populate_directory :: (dir: str, files: json.Value, vars: &Map(str, str)) {
         for files->as_map_iter() {
@@ -1168,7 +1196,7 @@ info_print :: (verb: str, text: str, va: ..any) {
     buf: [1024] u8;
 
     // HACK
-    for 12 - verb.length do print(" ");
+    for 12 - cast(i32) verb.length do print(" ");
 
     color_print(
         .{ .Green, tprintf("{}  ", verb) },
