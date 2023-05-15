@@ -445,21 +445,21 @@ GB_DLL_IMPORT short WINAPI ntohs(short netshort);
 GB_DLL_IMPORT int   WINAPI ntohl(int   netint);
 
 
-GB_DLL_IMPORT NTSTATUS BCryptGenRandom(
+GB_DLL_IMPORT int BCryptGenRandom(
     BCRYPT_ALG_HANDLE hAlgorithm,
     unsigned char *   pbBuffer,
     unsigned long     cbBuffer,
     unsigned long     wFlags
 );
 
-GB_DLL_IMPORT NTSTATUS BCryptOpenAlgorithmProvider(
+GB_DLL_IMPORT int BCryptOpenAlgorithmProvider(
     BCRYPT_ALG_HANDLE *phAlgorithm,
     const wchar_t *    pszAlgId,
     const wchar_t *    pszImplementation,
     unsigned long      dwFlags
 );
 
-GB_DLL_IMPORT NTSTATUS BCryptCloseAlgorithmProvider(
+GB_DLL_IMPORT int BCryptCloseAlgorithmProvider(
     BCRYPT_ALG_HANDLE hAlgorithm,
     unsigned long     dwFlags
 );
