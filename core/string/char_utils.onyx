@@ -25,6 +25,16 @@ package core.string
     is_whitespace :: (c: u8) -> bool {
         return c == #char " " || c == #char "\n" || c == #char "\t" || c == #char "\v";
     }
+
+    to_upper :: (c: u8) -> u8 {
+        if c >= 'a' && c <= 'z' do return c - 32;
+        return c;
+    }
+
+    to_lower :: (c: u8) -> u8 {
+        if c >= 'A' && c <= 'Z' do return c + 32;
+        return c;
+    }
 }
 
 

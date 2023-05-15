@@ -527,7 +527,7 @@ Link_Options :: struct {
 
     // Controls if/how the WASM function table will be exported.
     export_func_table := true;
-    export_func_table_name := "func_table";
+    export_func_table_name := "__indirect_function_table";
 
     // Controls the minimum and maximum number of pages for WASM memory.
     memory_min_size := 1024;
@@ -540,11 +540,16 @@ Link_Options :: struct {
         IMPORT_MEMORY_DEFAULT :: true;
         IMPORT_MEMORY_MODULE_NAME_DEFAULT :: "onyx";
         IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: "memory";
-
     } else {
-        IMPORT_MEMORY_DEFAULT :: false;
-        IMPORT_MEMORY_MODULE_NAME_DEFAULT :: "";
-        IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: "";
+        #if runtime.runtime == .Wasi && runtime.Multi_Threading_Enabled {
+            IMPORT_MEMORY_DEFAULT :: true;
+            IMPORT_MEMORY_MODULE_NAME_DEFAULT :: "env";
+            IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: "memory";
+        } else {
+            IMPORT_MEMORY_DEFAULT :: false;
+            IMPORT_MEMORY_MODULE_NAME_DEFAULT :: "";
+            IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: "";
+        }
     }
 }
 

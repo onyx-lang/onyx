@@ -18,10 +18,8 @@ Date :: struct {
     }
 
 
-    #if runtime.platform.Supports_Time {
-        today :: () -> Date {
-            return now()->as_date();
-        }
+    today :: () -> Date {
+        return now()->as_date();
     }
 
     add_months :: (d: Date, days: i32) -> Date {

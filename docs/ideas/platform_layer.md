@@ -94,10 +94,6 @@ this document will serve as that "header file"
 
 ### Procedures
 - `__time() -> u64`
-- `__time_localtime(time: u64, tm: ^core.time.Timestamp) -> void`
-- `__time_gmtime(time: u64, tm: ^core.time.Timestamp) -> void`
-- `__time_gmtime(tm: ^core.time.Timestamp) -> i64`
-- `__time_strftime(buf: [] u8, format: cstr, tm: ^core.time.Timestamp) -> u32`
 
 ### Values
 

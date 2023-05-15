@@ -1,8 +1,8 @@
 {
     "name": "onyx",
     "displayName": "Onyx",
-    "description": "Onyx syntax highlighting.",
-    "version": "0.1.5",
+    "description": "Onyx syntax highlighting and debugger support.",
+    "version": "0.1.6",
     "publisher": "brendanfh",
     "license": "BSD-2-Clause",
     "engines": {
@@ -30,7 +30,11 @@
                 "extensions": [
                     ".onyx"
                 ],
-                "configuration": "./language-configuration.json"
+                "configuration": "./language-configuration.json",
+                "icon": {
+                    "dark": "logo-icon.png",
+                    "light": "logo-icon.png"
+                }
             }
         ],
         "grammars": [

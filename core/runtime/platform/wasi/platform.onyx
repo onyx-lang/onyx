@@ -2,16 +2,20 @@ package runtime.platform
 
 #load "./wasi_defs"
 #load "./wasi_fs"
+#load "./wasi_env"
 
 use core
 use wasi
 use runtime
+use main { MAIN_PKG :: package }
 
 use wasi {
     IOVec, SubscriptionTagged, Subscription, Event, Size,
     poll_oneoff, fd_write, fd_datasync, fd_read,
     args_get, args_sizes_get,
-    proc_exit
+    proc_exit,
+    clock_time_get, Timestamp,
+    random_get,
 }
 use runtime {
     __runtime_initialize,
@@ -27,10 +31,10 @@ Supports_Files :: true
 Supports_Directories :: true
 Supports_Os :: true
 Supports_Processes :: false
-Supports_Time :: false
+Supports_Time :: true
 Supports_Networking :: false
 Supports_Type_Info :: true
-Supports_Threads :: false
+Supports_Threads :: true
 Supports_Env_Vars :: true
 
 
@@ -78,14 +82,28 @@ __sleep :: (milliseconds: u32) {
     error_code := poll_oneoff(&subscription, &event, 1, &number_of_events);
 }
 
+__time :: () -> i64 {
+    time: Timestamp;
+    if clock_time_get(.Realtime, 1, &time) != .Success {
+        return 0;
+    }
+
+    // Need to return in milliseconds, not nanoseconds.
+    return time / 1000000;
+}
+
+__random_get :: (buf: [] u8) {
+    random_get(buf.data, buf.length);
+}
+
 
 // Sets up everything needed for execution.
 __start :: () {
     __runtime_initialize();
     context.thread_id = 0;
 
-    #if (typeof (package main).main) == #type () -> void {
-        (package main).main();
+    #if (typeof MAIN_PKG.main) == #type () -> void {
+        MAIN_PKG.main();
 
     } else {
         args : [] cstr;
@@ -110,9 +128,41 @@ __start :: () {
             args[i] = cast(cstr) (cast([&] u32) args.data)[i];
         }
 
-        (package main).main(args);
+        MAIN_PKG.main(args);
     }
 
     __flush_stdio();
 }
+
+
+#if runtime.Multi_Threading_Enabled {
+    #local ThreadData :: struct {
+        id: i32;
+        tls_base, stack_base: rawptr;
+        func: (data: rawptr) -> void;
+        data: rawptr;
+    }
+
+    __spawn_thread :: (
+        id: i32,
+        tls_base, stack_base: rawptr,
+        func: (data: rawptr) -> void, data: rawptr) -> void
+    {
+        thread_data := core.alloc.on_heap(ThreadData.{
+            id, tls_base, stack_base, func, data
+        });
+
+        wasi.thread_spawn(thread_data);
+    }
+
+    // Currently, WASI does not provide a way to kill a thread preemptively.
+    __kill_thread :: (id: i32) => 0
+
+    #export "wasi_thread_start"
+    (wasi_tid: u32, use td: &ThreadData) {
+        runtime._thread_start(id, tls_base, stack_base, func, data);
+        runtime._thread_exit(id);
+    }
+}
+
 

@@ -11,6 +11,19 @@ Known_Repositories :: str.[
     "git://onyxlang.io/repo/{}"
 ]
 
+
+//
+// NOTE: This returns a string that ends with the path separator.
+Template_Directory :: () -> str {
+    // TODO: Write a path library for this...
+    path_sep := '/';
+    if runtime.compiler_os == .Windows do path_sep = '\\';
+
+    file := #file;
+    path := file[0 .. string.last_index_of(file, path_sep)];
+    return aprintf("{}{}pkg_templates{}", path, path_sep, path_sep);
+}
+
 Version :: SemVer.{0, 1, 1}
 
 
@@ -53,7 +66,8 @@ main :: (args: [] cstr) {
 
     if command_tag.tag.require_config_file {
         if !load_config_file() {
-            eprintf("Failed to open {}.\n", global_arguments.config_file);
+            error_print("Failed to open {}.\n", global_arguments.config_file);
+            info_print("", "Is this the root directory of an Onyx project?\n");
             os.exit(1);
         }
 
@@ -103,7 +117,7 @@ run_help_command :: (args: [] cstr) {
 #tag Command.{ "init", "Initialize a new project.", "", require_config_file=false }
 run_init_command :: (args: [] cstr) {
     if os.file_exists(global_arguments.config_file) {
-        eprintf("Config file present; project already initialized.\n");
+        error_print("Config file present; project already initialized.\n");
         return;
     }
 
@@ -148,7 +162,7 @@ verion           Semantic version number (Major.Minor.Patch). If omitted, the mo
 }
 run_add_command :: (args: [] cstr) {
     if args.count < 1 {
-        eprintf("Expected package name.");
+        error_print("Expected package URL");
         return;
     }
 
@@ -158,7 +172,7 @@ run_add_command :: (args: [] cstr) {
     version: SemVer;
     if args.count > 1 {
         if !conv.parse_any(&version, string.as_str(args[1])) {
-            eprintf("Failed to parse version number given: {}\n", string.as_str(args[1]));
+            error_print("Failed to parse version number given: {}\n", string.as_str(args[1]));
             return;
         }
 
@@ -167,14 +181,14 @@ run_add_command :: (args: [] cstr) {
     }
 
     if config.dependencies.dependencies->has(dep) {
-        eprintf("Dependency '{}' already specified at version '{}'.\n", dep, config.dependencies.dependencies[dep]);
+        error_print("Dependency '{}' already specified at version '{}'.\n", dep, config.dependencies.dependencies[dep]);
 
     } elseif version->is_zero() {
-        printf("Unable to find latest version of '{}'.\n", dep);
+        error_print("Unable to find latest version of '{}'\n", string.as_str(args[0]));
 
     } else {
         config.dependencies.dependencies[dep] = version;
-        printf("Added dependency '{}' at version {}.\n", dep, version);
+        info_print("Added", "'{}' version {}\n", dep, version);
     }
 }
 
@@ -185,7 +199,7 @@ package-or-url   Git repository name or package name on disk to remove.
 }
 run_remove_command :: (args: [] cstr) {
     if args.count < 1 {
-        eprintf("Expected package name.");
+        error_print("Expected package name.");
         return;
     }
 
@@ -205,7 +219,7 @@ run_remove_command :: (args: [] cstr) {
         }
     }
 
-    eprintf("Dependency '{}' is not currently used.\n", dep);
+    error_print("Dependency '{}' is not currently used.\n", dep);
 }
 
 #tag Command.{ "show", "Show dependencies and versions.", "" }
@@ -232,11 +246,13 @@ run_show_command :: (args: [] cstr) {
 #tag Command.{ "update", "Update dependencies to newest compatible versions.", "" }
 // @Feature // Add "locked" dependencies that will never update?
 run_update_command :: (args: [] cstr) {
-    printf("Updating dependencies to newest compatible versions.\n");
+    info_print("Info", "Updating dependencies to newest compatible versions.\n");
     for& config.dependencies.dependencies.entries {
         new_version := Git.get_latest_compatible_version(it.key, it.value);
 
-        printf("{}: {} -> {}\n", it.key, it.value, new_version);
+        if it.value != new_version {
+            info_print("Update", "{}  {} -> {}\n", it.key, it.value, new_version);
+        }
 
         it.value = new_version;
     }
@@ -284,7 +300,7 @@ run_sync_command :: (args: [] cstr) {
 
         success, installed_folder := install_package(to_install.pack, to_install.downgrade_if_necessary);
         if !success {
-            eprintf("Aborting sync.\n");
+            error_print("Aborting sync.\n");
             return;
         }
 
@@ -297,25 +313,27 @@ run_sync_command :: (args: [] cstr) {
             result, error := encoding.ini.parse_ini_file(&r, &inner_config);
 
             if result != .Success {
-                eprintf("Failed to parse onyx-pkg.ini in {}. Skipping...\n", to_install.repo);
+                error_print("Misconfigured onyx-pkg.ini in '{}'. Omitting.\n", to_install.repo);
                 continue;
             }
         }
 
         if inner_config.metadata.version->is_zero() {
-            eprintf("Failed to parse onyx-pkg.ini in {}. Skipping...\n", to_install.repo);
+            error_print("Misconfigured parse onyx-pkg.ini in '{}'. Omitting.\n", to_install.repo);
             continue;
         }
 
         for& inner_config.dependencies.dependencies.entries {
             if dependencies_installed->has(it.key) {
+                // TODO : Check if this is right? Could this accidentally forcefully upgrade a package?
                 if it.value->is_newer(dependencies_installed[it.key]) {
                     uninstall_package(.{it.key, it.value});
                     dependencies_installed->delete(it.key);
                     dependencies_to_install << .{ .{it.key, it.value}, false };
 
                 } elseif !(it.value->is_compatible(dependencies_installed[it.key])) {
-                    eprintf("Different major versions of {} being used!\n", it.key);
+                    // TODO: Explain this more
+                    error_print("Different major versions of '{}' being used!\n", it.key);
                     os.exit(1);
                 }
             } else {
@@ -333,6 +351,7 @@ run_sync_command :: (args: [] cstr) {
             if it.type != .Directory do continue;
 
             if !array.contains(needed_dependency_folders, it->name()) {
+                info_print("Remove", "{}\n", it->name());
                 package_folder := tprintf("{}/{}", config.config.lib_source_directory, it->name());
                 attempt_remove_native_library(package_folder);
                 os.remove_directory(package_folder);
@@ -348,7 +367,7 @@ package-or-url   Git repository name or package name on disk to remove.
 }
 run_rebuild_command :: (args: [] cstr)  {
     if args.count < 1 {
-        eprintf("Expected package name.");
+        error_print("Expected package name.");
         return;
     }
 
@@ -359,10 +378,12 @@ run_rebuild_command :: (args: [] cstr)  {
         folder = config.dependency_folders.folders[dep];
     }
 
-    if rebuild_native_library(folder) {
-        printf("Successfully rebuilt {}.\n", dep);
+    info_print("Rebuild", "{}\n", dep);
+    if success, err := rebuild_native_library(folder); success {
+        info_print("Rebuilt", "{}\n", dep);
     } else {
-        printf("Failed to rebuild {}.\n", dep);
+        error_print("Rebuild failed.\n", dep);
+        println(err);
         os.exit(1);
     }
 }
@@ -372,6 +393,7 @@ run_publish_command :: (args: [] cstr) {
     // @TODO // Better error handling and reporting, as this is a delicate process.
 
     if !os.dir_exists(".git") {
+        error_print("Not in Git repository.\n");
         printf("It does not look like you are in a Git repository. In order to publish packages\n");
         printf("with onyx-pkg, you have to initailize a Git repository in the current directory.\n\n");
         return;
@@ -413,11 +435,11 @@ run_publish_command :: (args: [] cstr) {
 
     store_config_file();
 
-    printf("Creating new published version...\n");
+    info_print("Publishing", "Creating new published version\n");
     if Git.publish_version() {
-        printf("Successfully published new version.\n");
+        info_print("Published", "Successfully published new version.\n");
     } else {
-        printf("Failed to publish new version.\n");
+        error_print("Failed to publish new version.\n");
     }
 }
 
@@ -461,12 +483,131 @@ run_test_command :: (args: [] cstr) {
     }
 }
 
-#tag Command.{ "new", "Create a new project in the current directory." }
+#tag Command.{
+    "new", "Create a new project from a template in the current directory.", "(template_name | --list) [directory]",
+"""
+template_name    Template name to create.
+
+directory        Directory in which to place the new package. Defaults to '.'.
+
+""",
+    require_config_file = false
+}
 run_new_command :: (args: [] cstr) {
-    // Create onyx-pkg.ini
-    // Create onyx-lsp.ini
-    // Create src/main.onyx
-    // Create .gitignore
+    if args.count >= 1 {
+        if string.as_str(args[0]) == "--list" {
+            printf("List of installed templates\n");
+            for os.list_directory(Template_Directory()) {
+                if !string.ends_with(it->name(), ".json") do continue;
+
+                printf("    {}\n", os.path_basename(it->name()));
+            }
+            return;
+        }
+    }
+
+    template_name := "default";
+    directory     := ".";
+
+    if args.count >= 1 {
+        template_name = string.as_str(args[0]);
+    }
+
+    if args.count >= 2 {
+        directory = string.as_str(args[1]);
+    }
+
+    if os.list_directory(directory)->count(x => true) > 0 {
+        error_print("Refusing to initialize project in non-empty directory.\n");
+        return;
+    }
+
+    template_dir := Template_Directory();
+    template_file := tprintf("{}{}.json", template_dir, template_name);
+    if !os.file_exists(template_file) {
+        error_print("Template '{}' not found in {}\n", template_name, template_dir);
+        return;
+    }
+
+    use core.encoding {json}
+    template, err := json.decode_with_error(os.get_contents(template_file));
+    if err->has_error() {
+        error_print("Failed to parse template file.\n");
+        print(err->message());
+        return;
+    }
+
+    vars := make(Map(str, str));
+    input := io.reader_make(&stdio.stream);
+
+    template_variables := template.root["variables"]->as_map();
+    for template_variables->as_iter() {
+        assert(it.value["type"]->as_str() == "string", "Only string types are supported right now in template variables.");
+
+        printf("{}: ", it.value["description"]->as_str());
+        line := input->read_line(consume_newline=true, allocator=context.temp_allocator)
+                |> string.strip_whitespace();
+
+        vars->put(it.key, line);
+    }
+
+    if !os.dir_exists(directory) {
+        os.dir_create(directory);
+    }
+
+    populate_directory(directory, template.root["files"], &vars);
+
+    for template.root["commands"]->as_array_iter() {
+        command := it->as_str();
+        info_print("Running", "{}\n", command);
+
+        args := string.split(command, ' ', context.temp_allocator);
+        cmd  := args[0];
+        args  = args[1 .. args.count];
+
+        run_proc   := os.process_spawn(cmd, args, starting_directory=directory);
+        run_result := os.process_wait(&run_proc);
+
+        if run_result != .Success {
+            error_print("Failed to run '{}'\n", command);
+        }
+    }
+
+    populate_directory :: (dir: str, files: json.Value, vars: &Map(str, str)) {
+        for files->as_map_iter() {
+            destination := os.path_join(dir, it.first);
+            switch it.second->type() {
+                case .String {
+                    info_print("Creating", tprintf("{}\n", destination));
+
+                    contents := process_contents(it.second->as_str(), vars);
+                    for os.with_file(destination, .Write) {
+                        io.stream_write(it, contents);
+                    }
+                }
+
+                case .Object {
+                    os.dir_create(destination);
+                    populate_directory(destination, it.second, vars);
+                }
+            }
+        }
+    }
+
+    process_contents :: (contents: str, vars: &Map(str, str)) -> str {
+        output: dyn_str;
+
+        to_process := contents;
+        while to_process {
+            to_output, to_process~ := string.bisect(to_process, "{{");
+            string.append(&output, to_output);
+
+            var_name, to_process~ := string.bisect(to_process, "}}");
+            string.append(&output, vars->get(var_name));
+        }
+
+        return output;
+    }
 }
 
 
@@ -489,22 +630,23 @@ install_package :: (pack: Package, downgrade_if_necessary := false) -> (bool, in
             installed_version := get_installed_version_of_package(folder_name);
 
             if installed_version == pack.version {
-                printf("{} is already installed at version {}.\n", pack.repo, installed_version);
+                info_print("Exists", "{}  {}\n", pack.repo, installed_version);
                 return true, folder_name;
             }
 
             if installed_version->is_newer(pack.version) && !downgrade_if_necessary {
-                eprintf("Refusing to downgrade package {} from version {} to {}.\n", pack.repo, installed_version, pack.version);
+                error_print("Refusing to downgrade '{}' from {} to {}.\n", pack.repo, installed_version, pack.version);
             }
 
+            // :PRETTY
             verb := "Upgrading" if pack.version->is_newer(installed_version) else "Downgrading";
-            printf("{} package {} from version {} to {}.\n", verb, pack.repo, installed_version, pack.version);
+            info_print(verb, "{}  {} -> {}\n", pack.repo, installed_version, pack.version);
             uninstall_package(pack);
         }
     }
 
     if !Git.clone_version(pack.repo, pack.version) {
-        eprintf("Failed to fetch {} version {}.\n", pack.repo, pack.version);
+        error_print("Failed to fetch {} version {}.\n", pack.repo, pack.version);
         return false, "";
     }
 
@@ -546,9 +688,10 @@ attempt_remove_native_library :: (package_folder: str) -> bool {
     return true;
 }
 
-rebuild_native_library :: (folder: str) -> bool {
+rebuild_native_library :: (folder: str) -> (bool, str) {
     attempt_remove_native_library(tprintf("{}/{}", config.config.lib_source_directory, folder));
-    return run_native_library_installation(folder);
+    success, build_error := run_native_library_installation(folder);
+    return success, build_error;
 }
 
 get_installed_version_of_package :: (package_path: str) -> SemVer {
@@ -565,32 +708,39 @@ get_installed_version_of_package :: (package_path: str) -> SemVer {
     return .{0, 0, 0};
 }
 
-run_native_library_installation :: (folder: str) -> bool {
+run_native_library_installation :: (folder: str) -> (bool, str) {
     inner_config: Config;
     for os.with_file(tprintf("{}/{}/onyx-pkg.ini", config.config.lib_source_directory, folder)) {
         r := io.reader_make(it);
         result, error := encoding.ini.parse_ini_file(&r, &inner_config);
 
-        if result != .Success do return false;
-        if string.empty(inner_config.native_library.build_cmd) do return true;
+        if result != .Success do return false, "";
+        if string.empty(inner_config.native_library.build_cmd) do return true, "";
 
         args := string.split(inner_config.native_library.build_cmd, #char " ", context.temp_allocator);
         cmd  := args[0];
         args  = args[1 .. args.count];
 
         installed_dest := tprintf("{}/{}", config.config.lib_source_directory, folder);
-        build_proc     := os.process_spawn(cmd, args, starting_directory=installed_dest);
-        build_result   := os.process_wait(&build_proc);
 
-        if build_result != .Success {
-            eprintf("Failed to build native library in {}.\n", folder);
-            return false;
+        {
+            build_proc     := os.process_spawn(cmd, args, starting_directory=installed_dest);
+            build_result   := os.process_wait(&build_proc);
+
+            build_reader := io.reader_make(&build_proc);
+            defer io.reader_free(&build_reader);
+            build_info := build_reader->read_all();
+
+            if build_result != .Success {
+                error_print("Failed to build native library in {}.\n", folder);
+                return false, build_info;
+            }
         }
 
         if !os.dir_exists(config.config.lib_bin_directory) {
             if !os.dir_create(config.config.lib_bin_directory) {
-                eprintf("Failed to create native library directory, {}.\n", config.config.lib_bin_directory);
-                return false;
+                error_print("Failed to create native library directory, {}.\n", config.config.lib_bin_directory);
+                return false, "";
             }
         }
 
@@ -599,10 +749,10 @@ run_native_library_installation :: (folder: str) -> bool {
         success := os.rename_file(source_path, dest_path);
 
         if !success {
-            eprintf("Failed to move native library to final destination.\n {} -> {}\n", source_path, dest_path);
+            error_print("Failed to move native library to final destination.\n {} -> {}\n", source_path, dest_path);
         }
 
-        return success;
+        return success, "";
     }
 }
 
@@ -796,7 +946,7 @@ Git :: struct {
     }
 
     clone_version :: (repo: str, version: SemVer) -> bool {
-        printf("Fetching {} version {}...\n", repo, version);
+        info_print("Fetch", "{}  {}\n", repo, version);
 
         version_str := tprintf("v{}", version);
         full_dest   := tprintf("{}/{}", config.config.lib_source_directory, ".cloned");
@@ -828,7 +978,7 @@ Git :: struct {
                 }
 
                 if !successfully_parsed {
-                    eprintf("Unknown destination directory and failed to find onyx-pkg.ini in {}.\n", repo);
+                    error_print("Unknown destination directory and failed to find onyx-pkg.ini in {}.\n", repo);
                     os.remove_directory(full_dest);
                     return false;
                 }
@@ -840,13 +990,13 @@ Git :: struct {
             // Move the cloned repository to its permanent location.
             actual_dest := tprintf("{}/{}", config.config.lib_source_directory, install_dest);
             if os.dir_exists(actual_dest) {
-                eprintf("Expected {} to not exist when fetching {}.\n", actual_dest, repo);
+                error_print("Expected {} to not exist when fetching '{}'.\n", actual_dest, repo);
                 os.remove_directory(full_dest);
                 return false;
             }
 
             if !os.dir_rename(full_dest, actual_dest) {
-                eprintf("Failed to move temporary package to final destination when fetching {}.\n", repo);
+                error_print("Failed to move temporary package to final destination when fetching '{}'.\n", repo);
                 os.remove_directory(full_dest);
                 return false;
             }
@@ -854,7 +1004,7 @@ Git :: struct {
             // Remove the .git folder, as it is unneeded.
             unnecessary_git_dir := tprintf("{}/.git", actual_dest);
             if !os.remove_directory(unnecessary_git_dir) {
-                eprintf("Failed to delete .git folder of {}.\n", repo);
+                error_print("Failed to delete .git folder of '{}'.\n", repo);
                 return false;
             }
 
@@ -1007,4 +1157,50 @@ store_config_file :: () -> bool {
     }
 }
 
+
+Color_Print :: struct {
+    Color :: enum {
+        Black;
+        Red;
+        Green;
+        Yellow;
+        Blue;
+        Purple;
+        Cyan;
+        White;
+        __Unused;
+        Default;
+    }
+
+    color: Color;
+    text: str;
+}
+
+color_print :: (segments: ..Color_Print) {
+    for segments {
+        printf("\x1b[3{}m{}", cast(u32) it.color, it.text);
+    }
+
+    print("\x1b[0m");
+}
+
+error_print :: (text: str, va: ..any) {
+    buf: [1024] u8;
+    color_print(
+        .{ .Red, "       Error  " },
+        .{ .Default, conv.format_va(buf, text, cast([] any) va) }
+    );
+}
+
+info_print :: (verb: str, text: str, va: ..any) {
+    buf: [1024] u8;
+
+    // HACK
+    for 12 - cast(i32) verb.length do print(" ");
+
+    color_print(
+        .{ .Green, tprintf("{}  ", verb) },
+        .{ .Default, conv.format_va(buf, text, cast([] any) va) }
+    );
+}
 

@@ -1,5 +1,7 @@
 package core
 
+use core
+
 // Optional is helper type that encapsulates the idea of an empty
 // value, without resorting to null pointers. Optionals are usually
 // provided as a return value from procedures that could fail. There

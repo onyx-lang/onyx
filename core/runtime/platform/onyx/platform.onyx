@@ -65,10 +65,6 @@ ProcessData :: #distinct u64
 
     // Time and sleep
     __time :: () -> u64 ---
-    __time_localtime :: (time: u64, tm: &core.time.Timestamp) -> void ---
-    __time_gmtime    :: (time: u64, tm: &core.time.Timestamp) -> void ---
-    __time_mktime    :: (tm: &time.Timestamp) -> i64 ---
-    __time_strftime  :: (buf: [] u8, format: cstr, tm: &time.Timestamp) -> u32 ---
 
     // Processes
     __process_spawn   :: (path: str, args: [] str, non_blocking_io: bool, starting_directory: str) -> ProcessData ---
@@ -80,6 +76,7 @@ ProcessData :: #distinct u64
 
     // Misc
     __file_get_standard :: (fd: i32, out: &FileData) -> bool ---
+    __random_get        :: (buf: [] u8) -> void ---
 }
 
 __start :: () {

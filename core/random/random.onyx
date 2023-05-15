@@ -1,6 +1,7 @@
 package core.random
 
 use core
+use runtime
 
 #doc "The state of a random number generator."
 Random :: struct {
@@ -116,10 +117,18 @@ string :: (bytes_long: u32, alpha_numeric := false, allocator := context.allocat
     RANDOM_MULTIPLIER :: 25214903917
     RANDOM_INCREMENT  :: cast(i64) 11
 
-    #if #defined(core.os.time) {
-        __initial_value :: #(core.os.time())
+    #if #defined(runtime.platform.__random_get) {
+        __initial_value :: #(do {
+            v: u64;
+            runtime.platform.__random_get(.{ ~~&v, sizeof typeof v });
+            return v;
+        })
     } else {
-        __initial_value :: #(8675309)
+        #if #defined(core.os.time) {
+            __initial_value :: #(core.os.time())
+        } else {
+            __initial_value :: #(8675309)
+        }
     }
 }
 

@@ -1055,6 +1055,10 @@ SymresStatus symres_function_header(AstFunction* func) {
     if (func->deprecated_warning) {
         SYMRES(expression, (AstTyped **) &func->deprecated_warning);
     }
+    
+    bh_arr_each(AstTyped *, pexpr, func->tags) {
+        SYMRES(expression, pexpr);
+    }
 
     if (func->foreign.import_name) {
         SYMRES(expression, &func->foreign.module_name);
@@ -1135,10 +1139,6 @@ SymresStatus symres_function(AstFunction* func) {
                         param->local->token->length);
                 }
             }
-        }
-
-        bh_arr_each(AstTyped *, pexpr, func->tags) {
-            SYMRES(expression, pexpr);
         }
 
         func->flags |= Ast_Flag_Has_Been_Symres;

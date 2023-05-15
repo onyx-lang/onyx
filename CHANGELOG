@@ -1,3 +1,43 @@
+Release v0.1.1
+-----------
+15th May 2023
+
+Additions:
+* Ability to have tags on `#foreign` block procedures.
+    - This will enable the creation different binding generators, such jsbindgen.
+* WASI support for threads at the platform layer.
+    - Requires passing '--multi-threaded' CLI flag.
+* `#distinct` types can now be made over any type.
+    - Used to be only primitives.
+* New `logo-new-256.ico` for favicon on website.
+* `u8.to_upper` and `u8.to_lower`
+* `iter.empty`
+* `json.Value->as_array_iter()`, `json.Value->as_map_iter()`
+* `onyx pkg new` for creating a project from a template
+* `#load_all_recursive` to recursively load all `.onyx` files in a directory.
+
+Removals:
+
+Changes:
+* Undefined function imports in `onyx run` no longer cause an immediate error.
+    - Instead, an error is produced when the function is called.
+* API for time remains the same, but reduced dependencies on external time things,
+    like strftime, localtime and mktime.
+* Ergnomic improvements to `onyx pkg`.
+* Not relying on time for random number seeding, if cryptographic random number generation is possible.
+    - Using `getrandom` on Linux, and `BcryptGenRandom` on Windows.
+    - Using `random_get` on WASI.
+
+Bugfixes:
+* Fixed missing `use core` in `optional.onyx`.
+    - Fixes `Optional.reset` and `Optional.hash`
+* Fixed missing newline in `onyx help build` documentation.
+* Fixed WASI compilation due to misconfigured environment code.
+* Fixed WASI `__dir_open` permissions.
+* Fixed `core.encoding.ini` clearing the temporary allocator.
+
+
+
 Release v0.1.0
 --------------
 This release contains MANY CHANGES because I am terrible at keeping up to date with a

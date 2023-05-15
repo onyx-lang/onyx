@@ -27,6 +27,10 @@
 #define WASM_TYPE_VOID    0x00
 
 static b32 onyx_type_is_stored_in_memory(Type *type) {
+    if (type->kind == Type_Kind_Distinct) {
+        type = type->Distinct.base_type;
+    }
+
     if (type_struct_is_just_one_basic_value(type)) return 0;
 
     return type->kind == Type_Kind_Struct
@@ -201,7 +205,7 @@ static inline b32 should_emit_function(AstFunction* fd) {
     // NOTE: Don't output functions that are not used, only if
     // they are also not exported.
     if ((fd->flags & Ast_Flag_Function_Used) == 0) {
-        if (fd->is_exported || bh_arr_length(fd->tags) > 0) {
+        if (fd->is_exported || (bh_arr_length(fd->tags) > 0 && !fd->is_foreign)) {
             return 1;
         } else {
             return 0;
@@ -965,10 +969,11 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
         return;
     }
 
+    if (type->kind == Type_Kind_Function) assert(5678 && 0);
     if (type->kind == Type_Kind_Struct)   type = type_struct_is_just_one_basic_value(type);
     if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
-    if (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
-    if (type->kind == Type_Kind_Function) assert(5678 && 0);
+
+    while (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
 
     assert(type);
 
@@ -1079,8 +1084,9 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
 
     if (type->kind == Type_Kind_Struct)   type = type_struct_is_just_one_basic_value(type);
     if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
-    if (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
     if (type->kind == Type_Kind_Function) assert(1234 && 0);
+
+    while (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
 
     assert(type);
 
@@ -4951,7 +4957,7 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
             .kind   = WASM_FOREIGN_MEMORY,
             .min    = options->memory_min_size,
             .max    = options->memory_max_size, // NOTE: Why not use all 4 Gigs of memory?
-            .shared = context.options->runtime == Runtime_Js,
+            .shared = context.options->use_multi_threading && context.options->runtime != Runtime_Onyx,
 
             .mod    = options->import_memory_module_name,
             .name   = options->import_memory_import_name,

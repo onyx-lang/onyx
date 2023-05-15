@@ -19,6 +19,7 @@ Foreign_Block :: struct {
     Foreign_Function :: struct {
         name: str;
         type: type_expr;
+        tags: [] any;
     }
 }
 

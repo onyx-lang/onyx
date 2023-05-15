@@ -84,6 +84,20 @@ ONYX_DEF(__lookup_env, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
 }
 
 
+ONYX_DEF(__random_get, (WASM_PTR, WASM_I32), ()) {
+    #ifdef _BH_LINUX
+    getrandom(ONYX_PTR(params->data[0].of.i32), params->data[1].of.i32, 0);
+    #endif
+
+    #ifdef _BH_WINDOWS
+    BCRYPT_ALG_HANDLE alg;
+    BCryptOpenAlgorithmProvider(&alg, L"SHA256", NULL, 0);
+    BCryptGenRandom(alg, ONYX_PTR(params->data[0].of.i32), params->data[1].of.i32, 0);
+    BCryptCloseAlgorithmProvider(alg, 0);
+    #endif
+
+    return NULL;
+}
 
 
 

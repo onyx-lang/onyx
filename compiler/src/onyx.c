@@ -19,7 +19,7 @@ extern struct bh_allocator global_heap_allocator;
 #include "wasm_emit.h"
 #include "doc.h"
 
-#define VERSION "v0.1.0"
+#define VERSION "v0.1.1"
 
 
 Context context;
@@ -75,7 +75,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     "Developer options:\n"
     "\t--no-colors               Disables colors in the error message.\n"
     "\t--no-file-contents        Disables '#file_contents' for security.\n"
-    "\t--show-all-errors         Print all errors (can result in many consequencial errors from a single error)"
+    "\t--show-all-errors         Print all errors (can result in many consequencial errors from a single error)\n"
     "\t--print-function-mappings Prints a mapping from WASM function index to source location.\n"
     "\t--print-static-if-results Prints the conditional result of each #if statement. Useful for debugging.\n"
     "\n";
@@ -519,30 +519,51 @@ static b32 process_load_entity(Entity* ent) {
             bh_snprintf(folder, 511, "%s", include->name);
         }
 
-        // This does not take into account #load_path'd folders...
-
         bh_path_convert_separators(folder);
-        bh_dir dir = bh_dir_open(folder);
-        if (dir == NULL) {
-            onyx_report_error(include->token->pos, Error_Critical, "Could not find folder '%s'.", folder);
-            return 0;
-        }
+        // This does not take into account #load_path'd folders...
+        
+        bh_arr(char *) folders_to_process = NULL;
+        bh_arr_new(global_heap_allocator, folders_to_process, 2);
 
-        bh_dirent entry;
-        b32 success = 1;
-        char fullpath[512];
-        while (bh_dir_read(dir, &entry)) {
-            if (entry.type == BH_DIRENT_FILE && bh_str_ends_with(entry.name, ".onyx")) {
-                bh_snprintf(fullpath, 511, "%s/%s", folder, entry.name);
-                bh_path_convert_separators(fullpath);
-                u8* formatted_name = bh_path_get_full_name(fullpath, global_heap_allocator);
-                success = process_source_file(formatted_name, include->token->pos);
-                if (!success) break;
+        bh_arr_push(folders_to_process, bh_strdup(global_scratch_allocator, folder));
+
+        while (bh_arr_length(folders_to_process) > 0) {
+            char *folder = bh_arr_pop(folders_to_process);
+            bh_dir dir = bh_dir_open(folder);
+            if (dir == NULL) {
+                onyx_report_error(include->token->pos, Error_Critical, "Could not find or open folder '%s'.", folder);
+                return 0;
             }
+
+            bh_dirent entry;
+            char fullpath[512];
+            while (bh_dir_read(dir, &entry)) {
+                if (entry.type == BH_DIRENT_FILE && bh_str_ends_with(entry.name, ".onyx")) {
+                    bh_snprintf(fullpath, 511, "%s/%s", folder, entry.name);
+                    bh_path_convert_separators(fullpath);
+
+                    u8* formatted_name = bh_path_get_full_name(fullpath, global_heap_allocator);
+
+                    AstInclude* new_include = onyx_ast_node_new(context.ast_alloc, sizeof(AstInclude), Ast_Kind_Load_File);
+                    new_include->token = include->token;
+                    new_include->name = formatted_name;
+                    add_entities_for_node(NULL, (AstNode *) new_include, include->entity->scope, include->entity->package);
+                }
+
+                if (entry.type == BH_DIRENT_DIRECTORY && include->recursive) {
+                    if (!strcmp(entry.name, ".") || !strcmp(entry.name, "..")) continue;
+
+                    bh_snprintf(fullpath, 511, "%s/%s", folder, entry.name);
+                    u8* formatted_name = bh_path_get_full_name(fullpath, global_scratch_allocator); // Could this overflow the scratch allocator?
+
+                    bh_arr_push(folders_to_process, formatted_name);
+                }
+            }
+
+            bh_dir_close(dir);
         }
 
-        bh_dir_close(dir);
-        return success;
+        return 1;
 
     } else if (include->kind == Ast_Kind_Load_Path) {
         bh_arr_push(context.options->included_folders, include->name);
@@ -1028,9 +1049,11 @@ int main(int argc, char *argv[]) {
             }
             break;
 
+        #ifdef _BH_LINUX
         case ONYX_COMPILE_ACTION_WATCH:
             onyx_watch(&compile_opts);
             break;
+        #endif
 
         #ifdef ENABLE_RUN_WITH_WASMER
         case ONYX_COMPILE_ACTION_RUN:

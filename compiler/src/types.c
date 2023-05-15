@@ -664,10 +664,10 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
 
             Type *base_type = type_build_from_ast(alloc, distinct->base_type);
             if (base_type == NULL) return NULL;
-            if (base_type->kind != Type_Kind_Basic && base_type->kind != Type_Kind_Pointer) {
-                onyx_report_error(distinct->token->pos, Error_Critical, "Distinct types can only be made out of primitive types. '%s' is not a primitive type.", type_get_name(base_type));
-                return NULL;
-            }
+            // if (base_type->kind != Type_Kind_Basic && base_type->kind != Type_Kind_Pointer) {
+            //     onyx_report_error(distinct->token->pos, Error_Critical, "Distinct types can only be made out of primitive types. '%s' is not a primitive type.", type_get_name(base_type));
+            //     return NULL;
+            // }
 
             Type *distinct_type = type_create(Type_Kind_Distinct, alloc, 0);
             distinct_type->Distinct.base_type = base_type;
@@ -1594,6 +1594,7 @@ u32 type_structlike_mem_count(Type* type) {
         case Type_Kind_VarArgs:  return 2;
         case Type_Kind_Function: return 3;
         case Type_Kind_DynArray: return 4;
+        case Type_Kind_Distinct: return 1;
         default: return 0;
     }
 }

@@ -270,22 +270,28 @@ DirectoryData :: &WasiDirectory;
 
 __dir_open :: (path: str, dir: &DirectoryData) -> bool {
     dir_fd: FileDescriptor;
-    err := wasi.path_open(4, .SymLinkFollow, path, .Directory, ~~0xffffffff, ~~0xffffffff, .Sync, &dir_fd);
-    if err != .Success {
-        return false;
+
+    DIR_PERMS  := Rights.PathOpen | .ReadDir | .PathReadlink | .FilestatGet | .PathFilestatGet;
+    FILE_PERMS := Rights.Read | .Seek | .Tell | .FilestatGet | .PollFDReadWrite;
+
+    for .[3, 4] {
+        err := wasi.path_open(it, .SymLinkFollow, path, .Directory, DIR_PERMS, FILE_PERMS, .Sync, &dir_fd);
+        if err != .Success do continue;
+
+        d := new(WasiDirectory);
+        d.dir_fd = dir_fd;
+        d.last_cookie = 0;
+
+        *dir = d;
+        return true;
     }
 
-    d := new(WasiDirectory);
-    d.dir_fd = dir_fd;
-    d.last_cookie = 0;
-
-    *dir = d;
-    return true;
+    return false;
 }
 
 __dir_close :: (dir: DirectoryData) {
     wasi.fd_close(dir.dir_fd);
-    cfree(dir);
+    if dir do cfree(dir);
 }
 
 __dir_read :: (dir: DirectoryData, out_entry: &os.DirectoryEntry) -> bool {

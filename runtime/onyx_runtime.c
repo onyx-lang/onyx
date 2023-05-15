@@ -28,7 +28,6 @@
 #include "src/ort_threads.h"
 #include "src/ort_processes.h"
 #include "src/ort_os.h"
-#include "src/ort_time.h"
 #include "src/ort_cptr.h"
 #include "src/ort_net.h"
 
@@ -71,12 +70,8 @@ ONYX_LIBRARY {
     ONYX_FUNC(__sleep)
     ONYX_FUNC(__time)
     ONYX_FUNC(__lookup_env)
+    ONYX_FUNC(__random_get)
     ONYX_FUNC(__register_cleanup)
-
-    ONYX_FUNC(__time_localtime)
-    ONYX_FUNC(__time_gmtime)
-    ONYX_FUNC(__time_strftime)
-    ONYX_FUNC(__time_mktime)
 
     ONYX_FUNC(__net_create_socket)
     ONYX_FUNC(__net_close_socket)
