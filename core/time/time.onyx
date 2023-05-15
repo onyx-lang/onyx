@@ -52,10 +52,11 @@ Timestamp :: struct #size (sizeof u32 * 12) {
 
 
 now :: () -> Timestamp {
+    current_time: i64;
     #if runtime.platform.Supports_Time {
-        current_time := runtime.platform.__time();
+        current_time = runtime.platform.__time();
     } else {
-        current_time := 0;
+        current_time = 0;
     }
 
     //
