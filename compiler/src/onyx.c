@@ -19,7 +19,7 @@ extern struct bh_allocator global_heap_allocator;
 #include "wasm_emit.h"
 #include "doc.h"
 
-#define VERSION "v0.1.0"
+#define VERSION "v0.1.1"
 
 
 Context context;
@@ -1049,9 +1049,11 @@ int main(int argc, char *argv[]) {
             }
             break;
 
+        #ifdef _BH_LINUX
         case ONYX_COMPILE_ACTION_WATCH:
             onyx_watch(&compile_opts);
             break;
+        #endif
 
         #ifdef ENABLE_RUN_WITH_WASMER
         case ONYX_COMPILE_ACTION_RUN:
