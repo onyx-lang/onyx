@@ -1,3 +1,19 @@
+Release v0.1.1a
+-----------
+15th May 2023
+
+Additions:
+
+Removals:
+
+Changes:
+* Javascript now supports time at the platform layer.
+    - Expects import "host.time"
+
+Bugfixes:
+* Fixed javascript runtime not compiling due to missing dependency on `core.os`.
+
+
 Release v0.1.1
 -----------
 15th May 2023

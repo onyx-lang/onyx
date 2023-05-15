@@ -15,6 +15,10 @@ window.ONYX_MODULES.push({
 
     exit: function() { debugger; },
 
+    time: function() {
+        return Date.now();
+    },
+
     spawn_thread: function(id, tls_base, stack_base, funcidx, closureptr, closuresize, dataptr) {
         try {
             let needed_imports = {};
