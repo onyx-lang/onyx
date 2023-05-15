@@ -1057,7 +1057,7 @@ struct AstDistinctType {
 // Top level nodes
 struct AstBinding       { AstTyped_base; AstNode* node; OnyxToken *documentation; };
 struct AstAlias         { AstTyped_base; AstTyped* alias; };
-struct AstInclude       { AstNode_base;  AstTyped* name_node; char* name; };
+struct AstInclude       { AstNode_base;  AstTyped* name_node; char* name; b32 recursive: 1; };
 struct AstInjection     {
     AstTyped_base;
     AstTyped* full_loc;

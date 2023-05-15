@@ -13,6 +13,7 @@ Additions:
 * `iter.empty`
 * `json.Value->as_array_iter()`, `json.Value->as_map_iter()`
 * `onyx pkg new` for creating a project from a template
+* `#load_all_recursive` to recursively load all `.onyx` files in a directory.
 
 Removals:
 
