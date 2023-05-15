@@ -1,7 +1,6 @@
 package core.time
 
 use core
-use core.os
 use core.io
 use core.string
 use core.conv
@@ -53,7 +52,11 @@ Timestamp :: struct #size (sizeof u32 * 12) {
 
 
 now :: () -> Timestamp {
-    current_time := os.time();
+    #if runtime.platform.Supports_Time {
+        current_time := runtime.platform.__time();
+    } else {
+        current_time := 0;
+    }
 
     //
     // Localtime operates on seconds, while os.time
