@@ -1,3 +1,22 @@
+Release v0.1.2
+-----------
+Unreleased
+
+Additions:
+* String literals can have unicode code points.
+    - '\uXXXX' for small code points (less than U+FFFF)
+    - '\UXXXXXX' for large code points
+    - Does not support UTF-16 surrogate pairs
+
+Removals:
+
+Changes:
+
+Bugfixes:
+
+
+
+
 Release v0.1.1a
 -----------
 15th May 2023
