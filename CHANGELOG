@@ -11,9 +11,13 @@ Additions:
 Removals:
 
 Changes:
+* `iter.single` can take a `dispose` function, which is called on close of the
+    iterator, with the single value yielded.
+* `io.write_escaped_str` supports escaping "\\" now.
+
 
 Bugfixes:
-
+* `json` encoder was wrongly not encoding strings when using `encode` on an `any`.
 
 
 

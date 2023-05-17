@@ -174,7 +174,7 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
 
         case .Slice, .Dynamic_Array {
             if data.type == str {
-                io.write_format_va(w, "{\"}", .[data]);
+                io.write_escaped_str(w, *misc.any_as(data, str));
                 break;
             }
 

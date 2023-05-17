@@ -24,7 +24,10 @@ __output_string   :: (s: str)      -> u32  #foreign "host" "print_str" ---
 __output_error    :: (s: str)      -> u32  #foreign "host" "print_str" ---
 __exit            :: (status: i32) -> void #foreign "host" "exit" ---
 __time            :: ()            -> i64  #foreign "host" "time" ---
-__read_from_input :: (buf: [] u8)  -> u32 do return 0;
+
+#if !#defined(__read_from_input) {
+    __read_from_input :: (buf: [] u8)  -> u32 do return 0;
+}
 
 // Sets up everything needed for execution.
 __start :: () {

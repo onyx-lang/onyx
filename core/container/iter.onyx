@@ -451,14 +451,18 @@ const :: (value: $T) -> Iterator(T) {
 }
 
 #doc "Yields a single value, then stops."
-single :: (value: $T) -> Iterator(T) {
-    return generator(&.{ v = value, yielded = false }, c => {
+single :: (value: $T, dispose: (T) -> void = null_proc) -> Iterator(T) {
+    return generator(&.{ v = value, yielded = false, dispose = dispose }, c => {
         if !c.yielded {
             c.yielded = true;
             return c.v, true;
         }
 
         return .{}, false;
+    }, c => {
+        if c.dispose != null_proc {
+            c.dispose(c.v);
+        }
     });
 }
 
