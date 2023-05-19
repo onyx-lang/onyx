@@ -103,31 +103,22 @@ get_contents :: #match {
 }
 
 with_file :: (path: str, mode := OpenMode.Read) -> Iterator(&File) {
-    Context :: struct {
-        valid_file_stream := false;
-
-        file_stream: File;
+    file_stream: ? File;
+    if fs := open(path, mode); fs {
+        file_stream = fs->ok();
     }
 
-    c := new(Context);
-    if file_stream := open(path, mode); file_stream {
-        c.file_stream = file_stream->unwrap();
-        c.valid_file_stream = true;
+    if file_stream {
+        return iter.single(
+            file_stream->unwrap() |> alloc.on_heap(),
+            file => {
+                close(file);
+                cfree(file);
+            });
+
+    } else {
+        return iter.empty(&File);
     }
-
-    next :: (use c: &Context) -> (&File, bool) {
-        if !valid_file_stream do return null, false;
-
-        defer valid_file_stream = false;
-        return &file_stream, true;
-    }
-
-    close_context :: (use c: &Context) {
-        close(&file_stream);
-        cfree(c);
-    }
-
-    return .{ c, next, close_context };
 }
 
 is_file :: (path: str) -> bool {
