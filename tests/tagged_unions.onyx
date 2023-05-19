@@ -1,0 +1,67 @@
+
+use core {*}
+
+/*
+Optional :: struct (T: type_expr) {
+    has_value: bool;
+    value: T;
+}
+*/
+
+Optional :: union (T: type_expr) {
+    None: void;
+    Some: T;
+}
+
+#inject Optional {
+    with :: macro (o: Optional($T), code: Code) {
+        switch o {
+            case .Some => v {
+                #unquote code(v);
+            }
+        }
+    }
+
+    or_default :: macro (o: Optional($T), default: T) -> T {
+        switch o {
+            case .Some => v do return v;
+            case .None      do return default;
+        }
+    }
+}
+
+// | tag type (Tag_Enum) | data... |
+
+
+Config :: struct {
+    name: Optional(str);
+}
+
+main :: () {
+    x := Optional(i32).{ Some = 123 };
+
+    c: Config;
+    c.name = .{ Some = "test" };
+
+    printf("{}.{}", typeof c.name.Some, c.name.Some);   // "Optional.tag_enum.Some"
+
+    x->with(#quote [v] {
+        printf("x has the value: {}\n", v);
+    });
+
+    y := x->or_default(0);
+    
+    switch x {
+        case .None {
+
+        }
+
+        case .Some => &value {
+            printf("x has the value: {}\n", value);
+        }
+    }
+}
+
+
+
+
