@@ -166,7 +166,7 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
             for i: a.count {
                 if i != 0 do io.write(w, ",");
 
-                encode(w, any.{ ~~(cast([^] u8) arr + get_type_info(a.of).size * i), a.of });
+                encode(w, misc.any_subscript(data, i));
             }
 
             io.write(w, "]");
@@ -188,7 +188,7 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
             for i: count {
                 if i != 0 do io.write(w, ",");
 
-                encode(w, any.{ ~~(cast([^] u8) data + get_type_info(a.of).size * i), a.of });
+                encode(w, misc.any_subscript(data, i));
             }
 
             io.write(w, "]");
@@ -225,7 +225,7 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
                 encode(w, key);
 
                 io.write(w, ":");
-                encode(w, any.{ ~~(cast([^] u8) data.data + member.offset), member.type });
+                encode(w, misc.any_member(data, member));
             }
             io.write(w, "}");
         }
@@ -291,7 +291,7 @@ from_any :: (type: type_expr, in: rawptr, allocator := context.allocator) -> Val
             array.init(^v.array_, a_info.count, allocator);
 
             for i: a_info.count {
-                v.array_ << from_any(a_info.of, cast([^] u8) in + size_of(a_info.of) * i);
+                v.array_ << from_any(a_info.of, memory.ptr_add(in, size_of(a_info.of) * i));
             }
 
             return Value.{v};
@@ -312,7 +312,7 @@ from_any :: (type: type_expr, in: rawptr, allocator := context.allocator) -> Val
             array.init(^v.array_, s.count, allocator);
 
             for i: s.count {
-                v.array_ << from_any(s_info.of, cast([^] u8) s.data + size_of(s_info.of) * i);
+                v.array_ << from_any(s_info.of, memory.ptr_add(s.data, size_of(s_info.of) * i));
             }
 
             return Value.{v};
@@ -336,7 +336,7 @@ from_any :: (type: type_expr, in: rawptr, allocator := context.allocator) -> Val
                     }
                 }
 
-                json.set(Value.{v}, key, from_any(member.type, cast([^] u8) in + member.offset), dont_copy_key=true);
+                json.set(Value.{v}, key, from_any(member.type, memory.ptr_add(in, member.offset)), dont_copy_key=true);
             }
 
             return Value.{v};
@@ -386,7 +386,7 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
             a_info := cast(^Type_Info_Array) t_info;
 
             for i: a_info.count {
-                to_any(value[i], a_info.of, cast([^] u8) out + size_of(a_info.of) * i);
+                to_any(value[i], a_info.of, memory.ptr_add(out, size_of(a_info.of) * i));
             }
         }
 
@@ -415,7 +415,7 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
             }
 
             for i: s.count {
-                to_any(value[i], s_info.of, cast([^] u8) s.data + size_of(s_info.of) * i);
+                to_any(value[i], s_info.of, memory.ptr_add(s.data, size_of(s_info.of) * i));
             }
         }
 
@@ -434,7 +434,7 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
                     }
                 }
 
-                to_any(value[key], member.type, cast([^] u8) out + member.offset);
+                to_any(value[key], member.type, memory.ptr_add(out, member.offset));
             }
         }
 

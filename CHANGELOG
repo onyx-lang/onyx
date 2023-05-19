@@ -7,6 +7,9 @@ Additions:
     - '\uXXXX' for small code points (less than U+FFFF)
     - '\UXXXXXX' for large code points
     - Does not support UTF-16 surrogate pairs
+* `iter.next_opt`
+* `memory.ptr_add`
+* `misc.any_member`
 
 Removals:
 
@@ -14,7 +17,8 @@ Changes:
 * `iter.single` can take a `dispose` function, which is called on close of the
     iterator, with the single value yielded.
 * `io.write_escaped_str` supports escaping "\\" now.
-
+* In Javascript runtime, made `__read_from_input` not defined right away, so
+    it can be overridden depending on the needs of the program.
 
 Bugfixes:
 * `json` encoder was wrongly not encoding strings when using `encode` on an `any`.
