@@ -648,11 +648,6 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
     } else {
         resolve_expression_type(value);
 
-        if ((value->flags & Ast_Flag_Comptime) == 0) {
-            if (err_msg) *err_msg = "Expected compile-time known argument here.";
-            return;
-        }
-
         param_type = type_build_from_ast(context.ast_alloc, param_type_expr);
         if (param_type == NULL) {
             flag_to_yield = 1;
@@ -679,7 +674,12 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
 
         if (tm == TYPE_MATCH_YIELD) flag_to_yield = 1;
 
-        *resolved = ((PolySolveResult) { PSK_Value, value });
+        if ((value_to_use->flags & Ast_Flag_Comptime) == 0) {
+            if (err_msg) *err_msg = "Expected compile-time known argument here.";
+            return;
+        }
+
+        *resolved = ((PolySolveResult) { PSK_Value, value_to_use });
     }
 
     if (orig_value->kind == Ast_Kind_Argument) {

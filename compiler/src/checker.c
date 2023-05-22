@@ -487,6 +487,10 @@ CheckStatus check_switch(AstSwitch* switchnode) {
             ERROR(sc->token->pos, "Expected exactly one value in switch-case when using a capture.");
         }
 
+        if (sc->capture && switchnode->switch_kind != Switch_Kind_Union) {
+            ERROR(sc->capture->token->pos, "Captures in switch cases are only allowed when switching over a union type.");
+        }
+
         if (sc->flags & Ast_Flag_Has_Been_Checked) goto check_switch_case_block;
 
         bh_arr_each(AstTyped *, value, sc->values) {
@@ -1483,6 +1487,8 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
     }
     
     if (sl->type->kind == Type_Kind_Union) {
+        if ((sl->flags & Ast_Flag_Has_Been_Checked) != 0) return Check_Success;
+
         if (bh_arr_length(sl->args.values) != 0 || bh_arr_length(sl->args.named_values) != 1) {
             ERROR_(sl->token->pos, "Expected exactly one named member when constructing an instance of a union type, '%s'.", type_get_name(sl->type));
         }
@@ -1513,6 +1519,8 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
 
         bh_arr_push(sl->args.values, (AstTyped *) tag_value);
         bh_arr_push(sl->args.values, value->value);
+
+        sl->flags |= Ast_Flag_Has_Been_Checked;
         return Check_Success;
     }
 

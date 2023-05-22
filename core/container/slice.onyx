@@ -160,13 +160,13 @@ set :: (arr: [] $T, idx: i32, value: T) {
 }
 
 contains :: #match #locked {
-    macro (arr: [] $T, $cmp: Code) -> bool {
-        for it: arr do if #unquote cmp do return true;
-        return false;
-    },
-
     (arr: [] $T, x: T) -> bool {
         for it: arr do if it == x do return true;
+        return false;
+    }, 
+
+    macro (arr: [] $T, $cmp: Code) -> bool {
+        for it: arr do if #unquote cmp do return true;
         return false;
     }
 }

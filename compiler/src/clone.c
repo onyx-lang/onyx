@@ -304,6 +304,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             break;
 
         case Ast_Kind_Switch_Case: {
+            C(AstSwitchCase, capture);
             C(AstSwitchCase, block);
 
             AstSwitchCase *dw = (AstSwitchCase *) nn;

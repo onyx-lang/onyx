@@ -1309,6 +1309,7 @@ static AstSwitchCase* parse_case_stmt(OnyxParser* parser) {
     } else {
         bh_arr_new(global_heap_allocator, sc_node->values, 1);
 
+        parser->parse_quick_functions = 0;
         AstTyped* value = parse_expression(parser, 1);
         bh_arr_push(sc_node->values, value);
         while (consume_token_if_next(parser, ',')) {
@@ -1317,6 +1318,8 @@ static AstSwitchCase* parse_case_stmt(OnyxParser* parser) {
             value = parse_expression(parser, 1);
             bh_arr_push(sc_node->values, value);
         }
+
+        parser->parse_quick_functions = 1;
     }
 
     if (consume_token_if_next(parser, Token_Type_Fat_Right_Arrow)) {
@@ -2859,6 +2862,8 @@ typedef struct QuickParam {
 } QuickParam;
 
 static b32 parse_possible_quick_function_definition_no_consume(OnyxParser* parser) {
+    if (!parser->parse_quick_functions) return 0;
+
     //
     // x => x + 1 case.
     if (next_tokens_are(parser, 2, Token_Type_Symbol, Token_Type_Fat_Right_Arrow)) {
@@ -3933,6 +3938,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     parser.scope_flags = NULL;
     parser.stored_tags = NULL;
     parser.parse_calls = 1;
+    parser.parse_quick_functions = 1;
     parser.tag_depth = 0;
     parser.overload_count = 0;
     parser.injection_point = NULL;

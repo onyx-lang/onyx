@@ -1,6 +1,16 @@
 
 use core {*}
 
+extract_variant :: macro (u: $U, $variant: U.tag_enum) => {
+    switch u {
+        case variant => v {
+            return Optional.make(v);
+        }
+    }
+
+    return .{};
+}
+
 SimpleUnion :: union {
     a: i32;
     b: struct {
@@ -40,6 +50,10 @@ simple_test :: () {
     println(cast(SimpleUnion.tag_enum) u);
 
     call_test(u);
+
+    if cast(SimpleUnion.tag_enum, u) == .b {
+        println(extract_variant(u, .b)?);
+    }
 }
 
 main :: () {simple_test(); link_test();}
