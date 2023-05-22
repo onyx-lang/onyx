@@ -15,11 +15,18 @@ call_test :: (u_: SimpleUnion) {
     u := u_;
     __byte_dump(&u, sizeof typeof u);
 
-    switch cast(SimpleUnion.tag_enum) u {
+    switch u {
         case .a do println("It was a!");
-        case .b do println("It was B!");
+        case .b => v do printf("It was B! {}\n", v);
         case .empty do println("It was EMPTY!");
-        case .large do println("It was a large number!");
+
+        case .large => &value {
+            printf("It was a large number! {} {}\n", value, *value);
+        }
+
+        case #default {
+            printf("none of the above.\n");
+        }
     }
 }
 
@@ -27,14 +34,15 @@ simple_test :: () {
     u := SimpleUnion.{ b = .{ "asdf" } };
     u  = .{ a = 123 };
     u  = .{ empty = .{} };
-    u  = .{ large = 0x0123456789abcdef };
+    u  = .{ large = 123456789 };
+    u  = .{ b = .{ "Wow this works!!" } };
 
     println(cast(SimpleUnion.tag_enum) u);
 
     call_test(u);
 }
 
-main :: () {simple_test();} //link_test();}
+main :: () {simple_test(); link_test();}
 
 Link :: union {
     End: void;
@@ -44,15 +52,15 @@ Link :: union {
     }
 }
 
-/*
 print_links :: (l: Link) {
     walker := l;
     while true {
         switch walker {
-            case Link.End do break;
-            case Link.Next => &next {
-                printf("{} ", next.data);
-                walker = next.next;
+            case .End do break break;
+
+            case .Next => &next {
+                printf("{}\n", next.data);
+                walker = *next.next;
             }
         }
     }
@@ -63,14 +71,16 @@ link_test :: () {
         Next = .{
             data = 123,
             next = &Link.{
-                End = .{}
+                Next = .{
+                    data = 456,
+                    next = &Link.{ End = .{} },
+                }
             }
         }
     };
     
     print_links(l);
 }
-*/
 
 // main :: () { link_test(); }
 

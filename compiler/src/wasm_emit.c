@@ -1625,8 +1625,11 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         block_num++;
     }
 
+    u64 union_capture_idx = 0;
+
     switch (switch_node->switch_kind) {
-        case Switch_Kind_Integer: {
+        case Switch_Kind_Integer:
+        case Switch_Kind_Union: {
             u64 count = switch_node->max_case + 1 - switch_node->min_case;
             BranchTable* bt = bh_alloc(mod->extended_instr_alloc, sizeof(BranchTable) + sizeof(u32) * count);
             bt->count = count;
@@ -1651,6 +1654,14 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
             // to the second block, and so on.
             WID(switch_node->expr->token, WI_BLOCK_START, 0x40);
             emit_expression(mod, &code, switch_node->expr);
+
+            if (switch_node->switch_kind == Switch_Kind_Union) {
+                assert(switch_node->expr->type->kind == Type_Kind_Union);
+                union_capture_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+                WIL(NULL, WI_LOCAL_TEE, union_capture_idx);
+                emit_load_instruction(mod, &code, switch_node->expr->type->Union.tag_type, 0);
+            }
+
             if (switch_node->min_case != 0) {
                 if (onyx_type_to_wasm_type(switch_node->expr->type) == WASM_TYPE_INT64) {
                     WI(switch_node->expr->token, WI_I32_FROM_I64);
@@ -1688,6 +1699,34 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
 
         u64 bn = bh_imap_get(&block_map, (u64) sc->block);
 
+        if (sc->capture) {
+            assert(union_capture_idx != 0);
+
+            if (sc->capture_is_by_pointer) {
+                u64 capture_pointer_local = emit_local_allocation(mod, &code, sc->capture);
+
+                WIL(NULL, WI_LOCAL_GET, union_capture_idx);
+                WIL(NULL, WI_PTR_CONST, switch_node->expr->type->Union.alignment);
+                WI(NULL, WI_PTR_ADD);
+
+                WIL(NULL, WI_LOCAL_SET, capture_pointer_local);
+
+            } else {
+                sc->capture->flags |= Ast_Flag_Decl_Followed_By_Init;
+                sc->capture->flags |= Ast_Flag_Address_Taken;
+
+                emit_local_allocation(mod, &code, sc->capture);
+                emit_location(mod, &code, sc->capture);
+
+                WIL(NULL, WI_LOCAL_GET, union_capture_idx);
+                WIL(NULL, WI_PTR_CONST, switch_node->expr->type->Union.alignment);
+                WI(NULL, WI_PTR_ADD);
+                
+                WIL(NULL, WI_I32_CONST, type_size_of(sc->capture->type));
+                emit_wasm_copy(mod, &code, NULL);
+            }
+        }
+
         // Maybe the Symbol Frame idea should be controlled as a block_flag?
         debug_enter_symbol_frame(mod);
         emit_block(mod, &code, sc->block, 0);
@@ -1705,6 +1744,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         emit_block(mod, &code, switch_node->default_case, 0);
     }
 
+    if (union_capture_idx != 0) local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     emit_leave_structured_block(mod, &code);
 
     bh_imap_free(&block_map);

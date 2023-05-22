@@ -336,7 +336,7 @@ static void parse_arguments(OnyxParser* parser, TokenType end_token, Arguments* 
         // This shouldn't be a named argument, but this should:
         //     f(g = x => x + 1)
         //
-        if (next_tokens_are(parser, 2, Token_Type_Symbol, '=') && peek_token(2)->type != '>') {
+        if (next_tokens_are(parser, 2, Token_Type_Symbol, '=')) {
             OnyxToken* name = expect_token(parser, Token_Type_Symbol);
             expect_token(parser, '=');
 
@@ -1317,6 +1317,19 @@ static AstSwitchCase* parse_case_stmt(OnyxParser* parser) {
             value = parse_expression(parser, 1);
             bh_arr_push(sc_node->values, value);
         }
+    }
+
+    if (consume_token_if_next(parser, Token_Type_Fat_Right_Arrow)) {
+        // Captured value for union switching
+        b32 is_pointer = 0;
+        if (consume_token_if_next(parser, '&') || consume_token_if_next(parser, '^'))
+            is_pointer = 1;
+        
+        OnyxToken *capture_symbol = expect_token(parser, Token_Type_Symbol);
+        AstLocal *capture = make_local(parser->allocator, capture_symbol, NULL);
+        
+        sc_node->capture = capture;
+        sc_node->capture_is_by_pointer = is_pointer;
     }
 
     sc_node->block = parse_block(parser, 1, NULL);
@@ -2705,8 +2718,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
         name = bh_aprintf(global_heap_allocator, "%b", current_symbol->text, current_symbol->length);
     }
 
-    if (consume_token_if_next(parser, '=')) {
-        expect_token(parser, '>');
+    if (consume_token_if_next(parser, Token_Type_Fat_Right_Arrow)) {
         func_def->return_type = (AstType *) &basic_type_auto_return;
 
         if (parser->curr->type == '{') {
@@ -2798,7 +2810,7 @@ static b32 parse_possible_function_definition_no_consume(OnyxParser* parser) {
         OnyxToken* matching_paren = find_matching_paren(parser->curr);
         if (matching_paren == NULL) return 0;
 
-        if (next_tokens_are(parser, 4, '(', ')', '=', '>')) return 0;
+        if (next_tokens_are(parser, 3, '(', ')', Token_Type_Fat_Right_Arrow)) return 0;
 
         // :LinearTokenDependent
         OnyxToken* token_after_paren = matching_paren + 1;
@@ -2807,7 +2819,7 @@ static b32 parse_possible_function_definition_no_consume(OnyxParser* parser) {
             && token_after_paren->type != Token_Type_Keyword_Do
             && token_after_paren->type != Token_Type_Empty_Block
             && token_after_paren->type != Token_Type_Keyword_Where
-            && (token_after_paren->type != '=' || (token_after_paren + 1)->type != '>'))
+            && token_after_paren->type != Token_Type_Fat_Right_Arrow)
             return 0;
 
         // :LinearTokenDependent
@@ -2849,7 +2861,7 @@ typedef struct QuickParam {
 static b32 parse_possible_quick_function_definition_no_consume(OnyxParser* parser) {
     //
     // x => x + 1 case.
-    if (next_tokens_are(parser, 3, Token_Type_Symbol, '=', '>')) {
+    if (next_tokens_are(parser, 2, Token_Type_Symbol, Token_Type_Fat_Right_Arrow)) {
         return 1;
     }
 
@@ -2860,7 +2872,7 @@ static b32 parse_possible_quick_function_definition_no_consume(OnyxParser* parse
 
     // :LinearTokenDependent
     OnyxToken* token_after_paren = matching_paren + 1;
-    if (token_after_paren->type != '=' || (token_after_paren + 1)->type != '>')
+    if (token_after_paren->type != Token_Type_Fat_Right_Arrow)
         return 0;
 
     return 1;
@@ -2903,8 +2915,7 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
         }
     }
 
-    expect_token(parser, '=');
-    expect_token(parser, '>');
+    expect_token(parser, Token_Type_Fat_Right_Arrow);
 
     bh_arr(AstNode *) poly_params=NULL;
     bh_arr_new(global_heap_allocator, poly_params, bh_arr_length(params));

@@ -168,6 +168,7 @@ typedef struct UnionVariant {
         char* name;                                               \
         Type* tag_type;                                           \
         Table(UnionVariant *) variants;                           \
+        bh_arr(UnionVariant *) variants_ordered;                  \
         bh_arr(struct AstPolySolution) poly_sln;                  \
         struct AstType *constructed_from;                         \
         bh_arr(struct AstTyped *) meta_tags;                      \

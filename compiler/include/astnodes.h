@@ -872,6 +872,7 @@ typedef struct AstIfWhile AstWhile;
 typedef enum SwitchKind {
     Switch_Kind_Integer,
     Switch_Kind_Use_Equals,
+    Switch_Kind_Union,
 } SwitchKind;
 
 typedef struct CaseToBlock {
@@ -888,7 +889,10 @@ struct AstSwitchCase {
 
     AstBlock *block;
 
+    AstLocal *capture;
+
     b32 is_default: 1; // Could this be inferred by the values array being null?
+    b32 capture_is_by_pointer: 1;
 };
 
 struct AstSwitch {

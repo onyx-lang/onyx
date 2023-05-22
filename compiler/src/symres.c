@@ -815,6 +815,11 @@ static SymresStatus symres_case(AstSwitchCase *casenode) {
         }
     }
 
+    if (casenode->capture) {
+        casenode->block->scope = scope_create(context.ast_alloc, current_scope, casenode->block->token->pos);
+        symbol_introduce(casenode->block->scope, casenode->capture->token, (AstNode *) casenode->capture);
+    }
+
     SYMRES(block, casenode->block);
     return Symres_Success;
 }

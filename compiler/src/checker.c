@@ -363,7 +363,7 @@ fornode_expr_checked:
 }
 
 static b32 add_case_to_switch_statement(AstSwitch* switchnode, u64 case_value, AstBlock* block, OnyxFilePos pos) {
-    assert(switchnode->switch_kind == Switch_Kind_Integer);
+    assert(switchnode->switch_kind == Switch_Kind_Integer || switchnode->switch_kind == Switch_Kind_Union);
 
     switchnode->min_case = bh_min(switchnode->min_case, case_value);
     switchnode->max_case = bh_max(switchnode->max_case, case_value);
@@ -440,6 +440,9 @@ CheckStatus check_switch(AstSwitch* switchnode) {
         if (!type_is_integer(switchnode->expr->type) && switchnode->expr->type->kind != Type_Kind_Enum) {
             switchnode->switch_kind = Switch_Kind_Use_Equals;
         }
+        if (switchnode->expr->type->kind == Type_Kind_Union) {
+            switchnode->switch_kind = Switch_Kind_Union;
+        }
 
         switch (switchnode->switch_kind) {
             case Switch_Kind_Integer:
@@ -449,6 +452,11 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
             case Switch_Kind_Use_Equals:
                 bh_arr_new(global_heap_allocator, switchnode->case_exprs, 4);
+                break;
+
+            case Switch_Kind_Union:
+                switchnode->min_case = 1;
+                bh_imap_init(&switchnode->case_map, global_heap_allocator, 4);
                 break;
 
             default: assert(0);
@@ -474,11 +482,17 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
     fori (i, switchnode->yield_return_index, bh_arr_length(switchnode->cases)) {
         AstSwitchCase *sc = switchnode->cases[i];
-        CHECK(block, sc->block);
+
+        if (sc->capture && bh_arr_length(sc->values) != 1) {
+            ERROR(sc->token->pos, "Expected exactly one value in switch-case when using a capture.");
+        }
+
+        if (sc->flags & Ast_Flag_Has_Been_Checked) goto check_switch_case_block;
 
         bh_arr_each(AstTyped *, value, sc->values) {
             CHECK(expression, value);
 
+            // Handle case 1 .. 10
             if (switchnode->switch_kind == Switch_Kind_Integer && (*value)->kind == Ast_Kind_Range_Literal) {
                 AstRangeLiteral* rl = (AstRangeLiteral *) (*value);
                 resolve_expression_type(rl->low);
@@ -503,16 +517,38 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                 continue;
             }
 
-            TYPE_CHECK(value, resolved_expr_type) {
-                OnyxToken* tkn = sc->block->token;
-                if ((*value)->token) tkn = (*value)->token;
+            if (switchnode->switch_kind == Switch_Kind_Union) {
+                TYPE_CHECK(value, resolved_expr_type->Union.tag_type) {
+                    OnyxToken* tkn = sc->block->token;
+                    if ((*value)->token) tkn = (*value)->token;
 
-                ERROR_(tkn->pos, "Mismatched types in switch-case. Expected '%s', got '%s'.",
-                    type_get_name(resolved_expr_type), type_get_name((*value)->type));
+                    ERROR_(tkn->pos, "'%b' is not a variant of '%s'.",
+                        (*value)->token->text, (*value)->token->length, type_get_name(resolved_expr_type));
+                }
+
+                // nocheckin Explain the -1
+                UnionVariant *union_variant = resolved_expr_type->Union.variants_ordered[get_expression_integer_value(*value, NULL) - 1];
+                if (sc->capture) {
+                    if (sc->capture_is_by_pointer) {
+                        sc->capture->type = type_make_pointer(context.ast_alloc, union_variant->type);
+                    } else {
+                        sc->capture->type = union_variant->type;
+                    }
+                }
+                
+            } else {
+                TYPE_CHECK(value, resolved_expr_type) {
+                    OnyxToken* tkn = sc->block->token;
+                    if ((*value)->token) tkn = (*value)->token;
+
+                    ERROR_(tkn->pos, "Mismatched types in switch-case. Expected '%s', got '%s'.",
+                        type_get_name(resolved_expr_type), type_get_name((*value)->type));
+                }
             }
 
             switch (switchnode->switch_kind) {
-                case Switch_Kind_Integer: {
+                case Switch_Kind_Integer:
+                case Switch_Kind_Union: {
                     b32 is_valid;
                     i64 integer_value = get_expression_integer_value(*value, &is_valid);
                     if (!is_valid)
@@ -548,6 +584,11 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                 }
             }
         }
+
+        sc->flags |= Ast_Flag_Has_Been_Checked;
+
+      check_switch_case_block:
+        CHECK(block, sc->block);
 
         switchnode->yield_return_index += 1;
     }

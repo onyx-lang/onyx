@@ -689,7 +689,9 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 type_register(u_type);
 
                 u_type->Union.variants = NULL;
+                u_type->Union.variants_ordered = NULL;
                 sh_new_arena(u_type->Union.variants);
+                bh_arr_new(global_heap_allocator, u_type->Union.variants_ordered, bh_arr_length(union_->variants));
             } else {
                 u_type = union_->pending_type;
             }
@@ -769,6 +771,8 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
 
                 shput(u_type->Union.variants, variant->token->text, uv);
                 token_toggle_end(variant->token);
+
+                bh_arr_push(u_type->Union.variants_ordered, uv);
 
                 AstEnumValue *ev = onyx_ast_node_new(alloc, sizeof(AstEnumValue), Ast_Kind_Enum_Value);
                 ev->token = uv->token;

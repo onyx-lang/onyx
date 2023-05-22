@@ -39,6 +39,7 @@ static const char* token_type_names[] = {
     "", // end
 
     "->",
+    "=>",
     "<-",
     "---",
     "|>",
@@ -422,6 +423,7 @@ whitespace_skipped:
 
     case '=':
         LITERAL_TOKEN("==",          0, Token_Type_Equal_Equal);
+        LITERAL_TOKEN("=>",          0, Token_Type_Fat_Right_Arrow);
         break;
 
     case '!':
