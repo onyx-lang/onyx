@@ -301,7 +301,7 @@ f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
     len += s1.count;
 
     if digits_after_decimal > 0 {
-        buf.data[s1.count + len] = #char ".";
+        buf.data[len] = #char ".";
         len += 1;
 
         digits := "0123456789";
