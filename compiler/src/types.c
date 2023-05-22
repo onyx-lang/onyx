@@ -236,6 +236,10 @@ b32 types_are_compatible_(Type* t1, Type* t2, b32 recurse_pointers) {
             // If the above cases didn't catch it, then these distinct types are not compatible.
             return 0;
 
+        case Type_Kind_Union:
+            // If the above cases didn't catch it, then these union types are not compatible.
+            return 0;
+
         default:
             assert(("Invalid type", 0));
             break;

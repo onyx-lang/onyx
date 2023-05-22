@@ -21,6 +21,12 @@ SimpleUnion :: union {
     large: i64;
 }
 
+#inject SimpleUnion {
+    foo :: (this: &SimpleUnion) {
+        printf("Working foo! {}\n", this);
+    }
+}
+
 call_test :: (u_: SimpleUnion) {
     u := u_;
     __byte_dump(&u, sizeof typeof u);
@@ -54,6 +60,14 @@ simple_test :: () {
     if cast(SimpleUnion.tag_enum, u) == .b {
         println(extract_variant(u, .b)?);
     }
+
+    u->foo();
+
+    use runtime
+    printf("{*p}\n", cast(&runtime.info.Type_Info_Union) runtime.info.get_type_info(typeof u));
+
+    u = .{ large = 8675309 };
+    println(u);
 }
 
 main :: () {simple_test(); link_test();}

@@ -22,6 +22,7 @@ Type_Info :: struct {
         Variadic_Argument  :: 0x0B;
         Enum               :: 0x0C;
         Distinct           :: 0x0D;
+        Union              :: 0x0E;
     }
 
     kind := Kind.Invalid;
@@ -186,6 +187,31 @@ Type_Info_Distinct :: struct {
 
     base_type: type_expr;
     name: str;
+}
+
+Type_Info_Union :: struct {
+    use base : Type_Info;
+
+    Variant :: struct {
+        name: str;
+        tag_value: u32;
+        type: type_expr;
+
+        tags: [] any;
+    }
+
+    constructed_from: type_expr;
+    tag_enum: type_expr;
+    name: str;
+    variants: [] Variant;
+    parameters: [] any;
+    tags: [] any;
+
+    Method :: struct {
+        name: str;
+        func: any;
+    }
+    methods: [] Method;
 }
 
 get_type_info :: (t: type_expr) -> &Type_Info {

@@ -95,6 +95,12 @@ write_type_name :: (writer: &io.Writer, t: type_expr) {
             else                do io.write_str(writer, "<anonymous polymorphic struct>");
         }
 
+        case .Union {
+            u := cast(&Type_Info_Union) info;
+            if u.name.count > 0 do io.write_str(writer, u.name);
+            else                do io.write_str(writer, "<anonymous union>");
+        }
+
         case .Compound {
             comp := cast(&Type_Info_Compound) info;
             io.write_str(writer, "(");

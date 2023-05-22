@@ -8,6 +8,70 @@ typedef struct StructMethodData {
     u32 data_loc;
 } StructMethodData;
 
+static void build_polymorphic_solutions_array(
+        bh_arr(AstPolySolution) slns,
+        bh_buffer *table_buffer,
+        ConstExprContext *constexpr_ctx,
+        u32 *param_locations
+) {
+    u32 i = 0;
+    bh_arr_each(AstPolySolution, sln, slns) {
+        bh_buffer_align(table_buffer, 8);
+        param_locations[i++] = table_buffer->length;
+
+        switch (sln->kind) {
+            case PSK_Type: {
+                // NOTE: This assumes a little endian compiler (which is assumed in other part of the code too)
+                bh_buffer_append(table_buffer, &sln->type->id, 4);
+                break;
+            }
+
+            case PSK_Value: {
+                assert(sln->value->type);
+                u32 size = type_size_of(sln->value->type);
+
+                bh_buffer_grow(table_buffer, table_buffer->length + size);
+                constexpr_ctx->data = table_buffer->data;
+                if (emit_constexpr_(constexpr_ctx, sln->value, table_buffer->length)) {
+                    table_buffer->length += size;
+                    break;
+                }
+
+                // fallthrough
+            }
+
+            default: {
+                // Set to null if this is not known how to encode
+                param_locations[i-1] = 0;
+                break;
+            }
+        }
+    }
+}
+
+static u32 build_constexpr(
+        AstTyped *value,
+        bh_buffer *table_buffer,
+        ConstExprContext *constexpr_ctx
+) {
+    if ((value->flags & Ast_Flag_Comptime) == 0) {
+        return 0;
+    }
+
+    u32 size = type_size_of(value->type);
+    bh_buffer_align(table_buffer, type_alignment_of(value->type));
+
+    bh_buffer_grow(table_buffer, table_buffer->length + size);
+    constexpr_ctx->data = table_buffer->data;
+    if (!emit_constexpr_(constexpr_ctx, value, table_buffer->length)) {
+        return 0;
+
+    } else {
+        table_buffer->length += size;
+        return table_buffer->length - size;
+    }
+}
+
 static u64 build_type_table(OnyxWasmModule* module) {
 
     bh_arr(u32) base_patch_locations=NULL;
@@ -219,39 +283,7 @@ static u64 build_type_table(OnyxWasmModule* module) {
                 bh_buffer_align(&table_buffer, 8);
 
                 // Polymorphic solutions
-                i = 0;
-                bh_arr_each(AstPolySolution, sln, s->poly_sln) {
-                    bh_buffer_align(&table_buffer, 8);
-                    param_locations[i++] = table_buffer.length;
-
-                    switch (sln->kind) {
-                        case PSK_Type: {
-                            // NOTE: This assumes a little endian compiler (which is assumed in other part of the code too)
-                            bh_buffer_append(&table_buffer, &sln->type->id, 4);
-                            break;
-                        }
-
-                        case PSK_Value: {
-                            assert(sln->value->type);
-                            u32 size = type_size_of(sln->value->type);
-
-                            bh_buffer_grow(&table_buffer, table_buffer.length + size);
-                            constexpr_ctx.data = table_buffer.data;
-                            if (emit_constexpr_(&constexpr_ctx, sln->value, table_buffer.length)) {
-                                table_buffer.length += size;
-                                break;
-                            }
-
-                            // fallthrough
-                        }
-
-                        default: {
-                            // Set to null if this is not known how to encode
-                            param_locations[i-1] = 0;
-                            break;
-                        }
-                    }
-                }
+                build_polymorphic_solutions_array(s->poly_sln, &table_buffer, &constexpr_ctx, param_locations);
 
                 bh_buffer_align(&table_buffer, 8);
 
@@ -268,27 +300,7 @@ static u64 build_type_table(OnyxWasmModule* module) {
                     AstTyped* value = *mem->initial_value;
                     assert(value->type);
 
-                    if ((value->flags & Ast_Flag_Comptime) == 0) {
-                        // onyx_report_warning(value->token->pos, "Warning: skipping generating default value for '%s' in '%s' because it is not compile-time known.\n", mem->name, s->name);
-                        i++;
-                        continue;
-                    }
-
-                    u32 size = type_size_of(value->type);
-                    bh_buffer_align(&table_buffer, type_alignment_of(value->type));
-
-                    bh_buffer_grow(&table_buffer, table_buffer.length + size);
-                    constexpr_ctx.data = table_buffer.data;
-                    if (!emit_constexpr_(&constexpr_ctx, value, table_buffer.length)) {
-                        // Failed to generate raw data
-                        // onyx_report_warning(value->token->pos, "Warning: failed to generate default value for '%s' in '%s'.\n", mem->name, s->name);
-                        value_locations[i++] = 0;
-
-                    } else {
-                        // Success 
-                        value_locations[i++] = table_buffer.length;
-                        table_buffer.length += size;
-                    }
+                    value_locations[i++] = build_constexpr(value, &table_buffer, &constexpr_ctx);
                 }
 
                 // Member tags
@@ -313,16 +325,7 @@ static u64 build_type_table(OnyxWasmModule* module) {
                         assert(value->flags & Ast_Flag_Comptime);
                         assert(value->type);
 
-                        u32 size = type_size_of(value->type);
-                        bh_buffer_align(&table_buffer, type_alignment_of(value->type));
-                        meta_tag_locations[j] = table_buffer.length;
-
-                        bh_buffer_grow(&table_buffer, table_buffer.length + size);
-                        constexpr_ctx.data = table_buffer.data;
-                        assert(emit_constexpr_(&constexpr_ctx, value, table_buffer.length));
-                        table_buffer.length += size;
-
-                        j += 1;
+                        meta_tag_locations[j++] = build_constexpr(value, &table_buffer, &constexpr_ctx);
                     }
 
                     bh_buffer_align(&table_buffer, 8);
@@ -377,16 +380,7 @@ static u64 build_type_table(OnyxWasmModule* module) {
                     assert(value->flags & Ast_Flag_Comptime);
                     assert(value->type);
 
-                    u32 size = type_size_of(value->type);
-                    bh_buffer_align(&table_buffer, type_alignment_of(value->type));
-                    struct_tag_locations[i] = table_buffer.length;
-
-                    bh_buffer_grow(&table_buffer, table_buffer.length + size);
-                    constexpr_ctx.data = table_buffer.data;
-                    assert(emit_constexpr_(&constexpr_ctx, value, table_buffer.length));
-                    table_buffer.length += size;
-
-                    i += 1;
+                    struct_tag_locations[i++] = build_constexpr(value, &table_buffer, &constexpr_ctx);
                 }
 
                 // Struct methods
@@ -543,6 +537,198 @@ static u64 build_type_table(OnyxWasmModule* module) {
                 bh_buffer_write_u32(&table_buffer, type_alignment_of(type));
                 bh_buffer_write_u32(&table_buffer, type->Distinct.base_type->id);
                 WRITE_SLICE(name_base, name_length);
+                break;
+            }
+
+            case Type_Kind_Union: {
+                TypeUnion* u = &type->Union;
+                u32 variant_count = bh_arr_length(u->variants_ordered);
+                u32* name_locations = bh_alloc_array(global_scratch_allocator, u32, variant_count);
+                u32* param_locations = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(u->poly_sln));
+                u32* meta_locations = bh_alloc_array(global_scratch_allocator, u32, variant_count);
+                u32* struct_tag_locations = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(u->meta_tags));
+                memset(meta_locations, 0, variant_count * sizeof(u32));
+                memset(struct_tag_locations, 0, bh_arr_length(u->meta_tags) * sizeof(u32));
+
+                // Member names
+                u32 i = 0;
+                bh_arr_each(UnionVariant*, puv, u->variants_ordered) {
+                    UnionVariant* uv = *puv;
+
+                    name_locations[i++] = table_buffer.length;
+                    bh_buffer_append(&table_buffer, uv->name, strlen(uv->name));
+                }
+
+                bh_buffer_align(&table_buffer, 8);
+
+                // Polymorphic solutions
+                build_polymorphic_solutions_array(u->poly_sln, &table_buffer, &constexpr_ctx, param_locations);
+
+                bh_buffer_align(&table_buffer, 8);
+
+                // Variant tags
+                i = 0;
+                bh_arr_each(UnionVariant*, puv, u->variants_ordered) {
+                    UnionVariant* uv = *puv;
+
+                    if (uv->meta_tags == NULL) {
+                        i += 1;
+                        continue;
+                    }
+
+                    bh_arr(AstTyped *) meta_tags = uv->meta_tags;
+                    assert(meta_tags);
+
+                    bh_arr(u64) meta_tag_locations=NULL;
+                    bh_arr_new(global_heap_allocator, meta_tag_locations, bh_arr_length(meta_tags));
+
+                    int j = 0;
+                    bh_arr_each(AstTyped *, meta, meta_tags) {
+                        AstTyped* value = *meta;                        
+                        assert(value->flags & Ast_Flag_Comptime);
+                        assert(value->type);
+
+                        meta_tag_locations[j++] = build_constexpr(value, &table_buffer, &constexpr_ctx);
+                    }
+
+                    bh_buffer_align(&table_buffer, 8);
+                    meta_locations[i] = table_buffer.length;
+
+                    fori (k, 0, bh_arr_length(meta_tags)) {
+                        WRITE_SLICE(meta_tag_locations[k], meta_tags[k]->type->id);
+                    }
+
+                    bh_arr_free(meta_tag_locations);
+                    i += 1;
+                }
+
+                bh_buffer_align(&table_buffer, 8);
+                u32 variants_base = table_buffer.length;
+
+                // Variants array
+                i = 0;
+                bh_arr_each(UnionVariant*, puv, u->variants_ordered) {
+                    UnionVariant* uv = *puv;
+
+                    u32 name_loc = name_locations[i];
+                    u32 meta_loc = meta_locations[i++];
+
+                    WRITE_SLICE(name_loc, strlen(uv->name));
+                    bh_buffer_write_u32(&table_buffer, uv->tag_value);
+                    bh_buffer_write_u32(&table_buffer, uv->type->id);
+
+                    WRITE_SLICE(meta_loc, bh_arr_length(uv->meta_tags));
+                }
+
+                bh_buffer_align(&table_buffer, 8);
+                u32 params_base = table_buffer.length;
+
+                // Polymorphic solution any array
+                i = 0;
+                bh_arr_each(AstPolySolution, sln, u->poly_sln) {
+                    WRITE_PTR(param_locations[i++]);
+
+                    if (sln->kind == PSK_Type) bh_buffer_write_u32(&table_buffer, basic_types[Basic_Kind_Type_Index].id);
+                    else                       bh_buffer_write_u32(&table_buffer, sln->value->type->id);
+                }
+
+                // Union tag array
+                i = 0;
+                bh_arr_each(AstTyped *, tag, u->meta_tags) {
+                    AstTyped* value = *tag;                        
+                    assert(value->flags & Ast_Flag_Comptime);
+                    assert(value->type);
+
+                    struct_tag_locations[i++] = build_constexpr(value, &table_buffer, &constexpr_ctx);
+                }
+
+                // Union methods
+                bh_arr(StructMethodData) method_data=NULL;
+                AstType *ast_type = type->ast_type;
+                if (ast_type && ast_type->kind == Ast_Kind_Union_Type) {
+                    AstUnionType *union_type  = (AstUnionType *) ast_type;
+                    Scope*        union_scope = union_type->scope;
+
+                    if (union_scope == NULL) goto no_union_methods;
+
+                    fori (i, 0, shlen(union_scope->symbols)) {
+                        AstFunction* node = (AstFunction *) strip_aliases(union_scope->symbols[i].value);
+                        if (node->kind != Ast_Kind_Function) continue;
+                        assert(node->entity);
+                        assert(node->entity->function == node);
+
+                        // Name
+                        char *name = union_scope->symbols[i].key;
+                        u32 name_loc = table_buffer.length;
+                        u32 name_len = strlen(name);
+                        bh_buffer_append(&table_buffer, name, name_len);
+
+                        // any data member
+                        bh_buffer_align(&table_buffer, 4);
+                        u32 data_loc = table_buffer.length;
+                        u32 func_idx = get_element_idx(module, node);
+                        bh_buffer_write_u32(&table_buffer, func_idx);
+                        bh_buffer_write_u32(&table_buffer, 0);
+                        bh_buffer_write_u32(&table_buffer, 0);
+                        
+                        bh_arr_push(method_data, ((StructMethodData) {
+                            .name_loc = name_loc,
+                            .name_len = name_len,
+                            .type     = node->type->id,
+                            .data_loc = data_loc,
+                        }));
+                    }
+                }
+
+                no_union_methods:
+
+                bh_buffer_align(&table_buffer, 4);
+                u32 method_data_base = table_buffer.length;
+
+                i = 0;
+                bh_arr_each(StructMethodData, method, method_data) {
+                    WRITE_SLICE(method->name_loc, method->name_len);
+                    WRITE_PTR(method->data_loc); 
+                    bh_buffer_write_u32(&table_buffer, method->type);
+                }
+
+                bh_buffer_align(&table_buffer, 8);
+                
+                u32 union_tag_base = table_buffer.length;
+                fori (i, 0, bh_arr_length(u->meta_tags)) {
+                    WRITE_SLICE(struct_tag_locations[i], u->meta_tags[i]->type->id);
+                }
+
+                // Union name
+                u32 name_base = 0;
+                u32 name_length = 0;
+                if (u->name) {
+                    name_length = strlen(u->name);
+                    name_base = table_buffer.length;
+                    bh_buffer_append(&table_buffer, u->name, name_length);
+                }
+
+                bh_buffer_align(&table_buffer, 8);
+                table_info[type_idx] = table_buffer.length;
+                bh_buffer_write_u32(&table_buffer, type->kind);
+                bh_buffer_write_u32(&table_buffer, type_size_of(type));
+                bh_buffer_write_u32(&table_buffer, type_alignment_of(type));
+
+                if (type->Union.constructed_from != NULL) {
+                    bh_buffer_write_u32(&table_buffer, type->Union.constructed_from->type_id);
+                } else {
+                    bh_buffer_write_u32(&table_buffer, 0);
+                }
+
+                bh_buffer_write_u32(&table_buffer, type->Union.tag_type->id);
+
+                WRITE_SLICE(name_base, name_length);
+                WRITE_SLICE(variants_base, variant_count);
+                WRITE_SLICE(params_base, bh_arr_length(u->poly_sln));
+                WRITE_SLICE(union_tag_base, bh_arr_length(u->meta_tags));
+                WRITE_SLICE(method_data_base, bh_arr_length(method_data));
+
+                bh_arr_free(method_data);
                 break;
             }
         }

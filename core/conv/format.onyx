@@ -741,6 +741,26 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                     output->write("]");
                 }
             }
+
+            if info.kind == .Union {
+                u := cast(&Type_Info_Union) info;
+
+                tag_value := *cast(&u32, v.data);
+
+                variant := array.first(u.variants, #(it.tag_value == tag_value));
+
+                if !variant {
+                    output->write("unknown_variant");
+                    return;
+                }
+
+                output->write(variant.name);
+                output->write("(");
+
+                format_any(output, formatting, any.{ cast([&] u8) v.data + u.alignment, variant.type });
+
+                output->write(")");
+            }
         }
     }
 }
