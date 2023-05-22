@@ -1,6 +1,10 @@
 
 use core {*}
 
+union_is :: macro (u: $U, $variant: U.tag_enum) -> bool {
+    return cast(U.tag_enum, u) == variant;
+}
+
 extract_variant :: macro (u: $U, $variant: U.tag_enum) => {
     switch u {
         case variant => v {
@@ -57,7 +61,7 @@ simple_test :: () {
 
     call_test(u);
 
-    if cast(SimpleUnion.tag_enum, u) == .b {
+    if union_is(u, .b) {
         println(extract_variant(u, .b)?);
     }
 
