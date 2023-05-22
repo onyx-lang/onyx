@@ -983,24 +983,29 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     i32 store_size  = type_size_of(type);
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer || type->kind == Type_Kind_MultiPointer;
 
-    if (is_basic && (type->Basic.flags & Basic_Flag_Pointer)) {
+    if (!is_basic) {
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical,
+            "Failed to generate store instruction for type '%s'. (compiler bug)",
+            type_get_name(type));
+    }
+
+    if (type->Basic.flags & Basic_Flag_Pointer) {
         WID(NULL, WI_I32_STORE, ((WasmInstructionData) { 2, offset }));
-    } else if (is_basic && ((type->Basic.flags & Basic_Flag_Integer)
-                         || (type->Basic.flags & Basic_Flag_Boolean)
-                         || (type->Basic.flags & Basic_Flag_Type_Index))) {
+    } else if ((type->Basic.flags & Basic_Flag_Integer)
+               || (type->Basic.flags & Basic_Flag_Boolean)
+               || (type->Basic.flags & Basic_Flag_Type_Index)) {
         if      (store_size == 1)   WID(NULL, WI_I32_STORE_8,  ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 2)   WID(NULL, WI_I32_STORE_16, ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 4)   WID(NULL, WI_I32_STORE,    ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 8)   WID(NULL, WI_I64_STORE,    ((WasmInstructionData) { alignment, offset }));
-    } else if (is_basic && (type->Basic.flags & Basic_Flag_Float)) {
+    } else if (type->Basic.flags & Basic_Flag_Float) {
         if      (store_size == 4)   WID(NULL, WI_F32_STORE, ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 8)   WID(NULL, WI_F64_STORE, ((WasmInstructionData) { alignment, offset }));
-    } else if (is_basic && (type->Basic.flags & Basic_Flag_SIMD)) {
+    } else if (type->Basic.flags & Basic_Flag_SIMD) {
         WID(NULL, WI_V128_STORE, ((WasmInstructionData) { alignment, offset }));
-    } else {
-        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical,
-            "Failed to generate store instruction for type '%s'.",
-            type_get_name(type));
+    } else if (type->Basic.kind == Basic_Kind_Void) {
+        // Do nothing, but drop the destination pointer.
+        WI(NULL, WI_DROP);
     }
 
     *pcode = code;
@@ -3790,6 +3795,14 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
 
     if (to->kind == Type_Kind_Distinct || from->kind == Type_Kind_Distinct) {
         // Nothing needs to be done because they are identical
+        *pcode = code;
+        return;
+    }
+
+    if (from->kind == Type_Kind_Union) {
+        // This should be check in the checker that are only casting
+        // to the union's tag_type.
+        emit_load_instruction(mod, &code, from->Union.tag_type, 0);
         *pcode = code;
         return;
     }

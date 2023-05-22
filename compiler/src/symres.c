@@ -365,7 +365,8 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
     if (expr->kind == Ast_Kind_Struct_Type ||
         expr->kind == Ast_Kind_Poly_Struct_Type ||
         expr->kind == Ast_Kind_Enum_Type ||
-        expr->kind == Ast_Kind_Type_Raw_Alias) {
+        expr->kind == Ast_Kind_Type_Raw_Alias ||
+        expr->kind == Ast_Kind_Union_Type) {
 
         force_a_lookup = 1;
     }

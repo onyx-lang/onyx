@@ -330,6 +330,18 @@ all_types_peeled_off:
             return result;
         }
 
+        case Ast_Kind_Union_Type: {
+            AstUnionType* utype = (AstUnionType *) node;
+            if (utype->utcache != NULL) {
+                //
+                // nocheckin Should this be hard coded?
+                if (!strcmp(symbol, "tag_enum")) {
+                    return (AstNode *) utype->utcache->Union.tag_type->ast_type;
+                }
+            }
+            break;
+        }
+
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* stype = ((AstPolyStructType *) node);
             return symbol_raw_resolve(stype->scope, symbol);

@@ -694,6 +694,8 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 u_type = union_->pending_type;
             }
 
+            union_->pending_type_is_valid = 1;
+
             //
             // All variants need to have type know.
             bh_arr_each(AstUnionVariant *, pvariant, union_->variants) {

@@ -3641,6 +3641,8 @@ void check_entity(Entity* ent) {
         case Entity_Type_Type_Alias:
             if (ent->type_alias->kind == Ast_Kind_Struct_Type)
                 cs = check_struct((AstStructType *) ent->type_alias);
+            else if (ent->type_alias->kind == Ast_Kind_Union_Type)
+                cs = check_union((AstUnionType *) ent->type_alias);
             else
                 cs = check_type(&ent->type_alias);
             break;

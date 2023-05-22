@@ -2171,7 +2171,10 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     while (parser->curr->type == '#') {
         if (parser->hit_unexpected_token) return NULL;
 
-        if (parse_possible_directive(parser, "union")) s_node->is_union = 1;
+        if (next_tokens_are(parser, 2, '#', Token_Type_Keyword_Union)) {
+            consume_tokens(parser, 2);
+            s_node->is_union = 1;
+        }
 
         else if (parse_possible_directive(parser, "pack")) s_node->is_packed = 1;
 

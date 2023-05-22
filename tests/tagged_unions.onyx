@@ -4,58 +4,74 @@ use core {*}
 SimpleUnion :: union {
     a: i32;
     b: struct {
-        c, d: str;
+        c: str;
     };
+
+    empty: void;
+    large: i64;
+}
+
+call_test :: (u_: SimpleUnion) {
+    u := u_;
+    __byte_dump(&u, sizeof typeof u);
+
+    switch cast(SimpleUnion.tag_enum) u {
+        case .a do println("It was a!");
+        case .b do println("It was B!");
+        case .empty do println("It was EMPTY!");
+        case .large do println("It was a large number!");
+    }
 }
 
 simple_test :: () {
-    u := SimpleUnion.{ a = 123 };
+    u := SimpleUnion.{ b = .{ "asdf" } };
+    u  = .{ a = 123 };
+    u  = .{ empty = .{} };
+    u  = .{ large = 0x0123456789abcdef };
 
-    println(sizeof str);
-    println(sizeof str * 2 + sizeof i32);
+    println(cast(SimpleUnion.tag_enum) u);
 
-    __byte_dump(&u, sizeof typeof u);
-    println(u.a);
+    call_test(u);
 }
 
-main :: () {simple_test();}
+main :: () {simple_test();} //link_test();}
 
+Link :: union {
+    End: void;
+    Next: struct {
+        data: i32;
+        next: &Link;
+    }
+}
 
-// Link :: union {
-//     End: void;
-//     Next: struct {
-//         data: i32;
-//         next: &Link;
-//     }
-// }
-// 
-// print_links :: (l: Link) {
-//     walker := l;
-//     while true {
-//         switch walker {
-//             case .End do break;
-//             case .Next {
-//                 next: struct {data: i32; next: rawptr};
-//                 printf("{} ", next.data);
-//                 walker = next.next;
-//             }
-//         }
-//     }
-// }
-// 
-// link_test :: () {
-//     l := Link.{
-//         Next = .{
-//             data = 123,
-//             next = &Link.{
-//                 End = .{}
-//             }
-//         }
-//     };
-//     
-//     print_links(l);
-// }
-// 
+/*
+print_links :: (l: Link) {
+    walker := l;
+    while true {
+        switch walker {
+            case Link.End do break;
+            case Link.Next => &next {
+                printf("{} ", next.data);
+                walker = next.next;
+            }
+        }
+    }
+}
+
+link_test :: () {
+    l := Link.{
+        Next = .{
+            data = 123,
+            next = &Link.{
+                End = .{}
+            }
+        }
+    };
+    
+    print_links(l);
+}
+*/
+
 // main :: () { link_test(); }
 
 // Optional :: union (T: type_expr) {

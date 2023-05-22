@@ -1239,7 +1239,11 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
         return 0;
     }
 
-
+    if (from->kind == Type_Kind_Union && to->kind == Type_Kind_Enum) {
+        if (from->Union.tag_type->id == to->id) {
+            return 1;
+        }
+    }
 
     if (from->kind == Type_Kind_Enum) from = from->Enum.backing;
     if (to->kind == Type_Kind_Enum) to = to->Enum.backing;
