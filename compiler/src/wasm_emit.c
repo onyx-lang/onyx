@@ -34,7 +34,8 @@ static b32 onyx_type_is_stored_in_memory(Type *type) {
     if (type_struct_is_just_one_basic_value(type)) return 0;
 
     return type->kind == Type_Kind_Struct
-        || type->kind == Type_Kind_DynArray;
+        || type->kind == Type_Kind_DynArray
+        || type->kind == Type_Kind_Union;
 }
 
 static WasmType onyx_type_to_wasm_type(Type* type) {

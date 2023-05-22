@@ -70,6 +70,9 @@
     NODE(PolyStructType)       \
     NODE(PolyStructParam)      \
     NODE(PolyCallType)         \
+    NODE(UnionType)            \
+    NODE(UnionVariant)         \
+    NODE(PolyUnionType)        \
     NODE(EnumType)             \
     NODE(EnumValue)            \
     NODE(TypeAlias)            \
@@ -172,6 +175,8 @@ typedef enum AstKind {
     Ast_Kind_Struct_Type,
     Ast_Kind_Poly_Struct_Type,
     Ast_Kind_Poly_Call_Type,
+    Ast_Kind_Union_Type,
+    Ast_Kind_Poly_Union_Type,
     Ast_Kind_Enum_Type,
     Ast_Kind_Type_Alias,
     Ast_Kind_Type_Raw_Alias,
@@ -181,6 +186,7 @@ typedef enum AstKind {
     Ast_Kind_Type_End,
 
     Ast_Kind_Struct_Member,
+    Ast_Kind_Union_Variant,
     Ast_Kind_Enum_Value,
 
     Ast_Kind_NumLit,
@@ -1016,6 +1022,39 @@ struct AstPolyCallType {
 
     // NOTE: These nodes can be either AstTypes, or AstTyped expressions.
     bh_arr(AstNode *) params;
+};
+struct AstUnionType {
+    AstType_base;
+    char *name;
+
+    bh_arr(AstUnionVariant *) variants;
+    bh_arr(AstTyped *) meta_tags;
+
+    // NOTE: Used to cache the actual type, since building
+    // a union type is kind of complicated and should
+    // only happen once.
+    Type *utcache;
+
+    // NOTE: This type is used when the union has not been
+    // completely generated, but is a valid pointer to where the
+    // type will be generated to.
+    Type *pending_type;
+
+    // NOTE: Used to store statically bound expressions in the union.
+    Scope* scope;
+
+    OnyxFilePos polymorphic_error_loc;
+    ConstraintContext constraints;
+
+    bh_arr(AstType *)       polymorphic_argument_types;
+    bh_arr(AstPolySolution) polymorphic_arguments;
+
+    b32 pending_type_is_valid : 1;
+    // b32 ready_to_build_type   : 1;
+};
+struct AstUnionVariant {
+    AstTyped_base;
+    bh_arr(AstTyped *) meta_tags;
 };
 struct AstEnumType {
     AstType_base;

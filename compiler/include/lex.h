@@ -17,6 +17,7 @@ typedef enum TokenType {
     Token_Type_Keyword_Start,
     Token_Type_Keyword_Package,
     Token_Type_Keyword_Struct,
+    Token_Type_Keyword_Union,
     Token_Type_Keyword_Enum,
     Token_Type_Keyword_Use,
     Token_Type_Keyword_If,

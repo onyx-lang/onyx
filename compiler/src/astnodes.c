@@ -46,6 +46,8 @@ static const char* ast_node_names[] = {
     "STRUCT TYPE",
     "POLYMORPHIC STRUCT TYPE",
     "POLYMORPHIC STRUCT CALL TYPE",
+    "UNION TYPE",
+    "POLYMORPHIC UNION TYPE",
     "ENUM TYPE",
     "TYPE_ALIAS",
     "TYPE RAW ALIAS",
@@ -55,6 +57,7 @@ static const char* ast_node_names[] = {
     "TYPE_END (BAD)",
 
     "STRUCT MEMBER",
+    "UNION VARIANT",
     "ENUM VALUE",
 
     "NUMERIC LITERAL",

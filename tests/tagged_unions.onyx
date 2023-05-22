@@ -1,67 +1,117 @@
 
 use core {*}
 
-/*
-Optional :: struct (T: type_expr) {
-    has_value: bool;
-    value: T;
-}
-*/
-
-Optional :: union (T: type_expr) {
-    None: void;
-    Some: T;
+SimpleUnion :: union {
+    a: i32;
+    b: struct {
+        c, d: str;
+    };
 }
 
-#inject Optional {
-    with :: macro (o: Optional($T), code: Code) {
-        switch o {
-            case .Some => v {
-                #unquote code(v);
-            }
-        }
-    }
+simple_test :: () {
+    u := SimpleUnion.{ a = 123 };
 
-    or_default :: macro (o: Optional($T), default: T) -> T {
-        switch o {
-            case .Some => v do return v;
-            case .None      do return default;
-        }
-    }
+    println(sizeof str);
+    println(sizeof str * 2 + sizeof i32);
+
+    __byte_dump(&u, sizeof typeof u);
+    println(u.a);
 }
+
+main :: () {simple_test();}
+
+
+// Link :: union {
+//     End: void;
+//     Next: struct {
+//         data: i32;
+//         next: &Link;
+//     }
+// }
+// 
+// print_links :: (l: Link) {
+//     walker := l;
+//     while true {
+//         switch walker {
+//             case .End do break;
+//             case .Next {
+//                 next: struct {data: i32; next: rawptr};
+//                 printf("{} ", next.data);
+//                 walker = next.next;
+//             }
+//         }
+//     }
+// }
+// 
+// link_test :: () {
+//     l := Link.{
+//         Next = .{
+//             data = 123,
+//             next = &Link.{
+//                 End = .{}
+//             }
+//         }
+//     };
+//     
+//     print_links(l);
+// }
+// 
+// main :: () { link_test(); }
+
+// Optional :: union (T: type_expr) {
+//     None: void;
+//     Some: T;
+// }
+// 
+// #inject Optional {
+//     with :: macro (o: Optional($T), code: Code) {
+//         switch o {
+//             case .Some => v {
+//                 #unquote code(v);
+//             }
+//         }
+//     }
+// 
+//     or_default :: macro (o: Optional($T), default: T) -> T {
+//         switch o {
+//             case .Some => v do return v;
+//             case .None      do return default;
+//         }
+//     }
+// }
 
 // | tag type (Tag_Enum) | data... |
 
 
-Config :: struct {
-    name: Optional(str);
-}
-
-main :: () {
-    x := Optional(i32).{ Some = 123 };
-
-    c: Config;
-    c.name = .{ Some = "test" };
-
-    printf("{}.{}", typeof c.name.Some, c.name.Some);   // "Optional.tag_enum.Some"
-
-    x->with(#quote [v] {
-        printf("x has the value: {}\n", v);
-    });
-
-    y := x->or_default(0);
-    
-    switch x {
-        case .None {
-
-        }
-
-        case .Some => &value {
-            printf("x has the value: {}\n", value);
-        }
-    }
-}
-
-
-
-
+// Config :: struct {
+//     name: Optional(str);
+// }
+// 
+// main :: () {
+//     x := Optional(i32).{ Some = 123 };
+// 
+//     c: Config;
+//     c.name = .{ Some = "test" };
+// 
+//     printf("{}.{}", typeof c.name.Some, c.name.Some);   // "Optional.tag_enum.Some"
+// 
+//     x->with(#quote {
+//         printf("x has the value: {}\n", it);
+//     });
+// 
+//     y := x->or_default(0);
+// 
+//     switch x {
+//         case .None {
+//             printf("x has nothing....\n");
+//         }
+// 
+//         case .Some => &value {
+//             printf("x has the value: {}\n", value);
+//         }
+//     }
+// }
+// 
+// 
+// 
+// 

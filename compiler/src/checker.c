@@ -1440,6 +1440,40 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         if (sl->type == NULL)
             YIELD(sl->token->pos, "Trying to resolve type of struct literal.");
     }
+    
+    if (sl->type->kind == Type_Kind_Union) {
+        if (bh_arr_length(sl->args.values) != 0 || bh_arr_length(sl->args.named_values) != 1) {
+            ERROR_(sl->token->pos, "Expected exactly one named member when constructing an instance of a union type, '%s'.", type_get_name(sl->type));
+        }
+
+        AstNamedValue* value = sl->args.named_values[0];
+        token_toggle_end(value->token);
+
+        Type *union_type = sl->type;
+        UnionVariant *matched_variant = union_type->Union.variants[
+            shgeti(union_type->Union.variants, value->token->text)
+        ].value;
+        token_toggle_end(value->token);
+
+        if (!matched_variant) {
+            ERROR_(value->token->pos, "'%b' is not a variant of '%s'.",
+                    value->token->text, value->token->length, type_get_name(union_type));
+        }
+
+        TYPE_CHECK(&value->value, matched_variant->type) {
+            ERROR_(value->token->pos,
+                   "Mismatched type in initialized type. Expected something of type '%s', got '%s'.",
+                   type_get_name(matched_variant->type),
+                   type_get_name(value->value->type));
+        }
+
+        AstNumLit *tag_value = make_int_literal(context.ast_alloc, matched_variant->tag_value);
+        tag_value->type = union_type->Union.tag_type;
+
+        bh_arr_push(sl->args.values, (AstTyped *) tag_value);
+        bh_arr_push(sl->args.values, value->value);
+        return Check_Success;
+    }
 
     if (!type_is_structlike_strict(sl->type)) {
         //
@@ -2668,6 +2702,38 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* ofunc) {
     return Check_Success;
 }
 
+static void mark_all_functions_used_in_scope(Scope *scope) {
+    //
+    // This ensures that all procedures defined inside of a structure are
+    // not pruned and omitted from the binary. This is because a large
+    // use-case of procedures in structures is dynamically linking them
+    // using the type info data.
+    if (scope) {
+        fori (i, 0, shlen(scope->symbols)) {
+            AstNode* node = scope->symbols[i].value;
+            if (node->kind == Ast_Kind_Function) {
+                node->flags |= Ast_Flag_Function_Used;
+            }
+        }
+    }
+}
+
+CheckStatus check_meta_tags(bh_arr(AstTyped *) tags) {
+    if (tags) {
+        bh_arr_each(AstTyped *, meta, tags) {
+            CHECK(expression, meta);
+            resolve_expression_type(*meta);
+
+            if (((*meta)->flags & Ast_Flag_Comptime) == 0) {
+                onyx_report_error((*meta)->token->pos, Error_Critical, "#tag expressions are expected to be compile-time known.");
+                return Check_Error;
+            }
+        }
+    }
+
+    return Check_Success;
+}
+
 CheckStatus check_struct(AstStructType* s_node) {
     if (s_node->entity_defaults && s_node->entity_defaults->state < Entity_State_Check_Types)
         YIELD(s_node->token->pos, "Waiting for struct member defaults to pass symbol resolution.");
@@ -2709,19 +2775,7 @@ CheckStatus check_struct(AstStructType* s_node) {
         CHECK(constraint_context, &s_node->constraints, s_node->scope, pos);
     }
 
-    //
-    // This ensures that all procedures defined inside of a structure are
-    // not pruned and omitted from the binary. This is because a large
-    // use-case of procedures in structures is dynamically linking them
-    // using the type info data.
-    if (s_node->scope) {
-        fori (i, 0, shlen(s_node->scope->symbols)) {
-            AstNode* node = s_node->scope->symbols[i].value;
-            if (node->kind == Ast_Kind_Function) {
-                node->flags |= Ast_Flag_Function_Used;
-            }
-        }
-    }
+    mark_all_functions_used_in_scope(s_node->scope);
 
     bh_arr_each(AstStructMember *, smem, s_node->members) {
         if ((*smem)->type_node != NULL) {
@@ -2776,17 +2830,7 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
     if (s_node->entity_type && s_node->entity_type->state == Entity_State_Failed)
         return Check_Failed;
 
-    if (s_node->meta_tags) {
-        bh_arr_each(AstTyped *, meta, s_node->meta_tags) {
-            CHECK(expression, meta);
-            resolve_expression_type(*meta);
-
-            if (((*meta)->flags & Ast_Flag_Comptime) == 0) {
-                onyx_report_error((*meta)->token->pos, Error_Critical, "#tag expressions are expected to be compile-time known.");
-                return Check_Error;
-            }
-        }
-    }
+    CHECK(meta_tags, s_node->meta_tags);
 
     bh_arr_each(StructMember *, smem, s_node->stcache->Struct.memarr) {
         if ((*smem)->initial_value && *(*smem)->initial_value) {
@@ -2802,19 +2846,37 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
             resolve_expression_type(*(*smem)->initial_value);
         }
 
-        if ((*smem)->meta_tags) {
-            bh_arr_each(AstTyped *, meta, (*smem)->meta_tags) {
-                CHECK(expression, meta);
-                resolve_expression_type(*meta);
-
-                if (((*meta)->flags & Ast_Flag_Comptime) == 0) {
-                    onyx_report_error((*meta)->token->pos, Error_Critical, "#tag expressions are expected to be compile-time known.");
-                    return Check_Error;
-                }
-            }
-        }
+        CHECK(meta_tags, (*smem)->meta_tags);
     }
 
+    return Check_Success;
+}
+
+CheckStatus check_union(AstUnionType *u_node) {
+    if (u_node->constraints.constraints) {
+        u_node->constraints.produce_errors = (u_node->flags & Ast_Flag_Header_Check_No_Error) == 0;
+
+        OnyxFilePos pos = u_node->token->pos;
+        if (u_node->polymorphic_error_loc.filename) {
+            pos = u_node->polymorphic_error_loc;
+        }
+        CHECK(constraint_context, &u_node->constraints, u_node->scope, pos);
+    }
+
+    mark_all_functions_used_in_scope(u_node->scope);
+
+    CHECK(meta_tags, u_node->meta_tags);
+
+    bh_arr_each(AstUnionVariant *, variant, u_node->variants) {
+        CHECK(type, &(* variant)->type_node);
+        CHECK(meta_tags, (* variant)->meta_tags);
+    }
+
+    type_build_from_ast(context.ast_alloc, (AstType *) u_node);
+    if (u_node->pending_type == NULL || !u_node->pending_type_is_valid)
+        YIELD(u_node->token->pos, "Waiting for type to be constructed.");
+
+    u_node->utcache = u_node->pending_type;
     return Check_Success;
 }
 
