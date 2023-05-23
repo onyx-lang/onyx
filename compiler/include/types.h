@@ -281,7 +281,7 @@ b32 type_is_structlike_strict(Type* type);
 u32 type_structlike_mem_count(Type* type);
 u32 type_structlike_is_simple(Type* type);
 b32 type_is_sl_constructable(Type* type);
-b32 type_struct_constructed_from_poly_struct(Type* struct_type, struct AstType* from);
+b32 type_constructed_from_poly(Type* base, struct AstType* from);
 Type* type_struct_is_just_one_basic_value(Type *type);
 
 #endif // #ifndef ONYX_TYPES

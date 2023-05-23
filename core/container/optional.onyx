@@ -20,8 +20,8 @@ use core
         the type will be inferred from the parameter type.
     """
     make :: #match #locked {
-        ((x: $T) => (?T).{ has_value = true, value = x }),
-        ($T: type_expr, x: T) => ((?T).{ has_value = true, value = x })
+        ((x: $T) => (?T).{ Some = x }),
+        ($T: type_expr, x: T) => ((?T).{ Some = x })
     }
 
     #doc """
@@ -29,7 +29,7 @@ use core
         is mostly useless, because you can use `.{}` in type inferred
         places to avoid having to specify the type.
     """
-    empty :: macro (T: type_expr) => (?T).{}; 
+    empty :: macro (T: type_expr) => (?T).{ None = .{} }; 
 
     #doc """
         Converts a pointer to an optional by defining `null` to be `None`,
@@ -39,7 +39,7 @@ use core
     from_ptr :: macro (p: &$T) -> ?T {
         p_ := p;
         if p_ do return *p_;
-        return .{};
+        return .{ None = .{} };
     }
 
     #doc """
@@ -47,32 +47,36 @@ use core
         no value is present.
     """
     value_or :: (o: ?$T, default: T) -> T {
-        if !o.has_value do return default;
-        return o.value;
+        switch o {
+            case .Some => v do return v;
+            case #default do return default;
+        }
     }
 
     #doc "Clears the value in the Optional, zeroing the memory of the value."
     reset :: (o: &?$T) {
-        o.has_value = false;
-        core.memory.set(&o.value, 0, sizeof T);
+        *o = .{ None = .{} };
     }
 
     #doc "Sets the value in the Optional."
     set :: (o: &?$T, value: T) {
-        o.has_value = true;
-        o.value = value;
+        *o = .{ Some = value };
     }
 
     #doc "Monadic chaining operation."
     and_then :: (o: ?$T, transform: (T) -> ?$R) -> ?R {
-        if !o.has_value do return .{};
-        return transform(o.value);
+        switch o {
+            case .Some => v do return transform(v);
+            case #default do return .{ None = .{} };
+        }
     }
 
     #doc "Changes the value inside the optional, if present."
     transform :: (o: ?$T, transform: (T) -> $R) -> ?R {
-        if !o.has_value do return .{};
-        return Optional.make(transform(o.value));
+        switch o {
+            case .Some => v do return .{ Some = transform(v) };
+            case #default do return .{ None = .{} };
+        }
     }
 
     #doc """
@@ -80,8 +84,10 @@ use core
         provide a function to generate a value.
     """
     or_else :: (o: ?$T, generate: () -> ?T) -> ?T {
-        if o.has_value do return o;
-        return generate();
+        switch o {
+            case .Some => v do return o;
+            case #default do return generate();
+        }
     }
 
     #doc """
@@ -90,20 +96,41 @@ use core
         handler must take care of it.
     """
     unwrap :: (o: ?$T) -> T {
-        if o.has_value do return o.value;
-        assert(false, "Unwrapping empty Optional.");
+        switch o {
+            case .Some => v do return v;
+            case #default {
+                assert(false, "Unwrapping empty Optional.");
+            }
+        }
+    }
+
+    #doc """
+        Returns a pointer to the value inside the optional, if there is one.
+        If not, an assertion is thrown and the context's assert handler must
+        take care of it.
+    """
+    unwrap_ptr :: (o: ?$T) -> &T {
+        switch o {
+            case .Some => &v do return v;
+            case #default {
+                assert(false, "Unwrapping empty Optional.");
+            }
+        }
     }
 
     or_return :: macro (o: ?$T) -> T {
-        value := o;
-        if value.has_value do return value.value;
-
-        return return .{};
+        switch value := o; value {
+            case .Some => v do return v;
+            case #default {
+                return return .{};
+            }
+        }
     }
 
     catch :: macro (o: ?$T, body: Code) -> T {
-        value := o;
-        if value.has_value do return value.value;
+        switch value := o; value {
+            case .Some => v do return v;
+        }
 
         #unquote body;
     }
@@ -161,39 +188,47 @@ use core
 
 
     hash :: (o: ?$T/core.hash.Hashable) -> u32 {
-        if !o.has_value do return 0;
-        return core.hash.hash(o.value);
+        switch o {
+            case .Some => v do return core.hash.hash(v);
+            case #default do return 0;
+        }
     }
 }
 
 #operator == (o1, o2: ?$T) -> bool {
-    if o1.has_value != o2.has_value do return false;
-    if !o1.has_value do return true;
-    return o1.value == o2.value;
+    if cast(Optional(T).tag_enum, o1) != cast(Optional(T).tag_enum, o2) do return false;
+    switch o1 {
+        case .None do return true;
+        case .Some => v1 {
+            v2 := o2->unwrap();
+            return v1 == v2;
+        }
+    }
 }
 
 #operator ?? macro (opt: ?$T, default: T) -> T {
-    value := opt;
-    if value do return value.value;
-
-    return default;
+    switch value := opt; value {
+        case .Some => v do return v;
+        case #default do return default;
+    }
 }
 
 #operator ?? macro (opt: ?$T, catch: Code) -> T {
-    value := opt;
-    if value do return value.value;
+    switch value := opt; value {
+        case .Some => v do return v;
+    }
 
     #unquote catch;
 }
 
 #operator ? macro (opt: ?$T) -> T {
-    value := opt;
-    if value do return value.value;
-
-    return return .{};
+    switch value := opt; value {
+        case .Some => v do return v;
+        case #default do return return .{};
+    }
 }
 
 
 #overload
-__implicit_bool_cast :: macro (o: ?$T) => o.has_value;
+__implicit_bool_cast :: macro (o: ?$T) => cast(Optional(T).tag_enum, o) == .Some;
 

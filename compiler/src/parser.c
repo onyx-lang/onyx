@@ -1997,9 +1997,9 @@ static AstType* parse_type(OnyxParser* parser) {
                     pc_type->params = params;
 
                     *next_insertion = (AstType *) pc_type;
+                } else {
+                    next_insertion = NULL;
                 }
-
-                next_insertion = NULL;
                 break;
             }
 
@@ -2075,9 +2075,18 @@ static AstType* parse_type(OnyxParser* parser) {
                 }
             }
 
-            default:
-                onyx_report_error(parser->curr->pos, Error_Critical, "unexpected token '%b'.", parser->curr->text, parser->curr->length);
+            case '.': {
                 consume_token(parser);
+                AstFieldAccess* field = make_node(AstFieldAccess, Ast_Kind_Field_Access);
+                field->token = expect_token(parser, Token_Type_Symbol);
+                field->expr  = (AstTyped *) *next_insertion;
+
+                *next_insertion = (AstType *) field;
+                break;
+            }
+
+            default:
+                next_insertion = NULL;
                 break;
         }
 

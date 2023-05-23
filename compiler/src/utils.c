@@ -366,6 +366,11 @@ all_types_peeled_off:
             return symbol_raw_resolve(stype->scope, symbol);
         }
 
+        case Ast_Kind_Poly_Union_Type: {
+            AstPolyUnionType* utype = ((AstPolyUnionType *) node);
+            return symbol_raw_resolve(utype->scope, symbol);
+        }
+
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pctype = (AstPolyCallType *) node;
             if (pctype->resolved_type) {
@@ -1386,6 +1391,11 @@ all_types_peeled_off:
         case Ast_Kind_Union_Type: {
             AstUnionType* utype = (AstUnionType *) node;
             return &utype->scope;
+        }
+
+        case Ast_Kind_Poly_Union_Type: {
+            AstPolyUnionType* putype = (AstPolyUnionType *) node;
+            return &putype->scope;
         }
 
         case Ast_Kind_Poly_Call_Type: {

@@ -26,6 +26,7 @@ static inline b32 should_clone(AstNode* node) {
         case Ast_Kind_Macro:
         case Ast_Kind_Symbol:
         case Ast_Kind_Poly_Struct_Type:
+        case Ast_Kind_Poly_Union_Type:
         case Ast_Kind_Basic_Type:
         case Ast_Kind_Enum_Type:
         case Ast_Kind_Enum_Value:

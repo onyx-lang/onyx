@@ -319,7 +319,7 @@ CheckStatus check_for(AstFor* fornode) {
 
         fornode->loop_type = For_Loop_DynArr;
     }
-    else if (type_struct_constructed_from_poly_struct(iter_type, builtin_iterator_type)) {
+    else if (type_constructed_from_poly(iter_type, builtin_iterator_type)) {
         if (fornode->by_pointer) {
             ERROR(error_loc, "Cannot iterate by pointer over an iterator.");
         }
@@ -348,7 +348,7 @@ fornode_expr_checked:
     old_inside_for_iterator = context.checker.inside_for_iterator;
     context.checker.inside_for_iterator = 0;
     iter_type = fornode->iter->type;
-    if (type_struct_constructed_from_poly_struct(iter_type, builtin_iterator_type)) {
+    if (type_constructed_from_poly(iter_type, builtin_iterator_type)) {
         context.checker.inside_for_iterator = 1;
     }
 
@@ -1490,6 +1490,22 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
     if (sl->type->kind == Type_Kind_Union) {
         if ((sl->flags & Ast_Flag_Has_Been_Checked) != 0) return Check_Success;
 
+        Type *union_type = sl->type;
+
+        if (bh_arr_length(sl->args.values) == 0 && bh_arr_length(sl->args.named_values) == 0) {
+            // Produce an empty value of the first union type.
+            UnionVariant *uv = union_type->Union.variants[0].value;
+
+            AstNumLit *tag_value = make_int_literal(context.ast_alloc, uv->tag_value); 
+            tag_value->type = union_type->Union.tag_type;
+
+            bh_arr_push(sl->args.values, (AstTyped *) tag_value);
+            bh_arr_push(sl->args.values, (AstTyped *) make_zero_value(context.ast_alloc, sl->token, uv->type));
+
+            sl->flags |= Ast_Flag_Has_Been_Checked;
+            return Check_Success;
+        }
+
         if (bh_arr_length(sl->args.values) != 0 || bh_arr_length(sl->args.named_values) != 1) {
             ERROR_(sl->token->pos, "Expected exactly one named member when constructing an instance of a union type, '%s'.", type_get_name(sl->type));
         }
@@ -1497,7 +1513,6 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         AstNamedValue* value = sl->args.named_values[0];
         token_toggle_end(value->token);
 
-        Type *union_type = sl->type;
         UnionVariant *matched_variant = union_type->Union.variants[
             shgeti(union_type->Union.variants, value->token->text)
         ].value;

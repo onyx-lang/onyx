@@ -1803,11 +1803,17 @@ b32 type_is_sl_constructable(Type* type) {
     }
 }
 
-b32 type_struct_constructed_from_poly_struct(Type* struct_type, struct AstType* from) {
-    if (struct_type == NULL) return 0;
-    if (struct_type->kind != Type_Kind_Struct) return 0;
+b32 type_constructed_from_poly(Type* base, struct AstType* from) {
+    if (base == NULL) return 0;
+    if (base->kind == Type_Kind_Struct) {
+        return base->Struct.constructed_from == from;
+    }
 
-    return struct_type->Struct.constructed_from == from;
+    if (base->kind == Type_Kind_Union) {
+        return base->Union.constructed_from == from;
+    }
+
+    return 0;
 }
 
 Type* type_struct_is_just_one_basic_value(Type *type) {

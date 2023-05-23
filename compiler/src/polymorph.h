@@ -1064,10 +1064,10 @@ char* build_poly_struct_name(char *name, Type* type) {
 
 
     // Special case for `? T`
-    if (type->kind == Type_Kind_Struct
-        && type->Struct.constructed_from == builtin_optional_type) {
+    if (type->kind == Type_Kind_Union
+        && type->Union.constructed_from == builtin_optional_type) {
         strncat(name_buf, "? ", 255);
-        strncat(name_buf, type_get_name(type->Struct.poly_sln[0].type), 255);
+        strncat(name_buf, type_get_name(type->Union.poly_sln[0].type), 255);
 
         return bh_aprintf(global_heap_allocator, "%s", name_buf);
     }
