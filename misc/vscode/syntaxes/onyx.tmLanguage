@@ -209,7 +209,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(struct|enum|interface)\b</string>
+					<string>\b(union|struct|enum|interface)\b</string>
 					<key>name</key>
 					<string>storage.type.onyx</string>
 				</dict>
@@ -234,7 +234,7 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\b(struct|enum|interface)\b(?:(\{)(\}))?</string>
+					<string>\b(union|struct|enum|interface)\b(?:(\{)(\}))?</string>
 					<key>name</key>
 					<string>storage.type.onyx</string>
 				</dict>
@@ -363,7 +363,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(\b[[:alpha:]_]+[[:alnum:]_]*\b)\s*[:]\s*[:]\s*(struct)</string>
+					<string>\b(\b[[:alpha:]_]+[[:alnum:]_]*\b)\s*[:]\s*[:]\s*(union|struct)</string>
 					<key>captures</key>
 					<dict>
 						<key>1</key>
