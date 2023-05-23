@@ -1703,7 +1703,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
             assert(union_capture_idx != 0);
 
             if (sc->capture_is_by_pointer) {
-                u64 capture_pointer_local = emit_local_allocation(mod, &code, sc->capture);
+                u64 capture_pointer_local = emit_local_allocation(mod, &code, (AstTyped *) sc->capture);
 
                 WIL(NULL, WI_LOCAL_GET, union_capture_idx);
                 WIL(NULL, WI_PTR_CONST, switch_node->expr->type->Union.alignment);
@@ -1715,8 +1715,8 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
                 sc->capture->flags |= Ast_Flag_Decl_Followed_By_Init;
                 sc->capture->flags |= Ast_Flag_Address_Taken;
 
-                emit_local_allocation(mod, &code, sc->capture);
-                emit_location(mod, &code, sc->capture);
+                emit_local_allocation(mod, &code, (AstTyped *) sc->capture);
+                emit_location(mod, &code, (AstTyped *) sc->capture);
 
                 WIL(NULL, WI_LOCAL_GET, union_capture_idx);
                 WIL(NULL, WI_PTR_CONST, switch_node->expr->type->Union.alignment);

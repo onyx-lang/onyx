@@ -13,13 +13,16 @@ unwrap_optional :: (o: NewOptional($T)) -> T {
     }
 }
 
+create_optional :: () -> NewOptional(i32) {
+    return .{ Some = i32 };
+}
+
 new_optional_test :: () {
-    v := NewOptional(i32).{ Some = 123 };
+    v := create_optional();
     v2 := NewOptional(str).{ None = .{} };
     println(v);
     println(v2);
 
-    v = .{ None = .{} };
     println(unwrap_optional(v));
 }
 
