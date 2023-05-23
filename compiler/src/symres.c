@@ -147,13 +147,66 @@ static SymresStatus symres_struct_type(AstStructType* s_node) {
             SymresStatus ss = symres_type(&member->type_node);
             if (ss != Symres_Success) {
                 s_node->flags &= ~Ast_Flag_Type_Is_Resolved;
-                if (s_node->scope) scope_leave();
+                scope_leave();
                 return ss;
             }
         }
     }
 
-    if (s_node->scope) scope_leave();
+    scope_leave();
+    return Symres_Success;
+}
+
+static SymresStatus symres_union_type(AstUnionType* u_node) {
+    if (u_node->flags & Ast_Flag_Type_Is_Resolved) return Symres_Success;
+    u_node->flags |= Ast_Flag_Comptime;
+
+    if (u_node->meta_tags) {
+        bh_arr_each(AstTyped *, meta, u_node->meta_tags) {
+            SYMRES(expression, meta);
+        }
+    }
+
+    u_node->flags |= Ast_Flag_Type_Is_Resolved;
+
+    assert(u_node->scope);
+    scope_enter(u_node->scope);
+    
+    if (u_node->polymorphic_argument_types) {
+        assert(u_node->polymorphic_arguments);
+
+        SymresStatus ss = Symres_Success, result;
+        fori (i, 0, (i64) bh_arr_length(u_node->polymorphic_argument_types)) {
+            result = symres_type(&u_node->polymorphic_argument_types[i]);
+            if (result > ss) ss = result;
+
+            if (u_node->polymorphic_arguments[i].value) {
+                result = symres_expression(&u_node->polymorphic_arguments[i].value);
+                if (result > ss) ss = result;
+            }
+        }
+    }
+
+    if (u_node->constraints.constraints) {
+        bh_arr_each(AstConstraint *, constraint, u_node->constraints.constraints) {
+            SYMRES(constraint, *constraint);
+        }
+    }
+
+    fori (i, 0, bh_arr_length(u_node->variants)) {
+        AstUnionVariant *variant = u_node->variants[i];
+        // track_declaration_for_symbol_info(member->token->pos, (AstNode *) member);
+
+        assert(variant->type_node);
+        SymresStatus ss = symres_type(&variant->type_node);
+        if (ss != Symres_Success) {
+            u_node->flags &= ~Ast_Flag_Type_Is_Resolved;
+            scope_leave();
+            return ss;
+        }
+    }
+
+    scope_leave();
     return Symres_Success;
 }
 
@@ -190,6 +243,7 @@ static SymresStatus symres_type(AstType** type) {
         }
 
         case Ast_Kind_Struct_Type: SYMRES(struct_type, (AstStructType *) *type); break;
+        case Ast_Kind_Union_Type:  SYMRES(union_type, (AstUnionType *) *type); break;
         case Ast_Kind_Array_Type: {
             AstArrayType* a_node = (AstArrayType *) *type;
 
@@ -203,6 +257,12 @@ static SymresStatus symres_type(AstType** type) {
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* pst_node = (AstPolyStructType *) *type;
             assert(pst_node->scope);
+            break;
+        }
+
+        case Ast_Kind_Poly_Union_Type: {
+            AstPolyUnionType* put_node = (AstPolyUnionType *) *type;
+            assert(put_node->scope);
             break;
         }
 
@@ -276,7 +336,8 @@ static SymresStatus symres_call(AstCall** pcall) {
     SYMRES(arguments, &call->args);
 
     AstNode* callee = strip_aliases((AstNode *) call->callee);
-    if (callee->kind == Ast_Kind_Poly_Struct_Type) {
+    if (callee->kind == Ast_Kind_Poly_Struct_Type ||
+        callee->kind == Ast_Kind_Poly_Union_Type) {
         *pcall = (AstCall *) convert_call_to_polycall(call);
         SYMRES(type, (AstType **) pcall);
         return Symres_Success;
@@ -311,7 +372,9 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
     if (expr->kind == Ast_Kind_Struct_Type ||
         expr->kind == Ast_Kind_Poly_Struct_Type ||
         expr->kind == Ast_Kind_Enum_Type ||
-        expr->kind == Ast_Kind_Type_Raw_Alias) {
+        expr->kind == Ast_Kind_Type_Raw_Alias ||
+        expr->kind == Ast_Kind_Union_Type ||
+        expr->kind == Ast_Kind_Poly_Union_Type) {
 
         force_a_lookup = 1;
     }
@@ -760,6 +823,11 @@ static SymresStatus symres_case(AstSwitchCase *casenode) {
         }
     }
 
+    if (casenode->capture) {
+        casenode->block->scope = scope_create(context.ast_alloc, current_scope, casenode->block->token->pos);
+        symbol_introduce(casenode->block->scope, casenode->capture->token, (AstNode *) casenode->capture);
+    }
+
     SYMRES(block, casenode->block);
     return Symres_Success;
 }
@@ -1190,11 +1258,14 @@ static SymresStatus symres_package(AstPackage* package) {
 }
 
 static SymresStatus symres_enum(AstEnumType* enum_node) {
-    if (enum_node->backing->kind == Ast_Kind_Symbol) SYMRES(symbol, (AstNode **) &enum_node->backing);
-    if (enum_node->backing == NULL) return Symres_Error;
+    if (!enum_node->backing_type) {
+        if (enum_node->backing == NULL) return Symres_Error;
+        if (enum_node->backing->kind == Ast_Kind_Symbol) SYMRES(symbol, (AstNode **) &enum_node->backing);
+
+        enum_node->backing_type = type_build_from_ast(context.ast_alloc, enum_node->backing);
+    }
 
     if (enum_node->scope == NULL) {
-        enum_node->backing_type = type_build_from_ast(context.ast_alloc, enum_node->backing);
         enum_node->scope = scope_create(context.ast_alloc, current_scope, enum_node->token->pos);
 
         type_build_from_ast(context.ast_alloc, (AstType *) enum_node);

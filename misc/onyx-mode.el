@@ -42,7 +42,7 @@
   '("cast" "it" "sizeof" "alignof" "typeof"))
 
 (defconst onyx-keywords
-  '("if" "elseif" "else" "do" "while" "for" "switch" "case" "struct" "enum"
+  '("if" "elseif" "else" "do" "while" "for" "switch" "case" "struct" "enum" "union"
     "return" "continue" "break" "fallthrough" "defer" "macro" "package"
     "use" "interface" "where"))
 

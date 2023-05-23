@@ -79,11 +79,11 @@ open :: (path: str, mode := OpenMode.Read) -> Result(File, os.FileError) {
     };
 
     file_data, error := fs.__file_open(path, mode);
-    if error != .None do return .{ .Err, .{error=error} };
+    if error != .None do return .{ Err = error };
 
     file.data = file_data;
     file.vtable = &fs.__file_stream_vtable;
-    return .{ .Ok, .{value=file} };
+    return .{ Ok = file };
 }
 
 close :: (file: &File) {
@@ -158,10 +158,10 @@ file_logger_open :: (filename: str, allocator := context.allocator) -> Result(&F
         raw_free(allocator, file_logger.file);
         raw_free(allocator, file_logger);
 
-        return return .{ .Err, .{error = "Unable to open file for logging."} };
+        return return .{ Err = "Unable to open file for logging." };
     });
 
-    return .{ .Ok, .{ value=file_logger } };
+    return .{ Ok = file_logger };
 }
 
 file_logger_use :: (logger: &File_Logger) {

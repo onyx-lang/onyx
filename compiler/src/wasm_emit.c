@@ -34,7 +34,8 @@ static b32 onyx_type_is_stored_in_memory(Type *type) {
     if (type_struct_is_just_one_basic_value(type)) return 0;
 
     return type->kind == Type_Kind_Struct
-        || type->kind == Type_Kind_DynArray;
+        || type->kind == Type_Kind_DynArray
+        || type->kind == Type_Kind_Union;
 }
 
 static WasmType onyx_type_to_wasm_type(Type* type) {
@@ -982,24 +983,29 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     i32 store_size  = type_size_of(type);
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer || type->kind == Type_Kind_MultiPointer;
 
-    if (is_basic && (type->Basic.flags & Basic_Flag_Pointer)) {
+    if (!is_basic) {
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical,
+            "Failed to generate store instruction for type '%s'. (compiler bug)",
+            type_get_name(type));
+    }
+
+    if (type->Basic.flags & Basic_Flag_Pointer) {
         WID(NULL, WI_I32_STORE, ((WasmInstructionData) { 2, offset }));
-    } else if (is_basic && ((type->Basic.flags & Basic_Flag_Integer)
-                         || (type->Basic.flags & Basic_Flag_Boolean)
-                         || (type->Basic.flags & Basic_Flag_Type_Index))) {
+    } else if ((type->Basic.flags & Basic_Flag_Integer)
+               || (type->Basic.flags & Basic_Flag_Boolean)
+               || (type->Basic.flags & Basic_Flag_Type_Index)) {
         if      (store_size == 1)   WID(NULL, WI_I32_STORE_8,  ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 2)   WID(NULL, WI_I32_STORE_16, ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 4)   WID(NULL, WI_I32_STORE,    ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 8)   WID(NULL, WI_I64_STORE,    ((WasmInstructionData) { alignment, offset }));
-    } else if (is_basic && (type->Basic.flags & Basic_Flag_Float)) {
+    } else if (type->Basic.flags & Basic_Flag_Float) {
         if      (store_size == 4)   WID(NULL, WI_F32_STORE, ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 8)   WID(NULL, WI_F64_STORE, ((WasmInstructionData) { alignment, offset }));
-    } else if (is_basic && (type->Basic.flags & Basic_Flag_SIMD)) {
+    } else if (type->Basic.flags & Basic_Flag_SIMD) {
         WID(NULL, WI_V128_STORE, ((WasmInstructionData) { alignment, offset }));
-    } else {
-        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical,
-            "Failed to generate store instruction for type '%s'.",
-            type_get_name(type));
+    } else if (type->Basic.kind == Basic_Kind_Void) {
+        // Do nothing, but drop the destination pointer.
+        WI(NULL, WI_DROP);
     }
 
     *pcode = code;
@@ -1619,8 +1625,11 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         block_num++;
     }
 
+    u64 union_capture_idx = 0;
+
     switch (switch_node->switch_kind) {
-        case Switch_Kind_Integer: {
+        case Switch_Kind_Integer:
+        case Switch_Kind_Union: {
             u64 count = switch_node->max_case + 1 - switch_node->min_case;
             BranchTable* bt = bh_alloc(mod->extended_instr_alloc, sizeof(BranchTable) + sizeof(u32) * count);
             bt->count = count;
@@ -1645,6 +1654,14 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
             // to the second block, and so on.
             WID(switch_node->expr->token, WI_BLOCK_START, 0x40);
             emit_expression(mod, &code, switch_node->expr);
+
+            if (switch_node->switch_kind == Switch_Kind_Union) {
+                assert(switch_node->expr->type->kind == Type_Kind_Union);
+                union_capture_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+                WIL(NULL, WI_LOCAL_TEE, union_capture_idx);
+                emit_load_instruction(mod, &code, switch_node->expr->type->Union.tag_type, 0);
+            }
+
             if (switch_node->min_case != 0) {
                 if (onyx_type_to_wasm_type(switch_node->expr->type) == WASM_TYPE_INT64) {
                     WI(switch_node->expr->token, WI_I32_FROM_I64);
@@ -1682,6 +1699,34 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
 
         u64 bn = bh_imap_get(&block_map, (u64) sc->block);
 
+        if (sc->capture) {
+            assert(union_capture_idx != 0);
+
+            if (sc->capture_is_by_pointer) {
+                u64 capture_pointer_local = emit_local_allocation(mod, &code, (AstTyped *) sc->capture);
+
+                WIL(NULL, WI_LOCAL_GET, union_capture_idx);
+                WIL(NULL, WI_PTR_CONST, switch_node->expr->type->Union.alignment);
+                WI(NULL, WI_PTR_ADD);
+
+                WIL(NULL, WI_LOCAL_SET, capture_pointer_local);
+
+            } else {
+                sc->capture->flags |= Ast_Flag_Decl_Followed_By_Init;
+                sc->capture->flags |= Ast_Flag_Address_Taken;
+
+                emit_local_allocation(mod, &code, (AstTyped *) sc->capture);
+                emit_location(mod, &code, (AstTyped *) sc->capture);
+
+                WIL(NULL, WI_LOCAL_GET, union_capture_idx);
+                WIL(NULL, WI_PTR_CONST, switch_node->expr->type->Union.alignment);
+                WI(NULL, WI_PTR_ADD);
+                
+                WIL(NULL, WI_I32_CONST, type_size_of(sc->capture->type));
+                emit_wasm_copy(mod, &code, NULL);
+            }
+        }
+
         // Maybe the Symbol Frame idea should be controlled as a block_flag?
         debug_enter_symbol_frame(mod);
         emit_block(mod, &code, sc->block, 0);
@@ -1699,6 +1744,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         emit_block(mod, &code, switch_node->default_case, 0);
     }
 
+    if (union_capture_idx != 0) local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     emit_leave_structured_block(mod, &code);
 
     bh_imap_free(&block_map);
@@ -3789,6 +3835,14 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
 
     if (to->kind == Type_Kind_Distinct || from->kind == Type_Kind_Distinct) {
         // Nothing needs to be done because they are identical
+        *pcode = code;
+        return;
+    }
+
+    if (from->kind == Type_Kind_Union) {
+        // This should be check in the checker that are only casting
+        // to the union's tag_type.
+        emit_load_instruction(mod, &code, from->Union.tag_type, 0);
         *pcode = code;
         return;
     }

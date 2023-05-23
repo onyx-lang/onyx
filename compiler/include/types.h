@@ -103,6 +103,14 @@ typedef enum StructProcessingStatus {
     SPS_Uses_Done,
 } StructProcessingStatus;
 
+typedef struct UnionVariant {
+    char *name;
+    Type *type;
+    u32 tag_value;
+    bh_arr(struct AstTyped *) meta_tags;
+    struct OnyxToken *token;
+} UnionVariant;
+
 #define TYPE_KINDS \
     TYPE_KIND(Basic, TypeBasic)                                   \
     TYPE_KIND(Pointer, struct {                                   \
@@ -153,7 +161,23 @@ typedef enum StructProcessingStatus {
     TYPE_KIND(Distinct, struct {                                  \
         char* name;                                               \
         Type* base_type;                                          \
-    })
+    })                                                            \
+    TYPE_KIND(Union, struct {                                     \
+        u32 size;                                                 \
+        u32 alignment;                                            \
+        char* name;                                               \
+        Type* tag_type;                                           \
+        Table(UnionVariant *) variants;                           \
+        bh_arr(UnionVariant *) variants_ordered;                  \
+        bh_arr(struct AstPolySolution) poly_sln;                  \
+        struct AstType *constructed_from;                         \
+        bh_arr(struct AstTyped *) meta_tags;                      \
+    })                                                            \
+    TYPE_KIND(PolyUnion, struct {                                 \
+        char* name;                                               \
+        bh_arr(struct AstTyped *) meta_tags;                      \
+    })                                                            \
+
 
 
 typedef enum TypeKind {
@@ -257,7 +281,7 @@ b32 type_is_structlike_strict(Type* type);
 u32 type_structlike_mem_count(Type* type);
 u32 type_structlike_is_simple(Type* type);
 b32 type_is_sl_constructable(Type* type);
-b32 type_struct_constructed_from_poly_struct(Type* struct_type, struct AstType* from);
+b32 type_constructed_from_poly(Type* base, struct AstType* from);
 Type* type_struct_is_just_one_basic_value(Type *type);
 
 #endif // #ifndef ONYX_TYPES

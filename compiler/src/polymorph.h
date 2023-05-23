@@ -386,24 +386,29 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
             }
 
             case Ast_Kind_Poly_Call_Type: {
-                if (elem.actual->kind != Type_Kind_Struct) break;
-                if (bh_arr_length(elem.actual->Struct.poly_sln) != bh_arr_length(((AstPolyCallType *) elem.type_expr)->params)) break;
+                if (elem.actual->kind != Type_Kind_Struct && elem.actual->kind != Type_Kind_Union) break;
+
+                bh_arr(AstPolySolution) slns;
+                if (elem.actual->kind == Type_Kind_Struct) slns = elem.actual->Struct.poly_sln;
+                if (elem.actual->kind == Type_Kind_Union)  slns = elem.actual->Union.poly_sln;
+
+                if (bh_arr_length(slns) != bh_arr_length(((AstPolyCallType *) elem.type_expr)->params)) break;
 
                 AstPolyCallType* pt = (AstPolyCallType *) elem.type_expr;
 
                 fori (i, 0, bh_arr_length(pt->params)) {
-                    PolySolutionKind kind = elem.actual->Struct.poly_sln[i].kind;
+                    PolySolutionKind kind = slns[i].kind;
                     if (kind == PSK_Type) {
                         bh_arr_push(elem_queue, ((PolySolveElem) {
                             .kind = kind,
                             .type_expr = (AstType *) pt->params[i],
-                            .actual = elem.actual->Struct.poly_sln[i].type,
+                            .actual = slns[i].type,
                         }));
                     } else {
                         bh_arr_push(elem_queue, ((PolySolveElem) {
                             .kind = kind,
                             .type_expr = (AstType *) pt->params[i],
-                            .value = elem.actual->Struct.poly_sln[i].value,
+                            .value = slns[i].value,
                         }));
                     }
                 }
@@ -648,11 +653,6 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
     } else {
         resolve_expression_type(value);
 
-        if ((value->flags & Ast_Flag_Comptime) == 0) {
-            if (err_msg) *err_msg = "Expected compile-time known argument here.";
-            return;
-        }
-
         param_type = type_build_from_ast(context.ast_alloc, param_type_expr);
         if (param_type == NULL) {
             flag_to_yield = 1;
@@ -679,7 +679,12 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
 
         if (tm == TYPE_MATCH_YIELD) flag_to_yield = 1;
 
-        *resolved = ((PolySolveResult) { PSK_Value, value });
+        if ((value_to_use->flags & Ast_Flag_Comptime) == 0) {
+            if (err_msg) *err_msg = "Expected compile-time known argument here.";
+            return;
+        }
+
+        *resolved = ((PolySolveResult) { PSK_Value, value_to_use });
     }
 
     if (orig_value->kind == Ast_Kind_Argument) {
@@ -982,6 +987,18 @@ b32 potentially_convert_function_to_polyproc(AstFunction *func) {
                     break;
                 }
 
+                case Ast_Kind_Poly_Union_Type: {
+                    AutoPolymorphVariable apv;
+                    apv.idx = param_idx;
+                    apv.base_type = param->local->type_node;
+                    apv.variable_count = bh_arr_length(((AstPolyUnionType *) param_type)->poly_params);
+                    apv.replace = to_replace;
+
+                    bh_arr_push(auto_vars, apv);
+                    done = 1;
+                    break;
+                }
+
                 default: done = 1; break;
             }
         }
@@ -1008,7 +1025,8 @@ b32 potentially_convert_function_to_polyproc(AstFunction *func) {
 
         AstType *dealiased_base_type = (AstType *) strip_aliases((AstNode *) apv->base_type);
 
-        if (dealiased_base_type->kind == Ast_Kind_Poly_Struct_Type) {
+        if (dealiased_base_type->kind == Ast_Kind_Poly_Struct_Type
+            || dealiased_base_type->kind == Ast_Kind_Poly_Union_Type) {
             pp.type_expr = (AstType *) pcall;
         } else {
             pp.type_expr = apv->base_type;
@@ -1053,24 +1071,29 @@ b32 potentially_convert_function_to_polyproc(AstFunction *func) {
 // The above documentation is very incorrect but I don't want to fix it right now. Basically, polymorphic
 // structures now have a delay instantiation phase and are not forced to be completed immediately.
 
-char* build_poly_struct_name(AstPolyStructType* ps_type, Type* cs_type) {
+char* build_poly_struct_name(char *name, Type* type) {
     char name_buf[256];
     fori (i, 0, 256) name_buf[i] = 0;
 
 
     // Special case for `? T`
-    if (cs_type->Struct.constructed_from == builtin_optional_type) {
+    if (type->kind == Type_Kind_Union
+        && type->Union.constructed_from == builtin_optional_type) {
         strncat(name_buf, "? ", 255);
-        strncat(name_buf, type_get_name(cs_type->Struct.poly_sln[0].type), 255);
+        strncat(name_buf, type_get_name(type->Union.poly_sln[0].type), 255);
 
         return bh_aprintf(global_heap_allocator, "%s", name_buf);
     }
 
+    bh_arr(AstPolySolution) slns = NULL;
+    if (type->kind == Type_Kind_Struct) slns = type->Struct.poly_sln;
+    if (type->kind == Type_Kind_Union)  slns = type->Union.poly_sln;
 
-    strncat(name_buf, ps_type->name, 255);
+
+    strncat(name_buf, name, 255);
     strncat(name_buf, "(", 255);
-    bh_arr_each(AstPolySolution, ptype, cs_type->Struct.poly_sln) {
-        if (ptype != cs_type->Struct.poly_sln)
+    bh_arr_each(AstPolySolution, ptype, slns) {
+        if (ptype != slns)
             strncat(name_buf, ", ", 255);
 
         // This logic will have to be other places as well.
@@ -1151,7 +1174,7 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
         cs_type->Struct.constructed_from = (AstType *) ps_type;
         
         if (cs_type->Struct.poly_sln == NULL) cs_type->Struct.poly_sln = bh_arr_copy(global_heap_allocator, slns);
-        if (cs_type->Struct.name == NULL)     cs_type->Struct.name = build_poly_struct_name(ps_type, cs_type);
+        if (cs_type->Struct.name == NULL)     cs_type->Struct.name = build_poly_struct_name(ps_type->name, cs_type);
 
         return cs_type;
     }
@@ -1176,5 +1199,78 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
 
     shput(ps_type->concrete_structs, unique_key, concrete_struct);
     add_entities_for_node(NULL, (AstNode *) concrete_struct, sln_scope, NULL);
+    return NULL;
+}
+
+Type* polymorphic_union_lookup(AstPolyUnionType* pu_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed) {
+    if (pu_type->scope == NULL) {
+        return NULL;
+    }
+
+    assert(!pu_type->base_union->scope);
+
+    if (pu_type->concrete_unions == NULL) {
+        sh_new_arena(pu_type->concrete_unions);
+    }
+
+    if (bh_arr_length(slns) != bh_arr_length(pu_type->poly_params)) {
+        onyx_report_error(pos, Error_Critical, "Wrong number of arguments for '%s'. Expected %d, got %d.",
+            pu_type->name,
+            bh_arr_length(pu_type->poly_params),
+            bh_arr_length(slns));
+
+        return NULL;
+    }
+
+    i32 i = 0;
+    bh_arr_each(AstPolySolution, sln, slns) {
+        sln->poly_sym = (AstNode *) &pu_type->poly_params[i];
+        i++;
+    }
+
+    char* unique_key = build_poly_slns_unique_key(slns);
+    i32 index = shgeti(pu_type->concrete_unions, unique_key);
+    if (index != -1) {
+        AstUnionType* concrete_union = pu_type->concrete_unions[index].value;
+
+        if (concrete_union->entity->state < Entity_State_Check_Types) {
+            return NULL;
+        }
+
+        if (concrete_union->entity->state == Entity_State_Failed) {
+            return (Type *) &node_that_signals_failure;
+        }
+
+        Type* cu_type = type_build_from_ast(context.ast_alloc, (AstType *) concrete_union);
+        if (!cu_type) return NULL;
+
+        cu_type->Union.constructed_from = (AstType *) pu_type;
+        
+        if (cu_type->Union.poly_sln == NULL) cu_type->Union.poly_sln = bh_arr_copy(global_heap_allocator, slns);
+        cu_type->Union.name = build_poly_struct_name(pu_type->name, cu_type);
+
+        return cu_type;
+    }
+
+    Scope* sln_scope = scope_create(context.ast_alloc, pu_type->scope, pu_type->token->pos);
+    insert_poly_slns_into_scope(sln_scope, slns);
+
+    AstUnionType* concrete_union = (AstUnionType *) ast_clone(context.ast_alloc, pu_type->base_union);
+    concrete_union->scope = scope_create(context.ast_alloc, sln_scope, pu_type->token->pos);
+    concrete_union->polymorphic_error_loc = pos;
+    BH_MASK_SET(concrete_union->flags, !error_if_failed, Ast_Flag_Header_Check_No_Error);
+
+    i64 arg_count = bh_arr_length(pu_type->poly_params);
+    bh_arr_new(global_heap_allocator, concrete_union->polymorphic_argument_types, arg_count);
+    bh_arr_set_length(concrete_union->polymorphic_argument_types, arg_count);
+    concrete_union->polymorphic_arguments = bh_arr_copy(global_heap_allocator, slns);
+    concrete_union->name = pu_type->name;
+
+    fori (i, 0, (i64) bh_arr_length(pu_type->poly_params)) {
+        concrete_union->polymorphic_argument_types[i] = (AstType *) ast_clone(context.ast_alloc, pu_type->poly_params[i].type_node);
+    }
+
+    shput(pu_type->concrete_unions, unique_key, concrete_union);
+    add_entities_for_node(NULL, (AstNode *) concrete_union, sln_scope, NULL);
     return NULL;
 }

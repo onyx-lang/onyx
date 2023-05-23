@@ -1,0 +1,8 @@
+int(123)
+float(100.0000)
+string("Working")
+This is a string: This works
+This is an integer: 9876
+123
+456
+Error(Process_Error("bad data"))

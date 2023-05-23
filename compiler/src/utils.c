@@ -330,9 +330,45 @@ all_types_peeled_off:
             return result;
         }
 
+        case Ast_Kind_Union_Type: {
+            AstUnionType* utype = (AstUnionType *) node;
+
+            AstNode *result = NULL;
+            if (utype->scope) {
+                Scope **tmp_parent;
+                Scope *tmp_parent_backup;
+                if (utype->utcache && utype->utcache->Union.constructed_from) {
+                    // Structs scope -> Poly Solution Scope -> Poly Struct Scope -> Enclosing Scope
+                    tmp_parent = &utype->scope->parent->parent->parent;
+                } else {
+                    tmp_parent = &utype->scope->parent;
+                }
+
+                tmp_parent_backup = *tmp_parent;
+                *tmp_parent = NULL;
+
+                result = symbol_raw_resolve(utype->scope, symbol);
+
+                *tmp_parent = tmp_parent_backup;
+            }
+
+            if (result == NULL && utype->utcache != NULL) {
+                if (!strcmp(symbol, "tag_enum")) {
+                    result = (AstNode *) utype->utcache->Union.tag_type->ast_type;
+                }
+            }
+
+            return result;
+        }
+
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* stype = ((AstPolyStructType *) node);
             return symbol_raw_resolve(stype->scope, symbol);
+        }
+
+        case Ast_Kind_Poly_Union_Type: {
+            AstPolyUnionType* utype = ((AstPolyUnionType *) node);
+            return symbol_raw_resolve(utype->scope, symbol);
         }
 
         case Ast_Kind_Poly_Call_Type: {
@@ -1350,6 +1386,16 @@ all_types_peeled_off:
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* pstype = (AstPolyStructType *) node;
             return &pstype->scope;
+        }
+
+        case Ast_Kind_Union_Type: {
+            AstUnionType* utype = (AstUnionType *) node;
+            return &utype->scope;
+        }
+
+        case Ast_Kind_Poly_Union_Type: {
+            AstPolyUnionType* putype = (AstPolyUnionType *) node;
+            return &putype->scope;
         }
 
         case Ast_Kind_Poly_Call_Type: {

@@ -46,6 +46,8 @@ static const char* ast_node_names[] = {
     "STRUCT TYPE",
     "POLYMORPHIC STRUCT TYPE",
     "POLYMORPHIC STRUCT CALL TYPE",
+    "UNION TYPE",
+    "POLYMORPHIC UNION TYPE",
     "ENUM TYPE",
     "TYPE_ALIAS",
     "TYPE RAW ALIAS",
@@ -55,6 +57,7 @@ static const char* ast_node_names[] = {
     "TYPE_END (BAD)",
 
     "STRUCT MEMBER",
+    "UNION VARIANT",
     "ENUM VALUE",
 
     "NUMERIC LITERAL",
@@ -759,8 +762,8 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // If the destination type is an optional, and the node's type is a value of
     // the same underlying type, then we can construct an optional with a value
     // implicitly. This makes working with optionals barable.
-    if (type_struct_constructed_from_poly_struct(type, builtin_optional_type)) {
-        TypeMatch match = unify_node_and_type_(pnode, type->Struct.poly_sln[0].type, permanent);
+    if (type_constructed_from_poly(type, builtin_optional_type)) {
+        TypeMatch match = unify_node_and_type_(pnode, type->Union.poly_sln[0].type, permanent);
         if (match == TYPE_MATCH_SUCCESS) {
             if (permanent) {
                 AstStructLiteral *opt_lit = make_optional_literal_some(context.ast_alloc, node, type);
@@ -1236,7 +1239,11 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
         return 0;
     }
 
-
+    if (from->kind == Type_Kind_Union && to->kind == Type_Kind_Enum) {
+        if (from->Union.tag_type->id == to->id) {
+            return 1;
+        }
+    }
 
     if (from->kind == Type_Kind_Enum) from = from->Enum.backing;
     if (to->kind == Type_Kind_Enum) to = to->Enum.backing;
@@ -1591,10 +1598,13 @@ AstStructLiteral* make_optional_literal_some(bh_allocator a, AstTyped *expr, Typ
 
     arguments_initialize(&opt_lit->args);
     arguments_ensure_length(&opt_lit->args, 2);
-    opt_lit->args.values[0] = (AstTyped *) make_bool_literal(a, 1);
+    opt_lit->args.values[0] = (AstTyped *) make_int_literal(a, 2);
     opt_lit->args.values[1] = expr;
 
     opt_lit->type = opt_type;
+    opt_lit->args.values[0]->type = opt_type->Union.tag_type;
+
+    opt_lit->flags |= Ast_Flag_Has_Been_Checked;
     return opt_lit;
 }
 

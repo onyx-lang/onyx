@@ -423,9 +423,9 @@ Iterator :: struct (Iter_Type: type_expr) {
     for types like '? i32'. In other words, '? i32' is equivalent to
     'Optional(i32)'.
 """
-Optional :: struct (Value_Type: type_expr) {
-    has_value: bool;
-    value: Value_Type;
+Optional :: union (Value_Type: type_expr) {
+    None: void;
+    Some: Value_Type;
 }
 
 

@@ -291,6 +291,8 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             // fallthrough
         }
 
+        case Ast_Kind_Union_Type:
+        case Ast_Kind_Poly_Union_Type:
         case Ast_Kind_Poly_Struct_Type:
         case Ast_Kind_Type_Alias: {
             ent.type = Entity_Type_Type_Alias;
