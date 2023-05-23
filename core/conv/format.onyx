@@ -739,7 +739,9 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 output->write(variant.name);
                 if variant.type != void {
                     output->write("(");
-                    format_any(output, formatting, any.{ cast([&] u8) v.data + u.alignment, variant.type });
+                    format := *formatting;
+                    format.quote_strings = true;
+                    format_any(output, &format, any.{ cast([&] u8) v.data + u.alignment, variant.type });
                     output->write(")");
                 }
             }

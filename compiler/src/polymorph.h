@@ -987,6 +987,18 @@ b32 potentially_convert_function_to_polyproc(AstFunction *func) {
                     break;
                 }
 
+                case Ast_Kind_Poly_Union_Type: {
+                    AutoPolymorphVariable apv;
+                    apv.idx = param_idx;
+                    apv.base_type = param->local->type_node;
+                    apv.variable_count = bh_arr_length(((AstPolyUnionType *) param_type)->poly_params);
+                    apv.replace = to_replace;
+
+                    bh_arr_push(auto_vars, apv);
+                    done = 1;
+                    break;
+                }
+
                 default: done = 1; break;
             }
         }
@@ -1013,7 +1025,8 @@ b32 potentially_convert_function_to_polyproc(AstFunction *func) {
 
         AstType *dealiased_base_type = (AstType *) strip_aliases((AstNode *) apv->base_type);
 
-        if (dealiased_base_type->kind == Ast_Kind_Poly_Struct_Type) {
+        if (dealiased_base_type->kind == Ast_Kind_Poly_Struct_Type
+            || dealiased_base_type->kind == Ast_Kind_Poly_Union_Type) {
             pp.type_expr = (AstType *) pcall;
         } else {
             pp.type_expr = apv->base_type;

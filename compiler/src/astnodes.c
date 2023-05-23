@@ -1603,6 +1603,8 @@ AstStructLiteral* make_optional_literal_some(bh_allocator a, AstTyped *expr, Typ
 
     opt_lit->type = opt_type;
     opt_lit->args.values[0]->type = opt_type->Union.tag_type;
+
+    opt_lit->flags |= Ast_Flag_Has_Been_Checked;
     return opt_lit;
 }
 

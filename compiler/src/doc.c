@@ -278,8 +278,16 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
             bh_buffer_write_string(buffer, ((AstStructType *) node)->name);
             return;
 
+        case Ast_Kind_Union_Type:
+            bh_buffer_write_string(buffer, ((AstUnionType *) node)->name);
+            return;
+
         case Ast_Kind_Poly_Struct_Type:
             bh_buffer_write_string(buffer, ((AstPolyStructType *) node)->name);
+            return;
+
+        case Ast_Kind_Poly_Union_Type:
+            bh_buffer_write_string(buffer, ((AstPolyUnionType *) node)->name);
             return;
 
         case Ast_Kind_Poly_Call_Type:

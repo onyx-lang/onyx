@@ -5,13 +5,21 @@ create_optional :: () -> ? i32 {
     return .{ Some = 123 };
 }
 
-new_optional_test :: () {
+create_result :: () -> Result(i32, str) {
+    return .{ Ok = 987 };
+    // return .{ Err = "oh no there was error :(" };
+}
+
+new_optional_test :: () -> Result(void, str) {
     v := create_optional();
-    v2 := Optional(str).{ None = .{} };
+    v2: ?str = "asdf";
     println(v);
     println(v2);
 
     println(v->unwrap());
+
+    r := create_result()?;
+    println(r);
 }
 
 union_is :: macro (u: $U, $variant: U.tag_enum) -> bool {
@@ -87,7 +95,7 @@ simple_test :: () {
     println(u);
 }
 
-main :: () {simple_test(); link_test(); new_optional_test();}
+main :: () {simple_test(); link_test(); new_optional_test()->err()? |> println();}
 
 Link :: union {
     End: void;
@@ -97,15 +105,15 @@ Link :: union {
     }
 }
 
-print_links :: (l: Link) {
+print_links :: (l: &Link) {
     walker := l;
     while true {
-        switch walker {
+        switch *walker {
             case .End do break break;
 
             case .Next => &next {
                 printf("{}\n", next.data);
-                walker = *next.next;
+                walker = next.next;
             }
         }
     }
@@ -124,7 +132,7 @@ link_test :: () {
         }
     };
     
-    print_links(l);
+    print_links(&l);
 }
 
 // main :: () { link_test(); }
