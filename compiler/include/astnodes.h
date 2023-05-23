@@ -1060,6 +1060,16 @@ struct AstUnionVariant {
     AstTyped_base;
     bh_arr(AstTyped *) meta_tags;
 };
+struct AstPolyUnionType {
+    AstType_base;
+    char *name;
+
+    Scope *scope;
+    bh_arr(AstPolyStructParam) poly_params;
+    Table(AstUnionType *) concrete_unions;
+
+    AstUnionType* base_union;
+};
 struct AstEnumType {
     AstType_base;
     char *name;
@@ -2026,6 +2036,7 @@ void expand_macro(AstCall** pcall, AstFunction* template);
 AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed);
 
 Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
+Type* polymorphic_union_lookup(AstPolyUnionType* pu_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
 
 b32 resolve_intrinsic_interface_constraint(AstConstraint *constraint);
 

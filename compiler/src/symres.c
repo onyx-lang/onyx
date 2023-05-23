@@ -172,20 +172,20 @@ static SymresStatus symres_union_type(AstUnionType* u_node) {
     assert(u_node->scope);
     scope_enter(u_node->scope);
     
-    // if (u_node->polymorphic_argument_types) {
-    //     assert(u_node->polymorphic_arguments);
+    if (u_node->polymorphic_argument_types) {
+        assert(u_node->polymorphic_arguments);
 
-    //     SymresStatus ss = Symres_Success, result;
-    //     fori (i, 0, (i64) bh_arr_length(u_node->polymorphic_argument_types)) {
-    //         result = symres_type(&u_node->polymorphic_argument_types[i]);
-    //         if (result > ss) ss = result;
+        SymresStatus ss = Symres_Success, result;
+        fori (i, 0, (i64) bh_arr_length(u_node->polymorphic_argument_types)) {
+            result = symres_type(&u_node->polymorphic_argument_types[i]);
+            if (result > ss) ss = result;
 
-    //         if (u_node->polymorphic_arguments[i].value) {
-    //             result = symres_expression(&u_node->polymorphic_arguments[i].value);
-    //             if (result > ss) ss = result;
-    //         }
-    //     }
-    // }
+            if (u_node->polymorphic_arguments[i].value) {
+                result = symres_expression(&u_node->polymorphic_arguments[i].value);
+                if (result > ss) ss = result;
+            }
+        }
+    }
 
     if (u_node->constraints.constraints) {
         bh_arr_each(AstConstraint *, constraint, u_node->constraints.constraints) {
@@ -260,6 +260,12 @@ static SymresStatus symres_type(AstType** type) {
             break;
         }
 
+        case Ast_Kind_Poly_Union_Type: {
+            AstPolyUnionType* put_node = (AstPolyUnionType *) *type;
+            assert(put_node->scope);
+            break;
+        }
+
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pc_node = (AstPolyCallType *) *type;
 
@@ -330,7 +336,8 @@ static SymresStatus symres_call(AstCall** pcall) {
     SYMRES(arguments, &call->args);
 
     AstNode* callee = strip_aliases((AstNode *) call->callee);
-    if (callee->kind == Ast_Kind_Poly_Struct_Type) {
+    if (callee->kind == Ast_Kind_Poly_Struct_Type ||
+        callee->kind == Ast_Kind_Poly_Union_Type) {
         *pcall = (AstCall *) convert_call_to_polycall(call);
         SYMRES(type, (AstType **) pcall);
         return Symres_Success;
@@ -366,7 +373,8 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
         expr->kind == Ast_Kind_Poly_Struct_Type ||
         expr->kind == Ast_Kind_Enum_Type ||
         expr->kind == Ast_Kind_Type_Raw_Alias ||
-        expr->kind == Ast_Kind_Union_Type) {
+        expr->kind == Ast_Kind_Union_Type ||
+        expr->kind == Ast_Kind_Poly_Union_Type) {
 
         force_a_lookup = 1;
     }

@@ -1,6 +1,28 @@
 
 use core {*}
 
+NewOptional :: union (T: type_expr) {
+    None: void;
+    Some: T;
+}
+
+unwrap_optional :: (o: NewOptional($T)) -> T {
+    switch o {
+        case .Some => v do return v;
+        case .None do return .{};
+    }
+}
+
+new_optional_test :: () {
+    v := NewOptional(i32).{ Some = 123 };
+    v2 := NewOptional(str).{ None = .{} };
+    println(v);
+    println(v2);
+
+    v = .{ None = .{} };
+    println(unwrap_optional(v));
+}
+
 union_is :: macro (u: $U, $variant: U.tag_enum) -> bool {
     return cast(U.tag_enum, u) == variant;
 }
@@ -74,7 +96,7 @@ simple_test :: () {
     println(u);
 }
 
-main :: () {simple_test(); link_test();}
+main :: () {simple_test(); link_test(); new_optional_test();}
 
 Link :: union {
     End: void;

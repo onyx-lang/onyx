@@ -731,6 +731,48 @@ static u64 build_type_table(OnyxWasmModule* module) {
                 bh_arr_free(method_data);
                 break;
             }
+
+            case Type_Kind_PolyUnion: {
+                u32* tag_locations = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(type->PolyUnion.meta_tags));
+                memset(tag_locations, 0, sizeof(u32) * bh_arr_length(type->PolyUnion.meta_tags));
+
+                u32 name_base = table_buffer.length;
+                u32 name_length = strlen(type->PolyUnion.name);
+                bh_buffer_append(&table_buffer, type->PolyUnion.name, name_length);
+
+                u32 tags_count = bh_arr_length(type->PolyUnion.meta_tags);
+                i32 i = 0;
+                bh_arr_each(AstTyped *, tag, type->PolyUnion.meta_tags) {
+                    AstTyped* value = *tag;                        
+
+                    tag_locations[i] = build_constexpr(value, &table_buffer, &constexpr_ctx);
+                    if (tag_locations[i] == 0) {
+                        // Polymorphic structs are weird in this case, because the tag might not be constructed generically for
+                        // the polymorphic structure so it should only be constructed for actual solidified structures.
+                        // See core/containers/map.onyx with Custom_Format for an example.
+                        tags_count--;
+                    } else {
+                        i++;
+                    }
+                }
+
+                bh_buffer_align(&table_buffer, 8);
+                u32 tags_base = table_buffer.length;
+
+                fori (i, 0, tags_count) {
+                    WRITE_SLICE(tag_locations[i], type->PolyUnion.meta_tags[i]->type->id);
+                }
+
+                bh_buffer_align(&table_buffer, 8);
+                table_info[type_idx] = table_buffer.length;
+                bh_buffer_write_u32(&table_buffer, type->kind);
+                bh_buffer_write_u32(&table_buffer, 0);
+                bh_buffer_write_u32(&table_buffer, 0);
+                WRITE_SLICE(name_base, name_length);
+                WRITE_SLICE(tags_base, tags_count);
+
+                break;
+            }
         }
     }
 

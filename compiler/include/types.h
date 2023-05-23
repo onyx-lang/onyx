@@ -172,7 +172,11 @@ typedef struct UnionVariant {
         bh_arr(struct AstPolySolution) poly_sln;                  \
         struct AstType *constructed_from;                         \
         bh_arr(struct AstTyped *) meta_tags;                      \
-    })
+    })                                                            \
+    TYPE_KIND(PolyUnion, struct {                                 \
+        char* name;                                               \
+        bh_arr(struct AstTyped *) meta_tags;                      \
+    })                                                            \
 
 
 

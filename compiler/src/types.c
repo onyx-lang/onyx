@@ -567,11 +567,27 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             return NULL;
         }
 
+        case Ast_Kind_Poly_Union_Type: {
+            if (type_node->type_id != 0) return NULL;
+
+            Type* p_type = type_create(Type_Kind_PolyUnion, alloc, 0);
+            p_type->ast_type = type_node;
+            p_type->PolyUnion.name = ((AstPolyUnionType *) type_node)->name;
+            p_type->PolyUnion.meta_tags = ((AstPolyUnionType *) type_node)->base_union->meta_tags;
+
+            type_register(p_type);
+            return NULL;
+        }
+
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pc_type = (AstPolyCallType *) type_node;
             pc_type->callee = (AstType *) strip_aliases((AstNode *) pc_type->callee);
 
-            if (!(pc_type->callee && pc_type->callee->kind == Ast_Kind_Poly_Struct_Type)) {
+            if (!(pc_type->callee && (
+                    pc_type->callee->kind == Ast_Kind_Poly_Struct_Type ||
+                    pc_type->callee->kind == Ast_Kind_Poly_Union_Type
+                ))) {
+
                 // If it is an unresolved field access or symbol, just return because an error will be printed elsewhere.
                 if (pc_type->callee->kind == Ast_Kind_Field_Access || pc_type->callee->kind == Ast_Kind_Symbol) return NULL;
 
@@ -579,8 +595,6 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 onyx_report_error(pc_type->callee->token->pos, Error_Critical, "Here is the type trying to be instantiated. (%s)", onyx_ast_node_kind_string(pc_type->callee->kind));
                 return NULL;
             }
-
-            AstPolyStructType* ps_type = (AstPolyStructType *) pc_type->callee;
 
             bh_arr(AstPolySolution) slns = NULL;
             bh_arr_new(global_heap_allocator, slns, bh_arr_length(pc_type->params));
@@ -603,7 +617,15 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 }
             }
 
-            Type* concrete = polymorphic_struct_lookup(ps_type, slns, pc_type->token->pos, (pc_type->flags & Ast_Flag_Header_Check_No_Error) == 0);
+            Type* concrete = NULL;
+            if (pc_type->callee->kind == Ast_Kind_Poly_Struct_Type) {
+                AstPolyStructType* ps_type = (AstPolyStructType *) pc_type->callee;
+                concrete = polymorphic_struct_lookup(ps_type, slns, pc_type->token->pos, (pc_type->flags & Ast_Flag_Header_Check_No_Error) == 0);
+            }
+            else if (pc_type->callee->kind == Ast_Kind_Poly_Union_Type) {
+                AstPolyUnionType* pu_type = (AstPolyUnionType *) pc_type->callee;
+                concrete = polymorphic_union_lookup(pu_type, slns, pc_type->token->pos, (pc_type->flags & Ast_Flag_Header_Check_No_Error) == 0);
+            }
 
             // This should be copied in the previous function.
             // CLEANUP: Maybe don't copy it and just use this one since it is allocated on the heap?
@@ -611,7 +633,6 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
 
             if (!concrete) return NULL;
             if (concrete == (Type *) &node_that_signals_failure) return concrete;
-            concrete->Struct.constructed_from = (AstType *) ps_type;
             pc_type->resolved_type = concrete;
             return concrete;
         }
@@ -1266,6 +1287,9 @@ const char* type_get_name(Type* type) {
 
         case Type_Kind_PolyStruct:
             return type->PolyStruct.name;
+
+        case Type_Kind_PolyUnion:
+            return type->PolyUnion.name;
 
         case Type_Kind_Struct:
             if (type->Struct.name)

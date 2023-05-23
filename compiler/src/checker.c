@@ -713,7 +713,8 @@ CheckStatus check_call(AstCall** pcall) {
 
     if (call->kind == Ast_Kind_Call) {
         AstNode* callee = strip_aliases((AstNode *) call->callee);
-        if (callee->kind == Ast_Kind_Poly_Struct_Type) {
+        if (callee->kind == Ast_Kind_Poly_Struct_Type ||
+            callee->kind == Ast_Kind_Poly_Union_Type) {
             *pcall = (AstCall *) convert_call_to_polycall(call);
             CHECK(expression, (AstTyped **) pcall);
             return Check_Success;
@@ -2155,7 +2156,8 @@ CheckStatus check_expression(AstTyped** pexpr) {
         expr = *pexpr;
 
         // Don't try to construct a polystruct ahead of time because you can't.
-        if (expr->kind != Ast_Kind_Poly_Struct_Type) {
+        if (expr->kind != Ast_Kind_Poly_Struct_Type &&
+            expr->kind != Ast_Kind_Poly_Union_Type) {
             if (type_build_from_ast(context.ast_alloc, (AstType*) expr) == NULL) {
                 YIELD(expr->token->pos, "Trying to construct type.");
             }
@@ -2702,7 +2704,8 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* ofunc) {
     if (ofunc->expected_return_node) {
         AstType *expected_return_node = (AstType *) strip_aliases((AstNode *) ofunc->expected_return_node);
 
-        if (expected_return_node->kind == Ast_Kind_Poly_Struct_Type) {
+        if (expected_return_node->kind == Ast_Kind_Poly_Struct_Type ||
+            expected_return_node->kind == Ast_Kind_Poly_Union_Type) {
             //
             // When you declare the expected return type of a #match'ed procedure to
             // be a polymorphic structure type, a special case has to happen. By trying
@@ -2902,6 +2905,30 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
 }
 
 CheckStatus check_union(AstUnionType *u_node) {
+    if (u_node->polymorphic_argument_types) {
+        assert(u_node->polymorphic_arguments);
+
+        fori (i, 0, (i64) bh_arr_length(u_node->polymorphic_argument_types)) {
+            Type *arg_type = type_build_from_ast(context.ast_alloc, u_node->polymorphic_argument_types[i]);
+            if (arg_type == NULL) YIELD(u_node->polymorphic_argument_types[i]->token->pos, "Waiting to build type for polymorph argument.");
+
+            //
+            // This check should always be false, but it handles
+            // the case where somewhere a type was expected, but
+            // not enough values were provided. This is checked
+            // elsewhere when instantiating a polymorphic sturucture.
+            if (i >= bh_arr_length(u_node->polymorphic_arguments)
+                || !u_node->polymorphic_arguments[i].value) continue;
+
+            
+            TYPE_CHECK(&u_node->polymorphic_arguments[i].value, arg_type) {
+                ERROR_(u_node->polymorphic_arguments[i].value->token->pos, "Expected value of type %s, got %s.",
+                    type_get_name(arg_type),
+                    type_get_name(u_node->polymorphic_arguments[i].value->type));
+            }
+        }
+    }
+
     if (u_node->constraints.constraints) {
         u_node->constraints.produce_errors = (u_node->flags & Ast_Flag_Header_Check_No_Error) == 0;
 

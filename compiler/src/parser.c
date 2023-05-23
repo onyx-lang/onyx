@@ -2323,6 +2323,8 @@ static AstUnionType* parse_union(OnyxParser* parser) {
     OnyxToken* union_token = expect_token(parser, Token_Type_Keyword_Union);
 
     AstUnionType* u_node;
+    AstPolyUnionType* poly_union = NULL;
+
     u_node = make_node(AstUnionType, Ast_Kind_Union_Type);
     u_node->token = union_token;
 
@@ -2331,6 +2333,36 @@ static AstUnionType* parse_union(OnyxParser* parser) {
     type_create_scope(parser, &u_node->scope, u_node->token);
     Scope *scope_to_restore_parser_to = parser->current_scope;
     Scope *scope_symbols_in_unions_should_be_bound_to = u_node->scope;
+
+    if (consume_token_if_next(parser, '(')) {
+        bh_arr(AstPolyStructParam) poly_params = NULL;
+        bh_arr_new(global_heap_allocator, poly_params, 1);
+
+        while (!consume_token_if_next(parser, ')')) {
+            if (parser->hit_unexpected_token) return NULL;
+
+            OnyxToken* sym_token = expect_token(parser, Token_Type_Symbol);
+            expect_token(parser, ':');
+
+            AstType* param_type = parse_type(parser);
+
+            bh_arr_push(poly_params, ((AstPolyStructParam) {
+                .token = sym_token,
+                .type_node = param_type,
+                .type = NULL,
+            }));
+
+            if (parser->curr->type != ')')
+                expect_token(parser, ',');
+        }
+
+        poly_union = make_node(AstPolyUnionType, Ast_Kind_Poly_Union_Type);
+        poly_union->token = union_token;
+        poly_union->poly_params = poly_params;
+        poly_union->base_union = u_node;
+        poly_union->scope = u_node->scope;
+        u_node->scope = NULL;
+    }
 
     // Parse constraints clause
     if (parser->curr->type == Token_Type_Keyword_Where) {
@@ -2380,17 +2412,14 @@ static AstUnionType* parse_union(OnyxParser* parser) {
 
     parser->current_scope = scope_to_restore_parser_to;
 
-    ENTITY_SUBMIT(u_node);
-    return u_node;
+    if (poly_union != NULL) {
+        // NOTE: Not a UnionType
+        return (AstUnionType *) poly_union;
 
-    //if (poly_struct != NULL) {
-    //    // NOTE: Not a StructType
-    //    return (AstStructType *) poly_struct;
-
-    //} else {
-    //    ENTITY_SUBMIT(s_node);
-    //    return s_node;
-    //}
+    } else {
+        ENTITY_SUBMIT(u_node);
+        return u_node;
+    }
 }
 
 static AstInterface* parse_interface(OnyxParser* parser) {
@@ -3334,6 +3363,7 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
         case Ast_Kind_Enum_Type:
         case Ast_Kind_Distinct_Type:
         case Ast_Kind_Union_Type:
+        case Ast_Kind_Poly_Union_Type:
             ((AstStructType *) node)->name = generate_name_within_scope(parser, symbol);
             goto default_case;
 

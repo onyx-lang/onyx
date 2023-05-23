@@ -23,6 +23,7 @@ Type_Info :: struct {
         Enum               :: 0x0C;
         Distinct           :: 0x0D;
         Union              :: 0x0E;
+        Polymorphic_Union  :: 0x0F;
     }
 
     kind := Kind.Invalid;
@@ -212,6 +213,13 @@ Type_Info_Union :: struct {
         func: any;
     }
     methods: [] Method;
+}
+
+Type_Info_Polymorphic_Union :: struct {
+    use base : Type_Info;
+
+    name: str;
+    tags: [] any;
 }
 
 get_type_info :: (t: type_expr) -> &Type_Info {
