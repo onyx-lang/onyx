@@ -70,8 +70,8 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
     unwrap :: (r: #Self) -> r.Ok_Type {
         switch r {
             case .Ok => v do return v;
-            case #default {
-                msg := tprintf("Unwrapping Result with error '{}'.", r.__data.error);
+            case .Err => err {
+                msg := tprintf("Unwrapping Result with error '{}'.", err);
                 assert(false, msg);
                 return .{};
             }

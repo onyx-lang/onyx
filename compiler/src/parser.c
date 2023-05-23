@@ -1997,9 +1997,11 @@ static AstType* parse_type(OnyxParser* parser) {
                     pc_type->params = params;
 
                     *next_insertion = (AstType *) pc_type;
-                } else {
-                    next_insertion = NULL;
                 }
+
+                if (peek_token(0)->type != '.')
+                    next_insertion = NULL;
+
                 break;
             }
 
