@@ -1409,7 +1409,7 @@ static const StructMember func_members[] = {
 };
 
 static const StructMember union_members[] = {
-    // { 0, 0, NULL, "tag", NULL, NULL, -1, 0, 0 },
+    { 0, 0, NULL, "tag", NULL, NULL, -1, 0, 0 },
 };
 
 b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
@@ -1461,14 +1461,11 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
         }
 
         case Type_Kind_Union: {
-            // fori (i, 0, (i64) (sizeof(array_members) / sizeof(StructMember))) {
-            //     if (strcmp(array_members[i].name, member) == 0) {
-            //         *smem = array_members[i];
-            //         if (smem->idx == 0) smem->type = type->Union.tag_enum;
-
-            //         return 1;
-            //     }
-            // }
+            if (!strcmp(member, "tag")) {
+                *smem = union_members[0];
+                smem->type = type->Union.tag_type;
+                return 1;
+            }
 
             return 0;
         }
@@ -1748,10 +1745,12 @@ b32 type_is_structlike(Type* type) {
     if (type->kind == Type_Kind_Function) return 1;
     if (type->kind == Type_Kind_DynArray) return 1;
     if (type->kind == Type_Kind_VarArgs) return 1;
+    if (type->kind == Type_Kind_Union) return 1;
     if (type->kind == Type_Kind_Pointer) {
         if (type->Pointer.elem->kind == Type_Kind_Struct) return 1;
         if (type->Pointer.elem->kind == Type_Kind_Slice)  return 1;
         if (type->Pointer.elem->kind == Type_Kind_DynArray) return 1;
+        if (type->Pointer.elem->kind == Type_Kind_Union) return 1;
     }
     return 0;
 }
