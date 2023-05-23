@@ -1,27 +1,6 @@
 
 use core {*}
 
-create_optional :: () -> ? i32 {
-    return .{ Some = 123 };
-}
-
-create_result :: () -> Result(i32, str) {
-    return .{ Ok = 987 };
-    // return .{ Err = "oh no there was error :(" };
-}
-
-new_optional_test :: () -> Result(void, str) {
-    v := create_optional();
-    v2: ?str = "asdf";
-    println(v);
-    println(v2);
-
-    println(v->unwrap());
-
-    r := create_result()?;
-    println(r);
-}
-
 union_is :: macro (u: $U, $variant: U.tag_enum) -> bool {
     return cast(U.tag_enum, u) == variant;
 }
@@ -36,90 +15,99 @@ extract_variant :: macro (u: $U, $variant: U.tag_enum) => {
     return .{};
 }
 
-SimpleUnion :: union {
-    a: i32;
-    b: struct {
-        c: str;
-    };
 
-    empty: void;
-    large: i64;
-}
 
-#inject SimpleUnion {
-    foo :: (this: &SimpleUnion) {
-        printf("Working foo! {}\n", this);
+simple_example :: () {
+    Simple :: union {
+        int: i32;
+        float: f32;
+        string: str;
     }
+
+    s := Simple.{ int = 123 };
+    println(s);
+
+    s = Simple.{ float = 100.0f };
+    println(s);
+
+    s = .{ string = "Working" };
+    println(s);
 }
 
-call_test :: (u_: SimpleUnion) {
-    u := u_;
-    __byte_dump(&u, sizeof typeof u);
+extraction_example :: () {
+    Extraction :: union {
+        int: i32;
+        float: f32;
+        string: str;
+    }
 
-    switch u {
-        case .a do println("It was a!");
-        case .b => v do printf("It was B! {}\n", v);
-        case .empty do println("It was EMPTY!");
+    value := Extraction.{ string = "This works" };
 
-        case .large => &value {
-            printf("It was a large number! {} {}\n", value, *value);
+    switch value {
+        case .int => int_value {
+            printf("This is an integer: {}\n", int_value);
         }
 
-        case #default {
-            printf("none of the above.\n");
+        case .float => float_value {
+            printf("This is a float: {}\n", float_value);
+        }
+
+        case .string => string_value {
+            printf("This is a string: {}\n", string_value);
         }
     }
 }
 
-simple_test :: () {
-    u := SimpleUnion.{ b = .{ "asdf" } };
-    u  = .{ a = 123 };
-    u  = .{ empty = .{} };
-    u  = .{ large = 123456789 };
-    u  = .{ b = .{ "Wow this works!!" } };
+method_example :: () {
+    Methoded :: union {
+        int: i32;
+        float: f32;
+        string: str;
 
-    println(cast(SimpleUnion.tag_enum) u);
+        do_the_thing :: (value: &Methoded) {
+            switch *value {
+                case .int => int_value {
+                    printf("This is an integer: {}\n", int_value);
+                }
 
-    call_test(u);
+                case .float => float_value {
+                    printf("This is a float: {}\n", float_value);
+                }
 
-    if union_is(u, .b) {
-        println(extract_variant(u, .b)?);
-    }
+                case .string => string_value {
+                    printf("This is a string: {}\n", string_value);
+                }
+            }
+        }
+    } 
 
-    u->foo();
-
-    use runtime
-    printf("{*p}\n", cast(&runtime.info.Type_Info_Union) runtime.info.get_type_info(typeof u));
-
-    u = .{ large = 8675309 };
-    println(u);
+    v := Methoded.{ int = 9876 };
+    v->do_the_thing();
 }
 
-main :: () {simple_test(); link_test(); new_optional_test()->err()? |> println();}
-
-Link :: union {
-    End: void;
-    Next: struct {
-        data: i32;
-        next: &Link;
+linked_list_example :: () {
+    Link :: union {
+        End: void;
+        Next: struct {
+            data: i32;
+            next: &Link;
+        }
     }
-}
 
-print_links :: (l: &Link) {
-    walker := l;
-    while true {
-        switch *walker {
-            case .End do break break;
+    print_links :: (l: &Link) {
+        walker := l;
+        while true {
+            switch *walker {
+                case .End do break break;
 
-            case .Next => &next {
-                printf("{}\n", next.data);
-                walker = next.next;
+                case .Next => &next {
+                    printf("{}\n", next.data);
+                    walker = next.next;
+                }
             }
         }
     }
-}
 
-link_test :: () {
     l := Link.{
         Next = .{
             data = 123,
@@ -135,62 +123,31 @@ link_test :: () {
     print_links(&l);
 }
 
-// main :: () { link_test(); }
+polymorphic_example :: () {
+    Error :: union {
+        Parse_Error: str;
+        Process_Error: str;
+    }
 
-// Optional :: union (T: type_expr) {
-//     None: void;
-//     Some: T;
-// }
-// 
-// #inject Optional {
-//     with :: macro (o: Optional($T), code: Code) {
-//         switch o {
-//             case .Some => v {
-//                 #unquote code(v);
-//             }
-//         }
-//     }
-// 
-//     or_default :: macro (o: Optional($T), default: T) -> T {
-//         switch o {
-//             case .Some => v do return v;
-//             case .None      do return default;
-//         }
-//     }
-// }
+    Errorable :: union (T: type_expr) {
+        Error: Error;
+        Success: T;
+    }
 
-// | tag type (Tag_Enum) | data... |
+    do_a_thing :: () -> Errorable(i32) {
+        // return .{ Success = 123 };
+        return .{ Error = .{ Process_Error = "bad data" } };
+    }
+
+    v := do_a_thing();
+    println(v);
+}
 
 
-// Config :: struct {
-//     name: Optional(str);
-// }
-// 
-// main :: () {
-//     x := Optional(i32).{ Some = 123 };
-// 
-//     c: Config;
-//     c.name = .{ Some = "test" };
-// 
-//     printf("{}.{}", typeof c.name.Some, c.name.Some);   // "Optional.tag_enum.Some"
-// 
-//     x->with(#quote {
-//         printf("x has the value: {}\n", it);
-//     });
-// 
-//     y := x->or_default(0);
-// 
-//     switch x {
-//         case .None {
-//             printf("x has nothing....\n");
-//         }
-// 
-//         case .Some => &value {
-//             printf("x has the value: {}\n", value);
-//         }
-//     }
-// }
-// 
-// 
-// 
-// 
+main :: () {
+    simple_example();
+    extraction_example();
+    method_example();
+    linked_list_example();
+    polymorphic_example();
+}
