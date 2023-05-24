@@ -1656,10 +1656,15 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
             emit_expression(mod, &code, switch_node->expr);
 
             if (switch_node->switch_kind == Switch_Kind_Union) {
-                assert(switch_node->expr->type->kind == Type_Kind_Union);
+                Type *union_expr_type = switch_node->expr->type;
+                if (union_expr_type->kind == Type_Kind_Pointer) {
+                    union_expr_type = union_expr_type->Pointer.elem;
+                }
+                assert(union_expr_type->kind == Type_Kind_Union);
+
                 union_capture_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
                 WIL(NULL, WI_LOCAL_TEE, union_capture_idx);
-                emit_load_instruction(mod, &code, switch_node->expr->type->Union.tag_type, 0);
+                emit_load_instruction(mod, &code, union_expr_type->Union.tag_type, 0);
             }
 
             if (switch_node->min_case != 0) {
@@ -1702,11 +1707,16 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         if (sc->capture) {
             assert(union_capture_idx != 0);
 
+            Type *union_expr_type = switch_node->expr->type;
+            if (union_expr_type->kind == Type_Kind_Pointer) {
+                union_expr_type = union_expr_type->Pointer.elem;
+            }
+
             if (sc->capture_is_by_pointer) {
                 u64 capture_pointer_local = emit_local_allocation(mod, &code, (AstTyped *) sc->capture);
 
                 WIL(NULL, WI_LOCAL_GET, union_capture_idx);
-                WIL(NULL, WI_PTR_CONST, switch_node->expr->type->Union.alignment);
+                WIL(NULL, WI_PTR_CONST, union_expr_type->Union.alignment);
                 WI(NULL, WI_PTR_ADD);
 
                 WIL(NULL, WI_LOCAL_SET, capture_pointer_local);
@@ -1719,7 +1729,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
                 emit_location(mod, &code, (AstTyped *) sc->capture);
 
                 WIL(NULL, WI_LOCAL_GET, union_capture_idx);
-                WIL(NULL, WI_PTR_CONST, switch_node->expr->type->Union.alignment);
+                WIL(NULL, WI_PTR_CONST, union_expr_type->Union.alignment);
                 WI(NULL, WI_PTR_ADD);
                 
                 WIL(NULL, WI_I32_CONST, type_size_of(sc->capture->type));

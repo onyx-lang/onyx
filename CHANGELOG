@@ -3,6 +3,7 @@ Release v0.1.2
 Unreleased
 
 Additions:
+* Tagged unions (`union` type)
 * String literals can have unicode code points.
     - '\uXXXX' for small code points (less than U+FFFF)
     - '\UXXXXXX' for large code points
@@ -14,6 +15,8 @@ Additions:
 Removals:
 
 Changes:
+* `Optional` is now a tagged-union
+* `Result` is now a tagged-union
 * `iter.single` can take a `dispose` function, which is called on close of the
     iterator, with the single value yielded.
 * `io.write_escaped_str` supports escaping "\\" now.

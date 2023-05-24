@@ -440,7 +440,8 @@ CheckStatus check_switch(AstSwitch* switchnode) {
         if (!type_is_integer(switchnode->expr->type) && switchnode->expr->type->kind != Type_Kind_Enum) {
             switchnode->switch_kind = Switch_Kind_Use_Equals;
         }
-        if (switchnode->expr->type->kind == Type_Kind_Union) {
+        if (switchnode->expr->type->kind == Type_Kind_Union
+            || (switchnode->expr->type->kind == Type_Kind_Pointer && switchnode->expr->type->Pointer.elem->kind == Type_Kind_Union)) {
             switchnode->switch_kind = Switch_Kind_Union;
         }
 
@@ -488,7 +489,8 @@ CheckStatus check_switch(AstSwitch* switchnode) {
         }
 
         if (sc->capture && switchnode->switch_kind != Switch_Kind_Union) {
-            ERROR(sc->capture->token->pos, "Captures in switch cases are only allowed when switching over a union type.");
+            ERROR_(sc->capture->token->pos, "Captures in switch cases are only allowed when switching over a union type. Switching over '%s' here.",
+                    type_get_name(switchnode->expr->type));
         }
 
         if (sc->flags & Ast_Flag_Has_Been_Checked) goto check_switch_case_block;
@@ -522,16 +524,21 @@ CheckStatus check_switch(AstSwitch* switchnode) {
             }
 
             if (switchnode->switch_kind == Switch_Kind_Union) {
-                TYPE_CHECK(value, resolved_expr_type->Union.tag_type) {
+                Type *union_expr_type = resolved_expr_type;
+                if (union_expr_type->kind == Type_Kind_Pointer) {
+                    union_expr_type = union_expr_type->Pointer.elem;
+                }
+
+                TYPE_CHECK(value, union_expr_type->Union.tag_type) {
                     OnyxToken* tkn = sc->block->token;
                     if ((*value)->token) tkn = (*value)->token;
 
                     ERROR_(tkn->pos, "'%b' is not a variant of '%s'.",
-                        (*value)->token->text, (*value)->token->length, type_get_name(resolved_expr_type));
+                        (*value)->token->text, (*value)->token->length, type_get_name(union_expr_type));
                 }
 
                 // nocheckin Explain the -1
-                UnionVariant *union_variant = resolved_expr_type->Union.variants_ordered[get_expression_integer_value(*value, NULL) - 1];
+                UnionVariant *union_variant = union_expr_type->Union.variants_ordered[get_expression_integer_value(*value, NULL) - 1];
                 if (sc->capture) {
                     if (sc->capture_is_by_pointer) {
                         sc->capture->type = type_make_pointer(context.ast_alloc, union_variant->type);
