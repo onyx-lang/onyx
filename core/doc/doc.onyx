@@ -9,6 +9,7 @@ Doc :: struct {
     structures:     [] Doc_Structure;
     enumerations:   [] Doc_Enum;
     distinct_types: [] Doc_Distinct_Type; 
+    unions:         [] Doc_Union;
     files:          [] Doc_File;
 }
 
@@ -27,6 +28,7 @@ Doc_Header :: struct {
     structures_info_start: u32;
     enumerations_info_start: u32;
     distinct_types_info_start: u32;
+    union_types_info_start: u32;
     files_info_start: u32;
 }
 
@@ -141,3 +143,18 @@ Doc_Distinct_Type :: struct {
     methods: [] Doc_Procedure;
 }
 
+Doc_Union :: struct {
+    use base: Doc_Entity;
+
+    variants: [] Doc_Union_Variant;
+    polymorph_arguments: [] Doc_Param;
+
+    constraints: [] str;
+
+    methods: [] Doc_Procedure;
+}
+
+Doc_Union_Variant :: struct {
+    name: str;
+    type: str;          // TODO: Make this not a string
+}
