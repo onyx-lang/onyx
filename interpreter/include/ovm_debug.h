@@ -58,6 +58,7 @@ typedef enum debug_type_kind_t {
     debug_type_kind_function  = 6,
     debug_type_kind_slice     = 7,
     debug_type_kind_enum      = 8,
+    debug_type_kind_union     = 9,
 } debug_type_kind_t;
 
 typedef enum debug_type_primitive_kind_t {
@@ -133,6 +134,17 @@ typedef struct debug_type_enum_t {
     debug_type_enum_value_t *values;
 } debug_type_enum_t;
 
+typedef struct debug_type_union_variant_t {
+    char *name;
+    u32 type;
+} debug_type_union_variant_t;
+
+typedef struct debug_type_union_t {
+    u32 tag_size;
+    u32 variant_count;
+    debug_type_union_variant_t *variants;
+} debug_type_union_t;
+
 typedef struct debug_type_info_t {
     u32 id;
     char *name;
@@ -148,6 +160,7 @@ typedef struct debug_type_info_t {
         debug_type_function_t  function;
         debug_type_slice_t     slice;
         debug_type_enum_t      enumeration;
+        debug_type_union_t     onion;
     };
 } debug_type_info_t;
 

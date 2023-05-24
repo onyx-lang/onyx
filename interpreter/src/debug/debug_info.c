@@ -204,6 +204,22 @@ void debug_info_import_type_info(debug_info_t *info, u8 *data, u32 len) {
                 }
                 break;
 
+            case debug_type_kind_union:
+                type.onion.tag_size = uleb128_to_uint(data, &offset);
+                type.onion.variant_count = uleb128_to_uint(data, &offset);
+                type.onion.variants = bh_alloc_array(info->alloc, debug_type_union_variant_t, type.onion.variant_count);
+                
+                fori (i, 0, type.onion.variant_count) {
+                    u32 name_length = uleb128_to_uint(data, &offset);
+                    type.onion.variants[i].name = bh_alloc_array(info->alloc, char, name_length + 1);
+                    memcpy(type.onion.variants[i].name, data + offset, name_length);
+                    type.onion.variants[i].name[name_length] = 0;
+                    offset += name_length;
+                    
+                    type.onion.variants[i].type = uleb128_to_uint(data, &offset);
+                }
+                break;
+
             // Error handling
             default: assert(("Unrecognized type kind", 0));
         }

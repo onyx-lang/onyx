@@ -986,6 +986,23 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
             //     continue;
             // }
 
+            if (type->kind == Type_Kind_Union) {
+                output_unsigned_integer(9, &section_buff);
+                output_unsigned_integer(type->Union.alignment, &section_buff);
+
+                i32 var_count = bh_arr_length(type->Union.variants_ordered);
+                output_unsigned_integer(var_count, &section_buff);
+
+                fori (i, 0, var_count) {
+                    char *name = type->Union.variants_ordered[i]->name;
+                    output_name(name, strlen(name), &section_buff);
+                    
+                    output_unsigned_integer(type->Union.variants_ordered[i]->type->id, &section_buff);
+                }
+
+                continue;
+            }
+
             if (type->kind == Type_Kind_Function) {
                 output_unsigned_integer(6, &section_buff);
                 output_unsigned_integer(type->Function.param_count, &section_buff);

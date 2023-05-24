@@ -97,7 +97,7 @@ linked_list_example :: () {
     print_links :: (l: &Link) {
         walker := l;
         while true {
-            switch *walker {
+            switch walker {
                 case .End do break break;
 
                 case .Next => &next {
