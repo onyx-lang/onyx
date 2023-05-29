@@ -283,5 +283,7 @@ u32 type_structlike_is_simple(Type* type);
 b32 type_is_sl_constructable(Type* type);
 b32 type_constructed_from_poly(Type* base, struct AstType* from);
 Type* type_struct_is_just_one_basic_value(Type *type);
+u32 type_union_get_variant_count(Type *type);
+UnionVariant* type_lookup_union_variant_by_idx(Type* type, i32 idx);
 
 #endif // #ifndef ONYX_TYPES

@@ -1822,3 +1822,22 @@ Type* type_struct_is_just_one_basic_value(Type *type) {
     if (type->Struct.memarr[0]->type->kind != Type_Kind_Basic) return NULL;
     return type->Struct.memarr[0]->type;
 }
+
+u32 type_union_get_variant_count(Type *type) {
+    if (!type) return 0;
+    switch (type->kind) {
+        case Type_Kind_Union: return bh_arr_length(type->Union.variants_ordered);
+        case Type_Kind_Pointer: return type_union_get_variant_count(type->Pointer.elem);
+        default: return 0;
+    }
+}
+
+UnionVariant* type_lookup_union_variant_by_idx(Type* type, i32 idx) {
+    if (!type) return NULL;
+    if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
+    if (type->kind != Type_Kind_Union) return NULL;
+    if (idx < 0 || idx >= bh_arr_length(type->Union.variants_ordered)) return NULL;
+
+    return type->Union.variants_ordered[idx];
+}
+

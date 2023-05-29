@@ -911,6 +911,10 @@ struct AstSwitch {
     i32 yield_return_index;
     SwitchKind switch_kind;
 
+    // NOTE: This is an array of "bools" that says which union variants have
+    // been handled.
+    u8 *union_variants_handled;
+
     union {
         struct {
             // NOTE: This is a mapping from the compile time known case value

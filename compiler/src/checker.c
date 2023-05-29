@@ -440,8 +440,8 @@ CheckStatus check_switch(AstSwitch* switchnode) {
         if (!type_is_integer(switchnode->expr->type) && switchnode->expr->type->kind != Type_Kind_Enum) {
             switchnode->switch_kind = Switch_Kind_Use_Equals;
         }
-        if (switchnode->expr->type->kind == Type_Kind_Union
-            || (switchnode->expr->type->kind == Type_Kind_Pointer && switchnode->expr->type->Pointer.elem->kind == Type_Kind_Union)) {
+
+        if (type_union_get_variant_count(switchnode->expr->type) > 0) {
             switchnode->switch_kind = Switch_Kind_Union;
         }
 
@@ -458,6 +458,9 @@ CheckStatus check_switch(AstSwitch* switchnode) {
             case Switch_Kind_Union:
                 switchnode->min_case = 1;
                 bh_imap_init(&switchnode->case_map, global_heap_allocator, 4);
+
+                u32 variants = type_union_get_variant_count(switchnode->expr->type);
+                switchnode->union_variants_handled = bh_alloc_array(context.ast_alloc, u8, variants);
                 break;
 
             default: assert(0);
@@ -485,7 +488,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
         AstSwitchCase *sc = switchnode->cases[i];
 
         if (sc->capture && bh_arr_length(sc->values) != 1) {
-            ERROR(sc->token->pos, "Expected exactly one value in switch-case when using a capture.");
+            ERROR(sc->token->pos, "Expected exactly one value in switch-case when using a capture, i.e. `case X => Y { ... }`.");
         }
 
         if (sc->capture && switchnode->switch_kind != Switch_Kind_Union) {
@@ -537,8 +540,12 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                         (*value)->token->text, (*value)->token->length, type_get_name(union_expr_type));
                 }
 
-                // nocheckin Explain the -1
-                UnionVariant *union_variant = union_expr_type->Union.variants_ordered[get_expression_integer_value(*value, NULL) - 1];
+                // We subtract one here because variant numbering starts at 1, instead of 0.
+                // This is so a zeroed out block of memory does not have a valid variant.
+                i32 variant_number = get_expression_integer_value(*value, NULL) - 1;
+                switchnode->union_variants_handled[variant_number] = 1;
+
+                UnionVariant *union_variant = union_expr_type->Union.variants_ordered[variant_number];
                 if (sc->capture) {
                     if (sc->capture_is_by_pointer) {
                         sc->capture->type = type_make_pointer(context.ast_alloc, union_variant->type);
@@ -604,10 +611,41 @@ CheckStatus check_switch(AstSwitch* switchnode) {
         switchnode->yield_return_index += 1;
     }
 
-    if (switchnode->default_case)
+    if (switchnode->default_case) {
         CHECK(block, switchnode->default_case);
 
-    return 0;
+    } else if (switchnode->switch_kind == Switch_Kind_Union) {
+        // If there is no default case, and this is a union switch,
+        // make sure all cases are handled.
+
+        bh_arr(char *) missed_variants = NULL;
+
+        i32 variant_count = type_union_get_variant_count(switchnode->expr->type);
+        fori (i, 0, variant_count) {
+            if (!switchnode->union_variants_handled[i]) {
+                UnionVariant *uv = type_lookup_union_variant_by_idx(switchnode->expr->type, i);
+                assert(uv && uv->name);
+                bh_arr_push(missed_variants, uv->name);
+            }
+        }
+
+        i32 missed_variant_count = bh_arr_length(missed_variants);
+        if (missed_variant_count > 0) {
+            char  buf[1024] = {0};
+            fori (i, 0, bh_min(missed_variant_count, 2)) {
+                if (i != 0) strncat(buf, ", ", 1023);
+                strncat(buf, missed_variants[i], 1023);
+            }
+
+            if (missed_variant_count > 2) {
+                strncat(buf, bh_bprintf(" and %d more", missed_variant_count - 2), 1023);
+            }
+
+            ERROR_(switchnode->token->pos, "Unhandled union variants: %s", buf);
+        }
+    }
+
+    return Check_Success;
 }
 
 CheckStatus check_arguments(Arguments* args) {
