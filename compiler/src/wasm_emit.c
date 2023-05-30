@@ -162,6 +162,14 @@ static u64 local_allocate_type_in_memory(LocalAllocator* la, Type *type) {
     return la->curr_stack - size;
 }
 
+static void local_free_type_in_memory(LocalAllocator* la, Type* type) {
+    u32 size = type_size_of(type);
+    u32 alignment = type_alignment_of(type);
+    bh_align(size, alignment);
+
+    la->curr_stack -= size;
+}
+
 static u64 local_allocate(LocalAllocator* la, AstTyped* local) {
     if (local_is_wasm_local(local)) {
         WasmType wt = onyx_type_to_wasm_type(local->type);
@@ -178,11 +186,7 @@ static void local_free(LocalAllocator* la, AstTyped* local) {
         local_raw_free(la, wt);
 
     } else {
-        u32 size = type_size_of(local->type);
-        u32 alignment = type_alignment_of(local->type);
-        bh_align(size, alignment);
-
-        la->curr_stack -= size;
+        local_free_type_in_memory(la, local->type);
     }
 }
 
@@ -3550,6 +3554,38 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr);
                 assert(localidx & LOCAL_IS_WASM);
                 WIL(NULL, WI_LOCAL_GET, localidx);
+            }
+
+            else if (field->is_union_variant_access) {
+                u64 intermediate_local = emit_local_allocation(mod, &code, (AstTyped *) field);
+                assert((intermediate_local & LOCAL_IS_WASM) == 0);
+
+                emit_expression(mod, &code, field->expr);
+                u64 source_base_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+                WIL(NULL, WI_LOCAL_TEE, source_base_ptr);
+                emit_load_instruction(mod, &code, &basic_types[Basic_Kind_U32], 0);
+                WIL(NULL, WI_I32_CONST, field->idx);
+                WI(NULL, WI_I32_EQ);
+                emit_enter_structured_block(mod, &code, SBT_Basic_If, field->token);
+                    emit_stack_address(mod, &code, intermediate_local, field->token);
+                    WIL(NULL, WI_I32_CONST, 2); // 2 is Some
+                    emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], 0);
+
+                    emit_stack_address(mod, &code, intermediate_local + type_alignment_of(field->type), field->token);
+                    WIL(NULL, WI_LOCAL_GET, source_base_ptr);
+                    WIL(NULL, WI_I32_CONST, type_alignment_of(field->expr->type));
+                    WI(NULL, WI_I32_ADD);
+                    WIL(NULL, WI_I32_CONST, type_size_of(field->type->Union.variants_ordered[1]->type));
+                    emit_wasm_copy(mod, &code, NULL);
+
+                WI(NULL, WI_ELSE);
+                    emit_stack_address(mod, &code, intermediate_local, field->token);
+                    WIL(NULL, WI_I32_CONST, 1); // 1 is None
+                    emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], 0);
+                emit_leave_structured_block(mod, &code);
+
+                local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+                emit_stack_address(mod, &code, intermediate_local, field->token);
             }
 
             else if (is_lval((AstNode *) field->expr) || type_is_pointer(field->expr->type)) {

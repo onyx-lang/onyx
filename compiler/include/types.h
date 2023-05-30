@@ -244,6 +244,7 @@ Type* type_make_array(bh_allocator alloc, Type* to, u32 count);
 Type* type_make_slice(bh_allocator alloc, Type* of);
 Type* type_make_dynarray(bh_allocator alloc, Type* of);
 Type* type_make_varargs(bh_allocator alloc, Type* of);
+Type* type_make_optional(bh_allocator alloc, Type* of);
 
 void build_linear_types_with_offset(Type* type, bh_arr(TypeWithOffset)* pdest, u32 offset);
 b32  type_struct_member_apply_use(bh_allocator alloc, Type *s_type, StructMember *smem);
@@ -285,5 +286,6 @@ b32 type_constructed_from_poly(Type* base, struct AstType* from);
 Type* type_struct_is_just_one_basic_value(Type *type);
 u32 type_union_get_variant_count(Type *type);
 UnionVariant* type_lookup_union_variant_by_idx(Type* type, i32 idx);
+UnionVariant* type_lookup_union_variant_by_name(Type* type, char *name);
 
 #endif // #ifndef ONYX_TYPES

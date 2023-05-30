@@ -143,6 +143,19 @@ polymorphic_example :: () {
     println(v);
 }
 
+direct_access_is_an_optional :: () {
+    Methoded :: union {
+        int: i32;
+        float: f32;
+        string: str;
+    }
+
+    v := Methoded.{ string = "A wrapped value" };
+
+    the_string := v.string->unwrap();
+    println(the_string);
+}
+
 
 main :: () {
     simple_example();
@@ -150,4 +163,5 @@ main :: () {
     method_example();
     linked_list_example();
     polymorphic_example();
+    direct_access_is_an_optional();
 }

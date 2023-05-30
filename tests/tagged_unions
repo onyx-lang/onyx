@@ -6,3 +6,4 @@ This is an integer: 9876
 123
 456
 Error(Process_Error("bad data"))
+A wrapped value

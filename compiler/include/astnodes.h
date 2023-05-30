@@ -710,6 +710,8 @@ struct AstFieldAccess   {
     u32 offset;
     u32 idx;
     char* field; // If token is null, defer to field
+
+    b32 is_union_variant_access : 1;
 };
 struct AstFileContents  {
     AstTyped_base;

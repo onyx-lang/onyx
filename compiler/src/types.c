@@ -1841,3 +1841,13 @@ UnionVariant* type_lookup_union_variant_by_idx(Type* type, i32 idx) {
     return type->Union.variants_ordered[idx];
 }
 
+UnionVariant* type_lookup_union_variant_by_name(Type* type, char *name) {
+    if (!type) return NULL;
+    if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
+    if (type->kind != Type_Kind_Union) return NULL;
+
+    i32 index = shgeti(type->Union.variants, name);
+    if (index == -1) return NULL;
+    return type->Union.variants[index].value;
+}
+

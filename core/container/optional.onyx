@@ -118,21 +118,32 @@ use core
         }
     }
 
-    or_return :: macro (o: ?$T) -> T {
-        switch value := o; value {
-            case .Some => v do return v;
-            case #default {
-                return return .{};
+    or_return :: #match {
+        macro (o: ?$T) -> T {
+            switch value := o; value {
+                case .Some => v do return v;
+                case #default {
+                    return return .{};
+                }
             }
-        }
+        },
+        macro (o: ?$T, return_value: $R) -> T {
+            switch value := o; value {
+                case .Some => v do return v;
+                case #default {
+                    return return return_value;
+                }
+            }
+        },
     }
 
     catch :: macro (o: ?$T, body: Code) -> T {
         switch value := o; value {
             case .Some => v do return v;
+            case .None {
+                #unquote body;
+            }
         }
-
-        #unquote body;
     }
 
     #doc """

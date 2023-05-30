@@ -2046,6 +2046,31 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
             }
         }
 
+        if (type_union_get_variant_count(field->expr->type) > 0) {
+            UnionVariant *uv = type_lookup_union_variant_by_name(field->expr->type, field->field);
+            if (uv) {
+                field->is_union_variant_access = 1;
+                field->idx = uv->tag_value;
+
+                // HACK make a function for this.
+                if (!field->type_node) {
+                    AstPolyCallType* pctype = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
+                    pctype->token = field->token;
+                    pctype->callee = builtin_optional_type;
+                    bh_arr_new(context.ast_alloc, pctype->params, 1);
+                    bh_arr_push(pctype->params, (AstNode *) uv->type->ast_type);
+
+                    field->type_node = (AstType *) pctype;
+                }
+
+                field->type = type_build_from_ast(context.ast_alloc, field->type_node);
+                if (!field->type) YIELD(field->token->pos, "Waiting for field access type to be constructed.");
+
+                field->flags |= Ast_Flag_Has_Been_Checked;
+                return Check_Success;
+            }
+        }
+
         goto try_resolve_from_type;
     }
 
