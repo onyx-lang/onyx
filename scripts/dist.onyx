@@ -1,0 +1,42 @@
+use core {*}
+
+FOLDERS := str.[
+    "compiler",
+    "core",
+    "interpreter",
+    "runtime",
+    "tests",
+    "misc",
+    "shared/lib/linux_x86_64",
+    "shared/include",
+    "examples/"
+];
+
+FILES := str.[
+    "README.md",
+    "LICENSE",
+    "CHANGELOG",
+    "build.sh",
+    "settings.sh",
+    "scripts/onyx-pkg.onyx",
+    "scripts/default.json",
+    "scripts/run_tests.onyx",
+    "bin/onyx-loader.js",
+    "bin/onyx-thread.js"
+]
+
+run :: (command: [] str) -> bool {
+    cmd := command[0];
+    parts := command[1 .. command.length];
+    proc := os.process_spawn(cmd, parts);
+    return os.process_wait(&proc) == .Success;
+}
+
+main :: () {
+    args := array.make(.["tar", "cvzf", "onyx-latest-linux-source.tar.gz"]);
+
+    for FOLDERS do args << it;
+    for FILES do args << it;
+
+    run(args);
+}
