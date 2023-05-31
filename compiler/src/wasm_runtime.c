@@ -437,7 +437,8 @@ static b32 link_wasm_imports(
         {
             char *funcname = bh_aprintf(bh_heap_allocator(), "%b.%b", module_name->data, module_name->size, import_name->data, import_name->size);
 
-            wasm_functype_t *wasm_functype = wasm_externtype_as_functype(wasm_importtype_type(module_imports.data[i]));
+            wasm_externtype_t *import_type = (wasm_externtype_t *) wasm_importtype_type(module_imports.data[i]);
+            wasm_functype_t *wasm_functype = wasm_externtype_as_functype(import_type);
             wasm_func_t* wasm_func = wasm_func_new_with_env(wasm_store, wasm_functype, __error_on_call, funcname, NULL);
             import = wasm_func_as_extern(wasm_func);
         }
