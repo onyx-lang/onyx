@@ -2,11 +2,11 @@
     "name": "onyx",
     "displayName": "Onyx",
     "description": "Onyx syntax highlighting and debugger support.",
-    "version": "0.1.6",
+    "version": "0.1.7",
     "publisher": "brendanfh",
     "license": "BSD-2-Clause",
     "engines": {
-        "vscode": "^1.51.0"
+        "vscode": "^1.75.0"
     },
     "categories": [
         "Programming Languages"

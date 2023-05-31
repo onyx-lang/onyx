@@ -103,6 +103,14 @@ typedef enum StructProcessingStatus {
     SPS_Uses_Done,
 } StructProcessingStatus;
 
+typedef struct UnionVariant {
+    char *name;
+    Type *type;
+    u32 tag_value;
+    bh_arr(struct AstTyped *) meta_tags;
+    struct OnyxToken *token;
+} UnionVariant;
+
 #define TYPE_KINDS \
     TYPE_KIND(Basic, TypeBasic)                                   \
     TYPE_KIND(Pointer, struct {                                   \
@@ -153,7 +161,23 @@ typedef enum StructProcessingStatus {
     TYPE_KIND(Distinct, struct {                                  \
         char* name;                                               \
         Type* base_type;                                          \
-    })
+    })                                                            \
+    TYPE_KIND(Union, struct {                                     \
+        u32 size;                                                 \
+        u32 alignment;                                            \
+        char* name;                                               \
+        Type* tag_type;                                           \
+        Table(UnionVariant *) variants;                           \
+        bh_arr(UnionVariant *) variants_ordered;                  \
+        bh_arr(struct AstPolySolution) poly_sln;                  \
+        struct AstType *constructed_from;                         \
+        bh_arr(struct AstTyped *) meta_tags;                      \
+    })                                                            \
+    TYPE_KIND(PolyUnion, struct {                                 \
+        char* name;                                               \
+        bh_arr(struct AstTyped *) meta_tags;                      \
+    })                                                            \
+
 
 
 typedef enum TypeKind {
@@ -220,6 +244,7 @@ Type* type_make_array(bh_allocator alloc, Type* to, u32 count);
 Type* type_make_slice(bh_allocator alloc, Type* of);
 Type* type_make_dynarray(bh_allocator alloc, Type* of);
 Type* type_make_varargs(bh_allocator alloc, Type* of);
+Type* type_make_optional(bh_allocator alloc, Type* of);
 
 void build_linear_types_with_offset(Type* type, bh_arr(TypeWithOffset)* pdest, u32 offset);
 b32  type_struct_member_apply_use(bh_allocator alloc, Type *s_type, StructMember *smem);
@@ -257,7 +282,10 @@ b32 type_is_structlike_strict(Type* type);
 u32 type_structlike_mem_count(Type* type);
 u32 type_structlike_is_simple(Type* type);
 b32 type_is_sl_constructable(Type* type);
-b32 type_struct_constructed_from_poly_struct(Type* struct_type, struct AstType* from);
+b32 type_constructed_from_poly(Type* base, struct AstType* from);
 Type* type_struct_is_just_one_basic_value(Type *type);
+u32 type_union_get_variant_count(Type *type);
+UnionVariant* type_lookup_union_variant_by_idx(Type* type, i32 idx);
+UnionVariant* type_lookup_union_variant_by_name(Type* type, char *name);
 
 #endif // #ifndef ONYX_TYPES

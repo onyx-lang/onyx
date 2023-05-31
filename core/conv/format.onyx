@@ -552,24 +552,6 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
             if info.kind == .Struct {
                 s := cast(&Type_Info_Struct) info;
 
-                if s.constructed_from == Optional {
-                    opt := cast(&?bool) v.data;
-
-                    if opt.has_value {
-                        format := *formatting;
-                        format.quote_strings = true;
-
-                        output->write("Some(");
-                        format_any(output, &format, .{ cast([&] u8) v.data + s.members[1].offset, s.members[1].type });
-                        output->write(")");
-
-                    } else {
-                        output->write("None");
-                    }
-
-                    return;
-                }
-
                 if s.name.count > 0 {
                     output->write(s.name);
                     output->write(" { ");
@@ -739,6 +721,28 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
 
                 if formatting.interpret_numbers {
                     output->write("]");
+                }
+            }
+
+            if info.kind == .Union {
+                u := cast(&Type_Info_Union) info;
+
+                tag_value := *cast(&u32, v.data);
+
+                variant := array.first(u.variants, #(it.tag_value == tag_value));
+
+                if !variant {
+                    output->write("unknown_variant");
+                    return;
+                }
+
+                output->write(variant.name);
+                if variant.type != void {
+                    output->write("(");
+                    format := *formatting;
+                    format.quote_strings = true;
+                    format_any(output, &format, any.{ cast([&] u8) v.data + u.alignment, variant.type });
+                    output->write(")");
                 }
             }
         }

@@ -18,50 +18,49 @@ use core {Optional}
     of type T, or an Err value of type E. `status` contains either
     .Ok, or .Err depending on which is currently held.
 """
-@conv.Custom_Format.{ #solidify format {T=Ok_Type, E=Err_Type} }
-Result :: struct (Ok_Type: type_expr, Err_Type: type_expr) {
-    status: Result_Status;
-    __data: Result_Data(Ok_Type, Err_Type);
-}
-
-#doc """
-    The type of Result(T, E).status
-"""
-Result_Status :: enum {
-    Ok  :: 1;
-    Err :: 2;
-}
-
-#local
-Result_Data :: struct (T: type_expr, E: type_expr) {
-    value: T;
-    error: E;
+Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
+    Err: Err_Type;
+    Ok: Ok_Type;
 }
 
 
 #inject Result {
     #doc "Quick way to return an Ok from a procedure."
-    return_ok  :: macro (x: $T) do return .{ .Ok, .{ value = x } };
+    return_ok  :: macro (x: $T) do return .{ Ok = x };
 
     #doc "Quick way to return an Err from a procedure."
-    return_err :: macro (x: $T) do return .{ .Err, .{ error = x } };
+    return_err :: macro (x: $T) do return .{ Err = x };
 
     #doc "Returns true if the result contains an Ok value."
-    is_ok :: (r: #Self) => r.status == .Ok;
+    is_ok :: (r: #Self) {
+        switch r {
+            case .Ok do return true;
+            case #default do return false;
+        }
+    }
 
     #doc "Returns true if the result contains an Err value."
-    is_err :: (r: #Self) => !r.status == .Err;
+    is_err :: (r: #Self) {
+        switch r {
+            case .Err do return true;
+            case #default do return false;
+        }
+    }
 
     #doc "Returns an Optional of the Ok type."
     ok :: (r: #Self) -> Optional(r.Ok_Type) {
-        if r.status == .Ok do return Optional.make(r.__data.value);
-        return .{};
+        switch r {
+            case .Ok => v do return v;
+            case #default do return .{};
+        }
     }
 
     #doc "Returns an Optional of the Err type."
     err :: (r: #Self) -> Optional(r.Err_Type) {
-        if r.status == .Err do return Optional.make(r.__data.error);
-        return .{};
+        switch r {
+            case .Err => v do return v;
+            case #default do return .{};
+        }
     }
 
     #doc """
@@ -69,13 +68,14 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
         result contains an Err, an assertion is thrown.
     """
     unwrap :: (r: #Self) -> r.Ok_Type {
-        if r.status == .Err {
-            msg := tprintf("Unwrapping Result with error '{}'.", r.__data.error);
-            assert(false, msg);
-            return .{};
+        switch r {
+            case .Ok => v do return v;
+            case .Err => err {
+                msg := tprintf("Unwrapping Result with error '{}'.", err);
+                assert(false, msg);
+                return .{};
+            }
         }
-
-        return r.__data.value;
     }
 
     #doc """
@@ -83,9 +83,10 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
         result contains an Err, the empty .{} value is returned.
     """
     unwrap_or_default :: (r: #Self) -> r.Ok_Type {
-        if r.status == .Err do return .{};
-
-        return r.__data.value;
+        switch r {
+            case .Ok => v do return v;
+            case #default do return .{};
+        }
     }
 
     #doc """
@@ -93,12 +94,12 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
         result contains an Err, a custom assertion message is thrown.
     """
     expect :: (r: #Self, msg: str) -> r.Ok_Type {
-        if r.status == .Err {
-            assert(false, msg);
-            return .{};
+        switch r {
+            case .Ok => v do return v;
+            case #default {
+                assert(false, msg);
+            }
         }
-
-        return r.__data.value;
     }
 
     #doc """
@@ -107,20 +108,26 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
             Err(e) => Err(e)
     """
     transform :: (r: Result($T, $E), f: (T) -> $R) -> Result(R, E) {
-        if r.status == .Err do return .{ .Err, .{ error = r.error } };
-        return .{ .Ok, .{ value = f(r.__data.value) } };
+        switch r {
+            case .Ok => v  do return .{ Ok = f(v) };
+            case .Err => v do return .{ Err = v };
+        }
     }
 
     #doc "Monadic chaining operation."
     and_then :: (r: #Self, f: (r.Ok_Type) -> Result($R, r.Err_Type)) -> Result(R, r.Err_Type) {
-        if r.status == .Err do return r;
-        return .{ .Ok, .{ value = f(r.__data.value) } };
+        switch r {
+            case .Ok => v  do return f(v);
+            case .Err => v do return .{ Err = v };
+        }
     }
 
     #doc "If the Result contains Err, generate is called to make a value"
     or_else :: (r: #Self, generate: () -> typeof r) => {
-        if r.status == .Ok do return r;
-        return .{};
+        switch r {
+            case .Ok => v do return v;
+            case #default do return generate();
+        }
     }
 
     #doc """
@@ -140,10 +147,10 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
             }
     """
     forward_err :: macro (r: Result($T, $E)) -> T {
-        res := r;
-        if res.status == .Ok do return res.__data.value;
-
-        return return .{ .Err, .{ error = res.__data.error } };
+        switch res := r; res {
+            case .Ok => v  do return v;
+            case .Err => v do return return .{ Err = v };
+        }
     }
 
     #doc """
@@ -151,10 +158,10 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
         enclosing procedure. Otherwise, the Ok value is returned.
     """
     or_return :: macro (r: Result($T, $E), v: $V) -> T {
-        res := r;
-        if res.status == .Ok do return res.__data.value;
-        
-        return return v;
+        switch res := r; res {
+            case .Ok => v  do return v;
+            case .Err do return return v;
+        }
     }
 
     #doc """
@@ -166,37 +173,31 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
         This procedure is subject to change.
     """
     catch :: macro (r: Result($T, $E), on_err: Code) -> T {
-        res := r;
-        if res.status == .Ok do return res.__data.value;
-
-        #unquote on_err;
-    }
-
-    format :: (o: &conv.Format_Output, format: &conv.Format, res: &Result($T, $E)) {
-        if res.status == .Ok {
-            conv.format(o, "{}({\"})", res.status, res.__data.value);
-        } else {
-            conv.format(o, "{}({\"})", res.status, res.__data.error);
+        switch res := r; res {
+            case .Ok => v  do return v;
+            case .Err {
+                #unquote on_err;
+            }
         }
     }
 }
 
 #overload
-__implicit_bool_cast :: macro (r: Result($O, $E)) => r.status == .Ok;
+__implicit_bool_cast :: macro (r: Result($O, $E)) => cast(Result(O, E).tag_enum, r) == .Ok;
 
 
 #operator ? macro (r: Result($T, $E)) -> T {
-    res := r;
-    if r.status == .Ok do return r.__data.value;
-
-    return return .{ .Err, .{ error = res.__data.error } };
+    switch res := r; res {
+        case .Ok => v  do return v;
+        case .Err => v do return return .{ Err = v };
+    }
 }
 
 #operator ?? macro (r: Result($T, $E), v: T) -> T {
-    r_ = r;
-    if r_.status == .Ok do return r_.__data.value;
-
-    return v;
+    switch res := r; res {
+        case .Ok => v do return v;
+        case .Err do return v;
+    }
 }
 
 

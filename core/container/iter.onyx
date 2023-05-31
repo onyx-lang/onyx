@@ -59,6 +59,16 @@ next :: (it: Iterator) -> (it.Iter_Type, bool) {
 }
 
 #doc """
+    Helper function to get the next value out of an iterator, but translated to an optional.
+    Returns `None` if the iterator was empty, `Some(value)` otherwise.
+"""
+next_opt :: (it: Iterator) -> ? it.Iter_Type {
+    v, exists := it.next(it.data);
+    if exists do return v;
+    return .{};
+}
+
+#doc """
     Helper function to close an iterator, if a close function
     is defined.
 """
@@ -451,14 +461,18 @@ const :: (value: $T) -> Iterator(T) {
 }
 
 #doc "Yields a single value, then stops."
-single :: (value: $T) -> Iterator(T) {
-    return generator(&.{ v = value, yielded = false }, c => {
+single :: (value: $T, dispose: (T) -> void = null_proc) -> Iterator(T) {
+    return generator(&.{ v = value, yielded = false, dispose = dispose }, c => {
         if !c.yielded {
             c.yielded = true;
             return c.v, true;
         }
 
         return .{}, false;
+    }, c => {
+        if c.dispose != null_proc {
+            c.dispose(c.v);
+        }
     });
 }
 

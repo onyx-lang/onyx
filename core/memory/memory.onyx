@@ -58,3 +58,8 @@ align :: (size: u32, align: u32) -> u32 {
     }
     return size;
 }
+
+ptr_add :: macro (p: rawptr, d: i32) -> rawptr {
+    return cast([&] u8, p) + d;
+}
+

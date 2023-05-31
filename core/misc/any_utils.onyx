@@ -87,6 +87,24 @@ any_nested_selector :: (v: any, member_name: str) -> any {
 }
 
 #doc """
+"""
+any_member :: #match #locked {
+    macro (v: any, member_type: type_expr, member_offset: u32) -> any {
+        return any.{
+            cast([&] u8, v.data) + member_offset,
+            member_type
+        };
+    },
+
+    (v: any, member: &Type_Info_Struct.Member) -> any {
+        return any.{
+            cast([&] u8, v.data) + member.offset,
+            member.type
+        };
+    }
+}
+
+#doc """
     Convert a structure or pointer to a structure to a Map with
     keys representing the fields of the structure, and values
     representing the value of each field.

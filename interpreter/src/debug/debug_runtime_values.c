@@ -182,6 +182,21 @@ static void append_value_from_memory_with_type(debug_runtime_value_builder_t *bu
             break;
         }
 
+        case debug_type_kind_union: {
+            u32 variant = *(u32 *) base;
+            if (variant == 0) {
+                WRITE("unknown_variant");
+
+            } else {
+                debug_type_union_variant_t *uv = &type->onion.variants[variant - 1];
+
+                WRITE_FORMAT("%s(", uv->name); 
+                append_value_from_memory_with_type(builder, bh_pointer_add(base, type->onion.tag_size), uv->type);
+                WRITE(")");
+            }
+            break;
+        }
+
         default: WRITE("(unknown)"); break;
     }
 }

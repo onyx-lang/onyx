@@ -319,7 +319,7 @@ CheckStatus check_for(AstFor* fornode) {
 
         fornode->loop_type = For_Loop_DynArr;
     }
-    else if (type_struct_constructed_from_poly_struct(iter_type, builtin_iterator_type)) {
+    else if (type_constructed_from_poly(iter_type, builtin_iterator_type)) {
         if (fornode->by_pointer) {
             ERROR(error_loc, "Cannot iterate by pointer over an iterator.");
         }
@@ -348,7 +348,7 @@ fornode_expr_checked:
     old_inside_for_iterator = context.checker.inside_for_iterator;
     context.checker.inside_for_iterator = 0;
     iter_type = fornode->iter->type;
-    if (type_struct_constructed_from_poly_struct(iter_type, builtin_iterator_type)) {
+    if (type_constructed_from_poly(iter_type, builtin_iterator_type)) {
         context.checker.inside_for_iterator = 1;
     }
 
@@ -363,7 +363,7 @@ fornode_expr_checked:
 }
 
 static b32 add_case_to_switch_statement(AstSwitch* switchnode, u64 case_value, AstBlock* block, OnyxFilePos pos) {
-    assert(switchnode->switch_kind == Switch_Kind_Integer);
+    assert(switchnode->switch_kind == Switch_Kind_Integer || switchnode->switch_kind == Switch_Kind_Union);
 
     switchnode->min_case = bh_min(switchnode->min_case, case_value);
     switchnode->max_case = bh_max(switchnode->max_case, case_value);
@@ -441,6 +441,10 @@ CheckStatus check_switch(AstSwitch* switchnode) {
             switchnode->switch_kind = Switch_Kind_Use_Equals;
         }
 
+        if (type_union_get_variant_count(switchnode->expr->type) > 0) {
+            switchnode->switch_kind = Switch_Kind_Union;
+        }
+
         switch (switchnode->switch_kind) {
             case Switch_Kind_Integer:
                 switchnode->min_case = 0xffffffffffffffff;
@@ -449,6 +453,14 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
             case Switch_Kind_Use_Equals:
                 bh_arr_new(global_heap_allocator, switchnode->case_exprs, 4);
+                break;
+
+            case Switch_Kind_Union:
+                switchnode->min_case = 1;
+                bh_imap_init(&switchnode->case_map, global_heap_allocator, 4);
+
+                u32 variants = type_union_get_variant_count(switchnode->expr->type);
+                switchnode->union_variants_handled = bh_alloc_array(context.ast_alloc, u8, variants);
                 break;
 
             default: assert(0);
@@ -474,11 +486,22 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
     fori (i, switchnode->yield_return_index, bh_arr_length(switchnode->cases)) {
         AstSwitchCase *sc = switchnode->cases[i];
-        CHECK(block, sc->block);
+
+        if (sc->capture && bh_arr_length(sc->values) != 1) {
+            ERROR(sc->token->pos, "Expected exactly one value in switch-case when using a capture, i.e. `case X => Y { ... }`.");
+        }
+
+        if (sc->capture && switchnode->switch_kind != Switch_Kind_Union) {
+            ERROR_(sc->capture->token->pos, "Captures in switch cases are only allowed when switching over a union type. Switching over '%s' here.",
+                    type_get_name(switchnode->expr->type));
+        }
+
+        if (sc->flags & Ast_Flag_Has_Been_Checked) goto check_switch_case_block;
 
         bh_arr_each(AstTyped *, value, sc->values) {
             CHECK(expression, value);
 
+            // Handle case 1 .. 10
             if (switchnode->switch_kind == Switch_Kind_Integer && (*value)->kind == Ast_Kind_Range_Literal) {
                 AstRangeLiteral* rl = (AstRangeLiteral *) (*value);
                 resolve_expression_type(rl->low);
@@ -503,16 +526,47 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                 continue;
             }
 
-            TYPE_CHECK(value, resolved_expr_type) {
-                OnyxToken* tkn = sc->block->token;
-                if ((*value)->token) tkn = (*value)->token;
+            if (switchnode->switch_kind == Switch_Kind_Union) {
+                Type *union_expr_type = resolved_expr_type;
+                if (union_expr_type->kind == Type_Kind_Pointer) {
+                    union_expr_type = union_expr_type->Pointer.elem;
+                }
 
-                ERROR_(tkn->pos, "Mismatched types in switch-case. Expected '%s', got '%s'.",
-                    type_get_name(resolved_expr_type), type_get_name((*value)->type));
+                TYPE_CHECK(value, union_expr_type->Union.tag_type) {
+                    OnyxToken* tkn = sc->block->token;
+                    if ((*value)->token) tkn = (*value)->token;
+
+                    ERROR_(tkn->pos, "'%b' is not a variant of '%s'.",
+                        (*value)->token->text, (*value)->token->length, type_get_name(union_expr_type));
+                }
+
+                // We subtract one here because variant numbering starts at 1, instead of 0.
+                // This is so a zeroed out block of memory does not have a valid variant.
+                i32 variant_number = get_expression_integer_value(*value, NULL) - 1;
+                switchnode->union_variants_handled[variant_number] = 1;
+
+                UnionVariant *union_variant = union_expr_type->Union.variants_ordered[variant_number];
+                if (sc->capture) {
+                    if (sc->capture_is_by_pointer) {
+                        sc->capture->type = type_make_pointer(context.ast_alloc, union_variant->type);
+                    } else {
+                        sc->capture->type = union_variant->type;
+                    }
+                }
+                
+            } else {
+                TYPE_CHECK(value, resolved_expr_type) {
+                    OnyxToken* tkn = sc->block->token;
+                    if ((*value)->token) tkn = (*value)->token;
+
+                    ERROR_(tkn->pos, "Mismatched types in switch-case. Expected '%s', got '%s'.",
+                        type_get_name(resolved_expr_type), type_get_name((*value)->type));
+                }
             }
 
             switch (switchnode->switch_kind) {
-                case Switch_Kind_Integer: {
+                case Switch_Kind_Integer:
+                case Switch_Kind_Union: {
                     b32 is_valid;
                     i64 integer_value = get_expression_integer_value(*value, &is_valid);
                     if (!is_valid)
@@ -549,13 +603,49 @@ CheckStatus check_switch(AstSwitch* switchnode) {
             }
         }
 
+        sc->flags |= Ast_Flag_Has_Been_Checked;
+
+      check_switch_case_block:
+        CHECK(block, sc->block);
+
         switchnode->yield_return_index += 1;
     }
 
-    if (switchnode->default_case)
+    if (switchnode->default_case) {
         CHECK(block, switchnode->default_case);
 
-    return 0;
+    } else if (switchnode->switch_kind == Switch_Kind_Union) {
+        // If there is no default case, and this is a union switch,
+        // make sure all cases are handled.
+
+        bh_arr(char *) missed_variants = NULL;
+
+        i32 variant_count = type_union_get_variant_count(switchnode->expr->type);
+        fori (i, 0, variant_count) {
+            if (!switchnode->union_variants_handled[i]) {
+                UnionVariant *uv = type_lookup_union_variant_by_idx(switchnode->expr->type, i);
+                assert(uv && uv->name);
+                bh_arr_push(missed_variants, uv->name);
+            }
+        }
+
+        i32 missed_variant_count = bh_arr_length(missed_variants);
+        if (missed_variant_count > 0) {
+            char  buf[1024] = {0};
+            fori (i, 0, bh_min(missed_variant_count, 2)) {
+                if (i != 0) strncat(buf, ", ", 1023);
+                strncat(buf, missed_variants[i], 1023);
+            }
+
+            if (missed_variant_count > 2) {
+                strncat(buf, bh_bprintf(" and %d more", missed_variant_count - 2), 1023);
+            }
+
+            ERROR_(switchnode->token->pos, "Unhandled union variants: %s", buf);
+        }
+    }
+
+    return Check_Success;
 }
 
 CheckStatus check_arguments(Arguments* args) {
@@ -668,7 +758,8 @@ CheckStatus check_call(AstCall** pcall) {
 
     if (call->kind == Ast_Kind_Call) {
         AstNode* callee = strip_aliases((AstNode *) call->callee);
-        if (callee->kind == Ast_Kind_Poly_Struct_Type) {
+        if (callee->kind == Ast_Kind_Poly_Struct_Type ||
+            callee->kind == Ast_Kind_Poly_Union_Type) {
             *pcall = (AstCall *) convert_call_to_polycall(call);
             CHECK(expression, (AstTyped **) pcall);
             return Check_Success;
@@ -1440,6 +1531,59 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         if (sl->type == NULL)
             YIELD(sl->token->pos, "Trying to resolve type of struct literal.");
     }
+    
+    if (sl->type->kind == Type_Kind_Union) {
+        if ((sl->flags & Ast_Flag_Has_Been_Checked) != 0) return Check_Success;
+
+        Type *union_type = sl->type;
+
+        if (bh_arr_length(sl->args.values) == 0 && bh_arr_length(sl->args.named_values) == 0) {
+            // Produce an empty value of the first union type.
+            UnionVariant *uv = union_type->Union.variants[0].value;
+
+            AstNumLit *tag_value = make_int_literal(context.ast_alloc, uv->tag_value); 
+            tag_value->type = union_type->Union.tag_type;
+
+            bh_arr_push(sl->args.values, (AstTyped *) tag_value);
+            bh_arr_push(sl->args.values, (AstTyped *) make_zero_value(context.ast_alloc, sl->token, uv->type));
+
+            sl->flags |= Ast_Flag_Has_Been_Checked;
+            return Check_Success;
+        }
+
+        if (bh_arr_length(sl->args.values) != 0 || bh_arr_length(sl->args.named_values) != 1) {
+            ERROR_(sl->token->pos, "Expected exactly one named member when constructing an instance of a union type, '%s'.", type_get_name(sl->type));
+        }
+
+        AstNamedValue* value = sl->args.named_values[0];
+        token_toggle_end(value->token);
+
+        UnionVariant *matched_variant = union_type->Union.variants[
+            shgeti(union_type->Union.variants, value->token->text)
+        ].value;
+        token_toggle_end(value->token);
+
+        if (!matched_variant) {
+            ERROR_(value->token->pos, "'%b' is not a variant of '%s'.",
+                    value->token->text, value->token->length, type_get_name(union_type));
+        }
+
+        TYPE_CHECK(&value->value, matched_variant->type) {
+            ERROR_(value->token->pos,
+                   "Mismatched type in initialized type. Expected something of type '%s', got '%s'.",
+                   type_get_name(matched_variant->type),
+                   type_get_name(value->value->type));
+        }
+
+        AstNumLit *tag_value = make_int_literal(context.ast_alloc, matched_variant->tag_value);
+        tag_value->type = union_type->Union.tag_type;
+
+        bh_arr_push(sl->args.values, (AstTyped *) tag_value);
+        bh_arr_push(sl->args.values, value->value);
+
+        sl->flags |= Ast_Flag_Has_Been_Checked;
+        return Check_Success;
+    }
 
     if (!type_is_structlike_strict(sl->type)) {
         //
@@ -1902,6 +2046,31 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
             }
         }
 
+        if (type_union_get_variant_count(field->expr->type) > 0) {
+            UnionVariant *uv = type_lookup_union_variant_by_name(field->expr->type, field->field);
+            if (uv) {
+                field->is_union_variant_access = 1;
+                field->idx = uv->tag_value;
+
+                // HACK make a function for this.
+                if (!field->type_node) {
+                    AstPolyCallType* pctype = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
+                    pctype->token = field->token;
+                    pctype->callee = builtin_optional_type;
+                    bh_arr_new(context.ast_alloc, pctype->params, 1);
+                    bh_arr_push(pctype->params, (AstNode *) uv->type->ast_type);
+
+                    field->type_node = (AstType *) pctype;
+                }
+
+                field->type = type_build_from_ast(context.ast_alloc, field->type_node);
+                if (!field->type) YIELD(field->token->pos, "Waiting for field access type to be constructed.");
+
+                field->flags |= Ast_Flag_Has_Been_Checked;
+                return Check_Success;
+            }
+        }
+
         goto try_resolve_from_type;
     }
 
@@ -2072,7 +2241,8 @@ CheckStatus check_expression(AstTyped** pexpr) {
         expr = *pexpr;
 
         // Don't try to construct a polystruct ahead of time because you can't.
-        if (expr->kind != Ast_Kind_Poly_Struct_Type) {
+        if (expr->kind != Ast_Kind_Poly_Struct_Type &&
+            expr->kind != Ast_Kind_Poly_Union_Type) {
             if (type_build_from_ast(context.ast_alloc, (AstType*) expr) == NULL) {
                 YIELD(expr->token->pos, "Trying to construct type.");
             }
@@ -2619,7 +2789,8 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* ofunc) {
     if (ofunc->expected_return_node) {
         AstType *expected_return_node = (AstType *) strip_aliases((AstNode *) ofunc->expected_return_node);
 
-        if (expected_return_node->kind == Ast_Kind_Poly_Struct_Type) {
+        if (expected_return_node->kind == Ast_Kind_Poly_Struct_Type ||
+            expected_return_node->kind == Ast_Kind_Poly_Union_Type) {
             //
             // When you declare the expected return type of a #match'ed procedure to
             // be a polymorphic structure type, a special case has to happen. By trying
@@ -2668,6 +2839,38 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* ofunc) {
     return Check_Success;
 }
 
+static void mark_all_functions_used_in_scope(Scope *scope) {
+    //
+    // This ensures that all procedures defined inside of a structure are
+    // not pruned and omitted from the binary. This is because a large
+    // use-case of procedures in structures is dynamically linking them
+    // using the type info data.
+    if (scope) {
+        fori (i, 0, shlen(scope->symbols)) {
+            AstNode* node = scope->symbols[i].value;
+            if (node->kind == Ast_Kind_Function) {
+                node->flags |= Ast_Flag_Function_Used;
+            }
+        }
+    }
+}
+
+CheckStatus check_meta_tags(bh_arr(AstTyped *) tags) {
+    if (tags) {
+        bh_arr_each(AstTyped *, meta, tags) {
+            CHECK(expression, meta);
+            resolve_expression_type(*meta);
+
+            if (((*meta)->flags & Ast_Flag_Comptime) == 0) {
+                onyx_report_error((*meta)->token->pos, Error_Critical, "#tag expressions are expected to be compile-time known.");
+                return Check_Error;
+            }
+        }
+    }
+
+    return Check_Success;
+}
+
 CheckStatus check_struct(AstStructType* s_node) {
     if (s_node->entity_defaults && s_node->entity_defaults->state < Entity_State_Check_Types)
         YIELD(s_node->token->pos, "Waiting for struct member defaults to pass symbol resolution.");
@@ -2709,19 +2912,7 @@ CheckStatus check_struct(AstStructType* s_node) {
         CHECK(constraint_context, &s_node->constraints, s_node->scope, pos);
     }
 
-    //
-    // This ensures that all procedures defined inside of a structure are
-    // not pruned and omitted from the binary. This is because a large
-    // use-case of procedures in structures is dynamically linking them
-    // using the type info data.
-    if (s_node->scope) {
-        fori (i, 0, shlen(s_node->scope->symbols)) {
-            AstNode* node = s_node->scope->symbols[i].value;
-            if (node->kind == Ast_Kind_Function) {
-                node->flags |= Ast_Flag_Function_Used;
-            }
-        }
-    }
+    mark_all_functions_used_in_scope(s_node->scope);
 
     bh_arr_each(AstStructMember *, smem, s_node->members) {
         if ((*smem)->type_node != NULL) {
@@ -2776,17 +2967,7 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
     if (s_node->entity_type && s_node->entity_type->state == Entity_State_Failed)
         return Check_Failed;
 
-    if (s_node->meta_tags) {
-        bh_arr_each(AstTyped *, meta, s_node->meta_tags) {
-            CHECK(expression, meta);
-            resolve_expression_type(*meta);
-
-            if (((*meta)->flags & Ast_Flag_Comptime) == 0) {
-                onyx_report_error((*meta)->token->pos, Error_Critical, "#tag expressions are expected to be compile-time known.");
-                return Check_Error;
-            }
-        }
-    }
+    CHECK(meta_tags, s_node->meta_tags);
 
     bh_arr_each(StructMember *, smem, s_node->stcache->Struct.memarr) {
         if ((*smem)->initial_value && *(*smem)->initial_value) {
@@ -2802,19 +2983,61 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
             resolve_expression_type(*(*smem)->initial_value);
         }
 
-        if ((*smem)->meta_tags) {
-            bh_arr_each(AstTyped *, meta, (*smem)->meta_tags) {
-                CHECK(expression, meta);
-                resolve_expression_type(*meta);
+        CHECK(meta_tags, (*smem)->meta_tags);
+    }
 
-                if (((*meta)->flags & Ast_Flag_Comptime) == 0) {
-                    onyx_report_error((*meta)->token->pos, Error_Critical, "#tag expressions are expected to be compile-time known.");
-                    return Check_Error;
-                }
+    return Check_Success;
+}
+
+CheckStatus check_union(AstUnionType *u_node) {
+    if (u_node->polymorphic_argument_types) {
+        assert(u_node->polymorphic_arguments);
+
+        fori (i, 0, (i64) bh_arr_length(u_node->polymorphic_argument_types)) {
+            Type *arg_type = type_build_from_ast(context.ast_alloc, u_node->polymorphic_argument_types[i]);
+            if (arg_type == NULL) YIELD(u_node->polymorphic_argument_types[i]->token->pos, "Waiting to build type for polymorph argument.");
+
+            //
+            // This check should always be false, but it handles
+            // the case where somewhere a type was expected, but
+            // not enough values were provided. This is checked
+            // elsewhere when instantiating a polymorphic sturucture.
+            if (i >= bh_arr_length(u_node->polymorphic_arguments)
+                || !u_node->polymorphic_arguments[i].value) continue;
+
+            
+            TYPE_CHECK(&u_node->polymorphic_arguments[i].value, arg_type) {
+                ERROR_(u_node->polymorphic_arguments[i].value->token->pos, "Expected value of type %s, got %s.",
+                    type_get_name(arg_type),
+                    type_get_name(u_node->polymorphic_arguments[i].value->type));
             }
         }
     }
 
+    if (u_node->constraints.constraints) {
+        u_node->constraints.produce_errors = (u_node->flags & Ast_Flag_Header_Check_No_Error) == 0;
+
+        OnyxFilePos pos = u_node->token->pos;
+        if (u_node->polymorphic_error_loc.filename) {
+            pos = u_node->polymorphic_error_loc;
+        }
+        CHECK(constraint_context, &u_node->constraints, u_node->scope, pos);
+    }
+
+    mark_all_functions_used_in_scope(u_node->scope);
+
+    CHECK(meta_tags, u_node->meta_tags);
+
+    bh_arr_each(AstUnionVariant *, variant, u_node->variants) {
+        CHECK(type, &(* variant)->type_node);
+        CHECK(meta_tags, (* variant)->meta_tags);
+    }
+
+    type_build_from_ast(context.ast_alloc, (AstType *) u_node);
+    if (u_node->pending_type == NULL || !u_node->pending_type_is_valid)
+        YIELD(u_node->token->pos, "Waiting for type to be constructed.");
+
+    u_node->utcache = u_node->pending_type;
     return Check_Success;
 }
 
@@ -2911,20 +3134,6 @@ CheckStatus check_function_header(AstFunction* func) {
         if (local->type->kind == Type_Kind_Compound) {
             ERROR(param->local->token->pos, "Compound types are not allowed as parameter types. Try splitting this into multiple parameters.");
         }
-
-        // NOTE: I decided to make parameter default values not type checked against
-        // the actual parameter type. The actual type checking will happen in check_call
-        // when the default value is used as an argument and then has to be checked against
-        // the parameter type                                  - brendanfh 2021/01/06
-        // if (param->default_value != NULL) {
-        //     if (!unify_node_and_type(&param->default_value, param->local->type)) {
-        //         onyx_report_error(param->local->token->pos,
-        //                 "Expected default value of type '%s', was of type '%s'.",
-        //                 type_get_name(param->local->type),
-        //                 type_get_name(param->default_value->type));
-        //         return Check_Error;
-        //     }
-        // }
 
         if (param->vararg_kind != VA_Kind_Not_VA) has_had_varargs = 1;
 
@@ -3593,6 +3802,8 @@ void check_entity(Entity* ent) {
         case Entity_Type_Type_Alias:
             if (ent->type_alias->kind == Ast_Kind_Struct_Type)
                 cs = check_struct((AstStructType *) ent->type_alias);
+            else if (ent->type_alias->kind == Ast_Kind_Union_Type)
+                cs = check_union((AstUnionType *) ent->type_alias);
             else
                 cs = check_type(&ent->type_alias);
             break;

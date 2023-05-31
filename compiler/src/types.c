@@ -4,6 +4,7 @@
 #include "astnodes.h"
 #include "utils.h"
 #include "errors.h"
+#include "parser.h"
 
 // NOTE: These have to be in the same order as Basic
 Type basic_types[] = {
@@ -235,6 +236,10 @@ b32 types_are_compatible_(Type* t1, Type* t2, b32 recurse_pointers) {
             // If the above cases didn't catch it, then these distinct types are not compatible.
             return 0;
 
+        case Type_Kind_Union:
+            // If the above cases didn't catch it, then these union types are not compatible.
+            return 0;
+
         default:
             assert(("Invalid type", 0));
             break;
@@ -263,6 +268,7 @@ u32 type_size_of(Type* type) {
         case Type_Kind_DynArray: return POINTER_SIZE + 8 + 8 + 2 * POINTER_SIZE; // data (8), count (4), capacity (4), allocator { func (4 + 4 + 8), data (8) }
         case Type_Kind_Compound: return type->Compound.size;
         case Type_Kind_Distinct: return type_size_of(type->Distinct.base_type);
+        case Type_Kind_Union:    return type->Union.size;
         default:                 return 0;
     }
 }
@@ -283,6 +289,7 @@ u32 type_alignment_of(Type* type) {
         case Type_Kind_DynArray: return POINTER_SIZE;
         case Type_Kind_Compound: return 4; // HACK
         case Type_Kind_Distinct: return type_alignment_of(type->Distinct.base_type);
+        case Type_Kind_Union:    return type->Union.alignment;
         default: return 1;
     }
 }
@@ -395,6 +402,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 s_type->Struct.mem_count = bh_arr_length(s_node->members);
                 s_type->Struct.meta_tags = s_node->meta_tags;
                 s_type->Struct.constructed_from = NULL;
+                s_type->Struct.poly_sln = NULL;
                 s_type->Struct.status = SPS_Start;
                 type_register(s_type);
 
@@ -405,8 +413,6 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             } else {
                 s_type = s_node->pending_type;
             }
-
-            s_type->Struct.poly_sln = NULL;
 
             bh_arr_clear(s_type->Struct.memarr);
             shfree(s_type->Struct.members);
@@ -561,11 +567,27 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             return NULL;
         }
 
+        case Ast_Kind_Poly_Union_Type: {
+            if (type_node->type_id != 0) return NULL;
+
+            Type* p_type = type_create(Type_Kind_PolyUnion, alloc, 0);
+            p_type->ast_type = type_node;
+            p_type->PolyUnion.name = ((AstPolyUnionType *) type_node)->name;
+            p_type->PolyUnion.meta_tags = ((AstPolyUnionType *) type_node)->base_union->meta_tags;
+
+            type_register(p_type);
+            return NULL;
+        }
+
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pc_type = (AstPolyCallType *) type_node;
             pc_type->callee = (AstType *) strip_aliases((AstNode *) pc_type->callee);
 
-            if (!(pc_type->callee && pc_type->callee->kind == Ast_Kind_Poly_Struct_Type)) {
+            if (!(pc_type->callee && (
+                    pc_type->callee->kind == Ast_Kind_Poly_Struct_Type ||
+                    pc_type->callee->kind == Ast_Kind_Poly_Union_Type
+                ))) {
+
                 // If it is an unresolved field access or symbol, just return because an error will be printed elsewhere.
                 if (pc_type->callee->kind == Ast_Kind_Field_Access || pc_type->callee->kind == Ast_Kind_Symbol) return NULL;
 
@@ -573,8 +595,6 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 onyx_report_error(pc_type->callee->token->pos, Error_Critical, "Here is the type trying to be instantiated. (%s)", onyx_ast_node_kind_string(pc_type->callee->kind));
                 return NULL;
             }
-
-            AstPolyStructType* ps_type = (AstPolyStructType *) pc_type->callee;
 
             bh_arr(AstPolySolution) slns = NULL;
             bh_arr_new(global_heap_allocator, slns, bh_arr_length(pc_type->params));
@@ -597,7 +617,15 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 }
             }
 
-            Type* concrete = polymorphic_struct_lookup(ps_type, slns, pc_type->token->pos, (pc_type->flags & Ast_Flag_Header_Check_No_Error) == 0);
+            Type* concrete = NULL;
+            if (pc_type->callee->kind == Ast_Kind_Poly_Struct_Type) {
+                AstPolyStructType* ps_type = (AstPolyStructType *) pc_type->callee;
+                concrete = polymorphic_struct_lookup(ps_type, slns, pc_type->token->pos, (pc_type->flags & Ast_Flag_Header_Check_No_Error) == 0);
+            }
+            else if (pc_type->callee->kind == Ast_Kind_Poly_Union_Type) {
+                AstPolyUnionType* pu_type = (AstPolyUnionType *) pc_type->callee;
+                concrete = polymorphic_union_lookup(pu_type, slns, pc_type->token->pos, (pc_type->flags & Ast_Flag_Header_Check_No_Error) == 0);
+            }
 
             // This should be copied in the previous function.
             // CLEANUP: Maybe don't copy it and just use this one since it is allocated on the heap?
@@ -605,7 +633,6 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
 
             if (!concrete) return NULL;
             if (concrete == (Type *) &node_that_signals_failure) return concrete;
-            concrete->Struct.constructed_from = (AstType *) ps_type;
             pc_type->resolved_type = concrete;
             return concrete;
         }
@@ -650,12 +677,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 return type_of->resolved_type;
             }
 
-            // Why does this have to be here?
-            if (type_of->expr->type != NULL) {
-                return type_of->expr->type;
-            }
-
-            return NULL;
+            return type_of->expr->type;
         }
 
         case Ast_Kind_Distinct_Type: {
@@ -664,10 +686,6 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
 
             Type *base_type = type_build_from_ast(alloc, distinct->base_type);
             if (base_type == NULL) return NULL;
-            // if (base_type->kind != Type_Kind_Basic && base_type->kind != Type_Kind_Pointer) {
-            //     onyx_report_error(distinct->token->pos, Error_Critical, "Distinct types can only be made out of primitive types. '%s' is not a primitive type.", type_get_name(base_type));
-            //     return NULL;
-            // }
 
             Type *distinct_type = type_create(Type_Kind_Distinct, alloc, 0);
             distinct_type->Distinct.base_type = base_type;
@@ -677,6 +695,121 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
 
             type_register(distinct_type);
             return distinct_type;
+        }
+
+        case Ast_Kind_Union_Type: {
+            AstUnionType* union_ = (AstUnionType *) type_node;
+            if (union_->utcache) return union_->utcache;
+            if (union_->pending_type && union_->pending_type_is_valid) return union_->pending_type;
+
+            Type *u_type;
+            if (union_->pending_type == NULL) {
+                u_type = type_create(Type_Kind_Union, alloc, 0);
+                union_->pending_type = u_type;
+
+                u_type->ast_type = type_node;
+                u_type->Union.name = union_->name;
+                u_type->Union.meta_tags = union_->meta_tags;
+                u_type->Union.constructed_from = NULL;
+                type_register(u_type);
+
+                u_type->Union.variants = NULL;
+                u_type->Union.variants_ordered = NULL;
+                sh_new_arena(u_type->Union.variants);
+                bh_arr_new(global_heap_allocator, u_type->Union.variants_ordered, bh_arr_length(union_->variants));
+            } else {
+                u_type = union_->pending_type;
+            }
+
+            union_->pending_type_is_valid = 1;
+
+            //
+            // All variants need to have type know.
+            bh_arr_each(AstUnionVariant *, pvariant, union_->variants) {
+                AstUnionVariant *variant = *pvariant;
+                if (!variant->type) {
+                    variant->type = type_build_from_ast(alloc, variant->type_node);
+                }
+
+                if (!variant->type) {
+                    if (context.cycle_detected) {
+                        onyx_report_error(variant->token->pos, Error_Critical, "Unable to figure out the type of this union variant.");
+                    }
+
+                    union_->pending_type_is_valid = 0;
+                    return accept_partial_types ? union_->pending_type : NULL;
+                }
+
+                if (variant->type->kind == Type_Kind_Struct && variant->type->Struct.status == SPS_Start) {
+                    union_->pending_type_is_valid = 0;
+                    return accept_partial_types ? union_->pending_type : NULL;
+                }
+            }
+
+            // From this point forward, there is no chance we will return early
+            // in a yielding fashion. Everything is either straight success or
+            // failure.
+
+            u32 size = 0;
+            u32 alignment = 0;
+            u32 next_tag_value = 1;
+
+            AstEnumType* tag_enum_node = onyx_ast_node_new(alloc, sizeof(AstEnumType), Ast_Kind_Enum_Type);
+            tag_enum_node->token = union_->token;
+            tag_enum_node->name = bh_aprintf(alloc, "%s.tag_enum", union_->name);
+            tag_enum_node->backing_type = &basic_types[Basic_Kind_U32];
+            bh_arr_new(alloc, tag_enum_node->values, bh_arr_length(union_->variants));
+
+            void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* scope, Package* package); // HACK
+            add_entities_for_node(NULL, (AstNode *) tag_enum_node, union_->entity->scope, union_->entity->package);
+
+            //
+            // Create variant instances
+            bh_arr_each(AstUnionVariant *, pvariant, union_->variants) {
+                AstUnionVariant *variant = *pvariant;
+                assert(variant->type);
+
+                u32 var_alignment = type_alignment_of(variant->type);
+                if (var_alignment <= 0) {
+                    onyx_report_error(variant->token->pos, Error_Critical, "Invalid variant type '%s', has alignment %d", type_get_name(variant->type), var_alignment);
+                    return NULL;
+                }
+
+                if (var_alignment > alignment) alignment = var_alignment;
+
+                token_toggle_end(variant->token);
+                if (shgeti(u_type->Union.variants, variant->token->text) != -1) {
+                    onyx_report_error(variant->token->pos, Error_Critical, "Duplicate union variant, '%s'.", variant->token->text);
+                    token_toggle_end(variant->token);
+                    return NULL;
+                }
+
+                u32 type_size = type_size_of(variant->type);
+                size = bh_max(size, type_size);
+
+                UnionVariant* uv = bh_alloc_item(alloc, UnionVariant);
+                uv->name = bh_strdup(alloc, variant->token->text);
+                uv->token = variant->token;
+                uv->tag_value = next_tag_value++;
+                uv->meta_tags = variant->meta_tags;
+                uv->type = variant->type;
+
+                shput(u_type->Union.variants, variant->token->text, uv);
+                token_toggle_end(variant->token);
+
+                bh_arr_push(u_type->Union.variants_ordered, uv);
+
+                AstEnumValue *ev = onyx_ast_node_new(alloc, sizeof(AstEnumValue), Ast_Kind_Enum_Value);
+                ev->token = uv->token;
+                ev->value = (AstTyped *) make_int_literal(alloc, uv->tag_value);
+                bh_arr_push(tag_enum_node->values, ev);
+            }
+
+            u_type->Union.alignment = alignment;
+            u_type->Union.size = size + alignment; // Add the size of the tag
+            u_type->Union.tag_type = type_build_from_ast(alloc, (AstType *) tag_enum_node);
+
+            return u_type;
         }
     }
 
@@ -1089,6 +1222,11 @@ const char* type_get_unique_name(Type* type) {
                 return bh_aprintf(global_scratch_allocator, "%s@%l", type->Enum.name, type->id);
             else
                 return bh_aprintf(global_scratch_allocator, "%s@%l", "<anonymous enum>", type->id);
+        case Type_Kind_Union:
+            if (type->Union.name)
+                return bh_aprintf(global_scratch_allocator, "%s@%l", type->Union.name, type->id);
+            else
+                return bh_aprintf(global_scratch_allocator, "%s@%l", "<anonymous union>", type->id);
 
         case Type_Kind_Slice: return bh_aprintf(global_scratch_allocator, "[] %s", type_get_unique_name(type->Slice.elem));
         case Type_Kind_VarArgs: return bh_aprintf(global_scratch_allocator, "..%s", type_get_unique_name(type->VarArgs.elem));
@@ -1150,6 +1288,9 @@ const char* type_get_name(Type* type) {
         case Type_Kind_PolyStruct:
             return type->PolyStruct.name;
 
+        case Type_Kind_PolyUnion:
+            return type->PolyUnion.name;
+
         case Type_Kind_Struct:
             if (type->Struct.name)
                 return type->Struct.name;
@@ -1161,6 +1302,12 @@ const char* type_get_name(Type* type) {
                 return type->Enum.name;
             else
                 return "<anonymous enum>";
+
+        case Type_Kind_Union:
+            if (type->Union.name)
+                return type->Union.name;
+            else
+                return "<anonymous union>";
 
         case Type_Kind_Slice: return bh_aprintf(global_scratch_allocator, "[] %s", type_get_name(type->Slice.elem));
         case Type_Kind_VarArgs: return bh_aprintf(global_scratch_allocator, "..%s", type_get_name(type->VarArgs.elem));
@@ -1261,6 +1408,10 @@ static const StructMember func_members[] = {
     { 2 * POINTER_SIZE, 2, &basic_types[Basic_Kind_U32],    "closure_size", NULL, NULL, -1, 0, 0 },
 };
 
+static const StructMember union_members[] = {
+    { 0, 0, NULL, "tag", NULL, NULL, -1, 0, 0 },
+};
+
 b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
     if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
 
@@ -1309,6 +1460,16 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
             }
         }
 
+        case Type_Kind_Union: {
+            if (!strcmp(member, "tag")) {
+                *smem = union_members[0];
+                smem->type = type->Union.tag_type;
+                return 1;
+            }
+
+            return 0;
+        }
+
         default: return 0;
     }
 }
@@ -1351,6 +1512,22 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
             if (idx > 2) return 0;
 
             *smem = func_members[idx];
+            return 1;
+        }
+
+        case Type_Kind_Union: {
+            if (idx > 2) return 0;
+
+            if (idx == 0) {
+                smem->type = type->Union.tag_type;
+                smem->offset = 0;
+            }
+
+            if (idx == 1) {
+                smem->type = NULL;
+                smem->offset = type->Union.alignment;
+            }
+
             return 1;
         }
 
@@ -1568,10 +1745,12 @@ b32 type_is_structlike(Type* type) {
     if (type->kind == Type_Kind_Function) return 1;
     if (type->kind == Type_Kind_DynArray) return 1;
     if (type->kind == Type_Kind_VarArgs) return 1;
+    if (type->kind == Type_Kind_Union) return 1;
     if (type->kind == Type_Kind_Pointer) {
         if (type->Pointer.elem->kind == Type_Kind_Struct) return 1;
         if (type->Pointer.elem->kind == Type_Kind_Slice)  return 1;
         if (type->Pointer.elem->kind == Type_Kind_DynArray) return 1;
+        if (type->Pointer.elem->kind == Type_Kind_Union) return 1;
     }
     return 0;
 }
@@ -1583,6 +1762,7 @@ b32 type_is_structlike_strict(Type* type) {
     if (type->kind == Type_Kind_DynArray) return 1;
     if (type->kind == Type_Kind_Function) return 1;
     if (type->kind == Type_Kind_VarArgs)  return 1;
+    if (type->kind == Type_Kind_Union)    return 1;
     return 0;
 }
 
@@ -1595,6 +1775,7 @@ u32 type_structlike_mem_count(Type* type) {
         case Type_Kind_Function: return 3;
         case Type_Kind_DynArray: return 4;
         case Type_Kind_Distinct: return 1;
+        case Type_Kind_Union:    return 2;
         default: return 0;
     }
 }
@@ -1605,8 +1786,6 @@ u32 type_structlike_is_simple(Type* type) {
         case Type_Kind_Slice:    return 1;
         case Type_Kind_VarArgs:  return 1;
         case Type_Kind_Function: return 1;
-        case Type_Kind_DynArray: return 0;
-        case Type_Kind_Struct:   return 0;
         default: return 0;
     }
 }
@@ -1618,15 +1797,22 @@ b32 type_is_sl_constructable(Type* type) {
         case Type_Kind_Slice:    return 1;
         case Type_Kind_DynArray: return 1;
         case Type_Kind_Function: return 1;
+        case Type_Kind_Union:    return 1;
         default: return 0;
     }
 }
 
-b32 type_struct_constructed_from_poly_struct(Type* struct_type, struct AstType* from) {
-    if (struct_type == NULL) return 0;
-    if (struct_type->kind != Type_Kind_Struct) return 0;
+b32 type_constructed_from_poly(Type* base, struct AstType* from) {
+    if (base == NULL) return 0;
+    if (base->kind == Type_Kind_Struct) {
+        return base->Struct.constructed_from == from;
+    }
 
-    return struct_type->Struct.constructed_from == from;
+    if (base->kind == Type_Kind_Union) {
+        return base->Union.constructed_from == from;
+    }
+
+    return 0;
 }
 
 Type* type_struct_is_just_one_basic_value(Type *type) {
@@ -1636,3 +1822,32 @@ Type* type_struct_is_just_one_basic_value(Type *type) {
     if (type->Struct.memarr[0]->type->kind != Type_Kind_Basic) return NULL;
     return type->Struct.memarr[0]->type;
 }
+
+u32 type_union_get_variant_count(Type *type) {
+    if (!type) return 0;
+    switch (type->kind) {
+        case Type_Kind_Union: return bh_arr_length(type->Union.variants_ordered);
+        case Type_Kind_Pointer: return type_union_get_variant_count(type->Pointer.elem);
+        default: return 0;
+    }
+}
+
+UnionVariant* type_lookup_union_variant_by_idx(Type* type, i32 idx) {
+    if (!type) return NULL;
+    if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
+    if (type->kind != Type_Kind_Union) return NULL;
+    if (idx < 0 || idx >= bh_arr_length(type->Union.variants_ordered)) return NULL;
+
+    return type->Union.variants_ordered[idx];
+}
+
+UnionVariant* type_lookup_union_variant_by_name(Type* type, char *name) {
+    if (!type) return NULL;
+    if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
+    if (type->kind != Type_Kind_Union) return NULL;
+
+    i32 index = shgeti(type->Union.variants, name);
+    if (index == -1) return NULL;
+    return type->Union.variants[index].value;
+}
+

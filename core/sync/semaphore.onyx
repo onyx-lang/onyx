@@ -3,7 +3,9 @@ package core.sync
 use runtime
 use core
 
-use core.intrinsics.atomics
+#if runtime.Wait_Notify_Available {
+    use core.intrinsics.atomics {__atomic_wait, __atomic_notify}
+}
 
 #doc """
     A semaphore represents a counter that can only be incremented

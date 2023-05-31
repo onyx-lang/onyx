@@ -1,0 +1,167 @@
+
+use core {*}
+
+union_is :: macro (u: $U, $variant: U.tag_enum) -> bool {
+    return cast(U.tag_enum, u) == variant;
+}
+
+extract_variant :: macro (u: $U, $variant: U.tag_enum) => {
+    switch u {
+        case variant => v {
+            return Optional.make(v);
+        }
+    }
+
+    return .{};
+}
+
+
+
+simple_example :: () {
+    Simple :: union {
+        int: i32;
+        float: f32;
+        string: str;
+    }
+
+    s := Simple.{ int = 123 };
+    println(s);
+
+    s = Simple.{ float = 100.0f };
+    println(s);
+
+    s = .{ string = "Working" };
+    println(s);
+}
+
+extraction_example :: () {
+    Extraction :: union {
+        int: i32;
+        float: f32;
+        string: str;
+    }
+
+    value := Extraction.{ string = "This works" };
+
+    switch value {
+        case .int => int_value {
+            printf("This is an integer: {}\n", int_value);
+        }
+
+        case .float => float_value {
+            printf("This is a float: {}\n", float_value);
+        }
+
+        case .string => string_value {
+            printf("This is a string: {}\n", string_value);
+        }
+    }
+}
+
+method_example :: () {
+    Methoded :: union {
+        int: i32;
+        float: f32;
+        string: str;
+
+        do_the_thing :: (value: &Methoded) {
+            switch *value {
+                case .int => int_value {
+                    printf("This is an integer: {}\n", int_value);
+                }
+
+                case .float => float_value {
+                    printf("This is a float: {}\n", float_value);
+                }
+
+                case .string => string_value {
+                    printf("This is a string: {}\n", string_value);
+                }
+            }
+        }
+    } 
+
+    v := Methoded.{ int = 9876 };
+    v->do_the_thing();
+}
+
+linked_list_example :: () {
+    Link :: union {
+        End: void;
+        Next: struct {
+            data: i32;
+            next: &Link;
+        }
+    }
+
+    print_links :: (l: &Link) {
+        walker := l;
+        while true {
+            switch walker {
+                case .End do break break;
+
+                case .Next => &next {
+                    printf("{}\n", next.data);
+                    walker = next.next;
+                }
+            }
+        }
+    }
+
+    l := Link.{
+        Next = .{
+            data = 123,
+            next = &Link.{
+                Next = .{
+                    data = 456,
+                    next = &Link.{ End = .{} },
+                }
+            }
+        }
+    };
+    
+    print_links(&l);
+}
+
+polymorphic_example :: () {
+    Error :: union {
+        Parse_Error: str;
+        Process_Error: str;
+    }
+
+    Errorable :: union (T: type_expr) {
+        Error: Error;
+        Success: T;
+    }
+
+    do_a_thing :: () -> Errorable(i32) {
+        // return .{ Success = 123 };
+        return .{ Error = .{ Process_Error = "bad data" } };
+    }
+
+    v := do_a_thing();
+    println(v);
+}
+
+direct_access_is_an_optional :: () {
+    Methoded :: union {
+        int: i32;
+        float: f32;
+        string: str;
+    }
+
+    v := Methoded.{ string = "A wrapped value" };
+
+    the_string := v.string->unwrap();
+    println(the_string);
+}
+
+
+main :: () {
+    simple_example();
+    extraction_example();
+    method_example();
+    linked_list_example();
+    polymorphic_example();
+    direct_access_is_an_optional();
+}

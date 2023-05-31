@@ -26,6 +26,7 @@ static inline b32 should_clone(AstNode* node) {
         case Ast_Kind_Macro:
         case Ast_Kind_Symbol:
         case Ast_Kind_Poly_Struct_Type:
+        case Ast_Kind_Poly_Union_Type:
         case Ast_Kind_Basic_Type:
         case Ast_Kind_Enum_Type:
         case Ast_Kind_Enum_Value:
@@ -119,6 +120,8 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Import: return sizeof(AstImport);
         case Ast_Kind_Capture_Block: return sizeof(AstCaptureBlock);
         case Ast_Kind_Capture_Local: return sizeof(AstCaptureLocal);
+        case Ast_Kind_Union_Type: return sizeof(AstUnionType);
+        case Ast_Kind_Union_Variant: return sizeof(AstUnionVariant);
         case Ast_Kind_Count: return 0;
     }
 
@@ -304,6 +307,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             break;
 
         case Ast_Kind_Switch_Case: {
+            C(AstSwitchCase, capture);
             C(AstSwitchCase, block);
 
             AstSwitchCase *dw = (AstSwitchCase *) nn;
@@ -400,6 +404,51 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             bh_arr_new(global_heap_allocator, ds->meta_tags, bh_arr_length(ss->meta_tags));
             bh_arr_each(AstTyped *, tag, ss->meta_tags) {
                 bh_arr_push(ds->meta_tags, (AstTyped *) ast_clone(a, *tag));
+            }
+
+            break;
+        }
+
+        case Ast_Kind_Union_Type: {
+            AstUnionType* du = (AstUnionType *) nn;
+            AstUnionType* su = (AstUnionType *) node;
+
+            du->variants = NULL;
+            bh_arr_new(global_heap_allocator, du->variants, bh_arr_length(su->variants));
+
+            bh_arr_each(AstUnionVariant *, uv, su->variants) {
+                bh_arr_push(du->variants, (AstUnionVariant *) ast_clone(a, *uv));
+            }
+
+            du->meta_tags = NULL;
+            bh_arr_new(global_heap_allocator, du->meta_tags, bh_arr_length(su->meta_tags));
+            bh_arr_each(AstTyped *, tag, su->meta_tags) {
+                bh_arr_push(du->meta_tags, (AstTyped *) ast_clone(a, *tag));
+            }
+            
+            if (su->constraints.constraints) {
+                memset(&du->constraints, 0, sizeof(ConstraintContext));
+                bh_arr_new(global_heap_allocator, du->constraints.constraints, bh_arr_length(su->constraints.constraints));
+
+                bh_arr_each(AstConstraint *, constraint, su->constraints.constraints) {
+                    bh_arr_push(du->constraints.constraints, (AstConstraint *) ast_clone(a, (AstNode *) *constraint));
+                }
+            }
+
+            du->utcache = NULL;
+            break;
+        }
+
+        case Ast_Kind_Union_Variant: {
+            C(AstUnionVariant, type_node);
+
+            AstUnionVariant *du = (AstUnionVariant *) nn;
+            AstUnionVariant *su = (AstUnionVariant *) node;
+
+            du->meta_tags = NULL;
+            bh_arr_new(global_heap_allocator, du->meta_tags, bh_arr_length(su->meta_tags));
+            bh_arr_each(AstTyped *, tag, su->meta_tags) {
+                bh_arr_push(du->meta_tags, (AstTyped *) ast_clone(a, *tag));
             }
 
             break;

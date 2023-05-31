@@ -330,9 +330,45 @@ all_types_peeled_off:
             return result;
         }
 
+        case Ast_Kind_Union_Type: {
+            AstUnionType* utype = (AstUnionType *) node;
+
+            AstNode *result = NULL;
+            if (utype->scope) {
+                Scope **tmp_parent;
+                Scope *tmp_parent_backup;
+                if (utype->utcache && utype->utcache->Union.constructed_from) {
+                    // Structs scope -> Poly Solution Scope -> Poly Struct Scope -> Enclosing Scope
+                    tmp_parent = &utype->scope->parent->parent->parent;
+                } else {
+                    tmp_parent = &utype->scope->parent;
+                }
+
+                tmp_parent_backup = *tmp_parent;
+                *tmp_parent = NULL;
+
+                result = symbol_raw_resolve(utype->scope, symbol);
+
+                *tmp_parent = tmp_parent_backup;
+            }
+
+            if (result == NULL && utype->utcache != NULL) {
+                if (!strcmp(symbol, "tag_enum")) {
+                    result = (AstNode *) utype->utcache->Union.tag_type->ast_type;
+                }
+            }
+
+            return result;
+        }
+
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* stype = ((AstPolyStructType *) node);
             return symbol_raw_resolve(stype->scope, symbol);
+        }
+
+        case Ast_Kind_Poly_Union_Type: {
+            AstPolyUnionType* utype = ((AstPolyUnionType *) node);
+            return symbol_raw_resolve(utype->scope, symbol);
         }
 
         case Ast_Kind_Poly_Call_Type: {
@@ -1196,6 +1232,43 @@ u32 char_to_base16_value(char x) {
     return 0xffffffff;
 }
 
+static i32 encode_utf8_char(char ** d, u32 r) {
+    char *dest = *d;
+    int len = 0;
+
+    if (r <= 0x7F) {
+        *dest++ = r;
+        len = 1;
+    }
+
+    else if (r <= 0x7FF) {
+        *dest++ = (0xC0 | ((r >> 6) & 0x1F));
+        *dest++ = (0x80 | (r & 0x3F));
+        len = 2;
+    }
+
+    else if (r >= 0xD800 && r <= 0xDFFF) {
+    }
+
+    else if (r <= 0xFFFF) {
+        *dest++ = (0xE0 | ((r >> 12) & 0x0F));
+        *dest++ = (0x80 | ((r >> 6) & 0x3F));
+        *dest++ = (0x80 | (r & 0x3F));
+        len = 3;
+    }
+
+    else if (r <= 0x10FFFF) {
+        *dest++ = (0xF0 | ((r >> 18) & 0x07));
+        *dest++ = (0x80 | ((r >> 12) & 0x3F));
+        *dest++ = (0x80 | ((r >> 6) & 0x3F));
+        *dest++ = (0x80 | (r & 0x3F));
+        len = 4;
+    }
+
+    *d = dest;
+    return len;
+}
+
 i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
     i32 total_len = 0;
     for (i32 i = 0; i < len; i++) {
@@ -1221,6 +1294,30 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
                 i += 2;
                 break;
             }
+            case 'u': {
+                if (len - i < 5) break;
+                u32 c =
+                      (char_to_base16_value(src[i + 1]) << 12)
+                    | (char_to_base16_value(src[i + 2]) << 8)
+                    | (char_to_base16_value(src[i + 3]) << 4)
+                    | (char_to_base16_value(src[i + 4]));
+                total_len += encode_utf8_char(&dest, c);
+                i += 5;
+                break;
+            }
+            case 'U': {
+                if (len - i < 7) break;
+                u32 c =
+                      (char_to_base16_value(src[i + 1]) << 20)
+                    | (char_to_base16_value(src[i + 2]) << 16)
+                    | (char_to_base16_value(src[i + 3]) << 12)
+                    | (char_to_base16_value(src[i + 4]) << 8)
+                    | (char_to_base16_value(src[i + 5]) << 4)
+                    | (char_to_base16_value(src[i + 6]));
+                total_len += encode_utf8_char(&dest, c);
+                i += 7;
+                break;
+            }
             default:  *dest++ = '\\';
                       *dest++ = src[i];
                       total_len += 2;
@@ -1236,6 +1333,7 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
 
     return total_len;
 }
+
 
 static Scope **get_scope_from_node_helper(AstNode *node) {
     b32 used_pointer = 0;
@@ -1288,6 +1386,16 @@ all_types_peeled_off:
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* pstype = (AstPolyStructType *) node;
             return &pstype->scope;
+        }
+
+        case Ast_Kind_Union_Type: {
+            AstUnionType* utype = (AstUnionType *) node;
+            return &utype->scope;
+        }
+
+        case Ast_Kind_Poly_Union_Type: {
+            AstPolyUnionType* putype = (AstPolyUnionType *) node;
+            return &putype->scope;
         }
 
         case Ast_Kind_Poly_Call_Type: {

@@ -12,6 +12,7 @@ static const char* token_type_names[] = {
     "", // start
     "package",
     "struct",
+    "union",
     "enum",
     "use",
     "if",
@@ -38,6 +39,7 @@ static const char* token_type_names[] = {
     "", // end
 
     "->",
+    "=>",
     "<-",
     "---",
     "|>",
@@ -380,6 +382,7 @@ whitespace_skipped:
         break;
     case 'u':
         LITERAL_TOKEN("use",         1, Token_Type_Keyword_Use);
+        LITERAL_TOKEN("union",       1, Token_Type_Keyword_Union);
         break;
     case 'w':
         LITERAL_TOKEN("while",       1, Token_Type_Keyword_While);
@@ -420,6 +423,7 @@ whitespace_skipped:
 
     case '=':
         LITERAL_TOKEN("==",          0, Token_Type_Equal_Equal);
+        LITERAL_TOKEN("=>",          0, Token_Type_Fat_Right_Arrow);
         break;
 
     case '!':

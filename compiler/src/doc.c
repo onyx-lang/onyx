@@ -204,6 +204,14 @@ void onyx_docs_submit(OnyxDocInfo *docs, AstBinding *binding) {
     if (node->kind == Ast_Kind_Distinct_Type) {
         bh_arr_push(docs->distinct_types, binding);
     }
+
+    if (node->kind == Ast_Kind_Union_Type) {
+        bh_arr_push(docs->unions, binding);
+    }
+
+    if (node->kind == Ast_Kind_Poly_Union_Type) {
+        bh_arr_push(docs->unions, binding);
+    }
 }
 
 #define Doc_Magic_Bytes "ODOC"
@@ -278,8 +286,16 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
             bh_buffer_write_string(buffer, ((AstStructType *) node)->name);
             return;
 
+        case Ast_Kind_Union_Type:
+            bh_buffer_write_string(buffer, ((AstUnionType *) node)->name);
+            return;
+
         case Ast_Kind_Poly_Struct_Type:
             bh_buffer_write_string(buffer, ((AstPolyStructType *) node)->name);
+            return;
+
+        case Ast_Kind_Poly_Union_Type:
+            bh_buffer_write_string(buffer, ((AstPolyUnionType *) node)->name);
             return;
 
         case Ast_Kind_Poly_Call_Type:
@@ -703,6 +719,76 @@ static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *
     return 1;
 }
 
+static b32 write_doc_union_type(bh_buffer *buffer, AstBinding *binding, AstNode *node) {
+    Scope *method_scope = NULL;
+
+    if (node->kind == Ast_Kind_Union_Type) {
+        AstUnionType *union_node = (void *) node;
+        method_scope = get_scope_from_node((AstNode *) union_node);
+
+        write_entity_header(buffer, binding, node->token->pos);
+
+        Type *union_type = union_node->utcache;
+        assert(union_type);
+
+        bh_buffer_write_u32(buffer, bh_arr_length(union_type->Union.variants_ordered));
+        bh_arr_each(UnionVariant*, puv, union_type->Union.variants_ordered) {
+            UnionVariant* uv = *puv;
+
+            write_cstring(buffer, uv->name);
+            write_cstring(buffer, type_get_name(uv->type));
+        }
+
+        // Polymorph parameters
+        bh_buffer_write_u32(buffer, 0);
+
+        // Constraints
+        write_doc_constraints(buffer, &union_node->constraints, NULL);
+    }
+    else if (node->kind == Ast_Kind_Poly_Union_Type) {
+        AstPolyUnionType *poly_union_node = (void *) node;
+        method_scope = get_scope_from_node((AstNode *) poly_union_node);
+
+        AstUnionType *union_node = poly_union_node->base_union;
+
+        write_entity_header(buffer, binding, node->token->pos);
+
+        bh_buffer type_buf;
+        bh_buffer_init(&type_buf, global_scratch_allocator, 256);
+
+        bh_buffer_write_u32(buffer, bh_arr_length(union_node->variants));
+        bh_arr_each(AstUnionVariant*, puv, union_node->variants) {
+            AstUnionVariant* uv = *puv;
+
+            bh_buffer_clear(&type_buf);
+            write_type_node(&type_buf, uv->type_node);
+
+            write_string(buffer, uv->token->length, uv->token->text);
+            write_string(buffer, type_buf.length, type_buf.data);
+        }
+
+        // Polymorph parameters
+        bh_buffer_write_u32(buffer, bh_arr_length(poly_union_node->poly_params));
+        bh_arr_each(AstPolyStructParam, param, poly_union_node->poly_params) {
+            bh_buffer_clear(&type_buf);
+            write_type_node(&type_buf, param->type_node);
+
+            write_string(buffer, param->token->length, param->token->text);
+            write_string(buffer, type_buf.length, type_buf.data);
+            write_cstring(buffer, "");
+        }
+
+        // Constraints
+        write_doc_constraints(buffer, &union_node->constraints, NULL);
+
+        bh_buffer_free(&type_buf);
+    }
+
+    write_doc_methods(buffer, method_scope);
+
+    return 1;
+}
+
 static b32 write_doc_enum(bh_buffer *buffer, AstBinding *binding, AstNode *node) {
     AstEnumType *enum_node = (void *) node;
 
@@ -784,6 +870,7 @@ void onyx_docs_emit_odoc(const char *dest) {
     bh_buffer_write_u32(&doc_buffer, 0);
     bh_buffer_write_u32(&doc_buffer, 0);
     bh_buffer_write_u32(&doc_buffer, 0);
+    bh_buffer_write_u32(&doc_buffer, 0);
 
     //
     // Package Info
@@ -836,9 +923,15 @@ void onyx_docs_emit_odoc(const char *dest) {
 
 
     //
+    // Union Info
+    //
+    write_doc_entity_array(&doc_buffer, context.doc_info->unions, write_doc_union_type, offset_table_index + 20);
+
+
+    //
     // File Info
     //
-    *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 20)) = doc_buffer.length;
+    *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 24)) = doc_buffer.length;
 
     bh_buffer_write_u32(&doc_buffer, shlenu(context.doc_info->file_ids));
     fori (i, 0, shlen(context.doc_info->file_ids)) {

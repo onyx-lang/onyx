@@ -70,6 +70,9 @@
     NODE(PolyStructType)       \
     NODE(PolyStructParam)      \
     NODE(PolyCallType)         \
+    NODE(UnionType)            \
+    NODE(UnionVariant)         \
+    NODE(PolyUnionType)        \
     NODE(EnumType)             \
     NODE(EnumValue)            \
     NODE(TypeAlias)            \
@@ -172,6 +175,8 @@ typedef enum AstKind {
     Ast_Kind_Struct_Type,
     Ast_Kind_Poly_Struct_Type,
     Ast_Kind_Poly_Call_Type,
+    Ast_Kind_Union_Type,
+    Ast_Kind_Poly_Union_Type,
     Ast_Kind_Enum_Type,
     Ast_Kind_Type_Alias,
     Ast_Kind_Type_Raw_Alias,
@@ -181,6 +186,7 @@ typedef enum AstKind {
     Ast_Kind_Type_End,
 
     Ast_Kind_Struct_Member,
+    Ast_Kind_Union_Variant,
     Ast_Kind_Enum_Value,
 
     Ast_Kind_NumLit,
@@ -704,6 +710,8 @@ struct AstFieldAccess   {
     u32 offset;
     u32 idx;
     char* field; // If token is null, defer to field
+
+    b32 is_union_variant_access : 1;
 };
 struct AstFileContents  {
     AstTyped_base;
@@ -866,6 +874,7 @@ typedef struct AstIfWhile AstWhile;
 typedef enum SwitchKind {
     Switch_Kind_Integer,
     Switch_Kind_Use_Equals,
+    Switch_Kind_Union,
 } SwitchKind;
 
 typedef struct CaseToBlock {
@@ -882,7 +891,10 @@ struct AstSwitchCase {
 
     AstBlock *block;
 
+    AstLocal *capture;
+
     b32 is_default: 1; // Could this be inferred by the values array being null?
+    b32 capture_is_by_pointer: 1;
 };
 
 struct AstSwitch {
@@ -900,6 +912,10 @@ struct AstSwitch {
 
     i32 yield_return_index;
     SwitchKind switch_kind;
+
+    // NOTE: This is an array of "bools" that says which union variants have
+    // been handled.
+    u8 *union_variants_handled;
 
     union {
         struct {
@@ -1016,6 +1032,49 @@ struct AstPolyCallType {
 
     // NOTE: These nodes can be either AstTypes, or AstTyped expressions.
     bh_arr(AstNode *) params;
+};
+struct AstUnionType {
+    AstType_base;
+    char *name;
+
+    bh_arr(AstUnionVariant *) variants;
+    bh_arr(AstTyped *) meta_tags;
+
+    // NOTE: Used to cache the actual type, since building
+    // a union type is kind of complicated and should
+    // only happen once.
+    Type *utcache;
+
+    // NOTE: This type is used when the union has not been
+    // completely generated, but is a valid pointer to where the
+    // type will be generated to.
+    Type *pending_type;
+
+    // NOTE: Used to store statically bound expressions in the union.
+    Scope* scope;
+
+    OnyxFilePos polymorphic_error_loc;
+    ConstraintContext constraints;
+
+    bh_arr(AstType *)       polymorphic_argument_types;
+    bh_arr(AstPolySolution) polymorphic_arguments;
+
+    b32 pending_type_is_valid : 1;
+    // b32 ready_to_build_type   : 1;
+};
+struct AstUnionVariant {
+    AstTyped_base;
+    bh_arr(AstTyped *) meta_tags;
+};
+struct AstPolyUnionType {
+    AstType_base;
+    char *name;
+
+    Scope *scope;
+    bh_arr(AstPolyStructParam) poly_params;
+    Table(AstUnionType *) concrete_unions;
+
+    AstUnionType* base_union;
 };
 struct AstEnumType {
     AstType_base;
@@ -1692,6 +1751,7 @@ typedef struct OnyxDocInfo {
     bh_arr(AstBinding *) structures;
     bh_arr(AstBinding *) enumerations;
     bh_arr(AstBinding *) distinct_types;
+    bh_arr(AstBinding *) unions;
 
     Table(u32) file_ids;
     u32 next_file_id;
@@ -1983,6 +2043,7 @@ void expand_macro(AstCall** pcall, AstFunction* template);
 AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed);
 
 Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
+Type* polymorphic_union_lookup(AstPolyUnionType* pu_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
 
 b32 resolve_intrinsic_interface_constraint(AstConstraint *constraint);
 
