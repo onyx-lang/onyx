@@ -171,7 +171,7 @@ contains :: (s: str, substr: str) -> bool {
 join :: (strs: [] str, sep: str, allocator := context.allocator) -> str {
     if strs.count == 0 do return "";
 
-    len_sum := array.fold(strs, 0, #(acc + it.length));
+    len_sum := array.fold(strs, 0, [v, acc](acc + v.length));
     out := make(str, len_sum + (strs.count - 1) * sep.count);
 
     i := 0;

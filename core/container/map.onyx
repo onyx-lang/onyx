@@ -213,7 +213,7 @@ to the value.
         *it += 10;
     }
 or:
-    m->update("test", #(*it += 10));
+    m->update("test", [v](*v += 10));
 """  
 update :: macro (map: ^Map, key: map.Key_Type, body: Code) {
     lookup_ :: lookup
@@ -221,7 +221,7 @@ update :: macro (map: ^Map, key: map.Key_Type, body: Code) {
 
     if lr.entry_index >= 0 {
         it := &map.entries[lr.entry_index].value;
-        #unquote body;
+        #unquote body(it);
     }
 }
 

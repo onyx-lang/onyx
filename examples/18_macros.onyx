@@ -108,8 +108,8 @@ main :: (args: [] cstr) {
     triple_macro(simple_code);
 
     // As another small shorthand, if a code block only contains one expression (like the code block above),
-    // then you can write by wrapping the expression in #(...).
-    triple_macro(#(println("Short code block!")));
+    // then you can write by wrapping the expression in [](...).
+    triple_macro([](println("Short code block!")));
 
     // As yet another small piece of syntactic sugar, you can pass a code block to a macro or procedure in
     // the following way:

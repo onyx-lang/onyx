@@ -48,7 +48,7 @@ __get_all_env :: () -> [] Pair(str, str) {
 __get_env :: (key: str) -> ? str {
     __lookup_all_envs();
 
-    return slice.first(all_env, #(it.first == key))
+    return slice.first(all_env, [v](v.first == key))
         |> Optional.from_ptr()
         |> Optional.transform(x => x.second);
 }

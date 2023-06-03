@@ -93,8 +93,8 @@ CSV_Column :: struct {
                         |> string.strip_trailing_whitespace();
 
             for header: string.split_iter(header_line, #char ",") {
-                member := array.first(output_type_info.members, #(do {
-                    if tag := array.first(it.tags, #(it.type == CSV_Column)); tag {
+                member := array.first(output_type_info.members, [](do {
+                    if tag := array.first(it.tags, [t](t.type == CSV_Column)); tag {
                         return any_as(*tag, CSV_Column).name == header;
                     }
 
@@ -144,7 +144,7 @@ CSV_Column :: struct {
             for &member: output_type_info.members {
                 if !#first do io.write(writer, ",");
 
-                if tag := array.first(member.tags, #(it.type == CSV_Column)); tag {
+                if tag := array.first(member.tags, [t](t.type == CSV_Column)); tag {
                     io.write(writer, any_as(*tag, CSV_Column).name);
                 } else {
                     io.write(writer, member.name);

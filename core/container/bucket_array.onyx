@@ -99,7 +99,7 @@ for_each :: macro (b: Bucket_Array($T), body: Code) {
         for bucket_index: bucket.count {
             it := &bucket.data[bucket_index];
 
-            #unquote body;
+            #unquote body(it);
         }
     }
 }
