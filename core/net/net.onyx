@@ -32,6 +32,7 @@ Socket :: struct {
     recv      :: socket_recv
     recv_into :: socket_recv_into
     recvfrom  :: socket_recvfrom
+    poll      :: socket_poll
 }
 
 SocketError :: enum {
@@ -185,6 +186,16 @@ socket_poll_all :: (sockets: [] &Socket, timeout := -1, stat_buff: [] Socket_Pol
     }
 
     __net_poll_recv(handles, timeout, stat_buff.data);
+}
+
+socket_poll :: (socket: &Socket, timeout := -1) -> Socket_Poll_Status {
+    handles := alloc.array_from_stack(Socket.Handle, 1);
+    handles[0] = socket.handle;
+
+    stat: Socket_Poll_Status;
+    __net_poll_recv(handles, timeout, &stat);
+
+    return stat;
 }
 
 socket_send :: (s: &Socket, data: [] u8) -> i32 {
