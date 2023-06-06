@@ -1700,8 +1700,6 @@ void arguments_clear_baked_flags(Arguments* args) {
 
 // GROSS: Using void* to avoid having to cast everything.
 const char* node_get_type_name(void* node) {
-    if (node_is_type((AstNode *) node)) return "type_expr";
-
     if (((AstNode *) node)->kind == Ast_Kind_Argument) {
         return node_get_type_name(((AstArgument *) node)->value);
     }

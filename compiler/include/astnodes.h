@@ -2105,6 +2105,7 @@ static inline b32 node_is_addressable_literal(AstNode* node) {
 static inline Type* get_expression_type(AstTyped* expr) {
     switch (expr->kind) {
         case Ast_Kind_Block: case Ast_Kind_If: case Ast_Kind_While: return NULL;
+        case Ast_Kind_Typeof: return &basic_types[Basic_Kind_Type_Index];
         default: return expr->type;
     }
 }

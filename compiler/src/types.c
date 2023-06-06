@@ -36,7 +36,7 @@ Type basic_types[] = {
     { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_f64x2, { Basic_Kind_F64X2,  Basic_Flag_SIMD,                        16, 16, "f64x2" } },
     { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_v128,  { Basic_Kind_V128,   Basic_Flag_SIMD,                        16, 16, "v128"  } },
 
-    { Type_Kind_Basic, 0, 0, NULL,                          { Basic_Kind_Type_Index, Basic_Flag_Type_Index,              4,  4, "type_expr" } },
+    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_type_expr, { Basic_Kind_Type_Index, Basic_Flag_Type_Index,          4,  4, "type_expr" } },
 };
 
 // TODO: Document this!!
