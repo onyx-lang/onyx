@@ -6,6 +6,7 @@ Additions:
 - New syntax for declaring quoted code blocks.
     - `[captures] { body }` for blocks.
     - `[captures] ( expr )` for expressions.
+- `Optional.with` for running a block of code with the value in an Optional, if one is present.
 
 Removals:
 - Remove old syntax for quoted blocks, `#quote` and `#()`.
