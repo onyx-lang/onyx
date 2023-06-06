@@ -496,7 +496,7 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\\(\\|[abefnrut"0]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|[0-7]{3})</string>
+					<string>\\(\\|[abefnrut'"0]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|[0-7]{3})</string>
 					<key>name</key>
 					<string>constant.character.escape.onyx</string>
 				</dict>
@@ -526,6 +526,37 @@
 					</dict>
 					<key>end</key>
 					<string>"</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>0</key>
+						<dict>
+							<key>name</key>
+							<string>punctuation.definition.string.end.onyx</string>
+						</dict>
+					</dict>
+					<key>name</key>
+					<string>string.quoted.double.onyx</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#string_escaped_char</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>begin</key>
+					<string>'</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>0</key>
+						<dict>
+							<key>name</key>
+							<string>punctuation.definition.string.begin.onyx</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>'</string>
 					<key>endCaptures</key>
 					<dict>
 						<key>0</key>
