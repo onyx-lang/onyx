@@ -272,6 +272,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
         case Ast_Kind_Block:
             ((AstBlock *) nn)->body = ast_clone_list(a, ((AstBlock *) node)->body);
+            ((AstBlock *) nn)->quoted_block_capture_scope = NULL;
             break;
 
         case Ast_Kind_Defer:
@@ -646,6 +647,15 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
         case Ast_Kind_Directive_Insert:
             C(AstDirectiveInsert, code_expr);
+
+            AstDirectiveInsert* id = (AstDirectiveInsert *) nn;
+            AstDirectiveInsert* is = (AstDirectiveInsert *) node;
+            id->binding_exprs = NULL;
+            bh_arr_new(global_heap_allocator, id->binding_exprs, bh_arr_length(is->binding_exprs));
+
+            bh_arr_each(AstTyped *, expr, is->binding_exprs) {
+                bh_arr_push(id->binding_exprs, (AstTyped *) ast_clone(a, (AstNode *) *expr));
+            }
             break;
 
         case Ast_Kind_Directive_Defined:

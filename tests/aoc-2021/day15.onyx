@@ -56,10 +56,10 @@ main :: (args) => {
                 }
             }
 
-            attempt_add(#(try.x > 0), -1, 0);
-            attempt_add(#(try.x < width * 5 - 1), 1, 0);
-            attempt_add(#(try.y > 0), 0, -1);
-            attempt_add(#(try.y < height * 5 - 1), 0, 1);
+            attempt_add([](try.x > 0), -1, 0);
+            attempt_add([](try.x < width * 5 - 1), 1, 0);
+            attempt_add([](try.y > 0), 0, -1);
+            attempt_add([](try.y < height * 5 - 1), 0, 1);
         }
 
         printf("Part 2: {}\n", minimum);

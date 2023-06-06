@@ -211,11 +211,11 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
 
             for ^member: s.members {
                 key := member.name;
-                if tag := array.first(member.tags, #(it.type == Custom_Key)); tag != null {
+                if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
                     key = (cast(^Custom_Key) tag.data).key;
                 }
 
-                if tag := array.first(member.tags, #(it.type == type_expr)); tag != null {
+                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
                     if *cast(^type_expr, tag.data) == Ignore {
                         continue;
                     }
@@ -326,11 +326,11 @@ from_any :: (type: type_expr, in: rawptr, allocator := context.allocator) -> Val
 
             for^ member: s_info.members {
                 key := member.name;
-                if tag := array.first(member.tags, #(it.type == Custom_Key)); tag != null {
+                if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
                     key = (cast(^Custom_Key) tag.data).key;
                 }
 
-                if tag := array.first(member.tags, #(it.type == type_expr)); tag != null {
+                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
                     if *cast(^type_expr, tag.data) == Ignore {
                         continue;
                     }
@@ -424,11 +424,11 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
 
             for^ member: s_info.members {
                 key := member.name;
-                if tag := array.first(member.tags, #(it.type == Custom_Key)); tag != null {
+                if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
                     key = (cast(^Custom_Key) tag.data).key;
                 }
 
-                if tag := array.first(member.tags, #(it.type == type_expr)); tag != null {
+                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
                     if *cast(^type_expr, tag.data) == Ignore {
                         continue;
                     }

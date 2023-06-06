@@ -1,7 +1,6 @@
 package core.time
 
 use core {package, *}
-use runtime
 
 Date :: struct {
     year: i32;

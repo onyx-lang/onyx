@@ -814,6 +814,7 @@ struct AstBlock         {
 
     Scope *scope;
     Scope *binding_scope;
+    Scope *quoted_block_capture_scope;
     BlockRule rules;
 
     u32 statement_idx;
@@ -1518,12 +1519,14 @@ struct AstCodeBlock {
     AstTyped_base;
 
     AstNode *code;
+    bh_arr(OnyxToken *) binding_symbols;
 };
 
 struct AstDirectiveInsert {
     AstTyped_base;
 
     AstTyped *code_expr;
+    bh_arr(AstTyped *) binding_exprs;
 };
 
 struct AstDirectiveInit {

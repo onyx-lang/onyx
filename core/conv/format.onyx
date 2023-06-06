@@ -729,7 +729,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
 
                 tag_value := *cast(&u32, v.data);
 
-                variant := array.first(u.variants, #(it.tag_value == tag_value));
+                variant := array.first(u.variants, [x](x.tag_value == tag_value));
 
                 if !variant {
                     output->write("unknown_variant");

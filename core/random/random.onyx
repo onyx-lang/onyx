@@ -118,16 +118,16 @@ string :: (bytes_long: u32, alpha_numeric := false, allocator := context.allocat
     RANDOM_INCREMENT  :: cast(i64) 11
 
     #if #defined(runtime.platform.__random_get) {
-        __initial_value :: #(do {
+        __initial_value :: [](do {
             v: u64;
             runtime.platform.__random_get(.{ ~~&v, sizeof typeof v });
             return v;
         })
     } else {
         #if #defined(core.os.time) {
-            __initial_value :: #(core.os.time())
+            __initial_value :: [](core.os.time())
         } else {
-            __initial_value :: #(8675309)
+            __initial_value :: [](8675309)
         }
     }
 }

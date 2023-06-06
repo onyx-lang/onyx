@@ -175,8 +175,8 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
     catch :: macro (r: Result($T, $E), on_err: Code) -> T {
         switch res := r; res {
             case .Ok => v  do return v;
-            case .Err {
-                #unquote on_err;
+            case .Err => err {
+                #unquote on_err(err);
             }
         }
     }

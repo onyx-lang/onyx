@@ -300,7 +300,7 @@ concat :: (arr: &[..] $T, other: Iterator(T)) {
     Use `it` to refer to the current element being tested.
 
         arr := array.make(.[ 1, 2, 3, 4, 5 ]);
-        array.filter(&arr, #(it % 2 == 0));
+        array.filter(&arr, [v](v % 2 == 0));
         println(arr); // 2, 4
 """
 filter :: macro (arr: &[..] $T, body: Code) {
@@ -310,7 +310,7 @@ filter :: macro (arr: &[..] $T, body: Code) {
         defer i += 1;
 
         it := arr[i];
-        if !(#unquote body) do move += 1;
+        if !(#unquote body(it)) do move += 1;
         if move != 0 do arr.data[i] = arr.data[i + move];
     }
 
@@ -354,6 +354,7 @@ fill_range  :: slice.fill_range
 to_list     :: slice.to_list
 find        :: slice.find
 find_ptr    :: slice.find_ptr
+find_opt    :: slice.find_opt
 first       :: slice.first
 count_where :: slice.count_where
 windows     :: slice.windows

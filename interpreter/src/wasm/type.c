@@ -157,7 +157,7 @@ WASM_DECLARE_VEC_IMPL(memorytype, *)
 
 // wasm_externtype_t
 
-const wasm_externkind_t wasm_externtype_kind(const wasm_externtype_t *externtype) {
+wasm_externkind_t wasm_externtype_kind(const wasm_externtype_t *externtype) {
     return externtype->kind;
 }
 

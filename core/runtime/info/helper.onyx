@@ -321,7 +321,7 @@ get_struct_method :: (type: type_expr, method_name: str) -> &any {
     info := cast(&Type_Info_Struct) get_type_info(type);
     if info.kind != .Struct do return null;
 
-    method := core.array.first(info.methods, #(it.name == method_name));
+    method := core.array.first(info.methods, [x](x.name == method_name));
     if method != null do return &method.func;
     return null;
 }
@@ -349,6 +349,6 @@ for_all_types :: macro (body: Code) {
         type_info := runtime.info.type_table[it];
         type_idx  : type_expr = ~~ it;
 
-        #unquote body;
+        #unquote body(type_info, type_idx);
     }
 }

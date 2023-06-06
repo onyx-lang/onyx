@@ -154,7 +154,7 @@ file_logger_open :: (filename: str, allocator := context.allocator) -> Result(&F
 
     file_logger.file = new(File, allocator);
 
-    *file_logger.file = open(filename, mode=.Append)->catch(#quote {
+    *file_logger.file = open(filename, mode=.Append)->catch([] {
         raw_free(allocator, file_logger.file);
         raw_free(allocator, file_logger);
 

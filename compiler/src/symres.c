@@ -916,6 +916,9 @@ static SymresStatus symres_directive_defined(AstDirectiveDefined** pdefined) {
 
 static SymresStatus symres_directive_insert(AstDirectiveInsert* insert) {
     SYMRES(expression, &insert->code_expr);
+    bh_arr_each(AstTyped *, pexpr, insert->binding_exprs) {
+        SYMRES(expression, pexpr);
+    }
     return Symres_Success;
 }
 
@@ -1002,6 +1005,9 @@ static SymresStatus symres_block(AstBlock* block) {
 
     if (block->binding_scope != NULL)
         scope_include(current_scope, block->binding_scope, block->token->pos);
+
+    if (block->quoted_block_capture_scope != NULL)
+        scope_include(current_scope, block->quoted_block_capture_scope, block->token->pos);
 
     if (block->body) {
         AstNode** start = &block->body;

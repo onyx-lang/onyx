@@ -58,7 +58,7 @@ main :: (args: [] cstr) {
     command_procedures := runtime.info.get_procedures_with_tag(Command);
     defer delete(&command_procedures);
 
-    command_tag := array.first(command_procedures, #(it.tag.command == command));
+    command_tag := array.first(command_procedures, [p](p.tag.command == command));
     if !command_tag {
         run_help_command(arguments);
         return;
