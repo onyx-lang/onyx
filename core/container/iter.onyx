@@ -25,6 +25,7 @@ use core.intrinsics.types {type_is_struct}
     skip :: skip;
     skip_while :: skip_while;
     
+    flatten :: flatten;
     enumerate :: enumerate;
 
     fold :: fold;
@@ -421,6 +422,35 @@ zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R)) -> Iterator(P
         zi => { close(zi.left_iter); close(zi.right_iter); });
 }
 
+
+#doc """
+    Filters and maps at the same time.
+
+    If the provided function returns a None variant of Optional,
+    then the entry is discarded.
+
+    If the provided function returns `Some(x)`, then `x` is yielded.
+"""
+flatten :: (i: Iterator($T), f: (T) -> ? $R) -> Iterator(R) {
+    return generator(
+        &.{ i = i, f = f },
+
+        fi => {
+            while true {
+                v, cont := next(fi.i);
+                if !cont do break;
+
+                v2 := fi.f(v);
+                if v2 {
+                    return v2->unwrap(), true;
+                }
+            }
+            return .{}, false;
+        },
+
+        fi => { close(fi.i); }
+    );
+}
 
 
 #doc """
