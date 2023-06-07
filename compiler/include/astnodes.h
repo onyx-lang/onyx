@@ -1776,6 +1776,11 @@ typedef struct ContextCaches {
     bh_imap implicit_cast_to_bool_cache;
 } ContextCaches; 
 
+typedef struct DefinedVariable {
+    char *key;
+    char *value;
+} DefinedVariable;
+
 
 typedef struct CompileOptions CompileOptions;
 struct CompileOptions {
@@ -1792,6 +1797,7 @@ struct CompileOptions {
     b32 use_post_mvp_features : 1;
     b32 use_multi_threading   : 1;
     b32 generate_foreign_info : 1;
+    b32 generate_type_info    : 1;
     b32 no_std                : 1;
     b32 no_stale_code         : 1;
     b32 show_all_errors       : 1;
@@ -1807,6 +1813,7 @@ struct CompileOptions {
     const char* documentation_file;
     const char* symbol_info_file;
     const char* help_subcommand;
+    bh_arr(DefinedVariable) defined_variables;
 
     b32 debug_enabled;
 

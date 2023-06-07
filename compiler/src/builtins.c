@@ -574,6 +574,9 @@ void initalize_special_globals() {
 
 void introduce_build_options(bh_allocator a) {
     Package* p = package_lookup_or_create("runtime", context.global_scope, a, context.global_scope->created_at);
+    
+    // HACK creating this for later
+    package_lookup_or_create("runtime.vars", p->scope, a, context.global_scope->created_at);
 
     AstType* Runtime_Type = (AstType *) symbol_raw_resolve(p->scope, "Runtime");
     if (Runtime_Type == NULL) {

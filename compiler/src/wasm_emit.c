@@ -4740,21 +4740,23 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
     u64 alignment = type_alignment_of(effective_type);
     u64 size = type_size_of(effective_type);
 
-    if (type_table_node != NULL && (AstMemRes *) type_table_node == memres) {
-        u64 table_location = build_type_table(mod);
-        memres->data_id = table_location;
-        return;
+    if (context.options->generate_type_info) {
+        if (type_table_node != NULL && (AstMemRes *) type_table_node == memres) {
+            u64 table_location = build_type_table(mod);
+            memres->data_id = table_location;
+            return;
+        }
+
+        if (tagged_procedures_node != NULL && (AstMemRes *) tagged_procedures_node == memres) {
+            u64 tagged_procedures_location = build_tagged_procedures(mod);
+            memres->data_id = tagged_procedures_location;
+            return;
+        }
     }
 
     if (foreign_blocks_node != NULL && (AstMemRes *) foreign_blocks_node == memres) {
         u64 foreign_blocks_location = build_foreign_blocks(mod);
         memres->data_id = foreign_blocks_location;
-        return;
-    }
-
-    if (tagged_procedures_node != NULL && (AstMemRes *) tagged_procedures_node == memres) {
-        u64 tagged_procedures_location = build_tagged_procedures(mod);
-        memres->data_id = tagged_procedures_location;
         return;
     }
 

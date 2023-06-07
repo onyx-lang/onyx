@@ -70,6 +70,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     "\t--tag                   Generates a C-Tag file.\n"
     "\t--syminfo <target_file> Generates a symbol resolution information file. Used by onyx-lsp.\n"
     "\t--no-stale-code         Disables use of `#allow_stale_code` directive\n"
+    "\t--no-type-info          Disables generating type information\n"
     "\t--generate-foreign-info\n"
     "\n"
     "Developer options:\n"
@@ -93,6 +94,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
         .use_post_mvp_features   = 1,
         .use_multi_threading     = 0,
+        .generate_foreign_info   = 0,
+        .generate_type_info      = 1,
         .no_std                  = 0,
         .no_stale_code           = 0,
         .show_all_errors         = 0,
@@ -106,6 +109,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .symbol_info_file   = NULL,
         .help_subcommand    = NULL,
 
+        .defined_variables = NULL,
+
         .debug_enabled = 0,
 
         .passthrough_argument_count = 0,
@@ -117,6 +122,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
     bh_arr_new(alloc, options.files, 2);
     bh_arr_new(alloc, options.included_folders, 2);
+    bh_arr_new(alloc, options.defined_variables, 2);
 
     char* core_installation;
     #ifdef _BH_LINUX
@@ -207,6 +213,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             else if (!strcmp(argv[i], "--generate-foreign-info")) {
                 options.generate_foreign_info = 1;
             }
+            else if (!strcmp(argv[i], "--no-type-info")) {
+                options.generate_type_info = 0;
+            }
             else if (!strcmp(argv[i], "--no-std")) {
                 options.no_std = 1;
             }
@@ -218,6 +227,18 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "-I")) {
                 bh_arr_push(options.included_folders, argv[++i]);
+            }
+            else if (!strncmp(argv[i], "-D", 2)) {
+                i32 len = strlen(argv[i]);
+                i32 j=2;
+                while (argv[i][j] != '=' && j < len) j++;
+
+                if (j < len) argv[i][j] = '\0';
+
+                DefinedVariable dv;
+                dv.key   = argv[i] + 2;
+                dv.value = argv[i] + j + 1;
+                bh_arr_push(options.defined_variables, dv);
             }
             else if (!strcmp(argv[i], "-r") || !strcmp(argv[i], "--runtime")) {
                 i += 1;
@@ -320,6 +341,34 @@ static AstInclude* create_load(bh_allocator alloc, char* filename) {
     include_node->token = &implicit_load_token;
 
     return include_node;
+}
+
+static void create_and_add_defined_variable(char *name, char *value) {
+    OnyxToken *value_token = bh_alloc_item(context.ast_alloc, OnyxToken);
+    value_token->text = value;
+    value_token->length = strlen(value);
+
+    OnyxToken *name_token = bh_alloc_item(context.ast_alloc, OnyxToken);
+    name_token->text = name;
+    name_token->length = strlen(name);
+
+    Package *p = package_lookup("runtime.vars");
+    assert(p);
+
+    AstStrLit *value_node = make_string_literal(context.ast_alloc, value_token);
+    add_entities_for_node(NULL, (AstNode *) value_node, NULL, NULL);
+
+    AstBinding *binding = onyx_ast_node_new(context.ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
+    binding->token = name_token;
+    binding->node = (AstNode *) value_node;
+
+    add_entities_for_node(NULL, (AstNode *) binding, p->scope, p);
+}
+
+static void introduce_defined_variables() {
+    bh_arr_each(DefinedVariable, dv, context.options->defined_variables) {
+        create_and_add_defined_variable(dv->key, dv->value);
+    }
 }
 
 // HACK
@@ -625,6 +674,7 @@ static b32 process_entity(Entity* ent) {
                 context.builtins_initialized = 1;
                 initialize_builtins(context.ast_alloc);
                 introduce_build_options(context.ast_alloc);
+                introduce_defined_variables();
             }
 
             // GROSS

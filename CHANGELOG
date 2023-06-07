@@ -8,10 +8,13 @@ Additions:
     - `[captures] ( expr )` for expressions.
 - `Optional.with` for running a block of code with the value in an Optional, if one is present.
 - `iter.flatten`
+- `-Dvariable=value` command line option to add symbols to the `runtime.vars` package.
+- `--no-type-info` command line option to omit type information from the binary.
 
 Removals:
 - Remove old syntax for quoted blocks, `#quote` and `#()`.
     - Switch to `[] {}` and `[] ()` respectively.
+- Old WASI specific modules for time and environment variables.
 
 Changes:
 
