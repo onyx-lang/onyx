@@ -1145,6 +1145,22 @@ SymresStatus symres_function_header(AstFunction* func) {
 
     SYMRES(type, &func->return_type);
 
+    if (context.options->stack_trace_enabled) {
+        OnyxToken *stack_trace_token = bh_alloc_item(context.ast_alloc, OnyxToken);
+        stack_trace_token->type = Token_Type_Symbol;
+        stack_trace_token->length = 13;
+        stack_trace_token->text = bh_strdup(context.ast_alloc, "__stack_trace ");
+        stack_trace_token->pos = func->token->pos;
+
+        if (!func->stack_trace_local) {
+            assert(builtin_stack_trace_type);
+            func->stack_trace_local = make_local(context.ast_alloc, stack_trace_token, builtin_stack_trace_type);
+            func->stack_trace_local->flags |= Ast_Flag_Decl_Followed_By_Init;
+        }
+
+        SYMRES(local, &func->stack_trace_local);
+    }
+
     scope_leave();
 
     return Symres_Success;

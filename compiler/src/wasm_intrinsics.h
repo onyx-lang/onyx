@@ -430,7 +430,7 @@ EMIT_FUNC_NO_ARGS(initialize_data_segments_body) {
         assert(datum->id > 0);
         if (datum->data == NULL) { index++; continue; }
 
-        emit_data_relocation(mod, &code, datum->id);
+        WIL(NULL, WI_PTR_CONST,   datum->offset_);
         WID(NULL, WI_PTR_CONST,   0);
         WID(NULL, WI_I32_CONST,   datum->length);
         WID(NULL, WI_MEMORY_INIT, ((WasmInstructionData) { index, 0 }));

@@ -2778,6 +2778,10 @@ CheckStatus check_function(AstFunction* func) {
             status = check_capture_block(func->captures);
         }
 
+        if (status == Check_Success && func->stack_trace_local) {
+            status = check_expression((AstTyped **) &func->stack_trace_local);
+        }
+
         if (status == Check_Success) {
             status = check_block(func->body);
         }

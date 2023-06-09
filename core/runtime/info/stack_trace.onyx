@@ -1,0 +1,37 @@
+package runtime.info
+use runtime
+
+Stack_Node :: struct {
+    file: str;
+    line: u32;
+    func_name: str;
+    func_type: type_expr;
+}
+
+Stack_Trace :: struct {
+    prev: &Stack_Trace;
+    data: &Stack_Node;
+}
+
+#if runtime.Stack_Trace_Enabled {
+
+get_stack_trace :: () -> [] &Stack_Node {
+    trace: [..] &Stack_Node;
+
+    walker := __stack_trace.prev;
+    while walker {
+        trace << walker.data;
+        walker = walker.prev;
+    }
+
+    return trace;
+}
+
+} else {
+
+get_stack_trace :: () -> [] &Stack_Node {
+    return .[];
+}
+    
+}
+

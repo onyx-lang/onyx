@@ -749,10 +749,12 @@ typedef struct OnyxWasmModule {
     i32 *heap_start_ptr;
     u64 stack_base_idx;
     u64 closure_base_idx;
+    u64 stack_trace_idx;
     CallingConvention curr_cc;
     i32 null_proc_func_idx;
 
     b32 has_stack_locals : 1;
+    b32 doing_linking : 1;
 
 #ifdef ENABLE_DEBUG_INFO
     struct DebugContext *debug_context;

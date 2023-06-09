@@ -62,16 +62,17 @@ static const char *build_docstring = DOCSTRING_HEADER
     "\t--verbose, -V           Verbose output.\n"
     "\t           -VV          Very verbose output.\n"
     "\t           -VVV         Very very verbose output (to be used by compiler developers).\n"
-    "\t--no-std                Disable automatically including \"core/std\".\n"
-    "\t--wasm-mvp              Use only WebAssembly MVP features.\n"
     "\t--multi-threaded        Enables multi-threading for this compilation.\n"
     "\t                        Automatically enabled for \"onyx\" runtime.\n"
     "\t--doc <doc_file>        Generates an O-DOC file, a.k.a an Onyx documentation file. Used by onyx-doc-gen.\n"
     "\t--tag                   Generates a C-Tag file.\n"
     "\t--syminfo <target_file> Generates a symbol resolution information file. Used by onyx-lsp.\n"
+    "\t--stack-trace           Enable dynamic stack trace.\n"
+    "\t--no-std                Disable automatically including \"core/std\".\n"
     "\t--no-stale-code         Disables use of `#allow_stale_code` directive\n"
     "\t--no-type-info          Disables generating type information\n"
-    "\t--generate-foreign-info\n"
+    "\t--generate-foreign-info Generate information for foreign blocks. Rarely needed, so disabled by default.\n"
+    "\t--wasm-mvp              Use only WebAssembly MVP features.\n"
     "\n"
     "Developer options:\n"
     "\t--no-colors               Disables colors in the error message.\n"
@@ -263,6 +264,10 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--debug")) {
                 options.debug_enabled = 1;
+                options.stack_trace_enabled = 1;
+            }
+            else if (!strcmp(argv[i], "--stack-trace")) {
+                options.stack_trace_enabled = 1;
             }
             else if (!strcmp(argv[i], "--")) {
                 options.passthrough_argument_count = argc - i - 1;
@@ -372,10 +377,11 @@ static void introduce_defined_variables() {
 }
 
 // HACK
-static u32 special_global_entities_remaining = 3;
+static u32 special_global_entities_remaining = 4;
 static Entity *runtime_info_types_entity;
 static Entity *runtime_info_foreign_entity;
 static Entity *runtime_info_proc_tags_entity;
+static Entity *runtime_info_stack_trace_entity;
 
 static void context_init(CompileOptions* opts) {
     memset(&context, 0, sizeof context);
@@ -384,7 +390,7 @@ static void context_init(CompileOptions* opts) {
     prepare_builtins();
 
     // HACK
-    special_global_entities_remaining = 3;
+    special_global_entities_remaining = 4;
 
     context.options = opts;
     context.cycle_detected = 0;
@@ -449,6 +455,12 @@ static void context_init(CompileOptions* opts) {
             .package = NULL,
             .include = create_load(context.ast_alloc, "core/runtime/info/proc_tags"),
         }));
+        runtime_info_stack_trace_entity = entity_heap_insert(&context.entities, ((Entity) {
+            .state = Entity_State_Parse,
+            .type = Entity_Type_Load_File,
+            .package = NULL,
+            .include = create_load(context.ast_alloc, "core/runtime/info/stack_trace"),
+        }));
     }
 
     builtin_heap_start.entity = NULL;
@@ -462,6 +474,7 @@ static void context_init(CompileOptions* opts) {
     add_entities_for_node(NULL, (AstNode *) &builtin_tls_base, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_tls_size, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_closure_base, context.global_scope, NULL);
+    add_entities_for_node(NULL, (AstNode *) &builtin_stack_trace, context.global_scope, NULL);
 
     // NOTE: Add all files passed by command line to the queue
     bh_arr_each(const char *, filename, opts->files) {
@@ -687,7 +700,8 @@ static b32 process_entity(Entity* ent) {
                 // GROSS
                 if (ent == runtime_info_types_entity
                     || ent == runtime_info_proc_tags_entity
-                    || ent == runtime_info_foreign_entity) {
+                    || ent == runtime_info_foreign_entity
+                    || ent == runtime_info_stack_trace_entity) {
                     special_global_entities_remaining--;
                 }
 

@@ -1402,6 +1402,9 @@ struct AstFunction {
     AstCaptureBlock *captures;
     Scope *scope_to_lookup_captured_values;
 
+    // NOTE: Only set on when --stack-trace is passed.
+    AstLocal *stack_trace_local;
+
     b32 is_exported        : 1;
     b32 is_foreign         : 1;
     b32 is_foreign_dyncall : 1;
@@ -1816,6 +1819,7 @@ struct CompileOptions {
     bh_arr(DefinedVariable) defined_variables;
 
     b32 debug_enabled;
+    b32 stack_trace_enabled;
 
     i32    passthrough_argument_count;
     char** passthrough_argument_data;
@@ -1903,6 +1907,7 @@ extern AstGlobal builtin_stack_top;
 extern AstGlobal builtin_tls_base;
 extern AstGlobal builtin_tls_size;
 extern AstGlobal builtin_closure_base;
+extern AstGlobal builtin_stack_trace;
 extern AstType  *builtin_string_type;
 extern AstType  *builtin_cstring_type;
 extern AstType  *builtin_range_type;
@@ -1918,6 +1923,7 @@ extern AstType  *builtin_any_type;
 extern AstType  *builtin_code_type;
 extern AstType  *builtin_link_options_type;
 extern AstType  *builtin_package_id_type;
+extern AstType  *builtin_stack_trace_type;
 extern AstTyped *type_table_node;
 extern AstTyped *foreign_blocks_node;
 extern AstType  *foreign_block_type;
