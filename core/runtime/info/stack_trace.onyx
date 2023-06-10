@@ -1,5 +1,16 @@
 package runtime.info
+
 use runtime
+use core {alloc} // These can included because this file is only included in non-custom runtimes.
+
+//
+// This file contains the code for working with runtime stack traces.
+// The only function in this file is `get_stack_trace`, which returns
+// an array of stack nodes, allocated from the threads temporary allocator.
+// This is not the `context.temp_allocator`, because certain builtin in
+// allocators use `get_stack_trace`, and can accidentally cause infinite
+// recursion.
+//
 
 Stack_Node :: struct {
     file: str;
@@ -15,8 +26,8 @@ Stack_Trace :: struct {
 
 #if runtime.Stack_Trace_Enabled {
 
-get_stack_trace :: () -> [] &Stack_Node {
-    trace: [..] &Stack_Node;
+get_stack_trace :: () -> [..] &Stack_Node {
+    trace := make([..] &Stack_Node, 8, alloc.temp_allocator);
 
     walker := __stack_trace.prev;
     while walker {
