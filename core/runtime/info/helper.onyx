@@ -261,6 +261,14 @@ struct_inherits :: (struct_type: type_expr, base_type: type_expr) -> bool {
     return first_member.used && first_member.type == base_type;
 }
 
+union_constructed_from :: (union_type: type_expr, base_type: type_expr) -> bool {
+    union_info := get_type_info(union_type);
+    if union_info.kind != .Union do return false;
+
+    return (cast(&Type_Info_Union) union_info).constructed_from == base_type;
+}
+
+
 #operator == (t1: Type_Info_Function, t2: Type_Info_Function) -> bool {
     if t1.parameter_types.count != t2.parameter_types.count do return false;
     if t1.return_type           != t2.return_type           do return false;

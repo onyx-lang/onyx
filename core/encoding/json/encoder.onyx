@@ -230,6 +230,20 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
             io.write(w, "}");
         }
 
+        case .Union {
+            if !union_constructed_from(data.type, Optional) {
+                return .Unsupported_Type;
+            }
+
+            u := info->as_union();
+            tag := *cast(&Optional(void).tag_enum) data.data;
+            if tag != .Some {
+                io.write(w, "null");
+            } else {
+                encode(w, misc.any_member(data, u.variants[1].type, u.alignment));
+            }
+        }
+
         case #default {
             return .Unsupported_Type;
         }
@@ -350,6 +364,20 @@ from_any :: (type: type_expr, in: rawptr, allocator := context.allocator) -> Val
             d_info := cast(^Type_Info_Distinct) t_info;
             return from_any(d_info.base_type, in);
         }
+
+        case .Union {
+            if !union_constructed_from(type, Optional) {
+                return null_value();
+            }
+
+            u := t_info->as_union();
+            tag := *cast(&Optional(void).tag_enum) in;
+            if tag != .Some {
+                return null_value();
+            } else {
+                return from_any(u.variants[1].type, memory.ptr_add(in, u.alignment), allocator);
+            }
+        }
     }
 
     return null_value();
@@ -446,6 +474,21 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
 
             d_info := cast(^Type_Info_Distinct) t_info;
             to_any(value, d_info.base_type, out);
+        }
+
+        case .Union {
+            if !union_constructed_from(type, Optional) {
+                return;
+            }
+
+            u_info := t_info->as_union();
+            if value->is_null() {
+                *cast(& ? void) out = .{};
+                return;
+            } else {
+                *cast(&Optional(void).tag_enum) out = .Some;
+                to_any(value, u_info.variants[1].type, memory.ptr_add(out, u_info.alignment));
+            }
         }
     }
 }
