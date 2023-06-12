@@ -162,6 +162,7 @@ static AstSolidifiedFunction generate_solidified_function(
         solidified_func.func = (AstFunction *) ast_clone(context.ast_alloc, pp);
     }
 
+    assert(pp->parent_scope_of_poly_proc);
     solidified_func.func->poly_scope = scope_create(context.ast_alloc, pp->parent_scope_of_poly_proc, poly_scope_pos);
     insert_poly_slns_into_scope(solidified_func.func->poly_scope, slns);
 
@@ -789,6 +790,11 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstFunction* pp, PolyProcLo
 // message if a solution could not be found. This can't be merged with polymorphic_proc_solidify
 // because polymorphic_proc_try_solidify uses the aforementioned function.
 AstFunction* polymorphic_proc_lookup(AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken* tkn) {
+
+    // Ensure the polymorphic procedure is ready to be solved for.
+    assert(pp->entity);
+    if (pp->entity->state < Entity_State_Check_Types) return (AstFunction *) &node_that_signals_a_yield;
+
     ensure_polyproc_cache_is_created(pp);
 
     bh_arr(AstPolySolution) slns = find_polymorphic_slns(pp, pp_lookup, actual, tkn, 1);
