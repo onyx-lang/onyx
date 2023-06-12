@@ -5,9 +5,9 @@ main :: () {
     s := "The quick brown fox jumps over the lazy dog";
     println(s);
 
-    encoded := conv.encode_hex(s);
+    encoded := encoding.hex.encode(s);
     println(encoded);
     
-    decoded := conv.decode_hex(encoded);
+    decoded := encoding.hex.decode(encoded);
     println(decoded);
 }

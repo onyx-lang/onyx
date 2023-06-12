@@ -59,6 +59,7 @@ use runtime
 
 #load "./time/date"
 #load "./encoding/base64"
+#load "./encoding/hex"
 #load "./encoding/utf8"
 #load "./encoding/osad"
 #load_all "./encoding/json"

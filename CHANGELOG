@@ -14,8 +14,8 @@ Additions:
 - `iter.flatten`
 - `-Dvariable=value` command line option to add symbols to the `runtime.vars` package.
 - `--no-type-info` command line option to omit type information from the binary.
-- `conv.encode_hex` and `conv.decode_hex`
-    - Quickly convrt a byte array to and from its hex equivalent.
+- `core.encoding.hex`
+    - Quickly convert a byte array to and from its hex equivalent.
 
 Removals:
 - Remove old syntax for quoted blocks, `#quote` and `#()`.
