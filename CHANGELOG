@@ -21,8 +21,11 @@ Removals:
 - Remove old syntax for quoted blocks, `#quote` and `#()`.
     - Switch to `[] {}` and `[] ()` respectively.
 - Old WASI specific modules for time and environment variables.
+- `Result.return_err` and `Result.return_ok`.
+    - Unnecessary with new union features.
 
 Changes:
+- Added support for optionals in `json.encode`, `json.from_any`, and `json.as_any`.
 
 Bugfixes:
 
