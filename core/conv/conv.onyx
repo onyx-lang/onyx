@@ -331,3 +331,39 @@ parse_float :: str_to_f64
 format_int :: i64_to_str
 format_uint :: u64_to_str
 format_float :: f64_to_str
+
+
+
+
+encode_hex :: (s: str, allocator := context.allocator) -> str {
+    #persist encode_map := u8.['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
+
+    new_str := make([] u8, s.count * 2, allocator);
+    for i: s.count {
+        new_str[2 * i + 0] = encode_map[(s[i] & 0xf0) >> 4];
+        new_str[2 * i + 1] = encode_map[s[i] & 0xf];
+    }
+
+    return new_str;
+}
+
+decode_hex :: (s: str, allocator := context.allocator) -> str {
+    assert(s.count & 1 == 0, "Expected string of even length");
+
+    new_str := make([] u8, s.count >> 1, allocator);
+    for i: range.{0, s.count, 2} {
+        new_str[i >> 1] = ~~((digit_to_value(s[i + 0]) << 4) | (digit_to_value(s[i + 1])));
+    }
+    
+    return new_str;
+
+    digit_to_value :: (it: u8) -> u32 {
+        switch it {
+            case #char "0" .. #char "9" do return ~~(it - #char "0");
+            case #char "a" .. #char "f" do return ~~(it - #char "a" + 10);
+            case #char "A" .. #char "F" do return ~~(it - #char "A" + 10);
+        }
+
+        return 0;
+    }
+}

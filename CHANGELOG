@@ -6,10 +6,16 @@ Additions:
 - New syntax for declaring quoted code blocks.
     - `[captures] { body }` for blocks.
     - `[captures] ( expr )` for expressions.
+- User-level stack trace.
+    - Enable with `--stack-trace`
+    - Use `runtime.info.get_stack_trace()` to get the current stack trace.
+    - Used in assertions and heap allocator for better error reporting
 - `Optional.with` for running a block of code with the value in an Optional, if one is present.
 - `iter.flatten`
 - `-Dvariable=value` command line option to add symbols to the `runtime.vars` package.
 - `--no-type-info` command line option to omit type information from the binary.
+- `conv.encode_hex` and `conv.decode_hex`
+    - Quickly convrt a byte array to and from its hex equivalent.
 
 Removals:
 - Remove old syntax for quoted blocks, `#quote` and `#()`.

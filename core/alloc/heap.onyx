@@ -15,8 +15,9 @@ use core
 // Enable this to enable checking for invalid blocks and other corruptions
 // that may happen on the heap, with the added overhead of checking that
 // on every alloc/resize/free.
-Enable_Debug :: #defined( runtime.vars.Enable_Heap_Debug )
-Enable_Clear_Freed_Memory :: #defined(runtime.vars.Enable_Heap_Clear_Freed_Memory)
+#local Enable_Debug :: #defined( runtime.vars.Enable_Heap_Debug )
+#local Enable_Clear_Freed_Memory :: #defined(runtime.vars.Enable_Heap_Clear_Freed_Memory)
+#local Enable_Stack_Trace :: runtime.Stack_Trace_Enabled
 
 #load "core/intrinsics/wasm"
 
@@ -195,18 +196,31 @@ get_freed_size :: () => {
         #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(&heap_mutex);
 
         #if Enable_Debug {
+            // RELOCATE
+            trace :: macro () {
+                #if Enable_Stack_Trace {
+                    trace := runtime.info.get_stack_trace();
+                    for trace {
+                        log(.Error, "Core", core.tprintf("in {} ({}:{})", it.func_name, it.file, it.line));
+                    }
+                }
+            }
+
             if cast(uintptr) hb_ptr < cast(uintptr) __heap_start {
                 log(.Error, "Core", "FREEING STATIC DATA");
+                trace();
                 return;
             }
 
             if hb_ptr.size & Allocated_Flag != Allocated_Flag {
                 log(.Error, "Core", "INVALID DOUBLE FREE");
+                trace();
                 return;
             }
 
             if hb_ptr.magic_number != Alloc_Block_Magic_Number {
                 log(.Error, "Core", "FREEING INVALID BLOCK");
+                trace();
                 return;
             }
         }

@@ -1,0 +1,13 @@
+
+use core {*}
+
+main :: () {
+    s := "The quick brown fox jumps over the lazy dog";
+    println(s);
+
+    encoded := conv.encode_hex(s);
+    println(encoded);
+    
+    decoded := conv.decode_hex(encoded);
+    println(decoded);
+}

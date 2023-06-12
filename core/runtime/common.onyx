@@ -16,9 +16,23 @@ __assert_handler :: (msg: str, site: CallSite) {
     __output_string("Assert failed: ");
     __output_string(msg);
 
-    if site.file.data != null {
-        __output_string(" in ");
-        __output_string(site.file);
+
+    #if Stack_Trace_Enabled {
+        __output_string("\n");
+        trace := info.get_stack_trace();
+        for trace[1..trace.length] {
+            __output_string(" in ");
+            __output_string(it.func_name);
+            __output_string(" (");
+            __output_string(it.file);
+            __output_string(")\n");
+        }
+
+    } else {
+        if site.file.data != null {
+            __output_string(" in ");
+            __output_string(site.file);
+        }
     }
 
     __output_string("\n");
