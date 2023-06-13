@@ -668,7 +668,11 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
             return TYPE_MATCH_YIELD;
         }
 
-        if (permanent) *pnode = (AstTyped *) resolved;
+        if (permanent) {
+            track_resolution_for_symbol_info((AstNode *) node, resolved);
+            *pnode = (AstTyped *) resolved;
+        }
+
         return TYPE_MATCH_SUCCESS;
     }
 

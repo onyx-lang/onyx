@@ -1047,6 +1047,7 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
             // Outside of runtime type information, they provide no useful
             // debugging information (I don't think at least...).
             if (type->kind == Type_Kind_PolyStruct ||
+                type->kind == Type_Kind_PolyUnion ||
                 type->kind == Type_Kind_Compound) {
                 output_unsigned_integer(1, &section_buff);
                 output_unsigned_integer(0, &section_buff);

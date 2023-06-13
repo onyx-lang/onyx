@@ -195,7 +195,7 @@ static SymresStatus symres_union_type(AstUnionType* u_node) {
 
     fori (i, 0, bh_arr_length(u_node->variants)) {
         AstUnionVariant *variant = u_node->variants[i];
-        // track_declaration_for_symbol_info(member->token->pos, (AstNode *) member);
+        track_declaration_for_symbol_info(variant->token->pos, (AstNode *) variant);
 
         assert(variant->type_node);
         SymresStatus ss = symres_type(&variant->type_node);

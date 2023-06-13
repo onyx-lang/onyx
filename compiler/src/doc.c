@@ -60,7 +60,7 @@ static i32 sort_symbol_resolutions(const SymbolResolution *a, const SymbolResolu
         return a->line > b->line ? 1 : -1;
     }
 
-    return 0;
+    return a->column > b->column ? 1 : -1;
 }
 
 void onyx_docs_emit_symbol_info(const char *dest) {
