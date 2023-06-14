@@ -26,8 +26,12 @@ Removals:
 
 Changes:
 - Added support for optionals in `json.encode`, `json.from_any`, and `json.as_any`.
+- Added support for optionals in `conv.parse_any`.
+- `Set` implementation no longer contains a "default value". Instead, an optional is returned from `get`.
+    - A similar thing may happen to `Map` soon, but that is a significant breaking change.
 
 Bugfixes:
+- Numerous bugs related to polymorphic procedures
 
 
 Release v0.1.2
