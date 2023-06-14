@@ -19,8 +19,6 @@ Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
     hashes  : [] i32;
     entries : [..] Entry(Elem_Type);
 
-    default_value: Elem_Type;
-
     Entry :: struct (T: type_expr) {
         next  : i32;
         hash  : u32;
@@ -46,18 +44,17 @@ Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
     Set :: Set;
 }
 
-make :: ($T: type_expr, default := T.{}, allocator := context.allocator) -> Set(T) {
+make :: ($T: type_expr, allocator := context.allocator) -> Set(T) {
     set : Set(T);
-    init(&set, default=default, allocator=allocator);
+    init(&set, allocator=allocator);
     return set;
 }
 
 #overload
 builtin.__make_overload :: macro (x: &Set, allocator: Allocator) => #this_package.make(x.Elem_Type, allocator = allocator);
 
-init :: (set: &Set($T), default := T.{}, allocator := context.allocator) {
+init :: (set: &Set($T), allocator := context.allocator) {
     set.allocator = allocator;
-    set.default_value = default;
 
     memory.alloc_slice(&set.hashes, 8, allocator=allocator);
     array.fill(set.hashes, -1);
@@ -102,9 +99,9 @@ get_ptr :: (use set: &Set, value: set.Elem_Type) -> &set.Elem_Type {
     return (&entries[lr.entry_index].value) if lr.entry_index >= 0 else null;
 }
 
-get_opt :: (use set: &Set, value: set.Elem_Type) -> Optional(set.Elem_Type) {
+get_opt :: (use set: &Set, value: set.Elem_Type) -> ? set.Elem_Type {
     lr := lookup(set, value);
-    if lr.entry_index >= 0 do return Optional.make(entries[lr.entry_index].value);
+    if lr.entry_index >= 0 do entries[lr.entry_index].value;
 
     return .{};
 }
