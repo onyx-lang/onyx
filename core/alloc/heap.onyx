@@ -201,7 +201,7 @@ get_freed_size :: () => {
                 #if Enable_Stack_Trace {
                     trace := runtime.info.get_stack_trace();
                     for trace {
-                        log(.Error, "Core", core.tprintf("in {} ({}:{})", it.func_name, it.file, it.line));
+                        log(.Error, "Core", core.tprintf("in {} ({}:{})", it.info.func_name, it.info.file, it.current.line));
                     }
                 }
             }

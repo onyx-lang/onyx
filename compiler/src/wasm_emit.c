@@ -2191,6 +2191,10 @@ EMIT_FUNC(call, AstCall* call) {
     if (cc == CC_Return_Stack) reserve_size += return_size;
 
     if (context.options->stack_trace_enabled) {
+        emit_stack_address(mod, &code, mod->stack_trace_idx, NULL);
+        WIL(NULL, WI_I32_CONST, call->token->pos.line);
+        emit_store_instruction(mod, &code, &basic_types[Basic_Kind_U32], 8);
+
         u64 stack_trace_pass_global = bh_imap_get(&mod->index_map, (u64) &builtin_stack_trace);
         emit_stack_address(mod, &code, mod->stack_trace_idx, NULL);
         WIL(NULL, WI_GLOBAL_SET, stack_trace_pass_global);
