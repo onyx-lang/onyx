@@ -123,10 +123,6 @@ use runtime
 
 #if runtime.runtime == .Onyx {
     #load "./runtime/platform/onyx/platform"
-
-    #load "./onyx/cptr"
-    #load "./onyx/cbindgen"
-    #load "./onyx/fault_handling"
 }
 
 #if runtime.runtime == .Wasi   {

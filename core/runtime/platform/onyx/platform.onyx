@@ -13,6 +13,9 @@ use runtime {
 #load "./fs"
 #load "./env"
 
+#load "core/onyx/cptr"
+#load "core/onyx/cbindgen"
+// #load "core/onyx/fault_handling"
 
 // Platform supports
 Supports_Files :: true

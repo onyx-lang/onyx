@@ -636,6 +636,7 @@ install_package :: (pack: Package, downgrade_if_necessary := false) -> (bool, in
 
             if installed_version->is_newer(pack.version) && !downgrade_if_necessary {
                 error_print("Refusing to downgrade '{}' from {} to {}.\n", pack.repo, installed_version, pack.version);
+                return false, "";
             }
 
             // :PRETTY
