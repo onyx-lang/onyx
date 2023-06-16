@@ -763,6 +763,14 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         return legal ? TYPE_MATCH_SUCCESS : TYPE_MATCH_FAILED;
     }
 
+    if (node->kind == Ast_Kind_Zero_Value) {
+        if (node_type == NULL) {
+            node->type = type;
+            return TYPE_MATCH_SUCCESS; // Shouldn't this be on the next line? And have node_type == node->type checked?
+        }
+    }
+
+
     // If the destination type is an optional, and the node's type is a value of
     // the same underlying type, then we can construct an optional with a value
     // implicitly. This makes working with optionals barable.
@@ -844,13 +852,6 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
                 *pnode = (AstTyped *) address_of->expr;
                 return unify_node_and_type_(pnode, type, permanent);
             }
-        }
-    }
-
-    if (node->kind == Ast_Kind_Zero_Value) {
-        if (node_type == NULL) {
-            node->type = type;
-            return TYPE_MATCH_SUCCESS; // Shouldn't this be on the next line? And have node_type == node->type checked?
         }
     }
 
@@ -1602,7 +1603,7 @@ AstStructLiteral* make_optional_literal_some(bh_allocator a, AstTyped *expr, Typ
 
     arguments_initialize(&opt_lit->args);
     arguments_ensure_length(&opt_lit->args, 2);
-    opt_lit->args.values[0] = (AstTyped *) make_int_literal(a, 2);
+    opt_lit->args.values[0] = (AstTyped *) make_int_literal(a, 1); // 1 is Some
     opt_lit->args.values[1] = expr;
 
     opt_lit->type = opt_type;

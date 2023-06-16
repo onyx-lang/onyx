@@ -3579,7 +3579,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 WI(NULL, WI_I32_EQ);
                 emit_enter_structured_block(mod, &code, SBT_Basic_If, field->token);
                     emit_stack_address(mod, &code, intermediate_local, field->token);
-                    WIL(NULL, WI_I32_CONST, 2); // 2 is Some
+                    WIL(NULL, WI_I32_CONST, 1); // 1 is Some
                     emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], 0);
 
                     emit_stack_address(mod, &code, intermediate_local + type_alignment_of(field->type), field->token);
@@ -3591,7 +3591,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
                 WI(NULL, WI_ELSE);
                     emit_stack_address(mod, &code, intermediate_local, field->token);
-                    WIL(NULL, WI_I32_CONST, 1); // 1 is None
+                    WIL(NULL, WI_I32_CONST, 0); // 0 is None
                     emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], 0);
                 emit_leave_structured_block(mod, &code);
 

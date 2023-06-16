@@ -542,7 +542,8 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
                 // We subtract one here because variant numbering starts at 1, instead of 0.
                 // This is so a zeroed out block of memory does not have a valid variant.
-                i32 variant_number = get_expression_integer_value(*value, NULL) - 1;
+                // This is going to change now...
+                i32 variant_number = get_expression_integer_value(*value, NULL);
                 switchnode->union_variants_handled[variant_number] = 1;
 
                 UnionVariant *union_variant = union_expr_type->Union.variants_ordered[variant_number];
