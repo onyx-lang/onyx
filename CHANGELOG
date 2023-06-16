@@ -16,6 +16,8 @@ Additions:
 - `--no-type-info` command line option to omit type information from the binary.
 - `core.encoding.hex`
     - Quickly convert a byte array to and from its hex equivalent.
+- `Allocator.move`. Moves a value into an allocator, returning a pointer to it.
+    - This is a copy operation (and might be renamed later)
 
 Removals:
 - Remove old syntax for quoted blocks, `#quote` and `#()`.
@@ -29,6 +31,9 @@ Changes:
 - Added support for optionals in `conv.parse_any`.
 - `Set` implementation no longer contains a "default value". Instead, an optional is returned from `get`.
     - A similar thing may happen to `Map` soon, but that is a significant breaking change.
+- Indexing for union tag types starts at 0 now, instead of 1.
+    - There were many annoyances where Zero-Is-Initialization (ZII) was not followed and
+      that was causing too many bugs to be worth it.
 
 Bugfixes:
 - Numerous bugs related to polymorphic procedures
