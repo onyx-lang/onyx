@@ -4,24 +4,118 @@ use runtime
 use core.string
 use core.conv
 
-#if runtime.compiler_os == .Windows {
-    PATH_SEP :: '\\'
-} else {
-    PATH_SEP :: '/'
+#local Path_Allocator :: context.temp_allocator
+
+PATH_SEP :: '/'
+// #if runtime.compiler_os == .Windows {
+//     PATH_SEP :: '\\'
+// } else {
+// }
+
+#doc """
+    Removes:
+    - Stray '.' in the path
+    - Stray '..'
+    - Repeated '/'
+    - Trailing '/'
+
+    Modifies the string in place, as the length will never be longer.
+"""
+path_clean :: (path: str, allocator := Path_Allocator) -> str {
+    if path == "" do return string.alloc_copy(".", Path_Allocator);
+
+    rooted := path[0] == PATH_SEP;
+    n := path.length;
+
+    out := make(dyn_str, path.length, allocator=context.temp_allocator);
+    r, dotdot := 0, 0;
+
+    if rooted {
+        string.append(&out, "/");
+        r, dotdot = 1, 1;
+    }
+
+    while r < n {
+        if     path[r] == '/' do r += 1;
+        elseif path[r] == '.' && (r+1 == n || path[r + 1] == '/') do r += 1;
+        elseif path[r] == '.' && path[r + 1] == '.' && (r+2 == n || path[r+2] == '/') {
+            r += 2;
+            if out.length > dotdot {
+                out.length -= 1;
+                while out.length > dotdot && out[out.length] != '/' {
+                    out.length -= 1;
+                }
+            }
+            elseif !rooted {
+                if out.length > 0 {
+                    string.append(&out, "/");
+                }
+                string.append(&out, "..");
+                dotdot = out.length;
+            }
+        }
+        else {
+            if (rooted && out.length != 1) || (!rooted && out.length != 0) {
+                string.append(&out, "/");
+            }
+
+            while r < n && path[r] != '/' {
+                string.append(&out, path[r]);
+                r += 1;
+            }
+        }
+    }
+
+    if out.length == 0 {
+        string.append(&out, ".");
+    }
+
+    return out;
 }
 
-path_join :: (parent: str, child: str, allocator := context.temp_allocator) -> str {
-    out := make(dyn_str, allocator=allocator);
-    if parent[parent.length - 1] == PATH_SEP {
-        return conv.format(&out, "{}{}", parent, child);
-    } else {
-        return conv.format(&out, "{}{}{}", parent, PATH_SEP, child);
+#doc """
+    Concatenates path elements, and returns cleaned output.
+
+    This uses the temporary allocator, so a copy may be needed.
+"""
+path_join :: (path: ..str) -> str {
+    out := make(dyn_str, allocator=context.temp_allocator);
+    
+    for p: path {
+        conv.format(&out, "{}{}", p, PATH_SEP);
     }
+
+    return path_clean(out);
+}
+
+#doc """
+    Returns everything but the last element in the path.
+
+    This is then cleaned and copied into the temporary allocator.
+"""
+path_directory :: (path: str) -> str {
+    dir, _ := path_split(path);
+    return path_clean(dir);
+}
+
+path_extension :: (path: str) -> str {
+    for i: range.{ path.length - 1, 0, -1 } {
+        if path[i] == '/' do break;
+        if path[i] == '.' do return path[i .. path.length];
+    }
+    return "";
 }
 
 path_basename :: (path: str) -> str {
+    if path == "" do return ".";
+
     start := string.last_index_of(path, PATH_SEP);
     end   := string.last_index_of(path, '.');
     return path[start + 1 .. end];
+}
+
+path_split :: (path: str) -> (parent: str, child: str) {
+    index := string.last_index_of(path, PATH_SEP);
+    return path[0 .. index], path[index+1 .. path.length];
 }
 

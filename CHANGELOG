@@ -18,6 +18,10 @@ Additions:
     - Quickly convert a byte array to and from its hex equivalent.
 - `Allocator.move`. Moves a value into an allocator, returning a pointer to it.
     - This is a copy operation (and might be renamed later)
+- `os.path_clean`
+- `os.path_directory`
+- `os.path_extension`
+- `os.path_split`
 
 Removals:
 - Remove old syntax for quoted blocks, `#quote` and `#()`.
