@@ -25,9 +25,14 @@ static inline int NEXT_VALUE(ovm_code_builder_t *b) {
     if (bh_arr_length(b->execution_stack) == 0) {
         return b->param_count + b->local_count;
     }
-    
-    b->highest_value_number = bh_max(b->highest_value_number, bh_arr_last(b->execution_stack) + 1);
-    return bh_arr_last(b->execution_stack) + 1;
+
+    i32 max = b->param_count + b->local_count;
+    bh_arr_each(i32, reg, b->execution_stack) {
+        max = bh_max(*reg, max);
+    }
+
+    b->highest_value_number = bh_max(b->highest_value_number, max + 1);
+    return max + 1;
 #endif
 }
 
@@ -393,22 +398,40 @@ void ovm_code_builder_drop_value(ovm_code_builder_t *builder) {
 }
 
 void ovm_code_builder_add_local_get(ovm_code_builder_t *builder, i32 local_idx) {
-    ovm_instr_t instr = {0};
-    instr.full_instr = OVM_TYPED_INSTR(OVMI_MOV, OVM_TYPE_NONE);
-    instr.r = NEXT_VALUE(builder);
-    instr.a = local_idx; // This makes the assumption that the params will be in
-                         // the lower "address space" of the value numbers. This
-                         // will be true for web assembly, because that's how it
-                         // it was spec'd; but in the future for other things,
-                         // this will be incorrect.
+    PUSH_VALUE(builder, local_idx);
+}
 
-    debug_info_builder_emit_location(builder->debug_builder);
-    ovm_program_add_instructions(builder->program, 1, &instr);
+static void maybe_copy_register_if_going_to_be_replaced(ovm_code_builder_t *builder, i32 local_idx) {
+    b32 need_to_copy = 0;
+    bh_arr_each(i32, reg, builder->execution_stack) {
+        if (*reg == local_idx) {
+            need_to_copy = 1;
+            break;
+        }
+    }
 
-    PUSH_VALUE(builder, instr.r);
+    if (need_to_copy) {
+        i32 new_register = NEXT_VALUE(builder);
+        assert(IS_TEMPORARY_VALUE(builder, new_register));
+        ovm_instr_t instr = {0};
+        instr.full_instr = OVM_TYPED_INSTR(OVMI_MOV, OVM_TYPE_NONE);
+        instr.r = new_register;
+        instr.a = local_idx;
+
+        debug_info_builder_emit_location(builder->debug_builder);
+        ovm_program_add_instructions(builder->program, 1, &instr);
+
+        bh_arr_each(i32, reg, builder->execution_stack) {
+            if (*reg == local_idx) {
+                *reg = new_register;
+            }
+        }
+    }
 }
 
 void ovm_code_builder_add_local_set(ovm_code_builder_t *builder, i32 local_idx) {
+    maybe_copy_register_if_going_to_be_replaced(builder, local_idx);
+
     // :PrimitiveOptimization
     // Perform a simple optimization that an immediate temporary moved to
     // a local can be optimized as an immediate loaded directly to a local.
@@ -445,19 +468,8 @@ void ovm_code_builder_add_local_set(ovm_code_builder_t *builder, i32 local_idx) 
 }
 
 void ovm_code_builder_add_local_tee(ovm_code_builder_t *builder, i32 local_idx) {
-    ovm_instr_t instr = {0};
-    instr.full_instr = OVM_TYPED_INSTR(OVMI_MOV, OVM_TYPE_NONE);
-    instr.r = local_idx; // This makes the assumption that the params will be in
-                         // the lower "address space" of the value numbers. This
-                         // will be true for web assembly, because that's how it
-                         // it was spec'd; but in the future for other things,
-                         // this will be incorrect.
-    instr.a = POP_VALUE(builder);
-
-    debug_info_builder_emit_location(builder->debug_builder);
-    ovm_program_add_instructions(builder->program, 1, &instr);
-
-    PUSH_VALUE(builder, instr.a);
+    ovm_code_builder_add_local_set(builder, local_idx);
+    PUSH_VALUE(builder, local_idx);
 }
 
 void ovm_code_builder_add_register_get(ovm_code_builder_t *builder, i32 reg_idx) {
@@ -523,22 +535,24 @@ void ovm_code_builder_add_store(ovm_code_builder_t *builder, u32 ovm_type, i32 o
 }
 
 void ovm_code_builder_add_cmpxchg(ovm_code_builder_t *builder, u32 ovm_type, i32 offset) {
-    if (offset == 0) {
-        ovm_instr_t cmpxchg_instr = {0};
-        cmpxchg_instr.full_instr = OVMI_ATOMIC | OVM_TYPED_INSTR(OVMI_CMPXCHG, ovm_type);
-        cmpxchg_instr.b = POP_VALUE(builder);
-        cmpxchg_instr.a = POP_VALUE(builder);
-        cmpxchg_instr.r = POP_VALUE(builder);
+    // This is an optimization for a 0 offset that could come back, but since CMPXCHG is
+    // not a common instruction (I think it is used in one place in the entire standard library),
+    // it does not make much of a difference.
+    //
+    // if (offset == 0) {
+    //     ovm_instr_t cmpxchg_instr = {0};
+    //     cmpxchg_instr.full_instr = OVMI_ATOMIC | OVM_TYPED_INSTR(OVMI_CMPXCHG, ovm_type);
+    //     cmpxchg_instr.b = POP_VALUE(builder);
+    //     cmpxchg_instr.a = POP_VALUE(builder);
+    //     cmpxchg_instr.r = POP_VALUE(builder);
 
-        debug_info_builder_emit_location(builder->debug_builder);
-        ovm_program_add_instructions(builder->program, 1, &cmpxchg_instr);
+    //     debug_info_builder_emit_location(builder->debug_builder);
+    //     ovm_program_add_instructions(builder->program, 1, &cmpxchg_instr);
 
-        PUSH_VALUE(builder, cmpxchg_instr.r);
-        return;
-    }
+    //     PUSH_VALUE(builder, cmpxchg_instr.r);
+    //     return;
+    // }
     
-    // TODO: explain the ordering here.
-
     ovm_instr_t instrs[3] = {0};
     // imm.i32 %n, offset
     instrs[0].full_instr = OVM_TYPED_INSTR(OVMI_IMM, OVM_TYPE_I32);
@@ -555,7 +569,7 @@ void ovm_code_builder_add_cmpxchg(ovm_code_builder_t *builder, u32 ovm_type, i32
     instrs[1].a = addr_reg;
     instrs[1].b = instrs[0].r;
 
-    // cmpxchg.x %m, %n
+    // cmpxchg.x %n, %e, %v
     instrs[2].full_instr = OVMI_ATOMIC | OVM_TYPED_INSTR(OVMI_CMPXCHG, ovm_type);
     instrs[2].r = instrs[1].r;
     instrs[2].a = expected_reg;
