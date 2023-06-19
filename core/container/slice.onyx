@@ -620,6 +620,21 @@ chunks :: (arr: [] $T, width: i32) -> Iterator([] T) {
 }
 
 
+#local HasEquals :: interface (t: $T) {
+    { t == t } -> bool;
+}
+
+equal :: (arr1: [] $T/HasEquals, arr2: [] T) -> bool {
+    if arr1.count != arr2.count do return false;
+
+    for i: arr1.count {
+        if !(arr1[i] == arr2[i]) do return false;
+    }
+
+    return true;
+}
+
+
 #local fold_idx_elem :: (arr: [] $T, $cmp: Code) -> (i32, T) {
     idx  := 0;
     elem := arr[0];

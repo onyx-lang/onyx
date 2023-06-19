@@ -11,17 +11,19 @@ Additions:
     - Use `runtime.info.get_stack_trace()` to get the current stack trace.
     - Used in assertions and heap allocator for better error reporting
 - `Optional.with` for running a block of code with the value in an Optional, if one is present.
-- `iter.flatten`
 - `-Dvariable=value` command line option to add symbols to the `runtime.vars` package.
 - `--no-type-info` command line option to omit type information from the binary.
-- `core.encoding.hex`
-    - Quickly convert a byte array to and from its hex equivalent.
 - `Allocator.move`. Moves a value into an allocator, returning a pointer to it.
     - This is a copy operation (and might be renamed later)
+- `core.encoding.hex` package
+    - Quickly convert a byte array to and from its hex equivalent.
 - `os.path_clean`
 - `os.path_directory`
 - `os.path_extension`
 - `os.path_split`
+- `slice.equal`
+- `iter.find`
+- `iter.flatten`
 
 Removals:
 - Remove old syntax for quoted blocks, `#quote` and `#()`.

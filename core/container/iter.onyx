@@ -28,6 +28,7 @@ use core.intrinsics.types {type_is_struct}
     flatten :: flatten;
     enumerate :: enumerate;
 
+    find :: find;
     fold :: fold;
     count :: count;
     some :: some;
@@ -716,6 +717,24 @@ as_iter :: (r: range) => generator(
 //
 // Iterator reducing
 //
+
+find :: #match #local {}
+
+#overload
+find :: macro (it: $T/Iterable, predicate: $F) =>
+    #this_package.find(#this_package.as_iter(it), predicate);
+
+#overload
+find :: (it: Iterator($T), predicate: (T) -> bool) -> ? T {
+    for v: it {
+        if predicate(v) {
+            return v;
+        }
+    }
+
+    return .{};
+}
+
 
 #doc """
     Incremently calls `combine` on the yielded value and the
