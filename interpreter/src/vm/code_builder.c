@@ -433,25 +433,11 @@ void ovm_code_builder_add_local_set(ovm_code_builder_t *builder, i32 local_idx) 
     maybe_copy_register_if_going_to_be_replaced(builder, local_idx);
 
     // :PrimitiveOptimization
-    // Perform a simple optimization that an immediate temporary moved to
-    // a local can be optimized as an immediate loaded directly to a local.
-    {
-        ovm_instr_t *last_instr = &bh_arr_last(builder->program->code);
-        if (OVM_INSTR_INSTR(*last_instr) == OVMI_IMM) {
-            if (IS_TEMPORARY_VALUE(builder, last_instr->r) && last_instr->r == LAST_VALUE(builder)) {
-                last_instr->r = local_idx;
-                POP_VALUE(builder);
-                return;
-            }
-        }
-
-        if (OVM_INSTR_INSTR(*last_instr) == OVMI_REG_GET) {
-            if (IS_TEMPORARY_VALUE(builder, last_instr->r) && last_instr->r == LAST_VALUE(builder)) {
-                last_instr->r = local_idx;
-                POP_VALUE(builder);
-                return;
-            }
-        }
+    ovm_instr_t *last_instr = &bh_arr_last(builder->program->code);
+    if (IS_TEMPORARY_VALUE(builder, last_instr->r) && last_instr->r == LAST_VALUE(builder)) {
+        last_instr->r = local_idx;
+        POP_VALUE(builder);
+        return;
     }
 
     ovm_instr_t instr = {0};

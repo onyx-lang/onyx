@@ -98,6 +98,13 @@ path_directory :: (path: str) -> str {
     return path_clean(dir);
 }
 
+#doc """
+    Returns the extension of the file on the end of the path, if present.
+
+        path_extension("foo.txt") -> "txt"
+        path_extension("foo/bar") -> ""
+        path_extension("foo/bar.txt") -> "txt"
+"""
 path_extension :: (path: str) -> str {
     for i: range.{ path.length - 1, 0, -1 } {
         if path[i] == '/' do break;
@@ -106,6 +113,12 @@ path_extension :: (path: str) -> str {
     return "";
 }
 
+#doc """
+    Returns the last element of the path, sans its extension.
+
+        path_basename("foo.txt") -> "foo"
+        path_basename("test/bar.txt") -> "bar"
+"""
 path_basename :: (path: str) -> str {
     if path == "" do return ".";
 
@@ -114,6 +127,9 @@ path_basename :: (path: str) -> str {
     return path[start + 1 .. end];
 }
 
+#doc """
+    Splits the last path element off.
+"""
 path_split :: (path: str) -> (parent: str, child: str) {
     index := string.last_index_of(path, PATH_SEP);
     return path[0 .. index], path[index+1 .. path.length];
