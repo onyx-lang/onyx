@@ -25,12 +25,6 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
 
 
 #inject Result {
-    #doc "Quick way to return an Ok from a procedure."
-    return_ok  :: macro (x: $T) do return .{ Ok = x };
-
-    #doc "Quick way to return an Err from a procedure."
-    return_err :: macro (x: $T) do return .{ Err = x };
-
     #doc "Returns true if the result contains an Ok value."
     is_ok :: (r: #Self) {
         switch r {
@@ -135,7 +129,7 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
         procedure. Otherwise, the Ok value is returned.
 
             f :: () -> Result(i32, str) {
-                Result.return_err("Oh no...");
+                return .{ Err = "Oh no..." };
             }
             
             g :: () -> Result(str, str) {
@@ -143,7 +137,7 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
                 v := f()->forward_err();
                 println(v);
                 
-                Result.return_ok("Success!");
+                return .{ Ok = "Success!" };
             }
     """
     forward_err :: macro (r: Result($T, $E)) -> T {
@@ -175,8 +169,8 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
     catch :: macro (r: Result($T, $E), on_err: Code) -> T {
         switch res := r; res {
             case .Ok => v  do return v;
-            case .Err {
-                #unquote on_err;
+            case .Err => err {
+                #unquote on_err(err);
             }
         }
     }

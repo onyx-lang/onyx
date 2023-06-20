@@ -62,15 +62,17 @@ static const char *build_docstring = DOCSTRING_HEADER
     "\t--verbose, -V           Verbose output.\n"
     "\t           -VV          Very verbose output.\n"
     "\t           -VVV         Very very verbose output (to be used by compiler developers).\n"
-    "\t--no-std                Disable automatically including \"core/std\".\n"
-    "\t--wasm-mvp              Use only WebAssembly MVP features.\n"
     "\t--multi-threaded        Enables multi-threading for this compilation.\n"
     "\t                        Automatically enabled for \"onyx\" runtime.\n"
     "\t--doc <doc_file>        Generates an O-DOC file, a.k.a an Onyx documentation file. Used by onyx-doc-gen.\n"
     "\t--tag                   Generates a C-Tag file.\n"
     "\t--syminfo <target_file> Generates a symbol resolution information file. Used by onyx-lsp.\n"
+    "\t--stack-trace           Enable dynamic stack trace.\n"
+    "\t--no-std                Disable automatically including \"core/std\".\n"
     "\t--no-stale-code         Disables use of `#allow_stale_code` directive\n"
-    "\t--generate-foreign-info\n"
+    "\t--no-type-info          Disables generating type information\n"
+    "\t--generate-foreign-info Generate information for foreign blocks. Rarely needed, so disabled by default.\n"
+    "\t--wasm-mvp              Use only WebAssembly MVP features.\n"
     "\n"
     "Developer options:\n"
     "\t--no-colors               Disables colors in the error message.\n"
@@ -93,6 +95,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
         .use_post_mvp_features   = 1,
         .use_multi_threading     = 0,
+        .generate_foreign_info   = 0,
+        .generate_type_info      = 1,
         .no_std                  = 0,
         .no_stale_code           = 0,
         .show_all_errors         = 0,
@@ -106,6 +110,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .symbol_info_file   = NULL,
         .help_subcommand    = NULL,
 
+        .defined_variables = NULL,
+
         .debug_enabled = 0,
 
         .passthrough_argument_count = 0,
@@ -117,6 +123,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
     bh_arr_new(alloc, options.files, 2);
     bh_arr_new(alloc, options.included_folders, 2);
+    bh_arr_new(alloc, options.defined_variables, 2);
 
     char* core_installation;
     #ifdef _BH_LINUX
@@ -207,6 +214,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             else if (!strcmp(argv[i], "--generate-foreign-info")) {
                 options.generate_foreign_info = 1;
             }
+            else if (!strcmp(argv[i], "--no-type-info")) {
+                options.generate_type_info = 0;
+            }
             else if (!strcmp(argv[i], "--no-std")) {
                 options.no_std = 1;
             }
@@ -218,6 +228,18 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "-I")) {
                 bh_arr_push(options.included_folders, argv[++i]);
+            }
+            else if (!strncmp(argv[i], "-D", 2)) {
+                i32 len = strlen(argv[i]);
+                i32 j=2;
+                while (argv[i][j] != '=' && j < len) j++;
+
+                if (j < len) argv[i][j] = '\0';
+
+                DefinedVariable dv;
+                dv.key   = argv[i] + 2;
+                dv.value = argv[i] + j + 1;
+                bh_arr_push(options.defined_variables, dv);
             }
             else if (!strcmp(argv[i], "-r") || !strcmp(argv[i], "--runtime")) {
                 i += 1;
@@ -242,6 +264,10 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--debug")) {
                 options.debug_enabled = 1;
+                options.stack_trace_enabled = 1;
+            }
+            else if (!strcmp(argv[i], "--stack-trace")) {
+                options.stack_trace_enabled = 1;
             }
             else if (!strcmp(argv[i], "--")) {
                 options.passthrough_argument_count = argc - i - 1;
@@ -322,11 +348,40 @@ static AstInclude* create_load(bh_allocator alloc, char* filename) {
     return include_node;
 }
 
+static void create_and_add_defined_variable(char *name, char *value) {
+    OnyxToken *value_token = bh_alloc_item(context.ast_alloc, OnyxToken);
+    value_token->text = value;
+    value_token->length = strlen(value);
+
+    OnyxToken *name_token = bh_alloc_item(context.ast_alloc, OnyxToken);
+    name_token->text = name;
+    name_token->length = strlen(name);
+
+    Package *p = package_lookup("runtime.vars");
+    assert(p);
+
+    AstStrLit *value_node = make_string_literal(context.ast_alloc, value_token);
+    add_entities_for_node(NULL, (AstNode *) value_node, NULL, NULL);
+
+    AstBinding *binding = onyx_ast_node_new(context.ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
+    binding->token = name_token;
+    binding->node = (AstNode *) value_node;
+
+    add_entities_for_node(NULL, (AstNode *) binding, p->scope, p);
+}
+
+static void introduce_defined_variables() {
+    bh_arr_each(DefinedVariable, dv, context.options->defined_variables) {
+        create_and_add_defined_variable(dv->key, dv->value);
+    }
+}
+
 // HACK
-static u32 special_global_entities_remaining = 3;
+static u32 special_global_entities_remaining = 4;
 static Entity *runtime_info_types_entity;
 static Entity *runtime_info_foreign_entity;
 static Entity *runtime_info_proc_tags_entity;
+static Entity *runtime_info_stack_trace_entity;
 
 static void context_init(CompileOptions* opts) {
     memset(&context, 0, sizeof context);
@@ -335,7 +390,7 @@ static void context_init(CompileOptions* opts) {
     prepare_builtins();
 
     // HACK
-    special_global_entities_remaining = 3;
+    special_global_entities_remaining = 4;
 
     context.options = opts;
     context.cycle_detected = 0;
@@ -400,6 +455,12 @@ static void context_init(CompileOptions* opts) {
             .package = NULL,
             .include = create_load(context.ast_alloc, "core/runtime/info/proc_tags"),
         }));
+        runtime_info_stack_trace_entity = entity_heap_insert(&context.entities, ((Entity) {
+            .state = Entity_State_Parse,
+            .type = Entity_Type_Load_File,
+            .package = NULL,
+            .include = create_load(context.ast_alloc, "core/runtime/info/stack_trace"),
+        }));
     }
 
     builtin_heap_start.entity = NULL;
@@ -413,6 +474,7 @@ static void context_init(CompileOptions* opts) {
     add_entities_for_node(NULL, (AstNode *) &builtin_tls_base, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_tls_size, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_closure_base, context.global_scope, NULL);
+    add_entities_for_node(NULL, (AstNode *) &builtin_stack_trace, context.global_scope, NULL);
 
     // NOTE: Add all files passed by command line to the queue
     bh_arr_each(const char *, filename, opts->files) {
@@ -625,6 +687,7 @@ static b32 process_entity(Entity* ent) {
                 context.builtins_initialized = 1;
                 initialize_builtins(context.ast_alloc);
                 introduce_build_options(context.ast_alloc);
+                introduce_defined_variables();
             }
 
             // GROSS
@@ -637,7 +700,8 @@ static b32 process_entity(Entity* ent) {
                 // GROSS
                 if (ent == runtime_info_types_entity
                     || ent == runtime_info_proc_tags_entity
-                    || ent == runtime_info_foreign_entity) {
+                    || ent == runtime_info_foreign_entity
+                    || ent == runtime_info_stack_trace_entity) {
                     special_global_entities_remaining--;
                 }
 

@@ -91,7 +91,7 @@ parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, Ini
         output.type = (cast(&info.Type_Info_Pointer) t).to;
     }
 
-    alloc.arena.auto(dest=#(context.temp_allocator));
+    alloc.arena.auto(dest=[](context.temp_allocator));
 
     active_item_ptr  := null;
     active_item_type := void;

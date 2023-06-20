@@ -156,7 +156,7 @@ get_allocated_bytes :: (arena: &Arena) -> u32 {
 }
 
 auto :: #match {
-    macro (size := 32 * 1024, $dest: Code = #(context.allocator)) {
+    macro (size := 32 * 1024, $dest: Code = [](context.allocator)) {
         use core.alloc {arena, heap_allocator}
 
         a := arena.make(heap_allocator, size);

@@ -9,6 +9,18 @@ use runtime.platform { __output_string }
 // Every platform should define this, even if is it just '() {}'.
 #export "_start" platform.__start
 
+#local
+__output_uint :: (n: u64) {
+    buf: [128] u8;
+    i := 127;
+    while n > 0 && i >= 0 {
+        buf[i] = ~~('0' + n % 10);
+        i -= 1;
+        n /= 10;
+    }
+
+    __output_string(buf[i .. 128]);
+}
 
 // The default assert handler. This assumes that __output_string
 // and __exit are defined in the 'runtime' package.
@@ -16,9 +28,25 @@ __assert_handler :: (msg: str, site: CallSite) {
     __output_string("Assert failed: ");
     __output_string(msg);
 
-    if site.file.data != null {
-        __output_string(" in ");
-        __output_string(site.file);
+
+    #if Stack_Trace_Enabled {
+        __output_string("\n");
+        trace := info.get_stack_trace();
+        for trace[1..trace.length] {
+            __output_string(" in ");
+            __output_string(it.info.func_name);
+            __output_string(" (");
+            __output_string(it.info.file);
+            __output_string(":");
+            __output_uint(~~it.current_line);
+            __output_string(")\n");
+        }
+
+    } else {
+        if site.file.data != null {
+            __output_string(" in ");
+            __output_string(site.file);
+        }
     }
 
     __output_string("\n");

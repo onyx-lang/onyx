@@ -5,6 +5,7 @@ package core.alloc.log
 // allocator.
 
 use core
+use runtime
 
 #local
 Allocation_Action_Strings := str.[
@@ -23,6 +24,12 @@ logging_allocator_proc :: (data: rawptr, aa: AllocationAction, size: u32, align:
         res, Allocation_Action_Strings[cast(u32) aa], size, align, oldptr);
 
     log(.Info, "Core", msg);
+
+    trace := runtime.info.get_stack_trace();
+    defer if trace do delete(&trace);
+    for trace {
+        log(.Info, "Core", tprintf("in {} ({}:{})", it.info.func_name, it.info.file, it.current_line));
+    }
 
     return res;
 }

@@ -614,8 +614,44 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
-        case '?':
         case '[': {
+            // HACK CLEANUP
+            // :LinearTokenDependent
+            OnyxToken *matching = find_matching_paren(parser->curr);
+            if (matching->type == ']' &&
+                ((matching + 1)->type == '{' || (matching + 1)->type == '(')) {
+                AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
+                code_block->token = expect_token(parser, '[');
+
+                assert(builtin_code_type != NULL);
+                code_block->type_node = builtin_code_type;
+
+                bh_arr_new(global_heap_allocator, code_block->binding_symbols, 4);
+                while (!consume_token_if_next(parser, ']')) {
+                    if (parser->hit_unexpected_token) return (AstTyped *) code_block;
+
+                    OnyxToken *symbol = expect_token(parser, Token_Type_Symbol);
+                    bh_arr_push(code_block->binding_symbols, symbol);
+
+                    if (parser->curr->type != ']')
+                        expect_token(parser, ',');
+                }
+
+                if (parser->curr->type == '{') {
+                    code_block->code = (AstNode *) parse_block(parser, 1, NULL);
+                    ((AstBlock *) code_block->code)->rules = Block_Rule_Code_Block;
+                } else {
+                    code_block->code = (AstNode *) parse_expression(parser, 1);
+                }
+
+                retval = (AstTyped *) code_block;
+                break;
+            }
+
+            // :fallthrough
+        }
+
+        case '?': {
             AstType *type = parse_type(parser);
             retval = (AstTyped *) type;
             break;
@@ -768,43 +804,6 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 retval = (AstTyped *) defined;
                 break;
             }
-            else if (parse_possible_directive(parser, "quote")) {
-                OnyxToken* code_token = parser->curr - 1;
-
-                AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
-                code_block->token = code_token;
-
-                assert(builtin_code_type != NULL);
-                code_block->type_node = builtin_code_type;
-
-                if (parser->curr->type == '{') {
-                    code_block->code = (AstNode *) parse_block(parser, 1, NULL);
-                    ((AstBlock *) code_block->code)->rules = Block_Rule_Code_Block;
-
-                } else {
-                    code_block->code = (AstNode *) parse_expression(parser, 0);
-                }
-
-                retval = (AstTyped *) code_block;
-                break;
-            }
-            else if (next_tokens_are(parser, 2, '#', '(')) {
-                OnyxToken* code_token = expect_token(parser, '#');
-                expect_token(parser, '(');
-
-                AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
-                code_block->token = code_token;
-
-                assert(builtin_code_type != NULL);
-                code_block->type_node = builtin_code_type;
-
-                code_block->code = (AstNode *) parse_expression(parser, 0);
-
-                expect_token(parser, ')');
-
-                retval = (AstTyped *) code_block;
-                break;
-            }
             else if (parse_possible_directive(parser, "unquote")) {
                 AstDirectiveInsert* insert = make_node(AstDirectiveInsert, Ast_Kind_Directive_Insert);
                 insert->token = parser->curr - 1;
@@ -819,6 +818,19 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 parser->parse_calls = 0;
                 insert->code_expr = parse_expression(parser, 0);
                 parser->parse_calls = 1;
+
+                if (consume_token_if_next(parser, '(')) {
+                    bh_arr_new(global_heap_allocator, insert->binding_exprs, 4);
+                    while (!consume_token_if_next(parser, ')')) {
+                        if (parser->hit_unexpected_token) break;
+
+                        AstTyped *expr = parse_expression(parser, 0);
+                        bh_arr_push(insert->binding_exprs, expr);
+
+                        if (parser->curr->type != ')')
+                            expect_token(parser, ',');
+                    }
+                }
 
                 retval = (AstTyped *) insert;
                 break;

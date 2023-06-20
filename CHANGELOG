@@ -1,3 +1,51 @@
+Release v0.1.3
+-----------
+Unreleased
+
+Additions:
+- New syntax for declaring quoted code blocks.
+    - `[captures] { body }` for blocks.
+    - `[captures] ( expr )` for expressions.
+- User-level stack trace.
+    - Enable with `--stack-trace`
+    - Use `runtime.info.get_stack_trace()` to get the current stack trace.
+    - Used in assertions and heap allocator for better error reporting
+- `Optional.with` for running a block of code with the value in an Optional, if one is present.
+- `-Dvariable=value` command line option to add symbols to the `runtime.vars` package.
+- `--no-type-info` command line option to omit type information from the binary.
+- `Allocator.move`. Moves a value into an allocator, returning a pointer to it.
+    - This is a copy operation (and might be renamed later)
+- `core.encoding.hex` package
+    - Quickly convert a byte array to and from its hex equivalent.
+- `os.path_clean`
+- `os.path_directory`
+- `os.path_extension`
+- `os.path_split`
+- `slice.equal`
+- `iter.find`
+- `iter.flatten`
+
+Removals:
+- Remove old syntax for quoted blocks, `#quote` and `#()`.
+    - Switch to `[] {}` and `[] ()` respectively.
+- Old WASI specific modules for time and environment variables.
+- `Result.return_err` and `Result.return_ok`.
+    - Unnecessary with new union features.
+
+Changes:
+- Much faster backend (approximate 1.3-1.4x speedup for most programs)
+- Added support for optionals in `json.encode`, `json.from_any`, and `json.as_any`.
+- Added support for optionals in `conv.parse_any`.
+- `Set` implementation no longer contains a "default value". Instead, an optional is returned from `get`.
+    - A similar thing may happen to `Map` soon, but that is a significant breaking change.
+- Indexing for union tag types starts at 0 now, instead of 1.
+    - There were many annoyances where Zero-Is-Initialization (ZII) was not followed and
+      that was causing too many bugs to be worth it.
+
+Bugfixes:
+- Numerous bugs related to polymorphic procedures
+
+
 Release v0.1.2
 -----------
 30th May 2023

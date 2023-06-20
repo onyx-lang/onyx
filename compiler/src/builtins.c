@@ -41,11 +41,13 @@ static OnyxToken builtin_stack_top_token   = { Token_Type_Symbol, 11, "__stack_t
 static OnyxToken builtin_tls_base_token    = { Token_Type_Symbol, 10, "__tls_base ",  { 0 } };
 static OnyxToken builtin_tls_size_token    = { Token_Type_Symbol, 10, "__tls_size ",  { 0 } };
 static OnyxToken builtin_closure_base_token = { Token_Type_Symbol, 14, "__closure_base ",  { 0 } };
+static OnyxToken builtin_stack_trace_token = { Token_Type_Symbol, 0, " ", { 0 } };
 AstGlobal builtin_heap_start  = { Ast_Kind_Global, Ast_Flag_Const, &builtin_heap_start_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
 AstGlobal builtin_stack_top   = { Ast_Kind_Global, 0, &builtin_stack_top_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
 AstGlobal builtin_tls_base    = { Ast_Kind_Global, 0, &builtin_tls_base_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
 AstGlobal builtin_tls_size    = { Ast_Kind_Global, 0, &builtin_tls_size_token, NULL, NULL, (AstType *) &basic_type_u32, NULL };
 AstGlobal builtin_closure_base = { Ast_Kind_Global, 0, &builtin_closure_base_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
+AstGlobal builtin_stack_trace = { Ast_Kind_Global, 0, &builtin_stack_trace_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
 
 AstType  *builtin_string_type;
 AstType  *builtin_cstring_type;
@@ -62,6 +64,7 @@ AstType  *builtin_any_type;
 AstType  *builtin_code_type;
 AstType  *builtin_link_options_type;
 AstType  *builtin_package_id_type;
+AstType  *builtin_stack_trace_type;
 
 AstTyped    *type_table_node = NULL;
 AstTyped    *foreign_blocks_node = NULL;
@@ -569,11 +572,18 @@ void initalize_special_globals() {
         foreign_blocks_node = (AstTyped *) symbol_raw_resolve(p->scope, "foreign_blocks");
         foreign_block_type  = (AstType *)  symbol_raw_resolve(p->scope, "foreign_block");
         tagged_procedures_node = (AstTyped *) symbol_raw_resolve(p->scope, "tagged_procedures");
+
+        if (context.options->stack_trace_enabled) {
+            builtin_stack_trace_type = (AstType *) symbol_raw_resolve(p->scope, "Stack_Trace");
+        }
     }
 }
 
 void introduce_build_options(bh_allocator a) {
     Package* p = package_lookup_or_create("runtime", context.global_scope, a, context.global_scope->created_at);
+    
+    // HACK creating this for later
+    package_lookup_or_create("runtime.vars", p->scope, a, context.global_scope->created_at);
 
     AstType* Runtime_Type = (AstType *) symbol_raw_resolve(p->scope, "Runtime");
     if (Runtime_Type == NULL) {
@@ -593,6 +603,14 @@ void introduce_build_options(bh_allocator a) {
     AstNumLit* wait_notify_available = make_int_literal(a, context.options->use_multi_threading && context.options->runtime == Runtime_Js);
     wait_notify_available->type_node = (AstType *) &basic_type_bool;
     symbol_builtin_introduce(p->scope, "Wait_Notify_Available", (AstNode *) wait_notify_available);
+
+    AstNumLit* debug_mode = make_int_literal(a, context.options->debug_enabled);
+    debug_mode->type_node = (AstType *) &basic_type_bool;
+    symbol_builtin_introduce(p->scope, "Debug_Mode_Enabled", (AstNode *) debug_mode);
+
+    AstNumLit* stack_trace = make_int_literal(a, context.options->stack_trace_enabled);
+    stack_trace->type_node = (AstType *) &basic_type_bool;
+    symbol_builtin_introduce(p->scope, "Stack_Trace_Enabled", (AstNode *) stack_trace);
 
     i32 os;
     #ifdef _BH_LINUX
@@ -638,5 +656,6 @@ void introduce_build_options(bh_allocator a) {
         foreign_info->type_node = (AstType *) &basic_type_bool;
         symbol_builtin_introduce(p->scope, "Generated_Foreign_Info", (AstNode *) foreign_info);
     }
+
 }
 

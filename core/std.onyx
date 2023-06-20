@@ -59,6 +59,7 @@ use runtime
 
 #load "./time/date"
 #load "./encoding/base64"
+#load "./encoding/hex"
 #load "./encoding/utf8"
 #load "./encoding/osad"
 #load_all "./encoding/json"
@@ -122,10 +123,6 @@ use runtime
 
 #if runtime.runtime == .Onyx {
     #load "./runtime/platform/onyx/platform"
-
-    #load "./onyx/cptr"
-    #load "./onyx/cbindgen"
-    #load "./onyx/fault_handling"
 }
 
 #if runtime.runtime == .Wasi   {

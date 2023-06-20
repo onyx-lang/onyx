@@ -556,6 +556,7 @@ EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt, OnyxToken* blo
 EMIT_FUNC_NO_ARGS(leave_structured_block);
 
 static u32 emit_data_entry(OnyxWasmModule *mod, WasmDatum *datum);
+static void emit_raw_string(OnyxWasmModule* mod, char *data, i32 len, u64 *out_data_id, u64 *out_len);
 
 static void emit_constexpr(ConstExprContext *ctx, AstTyped *node, u32 offset);
 static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset);
@@ -2189,6 +2190,16 @@ EMIT_FUNC(call, AstCall* call) {
 
     if (cc == CC_Return_Stack) reserve_size += return_size;
 
+    if (context.options->stack_trace_enabled) {
+        emit_stack_address(mod, &code, mod->stack_trace_idx, NULL);
+        WIL(NULL, WI_I32_CONST, call->token->pos.line);
+        emit_store_instruction(mod, &code, &basic_types[Basic_Kind_U32], 8);
+
+        u64 stack_trace_pass_global = bh_imap_get(&mod->index_map, (u64) &builtin_stack_trace);
+        emit_stack_address(mod, &code, mod->stack_trace_idx, NULL);
+        WIL(NULL, WI_GLOBAL_SET, stack_trace_pass_global);
+    }
+
     if (call->callee->kind == Ast_Kind_Function) {
         i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) call->callee);
         WIL(NULL, WI_CALL, func_idx);
@@ -3568,7 +3579,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 WI(NULL, WI_I32_EQ);
                 emit_enter_structured_block(mod, &code, SBT_Basic_If, field->token);
                     emit_stack_address(mod, &code, intermediate_local, field->token);
-                    WIL(NULL, WI_I32_CONST, 2); // 2 is Some
+                    WIL(NULL, WI_I32_CONST, 1); // 1 is Some
                     emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], 0);
 
                     emit_stack_address(mod, &code, intermediate_local + type_alignment_of(field->type), field->token);
@@ -3580,7 +3591,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
                 WI(NULL, WI_ELSE);
                     emit_stack_address(mod, &code, intermediate_local, field->token);
-                    WIL(NULL, WI_I32_CONST, 1); // 1 is None
+                    WIL(NULL, WI_I32_CONST, 0); // 0 is None
                     emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], 0);
                 emit_leave_structured_block(mod, &code);
 
@@ -4211,8 +4222,67 @@ static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func) {
     }
 }
 
+EMIT_FUNC(stack_trace_blob, AstFunction *fd)  {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    mod->stack_trace_idx = emit_local_allocation(mod, &code, (AstTyped *) fd->stack_trace_local);
+    assert(!(mod->stack_trace_idx & LOCAL_IS_WASM));
+
+    u64 file_name_id, func_name_id;
+    u8* node_data = bh_alloc_array(context.ast_alloc, u8, 6 * POINTER_SIZE);
+
+    char *name = get_function_name(fd);
+    emit_raw_string(mod, (const char *) fd->token->pos.filename, strlen(fd->token->pos.filename), &file_name_id, &node_data[4]);
+    emit_raw_string(mod, name, strlen(name), &func_name_id, &node_data[16]);
+    *((u32 *) &node_data[8]) = fd->token->pos.line;
+    *((u32 *) &node_data[20]) = fd->type->id;
+
+    WasmDatum stack_node_data = ((WasmDatum) {
+        .data = node_data,
+        .length = 6 * POINTER_SIZE,
+        .alignment = POINTER_SIZE,
+    });
+    u32 stack_node_data_id = emit_data_entry(mod, &stack_node_data);
+
+    DatumPatchInfo patch;
+    patch.kind = Datum_Patch_Data;
+    patch.index = stack_node_data_id;
+    patch.offset = 0;
+    patch.location = 0;
+    patch.data_id = file_name_id;
+    bh_arr_push(mod->data_patches, patch);
+
+    patch.location = 12;
+    patch.data_id = func_name_id;
+    bh_arr_push(mod->data_patches, patch);
+
+    u64 offset = 0;
+    u64 stack_trace_pass_global = bh_imap_get(&mod->index_map, (u64) &builtin_stack_trace);
+
+    emit_location_return_offset(mod, &code, (AstTyped *) fd->stack_trace_local, &offset);
+    WIL(NULL, WI_GLOBAL_GET, stack_trace_pass_global);
+    emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], offset);
+
+    offset = 0;
+    emit_location_return_offset(mod, &code, (AstTyped *) fd->stack_trace_local, &offset);
+    emit_data_relocation(mod, &code, stack_node_data_id);
+    emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], offset + 4);
+
+    *pcode = code;
+}
+
 static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     if (!should_emit_function(fd)) return;
+
+    if (fd == builtin_initialize_data_segments && !mod->doing_linking) {
+        // This is a large hack, but is necessary.
+        // This particular function (__initialize_data_segments) should not be generated
+        // until the module is in its linking phase. This is because we have to wait 
+        // until we have reached the linking phase to know every data element that is
+        // and will be present. Without this, the generating data segments in the bodies
+        // of the functions is not possible.
+        return;
+    }
 
     i32 type_idx = generate_type_idx(mod, fd->type);
 
@@ -4303,6 +4373,10 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
             u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_closure_base);
             bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_GLOBAL_GET, { .l = global_closure_base_idx } }));
             bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_LOCAL_SET,  { .l = mod->closure_base_idx } }));
+        }
+
+        if (fd->stack_trace_local) {
+            emit_stack_trace_blob(mod, &wasm_func.code, fd);
         }
 
         // Generate code
@@ -4479,19 +4553,18 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
         module->globals[global_idx].initial_value[0].data.i1 =  module->next_tls_offset;
 }
 
-static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
-
+static void emit_raw_string(OnyxWasmModule* mod, char *data, i32 len, u64 *out_data_id, u64 *out_len) {
     // NOTE: Allocating more than necessary, but there are no cases
     // in a string literal that create more bytes than already
     // existed. You can create less however ('\n' => 0x0a).
-    i8* strdata = bh_alloc_array(global_heap_allocator, i8, strlit->token->length + 1);
-    i32 length  = string_process_escape_seqs(strdata, strlit->token->text, strlit->token->length);
+    i8* strdata = bh_alloc_array(global_heap_allocator, i8, len + 1);
+    i32 length  = string_process_escape_seqs(strdata, data, len);
 
     i32 index = shgeti(mod->string_literals, (char *) strdata);
     if (index != -1) {
         StrLitInfo sti = mod->string_literals[index].value;
-        strlit->data_id = sti.data_id;
-        strlit->length  = sti.len + (strlit->is_cstr ? 1 : 0);
+        *out_data_id = sti.data_id;
+        *out_len = sti.len;
 
         bh_free(global_heap_allocator, strdata);
         return;
@@ -4506,11 +4579,16 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
         .data = strdata,
     };
 
-    strlit->data_id = emit_data_entry(mod, &datum);
-    strlit->length  = length + (strlit->is_cstr ? 1 : 0);
+    *out_data_id = emit_data_entry(mod, &datum);
+    *out_len     = length;
 
     // :ProperLinking
-    shput(mod->string_literals, (char *) strdata, ((StrLitInfo) { strlit->data_id, length }));
+    shput(mod->string_literals, (char *) strdata, ((StrLitInfo) { *out_data_id, length }));
+}
+
+static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
+    emit_raw_string(mod, strlit->token->text, strlit->token->length, &strlit->data_id, &strlit->length);
+    if (strlit->is_cstr) strlit->length += 1;
 }
 
 static u32 emit_data_entry(OnyxWasmModule *mod, WasmDatum *datum) {
@@ -4740,21 +4818,23 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
     u64 alignment = type_alignment_of(effective_type);
     u64 size = type_size_of(effective_type);
 
-    if (type_table_node != NULL && (AstMemRes *) type_table_node == memres) {
-        u64 table_location = build_type_table(mod);
-        memres->data_id = table_location;
-        return;
+    if (context.options->generate_type_info) {
+        if (type_table_node != NULL && (AstMemRes *) type_table_node == memres) {
+            u64 table_location = build_type_table(mod);
+            memres->data_id = table_location;
+            return;
+        }
+
+        if (tagged_procedures_node != NULL && (AstMemRes *) tagged_procedures_node == memres) {
+            u64 tagged_procedures_location = build_tagged_procedures(mod);
+            memres->data_id = tagged_procedures_location;
+            return;
+        }
     }
 
     if (foreign_blocks_node != NULL && (AstMemRes *) foreign_blocks_node == memres) {
         u64 foreign_blocks_location = build_foreign_blocks(mod);
         memres->data_id = foreign_blocks_location;
-        return;
-    }
-
-    if (tagged_procedures_node != NULL && (AstMemRes *) tagged_procedures_node == memres) {
-        u64 tagged_procedures_location = build_tagged_procedures(mod);
-        memres->data_id = tagged_procedures_location;
         return;
     }
 
@@ -5047,6 +5127,8 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
     // the code will probably need to be altered.
     assert(POINTER_SIZE == 4);
 
+    module->doing_linking = 1;
+
     module->memory_min_size = options->memory_min_size;
     module->memory_max_size = options->memory_max_size;
 
@@ -5098,6 +5180,10 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
 
         datum_offset += datum->length;
     }
+
+    // Now that we know where the data elements will go (and to avoid a lot of patches),
+    // we can emit the __initialize_data_segments function.
+    emit_function(module, builtin_initialize_data_segments);
 
     bh_arr_each(DatumPatchInfo, patch, module->data_patches) {
         if (patch->data_id == 0) {

@@ -4,3 +4,6 @@
 {"test":"Wow!","working":123,"data":[1,2,3,4,5],"people":[{"name":"Joe"},{"name":"Bob"}],"other":[{"x":1},{"x":2}]}
 {"foo":{"data":5}}
 🂡
+main.Union_Test { v1 = None, v2 = Some(123) }
+{"v1":null,"v2":123}
+{"v1":null,"v2":123}

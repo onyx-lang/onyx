@@ -166,7 +166,7 @@ contains :: #match #locked {
     }, 
 
     macro (arr: [] $T, $cmp: Code) -> bool {
-        for it: arr do if #unquote cmp do return true;
+        for it: arr do if #unquote cmp(it) do return true;
         return false;
     }
 }
@@ -371,7 +371,7 @@ unique :: (arr: &[] $T) {
 
         // OR
 
-        slice.fold(arr, 0, #(it + acc)) |> println();
+        slice.fold(arr, 0, [it](it + acc)) |> println();
 """
 fold :: #match #local {}
 
@@ -385,7 +385,7 @@ fold :: (arr: [] $T, init: $R, f: (T, R) -> R) -> R {
 #overload
 fold :: macro (arr: [] $T, init: $R, body: Code) -> R {
     acc := init;
-    for it: arr do acc = #unquote body;
+    for it: arr do acc = #unquote body(it, acc);
     return acc;
 }
 
@@ -395,12 +395,12 @@ fold :: macro (arr: [] $T, init: $R, body: Code) -> R {
 every :: #match #local {}
 
 #overload
-every :: macro (arr: [] $T, predicate: (T) -> bool) => #this_package.every(arr, #(predicate(it)));
+every :: macro (arr: [] $T, predicate: (T) -> bool) => #this_package.every(arr, [it](predicate(it)));
 
 #overload
 every :: macro (arr: [] $T, predicate_body: Code) -> bool {
     for arr {
-        if !(#unquote predicate_body) do return false;
+        if !(#unquote predicate_body(it)) do return false;
     }
     return true;
 }
@@ -411,12 +411,12 @@ every :: macro (arr: [] $T, predicate_body: Code) -> bool {
 some :: #match #local {}
 
 #overload
-some :: macro (arr: [] $T, predicate: (T) -> bool) => #this_package.some(arr, #(predicate(it)));
+some :: macro (arr: [] $T, predicate: (T) -> bool) => #this_package.some(arr, [it](predicate(it)));
 
 #overload
 some :: macro (arr: [] $T/type_is_struct, predicate_body: Code) -> bool {
     for & arr {
-        if #unquote predicate_body do return true;
+        if #unquote predicate_body(it) do return true;
     }
     return false;
 }
@@ -424,7 +424,7 @@ some :: macro (arr: [] $T/type_is_struct, predicate_body: Code) -> bool {
 #overload
 some :: macro (arr: [] $T, predicate_body: Code) -> bool {
     for arr {
-        if #unquote predicate_body do return true;
+        if #unquote predicate_body(it) do return true;
     }
     return false;
 }
@@ -481,7 +481,7 @@ find :: (arr: [] $T, value: T) -> i32 {
 find :: macro (arr: [] $T/type_is_struct, pred: Code) -> i32 {
     for i: arr.count {
         it := &arr[i];
-        if #unquote pred do return i;
+        if #unquote pred(it) do return i;
     }
 
     return -1;
@@ -491,7 +491,7 @@ find :: macro (arr: [] $T/type_is_struct, pred: Code) -> i32 {
 find :: macro (arr: [] $T, pred: Code) -> i32 {
     for i: arr.count {
         it := arr[i];
-        if #unquote pred do return i;
+        if #unquote pred(it) do return i;
     }
 
     return -1;
@@ -510,15 +510,38 @@ find_ptr :: (arr: [] $T, value: T) -> &T {
     return null;
 }
 
+#doc """
+    
+"""
+find_opt :: #match {
+    macro (arr: [] $T/type_is_struct, cond: Code) -> ? T {
+        for& it: arr {
+            if #unquote cond(it) {
+                return *it;
+            }
+        }
+        return .{};
+    },
+
+    macro (arr: [] $T, cond: Code) -> ? T {
+        for it: arr {
+            if #unquote cond(it) {
+                return it;
+            }
+        }
+        return .{};
+    },
+}
+
 first :: #match #locked {
     macro (arr: [] $T, predicate: (T) -> bool) -> &T {
         first :: first
-        return first(arr, #(predicate(it)));
+        return first(arr, [it](predicate(it)));
     },
 
     macro (arr: [] $T/type_is_struct, predicate_body: Code) -> &T {
         for & arr {
-            if #unquote predicate_body do return it;
+            if #unquote predicate_body(it) do return it;
         }
 
         return null;
@@ -530,7 +553,7 @@ first :: #match #locked {
         // structure.
         for &it_ptr: arr {
             it := *it_ptr;
-            if #unquote predicate_body do return it_ptr;
+            if #unquote predicate_body(it) do return it_ptr;
         }
 
         return null;
@@ -543,13 +566,13 @@ first :: #match #locked {
 count_where :: #match #local {}
 
 #overload
-count_where :: macro (arr: [] $T, predicate: (T) -> bool) => #this_package.count_where(arr, #(predicate(it)));
+count_where :: macro (arr: [] $T, predicate: (T) -> bool) => #this_package.count_where(arr, [it](predicate(it)));
 
 #overload
 count_where :: macro (arr: [] $T, predicate_body: Code) -> u32 {
     count: u32 = 0;
     for arr {
-        if #unquote predicate_body do count += 1;
+        if #unquote predicate_body(it) do count += 1;
     }
     return count;
 }
@@ -597,6 +620,21 @@ chunks :: (arr: [] $T, width: i32) -> Iterator([] T) {
 }
 
 
+#local HasEquals :: interface (t: $T) {
+    { t == t } -> bool;
+}
+
+equal :: (arr1: [] $T/HasEquals, arr2: [] T) -> bool {
+    if arr1.count != arr2.count do return false;
+
+    for i: arr1.count {
+        if !(arr1[i] == arr2[i]) do return false;
+    }
+
+    return true;
+}
+
+
 #local fold_idx_elem :: (arr: [] $T, $cmp: Code) -> (i32, T) {
     idx  := 0;
     elem := arr[0];
@@ -618,7 +656,7 @@ chunks :: (arr: [] $T, width: i32) -> Iterator([] T) {
 """
 greatest :: macro (arr: [] $T) -> (i32, T) {
     fold_idx_elem :: fold_idx_elem
-    return fold_idx_elem(arr, #(*A > *B));
+    return fold_idx_elem(arr, [](*A > *B));
 }
 
 #doc """
@@ -626,5 +664,5 @@ greatest :: macro (arr: [] $T) -> (i32, T) {
 """
 least :: macro (arr: [] $T) -> (i32, T) {
     fold_idx_elem :: fold_idx_elem
-    return fold_idx_elem(arr, #(*A < *B));
+    return fold_idx_elem(arr, [](*A < *B));
 }

@@ -267,6 +267,12 @@ raw_free :: (use a: Allocator, ptr: rawptr) {
     alloc :: raw_alloc
     resize :: raw_resize
     free :: raw_free
+
+    move :: macro (use a: Allocator, v: $V) -> &V {
+        out := cast(&V) a->alloc(sizeof V);
+        *out = v;
+        return out;
+    }
 }
 
 //

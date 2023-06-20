@@ -89,7 +89,7 @@ any_nested_selector :: (v: any, member_name: str) -> any {
 #doc """
 """
 any_member :: #match #locked {
-    macro (v: any, member_type: type_expr, member_offset: u32) -> any {
+    (v: any, member_type: type_expr, member_offset: u32) -> any {
         return any.{
             cast([&] u8, v.data) + member_offset,
             member_type

@@ -36,7 +36,7 @@ Type basic_types[] = {
     { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_f64x2, { Basic_Kind_F64X2,  Basic_Flag_SIMD,                        16, 16, "f64x2" } },
     { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_v128,  { Basic_Kind_V128,   Basic_Flag_SIMD,                        16, 16, "v128"  } },
 
-    { Type_Kind_Basic, 0, 0, NULL,                          { Basic_Kind_Type_Index, Basic_Flag_Type_Index,              4,  4, "type_expr" } },
+    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_type_expr, { Basic_Kind_Type_Index, Basic_Flag_Type_Index,          4,  4, "type_expr" } },
 };
 
 // TODO: Document this!!
@@ -752,7 +752,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
 
             u32 size = 0;
             u32 alignment = 0;
-            u32 next_tag_value = 1;
+            u32 next_tag_value = 0;
 
             AstEnumType* tag_enum_node = onyx_ast_node_new(alloc, sizeof(AstEnumType), Ast_Kind_Enum_Type);
             tag_enum_node->token = union_->token;

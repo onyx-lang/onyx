@@ -195,7 +195,7 @@ static SymresStatus symres_union_type(AstUnionType* u_node) {
 
     fori (i, 0, bh_arr_length(u_node->variants)) {
         AstUnionVariant *variant = u_node->variants[i];
-        // track_declaration_for_symbol_info(member->token->pos, (AstNode *) member);
+        track_declaration_for_symbol_info(variant->token->pos, (AstNode *) variant);
 
         assert(variant->type_node);
         SymresStatus ss = symres_type(&variant->type_node);
@@ -916,6 +916,9 @@ static SymresStatus symres_directive_defined(AstDirectiveDefined** pdefined) {
 
 static SymresStatus symres_directive_insert(AstDirectiveInsert* insert) {
     SYMRES(expression, &insert->code_expr);
+    bh_arr_each(AstTyped *, pexpr, insert->binding_exprs) {
+        SYMRES(expression, pexpr);
+    }
     return Symres_Success;
 }
 
@@ -1002,6 +1005,9 @@ static SymresStatus symres_block(AstBlock* block) {
 
     if (block->binding_scope != NULL)
         scope_include(current_scope, block->binding_scope, block->token->pos);
+
+    if (block->quoted_block_capture_scope != NULL)
+        scope_include(current_scope, block->quoted_block_capture_scope, block->token->pos);
 
     if (block->body) {
         AstNode** start = &block->body;
@@ -1138,6 +1144,22 @@ SymresStatus symres_function_header(AstFunction* func) {
     }
 
     SYMRES(type, &func->return_type);
+
+    if (context.options->stack_trace_enabled) {
+        OnyxToken *stack_trace_token = bh_alloc_item(context.ast_alloc, OnyxToken);
+        stack_trace_token->type = Token_Type_Symbol;
+        stack_trace_token->length = 13;
+        stack_trace_token->text = bh_strdup(context.ast_alloc, "__stack_trace ");
+        stack_trace_token->pos = func->token->pos;
+
+        if (!func->stack_trace_local) {
+            assert(builtin_stack_trace_type);
+            func->stack_trace_local = make_local(context.ast_alloc, stack_trace_token, builtin_stack_trace_type);
+            func->stack_trace_local->flags |= Ast_Flag_Decl_Followed_By_Init;
+        }
+
+        SYMRES(local, &func->stack_trace_local);
+    }
 
     scope_leave();
 

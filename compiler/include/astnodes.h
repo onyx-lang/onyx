@@ -814,6 +814,7 @@ struct AstBlock         {
 
     Scope *scope;
     Scope *binding_scope;
+    Scope *quoted_block_capture_scope;
     BlockRule rules;
 
     u32 statement_idx;
@@ -1401,6 +1402,9 @@ struct AstFunction {
     AstCaptureBlock *captures;
     Scope *scope_to_lookup_captured_values;
 
+    // NOTE: Only set on when --stack-trace is passed.
+    AstLocal *stack_trace_local;
+
     b32 is_exported        : 1;
     b32 is_foreign         : 1;
     b32 is_foreign_dyncall : 1;
@@ -1518,12 +1522,14 @@ struct AstCodeBlock {
     AstTyped_base;
 
     AstNode *code;
+    bh_arr(OnyxToken *) binding_symbols;
 };
 
 struct AstDirectiveInsert {
     AstTyped_base;
 
     AstTyped *code_expr;
+    bh_arr(AstTyped *) binding_exprs;
 };
 
 struct AstDirectiveInit {
@@ -1773,6 +1779,11 @@ typedef struct ContextCaches {
     bh_imap implicit_cast_to_bool_cache;
 } ContextCaches; 
 
+typedef struct DefinedVariable {
+    char *key;
+    char *value;
+} DefinedVariable;
+
 
 typedef struct CompileOptions CompileOptions;
 struct CompileOptions {
@@ -1789,6 +1800,7 @@ struct CompileOptions {
     b32 use_post_mvp_features : 1;
     b32 use_multi_threading   : 1;
     b32 generate_foreign_info : 1;
+    b32 generate_type_info    : 1;
     b32 no_std                : 1;
     b32 no_stale_code         : 1;
     b32 show_all_errors       : 1;
@@ -1804,8 +1816,10 @@ struct CompileOptions {
     const char* documentation_file;
     const char* symbol_info_file;
     const char* help_subcommand;
+    bh_arr(DefinedVariable) defined_variables;
 
     b32 debug_enabled;
+    b32 stack_trace_enabled;
 
     i32    passthrough_argument_count;
     char** passthrough_argument_data;
@@ -1893,6 +1907,7 @@ extern AstGlobal builtin_stack_top;
 extern AstGlobal builtin_tls_base;
 extern AstGlobal builtin_tls_size;
 extern AstGlobal builtin_closure_base;
+extern AstGlobal builtin_stack_trace;
 extern AstType  *builtin_string_type;
 extern AstType  *builtin_cstring_type;
 extern AstType  *builtin_range_type;
@@ -1908,6 +1923,7 @@ extern AstType  *builtin_any_type;
 extern AstType  *builtin_code_type;
 extern AstType  *builtin_link_options_type;
 extern AstType  *builtin_package_id_type;
+extern AstType  *builtin_stack_trace_type;
 extern AstTyped *type_table_node;
 extern AstTyped *foreign_blocks_node;
 extern AstType  *foreign_block_type;
@@ -2102,6 +2118,7 @@ static inline b32 node_is_addressable_literal(AstNode* node) {
 static inline Type* get_expression_type(AstTyped* expr) {
     switch (expr->kind) {
         case Ast_Kind_Block: case Ast_Kind_If: case Ast_Kind_While: return NULL;
+        case Ast_Kind_Typeof: return &basic_types[Basic_Kind_Type_Index];
         default: return expr->type;
     }
 }

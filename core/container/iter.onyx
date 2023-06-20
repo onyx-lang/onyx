@@ -25,8 +25,10 @@ use core.intrinsics.types {type_is_struct}
     skip :: skip;
     skip_while :: skip_while;
     
+    flatten :: flatten;
     enumerate :: enumerate;
 
+    find :: find;
     fold :: fold;
     count :: count;
     some :: some;
@@ -422,6 +424,35 @@ zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R)) -> Iterator(P
 }
 
 
+#doc """
+    Filters and maps at the same time.
+
+    If the provided function returns a None variant of Optional,
+    then the entry is discarded.
+
+    If the provided function returns `Some(x)`, then `x` is yielded.
+"""
+flatten :: (i: Iterator($T), f: (T) -> ? $R) -> Iterator(R) {
+    return generator(
+        &.{ i = i, f = f },
+
+        fi => {
+            while true {
+                v, cont := next(fi.i);
+                if !cont do break;
+
+                v2 := fi.f(v);
+                if v2 {
+                    return v2->unwrap(), true;
+                }
+            }
+            return .{}, false;
+        },
+
+        fi => { close(fi.i); }
+    );
+}
+
 
 #doc """
     Combines iterators by first yielding all values from
@@ -529,7 +560,7 @@ take_one :: (it: Iterator($T), no_close := false) -> (T, bool) {
     value: i32;
     iterator: Iterator(i32) = ...;
     
-    if #(value) << iterator {
+    if [](value) << iterator {
         ...iterater closed...
     }
 """
@@ -649,13 +680,13 @@ generic_dynamic_array_as_iter :: (x: &[..] $T, $access: Code, $return_type: type
 #overload
 as_iter :: macro (x: &[..] $T) => {
     G :: generic_dynamic_array_as_iter
-    return G(x, #(arr.data[current]), Iterator(T));
+    return G(x, [](arr.data[current]), Iterator(T));
 }
 
 #overload
 as_iter :: macro (x: &[..] $T, by_pointer: bool) => {
     G :: generic_dynamic_array_as_iter
-    return G(x, #(&arr.data[current]), Iterator(&T));
+    return G(x, [](&arr.data[current]), Iterator(&T));
 }
 
 
@@ -686,6 +717,24 @@ as_iter :: (r: range) => generator(
 //
 // Iterator reducing
 //
+
+find :: #match #local {}
+
+#overload
+find :: macro (it: $T/Iterable, predicate: $F) =>
+    #this_package.find(#this_package.as_iter(it), predicate);
+
+#overload
+find :: (it: Iterator($T), predicate: (T) -> bool) -> ? T {
+    for v: it {
+        if predicate(v) {
+            return v;
+        }
+    }
+
+    return .{};
+}
+
 
 #doc """
     Incremently calls `combine` on the yielded value and the
@@ -773,6 +822,14 @@ to_map :: (it: Iterator(Pair($K, $V)), allocator := context.allocator) -> Map(K,
     return m;
 }
 
+#doc """
+    Collects elements into an array, or a map, depending on if the
+    iterator produces a Pair(K, V) or not.
+"""
+collect :: #match {
+    to_array
+}
+
 
 #doc """
     Produces an iterator that first yields all values from the
@@ -832,7 +889,7 @@ prod :: (x: $I1/Iterable, y_iter: Iterator($Y)) => {
     Python:
         results = [it * 2 for it in [1, 2, 3, 4, 5]]
     Onyx:
-        results := iter.comp(u32.[1, 2, 3, 4, 5], #(it * 2));
+        results := iter.comp(u32.[1, 2, 3, 4, 5], [it](it * 2));
 """
 comp :: #match #local {}
 
@@ -843,7 +900,7 @@ comp :: macro (i: Iterator(&$V), value: Code) => {
 
     for __it: i {
         it := *__it;
-        a << (#unquote value);
+        a << (#unquote value(it));
     }
     return a;
 }
@@ -853,7 +910,7 @@ comp :: macro (i: Iterator($V), value: Code) => {
     it: V;
     a := make([..] typeof #unquote value);
 
-    for i do a << (#unquote value);
+    for i do a << (#unquote value(it));
     return a;
 }
 

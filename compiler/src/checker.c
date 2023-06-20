@@ -542,7 +542,8 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
                 // We subtract one here because variant numbering starts at 1, instead of 0.
                 // This is so a zeroed out block of memory does not have a valid variant.
-                i32 variant_number = get_expression_integer_value(*value, NULL) - 1;
+                // This is going to change now...
+                i32 variant_number = get_expression_integer_value(*value, NULL);
                 switchnode->union_variants_handled[variant_number] = 1;
 
                 UnionVariant *union_variant = union_expr_type->Union.variants_ordered[variant_number];
@@ -2455,6 +2456,10 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
         YIELD(insert->token->pos, "Waiting for resolution to code expression type.");
     }
 
+    bh_arr_each(AstTyped *, pexpr, insert->binding_exprs) {
+        CHECK(expression, pexpr);
+    }
+
     Type* code_type = type_build_from_ast(context.ast_alloc, builtin_code_type);
 
     TYPE_CHECK(&insert->code_expr, code_type) {
@@ -2469,8 +2474,53 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
         ERROR(insert->token->pos, "Expected compile-time known expression of type 'Code'.");
     }
 
+    u32 bound_symbol_count = bh_arr_length(code_block->binding_symbols);
+    u32 bound_expr_count   = bh_arr_length(insert->binding_exprs);
+    if (bound_symbol_count > bound_expr_count) {
+        onyx_report_error(insert->token->pos, Error_Critical,
+                "Expected at least %d argument%s to unquote code block, only got %d.",
+                bound_symbol_count, bh_num_plural(bound_symbol_count), bound_expr_count);
+        ERROR(code_block->token->pos, "Here is the code block being unquoted.");
+    }
+
     AstNode* cloned_block = ast_clone(context.ast_alloc, code_block->code);
     cloned_block->next = insert->next;
+
+    if (bound_expr_count > 0) {
+        Scope **scope = NULL;
+
+        if (cloned_block->kind == Ast_Kind_Block) {
+            scope = &((AstBlock *) cloned_block)->quoted_block_capture_scope;
+
+        } else if (bound_symbol_count > 0) {
+            AstReturn* return_node = onyx_ast_node_new(context.ast_alloc, sizeof(AstReturn), Ast_Kind_Return);
+            return_node->token = cloned_block->token;
+            return_node->expr = (AstTyped *) cloned_block;
+
+            AstBlock* body_block = onyx_ast_node_new(context.ast_alloc, sizeof(AstBlock), Ast_Kind_Block);
+            body_block->token = cloned_block->token;
+            body_block->body = (AstNode *) return_node;
+            scope = &((AstBlock *) body_block)->quoted_block_capture_scope;
+
+            AstDoBlock* doblock = (AstDoBlock *) onyx_ast_node_new(context.ast_alloc, sizeof(AstDoBlock), Ast_Kind_Do_Block);
+            doblock->token = cloned_block->token;
+            doblock->block = body_block;
+            doblock->type = &type_auto_return;
+            doblock->next = cloned_block->next;
+
+            cloned_block = (AstNode *) doblock;
+        }
+
+        if (bound_symbol_count > 0) {
+            assert(scope);
+            *scope = scope_create(context.ast_alloc, NULL, code_block->token->pos);
+
+            fori (i, 0, bound_symbol_count) {
+                symbol_introduce(*scope, code_block->binding_symbols[i], (AstNode *) insert->binding_exprs[i]);
+            }
+        }
+    }
+
     *(AstNode **) pinsert = cloned_block;
 
     insert->flags |= Ast_Flag_Has_Been_Checked;
@@ -2727,6 +2777,10 @@ CheckStatus check_function(AstFunction* func) {
         CheckStatus status = Check_Success;
         if (func->captures) {
             status = check_capture_block(func->captures);
+        }
+
+        if (status == Check_Success && func->stack_trace_local) {
+            status = check_expression((AstTyped **) &func->stack_trace_local);
         }
 
         if (status == Check_Success) {

@@ -122,7 +122,12 @@ static instr_format_t instr_formats[] = {
     { "transmute_f32", instr_format_ra },
     { "transmute_f64", instr_format_ra },
 
-    { "cmpxchg", instr_format_rab }
+    { "cmpxchg", instr_format_rab },
+
+    { "break", instr_format_none },
+
+    { "memory_size", instr_format_none },
+    { "memory_grow", instr_format_ra }
 };
 
 void ovm_disassemble(ovm_program_t *program, u32 instr_addr, bh_buffer *instr_text) {

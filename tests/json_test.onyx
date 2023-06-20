@@ -42,7 +42,23 @@ main :: () {
     json.set(o, "foo", json.from_any(^.{data=5}));
     json.encode(^core.stdio.print_writer, o);
 
-    v := json.decode_with_error("""{ "key1": "\\uD83C\\uDCA1", "key2": "\\u264C" }""");
+    v := json.decode_with_error("{ \"key1\": \"\\uD83C\\uDCA1\", \"key2\": \"\\u264C\" }");
     core.print("\n");
     core.println(v.root["key1"]->as_str());
+
+
+    Union_Test :: struct {
+        v1: ? i32;
+        v2: ? i32;
+    }
+
+    ut_json := json.decode_with_error("""{ "v1": null, "v2": 123 }""");
+    ut: Union_Test;
+    json.as_any(ut_json.root, &ut);
+    core.println(ut);
+
+    json.encode(&core.stdio.print_writer, ut_json.root);
+    core.print("\n");
+    json.encode(&core.stdio.print_writer, ut);
+    core.print("\n");
 }

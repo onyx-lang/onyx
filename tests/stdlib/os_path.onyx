@@ -1,0 +1,35 @@
+use core {*}
+
+main :: () {
+    for t: Pair(str, str).[
+        .{"", "."},
+        .{"abc", "abc"},
+        .{"..", ".."},
+        .{"../../abc", "../../abc"},
+        .{"/", "/"},
+
+        .{"abc/", "abc"},
+        .{"a/b/c/", "a/b/c"},
+        .{"/abc/", "/abc"},
+
+        .{"abc//def//ghi", "abc/def/ghi"},
+        .{"//abc", "/abc"},
+        .{"//abc//", "/abc"},
+
+        .{"abc/./def", "abc/def"},
+        .{"/./abc/def", "/abc/def"},
+        .{"abc/.", "abc"},
+
+        .{"abc/def/ghi/../jkl", "abc/def/jkl"},
+        .{"abc/def/../ghi/../jkl", "abc/jkl"},
+
+	.{"abc/./../def", "def"},
+	.{"abc//./../def", "def"},
+	.{"abc/../../././../def", "../../def"},
+
+        .{"abc/def/..", "abc"}
+    ] {
+        cleaned := os.path_clean(t.first);
+        printf("{}: {}=={}\n", cleaned == t.second, cleaned, t.second);
+    }
+}

@@ -4,6 +4,7 @@ use core.map
 use core.string
 use core.array
 use core.math
+use core.memory
 use runtime
 
 #doc """
@@ -87,6 +88,15 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
             if info.kind == .Distinct {
                 d_info := cast(&Type_Info_Distinct) info;
                 return parse_any(target, d_info.base_type, to_parse, string_allocator);
+            }
+
+            if info.kind == .Union && union_constructed_from(data_type, Optional) {
+                parsed_successful := parse_any(memory.ptr_add(target, info.alignment), info->as_union().variants[1].type, to_parse, string_allocator);
+                if !parsed_successful {
+                    *cast(& u32) target = ~~ Optional(void).tag_enum.None;
+                } else {
+                    *cast(& u32) target = ~~ Optional(void).tag_enum.Some;
+                }
             }
         }
     }

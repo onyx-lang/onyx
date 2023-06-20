@@ -146,6 +146,15 @@ use core
         }
     }
 
+    with :: macro (o: ?$T, body: Code) {
+        switch o {
+            case .None ---;
+            case .Some => it {
+                #unquote body(it);
+            }
+        }
+    }
+
     #doc """
         Creates a scope that the `?` operator on an Optional type can
         return to, instead of returning from the enclosing function.
@@ -173,7 +182,7 @@ use core
                 // ...
             });
     """
-    try :: macro (body: Code, catch: Code = #quote {}) -> bool {
+    try :: macro (body: Code, catch: Code = []{}) -> bool {
         //
         // Using a 'do'-expression block to introduce a new
         // 'return' location. This way, when the code in the `body`
@@ -227,6 +236,7 @@ use core
 #operator ?? macro (opt: ?$T, catch: Code) -> T {
     switch value := opt; value {
         case .Some => v do return v;
+        case #default ---
     }
 
     #unquote catch;

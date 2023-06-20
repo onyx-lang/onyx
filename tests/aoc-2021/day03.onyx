@@ -73,8 +73,8 @@ main :: (args) => {
         }
 
         for iter.as_iter(range.{ BITS - 1, 0, -1 }) {
-            filter_array(oxygen_array, it, #(A >= B));
-            filter_array(co2_array,    it, #(A <  B));
+            filter_array(oxygen_array, it, [](A >= B));
+            filter_array(co2_array,    it, [](A <  B));
         }
 
         printf("Part 2: {}\n", oxygen_array[0] * co2_array[0]);
