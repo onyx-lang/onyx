@@ -19,7 +19,7 @@ extern struct bh_allocator global_heap_allocator;
 #include "wasm_emit.h"
 #include "doc.h"
 
-#define VERSION "v0.1.2"
+#define VERSION "v0.1.3"
 
 
 Context context;
@@ -112,7 +112,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
         .defined_variables = NULL,
 
-        .debug_enabled = 0,
+        .debug_info_enabled = 0,
 
         .passthrough_argument_count = 0,
         .passthrough_argument_data  = NULL,
@@ -263,7 +263,12 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
                 options.symbol_info_file = argv[++i];
             }
             else if (!strcmp(argv[i], "--debug")) {
-                options.debug_enabled = 1;
+                options.debug_session = 1;
+                options.debug_info_enabled = 1;
+                options.stack_trace_enabled = 1;
+            }
+            else if (!strcmp(argv[i], "--debug-info")) {
+                options.debug_info_enabled = 1;
                 options.stack_trace_enabled = 1;
             }
             else if (!strcmp(argv[i], "--stack-trace")) {
@@ -978,7 +983,7 @@ static CompilerProgress onyx_flush_module() {
 
 #ifdef ENABLE_RUN_WITH_WASMER
 static b32 onyx_run_module(bh_buffer code_buffer) {
-    onyx_run_initialize(context.options->debug_enabled);
+    onyx_run_initialize(context.options->debug_session);
 
     if (context.options->verbose_output > 0)
         bh_printf("Running program:\n");

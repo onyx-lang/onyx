@@ -313,7 +313,7 @@ static void debug_set_position(OnyxWasmModule *mod, OnyxToken *token) {
 //    - REP
 //    - SET, REP 0
 static void debug_emit_instruction(OnyxWasmModule *mod, OnyxToken *token) {
-    if (!context.options->debug_enabled) {
+    if (!context.options->debug_info_enabled) {
         return;
     }
 

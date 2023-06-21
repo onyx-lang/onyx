@@ -428,7 +428,7 @@ static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer
     i32 leb_len;
     u8* leb;
 
-    if (instr->type == WI_NOP && !context.options->debug_enabled) return;
+    if (instr->type == WI_NOP && !context.options->debug_info_enabled) return;
 
     if (instr->type & SIMD_INSTR_MASK) {
         bh_buffer_write_byte(buff, 0xFD);
@@ -765,7 +765,7 @@ static i32 output_onyx_func_offset_section(OnyxWasmModule* module, bh_buffer* bu
 
 #ifdef ENABLE_DEBUG_INFO
 static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
-    if (!module->debug_context || !context.options->debug_enabled) return 0;
+    if (!module->debug_context || !context.options->debug_info_enabled) return 0;
 
     DebugContext *ctx = module->debug_context;
 
@@ -1090,7 +1090,7 @@ void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer)
     bh_buffer_append(buffer, WASM_VERSION, 4);
 
 #ifdef ENABLE_DEBUG_INFO
-    if (context.options->debug_enabled) {
+    if (context.options->debug_info_enabled) {
         output_ovm_debug_sections(module, buffer);
     }
 #endif
