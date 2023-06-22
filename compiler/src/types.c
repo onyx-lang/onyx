@@ -805,6 +805,9 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 bh_arr_push(tag_enum_node->values, ev);
             }
 
+            alignment = bh_max(alignment, 4);
+            bh_align(size, alignment);
+
             u_type->Union.alignment = alignment;
             u_type->Union.size = size + alignment; // Add the size of the tag
             u_type->Union.tag_type = type_build_from_ast(alloc, (AstType *) tag_enum_node);
