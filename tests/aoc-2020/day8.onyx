@@ -43,7 +43,7 @@ get_acc_value :: (instrs: [..] Instruction, ret_acc: &i32) -> bool {
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day8.txt";
+    contents := #file_contents "./input/day8.txt";
 
     file := contents;
 

@@ -32,7 +32,7 @@ turn_around :: (ship: &Ship) {
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day12.txt";
+    contents := #file_contents "./input/day12.txt";
 
     file := contents;
 

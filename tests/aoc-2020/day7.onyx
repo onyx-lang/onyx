@@ -50,7 +50,7 @@ bg_get_node :: (use graph: &BagGraph, name: str) -> &BagNode {
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day7.txt";
+    contents := #file_contents "./input/day7.txt";
 
     file := contents;
 

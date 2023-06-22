@@ -238,7 +238,7 @@ scan_for_monsters :: (forest: [&] u8, ori: TO, width: u32, height: u32) -> bool 
 }
 
 main :: (args: [] cstr) {
-	contents := #file_contents "./tests/aoc-2020/input/day20.txt";
+	contents := #file_contents "./input/day20.txt";
 
 	file := contents;	
 

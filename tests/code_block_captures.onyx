@@ -1,0 +1,34 @@
+use core {*}
+
+main :: () {
+    arr := .[2, 3, 5, 7, 11];
+
+    x := 5;
+
+    val := slice.find_opt(arr, [n](n > x));
+    val->with([captured_name] {
+        println(captured_name);
+    });
+
+    m := Map.literal(str, i32, .[
+        .{ "foo", 123 },
+        .{ "leet", 1337 }
+    ]);
+
+    Map.each(m, [k, v] {
+        printf("{} => {}\n", k, v);
+    });
+}
+
+#inject Map {
+    each :: macro (m: $M, body: Code) {
+        for& m.entries {
+            #unquote body(it.key, it.value);
+        }
+    }
+}
+
+
+
+
+

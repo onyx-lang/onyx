@@ -52,7 +52,7 @@ transform_subject :: (subject: u32, loop_size: u32) -> u32 {
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day25.txt";
+    contents := #file_contents "./input/day25.txt";
 
     file := contents;
 

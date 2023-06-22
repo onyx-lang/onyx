@@ -42,7 +42,7 @@ part_2 :: (contents: &str) -> u32 {
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day6.txt";
+    contents := #file_contents "./input/day6.txt";
 
     unique_sum := 0;
     while true {

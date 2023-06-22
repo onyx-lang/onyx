@@ -31,7 +31,7 @@ ingredient_map : map.Map(str, Ingredient);
 allergen_map   : map.Map(str, Allergen);
 
 main :: (args: [] cstr) {
-	contents := #file_contents "./tests/aoc-2020/input/day21.txt";
+	contents := #file_contents "./input/day21.txt";
 
 	file := contents;
 

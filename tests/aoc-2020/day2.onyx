@@ -5,7 +5,7 @@ package main
 use core {*}
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day2.txt";
+    contents := #file_contents "./input/day2.txt";
     reader, stream := io.reader_from_string(contents);
     defer cfree(stream);
 

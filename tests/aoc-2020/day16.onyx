@@ -44,7 +44,7 @@ read_ticket_and_validate :: (file: &str, fields: [..] Field, ticket_store: [&] u
 }
 
 main :: (args: [] cstr) {
-	contents := #file_contents "./tests/aoc-2020/input/day16.txt";
+	contents := #file_contents "./input/day16.txt";
 
 	file := contents;
 

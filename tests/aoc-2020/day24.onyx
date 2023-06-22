@@ -26,7 +26,7 @@ Cell :: struct {
 }
 
 main :: (args: [] cstr) {
-	contents := #file_contents "./tests/aoc-2020/input/day24.txt";
+	contents := #file_contents "./input/day24.txt";
 
     file_stream := io.buffer_stream_make(contents);
 	file := io.reader_make(&file_stream);

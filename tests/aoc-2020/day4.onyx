@@ -30,7 +30,7 @@ process_passport :: (contents: &str) -> u32 {
 // This does not include part 2 because it is gross and
 // not worth the effort to implement it.
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day4.txt";
+    contents := #file_contents "./input/day4.txt";
 
     valid_passports := 0;
     while true {

@@ -100,7 +100,7 @@ recursive_combat :: (player1: &[..] u32, player2: &[..] u32) -> u32 {
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day22.txt";
+    contents := #file_contents "./input/day22.txt";
 
     file := contents;
 

@@ -51,7 +51,7 @@ get_neighbor_count :: (cubes: &Map(CubePos, CubeState), pos: CubePos) -> u32 {
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day17.txt";
+    contents := #file_contents "./input/day17.txt";
 
     file := contents;
 
