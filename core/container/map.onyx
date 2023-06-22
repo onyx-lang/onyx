@@ -22,9 +22,6 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
     hashes  : [] i32;
     entries : [..] Entry(Key_Type, Value_Type);
 
-    // The value provided by `map.get`, if nothing was found.
-    default_value : Value_Type;
-
     Entry :: struct (K: type_expr, V: type_expr) {
         next  : i32;
         hash  : u32;
@@ -75,18 +72,17 @@ __make_overload :: macro (x: &Map($K, $V), allocator := context.allocator) =>
 #doc """
    Creates and initializes a new map using the types provided.
 """
-make :: macro ($Key: type_expr, $Value: type_expr, default := Value.{}) -> Map(Key, Value) {
+make :: macro ($Key: type_expr, $Value: type_expr) -> Map(Key, Value) {
     map : Map(Key, Value);
-    #this_package.init(&map, default = default);
+    #this_package.init(&map);
     return map;
 }
 
 #doc "Initializes a map."
-init :: (use map: &Map($K, $V), default := V.{}) {
+init :: (use map: &Map($K, $V)) {
     __initialize(map);
 
     allocator = context.allocator;
-    default_value = default;
 
     hashes = builtin.make([] u32, 8, allocator=allocator);
     array.fill(hashes, -1);
@@ -142,7 +138,7 @@ get :: (use map: &Map, key: map.Key_Type) -> map.Value_Type {
     lr := lookup(map, key);
     if lr.entry_index >= 0 do return entries[lr.entry_index].value;
 
-    return default_value;
+    return .{};
 }
 
 #doc """

@@ -55,7 +55,7 @@ main :: (args: [] cstr) {
 
     file := contents;
 
-    cubes := map.make(CubePos, CubeState, .{});
+    cubes := map.make(CubePos, CubeState);
     defer map.free(&cubes);
 
     z := 0;

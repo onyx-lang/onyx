@@ -13,7 +13,7 @@ Instruction :: struct {
 
 // Returns if the program successfully exited.
 get_acc_value :: (instrs: [..] Instruction, ret_acc: &i32) -> bool {
-    already_been := map.make(i32, bool, false);
+    already_been := map.make(i32, bool);
     defer map.free(&already_been);
 
     ip   := 0;

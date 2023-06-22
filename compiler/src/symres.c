@@ -489,8 +489,14 @@ static SymresStatus symres_pipe(AstBinaryOp** pipe) {
 //     foo->member_function(...)
 static SymresStatus symres_method_call(AstBinaryOp** mcall) {
     // :EliminatingSymres
+    
+    // We have to check this no matter what, because if we return to symbol resolution
+    // the left hand side could be something different. In particular this was a problem
+    // when expanding `some_map["value"]->unwrap()`, as the left hand side expands to a
+    // macro.
+    SYMRES(expression, &(*mcall)->left);
+
     if (((*mcall)->flags & Ast_Flag_Has_Been_Symres) == 0) {
-        SYMRES(expression, &(*mcall)->left);
         if ((*mcall)->left == NULL) return Symres_Error;
 
         if ((*mcall)->right->kind != Ast_Kind_Call) {

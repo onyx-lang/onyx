@@ -18,8 +18,8 @@ use runtime
     registers them to be used in format_any and parse_any.
 """
 custom_formatters_initialized :: #init () {
-    map.init(&custom_formatters, default=null_proc);
-    map.init(&custom_parsers,    default=null_proc);
+    map.init(&custom_formatters);
+    map.init(&custom_parsers);
 
     #if Enable_Custom_Formatters {
         use runtime.info {*};

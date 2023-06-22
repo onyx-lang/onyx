@@ -35,8 +35,8 @@ main :: (args: [] cstr) {
 
 	file := contents;
 
-    map.init(&ingredient_map, .{});
-    map.init(&allergen_map, .{});
+    map.init(&ingredient_map);
+    map.init(&allergen_map);
     defer {
         map.free(&ingredient_map);
         map.free(&allergen_map);

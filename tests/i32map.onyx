@@ -6,7 +6,7 @@ use core {*}
 
 main :: (args: [] cstr) {
     imap : Map(i32, str);
-    map.init(&imap, "");
+    map.init(&imap);
     defer {
         print("Freeing map\n");
         map.free(&imap);

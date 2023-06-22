@@ -23,7 +23,7 @@ BagContainment :: struct {
 
 bg_init :: (use graph: &BagGraph) {
     array.init(&nodes, 16);
-    map.init(&node_map, null);
+    map.init(&node_map);
 }
 
 bg_free :: (use graph: &BagGraph) {

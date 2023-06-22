@@ -31,7 +31,7 @@ main :: (args: [] cstr) {
 
 
     // This is so much cleaner than the alternative.
-    ages := map.make(str, u32, default=0);
+    ages := map.make(str, u32);
     defer delete(&ages);
 
     map.put(&ages, "Dwight", 32);
