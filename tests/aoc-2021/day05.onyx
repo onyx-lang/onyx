@@ -66,11 +66,7 @@ main :: (args) => {
 
         for &line: lines {
             for p: line_points(*line) {
-                if point_count->has(p) {
-                    point_count[p] = point_count[p] + 1;
-                } else {
-                    point_count[p] = 1;
-                }
+                point_count[p] = (point_count[p] ?? 0) + 1;
             }
         }
 

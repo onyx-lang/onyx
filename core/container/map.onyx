@@ -134,7 +134,7 @@ has :: (use map: &Map, key: map.Key_Type) -> bool {
     This is subject to change with the addition of Optional to the
     standard library.
 """
-get :: (use map: &Map, key: map.Key_Type) -> map.Value_Type {
+get :: (use map: &Map, key: map.Key_Type) -> ? map.Value_Type {
     lr := lookup(map, key);
     if lr.entry_index >= 0 do return entries[lr.entry_index].value;
 
@@ -301,7 +301,7 @@ as_iter :: (m: &Map) =>
 //
 // Helper operator overloads for accessing values, accessing
 // values by pointer, and setting values.
-#operator []  macro (map: Map($K, $V), key: K) -> V      { return #this_package.get(&map, key); }
+#operator []  macro (map: Map($K, $V), key: K) -> ?V     { return #this_package.get(&map, key); }
 #operator &[] macro (map: Map($K, $V), key: K) -> &V     { return #this_package.get_ptr(&map, key); }
 #operator []= macro (map: Map($K, $V), key: K, value: V) { #this_package.put(&map, key, value); }
 

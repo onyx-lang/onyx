@@ -74,8 +74,8 @@ decode_line :: (left, right: str) -> u32 {
 
     // Solve for bottom segment
     for three_data {
-        if solved_segments[it] == 4 do continue;
-        if solved_segments[it] == 1 do continue;
+        if solved_segments[it] ?? 0 == 4 do continue;
+        if solved_segments[it] ?? 0 == 1 do continue;
         for o: one_data do if it == o do continue continue;
 
         solved_segments[it] = 7;
@@ -88,7 +88,7 @@ decode_line :: (left, right: str) -> u32 {
         if seg.count != 5 do continue;
 
         for four_data {
-            if solved_segments[it] == 4 do continue;
+            if solved_segments[it] ?? 0 == 4 do continue;
             for o: one_data do if it == o do continue continue;
 
             if array.contains(seg, it) {
@@ -104,17 +104,17 @@ decode_line :: (left, right: str) -> u32 {
             break;
         }
 
-        if solved_segments[it] == 0 {
+        if solved_segments[it] ?? 0 == 0 {
             solved_segments[it] = 2;
         }
     }
 
     for one_data {
-        if solved_segments[it] == 0 do solved_segments[it] = 3;
+        if solved_segments[it] ?? 0 == 0 do solved_segments[it] = 3;
     }
 
     for *array.first(left_segments, (x) => x.count == 7)  {
-        if solved_segments[it] == 0 {
+        if solved_segments[it] ?? 0 == 0 {
             solved_segments[it] = 5;
         }
     }
@@ -126,7 +126,7 @@ decode_line :: (left, right: str) -> u32 {
         string.strip_whitespace(it);
         
         num_segments : [7] bool;
-        for w: *it do num_segments[solved_segments[w] - 1] = true;
+        for w: *it do num_segments[solved_segments[w] ?? 0 - 1] = true;
 
         sum *= 10;
         for i: 10 {

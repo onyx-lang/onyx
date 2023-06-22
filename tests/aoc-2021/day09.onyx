@@ -36,12 +36,12 @@ find_span :: macro (low: Pos) -> u32 {
             potential << Pos.{t.x,t.y+1};
         }
         if t.x > 0 {
-            if heightmap[Pos.{t.x-1,t.y}].height > 0 {
+            if heightmap[Pos.{t.x-1,t.y}]->unwrap().height > 0 {
                 potential << Pos.{t.x-1,t.y};
             }
         }
         if t.y > 0 {
-            if heightmap[Pos.{t.x,t.y-1}].height > 0 {
+            if heightmap[Pos.{t.x,t.y-1}]->unwrap().height > 0 {
                 potential << Pos.{t.x,t.y-1};
             }
         }
@@ -85,12 +85,12 @@ main :: (args) => {
 
         for y: height - 1 do for x: width {
             map.update(&heightmap, .{x,y}) {
-                it.dy = it.height - heightmap[Pos.{x,y+1}].height;
+                it.dy = it.height - heightmap[Pos.{x,y+1}]->unwrap().height;
             }
         }
         for x: width - 1 do for y: height {
             map.update(&heightmap, .{x,y}) {
-                it.dx = it.height - heightmap[Pos.{x+1,y}].height;
+                it.dx = it.height - heightmap[Pos.{x+1,y}]->unwrap().height;
             }
         }
 
@@ -102,11 +102,11 @@ main :: (args) => {
             if y < height - 1 && h.dy >= 0 do continue;
 
             if x > 0 {
-                if heightmap[Pos.{x-1, y}].dx <= 0 do continue;
+                if heightmap[Pos.{x-1, y}]->unwrap().dx <= 0 do continue;
             }
 
             if y > 0 {
-                if heightmap[Pos.{x, y-1}].dy <= 0 do continue;
+                if heightmap[Pos.{x, y-1}]->unwrap().dy <= 0 do continue;
             }
 
             lowest << .{x, y};

@@ -39,7 +39,7 @@ main :: (args: [] cstr) {
     map.put(&ages, "Pam", 24);
 
     print_age :: (ages: &map.Map(str, u32), name: str) {
-        age := map.get(ages, name);
+        age := map.get(ages, name) ?? 0;
         printf("{}'s age is {}.\n", name, age);
     }
 

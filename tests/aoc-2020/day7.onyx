@@ -32,7 +32,7 @@ bg_free :: (use graph: &BagGraph) {
 }
 
 bg_get_node :: (use graph: &BagGraph, name: str) -> &BagNode {
-    node := map.get(&node_map, name);
+    node := map.get(&node_map, name) ?? null;
 
     if node == null {
         node = calloc(sizeof BagNode);

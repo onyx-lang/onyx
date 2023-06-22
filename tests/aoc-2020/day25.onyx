@@ -35,7 +35,7 @@ dlp_bsgs :: (n: u32, a: u32, b: u32) -> u32 {
     tmp = ~~b;
     for i: 0 .. m {
         if map.has(&t, ~~tmp) {
-            v := map.get(&t, ~~tmp);
+            v := map.get(&t, ~~tmp) ?? 0;
             return i * m + v; 
         }
 

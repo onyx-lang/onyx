@@ -26,12 +26,12 @@ main :: (args: [] cstr) {
     }
 
     while turn != 2021 {
-        st := map.get(&nums, last_num);
+        st := map.get(&nums, last_num) ?? .{};
 
         if st.previous == 0 do last_num = 0;
         else                do last_num = st.recent - st.previous;
 
-        st = map.get(&nums, last_num);
+        st = map.get(&nums, last_num) ?? .{};
         st.previous = st.recent;
         st.recent = turn;
         map.put(&nums, last_num, st);

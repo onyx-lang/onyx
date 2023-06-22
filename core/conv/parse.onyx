@@ -20,9 +20,9 @@ parse_any :: macro (v: &$T, to_parse: str, string_allocator := context.allocator
 
 #overload
 parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_allocator := context.allocator) -> bool {
-    if custom_parsers->has(data_type) {
-        return custom_parsers[data_type](target, to_parse, string_allocator);
-    }
+    custom_parsers->get(data_type)->with([parser] {
+        return parser(target, to_parse, string_allocator);
+    });
 
     use runtime.info {*};
     info := get_type_info(data_type);

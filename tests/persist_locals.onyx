@@ -32,7 +32,7 @@ cached_fib :: (n: u64) -> u64 {
 
     if n <= 1 do return n;
 
-    if map.has(&cache, n) do return map.get(&cache, n);
+    map.get(&cache, n)->with([n] { return n; });
 
     res := cached_fib(n - 1) + cached_fib(n - 2);
     map.put(&cache, n, res);

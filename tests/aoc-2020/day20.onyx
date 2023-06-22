@@ -332,7 +332,7 @@ main :: (args: [] cstr) {
 
         if grid[tid.pos_x + 12 * tid.pos_y] != 0 do continue;
         
-        tile_ptr := map.get(&tile_map, tid.match.tile);
+        tile_ptr := map.get(&tile_map, tid.match.tile)->unwrap();
         tile_ptr.pos_x = tid.pos_x;
         tile_ptr.pos_y = tid.pos_y;
         grid[tid.pos_x + 12 * tid.pos_y] = tid.match.tile;
@@ -348,7 +348,7 @@ main :: (args: [] cstr) {
     forest : [12 * 8 * 12 * 8] u8;
     for y: 0 .. 12 {
         for x: 0 .. 12 {
-            tile := map.get(&tile_map, grid[y * 12 + x]);
+            tile := map.get(&tile_map, grid[y * 12 + x])->unwrap();
 
             for fy: 0 .. 8 {
                 for fx: 0 .. 8 {
