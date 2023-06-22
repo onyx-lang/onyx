@@ -511,6 +511,14 @@ static void context_init(CompileOptions* opts) {
         bh_arr_new(global_heap_allocator, context.doc_info->structures, 128);
         bh_arr_new(global_heap_allocator, context.doc_info->enumerations, 128);
     }
+
+    if (context.options->verbose_output > 0) {
+        bh_printf("File search path:\n");
+        bh_arr_each(const char *, p, context.options->included_folders) {
+            bh_printf("\t%s\n", *p);
+        }
+        bh_printf("\n");
+    }
 }
 
 static void context_free() {

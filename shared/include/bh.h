@@ -1988,7 +1988,7 @@ char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_su
 
         if (bh_file_exists(path)) return bh_path_get_full_name(path, BH_INTERNAL_ALLOCATOR);
 
-        return fn;
+        return path;
     }
 
     if (search_included_folders) {
