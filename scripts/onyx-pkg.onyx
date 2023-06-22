@@ -8,20 +8,27 @@
 // argument, which the package name.
 Known_Repositories :: str.[
     "{}",
-    "git://onyxlang.io/repo/{}"
+    "onyxlang.io/repo/{}"
+]
+
+
+//
+// A list of protocols to try, in order on the
+// repositories. Most repos will use http://, but
+// currently the official Onyx repo uses git://.
+Protocols :: str.[
+    "",
+    "http://",
+    "https://",
+    "git://"
 ]
 
 
 //
 // NOTE: This returns a string that ends with the path separator.
 Template_Directory :: () -> str {
-    // TODO: Write a path library for this...
-    path_sep := '/';
-    if runtime.compiler_os == .Windows do path_sep = '\\';
-
-    file := #file;
-    path := file[0 .. string.last_index_of(file, path_sep)];
-    return aprintf("{}{}pkg_templates{}", path, path_sep, path_sep);
+    return os.path_join(os.path_directory(#file), "pkg_templates")
+            |> string.alloc_copy();
 }
 
 Version :: SemVer.{0, 1, 1}
@@ -207,16 +214,7 @@ run_remove_command :: (args: [] cstr) {
 
     if config.dependencies.dependencies->has(dep) {
         config.dependencies.dependencies->delete(dep);
-        config.dependency_folders.folders->delete(dep);
         return;
-    }
-
-    for& config.dependency_folders.folders.entries {
-        if it.value == dep {
-            config.dependencies.dependencies->delete(it.key);
-            config.dependency_folders.folders->delete(it.key);
-            return;
-        }
     }
 
     error_print("Dependency '{}' is not currently used.\n", dep);
@@ -272,6 +270,11 @@ run_sync_command :: (args: [] cstr) {
     options: Sync_Options;
     arg_parse.arg_parse(args, &options);
 
+    if options.clean {
+        info_print("Cleaning", "Removing {} directory\n", config.config.lib_source_directory);
+        os.remove_directory(config.config.lib_source_directory);
+    }
+
     To_Install :: struct {
         use pack: Package;
         downgrade_if_necessary: bool;
@@ -306,20 +309,14 @@ run_sync_command :: (args: [] cstr) {
 
         needed_dependency_folders << installed_folder;
 
-        inner_config: Config;
-        package_path := config.dependency_folders.folders[to_install.repo];
-        for os.with_file(tprintf("{}/{}/onyx-pkg.ini", config.config.lib_source_directory, package_path)) {
-            r := io.reader_make(it);
-            result, error := encoding.ini.parse_ini_file(&r, &inner_config);
+        inner_config := read_config_from_installed_dependency(installed_folder) ?? [] {
+            error_print("Misconfigured onyx-pkg.ini in '{}'. Omitting.\n", to_install.repo);
+            continue;
+        };
 
-            if result != .Success {
-                error_print("Misconfigured onyx-pkg.ini in '{}'. Omitting.\n", to_install.repo);
-                continue;
-            }
-        }
 
         if inner_config.metadata.version->is_zero() {
-            error_print("Misconfigured parse onyx-pkg.ini in '{}'. Omitting.\n", to_install.repo);
+            error_print("Expected a version for '{}' that is not '0.0.0'.\n", to_install.repo);
             continue;
         }
 
@@ -345,19 +342,6 @@ run_sync_command :: (args: [] cstr) {
     }
 
     build_package_file_to_load();
-
-    if options.clean {
-        for os.list_directory(config.config.lib_source_directory) {
-            if it.type != .Directory do continue;
-
-            if !array.contains(needed_dependency_folders, it->name()) {
-                info_print("Remove", "{}\n", it->name());
-                package_folder := tprintf("{}/{}", config.config.lib_source_directory, it->name());
-                attempt_remove_native_library(package_folder);
-                os.remove_directory(package_folder);
-            }
-        }
-    }
 }
 
 #tag Command.{ "rebuild", "Rebuild native library for a package", "package-or-url",
@@ -373,13 +357,8 @@ run_rebuild_command :: (args: [] cstr)  {
 
     dep := string.as_str(args[0]);
 
-    folder := dep;
-    if config.dependency_folders.folders->has(dep) {
-        folder = config.dependency_folders.folders[dep];
-    }
-
     info_print("Rebuild", "{}\n", dep);
-    if success, err := rebuild_native_library(folder); success {
+    if success, err := rebuild_native_library(dep); success {
         info_print("Rebuilt", "{}\n", dep);
     } else {
         error_print("Rebuild failed.\n", dep);
@@ -622,28 +601,25 @@ run_new_command :: (args: [] cstr) {
 
 
 install_package :: (pack: Package, downgrade_if_necessary := false) -> (bool, installed_folder: str) {
-    if config.dependency_folders.folders->has(pack.repo) {
-        folder_name := config.dependency_folders.folders[pack.repo];
-        package_folder := tprintf("{}/{}", config.config.lib_source_directory, folder_name);
+    package_folder := get_install_path_of_repo(pack.repo);
 
-        if os.file_exists(package_folder) {
-            installed_version := get_installed_version_of_package(folder_name);
+    if os.file_exists(package_folder) {
+        installed_version := get_installed_version_of_package(pack.repo);
 
-            if installed_version == pack.version {
-                info_print("Exists", "{}  {}\n", pack.repo, installed_version);
-                return true, folder_name;
-            }
-
-            if installed_version->is_newer(pack.version) && !downgrade_if_necessary {
-                error_print("Refusing to downgrade '{}' from {} to {}.\n", pack.repo, installed_version, pack.version);
-                return false, "";
-            }
-
-            // :PRETTY
-            verb := "Upgrading" if pack.version->is_newer(installed_version) else "Downgrading";
-            info_print(verb, "{}  {} -> {}\n", pack.repo, installed_version, pack.version);
-            uninstall_package(pack);
+        if installed_version == pack.version {
+            info_print("Exists", "{}  {}\n", pack.repo, installed_version);
+            return true, package_folder;
         }
+
+        if installed_version->is_newer(pack.version) && !downgrade_if_necessary {
+            error_print("Refusing to downgrade '{}' from {} to {}.\n", pack.repo, installed_version, pack.version);
+            return false, "";
+        }
+
+        // :PRETTY
+        verb := "Upgrading" if pack.version->is_newer(installed_version) else "Downgrading";
+        info_print(verb, "{}  {} -> {}\n", pack.repo, installed_version, pack.version);
+        uninstall_package(pack);
     }
 
     if !Git.clone_version(pack.repo, pack.version) {
@@ -651,23 +627,20 @@ install_package :: (pack: Package, downgrade_if_necessary := false) -> (bool, in
         return false, "";
     }
 
-    assert(config.dependency_folders.folders->has(pack.repo), "");
-    folder_name     := config.dependency_folders.folders[pack.repo];
-    install_success := run_native_library_installation(folder_name);
-    return install_success, folder_name;
+    install_success := run_native_library_installation(package_folder);
+    return install_success, package_folder;
 }
 
 uninstall_package :: (pack: Package) -> bool {
-    if config.dependency_folders.folders->has(pack.repo) {
-        folder_name := config.dependency_folders.folders[pack.repo];
-        package_folder := tprintf("{}/{}", config.config.lib_source_directory, folder_name);
+    folder_name := strip_protocol_and_www_from_repo(pack.repo);
+    package_folder := os.path_join(config.config.lib_source_directory, folder_name);
 
-        if os.file_exists(package_folder) {
-            // Should this check if the version to be deleted is the one that is actually installed?
-            attempt_remove_native_library(package_folder);
-            os.remove_directory(package_folder);
-        }
+    if os.file_exists(package_folder) {
+        // Should this check if the version to be deleted is the one that is actually installed?
+        attempt_remove_native_library(package_folder);
+        os.remove_directory(package_folder);
 
+        // This should maybe cleanup the parent directory if it is now empty.
         return true;
     }
 
@@ -675,86 +648,110 @@ uninstall_package :: (pack: Package) -> bool {
 }
 
 attempt_remove_native_library :: (package_folder: str) -> bool {
-    inner_config: Config;
-    for os.with_file(tprintf("{}/onyx-pkg.ini", package_folder)) {
-        r := io.reader_make(it);
-        result, error := encoding.ini.parse_ini_file(&r, &inner_config);
+    inner_config := read_config_from_installed_dependency(package_folder)?;
 
-        if result != .Success do return false;
-        if string.empty(inner_config.native_library.library) do return false;
+    if string.empty(inner_config.native_library.library) do return false;
 
-        os.remove_file(tprintf("{}/{}{}", config.config.lib_bin_directory, inner_config.native_library.library, native_library_suffix));
-    }
-
+    os.remove_file(os.path_join(config.config.lib_bin_directory, tprintf("{}{}", inner_config.native_library.library, native_library_suffix)));
     return true;
 }
 
 rebuild_native_library :: (folder: str) -> (bool, str) {
-    attempt_remove_native_library(tprintf("{}/{}", config.config.lib_source_directory, folder));
-    success, build_error := run_native_library_installation(folder);
+    cleaned_folder := get_install_path_of_repo(folder);
+
+    attempt_remove_native_library(cleaned_folder);
+
+    success, build_error := run_native_library_installation(cleaned_folder);
     return success, build_error;
 }
 
 get_installed_version_of_package :: (package_path: str) -> SemVer {
-    inner_config: Config;
-    for os.with_file(tprintf("{}/{}/onyx-pkg.ini", config.config.lib_source_directory, package_path)) {
+    inner_config := read_config_from_installed_dependency(get_install_path_of_repo(package_path));
+    return inner_config?.metadata.version;
+}
+
+read_config_from_installed_dependency :: (dependency_folder: str) -> ? Config {
+    for os.with_file(tprintf("{}/onyx-pkg.ini", dependency_folder)) {
         r := io.reader_make(it);
+        defer io.reader_free(&r);
+
+        inner_config: Config;
         result, error := encoding.ini.parse_ini_file(&r, &inner_config);
 
-        if result == .Success {
-            return inner_config.metadata.version;
+        if result != .Success {
+            return .{};
+
+        } else {
+            return inner_config;
         }
     }
+}
 
-    return .{0, 0, 0};
+strip_protocol_and_www_from_repo :: (repo: str) -> str {
+    to_return := repo;
+
+    if string.contains(to_return, "://") {
+        _, to_return~ := string.bisect(to_return, "://");
+    }
+
+    if string.starts_with(to_return, "www.") {
+        to_return = to_return["www.".count .. to_return.count];
+    }
+
+    if string.ends_with(to_return, ".git") {
+        to_return = to_return[0 .. to_return.count - ".git".count];
+    }
+
+    return to_return;
+}
+
+get_install_path_of_repo :: (repo: str) -> str {
+    return os.path_join(config.config.lib_source_directory, strip_protocol_and_www_from_repo(repo));
 }
 
 run_native_library_installation :: (folder: str) -> (bool, str) {
-    inner_config: Config;
-    for os.with_file(tprintf("{}/{}/onyx-pkg.ini", config.config.lib_source_directory, folder)) {
-        r := io.reader_make(it);
-        result, error := encoding.ini.parse_ini_file(&r, &inner_config);
+    inner_config := read_config_from_installed_dependency(folder) ?? [] {
+        return return false, "";
+    };
 
-        if result != .Success do return false, "";
-        if string.empty(inner_config.native_library.build_cmd) do return true, "";
+    if string.empty(inner_config.native_library.build_cmd) do return true, "";
 
-        args := string.split(inner_config.native_library.build_cmd, #char " ", context.temp_allocator);
-        cmd  := args[0];
-        args  = args[1 .. args.count];
+    info_print("Install", "Running installation of '{}'\n", folder);    
 
-        installed_dest := tprintf("{}/{}", config.config.lib_source_directory, folder);
+    args := string.split(inner_config.native_library.build_cmd, #char " ", context.temp_allocator);
+    cmd  := args[0];
+    args  = args[1 .. args.count];
 
-        {
-            build_proc     := os.process_spawn(cmd, args, starting_directory=installed_dest);
-            build_result   := os.process_wait(&build_proc);
+    {
+        build_proc     := os.process_spawn(cmd, args, starting_directory=folder);
+        build_result   := os.process_wait(&build_proc);
 
-            build_reader := io.reader_make(&build_proc);
-            defer io.reader_free(&build_reader);
-            build_info := build_reader->read_all();
+        build_reader := io.reader_make(&build_proc);
+        defer io.reader_free(&build_reader);
+        build_info := build_reader->read_all();
 
-            if build_result != .Success {
-                error_print("Failed to build native library in {}.\n", folder);
-                return false, build_info;
-            }
+        if build_result != .Success {
+            error_print("Failed to build native library in {}.\n", folder);
+            return false, build_info;
         }
-
-        if !os.dir_exists(config.config.lib_bin_directory) {
-            if !os.dir_create(config.config.lib_bin_directory) {
-                error_print("Failed to create native library directory, {}.\n", config.config.lib_bin_directory);
-                return false, "";
-            }
-        }
-
-        source_path := tprintf("{}/{}{}", installed_dest, inner_config.native_library.library, native_library_suffix);
-        dest_path   := tprintf("{}/{}{}", config.config.lib_bin_directory, inner_config.native_library.library, native_library_suffix);
-        success := os.rename_file(source_path, dest_path);
-
-        if !success {
-            error_print("Failed to move native library to final destination.\n {} -> {}\n", source_path, dest_path);
-        }
-
-        return success, "";
     }
+
+    if !os.dir_exists(config.config.lib_bin_directory) {
+        if !os.dir_create(config.config.lib_bin_directory) {
+            error_print("Failed to create native library directory, {}.\n", config.config.lib_bin_directory);
+            return false, "";
+        }
+    }
+
+    source_path := tprintf("{}/{}{}", folder, inner_config.native_library.library, native_library_suffix);
+    dest_path   := tprintf("{}/{}{}", config.config.lib_bin_directory, inner_config.native_library.library, native_library_suffix);
+    success := os.rename_file(source_path, dest_path);
+
+    if !success {
+        error_print("Failed to move native library to final destination.\n {} -> {}\n", source_path, dest_path);
+    }
+
+    return success, "";
 }
 
 run_command_and_forward_output :: (cmd: str) => {
@@ -774,7 +771,7 @@ run_command_and_forward_output :: (cmd: str) => {
 }
 
 build_package_file_to_load :: () {
-    filepath := tprintf("{}/{}", config.config.lib_source_directory, "packages.onyx");
+    filepath := os.path_join(config.config.lib_source_directory, "packages.onyx");
 
     if os.file_exists(filepath) {
         os.remove_file(filepath);
@@ -795,7 +792,7 @@ build_package_file_to_load :: () {
 
         for config.dependencies.dependencies->as_iter() {
             dependency_repo := it.key;
-            dependency_folder := config.dependency_folders.folders[dependency_repo];
+            dependency_folder := strip_protocol_and_www_from_repo(dependency_repo);
 
             io.write_format(&w,
                 "#load \"./{}/module.onyx\"\n",
@@ -887,10 +884,12 @@ Package :: struct {
 Git :: struct {
     get_full_repo_uri :: (repo: str) -> str {
         for Known_Repositories {
-            r := tprintf(it, repo);
-            git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", r]);
-            if os.process_wait(&git_proc) == .Success {
-                return r |> string.alloc_copy();
+            for proto: Protocols {
+                r := tprintf("{}{}", proto, tprintf(it, repo));
+                git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", r]);
+                if os.process_wait(&git_proc) == .Success {
+                    return r |> string.alloc_copy();
+                }
             }
         }
 
@@ -950,69 +949,60 @@ Git :: struct {
         info_print("Fetch", "{}  {}\n", repo, version);
 
         version_str := tprintf("v{}", version);
-        full_dest   := tprintf("{}/{}", config.config.lib_source_directory, ".cloned");
+        temporary_dest := os.path_join(config.config.lib_source_directory, ".cloned");
 
-        os.remove_directory(full_dest);
+        os.remove_directory(temporary_dest);
 
-        // Use 'git clone' to clone the bare minimum amount to get the released version.
-        git_proc    := os.process_spawn(git_path, .["clone", "--depth", "1", "-b", version_str, repo, full_dest]);
-        result      := os.process_wait(&git_proc);
+        successfully_cloned := do -> bool {
+            for proto: Protocols {
+                // Use 'git clone' to clone the bare minimum amount to get the released version.
+                proto_repo  := tprintf("{}{}", proto, repo);
+                git_proc    := os.process_spawn(git_path, .["clone", "--depth", "1", "-b", version_str, proto_repo, temporary_dest]);
+                result      := os.process_wait(&git_proc);
 
-        if result == .Success {
-            install_dest: str;
-
-            if config.dependency_folders.folders->has(repo) {
-                install_dest = config.dependency_folders.folders[repo];
-
-            } else {
-                // Read the onyx-pkg.ini file in the cloned package, if available.
-                // This will be used to extract the desired name for the repository.
-                new_config: Config;
-                successfully_parsed := false;
-                for os.with_file(tprintf("{}/onyx-pkg.ini", full_dest)) {
-                    r := io.reader_make(it);
-                    result, error := encoding.ini.parse_ini_file(&r, &new_config);
-
-                    if result == .Success {
-                        successfully_parsed = true;
-                    }
-                }
-
-                if !successfully_parsed {
-                    error_print("Unknown destination directory and failed to find onyx-pkg.ini in {}.\n", repo);
-                    os.remove_directory(full_dest);
-                    return false;
-                }
-
-                install_dest = new_config.metadata.name;
-                config.dependency_folders.folders[repo] = install_dest;
+                if result == .Success do return true;
             }
 
+            return false;
+        };
+
+        if successfully_cloned {
+            install_dest := strip_protocol_and_www_from_repo(repo);
+
             // Move the cloned repository to its permanent location.
-            actual_dest := tprintf("{}/{}", config.config.lib_source_directory, install_dest);
+            actual_dest := os.path_join(config.config.lib_source_directory, install_dest);
             if os.dir_exists(actual_dest) {
                 error_print("Expected {} to not exist when fetching '{}'.\n", actual_dest, repo);
-                os.remove_directory(full_dest);
+                os.remove_directory(temporary_dest);
                 return false;
             }
 
-            if !os.dir_rename(full_dest, actual_dest) {
+            rolling_parent := make(dyn_str);
+            path := string.split(actual_dest, '/');
+            for path[0 .. path.length-1] {
+                string.append(&rolling_parent, it);
+                string.append(&rolling_parent, "/");
+
+                if !os.dir_exists(rolling_parent) {
+                    os.dir_create(rolling_parent);
+                }
+            }
+
+            if !os.dir_rename(temporary_dest, actual_dest) {
                 error_print("Failed to move temporary package to final destination when fetching '{}'.\n", repo);
-                os.remove_directory(full_dest);
+                os.remove_directory(temporary_dest);
                 return false;
             }
 
             // Remove the .git folder, as it is unneeded.
-            unnecessary_git_dir := tprintf("{}/.git", actual_dest);
+            unnecessary_git_dir := os.path_join(actual_dest, ".git");
             if !os.remove_directory(unnecessary_git_dir) {
                 error_print("Failed to delete .git folder of '{}'.\n", repo);
                 return false;
             }
-
-            return true;
         }
 
-        return false;
+        return successfully_cloned;
     }
 
     publish_version :: () -> bool {
