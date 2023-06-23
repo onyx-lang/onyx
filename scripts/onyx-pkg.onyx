@@ -321,14 +321,15 @@ run_sync_command :: (args: [] cstr) {
         }
 
         for& inner_config.dependencies.dependencies.entries {
-            if dependencies_installed->has(it.key) {
+            dep := dependencies_installed[it.key];
+            if dep {
                 // TODO : Check if this is right? Could this accidentally forcefully upgrade a package?
-                if it.value->is_newer(dependencies_installed[it.key]) {
+                if it.value->is_newer(dep->unwrap()) {
                     uninstall_package(.{it.key, it.value});
                     dependencies_installed->delete(it.key);
                     dependencies_to_install << .{ .{it.key, it.value}, false };
 
-                } elseif !(it.value->is_compatible(dependencies_installed[it.key])) {
+                } elseif !(it.value->is_compatible(dep->unwrap())) {
                     // TODO: Explain this more
                     error_print("Different major versions of '{}' being used!\n", it.key);
                     os.exit(1);
@@ -582,7 +583,7 @@ run_new_command :: (args: [] cstr) {
             string.append(&output, to_output);
 
             var_name, to_process~ := string.bisect(to_process, "}}");
-            string.append(&output, vars->get(var_name));
+            string.append(&output, vars->get(var_name) ?? "");
         }
 
         return output;
