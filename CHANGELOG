@@ -1,3 +1,19 @@
+Release v0.1.5
+-----------
+Not released
+
+Additions:
+
+Removals:
+
+Changes:
+
+Bugfixes:
+- Fixed bug in `json.encode` that caused arrays of structures to not be outputted correctly.
+- Fixed bug in `onyx pkg` that caused `onyx pkg new` to not work as intended.
+
+
+
 Release v0.1.4
 -----------
 22nd June 2023
