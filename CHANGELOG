@@ -1,6 +1,6 @@
 Release v0.1.4
 -----------
-Not released
+22nd June 2023
 
 Additions:
 
@@ -16,7 +16,7 @@ Changes:
 
 Bugfixes:
 - Fixed a bug that made relative imports not always relative to the current file.
-    - This may break some programs that were accidently using this "feature".
+    - This may break some programs that were accidentally using this "feature".
 - Fixed a bug with small a `union` over small data types, such as booleans.
     - There was an alignment issue, which caused the union to be smaller than expected.
 
