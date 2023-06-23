@@ -3,7 +3,7 @@
 use core {*}
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day5.txt";
+    contents := #file_contents "./input/day5.txt";
 
     vals := array.make(u32);
     defer array.free(&vals);

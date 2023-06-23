@@ -6,7 +6,7 @@ use core {*}
 
 main :: (args: [] cstr) {
     imap : Map(i32, str);
-    map.init(&imap, "");
+    map.init(&imap);
     defer {
         print("Freeing map\n");
         map.free(&imap);
@@ -17,7 +17,7 @@ main :: (args: [] cstr) {
     println(map.has(&imap, 50));
     println(map.has(&imap, 51));
 
-    printf("{}{}\n", map.get(&imap, 50), map.get(&imap, 1234));
+    printf("{}{}\n", map.get(&imap, 50)->unwrap(), map.get(&imap, 1234)->unwrap());
 
     printf("{*p}\n", &imap);
 

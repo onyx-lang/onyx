@@ -105,7 +105,7 @@ cyk_algorithm :: (use grammar: &Grammar, input: str) -> bool {
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day19.txt";
+    contents := #file_contents "./input/day19.txt";
 
     file := contents;
 

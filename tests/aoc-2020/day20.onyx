@@ -238,14 +238,14 @@ scan_for_monsters :: (forest: [&] u8, ori: TO, width: u32, height: u32) -> bool 
 }
 
 main :: (args: [] cstr) {
-	contents := #file_contents "./tests/aoc-2020/input/day20.txt";
+	contents := #file_contents "./input/day20.txt";
 
 	file := contents;	
 
 	tiles := array.make(Tile);
 	defer array.free(&tiles);
 
-    tile_map := map.make(u32, &Tile, null);
+    tile_map := map.make(u32, &Tile);
     defer map.free(&tile_map);
 
 	tile_data := cast(&TileData) calloc(200 * sizeof TileData);
@@ -332,7 +332,7 @@ main :: (args: [] cstr) {
 
         if grid[tid.pos_x + 12 * tid.pos_y] != 0 do continue;
         
-        tile_ptr := map.get(&tile_map, tid.match.tile);
+        tile_ptr := map.get(&tile_map, tid.match.tile)->unwrap();
         tile_ptr.pos_x = tid.pos_x;
         tile_ptr.pos_y = tid.pos_y;
         grid[tid.pos_x + 12 * tid.pos_y] = tid.match.tile;
@@ -348,7 +348,7 @@ main :: (args: [] cstr) {
     forest : [12 * 8 * 12 * 8] u8;
     for y: 0 .. 12 {
         for x: 0 .. 12 {
-            tile := map.get(&tile_map, grid[y * 12 + x]);
+            tile := map.get(&tile_map, grid[y * 12 + x])->unwrap();
 
             for fy: 0 .. 8 {
                 for fx: 0 .. 8 {

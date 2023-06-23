@@ -22,7 +22,7 @@
         "onyx-lsp.ini": "[lsp]\nmode=project\nonyxFiles=src/main.onyx\nworkingDir=.",
         "onyx-pkg.ini": "[metadata]\nname={{name}}\ndescription={{description}}\nurl={{url}}\nauthor={{author}}\nversion=0.0.1\n",
         "src": {
-            "main.onyx": "use core {*}\n\nmain :: () {\n    println(\"Hello Onyx!\");\n}\n"
+            "main.onyx": "#load \"lib/packages\"\n\nuse core {*}\n\nmain :: () {\n    println(\"Hello Onyx!\");\n}\n"
         }
     },
     "commands": [

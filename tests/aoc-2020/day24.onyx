@@ -26,12 +26,12 @@ Cell :: struct {
 }
 
 main :: (args: [] cstr) {
-	contents := #file_contents "./tests/aoc-2020/input/day24.txt";
+	contents := #file_contents "./input/day24.txt";
 
     file_stream := io.buffer_stream_make(contents);
 	file := io.reader_make(&file_stream);
 
-	grid := map.make(Vec2, Cell, .{}); // `true` is black
+	grid := map.make(Vec2, Cell); // `true` is black
 	defer map.free(&grid);
 
 	while !io.reader_empty(&file) {
@@ -65,7 +65,7 @@ main :: (args: [] cstr) {
 		}
 
 
-		curr := map.get(&grid, loc);
+		curr := map.get(&grid, loc) ?? .{};
 		map.put(&grid, loc, .{ alive = !curr.alive });
 	}
 
@@ -95,7 +95,7 @@ main :: (args: [] cstr) {
 		}
 
 		for &cell: cells_to_consider {
-			state  := map.get(&grid, *cell);
+			state  := map.get(&grid, *cell) ?? .{};
 			ncount := get_neighbor_count(&grid, *cell);
 
 			if state.alive {
@@ -125,7 +125,7 @@ get_neighbor_count :: (grid: &map.Map(Vec2, Cell), pos: Vec2) -> u32 {
 	count := 0;
 
 	for &dir: Hex_Directions {
-		cell := map.get(grid, Vec2.{ x = pos.x + dir.x, y = pos.y + dir.y });
+		cell := map.get(grid, Vec2.{ x = pos.x + dir.x, y = pos.y + dir.y }) ?? .{};
 		if cell.alive do count += 1;
 	}
 

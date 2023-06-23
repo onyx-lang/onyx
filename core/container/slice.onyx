@@ -371,7 +371,7 @@ unique :: (arr: &[] $T) {
 
         // OR
 
-        slice.fold(arr, 0, [it](it + acc)) |> println();
+        slice.fold(arr, 0, [it, acc](it + acc)) |> println();
 """
 fold :: #match #local {}
 

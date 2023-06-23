@@ -66,7 +66,7 @@ parse_expression_mul :: (file: &str) -> u64 {
 }
 
 main :: (args: [] cstr) {
-	contents := #file_contents "./tests/aoc-2020/input/day18.txt";
+	contents := #file_contents "./input/day18.txt";
     file := contents;
 
 	total: u64 = 0;

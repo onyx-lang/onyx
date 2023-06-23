@@ -21,7 +21,7 @@ power_mod :: (base: u32, exp: u32, mod: u32) -> u32 {
 dlp_bsgs :: (n: u32, a: u32, b: u32) -> u32 {
     m := cast(u32) math.ceil(math.sqrt(cast(f64) n));
 
-    t := map.make(u32, u32, default=0);
+    t := map.make(u32, u32);
     defer map.free(&t);
 
     tmp: u64 = 1;
@@ -35,7 +35,7 @@ dlp_bsgs :: (n: u32, a: u32, b: u32) -> u32 {
     tmp = ~~b;
     for i: 0 .. m {
         if map.has(&t, ~~tmp) {
-            v := map.get(&t, ~~tmp);
+            v := map.get(&t, ~~tmp) ?? 0;
             return i * m + v; 
         }
 
@@ -52,7 +52,7 @@ transform_subject :: (subject: u32, loop_size: u32) -> u32 {
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day25.txt";
+    contents := #file_contents "./input/day25.txt";
 
     file := contents;
 

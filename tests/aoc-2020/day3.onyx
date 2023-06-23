@@ -16,7 +16,7 @@ line_interp_at :: (use li: LineInterp, t: i32) -> Point {
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day3.txt";
+    contents := #file_contents "./input/day3.txt";
 
     forest := array.make(u8, 1024);
     defer array.free(&forest);

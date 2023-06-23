@@ -63,7 +63,7 @@ gos_iter :: (use gos: &GameOfSeats) -> bool {
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day11.txt";
+    contents := #file_contents "./input/day11.txt";
 
     file := contents;
 

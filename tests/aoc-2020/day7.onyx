@@ -23,7 +23,7 @@ BagContainment :: struct {
 
 bg_init :: (use graph: &BagGraph) {
     array.init(&nodes, 16);
-    map.init(&node_map, null);
+    map.init(&node_map);
 }
 
 bg_free :: (use graph: &BagGraph) {
@@ -32,7 +32,7 @@ bg_free :: (use graph: &BagGraph) {
 }
 
 bg_get_node :: (use graph: &BagGraph, name: str) -> &BagNode {
-    node := map.get(&node_map, name);
+    node := map.get(&node_map, name) ?? null;
 
     if node == null {
         node = calloc(sizeof BagNode);
@@ -50,7 +50,7 @@ bg_get_node :: (use graph: &BagGraph, name: str) -> &BagNode {
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day7.txt";
+    contents := #file_contents "./input/day7.txt";
 
     file := contents;
 

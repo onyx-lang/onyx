@@ -67,7 +67,7 @@ main :: (args) => {
             node_idx := node_stack.count - 1;
             defer node_stack[node_idx].child_idx += 1;
 
-            children := edge_map[node_stack[node_idx].name];
+            children := edge_map[node_stack[node_idx].name] ?? .[];
             valid := node_stack[node_idx].child_idx < children.count;
 
             if valid {

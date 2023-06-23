@@ -153,7 +153,7 @@ parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, Ini
                                   |> string.alloc_copy();
 
             } else {
-                error(aprintf("Failed to parse value."));
+                error(aprintf("Failed to parse value of type '{}' from string '{}'.", field.type, value_string));
             }
         }
 
@@ -167,15 +167,15 @@ parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, Ini
 
 //
 // Outputs a two-level structure into an ini file. The inverse of `parse_ini_file`.
-write_ini_file :: macro (w: &io.Writer, output: $T/type_is_struct) => {
+write_ini_file :: macro (w: &io.Writer, output: $T/type_is_struct, leave_empty_strings := false) => {
     write_ini_file_inner :: write_ini_file_inner
 
     // See note above in parse_ini_file.
-    return write_ini_file_inner(w, output);
+    return write_ini_file_inner(w, output, leave_empty_strings);
 }
 
 #local
-write_ini_file_inner :: (w: &io.Writer, output: any) -> bool {
+write_ini_file_inner :: (w: &io.Writer, output: any, leave_empty_strings := false) -> bool {
     info :: runtime.info
 
     output_info := cast(&info.Type_Info_Struct) info.get_type_info(output.type);
@@ -200,6 +200,12 @@ write_ini_file_inner :: (w: &io.Writer, output: any) -> bool {
         }
 
         for& prop: member_info.members {
+            if !leave_empty_strings && prop.type == str {
+                if cast(&str, member_data + prop.offset).length == 0 {
+                    continue;
+                }
+            }
+
             io.write_format_va(w, "{}={}\n", .[
                 .{&prop.name, str},
                 .{member_data + prop.offset, prop.type}

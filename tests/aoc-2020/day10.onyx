@@ -23,7 +23,7 @@ count_ending_paths :: (nums: [..] u32) -> u64 {
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day10.txt";
+    contents := #file_contents "./input/day10.txt";
 
     file := contents;
 

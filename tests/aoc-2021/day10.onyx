@@ -29,14 +29,14 @@ main :: (args) => {
             for ch: line {
                 switch ch {
                     case #char "(", #char "[", #char "<", #char "{" {
-                        char_stack << bracket_map[ch];
+                        char_stack << bracket_map[ch]->unwrap();
                     }
 
                     case #char ")", #char "]", #char ">", #char "}" {
                         x := array.pop(&char_stack);
                         if x != ch {
                             // printf("Expected '{}', found '{}' instead.\n", x, ch);
-                            corrupted_score += score_map[ch];
+                            corrupted_score += score_map[ch]->unwrap();
                             continue continue;
                         }
                     }

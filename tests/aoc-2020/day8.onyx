@@ -13,7 +13,7 @@ Instruction :: struct {
 
 // Returns if the program successfully exited.
 get_acc_value :: (instrs: [..] Instruction, ret_acc: &i32) -> bool {
-    already_been := map.make(i32, bool, false);
+    already_been := map.make(i32, bool);
     defer map.free(&already_been);
 
     ip   := 0;
@@ -43,7 +43,7 @@ get_acc_value :: (instrs: [..] Instruction, ret_acc: &i32) -> bool {
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./tests/aoc-2020/input/day8.txt";
+    contents := #file_contents "./input/day8.txt";
 
     file := contents;
 

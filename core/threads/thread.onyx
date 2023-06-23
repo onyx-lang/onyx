@@ -91,7 +91,7 @@ __initialize :: () {
 __exited :: (id: i32) {
     sync.scoped_mutex(&thread_mutex);
 
-    thread := thread_map->get(id);
+    thread := thread_map->get(id)?;
     if thread != null {
         thread.alive = false;
         #if runtime.Wait_Notify_Available {

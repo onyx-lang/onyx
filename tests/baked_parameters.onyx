@@ -31,7 +31,7 @@ main :: (args: [] cstr) {
 
 
     // This is so much cleaner than the alternative.
-    ages := map.make(str, u32, default=0);
+    ages := map.make(str, u32);
     defer delete(&ages);
 
     map.put(&ages, "Dwight", 32);
@@ -39,7 +39,7 @@ main :: (args: [] cstr) {
     map.put(&ages, "Pam", 24);
 
     print_age :: (ages: &map.Map(str, u32), name: str) {
-        age := map.get(ages, name);
+        age := map.get(ages, name) ?? 0;
         printf("{}'s age is {}.\n", name, age);
     }
 

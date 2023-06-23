@@ -73,11 +73,11 @@ bitmask_p2 :: (mask: Bitmask, val: u64) -> Iterator(u64) {
 }
 
 main :: (args: [] cstr) {
-	contents := #file_contents "./tests/aoc-2020/input/day14.txt";
+	contents := #file_contents "./input/day14.txt";
 
 	file := contents;
 
-	mem := map.make(u64, u64, default=0);
+	mem := map.make(u64, u64);
 	defer map.free(&mem);
 
 	mask : Bitmask;

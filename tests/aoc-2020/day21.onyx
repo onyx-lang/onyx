@@ -31,12 +31,12 @@ ingredient_map : map.Map(str, Ingredient);
 allergen_map   : map.Map(str, Allergen);
 
 main :: (args: [] cstr) {
-	contents := #file_contents "./tests/aoc-2020/input/day21.txt";
+	contents := #file_contents "./input/day21.txt";
 
 	file := contents;
 
-    map.init(&ingredient_map, .{});
-    map.init(&allergen_map, .{});
+    map.init(&ingredient_map);
+    map.init(&allergen_map);
     defer {
         map.free(&ingredient_map);
         map.free(&allergen_map);
@@ -57,11 +57,10 @@ main :: (args: [] cstr) {
 
             array.push(&food.ingredients, ingredient_name);
 
-            ingredient := map.get(&ingredient_map, ingredient_name);
-            if ingredient.name.data == null {
-                ingredient.name = ingredient_name;
-                array.init(&ingredient.appears_on, 4);
-            }
+            ingredient := map.get(&ingredient_map, ingredient_name) ?? .{
+                name = ingredient_name,
+                appears_on = make([..] u32, 4)
+            };
 
             array.push(&ingredient.appears_on, line_num);
 
@@ -76,11 +75,10 @@ main :: (args: [] cstr) {
 
             array.push(&food.allergens, allergen_name);
 
-            allergen := map.get(&allergen_map, allergen_name);
-            if allergen.name.data == null {
-                allergen.name = allergen_name;
-                array.init(&allergen.appears_on, 4);
-            }
+            allergen := map.get(&allergen_map, allergen_name) ?? .{
+                name = allergen_name,
+                appears_on = make([..] u32, 4)
+            };
 
             array.push(&allergen.appears_on, line_num);
 
@@ -109,7 +107,7 @@ main :: (args: [] cstr) {
         potential_allergen_count := 0;
         for &allergen_name: potential_allergens {
             c := array_count_contains(&potential_allergens, *allergen_name, string.equal);
-            allergen := map.get(&allergen_map, *allergen_name); 
+            allergen := map.get(&allergen_map, *allergen_name)->unwrap();
             if c == allergen.appears_on.count {
                 potential_allergen_count += 1;
             }
@@ -122,7 +120,7 @@ main :: (args: [] cstr) {
 
     total_safe := 0;
     for safe: definitely_safe {
-        ingredient := map.get(&ingredient_map, safe);
+        ingredient := map.get(&ingredient_map, safe)->unwrap();
         total_safe += ingredient.appears_on.count;
 
         map.delete(&ingredient_map, safe);
@@ -152,7 +150,7 @@ main :: (args: [] cstr) {
             }
 
             if match_count == 1 {
-                ingredient := map.get(&ingredient_map, matching_ingredient_name);
+                ingredient := map.get(&ingredient_map, matching_ingredient_name)->unwrap();
                 map.delete(&ingredient_map, matching_ingredient_name);
 
                 ingredient.allergen = allergen_entry.key;

@@ -1818,7 +1818,8 @@ struct CompileOptions {
     const char* help_subcommand;
     bh_arr(DefinedVariable) defined_variables;
 
-    b32 debug_enabled;
+    b32 debug_session;
+    b32 debug_info_enabled;
     b32 stack_trace_enabled;
 
     i32    passthrough_argument_count;
