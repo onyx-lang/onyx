@@ -5,16 +5,20 @@ Not released
 Additions:
 
 Removals:
+- `map.get_opt`
+    - This is unnecessary with the new semantics of `map.get`.
 
 Changes:
 - `onyx pkg` now stores synchronized packages in a different folder hierarchy.
     - This is a transparent change so long as you use the `lib/packages.onyx` file.
-- `Map` implementation no longer holds a default value.
-    - `.{}` is returned instead.
+- `Map` implementation no longer holds a default value. Instead, it returns an optional from `map.get`.
+    - This is a significant breaking change that will affect many programs.
 
 Bugfixes:
 - Fixed a bug that made relative imports not always relative to the current file.
     - This may break some programs that were accidently using this "feature".
+- Fixed a bug with small a `union` over small data types, such as booleans.
+    - There was an alignment issue, which caused the union to be smaller than expected.
 
 
 Release v0.1.3
