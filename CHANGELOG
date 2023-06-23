@@ -7,8 +7,14 @@ Additions:
 Removals:
 
 Changes:
+- `onyx pkg` now stores synchronized packages in a different folder hierarchy.
+    - This is a transparent change so long as you use the `lib/packages.onyx` file.
+- `Map` implementation no longer holds a default value.
+    - `.{}` is returned instead.
 
 Bugfixes:
+- Fixed a bug that made relative imports not always relative to the current file.
+    - This may break some programs that were accidently using this "feature".
 
 
 Release v0.1.3
