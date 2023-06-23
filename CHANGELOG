@@ -5,7 +5,7 @@ Release v0.1.4
 Additions:
 
 Removals:
-- `map.get_opt`
+- Deprecated `map.get_opt`.
     - This is unnecessary with the new semantics of `map.get`.
 
 Changes:
