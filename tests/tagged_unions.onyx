@@ -156,6 +156,18 @@ direct_access_is_an_optional :: () {
     println(the_string);
 }
 
+sized_tagged_union :: () {
+    Smol :: union #tag_type u8 {
+        Void: void;
+        Bool: bool;
+    }
+
+    println(sizeof Smol);
+
+    v := Smol.{ Bool = true };
+    println(v);
+}
+
 
 main :: () {
     simple_example();
@@ -164,4 +176,5 @@ main :: () {
     linked_list_example();
     polymorphic_example();
     direct_access_is_an_optional();
+    sized_tagged_union();
 }

@@ -2357,6 +2357,13 @@ static AstUnionType* parse_union(OnyxParser* parser) {
     Scope *scope_to_restore_parser_to = parser->current_scope;
     Scope *scope_symbols_in_unions_should_be_bound_to = u_node->scope;
 
+    if (parse_possible_directive(parser, "tag_type")) {
+        AstType *backing_type = parse_type(parser);
+        u_node->tag_backing_type = backing_type;
+    } else {
+        u_node->tag_backing_type = &basic_type_u32;
+    }
+
     if (consume_token_if_next(parser, '(')) {
         bh_arr(AstPolyStructParam) poly_params = NULL;
         bh_arr_new(global_heap_allocator, poly_params, 1);

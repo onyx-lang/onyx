@@ -1041,6 +1041,8 @@ struct AstUnionType {
     bh_arr(AstUnionVariant *) variants;
     bh_arr(AstTyped *) meta_tags;
 
+    AstType *tag_backing_type;
+
     // NOTE: Used to cache the actual type, since building
     // a union type is kind of complicated and should
     // only happen once.

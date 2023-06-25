@@ -161,6 +161,8 @@ static SymresStatus symres_union_type(AstUnionType* u_node) {
     if (u_node->flags & Ast_Flag_Type_Is_Resolved) return Symres_Success;
     u_node->flags |= Ast_Flag_Comptime;
 
+    SYMRES(type, &u_node->tag_backing_type);
+
     if (u_node->meta_tags) {
         bh_arr_each(AstTyped *, meta, u_node->meta_tags) {
             SYMRES(expression, meta);
