@@ -126,7 +126,7 @@ ONYX_DEF(__futex_wait, (WASM_PTR, WASM_I32, WASM_I32), (WASM_I32)) {
     #endif
 
     #ifdef _BH_WINDOWS
-    results->data[0] = WaitOnAddress(addr, &params->data[1].of.i32, 4, params->data[2].of.i32);
+    results->data[0] = WASM_I32_VAL(WaitOnAddress(addr, &params->data[1].of.i32, 4, params->data[2].of.i32));
     #endif
 
     return NULL;
