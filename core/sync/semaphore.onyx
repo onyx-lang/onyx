@@ -3,10 +3,6 @@ package core.sync
 use runtime
 use core
 
-#if runtime.Wait_Notify_Available {
-    use core.intrinsics.atomics {__atomic_wait, __atomic_notify}
-}
-
 #doc """
     A semaphore represents a counter that can only be incremented
     and decremented by one thread at a time. "Waiting" on a semaphore
