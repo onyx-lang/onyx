@@ -464,6 +464,6 @@ GB_DLL_IMPORT int BCryptCloseAlgorithmProvider(
     unsigned long     dwFlags
 );
 
-GB_DLL_IMPORT void WakeByAddressSingle(PVOID Address);
-GB_DLL_IMPORT BOOL WaitOnAddress(volatile PVOID Address, PVOID compareAddress, size_t addressSize, DWORD milliseconds);
+GB_DLL_IMPORT void WakeByAddressSingle(void * Address);
+GB_DLL_IMPORT BOOL WaitOnAddress(volatile void * Address, void * compareAddress, size_t addressSize, DWORD milliseconds);
 
