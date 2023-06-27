@@ -5,6 +5,9 @@ Not released
 Additions:
 - Added ability to control the size of the tag type for tagged unions.
     - `union #tag_type u8`
+- Infrastructure to have custom sub-commands.
+    - Any `*.wasm` file in `$ONYX_PATH/tools` is available to run with `onyx <cmd>`
+- Added `--skip-native` flag to `onyx pkg sync` to skip compiling native libraries.
 
 Removals:
 

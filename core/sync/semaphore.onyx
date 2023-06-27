@@ -53,8 +53,8 @@ semaphore_post :: (s: &Semaphore, count := 1) {
     // @Bug
     // This is susceptible to starvation. Semaphores should have a queue
     // or something like that.
-    #if runtime.Wait_Notify_Available {
-        __atomic_notify(&s.counter, maximum = count);
+    #if runtime.platform.Supports_Futexes {
+        runtime.platform.__futex_wake(&s.counter, count);
     }
 }
 
@@ -71,8 +71,8 @@ semaphore_wait :: (s: &Semaphore) {
         } else {
             mutex_unlock(&s.mutex);
 
-            #if runtime.Wait_Notify_Available {
-                __atomic_wait(&s.counter, 0);
+            #if runtime.platform.Supports_Futexes {
+                runtime.platform.__futex_wait(&s.counter, 0, -1);
             }
         }
     }

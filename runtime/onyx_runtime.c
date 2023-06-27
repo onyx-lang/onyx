@@ -18,6 +18,8 @@
     #include <netinet/in.h>
     #include <sys/socket.h>
     #include <sys/un.h>
+    #include <linux/futex.h>
+    #include <sys/syscall.h>
     #include <poll.h>
 #endif
 
@@ -71,6 +73,8 @@ ONYX_LIBRARY {
     ONYX_FUNC(__time)
     ONYX_FUNC(__lookup_env)
     ONYX_FUNC(__random_get)
+    ONYX_FUNC(__futex_wait)
+    ONYX_FUNC(__futex_wake)
     ONYX_FUNC(__register_cleanup)
 
     ONYX_FUNC(__net_create_socket)

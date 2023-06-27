@@ -27,6 +27,7 @@ Supports_Networking :: true
 Supports_Type_Info :: true
 Supports_Threads :: true
 Supports_Env_Vars :: true
+Supports_Futexes :: true
 
 
 #library "onyx_runtime"
@@ -65,6 +66,8 @@ ProcessData :: #distinct u64
     // OS
     __exit :: (status: i32) -> void ---
     __sleep :: (milliseconds: i32) -> void ---
+    __futex_wait :: (addr: rawptr, expected: i32, timeout: i32) -> i32 ---
+    __futex_wake :: (addr: rawptr, maximum: i32) -> i32 ---
 
     // Time and sleep
     __time :: () -> u64 ---
