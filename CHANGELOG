@@ -7,7 +7,11 @@ Additions:
     - `union #tag_type u8`
 - Infrastructure to have custom sub-commands.
     - Any `*.wasm` file in `$ONYX_PATH/tools` is available to run with `onyx <cmd>`
-- Added `--skip-native` flag to `onyx pkg sync` to skip compiling native libraries.
+- `__futex_wait` and `__futex_wake` to platform layer.
+    - This allows for non-busy-waiting on mutexes on semaphores.
+    - Currently implemented for Onyx and JS platforms; WASI is impossible, but WASIX will come soon.
+- `--skip-native` flag to `onyx pkg sync` to skip compiling native libraries.
+- Ability to tag methods on structures.
 
 Removals:
 
