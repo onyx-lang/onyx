@@ -106,6 +106,10 @@ use runtime
     #load "./os/env"
 }
 
+#if runtime.platform.Supports_TTY {
+    #load "./os/tty"
+}
+
 #if runtime.Multi_Threading_Enabled {
     #load "./intrinsics/atomics"
 

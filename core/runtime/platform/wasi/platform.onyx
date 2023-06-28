@@ -37,6 +37,7 @@ Supports_Type_Info :: true
 Supports_Threads :: true
 Supports_Env_Vars :: true
 Supports_Futexes :: false
+Supports_TTY :: false
 
 
 __output_string :: (s: str) -> u32 {
