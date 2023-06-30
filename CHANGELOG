@@ -8,10 +8,13 @@ Additions:
 - Infrastructure to have custom sub-commands.
     - Any `*.wasm` file in `$ONYX_PATH/tools` is available to run with `onyx <cmd>`
 - `__futex_wait` and `__futex_wake` to platform layer.
-    - This allows for non-busy-waiting on mutexes on semaphores.
+    - This allows for non-busy-waiting on mutexes and semaphores.
     - Currently implemented for Onyx and JS platforms; WASI is impossible, but WASIX will come soon.
 - `--skip-native` flag to `onyx pkg sync` to skip compiling native libraries.
 - Ability to tag methods on structures.
+- `tty_get` and `tty_set` functions in `core.os`
+    - Allows for controlling raw and echoed input
+    - Currently only for `onyx` runtime and on Linux only.
 
 Removals:
 

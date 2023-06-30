@@ -1,0 +1,25 @@
+use core {*}
+use runtime
+
+#inject runtime.vars.Onyx_Enable_Operator_Methods :: true
+
+main :: () {
+    Point :: struct {
+        x, y: i32;
+
+        __eq :: (p1, p2: Point) => {
+            return p1.x == p2.x && p1.y == p2.y;
+        }
+    }
+
+    p := Point.{1, 2};
+
+    if p == Point.{1, 2} {
+        println("If works!");
+    }
+
+    switch p {
+        case .{0, 0} ---
+        case .{1, 2} do println("Working!");
+    }
+}
