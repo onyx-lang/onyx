@@ -52,6 +52,12 @@ get_freed_size :: () => {
     return total;
 }
 
+#if !#defined(runtime.vars.Dont_Export_Heap_Functions) {
+    // heap_alloc is not exported because you can use __heap_resize(NULL, size)
+    #export "__heap_resize" heap_resize
+    #export "__heap_free"   heap_free
+}
+
 #local {
     use core.intrinsics.wasm {
         memory_size, memory_grow,
