@@ -1,6 +1,5 @@
 package runtime.platform
 
-use main
 use core {package, *}
 use runtime {
     package,
@@ -90,6 +89,14 @@ ProcessData :: #distinct u64
     __random_get        :: (buf: [] u8) -> void ---
 }
 
+#if !#defined(runtime.vars.no_entrypoint) {
+    use main
+    #local MAIN_FUNCTION :: main.main
+
+} else {
+    MAIN_FUNCTION :: () {}
+}
+
 __start :: () {
     fd: FileData;
     __file_get_standard(1, &fd);
@@ -113,8 +120,9 @@ __start :: () {
     __runtime_initialize();
     context.thread_id = 0;
 
-    #if (typeof main.main) == #type () -> void {
-        main.main();
+
+    #if (typeof MAIN_FUNCTION) == #type () -> void { // An error on this line means no 'main.main' was found in your program.
+        MAIN_FUNCTION();
 
     } else {
         args : [] cstr;
@@ -125,7 +133,7 @@ __start :: () {
         argv_buf := cast(cstr) calloc(argv_buf_size);
         __args_get(args.data, argv_buf);
 
-        main.main(args);
+        MAIN_FUNCTION(args);
     }
 
     __flush_stdio();
