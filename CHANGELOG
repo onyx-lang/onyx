@@ -15,8 +15,11 @@ Additions:
 - `tty_get` and `tty_set` functions in `core.os`
     - Allows for controlling raw and echoed input
     - Currently only for `onyx` runtime and on Linux only.
+- `-Dno_entrypoint` for programs that do not have a `main` function.
 
 Removals:
+- `Wait_Notify_Available` global in `runtime` package.
+    - This is no longer needed as futexes are preferred instead of wait/notify.
 
 Changes:
 
