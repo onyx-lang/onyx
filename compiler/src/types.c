@@ -757,7 +757,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             AstEnumType* tag_enum_node = onyx_ast_node_new(alloc, sizeof(AstEnumType), Ast_Kind_Enum_Type);
             tag_enum_node->token = union_->token;
             tag_enum_node->name = bh_aprintf(alloc, "%s.tag_enum", union_->name);
-            tag_enum_node->backing_type = &basic_types[Basic_Kind_U32];
+            tag_enum_node->backing_type = type_build_from_ast(alloc, union_->tag_backing_type);
             bh_arr_new(alloc, tag_enum_node->values, bh_arr_length(union_->variants));
 
             void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* scope, Package* package); // HACK
@@ -805,7 +805,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 bh_arr_push(tag_enum_node->values, ev);
             }
 
-            alignment = bh_max(alignment, 4);
+            alignment = bh_max(alignment, type_alignment_of(tag_enum_node->backing_type));
             bh_align(size, alignment);
 
             u_type->Union.alignment = alignment;

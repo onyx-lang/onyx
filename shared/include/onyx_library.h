@@ -1,3 +1,5 @@
+#ifndef ONYX_LIBRARY_H
+#define ONYX_LIBRARY_H
 
 #include "wasm.h"
 
@@ -102,3 +104,47 @@ typedef struct WasmFuncDefinition {
 #endif
 
 #define ONYX_PTR(p) ((void*) (p != 0 ? (runtime->wasm_memory_data(runtime->wasm_memory) + p) : NULL))
+#define ONYX_UNPTR(p) ((int) (p != NULL ? ((char *) p - runtime->wasm_memory_data(runtime->wasm_memory)) : 0))
+
+
+#ifdef ONYX_HEAP_FUNCTIONS
+
+static wasm_func_t* __onyx_heap_resize_function = NULL;
+static void *__onyx_heap_resize(void* ptr, int size) {
+    if (__onyx_heap_resize_function == NULL) {
+        wasm_extern_t *__extern = runtime->wasm_extern_lookup_by_name(runtime->wasm_module, runtime->wasm_instance, "__heap_resize");
+        __onyx_heap_resize_function = runtime->wasm_extern_as_func(__extern);
+    }
+
+    int onyx_ptr = ONYX_UNPTR(ptr);
+
+    wasm_val_t args[] = { WASM_I32_VAL(onyx_ptr), WASM_I32_VAL(size) };
+    wasm_val_t results[1];
+    wasm_val_vec_t args_arr = WASM_ARRAY_VEC(args);
+    wasm_val_vec_t results_arr = WASM_ARRAY_VEC(results);
+
+    runtime->wasm_func_call(__onyx_heap_resize_function, &args_arr, &results_arr);
+    return ONYX_PTR(results[0].of.i32);
+}
+
+static wasm_func_t* __onyx_heap_free_function = NULL;
+static void __onyx_heap_free(void *ptr) {
+    if (__onyx_heap_free_function == NULL) {
+        wasm_extern_t *__extern = runtime->wasm_extern_lookup_by_name(runtime->wasm_module, runtime->wasm_instance, "__heap_free");
+        __onyx_heap_free_function = runtime->wasm_extern_as_func(__extern);
+    }
+
+    if (ptr == NULL) return;
+    int onyx_ptr = ONYX_UNPTR(ptr);
+
+    wasm_val_t args[] = { WASM_I32_VAL(onyx_ptr) };
+    wasm_val_vec_t results = {0,0};
+    wasm_val_vec_t args_arr = WASM_ARRAY_VEC(args);
+
+    runtime->wasm_func_call(__onyx_heap_free_function, &args_arr, &results);
+}
+
+
+#endif
+
+#endif

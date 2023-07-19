@@ -19,6 +19,8 @@ Supports_Networking :: false
 Supports_Type_Info :: true
 Supports_Threads :: true
 Supports_Env_Vars :: false
+Supports_Futexes :: true
+Supports_TTY :: false
 
 __output_string   :: (s: str)      -> u32  #foreign "host" "print_str" ---
 __output_error    :: (s: str)      -> u32  #foreign "host" "print_str" ---
@@ -27,6 +29,18 @@ __time            :: ()            -> i64  #foreign "host" "time" ---
 
 #if !#defined(__read_from_input) {
     __read_from_input :: (buf: [] u8)  -> u32 do return 0;
+}
+
+__futex_wait :: (addr: rawptr, expected: i32, timeout: i32) -> i32 {
+    use core.intrinsics.atomics {__atomic_wait}
+    if context.thread_id != 0 {
+        __atomic_wait(addr, expected, ~~timeout);
+    }
+}
+
+__futex_wake :: (addr: rawptr, maximum: i32) -> i32 {
+    use core.intrinsics.atomics {__atomic_notify}
+    __atomic_notify(addr, maximum);
 }
 
 // Sets up everything needed for execution.

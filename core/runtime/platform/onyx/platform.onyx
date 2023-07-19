@@ -1,6 +1,5 @@
 package runtime.platform
 
-use main
 use core {package, *}
 use runtime {
     package,
@@ -27,6 +26,8 @@ Supports_Networking :: true
 Supports_Type_Info :: true
 Supports_Threads :: true
 Supports_Env_Vars :: true
+Supports_Futexes :: true
+Supports_TTY :: true
 
 
 #library "onyx_runtime"
@@ -65,6 +66,12 @@ ProcessData :: #distinct u64
     // OS
     __exit :: (status: i32) -> void ---
     __sleep :: (milliseconds: i32) -> void ---
+    __futex_wait :: (addr: rawptr, expected: i32, timeout: i32) -> i32 ---
+    __futex_wake :: (addr: rawptr, maximum: i32) -> i32 ---
+
+    // TTY
+    __tty_get :: (state: &os.TTY_State) -> void ---
+    __tty_set :: (state: &os.TTY_State) -> bool ---
 
     // Time and sleep
     __time :: () -> u64 ---
@@ -80,6 +87,14 @@ ProcessData :: #distinct u64
     // Misc
     __file_get_standard :: (fd: i32, out: &FileData) -> bool ---
     __random_get        :: (buf: [] u8) -> void ---
+}
+
+#if !#defined(runtime.vars.no_entrypoint) {
+    use main
+    #local MAIN_FUNCTION :: main.main
+
+} else {
+    MAIN_FUNCTION :: () {}
 }
 
 __start :: () {
@@ -105,8 +120,9 @@ __start :: () {
     __runtime_initialize();
     context.thread_id = 0;
 
-    #if (typeof main.main) == #type () -> void {
-        main.main();
+
+    #if (typeof MAIN_FUNCTION) == #type () -> void { // An error on this line means no 'main.main' was found in your program.
+        MAIN_FUNCTION();
 
     } else {
         args : [] cstr;
@@ -117,7 +133,7 @@ __start :: () {
         argv_buf := cast(cstr) calloc(argv_buf_size);
         __args_get(args.data, argv_buf);
 
-        main.main(args);
+        MAIN_FUNCTION(args);
     }
 
     __flush_stdio();

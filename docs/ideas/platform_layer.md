@@ -27,6 +27,9 @@ this document will serve as that "header file"
 - `Supports_Networking :: bool`
 - `Supports_Type_Info :: bool`
 - `Supports_Threads :: bool`
+- `Supports_Env_Vars :: bool`
+- `Supports_Futexes :: bool`
+- `Supports_TTY :: bool`
 
 
 ## Files
@@ -131,5 +134,18 @@ this document will serve as that "header file"
 - `__get_all_env() -> [] Pair(str, str)`
 - `__get_env(key: str) -> str`
 
+
+## Futexes
+
+### Procedures
+- `__futex_wait(addr: rawptr, expected: i32, timeout: i32) -> i32`
+- `__futex_wake(addr: rawptr, maximum: i32) -> i32`
+
+
+## TTY
+
+### Procedures
+- `__tty_get(state: &core.os.TTY_State) -> void`
+- `__tty_set(state: &core.os.TTY_State) -> bool`
 
 

@@ -260,12 +260,17 @@ run_update_command :: (args: [] cstr) {
 """
 --clean          Remove directories of unneeded dependencies. This is not the default
                  behavior, as it could break builds.
+
+--skip-native    Skips compiling native libraries during synchronization.
 """
 }
 run_sync_command :: (args: [] cstr) {
     Sync_Options :: struct {
         #tag "--clean"
         clean := false;
+
+        #tag "--skip-native"
+        skip_native := false;
     }
     options: Sync_Options;
     arg_parse.arg_parse(args, &options);
@@ -301,7 +306,7 @@ run_sync_command :: (args: [] cstr) {
             continue;
         }
 
-        success, installed_folder := install_package(to_install.pack, to_install.downgrade_if_necessary);
+        success, installed_folder := install_package(to_install.pack, to_install.downgrade_if_necessary, options.skip_native);
         if !success {
             error_print("Aborting sync.\n");
             return;
@@ -503,7 +508,7 @@ run_new_command :: (args: [] cstr) {
     }
 
     template_dir := Template_Directory();
-    template_file := tprintf("{}{}.json", template_dir, template_name);
+    template_file := os.path_join(template_dir, tprintf("{}.json", template_name));
     if !os.file_exists(template_file) {
         error_print("Template '{}' not found in {}\n", template_name, template_dir);
         return;
@@ -601,7 +606,7 @@ run_new_command :: (args: [] cstr) {
 }
 
 
-install_package :: (pack: Package, downgrade_if_necessary := false) -> (bool, installed_folder: str) {
+install_package :: (pack: Package, downgrade_if_necessary := false, skip_native_compilation := false) -> (bool, installed_folder: str) {
     package_folder := get_install_path_of_repo(pack.repo);
 
     if os.file_exists(package_folder) {
@@ -627,6 +632,8 @@ install_package :: (pack: Package, downgrade_if_necessary := false) -> (bool, in
         error_print("Failed to fetch {} version {}.\n", pack.repo, pack.version);
         return false, "";
     }
+    
+    if skip_native_compilation do return true, package_folder;
 
     install_success := run_native_library_installation(package_folder);
     return install_success, package_folder;
@@ -772,6 +779,10 @@ run_command_and_forward_output :: (cmd: str) => {
 }
 
 build_package_file_to_load :: () {
+    if !os.dir_exists(config.config.lib_source_directory) {
+        os.dir_create(config.config.lib_source_directory);
+    }
+
     filepath := os.path_join(config.config.lib_source_directory, "packages.onyx");
 
     if os.file_exists(filepath) {

@@ -19,7 +19,7 @@ extern struct bh_allocator global_heap_allocator;
 #include "wasm_emit.h"
 #include "doc.h"
 
-#define VERSION "v0.1.4"
+#define VERSION "v0.1.5"
 
 
 Context context;
@@ -160,6 +160,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         arg_parse_start = argc;
 
         bh_arr_push(options.files, bh_aprintf(alloc, "%s/tools/onyx-pkg.onyx", core_installation));
+        goto skip_parsing_arguments;
     }
     #ifdef ENABLE_RUN_WITH_WASMER
     else if (!strcmp(argv[1], "run")) {
@@ -174,6 +175,16 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     }
     #endif
     else {
+        char *script_filename = bh_aprintf(alloc, "%s/tools/%s.wasm", core_installation, argv[1]);
+        if (bh_file_exists(script_filename)) {
+            options.action = ONYX_COMPILE_ACTION_RUN_WASM;
+            options.target_file = script_filename;
+
+            options.passthrough_argument_count = argc - 2;
+            options.passthrough_argument_data  = &argv[2];
+            goto skip_parsing_arguments;
+        }
+
         bh_printf("Unknown subcommand: '%s'\n", argv[1]);
         bh_printf("Run \"onyx help\" for valid subcommands.\n");
         exit(1);
@@ -307,6 +318,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
         }
     }
+
+  skip_parsing_arguments:
 
     // NOTE: Always enable multi-threading for the Onyx runtime.
     if (options.runtime == Runtime_Onyx) {

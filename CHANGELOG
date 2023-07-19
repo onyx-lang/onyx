@@ -1,3 +1,34 @@
+Release v0.1.5
+-----------
+Not released
+
+Additions:
+- Added ability to control the size of the tag type for tagged unions.
+    - `union #tag_type u8`
+- Infrastructure to have custom sub-commands.
+    - Any `*.wasm` file in `$ONYX_PATH/tools` is available to run with `onyx <cmd>`
+- `__futex_wait` and `__futex_wake` to platform layer.
+    - This allows for non-busy-waiting on mutexes and semaphores.
+    - Currently implemented for Onyx and JS platforms; WASI is impossible, but WASIX will come soon.
+- `--skip-native` flag to `onyx pkg sync` to skip compiling native libraries.
+- Ability to tag methods on structures.
+- `tty_get` and `tty_set` functions in `core.os`
+    - Allows for controlling raw and echoed input
+    - Currently only for `onyx` runtime and on Linux only.
+- `-Dno_entrypoint` for programs that do not have a `main` function.
+
+Removals:
+- `Wait_Notify_Available` global in `runtime` package.
+    - This is no longer needed as futexes are preferred instead of wait/notify.
+
+Changes:
+
+Bugfixes:
+- Fixed bug in `json.encode` that caused arrays of structures to not be outputted correctly.
+- Fixed bug in `onyx pkg` that caused `onyx pkg new` to not work as intended.
+
+
+
 Release v0.1.4
 -----------
 22nd June 2023
@@ -5,7 +36,7 @@ Release v0.1.4
 Additions:
 
 Removals:
-- `map.get_opt`
+- Deprecated `map.get_opt`.
     - This is unnecessary with the new semantics of `map.get`.
 
 Changes:

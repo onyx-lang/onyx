@@ -182,7 +182,6 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
 
             a := cast(^Type_Info_Dynamic_Array) info;
             arr := cast(^core.array.Untyped_Array) data.data;
-            data  := arr.data;
             count := arr.count;
 
             for i: count {

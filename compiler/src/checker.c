@@ -3044,6 +3044,13 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
 }
 
 CheckStatus check_union(AstUnionType *u_node) {
+    CHECK(type, &u_node->tag_backing_type);
+
+    Type *tag_type = type_build_from_ast(context.ast_alloc, u_node->tag_backing_type);
+    if (!type_is_integer(tag_type)) {
+        ERROR_(u_node->token->pos, "Union tag types must be an integer, got '%s'.", type_get_name(tag_type));
+    }
+    
     if (u_node->polymorphic_argument_types) {
         assert(u_node->polymorphic_arguments);
 

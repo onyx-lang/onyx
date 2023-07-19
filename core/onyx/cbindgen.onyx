@@ -273,6 +273,10 @@ compile_c_file :: (
             case "f32" do io.write_format(writer,  "    results->data[0] = WASM_F32_VAL({}({}));\n", method_name, call_str[0..call_str.count-2]);
             case "f64" do io.write_format(writer,  "    results->data[0] = WASM_F64_VAL({}({}));\n", method_name, call_str[0..call_str.count-2]);
             case "cptr" do io.write_format(writer, "    results->data[0] = WASM_I64_VAL((int64_t) {}({}));\n", method_name, call_str[0..call_str.count-2]);
+            case "ptr" {
+                printf("Returning a pointer-like object from C to Onyx in '{}'.\nWhile this is not an error, be careful with what you are doing, as this pointer MUST be allocated in Onyx's memory space, not in external memory. Use cptr(...) if the memory lives elsewhere.\n\n", method_name);
+                io.write_format(writer,  "    int out = ONYX_UNPTR({}({}));\n    results->data[0] = WASM_I32_VAL(out);\n", method_name, call_str[0..call_str.count-2]);
+            }
         }
 
         io.write_format(writer, "    return NULL;\n");
@@ -297,18 +301,19 @@ compile_c_file :: (
                 case f32  do return "f32";
                 case f64  do return "f64";
 
-                case rawptr do return "i32"; // This will have to depend on the pointer size...
+                case rawptr do return "ptr"; 
                 
                 case i8x16, i16x8, i32x4, i64x2, f32x4, f64x2, v128 do return "v128";
 
                 case type_expr do return "i32";
             }
 
-            case .Pointer do return "i32"; // This will also have to depend on the pointer size...
-            case .Multi_Pointer do return "i32"; // This will also have to depend on the pointer size...
+            case .Pointer do return "ptr"; 
+            case .Multi_Pointer do return "ptr"; 
+            case .Array do return "ptr";
+
             case .Function do assert(false, "Passing functions between wasm and c is not yet supported.");
-            case .Array do return "i32";
-            case .Slice do assert(false, "ASDFASDF");
+            case .Slice do assert(false, "Passing a slice from c to wasm is not yet supported.");
             case .Enum do return type_to_wasm_type((cast(&Type_Info_Enum) param_info).backing_type);
             case .Distinct do return type_to_wasm_type((cast(&Type_Info_Distinct) param_info).base_type);
 
@@ -324,6 +329,10 @@ compile_c_file :: (
                 }
 
                 assert(false, "Passing structures between wasm and c is not yet supported.");
+            }
+
+            case .Union {
+                assert(false, "Passing unions between wasm and c is not yet supported.");
             }
         }
 

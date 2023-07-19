@@ -54,8 +54,8 @@ spawn :: (t: &Thread, data: &$T, func: (&T) -> void) {
 """
 join :: (t: &Thread) {
     while t.alive {
-        #if runtime.Wait_Notify_Available {
-            __atomic_wait(&t.id, t.id);
+        #if runtime.platform.Supports_Futexes {
+            runtime.platform.__futex_wait(&t.id, t.id, -1);
         } else {
             // To not completely kill the CPU.
             runtime.platform.__sleep(1);
@@ -94,8 +94,8 @@ __exited :: (id: i32) {
     thread := thread_map->get(id)?;
     if thread != null {
         thread.alive = false;
-        #if runtime.Wait_Notify_Available {
-            __atomic_notify(&thread.id);
+        #if runtime.platform.Supports_Futexes {
+            runtime.platform.__futex_wake(&thread.id, 1);
         }
 
         thread_map->delete(id);

@@ -729,9 +729,16 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
             if info.kind == .Union {
                 u := cast(&Type_Info_Union) info;
 
-                tag_value := *cast(&u32, v.data);
+                tag_value: u64;
+                switch e := u.tag_enum->info()->as_enum(); e.backing_type {
+                    case i8,  u8  do tag_value = cast(u64) *(cast(&u8) v.data);
+                    case i16, u16 do tag_value = cast(u64) *(cast(&u16) v.data);
+                    case i32, u32 do tag_value = cast(u64) *(cast(&u32) v.data);
+                    case i64, u64 do tag_value = cast(u64) *(cast(&u64) v.data);
+                    case #default do assert(false, "Bad union backing type");
+                }
 
-                variant := array.first(u.variants, [x](x.tag_value == tag_value));
+                variant := array.first(u.variants, [x](x.tag_value == ~~tag_value));
 
                 if !variant {
                     output->write("unknown_variant");

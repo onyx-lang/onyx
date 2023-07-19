@@ -600,10 +600,6 @@ void introduce_build_options(bh_allocator a) {
     multi_threaded->type_node = (AstType *) &basic_type_bool;
     symbol_builtin_introduce(p->scope, "Multi_Threading_Enabled", (AstNode *) multi_threaded);
 
-    AstNumLit* wait_notify_available = make_int_literal(a, context.options->use_multi_threading && context.options->runtime == Runtime_Js);
-    wait_notify_available->type_node = (AstType *) &basic_type_bool;
-    symbol_builtin_introduce(p->scope, "Wait_Notify_Available", (AstNode *) wait_notify_available);
-
     AstNumLit* debug_mode = make_int_literal(a, context.options->debug_info_enabled);
     debug_mode->type_node = (AstType *) &basic_type_bool;
     symbol_builtin_introduce(p->scope, "Debug_Mode_Enabled", (AstNode *) debug_mode);

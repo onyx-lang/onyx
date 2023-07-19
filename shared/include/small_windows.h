@@ -463,3 +463,7 @@ GB_DLL_IMPORT int BCryptCloseAlgorithmProvider(
     BCRYPT_ALG_HANDLE hAlgorithm,
     unsigned long     dwFlags
 );
+
+GB_DLL_IMPORT void WINAPI WakeByAddressSingle(void * Address);
+GB_DLL_IMPORT BOOL WINAPI WaitOnAddress(volatile void * Address, void * compareAddress, size_t addressSize, DWORD milliseconds);
+

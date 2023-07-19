@@ -183,6 +183,23 @@ static void expect_no_stored_tags(OnyxParser *parser) {
     expect_no_stored_tags_pos(parser, parser->curr->pos);
 }
 
+static b32 parse_possible_tag(OnyxParser *parser) {
+    b32 parsed = 0;
+    while (parse_possible_directive(parser, "tag") || consume_token_if_next(parser, '@')) {
+        parser->tag_depth += 1;
+        parsed = 1;
+
+        do {
+            AstTyped* expr = parse_expression(parser, 0);
+            bh_arr_push(parser->stored_tags, expr);
+        } while (consume_token_if_next(parser, ','));
+
+        parser->tag_depth -= 1;
+    }
+
+    return parsed;
+}
+
 static void flush_stored_tags(OnyxParser *parser, bh_arr(AstTyped *) *out_arr) {
     //
     // When tag_depth > 0, no tags will be added to the element.
@@ -2135,24 +2152,6 @@ static void type_create_scope(OnyxParser *parser, Scope ** scope, OnyxToken* tok
     }
 }
 
-static void parse_meta_tags(OnyxParser *parser, bh_arr(AstTyped *) *out_arr) {
-    bh_arr(AstTyped *) meta_tags = NULL;
-    while (parse_possible_directive(parser, "tag") || consume_token_if_next(parser, '@')) {
-        if (meta_tags == NULL) bh_arr_new(global_heap_allocator, meta_tags, 1);
-
-        parser->tag_depth += 1;
-
-        do {
-            AstTyped* expr = parse_expression(parser, 0);
-            bh_arr_push(meta_tags, expr);
-        } while (consume_token_if_next(parser, ','));
-
-        parser->tag_depth -= 1;
-    }
-
-    *out_arr = meta_tags;
-}
-
 static AstStructType* parse_struct(OnyxParser* parser) {
     OnyxToken *s_token = expect_token(parser, Token_Type_Keyword_Struct);
 
@@ -2244,6 +2243,8 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) return s_node;
 
+        parse_possible_tag(parser);
+
         if (parse_possible_directive(parser, "persist")) {
             b32 thread_local = parse_possible_directive(parser, "thread_local");
 
@@ -2270,7 +2271,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         }
 
         bh_arr(AstTyped *) meta_tags=NULL;
-        parse_meta_tags(parser, &meta_tags);
+        flush_stored_tags(parser, &meta_tags);
 
         if (parser->curr->type == '}') {
             consume_token(parser);
@@ -2357,6 +2358,13 @@ static AstUnionType* parse_union(OnyxParser* parser) {
     Scope *scope_to_restore_parser_to = parser->current_scope;
     Scope *scope_symbols_in_unions_should_be_bound_to = u_node->scope;
 
+    if (parse_possible_directive(parser, "tag_type")) {
+        AstType *backing_type = parse_type(parser);
+        u_node->tag_backing_type = backing_type;
+    } else {
+        u_node->tag_backing_type = &basic_type_u32;
+    }
+
     if (consume_token_if_next(parser, '(')) {
         bh_arr(AstPolyStructParam) poly_params = NULL;
         bh_arr_new(global_heap_allocator, poly_params, 1);
@@ -2399,6 +2407,8 @@ static AstUnionType* parse_union(OnyxParser* parser) {
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) return u_node;
 
+        parse_possible_tag(parser);
+
         if (next_tokens_are(parser, 3, Token_Type_Symbol, ':', ':')) {
             OnyxToken* binding_name = expect_token(parser, Token_Type_Symbol);
             consume_token(parser);
@@ -2411,7 +2421,7 @@ static AstUnionType* parse_union(OnyxParser* parser) {
         }
 
         bh_arr(AstTyped *) meta_tags=NULL;
-        parse_meta_tags(parser, &meta_tags);
+        flush_stored_tags(parser, &meta_tags);
 
         if (parser->curr->type == '}') {
             consume_token(parser);
@@ -3454,6 +3464,8 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
     AstBinding* binding = NULL;
 
+    if (parse_possible_tag(parser)) return;
+
     switch ((u16) parser->curr->type) {
         case Token_Type_Keyword_Use: {
             OnyxToken *use_token = expect_token(parser, Token_Type_Keyword_Use);
@@ -3714,15 +3726,6 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(library);
                 return;
             }
-            else if (parse_possible_directive(parser, "tag")) {
-                parser->tag_depth += 1;
-
-                AstTyped *expr = parse_expression(parser, 0);
-                bh_arr_push(parser->stored_tags, expr);
-
-                parser->tag_depth -= 1;
-                return;
-            }
             else if (parse_possible_directive(parser, "doc")) {
                 // This is a future feature I want to add to the language, proper docstrings.
                 // For now (and so I start documenting thing...), #doc can be used anywhere
@@ -3746,17 +3749,6 @@ static void parse_top_level_statement(OnyxParser* parser) {
             }
 
             break;
-        }
-
-        case '@': {
-            consume_token(parser);
-            parser->tag_depth += 1;
-
-            AstTyped *expr = parse_expression(parser, 0);
-            bh_arr_push(parser->stored_tags, expr);
-
-            parser->tag_depth -= 1;
-            return;
         }
 
         default: break;
