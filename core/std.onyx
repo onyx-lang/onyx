@@ -38,6 +38,7 @@ use runtime
 #load "./intrinsics/onyx"
 #load "./intrinsics/wasm"
 #load "./intrinsics/type_interfaces"
+#load "./intrinsics/atomics"
 
 #load "./io/io"
 #load "./io/stream"
@@ -111,8 +112,6 @@ use runtime
 }
 
 #if runtime.Multi_Threading_Enabled {
-    #load "./intrinsics/atomics"
-
     #load "./sync/mutex"
     #load "./sync/condition_variable"
     #load "./sync/semaphore"
