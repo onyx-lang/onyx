@@ -184,11 +184,11 @@ static void append_value_from_memory_with_type(debug_runtime_value_builder_t *bu
 
         case debug_type_kind_union: {
             u32 variant = *(u32 *) base;
-            if (variant == 0) {
+            if (variant >= type->onion.variant_count) {
                 WRITE("unknown_variant");
 
             } else {
-                debug_type_union_variant_t *uv = &type->onion.variants[variant - 1];
+                debug_type_union_variant_t *uv = &type->onion.variants[variant];
 
                 WRITE_FORMAT("%s(", uv->name); 
                 append_value_from_memory_with_type(builder, bh_pointer_add(base, type->onion.tag_size), uv->type);

@@ -587,7 +587,7 @@ static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunct
     PolySolveResult res = solve_poly_type(param->poly_sym, param->type_expr, actual_type);
 
     // If we are trying to match against an "address of" node that was
-    // placed because of a method call, there's a small change that the
+    // placed because of a method call, there's a small chance that the
     // address of is unnecessary and can be removed. This happens in
     // unify_node_and_type, but because that relies on knowning the type,
     // it cannot happen until after polymorphic arguments are determined.

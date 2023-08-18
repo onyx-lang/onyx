@@ -56,6 +56,9 @@ use simd {*}
 }
 
 
+customize :: struct {
+    symbol_name: str;
+}
 
 Cast_Mapping :: struct {
     type: type_expr;
@@ -212,7 +215,10 @@ compile_c_file :: (
         io.write(writer, type_encoding(method_info.return_type));
         io.write(writer, ")) {\n");
 
-        method_name := ff.name;
+        method_name := slice.find_opt(ff.tags, [it](it.type == customize))
+                       ->transform(x => misc.any_as(x, customize).symbol_name)
+                       ?? ff.name;
+
         if name_map != null_proc {
             method_name = name_map(method_name);
         }
