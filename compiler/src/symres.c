@@ -1384,6 +1384,11 @@ static SymresStatus symres_memres(AstMemRes** memres) {
     if ((*memres)->initial_value != NULL) {
         SYMRES(expression, &(*memres)->initial_value);
     }
+
+    bh_arr_each(AstTyped *, ptag, (*memres)->tags) {
+        SYMRES(expression, ptag);
+    }
+
     return Symres_Success;
 }
 

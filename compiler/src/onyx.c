@@ -395,10 +395,11 @@ static void introduce_defined_variables() {
 }
 
 // HACK
-static u32 special_global_entities_remaining = 4;
+static u32 special_global_entities_remaining = 5;
 static Entity *runtime_info_types_entity;
 static Entity *runtime_info_foreign_entity;
 static Entity *runtime_info_proc_tags_entity;
+static Entity *runtime_info_global_tags_entity;
 static Entity *runtime_info_stack_trace_entity;
 
 static void context_init(CompileOptions* opts) {
@@ -408,7 +409,7 @@ static void context_init(CompileOptions* opts) {
     prepare_builtins();
 
     // HACK
-    special_global_entities_remaining = 4;
+    special_global_entities_remaining = 5;
 
     context.options = opts;
     context.cycle_detected = 0;
@@ -472,6 +473,12 @@ static void context_init(CompileOptions* opts) {
             .type = Entity_Type_Load_File,
             .package = NULL,
             .include = create_load(context.ast_alloc, "core/runtime/info/proc_tags"),
+        }));
+        runtime_info_global_tags_entity = entity_heap_insert(&context.entities, ((Entity) {
+            .state = Entity_State_Parse,
+            .type = Entity_Type_Load_File,
+            .package = NULL,
+            .include = create_load(context.ast_alloc, "core/runtime/info/global_tags"),
         }));
         runtime_info_stack_trace_entity = entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
@@ -726,6 +733,7 @@ static b32 process_entity(Entity* ent) {
                 // GROSS
                 if (ent == runtime_info_types_entity
                     || ent == runtime_info_proc_tags_entity
+                    || ent == runtime_info_global_tags_entity
                     || ent == runtime_info_foreign_entity
                     || ent == runtime_info_stack_trace_entity) {
                     special_global_entities_remaining--;

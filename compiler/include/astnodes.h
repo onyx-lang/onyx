@@ -1134,6 +1134,8 @@ struct AstMemRes        {
 
     struct Entity *type_entity;
 
+    bh_arr(AstTyped *) tags;
+
     b32 threadlocal : 1;
 
     // Set and used in the wasm emission.
@@ -1931,6 +1933,7 @@ extern AstTyped *type_table_node;
 extern AstTyped *foreign_blocks_node;
 extern AstType  *foreign_block_type;
 extern AstTyped *tagged_procedures_node;
+extern AstTyped *tagged_globals_node;
 extern AstFunction *builtin_initialize_data_segments;
 extern AstFunction *builtin_run_init_procedures;
 extern AstFunction *builtin_closure_block_allocate;

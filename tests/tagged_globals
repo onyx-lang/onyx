@@ -1,0 +1,9 @@
+i32
+package_id[7]
+1
+Default value is: 1234
+New value is: 5678
+Test that strings work!
+==============================================
+Something_Interesting { version = 10, about = "This is a cool variable" }
+Something_Interesting { version = 20, about = "This is another cool variable!" }

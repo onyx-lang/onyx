@@ -3198,11 +3198,11 @@ static AstIf* parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statem
 static AstMemRes* parse_memory_reservation(OnyxParser* parser, OnyxToken* symbol, b32 threadlocal) {
     expect_token(parser, ':');
 
-    expect_no_stored_tags(parser);
-
     AstMemRes* memres = make_node(AstMemRes, Ast_Kind_Memres);
     memres->threadlocal = threadlocal;
     memres->token = symbol;
+
+    flush_stored_tags(parser, &memres->tags);
 
     if (parser->curr->type != '=')
         memres->type_node = parse_type(parser);

@@ -70,6 +70,7 @@ AstTyped    *type_table_node = NULL;
 AstTyped    *foreign_blocks_node = NULL;
 AstType     *foreign_block_type = NULL;
 AstTyped    *tagged_procedures_node = NULL;
+AstTyped    *tagged_globals_node = NULL;
 AstFunction *builtin_initialize_data_segments = NULL;
 AstFunction *builtin_run_init_procedures = NULL;
 AstFunction *builtin_closure_block_allocate = NULL;
@@ -402,6 +403,7 @@ void prepare_builtins() {
     foreign_blocks_node = NULL;
     foreign_block_type = NULL;
     tagged_procedures_node = NULL;
+    tagged_globals_node = NULL;
     builtin_initialize_data_segments = NULL;
     builtin_run_init_procedures = NULL;
     init_procedures = NULL;
@@ -572,6 +574,7 @@ void initalize_special_globals() {
         foreign_blocks_node = (AstTyped *) symbol_raw_resolve(p->scope, "foreign_blocks");
         foreign_block_type  = (AstType *)  symbol_raw_resolve(p->scope, "foreign_block");
         tagged_procedures_node = (AstTyped *) symbol_raw_resolve(p->scope, "tagged_procedures");
+        tagged_globals_node = (AstTyped *) symbol_raw_resolve(p->scope, "tagged_globals");
 
         if (context.options->stack_trace_enabled) {
             builtin_stack_trace_type = (AstType *) symbol_raw_resolve(p->scope, "Stack_Trace");

@@ -4830,6 +4830,12 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
             memres->data_id = tagged_procedures_location;
             return;
         }
+
+        if (tagged_globals_node != NULL && (AstMemRes *) tagged_globals_node == memres) {
+            u64 tagged_globals_location = build_tagged_globals(mod);
+            memres->data_id = tagged_globals_location;
+            return;
+        }
     }
 
     if (foreign_blocks_node != NULL && (AstMemRes *) foreign_blocks_node == memres) {
@@ -5020,6 +5026,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(global_heap_allocator, module.stack_leave_patches, 4);
     bh_arr_new(global_heap_allocator, module.foreign_blocks, 4);
     bh_arr_new(global_heap_allocator, module.procedures_with_tags, 4);
+    bh_arr_new(global_heap_allocator, module.globals_with_tags, 4);
     bh_arr_new(global_heap_allocator, module.data_patches, 4);
 
 #ifdef ENABLE_DEBUG_INFO
@@ -5088,6 +5095,13 @@ void emit_entity(Entity* ent) {
 
         case Entity_Type_File_Contents: {
             emit_file_contents(module, (AstFileContents *) ent->file_contents);
+            break;
+        }
+
+        case Entity_Type_Memory_Reservation_Type: {
+            if (ent->mem_res->tags != NULL) {
+                bh_arr_push(module->globals_with_tags, ent->mem_res);
+            }
             break;
         }
 

@@ -3276,6 +3276,10 @@ CheckStatus check_memres(AstMemRes* memres) {
         }
     }
 
+    bh_arr_each(AstTyped *, ptag, memres->tags) {
+        CHECK(expression, ptag);
+    }
+
     return Check_Success;
 }
 

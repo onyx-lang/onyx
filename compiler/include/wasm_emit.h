@@ -710,6 +710,7 @@ typedef struct OnyxWasmModule {
     u32 next_foreign_block_idx;
 
     bh_arr(AstFunction *) procedures_with_tags;
+    bh_arr(AstMemRes *)   globals_with_tags;
 
     // NOTE: Used internally as a map from strings that represent function types,
     // 0x7f 0x7f : 0x7f ( (i32, i32) -> i32 )
