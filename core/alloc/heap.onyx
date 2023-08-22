@@ -207,7 +207,7 @@ get_freed_size :: () => {
                 #if Enable_Stack_Trace {
                     trace := runtime.info.get_stack_trace();
                     for trace {
-                        log(.Error, "Core", core.tprintf("in {} ({}:{})", it.info.func_name, it.info.file, it.current.line));
+                        log(.Error, "Core", core.tprintf("in {} ({}:{})", it.info.func_name, it.info.file, it.current_line));
                     }
                 }
             }
@@ -227,6 +227,24 @@ get_freed_size :: () => {
             if hb_ptr.magic_number != Alloc_Block_Magic_Number {
                 log(.Error, "Core", "FREEING INVALID BLOCK");
                 trace();
+                return;
+            }
+
+        } else {
+            //
+            // If not in debug mode, still catch the wierd cases and prevent them from breaking
+            // the free list, as this will certainly cause terrible bugs that take hours to fix.
+            //
+
+            if cast(uintptr) hb_ptr < cast(uintptr) __heap_start {
+                return;
+            }
+
+            if hb_ptr.size & Allocated_Flag != Allocated_Flag {
+                return;
+            }
+
+            if hb_ptr.magic_number != Alloc_Block_Magic_Number {
                 return;
             }
         }

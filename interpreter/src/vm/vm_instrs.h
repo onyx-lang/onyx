@@ -282,7 +282,9 @@ OVMI_INSTR_EXEC(reg_set) {
 
 OVMI_INSTR_EXEC(idx_arr) {
     ovm_static_integer_array_t data_elem = state->program->static_data[instr->a];
-    ovm_assert(VAL(instr->b).u32 < (u32) data_elem.len);
+    if (VAL(instr->b).u32 >= (u32) data_elem.len) {
+        OVMI_EXCEPTION_HOOK;
+    }
 
     VAL(instr->r).i32 = state->program->static_integers[data_elem.start_idx + VAL(instr->b).u32];
     VAL(instr->r).type = OVM_TYPE_I32;
