@@ -1,19 +1,23 @@
 #!/bin/sh
 
+[ ! $UID = 0 ] \
+    && echo "Please run this script as root." \
+    && exit 1
+
 . ./settings.sh
 
 echo "Installing on '$(uname -a)'"
 
 echo "Installing core libs"
-[ -d "$CORE_DIR/core" ] && sudo rm -r "$CORE_DIR/core"
-sudo mkdir -p "$CORE_DIR"
-sudo cp -r ./core/ "$CORE_DIR"
+[ -d "$CORE_DIR/core" ] && rm -r "$CORE_DIR/core"
+mkdir -p "$CORE_DIR"
+cp -r ./core/ "$CORE_DIR"
 
 
-sudo mkdir -p "$CORE_DIR/tools"
-sudo mkdir -p "$CORE_DIR/tools/pkg_templates"
-sudo cp ./scripts/onyx-pkg.onyx "$CORE_DIR/tools"
-sudo cp ./scripts/default.json "$CORE_DIR/tools/pkg_templates"
+mkdir -p "$CORE_DIR/tools"
+mkdir -p "$CORE_DIR/tools/pkg_templates"
+cp ./scripts/onyx-pkg.onyx "$CORE_DIR/tools"
+cp ./scripts/default.json "$CORE_DIR/tools/pkg_templates"
 
 # This is a development feature to allow for quickly reinstalling core libraries
 # without have to recompile the entire compiler
@@ -28,13 +32,13 @@ fi
 if [ ! -f "$CORE_DIR/lib/lib$RUNTIME_LIBRARY.so" ] || true; then
     echo "Copying lib$RUNTIME_LIBRARY to $CORE_DIR/lib (first install)"
 
-    sudo mkdir -p "$CORE_DIR/lib"
-    sudo mkdir -p "$CORE_DIR/include"
+    mkdir -p "$CORE_DIR/lib"
+    mkdir -p "$CORE_DIR/include"
 
-    sudo cp "$WASMER_LIBRARY_DIR/lib$RUNTIME_LIBRARY.so" "$CORE_DIR/lib/lib$RUNTIME_LIBRARY.so"
+    cp "$WASMER_LIBRARY_DIR/lib$RUNTIME_LIBRARY.so" "$CORE_DIR/lib/lib$RUNTIME_LIBRARY.so"
 
-    sudo cp "shared/include/onyx_library.h" "$CORE_DIR/include/onyx_library.h"
-    sudo cp "$WASMER_INCLUDE_DIR/wasm.h" "$CORE_DIR/include/wasm.h"
+    cp "shared/include/onyx_library.h" "$CORE_DIR/include/onyx_library.h"
+    cp "$WASMER_INCLUDE_DIR/wasm.h" "$CORE_DIR/include/wasm.h"
 fi
 
 cd compiler

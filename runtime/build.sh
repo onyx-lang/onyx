@@ -9,4 +9,4 @@ $CC -shared -fpic -w -O2 \
     -lpthread
 
 echo "Installing onyx_runtime.so"
-sudo mv "../bin/onyx_runtime.so" "$CORE_DIR/lib/onyx_runtime.so"
+mv "../bin/onyx_runtime.so" "$CORE_DIR/lib/onyx_runtime.so"
