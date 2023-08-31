@@ -127,7 +127,7 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type) {
     consume_token(parser);
 
     if (token->type != token_type) {
-        onyx_report_error(token->pos, Error_Critical, "expected token '%s', got '%s'.", token_name(token_type), token_name(token->type));
+        onyx_report_error(token->pos, Error_Critical, "expected token '%s', got '%s'.", token_type_name(token_type), token_name(token));
         parser->hit_unexpected_token = 1;
         // :LinearTokenDependent
         parser->curr = &parser->tokenizer->tokens[bh_arr_length(parser->tokenizer->tokens) - 1];
@@ -620,7 +620,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             }
 
             if (parser->curr->type != '{') {
-                onyx_report_error(parser->curr->pos, Error_Critical, "Expected '{' after 'do', got '%s'.", token_name(parser->curr->type));
+                onyx_report_error(parser->curr->pos, Error_Critical, "Expected '{' after 'do', got '%s'.", token_name(parser->curr));
                 retval = NULL;
                 break;
             }
@@ -906,7 +906,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
         default:
         no_match:
-            onyx_report_error(parser->curr->pos, Error_Critical, "Unexpected token '%s'.", token_name(parser->curr->type));
+            onyx_report_error(parser->curr->pos, Error_Critical, "Unexpected token '%s'.", token_name(parser->curr));
             return NULL;
     }
 
@@ -3742,7 +3742,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
                 if (symbol_token->type > Token_Type_Keyword_Start && symbol_token->type < Token_Type_Keyword_End) {
                     onyx_report_error(directive_token->pos, Error_Critical, "Did you mean the keyword, '%s'?",
-                        token_name(symbol_token->type));
+                        token_name(symbol_token));
                 }
 
                 return;
