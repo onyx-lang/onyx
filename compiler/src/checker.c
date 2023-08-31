@@ -2421,6 +2421,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Switch_Case: break;
         case Ast_Kind_Foreign_Block: break;
         case Ast_Kind_Zero_Value: break;
+        case Ast_Kind_Interface: break;
 
         default:
             retval = Check_Error;

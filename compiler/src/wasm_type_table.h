@@ -1274,7 +1274,7 @@ static u64 build_tagged_globals(OnyxWasmModule *module) {
         patch.location = tag_global_buffer.length;
         patch.offset = 0;
         patch.data_id = 0;
-        patch.node_to_use_if_data_id_is_null = memres;
+        patch.node_to_use_if_data_id_is_null = (AstNode *) memres;
         bh_arr_push(module->data_patches, patch);
 
         bh_buffer_write_u32(&tag_global_buffer, 0);

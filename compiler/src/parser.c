@@ -1492,7 +1492,7 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
         bh_arr_push(parser->current_symbol_stack, symbol);
         AstBinding* binding = parse_top_level_binding(parser, symbol);
         bh_arr_pop(parser->current_symbol_stack);
-        if (parser->hit_unexpected_token) return 2;
+        if (parser->hit_unexpected_token || !binding) return 2;
 
         ENTITY_SUBMIT(binding);
         return 2;
@@ -2362,7 +2362,7 @@ static AstUnionType* parse_union(OnyxParser* parser) {
         AstType *backing_type = parse_type(parser);
         u_node->tag_backing_type = backing_type;
     } else {
-        u_node->tag_backing_type = &basic_type_u32;
+        u_node->tag_backing_type = (AstType *) &basic_type_u32;
     }
 
     if (consume_token_if_next(parser, '(')) {

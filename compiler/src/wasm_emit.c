@@ -4232,8 +4232,8 @@ EMIT_FUNC(stack_trace_blob, AstFunction *fd)  {
     u8* node_data = bh_alloc_array(context.ast_alloc, u8, 6 * POINTER_SIZE);
 
     char *name = get_function_name(fd);
-    emit_raw_string(mod, (const char *) fd->token->pos.filename, strlen(fd->token->pos.filename), &file_name_id, &node_data[4]);
-    emit_raw_string(mod, name, strlen(name), &func_name_id, &node_data[16]);
+    emit_raw_string(mod, (char *) fd->token->pos.filename, strlen(fd->token->pos.filename), &file_name_id, (u64 *) &node_data[4]);
+    emit_raw_string(mod, name, strlen(name), &func_name_id, (u64 *) &node_data[16]);
     *((u32 *) &node_data[8]) = fd->token->pos.line;
     *((u32 *) &node_data[20]) = fd->type->id;
 
