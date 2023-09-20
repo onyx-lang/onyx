@@ -111,6 +111,7 @@ TCP_Server :: struct {
     pulse_time_ms := 500;
 
     emit_data_events := true;
+    emit_ready_event_multiple_times := false;
 }
 
 #inject TCP_Server {
@@ -341,7 +342,9 @@ wait_to_get_client_messages :: (use server: &TCP_Server) -> [] &TCP_Server.Clien
     for clients {
         if it == null do continue;
 
-        if it.state == .Alive && !it.recv_ready_event_present {
+        if it.state == .Alive {
+            if it.recv_ready_event_present && !emit_ready_event_multiple_times do continue;
+
             active_clients[active_clients.count] = it;
             active_clients.count += 1;
         }
