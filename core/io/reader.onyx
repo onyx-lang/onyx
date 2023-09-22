@@ -170,8 +170,8 @@ read_bytes :: (use reader: &Reader, bytes: [] u8) -> (i32, Error) {
 
     write_index := 0;
     while n > 0 && !reader_empty(reader) {
-        if start != end {
-            to_write := math.min(n, end);
+        if start < end {
+            to_write := math.min(n, end - start);
             memory.copy(bytes.data + write_index, buffer.data + start, to_write);
             n -= to_write;
             write_index += to_write;
