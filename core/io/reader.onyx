@@ -170,17 +170,21 @@ read_bytes :: (use reader: &Reader, bytes: [] u8) -> (i32, Error) {
 
     write_index := 0;
     while n > 0 && !reader_empty(reader) {
+        if start != end {
+            to_write := math.min(n, end);
+            memory.copy(bytes.data + write_index, buffer.data + start, to_write);
+            n -= to_write;
+            write_index += to_write;
+            start += to_write;
+        }
+
+        if n == 0 do break;
+
         if  err := reader_read_next_chunk(reader);
             err == .ReadPending || err == .ReadLater
         {
             return write_index, err;
         }
-
-        to_write := math.min(n, end);
-        memory.copy(bytes.data + write_index, buffer.data, to_write);
-        n -= to_write;
-        write_index += to_write;
-        start += to_write;
     }
 
     last_byte = cast(i32) bytes[write_index - 1];
@@ -336,6 +340,10 @@ read_line :: (use reader: &Reader, consume_newline := true, allocator := context
     array.init(&out, allocator=allocator);
 
     while done := false; !done {
+        if start == end {
+            while reader_read_next_chunk(reader) == .ReadPending ---
+        }
+
         count := start;
         while count < end && buffer[count] != #char "\n" {
             count += 1;

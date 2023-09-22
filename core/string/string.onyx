@@ -303,7 +303,7 @@ index_of :: (s: str, substr: str) -> i32 {
 }
 
 last_index_of :: (s: str, c: u8) -> i32 {
-    for range.{s.count, 0, -1} {
+    for range.{s.count-1, 0, -1} {
         if s[it] == c do return it;
     }
     return -1;

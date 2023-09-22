@@ -6,6 +6,7 @@ package core.alloc.atomic
 // is not needed for the general purpose heap allocator,
 // as that already has a thread-safe implementation.
 
+use core.alloc
 use core.sync
 
 AtomicAllocator :: struct {
@@ -25,7 +26,7 @@ make_allocator :: (atomic: &AtomicAllocator) =>
     Allocator.{ atomic, atomic_alloc };
 
 #overload
-core.alloc.as_allocator :: make_allocator
+alloc.as_allocator :: make_allocator
 
 
 #local
