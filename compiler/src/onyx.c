@@ -19,7 +19,7 @@ extern struct bh_allocator global_heap_allocator;
 #include "wasm_emit.h"
 #include "doc.h"
 
-#define VERSION "v0.1.5"
+#define VERSION "v0.1.6"
 
 
 Context context;
@@ -173,6 +173,12 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         options.action = ONYX_COMPILE_ACTION_WATCH;
         arg_parse_start = 2;
     }
+        // `#ifdef ENABLE_RUN_WITH_WASMER
+        // `else if (!strcmp(argv[1], "run-watch")) {
+        // `    options.action = ONYX_COMPILE_ACTION_RUN_WATCH;
+        // `    arg_parse_start = 2;
+        // `}
+        // `#endif
     #endif
     else {
         char *script_filename = bh_aprintf(alloc, "%s/tools/%s.wasm", core_installation, argv[1]);
