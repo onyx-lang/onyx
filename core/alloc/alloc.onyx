@@ -1,6 +1,7 @@
 package core.alloc
 
 #load "./arena"
+#load "./atomic"
 #load "./fixed"
 #load "./heap"
 #load "./ring"

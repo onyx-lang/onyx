@@ -2421,6 +2421,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Switch_Case: break;
         case Ast_Kind_Foreign_Block: break;
         case Ast_Kind_Zero_Value: break;
+        case Ast_Kind_Interface: break;
 
         default:
             retval = Check_Error;
@@ -3274,6 +3275,10 @@ CheckStatus check_memres(AstMemRes* memres) {
 
             ERROR(memres->initial_value->token->pos, "Top level expressions must be compile time known.");
         }
+    }
+
+    bh_arr_each(AstTyped *, ptag, memres->tags) {
+        CHECK(expression, ptag);
     }
 
     return Check_Success;

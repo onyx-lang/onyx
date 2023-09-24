@@ -1,13 +1,5 @@
 package core.intrinsics.atomics
 
-#local {
-    use runtime
-
-    #if !runtime.Multi_Threading_Enabled {
-        #error "Multi-threading is not enabled so you cannot include the 'core.intrinsics.atomics' package."
-    }
-}
-
 // __atomic_wait is only valid for i32 and i64
 __atomic_wait   :: (addr: &$T, value: T, timeout: i64 = -1) -> i32 #intrinsic ---
 __atomic_notify :: (addr: rawptr, maximum: i32 = 1) -> i32 #intrinsic ---

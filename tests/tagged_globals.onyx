@@ -1,0 +1,48 @@
+package main
+
+use core {*}
+use runtime.info
+
+@"Test that strings work!"
+x: i32 = 1234;
+
+
+Something_Interesting :: struct {
+    version: u32;
+    about: str;
+}
+
+@Something_Interesting.{ 10, "This is a cool variable" }
+value_1 := "Working!"
+
+@Something_Interesting.{ 20, "This is another cool variable!" }
+value_2 := "Also working!"
+
+
+main :: () {
+    for info.tagged_globals {
+        if it.type != i32 do continue;
+        println(it.type);
+        println(it.pack);
+        println(it.tags.count);
+
+        val_ptr: &i32 = it.data;
+        printf("Default value is: {*}\n", val_ptr);
+
+        *val_ptr = 5678;
+        printf("New value is: {*}\n", val_ptr);
+
+        for t: it.tags {
+            if t.type == str {
+                printf("{*}\n", misc.any_as(t, str));
+            }
+        }
+    }
+
+    println("==============================================");
+
+    for info.get_globals_with_tag(Something_Interesting) {
+        println(*it.tag);
+    }
+}
+

@@ -67,27 +67,27 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
 """
 #overload
 __make_overload :: macro (x: &Map($K, $V), allocator := context.allocator) =>
-    #this_package.make(K, V);
+    #this_package.make(K, V, allocator);
 
 #doc """
    Creates and initializes a new map using the types provided.
 """
-make :: macro ($Key: type_expr, $Value: type_expr) -> Map(Key, Value) {
+make :: macro ($Key: type_expr, $Value: type_expr, allocator := context.allocator) -> Map(Key, Value) {
     map : Map(Key, Value);
-    #this_package.init(&map);
+    #this_package.init(&map, allocator);
     return map;
 }
 
 #doc "Initializes a map."
-init :: (use map: &Map($K, $V)) {
+init :: (map: &Map($K, $V), allocator := context.allocator) {
     __initialize(map);
 
-    allocator = context.allocator;
+    map.allocator = allocator;
 
-    hashes = builtin.make([] u32, 8, allocator=allocator);
-    array.fill(hashes, -1);
+    map.hashes = builtin.make([] u32, 8, allocator=allocator);
+    array.fill(map.hashes, -1);
 
-    array.init(&entries, allocator=allocator);
+    array.init(&map.entries, allocator=allocator);
 }
 
 #doc "Allows for deletion of a Map using `delete(&map)`."

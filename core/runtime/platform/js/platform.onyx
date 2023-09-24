@@ -34,7 +34,7 @@ __time            :: ()            -> i64  #foreign "host" "time" ---
 __futex_wait :: (addr: rawptr, expected: i32, timeout: i32) -> i32 {
     use core.intrinsics.atomics {__atomic_wait}
     if context.thread_id != 0 {
-        __atomic_wait(addr, expected, ~~timeout);
+        __atomic_wait(cast(&i32) addr, expected, ~~timeout);
     }
 }
 

@@ -203,6 +203,16 @@ str_format :: format
 str_format_va :: format_va
 
 
+
+#inject
+builtin.logf :: (level: builtin.Log_Level, format: str, va: ..any) {
+    use core {conv}
+
+    buf: [2048] u8;
+    log(level, conv.format_va(buf, format, cast([] any) va));
+}
+
+
 #doc """
     Formats a string using the provided arguments and format specified string.
     This has many overloads to make it easy to work with.

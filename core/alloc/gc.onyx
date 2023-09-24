@@ -16,6 +16,8 @@ package core.alloc.gc
 //       // Every allocation here will automatically be freed
 //   }
 
+
+use runtime
 use core {package, *}
 
 GCState :: struct {
@@ -36,15 +38,30 @@ make :: (backing := context.allocator) -> GCState {
 }
 
 clear :: (hs: &GCState) {
+    Debug_Printing :: #defined(runtime.vars.Enable_GC_Debug)
+
+    count := 0;
+    size := 0;
+
     while l := hs.first; l != null {
         n := l.next;
 
         if l.magic_number == GC_Link_Magic_Number {
+            #if Debug_Printing {
+                count += 1;
+                size += *cast(&u32) (cast([&] u8) l - 8);
+            }
+
             l.magic_number = 0;
             raw_free(hs.backing_allocator, l);
         }
 
         l = n;
+    }
+
+    #if Debug_Printing {
+        logf(.Debug, "Garbage collected items: {}", count);
+        logf(.Debug, "Garbage collected bytes: {}", size);
     }
 
     hs.first = null;

@@ -1,6 +1,24 @@
-Release v0.1.5
+Release v0.1.6
 -----------
 Not released
+
+Additions:
+* Tagging global variables.
+    - Just like procedure and structure tags.
+    - Use `runtime.info.tagged_globals` and `runtime.info.get_globals_with_tag()`
+* `string.to_cstr_on_stack`
+
+Removals:
+
+Changes:
+
+Bugfixes:
+
+
+
+Release v0.1.5
+-----------
+18th July 2023
 
 Additions:
 - Added ability to control the size of the tag type for tagged unions.

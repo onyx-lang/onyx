@@ -272,6 +272,8 @@ network_to_host :: #match #local {}
 
         if would_block do return .ReadLater, bytes_read;
 
+        if bytes_read == 0 do return .EOF, bytes_read;
+
         return .None, bytes_read;
     },
 

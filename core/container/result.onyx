@@ -26,7 +26,7 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
 
 #inject Result {
     #doc "Returns true if the result contains an Ok value."
-    is_ok :: (r: #Self) {
+    is_ok :: (r: #Self) -> bool {
         switch r {
             case .Ok do return true;
             case #default do return false;
@@ -34,7 +34,7 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
     }
 
     #doc "Returns true if the result contains an Err value."
-    is_err :: (r: #Self) {
+    is_err :: (r: #Self) -> bool {
         switch r {
             case .Err do return true;
             case #default do return false;

@@ -131,12 +131,14 @@ free :: (arena: &Arena) {
 #doc "Clears and frees every page, except for first page."
 clear :: (arena: &Arena) {
     walker := arena.first_arena.next;
+
     while walker != null {
         next := walker.next;
         raw_free(arena.backing_allocator, walker);
         walker = next;
     }
 
+    arena.first_arena.next = null;
     arena.size = sizeof rawptr;
 }
 

@@ -118,15 +118,15 @@ any_member :: #match #locked {
    
     `m` would have two keys, "x" and "y".
 """
-any_to_map :: (v: any) -> (Map(str, any), success: bool) {
+any_to_map :: (v: any) -> ? Map(str, any) {
     vals := v;
-    if get_type_info(vals.type).kind == .Pointer {
+    if vals.type->info().kind == .Pointer {
         vals = any_dereference(vals);
     }
 
-    val_info := cast(&Type_Info_Struct) get_type_info(vals.type);
+    val_info := vals.type->info()->as_struct();
     if val_info.kind != .Struct {
-        return .{}, false;
+        return .{};
     }
 
     out: Map(str, any);
@@ -134,7 +134,7 @@ any_to_map :: (v: any) -> (Map(str, any), success: bool) {
         out->put(it.name, any_selector(vals, it.name));
     }
 
-    return out, true;
+    return out;
 }
 
 #doc "Creates an iterator out of an array-like any."

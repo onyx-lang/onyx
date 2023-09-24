@@ -35,7 +35,7 @@ if [ "$USE_DYNCALL" = "1" ]; then
     FLAGS="$FLAGS -DUSE_DYNCALL"
 fi
 
-sudo mkdir -p "$BIN_DIR"
+mkdir -p "$BIN_DIR"
 
 echo "Compiling onyx..."
 $CC -o "../bin/onyx" \
@@ -46,7 +46,7 @@ $CC -o "../bin/onyx" \
     $LIBS
 
 echo "Installing onyx executable"
-sudo cp "../bin/onyx" "$BIN_DIR/onyx"
+cp "../bin/onyx" "$BIN_DIR/onyx"
 
 C_FILES="onyxrun wasm_runtime "
 
@@ -58,4 +58,4 @@ $CC -o "../bin/onyx-run" \
     $LIBS
 
 echo "Installing onyx-run executable"
-sudo cp "../bin/onyx-run" "$BIN_DIR/onyx-run"
+cp "../bin/onyx-run" "$BIN_DIR/onyx-run"

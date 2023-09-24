@@ -119,12 +119,22 @@ static inline b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, 
     return 1;
 }
 
-const char* token_name(TokenType tkn_type) {
+const char *token_type_name(TokenType tkn_type) {
     if (tkn_type < Token_Type_Ascii_End) {
         return bh_aprintf(global_scratch_allocator, "%c", (char) tkn_type);
     } else {
         return token_type_names[tkn_type - Token_Type_Ascii_End];
     }
+}
+
+const char* token_name(OnyxToken * tkn) {
+    TokenType tkn_type = tkn->type;
+
+    if (tkn_type == Token_Type_Symbol) {
+        return bh_aprintf(global_scratch_allocator, "%b", tkn->text, tkn->length);
+    }
+
+    return token_type_name(tkn_type);
 }
 
 void token_toggle_end(OnyxToken* tkn) {

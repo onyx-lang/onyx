@@ -112,7 +112,8 @@ typedef struct OnyxTokenizer {
     bh_arr(OnyxToken) tokens;
 } OnyxTokenizer;
 
-const char* token_name(TokenType tkn_type);
+const char *token_type_name(TokenType tkn_type);
+const char* token_name(OnyxToken *tkn);
 void token_toggle_end(OnyxToken* tkn);
 OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer);
 OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc);

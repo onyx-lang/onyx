@@ -1191,3 +1191,157 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
 #undef PATCH
 }
 
+
+static u64 build_tagged_globals(OnyxWasmModule *module) {
+    bh_arr(u32) base_patch_locations=NULL;
+    bh_arr_new(global_heap_allocator, base_patch_locations, 256);
+
+#define PATCH (bh_arr_push(base_patch_locations, tag_global_buffer.length))
+#define WRITE_PTR(val) \
+    bh_buffer_align(&tag_global_buffer, POINTER_SIZE); \
+    PATCH; \
+    if (POINTER_SIZE == 4) bh_buffer_write_u32(&tag_global_buffer, val); \
+    if (POINTER_SIZE == 8) bh_buffer_write_u64(&tag_global_buffer, val); 
+#define WRITE_SLICE(ptr, count) \
+    WRITE_PTR(ptr); \
+    if (POINTER_SIZE == 4) bh_buffer_write_u32(&tag_global_buffer, count); \
+    if (POINTER_SIZE == 8) bh_buffer_write_u64(&tag_global_buffer, count); 
+
+    #if (POINTER_SIZE == 4)
+        #define Tagged_Global_Type u32
+    #else
+        #define Tagged_Global_Type u64
+    #endif
+    u32 global_count = bh_arr_length(module->globals_with_tags);
+    Tagged_Global_Type* tag_global_info = bh_alloc_array(global_heap_allocator, Tagged_Global_Type, global_count); // HACK
+    memset(tag_global_info, 0, global_count * sizeof(Tagged_Global_Type));
+
+    bh_buffer tag_global_buffer;
+    bh_buffer_init(&tag_global_buffer, global_heap_allocator, 4096);
+
+    u32 global_info_data_id = NEXT_DATA_ID(module);
+
+    ConstExprContext constexpr_ctx;
+    constexpr_ctx.module = module;
+    constexpr_ctx.data_id = global_info_data_id;
+
+    // 
+    // This is necessary because 0 is an invalid offset to store in this
+    // buffer, as 0 will map to NULL. This could be a single byte insertion,
+    // but 64 bytes keeps better alignment.
+    bh_buffer_write_u64(&tag_global_buffer, 0);
+
+    u32 index = 0;
+    bh_arr_each(AstMemRes *, pmemres, module->globals_with_tags) {
+        AstMemRes *memres = *pmemres;
+
+        u32 tag_count = bh_arr_length(memres->tags);
+        u32 *tag_data_offsets = bh_alloc_array(global_scratch_allocator, u32, tag_count);
+        u32 *tag_data_types   = bh_alloc_array(global_scratch_allocator, u32, tag_count);
+
+        u32 tag_index = 0;
+        bh_arr_each(AstTyped *, ptag, memres->tags) {
+            AstTyped *tag = *ptag;
+            bh_buffer_align(&tag_global_buffer, type_alignment_of(tag->type));
+
+            tag_data_offsets[tag_index  ] = tag_global_buffer.length;
+            tag_data_types  [tag_index++] = tag->type->id;
+
+            u32 size = type_size_of(tag->type);
+            bh_buffer_grow(&tag_global_buffer, tag_global_buffer.length + size);
+
+            constexpr_ctx.data = tag_global_buffer.data;
+            emit_constexpr(&constexpr_ctx, tag, tag_global_buffer.length);
+            tag_global_buffer.length += size;
+        }
+
+        bh_buffer_align(&tag_global_buffer, 4);
+        u32 tag_array_base = tag_global_buffer.length;
+        fori (i, 0, tag_count) {
+            PATCH;
+            bh_buffer_write_u32(&tag_global_buffer, tag_data_offsets[i]);
+            bh_buffer_write_u32(&tag_global_buffer, tag_data_types[i]);
+        }
+
+        bh_buffer_align(&tag_global_buffer, 4);
+        tag_global_info[index++] = tag_global_buffer.length;
+
+        assert(memres->entity && memres->entity->package);
+
+        DatumPatchInfo patch;
+        patch.kind = Datum_Patch_Data;
+        patch.index = global_info_data_id;
+        patch.location = tag_global_buffer.length;
+        patch.offset = 0;
+        patch.data_id = 0;
+        patch.node_to_use_if_data_id_is_null = (AstNode *) memres;
+        bh_arr_push(module->data_patches, patch);
+
+        bh_buffer_write_u32(&tag_global_buffer, 0);
+        bh_buffer_write_u32(&tag_global_buffer, memres->type->id);
+        WRITE_SLICE(tag_array_base, tag_count);
+        bh_buffer_write_u32(&tag_global_buffer, memres->entity->package->id);
+    }
+
+    if (context.options->verbose_output == 1) {
+        bh_printf("Tagged global size: %d bytes.\n", tag_global_buffer.length);
+    }
+
+    WasmDatum global_info_data = {
+        .alignment = 8,
+        .length = tag_global_buffer.length,
+        .data = tag_global_buffer.data,
+    };
+    emit_data_entry(module, &global_info_data);
+    assert(global_info_data.id == global_info_data_id);
+
+    bh_arr_each(u32, patch_loc, base_patch_locations) {
+        DatumPatchInfo patch;
+        patch.kind = Datum_Patch_Relative;
+        patch.data_id = global_info_data.id;
+        patch.location = *patch_loc;
+        patch.index = global_info_data.id;
+        patch.offset = 0;
+        bh_arr_push(module->data_patches, patch);
+    }
+
+    WasmDatum global_table_data = {
+        .alignment = POINTER_SIZE,
+        .length = global_count * POINTER_SIZE,
+        .data = tag_global_info,
+    };
+    emit_data_entry(module, &global_table_data);
+
+    fori (i, 0, global_count) {
+        DatumPatchInfo patch;
+        patch.kind = Datum_Patch_Data;
+        patch.data_id = global_info_data.id;
+        patch.offset = tag_global_info[i];
+        patch.index = global_table_data.id;
+        patch.location = i * POINTER_SIZE;
+        bh_arr_push(module->data_patches, patch);
+    }
+
+    Tagged_Procedure_Type* tmp_data = bh_alloc(global_heap_allocator, 2 * POINTER_SIZE);
+    tmp_data[0] = 0;
+    tmp_data[1] = global_count;
+    WasmDatum global_table_global_data = {
+        .alignment = POINTER_SIZE,
+        .length = 2 * POINTER_SIZE,
+        .data = tmp_data,
+    };
+    emit_data_entry(module, &global_table_global_data);
+
+    {
+        DatumPatchInfo patch;
+        patch.kind = Datum_Patch_Data;
+        patch.offset = 0;
+        patch.data_id = global_table_data.id;
+        patch.index = global_table_global_data.id;
+        patch.location = 0;
+        bh_arr_push(module->data_patches, patch);
+    }
+
+    return global_table_global_data.id;
+}
+

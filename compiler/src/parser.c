@@ -127,7 +127,7 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type) {
     consume_token(parser);
 
     if (token->type != token_type) {
-        onyx_report_error(token->pos, Error_Critical, "expected token '%s', got '%s'.", token_name(token_type), token_name(token->type));
+        onyx_report_error(token->pos, Error_Critical, "expected token '%s', got '%s'.", token_type_name(token_type), token_name(token));
         parser->hit_unexpected_token = 1;
         // :LinearTokenDependent
         parser->curr = &parser->tokenizer->tokens[bh_arr_length(parser->tokenizer->tokens) - 1];
@@ -620,7 +620,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             }
 
             if (parser->curr->type != '{') {
-                onyx_report_error(parser->curr->pos, Error_Critical, "Expected '{' after 'do', got '%s'.", token_name(parser->curr->type));
+                onyx_report_error(parser->curr->pos, Error_Critical, "Expected '{' after 'do', got '%s'.", token_name(parser->curr));
                 retval = NULL;
                 break;
             }
@@ -906,7 +906,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
         default:
         no_match:
-            onyx_report_error(parser->curr->pos, Error_Critical, "Unexpected token '%s'.", token_name(parser->curr->type));
+            onyx_report_error(parser->curr->pos, Error_Critical, "Unexpected token '%s'.", token_name(parser->curr));
             return NULL;
     }
 
@@ -1492,7 +1492,7 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
         bh_arr_push(parser->current_symbol_stack, symbol);
         AstBinding* binding = parse_top_level_binding(parser, symbol);
         bh_arr_pop(parser->current_symbol_stack);
-        if (parser->hit_unexpected_token) return 2;
+        if (parser->hit_unexpected_token || !binding) return 2;
 
         ENTITY_SUBMIT(binding);
         return 2;
@@ -2362,7 +2362,7 @@ static AstUnionType* parse_union(OnyxParser* parser) {
         AstType *backing_type = parse_type(parser);
         u_node->tag_backing_type = backing_type;
     } else {
-        u_node->tag_backing_type = &basic_type_u32;
+        u_node->tag_backing_type = (AstType *) &basic_type_u32;
     }
 
     if (consume_token_if_next(parser, '(')) {
@@ -3198,11 +3198,11 @@ static AstIf* parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statem
 static AstMemRes* parse_memory_reservation(OnyxParser* parser, OnyxToken* symbol, b32 threadlocal) {
     expect_token(parser, ':');
 
-    expect_no_stored_tags(parser);
-
     AstMemRes* memres = make_node(AstMemRes, Ast_Kind_Memres);
     memres->threadlocal = threadlocal;
     memres->token = symbol;
+
+    flush_stored_tags(parser, &memres->tags);
 
     if (parser->curr->type != '=')
         memres->type_node = parse_type(parser);
@@ -3742,7 +3742,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
                 if (symbol_token->type > Token_Type_Keyword_Start && symbol_token->type < Token_Type_Keyword_End) {
                     onyx_report_error(directive_token->pos, Error_Critical, "Did you mean the keyword, '%s'?",
-                        token_name(symbol_token->type));
+                        token_name(symbol_token));
                 }
 
                 return;

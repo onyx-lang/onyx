@@ -770,7 +770,7 @@ run_command_and_forward_output :: (cmd: str) => {
     run_proc := os.process_spawn(prog, args);
     r := io.reader_make(&run_proc);
 
-    while !(r->empty()) {
+    while !r->empty() {
         line := r->read_line(consume_newline=true);
         print(line);
     }
