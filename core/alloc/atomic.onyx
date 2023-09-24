@@ -1,5 +1,8 @@
 package core.alloc.atomic
 
+// This can only be used when the core.sync package exists.
+#if #defined(package core.sync) {
+
 //
 // AtomicAllocator wraps another allocator in a mutex,
 // ensuring that every allocation is thread-safe. This
@@ -36,3 +39,4 @@ atomic_alloc :: (atomic: &AtomicAllocator, aa: AllocationAction, size: u32, alig
 }
 
 
+}
