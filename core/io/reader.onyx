@@ -98,6 +98,14 @@ read_all :: (use reader: &Reader, allocator := context.allocator) -> [] u8 {
     output := array.make(u8, 128, allocator=allocator);
 
     while !reader_empty(reader) {
+        buffered := reader_get_buffered(reader);
+        if buffered > 0 {
+            array.ensure_capacity(&output, output.count + buffered);
+            memory.copy(output.data + output.count, buffer.data, buffered);
+            output.count += buffered;
+            start = end;
+        }
+
         if err := reader_read_next_chunk(reader); err != .None && err != .ReadPending {
             break;
         }
@@ -105,14 +113,6 @@ read_all :: (use reader: &Reader, allocator := context.allocator) -> [] u8 {
         if error != .None && error != .ReadPending && error != .EOF {
             reader_consume_error(reader);
             break;
-        }
-
-        buffered := reader_get_buffered(reader);
-        if buffered > 0 {
-            array.ensure_capacity(&output, output.count + buffered);
-            memory.copy(output.data + output.count, buffer.data, buffered);
-            output.count += buffered;
-            start = end;
         }
     }
 
@@ -206,13 +206,13 @@ read_fill_buffer :: (use reader: &Reader, bytes: [] u8) -> Error {
 
     write_index := 0;
     while n > 0 && !reader_empty(reader) {
-        reader_read_next_chunk(reader);
-
-        to_write := math.min(n, end);
-        memory.copy(bytes.data + write_index, buffer.data, to_write);
+        to_write := math.min(n, end - start);
+        memory.copy(bytes.data + write_index, buffer.data + start, to_write);
         n -= to_write;
         write_index += to_write;
         start += to_write;
+
+        reader_read_next_chunk(reader);
     }
 
     last_byte = cast(i32) bytes[write_index - 1];
@@ -336,8 +336,7 @@ read_line :: (use reader: &Reader, consume_newline := true, allocator := context
         return buffer[start .. count];
     }
 
-    out: [..] u8;
-    array.init(&out, allocator=allocator);
+    out := make(dyn_str, allocator);
 
     while done := false; !done {
         if start == end {
@@ -406,8 +405,7 @@ read_word :: (use reader: &Reader, numeric_allowed := false, allocator := contex
         return buffer[start .. count];
     }
 
-    out: [..] u8;
-    array.init(&out, allocator=allocator);
+    out := make(dyn_str, allocator);
 
     while done := false; !done {
         count := start;
@@ -473,8 +471,7 @@ read_until :: (use reader: &Reader, until: u8, skip: u32 = 0, allocator := conte
         return buffer[start .. count];
     }
 
-    out: [..] u8;
-    array.init(&out, allocator=allocator);
+    out := make(dyn_str, allocator);
 
     while done := false; !done {
         count := start;

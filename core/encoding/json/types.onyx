@@ -244,23 +244,25 @@ set :: #match {
 
     // Quick thing for allocating json values on the stack.
     macro (v: Value, key: str, value: str,
-           dont_copy_key := false, dont_copy_value := false) {
+           dont_copy_key := false, dont_copy_value := false) -> i32 {
         _Value_String :: _Value_String;
         _Value_Object :: _Value_Object;
+        _Value :: _Value
+        Value :: Value
 
         use core {string}
 
         v_ := cast(^_Value) v;
-        if v_.type == .Object {
-            k := key if dont_copy_key else string.alloc_copy(key);
-            v := value if dont_copy_value else string.alloc_copy(value);
+        if v_.type != .Object do return 0;
+        k := key if dont_copy_key else string.alloc_copy(key);
+        val := value if dont_copy_value else string.alloc_copy(value);
 
-            json_value := init(_Value_String);
-            json_value.str_ = v;
-            json_value.dont_free = dont_copy_value;
+        json_value := _Value_String.{
+            str_ = val,
+            dont_free = dont_copy_value
+        };
 
-            (cast(^_Value_Object) v_).object_ << .{ k, dont_copy_key, ^json_value };
-        }
+        (cast(^_Value_Object) v_).object_ << .{ k, dont_copy_key, ~~ cast(&_Value) ^json_value };
     }
 }
 

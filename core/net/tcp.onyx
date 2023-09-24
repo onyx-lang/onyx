@@ -350,6 +350,19 @@ wait_to_get_client_messages :: (use server: &TCP_Server) -> [] &TCP_Server.Clien
         }
     }
 
+    //
+    // If there are no "active" clients, but we are hitting this function,
+    // there are clients, but they are still being processed with .ready,
+    // events. If we continue, we will end up waiting for `pulse_time_ms`
+    // seconds, since there is nothing to wake up the polling action. In
+    // a rare chance when this is multi-threaded, waiting could stall other
+    // threads because we haven't pushed new ready events out. So, we have
+    // to immediately return, and enter a sort of complicated "spin loop"
+    // in order to not stall worker threads.
+    if active_clients.count == 0 {
+        return .{ null, 0 };
+    }
+
     status_buffer := alloc.array_from_stack(Socket_Poll_Status, client_count);
     socket_poll_all(cast([] &Socket) active_clients, pulse_time_ms, status_buffer);
 
