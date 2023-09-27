@@ -13,7 +13,8 @@ use runtime.info {
     Type_Info_Slice,
     Type_Info_Dynamic_Array,
 
-    get_struct_member
+    get_struct_member,
+    union_constructed_from
 }
 
 // Either to_any or as_any will work. I prefer `as_any` because
@@ -33,6 +34,19 @@ any_dereference :: (v: any) -> any {
     if t.kind == .Pointer {
         p := cast(&Type_Info_Pointer) t;
         return any.{*cast(&rawptr) v.data, p.to};
+    }
+
+    return v;
+}
+
+#doc "Unwraps an optional any, if the any is an optional. `? T -> T`"
+any_unwrap :: (v: any) -> any {
+    if union_constructed_from(v.type, Optional) {
+        t := v.type->info()->as_union();
+        return any.{
+            cast([&] u8, v.data) + t.alignment,
+            t.variants[1].type
+        };
     }
 
     return v;
