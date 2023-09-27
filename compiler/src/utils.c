@@ -383,6 +383,11 @@ all_types_peeled_off:
             AstDistinctType* dtype = (AstDistinctType *) node;
             return symbol_raw_resolve(dtype->scope, symbol);
         }
+
+        case Ast_Kind_Interface: {
+            AstInterface* inter = (AstInterface *) node;
+            return symbol_raw_resolve(inter->scope, symbol);
+        }
     }
 
     return NULL;
@@ -1410,6 +1415,11 @@ all_types_peeled_off:
         case Ast_Kind_Distinct_Type: {
             AstDistinctType* dtype = (AstDistinctType *) node;
             return &dtype->scope;
+        }
+
+        case Ast_Kind_Interface: {
+            AstInterface* inter = (AstInterface *) node;
+            return &inter->scope;
         }
     }
 

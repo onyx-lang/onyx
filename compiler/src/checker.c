@@ -3567,8 +3567,10 @@ CheckStatus check_constraint(AstConstraint *constraint) {
             }
 
             assert(constraint->interface->entity && constraint->interface->entity->scope);
+            assert(constraint->interface->scope);
+            assert(constraint->interface->scope->parent == constraint->interface->entity->scope);
 
-            constraint->scope = scope_create(context.ast_alloc, constraint->interface->entity->scope, constraint->token->pos);
+            constraint->scope = scope_create(context.ast_alloc, constraint->interface->scope, constraint->token->pos);
 
             if (bh_arr_length(constraint->type_args) != bh_arr_length(constraint->interface->params)) {
                 ERROR_(constraint->token->pos, "Wrong number of arguments given to interface. Expected %d, got %d.",

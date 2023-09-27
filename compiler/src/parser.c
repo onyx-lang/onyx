@@ -2484,9 +2484,23 @@ static AstInterface* parse_interface(OnyxParser* parser) {
 
     bh_arr_new(global_heap_allocator, interface->exprs, 2);
 
+    type_create_scope(parser, &interface->scope, interface->token);
+    parser->current_scope = interface->scope;
+
     expect_token(parser, '{');
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) return interface;
+
+        if (next_tokens_are(parser, 3, Token_Type_Symbol, ':', ':')) {
+            OnyxToken* binding_name = expect_token(parser, Token_Type_Symbol);
+            consume_token(parser);
+
+            AstBinding* binding = parse_top_level_binding(parser, binding_name);
+            if (binding) ENTITY_SUBMIT(binding);
+
+            consume_token_if_next(parser, ';');
+            continue;
+        }
 
         InterfaceConstraint ic = {0};
         if (parse_possible_directive(parser, "not")) {
@@ -2510,6 +2524,7 @@ static AstInterface* parse_interface(OnyxParser* parser) {
         expect_token(parser, ';');
     }
 
+    parser->current_scope = parser->current_scope->parent;
     return interface;
 }
 

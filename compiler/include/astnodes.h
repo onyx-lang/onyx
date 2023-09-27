@@ -1213,6 +1213,8 @@ struct AstInterface {
     bh_arr(InterfaceParam)      params;
     bh_arr(InterfaceConstraint) exprs;
 
+    Scope *scope;
+
     b32 is_intrinsic: 1;
 };
 
