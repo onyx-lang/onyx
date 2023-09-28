@@ -119,6 +119,7 @@ struct ovm_engine_t {
 
 ovm_engine_t *ovm_engine_new(ovm_store_t *store);
 void          ovm_engine_delete(ovm_engine_t *engine);
+void          ovm_engine_enable_debug(ovm_engine_t *engine, debug_state_t *debug);
 bool          ovm_engine_memory_ensure_capacity(ovm_engine_t *engine, i64 minimum_size);
 void          ovm_engine_memory_copy(ovm_engine_t *engine, i64 target, void *data, i64 size);
 

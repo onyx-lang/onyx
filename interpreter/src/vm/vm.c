@@ -3,6 +3,7 @@
 #include "vm.h"
 
 #include <sys/mman.h>
+#include <signal.h>
 #include <x86intrin.h>
 #include <math.h> // REMOVE THIS!!!  only needed for sqrt
 #include <pthread.h>
@@ -170,6 +171,29 @@ void ovm_engine_delete(ovm_engine_t *engine) {
     }
     
     bh_free(store->heap_allocator, engine);
+}
+
+static i32 hit_signaled_exception = 0;
+static void signal_handler(int signo, siginfo_t *info, void *context) {
+    hit_signaled_exception = 1;
+}
+
+void ovm_engine_enable_debug(ovm_engine_t *engine, debug_state_t *debug) {
+    engine->debug = debug;
+
+    struct sigaction sa;
+    sa.sa_sigaction = signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART | SA_SIGINFO;
+
+    sigaction(SIGQUIT, &sa, NULL);
+    sigaction(SIGPIPE, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGHUP, &sa, NULL);
+
+    // sigaction(SIGSEGV, &sa, NULL);
+    // sigaction(SIGFPE, &sa, NULL);
+    // sigaction(SIGINT, &sa, NULL);   Don't overload Ctrl+C
 }
 
 bool ovm_engine_memory_ensure_capacity(ovm_engine_t *engine, i64 minimum_size) {
@@ -413,6 +437,12 @@ static void __ovm_trigger_exception(ovm_state_t *state) {
 static void __ovm_debug_hook(ovm_engine_t *engine, ovm_state_t *state) {
     if (!state->debug) return;
 
+    if (hit_signaled_exception) {
+        __ovm_trigger_exception(state);
+        hit_signaled_exception = 0;
+        return;
+    }
+
     if (state->debug->run_count == 0) {
         state->debug->state = debug_state_pausing;
 
@@ -466,12 +496,14 @@ static void __ovm_debug_hook(ovm_engine_t *engine, ovm_state_t *state) {
 #define OVMI_DISPATCH_NAME ovmi_dispatch
 #define OVMI_DEBUG_HOOK ((void)0)
 #define OVMI_EXCEPTION_HOOK ((void)0)
+#define OVMI_DIVIDE_CHECK_HOOK(_) ((void)0)
 #include "./vm_instrs.h"
 
 #define OVMI_FUNC_NAME(n) ovmi_exec_debug_##n
 #define OVMI_DISPATCH_NAME ovmi_debug_dispatch
 #define OVMI_DEBUG_HOOK __ovm_debug_hook(state->engine, state)
 #define OVMI_EXCEPTION_HOOK __ovm_trigger_exception(state)
+#define OVMI_DIVIDE_CHECK_HOOK(ctype) if (VAL(instr->b).ctype == 0) __ovm_trigger_exception(state)
 #include "./vm_instrs.h"
 
 ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program) {
@@ -480,7 +512,9 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
     ovm_assert(program);
 
     ovmi_instr_exec_t *exec_table = ovmi_dispatch;
-    if (state->debug) exec_table = ovmi_debug_dispatch;
+    if (state->debug) {
+        exec_table = ovmi_debug_dispatch;
+    }
 
     ovm_instr_t *code = program->code;
     u8 *memory = engine->memory;
