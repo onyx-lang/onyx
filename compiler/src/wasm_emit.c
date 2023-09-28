@@ -3584,8 +3584,15 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
                     emit_stack_address(mod, &code, intermediate_local + type_alignment_of(field->type), field->token);
                     WIL(NULL, WI_LOCAL_GET, source_base_ptr);
-                    WIL(NULL, WI_I32_CONST, type_alignment_of(field->expr->type));
+
+                    if (type_is_pointer(field->expr->type)) {
+                        WIL(NULL, WI_I32_CONST, type_alignment_of(field->expr->type->Pointer.elem));
+                    } else {
+                        WIL(NULL, WI_I32_CONST, type_alignment_of(field->expr->type));
+                    }
+                    
                     WI(NULL, WI_I32_ADD);
+
                     WIL(NULL, WI_I32_CONST, type_size_of(field->type->Union.variants_ordered[1]->type));
                     emit_wasm_copy(mod, &code, NULL);
 
