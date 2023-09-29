@@ -881,7 +881,7 @@ typedef enum SwitchKind {
 typedef struct CaseToBlock {
     AstTyped *original_value;
     AstBinaryOp *comparison;
-    AstBlock *block;
+    AstSwitchCase *casestmt;
 } CaseToBlock;
 
 struct AstSwitchCase {
@@ -890,16 +890,21 @@ struct AstSwitchCase {
     // NOTE: All expressions that end up in this block
     bh_arr(AstTyped *) values;
 
-    AstBlock *block;
+    union {
+        AstBlock *block;
+        AstTyped *expr;
+    };
 
     AstLocal *capture;
+    Scope *scope; // Scope for the capture
 
     b32 is_default: 1; // Could this be inferred by the values array being null?
     b32 capture_is_by_pointer: 1;
+    b32 body_is_expr : 1;
 };
 
 struct AstSwitch {
-    AstNode_base;
+    AstTyped_base;
 
     Scope *scope;
     AstNode* initialization;
@@ -917,6 +922,8 @@ struct AstSwitch {
     // NOTE: This is an array of "bools" that says which union variants have
     // been handled.
     u8 *union_variants_handled;
+
+    b32 is_expr;
 
     union {
         struct {

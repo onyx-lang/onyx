@@ -405,25 +405,23 @@ parse_and_write_utf8_character :: (s: str, out: [&] u8) -> (i32, i32) {
     return 0, 0;
 
     digit_to_hex :: (c: u8) -> i32 {
-        switch c {
-            case #char "0" do return 0;
-            case #char "1" do return 1;
-            case #char "2" do return 2;
-            case #char "3" do return 3;
-            case #char "4" do return 4;
-            case #char "5" do return 5;
-            case #char "6" do return 6;
-            case #char "7" do return 7;
-            case #char "8" do return 8;
-            case #char "9" do return 9;
-            case #char "A", #char "a" do return 10;
-            case #char "B", #char "b" do return 11;
-            case #char "C", #char "c" do return 12;
-            case #char "D", #char "d" do return 13;
-            case #char "E", #char "e" do return 14;
-            case #char "F", #char "f" do return 15;
-        }
-
-        return 0;
+        return switch c {
+            case '0' => 0;
+            case '1' => 1;
+            case '2' => 2;
+            case '3' => 3;
+            case '4' => 4;
+            case '5' => 5;
+            case '6' => 6;
+            case '7' => 7;
+            case '8' => 8;
+            case '9' => 9;
+            case 'A', 'a' => 10;
+            case 'B', 'b' => 11;
+            case 'C', 'c' => 12;
+            case 'D', 'd' => 13;
+            case 'E', 'e' => 14;
+            case 'F', 'f' => 15;
+        };
     }
 }

@@ -27,34 +27,34 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
 #inject Result {
     #doc "Returns true if the result contains an Ok value."
     is_ok :: (r: #Self) -> bool {
-        switch r {
-            case .Ok do return true;
-            case #default do return false;
-        }
+        return switch r {
+            case .Ok => true;
+            case #default => false;
+        };
     }
 
     #doc "Returns true if the result contains an Err value."
     is_err :: (r: #Self) -> bool {
-        switch r {
-            case .Err do return true;
-            case #default do return false;
-        }
+        return switch r {
+            case .Err => true;
+            case #default => false;
+        };
     }
 
     #doc "Returns an Optional of the Ok type."
     ok :: (r: #Self) -> Optional(r.Ok_Type) {
-        switch r {
-            case .Ok => v do return v;
-            case #default do return .{};
-        }
+        return switch r {
+            case v: .Ok => Optional.make(v);
+            case #default => .{};
+        };
     }
 
     #doc "Returns an Optional of the Err type."
     err :: (r: #Self) -> Optional(r.Err_Type) {
-        switch r {
-            case .Err => v do return v;
-            case #default do return .{};
-        }
+        return switch r {
+            case v: .Err => Optional.make(v);
+            case #default => .{};
+        };
     }
 
     #doc """
@@ -63,8 +63,8 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
     """
     unwrap :: (r: #Self) -> r.Ok_Type {
         switch r {
-            case .Ok => v do return v;
-            case .Err => err {
+            case v: .Ok do return v;
+            case err: .Err {
                 msg := tprintf("Unwrapping Result with error '{}'.", err);
                 assert(false, msg);
                 return .{};
@@ -77,10 +77,10 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
         result contains an Err, the empty .{} value is returned.
     """
     unwrap_or_default :: (r: #Self) -> r.Ok_Type {
-        switch r {
-            case .Ok => v do return v;
-            case #default do return .{};
-        }
+        return switch r {
+            case v: .Ok => v;
+            case #default => .{};
+        };
     }
 
     #doc """
@@ -89,7 +89,7 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
     """
     expect :: (r: #Self, msg: str) -> r.Ok_Type {
         switch r {
-            case .Ok => v do return v;
+            case v: .Ok do return v;
             case #default {
                 assert(false, msg);
             }
@@ -102,26 +102,26 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
             Err(e) => Err(e)
     """
     transform :: (r: Result($T, $E), f: (T) -> $R) -> Result(R, E) {
-        switch r {
-            case .Ok => v  do return .{ Ok = f(v) };
-            case .Err => v do return .{ Err = v };
-        }
+        return switch r {
+            case v: .Ok => .{ Ok = f(v) };
+            case v: .Err => .{ Err = v };
+        };
     }
 
     #doc "Monadic chaining operation."
     and_then :: (r: #Self, f: (r.Ok_Type) -> Result($R, r.Err_Type)) -> Result(R, r.Err_Type) {
-        switch r {
-            case .Ok => v  do return f(v);
-            case .Err => v do return .{ Err = v };
-        }
+        return switch r {
+            case v: .Ok  => f(v);
+            case v: .Err => .{ Err = v };
+        };
     }
 
     #doc "If the Result contains Err, generate is called to make a value"
     or_else :: (r: #Self, generate: () -> typeof r) => {
-        switch r {
-            case .Ok => v do return v;
-            case #default do return generate();
-        }
+        return switch r {
+            case v: .Ok   => v;
+            case #default => generate();
+        };
     }
 
     #doc """
@@ -142,8 +142,8 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
     """
     forward_err :: macro (r: Result($T, $E)) -> T {
         switch res := r; res {
-            case .Ok => v  do return v;
-            case .Err => v do return return .{ Err = v };
+            case v: .Ok  do return v;
+            case v: .Err do return return .{ Err = v };
         }
     }
 
@@ -153,7 +153,7 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
     """
     or_return :: macro (r: Result($T, $E), v: $V) -> T {
         switch res := r; res {
-            case .Ok => v  do return v;
+            case v: .Ok  do return v;
             case .Err do return return v;
         }
     }
@@ -168,8 +168,8 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
     """
     catch :: macro (r: Result($T, $E), on_err: Code) -> T {
         switch res := r; res {
-            case .Ok => v  do return v;
-            case .Err => err {
+            case v: .Ok  do return v;
+            case err: .Err {
                 #unquote on_err(err);
             }
         }
@@ -182,16 +182,16 @@ __implicit_bool_cast :: macro (r: Result($O, $E)) => cast(Result(O, E).tag_enum,
 
 #operator ? macro (r: Result($T, $E)) -> T {
     switch res := r; res {
-        case .Ok => v  do return v;
-        case .Err => v do return return .{ Err = v };
+        case v: .Ok do return v;
+        case v: .Err do return return .{ Err = v };
     }
 }
 
 #operator ?? macro (r: Result($T, $E), v: T) -> T {
-    switch res := r; res {
-        case .Ok => v do return v;
-        case .Err do return v;
-    }
+    return switch res := r; res {
+        case val: .Ok => val;
+        case .Err => v;
+    };
 }
 
 

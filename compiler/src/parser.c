@@ -50,7 +50,7 @@ static AstIfWhile*    parse_if_stmt(OnyxParser* parser);
 static AstIfWhile*    parse_while_stmt(OnyxParser* parser);
 static AstFor*        parse_for_stmt(OnyxParser* parser);
 static AstSwitchCase* parse_case_stmt(OnyxParser* parser);
-static AstSwitch*     parse_switch_stmt(OnyxParser* parser);
+static AstSwitch*     parse_switch_stmt(OnyxParser* parser, b32 switch_is_expr);
 static i32            parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret);
 static AstReturn*     parse_return_stmt(OnyxParser* parser);
 static AstBlock*      parse_block(OnyxParser* parser, b32 make_a_new_scope, char* block_name);
@@ -628,6 +628,11 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             do_block->block = parse_block(parser, 1, NULL);
 
             retval = (AstTyped *) do_block;
+            break;
+        }
+
+        case Token_Type_Keyword_Switch: {
+            retval = (AstTyped *) parse_switch_stmt(parser, 1);
             break;
         }
 
@@ -1336,6 +1341,23 @@ static AstSwitchCase* parse_case_stmt(OnyxParser* parser) {
         sc_node->is_default = 1;
 
     } else {
+        if (   next_tokens_are(parser, 3, '&', Token_Type_Symbol, ':')
+            || next_tokens_are(parser, 3, '^', Token_Type_Symbol, ':')
+            || next_tokens_are(parser, 2, Token_Type_Symbol, ':')
+       ) {
+            b32 is_pointer = 0;
+            if (consume_token_if_next(parser, '&') || consume_token_if_next(parser, '^'))
+                is_pointer = 1;
+            
+            OnyxToken *capture_symbol = expect_token(parser, Token_Type_Symbol);
+            AstLocal *capture = make_local(parser->allocator, capture_symbol, NULL);
+            
+            sc_node->capture = capture;
+            sc_node->capture_is_by_pointer = is_pointer;
+
+            expect_token(parser, ':');
+        }
+
         bh_arr_new(global_heap_allocator, sc_node->values, 1);
 
         parser->parse_quick_functions = 0;
@@ -1352,26 +1374,19 @@ static AstSwitchCase* parse_case_stmt(OnyxParser* parser) {
     }
 
     if (consume_token_if_next(parser, Token_Type_Fat_Right_Arrow)) {
-        // Captured value for union switching
-        b32 is_pointer = 0;
-        if (consume_token_if_next(parser, '&') || consume_token_if_next(parser, '^'))
-            is_pointer = 1;
-        
-        OnyxToken *capture_symbol = expect_token(parser, Token_Type_Symbol);
-        AstLocal *capture = make_local(parser->allocator, capture_symbol, NULL);
-        
-        sc_node->capture = capture;
-        sc_node->capture_is_by_pointer = is_pointer;
+        sc_node->expr = parse_expression(parser, 0);
+        sc_node->body_is_expr = 1;
+    } else {
+        sc_node->block = parse_block(parser, 1, NULL);
     }
-
-    sc_node->block = parse_block(parser, 1, NULL);
 
     return sc_node;
 }
 
-static AstSwitch* parse_switch_stmt(OnyxParser* parser) {
+static AstSwitch* parse_switch_stmt(OnyxParser* parser, b32 switch_is_expr) {
     AstSwitch* switch_node = make_node(AstSwitch, Ast_Kind_Switch);
     switch_node->token = expect_token(parser, Token_Type_Keyword_Switch);
+    switch_node->is_expr = switch_is_expr;
 
     AstTyped* expr;
     AstNode* initialization_or_expr=NULL;
@@ -1642,7 +1657,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
 
         case Token_Type_Keyword_Switch:
             needs_semicolon = 0;
-            retval = (AstNode *) parse_switch_stmt(parser);
+            retval = (AstNode *) parse_switch_stmt(parser, 0);
             break;
 
         case Token_Type_Keyword_Case:
