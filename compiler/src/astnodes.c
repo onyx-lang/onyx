@@ -770,6 +770,34 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         }
     }
 
+    if (node->kind == Ast_Kind_Switch) {
+        AstSwitch *switchnode = (AstSwitch *) node;
+        if (!switchnode->is_expr) return TYPE_MATCH_FAILED;
+
+        if (switchnode->cases == NULL) return TYPE_MATCH_YIELD;
+
+        bh_arr_each(AstSwitchCase *, pcasestmt, switchnode->cases) {
+            AstSwitchCase *casestmt = *pcasestmt;
+            if (!casestmt->body_is_expr) continue;
+
+            switch (unify_node_and_type_(&casestmt->expr, type, permanent)) {
+                case TYPE_MATCH_SUCCESS: break;
+                case TYPE_MATCH_FAILED: return TYPE_MATCH_FAILED;
+                case TYPE_MATCH_YIELD: return TYPE_MATCH_YIELD;
+            }
+        }
+
+        if (switchnode->default_case) {
+            switch (unify_node_and_type_((AstTyped **) &switchnode->default_case, type, permanent)) {
+                case TYPE_MATCH_SUCCESS: break;
+                case TYPE_MATCH_FAILED: return TYPE_MATCH_FAILED;
+                case TYPE_MATCH_YIELD: return TYPE_MATCH_YIELD;
+            }
+        }
+
+        if (permanent) switchnode->type = type;
+        return TYPE_MATCH_SUCCESS;
+    }
 
     // If the destination type is an optional, and the node's type is a value of
     // the same underlying type, then we can construct an optional with a value

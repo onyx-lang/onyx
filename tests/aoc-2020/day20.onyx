@@ -180,18 +180,17 @@ apply_orientation :: (t: &Tile, ori: TO) {
 }
 
 index_square_with_orientation :: (data: [&] $T, ori: TO, size: i32, x: i32, y: i32) -> &T {
-    switch ori {
-        case TO.N     do return &data[x + y * size];
-        case TO.R90   do return &data[y + (size - 1 - x) * size];
-        case TO.R180  do return &data[(size - 1 - x) + (size - 1 - y) * size];
-        case TO.R270  do return &data[(size - 1 - y) + x * size];
-        case TO.F     do return &data[x + (size - 1 - y) * size];
-        case TO.FR90  do return &data[y + x * size];
-        case TO.FR180 do return &data[(size - 1 - x) + y * size];
-        case TO.FR270 do return &data[(size - 1 - y) + (size - 1 - x) * size];
-    }
-
-    return null;
+    return switch ori {
+        case TO.N     => &data[x + y * size];
+        case TO.R90   => &data[y + (size - 1 - x) * size];
+        case TO.R180  => &data[(size - 1 - x) + (size - 1 - y) * size];
+        case TO.R270  => &data[(size - 1 - y) + x * size];
+        case TO.F     => &data[x + (size - 1 - y) * size];
+        case TO.FR90  => &data[y + x * size];
+        case TO.FR180 => &data[(size - 1 - x) + y * size];
+        case TO.FR270 => &data[(size - 1 - y) + (size - 1 - x) * size];
+        case #default => null
+    };
 }
 
 sea_monster_width  := 20;

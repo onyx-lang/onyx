@@ -293,26 +293,26 @@ compile_c_file :: (
 
         param_info := get_type_info(t);
         switch param_info.kind {
-            case .Basic do switch t {
-                case bool do return "i32";
-                case i8   do return "i32";
-                case u8   do return "i32";
-                case i16  do return "i32";
-                case u16  do return "i32";
-                case i32  do return "i32";
-                case u32  do return "i32";
-                case i64  do return "i64";
-                case u64  do return "i64";
+            case .Basic do return switch t {
+                case bool => "i32";
+                case i8   => "i32";
+                case u8   => "i32";
+                case i16  => "i32";
+                case u16  => "i32";
+                case i32  => "i32";
+                case u32  => "i32";
+                case i64  => "i64";
+                case u64  => "i64";
 
-                case f32  do return "f32";
-                case f64  do return "f64";
+                case f32  => "f32";
+                case f64  => "f64";
 
-                case rawptr do return "ptr"; 
+                case rawptr => "ptr"; 
                 
-                case i8x16, i16x8, i32x4, i64x2, f32x4, f64x2, v128 do return "v128";
+                case i8x16, i16x8, i32x4, i64x2, f32x4, f64x2, v128 => "v128";
 
-                case type_expr do return "i32";
-            }
+                case type_expr => "i32";
+            };
 
             case .Pointer do return "ptr"; 
             case .Multi_Pointer do return "ptr"; 
@@ -350,26 +350,26 @@ compile_c_file :: (
 
         param_info := get_type_info(t);
         switch param_info.kind {
-            case .Basic do switch t {
-                case bool do return "WASM_I32";
-                case i8   do return "WASM_I32";
-                case u8   do return "WASM_I32";
-                case i16  do return "WASM_I32";
-                case u16  do return "WASM_I32";
-                case i32  do return "WASM_I32";
-                case u32  do return "WASM_I32";
-                case i64  do return "WASM_I64";
-                case u64  do return "WASM_I64";
+            case .Basic do return switch t {
+                case bool => "WASM_I32";
+                case i8   => "WASM_I32";
+                case u8   => "WASM_I32";
+                case i16  => "WASM_I32";
+                case u16  => "WASM_I32";
+                case i32  => "WASM_I32";
+                case u32  => "WASM_I32";
+                case i64  => "WASM_I64";
+                case u64  => "WASM_I64";
 
-                case f32  do return "WASM_F32";
-                case f64  do return "WASM_F64";
+                case f32  => "WASM_F32";
+                case f64  => "WASM_F64";
 
-                case rawptr do return "WASM_I32"; // This will have to depend on the pointer size...
+                case rawptr => "WASM_I32"; // This will have to depend on the pointer size...
                 
-                case i8x16, i16x8, i32x4, i64x2, f32x4, f64x2, v128 do return "WASM_V128";
+                case i8x16, i16x8, i32x4, i64x2, f32x4, f64x2, v128 => "WASM_V128";
 
-                case type_expr do return "WASM_I32";
-            }
+                case type_expr => "WASM_I32";
+            };
 
             case .Pointer do return "WASM_I32"; // This will also have to depend on the pointer size...
             case .Multi_Pointer do return "WASM_I32"; // This will also have to depend on the pointer size...

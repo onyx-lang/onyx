@@ -26,15 +26,15 @@ write_type_name :: (writer: &io.Writer, t: type_expr) {
                 case .F32  do io.write_str(writer, "f32");
                 case .F64  do io.write_str(writer, "f64");
 
-                case .Rawptr do return io.write_str(writer, "rawptr");
+                case .Rawptr do io.write_str(writer, "rawptr");
 
-                case .I8X16 do return io.write_str(writer, "i8x16");
-                case .I16X8 do return io.write_str(writer, "i16x8");
-                case .I32X4 do return io.write_str(writer, "i32x4");
-                case .I64X2 do return io.write_str(writer, "i64x2");
-                case .F32X4 do return io.write_str(writer, "f32x4");
-                case .F64X2 do return io.write_str(writer, "f64x2");
-                case .V128  do return io.write_str(writer, "v128");
+                case .I8X16 do io.write_str(writer, "i8x16");
+                case .I16X8 do io.write_str(writer, "i16x8");
+                case .I32X4 do io.write_str(writer, "i32x4");
+                case .I64X2 do io.write_str(writer, "i64x2");
+                case .F32X4 do io.write_str(writer, "f32x4");
+                case .F64X2 do io.write_str(writer, "f64x2");
+                case .V128  do io.write_str(writer, "v128");
 
                 case .Type_Index do io.write_str(writer, "type_expr");
                 case .Unsized_Int do io.write_str(writer, "<unsized int>");
@@ -154,57 +154,57 @@ size_of :: (t: type_expr) -> u32 {
     info := get_type_info(t);
     if info == null do return 0;
 
-    switch info.kind {
-        case .Basic {
+    return switch info.kind {
+        case .Basic => do {
             basic := cast(&Type_Info_Basic) info;
 
-            switch basic.basic_kind {
-                case .Void do return 0;
-                case .Bool, .U8, .I8 do return 1;
-                case .U16, .I16 do return 2;
-                case .U32, .I32, .F32, .Type_Index do return 4;
-                case .U64, .I64, .F64 do return 8;
-                case .I8X16, .I16X8, .I32X4, .I64X2, .F32X4, .F64X2, .V128 do return 16;
-                case .Rawptr do return sizeof rawptr;
+            return switch basic.basic_kind {
+                case .Void => 0;
+                case .Bool, .U8, .I8 => 1;
+                case .U16, .I16 => 2;
+                case .U32, .I32, .F32, .Type_Index => 4;
+                case .U64, .I64, .F64 => 8;
+                case .I8X16, .I16X8, .I32X4, .I64X2, .F32X4, .F64X2, .V128 => 16;
+                case .Rawptr => sizeof rawptr;
 
-                case .Unsized_Int do return 0;
-                case .Unsized_Float do return 0;
-            }
+                case .Unsized_Int => 0;
+                case .Unsized_Float => 0;
+            };
         }
 
-        case .Pointer do return sizeof rawptr;
+        case .Pointer => sizeof rawptr
 
-        case .Array {
+        case .Array => do {
             arr := cast(&Type_Info_Array) info;
             return size_of(arr.of) * arr.count;
         }
 
-        case .Slice do return sizeof str;
-        case .Dynamic_Array do return sizeof [..] void;
-        case .Variadic_Argument do return sizeof str;
-        case .Enum {
+        case .Slice => sizeof str;
+        case .Dynamic_Array => sizeof [..] void;
+        case .Variadic_Argument => sizeof str;
+        case .Enum => do {
             e := cast(&Type_Info_Enum) info;
             return e.size;
         }
 
-        case .Struct {
+        case .Struct => do {
             s := cast(&Type_Info_Struct) info;
             return s.size;
         }
 
-        case .Polymorphic_Struct do return 0;
+        case .Polymorphic_Struct => 0;
 
-        case .Compound do return 0;
+        case .Compound => 0;
 
-        case .Function do return 4;
+        case .Function => 4;
 
-        case .Distinct {
+        case .Distinct => do {
             d := cast(&Type_Info_Distinct) info;
             return size_of(d.base_type);
         }
-    }
 
-    return 0;
+        case #default => 0;
+    };
 }
 
 offset_of :: (T: type_expr, member_name: str) -> u32 {

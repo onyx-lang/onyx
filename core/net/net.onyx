@@ -137,11 +137,11 @@ socket_is_alive :: (s: &Socket) -> bool {
 }
 
 socket_connect :: (s: &Socket, host: str, port: u16 = 0) -> SocketError {
-    switch s.family {
-        case .Inet do return __net_connect_ipv4(s.handle, host, port);
-        case .Unix do return __net_connect_unix(s.handle, host);
-        case #default do return .BadSettings;
-    }
+    return switch s.family {
+        case .Inet => __net_connect_ipv4(s.handle, host, port);
+        case .Unix => __net_connect_unix(s.handle, host);
+        case #default => .BadSettings;
+    };
 }
 
 socket_bind :: (s: &Socket, bind_address: &Socket_Address) -> bool {
