@@ -2442,6 +2442,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
                     ERROR_(cl->token->pos, "Cannot pass '%b' by pointer because it is not an l-value.", cl->token->text, cl->token->length);
                 }
 
+                if (cl->captured_value->kind == Ast_Kind_Local) {
+                    cl->captured_value->flags |= Ast_Flag_Address_Taken;
+                }
+
                 expr->type = type_make_pointer(context.ast_alloc, cl->captured_value->type);
 
             } else {
