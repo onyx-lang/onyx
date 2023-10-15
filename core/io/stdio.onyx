@@ -214,5 +214,13 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
     flush = (_: &io.Stream) -> io.Error {
         __flush_stdio();
         return .None;
+    },
+
+    poll = (_: &io.Stream, ev: io.PollEvent, timeout: i32) -> (io.Error, bool) {
+        // TODO: This might not be right, as maybe sometimes you can't actually
+        // write because a the output was closed?
+        if ev == .Write do return .None, true;
+
+        return .None, runtime.platform.__wait_for_input(timeout);
     }
 }

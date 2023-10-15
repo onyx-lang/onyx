@@ -52,6 +52,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(__file_size)
     ONYX_FUNC(__file_get_standard)
     ONYX_FUNC(__file_rename)
+    ONYX_FUNC(__poll)
 
     ONYX_FUNC(__dir_open)
     ONYX_FUNC(__dir_read)
@@ -96,7 +97,6 @@ ONYX_LIBRARY {
     ONYX_FUNC(__net_sendto)
     ONYX_FUNC(__net_recv)
     ONYX_FUNC(__net_recvfrom)
-    ONYX_FUNC(__net_poll_recv)
     ONYX_FUNC(__net_host_to_net_s)
     ONYX_FUNC(__net_host_to_net_l)
     ONYX_FUNC(__net_net_to_host_s)

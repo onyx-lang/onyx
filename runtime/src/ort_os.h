@@ -53,6 +53,52 @@ ONYX_DEF(__time, (), (WASM_I64)) {
     return NULL;
 }
 
+// ([] PollDescription, timeout: i32) -> void
+// PollDescription :: struct { fd: i64; in_event: PollEvent; out_event: PollEvent; }
+ONYX_DEF(__poll, (WASM_I32, WASM_I32, WASM_I32), ()) {
+    #ifdef _BH_LINUX
+    struct pollfd* fds = alloca(params->data[1].of.i32 * sizeof(struct pollfd));
+
+    for (int i=0; i < params->data[1].of.i32; i++) {
+        fds[i].fd = *(i64 *) ONYX_PTR(params->data[0].of.i32 + 16 * i);
+        fds[i].revents = 0;
+        fds[i].events = 0;
+
+        switch (*(i32 *) ONYX_PTR(params->data[0].of.i32 + 16 * i + 8)) {
+            case 0x01: // Read
+                fds[i].events = POLLIN;
+                break;
+            
+            case 0x02: // Write
+                fds[i].events = POLLOUT;
+                break;
+        }
+    }
+
+    int res = poll(fds, params->data[1].of.i32, params->data[2].of.i32);
+
+    for (int i=0; i<params->data[1].of.i32; i++) {
+        *(i32 *) ONYX_PTR(params->data[0].of.i32 + 16 * i + 12) = 0; // NO_CHANGE
+
+        if (fds[i].revents & POLLIN) {
+            *(i32 *) ONYX_PTR(params->data[0].of.i32 + 16 * i + 12) = 1; // READABLE
+        }
+
+        if (fds[i].revents & POLLOUT) {
+            *(i32 *) ONYX_PTR(params->data[0].of.i32 + 16 * i + 12) = 2; // WRITABLE
+        }
+
+        if ((fds[i].revents & POLLHUP)
+            || (fds[i].revents & POLLNVAL)
+            || (fds[i].revents & POLLERR)) {
+            *(i32 *) ONYX_PTR(params->data[0].of.i32 + 16 * i + 12) = 3; // CLOSED
+        }
+    }
+    #endif
+
+    return NULL;
+}
+
 
 ONYX_DEF(__lookup_env, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
 

@@ -5,6 +5,17 @@ use core {*}
 FileData :: #distinct i64
 DirectoryData :: #distinct u64
 
+PollDescription :: struct {
+    fd: u64;
+    in: io.PollEvent;
+    out: io.PollEvent;
+}
+
+#foreign "onyx_runtime" {
+    __poll :: (fds: [] PollDescription, timeout: i32) -> void ---
+}
+
+
 #local {
     #foreign "onyx_runtime" {
         __file_open_impl :: (path: str, mode: os.OpenMode, out_handle: &FileData) -> os.FileError ---
@@ -110,5 +121,21 @@ __file_stream_vtable := io.Stream_Vtable.{
     size = (use fs: &os.File) -> i32 {
         return __file_size(data);
     },
+
+    poll = (use fs: &os.File, ev: io.PollEvent, timeout: i32) -> (io.Error, bool) {
+        fds: [1] PollDescription;
+        fds[0] = .{
+            fd = ~~data,
+            in = ev
+        };
+
+        __poll(fds, timeout);
+
+        if fds[0].out == .Closed {
+            return .EOF, ev == .Closed;
+        }
+
+        return .None, fds[0].out == ev;
+    }
 };
 

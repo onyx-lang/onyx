@@ -63,6 +63,45 @@ __read_from_input :: (buffer: [] u8) -> i32 {
     return read;
 }
 
+__wait_for_input :: (timeout: i32) -> bool {
+    events := 1;
+    subscriptions: [2] Subscription;
+
+    fd_tagged: SubscriptionTagged;
+    fd_tagged.tag = .FDRead;
+    fd_tagged.fd_read = .{ file_description = STDIN_FILENO, };
+    subscriptions[0] = .{
+        userdata = 0,
+        u = tagged,
+    };
+
+    clock_tagged: SubscriptionTagged;
+    if timeout > 0 {
+        events += 1;
+        clock_tagged.tag = .Clock;
+        clock_tagged.clock = .{
+            id = .Realtime,
+            timeout = cast(u64) timeout * 1000000,
+            precision
+        };
+
+        subscriptions[1] = .{
+            userdata = 0,
+            u = clock_tagged,
+        };
+    }
+
+    event: [2] Event;
+    number_of_events: u32;
+
+    error_code := poll_oneoff(&subscription, &event, 2, &number_of_events);
+
+    if number_of_events == 0 do return false;
+    if event[0].type == .Clock do return false;
+
+    return event[0].fd_readwrite.nbytes > 0;
+}
+
 __sleep :: (milliseconds: u32) {
     tagged: SubscriptionTagged;
     tagged.tag = .Clock;

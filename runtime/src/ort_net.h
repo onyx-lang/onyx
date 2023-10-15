@@ -324,40 +324,6 @@ ONYX_DEF(__net_recvfrom, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WA
     return NULL;
 }
 
-ONYX_DEF(__net_poll_recv, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), ()) {
-    #ifdef _BH_LINUX
-    int i, res, cursor;
-    struct pollfd* fds;
-
-    fds = alloca(params->data[1].of.i32 * sizeof(struct pollfd));
-
-    for (i=0; i < params->data[1].of.i32; i++) {
-        fds[i].fd = *(i32 *) ONYX_PTR(params->data[0].of.i32 + 4 * i);
-        fds[i].events = POLLIN;
-        fds[i].revents = 0;
-    }
-
-    res = poll(fds, params->data[1].of.i32, params->data[2].of.i32);
-
-    for (i=0; i<params->data[1].of.i32; i++) {
-        *(i32 *) ONYX_PTR(params->data[3].of.i32 + 4 * i) = 0; // NO_CHANGE
-
-        if (fds[i].revents & POLLIN) {
-            *(i32 *) ONYX_PTR(params->data[3].of.i32 + 4 * i) = 1; // READABLE
-        }
-
-        if ((fds[i].revents & POLLHUP)
-            || (fds[i].revents & POLLNVAL)
-            || (fds[i].revents & POLLERR)) {
-            *(i32 *) ONYX_PTR(params->data[3].of.i32 + 4 * i) = 2; // CLOSED
-        }
-    }
-
-    #endif
-
-    return NULL;
-}
-
 ONYX_DEF(__net_host_to_net_s, (WASM_I32), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(htons(params->data[0].of.i32));
     return NULL;

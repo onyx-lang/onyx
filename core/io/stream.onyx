@@ -32,6 +32,15 @@ Stream_Vtable :: struct {
     flush        : (s: &Stream) -> Error                                       = null_proc;
 
     size         : (s: &Stream) -> i32                                         = null_proc;
+
+    poll         : (s: &Stream, ev: PollEvent, timeout: i32) -> (Error, bool)  = null_proc;
+}
+
+PollEvent :: enum {
+    None :: 0x00;
+    Read :: 0x01;
+    Write :: 0x02;
+    Closed :: 0x03;
 }
 
 SeekFrom :: enum {
@@ -132,6 +141,22 @@ stream_size :: (use s: &Stream) -> i32 {
     if vtable.size == null_proc do return 0;
 
     return vtable.size(s);
+}
+
+#doc """
+    Waits until a stream is able to be read from or written to.
+
+    If `timeout` < 0, then there is an indefinite timeout.
+    
+    If `timeout` = 0, then there is no timeout, and this function returns immediately.
+
+    If `timeout` > 0, then there is a `timeout` millisecond delay before returning false.
+"""
+stream_poll :: (use s: &Stream, ev: PollEvent, timeout: i32) -> (Error, bool) {
+    if vtable == null do return .NoVtable, false;
+    if vtable.poll == null_proc do return .NotImplemented, false;
+
+    return vtable.poll(s, ev, timeout);
 }
 
 
@@ -344,6 +369,14 @@ buffer_stream_vtable := Stream_Vtable.{
         }
 
         return .None;
+    },
+
+    poll = (use dss: &BufferStream, ev: io.PollEvent, timeout: i32) -> (Error, bool) {
+        if ev == .Write && !write_enabled {
+            return .None, false;
+        }
+
+        return .None, true;
     }
 }
 

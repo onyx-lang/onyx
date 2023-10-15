@@ -31,6 +31,8 @@ __time            :: ()            -> i64  #foreign "host" "time" ---
     __read_from_input :: (buf: [] u8)  -> u32 do return 0;
 }
 
+__wait_for_input :: (timeout: i32) => true;
+
 __futex_wait :: (addr: rawptr, expected: i32, timeout: i32) -> i32 {
     use core.intrinsics.atomics {__atomic_wait}
     if context.thread_id != 0 {

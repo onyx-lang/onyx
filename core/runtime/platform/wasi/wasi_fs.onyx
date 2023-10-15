@@ -258,6 +258,46 @@ __file_stream_vtable := io.Stream_Vtable.{
 
         return ~~ file_stat.size;
     },
+
+    poll = (use fs: &os.File, ev: io.PollEvent, timeout: i32) -> (Error, bool) {
+        // TODO: Not entirely sure this is implemented correctly.
+        events := 1;
+        subscriptions: [2] Subscription;
+
+        fd_tagged: SubscriptionTagged;
+        fd_tagged.tag = .FDRead;
+        fd_tagged.fd_read = .{ file_description = cast(i64) data, };
+        subscriptions[0] = .{
+            userdata = 0,
+            u = tagged,
+        };
+
+        clock_tagged: SubscriptionTagged;
+        if timeout > 0 {
+            events += 1;
+            clock_tagged.tag = .Clock;
+            clock_tagged.clock = .{
+                id = .Realtime,
+                timeout = cast(u64) timeout * 1000000,
+                precision
+            };
+
+            subscriptions[1] = .{
+                userdata = 0,
+                u = clock_tagged,
+            };
+        }
+
+        event: [2] Event;
+        number_of_events: u32;
+
+        error_code := poll_oneoff(&subscription, &event, 2, &number_of_events);
+
+        if number_of_events == 0 do return .None, false;
+        if event[0].type == .Clock do return .None, false;
+
+        return .None, event[0].fd_readwrite.nbytes > 0;
+    }
 }
 
 

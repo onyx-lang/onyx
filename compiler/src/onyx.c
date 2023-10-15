@@ -934,7 +934,7 @@ static i32 onyx_compile() {
     if (context.options->verbose_output > 0) {
         // TODO: Replace these with bh_printf when padded formatting is added.
         printf("\nStatistics:\n");
-        printf("    Time taken: %lf seconds\n", (double) duration / 1000);
+        printf("    Time taken: %lf ms\n", (double) duration);
         printf("    Processed %ld lines (%f lines/second).\n", context.lexer_lines_processed, ((f32) 1000 * context.lexer_lines_processed) / (duration));
         printf("    Processed %ld tokens (%f tokens/second).\n", context.lexer_tokens_processed, ((f32) 1000 * context.lexer_tokens_processed) / (duration));
         printf("\n");

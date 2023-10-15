@@ -58,7 +58,6 @@ struct ovm_static_integer_array_t {
 #define OVM_TYPE_V128   0x07
 
 struct ovm_value_t {
-    ovm_valtype_t type;
     union {
         i8  i8;
         i16 i16;
@@ -71,6 +70,7 @@ struct ovm_value_t {
         f32 f32;
         f64 f64;
     };
+    ovm_valtype_t type;
 };
 
 
