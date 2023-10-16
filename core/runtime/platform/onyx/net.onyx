@@ -1,0 +1,92 @@
+package runtime.platform
+
+use core.io
+use core.net {
+    SocketFamily,
+    SocketProto,
+    SocketType
+}
+
+SocketData :: #distinct i32
+
+__net_sock_create :: (af: SocketFamily, type: SocketType, proto: SocketProto) -> Result(SocketData, io.Error) {
+
+}
+
+__net_sock_status :: (s: SocketData) -> SocketStatus {
+
+}
+
+__net_sock_opt_flag :: (s: SocketData, sockopt: SocketOption, flag: bool) -> bool {
+}
+
+__net_sock_opt_time :: (s: SocketData, sockopt: SocketOption, time: ? u64) -> bool {
+
+}
+
+__net_sock_opt_size :: (s: SocketData, sockopt: SocketOption, size: i64) -> bool {
+
+}
+
+__net_sock_bind :: (s: SocketData, addr: &SocketAddress) -> bool {
+
+}
+
+__net_sock_listen :: (s: SocketData, backlog: i32) -> bool {
+
+}
+
+__net_sock_accept :: (s: SocketData, addr: &SocketAddress) -> Result(SocketData, io.Error) {
+
+}
+
+__net_sock_connect :: (s: SocketData, addr: &SocketAddress) -> io.Error {
+
+}
+
+__net_sock_recv_from :: (s: SocketData, buf: [] u8, addr: &SocketAddress) -> Result(i32, io.Error) {
+
+}
+
+__net_sock_send_to :: (s: SocketData, buf: [] u8, addr: &SocketAddress) -> Result(i32, io.Error) {
+
+}
+
+__net_sock_recv :: (s: SocketData, buf: [] u8) -> Result(i32, io.Error) {
+
+}
+
+__net_sock_send :: (s: SocketData, buf: [] u8) -> Result(i32, io.Error) {
+
+}
+
+__net_sock_shutdown :: (s: SocketData, how: SocketShutdown) -> io.Error {
+
+}
+
+__net_sock_close :: (s: SocketData) -> void {
+
+}
+
+__net_resolve :: (host: str, port: u16, out_addrs: [] SocketAddress) -> i32 {
+
+}
+
+
+#package {
+    #foreign "onyx_runtime" {
+        __net_create_socket :: (out_handle: &Socket.Handle, domain: SocketDomain, type: SocketType) -> SocketError ---
+        __net_close_socket  :: (handle: Socket.Handle)               -> void ---
+        __net_setting       :: (handle: Socket.Handle, setting: SocketSetting, value: i32) -> void ---
+        __net_bind          :: (handle: Socket.Handle, bind_address: &Socket_Address)    -> bool ---
+        __net_listen        :: (handle: Socket.Handle, backlog: i32) -> void ---
+        __net_accept        :: (handle: Socket.Handle, out_address: &Socket_Address) -> Socket.Handle ---
+        __net_connect_unix  :: (handle: Socket.Handle, path: str) -> SocketError ---
+        __net_connect_ipv4  :: (handle: Socket.Handle, host: str, port: u16) -> SocketError ---
+        __net_shutdown      :: (handle: Socket.Handle, how: u32) -> void ---
+        __net_send          :: (handle: Socket.Handle, data: [] u8)  -> i32 ---
+        __net_sendto        :: (handle: Socket.Handle, data: [] u8, addr: &Socket_Address)  -> i32 ---
+        __net_recv          :: (handle: Socket.Handle, data: [] u8, async_would_block: &bool) -> i32 ---
+        __net_recvfrom      :: (handle: Socket.Handle, data: [] u8, out_recv_addr: &Socket_Address, async_would_block: &bool) -> i32 ---
+    }
+}

@@ -166,13 +166,14 @@ this document will serve as that "header file"
 - `__net_sock_opt_size(SocketData, sockopt: SocketOption, size: i64) -> bool`
 - `__net_sock_bind(SocketData, addr: &SocketAddress) -> bool`
 - `__net_sock_listen(SocketData, backlog: i32) -> bool`
-- `__net_sock_accept(SocketData, addr: &SocketAddress) -> Result(i32, io.Error)`
+- `__net_sock_accept(SocketData, addr: &SocketAddress) -> Result(SocketData, io.Error)`
 - `__net_sock_connect(SocketData, addr: &SocketAddress) -> io.Error`
 - `__net_sock_recv_from(SocketData, buf: [] u8, addr: &SocketAddress) -> Result(i32, io.Error)`
 - `__net_sock_send_to(SocketData, buf: [] u8, addr: &SocketAddress) -> Result(i32, io.Error)`
 - `__net_sock_recv(SocketData, buf: [] u8) -> Result(i32, io.Error)`
 - `__net_sock_send(SocketData, buf: [] u8) -> Result(i32, io.Error)`
 - `__net_sock_shutdown(SocketData, how: SocketShutdown) -> io.Error`
+- `__net_sock_close(SocketData) -> void`
 - `__net_resolve(host: str, port: u16, out_addrs: [] SocketAddress) -> i32`
 
 

@@ -8,12 +8,12 @@ use core {*}
 use runtime
 
 Socket :: struct {
-    Handle :: #distinct i32
-
     use stream : io.Stream;
-    handle: Handle;
+    handle: runtime.platform.SocketData;
+
     type: SocketType;
-    family: SocketDomain;
+    family: SocketFamily;
+    proto: SocketProto;
 }
 
 // Inject methods for the socket
@@ -35,22 +35,25 @@ Socket :: struct {
     poll      :: socket_poll
 }
 
-SocketError :: enum {
-    None :: 0x00;
-    BadSettings :: 0x01;
-    NoHost :: 0x02;
-    ConnectFailed :: 0x03;
-}
-
-SocketDomain :: enum {
-    Unix  :: 0x00;
-    Inet  :: 0x01;
-    Inet6 :: 0x02;
+SocketFamily :: enum {
+    Unknown :: 0x00;
+    Inet    :: 0x01;
+    Inet6   :: 0x02;
+    Unix    :: 0x03;
 }
 
 SocketType :: enum {
     Stream :: 0x00;
     Dgram  :: 0x01;
+}
+
+SocketProto :: enum {
+    IP   :: 0x00;
+    ICMP :: 0x01;
+    IGMP :: 0x02;
+    TCP  :: 0x06;
+    UDP  :: 0x11;
+    IPV6 :: 0x29;
 }
 
 SocketSetting :: enum {
@@ -67,33 +70,47 @@ SocketShutdown :: enum {
 
 #local UNIX_SOCKET_PATH_LEN :: 256
 
-Socket_Address :: struct #size (8 + UNIX_SOCKET_PATH_LEN) {
-    family: u16;
-    port: u16;
-    addr: u32;
+SocketAddress :: union {
+    // Null-terminated string
+    Unix: [UNIX_SOCKET_PATH_LEN] u8;
 
-    addr_as_str :: (use this: &Socket_Address, allocator := context.allocator) -> str {
-        str_addr := ipv4_to_str(this.addr);
-        return string.alloc_copy(str_addr, allocator=allocator);
-    }
+    Inet: struct {
+        port: u16;
+        addr: u32;
+    };
+
+    Inet6: struct {
+        port: u16;
+        addr_h: u64;
+        addr_l: u64;
+    };
 }
 
-make_ipv4_address :: (out: &Socket_Address, addr: u32, port: u16) {
-    out.family = ~~ SocketDomain.Inet;
-    out.port = port;
-    out.addr = addr;
+#inject
+SocketAddress.addr_as_str :: (this: &SocketAddress, allocator := context.allocator) -> str {
+    return switch *this {
+        case path: .Unix => string.as_str(cast(cstr) path);
+        case inet: .Inet => do {
+            str_addr := ipv4_to_str(inet.addr);
+            out := make(dyn_str, allocator);
+            return conv.format(&out, "{}:{}", str_addr, inet.port);
+        }
+        case inet6: .Inet6 => do {
+            str_addr := ipv6_to_str(inet6.addr_h, inet6.addr_l);
+            out := make(dyn_str, allocator);
+            return conv.format(&out, "{}:{}", str_addr, inet6.port);
+        }
+    };
 }
 
-make_unix_address :: (out: &Socket_Address, path: str) {
-    out.family = ~~ SocketDomain.Unix;
-    out.port   = 0;
+make_ipv4_address :: (out: &SocketAddress, addr: u32, port: u16) {
+    *out = .{ Inet = .{ port = port, addr = addr } };
+}
 
-    //
-    // If we are constructing a unix socket, we have to write the path
-    // at the address where the addr field is in the Socket_Address.
-    // We also have to append a null-terminator, as that is what will
-    // be expected from any C function.
-    out_path := cast([&] u8) &out.addr;
+make_unix_address :: (out: &SocketAddress, path: str) {
+    *out = .{ Unix = .{} };
+
+    out_path := cast([&] u8) out + alignof out.tag_enum;
     offset   := 0;
     while offset < math.min(path.count, UNIX_SOCKET_PATH_LEN - 1) {
         defer offset += 1;
@@ -104,68 +121,75 @@ make_unix_address :: (out: &Socket_Address, path: str) {
     out_path[offset] = 0;
 }
 
-socket_create :: (domain: SocketDomain, type: SocketType) -> (Socket, SocketError) {
+socket_create :: (family: SocketFamily, type: SocketType, proto: SocketProto) -> Result(Socket, io.Error) {
     s: Socket;
     s.type = type;
-    s.family = domain;
+    s.family = family;
+    s.proto = proto;
 
-    err := __net_create_socket(&s.handle, domain, type);
-    if err == .None {
-        s.vtable = &__net_socket_vtable;
-        s.flags |= .Block_On_Read;
-    }
+    socket := runtime.platform.__net_sock_create(family, type, proto)?;
+    s.handle = socket;
 
-    return s, err;
+    s.flags |= .Block_On_Read;
+
+    return .{ Ok = s };
+}
+
+socket_from_fd :: (fd: runtime.platform.SocketData) -> Socket {
+    return Socket.{
+        stream = .{ vtable = &__net_socket_vtable },
+        handle = fd,
+    };
 }
 
 socket_close :: (s: &Socket) {
-    __net_close_socket(s.handle);
-    s.vtable = null;
+    runtime.platform.__net_sock_close(s.handle);
 }
 
-socket_setting :: (s: &Socket, setting: SocketSetting, value: u32) {
-    __net_setting(s.handle, setting, value);
-
-    if setting == .NonBlocking {
-        if value > 0 do s.flags = ~~ (cast(u32) s.flags & cast(u32) ~io.Stream_Flags.Block_On_Read);
-        else do         s.flags |= io.Stream_Flags.Block_On_Read;
+socket_setting :: (s: &Socket, setting: SocketSetting, flag: bool) {
+    if runtime.platform.__net_sock_opt_flag(s.handle, setting, flag) {
+        if setting == .NonBlocking {
+            if flag do s.flags = ~~ (cast(u32) s.flags & cast(u32) ~io.Stream_Flags.Block_On_Read);
+            else do    s.flags |= io.Stream_Flags.Block_On_Read;
+        }
     }
 }
 
 socket_is_alive :: (s: &Socket) -> bool {
-    return s.vtable != null;
+    return runtime.platform.__net_sock_status(s.handle) == .Open;
 }
 
-socket_connect :: (s: &Socket, host: str, port: u16 = 0) -> SocketError {
-    return switch s.family {
-        case .Inet => __net_connect_ipv4(s.handle, host, port);
-        case .Unix => __net_connect_unix(s.handle, host);
-        case #default => .BadSettings;
-    };
+socket_connect :: (s: &Socket, addr: &SocketAddress) -> io.Error {
+    return runtime.platform.__net_sock_connect(s.handle, addr);
 }
 
 socket_bind :: (s: &Socket, bind_address: &Socket_Address) -> bool {
-    return __net_bind(s.handle, bind_address);
+    return runtime.platform.__net_sock_bind(s.handle, bind_address);
 }
 
-socket_listen :: (s: &Socket, backlog := 32) {
-    __net_listen(s.handle, backlog);
+socket_listen :: (s: &Socket, backlog := 32) -> bool {
+    return runtime.platform.__net_sock_listen(s.handle, backlog);
 }
 
-socket_shutdown :: (s: &Socket, how: SocketShutdown) {
-    __net_shutdown(s.handle, cast(u32) how);
+socket_shutdown :: (s: &Socket, how: SocketShutdown) -> io.Error {
+    return runtime.platform.__net_socket_shutdown(s.handle, how);
 }
 
-socket_accept :: (s: &Socket) -> (Socket, Socket_Address) {
-    new_socket: Socket;
-    new_addr: Socket_Address;
-    new_socket.handle = __net_accept(s.handle, &new_addr);
+SocketAcceptResult :: struct {
+    socket: Socket;
+    addr:   SocketAddress;
+}
 
-    if cast(i32) new_socket.handle >= 0 {
-        new_socket.vtable = &__net_socket_vtable;
-    }
+socket_accept :: (s: &Socket) -> Result(SocketAcceptResult, io.Error) {
+    new_addr: SocketAddress;
+    sock_fd := runtime.platform.__net_sock_accept(s.handle, &new_addr)?;
 
-    return new_socket, new_addr;
+    return .{
+        Ok = .{
+            socket = socket_from_fd(sock_fd),
+            addr   = new_addr
+        }
+    };
 }
 
 Socket_Poll_Status :: enum {
@@ -174,10 +198,7 @@ Socket_Poll_Status :: enum {
     Closed    :: 2;
 }
 
-// TODO: Cleanup this function. The stat_buff should be something that is at least
-// as big as the sockets array, and the timeout should be the last parameter because
-// it is not required.
-socket_poll_all :: (sockets: [] &Socket, timeout := -1, stat_buff: [] Socket_Poll_Status = .[]) {
+socket_poll_all :: (sockets: [] &Socket, stat_buff: [] Socket_Poll_Status, timeout := -1) {
     if sockets.count > stat_buff.count do return;
 
     handles := alloc.array_from_stack(runtime.platform.PollDescription, sockets.count);
@@ -212,98 +233,134 @@ socket_poll :: (socket: &Socket, timeout := -1) -> Socket_Poll_Status {
 }
 
 socket_send :: (s: &Socket, data: [] u8) -> i32 {
-    sent := __net_send(s.handle, data);
-    if sent < 0 { s.vtable = null; }
-    return sent;
+    res := runtime.platform.__net_sock_send(s.handle, data);
+    return res.Ok ?? -1;
 }
 
-socket_sendto :: (s: &Socket, data: [] u8, addr: &Socket_Address) -> i32 {
-    sent := __net_sendto(s.handle, data, addr);
-    return sent;
+socket_sendto :: (s: &Socket, data: [] u8, addr: &SocketAddress) -> i32 {
+    res := runtime.platform.__net_sock_sendto(s.handle, data, addr);
+    return res.Ok ?? -1;
 }
 
 socket_sendall :: (s: &Socket, data: [] u8) {
     to_send := data;
 
     while to_send.count > 0 {
-        sent := __net_send(s.handle, to_send);
-        if sent < 0 { s.vtable = null; return; }
+        sent := socket_send(s, to_send);
+        if sent < 0 { return; }
         else        do to_send = to_send[sent .. to_send.count];
     }
 }
 
-socket_recv :: (s: &Socket, maxlen := 1024, allocator := context.allocator) -> [] u8 {
-    buffer := alloc.from_stack(maxlen);
-    would_block: bool;
-    received := __net_recv(s.handle, .{ buffer, maxlen }, &would_block);
-    if received < 0 { 
-        if !would_block do s.vtable = null;
-        return .[];
+socket_recv :: (s: &Socket, maxlen := 1024, allocator := context.allocator) -> ? [] u8 {
+    buffer := alloc.array_from_stack(u8, maxlen);
+    res := runtime.platform.__net_sock_recv(s.handle, buffer);
+    if res.Err {
+        return .{};
     }
 
-    result := memory.make_slice(u8, received, allocator=allocator);
-    memory.copy(result.data, buffer, received);
+    return slice.copy(buffer[0 .. res.Ok->unwrap()], allocator);
 
-    return result;
+    // buffer := alloc.from_stack(maxlen);
+    // would_block: bool;
+    // received := __net_recv(s.handle, .{ buffer, maxlen }, &would_block);
+    // if received < 0 { 
+    //     if !would_block do s.vtable = null;
+    //     return .[];
+    // }
+
+    // result := memory.make_slice(u8, received, allocator=allocator);
+    // memory.copy(result.data, buffer, received);
+
+    // return result;
 }
 
 socket_recv_into :: (s: &Socket, buffer: [] u8) -> i32 {
-    would_block: bool;
-    received := __net_recv(s.handle, buffer, &would_block);
-    if received < 0 && !would_block do s.vtable = null;
-    if would_block do return 0;
+    res := runtime.platform.__net_sock_recv(s.handle, buffer);
+    if res.Err {
+        return 0;
+    }
 
-    return received;
+    return res.Ok->unwrap();
+
+    // would_block: bool;
+    // received := __net_recv(s.handle, buffer, &would_block);
+    // if received < 0 && !would_block do s.vtable = null;
+    // if would_block do return 0;
+
+    // return received;
 }
 
-socket_recvfrom :: (s: &Socket, buffer: [] u8) -> (Socket_Address, i32) {
-    would_block: bool;
-    sa: Socket_Address;
-
-    received := __net_recvfrom(s.handle, buffer, &sa, &would_block);
-    if received < 0 && !would_block do s.vtable = null;
-    if would_block do return sa, 0;
-
-    return sa, received;
+SocketRecvFromResult :: struct {
+    addr: SocketAddress;
+    count: i32;
 }
 
-host_to_network :: #match #local {}
-#match host_to_network (x: u16) => __net_host_to_net_s(x);
-#match host_to_network (x: u32) => __net_host_to_net_l(x);
+socket_recvfrom :: (s: &Socket, buffer: [] u8) -> ? SocketRecvFromResult {
+    sender_addr: SocketAddress;
+    res := runtime.platform.__net_sock_recvfrom(s.handle, buffer, &sender_addr);
+    if res.Err do return .{};
 
-network_to_host :: #match #local {}
-#match network_to_host (x: u16) => __net_net_to_host_s(x);
-#match network_to_host (x: u32) => __net_net_to_host_l(x);
+    return .{ Some = .{ addr = sender_addr, res.Ok->unwrap() } };
+
+    // would_block: bool;
+    // sa: SocketAddress;
+
+    // received := __net_recvfrom(s.handle, buffer, &sa, &would_block);
+    // if received < 0 && !would_block do s.vtable = null;
+    // if would_block do return sa, 0;
+
+    // return sa, received;
+}
+
+// TODO: Add these back
+// host_to_network :: #match #local {}
+// #match host_to_network (x: u16) => __net_host_to_net_s(x);
+// #match host_to_network (x: u32) => __net_host_to_net_l(x);
+
+// network_to_host :: #match #local {}
+// #match network_to_host (x: u16) => __net_net_to_host_s(x);
+// #match network_to_host (x: u32) => __net_net_to_host_l(x);
 
 #local __net_socket_vtable := io.Stream_Vtable.{
     read = (use s: &Socket, buffer: [] u8) -> (io.Error, u32) {
         if cast(i32) handle == 0 do return .BadFile, 0;
         
-        would_block := false;
-        bytes_read := __net_recv(handle, buffer, &would_block);
-        if bytes_read < 0 && !would_block do s.vtable = null;
+        res := runtime.platform.__net_sock_recv(handle, buffer);
+        res->ok()->with([bytes_read] {
+            if bytes_read == 0 do return .EOF, 0;
 
-        if would_block do return .ReadLater, bytes_read;
+            return .None, bytes_read;
+        });
 
-        if bytes_read == 0 do return .EOF, bytes_read;
+        res->err()->with([err] {
+            if err == .NoData do return .ReadLater, 0;
 
-        return .None, bytes_read;
+            return err, 0;
+        });
     },
 
     write_byte = (use s: &Socket, byte: u8) -> io.Error {
         if cast(i32) handle == 0 do return .BadFile;
 
-        bytes_written := __net_send(handle, .[ byte ]);
-        if bytes_written < 0 { s.vtable = null; return .BufferFull; }
-        return .None;
+        res := runtime.platform.__net_sock_send(handle, .[ byte ]);
+        res->err()->with([err] {
+            return err;
+        });
+
+        if res->ok()->unwrap() > 0 do return .None;
+        return .BufferFull;
     },
 
     write = (use s: &Socket, buffer: [] u8) -> (io.Error, u32) {
         if cast(i32) handle == 0 do return .BadFile, 0;
         
-        bytes_written := __net_send(handle, buffer);
-        if bytes_written < 0 { s.vtable = null; return .EOF, 0; }
-        return .None, bytes_written;
+        res := runtime.platform.__net_sock_send(handle, .[ byte ]);
+        res->err()->with([err] {
+            return err, 0;
+        });
+
+        return .None, res->ok()->unwrap();
     },
 
     poll = (use s: &Socket, ev: io.PollEvent, timeout: i32) -> (io.Error, bool) {
@@ -319,41 +376,10 @@ network_to_host :: #match #local {}
     },
 
     close = (use p: &Socket) -> io.Error {
-        __net_close_socket(handle);
+        socket_close(p);
         return .None;
     }
 };
-
-//
-// This will be moved into the platform layer later.
-// I think this is most everything you would need, but
-// I need to see how WASI does sockets to see if this
-// makes sense as an abstraction.
-#foreign "onyx_runtime" {
-    #package __net_create_socket :: (out_handle: &Socket.Handle, domain: SocketDomain, type: SocketType) -> SocketError ---
-    #package __net_close_socket  :: (handle: Socket.Handle)               -> void ---
-    #package __net_setting       :: (handle: Socket.Handle, setting: SocketSetting, value: i32) -> void ---
-    #package __net_bind          :: (handle: Socket.Handle, bind_address: &Socket_Address)    -> bool ---
-    #package __net_listen        :: (handle: Socket.Handle, backlog: i32) -> void ---
-    #package __net_accept        :: (handle: Socket.Handle, out_address: &Socket_Address) -> Socket.Handle ---
-    #package __net_connect_unix  :: (handle: Socket.Handle, path: str) -> SocketError ---
-    #package __net_connect_ipv4  :: (handle: Socket.Handle, host: str, port: u16) -> SocketError ---
-    #package __net_shutdown      :: (handle: Socket.Handle, how: u32) -> void ---
-    #package __net_send          :: (handle: Socket.Handle, data: [] u8)  -> i32 ---
-    #package __net_sendto        :: (handle: Socket.Handle, data: [] u8, addr: &Socket_Address)  -> i32 ---
-    #package __net_recv          :: (handle: Socket.Handle, data: [] u8, async_would_block: &bool) -> i32 ---
-    #package __net_recvfrom      :: (handle: Socket.Handle, data: [] u8, out_recv_addr: &Socket_Address, async_would_block: &bool) -> i32 ---
-
-    #package __net_host_to_net_s :: (s: u16) -> u16 ---
-    #package __net_host_to_net_l :: (s: u32) -> u32 ---
-    #package __net_net_to_host_s :: (s: u16) -> u16 ---
-    #package __net_net_to_host_l :: (s: u32) -> u32 ---
-}
-
-#operator >= macro (a, b: Socket.Handle) => cast(u32) a >= cast(u32) b;
-#operator == macro (a, b: Socket.Handle) => cast(u32) a == cast(u32) b;
-
-
 
 //
 // Non-socket related helper functions
@@ -384,3 +410,19 @@ ipv4_to_str :: (addr: u32) -> str {
         (addr >>  0) & 0xff);
     return str_addr;
 }
+
+// This returns a volatile buffer that should be copied.
+ipv6_to_str :: (addr_h: u64, addr_l: u64) -> str {
+    #persist out: [64] u8;
+    str_addr := conv.format(out, "{w2b16}:{w2b16}:{w2b16}:{w2b16}:{w2b16}:{w2b16}:{w2b16}:{w2b16}",
+        (addr_h >> 24) & 0xff,
+        (addr_h >> 16) & 0xff,
+        (addr_h >>  8) & 0xff,
+        (addr_h >>  0) & 0xff,
+        (addr_l >> 24) & 0xff,
+        (addr_l >> 16) & 0xff,
+        (addr_l >>  8) & 0xff,
+        (addr_l >>  0) & 0xff);
+    return str_addr;
+}
+

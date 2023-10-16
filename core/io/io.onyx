@@ -35,4 +35,10 @@ Error :: enum {
 
     // When reading from a stream, no data was read, and data will not become available soon.
     ReadLater      :: 0x0b;
+
+    // A socket tried to connect to an endpoint and failed.
+    ConnectFailed  :: 0x0c;
+
+    // Sockets only. Signals that no data was recieved from a non-blocking operation.
+    NoData     :: 0x0d;
 }
