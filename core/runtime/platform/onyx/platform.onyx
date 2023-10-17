@@ -11,6 +11,7 @@ use runtime {
 
 #load "./fs"
 #load "./env"
+#load "./net"
 
 #load "core/onyx/cptr"
 #load "core/onyx/cbindgen"

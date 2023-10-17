@@ -41,4 +41,10 @@ Error :: enum {
 
     // Sockets only. Signals that no data was recieved from a non-blocking operation.
     NoData     :: 0x0d;
+
+    // Failed to create an object.
+    CreationFailed :: 0x0e;
+
+    // The operation failed.
+    OperationFailed :: 0x0f;
 }

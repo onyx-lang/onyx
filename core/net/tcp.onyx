@@ -39,21 +39,21 @@ TCP_Event :: struct {
     }
 
     Connection :: struct {
-        address : &Socket_Address;
+        address : &SocketAddress;
 
         // This is only set when the event is coming from the server.
         client  : &TCP_Server.Client;
     }
 
     Disconnection :: struct {
-        address: &Socket_Address;
+        address: &SocketAddress;
 
         // This is only set when the event is coming from the server.
         client  : &TCP_Server.Client;
     }
 
     Data :: struct {
-        address: &Socket_Address;
+        address: &SocketAddress;
         // This is only set when the event is coming from the server.
         client  : &TCP_Server.Client;
 
@@ -61,7 +61,7 @@ TCP_Event :: struct {
     }
 
     Ready :: struct {
-        address: &Socket_Address;
+        address: &SocketAddress;
         // This is only set when the event is coming from the server.
         client : &TCP_Server.Client;
     }
@@ -127,7 +127,7 @@ TCP_Server :: struct {
 #inject TCP_Server {
     Client :: struct {
         use socket  : Socket;
-        address : Socket_Address;
+        address : SocketAddress;
         state   : State;
 
         recv_ready_event_present := false;
@@ -148,8 +148,10 @@ TCP_Server :: struct {
 }
 
 tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> &TCP_Server {
-    socket, err := socket_create(.Inet, .Stream); // IPv6?
-    if err != .None do return null;
+    maybe_socket := socket_create(.Inet, .Stream, .IP); // IPv6?
+    if maybe_socket.Err do return null;
+
+    socket := maybe_socket.Ok->unwrap();
 
     server := new(TCP_Server, allocator=allocator);
     server.socket = socket;
@@ -164,12 +166,12 @@ tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> &TCP_S
 }
 
 tcp_server_listen :: (use server: &TCP_Server, port: u16) -> bool {
-    sa: Socket_Address;
+    sa: SocketAddress;
     make_ipv4_address(&sa, 0x00000000, port);
     if !(socket->bind(&sa)) do return false;
 
     socket->listen();
-    socket->setting(.NonBlocking, 1);
+    socket->option(.NonBlocking, true);
     return true;
 }
 
@@ -188,12 +190,11 @@ tcp_server_stop :: (use server: &TCP_Server) {
 tcp_server_pulse :: (use server: &TCP_Server) -> bool {
     //
     // Check for new connection
-    client_socket, client_addr := socket->accept();
-    if client_socket.vtable {
+    socket->accept().Ok->with([client_data] {
         client := new(TCP_Server.Client, allocator=client_allocator);
         client.state = .Alive;
-        client.socket = client_socket;
-        client.address = client_addr;
+        client.socket = client_data.socket;
+        client.address = client_data.addr;
 
         for& clients do if *it == null { *it = client; break; }
         server.client_count += 1;
@@ -203,7 +204,7 @@ tcp_server_pulse :: (use server: &TCP_Server) -> bool {
         conn_event.client = client;
 
         server.events << .{ .Connection, conn_event };
-    }
+    });
 
     // 
     // Process dead clients
@@ -238,7 +239,7 @@ tcp_server_pulse :: (use server: &TCP_Server) -> bool {
     if client_count == 0 {
         // Wait for a client to connect.
         status_buffer: [1] Socket_Poll_Status;
-        socket_poll_all(.[&socket], -1, status_buffer);
+        socket_poll_all(.[&socket], status_buffer, -1);
         return server.alive;
     }
 
@@ -364,7 +365,7 @@ wait_to_get_client_messages :: (use server: &TCP_Server) -> [] &TCP_Server.Clien
     }
 
     status_buffer := alloc.array_from_stack(Socket_Poll_Status, client_count);
-    socket_poll_all(cast([] &Socket) active_clients, pulse_time_ms, status_buffer);
+    socket_poll_all(cast([] &Socket) active_clients, status_buffer, pulse_time_ms);
 
     recv_clients: [..] &TCP_Server.Client;
     for it: client_count {

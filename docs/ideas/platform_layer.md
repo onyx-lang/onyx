@@ -160,7 +160,6 @@ this document will serve as that "header file"
 
 ### Procedures
 - `__net_sock_create(af: SocketFamily, type: SocketType, proto: SocketProto) -> Result(SocketData, io.Error)`
-- `__net_sock_status(SocketData) -> SocketStatus`
 - `__net_sock_opt_flag(SocketData, sockopt: SocketOption, flag: bool) -> bool`
 - `__net_sock_opt_time(SocketData, sockopt: SocketOption, time: ? u64) -> bool`
 - `__net_sock_opt_size(SocketData, sockopt: SocketOption, size: i64) -> bool`
