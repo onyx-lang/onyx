@@ -113,6 +113,24 @@ ONYX_DEF(__net_bind_unix, (WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
+ONYX_DEF(__net_bind_ipv4, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    struct sockaddr_in bind_addr;
+    memset(&bind_addr, 0, sizeof(bind_addr));
+
+    bind_addr.sin_family = AF_INET;
+    bind_addr.sin_addr.s_addr = params->data[1].of.i32;
+    bind_addr.sin_port = htons(params->data[2].of.i32);
+    
+    if (bind(params->data[0].of.i32, &bind_addr, sizeof(bind_addr)) >= 0) {
+        results->data[0] = WASM_I32_VAL(1);
+    } else {
+        results->data[0] = WASM_I32_VAL(0);
+    }
+
+    return NULL;
+}
+
+
 ONYX_DEF(__net_bind_host, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     int   hostlen  = params->data[2].of.i32;
     char *hostname = alloca(hostlen + 1);

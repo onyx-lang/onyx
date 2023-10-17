@@ -42,6 +42,10 @@ __net_sock_bind :: (s: SocketData, addr: &SocketAddress) -> bool {
             return __net_bind_unix(s, ~~path);
         }
 
+        case ipv4: .Inet {
+            return __net_bind_ipv4(s, ipv4.addr, ipv4.port);
+        }
+
         case host: .HostPort {
             return __net_bind_host(s, host.host, host.port);
         }
@@ -261,6 +265,7 @@ __net_resolve :: (host: str, port: u16, out_addrs: [] SocketAddress) -> i32 {
         __net_connect_host  :: (handle: SocketData, host: str, port: u16) -> SocketError ---
 
         __net_bind_unix     :: (handle: SocketData, path: cstr) -> bool ---
+        __net_bind_ipv4     :: (handle: SocketData, addr: u32, port: u16) -> bool ---
         __net_bind_host     :: (handle: SocketData, host: str, port: u16) -> bool ---
 
         __net_accept        :: (handle: SocketData, out_buf: rawptr, out_len: &i32) -> SocketData ---

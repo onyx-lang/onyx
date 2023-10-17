@@ -436,10 +436,10 @@ str_to_ipv4 :: (ip: str) -> u32 {
 ipv4_to_str :: (addr: u32) -> str {
     #persist out: [64] u8;
     str_addr := conv.format(out, "{}.{}.{}.{}",
-        (addr >> 24) & 0xff,
+        (addr >> 0) & 0xff,
+        (addr >> 8) & 0xff,
         (addr >> 16) & 0xff,
-        (addr >>  8) & 0xff,
-        (addr >>  0) & 0xff);
+        (addr >> 24) & 0xff);
     return str_addr;
 }
 

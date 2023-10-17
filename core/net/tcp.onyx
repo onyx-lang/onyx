@@ -168,7 +168,7 @@ tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> &TCP_S
 tcp_server_listen :: (use server: &TCP_Server, port: u16) -> bool {
     sa: SocketAddress;
     make_ipv4_address(&sa, 0x00000000, port);
-    if !(socket->bind(&sa)) do return false;
+    if !socket->bind(&sa) do return false;
 
     socket->listen();
     socket->option(.NonBlocking, true);

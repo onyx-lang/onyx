@@ -212,7 +212,9 @@ read_fill_buffer :: (use reader: &Reader, bytes: [] u8) -> Error {
         write_index += to_write;
         start += to_write;
 
-        reader_read_next_chunk(reader);
+        if n > 0 {
+            reader_read_next_chunk(reader);
+        }
     }
 
     last_byte = cast(i32) bytes[write_index - 1];

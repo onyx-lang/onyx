@@ -95,6 +95,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(__net_close_socket)
     ONYX_FUNC(__net_setting_flag)
     ONYX_FUNC(__net_bind_unix)
+    ONYX_FUNC(__net_bind_ipv4)
     ONYX_FUNC(__net_bind_host)
     ONYX_FUNC(__net_listen)
     ONYX_FUNC(__net_accept)
