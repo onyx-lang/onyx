@@ -190,21 +190,23 @@ tcp_server_stop :: (use server: &TCP_Server) {
 tcp_server_pulse :: (use server: &TCP_Server) -> bool {
     //
     // Check for new connection
-    socket->accept().Ok->with([client_data] {
-        client := new(TCP_Server.Client, allocator=client_allocator);
-        client.state = .Alive;
-        client.socket = client_data.socket;
-        client.address = client_data.addr;
+    if client_count < clients.count {
+        socket->accept().Ok->with([client_data] {
+            client := new(TCP_Server.Client, allocator=client_allocator);
+            client.state = .Alive;
+            client.socket = client_data.socket;
+            client.address = client_data.addr;
 
-        for& clients do if *it == null { *it = client; break; }
-        server.client_count += 1;
+            for& clients do if *it == null { *it = client; break; }
+            server.client_count += 1;
 
-        conn_event := new(TCP_Event.Connection, allocator=server.event_allocator);
-        conn_event.address = &client.address;
-        conn_event.client = client;
+            conn_event := new(TCP_Event.Connection, allocator=server.event_allocator);
+            conn_event.address = &client.address;
+            conn_event.client = client;
 
-        server.events << .{ .Connection, conn_event };
-    });
+            server.events << .{ .Connection, conn_event };
+        });
+    }
 
     // 
     // Process dead clients
@@ -319,7 +321,6 @@ tcp_server_kill_client :: (use server: &TCP_Server, client: &TCP_Server.Client) 
     client.state = .Being_Killed;
     client.socket->shutdown(.ReadWrite);
     client.socket->close();
-    client.socket.vtable = null;
 }
 
 
@@ -344,8 +345,6 @@ wait_to_get_client_messages :: (use server: &TCP_Server) -> [] &TCP_Server.Clien
         if it == null do continue;
 
         if it.state == .Alive {
-            if it.recv_ready_event_present && !emit_ready_event_multiple_times do continue;
-
             active_clients[active_clients.count] = it;
             active_clients.count += 1;
         }
@@ -370,6 +369,16 @@ wait_to_get_client_messages :: (use server: &TCP_Server) -> [] &TCP_Server.Clien
     recv_clients: [..] &TCP_Server.Client;
     for it: client_count {
         if status_buffer[it] == .Readable {
+            //
+            // If there is already a Ready event present for this client,
+            // do not add another one if the `emit_ready_event_multiple_times` flag
+            // is false. Not filtering out the clients earlier does have the
+            // problem that whenever there is a client that has data ready to be
+            // read, the TCP server will enter a spin loop, effectively ignoring
+            // the polling. This shouldn't be too bad because in most cases the
+            // code will immediately parse the response.
+            if active_clients[it].recv_ready_event_present && !emit_ready_event_multiple_times do continue;
+
             recv_clients << active_clients[it];
         }
 
