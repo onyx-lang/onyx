@@ -1,0 +1,179 @@
+package wasi
+
+#if !#defined(WASIX_VERSION) {
+    WASIX_VERSION :: "wasix_32v1"
+}
+
+EventFDFlags :: enum {
+}
+
+TTY :: struct {
+    cols: u32;
+    rows: u32;
+    width: u32;
+    height: u32;
+    stdin_tty: bool;
+    stdout_tty: bool;
+    stderr_tty: bool;
+    echo: bool;
+    line_buffered: bool;
+    line_feeds: bool;
+}
+
+OptionTimestamp :: union #tag_type u8 {
+    None: void;
+    Some: Timestamp;
+}
+
+SockStatus :: enum {
+    Opening;
+    Opened;
+    Closed;
+    Failed;
+}
+
+AddrIPv4 :: struct {
+    n0, n1, h0, h1: u8;
+}
+
+AddrIPv6 :: struct {
+    n0, n1, n2, n3, h0, h1, h2, h3: u8;
+    flow_info1: u16;
+    flow_info0: u16;
+    scope_id1: u16;
+    scope_id0: u16;
+}
+
+Addr :: union #tag_type u8 {
+    Unspec: struct {
+        n0: u8;
+    };
+
+    Ipv4: AddrIPv4;
+
+    Ipv6: AddrIPv6;
+
+    Unix: [108] u8;
+}
+
+AddrPort :: union #tag_type u8 {
+    Unspec: struct {
+        port: u16;
+        n0: u8;
+    };
+
+    Ipv4: struct {
+        port: u16;
+        addr: AddrIPv4;
+    };
+
+    Ipv6: struct {
+        port: u16;
+        addr: AddrIPv6;
+    };
+
+    Unix: struct {
+        path: [108] u8;
+    }
+}
+
+AddressFamily :: enum {
+    Unspec;
+    Inet;
+    Inet6;
+    Unix;    
+}
+
+SockType :: enum {
+    Unused;
+    Stream;
+    Dgram;
+    Raw;
+    Seqpacket;
+}
+
+SockProto :: enum {
+    IP;
+    ICMP;
+    IGMP;
+    IPIP :: 4;    
+    TCP :: 6;
+    EGP :: 8;
+    PUP :: 12;
+    UDP :: 17;
+    IDP :: 22;
+    DCCP :: 33;
+    IPV6 :: 41;
+    ICMPV6 :: 58;
+}
+
+SockOption :: enum {
+    Noop;
+    ReusePort;
+    ReuseAddr;
+    NoDelay;
+    DontRoute;
+    OnlyV6;
+    Broadcast;
+    MulticastLoopV4;
+    MulticastLoopV6;
+    Promiscuous;
+    Listening;
+    LastError;
+    KeepAlive;
+    Linger;
+    OOBInline;
+    RecvBufSize;
+    SendBufSize;
+    RecvLowat;
+    SendLowat;
+    RecvTimeout;
+    SendTimeout;
+    ConnectTimeout;
+    AcceptTimeout;
+    TTL;
+    MulticastTTLV5;
+    Type;
+    Proto;
+}
+
+#foreign WASIX_VERSION {
+    fd_dup :: (fd: FileDescriptor, out: &FileDescriptor) -> Errno ---
+    fd_event :: (init_val: u64, flags: EventFDFlags, fd: &FileDescriptor) -> Errno ---
+    fd_pipe :: (fd1, fd2: &FileDescriptor) -> Errno ---
+
+    tty_get :: (state: &TTY) -> Errno ---
+    tty_set :: (state: &TTY) -> Errno ---
+
+    getcwd :: (path: [&] u8, pathlen: &u32) -> Errno ---
+    chdir  :: (path: cstr) -> Errno ---
+
+    thread_spawn_v2    :: (args: rawptr, tid: &u32) -> Errno ---
+    thread_sleep       :: (duration: Timestamp) -> Errno ---
+    thread_id          :: (tid: &u32) -> Errno ---
+    thread_join        :: (tid: u32) -> Errno ---
+    thread_parallelism :: (size: &u32) -> Errno ---
+
+    futex_wait     :: (futex: &u32, expected: u32, timeout: &OptionTimestamp, out: &bool) -> Errno ---
+    futex_wake     :: (futex: &u32, out: &bool) -> Errno ---
+    futex_wake_all :: (futex: &u32, out: &bool) -> Errno ---
+
+    sock_status :: (fd: FileDescriptor, out: &SockStatus) -> Errno ---
+    sock_addr_local :: (fd: FileDescriptor, addr: &AddrPort) -> Errno ---
+    sock_addr_peer  :: (fd: FileDescriptor, addr: &AddrPort) -> Errno ---
+    sock_open :: (af: AddressFamily, socktype: SockType, sockproto: SockProto, out: &FileDescriptor) -> Errno ---
+    sock_set_opt_flag :: (fd: FileDescriptor, sockopt: SockOption, flag: bool) -> Errno ---
+    sock_get_opt_flag :: (fd: FileDescriptor, sockopt: SockOption, flag: &bool) -> Errno ---
+    sock_set_opt_time :: (fd: FileDescriptor, sockopt: SockOption, flag: &OptionTimestamp) -> Errno ---
+    sock_get_opt_time :: (fd: FileDescriptor, sockopt: SockOption, flag: &OptionTimestamp) -> Errno ---
+    sock_set_opt_size :: (fd: FileDescriptor, sockopt: SockOption, flag: u64) -> Errno ---
+    sock_get_opt_size :: (fd: FileDescriptor, sockopt: SockOption, flag: &u64) -> Errno ---
+    sock_bind :: (fd: FileDescriptor, addr: &AddrPort) -> Errno ---
+    sock_listen :: (fd: FileDescriptor, backlog: i32) -> Errno ---
+    sock_accept_v2 :: (fd: FileDescriptor, flags: FDFlags, out_sock: &FileDescriptor, out_addr: &AddrPort) -> Errno ---
+    sock_connect :: (fd: FileDescriptor, addr: &AddrPort) -> Errno ---
+    sock_recv_from :: (fd: FileDescriptor, data: &IOVec, data_len: Size, flags: RIFlags, written: &Size, oflags: &ROFlags, addr: &AddrPort) -> Errno ---
+    sock_send_to :: (fd: FileDescriptor, data: &IOVec, data_len: Size, flags: SIFlags, addr: &AddrPort, sent: &Size) -> Errno ---
+
+    resolve      :: (host: cstr, port: u16, addr: [&] Addr, addr_len: Size, retaddrs: &Size) -> Errno ---
+}
