@@ -156,6 +156,7 @@ socket_create :: (family: SocketFamily, type: SocketType, proto: SocketProto) ->
 
     s.flags |= .Block_On_Read;
     s.alive = true;
+    s.vtable = &__net_socket_vtable;
 
     return .{ Ok = s };
 }
@@ -478,8 +479,8 @@ ipv4_to_str :: (addr: u32) -> str {
 // This returns a volatile buffer that should be copied.
 ipv6_to_str :: (addr: [16] u8) -> str {
     return iter.as_iter(addr)
-        |> iter.map(x => tprintf("{w2b16}", cast(u32) x))
-        |> iter.collect()
+        ->map(x => tprintf("{w2b16}", cast(u32) x))
+        ->collect()
         |> string.join(" ");
 }
 
