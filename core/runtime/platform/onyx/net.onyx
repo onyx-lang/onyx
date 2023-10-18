@@ -1,0 +1,287 @@
+package runtime.platform
+
+use core.net {
+    SocketFamily,
+    SocketProto,
+    SocketType,
+    SocketOption,
+    SocketAddress,
+    SocketShutdown,
+    SocketStatus
+}
+use core {Result, string, io}
+
+SocketData :: #distinct i32
+
+__net_sock_create :: (af: SocketFamily, type: SocketType, proto: SocketProto) -> Result(SocketData, io.Error) {
+    sock: SocketData;
+
+    err := __net_create_socket(&sock, af, type, proto);
+    if err != .None {
+        return .{ Err = .CreationFailed };
+    }
+    
+    return .{ Ok = sock };
+}
+
+__net_sock_status :: (s: SocketData) => SocketStatus.Unknown;
+
+__net_sock_opt_flag :: (s: SocketData, sockopt: SocketOption, flag: bool) -> bool {
+    __net_setting_flag(s, sockopt, flag);
+    return true;
+}
+
+__net_sock_opt_time :: (s: SocketData, sockopt: SocketOption, time: ? u64) -> bool {
+    return false;
+}
+
+__net_sock_opt_size :: (s: SocketData, sockopt: SocketOption, size: i64) -> bool {
+    return false;
+}
+
+__net_sock_bind :: (s: SocketData, addr: &SocketAddress) -> bool {
+    switch *addr {
+        case &path: .Unix {
+            return __net_bind_unix(s, ~~path);
+        }
+
+        case ipv4: .Inet {
+            return __net_bind_ipv4(s, ipv4.addr, ipv4.port);
+        }
+
+        case host: .HostPort {
+            return __net_bind_host(s, host.host, host.port);
+        }
+
+        case #default do return false;
+    }
+}
+
+__net_sock_listen :: (s: SocketData, backlog: i32) -> bool {
+    return __net_listen(s, backlog) >= 0;
+}
+
+__net_sock_accept :: (s: SocketData, out: &SocketAddress) -> Result(SocketData, io.Error) {
+    addr_buf: [512] u8;
+    addr_len := 512;
+
+    sock := __net_accept(s, &addr_buf, &addr_len);
+    if cast(i32) sock == -1
+    {
+        return .{ Err = .OperationFailed };
+    }
+
+    if cast(i32) sock == -2
+    {
+        return .{ Err = .NoData };
+    }
+
+    addr: &sockaddr_t = ~~addr_buf;
+    sockaddr_to_socket_address(addr, out);
+
+    return .{ Ok = sock };
+}
+
+__net_sock_connect :: (s: SocketData, addr: &SocketAddress) -> io.Error {
+    switch *addr {
+        case &path: .Unix {
+            return __net_connect_unix(s, ~~path)
+                |> translate_error();
+        }
+
+        case i: .Inet {
+            return __net_connect_ipv4(s, i.addr, i.port)
+                |> translate_error();
+        }
+
+        case i: .Inet6 {
+            return __net_connect_ipv6(s, i.addr, i.port)
+                |> translate_error();
+        }
+
+        case h: .HostPort {
+            return __net_connect_host(s, h.host, h.port)
+                |> translate_error();
+        }
+    }
+
+    translate_error :: (s: SocketError) => switch s {
+        case .None => io.Error.None;
+        case .ConnectFailed => .ConnectFailed;
+        case #default => .OperationFailed;
+    }
+}
+
+__net_sock_recv_from :: (s: SocketData, buf: [] u8, out: &SocketAddress) -> Result(i32, io.Error) {
+    addr_buf: [512] u8;
+    addr_len := 512;
+
+    recieved := __net_recvfrom(s, buf, &addr_buf, &addr_len);
+    if recieved == 0 || recieved == -1
+    {
+        return .{ Err = .EOF };
+    }
+
+    if recieved == -2
+    {
+        return .{ Err = .NoData };
+    }
+
+    addr: &sockaddr_t = ~~ &addr_buf;    
+    sockaddr_to_socket_address(addr, out);
+
+    return .{ Ok = recieved };
+}
+
+__net_sock_send_to :: (s: SocketData, buf: [] u8, addr: &SocketAddress) -> Result(i32, io.Error) {
+    sent := switch *addr {
+        case &path: .Unix => __net_sendto_unix(s, buf, ~~path);
+        case i: .Inet     => __net_sendto_ipv4(s, buf, i.addr, i.port);
+        case i: .Inet6    => __net_sendto_ipv6(s, buf, i.addr, i.port);
+        case h: .HostPort => __net_sendto_host(s, buf, h.host, h.port);
+    };
+
+    if sent == 0 || sent == -1
+    {
+        // If there was an error sending data, call the connection closed.
+        return .{ Err = .EOF };
+    }
+
+    if sent == -2
+    {
+        // -2 is used for signalling a non-blocking send that did not successfully
+        // send anything.
+        return .{ Err = .NoData };
+    }
+
+    return .{ Ok = sent };
+}
+
+__net_sock_recv :: (s: SocketData, buf: [] u8) -> Result(i32, io.Error) {
+    recieved := __net_recv(s, buf);
+    if recieved == 0 || recieved == -1
+    {
+        // If there was an error sending data, call the connection closed.
+        return .{ Err = .EOF };
+    }
+
+    if recieved == -2
+    {
+        return .{ Err = .NoData };
+    }
+
+    return .{ Ok = recieved };
+}
+
+__net_sock_send :: (s: SocketData, buf: [] u8) -> Result(i32, io.Error) {
+    sent := __net_send(s, buf);
+    if sent == 0 || sent == -1
+    {
+        // If there was an error sending data, call the connection closed.
+        return .{ Err = .EOF };
+    }
+
+    if sent == -2
+    {
+        // -2 is used for signalling a non-blocking send that did not successfully
+        // send anything.
+        return .{ Err = .NoData };
+    }
+
+    return .{ Ok = sent };
+}
+
+__net_sock_shutdown :: (s: SocketData, how: SocketShutdown) -> io.Error {
+    if __net_shutdown(s, cast(u32) how) < 0 {
+        return .OperationFailed;
+    }
+
+    return .None;
+}
+
+__net_sock_close :: (s: SocketData) -> void {
+    __net_close_socket(s);
+}
+
+__net_resolve :: (host: str, port: u16, out_addrs: [] SocketAddress) -> i32 {
+
+}
+
+
+#package {
+    SocketError :: enum {
+        None :: 0x00;
+        BadSettings :: 0x01;
+        ConnectFailed :: 0x02;
+    }
+
+    sockaddr_t :: struct {
+        family: u16;
+    }
+
+    sockaddr_un_t :: struct {
+        family: u16;
+        path: [256] u8;
+    }
+
+    sockaddr_in_t :: struct {
+        family: u16;
+        port: u16;
+        addr: u32;
+    }
+
+    sockaddr_in6_t :: struct {
+        family: u16;
+        port: u16;
+        flowinfo: u32;
+        addr: [16] u8;
+    }
+
+    sockaddr_to_socket_address :: (addr: &sockaddr_t, out: &SocketAddress) {
+        switch addr.family {
+            case 1 {
+                addr_un: &sockaddr_un_t = ~~addr;
+                *out = .{ Unix = addr_un.path };
+            }
+
+            case 2 {
+                addr_in: &sockaddr_in_t = ~~addr;
+                *out = .{ Inet = .{ addr_in.port, addr_in.addr } };
+            }
+
+            case 10 {
+                addr_in6: &sockaddr_in6_t = ~~addr;
+                *out = .{ Inet6 = .{ addr_in6.port, addr_in6.addr } };
+            }
+        }
+    }
+
+    #foreign "onyx_runtime" {
+        __net_create_socket :: (out_handle: &SocketData, family: SocketFamily, type: SocketType, proto: SocketProto) -> SocketError ---
+        __net_close_socket  :: (handle: SocketData) -> void ---
+        __net_shutdown      :: (handle: SocketData, how: u32) -> i32 ---
+        __net_listen        :: (handle: SocketData, backlog: i32) -> i32 ---
+
+        __net_connect_unix  :: (handle: SocketData, path: cstr) -> SocketError ---
+        __net_connect_ipv4  :: (handle: SocketData, addr: u32, port: u16) -> SocketError ---
+        __net_connect_ipv6  :: (handle: SocketData, addr: [16] u8, port: u16) -> SocketError ---
+        __net_connect_host  :: (handle: SocketData, host: str, port: u16) -> SocketError ---
+
+        __net_bind_unix     :: (handle: SocketData, path: cstr) -> bool ---
+        __net_bind_ipv4     :: (handle: SocketData, addr: u32, port: u16) -> bool ---
+        __net_bind_host     :: (handle: SocketData, host: str, port: u16) -> bool ---
+
+        __net_accept        :: (handle: SocketData, out_buf: rawptr, out_len: &i32) -> SocketData ---
+
+        __net_send          :: (handle: SocketData, data: [] u8)  -> i32 ---
+        __net_sendto_unix   :: (handle: SocketData, data: [] u8, path: cstr)  -> i32 ---
+        __net_sendto_ipv4   :: (handle: SocketData, data: [] u8, addr: u32, port: u16) -> i32 ---
+        __net_sendto_ipv6   :: (handle: SocketData, data: [] u8, addr: [16] u8, port: u16) -> i32 ---
+        __net_sendto_host   :: (handle: SocketData, data: [] u8, host: str, port: u16) -> i32 ---
+
+        __net_recv          :: (handle: SocketData, data: [] u8) -> i32 ---
+        __net_recvfrom      :: (handle: SocketData, data: [] u8, out_buf: rawptr, out_len: &i32) -> i32 ---
+
+        __net_setting_flag  :: (handle: SocketData, setting: SocketOption, value: bool) -> void ---
+    }
+}
