@@ -71,6 +71,14 @@ SocketShutdown :: enum {
     ReadWrite :: 2;
 }
 
+SocketStatus :: enum {
+    Unknown :: 0x00;
+    Opening :: 0x01;
+    Open    :: 0x02;
+    Closed  :: 0x03;
+    Errored :: 0x04;
+}
+
 #local UNIX_SOCKET_PATH_LEN :: 256
 
 SocketAddress :: union {
@@ -175,6 +183,15 @@ socket_option :: (s: &Socket, setting: SocketOption, flag: bool) {
 }
 
 socket_is_alive :: (s: &Socket) -> bool {
+    if !s.alive do return false;
+
+    if stat := runtime.platform.__net_sock_status(s.handle); stat != .Unknown {
+        s.alive = stat != .Errored && stat != .Closed;
+        if !s.alive {
+            socket_close(s);
+        }
+    }
+
     return s.alive;
 }
 
@@ -252,6 +269,8 @@ socket_poll :: (socket: &Socket, timeout := -1) -> Socket_Poll_Status {
 }
 
 socket_send :: (s: &Socket, data: [] u8) -> i32 {
+    if !s->is_alive() do return -1;
+
     res := runtime.platform.__net_sock_send(s.handle, data);
     res.Err->with([err] {
         if err == .EOF {
@@ -263,6 +282,8 @@ socket_send :: (s: &Socket, data: [] u8) -> i32 {
 }
 
 socket_sendto :: (s: &Socket, data: [] u8, addr: &SocketAddress) -> i32 {
+    if !s->is_alive() do return -1;
+
     res := runtime.platform.__net_sock_send_to(s.handle, data, addr);
     res.Err->with([err] {
         if err == .EOF {
@@ -274,6 +295,8 @@ socket_sendto :: (s: &Socket, data: [] u8, addr: &SocketAddress) -> i32 {
 }
 
 socket_sendall :: (s: &Socket, data: [] u8) {
+    if !s->is_alive() do return;
+
     to_send := data;
 
     while to_send.count > 0 {
@@ -284,6 +307,8 @@ socket_sendall :: (s: &Socket, data: [] u8) {
 }
 
 socket_recv :: (s: &Socket, maxlen := 1024, allocator := context.allocator) -> ? [] u8 {
+    if !s->is_alive() do return .{};
+
     buffer := alloc.array_from_stack(u8, maxlen);
     res := runtime.platform.__net_sock_recv(s.handle, buffer);
     res.Err->with([err] {
@@ -300,6 +325,8 @@ socket_recv :: (s: &Socket, maxlen := 1024, allocator := context.allocator) -> ?
 }
 
 socket_recv_into :: (s: &Socket, buffer: [] u8) -> i32 {
+    if !s->is_alive() do return 0;
+
     res := runtime.platform.__net_sock_recv(s.handle, buffer);
     res.Err->with([err] {
         if err == .EOF {
@@ -320,6 +347,8 @@ SocketRecvFromResult :: struct {
 }
 
 socket_recvfrom :: (s: &Socket, buffer: [] u8) -> ? SocketRecvFromResult {
+    if !s->is_alive() do return .{};
+
     sender_addr: SocketAddress;
     res := runtime.platform.__net_sock_recv_from(s.handle, buffer, &sender_addr);
     res.Err->with([err] {
@@ -345,7 +374,7 @@ socket_recvfrom :: (s: &Socket, buffer: [] u8) -> ? SocketRecvFromResult {
 #local __net_socket_vtable := io.Stream_Vtable.{
     read = (use s: &Socket, buffer: [] u8) -> (io.Error, u32) {
         if cast(i32) handle == 0 do return .BadFile, 0;
-        if !alive do return .BadFile, 0;
+        if !s->is_alive() do return .EOF, 0;
         
         res := runtime.platform.__net_sock_recv(handle, buffer);
         res->ok()->with([bytes_read] {
@@ -366,6 +395,7 @@ socket_recvfrom :: (s: &Socket, buffer: [] u8) -> ? SocketRecvFromResult {
 
     write_byte = (use s: &Socket, byte: u8) -> io.Error {
         if cast(i32) handle == 0 do return .BadFile;
+        if !s->is_alive() do return .EOF;
 
         res := runtime.platform.__net_sock_send(handle, .[ byte ]);
         res->err()->with([err] {
@@ -382,6 +412,7 @@ socket_recvfrom :: (s: &Socket, buffer: [] u8) -> ? SocketRecvFromResult {
 
     write = (use s: &Socket, buffer: [] u8) -> (io.Error, u32) {
         if cast(i32) handle == 0 do return .BadFile, 0;
+        if !s->is_alive() do return .EOF, 0;
         
         res := runtime.platform.__net_sock_send(handle, buffer);
         res->err()->with([err] {
@@ -397,6 +428,7 @@ socket_recvfrom :: (s: &Socket, buffer: [] u8) -> ? SocketRecvFromResult {
 
     poll = (use s: &Socket, ev: io.PollEvent, timeout: i32) -> (io.Error, bool) {
         if ev == .Write do return .None, true;
+        if !s->is_alive() do return .None, false;
 
         status := socket_poll(s, timeout);
 

@@ -6,7 +6,8 @@ use core.net {
     SocketType,
     SocketOption,
     SocketAddress,
-    SocketShutdown
+    SocketShutdown,
+    SocketStatus
 }
 use core {Result, string, io}
 
@@ -22,6 +23,8 @@ __net_sock_create :: (af: SocketFamily, type: SocketType, proto: SocketProto) ->
     
     return .{ Ok = sock };
 }
+
+__net_sock_status :: (s: SocketData) => SocketStatus.Unknown;
 
 __net_sock_opt_flag :: (s: SocketData, sockopt: SocketOption, flag: bool) -> bool {
     __net_setting_flag(s, sockopt, flag);

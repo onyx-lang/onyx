@@ -345,6 +345,8 @@ wait_to_get_client_messages :: (use server: &TCP_Server) -> [] &TCP_Server.Clien
         if it == null do continue;
 
         if it.state == .Alive {
+            if !it.socket->is_alive() do continue;
+
             active_clients[active_clients.count] = it;
             active_clients.count += 1;
         }
