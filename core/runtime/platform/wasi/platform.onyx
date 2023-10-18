@@ -39,6 +39,7 @@ Supports_Env_Vars :: true
 #if #defined(runtime.vars.WASIX) {
     Supports_Networking :: true
     Supports_Futexes :: true
+    Supports_TTY :: true
 
     #load "./wasix_defs"
     #load "./wasix_net"
@@ -47,9 +48,8 @@ Supports_Env_Vars :: true
 } else {
     Supports_Networking :: false
     Supports_Futexes :: false
+    Supports_TTY :: false
 }
-
-Supports_TTY :: false
 
 __output_string :: (s: str) -> u32 {
     STDOUT_FILENO :: 1
