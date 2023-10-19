@@ -620,6 +620,33 @@ chunks :: (arr: [] $T, width: i32) -> Iterator([] T) {
 }
 
 
+#doc """
+"""
+group_by :: #match #local {}
+
+#overload
+group_by :: macro (arr: [] $T, comp: (T, T) -> bool, allocator := context.allocator) -> [..] [] T {
+    return #this_package.group_by(arr, [a, b](comp(a, b)), allocator);
+}
+
+#overload
+group_by :: macro (arr_: [] $T, comp: Code, allocator := context.allocator) -> [..] [] T {
+    out := make([..] [] T, allocator);
+    start := 0;
+    arr := arr_;
+    for i: 1 .. arr.count {
+        if !#unquote comp(arr[start], arr[i]) {
+            out << arr[start .. i];
+            start = i;
+        }
+    }
+
+    out << arr[start .. arr.count];
+    return out;
+}
+
+
+
 #local HasEquals :: interface (t: $T) {
     { t == t } -> bool;
 }
