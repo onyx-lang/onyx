@@ -12,10 +12,6 @@ use core.os
 use core.iter
 use runtime
 
-#if !runtime.Multi_Threading_Enabled {
-    #error "Expected multi-threading to be enabled for TCP server.";
-}
-
 // Should TCP_Connection be an abstraction of both the client and the server?
 // Or is there not enough shared between them to justify that?
 TCP_Connection :: struct {
