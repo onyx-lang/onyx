@@ -621,6 +621,11 @@ chunks :: (arr: [] $T, width: i32) -> Iterator([] T) {
 
 
 #doc """
+    Groups a slice into sub-slices using the comparison function.
+
+    `comp` should evaluate to a boolean value.
+
+    Expects slice to sorted so all equal values are next to each other.
 """
 group_by :: #match #local {}
 
