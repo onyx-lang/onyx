@@ -9,12 +9,17 @@ Additions:
 - `switch` expressions.
     - `switch` can appear at the expression level, and uses `case X => value` to
       specify cases.
+- `cbindgen` now supports passing functions as arguments.
+    - Internally uses dyncallback
+    - Only for OVM-wasm and Linux, for now.
 - Scoped values in interfaces. `X :: ...` is allowed in an interface now.
 - `#inject` works on interfaces.
 - Polling to the `io.Stream` functionality.
     - Used to query when data is read/write-able from a stream, for supported streams.
     - `io.stream_poll`
 - `misc.any_unwrap` to unwrap an `any` containing an optional.
+- `json.decode_with_result`
+- `json.decode_into`
 - When debugging, `/ 0` or `% 0` will trigger an exception to debug the error.
 
 Removals:
@@ -29,6 +34,7 @@ Bugfixes:
 - `X.foo` would not work if `X` was a pointer to a union.
 - Captures by pointer would break if the value was a primitive whose address wasn't
   taken anywhere else.
+- Symbol name reported by documentation generation was incorrect for some methods.
 
 
 
