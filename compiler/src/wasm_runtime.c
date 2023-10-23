@@ -202,6 +202,11 @@ static void lookup_and_load_custom_libraries(LinkLibraryContext *ctx, bh_arr(Was
 
 #ifdef USE_DYNCALL
 
+//
+// This code implements the ability to use `dyncall:some_library.so` as the
+// module import name to dynamically load a shared library at runtime.
+//
+
 typedef struct DynCallContext {
     void (*func)();
     char types[64];
@@ -288,6 +293,84 @@ static wasm_func_t *link_and_prepare_dyncall_function(
 
     wasm_func_t *wasm_func = wasm_func_new_with_env(wasm_store, functype, &__wasm_dyncall, dcc, NULL);
     return wasm_func;
+}
+
+
+//
+// This code implements the ability to wrap a wasm function in a callback
+// that can be handed to a library that expects a C function.
+//
+
+typedef struct DynCallbackContext {
+    wasm_func_t *wasm_func;
+    char *sig;
+} DynCallbackContext;
+
+static DCsigchar __wasm_dyncallback(DCCallback *cb, DCArgs *args, DCValue *result, void *userdata) {
+    DynCallbackContext *ctx = userdata;
+    int arg_count = bh_str_last_index_of(ctx->sig, ')');
+
+    wasm_val_vec_t wasm_args;
+    wasm_val_vec_new_uninitialized(&wasm_args, arg_count);
+
+    for (int i = 0; i < arg_count; i++) {
+        switch (ctx->sig[i]) {
+            case 'B': wasm_args.data[i] = WASM_I32_VAL(dcbArgBool(args)); break;
+            case 'c': wasm_args.data[i] = WASM_I32_VAL(dcbArgChar(args)); break;
+            case 'C': wasm_args.data[i] = WASM_I32_VAL(dcbArgUChar(args)); break;
+            case 's': wasm_args.data[i] = WASM_I32_VAL(dcbArgShort(args)); break;
+            case 'S': wasm_args.data[i] = WASM_I32_VAL(dcbArgUShort(args)); break;
+            case 'i': wasm_args.data[i] = WASM_I32_VAL(dcbArgInt(args)); break;
+            case 'I': wasm_args.data[i] = WASM_I32_VAL(dcbArgUInt(args)); break;
+            case 'j': wasm_args.data[i] = WASM_I64_VAL(dcbArgLong(args)); break;
+            case 'J': wasm_args.data[i] = WASM_I64_VAL(dcbArgULong(args)); break;
+            case 'l': wasm_args.data[i] = WASM_I64_VAL(dcbArgLongLong(args)); break;
+            case 'L': wasm_args.data[i] = WASM_I64_VAL(dcbArgULongLong(args)); break;
+            case 'f': wasm_args.data[i] = WASM_F32_VAL(dcbArgFloat(args)); break;
+            case 'd': wasm_args.data[i] = WASM_F64_VAL(dcbArgDouble(args)); break;
+            case 'p': wasm_args.data[i] = WASM_I64_VAL((uintptr_t) dcbArgPointer(args)); break;
+        }
+    }
+
+    wasm_val_vec_t wasm_results;
+    wasm_val_vec_new_uninitialized(&wasm_results, 1);
+
+    wasm_func_call(ctx->wasm_func, &wasm_args, &wasm_results);
+
+    switch (ctx->sig[arg_count + 1]) {
+        case 'B': result->B = wasm_results.data[0].of.i32; break;
+        case 'c': result->c = wasm_results.data[0].of.i32; break;
+        case 'C': result->C = wasm_results.data[0].of.i32; break;
+        case 's': result->s = wasm_results.data[0].of.i32; break;
+        case 'S': result->S = wasm_results.data[0].of.i32; break;
+        case 'i': result->i = wasm_results.data[0].of.i32; break;
+        case 'I': result->I = wasm_results.data[0].of.i32; break;
+        case 'j': result->j = wasm_results.data[0].of.i64; break;
+        case 'J': result->J = wasm_results.data[0].of.i64; break;
+        case 'l': result->l = wasm_results.data[0].of.i64; break;
+        case 'L': result->L = wasm_results.data[0].of.i64; break;
+        case 'f': result->f = wasm_results.data[0].of.f32; break;
+        case 'd': result->d = wasm_results.data[0].of.f64; break;
+        case 'p': result->p = (void *) wasm_results.data[0].of.i64; break;
+    }
+
+    wasm_val_vec_delete(&wasm_args);
+    wasm_val_vec_delete(&wasm_results);
+
+    return ctx->sig[arg_count + 1];
+}
+
+static void (* wasm_func_from_idx(wasm_table_t *func_table, unsigned int index, char *signature))(void) {
+    wasm_ref_t *func_ref = wasm_table_get(func_table, index);
+    assert(func_ref); // TODO: Switch to trap
+
+    wasm_func_t *func = wasm_ref_as_func(func_ref);
+
+    DynCallbackContext *dcc = bh_alloc_item(bh_heap_allocator(), DynCallbackContext);
+    dcc->wasm_func = func;
+    dcc->sig = signature;
+
+    return (void (*)()) dcbNewCallback(signature, &__wasm_dyncallback, dcc);
 }
 
 #endif // USE_DYNCALL
@@ -560,6 +643,13 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     wasm_runtime.wasm_imports = wasm_imports;
     wasm_runtime.wasm_memory = wasm_memory;
     wasm_runtime.wasm_instance = wasm_instance;
+    wasm_runtime.wasm_func_table = wasm_extern_as_table(
+        wasm_extern_lookup_by_name(wasm_module, wasm_instance, "__indirect_function_table")
+    );
+
+#ifdef USE_DYNCALL
+    wasm_runtime.wasm_func_from_idx = wasm_func_from_idx;
+#endif
     
     wasm_runtime.argc = argc;
     wasm_runtime.argv = argv;

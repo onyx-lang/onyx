@@ -19,12 +19,12 @@ typedef struct OnyxRuntime {
     wasm_memory_t* wasm_memory;
     wasm_engine_t *wasm_engine;
     wasm_extern_vec_t wasm_imports;
+    wasm_table_t *wasm_func_table;
 
     int argc;
     char **argv;
 
-    // HACK HACK HACK
-    // There should need to be this much stuff in here, but because Wasmer doesn't ship a "wasmerdll.lib"
+    // There shouldn't need to be this much stuff in here, but because Wasmer doesn't ship a "wasmerdll.lib"
     // file for windows, it is impossible for it to link successfully against the function provided in onyx.exe.
     // Therefore, we must serve as the linker and do this manually. Hopefully that library file will be
     // shipped soon so this can go away...
@@ -36,6 +36,10 @@ typedef struct OnyxRuntime {
     void (*onyx_print_trap)(wasm_trap_t* trap);
     wasm_store_t *(*wasm_store_new)(wasm_engine_t *engine);
     void (*wasm_store_delete)(wasm_store_t *store);
+
+    // This is only set when using the OVMwasm runtime, as Wasmer's C-api does not allow
+    // for this function to exist, yet.
+    void (*(*wasm_func_from_idx)(wasm_table_t *table, unsigned int index, char *signature))(void);
 } OnyxRuntime;
 
 OnyxRuntime* runtime;

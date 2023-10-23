@@ -242,6 +242,7 @@ static void prepare_instance(wasm_instance_t *instance, const wasm_extern_vec_t 
         wasm_table_t *table = wasm_table_new(instance->store, instance->module->tabletypes.data[i], NULL);
         table->inner.table.engine     = ovm_engine;
         table->inner.table.program    = ovm_program;
+        table->inner.table.instance   = instance;
         table->inner.table.static_arr = instance->module->tabletypes.data[i]->type.table.static_arr;
 
         bh_arr_push(instance->tables, table);

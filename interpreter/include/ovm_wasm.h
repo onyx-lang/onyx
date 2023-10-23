@@ -94,7 +94,17 @@ struct wasm_exporttype_t {
 
 // Runtime Objects
 
+enum wasm_ref_stored_obj_t {
+    wasm_ref_stored_obj_unknown,
+    wasm_ref_stored_obj_func,
+};
+
 struct wasm_ref_t {
+    enum wasm_ref_stored_obj_t stored_obj;
+
+    union {
+        struct wasm_func_t *func;
+    };
 };
 
 struct wasm_frame_t {
@@ -180,6 +190,7 @@ struct wasm_global_inner_t {
 struct wasm_table_inner_t {
     ovm_program_t *program;
     ovm_engine_t  *engine;
+    struct wasm_instance_t *instance;
 
     int static_arr;
 
