@@ -19,7 +19,6 @@ typedef struct OnyxRuntime {
     wasm_memory_t* wasm_memory;
     wasm_engine_t *wasm_engine;
     wasm_extern_vec_t wasm_imports;
-    wasm_table_t *wasm_func_table;
 
     int argc;
     char **argv;
@@ -39,6 +38,7 @@ typedef struct OnyxRuntime {
 
     // This is only set when using the OVMwasm runtime, as Wasmer's C-api does not allow
     // for this function to exist, yet.
+    wasm_table_t *wasm_func_table;
     void (*(*wasm_func_from_idx)(wasm_table_t *table, unsigned int index, char *signature))(void);
 } OnyxRuntime;
 

@@ -308,7 +308,7 @@ typedef struct DynCallbackContext {
 
 static DCsigchar __wasm_dyncallback(DCCallback *cb, DCArgs *args, DCValue *result, void *userdata) {
     DynCallbackContext *ctx = userdata;
-    int arg_count = bh_str_last_index_of(ctx->sig, ')');
+    int arg_count = bh_str_last_index_of(ctx->sig, ')') - 1;
 
     wasm_val_vec_t wasm_args;
     wasm_val_vec_new_uninitialized(&wasm_args, arg_count);
