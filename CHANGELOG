@@ -20,7 +20,7 @@ Additions:
 - `misc.any_unwrap` to unwrap an `any` containing an optional.
 - `json.decode_with_result`
 - `json.decode_into`
-- When debugging, `/ 0` or `% 0` will trigger an exception to debug the error.
+- `slice.group_by`
 
 Removals:
 
@@ -28,6 +28,7 @@ Changes:
 - Complete overhaul of networking in the core library.
     - Backwards compatiblity was not strictly maintained, but common functions did
       not change, like `socket_send` and `socket_recv`.
+- When debugging, `/ 0` or `% 0` will trigger an exception to debug the error.
 
 Bugfixes:
 - `alloc.atomic` package was broken when `sync` package was missing.
