@@ -1,6 +1,6 @@
 Release v0.1.7
 --------------
-Unreleased
+October 25th, 2023
 
 Additions:
 - Support for WASIX, a new, extended standard to WASI, popularized by Wasmer.
