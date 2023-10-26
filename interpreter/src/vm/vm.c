@@ -353,6 +353,8 @@ ovm_value_t ovm_func_call(ovm_engine_t *engine, ovm_state_t *state, ovm_program_
     ovm_func_t *func = &program->funcs[func_idx];
     ovm_assert(func->value_number_count >= func->param_count);
 
+    state->call_depth += 1;
+
     switch (func->kind) {
         case OVM_FUNC_INTERNAL: {
             ovm__func_setup_stack_frame(state, func, 0);
@@ -364,6 +366,7 @@ ovm_value_t ovm_func_call(ovm_engine_t *engine, ovm_state_t *state, ovm_program_
             state->pc = func->start_instr;
             ovm_value_t result = ovm_run_code(engine, state, program);
 
+            state->call_depth -= 1;
             return result;
         }
 
@@ -375,6 +378,8 @@ ovm_value_t ovm_func_call(ovm_engine_t *engine, ovm_state_t *state, ovm_program_
             external_func.native_func(external_func.userdata, params, &result);
 
             ovm__func_teardown_stack_frame(state);
+
+            state->call_depth -= 1;
             return result;
         }
 

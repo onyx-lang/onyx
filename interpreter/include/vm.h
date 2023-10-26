@@ -164,6 +164,7 @@ struct ovm_state_t {
     ovm_value_t *__frame_values;
 
     debug_thread_state_t *debug;
+    i32                   call_depth;
 };
 
 ovm_state_t *ovm_state_new(ovm_engine_t *engine, ovm_program_t *program);

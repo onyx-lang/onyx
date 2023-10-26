@@ -586,6 +586,7 @@ void onyx_run_initialize(b32 debug_enabled) {
     wasm_runtime.wasm_extern_as_func = &wasm_extern_as_func;
     wasm_runtime.wasm_func_call = &wasm_func_call;
     wasm_runtime.wasm_instance_new = &wasm_instance_new;
+    wasm_runtime.wasm_instance_delete = &wasm_instance_delete;
     wasm_runtime.wasm_store_new = &wasm_store_new;
     wasm_runtime.wasm_store_delete = &wasm_store_delete;
     wasm_runtime.onyx_print_trap = &onyx_print_trap;

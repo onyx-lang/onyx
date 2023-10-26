@@ -78,6 +78,7 @@ static i32 onyx_run_thread(void *data) {
         trap = runtime->wasm_func_call(exit_func, &args_array, &results);
     }
 
+    runtime->wasm_instance_delete(thread->instance);
     runtime->wasm_store_delete(wasm_store);
 
     return 0;

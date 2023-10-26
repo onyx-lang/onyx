@@ -40,6 +40,8 @@ typedef struct OnyxRuntime {
     // for this function to exist, yet.
     wasm_table_t *wasm_func_table;
     void (*(*wasm_func_from_idx)(wasm_table_t *table, unsigned int index, char *signature))(void);
+
+    void (*wasm_instance_delete)(wasm_instance_t *instance);
 } OnyxRuntime;
 
 OnyxRuntime* runtime;

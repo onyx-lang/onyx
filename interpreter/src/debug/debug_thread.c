@@ -25,7 +25,6 @@
 #define EVT_NOP 0
 #define EVT_BRK_HIT 1
 #define EVT_PAUSE 2
-#define EVT_NEW_THREAD 3 // Not Implemented
 #define EVT_RESPONSE 0xffffffff
 
 struct msg_parse_ctx_t {
@@ -608,6 +607,15 @@ void *__debug_thread_entry(void * data) {
     char command[4096];
     while (debug->debug_thread_running) {
         poll(poll_fds, 2, 1000);
+
+        //
+        // If there are no functions on the main thread,
+        // assume the program has exited and do not continue to
+        // do anything.
+        if (debug->threads[0]->ovm_state->call_depth <= 0) {
+            debug->debug_thread_running = false;
+            break;
+        }
 
         //
         // Try to read commands from the client.

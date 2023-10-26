@@ -98,7 +98,7 @@
                             "onyxFiles": {
                                 "type": "array",
                                 "description": "The Onyx files for compiling.",
-                                "default": "[]"
+                                "default": []
                             },
                             "workingDir": {
                                 "type": "string",
