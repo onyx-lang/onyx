@@ -42,6 +42,10 @@ package cbindgen
 
 use runtime
 
+customize :: struct {
+    symbol_name: str;
+}
+
 #if #defined (runtime.Generated_Foreign_Info) {
 
 use core {package, *}
@@ -55,10 +59,6 @@ use simd {*}
     }
 }
 
-
-customize :: struct {
-    symbol_name: str;
-}
 
 Cast_Mapping :: struct {
     type: type_expr;
@@ -246,12 +246,59 @@ compile_c_file :: (
 
         param_num := 0;
         for method_info.parameter_types {
-            if get_type_info(it).kind == .Slice {
+            it_info := it->info();
+
+            if it_info.kind == .Slice {
                 io.write_format(&callw, "ONYX_PTR(P({}, i32)), P({}, i32)", param_num, param_num + 1);
                 param_num += 1;
 
             } elseif is_pointer(it) {
                 io.write_format(&callw, "ONYX_PTR(P({}, i32))", param_num);
+            
+            } elseif it_info.kind == .Function {
+                call_signature := make(dyn_str);
+                defer delete(&call_signature);
+
+                func_info := it_info->as_function();
+                for p: func_info.parameter_types {
+                    map_to_dyncall(p, &call_signature);
+                }
+
+                string.append(&call_signature, ")");
+                map_to_dyncall(func_info.return_type, &call_signature);
+
+                io.write_format(&callw, "(void *) runtime->wasm_func_from_idx(runtime->wasm_func_table, P({}, i32), \"{}\")", param_num, cast(str) call_signature);
+
+                map_to_dyncall :: (t: type_expr, call_signature: &dyn_str) {
+                    p := t;
+                    switch i := t->info(); i.kind {
+                        case .Distinct {
+                            p = i->as_distinct().base_type;
+                        }
+                    }
+
+                    switch p {
+                        case void do string.append(call_signature, "v");
+                        case bool do string.append(call_signature, "B");
+                        case i8   do string.append(call_signature, "c");
+                        case u8   do string.append(call_signature, "C");
+                        case i16  do string.append(call_signature, "s");
+                        case u16  do string.append(call_signature, "S");
+                        case i32  do string.append(call_signature, "i");
+                        case u32  do string.append(call_signature, "I");
+                        case i64  do string.append(call_signature, "l");
+                        case u64  do string.append(call_signature, "L");
+                        case f32  do string.append(call_signature, "f");
+                        case f64  do string.append(call_signature, "d");
+                        case #default {
+                            if is_pointer(p) {
+                                string.append(call_signature, "p");
+                            } else {
+                                assert(false, tprintf("Unsupported type in function pointer: {}", p));
+                            }
+                        }
+                    }
+                }
 
             } else {
                 matched := false;
@@ -318,7 +365,7 @@ compile_c_file :: (
             case .Multi_Pointer do return "ptr"; 
             case .Array do return "ptr";
 
-            case .Function do assert(false, "Passing functions between wasm and c is not yet supported.");
+            case .Function do return "i32"; // assert(false, "Passing functions between wasm and c is not yet supported.");
             case .Slice do assert(false, "Passing a slice from c to wasm is not yet supported.");
             case .Enum do return type_to_wasm_type((cast(&Type_Info_Enum) param_info).backing_type);
             case .Distinct do return type_to_wasm_type((cast(&Type_Info_Distinct) param_info).base_type);
@@ -373,7 +420,7 @@ compile_c_file :: (
 
             case .Pointer do return "WASM_I32"; // This will also have to depend on the pointer size...
             case .Multi_Pointer do return "WASM_I32"; // This will also have to depend on the pointer size...
-            case .Function do assert(false, "Passing functions between wasm and c is not yet supported.");
+            case .Function do return "WASM_I32, WASM_I32, WASM_I32"; // assert(false, "Passing functions between wasm and c is not yet supported.");
             case .Array do return "WASM_I32";
             case .Slice do return "WASM_I32,WASM_I32";
             case .Enum do return type_encoding((cast(&Type_Info_Enum) param_info).backing_type);

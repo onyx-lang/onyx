@@ -82,16 +82,26 @@ OVMI_INSTR_EXEC(nop) {
 OVM_OP_EXEC(add, +)
 OVM_OP_EXEC(sub, -)
 OVM_OP_EXEC(mul, *)
-OVM_OP_EXEC(div_s, /)
-OVM_OP_UNSIGNED_EXEC(div, /)
-OVM_OP_INTEGER_UNSIGNED_EXEC(rem, %)
-OVM_OP_INTEGER_EXEC(rem_s, %)
 OVM_OP_INTEGER_UNSIGNED_EXEC(and, &)
 OVM_OP_INTEGER_UNSIGNED_EXEC(or, |)
 OVM_OP_INTEGER_UNSIGNED_EXEC(xor, ^)
 OVM_OP_INTEGER_UNSIGNED_EXEC(shl, <<)
 OVM_OP_INTEGER_UNSIGNED_EXEC(shr, >>)
 OVM_OP_INTEGER_EXEC(sar, >>)
+
+#undef OVM_OP
+
+
+#define OVM_OP(t, op, ctype) \
+    ovm_assert(VAL(instr->a).type == t && VAL(instr->b).type == t); \
+    OVMI_DIVIDE_CHECK_HOOK(ctype); \
+    VAL(instr->r).ctype = VAL(instr->a).ctype op VAL(instr->b).ctype; \
+    VAL(instr->r).type = t;
+
+OVM_OP_EXEC(div_s, /)
+OVM_OP_UNSIGNED_EXEC(div, /)
+OVM_OP_INTEGER_UNSIGNED_EXEC(rem, %)
+OVM_OP_INTEGER_EXEC(rem_s, %)
 
 #undef OVM_OP
 
@@ -641,4 +651,5 @@ static ovmi_instr_exec_t OVMI_DISPATCH_NAME[] = {
 #undef OVMI_DISPATCH_NAME
 #undef OVMI_DEBUG_HOOK
 #undef OVMI_EXCEPTION_HOOK
+#undef OVMI_DIVIDE_CHECK_HOOK
 

@@ -212,7 +212,9 @@ read_fill_buffer :: (use reader: &Reader, bytes: [] u8) -> Error {
         write_index += to_write;
         start += to_write;
 
-        reader_read_next_chunk(reader);
+        if n > 0 {
+            reader_read_next_chunk(reader);
+        }
     }
 
     last_byte = cast(i32) bytes[write_index - 1];
@@ -640,7 +642,8 @@ lines :: (r: &Reader, inplace := false, allocator := context.allocator) =>
     // 'stream_poll' that tests if the next read would block, but that
     // can happen later.
     if end > 0 && stream.flags & .Block_On_Read {
-        return .None;
+        _, data_available := stream_poll(stream, .Read, 0);
+        if !data_available do return .None;
     }
 
     err, n := stream_read(stream, buffer[end .. buffer.count]);

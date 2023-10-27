@@ -362,7 +362,7 @@ fornode_expr_checked:
     return Check_Success;
 }
 
-static b32 add_case_to_switch_statement(AstSwitch* switchnode, u64 case_value, AstBlock* block, OnyxFilePos pos) {
+static b32 add_case_to_switch_statement(AstSwitch* switchnode, u64 case_value, AstSwitchCase* casestmt, OnyxFilePos pos) {
     assert(switchnode->switch_kind == Switch_Kind_Integer || switchnode->switch_kind == Switch_Kind_Union);
 
     switchnode->min_case = bh_min(switchnode->min_case, case_value);
@@ -373,7 +373,7 @@ static b32 add_case_to_switch_statement(AstSwitch* switchnode, u64 case_value, A
         return 1;
     }
 
-    bh_imap_put(&switchnode->case_map, case_value, (u64) block);
+    bh_imap_put(&switchnode->case_map, case_value, (u64) casestmt);
     return 0;
 }
 
@@ -488,7 +488,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
         AstSwitchCase *sc = switchnode->cases[i];
 
         if (sc->capture && bh_arr_length(sc->values) != 1) {
-            ERROR(sc->token->pos, "Expected exactly one value in switch-case when using a capture, i.e. `case X => Y { ... }`.");
+            ERROR(sc->token->pos, "Expected exactly one value in switch-case when using a capture, i.e. `case value: X { ... }`.");
         }
 
         if (sc->capture && switchnode->switch_kind != Switch_Kind_Union) {
@@ -519,7 +519,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
                 // NOTE: This is inclusive!!!!
                 fori (case_value, lower, upper + 1) {
-                    if (add_case_to_switch_statement(switchnode, case_value, sc->block, rl->token->pos))
+                    if (add_case_to_switch_statement(switchnode, case_value, sc, rl->token->pos))
                         return Check_Error;
                 }
 
@@ -573,7 +573,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                     if (!is_valid)
                         ERROR_((*value)->token->pos, "Case statement expected compile time known integer. Got '%s'.", onyx_ast_node_kind_string((*value)->kind));
 
-                    if (add_case_to_switch_statement(switchnode, integer_value, sc->block, sc->block->token->pos))
+                    if (add_case_to_switch_statement(switchnode, integer_value, sc, sc->block->token->pos))
                         return Check_Error;
 
                     break;
@@ -592,7 +592,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                     if (found) break;
 
                     CaseToBlock ctb;
-                    ctb.block = sc->block;
+                    ctb.casestmt = sc;
                     ctb.original_value = *value;
                     ctb.comparison = make_binary_op(context.ast_alloc, Binary_Op_Equal, switchnode->expr, *value);
                     ctb.comparison->token = (*value)->token;
@@ -607,13 +607,52 @@ CheckStatus check_switch(AstSwitch* switchnode) {
         sc->flags |= Ast_Flag_Has_Been_Checked;
 
       check_switch_case_block:
-        CHECK(block, sc->block);
+        if (switchnode->is_expr) {
+            if (!sc->body_is_expr) {
+                onyx_report_error(sc->token->pos, Error_Critical, "Inside a switch expression, all cases must return a value.");
+                ERROR(sc->token->pos, "Change the case statement to look like 'case X => expr'.");
+            }
+        } else {
+            if (sc->body_is_expr) {
+                ERROR(sc->token->pos, "This kind of case statement is only allowed in switch expressions, not switch statements.");
+            }
+        }
+
+        if (sc->body_is_expr) {
+            CHECK(expression, &sc->expr);
+            if (switchnode->type == NULL) {
+                switchnode->type = resolve_expression_type(sc->expr);
+            } else {
+                TYPE_CHECK(&sc->expr, switchnode->type) { 
+                    ERROR_(sc->token->pos, "Expected case expression to be of type '%s', got '%s'.",
+                        type_get_name(switchnode->type),
+                        type_get_name(sc->expr->type));
+                }
+            }
+
+        } else {
+            CHECK(block, sc->block);
+        }
 
         switchnode->yield_return_index += 1;
     }
 
     if (switchnode->default_case) {
-        CHECK(block, switchnode->default_case);
+        if (switchnode->is_expr) {
+            AstTyped **default_case = (AstTyped **) &switchnode->default_case;
+            CHECK(expression, default_case);
+
+            if (switchnode->type) {
+                TYPE_CHECK(default_case, switchnode->type) { 
+                    ERROR_((*default_case)->token->pos, "Expected case expression to be of type '%s', got '%s'.",
+                        type_get_name(switchnode->type),
+                        type_get_name((*default_case)->type));
+                }
+            }
+
+        } else {
+            CHECK(block, switchnode->default_case);
+        }
 
     } else if (switchnode->switch_kind == Switch_Kind_Union) {
         // If there is no default case, and this is a union switch,
@@ -2403,6 +2442,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
                     ERROR_(cl->token->pos, "Cannot pass '%b' by pointer because it is not an l-value.", cl->token->text, cl->token->length);
                 }
 
+                if (cl->captured_value->kind == Ast_Kind_Local) {
+                    cl->captured_value->flags |= Ast_Flag_Address_Taken;
+                }
+
                 expr->type = type_make_pointer(context.ast_alloc, cl->captured_value->type);
 
             } else {
@@ -2411,6 +2454,15 @@ CheckStatus check_expression(AstTyped** pexpr) {
             break;
         }
 
+        case Ast_Kind_Switch: {
+            AstSwitch* switch_node = (AstSwitch *) expr;
+            assert(switch_node->is_expr);
+
+            CHECK(switch, switch_node);
+            break;
+        }
+
+        case Ast_Kind_Switch_Case: break;
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;
         case Ast_Kind_Enum_Value: break;
@@ -2418,7 +2470,6 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Package: break;
         case Ast_Kind_Error: break;
         case Ast_Kind_Unary_Field_Access: break;
-        case Ast_Kind_Switch_Case: break;
         case Ast_Kind_Foreign_Block: break;
         case Ast_Kind_Zero_Value: break;
         case Ast_Kind_Interface: break;
@@ -3567,8 +3618,10 @@ CheckStatus check_constraint(AstConstraint *constraint) {
             }
 
             assert(constraint->interface->entity && constraint->interface->entity->scope);
+            assert(constraint->interface->scope);
+            assert(constraint->interface->scope->parent == constraint->interface->entity->scope);
 
-            constraint->scope = scope_create(context.ast_alloc, constraint->interface->entity->scope, constraint->token->pos);
+            constraint->scope = scope_create(context.ast_alloc, constraint->interface->scope, constraint->token->pos);
 
             if (bh_arr_length(constraint->type_args) != bh_arr_length(constraint->interface->params)) {
                 ERROR_(constraint->token->pos, "Wrong number of arguments given to interface. Expected %d, got %d.",

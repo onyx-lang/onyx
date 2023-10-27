@@ -1612,6 +1612,12 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
     bh_imap block_map;
     bh_imap_init(&block_map, global_heap_allocator, bh_arr_length(switch_node->cases));
 
+    u64 expr_result_local = 0;
+    if (switch_node->is_expr) {
+        expr_result_local = local_allocate(mod->local_alloc, (AstTyped *) switch_node);
+        bh_imap_put(&mod->local_map, (u64) switch_node, expr_result_local);
+    }
+
     if (switch_node->initialization != NULL) {
         forll (AstNode, stmt, switch_node->initialization, next) {
             emit_statement(mod, &code, stmt);
@@ -1622,11 +1628,11 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
 
     u64 block_num = 0;
     bh_arr_each(AstSwitchCase *, sc, switch_node->cases) {
-        if (bh_imap_has(&block_map, (u64) (*sc)->block)) continue;
+        if (bh_imap_has(&block_map, (u64) *sc)) continue;
 
         emit_enter_structured_block(mod, &code, SBT_Fallthrough_Block, (*sc)->block->token);
 
-        bh_imap_put(&block_map, (u64) (*sc)->block, block_num);
+        bh_imap_put(&block_map, (u64) *sc, block_num);
         block_num++;
     }
 
@@ -1642,6 +1648,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
             fori (i, 0, bt->count) bt->cases[i] = bt->default_case;
 
             bh_arr_each(bh__imap_entry, sc, switch_node->case_map.entries) {
+                assert(bh_imap_has(&block_map, (u64) sc->value));
                 bt->cases[sc->key - switch_node->min_case] = bh_imap_get(&block_map, (u64) sc->value);
             }
 
@@ -1691,7 +1698,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
             bh_arr_each(CaseToBlock, ctb, switch_node->case_exprs) {
                 emit_expression(mod, &code, (AstTyped *) ctb->comparison);
 
-                u64 bn = bh_imap_get(&block_map, (u64) ctb->block);
+                u64 bn = bh_imap_get(&block_map, (u64) ctb->casestmt);
                 WID(switch_node->expr->token, WI_IF_START, 0x40);
                 WID(switch_node->expr->token, WI_JUMP, bn + 1);
                 WI(switch_node->expr->token, WI_IF_END);
@@ -1707,7 +1714,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         AstSwitchCase *sc = *psc;
         if (bh_imap_get(&block_map, (u64) sc->block) == 0xdeadbeef) continue;
 
-        u64 bn = bh_imap_get(&block_map, (u64) sc->block);
+        u64 bn = bh_imap_get(&block_map, (u64) sc);
 
         if (sc->capture) {
             assert(union_capture_idx != 0);
@@ -1744,7 +1751,14 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
 
         // Maybe the Symbol Frame idea should be controlled as a block_flag?
         debug_enter_symbol_frame(mod);
-        emit_block(mod, &code, sc->block, 0);
+        if (sc->body_is_expr) {
+            emit_expression(mod, &code, sc->expr);
+            emit_generic_store_instruction(mod, &code, (AstTyped *) switch_node, switch_node->token);
+
+        } else {
+            emit_block(mod, &code, sc->block, 0);
+        }
+
         debug_leave_symbol_frame(mod);
 
         if (bh_arr_last(code).type != WI_JUMP)
@@ -1752,15 +1766,34 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
 
         emit_leave_structured_block(mod, &code);
 
-        bh_imap_put(&block_map, (u64) sc->block, 0xdeadbeef);
+        bh_imap_put(&block_map, (u64) sc, 0xdeadbeef);
     }
 
     if (switch_node->default_case != NULL) {
-        emit_block(mod, &code, switch_node->default_case, 0);
+        if (switch_node->is_expr) {
+            emit_expression(mod, &code, (AstTyped *) switch_node->default_case);
+            emit_generic_store_instruction(mod, &code, (AstTyped *) switch_node, switch_node->token);
+
+        } else {
+            emit_block(mod, &code, switch_node->default_case, 0);
+        }
     }
 
     if (union_capture_idx != 0) local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     emit_leave_structured_block(mod, &code);
+
+    if (switch_node->is_expr) {
+        if ((expr_result_local & LOCAL_IS_WASM) == 0) {
+            u64 offset = 0;
+            emit_local_location(mod, &code, (AstLocal *) switch_node, &offset);
+            emit_load_instruction(mod, &code, switch_node->type, offset);
+
+        } else {
+            WIL(switch_node->token, WI_LOCAL_GET, expr_result_local);
+        }
+
+        local_free(mod->local_alloc, (AstTyped *) switch_node);
+    }
 
     bh_imap_free(&block_map);
     *pcode = code;
@@ -3279,7 +3312,8 @@ EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
         case Ast_Kind_Do_Block:
         case Ast_Kind_If_Expression:
         case Ast_Kind_Call_Site:
-        case Ast_Kind_Zero_Value: {
+        case Ast_Kind_Zero_Value:
+        case Ast_Kind_Switch: {
             emit_local_location(mod, &code, (AstLocal *) expr, offset_return);
             break;
         }
@@ -3584,8 +3618,15 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
                     emit_stack_address(mod, &code, intermediate_local + type_alignment_of(field->type), field->token);
                     WIL(NULL, WI_LOCAL_GET, source_base_ptr);
-                    WIL(NULL, WI_I32_CONST, type_alignment_of(field->expr->type));
+
+                    if (type_is_pointer(field->expr->type)) {
+                        WIL(NULL, WI_I32_CONST, type_alignment_of(field->expr->type->Pointer.elem));
+                    } else {
+                        WIL(NULL, WI_I32_CONST, type_alignment_of(field->expr->type));
+                    }
+                    
                     WI(NULL, WI_I32_ADD);
+
                     WIL(NULL, WI_I32_CONST, type_size_of(field->type->Union.variants_ordered[1]->type));
                     emit_wasm_copy(mod, &code, NULL);
 
@@ -3815,8 +3856,16 @@ EMIT_FUNC(expression, AstTyped* expr) {
             break;
         }
 
+        case Ast_Kind_Switch: {
+            AstSwitch* switchnode = (AstSwitch *) expr;
+            assert(switchnode->is_expr);
+
+            emit_switch(mod, &code, switchnode);
+            break;
+        }
+
         default:
-            bh_printf("Unhandled case: %d\n", expr->kind);
+            bh_printf("Unhandled case: %s\n", onyx_ast_node_kind_string(expr->kind));
             DEBUG_HERE;
             assert(0);
     }

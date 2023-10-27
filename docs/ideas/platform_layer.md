@@ -76,6 +76,9 @@ this document will serve as that "header file"
     - `> 0` on success. Returns number of bytes
     - `0` on no-input, but not error.
     - `< 0` on error.
+- `__wait_for_input(timeout: i32) -> bool`
+    - waits for standard input to be readable
+    - return `true` as the default
 
 ### Values
 
@@ -148,4 +151,30 @@ this document will serve as that "header file"
 - `__tty_get(state: &core.os.TTY_State) -> void`
 - `__tty_set(state: &core.os.TTY_State) -> bool`
 
+
+
+## Networking
+
+### Types
+- `SocketData`
+
+### Procedures
+- `__net_sock_create(af: SocketFamily, type: SocketType, proto: SocketProto) -> Result(SocketData, io.Error)`
+- `__net_sock_opt_flag(SocketData, sockopt: SocketOption, flag: bool) -> bool`
+- `__net_sock_opt_time(SocketData, sockopt: SocketOption, time: ? u64) -> bool`
+- `__net_sock_opt_size(SocketData, sockopt: SocketOption, size: i64) -> bool`
+- `__net_sock_bind(SocketData, addr: &SocketAddress) -> bool`
+- `__net_sock_listen(SocketData, backlog: i32) -> bool`
+- `__net_sock_accept(SocketData, addr: &SocketAddress) -> Result(SocketData, io.Error)`
+- `__net_sock_connect(SocketData, addr: &SocketAddress) -> io.Error`
+- `__net_sock_recv_from(SocketData, buf: [] u8, addr: &SocketAddress) -> Result(i32, io.Error)`
+- `__net_sock_send_to(SocketData, buf: [] u8, addr: &SocketAddress) -> Result(i32, io.Error)`
+- `__net_sock_recv(SocketData, buf: [] u8) -> Result(i32, io.Error)`
+- `__net_sock_send(SocketData, buf: [] u8) -> Result(i32, io.Error)`
+- `__net_sock_shutdown(SocketData, how: SocketShutdown) -> io.Error`
+- `__net_sock_close(SocketData) -> void`
+- `__net_resolve(host: str, port: u16, out_addrs: [] SocketAddress) -> i32`
+
+
+### Values
 

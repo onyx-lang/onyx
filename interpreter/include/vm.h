@@ -58,7 +58,6 @@ struct ovm_static_integer_array_t {
 #define OVM_TYPE_V128   0x07
 
 struct ovm_value_t {
-    ovm_valtype_t type;
     union {
         i8  i8;
         i16 i16;
@@ -71,6 +70,7 @@ struct ovm_value_t {
         f32 f32;
         f64 f64;
     };
+    ovm_valtype_t type;
 };
 
 
@@ -119,6 +119,7 @@ struct ovm_engine_t {
 
 ovm_engine_t *ovm_engine_new(ovm_store_t *store);
 void          ovm_engine_delete(ovm_engine_t *engine);
+void          ovm_engine_enable_debug(ovm_engine_t *engine, debug_state_t *debug);
 bool          ovm_engine_memory_ensure_capacity(ovm_engine_t *engine, i64 minimum_size);
 void          ovm_engine_memory_copy(ovm_engine_t *engine, i64 target, void *data, i64 size);
 
@@ -163,6 +164,7 @@ struct ovm_state_t {
     ovm_value_t *__frame_values;
 
     debug_thread_state_t *debug;
+    i32                   call_depth;
 };
 
 ovm_state_t *ovm_state_new(ovm_engine_t *engine, ovm_program_t *program);

@@ -31,7 +31,7 @@ ONYX_DEF(__tty_get, (WASM_I32), ()) {
     state->columns = 25;
     state->echo = 1;
     state->input_buffered = 1;
-    state->linefeeds_ignored = 0;
+    state->input_linefeeds = 0;
 #endif
 
     return NULL;

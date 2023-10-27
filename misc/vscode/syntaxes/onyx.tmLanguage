@@ -211,7 +211,7 @@
 					<key>match</key>
 					<string>\b(union|struct|enum|interface)\b</string>
 					<key>name</key>
-					<string>storage.type.onyx</string>
+					<string>keyword.onyx</string>
 				</dict>
 				<dict>
 					<key>match</key>
@@ -236,7 +236,7 @@
 					<key>match</key>
 					<string>\b(union|struct|enum|interface)\b(?:(\{)(\}))?</string>
 					<key>name</key>
-					<string>storage.type.onyx</string>
+					<string>keyword.onyx</string>
 				</dict>
 				<dict>
 					<key>match</key>
@@ -374,7 +374,7 @@
 						<key>2</key>
 						<dict>
 							<key>name</key>
-							<string>storage.type.onyx</string>
+							<string>keyword.onyx</string>
 						</dict>
 					</dict>
 				</dict>
@@ -391,7 +391,7 @@
 						<key>2</key>
 						<dict>
 							<key>name</key>
-							<string>storage.type.onyx</string>
+							<string>keyword.onyx</string>
 						</dict>
 					</dict>
 				</dict>
@@ -408,7 +408,7 @@
 						<key>2</key>
 						<dict>
 							<key>name</key>
-							<string>storage.type.onyx</string>
+							<string>keyword.onyx</string>
 						</dict>
 					</dict>
 				</dict>

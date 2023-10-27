@@ -34,8 +34,15 @@
 #include "src/ort_processes.h"
 #include "src/ort_os.h"
 #include "src/ort_cptr.h"
-#include "src/ort_net.h"
 #include "src/ort_tty.h"
+
+#ifdef _BH_LINUX
+#include "src/ort_net_linux.h"
+#endif
+
+#ifdef _BH_WINDOWS
+#include "src/ort_net_windows.h"
+#endif
 
 
 ONYX_LIBRARY {
@@ -52,6 +59,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(__file_size)
     ONYX_FUNC(__file_get_standard)
     ONYX_FUNC(__file_rename)
+    ONYX_FUNC(__poll)
 
     ONYX_FUNC(__dir_open)
     ONYX_FUNC(__dir_read)
@@ -85,22 +93,24 @@ ONYX_LIBRARY {
 
     ONYX_FUNC(__net_create_socket)
     ONYX_FUNC(__net_close_socket)
-    ONYX_FUNC(__net_setting)
-    ONYX_FUNC(__net_bind)
+    ONYX_FUNC(__net_setting_flag)
+    ONYX_FUNC(__net_bind_unix)
+    ONYX_FUNC(__net_bind_ipv4)
+    ONYX_FUNC(__net_bind_host)
     ONYX_FUNC(__net_listen)
     ONYX_FUNC(__net_accept)
     ONYX_FUNC(__net_connect_unix)
     ONYX_FUNC(__net_connect_ipv4)
+    ONYX_FUNC(__net_connect_ipv6)
+    ONYX_FUNC(__net_connect_host)
     ONYX_FUNC(__net_shutdown)
     ONYX_FUNC(__net_send)
-    ONYX_FUNC(__net_sendto)
+    ONYX_FUNC(__net_sendto_unix)
+    ONYX_FUNC(__net_sendto_ipv4)
+    ONYX_FUNC(__net_sendto_ipv6)
+    ONYX_FUNC(__net_sendto_host)
     ONYX_FUNC(__net_recv)
     ONYX_FUNC(__net_recvfrom)
-    ONYX_FUNC(__net_poll_recv)
-    ONYX_FUNC(__net_host_to_net_s)
-    ONYX_FUNC(__net_host_to_net_l)
-    ONYX_FUNC(__net_net_to_host_s)
-    ONYX_FUNC(__net_net_to_host_l)
 
     ONYX_FUNC(__cptr_make)
     ONYX_FUNC(__cptr_read)

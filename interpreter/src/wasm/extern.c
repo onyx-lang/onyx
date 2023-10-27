@@ -18,10 +18,10 @@ wasm_extern_t* wasm_global_as_extern(wasm_global_t* ext) { return (wasm_extern_t
 wasm_extern_t* wasm_table_as_extern(wasm_table_t* ext)   { return (wasm_extern_t *) ext; }
 wasm_extern_t* wasm_memory_as_extern(wasm_memory_t* ext) { return (wasm_extern_t *) ext; }
 
-wasm_func_t* wasm_extern_as_func(wasm_extern_t* ext)     { return ext->type->kind == WASM_EXTERN_FUNC ? (wasm_func_t *) ext : NULL; }
-wasm_global_t* wasm_extern_as_global(wasm_extern_t* ext) { return ext->type->kind == WASM_EXTERN_GLOBAL ? (wasm_global_t *) ext : NULL; }
-wasm_table_t* wasm_extern_as_table(wasm_extern_t* ext)   { return ext->type->kind == WASM_EXTERN_TABLE ? (wasm_table_t *) ext : NULL; }
-wasm_memory_t* wasm_extern_as_memory(wasm_extern_t* ext) { return ext->type->kind == WASM_EXTERN_MEMORY ? (wasm_memory_t *) ext : NULL; }
+wasm_func_t* wasm_extern_as_func(wasm_extern_t* ext)     { return (ext && ext->type->kind == WASM_EXTERN_FUNC) ? (wasm_func_t *) ext : NULL; }
+wasm_global_t* wasm_extern_as_global(wasm_extern_t* ext) { return (ext && ext->type->kind == WASM_EXTERN_GLOBAL) ? (wasm_global_t *) ext : NULL; }
+wasm_table_t* wasm_extern_as_table(wasm_extern_t* ext)   { return (ext && ext->type->kind == WASM_EXTERN_TABLE) ? (wasm_table_t *) ext : NULL; }
+wasm_memory_t* wasm_extern_as_memory(wasm_extern_t* ext) { return (ext && ext->type->kind == WASM_EXTERN_MEMORY) ? (wasm_memory_t *) ext : NULL; }
 
 const wasm_extern_t* wasm_func_as_extern_const(const wasm_func_t* ext)     { return (const wasm_extern_t *) ext; }
 const wasm_extern_t* wasm_global_as_extern_const(const wasm_global_t* ext) { return (const wasm_extern_t *) ext; }

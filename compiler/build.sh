@@ -30,7 +30,7 @@ fi
 
 FLAGS="$FLAGS -DENABLE_RUN_WITH_WASMER"
 
-if [ "$USE_DYNCALL" = "1" ]; then
+if [ "$USE_DYNCALL" = "1" ] && [ "$RUNTIME_LIBRARY" = "ovmwasm" ]; then
     LIBS="$LIBS ../shared/lib/linux_$ARCH/lib/libdyncall_s.a ../shared/lib/linux_$ARCH/lib/libdyncallback_s.a"
     FLAGS="$FLAGS -DUSE_DYNCALL"
 fi

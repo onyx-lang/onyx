@@ -32,13 +32,24 @@ Supports_Directories :: true
 Supports_Os :: true
 Supports_Processes :: false
 Supports_Time :: true
-Supports_Networking :: false
 Supports_Type_Info :: true
 Supports_Threads :: true
 Supports_Env_Vars :: true
-Supports_Futexes :: false
-Supports_TTY :: false
 
+#if #defined(runtime.vars.WASIX) {
+    Supports_Networking :: true
+    Supports_Futexes :: true
+    Supports_TTY :: true
+
+    #load "./wasix_defs"
+    #load "./wasix_net"
+    #load "./wasix_misc"
+
+} else {
+    Supports_Networking :: false
+    Supports_Futexes :: false
+    Supports_TTY :: false
+}
 
 __output_string :: (s: str) -> u32 {
     STDOUT_FILENO :: 1
@@ -61,6 +72,47 @@ __read_from_input :: (buffer: [] u8) -> i32 {
     if error != .Success do return -1;
 
     return read;
+}
+
+__wait_for_input :: (timeout: i32) -> bool {
+    STDIN_FILENO :: 0
+
+    events := 1;
+    subscriptions: [2] Subscription;
+
+    fd_tagged: SubscriptionTagged;
+    fd_tagged.tag = .FDRead;
+    fd_tagged.fd_read = .{ file_descriptor = STDIN_FILENO };
+    subscriptions[0] = .{
+        userdata = 0,
+        u = fd_tagged,
+    };
+
+    clock_tagged: SubscriptionTagged;
+    if timeout > 0 {
+        events += 1;
+        clock_tagged.tag = .Clock;
+        clock_tagged.clock = .{
+            id = .Realtime,
+            timeout = cast(u64) timeout * 1000000,
+            precision = 1,
+        };
+
+        subscriptions[1] = .{
+            userdata = 0,
+            u = clock_tagged,
+        };
+    }
+
+    event: [2] Event;
+    number_of_events: u32;
+
+    error_code := poll_oneoff(~~subscriptions, ~~event, 2, &number_of_events);
+
+    if number_of_events == 0 do return false;
+    if event[0].type == .Clock do return false;
+
+    return event[0].fd_readwrite.nbytes > 0;
 }
 
 __sleep :: (milliseconds: u32) {
@@ -96,6 +148,61 @@ __time :: () -> i64 {
 
 __random_get :: (buf: [] u8) {
     random_get(buf.data, buf.length);
+}
+
+PollDescription :: struct {
+    fd: wasi.FileDescriptor;
+    in: core.io.PollEvent;
+    out: core.io.PollEvent;
+}
+
+__poll :: (fds: [] PollDescription, timeout: i32) -> void {
+    count := fds.count;
+    if timeout == 0 {
+        timeout = 1;
+    }
+
+    if timeout > 0 {
+        count += 1; 
+    }
+
+    subs := core.alloc.array_from_stack(wasi.Subscription, count);
+    for i: fds.count {
+        subs[i].userdata = ~~ i;
+        subs[i].u.tag = switch fds[i].in {
+            case .None => .FDRead;
+            case .Read => .FDRead;
+            case .Write => .FDWrite;
+            case .Closed => .FDRead;
+        };
+        subs[i].u.u.fd_read = .{ file_descriptor = cast(i32) fds[i].fd };
+    }
+
+    if timeout > 0 {
+        subs[count - 1].userdata = 0;
+        subs[count - 1].u.tag = .Clock;
+        subs[count - 1].u.u.clock = .{
+            id = .Realtime,
+            timeout = cast(u64) timeout * 1000000,
+            precision = 1,
+        };
+    }
+
+    events := core.alloc.array_from_stack(wasi.Event, count);
+    number_of_events: u32;
+
+    error_code := wasi.poll_oneoff(~~subs.data, ~~events.data, count, &number_of_events);
+    if error_code != .Success do return;
+
+    if number_of_events == 0 do return;
+    for ev: events[0 .. number_of_events] {
+        if ev.type !=.Clock {
+            if ev.fd_readwrite.nbytes > 0 {
+                i := cast(i32) ev.userdata;
+                fds[i].out = fds[i].in;
+            }
+        }
+    }
 }
 
 

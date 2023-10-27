@@ -11,6 +11,7 @@ use runtime {
 
 #load "./fs"
 #load "./env"
+#load "./net"
 
 #load "core/onyx/cptr"
 #load "core/onyx/cbindgen"
@@ -53,6 +54,12 @@ __read_from_input :: (buffer: [] u8) -> i32 {
     if err == .ReadPending do return 0;
     if err != .None do return -1;
     return read;
+}
+
+__wait_for_input :: (timeout: i32) -> bool {
+    err, ready := io.stream_poll(&__stdin, .Read, timeout);
+    if err != .None do return false;
+    return ready;
 }
 
 

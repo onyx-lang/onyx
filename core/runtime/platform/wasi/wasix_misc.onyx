@@ -1,0 +1,58 @@
+package runtime.platform
+
+use wasi
+use core.os
+
+__futex_wait :: (addr: rawptr, expected: i32, timeout: i32) -> i32 {
+    tm: wasi.OptionTimestamp;
+    if timeout < 0 {
+        tm = .{ None = .{} };
+    } else {
+        tm = .{ Some = ~~timeout };
+    }
+
+    out: bool;
+    if wasi.futex_wait(addr, expected, &tm, &out) != .Success do return 0;
+    return 1 if out else 0;
+}
+
+__futex_wake :: (addr: rawptr, maximum: i32) -> i32 {
+    out: bool;
+    if (maximum == -1) {
+        if wasi.futex_wake_all(addr, &out) != .Success do return 0;
+    } else {
+        if wasi.futex_wake(addr, &out) != .Success do return 0;
+    }
+
+    return 1 if out else 0;
+}
+
+__tty_get :: (tty: &os.TTY_State) {
+    state: wasi.TTY;
+    if wasi.tty_get(&state) != .Success do return;
+
+    tty.rows = state.rows;
+    tty.cols = state.cols;
+    tty.stdin_is_tty = state.stdin_tty;
+    tty.stdout_is_tty = state.stdout_tty;
+    tty.stderr_is_tty = state.stderr_tty;
+    tty.echo = state.echo;
+    tty.input_buffered = state.line_buffered;
+    tty.input_linefeeds = state.line_feeds;
+}
+
+__tty_set :: (tty: &os.TTY_State) -> bool {
+    state := wasi.TTY.{
+        rows = tty.rows,
+        cols = tty.cols,
+        stdin_tty = tty.stdin_is_tty,
+        stdout_tty = tty.stdout_is_tty,
+        stderr_tty = tty.stderr_is_tty,
+        echo = tty.echo,
+        line_buffered = tty.input_buffered,
+        line_feeds = tty.input_linefeeds
+    };
+
+    wasi.tty_set(&state);
+    return true;
+}

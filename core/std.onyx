@@ -54,11 +54,11 @@ use runtime
 #load "./test/testing"
 
 #load "./time/time"
+#load "./time/date"
 
 #load "./misc/arg_parse"
 #load "./misc/method_ops"
 
-#load "./time/date"
 #load "./encoding/base64"
 #load "./encoding/hex"
 #load "./encoding/utf8"

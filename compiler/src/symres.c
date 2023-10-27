@@ -376,8 +376,8 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
         expr->kind == Ast_Kind_Enum_Type ||
         expr->kind == Ast_Kind_Type_Raw_Alias ||
         expr->kind == Ast_Kind_Union_Type ||
-        expr->kind == Ast_Kind_Poly_Union_Type) {
-
+        expr->kind == Ast_Kind_Poly_Union_Type ||
+        expr->kind == Ast_Kind_Interface) {
         force_a_lookup = 1;
     }
 
@@ -744,6 +744,11 @@ static SymresStatus symres_expression(AstTyped** expr) {
             break;
         }
 
+        case Ast_Kind_Switch: {
+            SYMRES(switch, (AstSwitch *) *expr);
+            break;
+        }
+
         default: break;
     }
 
@@ -832,11 +837,24 @@ static SymresStatus symres_case(AstSwitchCase *casenode) {
     }
 
     if (casenode->capture) {
-        casenode->block->scope = scope_create(context.ast_alloc, current_scope, casenode->block->token->pos);
-        symbol_introduce(casenode->block->scope, casenode->capture->token, (AstNode *) casenode->capture);
+        if (casenode->scope == NULL) {
+            casenode->scope = scope_create(context.ast_alloc, current_scope, casenode->token->pos);
+            symbol_introduce(casenode->scope, casenode->capture->token, (AstNode *) casenode->capture);
+        }
+
+        scope_enter(casenode->scope);
     }
 
-    SYMRES(block, casenode->block);
+    if (casenode->body_is_expr) {
+        SYMRES(expression, &casenode->expr);
+    } else {
+        SYMRES(block, casenode->block);
+    }
+
+    if (casenode->capture) {
+        scope_leave();
+    }
+
     return Symres_Success;
 }
 
@@ -857,7 +875,13 @@ static SymresStatus symres_switch(AstSwitch* switchnode) {
             SYMRES(case, *pcase);
         }
 
-        if (switchnode->default_case) SYMRES(block, switchnode->default_case);
+        if (switchnode->default_case) {
+            if (switchnode->is_expr) {
+                SYMRES(expression, (AstTyped **) &switchnode->default_case);
+            } else {
+                SYMRES(block, switchnode->default_case);
+            }
+        }
     }
 
     if (switchnode->switch_kind == Switch_Kind_Use_Equals && switchnode->case_exprs) {

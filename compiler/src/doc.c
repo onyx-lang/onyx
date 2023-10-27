@@ -501,8 +501,18 @@ static void write_doc_methods(bh_buffer *buffer, Scope *method_scope) {
             case Ast_Kind_Overloaded_Function: binding = ((AstOverloadedFunction *) node)->original_binding_to_node; break;
         }
 
+        OnyxToken tmp_name_token;
+        tmp_name_token.pos = binding->token->pos;
+        tmp_name_token.text = method_scope->symbols[i].key;
+        tmp_name_token.length = strlen(tmp_name_token.text);
+
+        OnyxToken *old_token = binding->token;
+        binding->token = &tmp_name_token;
+
         method_count++;
         write_doc_procedure(buffer, binding, (AstNode *) node);
+
+        binding->token = old_token;
     }
 
     *((u32 *) bh_pointer_add(buffer->data, count_patch)) = method_count;

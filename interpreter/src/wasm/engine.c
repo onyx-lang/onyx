@@ -20,7 +20,7 @@ wasm_engine_t *wasm_engine_new_with_config(wasm_config_t *config) {
     if (config && config->debug_enabled) {
         // This should maybe be moved elsewhere?
         debug_state_t *debug  = bh_alloc_item(store->heap_allocator, debug_state_t);
-        engine->engine->debug = debug;
+        ovm_engine_enable_debug(engine->engine, debug);
 
         debug_host_init(engine->engine->debug, engine->engine);
         debug->listen_path = config->listen_path;

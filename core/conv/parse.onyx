@@ -67,12 +67,21 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
         }
 
         case str {
-            if to_parse.count == 0       do return false;
-            if to_parse[0] != #char "\"" do return false;
+            if to_parse.count == 0 do return false;
+
+            dest := cast(&str) target;
+            
+            // If the string does *look* like a quoted string,
+            // simply return a copy of the whole string.
+            if to_parse[0] != #char "\"" {
+                *dest = string.alloc_copy(to_parse, string_allocator);
+                return true;
+            }
+
+
             line := to_parse;
             string.advance(&line);
 
-            dest := cast(&str) target;
             *dest = string.read_until(&line, #char "\"") |> string.alloc_copy(string_allocator); // @BUG // This does not handle escaped strings!
             return true;
         }
