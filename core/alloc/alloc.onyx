@@ -8,6 +8,7 @@ package core.alloc
 #load "./pool"
 #load "./logging"
 #load "./gc"
+#load "./memdebug"
 
 use core.memory
 use core.intrinsics.types {type_is_function}
