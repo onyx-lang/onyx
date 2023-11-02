@@ -19,7 +19,7 @@ extern struct bh_allocator global_heap_allocator;
 #include "wasm_emit.h"
 #include "doc.h"
 
-#define VERSION "v0.1.7"
+#define VERSION "v0.1.8"
 
 
 Context context;
@@ -66,7 +66,8 @@ static const char *build_docstring = DOCSTRING_HEADER
     "\t                        Automatically enabled for \"onyx\" runtime.\n"
     "\t--doc <doc_file>        Generates an O-DOC file, a.k.a an Onyx documentation file. Used by onyx-doc-gen.\n"
     "\t--tag                   Generates a C-Tag file.\n"
-    "\t--syminfo <target_file> Generates a symbol resolution information file. Used by onyx-lsp.\n"
+    "\t--syminfo <target_file> (DEPRECATED) Generates a symbol resolution information file. Used by onyx-lsp.\n"
+    "\t--lspinfo <target_file> Generates an LSP information file. Used by onyx-lsp.\n"
     "\t--stack-trace           Enable dynamic stack trace.\n"
     "\t--no-std                Disable automatically including \"core/std\".\n"
     "\t--no-stale-code         Disables use of `#allow_stale_code` directive\n"
@@ -119,6 +120,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
         .generate_tag_file = 0,
         .generate_symbol_info_file = 0,
+        .generate_lsp_info_file = 0,
     };
 
     bh_arr_new(alloc, options.files, 2);
@@ -277,6 +279,11 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--syminfo")) {
                 options.generate_symbol_info_file = 1;
+                options.symbol_info_file = argv[++i];
+            }
+            else if (!strcmp(argv[i], "--lspinfo")) {
+                options.generate_symbol_info_file = 1;
+                options.generate_lsp_info_file = 1;
                 options.symbol_info_file = argv[++i];
             }
             else if (!strcmp(argv[i], "--debug")) {
