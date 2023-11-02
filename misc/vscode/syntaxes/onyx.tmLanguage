@@ -454,7 +454,7 @@
 						<key>2</key>
 						<dict>
 							<key>name</key>
-							<string>punctuation.block.start.onyx</string>
+							<string>punctuation.block.begin.onyx</string>
 						</dict>
 					</dict>
 				</dict>

@@ -8,8 +8,9 @@ File contains:
 - File definition table
     - File ID
     - File name
+    * Scope ID
 
-- Symbol definition table (16 bytes each)
+- Symbol definition table (16 bytes each, sorted by Symbol ID)
     - ID
     - File ID
     - Line
@@ -21,6 +22,14 @@ File contains:
     - Column
     - Length
     - Symbol ID that it resolves to
+
+* Scopes table (12 bytes each, sorted by Scope ID)
+    * Scope ID
+    * Parent Scope ID (-1 for root)
+    * Symbol list start index
+
+* Scope symbols table
+    * Symbol ID (-1 for end of list)
 
 Byte respresentation of the file:
     magic bytes:
