@@ -1576,6 +1576,19 @@ void track_declaration_for_symbol_info(OnyxFilePos pos, AstNode *node) {
     bh_imap_put(&syminfo->node_to_id, (u64) node, (u64) symbol_id);
 }
 
+void track_documentation_for_symbol_info(AstNode *node, OnyxToken *documentation) {
+    if (!context.options->generate_lsp_info_file) return;
+    if (!context.options->generate_symbol_info_file) return;
+
+    SymbolInfoTable *syminfo = context.symbol_info;
+    assert(syminfo);
+
+    if (!bh_imap_has(&syminfo->node_to_id, (u64) node)) return;
+
+    u64 symbol_id = bh_imap_get(&syminfo->node_to_id, (u64) node);
+    syminfo->symbols[symbol_id].documentation = documentation;
+}
+
 void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved) {
     if (!context.options->generate_symbol_info_file) return;
     if (!resolved) return;

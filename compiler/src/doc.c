@@ -89,11 +89,27 @@ void onyx_docs_emit_symbol_info(const char *dest) {
 
     bh_buffer sym_def_section;
     bh_buffer_init(&sym_def_section, global_heap_allocator, 2048);
+
+    bh_buffer docs_section;
+    bh_buffer_init(&docs_section, global_heap_allocator, 4096);
+
     bh_arr_each(SymbolInfo, sym, syminfo->symbols) {
         bh_buffer_write_u32(&sym_def_section, sym->id);
         bh_buffer_write_u32(&sym_def_section, sym->file_id);
         bh_buffer_write_u32(&sym_def_section, sym->line);
         bh_buffer_write_u32(&sym_def_section, sym->column);
+
+        if (context.options->generate_lsp_info_file) {
+            if (sym->documentation) {
+                bh_buffer_write_u32(&sym_def_section, docs_section.length);
+                bh_buffer_write_u32(&sym_def_section, sym->documentation->length);
+
+                bh_buffer_append(&docs_section, sym->documentation->text, sym->documentation->length);
+            } else {
+                bh_buffer_write_u32(&sym_def_section, 0);
+                bh_buffer_write_u32(&sym_def_section, 0);
+            }
+        }
     }
 
     bh_buffer sym_res_section;
@@ -109,18 +125,35 @@ void onyx_docs_emit_symbol_info(const char *dest) {
     bh_buffer header_section;
     bh_buffer_init(&header_section, global_heap_allocator, 16);
     bh_buffer_append(&header_section, "OSYM", 4);
-    bh_buffer_write_u32(&header_section, 1);
-    bh_buffer_write_u32(&header_section, 32);
+
+    u32 header_size = 32;
+    if (context.options->generate_lsp_info_file) {
+        bh_buffer_write_u32(&header_section, 2);
+        header_size = 40;
+    } else {
+        bh_buffer_write_u32(&header_section, 1);
+    }
+
+    bh_buffer_write_u32(&header_section, header_size);
     bh_buffer_write_u32(&header_section, shlenu(syminfo->files));
-    bh_buffer_write_u32(&header_section, 32 + file_section.length);
+    bh_buffer_write_u32(&header_section, header_size + file_section.length);
     bh_buffer_write_u32(&header_section, bh_arr_length(syminfo->symbols));
-    bh_buffer_write_u32(&header_section, 32 + file_section.length + sym_def_section.length);
+    bh_buffer_write_u32(&header_section, header_size + file_section.length + sym_def_section.length);
     bh_buffer_write_u32(&header_section, bh_arr_length(syminfo->symbols_resolutions));
+
+    if (context.options->generate_lsp_info_file) {
+        bh_buffer_write_u32(&header_section, header_size + file_section.length + sym_def_section.length + sym_res_section.length);
+        bh_buffer_write_u32(&header_section, docs_section.length);
+    }
 
     bh_file_write(&sym_file, header_section.data, header_section.length);
     bh_file_write(&sym_file, file_section.data, file_section.length);
     bh_file_write(&sym_file, sym_def_section.data, sym_def_section.length);
     bh_file_write(&sym_file, sym_res_section.data, sym_res_section.length);
+
+    if (context.options->generate_lsp_info_file) {
+        bh_file_write(&sym_file, docs_section.data, docs_section.length);
+    }
 
     bh_file_close(&sym_file);
 

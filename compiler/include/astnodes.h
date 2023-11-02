@@ -1820,6 +1820,7 @@ struct CompileOptions {
 
     b32 generate_tag_file         : 1;
     b32 generate_symbol_info_file : 1;
+    b32 generate_lsp_info_file    : 1;
 
     Runtime runtime;
 
@@ -2081,6 +2082,7 @@ b32 resolve_intrinsic_interface_constraint(AstConstraint *constraint);
 void track_declaration_for_tags(AstNode *);
 
 void track_declaration_for_symbol_info(OnyxFilePos, AstNode *);
+void track_documentation_for_symbol_info(AstNode *, OnyxToken *);
 void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved);
 
 // NOTE: Useful inlined functions

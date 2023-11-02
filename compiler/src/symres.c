@@ -1903,6 +1903,7 @@ void symres_entity(Entity* ent) {
     switch (ent->type) {
         case Entity_Type_Binding: {
             symbol_introduce(current_scope, ent->binding->token, ent->binding->node);
+            track_documentation_for_symbol_info(ent->binding->node, ent->binding->documentation);
             track_declaration_for_tags((AstNode *) ent->binding);
 
             if (context.doc_info) {
