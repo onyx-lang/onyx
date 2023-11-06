@@ -127,6 +127,10 @@ __start :: () {
     __runtime_initialize();
     context.thread_id = 0;
 
+    #if #defined(runtime.vars.MEMDEBUG) {
+        use core.alloc.memdebug
+        memdebug.enable_in_scope(context.allocator);
+    }
 
     #if (typeof MAIN_FUNCTION) == #type () -> void { // An error on this line means no 'main.main' was found in your program.
         MAIN_FUNCTION();
