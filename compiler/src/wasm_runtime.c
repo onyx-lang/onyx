@@ -400,8 +400,6 @@ static void onyx_print_trap(wasm_trap_t* trap) {
         cursor = section_start + section_size;
     }
 
-    if (func_name_section == 0) return;
-
     bh_printf("TRACE:\n");
     wasm_frame_vec_t frames;
     wasm_trap_trace(trap, &frames);
@@ -409,11 +407,15 @@ static void onyx_print_trap(wasm_trap_t* trap) {
         i32 func_idx   = wasm_frame_func_index(frames.data[i]);
         i32 mod_offset = wasm_frame_module_offset(frames.data[i]);
 
-        i32 cursor = func_name_section + 4 * func_idx;
-        i32 func_offset = *(i32 *) (wasm_raw_bytes.data + cursor);
-        char* func_name = wasm_raw_bytes.data + func_name_section + func_offset;
+        if (func_name_section > 0) {
+            i32 cursor = func_name_section + 4 * func_idx;
+            i32 func_offset = *(i32 *) (wasm_raw_bytes.data + cursor);
+            char* func_name = wasm_raw_bytes.data + func_name_section + func_offset;
 
-        bh_printf("    func[%d]:%p at %s\n", func_idx, mod_offset, func_name);
+            bh_printf("    func[%d]:%p at %s\n", func_idx, mod_offset, func_name);
+        } else {
+            bh_printf("    func[%d]\n", func_idx);
+        }
     }
 }
 
@@ -644,6 +646,7 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     wasm_runtime.wasm_imports = wasm_imports;
     wasm_runtime.wasm_memory = wasm_memory;
     wasm_runtime.wasm_instance = wasm_instance;
+    wasm_runtime.wasm_store = wasm_store;
     wasm_runtime.wasm_func_table = wasm_extern_as_table(
         wasm_extern_lookup_by_name(wasm_module, wasm_instance, "__indirect_function_table")
     );

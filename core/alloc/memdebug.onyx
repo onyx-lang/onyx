@@ -5,7 +5,7 @@ use core {Result}
 use core.alloc
 use core.net
 use core.io
-use core.iter
+use core.slice
 use core.encoding.osad
 use runtime
 
@@ -94,15 +94,18 @@ alloc.as_allocator :: (memdebug: &MemDebugState) => Allocator.{ memdebug, memdeb
 memdebug_proc :: (m: &MemDebugState, action: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     newptr := m.wrapped_allocator.func(m.wrapped_allocator.data, action, size, align, oldptr);
 
-    trace := iter.as_iter(runtime.info.get_stack_trace())
-        |> iter.map(frame => {
-            info := frame.info;
 
-            return MemDebugStackNode.{
-                info.file, info.line, frame.current_line, info.func_name
+    trace: [] MemDebugStackNode = .[];
+    stack_trace := runtime.info.get_stack_trace();
+    if stack_trace {
+        slice.init(&trace, stack_trace.count, context.temp_allocator);
+        for i: stack_trace.count {
+            info := stack_trace[i].info;
+            trace[i] = .{
+                info.file, info.line, stack_trace[i].current_line, info.func_name
             };
-        })
-        |> iter.collect(context.temp_allocator);
+        }
+    }
 
     memdebug_send_message(m, .{
         Action = .{
