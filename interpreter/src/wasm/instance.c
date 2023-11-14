@@ -12,6 +12,8 @@ struct wasm_ovm_binding {
     ovm_engine_t  *engine;
     ovm_state_t   *state;
     ovm_program_t *program;
+
+    wasm_instance_t *instance;
 };
 
 typedef struct ovm_wasm_binding ovm_wasm_binding;
@@ -86,6 +88,11 @@ struct ovm_wasm_binding {
             (w).of.f64 = (o).f64; \
             break; \
  \
+        case OVM_TYPE_ERR: \
+            (w).kind = WASM_I32; \
+            (w).of.i32 = 0; \
+            break; \
+ \
         default: \
             printf("INVALID: %d\n", (o).type); \
             assert(("invalid ovm value type for conversion", 0)); \
@@ -100,6 +107,15 @@ static wasm_trap_t *wasm_to_ovm_func_call_binding(void *vbinding, const wasm_val
     }
 
     ovm_value_t ovm_res = ovm_func_call(binding->engine, binding->state, binding->program, binding->func_idx, args->size, vals);
+
+    // Check for error (trap).
+    if (ovm_res.type == OVM_TYPE_ERR) {
+        wasm_byte_vec_t msg;
+        wasm_byte_vec_new(&msg, 9, "Hit error");
+        wasm_trap_t *trap = wasm_trap_new(binding->instance->store, (void *) &msg);
+        return trap;
+    }
+
     if (!res || res->size == 0) return NULL;
 
     OVM_TO_WASM(ovm_res, res->data[0]);
@@ -220,6 +236,7 @@ static void prepare_instance(wasm_instance_t *instance, const wasm_extern_vec_t 
         binding->func_idx = bh_arr_length(instance->funcs);
         binding->program  = ovm_program;
         binding->state    = ovm_state;
+        binding->instance = instance;
         
         wasm_func_t *func = wasm_func_new_with_env(instance->store, instance->module->functypes.data[i], 
             wasm_to_ovm_func_call_binding, binding, NULL);
@@ -314,12 +331,9 @@ wasm_instance_t *wasm_instance_new(wasm_store_t *store, const wasm_module_t *mod
     instance->store = store;
     instance->module = module;
 
-    if (store->instance) {
-        bh_printf("A WASM store should only be used for a single instance!\n");
-        return NULL;
+    if (!store->instance) {
+        store->instance = instance;
     }
-
-    store->instance = instance;
 
     instance->funcs = NULL;
     instance->memories = NULL;

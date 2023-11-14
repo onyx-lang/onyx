@@ -1,0 +1,131 @@
+package core.alloc.memdebug
+#allow_stale_code
+
+use core {Result}
+use core.alloc
+use core.net
+use core.io
+use core.slice
+use core.encoding.osad
+use runtime
+
+VERSION :: 1
+DEFAULT_PORT :: 4004
+
+MemDebugState :: struct {
+    wrapped_allocator: Allocator;
+    listen_addr: net.SocketAddress;
+
+    socket: ? net.Socket;
+    writer: ? io.Writer;
+}
+
+MemDebugMsg :: union {
+    Start: struct {
+        version: u32;
+        heap_base_address: u32;
+    };
+
+    Action: struct {
+        action: AllocationAction;
+        oldptr: u32;
+        newptr: u32;
+        size: u32;
+        align: u32;
+        trace: [] MemDebugStackNode;
+    };
+}
+
+MemDebugStackNode :: struct {
+    file: str;
+    line: u32;
+    current_line: u32;
+    func_name: str;
+}
+
+
+make :: (a: Allocator, listen_addr: &net.SocketAddress) -> MemDebugState {
+    return .{
+        a,
+        *listen_addr,
+        .{ None = .{} },
+        .{ None = .{} }
+    };
+}
+
+free :: (m: &MemDebugState) {
+    io.writer_free(m.writer->unwrap_ptr());
+    m.socket->unwrap_ptr()->close();
+}
+
+wait_for_connection :: (m: &MemDebugState) -> Result(void, io.Error) {
+    listen_socket := net.socket_create(.Inet, .Stream, .ANY)?;
+    listen_socket->option(.ReuseAddress, true);
+    listen_socket->bind(&m.listen_addr);
+    listen_socket->listen(1);
+    result := listen_socket->accept()?;
+
+    m.socket = .{ Some = result.socket };
+    m.writer = .{ Some = io.writer_make(m.socket->unwrap_ptr(), 0) };
+
+    memdebug_send_message(m, .{ Start = .{ version = VERSION, heap_base_address = cast(u32) __heap_start } });
+}
+
+enable_in_scope :: macro (a: Allocator, port := DEFAULT_PORT) {
+    use core.alloc.memdebug
+
+    addr: net.SocketAddress;
+    net.make_ipv4_address(&addr, 0, ~~port);
+
+    old_allocator := a;
+    dbg := memdebug.make(old_allocator, &addr);
+    a = alloc.as_allocator(&dbg);
+
+    memdebug.wait_for_connection(&dbg);
+
+    defer memdebug.free(&dbg);
+}
+
+
+#overload
+alloc.as_allocator :: (memdebug: &MemDebugState) => Allocator.{ memdebug, memdebug_proc }
+
+#local
+memdebug_proc :: (m: &MemDebugState, action: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+    newptr := m.wrapped_allocator.func(m.wrapped_allocator.data, action, size, align, oldptr);
+
+
+    trace: [] MemDebugStackNode = .[];
+    stack_trace := runtime.info.get_stack_trace();
+    if stack_trace {
+        slice.init(&trace, stack_trace.count, context.temp_allocator);
+        for i: stack_trace.count {
+            info := stack_trace[i].info;
+            trace[i] = .{
+                info.file, info.line, stack_trace[i].current_line, info.func_name
+            };
+        }
+    }
+
+    memdebug_send_message(m, .{
+        Action = .{
+            action,
+            ~~oldptr,
+            ~~newptr,
+            size,
+            align,
+            trace
+        }
+    });
+
+    return newptr;
+}
+
+
+#local
+memdebug_send_message :: (m: &MemDebugState, msg: MemDebugMsg) {
+    success := osad.serialize(msg, m.writer->unwrap_ptr());
+    if !success {
+        logf(.Warning, "MemDebug logging failed when sending.");
+    }
+}

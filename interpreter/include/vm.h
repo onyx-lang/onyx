@@ -56,6 +56,7 @@ struct ovm_static_integer_array_t {
 #define OVM_TYPE_F32    0x05
 #define OVM_TYPE_F64    0x06
 #define OVM_TYPE_V128   0x07
+#define OVM_TYPE_ERR    0xff
 
 struct ovm_value_t {
     union {
