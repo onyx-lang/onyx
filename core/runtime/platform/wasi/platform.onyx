@@ -201,6 +201,11 @@ __poll :: (fds: [] PollDescription, timeout: i32) -> void {
                 i := cast(i32) ev.userdata;
                 fds[i].out = fds[i].in;
             }
+
+            if ev.fd_readwrite.flags & .ReadWriteHangUp {
+                i := cast(i32) ev.userdata;
+                fds[i].out = .Closed;
+            }
         }
     }
 }
