@@ -219,7 +219,7 @@ initRuntime() {
             1) RUNTIME="wasmer"; break ;; 
             2) RUNTIME="ovm"; break ;; 
             3) RUNTIME="none"; break ;; 
-            *) echo "Invalid choice. Choose again." ;;
+            *) echo "Invalid choice. Quitting."; exit 1 ;;
         esac
     done
 }
