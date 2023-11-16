@@ -1,6 +1,6 @@
 #!/bin/sh
 
-C_FILES="onyx astnodes builtins checker clone doc entities errors lex parser symres types utils wasm_emit wasm_runtime "
+C_FILES="onyx astnodes builtins checker clone doc entities errors lex parser symres types utils wasm_emit "
 LIBS="-L$ONYX_LIBRARY_DIR -lpthread -ldl -lm"
 INCLUDES="-I./include -I../shared/include -I../shared/include/dyncall"
 
@@ -14,6 +14,7 @@ fi
 
 if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
     FLAGS="$FLAGS -DENABLE_RUN_WITH_WASMER"
+    C_FILES="$C_FILES wasm_runtime "
     LIBS="$LIBS -l$ONYX_RUNTIME_LIBRARY"
 fi
 
