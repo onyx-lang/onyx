@@ -6,10 +6,10 @@
 # the platform is not supported.
 #
 # Environment variables:
-# - ONYX_DIR (optional): defaults to $HOME/.wasmer
+# - ONYX_DIR (optional): defaults to $HOME/.onyx.
 #
 # You can install using this script:
-# $ curl https://raw.githubusercontent.com/wasmerio/wasmer-install/master/install.sh | sh
+# $ curl https://raw.githubusercontent.com/onyx-lang/onyx/master/bin/install.sh | sh
 
 # Installer script inspired by:
 #  0) https://raw.githubusercontent.com/wasmerio/wasmer-install/master/install.sh
@@ -23,8 +23,8 @@ red="\033[31m"
 green="\033[32m"
 yellow="\033[33m"
 white="\033[37m"
-bold="\e[1m"
-dim="\e[2m"
+bold="\033[1m"
+dim="\033[2m"
 
 RELEASES_URL="https://github.com/onyx-lang/onyx/releases"
 
@@ -206,22 +206,19 @@ initOS() {
 }
 
 initRuntime() {
-    options=(
-        "Wasmer: An industry standard WebAssembly runtime. Very fast."
-        "OVM: A custom, lightweight runtime made for Onyx. Supports debugging. Slower than Wasmer."
-        "None: Omit using a runtime and only use Onyx as a compiler to WebAssembly."
-    )
-
     printf "${green}Please choose a WebAssembly runtime to use with your Onyx installation.\n${reset}"
 
-    PS3='Which runtime would you like to use? '
-    COLUMNS=1
-    select opt in "${options[@]}"
-    do
-        case $opt in
-            Wasmer*) RUNTIME="wasmer"; break ;; 
-            OVM*) RUNTIME="ovm"; break ;; 
-            None*) RUNTIME="none"; break ;; 
+    echo "1) Wasmer: An industry standard WebAssembly runtime. Very fast."
+    echo "2) OVM: A custom, lightweight runtime made for Onyx. Supports debugging. Slower than Wasmer."
+    echo "3) None: Omit using a runtime and only use Onyx as a compiler to WebAssembly."
+
+    while true; do 
+        read -p "Which runtime would you like to use? [1/2/3] " selected
+
+        case $selected in
+            1) RUNTIME="wasmer"; break ;; 
+            2) RUNTIME="ovm"; break ;; 
+            3) RUNTIME="none"; break ;; 
             *) echo "Invalid choice. Choose again." ;;
         esac
     done
@@ -230,30 +227,30 @@ initRuntime() {
 onyx_install() {
   printf "${reset}Welcome to the Onyx shell installer!$reset\n"
   if [ "$ONYX_INSTALL_LOG" = "$ONYX_VERBOSE" ]; then
-    echo "                   ######"
-    echo "               ####++++++###"
-    echo "            ###+++++++++++++###"
-    echo "         ###+++++++++++++++++++###"
-    echo "      ###++++++++++++++++++++++++++###"
-    echo "  ###+++++++++++++++++++++++++++++++++###"
-    echo "  #++++++++++++++++++++++++++++++++++++#-#"
-    echo "  #--------------------------------++#####"
-    echo "  #-----------------------------+##+++####"
-    echo "  #--------------------------+##+++++#####      The Onyx Programming Language"
-    echo "  #-----------------------+##+++++++######"
-    echo "  #--------------------##++++++++++#######             Brendan Hansen"
-    echo "  #----------------+##+++++++++++#########"
-    echo "  #-------------+##+++++++++++++##########"
-    echo "  #----------##++++++++++++++++###########"
-    echo "  #------+##++++++++++++++++++############"
-    echo "  #---+##++++++++++++++++++++#############"
-    echo "  ####++++++++++++++++++++++##############"
-    echo "  ###++++++++++++++++++++++##############"
-    echo "     ####+++++++++++++++++############"
-    echo "         ###+++++++++++++##########"
-    echo "            ###+++++++++########"
-    echo "               ####++++######"
-    echo "                   ######"
+    printf "\033[96m                   ######\n"
+    printf "\033[96m               ####++++++###\n"
+    printf "\033[96m            ###+++++++++++++###\n"
+    printf "\033[96m         ###+++++++++++++++++++###\n"
+    printf "\033[96m      ###++++++++++++++++++++++++++###\n"
+    printf "\033[96m  ###+++++++++++++++++++++++++++++++++###\n"
+    printf "\033[96m  #++++++++++++++++++++++++++++++++++++#-#\n"
+    printf "\033[96m  #--------------------------------++#####\n"
+    printf "\033[96m  #-----------------------------+##+++####\n"
+    printf "\033[96m  #--------------------------+##+++++#####      The Onyx Programming Language\n"
+    printf "\033[96m  #-----------------------+##+++++++######\n"
+    printf "\033[96m  #--------------------##++++++++++#######             Brendan Hansen\n"
+    printf "\033[96m  #----------------+##+++++++++++#########\n"
+    printf "\033[96m  #-------------+##+++++++++++++##########\n"
+    printf "\033[96m  #----------##++++++++++++++++###########\n"
+    printf "\033[96m  #------+##++++++++++++++++++############\n"
+    printf "\033[96m  #---+##++++++++++++++++++++#############\n"
+    printf "\033[96m  ####++++++++++++++++++++++##############\n"
+    printf "\033[96m  ###++++++++++++++++++++++##############\n"
+    printf "\033[96m     ####+++++++++++++++++############\n"
+    printf "\033[96m         ###+++++++++++++##########\n"
+    printf "\033[96m            ###+++++++++########\n"
+    printf "\033[96m               ####++++######\n"
+    printf "\033[96m                   ######\n"
     printf "\n\n"
   fi
 
