@@ -20,24 +20,34 @@ export async function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.languages.registerWorkspaceSymbolProvider(workspaceSymbolProvider));
 	context.subscriptions.push(vscode.languages.registerDefinitionProvider({ 'language': 'onyx' }, peekFileDefinitionProvider));
 
-	let serverOptions: vslc.ServerOptions = {
-		command: "onyx-lsp",
-		transport: vslc.TransportKind.stdio,
-	};
+	let onyx_path = process.env['ONYX_PATH'];
+	if (!onyx_path) {
+		onyx_path = require('os').homedir() + "/.onyx";
+		process.env["ONYX_PATH"] = onyx_path;
+		process.env["PATH"] = process.env["PATH"] + ":" + onyx_path + "/bin"
+	}
 
-	let clientOptions: vslc.LanguageClientOptions = {
-		documentSelector: [
-			{ scheme: "file", language: "onyx" },
-		],
-		connectionOptions: {
-			cancellationStrategy: null,
-			maxRestartCount: 5
-		}
-	};
+	if (onyx_path) {
+		let serverOptions: vslc.ServerOptions = {
+			command: `${onyx_path}/bin/onyx`,
+			args: ["lsp"],
+			transport: vslc.TransportKind.stdio,
+		};
 
-	client = new vslc.LanguageClient("onyx-lsp", serverOptions, clientOptions);
+		let clientOptions: vslc.LanguageClientOptions = {
+			documentSelector: [
+				{ scheme: "file", language: "onyx" },
+			],
+			connectionOptions: {
+				cancellationStrategy: null,
+				maxRestartCount: 5
+			}
+		};
 
-	client.start();
+		client = new vslc.LanguageClient("onyx-lsp", serverOptions, clientOptions);
+
+		client.start();
+	}
 
 	console.appendLine("Onyx Extension loaded.");
 }

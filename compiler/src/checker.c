@@ -1923,7 +1923,7 @@ CheckStatus check_address_of(AstAddressOf** paof) {
         AstPointerType *pt = onyx_ast_node_new(context.ast_alloc, sizeof(AstPointerType), Ast_Kind_Pointer_Type);
         pt->token     = aof->token;
         pt->elem      = (AstType *) expr;
-        pt->__unused  = aof->next;
+        pt->next      = aof->next;
         *paof         = (AstAddressOf *) pt;
         CHECK(type, (AstType **) &pt);
         return Check_Success;

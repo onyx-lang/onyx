@@ -70,6 +70,7 @@ jobs:
           ONYX_RUNTIME_LIBRARY: ${{ matrix.runtime_library }} 
           ONYX_INCLUDE_DIR: ../shared/include
           ONYX_LIBRARY_DIR: ${{ env.ONYX_LIBRARY_DIR }}
+          ONYX_USE_DYNCALL: '1'
 
       - name: Build Onyx for ${{ matrix.build }}
         if: matrix.build == 'windows-amd64'

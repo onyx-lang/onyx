@@ -27,18 +27,32 @@
     #define _BH_LINUX 1
 #endif
 
+#if defined(__MACH__) && defined(__APPLE__)
+    #define _BH_DARWIN 1
+#endif
+
 #include <sys/stat.h>
-#include <malloc.h>
 #include <time.h>
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     #include <errno.h>
     #include <fcntl.h>
     #include <unistd.h>
     #include <dirent.h>
     #include <pthread.h>
-    #include <sys/inotify.h>
     #include <sys/select.h>
+#endif
+
+#if defined(_BH_LINUX) || defined(_BH_WINDOWS)
+    #include <malloc.h>
+#endif
+
+#if defined(_BH_LINUX)
+    #include <sys/inotify.h>
+#endif
+
+#if defined(_BH_DARWIN)
+    #include <sys/malloc.h>
 #endif
 
 #include <stdlib.h>
@@ -209,7 +223,7 @@ BH_DEF i64 leb128_to_int(u8* bytes, i32 *byte_count);
 #define forir(var, hi, lo)                for (i64 var = (hi); var >= (lo); var--)
 #define forll(T, var, start, step)        for (T* var = (start); var != NULL; var = (T *) var->step)
 
-#if defined(BH_DEBUG) && !defined(_BH_WINDOWS)
+#if defined(BH_DEBUG) && defined(_BH_LINUX) && false
     #define DEBUG_HERE                        __asm("int $3")
 #else
     #define DEBUG_HERE
@@ -497,8 +511,8 @@ void   bh_dir_close(bh_dir dir);
         fd_set fds;
     } bh_file_watch;
 #endif
-#ifdef _BH_WINDOWS
-    // TODO: Make these work on Windows
+#if defined(_BH_WINDOWS) || defined(_BH_DARWIN)
+    // TODO: Make these work on Windows and MacOS
     typedef u32 bh_file_watch;
 #endif
 
@@ -998,7 +1012,7 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc) {
     case bh_allocator_action_alloc: {
 #if defined(_BH_WINDOWS)
         retval = _aligned_malloc(size, alignment);
-#elif defined(_BH_LINUX)
+#elif defined(_BH_LINUX) || defined (_BH_DARWIN)
         i32 success = posix_memalign(&retval, alignment, size);
 #endif
         if (flags & bh_allocator_flag_clear && retval != NULL) {
@@ -1010,7 +1024,7 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc) {
         // TODO: Maybe replace with better custom function
 #if defined(_BH_WINDOWS)
         retval = _aligned_realloc(prev_memory, size, alignment);
-#elif defined(_BH_LINUX)
+#elif defined(_BH_LINUX) || defined (_BH_DARWIN)
         retval = realloc(prev_memory, size);
 #endif
     } break;
@@ -1018,7 +1032,7 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc) {
     case bh_allocator_action_free: {
 #if defined(_BH_WINDOWS)
         _aligned_free(prev_memory);
-#elif defined(_BH_LINUX)
+#elif defined(_BH_LINUX) || defined (_BH_DARWIN)
         free(prev_memory);
 #endif
     } break;
@@ -1045,7 +1059,7 @@ void bh_managed_heap_free(bh_managed_heap* mh) {
             l->magic_number = 0;
 #if defined(_BH_WINDOWS)
             _aligned_free((void *) l);
-#elif defined(_BH_LINUX)
+#elif defined(_BH_LINUX) || defined (_BH_DARWIN)
             free((void *) l);
 #endif
         }
@@ -1595,7 +1609,7 @@ bh_file_error bh_file_get_standard(bh_file* file, bh_file_standard stand) {
     }
     file->fd = sd_fd;
 
-#elif defined(_BH_LINUX)
+#elif defined(_BH_LINUX) || defined (_BH_DARWIN)
     i32 sd_fd = -1;
 
     switch (stand) {
@@ -1683,7 +1697,7 @@ bh_file_error bh_file_open_mode(bh_file* file, bh_file_mode mode, const char* fi
     file->filename = filename;
     return BH_FILE_ERROR_NONE;
 
-#elif defined(_BH_LINUX)
+#elif defined(_BH_LINUX) || defined (_BH_DARWIN)
     i32 os_mode = 0;
 
     switch (mode & BH_FILE_MODE_MODES) {
@@ -1723,7 +1737,7 @@ b32 bh_file_read_at(bh_file* file, i64 offset, void* buffer, isize buff_size, is
     if (res) return 1;
     else     return 0;
 
-#elif defined(_BH_LINUX)
+#elif defined(_BH_LINUX) || defined (_BH_DARWIN)
     if (file->fd == 0) {
         isize res = read(file->fd, buffer, buff_size);
         if (res < 0) return 0;
@@ -1748,7 +1762,7 @@ b32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_s
     res = (isize) WriteFile(file->fd, buffer, buff_size, (i32 *) bytes_wrote, NULL);
     return res;
 
-#elif defined(_BH_LINUX)
+#elif defined(_BH_LINUX) || defined (_BH_DARWIN)
     if (current_offset == offset || file->fd == 1 || file->fd == 2) {
         // Standard in and out do like pwrite()
         res = write(file->fd, buffer, buff_size);
@@ -1775,6 +1789,13 @@ static b32 bh__file_seek_wrapper(bh_file_descriptor fd, i64 offset, bh_file_when
 
 #elif defined(_BH_LINUX)
     i64 res = lseek64(fd, offset, whence);
+    if (res < 0) return 0;
+    if (new_offset) *new_offset = res;
+    return 1;
+#endif
+
+#elif defined(_BH_DARWIN)
+    i64 res = lseek(fd, offset, whence);
     if (res < 0) return 0;
     if (new_offset) *new_offset = res;
     return 1;
@@ -1821,7 +1842,7 @@ bh_file_error bh_file_close(bh_file* file) {
 
     return err;
 
-#elif defined(_BH_LINUX)
+#elif defined(_BH_LINUX) || defined (_BH_DARWIN)
     i32 res = close(file->fd);
     if (res < 0)
         err = BH_FILE_ERROR_INVALID;
@@ -1839,7 +1860,7 @@ b32 bh_file_write(bh_file* file, void* buffer, isize buff_size) {
 }
 
 void bh_file_flush(bh_file* file) {
-    #ifdef _BH_LINUX
+    #ifdef _BH_LINUX || defined (_BH_DARWIN)
     fdatasync(file->fd);
     #endif
 }
@@ -1896,7 +1917,7 @@ b32 bh_file_stat(char const* filename, bh_file_stats* out) {
     if ((s.st_mode & S_IFMT) == S_IFDIR) out->file_type = BH_FILE_TYPE_DIRECTORY;
     if ((s.st_mode & S_IFMT) == S_IFREG) out->file_type = BH_FILE_TYPE_FILE;
 
-#if defined(_BH_LINUX) 
+#if defined(_BH_LINUX) || defined (_BH_DARWIN)
     if ((s.st_mode & S_IFMT) == S_IFLNK) out->file_type = BH_FILE_TYPE_LINK;
 #endif
 
@@ -1912,7 +1933,7 @@ b32 bh_file_remove(char const* filename) {
 #if defined(_BH_WINDOWS)
     return DeleteFileA(filename);
 
-#elif defined(_BH_LINUX)
+#elif defined(_BH_LINUX) || defined (_BH_DARWIN)
     return unlink(filename) == 0;
 #endif
 }
@@ -1929,7 +1950,7 @@ char* bh_path_get_full_name(char const* filename, bh_allocator a) {
 
     return result;
 
-#elif defined(_BH_LINUX)
+#elif defined(_BH_LINUX) || defined (_BH_DARWIN)
     char* p = realpath(filename, NULL);    
 
     // Check if the file did not exists.
@@ -1948,7 +1969,7 @@ char* bh_path_get_full_name(char const* filename, bh_allocator a) {
 }
 
 // NOTE: This assumes the filename is the full path, not relative to anything else.
-#if defined(_BH_LINUX)
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     #define DIR_SEPARATOR '/'
 #elif defined(_BH_WINDOWS)
     #define DIR_SEPARATOR '\\'
@@ -2008,7 +2029,7 @@ char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_su
 //
 // Modifies the path in-place.
 char* bh_path_convert_separators(char* path) {
-#if defined(_BH_LINUX)
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     #define DIR_SEPARATOR '/'
     #define OTHER_SEPARATOR '\\'
 #elif defined(_BH_WINDOWS)
@@ -2042,7 +2063,7 @@ bh_dir bh_dir_open(char* path) {
     return dir;
 #endif
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     DIR* dir = opendir(path);
     return dir;
 #endif
@@ -2067,7 +2088,7 @@ b32 bh_dir_read(bh_dir dir, bh_dirent* out) {
     return 1;
 #endif
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     struct dirent *ent;
     while (1) {
         ent = readdir(dir);
@@ -2107,7 +2128,7 @@ void bh_dir_close(bh_dir dir) {
     free(dir);
 #endif
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     if (dir == NULL) return;
     closedir(dir);
 #endif
@@ -3048,7 +3069,7 @@ u64 bh_time_curr() {
     QueryPerformanceCounter(&result);
     return (u64) result.QuadPart;
 
-#elif defined(_BH_LINUX)
+#elif defined(_BH_LINUX) || defined(_BH_DARWIN)
     struct timespec spec;
     clock_gettime(CLOCK_REALTIME, &spec);
 
@@ -3074,7 +3095,7 @@ u64 bh_time_duration(u64 old) {
     duration /= freq.QuadPart;
     return duration;
 
-#elif defined(_BH_LINUX)
+#elif defined(_BH_LINUX) || defined(_BH_DARWIN)
     u64 curr = bh_time_curr();
     return curr - old;
 #endif

@@ -618,6 +618,9 @@ void introduce_build_options(bh_allocator a) {
     #ifdef _BH_WINDOWS
         os = 2;
     #endif
+    #ifdef _BH_DARWIN
+        os = 3;
+    #endif
 
     AstType* OS_Type = (AstType *) symbol_raw_resolve(p->scope, "OS");
     if (OS_Type == NULL) {

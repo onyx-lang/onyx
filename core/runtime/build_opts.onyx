@@ -12,6 +12,7 @@ Runtime :: enum {
 OS :: enum {
     Linux       :: 1;
     Windows     :: 2;
+    MacOS       :: 3;
 }
 
 // arch: Arch         This is set by the compiler.

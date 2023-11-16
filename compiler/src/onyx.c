@@ -128,7 +128,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     bh_arr_new(alloc, options.defined_variables, 2);
 
     char* core_installation = NULL;
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     core_installation = getenv("ONYX_PATH");
     #endif
     #ifdef _BH_WINDOWS
