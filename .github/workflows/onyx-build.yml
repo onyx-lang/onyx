@@ -28,7 +28,7 @@ jobs:
             artifact_name: 'onyx-linux-ovm-amd64'
           - build: linux-amd64
             os: ubuntu-20.04
-            runtime_library: libwasmer.a
+            runtime_library: ':libwasmer.a'
             artifact_name: 'onyx-linux-wasmer-amd64'
           - build: windows-amd64
             os: windows-latest
@@ -42,17 +42,17 @@ jobs:
           mkdir -p build
 
       - name: Install Linux building dependencies
-        if: matrix.runtime_library == 'libwasmer.a'
+        if: matrix.runtime_library == ':libwasmer.a'
         run: |
           curl https://get.wasmer.io -sSfL | sh
 
       - name: Setup environment variables for Wasmer
-        if: matrix.runtime_library == 'libwasmer.a'
+        if: matrix.runtime_library == ':libwasmer.a'
         run: |
-          echo "ONYX_LIBRARY_DIR=$(/home/runner/.wasmer/bin/wasmer config --libdir)" >> "$GITHUB_ENV"
+          echo "ONYX_LIBRARY_DIR=/home/runner/.wasmer/lib" >> "$GITHUB_ENV"
 
       - name: Setup environment variables for OVM-Wasm
-        if: matrix.runtime_library != 'libwasmer.a'
+        if: matrix.runtime_library != ':libwasmer.a'
         run: |
           echo "ONYX_LIBRARY_DIR=../shared/lib/linux_x86_64/lib" >> "$GITHUB_ENV"
 
