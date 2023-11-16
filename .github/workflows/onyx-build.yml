@@ -36,7 +36,12 @@ jobs:
           - build: darwin-arm64
             os: macos-11.0
             runtime_library: none
+            target: aarch64-apple-darwin
             artifact_name: 'onyx-darwin-none-arm64'
+          - build: darwin-amd64
+            os: macos-11.0
+            runtime_library: none
+            artifact_name: 'onyx-darwin-none-amd64'
           # - build: darwin-arm64
           #   os: macos-11.0
           #   runtime_library: wasmer 
@@ -87,6 +92,7 @@ jobs:
         env:
           ONYX_CC: gcc
           ONYX_ARCH: darwin_arm64
+          ONYX_TARGET: aarch64-apple-darwin
 
       - name: Build Onyx for ${{ matrix.build }}
         if: matrix.build == 'windows-amd64'

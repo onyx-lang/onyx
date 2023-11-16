@@ -14,6 +14,10 @@ fi
 
 FLAGS="$FLAGS -DENABLE_DEBUG_INFO"
 
+if [ ! -z ${ONYX_TARGET+x} ]; then
+    FLAGS="$FLAGS --target=$ONYX_TARGET"
+fi
+
 if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
     FLAGS="$FLAGS -DENABLE_RUN_WITH_WASMER"
     C_FILES="${C_FILES}wasm_runtime "
