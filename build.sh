@@ -42,7 +42,7 @@ package_all() {
     mkdir -p "$DIST_DIR/lib"
     mkdir -p "$DIST_DIR/include"
 
-    cp runtime/onyx_runtime.so "$DIST_DIR/lib/"
+    [ -f runtime/onyx_runtime.so ] && cp runtime/onyx_runtime.so "$DIST_DIR/lib/"
     cp "shared/include/onyx_library.h" "$DIST_DIR/include/onyx_library.h"
     cp "shared/include/wasm.h" "$DIST_DIR/include/wasm.h"
 

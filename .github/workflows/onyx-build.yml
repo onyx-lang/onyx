@@ -33,6 +33,10 @@ jobs:
             os: ubuntu-latest
             runtime_library: none
             artifact_name: 'onyx-linux-none-amd64' 
+          - build: darwin-arm64
+            os: macos-11.0
+            runtime_library: none
+            artifact_name: 'onyx-darwin-none-arm64'
           - build: windows-amd64
             os: windows-latest
             artifact_name: 'onyx-windows-amd64'
@@ -82,6 +86,15 @@ jobs:
         env:
           ONYX_CC: gcc
           ONYX_ARCH: x86_64
+          ONYX_INCLUDE_DIR: ../shared/include
+
+      - name: Build Onyx for ${{ matrix.build }}
+        if: (matrix.build == 'darwin-arm64') && (matrix.runtime_library == 'none')
+        run: |
+          ./build.sh compile package
+        env:
+          ONYX_CC: gcc
+          ONYX_ARCH: arm64
           ONYX_INCLUDE_DIR: ../shared/include
 
       - name: Build Onyx for ${{ matrix.build }}
