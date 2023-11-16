@@ -63,14 +63,3 @@ jobs:
           path: dist
           if-no-files-found: error
           retention-days: 5
-    
-    steps:
-    - uses: actions/checkout@v2
-    - name: make build.sh executable
-      run: chmod +x build.sh
-    - name: make build directory
-      run: mkdir -p build
-    - name: build onyx
-      run: ./build.sh
-    - name: run tests
-      run: ./bin/onyx run scripts/run_tests.onyx
