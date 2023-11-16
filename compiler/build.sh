@@ -1,7 +1,7 @@
 #!/bin/sh
 
 C_FILES="onyx astnodes builtins checker clone doc entities errors lex parser symres types utils wasm_emit "
-LIBS="-L$ONYX_LIBRARY_DIR -lpthread -ldl -lm"
+LIBS="-lpthread -ldl -lm"
 INCLUDES="-I./include -I../shared/include -I../shared/include/dyncall"
 
 WARNINGS='-Wimplicit -Wmisleading-indentation -Wparentheses -Wsequence-point -Wreturn-type -Wshift-negative-value -Wunused-but-set-parameter -Wunused-but-set-variable -Wunused-function -Wunused-label -Wmaybe-uninitialized -Wsign-compare -Wstrict-overflow -Wduplicated-branches -Wduplicated-cond -Wtrigraphs -Waddress -Wlogical-op'
@@ -12,20 +12,36 @@ else
     FLAGS="$WARNINGS -O3"
 fi
 
+FLAGS="$FLAGS -DENABLE_DEBUG_INFO"
+
 if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
     FLAGS="$FLAGS -DENABLE_RUN_WITH_WASMER"
     C_FILES="${C_FILES}wasm_runtime "
-    LIBS="-l$ONYX_RUNTIME_LIBRARY $LIBS"
+    case "${ONYX_RUNTIME_LIBRARY}" in
+        ovmwasm)
+            LIBS="../shared/lib/$ONYX_ARCH/lib/libovmwasm.a $LIBS"
+            FLAGS="$FLAGS -DUSE_OVM_DEBUGGER"
+            ;;
+
+        wasmer)
+            LIBS="$(wasmer config --libdir)/libwasmer.a $LIBS"
+            ;;
+
+        *)
+            echo "Unknown WebAssembly runtime '$ONYX_RUNTIME_LIBRARY'. Aborting.";
+            exit 1
+            ;;
+    esac
 fi
 
-if [ "$ONYX_RUNTIME_LIBRARY" = "ovmwasm" ]; then
-    FLAGS="$FLAGS -DUSE_OVM_DEBUGGER"
-fi
-
-FLAGS="$FLAGS -DENABLE_DEBUG_INFO"
+case "$ONYX_ARCH" in
+    *darwin*)
+        LIBS="$LIBS -lffi -lSystem -framework CoreFoundation -framework SystemConfiguration"
+        ;;
+esac
 
 if [ "$ONYX_USE_DYNCALL" = "1" ] && [ "$ONYX_RUNTIME_LIBRARY" = "ovmwasm" ]; then
-    LIBS="$LIBS ../shared/lib/linux_$ONYX_ARCH/lib/libdyncall_s.a ../shared/lib/linux_$ONYX_ARCH/lib/libdyncallback_s.a"
+    LIBS="$LIBS ../shared/lib/$ONYX_ARCH/lib/libdyncall_s.a ../shared/lib/$ONYX_ARCH/lib/libdyncallback_s.a"
     FLAGS="$FLAGS -DUSE_DYNCALL"
 fi
 

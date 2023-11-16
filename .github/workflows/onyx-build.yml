@@ -27,7 +27,7 @@ jobs:
             artifact_name: 'onyx-linux-ovm-amd64'
           - build: linux-amd64
             os: ubuntu-latest
-            runtime_library: ':libwasmer.a'
+            runtime_library: wasmer
             artifact_name: 'onyx-linux-wasmer-amd64'
           - build: linux-amd64
             os: ubuntu-latest
@@ -49,19 +49,9 @@ jobs:
           mkdir -p build
 
       - name: Install Linux building dependencies
-        if: matrix.runtime_library == ':libwasmer.a'
+        if: matrix.runtime_library == 'wasmer'
         run: |
           curl https://get.wasmer.io -sSfL | sh
-
-      - name: Setup environment variables for Wasmer
-        if: matrix.runtime_library == ':libwasmer.a'
-        run: |
-          echo "ONYX_LIBRARY_DIR=/home/runner/.wasmer/lib" >> "$GITHUB_ENV"
-
-      - name: Setup environment variables for OVM-Wasm
-        if: matrix.runtime_library != ':libwasmer.a'
-        run: |
-          echo "ONYX_LIBRARY_DIR=../shared/lib/linux_x86_64/lib" >> "$GITHUB_ENV"
 
       - name: Install Windows building dependencies
         if: matrix.build == 'windows-amd64'
@@ -73,10 +63,8 @@ jobs:
           ./build.sh compile package
         env:
           ONYX_CC: gcc
-          ONYX_ARCH: x86_64
+          ONYX_ARCH: linux_x86_64
           ONYX_RUNTIME_LIBRARY: ${{ matrix.runtime_library }} 
-          ONYX_INCLUDE_DIR: ../shared/include
-          ONYX_LIBRARY_DIR: ${{ env.ONYX_LIBRARY_DIR }}
           ONYX_USE_DYNCALL: '1'
           
       - name: Build Onyx for ${{ matrix.build }}
@@ -85,8 +73,7 @@ jobs:
           ./build.sh compile package
         env:
           ONYX_CC: gcc
-          ONYX_ARCH: x86_64
-          ONYX_INCLUDE_DIR: ../shared/include
+          ONYX_ARCH: linux_x86_64
 
       - name: Build Onyx for ${{ matrix.build }}
         if: (matrix.build == 'darwin-arm64') && (matrix.runtime_library == 'none')
@@ -94,8 +81,7 @@ jobs:
           ./build.sh compile package
         env:
           ONYX_CC: gcc
-          ONYX_ARCH: arm64
-          ONYX_INCLUDE_DIR: ../shared/include
+          ONYX_ARCH: darwin_arm64
 
       - name: Build Onyx for ${{ matrix.build }}
         if: matrix.build == 'windows-amd64'

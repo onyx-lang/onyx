@@ -18,12 +18,15 @@
     #include <netinet/in.h>
     #include <sys/socket.h>
     #include <sys/un.h>
-    #include <linux/futex.h>
     #include <sys/syscall.h>
     #include <poll.h>
     #include <termios.h>
     #include <sys/ioctl.h>
     #include <unistd.h>
+#endif
+
+#if defined(_BH_LINUX)
+    #include <linux/futex.h>
 #endif
 
 #include "types.h"  // For POINTER_SIZE
