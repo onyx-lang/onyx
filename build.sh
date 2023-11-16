@@ -14,9 +14,11 @@ compile_all() {
     ./build.sh $1
     cd ..
 
-    cd runtime
-    ./build.sh $1
-    cd ..
+    if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
+        cd runtime
+        ./build.sh $1
+        cd ..
+    fi
 }
 
 package_all() {
@@ -25,7 +27,7 @@ package_all() {
     echo "Installing on '$(uname -a)'"
     echo "Installing core libs"
     [ -d "$DIST_DIR/core" ] && rm -r "$DIST_DIR/core"
-    cp -r ./core/ "$DIST_DIR"
+    cp -r ./core "$DIST_DIR/core"
 
     echo "Installing core tools"
     mkdir -p "$DIST_DIR/bin"

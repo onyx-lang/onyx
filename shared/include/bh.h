@@ -1859,7 +1859,7 @@ b32 bh_file_write(bh_file* file, void* buffer, isize buff_size) {
 }
 
 void bh_file_flush(bh_file* file) {
-    #ifdef _BH_LINUX || defined (_BH_DARWIN)
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     fdatasync(file->fd);
     #endif
 }
