@@ -1,6 +1,6 @@
 #!/bin/sh
 
-C_FILES="onyx astnodes builtins checker clone doc entities errors lex parser symres types utils wasm_emit "
+C_FILES="onyx astnodes builtins checker clone doc entities errors lex parser symres types utils wasm_emit"
 LIBS="-L$ONYX_LIBRARY_DIR -lpthread -ldl -lm"
 INCLUDES="-I./include -I../shared/include -I../shared/include/dyncall"
 
