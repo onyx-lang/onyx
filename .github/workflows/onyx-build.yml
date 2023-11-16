@@ -44,8 +44,8 @@ jobs:
           ONYX_CC: gcc
           ONYX_ARCH: x86_64
           ONYX_RUNTIME_LIBRARY: ovmwasm
-          ONYX_INCLUDE_DIR: shared/include
-          ONYX_LIBRARY_DIR: shared/lib/linux_x86_64/lib
+          ONYX_INCLUDE_DIR: ../shared/include
+          ONYX_LIBRARY_DIR: ../shared/lib/linux_x86_64/lib
 
       - name: Install Windows building dependencies
         if: matrix.build == 'windows-amd64'
