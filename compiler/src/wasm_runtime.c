@@ -146,6 +146,11 @@ static WasmFuncDefinition** onyx_load_library(LinkLibraryContext *ctx, char *nam
 static void lookup_and_load_custom_libraries(LinkLibraryContext *ctx, bh_arr(WasmFuncDefinition **)* p_out) {
     bh_arr(WasmFuncDefinition **) out = *p_out;
 
+    char *onyx_path = getenv("ONYX_PATH");
+    if (onyx_path) {
+        bh_arr_push(ctx->library_paths, bh_aprintf(bh_heap_allocator(), "%s/lib", onyx_path));
+    }
+
     bh_buffer wasm_bytes = ctx->wasm_bytes;
 
     i32 cursor = 8; // skip the magic number and version
@@ -556,11 +561,6 @@ void onyx_run_initialize(b32 debug_enabled) {
 #ifndef USE_OVM_DEBUGGER
     if (debug_enabled) {
         printf("Warning: --debug does nothing if libovmwasm.so is not being used!\n");
-    }
-
-    // Prefer the LLVM compile because it is faster. This should be configurable from the command line and/or a top-level directive.
-    if (wasmer_is_compiler_available(LLVM)) {
-        wasm_config_set_compiler(wasm_config, LLVM);
     }
 
     wasmer_features_t* features = wasmer_features_new();

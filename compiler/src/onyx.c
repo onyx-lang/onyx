@@ -127,14 +127,19 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     bh_arr_new(alloc, options.included_folders, 2);
     bh_arr_new(alloc, options.defined_variables, 2);
 
-    char* core_installation;
+    char* core_installation = NULL;
     #ifdef _BH_LINUX
-    core_installation = CORE_INSTALLATION;
+    core_installation = getenv("ONYX_PATH");
     #endif
     #ifdef _BH_WINDOWS
     core_installation = bh_alloc_array(alloc, u8, 512);
     GetEnvironmentVariableA("ONYX_PATH", core_installation, 512);
     #endif
+
+    if (core_installation == NULL) {
+        bh_printf("Error: ONYX_PATH environment variable is not set. Please set this to the location of your Onyx installation.\n");
+        exit(0);
+    }
 
     // NOTE: Add the current folder
     bh_arr_push(options.included_folders, core_installation);

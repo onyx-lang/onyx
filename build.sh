@@ -1,55 +1,71 @@
 #!/bin/sh
 
-[ ! $UID = 0 ] \
-    && echo "Please run this script as root." \
-    && exit 1
+DIST_DIR="./dist"
+ONYX_INSTALL_DIR="$HOME/.onyx"
 
-. ./settings.sh
+compile_all() {
+    if [ "$ONYX_RUNTIME_LIBRARY" = "ovmwasm" ]; then
+        cd interpreter
+        ./build.sh $1
+        cd ..
+    fi
 
-echo "Installing on '$(uname -a)'"
-
-echo "Installing core libs"
-[ -d "$CORE_DIR/core" ] && rm -r "$CORE_DIR/core"
-mkdir -p "$CORE_DIR"
-cp -r ./core/ "$CORE_DIR"
-
-
-mkdir -p "$CORE_DIR/tools"
-mkdir -p "$CORE_DIR/tools/pkg_templates"
-cp ./scripts/onyx-pkg.onyx "$CORE_DIR/tools"
-cp ./scripts/default.json "$CORE_DIR/tools/pkg_templates"
-
-# This is a development feature to allow for quickly reinstalling core libraries
-# without have to recompile the entire compiler
-[ "$1" = "core" ] && exit 0
-
-if [ "$RUNTIME_LIBRARY" = "ovmwasm" ]; then
-    cd interpreter
+    cd compiler
     ./build.sh $1
     cd ..
-fi
 
-if [ ! -f "$CORE_DIR/lib/lib$RUNTIME_LIBRARY.so" ] || true; then
-    echo "Copying lib$RUNTIME_LIBRARY to $CORE_DIR/lib (first install)"
+    cd runtime
+    ./build.sh $1
+    cd ..
+}
 
-    mkdir -p "$CORE_DIR/lib"
-    mkdir -p "$CORE_DIR/include"
+package_all() {
+    mkdir -p "$DIST_DIR"
 
-    cp "$WASMER_LIBRARY_DIR/lib$RUNTIME_LIBRARY.so" "$CORE_DIR/lib/lib$RUNTIME_LIBRARY.so"
+    echo "Installing on '$(uname -a)'"
+    echo "Installing core libs"
+    [ -d "$DIST_DIR/core" ] && rm -r "$DIST_DIR/core"
+    cp -r ./core/ "$DIST_DIR"
 
-    cp "shared/include/onyx_library.h" "$CORE_DIR/include/onyx_library.h"
-    cp "$WASMER_INCLUDE_DIR/wasm.h" "$CORE_DIR/include/wasm.h"
-fi
+    echo "Installing core tools"
+    mkdir -p "$DIST_DIR/bin"
+    cp compiler/onyx "$DIST_DIR/bin/"
 
-cd compiler
-./build.sh $1
-cd ..
+    mkdir -p "$DIST_DIR/tools"
+    mkdir -p "$DIST_DIR/tools/pkg_templates"
+    cp ./scripts/onyx-pkg.onyx "$DIST_DIR/tools"
+    cp ./scripts/default.json "$DIST_DIR/tools/pkg_templates"
 
-cd runtime
-./build.sh $1
-cd ..
+    echo "Installing runtime library '$ONYX_RUNTIME_LIBRARY'"
+    mkdir -p "$DIST_DIR/lib"
+    mkdir -p "$DIST_DIR/include"
 
+    cp runtime/onyx_runtime.so "$DIST_DIR/lib/"
+    cp "shared/include/onyx_library.h" "$DIST_DIR/include/onyx_library.h"
+    cp "shared/include/wasm.h" "$DIST_DIR/include/wasm.h"
 
+    cp -r "tests" "$DIST_DIR/"
+    cp -r "examples" "$DIST_DIR/"
+}
+
+install_all() {
+    package_all
+
+    mkdir -p "$ONYX_INSTALL_DIR"
+    cp -r "$DIST_DIR/." "$ONYX_INSTALL_DIR"
+}
+
+for arg in $@; do
+    case "$arg" in
+        compile) compile_all ;;
+        package) package_all ;;
+        install) install_all ;;
+        clean)
+            rm -f compiler/onyx 2>/dev/null
+            rm -f runtime/onyx_runtime.so 2>/dev/null
+            ;;
+    esac
+done
 
 # Otherwise the prompt ends on the same line
 printf "\n"

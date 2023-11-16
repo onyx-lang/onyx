@@ -2,15 +2,68 @@ name: Build and Test
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, dev ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, dev ]
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Make release'
 
 jobs:
   build:
+    name: Building on ${{ matrix.build }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - build: linux-amd64
+            os: ubuntu-20.04
+            artifact_name: 'onyx-linux-amd64'
+          - build: windows-amd64
+            os: windows-latest
+            artifact_name: 'onyx-windows-amd64'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup directory for building
+        if: matrix.build == 'linux-amd64'
+        run: |
+          chmod +x build.sh
+          mkdir -p build
 
-    runs-on: ubuntu-latest
+      - name: Build Onyx for ${{ matrix.build }}
+        if: matrix.build == 'linux-amd64'
+        run: |
+          ./build.sh compile package
+        env:
+          ONYX_CC: gcc
+          ONYX_ARCH: x86_64
+          ONYX_RUNTIME_LIBRARY: ovmwasm
+          ONYX_INCLUDE_DIR: shared/include
+          ONYX_LIBRARY_DIR: shared/lib/linux_x86_64/lib
 
+      - name: Install Windows building dependencies
+        if: matrix.build == 'windows-amd64'
+        uses: ilammy/mscv-dev-cmd@v1
+
+      - name: Build Onyx for ${{ matrix.build }}
+        if: matrix.build == 'windows-amd64'
+        run: |
+          cmd.exe /c 'build.bat dist'
+      
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 5
+
+
+
+
+          
     steps:
     - uses: actions/checkout@v2
     - name: make build.sh executable

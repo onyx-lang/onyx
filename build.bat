@@ -27,3 +27,15 @@ cl /MT /std:c17 /TC /I compiler/include /I shared/include /D_USRDLL /D_WINDLL ru
 del onyx_runtime.obj
 del onyx_runtime.lib
 del onyx_runtime.exp
+
+if "%1" == "dist" (
+    mkdir dist
+    mkdir dist\shared\lib\windows_x86_64\lib
+    copy shared\lib\windows_x86_64\lib\wasmer.dll dist\shared\lib\windows_x86_64\lib\wasmer.dll
+    xcopy core dist\core /s /e /h /I
+    xcopy examples dist\examples /s /e /h /I
+    @REM xcopy misc dist\misc /s /e /h /I
+    xcopy onyx_runtime.dll dist\onyx_runtime.dll /s /e /h /I
+    xcopy tests dist\tests /s /e /h /I
+    xcopy onyx.exe dist\onyx.exe /s /e /h /I
+)

@@ -110,7 +110,7 @@ main :: (args) => {
 
     switch runtime.compiler_os {
         case .Linux {
-            exec_context.onyx_cmd = "./bin/onyx";
+            exec_context.onyx_cmd = "./dist/bin/onyx";
             if settings.debug do exec_context.onyx_cmd = "./bin/onyx-debug";
         }
         case .Windows do exec_context.onyx_cmd = "onyx.exe";
