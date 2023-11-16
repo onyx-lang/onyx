@@ -52,7 +52,7 @@ jobs:
           echo "ONYX_LIBRARY_DIR=$(wasmer config --libdir)" >> "$GITHUB_ENV"
 
       - name: Setup environment variables for OVM-Wasm
-        if: matrix.runtime_library == 'libwasmer.a'
+        if: matrix.runtime_library != 'libwasmer.a'
         run: |
           echo "ONYX_LIBRARY_DIR=../shared/lib/linux_x86_64/lib" >> "$GITHUB_ENV"
 
