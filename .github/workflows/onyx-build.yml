@@ -45,6 +45,8 @@ jobs:
         if: matrix.runtime_library == 'libwasmer.a'
         run: |
           curl https://get.wasmer.io -sSfL | sh
+          export WASMER_DIR="/home/runner/.wasmer"
+          [ -s "$WASMER_DIR/wasmer.sh" ] && source "$WASMER_DIR/wasmer.sh"
 
       - name: Setup environment variables for Wasmer
         if: matrix.runtime_library == 'libwasmer.a'
