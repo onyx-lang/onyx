@@ -49,7 +49,7 @@ jobs:
 
       - name: Install Windows building dependencies
         if: matrix.build == 'windows-amd64'
-        uses: ilammy/mscv-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Build Onyx for ${{ matrix.build }}
         if: matrix.build == 'windows-amd64'
