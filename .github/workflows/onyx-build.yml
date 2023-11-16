@@ -24,7 +24,12 @@ jobs:
         include:
           - build: linux-amd64
             os: ubuntu-20.04
-            artifact_name: 'onyx-linux-amd64'
+            runtime_library: ovmwasm
+            artifact_name: 'onyx-linux-ovm-amd64'
+          - build: linux-amd64
+            os: ubuntu-20.04
+            runtime_library: libwasmer.a
+            artifact_name: 'onyx-linux-wasmer-amd64'
           - build: windows-amd64
             os: windows-latest
             artifact_name: 'onyx-windows-amd64'
@@ -36,6 +41,25 @@ jobs:
           chmod +x build.sh
           mkdir -p build
 
+      - name: Install Linux building dependencies
+        if: matrix.runtime_library == 'libwasmer.a'
+        run: |
+          curl https://get.wasmer.io -sSfL | sh
+
+      - name: Setup environment variables for Wasmer
+        if: matrix.runtime_library == 'libwasmer.a'
+        run: |
+          echo "ONYX_LIBRARY_DIR=$(wasmer config --libdir)" >> "$GITHUB_ENV"
+
+      - name: Setup environment variables for OVM-Wasm
+        if: matrix.runtime_library == 'libwasmer.a'
+        run: |
+          echo "ONYX_LIBRARY_DIR=../shared/lib/linux_x86_64/lib" >> "$GITHUB_ENV"
+
+      - name: Install Windows building dependencies
+        if: matrix.build == 'windows-amd64'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Build Onyx for ${{ matrix.build }}
         if: matrix.build == 'linux-amd64'
         run: |
@@ -43,13 +67,9 @@ jobs:
         env:
           ONYX_CC: gcc
           ONYX_ARCH: x86_64
-          ONYX_RUNTIME_LIBRARY: ovmwasm
+          ONYX_RUNTIME_LIBRARY: ${{ matrix.runtime_library }} 
           ONYX_INCLUDE_DIR: ../shared/include
-          ONYX_LIBRARY_DIR: ../shared/lib/linux_x86_64/lib
-
-      - name: Install Windows building dependencies
-        if: matrix.build == 'windows-amd64'
-        uses: ilammy/msvc-dev-cmd@v1
+          ONYX_LIBRARY_DIR: ${{ env.ONYX_LIBRARY_DIR }}
 
       - name: Build Onyx for ${{ matrix.build }}
         if: matrix.build == 'windows-amd64'
