@@ -8,7 +8,7 @@
     #define ONYX_IMPORT extern __declspec(dllimport)
 #endif
 
-#if defined(__unix__)
+#if defined(__unix__) || defined(__APPLE__)
     #define ONYX_EXPORT
     #define ONYX_IMPORT
 #endif

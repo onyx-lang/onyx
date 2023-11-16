@@ -6,7 +6,7 @@
 #define ONYX_NO_SHORT_NAMES
 #include "onyx_library.h"
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     #include <pthread.h>
     #include <signal.h>
     #include <sys/wait.h>
@@ -36,7 +36,7 @@
 #include "src/ort_cptr.h"
 #include "src/ort_tty.h"
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
 #include "src/ort_net_linux.h"
 #endif
 

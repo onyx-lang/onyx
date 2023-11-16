@@ -14,7 +14,7 @@
     #include "wasmer.h"
 #endif
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     #include <pthread.h>
     #include <signal.h>
     #include <sys/wait.h>
@@ -80,7 +80,7 @@ typedef struct LinkLibraryContext {
 
 
 static void *locate_symbol_in_dynamic_library_raw(char *libname, char *sym) {
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     void* handle = dlopen(libname, RTLD_LAZY);
     if (handle == NULL) {
         return NULL;
@@ -108,6 +108,10 @@ static void *locate_symbol_in_dynamic_library(LinkLibraryContext *ctx, char *lib
     library_name = bh_lookup_file(libname, ".", ".so", 1, (const char **) ctx->library_paths, 1);
     #endif
 
+    #ifdef _BH_DARWIN
+    library_name = bh_lookup_file(libname, ".", ".dylib", 1, (const char **) ctx->library_paths, 1);
+    #endif
+
     #ifdef _BH_WINDOWS
     library_name = bh_lookup_file(libname, ".", ".dll", 1, (const char **) ctx->library_paths, 1);
     #endif
@@ -118,7 +122,7 @@ static void *locate_symbol_in_dynamic_library(LinkLibraryContext *ctx, char *lib
 typedef void *(*LinkLibraryer)(OnyxRuntime *runtime);
 
 static WasmFuncDefinition** onyx_load_library(LinkLibraryContext *ctx, char *name) {
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         #define DIR_SEPARATOR '/'
     #endif
     #ifdef _BH_WINDOWS

@@ -28,7 +28,7 @@ ONYX_DEF(__dir_open, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 #endif
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     DIR* dir = opendir(path);
     *(u64 *) ONYX_PTR(params->data[2].of.i32) = (u64) dir;
     results->data[0] = WASM_I32_VAL(dir != NULL);
@@ -65,7 +65,7 @@ ONYX_DEF(__dir_read, (WASM_I64, WASM_I32), (WASM_I32)) {
     return NULL;
 #endif
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     DIR* dir = (DIR *) params->data[0].of.i64;
     if (dir == NULL) {
         results->data[0] = WASM_I32_VAL(0);
@@ -118,7 +118,7 @@ ONYX_DEF(__dir_close, (WASM_I64), ()) {
     return NULL;
 #endif
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     DIR* dir = (DIR *) params->data[0].of.i64;
     if (dir == NULL) return NULL;
 
@@ -141,7 +141,7 @@ ONYX_DEF(__dir_create, (WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 #endif
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     results->data[0] = WASM_I32_VAL(mkdir(path, 0777) == 0);
     return NULL;
 #endif
@@ -161,7 +161,7 @@ ONYX_DEF(__dir_remove, (WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 #endif
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     results->data[0] = WASM_I32_VAL(rmdir(path) == 0);
     return NULL;
 #endif

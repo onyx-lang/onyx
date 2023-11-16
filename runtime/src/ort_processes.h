@@ -7,7 +7,7 @@
 typedef struct OnyxProcess {
     u64 magic_number;
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     // Pipes
     i32 proc_to_host[2];
     i32 host_to_proc[2];
@@ -50,7 +50,7 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
     memset(process, 0, sizeof(*process));
     process->magic_number = ONYX_PROCESS_MAGIC_NUMBER;
 
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         // :Security - alloca a user controlled string.
         char **process_args = alloca(sizeof(char *) * (args_len + 2));
         byte_t* array_loc = ONYX_PTR(args_ptr);
@@ -198,7 +198,7 @@ ONYX_DEF(__process_read, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
     u8 *buffer = ONYX_PTR(output_ptr);
 
     i32 bytes_read;
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         bytes_read = read(process->proc_to_host[0], buffer, output_len);
         if (bytes_read < 0) {
             switch (errno) {
@@ -232,7 +232,7 @@ ONYX_DEF(__process_write, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
     u8 *buffer = ONYX_PTR(input_ptr);
 
     i32 bytes_written;
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         bytes_written = write(process->host_to_proc[1], buffer, input_len);
         bytes_written = bh_max(bytes_written, 0);  // Silently consume errors
     #endif
@@ -253,7 +253,7 @@ ONYX_DEF(__process_kill, (WASM_I64), (WASM_I32)) {
         return NULL;
     }
 
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         i32 failed = kill(process->pid, SIGKILL);
         results->data[0] = WASM_I32_VAL(!failed);
     #endif
@@ -273,7 +273,7 @@ ONYX_DEF(__process_wait, (WASM_I64), (WASM_I32)) {
         return NULL;
     }
 
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         i32 status;
         waitpid(process->pid, &status, 0);
 
@@ -330,7 +330,7 @@ ONYX_DEF(__process_destroy, (WASM_I64), ()) {
         return NULL;
     }
 
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         close(process->proc_to_host[0]);
         close(process->host_to_proc[1]);
     #endif

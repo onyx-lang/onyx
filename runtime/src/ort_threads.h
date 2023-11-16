@@ -11,7 +11,7 @@ typedef struct OnyxThread {
     i32 dataptr;
     wasm_instance_t* instance;
 
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         pthread_t thread;
     #endif
 
@@ -23,7 +23,7 @@ typedef struct OnyxThread {
 
 static bh_arr(OnyxThread) threads = NULL;
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
 static void *onyx_run_thread(void *data) {
 #endif
 #ifdef _BH_WINDOWS
@@ -94,7 +94,7 @@ ONYX_DEF(__spawn_thread, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM
     thread->closureptr = params->data[4].of.i32;
     thread->dataptr    = params->data[6].of.i32;
 
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         pthread_create(&thread->thread, NULL, onyx_run_thread, thread);
     #endif
 
@@ -113,7 +113,7 @@ ONYX_DEF(__kill_thread, (WASM_I32), (WASM_I32)) {
     i32 i = 0;
     bh_arr_each(OnyxThread, thread, threads) {
         if (thread->id == thread_id) {
-            #ifdef _BH_LINUX
+            #if defined(_BH_LINUX) || defined(_BH_DARWIN)
             // This leads to some weirdness and bugs...
             //
             // pthread_kill(thread->thread, SIGKILL);
