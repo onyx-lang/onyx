@@ -36,7 +36,7 @@ package_all() {
     cp ./scripts/onyx-pkg.onyx "$DIST_DIR/tools"
     cp ./scripts/default.json "$DIST_DIR/tools/pkg_templates"
 
-    echo "Installing runtime library '$ONYX_RUNTIME_LIBRARY'"
+    echo "Installing runtime library"
     mkdir -p "$DIST_DIR/lib"
     mkdir -p "$DIST_DIR/include"
 
@@ -46,11 +46,19 @@ package_all() {
 
     cp -r "tests" "$DIST_DIR/"
     cp -r "examples" "$DIST_DIR/"
+
+    mkdir -p "$DIST_DIR/misc"
+    cp misc/onyx-linux.sublime-build "$DIST_DIR/misc"
+    cp misc/onyx-windows.sublime-build "$DIST_DIR/misc"
+    cp misc/onyx-mode.el "$DIST_DIR/misc"
+    cp misc/onyx.sublime-syntax "$DIST_DIR/misc"
+    cp misc/vscode/onyx-0.1.8.vsix "$DIST_DIR/misc"
 }
 
 install_all() {
     package_all
 
+    echo "Installing to $ONYX_INSTALL_DIR"
     mkdir -p "$ONYX_INSTALL_DIR"
     cp -r "$DIST_DIR/." "$ONYX_INSTALL_DIR"
 }
