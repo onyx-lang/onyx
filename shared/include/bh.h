@@ -1792,7 +1792,6 @@ static b32 bh__file_seek_wrapper(bh_file_descriptor fd, i64 offset, bh_file_when
     if (res < 0) return 0;
     if (new_offset) *new_offset = res;
     return 1;
-#endif
 
 #elif defined(_BH_DARWIN)
     i64 res = lseek(fd, offset, whence);
