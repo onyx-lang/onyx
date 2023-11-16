@@ -149,7 +149,7 @@ ONYX_DEF(__random_get, (WASM_PTR, WASM_I32), ()) {
 ONYX_DEF(__futex_wait, (WASM_PTR, WASM_I32, WASM_I32), (WASM_I32)) {
     int *addr = ONYX_PTR(params->data[0].of.i32);
 
-    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    #if defined(_BH_LINUX)
     struct timespec delay;
 
     struct timespec *t = NULL;
@@ -181,7 +181,7 @@ ONYX_DEF(__futex_wait, (WASM_PTR, WASM_I32, WASM_I32), (WASM_I32)) {
 ONYX_DEF(__futex_wake, (WASM_PTR, WASM_I32), (WASM_I32)) {
     int *addr = ONYX_PTR(params->data[0].of.i32);
 
-    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    #if defined(_BH_LINUX)
     int res = syscall(SYS_futex, addr, FUTEX_WAKE, params->data[1].of.i32, NULL, NULL, 0);
 
     results->data[0] = WASM_I32_VAL(res);

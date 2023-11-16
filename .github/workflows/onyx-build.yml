@@ -4,7 +4,6 @@ on:
   push:
     branches: 
       - master
-      - dev
   pull_request:
     branches:
       - master
@@ -30,6 +29,10 @@ jobs:
             os: ubuntu-latest
             runtime_library: ':libwasmer.a'
             artifact_name: 'onyx-linux-wasmer-amd64'
+          - build: linux-amd64
+            os: ubuntu-latest
+            runtime_library: none
+            artifact_name: 'onyx-linux-none-amd64' 
           - build: windows-amd64
             os: windows-latest
             artifact_name: 'onyx-windows-amd64'
@@ -61,7 +64,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Build Onyx for ${{ matrix.build }}
-        if: matrix.build == 'linux-amd64'
+        if: (matrix.build == 'linux-amd64') && (matrix.runtime_library != 'none')
         run: |
           ./build.sh compile package
         env:
@@ -71,6 +74,15 @@ jobs:
           ONYX_INCLUDE_DIR: ../shared/include
           ONYX_LIBRARY_DIR: ${{ env.ONYX_LIBRARY_DIR }}
           ONYX_USE_DYNCALL: '1'
+          
+      - name: Build Onyx for ${{ matrix.build }}
+        if: (matrix.build == 'linux-amd64') && (matrix.runtime_library == 'none')
+        run: |
+          ./build.sh compile package
+        env:
+          ONYX_CC: gcc
+          ONYX_ARCH: x86_64
+          ONYX_INCLUDE_DIR: ../shared/include
 
       - name: Build Onyx for ${{ matrix.build }}
         if: matrix.build == 'windows-amd64'

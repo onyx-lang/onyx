@@ -24,11 +24,13 @@ extern struct bh_allocator global_heap_allocator;
 
 Context context;
 
-#define DOCSTRING_HEADER "Onyx toolchain version " VERSION "\n" \
+#define VERSION_STRING "Onyx toolchain version " VERSION "\n" \
+    "Built on " __TIMESTAMP__ "\n"
+
+#define DOCSTRING_HEADER VERSION_STRING \
     "\n" \
     "The toolchain for the Onyx programming language, created by Brendan Hansen.\n" \
     "\n"
-
 
 
 static const char* top_level_docstring = DOCSTRING_HEADER
@@ -43,7 +45,8 @@ static const char* top_level_docstring = DOCSTRING_HEADER
 #endif
     "\tcheck     Checks syntax and types of an Onyx program.\n"
     "\twatch     Continuously rebuilds an Onyx program on file changes.\n"
-    "\tpackage   Package manager\n";
+    "\tpackage   Package manager\n"
+    "\tversion   Prints version information\n";
     // "\tdoc <input files>\n"
 
 static const char *build_docstring = DOCSTRING_HEADER
@@ -132,8 +135,10 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     core_installation = getenv("ONYX_PATH");
     #endif
     #ifdef _BH_WINDOWS
-    core_installation = bh_alloc_array(alloc, u8, 512);
-    GetEnvironmentVariableA("ONYX_PATH", core_installation, 512);
+    char *tmp_core_installation = bh_alloc_array(alloc, u8, 512);
+    if (GetEnvironmentVariableA("ONYX_PATH", tmp_core_installation, 512) > 0) {
+        core_installation = tmp_core_installation;
+    }
     #endif
 
     if (core_installation == NULL) {
@@ -151,6 +156,10 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     if (!strcmp(argv[1], "help")) {
         options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
         options.help_subcommand = argc > 2 ? argv[2] : NULL;
+    }
+    else if (!strcmp(argv[1], "version")) {
+        options.action = ONYX_COMPILE_ACTION_PRINT_VERSION;
+        goto skip_parsing_arguments;
     }
     else if (!strcmp(argv[1], "compile") || !strcmp(argv[1], "build")) {
         options.action = ONYX_COMPILE_ACTION_COMPILE;
@@ -1152,6 +1161,11 @@ int main(int argc, char *argv[]) {
                 bh_printf(top_level_docstring);
             }
             return 1;
+        }
+
+        case ONYX_COMPILE_ACTION_PRINT_VERSION: {
+            bh_printf(VERSION_STRING);
+            return 0;
         }
 
         case ONYX_COMPILE_ACTION_CHECK:
