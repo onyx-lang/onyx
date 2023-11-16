@@ -45,13 +45,11 @@ jobs:
         if: matrix.runtime_library == 'libwasmer.a'
         run: |
           curl https://get.wasmer.io -sSfL | sh
-          export WASMER_DIR="/home/runner/.wasmer"
-          [ -s "$WASMER_DIR/wasmer.sh" ] && source "$WASMER_DIR/wasmer.sh"
 
       - name: Setup environment variables for Wasmer
         if: matrix.runtime_library == 'libwasmer.a'
         run: |
-          echo "ONYX_LIBRARY_DIR=$(wasmer config --libdir)" >> "$GITHUB_ENV"
+          echo "ONYX_LIBRARY_DIR=$(/home/runner/.wasmer/bin/wasmer config --libdir)" >> "$GITHUB_ENV"
 
       - name: Setup environment variables for OVM-Wasm
         if: matrix.runtime_library != 'libwasmer.a'
