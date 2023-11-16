@@ -37,9 +37,13 @@ jobs:
             os: macos-11.0
             runtime_library: none
             artifact_name: 'onyx-darwin-none-arm64'
+          # - build: darwin-arm64
+          #   os: macos-11.0
+          #   runtime_library: wasmer 
+          #   artifact_name: 'onyx-darwin-wasmer-arm64'
           - build: windows-amd64
             os: windows-latest
-            artifact_name: 'onyx-windows-amd64'
+            artifact_name: 'onyx-windows-wasmer-amd64'
     steps:
       - uses: actions/checkout@v3
       - name: Setup directory for building
@@ -52,6 +56,7 @@ jobs:
         if: matrix.runtime_library == 'wasmer'
         run: |
           curl https://get.wasmer.io -sSfL | sh
+          echo "$HOME/.wasmer/bin" >> $GITHUB_PATH
 
       - name: Install Windows building dependencies
         if: matrix.build == 'windows-amd64'
