@@ -2,9 +2,13 @@ name: Build and Test
 
 on:
   push:
-    branches: [ master, dev ]
+    branches: 
+      - master
+      - dev
   pull_request:
-    branches: [ master, dev ]
+    branches:
+      - master
+      - dev
   workflow_dispatch:
     inputs:
       release:
@@ -59,11 +63,7 @@ jobs:
           path: dist
           if-no-files-found: error
           retention-days: 5
-
-
-
-
-          
+    
     steps:
     - uses: actions/checkout@v2
     - name: make build.sh executable
