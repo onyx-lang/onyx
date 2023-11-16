@@ -212,16 +212,14 @@ initRuntime() {
     echo "2) OVM: A custom, lightweight runtime made for Onyx. Supports debugging. Slower than Wasmer."
     echo "3) None: Omit using a runtime and only use Onyx as a compiler to WebAssembly."
 
-    while true; do 
-        read -p "Which runtime would you like to use? [1/2/3] " selected
+    read -p "Which runtime would you like to use? [1/2/3] " selected
 
-        case $selected in
-            1) RUNTIME="wasmer"; break ;; 
-            2) RUNTIME="ovm"; break ;; 
-            3) RUNTIME="none"; break ;; 
-            *) echo "Invalid choice. Quitting."; exit 1 ;;
-        esac
-    done
+    case $selected in
+        1) RUNTIME="wasmer"; break ;; 
+        2) RUNTIME="ovm"; break ;; 
+        3) RUNTIME="none"; break ;; 
+        *) echo "Invalid choice. Quitting."; exit 1 ;;
+    esac
 }
 
 onyx_install() {
