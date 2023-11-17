@@ -19,7 +19,7 @@ if [ ! -z ${ONYX_TARGET+x} ]; then
 fi
 
 if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
-    FLAGS="$FLAGS -DENABLE_RUN_WITH_WASMER"
+    FLAGS="$FLAGS -DONYX_RUNTIME_LIBRARY=$ONYX_RUNTIME_LIBRARY"
     C_FILES="${C_FILES}wasm_runtime "
     case "${ONYX_RUNTIME_LIBRARY}" in
         ovmwasm)

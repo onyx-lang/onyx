@@ -21,11 +21,21 @@ extern struct bh_allocator global_heap_allocator;
 
 #define VERSION "v0.1.8"
 
+#ifdef ONYX_RUNTIME_LIBRARY
+    #define ONYX_RUNTIME_LIBRARY_MAPPED ONYX_RUNTIME_LIBRARY
+#else
+    #define ONYX_RUNTIME_LIBRARY_MAPPED none
+#endif
+
+#define STRINGIFY_(x) #x
+#define STRINGIFY(x) STRINGIFY_(x)
+
 
 Context context;
 
 #define VERSION_STRING "Onyx toolchain version " VERSION "\n" \
-    "Built on " __TIMESTAMP__ "\n"
+    "Built on " __TIMESTAMP__ "\n" \
+    "Runtime: " STRINGIFY(ONYX_RUNTIME_LIBRARY_MAPPED) "\n"
 
 #define DOCSTRING_HEADER VERSION_STRING \
     "\n" \
@@ -40,11 +50,13 @@ static const char* top_level_docstring = DOCSTRING_HEADER
     "Subcommands:\n"
     "\thelp      Shows this help message. Use \"onyx help <subcommand>\".\n"
     "\tbuild     Compiles an Onyx program into an executable.\n"
-#ifdef ENABLE_RUN_WITH_WASMER
+#ifdef ONYX_RUNTIME_LIBRARY
     "\trun       Compiles and runs an Onyx program, all at once.\n"
 #endif
     "\tcheck     Checks syntax and types of an Onyx program.\n"
+#ifdef _BH_LINUX
     "\twatch     Continuously rebuilds an Onyx program on file changes.\n"
+#endif
     "\tpackage   Package manager\n"
     "\tversion   Prints version information\n";
     // "\tdoc <input files>\n"
@@ -178,7 +190,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         bh_arr_push(options.files, bh_aprintf(alloc, "%s/tools/onyx-pkg.onyx", core_installation));
         goto skip_parsing_arguments;
     }
-    #ifdef ENABLE_RUN_WITH_WASMER
+    #ifdef ONYX_RUNTIME_LIBRARY
     else if (!strcmp(argv[1], "run")) {
         options.action = ONYX_COMPILE_ACTION_RUN;
         arg_parse_start = 2;
@@ -189,7 +201,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         options.action = ONYX_COMPILE_ACTION_WATCH;
         arg_parse_start = 2;
     }
-        // `#ifdef ENABLE_RUN_WITH_WASMER
+        // `#ifdef ONYX_RUNTIME_LIBRARY
         // `else if (!strcmp(argv[1], "run-watch")) {
         // `    options.action = ONYX_COMPILE_ACTION_RUN_WATCH;
         // `    arg_parse_start = 2;
@@ -348,8 +360,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
   skip_parsing_arguments:
 
-    // NOTE: Always enable multi-threading for the Onyx runtime.
-    if (options.runtime == Runtime_Onyx) {
+    // NOTE: Always enable multi-threading for the Onyx and WASI runtime.
+    if (options.runtime == Runtime_Onyx || options.runtime == Runtime_Wasi) {
         options.use_multi_threading = 1;
     }
 
@@ -1037,7 +1049,7 @@ static CompilerProgress onyx_flush_module() {
     return ONYX_COMPILER_PROGRESS_SUCCESS;
 }
 
-#ifdef ENABLE_RUN_WITH_WASMER
+#ifdef ONYX_RUNTIME_LIBRARY
 static b32 onyx_run_module(bh_buffer code_buffer) {
     onyx_run_initialize(context.options->debug_session);
 
@@ -1185,7 +1197,7 @@ int main(int argc, char *argv[]) {
             break;
         #endif
 
-        #ifdef ENABLE_RUN_WITH_WASMER
+        #ifdef ONYX_RUNTIME_LIBRARY
         case ONYX_COMPILE_ACTION_RUN:
             compiler_progress = do_compilation(&compile_opts);
             if (compiler_progress == ONYX_COMPILER_PROGRESS_SUCCESS) {
@@ -1196,7 +1208,7 @@ int main(int argc, char *argv[]) {
             break;
         #endif
 
-        #ifdef ENABLE_RUN_WITH_WASMER
+        #ifdef ONYX_RUNTIME_LIBRARY
         case ONYX_COMPILE_ACTION_RUN_WASM:
             global_heap_allocator = bh_heap_allocator();
             context_init(&compile_opts);
