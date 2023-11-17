@@ -463,7 +463,11 @@ static b32 link_wasm_imports(
         if (wasm_name_equals_string(module_name, "onyx")) {
             if (wasm_name_equals_string(import_name, "memory")) {
                 if (wasm_memory == NULL) {
-                    wasm_limits_t limits = { 1024, 65536 };
+                    const wasm_externtype_t *memory_extern_type = wasm_importtype_type(module_imports.data[i]);
+                    const wasm_memorytype_t *expected_memory_type = wasm_externtype_as_memorytype_const(memory_extern_type);
+                    const wasm_limits_t *memory_limits = wasm_memorytype_limits(expected_memory_type);
+
+                    wasm_limits_t limits = { memory_limits->min, memory_limits->max };
                     wasm_memorytype_t* memory_type = wasm_memorytype_new(&limits);
                     wasm_memory = wasm_memory_new(wasm_store, memory_type);
                 }

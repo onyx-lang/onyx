@@ -115,44 +115,64 @@ typedef struct WasmFuncDefinition {
 #define ONYX_UNPTR(p) ((int) (p != NULL ? ((char *) p - runtime->wasm_memory_data(runtime->wasm_memory)) : 0))
 
 
-#ifdef ONYX_HEAP_FUNCTIONS
+//
+// Below are definitions that allow you to use the heap_resize and heap_free
+// functions to allocate and free memory inside Onyx's memory space, but from
+// a C-library. These functions were very useful, but they had some nasty
+// problems that cannot be easily addressed.
+//
+// The largest problem was that the WASM embedder made no guarantees about how
+// the underlying memory used would be positioned or when it could relocate.
+// If a C-library were to invoke heap_resize, and that resize caused the
+// memory_grow intrinsic to be invoked, the embedder could move the memory to
+// a new address. This would mean that ALL existing pointers into Onyx's memory
+// given to the C-library would be invalidated, almost always causing a segfault.
+//
+// There isn't a great way around this, since the idea of wrapping a C library
+// isn't necessarily supported by WASM at any level. The current work around
+// is to have the C library allocate using malloc(), then return the pointer
+// as a cptr(T), and then have Onyx copy that to a new buffer, and immediately
+// free the cptr(T), generally using a destructor of some kind from the C library.
+//
 
-static wasm_func_t* __onyx_heap_resize_function = NULL;
-static void *__onyx_heap_resize(void* ptr, int size) {
-    if (__onyx_heap_resize_function == NULL) {
-        wasm_extern_t *__extern = runtime->wasm_extern_lookup_by_name(runtime->wasm_module, runtime->wasm_instance, "__heap_resize");
-        __onyx_heap_resize_function = runtime->wasm_extern_as_func(__extern);
-    }
+// #ifdef ONYX_HEAP_FUNCTIONS
 
-    int onyx_ptr = ONYX_UNPTR(ptr);
+// static wasm_func_t* __onyx_heap_resize_function = NULL;
+// static void *__onyx_heap_resize(void* ptr, int size) {
+//     if (__onyx_heap_resize_function == NULL) {
+//         wasm_extern_t *__extern = runtime->wasm_extern_lookup_by_name(runtime->wasm_module, runtime->wasm_instance, "__heap_resize");
+//         __onyx_heap_resize_function = runtime->wasm_extern_as_func(__extern);
+//     }
 
-    wasm_val_t args[] = { WASM_I32_VAL(onyx_ptr), WASM_I32_VAL(size) };
-    wasm_val_t results[1];
-    wasm_val_vec_t args_arr = WASM_ARRAY_VEC(args);
-    wasm_val_vec_t results_arr = WASM_ARRAY_VEC(results);
+//     int onyx_ptr = ONYX_UNPTR(ptr);
 
-    runtime->wasm_func_call(__onyx_heap_resize_function, &args_arr, &results_arr);
-    return ONYX_PTR(results[0].of.i32);
-}
+//     wasm_val_t args[] = { WASM_I32_VAL(onyx_ptr), WASM_I32_VAL(size) };
+//     wasm_val_t results[1];
+//     wasm_val_vec_t args_arr = WASM_ARRAY_VEC(args);
+//     wasm_val_vec_t results_arr = WASM_ARRAY_VEC(results);
 
-static wasm_func_t* __onyx_heap_free_function = NULL;
-static void __onyx_heap_free(void *ptr) {
-    if (__onyx_heap_free_function == NULL) {
-        wasm_extern_t *__extern = runtime->wasm_extern_lookup_by_name(runtime->wasm_module, runtime->wasm_instance, "__heap_free");
-        __onyx_heap_free_function = runtime->wasm_extern_as_func(__extern);
-    }
+//     runtime->wasm_func_call(__onyx_heap_resize_function, &args_arr, &results_arr);
+//     return ONYX_PTR(results[0].of.i32);
+// }
 
-    if (ptr == NULL) return;
-    int onyx_ptr = ONYX_UNPTR(ptr);
+// static wasm_func_t* __onyx_heap_free_function = NULL;
+// static void __onyx_heap_free(void *ptr) {
+//     if (__onyx_heap_free_function == NULL) {
+//         wasm_extern_t *__extern = runtime->wasm_extern_lookup_by_name(runtime->wasm_module, runtime->wasm_instance, "__heap_free");
+//         __onyx_heap_free_function = runtime->wasm_extern_as_func(__extern);
+//     }
 
-    wasm_val_t args[] = { WASM_I32_VAL(onyx_ptr) };
-    wasm_val_vec_t results = {0,0};
-    wasm_val_vec_t args_arr = WASM_ARRAY_VEC(args);
+//     if (ptr == NULL) return;
+//     int onyx_ptr = ONYX_UNPTR(ptr);
 
-    runtime->wasm_func_call(__onyx_heap_free_function, &args_arr, &results);
-}
+//     wasm_val_t args[] = { WASM_I32_VAL(onyx_ptr) };
+//     wasm_val_vec_t results = {0,0};
+//     wasm_val_vec_t args_arr = WASM_ARRAY_VEC(args);
+
+//     runtime->wasm_func_call(__onyx_heap_free_function, &args_arr, &results);
+// }
 
 
-#endif
+// #endif
 
 #endif

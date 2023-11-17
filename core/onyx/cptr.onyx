@@ -38,6 +38,10 @@ cptr :: struct (T: type_expr) {
             buf: [sizeof T] u8;
             __cptr_read(this.data, ~~buf, sizeof T);
             return *cast(&T) buf;
+        },
+
+        (this: cptr($T), buffer: [] u8) {
+            __cptr_read(this.data, ~~buffer.data, buffer.length);
         }
     }
 
