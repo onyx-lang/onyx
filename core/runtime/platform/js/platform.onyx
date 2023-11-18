@@ -10,17 +10,22 @@ use runtime {
 use main
 
 // Platform supports
-Supports_Files :: false
-Supports_Directories :: false
-Supports_Os :: false
-Supports_Processes :: false
 Supports_Time :: true
-Supports_Networking :: false
+Supports_Futexes :: true
 Supports_Type_Info :: true
 Supports_Threads :: true
-Supports_Env_Vars :: false
-Supports_Futexes :: true
-Supports_TTY :: false
+
+// The Onyx Playground needs to overload these because it does special things
+// to make some of these work.
+#if !#defined(runtime.vars.JS_PLATFORM_LAYER_EXTENSIONS) {
+    Supports_Files :: false
+    Supports_Directories :: false
+    Supports_Os :: false
+    Supports_Processes :: false
+    Supports_Networking :: false
+    Supports_Env_Vars :: false
+    Supports_TTY :: false
+}
 
 __output_string   :: (s: str)      -> u32  #foreign "host" "print_str" ---
 __output_error    :: (s: str)      -> u32  #foreign "host" "print_str" ---

@@ -8,7 +8,7 @@ struct Onyx_TTY_State {
 ONYX_DEF(__tty_get, (WASM_I32), ()) {
     struct Onyx_TTY_State *state = ONYX_PTR(params->data[0].of.i32);
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     struct winsize sz;
     ioctl(0, TIOCGWINSZ, &sz);
     state->rows = sz.ws_row;
@@ -40,7 +40,7 @@ ONYX_DEF(__tty_get, (WASM_I32), ()) {
 ONYX_DEF(__tty_set, (WASM_I32), (WASM_I32)) {
     struct Onyx_TTY_State *state = ONYX_PTR(params->data[0].of.i32);
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     int success = 1;
 
     struct termios term;

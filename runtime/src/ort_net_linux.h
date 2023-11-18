@@ -3,8 +3,6 @@
 // Networking
 //
 
-#include <byteswap.h>
-
 #define SOCKET_ERROR_NONE 0
 #define SOCKET_ERROR_BAD_SETTINGS 1
 #define SOCKET_ERROR_CONNECT_FAILED 1

@@ -14,7 +14,7 @@
     #include "wasmer.h"
 #endif
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     #include <pthread.h>
     #include <signal.h>
     #include <sys/wait.h>
@@ -80,7 +80,7 @@ typedef struct LinkLibraryContext {
 
 
 static void *locate_symbol_in_dynamic_library_raw(char *libname, char *sym) {
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     void* handle = dlopen(libname, RTLD_LAZY);
     if (handle == NULL) {
         return NULL;
@@ -108,6 +108,10 @@ static void *locate_symbol_in_dynamic_library(LinkLibraryContext *ctx, char *lib
     library_name = bh_lookup_file(libname, ".", ".so", 1, (const char **) ctx->library_paths, 1);
     #endif
 
+    #ifdef _BH_DARWIN
+    library_name = bh_lookup_file(libname, ".", ".dylib", 1, (const char **) ctx->library_paths, 1);
+    #endif
+
     #ifdef _BH_WINDOWS
     library_name = bh_lookup_file(libname, ".", ".dll", 1, (const char **) ctx->library_paths, 1);
     #endif
@@ -118,7 +122,7 @@ static void *locate_symbol_in_dynamic_library(LinkLibraryContext *ctx, char *lib
 typedef void *(*LinkLibraryer)(OnyxRuntime *runtime);
 
 static WasmFuncDefinition** onyx_load_library(LinkLibraryContext *ctx, char *name) {
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         #define DIR_SEPARATOR '/'
     #endif
     #ifdef _BH_WINDOWS
@@ -145,6 +149,11 @@ static WasmFuncDefinition** onyx_load_library(LinkLibraryContext *ctx, char *nam
 
 static void lookup_and_load_custom_libraries(LinkLibraryContext *ctx, bh_arr(WasmFuncDefinition **)* p_out) {
     bh_arr(WasmFuncDefinition **) out = *p_out;
+
+    char *onyx_path = getenv("ONYX_PATH");
+    if (onyx_path) {
+        bh_arr_push(ctx->library_paths, bh_aprintf(bh_heap_allocator(), "%s/lib", onyx_path));
+    }
 
     bh_buffer wasm_bytes = ctx->wasm_bytes;
 
@@ -400,8 +409,6 @@ static void onyx_print_trap(wasm_trap_t* trap) {
         cursor = section_start + section_size;
     }
 
-    if (func_name_section == 0) return;
-
     bh_printf("TRACE:\n");
     wasm_frame_vec_t frames;
     wasm_trap_trace(trap, &frames);
@@ -409,11 +416,15 @@ static void onyx_print_trap(wasm_trap_t* trap) {
         i32 func_idx   = wasm_frame_func_index(frames.data[i]);
         i32 mod_offset = wasm_frame_module_offset(frames.data[i]);
 
-        i32 cursor = func_name_section + 4 * func_idx;
-        i32 func_offset = *(i32 *) (wasm_raw_bytes.data + cursor);
-        char* func_name = wasm_raw_bytes.data + func_name_section + func_offset;
+        if (func_name_section > 0) {
+            i32 cursor = func_name_section + 4 * func_idx;
+            i32 func_offset = *(i32 *) (wasm_raw_bytes.data + cursor);
+            char* func_name = wasm_raw_bytes.data + func_name_section + func_offset;
 
-        bh_printf("    func[%d]:%p at %s\n", func_idx, mod_offset, func_name);
+            bh_printf("    func[%d]:%p at %s\n", func_idx, mod_offset, func_name);
+        } else {
+            bh_printf("    func[%d]\n", func_idx);
+        }
     }
 }
 
@@ -452,7 +463,11 @@ static b32 link_wasm_imports(
         if (wasm_name_equals_string(module_name, "onyx")) {
             if (wasm_name_equals_string(import_name, "memory")) {
                 if (wasm_memory == NULL) {
-                    wasm_limits_t limits = { 1024, 65536 };
+                    const wasm_externtype_t *memory_extern_type = wasm_importtype_type(module_imports.data[i]);
+                    const wasm_memorytype_t *expected_memory_type = wasm_externtype_as_memorytype_const(memory_extern_type);
+                    const wasm_limits_t *memory_limits = wasm_memorytype_limits(expected_memory_type);
+
+                    wasm_limits_t limits = { memory_limits->min, memory_limits->max };
                     wasm_memorytype_t* memory_type = wasm_memorytype_new(&limits);
                     wasm_memory = wasm_memory_new(wasm_store, memory_type);
                 }
@@ -556,11 +571,6 @@ void onyx_run_initialize(b32 debug_enabled) {
         printf("Warning: --debug does nothing if libovmwasm.so is not being used!\n");
     }
 
-    // Prefer the LLVM compile because it is faster. This should be configurable from the command line and/or a top-level directive.
-    if (wasmer_is_compiler_available(LLVM)) {
-        wasm_config_set_compiler(wasm_config, LLVM);
-    }
-
     wasmer_features_t* features = wasmer_features_new();
     wasmer_features_simd(features, 1);
     wasmer_features_threads(features, 1);
@@ -644,6 +654,7 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     wasm_runtime.wasm_imports = wasm_imports;
     wasm_runtime.wasm_memory = wasm_memory;
     wasm_runtime.wasm_instance = wasm_instance;
+    wasm_runtime.wasm_store = wasm_store;
     wasm_runtime.wasm_func_table = wasm_extern_as_table(
         wasm_extern_lookup_by_name(wasm_module, wasm_instance, "__indirect_function_table")
     );

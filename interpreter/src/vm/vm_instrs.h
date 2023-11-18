@@ -294,6 +294,9 @@ OVMI_INSTR_EXEC(idx_arr) {
     ovm_static_integer_array_t data_elem = state->program->static_data[instr->a];
     if (VAL(instr->b).u32 >= (u32) data_elem.len) {
         OVMI_EXCEPTION_HOOK;
+        ovm_value_t bad_val;
+        bad_val.type = OVM_TYPE_ERR;
+        return bad_val;
     }
 
     VAL(instr->r).i32 = state->program->static_integers[data_elem.start_idx + VAL(instr->b).u32];

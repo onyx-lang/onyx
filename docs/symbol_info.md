@@ -8,12 +8,15 @@ File contains:
 - File definition table
     - File ID
     - File name
+    * Scope ID
 
-- Symbol definition table (16 bytes each)
+- Symbol definition table (16 bytes each, sorted by Symbol ID)
     - ID
     - File ID
     - Line
     - Column
+    * Documentation offset
+    * Documentation length
 
 - Symbol resolution table (sorted in some way to speed up lookup) (20 bytes)
     - File ID
@@ -21,6 +24,17 @@ File contains:
     - Column
     - Length
     - Symbol ID that it resolves to
+
+* Scopes table (12 bytes each, sorted by Scope ID)
+    * Scope ID
+    * Parent Scope ID (-1 for root)
+    * Symbol list start index
+
+* Scope symbols table
+    * Symbol ID (-1 for end of list)
+
+* Documentation table
+    * Long list of bytes
 
 Byte respresentation of the file:
     magic bytes:
@@ -30,6 +44,7 @@ Byte respresentation of the file:
         file definition offset   file definition entry count
         symbol definition offset symbol definition entry count
         symbol resolution offset symbol resolution entry count
+      * docs offset   docs length
 
     file section:
         file defintions

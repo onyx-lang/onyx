@@ -1,12 +1,15 @@
 #!/bin/sh
 
-. ../settings.sh
+case "$(uname)" in
+    Linux)  suffix='so' ;;
+    *BSD)   suffix='so' ;;
+    Darwin) suffix='dylib' ;;
+    *)      suffix='dll' ;;
+esac
 
-$CC -shared -fpic -w -O2 \
-    -o ../bin/onyx_runtime.so \
+echo "Compiling onyx_runtime.$suffix"
+$ONYX_CC -shared -fpic -w -O2 \
+    -o onyx_runtime.$suffix \
     -I ../shared/include -I ../compiler/include \
     ./onyx_runtime.c \
     -lpthread
-
-echo "Installing onyx_runtime.so"
-mv "../bin/onyx_runtime.so" "$CORE_DIR/lib/onyx_runtime.so"

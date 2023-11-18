@@ -51,11 +51,16 @@ customize :: struct {
 use core {package, *}
 use simd {*}
 
-#if runtime.compiler_os == .Linux {
-    #if #defined (runtime.vars.CC) {
-        Linux_Compiler :: runtime.vars.CC    
-    } else {
-        Linux_Compiler :: "/usr/bin/gcc"
+#if #defined (runtime.vars.CC) {
+    #local Compiler :: runtime.vars.CC    
+} else {
+    #if runtime.compiler_os == .Linux {
+        #local Compiler :: "/usr/bin/gcc"
+        #local Library_Suffix :: "so"
+    }
+    #if runtime.compiler_os == .MacOS {
+        #local Compiler :: "clang"
+        #local Library_Suffix :: "dylib"
     }
 }
 
@@ -130,14 +135,19 @@ compile_c_file :: (
     includes: [] str = .[],
     libraries: [] str = .[],
     flags := "") -> bool {
-    #if runtime.compiler_os == .Linux {
+    #if runtime.compiler_os == .Linux || runtime.compiler_os == .MacOS {
         args: [..] str;
         args << "-shared";
         args << "-fPIC";
         args << path;
 
-        args << "-I";
-        args << "/usr/share/onyx/include";
+        onyx_path := os.env("ONYX_PATH");
+        if !onyx_path {
+            logf(.Warning, "ONYX_PATH environment variable was not declared. This likely won't compile.");
+        } else {
+            args << "-I";
+            args << tprintf("{}/include", onyx_path->unwrap());
+        }
 
         for includes {
             args << "-I";
@@ -149,13 +159,13 @@ compile_c_file :: (
         }
 
         args << "-o";
-        args << tprintf("{}.so", dest);
+        args << tprintf("{}.{}", dest, Library_Suffix);
 
         for libraries {
             args << aprintf("-l{}", it);
         }
 
-        proc := os.process_spawn(Linux_Compiler, args);
+        proc := os.process_spawn(Compiler, args);
         defer os.process_destroy(&proc);
 
         proc_reader := io.reader_make(&proc);
@@ -177,7 +187,6 @@ compile_c_file :: (
 }
 
 #local {
-
     write_file_introduction :: (writer: &io.Writer, preamble: [] str, name: str) {
         io.write_format(writer, "//\n");
         io.write_format(writer, "// THIS FILE WAS AUTOMATICALLY GENERATED.\n");

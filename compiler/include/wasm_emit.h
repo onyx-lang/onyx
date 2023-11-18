@@ -792,7 +792,7 @@ void onyx_wasm_module_free(OnyxWasmModule* module);
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer);
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);
 
-#ifdef ENABLE_RUN_WITH_WASMER
+#ifdef ONYX_RUNTIME_LIBRARY 
 void onyx_run_initialize(b32 debug_enabled);
 b32 onyx_run_wasm(bh_buffer code_buffer, int argc, char *argv[]);
 #endif

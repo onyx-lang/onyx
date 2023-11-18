@@ -19,16 +19,28 @@ extern struct bh_allocator global_heap_allocator;
 #include "wasm_emit.h"
 #include "doc.h"
 
-#define VERSION "v0.1.7"
+#define VERSION "v0.1.8"
+
+#ifdef ONYX_RUNTIME_LIBRARY
+    #define ONYX_RUNTIME_LIBRARY_MAPPED ONYX_RUNTIME_LIBRARY
+#else
+    #define ONYX_RUNTIME_LIBRARY_MAPPED none
+#endif
+
+#define STRINGIFY_(x) #x
+#define STRINGIFY(x) STRINGIFY_(x)
 
 
 Context context;
 
-#define DOCSTRING_HEADER "Onyx toolchain version " VERSION "\n" \
+#define VERSION_STRING "Onyx toolchain version " VERSION "\n" \
+    "Built on " __TIMESTAMP__ "\n" \
+    "Runtime: " STRINGIFY(ONYX_RUNTIME_LIBRARY_MAPPED) "\n"
+
+#define DOCSTRING_HEADER VERSION_STRING \
     "\n" \
     "The toolchain for the Onyx programming language, created by Brendan Hansen.\n" \
     "\n"
-
 
 
 static const char* top_level_docstring = DOCSTRING_HEADER
@@ -38,12 +50,15 @@ static const char* top_level_docstring = DOCSTRING_HEADER
     "Subcommands:\n"
     "\thelp      Shows this help message. Use \"onyx help <subcommand>\".\n"
     "\tbuild     Compiles an Onyx program into an executable.\n"
-#ifdef ENABLE_RUN_WITH_WASMER
+#ifdef ONYX_RUNTIME_LIBRARY
     "\trun       Compiles and runs an Onyx program, all at once.\n"
 #endif
     "\tcheck     Checks syntax and types of an Onyx program.\n"
+#ifdef _BH_LINUX
     "\twatch     Continuously rebuilds an Onyx program on file changes.\n"
-    "\tpackage   Package manager\n";
+#endif
+    "\tpackage   Package manager\n"
+    "\tversion   Prints version information\n";
     // "\tdoc <input files>\n"
 
 static const char *build_docstring = DOCSTRING_HEADER
@@ -66,7 +81,8 @@ static const char *build_docstring = DOCSTRING_HEADER
     "\t                        Automatically enabled for \"onyx\" runtime.\n"
     "\t--doc <doc_file>        Generates an O-DOC file, a.k.a an Onyx documentation file. Used by onyx-doc-gen.\n"
     "\t--tag                   Generates a C-Tag file.\n"
-    "\t--syminfo <target_file> Generates a symbol resolution information file. Used by onyx-lsp.\n"
+    "\t--syminfo <target_file> (DEPRECATED) Generates a symbol resolution information file. Used by onyx-lsp.\n"
+    "\t--lspinfo <target_file> Generates an LSP information file. Used by onyx-lsp.\n"
     "\t--stack-trace           Enable dynamic stack trace.\n"
     "\t--no-std                Disable automatically including \"core/std\".\n"
     "\t--no-stale-code         Disables use of `#allow_stale_code` directive\n"
@@ -119,20 +135,28 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
         .generate_tag_file = 0,
         .generate_symbol_info_file = 0,
+        .generate_lsp_info_file = 0,
     };
 
     bh_arr_new(alloc, options.files, 2);
     bh_arr_new(alloc, options.included_folders, 2);
     bh_arr_new(alloc, options.defined_variables, 2);
 
-    char* core_installation;
-    #ifdef _BH_LINUX
-    core_installation = CORE_INSTALLATION;
+    char* core_installation = NULL;
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    core_installation = getenv("ONYX_PATH");
     #endif
     #ifdef _BH_WINDOWS
-    core_installation = bh_alloc_array(alloc, u8, 512);
-    GetEnvironmentVariableA("ONYX_PATH", core_installation, 512);
+    char *tmp_core_installation = bh_alloc_array(alloc, u8, 512);
+    if (GetEnvironmentVariableA("ONYX_PATH", tmp_core_installation, 512) > 0) {
+        core_installation = tmp_core_installation;
+    }
     #endif
+
+    if (core_installation == NULL) {
+        bh_printf("Error: ONYX_PATH environment variable is not set. Please set this to the location of your Onyx installation.\n");
+        exit(0);
+    }
 
     // NOTE: Add the current folder
     bh_arr_push(options.included_folders, core_installation);
@@ -144,6 +168,10 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     if (!strcmp(argv[1], "help")) {
         options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
         options.help_subcommand = argc > 2 ? argv[2] : NULL;
+    }
+    else if (!strcmp(argv[1], "version")) {
+        options.action = ONYX_COMPILE_ACTION_PRINT_VERSION;
+        goto skip_parsing_arguments;
     }
     else if (!strcmp(argv[1], "compile") || !strcmp(argv[1], "build")) {
         options.action = ONYX_COMPILE_ACTION_COMPILE;
@@ -162,7 +190,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         bh_arr_push(options.files, bh_aprintf(alloc, "%s/tools/onyx-pkg.onyx", core_installation));
         goto skip_parsing_arguments;
     }
-    #ifdef ENABLE_RUN_WITH_WASMER
+    #ifdef ONYX_RUNTIME_LIBRARY
     else if (!strcmp(argv[1], "run")) {
         options.action = ONYX_COMPILE_ACTION_RUN;
         arg_parse_start = 2;
@@ -173,7 +201,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         options.action = ONYX_COMPILE_ACTION_WATCH;
         arg_parse_start = 2;
     }
-        // `#ifdef ENABLE_RUN_WITH_WASMER
+        // `#ifdef ONYX_RUNTIME_LIBRARY
         // `else if (!strcmp(argv[1], "run-watch")) {
         // `    options.action = ONYX_COMPILE_ACTION_RUN_WATCH;
         // `    arg_parse_start = 2;
@@ -279,6 +307,11 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
                 options.generate_symbol_info_file = 1;
                 options.symbol_info_file = argv[++i];
             }
+            else if (!strcmp(argv[i], "--lspinfo")) {
+                options.generate_symbol_info_file = 1;
+                options.generate_lsp_info_file = 1;
+                options.symbol_info_file = argv[++i];
+            }
             else if (!strcmp(argv[i], "--debug")) {
                 options.debug_session = 1;
                 options.debug_info_enabled = 1;
@@ -327,8 +360,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
   skip_parsing_arguments:
 
-    // NOTE: Always enable multi-threading for the Onyx runtime.
-    if (options.runtime == Runtime_Onyx) {
+    // NOTE: Always enable multi-threading for the Onyx and WASI runtime.
+    if (options.runtime == Runtime_Onyx || options.runtime == Runtime_Wasi) {
         options.use_multi_threading = 1;
     }
 
@@ -1016,7 +1049,7 @@ static CompilerProgress onyx_flush_module() {
     return ONYX_COMPILER_PROGRESS_SUCCESS;
 }
 
-#ifdef ENABLE_RUN_WITH_WASMER
+#ifdef ONYX_RUNTIME_LIBRARY
 static b32 onyx_run_module(bh_buffer code_buffer) {
     onyx_run_initialize(context.options->debug_session);
 
@@ -1142,6 +1175,11 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
+        case ONYX_COMPILE_ACTION_PRINT_VERSION: {
+            bh_printf(VERSION_STRING);
+            return 0;
+        }
+
         case ONYX_COMPILE_ACTION_CHECK:
             compiler_progress = do_compilation(&compile_opts);
             break;
@@ -1159,7 +1197,7 @@ int main(int argc, char *argv[]) {
             break;
         #endif
 
-        #ifdef ENABLE_RUN_WITH_WASMER
+        #ifdef ONYX_RUNTIME_LIBRARY
         case ONYX_COMPILE_ACTION_RUN:
             compiler_progress = do_compilation(&compile_opts);
             if (compiler_progress == ONYX_COMPILER_PROGRESS_SUCCESS) {
@@ -1170,7 +1208,7 @@ int main(int argc, char *argv[]) {
             break;
         #endif
 
-        #ifdef ENABLE_RUN_WITH_WASMER
+        #ifdef ONYX_RUNTIME_LIBRARY
         case ONYX_COMPILE_ACTION_RUN_WASM:
             global_heap_allocator = bh_heap_allocator();
             context_init(&compile_opts);

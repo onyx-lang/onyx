@@ -239,6 +239,18 @@ tcp_server_pulse :: (use server: &TCP_Server) -> bool {
         status_buffer: [1] Socket_Poll_Status;
         socket_poll_all(.[&socket], status_buffer, -1);
         return server.alive;
+
+    } else do for clients {
+        // If we have some clients, make sure their sockets are still alive.
+        // There were issues detecting this in the poll() function so we do
+        // do it explictly here.
+
+        if it == null do continue;
+        if it.state != .Alive do continue;
+
+        if !it.socket->is_alive() {
+            tcp_server_kill_client(server, it);
+        }
     }
 
     clients_with_messages := wait_to_get_client_messages(server);

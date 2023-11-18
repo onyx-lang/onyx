@@ -124,17 +124,17 @@ strftime :: (buf: [] u8, format_: [] u8, tm: &Timestamp) -> str {
                     }
 
                     case 'd', 'e' {
-                        io.write_format(&w, "{}", tm.mday);
+                        io.write_format(&w, "{w2}", tm.mday);
                     }
 
                     case 'D' {
-                        io.write_format(&w, "{}/{}/{}", tm.mon + 1, tm.mday, tm.year - 100 if tm.year >= 100 else tm.year);
+                        io.write_format(&w, "{w2}/{w2}/{}", tm.mon + 1, tm.mday, tm.year - 100 if tm.year >= 100 else tm.year);
                     }
 
                     case 'H' do io.write_format(&w, "{w2}", tm.hour);
                     case 'I' do io.write_format(&w, "{w2}", hour_to_12h(tm.hour));
                     case 'j' do io.write_format(&w, "{}", tm.yday + 1);
-                    case 'm' do io.write_format(&w, "{}", tm.mon + 1);
+                    case 'm' do io.write_format(&w, "{w2}", tm.mon + 1);
                     case 'M' do io.write_format(&w, "{w2}", tm.min);
                     case 'p' do io.write(&w, "am" if tm.hour < 12 else "pm");
 
@@ -459,4 +459,6 @@ tm_to_time :: (tm: &Timestamp) -> i64 {
         + 60 * mi
         + s;
 }
+
+
 

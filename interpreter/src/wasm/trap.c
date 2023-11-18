@@ -37,6 +37,6 @@ wasm_frame_t *wasm_trap_origin(const wasm_trap_t *trap) {
 }
 
 void wasm_trap_trace(const wasm_trap_t *trap, wasm_frame_vec_t *frames) {
-    frames->size = 0;
-    frames->data = NULL;
+    frames->size = trap->frames.size;
+    frames->data = trap->frames.data;
 }

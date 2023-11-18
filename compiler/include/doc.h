@@ -24,6 +24,7 @@ struct SymbolInfo {
 	u32 file_id;
 	u32 line;
 	u32 column;
+	OnyxToken *documentation;
 };
 
 typedef struct SymbolResolution SymbolResolution;

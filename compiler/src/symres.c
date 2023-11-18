@@ -584,7 +584,7 @@ static SymresStatus symres_address_of(AstAddressOf** paof) {
         AstPointerType *pt = onyx_ast_node_new(context.ast_alloc, sizeof(AstPointerType), Ast_Kind_Pointer_Type);
         pt->token     = aof->token;
         pt->elem      = (AstType *) expr;
-        pt->__unused  = aof->next;
+        pt->next      = aof->next;
         *paof         = (AstAddressOf *) pt;
         SYMRES(type, (AstType **) &pt);
         return Symres_Success;
@@ -1903,6 +1903,7 @@ void symres_entity(Entity* ent) {
     switch (ent->type) {
         case Entity_Type_Binding: {
             symbol_introduce(current_scope, ent->binding->token, ent->binding->node);
+            track_documentation_for_symbol_info(ent->binding->node, ent->binding->documentation);
             track_declaration_for_tags((AstNode *) ent->binding);
 
             if (context.doc_info) {

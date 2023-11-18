@@ -38,7 +38,7 @@ ONYX_DEF(__exit, (WASM_I32), ()) {
 }
 
 ONYX_DEF(__sleep, (WASM_I32), ()) {
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     usleep(params->data[0].of.i32 * 1000);
     #endif
 
@@ -56,7 +56,7 @@ ONYX_DEF(__time, (), (WASM_I64)) {
 // ([] PollDescription, timeout: i32) -> void
 // PollDescription :: struct { fd: i64; in_event: PollEvent; out_event: PollEvent; }
 ONYX_DEF(__poll, (WASM_I32, WASM_I32, WASM_I32), ()) {
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     struct pollfd* fds = alloca(params->data[1].of.i32 * sizeof(struct pollfd));
 
     for (int i=0; i < params->data[1].of.i32; i++) {
@@ -102,7 +102,7 @@ ONYX_DEF(__poll, (WASM_I32, WASM_I32, WASM_I32), ()) {
 
 ONYX_DEF(__lookup_env, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
 
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     char *key_ptr = ONYX_PTR(params->data[0].of.i32);
     int   key_len = params->data[1].of.i32;
     char *out_ptr = ONYX_PTR(params->data[2].of.i32);
@@ -131,7 +131,7 @@ ONYX_DEF(__lookup_env, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
 
 
 ONYX_DEF(__random_get, (WASM_PTR, WASM_I32), ()) {
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     getrandom(ONYX_PTR(params->data[0].of.i32), params->data[1].of.i32, 0);
     #endif
 
@@ -149,7 +149,7 @@ ONYX_DEF(__random_get, (WASM_PTR, WASM_I32), ()) {
 ONYX_DEF(__futex_wait, (WASM_PTR, WASM_I32, WASM_I32), (WASM_I32)) {
     int *addr = ONYX_PTR(params->data[0].of.i32);
 
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX)
     struct timespec delay;
 
     struct timespec *t = NULL;
@@ -181,7 +181,7 @@ ONYX_DEF(__futex_wait, (WASM_PTR, WASM_I32, WASM_I32), (WASM_I32)) {
 ONYX_DEF(__futex_wake, (WASM_PTR, WASM_I32), (WASM_I32)) {
     int *addr = ONYX_PTR(params->data[0].of.i32);
 
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX)
     int res = syscall(SYS_futex, addr, FUTEX_WAKE, params->data[1].of.i32, NULL, NULL, 0);
 
     results->data[0] = WASM_I32_VAL(res);
@@ -200,7 +200,7 @@ ONYX_DEF(__futex_wake, (WASM_PTR, WASM_I32), (WASM_I32)) {
 
 
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
 static wasm_func_t *wasm_cleanup_func;
 
 static void unix_signal_handler(int signo, siginfo_t *info, void *context) {
@@ -211,7 +211,7 @@ static void unix_signal_handler(int signo, siginfo_t *info, void *context) {
 #endif
 
 ONYX_DEF(__register_cleanup, (WASM_I32, WASM_I32), (WASM_I32)) {
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
 
     int len = (127 < params->data[1].of.i32 ? 127 : params->data[1].of.i32);
     char name[128];

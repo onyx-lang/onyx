@@ -204,7 +204,7 @@ ONYX_DEF(__file_rename, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 #endif
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     results->data[0] = WASM_I32_VAL(rename(old_path, new_path) == 0);
     return NULL;
 #endif

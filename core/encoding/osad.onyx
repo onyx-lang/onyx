@@ -106,13 +106,39 @@ serialize :: (v: any, w: &io.Writer) -> bool {
                 try(serialize(any.{ base + member.offset, member.type }, w));
             }
         }
+
+        case .Union {
+            u_info := cast(&type_info.Type_Info_Union, info);
+
+            base: [&] u8 = ~~v.data;
+
+            tag_value: u64;
+            switch e := u_info.tag_enum->info()->as_enum(); e.backing_type {
+                case i8,  u8  do tag_value = cast(u64) *(cast(&u8) v.data);
+                case i16, u16 do tag_value = cast(u64) *(cast(&u16) v.data);
+                case i32, u32 do tag_value = cast(u64) *(cast(&u32) v.data);
+                case i64, u64 do tag_value = cast(u64) *(cast(&u64) v.data);
+                case #default do assert(false, "Bad union backing type");
+            }
+
+            variant := array.first(u_info.variants, [x](x.tag_value == ~~tag_value));
+
+            if !variant {
+                output_u32(w, 0xffffffff);
+                break;
+            }
+
+            output_u32(w, ~~tag_value);
+
+            try(serialize(any.{ base + u_info.alignment, variant.type }, w));
+        }
     }
 
     return true;
 
 
     output_u32 :: macro (w: &io.Writer, i: u32) {
-        v := i;
+        v: u32 = i;
         io.write_str(w, str.{ ~~&v, 4 });
     }
 }
@@ -155,7 +181,8 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := con
 
         case .Basic {
             err := io.read_fill_buffer(r, .{ target, info.size });
-            assert(err == .None, "Deserialize expected to be able to read all the bytes.");
+            // if err != .None do logf(.Warning, "Deserialize hit end of file.");
+            return err == .None;
         }
 
         case .Enum {
@@ -210,6 +237,28 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := con
             for& member: s_info.members {
                 try(deserialize(base + member.offset, member.type, r, allocator));
             }
+        }
+
+        case .Union {
+            u_info := cast(&type_info.Type_Info_Union, info);
+
+            base: [&] u8 = target;
+            variant_value := read_u32(r);
+            variant := array.first(u_info.variants, [x](x.tag_value == ~~variant_value));
+            if !variant {
+                memory.set(target, 0, u_info.size);
+                break;
+            }
+
+            switch e := u_info.tag_enum->info()->as_enum(); e.backing_type {
+                case i8,  u8  do *(cast(&u8)  target) = ~~variant_value;
+                case i16, u16 do *(cast(&u16) target) = ~~variant_value;
+                case i32, u32 do *(cast(&u32) target) = ~~variant_value;
+                case i64, u64 do *(cast(&u64) target) = ~~variant_value;
+                case #default do assert(false, "Bad union backing type");
+            }
+
+            try(deserialize(base + u_info.alignment, variant.type, r));
         }
     }
 

@@ -1756,8 +1756,8 @@ b32 static_if_resolution(AstIf* static_if) {
 AstPolyCallType* convert_call_to_polycall(AstCall* call) {
     // HACK HACK HACK
     AstPolyCallType *pct = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
-    pct->token = call->token;
-    pct->__unused = call->next;
+    pct->token  = call->token;
+    pct->next   = call->next;
     pct->callee = (AstType *) call->callee;
     pct->params = (AstNode **) bh_arr_copy(global_heap_allocator, call->args.values);
     bh_arr_each(AstNode *, pp, pct->params) {

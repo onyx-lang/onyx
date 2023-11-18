@@ -1,15 +1,7 @@
 #!/bin/sh
 
-. ../settings.sh
-
-# Enable Dynamic call
-USE_DYNCALL=1
-
-# Temporary flag
-ENABLE_DEBUG_INFO=1
-
-C_FILES="onyx astnodes builtins checker clone doc entities errors lex parser symres types utils wasm_emit wasm_runtime "
-LIBS="-L$CORE_DIR/lib -l$RUNTIME_LIBRARY -Wl,-rpath=$CORE_DIR/lib:./ -lpthread -ldl -lm"
+C_FILES="onyx astnodes builtins checker clone doc entities errors lex parser symres types utils wasm_emit "
+LIBS="-lpthread -ldl -lm"
 INCLUDES="-I./include -I../shared/include -I../shared/include/dyncall"
 
 WARNINGS='-Wimplicit -Wmisleading-indentation -Wparentheses -Wsequence-point -Wreturn-type -Wshift-negative-value -Wunused-but-set-parameter -Wunused-but-set-variable -Wunused-function -Wunused-label -Wmaybe-uninitialized -Wsign-compare -Wstrict-overflow -Wduplicated-branches -Wduplicated-cond -Wtrigraphs -Waddress -Wlogical-op'
@@ -20,42 +12,45 @@ else
     FLAGS="$WARNINGS -O3"
 fi
 
-if [ "$RUNTIME_LIBRARY" = "ovmwasm" ]; then
-    FLAGS="$FLAGS -DUSE_OVM_DEBUGGER"
+FLAGS="$FLAGS -DENABLE_DEBUG_INFO"
+
+if [ ! -z ${ONYX_TARGET+x} ]; then
+    FLAGS="$FLAGS --target=$ONYX_TARGET"
 fi
 
-if [ "$ENABLE_DEBUG_INFO" = "1" ]; then
-    FLAGS="$FLAGS -DENABLE_DEBUG_INFO"
+if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
+    FLAGS="$FLAGS -DONYX_RUNTIME_LIBRARY=$ONYX_RUNTIME_LIBRARY"
+    C_FILES="${C_FILES}wasm_runtime "
+    case "${ONYX_RUNTIME_LIBRARY}" in
+        ovmwasm)
+            LIBS="../shared/lib/$ONYX_ARCH/lib/libovmwasm.a $LIBS"
+            FLAGS="$FLAGS -DUSE_OVM_DEBUGGER"
+            ;;
+
+        wasmer)
+            LIBS="$(wasmer config --libdir)/libwasmer.a $LIBS"
+            ;;
+
+        *)
+            echo "Unknown WebAssembly runtime '$ONYX_RUNTIME_LIBRARY'. Aborting.";
+            exit 1
+            ;;
+    esac
 fi
 
-FLAGS="$FLAGS -DENABLE_RUN_WITH_WASMER"
+case "$ONYX_ARCH" in
+    *darwin*)
+        LIBS="$LIBS -lffi -lSystem -framework CoreFoundation -framework SystemConfiguration"
+        ;;
+esac
 
-if [ "$USE_DYNCALL" = "1" ] && [ "$RUNTIME_LIBRARY" = "ovmwasm" ]; then
-    LIBS="$LIBS ../shared/lib/linux_$ARCH/lib/libdyncall_s.a ../shared/lib/linux_$ARCH/lib/libdyncallback_s.a"
+if [ "$ONYX_USE_DYNCALL" = "1" ] && [ "$ONYX_RUNTIME_LIBRARY" = "ovmwasm" ]; then
+    LIBS="$LIBS ../shared/lib/$ONYX_ARCH/lib/libdyncall_s.a ../shared/lib/$ONYX_ARCH/lib/libdyncallback_s.a"
     FLAGS="$FLAGS -DUSE_DYNCALL"
 fi
 
-mkdir -p "$BIN_DIR"
-
-echo "Compiling onyx..."
-$CC -o "../bin/onyx" \
-    $FLAGS \
-    "-DCORE_INSTALLATION=\"$CORE_DIR\"" \
-    $INCLUDES \
+echo "Compiling onyx"
+$ONYX_CC -o "onyx" \
+    $FLAGS $INCLUDES \
     $(echo "$C_FILES" | sed 's/ /\n/g;s/\([a-zA-Z_0-9]*\)\n/src\/\1.c\n/g;s/\n/ /g') \
     $LIBS
-
-echo "Installing onyx executable"
-cp "../bin/onyx" "$BIN_DIR/onyx"
-
-C_FILES="onyxrun wasm_runtime "
-
-echo "Compiling onyx-run..."
-$CC -o "../bin/onyx-run" \
-    $FLAGS \
-    $INCLUDES \
-    $(echo "$C_FILES" | sed 's/ /\n/g;s/\([a-zA-Z_0-9]*\)\n/src\/\1.c\n/g;s/\n/ /g') \
-    $LIBS
-
-echo "Installing onyx-run executable"
-cp "../bin/onyx-run" "$BIN_DIR/onyx-run"

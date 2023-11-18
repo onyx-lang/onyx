@@ -11,7 +11,7 @@ typedef struct OnyxThread {
     i32 dataptr;
     wasm_instance_t* instance;
 
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         pthread_t thread;
     #endif
 
@@ -23,7 +23,7 @@ typedef struct OnyxThread {
 
 static bh_arr(OnyxThread) threads = NULL;
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
 static void *onyx_run_thread(void *data) {
 #endif
 #ifdef _BH_WINDOWS
@@ -31,10 +31,9 @@ static i32 onyx_run_thread(void *data) {
 #endif
     OnyxThread *thread = (OnyxThread *) data;
 
-    wasm_store_t *wasm_store = runtime->wasm_store_new(runtime->wasm_engine);
-
     wasm_trap_t* traps = NULL;
-    thread->instance = runtime->wasm_instance_new(wasm_store, runtime->wasm_module, &runtime->wasm_imports, &traps);
+    thread->instance = runtime->wasm_instance_new(runtime->wasm_store, runtime->wasm_module, &runtime->wasm_imports, &traps);
+    assert(thread->instance);
 
     wasm_extern_t* start_extern = runtime->wasm_extern_lookup_by_name(runtime->wasm_module, thread->instance, "_thread_start");
     wasm_func_t*   start_func   = runtime->wasm_extern_as_func(start_extern);
@@ -79,7 +78,6 @@ static i32 onyx_run_thread(void *data) {
     }
 
     runtime->wasm_instance_delete(thread->instance);
-    runtime->wasm_store_delete(wasm_store);
 
     return 0;
 }
@@ -96,7 +94,7 @@ ONYX_DEF(__spawn_thread, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM
     thread->closureptr = params->data[4].of.i32;
     thread->dataptr    = params->data[6].of.i32;
 
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         pthread_create(&thread->thread, NULL, onyx_run_thread, thread);
     #endif
 
@@ -115,7 +113,7 @@ ONYX_DEF(__kill_thread, (WASM_I32), (WASM_I32)) {
     i32 i = 0;
     bh_arr_each(OnyxThread, thread, threads) {
         if (thread->id == thread_id) {
-            #ifdef _BH_LINUX
+            #if defined(_BH_LINUX) || defined(_BH_DARWIN)
             // This leads to some weirdness and bugs...
             //
             // pthread_kill(thread->thread, SIGKILL);

@@ -6,7 +6,7 @@
 #define ONYX_NO_SHORT_NAMES
 #include "onyx_library.h"
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     #include <pthread.h>
     #include <signal.h>
     #include <sys/wait.h>
@@ -18,12 +18,15 @@
     #include <netinet/in.h>
     #include <sys/socket.h>
     #include <sys/un.h>
-    #include <linux/futex.h>
     #include <sys/syscall.h>
     #include <poll.h>
     #include <termios.h>
     #include <sys/ioctl.h>
     #include <unistd.h>
+#endif
+
+#if defined(_BH_LINUX)
+    #include <linux/futex.h>
 #endif
 
 #include "types.h"  // For POINTER_SIZE
@@ -36,7 +39,7 @@
 #include "src/ort_cptr.h"
 #include "src/ort_tty.h"
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
 #include "src/ort_net_linux.h"
 #endif
 

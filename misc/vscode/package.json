@@ -2,7 +2,7 @@
     "name": "onyx",
     "displayName": "Onyx",
     "description": "Onyx syntax highlighting and debugger support.",
-    "version": "0.1.7",
+    "version": "0.1.8",
     "publisher": "brendanfh",
     "license": "BSD-2-Clause",
     "engines": {

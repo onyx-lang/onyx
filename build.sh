@@ -1,55 +1,97 @@
 #!/bin/sh
 
-[ ! $UID = 0 ] \
-    && echo "Please run this script as root." \
-    && exit 1
+DIST_DIR="./dist"
+ONYX_INSTALL_DIR="$HOME/.onyx"
 
-. ./settings.sh
+compile_all() {
+    if [ "$ONYX_RUNTIME_LIBRARY" = "ovmwasm" ]; then
+        cd interpreter
+        ./build.sh $1
+        cd ..
+    fi
 
-echo "Installing on '$(uname -a)'"
-
-echo "Installing core libs"
-[ -d "$CORE_DIR/core" ] && rm -r "$CORE_DIR/core"
-mkdir -p "$CORE_DIR"
-cp -r ./core/ "$CORE_DIR"
-
-
-mkdir -p "$CORE_DIR/tools"
-mkdir -p "$CORE_DIR/tools/pkg_templates"
-cp ./scripts/onyx-pkg.onyx "$CORE_DIR/tools"
-cp ./scripts/default.json "$CORE_DIR/tools/pkg_templates"
-
-# This is a development feature to allow for quickly reinstalling core libraries
-# without have to recompile the entire compiler
-[ "$1" = "core" ] && exit 0
-
-if [ "$RUNTIME_LIBRARY" = "ovmwasm" ]; then
-    cd interpreter
+    cd compiler
     ./build.sh $1
     cd ..
-fi
 
-if [ ! -f "$CORE_DIR/lib/lib$RUNTIME_LIBRARY.so" ] || true; then
-    echo "Copying lib$RUNTIME_LIBRARY to $CORE_DIR/lib (first install)"
+    if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
+        cd runtime
+        ./build.sh $1
+        cd ..
+    fi
+}
 
-    mkdir -p "$CORE_DIR/lib"
-    mkdir -p "$CORE_DIR/include"
+package_all() {
+    rm -rf "$DIST_DIR"
+    mkdir -p "$DIST_DIR"
 
-    cp "$WASMER_LIBRARY_DIR/lib$RUNTIME_LIBRARY.so" "$CORE_DIR/lib/lib$RUNTIME_LIBRARY.so"
+    echo "Installing on '$(uname -a)'"
+    echo "Installing core libs"
+    [ -d "$DIST_DIR/core" ] && rm -r "$DIST_DIR/core"
+    cp -r ./core "$DIST_DIR/core"
 
-    cp "shared/include/onyx_library.h" "$CORE_DIR/include/onyx_library.h"
-    cp "$WASMER_INCLUDE_DIR/wasm.h" "$CORE_DIR/include/wasm.h"
-fi
+    echo "Installing core tools"
+    mkdir -p "$DIST_DIR/bin"
+    cp compiler/onyx "$DIST_DIR/bin/"
 
-cd compiler
-./build.sh $1
-cd ..
+    mkdir -p "$DIST_DIR/tools"
+    mkdir -p "$DIST_DIR/tools/pkg_templates"
+    cp ./scripts/onyx-pkg.onyx "$DIST_DIR/tools"
+    cp ./scripts/default.json "$DIST_DIR/tools/pkg_templates"
 
-cd runtime
-./build.sh $1
-cd ..
+    echo "Installing runtime library"
+    mkdir -p "$DIST_DIR/lib"
+    mkdir -p "$DIST_DIR/include"
 
+    [ -f runtime/onyx_runtime.so ] && cp runtime/onyx_runtime.so "$DIST_DIR/lib/"
+    cp "shared/include/onyx_library.h" "$DIST_DIR/include/onyx_library.h"
+    cp "shared/include/wasm.h" "$DIST_DIR/include/wasm.h"
 
+    cp -r "tests" "$DIST_DIR/"
+    cp -r "examples" "$DIST_DIR/"
+
+    mkdir -p "$DIST_DIR/misc"
+    cp misc/onyx-linux.sublime-build "$DIST_DIR/misc"
+    cp misc/onyx-windows.sublime-build "$DIST_DIR/misc"
+    cp misc/onyx-mode.el "$DIST_DIR/misc"
+    cp misc/onyx.sublime-syntax "$DIST_DIR/misc"
+    cp misc/vscode/onyx-0.1.8.vsix "$DIST_DIR/misc"
+
+    cp LICENSE "$DIST_DIR/LICENSE"
+}
+
+compress_all() {
+    package_all
+
+    tar -C dist -zcvf onyx.tar.gz bin core examples include lib misc tests tools LICENSE
+    mv onyx.tar.gz dist/
+}
+
+install_all() {
+    package_all
+
+    echo "Installing to $ONYX_INSTALL_DIR"
+    mkdir -p "$ONYX_INSTALL_DIR"
+    cp -r "$DIST_DIR/." "$ONYX_INSTALL_DIR"
+
+    # Sign the binaries on MacOS
+    [ "$(uname)" = 'Darwin' ] && \
+        codesign -s - "$ONYX_INSTALL_DIR/bin/onyx" && \
+        codesign -s - "$ONYX_INSTALL_DIR/lib/onyx_runtime.dylib"
+}
+
+for arg in $@; do
+    case "$arg" in
+        compile) compile_all ;;
+        package) package_all ;;
+        compress) compress_all ;;
+        install) install_all ;;
+        clean)
+            rm -f compiler/onyx 2>/dev/null
+            rm -f runtime/onyx_runtime.so 2>/dev/null
+            ;;
+    esac
+done
 
 # Otherwise the prompt ends on the same line
 printf "\n"
