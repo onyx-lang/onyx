@@ -166,7 +166,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.release.outputs.upload_url }}
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: artifacts/onyx-linux-ovm-amd64/onyx.tar.gz
           asset_name: onyx-linux-ovm-amd64.tar.gz
           asset_content_type: application/gzip
@@ -175,7 +175,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.release.outputs.upload_url }}
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: artifacts/onyx-linux-wasmer-amd64/onyx.tar.gz
           asset_name: onyx-linux-wasmer-amd64.tar.gz
           asset_content_type: application/gzip
@@ -184,7 +184,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.release.outputs.upload_url }}
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: artifacts/onyx-linux-none-amd64/onyx.tar.gz
           asset_name: onyx-linux-none-amd64.tar.gz
           asset_content_type: application/gzip
@@ -193,7 +193,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.release.outputs.upload_url }}
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: artifacts/onyx-darwin-none-amd64/onyx.tar.gz
           asset_name: onyx-darwin-none-amd64.tar.gz
           asset_content_type: application/gzip
@@ -202,7 +202,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.release.outputs.upload_url }}
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: artifacts/onyx-darwin-none-arm64/onyx.tar.gz
           asset_name: onyx-darwin-none-arm64.tar.gz
           asset_content_type: application/gzip
@@ -211,7 +211,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.release.outputs.upload_url }}
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: artifacts/onyx-windows-wasmer-amd64/onyx.zip
           asset_name: onyx-windows-wasmer-amd64.zip
       
