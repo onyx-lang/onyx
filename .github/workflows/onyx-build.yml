@@ -14,9 +14,28 @@ on:
         description: 'Make release'
 
 jobs:
+  setup:
+    name: Set up
+    runs-on: ubuntu-latest
+    outputs:
+      VERSION: ${{ steps.setup.outputs.VERSION }}
+      DOING_RELEASE: ${{ steps.setup.outputs.DOING_RELEASE }}
+    steps:
+      - name: Set up environment variables
+        id: setup
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF/refs\/tags\//}
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          DOING_RELEASE=$(echo $VERSION | grep -c '^v\?[0-9]\+\.[0-9]\+\.[0-9]\+\(-\([a-zA-Z]\+\)\?[0-9]*\)\?$' || true)
+          echo "DOING_RELEASE=${DOING_RELEASE}" >> $GITHUB_OUTPUT
+          echo $VERSION
+          echo $DOING_RELEASE
+
   build:
     name: Building on ${{ matrix.build }}
     runs-on: ${{ matrix.os }}
+    needs: [ setup ]
     strategy:
       fail-fast: false
       matrix:
@@ -52,10 +71,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Setup directory for building
-        if: matrix.build == 'linux-amd64'
+        if: matrix.build != 'windows-amd64'
         run: |
           chmod +x build.sh
-          mkdir -p build
 
       - name: Install Linux building dependencies
         if: matrix.runtime_library == 'wasmer'
@@ -70,7 +88,7 @@ jobs:
       - name: Build Onyx for ${{ matrix.build }}
         if: (matrix.build == 'linux-amd64') && (matrix.runtime_library != 'none')
         run: |
-          ./build.sh compile package
+          ./build.sh compile compress
         env:
           ONYX_CC: gcc
           ONYX_ARCH: linux_x86_64
@@ -80,7 +98,7 @@ jobs:
       - name: Build Onyx for ${{ matrix.build }}
         if: (matrix.build == 'linux-amd64') && (matrix.runtime_library == 'none')
         run: |
-          ./build.sh compile package
+          ./build.sh compile compress
         env:
           ONYX_CC: gcc
           ONYX_ARCH: linux_x86_64
@@ -88,7 +106,7 @@ jobs:
       - name: Build Onyx for ${{ matrix.build }}
         if: (matrix.build == 'darwin-amd64') && (matrix.runtime_library == 'none')
         run: |
-          ./build.sh compile package
+          ./build.sh compile compress
         env:
           ONYX_CC: gcc
           ONYX_ARCH: darwin_amd64
@@ -96,7 +114,7 @@ jobs:
       - name: Build Onyx for ${{ matrix.build }}
         if: (matrix.build == 'darwin-arm64') && (matrix.runtime_library == 'none')
         run: |
-          ./build.sh compile package
+          ./build.sh compile compress
         env:
           ONYX_CC: gcc
           ONYX_ARCH: darwin_arm64
@@ -114,3 +132,76 @@ jobs:
           path: dist
           if-no-files-found: error
           retention-days: 5
+  
+  release:
+    needs: [setup, build]
+    runs-on: ubuntu-latest
+    if: needs.setup.outputs.DOING_RELEASE == '1' || github.event.inputs.release != ''
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          path: artifacts
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.setup.outputs.VERSION }}
+          release_name: Release ${{ needs.setup.outputs.VERSION }}
+          draft: true
+          prerelease: false
+
+  release_upload:
+    needs: [setup, build, release]
+    runs-on: ubuntu-latest
+    if: needs.setup.outputs.DOING_RELEASE == '1' || github.event.inputs.release != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - build: linux-amd64
+            artifact_name: 'onyx-linux-ovm-amd64'
+            asset_friendy_name: 'Linux AMD64 with OVM'
+          - build: linux-amd64
+            artifact_name: 'onyx-linux-wasmer-amd64'
+            asset_friendy_name: 'Linux AMD64 with Wasmer'
+          - build: linux-amd64
+            artifact_name: 'onyx-linux-none-amd64' 
+            asset_friendy_name: 'Linux AMD64'
+          - build: darwin-arm64
+            artifact_name: 'onyx-darwin-none-arm64'
+            asset_friendy_name: 'MacOS ARM64'
+          - build: darwin-amd64
+            artifact_name: 'onyx-darwin-none-amd64'
+            asset_friendy_name: 'MacOS AMD64'
+          # - build: darwin-arm64
+          #   os: macos-11.0
+          #   runtime_library: wasmer 
+          #   artifact_name: 'onyx-darwin-wasmer-arm64'
+          - build: windows-amd64
+            artifact_name: 'onyx-windows-wasmer-amd64'
+            asset_friendy_name: 'Windows x64'
+    steps:
+      - name: Upload Release Asset ${{ matrix.asset_friendly_name }}
+        if: ${{ matrix.build }} != 'windows-amd64'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/${{ matrix.artifact_name }}/onyx.tar.gz
+          asset_name: ${{ matrix.artifact_name }}.tar.gz
+          asset_content_type: application/gzip
+      
+      - name: Upload Release Asset ${{ matrix.asset_friendly_name }}
+        if: ${{ matrix.build }} == 'windows-amd64'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/${{ matrix.artifact_name }}/onyx.zip
+          asset_name: ${{ matrix.artifact_name }}.zip
+

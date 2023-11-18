@@ -22,6 +22,7 @@ compile_all() {
 }
 
 package_all() {
+    rm -rf "$DIST_DIR"
     mkdir -p "$DIST_DIR"
 
     echo "Installing on '$(uname -a)'"
@@ -55,6 +56,15 @@ package_all() {
     cp misc/onyx-mode.el "$DIST_DIR/misc"
     cp misc/onyx.sublime-syntax "$DIST_DIR/misc"
     cp misc/vscode/onyx-0.1.8.vsix "$DIST_DIR/misc"
+
+    cp LICENSE "$DIST_DIR/LICENSE"
+}
+
+compress_all() {
+    package_all
+
+    tar -C dist -zcvf onyx.tar.gz bin core examples include lib misc tests tools LICENSE
+    mv onyx.tar.gz dist/
 }
 
 install_all() {
@@ -63,12 +73,18 @@ install_all() {
     echo "Installing to $ONYX_INSTALL_DIR"
     mkdir -p "$ONYX_INSTALL_DIR"
     cp -r "$DIST_DIR/." "$ONYX_INSTALL_DIR"
+
+    # Sign the binaries on MacOS
+    [ "$(uname)" = 'Darwin' ] && \
+        codesign -s - "$ONYX_INSTALL_DIR/bin/onyx" && \
+        codesign -s - "$ONYX_INSTALL_DIR/lib/onyx_runtime.dylib"
 }
 
 for arg in $@; do
     case "$arg" in
         compile) compile_all ;;
         package) package_all ;;
+        compress) compress_all ;;
         install) install_all ;;
         clean)
             rm -f compiler/onyx 2>/dev/null

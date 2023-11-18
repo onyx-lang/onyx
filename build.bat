@@ -42,4 +42,7 @@ if "%1" == "dist" (
     copy onyx_runtime.dll dist\onyx_runtime.dll
     xcopy tests dist\tests /s /e /h /I
     copy onyx.exe dist\onyx.exe
+
+    powershell Compress-Archive dist onyx.zip
+    move onyx.zip dist/onyx.zip
 )

@@ -223,7 +223,6 @@ initRuntime() {
 }
 
 onyx_install() {
-  printf "${reset}Welcome to the Onyx shell installer!$reset\n"
   if [ "$ONYX_INSTALL_LOG" = "$ONYX_VERBOSE" ]; then
     printf "\033[96m                   ######\n"
     printf "\033[96m               ####++++++###\n"
@@ -250,6 +249,8 @@ onyx_install() {
     printf "\033[96m               ####++++######\n"
     printf "\033[96m                   ######\n"
     printf "\n\n"
+  else
+    printf "The Onyx Programming Language\n\n"
   fi
 
   onyx_download $1 && onyx_link
