@@ -214,5 +214,6 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: artifacts/onyx-windows-wasmer-amd64/onyx.zip
           asset_name: onyx-windows-wasmer-amd64.zip
+          asset_content_type: application/zip
       
 
