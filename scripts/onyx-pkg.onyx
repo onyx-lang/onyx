@@ -600,6 +600,9 @@ run_new_command :: (args: [] cstr) {
     #if runtime.compiler_os == .Linux {
         native_library_suffix :: ".so"
     }
+    #if runtime.compiler_os == .MacOS {
+        native_library_suffix :: ".dylib"
+    }
     #if runtime.compiler_os == .Windows {
         native_library_suffix :: ".dll"
     }
@@ -886,7 +889,7 @@ Package :: struct {
     version: SemVer;
 }
 
-#if runtime.compiler_os == .Linux {
+#if runtime.compiler_os == .Linux || runtime.compiler_os == .MacOS {
     git_path :: "git"
 }
 #if runtime.compiler_os == .Windows {
