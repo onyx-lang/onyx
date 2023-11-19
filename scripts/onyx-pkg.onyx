@@ -1,5 +1,5 @@
 
-#load "core/std"
+#load "core/module"
 #load "core/encoding/ini"
 
 //

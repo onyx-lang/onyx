@@ -134,5 +134,5 @@ main :: (args: [] cstr) {
     //     }
 }
 
-#load "core/std"
+#load "core/module"
 use core {*}

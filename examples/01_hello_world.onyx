@@ -14,7 +14,7 @@ package main
 // option to disable loading the standard library, if that is needed. For the sake
 // of completeness, the following line manually includes the standard library, but
 // this is not necessary.
-#load "core/std"
+#load "core/module"
 
 // Below is the function declaration for `main`. While it might look weird at first
 // sight, Onyx uses a consistent syntax for declaring static "things" (functions,

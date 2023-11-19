@@ -1815,7 +1815,7 @@ struct CompileOptions {
     b32 use_multi_threading   : 1;
     b32 generate_foreign_info : 1;
     b32 generate_type_info    : 1;
-    b32 no_std                : 1;
+    b32 no_core               : 1;
     b32 no_stale_code         : 1;
     b32 show_all_errors       : 1;
 

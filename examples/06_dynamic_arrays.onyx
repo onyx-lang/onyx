@@ -7,7 +7,7 @@
 // Dynamic arrays in Onyx are easy to use on purpose, because I
 // know how useful they are in almost every program I write.
 
-#load "core/std"
+#load "core/module"
 
 use core {*}
 

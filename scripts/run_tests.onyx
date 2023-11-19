@@ -2,9 +2,6 @@
 //     - Fancy display
 
 
-
-#load "core/std"
-
 use runtime
 use core {package, *}
 use core.intrinsics.onyx { init }

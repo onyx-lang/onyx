@@ -32,7 +32,7 @@
 // Let's look at some examples of overloaded procedures and how they are resolved.
 
 
-#load "core/std"
+#load "core/module"
 
 use core {*}
 

@@ -8,7 +8,6 @@ package cbindgen
 // 3. Run the build file with the --generate-foreign-info flag enabled.
 //
 // Full example:
-// #load "core/std"
 // #load "./module"
 //
 // use core {*}
