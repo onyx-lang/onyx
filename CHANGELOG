@@ -1,3 +1,27 @@
+Release v0.1.8
+--------------
+Unreleased
+
+Additions:
+- MacOS compatibility
+    - Using Wasmer runtime, MacOS on ARM and AMD64 are supported.
+- Memory debugger
+    - A custom allocator that intercepts allocations and frees and reports them
+      to a client for visualizations and debugging.
+- New installation script
+    - sh <(curl https://get.onyxlang.io -sSfL)
+    - Works on Linux and MacOS
+
+Removals:
+
+Changes:
+- Renamed `--no-std` flag to `--no-core`, since Onyx does not call its standard
+  library "std", the name did not make any sense.
+
+Bugfixes:
+- Formatting of days and months were incorrect `time.strftime`.
+- Infinite loop in TCP server when a client disconnects.
+
 Release v0.1.7
 --------------
 October 25th, 2023

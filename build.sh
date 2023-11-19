@@ -63,7 +63,12 @@ package_all() {
 compress_all() {
     package_all
 
-    tar -C dist -zcvf onyx.tar.gz bin core examples include lib misc tests tools LICENSE
+    # Sign the binaries on MacOS
+    [ "$(uname)" = 'Darwin' ] && \
+        codesign -s - "$DIST_DIR/bin/onyx" && \
+        codesign -s - "$DIST_DIR/lib/onyx_runtime.dylib"
+
+    tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples include lib misc tests tools LICENSE
     mv onyx.tar.gz dist/
 }
 
