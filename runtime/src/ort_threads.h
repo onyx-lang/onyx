@@ -31,10 +31,6 @@ static i32 onyx_run_thread(void *data) {
 #endif
     OnyxThread *thread = (OnyxThread *) data;
 
-    wasm_trap_t* traps = NULL;
-    thread->instance = runtime->wasm_instance_new(runtime->wasm_store, runtime->wasm_module, &runtime->wasm_imports, &traps);
-    assert(thread->instance);
-
     wasm_extern_t* start_extern = runtime->wasm_extern_lookup_by_name(runtime->wasm_module, thread->instance, "_thread_start");
     wasm_func_t*   start_func   = runtime->wasm_extern_as_func(start_extern);
 
@@ -93,6 +89,10 @@ ONYX_DEF(__spawn_thread, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM
     thread->funcidx    = params->data[3].of.i32;
     thread->closureptr = params->data[4].of.i32;
     thread->dataptr    = params->data[6].of.i32;
+
+    wasm_trap_t* traps = NULL;
+    thread->instance = runtime->wasm_instance_new(runtime->wasm_store, runtime->wasm_module, &runtime->wasm_imports, &traps);
+    assert(thread->instance);
 
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         pthread_create(&thread->thread, NULL, onyx_run_thread, thread);
