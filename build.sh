@@ -1,7 +1,6 @@
 #!/bin/sh
 
 DIST_DIR="./dist"
-ONYX_INSTALL_DIR="$HOME/.onyx"
 
 compile_all() {
     if [ "$ONYX_RUNTIME_LIBRARY" = "ovmwasm" ]; then
@@ -73,6 +72,8 @@ compress_all() {
 }
 
 install_all() {
+    [ -z ${ONYX_INSTALL_DIR+x} ] && echo "Please set ONYX_INSTALL_DIR to install Onyx." && exit 1
+
     package_all
 
     echo "Installing to $ONYX_INSTALL_DIR"
