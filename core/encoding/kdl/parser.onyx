@@ -1,0 +1,586 @@
+package core.encoding.kdl
+#allow_stale_code
+
+
+// TODO
+//  - Parse integers
+//  - Parse decimals
+//  - Types in the correct places
+//  - Escaped strings
+//  - Slashdash on children block
+
+use core {tprintf, Result, printf}
+use core.io
+use core.memory
+use core.slice
+use core.encoding.utf8
+use core.string
+
+#package
+Tokenizer :: struct {
+    doc: [] u8;
+    cursor: u32;
+    doc_is_owned := false;
+
+    peeked_token: ? Token;
+}
+
+#package
+Token :: union {
+    Error: void;
+    Start_Type: void;
+    End_Type: void;
+    Word: str;
+    String: str;
+    Raw_String: str;
+    Single_Line_Comment: str;
+    Slashdash: void;
+    Multi_Line_Comment: str;
+    Equals: void;
+    Start_Children: void;
+    End_Children: void;
+    Newline: void;
+    Semicolon: void;
+    Line_Continuation: void;
+    Whitespace: str;
+    EOF: void;
+}
+
+#inject Tokenizer {
+    make :: #match {
+        ((r: &io.Reader) => #Self.{ doc = r->read_all(), doc_is_owned = true }),
+        ((s: str)        => #Self.{ doc = s }),
+    }
+
+    destroy :: (self: &#Self) {
+        if self.doc_is_owned {
+            delete(&self.doc);
+        }
+    }
+
+    peek_char :: (self: &#Self) -> ? u32 {
+        codepoint_length := utf8.rune_length_from_first_byte(self.doc[self.cursor]);
+        if self.cursor + codepoint_length >= self.doc.length do return .{ None = .{} };
+        
+        value := utf8.decode_rune(string.advance(self.doc, self.cursor));
+        return value;
+    }
+
+    eat_char :: (self: &#Self) -> ? u32 {
+        codepoint_length := utf8.rune_length_from_first_byte(self.doc[self.cursor]);
+        if self.cursor + codepoint_length >= self.doc.length do return .{ None = .{} };
+        
+        value := utf8.decode_rune(string.advance(self.doc, self.cursor));
+        self.cursor += codepoint_length;
+
+        return value;
+    }
+
+    peek_token :: (use self: &#Self) -> Token {
+        if peeked_token do return peeked_token->unwrap();
+
+        // :CompilerBug
+        // There is a weird bug related to an optimization happening here.
+        // I would like the following code to just be:
+        //
+        //     peeked_token = self->next_token();
+        //
+        // But sadly, this does not work. This is because the next_token return value
+        // is being upcasted to an optional token. The tag for the optional saying
+        // that it is a "some" not a "none" is emitted first, then the actual call.
+        // The problem is that when assigning a structure literal (which is what this
+        // is internally implemented as), the assignment is done in parts (1st member
+        // emit and store, 2nd member emit and store, etc.). Well, the first member
+        // says that the result is a Some, so at this point peeked_token is a Some
+        // of invalid data. Then in next_token, this is consumed and returned as
+        // a valid token, even though it is not.
+        //
+        new_token := self->next_token();
+        peeked_token = new_token;
+
+        return peeked_token?;
+    }
+
+    next_token :: (self: &#Self) -> Token {
+        if self.peeked_token {
+            tkn := self.peeked_token->unwrap();
+            self.peeked_token->reset();
+            return tkn;
+        }
+
+        c := self->peek_char()->or_return(Token.{ EOF = .{} });
+
+        if is_whitespace(c) {
+            self->consume_while([c](is_whitespace(c)));
+            return self->next_token();
+        }
+
+        if c == '/' {
+            comment := self->handle_comment();
+            if comment.Slashdash do return comment;
+            return self->next_token();
+        }
+
+        if is_newline(c) {
+            self->eat_char();
+            if c == '\r' {
+                // Consume one more character for CRLF.
+                self->eat_char();
+            }
+
+            return .{ Newline = .{} };
+            // return self->next_token();
+        }
+
+        if c == ';'  { self->eat_char(); return .{ Semicolon = .{} }; }
+        if c == '\\' { self->eat_char(); return .{ Line_Continuation = .{} }; }
+        if c == '('  { self->eat_char(); return .{ Start_Type = .{} }; }
+        if c == ')'  { self->eat_char(); return .{ End_Type = .{} }; }
+        if c == '{'  { self->eat_char(); return .{ Start_Children = .{} }; }
+        if c == '}'  { self->eat_char(); return .{ End_Children = .{} }; }
+        if c == '='  { self->eat_char(); return .{ Equals = .{} }; }
+        if c == '"' {
+            return self->handle_string();
+        }
+        if is_id(c) {
+            return self->handle_word();
+        }
+
+        assert(false, tprintf("Unhandled character, {}", c));
+        return .{ Error = .{} };
+    }
+
+    consume_while :: macro (self: &#Self, cond: Code) -> str {
+        res := self.doc[self.cursor .. self.cursor];
+        while true {
+            codepoint := self->peek_char()->or_return(res);
+            if !(#unquote cond(codepoint)) {
+                return res;
+            } else {
+                self->eat_char();
+                res.length += 1;
+            }
+        }
+    }
+
+    handle_comment :: (self: &#Self) -> Token {
+        self->eat_char();
+        c := self->eat_char()->or_return(Token.{EOF=.{}});
+        switch c {
+            case '-' {
+                return .{ Slashdash = .{} };
+            }
+            case '/' {
+                body := self->consume_while([c](!is_newline(c)));
+                return .{ Single_Line_Comment = body };
+            }
+            case '*' {
+                cursor_start := self.cursor;
+
+                depth := 1;
+                prev_char := 0;
+                while depth >= 1 {
+                    c := self->eat_char()->or_return(Token.{ Error=.{} });
+                    if c == '*' && prev_char == '/' {
+                        depth += 1;
+                        c = 0;
+                    }
+                    if c == '/' && prev_char == '*' {
+                        depth -= 1;
+                        c = 0;
+                    }
+
+                    prev_char = c;
+                }
+
+                return .{ Multi_Line_Comment = self.doc[cursor_start .. self.cursor-2] };
+            }
+        }
+    }
+
+    handle_string :: (self: &#Self) -> Token {
+        c := self->eat_char()->or_return(Token.{EOF=.{}});
+        if c != '"' do return Token.{Error=.{}};
+
+        cursor_start := self.cursor;
+        prev_char := 0;
+        while true {
+            c := self->eat_char()->or_return(Token.{Error=.{}});
+            if c == '\\' && prev_char == '\\' {
+                c = 0;
+            }
+            if c == '"' && prev_char != '\\' {
+                break;
+            }
+            prev_char = c;
+        }
+
+        return .{ String = self.doc[cursor_start .. self.cursor-1] };
+    }
+
+    handle_word :: (self: &#Self) -> Token {
+        word := self->consume_while([c](!is_end_of_word(c) && is_id(c)));
+        return .{ Word = word };
+    }
+}
+
+
+#package
+Parser :: struct {
+    tokenizer: Tokenizer;
+    state: Parser_State;
+
+    depth: i32;
+
+    result_allocator: Allocator;
+}
+
+#local
+Parser_State :: enum #flags {
+    Outside_Node;
+    Inside_Node;
+
+    Line_Continuation :: 0x100;
+    Annotation_Start :: 0x200;
+    Annotation_End   :: 0x400;
+    Annotation_Ended :: 0x800;
+
+    In_Property :: 0x1000;
+
+    Whitespace_Banned :: Annotation_Start | Annotation_End | Annotation_Ended | In_Property;
+}
+
+Parse_Error :: union {
+    None: void;
+    Whitespace_Banned: void;
+    Parser_Error: str;
+}
+
+#inject Parser {
+    make :: #match {
+        ((r: &io.Reader) => Parser.{ Tokenizer.make(r) }),
+        ((s: str)        => Parser.{ Tokenizer.make(s) }),
+    }
+
+    parse :: (self: &#Self, doc: &Document) -> Parse_Error {
+        self.result_allocator = doc.allocator;
+
+        while true {
+            token := self.tokenizer->peek_token();
+            switch token {
+                case .EOF {
+                    break break;
+                }
+
+                case .Error {
+                    self.tokenizer->next_token();
+                    return .{ Parser_Error = tprintf("bad token: {}", token) };
+                }
+
+                case .Whitespace, .Newline {
+                    self.tokenizer->next_token();
+                    if self.state & .Whitespace_Banned {
+                        return .{ Whitespace_Banned = .{} };
+                    }
+                }
+
+                case .Single_Line_Comment, .Multi_Line_Comment {
+                    self.tokenizer->next_token();
+                    if self.state & .Whitespace_Banned {
+                        return .{ Whitespace_Banned = .{} };
+                    }
+                }
+
+                case #default {
+                    node_result := self->parse_node();
+                    if err := node_result->err(); err {
+                        logf(.Info, self.tokenizer.doc[self.tokenizer.cursor .. self.tokenizer.doc.length]);
+                        return err?;
+                    }
+
+                    node := node_result->ok()->unwrap();
+                    if node {
+                        doc.nodes << node;
+                    }
+                }
+            }
+        }
+
+        return .{};
+    }
+
+    parse_node :: (self: &#Self) -> Result(&Node, Parse_Error) {
+        self.depth += 1;
+        defer self.depth -= 1;
+
+        self->skip_linespace();
+
+        if_next_token_is(self, .End_Children, [] { return .{ Ok = null }; });
+
+        is_ignored := false;
+        if self.tokenizer->peek_token().Slashdash {
+            self.tokenizer->next_token();
+            is_ignored = true;
+        }
+
+        type_annotation := self->parse_type_if_present()?;
+        name := self->parse_identifier()?;
+
+        if !name do return .{ Ok = null };
+
+        node_to_return := self.result_allocator->move(Node.{
+            node = name->unwrap(),
+            type_annotation = type_annotation,
+            props     = make(Map(str, Value), self.result_allocator),
+            values    = make([..] Value, 0, self.result_allocator),
+            children  = make([..] &Node, 0, self.result_allocator),
+        });
+
+        while true {
+            switch tkn := self.tokenizer->peek_token(); tkn {
+                case .Newline, .Semicolon {
+                    self.tokenizer->next_token();
+                    _apply_slashdash(node_to_return);
+                    return .{ Ok = node_to_return };
+                }
+
+                case .Word, .Raw_String, .String {
+                    self.tokenizer->next_token();
+                    if_next_token_is(self, .Equals, [] {
+                        // Is this good? Or just too hacky?
+                        prop_name := self->parse_into_string(tkn)->or_return(
+                            Result(&Node, Parse_Error).{ Err = .{ Parser_Error = "Error parsing property key" } }
+                        );
+
+                        type := self->parse_type_if_present()?;
+                        value := self->parse_value(self.tokenizer->next_token()) ?? [] {
+                            return return .{ Err = .{ Parser_Error = "Error parsing property value" } };
+                        };
+
+                        value.type_annotation = type;
+
+                        node_to_return.props[prop_name] = value;
+                        continue;
+                    });
+
+                    value := self->parse_value(tkn) ?? [] {
+                        return return .{ Err = .{ Parser_Error = "Error parsing argument value" } };
+                    };
+
+                    node_to_return.values << value;
+                }
+
+                case .Start_Type {
+                    type := self->parse_type_if_present()?;
+
+                    value := self->parse_value(self.tokenizer->next_token()) ?? [] {
+                        return return .{ Err = .{ Parser_Error = "Error parsing argument value" } };
+                    };
+
+                    value.type_annotation = type;
+                    node_to_return.values << value;
+                }
+
+                case .Start_Children {
+                    self.tokenizer->next_token();
+                    while !self.tokenizer->peek_token().End_Children {
+                        child := self->parse_node()?;
+                        if child {
+                            node_to_return.children << child;
+                        }
+
+                        self->skip_linespace();
+                    }
+
+                    self->expect_token(.End_Children);
+                    break break;
+                }
+
+                case .End_Children {
+                    break break;
+                }
+
+                case #default {
+                    return .{ Err = .{ Parser_Error = tprintf("Unexpected token {}, expected node", tkn) } };
+                }
+            }
+        }
+        
+        _apply_slashdash(node_to_return);
+        return .{ Ok = node_to_return };
+
+        _apply_slashdash :: macro (n: &Node) {
+            if is_ignored {
+                n = null;
+            }
+        }
+    }
+
+    parse_value :: (self: &#Self, token: Token) -> ? Value {
+        switch token {
+            case s: .Raw_String {
+                return Value.{
+                    data = .{ String = string.alloc_copy(s, self.result_allocator) }
+                };
+            }
+
+            case s: .String {
+                // TODO: Handle escaped strings here
+                return Value.{
+                    data = .{ String = string.alloc_copy(s, self.result_allocator) }
+                };
+            }
+            
+            case w: .Word {
+                if w == "null" {
+                    return Value.{
+                        data = .{ Null = .{} }
+                    };
+                }
+
+                if w == "true" {
+                    return Value.{
+                        data = .{ Boolean = true }
+                    };
+                }
+
+                if w == "false" {
+                    return Value.{
+                        data = .{ Boolean = false }
+                    };
+                }
+
+                // TODO: parse numbers
+
+                return Value.{
+                    data = .{ String = string.alloc_copy(w, self.result_allocator) }
+                };
+            }
+
+            case #default do return .{};
+        }
+    }
+
+    parse_type_if_present :: (self: &#Self) -> Result(? str, Parse_Error) {
+        if_next_token_is(self, .Start_Type, [start_tkn] {
+            type_token := self.tokenizer->next_token();
+            switch type_token {
+                case .Word, .String, .Raw_String {
+                    self->expect_token(.End_Type);
+                    return .{ Ok = self->parse_into_string(type_token) };
+                }
+
+                case #default {
+                    return .{ Err = .{Parser_Error = tprintf("Expected identifier or string, got {}.", type_token)}};
+                }
+            }
+        });
+
+        return .{ Ok = .{ None = .{} } };
+    }
+
+    parse_identifier :: (self: &#Self) -> Result(? str, Parse_Error) {
+        id_token := self.tokenizer->next_token();
+        switch id_token {
+            case .Word, .String, .Raw_String {
+                name := self->parse_into_string(id_token)
+                            ->catch([] { fallthrough; });
+                return .{ Ok = .{ Some = name } };
+            }
+
+            case .EOF {
+                return .{ Ok = .{ None = .{} } };
+            }
+
+            case #default {
+                return .{ Err = .{Parser_Error = tprintf("Expected identifier or string, got {}.", id_token)}};
+            }
+        }
+    }
+
+    skip_linespace :: (self: &#Self) {
+        while true {
+            switch tkn := self.tokenizer->peek_token(); tkn {
+                case .Newline, .Single_Line_Comment {
+                    self.tokenizer->next_token();
+                }
+
+                case #default {
+                    return;
+                }
+            }
+        }
+    }
+
+
+    expect_token :: macro (self: &#Self, type: Token.tag_enum) -> Token {
+        tkn := self.tokenizer->next_token();
+        if tkn.tag != type {
+            return return .{ Err = .{Parser_Error = tprintf("Expected {}, got {}", type, tkn) } };
+        } else {
+            return tkn;
+        }
+    }
+
+    parse_into_string :: (self: &#Self, tkn: Token) -> ? str {
+        return self->parse_value(tkn)->and_then(x => x.data.String);
+    }
+}
+
+#package {
+    MIN_BUFFER_SIZE :: 1024
+    BUFFER_SIZE_INCREMENT :: 4096
+
+    is_whitespace :: (c: u32) -> bool {
+        #persist chars := u32.[
+            0x9, 0x20, 0xa0, 0x1680,
+            0x2000, 0x2001, 0x2002, 0x2003,
+            0x2004, 0x2005, 0x2006, 0x2007,
+            0x2008, 0x2009, 0x200A,
+            0x202F, 0x205F,
+            0x3000
+        ];
+        return slice.contains(chars, [it](it == c));
+    }
+
+    is_newline :: (c: u32) -> bool {
+        #persist chars := u32.[
+            0xd, 0xa, 0x85, 0xc, 0x2028, 0x2029
+        ];
+        return slice.contains(chars, [it](it == c));
+    }
+
+    is_id :: (c: u32) -> bool {
+        if c < 0x20 || c > 0x10ffff do return false;
+        if is_whitespace(c) || is_newline(c) do return false;
+
+        #persist chars := u32.[
+            '\\', '/', '(', ')', '{', '}', '<', '>', ';', '[', ']', '=', ',', '"'
+        ];
+
+        return !slice.contains(chars, [it](it == c));
+    }
+
+    is_id_start :: (c: u32) -> bool {
+        return is_id(c) && (c < '0' || c > '9');
+    }
+
+    is_end_of_word :: (c: u32) -> bool {
+        if is_whitespace(c) do return true;
+        if is_newline(c) do return true;
+
+        #persist chars := u32.[ ';', ')', '}', '/', '\\', '=' ];
+        return slice.contains(chars, [it](it == c));
+    }
+
+    if_next_token_is :: macro (p: &Parser, $type: Token.tag_enum, body: Code) {
+        switch __tkn := p.tokenizer->peek_token(); __tkn {
+            case type {
+                p.tokenizer->next_token();
+                #unquote body(__tkn);
+            }
+            case #default ---
+        }
+    }
+}
+

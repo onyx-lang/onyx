@@ -89,6 +89,7 @@ install_all() {
 for arg in $@; do
     case "$arg" in
         compile) compile_all ;;
+        debug) compile_all debug ;;
         package) package_all ;;
         compress) compress_all ;;
         install) install_all ;;

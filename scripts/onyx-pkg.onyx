@@ -287,11 +287,9 @@ run_sync_command :: (args: [] cstr) {
 
     dependencies_to_install   := make([..] To_Install);
     dependencies_installed    := make(Map(str, SemVer));
-    needed_dependency_folders := make([..] str);
     defer {
         delete(&dependencies_to_install);
         delete(&dependencies_installed);
-        delete(&needed_dependency_folders);
     }
 
     for& config.dependencies.dependencies.entries {
@@ -311,8 +309,6 @@ run_sync_command :: (args: [] cstr) {
             error_print("Aborting sync.\n");
             return;
         }
-
-        needed_dependency_folders << installed_folder;
 
         inner_config := read_config_from_installed_dependency(installed_folder) ?? [] {
             error_print("Misconfigured onyx-pkg.ini in '{}'. Omitting.\n", to_install.repo);
