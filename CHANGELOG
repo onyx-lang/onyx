@@ -11,6 +11,13 @@ Additions:
 - New installation script
     - sh <(curl https://get.onyxlang.io -sSfL)
     - Works on Linux and MacOS
+- KDL document parsing support
+    - Used as the new format for the package manager.
+    - See https://kdl.dev for details
+- `os.chdir` for changing the current directory
+    - Supported on WASIX and Onyx runtime
+- `os.getcwd` for getting the current directory
+    - Supported on WASIX and Onyx runtime
 
 Removals:
 
@@ -21,6 +28,8 @@ Changes:
 Bugfixes:
 - Formatting of days and months were incorrect `time.strftime`.
 - Infinite loop in TCP server when a client disconnects.
+
+
 
 Release v0.1.7
 --------------

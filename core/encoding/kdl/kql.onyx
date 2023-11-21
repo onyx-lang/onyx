@@ -4,37 +4,91 @@ package core.encoding.kdl
 use core {iter, alloc, array, string}
 
 #inject Document {
-    query     :: query
-    query_all :: query_all
+    query     :: query_doc
+    query_all :: query_doc_all
 }
 
-query :: (d: &Document, query: str) -> ? &Node {
-    query_iter := query_all(d, query);
-    node, empty := iter.next(query_iter);
+#inject Node {
+    query     :: query_node
+    query_all :: query_node_all
+}
+
+query :: #match #local {
+    query_doc, query_node
+}
+
+query_all :: #match #local {
+    query_doc_all, query_node_all
+}
+
+query_doc :: (d: &Document, query: str) -> ? &Node {
+    query_iter := query_doc_all(d, query);
+    node, cont := iter.next(query_iter);
     iter.close(query_iter);
 
-    if !empty do return node;
-    return null;
+    if cont do return node;
+    return .{};
 }
 
-query_all :: (d: &Document, query: str) -> Iterator(&Node) {
+query_doc_all :: (d: &Document, query: str) -> Iterator(&Node) {
     arena := alloc.arena.make(context.allocator, 16 * 1024);
     q     := parse_query(query, alloc.as_allocator(&arena));
 
-    ctx := .{
-        d = d,
-        q = q,
-        stack = make([..] QueryStack, 8, alloc.as_allocator(&arena)),
-        top_level_node = -1,
-        current_selector = 0,
-        arena = arena
-    };
+    ctx := QueryIterator.make(d, q, arena);
 
     return iter.generator(
         &ctx,
         query_next,
-        ctx => { alloc.arena.free(&ctx.arena); }
+        ctx => { alloc.arena.free(&ctx.arena); delete(&ctx.stack); }
     );
+}
+
+query_node :: (n: &Node, query: str) -> ? &Node {
+    query_iter := query_node_all(n, query);
+    node, cont := iter.next(query_iter);
+    iter.close(query_iter);
+
+    if cont do return node;
+    return .{};
+}
+
+query_node_all :: (n: &Node, query: str) -> Iterator(&Node) {
+    if n == null do return iter.empty(&Node);
+
+    arena := alloc.arena.make(context.allocator, 16 * 1024);
+    q     := parse_query(query, alloc.as_allocator(&arena));
+
+    ctx := QueryIterator.make(null, q, arena);
+    ctx.stack << .{ n, 0 };
+
+    return iter.generator(
+        &ctx,
+        query_next,
+        ctx => { alloc.arena.free(&ctx.arena); delete(&ctx.stack); }
+    );
+}
+
+#local
+QueryIterator :: struct {
+    d: &Document;
+    q: Query;
+    stack: [..] QueryStack;
+    arena: alloc.arena.Arena;
+
+    top_level_node := -1;
+    current_selector := 0;
+}
+
+#inject
+QueryIterator.make :: (
+    d: &Document,
+    q: Query,
+    arena: alloc.arena.Arena
+) -> QueryIterator {
+    return QueryIterator.{
+        d = d, q = q, arena = arena,
+        stack = make([..] QueryStack, 16)
+    };
 }
 
 #local
@@ -44,16 +98,18 @@ QueryStack :: struct {
 }
 
 #local
-query_next :: ctx => {
+query_next :: (ctx: &QueryIterator) -> (&Node, bool) {
     while true {
         if !ctx.stack {
-            if !ctx.d do break;
+            if ctx.d {
+                // If the stack is empty, populate with a node
+                ctx.top_level_node += 1;
+                if ctx.top_level_node >= ctx.d.nodes.length do break;
 
-            // If the stack is empty, populate with a node
-            ctx.top_level_node += 1;
-            if ctx.top_level_node >= ctx.d.nodes.length do break;
-
-            ctx.stack << .{ ctx.d.nodes[ctx.top_level_node], 0 };
+                ctx.stack << .{ ctx.d.nodes[ctx.top_level_node], 0 };
+            } else {
+                break;
+            }
         }
 
         last_query := array.get_ptr(ctx.stack, -1);
@@ -82,6 +138,7 @@ query_selector_matches :: (s: &Selector, trail: [] QueryStack) -> bool {
 
     node_index: i32 = trail.count - 1;
     if !query_matcher_matches(s.segments[0].matcher, trail[node_index].node) {
+        // logf(.Error, "NO MATCH BETWEEN '{*p}' and '{*p}'\n=======================", s.segments[0].matcher, trail[node_index].node);
         return false;
     }
 
@@ -90,15 +147,21 @@ query_selector_matches :: (s: &Selector, trail: [] QueryStack) -> bool {
         switch segment.op->unwrap() {
             case .Child, .Descendant {
                 while node_index >= 0 {
-                    defer node_index -= 1;
                     if query_matcher_matches(segment.matcher, trail[node_index].node) {
                         // Continue from the outer for loop
+                        node_index -= 1;
                         continue continue;
                     }
 
                     if segment.op->unwrap() == .Child {
                         break;
                     }
+
+                    node_index -= 1;
+                }
+
+                if segment->is_scope() {
+                    if node_index < 0 do return true;
                 }
 
                 return false;
@@ -208,6 +271,10 @@ Selector :: struct {
 SelectorSegment :: struct {
     op: ? SelectorOp;
     matcher: &Matcher;
+
+    is_scope :: (s: &SelectorSegment) =>
+        s.matcher.details.length == 1 &&
+        s.matcher.details[0].accessor.tag == .Scope
 }
 
 #local
@@ -342,13 +409,23 @@ parse_matcher :: (p: &QueryParser) -> ? &Matcher {
     });
 
     if p.query[p.cursor] != '[' {
-        id := parse_identifier(p);
+        if string.starts_with(p->rem(), "top()") {
+            p.cursor += 5;
+            m.details << .{
+                accessor = .{ Scope = .{} },
+                op = .Equal,
+                value = .{ None = .{} },
+            };
 
-        m.details << .{
-            accessor = .{ Node = .{} },
-            op = .Equal,
-            value = .{ Some = .{ data = .{ String = id } } }
-        };
+        } else {
+            id := parse_identifier(p);
+
+            m.details << .{
+                accessor = .{ Node = .{} },
+                op = .Equal,
+                value = .{ Some = .{ data = .{ String = id } } }
+            };
+        }
     }
 
     while p.query[p.cursor] == '[' {

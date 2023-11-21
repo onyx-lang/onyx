@@ -4,7 +4,7 @@ package core.encoding.kdl
 use core {string}
 
 #inject Value {
-    as_str :: (v: &Value) -> ? str {
+    as_str :: (v: Value) -> ? str {
         return v.data.String;
     }
 
@@ -43,5 +43,19 @@ use core {string}
             string.alloc_copy(name, n.props.allocator),
             .{ data = value }
         );
+    }
+
+    value :: (n: &Node, index := 0) -> ? Value {
+        if index >= n.values.length do return .{};
+
+        return n.values[index];
+    }
+
+    value_or_null :: (n: &Node, index := 0) -> Value {
+        if index >= n.values.length do return .{
+            data = .{ Null = .{} }
+        };
+
+        return n.values[index];
     }
 }

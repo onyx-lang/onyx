@@ -146,7 +146,7 @@ Token :: union {
             return self->handle_word();
         }
 
-        assert(false, tprintf("Unhandled character, {}", c));
+        // assert(false, tprintf("Unhandled character, {}", c));
         return .{ Error = .{} };
     }
 

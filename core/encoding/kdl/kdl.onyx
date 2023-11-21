@@ -2,6 +2,7 @@ package core.encoding.kdl
 #allow_stale_code
 
 #load "./parser"
+#load "./encoder"
 #load "./utils"
 #load "./kql"
 
@@ -42,6 +43,16 @@ KDL_Number :: union {
     Integer: i64;
     Float: f64;
     String: str;
+}
+
+#doc """
+    Creates a new KDL document, using the allocator provided.
+"""
+new_doc :: (allocator := context.allocator) -> Document {
+    doc: Document;
+    doc.allocator = allocator;
+    doc.nodes = make([..] &Node, allocator);
+    return doc;
 }
 
 
