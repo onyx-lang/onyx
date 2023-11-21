@@ -38,6 +38,8 @@ PollDescription :: struct {
         __dir_read   :: (dir: DirectoryData, out_entry: &os.DirectoryEntry) -> bool ---
         __dir_create :: (path: str) -> bool ---
         __dir_remove :: (path: str) -> bool ---
+        __dir_cwd    :: (pathbuf: [] u8) -> i32 ---
+        __dir_chdir  :: (path: cstr) -> bool ---
     }
 }
 
@@ -59,6 +61,23 @@ __dir_close    :: __dir_close
 __dir_read     :: __dir_read
 __dir_create   :: __dir_create
 __dir_remove   :: __dir_remove
+
+__chdir :: (path: str) -> bool {
+    #persist buf: [1024] u8;
+    memory.copy(~~buf, path.data, math.min(1023, path.length));
+
+    return __dir_chdir(~~ buf);
+}
+
+__getcwd :: () -> str {
+    #persist buf: [1024] u8;
+    length := __dir_cwd(.{ ~~buf, 1024 });
+    if length < 0 {
+        return "";
+    }
+
+    return buf[0 .. length];
+}
 
 __file_stream_vtable := io.Stream_Vtable.{
     seek = (use fs: &os.File, to: i32, whence: io.SeekFrom) -> io.Error {

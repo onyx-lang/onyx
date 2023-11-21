@@ -146,7 +146,7 @@ SockOption :: enum {
     tty_set :: (state: &TTY) -> Errno ---
 
     getcwd :: (path: [&] u8, pathlen: &u32) -> Errno ---
-    chdir  :: (path: cstr) -> Errno ---
+    chdir  :: (path: str) -> Errno ---
 
     thread_spawn_v2    :: (args: rawptr, tid: &u32) -> Errno ---
     thread_sleep       :: (duration: Timestamp) -> Errno ---

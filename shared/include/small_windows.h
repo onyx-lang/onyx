@@ -467,3 +467,5 @@ GB_DLL_IMPORT int BCryptCloseAlgorithmProvider(
 GB_DLL_IMPORT void WINAPI WakeByAddressSingle(void * Address);
 GB_DLL_IMPORT BOOL WINAPI WaitOnAddress(volatile void * Address, void * compareAddress, size_t addressSize, DWORD milliseconds);
 
+GB_DLL_IMPORT DWORD GetCurrentDirectory(DWORD nBufferLength, char *lpBuffer);
+GB_DLL_IMPORT BOOL  SetCurrentDirectory(char *lpPathName);

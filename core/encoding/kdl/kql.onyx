@@ -47,6 +47,8 @@ QueryStack :: struct {
 query_next :: ctx => {
     while true {
         if !ctx.stack {
+            if !ctx.d do break;
+
             // If the stack is empty, populate with a node
             ctx.top_level_node += 1;
             if ctx.top_level_node >= ctx.d.nodes.length do break;

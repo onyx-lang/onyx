@@ -166,3 +166,42 @@ ONYX_DEF(__dir_remove, (WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 #endif
 }
+
+ONYX_DEF(__dir_cwd, (WASM_I32, WASM_I32), (WASM_I32)) {
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    char *dir = getcwd(ONYX_PTR(params->data[0].of.i32), params->data[1].of.i32);
+    if (!dir) {
+        results->data[0] = WASM_I32_VAL(-1);
+        return NULL;
+    }
+
+    results->data[0] = WASM_I32_VAL( strlen(dir) );
+    return NULL;
+#endif
+
+#if defined(_BH_WINDOWS)
+    int length = GetCurrentDirectory(params->data[1].of.i32, ONYX_PTR(params->data[0].of.i32));
+    if (length == 0 || length > params->data[1].of.i32) {
+        results->data[0] = WASM_I32_VAL(-1);
+        return NULL;
+    }
+
+    results->data[0] = WASM_I32_VAL( length );
+    return NULL;
+#endif
+}
+
+ONYX_DEF(__dir_chdir, (WASM_I32), (WASM_I32)) {
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    int result = chdir(ONYX_PTR(params->data[0].of.i32));
+    results->data[0] = WASM_I32_VAL(result ? 0 : 1);
+    return NULL;
+#endif
+
+#if defined(_BH_WINDOWS)
+    int result = SetCurrentDirectory(ONYX_PTR(params->data[0].of.i32));
+    results->data[0] = WASM_I32_VAL(result ? 1 : 0);
+    return NULL;
+#endif
+}
+

@@ -56,3 +56,17 @@ __tty_set :: (tty: &os.TTY_State) -> bool {
     wasi.tty_set(&state);
     return true;
 }
+
+__chdir :: (path: str) -> bool {
+    return wasi.chdir(path) == .Success;
+}
+
+__getcwd :: () -> str {
+    #persist buf: [1024] u8;
+    len := 1024;
+    if wasi.getcwd(~~buf, &len) == .Success {
+        return buf[0 .. len];
+    }
+
+    return "";
+}

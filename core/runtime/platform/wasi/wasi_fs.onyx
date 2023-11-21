@@ -351,3 +351,9 @@ __dir_remove :: (path: str) -> bool {
 
     return removed;
 }
+
+
+#if !#defined(runtime.vars.WASIX) {
+    __chdir  :: (path: str) => false
+    __getcwd :: () => ""
+}

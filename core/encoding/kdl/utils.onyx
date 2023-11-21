@@ -15,6 +15,10 @@ use core {string}
     as_float :: (v: Value) -> ? f64 {
         return v.data.Number?.Float;
     }
+
+    as_bool :: (v: Value) -> ? bool {
+        return v.data.Boolean;
+    }
 }
 
 #inject Document {
