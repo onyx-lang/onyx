@@ -1735,6 +1735,9 @@ struct Package {
     // 'use package' statements have to be reevaluated to pull in the new symbols.
     bh_arr(Entity *) use_package_entities;
 
+    // NOTE: This tracks all #package_doc statements used for this package.
+    bh_arr(OnyxToken *) doc_strings;
+
     // NOTE: These are entities that are stored in packages marked with `#allow_stale_code`.
     // These entities are flushed to the entity heap when the package has been explicit used
     // somewhere.

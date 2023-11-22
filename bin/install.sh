@@ -208,7 +208,7 @@ initOS() {
 initRuntime() {
     printf "${green}Please choose a WebAssembly runtime to use with your Onyx installation.\n${reset}"
 
-    echo "1) Wasmer: An industry standard WebAssembly runtime. Very fast."
+    echo "1) Wasmer: An industry standard WebAssembly runtime. Very fast. (default)"
     echo "2) OVM: A custom, lightweight runtime made for Onyx. Supports debugging. Slower than Wasmer."
     echo "3) None: Omit using a runtime and only use Onyx as a compiler to WebAssembly."
 
@@ -218,7 +218,7 @@ initRuntime() {
         1) RUNTIME="wasmer"; break ;; 
         2) RUNTIME="ovm"; break ;; 
         3) RUNTIME="none"; break ;; 
-        *) echo "Invalid choice. Quitting."; exit 1 ;;
+        *) echo "Invalid choice. Defaulting to 'wasmer'."; RUNTIME="wasmer" ;;
     esac
 }
 

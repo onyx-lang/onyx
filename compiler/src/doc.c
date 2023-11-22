@@ -391,7 +391,9 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
             return;
 
         case Ast_Kind_Typeof:
-            bh_buffer_write_string(buffer, "_TYPEOF_");
+            bh_buffer_write_string(buffer, (char *) type_get_name(
+                type_build_from_ast(context.ast_alloc, (AstType *) node)
+            ));
             return;
 
         case Ast_Kind_Alias:
@@ -938,6 +940,12 @@ void onyx_docs_emit_odoc(const char *dest) {
         bh_buffer_write_u32(&doc_buffer, bh_arr_length(p->sub_packages));
         fori (j, 0, bh_arr_length(p->sub_packages)) {
             bh_buffer_write_u32(&doc_buffer, (u32) p->sub_packages[j] - 1);
+        }
+
+        bh_buffer_write_u32(&doc_buffer, bh_arr_length(p->doc_strings));
+        bh_arr_each(OnyxToken *, ptkn, p->doc_strings) {
+            OnyxToken *tkn = *ptkn;
+            write_string(&doc_buffer, tkn->length, tkn->text);
         }
     }
 
