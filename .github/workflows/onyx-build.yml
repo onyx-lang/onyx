@@ -61,6 +61,10 @@ jobs:
             os: macos-11.0
             runtime_library: none
             artifact_name: 'onyx-darwin-none-amd64'
+          - build: darwin-amd64
+            os: macos-11.0
+            runtime_library: wasmer
+            artifact_name: 'onyx-darwin-wasmer-amd64'
           # - build: darwin-arm64
           #   os: macos-11.0
           #   runtime_library: wasmer 
@@ -104,7 +108,7 @@ jobs:
           ONYX_ARCH: linux_x86_64
 
       - name: Build Onyx for ${{ matrix.build }}
-        if: (matrix.build == 'darwin-amd64') && (matrix.runtime_library == 'none')
+        if: matrix.build == 'darwin-amd64'
         run: |
           ./build.sh compile compress
         env:
