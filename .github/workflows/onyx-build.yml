@@ -79,17 +79,27 @@ jobs:
         run: |
           chmod +x build.sh
 
-      - name: Install Wasmer building dependencies
-        if: matrix.runtime_library == 'wasmer'
+      - name: Install Wasmer building dependencies (AMD64)
+        if: (matrix.runtime_library == 'wasmer') && (matrix.build != 'darwin-arm64')
         run: |
           curl https://get.wasmer.io -sSfL | sh
           echo "$HOME/.wasmer/bin" >> $GITHUB_PATH
+
+      # Have to do MacOS ARM64 special, since I don't want to pay for the M1 GitHub runners
+      # to build this natively. Instead, we directly download the ARM version of WASMER
+      # and link to its libwasmer.a file.
+      - name: Install Wasmer building dependencies (ARM64)
+        if: (matrix.runtime_library == 'wasmer') && (matrix.build == 'darwin-arm64')
+        run: |
+          curl -o wasmer.tar.gz https://github.com/wasmerio/wasmer/releases/v4.2.3/wasmer-darwin-arm64.tar.gz -L
+          mkdir wasmer
+          tar -C wasmer zxvf wasmer.tar.gz
 
       - name: Install Windows building dependencies
         if: matrix.build == 'windows-amd64'
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Build Onyx for ${{ matrix.build }}
+      - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'linux-amd64') && (matrix.runtime_library != 'none')
         run: |
           ./build.sh compile compress
@@ -99,7 +109,7 @@ jobs:
           ONYX_RUNTIME_LIBRARY: ${{ matrix.runtime_library }} 
           ONYX_USE_DYNCALL: '1'
           
-      - name: Build Onyx for ${{ matrix.build }}
+      - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'linux-amd64') && (matrix.runtime_library == 'none')
         run: |
           ./build.sh compile compress
@@ -107,7 +117,7 @@ jobs:
           ONYX_CC: gcc
           ONYX_ARCH: linux_x86_64
 
-      - name: Build Onyx for ${{ matrix.build }}
+      - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'darwin-amd64') && (matrix.runtime_library != 'none')
         run: |
           ./build.sh compile compress
@@ -116,7 +126,7 @@ jobs:
           ONYX_ARCH: darwin_amd64
           ONYX_RUNTIME_LIBRARY: ${{ matrix.runtime_library }}
 
-      - name: Build Onyx for ${{ matrix.build }}
+      - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'darwin-amd64') && (matrix.runtime_library == 'none')
         run: |
           ./build.sh compile compress
@@ -124,7 +134,18 @@ jobs:
           ONYX_CC: gcc
           ONYX_ARCH: darwin_amd64
 
-      - name: Build Onyx for ${{ matrix.build }}
+      - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
+        if: (matrix.build == 'darwin-arm64') && (matrix.runtime_library == 'wasmer')
+        run: |
+          ./build.sh compile compress
+        env:
+          ONYX_CC: gcc
+          ONYX_ARCH: darwin_arm64
+          ONYX_TARGET: aarch64-apple-darwin
+          WASMER_LIB_PATH: wasmer/lib
+          ONYX_RUNTIME_LIBRARY: wasmer-custom
+
+      - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'darwin-arm64') && (matrix.runtime_library == 'none')
         run: |
           ./build.sh compile compress
@@ -133,7 +154,7 @@ jobs:
           ONYX_ARCH: darwin_arm64
           ONYX_TARGET: aarch64-apple-darwin
 
-      - name: Build Onyx for ${{ matrix.build }}
+      - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: matrix.build == 'windows-amd64'
         run: |
           cmd.exe /c 'build.bat dist'
