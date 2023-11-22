@@ -57,6 +57,10 @@ jobs:
             runtime_library: none
             target: aarch64-apple-darwin
             artifact_name: 'onyx-darwin-none-arm64'
+          - build: darwin-arm64
+            os: macos-12
+            runtime_library: wasmer
+            artifact_name: 'onyx-darwin-wasmer-arm64'
           - build: darwin-amd64
             os: macos-12
             runtime_library: none
@@ -65,10 +69,6 @@ jobs:
             os: macos-12
             runtime_library: wasmer
             artifact_name: 'onyx-darwin-wasmer-amd64'
-          # - build: darwin-arm64
-          #   os: macos-11.0
-          #   runtime_library: wasmer 
-          #   artifact_name: 'onyx-darwin-wasmer-arm64'
           - build: windows-amd64
             os: windows-latest
             artifact_name: 'onyx-windows-wasmer-amd64'
