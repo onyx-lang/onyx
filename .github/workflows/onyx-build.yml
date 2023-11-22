@@ -143,7 +143,7 @@ jobs:
           ONYX_CC: gcc
           ONYX_ARCH: darwin_arm64
           ONYX_TARGET: aarch64-apple-darwin
-          WASMER_LIB_PATH: wasmer/lib
+          WASMER_LIB_PATH: ../wasmer/lib
           ONYX_RUNTIME_LIBRARY: wasmer-custom
 
       - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
