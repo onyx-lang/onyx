@@ -60,6 +60,7 @@ jobs:
           - build: darwin-arm64
             os: macos-12
             runtime_library: wasmer
+            target: aarch64-apple-darwin
             artifact_name: 'onyx-darwin-wasmer-arm64'
           - build: darwin-amd64
             os: macos-12
@@ -93,7 +94,7 @@ jobs:
         run: |
           curl -o wasmer.tar.gz https://github.com/wasmerio/wasmer/releases/v4.2.3/wasmer-darwin-arm64.tar.gz -L
           mkdir wasmer
-          tar -C wasmer zxvf wasmer.tar.gz
+          tar -C wasmer -zxvf wasmer.tar.gz
 
       - name: Install Windows building dependencies
         if: matrix.build == 'windows-amd64'
