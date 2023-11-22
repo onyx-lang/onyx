@@ -11,11 +11,15 @@ FLAGS=""
 if [ "$(uname)" = "Darwin" ]; then
     FLAGS="$FLAGS -framework Security"
 fi
+if [ ! -z ${ONYX_TARGET+x} ]; then
+    FLAGS="$FLAGS --target=$ONYX_TARGET"
+fi
+
 
 echo "Compiling onyx_runtime.$suffix"
 $ONYX_CC -shared -fpic -w -O2 \
     -o onyx_runtime.$suffix \
+    $FLAGS \
     -I ../shared/include -I ../compiler/include \
     ./onyx_runtime.c \
-    $FLAGS \
     -lpthread
