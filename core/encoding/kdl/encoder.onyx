@@ -1,6 +1,8 @@
 package core.encoding.kdl
 #allow_stale_code
 
+KDL_TAB_SIZE :: 4
+
 use core {io}
 
 write :: (d: &Document, w: &io.Writer) {
@@ -11,7 +13,7 @@ write :: (d: &Document, w: &io.Writer) {
 }
 
 write_node :: (n: &Node, w: &io.Writer, indentation := 0) {
-    for indentation * 4 do io.write(w, " ");
+    for indentation * KDL_TAB_SIZE do io.write(w, " ");
 
     n.type_annotation->with([ta] {
         io.write_format(w, "({}) ", ta);
@@ -38,7 +40,7 @@ write_node :: (n: &Node, w: &io.Writer, indentation := 0) {
             write_node(it, w, indentation + 1);
         }
 
-        for indentation * 2 do io.write(w, " ");
+        for indentation * KDL_TAB_SIZE do io.write(w, " ");
         io.write(w, "}");
     }
 

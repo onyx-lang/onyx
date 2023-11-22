@@ -1049,7 +1049,7 @@ Config :: struct {
 
     dependencies: Map(str, Dependency);
 
-    _source_doc: kdl.Document;
+    _source_doc: ? kdl.Document;
 }
 
 Dependency :: struct {
@@ -1092,6 +1092,7 @@ load_config :: (path: str) -> ? Config {
     doc := kdl.parse(contents).Ok?;
 
     c: Config;
+    c._source_doc = doc;
     c.dependency_source_path = "./lib";
     c.dependency_binary_path = "./bin";
 
@@ -1191,7 +1192,7 @@ store_config :: (path: str) -> bool {
         native_node.children << library_node;
 
         build_node := doc->create_node("build");
-        build_node->add_value(.{ String = config.native_library_build->unwrap() });
+        build_node->add_value(.{ String = config.native_library_build ?? "" });
         native_node.children << build_node;
     }
 
@@ -1213,6 +1214,14 @@ store_config :: (path: str) -> bool {
             }
         }
     }
+
+    config._source_doc->with([source] {
+        for source->query_all("top() > []") {
+            if !array.contains(str.["package", "config", "native", "dependencies"], it.node) {
+                doc.nodes << it;
+            }
+        }
+    });
 
     file := os.open(path, .Write)->or_return(false);
     defer os.close(&file);

@@ -383,6 +383,8 @@ Parse_Error :: union {
 
                 case .Start_Children {
                     self.tokenizer->next_token();
+                    self->skip_linespace();
+
                     while !self.tokenizer->peek_token().End_Children {
                         child := self->parse_node()?;
                         if child {
