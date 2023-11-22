@@ -42,7 +42,14 @@ package_all() {
     mkdir -p "$DIST_DIR/lib"
     mkdir -p "$DIST_DIR/include"
 
-    [ -f runtime/onyx_runtime.so ] && cp runtime/onyx_runtime.so "$DIST_DIR/lib/"
+    case "$(uname)" in
+        Linux)  suffix='so' ;;
+        *BSD)   suffix='so' ;;
+        Darwin) suffix='dylib' ;;
+        *)      suffix='dll' ;;
+    esac
+
+    [ -f runtime/onyx_runtime.$suffix ] && cp runtime/onyx_runtime.$suffix "$DIST_DIR/lib/"
     cp "shared/include/onyx_library.h" "$DIST_DIR/include/onyx_library.h"
     cp "shared/include/wasm.h" "$DIST_DIR/include/wasm.h"
 
