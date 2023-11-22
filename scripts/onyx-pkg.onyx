@@ -151,6 +151,9 @@ run_init_command :: (args: [] cstr) {
         }
     }
 
+    config.dependency_binary_path = "./bin";
+    config.dependency_source_path = "./lib";
+
     // @TODO // Validation for these fields.
     r := io.reader_make(&stdio.stream);
     read_field("Package name: ", &config.package_name, "");
