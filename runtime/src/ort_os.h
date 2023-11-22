@@ -131,8 +131,12 @@ ONYX_DEF(__lookup_env, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
 
 
 ONYX_DEF(__random_get, (WASM_PTR, WASM_I32), ()) {
-    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    #if defined(_BH_LINUX)
     getrandom(ONYX_PTR(params->data[0].of.i32), params->data[1].of.i32, 0);
+    #endif
+
+    #if defined(_BH_DARWIN)
+    SecRandomCopyBytes(NULL, params->data[1].of.i32, ONYX_PTR(params->data[0].of.i32));
     #endif
 
     #ifdef _BH_WINDOWS
