@@ -92,7 +92,7 @@ jobs:
       - name: Install Wasmer building dependencies (ARM64)
         if: (matrix.runtime_library == 'wasmer') && (matrix.build == 'darwin-arm64')
         run: |
-          curl -o wasmer.tar.gz https://github.com/wasmerio/wasmer/releases/v4.2.3/wasmer-darwin-arm64.tar.gz -L
+          curl -o wasmer.tar.gz https://github.com/wasmerio/wasmer/releases/download/v4.2.3/wasmer-darwin-arm64.tar.gz -L
           mkdir wasmer
           tar -C wasmer -zxvf wasmer.tar.gz
 
