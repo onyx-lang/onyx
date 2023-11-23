@@ -122,13 +122,20 @@ SocketAddress.addr_as_str :: (this: &SocketAddress, allocator := context.allocat
     };
 }
 
-make_ipv4_address :: (out: &SocketAddress, addr: u32, port: u16) {
-    n :=  (addr & 0xFF) << 24
-        | (addr & 0xFF00) << 8
-        | (addr & 0xFF0000) >> 8
-        | (addr & 0xFF000000) >> 24;
+make_ipv4_address :: #match #local {}
 
-    *out = .{ Inet = .{ port = port, addr = n } };
+#overload
+make_ipv4_address :: (addr: str, port: u16) -> SocketAddress {
+    ip := str_to_ipv4(addr);
+
+    return .{ Inet = .{ port = port, addr = ip } };
+}
+
+#overload
+make_ipv4_address :: (out: &SocketAddress, addr: str, port: u16) {
+    ip := str_to_ipv4(addr);
+
+    *out = .{ Inet = .{ port = port, addr = ip } };
 }
 
 make_unix_address :: (out: &SocketAddress, path: str) {
@@ -363,14 +370,6 @@ socket_recvfrom :: (s: &Socket, buffer: [] u8) -> ? SocketRecvFromResult {
     return .{ Some = .{ sender_addr, res.Ok->unwrap() } };
 }
 
-// TODO: Add these back
-// host_to_network :: #match #local {}
-// #match host_to_network (x: u16) => __net_host_to_net_s(x);
-// #match host_to_network (x: u32) => __net_host_to_net_l(x);
-
-// network_to_host :: #match #local {}
-// #match network_to_host (x: u16) => __net_net_to_host_s(x);
-// #match network_to_host (x: u32) => __net_net_to_host_l(x);
 
 #local __net_socket_vtable := io.Stream_Vtable.{
     read = (use s: &Socket, buffer: [] u8) -> (io.Error, u32) {
@@ -454,12 +453,13 @@ str_to_ipv4 :: (ip: str) -> u32 {
     ip_ := ip;
 
     res: u32;
+    shift := 0;
     for 4 {
         octet := string.read_until(&ip_, #char ".");
         string.advance(&ip_, 1);
 
-        res = res << 8;
-        res |= ~~(conv.str_to_i64(octet) & cast(i64) 0xFF);
+        res |= cast(u32) (conv.str_to_i64(octet) & cast(i64) 0xFF) << shift;
+        shift += 8;
     }
 
     return res;

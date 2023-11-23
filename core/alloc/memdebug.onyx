@@ -85,7 +85,7 @@ enable_in_scope :: macro (a: Allocator, port := DEFAULT_PORT) {
     use core.alloc.memdebug
 
     addr: net.SocketAddress;
-    net.make_ipv4_address(&addr, 0, ~~port);
+    net.make_ipv4_address(&addr, "0.0.0.0", ~~port);
 
     old_allocator := a;
     dbg := memdebug.make(old_allocator, &addr);

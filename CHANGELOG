@@ -24,6 +24,8 @@ Removals:
 Changes:
 - Renamed `--no-std` flag to `--no-core`, since Onyx does not call its standard
   library "std", the name did not make any sense.
+- `net.make_ipv4_address` now has a reasonable definition using a string for the IP,
+  instead of an integer.
 
 Bugfixes:
 - Formatting of days and months were incorrect `time.strftime`.
