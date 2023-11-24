@@ -8,7 +8,7 @@
 // argument, which the package name.
 Known_Repositories :: str.[
     "{}",
-    "onyxlang.io/repo/{}"
+    "repo.onyxlang.io/repo/{}"
 ]
 
 
@@ -595,6 +595,57 @@ run_new_command :: (args: [] cstr) {
     }
 }
 
+#tag Command.{
+    "build", "Builds the project according to the build configuration specified the package file.", "[build_config]",
+    """
+build_config     The name of the configuration to use (defaults to 'default').
+    """
+}
+run_build_command :: (args: [] cstr) {
+    build_config := "default";
+    if args.count >= 1 {
+        build_config = string.as_str(args[0]);
+    }
+
+    maybe_bc := config.build_configs[build_config];
+    if !maybe_bc {
+        error_print("Unrecognized build configuration '{}'.\n", build_config);
+        return;
+    }
+
+    info_print("Building", "Compiling with build configuration '{}'.\n", build_config);
+
+    bc := maybe_bc->unwrap();
+
+    args: [..] str;
+    args << "build";
+
+    for bc.sources do args << it;
+    for bc.include {  args << "-I"; args << it; }
+    for bc.defines do args << tprintf("-D{}", it);
+    for bc.args    do args << it;
+    
+    args << "-r";
+    args << bc.runtime;
+
+    args << "-o";
+    args << bc.target;
+
+    p := os.process_spawn("onyx", args);
+    r := io.reader_make(&p);
+    output := io.read_all(&r);
+    switch os.process_wait(&p) {
+        case .Success {
+            info_print("Built", "Successfully compiled with build configuration '{}'.\n", build_config);
+        }
+
+        case #default {
+            error_print("Failed to compile with build configuration '{}'.\n", build_config);
+            println(output);
+        }
+    }
+}
+
 
 #local {
     #if runtime.compiler_os == .Linux {
@@ -1069,6 +1120,8 @@ DependencySource :: union {
 BuildConfig :: struct {
     include: [..] str;
     args: [..] str;
+    defines: [..] str;
+    sources: [..] str;
     runtime: str;
     target: str;
 }
@@ -1122,6 +1175,37 @@ load_config :: (path: str) -> ? Config {
         load_string(p, "library", &c.native_library);
         load_string(p, "build", &c.native_library_build);
     });
+
+    for doc->query_all("top() > build > []") {
+        b: BuildConfig;
+        b.runtime = "onyx";
+        b.target = "out.wasm";
+
+        load_string(it, "runtime", &b.runtime);
+        load_string(it, "target", &b.target);
+
+        for it->query_all("include") {
+            array.concat(&b.include,
+                iter.as_iter(it.values)->flatten(x => (*x)->as_str()));
+        }
+
+        for it->query_all("define") {
+            array.concat(&b.defines,
+                iter.as_iter(it.values)->flatten(x => (*x)->as_str()));
+        }
+
+        for it->query_all("args") {
+            array.concat(&b.args,
+                iter.as_iter(it.values)->flatten(x => (*x)->as_str()));
+        }
+
+        for it->query_all("source") {
+            array.concat(&b.sources,
+                iter.as_iter(it.values)->flatten(x => (*x)->as_str()));
+        }
+
+        c.build_configs[it.node] = b;
+    }
 
     for doc->query_all("top() > dependencies > []") {
         d: Dependency;
