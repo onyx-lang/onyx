@@ -19,7 +19,10 @@ extern struct bh_allocator global_heap_allocator;
 #include "wasm_emit.h"
 #include "doc.h"
 
-#define VERSION "v0.1.8"
+
+#define VERSION__(m,i,p) "v" #m "." #i "." #p
+#define VERSION_(m,i,p) VERSION__(m,i,p)
+#define VERSION VERSION_(VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH)
 
 #ifdef ONYX_RUNTIME_LIBRARY
     #define ONYX_RUNTIME_LIBRARY_MAPPED ONYX_RUNTIME_LIBRARY

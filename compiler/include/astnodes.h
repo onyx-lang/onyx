@@ -1,6 +1,10 @@
 #ifndef ONYXASTNODES_H
 #define ONYXASTNODES_H
 
+#define VERSION_MAJOR 0
+#define VERSION_MINOR 1
+#define VERSION_PATCH 8
+
 #include "stb_ds.h"
 #include "lex.h"
 #include "types.h"
