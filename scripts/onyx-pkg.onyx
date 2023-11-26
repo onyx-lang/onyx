@@ -8,7 +8,7 @@
 // argument, which the package name.
 Known_Repositories :: str.[
     "{}",
-    "repo.onyxlang.io/repo/{}"
+    "github.com/onyx-lang/pkg-{}"
 ]
 
 
