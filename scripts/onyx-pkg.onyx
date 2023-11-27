@@ -374,6 +374,9 @@ run_rebuild_command :: (args: [] cstr)  {
     }
 
     dep := string.as_str(args[0]);
+    if config.dependencies->has(dep) {
+        dep = config.dependencies->get(dep)->unwrap().source.Git->unwrap();
+    }
 
     info_print("Rebuild", "{}\n", dep);
     if success, err := rebuild_native_library(dep); success {
@@ -392,7 +395,7 @@ run_publish_command :: (args: [] cstr) {
     if !os.dir_exists(".git") {
         error_print("Not in Git repository.\n");
         printf("It does not look like you are in a Git repository. In order to publish packages\n");
-        printf("with onyx-pkg, you have to initailize a Git repository in the current directory.\n\n");
+        printf("with onyx-pkg, you have to initialize a Git repository in the current directory.\n\n");
         return;
     }
 

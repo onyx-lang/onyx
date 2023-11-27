@@ -744,6 +744,20 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
             return TYPE_MATCH_SUCCESS;
         }
     }
+    
+    // String literals implicitly become c-strings for convience.
+    if (node->kind == Ast_Kind_StrLit
+        && type->kind == Type_Kind_MultiPointer
+        && type->MultiPointer.elem == &basic_types[Basic_Kind_U8]) {
+
+        if (permanent) {
+            AstStrLit *strlit = (AstStrLit *) node;
+            strlit->is_cstr = 1;
+            strlit->type = type;
+        }
+
+        return TYPE_MATCH_SUCCESS;
+    }
 
     // If the destination type is a slice, then automatically convert arrays, dynamic
     // arrays, and var args, if they are the same type. This is big convenience feature

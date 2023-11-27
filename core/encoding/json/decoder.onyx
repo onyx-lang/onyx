@@ -100,5 +100,5 @@ decode_into :: (data: str, out: &$T) -> Error {
     defer delete(obj);
 
     as_any(obj.root, out);
-    return .None;
+    return .{ .None };
 }
