@@ -1,6 +1,8 @@
 // Now, lets go over the basic types and control flow mechanisms in Onyx.
 
-main :: (args: [] cstr) {
+use core
+
+main :: () {
     // Here is a list of all the builtin types:
     //       void
     //       bool

@@ -3,6 +3,8 @@
 // main package unless specified otherwise, and every compilations includes
 // the standard library.
 
+use core
+
 main :: () {
 
     // To declare a local variable, the variable name is simply followed by

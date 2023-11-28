@@ -16,6 +16,12 @@ package main
 // this is not necessary.
 #load "core/module"
 
+
+// To use packages, use the 'use' keyword. The 'core' package houses all of the
+// standard library functions. In the case of this program, we will just be using
+// the 'println' function to print something to the screen.
+use core
+
 // Below is the function declaration for `main`. While it might look weird at first
 // sight, Onyx uses a consistent syntax for declaring static "things" (functions,
 // structures, enums, etc.). It is always,
