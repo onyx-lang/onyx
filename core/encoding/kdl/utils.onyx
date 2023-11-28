@@ -25,7 +25,7 @@ use core {string}
     create_node :: (d: &Document, name: str) -> &Node {
         return d.allocator->move(Node.{
             node = name,
-            type_annotation = .{ None = .{} },
+            type_annotation = .None,
             values = make([..] Value, d.allocator),
             props = make(Map(str, Value), d.allocator),
             children = make([..] &Node, d.allocator)

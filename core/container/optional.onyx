@@ -39,7 +39,7 @@ use core
     from_ptr :: macro (p: &$T) -> ?T {
         p_ := p;
         if p_ do return *p_;
-        return .{ None = .{} };
+        return .None;
     }
 
     #doc """
@@ -53,7 +53,7 @@ use core
 
     #doc "Clears the value in the Optional, zeroing the memory of the value."
     reset :: (o: &?$T) {
-        *o = .{ None = .{} };
+        *o = .None;
     }
 
     #doc "Sets the value in the Optional."
@@ -65,7 +65,7 @@ use core
     and_then :: (o: ?$T, transform: (T) -> ?$R) -> ?R {
         return switch o {
             case v: .Some => transform(v);
-            case #default => .{ None = .{} };
+            case #default => .None;
         };
     }
 
@@ -73,7 +73,7 @@ use core
     transform :: (o: ?$T, transform: (T) -> $R) -> ?R {
         switch o {
             case v: .Some do return .{ Some = transform(v) };
-            case #default do return .{ None = .{} };
+            case #default do return .None;
         }
     }
 

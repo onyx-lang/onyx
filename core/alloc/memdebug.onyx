@@ -58,8 +58,8 @@ make :: (a: Allocator, listen_addr: &net.SocketAddress) -> MemDebugState {
     return .{
         a,
         *listen_addr,
-        .{ None = .{} },
-        .{ None = .{} }
+        .None,
+        .None
     };
 }
 

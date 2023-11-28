@@ -6,7 +6,7 @@ use core.os
 __futex_wait :: (addr: rawptr, expected: i32, timeout: i32) -> i32 {
     tm: wasi.OptionTimestamp;
     if timeout < 0 {
-        tm = .{ None = .{} };
+        tm = .None;
     } else {
         tm = .{ Some = ~~timeout };
     }

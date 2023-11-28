@@ -414,7 +414,7 @@ parse_matcher :: (p: &QueryParser) -> ? &Matcher {
             m.details << .{
                 accessor = .{ Scope = .{} },
                 op = .Equal,
-                value = .{ None = .{} },
+                value = .None,
             };
 
         } else {
@@ -437,7 +437,7 @@ parse_matcher :: (p: &QueryParser) -> ? &Matcher {
             m.details << .{
                 accessor = .{ Node = .{} },
                 op = .Equal,
-                value = .{ None = .{} },
+                value = .None,
             };
             continue;
         }

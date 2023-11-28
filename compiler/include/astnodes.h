@@ -2037,6 +2037,7 @@ AstNode*          make_symbol(bh_allocator a, OnyxToken* sym);
 AstUnaryOp*       make_cast(bh_allocator a, AstTyped* expr, Type* to);
 AstZeroValue*     make_zero_value(bh_allocator a, OnyxToken *token, Type* type);
 AstStructLiteral* make_optional_literal_some(bh_allocator a, AstTyped *expr, Type* opt_type);
+AstStructLiteral* make_union_variant_of_void(bh_allocator a, Type* union_type, OnyxToken* token, UnionVariant* variant);
 
 void arguments_initialize(Arguments* args);
 b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg, b32 insert_zero_values);
