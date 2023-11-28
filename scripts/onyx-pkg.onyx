@@ -31,7 +31,7 @@ Template_Directory :: () -> str {
             |> string.alloc_copy();
 }
 
-Version :: SemVer.{0, 1, 1}
+Version :: SemVer.{0, 1, 8}
 
 
 
@@ -1095,6 +1095,7 @@ Config :: struct {
     package_url: str;
     package_author: str;
     package_version: SemVer;
+    package_license: str;
 
     dependency_source_path: str;
     dependency_binary_path: str;
@@ -1162,6 +1163,7 @@ load_config :: (path: str) -> ? Config {
         load_string(pack, "author", &c.package_author);
         load_string(pack, "description", &c.package_description);
         load_string(pack, "url", &c.package_url);
+        load_string(pack, "license", &c.package_license);
 
         version: str;
         load_string(pack, "version", &version);
@@ -1255,6 +1257,9 @@ store_config :: (path: str) -> bool {
 
         version_node := doc->create_node("version");
         version_node->add_value(.{ String = tprintf("{}", config.package_version) });
+
+        license_node := doc->create_node("license");
+        license_node->add_value(.{ String = config.package_license });
 
         array.concat(&package_node.children, .[
             name_node, author_node, url_node, description_node, version_node

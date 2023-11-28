@@ -22,6 +22,8 @@ Additions:
 Removals:
 
 Changes:
+- Simplified using union variants of type `void`.
+    - Now instead of `.{ Foo = .{} }`, use `.Foo` instead.
 - Renamed `--no-std` flag to `--no-core`, since Onyx does not call its standard
   library "std", the name did not make any sense.
 - `net.make_ipv4_address` now has a reasonable definition using a string for the IP,
