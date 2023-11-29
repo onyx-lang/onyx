@@ -241,6 +241,24 @@ jobs:
           asset_path: artifacts/onyx-darwin-none-arm64/onyx.tar.gz
           asset_name: onyx-darwin-none-arm64.tar.gz
           asset_content_type: application/gzip
+      - name: Upload Release Asset MacOS AMD64 (Wasmser)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/onyx-darwin-wasmer-amd64/onyx.tar.gz
+          asset_name: onyx-darwin-wasmer-amd64.tar.gz
+          asset_content_type: application/gzip
+      - name: Upload Release Asset MacOS ARM64 (Wasmer)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/onyx-darwin-wasmer-arm64/onyx.tar.gz
+          asset_name: onyx-darwin-wasmer-arm64.tar.gz
+          asset_content_type: application/gzip
       - name: Upload Release Asset Window X64
         uses: actions/upload-release-asset@v1
         env:
