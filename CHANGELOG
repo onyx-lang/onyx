@@ -18,6 +18,11 @@ Additions:
     - Supported on WASIX and Onyx runtime
 - `os.getcwd` for getting the current directory
     - Supported on WASIX and Onyx runtime
+- Basic build configurations into package manager.
+    - Configure sources files, runtime, target file,
+      included files, and CLI arguments
+    - Multiple configurations per project.
+    - Build with 'onyx package build <config_name>'
 
 Removals:
 
