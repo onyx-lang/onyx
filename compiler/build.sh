@@ -31,6 +31,11 @@ if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
             LIBS="$(wasmer config --libdir)/libwasmer.a $LIBS"
             ;;
 
+        # Used by MacOS ARM64 cross compilation
+        wasmer-custom)
+            LIBS="$WASMER_LIB_PATH/libwasmer.a $LIBS"
+            ;;
+
         *)
             echo "Unknown WebAssembly runtime '$ONYX_RUNTIME_LIBRARY'. Aborting.";
             exit 1

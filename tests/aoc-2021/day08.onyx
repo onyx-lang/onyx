@@ -1,5 +1,5 @@
 PART :: 2
-#load "core/std"
+#load "core/module"
 
 use core {*}
 

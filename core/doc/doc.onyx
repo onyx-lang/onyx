@@ -54,6 +54,8 @@ Doc_Package :: struct {
 
     parent: Id;
     subpackages: [] Id;
+
+    notes: [] str;
 }
 
 Doc_Entity :: struct {

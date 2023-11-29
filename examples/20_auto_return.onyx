@@ -42,6 +42,6 @@ main :: (args: [] cstr) {
     println(arr);
 }
 
-#load "core/std"
+#load "core/module"
 use core {*}
 

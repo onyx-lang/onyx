@@ -14,7 +14,7 @@
 // most cases, but can easily break and require you to write the code without it. This
 // is being address and hopefully in the next couple months it will be much more robust.
 
-#load "core/std"
+#load "core/module"
 
 use core {*}
 
@@ -23,8 +23,8 @@ main :: (args: [] cstr) {
 
     {
         // You can 'use' a package. You hopefully already knew this.
-        // This brings in all the symbols from the core.alloc package into
-        // this scope.
+        // This allows you to use the 'core.alloc' package in this scope
+        // under the name 'alloc'.
         use core.alloc
 
         // You can also restrict and partially rename the symbols that collide
@@ -32,11 +32,8 @@ main :: (args: [] cstr) {
     }
 
     {
-        // You can also 'use' a package that is a subpackage of another package. Here, 'string'
-        // is a subpackage of 'core' and the above 'use core' makes this package
-        // available for you to write code like 'string.equal(...)'. However, because it is
-        // a namespace, you can 'use' it.
-        use core.string
+        // You can use everything inside of a package using a '*' between the include list.
+        use core.string {*}
 
         s := "   Some string ...";
         t := strip_leading_whitespace(s); // This would have to be 'string.strip_leading_whitespace' otherwise.
@@ -68,30 +65,6 @@ main :: (args: [] cstr) {
         }
     }
     
-    {
-        // You can 'use' an enum. This is great if you have a burried enum in some other namespace
-        // and want to do a switch over that enum.
-
-        Player :: struct {
-            Color :: enum {
-                Undefined;
-                Red; Green; Blue;
-            }
-
-            color := Color.Red;
-        }
-
-        value := Player.{};
-
-        use Player.Color;
-        switch value.color {
-            case Red      do println("The color is red!");
-            case Green    do println("The color is green!");
-            case Blue     do println("The color is blue!");
-            case #default do println("The color is unknown...");
-        }
-    }
-
     {
         // You can 'use' struct members that are structures.
         // This is already explained in the struct example.

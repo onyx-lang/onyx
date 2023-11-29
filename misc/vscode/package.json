@@ -1,9 +1,9 @@
 {
-    "name": "onyx",
-    "displayName": "Onyx",
+    "name": "onyxlang",
+    "displayName": "Onyx Programming Language",
     "description": "Onyx syntax highlighting and debugger support.",
     "version": "0.1.8",
-    "publisher": "brendanfh",
+    "publisher": "onyxlang",
     "license": "BSD-2-Clause",
     "engines": {
         "vscode": "^1.75.0"

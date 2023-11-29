@@ -1,3 +1,45 @@
+Release v0.1.8
+--------------
+Unreleased
+
+Additions:
+- MacOS compatibility
+    - Using Wasmer runtime, MacOS on ARM and AMD64 are supported.
+- Memory debugger
+    - A custom allocator that intercepts allocations and frees and reports them
+      to a client for visualizations and debugging.
+- New installation script
+    - sh <(curl https://get.onyxlang.io -sSfL)
+    - Works on Linux and MacOS
+- KDL document parsing support
+    - Used as the new format for the package manager.
+    - See https://kdl.dev for details
+- `os.chdir` for changing the current directory
+    - Supported on WASIX and Onyx runtime
+- `os.getcwd` for getting the current directory
+    - Supported on WASIX and Onyx runtime
+- Basic build configurations into package manager.
+    - Configure sources files, runtime, target file,
+      included files, and CLI arguments
+    - Multiple configurations per project.
+    - Build with 'onyx package build <config_name>'
+
+Removals:
+
+Changes:
+- Simplified using union variants of type `void`.
+    - Now instead of `.{ Foo = .{} }`, use `.Foo` instead.
+- Renamed `--no-std` flag to `--no-core`, since Onyx does not call its standard
+  library "std", the name did not make any sense.
+- `net.make_ipv4_address` now has a reasonable definition using a string for the IP,
+  instead of an integer.
+
+Bugfixes:
+- Formatting of days and months were incorrect `time.strftime`.
+- Infinite loop in TCP server when a client disconnects.
+
+
+
 Release v0.1.7
 --------------
 October 25th, 2023

@@ -5,7 +5,7 @@
 // 'structs' in Onyx are very similar to structs in C and C++, with a couple
 // of additional capabilities to make using them even easier.
 
-#load "core/std"
+#load "core/module"
 
 use core {*}
 

@@ -1,6 +1,10 @@
 #ifndef ONYXASTNODES_H
 #define ONYXASTNODES_H
 
+#define VERSION_MAJOR 0
+#define VERSION_MINOR 1
+#define VERSION_PATCH 8
+
 #include "stb_ds.h"
 #include "lex.h"
 #include "types.h"
@@ -1735,6 +1739,9 @@ struct Package {
     // 'use package' statements have to be reevaluated to pull in the new symbols.
     bh_arr(Entity *) use_package_entities;
 
+    // NOTE: This tracks all #package_doc statements used for this package.
+    bh_arr(OnyxToken *) doc_strings;
+
     // NOTE: These are entities that are stored in packages marked with `#allow_stale_code`.
     // These entities are flushed to the entity heap when the package has been explicit used
     // somewhere.
@@ -1815,7 +1822,7 @@ struct CompileOptions {
     b32 use_multi_threading   : 1;
     b32 generate_foreign_info : 1;
     b32 generate_type_info    : 1;
-    b32 no_std                : 1;
+    b32 no_core               : 1;
     b32 no_stale_code         : 1;
     b32 show_all_errors       : 1;
 
@@ -2030,6 +2037,7 @@ AstNode*          make_symbol(bh_allocator a, OnyxToken* sym);
 AstUnaryOp*       make_cast(bh_allocator a, AstTyped* expr, Type* to);
 AstZeroValue*     make_zero_value(bh_allocator a, OnyxToken *token, Type* type);
 AstStructLiteral* make_optional_literal_some(bh_allocator a, AstTyped *expr, Type* opt_type);
+AstStructLiteral* make_union_variant_of_void(bh_allocator a, Type* union_type, OnyxToken* token, UnionVariant* variant);
 
 void arguments_initialize(Arguments* args);
 b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg, b32 insert_zero_values);

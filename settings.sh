@@ -1,4 +1,7 @@
 
+# Where Onyx will be installed from the "./build.sh install" command.
+export ONYX_INSTALL_DIR="$HOME/.onyx"
+
 # The compiler to use. Only GCC and TCC have been tested.
 export ONYX_CC='gcc'
 

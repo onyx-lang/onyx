@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # This install script is intended to download and install the latest available
-# release of Wasmer.
+# release of Onyx.
 # It attempts to identify the current platform and an error will be thrown if
 # the platform is not supported.
 #
@@ -148,7 +148,7 @@ onyx_link() {
   else
     printf "Updating bash profile $ONYX_PROFILE\n"
     if ! grep -q 'ONYX_PATH' "$ONYX_PROFILE"; then
-      command printf "$SOURCE_STR" >>"$WASMER_PROFILE"
+      command printf "$SOURCE_STR" >>"$ONYX_PROFILE"
       if [ "$ONYX_INSTALL_LOG" = "$ONYX_VERBOSE" ]; then
         printf "we've added the following to your $ONYX_PROFILE\n"
         echo "If you have a different profile please add the following:"
@@ -208,7 +208,7 @@ initOS() {
 initRuntime() {
     printf "${green}Please choose a WebAssembly runtime to use with your Onyx installation.\n${reset}"
 
-    echo "1) Wasmer: An industry standard WebAssembly runtime. Very fast."
+    echo "1) Wasmer: An industry standard WebAssembly runtime. Very fast. (default)"
     echo "2) OVM: A custom, lightweight runtime made for Onyx. Supports debugging. Slower than Wasmer."
     echo "3) None: Omit using a runtime and only use Onyx as a compiler to WebAssembly."
 
@@ -218,7 +218,7 @@ initRuntime() {
         1) RUNTIME="wasmer"; break ;; 
         2) RUNTIME="ovm"; break ;; 
         3) RUNTIME="none"; break ;; 
-        *) echo "Invalid choice. Quitting."; exit 1 ;;
+        *) echo "Invalid choice. Defaulting to 'wasmer'."; RUNTIME="wasmer" ;;
     esac
 }
 
@@ -368,7 +368,7 @@ onyx_download() {
        ;;
      1)
        onyx_warning "The selected version (${ONYX_RELEASE_TAG}) is lower than current installed version ($ONYX_VERSION)"
-       printf "Do you want to continue installing Wasmer $ONYX_RELEASE_TAG?"
+       printf "Do you want to continue installing Onyx $ONYX_RELEASE_TAG?"
        onyx_verify_or_quit || return 1
        ;;
      -1) ;;
@@ -390,7 +390,7 @@ onyx_download() {
 
   mkdir -p $INSTALL_DIRECTORY
 
-  # Untar the wasmer contents in the install directory
+  # Untar the Onyx contents in the install directory
   tar -C $INSTALL_DIRECTORY -zxf $DOWNLOAD_FILE
 
   # Make the executable executable

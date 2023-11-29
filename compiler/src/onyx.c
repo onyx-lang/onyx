@@ -19,7 +19,10 @@ extern struct bh_allocator global_heap_allocator;
 #include "wasm_emit.h"
 #include "doc.h"
 
-#define VERSION "v0.1.8"
+
+#define VERSION__(m,i,p) "v" #m "." #i "." #p
+#define VERSION_(m,i,p) VERSION__(m,i,p)
+#define VERSION VERSION_(VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH)
 
 #ifdef ONYX_RUNTIME_LIBRARY
     #define ONYX_RUNTIME_LIBRARY_MAPPED ONYX_RUNTIME_LIBRARY
@@ -84,7 +87,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     "\t--syminfo <target_file> (DEPRECATED) Generates a symbol resolution information file. Used by onyx-lsp.\n"
     "\t--lspinfo <target_file> Generates an LSP information file. Used by onyx-lsp.\n"
     "\t--stack-trace           Enable dynamic stack trace.\n"
-    "\t--no-std                Disable automatically including \"core/std\".\n"
+    "\t--no-core               Disable automatically including \"core/module\".\n"
     "\t--no-stale-code         Disables use of `#allow_stale_code` directive\n"
     "\t--no-type-info          Disables generating type information\n"
     "\t--generate-foreign-info Generate information for foreign blocks. Rarely needed, so disabled by default.\n"
@@ -113,7 +116,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .use_multi_threading     = 0,
         .generate_foreign_info   = 0,
         .generate_type_info      = 1,
-        .no_std                  = 0,
+        .no_core                 = 0,
         .no_stale_code           = 0,
         .show_all_errors         = 0,
 
@@ -262,8 +265,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             else if (!strcmp(argv[i], "--no-type-info")) {
                 options.generate_type_info = 0;
             }
-            else if (!strcmp(argv[i], "--no-std")) {
-                options.no_std = 1;
+            else if (!strcmp(argv[i], "--no-core")) {
+                options.no_core = 1;
             }
             else if (!strcmp(argv[i], "--no-stale-code")) {
                 options.no_stale_code = 1;
@@ -546,12 +549,12 @@ static void context_init(CompileOptions* opts) {
         add_entities_for_node(NULL, (AstNode *) load_node, context.global_scope, NULL);
     }
 
-    if (!context.options->no_std) {
+    if (!context.options->no_core) {
         entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context.ast_alloc, "core/std"),
+            .include = create_load(context.ast_alloc, "core/module"),
         }));
     }
 

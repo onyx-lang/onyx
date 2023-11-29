@@ -611,6 +611,17 @@ void introduce_build_options(bh_allocator a) {
     stack_trace->type_node = (AstType *) &basic_type_bool;
     symbol_builtin_introduce(p->scope, "Stack_Trace_Enabled", (AstNode *) stack_trace);
 
+    AstNumLit* version_major = make_int_literal(a, VERSION_MAJOR);
+    version_major->type_node = (AstType *) &basic_type_i32;
+    AstNumLit* version_minor = make_int_literal(a, VERSION_MINOR);
+    version_minor->type_node = (AstType *) &basic_type_i32;
+    AstNumLit* version_patch = make_int_literal(a, VERSION_PATCH);
+    version_patch->type_node = (AstType *) &basic_type_i32;
+    symbol_builtin_introduce(p->scope, "onyx_version_major", (AstNode *) version_major);
+    symbol_builtin_introduce(p->scope, "onyx_version_minor", (AstNode *) version_minor);
+    symbol_builtin_introduce(p->scope, "onyx_version_patch", (AstNode *) version_patch);
+
+
     i32 os;
     #ifdef _BH_LINUX
         os = 1;
@@ -658,6 +669,5 @@ void introduce_build_options(bh_allocator a) {
         foreign_info->type_node = (AstType *) &basic_type_bool;
         symbol_builtin_introduce(p->scope, "Generated_Foreign_Info", (AstNode *) foreign_info);
     }
-
 }
 

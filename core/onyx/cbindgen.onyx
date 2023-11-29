@@ -8,7 +8,6 @@ package cbindgen
 // 3. Run the build file with the --generate-foreign-info flag enabled.
 //
 // Full example:
-// #load "core/std"
 // #load "./module"
 //
 // use core {*}
@@ -42,9 +41,16 @@ package cbindgen
 
 use runtime
 
+#doc "Deprecated. Use `link_name`."
 customize :: struct {
     symbol_name: str;
 }
+
+link_name :: customize
+func_body :: struct {
+    body: str;
+}
+last_arg_is_return_value :: #distinct void
 
 #if #defined (runtime.Generated_Foreign_Info) {
 
@@ -134,7 +140,9 @@ compile_c_file :: (
     path: str, dest: str,
     includes: [] str = .[],
     libraries: [] str = .[],
-    flags := "") -> bool {
+    flags := "",
+    other_sources: [] str = .[]
+) -> bool {
     #if runtime.compiler_os == .Linux || runtime.compiler_os == .MacOS {
         args: [..] str;
         args << "-shared";
@@ -160,6 +168,10 @@ compile_c_file :: (
 
         args << "-o";
         args << tprintf("{}.{}", dest, Library_Suffix);
+
+        for other_sources {
+            args << it;
+        }
 
         for libraries {
             args << aprintf("-l{}", it);
@@ -232,7 +244,26 @@ compile_c_file :: (
             method_name = name_map(method_name);
         }
 
-        print_body(writer, method_name, method_info, cast_map);
+        switch slice.find_opt(ff.tags, [it](it.type == func_body))
+                   ->transform(x => misc.any_as(x, func_body).body)
+        {
+            case body: .Some {
+                io.write(writer, body);
+                io.write(writer, "    return NULL;");
+            }
+
+            case .None {
+                print_body(
+                    writer, method_name, method_info, cast_map,
+                    slice.some(ff.tags, [it](
+                        misc.any_as(*it, type_expr)
+                        |> Optional.from_ptr()
+                        |> Optional.transform(x => x == last_arg_is_return_value)
+                        |> Optional.value_or(false)
+                    ))
+                );
+            }
+        }
 
         io.write(writer, "}\n\n");
     }
@@ -247,14 +278,19 @@ compile_c_file :: (
         io.write(writer, "};");
     }
 
-    print_body :: (writer, method_name, method_info, cast_map) => {
+    print_body :: (writer, method_name, method_info, cast_map, last_arg_is_return_value) => {
         use runtime.info {*};
         callw, call := io.string_builder();
         defer io.buffer_stream_free(call);
         defer cfree(call);
 
+        params := method_info.parameter_types;
+        if last_arg_is_return_value {
+            params = params[0 .. params.length - 1];
+        }
+
         param_num := 0;
-        for method_info.parameter_types {
+        for params {
             it_info := it->info();
 
             if it_info.kind == .Slice {
@@ -309,6 +345,14 @@ compile_c_file :: (
                     }
                 }
 
+            } elseif it_info.kind == .Struct && it_info->as_struct().constructed_from != cptr {
+                param_type := it;
+                name := slice.find_opt(cast_map, [x](x.type == param_type))
+                    ->expect(tprintf("Structures used as parameter arguments MUST have a definition in the 'cast_map' in '{}'.", method_name))
+                    .name;
+
+                io.write_format(&callw, "*({} *) ONYX_PTR(P({}, i32))", name, param_num); // This is dependent on the pointer size
+
             } else {
                 matched := false;
                 for& m: cast_map {
@@ -319,7 +363,9 @@ compile_c_file :: (
                     }
                 }
                 
-                if !matched do io.write_format(&callw, "P({}, {})", param_num, type_to_wasm_type(it));
+                if !matched {
+                    io.write_format(&callw, "P({}, {})", param_num, type_to_wasm_type(it));
+                }
             }
 
             io.write_format(&callw, ", ");
@@ -327,17 +373,33 @@ compile_c_file :: (
         }
 
         call_str := io.buffer_stream_to_str(call);
-        wasm_return_type := type_to_wasm_type(method_info.return_type, for_return=true);
-        switch wasm_return_type {
-            case ""    do io.write_format(writer,  "    {}({});\n", method_name, call_str[0..call_str.count-2]);
-            case "i32" do io.write_format(writer,  "    results->data[0] = WASM_I32_VAL({}({}));\n", method_name, call_str[0..call_str.count-2]);
-            case "i64" do io.write_format(writer,  "    results->data[0] = WASM_I64_VAL({}({}));\n", method_name, call_str[0..call_str.count-2]);
-            case "f32" do io.write_format(writer,  "    results->data[0] = WASM_F32_VAL({}({}));\n", method_name, call_str[0..call_str.count-2]);
-            case "f64" do io.write_format(writer,  "    results->data[0] = WASM_F64_VAL({}({}));\n", method_name, call_str[0..call_str.count-2]);
-            case "cptr" do io.write_format(writer, "    results->data[0] = WASM_I64_VAL((int64_t) {}({}));\n", method_name, call_str[0..call_str.count-2]);
-            case "ptr" {
-                printf("Returning a pointer-like object from C to Onyx in '{}'.\nWhile this is not an error, be careful with what you are doing, as this pointer MUST be allocated in Onyx's memory space, not in external memory. Use cptr(...) if the memory lives elsewhere.\n\n", method_name);
-                io.write_format(writer,  "    int out = ONYX_UNPTR({}({}));\n    results->data[0] = WASM_I32_VAL(out);\n", method_name, call_str[0..call_str.count-2]);
+        call_str  = call_str[0 .. call_str.count - 2];
+        if last_arg_is_return_value {
+            return_type := slice.get(method_info.parameter_types, -1);
+            if return_type->info().kind != .Pointer {
+                assert(false, tprintf("last_arg_is_return_value requires last parameter to be a pointer. ({} in {})", method_info.parameter_types, method_name));
+            }
+
+            return_type = return_type->info()->as_pointer().to;
+            type_name := slice.find_opt(cast_map, [x](x.type == return_type))
+                ->expect(tprintf("Types used as last argument return values MUST have a definition in the 'cast_map' in '{}'.", method_name))
+                .name;
+
+            io.write_format(writer, "    *({} *) ONYX_PTR(P({}, i32)) = {}({});\n", type_name, param_num, method_name, call_str);
+            
+        } else {
+            wasm_return_type := type_to_wasm_type(method_info.return_type, for_return=true);
+            switch wasm_return_type {
+                case ""    do io.write_format(writer,  "    {}({});\n", method_name, call_str);
+                case "i32" do io.write_format(writer,  "    results->data[0] = WASM_I32_VAL({}({}));\n", method_name, call_str);
+                case "i64" do io.write_format(writer,  "    results->data[0] = WASM_I64_VAL({}({}));\n", method_name, call_str);
+                case "f32" do io.write_format(writer,  "    results->data[0] = WASM_F32_VAL({}({}));\n", method_name, call_str);
+                case "f64" do io.write_format(writer,  "    results->data[0] = WASM_F64_VAL({}({}));\n", method_name, call_str);
+                case "cptr" do io.write_format(writer, "    results->data[0] = WASM_I64_VAL((int64_t) {}({}));\n", method_name, call_str);
+                case "ptr" {
+                    printf("Returning a pointer-like object from C to Onyx in '{}'.\nWhile this is not an error, be careful with what you are doing, as this pointer MUST be allocated in Onyx's memory space, not in external memory. Use cptr(...) if the memory lives elsewhere.\n\n", method_name);
+                    io.write_format(writer,  "    int out = ONYX_UNPTR({}({}));\n    results->data[0] = WASM_I32_VAL(out);\n", method_name, call_str);
+                }
             }
         }
 
@@ -441,7 +503,8 @@ compile_c_file :: (
                     return type_encoding(s_info.members[0].type);
                 }
 
-                assert(false, "Passing structures between wasm and c is not yet supported.");
+                // assert(false, "Passing structures between wasm and c is not yet supported.");
+                return "WASM_I32";
             }
         }
 

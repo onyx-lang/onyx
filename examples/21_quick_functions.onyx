@@ -44,5 +44,5 @@ main :: (args) => {
     println(val);
 }
 
-#load "core/std"
+#load "core/module"
 use core {*}

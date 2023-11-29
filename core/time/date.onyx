@@ -88,6 +88,22 @@ Date :: struct {
         return dig % 7;
     }
 
+    start_of_month :: (d: Date) -> Date {
+        return .{
+            year = d.year,
+            month = d.month,
+            day = 1,
+        };
+    }
+
+    end_of_month :: (d: Date) -> Date {
+        return .{
+            year = d.year,
+            month = d.month,
+            day = Date.month_durations[d.month],
+        };
+    }
+
     is_before :: (d1, d2: Date) -> bool {
         if d1.year  != d2.year  do return d1.year  < d2.year;
         if d1.month != d2.month do return d1.month < d2.month;

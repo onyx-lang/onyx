@@ -4057,6 +4057,12 @@ void onyx_parse(OnyxParser *parser) {
         bh_arr_push(parser->alternate_entity_placement_stack, &parser->package->buffered_entities);
     }
 
+    while (parse_possible_directive(parser, "package_doc")) {
+        OnyxToken *doc_string = expect_token(parser, Token_Type_Literal_String);
+
+        bh_arr_push(parser->package->doc_strings, doc_string);
+    }
+
     parse_top_level_statements_until(parser, Token_Type_End_Stream);
 
     parser->current_scope = parser->current_scope->parent;

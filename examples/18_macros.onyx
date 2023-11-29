@@ -73,10 +73,10 @@ main :: (args: [] cstr) {
 
     // A powerful feature of Onyx that enables macros to be very useful is code blocks.
     // Code blocks allow you to capture code and treat it as a compile-time object that can
-    // be passed around. To create a code blocks, simply put '#quote' in front of the block
+    // be passed around. To create a code blocks, simply put '[]' in front of the block
     // of code you want to capture. Notice that this uses '::' because this is a compile-time
     // value.
-    simple_code :: #quote {
+    simple_code :: [] {
         println("This is a code block!");
     }
 
@@ -134,5 +134,5 @@ main :: (args: [] cstr) {
     //     }
 }
 
-#load "core/std"
+#load "core/module"
 use core {*}

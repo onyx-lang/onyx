@@ -1,4 +1,4 @@
-#load "core/std"
+#load "core/module"
 
 use core
 use core.io

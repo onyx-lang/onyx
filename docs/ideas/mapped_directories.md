@@ -13,7 +13,7 @@ scheme for file resolution, UNLESS you specify the full path,
 or a *mapped directory* to use as the base directory.
 
 For example, instead of relying on "/usr/share/onyx" to be in
-the search path to make "core/std" work, we would instead have
+the search path to make "core/module" work, we would instead have
 "core" be a mapped directory to "/usr/share/onyx/core". Then,
-you would say, `#load "core:std"` or `#load core "std"` to
+you would say, `#load "core:module"` or `#load core "module"` to
 specify the base path.

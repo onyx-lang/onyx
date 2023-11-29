@@ -1,7 +1,6 @@
 #!/bin/sh
 
 DIST_DIR="./dist"
-ONYX_INSTALL_DIR="$HOME/.onyx"
 
 compile_all() {
     if [ "$ONYX_RUNTIME_LIBRARY" = "ovmwasm" ]; then
@@ -43,7 +42,14 @@ package_all() {
     mkdir -p "$DIST_DIR/lib"
     mkdir -p "$DIST_DIR/include"
 
-    [ -f runtime/onyx_runtime.so ] && cp runtime/onyx_runtime.so "$DIST_DIR/lib/"
+    case "$(uname)" in
+        Linux)  suffix='so' ;;
+        *BSD)   suffix='so' ;;
+        Darwin) suffix='dylib' ;;
+        *)      suffix='dll' ;;
+    esac
+
+    [ -f runtime/onyx_runtime.$suffix ] && cp runtime/onyx_runtime.$suffix "$DIST_DIR/lib/"
     cp "shared/include/onyx_library.h" "$DIST_DIR/include/onyx_library.h"
     cp "shared/include/wasm.h" "$DIST_DIR/include/wasm.h"
 
@@ -63,11 +69,18 @@ package_all() {
 compress_all() {
     package_all
 
-    tar -C dist -zcvf onyx.tar.gz bin core examples include lib misc tests tools LICENSE
+    # Sign the binaries on MacOS
+    [ "$(uname)" = 'Darwin' ] && \
+        codesign -s - "$DIST_DIR/bin/onyx" && \
+        codesign -s - "$DIST_DIR/lib/onyx_runtime.dylib"
+
+    tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples include lib misc tests tools LICENSE
     mv onyx.tar.gz dist/
 }
 
 install_all() {
+    [ -z ${ONYX_INSTALL_DIR+x} ] && echo "Please set ONYX_INSTALL_DIR to install Onyx." && exit 1
+
     package_all
 
     echo "Installing to $ONYX_INSTALL_DIR"
@@ -83,6 +96,7 @@ install_all() {
 for arg in $@; do
     case "$arg" in
         compile) compile_all ;;
+        debug) compile_all debug ;;
         package) package_all ;;
         compress) compress_all ;;
         install) install_all ;;

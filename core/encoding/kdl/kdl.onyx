@@ -1,0 +1,145 @@
+package core.encoding.kdl
+#allow_stale_code
+
+#load "./parser"
+#load "./encoder"
+#load "./utils"
+#load "./kql"
+
+use core {Result, io, string}
+
+//
+// Cuddly Document Language (KDL)
+// https://kdl.dev
+//
+
+
+Document :: struct {
+    allocator: Allocator;
+    nodes: [..] &Node;
+}
+
+Node :: struct {
+    node: str;
+    type_annotation: ? str;
+    values: [..] Value;
+    props: Map(str, Value);
+    children: [..] &Node;
+}
+
+Value :: struct {
+    data: Value_Data;
+    type_annotation: ? str;
+
+    Value_Data :: union {
+        String: str;
+        Number: KDL_Number;
+        Boolean: bool;
+        Null: void;
+    }
+}
+
+KDL_Number :: union {
+    Integer: i64;
+    Float: f64;
+    String: str;
+}
+
+#doc """
+    Creates a new KDL document, using the allocator provided.
+"""
+new_doc :: (allocator := context.allocator) -> Document {
+    doc: Document;
+    doc.allocator = allocator;
+    doc.nodes = make([..] &Node, allocator);
+    return doc;
+}
+
+
+#doc """
+    Parses a string or `io.Reader` into a KDL document, using the allocator provided for internal allocations.
+
+    Call `core.encoding.kdl.free` to free the returned document.
+"""
+parse :: #match #local -> Result(Document, Parse_Error) {}
+
+#overload
+parse :: (s: str, allocator := context.allocator) -> Result(Document, Parse_Error) {
+    doc: Document;
+    doc.allocator = allocator;
+
+    parser := Parser.make(s);
+    error  := parser->parse(&doc);
+
+    if error.None {
+        return .{ Ok = doc };
+    } else {
+        return .{ Err = error };
+    }
+}
+
+#overload
+parse :: (r: &io.Reader, allocator := context.allocator) -> Result(Document, Parse_Error) {
+    doc: Document;
+    doc.allocator = allocator;
+
+    parser := Parser.make(r);
+    error  := parser->parse(&doc);
+
+    if error.None {
+        return .{ Ok = doc };
+    } else {
+        return .{ Err = error };
+    }
+}
+
+#overload
+builtin.delete :: free
+
+#doc """
+    Releases all resources allocated for the document.
+"""
+free :: (d: Document) {
+    for d.nodes do free_node(d.allocator, it);
+    delete(&d.nodes);
+}
+
+#local
+free_node :: (al: Allocator, n: &Node) {
+    string.free(n.node, al);
+    n.type_annotation->with([t] { string.free(t, al); });
+
+    for& v: n.values do free_value(al, v);
+    delete(&n.values); // This should use the allocator inside of the array
+
+    for n.props->as_iter() {
+        string.free(it.key, al);
+        free_value(al, &it.value);
+    }
+    delete(&n.props);
+
+    for n.children do free_node(al, it);
+}
+
+#local
+free_value :: (al: Allocator, v: &Value) {
+    v.type_annotation->with([t] { string.free(t, al); });
+
+    switch v.data {
+        case s: .String {
+            string.free(s, al);
+        }
+
+        case num: .Number do switch num {
+            case s: .String {
+                string.free(s, al);
+            } 
+
+            case #default ---
+        }
+
+        case #default ---
+    }
+}
+
+

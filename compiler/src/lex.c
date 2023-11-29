@@ -90,7 +90,7 @@ static const char* token_type_names[] = {
         (tkn)->line_number++; \
         (tkn)->line_start = (tkn)->curr + 1; \
     } \
-    (tkn)->curr++; \
+    if ((tkn)->curr != (tkn)->end) (tkn)->curr++; \
 }
 #endif
 
@@ -239,7 +239,7 @@ whitespace_skipped:
         INCREMENT_CURR_TOKEN(tokenizer);
         INCREMENT_CURR_TOKEN(tokenizer);
 
-        while (!(*tokenizer->curr == '"' && *(tokenizer->curr + 1) == '"' && *(tokenizer->curr + 2) == '"')) {
+        while (!(*tokenizer->curr == '"' && *(tokenizer->curr + 1) == '"' && *(tokenizer->curr + 2) == '"') && tokenizer->curr != tokenizer->end) {
             len++;
             INCREMENT_CURR_TOKEN(tokenizer);
         }
@@ -262,7 +262,7 @@ whitespace_skipped:
         char ch = *tk.text;
         INCREMENT_CURR_TOKEN(tokenizer);
 
-        while (!(*tokenizer->curr == ch && slash_count == 0)) {
+        while (tokenizer->curr != tokenizer->end && !(*tokenizer->curr == ch && slash_count == 0)) {
             len++;
 
             if (*tokenizer->curr == '\n' && ch == '\'') {
@@ -279,6 +279,10 @@ whitespace_skipped:
             }
 
             INCREMENT_CURR_TOKEN(tokenizer);
+            if (tokenizer->curr == tokenizer->end) {
+                onyx_report_error(tk.pos, Error_Critical, "String literal not closed. String literal starts here.");
+                break;
+            }
         }
 
         INCREMENT_CURR_TOKEN(tokenizer);

@@ -69,6 +69,8 @@ ONYX_LIBRARY {
     ONYX_FUNC(__dir_close)
     ONYX_FUNC(__dir_create)
     ONYX_FUNC(__dir_remove)
+    ONYX_FUNC(__dir_cwd)
+    ONYX_FUNC(__dir_chdir)
 
     ONYX_FUNC(__spawn_thread)
     ONYX_FUNC(__kill_thread)

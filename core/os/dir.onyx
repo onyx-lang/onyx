@@ -39,6 +39,9 @@ dir_exists :: fs.__file_exists
 dir_remove :: fs.__dir_remove
 dir_rename :: fs.__file_rename
 
+chdir  :: fs.__chdir
+getcwd :: fs.__getcwd
+
 list_directory :: (path: str) -> Iterator(DirectoryEntry) {
     Context :: struct {
         dir: Directory;

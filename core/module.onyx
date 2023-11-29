@@ -64,6 +64,7 @@ use runtime
 #load "./encoding/utf8"
 #load "./encoding/osad"
 #load_all "./encoding/json"
+#load "./encoding/kdl/kdl"
 
 #load "./runtime/common"
 

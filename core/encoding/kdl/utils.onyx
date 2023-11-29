@@ -1,0 +1,61 @@
+package core.encoding.kdl
+#allow_stale_code
+
+use core {string}
+
+#inject Value {
+    as_str :: (v: Value) -> ? str {
+        return v.data.String;
+    }
+
+    as_int :: (v: Value) -> ? i64 {
+        return v.data.Number?.Integer;
+    }
+
+    as_float :: (v: Value) -> ? f64 {
+        return v.data.Number?.Float;
+    }
+
+    as_bool :: (v: Value) -> ? bool {
+        return v.data.Boolean;
+    }
+}
+
+#inject Document {
+    create_node :: (d: &Document, name: str) -> &Node {
+        return d.allocator->move(Node.{
+            node = name,
+            type_annotation = .None,
+            values = make([..] Value, d.allocator),
+            props = make(Map(str, Value), d.allocator),
+            children = make([..] &Node, d.allocator)
+        });
+    }
+}
+
+#inject Node {
+    add_value :: (n: &Node, value: Value.Value_Data) {
+        n.values << Value.{data = value};
+    }
+
+    set_prop :: (n: &Node, name: str, value: Value.Value_Data) {
+        n.props->put(
+            string.alloc_copy(name, n.props.allocator),
+            .{ data = value }
+        );
+    }
+
+    value :: (n: &Node, index := 0) -> ? Value {
+        if index >= n.values.length do return .{};
+
+        return n.values[index];
+    }
+
+    value_or_null :: (n: &Node, index := 0) -> Value {
+        if index >= n.values.length do return .{
+            data = .{ Null = .{} }
+        };
+
+        return n.values[index];
+    }
+}

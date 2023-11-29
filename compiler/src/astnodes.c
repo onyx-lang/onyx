@@ -644,6 +644,34 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     }
 
     if (node->kind == Ast_Kind_Unary_Field_Access) {
+        if (type->kind == Type_Kind_Union) {
+            token_toggle_end(node->token);
+            int index = 0;
+            if ((index = shgeti(type->Union.variants, node->token->text)) != -1) {
+                UnionVariant *uv = type->Union.variants[index].value;
+                if (uv->type != &basic_types[Basic_Kind_Void]) {
+                    if (permanent) {
+                        onyx_report_error(node->token->pos, Error_Critical,
+                            "Shorthand union literal syntax '.%s' is not all for this variant, because its type is not void; it is '%s'. Use the longer syntax, '.{ %s = value }'",
+                            node->token->text,
+                            type_get_name(uv->type),
+                            node->token->text);
+                    }
+                    token_toggle_end(node->token);
+                    return TYPE_MATCH_FAILED;
+                }
+
+                if (permanent) {
+                    AstStructLiteral *sl = make_union_variant_of_void(context.ast_alloc, type, node->token, uv);
+                    *pnode = (AstTyped *) sl;
+                }
+
+                token_toggle_end(node->token);
+                return TYPE_MATCH_SUCCESS;
+            }
+            token_toggle_end(node->token);
+        }
+
         AstType* ast_type = type->ast_type;
         AstNode* resolved = try_symbol_resolve_from_node((AstNode *) ast_type, node->token);
         if (resolved == NULL) {
@@ -743,6 +771,20 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
             if (permanent) ((AstUnaryOp *) node)->type = type;
             return TYPE_MATCH_SUCCESS;
         }
+    }
+    
+    // String literals implicitly become c-strings for convience.
+    if (node->kind == Ast_Kind_StrLit
+        && type->kind == Type_Kind_MultiPointer
+        && type->MultiPointer.elem == &basic_types[Basic_Kind_U8]) {
+
+        if (permanent) {
+            AstStrLit *strlit = (AstStrLit *) node;
+            strlit->is_cstr = 1;
+            strlit->type = type;
+        }
+
+        return TYPE_MATCH_SUCCESS;
     }
 
     // If the destination type is a slice, then automatically convert arrays, dynamic
@@ -1641,6 +1683,23 @@ AstStructLiteral* make_optional_literal_some(bh_allocator a, AstTyped *expr, Typ
     return opt_lit;
 }
 
+AstStructLiteral* make_union_variant_of_void(bh_allocator a, Type* union_type, OnyxToken* token, UnionVariant* variant) {
+    AstStructLiteral *lit = onyx_ast_node_new(a, sizeof(AstStructLiteral), Ast_Kind_Struct_Literal);
+    lit->token = token;
+
+    assert(variant->type == &basic_types[Basic_Kind_Void]);
+
+    arguments_initialize(&lit->args);
+    arguments_ensure_length(&lit->args, 2);
+    lit->args.values[0] = (AstTyped *) make_int_literal(a, variant->tag_value);
+    lit->args.values[1] = (AstTyped *) make_zero_value(a, token, variant->type);
+
+    lit->type = union_type;
+    lit->args.values[0]->type = union_type->Union.tag_type;
+
+    lit->flags |= Ast_Flag_Has_Been_Checked;
+    return lit;
+}
 
 
 void arguments_initialize(Arguments* args) {

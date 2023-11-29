@@ -131,8 +131,12 @@ ONYX_DEF(__lookup_env, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
 
 
 ONYX_DEF(__random_get, (WASM_PTR, WASM_I32), ()) {
-    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    #if defined(_BH_LINUX)
     getrandom(ONYX_PTR(params->data[0].of.i32), params->data[1].of.i32, 0);
+    #endif
+
+    #if defined(_BH_DARWIN)
+    SecRandomCopyBytes(NULL, params->data[1].of.i32, ONYX_PTR(params->data[0].of.i32));
     #endif
 
     #ifdef _BH_WINDOWS
@@ -175,6 +179,10 @@ ONYX_DEF(__futex_wait, (WASM_PTR, WASM_I32, WASM_I32), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(WaitOnAddress(addr, &params->data[1].of.i32, 4, params->data[2].of.i32));
     #endif
 
+    #ifdef _BH_DARWIN
+    results->data[0] = WASM_I32_VAL(0);
+    #endif
+
     return NULL;
 }
 
@@ -192,6 +200,10 @@ ONYX_DEF(__futex_wake, (WASM_PTR, WASM_I32), (WASM_I32)) {
         WakeByAddressSingle(addr);
     }
 
+    results->data[0] = WASM_I32_VAL(params->data[1].of.i32);
+    #endif
+
+    #ifdef _BH_DARWIN
     results->data[0] = WASM_I32_VAL(params->data[1].of.i32);
     #endif
 

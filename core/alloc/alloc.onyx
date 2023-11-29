@@ -13,6 +13,7 @@ package core.alloc
 use core.memory
 use core.intrinsics.types {type_is_function}
 
+#doc "Overloaded procedure for converting something to an Allocator."
 as_allocator :: #match {
     macro (a: Allocator) => a
 }
@@ -95,11 +96,19 @@ temp_state     : arena.ArenaState;
 #thread_local
 temp_allocator : Allocator;
 
+#doc """
+    Initializes the thread-local temporary allocator.
+
+    You do not need to call this. It is called automatically on thread initialization.
+"""
 init_temp_allocator :: () {
     temp_state = arena.make(heap_allocator, TEMPORARY_ALLOCATOR_SIZE);
     temp_allocator = as_allocator(&temp_state);
 }
 
+#doc """
+    Resets the temporary allocator, effectively freeing all allocations made in the temporary allocator.
+"""
 clear_temp_allocator :: () {
     arena.clear(&temp_state);
 }

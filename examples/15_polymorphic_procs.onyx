@@ -57,7 +57,7 @@ compose :: (a: $A, f: (A) -> $B, g: (B) -> $C) -> C {
 
 }
 
-#load "core/std"
+#load "core/module"
 
 use core {*}
 
