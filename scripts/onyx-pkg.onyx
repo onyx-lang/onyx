@@ -59,14 +59,6 @@ main :: (args: [] cstr) {
         return;
     }
 
-    if !Git.test_for_git() {
-        error_print("onyx package requires Git to be installed and accessible.");
-        info_print("", "Ensure Git is installed on your system.\n");
-        os.exit(1);
-        return;
-    }
-
-
     loaded_config_file := false;
     defer if loaded_config_file do store_config_file();
 
@@ -953,14 +945,6 @@ Package :: struct {
 }
 
 Git :: struct {
-    test_for_git :: () -> bool {
-        p := os.process_spawn(git_path, .[]);
-        return switch os.process_wait(&p) {
-            case .Success => true;
-            case #default => false;
-        };
-    }
-
     get_full_repo_uri :: (package_search: str) -> str {
         for Known_Repositories {
             for proto: Protocols {
