@@ -61,7 +61,7 @@ package_all() {
     cp misc/onyx-windows.sublime-build "$DIST_DIR/misc"
     cp misc/onyx-mode.el "$DIST_DIR/misc"
     cp misc/onyx.sublime-syntax "$DIST_DIR/misc"
-    cp misc/vscode/onyx-0.1.8.vsix "$DIST_DIR/misc"
+    cp misc/vscode/onyxlang-0.1.9.vsix "$DIST_DIR/misc"
 
     cp LICENSE "$DIST_DIR/LICENSE"
 }

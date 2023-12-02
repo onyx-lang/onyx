@@ -37,7 +37,7 @@ if "%1" == "dist" (
     copy misc\onyx-windows.sublime-build dist\misc\onyx-windows.sublime-build
     copy misc\onyx-mode.el dist\misc\onyx-mode.el
     copy misc\onyx.sublime-syntax dist\misc\onyx.sublime-syntax
-    copy misc\vscode\onyx-0.1.8.vsix dist\misc\onyx-0.1.8.vsix
+    copy misc\vscode\onyxlang-0.1.9.vsix dist\misc\onyxlang-0.1.9.vsix
 
     copy onyx_runtime.dll dist\onyx_runtime.dll
     xcopy tests dist\tests /s /e /h /I
