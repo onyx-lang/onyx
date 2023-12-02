@@ -2,7 +2,7 @@
     "name": "onyxlang",
     "displayName": "Onyx Programming Language",
     "description": "Onyx syntax highlighting and debugger support.",
-    "version": "0.1.8",
+    "version": "0.1.9",
     "publisher": "onyxlang",
     "license": "BSD-2-Clause",
     "engines": {

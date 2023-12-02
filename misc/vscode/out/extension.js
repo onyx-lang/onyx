@@ -32,9 +32,14 @@ function activate(context) {
             process.env["ONYX_PATH"] = onyx_path;
             process.env["PATH"] = process.env["PATH"] + ":" + onyx_path + "/bin";
         }
+        let executable = `${onyx_path}/bin/onyx`;
+        if (process.platform == "win32") {
+            // Windows distributions are different
+            executable = `${onyx_path}/onyx`;
+        }
         if (onyx_path) {
             let serverOptions = {
-                command: `${onyx_path}/bin/onyx`,
+                command: executable,
                 args: ["lsp"],
                 transport: vslc.TransportKind.stdio,
             };
