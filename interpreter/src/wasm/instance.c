@@ -4,7 +4,7 @@
 #include "vm.h"
 #include <alloca.h>
 
-static_assert(sizeof(ovm_value_t) == sizeof(wasm_val_t));
+static_assert(sizeof(ovm_value_t) == sizeof(wasm_val_t), "Size of ovm_value_t should match size of wasm_val_t");
 
 typedef struct wasm_ovm_binding wasm_ovm_binding;
 struct wasm_ovm_binding {
