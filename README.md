@@ -5,5 +5,5 @@
 
 A simple, yet powerful language for WebAssembly.
 
-[Try Online](https://onyxlang.io/playground/) |
+[Try Online](https://try.onyxlang.io/) |
 [Read the Docs](https://onyxlang.io/docs/)
