@@ -43,6 +43,11 @@ if "%1" == "dist" (
     xcopy tests dist\tests /s /e /h /I
     copy onyx.exe dist\onyx.exe
 
+    mkdir dist\tools
+    copy scripts\onyx-pkg.onyx dist\tools\onyx-pkg.onyx
+    mkdir dist\tools\pkg_templates
+    copy scripts\default.json  dist\tools\pkg_templates\default.json
+
     powershell Compress-Archive dist onyx.zip
     move onyx.zip dist/onyx.zip
 )
