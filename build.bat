@@ -22,7 +22,7 @@ del *.ilk > NUL 2> NUL
 del *.obj > NUL 2> NUL
 del misc\icon_resource.res
 
-cl /MT /std:c17 /TC /I compiler/include /I shared/include /D_USRDLL /D_WINDLL runtime\onyx_runtime.c /link /DLL ws2_32.lib bcrypt.lib Synchronization.lib Kernel32.lib /OUT:onyx_runtime.dll
+cl /MT /std:c17 /TC /I compiler/include /I shared/include /D_USRDLL /D_WINDLL runtime\onyx_runtime.c /link /DLL ws2_32.lib bcrypt.lib Synchronization.lib kernel32.lib /OUT:onyx_runtime.dll
 
 del onyx_runtime.obj
 del onyx_runtime.lib
