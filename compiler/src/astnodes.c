@@ -116,7 +116,7 @@ static const char* ast_node_names[] = {
 
     "FOREIGN BLOCK",
     "ZERO VALUE",
-    
+
     "AST_NODE_KIND_COUNT",
 };
 
@@ -138,7 +138,7 @@ const char *binaryop_string[Binary_Op_Count] = {
     "|>", "..", "->",
 
     "[]", "[]=", "^[]",
-    
+
     "??"
 };
 
@@ -772,7 +772,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
             return TYPE_MATCH_SUCCESS;
         }
     }
-    
+
     // String literals implicitly become c-strings for convience.
     if (node->kind == Ast_Kind_StrLit
         && type->kind == Type_Kind_MultiPointer
@@ -855,7 +855,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
 
             return TYPE_MATCH_SUCCESS;
         }
-        
+
         if (match == TYPE_MATCH_YIELD) return TYPE_MATCH_YIELD;
     }
 
@@ -1223,6 +1223,10 @@ i64 get_expression_integer_value(AstTyped* node, b32 *is_valid) {
         return get_expression_integer_value(((AstEnumValue *) node)->value, is_valid);
     }
 
+    if (node->kind == Ast_Kind_Unary_Op && type_is_integer(node->type)) {
+        return get_expression_integer_value(((AstUnaryOp *) node)->expr, is_valid);
+    }
+
     if (node_is_type((AstNode*) node)) {
         Type* type = type_build_from_ast(context.ast_alloc, (AstType *) node);
         if (type) return type->id;
@@ -1489,27 +1493,27 @@ TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
         *pnode = (AstTyped *) cmp;
         return TYPE_MATCH_SUCCESS;
     }
-    
+
     if (context.caches.implicit_cast_to_bool_cache.entries == NULL) {
         bh_imap_init(&context.caches.implicit_cast_to_bool_cache, global_heap_allocator, 8);
     }
 
     if (!bh_imap_has(&context.caches.implicit_cast_to_bool_cache, (u64) node)) {
         AstArgument *implicit_arg = make_argument(context.ast_alloc, node);
-        
+
         Arguments *args = bh_alloc_item(context.ast_alloc, Arguments);
         bh_arr_new(context.ast_alloc, args->values, 1);
         bh_arr_push(args->values, (AstTyped *) implicit_arg);
 
         bh_imap_put(&context.caches.implicit_cast_to_bool_cache, (u64) node, (u64) args);
     }
-    
+
     Arguments *args = (Arguments *) bh_imap_get(&context.caches.implicit_cast_to_bool_cache, (u64) node);
     AstFunction *overload = (AstFunction *) find_matching_overload_by_arguments(builtin_implicit_bool_cast->overloads, args);
 
     if (overload == NULL)                                       return TYPE_MATCH_FAILED;
     if (overload == (AstFunction *) &node_that_signals_a_yield) return TYPE_MATCH_YIELD;
-    
+
     AstCall *implicit_call = onyx_ast_node_new(context.ast_alloc, sizeof(AstCall), Ast_Kind_Call);
     implicit_call->token = node->token;
     implicit_call->callee = (AstTyped *) overload;
