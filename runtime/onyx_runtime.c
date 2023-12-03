@@ -29,6 +29,10 @@
     #include <linux/futex.h>
 #endif
 
+#if defined(_BH_DARWIN)
+    #include <Security/Security.h>
+#endif
+
 #include "types.h"  // For POINTER_SIZE
 
 #include "src/ort_files.h"
