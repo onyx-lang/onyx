@@ -378,7 +378,19 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                     return NULL;
                 }
 
-                count = get_expression_integer_value(a_node->count_expr, NULL);
+                b32 valid = 0;
+                count = get_expression_integer_value(a_node->count_expr, &valid);
+
+                if (!valid) {
+                    onyx_report_error(a_node->token->pos, Error_Critical, "Array type size expression must be 'i32', got '%s'.",
+                        type_get_name(a_node->count_expr->type));
+                    return NULL;
+                }
+
+                if ((i32)count < 0) {
+                    onyx_report_error(a_node->token->pos, Error_Critical, "Array type size must be a positive integer.");
+                    return NULL;
+                }
             }
 
             Type* array_type = type_make_array(alloc, elem_type, count);
@@ -1129,7 +1141,7 @@ void build_linear_types_with_offset(Type* type, bh_arr(TypeWithOffset)* pdest, u
             build_linear_types_with_offset(type->Compound.types[i], pdest, offset + elem_offset);
             elem_offset += bh_max(type_size_of(type->Compound.types[i]), 4);
         }
-        
+
     } else if (type->kind == Type_Kind_Slice || type->kind == Type_Kind_VarArgs || type->kind == Type_Kind_Function) {
         u32 mem_count = type_structlike_mem_count(type);
         StructMember smem = { 0 };
