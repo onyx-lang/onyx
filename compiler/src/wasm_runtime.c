@@ -604,16 +604,6 @@ void onyx_run_initialize(b32 debug_enabled) {
 
 b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     runtime = &wasm_runtime;
-
-    if (strncmp(wasm_bytes.data, "ONYX", 4)) {
-        printf("Bad magic bytes for Onyx binary.\n");
-        return 0;
-    }
-
-    wasm_bytes.data[0] = '\0';
-    wasm_bytes.data[1] = 'a';
-    wasm_bytes.data[2] = 's';
-    wasm_bytes.data[3] = 'm';
     wasm_raw_bytes = wasm_bytes;
 
     bh_arr(WasmFuncDefinition **) linkable_functions = NULL;
