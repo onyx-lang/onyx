@@ -219,8 +219,17 @@ bool ovm_engine_memory_ensure_capacity(ovm_engine_t *engine, i64 minimum_size) {
     if (engine->memory == NULL) {
         new_addr = mmap(NULL, minimum_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     } else {
-        munmap(engine->memory, engine->memory_size);
-        new_addr = mmap(NULL, minimum_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        #ifdef _BH_DARWIN // Darwin doesn't support mremap so we need to map and copy it manually
+            new_addr = mmap(engine->memory, minimum_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            if (new_addr == MAP_FAILED) return false;
+
+            memcpy(new_addr, engine->memory, engine->memory_size);
+            munmap(engine->memory, engine->memory_size);
+        #elif defined(_BH_LINUX)
+            new_addr = mremap(engine->memory, engine->memory_size, minimum_size, MREMAP_MAYMOVE);
+        #else
+            #error "Unhandled platform."
+        #endif
     }
 
     if (new_addr == MAP_FAILED) {
