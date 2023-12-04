@@ -658,7 +658,7 @@ static b32 process_load_entity(Entity* ent) {
 
         bh_path_convert_separators(folder);
         // This does not take into account #load_path'd folders...
-        
+
         bh_arr(char *) folders_to_process = NULL;
         bh_arr_new(global_heap_allocator, folders_to_process, 2);
 
@@ -1079,7 +1079,7 @@ static b32 onyx_run() {
     onyx_wasm_module_write_to_buffer(context.wasm_module, &code_buffer);
 
     return onyx_run_module(code_buffer);
-    
+
 }
 #endif
 
@@ -1155,7 +1155,7 @@ static void onyx_watch(CompileOptions *compile_opts) {
         bh_file_watch_free(&watches);
     } while(running_watch);
 
-        
+
     bh_printf("\e[2J\e[1;1H\e[?25h\n");
 }
 

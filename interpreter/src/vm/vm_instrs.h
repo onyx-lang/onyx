@@ -156,12 +156,12 @@ OVM_OP_FLOAT_EXEC(copysign, __ovm_copysign)
     VAL(instr->r).type = t; \
     VAL(instr->r).ctype = (ctype) op (VAL(instr->a).ctype);
 
-OVMI_INSTR_EXEC(clz_i32) { OVM_OP(OVM_TYPE_I32, __builtin_clz, u32);   NEXT_OP; }
-OVMI_INSTR_EXEC(clz_i64) { OVM_OP(OVM_TYPE_I64, __builtin_clzll, u64); NEXT_OP; }
-OVMI_INSTR_EXEC(ctz_i32) { OVM_OP(OVM_TYPE_I32, __builtin_ctz, u32);   NEXT_OP; }
-OVMI_INSTR_EXEC(ctz_i64) { OVM_OP(OVM_TYPE_I64, __builtin_ctzll, u64); NEXT_OP; }
-OVMI_INSTR_EXEC(popcount_i32) { OVM_OP(OVM_TYPE_I32, __builtin_popcount, u32);   NEXT_OP; }
-OVMI_INSTR_EXEC(popcount_i64) { OVM_OP(OVM_TYPE_I64, __builtin_popcountll, u64); NEXT_OP; }
+OVMI_INSTR_EXEC(clz_i32) { OVM_OP(OVM_TYPE_I32, __ovm_clz, u32);   NEXT_OP; }
+OVMI_INSTR_EXEC(clz_i64) { OVM_OP(OVM_TYPE_I64, __ovm_clzll, u64); NEXT_OP; }
+OVMI_INSTR_EXEC(ctz_i32) { OVM_OP(OVM_TYPE_I32, __ovm_ctz, u32);   NEXT_OP; }
+OVMI_INSTR_EXEC(ctz_i64) { OVM_OP(OVM_TYPE_I64, __ovm_ctzll, u64); NEXT_OP; }
+OVMI_INSTR_EXEC(popcount_i32) { OVM_OP(OVM_TYPE_I32, __ovm_popcount, u32);   NEXT_OP; }
+OVMI_INSTR_EXEC(popcount_i64) { OVM_OP(OVM_TYPE_I64, __ovm_popcountll, u64); NEXT_OP; }
 
 OVM_OP_FLOAT_EXEC(abs,     __ovm_abs)
 OVM_OP_FLOAT_EXEC(neg,     -)
@@ -525,7 +525,7 @@ OVMI_INSTR_EXEC(mem_grow) {
             state->engine->memory_size + VAL(instr->a).u32 * 65536)) {
         VAL(instr->r).i32 = -1;
     }
-    
+
     memory = state->engine->memory;
     NEXT_OP;
 }
