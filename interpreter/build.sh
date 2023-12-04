@@ -16,7 +16,7 @@ mkdir -p "build_tmp"
 
 echo "Compiling ovmwasm to $TARGET"
 for c_file in $C_FILES; do
-    $ONYX_CC $FLAGS $INCLUDES -fPIC -o $(mktemp -p build_tmp -t XXXXXXX.o) -c $c_file $LIBS
+    $ONYX_CC $FLAGS $INCLUDES -fPIC -o build_tmp/$(basename $c_file).o -c $c_file $LIBS
 done
 
 ar crs "$TARGET" build_tmp/*.o*
