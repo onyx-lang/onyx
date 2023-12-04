@@ -221,7 +221,6 @@ bool ovm_engine_memory_ensure_capacity(ovm_engine_t *engine, i64 minimum_size) {
     } else {
         munmap(engine->memory, engine->memory_size);
         new_addr = mmap(NULL, minimum_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        // new_addr = mremap(engine->memory, engine->memory_size, minimum_size, MREMAP_MAYMOVE);
     }
 
     if (new_addr == MAP_FAILED) {
