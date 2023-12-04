@@ -33,7 +33,7 @@ jobs:
           echo $DOING_RELEASE
 
   build:
-    name: Building on ${{ matrix.build }}
+    name: Building on ${{ matrix.build }}-${{ matrix.runtime_library }}
     runs-on: ${{ matrix.os }}
     needs: [ setup ]
     strategy:
@@ -70,6 +70,15 @@ jobs:
             os: macos-12
             runtime_library: wasmer
             artifact_name: 'onyx-darwin-wasmer-amd64'
+          - build: darwin-amd64
+            os: macos-12
+            runtime_library: ovmwasm
+            artifact_name: 'onyx-darwin-ovm-amd64'
+          - build: darwin-arm64
+            os: macos-12
+            runtime_library: ovmwasm
+            target: aarch64-apple-darwin
+            artifact_name: 'onyx-darwin-ovm-arm64'
           - build: windows-amd64
             os: windows-latest
             artifact_name: 'onyx-windows-wasmer-amd64'
@@ -145,6 +154,16 @@ jobs:
           ONYX_TARGET: aarch64-apple-darwin
           WASMER_LIB_PATH: ../wasmer/lib
           ONYX_RUNTIME_LIBRARY: wasmer-custom
+
+      - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
+        if: (matrix.build == 'darwin-arm64') && (matrix.runtime_library == 'ovmwasm')
+        run: |
+          ./build.sh compile compress
+        env:
+          ONYX_CC: gcc
+          ONYX_ARCH: darwin_arm64
+          ONYX_TARGET: aarch64-apple-darwin
+          ONYX_RUNTIME_LIBRARY: ovmwasm
 
       - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'darwin-arm64') && (matrix.runtime_library == 'none')
@@ -258,6 +277,24 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: artifacts/onyx-darwin-wasmer-arm64/onyx.tar.gz
           asset_name: onyx-darwin-wasmer-arm64.tar.gz
+          asset_content_type: application/gzip
+      - name: Upload Release Asset MacOS AMD64 (OVMwasm)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/onyx-darwin-ovm-amd64/onyx.tar.gz
+          asset_name: onyx-darwin-ovm-amd64.tar.gz
+          asset_content_type: application/gzip
+      - name: Upload Release Asset MacOS ARM64 (OVMwasm)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/onyx-darwin-ovm-arm64/onyx.tar.gz
+          asset_name: onyx-darwin-ovm-arm64.tar.gz
           asset_content_type: application/gzip
       - name: Upload Release Asset Window X64
         uses: actions/upload-release-asset@v1
