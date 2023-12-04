@@ -120,7 +120,7 @@ typedef struct debug_type_function_t {
 } debug_type_function_t;
 
 typedef struct debug_type_slice_t {
-    u32 type; 
+    u32 type;
 } debug_type_slice_t;
 
 typedef struct debug_type_enum_value_t {
@@ -315,7 +315,7 @@ typedef struct debug_state_t {
     u32 client_fd;
 
     bh_buffer send_buffer;
-    
+
     u32 state_change_pipes[2];
 } debug_state_t;
 
@@ -339,7 +339,7 @@ typedef struct debug_runtime_value_builder_t {
     debug_func_info_t func_info;
     debug_file_info_t file_info;
     debug_loc_info_t loc_info;
-    
+
     // "base_" refers to the top symbol. In a layered
     // query, this information is not outputted, only
     // used to lookup the values inside of it.
@@ -355,7 +355,7 @@ typedef struct debug_runtime_value_builder_t {
     u32 it_loc;
     u32 it_type;
     char *it_name;
-    bool it_has_children; 
+    bool it_has_children;
 } debug_runtime_value_builder_t;
 
 void debug_runtime_value_build_init(debug_runtime_value_builder_t *builder, bh_allocator alloc);

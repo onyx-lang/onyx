@@ -304,8 +304,8 @@ BH_DEF BH_ALLOCATOR_PROC(bh_arena_allocator_proc);
 
 
 // ATOMIC ARENA ALLOCATOR
-// Currently, this is only available on Linux, as it is using pthreads.
-#ifdef _BH_LINUX
+// Currently, this is only available on Linux/MacOS, as it is using pthreads.
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
 
 typedef struct bh_atomic_arena {
     bh_allocator backing;
@@ -1102,7 +1102,7 @@ BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc) {
     }
 
     bh_managed_heap__link *newptr = bh_heap_allocator_proc(NULL, action, size + sizeof(*old), alignment, old, flags);
-    
+
     if (action == bh_allocator_action_alloc || action == bh_allocator_action_resize) {
         if (newptr) {
             newptr->magic_number = bh_managed_heap_magic_number;
@@ -1152,7 +1152,7 @@ BH_DEF void bh_arena_clear(bh_arena* alloc) {
             trailer = walker;
         }
     }
-    
+
     alloc->current_arena = alloc->first_arena;
     alloc->size = sizeof(ptr);
 }
@@ -1226,7 +1226,7 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
 
 
 // ATOMIC ARENA ALLOCATOR IMPLEMENTATION
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
 BH_DEF void bh_atomic_arena_init(bh_atomic_arena* alloc, bh_allocator backing, isize arena_size) {
     arena_size = bh_max(arena_size, size_of(ptr));
     ptr data = bh_alloc(backing, arena_size);
@@ -1510,7 +1510,7 @@ BH_DEF i64 leb128_to_int(u8* bytes, i32 *byte_count) {
         zero_shifted = zero_shifted << shift;
         return res | zero_shifted;
     }
-    
+
     return res;
 }
 
@@ -1950,12 +1950,12 @@ char* bh_path_get_full_name(char const* filename, bh_allocator a) {
     return result;
 
 #elif defined(_BH_LINUX) || defined (_BH_DARWIN)
-    char* p = realpath(filename, NULL);    
+    char* p = realpath(filename, NULL);
 
     // Check if the file did not exists.
     // :Cleanup should this return NULL?
     if (p == NULL) return (char *) filename;
-    
+
     i32 len = strlen(p);
     char* result = bh_alloc_array(a, char, len + 1);
     memmove(result, p, len);
@@ -2169,7 +2169,7 @@ b32 bh_file_watch_wait(bh_file_watch *w) {
         (void) read(w->kill_pipe[0], &buf, sizeof(buf));
         return 0;
     }
-    
+
     FD_ZERO(&w->fds);
     FD_SET(w->inotify_fd, &w->fds);
     FD_SET(w->kill_pipe[0], &w->fds);
@@ -3087,7 +3087,7 @@ u64 bh_time_duration(u64 old) {
 #if defined(_BH_WINDOWS)
     u64 curr = bh_time_curr();
     u64 duration = curr - old;
-    
+
     LARGE_INTEGER freq;
     QueryPerformanceFrequency(&freq);
     duration *= 1000;

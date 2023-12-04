@@ -106,7 +106,7 @@ void ovm_program_modify_static_int(ovm_program_t *program, int arr, int idx, int
 // Represents the running configuration and static
 // data needed by the VM. This is for more "global" data.
 // If multiple threads are used, only one engine is needed.
-// 
+//
 struct ovm_engine_t {
     ovm_store_t *store;
 
@@ -129,7 +129,7 @@ bool ovm_program_load_from_file(ovm_program_t *program, ovm_engine_t *engine, ch
 //
 // Represents ephemeral state / execution context.
 // If multiple threads are used, multiple states are needed.
-// 
+//
 
 #define OVM_MAX_PARAM_COUNT 64
 
@@ -140,7 +140,7 @@ struct ovm_state_t {
 
     i32 pc;
     i32 value_number_offset;
-    
+
     bh_arr(ovm_value_t) numbered_values;
     bh_arr(ovm_stack_frame_t) stack_frames;
     bh_arr(ovm_value_t) registers;
@@ -221,7 +221,7 @@ struct ovm_linkable_func_t {
     i32 param_count;
     ovm_external_func_t func;
 };
- 
+
 ovm_func_t  *ovm_func_new();
 ovm_instr_t *ovm_func_add_instruction(ovm_func_t *func, ovm_instr_kind_t instr, ovm_valtype_t type);
 void         ovm_func_delete(ovm_func_t *func);
@@ -352,7 +352,7 @@ struct ovm_instr_t {
 #define OVMI_TRANSMUTE_F32     0x4a   // %r = *(t *) &%a (reinterpret bytes)
 #define OVMI_TRANSMUTE_F64     0x4b   // %r = *(t *) &%a (reinterpret bytes)
 
-#define OVMI_CMPXCHG           0x4c   // %r = %r == %a ? %b : %r 
+#define OVMI_CMPXCHG           0x4c   // %r = %r == %a ? %b : %r
 
 #define OVMI_BREAK             0x4d
 

@@ -4,7 +4,22 @@
 
 #include <sys/mman.h>
 #include <signal.h>
-#include <x86intrin.h>
+#if defined(__arm64__)
+    #include <arm_neon.h>
+#elif defined(__x86_64__)
+    #include <x86intrin.h>
+#else
+    #error "Unsupported architecture"
+#endif
+
+// @todo(judah): this may need to change in the future.
+#define __ovm_clz(v)        __builtin_clz(v)
+#define __ovm_clzll(v)      __builtin_clzll(v)
+#define __ovm_ctz(v)        __builtin_ctz(v)
+#define __ovm_ctzll(v)      __builtin_ctzll(v)
+#define __ovm_popcount(v)   __builtin_popcount(v)
+#define __ovm_popcountll(v) __builtin_popcount(v)
+
 #include <math.h> // REMOVE THIS!!!  only needed for sqrt
 #include <pthread.h>
 
@@ -169,7 +184,7 @@ void ovm_engine_delete(ovm_engine_t *engine) {
     if (engine->memory) {
         munmap(engine->memory, engine->memory_size);
     }
-    
+
     bh_free(store->heap_allocator, engine);
 }
 
@@ -204,7 +219,17 @@ bool ovm_engine_memory_ensure_capacity(ovm_engine_t *engine, i64 minimum_size) {
     if (engine->memory == NULL) {
         new_addr = mmap(NULL, minimum_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     } else {
-        new_addr = mremap(engine->memory, engine->memory_size, minimum_size, MREMAP_MAYMOVE);
+        #ifdef _BH_DARWIN // Darwin doesn't support mremap so we need to map and copy it manually
+            new_addr = mmap(engine->memory, minimum_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            if (new_addr == MAP_FAILED) return false;
+
+            memcpy(new_addr, engine->memory, engine->memory_size);
+            munmap(engine->memory, engine->memory_size);
+        #elif defined(_BH_LINUX)
+            new_addr = mremap(engine->memory, engine->memory_size, minimum_size, MREMAP_MAYMOVE);
+        #else
+            #error "Unhandled platform."
+        #endif
     }
 
     if (new_addr == MAP_FAILED) {
