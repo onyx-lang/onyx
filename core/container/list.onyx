@@ -39,7 +39,7 @@ free :: (list: &List) {
     while elem != null {
         to_delete := elem;
         elem = elem.next;
-        raw_free(list.allocator, elem);
+        raw_free(list.allocator, to_delete);
     }
 }
 
