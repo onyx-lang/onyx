@@ -3477,6 +3477,11 @@ CheckStatus check_process_directive(AstNode* directive) {
         if (exported->entity && exported->entity->state <= Entity_State_Check_Types)
             YIELD(directive->token->pos, "Waiting for exported type to be known.");
 
+        if (exported->kind != Ast_Kind_Function) {
+            onyx_report_error(export->token->pos, Error_Critical, "Cannot export something that is not a procedure.");
+            ERROR(exported->token->pos, "Here is the thing being exported that is not a procedure.");
+        }
+
         CHECK(expression, &export->export_name_expr);
 
         if (export->export_name_expr->kind != Ast_Kind_StrLit) {
