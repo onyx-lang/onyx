@@ -1540,6 +1540,8 @@ struct AstCodeBlock {
 
     AstNode *code;
     bh_arr(OnyxToken *) binding_symbols;
+
+    b32 is_expression: 1;
 };
 
 struct AstDirectiveInsert {

@@ -664,6 +664,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                     ((AstBlock *) code_block->code)->rules = Block_Rule_Code_Block;
                 } else {
                     code_block->code = (AstNode *) parse_expression(parser, 1);
+                    code_block->is_expression = 1;
                 }
 
                 retval = (AstTyped *) code_block;

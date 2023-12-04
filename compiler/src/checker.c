@@ -104,7 +104,7 @@ CheckStatus check_function_header(AstFunction* func);
 CheckStatus check_memres_type(AstMemRes* memres);
 CheckStatus check_memres(AstMemRes* memres);
 CheckStatus check_type(AstType** ptype);
-CheckStatus check_insert_directive(AstDirectiveInsert** pinsert);
+CheckStatus check_insert_directive(AstDirectiveInsert** pinsert, b32 expected_expression);
 CheckStatus check_directive_solidify(AstDirectiveSolidify** psolid);
 CheckStatus check_do_block(AstDoBlock** pdoblock);
 CheckStatus check_constraint(AstConstraint *constraint);
@@ -2424,7 +2424,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
             break;
 
         case Ast_Kind_Directive_Insert:
-            retval = check_insert_directive((AstDirectiveInsert **) pexpr);
+            retval = check_insert_directive((AstDirectiveInsert **) pexpr, 1);
             break;
 
         case Ast_Kind_Code_Block:
@@ -2519,7 +2519,7 @@ CheckStatus check_global(AstGlobal* global) {
     return Check_Success;
 }
 
-CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
+CheckStatus check_insert_directive(AstDirectiveInsert** pinsert, b32 expected_expression) {
     AstDirectiveInsert* insert = *pinsert;
     if (insert->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
@@ -2549,6 +2549,12 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
 
     if (code_block->kind != Ast_Kind_Code_Block) {
         ERROR(insert->token->pos, "Expected compile-time known expression of type 'Code'.");
+    }
+
+    if (!code_block->is_expression && expected_expression) {
+        onyx_report_error(insert->token->pos, Error_Critical, "Expected a code block that is an expression here, but got a code block that is statements.");
+        onyx_report_error(code_block->token->pos, Error_Critical, "Try changing { expr } into ( expr ) here.");
+        return Check_Error;
     }
 
     u32 bound_symbol_count = bh_arr_length(code_block->binding_symbols);
@@ -2746,6 +2752,7 @@ CheckStatus check_statement(AstNode** pstmt) {
         case Ast_Kind_Block:      return check_block((AstBlock *) stmt);
         case Ast_Kind_Defer:      return check_statement(&((AstDefer *) stmt)->stmt);
         case Ast_Kind_Directive_Remove: return check_remove_directive((AstDirectiveRemove *) stmt);
+        case Ast_Kind_Directive_Insert: return check_insert_directive((AstDirectiveInsert **) pstmt, 0);
         case Ast_Kind_Call: {
             CHECK(call, (AstCall **) pstmt);
             (*pstmt)->flags |= Ast_Flag_Expr_Ignored;
