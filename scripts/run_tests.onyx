@@ -106,7 +106,7 @@ main :: (args) => {
     sync.mutex_init(&exec_context.failed_tests_mutex);
 
     switch runtime.compiler_os {
-        case .Linux {
+        case .Linux, .MacOS {
             exec_context.onyx_cmd = "./dist/bin/onyx";
             if settings.debug do exec_context.onyx_cmd = "./bin/onyx-debug";
         }
@@ -174,7 +174,7 @@ main :: (args) => {
         for failed_tests {
             printf("  {}\n", it);
         }
-        
+
         os.exit(-1);
 
     } else {

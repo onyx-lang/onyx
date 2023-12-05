@@ -21,9 +21,9 @@ main :: () {
    arr1: [cast(i32)(3 * 4 - 5)]f32;
    arr2: [cast(i32)An_Enum.Count]A_Struct;
 
-   assert(arr1.count == (3 * 4 - 5), "invalid count for arr1");
-   assert(sizeof(typeof(arr1)) == (3 * 4 - 5) * sizeof(f32), "invalid size for arr1");
+   println(arr1.count == (3 * 4 - 5));
+   println(sizeof(typeof(arr1)) == (3 * 4 - 5) * sizeof(f32));
 
-   assert(arr2.count == ~~An_Enum.Count, "invalid count for arr2");
-   assert(sizeof(typeof(arr2)) == ~~An_Enum.Count * sizeof(A_Struct), "invalid size for arr2");
+   println(arr2.count == ~~An_Enum.Count);
+   println(sizeof(typeof(arr2)) == ~~An_Enum.Count * sizeof(A_Struct));
 }

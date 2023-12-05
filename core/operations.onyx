@@ -1,5 +1,7 @@
 package builtin
 
+use core { intrinsics }
+
 //
 // This file contains builtin operator overloads.
 // It's in a separate file because we need to defer resolution of some definitions
@@ -13,15 +15,30 @@ package builtin
 
 //
 // Allows for basic array programming support
-#operator +  macro (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a + b));
-#operator -  macro (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a - b));
-#operator *  macro (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a * b));
-#operator /  macro (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a / b));
-#operator == macro (l, r: [$N]$T) => core.intrinsics.wasm.memory_equal(cast(rawptr)l, cast(rawptr)r, N * sizeof T);
+
+// Array w/ array operations
+#operator + macro (l, r: [$N]$T) => __array_op_array(l, r, [a, b](a + b));
+#operator - macro (l, r: [$N]$T) => __array_op_array(l, r, [a, b](a - b));
+#operator * macro (l, r: [$N]$T) => __array_op_array(l, r, [a, b](a * b));
+#operator / macro (l, r: [$N]$T) => __array_op_array(l, r, [a, b](a / b));
+
+// Array w/ scalar operations
+#operator + macro (l: [$N]$T, r: T) => __array_op_scalar(l, r, [a, b](a + b));
+#operator - macro (l: [$N]$T, r: T) => __array_op_scalar(l, r, [a, b](a - b));
+#operator * macro (l: [$N]$T, r: T) => __array_op_scalar(l, r, [a, b](a * b));
+#operator / macro (l: [$N]$T, r: T) => __array_op_scalar(l, r, [a, b](a / b));
+
+#operator == macro (l, r: [$N]$T) => intrinsics.wasm.memory_equal(cast(rawptr)l, cast(rawptr)r, N * sizeof T);
 #operator != macro (l, r: [$N]$T) => !(l == r);
 
-#local __array_math_op :: macro (l, r: [$N]$T, $body: Code) -> [N]T {
-   res: [N]T;
-   for 0..N do res[it] = #unquote body(l[it], r[it]);
-   return res;
+__array_op_array :: macro (l, r: [$N]$T, $body: Code) -> [N]T {
+    res: [N]T;
+    for 0..N do res[it] = #unquote body(l[it], r[it]);
+    return res;
+}
+
+__array_op_scalar :: macro (l: [$N]$T, r: T, $body: Code) -> [N]T {
+    res: [N]T;
+    for 0..N do res[it] = #unquote body(l[it], r);
+    return res;
 }
