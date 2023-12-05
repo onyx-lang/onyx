@@ -577,12 +577,8 @@ package_id :: #distinct u32
 any_package :: cast(package_id) 0
 
 //
-// Allow for comparing `package_id`s
-#operator == macro (p1, p2: package_id) => cast(u32) p1 == cast(u32) p2;
-#operator != macro (p1, p2: package_id) => cast(u32) p1 != cast(u32) p2;
-
-#operator == macro (l, r: [$N]$T) => core.intrinsics.wasm.memory_equal(cast(rawptr)l, cast(rawptr)r, N * sizeof T);
-#operator != macro (l, r: [$N]$T) => !(l == r);
+// Load builtin operator overloads.
+#load "./operations.onyx"
 
 //
 // DEPRECATED THINGS

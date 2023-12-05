@@ -1,0 +1,28 @@
+package builtin
+
+//
+// This file contains builtin operator overloads.
+// It's in a separate file because we need to defer resolution of some definitions
+// until certain types are defined (namely builtin code used for math operators).
+//
+
+//
+// Allows for comparing `package_id`s
+#operator == macro (p1, p2: package_id) => cast(u32) p1 == cast(u32) p2;
+#operator != macro (p1, p2: package_id) => cast(u32) p1 != cast(u32) p2;
+
+//
+// Allows for basic array programming support
+#operator + (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a + b));
+#operator - (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a - b));
+#operator * (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a * b));
+#operator / (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a / b));
+
+#operator == macro (l, r: [$N]$T) => core.intrinsics.wasm.memory_equal(cast(rawptr)l, cast(rawptr)r, N * sizeof T);
+#operator != macro (l, r: [$N]$T) => !(l == r);
+
+#local __array_math_op :: macro (l, r: [$N]$T, $body: Code) -> [N]T {
+   res: [N]T;
+   for 0..N do res[it] = #unquote body(l[it], r[it]);
+   return res;
+}
