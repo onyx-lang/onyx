@@ -13,11 +13,10 @@ package builtin
 
 //
 // Allows for basic array programming support
-#operator + (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a + b));
-#operator - (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a - b));
-#operator * (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a * b));
-#operator / (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a / b));
-
+#operator +  macro (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a + b));
+#operator -  macro (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a - b));
+#operator *  macro (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a * b));
+#operator /  macro (l, r: [$N]$T) => __array_math_op(l, r, [a, b](a / b));
 #operator == macro (l, r: [$N]$T) => core.intrinsics.wasm.memory_equal(cast(rawptr)l, cast(rawptr)r, N * sizeof T);
 #operator != macro (l, r: [$N]$T) => !(l == r);
 
