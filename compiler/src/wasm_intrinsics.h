@@ -9,110 +9,190 @@
 // :32BitPointers
 EMIT_FUNC_NO_ARGS(intrinsic_memory_copy) {
     bh_arr(WasmInstruction) code = *pcode;
-    
+
     // The stack should look like this:
     //     <count>
     //     <source>
     //     <dest>
-    
+
     u64 count_local  = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
     u64 source_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     u64 dest_local   = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-    
+
     WIL(NULL, WI_LOCAL_SET, count_local);
     WIL(NULL, WI_LOCAL_SET, source_local);
     WIL(NULL, WI_LOCAL_SET, dest_local);
-    
+
     // count is greater than 0
     WIL(NULL, WI_LOCAL_GET, count_local);
     WID(NULL, WI_I32_CONST, 0);
     WI(NULL, WI_I32_GT_S);
-    
+
     WID(NULL, WI_IF_START, 0x40);
     WID(NULL, WI_LOOP_START, 0x40);
-    
+
     WIL(NULL, WI_LOCAL_GET, count_local);
     WID(NULL, WI_I32_CONST, 1);
     WI(NULL, WI_I32_SUB);
     WIL(NULL, WI_LOCAL_SET, count_local);
-    
+
     WIL(NULL, WI_LOCAL_GET, dest_local);
     WIL(NULL, WI_LOCAL_GET, count_local);
     WI(NULL, WI_PTR_ADD);
-    
+
     WIL(NULL, WI_LOCAL_GET, source_local);
     WIL(NULL, WI_LOCAL_GET, count_local);
     WI(NULL, WI_PTR_ADD);
-    
+
     WID(NULL, WI_I32_LOAD_8_U, ((WasmInstructionData) { 0, 0 }));
     WID(NULL, WI_I32_STORE_8, ((WasmInstructionData) { 0, 0 }));
-    
+
     WIL(NULL, WI_LOCAL_GET, count_local);
     WID(NULL, WI_I32_CONST, 0);
     WI(NULL, WI_I32_GT_S);
     WID(NULL, WI_COND_JUMP, 0x00);
-    
+
     WI(NULL, WI_LOOP_END);
     WI(NULL, WI_IF_END);
-    
+
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-    
+
     *pcode = code;
 }
 
 EMIT_FUNC_NO_ARGS(intrinsic_memory_fill) {
     bh_arr(WasmInstruction) code = *pcode;
-    
+
     // The stack should look like this:
     //     <count>
     //     <byte>
     //     <dest>
-    
+
     u64 count_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
     u64 byte_local  = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
     u64 dest_local  = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-    
+
     WIL(NULL, WI_LOCAL_SET, count_local);
     WIL(NULL, WI_LOCAL_SET, byte_local);
     WIL(NULL, WI_LOCAL_SET, dest_local);
-    
+
     // count is greater than 0
     WIL(NULL, WI_LOCAL_GET, count_local);
     WID(NULL, WI_I32_CONST, 0);
     WI(NULL, WI_I32_GT_S);
-    
+
     WID(NULL, WI_IF_START, 0x40);
     WID(NULL, WI_LOOP_START, 0x40);
-    
+
     WIL(NULL, WI_LOCAL_GET, count_local);
     WID(NULL, WI_I32_CONST, 1);
     WI(NULL, WI_I32_SUB);
     WIL(NULL, WI_LOCAL_SET, count_local);
-    
+
     WIL(NULL, WI_LOCAL_GET, dest_local);
     WIL(NULL, WI_LOCAL_GET, count_local);
     WI(NULL, WI_PTR_ADD);
-    
+
     WIL(NULL, WI_LOCAL_GET, byte_local);
     WID(NULL, WI_I32_STORE_8, ((WasmInstructionData) { 0, 0 }));
-    
+
     WIL(NULL, WI_LOCAL_GET, count_local);
     WID(NULL, WI_I32_CONST, 0);
     WI(NULL, WI_I32_GT_S);
     WID(NULL, WI_COND_JUMP, 0x00);
-    
+
     WI(NULL, WI_LOOP_END);
     WI(NULL, WI_IF_END);
-    
+
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-    
+
     *pcode = code;
 }
 
+// IMPROVE: This is a stripped down/unoptimized version of memcmp that only checks equality
+// between two blocks of memory (and doesn't return -1/1). Returns 1 if the blocks of memory are equal,
+// and 0 otherwise.
+// NOTE: This implementation is unsafe and assumes both blocks of memory are at least size_in_bytes long.
+EMIT_FUNC_NO_ARGS(intrinsic_memory_equal) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    // The stack should look like this:
+    //     <size in bytes>
+    //     <ptr>
+    //     <ptr>
+
+    u64 size_in_bytes = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    u64 b_addr        = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+    u64 a_addr        = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+
+    WIL(NULL, WI_LOCAL_SET, size_in_bytes);
+    WIL(NULL, WI_LOCAL_SET, b_addr);
+    WIL(NULL, WI_LOCAL_SET, a_addr);
+
+    u64 memory_is_equal = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    WID(NULL, WI_I32_CONST, 1); // set to 1 so size_in_bytes == 0 will return true
+    WIL(NULL, WI_LOCAL_SET, memory_is_equal);
+
+    // if size_in_bytes > 0
+    WIL(NULL, WI_LOCAL_GET, size_in_bytes);
+    WID(NULL, WI_I32_CONST, 0);
+    WI (NULL, WI_I32_GT_S);
+    WID(NULL, WI_IF_START, 0x40);
+        u64 loop_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        WIL(NULL, WI_I32_CONST, 0);
+        WIL(NULL, WI_LOCAL_SET, loop_idx);
+
+        WID(NULL, WI_LOOP_START, 0x40);
+            // if loop_idx >= size_in_bytes, break
+            WIL(NULL, WI_LOCAL_GET, loop_idx);
+            WIL(NULL, WI_LOCAL_GET, size_in_bytes);
+            WI (NULL, WI_I32_GE_S);
+            WID(NULL, WI_COND_JUMP, 0x01);
+
+            // a = *(a_addr + loop_idx)
+            WIL(NULL, WI_LOCAL_GET, a_addr);
+            WIL(NULL, WI_LOCAL_GET, loop_idx);
+            WI (NULL, WI_PTR_ADD);
+            WID(NULL, WI_I32_LOAD_8_U, ((WasmInstructionData) { 0, 0 }));
+
+            // b = *(b_addr + loop_idx)
+            WIL(NULL, WI_LOCAL_GET, b_addr);
+            WIL(NULL, WI_LOCAL_GET, loop_idx);
+            WI (NULL, WI_PTR_ADD);
+            WID(NULL, WI_I32_LOAD_8_U, ((WasmInstructionData) { 0, 0 }));
+
+            WI (NULL, WI_I32_EQ);
+            WIL(NULL, WI_LOCAL_SET, memory_is_equal);
+
+            // if bytes are not equal, break
+            WIL(NULL, WI_LOCAL_GET, memory_is_equal);
+            WI (NULL, WI_I32_EQZ);
+            WID(NULL, WI_COND_JUMP, 0x01);
+
+            // loop_idx += 1
+            WIL(NULL, WI_LOCAL_GET, loop_idx);
+            WIL(NULL, WI_I32_CONST, 1);
+            WI (NULL, WI_I32_ADD);
+            WIL(NULL, WI_LOCAL_SET, loop_idx);
+
+            WID(NULL, WI_JUMP, 0x00);
+        WI(NULL, WI_LOOP_END);
+    WI(NULL, WI_IF_END);
+
+    WIL(NULL, WI_LOCAL_GET, memory_is_equal);
+
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);   // a_addr
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);   // b_addr
+    local_raw_free(mod->local_alloc, WASM_TYPE_INT32); // size_in_bytes
+    local_raw_free(mod->local_alloc, WASM_TYPE_INT32); // memory_is_equal
+    local_raw_free(mod->local_alloc, WASM_TYPE_INT32); // loop_idx
+
+    *pcode = code;
+}
 EMIT_FUNC(initialize_type, Type* type, OnyxToken* where) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -137,7 +217,7 @@ EMIT_FUNC(initialize_type, Type* type, OnyxToken* where) {
                 emit_expression(mod, &code, *smem->initial_value);
                 emit_store_instruction(mod, &code, smem->type, smem->offset);
             }
-            
+
             local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
             break;
         }

@@ -64,6 +64,7 @@ get_freed_size :: () => {
     use core.intrinsics.wasm {
         memory_size, memory_grow,
         memory_copy, memory_fill,
+        memory_equal,
     }
 
     use core {memory, math}
@@ -190,7 +191,7 @@ get_freed_size :: () => {
 
     heap_free :: (ptr: rawptr) {
         #if Enable_Debug do assert(ptr != null, "Trying to free a null pointer.");
-        
+
         hb_ptr := cast(&heap_freed_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
 
         //
@@ -350,7 +351,7 @@ get_freed_size :: () => {
         hb_ptr.size |= Allocated_Flag;
         new_ptr := heap_alloc(new_size_, align);
         #if runtime.Multi_Threading_Enabled do sync.mutex_lock(&heap_mutex);
-        
+
         memory_copy(new_ptr, ptr, old_size - sizeof heap_block);
         heap_free(ptr);
         return new_ptr;

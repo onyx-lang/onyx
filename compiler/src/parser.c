@@ -713,7 +713,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
                 if (parser->current_function_stack && bh_arr_length(parser->current_function_stack) > 0) {
                     bh_arr_push(bh_arr_last(parser->current_function_stack)->nodes_that_need_entities_after_clone, (AstNode *) fc);
-                    
+
                 } else {
                     ENTITY_SUBMIT(fc);
                 }
@@ -883,7 +883,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 export_name->token = parser->curr - 1;
                 export_name->func  = (AstFunction *) parse_factor(parser);
                 export_name->type_node = builtin_string_type;
-                
+
                 retval = (AstTyped *) export_name;
                 break;
             }
@@ -993,7 +993,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 }
 
                 method_call->right = (AstTyped *) parse_function_call(parser, (AstTyped *) method);
-                
+
                 retval = (AstTyped *) method_call;
                 break;
             }
@@ -1050,7 +1050,7 @@ static inline i32 get_precedence(BinaryOp kind) {
         case Binary_Op_Divide:          return 8;
 
         case Binary_Op_Modulus:         return 9;
-        
+
         case Binary_Op_Coalesce:        return 11;
 
         default:                        return -1;
@@ -1348,10 +1348,10 @@ static AstSwitchCase* parse_case_stmt(OnyxParser* parser) {
             b32 is_pointer = 0;
             if (consume_token_if_next(parser, '&') || consume_token_if_next(parser, '^'))
                 is_pointer = 1;
-            
+
             OnyxToken *capture_symbol = expect_token(parser, Token_Type_Symbol);
             AstLocal *capture = make_local(parser->allocator, capture_symbol, NULL);
-            
+
             sc_node->capture = capture;
             sc_node->capture_is_by_pointer = is_pointer;
 
@@ -2248,7 +2248,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     }
 
     expect_token(parser, '{');
-    
+
     parser->current_scope = scope_symbols_in_structures_should_be_bound_to;
 
     b32 member_is_used = 0;
@@ -3668,7 +3668,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 //      #match
                 //      something :: (....) {
                 //      }
-                // 
+                //
                 // This will make converting something to a overloaded
                 // function easier and require less copying by the programmer.
                 if (next_tokens_are(parser, 2, ':', ':')) {
@@ -3715,7 +3715,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                     inject->documentation = parser->last_documentation_token;
                     parser->last_documentation_token = NULL;
                 }
-                
+
                 ENTITY_SUBMIT(inject);
                 return;
             }

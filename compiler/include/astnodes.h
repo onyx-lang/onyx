@@ -385,6 +385,7 @@ typedef enum OnyxIntrinsic {
 
     ONYX_INTRINSIC_MEMORY_SIZE, ONYX_INTRINSIC_MEMORY_GROW,
     ONYX_INTRINSIC_MEMORY_COPY, ONYX_INTRINSIC_MEMORY_FILL,
+    ONYX_INTRINSIC_MEMORY_EQUAL,
 
     ONYX_INTRINSIC_INITIALIZE,
 
@@ -1293,7 +1294,7 @@ struct AstImport {
     // be imported as. If NULL, the last token of
     // the package path is used. The following
     // imports the core package as C.
-    // 
+    //
     //     use core { C :: package }
     //
     OnyxToken *qualified_package_name;
@@ -1798,7 +1799,7 @@ typedef struct CheckerData {
 
 typedef struct ContextCaches {
     bh_imap implicit_cast_to_bool_cache;
-} ContextCaches; 
+} ContextCaches;
 
 typedef struct DefinedVariable {
     char *key;
