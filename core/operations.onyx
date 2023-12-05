@@ -1,7 +1,5 @@
 package builtin
 
-use core { intrinsics }
-
 //
 // This file contains builtin operator overloads.
 // It's in a separate file because we need to defer resolution of some definitions
@@ -28,8 +26,10 @@ use core { intrinsics }
 #operator * macro (l: [$N]$T, r: T) => __array_op_scalar(l, r, [a, b](a * b));
 #operator / macro (l: [$N]$T, r: T) => __array_op_scalar(l, r, [a, b](a / b));
 
-#operator == macro (l, r: [$N]$T) => intrinsics.wasm.memory_equal(cast(rawptr)l, cast(rawptr)r, N * sizeof T);
+#operator == macro (l, r: [$N]$T) => memory_equal(cast(rawptr)l, cast(rawptr)r, N * sizeof T);
 #operator != macro (l, r: [$N]$T) => !(l == r);
+
+memory_equal :: (a: rawptr, b: rawptr, count: i32) -> bool #intrinsic --- // So we don't have to include core.intrinsics
 
 __array_op_array :: macro (l, r: [$N]$T, $body: Code) -> [N]T {
     res: [N]T;
