@@ -749,11 +749,13 @@ fold :: macro (it: $T/Iterable, init: $R, combine: $S) =>
 
 #overload
 fold :: (it: Iterator($T), initial_value: $R, combine: (T, R) -> R) -> R {
+    result := initial_value;
+
     for value: it {
-        initial_value = combine(value, initial_value);
+        result = combine(value, result);
     }
 
-    return initial_value;
+    return result;
 }
 
 
