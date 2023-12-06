@@ -221,7 +221,10 @@ remove :: (arr: &[..] $T, elem: T) {
     while i := 0; i < arr.count - move {
         defer i += 1;
 
-        if arr.data[i + move] == elem do move += 1;
+        while i + move < arr.count && arr.data[i + move] == elem {
+            move += 1;
+        }
+
         if move != 0 do arr.data[i] = arr.data[i + move];
     }
 
@@ -309,8 +312,12 @@ filter :: macro (arr: &[..] $T, body: Code) {
     while i := 0; i < arr.count - move {
         defer i += 1;
 
-        it := arr.data[i];
-        if !(#unquote body(it)) do move += 1;
+        while i + move < arr.count {
+            it := arr.data[i + move];
+            if #unquote body(it) do break;
+            move += 1;
+        }
+
         if move != 0 do arr.data[i] = arr.data[i + move];
     }
 
