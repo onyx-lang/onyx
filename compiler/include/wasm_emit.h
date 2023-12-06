@@ -422,8 +422,8 @@ typedef enum WasmInstructionType {
     WI_I32X4_TRUNC_SAT_F32X4_U       = SIMD_INSTR_MASK | 249,
     WI_F32X4_CONVERT_I32X4_S         = SIMD_INSTR_MASK | 250,
     WI_F32X4_CONVERT_I32X4_U         = SIMD_INSTR_MASK | 251,
-    
-    
+
+
     WI_MEMORY_INIT                   = EXT_INSTR_MASK | 0x08,
     WI_MEMORY_COPY                   = EXT_INSTR_MASK | 0x0a,
     WI_MEMORY_FILL                   = EXT_INSTR_MASK | 0x0b,
@@ -699,7 +699,7 @@ typedef struct OnyxWasmModule {
     bh_imap elem_map;
 
     bh_arr(DeferredStmt)   deferred_stmts;
-    bh_arr(AllocatedSpace) local_allocations; 
+    bh_arr(AllocatedSpace) local_allocations;
 
     bh_arr(PatchInfo) stack_leave_patches;
     bh_arr(DatumPatchInfo) data_patches;
@@ -792,7 +792,7 @@ void onyx_wasm_module_free(OnyxWasmModule* module);
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer);
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);
 
-#ifdef ONYX_RUNTIME_LIBRARY 
+#ifdef ONYX_RUNTIME_LIBRARY
 void onyx_run_initialize(b32 debug_enabled);
 b32 onyx_run_wasm(bh_buffer code_buffer, int argc, char *argv[]);
 #endif

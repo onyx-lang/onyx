@@ -1,0 +1,25 @@
+#load "core/module"
+
+use core {*}
+
+main :: () {
+    a := i32.[ 1, 2, 3, 4 ];
+    b := i32.[ 1, 2, 3, 4 ];
+
+    println(a == b);
+    b.z = 2;
+    println(a != b);
+
+    c := a + b;
+    println(c);
+
+    d := a * 2;
+    println(d);
+
+    e := d / 2;
+    println(e == a);
+
+    f := a - a;
+    println(f.count == a.count);
+    println(f == i32.[ 0, 0, 0, 0 ]);
+}

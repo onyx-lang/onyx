@@ -317,7 +317,7 @@ static void debug_emit_instruction(OnyxWasmModule *mod, OnyxToken *token) {
         return;
     }
 
-    DebugContext *ctx = mod->debug_context; 
+    DebugContext *ctx = mod->debug_context;
     assert(ctx && ctx->last_token);
 
     // Sanity check
@@ -337,7 +337,7 @@ static void debug_emit_instruction(OnyxWasmModule *mod, OnyxToken *token) {
             repeat_previous = 1;
         }
     }
-    
+
     if (repeat_previous) {
         // Output / increment REP instruction
         if (ctx->last_op_was_rep) {
@@ -551,6 +551,7 @@ EMIT_FUNC(values_into_contiguous_memory,   u64 base_ptr_local, Type *type, u32 o
 EMIT_FUNC(struct_literal_into_contiguous_memory, AstStructLiteral* sl, u64 base_ptr_local, u32 offset);
 EMIT_FUNC(wasm_copy,                       OnyxToken *token);
 EMIT_FUNC(wasm_fill,                       OnyxToken *token);
+EMIT_FUNC(wasm_memory_equal,               OnyxToken *token);
 
 EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt, OnyxToken* block_token);
 EMIT_FUNC_NO_ARGS(leave_structured_block);
@@ -1316,7 +1317,7 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     WIL(for_node->token, WI_LOCAL_GET, step_local);
     WI(for_node->token, WI_I32_ADD);
     WIL(for_node->token, WI_LOCAL_SET, iter_local);
-    
+
     if (for_node->has_first) {
         WIL(for_node->token, WI_I32_CONST, 0);
         WIL(for_node->token, WI_LOCAL_SET, for_node->first_local);
@@ -1743,7 +1744,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
                 WIL(NULL, WI_LOCAL_GET, union_capture_idx);
                 WIL(NULL, WI_PTR_CONST, union_expr_type->Union.alignment);
                 WI(NULL, WI_PTR_ADD);
-                
+
                 WIL(NULL, WI_I32_CONST, type_size_of(sc->capture->type));
                 emit_wasm_copy(mod, &code, NULL);
             }
@@ -2145,7 +2146,7 @@ EMIT_FUNC(call, AstCall* call) {
                 emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Type_Index], reserve_size + 4);
 
                 local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-                
+
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WIL(call_token, WI_I32_CONST, reserve_size);
                 WI(call_token, WI_I32_ADD);
@@ -2239,7 +2240,7 @@ EMIT_FUNC(call, AstCall* call) {
 
     } else {
         emit_expression(mod, &code, call->callee);
-        
+
         u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_closure_base);
         WI(NULL, WI_DROP);
         WIL(NULL, WI_GLOBAL_SET, global_closure_base_idx);
@@ -2326,7 +2327,7 @@ EMIT_FUNC(method_call, AstBinaryOp *mcall) {
     } else {
         first_arg->value = (AstTyped *) tmp_local;
     }
-    
+
     //
     // Actually emit the function call.
     emit_call(mod, &code, call_node);
@@ -2407,7 +2408,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
 
     switch (call->intrinsic) {
         case ONYX_INTRINSIC_UNREACHABLE:  WI(call->token, WI_UNREACHABLE); break;
-        
+
         case ONYX_INTRINSIC_MEMORY_SIZE:  WID(call->token, WI_MEMORY_SIZE, 0x00); break;
         case ONYX_INTRINSIC_MEMORY_GROW:  WID(call->token, WI_MEMORY_GROW, 0x00); break;
         case ONYX_INTRINSIC_MEMORY_COPY:
@@ -2415,6 +2416,9 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
             break;
         case ONYX_INTRINSIC_MEMORY_FILL:
             emit_wasm_fill(mod, &code, call->token);
+            break;
+        case ONYX_INTRINSIC_MEMORY_EQUAL:
+            emit_wasm_memory_equal(mod, &code, call->token);
             break;
 
         case ONYX_INTRINSIC_INITIALIZE: {
@@ -3007,6 +3011,12 @@ EMIT_FUNC(wasm_fill, OnyxToken *token) {
     *pcode = code;
 }
 
+EMIT_FUNC(wasm_memory_equal, OnyxToken *token) {
+    bh_arr(WasmInstruction) code = *pcode;
+    emit_intrinsic_memory_equal(mod, &code);
+    *pcode = code;
+}
+
 EMIT_FUNC(values_into_contiguous_memory, u64 base_ptr_local, Type *type, u32 offset, i32 value_count, AstTyped **values) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -3525,7 +3535,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
             u64 capture_block_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
             WIL(NULL, WI_LOCAL_TEE, capture_block_ptr);
-            
+
             // Populate the block
             bh_arr_each(AstCaptureLocal *, capture, func->captures->captures) {
                 WIL(NULL, WI_LOCAL_GET, capture_block_ptr);
@@ -3538,7 +3548,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
                 emit_store_instruction(mod, &code, (*capture)->type, (*capture)->offset);
             }
-            
+
             local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
             WIL(NULL, WI_I32_CONST, func->captures->total_size_in_bytes);
@@ -3624,7 +3634,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
                     } else {
                         WIL(NULL, WI_I32_CONST, type_alignment_of(field->expr->type));
                     }
-                    
+
                     WI(NULL, WI_I32_ADD);
 
                     WIL(NULL, WI_I32_CONST, type_size_of(field->type->Union.variants_ordered[1]->type));
@@ -4326,7 +4336,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     if (fd == builtin_initialize_data_segments && !mod->doing_linking) {
         // This is a large hack, but is necessary.
         // This particular function (__initialize_data_segments) should not be generated
-        // until the module is in its linking phase. This is because we have to wait 
+        // until the module is in its linking phase. This is because we have to wait
         // until we have reached the linking phase to know every data element that is
         // and will be present. Without this, the generating data segments in the bodies
         // of the functions is not possible.
@@ -4379,7 +4389,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         u64 localidx = 0;
         bh_arr_each(AstParam, param, fd->params) {
             switch (type_get_param_pass(param->local->type)) {
-                case Param_Pass_By_Multiple_Values: 
+                case Param_Pass_By_Multiple_Values:
                     debug_introduce_symbol(mod, param->local->token, DSL_REGISTER, localidx | LOCAL_IS_WASM, param->local->type);
                     bh_imap_put(&mod->local_map, (u64) param->local, localidx | LOCAL_IS_WASM);
                     localidx += type_structlike_mem_count(param->local->type);
@@ -4618,7 +4628,7 @@ static void emit_raw_string(OnyxWasmModule* mod, char *data, i32 len, u64 *out_d
         bh_free(global_heap_allocator, strdata);
         return;
     }
-    
+
     // :ProperLinking
     // The length used here is one greater than the string length, because
     // we DO want to include the null-terminator in the outputted string.
@@ -4642,7 +4652,7 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
 
 static u32 emit_data_entry(OnyxWasmModule *mod, WasmDatum *datum) {
     datum->offset_ = 0;
-    datum->id = NEXT_DATA_ID(mod); 
+    datum->id = NEXT_DATA_ID(mod);
     bh_arr_push(mod->data, *datum);
     return datum->id;
 }
@@ -4933,7 +4943,7 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
         if (parent_file == NULL) parent_file = ".";
 
         char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
-        
+
         OnyxToken *filename_token = fc->filename_expr->token;
 
         token_toggle_end(filename_token);
@@ -5325,7 +5335,7 @@ b32 onyx_wasm_build_link_options_from_node(OnyxWasmLinkOptions *opts, AstTyped *
     assert(builtin_link_options_type);
 
     Type *link_options_type = type_build_from_ast(context.ast_alloc, builtin_link_options_type);
-    
+
     AstStructLiteral *input = (AstStructLiteral *) node;
 
     StructMember smem;

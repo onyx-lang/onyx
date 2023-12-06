@@ -115,10 +115,11 @@ IntrinsicTable intrinsic_table;
 static IntrinsicMap builtin_intrinsics[] = {
     { "unreachable",  ONYX_INTRINSIC_UNREACHABLE },
 
-    { "memory_size",  ONYX_INTRINSIC_MEMORY_SIZE },
-    { "memory_grow",  ONYX_INTRINSIC_MEMORY_GROW },
-    { "memory_copy",  ONYX_INTRINSIC_MEMORY_COPY },
-    { "memory_fill",  ONYX_INTRINSIC_MEMORY_FILL },
+    { "memory_size",  ONYX_INTRINSIC_MEMORY_SIZE  },
+    { "memory_grow",  ONYX_INTRINSIC_MEMORY_GROW  },
+    { "memory_copy",  ONYX_INTRINSIC_MEMORY_COPY  },
+    { "memory_fill",  ONYX_INTRINSIC_MEMORY_FILL  },
+    { "memory_equal", ONYX_INTRINSIC_MEMORY_EQUAL },
 
     { "__initialize", ONYX_INTRINSIC_INITIALIZE },
 
@@ -551,12 +552,12 @@ void initialize_builtins(bh_allocator a) {
 
     fori (i, 0, Binary_Op_Count) {
         operator_overloads[i] = NULL;
-        bh_arr_new(global_heap_allocator, operator_overloads[i], 4); 
+        bh_arr_new(global_heap_allocator, operator_overloads[i], 4);
     }
 
     fori (i, 0, Unary_Op_Count) {
         unary_operator_overloads[i] = NULL;
-        bh_arr_new(global_heap_allocator, unary_operator_overloads[i], 4); 
+        bh_arr_new(global_heap_allocator, unary_operator_overloads[i], 4);
     }
 
     IntrinsicMap* intrinsic = &builtin_intrinsics[0];
@@ -584,7 +585,7 @@ void initalize_special_globals() {
 
 void introduce_build_options(bh_allocator a) {
     Package* p = package_lookup_or_create("runtime", context.global_scope, a, context.global_scope->created_at);
-    
+
     // HACK creating this for later
     package_lookup_or_create("runtime.vars", p->scope, a, context.global_scope->created_at);
 

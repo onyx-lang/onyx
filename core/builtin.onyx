@@ -64,9 +64,9 @@ null :: cast(rawptr) 0
     `null_proc` is a special function that breaks the normal rules of type
     checking. `null_proc`, or any procedure marked with `#null`, is assignable
     to any function type, regardless of if the types match. For example,
-    
+
         f: (i32) -> i32 = null_proc;
-    
+
     Even though `null_proc` is a `() -> void` function, it bypasses that check
     and gets assigned to `f`. If f is called, there will be a runtime exception.
     This is by design.
@@ -393,22 +393,22 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 #doc """
    Represents a generic "iterator" or "generator" of a specific
    type. Can be used in a for-loop natively.
-   
+
    `data` is used for contextual information and is passed to
    the `next`, `close`, and `remove` procedures.
-   
+
    `next` is used to extract the next value out of the iterator.
    It returns the next value, and a continuation flag. If the
    flag is false, the value should be ignored and iteration should
    stop.
-   
+
    `close` should called when the iterator has ended. This is
    done automatically in for-loops, and in the `core.iter` library.
    In for-loops, `close` is called no matter which way the for-loop
    exits (`break`, `return`, etc). Using this rule, iterator can
    be used to create "resources" that automatically close when you
    are done with them.
-   
+
    `remove` is used to tell the iterator to remove the last value
    returned from some underlying data store. Invoked automatically
    using the `#remove` directive in a for-loop.
@@ -508,7 +508,7 @@ Link_Options :: struct {
     // But when stack_first is true, it is:
     //   reserved | stack | static-data | heap
     stack_first     := false;
-    
+
     // The size, in bytes of the stack.
     stack_size      := 16 * 65536;  // 16 pages * 65536 bytes per page = 1 MiB stack
 
@@ -563,9 +563,9 @@ Link_Options :: struct {
 #doc """
     Special type used to represent a package at runtime.
     For example,
-   
+
         x: package_id = package main
-   
+
     Currently, there is not much you can do with this; it is
     only used by the runtime.info library if you want to filter
     tags based on which package they are coming from.
@@ -577,11 +577,8 @@ package_id :: #distinct u32
 any_package :: cast(package_id) 0
 
 //
-// Allow for comparing `package_id`s
-#operator == macro (p1, p2: package_id) => cast(u32) p1 == cast(u32) p2;
-#operator != macro (p1, p2: package_id) => cast(u32) p1 != cast(u32) p2;
-
-
+// Load builtin operator overloads.
+#load "./operations.onyx"
 
 //
 // DEPRECATED THINGS
