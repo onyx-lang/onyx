@@ -2249,10 +2249,11 @@ CheckStatus check_method_call(AstBinaryOp** pmcall) {
             implicit_argument = (AstTyped *) address_of;
         }
 
-        implicit_argument = (AstTyped *) make_argument(context.ast_alloc, implicit_argument);
+        AstArgument *new_arg = make_argument(context.ast_alloc, implicit_argument);
+        new_arg->used_as_lval_of_method_call = 1;
 
         bh_arr_insertn(call_node->args.values, 0, 1);
-        call_node->args.values[0] = implicit_argument;
+        call_node->args.values[0] = (AstTyped *) new_arg;
 
         mcall->right->next = mcall->next;
         mcall->flags |= Ast_Flag_Has_Been_Checked;

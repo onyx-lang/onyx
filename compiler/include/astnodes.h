@@ -696,6 +696,7 @@ struct AstArgument      {
     VarArgKind va_kind;
     b32 is_baked : 1;
     b32 pass_as_any : 1;
+    b32 used_as_lval_of_method_call : 1;
 };
 struct AstSubscript   {
     AstTyped_base;
