@@ -383,7 +383,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
 
                 if (!valid) {
                     if (!(a_node->count_expr->flags & Ast_Flag_Const)) {
-                        onyx_report_error(a_node->token->pos, Error_Critical, "Array type size must be a constant expression.");
+                        onyx_report_error(a_node->token->pos, Error_Critical, "Array type size must be a constant.");
                     }
                     else {
                         onyx_report_error(a_node->token->pos, Error_Critical, "Array type size expression must be 'i32', got '%s'.",
