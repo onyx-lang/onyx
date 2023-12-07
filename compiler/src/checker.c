@@ -3414,13 +3414,29 @@ CheckStatus check_type(AstType** ptype) {
         case Ast_Kind_Function_Type: {
             AstFunctionType* ftype = (AstFunctionType *) type;
 
-            CHECK(type, &ftype->return_type);
+            if (ftype->being_checked) {
+                // ERROR(ftype->token->pos, "Circular-referential function types are currently not allowed.");
+                break;
+            }
+
+            ftype->being_checked = 1;
+            CheckStatus cs = check_type(&ftype->return_type);
+            if (cs > Check_Errors_Start) {
+                ftype->being_checked = 0;
+                return cs;
+            }
 
             if (ftype->param_count > 0) {
                 fori (i, 0, (i64) ftype->param_count) {
-                    CHECK(type, &ftype->params[i]);
+                    cs = check_type(&ftype->params[i]);
+                    if (cs > Check_Errors_Start) {
+                        ftype->being_checked = 0;
+                        return cs;
+                    }
                 }
             }
+
+            ftype->being_checked = 0;
             break;
         }
 

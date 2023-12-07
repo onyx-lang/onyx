@@ -314,16 +314,23 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
 
         case Ast_Kind_Function_Type: {
             AstFunctionType* ftype_node = (AstFunctionType *) type_node;
+            if (ftype_node->incomplete_type && ftype_node->being_checked) return ftype_node->incomplete_type;
             u64 param_count = ftype_node->param_count;
+
+            Type* func_type;
+            if (ftype_node->incomplete_type == NULL) {
+                func_type = type_create(Type_Kind_Function, alloc, param_count);
+                func_type->ast_type = type_node;
+                func_type->Function.param_count = param_count;
+                func_type->Function.needed_param_count = param_count;
+                func_type->Function.vararg_arg_pos = -1;
+                ftype_node->incomplete_type = func_type;
+            } else {
+                func_type = ftype_node->incomplete_type;
+            }
 
             Type* return_type = type_build_from_ast_inner(alloc, ftype_node->return_type, 1);
             if (return_type == NULL) return NULL;
-
-            Type* func_type = type_create(Type_Kind_Function, alloc, param_count);
-            func_type->ast_type = type_node;
-            func_type->Function.param_count = param_count;
-            func_type->Function.needed_param_count = param_count;
-            func_type->Function.vararg_arg_pos = -1;
             func_type->Function.return_type = return_type;
 
             if (param_count > 0) {

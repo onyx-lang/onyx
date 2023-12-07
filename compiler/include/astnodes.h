@@ -974,8 +974,12 @@ struct AstFunctionType  {
 
     // Used in a rare case in solve_for_polymorphic_param_type.
     Type *partial_function_type;
+    Type *incomplete_type;
 
     AstType* return_type;
+
+    // Used to ensure f :: #type () -> f does not work.
+    b32 being_checked : 1;
 
     u64 param_count;
     AstType* params[];
