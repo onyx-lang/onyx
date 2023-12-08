@@ -1129,6 +1129,10 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     else if (is_basic && (type->Basic.flags & Basic_Flag_SIMD)) {
         instr = WI_V128_LOAD;
     }
+    else if (is_basic && (type->Basic.kind == Basic_Kind_Void)) {
+        // Do nothing to "load" a void type.
+        return;
+    }
 
     WID(NULL, instr, ((WasmInstructionData) { alignment, offset }));
 

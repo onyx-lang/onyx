@@ -1100,6 +1100,10 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
 
                 } else {
                     fori (i, 0, store_expr_count) {
+                        if (right_type->Compound.types[i] == &basic_types[Basic_Kind_Void]) {
+                            ERROR(lhs->exprs[i]->token->pos, "Due to inference, this variables type would be 'void', which is not allowed.");
+                        }
+
                         TRY_ASSIGN_TYPE_OR_FAIL(&lhs->exprs[i], right_type->Compound.types[i], binop->token);
                     }
 
@@ -3293,7 +3297,7 @@ CheckStatus check_function_header(AstFunction* func) {
         if (param->vararg_kind != VA_Kind_Not_VA) has_had_varargs = 1;
 
         if (local->type->kind != Type_Kind_Array && type_size_of(local->type) == 0) {
-            ERROR(local->token->pos, "Function parameters cannot have zero-width types.");
+            ERROR(local->token->pos, "Function parameters cannot have 'void' as their type.");
         }
     }
 
