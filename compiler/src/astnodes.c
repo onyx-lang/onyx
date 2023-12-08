@@ -1804,6 +1804,14 @@ const char* node_get_type_name(void* node) {
         return "polymorphic procedure";
     }
 
+    if (((AstNode *) node)->kind == Ast_Kind_Overloaded_Function) {
+        return "overloaded procedure";
+    }
+
+    if (((AstNode *) node)->kind == Ast_Kind_Alias) {
+        return node_get_type_name(((AstAlias *) node)->alias);
+    }
+
     return type_get_name(((AstTyped *) node)->type);
 }
 
