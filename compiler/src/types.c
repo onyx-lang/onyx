@@ -382,7 +382,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 count = get_expression_integer_value(a_node->count_expr, &valid);
 
                 if (!valid) {
-                    if (!(a_node->count_expr->flags & Ast_Flag_Const)) {
+                    if (!(a_node->count_expr->flags & Ast_Flag_Comptime)) {
                         onyx_report_error(a_node->token->pos, Error_Critical, "Array type size must be a constant.");
                     }
                     else {
