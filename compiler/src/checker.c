@@ -1107,6 +1107,10 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
                 }
 
             } else {
+                if (right_type == &basic_types[Basic_Kind_Void]) {
+                    ERROR(binop->left->token->pos, "Due to inference, this variables type would be 'void', which is not allowed.");
+                }
+
                 binop->left->type = right_type;
             }
         }
@@ -2799,6 +2803,11 @@ CheckStatus check_statement(AstNode** pstmt) {
                     typed_stmt->flags |= Ast_Flag_Decl_Followed_By_Init;
                 }
             }
+            
+            if (typed_stmt->type != NULL && typed_stmt->type == &basic_types[Basic_Kind_Void]) {
+                ERROR(stmt->token->pos, "This local variable has a type of 'void', which is not allowed.");
+            }
+
             return Check_Success;
         }
 
