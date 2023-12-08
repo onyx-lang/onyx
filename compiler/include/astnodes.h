@@ -311,6 +311,8 @@ typedef enum AstFlags {
 
     Ast_Flag_Function_Is_Lambda    = BH_BIT(26),
     Ast_Flag_Function_Is_Lambda_Inside_PolyProc = BH_BIT(27),
+
+    Ast_Flag_Constraint_Is_Expression = BH_BIT(28),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -1241,16 +1243,19 @@ typedef enum ConstraintPhase {
 struct AstConstraint {
     AstNode_base;
 
-    ConstraintPhase phase;
+    ConstraintPhase        phase;
+    ConstraintCheckStatus* report_status;
 
-    AstInterface *interface;
-    bh_arr(AstType *) type_args;
-
-    ConstraintCheckStatus *report_status;
-
-    Scope* scope;
-    bh_arr(InterfaceConstraint) exprs;
-    u32 expr_idx;
+    union {
+        struct {
+            AstInterface *              interface;
+            bh_arr(AstType *)           type_args;
+            Scope*                      scope;
+            bh_arr(InterfaceConstraint) exprs;
+            u32                         expr_idx;
+        };
+        AstTyped *const_expr; // only used when flags & Ast_Flag_Constraint_Is_Expression
+    };
 };
 
 

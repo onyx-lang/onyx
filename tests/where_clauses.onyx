@@ -1,0 +1,33 @@
+#load "core/module"
+
+use core {*};
+
+main :: () {
+   a := f32.[ 1, 2, 3, 4 ];
+   b := f32.[ 1, 2, 3, 4 ];
+   c := add(a, b);
+   println(c);
+
+   d: Foo(typeof c);
+   d.values = c;
+}
+
+Adder :: interface(t: $T) {
+   { t + t } -> T;
+}
+
+add :: (a, b: [$N]$T) -> [N]T
+   where Adder(T), N > 0, N <= 4
+{
+   return a + b;
+}
+
+CanBeIndexed :: interface(t: $T) {
+   t[0];
+}
+
+Foo :: struct (T: type_expr) where CanBeIndexed(T) {
+   values: T;
+}
+
+
