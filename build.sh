@@ -1,6 +1,4 @@
 #!/bin/sh
-set -e
-
 DIST_DIR="./dist"
 
 compile_all() {
