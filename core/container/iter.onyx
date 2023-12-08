@@ -93,6 +93,25 @@ empty :: ($T: type_expr) -> Iterator(T) {
     };
 }
 
+
+#doc """
+    Helper function to create an infinite counting iterator.
+
+    Use `start` to configure the starting value.
+
+    Use `type` to configure the type used for the iterator.
+"""
+counter :: (start: type = 0, $type: type_expr = i32) -> Iterator(type) {
+    return generator(
+        &.{ i = start },
+        ctx => {
+            defer ctx.i += 1;
+            return ctx.i, true;
+        }
+    );
+}
+
+
 //
 // Implicit iterator creation
 //
