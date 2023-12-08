@@ -73,7 +73,7 @@ __start :: () {
 }
 
 #if Multi_Threading_Enabled {
-    __spawn_thread :: (id: i32, tls_base: rawptr, func: (data: rawptr) -> void, data: rawptr) -> bool #foreign "host" "spawn_thread" ---
+    __spawn_thread :: (id: i32, tls_base: rawptr, stack_base: rawptr, func: (data: rawptr) -> void, data: rawptr) -> bool #foreign "host" "spawn_thread" ---
     __kill_thread  :: (id: i32) -> i32 #foreign "host" "kill_thread" ---
 
     #export "_thread_start" runtime._thread_start
