@@ -77,7 +77,8 @@ compress_all() {
     # Sign the binaries on MacOS
     [ "$(uname)" = 'Darwin' ] && \
         codesign -s - "$DIST_DIR/bin/onyx" && \
-        [ -f "$DIST_DIR/lib/onyx_runtime.dylib" ] && codesign -s - "$DIST_DIR/lib/onyx_runtime.dylib"
+        [ -f "$DIST_DIR/lib/onyx_runtime.dylib" ] && \
+            codesign -s - "$DIST_DIR/lib/onyx_runtime.dylib"
 
     if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
         # When including a runtime library, include the lib and include folders
@@ -101,7 +102,8 @@ install_all() {
     # Sign the binaries on MacOS
     [ "$(uname)" = 'Darwin' ] && \
         codesign -s - "$ONYX_INSTALL_DIR/bin/onyx" && \
-        [ -f "$DIST_DIR/lib/onyx_runtime.dylib" ] && codesign -s - "$DIST_DIR/lib/onyx_runtime.dylib"
+        [ -f "$ONYX_INSTALL_DIR/lib/onyx_runtime.dylib" ] && \
+            codesign -s - "$ONYX_INSTALL_DIR/lib/onyx_runtime.dylib"
 }
 
 for arg in $@; do
