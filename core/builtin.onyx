@@ -542,7 +542,7 @@ Link_Options :: struct {
 
 // Define settings for the link options depending on the runtime.
 #local {
-    #if runtime.runtime == .Onyx {
+    #if runtime.runtime == .Onyx || (runtime.runtime == .Js && runtime.Multi_Threading_Enabled) {
         IMPORT_MEMORY_DEFAULT :: true;
         IMPORT_MEMORY_MODULE_NAME_DEFAULT :: "onyx";
         IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: "memory";
