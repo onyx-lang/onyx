@@ -157,11 +157,11 @@ void ovm_disassemble(ovm_program_t *program, u32 instr_addr, bh_buffer *instr_te
         case instr_format_imm:
             switch (OVM_INSTR_TYPE(*instr)) {
                 case OVM_TYPE_I8:   formatted = snprintf(buf, 255, "%%%d, %hhd", instr->r, instr->i); break;
-                case OVM_TYPE_I16:  formatted = snprintf(buf, 255, "%%%d, %hd", instr->r, instr->i); break;
-                case OVM_TYPE_I32:  formatted = snprintf(buf, 255, "%%%d, %d", instr->r, instr->i); break;
-                case OVM_TYPE_I64:  formatted = snprintf(buf, 255, "%%%d, %ld", instr->r, instr->l); break;
-                case OVM_TYPE_F32:  formatted = snprintf(buf, 255, "%%%d, %f", instr->r, instr->f); break;
-                case OVM_TYPE_F64:  formatted = snprintf(buf, 255, "%%%d, %lf", instr->r, instr->d); break;
+                case OVM_TYPE_I16:  formatted = snprintf(buf, 255, "%%%d, %hd",  instr->r, instr->i); break;
+                case OVM_TYPE_I32:  formatted = snprintf(buf, 255, "%%%d, %d",   instr->r, instr->i); break;
+                case OVM_TYPE_I64:  formatted = snprintf(buf, 255, "%%%d, %lld", instr->r, instr->l); break;
+                case OVM_TYPE_F32:  formatted = snprintf(buf, 255, "%%%d, %f",   instr->r, instr->f); break;
+                case OVM_TYPE_F64:  formatted = snprintf(buf, 255, "%%%d, %lf",  instr->r, instr->d); break;
             }
             break;
 
@@ -190,6 +190,8 @@ void ovm_disassemble(ovm_program_t *program, u32 instr_addr, bh_buffer *instr_te
                 formatted = snprintf(buf, 255, "%%%d", instr->a);
             }
             break;
+
+        default: break;
     }
 
     if (formatted > 0) {

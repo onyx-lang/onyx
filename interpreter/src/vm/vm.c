@@ -32,10 +32,10 @@
 
 static inline void ovm_print_val(ovm_value_t val) {
     switch (val.type) {
-        case OVM_TYPE_I32: printf("i32[%d]", val.i32); break;
-        case OVM_TYPE_I64: printf("i64[%ld]", val.i64); break;
-        case OVM_TYPE_F32: printf("f32[%f]", val.f32); break;
-        case OVM_TYPE_F64: printf("f64[%lf]", val.f64); break;
+        case OVM_TYPE_I32: printf("i32[%d]",   val.i32); break;
+        case OVM_TYPE_I64: printf("i64[%lld]", val.i64); break;
+        case OVM_TYPE_F32: printf("f32[%f]",   val.f32); break;
+        case OVM_TYPE_F64: printf("f64[%lf]",  val.f64); break;
     }
 }
 

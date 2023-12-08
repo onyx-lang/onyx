@@ -36,7 +36,7 @@ static bool lookup_stack_pointer(debug_runtime_value_builder_t *builder, u32 *ou
         return false;
     }
 
-    *out = stack_ptr.u32;    
+    *out = stack_ptr.u32;
     return true;
 }
 
@@ -51,20 +51,20 @@ static void append_value_from_memory_with_type(debug_runtime_value_builder_t *bu
                 case debug_type_primitive_kind_void: WRITE("void"); break;
                 case debug_type_primitive_kind_signed_integer:
                     switch (type->size) {
-                        case 1: WRITE_FORMAT("%hhd", *(i8 *)  base); break;
-                        case 2: WRITE_FORMAT("%hd",  *(i16 *) base); break;
-                        case 4: WRITE_FORMAT("%d",   *(i32 *) base); break;
-                        case 8: WRITE_FORMAT("%ld",  *(i64 *) base); break;
+                        case 1: WRITE_FORMAT("%hhd",  *(i8 *)  base); break;
+                        case 2: WRITE_FORMAT("%hd",   *(i16 *) base); break;
+                        case 4: WRITE_FORMAT("%d",    *(i32 *) base); break;
+                        case 8: WRITE_FORMAT("%lld",  *(i64 *) base); break;
                         default: WRITE("(err)"); break;
                     }
                     break;
 
                 case debug_type_primitive_kind_unsigned_integer:
                     switch (type->size) {
-                        case 1: WRITE_FORMAT("%hhu", *(u8 *) base); break;
-                        case 2: WRITE_FORMAT("%hu",  *(u16 *) base); break;
-                        case 4: WRITE_FORMAT("%u",   *(u32 *) base); break;
-                        case 8: WRITE_FORMAT("%lu",  *(u64 *) base); break;
+                        case 1: WRITE_FORMAT("%hhu",  *(u8 *) base); break;
+                        case 2: WRITE_FORMAT("%hu",   *(u16 *) base); break;
+                        case 4: WRITE_FORMAT("%u",    *(u32 *) base); break;
+                        case 8: WRITE_FORMAT("%llu",  *(u64 *) base); break;
                         default: WRITE("(err)"); break;
                     }
                     break;
@@ -101,8 +101,8 @@ static void append_value_from_memory_with_type(debug_runtime_value_builder_t *bu
             switch (type->modifier.modifier_kind) {
                 case debug_type_modifier_kind_pointer:
                     switch (type->size) {
-                        case 4: WRITE_FORMAT("0x%x",   *(u32 *) base); break;
-                        case 8: WRITE_FORMAT("0x%lx",  *(u64 *) base); break;
+                        case 4: WRITE_FORMAT("0x%x",    *(u32 *) base); break;
+                        case 8: WRITE_FORMAT("0x%llx",  *(u64 *) base); break;
                         default: WRITE("(err)"); break;
                     }
                     break;
@@ -176,7 +176,7 @@ static void append_value_from_memory_with_type(debug_runtime_value_builder_t *bu
             if (name) {
                 WRITE(name);
             } else {
-                WRITE_FORMAT("%lu", value);
+                WRITE_FORMAT("%llu", value);
             }
 
             break;
@@ -190,7 +190,7 @@ static void append_value_from_memory_with_type(debug_runtime_value_builder_t *bu
             } else {
                 debug_type_union_variant_t *uv = &type->onion.variants[variant];
 
-                WRITE_FORMAT("%s(", uv->name); 
+                WRITE_FORMAT("%s(", uv->name);
                 append_value_from_memory_with_type(builder, bh_pointer_add(base, type->onion.tag_size), uv->type);
                 WRITE(")");
             }
@@ -244,20 +244,20 @@ static void append_ovm_value_with_type(debug_runtime_value_builder_t *builder, o
                 case debug_type_primitive_kind_void: WRITE("void"); break;
                 case debug_type_primitive_kind_signed_integer:
                     switch (type->size) {
-                        case 1: WRITE_FORMAT("%hhd", value.i8); break;
-                        case 2: WRITE_FORMAT("%hd",  value.i16); break;
-                        case 4: WRITE_FORMAT("%d",   value.i32); break;
-                        case 8: WRITE_FORMAT("%ld",  value.i64); break;
+                        case 1: WRITE_FORMAT("%hhd",  value.i8); break;
+                        case 2: WRITE_FORMAT("%hd",   value.i16); break;
+                        case 4: WRITE_FORMAT("%d",    value.i32); break;
+                        case 8: WRITE_FORMAT("%lld",  value.i64); break;
                         default: WRITE("(err)"); break;
                     }
                     break;
 
                 case debug_type_primitive_kind_unsigned_integer:
                     switch (type->size) {
-                        case 1: WRITE_FORMAT("%hhu", value.u8); break;
-                        case 2: WRITE_FORMAT("%hu",  value.u16); break;
-                        case 4: WRITE_FORMAT("%u",   value.u32); break;
-                        case 8: WRITE_FORMAT("%lu",  value.u64); break;
+                        case 1: WRITE_FORMAT("%hhu",  value.u8); break;
+                        case 2: WRITE_FORMAT("%hu",   value.u16); break;
+                        case 4: WRITE_FORMAT("%u",    value.u32); break;
+                        case 8: WRITE_FORMAT("%llu",  value.u64); break;
                         default: WRITE("(err)"); break;
                     }
                     break;
@@ -285,7 +285,7 @@ static void append_ovm_value_with_type(debug_runtime_value_builder_t *builder, o
                 case debug_type_modifier_kind_pointer:
                     switch (type->size) {
                         case 4: WRITE_FORMAT("0x%x",   value.u32); break;
-                        case 8: WRITE_FORMAT("0x%lx",  value.u64); break;
+                        case 8: WRITE_FORMAT("0x%llx", value.u64); break;
                         default: WRITE("(err)"); break;
                     }
                     break;
@@ -320,7 +320,7 @@ static void append_ovm_value_with_type(debug_runtime_value_builder_t *builder, o
         case debug_type_kind_enum: {
             char *name = debug_info_type_enum_find_name(builder->info, type_id, value.u64);
             if (name == NULL) {
-                WRITE_FORMAT("%lu", value.u64);
+                WRITE_FORMAT("%llu", value.u64);
             } else {
                 WRITE(name);
             }
@@ -409,13 +409,13 @@ static u32 get_subvalues_for_type(debug_runtime_value_builder_t *builder, u32 ty
         case debug_type_kind_modifier:
             if (t->modifier.modifier_kind == debug_type_modifier_kind_pointer) return 1;
             return 0;
-        
+
         case debug_type_kind_alias:
             return get_subvalues_for_type(builder, t->alias.aliased_type);
 
         case debug_type_kind_structure:
             return t->structure.member_count;
-        
+
         case debug_type_kind_array: return t->array.count;
 
         case debug_type_kind_slice: {
@@ -434,7 +434,7 @@ static u32 get_subvalues_for_type(debug_runtime_value_builder_t *builder, u32 ty
                 u32 stack_ptr;
                 if (!lookup_stack_pointer(builder, &stack_ptr)) {
                     return 0;
-                }    
+                }
 
                 u32 *ptr_loc = bh_pointer_add(builder->state->ovm_engine->memory, stack_ptr + builder->base_loc + 4);
                 count = *ptr_loc;
@@ -451,6 +451,8 @@ static u32 get_subvalues_for_type(debug_runtime_value_builder_t *builder, u32 ty
 
             return count;
         }
+
+        default: return 0;
     }
 }
 
@@ -500,7 +502,7 @@ void debug_runtime_value_build_descend(debug_runtime_value_builder_t *builder, u
             u32 stack_ptr;
             if (!lookup_stack_pointer(builder, &stack_ptr)) {
                 goto bad_case;
-            }    
+            }
 
             u32 *ptr_loc = bh_pointer_add(builder->state->ovm_engine->memory, stack_ptr + builder->base_loc);
             builder->base_loc = *ptr_loc;
@@ -580,7 +582,7 @@ void debug_runtime_value_build_descend(debug_runtime_value_builder_t *builder, u
             u32 stack_ptr;
             if (!lookup_stack_pointer(builder, &stack_ptr)) {
                 goto bad_case;
-            }    
+            }
 
             u32 *data_loc = bh_pointer_add(builder->state->ovm_engine->memory, stack_ptr + builder->base_loc);
 
@@ -600,7 +602,7 @@ void debug_runtime_value_build_descend(debug_runtime_value_builder_t *builder, u
 
   bad_case:
     builder->base_loc_kind = debug_sym_loc_unknown;
-    return;        
+    return;
 }
 
 bool debug_runtime_value_build_step(debug_runtime_value_builder_t *builder) {
@@ -632,7 +634,7 @@ bool debug_runtime_value_build_step(debug_runtime_value_builder_t *builder) {
             u32 stack_ptr;
             if (!lookup_stack_pointer(builder, &stack_ptr)) {
                 return false;
-            }    
+            }
 
             u32 *data_loc = bh_pointer_add(builder->state->ovm_engine->memory, stack_ptr + builder->base_loc);
 
@@ -730,7 +732,7 @@ bool debug_runtime_value_build_step(debug_runtime_value_builder_t *builder) {
             u32 stack_ptr;
             if (!lookup_stack_pointer(builder, &stack_ptr)) {
                 return false;
-            }    
+            }
 
             u32 *data_loc = bh_pointer_add(builder->state->ovm_engine->memory, stack_ptr + builder->base_loc);
 

@@ -3,7 +3,7 @@
 //
 // This file is not to be compile like normal.
 // It is instead included in wasm/module.c
-// 
+//
 // Currently, this file has a lot of code that directly manipulates
 // the code builder object. I would like to move this into the API
 // for the code builder itself, to make it more portable and easy
@@ -20,7 +20,7 @@ struct build_context {
 
     int func_table_arr_idx;
     int next_external_func_idx;
-    
+
     debug_info_builder_t debug_builder;
 
     // This will be set/reset for every code (function) entry.
@@ -52,21 +52,21 @@ static inline wasm_valkind_t parse_valtype(build_context *ctx) {
         case 0x7e: return WASM_I64;
         case 0x7d: return WASM_F32;
         case 0x7c: return WASM_F64;
-        case 0x7b: assert(("SIMD values are not currently supported", 0));
+        case 0x7b: assert(0 && "SIMD values are not currently supported");
         case 0x70: return WASM_FUNCREF;
         case 0x6F: return WASM_ANYREF;
-        default:   assert(("Invalid valtype.", 0));
+        default:   assert(0 && "Invalid valtype.");
     }
 }
 
 static void parse_custom_section(build_context *ctx) {
-    unsigned int section_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    unsigned int section_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
     unsigned int end_of_section = ctx->offset + section_size;
 
     struct wasm_custom_section_t cs;
 
     char name[256];
-    unsigned int name_len = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    unsigned int name_len = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
     if (name_len < sizeof(name) - 1) {
         strncpy(name, &((char *) ctx->binary.data)[ctx->offset], name_len);
         name[name_len] = '\0';
@@ -81,23 +81,23 @@ static void parse_custom_section(build_context *ctx) {
         shput(ctx->module->custom_sections, name, cs);
 
         if (!strcmp(name, "ovm_debug_files")) {
-            debug_info_import_file_info(ctx->debug_builder.info, cs.data, cs.size);
+            debug_info_import_file_info(ctx->debug_builder.info, (u8 *)cs.data, cs.size);
         }
 
         if (!strcmp(name, "ovm_debug_funcs")) {
-            debug_info_import_func_info(ctx->debug_builder.info, cs.data, cs.size);
+            debug_info_import_func_info(ctx->debug_builder.info, (u8 *)cs.data, cs.size);
         }
 
         if (!strcmp(name, "ovm_debug_ops")) {
-            debug_info_builder_prepare(&ctx->debug_builder, cs.data);
+            debug_info_builder_prepare(&ctx->debug_builder, (u8 *)cs.data);
         }
 
         if (!strcmp(name, "ovm_debug_syms")) {
-            debug_info_import_sym_info(ctx->debug_builder.info, cs.data, cs.size);
+            debug_info_import_sym_info(ctx->debug_builder.info, (u8 *)cs.data, cs.size);
         }
 
         if (!strcmp(name, "ovm_debug_types")) {
-            debug_info_import_type_info(ctx->debug_builder.info, cs.data, cs.size);
+            debug_info_import_type_info(ctx->debug_builder.info, (u8 *)cs.data, cs.size);
         }
     }
 
@@ -105,22 +105,22 @@ static void parse_custom_section(build_context *ctx) {
 }
 
 static void parse_type_section(build_context *ctx) {
-    unsigned int section_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
-    unsigned int type_count   = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    unsigned int section_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
+    unsigned int type_count   = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
     wasm_functype_vec_new_uninitialized(&ctx->module->type_section, type_count);
 
     fori (i, 0, (int) type_count) {
         assert(CONSUME_BYTE(ctx) == 0x60); // @ReportError
 
-        unsigned int param_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+        unsigned int param_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
         wasm_valtype_vec_t param_types;
         wasm_valtype_vec_new_uninitialized(&param_types, param_count);
         fori (p, 0, (int) param_count) {
             param_types.data[p] = wasm_valtype_new(parse_valtype(ctx));
         }
 
-        unsigned int result_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+        unsigned int result_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
         wasm_valtype_vec_t result_types;
         wasm_valtype_vec_new_uninitialized(&result_types, result_count);
         fori (p, 0, (int) result_count) {
@@ -136,9 +136,9 @@ static wasm_limits_t parse_limits(build_context *ctx) {
     bool maximum_present = CONSUME_BYTE(ctx) & 0x01;
 
     wasm_limits_t limits;
-    limits.min = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    limits.min = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
     if (maximum_present) {
-        limits.max = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+        limits.max = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
     } else {
         limits.max = wasm_limits_max_default;
     }
@@ -169,18 +169,18 @@ static wasm_globaltype_t *parse_globaltype(build_context *ctx) {
 }
 
 static void parse_import_section(build_context *ctx) {
-    unsigned int section_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
-    unsigned int import_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    unsigned int section_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
+    unsigned int import_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
     wasm_importtype_vec_new_uninitialized(&ctx->module->imports, import_count);
 
     fori (i, 0, (int) import_count) {
-        unsigned int mod_name_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+        unsigned int mod_name_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
         wasm_byte_vec_t module_name;
         wasm_byte_vec_new_uninitialized(&module_name, mod_name_size);
         fori (n, 0, mod_name_size) module_name.data[n] = CONSUME_BYTE(ctx);
 
-        unsigned int import_name_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+        unsigned int import_name_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
         wasm_byte_vec_t import_name;
         wasm_byte_vec_new_uninitialized(&import_name, import_name_size);
         fori (n, 0, import_name_size) import_name.data[n] = CONSUME_BYTE(ctx);
@@ -188,7 +188,7 @@ static void parse_import_section(build_context *ctx) {
         wasm_externtype_t *import_type = NULL;
         switch (CONSUME_BYTE(ctx)) {
             case 0x00: {
-                unsigned int type_idx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+                unsigned int type_idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
                 import_type = wasm_functype_as_externtype(ctx->module->type_section.data[type_idx]);
                 break;
             }
@@ -215,20 +215,20 @@ static void parse_import_section(build_context *ctx) {
 }
 
 static void parse_func_section(build_context *ctx) {
-    unsigned int section_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
-    unsigned int func_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    unsigned int section_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
+    unsigned int func_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
     wasm_functype_vec_new_uninitialized(&ctx->module->functypes, func_count);
 
     fori (i, 0, (int) func_count) {
-        unsigned int index = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+        unsigned int index = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
         ctx->module->functypes.data[i] = ctx->module->type_section.data[index];
     }
 }
 
 static void parse_table_section(build_context *ctx) {
-    unsigned int section_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
-    unsigned int table_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    unsigned int section_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
+    unsigned int table_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
     wasm_tabletype_vec_new_uninitialized(&ctx->module->tabletypes, table_count);
 
@@ -238,8 +238,8 @@ static void parse_table_section(build_context *ctx) {
 }
 
 static void parse_memory_section(build_context *ctx) {
-    unsigned int section_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
-    unsigned int memory_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    unsigned int section_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
+    unsigned int memory_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
     wasm_memorytype_vec_new_uninitialized(&ctx->module->memorytypes, memory_count);
 
@@ -249,8 +249,8 @@ static void parse_memory_section(build_context *ctx) {
 }
 
 static void parse_global_section(build_context *ctx) {
-    unsigned int section_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
-    unsigned int global_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    unsigned int section_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
+    unsigned int global_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
     wasm_globaltype_vec_new_uninitialized(&ctx->module->globaltypes, global_count);
 
@@ -260,13 +260,13 @@ static void parse_global_section(build_context *ctx) {
         switch (CONSUME_BYTE(ctx)) {
             case 0x41: {
                 gt->type.global.initial_value.kind = WASM_I32;
-                gt->type.global.initial_value.of.i32 = (i32) uleb128_to_uint(ctx->binary.data, &ctx->offset);
+                gt->type.global.initial_value.of.i32 = (i32) uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
                 break;
             }
 
             case 0x42: {
                 gt->type.global.initial_value.kind = WASM_I64;
-                gt->type.global.initial_value.of.i64 = (i64) uleb128_to_uint(ctx->binary.data, &ctx->offset);
+                gt->type.global.initial_value.of.i64 = (i64) uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
                 break;
             }
 
@@ -292,19 +292,19 @@ static void parse_global_section(build_context *ctx) {
 }
 
 static void parse_export_section(build_context *ctx) {
-    unsigned int section_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
-    unsigned int export_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    unsigned int section_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
+    unsigned int export_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
     wasm_exporttype_vec_new_uninitialized(&ctx->module->exports, export_count);
 
     fori (i, 0, (int) export_count) {
-        unsigned int export_name_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+        unsigned int export_name_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
         wasm_byte_vec_t export_name;
         wasm_byte_vec_new_uninitialized(&export_name, export_name_size);
         fori (n, 0, export_name_size) export_name.data[n] = CONSUME_BYTE(ctx);
 
         unsigned int type = CONSUME_BYTE(ctx);
-        unsigned int idx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+        unsigned int idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
         wasm_externtype_t *export_type = NULL;
 
@@ -325,13 +325,13 @@ static void parse_export_section(build_context *ctx) {
 }
 
 static void parse_start_section(build_context *ctx) {
-    unsigned int section_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
-    ctx->module->start_func_idx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    unsigned int section_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
+    ctx->module->start_func_idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 }
 
 static void parse_elem_section(build_context *ctx) {
-    unsigned int section_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
-    unsigned int elem_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    unsigned int section_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
+    unsigned int elem_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
     // This is going to be a mess...
     // I am only going to handle the case of a single, active, offset-0,
@@ -343,23 +343,23 @@ static void parse_elem_section(build_context *ctx) {
     assert(CONSUME_BYTE(ctx) == 0x00);
     assert(CONSUME_BYTE(ctx) == 0x0B);
 
-    unsigned int entry_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    unsigned int entry_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
     ctx->module->elem_count = entry_count;
     ctx->module->elem_entries = malloc(sizeof(unsigned int) * entry_count);
 
     fori (i, 0, (int) entry_count) {
-        ctx->module->elem_entries[i] = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+        ctx->module->elem_entries[i] = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
     }
 
-    ctx->func_table_arr_idx = ovm_program_register_static_ints(ctx->program, entry_count, ctx->module->elem_entries);
+    ctx->func_table_arr_idx = ovm_program_register_static_ints(ctx->program, entry_count, (int *)ctx->module->elem_entries);
 
     assert(ctx->module->tabletypes.size == 1);
     ctx->module->tabletypes.data[0]->type.table.static_arr = ctx->func_table_arr_idx;
 }
 
 static void parse_data_section(build_context *ctx) {
-    unsigned int section_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
-    unsigned int data_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    unsigned int section_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
+    unsigned int data_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
     if (ctx->module->data_count_present) {
         assert(ctx->module->data_count == data_count);
@@ -379,12 +379,12 @@ static void parse_data_section(build_context *ctx) {
         char data_type = CONSUME_BYTE(ctx);
         if (data_type == 0x00) {
             assert(CONSUME_BYTE(ctx) == 0x41);
-            data_entry.offset = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+            data_entry.offset = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
             data_entry.passive = false;
             assert(CONSUME_BYTE(ctx) == 0x0B);
         }
 
-        data_entry.length = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+        data_entry.length = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
         data_entry.data = bh_pointer_add(ctx->binary.data, ctx->offset);
         ctx->offset += data_entry.length;
 
@@ -393,8 +393,8 @@ static void parse_data_section(build_context *ctx) {
 }
 
 static void parse_data_count_section(build_context *ctx) {
-    unsigned int section_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
-    unsigned int data_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    unsigned int section_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
+    unsigned int data_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
     ctx->module->data_count_present = true;
     ctx->module->data_count = data_count;
@@ -409,7 +409,7 @@ static void parse_data_count_section(build_context *ctx) {
 static void parse_expression(build_context *ctx);
 
 static void parse_fc_instruction(build_context *ctx) {
-    int instr_num = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    int instr_num = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
     switch (instr_num) {
         case 0: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_CVT_F32, OVM_TYPE_I32)); break;
@@ -422,7 +422,7 @@ static void parse_fc_instruction(build_context *ctx) {
         case 7: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_CVT_F64, OVM_TYPE_I64)); break;
 
         case 8: {
-            int dataidx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+            int dataidx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
             assert(CONSUME_BYTE(ctx) == 0x00);
 
             ovm_code_builder_add_imm(&ctx->builder, OVM_TYPE_I32, &dataidx);
@@ -445,19 +445,19 @@ static void parse_fc_instruction(build_context *ctx) {
             break;
         }
 
-        default: assert(("UNHANDLED FC INSTRUCTION", 0));
+        default: assert(0 && "UNHANDLED FC INSTRUCTION");
     }
 }
 
 static void parse_fe_instruction(build_context *ctx) {
-    int instr_num = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    int instr_num = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
     switch (instr_num) {
 
 #define LOAD_CASE(num, type) \
         case num : { \
-            int alignment = uleb128_to_uint(ctx->binary.data, &ctx->offset); \
-            int offset    = uleb128_to_uint(ctx->binary.data, &ctx->offset); \
+            int alignment = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset); \
+            int offset    = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset); \
             ovm_code_builder_add_atomic_load(&ctx->builder, type, offset); \
             break; \
         }
@@ -474,8 +474,8 @@ static void parse_fe_instruction(build_context *ctx) {
 
 #define STORE_CASE(num, type) \
         case num : { \
-            int alignment = uleb128_to_uint(ctx->binary.data, &ctx->offset); \
-            int offset    = uleb128_to_uint(ctx->binary.data, &ctx->offset); \
+            int alignment = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset); \
+            int offset    = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset); \
             ovm_code_builder_add_atomic_store(&ctx->builder, type, offset); \
             break; \
         }
@@ -492,8 +492,8 @@ static void parse_fe_instruction(build_context *ctx) {
 
 #define CMPXCHG_CASE(num, type) \
         case num : { \
-            int alignment = uleb128_to_uint(ctx->binary.data, &ctx->offset); \
-            int offset    = uleb128_to_uint(ctx->binary.data, &ctx->offset); \
+            int alignment = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset); \
+            int offset    = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset); \
             ovm_code_builder_add_cmpxchg(&ctx->builder, type, offset); \
             break; \
         }
@@ -508,7 +508,7 @@ static void parse_fe_instruction(build_context *ctx) {
 
 #undef CMPXCHG_CASE
 
-        default: assert(("UNHANDLED ATOMIC INSTRUCTION... SORRY :/", 0));
+        default: assert(0 && "UNHANDLED ATOMIC INSTRUCTION... SORRY :/");
     }
 }
 
@@ -564,7 +564,7 @@ static void parse_instruction(build_context *ctx) {
         }
 
         case 0x0C: {
-            int label_idx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+            int label_idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
             label_target_t target = ovm_code_builder_wasm_target_idx(&ctx->builder, label_idx);
             ovm_code_builder_add_branch(&ctx->builder, target.idx);
@@ -572,7 +572,7 @@ static void parse_instruction(build_context *ctx) {
         }
 
         case 0x0D: {
-            int label_idx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+            int label_idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
             label_target_t target = ovm_code_builder_wasm_target_idx(&ctx->builder, label_idx);
             ovm_code_builder_add_cond_branch(&ctx->builder, target.idx, true, false);
@@ -582,16 +582,16 @@ static void parse_instruction(build_context *ctx) {
         case 0x0E: {
             // Branch tables are the most complicated thing ever :/
 
-            int entry_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+            int entry_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
             int *entries = bh_alloc_array(bh_heap_allocator(), int, entry_count);
 
             fori (i, 0, entry_count) {
-                int label_idx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+                int label_idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
                 label_target_t target = ovm_code_builder_wasm_target_idx(&ctx->builder, label_idx);
                 entries[i] = target.idx;
             }
 
-            int default_entry_idx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+            int default_entry_idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
             label_target_t target = ovm_code_builder_wasm_target_idx(&ctx->builder, default_entry_idx);
             int default_entry = target.idx;
 
@@ -605,7 +605,7 @@ static void parse_instruction(build_context *ctx) {
         }
 
         case 0x10: {
-            int func_idx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+            int func_idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
             wasm_functype_t *functype = wasm_module_index_functype(ctx->module, func_idx);
             int param_count = functype->type.func.params.size;
@@ -615,8 +615,8 @@ static void parse_instruction(build_context *ctx) {
         }
 
         case 0x11: {
-            int type_idx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
-            int table_idx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+            int type_idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
+            int table_idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
             assert(table_idx == 0);
 
             wasm_functype_t *functype = ctx->module->type_section.data[type_idx];
@@ -633,39 +633,39 @@ static void parse_instruction(build_context *ctx) {
         case 0x1B: assert(0);
 
         case 0x20: {
-            int local_idx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+            int local_idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
             ovm_code_builder_add_local_get(&ctx->builder, local_idx);
             break;
         }
 
         case 0x21: {
-            int local_idx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+            int local_idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
             ovm_code_builder_add_local_set(&ctx->builder, local_idx);
             break;
         }
 
         case 0x22: {
-            int local_idx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+            int local_idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
             ovm_code_builder_add_local_tee(&ctx->builder, local_idx);
             break;
         }
 
         case 0x23: {
-            int global_idx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+            int global_idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
             ovm_code_builder_add_register_get(&ctx->builder, global_idx);
             break;
         }
 
         case 0x24: {
-            int global_idx = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+            int global_idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
             ovm_code_builder_add_register_set(&ctx->builder, global_idx);
             break;
         }
 
 #define LOAD_CASE(num, type, convert, convert_op, convert_type) \
         case num : { \
-            int alignment = uleb128_to_uint(ctx->binary.data, &ctx->offset); \
-            int offset    = uleb128_to_uint(ctx->binary.data, &ctx->offset); \
+            int alignment = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset); \
+            int offset    = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset); \
             ovm_code_builder_add_load(&ctx->builder, type, offset); \
             if (convert) ovm_code_builder_add_unop(&ctx->builder, OVM_TYPED_INSTR(convert_op, convert_type)); \
             break; \
@@ -691,8 +691,8 @@ static void parse_instruction(build_context *ctx) {
 
 #define STORE_CASE(num, type) \
         case num : { \
-            int alignment = uleb128_to_uint(ctx->binary.data, &ctx->offset); \
-            int offset    = uleb128_to_uint(ctx->binary.data, &ctx->offset); \
+            int alignment = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset); \
+            int offset    = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset); \
             ovm_code_builder_add_store(&ctx->builder, type, offset); \
             break; \
         }
@@ -723,7 +723,7 @@ static void parse_instruction(build_context *ctx) {
         }
 
         case 0x41: {
-            i64 value = leb128_to_int(ctx->binary.data, &ctx->offset);
+            i64 value = leb128_to_int((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
             // NOTE: This assumes a little-endian CPU as the address is assumes
             // to be the least significant byte.
@@ -732,7 +732,7 @@ static void parse_instruction(build_context *ctx) {
         }
 
         case 0x42: {
-            i64 value = leb128_to_int(ctx->binary.data, &ctx->offset);
+            i64 value = leb128_to_int((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
             ovm_code_builder_add_imm(&ctx->builder, OVM_TYPE_I64, &value);
             break;
         }
@@ -901,7 +901,7 @@ static void parse_instruction(build_context *ctx) {
         case 0xFC: parse_fc_instruction(ctx); break;
         case 0xFE: parse_fe_instruction(ctx); break;
 
-        default: assert(("UNHANDLED INSTRUCTION", 0));
+        default: assert(0 && "UNHANDLED INSTRUCTION");
     }
 }
 
@@ -912,22 +912,22 @@ static void parse_expression(build_context *ctx) {
 }
 
 static void parse_code_section(build_context *ctx) {
-    unsigned int section_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
-    unsigned int code_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+    unsigned int section_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
+    unsigned int code_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
     assert(ctx->module->functypes.size == code_count);
 
     ctx->module->memory_init_external_idx = ctx->next_external_func_idx++;
-    
+
     // HACK HACK HACK THIS IS SUCH A BAD WAY OF DOING THIS
     ctx->module->memory_init_idx = bh_arr_length(ctx->program->funcs) + code_count;
 
     fori (i, 0, (int) code_count) {
-        unsigned int code_size = uleb128_to_uint(ctx->binary.data, &ctx->offset);
-        unsigned int local_sections_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+        unsigned int code_size = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
+        unsigned int local_sections_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
 
         unsigned int total_locals = 0;
         fori (j, 0, (int) local_sections_count) {
-            unsigned int local_count = uleb128_to_uint(ctx->binary.data, &ctx->offset);
+            unsigned int local_count = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);
             wasm_valkind_t valtype = parse_valtype(ctx);
 
             total_locals += local_count;
@@ -976,6 +976,6 @@ static void parse_section(build_context *ctx) {
         case WASM_CODE_SECTION:   parse_code_section(ctx);       break;
         case WASM_DATA_SECTION:   parse_data_section(ctx);       break;
         case WASM_DATAC_SECTION:  parse_data_count_section(ctx); break;
-        default: assert(("bad section number", 0)); break;
+        default: assert(0 && "bad section number"); break;
     }
 }

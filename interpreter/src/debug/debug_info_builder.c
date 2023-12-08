@@ -22,7 +22,7 @@ void debug_info_builder_prepare(debug_info_builder_t *builder, u8 *data) {
 static i32 debug_info_builder_push_scope(debug_info_builder_t *builder) {
     debug_sym_scope_t scope;
     scope.symbols = NULL;
-    bh_arr_new(builder->info->alloc, scope.symbols, 4);    
+    bh_arr_new(builder->info->alloc, scope.symbols, 4);
     scope.parent = builder->current_scope;
 
     i32 scope_id = bh_arr_length(builder->info->symbol_scopes);
@@ -58,14 +58,14 @@ static void debug_info_builder_parse(debug_info_builder_t *builder) {
                 switch (instr) {
                     case 0: builder->locked = 1; break; // Early return!
                     case 1:
-                        builder->current_file_id = uleb128_to_uint(builder->data, &builder->reader_offset);
-                        builder->current_line    = uleb128_to_uint(builder->data, &builder->reader_offset);
+                        builder->current_file_id = uleb128_to_uint(builder->data, (i32 *)&builder->reader_offset);
+                        builder->current_line    = uleb128_to_uint(builder->data, (i32 *)&builder->reader_offset);
                         break;
 
                     case 2:
                         debug_info_builder_push_scope(builder);
                         break;
-                        
+
                     case 3:
                         debug_info_builder_pop_scope(builder);
                         break;
@@ -73,7 +73,7 @@ static void debug_info_builder_parse(debug_info_builder_t *builder) {
                     case 4:
                         debug_info_builder_add_symbol(
                             builder,
-                            uleb128_to_uint(builder->data, &builder->reader_offset));
+                            uleb128_to_uint(builder->data, (i32 *)&builder->reader_offset));
                         break;
                 }
                 break;
@@ -104,7 +104,7 @@ void debug_info_builder_step(debug_info_builder_t *builder) {
     while (builder->remaining_reps == 0 && !builder->locked) {
         debug_info_builder_parse(builder);
 
-        debug_loc_info_t info; 
+        debug_loc_info_t info;
         info.file_id      = builder->current_file_id;
         info.line         = builder->current_line;
         info.symbol_scope = builder->current_scope;
@@ -151,7 +151,7 @@ void debug_info_builder_begin_func(debug_info_builder_t *builder, i32 func_idx) 
 
 void debug_info_builder_end_func(debug_info_builder_t *builder) {
     if (!builder->data) return;
-    
+
     assert(!builder->locked);
     debug_info_builder_step(builder);
     assert(builder->locked);
