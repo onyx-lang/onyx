@@ -79,7 +79,13 @@ compress_all() {
         codesign -s - "$DIST_DIR/bin/onyx" && \
         codesign -s - "$DIST_DIR/lib/onyx_runtime.dylib"
 
-    tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples include lib misc tests tools LICENSE
+    if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
+        # When including a runtime library, include the lib and include folders
+        tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples include lib misc tests tools LICENSE
+    else
+        tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples misc tests tools LICENSE
+    fi
+
     mv onyx.tar.gz dist/
 }
 
