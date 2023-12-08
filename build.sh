@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 DIST_DIR="./dist"
 
 compile_all() {
@@ -38,20 +40,22 @@ package_all() {
     cp ./scripts/onyx-pkg.onyx "$DIST_DIR/tools"
     cp ./scripts/default.json "$DIST_DIR/tools/pkg_templates"
 
-    echo "Installing runtime library"
-    mkdir -p "$DIST_DIR/lib"
-    mkdir -p "$DIST_DIR/include"
+    if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
+        echo "Installing runtime library"
+        mkdir -p "$DIST_DIR/lib"
+        mkdir -p "$DIST_DIR/include"
 
-    case "$(uname)" in
-        Linux)  suffix='so' ;;
-        *BSD)   suffix='so' ;;
-        Darwin) suffix='dylib' ;;
-        *)      suffix='dll' ;;
-    esac
+        case "$(uname)" in
+            Linux)  suffix='so' ;;
+            *BSD)   suffix='so' ;;
+            Darwin) suffix='dylib' ;;
+            *)      suffix='dll' ;;
+        esac
 
-    [ -f runtime/onyx_runtime.$suffix ] && cp runtime/onyx_runtime.$suffix "$DIST_DIR/lib/"
-    cp "shared/include/onyx_library.h" "$DIST_DIR/include/onyx_library.h"
-    cp "shared/include/wasm.h" "$DIST_DIR/include/wasm.h"
+        [ -f runtime/onyx_runtime.$suffix ] && cp runtime/onyx_runtime.$suffix "$DIST_DIR/lib/"
+        cp "shared/include/onyx_library.h" "$DIST_DIR/include/onyx_library.h"
+        cp "shared/include/wasm.h" "$DIST_DIR/include/wasm.h"
+    fi
 
     cp -r "tests" "$DIST_DIR/"
     cp -r "examples" "$DIST_DIR/"
@@ -61,6 +65,7 @@ package_all() {
     cp misc/onyx-windows.sublime-build "$DIST_DIR/misc"
     cp misc/onyx-mode.el "$DIST_DIR/misc"
     cp misc/onyx.sublime-syntax "$DIST_DIR/misc"
+    cp misc/onyx.tmPreferences "$DIST_DIR/misc"
     cp misc/vscode/onyxlang-0.1.9.vsix "$DIST_DIR/misc"
 
     cp LICENSE "$DIST_DIR/LICENSE"
@@ -72,9 +77,16 @@ compress_all() {
     # Sign the binaries on MacOS
     [ "$(uname)" = 'Darwin' ] && \
         codesign -s - "$DIST_DIR/bin/onyx" && \
-        codesign -s - "$DIST_DIR/lib/onyx_runtime.dylib"
+        [ -f "$DIST_DIR/lib/onyx_runtime.dylib" ] && \
+            codesign -s - "$DIST_DIR/lib/onyx_runtime.dylib"
 
-    tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples include lib misc tests tools LICENSE
+    if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
+        # When including a runtime library, include the lib and include folders
+        tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples include lib misc tests tools LICENSE
+    else
+        tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples misc tests tools LICENSE
+    fi
+
     mv onyx.tar.gz dist/
 }
 
@@ -90,7 +102,8 @@ install_all() {
     # Sign the binaries on MacOS
     [ "$(uname)" = 'Darwin' ] && \
         codesign -s - "$ONYX_INSTALL_DIR/bin/onyx" && \
-        codesign -s - "$ONYX_INSTALL_DIR/lib/onyx_runtime.dylib"
+        [ -f "$ONYX_INSTALL_DIR/lib/onyx_runtime.dylib" ] && \
+            codesign -s - "$ONYX_INSTALL_DIR/lib/onyx_runtime.dylib"
 }
 
 for arg in $@; do
