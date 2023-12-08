@@ -1113,6 +1113,21 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
                 if (tm == TYPE_MATCH_SPECIAL) return tm;
                 if (tm == TYPE_MATCH_FAILED) {
                     if (error != NULL) {
+                        AstArgument *the_arg = (void *) arg_arr[arg_pos];
+                        if (the_arg->used_as_lval_of_method_call) {
+                            if (formal_params[arg_pos]->kind == Type_Kind_Pointer &&
+                                formal_params[arg_pos]->Pointer.elem == arg_arr[arg_pos]->type) {
+                                // We didn't match the type, and this arg was from a method call,
+                                // and its because it wanted a &T, but got a T. This is likely
+                                // due to the fact that the method call argument is not an lval.
+                                error->pos = arg_arr[arg_pos]->token->pos;
+                                error->text = bh_aprintf(global_heap_allocator,
+                                        "This method expects a pointer to the first argument, which normally `->` would do automatically, but in this case, the left-hand side is not an l-value, so its address cannot be taken. Try storing it in a temporary variable first, then calling the method."
+                                );
+                                return tm;
+                            }
+                        }
+
                         error->pos = arg_arr[arg_pos]->token->pos;
                         error->text = bh_aprintf(global_heap_allocator,
                                 "The procedure '%s' expects a value of type '%s' for %d%s parameter, got '%s'.",

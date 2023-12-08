@@ -1175,7 +1175,7 @@ int main(int argc, char *argv[]) {
             } else {
                 bh_printf(top_level_docstring);
             }
-            return 1;
+            return 0;
         }
 
         case ONYX_COMPILE_ACTION_PRINT_VERSION: {

@@ -1107,6 +1107,10 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
                 }
 
             } else {
+                if (right_type == &basic_types[Basic_Kind_Void]) {
+                    ERROR(binop->left->token->pos, "Due to inference, this variables type would be 'void', which is not allowed.");
+                }
+
                 binop->left->type = right_type;
             }
         }
@@ -2249,10 +2253,11 @@ CheckStatus check_method_call(AstBinaryOp** pmcall) {
             implicit_argument = (AstTyped *) address_of;
         }
 
-        implicit_argument = (AstTyped *) make_argument(context.ast_alloc, implicit_argument);
+        AstArgument *new_arg = make_argument(context.ast_alloc, implicit_argument);
+        new_arg->used_as_lval_of_method_call = 1;
 
         bh_arr_insertn(call_node->args.values, 0, 1);
-        call_node->args.values[0] = implicit_argument;
+        call_node->args.values[0] = (AstTyped *) new_arg;
 
         mcall->right->next = mcall->next;
         mcall->flags |= Ast_Flag_Has_Been_Checked;
@@ -2798,6 +2803,11 @@ CheckStatus check_statement(AstNode** pstmt) {
                     typed_stmt->flags |= Ast_Flag_Decl_Followed_By_Init;
                 }
             }
+            
+            if (typed_stmt->type != NULL && typed_stmt->type == &basic_types[Basic_Kind_Void]) {
+                ERROR(stmt->token->pos, "This local variable has a type of 'void', which is not allowed.");
+            }
+
             return Check_Success;
         }
 
@@ -3619,6 +3629,100 @@ CheckStatus check_macro(AstMacro* macro) {
     return Check_Success;
 }
 
+CheckStatus check_interface_constraint(AstConstraint *constraint) {
+    if (constraint->interface->kind != Ast_Kind_Interface) {
+        // CLEANUP: This error message might not look totally right in some cases.
+        ERROR_(constraint->token->pos, "'%b' is not an interface. It is a '%s'.",
+            constraint->token->text, constraint->token->length,
+            onyx_ast_node_kind_string(constraint->interface->kind));
+    }
+
+    // #intrinsic interfaces
+    if (constraint->interface->is_intrinsic) {
+        b32 success = resolve_intrinsic_interface_constraint(constraint);
+        if (success) {
+            *constraint->report_status = Constraint_Check_Status_Success;
+            return Check_Complete;
+        } else {
+            *constraint->report_status = Constraint_Check_Status_Failed;
+            return Check_Failed;
+        }
+    }
+
+    bh_arr_new(global_heap_allocator, constraint->exprs, bh_arr_length(constraint->interface->exprs));
+    bh_arr_each(InterfaceConstraint, ic, constraint->interface->exprs) {
+        InterfaceConstraint new_ic = {0};
+        new_ic.expr = (AstTyped *) ast_clone(context.ast_alloc, (AstNode *) ic->expr);
+        new_ic.expected_type_expr = (AstType *) ast_clone(context.ast_alloc, (AstNode *) ic->expected_type_expr);
+        new_ic.invert_condition = ic->invert_condition;
+        bh_arr_push(constraint->exprs, new_ic);
+    }
+
+    assert(constraint->interface->entity && constraint->interface->entity->scope);
+    assert(constraint->interface->scope);
+    assert(constraint->interface->scope->parent == constraint->interface->entity->scope);
+
+    constraint->scope = scope_create(context.ast_alloc, constraint->interface->scope, constraint->token->pos);
+
+    if (bh_arr_length(constraint->type_args) != bh_arr_length(constraint->interface->params)) {
+        ERROR_(constraint->token->pos, "Wrong number of arguments given to interface. Expected %d, got %d.",
+            bh_arr_length(constraint->interface->params),
+            bh_arr_length(constraint->type_args));
+    }
+
+    fori (i, 0, bh_arr_length(constraint->interface->params)) {
+        InterfaceParam *ip = &constraint->interface->params[i];
+
+        AstTyped *sentinel = onyx_ast_node_new(context.ast_alloc, sizeof(AstTyped), Ast_Kind_Constraint_Sentinel);
+        sentinel->token = ip->value_token;
+        sentinel->type_node = constraint->type_args[i];
+
+        AstAlias *type_alias = onyx_ast_node_new(context.ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
+        type_alias->token = ip->type_token;
+        type_alias->alias = (AstTyped *) constraint->type_args[i];
+
+        symbol_introduce(constraint->scope, ip->value_token, (AstNode *) sentinel);
+        symbol_introduce(constraint->scope, ip->type_token, (AstNode *) type_alias);
+    }
+
+    assert(constraint->entity);
+    constraint->entity->scope = constraint->scope;
+
+    constraint->phase = Constraint_Phase_Checking_Expressions;
+    return Check_Return_To_Symres;
+}
+
+CheckStatus check_expression_constraint(AstConstraint *constraint) {
+    onyx_errors_enable();
+
+    AstTyped* expr = constraint->const_expr;
+
+    context.checker.expression_types_must_be_known = 1;
+    CheckStatus result = check_expression(&expr);
+    context.checker.expression_types_must_be_known = 0;
+
+    if (result == Check_Yield_Macro) return Check_Yield_Macro;
+
+    if (result > Check_Errors_Start || !(expr->flags & Ast_Flag_Comptime)) {
+        ERROR(expr->token->pos, "Where clauses must be a constant expressions.");
+    }
+
+    if (!type_is_bool(expr->type)) {
+        ERROR(expr->token->pos, "Where clauses must result in a boolean.");
+    }
+
+    b32 value = (b32)get_expression_integer_value(expr, NULL);
+    if (!value) {
+        *constraint->report_status = Constraint_Check_Status_Failed;
+        return Check_Failed;
+    }
+
+    expr = (AstTyped *)make_bool_literal(context.ast_alloc, 1);
+    *constraint->report_status = Constraint_Check_Status_Success;
+
+    return Check_Complete;
+}
+
 CheckStatus check_constraint(AstConstraint *constraint) {
     switch (constraint->phase) {
         case Constraint_Phase_Cloning_Expressions: {
@@ -3626,66 +3730,12 @@ CheckStatus check_constraint(AstConstraint *constraint) {
                 return Check_Return_To_Symres;
             }
 
-            if (constraint->interface->kind != Ast_Kind_Interface) {
-                // CLEANUP: This error message might not look totally right in some cases.
-                ERROR_(constraint->token->pos, "'%b' is not an interface. It is a '%s'.",
-                    constraint->token->text, constraint->token->length,
-                    onyx_ast_node_kind_string(constraint->interface->kind));
+            if (constraint->flags & Ast_Flag_Constraint_Is_Expression) {
+                return check_expression_constraint(constraint);
             }
-
-            // #intrinsic interfaces
-            if (constraint->interface->is_intrinsic) {
-                b32 success = resolve_intrinsic_interface_constraint(constraint);
-                if (success) {
-                    *constraint->report_status = Constraint_Check_Status_Success;
-                    return Check_Complete;
-                } else {
-                    *constraint->report_status = Constraint_Check_Status_Failed;
-                    return Check_Failed;
-                }
+            else {
+                return check_interface_constraint(constraint);
             }
-
-            bh_arr_new(global_heap_allocator, constraint->exprs, bh_arr_length(constraint->interface->exprs));
-            bh_arr_each(InterfaceConstraint, ic, constraint->interface->exprs) {
-                InterfaceConstraint new_ic = {0};
-                new_ic.expr = (AstTyped *) ast_clone(context.ast_alloc, (AstNode *) ic->expr);
-                new_ic.expected_type_expr = (AstType *) ast_clone(context.ast_alloc, (AstNode *) ic->expected_type_expr);
-                new_ic.invert_condition = ic->invert_condition;
-                bh_arr_push(constraint->exprs, new_ic);
-            }
-
-            assert(constraint->interface->entity && constraint->interface->entity->scope);
-            assert(constraint->interface->scope);
-            assert(constraint->interface->scope->parent == constraint->interface->entity->scope);
-
-            constraint->scope = scope_create(context.ast_alloc, constraint->interface->scope, constraint->token->pos);
-
-            if (bh_arr_length(constraint->type_args) != bh_arr_length(constraint->interface->params)) {
-                ERROR_(constraint->token->pos, "Wrong number of arguments given to interface. Expected %d, got %d.",
-                    bh_arr_length(constraint->interface->params),
-                    bh_arr_length(constraint->type_args));
-            }
-
-            fori (i, 0, bh_arr_length(constraint->interface->params)) {
-                InterfaceParam *ip = &constraint->interface->params[i];
-
-                AstTyped *sentinel = onyx_ast_node_new(context.ast_alloc, sizeof(AstTyped), Ast_Kind_Constraint_Sentinel);
-                sentinel->token = ip->value_token;
-                sentinel->type_node = constraint->type_args[i];
-
-                AstAlias *type_alias = onyx_ast_node_new(context.ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
-                type_alias->token = ip->type_token;
-                type_alias->alias = (AstTyped *) constraint->type_args[i];
-
-                symbol_introduce(constraint->scope, ip->value_token, (AstNode *) sentinel);
-                symbol_introduce(constraint->scope, ip->type_token, (AstNode *) type_alias);
-            }
-
-            assert(constraint->entity);
-            constraint->entity->scope = constraint->scope;
-
-            constraint->phase = Constraint_Phase_Checking_Expressions;
-            return Check_Return_To_Symres;
         }
 
         case Constraint_Phase_Checking_Expressions: {
@@ -3802,9 +3852,21 @@ CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFi
                         error_pos = constraint->interface->token->pos;
                     }
 
-                    onyx_report_error(error_pos, Error_Critical, "Failed to satisfy constraint where %s.", constraint_map);
-                    if (error_msg) onyx_report_error(error_pos, Error_Critical, error_msg);
-                    onyx_report_error(constraint->token->pos, Error_Critical, "Here is where the interface was used.");
+                    if (constraint->flags & Ast_Flag_Constraint_Is_Expression) {
+                        onyx_report_error(error_pos, Error_Critical, "Where clause did not evaluate to true.");
+                    }
+                    else {
+                        onyx_report_error(error_pos, Error_Critical, "Failed to satisfy constraint where %s.", constraint_map);
+                    }
+
+                    if (error_msg) {
+                        onyx_report_error(error_pos, Error_Critical, error_msg);
+                    }
+
+                    if (!(constraint->flags & Ast_Flag_Constraint_Is_Expression)) {
+                        onyx_report_error(constraint->token->pos, Error_Critical, "Here is where the interface was used.");
+                    }
+
                     onyx_report_error(pos, Error_Critical, "Here is the code that caused this constraint to be checked.");
 
                     return Check_Error;

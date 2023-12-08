@@ -2544,26 +2544,62 @@ static AstInterface* parse_interface(OnyxParser* parser) {
     return interface;
 }
 
+// :InterfacesAsExpressionsRefactor
+
+// @Todo(Judah): This can be significantly improved by not treating interface calls as a separate thing.
+// Maybe a flag on parser called 'calls_are_interfaces' that tells parse_expression to do what we do below?
+// This should allow us to remove the N token lookahead and give better error reporting for invalid interface usage.
 static AstConstraint* parse_constraint(OnyxParser* parser) {
     AstConstraint* constraint = make_node(AstConstraint, Ast_Kind_Constraint);
 
-    parser->parse_calls = 0;
-    constraint->interface = (AstInterface *) parse_factor(parser);
-    parser->parse_calls = 1;
+    // @Note(Judah): We lookahead N tokens to see which kind of constraint
+    // this is. A simple check will not match things like: 'foo.bar.Baz(T)'
 
-    constraint->token = constraint->interface->token;
+    i32 i               = 0;
+    b32 parse_interface = 0;
+    while (1) {
+        OnyxToken* next = peek_token(i);
+        if (!next || next->type == '{') break;
 
-    bh_arr_new(global_heap_allocator, constraint->type_args, 2);
+        if (next->type == Token_Type_Symbol) {
+            next = peek_token(i + 1);
+            if (next && next->type == '(') {
+                parse_interface = 1;
+                break;
+            }
+        }
 
-    expect_token(parser, '(');
-    while (!consume_token_if_next(parser, ')')) {
-        if (parser->hit_unexpected_token) return constraint;
+        i += 1;
+    }
 
-        AstType* type_node = parse_type(parser);
-        bh_arr_push(constraint->type_args, type_node);
+    // Interface constraint: Foo(T)
+    if (parse_interface) {
+        parser->parse_calls = 0;
+        constraint->interface = (AstInterface *) parse_factor(parser);
+        parser->parse_calls = 1;
 
-        if (parser->curr->type != ')')
-            expect_token(parser, ',');
+        constraint->token = constraint->interface->token;
+
+        bh_arr_new(global_heap_allocator, constraint->type_args, 2);
+
+        expect_token(parser, '(');
+        while (!consume_token_if_next(parser, ')')) {
+            if (parser->hit_unexpected_token) return constraint;
+
+            AstType* type_node = parse_type(parser);
+            bh_arr_push(constraint->type_args, type_node);
+
+            if (parser->curr->type != ')')
+                expect_token(parser, ',');
+        }
+    }
+    // Expression constraint: T == X
+    else {
+        constraint->const_expr = parse_expression(parser, 0);
+        if (parser->hit_unexpected_token || !constraint->const_expr) return constraint;
+
+        constraint->token  = constraint->const_expr->token;
+        constraint->flags |= Ast_Flag_Constraint_Is_Expression;
     }
 
     return constraint;
