@@ -41,7 +41,8 @@ jobs:
         tag_name: nightly
         name: 'Desktop App Nightly Release $$'
         prerelease: true
-        body: 'TODO: Add nightly release notes'
+        body: |
+          This is a nightly release of the Onyx toolchain. **Use with caution.** 
         files: |
-          "*.tar.gz"
-          "*.zip"
+          ./*.tar.gz
+          ./*.zip
