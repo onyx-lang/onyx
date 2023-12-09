@@ -1,0 +1,45 @@
+name: Nightly Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      workflow_id:
+        description: "Workflow id"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+    - name: Download Artifacts from Previous Workflow
+      uses: synergy-au/download-workflow-artifacts-action@v1
+      with:
+        auth-token: ${{ secrets.GITHUB_TOKEN }}
+        workflow-run-id: ${{ github.event.inputs.workflow_id }}
+
+    - name: Move assets to rename them
+      run: |
+        mv artifacts/onyx-linux-wasmer-amd64/onyx.tar.gz  ./onyx-linux-wasmer-amd64.tar.gz
+        mv artifacts/onyx-linux-ovm-amd64/onyx.tar.gz     ./onyx-linux-ovm-amd64.tar.gz
+        mv artifacts/onyx-linux-none-amd64/onyx.tar.gz    ./onyx-linux-none-amd64.tar.gz
+        mv artifacts/onyx-darwin-wasmer-amd64/onyx.tar.gz ./onyx-darwin-wasmer-amd64.tar.gz
+        mv artifacts/onyx-darwin-ovm-amd64/onyx.tar.gz    ./onyx-darwin-ovm-amd64.tar.gz
+        mv artifacts/onyx-darwin-none-amd64/onyx.tar.gz   ./onyx-darwin-none-amd64.tar.gz
+        mv artifacts/onyx-darwin-wasmer-arm64/onyx.tar.gz ./onyx-darwin-wasmer-arm64.tar.gz
+        mv artifacts/onyx-darwin-ovm-arm64/onyx.tar.gz    ./onyx-darwin-ovm-arm64.tar.gz
+        mv artifacts/onyx-darwin-none-arm64/onyx.tar.gz   ./onyx-darwin-none-arm64.tar.gz
+        mv artifacts/onyx-windows-wasmer-amd64/onyx.zip   ./onyx-windows-wasmer-amd64.zip
+
+    - name: Update Nightly Release
+      uses: andelf/nightly-release@main
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: nightly
+        name: 'Desktop App Nightly Release $$'
+        prerelease: true
+        body: 'TODO: Add nightly release notes'
+        files: |
+          "*.tar.gz"
+          "*.zip"
