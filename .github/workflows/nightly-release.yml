@@ -13,10 +13,12 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v3
     - name: Download Artifacts from Previous Workflow
-      uses: synergy-au/download-workflow-artifacts-action@v1
+      id: download-artifacts
+      uses: dawidd6/action-download-artifact@v2
       with:
-        auth-token: ${{ secrets.GITHUB_TOKEN }}
-        workflow-run-id: ${{ github.event.inputs.workflow_id }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        run_id: ${{ github.event.inputs.workflow_id }}
+        path: ./artifacts
 
     - name: Move assets to rename them
       run: |
