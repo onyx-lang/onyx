@@ -1129,6 +1129,10 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     else if (is_basic && (type->Basic.flags & Basic_Flag_SIMD)) {
         instr = WI_V128_LOAD;
     }
+    else if (is_basic && (type->Basic.kind == Basic_Kind_Void)) {
+        // Do nothing to "load" a void type.
+        return;
+    }
 
     WID(NULL, instr, ((WasmInstructionData) { alignment, offset }));
 
@@ -2961,8 +2965,10 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
         type_linear_member_lookup(type, i, &two);
 
         WasmType wt = onyx_type_to_wasm_type(two.type);
-        temp_locals[i] = local_raw_allocate(mod->local_alloc, wt);
-        WIL(NULL, WI_LOCAL_SET, temp_locals[i]);
+        if (wt != WASM_TYPE_VOID) {
+            temp_locals[i] = local_raw_allocate(mod->local_alloc, wt);
+            WIL(NULL, WI_LOCAL_SET, temp_locals[i]);
+        }
     }
 
     if (!location_first) WIL(NULL, WI_LOCAL_SET, loc_idx);
@@ -2970,13 +2976,15 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     fori (i, 0, elem_count) {
         type_linear_member_lookup(type, i, &two);
 
-        u64 tmp_idx = temp_locals[i];
-        WIL(NULL, WI_LOCAL_GET, loc_idx);
-        WIL(NULL, WI_LOCAL_GET, tmp_idx);
-        emit_store_instruction(mod, &code, two.type, offset + two.offset);
-
         WasmType wt = onyx_type_to_wasm_type(two.type);
-        local_raw_free(mod->local_alloc, wt);
+        if (wt != WASM_TYPE_VOID) {
+            u64 tmp_idx = temp_locals[i];
+            WIL(NULL, WI_LOCAL_GET, loc_idx);
+            WIL(NULL, WI_LOCAL_GET, tmp_idx);
+            emit_store_instruction(mod, &code, two.type, offset + two.offset);
+
+            local_raw_free(mod->local_alloc, wt);
+        }
     }
 
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
