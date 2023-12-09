@@ -39,7 +39,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: nightly
-        name: 'Desktop App Nightly Release $$'
+        name: 'Onyx Nightly Release $$'
         prerelease: true
         body: |
           This is a nightly release of the Onyx toolchain. **Use with caution.** 
