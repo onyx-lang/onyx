@@ -129,10 +129,11 @@ transplant :: (arr: [] $T, old_index: i32, new_index: i32) -> bool {
 get :: (arr: [] $T, idx: i32) -> T {
     if arr.count == 0 do return .{};
 
-    while idx < 0          do idx += arr.count;
-    while idx >= arr.count do idx -= arr.count;
+    i := idx;
+    while i < 0          do i += arr.count;
+    while i >= arr.count do i -= arr.count;
 
-    return arr.data[idx];
+    return arr.data[i];
 }
 
 #doc """
@@ -141,10 +142,11 @@ get :: (arr: [] $T, idx: i32) -> T {
 get_ptr :: (arr: [] $T, idx: i32) -> &T {
     if arr.count == 0 do return null;
 
-    while idx < 0          do idx += arr.count;
-    while idx >= arr.count do idx -= arr.count;
+    i := idx;
+    while i < 0          do i += arr.count;
+    while i >= arr.count do i -= arr.count;
 
-    return &arr.data[idx];
+    return &arr.data[i];
 }
 
 #doc """
@@ -153,10 +155,11 @@ get_ptr :: (arr: [] $T, idx: i32) -> &T {
 set :: (arr: [] $T, idx: i32, value: T) {
     if arr.count == 0 do return;
 
-    while idx < 0          do idx += arr.count;
-    while idx >= arr.count do idx -= arr.count;
+    i := idx;
+    while i < 0          do i += arr.count;
+    while i >= arr.count do i -= arr.count;
 
-    arr.data[idx] = value;
+    arr.data[i] = value;
 }
 
 contains :: #match #locked {

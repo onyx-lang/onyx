@@ -38,28 +38,29 @@ remove_top :: (use heap: &Heap) -> heap.T {
     heap_rchild :: macro (index) => (index * 2) + 2
 
     shift_down :: (use heap: &Heap, idx: i32) {
+        index := idx;
         while true {
-            min_index := idx;
+            min_index := index;
 
-            l := heap_lchild(idx);
+            l := heap_lchild(index);
             if l < data.count {
                 if compare(data[l], data[min_index]) < 0 {
                     min_index = l;
                 }
             }
 
-            r := heap_rchild(idx);
+            r := heap_rchild(index);
             if r < data.count {
                 if compare(data[r], data[min_index]) < 0 {
                     min_index = r;
                 }
             }
 
-            if idx != min_index {
-                tmp := data[idx];
-                data[idx] = data[min_index];
+            if index != min_index {
+                tmp := data[index];
+                data[index] = data[min_index];
                 data[min_index] = tmp;
-                idx = min_index;
+                index = min_index;
                 continue;
             }
 
@@ -68,14 +69,15 @@ remove_top :: (use heap: &Heap) -> heap.T {
     }
 
     shift_up :: (use heap: &Heap, idx: i32) {
-        while idx > 0 {
-            parent := heap_parent(idx);
-            if compare(data[parent], data[idx]) <= 0 do break;
+        index := idx;
+        while index > 0 {
+            parent := heap_parent(index);
+            if compare(data[parent], data[index]) <= 0 do break;
 
             tmp := data[parent];
-            data[parent] = data[idx];
-            data[idx] = tmp;
-            idx = parent;
+            data[parent] = data[index];
+            data[index] = tmp;
+            index = parent;
         }
     }
 }

@@ -156,7 +156,8 @@ PollDescription :: struct {
     out: core.io.PollEvent;
 }
 
-__poll :: (fds: [] PollDescription, timeout: i32) -> void {
+__poll :: (fds: [] PollDescription, timeout_: i32) -> void {
+    timeout := timeout_;
     count := fds.count;
     if timeout == 0 {
         timeout = 1;

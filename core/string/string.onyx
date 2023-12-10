@@ -426,19 +426,19 @@ advance :: #match #local {}
 
 #overload
 advance :: (s: &str, chars := 1) {
-    chars = math.min(chars, s.count);
+    c := math.min(chars, s.count);
 
-    s.data += chars;
-    s.count -= chars;
+    s.data += c;
+    s.count -= c;
 }
 
 #overload
 advance :: (s: str, chars := 1) -> str {
-    chars = math.min(chars, s.count);
+    c := math.min(chars, s.count);
     out := s;
 
-    out.data += chars;
-    out.count -= chars;
+    out.data += c;
+    out.count -= c;
 
     return out;
 }
