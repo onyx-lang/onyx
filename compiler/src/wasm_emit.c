@@ -892,6 +892,41 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
     *pcode = code;
 }
 
+static void flatten_nested_array_literals_for_emit_helper(bh_arr(AstTyped *) *poutput, AstArrayLiteral *al) {
+    u32 elem_count = al->type->Array.count;
+
+    if (al->type->Array.elem->kind == Type_Kind_Array) {
+        fori (i, 0, elem_count) {
+            flatten_nested_array_literals_for_emit_helper(poutput, (AstArrayLiteral *) al->values[i]);
+        }
+
+    } else {
+        bh_arr(AstTyped *) output = *poutput;
+        fori (i, 0, elem_count) {
+            bh_arr_push(output, al->values[i]);
+        }
+        *poutput = output;
+    }
+}
+
+static bh_arr(AstTyped *) flatten_nested_array_literals_for_emit(AstArrayLiteral *al, Type **elem_type) {
+    u32 ec = 1;
+    Type *et = al->type;
+
+    while (et->kind == Type_Kind_Array) {
+        ec *= et->Array.count;
+        et = et->Array.elem;
+    }
+
+    *elem_type = et;
+
+    bh_arr(AstTyped *) result = NULL;
+    bh_arr_new(global_heap_allocator, result, ec);
+    flatten_nested_array_literals_for_emit_helper(&result, al);
+
+    return result;
+}
+
 EMIT_FUNC(assignment_of_array, AstTyped* left, AstTyped* right) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -899,27 +934,30 @@ EMIT_FUNC(assignment_of_array, AstTyped* left, AstTyped* right) {
     assert(rtype->kind == Type_Kind_Array);
 
     if (right->kind == Ast_Kind_Array_Literal) {
-        Type* elem_type = rtype;
-        u32 elem_count = 1;
-        while (elem_type->kind == Type_Kind_Array) {
-            elem_count *= elem_type->Array.count;
-            elem_type = elem_type->Array.elem;
-        }
+        AstArrayLiteral* al = (AstArrayLiteral *) right;
+
+        Type* elem_type;
+        bh_arr(AstTyped *) values = flatten_nested_array_literals_for_emit(al, &elem_type);
+
+        u32 elem_count = bh_arr_length(values);
         u32 elem_size = type_size_of(elem_type);
 
         u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
 
         emit_location(mod, &code, left);
-        WIL(left->token, WI_LOCAL_SET, lptr_local);
+        WIL(left->token, WI_LOCAL_TEE, lptr_local);
 
-        AstArrayLiteral* al = (AstArrayLiteral *) right;
         fori (i, 0, elem_count) {
-            WIL(left->token, WI_LOCAL_GET, lptr_local);
-            emit_expression(mod, &code, al->values[i]);
+            if (i != 0) {
+                WIL(left->token, WI_LOCAL_GET, lptr_local);
+            }
+
+            emit_expression(mod, &code, values[i]);
             emit_store_instruction(mod, &code, elem_type, i * elem_size);
         }
 
         local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+        bh_arr_free(values);
 
     } else {
         u64 offset = 0;
