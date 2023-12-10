@@ -284,7 +284,7 @@ ONYX_DEF(__process_wait, (WASM_I64), (WASM_I32)) {
     #ifdef _BH_WINDOWS
         DWORD exitCode;
         while (1) {
-            WaitForSingleObject(process->proc_info.hProcess, INFINITE));
+            WaitForSingleObject(process->proc_info.hProcess, INFINITE);
             // if (!WaitForSingleObject(process->proc_info.hProcess, INFINITE)) {
             //     // HACK HACK HACK
             //     DWORD error = GetLastError();
