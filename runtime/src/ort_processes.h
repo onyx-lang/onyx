@@ -284,15 +284,16 @@ ONYX_DEF(__process_wait, (WASM_I64), (WASM_I32)) {
     #ifdef _BH_WINDOWS
         DWORD exitCode;
         while (1) {
-            if (!WaitForSingleObject(process->proc_info.hProcess, INFINITE)) {
-                // HACK HACK HACK
-                DWORD error = GetLastError();
-                if (error != 109 && error != 6) {
-                    // printf("ERROR IN WAIT FOR SINGLE: %d\n", error);
-                    results->data[0] = WASM_I32_VAL(1);
-                    return NULL;
-                }
-            }
+            WaitForSingleObject(process->proc_info.hProcess, INFINITE));
+            // if (!WaitForSingleObject(process->proc_info.hProcess, INFINITE)) {
+            //     // HACK HACK HACK
+            //     DWORD error = GetLastError();
+            //     if (error != 109 && error != 6) {
+            //         // printf("ERROR IN WAIT FOR SINGLE: %d\n", error);
+            //         results->data[0] = WASM_I32_VAL(1);
+            //         return NULL;
+            //     }
+            // }
 
             if (!GetExitCodeProcess(process->proc_info.hProcess, &exitCode)) {
                 // HACK HACK HACK
