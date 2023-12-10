@@ -9,6 +9,14 @@ use runtime.platform { __output_string }
 // Every platform should define this, even if is it just '() {}'.
 #export "_start" platform.__start
 
+//
+// Export a common initialization procedure that should
+// always be invoked before using anything in Onyx.
+#export "_initialize" () {
+    __runtime_initialize();
+    context.thread_id = 0;    
+}
+
 #local
 __output_uint :: (n: u64) {
     buf: [128] u8;
