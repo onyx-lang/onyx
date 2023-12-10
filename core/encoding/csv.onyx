@@ -101,7 +101,7 @@ CSV_Column :: struct {
                     return false;
                 }));
 
-                any_headers << (.{member.type, member.offset}) if member else .{void, -1};
+                any_headers << ((.{member.type, member.offset}) if member else .{void, -1});
             }
 
         } else {
