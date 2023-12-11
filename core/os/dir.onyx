@@ -5,6 +5,7 @@ package core.os
 }
 
 use core.string
+use core.conv
 use runtime
 
 #local fs :: runtime.platform
@@ -79,7 +80,7 @@ remove_directory :: (path: str) -> bool {
     full_path_buffer: [512] u8;
 
     for list_directory(path) {
-        full_path := string.concat(full_path_buffer, path, "/", it->name());
+        full_path := conv.format(full_path_buffer, "{}{}{}", path, PATH_SEP, it->name());
 
         if it.type == .Directory {
             if !remove_directory(full_path) do return false;

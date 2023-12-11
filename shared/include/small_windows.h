@@ -420,7 +420,7 @@ GB_DLL_IMPORT BOOL   WINAPI GetFileAttributesExW(wchar_t const *path, GET_FILEEX
 GB_DLL_IMPORT BOOL   WINAPI CopyFileW(wchar_t const *old_f, wchar_t const *new_f, BOOL fail_if_exists);
 GB_DLL_IMPORT BOOL   WINAPI MoveFileW(wchar_t const *old_f, wchar_t const *new_f);
 GB_DLL_IMPORT BOOL   WINAPI DeleteFileA     (char const *path);
-GB_DLL_IMPORT BOOL   WINAPI CreateDirectoryA(char const *path);
+GB_DLL_IMPORT BOOL   WINAPI CreateDirectoryA(char const *path, SECURITY_ATTRIBUTES *lpSecurityAttributes);
 GB_DLL_IMPORT BOOL   WINAPI RemoveDirectoryA(char const *path);
 GB_DLL_IMPORT BOOL   WINAPI MoveFileA       (char const *old_path, char const *new_path);
 

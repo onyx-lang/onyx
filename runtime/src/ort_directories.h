@@ -137,7 +137,7 @@ ONYX_DEF(__dir_create, (WASM_I32, WASM_I32), (WASM_I32)) {
     path[path_len] = 0;
 
 #ifdef _BH_WINDOWS
-    results->data[0] = WASM_I32_VAL(CreateDirectoryA(path));
+    results->data[0] = WASM_I32_VAL(CreateDirectoryA(path, NULL));
     return NULL;
 #endif
 
