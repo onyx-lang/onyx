@@ -1,0 +1,19 @@
+use core {println}
+
+main :: () {
+    // 'x' should be set to 1, but the compiler hangs/crashes.
+    // removing 'do' has the same issue.
+    x := do if true {
+        return 1;
+    } else {
+        return 2;
+    };
+
+    y := do return 10;; // Needing double ';' is gross here.
+
+    z := do -> f32 return 10;;
+
+    println(x);
+    println(y);
+    println(z);
+}
