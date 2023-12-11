@@ -620,12 +620,21 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             }
 
             if (parser->curr->type != '{') {
-                onyx_report_error(parser->curr->pos, Error_Critical, "Expected '{' after 'do', got '%s'.", token_name(parser->curr));
-                retval = NULL;
-                break;
-            }
+                AstBlock *tmp_block = make_node(AstBlock, Ast_Kind_Block);
+                tmp_block->token = do_token;
 
-            do_block->block = parse_block(parser, 1, NULL);
+                tmp_block->binding_scope = scope_create(parser->allocator, parser->current_scope, parser->curr->pos);
+                tmp_block->binding_scope->name = "<anonymous do block>";
+
+                parser->current_scope = tmp_block->binding_scope;
+                tmp_block->body = parse_statement(parser);
+                parser->current_scope = parser->current_scope->parent;
+
+                do_block->block = tmp_block;
+
+            } else {
+                do_block->block = parse_block(parser, 1, NULL);
+            }
 
             retval = (AstTyped *) do_block;
             break;
