@@ -1047,10 +1047,10 @@ Git :: struct {
             }
 
             rolling_parent := make(dyn_str);
-            path := string.split(actual_dest, '/');
+            path := string.split(actual_dest, os.PATH_SEP);
             for path[0 .. path.length-1] {
                 string.append(&rolling_parent, it);
-                string.append(&rolling_parent, "/");
+                string.append(&rolling_parent, os.PATH_SEP);
 
                 if !os.dir_exists(rolling_parent) {
                     os.dir_create(rolling_parent);

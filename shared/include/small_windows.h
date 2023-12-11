@@ -469,3 +469,6 @@ GB_DLL_IMPORT BOOL WINAPI WaitOnAddress(volatile void * Address, void * compareA
 
 GB_DLL_IMPORT DWORD GetCurrentDirectory(DWORD nBufferLength, char *lpBuffer);
 GB_DLL_IMPORT BOOL  SetCurrentDirectory(char *lpPathName);
+
+GB_DLL_IMPORT DWORD GetFileAttributesA(char *lpPathName);
+GB_DLL_IMPORT BOOL  SetFileAttributesA(char *lpPathName, DWORD attrs);

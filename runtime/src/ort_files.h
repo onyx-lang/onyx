@@ -89,6 +89,12 @@ ONYX_DEF(__file_remove, (WASM_I32, WASM_I32), (WASM_I32)) {
     strncpy(path, path_ptr, path_len);
     path[path_len] = 0;
 
+    #if _BH_WINDOWS
+        DWORD attrs = GetFileAttributesA(path);
+        attrs &= ~FILE_ATTRIBUTE_READONLY;
+        SetFileAttributesA(path, attrs);
+    #endif
+
     results->data[0] = WASM_I32_VAL(bh_file_remove(path));
     return NULL;
 }
