@@ -3114,6 +3114,11 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
 
     } else {
         AstTyped* body = parse_compound_expression(parser, 0);
+        if (body == NULL) {
+            onyx_report_error(parser->curr->pos, Error_Critical, "Expected an expression here.");
+            parser->hit_unexpected_token = 1;
+            return 0;
+        }
 
         AstReturn* return_node = make_node(AstReturn, Ast_Kind_Return);
         return_node->token = body->token;
