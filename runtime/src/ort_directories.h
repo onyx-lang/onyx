@@ -111,6 +111,7 @@ ONYX_DEF(__dir_read, (WASM_I64, WASM_I32), (WASM_I32)) {
 ONYX_DEF(__dir_close, (WASM_I64), ()) {
 #ifdef _BH_WINDOWS
     Windows_Directory_Opened* dir = (Windows_Directory_Opened *) params->data[0].of.i64;
+    if (dir == NULL) return NULL;
 
     FindClose(dir->hndl);
     free(dir);

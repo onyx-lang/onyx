@@ -61,7 +61,10 @@ list_directory :: (path: str) -> Iterator(DirectoryEntry) {
     }
 
     close :: (use c: &Context) {
-        dir_close(dir);
+        if opened {
+            dir_close(dir);
+        }
+
         cfree(c);
     }
 
