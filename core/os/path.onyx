@@ -6,11 +6,11 @@ use core.conv
 
 #local Path_Allocator :: context.temp_allocator
 
-PATH_SEP :: '/'
-// #if runtime.compiler_os == .Windows {
-//     PATH_SEP :: '\\'
-// } else {
-// }
+#if runtime.compiler_os == .Windows {
+    PATH_SEP :: '\\'
+} else {
+    PATH_SEP :: '/'
+}
 
 #doc """
     Removes:
@@ -31,24 +31,24 @@ path_clean :: (path: str, allocator := Path_Allocator) -> str {
     r, dotdot := 0, 0;
 
     if rooted {
-        string.append(&out, "/");
+        string.append(&out, PATH_SEP);
         r, dotdot = 1, 1;
     }
 
     while r < n {
-        if     path[r] == '/' do r += 1;
-        elseif path[r] == '.' && (r+1 == n || path[r + 1] == '/') do r += 1;
-        elseif path[r] == '.' && path[r + 1] == '.' && (r+2 == n || path[r+2] == '/') {
+        if     path[r] == PATH_SEP do r += 1;
+        elseif path[r] == '.' && (r+1 == n || path[r + 1] == PATH_SEP) do r += 1;
+        elseif path[r] == '.' && path[r + 1] == '.' && (r+2 == n || path[r+2] == PATH_SEP) {
             r += 2;
             if out.length > dotdot {
                 out.length -= 1;
-                while out.length > dotdot && out[out.length] != '/' {
+                while out.length > dotdot && out[out.length] != PATH_SEP {
                     out.length -= 1;
                 }
             }
             elseif !rooted {
                 if out.length > 0 {
-                    string.append(&out, "/");
+                    string.append(&out, PATH_SEP);
                 }
                 string.append(&out, "..");
                 dotdot = out.length;
@@ -56,10 +56,10 @@ path_clean :: (path: str, allocator := Path_Allocator) -> str {
         }
         else {
             if (rooted && out.length != 1) || (!rooted && out.length != 0) {
-                string.append(&out, "/");
+                string.append(&out, PATH_SEP);
             }
 
-            while r < n && path[r] != '/' {
+            while r < n && path[r] != PATH_SEP {
                 string.append(&out, path[r]);
                 r += 1;
             }
@@ -107,7 +107,7 @@ path_directory :: (path: str) -> str {
 """
 path_extension :: (path: str) -> str {
     for i: range.{ path.length - 1, 0, -1 } {
-        if path[i] == '/' do break;
+        if path[i] == PATH_SEP do break;
         if path[i] == '.' do return path[i .. path.length];
     }
     return "";

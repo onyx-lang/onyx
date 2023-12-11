@@ -760,6 +760,12 @@ strip_protocol_and_www_from_repo :: (repo: str) -> str {
         to_return = to_return[0 .. to_return.count - ".git".count];
     }
 
+    #if runtime.compiler_os == .Windows {
+        to_return = string.alloc_copy(to_return);
+
+        string.replace(to_return, '/', '\\');
+    }
+
     return to_return;
 }
 
