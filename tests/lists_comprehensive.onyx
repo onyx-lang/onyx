@@ -1,0 +1,36 @@
+use core {*}
+
+main :: () {
+    l := make(list.List(i32));
+
+    for 10 {
+        list.push_end(&l, it);
+    }
+
+    for iter.as_iter(&l) {
+        println(it);
+    }
+
+    println("=================");
+    for 5 {
+        list.pop_begin_opt(&l) |> println();
+    }
+
+    println("=================");
+    for iter.as_iter(&l) {
+        println(it);
+    }
+
+    println("=================");
+    for 5 {
+        list.pop_end_opt(&l) |> println();
+    }
+
+    println("=================");
+    for 5 {
+        list.pop_begin_opt(&l) |> println();
+    }
+
+    println(list.count(&l));
+    println(list.empty(&l));
+}
