@@ -19,7 +19,8 @@ void debug_host_init(debug_state_t *debug, struct ovm_engine_t *ovm_engine) {
     debug->listen_socket_fd = 0;
     debug->client_fd = 0;
 
-    if (pipe(debug->state_change_pipes) != 0) {
+    int *pipes = (int *)debug->state_change_pipes;
+    if (pipe(pipes) != 0) {
         printf("[ERROR] Failed to create thread notification pipes.\n");
     }
 }

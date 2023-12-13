@@ -241,7 +241,7 @@ static wasm_trap_t *__wasm_dyncall(void *env, const wasm_val_vec_t *args, wasm_v
                 dcArgInt(dcCallVM, args->data[arg_idx++].of.i32);
                 break;
 
-            default: assert(("bad dynamic call type", 0));
+            default: assert("bad dynamic call type" && 0);
         }
     }
 
@@ -652,7 +652,7 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
 #ifdef USE_DYNCALL
     wasm_runtime.wasm_func_from_idx = wasm_func_from_idx;
 #endif
-    
+
     wasm_runtime.argc = argc;
     wasm_runtime.argv = argv;
 

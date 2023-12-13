@@ -449,7 +449,7 @@ static inline double __ovm_nearest(double f) {
     else                          return __ovm_ceil(f);
 }
 
-static inline double __ovm_copysign(a, b) double a, b; {
+static inline double __ovm_copysign(double a, double b) {
     if ((a > 0 && b > 0) || (a < 0 && b < 0)) return a;
     return -a;
 }
