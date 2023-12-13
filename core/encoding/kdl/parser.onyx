@@ -59,16 +59,20 @@ Token :: union {
     }
 
     peek_char :: (self: &#Self) -> ? u32 {
+        if self.cursor >= self.doc.length do return .None;
+
         codepoint_length := utf8.rune_length_from_first_byte(self.doc[self.cursor]);
-        if self.cursor + codepoint_length >= self.doc.length do return .None;
+        if self.cursor + codepoint_length > self.doc.length do return .None;
         
         value := utf8.decode_rune(string.advance(self.doc, self.cursor));
         return value;
     }
 
     eat_char :: (self: &#Self) -> ? u32 {
+        if self.cursor >= self.doc.length do return .None;
+
         codepoint_length := utf8.rune_length_from_first_byte(self.doc[self.cursor]);
-        if self.cursor + codepoint_length >= self.doc.length do return .None;
+        if self.cursor + codepoint_length > self.doc.length do return .None;
         
         value := utf8.decode_rune(string.advance(self.doc, self.cursor));
         self.cursor += codepoint_length;
@@ -129,7 +133,6 @@ Token :: union {
             }
 
             return .{ Newline = .{} };
-            // return self->next_token();
         }
 
         if c == ';'  { self->eat_char(); return .{ Semicolon = .{} }; }
@@ -146,7 +149,6 @@ Token :: union {
             return self->handle_word();
         }
 
-        // assert(false, tprintf("Unhandled character, {}", c));
         return .{ Error = .{} };
     }
 
