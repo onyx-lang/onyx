@@ -24,10 +24,16 @@
 #define OVMI_INSTR_EXEC(name) \
     static OVMI_INSTR_PROTO(OVMI_FUNC_NAME(name))
 
+#if _BH_DARWIN
+    #define FORCE_TAILCALL __attribute__((musttail))
+#else
+    #define FORCE_TAILCALL
+#endif
+
 #define NEXT_OP \
     OVMI_DEBUG_HOOK; \
     instr = &code[state->pc++]; \
-    __attribute__((musttail)) return OVMI_DISPATCH_NAME[instr->full_instr & OVM_INSTR_MASK](instr, state, values, memory, code);
+    FORCE_TAILCALL return OVMI_DISPATCH_NAME[instr->full_instr & OVM_INSTR_MASK](instr, state, values, memory, code);
 
 #define VAL(loc) values[loc]
 
