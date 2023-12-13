@@ -2,7 +2,7 @@
 
 # FLAGS="-g3 -O2 -DOVM_DEBUG=1 -fno-stack-protector"
 # FLAGS="-g3 -DOVM_VERBOSE=1"
-FLAGS="-Ofast -fno-stack-protector"
+FLAGS="-O3 -fno-stack-protector"
 LIBS="-pthread"
 TARGET="../shared/lib/$ONYX_ARCH/lib/libovmwasm.a"
 C_FILES="src/ovmwasm.c src/vm/*.c src/wasm/*.c src/debug/*.c"

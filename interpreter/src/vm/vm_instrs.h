@@ -27,7 +27,7 @@
 #define NEXT_OP \
     OVMI_DEBUG_HOOK; \
     instr = &code[state->pc++]; \
-    return OVMI_DISPATCH_NAME[instr->full_instr & OVM_INSTR_MASK](instr, state, values, memory, code);
+    __attribute__((musttail)) return OVMI_DISPATCH_NAME[instr->full_instr & OVM_INSTR_MASK](instr, state, values, memory, code);
 
 #define VAL(loc) values[loc]
 
