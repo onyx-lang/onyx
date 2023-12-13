@@ -262,7 +262,8 @@ static i32 output_importsection(OnyxWasmModule* module, bh_buffer* buff) {
                 output_limits(import->min, import->max, import->shared, &vec_buff);
                 break;
 
-            case WASM_FOREIGN_TABLE: assert(0);
+            case WASM_FOREIGN_GLOBAL:
+            case WASM_FOREIGN_TABLE: assert("Bad foreign import kind" && 0);
         }
     }
 
@@ -1053,7 +1054,7 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
                 continue;
             }
 
-            assert(("Unhandled type", 0));
+            assert("Unhandled type in debug info builder" && 0);
         }
 
         output_unsigned_integer(section_buff.length, buff);

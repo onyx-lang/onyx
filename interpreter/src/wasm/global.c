@@ -20,10 +20,10 @@ wasm_globaltype_t *wasm_global_type(const wasm_global_t *global) {
 }
 
 void wasm_global_get(const wasm_global_t *global, wasm_val_t *value) {
-    assert(("unimplemented", 0));
+    assert(0 && "unimplemented");
 }
 
 void wasm_global_set(wasm_global_t *global, const wasm_val_t *value) {
-    assert(("unimplemented", 0));
+    assert(0 && "unimplemented");
 }
 

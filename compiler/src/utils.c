@@ -388,6 +388,8 @@ all_types_peeled_off:
             AstInterface* inter = (AstInterface *) node;
             return symbol_raw_resolve(inter->scope, symbol);
         }
+
+        default: break;
     }
 
     return NULL;
@@ -543,6 +545,7 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
                 overload = (AstFunction *) node;
                 arguments_clear_baked_flags(&args);
                 break;
+            default: break;
         }
 
         // NOTE: Overload is not something that is known to be overloadable.
@@ -856,7 +859,7 @@ AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* c
             return polymorphic_proc_build_only_header_with_slns(pp, slns, error_if_failed);
         }
 
-        default: assert(("Bad macro body type.", 0));
+        default: assert("Bad macro body type." && 0);
     }
 
     return NULL;
@@ -941,6 +944,8 @@ static i32 maximum_argument_count(AstNode* provider) {
 
             return type_structlike_mem_count(sl->type);
         }
+
+        default: break;
     }
 
     // NOTE: This returns int_max for anything other than struct literals because the
@@ -1436,6 +1441,8 @@ all_types_peeled_off:
             AstInterface* inter = (AstInterface *) node;
             return &inter->scope;
         }
+
+        default: break;
     }
 
     return NULL;

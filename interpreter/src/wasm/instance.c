@@ -47,7 +47,7 @@ struct ovm_wasm_binding {
             (o).f64  = (w).of.f64; \
             break; \
  \
-        default: assert(("invalid wasm value type for conversion", 0)); \
+        default: assert(0 && "invalid wasm value type for conversion"); \
     } }
 
 #define OVM_TO_WASM(o, w) { \
@@ -95,7 +95,7 @@ struct ovm_wasm_binding {
  \
         default: \
             printf("INVALID: %d\n", (o).type); \
-            assert(("invalid ovm value type for conversion", 0)); \
+            assert(0 && "invalid ovm value type for conversion"); \
     } }
 
 static wasm_trap_t *wasm_to_ovm_func_call_binding(void *vbinding, const wasm_val_vec_t *args, wasm_val_vec_t *res) {
@@ -174,7 +174,7 @@ static void prepare_instance(wasm_instance_t *instance, const wasm_extern_vec_t 
                 if (!wasm_functype_equals(
                         wasm_externtype_as_functype(importtype->type),
                         wasm_externtype_as_functype((wasm_externtype_t *) imports->data[i]->type))) {
-                    assert(("MISMATCHED FUNCTION TYPE", 0));
+                    assert(0 && "MISMATCHED FUNCTION TYPE");
                 }
 
                 wasm_func_t *func = wasm_extern_as_func(imports->data[i]);
@@ -185,7 +185,7 @@ static void prepare_instance(wasm_instance_t *instance, const wasm_extern_vec_t 
                 binding->result_count = functype->results.size;
                 binding->func         = func;
                 binding->param_buffer.data = bh_alloc(ovm_store->arena_allocator, sizeof(wasm_val_t) * binding->param_count);
-                binding->param_buffer.size = binding->param_count; 
+                binding->param_buffer.size = binding->param_count;
 
                 ovm_state_register_external_func(ovm_state, importtype->external_func_idx, ovm_to_wasm_func_call_binding, binding);
                 break;
@@ -237,8 +237,8 @@ static void prepare_instance(wasm_instance_t *instance, const wasm_extern_vec_t 
         binding->program  = ovm_program;
         binding->state    = ovm_state;
         binding->instance = instance;
-        
-        wasm_func_t *func = wasm_func_new_with_env(instance->store, instance->module->functypes.data[i], 
+
+        wasm_func_t *func = wasm_func_new_with_env(instance->store, instance->module->functypes.data[i],
             wasm_to_ovm_func_call_binding, binding, NULL);
 
         bh_arr_push(instance->funcs, func);

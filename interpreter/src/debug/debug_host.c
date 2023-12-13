@@ -9,7 +9,7 @@ void debug_host_init(debug_state_t *debug, struct ovm_engine_t *ovm_engine) {
 
     bh_arena_init(&debug->tmp_arena, bh_heap_allocator(), 16 * 1024);
     debug->tmp_alloc = bh_arena_allocator(&debug->tmp_arena);
-    
+
     debug->info = NULL;
 
     debug->threads = NULL;
@@ -19,7 +19,8 @@ void debug_host_init(debug_state_t *debug, struct ovm_engine_t *ovm_engine) {
     debug->listen_socket_fd = 0;
     debug->client_fd = 0;
 
-    if (pipe(debug->state_change_pipes) != 0) {
+    int *pipes = (int *)debug->state_change_pipes;
+    if (pipe(pipes) != 0) {
         printf("[ERROR] Failed to create thread notification pipes.\n");
     }
 }

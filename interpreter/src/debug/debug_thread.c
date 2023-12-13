@@ -49,7 +49,7 @@ static void send_string(debug_state_t *debug, const char *str) {
     }
 }
 
-static void send_bytes(debug_state_t *debug, const char *bytes, unsigned int len) {
+static void send_bytes(debug_state_t *debug, const unsigned char *bytes, unsigned int len) {
     bh_buffer_write_u32(&debug->send_buffer, len);
     bh_buffer_append(&debug->send_buffer, bytes, len);
 }
@@ -186,7 +186,7 @@ static DEBUG_COMMAND_HANDLER(debug_command_brk) {
 
     debug_file_info_t file_info;
     debug_info_lookup_file_by_name(debug->info, filename, &file_info);
-    
+
     debug_breakpoint_t bp;
     bp.id = debug->next_breakpoint_id++;
     bp.instr = instr;
@@ -239,7 +239,7 @@ static DEBUG_COMMAND_HANDLER(debug_command_clr_brk) {
 static DEBUG_COMMAND_HANDLER(debug_command_step) {
     u32 granularity = parse_int(debug, ctx);
     u32 thread_id = parse_int(debug, ctx);
-    
+
     if (granularity == 1) {
         ON_THREAD(thread_id) {
             (*thread)->pause_at_next_line = true;
@@ -420,7 +420,7 @@ static DEBUG_COMMAND_HANDLER(debug_command_vars) {
 
                     debug_runtime_value_build_clear(&builder);
                 }
-                
+
                 // This is important, as when doing a layered query, only one symbol
                 // should be considered, and once found, should immediate stop.
                 goto syms_done;
@@ -445,7 +445,7 @@ static DEBUG_COMMAND_HANDLER(debug_command_vars) {
 
         symbol_scope = sym_scope.parent;
     }
-        
+
   syms_done:
     send_int(debug, 1);
     debug_runtime_value_build_free(&builder);
@@ -470,7 +470,7 @@ static DEBUG_COMMAND_HANDLER(debug_command_memory_write) {
     u32 addr = parse_int(debug, ctx);
     u32 count;
 
-    u8 *data = parse_bytes(debug, ctx, &count);
+    u8 *data = (u8 *)parse_bytes(debug, ctx, &count);
     memcpy(bh_pointer_add(debug->ovm_engine->memory, addr), data, count);
 
     send_response_header(debug, msg_id);
@@ -570,7 +570,7 @@ void *__debug_thread_entry(void * data) {
 
     // Set up socket listener
     // Wait for initial connection/handshake before entering loop.
-    
+
     debug->listen_socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
     struct sockaddr_un local_addr, remote_addr;
@@ -585,7 +585,7 @@ void *__debug_thread_entry(void * data) {
     listen(debug->listen_socket_fd, 1);
 
     len = sizeof(struct sockaddr_un);
-    debug->client_fd = accept(debug->listen_socket_fd, (void * restrict)&remote_addr, &len);
+    debug->client_fd = accept(debug->listen_socket_fd, (void * restrict)&remote_addr, (socklen_t * restrict)&len);
 
     close(debug->listen_socket_fd);
 

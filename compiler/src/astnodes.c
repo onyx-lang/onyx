@@ -208,7 +208,7 @@ AstNumLit* ast_reduce_type_compare(bh_allocator a, AstBinaryOp* node) {
     switch (node->operation) {
         case Binary_Op_Equal:     res->value.l = left_type->id == right_type->id; break;
         case Binary_Op_Not_Equal: res->value.l = left_type->id != right_type->id; break;
-        default: assert(("Bad case in ast_reduce_type_compare", 0));
+        default: assert("Bad case in ast_reduce_type_compare" && 0);
     }
 
     return res;
@@ -530,7 +530,7 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type) {
                 return 1;
             }
             if (type->Basic.size == 8) {
-                if (bh_abs(num->value.l) >= (1ull << 52)) {
+                if (bh_abs(num->value.l) >= (1ll << 52)) {
                     onyx_report_error(num->token->pos, Error_Critical, "Integer '%l' does not fit in 64-bit float exactly.", num->value.l);
                     return 0;
                 }
@@ -826,6 +826,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
                 case TYPE_MATCH_SUCCESS: break;
                 case TYPE_MATCH_FAILED: return TYPE_MATCH_FAILED;
                 case TYPE_MATCH_YIELD: return TYPE_MATCH_YIELD;
+                default: break;
             }
         }
 
@@ -834,6 +835,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
                 case TYPE_MATCH_SUCCESS: break;
                 case TYPE_MATCH_FAILED: return TYPE_MATCH_FAILED;
                 case TYPE_MATCH_YIELD: return TYPE_MATCH_YIELD;
+                default: break;
             }
         }
 
@@ -1061,7 +1063,7 @@ Type* query_expression_type(AstTyped *node) {
 
     if (node->kind == Ast_Kind_NumLit && node->type->kind == Type_Kind_Basic) {
         if (node->type->Basic.kind == Basic_Kind_Int_Unsized) {
-            b32 big    = bh_abs(((AstNumLit *) node)->value.l) >= (1ull << 32);
+            b32 big    = bh_abs(((AstNumLit *) node)->value.l) >= (1ll << 32);
             b32 unsign = ((AstNumLit *) node)->was_hex_literal;
 
             if (((AstNumLit *) node)->was_char_literal) return &basic_types[Basic_Kind_U8];
@@ -1171,7 +1173,7 @@ Type* resolve_expression_type(AstTyped* node) {
 
     if (node->kind == Ast_Kind_NumLit && node->type->kind == Type_Kind_Basic) {
         if (node->type->Basic.kind == Basic_Kind_Int_Unsized) {
-            b32 big    = bh_abs(((AstNumLit *) node)->value.l) >= (1ull << 32);
+            b32 big    = bh_abs(((AstNumLit *) node)->value.l) >= (1ll << 32);
             b32 unsign = ((AstNumLit *) node)->was_hex_literal;
 
             if (((AstNumLit *) node)->was_char_literal) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U8]);
@@ -1247,7 +1249,7 @@ char *get_expression_string_value(AstTyped* node, b32 *out_is_valid) {
         // CLEANUP: Maybe this should allocate on the heap?
         // I guess if in all cases the memory is allocated on the heap,
         // then the caller can free the memory.
-        i8* strdata = bh_alloc_array(global_heap_allocator, i8, str->token->length + 1);
+        char* strdata = bh_alloc_array(global_heap_allocator, char, str->token->length + 1);
         i32 length  = string_process_escape_seqs(strdata, str->token->text, str->token->length);
         strdata[length] = '\0';
 
@@ -1563,7 +1565,7 @@ AstNumLit* make_int_literal(bh_allocator a, i64 i) {
     AstNumLit* num = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
     num->flags |= Ast_Flag_Comptime;
 
-    if (bh_abs(i) >= ((u64) 1 << 32))
+    if (bh_abs(i) >= (1ll << 32))
         num->type_node = (AstType *) &basic_type_i64;
     else
         num->type_node = (AstType *) &basic_type_i32;

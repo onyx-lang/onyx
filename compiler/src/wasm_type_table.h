@@ -773,6 +773,10 @@ static u64 build_type_table(OnyxWasmModule* module) {
 
                 break;
             }
+        
+            case Type_Kind_Invalid:
+            case Type_Kind_Count:
+                break;
         }
     }
 

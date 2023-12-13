@@ -27,7 +27,7 @@ void debug_info_free(debug_info_t *info) {
 }
 
 void debug_info_import_file_info(debug_info_t *info, u8 *data, u32 len) {
-    u32 offset = 0;
+    i32 offset = 0;
     info->has_debug_info = true;
 
     i32 count = uleb128_to_uint(data, &offset);
@@ -52,7 +52,7 @@ void debug_info_import_file_info(debug_info_t *info, u8 *data, u32 len) {
 }
 
 void debug_info_import_func_info(debug_info_t *info, u8 *data, u32 len) {
-    u32 offset = 0;
+    i32 offset = 0;
     info->has_debug_info = true;
 
     i32 count = uleb128_to_uint(data, &offset);
@@ -85,7 +85,7 @@ void debug_info_import_func_info(debug_info_t *info, u8 *data, u32 len) {
 }
 
 void debug_info_import_sym_info(debug_info_t *info, u8 *data, u32 len) {
-    u32 offset = 0;
+    i32 offset = 0;
     info->has_debug_info = true;
 
     i32 count = uleb128_to_uint(data, &offset);
@@ -102,7 +102,7 @@ void debug_info_import_sym_info(debug_info_t *info, u8 *data, u32 len) {
             sym_info.name[name_length] = 0;
             offset += name_length;
         }
-        
+
         sym_info.loc_kind = uleb128_to_uint(data, &offset);
         sym_info.loc = uleb128_to_uint(data, &offset);
         sym_info.type = uleb128_to_uint(data, &offset);
@@ -114,7 +114,7 @@ void debug_info_import_sym_info(debug_info_t *info, u8 *data, u32 len) {
 }
 
 void debug_info_import_type_info(debug_info_t *info, u8 *data, u32 len) {
-    u32 offset = 0;
+    i32 offset = 0;
     info->has_debug_info = true;
 
     i32 count = uleb128_to_uint(data, &offset);
@@ -208,20 +208,20 @@ void debug_info_import_type_info(debug_info_t *info, u8 *data, u32 len) {
                 type.onion.tag_size = uleb128_to_uint(data, &offset);
                 type.onion.variant_count = uleb128_to_uint(data, &offset);
                 type.onion.variants = bh_alloc_array(info->alloc, debug_type_union_variant_t, type.onion.variant_count);
-                
+
                 fori (i, 0, type.onion.variant_count) {
                     u32 name_length = uleb128_to_uint(data, &offset);
                     type.onion.variants[i].name = bh_alloc_array(info->alloc, char, name_length + 1);
                     memcpy(type.onion.variants[i].name, data + offset, name_length);
                     type.onion.variants[i].name[name_length] = 0;
                     offset += name_length;
-                    
+
                     type.onion.variants[i].type = uleb128_to_uint(data, &offset);
                 }
                 break;
 
             // Error handling
-            default: assert(("Unrecognized type kind", 0));
+            default: assert(0 && "Unrecognized type kind");
         }
 
         bh_arr_set_at(info->types, type.id, type);

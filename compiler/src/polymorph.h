@@ -47,6 +47,8 @@ void insert_poly_sln_into_scope(Scope* scope, AstPolySolution *sln) {
 
             node = (AstNode *) sln->value;
             break;
+
+        case PSK_Undefined: assert("Unexpected PSK_Undefined" && 0); break;
     }
 
     symbol_introduce(scope, sln->poly_sym->token, node);

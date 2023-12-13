@@ -411,6 +411,8 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
                 
             bh_buffer_append(buffer, node->token->text, node->token->length);
             return;
+
+        default: break;
     }
 
   unknown_case:
@@ -479,7 +481,7 @@ static void write_doc_constraints(bh_buffer *buffer, ConstraintContext *constrai
         }
 
         bh_buffer_write_string(&tmp_buffer, ")");
-        write_string(buffer, tmp_buffer.length, tmp_buffer.data);
+        write_string(buffer, tmp_buffer.length, (char *) tmp_buffer.data);
 
         constraint_count += 1;
     }
@@ -497,7 +499,7 @@ static void write_doc_constraints(bh_buffer *buffer, ConstraintContext *constrai
             poly_param->poly_sym->flags |= Ast_Flag_Symbol_Is_PolyVar;
 
             bh_buffer_write_string(&tmp_buffer, ")");
-            write_string(buffer, tmp_buffer.length, tmp_buffer.data);
+            write_string(buffer, tmp_buffer.length, (char *) tmp_buffer.data);
 
             constraint_count += 1;
         }
@@ -534,6 +536,7 @@ static void write_doc_methods(bh_buffer *buffer, Scope *method_scope) {
             case Ast_Kind_Function:            binding = node->original_binding_to_node; break;
             case Ast_Kind_Macro:               binding = ((AstMacro *) node)->original_binding_to_node; break;
             case Ast_Kind_Overloaded_Function: binding = ((AstOverloadedFunction *) node)->original_binding_to_node; break;
+            default: break;
         }
 
         OnyxToken tmp_name_token;
@@ -647,7 +650,7 @@ static b32 write_doc_polymorphic_proc(bh_buffer *buffer, AstBinding *binding, As
             write_string(buffer, param->local->token->length, param->local->token->text);
 
         write_type_node(&param_type_buf, param->local->type_node);
-        write_string(buffer, param_type_buf.length, param_type_buf.data);
+        write_string(buffer, param_type_buf.length, (char *) param_type_buf.data);
         write_cstring(buffer, "");
     }
 
@@ -655,7 +658,7 @@ static b32 write_doc_polymorphic_proc(bh_buffer *buffer, AstBinding *binding, As
     // Return type
     bh_buffer_clear(&param_type_buf);
     write_type_node(&param_type_buf, func->return_type);
-    write_string(buffer, param_type_buf.length, param_type_buf.data);
+    write_string(buffer, param_type_buf.length, (char *) param_type_buf.data);
     bh_buffer_free(&param_type_buf);
 
     // Overload procs
@@ -736,7 +739,7 @@ static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *
             write_type_node(&type_buf, smem->type_node);
 
             write_string(buffer, smem->token->length, smem->token->text);
-            write_string(buffer, type_buf.length, type_buf.data);
+            write_string(buffer, type_buf.length, (char *) type_buf.data);
             write_cstring(buffer, "");
 
             bh_buffer_write_u32(buffer, smem->is_used ? 1 : 0);
@@ -749,7 +752,7 @@ static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *
             write_type_node(&type_buf, param->type_node);
 
             write_string(buffer, param->token->length, param->token->text);
-            write_string(buffer, type_buf.length, type_buf.data);
+            write_string(buffer, type_buf.length, (char *) type_buf.data);
             write_cstring(buffer, "");
         }
 
@@ -809,7 +812,7 @@ static b32 write_doc_union_type(bh_buffer *buffer, AstBinding *binding, AstNode 
             write_type_node(&type_buf, uv->type_node);
 
             write_string(buffer, uv->token->length, uv->token->text);
-            write_string(buffer, type_buf.length, type_buf.data);
+            write_string(buffer, type_buf.length, (char *) type_buf.data);
         }
 
         // Polymorph parameters
@@ -819,7 +822,7 @@ static b32 write_doc_union_type(bh_buffer *buffer, AstBinding *binding, AstNode 
             write_type_node(&type_buf, param->type_node);
 
             write_string(buffer, param->token->length, param->token->text);
-            write_string(buffer, type_buf.length, type_buf.data);
+            write_string(buffer, type_buf.length, (char *) type_buf.data);
             write_cstring(buffer, "");
         }
 
@@ -863,7 +866,7 @@ static b32 write_doc_distinct_type(bh_buffer *buffer, AstBinding *binding, AstNo
     bh_buffer type_buf;
     bh_buffer_init(&type_buf, global_scratch_allocator, 256);
     write_type_node(&type_buf, distinct_node->base_type);
-    write_string(buffer, type_buf.length, type_buf.data);
+    write_string(buffer, type_buf.length, (char *) type_buf.data);
     bh_buffer_free(&type_buf);
 
     write_doc_methods(buffer, distinct_node->scope);

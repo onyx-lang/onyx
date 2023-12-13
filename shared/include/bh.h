@@ -78,7 +78,7 @@ typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
 typedef int64_t isize;
-typedef i32 b32;
+typedef u32 b32;
 typedef void* ptr;
 typedef float f32;
 typedef double f64;
@@ -466,7 +466,7 @@ char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_su
 
 bh_file_contents bh_file_read_contents_bh_file(bh_allocator alloc, bh_file* file);
 bh_file_contents bh_file_read_contents_direct(bh_allocator alloc, const char* filename);
-i32 bh_file_contents_free(bh_file_contents* contents);
+b32 bh_file_contents_free(bh_file_contents* contents);
 
 
 #ifdef _BH_WINDOWS
@@ -1850,11 +1850,11 @@ bh_file_error bh_file_close(bh_file* file) {
 #endif
 }
 
-b32 bh_file_read(bh_file* file, void* buffer, isize buff_size) {
+i32 bh_file_read(bh_file* file, void* buffer, isize buff_size) {
     return bh_file_read_at(file, bh_file_tell(file), buffer, buff_size, NULL);
 }
 
-b32 bh_file_write(bh_file* file, void* buffer, isize buff_size) {
+i32 bh_file_write(bh_file* file, void* buffer, isize buff_size) {
     return bh_file_write_at(file, bh_file_tell(file), buffer, buff_size, NULL);
 }
 

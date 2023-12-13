@@ -3151,7 +3151,7 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
     bh_arr_new(global_heap_allocator, poly_proc->poly_params, bh_arr_length(params));
     fori (i, 0, bh_arr_length(params)) {
         bh_arr_push(poly_proc->poly_params, ((AstPolyParam) {
-            .kind = PSK_Type,
+            .kind = PPK_Poly_Type,
             .idx  = i,
             .poly_sym = poly_params[i],
             .type_expr = (AstType *) poly_params[i],

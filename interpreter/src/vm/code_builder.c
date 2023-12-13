@@ -5,7 +5,7 @@
 // #define BUILDER_DEBUG
 
 #if defined(BUILDER_DEBUG)
-    #define POP_VALUE(b)     (bh_arr_length((b)->execution_stack) == 0 ? (assert(("invalid value pop", 0)), 0) : bh_arr_pop((b)->execution_stack))
+    #define POP_VALUE(b)     (bh_arr_length((b)->execution_stack) == 0 ? (assert(0 && "invalid value pop"), 0) : bh_arr_pop((b)->execution_stack))
 #else
     #define POP_VALUE(b) bh_arr_pop((b)->execution_stack)
 #endif
@@ -109,7 +109,7 @@ void ovm_code_builder_pop_label_target(ovm_code_builder_t *builder) {
                 ovm_program_modify_static_int(builder->program, patch.static_arr, patch.static_idx, br_delta);
                 break;
         }
-        
+
         bh_arr_fastdelete(builder->branch_patches, i);
         i--;
     }
@@ -193,7 +193,7 @@ void ovm_code_builder_add_imm(ovm_code_builder_t *builder, u32 ovm_type, void *i
         case OVM_TYPE_I64: imm_instr.l =       *(u64 *) imm; break;
         case OVM_TYPE_F32: imm_instr.f =       *(f32 *) imm; break;
         case OVM_TYPE_F64: imm_instr.d =       *(f64 *) imm; break;
-        default: assert(("bad ovm type for add_imm", 0));
+        default: assert(0 && "bad ovm type for add_imm");
     }
 
     debug_info_builder_emit_location(builder->debug_builder);
@@ -283,12 +283,12 @@ void ovm_code_builder_add_branch_table(ovm_code_builder_t *builder, i32 count, i
     instrs[3].r = tmp_register;
     instrs[3].a = table_idx;
     instrs[3].b = index_register;
-    
+
     instrs[4].full_instr = OVM_TYPED_INSTR(OVMI_BRI, OVM_TYPE_NONE);
     instrs[4].a = tmp_register;
-    
+
     POP_VALUE(builder);
-    
+
     fori (i, 0, count) {
         branch_patch_t patch;
         patch.kind = branch_patch_static_idx;
@@ -476,7 +476,7 @@ void ovm_code_builder_add_register_set(ovm_code_builder_t *builder, i32 reg_idx)
         ovm_instr_t *last_instr = &bh_arr_last(builder->program->code);
         if (OVM_INSTR_INSTR(*last_instr) == OVMI_MOV) {
             if (IS_TEMPORARY_VALUE(builder, last_instr->r) && last_instr->r == LAST_VALUE(builder)) {
-                
+
                 last_instr->full_instr = OVM_TYPED_INSTR(OVMI_REG_SET, OVM_TYPE_NONE);
                 last_instr->r = reg_idx;
 
@@ -538,7 +538,7 @@ void ovm_code_builder_add_cmpxchg(ovm_code_builder_t *builder, u32 ovm_type, i32
     //     PUSH_VALUE(builder, cmpxchg_instr.r);
     //     return;
     // }
-    
+
     ovm_instr_t instrs[3] = {0};
     // imm.i32 %n, offset
     instrs[0].full_instr = OVM_TYPED_INSTR(OVMI_IMM, OVM_TYPE_I32);
