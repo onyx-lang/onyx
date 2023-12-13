@@ -27,19 +27,19 @@ void debug_info_free(debug_info_t *info) {
 }
 
 void debug_info_import_file_info(debug_info_t *info, u8 *data, u32 len) {
-    u32 offset = 0;
+    i32 offset = 0;
     info->has_debug_info = true;
 
-    i32 count = uleb128_to_uint(data, (i32 *)&offset);
+    i32 count = uleb128_to_uint(data, &offset);
     fori (i, 0, (i32) count) {
         debug_file_info_t file_info;
         file_info.line_buffer_offset = -1;
 
-        u32 file_id = uleb128_to_uint(data, (i32 *)&offset);
+        u32 file_id = uleb128_to_uint(data, &offset);
         file_info.file_id = file_id;
-        file_info.line_count = uleb128_to_uint(data, (i32 *)&offset);
+        file_info.line_count = uleb128_to_uint(data, &offset);
 
-        u32 name_length = uleb128_to_uint(data, (i32 *)&offset);
+        u32 name_length = uleb128_to_uint(data, &offset);
         file_info.name = bh_alloc_array(info->alloc, char, name_length + 1);
         memcpy(file_info.name, data + offset, name_length);
         file_info.name[name_length] = 0;
@@ -52,17 +52,17 @@ void debug_info_import_file_info(debug_info_t *info, u8 *data, u32 len) {
 }
 
 void debug_info_import_func_info(debug_info_t *info, u8 *data, u32 len) {
-    u32 offset = 0;
+    i32 offset = 0;
     info->has_debug_info = true;
 
-    i32 count = uleb128_to_uint(data, (i32 *)&offset);
+    i32 count = uleb128_to_uint(data, &offset);
     fori (i, 0, (i32) count) {
         debug_func_info_t func_info;
-        func_info.func_id = uleb128_to_uint(data, (i32 *)&offset);
-        func_info.file_id = uleb128_to_uint(data, (i32 *)&offset);
-        func_info.line    = uleb128_to_uint(data, (i32 *)&offset);
+        func_info.func_id = uleb128_to_uint(data, &offset);
+        func_info.file_id = uleb128_to_uint(data, &offset);
+        func_info.line    = uleb128_to_uint(data, &offset);
 
-        u32 name_length = uleb128_to_uint(data, (i32 *)&offset);
+        u32 name_length = uleb128_to_uint(data, &offset);
         if (name_length == 0) {
             func_info.name = NULL;
         } else {
@@ -73,10 +73,10 @@ void debug_info_import_func_info(debug_info_t *info, u8 *data, u32 len) {
         }
 
         func_info.internal = data[offset++] != 0;
-        func_info.debug_op_offset = uleb128_to_uint(data, (i32 *)&offset);
-        func_info.stack_ptr_idx = uleb128_to_uint(data, (i32 *)&offset);
+        func_info.debug_op_offset = uleb128_to_uint(data, &offset);
+        func_info.stack_ptr_idx = uleb128_to_uint(data, &offset);
 
-        uleb128_to_uint(data, (i32 *)&offset);
+        uleb128_to_uint(data, &offset);
 
         bh_arr_set_at(info->funcs, func_info.func_id, func_info);
     }
@@ -85,15 +85,15 @@ void debug_info_import_func_info(debug_info_t *info, u8 *data, u32 len) {
 }
 
 void debug_info_import_sym_info(debug_info_t *info, u8 *data, u32 len) {
-    u32 offset = 0;
+    i32 offset = 0;
     info->has_debug_info = true;
 
-    i32 count = uleb128_to_uint(data, (i32 *)&offset);
+    i32 count = uleb128_to_uint(data, &offset);
     fori (i, 0, count) {
         debug_sym_info_t sym_info;
-        sym_info.sym_id = uleb128_to_uint(data, (i32 *)&offset);
+        sym_info.sym_id = uleb128_to_uint(data, &offset);
 
-        u32 name_length = uleb128_to_uint(data, (i32 *)&offset);
+        u32 name_length = uleb128_to_uint(data, &offset);
         if (name_length == 0) {
             sym_info.name = NULL;
         } else {
@@ -103,9 +103,9 @@ void debug_info_import_sym_info(debug_info_t *info, u8 *data, u32 len) {
             offset += name_length;
         }
 
-        sym_info.loc_kind = uleb128_to_uint(data, (i32 *)&offset);
-        sym_info.loc = uleb128_to_uint(data, (i32 *)&offset);
-        sym_info.type = uleb128_to_uint(data, (i32 *)&offset);
+        sym_info.loc_kind = uleb128_to_uint(data, &offset);
+        sym_info.loc = uleb128_to_uint(data, &offset);
+        sym_info.type = uleb128_to_uint(data, &offset);
 
         bh_arr_set_at(info->symbols, sym_info.sym_id, sym_info);
     }
@@ -114,15 +114,15 @@ void debug_info_import_sym_info(debug_info_t *info, u8 *data, u32 len) {
 }
 
 void debug_info_import_type_info(debug_info_t *info, u8 *data, u32 len) {
-    u32 offset = 0;
+    i32 offset = 0;
     info->has_debug_info = true;
 
-    i32 count = uleb128_to_uint(data, (i32 *)&offset);
+    i32 count = uleb128_to_uint(data, &offset);
     fori (i, 0, count) {
         debug_type_info_t type;
-        type.id = uleb128_to_uint(data, (i32 *)&offset);
+        type.id = uleb128_to_uint(data, &offset);
 
-        u32 name_length = uleb128_to_uint(data, (i32 *)&offset);
+        u32 name_length = uleb128_to_uint(data, &offset);
         if (name_length == 0) {
             type.name = NULL;
         } else {
@@ -132,30 +132,30 @@ void debug_info_import_type_info(debug_info_t *info, u8 *data, u32 len) {
             offset += name_length;
         }
 
-        type.size = uleb128_to_uint(data, (i32 *)&offset);
-        type.kind = uleb128_to_uint(data, (i32 *)&offset);
+        type.size = uleb128_to_uint(data, &offset);
+        type.kind = uleb128_to_uint(data, &offset);
 
         switch (type.kind) {
             case debug_type_kind_primitive:
-                type.primitive.primitive_kind = uleb128_to_uint(data, (i32 *)&offset);
+                type.primitive.primitive_kind = uleb128_to_uint(data, &offset);
                 break;
 
             case debug_type_kind_modifier:
-                type.modifier.modifier_kind = uleb128_to_uint(data, (i32 *)&offset);
-                type.modifier.modified_type = uleb128_to_uint(data, (i32 *)&offset);
+                type.modifier.modifier_kind = uleb128_to_uint(data, &offset);
+                type.modifier.modified_type = uleb128_to_uint(data, &offset);
                 break;
 
             case debug_type_kind_structure:
-                type.structure.simple = uleb128_to_uint(data, (i32 *)&offset);
+                type.structure.simple = uleb128_to_uint(data, &offset);
 
-                type.structure.member_count = uleb128_to_uint(data, (i32 *)&offset);
+                type.structure.member_count = uleb128_to_uint(data, &offset);
                 type.structure.members = bh_alloc_array(info->alloc, debug_type_structure_member_t, type.structure.member_count);
 
                 fori (i, 0, type.structure.member_count) {
-                    type.structure.members[i].offset = uleb128_to_uint(data, (i32 *)&offset);
-                    type.structure.members[i].type   = uleb128_to_uint(data, (i32 *)&offset);
+                    type.structure.members[i].offset = uleb128_to_uint(data, &offset);
+                    type.structure.members[i].type   = uleb128_to_uint(data, &offset);
 
-                    u32 name_length = uleb128_to_uint(data, (i32 *)&offset);
+                    u32 name_length = uleb128_to_uint(data, &offset);
                     type.structure.members[i].name = bh_alloc_array(info->alloc, char, name_length + 1);
                     memcpy(type.structure.members[i].name, data + offset, name_length);
                     type.structure.members[i].name[name_length] = 0;
@@ -164,39 +164,39 @@ void debug_info_import_type_info(debug_info_t *info, u8 *data, u32 len) {
                 break;
 
             case debug_type_kind_array:
-                type.array.count = uleb128_to_uint(data, (i32 *)&offset);
-                type.array.type  = uleb128_to_uint(data, (i32 *)&offset);
+                type.array.count = uleb128_to_uint(data, &offset);
+                type.array.type  = uleb128_to_uint(data, &offset);
                 break;
 
             case debug_type_kind_alias:
-                type.alias.alias_kind   = uleb128_to_uint(data, (i32 *)&offset);
-                type.alias.aliased_type = uleb128_to_uint(data, (i32 *)&offset);
+                type.alias.alias_kind   = uleb128_to_uint(data, &offset);
+                type.alias.aliased_type = uleb128_to_uint(data, &offset);
                 break;
 
             case debug_type_kind_function:
-                type.function.param_count = uleb128_to_uint(data, (i32 *)&offset);
+                type.function.param_count = uleb128_to_uint(data, &offset);
                 type.function.param_types = bh_alloc_array(info->alloc, u32, type.function.param_count);
 
                 fori (i, 0, type.function.param_count) {
-                    type.function.param_types[i] = uleb128_to_uint(data, (i32 *)&offset);
+                    type.function.param_types[i] = uleb128_to_uint(data, &offset);
                 }
 
-                type.function.return_type = uleb128_to_uint(data, (i32 *)&offset);
+                type.function.return_type = uleb128_to_uint(data, &offset);
                 break;
 
             case debug_type_kind_slice:
-                type.slice.type = uleb128_to_uint(data, (i32 *)&offset);
+                type.slice.type = uleb128_to_uint(data, &offset);
                 break;
 
             case debug_type_kind_enum:
-                type.enumeration.backing_type = uleb128_to_uint(data, (i32 *)&offset);
-                type.enumeration.value_count = uleb128_to_uint(data, (i32 *)&offset);
+                type.enumeration.backing_type = uleb128_to_uint(data, &offset);
+                type.enumeration.value_count = uleb128_to_uint(data, &offset);
                 type.enumeration.values = bh_alloc_array(info->alloc, debug_type_enum_value_t, type.enumeration.value_count);
 
                 fori (i, 0, type.enumeration.value_count) {
-                    type.enumeration.values[i].value = uleb128_to_uint(data, (i32 *)&offset);
+                    type.enumeration.values[i].value = uleb128_to_uint(data, &offset);
 
-                    u32 name_length = uleb128_to_uint(data, (i32 *)&offset);
+                    u32 name_length = uleb128_to_uint(data, &offset);
                     type.enumeration.values[i].name = bh_alloc_array(info->alloc, char, name_length + 1);
                     memcpy(type.enumeration.values[i].name, data + offset, name_length);
                     type.enumeration.values[i].name[name_length] = 0;
@@ -205,18 +205,18 @@ void debug_info_import_type_info(debug_info_t *info, u8 *data, u32 len) {
                 break;
 
             case debug_type_kind_union:
-                type.onion.tag_size = uleb128_to_uint(data, (i32 *)&offset);
-                type.onion.variant_count = uleb128_to_uint(data, (i32 *)&offset);
+                type.onion.tag_size = uleb128_to_uint(data, &offset);
+                type.onion.variant_count = uleb128_to_uint(data, &offset);
                 type.onion.variants = bh_alloc_array(info->alloc, debug_type_union_variant_t, type.onion.variant_count);
 
                 fori (i, 0, type.onion.variant_count) {
-                    u32 name_length = uleb128_to_uint(data, (i32 *)&offset);
+                    u32 name_length = uleb128_to_uint(data, &offset);
                     type.onion.variants[i].name = bh_alloc_array(info->alloc, char, name_length + 1);
                     memcpy(type.onion.variants[i].name, data + offset, name_length);
                     type.onion.variants[i].name[name_length] = 0;
                     offset += name_length;
 
-                    type.onion.variants[i].type = uleb128_to_uint(data, (i32 *)&offset);
+                    type.onion.variants[i].type = uleb128_to_uint(data, &offset);
                 }
                 break;
 

@@ -545,7 +545,6 @@ static b32 link_wasm_imports(
         wasm_imports.data[i] = import;
         continue;
 
-
     bad_import:
         bh_printf("Couldn't find import %b.%b.\n", module_name->data, module_name->size, import_name->data, import_name->size);
         return 0;
