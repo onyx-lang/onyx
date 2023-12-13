@@ -4,7 +4,7 @@ C_FILES="onyx astnodes builtins checker clone doc entities errors lex parser sym
 LIBS="-lpthread -ldl -lm"
 INCLUDES="-I./include -I../shared/include -I../shared/include/dyncall"
 
-WARNINGS='-Wimplicit -Wmisleading-indentation -Wparentheses -Wsequence-point -Wreturn-type -Wshift-negative-value -Wunused-but-set-parameter -Wunused-but-set-variable -Wunused-function -Wunused-label -Wmaybe-uninitialized -Wsign-compare -Wstrict-overflow -Wduplicated-branches -Wduplicated-cond -Wtrigraphs -Waddress -Wlogical-op'
+WARNINGS='-Wimplicit -Wmisleading-indentation -Wparentheses -Wsequence-point -Wreturn-type -Wshift-negative-value -Wunused-but-set-parameter -Wunused-but-set-variable -Wunused-function -Wunused-label -Wsign-compare -Wstrict-overflow -Wtrigraphs -Waddress'
 
 if [ "$1" = "debug" ]; then
     FLAGS="$WARNINGS -g3"
@@ -45,7 +45,7 @@ fi
 
 case "$ONYX_ARCH" in
     *darwin*)
-        LIBS="$LIBS -lffi -lSystem -framework CoreFoundation -framework SystemConfiguration"
+        LIBS="$LIBS -lffi -framework CoreFoundation -framework SystemConfiguration"
         ;;
 esac
 

@@ -308,6 +308,8 @@ static SymresStatus symres_type(AstType** type) {
             SYMRES(type, &distinct->base_type);
             break;
         }
+
+        default: break;
     }
 
     return Symres_Success;
@@ -1536,8 +1538,8 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 }
 
                 UnaryOp unop = Unary_Op_Count;
-                switch (operator->operator_token->type) {
-                    case '?': unop = Unary_Op_Try; break;
+                if (operator->operator_token->type == (TokenType) '?') {
+                    unop = Unary_Op_Try;
                 }
 
                 if (unop == Unary_Op_Count) {
@@ -1634,6 +1636,8 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             package->package = current_entity->package;
             return Symres_Complete;
         }
+    
+        default: assert("Bad directive in symres_process_directive" && 0); break;
     }
 
     return Symres_Success;
@@ -1708,6 +1712,8 @@ static SymresStatus symres_constraint(AstConstraint* constraint) {
             onyx_errors_enable();
             return Symres_Success;
         }
+
+        default: break;
     }
 
     return Symres_Success;

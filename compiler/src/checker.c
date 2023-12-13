@@ -1213,6 +1213,8 @@ static b32 binary_op_is_allowed(BinaryOp operation, Type* type) {
         case Type_Kind_MultiPointer: effective_flags = Basic_Flag_Multi_Pointer; break;
         case Type_Kind_Enum:         effective_flags = Basic_Flag_Integer; break;
         case Type_Kind_Function:     effective_flags = Basic_Flag_Equality; break;
+
+        default: break;
     }
 
     return (binop_allowed[operation] & effective_flags) != 0;
@@ -3464,6 +3466,8 @@ CheckStatus check_type(AstType** ptype) {
             }
             break;
         }
+
+        default: break;
     }
 
     type = original_type;
@@ -3819,6 +3823,8 @@ CheckStatus check_constraint(AstConstraint *constraint) {
             *constraint->report_status = Constraint_Check_Status_Success;
             return Check_Complete;
         }
+
+        default: break;
     }
 
     onyx_errors_enable();
@@ -3988,6 +3994,7 @@ CheckStatus check_arbitrary_job(EntityJobData *job) {
         case TYPE_MATCH_SUCCESS: return Check_Complete;
         case TYPE_MATCH_FAILED:  return Check_Error;
         case TYPE_MATCH_YIELD:   return Check_Yield_Macro;
+        case TYPE_MATCH_SPECIAL: return Check_Yield_Macro;
     }
 
     return Check_Error;
@@ -4051,5 +4058,7 @@ void check_entity(Entity* ent) {
     clear_attempts:
         ent->macro_attempts = 0;
         ent->micro_attempts = 0;
+
+        default: break;
     }
 }

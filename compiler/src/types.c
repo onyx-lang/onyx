@@ -241,7 +241,7 @@ b32 types_are_compatible_(Type* t1, Type* t2, b32 recurse_pointers) {
             return 0;
 
         default:
-            assert(("Invalid type", 0));
+            assert("Invalid type" && 0);
             break;
     }
 
@@ -832,6 +832,8 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
 
             return u_type;
         }
+
+        default: break;
     }
 
     return NULL;

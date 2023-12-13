@@ -679,7 +679,7 @@ static b32 process_load_entity(Entity* ent) {
                     bh_snprintf(fullpath, 511, "%s/%s", folder, entry.name);
                     bh_path_convert_separators(fullpath);
 
-                    u8* formatted_name = bh_path_get_full_name(fullpath, global_heap_allocator);
+                    char* formatted_name = bh_path_get_full_name(fullpath, global_heap_allocator);
 
                     AstInclude* new_include = onyx_ast_node_new(context.ast_alloc, sizeof(AstInclude), Ast_Kind_Load_File);
                     new_include->token = include->token;
@@ -691,7 +691,7 @@ static b32 process_load_entity(Entity* ent) {
                     if (!strcmp(entry.name, ".") || !strcmp(entry.name, "..")) continue;
 
                     bh_snprintf(fullpath, 511, "%s/%s", folder, entry.name);
-                    u8* formatted_name = bh_path_get_full_name(fullpath, global_scratch_allocator); // Could this overflow the scratch allocator?
+                    char* formatted_name = bh_path_get_full_name(fullpath, global_scratch_allocator); // Could this overflow the scratch allocator?
 
                     bh_arr_push(folders_to_process, formatted_name);
                 }
@@ -799,6 +799,8 @@ static b32 process_entity(Entity* ent) {
             emit_entity(ent);
             break;
         }
+
+        default: break;
     }
 
     b32 changed = ent->state != before_state;
@@ -971,8 +973,8 @@ static i32 onyx_compile() {
         // TODO: Replace these with bh_printf when padded formatting is added.
         printf("\nStatistics:\n");
         printf("    Time taken: %lf ms\n", (double) duration);
-        printf("    Processed %ld lines (%f lines/second).\n", context.lexer_lines_processed, ((f32) 1000 * context.lexer_lines_processed) / (duration));
-        printf("    Processed %ld tokens (%f tokens/second).\n", context.lexer_tokens_processed, ((f32) 1000 * context.lexer_tokens_processed) / (duration));
+        printf("    Processed %llu lines (%f lines/second).\n", context.lexer_lines_processed, ((f32) 1000 * context.lexer_lines_processed) / (duration));
+        printf("    Processed %llu tokens (%f tokens/second).\n", context.lexer_tokens_processed, ((f32) 1000 * context.lexer_tokens_processed) / (duration));
         printf("\n");
     }
 
@@ -1224,10 +1226,8 @@ int main(int argc, char *argv[]) {
         default: break;
     }
 
-    switch (compiler_progress) {
-        case ONYX_COMPILER_PROGRESS_FAILED_OUTPUT:
-            bh_printf_err("Failed to open file for writing: '%s'\n", compile_opts.target_file);
-            break;
+    if (compiler_progress == ONYX_COMPILER_PROGRESS_FAILED_OUTPUT) {
+        bh_printf_err("Failed to open file for writing: '%s'\n", compile_opts.target_file);
     }
 
     cleanup_compilation();

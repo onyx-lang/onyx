@@ -257,7 +257,7 @@ static u32 debug_introduce_symbol(OnyxWasmModule *mod, OnyxToken *token, DebugSy
     }
 
     bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_SYM);
-    u32 leb_len=0;
+    i32 leb_len=0;
     u8 *bytes = uint_to_uleb128(id, &leb_len);
     bh_buffer_append(&mod->debug_context->op_buffer, bytes, leb_len);
 
@@ -296,7 +296,7 @@ static void debug_set_position(OnyxWasmModule *mod, OnyxToken *token) {
     bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_SET);
     mod->debug_context->last_op_was_rep = 0;
 
-    u32 leb_len=0;
+    i32 leb_len=0;
     u8 *bytes = uint_to_uleb128(file_id, &leb_len);
     bh_buffer_append(&mod->debug_context->op_buffer, bytes, leb_len);
 
@@ -1953,6 +1953,7 @@ EMIT_FUNC(binop, AstBinaryOp* binop) {
         case Binary_Op_Less:    case Binary_Op_Less_Equal:
         case Binary_Op_Greater: case Binary_Op_Greater_Equal:
             is_sign_significant = 1;
+        default: break;
     }
 
     WasmType operator_type = onyx_type_to_wasm_type(binop->left->type);
@@ -2056,6 +2057,10 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
 
         case Unary_Op_Auto_Cast:
         case Unary_Op_Cast: emit_cast(mod, &code, unop); break;
+
+        case Unary_Op_Try: // Should be handled in operator overload
+        case Unary_Op_Count:
+            break;
     }
 
     *pcode = code;
@@ -2255,6 +2260,9 @@ EMIT_FUNC(call, AstCall* call) {
             reserve_size += 4 + POINTER_SIZE;
             break;
         }
+
+        case VA_Kind_Not_VA:
+            break;
     }
 
     CallingConvention cc = type_function_get_cc(call->callee->type);
@@ -2830,7 +2838,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
             break;
         }
 
-        default: assert(("Unsupported intrinsic", 0));
+        default: assert("Unsupported intrinsic" && 0);
     }
 
     *pcode = code;
@@ -4276,6 +4284,8 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
                 param_count += mem_count - 1;
                 break;
             }
+
+            case Param_Pass_Invalid: assert("Invalid parameter passing" && 0);
         }
 
         param_type++;
@@ -4615,6 +4625,8 @@ static void emit_export_directive(OnyxWasmModule* mod, AstDirectiveExport* expor
 
         case Ast_Kind_Global:   wasm_export.kind = WASM_FOREIGN_GLOBAL;
                                 break;
+
+        default: assert("Invalid export node" && 0);
     }
 
     shput(mod->exports, export->export_name->text, wasm_export);
@@ -4643,7 +4655,7 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
         case WASM_TYPE_FLOAT32: bh_arr_push(glob.initial_value, ((WasmInstruction) { WI_F32_CONST, 0 })); break;
         case WASM_TYPE_FLOAT64: bh_arr_push(glob.initial_value, ((WasmInstruction) { WI_F64_CONST, 0 })); break;
 
-        default: assert(("Invalid global type", 0)); break;
+        default: assert("Invalid global type" && 0); break;
     }
 
     bh_arr_set_at(module->globals, global_idx, glob);
@@ -4662,7 +4674,7 @@ static void emit_raw_string(OnyxWasmModule* mod, char *data, i32 len, u64 *out_d
     // NOTE: Allocating more than necessary, but there are no cases
     // in a string literal that create more bytes than already
     // existed. You can create less however ('\n' => 0x0a).
-    i8* strdata = bh_alloc_array(global_heap_allocator, i8, len + 1);
+    char* strdata = bh_alloc_array(global_heap_allocator, char, len + 1);
     i32 length  = string_process_escape_seqs(strdata, data, len);
 
     i32 index = shgeti(mod->string_literals, (char *) strdata);
@@ -5312,7 +5324,7 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
                 patch->data_id = ((AstMemRes *) patch->node_to_use_if_data_id_is_null)->data_id;
 
             } else {
-                assert(("Unexpected empty data_id in linking!", 0));
+                assert("Unexpected empty data_id in linking!" && 0);
             }
         }
 
