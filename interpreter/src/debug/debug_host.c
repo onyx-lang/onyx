@@ -43,10 +43,13 @@ u32 debug_host_register_thread(debug_state_t *debug, ovm_state_t *ovm_state) {
     new_thread->state = debug_state_starting;
     new_thread->ovm_state = ovm_state;
     new_thread->run_count = 0;                    // Start threads in stopped state.
-    sem_init(&new_thread->wait_semaphore, 0, 0);
 
     u32 id = debug->next_thread_id++;
     new_thread->id = id;
+
+    char name_buf[256];
+    bh_bprintf(name_buf, 256, "/ovm_thread_%d", new_thread->id);
+    new_thread->wait_semaphore = sem_open(name_buf, O_CREAT, 0664, 0);
 
     new_thread->state_change_write_fd = debug->state_change_pipes[1];
 

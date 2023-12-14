@@ -275,7 +275,7 @@ typedef struct debug_thread_state_t {
     b32 started;
 
     i32 run_count;
-    sem_t wait_semaphore;
+    sem_t* wait_semaphore;
 
     bool pause_at_next_line;
     i32 pause_within;

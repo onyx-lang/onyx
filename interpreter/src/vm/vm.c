@@ -460,7 +460,7 @@ static void __ovm_trigger_exception(ovm_state_t *state) {
         state->debug->pause_reason = debug_pause_exception;
 
         assert(write(state->debug->state_change_write_fd, "1", 1));
-        sem_wait(&state->debug->wait_semaphore);
+        sem_wait(state->debug->wait_semaphore);
     }
 }
 
@@ -515,7 +515,7 @@ static void __ovm_debug_hook(ovm_engine_t *engine, ovm_state_t *state) {
 
     should_wait:
     assert(write(state->debug->state_change_write_fd, "1", 1));
-    sem_wait(&state->debug->wait_semaphore);
+    sem_wait(state->debug->wait_semaphore);
     state->debug->state = debug_state_running;
 
     shouldnt_wait:

@@ -92,11 +92,11 @@ static char *parse_string(debug_state_t *debug, struct msg_parse_ctx_t *ctx) {
 
 static void resume_thread(debug_thread_state_t *thread) {
     thread->run_count = -1;
-    sem_post(&thread->wait_semaphore);
+    sem_post(thread->wait_semaphore);
 }
 
 static void resume_thread_slow(debug_thread_state_t *thread) {
-    sem_post(&thread->wait_semaphore);
+    sem_post(thread->wait_semaphore);
 }
 
 static u32 get_stack_frame_instruction_pointer(debug_state_t *debug, debug_thread_state_t *thread, ovm_stack_frame_t *frame) {
@@ -577,7 +577,7 @@ void *__debug_thread_entry(void * data) {
     local_addr.sun_family = AF_UNIX;
     strcpy(local_addr.sun_path, debug->listen_path); // TODO: Make this dynamic so mulitple servers can exist at a time.
     unlink(local_addr.sun_path);                     // TODO: Remove this line for the same reason.
-    int len = strlen(local_addr.sun_path) + sizeof(local_addr.sun_family);
+    int len = strlen(local_addr.sun_path) + 1 + sizeof(local_addr.sun_family);
     bind(debug->listen_socket_fd, (struct sockaddr *)&local_addr, len);
 
     //
