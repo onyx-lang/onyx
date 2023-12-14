@@ -7,4 +7,4 @@ A simple, yet powerful language for WebAssembly.
 
 [Try Online](https://try.onyxlang.io/) |
 [Read the Docs](https://onyxlang.io/docs/) |
-[Join the Discord](https://discord.gg/b9PS42uW)
+[Join the Discord](https://discord.gg/bhuN36dqj7)
