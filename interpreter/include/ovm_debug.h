@@ -7,7 +7,7 @@
 #if defined(_BH_LINUX)
     #include <semaphore.h>
 
-    typedef dispatch_semaphore_t semaphore;
+    typedef sem_t semaphore;
 
     static inline semaphore* semaphore_create(const char *name, int oflag, mode_t mode, unsigned int value) {
         return sem_open(name, flags, mode, value);
