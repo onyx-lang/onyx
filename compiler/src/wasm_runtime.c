@@ -563,6 +563,14 @@ void onyx_run_initialize(b32 debug_enabled) {
 #ifdef USE_OVM_DEBUGGER
     void wasm_config_enable_debug(wasm_config_t *config, int value);
     wasm_config_enable_debug(wasm_config, debug_enabled);
+
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+        char *env_path = getenv("ONYX_PATH");
+        char *socket_path = bh_aprintf(bh_heap_allocator(), "%s/debug.0000", env_path);
+
+        void wasm_config_set_listen_path(wasm_config_t *config, char *listen_path);
+        wasm_config_set_listen_path(wasm_config, socket_path);
+    #endif
 #endif
 
 #ifndef USE_OVM_DEBUGGER

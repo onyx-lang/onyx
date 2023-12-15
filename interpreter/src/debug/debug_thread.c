@@ -92,11 +92,11 @@ static char *parse_string(debug_state_t *debug, struct msg_parse_ctx_t *ctx) {
 
 static void resume_thread(debug_thread_state_t *thread) {
     thread->run_count = -1;
-    sem_post(&thread->wait_semaphore);
+    semaphore_post(thread->wait_semaphore);
 }
 
 static void resume_thread_slow(debug_thread_state_t *thread) {
-    sem_post(&thread->wait_semaphore);
+    semaphore_post(thread->wait_semaphore);
 }
 
 static u32 get_stack_frame_instruction_pointer(debug_state_t *debug, debug_thread_state_t *thread, ovm_stack_frame_t *frame) {
@@ -577,7 +577,7 @@ void *__debug_thread_entry(void * data) {
     local_addr.sun_family = AF_UNIX;
     strcpy(local_addr.sun_path, debug->listen_path); // TODO: Make this dynamic so mulitple servers can exist at a time.
     unlink(local_addr.sun_path);                     // TODO: Remove this line for the same reason.
-    int len = strlen(local_addr.sun_path) + sizeof(local_addr.sun_family);
+    int len = strlen(local_addr.sun_path) + 1 + sizeof(local_addr.sun_family);
     bind(debug->listen_socket_fd, (struct sockaddr *)&local_addr, len);
 
     //
@@ -621,6 +621,15 @@ void *__debug_thread_entry(void * data) {
         // Try to read commands from the client.
         // If an error was returned, bail out of this thread.
         i32 bytes_read = recv(debug->client_fd, command, 4096, 0);
+        if (bytes_read == 0) {
+            printf("[INFO ] OVM Debugger connection closed by peer.\n");
+            debug->debug_thread_running = false;
+            bh_arr_each(debug_thread_state_t *, pthread, debug->threads) {
+                resume_thread(*pthread);
+            }
+            break;
+        }
+
         if (bytes_read == -1) {
             switch (errno) {
                 case EAGAIN: break;

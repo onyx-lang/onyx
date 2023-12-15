@@ -2,8 +2,45 @@
 #define _OVM_DEBUG_H
 
 #include "bh.h"
-#include <semaphore.h>
 #include <stdbool.h>
+
+#if defined(_BH_LINUX)
+    #include <semaphore.h>
+
+    typedef sem_t semaphore;
+
+    static inline semaphore* semaphore_create(const char *name, int oflag, mode_t mode, unsigned int value) {
+        return sem_open(name, oflag, mode, value);
+    }
+
+    static inline void semaphore_wait(semaphore* sem) {
+        sem_wait(sem);
+    }
+
+    static inline void semaphore_post(semaphore* sem) {
+        sem_post(sem);
+    }
+#elif defined(_BH_DARWIN)
+    #include <dispatch/dispatch.h>
+
+    typedef dispatch_semaphore_t semaphore;
+
+    static inline semaphore* semaphore_create(const char *name, int oflag, mode_t mode, unsigned int value) {
+        semaphore* sem = bh_alloc(bh_heap_allocator(), sizeof(semaphore));
+        *sem = dispatch_semaphore_create(value);
+        return sem;
+    }
+
+    static inline void semaphore_wait(semaphore* sem) {
+        dispatch_semaphore_wait(*sem, DISPATCH_TIME_FOREVER);
+    }
+
+    static inline void semaphore_post(semaphore* sem) {
+        dispatch_semaphore_signal(*sem);
+    }
+#else
+    #error "Unsupported platform"
+#endif
 
 typedef struct debug_loc_info_t {
     u32 file_id;
@@ -275,7 +312,7 @@ typedef struct debug_thread_state_t {
     b32 started;
 
     i32 run_count;
-    sem_t wait_semaphore;
+    semaphore* wait_semaphore;
 
     bool pause_at_next_line;
     i32 pause_within;
