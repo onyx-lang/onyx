@@ -621,6 +621,15 @@ void *__debug_thread_entry(void * data) {
         // Try to read commands from the client.
         // If an error was returned, bail out of this thread.
         i32 bytes_read = recv(debug->client_fd, command, 4096, 0);
+        if (bytes_read == 0) {
+            printf("[INFO ] OVM Debugger connection closed by peer.\n");
+            debug->debug_thread_running = false;
+            bh_arr_each(debug_thread_state_t *, pthread, debug->threads) {
+                resume_thread(*pthread);
+            }
+            break;
+        }
+
         if (bytes_read == -1) {
             switch (errno) {
                 case EAGAIN: break;
