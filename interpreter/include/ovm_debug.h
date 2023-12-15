@@ -10,7 +10,7 @@
     typedef sem_t semaphore;
 
     static inline semaphore* semaphore_create(const char *name, int oflag, mode_t mode, unsigned int value) {
-        return sem_open(name, flags, mode, value);
+        return sem_open(name, oflag, mode, value);
     }
 
     static inline void semaphore_wait(semaphore* sem) {
