@@ -92,11 +92,11 @@ static char *parse_string(debug_state_t *debug, struct msg_parse_ctx_t *ctx) {
 
 static void resume_thread(debug_thread_state_t *thread) {
     thread->run_count = -1;
-    sem_post(thread->wait_semaphore);
+    semaphore_post(thread->wait_semaphore);
 }
 
 static void resume_thread_slow(debug_thread_state_t *thread) {
-    sem_post(thread->wait_semaphore);
+    semaphore_post(thread->wait_semaphore);
 }
 
 static u32 get_stack_frame_instruction_pointer(debug_state_t *debug, debug_thread_state_t *thread, ovm_stack_frame_t *frame) {
