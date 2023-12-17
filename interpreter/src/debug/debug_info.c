@@ -294,7 +294,7 @@ bool debug_info_lookup_file_by_name(debug_info_t *info, char *name, debug_file_i
     if (!info || !info->has_debug_info) return false;
 
     bh_arr_each(debug_file_info_t, file, info->files) {
-        if (!strcmp(file->name, name)) {
+        if (bh_str_ends_with(file->name, name)) {
             *out = *file;
             return true;
         }
