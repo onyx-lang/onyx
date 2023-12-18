@@ -1,0 +1,9 @@
+(/Users/brendan/.onyx/core/hash/hash.onyx:46,41) Failed to satisfy constraint where t is of type 'Fruit'.
+ 46 |     macro (key: $T/type_is_enum) -> u32 {
+                                              ^ 
+(/Users/brendan/.onyx/core/container/map.onyx:19,66) Here is where the interface was used.
+ 19 | Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Type) {
+                                                                       ^~~~~~~~ 
+(/Users/brendan/dev/onyx/tests/map_enum_key.onyx:18,18) Here is the code that caused this constraint to be checked.
+ 18 |     m := make(Map(Fruit, str));
+                       ^ 

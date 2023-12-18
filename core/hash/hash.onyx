@@ -1,5 +1,7 @@
 package core.hash
 
+use core.intrinsics.types {type_is_enum}
+
 //
 // DEPRECATED: to_u32 is the old name that kind of
 // makes sense, but is a little unintuitive. Use
@@ -40,6 +42,10 @@ hash :: #match -> u32 {
     },
     (key: type_expr) -> u32 { return hash(cast(u32) key); },
     (key: bool)   -> u32 { return 1 if key else 0; },
+
+    (key: $T/type_is_enum) -> u32 {
+        return hash(cast(T.__backing_type) key);
+    },
 
     #order 10000
     macro (key: $T/HasHashMethod) => key->hash()

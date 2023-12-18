@@ -1324,6 +1324,8 @@ static SymresStatus symres_enum(AstEnumType* enum_node) {
     if (enum_node->scope == NULL) {
         enum_node->scope = scope_create(context.ast_alloc, current_scope, enum_node->token->pos);
 
+        symbol_raw_introduce(enum_node->scope, "__backing_type", enum_node->token->pos, (AstNode *) enum_node->backing);
+
         type_build_from_ast(context.ast_alloc, (AstType *) enum_node);
     }
 

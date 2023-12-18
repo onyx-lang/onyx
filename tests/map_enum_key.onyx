@@ -1,0 +1,33 @@
+package main
+
+use core {*}
+
+Fruit :: enum {
+    Apple;
+    Banana;
+    Orange; 
+}
+
+Fruit_64 :: enum (i64) {
+    Apple;
+    Banana;
+    Orange; 
+}
+
+main :: () {
+    m := make(Map(Fruit, str));
+
+    m->put(.Apple, "This is apple.");
+    m->put(.Banana, "This is banana.");
+    m->put(.Orange, "This is orange.");
+
+    println(m);
+    
+    m2 := make(Map(Fruit, str));
+
+    m2->put(.Apple, "This is apple 64.");
+    m2->put(.Banana, "This is banana 64.");
+    m2->put(.Orange, "This is orange 64.");
+
+    println(m2);
+}
