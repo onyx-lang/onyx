@@ -148,7 +148,7 @@ str_to_f64 :: (s: &str) -> f64 {
 """
 i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
     is_neg := false;
-    if n < 0 && base == 10 {
+    if n < 0 {
         is_neg = true;
         n = -n;
     }

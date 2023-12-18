@@ -1,0 +1,11 @@
+package main
+
+use core
+
+main :: () {
+	a: i32 = -0x1234;
+
+	core.printf("{}\n", a);
+	core.printf("{x}\n", a);
+	core.printf("{b12}\n", a);
+}
