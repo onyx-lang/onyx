@@ -4611,6 +4611,13 @@ static void emit_export_directive(OnyxWasmModule* mod, AstDirectiveExport* expor
 
     token_toggle_end(export->export_name);
 
+    if (shgeti(mod->exports, export->export_name->text) != -1) {
+        onyx_errors_print(export->token->pos, Error_Critical, "Duplicate export name, '%s'.", export->export_name->text);
+        token_toggle_end(export->export_name);
+        return;        
+    }
+
+
     AstTyped *the_export = (AstTyped *) strip_aliases((AstNode *) export->export);
     assert(the_export);
 
