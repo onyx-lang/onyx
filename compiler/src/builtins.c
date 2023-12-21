@@ -3,20 +3,35 @@
 #include "errors.h"
 #include "utils.h"
 
-AstBasicType basic_type_void      = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_Void]  };
-AstBasicType basic_type_bool      = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_Bool]  };
-AstBasicType basic_type_i8        = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I8]    };
-AstBasicType basic_type_u8        = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_U8]    };
-AstBasicType basic_type_i16       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I16]   };
-AstBasicType basic_type_u16       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_U16]   };
-AstBasicType basic_type_i32       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I32]   };
-AstBasicType basic_type_u32       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_U32]   };
-AstBasicType basic_type_i64       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I64]   };
-AstBasicType basic_type_u64       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_U64]   };
-AstBasicType basic_type_f32       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_F32]   };
-AstBasicType basic_type_f64       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_F64]   };
-AstBasicType basic_type_rawptr    = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_Rawptr] };
-AstBasicType basic_type_type_expr = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_Type_Index] };
+static OnyxToken basic_type_void_token      = { Token_Type_Symbol, 4, "void " };
+static OnyxToken basic_type_bool_token      = { Token_Type_Symbol, 4, "bool " };
+static OnyxToken basic_type_i8_token        = { Token_Type_Symbol, 2, "i8 " };
+static OnyxToken basic_type_u8_token        = { Token_Type_Symbol, 2, "u8 " };
+static OnyxToken basic_type_i16_token       = { Token_Type_Symbol, 3, "i16 " };
+static OnyxToken basic_type_u16_token       = { Token_Type_Symbol, 3, "u16 " };
+static OnyxToken basic_type_i32_token       = { Token_Type_Symbol, 3, "i32 " };
+static OnyxToken basic_type_u32_token       = { Token_Type_Symbol, 3, "u32 " };
+static OnyxToken basic_type_i64_token       = { Token_Type_Symbol, 3, "i64 " };
+static OnyxToken basic_type_u64_token       = { Token_Type_Symbol, 3, "u64 " };
+static OnyxToken basic_type_f32_token       = { Token_Type_Symbol, 3, "f32 " };
+static OnyxToken basic_type_f64_token       = { Token_Type_Symbol, 3, "f64 " };
+static OnyxToken basic_type_rawptr_token    = { Token_Type_Symbol, 6, "rawptr " };
+static OnyxToken basic_type_type_expr_token = { Token_Type_Symbol, 9, "type_expr " };
+
+AstBasicType basic_type_void      = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_void_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_Void]  };
+AstBasicType basic_type_bool      = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_bool_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_Bool]  };
+AstBasicType basic_type_i8        = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i8_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I8]    };
+AstBasicType basic_type_u8        = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u8_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_U8]    };
+AstBasicType basic_type_i16       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i16_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I16]   };
+AstBasicType basic_type_u16       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u16_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_U16]   };
+AstBasicType basic_type_i32       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i32_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I32]   };
+AstBasicType basic_type_u32       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u32_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_U32]   };
+AstBasicType basic_type_i64       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i64_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I64]   };
+AstBasicType basic_type_u64       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u64_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_U64]   };
+AstBasicType basic_type_f32       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_f32_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_F32]   };
+AstBasicType basic_type_f64       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_f64_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_F64]   };
+AstBasicType basic_type_rawptr    = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_rawptr_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_Rawptr] };
+AstBasicType basic_type_type_expr = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_type_expr_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_Type_Index] };
 
 // NOTE: Types used for numeric literals
 AstBasicType basic_type_int_unsized   = { Ast_Kind_Basic_Type, 0, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_Int_Unsized] };
