@@ -117,7 +117,7 @@ __net_sock_recv_from :: (s: SocketData, buf: [] u8, out: &SocketAddress) -> Resu
     addr_len := 512;
 
     recieved := __net_recvfrom(s, buf, &addr_buf, &addr_len);
-    if recieved == 0 || recieved == -1
+    if recieved == -1
     {
         return .{ Err = .EOF };
     }
@@ -141,7 +141,7 @@ __net_sock_send_to :: (s: SocketData, buf: [] u8, addr: &SocketAddress) -> Resul
         case h: .HostPort => __net_sendto_host(s, buf, h.host, h.port);
     };
 
-    if sent == 0 || sent == -1
+    if sent == -1
     {
         // If there was an error sending data, call the connection closed.
         return .{ Err = .EOF };
@@ -246,12 +246,12 @@ __net_resolve :: (host: str, port: u16, out_addrs: [] SocketAddress) -> i32 {
 
             case 2 {
                 addr_in: &sockaddr_in_t = ~~addr;
-                *out = .{ Inet = .{ addr_in.port, addr_in.addr } };
+                *out = .{ Inet = .{ beu16_to_leu16(addr_in.port), addr_in.addr } };
             }
 
             case 10 {
                 addr_in6: &sockaddr_in6_t = ~~addr;
-                *out = .{ Inet6 = .{ addr_in6.port, addr_in6.addr } };
+                *out = .{ Inet6 = .{ beu16_to_leu16(addr_in6.port), addr_in6.addr } };
             }
         }
     }
@@ -283,5 +283,12 @@ __net_resolve :: (host: str, port: u16, out_addrs: [] SocketAddress) -> i32 {
         __net_recvfrom      :: (handle: SocketData, data: [] u8, out_buf: rawptr, out_len: &i32) -> i32 ---
 
         __net_setting_flag  :: (handle: SocketData, setting: SocketOption, value: bool) -> void ---
+    }
+
+    beu16_to_leu16 :: (x: u16) -> u16 {
+        lo := x & 0xff;
+        hi := (x & 0xff00) >> 8;
+
+        return hi | (lo << 8);
     }
 }
