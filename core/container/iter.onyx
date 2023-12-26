@@ -30,9 +30,11 @@ use core.intrinsics.types {type_is_struct}
 
     find :: find;
     fold :: fold;
+    fold1 :: fold1;
     count :: count;
     some :: some;
     every :: every;
+    sum   :: sum;
     collect :: to_array;
     collect_map :: to_map;
 }
@@ -777,6 +779,29 @@ fold :: (it: Iterator($T), initial_value: $R, combine: (T, R) -> R) -> R {
     return result;
 }
 
+#doc """
+    Incremently calls `combine` on the yielded value and the
+    accumulated value, producing a new accumulated value. Returns
+    the final accumulated value.
+"""
+fold1 :: #match #local {}
+
+#overload
+fold1 :: macro (it: $T/Iterable, combine: $S) =>
+    #this_package.fold1(#this_package.as_iter(it), combine);
+
+#overload
+fold1 :: (it: Iterator($T), combine: (T, T) -> T) -> ? T {
+    result, valid := next(it);
+    if !valid do return .None;
+
+    for value: it {
+        result = combine(value, result);
+    }
+
+    return result;
+}
+
 
 #doc "Returns how many times the `cond` was true."
 count :: #match #local {}
@@ -819,6 +844,24 @@ every :: macro (it: $T/Iterable, cond: $F) =>
 every :: (it: Iterator($T), cond: (T) -> bool) -> bool {
     for value: it do if !cond(value) do return false;
     return true;
+}
+
+#doc "Returns the sum of all yield values, using the `+` operator."
+sum :: #match #local {}
+
+#overload
+sum :: macro (it: $T/Iterable) =>
+    #this_package.sum(#this_package.as_iter(it));
+
+#overload
+sum :: (it: Iterator($T)) -> T {
+    val := T.{};
+
+    for v: it {
+        val = val + v;
+    }
+
+    return val;
 }
 
 
