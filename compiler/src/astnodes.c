@@ -1039,7 +1039,7 @@ Type* query_expression_type(AstTyped *node) {
             return NULL;
         }
 
-        return type_build_implicit_type_of_struct_literal(context.ast_alloc, sl);
+        return type_build_implicit_type_of_struct_literal(context.ast_alloc, sl, 1);
     }
 
     // If polymorphic procedures HAVE to have a type, most likely
@@ -1145,7 +1145,7 @@ Type* resolve_expression_type(AstTyped* node) {
             return NULL;
         }
 
-        sl->type = type_build_implicit_type_of_struct_literal(context.ast_alloc, sl);
+        sl->type = type_build_implicit_type_of_struct_literal(context.ast_alloc, sl, 0);
         if (sl->type) {
             add_entities_for_node(NULL, (AstNode *) sl, NULL, NULL);
         }
