@@ -1,0 +1,21 @@
+use core {*}
+
+main :: () {
+    conv.parse(i32, "1203") |> println();
+    conv.parse(f32, "45.32") |> println();
+    conv.parse(? i8, "72") |> Optional.flatten() |> println();
+
+    conv.parse(Food, "2") |> println();
+
+    "12 34 56 78 90"
+    |> string.split_iter(" ")
+    |> iter.map(x => conv.parse(i32, x))
+    |> iter.collect()
+    |> println();
+}
+
+Food :: enum {
+    Apple;
+    Banana;
+    Coconut;
+}

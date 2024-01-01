@@ -88,9 +88,16 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
 
         case #default {
             if info.kind == .Enum {
-                // TEMPORARY this needs to look at the backing type for the
-                // enum in order to know how large this integer should be.
-                *cast(&u32) target = ~~ str_to_i64(to_parse);
+                val := str_to_i64(to_parse);
+                
+                einfo := info->as_enum();
+                switch einfo.backing_type {
+                    case i8,  u8  do *cast(&u8)  target = ~~val;
+                    case i16, u16 do *cast(&u16) target = ~~val;
+                    case i32, u32 do *cast(&u32) target = ~~val;
+                    case i64, u64 do *cast(&u64) target = ~~val;
+                }
+
                 return true;
             }
 
@@ -102,13 +109,41 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
             if info.kind == .Union && union_constructed_from(data_type, Optional) {
                 parsed_successful := parse_any(memory.ptr_add(target, info.alignment), info->as_union().variants[1].type, to_parse, string_allocator);
                 if !parsed_successful {
-                    *cast(& u32) target = ~~ Optional(void).tag_enum.None;
+                    *cast(& u8) target = ~~ Optional(void).tag_enum.None;
                 } else {
-                    *cast(& u32) target = ~~ Optional(void).tag_enum.Some;
+                    *cast(& u8) target = ~~ Optional(void).tag_enum.Some;
                 }
+
+                return true;
             }
         }
     }
 
     return false;
 }
+
+
+#doc """
+    Shortcut to parse a type `T` using `parse_any`.
+"""
+parse :: ($T: type_expr, to_parse: str) -> ? T {
+    v: T;
+    if #this_package.parse_any(&v, to_parse) {
+        return v;
+    } else {
+        return .None;
+    }
+}
+
+#doc """
+    Shortcut to parse a type `T` using `parse_any`, and specify an allocator.
+"""
+parse_with_allocator :: ($T: type_expr, to_parse: str, allocator: Allocator) -> ? T {
+    v: T;
+    if #this_package.parse_any(&v, to_parse, allocator) {
+        return v;
+    } else {
+        return .None;
+    }
+}
+
