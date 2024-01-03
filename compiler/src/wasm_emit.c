@@ -999,6 +999,8 @@ EMIT_FUNC(compound_assignment, AstBinaryOp* assign) {
 EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    while (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
+
     if (onyx_type_is_stored_in_memory(type)) {
         emit_struct_store(mod, pcode, type, offset);
         return;
@@ -1017,8 +1019,6 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     if (type->kind == Type_Kind_Function) assert(5678 && 0);
     if (type->kind == Type_Kind_Struct)   type = type_struct_is_just_one_basic_value(type);
     if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
-
-    while (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
 
     assert(type);
 
@@ -1117,6 +1117,8 @@ EMIT_FUNC(load_with_ignored_instruction, Type* type, u32 offset, i32 ignored_val
 EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    while (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
+
     if (type->kind == Type_Kind_Array || onyx_type_is_stored_in_memory(type)) {
         if (offset != 0) {
             WID(NULL, WI_PTR_CONST, offset);
@@ -1135,8 +1137,6 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     if (type->kind == Type_Kind_Struct)   type = type_struct_is_just_one_basic_value(type);
     if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
     if (type->kind == Type_Kind_Function) assert(1234 && 0);
-
-    while (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
 
     assert(type);
 
