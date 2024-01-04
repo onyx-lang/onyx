@@ -181,7 +181,7 @@ ONYX_DEF(__dir_cwd, (WASM_I32, WASM_I32), (WASM_I32)) {
 #endif
 
 #if defined(_BH_WINDOWS)
-    int length = GetCurrentDirectory(params->data[1].of.i32, ONYX_PTR(params->data[0].of.i32));
+    int length = GetCurrentDirectoryA(params->data[1].of.i32, ONYX_PTR(params->data[0].of.i32));
     if (length == 0 || length > params->data[1].of.i32) {
         results->data[0] = WASM_I32_VAL(-1);
         return NULL;
@@ -200,7 +200,7 @@ ONYX_DEF(__dir_chdir, (WASM_I32), (WASM_I32)) {
 #endif
 
 #if defined(_BH_WINDOWS)
-    int result = SetCurrentDirectory(ONYX_PTR(params->data[0].of.i32));
+    int result = SetCurrentDirectoryA(ONYX_PTR(params->data[0].of.i32));
     results->data[0] = WASM_I32_VAL(result ? 1 : 0);
     return NULL;
 #endif
