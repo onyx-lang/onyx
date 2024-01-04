@@ -27,7 +27,7 @@
 #define WASM_TYPE_VOID    0x00
 
 static b32 onyx_type_is_stored_in_memory(Type *type) {
-    if (type->kind == Type_Kind_Distinct) {
+    while (type->kind == Type_Kind_Distinct) {
         type = type->Distinct.base_type;
     }
 
@@ -4241,6 +4241,9 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_nod
         WID(NULL, WI_I32_CONST, mod->null_proc_func_idx);
         WIL(NULL, WI_I32_CONST, 0);
         WIL(NULL, WI_I32_CONST, 0);
+
+    } else if (type->kind == Type_Kind_Distinct) {
+        emit_zero_value_for_type(mod, &code, type->Distinct.base_type, where, alloc_node);
 
     } else {
         if (type == &basic_types[Basic_Kind_Void]) {

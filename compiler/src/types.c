@@ -1498,6 +1498,8 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
 }
 
 b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
+    while (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
+
     if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
 
     switch (type->kind) {
@@ -1565,11 +1567,14 @@ i32 type_linear_member_count(Type* type) {
         case Type_Kind_VarArgs:  return 2;
         case Type_Kind_Function: return 3;
         case Type_Kind_Compound: return bh_arr_length(type->Compound.linear_members);
+        case Type_Kind_Distinct: return type_linear_member_count(type->Distinct.base_type);
         default: return 1;
     }
 }
 
 b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
+    while (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
+
     switch (type->kind) {
         case Type_Kind_Slice:
         case Type_Kind_VarArgs: {
@@ -1607,11 +1612,6 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
         }
         case Type_Kind_Compound: *two = type->Compound.linear_members[idx]; return 1;
 
-        case Type_Kind_Distinct:
-            two->type = type->Distinct.base_type;
-            two->offset = 0;
-            return 1;
-
         case Type_Kind_Function:
             if (idx == 0) {
                 two->type = &basic_types[Basic_Kind_U32];
@@ -1637,6 +1637,8 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
 }
 
 i32 type_get_idx_of_linear_member_with_offset(Type* type, u32 offset) {
+    while (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
+
     switch (type->kind) {
         case Type_Kind_Slice:
         case Type_Kind_VarArgs: {
@@ -1775,6 +1777,9 @@ b32 type_is_structlike(Type* type) {
         if (type->Pointer.elem->kind == Type_Kind_DynArray) return 1;
         if (type->Pointer.elem->kind == Type_Kind_Union) return 1;
     }
+    if (type->kind == Type_Kind_Distinct) {
+        return type_is_structlike(type->Distinct.base_type);
+    }
     return 0;
 }
 
@@ -1789,6 +1794,18 @@ b32 type_is_structlike_strict(Type* type) {
     return 0;
 }
 
+b32 type_should_be_passed_like_a_struct(Type *type) {
+    if (type == NULL) return 0;
+    if (type->kind == Type_Kind_Struct)   return 1;
+    if (type->kind == Type_Kind_Slice)    return 1;
+    if (type->kind == Type_Kind_DynArray) return 1;
+    if (type->kind == Type_Kind_Function) return 1;
+    if (type->kind == Type_Kind_VarArgs)  return 1;
+    if (type->kind == Type_Kind_Union)    return 1;
+    if (type->kind == Type_Kind_Distinct) return type_should_be_passed_like_a_struct(type->Distinct.base_type);
+    return 0;
+}
+
 u32 type_structlike_mem_count(Type* type) {
     if (type == NULL) return 0;
     switch (type->kind) {
@@ -1797,7 +1814,7 @@ u32 type_structlike_mem_count(Type* type) {
         case Type_Kind_VarArgs:  return 2;
         case Type_Kind_Function: return 3;
         case Type_Kind_DynArray: return 4;
-        case Type_Kind_Distinct: return 1;
+        case Type_Kind_Distinct: return type_structlike_mem_count(type->Distinct.base_type);
         case Type_Kind_Union:    return 2;
         default: return 0;
     }
@@ -1809,6 +1826,7 @@ u32 type_structlike_is_simple(Type* type) {
         case Type_Kind_Slice:    return 1;
         case Type_Kind_VarArgs:  return 1;
         case Type_Kind_Function: return 1;
+        case Type_Kind_Distinct: return type_structlike_is_simple(type->Distinct.base_type);
         default: return 0;
     }
 }
