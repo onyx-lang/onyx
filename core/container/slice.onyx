@@ -637,6 +637,8 @@ group_by :: macro (arr: [] $T, comp: (T, T) -> bool, allocator := context.alloca
 #overload
 group_by :: macro (arr_: [] $T, comp: Code, allocator := context.allocator) -> [..] [] T {
     out := make([..] [] T, allocator);
+    if arr_.count == 0 do return out;
+
     start := 0;
     arr := arr_;
     for i: 1 .. arr.count {
