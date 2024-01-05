@@ -921,7 +921,7 @@ Type* type_build_compound_type(bh_allocator alloc, AstCompound* compound) {
     return comp_type;
 }
 
-Type* type_build_implicit_type_of_struct_literal(bh_allocator alloc, AstStructLiteral* lit) {
+Type* type_build_implicit_type_of_struct_literal(bh_allocator alloc, AstStructLiteral* lit, b32 is_query) {
     if (lit->generated_inferred_type) {
         return lit->generated_inferred_type;
     }
@@ -949,6 +949,10 @@ Type* type_build_implicit_type_of_struct_literal(bh_allocator alloc, AstStructLi
 
         Type* member_type = resolve_expression_type(nv->value);
         if (member_type == NULL) {
+            if (!is_query) {
+                onyx_report_error(nv->value->token->pos, Error_Critical, "Unable to resolve type of this member when trying to construct an inferred type of the structure literal.");
+            }
+
             return NULL;
         }
 
