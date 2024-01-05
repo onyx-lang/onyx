@@ -1748,6 +1748,10 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
 }
 
 CheckStatus check_array_literal(AstArrayLiteral* al) {
+    bh_arr_each(AstTyped *, expr, al->values) {
+        CHECK(expression, expr);
+    }
+
     // :Idempotency
     if ((al->flags & Ast_Flag_Array_Literal_Typed) == 0) {
         if (al->atnode == NULL) return Check_Success;
@@ -1769,7 +1773,7 @@ CheckStatus check_array_literal(AstArrayLiteral* al) {
     }
 
     if (al->type->Array.count != (u32) bh_arr_length(al->values)) {
-        ERROR_(al->token->pos, "Wrong array size (%d) for number of values (%d).",
+        ERROR_(al->token->pos, "Wrong number of values provided in array literal. Wanted %d values, got %d values.",
             al->type->Array.count, bh_arr_length(al->values));
     }
 
@@ -1778,8 +1782,6 @@ CheckStatus check_array_literal(AstArrayLiteral* al) {
 
     Type* elem_type = al->type->Array.elem;
     bh_arr_each(AstTyped *, expr, al->values) {
-        CHECK(expression, expr);
-
         // HACK HACK HACK
         if ((*expr)->type == NULL &&
             (*expr)->entity != NULL &&
@@ -1790,7 +1792,7 @@ CheckStatus check_array_literal(AstArrayLiteral* al) {
         al->flags &= ((*expr)->flags & Ast_Flag_Comptime) | (al->flags &~ Ast_Flag_Comptime);
 
         TYPE_CHECK(expr, elem_type) {
-            ERROR_((*expr)->token->pos, "Mismatched types for value of in array, expected '%s', got '%s'.",
+            ERROR_((*expr)->token->pos, "Mismatched types for value in array. Expected something of type '%s', got '%s' instead.",
                 type_get_name(elem_type),
                 node_get_type_name(*expr));
         }
@@ -3923,7 +3925,8 @@ CheckStatus check_polyquery(AstPolyQuery *query) {
 
     b32 solved_something = 0;
     i32 solved_count = 0;
-    char *err_msg = NULL;
+    OnyxError err_msg = { 0 };
+
     bh_arr_each(AstPolyParam, param, query->proc->poly_params) {
         AstPolySolution sln;
         bh_arr_each(AstPolySolution, solved_sln, query->slns) {
@@ -3959,7 +3962,7 @@ CheckStatus check_polyquery(AstPolyQuery *query) {
 
                 if (query->error_on_fail || context.cycle_detected) {
                     onyx_report_error(query->token->pos, Error_Critical, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
-                    if (err_msg != NULL)  onyx_report_error(query->token->pos, Error_Critical, "%s", err_msg);
+                    if (err_msg.text != NULL) onyx_submit_error(err_msg);
                     if (query->error_loc) onyx_report_error(query->error_loc->pos, Error_Critical, "Here is where the call is located."); // :ErrorMessage
                 }
 

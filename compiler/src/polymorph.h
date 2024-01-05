@@ -449,7 +449,7 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
 // and solve for the argument that matches the parameter. This is needed because polymorphic
 // procedure resolution has to happen before the named arguments are placed in their correct
 // positions.
-static AstTyped* lookup_param_in_arguments(AstFunction* func, AstPolyParam* param, Arguments* args, char** err_msg) {
+static AstTyped* lookup_param_in_arguments(AstFunction* func, AstPolyParam* param, Arguments* args, OnyxError* err_msg) {
     bh_arr(AstTyped *) arg_arr = args->values;
     bh_arr(AstNamedValue *) named_values = args->named_values;
 
@@ -479,7 +479,9 @@ static AstTyped* lookup_param_in_arguments(AstFunction* func, AstPolyParam* para
         }
 
         // CLEANUP
-        if (err_msg) *err_msg = "Not enough arguments to polymorphic procedure. This error message may not be entirely right.";
+        if (err_msg) {
+            err_msg->text = "Not enough arguments to polymorphic procedure. This error message may not be entirely right.";
+        }
 
     } else {
         return (AstTyped *) arg_arr[param->idx];
@@ -524,7 +526,7 @@ static AstTyped* try_lookup_based_on_partial_function_type(AstFunction *pp, AstF
 // information. It is asssumed that the "param" is of kind PPK_Poly_Type. This function uses
 // either the arguments provided, or a function type to compare against to pattern match for
 // the type that the parameter but be.
-static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunction* func, AstPolyParam* param, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg) {
+static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunction* func, AstPolyParam* param, PolyProcLookupMethod pp_lookup, ptr actual, OnyxError* err_msg) {
     Type* actual_type = NULL;
     b32 can_strip_pointer = 0;
 
@@ -567,7 +569,12 @@ static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunct
           skip_nested_polymorph_case:
 
             actual_type = query_expression_type(typed_param);
-            if (actual_type == NULL) return;
+            if (actual_type == NULL) {
+                if (typed_param) err_msg->pos = typed_param->token->pos;
+
+                err_msg->text = "Unable to resolve type of this expression, needed to solve for polymorphic variable.";
+                return;
+            }
 
             break;
         }
@@ -575,7 +582,9 @@ static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunct
         case PPLM_By_Function_Type: {
             Type* ft = (Type *) actual;
             if (param->idx >= ft->Function.param_count) {
-                if (err_msg) *err_msg = "Incompatible polymorphic argument to function parameter.";
+                if (err_msg) {
+                    err_msg->text = "Incompatible polymorphic argument to function parameter.";
+                }
                 return;
             }
 
@@ -601,7 +610,8 @@ static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunct
     }
 
     if (res.kind == PSK_Undefined) {
-        *err_msg = bh_aprintf(global_scratch_allocator,
+        err_msg->pos = param->poly_sym->token->pos;
+        err_msg->text = bh_aprintf(global_scratch_allocator,
             "Unable to solve for polymorphic variable '%b', given the type '%s'.",
             param->poly_sym->token->text,
             param->poly_sym->token->length,
@@ -618,9 +628,9 @@ static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunct
 // CLEANUP: This function is kind of gross at the moment, because it handles different cases for
 // the argument kind. When type expressions (type_expr) become first-class types in the type
 // system, this code should be able to be a lot cleaner.
-static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunction* func, AstPolyParam* param, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg) {
+static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunction* func, AstPolyParam* param, PolyProcLookupMethod pp_lookup, ptr actual, OnyxError* err_msg) {
     if (pp_lookup != PPLM_By_Arguments) {
-        *err_msg = "Function type cannot be used to solved for baked parameter value.";
+        err_msg->text = "Function type cannot be used to solved for baked parameter value.";
         return;
     }
 
@@ -640,11 +650,12 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
     AstType *param_type_expr = func->params[param->idx].local->type_node;
     if (param_type_expr == (AstType *) &basic_type_type_expr) {
         if (!node_is_type((AstNode *) value)) {
-            if (err_msg)
-                // CLEANUP: Use a different allocator.
-                *err_msg = bh_aprintf(global_heap_allocator,
+            if (err_msg) {
+                err_msg->pos = value->token->pos;
+                err_msg->text = bh_aprintf(global_scratch_allocator,
                     "Expected type expression here, got a '%s'.",
                     type_get_name(value->type));
+            }
             return;
         }
 
@@ -659,7 +670,7 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
         param_type = type_build_from_ast(context.ast_alloc, param_type_expr);
         if (param_type == NULL) {
             flag_to_yield = 1;
-            *err_msg = "Waiting to know type for polymorphic value.";
+            err_msg->text = "Waiting to know type for polymorphic value.";
             return;
         }
 
@@ -670,20 +681,28 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
 
         TypeMatch tm = unify_node_and_type(&value_to_use, param_type);
         if (tm == TYPE_MATCH_FAILED) {
-            if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator,
-                    "The procedure '%s' expects a value of type '%s' for baked %d%s parameter, got '%s'.",
+            if (err_msg) {
+                err_msg->pos = param->poly_sym->token->pos;
+                err_msg->text = bh_aprintf(global_scratch_allocator,
+                    "The procedure '%s' expects a value of type '%s' for %d%s baked parameter '%b', got '%s'.",
                     get_function_name(func),
                     type_get_name(param_type),
                     param->idx + 1,
                     bh_num_suffix(param->idx + 1),
+                    param->poly_sym->token->text,
+                    param->poly_sym->token->length,
                     node_get_type_name(value_to_use));
+            }
             return;
         }
 
         if (tm == TYPE_MATCH_YIELD) flag_to_yield = 1;
 
         if ((value_to_use->flags & Ast_Flag_Comptime) == 0) {
-            if (err_msg) *err_msg = "Expected compile-time known argument here.";
+            if (err_msg) {
+                err_msg->pos = value_to_use->token->pos;
+                err_msg->text = "Expected compile-time known argument here.";
+            }
             return;
         }
 
@@ -695,14 +714,19 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
     }
 }
 
-TypeMatch find_polymorphic_sln(AstPolySolution *out, AstPolyParam *param, AstFunction *func, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg) {
+TypeMatch find_polymorphic_sln(AstPolySolution *out, AstPolyParam *param, AstFunction *func, PolyProcLookupMethod pp_lookup, ptr actual, OnyxError* err_msg) {
+    if (err_msg) {
+        err_msg->pos = func->token->pos;
+        err_msg->rank = Error_Critical;
+    }
+
     // NOTE: Solve for the polymorphic parameter's value
     PolySolveResult resolved = { PSK_Undefined };
     switch (param->kind) {
         case PPK_Poly_Type:   solve_for_polymorphic_param_type (&resolved, func, param, pp_lookup, actual, err_msg); break;
         case PPK_Baked_Value: solve_for_polymorphic_param_value(&resolved, func, param, pp_lookup, actual, err_msg); break;
 
-        default: if (err_msg) *err_msg = "Invalid polymorphic parameter kind. This is a compiler bug.";
+        default: if (err_msg) err_msg->text = "Invalid polymorphic parameter kind. This is a compiler bug.";
     }
 
     if (doing_nested_polymorph_lookup) {
@@ -732,8 +756,8 @@ TypeMatch find_polymorphic_sln(AstPolySolution *out, AstPolyParam *param, AstFun
         default:
             // NOTE: If no error message has been assigned to why this polymorphic parameter
             // resolution was unsuccessful, provide a basic dummy one.
-            if (err_msg && *err_msg == NULL)
-                *err_msg = bh_aprintf(global_scratch_allocator,
+            if (err_msg && err_msg->text == NULL)
+                err_msg->text = bh_aprintf(global_scratch_allocator,
                     "Unable to solve for polymorphic variable '%b'.",
                     param->poly_sym->token->text,
                     param->poly_sym->token->length);

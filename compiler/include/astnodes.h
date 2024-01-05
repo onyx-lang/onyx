@@ -2066,7 +2066,7 @@ const char* node_get_type_name(void* node);
 b32 static_if_resolution(AstIf* static_if);
 
 void insert_poly_sln_into_scope(Scope* scope, AstPolySolution *sln);
-TypeMatch find_polymorphic_sln(AstPolySolution *out, AstPolyParam *param, AstFunction *func, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg);
+TypeMatch find_polymorphic_sln(AstPolySolution *out, AstPolyParam *param, AstFunction *func, PolyProcLookupMethod pp_lookup, ptr actual, OnyxError* err_msg);
 AstFunction* polymorphic_proc_lookup(AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken* tkn);
 AstFunction* polymorphic_proc_solidify(AstFunction* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
 AstNode* polymorphic_proc_try_solidify(AstFunction* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
