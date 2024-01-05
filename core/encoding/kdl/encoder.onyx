@@ -4,6 +4,7 @@ package core.encoding.kdl
 KDL_TAB_SIZE :: 4
 
 use core {io}
+use core.string {contains}
 
 write :: (d: &Document, w: &io.Writer) {
     for d.nodes {
@@ -19,7 +20,8 @@ write_node :: (n: &Node, w: &io.Writer, indentation := 0) {
         io.write_format(w, "({}) ", ta);
     });
 
-    io.write(w, n.node);
+    if contains(n.node, "//") do io.write_format(w, "{\"}", n.node);
+    else do io.write(w, n.node);
     io.write(w, " ");
 
     for n.values {
