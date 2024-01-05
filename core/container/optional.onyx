@@ -61,6 +61,20 @@ use core
         *o = .{ Some = value };
     }
 
+    #doc "Flattens nested optionals."
+    // @Bug should be able to say ? ? $T here.
+    flatten :: (o1: ? Optional($T)) -> ? T {
+        switch o1 {
+            case o2: .Some {
+                return o2;
+            }
+
+            case .None ---
+        }
+
+        return .None;
+    }
+
     #doc "Monadic chaining operation."
     and_then :: (o: ?$T, transform: (T) -> ?$R) -> ?R {
         return switch o {

@@ -2166,7 +2166,7 @@ static inline CallingConvention type_function_get_cc(Type* type) {
 }
 
 static inline ParamPassType type_get_param_pass(Type* type) {
-    if (type_is_structlike_strict(type) && !type_struct_is_just_one_basic_value(type)) {
+    if (type_should_be_passed_like_a_struct(type) && !type_struct_is_just_one_basic_value(type)) {
         if (type_structlike_is_simple(type)) return Param_Pass_By_Multiple_Values;
         else                                 return Param_Pass_By_Implicit_Pointer;
     }

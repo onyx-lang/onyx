@@ -181,17 +181,13 @@ ONYX_DEF(__dir_cwd, (WASM_I32, WASM_I32), (WASM_I32)) {
 #endif
 
 #if defined(_BH_WINDOWS)
-    // The GetCurrentDirectory symbol is causing a linker error.
-    // For a hotfix, I am leaving these unimplemented for now,
-    // but they should be fixed asap.
-    //
-    // int length = GetCurrentDirectory(params->data[1].of.i32, ONYX_PTR(params->data[0].of.i32));
-    // if (length == 0 || length > params->data[1].of.i32) {
-    //     results->data[0] = WASM_I32_VAL(-1);
-    //     return NULL;
-    // }
+    int length = GetCurrentDirectoryA(params->data[1].of.i32, ONYX_PTR(params->data[0].of.i32));
+    if (length == 0 || length > params->data[1].of.i32) {
+        results->data[0] = WASM_I32_VAL(-1);
+        return NULL;
+    }
 
-    results->data[0] = WASM_I32_VAL(-1);
+    results->data[0] = WASM_I32_VAL(length);
     return NULL;
 #endif
 }
@@ -204,12 +200,8 @@ ONYX_DEF(__dir_chdir, (WASM_I32), (WASM_I32)) {
 #endif
 
 #if defined(_BH_WINDOWS)
-    // The SetCurrentDirectory symbol is causing a linker error.
-    // For a hotfix, I am leaving these unimplemented for now,
-    // but they should be fixed asap.
-    //
-    // int result = SetCurrentDirectory(ONYX_PTR(params->data[0].of.i32));
-    results->data[0] = WASM_I32_VAL(0);
+    int result = SetCurrentDirectoryA(ONYX_PTR(params->data[0].of.i32));
+    results->data[0] = WASM_I32_VAL(result ? 1 : 0);
     return NULL;
 #endif
 }
