@@ -1083,10 +1083,6 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
     u32 index = 0;
     bh_arr_each(AstFunction *, pfunc, module->procedures_with_tags) {
         AstFunction *func = *pfunc;
-        if (!should_emit_function(func)) {
-            proc_count--;
-            continue;
-        }
 
         u32 tag_count = bh_arr_length(func->tags);
         u32 *tag_data_offsets = bh_alloc_array(global_scratch_allocator, u32, tag_count);
@@ -1127,7 +1123,7 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
         bh_buffer_write_u32(&tag_proc_buffer, func->type->id);
         WRITE_SLICE(tag_array_base, tag_count);
         bh_buffer_write_u32(&tag_proc_buffer, func->entity->package->id);
-    }    
+    }
 
     if (context.options->verbose_output == 1) {
         bh_printf("Tagged procedure size: %d bytes.\n", tag_proc_buffer.length);

@@ -2902,7 +2902,13 @@ CheckStatus check_function(AstFunction* func) {
     }
 
     func->flags |= Ast_Flag_Has_Been_Checked;
-    return Check_Success;
+
+    if (bh_arr_length(func->tags) > 0 || (func->flags & Ast_Flag_Proc_Is_Null) != 0) {
+        func->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
+        return Check_Success;
+    }
+
+    return Check_Complete;
 }
 
 CheckStatus check_overloaded_function(AstOverloadedFunction* ofunc) {
@@ -3330,7 +3336,12 @@ CheckStatus check_function_header(AstFunction* func) {
         CHECK(expression, &func->foreign.import_name);
     }
 
-    return Check_Success;
+    if (bh_arr_length(func->tags) > 0 || (func->flags & Ast_Flag_Proc_Is_Null) != 0) {
+        func->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
+        return Check_Success;
+    }
+
+    return Check_Complete;
 }
 
 CheckStatus check_memres_type(AstMemRes* memres) {

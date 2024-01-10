@@ -313,6 +313,8 @@ typedef enum AstFlags {
     Ast_Flag_Function_Is_Lambda_Inside_PolyProc = BH_BIT(27),
 
     Ast_Flag_Constraint_Is_Expression = BH_BIT(28),
+
+    Ast_Flag_Has_Been_Scheduled_For_Emit = BH_BIT(29)
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -1721,6 +1723,7 @@ Entity* entity_heap_top(EntityHeap* entities);
 void entity_heap_change_top(EntityHeap* entities, Entity* new_top);
 void entity_heap_remove_top(EntityHeap* entities);
 void entity_change_type(EntityHeap* entities, Entity *ent, EntityType new_type);
+void entity_change_state(EntityHeap* entities, Entity *ent, EntityState new_state);
 void entity_heap_add_job(EntityHeap *entities, enum TypeMatch (*func)(void *), void *job_data);
 
 // If target_arr is null, the entities will be placed directly in the heap.

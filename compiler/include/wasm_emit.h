@@ -589,6 +589,12 @@ typedef enum DatumPatchInfoKind {
     Datum_Patch_Relative,
 } DatumPatchInfoKind;
 
+typedef enum CodePatchInfoKind {
+    Code_Patch_Callee,
+    Code_Patch_Element,
+    Code_Patch_Export,
+} CodePatchInfoKind;
+
 //
 // This represents a pointer that should be filled in
 // later when the corresponding data element is placed.
@@ -631,6 +637,15 @@ typedef struct DatumPatchInfo {
 
     AstNode *node_to_use_if_data_id_is_null;
 } DatumPatchInfo;
+
+typedef struct CodePatchInfo {
+    CodePatchInfoKind kind;
+    u32 func_idx;
+    u32 instr;
+
+    AstNode *node_related_to_patch;
+    OnyxToken *token_related_to_patch;
+} CodePatchInfo;
 
 // Context used when building a constexpr buffer
 typedef struct ConstExprContext {
@@ -703,6 +718,7 @@ typedef struct OnyxWasmModule {
 
     bh_arr(PatchInfo) stack_leave_patches;
     bh_arr(DatumPatchInfo) data_patches;
+    bh_arr(CodePatchInfo)  code_patches;
 
     bh_arr(ForRemoveInfo) for_remove_info;
 
@@ -740,10 +756,9 @@ typedef struct OnyxWasmModule {
     u32 export_count;
     u32 next_type_idx;
     u32 next_func_idx;
+    u32 next_foreign_func_idx;
     u32 next_global_idx;
     u32 next_tls_offset;
-    u32 next_elem_idx;
-    u32 foreign_function_count;
 
     i32 *stack_top_ptr;
     i32 *tls_size_ptr;
