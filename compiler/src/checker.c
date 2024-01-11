@@ -3348,7 +3348,13 @@ CheckStatus check_memres_type(AstMemRes* memres) {
     CHECK(type, &memres->type_node);
     fill_in_type((AstTyped *) memres);
     if (memres->type_node && !memres->type) YIELD(memres->token->pos, "Waiting for global type to be constructed.");
-    return Check_Success;
+
+    if (bh_arr_length(memres->tags) > 0) {
+        memres->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
+        return Check_Success;
+    }
+
+    return Check_Complete;
 }
 
 CheckStatus check_memres(AstMemRes* memres) {
@@ -3393,7 +3399,12 @@ CheckStatus check_memres(AstMemRes* memres) {
         CHECK(expression, ptag);
     }
 
-    return Check_Success;
+    if (bh_arr_length(memres->tags) > 0) {
+        memres->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
+        return Check_Success;
+    }
+
+    return Check_Complete;
 }
 
 CheckStatus check_type(AstType** ptype) {
@@ -4040,6 +4051,7 @@ void check_entity(Entity* ent) {
         case Entity_Type_Expression:
             cs = check_expression(&ent->expr);
             resolve_expression_type(ent->expr);
+            if (cs == Check_Success) cs = Check_Complete;
             break;
 
         case Entity_Type_Type_Alias:
@@ -4055,6 +4067,7 @@ void check_entity(Entity* ent) {
             if (context.options->no_file_contents) {
                 onyx_report_error(ent->expr->token->pos, Error_Critical, "#file_contents is disabled for this compilation.");
             }
+            cs = Check_Complete;
             break;
 
         case Entity_Type_Job: cs = check_arbitrary_job(ent->job_data); break;

@@ -484,6 +484,7 @@ EMIT_FUNC(statement,                       AstNode* stmt);
 EMIT_FUNC_RETURNING(u64, local_allocation, AstTyped* stmt);
 EMIT_FUNC_NO_ARGS(free_local_allocations);
 EMIT_FUNC(data_relocation,                 u32 data_id);
+EMIT_FUNC(data_relocation_for_node,        AstNode *node);
 EMIT_FUNC(assignment,                      AstBinaryOp* assign);
 EMIT_FUNC(assignment_of_array,             AstTyped* left, AstTyped* right);
 EMIT_FUNC(compound_assignment,             AstBinaryOp* assign);
@@ -820,6 +821,25 @@ EMIT_FUNC(data_relocation, u32 data_id) {
     patch.location = instr_idx;
     patch.data_id = data_id;
     patch.offset = 0;
+    bh_arr_push(mod->data_patches, patch);
+
+    *pcode = code;
+}
+
+EMIT_FUNC(data_relocation_for_node, AstNode *node) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    u32 instr_idx = bh_arr_length(code);
+    WID(NULL, WI_PTR_CONST, 0);
+    assert(mod->current_func_idx >= 0);
+
+    DatumPatchInfo patch;
+    patch.kind = Datum_Patch_Instruction;
+    patch.index = mod->current_func_idx;
+    patch.location = instr_idx;
+    patch.data_id = 0;
+    patch.offset = 0;
+    patch.node_to_use_if_data_id_is_null = node;
     bh_arr_push(mod->data_patches, patch);
 
     *pcode = code;
@@ -2938,22 +2958,25 @@ EMIT_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
 EMIT_FUNC(memory_reservation_location, AstMemRes* memres) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    ensure_node_has_been_submitted_for_emission((AstNode *) memres);
+
     if (memres->threadlocal) {
         u64 tls_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_tls_base);
 
-        if (memres->tls_offset > 0) {
-            WID(NULL, WI_PTR_CONST, memres->tls_offset);
-            WIL(NULL, WI_GLOBAL_GET, tls_base_idx);
-            WI(NULL, WI_PTR_ADD);
+        CodePatchInfo code_patch;
+        code_patch.kind = Code_Patch_Tls_Offset;
+        code_patch.func_idx = mod->current_func_idx;
+        code_patch.instr = bh_arr_length(code);
+        code_patch.node_related_to_patch = (AstNode *) memres;
+        bh_arr_push(mod->code_patches, code_patch);
 
-        } else {
-            WIL(NULL, WI_GLOBAL_GET, tls_base_idx);
-        }
+        WID(NULL, WI_PTR_CONST, 0);
+        WIL(NULL, WI_GLOBAL_GET, tls_base_idx);
+        WI(NULL, WI_PTR_ADD);
 
     } else {
         // :ProperLinking
-        assert(memres->data_id != 0);
-        emit_data_relocation(mod, &code, memres->data_id);
+        emit_data_relocation_for_node(mod, &code, (AstNode *) memres);
     }
 
     *pcode = code;
@@ -3569,11 +3592,19 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_StrLit: {
             // :ProperLinking
             AstStrLit *strlit = (AstStrLit *) expr;
-            assert(strlit->data_id > 0);
-            emit_data_relocation(mod, &code, strlit->data_id);
+            ensure_node_has_been_submitted_for_emission((AstNode *) strlit);
+            emit_data_relocation_for_node(mod, &code, (AstNode *) strlit);
 
-            if (strlit->is_cstr == 0)
-                WID(NULL, WI_I32_CONST, strlit->length);
+            if (strlit->is_cstr == 0) {
+                CodePatchInfo code_patch;
+                code_patch.kind = Code_Patch_String_Length;
+                code_patch.func_idx = mod->current_func_idx;
+                code_patch.instr = bh_arr_length(code);
+                code_patch.node_related_to_patch = (AstNode *) strlit;
+                bh_arr_push(mod->code_patches, code_patch);
+
+                WID(NULL, WI_I32_CONST, 0);
+            }
             break;
         }
 
@@ -3854,12 +3885,18 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_File_Contents: {
             AstFileContents* fc = (AstFileContents *) expr;
 
-            assert(fc->data_id > 0);
-            assert(fc->size > 0);
-
             // :ProperLinking
-            emit_data_relocation(mod, &code, fc->data_id);
-            WID(NULL, WI_I32_CONST, fc->size);
+            ensure_node_has_been_submitted_for_emission((AstNode *) fc);
+            emit_data_relocation_for_node(mod, &code, (AstNode *) fc);
+
+            CodePatchInfo code_patch;
+            code_patch.kind = Code_Patch_String_Length;
+            code_patch.func_idx = mod->current_func_idx;
+            code_patch.instr = bh_arr_length(code);
+            code_patch.node_related_to_patch = (AstNode *) fc;
+            bh_arr_push(mod->code_patches, code_patch);
+
+            WID(NULL, WI_I32_CONST, 0);
             break;
         }
 
@@ -4738,7 +4775,7 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
         module->heap_start_ptr = &module->globals[global_idx].initial_value[0].data.i1;
 
     if (global == &builtin_tls_size)
-        module->globals[global_idx].initial_value[0].data.i1 =  module->next_tls_offset;
+        module->tls_size_ptr = &module->globals[global_idx].initial_value[0].data.i1;
 }
 
 static void emit_raw_string(OnyxWasmModule* mod, char *data, i32 len, u64 *out_data_id, u64 *out_len) {
@@ -4856,25 +4893,23 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
     case Ast_Kind_StrLit: {
         AstStrLit* sl = (AstStrLit *) node;
 
-        // NOTE: This assumes the data_id and the length fields have been filled out
-        // by emit_string_literal.
-        if (POINTER_SIZE == 4) {
-            CE(u32, 0) = 0;
-            CE(u32, 4) = sl->length;
-        } else {
-            CE(u64, 0) = 0;
-            CE(u64, 8) = sl->length;
-        }
-
-        assert(sl->data_id > 0);
+        ensure_node_has_been_submitted_for_emission((AstNode *) sl);
 
         DatumPatchInfo patch;
         patch.kind = Datum_Patch_Data;
         patch.index = ctx->data_id;
         patch.location = offset;
-        patch.data_id = sl->data_id;
+        patch.data_id = 0;
         patch.offset = 0;
+        patch.node_to_use_if_data_id_is_null = (AstNode *) sl;
         bh_arr_push(ctx->module->data_patches, patch);
+
+        CodePatchInfo code_patch;
+        code_patch.kind = Code_Patch_String_Length_In_Data;
+        code_patch.func_idx = ctx->data_id; // Repurposing func_idx for this.
+        code_patch.instr    = offset + POINTER_SIZE; // Repurposing instr for offset into section
+        code_patch.node_related_to_patch = (AstNode *) sl;
+        bh_arr_push(ctx->module->code_patches, code_patch);
 
         break;
     }
@@ -5364,6 +5399,41 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
                 module->exports[export_idx].value.idx = (i32) func_idx;
                 break;
             }
+
+            case Code_Patch_Tls_Offset: {
+                AstMemRes *memres = (AstMemRes *) patch->node_related_to_patch;
+                assert(memres->kind == Ast_Kind_Memres);
+                assert(memres->threadlocal);
+
+                module->funcs[patch->func_idx].code[patch->instr].data.l = memres->tls_offset;
+                break;
+            }
+
+            case Code_Patch_String_Length: {
+                i32 length;
+                switch (patch->node_related_to_patch->kind) {
+                    case Ast_Kind_StrLit:        length = ((AstStrLit *) patch->node_related_to_patch)->length; break;
+                    case Ast_Kind_File_Contents: length = ((AstFileContents *) patch->node_related_to_patch)->size; break;
+                    default: assert("Unexpected node kind in Code_Patch_String_Length." && 0);
+                }
+
+                module->funcs[patch->func_idx].code[patch->instr].data.l = length;
+                break;
+            }
+
+            case Code_Patch_String_Length_In_Data: {
+                i32 length;
+                switch (patch->node_related_to_patch->kind) {
+                    case Ast_Kind_StrLit:        length = ((AstStrLit *) patch->node_related_to_patch)->length; break;
+                    case Ast_Kind_File_Contents: length = ((AstFileContents *) patch->node_related_to_patch)->size; break;
+                    default: assert("Unexpected node kind in Code_Patch_String_Length_In_Data." && 0);
+                }
+
+                WasmDatum *datum = &module->data[patch->func_idx - 1];
+                assert(datum->id == patch->func_idx);
+                *(i32 *) bh_pointer_add(datum->data, patch->instr) = (i32) length;
+                break;
+            }
         }
     }
 
@@ -5423,15 +5493,22 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
     // we can emit the __initialize_data_segments function.
     emit_function(module, builtin_initialize_data_segments);
 
+#ifdef ENABLE_DEBUG_INFO
+    if (module->debug_context) {
+        bh_arr_each(DebugFuncContext, func, module->debug_context->funcs) {
+            func->func_index += module->next_foreign_func_idx;
+        }
+    }
+#endif
+
     bh_arr_each(DatumPatchInfo, patch, module->data_patches) {
         if (patch->data_id == 0) {
-            if (patch->node_to_use_if_data_id_is_null
-                && patch->node_to_use_if_data_id_is_null->kind == Ast_Kind_Memres) {
-
-                patch->data_id = ((AstMemRes *) patch->node_to_use_if_data_id_is_null)->data_id;
-
-            } else {
-                assert("Unexpected empty data_id in linking!" && 0);
+            assert(patch->node_to_use_if_data_id_is_null || ("Unexpected empty data_id in linking!" && 0));
+            switch (patch->node_to_use_if_data_id_is_null->kind) {
+                case Ast_Kind_Memres:        patch->data_id = ((AstMemRes *) patch->node_to_use_if_data_id_is_null)->data_id; break;
+                case Ast_Kind_StrLit:        patch->data_id = ((AstStrLit *) patch->node_to_use_if_data_id_is_null)->data_id; break;
+                case Ast_Kind_File_Contents: patch->data_id = ((AstFileContents *) patch->node_to_use_if_data_id_is_null)->data_id; break;
+                default: assert("Unexpected node kind in linking phase." && 0);
             }
         }
 
@@ -5478,6 +5555,11 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
 
     *module->heap_start_ptr = *module->stack_top_ptr + options->stack_size;
     bh_align(*module->heap_start_ptr, 16);
+
+    if (module->tls_size_ptr) {
+        *module->tls_size_ptr = module->next_tls_offset;
+        bh_align(*module->tls_size_ptr, 16);
+    }
 }
 
 void onyx_wasm_module_free(OnyxWasmModule* module) {

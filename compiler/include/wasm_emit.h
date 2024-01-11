@@ -593,6 +593,9 @@ typedef enum CodePatchInfoKind {
     Code_Patch_Callee,
     Code_Patch_Element,
     Code_Patch_Export,
+    Code_Patch_Tls_Offset,
+    Code_Patch_String_Length,
+    Code_Patch_String_Length_In_Data,
 } CodePatchInfoKind;
 
 //
