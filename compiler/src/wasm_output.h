@@ -140,6 +140,8 @@ static i32 output_funcsection(OnyxWasmModule* module, bh_buffer* buff) {
     bh_buffer_append(&vec_buff, leb, leb_len);
 
     bh_arr_each(WasmFunc, func, module->funcs) {
+        assert(func->code);
+
         leb = uint_to_uleb128((u64) (func->type_idx), &leb_len);
         bh_buffer_append(&vec_buff, leb, leb_len);
     }
@@ -601,7 +603,10 @@ static i32 output_codesection(OnyxWasmModule* module, bh_buffer* buff) {
     u8* leb = uint_to_uleb128((u64) bh_arr_length(module->funcs), &leb_len);
     bh_buffer_append(&vec_buff, leb, leb_len);
 
-    bh_arr_each(WasmFunc, func, module->funcs) output_code(func, &vec_buff);
+    bh_arr_each(WasmFunc, func, module->funcs) {
+        assert(func->code);
+        output_code(func, &vec_buff);
+    }
 
     leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
     bh_buffer_append(buff, leb, leb_len);
@@ -720,49 +725,6 @@ static i32 output_onyx_libraries_section(OnyxWasmModule* module, bh_buffer* buff
     return buff->length - prev_len;
 }
 
-/*
-static i32 output_onyx_func_offset_section(OnyxWasmModule* module, bh_buffer* buff) {
-    i32 prev_len = buff->length;
-
-    bh_buffer_write_byte(buff, WASM_SECTION_ID_CUSTOM);
-
-    bh_buffer section_buff;
-    bh_buffer_init(&section_buff, buff->allocator, 128);
-
-    output_custom_section_name("_onyx_func_offsets", &section_buff);
-
-    i32 func_count = bh_arr_length(module->funcs) + module->foreign_function_count;
-
-    bh_buffer name_buff;
-    bh_buffer_init(&name_buff, buff->allocator, 1024);
-    u32 str_cursor = func_count * 4;
-    fori (i, 0, func_count) {
-        bh_buffer_write_u32(&section_buff, str_cursor);
-
-        if (i < module->foreign_function_count) {
-            bh_buffer_append(&name_buff, "<imported function>", 20);
-            str_cursor += 20;
-        } else {
-            WasmFunc *func = &module->funcs[i - module->foreign_function_count];
-            assert(func->location);
-            char *str = bh_bprintf("%s:%d,%d\0", func->location->pos.filename, func->location->pos.line, func->location->pos.column);
-            i32 len = strlen(str);
-            bh_buffer_append(&name_buff, str, len + 1);
-            str_cursor += len + 1;
-        }
-    }
-
-    bh_buffer_concat(&section_buff, name_buff);
-
-    output_unsigned_integer(section_buff.length, buff);
-
-    bh_buffer_concat(buff, section_buff);
-    bh_buffer_free(&section_buff);
-
-    return buff->length - prev_len;
-}
-*/
-
 #ifdef ENABLE_DEBUG_INFO
 static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
     if (!module->debug_context || !context.options->debug_info_enabled) return 0;
@@ -839,7 +801,7 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
             // that this has been implemented right now.
             assert(ctx->sym_info[patch->sym_id].location_type == DSL_REGISTER);
 
-            LocalAllocator *locals = &module->funcs[patch->func_idx - module->foreign_function_count].locals;
+            LocalAllocator *locals = &module->funcs[patch->func_idx].locals;
             ctx->sym_info[patch->sym_id].location_num = local_lookup_idx(locals, patch->local_idx);
         }
 

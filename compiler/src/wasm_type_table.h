@@ -385,7 +385,12 @@ static u64 build_type_table(OnyxWasmModule* module) {
 
                 // Struct methods
                 bh_arr(StructMethodData) method_data=NULL;
+
                 AstType *ast_type = type->ast_type;
+                if (!context.options->generate_method_info) {
+                    goto no_methods;
+                }
+
                 if (ast_type && ast_type->kind == Ast_Kind_Struct_Type) {
                     AstStructType *struct_type  = (AstStructType *) ast_type;
                     Scope*         struct_scope = struct_type->scope;
@@ -644,7 +649,12 @@ static u64 build_type_table(OnyxWasmModule* module) {
 
                 // Union methods
                 bh_arr(StructMethodData) method_data=NULL;
+
                 AstType *ast_type = type->ast_type;
+                if (!context.options->generate_method_info) {
+                    goto no_union_methods;
+                }
+
                 if (ast_type && ast_type->kind == Ast_Kind_Union_Type) {
                     AstUnionType *union_type  = (AstUnionType *) ast_type;
                     Scope*        union_scope = union_type->scope;
@@ -666,7 +676,7 @@ static u64 build_type_table(OnyxWasmModule* module) {
                         // any data member
                         bh_buffer_align(&table_buffer, 4);
                         u32 data_loc = table_buffer.length;
-                        u32 func_idx = get_element_idx(module, node);
+                        u32 func_idx = 0; // get_element_idx(module, node);
                         bh_buffer_write_u32(&table_buffer, func_idx);
                         bh_buffer_write_u32(&table_buffer, 0);
                         bh_buffer_write_u32(&table_buffer, 0);
@@ -1083,10 +1093,6 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
     u32 index = 0;
     bh_arr_each(AstFunction *, pfunc, module->procedures_with_tags) {
         AstFunction *func = *pfunc;
-        if (!should_emit_function(func)) {
-            proc_count--;
-            continue;
-        }
 
         u32 tag_count = bh_arr_length(func->tags);
         u32 *tag_data_offsets = bh_alloc_array(global_scratch_allocator, u32, tag_count);
@@ -1127,7 +1133,7 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
         bh_buffer_write_u32(&tag_proc_buffer, func->type->id);
         WRITE_SLICE(tag_array_base, tag_count);
         bh_buffer_write_u32(&tag_proc_buffer, func->entity->package->id);
-    }    
+    }
 
     if (context.options->verbose_output == 1) {
         bh_printf("Tagged procedure size: %d bytes.\n", tag_proc_buffer.length);

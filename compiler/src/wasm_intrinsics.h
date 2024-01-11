@@ -525,9 +525,17 @@ EMIT_FUNC_NO_ARGS(run_init_procedures) {
     bh_arr(WasmInstruction) code = *pcode;
 
     bh_arr_each(AstFunction *, func, init_procedures) {
-        i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) *func);
+        CodePatchInfo code_patch;
+        code_patch.kind = Code_Patch_Callee;
+        code_patch.func_idx = mod->current_func_idx;
+        code_patch.instr = bh_arr_length(code);
+        code_patch.node_related_to_patch = (AstNode *) *func;
+        bh_arr_push(mod->code_patches, code_patch);
+
+        ensure_node_has_been_submitted_for_emission((AstNode *) *func);
+
         debug_emit_instruction(mod, NULL);
-        bh_arr_push(code, ((WasmInstruction){ WI_CALL, func_idx }));
+        bh_arr_push(code, ((WasmInstruction){ WI_CALL, 0 }));
     }
 
     *pcode = code;

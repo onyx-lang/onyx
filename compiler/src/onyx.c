@@ -90,6 +90,8 @@ static const char *build_docstring = DOCSTRING_HEADER
     "\t--no-core               Disable automatically including \"core/module\".\n"
     "\t--no-stale-code         Disables use of `#allow_stale_code` directive\n"
     "\t--no-type-info          Disables generating type information\n"
+    "\t--generate-method-info  Populate method information in type information structures.\n"
+    "\t                        Can drastically increase binary size.\n"
     "\t--generate-foreign-info Generate information for foreign blocks. Rarely needed, so disabled by default.\n"
     "\t--wasm-mvp              Use only WebAssembly MVP features.\n"
     "\n"
@@ -116,6 +118,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .use_multi_threading     = 0,
         .generate_foreign_info   = 0,
         .generate_type_info      = 1,
+        .generate_method_info    = 0,
         .no_core                 = 0,
         .no_stale_code           = 0,
         .show_all_errors         = 0,
@@ -261,6 +264,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--generate-foreign-info")) {
                 options.generate_foreign_info = 1;
+            }
+            else if (!strcmp(argv[i], "--generate-method-info")) {
+                options.generate_method_info = 1;
             }
             else if (!strcmp(argv[i], "--no-type-info")) {
                 options.generate_type_info = 0;

@@ -166,6 +166,12 @@ void entity_change_type(EntityHeap* entities, Entity *ent, EntityType new_type) 
     ent->type = new_type;
 }
 
+void entity_change_state(EntityHeap* entities, Entity *ent, EntityState new_state) {
+    entities->state_count[ent->state]--;
+    entities->state_count[new_state]++;
+    ent->state = new_state;
+}
+
 void entity_heap_add_job(EntityHeap *entities, TypeMatch (*func)(void *), void *job_data) {
     EntityJobData *job = bh_alloc(global_heap_allocator, sizeof(*job));
     job->func = func;
