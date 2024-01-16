@@ -442,7 +442,7 @@ time_to_tm :: (ts: i64, tm: &Timestamp) {
 }
 
 #local
-tm_to_time :: (tm: &Timestamp) -> i64 {
+tm_to_time :: (tm: Timestamp) -> i64 {
     y := cast(i64, tm.year + 1900);
     m := cast(i64, tm.mon + 1);
     if m <= 2 {
