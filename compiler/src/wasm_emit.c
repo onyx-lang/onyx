@@ -4470,14 +4470,7 @@ static i32 assign_function_index(OnyxWasmModule *mod, AstFunction *fd) {
         i32 func_idx = (i32) mod->next_func_idx++;
         bh_imap_put(&mod->index_map, (u64) fd, (u64) func_idx);
 
-        if (context.options->print_function_mappings) {
-            bh_printf("%d -> %s:%d:%d\n",
-                func_idx,
-                fd->token->pos.filename,
-                fd->token->pos.line,
-                fd->token->pos.column);
-        }
-
+        bh_arr_push(mod->all_procedures, fd);
         return func_idx;
     }
 
@@ -5249,6 +5242,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(global_heap_allocator, module.foreign_blocks, 4);
     bh_arr_new(global_heap_allocator, module.procedures_with_tags, 4);
     bh_arr_new(global_heap_allocator, module.globals_with_tags, 4);
+    bh_arr_new(global_heap_allocator, module.all_procedures, 4);
     bh_arr_new(global_heap_allocator, module.data_patches, 4);
     bh_arr_new(global_heap_allocator, module.code_patches, 4);
 
@@ -5281,6 +5275,7 @@ void emit_entity(Entity* ent) {
         case Entity_Type_Foreign_Function_Header:
             emit_foreign_function(module, ent->function);
             bh_imap_put(&module->index_map, (u64) ent->function, module->next_foreign_func_idx++);
+            bh_arr_push(module->all_procedures, ent->function);
 
             if (ent->function->tags != NULL) {
                 bh_arr_push(module->procedures_with_tags, ent->function);
@@ -5559,6 +5554,25 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
     if (module->tls_size_ptr) {
         *module->tls_size_ptr = module->next_tls_offset;
         bh_align(*module->tls_size_ptr, 16);
+    }
+
+
+    if (context.options->print_function_mappings) {
+        bh_arr_each(AstFunction *, pfunc, module->all_procedures) {
+            AstFunction *func = *pfunc;
+
+            u64 func_idx = (u64) bh_imap_get(&module->index_map, (u64) func);
+
+            if (!func->is_foreign) {
+                func_idx += module->next_foreign_func_idx;
+            }
+
+            bh_printf("%d -> %s:%d:%d\n",
+                func_idx,
+                func->token->pos.filename,
+                func->token->pos.line,
+                func->token->pos.column);
+        }
     }
 }
 
