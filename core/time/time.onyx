@@ -6,9 +6,11 @@ use core.string
 use core.conv
 use runtime
 
-//
-// This structure has to match the 'struct tm'
-// defined in time.h of POSIX.
+#doc """
+    Represents a timestamp broken down by month, day, year, hour, minute, and seconds.
+
+    *This structure does not represent or store timezone information.*
+"""
 Timestamp :: struct #size (sizeof u32 * 12) {
     sec:   i32;
     min:   i32;
@@ -22,10 +24,7 @@ Timestamp :: struct #size (sizeof u32 * 12) {
 }
 
 #inject Timestamp {
-    as_date :: (t: Timestamp) -> Date {
-        return Date.make(t.year + 1900, t.mon + 1, t.mday);
-    }
-
+    #doc "Converts a Date into a Timestamp."
     from_date :: (d: Date) -> Timestamp {
         return .{
             year = d.year - 1900,
@@ -34,10 +33,21 @@ Timestamp :: struct #size (sizeof u32 * 12) {
         };
     }
 
+    #doc "Converts the month, day and year fields into a `Date`."
+    as_date :: (t: Timestamp) -> Date {
+        return Date.make(t.year + 1900, t.mon + 1, t.mday);
+    }
+
     to_epoch :: to_epoch
+
+    #doc "Formats a timestamp into a string."
+    format :: (t: Timestamp, format := "%Y-%m-%d %H:%M:%S") -> str {
+        t_ := t;
+        return strftime(format, &t_);
+    }
 }
 
-@conv.Custom_Format_Proc.{ Timestamp }
+#tag conv.Custom_Format_Proc.{ Timestamp }
 (output: &conv.Format_Output, format: &conv.Format, time: &Timestamp) {
     time_buf: [64] u8;
     to_output := strftime(time_buf, "%Y-%m-%d %H:%M:%S", time);
@@ -45,12 +55,14 @@ Timestamp :: struct #size (sizeof u32 * 12) {
     output->write(to_output);
 }
 
-@conv.Custom_Parse_Proc.{ Timestamp }
+#tag conv.Custom_Parse_Proc.{ Timestamp }
 (time: &Timestamp, data: str, _: Allocator) -> bool {
     return strptime(data, "%Y-%m-%d %H:%M:%S", time);
 }
 
-
+#doc """
+    Returns the current system time at UTC-0.
+"""
 now :: () -> Timestamp {
     current_time: i64;
     #if runtime.platform.Supports_Time {
@@ -67,7 +79,11 @@ now :: () -> Timestamp {
 
 to_epoch :: tm_to_time
 
+#doc """
+    Converts UNIX epoch time to a timestamp, relative to the current timezone.
 
+    *Note, this function is currently not implemented correctly as there is no reliable way to get the current system timezone. It is currently equivalent to `gmtime`*
+"""
 localtime :: #match #local {}
 
 #overload
@@ -81,6 +97,11 @@ localtime :: (seconds: u64) -> Timestamp {
 }
 
 
+#doc """
+    Converts UNIX epoch time to a timestamp, relative to the Greenich mean time.
+
+    *Note, this function is currently not implemented correctly as there is no reliable way to get the current system timezone. It is currently equivalent to `gmtime`*
+"""
 gmtime :: #match #local {}
 
 #overload
@@ -93,14 +114,78 @@ gmtime :: (seconds: u64) -> Timestamp {
     return t;
 }
 
+strftime :: #match #local {}
 
-#local weekdays   := str.[ "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" ];
-#local monthnames := str.[ "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december" ];
+#doc """
+    Formats a timestamp into a string, using the format specified.
 
+    The follow format specifiers are supported:
+
+    **%A** Day of the week (Sunday, Monday, ...)
+
+    **%a** Short day of the week (Sun, Mon, ...)
+
+    **%B** Month (January, February, ...)
+
+    **%b %h** Short month (Jan, Feb, ...)
+
+    **%d %e** Day of the month (01, ..., 31)
+
+    **%D** Full day (08/31/2023)
+
+    **%H** Hour (00, ..., 23)
+
+    **%I** 12-hour Hour (12, 01, ..., 11, 12)
+
+    **%j** Day of the year (0, ..., 364)
+
+    **%m** Month number (01, 02, ... 12)
+
+    **%M** Minute (00, ..., 59)
+
+    **%p** AM/PM signifier
+
+    **%r** 12-hour time of day (12:15:39 pm)
+
+    **%R** 24-hour time of day (without seconds) (15:37)
+
+    **%S** Seconds (00, ..., 59)
+
+    **%T** 24-hour time of day (15:37:40)
+
+    **%w** Numeric day of week (0, ..., 6)
+
+    **%Y** Year
+
+    **%y** 2-digit year
+
+    **%%** Percent-sign
+"""
+#overload
+strftime :: (format_: [] u8, tm: &Timestamp) -> str {
+    s := io.buffer_stream_make();
+    w := io.writer_make(&s, 0);
+
+    strftime(&w, format_, tm);
+
+    return string.as_str(&s);
+}
+
+#overload
 strftime :: (buf: [] u8, format_: [] u8, tm: &Timestamp) -> str {
     s := io.buffer_stream_make(buf, fixed=true);
     w := io.writer_make(&s, 0);
 
+    strftime(&w, format_, tm);
+
+    return string.as_str(&s);
+}
+
+#local weekdays   := str.[ "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" ];
+#local monthnames := str.[ "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december" ];
+
+#overload
+strftime :: (w: &io.Writer, format_: [] u8, tm: &Timestamp) {
     format := format_;
 
     while format.length > 0 {
@@ -113,51 +198,50 @@ strftime :: (buf: [] u8, format_: [] u8, tm: &Timestamp) -> str {
                         day := weekdays[tm.wday];
                         len := 3 if format[0] == 'a' else day.length;
 
-                        io.write_format(&w, "{}{}", day[0]->to_upper(), day[1..len]);
+                        io.write_format(w, "{}{}", day[0]->to_upper(), day[1..len]);
                     }
 
                     case 'B', 'b', 'h' {
                         mon := monthnames[tm.mon];
                         len := 3 if format[0] != 'B' else mon.length;
 
-                        io.write_format(&w, "{}{}", mon[0]->to_upper(), mon[1..len]);
+                        io.write_format(w, "{}{}", mon[0]->to_upper(), mon[1..len]);
                     }
 
                     case 'd', 'e' {
-                        io.write_format(&w, "{w2}", tm.mday);
+                        io.write_format(w, "{w2}", tm.mday);
                     }
 
                     case 'D' {
-                        io.write_format(&w, "{w2}/{w2}/{}", tm.mon + 1, tm.mday, tm.year - 100 if tm.year >= 100 else tm.year);
+                        io.write_format(w, "{w2}/{w2}/{}", tm.mon + 1, tm.mday, tm.year - 100 if tm.year >= 100 else tm.year);
                     }
 
-                    case 'H' do io.write_format(&w, "{w2}", tm.hour);
-                    case 'I' do io.write_format(&w, "{w2}", hour_to_12h(tm.hour));
-                    case 'j' do io.write_format(&w, "{}", tm.yday + 1);
-                    case 'm' do io.write_format(&w, "{w2}", tm.mon + 1);
-                    case 'M' do io.write_format(&w, "{w2}", tm.min);
-                    case 'p' do io.write(&w, "am" if tm.hour < 12 else "pm");
+                    case 'H' do io.write_format(w, "{w2}", tm.hour);
+                    case 'I' do io.write_format(w, "{w2}", hour_to_12h(tm.hour));
+                    case 'j' do io.write_format(w, "{}", tm.yday + 1);
+                    case 'm' do io.write_format(w, "{w2}", tm.mon + 1);
+                    case 'M' do io.write_format(w, "{w2}", tm.min);
+                    case 'p' do io.write(w, "am" if tm.hour < 12 else "pm");
 
                     case 'r' {
-                        io.write_format(&w, "{w2}:{w2}:{w2} {}", hour_to_12h(tm.hour), tm.min, tm.sec,
+                        io.write_format(w, "{w2}:{w2}:{w2} {}", hour_to_12h(tm.hour), tm.min, tm.sec,
                             "am" if tm.hour < 12 else "pm");
                     }
 
                     case 'R' {
-                        io.write_format(&w, "{w2}:{w2}", tm.hour, tm.min);
+                        io.write_format(w, "{w2}:{w2}", tm.hour, tm.min);
                     }
 
-                    case 'S' do io.write_format(&w, "{w2}", tm.sec);
-                    case 'T' do io.write_format(&w, "{w2}:{w2}:{w2}", tm.hour, tm.min, tm.sec);
-                    case 'w' do io.write_format(&w, "{}", tm.wday);
-                    case 'Y' do io.write_format(&w, "{}", tm.year + 1900);
-                    case 'y' do io.write_format(&w, "{w2}", tm.year - 100 if tm.year >= 100 else tm.year);
-                    case '%' do io.write(&w, "%");
+                    case 'S' do io.write_format(w, "{w2}", tm.sec);
+                    case 'T' do io.write_format(w, "{}", tm.wday);
+                    case 'Y' do io.write_format(w, "{}", tm.year + 1900);
+                    case 'y' do io.write_format(w, "{w2}", tm.year - 100 if tm.year >= 100 else tm.year);
+                    case '%' do io.write(w, "%");
                 }
             }
 
             case #default {
-                io.write(&w, c);
+                io.write(w, c);
             }
         }
 
@@ -169,10 +253,28 @@ strftime :: (buf: [] u8, format_: [] u8, tm: &Timestamp) -> str {
         if h <= 12 do return h;
         return h - 12;
     }
-
-    return string.as_str(&s);
 }
 
+strptime :: #match #local {}
+
+#doc """
+    Parses a string into a `Timestamp`.
+"""
+#overload
+strptime :: (buf: [] u8, format: [] u8) -> ? Timestamp {
+    t: Timestamp;
+
+    if strptime(buf, format, &t) {
+        return t;
+    }
+
+    return .None;
+}
+
+#doc """
+    Parses a string into a `Timestamp`. Returns `true` if the parsing was successful.
+"""
+#overload
 strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
     use core {*}
 
