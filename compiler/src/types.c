@@ -294,19 +294,27 @@ u32 type_alignment_of(Type* type) {
     }
 }
 
+static b32 type_is_ready_to_be_used_in_construction(Type *t) {
+    switch (t->kind) {
+        case Type_Kind_Struct: return t->Struct.status != SPS_Start; break;
+        case Type_Kind_Union:  return t->Union.status != SPS_Start; break;
+        default: return 1;
+    }
+}
+
 static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b32 accept_partial_types) {
     if (type_node == NULL) return NULL;
 
     switch (type_node->kind) {
         case Ast_Kind_Pointer_Type: {
-            Type *inner_type = type_build_from_ast_inner(alloc, ((AstPointerType *) type_node)->elem, 1);
+            Type *inner_type = type_build_from_ast_inner(alloc, ((AstPointerType *) type_node)->elem, accept_partial_types);
             Type *ptr_type = type_make_pointer(alloc, inner_type);
             if (ptr_type) ptr_type->ast_type = type_node;
             return ptr_type;
         }
 
         case Ast_Kind_Multi_Pointer_Type: {
-            Type *inner_type = type_build_from_ast_inner(alloc, ((AstMultiPointerType *) type_node)->elem, 1);
+            Type *inner_type = type_build_from_ast_inner(alloc, ((AstMultiPointerType *) type_node)->elem, accept_partial_types);
             Type *ptr_type = type_make_multi_pointer(alloc, inner_type);
             if (ptr_type) ptr_type->ast_type = type_node;
             return ptr_type;
@@ -316,7 +324,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             AstFunctionType* ftype_node = (AstFunctionType *) type_node;
             u64 param_count = ftype_node->param_count;
 
-            Type* return_type = type_build_from_ast_inner(alloc, ftype_node->return_type, 1);
+            Type* return_type = type_build_from_ast_inner(alloc, ftype_node->return_type, accept_partial_types);
             if (return_type == NULL) return NULL;
 
             Type* func_type = type_create(Type_Kind_Function, alloc, param_count);
@@ -328,7 +336,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
 
             if (param_count > 0) {
                 fori (i, 0, (i64) param_count) {
-                    func_type->Function.params[i] = type_build_from_ast_inner(alloc, ftype_node->params[i], 1);
+                    func_type->Function.params[i] = type_build_from_ast_inner(alloc, ftype_node->params[i], accept_partial_types);
 
                     // LEAK LEAK LEAK
                     if (func_type->Function.params[i] == NULL) return NULL;
@@ -356,13 +364,13 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
         case Ast_Kind_Array_Type: {
             AstArrayType* a_node = (AstArrayType *) type_node;
 
-            Type *elem_type = type_build_from_ast_inner(alloc, a_node->elem, 1);
+            Type *elem_type = type_build_from_ast_inner(alloc, a_node->elem, accept_partial_types);
             if (elem_type == NULL)  return NULL;
 
             u32 count = 0;
             if (a_node->count_expr) {
                 if (a_node->count_expr->type == NULL)
-                    a_node->count_expr->type = type_build_from_ast_inner(alloc, a_node->count_expr->type_node, 1);
+                    a_node->count_expr->type = type_build_from_ast(alloc, a_node->count_expr->type_node);
 
                 if (node_is_auto_cast((AstNode *) a_node->count_expr)) {
                     a_node->count_expr = ((AstUnaryOp *) a_node)->expr;
@@ -445,7 +453,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             u32 idx = 0;
             bh_arr_each(AstStructMember *, member, s_node->members) {
                 if ((*member)->type == NULL)
-                    (*member)->type = type_build_from_ast(alloc, (*member)->type_node);
+                    (*member)->type = type_build_from_ast_inner(alloc, (*member)->type_node, 1);
 
                 if ((*member)->type == NULL) {
                     if (context.cycle_detected) {
@@ -456,7 +464,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                     return accept_partial_types ? s_node->pending_type : NULL;
                 }
 
-                if ((*member)->type->kind == Type_Kind_Struct && (*member)->type->Struct.status == SPS_Start) {
+                if (!type_is_ready_to_be_used_in_construction((*member)->type)) {
                     s_node->pending_type_is_valid = 0;
                     return accept_partial_types ? s_node->pending_type : NULL;
                 }
@@ -543,19 +551,19 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
         }
 
         case Ast_Kind_Slice_Type: {
-            Type* slice_type = type_make_slice(alloc, type_build_from_ast_inner(alloc, ((AstSliceType *) type_node)->elem, 1));
+            Type* slice_type = type_make_slice(alloc, type_build_from_ast_inner(alloc, ((AstSliceType *) type_node)->elem, accept_partial_types));
             if (slice_type) slice_type->ast_type = type_node;
             return slice_type;
         }
 
         case Ast_Kind_DynArr_Type: {
-            Type* dynarr_type = type_make_dynarray(alloc, type_build_from_ast_inner(alloc, ((AstDynArrType *) type_node)->elem, 1));
+            Type* dynarr_type = type_make_dynarray(alloc, type_build_from_ast_inner(alloc, ((AstDynArrType *) type_node)->elem, accept_partial_types));
             if (dynarr_type) dynarr_type->ast_type = type_node;
             return dynarr_type;
         }
 
         case Ast_Kind_VarArg_Type: {
-            Type* va_type = type_make_varargs(alloc, type_build_from_ast_inner(alloc, ((AstVarArgType *) type_node)->elem, 1));
+            Type* va_type = type_make_varargs(alloc, type_build_from_ast_inner(alloc, ((AstVarArgType *) type_node)->elem, accept_partial_types));
             if (va_type) va_type->ast_type = type_node;
             return va_type;
         }
@@ -565,7 +573,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
         }
 
         case Ast_Kind_Type_Alias: {
-            Type* type = type_build_from_ast_inner(alloc, ((AstTypeAlias *) type_node)->to, 1);
+            Type* type = type_build_from_ast_inner(alloc, ((AstTypeAlias *) type_node)->to, accept_partial_types);
             if (type && type->ast_type) type_node->type_id = type->id;
             return type;
         }
@@ -666,7 +674,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
 
             fori (i, 0, type_count) {
                 assert(ctype->types[i] != NULL);
-                comp_type->Compound.types[i] = type_build_from_ast_inner(alloc, ctype->types[i], 1);
+                comp_type->Compound.types[i] = type_build_from_ast_inner(alloc, ctype->types[i], accept_partial_types);
 
                 // LEAK LEAK LEAK
                 if (comp_type->Compound.types[i] == NULL) return NULL;
@@ -729,6 +737,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 u_type->Union.name = union_->name;
                 u_type->Union.meta_tags = union_->meta_tags;
                 u_type->Union.constructed_from = NULL;
+                u_type->Union.status = SPS_Start;
                 type_register(u_type);
 
                 u_type->Union.variants = NULL;
@@ -746,7 +755,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             bh_arr_each(AstUnionVariant *, pvariant, union_->variants) {
                 AstUnionVariant *variant = *pvariant;
                 if (!variant->type) {
-                    variant->type = type_build_from_ast(alloc, variant->type_node);
+                    variant->type = type_build_from_ast_inner(alloc, variant->type_node, 1);
                 }
 
                 if (!variant->type) {
@@ -758,11 +767,13 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                     return accept_partial_types ? union_->pending_type : NULL;
                 }
 
-                if (variant->type->kind == Type_Kind_Struct && variant->type->Struct.status == SPS_Start) {
+                if (!type_is_ready_to_be_used_in_construction(variant->type)) {
                     union_->pending_type_is_valid = 0;
                     return accept_partial_types ? union_->pending_type : NULL;
                 }
             }
+
+            u_type->Union.status = SPS_Members_Done;
 
             // From this point forward, there is no chance we will return early
             // in a yielding fashion. Everything is either straight success or
@@ -829,6 +840,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             u_type->Union.alignment = alignment;
             u_type->Union.size = size + alignment; // Add the size of the tag
             u_type->Union.tag_type = type_build_from_ast(alloc, (AstType *) tag_enum_node);
+            u_type->Union.status = SPS_Uses_Done;
 
             return u_type;
         }
