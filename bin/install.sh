@@ -390,6 +390,9 @@ onyx_download() {
 
   mkdir -p $INSTALL_DIRECTORY
 
+  # Remove old tests directory that should not be shipped with the toolchain anymore
+  rm -rf $INSTALL_DIRECTORY/tests 2>/dev/null
+
   # Untar the Onyx contents in the install directory
   tar -C $INSTALL_DIRECTORY -zxf $DOWNLOAD_FILE
 
