@@ -81,9 +81,9 @@ compress_all() {
 
     if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
         # When including a runtime library, include the lib and include folders
-        tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples include lib misc tests tools LICENSE
+        tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples include lib misc tools LICENSE
     else
-        tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples misc tests tools LICENSE
+        tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples misc tools LICENSE
     fi
 
     mv onyx.tar.gz dist/
