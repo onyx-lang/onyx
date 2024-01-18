@@ -1,3 +1,47 @@
+Nightly build
+--------------
+
+Additions:
+- OVM-Wasm support on MacOS (thanks to @judah-caruso).
+    - This enables debugging support when on MacOS.
+    - Available from installer.
+- `where` clauses can contain arbitrary boolean expressions (thanks to @judah-caruso).
+- Small arrays (4 or fewer elements) have special accessors for their components.
+- Tree-shaking is performed prior to code generation, reducing binary size drastically in some cases.
+- Operation overloads for `+`, `-` and `*` for small arrays.
+- `core.intrinsics.wasm.memory_equal`
+- `core.iter.counter`
+- `core.iter.sum`
+- `core.iter.fold1`
+- `make(List(T))`
+- `core.list.from_array`
+- `core.list.pop_begin_opt`
+- `core.list.pop_end_opt`
+- `core.list.empty`
+- `core.conv.parse`
+- `core.conv.parse_with_allocator`
+
+Removals:
+- Compiler test cases are no longer shipped with toolchain.
+
+Changes:
+- Due to tree shaking, the `methods` member of `Type_Info_Struct` and `Type_Info_Union` is not populated by default anymore.
+    - Use the `--generate-method-info` CLI flag to add this information back in.
+
+Bugfixes:
+- Error reporting in many cases saw a lot of improvements.
+    - Specially with polymorphic procedures, l-values, and code blocks.
+- Implementation of `core.array.remove`.
+- Implementation 
+
+Contributors:
+- @judah-caruso (10 pull requests)
+- @stagas (2 pull requests)
+- @magnetenstad (1 pull request)
+- @jtakakura (1 pull request)
+- @hatappo (1 pull request)
+
+
 Release v0.1.8
 --------------
 November 28th, 2023
