@@ -119,6 +119,9 @@ __file_stat :: (path: str, out: &os.FileStat) -> bool {
         if err == .Success {
             exists = true;
             out.size = ~~ fs.size;
+            out.change_time = fs.ctim / 1000000;
+            out.accessed_time = fs.atim / 1000000;
+            out.modified_time = fs.mtim / 1000000;
 
             switch fs.filetype {
                 case .RegularFile do out.type = .RegularFile;

@@ -428,6 +428,9 @@ typedef struct bh_file_contents {
 typedef struct bh_file_stats {
     isize size;
     u32 file_type;
+    u64 change_time;
+    u64 accessed_time;
+    u64 modified_time;
 } bh_file_stats;
 
 bh_file_error bh_file_get_standard(bh_file* file, bh_file_standard stand);
@@ -1905,6 +1908,10 @@ b32 bh_file_contents_free(bh_file_contents* contents) {
     return 1;
 }
 
+static u64 timespec_to_ms(struct timespec t) {
+    return t.tv_sec * 1000 + t.tv_nsec / 1000000;
+}
+
 b32 bh_file_stat(char const* filename, bh_file_stats* out) {
     struct stat s;
     if (stat(filename, &s) == -1) {
@@ -1912,6 +1919,9 @@ b32 bh_file_stat(char const* filename, bh_file_stats* out) {
     }
 
     out->size = s.st_size;
+    out->modified_time = timespec_to_ms(s.st_mtim);
+    out->accessed_time = timespec_to_ms(s.st_atim);
+    out->change_time   = timespec_to_ms(s.st_ctim);
 
     if ((s.st_mode & S_IFMT) == S_IFDIR) out->file_type = BH_FILE_TYPE_DIRECTORY;
     if ((s.st_mode & S_IFMT) == S_IFREG) out->file_type = BH_FILE_TYPE_FILE;

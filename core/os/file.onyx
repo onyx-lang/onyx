@@ -50,6 +50,9 @@ FileType :: enum {
 FileStat :: struct {
     size: i64;
     type: FileType;
+    change_time: u64;   // in milliseconds
+    accessed_time: u64; // in milliseconds
+    modified_time: u64; // in milliseconds
 }
 
 file_exists :: fs.__file_exists
