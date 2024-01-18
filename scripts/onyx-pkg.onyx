@@ -675,7 +675,13 @@ install_package :: (pack: Package, downgrade_if_necessary := false, skip_native_
 
         if installed_version == pack.version {
             info_print("Exists", "{}  {}\n", repo, installed_version);
-            return true, package_folder;
+
+            success := true;
+            if !native_library_is_up_to_date(package_folder) {
+                success = run_native_library_installation(package_folder);
+            }
+
+            return success, package_folder;
         }
 
         if installed_version->is_newer(pack.version) && !downgrade_if_necessary {
@@ -817,6 +823,22 @@ run_native_library_installation :: (folder: str) -> (bool, str) {
     }
 
     return success, "";
+}
+
+native_library_is_up_to_date :: (folder: str) -> bool {
+    inner_config := read_config_from_installed_dependency(folder)?;
+
+    // If no native library, no worries.
+    if !inner_config.native_library do return true;
+
+    target := os.path_join(config.dependency_binary_path, tprintf("{}{}", inner_config.native_library->unwrap(), native_library_suffix));
+    inner_package_file := tprintf("{}/onyx-pkg.kdl", folder);
+
+    target_stat, package_stat: os.FileStat;
+    if !os.file_stat(target, &target_stat) do return false;
+    if !os.file_stat(inner_package_file, &package_stat) do return false;
+
+    return target_stat.modified_time >= package_stat.modified_time;
 }
 
 run_command_and_forward_output :: (cmd: str) => {
