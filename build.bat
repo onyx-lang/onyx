@@ -40,7 +40,6 @@ if "%1" == "dist" (
     copy misc\vscode\onyxlang-0.1.9.vsix dist\misc\onyxlang-0.1.9.vsix
 
     copy onyx_runtime.dll dist\onyx_runtime.dll
-    xcopy tests dist\tests /s /e /h /I
     copy onyx.exe dist\onyx.exe
 
     mkdir dist\tools

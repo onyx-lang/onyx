@@ -57,7 +57,6 @@ package_all() {
         cp "shared/include/wasm.h" "$DIST_DIR/include/wasm.h"
     fi
 
-    cp -r "tests" "$DIST_DIR/"
     cp -r "examples" "$DIST_DIR/"
 
     mkdir -p "$DIST_DIR/misc"
