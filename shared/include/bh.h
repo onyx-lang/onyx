@@ -1919,9 +1919,17 @@ b32 bh_file_stat(char const* filename, bh_file_stats* out) {
     }
 
     out->size = s.st_size;
+
+#if defined(_BH_DARWIN)
+    // Apple just has to be different.
+    out->modified_time = timespec_to_ms(s.st_mtimespec);
+    out->accessed_time = timespec_to_ms(s.st_atimespec);
+    out->change_time   = timespec_to_ms(s.st_ctimespec);
+#else
     out->modified_time = timespec_to_ms(s.st_mtim);
     out->accessed_time = timespec_to_ms(s.st_atim);
     out->change_time   = timespec_to_ms(s.st_ctim);
+#endif
 
     if ((s.st_mode & S_IFMT) == S_IFDIR) out->file_type = BH_FILE_TYPE_DIRECTORY;
     if ((s.st_mode & S_IFMT) == S_IFREG) out->file_type = BH_FILE_TYPE_FILE;
