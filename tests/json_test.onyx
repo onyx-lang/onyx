@@ -61,4 +61,10 @@ main :: () {
     core.print("\n");
     json.encode(&core.stdio.print_writer, ut);
     core.print("\n");
+
+    json.as_any(j.root, [] struct {
+        @json.Custom_Key.{"x"}
+        foo: i32
+    })
+    |> core.println();
 }

@@ -25,6 +25,15 @@ encode_string :: (v: $T, allocator := context.allocator) -> (str, Encoding_Error
     return s, .None;
 }
 
+encode_string_opt :: (v: $T, allocator := context.allocator) -> ? str {
+    s, err := encode_string(v, allocator);
+    if err != .None {
+        return .None;
+    }
+
+    return s;
+}
+
 //
 // This could be changed to use the "any" type now, which would allow for any type to be
 // represented as a json value. However, this eliminates the control that you get from
@@ -387,6 +396,13 @@ from_any :: (type: type_expr, in: rawptr, allocator := context.allocator) -> Val
 to_any :: as_any
 
 as_any :: #match #local {}
+
+#overload
+as_any :: macro (value: Value, $T: type_expr) -> T {
+    x: T;
+    #this_package.as_any(value, &x);
+    return x;
+}
 
 #overload
 as_any :: macro (value: Value, out: ^$T) {

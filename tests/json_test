@@ -7,3 +7,4 @@
 main.Union_Test { v1 = None, v2 = Some(123) }
 {"v1":null,"v2":123}
 {"v1":null,"v2":123}
+[ { foo = 1 }, { foo = 2 } ]

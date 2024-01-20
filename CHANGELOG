@@ -20,6 +20,8 @@ Additions:
 - `core.list.empty`
 - `core.conv.parse`
 - `core.conv.parse_with_allocator`
+- `core.encoding.json.encode_string_opt`
+- `core.encoding.json.as_any` overload
 
 Removals:
 - Compiler test cases are no longer shipped with toolchain.
