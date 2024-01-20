@@ -1617,6 +1617,8 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
                     value->token->text, value->token->length, type_get_name(union_type));
         }
 
+        CHECK(expression, &value->value);
+
         TYPE_CHECK(&value->value, matched_variant->type) {
             ERROR_(value->token->pos,
                    "Mismatched type in initialized type. Expected something of type '%s', got '%s'.",
