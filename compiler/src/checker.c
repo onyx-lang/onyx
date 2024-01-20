@@ -917,7 +917,6 @@ CheckStatus check_call(AstCall** pcall) {
     if (tm == TYPE_MATCH_YIELD) YIELD(call->token->pos, "Waiting on argument type checking.");
 
     call->flags   |= Ast_Flag_Has_Been_Checked;
-    callee->flags |= Ast_Flag_Function_Used;
 
     if (call->kind == Ast_Kind_Call && call->callee->kind == Ast_Kind_Macro) {
         expand_macro(pcall, callee);
@@ -2404,7 +2403,6 @@ CheckStatus check_expression(AstTyped** pexpr) {
             if (expr->type == NULL)
                 YIELD(expr->token->pos, "Waiting for function type to be resolved.");
 
-            expr->flags |= Ast_Flag_Function_Used;
             break;
 
         case Ast_Kind_Directive_Solidify:
@@ -3001,22 +2999,6 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* ofunc) {
     return Check_Success;
 }
 
-static void mark_all_functions_used_in_scope(Scope *scope) {
-    //
-    // This ensures that all procedures defined inside of a structure are
-    // not pruned and omitted from the binary. This is because a large
-    // use-case of procedures in structures is dynamically linking them
-    // using the type info data.
-    if (scope) {
-        fori (i, 0, shlen(scope->symbols)) {
-            AstNode* node = scope->symbols[i].value;
-            if (node->kind == Ast_Kind_Function) {
-                node->flags |= Ast_Flag_Function_Used;
-            }
-        }
-    }
-}
-
 CheckStatus check_meta_tags(bh_arr(AstTyped *) tags) {
     if (tags) {
         bh_arr_each(AstTyped *, meta, tags) {
@@ -3073,8 +3055,6 @@ CheckStatus check_struct(AstStructType* s_node) {
         }
         CHECK(constraint_context, &s_node->constraints, s_node->scope, pos);
     }
-
-    mark_all_functions_used_in_scope(s_node->scope);
 
     bh_arr_each(AstStructMember *, smem, s_node->members) {
         if ((*smem)->type_node != NULL) {
@@ -3192,8 +3172,6 @@ CheckStatus check_union(AstUnionType *u_node) {
         }
         CHECK(constraint_context, &u_node->constraints, u_node->scope, pos);
     }
-
-    mark_all_functions_used_in_scope(u_node->scope);
 
     CHECK(meta_tags, u_node->meta_tags);
 

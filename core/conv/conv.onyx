@@ -1,6 +1,8 @@
 package core.conv
 
-Enable_Custom_Formatters :: true
+#if !#defined(Enable_Custom_Formatters) {
+    Enable_Custom_Formatters :: true
+}
 
 use core.string
 use core.math

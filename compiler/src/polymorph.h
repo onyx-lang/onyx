@@ -110,7 +110,6 @@ static char* build_poly_slns_unique_key(bh_arr(AstPolySolution) slns) {
 // later. It optionally can start the function header entity at the code generation state if
 // the header has already been processed.
 static b32 add_solidified_function_entities(AstSolidifiedFunction *solidified_func) {
-    solidified_func->func->flags |= Ast_Flag_Function_Used;
     solidified_func->func->flags |= Ast_Flag_From_Polymorphism;
 
     Entity func_header_entity = {

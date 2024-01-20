@@ -263,9 +263,6 @@ typedef enum AstFlags {
     Ast_Flag_Private_Package       = BH_BIT(3),
     Ast_Flag_Private_File          = BH_BIT(4),
 
-    // Function flags
-    Ast_Flag_Function_Used         = BH_BIT(5),
-
     // Expression flags
     Ast_Flag_Expr_Ignored          = BH_BIT(6),
     Ast_Flag_Address_Taken         = BH_BIT(7),

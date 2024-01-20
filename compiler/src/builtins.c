@@ -546,8 +546,6 @@ void initialize_builtins(bh_allocator a) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__closure_block_allocate' procedure not found.");
         return;
     }
-    // HACK
-    builtin_closure_block_allocate->flags |= Ast_Flag_Function_Used;
 
 
     builtin_link_options_type = (AstType *) symbol_raw_resolve(p->scope, "Link_Options");
