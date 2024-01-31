@@ -16,6 +16,7 @@ main :: () {
     l->pop_begin();
 
     println(l->count());
+    println(*(l->at(1)));
 
     float_list := l->map(x => cast(f32) x);
 
