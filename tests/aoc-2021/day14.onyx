@@ -14,14 +14,14 @@ State :: struct {
 // Nicer way of printing a Map.
 #match io.write (w: &io.Writer, x: &Map($K, $V)) {
     io.write(w, "{\n");
-    for e: x.entries {
+    for e in x.entries {
         io.write(w, "    {} => {}\n", e.key, e.value);
     }
     io.write(w, "}");
 }
 
 main :: (args) => {
-    for file: os.with_file("./tests/aoc-2021/input/day14.txt") {
+    for file in os.with_file("./tests/aoc-2021/input/day14.txt") {
         reader := io.reader_make(file);
 
         start_polymer := io.read_line(&reader, consume_newline=false);
@@ -62,7 +62,7 @@ main :: (args) => {
         step_state();
 
         for 40 {
-            for& rule: rules {
+            for& rule in rules {
                 pair_count := &polymer_state[rule.pair];
                 if pair_count != null {
                     if pair_count.now > 0 {

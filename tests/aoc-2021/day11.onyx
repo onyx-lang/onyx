@@ -7,7 +7,7 @@ Pos :: struct {x, y:i32;}
 #operator == (p1, p2: Pos) => p1.x == p2.x && p1.y == p2.y;
 
 main :: (args) => {
-    for file: os.with_file("./tests/aoc-2021/input/day11.txt") {
+    for file in os.with_file("./tests/aoc-2021/input/day11.txt") {
         reader := io.reader_make(file);
 
         octopuses: [..] u32;
@@ -15,7 +15,7 @@ main :: (args) => {
             line := io.read_line(&reader, consume_newline=false, inplace=true);
             io.skip_whitespace(&reader);
 
-            for ch: line do octopuses << ~~(ch - #char "0");
+            for ch in line do octopuses << ~~(ch - #char "0");
         }
 
         get_octopus :: macro (x, y) => {
@@ -41,17 +41,17 @@ main :: (args) => {
         sync_step := 0;
         while true {
             step += 1;
-            for &o: octopuses do *o += 1;
+            for &o in octopuses do *o += 1;
 
             #persist to_flash: Set(Pos);
-            for y: 10 do for x: 10 {
+            for y in 10 do for x in 10 {
                 if get_octopus(x, y) >= 10 {
                     to_flash << .{x, y};
                 }
             }
 
-            for flash: iter.as_iter(&to_flash) {
-                for y: -1 .. 2 do for x: -1 .. 2 {
+            for flash in iter.as_iter(&to_flash) {
+                for y in -1 .. 2 do for x in -1 .. 2 {
                     if y == 0 && x == 0 do continue;
 
                     if inc_octopus(flash.x + x, flash.y + y) >= 10 {
@@ -60,7 +60,7 @@ main :: (args) => {
                 }
             }
 
-            for flash: iter.as_iter(&to_flash) {
+            for flash in iter.as_iter(&to_flash) {
                 set_octopus(flash.x, flash.y, 0);
                 if step <= 100 do flash_count += 1;
             }

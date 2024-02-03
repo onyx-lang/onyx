@@ -23,7 +23,7 @@ apply_fold :: (dots: &[] Point, axis_name: str, axis_value: i32) {
 }
 
 main :: (args) => {
-    for file: os.with_file("./tests/aoc-2021/input/day13.txt") {
+    for file in os.with_file("./tests/aoc-2021/input/day13.txt") {
         reader := io.reader_make(file);
 
         dots: [..] Point;
@@ -61,8 +61,8 @@ main :: (args) => {
         printf("Part 1: {}\n", part_1_answer);
 
         printf("Part 2:\n");
-        for y: 7 {
-            for x: 50 {
+        for y in 7 {
+            for x in 50 {
                 print("X" if array.contains(dots, .{x, y}) else " ");
             }
 

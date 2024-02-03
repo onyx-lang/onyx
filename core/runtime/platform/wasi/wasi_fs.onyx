@@ -83,7 +83,7 @@ __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError)
 
     // Currently the directory's file descriptor appears to always be 3
     // However, this is not necessarily correct, so also try a preopened directory
-    for DIR_FD: .[ 3, 4 ] {
+    for DIR_FD in .[ 3, 4 ] {
         if err := wasi.path_open(
             DIR_FD,
             .SymLinkFollow,

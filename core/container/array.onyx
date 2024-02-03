@@ -80,13 +80,13 @@ copy :: #match #locked {
         init(&new_arr, arr.count, allocator);
         new_arr.count = arr.count;
 
-        for i: 0 .. arr.count do new_arr.data[i] = arr.data[i];
+        for i in 0 .. arr.count do new_arr.data[i] = arr.data[i];
         return new_arr;
     },
 
     (arr: [] $T, allocator := context.allocator) -> [] T {
         new_arr := builtin.make([] T, arr.count);
-        for i: 0 .. arr.count do new_arr.data[i] = arr.data[i];
+        for i in 0 .. arr.count do new_arr.data[i] = arr.data[i];
         return new_arr;
     }
 }
@@ -103,7 +103,7 @@ copy_range :: (arr: &[..] $T, r: range, allocator := context.allocator) -> [..] 
     init(&new_arr, r.high - r.low, allocator);
     new_arr.count = r.high - r.low;
 
-    for i: r do new_arr.data[i] = arr.data[i];
+    for i in r do new_arr.data[i] = arr.data[i];
     return new_arr;
 }
 
@@ -188,7 +188,7 @@ insert :: (arr: &[..] $T, idx: u32, new_arr: [] T) -> bool {
         i -= 1;
     }
 
-    for i: 0 .. new_arr.count {
+    for i in 0 .. new_arr.count {
         arr.data[i + idx] = new_arr[i];
     }
     return true;
@@ -240,7 +240,7 @@ delete :: (arr: &[..] $T, idx: u32) -> T {
     if idx >= arr.count do return .{};
 
     to_return := arr.data[idx];
-    for i: idx .. arr.count - 1 {
+    for i in idx .. arr.count - 1 {
         arr.data[i] = arr.data[i + 1];
     }
 

@@ -28,7 +28,7 @@ main :: (args: [] cstr) {
     // and will "disappear" when the procedure returns.
     typed_varargs :: (args: ..i32) {
         print("Typed variadic arguments: ");
-        for x: args {
+        for x in args {
             printf("{} ", x);
         }
         print("\n");
@@ -83,7 +83,7 @@ main :: (args: [] cstr) {
     any_varargs :: (args: ..any) {
         print("Any variadic arguments: ");
 
-        for arg: args {
+        for arg in args {
             printf("{}, ", arg.type);
         }
 

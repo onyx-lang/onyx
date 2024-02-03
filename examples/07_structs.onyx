@@ -159,7 +159,7 @@ main :: (args: [] cstr) {
 
     println("param_struct_instance values:");
     println(param_struct_instance.t_member);
-    for elem: param_struct_instance.array_of_T do printf("{} ", elem);
+    for elem in param_struct_instance.array_of_T do printf("{} ", elem);
     print("\n");
 
 

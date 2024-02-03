@@ -41,7 +41,7 @@ array_from_stack :: macro ($T: type_expr, size: u32) -> [] T {
 }
 
 #doc """
-    Moves a value on to the heap. Useful for cases like this:
+    Moves a value on to the heap. Useful for cases like this in
 
         f :: () -> &Foo {
             return alloc.on_heap(Foo.{

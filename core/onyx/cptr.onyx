@@ -83,7 +83,7 @@ cptr :: struct (T: type_expr) {
         return ~~(this.data - mem_base_ptr + 1);
     }
 
-    as :: (this: cptr($T), $new_type: type_expr) -> cptr(new_type) {
+    as_unsafe :: (this: cptr($T), $new_type: type_expr) -> cptr(new_type) {
         return .{ this.data };
     }
 

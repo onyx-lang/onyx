@@ -14,7 +14,7 @@ w :: (idx: $T, mod := cups.count) -> T {
 }
 
 get_idx :: (cups: [] i32, cup: i32) -> i32 {
-    for i: 0 .. cups.count do if cups[i] == cup do return i;
+    for i in 0 .. cups.count do if cups[i] == cup do return i;
     return -1;
 }
 
@@ -22,11 +22,11 @@ simulate :: (cups: [] i32, moves := 100) {
     cw := memory.make_slice(i32, cups.count);
     defer cfree(cw.data);
 
-    for i: 0 .. cups.count do cw[cups[i]] = cups[w(i + 1)];
+    for i in 0 .. cups.count do cw[cups[i]] = cups[w(i + 1)];
 
     current_cup := cups[0];
 
-    for move: 0 .. moves {
+    for move in 0 .. moves {
         next_1 := cw[current_cup];
         next_2 := cw[next_1];
         next_3 := cw[next_2];
@@ -46,7 +46,7 @@ simulate :: (cups: [] i32, moves := 100) {
     }
 
     cup := 0;
-    for i: 0 .. cups.count {
+    for i in 0 .. cups.count {
         cups[i] = cup;
         cup = cw[cup];
     }
@@ -56,26 +56,26 @@ main :: (args: [] cstr) {
     cups_data := i32.[ 9, 6, 2, 7, 1, 3, 8, 5, 4 ];
 
     // Easier think about in zero-indexed
-    for &cup: cups_data do *cup -= 1;
+    for &cup in cups_data do *cup -= 1;
 
     array.init(&cups, 1000000);
     defer array.free(&cups);
 
-    for cup: cups_data do array.push(&cups, cup);
+    for cup in cups_data do array.push(&cups, cup);
 
     // Part 1
     // simulate(array.to_slice(&cups));
     
     // Part 2
-    for i: 9 .. 1000000 do array.push(&cups, i);
+    for i in 9 .. 1000000 do array.push(&cups, i);
     simulate(cups, 10000000);
 
     // Undo the zero-indexing
-    for &cup: cups do *cup += 1;
+    for &cup in cups do *cup += 1;
 
     // Part 1
     // one_idx := get_idx(array.to_slice(&cups), 1);
-    // for i: 1 .. 9 {
+    // for i in 1 .. 9 {
     //     printf("{}", cast(i32) cups[w(one_idx + i)]);
     // }
     // printf("\n");

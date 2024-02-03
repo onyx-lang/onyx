@@ -36,6 +36,8 @@ static const char* token_type_names[] = {
     "macro",
     "interface",
     "where",
+    "as",
+    "in",
     "", // end
 
     "->",
@@ -345,6 +347,7 @@ whitespace_skipped:
     char curr = *tokenizer->curr;
     switch (curr) {
     case 'a':
+        LITERAL_TOKEN("as",          1, Token_Type_Keyword_As);
         LITERAL_TOKEN("alignof",     1, Token_Type_Keyword_Alignof);
         break;
     case 'b':
@@ -374,6 +377,7 @@ whitespace_skipped:
         break;
     case 'i':
         LITERAL_TOKEN("if",          1, Token_Type_Keyword_If);
+        LITERAL_TOKEN("in",          1, Token_Type_Keyword_In);
         LITERAL_TOKEN("interface",   1, Token_Type_Keyword_Interface);
         break;
     case 'm':

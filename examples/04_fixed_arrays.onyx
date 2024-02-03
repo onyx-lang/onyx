@@ -25,7 +25,7 @@ main :: (args: [] cstr) {
     // with a for loop. Note, the `^` after the for keyword means we are iterating by
     // pointer.
     arr : [10] i32;
-    for ^elem: arr do *elem = 0;
+    for ^elem in arr do *elem = 0;
 
     // To access certain elements of the array, simply use the array access operator,
     // [...], as so. This sets the fourth element of the array to be 1234.
@@ -33,7 +33,7 @@ main :: (args: [] cstr) {
     printf("arr[3] is {}\n", arr[3]);
 
     // Fixed-size arrays can be iterated over using a `for` loop as so.
-    for element: arr {
+    for element in arr {
         printf("{} ", element);
     }
     print("\n");
@@ -43,13 +43,13 @@ main :: (args: [] cstr) {
     // the array `arr` is passed by reference so when the for loop changes the
     // contents of `array_param`, the contents of `arr` are changed as well.
     array_proc :: (array_param: [10] i32) {
-        for i: 0 .. 10 {
+        for i in 0 .. 10 {
             array_param[i] = 1000 + i;
         }
     }
 
     array_proc(arr);
-    for element: arr {
+    for element in arr {
         printf("{} ", element);
     }
 
@@ -59,7 +59,7 @@ main :: (args: [] cstr) {
     // array. Slices and dynamic arrays do not operate this way.
     other_arr : [10] i32;
     other_arr = arr;
-    for other_element: other_arr do printf("{} ", other_element);
+    for other_element in other_arr do printf("{} ", other_element);
     print("\n");
 
     // This does mean that the following pattern of double buffering arrays (which
@@ -84,7 +84,7 @@ main :: (args: [] cstr) {
     // OR
     arr_lit := i32.[ 2, 3, 5, 7, 11 ];
     
-    for elem: arr_lit do printf("{} ", elem);
+    for elem in arr_lit do printf("{} ", elem);
     print("\n");
 
     // The type of the elements of the array is given right before the `.`. The

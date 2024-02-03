@@ -199,7 +199,7 @@ write_ini_file_inner :: (w: &io.Writer, output: any, leave_empty_strings := fals
             continue;
         }
 
-        for& prop: member_info.members {
+        for& prop in member_info.members {
             if !leave_empty_strings && prop.type == str {
                 if cast(&str, member_data + prop.offset).length == 0 {
                     continue;

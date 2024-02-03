@@ -10,7 +10,7 @@ pos :: struct { x, y: i32; }
 #operator == (p1, p2: pos) => p1.x == p2.x && p1.y == p2.y;
 
 main :: (args) => {
-    for file: os.with_file("./tests/aoc-2021/input/day15.txt") {
+    for file in os.with_file("./tests/aoc-2021/input/day15.txt") {
         reader := io.reader_make(file);
 
         cells: [..] u8;
@@ -69,7 +69,7 @@ main :: (args) => {
         min_paths.count = cells.count * 25;
         memory.set(min_paths.data, 0, sizeof u32 * min_paths.count * 25);
 
-        for y: height * 5 do for x: width * 5 {
+        for y in height * 5 do for x in width * 5 {
             if y == 0 && x == 0 do continue;
 
             a, b := 100000, 100000;

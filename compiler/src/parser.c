@@ -949,11 +949,20 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 if (parse_possible_array_literal(parser, retval, &retval))  return retval;
 
                 consume_token(parser);
-                AstFieldAccess* field = make_node(AstFieldAccess, Ast_Kind_Field_Access);
-                field->token = expect_token(parser, Token_Type_Symbol);
-                field->expr  = retval;
+                if (parser->curr->type == '*') {
+                    AstDereference* deref_node = make_node(AstDereference, Ast_Kind_Dereference);
+                    deref_node->token = expect_token(parser, '*');
+                    deref_node->expr  = retval;
 
-                retval = (AstTyped *) field;
+                    retval = (AstTyped *) deref_node;
+
+                } else {
+                    AstFieldAccess* field = make_node(AstFieldAccess, Ast_Kind_Field_Access);
+                    field->token = expect_token(parser, Token_Type_Symbol);
+                    field->expr  = retval;
+
+                    retval = (AstTyped *) field;
+                }
                 break;
             }
 
@@ -1331,13 +1340,19 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
         for_node->by_pointer = 1;
     }
 
-    if (next_tokens_are(parser, 2, Token_Type_Symbol, ':')) {
+    if (next_tokens_are(parser, 2, Token_Type_Symbol, Token_Type_Keyword_In)
+        || next_tokens_are(parser, 2, Token_Type_Symbol, ':')
+    ) {
         OnyxToken* local_sym = expect_token(parser, Token_Type_Symbol);
         AstLocal* var_node = make_local(parser->allocator, local_sym, NULL);
 
         for_node->var = var_node;
+        if (peek_token(0)->type == ':') {
+            expect_token(parser, ':');
+            var_node->type_node = parse_type(parser);
+        }
 
-        expect_token(parser, ':');
+        expect_token(parser, Token_Type_Keyword_In);
     } else {
         // HACK
         static char it_name[] = "it ";
@@ -1361,23 +1376,6 @@ static AstSwitchCase* parse_case_stmt(OnyxParser* parser) {
         sc_node->is_default = 1;
 
     } else {
-        if (   next_tokens_are(parser, 3, '&', Token_Type_Symbol, ':')
-            || next_tokens_are(parser, 3, '^', Token_Type_Symbol, ':')
-            || next_tokens_are(parser, 2, Token_Type_Symbol, ':')
-       ) {
-            b32 is_pointer = 0;
-            if (consume_token_if_next(parser, '&') || consume_token_if_next(parser, '^'))
-                is_pointer = 1;
-
-            OnyxToken *capture_symbol = expect_token(parser, Token_Type_Symbol);
-            AstLocal *capture = make_local(parser->allocator, capture_symbol, NULL);
-
-            sc_node->capture = capture;
-            sc_node->capture_is_by_pointer = is_pointer;
-
-            expect_token(parser, ':');
-        }
-
         bh_arr_new(global_heap_allocator, sc_node->values, 1);
 
         parser->parse_quick_functions = 0;
@@ -1391,6 +1389,23 @@ static AstSwitchCase* parse_case_stmt(OnyxParser* parser) {
         }
 
         parser->parse_quick_functions = 1;
+
+        if (   next_tokens_are(parser, 3, Token_Type_Keyword_As, '&', Token_Type_Symbol)
+            || next_tokens_are(parser, 3, Token_Type_Keyword_As, '^', Token_Type_Symbol)
+            || next_tokens_are(parser, 2, Token_Type_Keyword_As, Token_Type_Symbol)
+        ) {
+            expect_token(parser, Token_Type_Keyword_As);
+
+            b32 is_pointer = 0;
+            if (consume_token_if_next(parser, '&') || consume_token_if_next(parser, '^'))
+                is_pointer = 1;
+
+            OnyxToken *capture_symbol = expect_token(parser, Token_Type_Symbol);
+            AstLocal *capture = make_local(parser->allocator, capture_symbol, NULL);
+
+            sc_node->capture = capture;
+            sc_node->capture_is_by_pointer = is_pointer;
+        }
     }
 
     if (consume_token_if_next(parser, Token_Type_Fat_Right_Arrow)) {

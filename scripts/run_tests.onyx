@@ -151,7 +151,7 @@ main :: (args) => {
 
         if thread_data.compile_only do continue;
 
-        for expected_file: os.with_file(it.expected_file) {
+        for expected_file in os.with_file(it.expected_file) {
             expected_reader := io.reader_make(expected_file);
             expected_output := io.read_all(&expected_reader);
 

@@ -22,14 +22,14 @@ total_scanning_error := 0;
 read_ticket_and_validate :: (file: &str, fields: [..] Field, ticket_store: [&] u32) -> bool {
 	retval := true;
 
-	for i: 0 .. fields.count {
+	for i in 0 .. fields.count {
 		n := cast(u32, conv.parse_int(file));
 		ticket_store[i] = n;
 
 		if file.data[0] == #char "," do string.advance(file, 1);
 
 		valid_count := 0;
-		for &field: fields {
+		for &field in fields {
 			if field_valid(field, n) do valid_count += 1;
 		}
 
@@ -73,13 +73,13 @@ main :: (args: [] cstr) {
 		array.push(&fields, field);
 	}
 
-	for i: 0 .. 2 do string.advance_line(&file);
+	for i in 0 .. 2 do string.advance_line(&file);
 
 	my_ticket := array.make(u32, fields.count);
 	defer array.free(&my_ticket);
 	read_ticket_and_validate(&file, fields, my_ticket.data);
 
-	for i: 0 .. 2 do string.advance_line(&file);
+	for i in 0 .. 2 do string.advance_line(&file);
 
 	ticket_data := array.make(u32, 1024);
 	defer array.free(&ticket_data);
@@ -96,18 +96,18 @@ main :: (args: [] cstr) {
 	cols_to_assign := array.make(u32, fields.count);
 	defer array.free(&cols_to_assign);
 
-	for i: 0 .. fields.count do array.push(&cols_to_assign, i);
+	for i in 0 .. fields.count do array.push(&cols_to_assign, i);
 
 	while cols_to_assign.count > 0 {
-		for col: cols_to_assign {
+		for col in cols_to_assign {
 			work_count := 0;
 			recent_work: &Field = null;
 
-			for &field: fields {
+			for &field in fields {
 				if field.column != -1 do continue;
 				works := true;
 
-				for row: 0 .. (ticket_data.count / fields.count) {
+				for row in 0 .. (ticket_data.count / fields.count) {
 					if !field_valid(field, ticket_data[col + fields.count * row]) {
 						works = false;
 						break;
@@ -129,7 +129,7 @@ main :: (args: [] cstr) {
 	}
 
 	prod: u64 = 1;
-	for &field: fields {
+	for &field in fields {
 		if string.starts_with(field.name, "departure") do prod *= ~~my_ticket[field.column];
 	}
 

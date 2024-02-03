@@ -15,7 +15,7 @@ get_extrema :: (arr: [$N] $T) -> (T, T) {
     min := arr[0];
     max := arr[0];
 
-    for e: arr {
+    for e in arr {
         if e < min do min = e;
         if e > max do max = e;
     }
@@ -48,7 +48,7 @@ main :: (args: [] cstr) {
     array_print(farr);
 
     array_print :: (arr: [$N] $T) {
-        for &e: arr {
+        for &e in arr {
             print(*e);
             print(" ");
         }

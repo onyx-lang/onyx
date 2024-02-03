@@ -19,7 +19,7 @@ main :: (args: [] cstr) {
         if num != 0 do array.push(&nums, num);
     }
 
-    for i: nums do for j: nums do for k: nums {
+    for i in nums do for j in nums do for k in nums {
         if j + i + k == 2020 {
             printf("Answer: {}\n", i * j * k);
 

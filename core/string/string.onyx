@@ -111,11 +111,11 @@ concat :: (s1: str, s2: str, allocator := context.allocator) -> str {
 #overload
 concat :: (allocator: Allocator, strings: ..str) -> str {
     total_length := 0;
-    for s: strings do total_length += s.count;
+    for s in strings do total_length += s.count;
 
     data := cast([&] u8) raw_alloc(allocator, total_length);
     offset := 0;
-    for s: strings {
+    for s in strings {
         memory.copy(data + offset, s.data, s.count);
         offset += s.count;
     }
@@ -126,7 +126,7 @@ concat :: (allocator: Allocator, strings: ..str) -> str {
 #overload
 concat :: (buffer: [] u8, strings: ..str) -> str {
     total_copied := 0;
-    for s: strings {
+    for s in strings {
         // Should never greater than, but better safe than sorry.
         if total_copied >= buffer.count do break;
 
@@ -140,7 +140,7 @@ concat :: (buffer: [] u8, strings: ..str) -> str {
 
 #overload
 concat :: (into: &[..] u8, strings: ..str) -> str {
-    for s: strings {
+    for s in strings {
         array.ensure_capacity(into, into.count + s.count);
         memory.copy(into.data + into.count, s.data, s.count);
         into.count += s.count;
@@ -151,7 +151,7 @@ concat :: (into: &[..] u8, strings: ..str) -> str {
 #overload
 concat :: (into: &[..] u8, chars: ..u8) -> str {
     array.ensure_capacity(into, into.count + chars.count);
-    for c: chars {
+    for c in chars {
         memory.copy(into.data + into.count, cast(rawptr) &.[c], 1);
         into.count += 1;
     }
@@ -163,7 +163,7 @@ contains :: #match #local {}
 
 #overload
 contains :: (s: str, c: u8) -> bool {
-    for ch: s do if ch == c do return true;
+    for ch in s do if ch == c do return true;
     return false;
 }
 
@@ -367,7 +367,7 @@ strip_trailing_whitespace :: (s: str) -> str {
 }
 
 to_uppercase :: (s: str) -> str {
-    for& ch: s {
+    for& ch in s {
         if *ch >= #char "a" && *ch <= #char "z" {
             *ch -= 32;
         }
@@ -377,7 +377,7 @@ to_uppercase :: (s: str) -> str {
 }
 
 to_lowercase :: (s: str) -> str {
-    for& ch: s {
+    for& ch in s {
         if *ch >= #char "A" && *ch <= #char "Z" {
             *ch += 32;
         }
@@ -444,7 +444,7 @@ advance :: (s: str, chars := 1) -> str {
 }
 
 replace :: (s: str, to_replace: u8, replace_with: u8) {
-    for &c: s {
+    for &c in s {
         if *c == to_replace do *c = replace_with;
     }
 }
@@ -460,7 +460,7 @@ read_until :: (s: &str, upto: u8, skip := 0) -> str {
     out.count = 0;
 
     rem := skip;
-    for ch: *s {
+    for ch in *s {
         if ch == upto {
             if rem <= 0 do break;
             else do rem -= 1;
@@ -524,7 +524,7 @@ read_alphanum :: (s: &str) -> str {
     out.data = s.data;
     out.count = 0;
 
-    for ch: *s {
+    for ch in *s {
         switch ch {
             case #char "a" .. #char "z",
                  #char "A" .. #char "Z",
@@ -552,8 +552,8 @@ read_until_any :: (s: &str, skip: u32, uptos: ..u8) -> str {
     out.count = 0;
 
     rem := skip;
-    for ch: *s {
-        for upto: uptos {
+    for ch in *s {
+        for upto in uptos {
             if ch == upto {
                 if rem <= 0 do break break;
                 else do rem -= 1;
@@ -581,14 +581,14 @@ advance_line :: (s: &str) {
 
 split :: (s: str, delim: u8, allocator := context.allocator) -> []str {
     delim_count := 0;
-    for i: 0 .. s.count do if s[i] == delim do delim_count += 1;
+    for i in 0 .. s.count do if s[i] == delim do delim_count += 1;
 
     strarr := cast([&] str) raw_alloc(allocator, sizeof str * (delim_count + 1));
 
     curr_str := 0;
     begin := 0;
 
-    for i: 0 .. s.count {
+    for i in 0 .. s.count {
         if s[i] == delim {
             strarr[curr_str] = s.data[begin .. i];
             begin = i + 1;

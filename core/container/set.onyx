@@ -192,10 +192,10 @@ as_iter :: (s: &Set) =>
         hashes = builtin.make([] u32, new_size, allocator=allocator);
         array.fill(hashes, -1);
 
-        for &entry: entries do entry.next = -1;
+        for &entry in entries do entry.next = -1;
 
         index := 0;
-        for &entry: entries {
+        for &entry in entries {
             defer index += 1;
 
             hash_index := entry.hash % hashes.count;

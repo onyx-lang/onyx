@@ -19,7 +19,7 @@ main :: (args: [] cstr) {
     turn := 1;
     last_num := 0;
 
-    for n: initial_numbers {
+    for n in initial_numbers {
         map.put(&nums, n, .{ recent = turn });
         turn += 1;
         last_num = n;

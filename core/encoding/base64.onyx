@@ -18,7 +18,7 @@ use core.array
 encode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
     out := array.make(u8, allocator=allocator);
 
-    for i: range.{0, data.count - 2, 3} {
+    for i in range.{0, data.count - 2, 3} {
         c1 := data[i + 0];
         c2 := data[i + 1];
         c3 := data[i + 2];
@@ -57,7 +57,7 @@ decode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
 
     out := array.make(u8, allocator=allocator);
 
-    for i: range.{0, data.count, 4} {
+    for i in range.{0, data.count, 4} {
         c1 := data[i + 0];
         c2 := data[i + 1];
         c3 := data[i + 2];

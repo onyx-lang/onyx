@@ -10,7 +10,7 @@ main :: (args: [] cstr) {
     sstream := io.buffer_stream_make(some_string);
     sreader := io.reader_make(&sstream);
 
-    for i: 0 .. 2 {
+    for i in 0 .. 2 {
         word := io.read_word(&sreader, allocator=context.temp_allocator);
         println(word);
     }

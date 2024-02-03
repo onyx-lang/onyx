@@ -24,7 +24,7 @@ buffer_make :: (buffer_memory: [] u8, initial_str := null_str) -> String_Buffer 
         initial_length := math.min(initial_str.count, buffer.capacity);
         buffer.count += initial_length;
 
-        for i: initial_length { 
+        for i in initial_length { 
             buffer.data[i] = initial_str.data[i];
         }
     }
@@ -50,7 +50,7 @@ buffer_insert :: (use buffer: &String_Buffer, position: i32, ch: u8) -> bool {
 buffer_append :: (use buffer: &String_Buffer, end: str) -> bool {
     if count + end.count > capacity do return false;
 
-    for i: end.count {
+    for i in end.count {
         data[i + count] = end[i];
     }
 

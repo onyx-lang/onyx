@@ -161,12 +161,12 @@ set :: (arr: [] $T, idx: i32, value: T) {
 
 contains :: #match #locked {
     (arr: [] $T, x: T) -> bool {
-        for it: arr do if it == x do return true;
+        for it in arr do if it == x do return true;
         return false;
     }, 
 
     macro (arr: [] $T, $cmp: Code) -> bool {
-        for it: arr do if #unquote cmp(it) do return true;
+        for it in arr do if #unquote cmp(it) do return true;
         return false;
     }
 }
@@ -188,14 +188,14 @@ empty :: (arr: [] $T) => arr.count == 0;
 #doc "Uses `+` to sum all elements in the slice."
 sum :: (arr: [] $T, start: T = 0) -> T {
     sum := start;
-    for it: arr do sum += it;
+    for it in arr do sum += it;
     return sum;
 }
 
 #doc "Uses `*` to multiply all elements in the slice."
 product :: (arr: [] $T, start: T = 1) -> T {
     prod := start;
-    for it: arr do prod *= it;
+    for it in arr do prod *= it;
     return prod;
 }
 
@@ -206,7 +206,7 @@ product :: (arr: [] $T, start: T = 1) -> T {
 """
 average :: (arr: [] $T) -> T {
     sum := cast(T) 0;
-    for it: *arr do sum += it;
+    for it in *arr do sum += it;
 
     return sum / cast(T) arr.count;
 }
@@ -215,7 +215,7 @@ average :: (arr: [] $T) -> T {
     Reverses a slice in-place.
 """
 reverse :: (arr: [] $T) {
-    for i: arr.count / 2 {
+    for i in arr.count / 2 {
         tmp := arr[i];
         arr[i] = arr[arr.count - 1 - i];
         arr[arr.count - 1 - i] = tmp;
@@ -235,7 +235,7 @@ sort :: #match #local {}
 
 #overload
 sort :: (arr: [] $T, cmp: (T, T) -> i32) -> [] T {
-    for i: 1 .. arr.count {
+    for i in 1 .. arr.count {
         x := arr.data[i];
         j := i - 1;
 
@@ -258,7 +258,7 @@ sort :: (arr: [] $T, cmp: (T, T) -> i32) -> [] T {
 
 #overload
 sort :: (arr: [] $T, cmp: (&T, &T) -> i32) -> [] T {
-    for i: 1 .. arr.count {
+    for i in 1 .. arr.count {
         j := i;
 
         while j > 0 {
@@ -304,7 +304,7 @@ quicksort :: #match #locked {
         pivot := arr[hi];
         i := lo - 1;
 
-        for j: lo .. hi+1 {
+        for j in lo .. hi+1 {
             if cmp(arr[j], pivot) <= 0 {
                 i += 1;
                 tmp := arr[i];
@@ -321,7 +321,7 @@ quicksort :: #match #locked {
         pivot := &arr[hi];
         i := lo - 1;
 
-        for j: lo .. hi+1 {
+        for j in lo .. hi+1 {
             if cmp(&arr[j], pivot) <= 0 {
                 i += 1;
                 tmp := arr[i];
@@ -378,14 +378,14 @@ fold :: #match #local {}
 #overload
 fold :: (arr: [] $T, init: $R, f: (T, R) -> R) -> R {
     val := init;
-    for it: arr do val = f(it, val);
+    for it in arr do val = f(it, val);
     return val;
 }
 
 #overload
 fold :: macro (arr: [] $T, init: $R, body: Code) -> R {
     acc := init;
-    for it: arr do acc = #unquote body(it, acc);
+    for it in arr do acc = #unquote body(it, acc);
     return acc;
 }
 
@@ -433,7 +433,7 @@ some :: macro (arr: [] $T, predicate_body: Code) -> bool {
     Sets all elements in a slice to be `value`.
 """
 fill :: (arr: [] $T, value: T) {
-    for i: arr.count {
+    for i in arr.count {
         arr[i] = value;
     }
 }
@@ -442,7 +442,7 @@ fill :: (arr: [] $T, value: T) {
     Sets all elements in the range to be `value`.
 """
 fill_range :: (arr: [] $T, r: range, value: T) {
-    for i: r {
+    for i in r {
         if i >= arr.count || i < 0 do continue;
         arr[i] = value;
     }
@@ -454,7 +454,7 @@ fill_range :: (arr: [] $T, r: range, value: T) {
 to_list :: (arr: [] $T, allocator := context.allocator) -> List(T) {
     new_list := list.make(T, allocator);
 
-    for &it: arr {
+    for &it in arr {
         list.push_end(&new_list, *it);
     }
 
@@ -470,7 +470,7 @@ find :: #match #local {}
 
 #overload
 find :: (arr: [] $T, value: T) -> i32 {
-    for i: arr.count {
+    for i in arr.count {
         if value == arr.data[i] do return i;
     }
 
@@ -479,7 +479,7 @@ find :: (arr: [] $T, value: T) -> i32 {
 
 #overload
 find :: macro (arr: [] $T/type_is_struct, pred: Code) -> i32 {
-    for i: arr.count {
+    for i in arr.count {
         it := &arr[i];
         if #unquote pred(it) do return i;
     }
@@ -489,7 +489,7 @@ find :: macro (arr: [] $T/type_is_struct, pred: Code) -> i32 {
 
 #overload
 find :: macro (arr: [] $T, pred: Code) -> i32 {
-    for i: arr.count {
+    for i in arr.count {
         it := arr[i];
         if #unquote pred(it) do return i;
     }
@@ -503,7 +503,7 @@ find :: macro (arr: [] $T, pred: Code) -> i32 {
     Returns `null` if no matching element is found.
 """
 find_ptr :: (arr: [] $T, value: T) -> &T {
-    for &it: arr {
+    for &it in arr {
         if value == *it do return it;
     }
 
@@ -515,7 +515,7 @@ find_ptr :: (arr: [] $T, value: T) -> &T {
 """
 find_opt :: #match {
     macro (arr: [] $T/type_is_struct, cond: Code) -> ? T {
-        for& it: arr {
+        for& it in arr {
             if #unquote cond(it) {
                 return *it;
             }
@@ -524,7 +524,7 @@ find_opt :: #match {
     },
 
     macro (arr: [] $T, cond: Code) -> ? T {
-        for it: arr {
+        for it in arr {
             if #unquote cond(it) {
                 return it;
             }
@@ -551,7 +551,7 @@ first :: #match #locked {
         // This is to preserve the semantics that "it" is
         // not a pointer (same as contains), when T is not a
         // structure.
-        for &it_ptr: arr {
+        for &it_ptr in arr {
             it := *it_ptr;
             if #unquote predicate_body(it) do return it_ptr;
         }
@@ -641,7 +641,7 @@ group_by :: macro (arr_: [] $T, comp: Code, allocator := context.allocator) -> [
 
     start := 0;
     arr := arr_;
-    for i: 1 .. arr.count {
+    for i in 1 .. arr.count {
         if !#unquote comp(arr[start], arr[i]) {
             out << arr[start .. i];
             start = i;
@@ -661,7 +661,7 @@ group_by :: macro (arr_: [] $T, comp: Code, allocator := context.allocator) -> [
 equal :: (arr1: [] $T/HasEquals, arr2: [] T) -> bool {
     if arr1.count != arr2.count do return false;
 
-    for i: arr1.count {
+    for i in arr1.count {
         if !(arr1[i] == arr2[i]) do return false;
     }
 
@@ -673,7 +673,7 @@ equal :: (arr1: [] $T/HasEquals, arr2: [] T) -> bool {
     idx  := 0;
     elem := arr[0];
 
-    for i: 1 .. arr.count {
+    for i in 1 .. arr.count {
         A := &arr[i];
         B := &elem;
         if #unquote cmp {

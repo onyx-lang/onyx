@@ -17,7 +17,7 @@ Communative_Pair :: struct (T: type_expr) where hash.Hashable(T) {
 }
 
 main :: (args) => {
-    for file: os.with_file("./tests/aoc-2021/input/day12.txt") {
+    for file in os.with_file("./tests/aoc-2021/input/day12.txt") {
         reader := io.reader_make(file);
 
         verticies: Set(str);
@@ -58,7 +58,7 @@ main :: (args) => {
         }
 
         edge_map: Map(str, [] str);
-        for v: iter.as_iter(&verticies) {
+        for v in iter.as_iter(&verticies) {
             edge_map[*v] = children_of(&edges, *v) |> iter.to_array();
         }
 

@@ -81,7 +81,7 @@ path_clean :: (path: str, allocator := Path_Allocator) -> str {
 path_join :: (path: ..str) -> str {
     out := make(dyn_str, allocator=context.temp_allocator);
     
-    for p: path {
+    for p in path {
         conv.format(&out, "{}{}", p, PATH_SEP);
     }
 
@@ -106,7 +106,7 @@ path_directory :: (path: str) -> str {
         path_extension("foo/bar.txt") -> "txt"
 """
 path_extension :: (path: str) -> str {
-    for i: range.{ path.length - 1, 0, -1 } {
+    for i in range.{ path.length - 1, 0, -1 } {
         if path[i] == PATH_SEP do break;
         if path[i] == '.' do return path[i .. path.length];
     }

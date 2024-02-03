@@ -55,7 +55,7 @@ tile_orientation_table := ([8] TO).[
 reverse_binary :: (n_: u32, digits := TILE_DATA_WIDTH) -> u32 {
 	res := 0;	
 	n := n_;
-	for _: 0 .. digits {
+	for _ in 0 .. digits {
 		res <<= 1;
 		res |= (n & 1);
 		n >>= 1;
@@ -68,9 +68,9 @@ build_edges :: (tile: [] bool, a := context.allocator) -> [] u32 {
 	edges : [..] u32;
     array.init(&edges, 8, allocator=a);
 
-	for y: u32.[0, 9] {
+	for y in u32.[0, 9] {
 		edge := 0;
-		for x: 0 .. 10 {
+		for x in 0 .. 10 {
 			edge <<= 1;
 			if tile[x + y * TILE_DATA_WIDTH] do edge |= 1;
 		}
@@ -78,9 +78,9 @@ build_edges :: (tile: [] bool, a := context.allocator) -> [] u32 {
         array.push(&edges, edge);
 	}	
 
-	for x: u32.[0, 9] {
+	for x in u32.[0, 9] {
 		edge := 0;
-		for y: 0 .. 10 {
+		for y in 0 .. 10 {
 			edge <<= 1;
 			if tile[x + y * TILE_DATA_WIDTH] do edge |= 1;
 		}
@@ -88,7 +88,7 @@ build_edges :: (tile: [] bool, a := context.allocator) -> [] u32 {
         array.push(&edges, edge);
 	}	
 
-	for i: 0 .. 4 do array.push(&edges, reverse_binary(edges[i]));
+	for i in 0 .. 4 do array.push(&edges, reverse_binary(edges[i]));
 
 	return edges.data[0 .. 8];
 }
@@ -109,7 +109,7 @@ side_relations := ([4] TO).[
 has_matching_edges :: (t1: &Tile, t2: &Tile) -> bool {
     match := false;
 
-	for e_idx: 0 .. t1.edges.count / 2 do for e2_idx: 0 .. t2.edges.count {
+	for e_idx in 0 .. t1.edges.count / 2 do for e2_idx in 0 .. t2.edges.count {
         if t1.edges[e_idx] == t2.edges[e2_idx] {
             match = true;
 
@@ -204,12 +204,12 @@ sea_monster := u8.[
 scan_for_monsters :: (forest: [&] u8, ori: TO, width: u32, height: u32) -> bool {
     found_monsters := false;
 
-    for y: 0 .. height - sea_monster_height {
-        for x: 0 .. width - sea_monster_width {
+    for y in 0 .. height - sea_monster_height {
+        for x in 0 .. width - sea_monster_width {
             is_monster := true;
 
-            for my: 0 .. sea_monster_height {
-                for mx: 0 .. sea_monster_width {
+            for my in 0 .. sea_monster_height {
+                for mx in 0 .. sea_monster_width {
                     if sea_monster[mx + my * sea_monster_width] != #char "#" do continue;
                     if *index_square_with_orientation(forest, ori, width, x + mx, y + my) != #char "." do continue;
 
@@ -219,8 +219,8 @@ scan_for_monsters :: (forest: [&] u8, ori: TO, width: u32, height: u32) -> bool 
             }
 
             if is_monster {
-                for my: 0 .. sea_monster_height {
-                    for mx: 0 .. sea_monster_width {
+                for my in 0 .. sea_monster_height {
+                    for mx in 0 .. sea_monster_width {
                         if sea_monster[mx + my * sea_monster_width] != #char "#" do continue;
                         if *index_square_with_orientation(forest, ori, width, x + mx, y + my) != #char "#" do continue;
 
@@ -265,10 +265,10 @@ main :: (args: [] cstr) {
 
 		td := cast([&] bool) raw_alloc(tile_allocator, sizeof TileData);
 
-		for y: 0 .. 10 {
+		for y in 0 .. 10 {
 			line, file~ := string.bisect(file, #char "\n");
 
-			for x: 0 .. 10 {
+			for x in 0 .. 10 {
 				td[x + y * TILE_DATA_WIDTH] = (line[x] == #char "#");
 			}
 		}
@@ -286,15 +286,15 @@ main :: (args: [] cstr) {
 		string.advance_line(&file);
 	}
 
-    for &t: tiles do map.put(&tile_map, t.id, t);
+    for &t in tiles do map.put(&tile_map, t.id, t);
 
 	prod: u64 = 1;
     top_left_id := 0;
 
-	for i: 0 .. tiles.count - 1 {
+	for i in 0 .. tiles.count - 1 {
 		matching_count := 0;
 
-		for j: 0 .. tiles.count {
+		for j in 0 .. tiles.count {
 			if i == j do continue;
 			if has_matching_edges(&tiles[i], &tiles[j]) {
 				matching_count += 1;
@@ -345,12 +345,12 @@ main :: (args: [] cstr) {
     }
 
     forest : [12 * 8 * 12 * 8] u8;
-    for y: 0 .. 12 {
-        for x: 0 .. 12 {
+    for y in 0 .. 12 {
+        for x in 0 .. 12 {
             tile := map.get(&tile_map, grid[y * 12 + x])->unwrap();
 
-            for fy: 0 .. 8 {
-                for fx: 0 .. 8 {
+            for fy in 0 .. 8 {
+                for fx in 0 .. 8 {
                     res := *index_square_with_orientation(cast([&] bool) tile.data.data, tile.orientation, 10, fx + 1, fy + 1);
                     loc := (y * 12 * 8 * 8) + (fy * 12 * 8) + (x * 8) + fx;
                     if res do forest[loc] = #char "#";
@@ -360,12 +360,12 @@ main :: (args: [] cstr) {
         }
     }
 
-    for ori: .[ TO.N, TO.R90, TO.R180, TO.R270, TO.F, TO.FR90, TO.FR180, TO.FR270 ] {
+    for ori in .[ TO.N, TO.R90, TO.R180, TO.R270, TO.F, TO.FR90, TO.FR180, TO.FR270 ] {
         if scan_for_monsters(cast([&] u8) forest, ori, 12 * 8, 12 * 8) do break;
     }
     
     safe_count := 0;
-    for c: forest do if c == #char "#" do safe_count += 1;
+    for c in forest do if c == #char "#" do safe_count += 1;
 
     printf("Safe count: {}\n", safe_count);
 }

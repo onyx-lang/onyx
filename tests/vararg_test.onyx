@@ -6,13 +6,13 @@ use core {*};
 
 old_va_test :: (prefix: str, va: ..i32) {
     println(prefix);
-    for v: va do println(v);
+    for v in va do println(v);
 }
 
 new_va_test :: (prefix: str, va: ..any) {
     println(prefix);
 
-    for i: 0 .. va.count {
+    for i in 0 .. va.count {
         // The right way to do it is this:
         // x := * misc.any_as(va[i], i32);
 

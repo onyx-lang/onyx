@@ -176,7 +176,7 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
     }
 
     if min_length > 0 && len < min_length {
-        for i: min_length - len {
+        for i in min_length - len {
             c[0] = #char "0";
             len += 1;
             c -= 1;
@@ -239,7 +239,7 @@ u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
     }
 
     if min_length > 0 && len < min_length {
-        for i: min_length - len {
+        for i in min_length - len {
             c[0] = #char "0";
             len += 1;
             c -= 1;
@@ -299,7 +299,7 @@ f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
     dec_part  = math.abs(dec_part);
 
     s1 := i64_to_str(~~int_part, 10, buf);
-    for i: 0 .. s1.count do buf.data[i + len] = s1.data[i];
+    for i in 0 .. s1.count do buf.data[i + len] = s1.data[i];
     len += s1.count;
 
     if digits_after_decimal > 0 {
@@ -308,7 +308,7 @@ f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
 
         digits := "0123456789";
 
-        for i: digits_after_decimal {
+        for i in digits_after_decimal {
             dec_part *= 10;
             v := math.trunc(dec_part);
             dec_part -= v;

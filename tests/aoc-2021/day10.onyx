@@ -3,7 +3,7 @@
 use core {*}
 
 main :: (args) => {
-    for file: os.with_file("./tests/aoc-2021/input/day10.txt") {
+    for file in os.with_file("./tests/aoc-2021/input/day10.txt") {
         reader := io.reader_make(file);
 
         bracket_map: Map(u8, u8);
@@ -26,7 +26,7 @@ main :: (args) => {
 
             char_stack: [..] u8;
             defer array.free(&char_stack);
-            for ch: line {
+            for ch in line {
                 switch ch {
                     case #char "(", #char "[", #char "<", #char "{" {
                         char_stack << bracket_map[ch]->unwrap();

@@ -30,7 +30,7 @@ Hasher :: struct {
     }
 
     update :: (self: &#Self, data: [] u8) {
-        for i: 0 .. data.count {
+        for i in 0 .. data.count {
             self.data[self.data_length] = data[i];
             self.data_length += 1;
 
@@ -75,7 +75,7 @@ Hasher :: struct {
         self.data[56] = cast(u8, self.bit_length >> 56);
         do_cycle(self, self.data);
 
-        for i: 0 .. 4 {
+        for i in 0 .. 4 {
             out[i + 0]  = ~~((self.state[0] >> (24 - i * 8)) & 0xff);
             out[i + 4]  = ~~((self.state[1] >> (24 - i * 8)) & 0xff);
             out[i + 8]  = ~~((self.state[2] >> (24 - i * 8)) & 0xff);
@@ -104,7 +104,7 @@ hash :: (x: str) -> [BLOCK_SIZE] u8 {
 do_cycle :: (self: &Hasher, data: [] u8) {
     m: [64] u32;
 
-    for i: 0 .. 16 {
+    for i in 0 .. 16 {
         j := 4 * i;
         m[i] = (cast(u32, data[j]) << 24)
              | (cast(u32, data[j + 1]) << 16)
@@ -112,7 +112,7 @@ do_cycle :: (self: &Hasher, data: [] u8) {
              | (cast(u32, data[j + 3]));
     }
 
-    for i: 16 .. 64 {
+    for i in 16 .. 64 {
         m[i] = SIG1(m[i - 2]) + m[i - 7] + SIG0(m[i - 15]) + m[i - 16];
     }
 
@@ -125,7 +125,7 @@ do_cycle :: (self: &Hasher, data: [] u8) {
     g := self.state[6];
     h := self.state[7];
 
-    for i: 0 .. 64 {
+    for i in 0 .. 64 {
         t1 := h + EP1(e) + CH(e, f, g) + k[i] + m[i];
         t2 := EP0(a) + MAJ(a, b, c);
         h = g;

@@ -68,7 +68,7 @@ encode :: #match {
     (w: ^io.Writer, v: [] $T) -> Encoding_Error {
         io.write_byte(w, #char "[");
 
-        for i: v.count {
+        for i in v.count {
             if i > 0 do io.write_byte(w, #char ",");
 
             err := encode(w, v[i]);
@@ -82,7 +82,7 @@ encode :: #match {
     (w: ^io.Writer, v: [..] $T) -> Encoding_Error {
         io.write_byte(w, #char "[");
 
-        for i: v.count {
+        for i in v.count {
             if i > 0 do io.write_byte(w, #char ",");
 
             err := encode(w, v[i]);
@@ -96,7 +96,7 @@ encode :: #match {
     (w: ^io.Writer, v: Map(str, $T)) -> Encoding_Error {
         io.write_byte(w, #char "{");
 
-        for i: v.entries.count {
+        for i in v.entries.count {
             if i > 0 do io.write_byte(w, #char ",");
             entry := ^v.entries[i];
 
@@ -124,7 +124,7 @@ encode :: #match {
                 io.write_byte(w, #char "{");
                 obj := cast(^_Value_Object) cast(^_Value) v;
 
-                for i: obj.object_.count {
+                for i in obj.object_.count {
                     if i > 0 do io.write_byte(w, #char ",");
 
                     io.write_escaped_str(w, obj.object_[i].key);
@@ -172,7 +172,7 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
             a := cast(^Type_Info_Array) info;
             arr := data.data;
 
-            for i: a.count {
+            for i in a.count {
                 if i != 0 do io.write(w, ",");
 
                 encode(w, misc.any_subscript(data, i));
@@ -193,7 +193,7 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
             arr := cast(^core.array.Untyped_Array) data.data;
             count := arr.count;
 
-            for i: count {
+            for i in count {
                 if i != 0 do io.write(w, ",");
 
                 encode(w, misc.any_subscript(data, i));
@@ -217,7 +217,7 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
 
             io.write(w, "{");
 
-            for ^member: s.members {
+            for ^member in s.members {
                 key := member.name;
                 if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
                     key = (cast(^Custom_Key) tag.data).key;
@@ -285,13 +285,13 @@ Ignore :: #distinct void
 from_any :: #match #local {}
 
 #overload
-from_any :: macro (in: ^$T, allocator := context.allocator) -> Value {
+from_any :: macro (v: ^$T, allocator := context.allocator) -> Value {
     from_any :: from_any
-    return from_any(T, in, allocator);
+    return from_any(T, v, allocator);
 }
 
 #overload
-from_any :: (type: type_expr, in: rawptr, allocator := context.allocator) -> Value {
+from_any :: (type: type_expr, v: rawptr, allocator := context.allocator) -> Value {
     use runtime.info;
 
     t_info := get_type_info(type);
@@ -299,11 +299,11 @@ from_any :: (type: type_expr, in: rawptr, allocator := context.allocator) -> Val
         case .Basic do switch type {
             // These functions handle the cases where the types do
             // not match, so no additional checks are needed here.
-            case bool     { v := new(_Value_Bool, allocator);    v.bool_  =    *cast(^bool) in; return Value.{v}; }
-            case i32, u32 { v := new(_Value_Integer, allocator); v.int_   = ~~ *cast(^i32)  in; return Value.{v}; }
-            case i64, u64 { v := new(_Value_Integer, allocator); v.int_   =    *cast(^i64)  in; return Value.{v}; }
-            case f32      { v := new(_Value_Float, allocator);   v.float_ = ~~ *cast(^f32)  in; return Value.{v}; }
-            case f64      { v := new(_Value_Float, allocator);   v.float_ =    *cast(^f64)  in; return Value.{v}; }
+            case bool     { v := new(_Value_Bool, allocator);    v.bool_  =    *cast(^bool) v; return Value.{v}; }
+            case i32, u32 { v := new(_Value_Integer, allocator); v.int_   = ~~ *cast(^i32)  v; return Value.{v}; }
+            case i64, u64 { v := new(_Value_Integer, allocator); v.int_   =    *cast(^i64)  v; return Value.{v}; }
+            case f32      { v := new(_Value_Float, allocator);   v.float_ = ~~ *cast(^f32)  v; return Value.{v}; }
+            case f64      { v := new(_Value_Float, allocator);   v.float_ =    *cast(^f64)  v; return Value.{v}; }
         }
 
         case .Array {
@@ -312,8 +312,8 @@ from_any :: (type: type_expr, in: rawptr, allocator := context.allocator) -> Val
             v := new(_Value_Array, allocator);
             array.init(^v.array_, a_info.count, allocator);
 
-            for i: a_info.count {
-                v.array_ << from_any(a_info.of, memory.ptr_add(in, size_of(a_info.of) * i));
+            for i in a_info.count {
+                v.array_ << from_any(a_info.of, memory.ptr_add(v, size_of(a_info.of) * i));
             }
 
             return Value.{v};
@@ -323,17 +323,17 @@ from_any :: (type: type_expr, in: rawptr, allocator := context.allocator) -> Val
             // Strings are handled differently
             if type == str {
                 v := new(_Value_String, allocator);
-                v.str_ = string.alloc_copy(*cast(^str) in, allocator);
+                v.str_ = string.alloc_copy(*cast(^str) v, allocator);
                 return Value.{v};
             }
 
             s_info := cast(^Type_Info_Slice) t_info;
-            s := cast(^core.array.Untyped_Array) in;
+            s := cast(^core.array.Untyped_Array) v;
 
             v := new(_Value_Array, allocator);
             array.init(^v.array_, s.count, allocator);
 
-            for i: s.count {
+            for i in s.count {
                 v.array_ << from_any(s_info.of, memory.ptr_add(s.data, size_of(s_info.of) * i));
             }
 
@@ -346,7 +346,7 @@ from_any :: (type: type_expr, in: rawptr, allocator := context.allocator) -> Val
             v := new(_Value_Object, allocator);
             array.init(^v.object_, s_info.members.count, allocator);
 
-            for^ member: s_info.members {
+            for^ member in s_info.members {
                 key := member.name;
                 if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
                     key = (cast(^Custom_Key) tag.data).key;
@@ -358,7 +358,7 @@ from_any :: (type: type_expr, in: rawptr, allocator := context.allocator) -> Val
                     }
                 }
 
-                json.set(Value.{v}, key, from_any(member.type, memory.ptr_add(in, member.offset)), dont_copy_key=true);
+                json.set(Value.{v}, key, from_any(member.type, memory.ptr_add(v, member.offset)), dont_copy_key=true);
             }
 
             return Value.{v};
@@ -366,11 +366,11 @@ from_any :: (type: type_expr, in: rawptr, allocator := context.allocator) -> Val
 
         case .Distinct {
             if type == Value {
-                return *cast(^Value) in;
+                return *cast(^Value) v;
             }
 
             d_info := cast(^Type_Info_Distinct) t_info;
-            return from_any(d_info.base_type, in);
+            return from_any(d_info.base_type, v);
         }
 
         case .Union {
@@ -379,11 +379,11 @@ from_any :: (type: type_expr, in: rawptr, allocator := context.allocator) -> Val
             }
 
             u := t_info->as_union();
-            tag := *cast(&Optional(void).tag_enum) in;
+            tag := *cast(&Optional(void).tag_enum) v;
             if tag != .Some {
                 return null_value();
             } else {
-                return from_any(u.variants[1].type, memory.ptr_add(in, u.alignment), allocator);
+                return from_any(u.variants[1].type, memory.ptr_add(v, u.alignment), allocator);
             }
         }
     }
@@ -428,7 +428,7 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
         case .Array {
             a_info := cast(^Type_Info_Array) t_info;
 
-            for i: a_info.count {
+            for i in a_info.count {
                 to_any(value[i], a_info.of, memory.ptr_add(out, size_of(a_info.of) * i));
             }
         }
@@ -457,7 +457,7 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
                 s.count = to_copy.count;
             }
 
-            for i: s.count {
+            for i in s.count {
                 to_any(value[i], s_info.of, memory.ptr_add(s.data, size_of(s_info.of) * i));
             }
         }
@@ -465,7 +465,7 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
         case .Struct {
             s_info := cast(^Type_Info_Struct) t_info;
 
-            for^ member: s_info.members {
+            for^ member in s_info.members {
                 key := member.name;
                 if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
                     key = (cast(^Custom_Key) tag.data).key;

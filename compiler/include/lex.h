@@ -41,6 +41,8 @@ typedef enum TokenType {
     Token_Type_Keyword_Macro,
     Token_Type_Keyword_Interface,
     Token_Type_Keyword_Where,
+    Token_Type_Keyword_As,
+    Token_Type_Keyword_In,
     Token_Type_Keyword_End,
 
     Token_Type_Right_Arrow,

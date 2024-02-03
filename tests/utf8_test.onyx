@@ -10,7 +10,7 @@ main :: () {
     output := make(dyn_str);
     defer delete(&output);
 
-    for i: 0x1F0A0 .. 0x1F0E0 {
+    for i in 0x1F0A0 .. 0x1F0E0 {
         utf8.append_rune(&output, i);
     }
 

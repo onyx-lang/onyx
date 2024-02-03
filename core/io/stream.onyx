@@ -164,7 +164,7 @@ stream_poll :: (use s: &Stream, ev: PollEvent, timeout: i32) -> (Error, bool) {
 // BufferStream
 //
 // In older times of the standard library, there were two string
-// streams that existed for different purposes: StringStream and
+// streams that existed for different purposes in StringStream and
 // DynamicStringStream. I have since merged them into one stream
 // called, BufferStream. Besides the names being confusing and
 // long, I thought it was needlessly complicated to have two

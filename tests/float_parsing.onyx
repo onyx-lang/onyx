@@ -45,7 +45,7 @@ main :: (args: [] cstr) {
         // "-1e-500000",
     ];
 
-    for s: strings {
+    for s in strings {
         value := conv.str_to_f64(s);
         println(value);
     }

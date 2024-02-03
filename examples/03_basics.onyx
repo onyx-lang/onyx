@@ -56,7 +56,7 @@ main :: () {
     // of creating and using a fixed size array. This uses a for-loop which we have not
     // looked at yet, but the example should be self-explanatory.
     fixed_arr : [10] i32;
-    for i: 0 .. 10 {
+    for i in 0 .. 10 {
         fixed_arr[i] = i * i;
     }
     core.printf("fixed_arr[3] is {}\n", fixed_arr[3]);
@@ -95,7 +95,7 @@ main :: () {
     core.array.init(^dyn_arr);
     defer core.array.free(^dyn_arr);
 
-    for i: 0 .. 10 {
+    for i in 0 .. 10 {
         core.array.push(^dyn_arr, i * i * i);
     }
 

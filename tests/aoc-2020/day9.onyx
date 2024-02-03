@@ -7,7 +7,7 @@ find_contiguous_subarray_with_sum :: (nums: [..] u64, sum: u64) -> (i32, i32) {
     end   := 0;
     con_sum: u64 = nums[0];
 
-    for i: 1 .. nums.count {
+    for i in 1 .. nums.count {
         end += 1;
         con_sum += nums[end];
 
@@ -40,12 +40,12 @@ main :: (args: [] cstr) {
     preamble_length :: 25;
 
     invalid: u64;
-    for i: 0 .. nums.count {
+    for i in 0 .. nums.count {
         if i < preamble_length do continue;
 
         success := false;
-        for j: 0 .. preamble_length - 1 {
-            for k: j + 1 .. preamble_length {
+        for j in 0 .. preamble_length - 1 {
+            for k in j + 1 .. preamble_length {
                 if nums[i - j - 1] + nums[i - k - 1] == nums[i] {
                     success = true;
                     break break;

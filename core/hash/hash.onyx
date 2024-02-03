@@ -37,7 +37,7 @@ hash :: #match -> u32 {
     (key: i64)    -> u32 { return cast(u32) (cast(u64) 0xcbf29ce7 ^ cast(u64) key); },
     (key: str)    -> u32 {
         hash: u32 = 5381;
-        for ch: key do hash += (hash << 5) + ~~ch;
+        for ch in key do hash += (hash << 5) + ~~ch;
         return hash;
     },
     (key: type_expr) -> u32 { return hash(cast(u32) key); },

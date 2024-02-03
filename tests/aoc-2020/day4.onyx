@@ -14,7 +14,7 @@ process_passport :: (contents: &str) -> u32 {
         fields := string.split(line, #char " ");
         defer cfree(fields.data);
 
-        for field: fields {
+        for field in fields {
             data := string.split(field, #char ":");
             defer cfree(data.data);
 

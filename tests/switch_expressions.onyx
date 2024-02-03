@@ -42,9 +42,9 @@ quick_union_map :: () {
     }
 
     quick_map :: (v: $T) => switch v {
-        case val: .z => val;
-        case val: .y => conv.format("{}", val);
-        case val: .x => conv.format("{}", val);
+        case .z as val => val;
+        case .y as val => conv.format("{}", val);
+        case .x as val => conv.format("{}", val);
     }
 }
 

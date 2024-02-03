@@ -341,11 +341,11 @@ choose :: (n: $T, k: T) -> T {
     assert(T == i32 || T == i64 || T == u32 || T == u64, "bad type for choose function");
 
     ret := 1;
-    for i: (n - k + 1) .. (n + 1) {
+    for i in (n - k + 1) .. (n + 1) {
         ret *= i;
     }
 
-    for i: 1 .. (k + 1) {
+    for i in 1 .. (k + 1) {
         ret /= i;
     }
 

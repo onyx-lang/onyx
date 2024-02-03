@@ -3,7 +3,7 @@
 use core {*}
 
 main :: (args) => {
-    for file: os.with_file("./tests/aoc-2021/input/day07.txt") {
+    for file in os.with_file("./tests/aoc-2021/input/day07.txt") {
         reader := io.reader_make(file);
         nums := io.read_all(&reader)
             |> string.split(#char ",")
@@ -16,7 +16,7 @@ main :: (args) => {
 
         min_cost := 0x7fffffff;
         best_middle := 0;
-        for middle: min .. max {
+        for middle in min .. max {
             total_cost := 0;
             for nums {
                 dist := math.abs(it - middle);

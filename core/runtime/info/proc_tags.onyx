@@ -34,7 +34,7 @@ get_tags_for_procedure :: (func: $T) -> [] any {
 get_procedures_with_tag :: ($tag_type: type_expr) -> [] GPWT_Result(tag_type) {
     results := make([..] GPWT_Result(tag_type));
 
-    for proc: tagged_procedures {
+    for proc in tagged_procedures {
         if tag := array.first(proc.tags, [v](v.type == tag_type)); tag != null {
             array.push(&results, .{
                 func = proc.func,

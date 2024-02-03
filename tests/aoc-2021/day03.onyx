@@ -37,7 +37,7 @@ main :: (args) => {
         num1 := 0;
         for BITS {
             one_count := 0;
-            for num: nums {
+            for num in nums {
                 if num & (1 << it) != 0 do one_count += 1;
             }
 

@@ -25,7 +25,7 @@ dlp_bsgs :: (n: u32, a: u32, b: u32) -> u32 {
     defer map.free(&t);
 
     tmp: u64 = 1;
-    for i: 0 .. m {
+    for i in 0 .. m {
         map.put(&t, ~~tmp, i);
         tmp = (tmp * ~~a) % ~~n;
     }
@@ -33,7 +33,7 @@ dlp_bsgs :: (n: u32, a: u32, b: u32) -> u32 {
     f := power_mod(a, n - 1 - m, n);
 
     tmp = ~~b;
-    for i: 0 .. m {
+    for i in 0 .. m {
         if map.has(&t, ~~tmp) {
             v := map.get(&t, ~~tmp) ?? 0;
             return i * m + v; 
@@ -47,7 +47,7 @@ dlp_bsgs :: (n: u32, a: u32, b: u32) -> u32 {
 
 transform_subject :: (subject: u32, loop_size: u32) -> u32 {
     value: u64 = 1;
-    for i: 0 .. loop_size do value = (value * ~~subject) % 20201227;
+    for i in 0 .. loop_size do value = (value * ~~subject) % 20201227;
     return cast(u32) value;
 }
 

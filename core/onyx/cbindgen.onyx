@@ -92,7 +92,7 @@ Binding_Config :: struct {
 
 generate_c_binding :: (use binding_config: Binding_Config) -> bool {
     wrote := false;
-    for file: os.with_file(output_file, .Write) {
+    for file in os.with_file(output_file, .Write) {
         writer := io.writer_make(file);
         defer io.writer_free(&writer);
 
@@ -101,7 +101,7 @@ generate_c_binding :: (use binding_config: Binding_Config) -> bool {
         write_file_introduction(&writer, preamble, fb.module_name);
 
         for fb.funcs {
-            for impl: custom_implementations {
+            for impl in custom_implementations {
                 if impl.name == it.name {
                     io.write(&writer, impl.impl);
                     io.write(&writer, "\n");
@@ -204,7 +204,7 @@ compile_c_file :: (
         io.write_format(writer, "// THIS FILE WAS AUTOMATICALLY GENERATED.\n");
         io.write_format(writer, "//\n");
 
-        for text: preamble {
+        for text in preamble {
             io.write_format(writer, "{}\n", text);
         }
 
@@ -247,7 +247,7 @@ compile_c_file :: (
         switch slice.find_opt(ff.tags, [it](it.type == func_body))
                    ->transform(x => misc.any_as(x, func_body).body)
         {
-            case body: .Some {
+            case .Some as body {
                 io.write(writer, body);
                 io.write(writer, "    return NULL;");
             }
@@ -305,7 +305,7 @@ compile_c_file :: (
                 defer delete(&call_signature);
 
                 func_info := it_info->as_function();
-                for p: func_info.parameter_types {
+                for p in func_info.parameter_types {
                     map_to_dyncall(p, &call_signature);
                 }
 
@@ -355,7 +355,7 @@ compile_c_file :: (
 
             } else {
                 matched := false;
-                for& m: cast_map {
+                for& m in cast_map {
                     if m.type == it {
                         io.write_format(&callw, "({}) P({}, {})", m.name, param_num, type_to_wasm_type(it));
                         matched = true;

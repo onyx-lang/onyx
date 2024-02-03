@@ -104,18 +104,18 @@ SocketAddress :: union {
 #inject
 SocketAddress.addr_as_str :: (this: &SocketAddress, allocator := context.allocator) -> str {
     return switch *this {
-        case path: .Unix => string.as_str(cast(cstr) path);
-        case inet: .Inet => do {
+        case .Unix as path => string.as_str(cast(cstr) path);
+        case .Inet as inet => do {
             str_addr := ipv4_to_str(inet.addr);
             out := make(dyn_str, allocator);
             return conv.format(&out, "{}:{}", str_addr, inet.port);
         }
-        case inet6: .Inet6 => do {
+        case .Inet6 as inet6 => do {
             str_addr := ipv6_to_str(inet6.addr);
             out := make(dyn_str, allocator);
             return conv.format(&out, "{}:{}", str_addr, inet6.port);
         }
-        case host: .HostPort => do {
+        case .HostPort as host => do {
             out := make(dyn_str, allocator);
             return conv.format(&out, "{}:{}", host.host, host.port);
         }
@@ -246,15 +246,15 @@ socket_poll_all :: (sockets: [] &Socket, stat_buff: [] Socket_Poll_Status, timeo
     if sockets.count > stat_buff.count do return;
 
     handles := alloc.array_from_stack(runtime.platform.PollDescription, sockets.count);
-    for i: sockets.count {
+    for i in sockets.count {
         handles[i] = .{
             ~~cast(i32) sockets[i].handle, .Read
         };
     }
 
     runtime.platform.__poll(handles, timeout);
-    for i: sockets.count {
-        stat_buff[i] = switch handles[i].out {
+    for i in sockets.count {
+        stat_buff[i] = switch handles[i].out_events {
             case .None => .No_Change
             case .Read => .Readable
             case .Closed => .Closed
@@ -269,7 +269,7 @@ socket_poll :: (socket: &Socket, timeout := -1) -> Socket_Poll_Status {
 
     runtime.platform.__poll(fds, timeout);
 
-    return switch fds[0].out {
+    return switch fds[0].out_events {
         case .None => .No_Change
         case .Read => .Readable
         case .Closed => .Closed

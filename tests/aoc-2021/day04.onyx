@@ -41,8 +41,8 @@ main :: (args) => {
         winning_board: &Board = null;
         worst_board  : &Board = null;
 
-        for called: numbers {
-            for & board: boards {
+        for called in numbers {
+            for & board in boards {
                 if board.has_won do continue;
 
                 // Whatever the last board we touch is must be the worst one.

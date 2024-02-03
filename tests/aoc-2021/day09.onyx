@@ -46,7 +46,7 @@ find_span :: macro (low: Pos) -> u32 {
             }
         }
 
-        for p: potential {
+        for p in potential {
             if !array.contains(included, p) && !array.contains(queued, p) {
                 queued << p;
             }
@@ -58,14 +58,14 @@ find_span :: macro (low: Pos) -> u32 {
 
 #match io.write (w: &io.Writer, x: &Map($K, $V)) {
     io.write(w, "{\n");
-    for e: x.entries {
+    for e in x.entries {
         io.write(w, "    {} => {}\n", e.key, e.value);
     }
     io.write(w, "}");
 }
 
 main :: (args) => {
-    for file: os.with_file("./tests/aoc-2021/input/day09.txt") {
+    for file in os.with_file("./tests/aoc-2021/input/day09.txt") {
         reader := io.reader_make(file);
 
         heightmap: Map(Pos, Cell);
@@ -83,12 +83,12 @@ main :: (args) => {
             height += 1;
         }
 
-        for y: height - 1 do for x: width {
+        for y in height - 1 do for x in width {
             map.update(&heightmap, .{x,y}) {
                 it.dy = it.height - heightmap[Pos.{x,y+1}]->unwrap().height;
             }
         }
-        for x: width - 1 do for y: height {
+        for x in width - 1 do for y in height {
             map.update(&heightmap, .{x,y}) {
                 it.dx = it.height - heightmap[Pos.{x+1,y}]->unwrap().height;
             }
@@ -96,7 +96,7 @@ main :: (args) => {
 
         lowest: [..] Pos;
         risk_sum := 0;
-        for y: height do for x: width {
+        for y in height do for x in width {
             h := &heightmap[Pos.{x,y}];
             if x < width  - 1 && h.dx >= 0 do continue;
             if y < height - 1 && h.dy >= 0 do continue;
@@ -116,7 +116,7 @@ main :: (args) => {
         printf("Part 1: {}\n", risk_sum);
 
         lowest_count: Map(Pos, i32);
-        for low: lowest do lowest_count[low] = find_span(low);
+        for low in lowest do lowest_count[low] = find_span(low);
 
         array.quicksort(lowest_count.entries, (a, b) => b.value - a.value);
 

@@ -25,7 +25,7 @@ main :: (args: [] cstr) {
 
         // Part 1
         // count := 0;
-        // for c: pw do if c == ch do count += 1;
+        // for c in pw do if c == ch do count += 1;
         // if count >= lo && count <= hi do valid += 1;
 
         // Part 2

@@ -109,7 +109,7 @@ free_node :: (al: Allocator, n: &Node) {
     string.free(n.node, al);
     n.type_annotation->with([t] { string.free(t, al); });
 
-    for& v: n.values do free_value(al, v);
+    for& v in n.values do free_value(al, v);
     delete(&n.values); // This should use the allocator inside of the array
 
     for n.props->as_iter() {
@@ -126,12 +126,12 @@ free_value :: (al: Allocator, v: &Value) {
     v.type_annotation->with([t] { string.free(t, al); });
 
     switch v.data {
-        case s: .String {
+        case .String as s {
             string.free(s, al);
         }
 
-        case num: .Number do switch num {
-            case s: .String {
+        case .Number as num do switch num {
+            case .String as s {
                 string.free(s, al);
             } 
 

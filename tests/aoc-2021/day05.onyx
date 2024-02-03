@@ -43,7 +43,7 @@ Point :: struct {x, y: u32;}
 #operator == (p1, p2: Point) => p1.x == p2.x && p1.y == p2.y;
 
 main :: (args) => {
-    for file: os.with_file("./tests/aoc-2021/input/day05.txt") {
+    for file in os.with_file("./tests/aoc-2021/input/day05.txt") {
         reader := io.reader_make(file);
 
         lines: [..] Line;
@@ -64,8 +64,8 @@ main :: (args) => {
 
         point_count: Map(Point, u32);
 
-        for &line: lines {
-            for p: line_points(*line) {
+        for &line in lines {
+            for p in line_points(*line) {
                 point_count[p] = (point_count[p] ?? 0) + 1;
             }
         }

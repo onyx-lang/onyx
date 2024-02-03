@@ -263,6 +263,8 @@ CheckStatus check_for(AstFor* fornode) {
     builtin_range_type_type = type_build_from_ast(context.ast_alloc, builtin_range_type);
     if (builtin_range_type_type == NULL) YIELD(fornode->token->pos, "Waiting for 'range' structure to be built.");
 
+    Type* given_type = NULL;
+
     fornode->loop_type = For_Loop_Invalid;
     if (types_are_compatible(iter_type, &basic_types[Basic_Kind_I32])) {
         if (fornode->by_pointer) {
@@ -274,7 +276,7 @@ CheckStatus check_for(AstFor* fornode) {
         CHECK(range_literal, &rl);
         fornode->iter = (AstTyped *) rl;
 
-        fornode->var->type = builtin_range_type_type->Struct.memarr[0]->type;
+        given_type = builtin_range_type_type->Struct.memarr[0]->type;
         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
         fornode->loop_type = For_Loop_Range;
     }
@@ -285,20 +287,20 @@ CheckStatus check_for(AstFor* fornode) {
 
         // NOTE: Blindly copy the first range member's type which will
         // be the low value.                - brendanfh 2020/09/04
-        fornode->var->type = builtin_range_type_type->Struct.memarr[0]->type;
+        given_type = builtin_range_type_type->Struct.memarr[0]->type;
         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
         fornode->loop_type = For_Loop_Range;
 
     }
     else if (iter_type->kind == Type_Kind_Array) {
-        if (fornode->by_pointer) fornode->var->type = type_make_pointer(context.ast_alloc, iter_type->Array.elem);
-        else                     fornode->var->type = iter_type->Array.elem;
+        if (fornode->by_pointer) given_type = type_make_pointer(context.ast_alloc, iter_type->Array.elem);
+        else                     given_type = iter_type->Array.elem;
 
         fornode->loop_type = For_Loop_Array;
     }
     else if (iter_type->kind == Type_Kind_Slice) {
-        if (fornode->by_pointer) fornode->var->type = type_make_pointer(context.ast_alloc, iter_type->Slice.elem);
-        else                     fornode->var->type = iter_type->Slice.elem;
+        if (fornode->by_pointer) given_type = type_make_pointer(context.ast_alloc, iter_type->Slice.elem);
+        else                     given_type = iter_type->Slice.elem;
 
         fornode->loop_type = For_Loop_Slice;
 
@@ -308,14 +310,14 @@ CheckStatus check_for(AstFor* fornode) {
             ERROR_(error_loc, "Cannot iterate by pointer over '%s'.", type_get_name(iter_type));
         }
 
-        fornode->var->type = iter_type->VarArgs.elem;
+        given_type = iter_type->VarArgs.elem;
 
         // NOTE: Slices are VarArgs are being treated the same here.
         fornode->loop_type = For_Loop_Slice;
     }
     else if (iter_type->kind == Type_Kind_DynArray) {
-        if (fornode->by_pointer) fornode->var->type = type_make_pointer(context.ast_alloc, iter_type->DynArray.elem);
-        else                     fornode->var->type = iter_type->DynArray.elem;
+        if (fornode->by_pointer) given_type = type_make_pointer(context.ast_alloc, iter_type->DynArray.elem);
+        else                     given_type = iter_type->DynArray.elem;
 
         fornode->loop_type = For_Loop_DynArr;
     }
@@ -325,8 +327,20 @@ CheckStatus check_for(AstFor* fornode) {
         }
 
         // HACK: This assumes the Iterator type only has a single type argument.
-        fornode->var->type = iter_type->Struct.poly_sln[0].type;
+        given_type = iter_type->Struct.poly_sln[0].type;
         fornode->loop_type = For_Loop_Iterator;
+    }
+
+    assert(given_type);
+
+    if (fornode->var->type_node) {
+        fill_in_type((AstTyped *) fornode->var);
+        TYPE_CHECK((AstTyped **) &fornode->var, given_type) {
+            ERROR_(error_loc, "Mismatched type for loop variable. You specified '%s', but it should be '%s'.", type_get_name(fornode->var->type), type_get_name(given_type));
+        }
+
+    } else {
+        fornode->var->type = given_type;
     }
 
     if (fornode->by_pointer)

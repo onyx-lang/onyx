@@ -747,7 +747,7 @@ find :: macro (it: $T/Iterable, predicate: $F) =>
 
 #overload
 find :: (it: Iterator($T), predicate: (T) -> bool) -> ? T {
-    for v: it {
+    for v in it {
         if predicate(v) {
             return v;
         }
@@ -772,7 +772,7 @@ fold :: macro (it: $T/Iterable, init: $R, combine: $S) =>
 fold :: (it: Iterator($T), initial_value: $R, combine: (T, R) -> R) -> R {
     result := initial_value;
 
-    for value: it {
+    for value in it {
         result = combine(value, result);
     }
 
@@ -795,7 +795,7 @@ fold1 :: (it: Iterator($T), combine: (T, T) -> T) -> ? T {
     result, valid := next(it);
     if !valid do return .None;
 
-    for value: it {
+    for value in it {
         result = combine(value, result);
     }
 
@@ -813,7 +813,7 @@ count :: macro (it: $T/Iterable, cond: $F) =>
 #overload
 count :: (it: Iterator($T), cond: (T) -> bool) -> i32 {
     c := 0;
-    for value: it do if cond(value) do c += 1;
+    for value in it do if cond(value) do c += 1;
     return c;
 }
 
@@ -828,7 +828,7 @@ some :: macro (it: $T/Iterable, cond: $F) =>
 
 #overload
 some :: (it: Iterator($T), cond: (T) -> bool) -> bool {
-    for value: it do if cond(value) do return true;
+    for value in it do if cond(value) do return true;
     return false;
 }
 
@@ -842,7 +842,7 @@ every :: macro (it: $T/Iterable, cond: $F) =>
 
 #overload
 every :: (it: Iterator($T), cond: (T) -> bool) -> bool {
-    for value: it do if !cond(value) do return false;
+    for value in it do if !cond(value) do return false;
     return true;
 }
 
@@ -857,7 +857,7 @@ sum :: macro (it: $T/Iterable) =>
 sum :: (it: Iterator($T)) -> T {
     val := T.{};
 
-    for v: it {
+    for v in it {
         val = val + v;
     }
 
@@ -871,7 +871,7 @@ sum :: (it: Iterator($T)) -> T {
 """
 to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
     arr := array.make(T, allocator=allocator);
-    for v: it do array.push(&arr, v);
+    for v in it do array.push(&arr, v);
 
     return arr;
 }
@@ -880,7 +880,7 @@ to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
 """
 to_map :: (it: Iterator(Pair($K, $V)), allocator := context.allocator) -> Map(K, V) {
     m := builtin.make(Map(K, V), allocator=allocator);
-    for p: it {
+    for p in it {
         m->put(p.first, p.second);
     }
     return m;
@@ -962,7 +962,7 @@ comp :: macro (i: Iterator(&$V), value: Code) => {
     it: V;
     a := make([..] typeof #unquote value);
 
-    for __it: i {
+    for __it in i {
         it := *__it;
         a << (#unquote value(it));
     }

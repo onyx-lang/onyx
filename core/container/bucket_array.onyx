@@ -40,7 +40,7 @@ init :: (use b: &Bucket_Array($T), elements: i32,
 
 // Frees all the buckets
 clear :: (use b: &Bucket_Array($T)) {
-    for &bucket: &buckets {
+    for &bucket in &buckets {
         raw_free(bucket_allocator, bucket.data);
         bucket.count = 0;
     }
@@ -95,8 +95,8 @@ pop :: (use b: &Bucket_Array($T)) {
 
 // Give you a pointer to the bucket data via 'it'.
 for_each :: macro (b: Bucket_Array($T), body: Code) {
-    for &bucket: b.buckets {
-        for bucket_index: bucket.count {
+    for &bucket in b.buckets {
+        for bucket_index in bucket.count {
             it := &bucket.data[bucket_index];
 
             #unquote body(it);

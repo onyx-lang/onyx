@@ -30,7 +30,7 @@ simulate :: (dx, dy: i32) -> (i32, bool) {
 
 main :: (args) => {
 
-    for file: os.with_file("./tests/aoc-2021/input/day17.txt") {
+    for file in os.with_file("./tests/aoc-2021/input/day17.txt") {
         reader := io.reader_make(file);
 
         io.skip_bytes(&reader, 15);
@@ -46,8 +46,8 @@ main :: (args) => {
     max := 0;
     count := 0;
 
-    for dx: 1 .. 1000 {
-        for dy: -1000 .. 1000 {
+    for dx in 1 .. 1000 {
+        for dy in -1000 .. 1000 {
             my, s := simulate(dx, dy);
             if s {
                 max = math.max(my, max);

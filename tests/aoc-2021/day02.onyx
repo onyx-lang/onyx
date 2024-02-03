@@ -3,7 +3,7 @@ PART :: 2
 use core {*}
 
 main :: (args) => {
-    for file: os.with_file("tests/aoc-2021/input/day02.txt") {
+    for file in os.with_file("tests/aoc-2021/input/day02.txt") {
         reader := io.reader_make(file);
 
         #if PART == 1 {

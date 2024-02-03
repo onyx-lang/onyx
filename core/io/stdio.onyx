@@ -142,7 +142,7 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
     temp: [3] u8;
 
     u8_ptr := cast([&] u8) ptr;
-    for i: byte_count {
+    for i in byte_count {
         val := u8_ptr[i];
 
         temp[0] = map_to_ascii(val >> 4);

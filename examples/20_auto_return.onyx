@@ -30,7 +30,7 @@ main :: (args: [] cstr) {
     consume :: (it: $T) -> #auto where iter.Iterable(T) {
         consume_inner :: macro (it: Iterator($V)) -> [] V {
             arr: [..] V;
-            for v: it do arr << v;
+            for v in it do arr << v;
             return arr;
         }
 

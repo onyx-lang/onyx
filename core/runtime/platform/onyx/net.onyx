@@ -41,15 +41,15 @@ __net_sock_opt_size :: (s: SocketData, sockopt: SocketOption, size: i64) -> bool
 
 __net_sock_bind :: (s: SocketData, addr: &SocketAddress) -> bool {
     switch *addr {
-        case &path: .Unix {
+        case .Unix as &path {
             return __net_bind_unix(s, ~~path);
         }
 
-        case ipv4: .Inet {
+        case .Inet as ipv4 {
             return __net_bind_ipv4(s, ipv4.addr, ipv4.port);
         }
 
-        case host: .HostPort {
+        case .HostPort as host {
             return __net_bind_host(s, host.host, host.port);
         }
 
@@ -84,22 +84,22 @@ __net_sock_accept :: (s: SocketData, out: &SocketAddress) -> Result(SocketData, 
 
 __net_sock_connect :: (s: SocketData, addr: &SocketAddress) -> io.Error {
     switch *addr {
-        case &path: .Unix {
+        case .Unix as &path {
             return __net_connect_unix(s, ~~path)
                 |> translate_error();
         }
 
-        case i: .Inet {
+        case .Inet as i {
             return __net_connect_ipv4(s, i.addr, i.port)
                 |> translate_error();
         }
 
-        case i: .Inet6 {
+        case .Inet6 as i {
             return __net_connect_ipv6(s, i.addr, i.port)
                 |> translate_error();
         }
 
-        case h: .HostPort {
+        case .HostPort as h {
             return __net_connect_host(s, h.host, h.port)
                 |> translate_error();
         }
@@ -135,10 +135,10 @@ __net_sock_recv_from :: (s: SocketData, buf: [] u8, out: &SocketAddress) -> Resu
 
 __net_sock_send_to :: (s: SocketData, buf: [] u8, addr: &SocketAddress) -> Result(i32, io.Error) {
     sent := switch *addr {
-        case &path: .Unix => __net_sendto_unix(s, buf, ~~path);
-        case i: .Inet     => __net_sendto_ipv4(s, buf, i.addr, i.port);
-        case i: .Inet6    => __net_sendto_ipv6(s, buf, i.addr, i.port);
-        case h: .HostPort => __net_sendto_host(s, buf, h.host, h.port);
+        case .Unix as &path => __net_sendto_unix(s, buf, ~~path);
+        case .Inet as i     => __net_sendto_ipv4(s, buf, i.addr, i.port);
+        case .Inet6 as i    => __net_sendto_ipv6(s, buf, i.addr, i.port);
+        case .HostPort as h => __net_sendto_host(s, buf, h.host, h.port);
     };
 
     if sent == -1

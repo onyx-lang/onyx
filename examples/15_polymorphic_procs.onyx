@@ -6,7 +6,7 @@
 // If you are unfamiliar, polymorphic procedures allow you to write code that applies
 // to all types, instead of to only a particular type. For example, you will probably
 // want something like a max function that returns the larger of its two arguments.
-// You might start by writing it for just integer types as so:
+// You might start by writing it for just integer types as so in
 
 max :: (a: i32, b: i32) -> i32 {
     return a if a > b else b;

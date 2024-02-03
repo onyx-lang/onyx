@@ -103,7 +103,7 @@ main :: (args: [] cstr) {
     //     bag := array.pop(&to_process_bags);
     //     array.push(&processed_bags, bag);
     //     
-    //     for container: bag.contained_in {
+    //     for container in bag.contained_in {
     //         if !array.contains(&processed_bags, container.bag) && !array.contains(&to_process_bags, container.bag) {
     //             // printf("Adding {} to process.\n", container.bag.color);
     //             array.push(&to_process_bags, container.bag);
@@ -125,7 +125,7 @@ main :: (args: [] cstr) {
         mul := array.pop(&multiplier);
         count += mul;
 
-        for bc: bag.contain {
+        for bc in bag.contain {
             array.push(&to_process, bc.bag);
             array.push(&multiplier, bc.count * mul);
         }

@@ -29,32 +29,32 @@ Vec :: struct (T: type_expr, N: i32) {
 
 #operator+ (a: Vec($T, $N), b: Vec(T, N)) -> Vec(T, N) {
     out : Vec(T, N);
-    for i: 0 .. N do out.data[i] = a.data[i] + b.data[i];
+    for i in 0 .. N do out.data[i] = a.data[i] + b.data[i];
     return out;
 }
 
 #operator- (a: Vec($T, $N), b: Vec(T, N)) -> Vec(T, N) {
     out : Vec(T, N);
-    for i: 0 .. N do out.data[i] = a.data[i] - b.data[i];
+    for i in 0 .. N do out.data[i] = a.data[i] - b.data[i];
     return out;
 }
 
 #operator* (a: Vec($T, $N), s: T) -> Vec(T, N) {
     out : Vec(T, N);
-    for i: 0 .. N do out.data[i] = a.data[i] * s;
+    for i in 0 .. N do out.data[i] = a.data[i] * s;
     return out;
 }
 
 #operator* (a: Vec($T, $N), b: Vec(T, N)) -> T {
     res := T.{};
-    for i: 0 .. N do res += a.data[i] * b.data[i];
+    for i in 0 .. N do res += a.data[i] * b.data[i];
     return res;
 }
 
 join :: (a: Vec($T, $N), b: Vec(T, $M)) -> Vec(T, N + M) {
     out : Vec(T, N + M);
-    for i: 0 .. N do out.data[i]     = a.data[i]; 
-    for i: 0 .. M do out.data[i + N] = b.data[i]; 
+    for i in 0 .. N do out.data[i]     = a.data[i]; 
+    for i in 0 .. M do out.data[i + N] = b.data[i]; 
     return out;
 }
 
@@ -85,7 +85,7 @@ main :: (args: [] cstr) {
 
         d := make_vec(f32.[2, 3, 5, 7]);
         e := join(d, c);
-        for v: e.data do printf("{} ", v);
+        for v in e.data do printf("{} ", v);
         print("\n");
     }
 

@@ -94,18 +94,18 @@ main :: (args: [] cstr) {
     definitely_safe := array.make(str);
     defer array.free(&definitely_safe);
 
-    for &ingredient_entry: ingredient_map.entries {
+    for &ingredient_entry in ingredient_map.entries {
         potential_allergens := array.make(str);
         defer array.free(&potential_allergens);
 
-        for food_num: ingredient_entry.value.appears_on {
-            for &allergen_name: foods[food_num].allergens {
+        for food_num in ingredient_entry.value.appears_on {
+            for &allergen_name in foods[food_num].allergens {
                 array.push(&potential_allergens, *allergen_name);
             }
         }
 
         potential_allergen_count := 0;
-        for &allergen_name: potential_allergens {
+        for &allergen_name in potential_allergens {
             c := array_count_contains(&potential_allergens, *allergen_name, string.equal);
             allergen := map.get(&allergen_map, *allergen_name)->unwrap();
             if c == allergen.appears_on.count {
@@ -119,7 +119,7 @@ main :: (args: [] cstr) {
     }
 
     total_safe := 0;
-    for safe: definitely_safe {
+    for safe in definitely_safe {
         ingredient := map.get(&ingredient_map, safe)->unwrap();
         total_safe += ingredient.appears_on.count;
 
@@ -132,14 +132,14 @@ main :: (args: [] cstr) {
     defer array.free(&matched_ingredients);
 
     while !map.empty(&ingredient_map) {
-        for &allergen_entry: allergen_map.entries {
+        for &allergen_entry in allergen_map.entries {
             match_count := 0;
             matching_ingredient_name := str.{ null, 0 };
 
-            for &ingredient_entry: ingredient_map.entries {
+            for &ingredient_entry in ingredient_map.entries {
                 matches := true;
 
-                for ap: allergen_entry.value.appears_on {
+                for ap in allergen_entry.value.appears_on {
                     if !array.contains(ingredient_entry.value.appears_on, ap) do matches = false;
                 }
 
@@ -161,13 +161,13 @@ main :: (args: [] cstr) {
 
     array.sort(matched_ingredients, (i1: &Ingredient, i2: &Ingredient) => string.compare(i1.allergen, i2.allergen));
 
-    for &mi: matched_ingredients do printf("{} -> {}\n", mi.name, mi.allergen);
-    for &mi: matched_ingredients do printf("{},", mi.name);
+    for &mi in matched_ingredients do printf("{} -> {}\n", mi.name, mi.allergen);
+    for &mi in matched_ingredients do printf("{},", mi.name);
     println("\n(Don't copy the last ','!)");
 }
 
 array_count_contains :: (arr: &[..] $T, x: T, equal: (T, T) -> bool) -> u32 {
     count := 0;
-    for &it: *arr do if equal(*it, x) do count += 1;
+    for &it in *arr do if equal(*it, x) do count += 1;
     return count;
 }

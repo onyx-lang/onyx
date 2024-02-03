@@ -71,7 +71,7 @@ main :: (args: [] cstr) {
     }
 
     acc: i32;
-    for &instr: instrs {
+    for &instr in instrs {
         if     instr.opcode == OpCode.Nop do instr.opcode = OpCode.Jmp;
         elseif instr.opcode == OpCode.Jmp do instr.opcode = OpCode.Nop;
 
