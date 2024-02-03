@@ -1292,7 +1292,8 @@ static AstIfWhile* parse_while_stmt(OnyxParser* parser) {
     AstIfWhile* while_node = make_node(AstIfWhile, Ast_Kind_While);
     while_node->token = while_token;
 
-    if (parse_possible_directive(parser, "bottom_test")) {
+    if (parse_possible_directive(parser, "bottom_test")
+        || consume_token_if_next(parser, Token_Type_Keyword_Defer)) {
         while_node->bottom_test = 1;
     }
 
@@ -1311,6 +1312,11 @@ static AstIfWhile* parse_while_stmt(OnyxParser* parser) {
 
     if (had_initialization || parser->curr->type == ';') {
         expect_token(parser, ';');
+        if (parse_possible_directive(parser, "bottom_test")
+            || consume_token_if_next(parser, Token_Type_Keyword_Defer)) {
+            while_node->bottom_test = 1;
+        }
+
         cond = parse_expression(parser, 1);
     } else {
         cond = (AstTyped *) initialization_or_cond;
