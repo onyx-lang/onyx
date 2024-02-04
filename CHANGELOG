@@ -1,14 +1,31 @@
 Nightly build
 --------------
 
+This release has some interesting new features and general usability improvements.
+It does have a couple rather LARGE syntax changes that will affect nearly every program
+written in Onyx. The two major syntax changes:
+
+    For loops:
+        for x in array             instead of        for x: array
+
+    Cases with captures:
+        case Value as capture      instead of        case capture: Value 
+
+These syntax changes help improve readability and makes the language more friendly to newcomers.
+These changes also introduce two new keywords into the language that could see use in other places
+in the future. This is a small improvement to make, but it is better to make it now while a
+(relatively) small amount of Onyx code has been written.
+
 Additions:
 - OVM-Wasm support on MacOS (thanks to @judah-caruso).
     - This enables debugging support when on MacOS.
     - Available from installer.
+- `.*` as a postfix alternative to `*`.
 - `where` clauses can contain arbitrary boolean expressions (thanks to @judah-caruso).
 - Small arrays (4 or fewer elements) have special accessors for their components.
 - Tree-shaking is performed prior to code generation, reducing binary size drastically in some cases.
 - Operation overloads for `+`, `-` and `*` for small arrays.
+- `where defer` as a cleaner alternative to `where #bottom_test`
 - `core.intrinsics.wasm.memory_equal`
 - `core.iter.counter`
 - `core.iter.sum`
@@ -29,12 +46,12 @@ Removals:
 Changes:
 - Due to tree shaking, the `methods` member of `Type_Info_Struct` and `Type_Info_Union` is not populated by default anymore.
     - Use the `--generate-method-info` CLI flag to add this information back in.
+- Due to `as` being a keyword now, `cptr.as` was renamed to `cptr.as_unsafe`.
 
 Bugfixes:
 - Error reporting in many cases saw a lot of improvements.
-    - Specially with polymorphic procedures, l-values, and code blocks.
+    - Especially with polymorphic procedures, l-values, and code blocks.
 - Implementation of `core.array.remove`.
-- Implementation 
 
 Contributors:
 - @judah-caruso (10 pull requests)
@@ -42,6 +59,7 @@ Contributors:
 - @magnetenstad (1 pull request)
 - @jtakakura (1 pull request)
 - @hatappo (1 pull request)
+- @Syuparn (1 pull request)
 
 
 Release v0.1.8
