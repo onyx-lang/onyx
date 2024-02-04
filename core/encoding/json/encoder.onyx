@@ -291,7 +291,7 @@ from_any :: macro (v: ^$T, allocator := context.allocator) -> Value {
 }
 
 #overload
-from_any :: (type: type_expr, v: rawptr, allocator := context.allocator) -> Value {
+from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> Value {
     use runtime.info;
 
     t_info := get_type_info(type);
@@ -299,11 +299,11 @@ from_any :: (type: type_expr, v: rawptr, allocator := context.allocator) -> Valu
         case .Basic do switch type {
             // These functions handle the cases where the types do
             // not match, so no additional checks are needed here.
-            case bool     { v := new(_Value_Bool, allocator);    v.bool_  =    *cast(^bool) v; return Value.{v}; }
-            case i32, u32 { v := new(_Value_Integer, allocator); v.int_   = ~~ *cast(^i32)  v; return Value.{v}; }
-            case i64, u64 { v := new(_Value_Integer, allocator); v.int_   =    *cast(^i64)  v; return Value.{v}; }
-            case f32      { v := new(_Value_Float, allocator);   v.float_ = ~~ *cast(^f32)  v; return Value.{v}; }
-            case f64      { v := new(_Value_Float, allocator);   v.float_ =    *cast(^f64)  v; return Value.{v}; }
+            case bool     { v := new(_Value_Bool, allocator);    v.bool_  =    *cast(^bool) input; return Value.{v}; }
+            case i32, u32 { v := new(_Value_Integer, allocator); v.int_   = ~~ *cast(^i32)  input; return Value.{v}; }
+            case i64, u64 { v := new(_Value_Integer, allocator); v.int_   =    *cast(^i64)  input; return Value.{v}; }
+            case f32      { v := new(_Value_Float, allocator);   v.float_ = ~~ *cast(^f32)  input; return Value.{v}; }
+            case f64      { v := new(_Value_Float, allocator);   v.float_ =    *cast(^f64)  input; return Value.{v}; }
         }
 
         case .Array {
@@ -313,7 +313,7 @@ from_any :: (type: type_expr, v: rawptr, allocator := context.allocator) -> Valu
             array.init(^v.array_, a_info.count, allocator);
 
             for i in a_info.count {
-                v.array_ << from_any(a_info.of, memory.ptr_add(v, size_of(a_info.of) * i));
+                v.array_ << from_any(a_info.of, memory.ptr_add(input, size_of(a_info.of) * i));
             }
 
             return Value.{v};
@@ -323,12 +323,12 @@ from_any :: (type: type_expr, v: rawptr, allocator := context.allocator) -> Valu
             // Strings are handled differently
             if type == str {
                 v := new(_Value_String, allocator);
-                v.str_ = string.alloc_copy(*cast(^str) v, allocator);
+                v.str_ = string.alloc_copy(*cast(^str) input, allocator);
                 return Value.{v};
             }
 
             s_info := cast(^Type_Info_Slice) t_info;
-            s := cast(^core.array.Untyped_Array) v;
+            s := cast(^core.array.Untyped_Array) input;
 
             v := new(_Value_Array, allocator);
             array.init(^v.array_, s.count, allocator);
@@ -358,7 +358,7 @@ from_any :: (type: type_expr, v: rawptr, allocator := context.allocator) -> Valu
                     }
                 }
 
-                json.set(Value.{v}, key, from_any(member.type, memory.ptr_add(v, member.offset)), dont_copy_key=true);
+                json.set(Value.{v}, key, from_any(member.type, memory.ptr_add(input, member.offset)), dont_copy_key=true);
             }
 
             return Value.{v};
@@ -366,11 +366,11 @@ from_any :: (type: type_expr, v: rawptr, allocator := context.allocator) -> Valu
 
         case .Distinct {
             if type == Value {
-                return *cast(^Value) v;
+                return *cast(^Value) input;
             }
 
             d_info := cast(^Type_Info_Distinct) t_info;
-            return from_any(d_info.base_type, v);
+            return from_any(d_info.base_type, input);
         }
 
         case .Union {
@@ -379,11 +379,11 @@ from_any :: (type: type_expr, v: rawptr, allocator := context.allocator) -> Valu
             }
 
             u := t_info->as_union();
-            tag := *cast(&Optional(void).tag_enum) v;
+            tag := *cast(&Optional(void).tag_enum) input;
             if tag != .Some {
                 return null_value();
             } else {
-                return from_any(u.variants[1].type, memory.ptr_add(v, u.alignment), allocator);
+                return from_any(u.variants[1].type, memory.ptr_add(input, u.alignment), allocator);
             }
         }
     }
