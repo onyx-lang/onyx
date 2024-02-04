@@ -182,8 +182,8 @@ static AstSolidifiedFunction generate_solidified_function(
             constraint->interface = (AstInterface *) param->implicit_interface;
             constraint->token = constraint->interface->token;
 
-            bh_arr_new(global_heap_allocator, constraint->type_args, 1);
-            bh_arr_push(constraint->type_args, (AstType *) ast_clone(context.ast_alloc, param->poly_sym));
+            bh_arr_new(global_heap_allocator, constraint->args, 1);
+            bh_arr_push(constraint->args, (AstTyped *) ast_clone(context.ast_alloc, param->poly_sym));
 
             bh_arr_push(solidified_func.func->constraints.constraints, constraint);
         }

@@ -377,7 +377,9 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
     delete :: #match {}
 
     #local
-    Destroyable :: interface (t: $T) {
+    Destroyable :: interface (T: type_expr) {
+        t as T;
+
         { T.destroy(&t) } -> void;
     }
 

@@ -1207,8 +1207,14 @@ struct AstOverloadedFunction {
 // @CLEANUP: Is this really necessary?
 typedef struct InterfaceParam {
     OnyxToken *value_token;
-    OnyxToken *type_token;
+    AstType   *value_type;
+    Type      *type;
 } InterfaceParam;
+
+typedef struct InterfaceSentinel {
+    OnyxToken *name;
+    AstType   *type;
+} InterfaceSentinel;
 
 typedef struct InterfaceConstraint {
     AstTyped *expr;
@@ -1225,6 +1231,7 @@ struct AstInterface {
     char *name;
 
     bh_arr(InterfaceParam)      params;
+    bh_arr(InterfaceSentinel)   sentinels;
     bh_arr(InterfaceConstraint) exprs;
 
     Scope *scope;
@@ -1248,7 +1255,7 @@ struct AstConstraint {
     union {
         struct {
             AstInterface *              interface;
-            bh_arr(AstType *)           type_args;
+            bh_arr(AstTyped *)          args;
             Scope*                      scope;
             bh_arr(InterfaceConstraint) exprs;
             u32                         expr_idx;

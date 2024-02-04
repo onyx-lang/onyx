@@ -471,12 +471,12 @@ static void write_doc_constraints(bh_buffer *buffer, ConstraintContext *constrai
         write_type_node(&tmp_buffer, constraint->interface);
         bh_buffer_write_string(&tmp_buffer, "(");
 
-        bh_arr_each(AstType *, ptype_arg, constraint->type_args) {
-            if (ptype_arg != constraint->type_args) {
+        bh_arr_each(AstTyped *, ptype_arg, constraint->args) {
+            if (ptype_arg != constraint->args) {
                 bh_buffer_write_string(&tmp_buffer, ", ");
             }
 
-            AstType *type_arg = *ptype_arg;
+            AstTyped *type_arg = *ptype_arg;
             write_type_node(&tmp_buffer, type_arg);
         }
 

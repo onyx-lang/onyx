@@ -591,11 +591,11 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             AstConstraint* dc = (AstConstraint *) nn;
             AstConstraint* sc = (AstConstraint *) node;
 
-            dc->type_args = NULL;
-            bh_arr_new(global_heap_allocator, dc->type_args, bh_arr_length(sc->type_args));
+            dc->args = NULL;
+            bh_arr_new(global_heap_allocator, dc->args, bh_arr_length(sc->args));
 
-            bh_arr_each(AstType *, type_arg, sc->type_args) {
-                bh_arr_push(dc->type_args, (AstType *) ast_clone(a, (AstNode *) *type_arg));
+            bh_arr_each(AstTyped *, arg, sc->args) {
+                bh_arr_push(dc->args, (AstTyped *) ast_clone(a, (AstNode *) *arg));
             }
 
             dc->phase = Constraint_Phase_Waiting_To_Be_Queued;

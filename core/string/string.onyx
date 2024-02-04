@@ -5,7 +5,9 @@ use core {package, *}
 #doc "Generic procedure for turning something into a string."
 as_str :: #match -> str {}
 
-#local HasAsStrMethod :: interface (t: $T) {
+#local HasAsStrMethod :: interface (T: type_expr) {
+    t as T;
+
     { T.as_str(t) } -> str;
 }
 

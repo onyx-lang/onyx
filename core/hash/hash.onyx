@@ -55,12 +55,14 @@ hash :: #match -> u32 {
 // Interface that holds true when the type has a hash() overload defined.
 // Useful in datastructure when the ability to hash is dependent on whether
 // the stored type is hashable. See core/container/pair.onyx for an example.
-Hashable :: interface (t: $T) {
+Hashable :: interface (T: type_expr) {
+    t as T;
     { hash(t) } -> u32;
 }
 
 #local
-HasHashMethod :: interface (t: $T) {
+HasHashMethod :: interface (T: type_expr) {
+    t as T;
     { t->hash() } -> u32;
 }
 

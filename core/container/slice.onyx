@@ -654,7 +654,8 @@ group_by :: macro (arr_: [] $T, comp: Code, allocator := context.allocator) -> [
 
 
 
-#local HasEquals :: interface (t: $T) {
+#local HasEquals :: interface (T: type_expr) {
+    t as T;
     { t == t } -> bool;
 }
 

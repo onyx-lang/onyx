@@ -53,7 +53,8 @@ as_iter :: #match -> Iterator {}
     Helper interface to test if something can be passed to
     as_iter successfully.
 """
-Iterable :: interface (t: $T) {
+Iterable :: interface (T: type_expr) {
+    t as T;
     { as_iter(t) } -> Iterator;
 }
 
@@ -129,7 +130,9 @@ as_iter :: (x: &$T/ImplicitIterator) => {
 }
 
 #local
-ImplicitIterator :: interface (t: $T) {
+ImplicitIterator :: interface (T: type_expr) {
+    t as T;
+
     { t->iter_open() } -> void;
     t->iter_next();
     { t->iter_close() } -> void;
@@ -147,7 +150,9 @@ ImplicitIterator :: interface (t: $T) {
 as_iter :: macro (x: $T/HasAsIter) => x->as_iter();
 
 #local
-HasAsIter :: interface (t: $T) {
+HasAsIter :: interface (T: type_expr) {
+    t as T;
+
     { t->as_iter() } -> Iterator;
 }
 

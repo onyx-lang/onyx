@@ -111,7 +111,9 @@ Player :: struct {
 }
 
 
-#local __HasEqMethod :: interface (t: $T) {
+#local __HasEqMethod :: interface (T: type_expr) {
+    t as T;
+
     { T.__eq(t, t) } -> bool;
 }
 

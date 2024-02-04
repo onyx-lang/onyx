@@ -8,7 +8,9 @@ use core.math
 
 use core {Optional}
 
-#local SetValue :: interface (t: $T) {
+#local SetValue :: interface (T: type_expr) {
+    t as T;
+
     { hash.hash(t) } -> u32;
     { t == t } -> bool;
 }

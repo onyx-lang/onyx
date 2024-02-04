@@ -12,8 +12,10 @@ main :: () {
    d.values = c;
 }
 
-Adder :: interface(t: $T) {
-   { t + t } -> T;
+Adder :: interface(T: type_expr) {
+    t as T;
+
+    { t + t } -> T;
 }
 
 add :: (a, b: [$N]$T) -> [N]T
@@ -22,8 +24,10 @@ add :: (a, b: [$N]$T) -> [N]T
    return a + b;
 }
 
-CanBeIndexed :: interface(t: $T) {
-   t[0];
+CanBeIndexed :: interface(T: type_expr) {
+    t as T;
+
+    t[0];
 }
 
 Foo :: struct (T: type_expr) where CanBeIndexed(T) {

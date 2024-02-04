@@ -8,7 +8,9 @@ use core.iter
 
 use core {println, printf}
 
-Hashable :: interface (t :$T) {
+Hashable :: interface (T: type_expr) {
+    t as T;
+
     { hash.to_u32(t) } -> u32;
 }
 
@@ -16,13 +18,14 @@ try_hash :: #match {
     macro (x: $T) where Hashable(T) {
         println(hash.to_u32(x));
     },
-
     (x: any) {
         printf("{} is not hashable!\n", x.type);
     },
 }
 
-CanCastTo :: interface (t: $T, d: $D) {
+CanCastTo :: interface (T: type_expr, D: type_expr) {
+    t as T;
+
     { cast(D) t } -> D;
 }
 
@@ -43,7 +46,9 @@ do_math :: macro (x, y: $T) -> T where SemiRing(T) {
     return x + y + x * y;
 }
 
-SemiRing :: interface (t: $T) {
+SemiRing :: interface (T: type_expr) {
+    t as T;
+
     {t + t} -> T;
     {t * t} -> T;
 }
@@ -52,7 +57,9 @@ bit_math :: (x, y: $T) -> T where BitField(T) {
     return (x & y) | (x ^ y);
 }
 
-BitField :: interface (t: $T) {
+BitField :: interface (T: type_expr) {
+    t as T;
+
     { ~t } -> T;
     { t & t } -> T;
     { t | t } -> T;
@@ -99,6 +106,25 @@ consume :: macro (x: $T/iter.Iterable) => {
     return consume_inner(iterator);
 }
 
+
+ReturnsArray :: interface (T: type_expr, N: i32) {
+    t as T;
+
+    { t->make_an_array() } -> [N] i32;
+}
+
+MakeArray :: struct {
+    member: i32;
+
+    make_an_array :: (self: &MakeArray) -> [5] i32 {
+        return .[ 1, 2, 3, 4, 5 ];
+    }
+}
+
+run_make_array :: (x: $T) where ReturnsArray(T, 5) {
+    x->make_an_array() |> println();
+}
+
 main :: (args: [] cstr) {
     try_hash("This is a test");
     try_hash(context);
@@ -124,4 +150,6 @@ main :: (args: [] cstr) {
 
     b: [10] i32;
     println(cast_able(b, [] i32));
+
+    run_make_array(&MakeArray.{});
 }

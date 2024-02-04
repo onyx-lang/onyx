@@ -1,3 +1,5 @@
+#include "astnodes.h"
+#include "types.h"
 #define BH_INTERNAL_ALLOCATOR (global_heap_allocator)
 #define BH_DEBUG
 #include "parser.h"
@@ -3655,6 +3657,19 @@ CheckStatus check_macro(AstMacro* macro) {
     return Check_Success;
 }
 
+CheckStatus check_interface(AstInterface *interface) {
+    bh_arr_each(InterfaceParam, param, interface->params) {
+        CHECK(type, &param->value_type);
+
+        param->type = type_build_from_ast(context.ast_alloc, param->value_type);
+        if (!param->type) {
+            YIELD(param->value_type->token->pos, "Waiting for interface parameter's type to be constructed.");
+        }
+    }
+
+    return Check_Success;
+}
+
 CheckStatus check_interface_constraint(AstConstraint *constraint) {
     if (constraint->interface->kind != Ast_Kind_Interface) {
         // CLEANUP: This error message might not look totally right in some cases.
@@ -3690,25 +3705,35 @@ CheckStatus check_interface_constraint(AstConstraint *constraint) {
 
     constraint->scope = scope_create(context.ast_alloc, constraint->interface->scope, constraint->token->pos);
 
-    if (bh_arr_length(constraint->type_args) != bh_arr_length(constraint->interface->params)) {
+    if (bh_arr_length(constraint->args) != bh_arr_length(constraint->interface->params)) {
         ERROR_(constraint->token->pos, "Wrong number of arguments given to interface. Expected %d, got %d.",
             bh_arr_length(constraint->interface->params),
-            bh_arr_length(constraint->type_args));
+            bh_arr_length(constraint->args));
     }
 
     fori (i, 0, bh_arr_length(constraint->interface->params)) {
         InterfaceParam *ip = &constraint->interface->params[i];
 
-        AstTyped *sentinel = onyx_ast_node_new(context.ast_alloc, sizeof(AstTyped), Ast_Kind_Constraint_Sentinel);
-        sentinel->token = ip->value_token;
-        sentinel->type_node = constraint->type_args[i];
+        AstTyped *arg = constraint->args[i];
+        TYPE_CHECK(&arg, ip->type) {
+            ERROR_(arg->token->pos, "Mismatched type in interface construction. Expected something of type '%s', but got something of type '%s'.", type_get_name(ip->type), type_get_name(arg->type));
+        }
 
         AstAlias *type_alias = onyx_ast_node_new(context.ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
-        type_alias->token = ip->type_token;
-        type_alias->alias = (AstTyped *) constraint->type_args[i];
+        type_alias->token = ip->value_token;
+        type_alias->alias = arg;
 
-        symbol_introduce(constraint->scope, ip->value_token, (AstNode *) sentinel);
-        symbol_introduce(constraint->scope, ip->type_token, (AstNode *) type_alias);
+        symbol_introduce(constraint->scope, ip->value_token, (AstNode *) type_alias);
+    }
+
+    fori (i, 0, bh_arr_length(constraint->interface->sentinels)) {
+        InterfaceSentinel *is = &constraint->interface->sentinels[i];
+
+        AstTyped *sentinel = onyx_ast_node_new(context.ast_alloc, sizeof(AstTyped), Ast_Kind_Constraint_Sentinel);
+        sentinel->token = is->name;
+        sentinel->type_node = is->type;
+
+        symbol_introduce(constraint->scope, is->name, (AstNode *) sentinel);
     }
 
     assert(constraint->entity);
@@ -3858,7 +3883,11 @@ CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFi
                 if (cc->produce_errors) {
                     AstConstraint *constraint = cc->constraints[i];
                     char constraint_map[512] = {0};
-                    fori (i, 0, bh_arr_length(constraint->type_args)) {
+                    fori (i, 0, bh_arr_length(constraint->args)) {
+                        if (!node_is_type((AstNode *) constraint->args[i])) {
+                            continue;
+                        }
+
                         if (i != 0) strncat(constraint_map, ", ", 511);
 
                         OnyxToken* symbol = constraint->interface->params[i].value_token;
@@ -3867,7 +3896,7 @@ CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFi
                         token_toggle_end(symbol);
 
                         strncat(constraint_map, " is of type '", 511);
-                        strncat(constraint_map, type_get_name(type_build_from_ast(context.ast_alloc, constraint->type_args[i])), 511);
+                        strncat(constraint_map, type_get_name(type_build_from_ast(context.ast_alloc, (AstType *) constraint->args[i])), 511);
                         strncat(constraint_map, "'", 511);
                     }
 
@@ -4040,6 +4069,7 @@ void check_entity(Entity* ent) {
         case Entity_Type_Polymorph_Query:          cs = check_polyquery(ent->poly_query); break;
         case Entity_Type_Enum_Value:               cs = check_expression(&ent->enum_value->value); break;
         case Entity_Type_Process_Directive:        cs = check_process_directive((AstNode *) ent->expr); break;
+        case Entity_Type_Interface:                cs = check_interface(ent->interface); break;
 
         case Entity_Type_String_Literal:
         case Entity_Type_Expression:

@@ -254,7 +254,7 @@ main :: (args: [] cstr) {
     // allocating memory that isn't technically free, but there
     // should be more than enough space in the allocator to not
     // run into that problem... Hopefully.
-    tile_data_ring := alloc.ring.make(tile_data);
+    tile_data_ring := alloc.ring.make(.{ ~~tile_data.data, 200 * sizeof TileData });
     tile_allocator := alloc.ring.make_allocator(&tile_data_ring);
 
     while !string.empty(file) {

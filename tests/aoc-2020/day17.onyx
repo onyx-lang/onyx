@@ -2,7 +2,8 @@
 
 use core {package, *}
 
-OverloadsEqual :: interface (t: $T) {
+OverloadsEqual :: interface (T: type_expr) {
+    t as T;
     { T.equals(t, t) } -> bool;
 }
 

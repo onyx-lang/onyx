@@ -1,6 +1,8 @@
 use core {*}
 
-Speak :: interface (t: $T) {
+Speak :: interface (T: type_expr) {
+    t as T;
+
     { speak(t, str.{}) } -> void;
     { yell(t, str.{}) } -> void;
 
