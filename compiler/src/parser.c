@@ -4,6 +4,7 @@
 // and declarations to be introduced into scopes.
 
 #include "astnodes.h"
+#undef BH_INTERNAL_ALLOCATOR
 #define BH_INTERNAL_ALLOCATOR (global_heap_allocator)
 
 #include "parser.h"

@@ -1,5 +1,6 @@
 #include "astnodes.h"
 #include "types.h"
+#undef BH_INTERNAL_ALLOCATOR
 #define BH_INTERNAL_ALLOCATOR (global_heap_allocator)
 #define BH_DEBUG
 #include "parser.h"
@@ -3731,7 +3732,7 @@ CheckStatus check_interface_constraint(AstConstraint *constraint) {
 
         AstTyped *sentinel = onyx_ast_node_new(context.ast_alloc, sizeof(AstTyped), Ast_Kind_Constraint_Sentinel);
         sentinel->token = is->name;
-        sentinel->type_node = is->type;
+        sentinel->type_node = (AstType *) ast_clone(context.ast_alloc, (AstNode *) is->type);
 
         symbol_introduce(constraint->scope, is->name, (AstNode *) sentinel);
     }
