@@ -556,10 +556,10 @@ tm_to_time :: (tm: Timestamp) -> i64 {
     mi := cast(i64, tm.min);
     s := cast(i64, tm.sec);
 
-    return (365 * y + y / 4 - y / 100 + y / 400 + 3 * (m + 1) / 5 + 30 * m + d - 719561) * 86400
-        + 3600 * h
-        + 60 * mi
-        + s;
+    return (365 * y + y / 4 - y / 100 + y / 400 + 3 * (m + 1) / 5 + 30 * m + d - 719561) * 86400 +
+        3600 * h +
+        60 * mi +
+        s;
 }
 
 

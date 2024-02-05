@@ -2,8 +2,8 @@ package core.string
 
 #inject u8 {
     is_alpha :: (c: u8) -> bool {
-        return (c >= #char "A" && c <= #char "Z")
-            || (c >= #char "a" && c <= #char "z");
+        return (c >= #char "A" && c <= #char "Z") ||
+               (c >= #char "a" && c <= #char "z");
     }
 
     is_num :: (c: u8) -> bool {

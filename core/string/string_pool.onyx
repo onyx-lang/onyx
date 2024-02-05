@@ -27,8 +27,8 @@ StringPool :: struct {
 //
 // Creates a StringPool capable of storing a string of at
 // most `maximum_string_length` bytes.
-pool_make :: (maximum_string_length := 16384, allocator := context.allocator)
-    => StringPool.{
+pool_make :: (maximum_string_length := 16384, allocator := context.allocator) =>
+    StringPool.{
         arena.make(allocator, maximum_string_length)
     }
 

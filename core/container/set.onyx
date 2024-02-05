@@ -84,7 +84,9 @@ insert :: (use set: &Set, value: set.Elem_Type) {
     if full(set) do grow(set);
 }
 
-#operator << macro (set: Set($T), value: T) do #this_package.insert(&set, value);
+#operator << macro (set: Set($T), value: T) {
+    #this_package.insert(&set, value)
+}
 
 has :: (use set: &Set, value: set.Elem_Type) -> bool {
     lr := lookup(set, value);

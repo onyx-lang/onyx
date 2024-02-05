@@ -28,8 +28,8 @@ use runtime
     false and are true if one or more of the option values are present.
 """ 
 arg_parse :: (c_args: [] cstr, output: any) -> bool {
-    arg_iter := iter.as_iter(c_args)
-             |> iter.map(string.from_cstr);
+    arg_iter := iter.as_iter(c_args) |>
+                iter.map(string.from_cstr);
     defer arg_iter.close(arg_iter.data);
 
     use runtime.info {*};

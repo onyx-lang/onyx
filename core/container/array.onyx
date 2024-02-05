@@ -152,7 +152,9 @@ push :: (arr: &[..] $T, x: T) -> bool {
 }
 
 // Semi-useful shortcut for adding something to an array.
-#operator << macro (arr: [..] $T, v: T) do #this_package.push(&arr, v);
+#operator << macro (arr: [..] $T, v: T) {
+    #this_package.push(&arr, v)
+}
 
 
 #doc """

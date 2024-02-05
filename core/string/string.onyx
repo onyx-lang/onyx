@@ -322,8 +322,7 @@ strip_whitespace :: (s: &str) {
 
 #overload
 strip_whitespace :: (s:  str) =>
-    s |> strip_leading_whitespace()
-      |> strip_trailing_whitespace()
+    s |> strip_leading_whitespace() |> strip_trailing_whitespace()
 
 
 strip_leading_whitespace :: #match #local {}

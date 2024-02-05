@@ -106,10 +106,10 @@ do_cycle :: (self: &Hasher, data: [] u8) {
 
     for i in 0 .. 16 {
         j := 4 * i;
-        m[i] = (cast(u32, data[j]) << 24)
-             | (cast(u32, data[j + 1]) << 16)
-             | (cast(u32, data[j + 2]) << 8)
-             | (cast(u32, data[j + 3]));
+        m[i] = (cast(u32, data[j]) << 24) |
+               (cast(u32, data[j + 1]) << 16) |
+               (cast(u32, data[j + 2]) << 8) |
+               (cast(u32, data[j + 3]));
     }
 
     for i in 16 .. 64 {
