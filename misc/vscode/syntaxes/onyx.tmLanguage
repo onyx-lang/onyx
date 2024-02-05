@@ -161,13 +161,13 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\b(if|else|elseif|for|while|defer|return|do)\b</string>
+					<string>\b(if|else|elseif|for|in|while|defer|return|do)\b</string>
 					<key>name</key>
 					<string>keyword.control.onyx</string>
 				</dict>
 				<dict>
 					<key>match</key>
-                    <string>\b(break|continue|fallthrough|switch|case)\b</string>
+                    <string>\b(break|continue|fallthrough|switch|case|as)\b</string>
 					<key>name</key>
 					<string>keyword.control.onyx</string>
 				</dict>
