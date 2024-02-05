@@ -84,6 +84,8 @@ typedef enum TokenType {
     Token_Type_Literal_True,
     Token_Type_Literal_False,
 
+    Token_Type_Inserted_Semicolon,
+
     Token_Type_Count,
 } TokenType;
 
@@ -112,6 +114,8 @@ typedef struct OnyxTokenizer {
     u64 line_number;
 
     bh_arr(OnyxToken) tokens;
+
+    b32 insert_semicolon: 1;
 } OnyxTokenizer;
 
 const char *token_type_name(TokenType tkn_type);

@@ -78,6 +78,8 @@ static const char* token_type_names[] = {
     "true",
     "false",
 
+    "inserted semicolon",
+
     "TOKEN_TYPE_COUNT"
 };
 
@@ -155,8 +157,20 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
         if (tokenizer->curr == tokenizer->end) break;
 
         switch (*tokenizer->curr) {
-            case ' ':
             case '\n':
+                if (tokenizer->insert_semicolon) {
+                    OnyxToken semicolon_token;
+                    semicolon_token.type = Token_Type_Inserted_Semicolon;
+                    semicolon_token.text = "; ";
+                    semicolon_token.length = 1;
+                    semicolon_token.pos.line_start = tokenizer->line_start;
+                    semicolon_token.pos.filename = tokenizer->filename;
+                    semicolon_token.pos.line = tokenizer->line_number;
+                    semicolon_token.pos.column = (u16)(tokenizer->curr - tokenizer->line_start) + 1;
+                    bh_arr_push(tokenizer->tokens, semicolon_token);
+                    tokenizer->insert_semicolon = 0;
+                }
+            case ' ':
             case '\t':
             case '\r':
                 INCREMENT_CURR_TOKEN(tokenizer);
@@ -502,6 +516,33 @@ token_parsed:
     tk.pos.length = (u16) tk.length;
     bh_arr_push(tokenizer->tokens, tk);
 
+    switch ((u32) tk.type) {
+        case Token_Type_Comment:
+            break;
+
+        case Token_Type_Symbol:
+        case Token_Type_Keyword_Break:
+        case Token_Type_Keyword_Continue:
+        case Token_Type_Keyword_Fallthrough:
+        case Token_Type_Keyword_Return:
+        case Token_Type_Literal_String:
+        case Token_Type_Literal_True:
+        case Token_Type_Literal_False:
+        case Token_Type_Literal_Integer:
+        case Token_Type_Literal_Float:
+        case Token_Type_Literal_Char:
+        case Token_Type_Empty_Block:
+        case '?':
+        case ')':
+        case '}':
+        case ']':
+            tokenizer->insert_semicolon = 1;
+            break;
+
+        default:
+            tokenizer->insert_semicolon = 0;
+    }
+
     return &tokenizer->tokens[bh_arr_length(tokenizer->tokens) - 1];
 }
 
@@ -516,6 +557,8 @@ OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc
         .line_number    = 1,
         .line_start     = fc->data,
         .tokens         = NULL,
+
+        .insert_semicolon = 0,
     };
 
     bh_arr_new(allocator, tknizer.tokens, 1 << 12);

@@ -126,7 +126,20 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type) {
     if (parser->hit_unexpected_token) return NULL;
 
     OnyxToken* token = parser->curr;
+    if (token_type == ';' && token->type == Token_Type_End_Stream) {
+        return token;
+    }
+
     consume_token(parser);
+
+    if (token->type == Token_Type_Inserted_Semicolon) {
+        if (token_type == ';' || token_type == ',') {
+            return token;
+        } else {
+            token = parser->curr;
+            consume_token(parser);
+        }
+    }
 
     if (token->type != token_type) {
         onyx_report_error(token->pos, Error_Critical, "expected token '%s', got '%s'.", token_type_name(token_type), token_name(token));
@@ -142,6 +155,11 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type) {
 static b32 consume_token_if_next(OnyxParser* parser, TokenType token_type) {
     if (parser->hit_unexpected_token) return 0;
 
+    if (parser->curr->type == Token_Type_Inserted_Semicolon && token_type == ';') {
+        consume_token(parser);
+        return 1;
+    }
+
     if (parser->curr->type == token_type) {
         consume_token(parser);
         return 1;
@@ -151,7 +169,13 @@ static b32 consume_token_if_next(OnyxParser* parser, TokenType token_type) {
 }
 
 static void consume_tokens(OnyxParser* parser, i32 n) {
-    fori (i, 0, n) consume_token(parser);
+    fori (i, 0, n) {
+        if (parser->curr->type == Token_Type_Inserted_Semicolon) {
+            i--;
+        }
+
+        consume_token(parser);
+    }
 }
 
 static b32 next_tokens_are(OnyxParser* parser, i32 n, ...) {
@@ -159,11 +183,20 @@ static b32 next_tokens_are(OnyxParser* parser, i32 n, ...) {
     va_start(va, n);
 
     i32 matched = 1;
+    i32 skipped = 0;
 
     // BUG: This does not take into consideration comments that can occur between any tokens.
     fori (i, 0, n) {
         TokenType expected_type = va_arg(va, TokenType);
-        if (peek_token(i)->type != expected_type) {
+        OnyxToken *peeked_token = peek_token(i + skipped);
+
+        // if (peeked_token->type == Token_Type_Inserted_Semicolon) {
+        //     i--;
+        //     skipped += 1;
+        //     continue;
+        // }
+
+        if (peeked_token->type != expected_type) {
             matched = 0;
             break;
         }
@@ -410,6 +443,8 @@ static AstCall* parse_function_call(OnyxParser *parser, AstTyped *callee) {
 
 static AstTyped* parse_factor(OnyxParser* parser) {
     AstTyped* retval = NULL;
+
+    consume_token_if_next(parser, Token_Type_Inserted_Semicolon);
 
     switch ((u16) parser->curr->type) {
         case '(': {
@@ -1257,6 +1292,7 @@ static AstIfWhile* parse_if_stmt(OnyxParser* parser) {
     }
 
     AstBlock* true_stmt = parse_block(parser, 1, NULL);
+    consume_token_if_next(parser, ';');
 
     if_node->initialization = initialization_or_cond;
     if_node->cond = cond;
@@ -1278,6 +1314,8 @@ static AstIfWhile* parse_if_stmt(OnyxParser* parser) {
 
         if_node->false_stmt = (AstBlock *) elseif_node;
         if_node = elseif_node;
+
+        consume_token_if_next(parser, ';');
     }
 
     if (consume_token_if_next(parser, Token_Type_Keyword_Else)) {
@@ -3294,6 +3332,7 @@ static AstIf* parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statem
             if (parser->hit_unexpected_token) return static_if_node;
 
             parse_top_level_statement(parser);
+            consume_token_if_next(parser, ';');
         }
     }
 
@@ -3312,6 +3351,7 @@ static AstIf* parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statem
                 if (parser->hit_unexpected_token) return static_if_node;
 
                 parse_top_level_statement(parser);
+                consume_token_if_next(parser, ';');
             }
         }
 
@@ -3880,7 +3920,6 @@ static void parse_top_level_statement(OnyxParser* parser) {
         default: break;
     }
 
-    expect_token(parser, ';');
     return;
 
 submit_binding_to_entities:
@@ -4080,6 +4119,7 @@ static void parse_top_level_statements_until(OnyxParser* parser, TokenType tt) {
         if (parser->hit_unexpected_token) break;
         if (onyx_has_errors()) break;
         parse_top_level_statement(parser);
+        consume_token_if_next(parser, ';');
     }
 }
 
@@ -4146,6 +4186,8 @@ void onyx_parse(OnyxParser *parser) {
     parser->file_scope = scope_create(parser->allocator, parser->package->private_scope, parser->tokenizer->tokens[0].pos);
     parser->current_scope = parser->file_scope;
 
+    consume_token_if_next(parser, ';');
+
     if (parse_possible_directive(parser, "allow_stale_code")
         && !parser->package->is_included_somewhere
         && !context.options->no_stale_code) {
@@ -4153,8 +4195,11 @@ void onyx_parse(OnyxParser *parser) {
         bh_arr_push(parser->alternate_entity_placement_stack, &parser->package->buffered_entities);
     }
 
+    consume_token_if_next(parser, ';');
+
     while (parse_possible_directive(parser, "package_doc")) {
         OnyxToken *doc_string = expect_token(parser, Token_Type_Literal_String);
+        consume_token_if_next(parser, ';');
 
         bh_arr_push(parser->package->doc_strings, doc_string);
     }
