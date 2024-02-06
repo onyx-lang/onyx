@@ -27,7 +27,7 @@ get_globals_with_tag :: ($tag_type: type_expr) -> [] GGWT_Result(tag_type) {
                 data = glob.data,
                 type = glob.type,
                 tag = cast(&tag_type) tag.data,
-                pack = glob.pack
+                pack = glob.pack,
             });
         });
     }
