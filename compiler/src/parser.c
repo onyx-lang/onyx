@@ -3068,6 +3068,16 @@ static b32 parse_possible_function_definition_no_consume(OnyxParser* parser) {
 
         // :LinearTokenDependent
         OnyxToken* token_after_paren = matching_paren + 1;
+
+        // Allow for:
+        //     foo :: ()
+        //         -> i32 {}
+        //
+        //     bar :: ()
+        //     { }
+        if (token_after_paren->type == Token_Type_Inserted_Semicolon)
+            token_after_paren += 1;
+
         if (token_after_paren->type != Token_Type_Right_Arrow
             && token_after_paren->type != '{'
             && token_after_paren->type != Token_Type_Keyword_Do

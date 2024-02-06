@@ -94,6 +94,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     "\t                        Can drastically increase binary size.\n"
     "\t--generate-foreign-info Generate information for foreign blocks. Rarely needed, so disabled by default.\n"
     "\t--wasm-mvp              Use only WebAssembly MVP features.\n"
+    "\t--feature <feature>     Enable an experimental language feature.\n"
     "\n"
     "Developer options:\n"
     "\t--no-colors               Disables colors in the error message.\n"
@@ -122,6 +123,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .no_core                 = 0,
         .no_stale_code           = 0,
         .show_all_errors         = 0,
+
+        .enable_optional_semicolons = 0,
 
         .runtime = Runtime_Onyx,
 
@@ -279,6 +282,12 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--show-all-errors")) {
                 options.show_all_errors = 1;
+            }
+            else if (!strcmp(argv[i], "--feature")) {
+                char *next_arg = argv[++i];
+                if (!strcmp(next_arg, "optional-semicolons")) {
+                    options.enable_optional_semicolons = 1;
+                }
             }
             else if (!strcmp(argv[i], "-I")) {
                 bh_arr_push(options.included_folders, argv[++i]);

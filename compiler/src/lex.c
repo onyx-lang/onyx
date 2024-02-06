@@ -158,7 +158,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
 
         switch (*tokenizer->curr) {
             case '\n':
-                if (tokenizer->insert_semicolon) {
+                if (tokenizer->insert_semicolon && context.options->enable_optional_semicolons) {
                     OnyxToken semicolon_token;
                     semicolon_token.type = Token_Type_Inserted_Semicolon;
                     semicolon_token.text = "; ";

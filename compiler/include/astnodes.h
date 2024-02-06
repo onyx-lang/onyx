@@ -1843,6 +1843,8 @@ struct CompileOptions {
     b32 no_stale_code         : 1;
     b32 show_all_errors       : 1;
 
+    b32 enable_optional_semicolons : 1;
+
     b32 generate_tag_file         : 1;
     b32 generate_symbol_info_file : 1;
     b32 generate_lsp_info_file    : 1;
