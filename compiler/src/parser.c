@@ -3122,7 +3122,7 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
         return_type = (AstType *) &basic_type_auto_return;
 
     } else {
-        AstTyped* body = parse_compound_expression(parser, 0);
+        AstTyped* body = parse_expression(parser, 0);
         if (body == NULL) {
             onyx_report_error(parser->curr->pos, Error_Critical, "Expected an expression here.");
             parser->hit_unexpected_token = 1;
