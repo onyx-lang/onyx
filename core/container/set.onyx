@@ -85,7 +85,7 @@ insert :: (use set: &Set, value: set.Elem_Type) {
 }
 
 #operator << macro (set: Set($T), value: T) {
-    #this_package.insert(&set, value)
+    #this_package.insert(&set, value);
 }
 
 has :: (use set: &Set, value: set.Elem_Type) -> bool {

@@ -182,8 +182,8 @@ SnailNum :: struct {
             return 0;
         }
 
-        return 3 * (left_val + left->magnitude())
-            +  2 * (right_val + right->magnitude());
+        return 3 * (left_val + left->magnitude()) +
+               2 * (right_val + right->magnitude());
     }
 
     parse :: (line: &str) -> &SnailNum {

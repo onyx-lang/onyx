@@ -25,10 +25,10 @@ CubePos :: struct {
     }
 
     equals :: (a, b: CubePos) => {
-        return (a.x == b.x)
-            && (a.y == b.y)
-            && (a.z == b.z)
-            && (a.w == b.w);
+        return (a.x == b.x) &&
+               (a.y == b.y) &&
+               (a.z == b.z) &&
+               (a.w == b.w);
     }
 }
 

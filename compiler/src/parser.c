@@ -1020,6 +1020,21 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 break;
             }
 
+            case Token_Type_Inserted_Semicolon: {
+                //
+                // This is a special case for -> method calls because they should be able to be split across
+                // multiple lines, unlike all other postfix operators. This is a personal choice, but I think
+                // it reads better than:
+                //      iter.as_iter(1 .. 10)->
+                //      map(x => x * 2)->
+                //      collect()
+                //
+                if (peek_token(1)->type != Token_Type_Right_Arrow) goto factor_parsed;
+
+                consume_token(parser);
+                // fallthrough
+            }
+
             case Token_Type_Right_Arrow: {
                 AstBinaryOp* method_call = make_node(AstBinaryOp, Ast_Kind_Method_Call);
                 method_call->token = expect_token(parser, Token_Type_Right_Arrow);
@@ -1146,6 +1161,19 @@ static BinaryOp binary_op_from_token_type(TokenType t) {
     }
 }
 
+static BinaryOp binary_op_from_current_token(OnyxParser *parser) {
+    BinaryOp op = binary_op_from_token_type(parser->curr->type);
+
+    if (op == Binary_Op_Count && parser->curr->type == Token_Type_Inserted_Semicolon) {
+        if (peek_token(1)->type == Token_Type_Pipe) {
+            consume_token(parser);
+            op = Binary_Op_Pipe;
+        }
+    }
+
+    return op;
+}
+
 static AstTyped* parse_compound_assignment(OnyxParser* parser, AstTyped* lhs) {
     if (parser->curr->type != '=') return lhs;
 
@@ -1224,7 +1252,7 @@ static AstTyped* parse_expression(OnyxParser* parser, b32 assignment_allowed) {
             goto expression_done;
         }
 
-        bin_op_kind = binary_op_from_token_type(parser->curr->type);
+        bin_op_kind = binary_op_from_current_token(parser);
         if (bin_op_kind == Binary_Op_Count) goto expression_done;
         if (binop_is_assignment(bin_op_kind) && !assignment_allowed) goto expression_done;
         if (bin_op_kind == Binary_Op_Subscript) goto expression_done;
@@ -2339,7 +2367,9 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) return s_node;
 
-        parse_possible_tag(parser);
+        if (parse_possible_tag(parser)) {
+            consume_token_if_next(parser, ';');
+        }
 
         if (parse_possible_directive(parser, "persist")) {
             b32 thread_local = parse_possible_directive(parser, "thread_local");

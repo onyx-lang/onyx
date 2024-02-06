@@ -92,8 +92,8 @@ cyk_algorithm :: (use grammar: &Grammar, input: str) -> bool {
         for s in 0 .. input.count - l {
             for p in 1 .. l + 1 {
                 for &prod in production_rules {
-                    if    T[(p - 1) * dim_0 + s       * dim_1 + prod.nt1 * dim_2]
-                       && T[(l - p) * dim_0 + (s + p) * dim_1 + prod.nt2 * dim_2] {
+                    if T[(p - 1) * dim_0 + s       * dim_1 + prod.nt1 * dim_2] &&
+                       T[(l - p) * dim_0 + (s + p) * dim_1 + prod.nt2 * dim_2] {
                         T[l * dim_0 + s * dim_1 + prod.nt0 * dim_2] = true;
                     }
                 }

@@ -32,9 +32,10 @@ simulate :: (cups: [] i32, moves := 100) {
         next_3 := cw[next_2];
         
         destination_cup := w(current_cup - 1);
-        while  destination_cup == ~~next_1
-            || destination_cup == ~~next_2
-            || destination_cup == ~~next_3 {
+        while  destination_cup == ~~next_1 ||
+               destination_cup == ~~next_2 ||
+               destination_cup == ~~next_3
+        {
             destination_cup = w(destination_cup - 1);
         }
 

@@ -24,7 +24,7 @@ insert :: (use heap: &Heap, v: heap.T) {
 }
 
 #operator << macro (heap: Heap($T), v: T) {
-    #this_package.insert(&heap, v)
+    #this_package.insert(&heap, v);
 }
 
 remove_top :: (use heap: &Heap) -> heap.T {
