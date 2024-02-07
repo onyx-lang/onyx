@@ -189,17 +189,29 @@ void symbol_subpackage_introduce(Package* parent, char* sym, AstPackage* subpack
     }
 }
 
+AstNode* symbol_raw_resolve_no_ascend(Scope* scope, char* sym) {
+    if (!scope || !scope->symbols) return NULL;
+
+    i32 index = shgeti(scope->symbols, sym);
+    if (index != -1) {
+        AstNode* res = scope->symbols[index].value;
+
+        if ((res->flags & Ast_Flag_Symbol_Invisible) == 0) {
+            return res;
+        }
+    }
+
+    return NULL;
+}
+
 AstNode* symbol_raw_resolve(Scope* start_scope, char* sym) {
     Scope* scope = start_scope;
+    AstNode *res = NULL;
 
     while (scope != NULL) {
-        i32 index = shgeti(scope->symbols, sym);
-        if (index != -1) {
-            AstNode* res = scope->symbols[index].value;
-
-            if ((res->flags & Ast_Flag_Symbol_Invisible) == 0) {
-                return res;
-            }
+        res = symbol_raw_resolve_no_ascend(scope, sym);
+        if (res) {
+            return res;
         }
 
         scope = scope->parent;
@@ -258,7 +270,7 @@ all_types_peeled_off:
                 return NULL;
             }
 
-            return symbol_raw_resolve(package->package->scope, symbol);
+            return symbol_raw_resolve_no_ascend(package->package->scope, symbol);
         } 
 
         case Ast_Kind_Foreign_Block: {
@@ -276,12 +288,12 @@ all_types_peeled_off:
             if (bt->scope == NULL)
                 return NULL;
 
-            return symbol_raw_resolve(bt->scope, symbol);
+            return symbol_raw_resolve_no_ascend(bt->scope, symbol);
         }
 
         case Ast_Kind_Enum_Type: {
             AstEnumType* etype = (AstEnumType *) node;
-            return symbol_raw_resolve(etype->scope, symbol);
+            return symbol_raw_resolve_no_ascend(etype->scope, symbol);
         }
 
         case Ast_Kind_Struct_Type: {
@@ -363,12 +375,12 @@ all_types_peeled_off:
 
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* stype = ((AstPolyStructType *) node);
-            return symbol_raw_resolve(stype->scope, symbol);
+            return symbol_raw_resolve_no_ascend(stype->scope, symbol);
         }
 
         case Ast_Kind_Poly_Union_Type: {
             AstPolyUnionType* utype = ((AstPolyUnionType *) node);
-            return symbol_raw_resolve(utype->scope, symbol);
+            return symbol_raw_resolve_no_ascend(utype->scope, symbol);
         }
 
         case Ast_Kind_Poly_Call_Type: {
@@ -381,12 +393,12 @@ all_types_peeled_off:
 
         case Ast_Kind_Distinct_Type: {
             AstDistinctType* dtype = (AstDistinctType *) node;
-            return symbol_raw_resolve(dtype->scope, symbol);
+            return symbol_raw_resolve_no_ascend(dtype->scope, symbol);
         }
 
         case Ast_Kind_Interface: {
             AstInterface* inter = (AstInterface *) node;
-            return symbol_raw_resolve(inter->scope, symbol);
+            return symbol_raw_resolve_no_ascend(inter->scope, symbol);
         }
 
         default: break;
