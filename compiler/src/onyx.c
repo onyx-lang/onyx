@@ -194,6 +194,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         options.action = ONYX_COMPILE_ACTION_RUN;
         options.passthrough_argument_count = argc - 2;
         options.passthrough_argument_data  = &argv[2];
+        options.generate_method_info = 1; // The package manager needs this to be enabled.
         arg_parse_start = argc;
 
         bh_arr_push(options.files, bh_aprintf(alloc, "%s/tools/onyx-pkg.onyx", core_installation));
