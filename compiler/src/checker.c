@@ -3715,14 +3715,16 @@ CheckStatus check_interface_constraint(AstConstraint *constraint) {
     fori (i, 0, bh_arr_length(constraint->interface->params)) {
         InterfaceParam *ip = &constraint->interface->params[i];
 
-        AstTyped *arg = constraint->args[i];
-        TYPE_CHECK(&arg, ip->type) {
-            ERROR_(arg->token->pos, "Mismatched type in interface construction. Expected something of type '%s', but got something of type '%s'.", type_get_name(ip->type), type_get_name(arg->type));
+        AstTyped **arg = &constraint->args[i];
+        CHECK(expression, arg);
+
+        TYPE_CHECK(arg, ip->type) {
+            ERROR_((*arg)->token->pos, "Mismatched type in interface construction. Expected something of type '%s', but got something of type '%s'.", type_get_name(ip->type), type_get_name((*arg)->type));
         }
 
         AstAlias *type_alias = onyx_ast_node_new(context.ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
         type_alias->token = ip->value_token;
-        type_alias->alias = arg;
+        type_alias->alias = *arg;
 
         symbol_introduce(constraint->scope, ip->value_token, (AstNode *) type_alias);
     }
