@@ -3857,6 +3857,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 injection_point->alias = parse_expression(parser, 0);
                 injection_point->token = injection_point->alias->token;
 
+                consume_token_if_next(parser, Token_Type_Inserted_Semicolon);
                 if (peek_token(0)->type == '{') {
                     if (parser->injection_point) {
                         onyx_report_error(dir_token->pos, Error_Critical, "#inject blocks cannot be nested.");
@@ -3952,7 +3953,14 @@ static void parse_top_level_statement(OnyxParser* parser) {
             break;
         }
 
-        default: break;
+        case ';':
+        case Token_Type_Inserted_Semicolon:
+            break;
+
+        default:
+            onyx_report_error(parser->curr->pos, Error_Critical, "Unexpected token in top-level statement, '%s'", token_name(parser->curr));
+            parser->hit_unexpected_token = 1;
+            break;
     }
 
     return;
@@ -4059,6 +4067,7 @@ static void parse_import_statement(OnyxParser* parser, OnyxToken *token) {
     import_node->imported_package = package_node;
     import_node->import_package_itself = 1;
 
+    consume_token_if_next(parser, Token_Type_Inserted_Semicolon);
     if (consume_token_if_next(parser, '{')) {
         import_node->specified_imports = 1;
         import_node->import_package_itself = 0;
