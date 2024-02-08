@@ -1663,7 +1663,7 @@ static AstReturn* parse_return_stmt(OnyxParser* parser) {
 
     AstTyped* expr = NULL;
 
-    if (parser->curr->type != ';') {
+    if (parser->curr->type != ';' && parser->curr->type != Token_Type_Inserted_Semicolon) {
         expr = parse_compound_expression(parser, 0);
 
         if (expr == NULL || expr == (AstTyped *) &error_node) {
@@ -2363,6 +2363,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
 
         if (parse_possible_tag(parser)) {
             consume_token_if_next(parser, ';');
+            continue;
         }
 
         if (parse_possible_directive(parser, "persist")) {
