@@ -908,6 +908,7 @@ BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc);
 // TIME / DURATION
 //------------------------------------------------------------------------------
 u64 bh_time_curr();
+u64 bh_time_curr_micro();
 u64 bh_time_duration(u64 old);
 
 
@@ -3079,6 +3080,26 @@ void bh_imap_clear(bh_imap* imap) {
 
 
 
+u64 bh_time_curr_micro() {
+#if defined(_BH_WINDOWS)
+    LARGE_INTEGER result;
+    QueryPerformanceCounter(&result);
+    return (u64) result.QuadPart; // This is wrong and not micro-seconds...
+
+#elif defined(_BH_LINUX) || defined(_BH_DARWIN)
+    struct timespec spec;
+    clock_gettime(CLOCK_REALTIME, &spec);
+
+    time_t sec = spec.tv_sec;
+    u64 ms  = spec.tv_nsec / 1000;
+    if (ms > 999999) {
+        sec++;
+        ms -= 1000000;
+    }
+
+    return sec * 1000000 + ms;
+#endif
+}
 
 u64 bh_time_curr() {
 #if defined(_BH_WINDOWS)

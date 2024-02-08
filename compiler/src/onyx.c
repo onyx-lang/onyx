@@ -142,6 +142,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .generate_tag_file = 0,
         .generate_symbol_info_file = 0,
         .generate_lsp_info_file = 0,
+
+        .running_perf = 0,
     };
 
     bh_arr_new(alloc, options.files, 2);
@@ -333,6 +335,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--stack-trace")) {
                 options.stack_trace_enabled = 1;
+            }
+            else if (!strcmp(argv[i], "--perf")) {
+                options.running_perf = 1;
             }
             else if (!strcmp(argv[i], "--")) {
                 options.passthrough_argument_count = argc - i - 1;
@@ -919,8 +924,17 @@ static i32 onyx_compile() {
         // Mostly a preventative thing to ensure that even if somehow
         // errors were left disabled, they are re-enabled in this cycle.
         onyx_errors_enable();
-
         entity_heap_remove_top(&context.entities);
+
+        u64 perf_start;
+        EntityType perf_entity_type;
+        EntityState perf_entity_state;
+        if (context.options->running_perf) {
+            perf_start = bh_time_curr_micro();
+            perf_entity_type = ent->type;
+            perf_entity_state = ent->state;
+        }
+
         b32 changed = process_entity(ent);
 
         // NOTE: VERY VERY dumb cycle breaking. Basically, remember the first entity that did
@@ -968,6 +982,14 @@ static i32 onyx_compile() {
 
         if (ent->state != Entity_State_Finalized && ent->state != Entity_State_Failed)
             entity_heap_insert_existing(&context.entities, ent);
+
+        if (context.options->running_perf) {
+            u64 perf_end = bh_time_curr_micro();
+
+            u64 duration = perf_end - perf_start;
+            context.microseconds_per_type[perf_entity_type] += duration;
+            context.microseconds_per_state[perf_entity_state] += duration;
+        }
     }
 
     //
@@ -995,6 +1017,17 @@ static i32 onyx_compile() {
 
     if (context.options->documentation_file != NULL) {
         onyx_docs_emit_odoc(context.options->documentation_file);
+    }
+
+    if (context.options->running_perf) {
+        fori (i, 0, Entity_State_Count) {
+            printf("| %27s | %10lu us |\n", entity_state_strings[i], context.microseconds_per_state[i]);
+        }
+        printf("\n");
+        fori (i, 0, Entity_Type_Count) {
+            printf("| %27s | %10lu us |\n", entity_type_strings[i], context.microseconds_per_type[i]);
+        }
+        printf("\n");
     }
 
     return ONYX_COMPILER_PROGRESS_SUCCESS;

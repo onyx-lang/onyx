@@ -1840,6 +1840,8 @@ struct CompileOptions {
     b32 generate_symbol_info_file : 1;
     b32 generate_lsp_info_file    : 1;
 
+    b32 running_perf : 1;
+
     Runtime runtime;
 
     bh_arr(const char *) included_folders;
@@ -1894,6 +1896,9 @@ struct Context {
 
     u64 lexer_lines_processed;
     u64 lexer_tokens_processed;
+
+    u64 microseconds_per_state[Entity_State_Count];
+    u64 microseconds_per_type[Entity_Type_Count];
 
     u32 cycle_almost_detected : 2;
     b32 cycle_detected : 1;
