@@ -104,6 +104,18 @@ free :: (use map: &Map) {
 }
 
 #doc """
+    Shallow copies a map using the allocator provided if one is provided, or the allocator on the old map otherwise.
+"""
+copy :: (oldMap: &Map, allocator: ? Allocator = .None) -> Map(oldMap.Key_Type, oldMap.Value_Type) {
+    newMap: typeof *oldMap;
+    newMap.allocator = allocator ?? oldMap.allocator;
+    newMap.hashes = array.copy(oldMap.hashes, newMap.allocator);
+    newMap.entries = array.copy(&oldMap.entries, newMap.allocator);
+
+    return newMap;
+}
+
+#doc """
     Sets the value at the specified key, or creates a new entry
     if the key was not already present.
 """
