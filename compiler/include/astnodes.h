@@ -835,6 +835,7 @@ struct AstFor           {
 
     // NOTE: Local defining the iteration variable
     AstLocal* var;
+    AstLocal* index_var;
 
     // NOTE: This can be any expression, but it is checked that
     // it is of a type that we know how to iterate over.

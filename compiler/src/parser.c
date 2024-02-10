@@ -1408,16 +1408,38 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
         for_node->by_pointer = 1;
     }
 
+    //
+    // For loops can take on a lot of shapes.
+    //     for value in iter
+    //     for value: i64 in iter
+    //     for value, index in iter
+    //     for value: i64, index in iter
+    //     for value: i64, index: i32 in iter
+    //
     if (next_tokens_are(parser, 2, Token_Type_Symbol, Token_Type_Keyword_In)
         || next_tokens_are(parser, 2, Token_Type_Symbol, ':')
+        || next_tokens_are(parser, 2, Token_Type_Symbol, ',')
     ) {
-        OnyxToken* local_sym = expect_token(parser, Token_Type_Symbol);
-        AstLocal* var_node = make_local(parser->allocator, local_sym, NULL);
+        for_node->var = make_local(
+            parser->allocator,
+            expect_token(parser, Token_Type_Symbol),
+            NULL
+        );
 
-        for_node->var = var_node;
-        if (peek_token(0)->type == ':') {
-            expect_token(parser, ':');
-            var_node->type_node = parse_type(parser);
+        if (consume_token_if_next(parser, ':')) {
+            for_node->var->type_node = parse_type(parser);
+        }
+
+        if (consume_token_if_next(parser, ',')) {
+            for_node->index_var = make_local(
+                parser->allocator,
+                expect_token(parser, Token_Type_Symbol),
+                (AstType *) &basic_type_u32
+            );
+
+            if (consume_token_if_next(parser, ':')) {
+                for_node->index_var->type_node = parse_type(parser);
+            }
         }
 
         expect_token(parser, Token_Type_Keyword_In);

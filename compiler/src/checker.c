@@ -346,6 +346,15 @@ CheckStatus check_for(AstFor* fornode) {
         fornode->var->type = given_type;
     }
 
+    if (fornode->index_var) {
+        fornode->index_var->flags |= Ast_Flag_Cannot_Take_Addr;
+        CHECK(expression, (AstTyped **) &fornode->index_var);
+
+        if (!type_is_integer(fornode->index_var->type)) {
+            ERROR_(fornode->index_var->token->pos, "Index for a for loop must be an integer type, but it is a '%s'.", type_get_name(fornode->index_var->type));
+        }
+    }
+
     if (fornode->by_pointer)
         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
 
