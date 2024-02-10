@@ -825,6 +825,12 @@ static SymresStatus symres_for(AstFor* fornode) {
     scope_enter(fornode->scope);
     SYMRES(expression, &fornode->iter);
     SYMRES(local, &fornode->var);
+
+    // Right now, the index variable is optional
+    if (fornode->index_var) {
+        SYMRES(local, &fornode->index_var);
+    }
+
     SYMRES(block, fornode->stmt);
     scope_leave();
 
