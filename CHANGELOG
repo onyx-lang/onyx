@@ -11,6 +11,15 @@ written in Onyx. The two major syntax changes:
     Cases with captures:
         case Value as capture      instead of        case capture: Value 
 
+    Interfaces:
+        X :: interface (T: type_expr) {
+            t as T;
+        }
+
+        instead of
+
+        X :: interface (t: $T) { ... }
+
 These syntax changes help improve readability and makes the language more friendly to newcomers.
 These changes also introduce two new keywords into the language that could see use in other places
 in the future. This is a small improvement to make, but it is better to make it now while a
