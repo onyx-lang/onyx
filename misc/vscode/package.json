@@ -2,7 +2,7 @@
     "name": "onyxlang",
     "displayName": "Onyx Programming Language",
     "description": "Onyx syntax highlighting and debugger support.",
-    "version": "0.1.9",
+    "version": "0.1.10",
     "publisher": "onyxlang",
     "license": "BSD-2-Clause",
     "engines": {
@@ -73,13 +73,16 @@
                 "label": "Onyx Debug",
                 "program": "./out/debugAdapter.js",
                 "runtime": "node",
+                "variables": {
+                    "pickSession": "extension.pickOnyxSession"
+                },
                 "configurationAttributes": {
                     "attach": {
                         "properties": {
                             "socketPath": {
                                 "type": "string",
                                 "description": "Path to UNIX socket for attaching to debugger",
-                                "default": "/tmp/ovm-debug.0000"
+                                "default": "${command:pickSession}"
                             },
                             "stopOnEntry": {
                                 "type": "boolean",
