@@ -181,8 +181,8 @@ __net_resolve :: (host: str, port: u16, out_addrs: [] SocketAddress) -> i32 {
 
 
 #package {
-    socket_addr_to_wasix_addr :: (in: &SocketAddress, out: &wasi.AddrPort) {
-        switch *in {
+    socket_addr_to_wasix_addr :: (input: &SocketAddress, out: &wasi.AddrPort) {
+        switch *innput {
             case .Unix as &path {
                 *out = .{ Unix = .{ *cast(&[108] u8) path } };
             }
@@ -200,8 +200,8 @@ __net_resolve :: (host: str, port: u16, out_addrs: [] SocketAddress) -> i32 {
         }
     }
 
-    wasi_addr_to_socket_address :: (in: &wasi.AddrPort, out: &SocketAddress) {
-        switch *in {
+    wasi_addr_to_socket_address :: (input: &wasi.AddrPort, out: &SocketAddress) {
+        switch *input {
             case .Unspec ---
 
             case .Ipv4 as &inet {

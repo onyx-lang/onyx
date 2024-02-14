@@ -422,7 +422,7 @@ path_rename  :: (fd: FileDescriptor, old_path: str, new_fd: FileDescriptor, new_
 path_symlink :: (old_path: &u8, old_path_len: Size, fd: FileDescriptor, new_path: str) -> Errno #foreign WASI_VERSION "path_symlink" ---
 path_unlink_file :: (fd: FileDescriptor, path: str) -> Errno #foreign WASI_VERSION "path_unlink_file" ---
 
-poll_oneoff :: (in: &Subscription, out: &Event, nsubscriptions: Size, nevents: &Size) -> Errno #foreign WASI_VERSION "poll_oneoff" ---
+poll_oneoff :: (input: &Subscription, out: &Event, nsubscriptions: Size, nevents: &Size) -> Errno #foreign WASI_VERSION "poll_oneoff" ---
 
 proc_exit  :: (rval: ExitCode) -> void #foreign WASI_VERSION "proc_exit" ---
 proc_raise :: (sig: Signal) -> Errno #foreign WASI_VERSION "proc_raise" ---

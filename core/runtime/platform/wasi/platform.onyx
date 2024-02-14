@@ -152,7 +152,7 @@ __random_get :: (buf: [] u8) {
 
 PollDescription :: struct {
     fd: wasi.FileDescriptor;
-    in: core.io.PollEvent;
+    input: core.io.PollEvent;
     out: core.io.PollEvent;
 }
 
@@ -169,7 +169,7 @@ __poll :: (fds: [] PollDescription, timeout: i32) -> void {
     subs := core.alloc.array_from_stack(wasi.Subscription, count);
     for i in fds.count {
         subs[i].userdata = ~~ i;
-        subs[i].u.tag = switch fds[i].in {
+        subs[i].u.tag = switch fds[i].input {
             case .None => .FDRead;
             case .Read => .FDRead;
             case .Write => .FDWrite;
@@ -199,7 +199,7 @@ __poll :: (fds: [] PollDescription, timeout: i32) -> void {
         if ev.type !=.Clock {
             if ev.fd_readwrite.nbytes > 0 {
                 i := cast(i32) ev.userdata;
-                fds[i].out = fds[i].in;
+                fds[i].out = fds[i].input;
             }
 
             if ev.fd_readwrite.flags & .ReadWriteHangUp {

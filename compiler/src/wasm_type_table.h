@@ -415,7 +415,6 @@ static u64 build_type_table(OnyxWasmModule* module) {
                         u32 func_idx = get_element_idx(module, node);
                         bh_buffer_write_u32(&table_buffer, func_idx);
                         bh_buffer_write_u32(&table_buffer, 0);
-                        bh_buffer_write_u32(&table_buffer, 0);
                         
                         bh_arr_push(method_data, ((StructMethodData) {
                             .name_loc = name_loc,
@@ -678,7 +677,6 @@ static u64 build_type_table(OnyxWasmModule* module) {
                         u32 data_loc = table_buffer.length;
                         u32 func_idx = 0; // get_element_idx(module, node);
                         bh_buffer_write_u32(&table_buffer, func_idx);
-                        bh_buffer_write_u32(&table_buffer, 0);
                         bh_buffer_write_u32(&table_buffer, 0);
                         
                         bh_arr_push(method_data, ((StructMethodData) {
@@ -1128,7 +1126,6 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
         assert(func->entity && func->entity->package);
 
         bh_buffer_write_u32(&tag_proc_buffer, get_element_idx(module, func));
-        bh_buffer_write_u32(&tag_proc_buffer, 0);
         bh_buffer_write_u32(&tag_proc_buffer, 0);
         bh_buffer_write_u32(&tag_proc_buffer, func->type->id);
         WRITE_SLICE(tag_array_base, tag_count);

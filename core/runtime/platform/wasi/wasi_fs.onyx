@@ -265,7 +265,7 @@ __file_stream_vtable := io.Stream_Vtable.{
     poll = (use fs: &os.File, ev: io.PollEvent, timeout: i32) -> (io.Error, bool) {
         p: [1] PollDescription = .[.{
             fd = data.fd,
-            in = ev,
+            input = ev,
         }];
 
         runtime.platform.__poll(p, timeout);

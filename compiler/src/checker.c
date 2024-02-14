@@ -2761,7 +2761,9 @@ CheckStatus check_directive_export_name(AstDirectiveExportName *ename) {
 }
 
 CheckStatus check_capture_block(AstCaptureBlock *block) {
-    block->total_size_in_bytes = 0;
+    //
+    // Reserve 8 bytes at the beginning of the closure block for the size of the closure.
+    block->total_size_in_bytes = 8;
 
     bh_arr_each(AstCaptureLocal *, capture, block->captures) {
         CHECK(expression, (AstTyped **) capture);

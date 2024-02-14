@@ -1536,12 +1536,9 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
     u64 iterator_remove_func = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
     u64 iterator_done_bool   = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
     WI(for_node->token, WI_DROP);
-    WI(for_node->token, WI_DROP);
     WIL(for_node->token, WI_LOCAL_SET, iterator_remove_func);
     WI(for_node->token, WI_DROP);
-    WI(for_node->token, WI_DROP);
     WIL(for_node->token, WI_LOCAL_SET, iterator_close_func);
-    WI(for_node->token, WI_DROP);
     WI(for_node->token, WI_DROP);
     WIL(for_node->token, WI_LOCAL_SET, iterator_next_func);
     WIL(for_node->token, WI_LOCAL_SET, iterator_data_ptr);
@@ -2044,14 +2041,12 @@ EMIT_FUNC(binop, AstBinaryOp* binop) {
     }
 
     emit_expression(mod, &code, binop->left);
-    if (binop->left->type->kind == Type_Kind_Function) { // nocheckin
-        WI(NULL, WI_DROP);
+    if (binop->left->type->kind == Type_Kind_Function) {
         WI(NULL, WI_DROP);
     }
 
     emit_expression(mod, &code, binop->right);
-    if (binop->right->type->kind == Type_Kind_Function) { // nocheckin
-        WI(NULL, WI_DROP);
+    if (binop->right->type->kind == Type_Kind_Function) {
         WI(NULL, WI_DROP);
     }
 
@@ -2367,7 +2362,6 @@ EMIT_FUNC(call, AstCall* call) {
         emit_expression(mod, &code, call->callee);
 
         u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_closure_base);
-        WI(NULL, WI_DROP);
         WIL(NULL, WI_GLOBAL_SET, global_closure_base_idx);
 
         i32 type_idx = generate_type_idx(mod, call->callee->type);
@@ -3666,7 +3660,6 @@ EMIT_FUNC(expression, AstTyped* expr) {
             WID(NULL, WI_I32_CONST, elemidx);
             if (!func->captures) {
                 WIL(NULL, WI_PTR_CONST, 0);
-                WIL(NULL, WI_I32_CONST, 0);
                 break;
             }
 
@@ -3686,6 +3679,10 @@ EMIT_FUNC(expression, AstTyped* expr) {
             u64 capture_block_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
             WIL(NULL, WI_LOCAL_TEE, capture_block_ptr);
 
+            WIL(NULL, WI_LOCAL_GET, capture_block_ptr);
+            WIL(NULL, WI_I32_CONST, func->captures->total_size_in_bytes);
+            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_U32], 0);
+
             // Populate the block
             bh_arr_each(AstCaptureLocal *, capture, func->captures->captures) {
                 WIL(NULL, WI_LOCAL_GET, capture_block_ptr);
@@ -3699,9 +3696,6 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 emit_store_instruction(mod, &code, (*capture)->type, (*capture)->offset);
             }
 
-            local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-
-            WIL(NULL, WI_I32_CONST, func->captures->total_size_in_bytes);
             break;
         }
 
@@ -4121,7 +4115,6 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
 
     if (to->kind == Type_Kind_Basic && from->kind == Type_Kind_Function) {
         WI(NULL, WI_DROP);
-        WI(NULL, WI_DROP);
         *pcode = code;
         return;
     }
@@ -4341,7 +4334,6 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_nod
 
     } else if (type->kind == Type_Kind_Function) {
         WID(NULL, WI_I32_CONST, mod->null_proc_func_idx);
-        WIL(NULL, WI_I32_CONST, 0);
         WIL(NULL, WI_I32_CONST, 0);
 
     } else if (type->kind == Type_Kind_Distinct) {
@@ -4951,7 +4943,6 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
         AstFunction* func = (AstFunction *) node;
         CE(u32, 0) = get_element_idx(ctx->module, func);
         CE(u32, 4) = 0;
-        CE(u32, 8) = 0;
         break;
     }
 
