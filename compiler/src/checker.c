@@ -2622,6 +2622,7 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert, b32 expected_ex
             AstBlock* body_block = onyx_ast_node_new(context.ast_alloc, sizeof(AstBlock), Ast_Kind_Block);
             body_block->token = cloned_block->token;
             body_block->body = (AstNode *) return_node;
+            body_block->rules = Block_Rule_Code_Block;
             scope = &((AstBlock *) body_block)->quoted_block_capture_scope;
 
             AstDoBlock* doblock = (AstDoBlock *) onyx_ast_node_new(context.ast_alloc, sizeof(AstDoBlock), Ast_Kind_Do_Block);
