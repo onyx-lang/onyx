@@ -1,0 +1,26 @@
+use core {*}
+
+main :: () {
+    for value, index in 10 .. 100 {
+        // value: 10 -> 99
+        // index: 0 -> 89
+        //
+        // value is i32
+        // index is i32
+        printf("{}: {}\n", index, value);
+    }
+
+    for value, index: i64 in 20 .. 50 {
+        // value: 20 -> 49
+        // index: 0 -> 29
+        //
+        // value is i32
+        // index is i64
+        printf("({}) {}: {}\n", typeof index, index, value);
+    }
+
+    values := .[2, 3, 5, 7, 11];
+    for value: i32, index in values {
+        printf("{}: {}\n", index, value);
+    }
+}

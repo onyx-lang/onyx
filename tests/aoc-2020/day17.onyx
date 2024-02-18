@@ -2,7 +2,8 @@
 
 use core {package, *}
 
-OverloadsEqual :: interface (t: $T) {
+OverloadsEqual :: interface (T: type_expr) {
+    t as T;
     { T.equals(t, t) } -> bool;
 }
 
@@ -24,10 +25,10 @@ CubePos :: struct {
     }
 
     equals :: (a, b: CubePos) => {
-        return (a.x == b.x)
-            && (a.y == b.y)
-            && (a.z == b.z)
-            && (a.w == b.w);
+        return (a.x == b.x) &&
+               (a.y == b.y) &&
+               (a.z == b.z) &&
+               (a.w == b.w);
     }
 }
 
@@ -40,7 +41,7 @@ CubeState :: struct {
 get_neighbor_count :: (cubes: &Map(CubePos, CubeState), pos: CubePos) -> u32 {
     count := 0;
 
-    for x: -1 .. 2 do for y: -1 .. 2 do for z: -1 .. 2 do for w: -1 .. 2 {
+    for x in -1 .. 2 do for y in -1 .. 2 do for z in -1 .. 2 do for w in -1 .. 2 {
         if x == 0 && y == 0 && z == 0 && w == 0 do continue;
         key := CubePos.{ pos.x + x, pos.y + y, pos.z + z, pos.w + w };
         map.get(cubes, key)->with([s] {
@@ -64,7 +65,7 @@ main :: (args: [] cstr) {
         line, file~ := string.bisect(file, #char "\n");
 
         x := 0;
-        for ch: line {
+        for ch in line {
             if ch == #char "#" do map.put(&cubes, .{ x, 0, z, 0 }, .{ alive = true });
 
             x += 1;
@@ -76,10 +77,10 @@ main :: (args: [] cstr) {
     cubes_to_consider := array.make(CubePos);
     defer array.free(&cubes_to_consider);
 
-    for i: 0 .. 6 {
-        for &cube_entry: cubes.entries {
+    for i in 0 .. 6 {
+        for &cube_entry in cubes.entries {
             if cube_entry.value.alive {
-                for x: -1 .. 2 do for y: -1 .. 2 do for z: -1 .. 2 do for w: -1 .. 2 {
+                for x in -1 .. 2 do for y in -1 .. 2 do for z in -1 .. 2 do for w in -1 .. 2 {
                     array.push(&cubes_to_consider, .{
                         cube_entry.key.x + x,
                         cube_entry.key.y + y,
@@ -90,7 +91,7 @@ main :: (args: [] cstr) {
             }
         }
 
-        for &cube: cubes_to_consider {
+        for &cube in cubes_to_consider {
             state  := map.get(&cubes, *cube) ?? .{};
             ncount := get_neighbor_count(&cubes, *cube);
             
@@ -103,7 +104,7 @@ main :: (args: [] cstr) {
             map.put(&cubes, *cube, state);
         }
 
-        for &cube: cubes_to_consider {
+        for &cube in cubes_to_consider {
             state := map.get(&cubes, *cube) ?? .{};
             state.alive = state.next;
             map.put(&cubes, *cube, state);
@@ -113,7 +114,7 @@ main :: (args: [] cstr) {
     }
 
     active_count := 0;
-    for &cube_entry: cubes.entries do if cube_entry.value.alive do active_count += 1;
+    for &cube_entry in cubes.entries do if cube_entry.value.alive do active_count += 1;
 
     printf("Active count: {}\n", active_count);
 }

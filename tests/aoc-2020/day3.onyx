@@ -31,7 +31,7 @@ main :: (args: [] cstr) {
         width = line.count;
         height = height + 1;
 
-        for ch: line do array.push(&forest, ch);
+        for ch in line do array.push(&forest, ch);
     }
 
     lis := LineInterp.[
@@ -44,7 +44,7 @@ main :: (args: [] cstr) {
 
     tree_prod: u64 = 1;
 
-    for li: lis {
+    for li in lis {
         tree_count: u64 = 0;
         while i := 0; true {
             p := line_interp_at(li, i); 

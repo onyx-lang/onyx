@@ -377,7 +377,7 @@ wait_to_get_client_messages :: (use server: &TCP_Server) -> [] &TCP_Server.Clien
     socket_poll_all(cast([] &Socket) active_clients, status_buffer, pulse_time_ms);
 
     recv_clients: [..] &TCP_Server.Client;
-    for it: client_count {
+    for it in client_count {
         if status_buffer[it] == .Readable {
             //
             // If there is already a Ready event present for this client,

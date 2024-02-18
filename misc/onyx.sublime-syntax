@@ -32,7 +32,7 @@ contexts:
     # strings in YAML. When using single quoted strings, only single quotes
     # need to be escaped: this is done by using two single quotes next to each
     # other.
-    - match: '\b(package|struct|union|interface|use|where|global|enum|if|elseif|else|for|while|do|break|continue|fallthrough|return|cast|sizeof|alignof|typeof|defer|switch|case|macro)\b'
+    - match: '\b(package|struct|union|interface|use|where|global|enum|if|elseif|else|for|while|do|break|continue|fallthrough|return|cast|sizeof|alignof|typeof|defer|switch|case|macro|in|as)\b'
       scope: keyword.control.onyx
 
     - match: '\b(bool|void|i8|u8|i16|u16|i32|u32|i64|u64|f32|f64|rawptr|str|cstr|dyn_str|range|type_expr|any)\b'

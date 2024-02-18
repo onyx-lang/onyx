@@ -30,10 +30,12 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
     }
 }
 
-#local ValidKey :: interface (t: $T) {
+#local ValidKey :: interface (T: type_expr) {
     // In order to use a certain type as a key in a Map, you must
     // provide an implementation of core.hash.hash() for that type,
     // and you must provide an operator overload for ==.
+
+    t as T;
 
     { hash.hash(t) } -> u32;
     { t == t       } -> bool;
@@ -240,7 +242,7 @@ update :: macro (map: ^Map, key: map.Key_Type, body: Code) {
     modify memory, so be wary of dangling pointers!
 """
 clear :: (use map: &Map) {
-    for i: 0 .. hashes.count do hashes.data[i] = -1;
+    for i in 0 .. hashes.count do hashes.data[i] = -1;
     entries.count = 0;
 }
 
@@ -369,10 +371,10 @@ as_iter :: (m: &Map) =>
         hashes = builtin.make([] u32, new_size, allocator=allocator);
         array.fill(hashes, -1);
 
-        for &entry: entries do entry.next = -1;
+        for &entry in entries do entry.next = -1;
 
         index := 0;
-        for &entry: entries {
+        for &entry in entries {
             defer index += 1;
 
             hash_index := entry.hash % hashes.count;

@@ -13,6 +13,7 @@
 
 
 
+#include "types.h"
 #define BH_DEBUG
 #include "wasm_emit.h"
 #include "utils.h"
@@ -1313,7 +1314,54 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
     *pcode = code;
 }
 
-EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
+EMIT_FUNC(for__prologue, AstFor* for_node, u64 iter_local, i64 index_local) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    if (for_node->has_first) {
+        for_node->first_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        WIL(for_node->token, WI_I32_CONST, 1);
+        WIL(for_node->token, WI_LOCAL_SET, for_node->first_local);
+    }
+
+    if (index_local != -1) {
+        if (type_is_small_integer(for_node->index_var->type)) {
+            WIL(for_node->token, WI_I32_CONST, 0);
+        } else {
+            WIL(for_node->token, WI_I64_CONST, 0);
+        }
+
+        WIL(for_node->token, WI_LOCAL_SET, index_local);
+    }
+
+    *pcode = code;
+}
+
+EMIT_FUNC(for__epilogue, AstFor* for_node, u64 iter_local, i64 index_local) {
+    bh_arr(WasmInstruction) code = *pcode;
+    
+    if (for_node->has_first) {
+        WIL(NULL, WI_I32_CONST, 0);
+        WIL(NULL, WI_LOCAL_SET, for_node->first_local);
+    }
+
+    if (index_local != -1) {
+        WIL(for_node->token, WI_LOCAL_GET, index_local);
+
+        if (type_is_small_integer(for_node->index_var->type)) {
+            WIL(for_node->token, WI_I32_CONST, 1);
+            WI(for_node->token, WI_I32_ADD);
+        } else {
+            WIL(for_node->token, WI_I64_CONST, 1);
+            WI(for_node->token, WI_I64_ADD);
+        }
+
+        WIL(for_node->token, WI_LOCAL_SET, index_local);
+    }
+
+    *pcode = code;
+}
+
+EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local, i64 index_local) {
     bh_arr(WasmInstruction) code = *pcode;
 
     // NOTE: There are some aspects of the code below that rely on the
@@ -1325,11 +1373,9 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     AstStructLiteral *range = (AstStructLiteral *) for_node->iter;
     u64 offset = 0;
 
-    StructMember low_mem, high_mem, step_mem;
-    type_lookup_member(builtin_range_type_type, "low", &low_mem);
+    StructMember high_mem, step_mem;
     type_lookup_member(builtin_range_type_type, "high", &high_mem);
     type_lookup_member(builtin_range_type_type, "step", &step_mem);
-    u64 low_local  = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(low_mem.type));
     u64 high_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(high_mem.type));
     u64 step_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(step_mem.type));
 
@@ -1337,14 +1383,9 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
 
     WIL(for_node->token, WI_LOCAL_SET, step_local);
     WIL(for_node->token, WI_LOCAL_SET, high_local);
-    WIL(for_node->token, WI_LOCAL_TEE, low_local);
     WIL(for_node->token, WI_LOCAL_SET, iter_local);
 
-    if (for_node->has_first) {
-        for_node->first_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-        WIL(for_node->token, WI_I32_CONST, 1);
-        WIL(for_node->token, WI_LOCAL_SET, for_node->first_local);
-    }
+    emit_for__prologue(mod, &code, for_node, iter_local, index_local);
 
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
     emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
@@ -1393,10 +1434,7 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     WI(for_node->token, WI_I32_ADD);
     WIL(for_node->token, WI_LOCAL_SET, iter_local);
 
-    if (for_node->has_first) {
-        WIL(for_node->token, WI_I32_CONST, 0);
-        WIL(for_node->token, WI_LOCAL_SET, for_node->first_local);
-    }
+    emit_for__epilogue(mod, &code, for_node, iter_local, index_local);
 
     if (bh_arr_last(code).type != WI_JUMP)
         WID(for_node->token, WI_JUMP, 0x00);
@@ -1405,14 +1443,13 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     emit_leave_structured_block(mod, &code);
 
     if (for_node->has_first) local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
-    local_raw_free(mod->local_alloc, onyx_type_to_wasm_type(low_mem.type));
     local_raw_free(mod->local_alloc, onyx_type_to_wasm_type(high_mem.type));
     local_raw_free(mod->local_alloc, onyx_type_to_wasm_type(step_mem.type));
 
     *pcode = code;
 }
 
-EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
+EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local, i64 index_local) {
     bh_arr(WasmInstruction) code = *pcode;
 
     u64 end_ptr_local, ptr_local;
@@ -1442,11 +1479,7 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     WI(for_node->token, WI_PTR_ADD);
     WIL(for_node->token, WI_LOCAL_SET, end_ptr_local);
 
-    if (for_node->has_first) {
-        for_node->first_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-        WIL(for_node->token, WI_I32_CONST, 1);
-        WIL(for_node->token, WI_LOCAL_SET, for_node->first_local);
-    }
+    emit_for__prologue(mod, &code, for_node, iter_local, index_local);
 
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
     emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
@@ -1476,10 +1509,7 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     WI(for_node->token, WI_PTR_ADD);
     WIL(for_node->token, WI_LOCAL_SET, ptr_local);
 
-    if (for_node->has_first) {
-        WIL(NULL, WI_I32_CONST, 0);
-        WIL(NULL, WI_LOCAL_SET, for_node->first_local);
-    }
+    emit_for__epilogue(mod, &code, for_node, iter_local, index_local);
 
     if (bh_arr_last(code).type != WI_JUMP)
         WID(for_node->token, WI_JUMP, 0x00);
@@ -1494,7 +1524,7 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     *pcode = code;
 }
 
-EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
+EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
     bh_arr(WasmInstruction) code = *pcode;
 
     // Allocate temporaries for iterator contents
@@ -1506,12 +1536,9 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     u64 iterator_remove_func = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
     u64 iterator_done_bool   = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
     WI(for_node->token, WI_DROP);
-    WI(for_node->token, WI_DROP);
     WIL(for_node->token, WI_LOCAL_SET, iterator_remove_func);
     WI(for_node->token, WI_DROP);
-    WI(for_node->token, WI_DROP);
     WIL(for_node->token, WI_LOCAL_SET, iterator_close_func);
-    WI(for_node->token, WI_DROP);
     WI(for_node->token, WI_DROP);
     WIL(for_node->token, WI_LOCAL_SET, iterator_next_func);
     WIL(for_node->token, WI_LOCAL_SET, iterator_data_ptr);
@@ -1532,11 +1559,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
         bh_arr_push(mod->for_remove_info, remove_info);
     }
 
-    if (for_node->has_first) {
-        for_node->first_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-        WIL(for_node->token, WI_I32_CONST, 1);
-        WIL(for_node->token, WI_LOCAL_SET, for_node->first_local);
-    }
+    emit_for__prologue(mod, &code, for_node, iter_local, index_local);
 
     AstLocal* var = for_node->var;
     b32 it_is_local = (b32) ((iter_local & LOCAL_IS_WASM) != 0);
@@ -1614,10 +1637,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
 
     emit_block(mod, &code, for_node->stmt, 0);
 
-    if (for_node->has_first) {
-        WIL(NULL, WI_I32_CONST, 0);
-        WIL(NULL, WI_LOCAL_SET, for_node->first_local);
-    }
+    emit_for__epilogue(mod, &code, for_node, iter_local, index_local);
 
     WID(for_node->token, WI_JUMP, 0x00);
 
@@ -1645,22 +1665,33 @@ EMIT_FUNC(for, AstFor* for_node) {
     u64 iter_local = local_allocate(mod->local_alloc, (AstTyped *) var);
     bh_imap_put(&mod->local_map, (u64) var, iter_local);
 
+    i64 index_local = -1;
+    if (for_node->index_var) {
+        index_local = local_allocate(mod->local_alloc, (AstTyped *) for_node->index_var);
+        bh_imap_put(&mod->local_map, (u64) for_node->index_var, index_local);
+    }
+
     debug_enter_symbol_frame(mod);
     debug_introduce_symbol(mod, var->token,
         local_is_wasm_local((AstTyped *) var) ? DSL_REGISTER : DSL_STACK,
         iter_local, var->type);
 
+    if (for_node->index_var) {
+        // index variables must be register allocated.
+        debug_introduce_symbol(mod, for_node->index_var->token, DSL_REGISTER, index_local, for_node->index_var->type);
+    }
+
     emit_expression(mod, &code, for_node->iter);
 
     switch (for_node->loop_type) {
-        case For_Loop_Range:    emit_for_range(mod, &code, for_node, iter_local); break;
+        case For_Loop_Range:    emit_for_range(mod, &code, for_node, iter_local, index_local); break;
 
         // NOTE: For static arrays, simply outputing the size
         // of the array right after the pointer to the start
         // of the array essentially makes it a slice.
         case For_Loop_Array:
             WIL(NULL, WI_I32_CONST, for_node->iter->type->Array.count);
-            emit_for_slice(mod, &code, for_node, iter_local);
+            emit_for_slice(mod, &code, for_node, iter_local, index_local);
             break;
 
         // NOTE: A dynamic array is just a slice with a capacity and allocator on the end.
@@ -1671,8 +1702,8 @@ EMIT_FUNC(for, AstFor* for_node) {
             emit_load_slice(mod, &code);
             // fallthrough
 
-        case For_Loop_Slice:    emit_for_slice(mod, &code, for_node, iter_local); break;
-        case For_Loop_Iterator: emit_for_iterator(mod, &code, for_node, iter_local); break;
+        case For_Loop_Slice:    emit_for_slice(mod, &code, for_node, iter_local, index_local); break;
+        case For_Loop_Iterator: emit_for_iterator(mod, &code, for_node, iter_local, index_local); break;
         default: onyx_report_error(for_node->token->pos, Error_Critical, "Invalid for loop type. You should probably not be seeing this...");
     }
 
@@ -2010,14 +2041,12 @@ EMIT_FUNC(binop, AstBinaryOp* binop) {
     }
 
     emit_expression(mod, &code, binop->left);
-    if (binop->left->type->kind == Type_Kind_Function) { // nocheckin
-        WI(NULL, WI_DROP);
+    if (binop->left->type->kind == Type_Kind_Function) {
         WI(NULL, WI_DROP);
     }
 
     emit_expression(mod, &code, binop->right);
-    if (binop->right->type->kind == Type_Kind_Function) { // nocheckin
-        WI(NULL, WI_DROP);
+    if (binop->right->type->kind == Type_Kind_Function) {
         WI(NULL, WI_DROP);
     }
 
@@ -2333,7 +2362,6 @@ EMIT_FUNC(call, AstCall* call) {
         emit_expression(mod, &code, call->callee);
 
         u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_closure_base);
-        WI(NULL, WI_DROP);
         WIL(NULL, WI_GLOBAL_SET, global_closure_base_idx);
 
         i32 type_idx = generate_type_idx(mod, call->callee->type);
@@ -3632,7 +3660,6 @@ EMIT_FUNC(expression, AstTyped* expr) {
             WID(NULL, WI_I32_CONST, elemidx);
             if (!func->captures) {
                 WIL(NULL, WI_PTR_CONST, 0);
-                WIL(NULL, WI_I32_CONST, 0);
                 break;
             }
 
@@ -3652,6 +3679,10 @@ EMIT_FUNC(expression, AstTyped* expr) {
             u64 capture_block_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
             WIL(NULL, WI_LOCAL_TEE, capture_block_ptr);
 
+            WIL(NULL, WI_LOCAL_GET, capture_block_ptr);
+            WIL(NULL, WI_I32_CONST, func->captures->total_size_in_bytes);
+            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_U32], 0);
+
             // Populate the block
             bh_arr_each(AstCaptureLocal *, capture, func->captures->captures) {
                 WIL(NULL, WI_LOCAL_GET, capture_block_ptr);
@@ -3665,9 +3696,6 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 emit_store_instruction(mod, &code, (*capture)->type, (*capture)->offset);
             }
 
-            local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-
-            WIL(NULL, WI_I32_CONST, func->captures->total_size_in_bytes);
             break;
         }
 
@@ -4087,7 +4115,6 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
 
     if (to->kind == Type_Kind_Basic && from->kind == Type_Kind_Function) {
         WI(NULL, WI_DROP);
-        WI(NULL, WI_DROP);
         *pcode = code;
         return;
     }
@@ -4307,7 +4334,6 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_nod
 
     } else if (type->kind == Type_Kind_Function) {
         WID(NULL, WI_I32_CONST, mod->null_proc_func_idx);
-        WIL(NULL, WI_I32_CONST, 0);
         WIL(NULL, WI_I32_CONST, 0);
 
     } else if (type->kind == Type_Kind_Distinct) {
@@ -4917,7 +4943,6 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
         AstFunction* func = (AstFunction *) node;
         CE(u32, 0) = get_element_idx(ctx->module, func);
         CE(u32, 4) = 0;
-        CE(u32, 8) = 0;
         break;
     }
 

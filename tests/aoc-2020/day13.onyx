@@ -24,10 +24,10 @@ inv_mod :: (a_: i64, m_: i64) -> i64 {
 
 chinese_remainder_theorem :: (mods: [..] i64, rems: [..] i64) -> i64 {
     N: i64 = 1;
-    for n: mods do N *= n;
+    for n in mods do N *= n;
     
     res: i64 = 0;
-    for i: 0 .. mods.count {
+    for i in 0 .. mods.count {
         n := N / mods[i];
         res += rems[i] * inv_mod(n, mods[i]) * n;
     }
@@ -70,8 +70,8 @@ main :: (args: [] cstr) {
     // take_bus := 0;
     // depart   := 0;
 
-    // for i: 0 .. min {
-    //     for bus: buses {
+    // for i in 0 .. min {
+    //     for bus in buses {
     //         if (i + est) % bus == 0 {
     //             take_bus = bus;
     //             depart = i + est;

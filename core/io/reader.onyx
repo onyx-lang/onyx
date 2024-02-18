@@ -393,9 +393,9 @@ read_word :: (use reader: &Reader, numeric_allowed := false, allocator := contex
 
         while count < end {
             curr := buffer[count];
-            if     (curr >= #char "a" && curr <= #char "z")
-                || (curr >= #char "A" && curr <= #char "Z")
-                || curr == #char "_" {
+            if  (curr >= #char "a" && curr <= #char "z") ||
+                (curr >= #char "A" && curr <= #char "Z") ||
+                 curr == #char "_" {
                 count += 1;
             } elseif numeric_allowed && (curr >= #char "0" && curr <= #char "9") {
                 count += 1;
@@ -413,9 +413,9 @@ read_word :: (use reader: &Reader, numeric_allowed := false, allocator := contex
         count := start;
         while count < end {
             curr := buffer[count];
-            if     (curr >= #char "a" && curr <= #char "z")
-                || (curr >= #char "A" && curr <= #char "Z")
-                || curr == #char "_" {
+            if  (curr >= #char "a" && curr <= #char "z") ||
+                (curr >= #char "A" && curr <= #char "Z") ||
+                 curr == #char "_" {
                 count += 1;
             } elseif numeric_allowed && (curr >= #char "0" && curr <= #char "9") {
                 count += 1;

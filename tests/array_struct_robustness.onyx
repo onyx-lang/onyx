@@ -18,7 +18,7 @@ calc_vecs :: (n := 0) -> [4] Vec2 {
     vecs : [4] Vec2;
 
     i := n;
-    for &v: vecs {
+    for &v in vecs {
         v.x = i * i;
         v.y = i * i * i;
         i += 1;
@@ -32,7 +32,7 @@ main :: (args: [] cstr) {
     {
         println("Array of structs on the stack.");
         vecs : [8] Vec2;
-        for &v: vecs {
+        for &v in vecs {
             v.x = 4039;
             v.y = 7782;
         }
@@ -44,7 +44,7 @@ main :: (args: [] cstr) {
     {
         println("Array of structs from function call.");
         vecs := calc_vecs();
-        for &v: vecs do println(*v);
+        for &v in vecs do println(*v);
     }
 
     // Array of structs on a struct
@@ -88,7 +88,7 @@ main :: (args: [] cstr) {
 
         nums : [100] u32;
         i := 1;
-        for &n: nums {
+        for &n in nums {
             *n = i * i;
             i += 5;
         }
@@ -104,8 +104,8 @@ main :: (args: [] cstr) {
 
         set_vecs :: (vecs: &[2][4] Vec2) {
             i := 0;
-            for &row: *vecs {
-                for &v: *row {
+            for &row in *vecs {
+                for &v in *row {
                     *v = .{ 1000 + i, 2000 + i * i };
                     i += 1;
                 }
@@ -115,7 +115,7 @@ main :: (args: [] cstr) {
         set_vecs(vecs);
 
         print_vecs :: (vecs: &[4] Vec2) {
-            for &v: *vecs do println(*v);
+            for &v in *vecs do println(*v);
         }
 
         print_vecs(&(*vecs)[0]);

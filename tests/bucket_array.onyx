@@ -4,7 +4,7 @@ use core {*}
 
 main :: (args: [] cstr) {
     ba := bucket_array.make(i32, 4);
-    for i: 24 do ba << i;
+    for i in 24 do ba << i;
 
     printf("ba[10] is {}.\n", ba[10]);
 
@@ -14,7 +14,7 @@ main :: (args: [] cstr) {
         sum += *value;
     });
 
-    for it: bucket_array.as_iter(&ba) {
+    for it in bucket_array.as_iter(&ba) {
         printf("{}\n", it);
     }
 

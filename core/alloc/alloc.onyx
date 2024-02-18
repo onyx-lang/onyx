@@ -41,7 +41,7 @@ array_from_stack :: macro ($T: type_expr, size: u32) -> [] T {
 }
 
 #doc """
-    Moves a value on to the heap. Useful for cases like this:
+    Moves a value on to the heap. Useful for cases like this in
 
         f :: () -> &Foo {
             return alloc.on_heap(Foo.{
@@ -78,10 +78,13 @@ on_temp :: macro (v: $V) -> &V {
 copy_closure :: (f: $F/type_is_function, a: Allocator) -> F {
     if !f.closure do return f;
 
-    new_closure := raw_alloc(a, f.closure_size);
-    memory.copy(new_closure, f.closure, f.closure_size);
+    //
+    // The size of the closure block is stored at offset 0 inside of the closure data.
+    closure_size := *cast(&u32, f.closure);
+    new_closure := raw_alloc(a, closure_size);
+    memory.copy(new_closure, f.closure, closure_size);
 
-    return F.{ f.__funcidx, new_closure, f.closure_size };
+    return F.{ f.__funcidx, new_closure };
 }
 
 TEMPORARY_ALLOCATOR_SIZE :: 1 << 16; // 16Kb

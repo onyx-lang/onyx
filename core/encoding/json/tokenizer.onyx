@@ -202,7 +202,7 @@ skip_numeric :: (use tkn: ^Tokenizer) {
 skip_escape :: (use tkn: ^Tokenizer) {
     switch data[offset] {
         case #char "u" {
-            for i: 4 {
+            for i in 4 {
                 ch, _ := next_character(tkn);
                 switch ch {
                     case #char "0" .. #char "9",

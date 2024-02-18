@@ -41,6 +41,8 @@ typedef enum TokenType {
     Token_Type_Keyword_Macro,
     Token_Type_Keyword_Interface,
     Token_Type_Keyword_Where,
+    Token_Type_Keyword_As,
+    Token_Type_Keyword_In,
     Token_Type_Keyword_End,
 
     Token_Type_Right_Arrow,
@@ -82,6 +84,8 @@ typedef enum TokenType {
     Token_Type_Literal_True,
     Token_Type_Literal_False,
 
+    Token_Type_Inserted_Semicolon,
+
     Token_Type_Count,
 } TokenType;
 
@@ -110,6 +114,8 @@ typedef struct OnyxTokenizer {
     u64 line_number;
 
     bh_arr(OnyxToken) tokens;
+
+    b32 insert_semicolon: 1;
 } OnyxTokenizer;
 
 const char *token_type_name(TokenType tkn_type);

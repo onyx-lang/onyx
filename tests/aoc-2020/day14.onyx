@@ -9,7 +9,7 @@ Bitmask :: [MASK_SIZE] u8;
 bitmask_p1 :: (mask: Bitmask, val: u64) -> u64 {
 	res: u64 = 0;
 	bit: u64 = 1;
-	for m: mask {
+	for m in mask {
 		switch m {
 			case 1 do res |= bit;
 			case 2 do res |= (val & bit);
@@ -34,7 +34,7 @@ bitmask_p2 :: (mask: Bitmask, val: u64) -> Iterator(u64) {
         bmi := cast(&BitmaskIter) data;
         if bmi.done do return 0, false;
 
-		for ind: bmi.floating_indicies {
+		for ind in bmi.floating_indicies {
 			is_set := (bmi.val & (1 << cast(u64) ind)) != 0;
 
 			bmi.val ^= 1 << cast(u64) ind;
@@ -58,7 +58,7 @@ bitmask_p2 :: (mask: Bitmask, val: u64) -> Iterator(u64) {
     array.init(&bmi.floating_indicies, 8);
 
 	v := val;
-	for i: 0 .. MASK_SIZE {
+	for i in 0 .. MASK_SIZE {
 		if mask[i] == 1 do v |= 1 << cast(u64) i;
 
 		if mask[i] == 2 {
@@ -81,7 +81,7 @@ main :: (args: [] cstr) {
 	defer map.free(&mem);
 
 	mask : Bitmask;
-	for &m: mask do *m = 2;
+	for &m in mask do *m = 2;
 
 	while !string.empty(file) {
 		word := string.read_alphanum(&file);
@@ -90,7 +90,7 @@ main :: (args: [] cstr) {
 
 			i := 35;
             m, file~ := string.bisect(file, #char "\n");
-            for ch: m {
+            for ch in m {
 				switch ch {
 					case #char "0" do mask[i] = 0;
 					case #char "1" do mask[i] = 1;
@@ -112,7 +112,7 @@ main :: (args: [] cstr) {
 			// map.put(&mem, addr, bitmask_p1(mask, val));
 
 			// Part 2
-            for real_addr: bitmask_p2(mask, addr) {
+            for real_addr in bitmask_p2(mask, addr) {
                 map.put(&mem, real_addr, val);
             }
 
@@ -121,7 +121,7 @@ main :: (args: [] cstr) {
 	}	
 
 	s: u64 = 0;
-	for e: mem.entries do s += e.value;
+	for e in mem.entries do s += e.value;
 
 	printf("Sum: {}\n", s);
 }

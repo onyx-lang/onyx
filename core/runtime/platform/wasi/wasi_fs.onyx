@@ -83,7 +83,7 @@ __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError)
 
     // Currently the directory's file descriptor appears to always be 3
     // However, this is not necessarily correct, so also try a preopened directory
-    for DIR_FD: .[ 3, 4 ] {
+    for DIR_FD in .[ 3, 4 ] {
         if err := wasi.path_open(
             DIR_FD,
             .SymLinkFollow,
@@ -265,7 +265,7 @@ __file_stream_vtable := io.Stream_Vtable.{
     poll = (use fs: &os.File, ev: io.PollEvent, timeout: i32) -> (io.Error, bool) {
         p: [1] PollDescription = .[.{
             fd = data.fd,
-            in = ev,
+            input = ev,
         }];
 
         runtime.platform.__poll(p, timeout);

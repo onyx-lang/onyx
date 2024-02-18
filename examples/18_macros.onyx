@@ -81,7 +81,7 @@ main :: (args: [] cstr) {
     }
 
     // You can then use the '#unquote' directive to place the code wherever you need it.
-    // We can paste it 3 times for examples:
+    // We can paste it 3 times for examples in
     #unquote simple_code;
     #unquote simple_code;
     #unquote simple_code;

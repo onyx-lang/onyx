@@ -32,7 +32,7 @@ main :: () {
         *val_ptr = 5678;
         printf("New value is: {*}\n", val_ptr);
 
-        for t: it.tags {
+        for t in it.tags {
             if t.type == str {
                 printf("{*}\n", misc.any_as(t, str));
             }

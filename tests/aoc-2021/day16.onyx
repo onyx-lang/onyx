@@ -191,12 +191,12 @@ packet_reduce :: (p: &Packet) -> u64 {
 
 
 main :: (args) => {
-    for file: os.with_file("./tests/aoc-2021/input/day16.txt") {
+    for file in os.with_file("./tests/aoc-2021/input/day16.txt") {
         reader := io.reader_make(file);
         line   := io.read_line(&reader, consume_newline=false, inplace=true);
 
         transmission: [..] u8;
-        for i: range.{ 0, line.count, 2 } {
+        for i in range.{ 0, line.count, 2 } {
             transmission << ~~(base16_to_hex(line[i .. i + 2]));
         }
 

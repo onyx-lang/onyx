@@ -32,17 +32,17 @@ main :: (args: [] cstr) {
     // to use it. The most common function you will probably use
     // is array.push. It simply appends a new element to end of
     // the array.
-    for i: 0 .. 10 do array.push(^arr, i);
+    for i in 0 .. 10 do array.push(^arr, i);
 
     // Now if we print the array, we will see the numbers from 0 to 9.
     println(arr);
 
     // We can remove elements from the end using array.pop.
-    for i: 0 .. 4 do array.pop(^arr);
+    for i in 0 .. 4 do array.pop(^arr);
     println(arr);
 
     // We can insert elements at the beginning using array.insert.
-    for i: 6 .. 10 do array.insert(^arr, 0, i);
+    for i in 6 .. 10 do array.insert(^arr, 0, i);
     println(arr);
 
     // There are many other useful functions in the core.array package.

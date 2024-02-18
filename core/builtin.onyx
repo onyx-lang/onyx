@@ -40,7 +40,7 @@ dyn_str :: #type [..] u8;
 // This is a special type that the compiler knows how to iterator through.
 // So, one can simply write:
 //
-//      for x: 1 .. 5 { ... }
+//      for x in 1 .. 5 { ... }
 //
 // Although not controllable from the literal syntax, there is a `step`
 // member that allows you control how many numbers to advance each iteration.
@@ -377,7 +377,9 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
     delete :: #match {}
 
     #local
-    Destroyable :: interface (t: $T) {
+    Destroyable :: interface (T: type_expr) {
+        t as T;
+
         { T.destroy(&t) } -> void;
     }
 

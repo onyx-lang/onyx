@@ -825,6 +825,12 @@ static SymresStatus symres_for(AstFor* fornode) {
     scope_enter(fornode->scope);
     SYMRES(expression, &fornode->iter);
     SYMRES(local, &fornode->var);
+
+    // Right now, the index variable is optional
+    if (fornode->index_var) {
+        SYMRES(local, &fornode->index_var);
+    }
+
     SYMRES(block, fornode->stmt);
     scope_leave();
 
@@ -1658,14 +1664,22 @@ static SymresStatus symres_macro(AstMacro* macro) {
     return Symres_Success;
 }
 
+static SymresStatus symres_interface(AstInterface* interface) {
+    bh_arr_each(InterfaceParam, param, interface->params) {
+        SYMRES(type, &param->value_type);
+    }
+
+    return Symres_Success;
+}
+
 static SymresStatus symres_constraint(AstConstraint* constraint) {
     switch (constraint->phase) {
         case Constraint_Phase_Cloning_Expressions:
         case Constraint_Phase_Waiting_To_Be_Queued: {
             SYMRES(expression, (AstTyped **) &constraint->interface);
 
-            bh_arr_each(AstType *, type_arg, constraint->type_args) {
-                SYMRES(type, type_arg);
+            bh_arr_each(AstTyped *, arg, constraint->args) {
+                SYMRES(expression, arg);
             }
 
             return Symres_Success;
@@ -1942,6 +1956,8 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Polymorphic_Proc:        ss = symres_polyproc(ent->poly_proc);
                                                   next_state = Entity_State_Finalized;
                                                   break;
+
+        case Entity_Type_Interface:               ss = symres_interface(ent->interface); break;
 
         case Entity_Type_Overloaded_Function:     ss = symres_overloaded_function(ent->overloaded_function); break;
         case Entity_Type_Expression:              ss = symres_expression(&ent->expr); break;

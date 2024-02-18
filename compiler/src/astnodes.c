@@ -929,7 +929,8 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // an instance of a type generic polymorphic structure.
     // For example, converting to an iterator can be tested with:
     //
-    //       IsIterable :: interface (t: $T) {
+    //       IsIterable :: interface (T: type_expr) {
+    //           t as T;
     //           { t->AsIterator() } -> Iterator;
     //       }
     //
@@ -1841,7 +1842,7 @@ AstPolyCallType* convert_call_to_polycall(AstCall* call) {
 
 b32 resolve_intrinsic_interface_constraint(AstConstraint *constraint) {
     AstInterface *interface = constraint->interface;
-    Type* type = type_build_from_ast(context.ast_alloc, constraint->type_args[0]);
+    Type* type = type_build_from_ast(context.ast_alloc, (AstType *) constraint->args[0]);
     if (!type) return 0;
 
     if (!strcmp(interface->name, "type_is_bool"))     return type_is_bool(type);

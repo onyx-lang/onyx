@@ -56,7 +56,7 @@ main :: (args: [] cstr) {
     person_set << .{ "Joe", 38 };
 
     // "Joe" will only be printed once.
-    for person: set.as_iter(^person_set) {
+    for person in set.as_iter(^person_set) {
         println(person);
     }
 }
@@ -70,7 +70,7 @@ print_type :: #match {
 
 // print_type is a little silly to have in this language because Onyx has complete
 // type knowledge at runtime. To rectify this, let's add a new case that makes
-// this work for any type:
+// this work for any type in
 
 #match #order 10 print_type (x: $T) {
     printf("Fallback case: called with a {} ({})\n", T, x);
@@ -93,7 +93,7 @@ print_type :: #match {
 
 Person :: struct { name: str; age: i32; }
 
-// The overload option for hashing a person:
+// The overload option for hashing a person in
 #match hash.to_u32 (use p: Person) -> u32 {
     return hash.to_u32(name) * 16239563 + age;
 }

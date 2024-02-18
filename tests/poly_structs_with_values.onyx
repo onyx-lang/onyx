@@ -10,10 +10,10 @@ main :: (args: [] cstr) {
 
     nps : NewPolyStruct(i32, 4);
 
-    for &x: nps.x do *x = 12345;
-    for &y: nps.y do *y = 67890;
+    for &x in nps.x do *x = 12345;
+    for &y in nps.y do *y = 67890;
 
-    for x: nps.x do println(x);
+    for x in nps.x do println(x);
 
 
 

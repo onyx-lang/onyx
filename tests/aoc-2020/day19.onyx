@@ -48,14 +48,14 @@ grammar_free :: (use g: &Grammar) {
 
 grammar_prepare :: (use g: &Grammar) {
     // Not full-proof, but good enough for AOC.
-    for &solo: unit_rules {
-        for &prod: production_rules {
+    for &solo in unit_rules {
+        for &prod in production_rules {
             if prod.nt0 == solo.nt1 {
                 array.push(&production_rules, Prod.{ solo.nt0, prod.nt1, prod.nt2 });
             }
         }
 
-        for &unit: terminate_rules {
+        for &unit in terminate_rules {
             if unit.nt == solo.nt1 {
                 array.push(&terminate_rules, Term.{ solo.nt0, unit.t });
             } 
@@ -80,20 +80,20 @@ cyk_algorithm :: (use grammar: &Grammar, input: str) -> bool {
     defer cfree(T);
     memory.set(T, ~~false, mem_size);
 
-    for s: 0 .. input.count {
-        for &term: terminate_rules {
+    for s in 0 .. input.count {
+        for &term in terminate_rules {
             if term.t == input[s] {
                 T[0 * dim_0 + s * dim_1 + term.nt * dim_2] = true;
             }
         }
     }
 
-    for l: 1 .. input.count {
-        for s: 0 .. input.count - l {
-            for p: 1 .. l + 1 {
-                for &prod: production_rules {
-                    if    T[(p - 1) * dim_0 + s       * dim_1 + prod.nt1 * dim_2]
-                       && T[(l - p) * dim_0 + (s + p) * dim_1 + prod.nt2 * dim_2] {
+    for l in 1 .. input.count {
+        for s in 0 .. input.count - l {
+            for p in 1 .. l + 1 {
+                for &prod in production_rules {
+                    if T[(p - 1) * dim_0 + s       * dim_1 + prod.nt1 * dim_2] &&
+                       T[(l - p) * dim_0 + (s + p) * dim_1 + prod.nt2 * dim_2] {
                         T[l * dim_0 + s * dim_1 + prod.nt0 * dim_2] = true;
                     }
                 }

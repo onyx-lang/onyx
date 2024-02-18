@@ -3,7 +3,7 @@
 use core {*}
 
 count_to :: ($N: i32) {
-    for i: 0 .. N do printf("{} ", i);
+    for i in 0 .. N do printf("{} ", i);
     print("\n");
 }
 

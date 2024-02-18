@@ -112,7 +112,7 @@ write_type_name :: (writer: &io.Writer, t: type_expr) {
             io.write_str(writer, "(");
 
             i := 0;
-            for type: comp.components {
+            for type in comp.components {
                 if i != 0 do io.write_str(writer, ", ");
 
                 write_type_name(writer, type);
@@ -126,7 +126,7 @@ write_type_name :: (writer: &io.Writer, t: type_expr) {
             io.write_str(writer, "(");
 
             i := 0;
-            for type: f.parameter_types {
+            for type in f.parameter_types {
                 if i != 0 do io.write_str(writer, ", ");
 
                 write_type_name(writer, type);
@@ -213,7 +213,7 @@ offset_of :: (T: type_expr, member_name: str) -> u32 {
     if info.kind != .Struct do return 0;
 
     struct_info := cast(&Type_Info_Struct) info;
-    for &m: struct_info.members {
+    for &m in struct_info.members {
         if m.name == member_name do return m.offset;
     }
 
@@ -287,7 +287,7 @@ enum_name :: (value: $Backing_Type) -> str {
     if info.kind != .Enum do return null_str;
 
     etype := cast(&Type_Info_Enum) info;
-    for &member: etype.members {
+    for &member in etype.members {
         if member.value == ~~value do return member.name;
     }
     
@@ -299,7 +299,7 @@ enum_value :: ($E: type_expr, name: str) -> E {
     if info.kind != .Enum do return ~~0;
 
     etype := cast(&Type_Info_Enum) info;
-    for &member: etype.members {
+    for &member in etype.members {
         if member.name == name do return ~~member.value;
     }
 
@@ -338,7 +338,7 @@ populate_struct_vtable :: (table: &$Table_Type, struct_type: type_expr, safe := 
     v_info := cast(&Type_Info_Struct) get_type_info(Table_Type);
     if v_info.kind != .Struct do return;
 
-    for& member: v_info.members {
+    for& member in v_info.members {
         if get_type_info(member.type).kind != .Function do continue;
 
         struct_method := get_struct_method(struct_type, member.name);

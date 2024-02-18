@@ -202,7 +202,7 @@ get :: (v: Value, key: str) -> Value {
     v_ := cast(^_Value) v;
     if v_.type != .Object do return Value.{^_null_value};
 
-    for ^entry: (cast(^_Value_Object) v_).object_ {
+    for ^entry in (cast(^_Value_Object) v_).object_ {
         if entry.key == key do return entry.value;
     }
     return Value.{^_null_value};
@@ -285,7 +285,7 @@ free :: (v: Value, allocator: Allocator) {
 
         case .Array {
             v_arr := cast(^_Value_Array) v_;
-            for elem: v_arr.array_ {
+            for elem in v_arr.array_ {
                 free(elem, allocator);
             }
             array.free(^v_arr.array_);
@@ -293,7 +293,7 @@ free :: (v: Value, allocator: Allocator) {
 
         case .Object {
             v_obj := cast(^_Value_Object) v_;
-            for ^entry: v_obj.object_ {
+            for ^entry in v_obj.object_ {
                 if !entry.dont_free_key do raw_free(allocator, entry.key.data);
                 free(entry.value, allocator);
             }

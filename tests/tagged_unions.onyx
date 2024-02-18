@@ -7,7 +7,7 @@ union_is :: macro (u: $U, $variant: U.tag_enum) -> bool {
 
 extract_variant :: macro (u: $U, $variant: U.tag_enum) => {
     switch u {
-        case v: variant {
+        case variant as v {
             return Optional.make(v);
         }
     }
@@ -44,15 +44,15 @@ extraction_example :: () {
     value := Extraction.{ string = "This works" };
 
     switch value {
-        case int_value: .int {
+        case .int as int_value {
             printf("This is an integer: {}\n", int_value);
         }
 
-        case float_value: .float {
+        case .float as float_value {
             printf("This is a float: {}\n", float_value);
         }
 
-        case string_value: .string {
+        case .string as string_value {
             printf("This is a string: {}\n", string_value);
         }
     }
@@ -66,15 +66,15 @@ method_example :: () {
 
         do_the_thing :: (value: &Methoded) {
             switch *value {
-                case int_value: .int {
+                case .int as int_value {
                     printf("This is an integer: {}\n", int_value);
                 }
 
-                case float_value: .float {
+                case .float as float_value {
                     printf("This is a float: {}\n", float_value);
                 }
 
-                case string_value: .string {
+                case .string as string_value {
                     printf("This is a string: {}\n", string_value);
                 }
             }
@@ -100,7 +100,7 @@ linked_list_example :: () {
             switch walker {
                 case .End do break break;
 
-                case &next: .Next {
+                case .Next as &next {
                     printf("{}\n", next.data);
                     walker = next.next;
                 }

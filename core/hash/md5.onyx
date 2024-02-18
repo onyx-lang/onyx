@@ -82,20 +82,20 @@ MD5_Digest :: struct {
     #doc "Returns a temporary byte array of the hash."
     as_str :: (self: #Self) -> [] u8 {
         result := make_temp([] u8, 16);
-        for i: 0  .. 4  do result[i] = ~~((self.a & (0xff << shift(i))) >> shift(i));
-        for i: 4  .. 8  do result[i] = ~~((self.b & (0xff << shift(i))) >> shift(i));
-        for i: 8  .. 12 do result[i] = ~~((self.c & (0xff << shift(i))) >> shift(i));
-        for i: 12 .. 16 do result[i] = ~~((self.d & (0xff << shift(i))) >> shift(i));
+        for i in 0  .. 4  do result[i] = ~~((self.a & (0xff << shift(i))) >> shift(i));
+        for i in 4  .. 8  do result[i] = ~~((self.b & (0xff << shift(i))) >> shift(i));
+        for i in 8  .. 12 do result[i] = ~~((self.c & (0xff << shift(i))) >> shift(i));
+        for i in 12 .. 16 do result[i] = ~~((self.d & (0xff << shift(i))) >> shift(i));
         return result;
     }
 
     #doc "Returns a temporary string of the hash."
     as_hex_str :: (self: #Self) -> str {
         result := make_temp([..] u8, 32);
-        for i: 0  .. 4  do conv.format(&result, "{w2b16}", (self.a & (0xff << shift(i)) >> shift(i)));
-        for i: 4  .. 8  do conv.format(&result, "{w2b16}", (self.b & (0xff << shift(i)) >> shift(i)));
-        for i: 8  .. 12 do conv.format(&result, "{w2b16}", (self.c & (0xff << shift(i)) >> shift(i)));
-        for i: 12 .. 16 do conv.format(&result, "{w2b16}", (self.d & (0xff << shift(i)) >> shift(i)));
+        for i in 0  .. 4  do conv.format(&result, "{w2b16}", (self.a & (0xff << shift(i)) >> shift(i)));
+        for i in 4  .. 8  do conv.format(&result, "{w2b16}", (self.b & (0xff << shift(i)) >> shift(i)));
+        for i in 8  .. 12 do conv.format(&result, "{w2b16}", (self.c & (0xff << shift(i)) >> shift(i)));
+        for i in 12 .. 16 do conv.format(&result, "{w2b16}", (self.d & (0xff << shift(i)) >> shift(i)));
         return result;
     }
 }
@@ -114,7 +114,7 @@ do_cycle :: (digest: &MD5_Digest, bytes: [64] u8, accumulate := true) {
     c := digest.c;
     d := digest.d;
 
-    for i: 0 .. 64 {
+    for i in 0 .. 64 {
         F, g: u32;
         if 0 <= i && i <= 15 {
             F = (b & c) | (~b & d);

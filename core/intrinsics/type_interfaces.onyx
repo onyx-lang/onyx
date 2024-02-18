@@ -12,17 +12,17 @@ package core.intrinsics.types
 // Slice: [] $T
 // Function: () -> void
 
-type_is_bool     :: interface (t: $T) #intrinsic
-type_is_int      :: interface (t: $T) #intrinsic
-type_is_float    :: interface (t: $T) #intrinsic
-type_is_number   :: interface (t: $T) #intrinsic
-type_is_simd     :: interface (t: $T) #intrinsic
-type_is_pointer  :: interface (t: $T) #intrinsic
-type_is_enum     :: interface (t: $T) #intrinsic
-type_is_simple   :: interface (t: $T) #intrinsic
-type_is_array    :: interface (t: $T) #intrinsic
-type_is_slice    :: interface (t: $T) #intrinsic
-type_is_struct   :: interface (t: $T) #intrinsic
-type_is_compound :: interface (t: $T) #intrinsic
-type_is_function :: interface (t: $T) #intrinsic
+type_is_bool     :: interface (T: type_expr) #intrinsic
+type_is_int      :: interface (T: type_expr) #intrinsic
+type_is_float    :: interface (T: type_expr) #intrinsic
+type_is_number   :: interface (T: type_expr) #intrinsic
+type_is_simd     :: interface (T: type_expr) #intrinsic
+type_is_pointer  :: interface (T: type_expr) #intrinsic
+type_is_enum     :: interface (T: type_expr) #intrinsic
+type_is_simple   :: interface (T: type_expr) #intrinsic
+type_is_array    :: interface (T: type_expr) #intrinsic
+type_is_slice    :: interface (T: type_expr) #intrinsic
+type_is_struct   :: interface (T: type_expr) #intrinsic
+type_is_compound :: interface (T: type_expr) #intrinsic
+type_is_function :: interface (T: type_expr) #intrinsic
 

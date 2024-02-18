@@ -9,18 +9,18 @@
 use core {package, *}
 
 main :: (args: [] cstr) {
-    // Currently, for loops can iterate over five kinds of data structures in Onyx:
+    // Currently, for loops can iterate over five kinds of data structures in Onyx in
     //      * Ranges
     //      * Fixed arrays
     //      * Slices
     //      * Dynamic arrays
     //      * Custom iterators
 
-    // The syntax of for loops is very simple:
-    // for ^? <iteration variable>: <iterator> <block>
+    // The syntax of for loops is very simple in
+    // for ^? <iteration variable> in <iterator> <block>
 
     // For example, this will print out the numbers in the array literal:
-    for i: u32.[ 10, 20, 30, 40, 50 ] {
+    for i in u32.[ 10, 20, 30, 40, 50 ] {
         println(i);
     }
     print("\n\n");
@@ -34,7 +34,7 @@ main :: (args: [] cstr) {
     // so:
 
     primes := u32.[ 2, 3, 5, 7, 11, 13, 17 ];
-    for ^prime: primes {
+    for ^prime in primes {
         *prime *= 2;
     }
 
@@ -70,7 +70,7 @@ main :: (args: [] cstr) {
         iterator: Iterator(i32) = .{ data = ^value, next = next, close = close };
 
         // Simply use the iterator.
-        for v: iterator {
+        for v in iterator {
             println(v);
         }
     }

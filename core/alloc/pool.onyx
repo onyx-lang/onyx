@@ -69,7 +69,7 @@ pool_free :: (pool: &PoolAllocator($Elem), elem: &Elem) {
 make :: (buffer: [] $Elem) -> PoolAllocator(Elem) {
     assert(sizeof Elem >= sizeof rawptr, "Cannot have a pool allocator of a type less than a rawptr in size.");
 
-    for i: 0 .. buffer.count - 1 {
+    for i in 0 .. buffer.count - 1 {
         *(cast(&rawptr) &buffer[i]) = cast(rawptr) &buffer[i + 1];
     }
 

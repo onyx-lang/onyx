@@ -181,17 +181,17 @@ __net_resolve :: (host: str, port: u16, out_addrs: [] SocketAddress) -> i32 {
 
 
 #package {
-    socket_addr_to_wasix_addr :: (in: &SocketAddress, out: &wasi.AddrPort) {
-        switch *in {
-            case &path: .Unix {
+    socket_addr_to_wasix_addr :: (input: &SocketAddress, out: &wasi.AddrPort) {
+        switch *innput {
+            case .Unix as &path {
                 *out = .{ Unix = .{ *cast(&[108] u8) path } };
             }
 
-            case &inet: .Inet {
+            case .Inet as &inet {
                 *out = .{ Ipv4 = .{ inet.port, *cast(&wasi.AddrIPv4)&inet.addr } };
             }
 
-            case &inet: .Inet6 {
+            case .Inet6 as &inet {
                 // Not entirely right...
                 *out = .{ Ipv6 = .{ inet.port, *cast(&wasi.AddrIPv6)&inet.addr } };
             }
@@ -200,19 +200,19 @@ __net_resolve :: (host: str, port: u16, out_addrs: [] SocketAddress) -> i32 {
         }
     }
 
-    wasi_addr_to_socket_address :: (in: &wasi.AddrPort, out: &SocketAddress) {
-        switch *in {
+    wasi_addr_to_socket_address :: (input: &wasi.AddrPort, out: &SocketAddress) {
+        switch *input {
             case .Unspec ---
 
-            case &inet: .Ipv4 {
+            case .Ipv4 as &inet {
                 *out = .{ Inet = .{ inet.port, *cast(&u32)&inet.addr } };
             }
 
-            case &inet: .Ipv6 {
+            case .Ipv6 as &inet {
                 *out = .{ Inet6 = .{ inet.port, *cast(&[16] u8)&inet.addr } };
             }
 
-            case &unix: .Unix {
+            case .Unix as &unix {
                 p: [256] u8 = *cast(&[256] u8) &unix.path;
                 *out = .{ Unix = p };
             }

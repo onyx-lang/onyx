@@ -24,7 +24,7 @@ custom_formatters_initialized :: #init () {
     #if Enable_Custom_Formatters {
         use runtime.info {*};
 
-        for type_idx: type_table.count {
+        for type_idx in type_table.count {
             type := type_table[type_idx];
             if type.kind != .Struct do continue;
 
@@ -45,7 +45,7 @@ custom_formatters_initialized :: #init () {
         format_procedures := get_procedures_with_tag(Custom_Format_Proc);
         defer delete(&format_procedures);
 
-        for p: format_procedures {
+        for p in format_procedures {
             custom_format := p.tag;
             custom_formatters[custom_format.type] = *cast(&(&Format_Output, &Format, rawptr) -> void, &p.func);
         }
@@ -54,7 +54,7 @@ custom_formatters_initialized :: #init () {
         parse_procedures := get_procedures_with_tag(Custom_Parse_Proc);
         defer delete(&parse_procedures);
 
-        for p: parse_procedures {
+        for p in parse_procedures {
             custom_parse := p.tag;
             custom_parsers[custom_parse.type] = *cast(&(rawptr, str, Allocator) -> bool, &p.func);
         }
@@ -154,7 +154,7 @@ Format_Output :: struct {
         },
 
         (use output: &Format_Output, s: str) {
-            for c: s {
+            for c in s {
                 if count >= capacity {
                     if flush.func == null_proc                   do return;
                     if !flush.func(flush.data, data[0 .. count]) do return;
@@ -578,12 +578,12 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                         format.indentation += 4;
                     }
                     
-                    for &member: s.members {
+                    for &member in s.members {
                         if member != s.members.data do output->write(", ");
 
                         if formatting.pretty_printing {
                             output->write(#char "\n");
-                            for i: format.indentation do output->write(#char " ");
+                            for i in format.indentation do output->write(#char " ");
                         }
 
                         output->write(member.name);
@@ -595,7 +595,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 
                 if formatting.pretty_printing {
                     output->write(#char "\n");
-                    for i: formatting.indentation do output->write(#char " ");
+                    for i in formatting.indentation do output->write(#char " ");
                     output->write("}");
                     
                 } else {
@@ -640,12 +640,12 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 format.quote_strings = true;
                 if format.pretty_printing do format.indentation += 4;
 
-                for i: count {
+                for i in count {
                     if i != 0 do output->write(", ");
 
                     if formatting.pretty_printing {
                         output->write("\n");
-                        for _: format.indentation do output->write(#char " ");
+                        for _ in format.indentation do output->write(#char " ");
                     }
 
                     format_any(output, &format, .{ cast([&] u8) data + get_type_info(a.of).size * i, a.of });
@@ -655,7 +655,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 if formatting.pretty_printing {
                     format.indentation -= 4;
                     output->write("\n");
-                    for _: format.indentation do output->write(#char " ");
+                    for _ in format.indentation do output->write(#char " ");
                     output->write(#char "]");
 
                 } else {
@@ -669,7 +669,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 a := cast(&Type_Info_Array) info;
                 data := v.data;
 
-                for i: a.count {
+                for i in a.count {
                     if i != 0 do output->write(", ");
 
                     format_any(output, formatting, .{ cast([&] u8) data + get_type_info(a.of).size * i, a.of });
@@ -696,7 +696,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 }
 
                 if !e.is_flags {
-                    for &member: e.members {
+                    for &member in e.members {
                         if value == member.value {
                             output->write(member.name);
                             break break;
@@ -707,7 +707,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
 
                 } else {
                     first := true;
-                    for &member: e.members {
+                    for &member in e.members {
                         if value & member.value != 0 {
                             if !first do output->write(" | ");
                             output->write(member.name);

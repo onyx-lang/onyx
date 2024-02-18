@@ -138,7 +138,7 @@ write_ptr :: (use writer: &Writer, p: &void) {
 }
 
 write_range :: (use writer: &Writer, r: range, sep := " ") {
-    for i: r {
+    for i in r {
         write_i32(writer, i);
         if i + r.step < r.high do write_str(writer, sep);
     }

@@ -35,7 +35,7 @@ main :: (args: [] cstr) {
     // I forget that it exists. It isn't something that is very useful,
     // and can lead to some code-smells, if do-blocks are used in strange
     // places, like as arguments. However, during the Advent of Code 2021
-    // I had a real use-case for them and it looked like this:
+    // I had a real use-case for them and it looked like this in
 
 #if false {
     left, right := do {

@@ -102,7 +102,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
 
             base: [&] u8 = ~~v.data;
 
-            for& member: s_info.members {
+            for& member in s_info.members {
                 try(serialize(any.{ base + member.offset, member.type }, w));
             }
         }
@@ -234,7 +234,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := con
 
             base: [&] u8 = target;
 
-            for& member: s_info.members {
+            for& member in s_info.members {
                 try(deserialize(base + member.offset, member.type, r, allocator));
             }
         }

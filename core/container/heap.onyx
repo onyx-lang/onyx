@@ -23,7 +23,9 @@ insert :: (use heap: &Heap, v: heap.T) {
     shift_up(heap, data.count - 1);
 }
 
-#operator << macro (heap: Heap($T), v: T) do #this_package.insert(&heap, v);
+#operator << macro (heap: Heap($T), v: T) {
+    #this_package.insert(&heap, v);
+}
 
 remove_top :: (use heap: &Heap) -> heap.T {
     x := data[0];

@@ -21,13 +21,13 @@ Tagged_Global :: struct {
 get_globals_with_tag :: ($tag_type: type_expr) -> [] GGWT_Result(tag_type) {
     results := make([..] GGWT_Result(tag_type));
 
-    for glob: tagged_globals {
+    for glob in tagged_globals {
         slice.find_opt(glob.tags, [v](v.type == tag_type))->with([tag] {
             array.push(&results, .{
                 data = glob.data,
                 type = glob.type,
                 tag = cast(&tag_type) tag.data,
-                pack = glob.pack
+                pack = glob.pack,
             });
         });
     }

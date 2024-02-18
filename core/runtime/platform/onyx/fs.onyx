@@ -7,8 +7,8 @@ DirectoryData :: #distinct u64
 
 PollDescription :: struct {
     fd: u64;
-    in: io.PollEvent;
-    out: io.PollEvent;
+    in_events: io.PollEvent;
+    out_events: io.PollEvent;
 }
 
 #foreign "onyx_runtime" {
@@ -145,16 +145,16 @@ __file_stream_vtable := io.Stream_Vtable.{
         fds: [1] PollDescription;
         fds[0] = .{
             fd = ~~data,
-            in = ev
+            in_events = ev
         };
 
         __poll(fds, timeout);
 
-        if fds[0].out == .Closed {
+        if fds[0].out_events == .Closed {
             return .EOF, ev == .Closed;
         }
 
-        return .None, fds[0].out == ev;
+        return .None, fds[0].out_events == ev;
     }
 };
 

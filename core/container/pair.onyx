@@ -40,6 +40,7 @@ hash.hash :: (p: Pair($First_Type/hash.Hashable, $Second_Type/hash.Hashable)) =>
     return !(p1.first == p2.first) || !(p1.second == p2.second);
 }
 
-#local Equatable :: interface (t: $T) {
+#local Equatable :: interface (T: type_expr) {
+    t as T;
     { t == t } -> bool;
 }

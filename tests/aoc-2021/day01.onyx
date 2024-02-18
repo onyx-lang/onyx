@@ -33,9 +33,9 @@ main :: (args) => {
 
     { // Part 2
         windows: [..] i32;
-        for i: range.{ 0, nums.count - 2 } {
+        for i in range.{ 0, nums.count - 2 } {
             sum := 0;
-            for k: i .. i+3 do sum += nums[k];
+            for k in i .. i+3 do sum += nums[k];
             windows << sum;
         }
 

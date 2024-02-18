@@ -3,7 +3,7 @@
 use core {*}
 
 main :: (args) => {
-    for file: os.with_file("./tests/aoc-2021/input/day06.txt") {
+    for file in os.with_file("./tests/aoc-2021/input/day06.txt") {
         reader := io.reader_make(file);
         start_str := io.read_all(&reader);
 
@@ -15,7 +15,7 @@ main :: (args) => {
             fish[value] += 1;
         }
 
-        for day: 256 {
+        for day in 256 {
             new_fish := fish[0];
             for 8 do fish[it] = fish[it + 1];
             fish[6] += new_fish;

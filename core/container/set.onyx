@@ -8,7 +8,9 @@ use core.math
 
 use core {Optional}
 
-#local SetValue :: interface (t: $T) {
+#local SetValue :: interface (T: type_expr) {
+    t as T;
+
     { hash.hash(t) } -> u32;
     { t == t } -> bool;
 }
@@ -82,7 +84,9 @@ insert :: (use set: &Set, value: set.Elem_Type) {
     if full(set) do grow(set);
 }
 
-#operator << macro (set: Set($T), value: T) do #this_package.insert(&set, value);
+#operator << macro (set: Set($T), value: T) {
+    #this_package.insert(&set, value);
+}
 
 has :: (use set: &Set, value: set.Elem_Type) -> bool {
     lr := lookup(set, value);
@@ -192,10 +196,10 @@ as_iter :: (s: &Set) =>
         hashes = builtin.make([] u32, new_size, allocator=allocator);
         array.fill(hashes, -1);
 
-        for &entry: entries do entry.next = -1;
+        for &entry in entries do entry.next = -1;
 
         index := 0;
-        for &entry: entries {
+        for &entry in entries {
             defer index += 1;
 
             hash_index := entry.hash % hashes.count;

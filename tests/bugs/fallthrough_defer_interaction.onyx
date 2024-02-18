@@ -26,7 +26,7 @@ main :: (args: [] cstr) {
 
         case 10 {
             count := 5;
-            for i: custom_iterator() {
+            for i in custom_iterator() {
                 println(i);
                 defer println("World");
 

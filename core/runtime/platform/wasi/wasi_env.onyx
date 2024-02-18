@@ -28,7 +28,7 @@ __lookup_all_envs :: () {
     }
 
     result := make([..] Pair(str, str), env_count, allocator);
-    for env: env_var {
+    for env in env_var {
         s := string.from_cstr(env);
         var, val := string.bisect(s, '=');
         result << .{var, val};

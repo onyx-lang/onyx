@@ -39,7 +39,7 @@ main :: (args: [] cstr) {
 
 		loc := Vec2.{ 0, 0 };
 		s := 0;
-		for ch: line do switch s {
+		for ch in line do switch s {
 			case 0 do switch ch {
 				case #char "e" do loc.x += 1;
 				case #char "w" do loc.x -= 1;
@@ -71,7 +71,7 @@ main :: (args: [] cstr) {
 
 	// Part 1
 	black_count := 0;
-	for &cell: grid.entries {
+	for &cell in grid.entries {
 		if cell.value.alive do black_count += 1;
 	}	
 	printf("Black count: {}\n", black_count);
@@ -80,12 +80,12 @@ main :: (args: [] cstr) {
 	cells_to_consider := array.make(Vec2);
 	defer array.free(&cells_to_consider);
 
-	for i: 0 .. 100 {
-		for &cell: grid.entries {
+	for i in 0 .. 100 {
+		for &cell in grid.entries {
 			if cell.value.alive {
 				array.push(&cells_to_consider, cell.key);
 
-				for &dir: Hex_Directions {
+				for &dir in Hex_Directions {
 					array.push(&cells_to_consider, .{
 						x = cell.key.x + dir.x,
 						y = cell.key.y + dir.y,
@@ -94,7 +94,7 @@ main :: (args: [] cstr) {
 			}
 		}
 
-		for &cell: cells_to_consider {
+		for &cell in cells_to_consider {
 			state  := map.get(&grid, *cell) ?? .{};
 			ncount := get_neighbor_count(&grid, *cell);
 
@@ -107,7 +107,7 @@ main :: (args: [] cstr) {
 			map.put(&grid, *cell, state);
 		}
 
-		for &cell: cells_to_consider {
+		for &cell in cells_to_consider {
 			map.update(&grid, *cell, [v]{ v.alive = v.next; });
 		}
 
@@ -115,7 +115,7 @@ main :: (args: [] cstr) {
 	}
 
 	black_count = 0;
-	for &cell: grid.entries {
+	for &cell in grid.entries {
 		if cell.value.alive do black_count += 1;
 	}	
 	printf("GOL black count: {}\n", black_count);
@@ -124,7 +124,7 @@ main :: (args: [] cstr) {
 get_neighbor_count :: (grid: &map.Map(Vec2, Cell), pos: Vec2) -> u32 {
 	count := 0;
 
-	for &dir: Hex_Directions {
+	for &dir in Hex_Directions {
 		cell := map.get(grid, Vec2.{ x = pos.x + dir.x, y = pos.y + dir.y }) ?? .{};
 		if cell.alive do count += 1;
 	}

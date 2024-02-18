@@ -422,20 +422,20 @@ Parse_Error :: union {
 
     parse_value :: (self: &#Self, token: Token) -> ? Value {
         switch token {
-            case s: .Raw_String {
+            case .Raw_String as s {
                 return Value.{
                     data = .{ String = string.alloc_copy(s, self.result_allocator) }
                 };
             }
 
-            case s: .String {
+            case .String as s {
                 // TODO: Handle escaped strings here
                 return Value.{
                     data = .{ String = string.alloc_copy(s, self.result_allocator) }
                 };
             }
             
-            case w: .Word {
+            case .Word as w {
                 if w == "null" {
                     return Value.{
                         data = .{ Null = .{} }

@@ -182,8 +182,8 @@ SnailNum :: struct {
             return 0;
         }
 
-        return 3 * (left_val + left->magnitude())
-            +  2 * (right_val + right->magnitude());
+        return 3 * (left_val + left->magnitude()) +
+               2 * (right_val + right->magnitude());
     }
 
     parse :: (line: &str) -> &SnailNum {
@@ -233,13 +233,13 @@ main :: () {
     
     conv.register_custom_formatter(SnailNum.format);
 
-    for file: os.with_file("./tests/aoc-2021/input/day18.txt") {
+    for file in os.with_file("./tests/aoc-2021/input/day18.txt") {
         r := io.reader_make(file);
 
         #if PART == 1 {
             s: &SnailNum = null;
             
-            for line: r->lines() {
+            for line in r->lines() {
                 n := SnailNum.parse(&line);
                 s = s->add(n);
             }
@@ -249,15 +249,15 @@ main :: () {
 
         #if PART == 2 {
             nums := make([..] &SnailNum);
-            for line: r->lines() {
+            for line in r->lines() {
                 nums << SnailNum.parse(&line);
             }
 
             maximum := 0;
             max_i, max_j : i32;
 
-            for i: nums.count {
-                for j: nums.count {
+            for i in nums.count {
+                for j in nums.count {
                     if i == j do continue;
 
                     n1 := nums[i]->clone();

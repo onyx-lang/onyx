@@ -92,7 +92,7 @@ CSV_Column :: struct {
             header_line := reader->read_line(allocator=context.temp_allocator)
                         |> string.strip_trailing_whitespace();
 
-            for header: string.split_iter(header_line, #char ",") {
+            for header in string.split_iter(header_line, #char ",") {
                 member := array.first(output_type_info.members, [](do {
                     if tag := array.first(it.tags, [t](t.type == CSV_Column)); tag {
                         return any_as(*tag, CSV_Column).name == header;
@@ -105,15 +105,15 @@ CSV_Column :: struct {
             }
 
         } else {
-            for &member: output_type_info.members {
+            for &member in output_type_info.members {
                 any_headers << .{ member.type, member.offset };
             }
         }
 
-        for line: reader->lines(allocator = context.temp_allocator) {
+        for line in reader->lines(allocator = context.temp_allocator) {
             out: csv.Output_Type;
 
-            for entry: string.split_iter(string.strip_trailing_whitespace(line), #char ",")
+            for entry in string.split_iter(string.strip_trailing_whitespace(line), #char ",")
                     |> iter.enumerate()
             {
                 header := &any_headers[entry.index];
@@ -141,7 +141,7 @@ CSV_Column :: struct {
         output_type_info: &Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
 
         if include_headers {
-            for &member: output_type_info.members {
+            for &member in output_type_info.members {
                 if !#first do io.write(writer, ",");
 
                 if tag := array.first(member.tags, [t](t.type == CSV_Column)); tag {
@@ -154,8 +154,8 @@ CSV_Column :: struct {
             io.write(writer, "\n");
         }
 
-        for &it: csv.entries {
-            for &member: output_type_info.members {
+        for &it in csv.entries {
+            for &member in output_type_info.members {
                 if !#first do io.write(writer, ",");
 
                 io.write_format_va(writer, "{}", .[ .{cast([&] u8) it + member.offset, member.type} ]);

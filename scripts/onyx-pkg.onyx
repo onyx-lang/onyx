@@ -98,7 +98,7 @@ Command :: struct {
 #tag Command.{ "help", "Show help.", "", require_config_file=false }
 run_help_command :: (args: [] cstr) {
     printf("onyx pkg version {}\n", Version);
-    printf("Package dependency resolver and synchronizer for Onyx.\n\nUsage:\n");
+    printf("Package dependency resolver and synchronizer for Onyx.\n\nUsage in\n");
 
     command_procedures := runtime.info.get_procedures_with_tag(Command);
     defer delete(&command_procedures);
@@ -110,7 +110,7 @@ run_help_command :: (args: [] cstr) {
             lines := string.split(it.tag.argument_descriptions, #char "\n", context.temp_allocator);
 
             print("\n");
-            for line: lines {
+            for line in lines {
                 if line.count == 0 do continue;
                 printf("        {}\n", line);
             }
@@ -975,7 +975,7 @@ Package :: struct {
 Git :: struct {
     get_full_repo_uri :: (package_search: str) -> str {
         for Known_Repositories {
-            for proto: Protocols {
+            for proto in Protocols {
                 r := tprintf("{}{}", proto, tprintf(it, package_search));
                 git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", r]);
                 if os.process_wait(&git_proc) == .Success {
@@ -1045,7 +1045,7 @@ Git :: struct {
         os.remove_directory(temporary_dest);
 
         successfully_cloned := do -> bool {
-            for proto: Protocols {
+            for proto in Protocols {
                 // Use 'git clone' to clone the bare minimum amount to get the released version.
                 proto_repo  := tprintf("{}{}", proto, repo);
                 git_proc    := os.process_spawn(git_path, .["clone", "--single-branch", "--depth", "1", "-b", version_str, proto_repo, temporary_dest]);
@@ -1328,7 +1328,7 @@ store_config :: (path: str) -> bool {
             dep_node->add_value(.{ String = tprintf("{}", it.value.version) });
 
             switch it.value.source {
-                case s: .Git {
+                case .Git as s {
                     dep_node.props["git"] = .{ data = .{ String = s } };
                 }
 

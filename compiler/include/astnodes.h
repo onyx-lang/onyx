@@ -835,6 +835,7 @@ struct AstFor           {
 
     // NOTE: Local defining the iteration variable
     AstLocal* var;
+    AstLocal* index_var;
 
     // NOTE: This can be any expression, but it is checked that
     // it is of a type that we know how to iterate over.
@@ -1207,8 +1208,14 @@ struct AstOverloadedFunction {
 // @CLEANUP: Is this really necessary?
 typedef struct InterfaceParam {
     OnyxToken *value_token;
-    OnyxToken *type_token;
+    AstType   *value_type;
+    Type      *type;
 } InterfaceParam;
+
+typedef struct InterfaceSentinel {
+    OnyxToken *name;
+    AstType   *type;
+} InterfaceSentinel;
 
 typedef struct InterfaceConstraint {
     AstTyped *expr;
@@ -1225,6 +1232,7 @@ struct AstInterface {
     char *name;
 
     bh_arr(InterfaceParam)      params;
+    bh_arr(InterfaceSentinel)   sentinels;
     bh_arr(InterfaceConstraint) exprs;
 
     Scope *scope;
@@ -1248,7 +1256,7 @@ struct AstConstraint {
     union {
         struct {
             AstInterface *              interface;
-            bh_arr(AstType *)           type_args;
+            bh_arr(AstTyped *)          args;
             Scope*                      scope;
             bh_arr(InterfaceConstraint) exprs;
             u32                         expr_idx;
@@ -1835,6 +1843,8 @@ struct CompileOptions {
     b32 no_core               : 1;
     b32 no_stale_code         : 1;
     b32 show_all_errors       : 1;
+
+    b32 enable_optional_semicolons : 1;
 
     b32 generate_tag_file         : 1;
     b32 generate_symbol_info_file : 1;

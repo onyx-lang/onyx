@@ -289,7 +289,7 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                 string.advance(&format);
                 switch format[0] {
                     case #char "a", #char "A" {
-                        for i: weekdays.count {
+                        for i in weekdays.count {
                             w := weekdays[i];
                             if string.equal_insensitive(w, buf[0 .. w.length]) {
                                 string.advance(&buf, w.length);
@@ -308,7 +308,7 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                     }
 
                     case #char "b", #char "B", #char "h" {
-                        for i: monthnames.count {
+                        for i in monthnames.count {
                             m := monthnames[i];
                             if string.equal_insensitive(m, buf[0 .. m.length]) {
                                 string.advance(&buf, m.length);
@@ -556,10 +556,10 @@ tm_to_time :: (tm: Timestamp) -> i64 {
     mi := cast(i64, tm.min);
     s := cast(i64, tm.sec);
 
-    return (365 * y + y / 4 - y / 100 + y / 400 + 3 * (m + 1) / 5 + 30 * m + d - 719561) * 86400
-        + 3600 * h
-        + 60 * mi
-        + s;
+    return (365 * y + y / 4 - y / 100 + y / 400 + 3 * (m + 1) / 5 + 30 * m + d - 719561) * 86400 +
+        3600 * h +
+        60 * mi +
+        s;
 }
 
 

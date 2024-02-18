@@ -1,3 +1,6 @@
+#include "astnodes.h"
+#include "types.h"
+#undef BH_INTERNAL_ALLOCATOR
 #define BH_INTERNAL_ALLOCATOR (global_heap_allocator)
 #define BH_DEBUG
 #include "parser.h"
@@ -263,6 +266,8 @@ CheckStatus check_for(AstFor* fornode) {
     builtin_range_type_type = type_build_from_ast(context.ast_alloc, builtin_range_type);
     if (builtin_range_type_type == NULL) YIELD(fornode->token->pos, "Waiting for 'range' structure to be built.");
 
+    Type* given_type = NULL;
+
     fornode->loop_type = For_Loop_Invalid;
     if (types_are_compatible(iter_type, &basic_types[Basic_Kind_I32])) {
         if (fornode->by_pointer) {
@@ -274,7 +279,7 @@ CheckStatus check_for(AstFor* fornode) {
         CHECK(range_literal, &rl);
         fornode->iter = (AstTyped *) rl;
 
-        fornode->var->type = builtin_range_type_type->Struct.memarr[0]->type;
+        given_type = builtin_range_type_type->Struct.memarr[0]->type;
         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
         fornode->loop_type = For_Loop_Range;
     }
@@ -285,20 +290,20 @@ CheckStatus check_for(AstFor* fornode) {
 
         // NOTE: Blindly copy the first range member's type which will
         // be the low value.                - brendanfh 2020/09/04
-        fornode->var->type = builtin_range_type_type->Struct.memarr[0]->type;
+        given_type = builtin_range_type_type->Struct.memarr[0]->type;
         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
         fornode->loop_type = For_Loop_Range;
 
     }
     else if (iter_type->kind == Type_Kind_Array) {
-        if (fornode->by_pointer) fornode->var->type = type_make_pointer(context.ast_alloc, iter_type->Array.elem);
-        else                     fornode->var->type = iter_type->Array.elem;
+        if (fornode->by_pointer) given_type = type_make_pointer(context.ast_alloc, iter_type->Array.elem);
+        else                     given_type = iter_type->Array.elem;
 
         fornode->loop_type = For_Loop_Array;
     }
     else if (iter_type->kind == Type_Kind_Slice) {
-        if (fornode->by_pointer) fornode->var->type = type_make_pointer(context.ast_alloc, iter_type->Slice.elem);
-        else                     fornode->var->type = iter_type->Slice.elem;
+        if (fornode->by_pointer) given_type = type_make_pointer(context.ast_alloc, iter_type->Slice.elem);
+        else                     given_type = iter_type->Slice.elem;
 
         fornode->loop_type = For_Loop_Slice;
 
@@ -308,14 +313,14 @@ CheckStatus check_for(AstFor* fornode) {
             ERROR_(error_loc, "Cannot iterate by pointer over '%s'.", type_get_name(iter_type));
         }
 
-        fornode->var->type = iter_type->VarArgs.elem;
+        given_type = iter_type->VarArgs.elem;
 
         // NOTE: Slices are VarArgs are being treated the same here.
         fornode->loop_type = For_Loop_Slice;
     }
     else if (iter_type->kind == Type_Kind_DynArray) {
-        if (fornode->by_pointer) fornode->var->type = type_make_pointer(context.ast_alloc, iter_type->DynArray.elem);
-        else                     fornode->var->type = iter_type->DynArray.elem;
+        if (fornode->by_pointer) given_type = type_make_pointer(context.ast_alloc, iter_type->DynArray.elem);
+        else                     given_type = iter_type->DynArray.elem;
 
         fornode->loop_type = For_Loop_DynArr;
     }
@@ -325,8 +330,29 @@ CheckStatus check_for(AstFor* fornode) {
         }
 
         // HACK: This assumes the Iterator type only has a single type argument.
-        fornode->var->type = iter_type->Struct.poly_sln[0].type;
+        given_type = iter_type->Struct.poly_sln[0].type;
         fornode->loop_type = For_Loop_Iterator;
+    }
+
+    assert(given_type);
+
+    if (fornode->var->type_node) {
+        fill_in_type((AstTyped *) fornode->var);
+        TYPE_CHECK((AstTyped **) &fornode->var, given_type) {
+            ERROR_(error_loc, "Mismatched type for loop variable. You specified '%s', but it should be '%s'.", type_get_name(fornode->var->type), type_get_name(given_type));
+        }
+
+    } else {
+        fornode->var->type = given_type;
+    }
+
+    if (fornode->index_var) {
+        fornode->index_var->flags |= Ast_Flag_Cannot_Take_Addr;
+        CHECK(expression, (AstTyped **) &fornode->index_var);
+
+        if (!type_is_integer(fornode->index_var->type)) {
+            ERROR_(fornode->index_var->token->pos, "Index for a for loop must be an integer type, but it is a '%s'.", type_get_name(fornode->index_var->type));
+        }
     }
 
     if (fornode->by_pointer)
@@ -2596,6 +2622,7 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert, b32 expected_ex
             AstBlock* body_block = onyx_ast_node_new(context.ast_alloc, sizeof(AstBlock), Ast_Kind_Block);
             body_block->token = cloned_block->token;
             body_block->body = (AstNode *) return_node;
+            body_block->rules = Block_Rule_Code_Block;
             scope = &((AstBlock *) body_block)->quoted_block_capture_scope;
 
             AstDoBlock* doblock = (AstDoBlock *) onyx_ast_node_new(context.ast_alloc, sizeof(AstDoBlock), Ast_Kind_Do_Block);
@@ -2735,7 +2762,9 @@ CheckStatus check_directive_export_name(AstDirectiveExportName *ename) {
 }
 
 CheckStatus check_capture_block(AstCaptureBlock *block) {
-    block->total_size_in_bytes = 0;
+    //
+    // Reserve 8 bytes at the beginning of the closure block for the size of the closure.
+    block->total_size_in_bytes = 8;
 
     bh_arr_each(AstCaptureLocal *, capture, block->captures) {
         CHECK(expression, (AstTyped **) capture);
@@ -3641,6 +3670,19 @@ CheckStatus check_macro(AstMacro* macro) {
     return Check_Success;
 }
 
+CheckStatus check_interface(AstInterface *interface) {
+    bh_arr_each(InterfaceParam, param, interface->params) {
+        CHECK(type, &param->value_type);
+
+        param->type = type_build_from_ast(context.ast_alloc, param->value_type);
+        if (!param->type) {
+            YIELD(param->value_type->token->pos, "Waiting for interface parameter's type to be constructed.");
+        }
+    }
+
+    return Check_Success;
+}
+
 CheckStatus check_interface_constraint(AstConstraint *constraint) {
     if (constraint->interface->kind != Ast_Kind_Interface) {
         // CLEANUP: This error message might not look totally right in some cases.
@@ -3676,25 +3718,37 @@ CheckStatus check_interface_constraint(AstConstraint *constraint) {
 
     constraint->scope = scope_create(context.ast_alloc, constraint->interface->scope, constraint->token->pos);
 
-    if (bh_arr_length(constraint->type_args) != bh_arr_length(constraint->interface->params)) {
+    if (bh_arr_length(constraint->args) != bh_arr_length(constraint->interface->params)) {
         ERROR_(constraint->token->pos, "Wrong number of arguments given to interface. Expected %d, got %d.",
             bh_arr_length(constraint->interface->params),
-            bh_arr_length(constraint->type_args));
+            bh_arr_length(constraint->args));
     }
 
     fori (i, 0, bh_arr_length(constraint->interface->params)) {
         InterfaceParam *ip = &constraint->interface->params[i];
 
-        AstTyped *sentinel = onyx_ast_node_new(context.ast_alloc, sizeof(AstTyped), Ast_Kind_Constraint_Sentinel);
-        sentinel->token = ip->value_token;
-        sentinel->type_node = constraint->type_args[i];
+        AstTyped **arg = &constraint->args[i];
+        CHECK(expression, arg);
+
+        TYPE_CHECK(arg, ip->type) {
+            ERROR_((*arg)->token->pos, "Mismatched type in interface construction. Expected something of type '%s', but got something of type '%s'.", type_get_name(ip->type), type_get_name((*arg)->type));
+        }
 
         AstAlias *type_alias = onyx_ast_node_new(context.ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
-        type_alias->token = ip->type_token;
-        type_alias->alias = (AstTyped *) constraint->type_args[i];
+        type_alias->token = ip->value_token;
+        type_alias->alias = *arg;
 
-        symbol_introduce(constraint->scope, ip->value_token, (AstNode *) sentinel);
-        symbol_introduce(constraint->scope, ip->type_token, (AstNode *) type_alias);
+        symbol_introduce(constraint->scope, ip->value_token, (AstNode *) type_alias);
+    }
+
+    fori (i, 0, bh_arr_length(constraint->interface->sentinels)) {
+        InterfaceSentinel *is = &constraint->interface->sentinels[i];
+
+        AstTyped *sentinel = onyx_ast_node_new(context.ast_alloc, sizeof(AstTyped), Ast_Kind_Constraint_Sentinel);
+        sentinel->token = is->name;
+        sentinel->type_node = (AstType *) ast_clone(context.ast_alloc, (AstNode *) is->type);
+
+        symbol_introduce(constraint->scope, is->name, (AstNode *) sentinel);
     }
 
     assert(constraint->entity);
@@ -3844,7 +3898,11 @@ CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFi
                 if (cc->produce_errors) {
                     AstConstraint *constraint = cc->constraints[i];
                     char constraint_map[512] = {0};
-                    fori (i, 0, bh_arr_length(constraint->type_args)) {
+                    fori (i, 0, bh_arr_length(constraint->args)) {
+                        if (!node_is_type((AstNode *) constraint->args[i])) {
+                            continue;
+                        }
+
                         if (i != 0) strncat(constraint_map, ", ", 511);
 
                         OnyxToken* symbol = constraint->interface->params[i].value_token;
@@ -3853,7 +3911,7 @@ CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFi
                         token_toggle_end(symbol);
 
                         strncat(constraint_map, " is of type '", 511);
-                        strncat(constraint_map, type_get_name(type_build_from_ast(context.ast_alloc, constraint->type_args[i])), 511);
+                        strncat(constraint_map, type_get_name(type_build_from_ast(context.ast_alloc, (AstType *) constraint->args[i])), 511);
                         strncat(constraint_map, "'", 511);
                     }
 
@@ -4026,6 +4084,7 @@ void check_entity(Entity* ent) {
         case Entity_Type_Polymorph_Query:          cs = check_polyquery(ent->poly_query); break;
         case Entity_Type_Enum_Value:               cs = check_expression(&ent->enum_value->value); break;
         case Entity_Type_Process_Directive:        cs = check_process_directive((AstNode *) ent->expr); break;
+        case Entity_Type_Interface:                cs = check_interface(ent->interface); break;
 
         case Entity_Type_String_Literal:
         case Entity_Type_Expression:

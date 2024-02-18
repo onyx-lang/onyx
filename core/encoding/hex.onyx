@@ -4,7 +4,7 @@ encode :: (s: str, allocator := context.allocator) -> str {
     #persist encode_map := u8.['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
 
     new_str := make([] u8, s.count * 2, allocator);
-    for i: s.count {
+    for i in s.count {
         new_str[2 * i + 0] = encode_map[(s[i] & 0xf0) >> 4];
         new_str[2 * i + 1] = encode_map[s[i] & 0xf];
     }
@@ -16,7 +16,7 @@ decode :: (s: str, allocator := context.allocator) -> str {
     assert(s.count & 1 == 0, "Expected string of even length");
 
     new_str := make([] u8, s.count >> 1, allocator);
-    for i: range.{0, s.count, 2} {
+    for i in range.{0, s.count, 2} {
         new_str[i >> 1] = ~~((digit_to_value(s[i + 0]) << 4) | (digit_to_value(s[i + 1])));
     }
     

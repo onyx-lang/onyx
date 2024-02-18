@@ -22,26 +22,26 @@ use runtime
 //
 
 #local {
-    __HasEqMethod     :: interface (t: $T, r: $R) { T.__eq(t, r); }
-    __HasNeMethod     :: interface (t: $T, r: $R) { T.__ne(t, r); }
-    __HasLtMethod     :: interface (t: $T, r: $R) { T.__lt(t, r); }
-    __HasLeMethod     :: interface (t: $T, r: $R) { T.__le(t, r); }
-    __HasGtMethod     :: interface (t: $T, r: $R) { T.__gt(t, r); }
-    __HasGeMethod     :: interface (t: $T, r: $R) { T.__ge(t, r); }
-    __HasAddMethod    :: interface (t: $T, r: $R) { T.__add(t, r); }
-    __HasMinusMethod  :: interface (t: $T, r: $R) { T.__minus(t, r); }
-    __HasMulMethod    :: interface (t: $T, r: $R) { T.__mul(t, r); }
-    __HasDivMethod    :: interface (t: $T, r: $R) { T.__div(t, r); }
-    __HasModMethod    :: interface (t: $T, r: $R) { T.__mod(t, r); }
-    __HasAndMethod    :: interface (t: $T, r: $R) { T.__and(t, r); }
-    __HasOrMethod     :: interface (t: $T, r: $R) { T.__or(t, r); }
-    __HasShlMethod    :: interface (t: $T, r: $R) { T.__shl(t, r); }
-    __HasShrMethod    :: interface (t: $T, r: $R) { T.__shr(t, r); }
-    __HasSarMethod    :: interface (t: $T, r: $R) { T.__sar(t, r); }
-    __HasXorMethod    :: interface (t: $T, r: $R) { T.__xor(t, r); }
-    __HasBandMethod   :: interface (t: $T, r: $R) { T.__band(t, r); }
-    __HasBorMethod    :: interface (t: $T, r: $R) { T.__bor(t, r); }
-    __HasSubMethod    :: interface (t: $T, r: $R) { T.__sub(t, r); }
+    __HasEqMethod     :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__eq(t, r); }
+    __HasNeMethod     :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__ne(t, r); }
+    __HasLtMethod     :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__lt(t, r); }
+    __HasLeMethod     :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__le(t, r); }
+    __HasGtMethod     :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__gt(t, r); }
+    __HasGeMethod     :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__ge(t, r); }
+    __HasAddMethod    :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__add(t, r); }
+    __HasMinusMethod  :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__minus(t, r); }
+    __HasMulMethod    :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__mul(t, r); }
+    __HasDivMethod    :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__div(t, r); }
+    __HasModMethod    :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__mod(t, r); }
+    __HasAndMethod    :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__and(t, r); }
+    __HasOrMethod     :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__or(t, r); }
+    __HasShlMethod    :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__shl(t, r); }
+    __HasShrMethod    :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__shr(t, r); }
+    __HasSarMethod    :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__sar(t, r); }
+    __HasXorMethod    :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__xor(t, r); }
+    __HasBandMethod   :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__band(t, r); }
+    __HasBorMethod    :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__bor(t, r); }
+    __HasSubMethod    :: interface (T: type_expr, R: type_expr) { t as T; r as R; T.__sub(t, r); }
 }
 
 #if #defined(runtime.vars.Onyx_Enable_Operator_Methods) {

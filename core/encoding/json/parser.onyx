@@ -132,7 +132,7 @@ parse_array :: (use parser: ^Parser) -> (Value, Error) {
     // This uses the context allocators because the array resizing needs to happen in a general purpose heap allocator
     arr := array.make(Value, allocator=context.allocator);
     defer if err.kind != .None {
-        for elem: arr {
+        for elem in arr {
             free(elem, allocator);
         }
 
@@ -200,7 +200,7 @@ parse_object :: (use parser: ^Parser) -> (Value, Error) {
 
         // Checking for duplicate keys. I have it disabled for the moment.
         #if false {
-            for elem: value.object_ {
+            for elem in value.object_ {
                 if elem.key == key {
                     err.kind = .Duplicate_Keys;
                     err.pos  = key_token.pos;
@@ -240,7 +240,7 @@ unescape_string :: (token: Token, allocator: Allocator) -> str {
     s = s.data[1 .. s.count - 1];
 
     i := 0;
-    for c: s {
+    for c in s {
         if c == #char "\\" || c == #char "\"" || c < #char " " {
             break;
         }
@@ -335,7 +335,7 @@ parse_and_write_utf8_character :: (s: str, out: [&] u8) -> (i32, i32) {
     chars := 0;
     codepoint: u32 = 0;
 
-    for c: s[0 .. 4] {
+    for c in s[0 .. 4] {
         codepoint = codepoint << 4;
         codepoint |= digit_to_hex(c);
     }
@@ -384,7 +384,7 @@ parse_and_write_utf8_character :: (s: str, out: [&] u8) -> (i32, i32) {
     second_codepoint: u32 = 0;
     if s[4 .. 6] != "\\u" do return 0, 0;
 
-    for c: s[6 .. 10] {
+    for c in s[6 .. 10] {
         second_codepoint = second_codepoint << 4;
         second_codepoint |= digit_to_hex(c);
     }

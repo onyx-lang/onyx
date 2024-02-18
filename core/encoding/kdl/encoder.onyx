@@ -55,17 +55,17 @@ write_value :: (v: Value, w: &io.Writer) {
     });
 
     switch v.data {
-        case s: .String {
+        case .String as s {
             io.write_format(w, "{\"}", s);
         }
 
-        case n: .Number do switch n {
-            case i: .Integer do io.write_format(w, "{}", i);
-            case f: .Float   do io.write_format(w, "{}", f);
-            case s: .String  do io.write_format(w, "{\"}", s);
+        case .Number as n do switch n {
+            case .Integer as i do io.write_format(w, "{}", i);
+            case .Float as f   do io.write_format(w, "{}", f);
+            case .String as s  do io.write_format(w, "{\"}", s);
         }
 
-        case b: .Boolean {
+        case .Boolean as b {
             io.write_format(w, "{}", b);
         }
 

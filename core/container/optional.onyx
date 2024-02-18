@@ -47,7 +47,7 @@ use core
         no value is present.
     """
     value_or :: (o: ?$T, default: T) => switch o {
-        case v: .Some => v;
+        case .Some as v => v;
         case #default => default;
     }
 
@@ -65,7 +65,7 @@ use core
     // @Bug should be able to say ? ? $T here.
     flatten :: (o1: ? Optional($T)) -> ? T {
         switch o1 {
-            case o2: .Some {
+            case .Some as o2 {
                 return o2;
             }
 
@@ -78,7 +78,7 @@ use core
     #doc "Monadic chaining operation."
     and_then :: (o: ?$T, transform: (T) -> ?$R) -> ?R {
         return switch o {
-            case v: .Some => transform(v);
+            case .Some as v => transform(v);
             case #default => .None;
         };
     }
@@ -86,7 +86,7 @@ use core
     #doc "Changes the value inside the optional, if present."
     transform :: (o: ?$T, transform: (T) -> $R) -> ?R {
         switch o {
-            case v: .Some do return .{ Some = transform(v) };
+            case .Some as v do return .{ Some = transform(v) };
             case #default do return .None;
         }
     }
@@ -109,7 +109,7 @@ use core
     """
     unwrap :: (o: ?$T) -> T {
         switch o {
-            case v: .Some do return v;
+            case .Some as v do return v;
             case #default {
                 assert(false, "Unwrapping empty Optional.");
             }
@@ -123,7 +123,7 @@ use core
     """
     unwrap_ptr :: (o: & ?$T) -> &T {
         switch o {
-            case &v: .Some do return v;
+            case .Some as &v do return v;
             case #default {
                 assert(false, "Unwrapping empty Optional.");
             }
@@ -137,7 +137,7 @@ use core
     """
     expect :: (o: ?$T, message: str) -> T {
         switch o {
-            case v: .Some do return v;
+            case .Some as v do return v;
             case #default {
                 assert(false, message);
             }
@@ -151,7 +151,7 @@ use core
     """
     expect_ptr :: (o: & ?$T, message: str) -> &T {
         switch o {
-            case &v: .Some do return v;
+            case .Some as &v do return v;
             case #default {
                 assert(false, message);
             }
@@ -161,7 +161,7 @@ use core
     or_return :: #match {
         macro (o: ?$T) -> T {
             switch value := o; value {
-                case v: .Some do return v;
+                case .Some as v do return v;
                 case #default {
                     return return .{};
                 }
@@ -169,7 +169,7 @@ use core
         },
         macro (o: ?$T, return_value: $R) -> T {
             switch value := o; value {
-                case v: .Some do return v;
+                case .Some as v do return v;
                 case #default {
                     return return return_value;
                 }
@@ -179,7 +179,7 @@ use core
 
     catch :: macro (o: ?$T, body: Code) -> T {
         switch value := o; value {
-            case v: .Some do return v;
+            case .Some as v do return v;
             case .None {
                 #unquote body;
             }
@@ -189,7 +189,7 @@ use core
     with :: macro (o: ?$T, body: Code) {
         switch o {
             case .None ---;
-            case it: .Some {
+            case .Some as it {
                 #unquote body(it);
             }
         }
@@ -248,7 +248,7 @@ use core
 
 
     hash :: (o: ?$T/core.hash.Hashable) => switch o {
-        case v: .Some => core.hash.hash(v);
+        case .Some as v => core.hash.hash(v);
         case #default => 0;
     }
 }
@@ -258,20 +258,20 @@ use core
 
     return switch o1 {
         case .None => true;
-        case v1: .Some => v1 == o2->unwrap();
+        case .Some as v1 => v1 == o2->unwrap();
     };
 }
 
 #operator ?? macro (opt: ?$T, default: T) -> T {
     return switch value := opt; value {
-        case v: .Some => v;
+        case .Some as v => v;
         case #default => default;
     };
 }
 
 #operator ?? macro (opt: ?$T, catch: Code) -> T {
     switch value := opt; value {
-        case v: .Some do return v;
+        case .Some as v do return v;
         case #default ---
     }
 
@@ -280,7 +280,7 @@ use core
 
 #operator ? macro (opt: ?$T) -> T {
     switch value := opt; value {
-        case v: .Some do return v;
+        case .Some as v do return v;
         case #default do return return .{};
     }
 }
