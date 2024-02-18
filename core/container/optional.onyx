@@ -255,11 +255,11 @@ use core
 
 #operator == (o1, o2: ?$T) -> bool {
     if cast(Optional(T).tag_enum, o1) != cast(Optional(T).tag_enum, o2) do return false;
+    if o1.tag == .None do return true;
 
-    return switch o1 {
-        case .None => true;
-        case .Some as v1 => v1 == o2->unwrap();
-    };
+    v1 := o1->unwrap();
+    v2 := o2->unwrap();
+    return v1 == v2;
 }
 
 #operator ?? macro (opt: ?$T, default: T) -> T {
