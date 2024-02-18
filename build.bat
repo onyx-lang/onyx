@@ -17,12 +17,23 @@ set FLAGS=%FLAGS% "/I%PWD%\shared\include" /DONYX_RUNTIME_LIBRARY=wasmer
 rc.exe misc/icon_resource.rc
 cl.exe %FLAGS% /Icompiler/include /std:c17 /TC %SOURCE_FILES% /link /IGNORE:4217 %LINK_OPTIONS% /DEBUG /OUT:onyx.exe /incremental:no /opt:ref /subsystem:console misc\icon_resource.res
 
+REM Don't continue if we had compilation errors. This prevents CI to succeed.
+if %ERRORLEVEL% neq 0 (
+    echo Compiler compilation failed.
+    exit /b %ERRORLEVEL%
+)
+
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 del *.obj > NUL 2> NUL
 del misc\icon_resource.res
 
 cl /MT /std:c17 /TC /I compiler/include /I shared/include /D_USRDLL /D_WINDLL runtime\onyx_runtime.c /link /DLL ws2_32.lib bcrypt.lib Synchronization.lib kernel32.lib /OUT:onyx_runtime.dll
+
+if %ERRORLEVEL% neq 0 (
+    echo Onyx runtime compilation failed.
+    exit /b %ERRORLEVEL%
+)
 
 del onyx_runtime.obj
 del onyx_runtime.lib

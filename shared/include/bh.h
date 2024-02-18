@@ -1926,6 +1926,10 @@ b32 bh_file_stat(char const* filename, bh_file_stats* out) {
     out->modified_time = timespec_to_ms(s.st_mtimespec);
     out->accessed_time = timespec_to_ms(s.st_atimespec);
     out->change_time   = timespec_to_ms(s.st_ctimespec);
+#elif defined(_BH_WINDOWS)
+    out->modified_time = s.st_mtime * 1000;
+    out->accessed_time = s.st_atime * 1000;
+    out->change_time   = s.st_ctime * 1000;
 #else
     out->modified_time = timespec_to_ms(s.st_mtim);
     out->accessed_time = timespec_to_ms(s.st_atim);
