@@ -115,6 +115,7 @@ typedef struct OnyxTokenizer {
 
     bh_arr(OnyxToken) tokens;
 
+    b32 optional_semicolons : 1;
     b32 insert_semicolon: 1;
 } OnyxTokenizer;
 

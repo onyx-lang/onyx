@@ -158,7 +158,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
 
         switch (*tokenizer->curr) {
             case '\n':
-                if (tokenizer->insert_semicolon && context.options->enable_optional_semicolons) {
+                if (tokenizer->insert_semicolon && tokenizer->optional_semicolons) {
                     OnyxToken semicolon_token;
                     semicolon_token.type = Token_Type_Inserted_Semicolon;
                     semicolon_token.text = "; ";
@@ -219,6 +219,11 @@ whitespace_skipped:
         }
 
         tk.length = tokenizer->curr - tk.text - 2;
+
+        if (bh_arr_length(tokenizer->tokens) == 0 && bh_str_starts_with(tk.text, "+optional_semicolons")) {
+            tokenizer->optional_semicolons = 1;
+        }
+
         goto token_parsed;
     }
 
@@ -558,6 +563,7 @@ OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc
         .line_start     = fc->data,
         .tokens         = NULL,
 
+        .optional_semicolons = context.options->enable_optional_semicolons,
         .insert_semicolon = 0,
     };
 
