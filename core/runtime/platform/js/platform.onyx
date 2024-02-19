@@ -52,7 +52,7 @@ __futex_wake :: (addr: rawptr, maximum: i32) -> i32 {
 
 PollDescription :: struct {
     fd: i32;
-    in, out: io.PollEvent;
+    input, out: io.PollEvent;
 }
 __poll :: (fds: [] PollDescription, timeout := -1) {}
 
