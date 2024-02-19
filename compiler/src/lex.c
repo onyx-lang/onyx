@@ -220,7 +220,7 @@ whitespace_skipped:
 
         tk.length = tokenizer->curr - tk.text - 2;
 
-        if (bh_arr_length(tokenizer->tokens) == 0 && bh_str_starts_with(tk.text, "+optional_semicolons")) {
+        if (bh_arr_length(tokenizer->tokens) == 0 && bh_str_starts_with(tk.text, "+optional-semicolons")) {
             tokenizer->optional_semicolons = 1;
         }
 
