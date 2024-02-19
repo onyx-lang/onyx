@@ -433,6 +433,18 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
             }
         }
 
+        case .Dynamic_Array {
+            s := cast(^core.array.Untyped_Array) out;
+            if s.count == 0 {
+                to_copy := value->as_array();
+
+                s.allocator = context.allocator;
+                s.capacity = to_copy.count;
+            }
+
+            fallthrough;
+        }
+
         case .Slice {
             // Strings are handled differently
             if type == str {
