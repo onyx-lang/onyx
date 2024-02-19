@@ -182,7 +182,7 @@ __net_resolve :: (host: str, port: u16, out_addrs: [] SocketAddress) -> i32 {
 
 #package {
     socket_addr_to_wasix_addr :: (input: &SocketAddress, out: &wasi.AddrPort) {
-        switch *innput {
+        switch *input {
             case .Unix as &path {
                 *out = .{ Unix = .{ *cast(&[108] u8) path } };
             }
