@@ -4,6 +4,8 @@ package core.os
     #error "Cannot include this file. Platform not supported.";
 }
 
+use core {Pair, cptr, Result, tprintf}
+use core.array
 use core.io
 use runtime
 
@@ -22,8 +24,44 @@ Process :: struct {
     process_handle: ProcessData;
 }
 
+ProcessSpawnOpts :: struct {
+    capture_io: bool;
+    non_blocking_io: bool; 
+    detach: bool; // setsid on linux
+    dir: str;
+    environment: [] Pair(str, str);
+}
+
+process_spawn :: #match #local -> Process {}
+
+#overload
 process_spawn :: (path: str, args: [] str, non_blocking_io := false, starting_directory := "") -> Process {
-    handle := __process_spawn(path, args, non_blocking_io, starting_directory);
+    opts := ProcessSpawnOpts.{
+        capture_io = true,
+        non_blocking_io = non_blocking_io,
+        detach = false,
+        dir = starting_directory,
+        environment = .{},
+    };
+
+    return process_spawn(path, args, &opts);
+}
+
+#overload
+process_spawn :: (path: str, args: [] str, opts: &ProcessSpawnOpts) -> Process {
+    env_data := null;
+    if opts.environment {
+        env: [..] cptr(u8);
+        for &e in opts.environment {
+            key_value := tprintf("{}={}\0", e.first, e.second);
+            env << cptr.make(key_value.data);
+        }
+        env << .{ 0 };
+
+        env_data = env.data;
+    }
+
+    handle := __process_spawn(path, args, env_data, opts);
 
     return .{
         .{ &process_stream_vtable },
@@ -84,5 +122,103 @@ ProcessResult :: enum {
     FailedToRun :: 0x01;
     Error       :: 0x02;
     InternalErr :: 0x03;
+}
+
+
+//
+// Builder pattern for processes
+//
+
+Command :: struct {
+    _path: str;
+    _args: [..] str;
+    _env: [..] Pair(str, str);
+    _dir: str;
+
+    _process: ? Process;
+    _opts: ProcessSpawnOpts;
+}
+
+command :: () -> &Command {
+    return new(Command);
+}
+
+#inject Command {
+    path :: (cmd: &Command, path: str) -> &Command {
+        cmd._path = path;
+        return cmd;
+    }
+
+    args :: (cmd: &Command, args: [] str) -> &Command {
+        array.concat(&cmd._args, args);
+        return cmd;
+    }
+
+    env :: (cmd: &Command, key, value: str) -> &Command {
+        cmd._env << .{ key, value };
+        return cmd;
+    }
+
+    dir :: (cmd: &Command, dir: str) -> &Command {
+        cmd._dir = dir;
+        return cmd;
+    }
+
+    output :: (cmd: &Command) -> Result(str, ProcessResult) {
+        if !cmd._process {
+            cmd._opts.capture_io = true;
+            cmd._opts.non_blocking_io = false;
+            cmd._opts.detach = false;
+
+            cmd->start();
+            if !cmd._process do return .{ Err = .Error };
+        }
+
+        r := io.reader_make(cmd._process->unwrap_ptr());
+        output := io.read_all(&r);
+        io.reader_free(&r);
+
+        res := cmd->wait();
+        if res != .Success {
+            delete(&output);
+            return .{ Err = res };
+        }
+
+        return .{ Ok = output };
+    }
+
+    run :: (cmd: &Command) -> ProcessResult {
+        cmd->start();
+        return cmd->wait();
+    }
+
+    start_with_output :: (cmd: &Command) -> &Command {
+        cmd._opts.capture_io = true;
+        return cmd->start();
+    }
+
+    start :: (cmd: &Command) -> &Command {
+        cmd._opts.environment = cmd._env;
+        cmd._opts.dir = cmd._dir;
+
+        cmd._process = process_spawn(cmd._path, cmd._args, &cmd._opts);
+        return cmd;
+    }
+
+    wait :: (cmd: &Command) -> ProcessResult {
+        if !cmd._process do return .Error;
+
+        res := process_wait(cmd._process->unwrap_ptr());
+        process_destroy(cmd._process->unwrap_ptr());
+
+        cmd->destroy();
+        return res;
+    }
+
+    destroy :: (cmd: &Command) {
+        delete(&cmd._args);
+        delete(&cmd._env);
+        cfree(cmd);
+    }
 }
 
