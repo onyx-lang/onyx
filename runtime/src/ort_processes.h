@@ -127,8 +127,9 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
                     chdir(starting_dir); // Switch current working directory.
                 }
 
-                if (env) execvpe(process_path, process_args, env);
-                else     execvp(process_path, process_args);
+                if (env) execve(process_path, process_args, env);
+                else     execv(process_path, process_args);
+
                 exit(-1);
                 break;
 
