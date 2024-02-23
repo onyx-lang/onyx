@@ -97,10 +97,18 @@ Date :: struct {
     }
 
     end_of_month :: (d: Date) -> Date {
+        day := Date.month_durations[d.month];
+
+        if d.month == 1 {
+            if nd.year % 4 == 0 && (nd.year % 100 != 0 || nd.year % 400 == 0) {
+                day += 1;
+            }
+        }
+
         return .{
             year = d.year,
             month = d.month,
-            day = Date.month_durations[d.month],
+            day = day,
         };
     }
 
