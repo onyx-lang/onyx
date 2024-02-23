@@ -9,13 +9,27 @@ Date :: struct {
     month, day: i32;
 }
 
+#local
+_month_durations := u32.[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
 #inject Date {
-    month_durations := u32.[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    month_duration_in_days :: (year: i32, month: i32) => {
+        d := _month_durations[month];
+
+        // February leap year case
+        if month == 1 {
+            if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) {
+                d += 1;
+            }
+        }
+
+        return d;
+    }
+
 
     make :: (year, month, day: i32) -> Date {
         return .{ year, month - 1, day };
     }
-
 
     today :: () -> Date {
         return now()->as_date();
@@ -42,17 +56,15 @@ Date :: struct {
         nd := d;
         nd.day += days;
 
-        while nd.day > Date.month_durations[nd.month] {
-            nd.day -= Date.month_durations[nd.month];
-
-            // February leap year case
-            if nd.month == 1 {
-                if nd.year % 4 == 0 && (nd.year % 100 != 0 || nd.year % 400 == 0) {
-                    nd.day -= 1;
-                }
+        while true {
+            duration := Date.month_duration_in_days(nd.year, nd.month);
+            if nd.day <= duration {
+                break;
             }
 
+            nd.day -= duration;
             nd.month += 1;
+
             if nd.month >= 12 {
                 nd.month = 0;
                 nd.year += 1;
@@ -97,18 +109,10 @@ Date :: struct {
     }
 
     end_of_month :: (d: Date) -> Date {
-        day := Date.month_durations[d.month];
-
-        if d.month == 1 {
-            if nd.year % 4 == 0 && (nd.year % 100 != 0 || nd.year % 400 == 0) {
-                day += 1;
-            }
-        }
-
         return .{
             year = d.year,
             month = d.month,
-            day = day,
+            day = Date.month_duration_in_days(d.year, d.month),
         };
     }
 
