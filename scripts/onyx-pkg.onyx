@@ -790,7 +790,7 @@ run_native_library_installation :: (folder: str) -> (bool, str) {
     info_print("Install", "Running installation of '{}'\n", folder);    
 
     args := string.split(inner_config.native_library_build->unwrap(), #char " ", context.temp_allocator);
-    cmd  := args[0];
+    cmd  := os.path_join(os.env("ONYX_PATH") ?? "/usr", "bin", args[0]);
     args  = args[1 .. args.count];
 
     {
@@ -966,7 +966,7 @@ Package :: struct {
 }
 
 #if runtime.compiler_os == .Linux || runtime.compiler_os == .MacOS {
-    git_path :: "git"
+    git_path :: "/usr/bin/git"
 }
 #if runtime.compiler_os == .Windows {
     git_path :: "git.exe"
