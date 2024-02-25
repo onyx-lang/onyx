@@ -1,0 +1,10 @@
+use core {println}
+use core.list
+
+main :: () {
+    arr := i32.[1];
+    l := list.from_array(arr);
+    for elem in l->as_iter() {
+        println(elem);
+    }
+}

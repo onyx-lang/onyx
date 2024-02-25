@@ -39,8 +39,8 @@ __make_overload :: (_: &List($T), allocator := context.allocator) -> List(T) {
     return #this_package.make(T, allocator);
 }
 
-from_array :: (arr: [] $T) -> List(T) {
-    l: List(T);
+from_array :: (arr: [] $T, allocator := context.allocator) -> List(T) {
+    l := make(T, allocator);
     for& arr {
         push_end(&l, *it);
     }
