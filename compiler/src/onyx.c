@@ -384,8 +384,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
   skip_parsing_arguments:
 
-    // NOTE: Always enable multi-threading for the Onyx and WASI runtime.
-    if (options.runtime == Runtime_Onyx || options.runtime == Runtime_Wasi) {
+    // NOTE: Always enable multi-threading for the Onyx runtime.
+    if (options.runtime == Runtime_Onyx) {
         options.use_multi_threading = 1;
     }
 
