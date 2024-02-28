@@ -11,10 +11,20 @@ void onyx_errors_init(bh_arr(bh_file_contents)* files) {
 }
 
 static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
-    bh_printf("(%s:%l,%l) %s\n", err->pos.filename, err->pos.line, err->pos.column, err->text);
+    switch (err->rank) {
+        case Error_Warning:
+            bh_printf("\033[93mwarning\033[0m: %s\n", err->text);
+            bh_printf("\033[90m     at: %s:%l,%l\033[0m\n", err->pos.filename, err->pos.line, err->pos.column);
+            break;
+
+        default:
+            bh_printf("\033[91merror\033[0m: %s\n", err->text);
+            bh_printf("\033[90m   at: %s:%l,%l\033[0m\n", err->pos.filename, err->pos.line, err->pos.column);
+            break;
+    }
 
     b32 colored_printing = 0;
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         colored_printing = !context.options->no_colors;
     #endif
 
@@ -24,23 +34,33 @@ static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
     while (*walker == ' ' || *walker == '\t') first_char++, linelength++, walker++;
     while (*walker != '\n') linelength++, walker++;
 
+
+    char numbuf[32];
+    i32 numlen = bh_snprintf(numbuf, 31, " %d | ", err->pos.line);
+
     if (colored_printing) bh_printf("\033[90m");
-    i32 numlen = bh_printf(" %d | ", err->pos.line);
+    fori (i, 0, numlen - 3) bh_printf(" ");
+    bh_printf("|\n%s", numbuf);
     if (colored_printing) bh_printf("\033[94m");
+
     bh_printf("%b\n", err->pos.line_start, linelength);
 
-    char* pointer_str = bh_alloc_array(global_scratch_allocator, char, linelength + numlen);
-    memset(pointer_str, ' ', linelength + numlen);
-    memcpy(pointer_str + numlen - 1, err->pos.line_start, first_char);
-    memset(pointer_str + first_char + numlen - 1, ' ', err->pos.column - first_char);
-    memset(pointer_str + err->pos.column + numlen - 1, '~', err->pos.length - 1);
-    pointer_str[err->pos.column + numlen - 2] = '^';
-    pointer_str[err->pos.column + numlen + err->pos.length - 1] = 0;
+    if (colored_printing) bh_printf("\033[90m");
+    fori (i, 0, numlen - 3) bh_printf(" ");
+    bh_printf("|  ");
+    if (colored_printing) bh_printf("\033[94m");
+
+    char* pointer_str = bh_alloc_array(global_scratch_allocator, char, linelength);
+    memset(pointer_str, ' ', linelength);
+    memcpy(pointer_str - 1, err->pos.line_start, first_char);
+    memset(pointer_str + first_char - 1, ' ', err->pos.column - first_char);
+    memset(pointer_str + err->pos.column - 1, '~', err->pos.length - 1);
+    pointer_str[err->pos.column - 2] = '^';
+    pointer_str[err->pos.column + err->pos.length - 1] = 0;
 
     if (colored_printing) bh_printf("\033[91m");
     bh_printf("%s\n", pointer_str);
-
-    if (colored_printing) bh_printf("\033[0m");
+    if (colored_printing) bh_printf("\033[0m\n");
 }
 
 static i32 errors_sort(const void* v1, const void* v2) {
@@ -75,7 +95,9 @@ void onyx_errors_print() {
             print_detailed_message(err, &file_contents);
 
         } else {
-            bh_printf("(%l,%l) %s\n", err->pos.line, err->pos.column, err->text);
+            bh_printf("\033[91merror\033[0m: ");
+            bh_printf("%s\n", err->text);
+            bh_printf("\033[90m   at: command line argument\033[0m\n");
         }
 
         last_rank = err->rank;

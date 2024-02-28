@@ -632,7 +632,11 @@ static b32 process_source_file(char* filename, OnyxFilePos error_pos) {
     bh_file_error err = bh_file_open(&file, filename);
     if (err != BH_FILE_ERROR_NONE) {
         if (context.cycle_detected) {
-            onyx_report_error(error_pos, Error_Critical, "Failed to open file %s", filename);
+            if (error_pos.filename == NULL) {
+                onyx_report_error(error_pos, Error_Command_Line_Arg, "Failed to open file %s", filename);
+            } else {
+                onyx_report_error(error_pos, Error_Critical, "Failed to open file %s", filename);
+            }
         }
         return 0;
     }

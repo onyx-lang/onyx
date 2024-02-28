@@ -1906,7 +1906,12 @@ static AstNode* parse_statement(OnyxParser* parser) {
             break;
     }
 
-    if (needs_semicolon) expect_token(parser, ';');
+    if (needs_semicolon) {
+        if (!consume_token_if_next(parser, ';')) {
+            onyx_report_error((parser->curr - 1)->pos, Error_Critical, "Expected a semi-colon after this token.");
+            parser->hit_unexpected_token = 1;
+        }
+    }
 
     return retval;
 }
