@@ -707,7 +707,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                 strncat(buf, bh_bprintf(" and %d more", missed_variant_count - 2), 1023);
             }
 
-            ERROR_(switchnode->token->pos, "Unhandled union variants: %s", buf);
+            ERROR_(switchnode->token->pos, "Unhandled union variants: '%s'", buf);
         }
     }
 
@@ -1484,7 +1484,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
         TYPE_CHECK(&binop->left, binop->right->type) {
             TYPE_CHECK(&binop->right, binop->left->type) {
                 ERROR_(binop->token->pos,
-                        "Mismatched types for binary operation '%s'. left: '%s', right: '%s'.",
+                        "Binary operation '%s' not understood for types '%s' and '%s'.",
                         binaryop_string[binop->operation],
                         node_get_type_name(binop->left),
                         node_get_type_name(binop->right));
@@ -2370,7 +2370,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
     }
 
     if (expr->kind == Ast_Kind_Directive_Init) {
-        ERROR(expr->token->pos, "#init declarations are not in normal expressions, only in #after clauses.");
+        ERROR(expr->token->pos, "#init declarations are not allowed in normal expressions, only in #after clauses.");
     }
 
     fill_in_type(expr);
@@ -3070,7 +3070,7 @@ CheckStatus check_struct(AstStructType* s_node) {
 
 
             TYPE_CHECK(&s_node->polymorphic_arguments[i].value, arg_type) {
-                ERROR_(s_node->polymorphic_arguments[i].value->token->pos, "Expected value of type %s, got %s.",
+                ERROR_(s_node->polymorphic_arguments[i].value->token->pos, "Expected value of type '%s', got '%s'.",
                     type_get_name(arg_type),
                     type_get_name(s_node->polymorphic_arguments[i].value->type));
             }

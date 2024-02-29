@@ -10,23 +10,63 @@ void onyx_errors_init(bh_arr(bh_file_contents)* files) {
     bh_arr_new(global_heap_allocator, context.errors.errors, 4);
 }
 
-static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
-    switch (err->rank) {
-        case Error_Warning:
-            bh_printf("\033[93mwarning\033[0m: %s\n", err->text);
-            bh_printf("\033[90m     at: %s:%l,%l\033[0m\n", err->pos.filename, err->pos.line, err->pos.column);
-            break;
-
-        default:
-            bh_printf("\033[91merror\033[0m: %s\n", err->text);
-            bh_printf("\033[90m   at: %s:%l,%l\033[0m\n", err->pos.filename, err->pos.line, err->pos.column);
-            break;
+static void print_error_text(char *text) {
+    if (context.options->no_colors) {
+        bh_printf("%s", text);
+        return;
     }
 
+    char *ch = text;
+    b32 in_color = 0;
+
+    while (*ch != '\0') {
+        if (*ch == '\'') {
+            in_color = !in_color;
+            if (in_color) bh_printf("\033[92m");
+            else          bh_printf("\033[0m");
+        } else {
+            bh_printf("%c", *ch);
+        }
+
+        ch++;
+    }
+}
+
+static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
     b32 colored_printing = 0;
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         colored_printing = !context.options->no_colors;
     #endif
+
+    if (colored_printing) {
+        switch (err->rank) {
+            case Error_Warning:
+                bh_printf("\033[93mwarning\033[0m: ");
+                print_error_text(err->text);
+                bh_printf("\n\033[90m     at: %s:%l,%l\033[0m\n", err->pos.filename, err->pos.line, err->pos.column);
+                break;
+
+            default:
+                bh_printf("\033[91merror\033[0m: ");
+                print_error_text(err->text);
+                bh_printf("\n\033[90m   at: %s:%l,%l\033[0m\n", err->pos.filename, err->pos.line, err->pos.column);
+                break;
+        }
+    } else {
+        switch (err->rank) {
+            case Error_Warning:
+                bh_printf("warning: ");
+                print_error_text(err->text);
+                bh_printf("\n     at: %s:%l,%l\n", err->pos.filename, err->pos.line, err->pos.column);
+                break;
+
+            default:
+                bh_printf("error: ");
+                print_error_text(err->text);
+                bh_printf("\n   at: %s:%l,%l\n", err->pos.filename, err->pos.line, err->pos.column);
+                break;
+        }
+    }
 
     i32 linelength = 0;
     i32 first_char = 0;

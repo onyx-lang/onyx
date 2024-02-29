@@ -1034,11 +1034,11 @@ static i32 onyx_compile() {
 
     if (context.options->running_perf) {
         fori (i, 0, Entity_State_Count) {
-            printf("| %27s | %10lu us |\n", entity_state_strings[i], context.microseconds_per_state[i]);
+            printf("| %27s | %10llu us |\n", entity_state_strings[i], context.microseconds_per_state[i]);
         }
         printf("\n");
         fori (i, 0, Entity_Type_Count) {
-            printf("| %27s | %10lu us |\n", entity_type_strings[i], context.microseconds_per_type[i]);
+            printf("| %27s | %10llu us |\n", entity_type_strings[i], context.microseconds_per_type[i]);
         }
         printf("\n");
     }
