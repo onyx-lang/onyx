@@ -1,3 +1,21 @@
+Nightly Release
+---------------
+No release date yet
+
+Additions:
+
+Removals:
+
+Changes:
+
+Bugfixes:
+- Fixed compiler crash when trying to iterate over something that is not iterable.
+
+
+
+
+
+
 Release 0.1.9
 --------------
 February 19th 2024
