@@ -334,7 +334,8 @@ CheckStatus check_for(AstFor* fornode) {
         fornode->loop_type = For_Loop_Iterator;
     }
 
-    assert(given_type);
+    if (given_type == NULL)
+        ERROR_(error_loc, "Cannot iterate over a '%s'.", type_get_name(iter_type));
 
     if (fornode->var->type_node) {
         fill_in_type((AstTyped *) fornode->var);
