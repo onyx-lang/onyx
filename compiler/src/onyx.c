@@ -147,6 +147,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .generate_lsp_info_file = 0,
 
         .running_perf = 0,
+
+        .error_format = "v1",
     };
 
     bh_arr_new(alloc, options.files, 2);
@@ -154,13 +156,22 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     bh_arr_new(alloc, options.defined_variables, 2);
 
     char* core_installation = NULL;
+
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     core_installation = getenv("ONYX_PATH");
+    if (getenv("ONYX_ERROR_FORMAT")) {
+        options.error_format = getenv("ONYX_ERROR_FORMAT");
+    }
     #endif
     #ifdef _BH_WINDOWS
     char *tmp_core_installation = bh_alloc_array(alloc, u8, 512);
+    char *tmp_error_format      = bh_alloc_array(alloc, u8, 512);
+
     if (GetEnvironmentVariableA("ONYX_PATH", tmp_core_installation, 512) > 0) {
         core_installation = tmp_core_installation;
+    }
+    if (GetEnvironmentVariableA("ONYX_ERROR_FORMAT", tmp_error_format, 512) > 0) {
+        options.error_format = tmp_error_format;
     }
     #endif
 
@@ -285,6 +296,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--show-all-errors")) {
                 options.show_all_errors = 1;
+            }
+            else if (!strcmp(argv[i], "--error-format")) {
+                options.error_format = argv[++i];
             }
             else if (!strcmp(argv[i], "--feature")) {
                 char *next_arg = argv[++i];

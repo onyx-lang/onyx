@@ -32,12 +32,39 @@ static void print_error_text(char *text) {
     }
 }
 
-static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
-    b32 colored_printing = 0;
-    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
-        colored_printing = !context.options->no_colors;
-    #endif
+static void print_underline(OnyxError *err, i32 len, i32 first_non_whitespace, b32 colored_printing) {
+    char* pointer_str = bh_alloc_array(global_scratch_allocator, char, len);
+    memset(pointer_str, ' ', len);
+    memcpy(pointer_str - 1, err->pos.line_start, first_non_whitespace);
+    memset(pointer_str + first_non_whitespace - 1, ' ', err->pos.column - first_non_whitespace);
+    memset(pointer_str + err->pos.column - 1, '~', err->pos.length - 1);
+    pointer_str[err->pos.column - 2] = '^';
+    pointer_str[err->pos.column + err->pos.length - 1] = 0;
 
+    if (colored_printing) bh_printf("\033[91m");
+    bh_printf("%s\n", pointer_str);
+    if (colored_printing) bh_printf("\033[0m\n");
+}
+
+static void print_detailed_message_v1(OnyxError *err, bh_file_contents* fc, b32 colored_printing) {
+    bh_printf("(%s:%l,%l) %s\n", err->pos.filename, err->pos.line, err->pos.column, err->text);
+
+    i32 linelength = 0;
+    i32 first_char = 0;
+    char* walker = err->pos.line_start;
+    while (*walker == ' ' || *walker == '\t') first_char++, linelength++, walker++;
+    while (*walker != '\n') linelength++, walker++;
+
+    if (colored_printing) bh_printf("\033[90m");
+    i32 numlen = bh_printf(" %d | ", err->pos.line);
+    if (colored_printing) bh_printf("\033[94m");
+    bh_printf("%b\n", err->pos.line_start, linelength);
+    
+    fori (i, 0, numlen) bh_printf(" ");
+    print_underline(err, linelength, first_char, colored_printing);
+}
+
+static void print_detailed_message_v2(OnyxError* err, bh_file_contents* fc, b32 colored_printing) {
     if (colored_printing) {
         switch (err->rank) {
             case Error_Warning:
@@ -74,7 +101,6 @@ static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
     while (*walker == ' ' || *walker == '\t') first_char++, linelength++, walker++;
     while (*walker != '\n') linelength++, walker++;
 
-
     char numbuf[32];
     i32 numlen = bh_snprintf(numbuf, 31, " %d | ", err->pos.line);
 
@@ -90,17 +116,43 @@ static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
     bh_printf("|  ");
     if (colored_printing) bh_printf("\033[94m");
 
-    char* pointer_str = bh_alloc_array(global_scratch_allocator, char, linelength);
-    memset(pointer_str, ' ', linelength);
-    memcpy(pointer_str - 1, err->pos.line_start, first_char);
-    memset(pointer_str + first_char - 1, ' ', err->pos.column - first_char);
-    memset(pointer_str + err->pos.column - 1, '~', err->pos.length - 1);
-    pointer_str[err->pos.column - 2] = '^';
-    pointer_str[err->pos.column + err->pos.length - 1] = 0;
+    print_underline(err, linelength, first_char, colored_printing);
+}
 
-    if (colored_printing) bh_printf("\033[91m");
-    bh_printf("%s\n", pointer_str);
-    if (colored_printing) bh_printf("\033[0m\n");
+static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
+    b32 colored_printing = 0;
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+        colored_printing = !context.options->no_colors;
+    #endif
+
+    if (!err->pos.filename) {
+        // This makes the assumption that if a file is not specified for an error,
+        // the error must have come from the command line.
+        
+        if (colored_printing) {
+            bh_printf("\033[91merror\033[0m: ");
+            bh_printf("%s\n", err->text);
+            bh_printf("\033[90m   at: command line argument\033[0m\n");
+        } else {
+            bh_printf("error: ");
+            bh_printf("%s\n", err->text);
+            bh_printf("   at: command line argument\n");
+        }
+
+        return;
+    }
+
+    char *error_format = context.options->error_format;
+
+    if (!strcmp(error_format, "v2")) {
+        print_detailed_message_v2(err, fc, colored_printing);
+    }
+    else if (!strcmp(error_format, "v1")) {
+        print_detailed_message_v1(err, fc, colored_printing);
+    }
+    else {
+        bh_printf("Unknown error format: '%s'.\n", error_format);
+    }
 }
 
 static i32 errors_sort(const void* v1, const void* v2) {
@@ -112,7 +164,7 @@ static i32 errors_sort(const void* v1, const void* v2) {
 void onyx_errors_print() {
     // NOTE: If the format of the error messages is ever changed,
     // update onyx_compile.vim and onyx.sublime-build to match
-    // the new format. This was editor error highlighting is still
+    // the new format. This way editor error highlighting is still
     // supported.
     //
     //                                      - brendanfh   2020/09/03
@@ -123,22 +175,17 @@ void onyx_errors_print() {
     bh_arr_each(OnyxError, err, context.errors.errors) {
         if (!context.options->show_all_errors && last_rank != err->rank) break;
 
+        bh_file_contents file_contents = { 0 };
         if (err->pos.filename) {
-            bh_file_contents file_contents = { 0 };
             bh_arr_each(bh_file_contents, fc, *context.errors.file_contents) {
                 if (!strcmp(fc->filename, err->pos.filename)) {
                     file_contents = *fc;
                     break;
                 }
             }
-
-            print_detailed_message(err, &file_contents);
-
-        } else {
-            bh_printf("\033[91merror\033[0m: ");
-            bh_printf("%s\n", err->text);
-            bh_printf("\033[90m   at: command line argument\033[0m\n");
         }
+
+        print_detailed_message(err, &file_contents);
 
         last_rank = err->rank;
     }
@@ -212,7 +259,6 @@ void onyx_submit_warning(OnyxError error) {
     print_detailed_message(&error, &file_contents);
 }
 
-// This definitely doesn't do what I thought it did?
 void onyx_report_warning(OnyxFilePos pos, char* format, ...) {
     if (!context.errors_enabled) return;
 
@@ -228,17 +274,4 @@ void onyx_report_warning(OnyxFilePos pos, char* format, ...) {
     };
 
     bh_arr_push(context.errors.errors, err);
-
-    /*
-
-    bh_file_contents file_contents = { 0 };
-    bh_arr_each(bh_file_contents, fc, *context.errors.file_contents) {
-        if (!strcmp(fc->filename, pos.filename)) {
-            file_contents = *fc;
-            break;
-        }
-    }
-
-    print_detailed_message(&err, &file_contents);
-    */
 }
