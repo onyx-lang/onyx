@@ -159,6 +159,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     core_installation = getenv("ONYX_PATH");
+
     if (getenv("ONYX_ERROR_FORMAT")) {
         options.error_format = getenv("ONYX_ERROR_FORMAT");
     }
@@ -176,8 +177,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     #endif
 
     if (core_installation == NULL) {
-        bh_printf("Error: ONYX_PATH environment variable is not set. Please set this to the location of your Onyx installation.\n");
-        exit(0);
+        bh_printf("error: ONYX_PATH environment variable is not set. Please set this to the location of your Onyx installation.\n");
+        exit(1);
     }
 
     // NOTE: Add the current folder
