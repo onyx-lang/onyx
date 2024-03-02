@@ -12,6 +12,7 @@ typedef enum OnyxErrorRank {
     Error_Warning = 2,
     Error_Waiting_On = 3,
     Error_Critical = 4,
+    Error_Command_Line_Arg = 5,
 } OnyxErrorRank;
 
 typedef struct OnyxError {

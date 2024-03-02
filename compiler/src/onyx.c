@@ -99,6 +99,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     "Developer options:\n"
     "\t--no-colors               Disables colors in the error message.\n"
     "\t--no-file-contents        Disables '#file_contents' for security.\n"
+    "\t--error-format (v1|v2)    Changes the output error format.\n"
     "\t--show-all-errors         Print all errors (can result in many consequencial errors from a single error)\n"
     "\t--print-function-mappings Prints a mapping from WASM function index to source location.\n"
     "\t--print-static-if-results Prints the conditional result of each #if statement. Useful for debugging.\n"
@@ -147,6 +148,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .generate_lsp_info_file = 0,
 
         .running_perf = 0,
+
+        .error_format = "v1",
     };
 
     bh_arr_new(alloc, options.files, 2);
@@ -154,19 +157,29 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     bh_arr_new(alloc, options.defined_variables, 2);
 
     char* core_installation = NULL;
+
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     core_installation = getenv("ONYX_PATH");
+
+    if (getenv("ONYX_ERROR_FORMAT")) {
+        options.error_format = getenv("ONYX_ERROR_FORMAT");
+    }
     #endif
     #ifdef _BH_WINDOWS
     char *tmp_core_installation = bh_alloc_array(alloc, u8, 512);
+    char *tmp_error_format      = bh_alloc_array(alloc, u8, 512);
+
     if (GetEnvironmentVariableA("ONYX_PATH", tmp_core_installation, 512) > 0) {
         core_installation = tmp_core_installation;
+    }
+    if (GetEnvironmentVariableA("ONYX_ERROR_FORMAT", tmp_error_format, 512) > 0) {
+        options.error_format = tmp_error_format;
     }
     #endif
 
     if (core_installation == NULL) {
-        bh_printf("Error: ONYX_PATH environment variable is not set. Please set this to the location of your Onyx installation.\n");
-        exit(0);
+        bh_printf("error: ONYX_PATH environment variable is not set. Please set this to the location of your Onyx installation.\n");
+        exit(1);
     }
 
     // NOTE: Add the current folder
@@ -285,6 +298,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--show-all-errors")) {
                 options.show_all_errors = 1;
+            }
+            else if (!strcmp(argv[i], "--error-format")) {
+                options.error_format = argv[++i];
             }
             else if (!strcmp(argv[i], "--feature")) {
                 char *next_arg = argv[++i];
@@ -632,7 +648,11 @@ static b32 process_source_file(char* filename, OnyxFilePos error_pos) {
     bh_file_error err = bh_file_open(&file, filename);
     if (err != BH_FILE_ERROR_NONE) {
         if (context.cycle_detected) {
-            onyx_report_error(error_pos, Error_Critical, "Failed to open file %s", filename);
+            if (error_pos.filename == NULL) {
+                onyx_report_error(error_pos, Error_Command_Line_Arg, "Failed to open file %s", filename);
+            } else {
+                onyx_report_error(error_pos, Error_Critical, "Failed to open file %s", filename);
+            }
         }
         return 0;
     }
@@ -1030,11 +1050,11 @@ static i32 onyx_compile() {
 
     if (context.options->running_perf) {
         fori (i, 0, Entity_State_Count) {
-            printf("| %27s | %10lu us |\n", entity_state_strings[i], context.microseconds_per_state[i]);
+            printf("| %27s | %10llu us |\n", entity_state_strings[i], context.microseconds_per_state[i]);
         }
         printf("\n");
         fori (i, 0, Entity_Type_Count) {
-            printf("| %27s | %10lu us |\n", entity_type_strings[i], context.microseconds_per_type[i]);
+            printf("| %27s | %10llu us |\n", entity_type_strings[i], context.microseconds_per_type[i]);
         }
         printf("\n");
     }
