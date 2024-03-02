@@ -99,6 +99,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     "Developer options:\n"
     "\t--no-colors               Disables colors in the error message.\n"
     "\t--no-file-contents        Disables '#file_contents' for security.\n"
+    "\t--error-format (v1|v2)    Changes the output error format.\n"
     "\t--show-all-errors         Print all errors (can result in many consequencial errors from a single error)\n"
     "\t--print-function-mappings Prints a mapping from WASM function index to source location.\n"
     "\t--print-static-if-results Prints the conditional result of each #if statement. Useful for debugging.\n"
