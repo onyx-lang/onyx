@@ -1605,6 +1605,7 @@ void track_declaration_for_symbol_info(OnyxFilePos pos, AstNode *node) {
     symbol.file_id = file_id;
     symbol.line = pos.line;
     symbol.column = pos.column;
+    symbol.documentation = NULL;
     bh_arr_push(syminfo->symbols, symbol);
 
     bh_imap_put(&syminfo->node_to_id, (u64) node, (u64) symbol_id);
