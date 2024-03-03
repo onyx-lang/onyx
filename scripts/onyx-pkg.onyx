@@ -633,7 +633,7 @@ run_build_command :: (args: [] cstr) {
     args << "-o";
     args << bc.target;
 
-    p := os.process_spawn(os.path_join(os.env("ONYX_PATH") ?? "", "bin", "onyx"), args);
+    p := os.process_spawn("onyx", args);
     r := io.reader_make(&p);
     output := io.read_all(&r);
     switch os.process_wait(&p) {
@@ -966,7 +966,7 @@ Package :: struct {
 }
 
 #if runtime.compiler_os == .Linux || runtime.compiler_os == .MacOS {
-    git_path :: "/usr/bin/git"
+    git_path :: "git"
 }
 #if runtime.compiler_os == .Windows {
     git_path :: "git.exe"

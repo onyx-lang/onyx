@@ -127,9 +127,23 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
                     chdir(starting_dir); // Switch current working directory.
                 }
 
-                if (env) execve(process_path, process_args, env);
-                else     execv(process_path, process_args);
+                if (env) {
+                    char **env_walker = env;
 
+                    while (*env_walker) {
+                        // We have to duplicate the string here
+                        // because there is disagreance on whether
+                        // putenv copies its input or not. To be safe
+                        // we copy it into the heap, which may be copied
+                        // again by putenv :|
+                        char *envvar = bh_strdup(bh_heap_allocator(), *env_walker);
+                        putenv(envvar);
+
+                        env_walker++;
+                    }
+                }
+
+                execvp(process_path, process_args);
                 exit(-1);
                 break;
 
