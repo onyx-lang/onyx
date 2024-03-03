@@ -180,7 +180,20 @@ ONYX_DEF(__futex_wait, (WASM_PTR, WASM_I32, WASM_I32), (WASM_I32)) {
     #endif
 
     #ifdef _BH_DARWIN
-    results->data[0] = WASM_I32_VAL(0);
+    int64_t timeout = params->data[2].of.i32;
+    if (timeout >= 0) timeout *= 1000;
+    else              timeout  = -1;
+
+    extern int __ulock_wait(int operation, void *addr, long long value, int64_t timeout);
+    int res = __ulock_wait(1 /* UL_COMPARE_AND_WAIT */, addr, params->data[1].of.i32, timeout);
+
+    if (res == 0) {
+        if (*addr == params->data[1].of.i32) results->data[0] = WASM_I32_VAL(0);
+        else                                 results->data[0] = WASM_I32_VAL(1);
+
+    } else {
+        results->data[0] = WASM_I32_VAL(2);
+    }
     #endif
 
     return NULL;
@@ -204,7 +217,15 @@ ONYX_DEF(__futex_wake, (WASM_PTR, WASM_I32), (WASM_I32)) {
     #endif
 
     #ifdef _BH_DARWIN
-    results->data[0] = WASM_I32_VAL(params->data[1].of.i32);
+    int op = 1 /* UL_COMPARE_AND_WAIT */;
+    if (params->data[1].of.i32 > 1) {
+        op |= 0x100 /* UL_WAKE_ALL */;
+    }
+
+    extern int __ulock_wake(int operation, void *addr, long long value);
+    int res = __ulock_wake(op, addr, 0);
+
+    results->data[0] = WASM_I32_VAL(res);
     #endif
 
     return NULL;

@@ -3086,9 +3086,13 @@ void bh_imap_clear(bh_imap* imap) {
 
 u64 bh_time_curr_micro() {
 #if defined(_BH_WINDOWS)
-    LARGE_INTEGER result;
-    QueryPerformanceCounter(&result);
-    return (u64) result.QuadPart; // This is wrong and not micro-seconds...
+    FILETIME ft;
+    GetSystemTimeAsFileTime(&ft);
+
+    ULARGE_INTEGER ull;
+    ull.LowPart = ft.dwLowDateTime;
+    ull.HighPart = ft.dwHighDateTime;
+    return (ull.QuadPart - 116444736000000000ULL) / 10;
 
 #elif defined(_BH_LINUX) || defined(_BH_DARWIN)
     struct timespec spec;
@@ -3107,9 +3111,13 @@ u64 bh_time_curr_micro() {
 
 u64 bh_time_curr() {
 #if defined(_BH_WINDOWS)
-    LARGE_INTEGER result;
-    QueryPerformanceCounter(&result);
-    return (u64) result.QuadPart;
+    FILETIME ft;
+    GetSystemTimeAsFileTime(&ft);
+
+    ULARGE_INTEGER ull;
+    ull.LowPart = ft.dwLowDateTime;
+    ull.HighPart = ft.dwHighDateTime;
+    return (ull.QuadPart - 116444736000000000ULL) / 10000;
 
 #elif defined(_BH_LINUX) || defined(_BH_DARWIN)
     struct timespec spec;
@@ -3127,20 +3135,8 @@ u64 bh_time_curr() {
 }
 
 u64 bh_time_duration(u64 old) {
-#if defined(_BH_WINDOWS)
-    u64 curr = bh_time_curr();
-    u64 duration = curr - old;
-
-    LARGE_INTEGER freq;
-    QueryPerformanceFrequency(&freq);
-    duration *= 1000;
-    duration /= freq.QuadPart;
-    return duration;
-
-#elif defined(_BH_LINUX) || defined(_BH_DARWIN)
     u64 curr = bh_time_curr();
     return curr - old;
-#endif
 }
 
 #endif // ifdef BH_DEFINE

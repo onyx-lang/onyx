@@ -418,7 +418,7 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
                     package_name,
                     closest);
             } else {
-                onyx_report_error((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Perhaps it is defined in a file that wasn't loaded?",
+                onyx_report_error((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Perhaps it is defined in a file that was not loaded?",
                     (*fa)->token->text,
                     (*fa)->token->length,
                     package_name);
@@ -1498,7 +1498,7 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             }
 
             if (ofunc->kind != Ast_Kind_Overloaded_Function) {
-                onyx_report_error(add_overload->token->pos, Error_Critical, "#match directive expects a matched procedure, got %s.",
+                onyx_report_error(add_overload->token->pos, Error_Critical, "#match directive expects a matched procedure, got '%s'.",
                             onyx_ast_node_kind_string(ofunc->kind));
                 return Symres_Error;
             }
@@ -1624,7 +1624,7 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 AstTyped *full_loc = (AstTyped *) strip_aliases((AstNode *) inject->full_loc);
 
                 if (full_loc->kind != Ast_Kind_Field_Access) {
-                    onyx_report_error(inject->token->pos, Error_Critical, "#inject expects a dot (a.b) expression for the injection point.");
+                    onyx_report_error(inject->token->pos, Error_Critical, "#inject expects a dot expression (a.b) for the injection point.");
                     return Symres_Error;
                 }
 
