@@ -790,7 +790,7 @@ run_native_library_installation :: (folder: str) -> (bool, str) {
     info_print("Install", "Running installation of '{}'\n", folder);    
 
     args := string.split(inner_config.native_library_build->unwrap(), #char " ", context.temp_allocator);
-    cmd  := os.path_join(os.env("ONYX_PATH") ?? "/usr", "bin", args[0]);
+    cmd  := args[0];
     args  = args[1 .. args.count];
 
     {
