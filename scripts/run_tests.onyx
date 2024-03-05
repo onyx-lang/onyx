@@ -121,44 +121,46 @@ main :: (args) => {
         use core {*}
         print_color :: print_color;
 
-        args: [] str;
+        cmd := os.command()
+            ->path(thread_data.onyx_cmd);
+
         if thread_data.compile_only {
             printf("[{}]  Compiling test {}...\n", context.thread_id, it.source_file);
-            args = .["build", it.source_file];
+            cmd->args(.["build", it.source_file]);
         } else {
             printf("[{}]  Running test {}...\n", context.thread_id, it.source_file);
-            args = .["run", it.source_file, "--generate-method-info"];
+            cmd->args(.["run", it.source_file, "--generate-method-info"]);
         }
 
-        proc := os.process_spawn(thread_data.onyx_cmd, args);
-        defer os.process_destroy(&proc);
+        output := cmd->output();
+        switch output {
+            case .Err as exit {
+                // Error running the test case
+                print_color(.Red, "[{}]  Error '{}' in test case {}.\n{}", context.thread_id, exit.result, it.source_file, exit.output);
+                thread_data.at_least_one_test_failed = true;
 
-        proc_reader := io.reader_make(&proc);
-        output := io.read_all(&proc_reader);
-        defer delete(&output);
+                sync.critical_section(&thread_data.failed_tests_mutex) {
+                    array.push(thread_data.failed_tests, it.source_file);
+                }
 
-        if exit := os.process_wait(&proc); exit != .Success {
-            // Error running the test case
-            print_color(.Red, "[{}]  Error '{}' in test case {}.\n{}", context.thread_id, exit, it.source_file, output);
-            thread_data.at_least_one_test_failed = true;
-
-            sync.critical_section(&thread_data.failed_tests_mutex) {
-                array.push(thread_data.failed_tests, it.source_file);
+                continue;
             }
 
-            continue;
+            case .Ok ---
         }
 
         if thread_data.compile_only do continue;
+
+        program_output := output.Ok->unwrap();
 
         for expected_file in os.with_file(it.expected_file) {
             expected_reader := io.reader_make(expected_file);
             expected_output := io.read_all(&expected_reader);
 
-            if output != expected_output {
+            if program_output != expected_output {
                 print_color(.Red, "[{}]  Output did not match for {}.\n", context.thread_id, it.source_file);
                 printf("Expected:\n{}\n", expected_output);
-                printf("Got:\n{}\n", output);
+                printf("Got:\n{}\n", program_output);
                 thread_data.at_least_one_test_failed = true;
 
                 sync.critical_section(&thread_data.failed_tests_mutex) {

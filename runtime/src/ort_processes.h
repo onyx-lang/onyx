@@ -3,6 +3,17 @@
 // PROCESS
 //
 
+#define ONYX_PARAM(index, otype, type, var) \
+    type var = params->data[index].of.otype
+
+#define ONYX_PARAM_PTR(index, type, var) \
+    type var = ONYX_PTR(params->data[index].of.i32)
+
+#define COPY_TO_BUF(bufname, maxlen, tocopy, copylen) \
+    char bufname[maxlen]; \
+    memcpy(bufname, tocopy, copylen); \
+    bufname[copylen] = '\0'
+
 #define ONYX_PROCESS_MAGIC_NUMBER 0xdeadfadebabecafe
 typedef struct OnyxProcess {
     u64 magic_number;
@@ -25,26 +36,27 @@ typedef struct OnyxProcess {
 #endif
 } OnyxProcess;
 
-ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I64)) {
-    char* process_str = ONYX_PTR(params->data[0].of.i32);
-    i32   process_len = params->data[1].of.i32;
-    i32   args_ptr    = params->data[2].of.i32;
-    i32   args_len    = params->data[3].of.i32;
-    b32   blocking_io = !params->data[4].of.i32;
-    char *cwd_str     = ONYX_PTR(params->data[5].of.i32);
-    i32   cwd_len     = params->data[6].of.i32;
+typedef struct ProcessSpawnOpts {
+    u8 capture_io;
+    u8 non_blocking_io;
+    u8 detach;
+    i32 dir_ptr;
+    i32 dir_len;
+} ProcessSpawnOpts;
 
-    char process_path[1024];
-    process_len = bh_min(1023, process_len);
-    memcpy(process_path, process_str, process_len);
-    process_path[process_len] = '\0';
+ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I64)) {
+    ONYX_PARAM_PTR(0, char *, process_str);
+    ONYX_PARAM    (1, i32, i32, process_len);
+    ONYX_PARAM    (2, i32, i32, args_ptr);
+    ONYX_PARAM    (3, i32, i32, args_len);
+    ONYX_PARAM_PTR(4, char **, env);
+    ONYX_PARAM_PTR(5, ProcessSpawnOpts *, spawn_opts);
 
-    char starting_dir[1024];
-    if (cwd_len > 0) {
-        cwd_len = bh_min(1023, cwd_len);
-        memcpy(starting_dir, cwd_str, cwd_len);
-        starting_dir[cwd_len] = '\0';
-    }
+    char *cwd_str = ONYX_PTR(spawn_opts->dir_ptr);
+    i32   cwd_len = spawn_opts->dir_len;
+
+    COPY_TO_BUF(process_path, 1024, process_str, bh_min(1023, process_len));
+    COPY_TO_BUF(starting_dir, 1024, cwd_str, bh_min(1023, cwd_len));
 
     OnyxProcess *process = malloc(sizeof(OnyxProcess));
     memset(process, 0, sizeof(*process));
@@ -53,49 +65,82 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         // :Security - alloca a user controlled string.
         char **process_args = alloca(sizeof(char *) * (args_len + 2));
+
         byte_t* array_loc = ONYX_PTR(args_ptr);
         fori (i, 0, args_len) {
-            char *arg_str = ONYX_PTR(*(i32 *) (array_loc + i * 2 * POINTER_SIZE));
-            i32   arg_len = *(i32 *) (array_loc + i * 2 * POINTER_SIZE + POINTER_SIZE);
+            i32 *arg_str_loc = array_loc + i * 2 * POINTER_SIZE;
+            i32 *arg_len_loc = arg_str_loc + 1;
+
+            char *arg_str = ONYX_PTR(*arg_str_loc);
+            i32   arg_len = *arg_len_loc;
 
             char *arg = alloca(sizeof(char) * (arg_len + 1));
             memcpy(arg, arg_str, arg_len);
             arg[arg_len] = '\0';
             process_args[i + 1] = arg;
         }
+
         process_args[0] = process_path;
         process_args[args_len + 1] = NULL;
 
-        if (pipe(process->proc_to_host) || pipe(process->host_to_proc)) {
-            wasm_val_init_ptr(&results->data[0], NULL); // Failed to run
-            return NULL;
+        if (spawn_opts->capture_io) {
+            if (pipe(process->proc_to_host) || pipe(process->host_to_proc)) {
+                wasm_val_init_ptr(&results->data[0], NULL); // Failed to run
+                return NULL;
+            }
         }
 
         pid_t pid;
         switch (pid = fork()) {
             case -1: // Bad fork
                 wasm_val_init_ptr(&results->data[0], NULL); // Failed to run
-
-                close(process->proc_to_host[0]);
-                close(process->proc_to_host[1]);
-                close(process->host_to_proc[0]);
-                close(process->host_to_proc[1]);
+                
+                if (spawn_opts->capture_io) {
+                    close(process->proc_to_host[0]);
+                    close(process->proc_to_host[1]);
+                    close(process->host_to_proc[0]);
+                    close(process->host_to_proc[1]);
+                }
                 break;
 
             case 0: // Child process
-                close(process->proc_to_host[0]);
-                close(process->host_to_proc[1]);
-                dup2(process->host_to_proc[0], 0); // Map the output to the pipe
-                dup2(process->proc_to_host[1], 1); // Map the output to the pipe
-                dup2(process->proc_to_host[1], 2); // Stderr to stdout
+                if (spawn_opts->detach) {
+                    setsid();
 
-                if (!blocking_io) {
-                    fcntl(0, F_SETFL, O_NONBLOCK);
-                    fcntl(1, F_SETFL, O_NONBLOCK);
+                } else {
+                    if (spawn_opts->capture_io) {
+                        close(process->proc_to_host[0]);
+                        close(process->host_to_proc[1]);
+
+                        dup2(process->host_to_proc[0], 0); // Map the output to the pipe
+                        dup2(process->proc_to_host[1], 1); // Map the output to the pipe
+                        dup2(process->proc_to_host[1], 2); // Stderr to stdout
+                    }
+
+                    if (spawn_opts->non_blocking_io && spawn_opts->capture_io) {
+                        fcntl(0, F_SETFL, O_NONBLOCK);
+                        fcntl(1, F_SETFL, O_NONBLOCK);
+                    }
                 }
 
                 if (cwd_len > 0) {
                     chdir(starting_dir); // Switch current working directory.
+                }
+
+                if (env) {
+                    char **env_walker = env;
+
+                    while (*env_walker) {
+                        // We have to duplicate the string here
+                        // because there is disagreance on whether
+                        // putenv copies its input or not. To be safe
+                        // we copy it into the heap, which may be copied
+                        // again by putenv :|
+                        char *envvar = bh_strdup(bh_heap_allocator(), *env_walker);
+                        putenv(envvar);
+
+                        env_walker++;
+                    }
                 }
 
                 execvp(process_path, process_args);
@@ -104,8 +149,11 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
 
             default: {
                 process->pid = pid;
-                close(process->host_to_proc[0]);
-                close(process->proc_to_host[1]);
+
+                if (spawn_opts->capture_io) {
+                    close(process->host_to_proc[0]);
+                    close(process->proc_to_host[1]);
+                }
 
                 wasm_val_init_ptr(&results->data[0], process);
                 break;
@@ -142,27 +190,29 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
         saAttr.bInheritHandle = 1;
 
         i32 success = 1;
-        success = success && CreatePipe(&process->host_to_proc_read, &process->host_to_proc_write, &saAttr, 4096);
-        success = success && CreatePipe(&process->proc_to_host_read, &process->proc_to_host_write, &saAttr, 4096);
-        if (!success) {
-            // printf("FAILED TO CREATE PIPES: %d\n", GetLastError());
-            wasm_val_init_ptr(&results->data[0], NULL); // Failed to run @LEAK
-            return NULL;
+        if (spawn_opts->capture_io) {
+            success = success && CreatePipe(&process->host_to_proc_read, &process->host_to_proc_write, &saAttr, 4096);
+            success = success && CreatePipe(&process->proc_to_host_read, &process->proc_to_host_write, &saAttr, 4096);
+            if (!success) {
+                // printf("FAILED TO CREATE PIPES: %d\n", GetLastError());
+                wasm_val_init_ptr(&results->data[0], NULL); // Failed to run @LEAK
+                return NULL;
+            }
+
+            success = SetHandleInformation(process->proc_to_host_read, 1 /* HANDLE_FLAG_INHERIT */, 0);
+            success = success && SetHandleInformation(process->host_to_proc_write, 1 /* HANDLE_FLAG_INHERIT */, 0);
+            if (!success) {
+                // printf("FAILED TO CONFIGURE PIPES: %d\n", GetLastError());
+                wasm_val_init_ptr(&results->data[0], NULL); // Failed to run @LEAK
+                return NULL;
+            }
+
+            startup.hStdInput  = process->host_to_proc_read;
+            startup.hStdOutput = process->proc_to_host_write;
+            startup.hStdError = process->proc_to_host_write;
+
+            startup.dwFlags |= STARTF_USESTDHANDLES;
         }
-
-        success = SetHandleInformation(process->proc_to_host_read, 1 /* HANDLE_FLAG_INHERIT */, 0);
-        success = success && SetHandleInformation(process->host_to_proc_write, 1 /* HANDLE_FLAG_INHERIT */, 0);
-        if (!success) {
-            // printf("FAILED TO CONFIGURE PIPES: %d\n", GetLastError());
-            wasm_val_init_ptr(&results->data[0], NULL); // Failed to run @LEAK
-            return NULL;
-        }
-
-        startup.hStdInput  = process->host_to_proc_read;
-        startup.hStdOutput = process->proc_to_host_write;
-        startup.hStdError = process->proc_to_host_write;
-
-        startup.dwFlags |= STARTF_USESTDHANDLES;
 
         memset(&process->proc_info, 0, sizeof process->proc_info);
 
@@ -171,15 +221,17 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
             working_dir = starting_dir;
         }
 
-        success = CreateProcessA(NULL, cmdLine, &saAttr, &saAttr, 1, 0, NULL, working_dir, &startup, &process->proc_info);
+        success = CreateProcessA(NULL, cmdLine, &saAttr, &saAttr, 1, 0, env, working_dir, &startup, &process->proc_info);
         if (!success) {
-            printf("FAILED TO CREATE PROCESS: %d\n", GetLastError());
             wasm_val_init_ptr(&results->data[0], NULL); // Failed to run @LEAK
             return NULL;
         }
 
-        CloseHandle(process->proc_to_host_write);
-        CloseHandle(process->host_to_proc_read);
+        if (spawn_opts->capture_io) {
+            CloseHandle(process->proc_to_host_write);
+            CloseHandle(process->host_to_proc_read);
+        }
+
         wasm_val_init_ptr(&results->data[0], process);
     #endif
 

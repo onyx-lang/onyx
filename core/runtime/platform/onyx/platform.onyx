@@ -84,7 +84,7 @@ ProcessData :: #distinct u64
     __time :: () -> u64 ---
 
     // Processes
-    __process_spawn   :: (path: str, args: [] str, non_blocking_io: bool, starting_directory: str) -> ProcessData ---
+    __process_spawn   :: (path: str, args: [] str, env: [&] cptr(u8), opts: &os.ProcessSpawnOpts) -> ProcessData ---
     __process_read    :: (handle: ProcessData, buffer: [] u8) -> i32 ---
     __process_write   :: (handle: ProcessData, buffer: [] u8) -> i32 ---
     __process_kill    :: (handle: ProcessData) -> bool ---
