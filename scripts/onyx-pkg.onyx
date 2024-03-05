@@ -255,6 +255,11 @@ run_show_command :: (args: [] cstr) {
 run_update_command :: (args: [] cstr) {
     info_print("Info", "Updating dependencies to newest compatible versions.\n");
     for& config.dependencies.entries {
+        if it.value.locked {
+            info_print("Skipping", "{} because it is locked.\n", it.key);
+            continue;
+        }
+
         repo := it.value.source.Git ?? [] { continue; };
         new_version := Git.get_latest_compatible_version(repo, it.value.version);
 
@@ -1140,6 +1145,7 @@ Config :: struct {
 Dependency :: struct {
     name: str;
     version: SemVer;
+    locked: bool;
     source: DependencySource;
 }
 
@@ -1250,6 +1256,10 @@ load_config :: (path: str) -> ? Config {
             d.source = .{ Git = src->as_str() ?? "" };
         });
 
+        it.props->get("locked")->with([locked] {
+            d.locked = locked->as_bool() ?? false;
+        });
+
         c.dependencies[d.name] = d;
     }
 
@@ -1333,6 +1343,10 @@ store_config :: (path: str) -> bool {
                 }
 
                 case #default ---
+            }
+
+            if it.value.locked {
+                dep_node.props["locked"] = .{ data = .{ Boolean = true } };
             }
         }
     }
