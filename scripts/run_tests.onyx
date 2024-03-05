@@ -122,8 +122,7 @@ main :: (args) => {
         print_color :: print_color;
 
         cmd := os.command()
-            ->path(thread_data.onyx_cmd)
-            ->env("ONYX_PATH", "./dist");
+            ->path(thread_data.onyx_cmd);
 
         if thread_data.compile_only {
             printf("[{}]  Compiling test {}...\n", context.thread_id, it.source_file);
