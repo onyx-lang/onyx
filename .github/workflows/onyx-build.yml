@@ -52,6 +52,18 @@ jobs:
             os: ubuntu-20.04
             runtime_library: none
             artifact_name: 'onyx-linux-none-amd64' 
+          - build: linux-arm64
+            os: ubuntu-20.04
+            runtime_library: ovmwasm
+            artifact_name: 'onyx-linux-ovm-arm64'
+          - build: linux-arm64
+            os: ubuntu-20.04
+            runtime_library: wasmer
+            artifact_name: 'onyx-linux-wasmer-arm64'
+          - build: linux-arm64
+            os: ubuntu-20.04
+            runtime_library: none
+            artifact_name: 'onyx-linux-none-arm64' 
           - build: darwin-arm64
             os: macos-12
             runtime_library: none
@@ -90,7 +102,7 @@ jobs:
           chmod +x build.sh
 
       - name: Install Wasmer building dependencies (AMD64)
-        if: (matrix.runtime_library == 'wasmer') && (matrix.build != 'darwin-arm64')
+        if: (matrix.runtime_library == 'wasmer') && (matrix.build != 'darwin-arm64' && matrix.build != 'linux-arm64')
         run: |
           curl https://get.wasmer.io -sSfL | sh
           echo "$HOME/.wasmer/bin" >> $GITHUB_PATH
@@ -98,10 +110,20 @@ jobs:
       # Have to do MacOS ARM64 special, since I don't want to pay for the M1 GitHub runners
       # to build this natively. Instead, we directly download the ARM version of WASMER
       # and link to its libwasmer.a file.
-      - name: Install Wasmer building dependencies (ARM64)
+      - name: Install Wasmer building dependencies (LINUX-ARM64)
+        if: (matrix.runtime_library == 'wasmer') && (matrix.build == 'linux-arm64')
+        run: |
+          curl -o wasmer.tar.gz https://github.com/wasmerio/wasmer/releases/download/v4.2.6/wasmer-linux-aarch64.tar.gz -L
+          mkdir wasmer
+          tar -C wasmer -zxvf wasmer.tar.gz
+
+      # Have to do MacOS ARM64 special, since I don't want to pay for the M1 GitHub runners
+      # to build this natively. Instead, we directly download the ARM version of WASMER
+      # and link to its libwasmer.a file.
+      - name: Install Wasmer building dependencies (DARWIN-ARM64)
         if: (matrix.runtime_library == 'wasmer') && (matrix.build == 'darwin-arm64')
         run: |
-          curl -o wasmer.tar.gz https://github.com/wasmerio/wasmer/releases/download/v4.2.3/wasmer-darwin-arm64.tar.gz -L
+          curl -o wasmer.tar.gz https://github.com/wasmerio/wasmer/releases/download/v4.2.6/wasmer-darwin-arm64.tar.gz -L
           mkdir wasmer
           tar -C wasmer -zxvf wasmer.tar.gz
 
@@ -126,6 +148,27 @@ jobs:
         env:
           ONYX_CC: gcc
           ONYX_ARCH: linux_x86_64
+
+      - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
+        if: (matrix.build == 'linux-arm64') && (matrix.runtime_library != 'none')
+        run: |
+          sudo apt install --yes gcc-aarch64-linux-gnu
+          ./build.sh compile compress
+        env:
+          ONYX_CC: aarch64-linux-gnu-gcc
+          ONYX_ARCH: linux_aarch64
+          ONYX_RUNTIME_LIBRARY: ${{ matrix.runtime_library }} 
+          WASMER_LIB_PATH: ../wasmer/lib
+          ONYX_USE_DYNCALL: '0'
+          
+      - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
+        if: (matrix.build == 'linux-arm64') && (matrix.runtime_library == 'none')
+        run: |
+          sudo apt install --yes gcc-aarch64-linux-gnu
+          ./build.sh compile compress
+        env:
+          ONYX_CC: aarch64-linux-gnu-gcc
+          ONYX_ARCH: linux_aarch64
 
       - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'darwin-amd64') && (matrix.runtime_library != 'none')
@@ -153,7 +196,7 @@ jobs:
           ONYX_ARCH: darwin_arm64
           ONYX_TARGET: aarch64-apple-darwin
           WASMER_LIB_PATH: ../wasmer/lib
-          ONYX_RUNTIME_LIBRARY: wasmer-custom
+          ONYX_RUNTIME_LIBRARY: wasmer
 
       - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'darwin-arm64') && (matrix.runtime_library == 'ovmwasm')
@@ -241,6 +284,33 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: artifacts/onyx-linux-none-amd64/onyx.tar.gz
           asset_name: onyx-linux-none-amd64.tar.gz
+          asset_content_type: application/gzip
+      - name: Upload Release Asset Linux ARM64 with OVM
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/onyx-linux-ovm-arm64/onyx.tar.gz
+          asset_name: onyx-linux-ovm-arm64.tar.gz
+          asset_content_type: application/gzip
+      - name: Upload Release Asset Linux ARM64 with Wasmer
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/onyx-linux-wasmer-arm64/onyx.tar.gz
+          asset_name: onyx-linux-wasmer-arm64.tar.gz
+          asset_content_type: application/gzip
+      - name: Upload Release Asset Linux ARM64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/onyx-linux-none-arm64/onyx.tar.gz
+          asset_name: onyx-linux-none-arm64.tar.gz
           asset_content_type: application/gzip
       - name: Upload Release Asset MacOS AMD64
         uses: actions/upload-release-asset@v1
