@@ -9,6 +9,7 @@
     #include <arm_neon.h>
 #elif defined(__x86_64__)
     #include <x86intrin.h>
+#elif defined(__aarch64__)
 #else
     #error "Unsupported architecture"
 #endif

@@ -21,6 +21,7 @@ fi
 if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
     FLAGS="$FLAGS -DONYX_RUNTIME_LIBRARY=$ONYX_RUNTIME_LIBRARY"
     C_FILES="${C_FILES}wasm_runtime "
+
     case "${ONYX_RUNTIME_LIBRARY}" in
         ovmwasm)
             LIBS="../shared/lib/$ONYX_ARCH/lib/libovmwasm.a $LIBS"
@@ -28,12 +29,8 @@ if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
             ;;
 
         wasmer)
-            LIBS="$(wasmer config --libdir)/libwasmer.a $LIBS"
-            ;;
-
-        # Used by MacOS ARM64 cross compilation
-        wasmer-custom)
-            LIBS="$WASMER_LIB_PATH/libwasmer.a $LIBS"
+            wasmer_lib="$(wasmer config --libdir || echo $WASMER_LIB_PATH)"
+            LIBS="$wasmer_lib/libwasmer.a $LIBS"
             ;;
 
         *)
