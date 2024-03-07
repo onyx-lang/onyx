@@ -25,9 +25,9 @@ jobs:
         mv artifacts/onyx-linux-wasmer-amd64/onyx.tar.gz  ./onyx-linux-wasmer-amd64.tar.gz
         mv artifacts/onyx-linux-ovm-amd64/onyx.tar.gz     ./onyx-linux-ovm-amd64.tar.gz
         mv artifacts/onyx-linux-none-amd64/onyx.tar.gz    ./onyx-linux-none-amd64.tar.gz
-        mv artifacts/onyx-linux-wasmer-arm64/onyx.tar.gz  ./onyx-linux-wasmer-arm64.tar.gz
-        mv artifacts/onyx-linux-ovm-arm64/onyx.tar.gz     ./onyx-linux-ovm-arm64.tar.gz
-        mv artifacts/onyx-linux-none-arm64/onyx.tar.gz    ./onyx-linux-none-arm64.tar.gz
+        mv artifacts/onyx-linux-wasmer-arm64/onyx.tar.gz  ./onyx-linux-wasmer-aarch64.tar.gz
+        mv artifacts/onyx-linux-ovm-arm64/onyx.tar.gz     ./onyx-linux-ovm-aarch64.tar.gz
+        mv artifacts/onyx-linux-none-arm64/onyx.tar.gz    ./onyx-linux-none-aarch64.tar.gz
         mv artifacts/onyx-darwin-wasmer-amd64/onyx.tar.gz ./onyx-darwin-wasmer-amd64.tar.gz
         mv artifacts/onyx-darwin-ovm-amd64/onyx.tar.gz    ./onyx-darwin-ovm-amd64.tar.gz
         mv artifacts/onyx-darwin-none-amd64/onyx.tar.gz   ./onyx-darwin-none-amd64.tar.gz
