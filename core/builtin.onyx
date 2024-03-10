@@ -53,6 +53,15 @@ range :: struct {
 }
 
 
+//
+// This is the same as the `range` type, except with 64-bit integers.
+range64 :: struct {
+    low  : i64;
+    high : i64;
+    step : i64 = 1;
+}
+
+
 
 
 //

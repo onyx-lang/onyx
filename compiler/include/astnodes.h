@@ -1962,6 +1962,8 @@ extern AstType  *builtin_string_type;
 extern AstType  *builtin_cstring_type;
 extern AstType  *builtin_range_type;
 extern Type     *builtin_range_type_type;
+extern AstType  *builtin_range64_type;
+extern Type     *builtin_range64_type_type;
 extern AstType  *builtin_vararg_type;
 extern Type     *builtin_vararg_type_type;
 extern AstTyped *builtin_context_variable;
@@ -2019,7 +2021,7 @@ AstFunction* clone_function_header(bh_allocator a, AstFunction* func);
 void clone_function_body(bh_allocator a, AstFunction* dest, AstFunction* source);
 
 void promote_numlit_to_larger(AstNumLit* num);
-b32 convert_numlit_to_type(AstNumLit* num, Type* type);
+b32 convert_numlit_to_type(AstNumLit* num, Type* type, b32 permanent);
 
 typedef enum TypeMatch {
     TYPE_MATCH_SUCCESS,

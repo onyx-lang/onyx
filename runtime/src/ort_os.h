@@ -233,7 +233,7 @@ ONYX_DEF(__futex_wake, (WASM_PTR, WASM_I32), (WASM_I32)) {
 
 
 
-#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+#if defined(_BH_LINUX)
 static wasm_func_t *wasm_cleanup_func;
 
 static void unix_signal_handler(int signo, siginfo_t *info, void *context) {
@@ -244,7 +244,7 @@ static void unix_signal_handler(int signo, siginfo_t *info, void *context) {
 #endif
 
 ONYX_DEF(__register_cleanup, (WASM_I32, WASM_I32), (WASM_I32)) {
-    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    #if defined(_BH_LINUX)
 
     int len = (127 < params->data[1].of.i32 ? 127 : params->data[1].of.i32);
     char name[128];

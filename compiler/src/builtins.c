@@ -68,6 +68,8 @@ AstType  *builtin_string_type;
 AstType  *builtin_cstring_type;
 AstType  *builtin_range_type;
 Type     *builtin_range_type_type;
+AstType  *builtin_range64_type;
+Type     *builtin_range64_type_type;
 AstType  *builtin_vararg_type;
 Type     *builtin_vararg_type_type;
 AstTyped *builtin_context_variable;
@@ -403,6 +405,8 @@ void prepare_builtins() {
     builtin_cstring_type = NULL;
     builtin_range_type = NULL;
     builtin_range_type_type = NULL;
+    builtin_range64_type = NULL;
+    builtin_range64_type_type = NULL;
     builtin_vararg_type = NULL;
     builtin_vararg_type_type = NULL;
     builtin_context_variable = NULL;
@@ -472,6 +476,12 @@ void initialize_builtins(bh_allocator a) {
     builtin_range_type = (AstType *) symbol_raw_resolve(p->scope, "range");
     if (builtin_range_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'range' struct not found in builtin package.");
+        return;
+    }
+
+    builtin_range64_type = (AstType *) symbol_raw_resolve(p->scope, "range64");
+    if (builtin_range64_type == NULL) {
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'range64' struct not found in builtin package.");
         return;
     }
 
