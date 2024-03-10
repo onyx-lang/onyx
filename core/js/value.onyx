@@ -1,0 +1,212 @@
+
+package core.js
+
+use core.iter
+use core.math
+
+Value :: #distinct u64
+
+Type :: enum {
+    Undefined :: 0;
+    Null      :: 1;
+    Boolean   :: 2;
+    Number    :: 3;
+    String    :: 4;
+    Symbol    :: 5;
+    Object    :: 6;
+    Function  :: 7;
+}
+
+#inject Value {
+    Undefined  :: Value.{0}
+    NaN        :: Value.{0x7ff8000000000000}
+    Zero       :: Value.{0x7ff8000000000001}
+    Null       :: Value.{0x7ff8000000000002}
+    True       :: Value.{0x7ff8000000000003}
+    False      :: Value.{0x7ff8000000000004}
+    GlobalThis :: Value.{0x7ff8000000000005}
+    Onyx       :: Value.{0x7ff8000000000006}
+
+    globalThis :: () => Value.GlobalThis
+
+    from :: (a: any) -> ? Value {
+        switch a.type {
+            case i32, u32 {
+                // Integers are simply upcasted to float64s
+                v := cast(f64) *cast(&i32, a.data);
+                if v == 0 do return Value.Zero;
+
+                return *cast(&Value) &v;
+            }
+
+            case i64, u64 {
+                // Integers are simply upcasted to float64s, even with a loss of precision
+                // Gotta love JS.
+                v := cast(f64) *cast(&i64, a.data);
+                if v == 0 do return Value.Zero;
+
+                return *cast(&Value) &v;
+            }
+
+            case f32 {
+                v := cast(f64) *cast(&f32, a.data);
+                if v == 0 do return Value.Zero;
+
+                return *cast(&Value) &v;
+            }
+
+            case f64 {
+                v := *cast(&f64, a.data);
+                if v == 0 do return Value.Zero;
+
+                return *cast(&Value) &v;
+            }
+
+            case bool {
+                if *cast(&bool, a.data) do return Value.True;
+                else                    do return Value.False;
+            }
+        }
+
+        if a.type == str {
+            return __from_str(*cast(&str) a.data);
+        }
+
+        if a.type == Value do return *cast(&Value) a.data;
+
+        return .None;
+    }
+
+    as_bool :: (v: Value) -> ? bool {
+        if cast(u64) v == cast(u64) Value.True  do return true;
+        if cast(u64) v == cast(u64) Value.False do return false;
+
+        return .None;
+    }
+
+    as_float :: (v: Value) -> ? f64 {
+        v_u64 := cast(u64, v);
+        v_f64 := *cast(&f64, v_u64);
+        if !math.is_nan(v_f64) {
+            return v_f64;
+        }
+
+        return .None;
+    }
+
+    as_int :: (v: Value) -> ? i32 {
+        v_u64 := cast(u64, v);
+        v_f64 := *cast(&f64, v_u64);
+        if !math.is_nan(v_f64) {
+            return cast(i32) v_f64;
+        }
+
+        return .None;
+    }
+
+    as_str :: (v: Value) -> ? str {
+        // If is identifier, look up string length
+            // Call another procedure to get data
+    }
+
+    type :: (v: Value) -> Type {
+        v_u64 := cast(u64, v);
+
+        // TODO: Cleanup these magic constants.
+        if v_u64 == 0                  do return .Undefined;
+        if v_u64 == 0x7ff8000000000001 do return .Number;
+        if v_u64 == 0x7ff8000000000002 do return .Null;
+        if v_u64 == 0x7ff8000000000003 do return .Boolean;
+        if v_u64 == 0x7ff8000000000004 do return .Boolean;
+        if v_u64 == 0x7ff8000000000005 do return .Object;
+        if v_u64 == 0x7ff8000000000006 do return .Object;
+
+        if !math.is_nan(*cast(&f64, v_u64)) do return .Number;
+
+        type_flag := (v_u64 >> 32) & 7;
+        switch type_flag {
+            case 0 do return .Null;
+            case 1 do return .Object;
+            case 2 do return .String;
+            case 3 do return .Symbol;
+            case 4 do return .Function;
+        }
+
+        return .Undefined;
+    }
+
+    call :: (v: Value, method: str, args: ..any) -> Value {
+        mapped_args := iter.as_iter(args)
+            |> iter.map(x => Value.from(*x) ?? Value.Undefined)
+            |> iter.collect(context.temp_allocator);
+
+        return __method(v, method, mapped_args);
+    }
+
+    invoke :: (v: Value, args: ..any) -> Value {
+        mapped_args := iter.as_iter(args)
+            |> iter.map(x => Value.from(*x) ?? Value.Undefined)
+            |> iter.collect(context.temp_allocator);
+
+        return __call(v, mapped_args);
+    }
+
+    free :: (v: Value) {
+        return __free(v);
+    }
+
+    delete :: (v: Value, property: str) {
+        return __delete(v, property);
+    }
+
+    equals :: (v1: Value, v2: Value) -> bool {
+        return cast(u64, v1) == cast(u64, v2) && cast(u64, v1) != cast(u64, Value.NaN);
+    }
+
+    is_null :: (v: Value) -> bool {
+        return cast(u64) v == cast(u64) Value.Null;
+    }
+
+    is_undefined :: (v: Value) -> bool {
+        return cast(u64) v == cast(u64) Value.Undefined;
+    }
+
+    is_nan :: (v: Value) -> bool {
+        return cast(u64) v == cast(u64) Value.NaN;
+    }
+
+    instance_of :: (v: Value, base: Value) -> bool {
+        return __instance_of(v, base);
+    }
+
+    new :: (v: Value, args: ..any) -> Value {
+        mapped_args := iter.as_iter(args)
+            |> iter.map(x => Value.from(*x) ?? Value.{0})
+            |> iter.collect(context.temp_allocator);
+
+        return __new(v, mapped_args);
+    }
+
+    get :: (v: Value, prop: str) -> Value {
+        return __dot(v, prop);
+    }
+
+    set :: #match #locked {
+        (v: Value, prop: str, value: Value) {
+            __set(v, prop, value);
+        },
+
+        (v: Value, prop: str, value: any) {
+            __set(v, prop, Value.from(value) ?? Value.Undefined);
+        }
+    }
+
+    index :: (v: Value, i: i32) -> Value {
+        return __sub(v, i);
+    }
+    
+    truthy :: (v: Value) -> bool {
+
+    }
+}
+

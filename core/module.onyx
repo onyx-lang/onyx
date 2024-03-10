@@ -134,5 +134,8 @@ use runtime
 }
 
 #if runtime.runtime == .Js {
+    #load "./js/value"
+    #load "./js/foreign"
+
     #load "./runtime/platform/js/platform"
 }

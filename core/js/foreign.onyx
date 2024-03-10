@@ -1,0 +1,22 @@
+
+package core.js
+
+#package {
+    #foreign "__syscall" {
+        __free :: (value: Value) -> void ---
+        __delete :: (value: Value, prop: str) -> void ---
+        __new :: (value: Value, args: [] Value) -> Value ---
+
+        __dot :: (value: Value, name: str) -> Value ---
+        __sub :: (value: Value, idx: i32) -> Value ---
+        __set :: (value: Value, name: str, v: Value) -> void ---
+
+	__from_str  :: (s: str) -> Value ---
+	__from_arr  :: (a: [] Value) -> Value ---
+
+        __call :: (func: Value, args: [] Value) -> Value ---
+        __method :: (value: Value, method: str, args: [] Value) -> Value ---
+
+        __instance_of :: (value: Value, class: Value) -> bool ---
+    }
+}
