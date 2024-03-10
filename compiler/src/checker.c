@@ -1919,6 +1919,20 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
         range->step = *smem.initial_value;
     }
 
+    if (range->inclusive) {
+        AstTyped *one = (AstTyped *) make_int_literal(context.ast_alloc, 1);
+        one->type = smem.type;
+
+        range->high = (AstTyped *) make_binary_op(
+            context.ast_alloc, 
+            Binary_Op_Add,
+            range->high,
+            one
+        );
+
+        CHECK(binaryop, (AstBinaryOp **) &range->high);
+    }
+
     range->flags |= Ast_Flag_Has_Been_Checked;
     range->type = expected_range_type;
     return Check_Success;

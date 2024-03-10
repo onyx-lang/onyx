@@ -12,4 +12,8 @@ main :: () {
     for iter.as_iter(0 .. x) |> iter.filter(x => x < 5) {
         printf("{}: {}\n", typeof it, it)
     }
+
+    for x ..= 15 {
+        println(it)
+    }
 }

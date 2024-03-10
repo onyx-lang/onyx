@@ -67,6 +67,7 @@ static const char* token_type_names[] = {
     ">>=",
     ">>>=",
     "..",
+    "..="
     "~~",
     "??",
 
@@ -488,6 +489,7 @@ whitespace_skipped:
         break;
 
     case '.':
+        LITERAL_TOKEN("..=",         0, Token_Type_Dot_Dot_Equal);
         LITERAL_TOKEN("..",          0, Token_Type_Dot_Dot);
         break;
 

@@ -1149,6 +1149,7 @@ static BinaryOp binary_op_from_token_type(TokenType t) {
 
         case Token_Type_Pipe:              return Binary_Op_Pipe;
         case Token_Type_Dot_Dot:           return Binary_Op_Range;
+        case Token_Type_Dot_Dot_Equal:     return Binary_Op_Range_Equal;
         case '[':                          return Binary_Op_Subscript;
         case Token_Type_Question_Question: return Binary_Op_Coalesce;
         default: return Binary_Op_Count;
@@ -1257,6 +1258,10 @@ static AstTyped* parse_expression(OnyxParser* parser, b32 assignment_allowed) {
         AstBinaryOp* bin_op;
         if      (bin_op_kind == Binary_Op_Pipe)        bin_op = make_node(AstBinaryOp, Ast_Kind_Pipe);
         else if (bin_op_kind == Binary_Op_Range)       bin_op = (AstBinaryOp *) make_node(AstRangeLiteral, Ast_Kind_Range_Literal);
+        else if (bin_op_kind == Binary_Op_Range_Equal) {
+            bin_op = (AstBinaryOp *) make_node(AstRangeLiteral, Ast_Kind_Range_Literal);
+            ((AstRangeLiteral *) bin_op)->inclusive = 1;
+        }
         else                                           bin_op = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
 
         bin_op->token = bin_op_tok;

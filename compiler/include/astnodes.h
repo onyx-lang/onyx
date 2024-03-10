@@ -366,13 +366,14 @@ typedef enum BinaryOp {
 
     Binary_Op_Pipe             = 33,
     Binary_Op_Range            = 34,
-    Binary_Op_Method_Call      = 35,
+    Binary_Op_Range_Equal      = 35,
+    Binary_Op_Method_Call      = 36,
 
-    Binary_Op_Subscript        = 36,
-    Binary_Op_Subscript_Equals = 37,
-    Binary_Op_Ptr_Subscript    = 38,
+    Binary_Op_Subscript        = 37,
+    Binary_Op_Subscript_Equals = 38,
+    Binary_Op_Ptr_Subscript    = 39,
 
-    Binary_Op_Coalesce         = 39,
+    Binary_Op_Coalesce         = 40,
 
     Binary_Op_Count
 } BinaryOp;
@@ -757,7 +758,10 @@ struct AstRangeLiteral {
     // the first sizeof(AstBinaryOp) bytes of this structure must match that of
     // AstBinaryOp, which means I need this dummy field here.
     //                                              - brendanfh 2020/12/23
-    BinaryOp __unused_operation;
+    union {
+        BinaryOp __unused_operation;
+        b32 inclusive: 1;
+    };
     AstTyped *low, *high;
 
     // Currently, there is no way to specify this in the grammar, but it is set
