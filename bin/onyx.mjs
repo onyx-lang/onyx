@@ -209,6 +209,10 @@ Onyx.register_module("host", instance => ({
 }));
 
 Onyx.register_module("__syscall", instance => ({
+    __new_object() {
+        return instance.store_value({});
+    },
+
     __new(v, args_ptr, args_len) {
         const args = instance.load_slice_of_values(args_ptr, args_len);
         const obj  = instance.load_value(v);
@@ -246,6 +250,12 @@ Onyx.register_module("__syscall", instance => ({
         const new_value = instance.load_value(newval);
         const name = instance.extract_string(name_ptr, name_len);
         Reflect.set(value, name, new_value);
+    },
+
+    __set_index(v, index, newval) {
+        const value = instance.load_value(v);
+        const new_value = instance.load_value(newval);
+        Reflect.set(value, index, new_value);
     },
 
     __from_str(ptr, len) {

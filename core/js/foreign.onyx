@@ -10,6 +10,7 @@ package core.js
         __dot :: (value: Value, name: str) -> Value ---
         __sub :: (value: Value, idx: i32) -> Value ---
         __set :: (value: Value, name: str, v: Value) -> void ---
+        __set_index :: (value: Value, index: i32, v: Value) -> void ---
 
 	__from_str  :: (s: str) -> Value ---
 	__from_arr  :: (a: [] Value) -> Value ---
@@ -18,5 +19,7 @@ package core.js
         __method :: (value: Value, method: str, args: [] Value) -> Value ---
 
         __instance_of :: (value: Value, class: Value) -> bool ---
+
+        __new_object :: () -> Value ---
     }
 }

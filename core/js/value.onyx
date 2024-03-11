@@ -24,10 +24,12 @@ Type :: enum {
     Null       :: Value.{0x7ff8000000000002}
     True       :: Value.{0x7ff8000000000003}
     False      :: Value.{0x7ff8000000000004}
-    GlobalThis :: Value.{0x7ff8000000000005}
+    Global     :: Value.{0x7ff8000000000005}
     Onyx       :: Value.{0x7ff8000000000006}
 
-    globalThis :: () => Value.GlobalThis
+    new_object :: () -> Value {
+        return __new_object();
+    }
 
     from :: (a: any) -> ? Value {
         switch a.type {
@@ -197,7 +199,19 @@ Type :: enum {
         },
 
         (v: Value, prop: str, value: any) {
-            __set(v, prop, Value.from(value) ?? Value.Undefined);
+            js_value := Value.from(value) ?? Value.Undefined;
+            __set(v, prop, js_value);
+            js_value->free();
+        },
+
+        (v: Value, index: i32, value: Value) {
+            __set_index(v, index, value);
+        },
+
+        (v: Value, index: i32, value: any) {
+            js_value := Value.from(value) ?? Value.Undefined;
+            __set_index(v, index, js_value);
+            js_value->free();
         }
     }
 
