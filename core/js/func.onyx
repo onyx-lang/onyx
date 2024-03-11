@@ -1,0 +1,15 @@
+
+package core.js
+
+Func :: #distinct Value
+
+#inject Func {
+    from :: (f: (this: Value, args: [] Value) -> Value) -> Func {
+        return __make_func(f);
+    }
+
+    free :: (f: Func) {
+        cast(Value, f)->free();
+    }
+}
+

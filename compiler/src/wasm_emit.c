@@ -5497,6 +5497,14 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
 
         shput(module->exports, options->export_func_table_name, func_table_export);
         module->export_count++;
+
+        WasmExport closure_export = {
+            .kind = WASM_FOREIGN_GLOBAL,
+            .idx  = bh_imap_get(&module->index_map, (u64) &builtin_closure_base),
+        };
+
+        shput(module->exports, "__closure_base", closure_export);
+        module->export_count++;
     }
 
     u32 datum_offset = options->null_reserve_size;

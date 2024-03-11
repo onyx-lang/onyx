@@ -75,6 +75,7 @@ Type :: enum {
         }
 
         if a.type == Value do return *cast(&Value) a.data;
+        if a.type == Func  do return *cast(&Value) a.data; // Funcs right now are just values
 
         return .None;
     }
@@ -88,7 +89,7 @@ Type :: enum {
 
     as_float :: (v: Value) -> ? f64 {
         v_u64 := cast(u64, v);
-        v_f64 := *cast(&f64, v_u64);
+        v_f64 := *cast(&f64, &v_u64);
         if !math.is_nan(v_f64) {
             return v_f64;
         }
@@ -98,7 +99,7 @@ Type :: enum {
 
     as_int :: (v: Value) -> ? i32 {
         v_u64 := cast(u64, v);
-        v_f64 := *cast(&f64, v_u64);
+        v_f64 := *cast(&f64, &v_u64);
         if !math.is_nan(v_f64) {
             return cast(i32) v_f64;
         }
@@ -123,9 +124,9 @@ Type :: enum {
         if v_u64 == 0x7ff8000000000005 do return .Object;
         if v_u64 == 0x7ff8000000000006 do return .Object;
 
-        if !math.is_nan(*cast(&f64, v_u64)) do return .Number;
+        if !math.is_nan(*cast(&f64, &v_u64)) do return .Number;
 
-        type_flag := (v_u64 >> 32) & 7;
+        type_flag: u32 = ~~((v_u64 >> 32) & 7);
         switch type_flag {
             case 0 do return .Null;
             case 1 do return .Object;
@@ -138,19 +139,13 @@ Type :: enum {
     }
 
     call :: (v: Value, method: str, args: ..any) -> Value {
-        mapped_args := iter.as_iter(args)
-            |> iter.map(x => Value.from(*x) ?? Value.Undefined)
-            |> iter.collect(context.temp_allocator);
-
-        return __method(v, method, mapped_args);
+        transform_args(cast([] any) args, [](__method(v, method, mapped_args)));
     }
 
     invoke :: (v: Value, args: ..any) -> Value {
-        mapped_args := iter.as_iter(args)
-            |> iter.map(x => Value.from(*x) ?? Value.Undefined)
-            |> iter.collect(context.temp_allocator);
-
-        return __call(v, mapped_args);
+        transform_args(cast([] any) args, [](do {
+            return __call(v, mapped_args);
+        }));
     }
 
     free :: (v: Value) {
@@ -182,11 +177,7 @@ Type :: enum {
     }
 
     new :: (v: Value, args: ..any) -> Value {
-        mapped_args := iter.as_iter(args)
-            |> iter.map(x => Value.from(*x) ?? Value.{0})
-            |> iter.collect(context.temp_allocator);
-
-        return __new(v, mapped_args);
+        transform_args(cast([] any) args, [](__new(v, mapped_args)));
     }
 
     get :: (v: Value, prop: str) -> Value {
@@ -223,4 +214,32 @@ Type :: enum {
 
     }
 }
+
+
+#local
+transform_args :: macro (args: [] any, $body: Code) {
+    mapped_args:  [..] Value;
+    args_to_free: [..] Value;
+    defer {
+        for to_free in args_to_free {
+            to_free->free();
+        }
+
+        delete(&mapped_args);
+        delete(&args_to_free);
+    }
+    
+    for arg in args {
+        if arg.type == Value || arg.type == Func {
+            mapped_args << *cast(&Value, arg.data);
+        } else {
+            generated := Value.from(arg) ?? Value.Undefined;
+            mapped_args << generated;
+            args_to_free << generated;
+        }
+    }
+
+    return #unquote body;
+}
+
 

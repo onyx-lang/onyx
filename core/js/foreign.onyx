@@ -2,6 +2,7 @@
 package core.js
 
 #package {
+    // Value
     #foreign "__syscall" {
         __free :: (value: Value) -> void ---
         __delete :: (value: Value, prop: str) -> void ---
@@ -21,5 +22,18 @@ package core.js
         __instance_of :: (value: Value, class: Value) -> bool ---
 
         __new_object :: () -> Value ---
+    }
+
+    // Func
+    #foreign "__syscall" {
+        __make_func :: (f: (Value, [] Value) -> Value) -> Func ---
+    }
+
+    #export "__allocate_arg_buf" (args: i32) -> rawptr {
+        return context.allocator->alloc(args * sizeof Value);
+    }
+
+    #export "__free_arg_buf" (buf: rawptr) {
+        context.allocator->free(buf);
     }
 }

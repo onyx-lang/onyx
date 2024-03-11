@@ -135,6 +135,7 @@ use runtime
 
 #if runtime.runtime == .Js {
     #load "./js/value"
+    #load "./js/func"
     #load "./js/foreign"
 
     #load "./runtime/platform/js/platform"

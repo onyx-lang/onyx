@@ -59,7 +59,7 @@ class JsHeap {
 
     free(x) {
         // Cannot free static things
-        if ((x | 0) <= JsHeap.Onyx) return;
+        if ((x | 0) <= 6) return;
 
         if ((x | 0) >= this.heap.length) {
             console.error("[JsHeap] Deleting outside of heap bounds.") 
@@ -297,6 +297,31 @@ Onyx.register_module("__syscall", instance => ({
         }
 
         return value instanceof base;
+    },
+
+    __make_func(funcidx, closureptr) {
+        let wasmFunc = instance.instance.exports.__indirect_function_table.get(funcidx);
+
+        return instance.store_value(function () {
+            let argptr = instance.instance.exports.__allocate_arg_buf(arguments.length);
+            for (let i = 0; i < arguments.length; i++) {
+                instance.data.setBigUint64(
+                    argptr + i * 8,
+                    instance.store_value(arguments[i]),
+                    true
+                );
+            }
+
+            let thisArg = instance.store_value(this);
+
+            instance.instance.exports.__closure_base.value = closureptr;
+            wasmFunc(thisArg, argptr, arguments.length);
+
+            const thisIndex = instance.load_value_index(thisArg);
+            instance._heap.free(thisIndex);
+
+            instance.instance.exports.__free_arg_buf(argptr);
+        })
     }
 }))
 
