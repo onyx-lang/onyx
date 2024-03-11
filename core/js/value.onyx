@@ -74,6 +74,11 @@ Type :: enum {
             return __from_str(*cast(&str) a.data);
         }
 
+        if a.type == #type (Value, [] Value) -> Value {
+            f := *cast(&(Value, [] Value) -> Value) a.data;
+            return cast(Value) Func.from(f);
+        }
+
         if a.type == Value do return *cast(&Value) a.data;
         if a.type == Func  do return *cast(&Value) a.data; // Funcs right now are just values
 
