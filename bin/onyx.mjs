@@ -66,8 +66,10 @@ class JsHeap {
             return;
         }
 
-        this.heap[x | 0] = null;
-        this.freelist.push(x | 0);
+        if (this.heap[x | 0] !== undefined) {
+            this.heap[x | 0] = undefined;
+            this.freelist.push(x | 0);
+        }
     }
 }
 

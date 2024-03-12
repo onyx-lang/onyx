@@ -1,6 +1,8 @@
 
 package core.js
 
+use core.alloc
+
 #package {
     // Value
     #foreign "__syscall" {
@@ -16,6 +18,9 @@ package core.js
 	__from_str  :: (s: str) -> Value ---
 	__from_arr  :: (a: [] Value) -> Value ---
 
+        // Call with zero-length to just retrieve length.
+        __to_str :: (v: Value, buf: [] u8) -> i32 ---
+
         __call :: (func: Value, args: [] Value) -> Value ---
         __method :: (value: Value, method: str, args: [] Value) -> Value ---
 
@@ -30,10 +35,12 @@ package core.js
     }
 
     #export "__allocate_arg_buf" (args: i32) -> rawptr {
-        return context.allocator->alloc(args * sizeof Value);
+        return alloc.heap_allocator->alloc(args * sizeof Value);
     }
 
     #export "__free_arg_buf" (buf: rawptr) {
-        context.allocator->free(buf);
+        if buf == null do return;
+
+        alloc.heap_allocator->free(buf);
     }
 }

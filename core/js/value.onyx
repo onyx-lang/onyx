@@ -1,10 +1,20 @@
+//
+// [x] Object tracking
+//      Allow for "garbage collection", unless object is marked as leaked.
+// [ ] as_str
+// [ ] Truthy
+// [ ] Documentation
 
 package core.js
 
 use core.iter
 use core.math
+use core.array
+use core.alloc
 
 Value :: #distinct u64
+
+value :: Value.from
 
 Type :: enum {
     Undefined :: 0;
@@ -28,61 +38,80 @@ Type :: enum {
     Onyx       :: Value.{0x7ff8000000000006}
 
     new_object :: () -> Value {
-        return __new_object();
+        v := __new_object();
+        __add_to_pool(v);
+        return v;
     }
 
-    from :: (a: any) -> ? Value {
-        switch a.type {
-            case i32, u32 {
-                // Integers are simply upcasted to float64s
-                v := cast(f64) *cast(&i32, a.data);
-                if v == 0 do return Value.Zero;
+    from :: #match {
+        (m: Map(str, $V)) -> ? Value {
+            result := Value.new_object();
+            __add_to_pool(result);
 
-                return *cast(&Value) &v;
+            for &entry in m.entries {
+                result->set(entry.key, Value.from(entry.value) ?? Value.Undefined);
             }
 
-            case i64, u64 {
-                // Integers are simply upcasted to float64s, even with a loss of precision
-                // Gotta love JS.
-                v := cast(f64) *cast(&i64, a.data);
-                if v == 0 do return Value.Zero;
+            return result;
+        },
 
-                return *cast(&Value) &v;
+        (a: any) -> ? Value {
+            switch a.type {
+                case i32, u32 {
+                    // Integers are simply upcasted to float64s
+                    v := cast(f64) *cast(&i32, a.data);
+                    if v == 0 do return Value.Zero;
+
+                    return *cast(&Value) &v;
+                }
+
+                case i64, u64 {
+                    // Integers are simply upcasted to float64s, even with a loss of precision
+                    // Gotta love JS.
+                    v := cast(f64) *cast(&i64, a.data);
+                    if v == 0 do return Value.Zero;
+
+                    return *cast(&Value) &v;
+                }
+
+                case f32 {
+                    v := cast(f64) *cast(&f32, a.data);
+                    if v == 0 do return Value.Zero;
+
+                    return *cast(&Value) &v;
+                }
+
+                case f64 {
+                    v := *cast(&f64, a.data);
+                    if v == 0 do return Value.Zero;
+
+                    return *cast(&Value) &v;
+                }
+
+                case bool {
+                    if *cast(&bool, a.data) do return Value.True;
+                    else                    do return Value.False;
+                }
             }
 
-            case f32 {
-                v := cast(f64) *cast(&f32, a.data);
-                if v == 0 do return Value.Zero;
-
-                return *cast(&Value) &v;
+            if a.type == str {
+                s := __from_str(*cast(&str) a.data);
+                __add_to_pool(s);
+                return s;
             }
 
-            case f64 {
-                v := *cast(&f64, a.data);
-                if v == 0 do return Value.Zero;
-
-                return *cast(&Value) &v;
+            if a.type == #type (Value, [] Value) -> Value {
+                f := *cast(&(Value, [] Value) -> Value) a.data;
+                v := cast(Value) Func.from(f);
+                __add_to_pool(v);
+                return v;
             }
 
-            case bool {
-                if *cast(&bool, a.data) do return Value.True;
-                else                    do return Value.False;
-            }
+            if a.type == Value do return *cast(&Value) a.data;
+            if a.type == Func  do return *cast(&Value) a.data; // Funcs right now are just values
+
+            return .None;
         }
-
-        if a.type == str {
-            return __from_str(*cast(&str) a.data);
-        }
-
-        if a.type == #type (Value, [] Value) -> Value {
-            f := *cast(&(Value, [] Value) -> Value) a.data;
-            return cast(Value) Func.from(f);
-        }
-
-        if a.type == Value do return *cast(&Value) a.data;
-        if a.type == Func  do return *cast(&Value) a.data; // Funcs right now are just values
-
-        return .None;
     }
 
     as_bool :: (v: Value) -> ? bool {
@@ -148,12 +177,22 @@ Type :: enum {
     }
 
     invoke :: (v: Value, args: ..any) -> Value {
-        transform_args(cast([] any) args, [](do {
-            return __call(v, mapped_args);
-        }));
+        transform_args(cast([] any) args, [](__call(v, mapped_args)));
     }
 
-    free :: (v: Value) {
+    leak :: (v: Value) -> Value {
+        if __current_pool {
+            __current_pool->remove(v);
+        }
+
+        return v;
+    }
+
+    release :: (v: Value) {
+        if __current_pool {
+            __current_pool->remove(v);
+        }
+
         return __free(v);
     }
 
@@ -186,7 +225,9 @@ Type :: enum {
     }
 
     get :: (v: Value, prop: str) -> Value {
-        return __dot(v, prop);
+        r := __dot(v, prop);
+        __add_to_pool(r);
+        return r;
     }
 
     set :: #match #locked {
@@ -194,29 +235,32 @@ Type :: enum {
             __set(v, prop, value);
         },
 
-        (v: Value, prop: str, value: any) {
+        (v: Value, prop: str, value: $T) {
             js_value := Value.from(value) ?? Value.Undefined;
             __set(v, prop, js_value);
-            js_value->free();
+            js_value->release();
         },
 
         (v: Value, index: i32, value: Value) {
             __set_index(v, index, value);
         },
 
-        (v: Value, index: i32, value: any) {
+        (v: Value, index: i32, value: $T) {
             js_value := Value.from(value) ?? Value.Undefined;
             __set_index(v, index, js_value);
-            js_value->free();
+            js_value->release();
         }
     }
 
     index :: (v: Value, i: i32) -> Value {
-        return __sub(v, i);
+        r := __sub(v, i);
+        __add_to_pool(r);
+        return r;
     }
     
     truthy :: (v: Value) -> bool {
-
+        // TODO: Correct this
+        return true;
     }
 }
 
@@ -227,7 +271,7 @@ transform_args :: macro (args: [] any, $body: Code) {
     args_to_free: [..] Value;
     defer {
         for to_free in args_to_free {
-            to_free->free();
+            to_free->release();
         }
 
         delete(&mapped_args);
@@ -237,6 +281,7 @@ transform_args :: macro (args: [] any, $body: Code) {
     for arg in args {
         if arg.type == Value || arg.type == Func {
             mapped_args << *cast(&Value, arg.data);
+
         } else {
             generated := Value.from(arg) ?? Value.Undefined;
             mapped_args << generated;
@@ -244,7 +289,88 @@ transform_args :: macro (args: [] any, $body: Code) {
         }
     }
 
-    return #unquote body;
+    res := #unquote body;
+    __add_to_pool(res);
+    return res;
+}
+
+#overload
+delete :: (v: Value) {
+    __free(v);
+}
+
+
+#package
+#thread_local
+__current_pool: &ValuePool
+
+#package
+__add_to_pool :: macro (v: Value) {
+    if __current_pool {
+        if cast(u64) v != 0 {
+            __current_pool->add(v);
+        }
+    }
+}
+
+
+ValuePool :: struct {
+    values: [..] Value = make([..] Value, alloc.heap_allocator);
+}
+
+#inject ValuePool {
+    add :: (vp: &ValuePool, v: Value) {
+        vp.values << v;
+    }
+
+    remove :: (vp: &ValuePool, v: Value) {
+        array.filter(&vp.values, [x](cast(u64) x != cast(u64) v));
+    }
+
+    release_all :: (vp: &ValuePool) {
+        for v in vp.values {
+            __free(v);
+        }
+
+        array.clear(&vp.values);
+    }
+
+    destroy :: (vp: &ValuePool) {
+        vp->release_all();
+        delete(&vp.values);
+    }
+}
+
+get_pool :: () => __current_pool;
+
+set_pool :: (vp: &ValuePool) {
+    __current_pool = vp;
+}
+
+setup_default_pool :: () {
+    __current_pool = new(ValuePool);
+}
+
+release_pooled_objects :: () {
+    if __current_pool {
+        __current_pool->release_all();
+    }
+}
+
+
+temp_pool :: macro (body: Code) -> u32 {
+    __current_pool :: __current_pool
+
+    pool := #this_package.ValuePool.{};
+    defer delete(&pool);
+
+    old_pool := __current_pool;
+    __current_pool = &pool;
+    defer __current_pool = old_pool;
+
+    #unquote body;
+
+    return 0;
 }
 
 

@@ -3,13 +3,29 @@ package core.js
 
 Func :: #distinct Value
 
+func :: Func.from
+
 #inject Func {
     from :: (f: (this: Value, args: [] Value) -> Value) -> Func {
-        return __make_func(f);
+        func := __make_func(f);
+        __add_to_pool(cast(Value) func);
+        return func;
     }
 
-    free :: (f: Func) {
-        cast(Value, f)->free();
+    release :: (f: Func) {
+        if __current_pool {
+            __current_pool->remove(cast(Value) f);
+        }
+
+        cast(Value, f)->release();
+    }
+
+    leak :: (f: Func) -> Func {
+        if __current_pool {
+            __current_pool->remove(cast(Value) f);
+        }
+
+        return f;
     }
 }
 
