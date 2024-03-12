@@ -54,7 +54,7 @@ Type :: enum {
         Converts an Onyx value into a JavaScript `Value`.
 
         Currently, these types are supported: `i32`, `u32`, `i64`, `u64`, `f32`, `f64`, `bool`, str, `Value`, `Func`, and `Map(str, $V)`.
-    """"
+    """
     from :: #match {
         (m: Map(str, $V)) -> ? Value {
             result := Value.new_object();
@@ -434,7 +434,7 @@ release_pooled_objects :: () {
 """
 temp_pool :: #match {
     macro (body: Code) -> u32 {
-        #this_package.temp_pool()
+        #this_package.temp_pool();
 
         #unquote body;
         return 0;

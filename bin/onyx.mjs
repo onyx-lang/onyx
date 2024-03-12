@@ -117,6 +117,10 @@ export default class Onyx {
         this.instance.exports._start();
     }
 
+    invoke(name) {
+        this.instance.exports[name]();
+    }
+
     extract_string(ptr, len) {
         const array = new Uint8Array(this.memory.buffer, ptr, len);
         const string = this._textDecoder.decode(array);
