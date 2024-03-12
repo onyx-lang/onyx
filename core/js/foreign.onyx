@@ -3,6 +3,8 @@ package core.js
 
 use core.alloc
 
+#js #order 0 #file "./onyx.js"
+
 #package {
     // Value
     #foreign "__syscall" {

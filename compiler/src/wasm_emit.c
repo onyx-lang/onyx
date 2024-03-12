@@ -5176,6 +5176,51 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     }));
 }
 
+static void emit_js_node(OnyxWasmModule* mod, AstJsNode *js) {
+    char *contents = NULL;
+
+    if (js->filepath) {
+        const char* parent_file = js->token->pos.filename;
+        if (parent_file == NULL) parent_file = ".";
+
+        char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
+
+        OnyxToken *filename_token = js->filepath->token;
+        token_toggle_end(filename_token);
+
+        char* temp_fn     = bh_alloc_array(global_scratch_allocator, char, filename_token->length);
+        i32   temp_fn_len = string_process_escape_seqs(temp_fn, filename_token->text, filename_token->length);
+        char* filename    = bh_strdup(
+            global_heap_allocator,
+            bh_lookup_file(temp_fn, parent_folder, "", 0, NULL, 0)
+        );
+
+        token_toggle_end(filename_token);
+
+        if (!bh_file_exists(filename)) {
+            onyx_report_error(js->token->pos, Error_Critical,
+                    "Unable to open file for reading, '%s'.",
+                    filename);
+            return;
+        }
+
+        bh_file_contents file_contents = bh_file_read_contents(global_heap_allocator, filename);
+        contents = bh_alloc(global_heap_allocator, file_contents.length + 1);
+        memcpy(contents, file_contents.data, file_contents.length);
+        contents[file_contents.length] = 0;
+        bh_file_contents_free(&file_contents);
+
+    } else {
+        contents = get_expression_string_value(js->code, NULL);
+    }
+
+    JsPartial partial;
+    partial.order = js->order;
+    partial.code  = contents;
+
+    bh_arr_push(mod->js_partials, partial);
+}
+
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     OnyxWasmModule module = {
         .allocator = alloc,
@@ -5246,6 +5291,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(alloc, module.elems, 4);
     bh_arr_new(alloc, module.libraries, 4);
     bh_arr_new(alloc, module.library_paths, 4);
+    bh_arr_new(alloc, module.js_partials, 4);
     bh_arr_new(alloc, module.for_remove_info, 4);
 
     bh_arr_new(global_heap_allocator, module.return_location_stack, 4);
@@ -5362,6 +5408,8 @@ void emit_entity(Entity* ent) {
 
         case Entity_Type_Function: emit_function(module, ent->function); break;
         case Entity_Type_Global:   emit_global(module,   ent->global); break;
+
+        case Entity_Type_JS:       emit_js_node(module, ent->js); break;
 
         default: break;
     }

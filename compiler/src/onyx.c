@@ -1118,6 +1118,21 @@ static CompilerProgress onyx_flush_module() {
         onyx_wasm_module_write_to_file(context.wasm_module, output_file);
     }
 
+    if (bh_arr_length(context.wasm_module->js_partials) > 0) {
+        bh_file js_file;
+        if (
+            bh_file_create(
+                &js_file,
+                bh_aprintf(global_heap_allocator, "%s.js", context.options->target_file)
+            ) != BH_FILE_ERROR_NONE
+        ) {
+            return ONYX_COMPILER_PROGRESS_FAILED_OUTPUT;
+        }
+
+        onyx_wasm_module_write_js_partials_to_file(context.wasm_module, js_file);
+        bh_file_close(&output_file);
+    }
+
     bh_file_close(&output_file);
 
     return ONYX_COMPILER_PROGRESS_SUCCESS;

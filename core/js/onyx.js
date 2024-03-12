@@ -1,5 +1,3 @@
-let modules = {};
-
 class JsHeap {
     NaN = 0;
     Zero = 1;
@@ -74,9 +72,11 @@ class JsHeap {
 }
 
 export default class Onyx {
+    static modules = {};
+
     static register_module(name, member_getter) {
-        modules[name] = modules[name] || [];
-        modules[name].push(member_getter);
+        Onyx.modules[name] = Onyx.modules[name] || [];
+        Onyx.modules[name].push(member_getter);
     }
 
     static async create(source) {
@@ -85,9 +85,9 @@ export default class Onyx {
 
         let instance = new Onyx();
         let import_object = {};
-        for (let name in modules) {
+        for (let name in Onyx.modules) {
             let module_object = {};
-            for (let generator of modules[name]) {
+            for (let generator of Onyx.modules[name]) {
                 module_object = { ...module_object, ...generator(instance) }
             }
             import_object[name] = module_object;

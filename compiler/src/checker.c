@@ -4064,6 +4064,38 @@ CheckStatus check_arbitrary_job(EntityJobData *job) {
     return Check_Error;
 }
 
+CheckStatus check_js_node(AstJsNode *js) {
+    if (js->order_expr) {
+        CHECK(expression, &js->order_expr);
+
+        TYPE_CHECK(&js->order_expr, &basic_types[Basic_Kind_I32]) {
+            ERROR_(js->token->pos, "Expected an expression of type 'i32' for '#order', but got a '%s' instead.", type_get_name(js->order_expr->type));
+        }
+
+        b32 valid = 0;
+        i64 value = get_expression_integer_value(js->order_expr, &valid);
+        assert(valid);
+
+        js->order = (u32) value;
+    }
+
+    if (js->code) {
+        CHECK(expression, &js->code);
+        if (js->code->kind != Ast_Kind_StrLit) {
+            ERROR(js->token->pos, "Expected the provided code to be a string-literal, but it was not.");
+        }
+    }
+
+    if (js->filepath) {
+        CHECK(expression, &js->filepath);
+        if (js->filepath->kind != Ast_Kind_StrLit) {
+            ERROR(js->token->pos, "Expected the provided file path to be a string-literal, but it was not.");
+        }
+    }
+
+    return Check_Success;
+}
+
 void check_entity(Entity* ent) {
     CheckStatus cs = Check_Success;
     context.checker.current_entity = ent;
@@ -4111,6 +4143,7 @@ void check_entity(Entity* ent) {
             break;
 
         case Entity_Type_Job: cs = check_arbitrary_job(ent->job_data); break;
+        case Entity_Type_JS:  cs = check_js_node(ent->js); break;
 
         default: break;
     }

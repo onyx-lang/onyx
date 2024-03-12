@@ -698,6 +698,11 @@ typedef struct ForRemoveInfo {
     i32 remove_func_type_idx;
 } ForRemoveInfo;
 
+typedef struct JsPartial {
+    u32 order;
+    char *code;
+} JsPartial;
+
 typedef struct OnyxWasmModule {
     bh_allocator allocator;
 
@@ -756,6 +761,8 @@ typedef struct OnyxWasmModule {
     u32 memory_min_size;
     u32 memory_max_size;
 
+    bh_arr(JsPartial)     js_partials;
+
     // NOTE: Set of things used when compiling; not part of the actual module
     u32 export_count;
     u32 next_type_idx;
@@ -810,6 +817,8 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
 void onyx_wasm_module_free(OnyxWasmModule* module);
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer);
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);
+void onyx_wasm_module_write_js_partials_to_buffer(OnyxWasmModule* module, bh_buffer* buffer);
+void onyx_wasm_module_write_js_partials_to_file(OnyxWasmModule* module, bh_file file);
 
 #ifdef ONYX_RUNTIME_LIBRARY
 void onyx_run_initialize(b32 debug_enabled);
