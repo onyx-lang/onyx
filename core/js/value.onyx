@@ -8,6 +8,9 @@ use core.math
 use core.array
 use core.alloc
 
+#doc """
+    Used to represent a JavaScript value.
+"""
 Value :: #distinct u64
 
 value :: Value.from
@@ -33,18 +36,25 @@ Type :: enum {
     Global     :: Value.{0x7ff8000000000005}
     Onyx       :: Value.{0x7ff8000000000006}
 
+    #doc "Creates a new JavaScript object and returns the `Value` handle to it."
     new_object :: () -> Value {
         v := __new_object();
         __add_to_pool(v);
         return v;
     }
 
+    #doc "Creates a new JavaScript array and returns the `Value` handle to it."
     new_array :: () -> Value {
         v := __new_array();
         __add_to_pool(v);
         return v;
     }
 
+    #doc """
+        Converts an Onyx value into a JavaScript `Value`.
+
+        Currently, these types are supported: `i32`, `u32`, `i64`, `u64`, `f32`, `f64`, `bool`, str, `Value`, `Func`, and `Map(str, $V)`.
+    """"
     from :: #match {
         (m: Map(str, $V)) -> ? Value {
             result := Value.new_object();
@@ -116,6 +126,7 @@ Type :: enum {
         }
     }
 
+    #doc "Converts a `Value` into a `bool`. If the value is not internally of boolean type, `None` is returned."
     as_bool :: (v: Value) -> ? bool {
         if cast(u64) v == cast(u64) Value.True  do return true;
         if cast(u64) v == cast(u64) Value.False do return false;
@@ -123,6 +134,7 @@ Type :: enum {
         return .None;
     }
 
+    #doc "Converts a `Value` into a `f64`. If the value is not internally of float type, `None` is returned."
     as_float :: (v: Value) -> ? f64 {
         v_u64 := cast(u64, v);
         v_f64 := *cast(&f64, &v_u64);
@@ -133,6 +145,7 @@ Type :: enum {
         return .None;
     }
 
+    #doc "Converts a `Value` into a `i32`. If the value is not internally of float type, `None` is returned."
     as_int :: (v: Value) -> ? i32 {
         v_u64 := cast(u64, v);
         v_f64 := *cast(&f64, &v_u64);
@@ -143,6 +156,12 @@ Type :: enum {
         return .None;
     }
 
+    #doc """
+        Converts a `Value` into a `str`. If the value is not internally of str type, `None` is returned.
+
+        Note that this function returns a string that is allocated on the heap.
+        The caller is responsible for managing the returned string.
+    """
     as_str :: (v: Value) -> ? str {
         len := __to_str(v, .[]);
         if len < 0 do return .None;
@@ -152,6 +171,9 @@ Type :: enum {
         return ret;
     }
 
+    #doc """
+        Returns the internal type of the `Value`.
+    """
     type :: (v: Value) -> Type {
         v_u64 := cast(u64, v);
 
@@ -178,14 +200,29 @@ Type :: enum {
         return .Undefined;
     }
 
-    call :: (v: Value, method: str, args: ..any) -> Value {
-        transform_args(cast([] any) args, [](__method(v, method, mapped_args)));
+    #doc "Calls a method on a `Value`."
+    call :: #match {
+        (v: Value, method: str, args: [] any) -> Value {
+            transform_args(args, [](__method(v, method, mapped_args)));
+        },
+
+        (v: Value, method: str, args: ..any) -> Value {
+            return Value.call(v, method, cast([] any) args);
+        }
     }
 
-    invoke :: (v: Value, args: ..any) -> Value {
-        transform_args(cast([] any) args, [](__call(v, mapped_args)));
+    #doc "Invokes the `Value` as though it is a JavaScript function."
+    invoke :: #match {
+        (v: Value, args: ..any) -> Value {
+            transform_args(args, [](__call(v, mapped_args)));
+        },
+
+        (v: Value, args: ..any) -> Value {
+            return Value.invoke(v, cast([] any) args);
+        }
     }
 
+    #doc "Removes the `Value` from current `ValuePool`. This means that the `Value` will not be automatically collected, and must be released with `Value.release`."
     leak :: (v: Value) -> Value {
         if __current_pool {
             __current_pool->remove(v);
@@ -194,6 +231,7 @@ Type :: enum {
         return v;
     }
 
+    #doc "Releases the `Value` from the JavaScript heap. The `Value` should not be used after this method is called."
     release :: (v: Value) {
         if __current_pool {
             __current_pool->remove(v);
@@ -202,6 +240,7 @@ Type :: enum {
         return __free(v);
     }
 
+    #doc "Invokes the JavaScript `delete` operator on the specified property."
     delete :: (v: Value, property: str) {
         return __delete(v, property);
     }
@@ -222,20 +261,24 @@ Type :: enum {
         return cast(u64) v == cast(u64) Value.NaN;
     }
 
+    #doc "Returns the evaluation of the `instanceof` operator in JavaScript."
     instance_of :: (v: Value, base: Value) -> bool {
         return __instance_of(v, base);
     }
 
+    #doc "Invokes the `new` operator on the `Value`, with arguments `args`."
     new :: (v: Value, args: ..any) -> Value {
         transform_args(cast([] any) args, [](__new(v, mapped_args)));
     }
 
+    #doc "Retrieves the evaluation of `v[prop]` in JavaScript."
     get :: (v: Value, prop: str) -> Value {
         r := __dot(v, prop);
         __add_to_pool(r);
         return r;
     }
 
+    #doc "Retrieves the evaluation of `v[prop] = value` in JavaScript."
     set :: #match #locked {
         (v: Value, prop: str, value: Value) {
             __set(v, prop, value);
@@ -258,16 +301,22 @@ Type :: enum {
         }
     }
 
+    #doc """Special case for `->get("length")`. Because it is required so often, this optimization is quite nice."""
     length :: (v: Value) -> i32 {
         return __len(v);
     }
 
+    #doc "Retrieves the evaluation of `v[i]` in JavaScript."
     index :: (v: Value, i: i32) -> Value {
         r := __sub(v, i);
         __add_to_pool(r);
         return r;
     }
     
+    #doc """
+        JavaScript defines a "falsesy" value as undefined, null, false, 0, and "".
+        All other values are "truthy".
+    """
     truthy :: (v: Value) -> bool {
         switch v->type() {
             case .Undefined, .Null do return false;
@@ -329,6 +378,10 @@ __add_to_pool :: macro (v: Value) {
 }
 
 
+#doc """
+    To aid in managing `Value`s that are created over the life time of the program,
+    `ValuePool` collects all of the `Value`s and allows for releasing them all at once.
+"""
 ValuePool :: struct {
     values: [..] Value = make([..] Value, alloc.heap_allocator);
 }
@@ -356,36 +409,47 @@ ValuePool :: struct {
     }
 }
 
+#doc "Gets the current `ValuePool` in use."
 get_pool :: () => __current_pool;
 
+#doc "Sets the `ValuePool` to use."
 set_pool :: (vp: &ValuePool) {
     __current_pool = vp;
 }
 
+#doc "Creates a new `ValuePool` and uses it. The old `ValuePool` is forgotten."
 setup_default_pool :: () {
     __current_pool = new(ValuePool);
 }
 
+#doc "Releases all objects in the current `ValuePool`."
 release_pooled_objects :: () {
     if __current_pool {
         __current_pool->release_all();
     }
 }
 
+#doc """
+    Helper macro to create a `ValuePool` that is scoped to a block.
+"""
+temp_pool :: #match {
+    macro (body: Code) -> u32 {
+        #this_package.temp_pool()
 
-temp_pool :: macro (body: Code) -> u32 {
-    __current_pool :: __current_pool
+        #unquote body;
+        return 0;
+    },
 
-    pool := #this_package.ValuePool.{};
-    defer delete(&pool);
+    macro () {
+        __current_pool :: __current_pool
 
-    old_pool := __current_pool;
-    __current_pool = &pool;
-    defer __current_pool = old_pool;
+        pool := #this_package.ValuePool.{};
+        defer delete(&pool);
 
-    #unquote body;
-
-    return 0;
+        old_pool := __current_pool;
+        __current_pool = &pool;
+        defer __current_pool = old_pool;
+    }
 }
 
 
