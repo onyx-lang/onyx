@@ -1,8 +1,4 @@
 //
-// [x] Object tracking
-//      Allow for "garbage collection", unless object is marked as leaked.
-// [ ] as_str
-// [ ] Truthy
 // [ ] Documentation
 
 package core.js
@@ -39,6 +35,12 @@ Type :: enum {
 
     new_object :: () -> Value {
         v := __new_object();
+        __add_to_pool(v);
+        return v;
+    }
+
+    new_array :: () -> Value {
+        v := __new_array();
         __add_to_pool(v);
         return v;
     }
@@ -142,8 +144,12 @@ Type :: enum {
     }
 
     as_str :: (v: Value) -> ? str {
-        // If is identifier, look up string length
-            // Call another procedure to get data
+        len := __to_str(v, .[]);
+        if len < 0 do return .None;
+
+        ret := make(str, len);
+        __to_str(v, ret);
+        return ret;
     }
 
     type :: (v: Value) -> Type {
@@ -252,6 +258,10 @@ Type :: enum {
         }
     }
 
+    length :: (v: Value) -> i32 {
+        return __len(v);
+    }
+
     index :: (v: Value, i: i32) -> Value {
         r := __sub(v, i);
         __add_to_pool(r);
@@ -259,8 +269,13 @@ Type :: enum {
     }
     
     truthy :: (v: Value) -> bool {
-        // TODO: Correct this
-        return true;
+        switch v->type() {
+            case .Undefined, .Null do return false;
+            case .Boolean do return cast(u64) v == cast(u64) Value.True;
+            case .Number  do return cast(u64) v != cast(u64) Value.Zero;
+            case .String  do return v->length() != 0;
+            case #default do return true;
+        }
     }
 }
 

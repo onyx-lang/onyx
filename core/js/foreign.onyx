@@ -14,6 +14,7 @@ use core.alloc
         __sub :: (value: Value, idx: i32) -> Value ---
         __set :: (value: Value, name: str, v: Value) -> void ---
         __set_index :: (value: Value, index: i32, v: Value) -> void ---
+        __len :: (value: Value) -> i32 ---
 
 	__from_str  :: (s: str) -> Value ---
 	__from_arr  :: (a: [] Value) -> Value ---
@@ -27,6 +28,7 @@ use core.alloc
         __instance_of :: (value: Value, class: Value) -> bool ---
 
         __new_object :: () -> Value ---
+        __new_array  :: () -> Value ---
     }
 
     // Func

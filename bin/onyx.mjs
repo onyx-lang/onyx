@@ -215,6 +215,10 @@ Onyx.register_module("__syscall", instance => ({
         return instance.store_value({});
     },
 
+    __new_array() {
+        return instance.store_value([]);
+    },
+
     __new(v, args_ptr, args_len) {
         const args = instance.load_slice_of_values(args_ptr, args_len);
         const obj  = instance.load_value(v);
@@ -258,6 +262,11 @@ Onyx.register_module("__syscall", instance => ({
         const value = instance.load_value(v);
         const new_value = instance.load_value(newval);
         Reflect.set(value, index, new_value);
+    },
+
+    __len(v) {
+        const value = instance.load_value(v);
+        return value.length;
     },
 
     __from_str(ptr, len) {
@@ -324,6 +333,22 @@ Onyx.register_module("__syscall", instance => ({
 
             instance.instance.exports.__free_arg_buf(argptr);
         })
+    },
+
+    __to_str(v, outptr, outlen) {
+        const s = instance.load_value(v);
+        if (typeof s !== "string") {
+            return -1;
+        }
+
+        const encoded = instance._textEncoder.encode(s);
+        if (outlen == 0) {
+            return encoded.length;
+        }
+
+        const onyxmem = new Uint8Array(instance.memory.buffer);
+        onyxmem.set(encoded, outptr);
+        return encoded.length;
     }
 }))
 
