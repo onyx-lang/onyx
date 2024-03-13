@@ -3,7 +3,10 @@ Nightly Release
 No release date yet
 
 Additions:
-- Added new alternate error format that may become the default in the future.
+- `#js` directive to build a JavaScript file during compilation.
+- `core.js` package for JavaScript interop.
+- `..=` operator that is a range, with an inclusive upper end.
+- New alternate error format that may become the default in the future.
     - Use `--error-format v2` or set environment variable `ONYX_ERROR_FORMAT` to be `v2`.
 
 Removals:
