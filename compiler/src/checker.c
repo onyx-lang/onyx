@@ -1900,14 +1900,14 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
     type_lookup_member(expected_range_type, "low", &smem);
     TYPE_CHECK(&range->low, smem.type) {
         ERROR_(range->token->pos,
-            "Expected left side of range to be a '%s' integer, got '%s'.",
+            "Expected left side of range to be a '%s', got '%s'.",
             type_get_name(smem.type), node_get_type_name(range->low));
     }
 
     type_lookup_member(expected_range_type, "high", &smem);
     TYPE_CHECK(&range->high, smem.type) {
         ERROR_(range->token->pos,
-            "Expected left side of range to be a '%s' integer, got '%s'.",
+            "Expected left side of range to be a '%s', got '%s'.",
             type_get_name(smem.type), node_get_type_name(range->high));
     }
 
