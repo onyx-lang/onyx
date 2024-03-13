@@ -3960,6 +3960,24 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(library);
                 return;
             }
+            else if (parse_possible_directive(parser, "js")) {
+                AstJsNode *jsNode = make_node(AstJsNode, Ast_Kind_Js_Code);
+                jsNode->token = parser->curr - 2;
+                jsNode->order = 0xffffffff;
+
+                if (parse_possible_directive(parser, "order")) {
+                    jsNode->order_expr = parse_expression(parser, 0);
+                }
+
+                if (parse_possible_directive(parser, "file")) {
+                    jsNode->filepath = parse_expression(parser, 0);
+                } else {
+                    jsNode->code = parse_expression(parser, 0);
+                }
+
+                ENTITY_SUBMIT(jsNode);
+                return;
+            }
             else if (parse_possible_directive(parser, "doc")) {
                 // This is a future feature I want to add to the language, proper docstrings.
                 // For now (and so I start documenting thing...), #doc can be used anywhere

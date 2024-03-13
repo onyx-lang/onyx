@@ -117,6 +117,8 @@ static const char* ast_node_names[] = {
     "FOREIGN BLOCK",
     "ZERO VALUE",
 
+    "JS CODE",
+
     "AST_NODE_KIND_COUNT",
 };
 
@@ -188,6 +190,7 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Global",
     "Overloaded_Function",
     "Function",
+    "JS",
 };
 
 AstNumLit* ast_reduce_type_compare(bh_allocator a, AstBinaryOp* node) {

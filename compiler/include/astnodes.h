@@ -118,7 +118,9 @@
     NODE(Package)              \
     NODE(Import)               \
                                \
-    NODE(ZeroValue)
+    NODE(ZeroValue)            \
+                               \
+    NODE(JsNode)               
 
 #define NODE(name) typedef struct Ast ## name Ast ## name;
 AST_NODES
@@ -250,6 +252,8 @@ typedef enum AstKind {
     Ast_Kind_Foreign_Block,
 
     Ast_Kind_Zero_Value,
+
+    Ast_Kind_Js_Code,
 
     Ast_Kind_Count
 } AstKind;
@@ -1603,6 +1607,17 @@ struct AstForeignBlock {
     b32 uses_dyncall : 1;
 };
 
+struct AstJsNode {
+    AstNode_base;
+
+    u32 order; 
+    AstTyped *order_expr;
+
+    AstTyped *code;
+    AstTyped *filepath;
+};
+
+
 typedef struct EntityJobData {
     enum TypeMatch (*func)(void *job_data);
     void *job_data;
@@ -1662,6 +1677,7 @@ typedef enum EntityType {
     Entity_Type_Global,
     Entity_Type_Overloaded_Function,
     Entity_Type_Function,
+    Entity_Type_JS,
 
     Entity_Type_Count,
 } EntityType;
@@ -1710,6 +1726,7 @@ typedef struct Entity {
         AstConstraint         *constraint;
         AstDirectiveLibrary   *library;
         EntityJobData         *job_data;
+        AstJsNode             *js;
     };
 } Entity;
 

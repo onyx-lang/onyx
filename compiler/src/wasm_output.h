@@ -1077,3 +1077,34 @@ void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file) {
 
     bh_file_write(&file, master_buffer.data, master_buffer.length);
 }
+
+
+
+//
+// JS File
+//
+
+static i32 compare_js_partials(const void *p1, const void *p2) {
+    return ((JsPartial *) p2)->order - ((JsPartial *) p1)->order;
+}
+
+void onyx_wasm_module_write_js_partials_to_buffer(OnyxWasmModule* module, bh_buffer* buffer) {
+    bh_buffer_init(buffer, global_heap_allocator, 128);
+
+    qsort(module->js_partials,
+        bh_arr_length(module->js_partials),
+        sizeof(JsPartial),
+        compare_js_partials);
+
+    bh_arr_each(JsPartial, partial, module->js_partials) {
+        bh_buffer_write_string(buffer, partial->code);
+    }
+}
+
+void onyx_wasm_module_write_js_partials_to_file(OnyxWasmModule* module, bh_file file) {
+    bh_buffer js_buffer;
+    onyx_wasm_module_write_js_partials_to_buffer(module, &js_buffer);
+
+    bh_file_write(&file, js_buffer.data, js_buffer.length);
+}
+

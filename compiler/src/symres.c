@@ -1913,6 +1913,14 @@ static SymresStatus symres_import(AstImport* import) {
     return Symres_Complete;
 }
 
+static SymresStatus symres_js_node(AstJsNode* js) {
+    if (js->order_expr) SYMRES(expression, &js->order_expr);
+    if (js->code)       SYMRES(expression, &js->code);
+    if (js->filepath)   SYMRES(expression, &js->filepath);
+
+    return Symres_Success;
+}
+
 void symres_entity(Entity* ent) {
     current_entity = ent;
     if (ent->scope) scope_enter(ent->scope);
@@ -1942,6 +1950,7 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Load_Path:
         case Entity_Type_Load_File:               ss = symres_include(ent->include); break;
         case Entity_Type_File_Contents:           ss = symres_file_contents(ent->file_contents); break;
+        case Entity_Type_JS:                      ss = symres_js_node(ent->js); break;
 
         case Entity_Type_Foreign_Function_Header:
         case Entity_Type_Temp_Function_Header:
