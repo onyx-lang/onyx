@@ -1373,17 +1373,31 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local, i64 index_local) {
     AstStructLiteral *range = (AstStructLiteral *) for_node->iter;
     u64 offset = 0;
 
+    assert(for_node->iter->type);
+
     StructMember high_mem, step_mem;
-    type_lookup_member(builtin_range_type_type, "high", &high_mem);
-    type_lookup_member(builtin_range_type_type, "step", &step_mem);
+    type_lookup_member(for_node->iter->type, "high", &high_mem);
+    type_lookup_member(for_node->iter->type, "step", &step_mem);
     u64 high_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(high_mem.type));
     u64 step_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(step_mem.type));
 
-    emit_struct_as_separate_values(mod, &code, builtin_range_type_type, 0);
+    emit_struct_as_separate_values(mod, &code, for_node->iter->type, 0);
 
     WIL(for_node->token, WI_LOCAL_SET, step_local);
     WIL(for_node->token, WI_LOCAL_SET, high_local);
     WIL(for_node->token, WI_LOCAL_SET, iter_local);
+
+    u64 INT_GE = WI_I32_GE_S;
+    u64 INT_LT = WI_I32_LT_S;
+    u64 INT_CONST = WI_I32_CONST;
+    u64 INT_ADD = WI_I32_ADD;
+
+    if (high_mem.type == &basic_types[Basic_Kind_I64]) {
+        INT_GE = WI_I64_GE_S;
+        INT_LT = WI_I64_LT_S;
+        INT_CONST = WI_I64_CONST;
+        INT_ADD = WI_I64_ADD;
+    }
 
     emit_for__prologue(mod, &code, for_node, iter_local, index_local);
 
@@ -1398,28 +1412,28 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local, i64 index_local) {
         if (step_value->value.l >= 0) {
             WIL(for_node->token, WI_LOCAL_GET, iter_local);
             WIL(for_node->token, WI_LOCAL_GET, high_local);
-            WI(for_node->token, WI_I32_GE_S);
+            WI(for_node->token, INT_GE);
             WID(for_node->token, WI_COND_JUMP, 0x02);
         } else {
             WIL(for_node->token, WI_LOCAL_GET, iter_local);
             WIL(for_node->token, WI_LOCAL_GET, high_local);
-            WI(for_node->token, WI_I32_LT_S);
+            WI(for_node->token, INT_LT);
             WID(for_node->token, WI_COND_JUMP, 0x02);
         }
 
     } else {
         WIL(for_node->token, WI_LOCAL_GET, step_local);
-        WID(for_node->token, WI_I32_CONST, 0);
-        WI(for_node->token, WI_I32_GE_S);
+        WID(for_node->token, INT_CONST, 0);
+        WI(for_node->token, INT_GE);
         WID(for_node->token, WI_IF_START, 0x40);
             WIL(for_node->token, WI_LOCAL_GET, iter_local);
             WIL(for_node->token, WI_LOCAL_GET, high_local);
-            WI(for_node->token, WI_I32_GE_S);
+            WI(for_node->token, INT_GE);
             WID(for_node->token, WI_COND_JUMP, 0x03);
         WI(for_node->token, WI_ELSE);
             WIL(for_node->token, WI_LOCAL_GET, iter_local);
             WIL(for_node->token, WI_LOCAL_GET, high_local);
-            WI(for_node->token, WI_I32_LT_S);
+            WI(for_node->token, INT_LT);
             WID(for_node->token, WI_COND_JUMP, 0x03);
         WI(for_node->token, WI_IF_END);
     }
@@ -1431,7 +1445,7 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local, i64 index_local) {
 
     WIL(for_node->token, WI_LOCAL_GET, iter_local);
     WIL(for_node->token, WI_LOCAL_GET, step_local);
-    WI(for_node->token, WI_I32_ADD);
+    WI(for_node->token, INT_ADD);
     WIL(for_node->token, WI_LOCAL_SET, iter_local);
 
     emit_for__epilogue(mod, &code, for_node, iter_local, index_local);

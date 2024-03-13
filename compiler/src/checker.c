@@ -59,9 +59,17 @@
     if (type_name == TYPE_MATCH_SPECIAL) return Check_Return_To_Symres;                         \
     if (type_name == TYPE_MATCH_FAILED)
 
+#define TYPE_QUERY_(expr, type, type_name)                                                      \
+    TypeMatch type_name;                                                                        \
+    type_name = unify_node_and_type_(expr, type, 0);                                            \
+    if (type_name == TYPE_MATCH_YIELD) YIELD((*expr)->token->pos, "Waiting on type checking."); \
+    if (type_name == TYPE_MATCH_SPECIAL) return Check_Return_To_Symres;                         \
+    if (type_name == TYPE_MATCH_SUCCESS)
+
 #define CONCAT(a, b) a##_##b
 #define DEFER_LINE(a, line) CONCAT(a, line)
 #define TYPE_CHECK(expr, type) TYPE_CHECK_(expr, type, DEFER_LINE(tc, __LINE__))
+#define TYPE_QUERY(expr, type) TYPE_QUERY_(expr, type, DEFER_LINE(tc, __LINE__))
 
 typedef enum CheckStatus {
     Check_Success,  // The node was successfully checked with out errors
@@ -283,6 +291,22 @@ CheckStatus check_for(AstFor* fornode) {
         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
         fornode->loop_type = For_Loop_Range;
     }
+    else if (types_are_compatible(iter_type, &basic_types[Basic_Kind_I64])) {
+        if (fornode->by_pointer) {
+            ERROR(error_loc, "Cannot iterate by pointer over a range.");
+        }
+
+        AstNumLit* low_0    = make_int_literal(context.ast_alloc, 0);
+        low_0->type = &basic_types[Basic_Kind_I64];
+        
+        AstRangeLiteral* rl = make_range_literal(context.ast_alloc, (AstTyped *) low_0, fornode->iter);
+        CHECK(range_literal, &rl);
+        fornode->iter = (AstTyped *) rl;
+
+        given_type = builtin_range64_type_type->Struct.memarr[0]->type;
+        fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
+        fornode->loop_type = For_Loop_Range;
+    }
     else if (types_are_compatible(iter_type, builtin_range_type_type)) {
         if (fornode->by_pointer) {
             ERROR(error_loc, "Cannot iterate by pointer over a range.");
@@ -290,10 +314,20 @@ CheckStatus check_for(AstFor* fornode) {
 
         // NOTE: Blindly copy the first range member's type which will
         // be the low value.                - brendanfh 2020/09/04
-        given_type = builtin_range_type_type->Struct.memarr[0]->type;
+        given_type = iter_type->Struct.memarr[0]->type;
         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
         fornode->loop_type = For_Loop_Range;
+    }
+    else if (types_are_compatible(iter_type, builtin_range64_type_type)) {
+        if (fornode->by_pointer) {
+            ERROR(error_loc, "Cannot iterate by pointer over a range.");
+        }
 
+        // NOTE: Blindly copy the first range member's type which will
+        // be the low value.                - brendanfh 2020/09/04
+        given_type = iter_type->Struct.memarr[0]->type;
+        fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
+        fornode->loop_type = For_Loop_Range;
     }
     else if (iter_type->kind == Type_Kind_Array) {
         if (fornode->by_pointer) given_type = type_make_pointer(context.ast_alloc, iter_type->Array.elem);
@@ -894,8 +928,8 @@ CheckStatus check_call(AstCall** pcall) {
             callsite->line   = make_int_literal(context.ast_alloc, call->token->pos.line);
             callsite->column = make_int_literal(context.ast_alloc, call->token->pos.column);
 
-            convert_numlit_to_type(callsite->line,   &basic_types[Basic_Kind_U32]);
-            convert_numlit_to_type(callsite->column, &basic_types[Basic_Kind_U32]);
+            convert_numlit_to_type(callsite->line,   &basic_types[Basic_Kind_U32], 1);
+            convert_numlit_to_type(callsite->column, &basic_types[Basic_Kind_U32], 1);
 
             callsite->collapsed = 1;
             *arg_value = (AstTyped *) callsite;
@@ -1837,23 +1871,44 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
     CHECK(expression, &range->high);
 
     builtin_range_type_type = type_build_from_ast(context.ast_alloc, builtin_range_type);
-    if (builtin_range_type_type == NULL) YIELD(range->token->pos, "Waiting for 'range' structure to be built.");
+    builtin_range64_type_type = type_build_from_ast(context.ast_alloc, builtin_range64_type);
+    if (builtin_range_type_type   == NULL) YIELD(range->token->pos, "Waiting for 'range' structure to be built.");
+    if (builtin_range64_type_type == NULL) YIELD(range->token->pos, "Waiting for 'range64' structure to be built.");
 
-    Type* expected_range_type = builtin_range_type_type;
+    Type* expected_range_type = NULL;
+    TYPE_QUERY(&range->low, &basic_types[Basic_Kind_I32]) {
+        TYPE_QUERY(&range->high, &basic_types[Basic_Kind_I32]) {
+            expected_range_type = builtin_range_type_type;
+        }
+    }
+
+    if (expected_range_type == NULL) {
+        TYPE_QUERY(&range->low, &basic_types[Basic_Kind_I64]) {
+            TYPE_QUERY(&range->high, &basic_types[Basic_Kind_I64]) {
+                expected_range_type = builtin_range64_type_type;
+            }
+        }
+    }
+
+    if (expected_range_type == NULL) {
+        ERROR_(range->token->pos, "Range operator '..' not understood for types '%s' and '%s'.",
+               node_get_type_name(range->low), node_get_type_name(range->high));
+    }
+
     StructMember smem;
 
     type_lookup_member(expected_range_type, "low", &smem);
     TYPE_CHECK(&range->low, smem.type) {
         ERROR_(range->token->pos,
-            "Expected left side of range to be a 32-bit integer, got '%s'.",
-            node_get_type_name(range->low));
+            "Expected left side of range to be a '%s' integer, got '%s'.",
+            type_get_name(smem.type), node_get_type_name(range->low));
     }
 
     type_lookup_member(expected_range_type, "high", &smem);
     TYPE_CHECK(&range->high, smem.type) {
         ERROR_(range->token->pos,
-            "Expected right side of range to be a 32-bit integer, got '%s'.",
-            node_get_type_name(range->high));
+            "Expected left side of range to be a '%s' integer, got '%s'.",
+            type_get_name(smem.type), node_get_type_name(range->high));
     }
 
     if (range->step == NULL) {
@@ -1864,7 +1919,22 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
         range->step = *smem.initial_value;
     }
 
+    if (range->inclusive) {
+        AstTyped *one = (AstTyped *) make_int_literal(context.ast_alloc, 1);
+        one->type = smem.type;
+
+        range->high = (AstTyped *) make_binary_op(
+            context.ast_alloc, 
+            Binary_Op_Add,
+            range->high,
+            one
+        );
+
+        CHECK(binaryop, (AstBinaryOp **) &range->high);
+    }
+
     range->flags |= Ast_Flag_Has_Been_Checked;
+    range->type = expected_range_type;
     return Check_Success;
 }
 

@@ -740,6 +740,29 @@ as_iter :: (r: range) => generator(
     });
 
 
+#overload
+as_iter :: (r: range64) => generator(
+    &.{ r = r, v = r.low },
+    ctx => {
+        if ctx.r.step > 0 {
+            if ctx.v < ctx.r.high {
+                defer ctx.v += ctx.r.step;
+                return ctx.v, true;
+            } else {
+                return 0, false;
+            }
+
+        } else {
+            if ctx.v >= ctx.r.high {
+                defer ctx.v += ctx.r.step;
+                return ctx.v, true;
+            } else {
+                return 0, false;
+            }
+        }
+    });
+
+
 //
 // Iterator reducing
 //

@@ -366,13 +366,14 @@ typedef enum BinaryOp {
 
     Binary_Op_Pipe             = 33,
     Binary_Op_Range            = 34,
-    Binary_Op_Method_Call      = 35,
+    Binary_Op_Range_Equal      = 35,
+    Binary_Op_Method_Call      = 36,
 
-    Binary_Op_Subscript        = 36,
-    Binary_Op_Subscript_Equals = 37,
-    Binary_Op_Ptr_Subscript    = 38,
+    Binary_Op_Subscript        = 37,
+    Binary_Op_Subscript_Equals = 38,
+    Binary_Op_Ptr_Subscript    = 39,
 
-    Binary_Op_Coalesce         = 39,
+    Binary_Op_Coalesce         = 40,
 
     Binary_Op_Count
 } BinaryOp;
@@ -757,7 +758,10 @@ struct AstRangeLiteral {
     // the first sizeof(AstBinaryOp) bytes of this structure must match that of
     // AstBinaryOp, which means I need this dummy field here.
     //                                              - brendanfh 2020/12/23
-    BinaryOp __unused_operation;
+    union {
+        BinaryOp __unused_operation;
+        b32 inclusive: 1;
+    };
     AstTyped *low, *high;
 
     // Currently, there is no way to specify this in the grammar, but it is set
@@ -1962,6 +1966,8 @@ extern AstType  *builtin_string_type;
 extern AstType  *builtin_cstring_type;
 extern AstType  *builtin_range_type;
 extern Type     *builtin_range_type_type;
+extern AstType  *builtin_range64_type;
+extern Type     *builtin_range64_type_type;
 extern AstType  *builtin_vararg_type;
 extern Type     *builtin_vararg_type_type;
 extern AstTyped *builtin_context_variable;
@@ -2019,7 +2025,7 @@ AstFunction* clone_function_header(bh_allocator a, AstFunction* func);
 void clone_function_body(bh_allocator a, AstFunction* dest, AstFunction* source);
 
 void promote_numlit_to_larger(AstNumLit* num);
-b32 convert_numlit_to_type(AstNumLit* num, Type* type);
+b32 convert_numlit_to_type(AstNumLit* num, Type* type, b32 permanent);
 
 typedef enum TypeMatch {
     TYPE_MATCH_SUCCESS,

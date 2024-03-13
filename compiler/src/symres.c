@@ -646,7 +646,7 @@ static SymresStatus symres_expression(AstTyped** expr) {
 
             // :EliminatingSymres
             SYMRES(type, &builtin_range_type);
-            (*expr)->type_node = builtin_range_type;
+            SYMRES(type, &builtin_range64_type);
             break;
 
         case Ast_Kind_Polymorphic_Proc:

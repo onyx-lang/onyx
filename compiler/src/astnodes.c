@@ -442,7 +442,7 @@ void promote_numlit_to_larger(AstNumLit* num) {
 }
 
 // NOTE: Returns 1 if the conversion was successful.
-b32 convert_numlit_to_type(AstNumLit* num, Type* to_type) {
+b32 convert_numlit_to_type(AstNumLit* num, Type* to_type, b32 permanent) {
     if (num->type == NULL)
         num->type = type_build_from_ast(context.ast_alloc, num->type_node);
     assert(num->type);
@@ -467,25 +467,25 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type) {
             if (type->Basic.flags & Basic_Flag_Unsigned) {
                 u64 value = (u64) num->value.l;
                 if (type->Basic.size == 8) {
-                    num->type = to_type;
+                    if (permanent) num->type = to_type;
                     return 1;
                 }
                 switch (type->Basic.size) {
                     case 1: if (value <= 255) {
-                                num->type = to_type;
+                                if (permanent) num->type = to_type;
                                 return 1;
                             }
                     case 2: if (value <= 65535) {
-                                num->type = to_type;
+                                if (permanent) num->type = to_type;
                                 return 1;
                             }
                     case 4: if (value <= 4294967295) {
-                                num->type = to_type;
+                                if (permanent) num->type = to_type;
                                 return 1;
                             }
                 }
 
-                onyx_report_error(num->token->pos, Error_Critical, "Unsigned integer constant with value '%l' does not fit into %d-bits.",
+                if (permanent) onyx_report_error(num->token->pos, Error_Critical, "Unsigned integer constant with value '%l' does not fit into %d-bits.",
                         num->value.l,
                         type->Basic.size * 8);
 
@@ -493,26 +493,26 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type) {
                 i64 value = (i64) num->value.l;
                 switch (type->Basic.size) {
                     case 1: if (-128ll <= value && value <= 127ll) {
-                                num->value.i = (i32) value;
-                                num->type = to_type;
+                                if (permanent) num->value.i = (i32) value;
+                                if (permanent) num->type = to_type;
                                 return 1;
                             } break;
                     case 2: if (-32768ll <= value && value <= 32767ll) {
-                                num->value.i = (i32) value;
-                                num->type = to_type;
+                                if (permanent) num->value.i = (i32) value;
+                                if (permanent) num->type = to_type;
                                 return 1;
                             } break;
                     case 4: if (-2147483648ll <= value && value <= 2147483647ll) {
-                                num->value.i = (i32) value;
-                                num->type = to_type;
+                                if (permanent) num->value.i = (i32) value;
+                                if (permanent) num->type = to_type;
                                 return 1;
                             } break;
-                    case 8: {   num->type = to_type;
+                    case 8: {   if (permanent) num->type = to_type;
                                 return 1;
                             } break;
                 }
 
-                onyx_report_error(num->token->pos, Error_Critical, "Integer constant with value '%l' does not fit into %d-bits.",
+                if (permanent) onyx_report_error(num->token->pos, Error_Critical, "Integer constant with value '%l' does not fit into %d-bits.",
                         num->value.l,
                         type->Basic.size * 8);
             }
@@ -521,22 +521,22 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type) {
         else if (type->Basic.flags & Basic_Flag_Float) {
             if (type->Basic.size == 4) {
                 if (bh_abs(num->value.l) >= (1 << 23)) {
-                    onyx_report_error(num->token->pos, Error_Critical, "Integer '%l' does not fit in 32-bit float exactly.", num->value.l);
+                    if (permanent) onyx_report_error(num->token->pos, Error_Critical, "Integer '%l' does not fit in 32-bit float exactly.", num->value.l);
                     return 0;
                 }
 
-                num->type = to_type;
-                num->value.f = (f32) num->value.l;
+                if (permanent) num->type = to_type;
+                if (permanent) num->value.f = (f32) num->value.l;
                 return 1;
             }
             if (type->Basic.size == 8) {
                 if (bh_abs(num->value.l) >= (1ll << 52)) {
-                    onyx_report_error(num->token->pos, Error_Critical, "Integer '%l' does not fit in 64-bit float exactly.", num->value.l);
+                    if (permanent) onyx_report_error(num->token->pos, Error_Critical, "Integer '%l' does not fit in 64-bit float exactly.", num->value.l);
                     return 0;
                 }
 
-                num->type = to_type;
-                num->value.d = (f64) num->value.l;
+                if (permanent) num->type = to_type;
+                if (permanent) num->value.d = (f64) num->value.l;
                 return 1;
             }
         }
@@ -546,10 +546,10 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type) {
         if ((type->Basic.flags & Basic_Flag_Float) == 0) return 0;
 
         if (type->Basic.kind == Basic_Kind_F32) {
-            num->value.f = (f32) num->value.d;
+            if (permanent) num->value.f = (f32) num->value.d;
         }
 
-        num->type = to_type;
+        if (permanent) num->type = to_type;
         return 1;
     }
     else if (num->type->Basic.kind == Basic_Kind_F32) {
@@ -557,8 +557,8 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type) {
         if ((type->Basic.flags & Basic_Flag_Float) == 0) return 0;
 
         if (type->Basic.kind == Basic_Kind_F64) {
-            num->value.d = (f64) num->value.f;
-            num->type = to_type;
+            if (permanent) num->value.d = (f64) num->value.f;
+            if (permanent) num->type = to_type;
             return 1;
         }
     }
@@ -860,7 +860,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
 
     // If the node is a numeric literal, try to convert it to the destination type.
     if (node->kind == Ast_Kind_NumLit) {
-        if (convert_numlit_to_type((AstNumLit *) node, type)) return TYPE_MATCH_SUCCESS;
+        if (convert_numlit_to_type((AstNumLit *) node, type, permanent)) return TYPE_MATCH_SUCCESS;
         return TYPE_MATCH_FAILED;
     }
 
@@ -1173,14 +1173,14 @@ Type* resolve_expression_type(AstTyped* node) {
             b32 big    = bh_abs(((AstNumLit *) node)->value.l) >= (1ll << 32);
             b32 unsign = ((AstNumLit *) node)->was_hex_literal;
 
-            if (((AstNumLit *) node)->was_char_literal) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U8]);
-            else if ( big && !unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I64]);
-            else if ( big &&  unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U64]);
-            else if (!big && !unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I32]);
-            else if (!big &&  unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U32]);
+            if (((AstNumLit *) node)->was_char_literal) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U8], 1);
+            else if ( big && !unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I64], 1);
+            else if ( big &&  unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U64], 1);
+            else if (!big && !unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I32], 1);
+            else if (!big &&  unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U32], 1);
         }
         else if (node->type->Basic.kind == Basic_Kind_Float_Unsized) {
-            convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_F64]);
+            convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_F64], 1);
         }
     }
 
@@ -1582,7 +1582,6 @@ AstNumLit* make_float_literal(bh_allocator a, f64 d) {
 
 AstRangeLiteral* make_range_literal(bh_allocator a, AstTyped* low, AstTyped* high) {
     AstRangeLiteral* rl = onyx_ast_node_new(a, sizeof(AstRangeLiteral), Ast_Kind_Range_Literal);
-    rl->type = builtin_range_type_type;
     rl->low = low;
     rl->high = high;
     return rl;
