@@ -209,6 +209,10 @@ Onyx.register_module("host", instance => ({
         console.log(instance.extract_string(ptr, len));
     },
 
+    time() {
+        return BigInt(Date.now());
+    },
+
     exit() {
         debugger;
     }
