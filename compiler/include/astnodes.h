@@ -1891,6 +1891,8 @@ struct CompileOptions {
 
     i32    passthrough_argument_count;
     char** passthrough_argument_data;
+
+    char *core_installation;
 };
 
 typedef struct Context Context;
