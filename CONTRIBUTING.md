@@ -30,13 +30,14 @@ Contributing code changes to Onyx is welcome by following the process outlined b
    your change would include new functionality, this issue will serve as a place
    to discuss the details of what you are adding, to ensure everyone is in agreement
    on how the new functionality will work.
-2. Create a fork and work on your code change.
-3. When ready, open a GitHub pull request to merge your changes with the `master` branch.
+2. Create a fork and work on your code change. Commit frequently in small commits.
+   When making commits, be descriptive in your message.
+4. When ready, open a GitHub pull request to merge your changes with the `master` branch.
    Once approved, your changes will be tested to ensure they pass CI/CD.
-4. I will review the committed request. I reserve the right to provide feedback,
+5. I will review the committed request. I reserve the right to provide feedback,
    request modifications or deny any requests, with or without an explanation.
    There may be multiple rounds of feedback.
-5. Once everything is approved, your code will be merged/rebased into the `master` branch.
+6. Once everything is approved, your code will be merged/rebased into the `master` branch.
 
 ### Code Standard
 
@@ -46,7 +47,7 @@ While not extensive, it does ensure the codebase stays relatively uniform.
 1. Use **4 spaces** per indentation level.
 2. Use descriptive identifier names. No one should have to guess what the variable/function is for.
 5. Separate a large block of code into small blocks by placing blank lines between distinct parts of the code.
-4. The C components of Onyx intentionally are divided into only a handful of files.
+4. The C components of Onyx are intentionally divided into only a handful of files.
    You will likely **not** need to create a new `.c` or `.h` file in repository.
 
 ## Development Environment
