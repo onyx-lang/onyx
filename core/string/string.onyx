@@ -209,6 +209,24 @@ join :: (strs: [] str, sep: str, allocator := context.allocator) -> str {
     return out;
 }
 
+diff :: (str1: str, str2: str) -> str {
+
+    diffs           := "";
+    overflow        := str1[str2.count .. str1.count] if str1.count > str2.count else str2[str1.count .. str2.count];
+    overflow_source := str1 if str1.count > str2.count else str2;
+    count           := str1.count if str1.count < str2.count else str2.count;
+
+    for i in 0 .. count {
+        if str1[i] != str2[i] do diffs = tprintf("{}(index: {}) :: {} != {}\n", diffs, i, str1[i], str2[i]);
+    }
+
+    if overflow != "" {
+        diffs = tprintf("{}OVERFLOW ({} is bigger):\n{}\n", diffs, overflow_source, overflow);
+    }
+
+    return diffs;
+}
+
 
 // @TODO
 // Check this for edge cases and other bugs. I'm not confident
@@ -649,7 +667,7 @@ bisect :: #match #local {}
 
 #overload
 bisect :: (s: str, c: u8) -> (str, str) {
-    index := index_of(s, c); 
+    index := index_of(s, c);
     if index == -1 {
         return s, "";
     }
@@ -685,12 +703,12 @@ append  :: #match {
     macro (x: &dyn_str, other: str) {
         use core.array
         array.concat(x, other);
-    }, 
+    },
 
     macro (x: &dyn_str, other: u8) {
         use core.array
         array.push(x, other);
-    }, 
+    },
 }
 
 clear   :: macro (x: &dyn_str) {
