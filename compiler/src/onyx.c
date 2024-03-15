@@ -187,6 +187,12 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     bh_arr_push(options.included_folders, ".");
 
     if (argc == 1) return options;
+    if (argc == 3) {
+        if (!strcmp(argv[2], "help")) {
+            options.help_subcommand = argv[1];
+            goto skip_parsing_arguments;
+        }
+    }
     i32 arg_parse_start = 1;
 
     if (!strcmp(argv[1], "help")) {
