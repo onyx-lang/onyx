@@ -12,6 +12,7 @@
     #define C_LBLUE   "\e[94m"
 #else 
     #define C_NORM
+    #define C_BOLD
     #define C_RED
     #define C_YELLOW
     #define C_GREY
