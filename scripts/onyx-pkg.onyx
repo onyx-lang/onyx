@@ -31,7 +31,7 @@ Template_Directory :: () -> str {
             |> string.alloc_copy();
 }
 
-Version :: SemVer.{0, 1, 8}
+Version :: SemVer.{0, 1, 9}
 
 
 
@@ -71,6 +71,13 @@ main :: (args: [] cstr) {
         return;
     }
 
+    if arguments.count > 0 {
+        if string.from_cstr(arguments[0]) == "--help" {
+            show_help_for_command(command_tag.tag);
+            os.exit(1);
+        }
+    }
+
     if command_tag.tag.require_config_file {
         if !load_config_file() {
             error_print("Failed to open {}.\n", global_arguments.config_file);
@@ -95,33 +102,56 @@ Command :: struct {
     require_config_file := true;
 }
 
-#tag Command.{ "help", "Show help.", "", require_config_file=false }
+#tag Command.{ "help", "Show this help message", "", require_config_file=false }
 run_help_command :: (args: [] cstr) {
-    printf("onyx pkg version {}\n", Version);
-    printf("Package dependency resolver and synchronizer for Onyx.\n\nUsage in\n");
+    printf("Onyx toolchain version {}\n", Version);
+    printf("\n");
+    printf("Package dependency resolver and synchronizer for Onyx.\n");
+    printf("\n");
+    printf("Usage: onyx pkg cmd [..flags]\n");
+    printf("\n");
+    printf("Commands:\n");
 
     command_procedures := runtime.info.get_procedures_with_tag(Command);
     defer delete(&command_procedures);
+
+    max_command_width :=
+        iter.as_iter(command_procedures)
+        |> iter.map(x => x.tag.command.length)
+        |> iter.fold(0, (x, y) => math.max(x, y));
+
+    command_fmt := tprintf("{{w{}}}", max_command_width + 2);
+
     for command_procedures {
-        printf("{}\n", it.tag.description);
-        printf("        onyx pkg {} {}\n", it.tag.command, it.tag.arguments);
-
-        if it.tag.argument_descriptions.count > 0 {
-            lines := string.split(it.tag.argument_descriptions, #char "\n", context.temp_allocator);
-
-            print("\n");
-            for line in lines {
-                if line.count == 0 do continue;
-                printf("        {}\n", line);
-            }
-            print("\n");
-        }
-
-        print("\n");
+        color_print(
+            .{ .White, "    " },
+            .{ .Blue, tprintf(command_fmt, it.tag.command) },
+            .{ .White, " " },
+            .{ .White, it.tag.description },
+            .{ .White, "\n" },
+        );
     }
 }
 
-#tag Command.{ "init", "Initialize a new project.", "", require_config_file=false }
+show_help_for_command :: (cmd: &Command) {
+    printf("Onyx toolchain version {}\n", Version);
+    printf("\n");
+    printf("Package dependency resolver and synchronizer for Onyx.\n");
+    printf("\n");
+    color_print(
+        .{ .White, "Usage: " },
+        .{ .Blue, "onyx pkg " },
+        .{ .Green, cmd.command },
+        .{ .White, " " },
+        .{ .Yellow, cmd.arguments },
+        .{ .White, "\n" },
+    );
+
+    println(cmd.argument_descriptions);
+}
+
+
+#tag Command.{ "init", "Initialize a new project in the current directory", "", require_config_file=false }
 run_init_command :: (args: [] cstr) {
     if os.file_exists(global_arguments.config_file) {
         error_print("Config file present; project already initialized.\n");
@@ -162,12 +192,13 @@ run_init_command :: (args: [] cstr) {
     read_field("Package version (0.0.1): ", &config.package_version, .{0, 0, 1});
 }
 
-#tag Command.{ "add", "Add a new dependency to the project.", "package-url [version]",
+#tag Command.{ "add", "Add a new dependency to the project", "package-url [version]",
 """
-package-url      Git repository to clone for the package. This can be anything that
-                 git knows how to clone.
-verion           Semantic version number (Major.Minor.Patch). If omitted, the most recent
-                 version is used.
+    package-url      Git repository to clone for the package. This can be anything that
+                     git knows how to clone.
+    
+    verion           Semantic version number (Major.Minor.Patch). If omitted, the most recent
+                     version is used.
 """
 }
 run_add_command :: (args: [] cstr) {
@@ -206,14 +237,14 @@ run_add_command :: (args: [] cstr) {
     }
 }
 
-#tag Command.{ "remove", "Remove a dependency.", "package-or-url",
+#tag Command.{ "remove", "Remove a dependency", "package-or-url",
 """
-package-or-url   Git repository name or package name on disk to remove.
+    package-or-url   Git repository name or package name on disk to remove.
 """
 }
 run_remove_command :: (args: [] cstr) {
     if args.count < 1 {
-        error_print("Expected package name.");
+        error_print("Expected package name.\n");
         return;
     }
 
@@ -229,7 +260,7 @@ run_remove_command :: (args: [] cstr) {
     error_print("Dependency '{}' is not currently used.\n", dep);
 }
 
-#tag Command.{ "show", "Show dependencies and versions.", "" }
+#tag Command.{ "show", "Show dependencies and versions", "" }
 run_show_command :: (args: [] cstr) {
     printf("Package name        : {}\n", config.package_name);
     printf("Package description : {}\n", config.package_description);
@@ -250,8 +281,7 @@ run_show_command :: (args: [] cstr) {
     print("\n");
 }
 
-#tag Command.{ "update", "Update dependencies to newest compatible versions.", "" }
-// @Feature // Add "locked" dependencies that will never update?
+#tag Command.{ "update", "Update dependencies to newest compatible versions", "" }
 run_update_command :: (args: [] cstr) {
     info_print("Info", "Updating dependencies to newest compatible versions.\n");
     for& config.dependencies.entries {
@@ -271,12 +301,13 @@ run_update_command :: (args: [] cstr) {
     }
 }
 
-#tag Command.{ "sync", "Synchronize local dependency folder.", "[--clean]",
+#tag Command.{ "sync", "Synchronize local dependency folder", "[..flags]",
 """
---clean          Remove directories of unneeded dependencies. This is not the default
-                 behavior, as it could break builds.
-
---skip-native    Skips compiling native libraries during synchronization.
+Flags:
+    --clean          Remove directories of unneeded dependencies. This is not the default
+                     behavior, as it could break builds.
+    
+    --skip-native    Skips compiling native libraries during synchronization.
 """
 }
 run_sync_command :: (args: [] cstr) {
@@ -368,12 +399,12 @@ run_sync_command :: (args: [] cstr) {
 
 #tag Command.{ "rebuild", "Rebuild native library for a package", "package-or-url",
 """
-package-or-url   Git repository name or package name on disk to remove.
+    package-or-url   Git repository name or package name on disk to remove.
 """
 }
 run_rebuild_command :: (args: [] cstr)  {
     if args.count < 1 {
-        error_print("Expected package name.");
+        error_print("Expected package name.\n");
         return;
     }
 
@@ -392,7 +423,7 @@ run_rebuild_command :: (args: [] cstr)  {
     }
 }
 
-#tag Command.{ "publish", "Bump version number and create a publishable version of the package", "" }
+#tag Command.{ "publish", "Create a published version of this package", "" }
 run_publish_command :: (args: [] cstr) {
     // @TODO // Better error handling and reporting, as this is a delicate process.
 
@@ -447,7 +478,7 @@ run_publish_command :: (args: [] cstr) {
     }
 }
 
-#tag Command.{ "list-versions", "List all installable versions of a remote package.", "[package-url]", require_config_file=false }
+#tag Command.{ "list-versions", "List all installable versions of a remote package", "[package-url]", require_config_file=false }
 run_list_versions :: (args: [] cstr) {
     if args.count < 1 {
         return;
@@ -467,7 +498,7 @@ run_list_versions :: (args: [] cstr) {
 }
 
 #tag Command.{
-    "migrate", "Migrate an old onyx-pkg.ini to the new onyx-pkg.kdl", "",
+    "migrate", "Migrate an old Onyx package", "",
     require_config_file = false,
 }
 run_migrate_command :: (args: [] cstr) {
@@ -476,12 +507,12 @@ run_migrate_command :: (args: [] cstr) {
 }
 
 #tag Command.{
-    "new", "Create a new project from a template in the current directory.", "(template_name | --list) [directory]",
+    "new", "Create a new project from a template in the current directory", "(template_name | --list) [directory]",
 """
-template_name    Template name to create.
+Arguments:
+    template_name    Template name to create.
 
-directory        Directory in which to place the new package. Defaults to '.'.
-
+    directory        Directory in which to place the new package. Defaults to '.'.
 """,
     require_config_file = false
 }
@@ -603,9 +634,10 @@ run_new_command :: (args: [] cstr) {
 }
 
 #tag Command.{
-    "build", "Builds the project according to the build configuration specified the package file.", "[build_config]",
+    "build", "Builds the package using the build configuration specified the package file", "[build_config]",
     """
-build_config     The name of the configuration to use (defaults to 'default').
+Arguments:
+    build_config     The name of the configuration to use (defaults to 'default').
     """
 }
 run_build_command :: (args: [] cstr) {
@@ -627,7 +659,6 @@ run_build_command :: (args: [] cstr) {
     args: [..] str;
     args << "build";
 
-    for bc.sources do args << it;
     for bc.include {  args << "-I"; args << it; }
     for bc.defines do args << tprintf("-D{}", it);
     for bc.args    do args << it;
@@ -637,6 +668,8 @@ run_build_command :: (args: [] cstr) {
 
     args << "-o";
     args << bc.target;
+
+    for bc.sources do args << it;
 
     p := os.process_spawn("onyx", args);
     r := io.reader_make(&p);

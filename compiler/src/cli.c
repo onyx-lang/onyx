@@ -58,7 +58,7 @@ static const char* top_level_docstring = DOCSTRING_HEADER
     C_LBLUE "    self-upgrade     " C_NORM "Upgrade your toolchain\n";
 
 static const char *build_docstring = DOCSTRING_HEADER
-    C_BOLD "Usage: " C_BLUE "onyx" C_LBLUE " %s " C_NORM C_YELLOW "[..flags] " C_GREEN "files\n" C_NORM
+    C_BOLD "Usage: " C_BLUE "onyx" C_LBLUE " %s " C_NORM C_YELLOW "[..flags] " C_GREEN "files " C_NORM "%s" "\n"
     "\n"
     C_BOLD "Flags:\n" C_NORM
     C_LBLUE "    -o, --output " C_GREY "target_file    " C_NORM "Specify the target file " C_GREY "(default: out.wasm)\n"
@@ -207,7 +207,6 @@ static void cli_determine_action(CompileOptions *options, int *first_sub_arg, in
         return;
     }
 
-    // nocheckin TODO cleanup
     bh_printf(C_RED  "error" C_NORM ": Unknown command: '%s'\n", argv[1]);
     bh_printf(C_GREY " hint: Run 'onyx --help' for valid commands.\n");
     exit(1);
@@ -493,10 +492,19 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         options.use_multi_threading = 1;
     }
 
-    if (options.action != ONYX_COMPILE_ACTION_PRINT_HELP && bh_arr_length(options.files) == 0) {
-        bh_printf(C_RED "error" C_NORM ": No files were provided.\n");
-        options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
+    switch (options.action) {
+        case ONYX_COMPILE_ACTION_CHECK:
+        case ONYX_COMPILE_ACTION_RUN:
+        case ONYX_COMPILE_ACTION_WATCH:
+        case ONYX_COMPILE_ACTION_COMPILE:
+            if (bh_arr_length(options.files) == 0) {
+                bh_printf(C_RED "error" C_NORM ": No files were provided.\n");
+                options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
+            }
+            break;
 
+        default:
+            break;
     }
 
     return options;
@@ -509,16 +517,19 @@ static void compile_opts_free(CompileOptions* opts) {
 
 static void print_subcommand_help(const char *subcommand) {
     if (!strcmp(subcommand, "build") || !strcmp(subcommand, "b")
-        || !strcmp(subcommand, "run") || !strcmp(subcommand, "r")
         || !strcmp(subcommand, "check")
         || !strcmp(subcommand, "watch")) {
-        bh_printf(build_docstring, subcommand);
+        bh_printf(build_docstring, subcommand, "");
+        return;
     }
 
-    else  {
-        bh_printf("Unknown command: '%s'\n", subcommand);
-        bh_printf("Run \"onyx --help\" for valid commands.\n");
-        exit(1);
+    if (!strcmp(subcommand, "run") || !strcmp(subcommand, "r")) {
+        bh_printf(build_docstring, subcommand, "[-- program args]");
+        return;
     }
+
+    bh_printf(C_RED  "error" C_NORM ": Unknown command: '%s'\n", subcommand);
+    bh_printf(C_GREY " hint: Run 'onyx --help' for valid commands.\n");
+    exit(1);
 }
 
