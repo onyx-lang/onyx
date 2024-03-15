@@ -3,6 +3,7 @@
 
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     #define C_NORM    "\e[0m"
+    #define C_BOLD    "\e[1m"
     #define C_RED     "\e[91m"
     #define C_YELLOW  "\e[93m"
     #define C_GREY    "\e[90m"
@@ -26,74 +27,67 @@
 
 #define DOCSTRING_HEADER \
     "\n" \
-    "The toolchain for the " C_BLUE "Onyx" C_NORM " programming language, created by Brendan Hansen.\n" \
+    "The toolchain for the " C_BLUE C_BOLD "Onyx" C_NORM " programming language, created by Brendan Hansen.\n" \
     "Learn more at " C_BLUE "https://onyxlang.io" C_NORM ".\n" \
     "\n"
 
 static const char* top_level_docstring = DOCSTRING_HEADER
-    "Usage: " C_BLUE "onyx" C_LBLUE " <command> " C_YELLOW " [..flags] " C_GREEN "[..args]\n" C_NORM
+    C_BOLD "Usage: " C_BLUE "onyx" C_LBLUE " <command> " C_NORM C_YELLOW "[..flags] " C_GREEN "[..args]\n" C_NORM
     "\n"
-    "Commands:\n"
-    C_LBLUE "    help           " C_NORM "Shows this help message\n"
-    C_LBLUE "    version        " C_NORM "Prints version information\n"
+    C_BOLD "Commands:\n" C_NORM
+    C_LBLUE "    help             " C_NORM "Shows this help message\n"
+    C_LBLUE "    version          " C_NORM "Prints version information\n"
     "\n"
-    C_LBLUE "    build          " C_NORM "Compiles an Onyx program into an executable " C_GREY "(onyx b)" C_NORM "\n"
+    C_LBLUE "    build " C_GREY "files      " C_NORM "Compiles an Onyx program into an executable " C_GREY "(onyx b)" C_NORM "\n"
 #ifdef ONYX_RUNTIME_LIBRARY
-    C_LBLUE "    run            " C_NORM "Compiles and runs an Onyx program " C_GREY "(onyx r)" C_NORM "\n"
+    C_LBLUE "    run " C_GREY "files        " C_NORM "Compiles and runs an Onyx program " C_GREY "(onyx r)" C_NORM "\n"
 #endif
-    C_LBLUE "    check          " C_NORM "Checks syntax and types of a program\n"
+    C_LBLUE "    check " C_GREY "files      " C_NORM "Checks syntax and types of a program\n"
 #ifdef _BH_LINUX
-    C_LBLUE "    watch          " C_NORM "Continuously rebuilds a program on file changes\n"
+    C_LBLUE "    watch            " C_NORM "Continuously rebuilds a program on file changes\n"
 #endif
 #ifdef ONYX_RUNTIME_LIBRARY
     "\n"
-    C_LBLUE "    package " C_GREY "cmd    " C_NORM "Package manager " C_GREY "(onyx pkg cmd)" C_NORM "\n"
-    C_LBLUE "    add            " C_NORM "Add a package to dependency list " C_GREY "(onyx a)" C_NORM "\n"
-    C_LBLUE "    remove         " C_NORM "Remove a package from dependency list " C_GREY "(onyx rm)" C_NORM "\n"
-    C_LBLUE "    sync           " C_NORM "Synchronize installed packages\n"
+    C_LBLUE "    package " C_GREY "cmd      " C_NORM "Package manager " C_GREY "(onyx pkg cmd)" C_NORM "\n"
+    C_LBLUE "    add " C_GREY "package      " C_NORM "Add a package to dependency list " C_GREY "(onyx a)" C_NORM "\n"
+    C_LBLUE "    remove " C_GREY "package   " C_NORM "Remove a package from dependency list " C_GREY "(onyx rm)" C_NORM "\n"
+    C_LBLUE "    sync             " C_NORM "Synchronize installed packages\n"
 #endif
     "\n"
-    C_LBLUE "    self-upgrade   " C_NORM "Upgrade your toolchain\n";
+    C_LBLUE "    self-upgrade     " C_NORM "Upgrade your toolchain\n";
 
 static const char *build_docstring = DOCSTRING_HEADER
-    "Usage:\n"
-    "\tonyx %s <input files> [-o target_file] OPTIONS\n"
+    C_BOLD "Usage: " C_BLUE "onyx" C_LBLUE " %s " C_NORM C_YELLOW "[..flags] " C_GREEN "files\n" C_NORM
     "\n"
-    "Required:\n"
-    "\t<input files>           One or more Onyx files to include in the program.\n"
+    C_BOLD "Flags:\n" C_NORM
+    C_LBLUE "    -o, --output " C_GREY "target_file    " C_NORM "Specify the target file " C_GREY "(default: out.wasm)\n"
+    C_LBLUE "    -r, --runtime " C_GREY "runtime       " C_NORM "Specifies the runtime " C_GREY "(onyx, wasi, js, custom)\n"
+    C_LBLUE "    -I, --include " C_GREY "dir           " C_NORM "Include a directory in the search path\n"
     "\n"
-    "Options:\n"
-    "\t-o <target_file>        Specify the target file (default: out.wasm).\n"
-    "\t   --output <target_file>\n"
-    "\t-I <dir>                Include a directory in the search path.\n"
-    "\t--runtime, -r <runtime> Specifies the runtime. Can be: onyx, wasi, js, custom.\n"
-    "\t                        (default: onyx)\n"
-    "\t--verbose, -V           Verbose output.\n"
-    "\t           -VV          Very verbose output.\n"
-    "\t           -VVV         Very very verbose output (to be used by compiler developers).\n"
-    "\t--multi-threaded        Enables multi-threading for this compilation.\n"
-    "\t                        Automatically enabled for \"onyx\" runtime.\n"
-    "\t--doc <doc_file>        Generates an O-DOC file, a.k.a an Onyx documentation file. Used by onyx-doc-gen.\n"
-    "\t--tag                   Generates a C-Tag file.\n"
-    "\t--syminfo <target_file> (DEPRECATED) Generates a symbol resolution information file. Used by onyx-lsp.\n"
-    "\t--lspinfo <target_file> Generates an LSP information file. Used by onyx-lsp.\n"
-    "\t--stack-trace           Enable dynamic stack trace.\n"
-    "\t--no-core               Disable automatically including \"core/module\".\n"
-    "\t--no-stale-code         Disables use of `#allow_stale_code` directive\n"
-    "\t--no-type-info          Disables generating type information\n"
-    "\t--generate-method-info  Populate method information in type information structures.\n"
-    "\t                        Can drastically increase binary size.\n"
-    "\t--generate-foreign-info Generate information for foreign blocks. Rarely needed, so disabled by default.\n"
-    "\t--wasm-mvp              Use only WebAssembly MVP features.\n"
-    "\t--feature <feature>     Enable an experimental language feature.\n"
+    C_LBLUE "    --debug                     " C_NORM "Output a debugable build\n"
+    C_LBLUE "    --feature " C_GREY "feature           " C_NORM "Enable an experimental language feature\n"
+    C_LBLUE "    --multi-threaded            " C_NORM "Enables multi-threading for this compilation\n"
+    C_LBLUE "    --stack-trace               " C_NORM "Enable dynamic stack trace\n"
+    C_LBLUE "    --wasm-mvp                  " C_NORM "Use only WebAssembly MVP features\n"
     "\n"
-    "Developer options:\n"
-    "\t--no-colors               Disables colors in the error message.\n"
-    "\t--no-file-contents        Disables '#file_contents' for security.\n"
-    "\t--error-format (v1|v2)    Changes the output error format.\n"
-    "\t--show-all-errors         Print all errors (can result in many consequencial errors from a single error)\n"
-    "\t--print-function-mappings Prints a mapping from WASM function index to source location.\n"
-    "\t--print-static-if-results Prints the conditional result of each #if statement. Useful for debugging.\n"
+    C_LBLUE "    --no-core                   " C_NORM "Disable automatically including \"core/module\"\n"
+    C_LBLUE "    --no-type-info              " C_NORM "Disables generating type information\n"
+    C_LBLUE "    --generate-method-info      " C_NORM "Populate method information in type information structures\n"
+    C_LBLUE "    --generate-foreign-info     " C_NORM "Generate information for foreign blocks\n"
+    C_LBLUE "    --no-stale-code             " C_NORM "Disables use of " C_YELLOW "#allow_stale_code" C_NORM " directive\n"
+    "\n"
+    C_LBLUE "    --doc " C_GREY "doc_file              " C_NORM "Generate a .odoc file, Onyx's documentation format used by " C_YELLOW "onyx-doc-gen\n"
+    C_LBLUE "    --tag                       " C_NORM "Generate a C-Tag file\n"
+    C_LBLUE "    --lspinfo " C_GREY "target_file       " C_NORM "Generate an LSP information file\n"
+    "\n"
+    C_LBLUE "    -V, --verbose               " C_NORM "Verbose output\n"
+    C_LBLUE "    --no-colors                 " C_NORM "Disables colors in the error message\n"
+    C_LBLUE "    --error-format " C_GREY "(v1|v2)      " C_NORM "Changes the output error format\n"
+    C_LBLUE "    --show-all-errors           " C_NORM "Print all errors\n"
+    C_LBLUE "    --print-function-mappings   " C_NORM "Prints a mapping from WASM function index to source location\n"
+    C_LBLUE "    --print-static-if-results   " C_NORM "Prints the conditional result of every " C_YELLOW "#if" C_NORM " statement\n"
+    "\n"
+    C_LBLUE "    --no-file-contents          " C_NORM "Disables " C_YELLOW "#file_contents" C_NORM " for security\n"
     "\n";
 
 static b32 is_flag(char *s) {
@@ -106,6 +100,8 @@ static void cli_determine_action(CompileOptions *options, int *first_sub_arg, in
         options->action = ONYX_COMPILE_ACTION_PRINT_HELP;
         return;
     }
+
+    options->help_subcommand = argc > 1 ? argv[1] : NULL;
 
     if (!strcmp(argv[1], "help")) {
         options->action = ONYX_COMPILE_ACTION_PRINT_HELP;
@@ -147,6 +143,43 @@ static void cli_determine_action(CompileOptions *options, int *first_sub_arg, in
         return;
     }
 
+    if (!strcmp(argv[1], "add") || !strcmp(argv[1], "a")) {
+        argv[1] = "add";
+
+        options->action = ONYX_COMPILE_ACTION_RUN;
+        options->passthrough_argument_count = argc - 1;
+        options->passthrough_argument_data  = &argv[1];
+        options->generate_method_info = 1; // The package manager needs this to be enabled.
+        *first_sub_arg = argc;
+
+        bh_arr_push(options->files, bh_aprintf(options->allocator, "%s/tools/onyx-pkg.onyx", options->core_installation));
+        return;
+    }
+
+    if (!strcmp(argv[1], "remove") || !strcmp(argv[1], "rm")) {
+        argv[1] = "remove";
+
+        options->action = ONYX_COMPILE_ACTION_RUN;
+        options->passthrough_argument_count = argc - 1;
+        options->passthrough_argument_data  = &argv[1];
+        options->generate_method_info = 1; // The package manager needs this to be enabled.
+        *first_sub_arg = argc;
+
+        bh_arr_push(options->files, bh_aprintf(options->allocator, "%s/tools/onyx-pkg.onyx", options->core_installation));
+        return;
+    }
+
+    if (!strcmp(argv[1], "sync")) {
+        options->action = ONYX_COMPILE_ACTION_RUN;
+        options->passthrough_argument_count = argc - 1;
+        options->passthrough_argument_data  = &argv[1];
+        options->generate_method_info = 1; // The package manager needs this to be enabled.
+        *first_sub_arg = argc;
+
+        bh_arr_push(options->files, bh_aprintf(options->allocator, "%s/tools/onyx-pkg.onyx", options->core_installation));
+        return;
+    }
+
     #ifdef ONYX_RUNTIME_LIBRARY
     if (!strcmp(argv[1], "run") || !strcmp(argv[1], "r")) {
         options->action = ONYX_COMPILE_ACTION_RUN;
@@ -174,8 +207,8 @@ static void cli_determine_action(CompileOptions *options, int *first_sub_arg, in
     }
 
     // nocheckin TODO cleanup
-    bh_printf(C_RED  "error" C_NORM ": Unknown subcommand: '%s'\n", argv[1]);
-    bh_printf(C_GREY " hint: Run 'onyx --help' for valid subcommands.\n");
+    bh_printf(C_RED  "error" C_NORM ": Unknown command: '%s'\n", argv[1]);
+    bh_printf(C_GREY " hint: Run 'onyx --help' for valid commands.\n");
     exit(1);
 }
 
@@ -250,7 +283,7 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
                 options->enable_optional_semicolons = 1;
             }
         }
-        else if (!strcmp(argv[i], "-I")) {
+        else if (!strcmp(argv[i], "-I") || !strcmp(argv[i], "--include")) {
             bh_arr_push(options->included_folders, argv[++i]);
         }
         else if (!strncmp(argv[i], "-D", 2)) {
@@ -316,7 +349,8 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
 #endif
         else {
             bh_printf(C_RED "error" C_NORM ": Unknown flag '%s'.\n", argv[i]);
-            exit(1);
+            options->action = ONYX_COMPILE_ACTION_PRINT_HELP;
+            return;
         }
     }
     
@@ -406,7 +440,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     options.core_installation = getenv("ONYX_PATH");
 
     if (getenv("ONYX_ERROR_FORMAT")) {
-        options.error_format = getenv("ONYX_EROLORROR_FORMAT");
+        options.error_format = getenv("ONYX_ERROR_FORMAT");
     }
     #endif
 
@@ -443,6 +477,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         case ONYX_COMPILE_ACTION_COMPILE:
         case ONYX_COMPILE_ACTION_RUN_WASM:
             cli_parse_compilation_options(&options, arg_parse_start, argc, argv);
+
             break;
 
         case ONYX_COMPILE_ACTION_PRINT_HELP:
@@ -457,6 +492,12 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         options.use_multi_threading = 1;
     }
 
+    if (options.action != ONYX_COMPILE_ACTION_PRINT_HELP && bh_arr_length(options.files) == 0) {
+        bh_printf(C_RED "error" C_NORM ": No files were provided.\n");
+        options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
+
+    }
+
     return options;
 }
 
@@ -466,16 +507,16 @@ static void compile_opts_free(CompileOptions* opts) {
 }
 
 static void print_subcommand_help(const char *subcommand) {
-    if (!strcmp(subcommand, "build")
-        || !strcmp(subcommand, "run")
+    if (!strcmp(subcommand, "build") || !strcmp(subcommand, "b")
+        || !strcmp(subcommand, "run") || !strcmp(subcommand, "r")
         || !strcmp(subcommand, "check")
         || !strcmp(subcommand, "watch")) {
         bh_printf(build_docstring, subcommand);
     }
 
     else  {
-        bh_printf("Unknown subcommand: '%s'\n", subcommand);
-        bh_printf("Run \"onyx --help\" for valid subcommands.\n");
+        bh_printf("Unknown command: '%s'\n", subcommand);
+        bh_printf("Run \"onyx --help\" for valid commands.\n");
         exit(1);
     }
 }
