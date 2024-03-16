@@ -841,7 +841,43 @@ static void onyx_watch(CompileOptions *compile_opts) {
 
 #endif
 
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+static void perform_self_upgrade(CompileOptions *opts, char *version) {
+    // TODO: cleanup    
+    
+    int curl_pid;
+    bh_file upgrade_script;
 
+    char file_path[512];
+    bh_snprintf(file_path, 511, "%s/upgrade.sh", opts->core_installation);
+
+    switch (curl_pid = fork()) {
+        case -1: exit(1);
+        case 0:
+            if (bh_file_create(&upgrade_script, file_path)) {
+                exit(1);
+            }
+
+            dup2(upgrade_script.fd, STDOUT_FILENO);
+            bh_file_close(&upgrade_script);
+
+            execlp("curl", "curl", "https://get.onyxlang.io", "-sSfL", NULL);
+            exit(1);
+            break;
+    }
+
+    int status;
+    waitpid(curl_pid, &status, 0);
+
+    if (status == 0) {
+        execlp("sh", "sh", file_path, version, STRINGIFY(ONYX_RUNTIME_LIBRARY_MAPPED), NULL);
+    }
+
+    printf("error: Failed to download upgrade script.\n");
+    printf(" hint: Ensure you have an active internet connection and 'curl' installed.\n");
+    exit(1);
+}
+#endif
 
 
 int main(int argc, char *argv[]) {
@@ -897,6 +933,12 @@ int main(int argc, char *argv[]) {
             if (!onyx_run_wasm_file(context.options->target_file)) {
                 compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
             }
+            break;
+        #endif
+
+        #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+        case ONYX_COMPILE_ACTION_SELF_UPGRADE:
+            perform_self_upgrade(&compile_opts, compile_opts.upgrade_version);
             break;
         #endif
 

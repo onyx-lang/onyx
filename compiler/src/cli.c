@@ -55,7 +55,9 @@ static const char* top_level_docstring = DOCSTRING_HEADER
     C_LBLUE "    sync             " C_NORM "Synchronize installed packages\n"
 #endif
     "\n"
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     C_LBLUE "    self-upgrade     " C_NORM "Upgrade your toolchain\n";
+#endif
 
 static const char *build_docstring = DOCSTRING_HEADER
     C_BOLD "Usage: " C_BLUE "onyx" C_LBLUE " %s " C_NORM C_YELLOW "[..flags] " C_GREEN "files " C_NORM "%s" "\n"
@@ -90,6 +92,13 @@ static const char *build_docstring = DOCSTRING_HEADER
     "\n"
     C_LBLUE "    --no-file-contents          " C_NORM "Disables " C_YELLOW "#file_contents" C_NORM " for security\n"
     "\n";
+
+static const char *self_upgrade_docstring = DOCSTRING_HEADER
+    C_BOLD "Usage: " C_BLUE "onyx" C_LBLUE " self-upgrade " C_GREEN "[version]\n" C_NORM
+    "\n"
+    C_BOLD "Arguments:\n" C_NORM
+    C_GREEN "    version      " C_NORM "Specify which version to install. Defaults to latest\n";
+
 
 static b32 is_flag(char *s) {
     if (!s) return 0;
@@ -190,12 +199,21 @@ static void cli_determine_action(CompileOptions *options, int *first_sub_arg, in
     #endif
 
     #ifdef _BH_LINUX
-    else if (!strcmp(argv[1], "watch")) {
+    if (!strcmp(argv[1], "watch")) {
         options->action = ONYX_COMPILE_ACTION_WATCH;
         *first_sub_arg = 2;
         return;
     }
     #endif
+
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    if (!strcmp(argv[1], "self-upgrade")) {
+        options->action = ONYX_COMPILE_ACTION_SELF_UPGRADE;
+        *first_sub_arg = 2;
+        return;
+    }
+    #endif
+
 
     char *script_filename = bh_aprintf(options->allocator, "%s/tools/%s.wasm", options->core_installation, argv[1]);
     if (bh_file_exists(script_filename)) {
@@ -430,6 +448,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .running_perf = 0,
 
         .error_format = "v1",
+
+        .upgrade_version = "",
     };
 
     bh_arr_new(alloc, options.files, 2);
@@ -477,7 +497,16 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         case ONYX_COMPILE_ACTION_COMPILE:
         case ONYX_COMPILE_ACTION_RUN_WASM:
             cli_parse_compilation_options(&options, arg_parse_start, argc, argv);
+            break;
 
+        case ONYX_COMPILE_ACTION_SELF_UPGRADE:
+            if (arg_parse_start < argc && !is_flag(argv[arg_parse_start])) {
+                options.upgrade_version = argv[arg_parse_start];
+            }
+            if (arg_parse_start < argc && !strcmp(argv[arg_parse_start], "--help")) {
+                options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
+                options.help_subcommand = argv[1];
+            }
             break;
 
         case ONYX_COMPILE_ACTION_PRINT_HELP:
@@ -517,14 +546,18 @@ static void compile_opts_free(CompileOptions* opts) {
 
 static void print_subcommand_help(const char *subcommand) {
     if (!strcmp(subcommand, "build") || !strcmp(subcommand, "b")
-        || !strcmp(subcommand, "check")
-        || !strcmp(subcommand, "watch")) {
+        || !strcmp(subcommand, "check") || !strcmp(subcommand, "watch")) {
         bh_printf(build_docstring, subcommand, "");
         return;
     }
 
     if (!strcmp(subcommand, "run") || !strcmp(subcommand, "r")) {
         bh_printf(build_docstring, subcommand, "[-- program args]");
+        return;
+    }
+
+    if (!strcmp(subcommand, "self-upgrade")) {
+        bh_printf(self_upgrade_docstring);
         return;
     }
 
