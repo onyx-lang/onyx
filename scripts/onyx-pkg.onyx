@@ -186,6 +186,8 @@ run_init_command :: (args: [] cstr) {
     read_field("Package url: ", &config.package_url, "");
     read_field("Package author: ", &config.package_author, "");
     read_field("Package version (0.0.1): ", &config.package_version, .{0, 0, 1});
+
+    store_config_file();
 }
 
 #tag Command.{ "add", "Add a new dependency to the project", "package-url [version]",
