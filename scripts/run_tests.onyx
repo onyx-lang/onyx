@@ -129,7 +129,7 @@ main :: (args) => {
             cmd->args(.["build", it.source_file]);
         } else {
             printf("[{}]  Running test {}...\n", context.thread_id, it.source_file);
-            cmd->args(.["run", it.source_file, "--generate-method-info"]);
+            cmd->args(.["run", "--generate-method-info", it.source_file]);
         }
 
         output := cmd->output();

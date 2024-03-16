@@ -253,7 +253,7 @@ onyx_install() {
     printf "The Onyx Programming Language\n\n"
   fi
 
-  onyx_download $1 && onyx_link
+  onyx_download "$1" "$2" && onyx_link
   onyx_reset
 }
 
@@ -336,13 +336,20 @@ onyx_download() {
   # identify platform based on uname output
   initArch || return 1
   initOS || return 1
-  initRuntime || return 1
+
+  if [ ! -z "$2" ]; then
+      if [ "$2" = "ovmwasm" ]; then RUNTIME="ovm";
+      else                          RUNTIME="$2";
+      fi
+  else
+      initRuntime || return 1;
+  fi
 
   # assemble expected release artifact name
   BINARY="onyx-${OS}-${RUNTIME}-${ARCH}.tar.gz"
 
   onyx_install_status "downloading" "onyx-$OS-$RUNTIME-$ARCH"
-  if [ $# -eq 0 ]; then
+  if [ -z "$1" ]; then
     # The version was not provided, assume latest
     onyx_download_json LATEST_RELEASE "$RELEASES_URL/latest" || return 1
     ONYX_RELEASE_TAG=$(echo "${LATEST_RELEASE}" | tr -s '\n' ' ' | sed 's/.*"tag_name":"//' | sed 's/".*//')
@@ -447,4 +454,4 @@ else
   INSTALL_DIRECTORY="${ONYX_DIR}"
 fi
 
-onyx_install $1 # $2
+onyx_install "$1" "$2"

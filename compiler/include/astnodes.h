@@ -1796,7 +1796,8 @@ enum CompileAction {
     ONYX_COMPILE_ACTION_WATCH,
     ONYX_COMPILE_ACTION_DOCUMENT,
     ONYX_COMPILE_ACTION_PRINT_HELP,
-    ONYX_COMPILE_ACTION_PRINT_VERSION
+    ONYX_COMPILE_ACTION_PRINT_VERSION,
+    ONYX_COMPILE_ACTION_SELF_UPGRADE,
 };
 
 
@@ -1891,6 +1892,10 @@ struct CompileOptions {
 
     i32    passthrough_argument_count;
     char** passthrough_argument_data;
+
+    char *core_installation;
+
+    char *upgrade_version;
 };
 
 typedef struct Context Context;
