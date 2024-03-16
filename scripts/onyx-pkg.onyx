@@ -399,7 +399,7 @@ run_sync_command :: (args: [] cstr) {
 
 #tag Command.{ "rebuild", "Rebuild native library for a package", "package-or-url",
 """
-    package-or-url   Git repository name or package name on disk to remove.
+    package-or-url   Git repository name or package name on disk to rebuild.
 """
 }
 run_rebuild_command :: (args: [] cstr)  {
