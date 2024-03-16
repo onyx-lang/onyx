@@ -53,12 +53,6 @@ main :: (args: [] cstr) {
     command   := args[0] |> string.as_str();
     arguments := args[1..args.count];
 
-    if command == "init" {
-        run_init_command(arguments);
-        store_config_file();
-        return;
-    }
-
     loaded_config_file := false;
     defer if loaded_config_file do store_config_file();
 
@@ -144,8 +138,10 @@ show_help_for_command :: (cmd: &Command) {
         .{ .Green, cmd.command },
         .{ .White, " " },
         .{ .Yellow, cmd.arguments },
-        .{ .White, "\n" },
+        .{ .White, "\n\n" },
     );
+
+    printf("Description: {}\n", cmd.description);
 
     println(cmd.argument_descriptions);
 }
