@@ -56,8 +56,9 @@ static const char* top_level_docstring = DOCSTRING_HEADER
 #endif
     "\n"
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
-    C_LBLUE "    self-upgrade     " C_NORM "Upgrade your toolchain\n";
+    C_LBLUE "    self-upgrade     " C_NORM "Upgrade your toolchain\n"
 #endif
+    "\n";
 
 static const char *build_docstring = DOCSTRING_HEADER
     C_BOLD "Usage: " C_BLUE "onyx" C_LBLUE " %s " C_NORM C_YELLOW "[..flags] " C_GREEN "files " C_NORM "%s" "\n"
