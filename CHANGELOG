@@ -12,6 +12,11 @@ Additions:
 Removals:
 
 Changes:
+- Revamped CLI
+    - Shorthand commands (r for run, b for build, etc.)
+    - Improved appearance
+    - Better help pages
+    - Note: flags must now appear before all files
 
 Bugfixes:
 - Fixed compiler crash when trying to iterate over something that is not iterable.
