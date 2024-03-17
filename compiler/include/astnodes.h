@@ -648,7 +648,7 @@ struct AstTyped { AstTyped_base; };
 // Expression Nodes
 struct AstNamedValue    { AstTyped_base; AstTyped* value; };
 struct AstStrLit        { AstTyped_base; u64 data_id; u64 length; b32 is_cstr: 1; };
-struct AstLocal         { AstTyped_base; };
+struct AstLocal         { AstTyped_base; b32 auto_dispose : 1; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstSizeOf        { AstTyped_base; AstType *so_ast_type; Type *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_ast_type; Type *ao_type; u64 alignment; };
@@ -2012,6 +2012,7 @@ extern AstFunction *builtin_run_init_procedures;
 extern AstFunction *builtin_closure_block_allocate;
 extern bh_arr(AstFunction *) init_procedures;
 extern AstOverloadedFunction *builtin_implicit_bool_cast;
+extern AstOverloadedFunction *builtin_dispose_used_local;
 
 
 typedef struct BuiltinSymbol {
@@ -2121,6 +2122,7 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(AstFunction* pp, bh_ar
 b32 potentially_convert_function_to_polyproc(AstFunction *func);
 AstPolyCallType* convert_call_to_polycall(AstCall* call);
 
+void insert_auto_dispose_call(bh_allocator a, AstLocal *local);
 
 typedef struct OverloadReturnTypeCheck {
     Type *expected_type;

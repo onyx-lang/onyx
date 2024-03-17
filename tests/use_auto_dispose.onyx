@@ -1,0 +1,27 @@
+use core {*}
+
+Foo :: struct {
+    data: str;
+}
+
+#inject Foo {
+    make :: (s: str) => Foo.{s}
+
+    dispose :: (f: &Foo) {
+        logf(.Info, "Destroying foo... {}", f.data);
+    }
+}
+
+#overload
+__dispose_used_local :: macro (f: &Foo) {
+    Foo.dispose(f);
+}
+
+main :: () {
+    // 'used' locals automatically have the following code inserted.
+    //     defer __dispose_used_local(&local_name);
+    use f := Foo.make("testing");
+
+    println("In main!");
+}
+

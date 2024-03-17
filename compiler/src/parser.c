@@ -1912,8 +1912,24 @@ static AstNode* parse_statement(OnyxParser* parser) {
         case Token_Type_Keyword_Use: {
             needs_semicolon = 0;
 
-            OnyxToken *use_token = expect_token(parser, Token_Type_Keyword_Use);
-            parse_import_statement(parser, use_token);
+            if (next_tokens_are(parser, 3, Token_Type_Keyword_Use, Token_Type_Symbol, ':')) {
+                OnyxToken *use_token = expect_token(parser, Token_Type_Keyword_Use);
+
+                AstLocal *out = NULL;
+                i32 res = parse_possible_symbol_declaration(parser, (AstNode **) &out);
+                if (res == 2) {
+                    onyx_report_error(use_token->pos, Error_Critical, "You cannot 'use' a binding in this way. Remove the 'use'.");
+                    parser->hit_unexpected_token = 1;
+                    break;
+                }
+
+                out->auto_dispose = 1;
+                retval = (AstNode *) out;
+
+            } else {
+                OnyxToken *use_token = expect_token(parser, Token_Type_Keyword_Use);
+                parse_import_statement(parser, use_token);
+            }
 
             break;
         }

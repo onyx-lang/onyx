@@ -498,7 +498,7 @@ __initialize_data_segments :: () -> void ---
 __run_init_procedures :: () -> void ---
 
 #doc """
-    This overloaded procedure allow you to define an implicit rule for how to convert any value
+    This overloaded procedure allows you to define an implicit rule for how to convert any value
     into a boolean. A default is provided for ALL pointer types and array types, but this can
     be used for structures or distinct types.
 """
@@ -511,6 +511,11 @@ __implicit_bool_cast :: #match -> bool {}
 __closure_block_allocate :: (size: i32) -> rawptr {
     return context.closure_allocate(size);
 }
+
+
+#doc """
+"""
+__dispose_used_local :: #match -> void {}
 
 
 #doc """
