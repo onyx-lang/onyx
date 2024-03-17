@@ -13,9 +13,7 @@ Foo :: struct {
 }
 
 #overload
-__dispose_used_local :: macro (f: &Foo) {
-    Foo.dispose(f);
-}
+__dispose_used_local :: Foo.dispose
 
 main :: () {
     // 'used' locals automatically have the following code inserted.
