@@ -1679,14 +1679,7 @@ static i32 parse_possible_compound_symbol_declaration(OnyxParser* parser, AstNod
 
     expect_token(parser, ':');
 
-    if (parser->curr->type == '=') {
-        AstBinaryOp* assignment = make_binary_op(parser->allocator, Binary_Op_Assign, (AstTyped *) local_compound, NULL);
-        assignment->token = expect_token(parser, '=');
-        assignment->right = parse_compound_expression(parser, 0);
-
-        prev_local->next = (AstNode *) assignment;
-
-    } else {
+    if (parser->curr->type != '=') {
         AstType* type_for_all = NULL;
 
         // See comment in parse_possible_symbol_declaration about "#auto"
@@ -1697,6 +1690,14 @@ static i32 parse_possible_compound_symbol_declaration(OnyxParser* parser, AstNod
         forll (AstLocal, local, first_local, next) {
             local->type_node = type_for_all;
         }
+    }
+
+    if (parser->curr->type == '=') {
+        AstBinaryOp* assignment = make_binary_op(parser->allocator, Binary_Op_Assign, (AstTyped *) local_compound, NULL);
+        assignment->token = expect_token(parser, '=');
+        assignment->right = parse_compound_expression(parser, 0);
+
+        prev_local->next = (AstNode *) assignment;
     }
 
     *ret = (AstNode *) first_local;

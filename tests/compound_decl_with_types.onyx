@@ -1,0 +1,15 @@
+use core {*}
+
+main :: () {
+    x, y: u32 = 0, 1;
+    println(x);
+    println(y);
+
+    a, b: str = two_strs();
+    println(a);
+    println(b);
+}
+
+two_strs :: () -> (str, str) {
+    return "str1", "str2";
+}
