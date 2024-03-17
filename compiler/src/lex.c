@@ -320,7 +320,7 @@ whitespace_skipped:
         INCREMENT_CURR_TOKEN(tokenizer);
         INCREMENT_CURR_TOKEN(tokenizer);
         u32 len = 3;
-        while (char_is_num(*(tokenizer->curr + 1)) || charset_contains("abcdefABCDEF", *(tokenizer->curr + 1))) {
+        while (char_is_num(*(tokenizer->curr + 1)) || charset_contains("abcdefABCDEF_", *(tokenizer->curr + 1))) {
             len++;
             INCREMENT_CURR_TOKEN(tokenizer);
         }
@@ -338,15 +338,20 @@ whitespace_skipped:
         tk.type = Token_Type_Literal_Integer;
 
         b32 hit_decimal = 0;
+        b32 hit_exponent = 0;
         if (*tokenizer->curr == '.') hit_decimal = 1;
 
         u32 len = 1;
         while (char_is_num(*(tokenizer->curr + 1))
-            || (!hit_decimal && *(tokenizer->curr + 1) == '.' && *(tokenizer->curr + 2) != '.')) {
+            || (*(tokenizer->curr + 1) == '_')
+            || (!hit_exponent && *(tokenizer->curr + 1) == 'e')
+            || (!hit_decimal && !hit_exponent && *(tokenizer->curr + 1) == '.' && *(tokenizer->curr + 2) != '.')
+            || (hit_exponent && *(tokenizer->curr + 1) == '-')) {
             len++;
             INCREMENT_CURR_TOKEN(tokenizer);
 
-            if (*tokenizer->curr == '.') hit_decimal = 1;
+            if (*tokenizer->curr == '.') hit_decimal  = 1;
+            if (*tokenizer->curr == 'e') hit_exponent = 1;
         }
 
         if (*(tokenizer->curr + 1) == 'f') {
@@ -356,7 +361,7 @@ whitespace_skipped:
             INCREMENT_CURR_TOKEN(tokenizer);
         }
 
-        if (hit_decimal) tk.type = Token_Type_Literal_Float;
+        if (hit_decimal || hit_exponent) tk.type = Token_Type_Literal_Float;
 
         tk.length = len;
 

@@ -259,28 +259,122 @@ static void flush_stored_tags(OnyxParser *parser, bh_arr(AstTyped *) *out_arr) {
 }
 
 
+static u64 parse_int_token(OnyxToken *int_token) {
+    u64 value = 0;
+
+    token_toggle_end(int_token);
+
+    char *buf = int_token->text;
+    i32     i = 0;
+    i64  base = 10;
+
+    if (buf[0] == '0' && buf[1] == 'x') {
+        base = 16;
+        i = 2;
+    }
+
+    while (i < int_token->length) {
+        char c = buf[i++];
+
+        if ('0' <= c && c <= '9') { value *= base; value += (c - '0'); }
+        if ('A' <= c && c <= 'Z') { value *= base; value += ((c - 'A') + 10); }
+        if ('a' <= c && c <= 'z') { value *= base; value += ((c - 'a') + 10); }
+    }
+
+    token_toggle_end(int_token);
+    return value;
+}
+
+static f64 parse_float_sign(char **s) {
+    if (**s == '-') {
+        *s += 1;
+        return -1;
+    }
+
+    if (**s == '+') {
+        *s += 1;
+        return 1;
+    }
+
+    return 1;
+}
+
+static f64 parse_float_digit(char **s, i32 *digit_count) {
+    f64 value = 0;
+    while (**s) {
+        char c = **s;
+        if ('0' <= c && c <= '9') {
+            value = value * 10 + (c - '0');
+            *s += 1;
+            *digit_count += 1;
+
+        }
+        else if (c == '_') { *s += 1; continue; }
+        else { break; }
+    }
+
+    return value;
+}
+
+static f64 parse_float_token(OnyxToken *float_token) {
+    token_toggle_end(float_token);
+
+    char *s = float_token->text;
+    i32 digit_count = 0;
+
+    f64 sign  = parse_float_sign(&s);
+    f64 value = parse_float_digit(&s, &digit_count);
+
+    if (*s == '.') {
+        s++;
+        digit_count = 0;
+        f64 fraction = parse_float_digit(&s, &digit_count);
+        while (digit_count > 0) {
+            digit_count -= 1;
+            fraction /= 10;
+        }
+        value += fraction;
+    }
+
+    value *= sign;
+
+    if (*s == 'e') {
+        s++;
+
+        digit_count = 0;
+        f64 exponent_sign = parse_float_sign(&s);
+        f64 exponent      = parse_float_digit(&s, &digit_count);
+
+        if (exponent_sign > 0) {
+            while (exponent > 0) {
+                value *= 10;
+                exponent -= 1;
+            }
+        } else {
+            while (exponent > 0) {
+                value /= 10;
+                exponent -= 1;
+            }
+        }
+    }
+
+    token_toggle_end(float_token);
+    return value;
+}
+
 // TODO: Make parsing numeric literals not rely on the C standard libary.
 static AstNumLit* parse_int_literal(OnyxParser* parser) {
     AstNumLit* int_node = make_node(AstNumLit, Ast_Kind_NumLit);
     int_node->token = expect_token(parser, Token_Type_Literal_Integer);
     int_node->flags |= Ast_Flag_Comptime;
-    int_node->value.l = 0ll;
 
-    token_toggle_end(int_node->token);
-
-    char* first_invalid = NULL;
-    i64 value = strtoll(int_node->token->text, &first_invalid, 0);
-
-    int_node->value.l = value;
-
+    int_node->value.l = parse_int_token(int_node->token);
     int_node->type_node = (AstType *) &basic_type_int_unsized;
 
     // NOTE: Hex literals are unsigned.
     if (int_node->token->length >= 2 && int_node->token->text[1] == 'x') {
         int_node->was_hex_literal = 1;
     }
-
-    token_toggle_end(int_node->token);
     return int_node;
 }
 
@@ -288,21 +382,17 @@ static AstNumLit* parse_float_literal(OnyxParser* parser) {
     AstNumLit* float_node = make_node(AstNumLit, Ast_Kind_NumLit);
     float_node->token = expect_token(parser, Token_Type_Literal_Float);
     float_node->flags |= Ast_Flag_Comptime;
-    float_node->value.d = 0.0;
 
     AstType* type = (AstType *) &basic_type_float_unsized;
-    token_toggle_end(float_node->token);
+
+    float_node->value.d = parse_float_token(float_node->token);
 
     if (float_node->token->text[float_node->token->length - 1] == 'f') {
         type = (AstType *) &basic_type_f32;
-        float_node->value.f = strtof(float_node->token->text, NULL);
-    } else {
-        float_node->value.d = strtod(float_node->token->text, NULL);
+        float_node->value.f = float_node->value.d;
     }
 
     float_node->type_node = type;
-
-    token_toggle_end(float_node->token);
     return float_node;
 }
 
