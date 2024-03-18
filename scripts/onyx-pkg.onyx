@@ -1441,6 +1441,8 @@ read_old_config :: (path: str) -> ? Config {
 
         return c;
     }
+
+    return .{};
 }
 
 IniConfig :: struct {
@@ -1563,6 +1565,8 @@ store_old_config_file :: () -> bool {
 
         return encoding.ini.write_ini_file(&writer, config);
     }
+
+    return false;
 }
 
 
