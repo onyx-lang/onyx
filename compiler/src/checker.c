@@ -1101,9 +1101,8 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
         ERROR(binop->token->pos, "Assignment not valid in expression.");
 
     if (!is_lval((AstNode *) binop->left))
-        ERROR_(binop->left->token->pos,
-                "Cannot assign to '%b'.",
-                binop->left->token->text, binop->left->token->length);
+        ERROR(binop->token->pos,
+                "Left-hand side is not assignable.");
 
     if ((binop->left->flags & Ast_Flag_Const) != 0 && binop->left->type != NULL)
         ERROR_(binop->token->pos,
@@ -2054,7 +2053,11 @@ CheckStatus check_address_of(AstAddressOf** paof) {
             return Check_Yield_Macro;
         }
 
-        ERROR_(aof->token->pos, "Cannot take the address of something that is not an l-value. %s", onyx_ast_node_kind_string(expr->kind));
+        if (expr->kind == Ast_Kind_Param) {
+            ERROR(aof->token->pos, "Cannot take the address of a parameter. Store it in a local variable first to take its address.");
+        } else {
+            ERROR_(aof->token->pos, "Cannot take the address of something that is not an l-value. %s", onyx_ast_node_kind_string(expr->kind));
+        }
     }
 
     expr->flags |= Ast_Flag_Address_Taken;

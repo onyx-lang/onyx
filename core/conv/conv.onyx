@@ -148,7 +148,8 @@ str_to_f64 :: (s: &str) -> f64 {
     prefixed with '0b' and hexadecimal numbers are prefixed with
     '0x'.
 """
-i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
+i64_to_str :: (num: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
+    n := num;
     is_neg := false;
     if n < 0 {
         is_neg = true;
@@ -217,7 +218,8 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
     Converts an unsigned number into a string using the buffer provided.
     Behaves like i64_to_str.
 """
-u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
+u64_to_str :: (num: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
+    n := num;
     c: [&] u8 = &buf[buf.count - 1];
     len := 0;
 
@@ -276,7 +278,8 @@ u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
     This is better than what used to be, but still relies on converting the integer
     part of the float to an integer, which could overflow.
 """
-f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
+f64_to_str :: (num: f64, buf: [] u8, digits_after_decimal := 4) -> str {
+    f := num;
     if math.is_nan(f) {
         return format(buf, "NaN");
     }

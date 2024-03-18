@@ -141,7 +141,8 @@ SnailNum :: struct {
         if new_right do new_right.parent = parent;
     }
 
-    number_to_left :: (n: &SnailNum) -> &u32 {
+    number_to_left :: (num: &SnailNum) -> &u32 {
+        n := num;
         while n.parent && n.parent.left == n {
             n = n.parent;
         }
@@ -159,7 +160,8 @@ SnailNum :: struct {
         return &n.right_val;
     }
 
-    number_to_right :: (n: &SnailNum) -> &u32 {
+    number_to_right :: (num: &SnailNum) -> &u32 {
+        n := num;
         while n.parent && n.parent.right == n {
             n = n.parent;
         }

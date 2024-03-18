@@ -28,7 +28,8 @@ SQRT_2 :: 1.414213562f;
 // implementations of these functions.
 //
 
-sin :: (t: f32) -> f32 {
+sin :: (x: f32) -> f32 {
+    t := x;
     while t >=  PI do t -= TAU;
     while t <= -PI do t += TAU;
 
@@ -49,7 +50,8 @@ sin :: (t: f32) -> f32 {
     return res;
 }
 
-cos :: (t: f32) -> f32 {
+cos :: (x: f32) -> f32 {
+    t := x;
     while t >=  PI do t -= TAU;
     while t <= -PI do t += TAU;
 
@@ -151,9 +153,10 @@ pow :: #match {
         if p == 0    do return 1;
 
         a: T = 1;
-        while p > 0 {
-            if p % 2 == 1 do a *= base;
-            p = p >> 1;
+        p_ := p;
+        while p_ > 0 {
+            if p_ % 2 == 1 do a *= base;
+            p_ = p_ >> 1;
             base *= base;
         }
 
@@ -353,11 +356,13 @@ choose :: (n: $T, k: T) -> T {
 }
 
 gcd :: (a: $T, b: T) -> T {
-    if a < 0 do a = -a;
-    if b < 0 do b = -b;
-
     if b == 0 do return a;
-    return gcd(b, a % b);
+
+    x := a;
+    y := b;
+    if x < 0 do x = -x;
+    if x < 0 do y = -y;
+    return gcd(y, x % y);
 }
 
 lcm :: (a: $T, b: T) -> T {

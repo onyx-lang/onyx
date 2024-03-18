@@ -7,7 +7,8 @@ ty0: i32
 tx1: i32
 ty1: i32
 
-simulate :: (dx, dy: i32) -> (i32, bool) {
+simulate :: (dx_, dy_: i32) -> (i32, bool) {
+    dx, dy := dx_, dy_;
     x, y := 0, 0;
     maxy := 0;
     did_enter := false;

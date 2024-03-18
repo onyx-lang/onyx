@@ -23,10 +23,11 @@ use runtime.platform { __output_string }
 __output_uint :: (n: u64) {
     buf: [128] u8;
     i := 127;
-    while n > 0 && i >= 0 {
-        buf[i] = ~~('0' + n % 10);
+    x := n;
+    while x > 0 && i >= 0 {
+        buf[i] = ~~('0' + x % 10);
         i -= 1;
-        n /= 10;
+        x /= 10;
     }
 
     __output_string(buf[i .. 128]);

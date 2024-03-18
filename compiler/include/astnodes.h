@@ -2154,7 +2154,6 @@ static inline b32 is_lval(AstNode* node) {
     node = strip_aliases(node);
 
     if    ((node->kind == Ast_Kind_Local)
-        || (node->kind == Ast_Kind_Param)
         || (node->kind == Ast_Kind_Global)
         || (node->kind == Ast_Kind_Dereference)
         || (node->kind == Ast_Kind_Subscript)
