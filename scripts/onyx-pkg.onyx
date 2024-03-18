@@ -698,7 +698,7 @@ run_build_command :: (args: [] cstr) {
 }
 
 
-install_package :: (pack: Package, downgrade_if_necessary := false, skip_native_compilation := false) -> (bool, installed_folder: str) {
+install_package :: (pack: Package, downgrade_if_necessary := false, skip_native_compilation := false) -> (bool, str) {
     //
     // Currently this only supports Git-based packages.
     repo := pack.source.Git ?? [] {

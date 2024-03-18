@@ -130,7 +130,7 @@ path_basename :: (path: str) -> str {
 #doc """
     Splits the last path element off.
 """
-path_split :: (path: str) -> (parent: str, child: str) {
+path_split :: (path: str) -> (str, str) {
     index := string.last_index_of(path, PATH_SEP);
     return path[0 .. index], path[index+1 .. path.length];
 }

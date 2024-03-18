@@ -563,7 +563,7 @@ skip_whitespace :: (use reader: &Reader) {
     }
 }
 
-skip_bytes :: (use reader: &Reader, bytes: u32) -> (skipped: i32, err: Error) {
+skip_bytes :: (use reader: &Reader, bytes: u32) -> (i32, Error) {
     if bytes == 0 do return 0, .None;
     if reader_empty(reader) do return 0, .EOF;
 

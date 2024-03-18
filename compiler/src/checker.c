@@ -139,12 +139,16 @@ static inline void fill_in_type(AstTyped* node) {
 
 CheckStatus check_return(AstReturn* retnode) {
     Type ** expected_return_type;
+    bh_arr(AstLocal *) named_return_values;
 
     if (retnode->count >= (u32) bh_arr_length(context.checker.expected_return_type_stack)) {
         ERROR_(retnode->token->pos, "Too many repeated 'return's here. Expected a maximum of %d.",
                 bh_arr_length(context.checker.expected_return_type_stack));
     }
+
     expected_return_type = context.checker.expected_return_type_stack[bh_arr_length(context.checker.expected_return_type_stack) - retnode->count - 1];
+    named_return_values  = context.checker.named_return_values_stack[bh_arr_length(context.checker.named_return_values_stack) - retnode->count - 1];
+
 
     if (retnode->expr) {
         CHECK(expression, &retnode->expr);
@@ -182,9 +186,30 @@ CheckStatus check_return(AstReturn* retnode) {
         }
 
         if ((*expected_return_type) != &basic_types[Basic_Kind_Void]) {
-            ERROR_(retnode->token->pos,
-                "Returning from non-void function without a value. Expected a value of type '%s'.",
-                type_get_name(*expected_return_type));
+            if (!named_return_values) {
+                ERROR_(retnode->token->pos,
+                    "Returning from non-void function without a value. Expected a value of type '%s'.",
+                    type_get_name(*expected_return_type));
+
+            } else {
+
+                if (bh_arr_length(named_return_values) == 1) {
+                    retnode->expr = (AstTyped *) named_return_values[0];
+
+                } else {
+                    AstCompound *implicit_compound = onyx_ast_node_new(context.ast_alloc, sizeof(AstCompound), Ast_Kind_Compound);
+                    implicit_compound->token = retnode->token;
+
+                    bh_arr_new(context.ast_alloc, implicit_compound->exprs, bh_arr_length(named_return_values));
+                    bh_arr_each(AstLocal *, named_return, named_return_values) {
+                        bh_arr_push(implicit_compound->exprs, (AstTyped *) *named_return);
+                    }
+
+                    retnode->expr = (AstTyped *) implicit_compound;
+                }
+
+                return Check_Yield_Macro;
+            }
         }
     }
 
@@ -1978,6 +2003,7 @@ CheckStatus check_do_block(AstDoBlock** pdoblock) {
     fill_in_type((AstTyped *) doblock);
 
     bh_arr_push(context.checker.expected_return_type_stack, &doblock->type);
+    bh_arr_push(context.checker.named_return_values_stack, NULL);
 
     doblock->block->rules = Block_Rule_Do_Block;
     CHECK(block, doblock->block);
@@ -1985,6 +2011,7 @@ CheckStatus check_do_block(AstDoBlock** pdoblock) {
     if (doblock->type == &type_auto_return) doblock->type = &basic_types[Basic_Kind_Void];
 
     bh_arr_pop(context.checker.expected_return_type_stack);
+    bh_arr_pop(context.checker.named_return_values_stack);
 
     doblock->flags |= Ast_Flag_Has_Been_Checked;
     return Check_Success;
@@ -2970,7 +2997,9 @@ CheckStatus check_function(AstFunction* func) {
         YIELD(func->token->pos, "Waiting for procedure header to pass type-checking");
 
     bh_arr_clear(context.checker.expected_return_type_stack);
+    bh_arr_clear(context.checker.named_return_values_stack);
     bh_arr_push(context.checker.expected_return_type_stack, &func->type->Function.return_type);
+    bh_arr_push(context.checker.named_return_values_stack, func->named_return_locals);
 
     context.checker.inside_for_iterator = 0;
     if (context.checker.for_node_stack) bh_arr_clear(context.checker.for_node_stack);

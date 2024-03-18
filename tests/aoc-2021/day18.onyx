@@ -54,13 +54,13 @@ SnailNum :: struct {
         return new_root;
     }
 
-    reduce :: (use n: &SnailNum) -> (reduced_something: bool) {
+    reduce :: (use n: &SnailNum) -> bool {
         if r, _ := n->reduce_explodes(); r do return true;
         if r    := n->reduce_splits();   r do return true;
         return false;
     }
 
-    reduce_explodes :: (use n: &SnailNum, depth := 0) -> (reduced_something: bool, zero_node: bool) {
+    reduce_explodes :: (use n: &SnailNum, depth := 0) -> (bool, bool) {
         if depth <= 3 {
             if left != null {
                 if did_reduce, zero_node := left->reduce_explodes(depth + 1); zero_node {
@@ -96,7 +96,7 @@ SnailNum :: struct {
         return true, true;
     }
 
-    reduce_splits :: (use n: &SnailNum) -> (reduced_something: bool) {
+    reduce_splits :: (use n: &SnailNum) -> (bool) {
         if left {
             if left->reduce_splits() {
                 return true;

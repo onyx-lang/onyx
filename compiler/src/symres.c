@@ -1201,6 +1201,18 @@ SymresStatus symres_function_header(AstFunction* func) {
         SYMRES(local, &func->stack_trace_local);
     }
 
+    if (func->named_return_locals) {
+        bh_arr_each(AstLocal *, named_return, func->named_return_locals) {
+            SYMRES(local, named_return);
+        }
+
+        AstNode **prev = &func->body->body;
+        bh_arr_each(AstLocal *, named_return, func->named_return_locals) {
+            (*named_return)->next = *prev;
+            *prev = (AstNode *) *named_return;
+        }
+    }
+
     scope_leave();
 
     return Symres_Success;

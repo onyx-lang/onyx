@@ -1393,6 +1393,7 @@ struct AstFunction {
 
     bh_arr(AstParam) params;
     AstType* return_type;
+    bh_arr(AstLocal *) named_return_locals;
 
     AstBlock *body;
 
@@ -1833,6 +1834,7 @@ typedef struct CheckerData {
     AstCall __op_maybe_overloaded;
     Entity *current_entity;
     bh_arr(Type **) expected_return_type_stack;
+    bh_arr(bh_arr(AstLocal *)) named_return_values_stack;
 } CheckerData;
 
 typedef struct ContextCaches {

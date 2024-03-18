@@ -2096,39 +2096,61 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
     }
 }
 
-static AstType* parse_compound_type(OnyxParser* parser) {
-    // CLEANUP this is little weird having this here because it means that this parses:
-    //
-    //      foo :: (x: (something_here: i32)) -> void ---
-    //
-    if (next_tokens_are(parser, 2, Token_Type_Symbol, ':')) {
-        consume_tokens(parser, 2);
+static AstType* parse_return_type(OnyxParser* parser, bh_arr(AstLocal *) *pimplicit_locals) {
+    b32 values_are_named = 0;
+    OnyxToken *last_named_value = NULL;
+
+    if (!consume_token_if_next(parser, '(')) {
+        return parse_type(parser);
     }
 
-    AstType* first = parse_type(parser);
+    if (next_tokens_are(parser, 2, Token_Type_Symbol, ':')) {
+        values_are_named = 1;
+        last_named_value = expect_token(parser, Token_Type_Symbol);
+        consume_tokens(parser, 1);
+    }
 
-    if (parser->curr->type == ',') {
-        AstCompoundType* ctype = make_node(AstCompoundType, Ast_Kind_Type_Compound);
-        ctype->token = parser->curr;
+    AstType* return_type = parse_type(parser);
 
-        bh_arr_new(global_heap_allocator, ctype->types, 2);
-        bh_arr_push(ctype->types, first);
+    bh_arr(AstLocal *) implicit_locals = NULL;
+    if (pimplicit_locals && values_are_named) {
+        implicit_locals = *pimplicit_locals;
+        if (!implicit_locals) bh_arr_new(global_heap_allocator, implicit_locals, 2);
 
-        while (consume_token_if_next(parser, ',')) {
-            if (parser->hit_unexpected_token) return (AstType *) ctype;
+        bh_arr_push(implicit_locals, make_local(parser->allocator, last_named_value, return_type));
+    }
 
-            if (next_tokens_are(parser, 2, Token_Type_Symbol, ':')) {
-                consume_tokens(parser, 2);
-            }
+    if (parser->curr->type != ',') {
+        expect_token(parser, ')');
+        if (pimplicit_locals) *pimplicit_locals = implicit_locals;
+        return return_type;
+    }
 
-            bh_arr_push(ctype->types, parse_type(parser));
+    AstCompoundType* ctype = make_node(AstCompoundType, Ast_Kind_Type_Compound);
+    ctype->token = parser->curr;
+
+    bh_arr_new(global_heap_allocator, ctype->types, 2);
+    bh_arr_push(ctype->types, return_type);
+
+    while (consume_token_if_next(parser, ',')) {
+        if (parser->hit_unexpected_token) return (AstType *) ctype;
+
+        if (values_are_named) {
+            last_named_value = expect_token(parser, Token_Type_Symbol);
+            expect_token(parser, ':');
         }
 
-        return (AstType *) ctype;
+        return_type = parse_type(parser);
+        bh_arr_push(ctype->types, return_type);
 
-    } else {
-        return first;
+        if (pimplicit_locals && values_are_named) {
+            bh_arr_push(implicit_locals, make_local(parser->allocator, last_named_value, return_type));
+        }
     }
+
+    expect_token(parser, ')');
+    if (pimplicit_locals) *pimplicit_locals = implicit_locals;
+    return (AstType *) ctype;
 }
 
 static AstType* parse_function_type(OnyxParser* parser, OnyxToken* proc_token) {
@@ -2150,9 +2172,8 @@ static AstType* parse_function_type(OnyxParser* parser, OnyxToken* proc_token) {
             expect_token(parser, ',');
     }
 
-    AstType* return_type = (AstType *) &basic_type_void;
-    if (consume_token_if_next(parser, Token_Type_Right_Arrow))
-        return_type = parse_type(parser);
+    expect_token(parser, Token_Type_Right_Arrow);
+    AstType* return_type = parse_return_type(parser, NULL);
 
     i64 param_count = bh_arr_length(params);
     AstFunctionType* new = onyx_ast_node_new(parser->allocator,
@@ -2297,17 +2318,7 @@ static AstType* parse_type(OnyxParser* parser) {
 
             case '(': {
                 OnyxToken* matching = find_matching_paren(parser->curr);
-
-                // :LinearTokenDependent
-                if ((matching + 1)->type == Token_Type_Right_Arrow) {
-                    *next_insertion = parse_function_type(parser, parser->curr);
-
-                } else {
-                    expect_token(parser, '(');
-                    *next_insertion = parse_compound_type(parser);
-                    expect_token(parser, ')');
-                }
-
+                *next_insertion = parse_function_type(parser, parser->curr);
                 next_insertion = NULL;
                 break;
             }
@@ -3118,7 +3129,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
         if (parse_possible_directive(parser, "auto")) {
             func_def->return_type = (AstType *) &basic_type_auto_return;
         } else {
-            func_def->return_type = parse_type(parser);
+            func_def->return_type = parse_return_type(parser, &func_def->named_return_locals);
         }
     }
 
