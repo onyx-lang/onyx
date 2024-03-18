@@ -42,12 +42,15 @@ __futex_wait :: (addr: rawptr, expected: i32, timeout: i32) -> i32 {
     use core.intrinsics.atomics {__atomic_wait}
     if context.thread_id != 0 {
         __atomic_wait(cast(&i32) addr, expected, ~~timeout);
+        return 0;
     }
+    return 1;
 }
 
 __futex_wake :: (addr: rawptr, maximum: i32) -> i32 {
     use core.intrinsics.atomics {__atomic_notify}
     __atomic_notify(addr, maximum);
+    return 1;
 }
 
 PollDescription :: struct {
