@@ -515,7 +515,9 @@ __closure_block_allocate :: (size: i32) -> rawptr {
 
 #doc """
 """
-__dispose_used_local :: #match -> void {}
+__dispose_used_local :: #match -> void {
+    #order 10000 delete
+}
 
 
 #doc """
