@@ -112,6 +112,7 @@ use core
             case .Some as v do return v;
             case #default {
                 assert(false, "Unwrapping empty Optional.");
+                return .{};
             }
         }
     }
@@ -126,6 +127,7 @@ use core
             case .Some as &v do return v;
             case #default {
                 assert(false, "Unwrapping empty Optional.");
+                return .{};
             }
         }
     }
@@ -140,6 +142,7 @@ use core
             case .Some as v do return v;
             case #default {
                 assert(false, message);
+                return .{};
             }
         }
     }
@@ -154,6 +157,7 @@ use core
             case .Some as &v do return v;
             case #default {
                 assert(false, message);
+                return .{};
             }
         }
     }

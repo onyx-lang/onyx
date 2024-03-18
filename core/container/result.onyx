@@ -92,6 +92,7 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
             case .Ok as v do return v;
             case #default {
                 assert(false, msg);
+                return .{};
             }
         }
     }

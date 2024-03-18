@@ -204,7 +204,7 @@ __net_sock_close :: (s: SocketData) -> void {
 }
 
 __net_resolve :: (host: str, port: u16, out_addrs: [] SocketAddress) -> i32 {
-
+    return 0;
 }
 
 

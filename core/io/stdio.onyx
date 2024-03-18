@@ -100,7 +100,7 @@ printf :: (format: str, va: ..any) {
 #if #defined(runtime.platform.__output_error) {
     //
     // Prints to standard error, if available.
-    eprintf :: (format: str, va: ..any) -> str {
+    eprintf :: (format: str, va: ..any) {
         buffer: [1024] u8;
         runtime.platform.__output_error(
             conv.format_va(buffer, format, va, .{

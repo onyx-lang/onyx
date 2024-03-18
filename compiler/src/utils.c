@@ -800,7 +800,7 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
                 bh_arr_push(doblock->named_return_locals, cloned);
 
                 cloned->next = doblock->block->body;
-                doblock->block->body = (AstBlock *) cloned;
+                doblock->block->body = (AstNode *) cloned;
             }
         }
 

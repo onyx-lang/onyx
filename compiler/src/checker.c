@@ -228,12 +228,14 @@ CheckStatus check_if(AstIfWhile* ifnode) {
             if (ifnode->true_stmt != NULL) {
                 CHECK(statement, (AstNode **) &ifnode->true_stmt);
                 ifnode->true_stmt->rules = Block_Rule_Macro;
+                ifnode->flags |= ifnode->true_stmt->flags & Ast_Flag_Block_Returns;
             }
 
         } else {
             if (ifnode->false_stmt != NULL) {
                 CHECK(statement, (AstNode **) &ifnode->false_stmt);
                 ifnode->false_stmt->rules = Block_Rule_Macro;
+                ifnode->flags |= ifnode->false_stmt->flags & Ast_Flag_Block_Returns;
             }
         }
 
@@ -250,6 +252,11 @@ CheckStatus check_if(AstIfWhile* ifnode) {
 
         if (ifnode->true_stmt)  CHECK(statement, (AstNode **) &ifnode->true_stmt);
         if (ifnode->false_stmt) CHECK(statement, (AstNode **) &ifnode->false_stmt);
+
+        if (ifnode->true_stmt && ifnode->false_stmt) {
+            if ((ifnode->true_stmt->flags & Ast_Flag_Block_Returns) && (ifnode->false_stmt->flags & Ast_Flag_Block_Returns))
+                ifnode->flags |= Ast_Flag_Block_Returns;
+        }
     }
 
     return Check_Success;
@@ -570,6 +577,8 @@ CheckStatus check_switch(AstSwitch* switchnode) {
         switchnode->case_block->statement_idx = 0;
     }
 
+    b32 all_cases_return = 1;
+
     fori (i, switchnode->yield_return_index, bh_arr_length(switchnode->cases)) {
         AstSwitchCase *sc = switchnode->cases[i];
 
@@ -718,6 +727,8 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
         } else {
             CHECK(block, sc->block);
+
+            all_cases_return = all_cases_return && (sc->block->flags & Ast_Flag_Block_Returns);
         }
 
         switchnode->yield_return_index += 1;
@@ -738,6 +749,8 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
         } else {
             CHECK(block, switchnode->default_case);
+
+            all_cases_return = all_cases_return && (switchnode->default_case->flags & Ast_Flag_Block_Returns);
         }
 
     } else if (switchnode->switch_kind == Switch_Kind_Union) {
@@ -769,6 +782,10 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
             ERROR_(switchnode->token->pos, "Unhandled union variants: '%s'", buf);
         }
+    }
+
+    if (all_cases_return) {
+        switchnode->flags |= Ast_Flag_Block_Returns;
     }
 
     return Check_Success;
@@ -2966,15 +2983,22 @@ CheckStatus check_block(AstBlock* block) {
     // This used to use statement_chain, but since block optimize which statements need to be rechecked,
     // it has to be its own thing.
 
+    AstNode *last = block->body;
     AstNode** start = &block->body;
     fori (i, 0, block->statement_idx) {
+        last = *start;
         start = &(*start)->next;
     }
 
     while (*start) {
+        if ((*start)->kind == Ast_Kind_Return) {
+            block->flags |= Ast_Flag_Block_Returns;
+        }
+
         CheckStatus cs = check_statement(start);
         switch (cs) {
             case Check_Success:
+                last = *start;
                 start = &(*start)->next;
                 block->statement_idx++;
                 break;
@@ -2985,7 +3009,10 @@ CheckStatus check_block(AstBlock* block) {
             default:
                 return cs;
         }
+    }
 
+    if (last && last->flags & Ast_Flag_Block_Returns) {
+        block->flags |= Ast_Flag_Block_Returns;
     }
 
     return Check_Success;
@@ -3016,6 +3043,17 @@ CheckStatus check_function(AstFunction* func) {
 
         if (status == Check_Success) {
             status = check_block(func->body);
+        }
+
+        if (status == Check_Success &&
+            !(func->body->flags & Ast_Flag_Block_Returns) &&
+            *bh_arr_last(context.checker.expected_return_type_stack) != &basic_types[Basic_Kind_Void] &&
+            *bh_arr_last(context.checker.expected_return_type_stack) != &type_auto_return &&
+            !func->is_intrinsic &&
+            !func->is_foreign
+        ) {
+            status = Check_Error;
+            onyx_report_error(func->token->pos, Error_Critical, "Not all code paths return a value.");
         }
 
         if (status == Check_Error && func->generated_from && context.cycle_detected == 0)

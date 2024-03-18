@@ -256,6 +256,8 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
             return .Unsupported_Type;
         }
     }
+
+    return .None;
 }
 
 

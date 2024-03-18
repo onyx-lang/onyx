@@ -70,7 +70,7 @@ get_ptr :: (use b: &Bucket_Array($T), idx: i32) -> &T {
     return &buckets[bucket_index].data[elem_index];
 }
 
-push :: (use b: &Bucket_Array($T), elem: T) -> bool {
+push :: (use b: &Bucket_Array($T), elem: T) {
     last_bucket := &buckets[buckets.count - 1];
     if last_bucket.count < elements_per_bucket {
         last_bucket.data[last_bucket.count] = elem;
