@@ -556,6 +556,14 @@ AstNode* ast_clone(bh_allocator a, void* n) {
                 bh_arr_push(df->params, new_param);
             }
 
+            df->named_return_locals = NULL;
+            if (sf->named_return_locals) {
+                bh_arr_new(context.ast_alloc, df->named_return_locals, bh_arr_length(sf->named_return_locals));
+                bh_arr_each(AstLocal *, named_return, sf->named_return_locals) {
+                    bh_arr_push(df->named_return_locals, (AstLocal *) ast_clone(a, (AstNode *) *named_return));
+                }
+            }
+
             if (sf->constraints.constraints) {
                 memset(&df->constraints, 0, sizeof(ConstraintContext));
                 bh_arr_new(context.ast_alloc, df->constraints.constraints, bh_arr_length(sf->constraints.constraints));

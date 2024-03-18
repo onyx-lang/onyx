@@ -803,6 +803,7 @@ struct AstDoBlock {
     AstTyped_base;
 
     AstBlock* block;
+    bh_arr(AstLocal *) named_return_locals;
 };
 struct AstZeroValue {
     AstTyped_base;

@@ -2003,7 +2003,7 @@ CheckStatus check_do_block(AstDoBlock** pdoblock) {
     fill_in_type((AstTyped *) doblock);
 
     bh_arr_push(context.checker.expected_return_type_stack, &doblock->type);
-    bh_arr_push(context.checker.named_return_values_stack, NULL);
+    bh_arr_push(context.checker.named_return_values_stack, doblock->named_return_locals);
 
     doblock->block->rules = Block_Rule_Do_Block;
     CHECK(block, doblock->block);

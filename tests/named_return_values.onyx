@@ -14,7 +14,7 @@ g :: (a: i32) -> (f: f32) {
     return
 }
 
-sum :: (a: [] $T) -> (total: T) {
+sum :: macro (a: [] $T) -> (total: T) {
     for a do total += it
     return
 }
