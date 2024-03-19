@@ -130,6 +130,8 @@ CSV_Column :: struct {
 
             csv.entries << out;
         }
+
+        return true;
     }
 
     #doc """

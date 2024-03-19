@@ -79,6 +79,8 @@ wait_for_connection :: (m: &MemDebugState) -> Result(void, io.Error) {
     m.writer = .{ Some = io.writer_make(m.socket->unwrap_ptr(), 0) };
 
     memdebug_send_message(m, .{ Start = .{ version = VERSION, heap_base_address = cast(u32) __heap_start } });
+
+    return .{ Ok = .{} };
 }
 
 enable_in_scope :: macro (a: Allocator, port := DEFAULT_PORT) {
