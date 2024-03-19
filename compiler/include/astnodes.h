@@ -1452,6 +1452,8 @@ struct AstFunction {
     b32 is_foreign         : 1;
     b32 is_foreign_dyncall : 1;
     b32 is_intrinsic       : 1;
+
+    b32 named_return_locals_added : 1;
 };
 
 struct AstCaptureBlock {
