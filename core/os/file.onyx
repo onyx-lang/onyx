@@ -75,6 +75,12 @@ get_contents_from_file :: (file: &File) -> str {
     return data[0 .. size];
 }
 
+from_fd :: (fd: FileData) -> (file: os.File) {
+    file.data = fd;
+    file.vtable = &fs.__file_stream_vtable;
+    return;
+}
+
 open :: (path: str, mode := OpenMode.Read) -> Result(File, os.FileError) {
     file := File.{
         stream = .{ vtable = null },
