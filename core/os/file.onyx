@@ -94,6 +94,11 @@ close :: (file: &File) {
     file.stream.vtable = null;
 }
 
+#overload
+__dispose_used_local :: macro (file: &File) {
+    #this_package.close(file);
+}
+
 get_contents :: #match {
     get_contents_from_file,
 
@@ -102,25 +107,6 @@ get_contents :: #match {
         defer close(&file);
 
         return get_contents(&file);
-    }
-}
-
-with_file :: (path: str, mode := OpenMode.Read) -> Iterator(&File) {
-    file_stream: ? File;
-    if fs := open(path, mode); fs {
-        file_stream = fs->ok();
-    }
-
-    if file_stream {
-        return iter.single(
-            file_stream->unwrap() |> alloc.on_heap(),
-            file => {
-                close(file);
-                cfree(file);
-            });
-
-    } else {
-        return iter.empty(&File);
     }
 }
 

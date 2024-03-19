@@ -38,8 +38,9 @@ Player :: struct {
 main :: () {
     p1, p2: Player;
 
-    for os.with_file("./tests/aoc-2021/input/day21.txt") {
-        r := io.reader_make(it);
+    {
+        use file := os.open("./tests/aoc-2021/input/day21.txt")->unwrap();
+        use r := io.reader_make(&file);
 
         l1 := r->read_line(consume_newline=true);
         l2 := r->read_line(consume_newline=true);
@@ -192,8 +193,9 @@ calc_wins :: (p1, p2: Player, player_1_turn := true) -> (u64, u64) {
 main :: () {
     p1, p2: Player;
 
-    for os.with_file("./tests/aoc-2021/input/day21.txt") {
-        r := io.reader_make(it);
+    {
+        use file := os.open("./tests/aoc-2021/input/day21.txt")->unwrap();
+        use r := io.reader_make(&file);
 
         l1 := r->read_line(consume_newline=true);
         l2 := r->read_line(consume_newline=true);

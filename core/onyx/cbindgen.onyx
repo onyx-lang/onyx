@@ -91,32 +91,27 @@ Binding_Config :: struct {
 }
 
 generate_c_binding :: (use binding_config: Binding_Config) -> bool {
-    wrote := false;
-    for file in os.with_file(output_file, .Write) {
-        writer := io.writer_make(file);
-        defer io.writer_free(&writer);
+    use file := os.open(output_file, .Write)?;
+    use writer := io.writer_make(&file);
 
-        fb := runtime.info.get_foreign_block(foreign_block);
+    fb := runtime.info.get_foreign_block(foreign_block);
 
-        write_file_introduction(&writer, preamble, fb.module_name);
+    write_file_introduction(&writer, preamble, fb.module_name);
 
-        for fb.funcs {
-            for impl in custom_implementations {
-                if impl.name == it.name {
-                    io.write(&writer, impl.impl);
-                    io.write(&writer, "\n");
-                    continue continue;
-                }
+    for fb.funcs {
+        for impl in custom_implementations {
+            if impl.name == it.name {
+                io.write(&writer, impl.impl);
+                io.write(&writer, "\n");
+                continue continue;
             }
-
-            write_function_body(&writer, it, cast_map, name_map);
         }
 
-        write_library_block(&writer, fb.funcs);
-        wrote = true;
+        write_function_body(&writer, it, cast_map, name_map);
     }
 
-    return wrote;
+    write_library_block(&writer, fb.funcs);
+    return true;
 }
 
 //

@@ -23,50 +23,49 @@ apply_fold :: (dots: &[] Point, axis_name: str, axis_value: i32) {
 }
 
 main :: (args) => {
-    for file in os.with_file("./tests/aoc-2021/input/day13.txt") {
-        reader := io.reader_make(file);
+    use file := os.open("./tests/aoc-2021/input/day13.txt")->unwrap();
+    use reader := io.reader_make(&file);
 
-        dots: [..] Point;
-        while true {
-            line := io.read_line(&reader, consume_newline=true, inplace=true);
-            string.strip_whitespace(&line);
-            if line.count == 0 do break;
+    dots: [..] Point;
+    while true {
+        line := io.read_line(&reader, consume_newline=true, inplace=true);
+        string.strip_whitespace(&line);
+        if line.count == 0 do break;
 
-            parts := string.split_iter(line, #char ",")
-                    |> iter.map(x => cast(i32) conv.parse_int(x));
-            
-            x, _ := iter.take_one(parts);
-            y, _ := iter.take_one(parts);
+        parts := string.split_iter(line, #char ",")
+                |> iter.map(x => cast(i32) conv.parse_int(x));
+        
+        x, _ := iter.take_one(parts);
+        y, _ := iter.take_one(parts);
 
-            dots << .{x,y};
+        dots << .{x,y};
+    }
+
+    part_1_answer := -1;
+    while !io.reader_empty(&reader) {
+        line := io.read_line(&reader, consume_newline=true, inplace=true);
+
+        string.read_until(&line, #char " ", 1);
+        string.advance(&line, 1);
+
+        axis_name := string.read_until(&line, #char "=");
+        string.advance(&line, 1);
+        axis_value := cast(i32) conv.str_to_i64(line);
+
+        apply_fold(~~ &dots, axis_name, axis_value);
+        if part_1_answer < 0 {
+            part_1_answer = dots.count;
+        }
+    }
+
+    printf("Part 1: {}\n", part_1_answer);
+
+    printf("Part 2:\n");
+    for y in 7 {
+        for x in 50 {
+            print("X" if array.contains(dots, .{x, y}) else " ");
         }
 
-        part_1_answer := -1;
-        while !io.reader_empty(&reader) {
-            line := io.read_line(&reader, consume_newline=true, inplace=true);
-
-            string.read_until(&line, #char " ", 1);
-            string.advance(&line, 1);
-
-            axis_name := string.read_until(&line, #char "=");
-            string.advance(&line, 1);
-            axis_value := cast(i32) conv.str_to_i64(line);
-
-            apply_fold(~~ &dots, axis_name, axis_value);
-            if part_1_answer < 0 {
-                part_1_answer = dots.count;
-            }
-        }
-
-        printf("Part 1: {}\n", part_1_answer);
-
-        printf("Part 2:\n");
-        for y in 7 {
-            for x in 50 {
-                print("X" if array.contains(dots, .{x, y}) else " ");
-            }
-
-            print("\n");
-        }
+        print("\n");
     }
 }
