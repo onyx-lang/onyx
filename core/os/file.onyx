@@ -27,6 +27,8 @@ OpenMode :: enum {
     Append  :: 0x03;
 }
 
+FileData :: fs.FileData;
+
 File :: struct {
     use stream : io.Stream;
     data   : fs.FileData;
@@ -73,6 +75,12 @@ get_contents_from_file :: (file: &File) -> str {
     io.stream_seek(file, prev_loc, .Start);
 
     return data[0 .. size];
+}
+
+from_fd :: (fd: fs.FileData) -> (file: os.File) {
+    file.data = fd;
+    file.vtable = &fs.__file_stream_vtable;
+    return;
 }
 
 open :: (path: str, mode := OpenMode.Read) -> Result(File, os.FileError) {

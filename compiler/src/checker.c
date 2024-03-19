@@ -149,6 +149,7 @@ CheckStatus check_return(AstReturn* retnode) {
     expected_return_type = context.checker.expected_return_type_stack[bh_arr_length(context.checker.expected_return_type_stack) - retnode->count - 1];
     named_return_values  = context.checker.named_return_values_stack[bh_arr_length(context.checker.named_return_values_stack) - retnode->count - 1];
 
+retry_return_expr_check:
 
     if (retnode->expr) {
         CHECK(expression, &retnode->expr);
@@ -192,7 +193,6 @@ CheckStatus check_return(AstReturn* retnode) {
                     type_get_name(*expected_return_type));
 
             } else {
-
                 if (bh_arr_length(named_return_values) == 1) {
                     retnode->expr = (AstTyped *) named_return_values[0];
 
@@ -208,7 +208,7 @@ CheckStatus check_return(AstReturn* retnode) {
                     retnode->expr = (AstTyped *) implicit_compound;
                 }
 
-                return Check_Yield_Macro;
+                goto retry_return_expr_check;
             }
         }
     }
