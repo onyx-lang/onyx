@@ -77,7 +77,7 @@ get_contents_from_file :: (file: &File) -> str {
     return data[0 .. size];
 }
 
-from_fd :: (fd: fs.FileData) -> (file: os.File) {
+from_fd :: (fd: FileData) -> (file: os.File) {
     file.data = fd;
     file.vtable = &fs.__file_stream_vtable;
     return;

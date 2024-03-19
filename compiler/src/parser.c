@@ -3811,6 +3811,30 @@ static void parse_top_level_statement(OnyxParser* parser) {
         case Token_Type_Symbol: {
             OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
 
+            if (consume_token_if_next(parser, '.')) {
+                if (parser->injection_point) {
+                    onyx_report_error(parser->curr->pos, Error_Critical, "Implicit injection is not allowed here.");
+                    parser->hit_unexpected_token = 1;
+                    return;
+                }
+
+                AstTyped *target = make_node(AstTyped, Ast_Kind_Symbol);
+                target->token = symbol;
+                while (next_tokens_are(parser, 2, Token_Type_Symbol, '.')) {
+                    AstFieldAccess *fa = make_node(AstFieldAccess, Ast_Kind_Field_Access);
+                    fa->token = expect_token(parser, Token_Type_Symbol);
+                    fa->expr = target;
+                    target = (AstTyped *) fa;
+
+                    expect_token(parser, '.');
+                }
+
+                parser->injection_point = target;
+                parse_top_level_statement(parser);
+                parser->injection_point = NULL;
+                return;
+            }
+
             if (next_tokens_are(parser, 2, ':', ':')) {
                 expect_token(parser, ':');
 
