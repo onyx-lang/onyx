@@ -803,8 +803,6 @@ struct AstDoBlock {
     AstTyped_base;
 
     AstBlock* block;
-
-    OnyxToken *macro_generated_from;
 };
 struct AstZeroValue {
     AstTyped_base;
@@ -835,6 +833,8 @@ struct AstBlock         {
     BlockRule rules;
 
     u32 statement_idx;
+
+    OnyxToken *macro_generated_from;
 };
 struct AstDefer         { AstNode_base; AstNode *stmt; };
 struct AstFor           {

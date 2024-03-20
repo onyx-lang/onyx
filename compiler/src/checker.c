@@ -1981,21 +1981,7 @@ CheckStatus check_do_block(AstDoBlock** pdoblock) {
 
     doblock->block->rules = Block_Rule_Do_Block;
 
-    CheckStatus status = check_block(doblock->block);
-    if (status > Check_Errors_Start) {
-        if (status == Check_Yield_Macro) return status;
-        if (status == Check_Return_To_Symres) return status;
-
-        if (doblock->macro_generated_from) {
-            onyx_report_error(
-                doblock->macro_generated_from->pos,
-                Error_Critical,
-                "Error generated in 'macro' generated from here."
-            );
-        }
-
-        return status;
-    }
+    CHECK(block, doblock->block);
 
     if (doblock->type == &type_auto_return) doblock->type = &basic_types[Basic_Kind_Void];
 
@@ -2969,6 +2955,18 @@ CheckStatus check_block(AstBlock* block) {
 
             case Check_Return_To_Symres:
                 block->statement_idx = 0;
+                return cs;
+
+            case Check_Failed:
+            case Check_Error:
+                if (block->macro_generated_from) {
+                    onyx_report_error(
+                        block->macro_generated_from->pos,
+                        Error_Critical,
+                        "Error in 'macro' that was generated from here."
+                    );
+                }
+                return cs;
 
             default:
                 return cs;
