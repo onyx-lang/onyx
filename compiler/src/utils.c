@@ -789,6 +789,7 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
         doblock->block = expansion;
         doblock->type = template->type->Function.return_type;
         doblock->next = expansion->next;
+        doblock->macro_generated_from = call->token;
         expansion->next = NULL;
 
         subst = (AstNode *) doblock;

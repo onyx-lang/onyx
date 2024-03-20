@@ -1980,7 +1980,22 @@ CheckStatus check_do_block(AstDoBlock** pdoblock) {
     bh_arr_push(context.checker.expected_return_type_stack, &doblock->type);
 
     doblock->block->rules = Block_Rule_Do_Block;
-    CHECK(block, doblock->block);
+
+    CheckStatus status = check_block(doblock->block);
+    if (status > Check_Errors_Start) {
+        if (status == Check_Yield_Macro) return status;
+        if (status == Check_Return_To_Symres) return status;
+
+        if (doblock->macro_generated_from) {
+            onyx_report_error(
+                doblock->macro_generated_from->pos,
+                Error_Critical,
+                "Error generated in 'macro' generated from here."
+            );
+        }
+
+        return status;
+    }
 
     if (doblock->type == &type_auto_return) doblock->type = &basic_types[Basic_Kind_Void];
 

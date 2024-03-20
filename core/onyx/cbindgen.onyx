@@ -91,7 +91,7 @@ Binding_Config :: struct {
 }
 
 generate_c_binding :: (use binding_config: Binding_Config) -> bool {
-    use file := os.open(output_file, .Write)?;
+    use file := os.open(output_file, .Write)->or_return(false);
     use writer := io.writer_make(&file);
 
     fb := runtime.info.get_foreign_block(foreign_block);

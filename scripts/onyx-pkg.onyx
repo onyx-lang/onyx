@@ -602,8 +602,8 @@ run_new_command :: (args: [] cstr) {
                     info_print("Creating", tprintf("{}\n", destination));
 
                     contents := process_contents(it.second->as_str(), vars);
-                    use file := os.open(destination, .Write);
-                    io.stream_write(file, contents);
+                    use file := os.open(destination, .Write).Ok?;
+                    io.stream_write(&file, contents);
                 }
 
                 case .Object {
@@ -903,8 +903,8 @@ build_package_file_to_load :: () {
         os.remove_file(filepath);
     }
 
-    use file := os.open(filepath, .Write);
-    use w := io.writer_make(file);
+    use file := os.open(filepath, .Write).Ok?;
+    use w := io.writer_make(&file);
 
     io.write(&w, """
 //
@@ -1401,8 +1401,8 @@ store_config :: (path: str) -> bool {
 
 //  Old INI config code
 read_old_config :: (path: str) -> ? Config {
-    use file = os.open(path);
-    use r := io.reader_make(file);
+    use file := os.open(path).Ok?;
+    use r := io.reader_make(&file);
 
     inner_config: IniConfig;
     result, error := encoding.ini.parse_ini_file(&r, &inner_config);
@@ -1552,8 +1552,8 @@ load_old_config_file :: () -> bool {
 }
 
 store_old_config_file :: () -> bool {
-    use file := os.open(global_arguments.config_file, .Write)?;
-    use writer := io.writer_make(file);
+    use file := os.open(global_arguments.config_file, .Write)->or_return(false);
+    use writer := io.writer_make(&file);
 
     return encoding.ini.write_ini_file(&writer, config);
 }

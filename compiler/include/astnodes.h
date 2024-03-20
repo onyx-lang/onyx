@@ -803,6 +803,8 @@ struct AstDoBlock {
     AstTyped_base;
 
     AstBlock* block;
+
+    OnyxToken *macro_generated_from;
 };
 struct AstZeroValue {
     AstTyped_base;
