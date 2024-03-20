@@ -69,7 +69,7 @@ Value.from :: #match {
             case i32, u32 {
                 // Integers are simply upcasted to float64s
                 v := cast(f64) *cast(&i32, a.data);
-                if v == 0 do return Value.Zero;
+                if v == 0 do return Zero;
 
                 return *cast(&Value) &v;
             }
@@ -78,28 +78,28 @@ Value.from :: #match {
                 // Integers are simply upcasted to float64s, even with a loss of precision
                 // Gotta love JS.
                 v := cast(f64) *cast(&i64, a.data);
-                if v == 0 do return Value.Zero;
+                if v == 0 do return Zero;
 
                 return *cast(&Value) &v;
             }
 
             case f32 {
                 v := cast(f64) *cast(&f32, a.data);
-                if v == 0 do return Value.Zero;
+                if v == 0 do return Zero;
 
                 return *cast(&Value) &v;
             }
 
             case f64 {
                 v := *cast(&f64, a.data);
-                if v == 0 do return Value.Zero;
+                if v == 0 do return Zero;
 
                 return *cast(&Value) &v;
             }
 
             case bool {
-                if *cast(&bool, a.data) do return Value.True;
-                else                    do return Value.False;
+                if *cast(&bool, a.data) do return True;
+                else                    do return False;
             }
         }
 
@@ -125,8 +125,8 @@ Value.from :: #match {
 
 #doc "Converts a `Value` into a `bool`. If the value is not internally of boolean type, `None` is returned."
 Value.as_bool :: (v: Value) -> ? bool {
-    if cast(u64) v == cast(u64) Value.True  do return true;
-    if cast(u64) v == cast(u64) Value.False do return false;
+    if cast(u64) v == cast(u64) True  do return true;
+    if cast(u64) v == cast(u64) False do return false;
 
     return .None;
 }
@@ -243,19 +243,19 @@ Value.delete :: (v: Value, property: str) {
 }
 
 Value.equals :: (v1: Value, v2: Value) -> bool {
-    return cast(u64, v1) == cast(u64, v2) && cast(u64, v1) != cast(u64, Value.NaN);
+    return cast(u64, v1) == cast(u64, v2) && cast(u64, v1) != cast(u64, NaN);
 }
 
 Value.is_null :: (v: Value) -> bool {
-    return cast(u64) v == cast(u64) Value.Null;
+    return cast(u64) v == cast(u64) Null;
 }
 
 Value.is_undefined :: (v: Value) -> bool {
-    return cast(u64) v == cast(u64) Value.Undefined;
+    return cast(u64) v == cast(u64) Undefined;
 }
 
 Value.is_nan :: (v: Value) -> bool {
-    return cast(u64) v == cast(u64) Value.NaN;
+    return cast(u64) v == cast(u64) NaN;
 }
 
 #doc "Returns the evaluation of the `instanceof` operator in JavaScript."
@@ -282,7 +282,7 @@ Value.set :: #match #locked {
     },
 
     (v: Value, prop: str, value: $T) {
-        js_value := Value.from(value) ?? Value.Undefined;
+        js_value := Value.from(value) ?? Undefined;
         __set(v, prop, js_value);
         js_value->release();
     },
@@ -292,7 +292,7 @@ Value.set :: #match #locked {
     },
 
     (v: Value, index: i32, value: $T) {
-        js_value := Value.from(value) ?? Value.Undefined;
+        js_value := Value.from(value) ?? Undefined;
         __set_index(v, index, js_value);
         js_value->release();
     }
@@ -317,8 +317,8 @@ Value.index :: (v: Value, i: i32) -> Value {
 Value.truthy :: (v: Value) -> bool {
     switch v->type() {
         case .Undefined, .Null do return false;
-        case .Boolean do return cast(u64) v == cast(u64) Value.True;
-        case .Number  do return cast(u64) v != cast(u64) Value.Zero;
+        case .Boolean do return cast(u64) v == cast(u64) True;
+        case .Number  do return cast(u64) v != cast(u64) Zero;
         case .String  do return v->length() != 0;
         case #default do return true;
     }
@@ -326,7 +326,7 @@ Value.truthy :: (v: Value) -> bool {
 
 
 #local
-Value.transform_args :: macro (args: [] any, $body: Code) {
+transform_args :: macro (args: [] any, $body: Code) {
     mapped_args:  [..] Value;
     args_to_free: [..] Value;
     defer {
@@ -343,7 +343,7 @@ Value.transform_args :: macro (args: [] any, $body: Code) {
             mapped_args << *cast(&Value, arg.data);
 
         } else {
-            generated := Value.from(arg) ?? Value.Undefined;
+            generated := Value.from(arg) ?? Undefined;
             mapped_args << generated;
             args_to_free << generated;
         }
@@ -355,7 +355,7 @@ Value.transform_args :: macro (args: [] any, $body: Code) {
 }
 
 #overload
-Value.delete :: (v: Value) {
+builtin.delete :: (v: Value) {
     __free(v);
 }
 
