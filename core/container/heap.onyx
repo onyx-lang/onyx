@@ -37,6 +37,8 @@ insert :: (use heap: &Heap, v: heap.T) {
     #this_package.insert(&heap, v);
 }
 
+empty :: macro (heap: &Heap) => heap.data.count == 0;
+
 peek_top :: (use heap: &Heap) -> ? heap.T {
     if data.count == 0 do return .None;
     return data[0];

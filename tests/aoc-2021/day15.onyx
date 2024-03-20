@@ -31,8 +31,8 @@ main :: (args) => {
     to_try << .{ 0, 0, -cast(i32) (cells[0] - #char "0") };
 
     minimum := 0;
-    while to_try.data.count != 0 {
-        try := heap.remove_top(&to_try);
+    while !heap.empty(&to_try) {
+        try := heap.remove_top(&to_try)->unwrap();
         tried << .{try.x, try.y};
 
         cell_value := cast(u32) (cells[(try.y % height) * width + (try.x % width)] - #char "0");
