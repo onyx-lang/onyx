@@ -7,6 +7,16 @@ Heap :: struct (T: type_expr) {
     compare: (T, T) -> i32 = null_proc;
 }
 
+#overload
+__make_overload :: macro (_: &Heap($T), allocator: Allocator) -> Heap(T) {
+    return #this_package.make(T);
+}
+
+#overload
+delete :: (h: &Heap) {
+    delete(&h.data);
+}
+
 make :: ($T: type_expr, cmp: (T, T) -> i32 = null_proc) -> Heap(T) {
     h: Heap(T);
     init(&h, cmp);
@@ -27,11 +37,33 @@ insert :: (use heap: &Heap, v: heap.T) {
     #this_package.insert(&heap, v);
 }
 
-remove_top :: (use heap: &Heap) -> heap.T {
+peek_top :: (use heap: &Heap) -> ? heap.T {
+    if data.count == 0 do return .None;
+    return data[0];
+}
+
+remove_top :: (use heap: &Heap) -> ? heap.T {
+    if data.count == 0 do return .None;
+
     x := data[0];
     array.fast_delete(&data, 0);
     shift_down(heap, 0);
     return x;
+}
+
+remove :: macro (heap: &Heap, cond: Code) -> ? heap.T {
+    array      :: array
+    shift_down :: shift_down
+
+    for e, i in heap.data {
+        if #unquote cond(e) {
+            x := array.fast_delete(&heap.data, i);
+            shift_down(heap, i);
+            return x;
+        }
+    }
+
+    return .None;
 }
 
 #local {
