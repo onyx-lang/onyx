@@ -32,6 +32,8 @@ File :: struct {
     data   : fs.FileData;
 }
 
+FileData :: fs.FileData;
+
 // Most of these types were stollen directly from
 // man readdir(3), and the most reasonable types
 // were used for Windows.
@@ -75,10 +77,11 @@ get_contents_from_file :: (file: &File) -> str {
     return data[0 .. size];
 }
 
-from_fd :: (fd: FileData) -> (file: os.File) {
+from_fd :: (fd: FileData) -> File {
+    file: File;
     file.data = fd;
     file.vtable = &fs.__file_stream_vtable;
-    return;
+    return file;
 }
 
 open :: (path: str, mode := OpenMode.Read) -> Result(File, os.FileError) {
