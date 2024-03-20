@@ -778,6 +778,7 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
     expansion->rules = Block_Rule_Macro;
     expansion->scope = NULL;
     expansion->next = call->next;
+    expansion->macro_generated_from = call->token;
 
     AstNode* subst = (AstNode *) expansion;
 

@@ -153,19 +153,18 @@ main :: (args) => {
 
         program_output := output.Ok->unwrap();
 
-        for expected_file in os.with_file(it.expected_file) {
-            expected_reader := io.reader_make(expected_file);
-            expected_output := io.read_all(&expected_reader);
+        use expected_file := os.open(it.expected_file)->unwrap();
+        use expected_reader := io.reader_make(&expected_file);
+        expected_output := io.read_all(&expected_reader);
 
-            if program_output != expected_output {
-                print_color(.Red, "[{}]  Output did not match for {}.\n", context.thread_id, it.source_file);
-                printf("Expected:\n{}\n", expected_output);
-                printf("Got:\n{}\n", program_output);
-                thread_data.at_least_one_test_failed = true;
+        if program_output != expected_output {
+            print_color(.Red, "[{}]  Output did not match for {}.\n", context.thread_id, it.source_file);
+            printf("Expected:\n{}\n", expected_output);
+            printf("Got:\n{}\n", program_output);
+            thread_data.at_least_one_test_failed = true;
 
-                sync.critical_section(&thread_data.failed_tests_mutex) {
-                    array.push(thread_data.failed_tests, it.source_file);
-                }
+            sync.critical_section(&thread_data.failed_tests_mutex) {
+                array.push(thread_data.failed_tests, it.source_file);
             }
         }
     }

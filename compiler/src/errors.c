@@ -101,7 +101,7 @@ static void print_detailed_message_v2(OnyxError* err, bh_file_contents* fc, b32 
     while (*walker == ' ' || *walker == '\t') first_char++, linelength++, walker++;
     while (*walker != '\n') linelength++, walker++;
 
-    char numbuf[32];
+    char numbuf[32] = {0};
     i32 numlen = bh_snprintf(numbuf, 31, " %d | ", err->pos.line);
 
     if (colored_printing) bh_printf("\033[90m");

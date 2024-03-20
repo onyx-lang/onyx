@@ -321,6 +321,11 @@ static SymresStatus symres_local(AstLocal** local) {
     if ((*local)->token != NULL)
         symbol_introduce(current_scope, (*local)->token, (AstNode *) *local);
 
+    if ((*local)->auto_dispose) {
+        insert_auto_dispose_call(context.ast_alloc, *local);
+        (*local)->auto_dispose = 0;
+    }
+
     return Symres_Success;
 }
 

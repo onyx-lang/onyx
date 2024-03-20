@@ -1,0 +1,33 @@
+use core {*}
+
+Foo :: struct {
+    data: str;
+}
+
+#inject Foo {
+    make :: (s: str) => Foo.{s}
+
+    dispose :: (f: &Foo) {
+        logf(.Info, "Destroying foo... {}", f.data);
+    }
+}
+
+#overload
+__dispose_used_local :: Foo.dispose
+
+main :: () {
+    // 'used' locals automatically have the following code inserted.
+    //     defer __dispose_used_local(&local_name);
+    use f := Foo.make("testing");
+
+    // You are able to 'use' anything that has a `delete` for it.
+    use w := io.writer_make(&stdio.stream);
+    io.write(&w, "From writer\n");
+
+    use arr := make([..] u32);
+    for 10 do arr << it;
+    println(arr);
+
+    println("In main!");
+}
+

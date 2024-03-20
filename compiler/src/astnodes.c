@@ -1841,6 +1841,32 @@ AstPolyCallType* convert_call_to_polycall(AstCall* call) {
     return pct;
 }
 
+void insert_auto_dispose_call(bh_allocator a, AstLocal *local) {
+    AstAddressOf *aof = make_address_of(a, (AstTyped *) local);
+    aof->token = local->token;
+    aof->can_be_removed = 1;
+
+    AstCall *dispose_call = onyx_ast_node_new(a, sizeof(AstCall), Ast_Kind_Call);
+    dispose_call->token = local->token;
+    dispose_call->callee = (AstTyped *) builtin_dispose_used_local;
+
+    arguments_initialize(&dispose_call->args);
+    bh_arr_push(dispose_call->args.values, (AstTyped *) make_argument(a, (AstTyped *) aof));
+
+    AstDefer *defered = onyx_ast_node_new(a, sizeof(AstDefer), Ast_Kind_Defer);
+    defered->token = local->token;
+    defered->stmt = (AstNode *) dispose_call;
+
+    AstNode **insertion_point = &local->next;
+    if (local->type_node == NULL && (*insertion_point)->kind == Ast_Kind_Binary_Op) {
+        // Handle `use x := ...`.
+        insertion_point = &(*insertion_point)->next;
+    }
+
+    defered->next = *insertion_point;
+    *insertion_point = (AstNode *) defered;
+}
+
 
 b32 resolve_intrinsic_interface_constraint(AstConstraint *constraint) {
     AstInterface *interface = constraint->interface;

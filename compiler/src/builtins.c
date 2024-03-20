@@ -93,6 +93,7 @@ AstFunction *builtin_run_init_procedures = NULL;
 AstFunction *builtin_closure_block_allocate = NULL;
 bh_arr(AstFunction *) init_procedures = NULL;
 AstOverloadedFunction *builtin_implicit_bool_cast;
+AstOverloadedFunction *builtin_dispose_used_local;
 
 const BuiltinSymbol builtin_symbols[] = {
     { NULL, "void",       (AstNode *) &basic_type_void },
@@ -428,6 +429,7 @@ void prepare_builtins() {
     builtin_run_init_procedures = NULL;
     init_procedures = NULL;
     builtin_implicit_bool_cast = NULL;
+    builtin_dispose_used_local = NULL;
 
     basic_type_void.scope = NULL;
     basic_type_bool.scope = NULL;
@@ -548,6 +550,12 @@ void initialize_builtins(bh_allocator a) {
     builtin_implicit_bool_cast = (AstOverloadedFunction *) symbol_raw_resolve(p->scope, "__implicit_bool_cast");
     if (builtin_implicit_bool_cast == NULL || builtin_implicit_bool_cast->kind != Ast_Kind_Overloaded_Function) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__implicit_bool_cast' #match procedure not found.");
+        return;
+    }
+
+    builtin_dispose_used_local = (AstOverloadedFunction *) symbol_raw_resolve(p->scope, "__dispose_used_local");
+    if (builtin_dispose_used_local == NULL || builtin_dispose_used_local->kind != Ast_Kind_Overloaded_Function) {
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__dispose_used_local' #match procedure not found.");
         return;
     }
 

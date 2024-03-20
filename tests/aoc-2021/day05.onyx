@@ -43,38 +43,37 @@ Point :: struct {x, y: u32;}
 #operator == (p1, p2: Point) => p1.x == p2.x && p1.y == p2.y;
 
 main :: (args) => {
-    for file in os.with_file("./tests/aoc-2021/input/day05.txt") {
-        reader := io.reader_make(file);
+    use file := os.open("./tests/aoc-2021/input/day05.txt")->unwrap();
+    use reader := io.reader_make(&file);
 
-        lines: [..] Line;
+    lines: [..] Line;
 
-        while !io.reader_empty(&reader) {
-            x1 := io.read_u32(&reader);
-            io.skip_bytes(&reader, 1);
-            y1 := io.read_u32(&reader);
-            io.skip_bytes(&reader, 4);
+    while !io.reader_empty(&reader) {
+        x1 := io.read_u32(&reader);
+        io.skip_bytes(&reader, 1);
+        y1 := io.read_u32(&reader);
+        io.skip_bytes(&reader, 4);
 
-            x2 := io.read_u32(&reader);
-            io.skip_bytes(&reader, 1);
-            y2 := io.read_u32(&reader);
-            io.skip_whitespace(&reader);
+        x2 := io.read_u32(&reader);
+        io.skip_bytes(&reader, 1);
+        y2 := io.read_u32(&reader);
+        io.skip_whitespace(&reader);
 
-            lines << .{x1, y1, x2, y2};
-        }
-
-        point_count: Map(Point, u32);
-
-        for &line in lines {
-            for p in line_points(*line) {
-                point_count[p] = (point_count[p] ?? 0) + 1;
-            }
-        }
-
-        count := 0;
-        for & point_count.entries {
-            if it.value >= 2 do count += 1;
-        }
-
-        printf("Part 2: {}\n", count);
+        lines << .{x1, y1, x2, y2};
     }
+
+    point_count: Map(Point, u32);
+
+    for &line in lines {
+        for p in line_points(*line) {
+            point_count[p] = (point_count[p] ?? 0) + 1;
+        }
+    }
+
+    count := 0;
+    for & point_count.entries {
+        if it.value >= 2 do count += 1;
+    }
+
+    printf("Part 2: {}\n", count);
 }

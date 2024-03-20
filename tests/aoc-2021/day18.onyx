@@ -231,47 +231,46 @@ main :: () {
     
     conv.register_custom_formatter(SnailNum.format);
 
-    for file in os.with_file("./tests/aoc-2021/input/day18.txt") {
-        r := io.reader_make(file);
+    use file := os.open("./tests/aoc-2021/input/day18.txt")->unwrap();
+    use r := io.reader_make(&file);
 
-        #if PART == 1 {
-            s: &SnailNum = null;
-            
-            for line in r->lines() {
-                n := SnailNum.parse(&line);
-                s = s->add(n);
-            }
-
-            printf("{*}\n", s->magnitude());
+    #if PART == 1 {
+        s: &SnailNum = null;
+        
+        for line in r->lines() {
+            n := SnailNum.parse(&line);
+            s = s->add(n);
         }
 
-        #if PART == 2 {
-            nums := make([..] &SnailNum);
-            for line in r->lines() {
-                nums << SnailNum.parse(&line);
-            }
+        printf("{*}\n", s->magnitude());
+    }
 
-            maximum := 0;
-            max_i, max_j : i32;
+    #if PART == 2 {
+        nums := make([..] &SnailNum);
+        for line in r->lines() {
+            nums << SnailNum.parse(&line);
+        }
 
-            for i in nums.count {
-                for j in nums.count {
-                    if i == j do continue;
+        maximum := 0;
+        max_i, max_j : i32;
 
-                    n1 := nums[i]->clone();
-                    n2 := nums[j]->clone();
+        for i in nums.count {
+            for j in nums.count {
+                if i == j do continue;
 
-                    mag := n1->add(n2)->magnitude();
-                    if mag >= maximum {
-                        maximum = mag;
-                        max_i, max_j = i, j;
-                    }
+                n1 := nums[i]->clone();
+                n2 := nums[j]->clone();
+
+                mag := n1->add(n2)->magnitude();
+                if mag >= maximum {
+                    maximum = mag;
+                    max_i, max_j = i, j;
                 }
             }
-
-            println(maximum);
-            printf("i: {*}\n", nums[max_i]);
-            printf("j: {*}\n", nums[max_j]);
         }
+
+        println(maximum);
+        printf("i: {*}\n", nums[max_i]);
+        printf("j: {*}\n", nums[max_j]);
     }
 }
