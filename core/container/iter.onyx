@@ -13,31 +13,29 @@ use core.intrinsics.types {type_is_struct}
 //
 // Iterator is a builtin type known by the compiler, as Iterators
 // can be used in for-loops natively without any translation.
-#inject Iterator {
-    filter :: filter;
-    map :: map;
-    flat_map :: flat_map;
-    zip :: zip;
+Iterator.filter :: filter;
+Iterator.map :: map;
+Iterator.flat_map :: flat_map;
+Iterator.zip :: zip;
 
-    take_one :: take_one;
-    take :: take;
-    take_while :: take_while;
-    skip :: skip;
-    skip_while :: skip_while;
-    
-    flatten :: flatten;
-    enumerate :: enumerate;
+Iterator.take_one :: take_one;
+Iterator.take :: take;
+Iterator.take_while :: take_while;
+Iterator.skip :: skip;
+Iterator.skip_while :: skip_while;
 
-    find :: find;
-    fold :: fold;
-    fold1 :: fold1;
-    count :: count;
-    some :: some;
-    every :: every;
-    sum   :: sum;
-    collect :: to_array;
-    collect_map :: to_map;
-}
+Iterator.flatten :: flatten;
+Iterator.enumerate :: enumerate;
+
+Iterator.find :: find;
+Iterator.fold :: fold;
+Iterator.fold1 :: fold1;
+Iterator.count :: count;
+Iterator.some :: some;
+Iterator.every :: every;
+Iterator.sum   :: sum;
+Iterator.collect :: to_array;
+Iterator.collect_map :: to_map;
 
 
 

@@ -28,23 +28,19 @@ Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
     }
 }
 
-#inject Set {
-    init     :: init
-    free     :: free
-    has      :: has
-    get      :: get
-    get_ptr  :: get_ptr
-    get_opt  :: get_opt
-    insert   :: insert
-    remove   :: remove
-    clear    :: clear
-    empty    :: empty
-    as_iter  :: as_iter
-}
+Set.init     :: init
+Set.free     :: free
+Set.has      :: has
+Set.get      :: get
+Set.get_ptr  :: get_ptr
+Set.get_opt  :: get_opt
+Set.insert   :: insert
+Set.remove   :: remove
+Set.clear    :: clear
+Set.empty    :: empty
+Set.as_iter  :: as_iter
 
-#inject builtin {
-    Set :: Set;
-}
+builtin.Set :: Set
 
 make :: ($T: type_expr, allocator := context.allocator) -> Set(T) {
     set : Set(T);

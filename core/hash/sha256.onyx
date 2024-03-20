@@ -13,81 +13,79 @@ Hasher :: struct {
     state: [8] u32;
 }
 
-#inject Hasher {
-    make :: () -> #Self {
-        return .{
-            state = .[
-                0x6a09e667,
-                0xbb67ae85,
-                0x3c6ef372,
-                0xa54ff53a,
-                0x510e527f,
-                0x9b05688c,
-                0x1f83d9ab,
-                0x5be0cd19
-            ]
-        };
-    }
+Hasher.make :: () -> #Self {
+    return .{
+        state = .[
+            0x6a09e667,
+            0xbb67ae85,
+            0x3c6ef372,
+            0xa54ff53a,
+            0x510e527f,
+            0x9b05688c,
+            0x1f83d9ab,
+            0x5be0cd19
+        ]
+    };
+}
 
-    update :: (self: &#Self, data: [] u8) {
-        for i in 0 .. data.count {
-            self.data[self.data_length] = data[i];
-            self.data_length += 1;
+Hasher.update :: (self: &#Self, data: [] u8) {
+    for i in 0 .. data.count {
+        self.data[self.data_length] = data[i];
+        self.data_length += 1;
 
-            if self.data_length == 64 {
-                do_cycle(self, self.data);
-                self.bit_length += 512;
-                self.data_length = 0;
-            }
-        }
-    }
-
-    final :: (self: &#Self) -> [BLOCK_SIZE] u8 {
-        out: [BLOCK_SIZE] u8;
-
-        i := self.data_length;
-        if self.data_length < 56 {
-            self.data[i] = 0x80;
-            i += 1;
-            while i < 56 {
-                self.data[i] = 0;
-                i += 1;
-            }
-        }
-        else {
-            self.data[i] = 0x80;
-            while i < 64 {
-                self.data[i] = 0;
-                i += 1;
-            }
+        if self.data_length == 64 {
             do_cycle(self, self.data);
-            memory.set(&self.data, 0, 56);
+            self.bit_length += 512;
+            self.data_length = 0;
         }
-
-        self.bit_length += ~~(self.data_length * 8);
-        self.data[63] = cast(u8, self.bit_length >> 0);
-        self.data[62] = cast(u8, self.bit_length >> 8);
-        self.data[61] = cast(u8, self.bit_length >> 16);
-        self.data[60] = cast(u8, self.bit_length >> 24);
-        self.data[59] = cast(u8, self.bit_length >> 32);
-        self.data[58] = cast(u8, self.bit_length >> 40);
-        self.data[57] = cast(u8, self.bit_length >> 48);
-        self.data[56] = cast(u8, self.bit_length >> 56);
-        do_cycle(self, self.data);
-
-        for i in 0 .. 4 {
-            out[i + 0]  = ~~((self.state[0] >> (24 - i * 8)) & 0xff);
-            out[i + 4]  = ~~((self.state[1] >> (24 - i * 8)) & 0xff);
-            out[i + 8]  = ~~((self.state[2] >> (24 - i * 8)) & 0xff);
-            out[i + 12] = ~~((self.state[3] >> (24 - i * 8)) & 0xff);
-            out[i + 16] = ~~((self.state[4] >> (24 - i * 8)) & 0xff);
-            out[i + 20] = ~~((self.state[5] >> (24 - i * 8)) & 0xff);
-            out[i + 24] = ~~((self.state[6] >> (24 - i * 8)) & 0xff);
-            out[i + 28] = ~~((self.state[7] >> (24 - i * 8)) & 0xff);
-        }
-
-        return out;
     }
+}
+
+Hasher.final :: (self: &#Self) -> [BLOCK_SIZE] u8 {
+    out: [BLOCK_SIZE] u8;
+
+    i := self.data_length;
+    if self.data_length < 56 {
+        self.data[i] = 0x80;
+        i += 1;
+        while i < 56 {
+            self.data[i] = 0;
+            i += 1;
+        }
+    }
+    else {
+        self.data[i] = 0x80;
+        while i < 64 {
+            self.data[i] = 0;
+            i += 1;
+        }
+        do_cycle(self, self.data);
+        memory.set(&self.data, 0, 56);
+    }
+
+    self.bit_length += ~~(self.data_length * 8);
+    self.data[63] = cast(u8, self.bit_length >> 0);
+    self.data[62] = cast(u8, self.bit_length >> 8);
+    self.data[61] = cast(u8, self.bit_length >> 16);
+    self.data[60] = cast(u8, self.bit_length >> 24);
+    self.data[59] = cast(u8, self.bit_length >> 32);
+    self.data[58] = cast(u8, self.bit_length >> 40);
+    self.data[57] = cast(u8, self.bit_length >> 48);
+    self.data[56] = cast(u8, self.bit_length >> 56);
+    do_cycle(self, self.data);
+
+    for i in 0 .. 4 {
+        out[i + 0]  = ~~((self.state[0] >> (24 - i * 8)) & 0xff);
+        out[i + 4]  = ~~((self.state[1] >> (24 - i * 8)) & 0xff);
+        out[i + 8]  = ~~((self.state[2] >> (24 - i * 8)) & 0xff);
+        out[i + 12] = ~~((self.state[3] >> (24 - i * 8)) & 0xff);
+        out[i + 16] = ~~((self.state[4] >> (24 - i * 8)) & 0xff);
+        out[i + 20] = ~~((self.state[5] >> (24 - i * 8)) & 0xff);
+        out[i + 24] = ~~((self.state[6] >> (24 - i * 8)) & 0xff);
+        out[i + 28] = ~~((self.state[7] >> (24 - i * 8)) & 0xff);
+    }
+
+    return out;
 }
 
 hash :: #match #local {}

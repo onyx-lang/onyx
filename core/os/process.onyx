@@ -181,91 +181,89 @@ command :: () -> &Command {
     return new(Command);
 }
 
-#inject Command {
-    #doc "Sets the path of the command."
-    path :: (cmd: &Command, path: str) -> &Command {
-        cmd._path = path;
-        return cmd;
-    }
+#doc "Sets the path of the command."
+Command.path :: (cmd: &Command, path: str) -> &Command {
+    cmd._path = path;
+    return cmd;
+}
 
-    #doc "Appends arguments to the argument array of the command."
-    args :: (cmd: &Command, args: [] str) -> &Command {
-        array.concat(&cmd._args, args);
-        return cmd;
-    }
+#doc "Appends arguments to the argument array of the command."
+Command.args :: (cmd: &Command, args: [] str) -> &Command {
+    array.concat(&cmd._args, args);
+    return cmd;
+}
 
-    #doc "Sets an environment variable."
-    env :: (cmd: &Command, key, value: str) -> &Command {
-        cmd._env << .{ key, value };
-        return cmd;
-    }
+#doc "Sets an environment variable."
+Command.env :: (cmd: &Command, key, value: str) -> &Command {
+    cmd._env << .{ key, value };
+    return cmd;
+}
 
-    #doc "Sets the working directory of the command."
-    dir :: (cmd: &Command, dir: str) -> &Command {
-        cmd._dir = dir;
-        return cmd;
-    }
+#doc "Sets the working directory of the command."
+Command.dir :: (cmd: &Command, dir: str) -> &Command {
+    cmd._dir = dir;
+    return cmd;
+}
 
-    #doc "Runs the command, wait until it completes, and capture output."
-    output :: (cmd: &Command) -> Result(str, ProcessResultOutput) {
-        if !cmd._process {
-            cmd._opts.capture_io = true;
-            cmd._opts.non_blocking_io = false;
-            cmd._opts.detach = false;
-
-            cmd->start();
-            if !cmd._process do return .{ Err = .{ .Error, "" } };
-        }
-
-        r := io.reader_make(cmd._process->unwrap_ptr());
-        output := io.read_all(&r);
-        io.reader_free(&r);
-
-        res := cmd->wait();
-        if res != .Success {
-            return .{ Err = .{ res, output } };
-        }
-
-        return .{ Ok = output };
-    }
-
-    #doc "Runs the command and waits until it completes."
-    run :: (cmd: &Command) -> ProcessResult {
-        cmd->start();
-        return cmd->wait();
-    }
-
-    #doc "Starts the command with the mapped I/O."
-    start_with_output :: (cmd: &Command) -> &Command {
+#doc "Runs the command, wait until it completes, and capture output."
+Command.output :: (cmd: &Command) -> Result(str, ProcessResultOutput) {
+    if !cmd._process {
         cmd._opts.capture_io = true;
-        return cmd->start();
+        cmd._opts.non_blocking_io = false;
+        cmd._opts.detach = false;
+
+        cmd->start();
+        if !cmd._process do return .{ Err = .{ .Error, "" } };
     }
 
-    #doc "Starts the command."
-    start :: (cmd: &Command) -> &Command {
-        cmd._opts.environment = cmd._env;
-        cmd._opts.dir = cmd._dir;
+    r := io.reader_make(cmd._process->unwrap_ptr());
+    output := io.read_all(&r);
+    io.reader_free(&r);
 
-        cmd._process = process_spawn(cmd._path, cmd._args, &cmd._opts);
-        return cmd;
+    res := cmd->wait();
+    if res != .Success {
+        return .{ Err = .{ res, output } };
     }
 
-    #doc "Wait for the command to complete."
-    wait :: (cmd: &Command) -> ProcessResult {
-        if !cmd._process do return .Error;
+    return .{ Ok = output };
+}
 
-        res := process_wait(cmd._process->unwrap_ptr());
-        process_destroy(cmd._process->unwrap_ptr());
+#doc "Runs the command and waits until it completes."
+Command.run :: (cmd: &Command) -> ProcessResult {
+    cmd->start();
+    return cmd->wait();
+}
 
-        cmd->destroy();
-        return res;
-    }
+#doc "Starts the command with the mapped I/O."
+Command.start_with_output :: (cmd: &Command) -> &Command {
+    cmd._opts.capture_io = true;
+    return cmd->start();
+}
 
-    #doc "Destroys all internal information of a command. Automatically called by `Command.wait`."
-    destroy :: (cmd: &Command) {
-        delete(&cmd._args);
-        delete(&cmd._env);
-        cfree(cmd);
-    }
+#doc "Starts the command."
+Command.start :: (cmd: &Command) -> &Command {
+    cmd._opts.environment = cmd._env;
+    cmd._opts.dir = cmd._dir;
+
+    cmd._process = process_spawn(cmd._path, cmd._args, &cmd._opts);
+    return cmd;
+}
+
+#doc "Wait for the command to complete."
+Command.wait :: (cmd: &Command) -> ProcessResult {
+    if !cmd._process do return .Error;
+
+    res := process_wait(cmd._process->unwrap_ptr());
+    process_destroy(cmd._process->unwrap_ptr());
+
+    cmd->destroy();
+    return res;
+}
+
+#doc "Destroys all internal information of a command. Automatically called by `Command.wait`."
+Command.destroy :: (cmd: &Command) {
+    delete(&cmd._args);
+    delete(&cmd._env);
+    cfree(cmd);
 }
 

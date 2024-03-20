@@ -18,11 +18,9 @@ StringPool :: struct {
     arena: arena.Arena;
 }
 
-#inject StringPool {
-    add   :: pool_add;
-    flush :: pool_flush;
-    free  :: pool_free;
-}
+StringPool.add   :: pool_add;
+StringPool.flush :: pool_flush;
+StringPool.free  :: pool_free;
 
 //
 // Creates a StringPool capable of storing a string of at

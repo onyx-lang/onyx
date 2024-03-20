@@ -1,7 +1,7 @@
 use core {*}
 use runtime
 
-#inject runtime.vars.Onyx_Enable_Operator_Methods :: true
+runtime.vars.Onyx_Enable_Operator_Methods :: true
 
 main :: () {
     Point :: struct {

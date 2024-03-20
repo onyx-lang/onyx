@@ -16,19 +16,17 @@ List :: struct (Elem_Type: type_expr) {
     last:  &ListElem(Elem_Type) = null;
 }
 
-#inject List {
-    free         :: free
-    push_end     :: push_end
-    push_begin   :: push_begin
-    pop_end      :: pop_end
-    pop_begin    :: pop_begin
-    count        :: count
-    at           :: at
-    contains     :: contains
-    fold         :: fold
-    map          :: map
-    as_iter      :: as_iter
-}
+List.free         :: free
+List.push_end     :: push_end
+List.push_begin   :: push_begin
+List.pop_end      :: pop_end
+List.pop_begin    :: pop_begin
+List.count        :: count
+List.at           :: at
+List.contains     :: contains
+List.fold         :: fold
+List.map          :: map
+List.as_iter      :: as_iter
 
 make :: ($T: type_expr, allocator := context.allocator) -> List(T) {
     return .{ allocator = allocator };

@@ -33,7 +33,6 @@ T :: struct {
     current_test_case: &Test_Case;
 }
 
-#inject
 T.assert :: (t: &T, cond: bool, name := "", site := #callsite) {
     t.current_test_case.assertions << .{
         name, cond, site

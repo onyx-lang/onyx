@@ -26,29 +26,26 @@ Reader :: struct {
     done: bool; // If an .EOF was reached.
 }
 
-#inject Reader {
-    is_empty :: reader_empty;
-    empty    :: reader_empty;
-    read_all :: read_all;
-    read_byte :: read_byte;
-    unread_byte :: unread_byte;
-    read_bytes :: read_bytes;
-    read_fill_buffer :: read_fill_buffer;
-    read_string :: read_string;
-    read_i32 :: read_i32;
-    read_i64 :: read_i64;
-    read_u32 :: read_u32;
-    read_u64 :: read_u64;
-    read_line :: read_line;
-    read_word :: read_word;
-    read_until :: read_until;
-    peek_byte :: peek_byte;
-    advance_line :: advance_line;
-    skip_whitespace :: skip_whitespace;
-    skip_bytes :: skip_bytes;
-
-    lines :: lines;
-}
+Reader.is_empty :: reader_empty;
+Reader.empty    :: reader_empty;
+Reader.read_all :: read_all;
+Reader.read_byte :: read_byte;
+Reader.unread_byte :: unread_byte;
+Reader.read_bytes :: read_bytes;
+Reader.read_fill_buffer :: read_fill_buffer;
+Reader.read_string :: read_string;
+Reader.read_i32 :: read_i32;
+Reader.read_i64 :: read_i64;
+Reader.read_u32 :: read_u32;
+Reader.read_u64 :: read_u64;
+Reader.read_line :: read_line;
+Reader.read_word :: read_word;
+Reader.read_until :: read_until;
+Reader.peek_byte :: peek_byte;
+Reader.advance_line :: advance_line;
+Reader.skip_whitespace :: skip_whitespace;
+Reader.skip_bytes :: skip_bytes;
+Reader.lines :: lines;
 
 reader_make :: (s: &Stream, buffer_size := 4096, allocator := context.allocator) -> Reader {
     assert(s.vtable != null, "Stream vtable was not setup correctly.");

@@ -15,213 +15,211 @@ SnailNum :: struct {
 }
 
 
-#inject SnailNum {
-    allocator: Allocator;
+SnailNum.allocator: Allocator;
 
-    make :: () => {
-        return new(SnailNum, SnailNum.allocator);
-    }
+SnailNum.make :: () => {
+    return new(SnailNum, SnailNum.allocator);
+}
 
-    make_pair :: (left, right: u32) => {
-        n := SnailNum.make();
-        n.left_val = left;
-        n.right_val = right;
-        return n;
-    }
+SnailNum.make_pair :: (left, right: u32) => {
+    n := SnailNum.make();
+    n.left_val = left;
+    n.right_val = right;
+    return n;
+}
 
-    clone :: (n: &SnailNum) -> &SnailNum {
-        if !n do return null;
+SnailNum.clone :: (n: &SnailNum) -> &SnailNum {
+    if !n do return null;
 
-        new_num := SnailNum.make();
-        new_num->set_left(SnailNum.clone(n.left));
-        new_num->set_right(SnailNum.clone(n.right));
-        new_num.left_val = n.left_val;
-        new_num.right_val = n.right_val;
+    new_num := SnailNum.make();
+    new_num->set_left(SnailNum.clone(n.left));
+    new_num->set_right(SnailNum.clone(n.right));
+    new_num.left_val = n.left_val;
+    new_num.right_val = n.right_val;
 
-        return new_num;
-    }
+    return new_num;
+}
 
-    add :: (a, b: &SnailNum) => {
-        if !a do return b;
-        if !b do return a;
+SnailNum.add :: (a, b: &SnailNum) => {
+    if !a do return b;
+    if !b do return a;
 
-        new_root := SnailNum.make();
-        new_root->set_left(a);
-        new_root->set_right(b);
+    new_root := SnailNum.make();
+    new_root->set_left(a);
+    new_root->set_right(b);
 
-        while new_root->reduce() ---
+    while new_root->reduce() ---
 
-        return new_root;
-    }
+    return new_root;
+}
 
-    reduce :: (use n: &SnailNum) -> bool {
-        if r, _ := n->reduce_explodes(); r do return true;
-        if r    := n->reduce_splits();   r do return true;
-        return false;
-    }
+SnailNum.reduce :: (use n: &SnailNum) -> bool {
+    if r, _ := n->reduce_explodes(); r do return true;
+    if r    := n->reduce_splits();   r do return true;
+    return false;
+}
 
-    reduce_explodes :: (use n: &SnailNum, depth := 0) -> (bool, bool) {
-        if depth <= 3 {
-            if left != null {
-                if did_reduce, zero_node := left->reduce_explodes(depth + 1); zero_node {
-                    left = null;
-                    return true, false;
+SnailNum.reduce_explodes :: (use n: &SnailNum, depth := 0) -> (bool, bool) {
+    if depth <= 3 {
+        if left != null {
+            if did_reduce, zero_node := left->reduce_explodes(depth + 1); zero_node {
+                left = null;
+                return true, false;
 
-                } elseif did_reduce {
-                    return true, false;
-                }
+            } elseif did_reduce {
+                return true, false;
             }
-
-            if right != null {
-                if did_reduce, zero_node := right->reduce_explodes(depth + 1); zero_node {
-                    right = null;
-                    return true, false;
-
-                } elseif did_reduce {
-                    return true, false;
-                }
-            }
-
-            return false, false;
         }
 
-        pleft  := n->number_to_left();
-        pright := n->number_to_right();
-        if pleft  do *pleft += left_val;
-        if pright do *pright += right_val;
+        if right != null {
+            if did_reduce, zero_node := right->reduce_explodes(depth + 1); zero_node {
+                right = null;
+                return true, false;
 
+            } elseif did_reduce {
+                return true, false;
+            }
+        }
+
+        return false, false;
+    }
+
+    pleft  := n->number_to_left();
+    pright := n->number_to_right();
+    if pleft  do *pleft += left_val;
+    if pright do *pright += right_val;
+
+    left_val = 0;
+    right_val = 0;
+
+    return true, true;
+}
+
+SnailNum.reduce_splits :: (use n: &SnailNum) -> (bool) {
+    if left {
+        if left->reduce_splits() {
+            return true;
+        }
+
+    } elseif left_val >= 10 {
+        l1, l2 := split_number(left_val);
+        n->set_left(SnailNum.make_pair(l1, l2));
         left_val = 0;
+        return true;
+    }
+
+    if right {
+        if right->reduce_splits() {
+            return true;
+        }
+
+    } elseif right_val >= 10 {
+        r1, r2 := split_number(right_val);
+        n->set_right(SnailNum.make_pair(r1, r2));
         right_val = 0;
+        return true;
+    }
+    
+    return false;
 
-        return true, true;
+    split_number :: (n: u32) -> (u32, u32) {
+        h := n / 2;
+        return h, h + (n % 2);
+    }
+}
+
+SnailNum.set_left :: (parent, new_left: &SnailNum) {
+    parent.left_val = 0;
+    parent.left = new_left;
+    if new_left do new_left.parent = parent;
+}
+
+SnailNum.set_right :: (parent, new_right: &SnailNum) {
+    parent.right_val = 0;
+    parent.right = new_right;
+    if new_right do new_right.parent = parent;
+}
+
+SnailNum.number_to_left :: (n: &SnailNum) -> &u32 {
+    while n.parent && n.parent.left == n {
+        n = n.parent;
     }
 
-    reduce_splits :: (use n: &SnailNum) -> (bool) {
-        if left {
-            if left->reduce_splits() {
-                return true;
-            }
+    if !n.parent do return null;
 
-        } elseif left_val >= 10 {
-            l1, l2 := split_number(left_val);
-            n->set_left(SnailNum.make_pair(l1, l2));
-            left_val = 0;
-            return true;
-        }
+    if !n.parent.left do return &n.parent.left_val;
 
-        if right {
-            if right->reduce_splits() {
-                return true;
-            }
+    n = n.parent.left;
 
-        } elseif right_val >= 10 {
-            r1, r2 := split_number(right_val);
-            n->set_right(SnailNum.make_pair(r1, r2));
-            right_val = 0;
-            return true;
-        }
-        
-        return false;
-
-        split_number :: (n: u32) -> (u32, u32) {
-            h := n / 2;
-            return h, h + (n % 2);
-        }
+    while n.right {
+        n = n.right;
     }
 
-    set_left :: (parent, new_left: &SnailNum) {
-        parent.left_val = 0;
-        parent.left = new_left;
-        if new_left do new_left.parent = parent;
+    return &n.right_val;
+}
+
+SnailNum.number_to_right :: (n: &SnailNum) -> &u32 {
+    while n.parent && n.parent.right == n {
+        n = n.parent;
     }
 
-    set_right :: (parent, new_right: &SnailNum) {
-        parent.right_val = 0;
-        parent.right = new_right;
-        if new_right do new_right.parent = parent;
+    if !n.parent do return null;
+
+    if !n.parent.right do return &n.parent.right_val;
+
+    n = n.parent.right;
+
+    while n.left {
+        n = n.left;
     }
 
-    number_to_left :: (n: &SnailNum) -> &u32 {
-        while n.parent && n.parent.left == n {
-            n = n.parent;
-        }
+    return &n.left_val;
+}
 
-        if !n.parent do return null;
-
-        if !n.parent.left do return &n.parent.left_val;
-
-        n = n.parent.left;
-
-        while n.right {
-            n = n.right;
-        }
-
-        return &n.right_val;
+SnailNum.magnitude :: (use n: &SnailNum) => {
+    if !n {
+        return 0;
     }
 
-    number_to_right :: (n: &SnailNum) -> &u32 {
-        while n.parent && n.parent.right == n {
-            n = n.parent;
-        }
+    return 3 * (left_val + left->magnitude()) +
+           2 * (right_val + right->magnitude());
+}
 
-        if !n.parent do return null;
+SnailNum.parse :: (line: &str) -> &SnailNum {
+    string.advance(line);  // [
 
-        if !n.parent.right do return &n.parent.right_val;
-
-        n = n.parent.right;
-
-        while n.left {
-            n = n.left;
-        }
-
-        return &n.left_val;
+    root := SnailNum.make();
+    if line.data[0] == #char "[" {
+        root->set_left(SnailNum.parse(line));
+    } else {
+        root.left_val = ~~ conv.str_to_i64(line);
     }
 
-    magnitude :: (use n: &SnailNum) => {
-        if !n {
-            return 0;
-        }
+    string.advance(line);  // ,
 
-        return 3 * (left_val + left->magnitude()) +
-               2 * (right_val + right->magnitude());
+    if line.data[0] == #char "[" {
+        root->set_right(SnailNum.parse(line));
+    } else {
+        root.right_val = ~~ conv.str_to_i64(line);
     }
 
-    parse :: (line: &str) -> &SnailNum {
-        string.advance(line);  // [
+    string.advance(line); // ]
 
-        root := SnailNum.make();
-        if line.data[0] == #char "[" {
-            root->set_left(SnailNum.parse(line));
-        } else {
-            root.left_val = ~~ conv.str_to_i64(line);
-        }
+    return root;
+}
 
-        string.advance(line);  // ,
-
-        if line.data[0] == #char "[" {
-            root->set_right(SnailNum.parse(line));
-        } else {
-            root.right_val = ~~ conv.str_to_i64(line);
-        }
-
-        string.advance(line); // ]
-
-        return root;
+SnailNum.format :: (output: &conv.Format_Output, s: &conv.Format, use n: &SnailNum) {
+    if !left && !right {
+        conv.format(output, "[{},{}]", left_val, right_val);
     }
-
-    format :: (output: &conv.Format_Output, s: &conv.Format, use n: &SnailNum) {
-        if !left && !right {
-            conv.format(output, "[{},{}]", left_val, right_val);
-        }
-        elseif !left && right {
-            conv.format(output, "[{},{*}]", left_val, right);
-        }
-        elseif left && !right {
-            conv.format(output, "[{*},{}]", left, right_val);
-        }
-        elseif left && right {
-            conv.format(output, "[{*},{*}]", left, right);
-        }
+    elseif !left && right {
+        conv.format(output, "[{},{*}]", left_val, right);
+    }
+    elseif left && !right {
+        conv.format(output, "[{*},{}]", left, right_val);
+    }
+    elseif left && right {
+        conv.format(output, "[{*},{*}]", left, right);
     }
 }
 

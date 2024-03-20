@@ -8,63 +8,61 @@ Random :: struct {
     seed: i64;
 }
 
-#inject Random {
-    #doc """
-        Creates a new random number generator.
+#doc """
+    Creates a new random number generator.
 
-        An initial seed can be passed in, otherwise the current UNIX time is used.
-    """
-    make :: (seed: i64 = (#unquote __initial_value)) -> Random {
-        return .{ seed };
-    }
+    An initial seed can be passed in, otherwise the current UNIX time is used.
+"""
+Random.make :: (seed: i64 = (#unquote __initial_value)) -> Random {
+    return .{ seed };
+}
 
-    #doc "Sets the seed of the random number generator."
-    set_seed :: #match {
-        (self: &Random, s: u32) { self.seed = ~~s; },
-        (self: &Random, s: u64) { self.seed =   s; },
-    }
+#doc "Sets the seed of the random number generator."
+Random.set_seed :: #match {
+    (self: &Random, s: u32) { self.seed = ~~s; },
+    (self: &Random, s: u64) { self.seed =   s; },
+}
 
-    #doc "Generates a random 32-bit integer."
-    int :: (self: &Random) -> u32 {
-        s := self.seed * RANDOM_MULTIPLIER + RANDOM_INCREMENT;
-        defer self.seed = s;
-        return cast(u32) ((s >> 16) & ~~0xffffffff);
-    }
+#doc "Generates a random 32-bit integer."
+Random.int :: (self: &Random) -> u32 {
+    s := self.seed * RANDOM_MULTIPLIER + RANDOM_INCREMENT;
+    defer self.seed = s;
+    return cast(u32) ((s >> 16) & ~~0xffffffff);
+}
 
-    #doc "Generates a random 32-bit integer between `lo` and `hi`, inclusive."
-    between :: (self: &Random, lo: i32, hi: i32) -> i32 {
-        return self->int() % (hi + 1 - lo) + lo;
-    }
+#doc "Generates a random 32-bit integer between `lo` and `hi`, inclusive."
+Random.between :: (self: &Random, lo: i32, hi: i32) -> i32 {
+    return self->int() % (hi + 1 - lo) + lo;
+}
 
-    #doc "Generates a random floating point number between `lo` and `hi`."
-    float :: (self: &Random, lo := 0.0f, hi := 1.0f) -> f32 {
-        return (cast(f32) (self->int() % (1 << 23)) / cast(f32) (1 << 23)) * (hi - lo) + lo;
-    }
+#doc "Generates a random floating point number between `lo` and `hi`."
+Random.float :: (self: &Random, lo := 0.0f, hi := 1.0f) -> f32 {
+    return (cast(f32) (self->int() % (1 << 23)) / cast(f32) (1 << 23)) * (hi - lo) + lo;
+}
 
-    #doc "Returns a random element from a slice."
-    choice :: (self: &Random, a: [] $T) -> T {
-        return a[self->between(0, a.count - 1)];
-    }
+#doc "Returns a random element from a slice."
+Random.choice :: (self: &Random, a: [] $T) -> T {
+    return a[self->between(0, a.count - 1)];
+}
 
-    #doc """
-        Returns a random byte-array of length `bytes_long`.
+#doc """
+    Returns a random byte-array of length `bytes_long`.
 
-        If `alpha_numeric` is true, then the string will only consist of alpha-numeric characters.
-    """
-    string :: (self: &Random, bytes_long: u32, alpha_numeric := false, allocator := context.allocator) -> str {
-        use core.memory
+    If `alpha_numeric` is true, then the string will only consist of alpha-numeric characters.
+"""
+Random.string :: (self: &Random, bytes_long: u32, alpha_numeric := false, allocator := context.allocator) -> str {
+    use core.memory
 
-        s := memory.make_slice(u8, bytes_long, allocator=allocator);
-        for& s {
-            if alpha_numeric {
-                #persist alpha_numeral := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-                *it = self->choice(alpha_numeral);
-            } else {
-                *it = ~~(self->between(32, 127));
-            }
+    s := memory.make_slice(u8, bytes_long, allocator=allocator);
+    for& s {
+        if alpha_numeric {
+            #persist alpha_numeral := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            *it = self->choice(alpha_numeral);
+        } else {
+            *it = ~~(self->between(32, 127));
         }
-        return s;
     }
+    return s;
 }
 
 //

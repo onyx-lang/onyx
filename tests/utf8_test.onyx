@@ -4,7 +4,7 @@ use runtime
 
 use core {print, println, printf}
 
-#inject runtime.vars.Enable_Heap_Debug :: true
+runtime.vars.Enable_Heap_Debug :: true
 
 main :: () {
     output := make(dyn_str);
