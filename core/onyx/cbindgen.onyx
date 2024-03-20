@@ -191,6 +191,8 @@ compile_c_file :: (
     #if runtime.compiler_os == .Windows {
         return true;
     }
+
+    return false;
 }
 
 #local {

@@ -14,22 +14,20 @@ CubePos :: struct {
     x, y, z, w : i32;
 }
 
-#inject CubePos {
-    hash :: (c: CubePos) => {
-        hash: u32 = 7;
-        hash += hash << 5 + core.hash.to_u32(c.x);
-        hash += hash << 5 + core.hash.to_u32(c.y);
-        hash += hash << 5 + core.hash.to_u32(c.z);
-        hash += hash << 5 + core.hash.to_u32(c.w);
-        return hash;
-    }
+CubePos.hash :: (c: CubePos) => {
+    hash: u32 = 7;
+    hash += hash << 5 + core.hash.to_u32(c.x);
+    hash += hash << 5 + core.hash.to_u32(c.y);
+    hash += hash << 5 + core.hash.to_u32(c.z);
+    hash += hash << 5 + core.hash.to_u32(c.w);
+    return hash;
+}
 
-    equals :: (a, b: CubePos) => {
-        return (a.x == b.x) &&
-               (a.y == b.y) &&
-               (a.z == b.z) &&
-               (a.w == b.w);
-    }
+CubePos.equals :: (a, b: CubePos) => {
+    return (a.x == b.x) &&
+           (a.y == b.y) &&
+           (a.z == b.z) &&
+           (a.w == b.w);
 }
 
 

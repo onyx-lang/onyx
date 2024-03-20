@@ -272,7 +272,7 @@ ends_with :: (s: str, suffix: str) -> bool {
 empty    :: (s: str) => s.count == 0 || s.data == null;
 
 is_empty :: (s: str) -> bool #deprecated "Use 'string.empty' instead." {
-    s.count == 0 || s.data == null;
+    return s.count == 0 || s.data == null;
 }
 
 index_of :: #match #local {}

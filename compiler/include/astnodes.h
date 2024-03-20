@@ -267,6 +267,8 @@ typedef enum AstFlags {
     Ast_Flag_Private_Package       = BH_BIT(3),
     Ast_Flag_Private_File          = BH_BIT(4),
 
+    Ast_Flag_Block_Returns         = BH_BIT(5),
+
     // Expression flags
     Ast_Flag_Expr_Ignored          = BH_BIT(6),
     Ast_Flag_Address_Taken         = BH_BIT(7),
@@ -803,6 +805,7 @@ struct AstDoBlock {
     AstTyped_base;
 
     AstBlock* block;
+    bh_arr(AstLocal *) named_return_locals;
 };
 struct AstZeroValue {
     AstTyped_base;
@@ -1395,6 +1398,7 @@ struct AstFunction {
 
     bh_arr(AstParam) params;
     AstType* return_type;
+    bh_arr(AstLocal *) named_return_locals;
 
     AstBlock *body;
 
@@ -1450,6 +1454,8 @@ struct AstFunction {
     b32 is_foreign         : 1;
     b32 is_foreign_dyncall : 1;
     b32 is_intrinsic       : 1;
+
+    b32 named_return_locals_added : 1;
 };
 
 struct AstCaptureBlock {
@@ -1835,6 +1841,7 @@ typedef struct CheckerData {
     AstCall __op_maybe_overloaded;
     Entity *current_entity;
     bh_arr(Type **) expected_return_type_stack;
+    bh_arr(bh_arr(AstLocal *)) named_return_values_stack;
 } CheckerData;
 
 typedef struct ContextCaches {

@@ -204,7 +204,6 @@ str_format_va :: format_va
 
 
 
-#inject
 builtin.logf :: (level: builtin.Log_Level, format: str, va: ..any) {
     use core {conv}
 

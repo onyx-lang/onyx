@@ -48,56 +48,54 @@ MD5_Digest :: struct {
     bytes_digested: u64;
 }
 
-#inject MD5_Digest {
-    make :: () => MD5_Digest.{
-        a = 0x67452301,
-        b = 0xefcdab89,
-        c = 0x98badcfe,
-        d = 0x10325476,
-        bytes_digested = 0,
-    }
+MD5_Digest.make :: () => MD5_Digest.{
+    a = 0x67452301,
+    b = 0xefcdab89,
+    c = 0x98badcfe,
+    d = 0x10325476,
+    bytes_digested = 0,
+}
 
-    reset :: (self: &#Self) {
-        *self = MD5_Digest.make();
-    }
+MD5_Digest.reset :: (self: &#Self) {
+    *self = MD5_Digest.make();
+}
 
-    _finish :: (self: &#Self, tail: [] u8) {
-        assert(tail.count < 64, "Tail too long");
+MD5_Digest._finish :: (self: &#Self, tail: [] u8) {
+    assert(tail.count < 64, "Tail too long");
 
-        bytes_to_digest: [64] u8;
-        memory.copy(~~bytes_to_digest, tail.data, tail.count);
-        bytes_to_digest[tail.count] = 0x80;
+    bytes_to_digest: [64] u8;
+    memory.copy(~~bytes_to_digest, tail.data, tail.count);
+    bytes_to_digest[tail.count] = 0x80;
 
-        if tail.count >= 56 {
-            do_cycle(self, bytes_to_digest, accumulate=false);
-            memory.set(~~bytes_to_digest, 0, 64);
-        }
-
-        self.bytes_digested += ~~tail.count;
-        *cast(&u64, &bytes_to_digest[56]) = self.bytes_digested * 8;
-
+    if tail.count >= 56 {
         do_cycle(self, bytes_to_digest, accumulate=false);
+        memory.set(~~bytes_to_digest, 0, 64);
     }
 
-    #doc "Returns a temporary byte array of the hash."
-    as_str :: (self: #Self) -> [] u8 {
-        result := make_temp([] u8, 16);
-        for i in 0  .. 4  do result[i] = ~~((self.a & (0xff << shift(i))) >> shift(i));
-        for i in 4  .. 8  do result[i] = ~~((self.b & (0xff << shift(i))) >> shift(i));
-        for i in 8  .. 12 do result[i] = ~~((self.c & (0xff << shift(i))) >> shift(i));
-        for i in 12 .. 16 do result[i] = ~~((self.d & (0xff << shift(i))) >> shift(i));
-        return result;
-    }
+    self.bytes_digested += ~~tail.count;
+    *cast(&u64, &bytes_to_digest[56]) = self.bytes_digested * 8;
 
-    #doc "Returns a temporary string of the hash."
-    as_hex_str :: (self: #Self) -> str {
-        result := make_temp([..] u8, 32);
-        for i in 0  .. 4  do conv.format(&result, "{w2b16}", (self.a & (0xff << shift(i)) >> shift(i)));
-        for i in 4  .. 8  do conv.format(&result, "{w2b16}", (self.b & (0xff << shift(i)) >> shift(i)));
-        for i in 8  .. 12 do conv.format(&result, "{w2b16}", (self.c & (0xff << shift(i)) >> shift(i)));
-        for i in 12 .. 16 do conv.format(&result, "{w2b16}", (self.d & (0xff << shift(i)) >> shift(i)));
-        return result;
-    }
+    do_cycle(self, bytes_to_digest, accumulate=false);
+}
+
+#doc "Returns a temporary byte array of the hash."
+MD5_Digest.as_str :: (self: #Self) -> [] u8 {
+    result := make_temp([] u8, 16);
+    for i in 0  .. 4  do result[i] = ~~((self.a & (0xff << shift(i))) >> shift(i));
+    for i in 4  .. 8  do result[i] = ~~((self.b & (0xff << shift(i))) >> shift(i));
+    for i in 8  .. 12 do result[i] = ~~((self.c & (0xff << shift(i))) >> shift(i));
+    for i in 12 .. 16 do result[i] = ~~((self.d & (0xff << shift(i))) >> shift(i));
+    return result;
+}
+
+#doc "Returns a temporary string of the hash."
+MD5_Digest.as_hex_str :: (self: #Self) -> str {
+    result := make_temp([..] u8, 32);
+    for i in 0  .. 4  do conv.format(&result, "{w2b16}", (self.a & (0xff << shift(i)) >> shift(i)));
+    for i in 4  .. 8  do conv.format(&result, "{w2b16}", (self.b & (0xff << shift(i)) >> shift(i)));
+    for i in 8  .. 12 do conv.format(&result, "{w2b16}", (self.c & (0xff << shift(i)) >> shift(i)));
+    for i in 12 .. 16 do conv.format(&result, "{w2b16}", (self.d & (0xff << shift(i)) >> shift(i)));
+    return result;
 }
 
 #local

@@ -11,7 +11,7 @@ Once :: struct {
     mutex: Mutex;
 }
 
-#inject Once.exec :: #match #local {}
+Once.exec :: #match #local {}
 
 #doc "Run a function with no arguments once."
 #overload

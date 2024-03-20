@@ -10,15 +10,13 @@ use runtime
 //
 //     Vec2 :: struct { x, y: f32 }
 //
-//     #inject Vec2 {
-//         __add :: (v1, v2: Vec2) => Vec2.{ v1.x + v2.x, v1.y + v2.y };
-//     }
+//     Vec2.__add :: (v1, v2: Vec2) => Vec2.{ v1.x + v2.x, v1.y + v2.y };
 //
 // This is an optional language feature because it currently significantly
 // affects compile-time, on average adding 30% to the total compilation time.
 // To enable this feature, add this somewhere:
 //
-//     #inject runtime.vars.Onyx_Enable_Operator_Methods :: true
+//     runtime.vars.Onyx_Enable_Operator_Methods :: true
 //
 
 #local {

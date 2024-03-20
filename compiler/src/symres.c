@@ -1279,6 +1279,22 @@ SymresStatus symres_function(AstFunction* func) {
         func->flags |= Ast_Flag_Has_Been_Symres;
     }
 
+    if (func->named_return_locals) {
+        bh_arr_each(AstLocal *, named_return, func->named_return_locals) {
+            SYMRES(local, named_return);
+        }
+
+        if (!func->named_return_locals_added) {
+            func->named_return_locals_added = 1;
+            
+            AstNode **prev = &func->body->body;
+            bh_arr_each(AstLocal *, named_return, func->named_return_locals) {
+                (*named_return)->next = *prev;
+                *prev = (AstNode *) *named_return;
+            }
+        }
+    }
+
     SYMRES(block, func->body);
 
     scope_leave();

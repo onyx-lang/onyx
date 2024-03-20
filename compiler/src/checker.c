@@ -139,12 +139,17 @@ static inline void fill_in_type(AstTyped* node) {
 
 CheckStatus check_return(AstReturn* retnode) {
     Type ** expected_return_type;
+    bh_arr(AstLocal *) named_return_values;
 
     if (retnode->count >= (u32) bh_arr_length(context.checker.expected_return_type_stack)) {
         ERROR_(retnode->token->pos, "Too many repeated 'return's here. Expected a maximum of %d.",
                 bh_arr_length(context.checker.expected_return_type_stack));
     }
+
     expected_return_type = context.checker.expected_return_type_stack[bh_arr_length(context.checker.expected_return_type_stack) - retnode->count - 1];
+    named_return_values  = context.checker.named_return_values_stack[bh_arr_length(context.checker.named_return_values_stack) - retnode->count - 1];
+
+retry_return_expr_check:
 
     if (retnode->expr) {
         CHECK(expression, &retnode->expr);
@@ -182,9 +187,29 @@ CheckStatus check_return(AstReturn* retnode) {
         }
 
         if ((*expected_return_type) != &basic_types[Basic_Kind_Void]) {
-            ERROR_(retnode->token->pos,
-                "Returning from non-void function without a value. Expected a value of type '%s'.",
-                type_get_name(*expected_return_type));
+            if (!named_return_values) {
+                ERROR_(retnode->token->pos,
+                    "Returning from non-void function without a value. Expected a value of type '%s'.",
+                    type_get_name(*expected_return_type));
+
+            } else {
+                if (bh_arr_length(named_return_values) == 1) {
+                    retnode->expr = (AstTyped *) named_return_values[0];
+
+                } else {
+                    AstCompound *implicit_compound = onyx_ast_node_new(context.ast_alloc, sizeof(AstCompound), Ast_Kind_Compound);
+                    implicit_compound->token = retnode->token;
+
+                    bh_arr_new(context.ast_alloc, implicit_compound->exprs, bh_arr_length(named_return_values));
+                    bh_arr_each(AstLocal *, named_return, named_return_values) {
+                        bh_arr_push(implicit_compound->exprs, (AstTyped *) *named_return);
+                    }
+
+                    retnode->expr = (AstTyped *) implicit_compound;
+                }
+
+                goto retry_return_expr_check;
+            }
         }
     }
 
@@ -203,12 +228,14 @@ CheckStatus check_if(AstIfWhile* ifnode) {
             if (ifnode->true_stmt != NULL) {
                 CHECK(statement, (AstNode **) &ifnode->true_stmt);
                 ifnode->true_stmt->rules = Block_Rule_Macro;
+                ifnode->flags |= ifnode->true_stmt->flags & Ast_Flag_Block_Returns;
             }
 
         } else {
             if (ifnode->false_stmt != NULL) {
                 CHECK(statement, (AstNode **) &ifnode->false_stmt);
                 ifnode->false_stmt->rules = Block_Rule_Macro;
+                ifnode->flags |= ifnode->false_stmt->flags & Ast_Flag_Block_Returns;
             }
         }
 
@@ -225,6 +252,11 @@ CheckStatus check_if(AstIfWhile* ifnode) {
 
         if (ifnode->true_stmt)  CHECK(statement, (AstNode **) &ifnode->true_stmt);
         if (ifnode->false_stmt) CHECK(statement, (AstNode **) &ifnode->false_stmt);
+
+        if (ifnode->true_stmt && ifnode->false_stmt) {
+            if ((ifnode->true_stmt->flags & Ast_Flag_Block_Returns) && (ifnode->false_stmt->flags & Ast_Flag_Block_Returns))
+                ifnode->flags |= Ast_Flag_Block_Returns;
+        }
     }
 
     return Check_Success;
@@ -545,6 +577,8 @@ CheckStatus check_switch(AstSwitch* switchnode) {
         switchnode->case_block->statement_idx = 0;
     }
 
+    b32 all_cases_return = 1;
+
     fori (i, switchnode->yield_return_index, bh_arr_length(switchnode->cases)) {
         AstSwitchCase *sc = switchnode->cases[i];
 
@@ -693,6 +727,8 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
         } else {
             CHECK(block, sc->block);
+
+            all_cases_return = all_cases_return && (sc->block->flags & Ast_Flag_Block_Returns);
         }
 
         switchnode->yield_return_index += 1;
@@ -713,6 +749,8 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
         } else {
             CHECK(block, switchnode->default_case);
+
+            all_cases_return = all_cases_return && (switchnode->default_case->flags & Ast_Flag_Block_Returns);
         }
 
     } else if (switchnode->switch_kind == Switch_Kind_Union) {
@@ -744,6 +782,10 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
             ERROR_(switchnode->token->pos, "Unhandled union variants: '%s'", buf);
         }
+    }
+
+    if (all_cases_return) {
+        switchnode->flags |= Ast_Flag_Block_Returns;
     }
 
     return Check_Success;
@@ -1978,6 +2020,7 @@ CheckStatus check_do_block(AstDoBlock** pdoblock) {
     fill_in_type((AstTyped *) doblock);
 
     bh_arr_push(context.checker.expected_return_type_stack, &doblock->type);
+    bh_arr_push(context.checker.named_return_values_stack, doblock->named_return_locals);
 
     doblock->block->rules = Block_Rule_Do_Block;
 
@@ -1986,6 +2029,7 @@ CheckStatus check_do_block(AstDoBlock** pdoblock) {
     if (doblock->type == &type_auto_return) doblock->type = &basic_types[Basic_Kind_Void];
 
     bh_arr_pop(context.checker.expected_return_type_stack);
+    bh_arr_pop(context.checker.named_return_values_stack);
 
     doblock->flags |= Ast_Flag_Has_Been_Checked;
     return Check_Success;
@@ -2940,15 +2984,22 @@ CheckStatus check_block(AstBlock* block) {
     // This used to use statement_chain, but since block optimize which statements need to be rechecked,
     // it has to be its own thing.
 
+    AstNode *last = block->body;
     AstNode** start = &block->body;
     fori (i, 0, block->statement_idx) {
+        last = *start;
         start = &(*start)->next;
     }
 
     while (*start) {
+        if ((*start)->kind == Ast_Kind_Return) {
+            block->flags |= Ast_Flag_Block_Returns;
+        }
+
         CheckStatus cs = check_statement(start);
         switch (cs) {
             case Check_Success:
+                last = *start;
                 start = &(*start)->next;
                 block->statement_idx++;
                 break;
@@ -2971,7 +3022,10 @@ CheckStatus check_block(AstBlock* block) {
             default:
                 return cs;
         }
+    }
 
+    if (last && last->flags & Ast_Flag_Block_Returns) {
+        block->flags |= Ast_Flag_Block_Returns;
     }
 
     return Check_Success;
@@ -2983,7 +3037,9 @@ CheckStatus check_function(AstFunction* func) {
         YIELD(func->token->pos, "Waiting for procedure header to pass type-checking");
 
     bh_arr_clear(context.checker.expected_return_type_stack);
+    bh_arr_clear(context.checker.named_return_values_stack);
     bh_arr_push(context.checker.expected_return_type_stack, &func->type->Function.return_type);
+    bh_arr_push(context.checker.named_return_values_stack, func->named_return_locals);
 
     context.checker.inside_for_iterator = 0;
     if (context.checker.for_node_stack) bh_arr_clear(context.checker.for_node_stack);
@@ -3000,6 +3056,17 @@ CheckStatus check_function(AstFunction* func) {
 
         if (status == Check_Success) {
             status = check_block(func->body);
+        }
+
+        if (status == Check_Success &&
+            !(func->body->flags & Ast_Flag_Block_Returns) &&
+            *bh_arr_last(context.checker.expected_return_type_stack) != &basic_types[Basic_Kind_Void] &&
+            *bh_arr_last(context.checker.expected_return_type_stack) != &type_auto_return &&
+            !func->is_intrinsic &&
+            !func->is_foreign
+        ) {
+            status = Check_Error;
+            onyx_report_error(func->token->pos, Error_Critical, "Not all code paths return a value.");
         }
 
         if (status == Check_Error && func->generated_from && context.cycle_detected == 0)

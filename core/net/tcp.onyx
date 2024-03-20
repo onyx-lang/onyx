@@ -64,31 +64,29 @@ TCP_Event :: struct {
 }
 
 // Iterator implementation for TCP_Connection
-#inject TCP_Connection {
-    iter_open :: (use conn: &TCP_Connection) {
-        conn.event_cursor = 0;
-    }
+TCP_Connection.iter_open :: (use conn: &TCP_Connection) {
+    conn.event_cursor = 0;
+}
 
-    iter_next :: (use conn: &TCP_Connection) -> (TCP_Event, bool) {
-        if event_cursor == events.count do return .{}, false;
+TCP_Connection.iter_next :: (use conn: &TCP_Connection) -> (TCP_Event, bool) {
+    if event_cursor == events.count do return .{}, false;
 
-        defer event_cursor += 1;
-        return events[event_cursor], true;
-    }
+    defer event_cursor += 1;
+    return events[event_cursor], true;
+}
 
-    iter_close :: (use conn: &TCP_Connection) {
-        for events {
-            switch it.kind {
-                case .Data {
-                    raw_free(event_allocator, (cast(&TCP_Event.Data) it.data).contents.data);
-                }
+TCP_Connection.iter_close :: (use conn: &TCP_Connection) {
+    for events {
+        switch it.kind {
+            case .Data {
+                raw_free(event_allocator, (cast(&TCP_Event.Data) it.data).contents.data);
             }
-
-            raw_free(event_allocator, it.data);
         }
 
-        array.clear(&events);
+        raw_free(event_allocator, it.data);
     }
+
+    array.clear(&events);
 }
 
 
@@ -110,37 +108,31 @@ TCP_Server :: struct {
     emit_ready_event_multiple_times := false;
 }
 
-#inject TCP_Server {
-    listen        :: tcp_server_listen
-    stop          :: tcp_server_stop
-    pulse         :: tcp_server_pulse
-    send          :: tcp_server_send
-    broadcast     :: tcp_server_broadcast
-    handle_events :: tcp_server_handle_events
-    kill_client   :: tcp_server_kill_client
-}
+TCP_Server.listen        :: tcp_server_listen
+TCP_Server.stop          :: tcp_server_stop
+TCP_Server.pulse         :: tcp_server_pulse
+TCP_Server.send          :: tcp_server_send
+TCP_Server.broadcast     :: tcp_server_broadcast
+TCP_Server.handle_events :: tcp_server_handle_events
+TCP_Server.kill_client   :: tcp_server_kill_client
 
-#inject TCP_Server {
-    Client :: struct {
-        use socket  : Socket;
-        address : SocketAddress;
-        state   : State;
+TCP_Server.Client :: struct {
+    use socket  : Socket;
+    address : SocketAddress;
+    state   : State;
 
-        recv_ready_event_present := false;
+    recv_ready_event_present := false;
 
-        State :: enum {
-            Alive;
-            Being_Killed;
-            Dying;
-            Dead;
-        }
+    State :: enum {
+        Alive;
+        Being_Killed;
+        Dying;
+        Dead;
     }
 }
 
-#inject TCP_Server.Client {
-    read_complete :: (use this: &TCP_Server.Client) {
-        recv_ready_event_present = false;
-    }
+TCP_Server.Client.read_complete :: (use this: &TCP_Server.Client) {
+    recv_ready_event_present = false;
 }
 
 tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> &TCP_Server {

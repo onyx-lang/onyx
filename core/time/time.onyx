@@ -23,28 +23,26 @@ Timestamp :: struct #size (sizeof u32 * 12) {
     isdst: i32;
 }
 
-#inject Timestamp {
-    #doc "Converts a Date into a Timestamp."
-    from_date :: (d: Date) -> Timestamp {
-        return .{
-            year = d.year - 1900,
-            mday = d.day,
-            mon  = d.month
-        };
-    }
+#doc "Converts a Date into a Timestamp."
+Timestamp.from_date :: (d: Date) -> Timestamp {
+    return .{
+        year = d.year - 1900,
+        mday = d.day,
+        mon  = d.month
+    };
+}
 
-    #doc "Converts the month, day and year fields into a `Date`."
-    as_date :: (t: Timestamp) -> Date {
-        return Date.make(t.year + 1900, t.mon + 1, t.mday);
-    }
+#doc "Converts the month, day and year fields into a `Date`."
+Timestamp.as_date :: (t: Timestamp) -> Date {
+    return Date.make(t.year + 1900, t.mon + 1, t.mday);
+}
 
-    to_epoch :: to_epoch
+Timestamp.to_epoch :: to_epoch
 
-    #doc "Formats a timestamp into a string."
-    format :: (t: Timestamp, format := "%Y-%m-%d %H:%M:%S") -> str {
-        t_ := t;
-        return strftime(format, &t_);
-    }
+#doc "Formats a timestamp into a string."
+Timestamp.format :: (t: Timestamp, format := "%Y-%m-%d %H:%M:%S") -> str {
+    t_ := t;
+    return strftime(format, &t_);
 }
 
 #tag conv.Custom_Format_Proc.{ Timestamp }

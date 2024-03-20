@@ -6,28 +6,26 @@ Func :: #distinct Value
 
 func :: Func.from
 
-#inject Func {
-    #doc "Creates a JavaScript function that wraps an Onyx function."
-    from :: (f: (this: Value, args: [] Value) -> Value) -> Func {
-        func := __make_func(f);
-        __add_to_pool(cast(Value) func);
-        return func;
+#doc "Creates a JavaScript function that wraps an Onyx function."
+Func.from :: (f: (this: Value, args: [] Value) -> Value) -> Func {
+    func := __make_func(f);
+    __add_to_pool(cast(Value) func);
+    return func;
+}
+
+Func.release :: (f: Func) {
+    if __current_pool {
+        __current_pool->remove(cast(Value) f);
     }
 
-    release :: (f: Func) {
-        if __current_pool {
-            __current_pool->remove(cast(Value) f);
-        }
+    cast(Value, f)->release();
+}
 
-        cast(Value, f)->release();
+Func.leak :: (f: Func) -> Func {
+    if __current_pool {
+        __current_pool->remove(cast(Value) f);
     }
 
-    leak :: (f: Func) -> Func {
-        if __current_pool {
-            __current_pool->remove(cast(Value) f);
-        }
-
-        return f;
-    }
+    return f;
 }
 

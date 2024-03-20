@@ -140,16 +140,14 @@ OnyxContext :: struct {
 //
 // Define helper methods for setting and retrieving the user_data
 // stored on the context.
-#inject OnyxContext {
-    set_user_data :: macro (c: &OnyxContext, data: &$T) {
-        c.user_data = data;
-        c.user_data_type = T;
-    }
+OnyxContext.set_user_data :: macro (c: &OnyxContext, data: &$T) {
+    c.user_data = data;
+    c.user_data_type = T;
+}
 
-    get_user_data :: macro (c: &OnyxContext, $T: type_expr) -> &T {
-        if c.user_data_type != T do return null;
-        return ~~ c.user_data;
-    }
+OnyxContext.get_user_data :: macro (c: &OnyxContext, $T: type_expr) -> &T {
+    if c.user_data_type != T do return null;
+    return ~~ c.user_data;
 }
 
 
@@ -276,16 +274,14 @@ raw_free :: (use a: Allocator, ptr: rawptr) {
     func(data, AllocationAction.Free, 0, 0, ptr);
 }
 
-#inject Allocator {
-    alloc :: raw_alloc
-    resize :: raw_resize
-    free :: raw_free
+Allocator.alloc :: raw_alloc
+Allocator.resize :: raw_resize
+Allocator.free :: raw_free
 
-    move :: macro (use a: Allocator, v: $V) -> &V {
-        out := cast(&V) a->alloc(sizeof V);
-        *out = v;
-        return out;
-    }
+Allocator.move :: macro (use a: Allocator, v: $V) -> &V {
+    out := cast(&V) a->alloc(sizeof V);
+    *out = v;
+    return out;
 }
 
 //

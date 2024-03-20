@@ -43,126 +43,125 @@ CSV_Column :: struct {
     name: str;
 }
 
-#doc "Define methods used with the CSV structure."
-#inject CSV {
-    #doc "Create and initialize a CSV with no elements."
-    make :: ($T: type_expr) => {
-        r := CSV(T).{};
-        r.entries = make(typeof r.entries);
+#doc "Create and initialize a CSV with no elements."
+CSV.make :: ($T: type_expr) => {
+    r := CSV(T).{};
+    r.entries = make(typeof r.entries);
 
-        return r;
+    return r;
+}
+
+#doc "Frees all data in a CSV."
+CSV.delete :: (csv: &CSV) {
+    delete(&csv.entries);
+}
+
+#doc """
+    Ingests data from a string representing CSV data.
+    Uses the type of the CSV to know what columns should be expected.
+    If `headers_presents` is true, the first line will be treated as
+    headers, and cross checked with the CSV_Column tag information.
+    Use this when the columns from your CSV have a different order
+    from the order of fields in the structure.
+"""
+CSV.ingress_string :: (csv: &CSV, contents: str, headers_present := true) -> bool {
+    reader, stream := io.reader_from_string(contents);
+    defer cfree(stream);
+
+    return csv->ingress(&reader, headers_present);
+}
+
+#doc """
+    Ingests data from a Reader containing CSV data.
+    Uses the type of the CSV to know what columns should be expectd.
+"""
+CSV.ingress :: (csv: &CSV, reader: &io.Reader, headers_present := true) -> bool {
+    Header :: struct {
+        type: type_expr;
+        offset: i32;
     }
 
-    #doc "Frees all data in a CSV."
-    delete :: (csv: &CSV) {
-        delete(&csv.entries);
-    }
+    any_headers := make([..] Header);
+    defer delete(&any_headers);
 
-    #doc """
-        Ingests data from a string representing CSV data.
-        Uses the type of the CSV to know what columns should be expected.
-        If `headers_presents` is true, the first line will be treated as
-        headers, and cross checked with the CSV_Column tag information.
-        Use this when the columns from your CSV have a different order
-        from the order of fields in the structure.
-    """
-    ingress_string :: (csv: &CSV, contents: str, headers_present := true) -> bool {
-        reader, stream := io.reader_from_string(contents);
-        defer cfree(stream);
+    output_type_info: &Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
 
-        return csv->ingress(&reader, headers_present);
-    }
-    
-    #doc """
-        Ingests data from a Reader containing CSV data.
-        Uses the type of the CSV to know what columns should be expectd.
-    """
-    ingress :: (csv: &CSV, reader: &io.Reader, headers_present := true) -> bool {
-        Header :: struct {
-            type: type_expr;
-            offset: i32;
-        }
+    if headers_present {
+        header_line := reader->read_line(allocator=context.temp_allocator)
+                    |> string.strip_trailing_whitespace();
 
-        any_headers := make([..] Header);
-        defer delete(&any_headers);
-
-        output_type_info: &Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
-
-        if headers_present {
-            header_line := reader->read_line(allocator=context.temp_allocator)
-                        |> string.strip_trailing_whitespace();
-
-            for header in string.split_iter(header_line, #char ",") {
-                member := array.first(output_type_info.members, [](do {
-                    if tag := array.first(it.tags, [t](t.type == CSV_Column)); tag {
-                        return any_as(*tag, CSV_Column).name == header;
-                    }
-
-                    return false;
-                }));
-
-                any_headers << ((.{member.type, member.offset}) if member else .{void, -1});
-            }
-
-        } else {
-            for &member in output_type_info.members {
-                any_headers << .{ member.type, member.offset };
-            }
-        }
-
-        for line in reader->lines(allocator = context.temp_allocator) {
-            out: csv.Output_Type;
-
-            for entry in string.split_iter(string.strip_trailing_whitespace(line), #char ",")
-                    |> iter.enumerate()
-            {
-                header := &any_headers[entry.index];
-                if header.offset == -1 do continue;
-
-                target := cast([&] u8) &out + header.offset;
-
-                if header.type == str {
-                    *cast(&str) target = string.alloc_copy(entry.value);
-                } else {
-                    conv.parse_any(target, header.type, entry.value);
+        for header in string.split_iter(header_line, #char ",") {
+            member := array.first(output_type_info.members, [](do {
+                if tag := array.first(it.tags, [t](t.type == CSV_Column)); tag {
+                    return any_as(*tag, CSV_Column).name == header;
                 }
-            }
 
-            csv.entries << out;
+                return false;
+            }));
+
+            any_headers << ((.{member.type, member.offset}) if member else .{void, -1});
+        }
+
+    } else {
+        for &member in output_type_info.members {
+            any_headers << .{ member.type, member.offset };
         }
     }
 
-    #doc """
-        Outputs data from a CSV into a Writer.
-        When `include_headers` is true, the first line outputted will be
-        the headers of the CSV, according to the CSV_Column tag information.
-    """
-    egress :: (csv: &CSV, writer: &io.Writer, include_headers := true) {
-        output_type_info: &Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
+    for line in reader->lines(allocator = context.temp_allocator) {
+        out: csv.Output_Type;
 
-        if include_headers {
-            for &member in output_type_info.members {
-                if !#first do io.write(writer, ",");
+        for entry in string.split_iter(string.strip_trailing_whitespace(line), #char ",")
+                |> iter.enumerate()
+        {
+            header := &any_headers[entry.index];
+            if header.offset == -1 do continue;
 
-                if tag := array.first(member.tags, [t](t.type == CSV_Column)); tag {
-                    io.write(writer, any_as(*tag, CSV_Column).name);
-                } else {
-                    io.write(writer, member.name);
-                }
+            target := cast([&] u8) &out + header.offset;
+
+            if header.type == str {
+                *cast(&str) target = string.alloc_copy(entry.value);
+            } else {
+                conv.parse_any(target, header.type, entry.value);
             }
-
-            io.write(writer, "\n");
         }
 
-        for &it in csv.entries {
-            for &member in output_type_info.members {
-                if !#first do io.write(writer, ",");
+        csv.entries << out;
+    }
 
-                io.write_format_va(writer, "{}", .[ .{cast([&] u8) it + member.offset, member.type} ]);
+    return true;
+}
+
+#doc """
+    Outputs data from a CSV into a Writer.
+    When `include_headers` is true, the first line outputted will be
+    the headers of the CSV, according to the CSV_Column tag information.
+"""
+CSV.egress :: (csv: &CSV, writer: &io.Writer, include_headers := true) {
+    output_type_info: &Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
+
+    if include_headers {
+        for &member in output_type_info.members {
+            if !#first do io.write(writer, ",");
+
+            if tag := array.first(member.tags, [t](t.type == CSV_Column)); tag {
+                io.write(writer, any_as(*tag, CSV_Column).name);
+            } else {
+                io.write(writer, member.name);
             }
-
-            io.write(writer, "\n");
         }
+
+        io.write(writer, "\n");
+    }
+
+    for &it in csv.entries {
+        for &member in output_type_info.members {
+            if !#first do io.write(writer, ",");
+
+            io.write_format_va(writer, "{}", .[ .{cast([&] u8) it + member.offset, member.type} ]);
+        }
+
+        io.write(writer, "\n");
     }
 }
 

@@ -125,7 +125,7 @@ str_to_f64 :: (s: &str) -> f64 {
         }
     }
 
-    parse_digits :: (s: &str) -> (f64, digit_count: i32) {
+    parse_digits :: (s: &str) -> (f64, i32) {
         value: f64 = 0;
         count := 0;
         while s.count > 0 do switch s.data[0] {

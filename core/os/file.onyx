@@ -27,12 +27,12 @@ OpenMode :: enum {
     Append  :: 0x03;
 }
 
+FileData :: fs.FileData;
+
 File :: struct {
     use stream : io.Stream;
     data   : fs.FileData;
 }
-
-FileData :: fs.FileData;
 
 // Most of these types were stollen directly from
 // man readdir(3), and the most reasonable types

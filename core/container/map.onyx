@@ -41,25 +41,21 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
     { t == t       } -> bool;
 }
 
-#inject Map {
-    init    :: init
-    has     :: has
-    get     :: get
-    get_ptr :: get_ptr
-    get_opt :: get_opt
-    get_ptr_or_create :: get_ptr_or_create
-    put     :: put
-    delete  :: delete
-    update  :: update
-    clear   :: clear
-    empty   :: empty
-    literal :: literal
-    as_iter :: as_iter
-}
+Map.init    :: init
+Map.has     :: has
+Map.get     :: get
+Map.get_ptr :: get_ptr
+Map.get_opt :: get_opt
+Map.get_ptr_or_create :: get_ptr_or_create
+Map.put     :: put
+Map.delete  :: delete
+Map.update  :: update
+Map.clear   :: clear
+Map.empty   :: empty
+Map.literal :: literal
+Map.as_iter :: as_iter
 
-#inject builtin {
-    Map :: Map;
-}
+builtin.Map :: Map
 
 
 #doc """

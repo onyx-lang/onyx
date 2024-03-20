@@ -20,11 +20,9 @@ main :: () {
     });
 }
 
-#inject Map {
-    each :: macro (m: $M, body: Code) {
-        for& m.entries {
-            #unquote body(it.key, it.value);
-        }
+Map.each :: macro (m: $M, body: Code) {
+    for& m.entries {
+        #unquote body(it.key, it.value);
     }
 }
 

@@ -1,0 +1,31 @@
+//+optional-semicolons
+use core {*}
+
+f :: () -> (x: i32, y: i32, z: i32) {
+    y = 20
+    z = 30
+    x = 10
+
+    return
+}
+
+g :: (a: i32) -> (f: f32) {
+    f = ~~(a * 2)
+    return
+}
+
+sum :: macro (a: [] $T) -> (total: T) {
+    for a do total += it
+    return
+}
+
+main :: () {
+    x, y, z := f()
+    printf("{} {} {}\n", x, y, z)
+
+    asdf := g(20)
+    println(asdf)
+
+    sum(.[1, 2, 3, 4, 5]) |> println()
+    sum(f32.[1, 2, 3, 4, 5]) |> println()
+}

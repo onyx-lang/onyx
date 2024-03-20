@@ -15,12 +15,10 @@ Pair :: struct (First_Type: type_expr, Second_Type: type_expr) {
     second: Second_Type;
 }
 
-#inject Pair {
-    make :: macro (x: $X, y: $Y) => #this_package.Pair(X, Y).{x, y};
+Pair.make :: macro (x: $X, y: $Y) => #this_package.Pair(X, Y).{x, y};
 
-    _format :: (output: &conv.Format_Output, format: &conv.Format, p: &Pair($First_Type, $Second_Type)) {
-        conv.format(output, "({}, {})", p.first, p.second);
-    }
+Pair._format :: (output: &conv.Format_Output, format: &conv.Format, p: &Pair($First_Type, $Second_Type)) {
+    conv.format(output, "({}, {})", p.first, p.second);
 }
 
 #overload

@@ -4,9 +4,7 @@
 
 use core {package, test}
 
-#inject core {
-    Running_Tests :: true 
-}
+core.Running_Tests :: true 
 
 main :: () {
     test.run_tests();

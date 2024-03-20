@@ -790,7 +790,20 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
         doblock->block = expansion;
         doblock->type = template->type->Function.return_type;
         doblock->next = expansion->next;
+        doblock->named_return_locals = NULL;
         expansion->next = NULL;
+
+        if (template->named_return_locals) {
+            bh_arr_new(context.ast_alloc, doblock->named_return_locals, bh_arr_length(template->named_return_locals));
+
+            bh_arr_each(AstLocal *, named_return, template->named_return_locals) {
+                AstLocal *cloned = (AstLocal *) ast_clone(context.ast_alloc, *named_return);
+                bh_arr_push(doblock->named_return_locals, cloned);
+
+                cloned->next = doblock->block->body;
+                doblock->block->body = (AstNode *) cloned;
+            }
+        }
 
         subst = (AstNode *) doblock;
     }

@@ -3,15 +3,11 @@ package core.encoding.kdl
 
 use core {iter, alloc, array, string}
 
-#inject Document {
-    query     :: query_doc
-    query_all :: query_doc_all
-}
+Document.query     :: query_doc
+Document.query_all :: query_doc_all
 
-#inject Node {
-    query     :: query_node
-    query_all :: query_node_all
-}
+Node.query     :: query_node
+Node.query_all :: query_node_all
 
 query :: #match #local {
     query_doc, query_node
@@ -79,7 +75,6 @@ QueryIterator :: struct {
     current_selector := 0;
 }
 
-#inject
 QueryIterator.make :: (
     d: &Document,
     q: Query,
@@ -533,7 +528,6 @@ skip_whitespace :: (p: &QueryParser) {
 #local
 reached_end :: macro (p: &QueryParser) => p.cursor >= p.query.length;
 
-#inject
 QueryParser.rem :: (p: &QueryParser) => p.query[p.cursor .. p.query.length];
 
 #local

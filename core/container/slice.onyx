@@ -37,7 +37,7 @@ make :: ($T: type_expr, length: u32, allocator := context.allocator) -> [] T {
         println(sl);
         // 0 0 0 0 0 0 0 0 0 0
 """
-init :: (sl: &[] $T, length: u32, allocator := context.allocator) -> [] T {
+init :: (sl: &[] $T, length: u32, allocator := context.allocator) {
     sl.count = length;
     sl.data = raw_alloc(allocator, sizeof T * length);
     memory.set(sl.data, 0, sizeof T * length);

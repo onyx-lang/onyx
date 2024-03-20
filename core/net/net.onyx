@@ -19,23 +19,21 @@ Socket :: struct {
 }
 
 // Inject methods for the socket
-#inject Socket {
-    close     :: socket_close
-    option    :: socket_option
-    is_alive  :: socket_is_alive
-    bind      :: socket_bind
-    listen    :: socket_listen
-    accept    :: socket_accept
-    connect   :: socket_connect
-    shutdown  :: socket_shutdown
-    send      :: socket_send
-    sendto    :: socket_sendto
-    sendall   :: socket_sendall
-    recv      :: socket_recv
-    recv_into :: socket_recv_into
-    recvfrom  :: socket_recvfrom
-    poll      :: socket_poll
-}
+Socket.close     :: socket_close
+Socket.option    :: socket_option
+Socket.is_alive  :: socket_is_alive
+Socket.bind      :: socket_bind
+Socket.listen    :: socket_listen
+Socket.accept    :: socket_accept
+Socket.connect   :: socket_connect
+Socket.shutdown  :: socket_shutdown
+Socket.send      :: socket_send
+Socket.sendto    :: socket_sendto
+Socket.sendall   :: socket_sendall
+Socket.recv      :: socket_recv
+Socket.recv_into :: socket_recv_into
+Socket.recvfrom  :: socket_recvfrom
+Socket.poll      :: socket_poll
 
 SocketFamily :: enum {
     Unknown :: 0x00;
@@ -101,7 +99,6 @@ SocketAddress :: union {
     };
 }
 
-#inject
 SocketAddress.addr_as_str :: (this: &SocketAddress, allocator := context.allocator) -> str {
     return switch *this {
         case .Unix as path => string.as_str(cast(cstr) path);

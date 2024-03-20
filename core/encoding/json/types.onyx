@@ -43,98 +43,96 @@ Error :: struct {
 
 Value :: #distinct ^_Value
 
-#inject Value {
-    type :: (v: Value) -> Value_Type {
-        if cast(rawptr) v == null do return .Null;
-        return (cast(^_Value) v).type;
+Value.type :: (v: Value) -> Value_Type {
+    if cast(rawptr) v == null do return .Null;
+    return (cast(^_Value) v).type;
+}
+
+Value.as_bool :: (v: Value) -> bool {
+    if cast(rawptr) v == null do return false;
+
+    if (cast(^_Value) v).type == .Bool do return (cast(^_Value_Bool) cast(^_Value) v).bool_;
+    return false;
+}
+
+Value.as_str :: (v: Value) -> str {
+    if cast(rawptr) v == null do return null_str;
+
+    if (cast(^_Value) v).type == .String do return (cast(^_Value_String) cast(^_Value) v).str_;
+    return "";
+}
+
+Value.as_int :: (v: Value) -> i64 {
+    if cast(rawptr) v == null do return 0;
+
+    if (cast(^_Value) v).type == .Integer do return (cast(^_Value_Integer) cast(^_Value) v).int_;
+    if (cast(^_Value) v).type == .Float   do return ~~ (cast(^_Value_Float) cast(^_Value) v).float_;
+    return 0;
+}
+
+Value.as_float :: (v: Value) -> f64 {
+    if cast(rawptr) v == null do return 0;
+
+    if (cast(^_Value) v).type == .Float   do return (cast(^_Value_Float) cast(^_Value) v).float_;
+    if (cast(^_Value) v).type == .Integer do return ~~ (cast(^_Value_Integer) cast(^_Value) v).int_;
+    return 0;
+}
+
+Value.as_array :: (v: Value) -> [..] Value {
+    if cast(rawptr) v == null do return .{};
+    if (cast(^_Value) v).type != .Array do return .{};
+
+    return (cast(^_Value_Array) cast(^_Value) v).array_;
+}
+
+Value.as_map :: (v: Value) -> Map(str, Value) {
+    if cast(rawptr) v == null do return .{};
+    if (cast(^_Value) v).type != .Object do return .{};
+
+    m: Map(str, Value);
+    for ^(cast(^_Value_Object, cast(^_Value, v))).object_ {
+        m->put(it.key, it.value);
     }
 
-    as_bool :: (v: Value) -> bool {
-        if cast(rawptr) v == null do return false;
+    return m;
+}
 
-        if (cast(^_Value) v).type == .Bool do return (cast(^_Value_Bool) cast(^_Value) v).bool_;
-        return false;
-    }
+Value.as_array_iter :: (v: Value) -> Iterator(Value) {
+    if cast(rawptr) v == null           do return iter.empty(Value);
+    if (cast(^_Value) v).type != .Array do return iter.empty(Value);
 
-    as_str :: (v: Value) -> str {
-        if cast(rawptr) v == null do return null_str;
-
-        if (cast(^_Value) v).type == .String do return (cast(^_Value_String) cast(^_Value) v).str_;
-        return "";
-    }
-
-    as_int :: (v: Value) -> i64 {
-        if cast(rawptr) v == null do return 0;
-
-        if (cast(^_Value) v).type == .Integer do return (cast(^_Value_Integer) cast(^_Value) v).int_;
-        if (cast(^_Value) v).type == .Float   do return ~~ (cast(^_Value_Float) cast(^_Value) v).float_;
-        return 0;
-    }
-
-    as_float :: (v: Value) -> f64 {
-        if cast(rawptr) v == null do return 0;
-
-        if (cast(^_Value) v).type == .Float   do return (cast(^_Value_Float) cast(^_Value) v).float_;
-        if (cast(^_Value) v).type == .Integer do return ~~ (cast(^_Value_Integer) cast(^_Value) v).int_;
-        return 0;
-    }
-
-    as_array :: (v: Value) -> [..] Value {
-        if cast(rawptr) v == null do return .{};
-        if (cast(^_Value) v).type != .Array do return .{};
-
-        return (cast(^_Value_Array) cast(^_Value) v).array_;
-    }
-
-    as_map :: (v: Value) -> Map(str, Value) {
-        if cast(rawptr) v == null do return .{};
-        if (cast(^_Value) v).type != .Object do return .{};
-
-        m: Map(str, Value);
-        for ^(cast(^_Value_Object, cast(^_Value, v))).object_ {
-            m->put(it.key, it.value);
+    return iter.generator(
+        &.{ arr = cast(&_Value_Array, cast(&_Value, v)).array_, index = 0 },
+        ctx => {
+            if ctx.index < ctx.arr.count {
+                defer ctx.index += 1;
+                return ctx.arr[ctx.index], true;
+            }
+            return .{}, false;
         }
+    );
+}
 
-        return m;
-    }
+Value.as_map_iter :: (v: Value) -> Iterator(Pair(str, Value)) {
+    if cast(rawptr) v == null            do return iter.empty(Pair(str, Value));
+    if (cast(^_Value) v).type != .Object do return iter.empty(Pair(str, Value));
 
-    as_array_iter :: (v: Value) -> Iterator(Value) {
-        if cast(rawptr) v == null           do return iter.empty(Value);
-        if (cast(^_Value) v).type != .Array do return iter.empty(Value);
-
-        return iter.generator(
-            &.{ arr = cast(&_Value_Array, cast(&_Value, v)).array_, index = 0 },
-            ctx => {
-                if ctx.index < ctx.arr.count {
-                    defer ctx.index += 1;
-                    return ctx.arr[ctx.index], true;
-                }
-                return .{}, false;
+    return iter.generator(
+        &.{ obj = cast(&_Value_Object, cast(&_Value, v)).object_, index = 0 },
+        ctx => {
+            if ctx.index < ctx.obj.count {
+                defer ctx.index += 1;
+                v := &ctx.obj[ctx.index];
+                return Pair.make(v.key, v.value), true;
             }
-        );
-    }
+            return .{}, false;
+        }
+    );
+}
 
-    as_map_iter :: (v: Value) -> Iterator(Pair(str, Value)) {
-        if cast(rawptr) v == null            do return iter.empty(Pair(str, Value));
-        if (cast(^_Value) v).type != .Object do return iter.empty(Pair(str, Value));
-
-        return iter.generator(
-            &.{ obj = cast(&_Value_Object, cast(&_Value, v)).object_, index = 0 },
-            ctx => {
-                if ctx.index < ctx.obj.count {
-                    defer ctx.index += 1;
-                    v := &ctx.obj[ctx.index];
-                    return Pair.make(v.key, v.value), true;
-                }
-                return .{}, false;
-            }
-        );
-    }
-
-    is_null :: (v: Value) -> bool {
-        if cast(rawptr) v == null do return true;
-        return cast(^_Value) v == ^_null_value || (cast(^_Value) v).type == .Null;
-    }
+Value.is_null :: (v: Value) -> bool {
+    if cast(rawptr) v == null do return true;
+    return cast(^_Value) v == ^_null_value || (cast(^_Value) v).type == .Null;
 }
 
 Value_Type :: enum {
