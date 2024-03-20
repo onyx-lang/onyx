@@ -31,8 +31,7 @@ writer_make :: (s: &Stream, buffer_size := 4096) -> Writer {
     return w;
 }
 
-//
-// Future-proofing the API
+#overload delete :: writer_free
 writer_free :: (w: &Writer) {
     writer_flush(w);
     delete(&w.buffer);

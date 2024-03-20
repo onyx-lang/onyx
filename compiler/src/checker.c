@@ -1980,6 +1980,7 @@ CheckStatus check_do_block(AstDoBlock** pdoblock) {
     bh_arr_push(context.checker.expected_return_type_stack, &doblock->type);
 
     doblock->block->rules = Block_Rule_Do_Block;
+
     CHECK(block, doblock->block);
 
     if (doblock->type == &type_auto_return) doblock->type = &basic_types[Basic_Kind_Void];
@@ -2954,6 +2955,18 @@ CheckStatus check_block(AstBlock* block) {
 
             case Check_Return_To_Symres:
                 block->statement_idx = 0;
+                return cs;
+
+            case Check_Failed:
+            case Check_Error:
+                if (block->macro_generated_from) {
+                    onyx_report_error(
+                        block->macro_generated_from->pos,
+                        Error_Critical,
+                        "Error in 'macro' that was generated from here."
+                    );
+                }
+                return cs;
 
             default:
                 return cs;
