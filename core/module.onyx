@@ -118,6 +118,8 @@ use runtime
     #load "./sync/semaphore"
     #load "./sync/barrier"
     #load "./sync/once"
+    #load "./sync/channel"
+    #load "./sync/mutex_guard"
 }
 
 

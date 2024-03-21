@@ -1,0 +1,49 @@
+package core.sync
+
+use core.iter
+use core.array
+
+Channel :: struct (T: type_expr) {
+    _buf: [..] T;
+    _mutex: Mutex;
+    _condvar: Condition_Variable;
+}
+
+Channel.make :: ($T: type_expr, allocator := context.allocator) -> (chan: Channel(T)) {
+    chan._buf = make([..] T, allocator);
+    mutex_init(&chan._mutex);
+    condition_init(&chan._condvar);
+    return;
+}
+
+Channel.send :: (chan: Channel, msg: chan.T) {
+    critical_section(&chan._mutex) {
+        array.push(&chan._buf, msg);
+        condition_broadcast(&chan._condvar);
+    }
+}
+
+Channel.recv :: (chan: Channel) -> chan.T {
+    res: chan.T;
+
+    critical_section(&chan._mutex) {
+        while (chan._buf.length == 0) {
+            condition_wait(&chan._condvar, &chan._mutex);
+        }
+
+        res = chan._buf[0];
+        array.delete(&chan._buf, 0);
+    }
+
+    return res;
+}
+
+Channel.as_iter :: (chan: Channel) -> Iterator(chan.T) {
+    return iter.generator(
+        &.{chan = chan},
+        ctx => {
+            return chan->recv(), true;
+        }
+    );
+}
+

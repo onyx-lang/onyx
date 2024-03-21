@@ -257,6 +257,18 @@ AstNumLit* ast_reduce_binop(bh_allocator a, AstBinaryOp* node) {
         }
     }
 
+    if (left->kind != Ast_Kind_NumLit) {
+        b32 valid = 0;
+        AstNumLit *tmp = make_int_literal(a, get_expression_integer_value((AstTyped *) left, &valid));
+        if (valid) left = tmp;
+    }
+
+    if (right->kind != Ast_Kind_NumLit) {
+        b32 valid = 0;
+        AstNumLit *tmp = make_int_literal(a, get_expression_integer_value((AstTyped *) right, &valid));
+        if (valid) right = tmp;
+    }
+
     if (left->kind != Ast_Kind_NumLit || right->kind != Ast_Kind_NumLit) {
         node->left  = (AstTyped *) left;
         node->right = (AstTyped *) right;
