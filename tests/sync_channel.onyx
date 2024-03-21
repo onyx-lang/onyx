@@ -3,14 +3,15 @@
 use core {*}
 
 main :: () {
-    chan := sync.Channel.make(Msg) |> alloc.on_heap()
+    chan := sync.Channel.make(Msg)
 
     consumer_thread: thread.Thread
-    thread.spawn(&consumer_thread, chan, consumer)
+    thread.spawn(&consumer_thread, &chan, consumer)
 
-    for 10 {
-        os.sleep(200)
+    for 20 {
+        os.sleep(150)
         chan->send(.{ Int = it * 10 })
+        chan->send(.{ Int = it * 10 + 5 })
     }
 
     chan->send(.{Str = "Done"})

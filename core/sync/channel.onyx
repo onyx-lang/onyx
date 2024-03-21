@@ -21,6 +21,7 @@ Channel.make :: ($T: type_expr, allocator := context.allocator) -> (chan: Channe
 
 Channel.close :: (chan: &Channel) {
     chan._is_open = false;
+    condition_broadcast(&chan._condvar);
 }
 
 Channel.send :: (chan: &Channel, msg: chan.T) {
@@ -32,17 +33,19 @@ Channel.send :: (chan: &Channel, msg: chan.T) {
     }
 }
 
-Channel.recv :: (chan: &Channel) -> chan.T {
-    res: chan.T;
+Channel.recv :: (chan: &Channel) -> ? chan.T {
+    scoped_mutex(&chan._mutex);
 
-    critical_section(&chan._mutex) {
-        while (chan._buf.length == 0) {
-            condition_wait(&chan._condvar, &chan._mutex);
-        }
-
-        res = chan._buf[0];
-        array.delete(&chan._buf, 0);
+    while chan._buf.length == 0 && chan._is_open {
+        condition_wait(&chan._condvar, &chan._mutex);
     }
+
+    if chan._buf.length == 0 {
+        return .None;
+    }
+
+    res := chan._buf[0];
+    array.delete(&chan._buf, 0);
 
     return res;
 }
@@ -51,9 +54,8 @@ Channel.as_iter :: (chan: &Channel) -> Iterator(chan.T) {
     return iter.generator(
         &.{chan = chan},
         ctx => {
-            if ctx.chan._is_open || ctx.chan._buf.length > 0 {
-                return ctx.chan->recv(), true;
-            }
+            v := ctx.chan->recv();
+            if v do return v->unwrap(), true;
 
             return .{}, false;
         }
