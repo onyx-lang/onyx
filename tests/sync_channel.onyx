@@ -1,0 +1,33 @@
+//+optional-semicolons
+
+use core {*}
+
+main :: () {
+    chan := sync.Channel.make(Msg) |> alloc.on_heap()
+
+    consumer_thread: thread.Thread
+    thread.spawn(&consumer_thread, chan, consumer)
+
+    for 10 {
+        os.sleep(200)
+        chan->send(.{ Int = it * 10 })
+    }
+
+    chan->send(.{Str = "Done"})
+    chan->close()
+
+    thread.join(&consumer_thread)
+}
+
+Msg :: union {
+    Str: str
+    Int: i32
+}
+
+consumer :: (channel: &sync.Channel(Msg)) {
+    for msg in channel->as_iter() {
+        println(msg)
+    }
+}
+
+
