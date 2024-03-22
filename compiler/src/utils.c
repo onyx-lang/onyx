@@ -204,6 +204,22 @@ AstNode* symbol_raw_resolve_no_ascend(Scope* scope, char* sym) {
     return NULL;
 }
 
+AstNode* symbol_raw_resolve_limited(Scope* start_scope, char* sym, i32 limit) {
+    Scope* scope = start_scope;
+    AstNode *res = NULL;
+
+    while (scope != NULL && limit-- > 0) {
+        res = symbol_raw_resolve_no_ascend(scope, sym);
+        if (res) {
+            return res;
+        }
+
+        scope = scope->parent;
+    }
+
+    return NULL;
+}
+
 AstNode* symbol_raw_resolve(Scope* start_scope, char* sym) {
     Scope* scope = start_scope;
     AstNode *res = NULL;
@@ -309,44 +325,17 @@ all_types_peeled_off:
         case Ast_Kind_Struct_Type: {
             AstStructType* stype = (AstStructType *) node;
 
-            // HACK HACK
             // Temporarily disable the parent scope so that you can't access things
             // "above" the structures scope. This leads to unintended behavior, as when
             // you are accessing a static element on a structure, you don't expect to
-            // bleed to the top level scope. This code is currently very GROSS, and
-            // should be refactored soon.
+            // bleed to the top level scope.            AstNode *result = NULL;
             AstNode *result = NULL;
-            if (stype->scope) {
-                Scope **tmp_parent;
-                Scope *tmp_parent_backup;
-                if (stype->stcache && stype->stcache->Struct.constructed_from) {
-                    // Structs scope -> Poly Solution Scope -> Poly Struct Scope -> Enclosing Scope
-                    tmp_parent = &stype->scope->parent->parent->parent;
-                } else {
-                    tmp_parent = &stype->scope->parent;
-                }
-
-                tmp_parent_backup = *tmp_parent;
-                *tmp_parent = NULL;
-
-                result = symbol_raw_resolve(stype->scope, symbol);
-
-                *tmp_parent = tmp_parent_backup;
+            if (stype->stcache != NULL) {
+                result = try_symbol_raw_resolve_from_type(stype->stcache, symbol);
             }
 
-            if (result == NULL && stype->stcache != NULL) {
-                Type* struct_type = stype->stcache;
-                assert(struct_type->kind == Type_Kind_Struct);
-
-                bh_arr_each(AstPolySolution, sln, struct_type->Struct.poly_sln) {
-                    if (token_text_equals(sln->poly_sym->token, symbol)) {
-                        if (sln->kind == PSK_Type) {
-                            result = (AstNode *) sln->type->ast_type;
-                        } else {
-                            result = (AstNode *) sln->value;
-                        }
-                    }
-                }
+            if (result == NULL && stype->scope) {
+                result = symbol_raw_resolve_no_ascend(stype->scope, symbol);
             }
 
             return result;
@@ -356,28 +345,12 @@ all_types_peeled_off:
             AstUnionType* utype = (AstUnionType *) node;
 
             AstNode *result = NULL;
-            if (utype->scope) {
-                Scope **tmp_parent;
-                Scope *tmp_parent_backup;
-                if (utype->utcache && utype->utcache->Union.constructed_from) {
-                    // Structs scope -> Poly Solution Scope -> Poly Struct Scope -> Enclosing Scope
-                    tmp_parent = &utype->scope->parent->parent->parent;
-                } else {
-                    tmp_parent = &utype->scope->parent;
-                }
-
-                tmp_parent_backup = *tmp_parent;
-                *tmp_parent = NULL;
-
-                result = symbol_raw_resolve(utype->scope, symbol);
-
-                *tmp_parent = tmp_parent_backup;
+            if (utype->utcache != NULL) {
+                result = try_symbol_raw_resolve_from_type(utype->utcache, symbol);
             }
 
-            if (result == NULL && utype->utcache != NULL) {
-                if (!strcmp(symbol, "tag_enum")) {
-                    result = (AstNode *) utype->utcache->Union.tag_type->ast_type;
-                }
+            if (result == NULL && utype->scope) {
+                result = symbol_raw_resolve_no_ascend(utype->scope, symbol);
             }
 
             return result;
@@ -392,7 +365,7 @@ all_types_peeled_off:
                 // forcing the use the Slice functions, but then it can
                 // get confusing about where every function lives, ya know.
                 // Is "get" in Array or Slice.
-                return symbol_raw_resolve(stype->scope, symbol);
+                return symbol_raw_resolve_limited(stype->scope, symbol, 2);
 
             } else {
                 return symbol_raw_resolve_no_ascend(stype->scope, symbol);
@@ -407,7 +380,7 @@ all_types_peeled_off:
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pctype = (AstPolyCallType *) node;
             if (pctype->resolved_type) {
-                return try_symbol_raw_resolve_from_node((AstNode*) pctype->resolved_type->ast_type, symbol);
+                return try_symbol_raw_resolve_from_type(pctype->resolved_type, symbol);
             }
             return NULL;
         }
@@ -436,30 +409,104 @@ AstNode* try_symbol_resolve_from_node(AstNode* node, OnyxToken* token) {
     return result;
 }
 
-AstNode* try_symbol_raw_resolve_from_type(Type *type, char* symbol) {
-    while (type->kind == Type_Kind_Pointer) {
-        type = type->Pointer.elem; 
-    }
+static AstNode* try_symbol_raw_resolve_from_poly_sln(bh_arr(AstPolySolution) slns, char *symbol) {
+    if (slns == NULL) return NULL;
 
-    if (type->kind == Type_Kind_Struct) {
-        if (type->Struct.poly_sln == NULL) return NULL;
+    bh_arr_each(AstPolySolution, sln, slns) {
+        if (token_text_equals(sln->poly_sym->token, symbol)) {
+            if (sln->kind == PSK_Type) {
+                AstTypeRawAlias* alias = onyx_ast_node_new(context.ast_alloc, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
+                alias->type = &basic_types[Basic_Kind_Type_Index];
+                alias->to = sln->type;
+                return (AstNode *) alias;
 
-        bh_arr_each(AstPolySolution, sln, type->Struct.poly_sln) {
-            if (token_text_equals(sln->poly_sym->token, symbol)) {
-                if (sln->kind == PSK_Type) {
-                    AstTypeRawAlias* alias = onyx_ast_node_new(context.ast_alloc, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
-                    alias->type = &basic_types[Basic_Kind_Type_Index];
-                    alias->to = sln->type;
-                    return (AstNode *) alias;
-
-                } else {
-                    return (AstNode *) sln->value;
-                }
+            } else {
+                return (AstNode *) sln->value;
             }
         }
     }
 
     return NULL;
+}
+
+AstNode* try_symbol_raw_resolve_from_type(Type *type, char* symbol) {
+    while (type->kind == Type_Kind_Pointer) {
+        type = type->Pointer.elem; 
+    }
+
+    switch (type->kind) {
+        case Type_Kind_Basic: {
+            return symbol_raw_resolve_no_ascend(((AstBasicType *) type->ast_type)->scope, symbol);
+        }
+
+        case Type_Kind_Enum: {
+            return symbol_raw_resolve_no_ascend(((AstEnumType *) type->ast_type)->scope, symbol);
+        }
+
+        case Type_Kind_Slice:
+        case Type_Kind_DynArray: {
+            Scope* scope = get_scope_from_node((AstNode *) type->ast_type);
+
+            if (!scope)
+                return NULL;
+
+            return symbol_raw_resolve(scope, symbol);
+        }
+
+        case Type_Kind_Struct: {
+            AstNode *poly_sln_res = try_symbol_raw_resolve_from_poly_sln(type->Struct.poly_sln, symbol);
+            if (poly_sln_res) return poly_sln_res;
+
+            i32 limit = 1;
+            if (type->Struct.constructed_from) {
+                // Structs scope -> Poly Solution Scope -> Poly Struct Scope -> Enclosing Scope
+                limit = 3;
+            }
+
+            return symbol_raw_resolve_limited(type->Struct.scope, symbol, limit);
+        }
+
+        case Type_Kind_Union: {
+            AstNode *poly_sln_res = try_symbol_raw_resolve_from_poly_sln(type->Union.poly_sln, symbol);
+            if (poly_sln_res) return poly_sln_res;
+
+            if (!strcmp(symbol, "tag_enum")) {
+                return (AstNode *) type->Union.tag_type->ast_type;
+            }
+
+            i32 limit = 1;
+            if (type->Union.constructed_from) {
+                // Structs scope -> Poly Solution Scope -> Poly Struct Scope -> Enclosing Scope
+                limit = 3;
+            }
+
+            return symbol_raw_resolve_limited(type->Union.scope, symbol, limit);
+        }
+
+        case Type_Kind_PolyStruct: {
+            return symbol_raw_resolve_no_ascend(type->PolyStruct.scope, symbol);
+        }
+
+        case Type_Kind_PolyUnion: {
+            return symbol_raw_resolve_no_ascend(type->PolyUnion.scope, symbol);
+        }
+
+        case Type_Kind_Distinct: {
+            return symbol_raw_resolve(type->Distinct.scope, symbol);
+        }
+
+        default: return NULL;
+    }
+
+    return NULL;
+}
+
+AstNode* try_symbol_resolve_from_type(Type *type, OnyxToken *token) {
+    token_toggle_end(token);
+    AstNode* result = try_symbol_raw_resolve_from_type(type, token->text);
+    token_toggle_end(token);
+
+    return result;
 }
 
 void scope_clear(Scope* scope) {

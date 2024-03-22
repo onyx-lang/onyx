@@ -138,10 +138,12 @@ typedef struct UnionVariant {
         struct AstType *constructed_from;                         \
         bh_arr(struct AstTyped *) meta_tags;                      \
         StructProcessingStatus status;                            \
+        struct Scope* scope;                                      \
     })                                                            \
     TYPE_KIND(PolyStruct, struct {                                \
         char* name;                                               \
         bh_arr(struct AstTyped *) meta_tags;                      \
+        struct Scope* scope;                                      \
     })                                                            \
     TYPE_KIND(Compound, struct {                                  \
         u32 count;                                                \
@@ -161,6 +163,7 @@ typedef struct UnionVariant {
     TYPE_KIND(Distinct, struct {                                  \
         char* name;                                               \
         Type* base_type;                                          \
+        struct Scope* scope;                                      \
     })                                                            \
     TYPE_KIND(Union, struct {                                     \
         u32 size;                                                 \
@@ -173,10 +176,12 @@ typedef struct UnionVariant {
         struct AstType *constructed_from;                         \
         bh_arr(struct AstTyped *) meta_tags;                      \
         StructProcessingStatus status;                            \
+        struct Scope* scope;                                      \
     })                                                            \
     TYPE_KIND(PolyUnion, struct {                                 \
         char* name;                                               \
         bh_arr(struct AstTyped *) meta_tags;                      \
+        struct Scope* scope;                                      \
     })                                                            \
 
 

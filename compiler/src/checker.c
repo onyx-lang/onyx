@@ -2339,12 +2339,12 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     // to the attempted lookup.
     AstNode *n;
     AstType *type_node;
-  try_resolve_from_type:
-    n = try_symbol_raw_resolve_from_type(field->expr->type, field->field);
 
+  try_resolve_from_type:
     type_node = field->expr->type->ast_type;
+
+    n = try_symbol_raw_resolve_from_type(field->expr->type, field->field);
     if (!n) n = try_symbol_raw_resolve_from_node((AstNode *) field->expr, field->field);
-    if (!n) n = try_symbol_raw_resolve_from_node((AstNode *) type_node, field->field);
 
     if (n) {
         track_resolution_for_symbol_info((AstNode *) *pfield, n);

@@ -687,12 +687,11 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
             token_toggle_end(node->token);
         }
 
-        AstType* ast_type = type->ast_type;
-        AstNode* resolved = try_symbol_resolve_from_node((AstNode *) ast_type, node->token);
+        AstNode* resolved = try_symbol_resolve_from_type(type, node->token);
         if (resolved == NULL) {
             if (context.cycle_detected) {
                 token_toggle_end(node->token);
-                char *closest = find_closest_symbol_in_node((AstNode *) ast_type, node->token->text);
+                char *closest = find_closest_symbol_in_node((AstNode *) type->ast_type, node->token->text);
                 token_toggle_end(node->token);
 
                 if (closest) {

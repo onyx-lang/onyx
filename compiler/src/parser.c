@@ -3666,6 +3666,7 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
             AstDistinctType *distinct = make_node(AstDistinctType, Ast_Kind_Distinct_Type);
             distinct->token = parser->curr - 2;
             distinct->base_type = parse_type(parser);
+            type_create_scope(parser, &distinct->scope, distinct->token);
             return (AstTyped *) distinct;
         }
 
