@@ -1,0 +1,24 @@
+//+optional-semicolons
+
+use core {println}
+
+main :: () {
+    arr := make([..] i32)
+
+    for i in 10 {
+        arr->push(i)
+    }
+
+    arr->fill(123)
+    arr->fill_range(3 .. 8, 456)
+    Array.fill_range(arr, 3 .. 5, 123456)
+
+    arr->some([x](x == 123)) |> println()
+
+    sli: [] i32 = arr
+
+    println(arr)
+
+    groups := sli->group_by([x, y](x == y))
+    println(groups)
+}

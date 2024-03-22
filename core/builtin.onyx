@@ -446,6 +446,15 @@ Optional :: union (Value_Type: type_expr) {
 }
 
 
+#doc """
+"""
+Slice :: struct (T: type_expr) { }
+
+
+#doc """
+"""
+Array :: struct (T: type_expr) { }
+
 
 #doc """
     This structure represents the result of a '#callsite' expression. Currently, #callsite

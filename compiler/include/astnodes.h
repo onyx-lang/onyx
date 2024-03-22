@@ -2011,6 +2011,8 @@ extern AstType  *builtin_code_type;
 extern AstType  *builtin_link_options_type;
 extern AstType  *builtin_package_id_type;
 extern AstType  *builtin_stack_trace_type;
+extern AstType  *builtin_slice_type;
+extern AstType  *builtin_array_type;
 extern AstTyped *type_table_node;
 extern AstTyped *foreign_blocks_node;
 extern AstType  *foreign_block_type;

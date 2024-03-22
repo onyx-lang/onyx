@@ -259,6 +259,11 @@ static SymresStatus symres_type(AstType** type) {
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* pst_node = (AstPolyStructType *) *type;
             assert(pst_node->scope);
+
+            if (*type == builtin_array_type) {
+                assert(((AstPolyStructType *) builtin_slice_type)->scope);
+                pst_node->scope->parent = ((AstPolyStructType *) builtin_slice_type)->scope;
+            }
             break;
         }
 

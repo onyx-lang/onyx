@@ -296,6 +296,16 @@ all_types_peeled_off:
             return symbol_raw_resolve_no_ascend(etype->scope, symbol);
         }
 
+        case Ast_Kind_Slice_Type:
+        case Ast_Kind_DynArr_Type: {
+            Scope* scope = get_scope_from_node(node);
+
+            if (!scope)
+                return NULL;
+
+            return symbol_raw_resolve(scope, symbol);
+        }
+
         case Ast_Kind_Struct_Type: {
             AstStructType* stype = (AstStructType *) node;
 
@@ -375,7 +385,18 @@ all_types_peeled_off:
 
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* stype = ((AstPolyStructType *) node);
-            return symbol_raw_resolve_no_ascend(stype->scope, symbol);
+            if ((AstType *) node == builtin_array_type) {
+                // We have to ascend on the builtin Array type because it
+                // "extends" the Slice type. This is the only structure
+                // that works this way. It might be worth considering
+                // forcing the use the Slice functions, but then it can
+                // get confusing about where every function lives, ya know.
+                // Is "get" in Array or Slice.
+                return symbol_raw_resolve(stype->scope, symbol);
+
+            } else {
+                return symbol_raw_resolve_no_ascend(stype->scope, symbol);
+            }
         }
 
         case Ast_Kind_Poly_Union_Type: {
@@ -1427,6 +1448,16 @@ all_types_peeled_off:
         case Ast_Kind_Enum_Type: {
             AstEnumType* etype = (AstEnumType *) node;
             return &etype->scope;
+        }
+
+        case Ast_Kind_Slice_Type: {
+            AstPolyStructType* slice_type = (AstPolyStructType *) builtin_slice_type;
+            return &slice_type->scope;
+        }
+        
+        case Ast_Kind_DynArr_Type: {
+            AstPolyStructType* dynarr_type = (AstPolyStructType *) builtin_array_type;
+            return &dynarr_type->scope;
         }
 
         case Ast_Kind_Struct_Type: {
