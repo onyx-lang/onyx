@@ -108,13 +108,14 @@ TCP_Server :: struct {
     emit_ready_event_multiple_times := false;
 }
 
-TCP_Server.listen        :: tcp_server_listen
-TCP_Server.stop          :: tcp_server_stop
-TCP_Server.pulse         :: tcp_server_pulse
-TCP_Server.send          :: tcp_server_send
-TCP_Server.broadcast     :: tcp_server_broadcast
-TCP_Server.handle_events :: tcp_server_handle_events
-TCP_Server.kill_client   :: tcp_server_kill_client
+TCP_Server.listen          :: tcp_server_listen
+TCP_Server.stop            :: tcp_server_stop
+TCP_Server.pulse           :: tcp_server_pulse
+TCP_Server.send            :: tcp_server_send
+TCP_Server.broadcast       :: tcp_server_broadcast
+TCP_Server.handle_events   :: tcp_server_handle_events
+TCP_Server.kill_client     :: tcp_server_kill_client
+TCP_Server.transfer_client :: tcp_server_transfer_client
 
 TCP_Server.Client :: struct {
     use socket  : Socket;
@@ -321,6 +322,31 @@ tcp_server_kill_client :: (use server: &TCP_Server, client: &TCP_Server.Client) 
     client.state = .Being_Killed;
     client.socket->shutdown(.ReadWrite);
     client.socket->close();
+}
+
+tcp_server_transfer_client :: (server: &TCP_Server, client: &TCP_Server.Client, other_server: &TCP_Server) -> ? &TCP_Server.Client {
+    if other_server.client_count >= other_server.clients.count do return .None;
+
+    transferred_client := other_server.client_allocator->move(*client);
+
+    for& other_server.clients {
+        if *it == null {
+            *it = transferred_client;
+            break;
+        }
+    }
+    other_server.client_count += 1;
+
+    for& server.clients {
+        if *it == client {
+            raw_free(server.client_allocator, client);
+            *it = null;
+            server.client_count -= 1;
+            break;
+        }
+    }
+
+    return transferred_client;
 }
 
 
