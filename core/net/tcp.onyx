@@ -121,6 +121,7 @@ TCP_Server.Client :: struct {
     use socket  : Socket;
     address : SocketAddress;
     state   : State;
+    server  : &TCP_Server;
 
     recv_ready_event_present := false;
 
@@ -134,6 +135,10 @@ TCP_Server.Client :: struct {
 
 TCP_Server.Client.read_complete :: (use this: &TCP_Server.Client) {
     recv_ready_event_present = false;
+}
+
+TCP_Server.Client.transfer :: (use this: &TCP_Server.Client, new_server: &TCP_Server) -> ? &TCP_Server.Client {
+    return tcp_server_transfer_client(server, this, new_server);
 }
 
 tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> &TCP_Server {
@@ -182,6 +187,7 @@ tcp_server_pulse :: (use server: &TCP_Server) -> bool {
     if client_count < clients.count {
         socket->accept().Ok->with([client_data] {
             client := new(TCP_Server.Client, allocator=client_allocator);
+            client.server = server;
             client.state = .Alive;
             client.socket = client_data.socket;
             client.address = client_data.addr;
@@ -328,6 +334,7 @@ tcp_server_transfer_client :: (server: &TCP_Server, client: &TCP_Server.Client, 
     if other_server.client_count >= other_server.clients.count do return .None;
 
     transferred_client := other_server.client_allocator->move(*client);
+    transferred_client.server = other_server;
 
     for& other_server.clients {
         if *it == null {
