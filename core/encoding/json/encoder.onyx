@@ -21,7 +21,7 @@ encode_string :: (v: $T, allocator := context.allocator) -> (str, Encoding_Error
         return "", err;
     }
 
-    s := string.alloc_copy(io.buffer_stream_to_str(^stream), allocator);
+    s := string.copy(io.buffer_stream_to_str(^stream), allocator);
     return s, .None;
 }
 
@@ -325,7 +325,7 @@ from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> 
             // Strings are handled differently
             if type == str {
                 v := new(_Value_String, allocator);
-                v.str_ = string.alloc_copy(*cast(^str) input, allocator);
+                v.str_ = string.copy(*cast(^str) input, allocator);
                 return Value.{v};
             }
 
@@ -450,7 +450,7 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
         case .Slice {
             // Strings are handled differently
             if type == str {
-                *cast(^str) out = string.alloc_copy(value->as_str());
+                *cast(^str) out = string.copy(value->as_str());
                 return;
             }
 

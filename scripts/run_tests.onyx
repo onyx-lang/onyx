@@ -47,7 +47,7 @@ find_onyx_files :: (root: str, cases: &[..] Test_Case) {
     for os.list_directory(root) {
         path_buffer: [512] u8;
         if string.ends_with(it->name(), ".onyx") {
-            test_case := string.concat(path_buffer, root, "/", it->name()) |> string.alloc_copy();
+            test_case := string.concat(path_buffer, root, "/", it->name()) |> string.copy();
             expected_file := test_case[0 .. (test_case.count - 5)];
 
             if !os.file_exists(expected_file) {

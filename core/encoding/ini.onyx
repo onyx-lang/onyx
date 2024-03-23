@@ -150,7 +150,7 @@ parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, Ini
             if field.type == str {
                 *cast(&str) target = value_string
                                   |> string.strip_whitespace()
-                                  |> string.alloc_copy();
+                                  |> string.copy();
 
             } else {
                 error(aprintf("Failed to parse value of type '{}' from string '{}'.", field.type, value_string));

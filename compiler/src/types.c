@@ -1115,6 +1115,10 @@ Type* type_make_slice(bh_allocator alloc, Type* of) {
         type_make_multi_pointer(alloc, of);
         slice_type->Slice.elem = of;
 
+        AstPolyStructType* pslice_type = (AstPolyStructType *) builtin_slice_type;
+        OnyxFilePos pos = {};
+        slice_type->Slice.scope = scope_create(context.ast_alloc, pslice_type->scope, pos);
+
         return slice_type;
     }
 }
@@ -1136,6 +1140,10 @@ Type* type_make_dynarray(bh_allocator alloc, Type* of) {
 
         type_make_multi_pointer(alloc, of);
         dynarr->DynArray.elem = of;
+
+        AstPolyStructType* dynarr_type = (AstPolyStructType *) builtin_array_type;
+        OnyxFilePos pos = {};
+        dynarr->DynArray.scope = scope_create(context.ast_alloc, dynarr_type->scope, pos);
 
         return dynarr;
     }

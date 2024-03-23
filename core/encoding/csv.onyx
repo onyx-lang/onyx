@@ -120,7 +120,7 @@ CSV.ingress :: (csv: &CSV, reader: &io.Reader, headers_present := true) -> bool 
             target := cast([&] u8) &out + header.offset;
 
             if header.type == str {
-                *cast(&str) target = string.alloc_copy(entry.value);
+                *cast(&str) target = string.copy(entry.value);
             } else {
                 conv.parse_any(target, header.type, entry.value);
             }

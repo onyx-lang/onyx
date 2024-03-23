@@ -421,14 +421,14 @@ Parser.parse_value :: (self: &#Self, token: Token) -> ? Value {
     switch token {
         case .Raw_String as s {
             return Value.{
-                data = .{ String = string.alloc_copy(s, self.result_allocator) }
+                data = .{ String = string.copy(s, self.result_allocator) }
             };
         }
 
         case .String as s {
             // TODO: Handle escaped strings here
             return Value.{
-                data = .{ String = string.alloc_copy(s, self.result_allocator) }
+                data = .{ String = string.copy(s, self.result_allocator) }
             };
         }
         
@@ -454,7 +454,7 @@ Parser.parse_value :: (self: &#Self, token: Token) -> ? Value {
             // TODO: parse numbers
 
             return Value.{
-                data = .{ String = string.alloc_copy(w, self.result_allocator) }
+                data = .{ String = string.copy(w, self.result_allocator) }
             };
         }
 

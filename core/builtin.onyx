@@ -448,12 +448,20 @@ Optional :: union (Value_Type: type_expr) {
 
 #doc """
 """
-Slice :: struct (T: type_expr) { }
+Slice :: struct (T: type_expr) {
+    data: [&] T;
+    count: i32;
+}
 
 
 #doc """
 """
-Array :: struct (T: type_expr) { }
+Array :: struct (T: type_expr) {
+    data: [&] T;
+    count: i32;
+    capacity: i32;
+    allocator: Allocator;
+}
 
 
 #doc """

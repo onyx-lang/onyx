@@ -152,8 +152,11 @@ typedef struct UnionVariant {
         Type* types[];                                            \
     })                                                            \
     TYPE_KIND(Array, struct { Type* elem; u32 size; u32 count; }) \
-    TYPE_KIND(Slice, struct { Type *elem; })                      \
-    TYPE_KIND(DynArray, struct { Type *elem; })                   \
+    TYPE_KIND(Slice, struct { Type *elem; struct Scope *scope; }) \
+    TYPE_KIND(DynArray, struct {                                  \
+        Type *elem;                                               \
+        struct Scope *scope;                                      \
+    })                                                            \
     TYPE_KIND(VarArgs, struct { Type *elem; })                    \
     TYPE_KIND(Enum, struct {                                      \
         char* name;                                               \

@@ -26,6 +26,11 @@ Reader :: struct {
     done: bool; // If an .EOF was reached.
 }
 
+Reader.make :: reader_make;
+Reader.reset :: reader_reset;
+Reader.free :: reader_free;
+Reader.from_string :: reader_from_string;
+Reader.get_buffered :: reader_get_buffered;
 Reader.is_empty :: reader_empty;
 Reader.empty    :: reader_empty;
 Reader.read_all :: read_all;

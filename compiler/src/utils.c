@@ -122,8 +122,8 @@ Scope* scope_create(bh_allocator a, Scope* parent, OnyxFilePos created_at) {
     scope->created_at = created_at;
     scope->name = NULL;
 
+    // This will be set on the first symbol insertion.
     scope->symbols = NULL;
-    sh_new_arena(scope->symbols);
 
     return scope;
 }
@@ -144,6 +144,10 @@ b32 symbol_introduce(Scope* scope, OnyxToken* tkn, AstNode* symbol) {
 }
 
 b32 symbol_raw_introduce(Scope* scope, char* name, OnyxFilePos pos, AstNode* symbol) {
+    if (!scope->symbols) {
+        sh_new_arena(scope->symbols);
+    }
+
     if (strcmp(name, "_")) {
         i32 index = shgeti(scope->symbols, name);
         if (index != -1) {
@@ -167,11 +171,14 @@ b32 symbol_raw_introduce(Scope* scope, char* name, OnyxFilePos pos, AstNode* sym
 }
 
 void symbol_builtin_introduce(Scope* scope, char* sym, AstNode *node) {
+    if (!scope->symbols) sh_new_arena(scope->symbols);
+
     shput(scope->symbols, sym, node);
 }
 
 void symbol_subpackage_introduce(Package* parent, char* sym, AstPackage* subpackage) {
     Scope *scope = parent->scope;
+    if (!scope->symbols) sh_new_arena(scope->symbols);
 
     i32 index = shgeti(scope->symbols, sym);
     if (index != -1) {
@@ -443,14 +450,12 @@ AstNode* try_symbol_raw_resolve_from_type(Type *type, char* symbol) {
             return symbol_raw_resolve_no_ascend(((AstEnumType *) type->ast_type)->scope, symbol);
         }
 
-        case Type_Kind_Slice:
+        case Type_Kind_Slice: {
+            return symbol_raw_resolve(type->Slice.scope, symbol);
+        }
+
         case Type_Kind_DynArray: {
-            Scope* scope = get_scope_from_node((AstNode *) type->ast_type);
-
-            if (!scope)
-                return NULL;
-
-            return symbol_raw_resolve(scope, symbol);
+            return symbol_raw_resolve(type->DynArray.scope, symbol);
         }
 
         case Type_Kind_Struct: {
@@ -1498,13 +1503,15 @@ all_types_peeled_off:
         }
 
         case Ast_Kind_Slice_Type: {
-            AstPolyStructType* slice_type = (AstPolyStructType *) builtin_slice_type;
-            return &slice_type->scope;
+            Type *t = type_build_from_ast(context.ast_alloc, (AstType *) node);
+            if (t) return &t->Slice.scope;
+            return NULL;
         }
         
         case Ast_Kind_DynArr_Type: {
-            AstPolyStructType* dynarr_type = (AstPolyStructType *) builtin_array_type;
-            return &dynarr_type->scope;
+            Type *t = type_build_from_ast(context.ast_alloc, (AstType *) node);
+            if (t) return &t->DynArray.scope;
+            return NULL;
         }
 
         case Ast_Kind_Struct_Type: {
@@ -1528,8 +1535,7 @@ all_types_peeled_off:
         }
 
         case Ast_Kind_Poly_Call_Type: {
-            AstPolyCallType* pctype = (AstPolyCallType *) node;
-            Type *t = type_build_from_ast(context.ast_alloc, (AstType *) pctype);
+            Type *t = type_build_from_ast(context.ast_alloc, (AstType *) node);
             if (t) {
                 return &((AstStructType *) t->ast_type)->scope;
             }

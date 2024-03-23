@@ -37,7 +37,7 @@ Node.add_value :: (n: &Node, value: Value.Value_Data) {
 
 Node.set_prop :: (n: &Node, name: str, value: Value.Value_Data) {
     n.props->put(
-        string.alloc_copy(name, n.props.allocator),
+        string.copy(name, n.props.allocator),
         .{ data = value }
     );
 }

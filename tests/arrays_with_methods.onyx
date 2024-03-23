@@ -21,4 +21,15 @@ main :: () {
 
     groups := sli->group_by([x, y](x == y))
     println(groups)
+
+
+    // String methdos
+
+    hello := "Hello"->copy()->to_lowercase()->to_dyn_str()
+    hello->append(" World!")
+    println(hello)
+
+    hello_str: str = hello
+    hello_str->index_of('o') |> println()
+    hello_str->last_index_of('o') |> println()
 }

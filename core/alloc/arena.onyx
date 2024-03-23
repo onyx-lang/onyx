@@ -188,7 +188,7 @@ get_allocated_bytes :: (arena: &Arena) -> u32 {
             // Lazily allocate everything, knowing that it will
             // be freed when this function returns.
             for 100 {
-                s := string.alloc_copy("Make a copy of me!");
+                s := string.copy("Make a copy of me!");
             }
         }
 """

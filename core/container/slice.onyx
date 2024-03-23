@@ -738,4 +738,5 @@ least       :: Slice.least
 free        :: Slice.free
 copy        :: Slice.copy
 make        :: Slice.make
+init        :: Slice.init
 
