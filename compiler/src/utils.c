@@ -296,27 +296,14 @@ all_types_peeled_off:
             return symbol_raw_resolve_no_ascend(package->package->scope, symbol);
         } 
 
-        case Ast_Kind_Foreign_Block: {
-            AstForeignBlock* fb = (AstForeignBlock *) node;
-
-            if (fb->scope == NULL)
-                return NULL;
-
-            return symbol_raw_resolve(fb->scope, symbol);
-        }
-
-        case Ast_Kind_Basic_Type: {
-            AstBasicType *bt = (AstBasicType *) node;
-
-            if (bt->scope == NULL)
-                return NULL;
-
-            return symbol_raw_resolve_no_ascend(bt->scope, symbol);
-        }
-
-        case Ast_Kind_Enum_Type: {
-            AstEnumType* etype = (AstEnumType *) node;
-            return symbol_raw_resolve_no_ascend(etype->scope, symbol);
+        case Ast_Kind_Foreign_Block:
+        case Ast_Kind_Basic_Type:
+        case Ast_Kind_Enum_Type:
+        case Ast_Kind_Poly_Union_Type:
+        case Ast_Kind_Distinct_Type:
+        case Ast_Kind_Interface: {
+            Scope* scope = get_scope_from_node(node);
+            return symbol_raw_resolve_no_ascend(scope, symbol);
         }
 
         case Ast_Kind_Slice_Type:
@@ -379,27 +366,12 @@ all_types_peeled_off:
             }
         }
 
-        case Ast_Kind_Poly_Union_Type: {
-            AstPolyUnionType* utype = ((AstPolyUnionType *) node);
-            return symbol_raw_resolve_no_ascend(utype->scope, symbol);
-        }
-
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pctype = (AstPolyCallType *) node;
             if (pctype->resolved_type) {
                 return try_symbol_raw_resolve_from_type(pctype->resolved_type, symbol);
             }
             return NULL;
-        }
-
-        case Ast_Kind_Distinct_Type: {
-            AstDistinctType* dtype = (AstDistinctType *) node;
-            return symbol_raw_resolve_no_ascend(dtype->scope, symbol);
-        }
-
-        case Ast_Kind_Interface: {
-            AstInterface* inter = (AstInterface *) node;
-            return symbol_raw_resolve_no_ascend(inter->scope, symbol);
         }
 
         default: break;
@@ -1491,6 +1463,11 @@ all_types_peeled_off:
 
             return &package->package->scope;
         } 
+
+        case Ast_Kind_Foreign_Block: {
+            AstForeignBlock* fb = (AstForeignBlock *) node;
+            return &fb->scope;
+        }
 
         case Ast_Kind_Basic_Type: {
             AstBasicType* btype = (AstBasicType *) node;
