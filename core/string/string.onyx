@@ -2,46 +2,6 @@ package core.string
 
 use core {package, *}
 
-free :: str.free
-copy :: str.copy
-temp_copy :: str.temp_copy
-copy_into :: str.copy_into
-concat :: str.concat
-contains :: str.contains
-equal :: str.equal
-equal_insensitive :: str.equal_insensitive
-starts_with :: str.starts_with
-ends_with :: str.ends_with
-empty :: str.empty
-index_of :: str.index_of
-last_index_of :: str.last_index_of
-strip_whitespace :: str.strip_whitespace
-strip_leading_whitespace :: str.strip_leading_whitespace
-strip_trailing_whitespace :: str.strip_trailing_whitespace
-to_lowercase :: str.to_lowercase
-to_uppercase :: str.to_uppercase
-trim_start :: str.trim_start
-trim_end :: str.trim_end
-advance :: str.advance
-replace :: str.replace
-read_until :: str.read_until
-read_alphanum :: str.read_alphanum
-read_until_any :: str.read_until_any
-advance_line :: str.advance_line
-split :: str.split
-split_iter :: str.split_iter
-bisect :: str.bisect
-
-to_dyn_str :: str.to_dyn_str
-delete :: dyn_str.delete
-append :: dyn_str.append
-clear  :: dyn_str.clear
-retreat :: dyn_str.retreat
-insert :: dyn_str.insert
-
-// DEPRECATED: Use `string.copy` instead
-alloc_copy :: str.copy
-
 
 #doc "Generic procedure for turning something into a string."
 as_str :: #match -> str {}
@@ -61,7 +21,7 @@ as_str :: macro (t: $T/HasAsStrMethod) -> str {
 
 str.free :: #match #locked {
     (s: str, allocator := context.allocator) { raw_free(allocator, s.data); },
-    (s: &dyn_str) { core.array.free(s); },
+    (s: &dyn_str) { s->free(); },
 }
 
 str.copy :: (original: str, allocator := context.allocator) -> str {
@@ -114,6 +74,7 @@ to_cstr_on_stack :: macro (s_: str) -> cstr {
 }
 
 
+// Does this still need to exist?
 length :: #match #local {}
 
 #overload
@@ -182,7 +143,7 @@ str.concat :: (buffer: [] u8, strings: ..str) -> str {
 }
 
 #overload
-str.concat :: (into: &[..] u8, strings: ..str) -> str {
+str.concat :: (into: &dyn_str, strings: ..str) -> str {
     for s in strings {
         array.ensure_capacity(into, into.count + s.count);
         memory.copy(into.data + into.count, s.data, s.count);
@@ -192,7 +153,7 @@ str.concat :: (into: &[..] u8, strings: ..str) -> str {
 }
 
 #overload
-str.concat :: (into: &[..] u8, chars: ..u8) -> str {
+str.concat :: (into: &dyn_str, chars: ..u8) -> str {
     array.ensure_capacity(into, into.count + chars.count);
     for c in chars {
         memory.copy(into.data + into.count, cast(rawptr) &.[c], 1);
@@ -733,4 +694,48 @@ dyn_str.retreat :: macro (x: &dyn_str, chars := 1) {
     use core.array
     array.pop(x, chars);
 }
+
+
+// These definitions exist to allow you to still say `string.XYZ`, instead of `str.XYZ`
+// That being said, `str.XYZ` should be the preferred way for the future.
+
+free :: str.free
+copy :: str.copy
+temp_copy :: str.temp_copy
+copy_into :: str.copy_into
+concat :: str.concat
+contains :: str.contains
+equal :: str.equal
+equal_insensitive :: str.equal_insensitive
+starts_with :: str.starts_with
+ends_with :: str.ends_with
+empty :: str.empty
+index_of :: str.index_of
+last_index_of :: str.last_index_of
+strip_whitespace :: str.strip_whitespace
+strip_leading_whitespace :: str.strip_leading_whitespace
+strip_trailing_whitespace :: str.strip_trailing_whitespace
+to_lowercase :: str.to_lowercase
+to_uppercase :: str.to_uppercase
+trim_start :: str.trim_start
+trim_end :: str.trim_end
+advance :: str.advance
+replace :: str.replace
+read_until :: str.read_until
+read_alphanum :: str.read_alphanum
+read_until_any :: str.read_until_any
+advance_line :: str.advance_line
+split :: str.split
+split_iter :: str.split_iter
+bisect :: str.bisect
+
+to_dyn_str :: str.to_dyn_str
+delete :: dyn_str.delete
+append :: dyn_str.append
+clear  :: dyn_str.clear
+retreat :: dyn_str.retreat
+insert :: dyn_str.insert
+
+// DEPRECATED: Use `string.copy` instead
+alloc_copy :: str.copy
 
