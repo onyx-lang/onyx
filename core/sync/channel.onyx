@@ -33,6 +33,10 @@ Channel.send :: (chan: &Channel, msg: chan.T) {
     }
 }
 
+Channel.poll :: (chan: &Channel) -> bool {
+    return chan._buf.length > 0;
+}
+
 Channel.recv :: (chan: &Channel) -> ? chan.T {
     scoped_mutex(&chan._mutex);
 
