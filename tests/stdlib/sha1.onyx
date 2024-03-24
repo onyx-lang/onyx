@@ -1,0 +1,10 @@
+use core.hash.sha1
+use core.encoding.hex
+
+main :: () {
+    msg := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    // msg := "The quick brown fox jumps over the lazy cog";
+
+    hash := sha1.hash(msg) |> hex.encode();
+    logf(.Info, "{}", hash);
+}

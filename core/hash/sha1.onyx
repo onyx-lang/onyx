@@ -1,30 +1,29 @@
-package core.hash.sha256
+package core.hash.sha1
 #allow_stale_code
 
 use core {memory}
 use core.intrinsics.wasm {wasm :: package}
 
-BLOCK_SIZE :: 32
+BLOCK_SIZE :: 20
 
 Hasher :: struct {
     data: [64] u8;
     data_length: u32;
     bit_length: u64;
-    state: [8] u32;
+    state: [5] u32;
 }
 
 Hasher.make :: () -> #Self {
     return .{
         state = .[
-            0x6a09e667,
-            0xbb67ae85,
-            0x3c6ef372,
-            0xa54ff53a,
-            0x510e527f,
-            0x9b05688c,
-            0x1f83d9ab,
-            0x5be0cd19
-        ]
+            0x67452301,
+            0xefcdab89,
+            0x98badcfe,
+            0x10325476,
+            0xc3d2e1f0
+        ],
+        data_length = 0,
+        bit_length = 0
     };
 }
 
@@ -65,8 +64,8 @@ Hasher.final :: (self: &#Self) -> [BLOCK_SIZE] u8 {
     }
 
     self.bit_length += ~~(self.data_length * 8);
-    self.data[63] = cast(u8, self.bit_length >> 0);
-    self.data[62] = cast(u8, self.bit_length >> 8);
+    self.data[63] = cast(u8, self.bit_length >> 0 );
+    self.data[62] = cast(u8, self.bit_length >> 8 );
     self.data[61] = cast(u8, self.bit_length >> 16);
     self.data[60] = cast(u8, self.bit_length >> 24);
     self.data[59] = cast(u8, self.bit_length >> 32);
@@ -81,9 +80,6 @@ Hasher.final :: (self: &#Self) -> [BLOCK_SIZE] u8 {
         out[i + 8]  = ~~((self.state[2] >> (24 - i * 8)) & 0xff);
         out[i + 12] = ~~((self.state[3] >> (24 - i * 8)) & 0xff);
         out[i + 16] = ~~((self.state[4] >> (24 - i * 8)) & 0xff);
-        out[i + 20] = ~~((self.state[5] >> (24 - i * 8)) & 0xff);
-        out[i + 24] = ~~((self.state[6] >> (24 - i * 8)) & 0xff);
-        out[i + 28] = ~~((self.state[7] >> (24 - i * 8)) & 0xff);
     }
 
     return out;
@@ -101,7 +97,7 @@ hash :: (x: str) -> [BLOCK_SIZE] u8 {
 
 #local
 do_cycle :: (self: &Hasher, data: [] u8) {
-    m: [64] u32;
+    m: [80] u32;
 
     for i in 0 .. 16 {
         j := 4 * i;
@@ -111,8 +107,8 @@ do_cycle :: (self: &Hasher, data: [] u8) {
                (cast(u32, data[j + 3]));
     }
 
-    for i in 16 .. 64 {
-        m[i] = SIG1(m[i - 2]) + m[i - 7] + SIG0(m[i - 15]) + m[i - 16];
+    for i in 16 .. 80 {
+        m[i] = wasm.rotl_i32(m[i-3] ^ m[i-8] ^ m[i-14] ^ m[i-16], 1);
     }
 
     a := self.state[0];
@@ -120,21 +116,30 @@ do_cycle :: (self: &Hasher, data: [] u8) {
     c := self.state[2];
     d := self.state[3];
     e := self.state[4];
-    f := self.state[5];
-    g := self.state[6];
-    h := self.state[7];
 
-    for i in 0 .. 64 {
-        t1 := h + EP1(e) + CH(e, f, g) + k[i] + m[i];
-        t2 := EP0(a) + MAJ(a, b, c);
-        h = g;
-        g = f;
-        f = e;
-        e = d + t1;
+    for i in 0 .. 80 {
+        f, k: u32;
+
+        if 0 <= i && i <= 19 {
+            f = (b & c) | ((~b) & d);
+            k = 0x5A827999;
+        } elseif 20 <= i && i <= 39 {
+            f = b ^ c ^ d;
+            k = 0x6ED9EBA1;
+        } elseif 40 <= i && i <= 59 {
+            f = (b & c) | (b & d) | (c & d);
+            k = 0x8F1BBCDC;
+        } elseif 60 <= i && i <= 79 {
+            f = b ^ c ^ d;
+            k = 0xCA62C1D6;
+        }
+
+        temp := wasm.rotl_i32(a, 5) + f + e + k + m[i];
+        e = d;
         d = c;
-        c = b;
+        c = wasm.rotl_i32(b, 30);
         b = a;
-        a = t1 + t2;
+        a = temp;
     }
 
 
@@ -143,28 +148,5 @@ do_cycle :: (self: &Hasher, data: [] u8) {
     self.state[2] += c;
     self.state[3] += d;
     self.state[4] += e;
-    self.state[5] += f;
-    self.state[6] += g;
-    self.state[7] += h;
 }
 
-#local {
-    CH   :: macro (x, y, z: u32) => (x & y) ^ (~x & z);
-    MAJ  :: macro (x, y, z: u32) => (x & y) ^ (x & z) ^ (y & z);
-    EP0  :: macro (x: u32) => wasm.rotr_i32(x, 2) ^ wasm.rotr_i32(x, 13) ^ wasm.rotr_i32(x, 22);
-    EP1  :: macro (x: u32) => wasm.rotr_i32(x, 6) ^ wasm.rotr_i32(x, 11) ^ wasm.rotr_i32(x, 25);
-    SIG0 :: macro (x: u32) => wasm.rotr_i32(x, 7) ^ wasm.rotr_i32(x, 18) ^ ((x) >> 3);
-    SIG1 :: macro (x: u32) => wasm.rotr_i32(x, 17) ^ wasm.rotr_i32(x, 19) ^ ((x) >> 10);
-}
-
-#local
-k := u32.[
-    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
-    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
-    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
-    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
-    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
-    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
-    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
-    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
-];
