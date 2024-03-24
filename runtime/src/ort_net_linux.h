@@ -389,7 +389,7 @@ ONYX_DEF(__net_recv, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
 
     if (received < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            results->data[0] = WASM_I32_VAL(received);
+            results->data[0] = WASM_I32_VAL(-2);
         }
     }
 

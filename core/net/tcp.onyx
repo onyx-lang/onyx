@@ -141,6 +141,21 @@ TCP_Server.Client.transfer :: (use this: &TCP_Server.Client, new_server: &TCP_Se
     return tcp_server_transfer_client(server, this, new_server);
 }
 
+TCP_Server.Client.detach :: (use this: &TCP_Server.Client) -> (res: Socket) {
+    res = this.socket;
+
+    for& server.clients {
+        if *it == this {
+            raw_free(server.client_allocator, this);
+            *it = null;
+            server.client_count -= 1;
+            break;
+        }
+    }
+    
+    return;
+}
+
 tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> &TCP_Server {
     maybe_socket := socket_create(.Inet, .Stream, .IP); // IPv6?
     if maybe_socket.Err do return null;
