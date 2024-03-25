@@ -175,5 +175,5 @@ SockOption :: enum {
     sock_recv_from :: (fd: FileDescriptor, data: &IOVec, data_len: Size, flags: RIFlags, written: &Size, oflags: &ROFlags, addr: &AddrPort) -> Errno ---
     sock_send_to :: (fd: FileDescriptor, data: &IOVec, data_len: Size, flags: SIFlags, addr: &AddrPort, sent: &Size) -> Errno ---
 
-    resolve      :: (host: cstr, port: u16, addr: [&] Addr, addr_len: Size, retaddrs: &Size) -> Errno ---
+    resolve      :: (host: str, port: u16, addr: [&] Addr, addr_len: Size, retaddrs: &Size) -> Errno ---
 }

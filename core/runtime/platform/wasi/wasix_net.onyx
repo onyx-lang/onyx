@@ -8,7 +8,8 @@ use core.net {
     SocketOption,
     SocketAddress,
     SocketShutdown,
-    SocketStatus
+    SocketStatus,
+    ResolveResult
 }
 use core {Result, string, io}
 
@@ -176,7 +177,28 @@ __net_sock_close :: (s: SocketData) -> void {
     wasi.fd_close(s);
 }
 
-__net_resolve :: (host: str, port: u16, out_addrs: [] SocketAddress) -> i32 {
+__net_resolve :: (host: str, port: u16, out_addrs: [] ResolveResult) -> i32 {
+    use addrbuf := make([] wasi.Addr, out_addrs.count);
+
+    results := 0;
+    err := wasi.resolve(host, port, addrbuf.data, addrbuf.count, &results);
+    if err != .Success do return 0;
+
+    for &in_addr, index in addrbuf[0..results] {
+        out_addr: ResolveResult; 
+        out_addr.family = switch in_addr {
+            case .Ipv4    => .Inet
+            case .Ipv6    => .Inet6
+            case .Unix    => .Unix
+            case #default => .Unknown
+        };
+
+       wasi_addr_no_port_to_socket_address(in_addr, port, &out_addr.addr);
+
+        out_addrs[index] = out_addr;
+    }
+
+    return results;
 }
 
 
@@ -214,6 +236,25 @@ __net_resolve :: (host: str, port: u16, out_addrs: [] SocketAddress) -> i32 {
 
             case .Unix as &unix {
                 p: [256] u8 = *cast(&[256] u8) &unix.path;
+                *out = .{ Unix = p };
+            }
+        }
+    }
+
+    wasi_addr_no_port_to_socket_address :: (input: &wasi.Addr, port: u16, out: &SocketAddress) {
+        switch *input {
+            case .Unspec ---
+
+            case .Ipv4 as &inet {
+                *out = .{ Inet = .{ port, *cast(&u32) inet } };
+            }
+
+            case .Ipv6 as &inet {
+                *out = .{ Inet6 = .{ port, *cast(&[16] u8) inet } };
+            }
+
+            case .Unix as &unix {
+                p: [256] u8 = *cast(&[256] u8) unix;
                 *out = .{ Unix = p };
             }
         }
