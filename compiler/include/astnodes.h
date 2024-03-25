@@ -1671,8 +1671,8 @@ typedef enum EntityType {
     Entity_Type_Constraint_Check,
     Entity_Type_Polymorphic_Proc,
     Entity_Type_Polymorph_Query,
-    Entity_Type_Macro,
     Entity_Type_Foreign_Block,
+    Entity_Type_Macro,
     Entity_Type_Foreign_Function_Header,
     Entity_Type_Temp_Function_Header,    // Same as a Function_Header, except it disappears after it checks completely.
     Entity_Type_Function_Header,
@@ -2011,6 +2011,8 @@ extern AstType  *builtin_code_type;
 extern AstType  *builtin_link_options_type;
 extern AstType  *builtin_package_id_type;
 extern AstType  *builtin_stack_trace_type;
+extern AstType  *builtin_slice_type;
+extern AstType  *builtin_array_type;
 extern AstTyped *type_table_node;
 extern AstTyped *foreign_blocks_node;
 extern AstType  *foreign_block_type;

@@ -249,11 +249,11 @@ unescape_string :: (token: Token, allocator: Allocator) -> str {
     }
 
     if i == s.count {
-        return string.alloc_copy(s, allocator);
+        return string.copy(s, allocator);
     }
 
     buffer := memory.make_slice(u8, s.count, allocator=allocator);
-    string.copy(s.data[0 .. i], buffer);
+    string.copy_into(s.data[0 .. i], buffer);
     buffer_write := i;
 
     while i < s.count {

@@ -82,6 +82,8 @@ AstType  *builtin_code_type;
 AstType  *builtin_link_options_type;
 AstType  *builtin_package_id_type;
 AstType  *builtin_stack_trace_type;
+AstType  *builtin_array_type;
+AstType  *builtin_slice_type;
 
 AstTyped    *type_table_node = NULL;
 AstTyped    *foreign_blocks_node = NULL;
@@ -532,6 +534,18 @@ void initialize_builtins(bh_allocator a) {
     builtin_code_type = (AstType *) symbol_raw_resolve(p->scope, "Code");
     if (builtin_code_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Code' struct not found in builtin package.");
+        return;
+    }
+
+    builtin_array_type = (AstType *) symbol_raw_resolve(p->scope, "Array");
+    if (builtin_array_type == NULL) {
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Array' struct not found in builtin package.");
+        return;
+    }
+
+    builtin_slice_type = (AstType *) symbol_raw_resolve(p->scope, "Slice");
+    if (builtin_slice_type == NULL) {
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Slice' struct not found in builtin package.");
         return;
     }
 

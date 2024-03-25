@@ -22,7 +22,7 @@ use core.conv
     Modifies the string in place, as the length will never be longer.
 """
 path_clean :: (path: str, allocator := Path_Allocator) -> str {
-    if path == "" do return string.alloc_copy(".", Path_Allocator);
+    if path == "" do return string.copy(".", Path_Allocator);
 
     rooted := path[0] == PATH_SEP;
     n := path.length;

@@ -138,10 +138,12 @@ typedef struct UnionVariant {
         struct AstType *constructed_from;                         \
         bh_arr(struct AstTyped *) meta_tags;                      \
         StructProcessingStatus status;                            \
+        struct Scope* scope;                                      \
     })                                                            \
     TYPE_KIND(PolyStruct, struct {                                \
         char* name;                                               \
         bh_arr(struct AstTyped *) meta_tags;                      \
+        struct Scope* scope;                                      \
     })                                                            \
     TYPE_KIND(Compound, struct {                                  \
         u32 count;                                                \
@@ -150,8 +152,11 @@ typedef struct UnionVariant {
         Type* types[];                                            \
     })                                                            \
     TYPE_KIND(Array, struct { Type* elem; u32 size; u32 count; }) \
-    TYPE_KIND(Slice, struct { Type *elem; })                      \
-    TYPE_KIND(DynArray, struct { Type *elem; })                   \
+    TYPE_KIND(Slice, struct { Type *elem; struct Scope *scope; }) \
+    TYPE_KIND(DynArray, struct {                                  \
+        Type *elem;                                               \
+        struct Scope *scope;                                      \
+    })                                                            \
     TYPE_KIND(VarArgs, struct { Type *elem; })                    \
     TYPE_KIND(Enum, struct {                                      \
         char* name;                                               \
@@ -161,6 +166,7 @@ typedef struct UnionVariant {
     TYPE_KIND(Distinct, struct {                                  \
         char* name;                                               \
         Type* base_type;                                          \
+        struct Scope* scope;                                      \
     })                                                            \
     TYPE_KIND(Union, struct {                                     \
         u32 size;                                                 \
@@ -173,10 +179,12 @@ typedef struct UnionVariant {
         struct AstType *constructed_from;                         \
         bh_arr(struct AstTyped *) meta_tags;                      \
         StructProcessingStatus status;                            \
+        struct Scope* scope;                                      \
     })                                                            \
     TYPE_KIND(PolyUnion, struct {                                 \
         char* name;                                               \
         bh_arr(struct AstTyped *) meta_tags;                      \
+        struct Scope* scope;                                      \
     })                                                            \
 
 

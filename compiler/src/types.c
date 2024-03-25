@@ -430,6 +430,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 s_type->Struct.constructed_from = NULL;
                 s_type->Struct.poly_sln = NULL;
                 s_type->Struct.status = SPS_Start;
+                s_type->Struct.scope = s_node->scope;
                 type_register(s_type);
 
                 s_type->Struct.memarr = NULL;
@@ -588,6 +589,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             p_type->ast_type = type_node;
             p_type->PolyStruct.name = ((AstPolyStructType *) type_node)->name;
             p_type->PolyStruct.meta_tags = ((AstPolyStructType *) type_node)->base_struct->meta_tags;
+            p_type->PolyStruct.scope = ((AstPolyStructType *) type_node)->scope;
 
             type_register(p_type);
             return NULL;
@@ -600,6 +602,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             p_type->ast_type = type_node;
             p_type->PolyUnion.name = ((AstPolyUnionType *) type_node)->name;
             p_type->PolyUnion.meta_tags = ((AstPolyUnionType *) type_node)->base_union->meta_tags;
+            p_type->PolyUnion.scope = ((AstPolyUnionType *) type_node)->scope;
 
             type_register(p_type);
             return NULL;
@@ -716,6 +719,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             Type *distinct_type = type_create(Type_Kind_Distinct, alloc, 0);
             distinct_type->Distinct.base_type = base_type;
             distinct_type->Distinct.name = distinct->name;
+            distinct_type->Distinct.scope = distinct->scope;
             distinct_type->ast_type = type_node;
             distinct->dtcache = distinct_type;
 
@@ -738,6 +742,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 u_type->Union.meta_tags = union_->meta_tags;
                 u_type->Union.constructed_from = NULL;
                 u_type->Union.status = SPS_Start;
+                u_type->Union.scope = union_->scope;
                 type_register(u_type);
 
                 u_type->Union.variants = NULL;
@@ -1110,6 +1115,10 @@ Type* type_make_slice(bh_allocator alloc, Type* of) {
         type_make_multi_pointer(alloc, of);
         slice_type->Slice.elem = of;
 
+        AstPolyStructType* pslice_type = (AstPolyStructType *) builtin_slice_type;
+        OnyxFilePos pos = { 0 };
+        slice_type->Slice.scope = scope_create(context.ast_alloc, pslice_type->scope, pos);
+
         return slice_type;
     }
 }
@@ -1131,6 +1140,10 @@ Type* type_make_dynarray(bh_allocator alloc, Type* of) {
 
         type_make_multi_pointer(alloc, of);
         dynarr->DynArray.elem = of;
+
+        AstPolyStructType* dynarr_type = (AstPolyStructType *) builtin_array_type;
+        OnyxFilePos pos = { 0 };
+        dynarr->DynArray.scope = scope_create(context.ast_alloc, dynarr_type->scope, pos);
 
         return dynarr;
     }

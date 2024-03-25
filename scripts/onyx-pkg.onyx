@@ -28,7 +28,7 @@ Protocols :: str.[
 // NOTE: This returns a string that ends with the path separator.
 Template_Directory :: () -> str {
     return os.path_join(os.path_directory(#file), "pkg_templates")
-            |> string.alloc_copy();
+            |> string.copy();
 }
 
 Version :: SemVer.{0, 1, 9}
@@ -170,7 +170,7 @@ run_init_command :: (args: [] cstr) {
             if conv.parse_any(dest, T, line, context.allocator) do break;
 
             if T == str {
-                *cast(&str) dest = string.alloc_copy(line);
+                *cast(&str) dest = string.copy(line);
                 break;
             }
         }
@@ -802,7 +802,7 @@ strip_protocol_and_www_from_repo :: (repo: str) -> str {
     }
 
     #if runtime.compiler_os == .Windows {
-        to_return = string.alloc_copy(to_return);
+        to_return = string.copy(to_return);
 
         string.replace(to_return, '/', '\\');
     }
@@ -1012,7 +1012,7 @@ Git :: struct {
                 r := tprintf("{}{}", proto, tprintf(it, package_search));
                 git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", r]);
                 if os.process_wait(&git_proc) == .Success {
-                    return r |> string.alloc_copy();
+                    return r |> string.copy();
                 }
             }
         }

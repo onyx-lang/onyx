@@ -1,7 +1,6 @@
 package core.set
 
 use core
-use core.array
 use core.hash
 use core.memory
 use core.math
@@ -28,48 +27,38 @@ Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
     }
 }
 
-Set.init     :: init
-Set.free     :: free
-Set.has      :: has
-Set.get      :: get
-Set.get_ptr  :: get_ptr
-Set.get_opt  :: get_opt
-Set.insert   :: insert
-Set.remove   :: remove
-Set.clear    :: clear
-Set.empty    :: empty
-Set.as_iter  :: as_iter
-
 builtin.Set :: Set
 
-make :: ($T: type_expr, allocator := context.allocator) -> Set(T) {
+
+Set.make :: ($T: type_expr, allocator := context.allocator) -> Set(T) {
     set : Set(T);
-    init(&set, allocator=allocator);
+    Set.init(&set, allocator=allocator);
     return set;
 }
 
 #overload
-builtin.__make_overload :: macro (x: &Set, allocator: Allocator) => #this_package.make(x.Elem_Type, allocator = allocator);
+builtin.__make_overload :: macro (x: &Set, allocator: Allocator) =>
+    #this_package.Set.make(x.Elem_Type, allocator = allocator);
 
-init :: (set: &Set($T), allocator := context.allocator) {
+Set.init :: (set: &Set($T), allocator := context.allocator) {
     set.allocator = allocator;
 
     memory.alloc_slice(&set.hashes, 8, allocator=allocator);
-    array.fill(set.hashes, -1);
+    Array.fill(set.hashes, -1);
 
-    array.init(&set.entries, 4, allocator=allocator); 
+    Array.init(&set.entries, 4, allocator=allocator); 
 }
 
-free :: (use set: &Set) {
+Set.free :: (use set: &Set) {
     memory.free_slice(&hashes, allocator=allocator);
-    array.free(&entries);
+    Array.free(&entries);
 }
 
 #overload
-builtin.delete :: #this_package.free
+builtin.delete :: #this_package.Set.free
 
-insert :: (use set: &Set, value: set.Elem_Type) {
-    if hashes.data == null do init(set);
+Set.insert :: (use set: &Set, value: set.Elem_Type) {
+    if hashes.data == null do Set.init(set);
     lr := lookup(set, value);
 
     if lr.entry_index >= 0 do return;
@@ -81,32 +70,32 @@ insert :: (use set: &Set, value: set.Elem_Type) {
 }
 
 #operator << macro (set: Set($T), value: T) {
-    #this_package.insert(&set, value);
+    #this_package.Set.insert(&set, value);
 }
 
-has :: (use set: &Set, value: set.Elem_Type) -> bool {
+Set.has :: (use set: &Set, value: set.Elem_Type) -> bool {
     lr := lookup(set, value);
     return lr.entry_index >= 0;
 }
 
-get :: (use set: &Set, value: set.Elem_Type) -> set.Elem_Type {
+Set.get :: (use set: &Set, value: set.Elem_Type) -> set.Elem_Type {
     lr := lookup(set, value);
     return entries[lr.entry_index].value if lr.entry_index >= 0 else set.Elem_Type.{};
 }
 
-get_ptr :: (use set: &Set, value: set.Elem_Type) -> &set.Elem_Type {
+Set.get_ptr :: (use set: &Set, value: set.Elem_Type) -> &set.Elem_Type {
     lr := lookup(set, value);
     return (&entries[lr.entry_index].value) if lr.entry_index >= 0 else null;
 }
 
-get_opt :: (use set: &Set, value: set.Elem_Type) -> ? set.Elem_Type {
+Set.get_opt :: (use set: &Set, value: set.Elem_Type) -> ? set.Elem_Type {
     lr := lookup(set, value);
     if lr.entry_index >= 0 do entries[lr.entry_index].value;
 
     return .{};
 }
 
-remove :: (use set: &Set, value: set.Elem_Type) {
+Set.remove :: (use set: &Set, value: set.Elem_Type) {
     lr := lookup(set, value);
     if lr.entry_index < 0 do return;
 
@@ -114,27 +103,27 @@ remove :: (use set: &Set, value: set.Elem_Type) {
     else                   do entries[lr.entry_prev].next = entries[lr.entry_index].next;
 
     if lr.entry_index == entries.count - 1 {
-        array.pop(&entries);
+        Array.pop(&entries);
         return;
     }
 
-    array.fast_delete(&entries, lr.entry_index);
+    Array.fast_delete(&entries, lr.entry_index);
     last := lookup(set, entries[lr.entry_index].value);
     if last.entry_prev >= 0    do entries[last.entry_prev].next = lr.entry_index;
     else                       do hashes[last.hash_index] = lr.entry_index;
 }
 
-clear :: (use set: &Set) {
-    array.fill(hashes, -1);
-    array.clear(&entries);
+Set.clear :: (use set: &Set) {
+    Array.fill(hashes, -1);
+    Array.clear(&entries);
 }
 
-empty :: (use set: &Set) -> bool {
+Set.empty :: (use set: &Set) -> bool {
     return entries.count == 0;
 }
 
 #overload core.iter.as_iter as_iter
-as_iter :: (s: &Set) =>
+Set.as_iter :: (s: &Set) =>
     core.iter.generator(
         &.{ s = s, i = 0 },
 
@@ -190,7 +179,7 @@ as_iter :: (s: &Set) =>
     rehash :: (use set: &Set, new_size: i32) {
         memory.free_slice(&hashes, allocator);
         hashes = builtin.make([] u32, new_size, allocator=allocator);
-        array.fill(hashes, -1);
+        Array.fill(hashes, -1);
 
         for &entry in entries do entry.next = -1;
 
@@ -204,3 +193,21 @@ as_iter :: (s: &Set) =>
         }
     }
 }
+
+
+//
+// Everything below here only exists for backwards compatibility.
+//
+
+make     :: Set.make
+init     :: Set.init
+free     :: Set.free
+has      :: Set.has
+get      :: Set.get
+get_ptr  :: Set.get_ptr
+get_opt  :: Set.get_opt
+insert   :: Set.insert
+remove   :: Set.remove
+clear    :: Set.clear
+empty    :: Set.empty
+as_iter  :: Set.as_iter

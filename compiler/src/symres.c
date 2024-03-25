@@ -259,6 +259,11 @@ static SymresStatus symres_type(AstType** type) {
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* pst_node = (AstPolyStructType *) *type;
             assert(pst_node->scope);
+
+            if (*type == builtin_array_type) {
+                assert(((AstPolyStructType *) builtin_slice_type)->scope);
+                pst_node->scope->parent = ((AstPolyStructType *) builtin_slice_type)->scope;
+            }
             break;
         }
 
@@ -375,6 +380,9 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
     if ((*fa)->expr == NULL) return Symres_Error;
 
     AstTyped* expr = (AstTyped *) strip_aliases((AstNode *) (*fa)->expr);
+    while (expr->kind == Ast_Kind_Type_Alias) {
+        expr = (AstTyped *)((AstTypeAlias *) expr)->to;
+    }
 
     b32 force_a_lookup = 0;
 
@@ -384,6 +392,8 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
         expr->kind == Ast_Kind_Type_Raw_Alias ||
         expr->kind == Ast_Kind_Union_Type ||
         expr->kind == Ast_Kind_Poly_Union_Type ||
+        expr->kind == Ast_Kind_Slice_Type ||
+        expr->kind == Ast_Kind_DynArr_Type ||
         expr->kind == Ast_Kind_Interface) {
         force_a_lookup = 1;
     }
@@ -1519,7 +1529,7 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             }
 
             if (ofunc->kind != Ast_Kind_Overloaded_Function) {
-                onyx_report_error(add_overload->token->pos, Error_Critical, "#match directive expects a matched procedure, got '%s'.",
+                onyx_report_error(add_overload->token->pos, Error_Critical, "#overload directive expects a matched procedure, got '%s'.",
                             onyx_ast_node_kind_string(ofunc->kind));
                 return Symres_Error;
             }
