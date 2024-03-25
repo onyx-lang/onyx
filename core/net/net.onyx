@@ -481,3 +481,19 @@ ipv6_to_str :: (addr: [16] u8) -> str {
         |> string.join(" ");
 }
 
+
+
+ResolveResult :: struct {
+    family: SocketFamily;
+    type: SocketType;
+    proto: SocketProto;
+    addr: SocketAddress;
+}
+
+resolve :: (host: str, port: u16, max_results: i32) -> (addrs: [] ResolveResult) {
+    addrs = make([] ResolveResult, max_results);
+    results := runtime.platform.__net_resolve(host, port, addrs);
+    addrs = addrs[0 .. results];
+    return;
+}
+
