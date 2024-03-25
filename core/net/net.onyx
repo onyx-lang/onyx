@@ -149,6 +149,25 @@ make_unix_address :: (out: &SocketAddress, path: str) {
     out_path[offset] = 0;
 }
 
+
+dial :: (host: str, port: u16, type: SocketType) -> Result(Socket, io.Error) {
+    use addrs := resolve(host, port, 10);
+
+    for &addr in addrs {
+        if addr.type != type do continue;
+
+        sock := socket_create(addr.family, type, .ANY).Ok?;
+        if err := socket_connect(&sock, &addr.addr); err != .None {
+            return .{ Err = err };
+        }
+
+        return .{ Ok = sock };
+    }
+
+    return .{ Err = .NotFound };
+}
+
+
 socket_create :: (family: SocketFamily, type: SocketType, proto: SocketProto) -> Result(Socket, io.Error) {
     s: Socket;
     s.type = type;
