@@ -148,6 +148,16 @@ Result.forward_err :: macro (r: Result($T, $E)) -> T {
 }
 
 #doc """
+    If result contains Err, the error is mapped to a new error type.
+"""
+Result.transform_err :: macro (r: Result($T, $E), f: (E) -> $N) -> Result(T, N) {
+    switch res := r; res {
+        case .Ok  as v do return .{ Ok = v };
+        case .Err as v do return .{ Err = f(v) };
+    }
+}
+
+#doc """
     If result contains Err, the given value is returned from the
     enclosing procedure. Otherwise, the Ok value is returned.
 """
