@@ -79,10 +79,14 @@ export default class Onyx {
         Onyx.modules[name].push(member_getter);
     }
 
-    static async create(source) {
+    static async load(source) {
         let res = await fetch(source);
         let wasm_code = await res.arrayBuffer();
 
+        return Onyx.create(wasm_code)
+    }
+
+    static async create(wasm_code) {
         let instance = new Onyx();
         let import_object = {};
         for (let name in Onyx.modules) {
@@ -92,7 +96,6 @@ export default class Onyx {
             }
             import_object[name] = module_object;
         }
-
 
         let wasm_module = await WebAssembly.instantiate(wasm_code, import_object);
         instance.memory = wasm_module.instance.exports.memory;
@@ -106,6 +109,7 @@ export default class Onyx {
         this.memory = null;
         this.data = null;
         this.instance = null;
+        this.started = false;
         this._scratchBuf = new ArrayBuffer(16);
         this._scratchBufView = new DataView(this._scratchBuf);
         this._textDecoder = new TextDecoder("utf-8");
@@ -114,11 +118,32 @@ export default class Onyx {
     }
 
     start() {
+        if (this.instance.started) return;
+        this.instance.started = true;
+
         this.instance.exports._start();
     }
 
-    invoke(name) {
-        this.instance.exports[name]();
+    invoke(name, ...rest) {
+        this.start();
+
+        let func = this.instance.exports[name];
+        if (func == null) throw new Error(`no such export '${name}'`)
+
+        let args   = rest.map(arg => this.store_value(arg))
+        let result = func.call(null, args)
+        if (result !== undefined) {
+            const index = this.load_value_index(result)
+            result = this.load_value(result)
+            this._heap.free(index)
+        }
+
+        for (let arg of args) {
+            const index = this.load_value_index(arg)
+            this._heap.free(index)
+        }
+
+        return result
     }
 
     extract_string(ptr, len) {
