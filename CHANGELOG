@@ -3,12 +3,28 @@ Nightly Release
 No release date yet
 
 Additions:
-- `#js` directive to build a JavaScript file during compilation.
-- `core.js` package for JavaScript interop.
+- JavaScript interop
+    - `core.js` package for JS FFI.
+    - `#js` directive to build a JavaScript file during compilation.
+- Implicit injections
+    - `#inject` is no longer required
+- Named return values
+- Official builds for Linux AARCH64
 - `Slice` and `Array` structures for placing methods on slices and dynamic arrays.
-- `..=` operator that is a range, with an inclusive upper end.
+- Range type improvements
+    - `range64` type
+    - `..=` operator that is a range, with an inclusive upper end.
 - New alternate error format that may become the default in the future.
     - Use `--error-format v2` or set environment variable `ONYX_ERROR_FORMAT` to be `v2`.
+- Auto-disposing locals (experimental)
+    - `use x := ...`
+- Core library functions
+    - New process spawning API with builder pattern (`os.command`)
+    - `sync.MutexGuard`
+    - `sync.Channel`
+    - `hash.sha1`
+    - `net.dial`
+    - `net.resolve`
 
 Removals:
 
@@ -18,11 +34,18 @@ Changes:
     - Improved appearance
     - Better help pages
     - Note: flags must now appear before all files
+- Better error messages for common issues
+- `Array` should be preferred over `core.array`
+- `Slice` should be preferred over `core.slice`
+- `str` should be preferred over `core.string`
 
 Bugfixes:
 - Fixed compiler crash when trying to iterate over something that is not iterable.
+- Fixed wrong implementation of futexes on MacOS.
+- Fixed implementation of `platform.__time()`
 
-
+Contributors:
+- @Syuparn (1 pull request)
 
 
 

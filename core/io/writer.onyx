@@ -19,6 +19,8 @@ Writer :: struct {
     buffer_filled: u32;
 }
 
+Writer.make :: writer_make
+Writer.free :: writer_free
 Writer.flush :: writer_flush
 Writer.consume_error :: writer_consume_error
 Writer.remaining_capacity :: writer_remaining_capacity
