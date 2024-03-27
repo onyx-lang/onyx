@@ -509,10 +509,10 @@ ResolveResult :: struct {
     addr: SocketAddress;
 }
 
-resolve :: (host: str, port: u16, max_results: i32) -> (addrs: [] ResolveResult) {
-    addrs = make([] ResolveResult, max_results);
+resolve :: (host: str, port: u16, max_results: i32) -> [] ResolveResult {
+    addrs := make([] ResolveResult, max_results);
     results := runtime.platform.__net_resolve(host, port, addrs);
     addrs = addrs[0 .. results];
-    return;
+    return addrs;
 }
 

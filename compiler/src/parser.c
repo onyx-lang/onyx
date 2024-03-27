@@ -3780,6 +3780,50 @@ default_case:
     return binding;
 }
 
+
+static void parse_implicit_injection(OnyxParser* parser) {
+    if (parser->injection_point) {
+        onyx_report_error(parser->curr->pos, Error_Critical, "Implicit injection is not allowed here.");
+        parser->hit_unexpected_token = 1;
+        return;
+    }
+
+    AstFieldAccess *injection_expression = (AstFieldAccess *) parse_type(parser);
+    if (injection_expression->kind != Ast_Kind_Field_Access) {
+        printf("%s\n", onyx_ast_node_kind_string(injection_expression->kind));
+        onyx_report_error(parser->curr->pos, Error_Critical, "Expected binding target to end in something like '.xyz'.");
+        parser->hit_unexpected_token = 1;
+        return;
+    }
+
+    AstInjection *inject = make_node(AstInjection, Ast_Kind_Injection);
+    inject->token = injection_expression->token;
+    inject->full_loc = (AstTyped *) injection_expression;
+
+    AstTyped *target = injection_expression->expr;
+    parser->injection_point = target;
+
+    if (next_tokens_are(parser, 2, ':', ':')) {
+        consume_tokens(parser, 2);
+
+        inject->to_inject = parse_top_level_expression(parser);
+
+        if (parser->last_documentation_token) {
+            inject->documentation = parser->last_documentation_token;
+            parser->last_documentation_token = NULL;
+        }
+
+    } else {
+        inject->to_inject = (AstTyped *) parse_memory_reservation(parser, inject->token, 0);
+    }
+
+    ENTITY_SUBMIT(inject);
+
+    parser->injection_point = NULL;
+    return;
+}
+
+
 static void parse_top_level_statement(OnyxParser* parser) {
     AstFlags private_kind = 0;
     if (bh_arr_length(parser->scope_flags) > 0)
@@ -3826,31 +3870,13 @@ static void parse_top_level_statement(OnyxParser* parser) {
         }
 
         case Token_Type_Symbol: {
-            OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
-
-            if (consume_token_if_next(parser, '.')) {
-                if (parser->injection_point) {
-                    onyx_report_error(parser->curr->pos, Error_Critical, "Implicit injection is not allowed here.");
-                    parser->hit_unexpected_token = 1;
-                    return;
-                }
-
-                AstTyped *target = make_node(AstTyped, Ast_Kind_Symbol);
-                target->token = symbol;
-                while (next_tokens_are(parser, 2, Token_Type_Symbol, '.')) {
-                    AstFieldAccess *fa = make_node(AstFieldAccess, Ast_Kind_Field_Access);
-                    fa->token = expect_token(parser, Token_Type_Symbol);
-                    fa->expr = target;
-                    target = (AstTyped *) fa;
-
-                    expect_token(parser, '.');
-                }
-
-                parser->injection_point = target;
-                parse_top_level_statement(parser);
-                parser->injection_point = NULL;
+            // Handle implicit injections as 'Foo.bar ::' or 'Foo(T).bar ::'
+            if (peek_token(1)->type == '.' || peek_token(1)->type == '(') {
+                parse_implicit_injection(parser);
                 return;
             }
+
+            OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
 
             if (next_tokens_are(parser, 2, ':', ':')) {
                 expect_token(parser, ':');

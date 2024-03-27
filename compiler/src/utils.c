@@ -1514,7 +1514,7 @@ all_types_peeled_off:
         case Ast_Kind_Poly_Call_Type: {
             Type *t = type_build_from_ast(context.ast_alloc, (AstType *) node);
             if (t) {
-                return &((AstStructType *) t->ast_type)->scope;
+                return &t->Struct.scope;
             }
             return NULL;
         }

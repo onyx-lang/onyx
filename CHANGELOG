@@ -7,7 +7,7 @@ Additions:
     - `core.js` package for JS FFI.
     - `#js` directive to build a JavaScript file during compilation.
 - Implicit injections
-    - `#inject` is no longer required
+    - `#inject` is no longer required in some cases
 - Named return values
 - Official builds for Linux AARCH64
 - `Slice` and `Array` structures for placing methods on slices and dynamic arrays.
