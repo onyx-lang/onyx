@@ -24,6 +24,7 @@ use runtime
 #load "./conv/parse"
 
 #load "./math/math"
+#load "./math/consts"
 #load "./random/random"
 
 #load "./hash/hash"

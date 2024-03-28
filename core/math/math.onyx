@@ -15,11 +15,6 @@ use core.intrinsics.wasm
 //  - Dual numbers
 
 
-E      :: 2.71828182845904523536f;
-PI     :: 3.14159265f;
-TAU    :: 6.28318330f;
-SQRT_2 :: 1.414213562f;
-
 //
 // Trigonometry
 // Basic trig functions have been implemented using taylor series approximations. The
