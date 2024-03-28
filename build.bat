@@ -57,6 +57,7 @@ if "%1" == "dist" (
     copy scripts\onyx-pkg.onyx dist\tools\onyx-pkg.onyx
     mkdir dist\tools\pkg_templates
     copy scripts\default.json  dist\tools\pkg_templates\default.json
+    copy scripts\lsp.wasm dist\tools\lsp.wasm
 
     powershell Compress-Archive dist onyx.zip
     move onyx.zip dist/onyx.zip

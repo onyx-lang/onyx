@@ -39,6 +39,7 @@ package_all() {
     mkdir -p "$DIST_DIR/tools/pkg_templates"
     cp ./scripts/onyx-pkg.onyx "$DIST_DIR/tools"
     cp ./scripts/default.json "$DIST_DIR/tools/pkg_templates"
+    cp ./scripts/lsp.wasm "$DIST_DIR/tools"
 
     if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
         echo "Installing runtime library"
