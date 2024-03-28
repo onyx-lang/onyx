@@ -25,6 +25,7 @@ Additions:
     - `hash.sha1`
     - `net.dial`
     - `net.resolve`
+    - integer constants `i8.MIN`, `i64.MAX`, etc.
 
 Removals:
 

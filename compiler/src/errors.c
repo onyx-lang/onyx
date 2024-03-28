@@ -119,6 +119,18 @@ static void print_detailed_message_v2(OnyxError* err, bh_file_contents* fc, b32 
     print_underline(err, linelength, first_char, colored_printing);
 }
 
+static void print_detailed_message_json(OnyxError* err, bh_file_contents* _fc, b32 colored_printing) {
+    bh_printf(
+        "{\"rank\":%d,\"file\":\"%s\",\"line\":%d,\"column\":%d,\"length\":%d,\"msg\":\"%s\"}",
+        err->rank,
+        err->pos.filename,
+        err->pos.line,
+        err->pos.column,
+        err->pos.length,
+        err->text
+    );
+}
+
 static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
     b32 colored_printing = 0;
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
@@ -150,6 +162,9 @@ static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
     else if (!strcmp(error_format, "v1")) {
         print_detailed_message_v1(err, fc, colored_printing);
     }
+    else if (!strcmp(error_format, "json")) {
+        print_detailed_message_json(err, fc, colored_printing);
+    }
     else {
         bh_printf("Unknown error format: '%s'.\n", error_format);
     }
@@ -171,6 +186,10 @@ void onyx_errors_print() {
 
     qsort(context.errors.errors, bh_arr_length(context.errors.errors), sizeof(OnyxError), errors_sort);
 
+    b32 error_format_json = !strcmp(context.options->error_format, "json");
+    if (error_format_json) bh_printf("[");
+    
+
     OnyxErrorRank last_rank = context.errors.errors[0].rank;
     bh_arr_each(OnyxError, err, context.errors.errors) {
         if (!context.options->show_all_errors && last_rank != err->rank) break;
@@ -185,10 +204,14 @@ void onyx_errors_print() {
             }
         }
 
+        if (error_format_json && err != context.errors.errors) bh_printf(",");
+
         print_detailed_message(err, &file_contents);
 
         last_rank = err->rank;
     }
+
+    if (error_format_json) bh_printf("]");
 }
 
 void onyx_errors_enable() {
