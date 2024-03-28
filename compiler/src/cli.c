@@ -50,6 +50,8 @@ static const char* top_level_docstring = DOCSTRING_HEADER
 #ifdef ONYX_RUNTIME_LIBRARY
     "\n"
     C_LBLUE "    package " C_GREY "cmd      " C_NORM "Package manager " C_GREY "(onyx pkg cmd)" C_NORM "\n"
+    C_LBLUE "    new              " C_NORM "Create a new project from a template\n"
+    C_LBLUE "    init             " C_NORM "Initialize a project in the current directory\n"
     C_LBLUE "    add " C_GREY "package      " C_NORM "Add a package to dependency list " C_GREY "(onyx a)" C_NORM "\n"
     C_LBLUE "    remove " C_GREY "package   " C_NORM "Remove a package from dependency list " C_GREY "(onyx rm)" C_NORM "\n"
     C_LBLUE "    sync             " C_NORM "Synchronize installed packages\n"
@@ -180,7 +182,7 @@ static void cli_determine_action(CompileOptions *options, int *first_sub_arg, in
         return;
     }
 
-    if (!strcmp(argv[1], "sync")) {
+    if (!strcmp(argv[1], "sync") || !strcmp(argv[1], "init") || !strcmp(argv[1], "new")) {
         options->action = ONYX_COMPILE_ACTION_RUN;
         options->passthrough_argument_count = argc - 1;
         options->passthrough_argument_data  = &argv[1];
