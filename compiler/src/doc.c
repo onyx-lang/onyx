@@ -300,6 +300,11 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
             write_type_node(buffer, ((AstPointerType *) node)->elem);
             return;
 
+        case Ast_Kind_Multi_Pointer_Type:
+            bh_buffer_write_string(buffer, "[&] ");
+            write_type_node(buffer, ((AstPointerType *) node)->elem);
+            return;
+
         case Ast_Kind_Slice_Type:
             bh_buffer_write_string(buffer, "[] ");
             write_type_node(buffer, ((AstSliceType *) node)->elem);
