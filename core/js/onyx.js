@@ -297,6 +297,32 @@ Onyx.register_module("__syscall", instance => ({
         const onyxmem = new Uint8Array(instance.memory.buffer)
         onyxmem.set(encoded, outptr)
         return encoded.length
+    },
+    __copy_to_js(a_ref, bufptr, buflen) {
+        const a = instance.load_value(a_ref)
+        if (!(a instanceof Uint8Array || a instanceof Uint8ClampedArray)) {
+            return -1
+        }
+
+        const onyxmem = new Uint8Array(instance.memory.buffer)
+        const copylen = Math.min(buflen, a.length)
+        const to_copy = onyxmem.subarray(bufptr, bufptr+copylen)
+        a.set(to_copy)
+
+        return copylen
+    },
+    __copy_to_onyx(bufptr, buflen, a_ref) {
+        const a = instance.load_value(a_ref)
+        if (!(a instanceof Uint8Array || a instanceof Uint8ClampedArray)) {
+            return -1
+        }
+
+        const onyxmem = new Uint8Array(instance.memory.buffer, bufptr)
+        const copylen = Math.min(buflen, a.length)
+        const to_copy = a.subarray(0, copylen)
+        onyxmem.set(to_copy)
+
+        return copylen
     }
 }))
 

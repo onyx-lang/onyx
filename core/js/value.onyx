@@ -324,6 +324,23 @@ Value.truthy :: (v: Value) -> bool {
     }
 }
 
+#doc """
+    Copies data from a Uint8Array in JS to a buffer in Onyx.
+    Returns the number of bytes copied, or -1 if the value was not a Uint8Array.
+"""
+Value.copy_to_onyx :: (v: Value, buf: [] u8) -> i32 {
+    return __copy_to_onyx(buf, v);
+}
+
+
+#doc """
+    Copies data into a Uint8Array in JS from a buffer in Onyx.
+    Returns the number of bytes copied, or -1 if the value was not a Uint8Array.
+"""
+Value.copy_to_js :: (v: Value, buf: [] u8) -> i32 {
+    return __copy_to_js(v, buf);
+}
+
 
 #local
 transform_args :: macro (args: [] any, $body: Code) {
