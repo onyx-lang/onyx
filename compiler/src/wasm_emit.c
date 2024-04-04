@@ -1606,9 +1606,6 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
     if (!it_is_local) emit_local_location(mod, &code, var, &offset);
 
     {
-        WIL(for_node->token, WI_LOCAL_GET, iterator_data_ptr);
-        WIL(for_node->token, WI_LOCAL_GET, iterator_next_func);
-
         // CLEANUP: Calling a function is way too f-ing complicated. FACTOR IT!!
         u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
 
@@ -1628,7 +1625,9 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
         WI(for_node->token, WI_PTR_SUB);
         WID(for_node->token, WI_GLOBAL_SET, stack_top_idx);
 
+        WIL(for_node->token, WI_LOCAL_GET, iterator_data_ptr);
         WID(for_node->token, WI_GLOBAL_GET, stack_top_idx);
+        WIL(for_node->token, WI_LOCAL_GET, iterator_next_func);
         i32 type_idx = generate_type_idx(mod, next_func_type.type);
         WID(for_node->token, WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
 
@@ -2347,12 +2346,15 @@ EMIT_FUNC(call, AstCall* call) {
     u32 return_size = type_size_of(return_type);
     assert(return_size % type_alignment_of(return_type) == 0);
 
+    u32 return_location = 0;
     if (cc == CC_Return_Stack) {
-        reserve_size += return_size;
+        return_location = reserve_size;
 
         WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
-        WID(call_token, WI_PTR_CONST, reserve_size - return_size);
+        WID(call_token, WI_PTR_CONST, return_location);
         WI(call_token, WI_PTR_ADD);
+
+        reserve_size += return_size;
     }
 
     if (context.options->stack_trace_enabled) {
@@ -2400,7 +2402,7 @@ EMIT_FUNC(call, AstCall* call) {
 
     if (cc == CC_Return_Stack) {
         WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
-        emit_load_with_ignored_instruction(mod, &code, return_type, reserve_size - return_size, call->ignored_return_value_count);
+        emit_load_with_ignored_instruction(mod, &code, return_type, return_location, call->ignored_return_value_count);
     }
 
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);

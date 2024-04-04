@@ -213,7 +213,7 @@ Command.output :: (cmd: &Command) -> Result(str, ProcessResultOutput) {
         cmd._opts.detach = false;
 
         cmd->start();
-        if !cmd._process do return .{ Err = .{ .Error, "" } };
+        if !cmd._process do return .{ Err = .{ .Error, "Failed to spawn process" } };
     }
 
     r := io.reader_make(cmd._process->unwrap_ptr());
