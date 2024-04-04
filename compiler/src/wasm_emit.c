@@ -5574,10 +5574,7 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
 
     i32 datum_offset = options->null_reserve_size;
 
-    options->stack_first = 1;
-    if (options->stack_first) {
-        datum_offset += options->stack_size;
-    }
+    datum_offset += options->stack_size;
 
     bh_arr_each(WasmDatum, datum, module->data) {
         assert(datum->id > 0);
@@ -5649,13 +5646,8 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
 
     assert(module->stack_top_ptr && module->heap_start_ptr);
 
-    if (options->stack_first) {
-        *module->stack_top_ptr = options->null_reserve_size + options->stack_size;
-        *module->heap_start_ptr = datum_offset;
-    } else {
-        *module->stack_top_ptr = datum_offset + options->stack_size;
-        *module->heap_start_ptr = *module->stack_top_ptr;
-    }
+    *module->stack_top_ptr = options->null_reserve_size + options->stack_size;
+    *module->heap_start_ptr = datum_offset;
 
     bh_align(*module->stack_top_ptr, options->stack_alignment);
     bh_align(*module->heap_start_ptr, 16);
@@ -5712,10 +5704,6 @@ b32 onyx_wasm_build_link_options_from_node(OnyxWasmLinkOptions *opts, AstTyped *
     b32 out_is_valid;
 
     // TODO: These should be properly error handled.
-    assert(type_lookup_member(link_options_type, "stack_first", &smem));
-    opts->stack_first = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid) != 0;
-    if (!out_is_valid) return 0;
-
     assert(type_lookup_member(link_options_type, "stack_size", &smem));
     opts->stack_size = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid);
     if (!out_is_valid) return 0;
