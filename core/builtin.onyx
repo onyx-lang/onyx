@@ -549,7 +549,7 @@ Link_Options :: struct {
     //   reserved | static-data | stack | heap
     // But when stack_first is true, it is:
     //   reserved | stack | static-data | heap
-    stack_first     := false;
+    stack_first     := true;
 
     // The size, in bytes of the stack.
     stack_size      := 16 * 65536;  // 16 pages * 65536 bytes per page = 1 MiB stack
