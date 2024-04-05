@@ -2,7 +2,7 @@
     "name": "onyxlang",
     "displayName": "Onyx Programming Language",
     "description": "Onyx syntax highlighting and debugger support.",
-    "version": "0.1.11",
+    "version": "0.1.12",
     "publisher": "onyxlang",
     "license": "BSD-2-Clause",
     "engines": {
@@ -140,13 +140,13 @@
         "./textmate-configuration.json"
     ],
     "dependencies": {
-        "@types/node": "^18.6.4",
         "@vscode/debugadapter": "^1.57.0",
         "await-notify": "^1.0.1",
         "vscode-languageclient": "^8.0.2",
         "vscode-textmate-languageservice": "0.2.1"
     },
     "devDependencies": {
+        "@types/node": "^20.12.4",
         "@types/vscode": "^1.1.37",
         "vscode-debugadapter": "^1.51.0"
     }

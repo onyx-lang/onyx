@@ -4,6 +4,7 @@ import * as fs from "fs";
 
 import * as vslc2 from "vscode-languageclient";
 import * as vslc from "vscode-languageclient/node";
+import * as cp from "child_process";
 
 let client: vslc.LanguageClient;
 
@@ -86,12 +87,15 @@ export async function activate(context: vscode.ExtensionContext) {
 		executable = `${onyx_path}/onyx`;
 	}
 
+	console.appendLine(`Onyx executable is: ${executable}`);
+
 	if (onyx_path) {
-		let serverOptions: vslc.ServerOptions = {
-			command: executable,
-			args: ["lsp"],
-			transport: vslc.TransportKind.stdio,
-		};
+		let serverOptions = async () => {
+			return cp.spawn(executable, ["lsp"], {
+				detached: true,
+				cwd: vscode.workspace.workspaceFolders[0].uri.fsPath
+			});
+		}
 
 		let clientOptions: vslc.LanguageClientOptions = {
 			documentSelector: [
@@ -100,11 +104,14 @@ export async function activate(context: vscode.ExtensionContext) {
 			connectionOptions: {
 				cancellationStrategy: null,
 				maxRestartCount: 5
+			},
+			uriConverters: {
+				code2Protocol: (x) => x.fsPath,
+				protocol2Code: (x) => vscode.Uri.parse(decodeURIComponent(x))
 			}
 		};
 
 		client = new vslc.LanguageClient("onyx-lsp", serverOptions, clientOptions);
-
 		client.start();
 	}
 
