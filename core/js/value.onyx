@@ -6,9 +6,7 @@ use core.math
 use core.array
 use core.alloc
 
-#doc """
-    Used to represent a JavaScript value.
-"""
+/// Used to represent a JavaScript value.
 Value :: #distinct u64
 
 value :: Value.from
@@ -33,25 +31,23 @@ False      :: Value.{0x7ff8000000000004}
 Global     :: Value.{0x7ff8000000000005}
 Onyx       :: Value.{0x7ff8000000000006}
 
-#doc "Creates a new JavaScript object and returns the `Value` handle to it."
+/// Creates a new JavaScript object and returns the `Value` handle to it.
 Value.new_object :: () -> Value {
     v := __new_object();
     __add_to_pool(v);
     return v;
 }
 
-#doc "Creates a new JavaScript array and returns the `Value` handle to it."
+/// Creates a new JavaScript array and returns the `Value` handle to it.
 Value.new_array :: () -> Value {
     v := __new_array();
     __add_to_pool(v);
     return v;
 }
 
-#doc """
-    Converts an Onyx value into a JavaScript `Value`.
-
-    Currently, these types are supported: `i32`, `u32`, `i64`, `u64`, `f32`, `f64`, `bool`, str, `Value`, `Func`, and `Map(str, $V)`.
-"""
+/// Converts an Onyx value into a JavaScript `Value`.
+///
+/// Currently, these types are supported: `i32`, `u32`, `i64`, `u64`, `f32`, `f64`, `bool`, str, `Value`, `Func`, and `Map(str, $V)`.
 Value.from :: #match {
     (m: Map(str, $V)) -> ? Value {
         result := Value.new_object();
@@ -123,7 +119,7 @@ Value.from :: #match {
     }
 }
 
-#doc "Converts a `Value` into a `bool`. If the value is not internally of boolean type, `None` is returned."
+/// Converts a `Value` into a `bool`. If the value is not internally of boolean type, `None` is returned.
 Value.as_bool :: (v: Value) -> ? bool {
     if cast(u64) v == cast(u64) True  do return true;
     if cast(u64) v == cast(u64) False do return false;
@@ -131,7 +127,7 @@ Value.as_bool :: (v: Value) -> ? bool {
     return .None;
 }
 
-#doc "Converts a `Value` into a `f64`. If the value is not internally of float type, `None` is returned."
+/// Converts a `Value` into a `f64`. If the value is not internally of float type, `None` is returned.
 Value.as_float :: (v: Value) -> ? f64 {
     v_u64 := cast(u64, v);
     v_f64 := *cast(&f64, &v_u64);
@@ -142,7 +138,7 @@ Value.as_float :: (v: Value) -> ? f64 {
     return .None;
 }
 
-#doc "Converts a `Value` into a `i32`. If the value is not internally of float type, `None` is returned."
+/// Converts a `Value` into a `i32`. If the value is not internally of float type, `None` is returned.
 Value.as_int :: (v: Value) -> ? i32 {
     v_u64 := cast(u64, v);
     v_f64 := *cast(&f64, &v_u64);
@@ -153,12 +149,10 @@ Value.as_int :: (v: Value) -> ? i32 {
     return .None;
 }
 
-#doc """
-    Converts a `Value` into a `str`. If the value is not internally of str type, `None` is returned.
-
-    Note that this function returns a string that is allocated on the heap.
-    The caller is responsible for managing the returned string.
-"""
+/// Converts a `Value` into a `str`. If the value is not internally of str type, `None` is returned.
+///
+/// Note that this function returns a string that is allocated on the heap.
+/// The caller is responsible for managing the returned string.
 Value.as_str :: (v: Value) -> ? str {
     len := __to_str(v, .[]);
     if len < 0 do return .None;
@@ -168,9 +162,7 @@ Value.as_str :: (v: Value) -> ? str {
     return ret;
 }
 
-#doc """
-    Returns the internal type of the `Value`.
-"""
+/// Returns the internal type of the `Value`.
 Value.type :: (v: Value) -> Type {
     v_u64 := cast(u64, v);
 
@@ -197,7 +189,7 @@ Value.type :: (v: Value) -> Type {
     return .Undefined;
 }
 
-#doc "Calls a method on a `Value`."
+/// Calls a method on a `Value`.
 Value.call :: #match {
     (v: Value, method: str, args: [] any) -> Value {
         transform_args(args, [](__method(v, method, mapped_args)));
@@ -208,7 +200,7 @@ Value.call :: #match {
     }
 }
 
-#doc "Invokes the `Value` as though it is a JavaScript function."
+/// Invokes the `Value` as though it is a JavaScript function.
 Value.invoke :: #match {
     (v: Value, args: ..any) -> Value {
         transform_args(args, [](__call(v, mapped_args)));
@@ -219,7 +211,7 @@ Value.invoke :: #match {
     }
 }
 
-#doc "Removes the `Value` from current `ValuePool`. This means that the `Value` will not be automatically collected, and must be released with `Value.release`."
+/// Removes the `Value` from current `ValuePool`. This means that the `Value` will not be automatically collected, and must be released with `Value.release`.
 Value.leak :: (v: Value) -> Value {
     if __current_pool {
         __current_pool->remove(v);
@@ -228,7 +220,7 @@ Value.leak :: (v: Value) -> Value {
     return v;
 }
 
-#doc "Releases the `Value` from the JavaScript heap. The `Value` should not be used after this method is called."
+/// Releases the `Value` from the JavaScript heap. The `Value` should not be used after this method is called.
 Value.release :: (v: Value) {
     if __current_pool {
         __current_pool->remove(v);
@@ -237,7 +229,7 @@ Value.release :: (v: Value) {
     return __free(v);
 }
 
-#doc "Invokes the JavaScript `delete` operator on the specified property."
+/// Invokes the JavaScript `delete` operator on the specified property.
 Value.delete :: (v: Value, property: str) {
     return __delete(v, property);
 }
@@ -258,24 +250,24 @@ Value.is_nan :: (v: Value) -> bool {
     return cast(u64) v == cast(u64) NaN;
 }
 
-#doc "Returns the evaluation of the `instanceof` operator in JavaScript."
+/// Returns the evaluation of the `instanceof` operator in JavaScript.
 Value.instance_of :: (v: Value, base: Value) -> bool {
     return __instance_of(v, base);
 }
 
-#doc "Invokes the `new` operator on the `Value`, with arguments `args`."
+/// Invokes the `new` operator on the `Value`, with arguments `args`.
 Value.new :: (v: Value, args: ..any) -> Value {
     transform_args(cast([] any) args, [](__new(v, mapped_args)));
 }
 
-#doc "Retrieves the evaluation of `v[prop]` in JavaScript."
+/// Retrieves the evaluation of `v[prop]` in JavaScript.
 Value.get :: (v: Value, prop: str) -> Value {
     r := __dot(v, prop);
     __add_to_pool(r);
     return r;
 }
 
-#doc "Retrieves the evaluation of `v[prop] = value` in JavaScript."
+/// Retrieves the evaluation of `v[prop] = value` in JavaScript.
 Value.set :: #match #locked {
     (v: Value, prop: str, value: Value) {
         __set(v, prop, value);
@@ -298,22 +290,20 @@ Value.set :: #match #locked {
     }
 }
 
-#doc """Special case for `->get("length")`. Because it is required so often, this optimization is quite nice."""
+/// Special case for `->get("length")`. Because it is required so often, this optimization is quite nice.
 Value.length :: (v: Value) -> i32 {
     return __len(v);
 }
 
-#doc "Retrieves the evaluation of `v[i]` in JavaScript."
+/// Retrieves the evaluation of `v[i]` in JavaScript.
 Value.index :: (v: Value, i: i32) -> Value {
     r := __sub(v, i);
     __add_to_pool(r);
     return r;
 }
 
-#doc """
-    JavaScript defines a "falsesy" value as undefined, null, false, 0, and "".
-    All other values are "truthy".
-"""
+/// JavaScript defines a "falsesy" value as undefined, null, false, 0, and "".
+/// All other values are "truthy".
 Value.truthy :: (v: Value) -> bool {
     switch v->type() {
         case .Undefined, .Null do return false;
@@ -324,19 +314,15 @@ Value.truthy :: (v: Value) -> bool {
     }
 }
 
-#doc """
-    Copies data from a Uint8Array in JS to a buffer in Onyx.
-    Returns the number of bytes copied, or -1 if the value was not a Uint8Array.
-"""
+/// Copies data from a Uint8Array in JS to a buffer in Onyx.
+/// Returns the number of bytes copied, or -1 if the value was not a Uint8Array.
 Value.copy_to_onyx :: (v: Value, buf: [] u8) -> i32 {
     return __copy_to_onyx(buf, v);
 }
 
 
-#doc """
-    Copies data into a Uint8Array in JS from a buffer in Onyx.
-    Returns the number of bytes copied, or -1 if the value was not a Uint8Array.
-"""
+/// Copies data into a Uint8Array in JS from a buffer in Onyx.
+/// Returns the number of bytes copied, or -1 if the value was not a Uint8Array.
 Value.copy_to_js :: (v: Value, buf: [] u8) -> i32 {
     return __copy_to_js(v, buf);
 }
@@ -391,10 +377,8 @@ __add_to_pool :: macro (v: Value) {
 }
 
 
-#doc """
-    To aid in managing `Value`s that are created over the life time of the program,
-    `ValuePool` collects all of the `Value`s and allows for releasing them all at once.
-"""
+/// To aid in managing `Value`s that are created over the life time of the program,
+/// `ValuePool` collects all of the `Value`s and allows for releasing them all at once.
 ValuePool :: struct {
     values: [..] Value = make([..] Value, alloc.heap_allocator);
 }
@@ -420,29 +404,27 @@ ValuePool.destroy :: (vp: &ValuePool) {
     delete(&vp.values);
 }
 
-#doc "Gets the current `ValuePool` in use."
+/// Gets the current `ValuePool` in use.
 get_pool :: () => __current_pool;
 
-#doc "Sets the `ValuePool` to use."
+/// Sets the `ValuePool` to use.
 set_pool :: (vp: &ValuePool) {
     __current_pool = vp;
 }
 
-#doc "Creates a new `ValuePool` and uses it. The old `ValuePool` is forgotten."
+/// Creates a new `ValuePool` and uses it. The old `ValuePool` is forgotten.
 setup_default_pool :: () {
     __current_pool = new(ValuePool);
 }
 
-#doc "Releases all objects in the current `ValuePool`."
+/// Releases all objects in the current `ValuePool`.
 release_pooled_objects :: () {
     if __current_pool {
         __current_pool->release_all();
     }
 }
 
-#doc """
-    Helper macro to create a `ValuePool` that is scoped to a block.
-"""
+/// Helper macro to create a `ValuePool` that is scoped to a block.
 temp_pool :: #match {
     macro (body: Code) -> u32 {
         #this_package.temp_pool();

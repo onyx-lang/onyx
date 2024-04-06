@@ -87,6 +87,8 @@ typedef enum TokenType {
 
     Token_Type_Inserted_Semicolon,
 
+    Token_Type_Doc_Comment,
+
     Token_Type_Count,
 } TokenType;
 

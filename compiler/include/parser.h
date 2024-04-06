@@ -49,8 +49,11 @@ typedef struct OnyxParser {
 
     // Used by `#doc` directives to store their documentation
     // string. This is then used by binding nodes to capture
-    // documentation.
+    // documentation. DEPRECATED
     OnyxToken *last_documentation_token;
+
+    // Used by `///` doc comments
+    bh_arr(OnyxToken *) documentation_tokens;
 
     u16 tag_depth : 16;
 

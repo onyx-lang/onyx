@@ -3794,10 +3794,8 @@ CheckStatus check_process_directive(AstNode* directive) {
             YIELD_ERROR(inject->token->pos, "Cannot #inject here.");
         }
 
-        AstBinding *binding = onyx_ast_node_new(context.ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
-        binding->token = inject->symbol;
-        binding->node = (AstNode *) inject->to_inject;
-        binding->documentation = inject->documentation;
+        // Check if this line is even necessary
+        inject->binding->token = inject->symbol;
 
         Package *pac = NULL;
         if (inject->dest->kind == Ast_Kind_Package) {
@@ -3806,7 +3804,7 @@ CheckStatus check_process_directive(AstNode* directive) {
             pac = context.checker.current_entity->package;
         }
 
-        add_entities_for_node(NULL, (AstNode *) binding, scope, pac);
+        add_entities_for_node(NULL, (AstNode *) inject->binding, scope, pac);
         return Check_Complete;
     }
 

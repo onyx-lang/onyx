@@ -1145,16 +1145,24 @@ struct AstDistinctType {
 };
 
 // Top level nodes
-struct AstBinding       { AstTyped_base; AstNode* node; OnyxToken *documentation; };
 struct AstAlias         { AstTyped_base; AstTyped* alias; };
 struct AstInclude       { AstNode_base;  AstTyped* name_node; char* name; b32 recursive: 1; };
+struct AstBinding       {
+    AstTyped_base;
+    AstNode* node;
+
+    // Used for the old '#doc' scheme
+    OnyxToken *documentation_token_old;
+
+    // Used for the new `///` scheme
+    const char *documentation_string;
+};
 struct AstInjection     {
     AstTyped_base;
     AstTyped* full_loc;
-    AstTyped* to_inject;
     AstTyped* dest;
     OnyxToken *symbol;
-    OnyxToken *documentation;
+    AstBinding *binding;
 };
 struct AstMemRes        {
     AstTyped_base;
@@ -1786,7 +1794,9 @@ struct Package {
     bh_arr(Entity *) use_package_entities;
 
     // NOTE: This tracks all #package_doc statements used for this package.
-    bh_arr(OnyxToken *) doc_strings;
+    bh_arr(OnyxToken *) doc_string_tokens;
+
+    bh_arr(const char *) doc_strings;
 
     // NOTE: These are entities that are stored in packages marked with `#allow_stale_code`.
     // These entities are flushed to the entity heap when the package has been explicit used
@@ -2159,7 +2169,7 @@ b32 resolve_intrinsic_interface_constraint(AstConstraint *constraint);
 void track_declaration_for_tags(AstNode *);
 
 void track_declaration_for_symbol_info(OnyxFilePos, AstNode *);
-void track_documentation_for_symbol_info(AstNode *, OnyxToken *);
+void track_documentation_for_symbol_info(AstNode *, AstBinding *);
 void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved);
 
 // NOTE: Useful inlined functions

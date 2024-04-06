@@ -6,27 +6,25 @@ use core.conv
 use core.string
 use runtime
 
-#doc """
-    This is currently a very basic argument parsing library.
-    The options are given through a structure like so:
-   
-        Options :: struct {
-            @"--option_1"
-            option_1: str;
-        
-            @"--option_2", "-o2"
-            option_2: bool;
-        }
-   
-        main :: (args) => {
-            o: Options;
-            arg_parse.arg_parse(args, &o);
-        }
-   
-    Options that are strings and integers expect an argument after
-    them to specify their value. Options that are bool default to
-    false and are true if one or more of the option values are present.
-""" 
+/// This is currently a very basic argument parsing library.
+/// The options are given through a structure like so:
+///
+///     Options :: struct {
+///         @"--option_1"
+///         option_1: str;
+///     
+///         @"--option_2", "-o2"
+///         option_2: bool;
+///     }
+///     
+///     main :: (args) => {
+///         o: Options;
+///         arg_parse.arg_parse(args, &o);
+///     }
+///
+/// Options that are strings and integers expect an argument after
+/// them to specify their value. Options that are bool default to
+/// false and are true if one or more of the option values are present.
 arg_parse :: (c_args: [] cstr, output: any) -> bool {
     arg_iter := iter.as_iter(c_args) |>
                 iter.map(string.from_cstr);

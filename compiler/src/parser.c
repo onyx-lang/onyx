@@ -258,6 +258,43 @@ static void flush_stored_tags(OnyxParser *parser, bh_arr(AstTyped *) *out_arr) {
     *out_arr = arr;
 }
 
+static void flush_doc_tokens(OnyxParser *parser, const char **out_string, OnyxToken **out_token) {
+    if (parser->last_documentation_token) {
+        if (out_token) *out_token = parser->last_documentation_token;
+        parser->last_documentation_token = NULL;
+    }
+
+    if (bh_arr_is_empty(parser->documentation_tokens)) {
+        if (out_string) *out_string = "";
+        return;
+    }
+
+    if (!out_string) {
+        bh_arr_clear(parser->documentation_tokens);
+        return;
+    }
+
+    // Build the full doc string from the tokens
+
+    i32 doc_len = 0;
+    bh_arr_each(OnyxToken *, ptoken, parser->documentation_tokens) {
+        doc_len += (*ptoken)->length;
+        doc_len += 1; // For the \n
+    }
+
+    bh_buffer str_buf;
+    bh_buffer_init(&str_buf, context.ast_alloc, doc_len + 1); // +1 for null byte
+
+    bh_arr_each(OnyxToken *, ptoken, parser->documentation_tokens) {
+        bh_buffer_append(&str_buf, (*ptoken)->text, (*ptoken)->length);
+        bh_buffer_write_byte(&str_buf, '\n');
+    }
+    bh_arr_clear(parser->documentation_tokens);
+
+    bh_buffer_write_byte(&str_buf, 0);
+    *out_string = (const char *) str_buf.data;
+}
+
 
 static u64 parse_int_token(OnyxToken *int_token) {
     u64 value = 0;
@@ -3790,7 +3827,6 @@ static void parse_implicit_injection(OnyxParser* parser) {
 
     AstFieldAccess *injection_expression = (AstFieldAccess *) parse_type(parser);
     if (injection_expression->kind != Ast_Kind_Field_Access) {
-        printf("%s\n", onyx_ast_node_kind_string(injection_expression->kind));
         onyx_report_error(parser->curr->pos, Error_Critical, "Expected binding target to end in something like '.xyz'.");
         parser->hit_unexpected_token = 1;
         return;
@@ -3804,17 +3840,16 @@ static void parse_implicit_injection(OnyxParser* parser) {
     parser->injection_point = target;
 
     if (next_tokens_are(parser, 2, ':', ':')) {
-        consume_tokens(parser, 2);
-
-        inject->to_inject = parse_top_level_expression(parser);
-
-        if (parser->last_documentation_token) {
-            inject->documentation = parser->last_documentation_token;
-            parser->last_documentation_token = NULL;
-        }
+        consume_token(parser);
+        inject->binding = parse_top_level_binding(parser, inject->token);
+        flush_doc_tokens(parser, &inject->binding->documentation_string, &inject->binding->documentation_token_old);
 
     } else {
-        inject->to_inject = (AstTyped *) parse_memory_reservation(parser, inject->token, 0);
+        AstMemRes* memres = parse_memory_reservation(parser, inject->token, 0);
+
+        inject->binding = make_node(AstBinding, Ast_Kind_Binding);
+        inject->binding->token = inject->token;
+        inject->binding->node = (AstNode *) memres;
     }
 
     ENTITY_SUBMIT(inject);
@@ -3910,6 +3945,14 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(retval);
                 return;
             }
+
+            onyx_report_error(parser->curr->pos, Error_Critical, "Unexpected '(' at top-level.");
+            parser->hit_unexpected_token = 1;
+            break;
+        }
+
+        case Token_Type_Doc_Comment: {
+            bh_arr_push(parser->documentation_tokens, expect_token(parser, Token_Type_Doc_Comment));
             break;
         }
 
@@ -4077,17 +4120,14 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
                 // See comment above
                 if (next_tokens_are(parser, 2, ':', ':')) {
-                    consume_tokens(parser, 2);
+                    consume_token(parser);
                 }
 
                 AstInjection *inject = make_node(AstInjection, Ast_Kind_Injection);
                 inject->token = dir_token;
                 inject->full_loc = (AstTyped *) injection_point;
-                inject->to_inject = parse_top_level_expression(parser);
-                if (parser->last_documentation_token) {
-                    inject->documentation = parser->last_documentation_token;
-                    parser->last_documentation_token = NULL;
-                }
+                inject->binding = parse_top_level_binding(parser, injection_point->token);
+                flush_doc_tokens(parser, &inject->binding->documentation_string, &inject->binding->documentation_token_old);
 
                 ENTITY_SUBMIT(inject);
                 return;
@@ -4188,10 +4228,7 @@ submit_binding_to_entities:
     {
         if (!binding) return;
 
-        if (parser->last_documentation_token) {
-            binding->documentation = parser->last_documentation_token;
-            parser->last_documentation_token = NULL;
-        }
+        flush_doc_tokens(parser, &binding->documentation_string, &binding->documentation_token_old);
 
         //
         // If this binding is inside an #inject block,
@@ -4203,8 +4240,7 @@ submit_binding_to_entities:
             injection->token = parser->injection_point->token;
             injection->dest = parser->injection_point;
             injection->symbol = binding->token;
-            injection->to_inject = (AstTyped *) binding->node;
-            injection->documentation = binding->documentation;
+            injection->binding = binding;
 
             ENTITY_SUBMIT(injection);
             return;
@@ -4418,6 +4454,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     parser.injection_point = NULL;
     parser.last_documentation_token = NULL;
     parser.allow_package_expressions = 0;
+    parser.documentation_tokens = NULL;
 
     parser.polymorph_context = (PolymorphicContext) {
         .root_node = NULL,
@@ -4429,6 +4466,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     bh_arr_new(global_heap_allocator, parser.scope_flags, 4);
     bh_arr_new(global_heap_allocator, parser.stored_tags, 4);
     bh_arr_new(global_heap_allocator, parser.current_function_stack, 4);
+    bh_arr_new(global_heap_allocator, parser.documentation_tokens, 8);
 
     return parser;
 }
@@ -4439,13 +4477,28 @@ void onyx_parser_free(OnyxParser* parser) {
     bh_arr_free(parser->scope_flags);
     bh_arr_free(parser->stored_tags);
     bh_arr_free(parser->current_function_stack);
+    bh_arr_free(parser->documentation_tokens);
 }
 
 void onyx_parse(OnyxParser *parser) {
     // NOTE: Skip comments at the beginning of the file
     while (consume_token_if_next(parser, Token_Type_Comment));
 
+    while (parser->curr->type == Token_Type_Doc_Comment) {
+        bh_arr_push(parser->documentation_tokens, expect_token(parser, Token_Type_Doc_Comment));
+    }
+
     parser->package = parse_file_package(parser);
+    assert(parser->package);
+
+    {
+        const char *doc_string = NULL;
+        flush_doc_tokens(parser, &doc_string, NULL);
+        if (doc_string && strlen(doc_string) > 0) {
+            bh_arr_push(parser->package->doc_strings, doc_string);
+        }
+    }
+
     parser->file_scope = scope_create(parser->allocator, parser->package->private_scope, parser->tokenizer->tokens[0].pos);
     parser->current_scope = parser->file_scope;
 
@@ -4464,7 +4517,7 @@ void onyx_parse(OnyxParser *parser) {
         OnyxToken *doc_string = expect_token(parser, Token_Type_Literal_String);
         consume_token_if_next(parser, ';');
 
-        bh_arr_push(parser->package->doc_strings, doc_string);
+        bh_arr_push(parser->package->doc_string_tokens, doc_string);
     }
 
     parse_top_level_statements_until(parser, Token_Type_End_Stream);

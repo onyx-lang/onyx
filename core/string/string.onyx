@@ -3,7 +3,7 @@ package core.string
 use core {package, *}
 
 
-#doc "Generic procedure for turning something into a string."
+/// Generic procedure for turning something into a string.
 as_str :: #match -> str {}
 
 #local HasAsStrMethod :: interface (T: type_expr) {
@@ -54,13 +54,11 @@ from_cstr :: (s: cstr) -> str {
     return .{ data = s, count = length(s) };
 }
 
-#doc """
-    Converts a `str` into a `cstr` by copying the memory of the string to the stack,
-    with an additional byte at the end that is set to 0, to correctly for a C-string.
-
-    This only needs to be done when the string does not contain a `\0` byte on the end,
-    which is most of the time. If you know that the string has a `\0` byte, simply use `s.data`.
-"""
+/// Converts a `str` into a `cstr` by copying the memory of the string to the stack,
+/// with an additional byte at the end that is set to 0, to correctly for a C-string.
+///
+/// This only needs to be done when the string does not contain a `\0` byte on the end,
+/// which is most of the time. If you know that the string has a `\0` byte, simply use `s.data`.
 to_cstr_on_stack :: macro (s_: str) -> cstr {
     use core.alloc
     use core.memory

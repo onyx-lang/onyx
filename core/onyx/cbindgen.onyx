@@ -41,7 +41,7 @@ package cbindgen
 
 use runtime
 
-#doc "Deprecated. Use `link_name`."
+/// Deprecated. Use `link_name`.
 customize :: struct {
     symbol_name: str;
 }

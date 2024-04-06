@@ -100,11 +100,11 @@ void onyx_docs_emit_symbol_info(const char *dest) {
         bh_buffer_write_u32(&sym_def_section, sym->column);
 
         if (context.options->generate_lsp_info_file) {
-            if (sym->documentation) {
+            if (sym->documentation_length > 0) {
                 bh_buffer_write_u32(&sym_def_section, docs_section.length);
-                bh_buffer_write_u32(&sym_def_section, sym->documentation->length);
+                bh_buffer_write_u32(&sym_def_section, sym->documentation_length);
 
-                bh_buffer_append(&docs_section, sym->documentation->text, sym->documentation->length);
+                bh_buffer_append(&docs_section, sym->documentation, sym->documentation_length);
             } else {
                 bh_buffer_write_u32(&sym_def_section, 0);
                 bh_buffer_write_u32(&sym_def_section, 0);
@@ -425,11 +425,19 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
 }
 
 static void write_doc_notes(bh_buffer *buffer, AstBinding *binding) {
-    if (!binding || !binding->documentation) {
-        write_cstring(buffer, "");
-    } else {
-        write_string(buffer, binding->documentation->length, binding->documentation->text);
+    if (binding) {
+        if (binding->documentation_token_old) {
+            write_string(buffer, binding->documentation_token_old->length, binding->documentation_token_old->text);
+            return;
+        }
+
+        if (binding->documentation_string) {
+            write_string(buffer, strlen(binding->documentation_string), (char *) binding->documentation_string);
+            return;
+        }
     }
+
+    write_cstring(buffer, "");
 }
 
 static void write_entity_header(bh_buffer *buffer, AstBinding *binding, OnyxFilePos location) {
@@ -950,10 +958,13 @@ void onyx_docs_emit_odoc(const char *dest) {
             bh_buffer_write_u32(&doc_buffer, (u32) p->sub_packages[j] - 1);
         }
 
-        bh_buffer_write_u32(&doc_buffer, bh_arr_length(p->doc_strings));
-        bh_arr_each(OnyxToken *, ptkn, p->doc_strings) {
+        bh_buffer_write_u32(&doc_buffer, bh_arr_length(p->doc_strings) + bh_arr_length(p->doc_string_tokens));
+        bh_arr_each(OnyxToken *, ptkn, p->doc_string_tokens) {
             OnyxToken *tkn = *ptkn;
             write_string(&doc_buffer, tkn->length, tkn->text);
+        }
+        bh_arr_each(const char *, pstr, p->doc_strings) {
+            write_cstring(&doc_buffer, *pstr);
         }
     }
 
