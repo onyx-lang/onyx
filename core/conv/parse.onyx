@@ -7,10 +7,8 @@ use core.math
 use core.memory
 use runtime
 
-#doc """
-    Parses many different types from a string into a value.
-    Uses a custom parser if one has been specified for the type given.
-"""
+/// Parses many different types from a string into a value.
+/// Uses a custom parser if one has been specified for the type given.
 parse_any :: #match {}
 
 #overload
@@ -123,9 +121,7 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
 }
 
 
-#doc """
-    Shortcut to parse a type `T` using `parse_any`.
-"""
+/// Shortcut to parse a type `T` using `parse_any`.
 parse :: ($T: type_expr, to_parse: str) -> ? T {
     v: T;
     if #this_package.parse_any(&v, to_parse) {
@@ -135,9 +131,7 @@ parse :: ($T: type_expr, to_parse: str) -> ? T {
     }
 }
 
-#doc """
-    Shortcut to parse a type `T` using `parse_any`, and specify an allocator.
-"""
+/// Shortcut to parse a type `T` using `parse_any`, and specify an allocator.
 parse_with_allocator :: ($T: type_expr, to_parse: str, allocator: Allocator) -> ? T {
     v: T;
     if #this_package.parse_any(&v, to_parse, allocator) {

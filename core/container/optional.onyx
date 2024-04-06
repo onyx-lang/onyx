@@ -13,54 +13,46 @@ use core
 // used by Map and Set in their `get_opt` function. In theory, it should
 // be used in many more places, instead of returning `.{}`.
 
-#doc """
-    Helper procedure for creating an Optional with a value.
-    Pass a type as the first argument to force the type, otherwise
-    the type will be inferred from the parameter type.
-"""
+/// Helper procedure for creating an Optional with a value.
+/// Pass a type as the first argument to force the type, otherwise
+/// the type will be inferred from the parameter type.
 Optional.make :: #match #locked {
     ((x: $T) => (?T).{ Some = x }),
     ($T: type_expr, x: T) => ((?T).{ Some = x })
 }
 
-#doc """
-    Create an empty Optional of a certain type. This procedure
-    is mostly useless, because you can use `.{}` in type inferred
-    places to avoid having to specify the type.
-"""
+/// Create an empty Optional of a certain type. This procedure
+/// is mostly useless, because you can use `.{}` in type inferred
+/// places to avoid having to specify the type.
 Optional.empty :: macro (T: type_expr) => (?T).{ None = .{} }; 
 
-#doc """
-    Converts a pointer to an optional by defining `null` to be `None`,
-    and a non-null pointer to be `Some`. This dereferences the valid
-    pointer to return the data stored at the pointer's address.
-"""
+/// Converts a pointer to an optional by defining `null` to be `None`,
+/// and a non-null pointer to be `Some`. This dereferences the valid
+/// pointer to return the data stored at the pointer's address.
 Optional.from_ptr :: macro (p: &$T) -> ?T {
     p_ := p;
     if p_ do return *p_;
     return .None;
 }
 
-#doc """
-    Extracts the value from the Optional, or uses a default if
-    no value is present.
-"""
+/// Extracts the value from the Optional, or uses a default if
+/// no value is present.
 Optional.value_or :: (o: ?$T, default: T) => switch o {
     case .Some as v => v;
     case #default => default;
 }
 
-#doc "Clears the value in the Optional, zeroing the memory of the value."
+/// Clears the value in the Optional, zeroing the memory of the value.
 Optional.reset :: (o: &?$T) {
     *o = .None;
 }
 
-#doc "Sets the value in the Optional."
+/// Sets the value in the Optional.
 Optional.set :: (o: &?$T, value: T) {
     *o = .{ Some = value };
 }
 
-#doc "Flattens nested optionals."
+/// Flattens nested optionals.
 // @Bug should be able to say ? ? $T here.
 Optional.flatten :: (o1: ? Optional($T)) -> ? T {
     switch o1 {
@@ -74,7 +66,7 @@ Optional.flatten :: (o1: ? Optional($T)) -> ? T {
     return .None;
 }
 
-#doc "Monadic chaining operation."
+/// Monadic chaining operation.
 Optional.and_then :: (o: ?$T, transform: (T) -> ?$R) -> ?R {
     return switch o {
         case .Some as v => transform(v);
@@ -82,7 +74,7 @@ Optional.and_then :: (o: ?$T, transform: (T) -> ?$R) -> ?R {
     };
 }
 
-#doc "Changes the value inside the optional, if present."
+/// Changes the value inside the optional, if present.
 Optional.transform :: (o: ?$T, transform: (T) -> $R) -> ?R {
     switch o {
         case .Some as v do return .{ Some = transform(v) };
@@ -90,10 +82,8 @@ Optional.transform :: (o: ?$T, transform: (T) -> $R) -> ?R {
     }
 }
 
-#doc """
-    Like `value_or`, but instead of providing a value, you
-    provide a function to generate a value.
-"""
+/// Like `value_or`, but instead of providing a value, you
+/// provide a function to generate a value.
 Optional.or_else :: (o: ?$T, generate: () -> ?T) -> ?T {
     return switch o {
         case .Some => o;
@@ -101,11 +91,9 @@ Optional.or_else :: (o: ?$T, generate: () -> ?T) -> ?T {
     };
 }
 
-#doc """
-    Returns the value inside the optional, if there is one.
-    If not, an assertion is thrown and the context's assert
-    handler must take care of it.
-"""
+/// Returns the value inside the optional, if there is one.
+/// If not, an assertion is thrown and the context's assert
+/// handler must take care of it.
 Optional.unwrap :: (o: ?$T) -> T {
     switch o {
         case .Some as v do return v;
@@ -116,11 +104,9 @@ Optional.unwrap :: (o: ?$T) -> T {
     }
 }
 
-#doc """
-    Returns a pointer to the value inside the optional, if there is one.
-    If not, an assertion is thrown and the context's assert handler must
-    take care of it.
-"""
+/// Returns a pointer to the value inside the optional, if there is one.
+/// If not, an assertion is thrown and the context's assert handler must
+/// take care of it.
 Optional.unwrap_ptr :: (o: & ?$T) -> &T {
     switch o {
         case .Some as &v do return v;
@@ -131,11 +117,9 @@ Optional.unwrap_ptr :: (o: & ?$T) -> &T {
     }
 }
 
-#doc """
-    Returns the value inside the optional, if there is one.
-    If not, an assertion is thrown and the context's assert
-    handler must take care of it.
-"""
+/// Returns the value inside the optional, if there is one.
+/// If not, an assertion is thrown and the context's assert
+/// handler must take care of it.
 Optional.expect :: (o: ?$T, message: str) -> T {
     switch o {
         case .Some as v do return v;
@@ -146,11 +130,9 @@ Optional.expect :: (o: ?$T, message: str) -> T {
     }
 }
 
-#doc """
-    Returns a pointer to the value inside the optional, if there is one.
-    If not, an assertion is thrown and the context's assert handler must
-    take care of it.
-"""
+/// Returns a pointer to the value inside the optional, if there is one.
+/// If not, an assertion is thrown and the context's assert handler must
+/// take care of it.
 Optional.expect_ptr :: (o: & ?$T, message: str) -> &T {
     switch o {
         case .Some as &v do return v;
@@ -198,33 +180,31 @@ Optional.with :: macro (o: ?$T, body: Code) {
     }
 }
 
-#doc """
-    Creates a scope that the `?` operator on an Optional type can
-    return to, instead of returning from the enclosing function.
-
-    Useful when chaining a bunch of operations that *could* fail,
-    while having a clean and easy escape hatch.
-
-        Optional.try() {
-            x := operation_1()?;
-            y := operation_2(x)?;
-            z := operation_3(x, y)?;
-            opreation_4(z);
-        }
-        println("Done");
-
-    In this example, if any of the operations fail, the execution
-    will cleanly go to `println` statement.
-
-    To know when something returned `None`, you can either use the second
-    parameter called `catch`, which is simply a block of code to be run.
-    Or you can use the return result from the function as so:
-    
-        // Sadly, cannot use the nicer syntax, `try() { ... }`
-        completed := Optional.try(#quote {
-            // ...
-        });
-"""
+/// Creates a scope that the `?` operator on an Optional type can
+/// return to, instead of returning from the enclosing function.
+///
+/// Useful when chaining a bunch of operations that *could* fail,
+/// while having a clean and easy escape hatch.
+///
+///     Optional.try() {
+///         x := operation_1()?;
+///         y := operation_2(x)?;
+///         z := operation_3(x, y)?;
+///         opreation_4(z);
+///     }
+///     println("Done");
+///
+/// In this example, if any of the operations fail, the execution
+/// will cleanly go to `println` statement.
+///
+/// To know when something returned `None`, you can either use the second
+/// parameter called `catch`, which is simply a block of code to be run.
+/// Or you can use the return result from the function as so:
+/// 
+///     // Sadly, cannot use the nicer syntax, `try() { ... }`
+///     completed := Optional.try(#quote {
+///         // ...
+///     });
 Optional.try :: macro (body: Code, catch: Code = []{}) -> bool {
     //
     // Using a 'do'-expression block to introduce a new

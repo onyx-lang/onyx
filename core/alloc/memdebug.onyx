@@ -1,15 +1,13 @@
+/// The memory debugger allocator wraps an existing allocator (normally the heap allocator),
+/// and reports on a TCP socket all of the allocation operations done to the underlying
+/// allocator. This listener on this socket can use this information to show useful information
+/// about the memory usage in the program.
+///
+/// This is best used when it starts at the very beginning of the program.
+/// The easiest way to use this is to define MEMDEBUG in runtime.vars,
+/// or pass -DMEMDEBUG on the command line. 
 package core.alloc.memdebug
 #allow_stale_code
-#package_doc """
-    The memory debugger allocator wraps an existing allocator (normally the heap allocator),
-    and reports on a TCP socket all of the allocation operations done to the underlying
-    allocator. This listener on this socket can use this information to show useful information
-    about the memory usage in the program.
-
-    This is best used when it starts at the very beginning of the program.
-    The easiest way to use this is to define MEMDEBUG in runtime.vars,
-    or pass -DMEMDEBUG on the command line. 
-"""
 
 use core {Result}
 use core.alloc

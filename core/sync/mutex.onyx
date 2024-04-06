@@ -5,51 +5,47 @@ use core
 use core.intrinsics.atomics {*}
 use core.thread { Thread_ID }
 
-#doc """
-    A mutex represents a resource that can only be held by one
-    thread at a time. It is used to create sections of code that
-    only one thread can be in at a time.
-   
-    Mutexes in WebAssembly are very cheap, because they simply
-    use the atomic_cmpxchg intrinsic to operate. This only uses
-    memory, so no real resource allocation is necessary.
-   
-    `lock` has two states: 0, and 1.
-    0 means unlocked, 1 means locked
-   
-    To lock it:
-        Try to store 1 if the value was already 0.
-        Otherwise, if it was already 1, wait until it goes to 0.
-   
-    To unlock it:
-        Atomically set it to 0.
-        Notify at most 1 other thread about this change.
-"""
+/// A mutex represents a resource that can only be held by one
+/// thread at a time. It is used to create sections of code that
+/// only one thread can be in at a time.
+///
+/// Mutexes in WebAssembly are very cheap, because they simply
+/// use the atomic_cmpxchg intrinsic to operate. This only uses
+/// memory, so no real resource allocation is necessary.
+///
+/// `lock` has two states: 0, and 1.
+/// 0 means unlocked, 1 means locked
+///
+/// To lock it:
+///     Try to store 1 if the value was already 0.
+///     Otherwise, if it was already 1, wait until it goes to 0.
+///
+/// To unlock it:
+///     Atomically set it to 0.
+///     Notify at most 1 other thread about this change.
 Mutex :: struct {
     lock  : i32;
     owner : Thread_ID;
 }
 
 
-#doc "Initializes a new mutex."
+/// Initializes a new mutex.
 mutex_init :: (m: &Mutex) {
     m.lock = 0;
     m.owner = -1;
 }
 
 
-#doc "Destroys a mutex."
+/// Destroys a mutex.
 mutex_destroy :: (m: &Mutex) {
     m.lock = -1;
     m.owner = -1;
 }
 
-#doc """
-    Locks a mutex. If the mutex is currently held by another thread,
-    this function enters a spin loop until the mutex is unlocked.
-    In a JavaScript based implementation, the __atomic_wait intrinsic
-    is used to avoid having to spin loop.
-"""
+/// Locks a mutex. If the mutex is currently held by another thread,
+/// this function enters a spin loop until the mutex is unlocked.
+/// In a JavaScript based implementation, the __atomic_wait intrinsic
+/// is used to avoid having to spin loop.
 mutex_lock :: (m: &Mutex) {
     while __atomic_cmpxchg(&m.lock, 0, 1) == 1 {
         if m.owner == context.thread_id do return;
@@ -64,11 +60,9 @@ mutex_lock :: (m: &Mutex) {
     m.owner = context.thread_id;
 }
 
-#doc """
-    Unlocks a mutex, if the calling thread currently holds the mutex.
-    In a JavaScript based implementation, the __atomic_notify intrinsic
-    is used to wake up one waiting thread.
-"""
+/// Unlocks a mutex, if the calling thread currently holds the mutex.
+/// In a JavaScript based implementation, the __atomic_notify intrinsic
+/// is used to wake up one waiting thread.
 mutex_unlock :: (m: &Mutex) {
     if m.owner != context.thread_id do return;
     
@@ -80,17 +74,15 @@ mutex_unlock :: (m: &Mutex) {
     }
 }
 
-#doc """
-    Helpful macro for making a particular block be protected by a macro.
-   
-        m: sync.Mutx;
-        sync.mutex_init(&m);
-        
-        {
-           sync.scoped_mutex(&m);
-           // Everything here is done by one thread at a time.
-        }
-"""
+/// Helpful macro for making a particular block be protected by a macro.
+///
+///     m: sync.Mutx;
+///     sync.mutex_init(&m);
+///     
+///     {
+///        sync.scoped_mutex(&m);
+///        // Everything here is done by one thread at a time.
+///     }
 scoped_mutex :: macro (m: &Mutex) {
     ml :: mutex_lock
     mu :: mutex_unlock
@@ -99,17 +91,15 @@ scoped_mutex :: macro (m: &Mutex) {
     defer mu(m);
 }
 
-#doc """
-    Abstracts the pattern decribed in scoped_mutex by automatically
-    calling scoped_mutex in the block of code given.
-   
-        m: sync.Mutx;
-        sync.mutex_init(&m);
-        
-        sync.critical_section(&m) {
-           // Everything here is done by one thread at a time.
-        }
-"""
+/// Abstracts the pattern decribed in scoped_mutex by automatically
+/// calling scoped_mutex in the block of code given.
+///
+///     m: sync.Mutx;
+///     sync.mutex_init(&m);
+///     
+///     sync.critical_section(&m) {
+///        // Everything here is done by one thread at a time.
+///     }
 critical_section :: macro (m: &Mutex, body: Code) -> i32 {
     scoped_mutex :: scoped_mutex;
     scoped_mutex(m);

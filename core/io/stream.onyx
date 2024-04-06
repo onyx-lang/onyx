@@ -143,15 +143,13 @@ stream_size :: (use s: &Stream) -> i32 {
     return vtable.size(s);
 }
 
-#doc """
-    Waits until a stream is able to be read from or written to.
-
-    If `timeout` < 0, then there is an indefinite timeout.
-    
-    If `timeout` = 0, then there is no timeout, and this function returns immediately.
-
-    If `timeout` > 0, then there is a `timeout` millisecond delay before returning false.
-"""
+/// Waits until a stream is able to be read from or written to.
+///
+/// If `timeout` < 0, then there is an indefinite timeout.
+/// 
+/// If `timeout` = 0, then there is no timeout, and this function returns immediately.
+///
+/// If `timeout` > 0, then there is a `timeout` millisecond delay before returning false.
 stream_poll :: (use s: &Stream, ev: PollEvent, timeout: i32) -> (Error, bool) {
     if vtable == null do return .NoVtable, false;
     if vtable.poll == null_proc do return .NotImplemented, false;

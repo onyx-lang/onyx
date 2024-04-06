@@ -28,7 +28,7 @@ any_as :: (a: any, $T: type_expr) -> &T {
     return cast(&T) a.data;
 }
 
-#doc "Dereference a pointer any."
+/// Dereference a pointer any.
 any_dereference :: (v: any) -> any {
     t := get_type_info(v.type);
     if t.kind == .Pointer {
@@ -39,7 +39,7 @@ any_dereference :: (v: any) -> any {
     return v;
 }
 
-#doc "Unwraps an optional any, if the any is an optional. `? T -> T`"
+/// Unwraps an optional any, if the any is an optional. `? T -> T`
 any_unwrap :: (v: any) -> any {
     if union_constructed_from(v.type, Optional) {
         t := v.type->info()->as_union();
@@ -53,7 +53,7 @@ any_unwrap :: (v: any) -> any {
 }
 
 
-#doc "Subscript an array-like any."
+/// Subscript an array-like any.
 any_subscript :: (v: any, index: i32) -> any {
     base_ptr, elem_type, count := any_as_array(v);
     if index >= count || index < 0 {
@@ -66,7 +66,7 @@ any_subscript :: (v: any, index: i32) -> any {
     };
 }
 
-#doc "Select a member from an any."
+/// Select a member from an any.
 any_selector :: (v: any, member_name: str) -> any {
     t := get_type_info(v.type);
     if t.kind == .Struct {
@@ -79,7 +79,7 @@ any_selector :: (v: any, member_name: str) -> any {
     return .{null, void};
 }
 
-#doc "Like `any_selector`, but works with selecting \"foo.bar.joe\"."
+/// Like `any_selector`, but works with selecting \"foo.bar.joe\".
 any_nested_selector :: (v: any, member_name: str) -> any {
     t := get_type_info(v.type);
     if t.kind != .Struct do return .{};
@@ -100,8 +100,6 @@ any_nested_selector :: (v: any, member_name: str) -> any {
     return .{null, void};
 }
 
-#doc """
-"""
 any_member :: #match #locked {
     (v: any, member_type: type_expr, member_offset: u32) -> any {
         return any.{
@@ -118,20 +116,18 @@ any_member :: #match #locked {
     }
 }
 
-#doc """
-    Convert a structure or pointer to a structure to a Map with
-    keys representing the fields of the structure, and values
-    representing the value of each field.
-   
-        T :: struct {
-            x := 123;
-            y := "test";
-        }
-        
-        m := any_to_map(T.{});
-   
-    `m` would have two keys, "x" and "y".
-"""
+/// Convert a structure or pointer to a structure to a Map with
+/// keys representing the fields of the structure, and values
+/// representing the value of each field.
+///
+///     T :: struct {
+///         x := 123;
+///         y := "test";
+///     }
+///     
+///     m := any_to_map(T.{});
+///
+/// `m` would have two keys, "x" and "y".
 any_to_map :: (v: any) -> ? Map(str, any) {
     vals := v;
     if vals.type->info().kind == .Pointer {
@@ -151,7 +147,7 @@ any_to_map :: (v: any) -> ? Map(str, any) {
     return out;
 }
 
-#doc "Creates an iterator out of an array-like any."
+/// Creates an iterator out of an array-like any.
 any_iter :: (arr: any) -> Iterator(any) {
     base_ptr, elem_type, count := any_as_array(arr);
     if count == 0 {

@@ -1,16 +1,14 @@
+/// This allocator is very simple. It is simply a bump allocator from
+/// a fixed size buffer. It cannot free or resize, and will return null
+/// when it has used all memory in the buffer given to it.
+/// 
+/// This kind of allocator is useful for temporary string building or
+/// similar circumstances, where you know that the needed memory size
+/// will not be exceeded, but you don't what to deal with potential
+/// slowness of a general heap allocator. By using this allocator, you
+/// can continue to use the same code that does allocations like normal,
+/// but can get the speed increase of a simple allocation strategy.
 package core.alloc.fixed
-#package_doc """
-    This allocator is very simple. It is simply a bump allocator from
-    a fixed size buffer. It cannot free or resize, and will return null
-    when it has used all memory in the buffer given to it.
-    
-    This kind of allocator is useful for temporary string building or
-    similar circumstances, where you know that the needed memory size
-    will not be exceeded, but you don't what to deal with potential
-    slowness of a general heap allocator. By using this allocator, you
-    can continue to use the same code that does allocations like normal,
-    but can get the speed increase of a simple allocation strategy.
-"""
 
 use core
 

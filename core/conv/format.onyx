@@ -12,11 +12,9 @@ use runtime
     custom_parsers   : Map(type_expr, #type (rawptr, str, Allocator) -> bool);
 }
 
-#doc """
-    This procedure is run before main() as it is an #init procedure.
-    It looks for all custom formatting and parsing definitions and
-    registers them to be used in format_any and parse_any.
-"""
+/// This procedure is run before main() as it is an #init procedure.
+/// It looks for all custom formatting and parsing definitions and
+/// registers them to be used in format_any and parse_any.
 custom_formatters_initialized :: #init () {
     map.init(&custom_formatters);
     map.init(&custom_parsers);
@@ -61,76 +59,61 @@ custom_formatters_initialized :: #init () {
     }
 }
 
-#doc """
-    Registers a formatting function for a particular type. This type is
-    inferred from the type of the third argument in the given function.
-"""
+/// Registers a formatting function for a particular type. This type is
+/// inferred from the type of the third argument in the given function.
 register_custom_formatter :: (formatter: (&Format_Output, &Format, &$T) -> void) {
     custom_formatters[T] = formatter;
 }
 
 
-#doc """
-    Registers a parsing function for a particular type. This type is
-    inferred from the type of the first argument in the given function.
-"""
+/// Registers a parsing function for a particular type. This type is
+/// inferred from the type of the first argument in the given function.
 register_custom_parser :: (parser: (&$T, str, Allocator) -> bool) {
     custom_parsers[T] = parser;
 }
 
 
-#doc """
-    Tag-type used to specify how to format a structure.
-   
-        @conv.Custom_Format.{ format_structure }
-        TheStructure :: struct { ... }
-"""
+/// Tag-type used to specify how to format a structure.
+///
+///     @conv.Custom_Format.{ format_structure }
+///     TheStructure :: struct { ... }
 Custom_Format :: struct {
     format: (&Format_Output, &Format, rawptr) -> void;
 }
 
 
-#doc """
-    Tag-type used to specify that a certain procedure should be used
-    to format a type.
-   
-        @conv.Custom_Format_Proc.{ TheStructure }
-        format_structure :: (output: &conv.Format_Output, format: &conv.Format, data: &TheStructure) { ... }
-"""
+/// Tag-type used to specify that a certain procedure should be used
+/// to format a type.
+///
+///     @conv.Custom_Format_Proc.{ TheStructure }
+///     format_structure :: (output: &conv.Format_Output, format: &conv.Format, data: &TheStructure) { ... }
 Custom_Format_Proc :: struct {
     type: type_expr;
 }
 
 
-#doc """
-    Tag-type used to specify how to parse a structure.
-   
-        @conv.Custom_Parse.{ parse_structure }
-        TheStructure :: struct { ... }
-"""
+/// Tag-type used to specify how to parse a structure.
+///
+///     @conv.Custom_Parse.{ parse_structure }
+///     TheStructure :: struct { ... }
 Custom_Parse :: struct {
     parse: (rawptr, str, Allocator) -> bool;
 }
 
 
-#doc """
-    Tag-type used to specify that a certain procedure should be used
-    to parse a type.
-   
-        @conv.Custom_Parse_Proc.{ TheStructure }
-        parse_structure :: (data: &TheStructure, input: str, allocator: Allocator) -> bool { ... }
-   
-"""
+/// Tag-type used to specify that a certain procedure should be used
+/// to parse a type.
+///
+///     @conv.Custom_Parse_Proc.{ TheStructure }
+///     parse_structure :: (data: &TheStructure, input: str, allocator: Allocator) -> bool { ... }
 Custom_Parse_Proc :: struct {
     type: type_expr;
 }
 
-#doc """
-    Passed to any custom formatter. Wraps outputting data to any source,
-    using a `flush` callback function. Use `write` to output a string.
-    When the internal buffer is filled, `flush` is called to empty the
-    buffer to the final destination.
-"""
+/// Passed to any custom formatter. Wraps outputting data to any source,
+/// using a `flush` callback function. Use `write` to output a string.
+/// When the internal buffer is filled, `flush` is called to empty the
+/// buffer to the final destination.
 Format_Output :: struct {
     data: [&] u8;
     count: u32;
@@ -174,7 +157,7 @@ Format_Flush_Callback :: struct {
 }
 
 
-#doc "Formatting options passed to a custom formatter."
+/// Formatting options passed to a custom formatter.
 Format :: struct {
     pretty_printing      := false;        // p
     quote_strings        := false;        // "
@@ -212,10 +195,8 @@ builtin.logf :: (level: builtin.Log_Level, format: str, va: ..any) {
 }
 
 
-#doc """
-    Formats a string using the provided arguments and format specified string.
-    This has many overloads to make it easy to work with.
-"""
+/// Formats a string using the provided arguments and format specified string.
+/// This has many overloads to make it easy to work with.
 format :: #match {}
 
 #overload
@@ -247,9 +228,7 @@ format :: (buffer: &dyn_str, format: str, va: ..any) -> str {
     return *buffer;
 }
 
-#doc """
-    Like `format`, but takes the arguments as an array of `any`s, not a variadic argument array.
-"""
+/// Like `format`, but takes the arguments as an array of `any`s, not a variadic argument array.
 format_va :: #match {}
 
 #overload
@@ -416,11 +395,9 @@ format_va :: (output: &Format_Output, format: str, va: [] any) -> str {
 }
 
 
-#doc """
-    This procedure converts any value into a string, using the type information system.
-    If a custom formatter is specified for the type, that is used instead.
-    This procedure is generally not used directly; instead, through format or format_va.
-"""
+/// This procedure converts any value into a string, using the type information system.
+/// If a custom formatter is specified for the type, that is used instead.
+/// This procedure is generally not used directly; instead, through format or format_va.
 format_any :: (output: &Format_Output, formatting: &Format, v: any) {
     use runtime.info {*};
 

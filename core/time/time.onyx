@@ -6,11 +6,9 @@ use core.string
 use core.conv
 use runtime
 
-#doc """
-    Represents a timestamp broken down by month, day, year, hour, minute, and seconds.
-
-    *This structure does not represent or store timezone information.*
-"""
+/// Represents a timestamp broken down by month, day, year, hour, minute, and seconds.
+///
+/// *This structure does not represent or store timezone information.*
 Timestamp :: struct #size (sizeof u32 * 12) {
     sec:   i32;
     min:   i32;
@@ -23,7 +21,7 @@ Timestamp :: struct #size (sizeof u32 * 12) {
     isdst: i32;
 }
 
-#doc "Converts a Date into a Timestamp."
+/// Converts a Date into a Timestamp.
 Timestamp.from_date :: (d: Date) -> Timestamp {
     return .{
         year = d.year - 1900,
@@ -32,14 +30,14 @@ Timestamp.from_date :: (d: Date) -> Timestamp {
     };
 }
 
-#doc "Converts the month, day and year fields into a `Date`."
+/// Converts the month, day and year fields into a `Date`.
 Timestamp.as_date :: (t: Timestamp) -> Date {
     return Date.make(t.year + 1900, t.mon + 1, t.mday);
 }
 
 Timestamp.to_epoch :: to_epoch
 
-#doc "Formats a timestamp into a string."
+/// Formats a timestamp into a string.
 Timestamp.format :: (t: Timestamp, format := "%Y-%m-%d %H:%M:%S") -> str {
     t_ := t;
     return strftime(format, &t_);
@@ -58,9 +56,7 @@ Timestamp.format :: (t: Timestamp, format := "%Y-%m-%d %H:%M:%S") -> str {
     return strptime(data, "%Y-%m-%d %H:%M:%S", time);
 }
 
-#doc """
-    Returns the current system time at UTC-0.
-"""
+/// Returns the current system time at UTC-0.
 now :: () -> Timestamp {
     current_time: i64;
     #if runtime.platform.Supports_Time {
@@ -77,11 +73,9 @@ now :: () -> Timestamp {
 
 to_epoch :: tm_to_time
 
-#doc """
-    Converts UNIX epoch time to a timestamp, relative to the current timezone.
-
-    *Note, this function is currently not implemented correctly as there is no reliable way to get the current system timezone. It is currently equivalent to `gmtime`*
-"""
+/// Converts UNIX epoch time to a timestamp, relative to the current timezone.
+///
+/// *Note, this function is currently not implemented correctly as there is no reliable way to get the current system timezone. It is currently equivalent to `gmtime`*
 localtime :: #match #local {}
 
 #overload
@@ -95,11 +89,9 @@ localtime :: (seconds: u64) -> Timestamp {
 }
 
 
-#doc """
-    Converts UNIX epoch time to a timestamp, relative to the Greenich mean time.
-
-    *Note, this function is currently not implemented correctly as there is no reliable way to get the current system timezone. It is currently equivalent to `gmtime`*
-"""
+/// Converts UNIX epoch time to a timestamp, relative to the Greenich mean time.
+//
+/// *Note, this function is currently not implemented correctly as there is no reliable way to get the current system timezone. It is currently equivalent to `gmtime`*
 gmtime :: #match #local {}
 
 #overload
@@ -114,51 +106,49 @@ gmtime :: (seconds: u64) -> Timestamp {
 
 strftime :: #match #local {}
 
-#doc """
-    Formats a timestamp into a string, using the format specified.
-
-    The follow format specifiers are supported:
-
-    **%A** Day of the week (Sunday, Monday, ...)
-
-    **%a** Short day of the week (Sun, Mon, ...)
-
-    **%B** Month (January, February, ...)
-
-    **%b %h** Short month (Jan, Feb, ...)
-
-    **%d %e** Day of the month (01, ..., 31)
-
-    **%D** Full day (08/31/2023)
-
-    **%H** Hour (00, ..., 23)
-
-    **%I** 12-hour Hour (12, 01, ..., 11, 12)
-
-    **%j** Day of the year (0, ..., 364)
-
-    **%m** Month number (01, 02, ... 12)
-
-    **%M** Minute (00, ..., 59)
-
-    **%p** AM/PM signifier
-
-    **%r** 12-hour time of day (12:15:39 pm)
-
-    **%R** 24-hour time of day (without seconds) (15:37)
-
-    **%S** Seconds (00, ..., 59)
-
-    **%T** 24-hour time of day (15:37:40)
-
-    **%w** Numeric day of week (0, ..., 6)
-
-    **%Y** Year
-
-    **%y** 2-digit year
-
-    **%%** Percent-sign
-"""
+/// Formats a timestamp into a string, using the format specified.
+///
+/// The follow format specifiers are supported:
+///
+/// **%A** Day of the week (Sunday, Monday, ...)
+///
+/// **%a** Short day of the week (Sun, Mon, ...)
+///
+/// **%B** Month (January, February, ...)
+///
+/// **%b %h** Short month (Jan, Feb, ...)
+///
+/// **%d %e** Day of the month (01, ..., 31)
+///
+/// **%D** Full day (08/31/2023)
+///
+/// **%H** Hour (00, ..., 23)
+///
+/// **%I** 12-hour Hour (12, 01, ..., 11, 12)
+///
+/// **%j** Day of the year (0, ..., 364)
+///
+/// **%m** Month number (01, 02, ... 12)
+///
+/// **%M** Minute (00, ..., 59)
+///
+/// **%p** AM/PM signifier
+///
+/// **%r** 12-hour time of day (12:15:39 pm)
+///
+/// **%R** 24-hour time of day (without seconds) (15:37)
+///
+/// **%S** Seconds (00, ..., 59)
+///
+/// **%T** 24-hour time of day (15:37:40)
+///
+/// **%w** Numeric day of week (0, ..., 6)
+///
+/// **%Y** Year
+///
+/// **%y** 2-digit year
+///
+/// **%%** Percent-sign
 #overload
 strftime :: (format_: [] u8, tm: &Timestamp) -> str {
     s := io.buffer_stream_make();
@@ -255,9 +245,7 @@ strftime :: (w: &io.Writer, format_: [] u8, tm: &Timestamp) {
 
 strptime :: #match #local {}
 
-#doc """
-    Parses a string into a `Timestamp`.
-"""
+/// Parses a string into a `Timestamp`.
 #overload
 strptime :: (buf: [] u8, format: [] u8) -> ? Timestamp {
     t: Timestamp;
@@ -269,9 +257,7 @@ strptime :: (buf: [] u8, format: [] u8) -> ? Timestamp {
     return .None;
 }
 
-#doc """
-    Parses a string into a `Timestamp`. Returns `true` if the parsing was successful.
-"""
+/// Parses a string into a `Timestamp`. Returns `true` if the parsing was successful.
 #overload
 strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
     use core {*}
