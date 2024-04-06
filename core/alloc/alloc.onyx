@@ -13,16 +13,14 @@ package core.alloc
 use core.memory
 use core.intrinsics.types {type_is_function}
 
-#doc "Overloaded procedure for converting something to an Allocator."
+/// Overloaded procedure for converting something to an Allocator.
 as_allocator :: #match {
     macro (a: Allocator) => a
 }
 
-#doc """
-    Allocates memory from the stack. This is similar to `alloca` in C.
-
-    **DO NOT USE THIS IN A LOOP! You cannot free memory allocated off the stack.**
-"""
+/// Allocates memory from the stack. This is similar to `alloca` in C.
+///
+/// **DO NOT USE THIS IN A LOOP! You cannot free memory allocated off the stack.**
 from_stack :: macro (size: u32) -> rawptr {
     // This should do something about the alignment...
     // Everything so far has assume that the stack is aligned to 16 bytes.
@@ -30,26 +28,22 @@ from_stack :: macro (size: u32) -> rawptr {
     return __stack_top;
 }
 
-#doc """
-    Allocates memory from the stack to form a slice of `T` with length `size`.
-
-    **DO NOT USE THIS IN A LOOP! You cannot free memory allocated off the stack.**
-"""
+/// Allocates memory from the stack to form a slice of `T` with length `size`.
+///
+/// **DO NOT USE THIS IN A LOOP! You cannot free memory allocated off the stack.**
 array_from_stack :: macro ($T: type_expr, size: u32) -> [] T {
     defer __stack_top = cast([&]u8, __stack_top) + size * sizeof T;
     return (cast([&]T) __stack_top)[0 .. size];
 }
 
-#doc """
-    Moves a value on to the heap. Useful for cases like this in
-
-        f :: () -> &Foo {
-            return alloc.on_heap(Foo.{
-                name = "...",
-                age  = 42
-            });
-        }
-"""
+/// Moves a value on to the heap. Useful for cases like this in
+///
+///     f :: () -> &Foo {
+///         return alloc.on_heap(Foo.{
+///             name = "...",
+///             age  = 42
+///         });
+///     }
 on_heap :: macro (v: $V) -> &V {
     use core
 
@@ -59,9 +53,7 @@ on_heap :: macro (v: $V) -> &V {
     return out;
 }
 
-#doc """
-    Like `alloc.on_heap`, but allocates on the temporary allocator.
-"""
+/// Like `alloc.on_heap`, but allocates on the temporary allocator.
 on_temp :: macro (v: $V) -> &V {
     use core
 
@@ -71,10 +63,8 @@ on_temp :: macro (v: $V) -> &V {
     return out;
 }
 
-#doc """
-    Copies the internal closure data of a function to the provided allocator,
-    and returns the new closed function.
-"""
+/// Copies the internal closure data of a function to the provided allocator,
+/// and returns the new closed function.
 copy_closure :: (f: $F/type_is_function, a: Allocator) -> F {
     if !f.closure do return f;
 
@@ -99,19 +89,15 @@ temp_state     : arena.ArenaState;
 #thread_local
 temp_allocator : Allocator;
 
-#doc """
-    Initializes the thread-local temporary allocator.
-
-    You do not need to call this. It is called automatically on thread initialization.
-"""
+/// Initializes the thread-local temporary allocator.
+///
+/// You do not need to call this. It is called automatically on thread initialization.
 init_temp_allocator :: () {
     temp_state = arena.make(heap_allocator, TEMPORARY_ALLOCATOR_SIZE);
     temp_allocator = as_allocator(&temp_state);
 }
 
-#doc """
-    Resets the temporary allocator, effectively freeing all allocations made in the temporary allocator.
-"""
+/// Resets the temporary allocator, effectively freeing all allocations made in the temporary allocator.
 clear_temp_allocator :: () {
     arena.clear(&temp_state);
 }

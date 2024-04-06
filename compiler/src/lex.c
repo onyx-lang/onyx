@@ -4,10 +4,10 @@
 #include "errors.h"
 
 static const char* token_type_names[] = {
-    "TOKEN_TYPE_UNKNOWN",
-    "TOKEN_TYPE_END_STREAM",
+    "UNKNOWN",
+    "the end of file",
 
-    "TOKEN_TYPE_COMMENT",
+    "a comment",
 
     "", // start
     "package",
@@ -67,19 +67,21 @@ static const char* token_type_names[] = {
     ">>=",
     ">>>=",
     "..",
-    "..="
+    "..=",
     "~~",
     "??",
 
-    "TOKEN_TYPE_SYMBOL",
-    "TOKEN_TYPE_LITERAL_STRING",
-    "TOKEN_TYPE_LITERAL_CHAR",
-    "TOKEN_TYPE_LITERAL_INTEGER",
-    "TOKEN_TYPE_LITERAL_FLOAT",
+    "a symbol",
+    "a string",
+    "a character literal",
+    "an integer",
+    "a float",
     "true",
     "false",
 
-    "inserted semicolon",
+    "an inserted semicolon",
+
+    "a doc comment",
 
     "TOKEN_TYPE_COUNT"
 };
@@ -212,14 +214,22 @@ whitespace_skipped:
     // Comments
     if (*tokenizer->curr == '/' && *(tokenizer->curr + 1) == '/') {
         tokenizer->curr += 2;
-        tk.type = Token_Type_Comment;
+
+        if (*tokenizer->curr == '/') {
+            tokenizer->curr += 1;
+            tk.type = Token_Type_Doc_Comment;
+        } else {
+            tk.type = Token_Type_Comment;
+        }
+
         tk.text = tokenizer->curr;
+        tk.pos.column = (u16)(tokenizer->curr - tokenizer->line_start) + 1;
 
         while (*tokenizer->curr != '\n' && tokenizer->curr != tokenizer->end) {
             INCREMENT_CURR_TOKEN(tokenizer);
         }
 
-        tk.length = tokenizer->curr - tk.text - 2;
+        tk.length = tokenizer->curr - tk.text;
 
         if (bh_arr_length(tokenizer->tokens) == 0 && bh_str_starts_with(tk.text, "+optional-semicolons")) {
             tokenizer->optional_semicolons = 1;
@@ -440,7 +450,7 @@ whitespace_skipped:
 
     case '<':
         LITERAL_TOKEN("<=",          0, Token_Type_Less_Equal);
-        LITERAL_TOKEN("<-",          0, Token_Type_Right_Arrow);
+        LITERAL_TOKEN("<-",          0, Token_Type_Left_Arrow);
         LITERAL_TOKEN("<<=",         0, Token_Type_Shl_Equal);
         LITERAL_TOKEN("<<",          0, Token_Type_Shift_Left);
         break;

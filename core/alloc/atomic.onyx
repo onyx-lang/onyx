@@ -1,10 +1,8 @@
+/// AtomicAllocator wraps another allocator in a mutex, 
+/// ensuring that every allocation is thread-safe. This 
+/// is not needed for the general purpose heap allocator, 
+/// as that already has a thread-safe implementation.
 package core.alloc.atomic
-#package_doc """
-    AtomicAllocator wraps another allocator in a mutex, 
-    ensuring that every allocation is thread-safe. This 
-    is not needed for the general purpose heap allocator, 
-    as that already has a thread-safe implementation.
-"""
 
 // This can only be used when the core.sync package exists.
 #if #defined(package core.sync) {
@@ -13,19 +11,15 @@ package core.alloc.atomic
 use core.alloc
 use core.sync
 
-#doc """
-    Stores internal details used by the atomic allocator.
-
-    Simply the wrapped allocator and the mutex.
-"""
+/// Stores internal details used by the atomic allocator.
+///
+/// Simply the wrapped allocator and the mutex.
 AtomicAllocator :: struct {
     a: Allocator;
     m: sync.Mutex;
 }
 
-#doc """
-    Creates a new AtomicAllocator over an existing allocator.
-"""
+/// Creates a new AtomicAllocator over an existing allocator.
 make :: (a: Allocator) -> AtomicAllocator {
     atomic: AtomicAllocator = .{ a = a };
 
@@ -34,9 +28,7 @@ make :: (a: Allocator) -> AtomicAllocator {
     return atomic;
 }
 
-#doc """
-    Makes an allocator out of the atomic allocator state.
-"""
+/// Makes an allocator out of the atomic allocator state.
 make_allocator :: (atomic: &AtomicAllocator) =>
     Allocator.{ atomic, atomic_alloc };
 
