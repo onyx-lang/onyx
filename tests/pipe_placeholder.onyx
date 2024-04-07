@@ -1,0 +1,9 @@
+use core {*}
+
+main :: () {
+    iter.as_iter(1 .. 10)
+    |> iter.fold1((x, y) => x + y)
+    |> printf("The value is: {}\n", _);
+
+    10 |> printf("The value is: {}\n", _);
+}

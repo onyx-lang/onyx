@@ -780,6 +780,7 @@ struct AstCall {
     AstTyped_base;
 
     Arguments args;
+    i32 placeholder_argument_position;
 
     union {
         AstTyped *callee;

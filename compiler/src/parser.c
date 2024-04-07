@@ -529,6 +529,13 @@ static void parse_arguments(OnyxParser* parser, TokenType end_token, Arguments* 
     }
 }
 
+static b32 arg_is_placeholder(AstTyped *arg) {
+    if (arg->kind != Ast_Kind_Symbol) return 0;
+    if (arg->token->length > 1) return 0;
+    if (arg->token->text[0] != '_') return 0;
+    return 1;
+}
+
 static AstCall* parse_function_call(OnyxParser *parser, AstTyped *callee) {
     AstCall* call_node = make_node(AstCall, Ast_Kind_Call);
     call_node->token = expect_token(parser, '(');
@@ -538,20 +545,32 @@ static AstCall* parse_function_call(OnyxParser *parser, AstTyped *callee) {
 
     parse_arguments(parser, ')', &call_node->args);
 
-    while (consume_token_if_next(parser, '!')) {
-        AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
-        code_block->token = parser->curr;
-        code_block->type_node = builtin_code_type;
+    // while (consume_token_if_next(parser, '!')) {
+    //     AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
+    //     code_block->token = parser->curr;
+    //     code_block->type_node = builtin_code_type;
 
-        code_block->code = (AstNode *) parse_block(parser, 1, NULL);
-        ((AstBlock *) code_block->code)->rules = Block_Rule_Code_Block;
-        bh_arr_push(call_node->args.values, (AstTyped *) code_block);
-    }
+    //     code_block->code = (AstNode *) parse_block(parser, 1, NULL);
+    //     ((AstBlock *) code_block->code)->rules = Block_Rule_Code_Block;
+    //     bh_arr_push(call_node->args.values, (AstTyped *) code_block);
+    // }
 
     // Wrap expressions in AstArgument
     bh_arr_each(AstTyped *, arg, call_node->args.values) {
         if ((*arg) == NULL) continue;
-        *arg = (AstTyped *) make_argument(parser->allocator, *arg);
+
+        if (arg_is_placeholder(*arg)) {
+            if (call_node->placeholder_argument_position > 0) {
+                onyx_report_error((*arg)->token->pos, Error_Critical, "Cannot have more than one placeholder argument ('_').");
+                parser->hit_unexpected_token = 1;
+                break;
+            }
+
+            call_node->placeholder_argument_position = (arg - call_node->args.values) + 1;
+            *arg = NULL;
+        } else {
+            *arg = (AstTyped *) make_argument(parser->allocator, *arg);
+        }
     }
 
     bh_arr_each(AstNamedValue *, named_value, call_node->args.named_values) {
