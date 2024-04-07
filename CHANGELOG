@@ -1,3 +1,20 @@
+Release 0.1.11
+--------------
+Not released yet
+
+Additions:
+- Ability specify where piped arguments are placed using `_`.
+    - `x |> foo(y, _) == foo(y, x)`
+
+Removals:
+
+Changes:
+
+Bugfixes:
+
+Contributors:
+
+
 Release 0.1.10
 ---------------
 30th March 2024
