@@ -146,13 +146,13 @@ RuneIterValue :: struct {
 runes :: (s: str) -> Iterator(RuneIterValue) {
     return iter.generator(
         &.{ s = s },
-        ctx => {
-            if string.empty(ctx.s) do return RuneIterValue.{}, false;
+        (ctx: $C) -> ? RuneIterValue {
+            if string.empty(ctx.s) do return .None;
 
             r, len := decode_rune(ctx.s);
             defer string.advance(&ctx.s, len);
 
-            return .{ r, ctx.s[0..len] }, true;
+            return RuneIterValue.{ r, ctx.s[0..len] };
         }            
     );
 }

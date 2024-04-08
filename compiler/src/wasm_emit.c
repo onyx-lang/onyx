@@ -1548,8 +1548,8 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
     u64 iterator_next_func   = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
     u64 iterator_close_func  = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
     u64 iterator_remove_func = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
-    u64 iterator_done_bool   = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-    WI(for_node->token, WI_DROP);
+    u64 iterator_done_res    = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+    WI(for_node->token, WI_DROP); // TODO: These need to not be dropped but actually used because they are the closure pointers!
     WIL(for_node->token, WI_LOCAL_SET, iterator_remove_func);
     WI(for_node->token, WI_DROP);
     WIL(for_node->token, WI_LOCAL_SET, iterator_close_func);
@@ -1576,8 +1576,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
     emit_for__prologue(mod, &code, for_node, iter_local, index_local);
 
     AstLocal* var = for_node->var;
-    b32 it_is_local = (b32) ((iter_local & LOCAL_IS_WASM) != 0);
-    u64 offset = 0;
+    assert((iter_local & LOCAL_IS_WASM) == 0);
 
     // Enter a deferred statement for the auto-close
     emit_enter_structured_block(mod, &code, SBT_Basic_Block, for_node->token);
@@ -1603,12 +1602,6 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
     emit_enter_structured_block(mod, &code, SBT_Continue_Loop, for_node->token);
 
-    if (!it_is_local) emit_local_location(mod, &code, var, &offset);
-
-    {
-        WIL(for_node->token, WI_LOCAL_GET, iterator_data_ptr);
-        WIL(for_node->token, WI_LOCAL_GET, iterator_next_func);
-
         // CLEANUP: Calling a function is way too f-ing complicated. FACTOR IT!!
         u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
 
@@ -1628,6 +1621,8 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
         WI(for_node->token, WI_PTR_ADD);
         WID(for_node->token, WI_GLOBAL_SET, stack_top_idx);
 
+        WIL(for_node->token, WI_LOCAL_GET, iterator_data_ptr);
+        WIL(for_node->token, WI_LOCAL_GET, iterator_next_func);
         i32 type_idx = generate_type_idx(mod, next_func_type.type);
         WID(for_node->token, WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
 
@@ -1636,18 +1631,17 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
         WI(for_node->token, WI_PTR_SUB);
         WID(for_node->token, WI_GLOBAL_SET, stack_top_idx);
 
-        WID(for_node->token, WI_GLOBAL_GET, stack_top_idx);
-        emit_load_instruction(mod, &code, return_type, reserve_size - return_size);
-    }
+    WIL(for_node->token, WI_LOCAL_TEE, iterator_done_res);
 
-    WIL(for_node->token, WI_LOCAL_SET, iterator_done_bool);
-
-    if (!it_is_local) emit_store_instruction(mod, &code, var->type, offset);
-    else              WIL(for_node->token, WI_LOCAL_SET, iter_local);
-
-    WIL(for_node->token, WI_LOCAL_GET, iterator_done_bool);
+    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_U8], 0);
     WI(for_node->token, WI_I32_EQZ);
     WID(for_node->token, WI_COND_JUMP, 0x01);
+
+    u64 offset = 0;
+    emit_local_location(mod, &code, var, &offset);
+    WIL(for_node->token, WI_LOCAL_GET, iterator_done_res);
+    emit_load_instruction(mod, &code, var->type, type_alignment_of(return_type));
+    emit_store_instruction(mod, &code, var->type, offset);
 
     emit_block(mod, &code, for_node->stmt, 0);
 
@@ -1668,7 +1662,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
     local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
     local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
     local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
-    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     *pcode = code;
 }
 

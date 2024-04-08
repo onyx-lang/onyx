@@ -255,10 +255,10 @@ Map.as_iter :: (m: &Map) =>
         ctx => {
             if ctx.i < ctx.m.entries.count {
                 defer ctx.i += 1;
-                return &ctx.m.entries.data[ctx.i], true;
+                return Optional.make(&ctx.m.entries.data[ctx.i]);
             }
 
-            return .{}, false;
+            return .None;
         });
 
 

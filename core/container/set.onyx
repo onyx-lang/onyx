@@ -128,12 +128,11 @@ Set.as_iter :: (s: &Set) =>
         &.{ s = s, i = 0 },
 
         (ctx) => {
-            if ctx.i >= ctx.s.entries.count {
-                return (typeof &ctx.s.entries.data[0].value).{}, false;
+            if ctx.i < ctx.s.entries.count {
+                defer ctx.i += 1;
+                return Optional.make(&ctx.s.entries.data[ctx.i].value);
             }
-
-            defer ctx.i += 1;
-            return &ctx.s.entries.data[ctx.i].value, true;
+            return .None;
         });
 
 //

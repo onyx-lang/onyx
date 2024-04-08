@@ -166,16 +166,16 @@ filter :: (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool) =>
     generator(
         &.{ iterator = it, predicate = predicate, ctx = ctx },
 
-        fi => {
+        (fi: $C) -> ? T {
             value := next(fi.iterator);
             if value {
                 while !fi.predicate(value->unwrap(), fi.ctx) {
                     value = next(fi.iterator);
-                    if !value do break;
+                    if !value do return .None;
                 }
                 return value;
             }
-            return value;
+            return .None;
         },
 
         fi => { close(fi.iterator); });
@@ -190,7 +190,11 @@ map :: (it: Iterator($T), transform: (T) -> $R) =>
     generator(
         &.{ iterator = it, transform = transform },
 
-        mi => { return next(mi.iterator)->transform(mi.transform); },
+        mi => {
+            v := next(mi.iterator);
+            v2 := v->transform(mi.transform);
+            return v2;
+        },
 
         mi => { close(mi.iterator); })
 
@@ -631,15 +635,13 @@ as_iter :: macro (x: &[..] $T, by_pointer: bool) => {
     return G(x, [](&arr.data[current]), Iterator(&T));
 }
 
-
-
 #overload
 as_iter :: (r: range) => generator(
     &.{ r = r, v = r.low },
-    ctx => {
+    (ctx: $C) -> ? i32 {
         if ctx.r.step > 0 {
             if ctx.v >= ctx.r.high {
-                return Optional.empty(i32);
+                return .None;
             } else {
                 defer ctx.v += ctx.r.step;
                 return ctx.v;
@@ -647,7 +649,7 @@ as_iter :: (r: range) => generator(
 
         } else {
             if ctx.v < ctx.r.high {
-                return Optional.empty(i32);
+                return .None;
             } else {
                 defer ctx.v += ctx.r.step;
                 return ctx.v;
@@ -659,21 +661,21 @@ as_iter :: (r: range) => generator(
 #overload
 as_iter :: (r: range64) => generator(
     &.{ r = r, v = r.low },
-    ctx => {
+    (ctx: $C) -> ? i64 {
         if ctx.r.step > 0 {
             if ctx.v < ctx.r.high {
                 defer ctx.v += ctx.r.step;
-                return ctx.v |> Optional.make();
+                return ctx.v;
             } else {
-                return Optional.empty(i64);
+                return .None;
             }
 
         } else {
             if ctx.v >= ctx.r.high {
                 defer ctx.v += ctx.r.step;
-                return ctx.v |> Optional.make();
+                return ctx.v;
             } else {
-                return Optional.empty(i64);
+                return .None;
             }
         }
     });
@@ -732,9 +734,10 @@ fold1 :: macro (it: $T/Iterable, combine: $S) =>
 
 #overload
 fold1 :: (it: Iterator($T), combine: (T, T) -> T) -> ? T {
-    result := next(it);
-    if !result do return .None;
+    maybe_result := next(it);
+    if !maybe_result do return .None;
 
+    result := maybe_result->unwrap();
     for value in it {
         result = combine(value, result);
     }
@@ -980,11 +983,11 @@ generator_no_copy :: (ctx: &$Ctx, gen: (&Ctx) -> ? $T, close: (&Ctx) -> void) =>
             ended := false;
         }
 
-        next :: (use c: &Context($T)) -> (T, bool) {
-            if ended do return .{}, false;
+        next :: (use c: &Context($T)) -> ? T {
+            if ended do return .None;
             sync.scoped_mutex(&mutex);
 
-            v := next(iterator);
+            v := iterator.next(iterator.data);
             if !v {
                 ended = true;
             }

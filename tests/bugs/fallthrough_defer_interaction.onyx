@@ -4,8 +4,8 @@ use core {*}
 
 custom_iterator :: () -> Iterator(i32) {
 
-    next :: (data: rawptr) -> (i32, bool) {
-        return 1234, true;
+    next :: (data: rawptr) -> ? i32 {
+        return 1234;
     }
 
     close :: (data: rawptr) {
