@@ -49,15 +49,15 @@ list_directory :: (path: str) -> Iterator(DirectoryEntry) {
         opened := false;
     }
 
-    next :: (use c: &Context) -> (DirectoryEntry, bool) {
-        if !opened do return .{}, false;
+    next :: (use c: &Context) -> ? DirectoryEntry {
+        if !opened do return .None;
 
         entry: DirectoryEntry;
         if !dir_read(dir, &entry) {
-            return .{}, false;
+            return .None;
         }
 
-        return entry, true;
+        return entry;
     }
 
     close :: (use c: &Context) {

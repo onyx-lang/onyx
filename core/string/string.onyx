@@ -609,14 +609,14 @@ str.split_iter :: (s: str, delim: u8) -> Iterator(str) {
     return iter.generator(
         &.{ s = s, delim = delim },
 
-        (ctx: &$T) -> (str, bool) {
+        (ctx: &$T) -> ? str {
             if string.empty(ctx.s) {
-                return "", false;
+                return .None;
             }
 
             ret: str;
             ret, ctx.s = bisect(ctx.s, ctx.delim);
-            return ret, true;
+            return ret;
         }
     );
 }
@@ -626,14 +626,14 @@ str.split_iter :: (s: str, delim: str) -> Iterator(str) {
     return iter.generator(
         &.{ s = s, delim = delim },
 
-        (ctx: &$T) -> (str, bool) {
+        (ctx: &$T) -> ? str {
             if string.empty(ctx.s) {
-                return "", false;
+                return .None;
             }
 
             ret: str;
             ret, ctx.s = bisect(ctx.s, ctx.delim);
-            return ret, true;
+            return ret;
         }
     );
 }

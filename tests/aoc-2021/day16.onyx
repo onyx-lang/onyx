@@ -26,8 +26,7 @@ BitIterator :: struct {
     bit_idx: i32;
 
     next :: (b: &BitIterator) -> u32 {
-        v, _ := iter.take_one(b.iter, no_close=true);
-        return v;
+        return iter.next(b.iter) ?? 0;
     }
 }
 

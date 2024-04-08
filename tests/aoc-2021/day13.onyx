@@ -35,8 +35,8 @@ main :: (args) => {
         parts := string.split_iter(line, #char ",")
                 |> iter.map(x => cast(i32) conv.parse_int(x));
         
-        x, _ := iter.take_one(parts);
-        y, _ := iter.take_one(parts);
+        x := iter.next(parts)->unwrap();
+        y := iter.next(parts)->unwrap();
 
         dots << .{x,y};
     }

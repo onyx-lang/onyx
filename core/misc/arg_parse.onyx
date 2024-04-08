@@ -54,18 +54,18 @@ arg_parse :: (c_args: [] cstr, output: any) -> bool {
                     }
 
                     case i32 {
-                        value_str, success := iter.take_one(arg_iter, no_close=true);
-                        if !success do return false;
+                        value_str := iter.next(arg_iter);
+                        if !value_str do return false;
 
-                        value := conv.str_to_i64(value_str);
+                        value := conv.str_to_i64(value_str->unwrap());
                         *(cast(&i32) (cast([&] u8) data_base + member.offset)) = ~~value;
                     }
 
                     case str {
-                        value, success := iter.take_one(arg_iter, no_close=true);
-                        if !success do return false;
+                        value := iter.next(arg_iter);
+                        if !value do return false;
 
-                        *(cast(&str) (cast([&] u8) data_base + member.offset)) = value;
+                        *(cast(&str) (cast([&] u8) data_base + member.offset)) = value->unwrap();
                     }
 
                     case #default {
