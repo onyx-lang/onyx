@@ -116,7 +116,7 @@ ImplicitIterator :: interface (T: type_expr) {
     t as T;
 
     { t->iter_open() } -> void;
-    { t->iter_next() } -> Optional;
+    t->iter_next();
     { t->iter_close() } -> void;
 }
 
@@ -190,10 +190,12 @@ map :: (it: Iterator($T), transform: (T) -> $R) =>
     generator(
         &.{ iterator = it, transform = transform },
 
-        mi => {
+        (mi: $C) -> ? R {
             v := next(mi.iterator);
-            v2 := v->transform(mi.transform);
-            return v2;
+            return switch v {
+                case .Some as v => Optional.make(mi.transform(v));
+                case .None      => .None;
+            };
         },
 
         mi => { close(mi.iterator); })
@@ -203,7 +205,13 @@ map :: (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> $R) =>
     generator(
         &.{ iterator = it, transform = transform, ctx = ctx },
 
-        mi => { return next(mi.iterator)->transform(v => mi.transform(v, mi.ctx)); },
+        (mi: $C) -> ? R {
+            v := next(mi.iterator);
+            return switch v {
+                case .Some as v => Optional.make(mi.transform(v, mi.ctx));
+                case .None      => .None;
+            };
+        },
 
         mi => { close(mi.iterator); })
 
@@ -314,7 +322,7 @@ skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
     return generator(
         &.{ iterator = it, to_skip = count, skipped = false },
 
-        si => {
+        (si: $C) -> ? T {
             while !si.skipped && si.to_skip > 0 {
                 si.to_skip -= 1;
                 value := next(si.iterator);
@@ -505,7 +513,7 @@ enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Va
             value := next(ec.iterator);
             if value {
                 defer ec.current_index += 1;
-                return Enumeration_Value(typeof value).{ ec.current_index, value }
+                return Enumeration_Value(T).{ ec.current_index, value->unwrap() }
                     |> Optional.make();
             }
 
