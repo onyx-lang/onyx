@@ -562,8 +562,6 @@ static AstCall* parse_function_call(OnyxParser *parser, AstTyped *callee) {
         if (arg_is_placeholder(*arg)) {
             if (call_node->placeholder_argument_position > 0) {
                 onyx_report_error((*arg)->token->pos, Error_Critical, "Cannot have more than one placeholder argument ('_').");
-                parser->hit_unexpected_token = 1;
-                break;
             }
 
             call_node->placeholder_argument_position = (arg - call_node->args.values) + 1;
@@ -2982,6 +2980,13 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
         if (consume_token_if_next(parser, '[') && !func->captures) {
             func->captures = parse_capture_list(parser, ']');
             consume_token_if_next(parser, ',');
+
+            if (bh_arr_length(parser->current_function_stack) == 1) continue;
+
+            AstFunction *parent_func = parser->current_function_stack[bh_arr_length(parser->current_function_stack) - 2];
+            if (parent_func->kind == Ast_Kind_Polymorphic_Proc) {
+                func->flags |= Ast_Flag_Function_Is_Lambda_Inside_PolyProc;
+            }
             continue;
         }
 
@@ -3159,11 +3164,18 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
 
     bh_arr(AstPolyParam) polymorphic_vars = NULL;
     bh_arr_new(global_heap_allocator, polymorphic_vars, 4);
-    // defer bh_arr_free(polymorphic_vars);
 
     parser->polymorph_context.poly_params = &polymorphic_vars;
     parse_function_params(parser, func_def);
     parser->polymorph_context.poly_params = NULL;
+
+    if (bh_arr_length(polymorphic_vars) > 0) {
+        func_def->kind = Ast_Kind_Polymorphic_Proc;
+        func_def->poly_params = polymorphic_vars;
+
+    } else {
+        bh_arr_free(polymorphic_vars);
+    }
 
     func_def->return_type = (AstType *) &basic_type_void;
 
@@ -3248,14 +3260,6 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
     func_def->closing_brace = parser->curr - 1;
 
 function_defined:
-    if (bh_arr_length(polymorphic_vars) > 0) {
-        func_def->kind = Ast_Kind_Polymorphic_Proc;
-        func_def->poly_params = polymorphic_vars;
-
-    } else {
-        bh_arr_free(polymorphic_vars);
-    }
-
     bh_arr_pop(parser->current_function_stack);
     return func_def;
 }
