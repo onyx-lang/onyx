@@ -19,11 +19,10 @@ query_all :: #match #local {
 
 query_doc :: (d: &Document, query: str) -> ? &Node {
     query_iter := query_doc_all(d, query);
-    node, cont := iter.next(query_iter);
+    node := iter.next(query_iter);
     iter.close(query_iter);
 
-    if cont do return node;
-    return .{};
+    return node;
 }
 
 query_doc_all :: (d: &Document, query: str) -> Iterator(&Node) {
@@ -41,11 +40,10 @@ query_doc_all :: (d: &Document, query: str) -> Iterator(&Node) {
 
 query_node :: (n: &Node, query: str) -> ? &Node {
     query_iter := query_node_all(n, query);
-    node, cont := iter.next(query_iter);
+    node := iter.next(query_iter);
     iter.close(query_iter);
 
-    if cont do return node;
-    return .{};
+    return node;
 }
 
 query_node_all :: (n: &Node, query: str) -> Iterator(&Node) {
@@ -93,7 +91,7 @@ QueryStack :: struct {
 }
 
 #local
-query_next :: (ctx: &QueryIterator) -> (&Node, bool) {
+query_next :: (ctx: &QueryIterator) -> ? &Node {
     while true {
         if !ctx.stack {
             if ctx.d {
@@ -119,12 +117,12 @@ query_next :: (ctx: &QueryIterator) -> (&Node, bool) {
         defer array.pop(&ctx.stack);
         for ctx.q.matches_any {
             if query_selector_matches(it, ctx.stack) {
-                return last_query.node, true;
+                return last_query.node;
             }
         }
     }
 
-    return .{}, false;
+    return .None;
 }
 
 #local
