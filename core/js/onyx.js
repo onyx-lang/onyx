@@ -279,12 +279,14 @@ Onyx.register_module("__syscall", instance => ({
             let thisArg = instance.store_value(this)
 
             instance.instance.exports.__closure_base.value = closureptr
-            wasmFunc(thisArg, argptr, arguments.length)
+            let result = wasmFunc(thisArg, argptr, arguments.length)
 
             const thisIndex = instance.load_value_index(thisArg)
             instance._heap.free(thisIndex)
 
             instance.instance.exports.__free_arg_buf(argptr)
+
+            return instance.load_value(result)
         })
     },
     __to_str(v, outptr, outlen) {
