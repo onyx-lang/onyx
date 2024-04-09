@@ -1699,10 +1699,12 @@ void track_documentation_for_symbol_info(AstNode *node, AstBinding *binding) {
     if (binding->documentation_token_old) {
         syminfo->symbols[symbol_id].documentation        = binding->documentation_token_old->text;
         syminfo->symbols[symbol_id].documentation_length = binding->documentation_token_old->length;
-    } else {
-        assert(binding->documentation_string);
+    } else if (binding->documentation_string) {
         syminfo->symbols[symbol_id].documentation = binding->documentation_string;
         syminfo->symbols[symbol_id].documentation_length = strlen(binding->documentation_string);
+    } else {
+        syminfo->symbols[symbol_id].documentation = "";
+        syminfo->symbols[symbol_id].documentation_length = 0;
     }
 }
 
