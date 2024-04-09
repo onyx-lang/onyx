@@ -4,6 +4,7 @@ use runtime
 use core.iter
 use core.array
 use core.string
+use core.memory
 
 use runtime.info {
     get_type_info,
@@ -172,6 +173,27 @@ any_iter :: (arr: any) -> Iterator(any) {
             return .None;
         }
     );
+}
+
+
+/// Creates a deep copy of an array of `any`s.
+///
+/// Copies the slice to a new slice, and all of the `any` data members.
+any_deep_copy :: (args: [] any, allocator := context.allocator) -> (result: [] any) {
+    result = make([] any, args.count, allocator);
+    
+    for arg, i in args {
+        size := get_type_info(arg.type).size;
+
+        new_data := allocator->alloc(size);
+        if !new_data do continue;
+
+        memory.copy(new_data, arg.data, size);
+
+        result[i] = any.{ new_data, arg.type };
+    }
+
+    return;
 }
 
 

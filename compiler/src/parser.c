@@ -3865,7 +3865,9 @@ static void parse_implicit_injection(OnyxParser* parser) {
     if (next_tokens_are(parser, 2, ':', ':')) {
         consume_token(parser);
         inject->binding = parse_top_level_binding(parser, inject->token);
-        flush_doc_tokens(parser, &inject->binding->documentation_string, &inject->binding->documentation_token_old);
+        if (inject->binding) {
+            flush_doc_tokens(parser, &inject->binding->documentation_string, &inject->binding->documentation_token_old);
+        }
 
     } else {
         AstMemRes* memres = parse_memory_reservation(parser, inject->token, 0);
