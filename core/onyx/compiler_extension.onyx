@@ -1,0 +1,117 @@
+//+optional-semicolons
+package onyx.compiler_extension
+#allow_stale_code
+
+use core {stdio}
+use core.alloc {package, arena}
+use core.encoding.osad
+use core.io
+
+// Types
+
+IncomingMessage :: union {
+    Init: struct {
+        compiler_version_major: u32
+        compiler_version_minor: u32
+        compiler_version_patch: u32
+
+        max_protocol_version_supported: u32
+    }
+
+    Terminate: struct {
+    }
+
+    ExpandMacro: struct {
+        id: u32
+        location: ExpansionLocation
+        macro_name: str
+        body: str
+    }
+}
+
+OutgoingMessage :: union {
+    Init: struct {
+        protocol_version: u32
+        name: str
+        procedural_macros: [] str
+    }
+
+    ErrorReport: struct {
+        line: u32
+        column: u32
+        msg: str
+    }
+
+    Expansion: struct {
+        id: u32
+        code: str
+    }
+
+    InjectCode: struct {
+        code: str
+    }
+}
+
+ExpansionLocation :: enum {
+    Expression
+    Statement
+    TopLevelStatement
+}
+
+
+// Code
+
+ExtensionContext :: struct {
+    protocol_version: u32
+    name: str
+    proc_macros: [..] str
+
+    arena: arena.Arena
+}
+
+ExtensionContext.make :: (name: str) -> (res: ExtensionContext) {
+    res.name = name
+    res.protocol_version = 1
+
+    res.arena = arena.make(context.allocator, 32 * 1024)
+    return
+}
+
+ExtensionContext.register_proc_macro :: (self: &#Self, name: str) {
+    self.proc_macros->push(name)
+}
+
+ExtensionContext.start :: (self: &#Self, callback: (&#Self, msg: IncomingMessage) -> void) {
+    use stdin_reader := io.Reader.make(&stdio.stream)
+
+    while true {
+        msg: IncomingMessage
+        if !osad.deserialize(&msg, typeof msg, &stdin_reader, alloc.as_allocator(&self.arena)) {
+            break
+        }
+
+        switch msg {
+            case .Init as &init {
+                self->send(.{
+                    Init = .{
+                        protocol_version = self.protocol_version,
+                        name = self.name,
+                        procedural_macros = self.proc_macros
+                    }
+                })
+            }
+
+            case .Terminate do break break
+
+            case #default {
+                callback(self, msg)
+            }
+        }
+    }
+}
+
+ExtensionContext.send :: (self: &#Self, msg: OutgoingMessage) {
+    use stdout_writer := io.Writer.make(&stdio.stream)
+
+    osad.serialize(msg, &stdout_writer)
+}

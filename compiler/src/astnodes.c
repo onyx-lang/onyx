@@ -119,6 +119,10 @@ static const char* ast_node_names[] = {
 
     "JS CODE",
 
+    "COMPILER EXTENSION",
+    "PROCEDURAL MACRO",
+    "PROCEDURAL EXPANSION",
+
     "AST_NODE_KIND_COUNT",
 };
 

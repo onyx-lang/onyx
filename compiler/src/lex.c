@@ -83,6 +83,8 @@ static const char* token_type_names[] = {
 
     "a doc comment",
 
+    "a procedural macro body",
+
     "TOKEN_TYPE_COUNT"
 };
 
@@ -379,6 +381,29 @@ whitespace_skipped:
         goto token_parsed;
     }
 
+    if (tokenizer->curr[0] == '!' && tokenizer->curr[1] == '{') {
+        INCREMENT_CURR_TOKEN(tokenizer);
+        INCREMENT_CURR_TOKEN(tokenizer);
+
+        tk.text = tokenizer->curr;
+
+        i32 bracket_count = 0;
+        i32 len = 0;
+        while ((bracket_count > 0 || tokenizer->curr[0] != '}') && tokenizer->curr != tokenizer->end) {
+            if (tokenizer->curr[0] == '{') bracket_count += 1;
+            if (tokenizer->curr[0] == '}') bracket_count -= 1;
+
+            len++;
+            INCREMENT_CURR_TOKEN(tokenizer);
+        }
+
+        tk.type = Token_Type_Proc_Macro_Body;
+        tk.length = len;
+
+        INCREMENT_CURR_TOKEN(tokenizer);
+        goto token_parsed;
+    }
+
     char curr = *tokenizer->curr;
     switch (curr) {
     case 'a':
@@ -554,6 +579,7 @@ token_parsed:
         case Token_Type_Literal_Float:
         case Token_Type_Literal_Char:
         case Token_Type_Empty_Block:
+        case Token_Type_Proc_Macro_Body:
         case '?':
         case ')':
         case '}':

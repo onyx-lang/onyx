@@ -776,6 +776,11 @@ static SymresStatus symres_expression(AstTyped** expr) {
             break;
         }
 
+        case Ast_Kind_Procedural_Expansion: {
+            onyx_report_error((*expr)->token->pos, Error_Critical, "proc macro not supported yet.");
+            break;
+        }
+
         default: break;
     }
 
@@ -1962,6 +1967,22 @@ static SymresStatus symres_js_node(AstJsNode* js) {
     return Symres_Success;
 }
 
+static SymresStatus symres_compiler_extension(AstCompilerExtension *ext) {
+    token_toggle_end(ext->name);
+    i32 extension_id = compiler_extension_start(ext->name->text);
+    token_toggle_end(ext->name);
+
+    if (extension_id < 0) {
+        onyx_report_error(ext->token->pos, Error_Critical, "Failed to initialize this compiler extension.");
+        return Symres_Error;
+    }
+
+    ext->extension_id = extension_id;
+
+    return Symres_Complete;
+}
+
+
 void symres_entity(Entity* ent) {
     current_entity = ent;
     if (ent->scope) scope_enter(ent->scope);
@@ -2027,6 +2048,7 @@ void symres_entity(Entity* ent) {
                                                       ss = Symres_Success;
                                                   }
                                                   break;
+        case Entity_Type_Compiler_Extension:      ss = symres_compiler_extension(ent->compiler_extension); break;
 
         default: break;
     }

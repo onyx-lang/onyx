@@ -120,7 +120,11 @@
                                \
     NODE(ZeroValue)            \
                                \
-    NODE(JsNode)               
+    NODE(JsNode)               \
+                               \
+    NODE(CompilerExtension)    \
+    NODE(ProceduralMacro)      \
+    NODE(ProceduralExpansion)
 
 #define NODE(name) typedef struct Ast ## name Ast ## name;
 AST_NODES
@@ -254,6 +258,10 @@ typedef enum AstKind {
     Ast_Kind_Zero_Value,
 
     Ast_Kind_Js_Code,
+
+    Ast_Kind_Compiler_Extension,
+    Ast_Kind_Procedural_Macro,
+    Ast_Kind_Procedural_Expansion,
 
     Ast_Kind_Count
 } AstKind;
@@ -1635,6 +1643,31 @@ struct AstJsNode {
 };
 
 
+struct AstCompilerExtension {
+    AstNode_base;
+
+    OnyxToken *name;
+    bh_arr(AstProceduralMacro *) proc_macros;
+
+    i32 extension_id;
+};
+
+struct AstProceduralMacro {
+    AstNode_base;
+
+    // name is stored in the `token`
+
+    AstCompilerExtension *extension;
+};
+
+struct AstProceduralExpansion {
+    AstTyped_base;
+
+    AstTyped *proc_macro;
+    OnyxToken *expansion_body;
+};
+
+
 typedef struct EntityJobData {
     enum TypeMatch (*func)(void *job_data);
     void *job_data;
@@ -1671,6 +1704,7 @@ typedef enum EntityType {
     Entity_Type_Static_If,
     Entity_Type_String_Literal,
     Entity_Type_File_Contents,
+    Entity_Type_Compiler_Extension,
     Entity_Type_Enum,
     Entity_Type_Enum_Value,
     Entity_Type_Type_Alias,
@@ -1744,6 +1778,7 @@ typedef struct Entity {
         AstDirectiveLibrary   *library;
         EntityJobData         *job_data;
         AstJsNode             *js;
+        AstCompilerExtension  *compiler_extension;
     };
 } Entity;
 
@@ -1864,6 +1899,13 @@ typedef struct DefinedVariable {
     char *value;
 } DefinedVariable;
 
+typedef struct CompilerExtension {
+    u32 pid;
+    u32 send_file;
+    u32 recv_file;
+
+    bh_arena arena;
+} CompilerExtension;
 
 typedef struct CompileOptions CompileOptions;
 struct CompileOptions {
@@ -1941,6 +1983,8 @@ struct Context {
 
     struct SymbolInfoTable *symbol_info;
     struct OnyxDocInfo     *doc_info;
+
+    bh_arr(CompilerExtension) extensions;
 
     CheckerData checker;
     ContextCaches caches;
@@ -2172,6 +2216,11 @@ void track_declaration_for_tags(AstNode *);
 void track_declaration_for_symbol_info(OnyxFilePos, AstNode *);
 void track_documentation_for_symbol_info(AstNode *, AstBinding *);
 void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved);
+
+
+// Compiler Extensions
+i32 compiler_extension_start(const char *name);
+
 
 // NOTE: Useful inlined functions
 static inline b32 is_lval(AstNode* node) {

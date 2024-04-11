@@ -1194,6 +1194,17 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 break;
             }
 
+            case Token_Type_Proc_Macro_Body: {
+                OnyxToken *tkn = expect_token(parser, Token_Type_Proc_Macro_Body);
+                AstProceduralExpansion *proc_expand = make_node(AstProceduralExpansion, Ast_Kind_Procedural_Expansion);
+                proc_expand->token = tkn - 1;
+                proc_expand->expansion_body = tkn;
+                proc_expand->proc_macro = retval;
+
+                retval = (AstTyped *) proc_expand;
+                break;
+            }
+
             default: goto factor_parsed;
         }
     }
@@ -3693,6 +3704,31 @@ static AstForeignBlock* parse_foreign_block(OnyxParser* parser, OnyxToken *token
     return fb;
 }
 
+static AstCompilerExtension* parse_compiler_extension(OnyxParser* parser, OnyxToken *token) {
+    AstCompilerExtension *ext = make_node(AstCompilerExtension, Ast_Kind_Compiler_Extension);
+    ext->token = token;
+
+    ext->name = expect_token(parser, Token_Type_Literal_String);
+    
+    bh_arr_new(global_heap_allocator, ext->proc_macros, 2);
+    expect_token(parser, '{');
+    while (!consume_token_if_next(parser, '}')) {
+        if (parser->hit_unexpected_token) break;
+        
+        AstProceduralMacro *pmacro = make_node(AstProceduralMacro, Ast_Kind_Procedural_Macro);
+        pmacro->token = expect_token(parser, Token_Type_Symbol);
+        pmacro->extension = ext;
+
+        bh_arr_push(ext->proc_macros, pmacro);
+
+        if (parser->curr->type != '}')
+            expect_token(parser, ',');
+    }
+
+    ENTITY_SUBMIT(ext);
+    return ext;
+}
+
 static AstTyped* parse_top_level_expression(OnyxParser* parser) {
     if (parser->curr->type == Token_Type_Keyword_Global)    return parse_global_declaration(parser);
     if (parser->curr->type == Token_Type_Keyword_Struct)    return (AstTyped *) parse_struct(parser);
@@ -3733,6 +3769,10 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
         if (parse_possible_directive(parser, "foreign")) {
             AstForeignBlock *foreign = parse_foreign_block(parser, parser->curr - 2);
             return (AstTyped *) foreign;
+        }
+
+        if (parse_possible_directive(parser, "compiler_extension")) {
+            return (AstTyped *) parse_compiler_extension(parser, parser->curr - 2);
         }
     }
 
