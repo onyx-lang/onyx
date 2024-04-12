@@ -331,7 +331,7 @@ compile_c_file :: (
                         case u64  do string.append(call_signature, "L");
                         case f32  do string.append(call_signature, "f");
                         case f64  do string.append(call_signature, "d");
-                        case #default {
+                        case _ {
                             if is_pointer(p) {
                                 string.append(call_signature, "p");
                             } else {

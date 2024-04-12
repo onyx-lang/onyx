@@ -310,7 +310,7 @@ Value.truthy :: (v: Value) -> bool {
         case .Boolean do return cast(u64) v == cast(u64) True;
         case .Number  do return cast(u64) v != cast(u64) Zero;
         case .String  do return v->length() != 0;
-        case #default do return true;
+        case _ do return true;
     }
 }
 

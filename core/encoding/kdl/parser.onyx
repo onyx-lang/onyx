@@ -290,7 +290,7 @@ Parser.parse :: (self: &#Self, doc: &Document) -> Parse_Error {
                 }
             }
 
-            case #default {
+            case _ {
                 node_result := self->parse_node();
                 if err := node_result->err(); err {
                     logf(.Info, self.tokenizer.doc[self.tokenizer.cursor .. self.tokenizer.doc.length]);
@@ -401,7 +401,7 @@ Parser.parse_node :: (self: &#Self) -> Result(&Node, Parse_Error) {
                 break break;
             }
 
-            case #default {
+            case _ {
                 return .{ Err = .{ Parser_Error = tprintf("Unexpected token {}, expected node", tkn) } };
             }
         }
@@ -458,7 +458,7 @@ Parser.parse_value :: (self: &#Self, token: Token) -> ? Value {
             };
         }
 
-        case #default do return .{};
+        case _ do return .{};
     }
 }
 
@@ -471,7 +471,7 @@ Parser.parse_type_if_present :: (self: &#Self) -> Result(? str, Parse_Error) {
                 return .{ Ok = self->parse_into_string(type_token) };
             }
 
-            case #default {
+            case _ {
                 return .{ Err = .{Parser_Error = tprintf("Expected identifier or string, got {}.", type_token)}};
             }
         }
@@ -493,7 +493,7 @@ Parser.parse_identifier :: (self: &#Self) -> Result(? str, Parse_Error) {
             return .{ Ok = .None };
         }
 
-        case #default {
+        case _ {
             return .{ Err = .{Parser_Error = tprintf("Expected identifier or string, got {}.", id_token)}};
         }
     }
@@ -506,7 +506,7 @@ Parser.skip_linespace :: (self: &#Self) {
                 self.tokenizer->next_token();
             }
 
-            case #default {
+            case _ {
                 return;
             }
         }
@@ -579,7 +579,7 @@ Parser.parse_into_string :: (self: &#Self, tkn: Token) -> ? str {
                 p.tokenizer->next_token();
                 #unquote body(__tkn);
             }
-            case #default ---
+            case _ ---
         }
     }
 }

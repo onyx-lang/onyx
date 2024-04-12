@@ -482,8 +482,8 @@ static CheckStatus collect_switch_case_blocks(AstSwitch* switchnode, AstBlock* r
                 AstSwitchCase *case_node = (AstSwitchCase *) walker;
                 if (case_node->is_default) {
                     if (switchnode->default_case != NULL && switchnode->default_case != case_node->block) {
-                        ERROR(case_node->token->pos, "Multiple #default cases given");
-                        ERROR(switchnode->default_case->token->pos, "Multiple #default cases given");
+                        ERROR(case_node->token->pos, "Multiple default cases given");
+                        ERROR(switchnode->default_case->token->pos, "Multiple default cases given");
                         return Check_Error;
                     }
 

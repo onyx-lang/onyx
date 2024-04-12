@@ -212,7 +212,7 @@ any_as_array :: (arr: any) -> (rawptr, type_expr, u32) {
             return a.data, (cast(&Type_Info_Dynamic_Array) info).of, a.count;
         }
 
-        case #default {
+        case _ {
             return null, void, 0;
         }
     }

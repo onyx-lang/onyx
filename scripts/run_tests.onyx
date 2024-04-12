@@ -26,7 +26,7 @@ print_color :: (color: Color, format: str, args: ..any) {
             case .Yellow do color_code = "\x1b[93m";
             case .Blue do color_code ="\x1b[94m";
             case .White do fallthrough;
-            case #default do color_code = "\x1b[97m";
+            case _ do color_code = "\x1b[97m";
         }
 
         printf("{}{}\x1b[0m", color_code, output);

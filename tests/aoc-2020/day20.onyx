@@ -189,7 +189,7 @@ index_square_with_orientation :: (data: [&] $T, ori: TO, size: i32, x: i32, y: i
         case TO.FR90  => &data[y + x * size];
         case TO.FR180 => &data[(size - 1 - x) + y * size];
         case TO.FR270 => &data[(size - 1 - y) + (size - 1 - x) * size];
-        case #default => null
+        case _ => null
     };
 }
 

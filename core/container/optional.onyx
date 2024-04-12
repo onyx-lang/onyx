@@ -39,7 +39,7 @@ Optional.from_ptr :: macro (p: &$T) -> ?T {
 /// no value is present.
 Optional.value_or :: (o: ?$T, default: T) => switch o {
     case .Some as v => v;
-    case #default => default;
+    case _          => default;
 }
 
 /// Clears the value in the Optional, zeroing the memory of the value.
@@ -70,7 +70,7 @@ Optional.flatten :: (o1: ? Optional($T)) -> ? T {
 Optional.and_then :: (o: ?$T, transform: (T) -> ?$R) -> ?R {
     return switch o {
         case .Some as v => transform(v);
-        case #default => .None;
+        case _          => .None;
     };
 }
 
@@ -78,7 +78,7 @@ Optional.and_then :: (o: ?$T, transform: (T) -> ?$R) -> ?R {
 Optional.transform :: (o: ?$T, transform: (T) -> $R) -> ?R {
     switch o {
         case .Some as v do return .{ Some = transform(v) };
-        case #default do return .None;
+        case _          do return .None;
     }
 }
 
@@ -87,7 +87,7 @@ Optional.transform :: (o: ?$T, transform: (T) -> $R) -> ?R {
 Optional.or_else :: (o: ?$T, generate: () -> ?T) -> ?T {
     return switch o {
         case .Some => o;
-        case #default => generate();
+        case _     => generate();
     };
 }
 
@@ -97,7 +97,7 @@ Optional.or_else :: (o: ?$T, generate: () -> ?T) -> ?T {
 Optional.unwrap :: (o: ?$T) -> T {
     switch o {
         case .Some as v do return v;
-        case #default {
+        case _ {
             assert(false, "Unwrapping empty Optional.");
             return .{};
         }
@@ -110,7 +110,7 @@ Optional.unwrap :: (o: ?$T) -> T {
 Optional.unwrap_ptr :: (o: & ?$T) -> &T {
     switch o {
         case .Some as &v do return v;
-        case #default {
+        case _ {
             assert(false, "Unwrapping empty Optional.");
             return .{};
         }
@@ -123,7 +123,7 @@ Optional.unwrap_ptr :: (o: & ?$T) -> &T {
 Optional.expect :: (o: ?$T, message: str) -> T {
     switch o {
         case .Some as v do return v;
-        case #default {
+        case _ {
             assert(false, message);
             return .{};
         }
@@ -136,7 +136,7 @@ Optional.expect :: (o: ?$T, message: str) -> T {
 Optional.expect_ptr :: (o: & ?$T, message: str) -> &T {
     switch o {
         case .Some as &v do return v;
-        case #default {
+        case _ {
             assert(false, message);
             return .{};
         }
@@ -147,7 +147,7 @@ Optional.or_return :: #match {
     macro (o: ?$T) -> T {
         switch value := o; value {
             case .Some as v do return v;
-            case #default {
+            case _ {
                 return return .{};
             }
         }
@@ -155,7 +155,7 @@ Optional.or_return :: #match {
     macro (o: ?$T, return_value: $R) -> T {
         switch value := o; value {
             case .Some as v do return v;
-            case #default {
+            case _ {
                 return return return_value;
             }
         }
@@ -232,7 +232,7 @@ Optional.try :: macro (body: Code, catch: Code = []{}) -> bool {
 
 Optional.hash :: (o: ?$T/core.hash.Hashable) => switch o {
     case .Some as v => core.hash.hash(v);
-    case #default => 0;
+    case _          => 0;
 }
 
 #operator == (o1, o2: ?$T) -> bool {
@@ -247,14 +247,14 @@ Optional.hash :: (o: ?$T/core.hash.Hashable) => switch o {
 #operator ?? macro (opt: ?$T, default: T) -> T {
     return switch value := opt; value {
         case .Some as v => v;
-        case #default => default;
+        case _          => default;
     };
 }
 
 #operator ?? macro (opt: ?$T, catch: Code) -> T {
     switch value := opt; value {
         case .Some as v do return v;
-        case #default ---
+        case _ ---
     }
 
     #unquote catch;
@@ -263,7 +263,7 @@ Optional.hash :: (o: ?$T/core.hash.Hashable) => switch o {
 #operator ? macro (opt: ?$T) -> T {
     switch value := opt; value {
         case .Some as v do return v;
-        case #default do return return .{};
+        case _ do return return .{};
     }
 }
 

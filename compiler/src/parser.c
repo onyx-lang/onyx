@@ -579,6 +579,16 @@ static AstCall* parse_function_call(OnyxParser *parser, AstTyped *callee) {
     return call_node;
 }
 
+static b32 parse_placeholder(OnyxParser* parser) {
+    OnyxToken *sym = peek_token(0);
+    if (sym->type != Token_Type_Symbol) return 0;
+    if (sym->length != 1) return 0;
+    if (sym->text[0] != '_') return 0;
+
+    consume_token(parser);
+    return 1;
+}
+
 static AstTyped* parse_factor(OnyxParser* parser) {
     AstTyped* retval = NULL;
 
@@ -1622,7 +1632,10 @@ static AstSwitchCase* parse_case_stmt(OnyxParser* parser) {
     AstSwitchCase *sc_node = make_node(AstSwitchCase, Ast_Kind_Switch_Case);
     sc_node->token = expect_token(parser, Token_Type_Keyword_Case);
 
-    if (parse_possible_directive(parser, "default")) {
+    if (
+        parse_possible_directive(parser, "default") ||
+        parse_placeholder(parser)
+    ) {
         sc_node->is_default = 1;
 
     } else {

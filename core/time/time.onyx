@@ -228,7 +228,7 @@ strftime :: (w: &io.Writer, format_: [] u8, tm: &Timestamp) {
                 }
             }
 
-            case #default {
+            case _ {
                 io.write(w, c);
             }
         }
@@ -435,7 +435,7 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                         string.advance(&buf);
                     }
 
-                    case #default {
+                    case _ {
                         working = false;
                     }
                 }
@@ -445,7 +445,7 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                 string.strip_leading_whitespace(&buf);
             }
 
-            case #default {
+            case _ {
                 if c != buf[0] {
                     working = false;
 
