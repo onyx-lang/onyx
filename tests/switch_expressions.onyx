@@ -24,7 +24,7 @@ quick_map_test :: () {
             case 4 => .Val1;
             case 5 => .Val2;
             case 6 => .Val3;
-            case #default => .Val1;
+            case _ => .Val1;
         };
     }
 }

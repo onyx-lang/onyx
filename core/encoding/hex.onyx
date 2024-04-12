@@ -27,7 +27,7 @@ decode :: (s: str, allocator := context.allocator) -> str {
             case #char "0" .. #char "9" => it - #char "0";
             case #char "a" .. #char "f" => it - #char "a" + 10;
             case #char "A" .. #char "F" => it - #char "A" + 10;
-            case #default => 0;
+            case _ => 0;
         };
     }
 }

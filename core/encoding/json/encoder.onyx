@@ -137,7 +137,7 @@ encode :: #match {
                 io.write_byte(w, #char "}");
             }
 
-            case #default {
+            case _ {
                 return .Unsupported_Type;
             }
         }
@@ -252,7 +252,7 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
             }
         }
 
-        case #default {
+        case _ {
             return .Unsupported_Type;
         }
     }

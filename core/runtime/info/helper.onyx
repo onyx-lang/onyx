@@ -203,7 +203,7 @@ size_of :: (t: type_expr) -> u32 {
             return size_of(d.base_type);
         }
 
-        case #default => 0;
+        case _ => 0;
     };
 }
 

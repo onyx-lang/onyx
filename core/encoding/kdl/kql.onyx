@@ -247,7 +247,7 @@ operate_on_values :: (v1, v2: Value, op: AttributeOp) -> bool {
         case .EndsWith   => string.ends_with(left, right);
         case .Contains   => string.contains(left, right);
 
-        case #default => false;
+        case _ => false;
     };
 }
 
@@ -371,7 +371,7 @@ parse_selector :: (p: &QueryParser) -> &Selector {
                     case '>' => SelectorOp.Child;
                     case '+' => .Neighbor;
                     case '~' => .Sibling;
-                    case #default => .Descendant;
+                    case _ => .Descendant;
                 };
 
                 if segment.op->unwrap() != .Descendant {

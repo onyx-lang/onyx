@@ -129,10 +129,10 @@ free_value :: (al: Allocator, v: &Value) {
                 string.free(s, al);
             } 
 
-            case #default ---
+            case _ ---
         }
 
-        case #default ---
+        case _ ---
     }
 }
 
