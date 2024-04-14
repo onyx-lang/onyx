@@ -2654,6 +2654,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Zero_Value: break;
         case Ast_Kind_Interface: break;
         case Ast_Kind_Compiler_Extension: break;
+        case Ast_Kind_Procedural_Macro: break;
 
         default:
             retval = Check_Error;

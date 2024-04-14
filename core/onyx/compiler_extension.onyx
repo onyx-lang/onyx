@@ -2,7 +2,10 @@
 package onyx.compiler_extension
 #allow_stale_code
 
-use core {stdio}
+use core {
+    stdio
+    Result
+}
 use core.alloc {package, arena}
 use core.encoding.osad
 use core.io
@@ -24,6 +27,7 @@ IncomingMessage :: union {
     ExpandMacro: struct {
         id: u32
         location: ExpansionLocation
+        position: Position
         macro_name: str
         body: str
     }
@@ -33,7 +37,6 @@ OutgoingMessage :: union {
     Init: struct {
         protocol_version: u32
         name: str
-        procedural_macros: [] str
     }
 
     ErrorReport: struct {
@@ -44,7 +47,7 @@ OutgoingMessage :: union {
 
     Expansion: struct {
         id: u32
-        code: str
+        code: Result(str, ExpansionFailureReason)
     }
 
     InjectCode: struct {
@@ -56,6 +59,17 @@ ExpansionLocation :: enum {
     Expression
     Statement
     TopLevelStatement
+}
+
+ExpansionFailureReason :: enum {
+    NotSupported
+    BadSyntax
+}
+
+Position :: struct {
+    filename: str
+    line: u32
+    column: u32
 }
 
 
@@ -77,10 +91,6 @@ ExtensionContext.make :: (name: str) -> (res: ExtensionContext) {
     return
 }
 
-ExtensionContext.register_proc_macro :: (self: &#Self, name: str) {
-    self.proc_macros->push(name)
-}
-
 ExtensionContext.start :: (self: &#Self, callback: (&#Self, msg: IncomingMessage) -> void) {
     use stdin_reader := io.Reader.make(&stdio.stream)
 
@@ -95,8 +105,7 @@ ExtensionContext.start :: (self: &#Self, callback: (&#Self, msg: IncomingMessage
                 self->send(.{
                     Init = .{
                         protocol_version = self.protocol_version,
-                        name = self.name,
-                        procedural_macros = self.proc_macros
+                        name = self.name
                     }
                 })
             }
@@ -107,6 +116,8 @@ ExtensionContext.start :: (self: &#Self, callback: (&#Self, msg: IncomingMessage
                 callback(self, msg)
             }
         }
+
+        alloc.arena.clear(&self.arena)
     }
 }
 

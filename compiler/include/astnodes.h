@@ -1899,10 +1899,19 @@ typedef struct DefinedVariable {
     char *value;
 } DefinedVariable;
 
+
+typedef enum ProceduralMacroExpansionKind {
+    PMEK_Expression,
+    PMEK_Statement,
+    PMEK_Top_Level
+} ProceduralMacroExpansionKind;
+
 typedef struct CompilerExtension {
     u32 pid;
     u32 send_file;
     u32 recv_file;
+
+    bh_arr(char *) registered_proc_macros;
 
     bh_arena arena;
 } CompilerExtension;
@@ -2220,6 +2229,12 @@ void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved);
 
 // Compiler Extensions
 i32 compiler_extension_start(const char *name);
+AstNode* compiler_extension_expand_macro(
+    int extension_id,
+    ProceduralMacroExpansionKind kind,
+    const char *macro_name,
+    OnyxToken *body,
+    Entity *entity);
 
 
 // NOTE: Useful inlined functions

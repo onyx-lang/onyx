@@ -70,5 +70,8 @@ void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstKind kind);
 OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer);
 void onyx_parser_free(OnyxParser* parser);
 void onyx_parse(OnyxParser *parser);
+AstTyped *onyx_parse_expression(OnyxParser *parser, Scope *scope);
+AstNode  *onyx_parse_statement(OnyxParser *parser, Scope *scope);
+void onyx_parse_top_level_statements(OnyxParser *parser, Scope *scope);
 
 #endif // #ifndef ONYXPARSER_H

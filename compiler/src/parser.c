@@ -887,9 +887,9 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             char_lit->token = expect_token(parser, Token_Type_Literal_Char);
             char_lit->was_char_literal = 1;
 
-            i8 dest = '\0';
+            char dest[2];
             i32 length = string_process_escape_seqs((char *) &dest, char_lit->token->text, 1);
-            char_lit->value.i = (u32) dest;
+            char_lit->value.i = (u32) dest[0];
 
             if (length != 1) {
                 onyx_report_error(char_lit->token->pos, Error_Critical, "Expected only a single character in character literal.");
@@ -954,9 +954,9 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 char_lit->token = expect_token(parser, Token_Type_Literal_String);
                 char_lit->was_char_literal = 1;
 
-                i8 dest = '\0';
+                char dest[2];
                 i32 length = string_process_escape_seqs((char *) &dest, char_lit->token->text, 1);
-                char_lit->value.i = (u32) dest;
+                char_lit->value.i = (u32) dest[0];
 
                 if (length != 1) {
                     onyx_report_error(char_lit->token->pos, Error_Critical, "Expected only a single character in character literal.");
@@ -4556,6 +4556,25 @@ void onyx_parser_free(OnyxParser* parser) {
     bh_arr_free(parser->stored_tags);
     bh_arr_free(parser->current_function_stack);
     bh_arr_free(parser->documentation_tokens);
+}
+
+AstTyped *onyx_parse_expression(OnyxParser *parser, Scope *scope) {
+    parser->current_scope = scope;
+    AstTyped *expr = parse_expression(parser, 0);
+
+    return expr;
+}
+
+AstNode  *onyx_parse_statement(OnyxParser *parser, Scope *scope) {
+    parser->current_scope = scope;
+    AstNode *stmt = parse_statement(parser);
+
+    return stmt;
+}
+
+void onyx_parse_top_level_statements(OnyxParser *parser, Scope *scope) {
+    parser->current_scope = scope;
+    parse_top_level_statements_until(parser, Token_Type_End_Stream);
 }
 
 void onyx_parse(OnyxParser *parser) {

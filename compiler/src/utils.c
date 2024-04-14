@@ -374,6 +374,18 @@ all_types_peeled_off:
             return NULL;
         }
 
+        case Ast_Kind_Compiler_Extension: {
+            AstCompilerExtension *ext = (AstCompilerExtension *) node;
+
+            bh_arr_each(AstProceduralMacro *, pmac, ext->proc_macros) {
+                if (token_text_equals((*pmac)->token, symbol)) {
+                    return (AstNode *) *pmac;
+                }
+            }
+
+            return NULL;
+        }
+
         default: break;
     }
 
