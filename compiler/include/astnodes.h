@@ -1705,6 +1705,7 @@ typedef enum EntityType {
     Entity_Type_String_Literal,
     Entity_Type_File_Contents,
     Entity_Type_Compiler_Extension,
+    Entity_Type_Procedural_Expansion,
     Entity_Type_Enum,
     Entity_Type_Enum_Value,
     Entity_Type_Type_Alias,
@@ -1779,6 +1780,7 @@ typedef struct Entity {
         EntityJobData         *job_data;
         AstJsNode             *js;
         AstCompilerExtension  *compiler_extension;
+        AstProceduralExpansion *proc_expansion;
     };
 } Entity;
 

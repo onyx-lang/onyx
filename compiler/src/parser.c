@@ -2106,6 +2106,24 @@ static AstNode* parse_statement(OnyxParser* parser) {
     return retval;
 }
 
+static AstNode *parse_statements_until(OnyxParser *parser, TokenType end_token) {
+    AstNode **next = NULL;
+    AstNode *root = NULL;
+    while (!consume_token_if_next(parser, end_token)) {
+        AstNode *stmt = parse_statement(parser);
+        if (!root) {
+            root = stmt;
+            next = &root->next;
+        } else {
+            *next = stmt;
+            while (stmt->next != NULL)  stmt = stmt->next;
+            next = &stmt->next;
+        }
+    }
+
+    return root;
+}
+
 static AstBlock* parse_block(OnyxParser* parser, b32 make_a_new_scope, char* block_name) {
     AstBlock* block = make_node(AstBlock, Ast_Kind_Block);
     block->rules = Block_Rule_Normal;
@@ -3908,6 +3926,16 @@ static void parse_implicit_injection(OnyxParser* parser) {
         return;
     }
 
+    if (peek_token(0)->type == Token_Type_Proc_Macro_Body) {
+        AstProceduralExpansion *proc_expand = make_node(AstProceduralExpansion, Ast_Kind_Procedural_Expansion);
+        proc_expand->token = injection_expression->token;
+        proc_expand->expansion_body = expect_token(parser, Token_Type_Proc_Macro_Body);
+        proc_expand->proc_macro = (AstTyped *) injection_expression;
+
+        ENTITY_SUBMIT(proc_expand);
+        return;
+    }
+
     AstInjection *inject = make_node(AstInjection, Ast_Kind_Injection);
     inject->token = injection_expression->token;
     inject->full_loc = (AstTyped *) injection_expression;
@@ -4567,7 +4595,7 @@ AstTyped *onyx_parse_expression(OnyxParser *parser, Scope *scope) {
 
 AstNode  *onyx_parse_statement(OnyxParser *parser, Scope *scope) {
     parser->current_scope = scope;
-    AstNode *stmt = parse_statement(parser);
+    AstNode *stmt = parse_statements_until(parser, Token_Type_End_Stream);
 
     return stmt;
 }

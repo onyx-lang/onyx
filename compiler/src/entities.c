@@ -439,6 +439,14 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             break;
         }
 
+        case Ast_Kind_Procedural_Expansion: {
+            ent.type = Entity_Type_Procedural_Expansion;
+            ent.proc_expansion = (AstProceduralExpansion *) node;
+            ent.state = Entity_State_Resolve_Symbols;
+            ENTITY_INSERT(ent);
+            break;
+        }
+
         default: {
             ent.type = Entity_Type_Expression;
             ent.expr = (AstTyped *) node;
