@@ -1910,10 +1910,10 @@ typedef enum ProceduralMacroExpansionKind {
 
 typedef struct CompilerExtension {
     u32 pid;
-    u32 send_file;
-    u32 recv_file;
+    u64 send_file;
+    u64 recv_file;
 
-    bh_arr(char *) registered_proc_macros;
+    char *name;
 
     bh_arena arena;
 } CompilerExtension;
@@ -1996,6 +1996,7 @@ struct Context {
     struct OnyxDocInfo     *doc_info;
 
     bh_arr(CompilerExtension) extensions;
+    u32 next_expansion_id;
 
     CheckerData checker;
     ContextCaches caches;
@@ -2231,12 +2232,14 @@ void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved);
 
 // Compiler Extensions
 i32 compiler_extension_start(const char *name);
-AstNode* compiler_extension_expand_macro(
+TypeMatch compiler_extension_expand_macro(
     int extension_id,
     ProceduralMacroExpansionKind kind,
     const char *macro_name,
     OnyxToken *body,
-    Entity *entity);
+    Entity *entity,
+    AstNode **out_node,
+    u32 *out_expansion_id);
 
 
 // NOTE: Useful inlined functions

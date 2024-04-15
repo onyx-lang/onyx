@@ -40,8 +40,7 @@ OutgoingMessage :: union {
     }
 
     ErrorReport: struct {
-        line: u32
-        column: u32
+        position: Position
         msg: str
     }
 
@@ -70,6 +69,7 @@ Position :: struct {
     filename: str
     line: u32
     column: u32
+    length: u32
 }
 
 
