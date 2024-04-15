@@ -1931,6 +1931,7 @@ struct CompileOptions {
     b32 print_static_if_results : 1;
     b32 no_colors               : 1;
     b32 no_file_contents        : 1;
+    b32 no_compiler_extensions  : 1;
 
     b32 use_post_mvp_features : 1;
     b32 use_multi_threading   : 1;

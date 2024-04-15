@@ -2046,6 +2046,11 @@ static SymresStatus symres_js_node(AstJsNode* js) {
 }
 
 static SymresStatus symres_compiler_extension(AstCompilerExtension *ext) {
+    if (context.options->no_compiler_extensions) {
+        onyx_report_error(ext->token->pos, Error_Critical, "Compiler extensions are disabled in this compilation.");
+        return Symres_Error;
+    }
+
     token_toggle_end(ext->name);
     i32 extension_id = compiler_extension_start(ext->name->text);
     token_toggle_end(ext->name);

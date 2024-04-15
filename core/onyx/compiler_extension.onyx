@@ -126,3 +126,24 @@ ExtensionContext.send :: (self: &#Self, msg: OutgoingMessage) {
 
     osad.serialize(msg, &stdout_writer)
 }
+
+
+map_position :: (base_pos: Position, pos: Position) => {
+    line := do {
+        if pos.line == 1 do return base_pos.line;
+        return pos.line + base_pos.line - 1;
+    };
+
+    column := do {
+        if pos.line == 1 do return base_pos.column + pos.column - 1;
+        return pos.column;
+    };
+
+    return Position.{
+        filename = base_pos.filename,
+        line = line,
+        column = column,
+        length = pos.length
+    };
+}
+

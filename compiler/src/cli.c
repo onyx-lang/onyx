@@ -94,6 +94,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     C_LBLUE "    --print-static-if-results   " C_NORM "Prints the conditional result of every " C_YELLOW "#if" C_NORM " statement\n"
     "\n"
     C_LBLUE "    --no-file-contents          " C_NORM "Disables " C_YELLOW "#file_contents" C_NORM " for security\n"
+    C_LBLUE "    --no-compiler-extensions    " C_NORM "Disables " C_YELLOW "#compiler_extension" C_NORM " for security\n"
     "\n";
 
 static const char *self_upgrade_docstring = DOCSTRING_HEADER
@@ -270,6 +271,9 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
         }
         else if (!strcmp(argv[i], "--no-file-contents")) {
             options->no_file_contents = 1;
+        }
+        else if (!strcmp(argv[i], "--no-compiler-extensions")) {
+            options->no_compiler_extensions = 1;
         }
         else if (!strcmp(argv[i], "--wasm-mvp")) {
             options->use_post_mvp_features = 0;

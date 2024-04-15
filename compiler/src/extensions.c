@@ -285,7 +285,20 @@ TypeMatch compiler_extension_expand_macro(
                 pos.line = line;
                 pos.filename = body->pos.filename;
                 pos.length = length;
-                pos.line_start = body->pos.line_start; // FIXME This is wrong...
+
+                i32 line_diff = line - body->pos.line;
+                if (line_diff == 0) {
+                    pos.line_start = body->pos.line_start; 
+                } else {
+                    char *c = body->text;
+                    while (*c && line_diff > 0) {
+                        while (*c && *c != '\n') c++;
+                        line_diff -= 1;
+                        c++;
+                    }
+
+                    pos.line_start = c;
+                }
 
                 onyx_report_error(pos, Error_Critical, msg);
                 break;
@@ -314,7 +327,7 @@ TypeMatch compiler_extension_expand_macro(
                     switch (reason) {
                         // TODO: Make this an enum
                         case 0: onyx_report_error(body->pos, Error_Critical, "Macro expansion '%s' is not supported by '%s'.", macro_name, ext->name); break;
-                        case 1: onyx_report_error(body->pos, Error_Critical, "Macro expansion '%s' failed because of a syntax error.", macro_name); break;
+                        // case 1: onyx_report_error(body->pos, Error_Critical, "Macro expansion '%s' failed because of a syntax error.", macro_name); break;
                     }
                     return TYPE_MATCH_FAILED;
                 }
