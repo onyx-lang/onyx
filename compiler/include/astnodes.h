@@ -2234,7 +2234,7 @@ void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved);
 
 
 // Compiler Extensions
-i32 compiler_extension_start(const char *name);
+i32 compiler_extension_start(const char *name, const char *containing_filename);
 TypeMatch compiler_extension_expand_macro(
     int extension_id,
     ProceduralMacroExpansionKind kind,

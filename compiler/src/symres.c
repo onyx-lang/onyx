@@ -2052,7 +2052,7 @@ static SymresStatus symres_compiler_extension(AstCompilerExtension *ext) {
     }
 
     token_toggle_end(ext->name);
-    i32 extension_id = compiler_extension_start(ext->name->text);
+    i32 extension_id = compiler_extension_start(ext->name->text, ext->token->pos.filename);
     token_toggle_end(ext->name);
 
     if (extension_id < 0) {
