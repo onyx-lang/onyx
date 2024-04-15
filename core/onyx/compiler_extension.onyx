@@ -24,13 +24,7 @@ IncomingMessage :: union {
     Terminate: struct {
     }
 
-    ExpandMacro: struct {
-        id: u32
-        location: ExpansionLocation
-        position: Position
-        macro_name: str
-        body: str
-    }
+    ExpandMacro: ExpansionInfo
 }
 
 OutgoingMessage :: union {
@@ -52,6 +46,14 @@ OutgoingMessage :: union {
     InjectCode: struct {
         code: str
     }
+}
+
+ExpansionInfo :: struct {
+    id: u32
+    location: ExpansionLocation
+    position: Position
+    macro_name: str
+    body: str
 }
 
 ExpansionLocation :: enum {
@@ -78,7 +80,7 @@ Position :: struct {
 ExtensionContext :: struct {
     protocol_version: u32
     name: str
-    proc_macros: [..] str
+    proc_macros: Map(str, #type (&ExtensionContext, ExpansionInfo) -> Result(str, ExpansionFailureReason))
 
     arena: arena.Arena
 }
@@ -87,6 +89,7 @@ ExtensionContext.make :: (name: str) -> (res: ExtensionContext) {
     res.name = name
     res.protocol_version = 1
 
+    res.proc_macros = make(typeof res.proc_macros)
     res.arena = arena.make(context.allocator, 32 * 1024)
     return
 }
@@ -112,7 +115,23 @@ ExtensionContext.start :: (self: &#Self, callback: (&#Self, msg: IncomingMessage
 
             case .Terminate do break break
 
-            case #default {
+            case .ExpandMacro as em {
+                if self.proc_macros->has(em.macro_name) {
+                    handler := self.proc_macros->get(em.macro_name)->unwrap()
+                    result  := handler(self, em)
+                    self->send(.{
+                        Expansion = .{
+                            id = em.id,
+                            code = result
+                        }
+                    })
+
+                } else {
+                    fallthrough
+                }
+            }
+
+            case _ {
                 callback(self, msg)
             }
         }
@@ -125,6 +144,10 @@ ExtensionContext.send :: (self: &#Self, msg: OutgoingMessage) {
     use stdout_writer := io.Writer.make(&stdio.stream)
 
     osad.serialize(msg, &stdout_writer)
+}
+
+ExtensionContext.handle_macro :: (self: &#Self, name: str, func: (&ExtensionContext, ExpansionInfo) -> Result(str, ExpansionFailureReason)) {
+    self.proc_macros->put(name, func)
 }
 
 
