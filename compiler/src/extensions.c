@@ -2,7 +2,6 @@
 #include "astnodes.h"
 #include "parser.h"
 #include "utils.h"
-#include <signal.h>
 
 #define MSG_HOST_INIT          0
 #define MSG_HOST_TERMINATE     1
@@ -15,6 +14,8 @@
 
 
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+#include <signal.h>
+#include <sys/wait.h>
 
 static void extension_send(CompilerExtension *ext, void *data, i32 len) {
     i32 wrote = 0;
@@ -89,7 +90,7 @@ static i32 extension_recv(CompilerExtension *ext, void *buf, i32 maxlen) {
 static void extension_kill(CompilerExtension *ext) {
 }
 
-static b32 compiler_extension_spawn(CompilerExtension *ext, const char *path) {
+static b32 extension_spawn(CompilerExtension *ext, const char *path) {
     printf("Compiler extensions are currently not support on Windows. Sorry! :(\n");
     return 0;
 }
