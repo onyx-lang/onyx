@@ -1916,6 +1916,8 @@ typedef struct CompilerExtension {
     char *name;
 
     bh_arena arena;
+
+    b32 alive : 1;
 } CompilerExtension;
 
 typedef struct CompileOptions CompileOptions;

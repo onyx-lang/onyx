@@ -17,19 +17,32 @@
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
 
 static void extension_send(CompilerExtension *ext, void *data, i32 len) {
+    if (!ext->alive) return;
+
     i32 wrote = 0;
     while (wrote < len) {
         i32 w = write(ext->send_file, bh_pointer_add(data, wrote), len - wrote);
         if (w > 0) wrote += w;
-        else       return;
+        else {
+            ext->alive = 0;
+            return;
+        }
     }
 }
 
 static i32 extension_recv(CompilerExtension *ext, void *buf, i32 maxlen) {
-    return read(ext->recv_file, buf, maxlen);
+    if (!ext->alive) return 0;
+
+    i32 bytes_read = read(ext->recv_file, buf, maxlen);
+    if (bytes_read < 0) {
+        ext->alive = 0;
+        return 0;
+    }
+    return bytes_read;
 }
 
 static void extension_kill(CompilerExtension *ext) {
+    ext->alive = 0;
     kill(ext->pid, SIGKILL);
     int status;
     waitpid(ext->pid, &status, 0);
@@ -154,6 +167,8 @@ i32 compiler_extension_start(const char *name) {
         return -1;
     }
 
+    ext.alive = 1;
+
     b32 compiler_extension_negotiate_capabilities(CompilerExtension *ext);
     b32 negotiated = compiler_extension_negotiate_capabilities(&ext);
     if (!negotiated) {
@@ -234,6 +249,8 @@ TypeMatch compiler_extension_expand_macro(
 
     CompilerExtension *ext = &context.extensions[extension_id];
     bh_arena_clear(&ext->arena);
+
+    if (!ext->alive) return TYPE_MATCH_FAILED;
 
     *expansion_id = ++context.next_expansion_id;
     
