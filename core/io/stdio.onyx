@@ -186,24 +186,24 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
 //
 // The v-table for the stream in stdio.
 #local stdio_vtable := io.Stream_Vtable.{
-    read = (_: &io.Stream, buffer: [] u8) -> (io.Error, u32) {
+    read = (_: &io.Stream, buffer: [] u8) -> Result(u32, io.Error) {
         __flush_stdio();
         bytes_read := runtime.platform.__read_from_input(buffer);
-        if bytes_read <= 0 do return .EOF, 0;
+        if bytes_read <= 0 do return .{ Err = .EOF };
 
-        return .None, bytes_read;
+        return .{ Ok = bytes_read };
     },
 
-    read_byte = (_: &io.Stream) -> (io.Error, u8) {
+    read_byte = (_: &io.Stream) -> Result(u8, io.Error) {
         __flush_stdio();
         buf: [1] u8;
         bytes_read := runtime.platform.__read_from_input(buf);
-        if bytes_read <= 0 do return .EOF, 0;
+        if bytes_read <= 0 do return .{ Err = .EOF };
 
-        return .None, buf[0];
+        return .{ Ok = buf[0] };
     },
 
-    write = (_: &io.Stream, buffer: [] u8) -> (io.Error, u32) {
+    write = (_: &io.Stream, buffer: [] u8) -> Result(u32, io.Error) {
         return io.stream_write(&stdio.print_stream, buffer);
     },
 
@@ -216,11 +216,11 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
         return .None;
     },
 
-    poll = (_: &io.Stream, ev: io.PollEvent, timeout: i32) -> (io.Error, bool) {
+    poll = (_: &io.Stream, ev: io.PollEvent, timeout: i32) -> Result(bool, io.Error) {
         // TODO: This might not be right, as maybe sometimes you can't actually
         // write because a the output was closed?
-        if ev == .Write do return .None, true;
+        if ev == .Write do return .{ Ok = true };
 
-        return .None, runtime.platform.__wait_for_input(timeout);
+        return .{ Ok = runtime.platform.__wait_for_input(timeout) };
     }
 }

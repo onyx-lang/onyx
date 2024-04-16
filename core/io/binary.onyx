@@ -48,7 +48,7 @@ binary_reader_make :: (s: &Stream) -> BinaryReader {
 }
 
 binary_read_byte :: (use br: &BinaryReader) -> u8 {
-    _, byte := stream_read_byte(stream);
+    byte := stream_read_byte(stream).Ok ?? 0;
     return byte;
 }
 

@@ -388,24 +388,24 @@ socket_recvfrom :: (s: &Socket, buffer: [] u8) -> ? SocketRecvFromResult {
 
 
 #local __net_socket_vtable := io.Stream_Vtable.{
-    read = (use s: &Socket, buffer: [] u8) -> (io.Error, u32) {
-        if cast(i32) handle == 0 do return .BadFile, 0;
-        if !s->is_alive() do return .EOF, 0;
+    read = (use s: &Socket, buffer: [] u8) -> Result(u32, io.Error) {
+        if cast(i32) handle == 0 do return .{ Err = .BadFile };
+        if !s->is_alive() do return .{ Err = .EOF };
         
         res := runtime.platform.__net_sock_recv(handle, buffer);
-        res->ok()->with([bytes_read] {
-            if bytes_read == 0 do return .EOF, 0;
+        res.Ok->with([bytes_read] {
+            if bytes_read == 0 do return .{ Err = .EOF };
 
-            return .None, bytes_read;
+            return .{ Ok = bytes_read };
         });
 
-        res->err()->with([err] {
-            if err == .NoData do return .ReadLater, 0;
+        res.Err->with([err] {
+            if err == .NoData do return .{ Err = .ReadLater };
             if err == .EOF {
                 socket_close(s);
             }
 
-            return err, 0;
+            return .{ Err = err };
         });
     },
 
@@ -426,9 +426,9 @@ socket_recvfrom :: (s: &Socket, buffer: [] u8) -> ? SocketRecvFromResult {
         return .BufferFull;
     },
 
-    write = (use s: &Socket, buffer: [] u8) -> (io.Error, u32) {
-        if cast(i32) handle == 0 do return .BadFile, 0;
-        if !s->is_alive() do return .EOF, 0;
+    write = (use s: &Socket, buffer: [] u8) -> Result(u32, io.Error) {
+        if cast(i32) handle == 0 do return .{ Err = .BadFile };
+        if !s->is_alive() do return .{ Err = .EOF };
         
         res := runtime.platform.__net_sock_send(handle, buffer);
         res->err()->with([err] {
@@ -436,23 +436,23 @@ socket_recvfrom :: (s: &Socket, buffer: [] u8) -> ? SocketRecvFromResult {
                 socket_close(s);
             }
 
-            return err, 0;
+            return .{ Err = err };
         });
 
-        return .None, res->ok()->unwrap();
+        return .{ Ok = res->ok()->unwrap() };
     },
 
-    poll = (use s: &Socket, ev: io.PollEvent, timeout: i32) -> (io.Error, bool) {
-        if ev == .Write do return .None, true;
-        if !s->is_alive() do return .None, false;
+    poll = (use s: &Socket, ev: io.PollEvent, timeout: i32) -> Result(bool, io.Error) {
+        if ev == .Write do return .{ Ok = true };
+        if !s->is_alive() do return .{ Ok = false };
 
         status := socket_poll(s, timeout);
 
         if status == .Closed {
-            return .EOF, false;
+            return .{ Err = .EOF };
         }
 
-        return .None, status == .Readable;
+        return .{ Ok = status == .Readable };
     },
 
     close = (use p: &Socket) -> io.Error {

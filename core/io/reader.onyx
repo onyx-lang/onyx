@@ -644,11 +644,13 @@ lines :: (r: &Reader, inplace := false, allocator := context.allocator) =>
     // 'stream_poll' that tests if the next read would block, but that
     // can happen later.
     if end > 0 && stream.flags & .Block_On_Read {
-        _, data_available := stream_poll(stream, .Read, 0);
+        data_available := stream_poll(stream, .Read, 0).Ok ?? false;
         if !data_available do return .None;
     }
 
-    err, n := stream_read(stream, buffer[end .. buffer.count]);
+    read_result := stream_read(stream, buffer[end .. buffer.count]);
+    err := read_result.Err ?? Error.None;
+    n   := read_result.Ok ?? 0;
     
     //
     // ReadPending is not an error, just a signal that data is not ready

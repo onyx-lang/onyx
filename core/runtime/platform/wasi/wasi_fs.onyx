@@ -177,62 +177,62 @@ __file_stream_vtable := io.Stream_Vtable.{
         return .None;
     },
 
-    tell = (use fs: &os.File) -> (io.Error, u32) {
+    tell = (use fs: &os.File) -> Result(u32, io.Error) {
         location : wasi.Filesize;
         error := wasi.fd_tell(data.fd, &location);
-        if error != .Success do return .BadFile, 0;
+        if error != .Success do return .{ Err = .BadFile };
 
-        return .None, ~~location;
+        return .{ Ok = ~~location };
     },
 
-    read = (use fs: &os.File, buffer: [] u8) -> (io.Error, u32) {
+    read = (use fs: &os.File, buffer: [] u8) -> Result(u32, io.Error) {
         bytes_read : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
         error := wasi.fd_read(data.fd, &vec, 1, &bytes_read);
-        if error != .Success do return .BadFile, 0;
+        if error != .Success do return .{ Err = .BadFile };
 
-        return .None, bytes_read;
+        return .{ Ok = bytes_read };
     },
 
-    read_at = (use fs: &os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
+    read_at = (use fs: &os.File, at: u32, buffer: [] u8) -> Result(u32, io.Error) {
         bytes_read : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
         error := wasi.fd_pread(data.fd, &vec, 1, ~~at, &bytes_read);
 
         // FIX: Maybe report io.Error.OutOfBounds if the 'at' was out of bounds?
-        if error != .Success do return .BadFile, 0;
+        if error != .Success do return .{ Err = .BadFile };
 
-        return .None, bytes_read;
+        return .{ Ok = bytes_read };
     },
 
-    read_byte = (use fs: &os.File) -> (io.Error, u8) {
+    read_byte = (use fs: &os.File) -> Result(u8, io.Error) {
         bytes_read : wasi.Size;
         byte  : u8;
         vec   := IOVec.{ buf = cast(u32) &byte, len = 1};
         error := wasi.fd_read(data.fd, &vec, 1, &bytes_read);
-        if error != .Success do return .BadFile, 0;
+        if error != .Success do return .{ Err = .BadFile };
 
-        return .None, byte;
+        return .{ Ok = byte };
     },
 
-    write = (use fs: &os.File, buffer: [] u8) -> (io.Error, u32) {
+    write = (use fs: &os.File, buffer: [] u8) -> Result(u32, io.Error) {
         bytes_written : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
         error := wasi.fd_write(data.fd, &vec, 1, &bytes_written);
-        if error != .Success do return .BadFile, 0;
+        if error != .Success do return .{ Err = .BadFile };
 
-        return .None, bytes_written;
+        return .{ Ok = bytes_written };
     },
 
-    write_at = (use fs: &os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
+    write_at = (use fs: &os.File, at: u32, buffer: [] u8) -> Result(u32, io.Error) {
         bytes_written : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
         error := wasi.fd_pwrite(data.fd, &vec, 1, ~~at, &bytes_written);
 
         // FIX: Maybe report io.Error.OutOfBounds if the 'at' was out of bounds?
-        if error != .Success do return .BadFile, 0;
+        if error != .Success do return .{ Err = .BadFile };
 
-        return .None, bytes_written;
+        return .{ Ok = bytes_written };
     },
 
     write_byte = (use fs: &os.File, byte: u8) -> io.Error {
@@ -262,7 +262,7 @@ __file_stream_vtable := io.Stream_Vtable.{
         return ~~ file_stat.size;
     },
 
-    poll = (use fs: &os.File, ev: io.PollEvent, timeout: i32) -> (io.Error, bool) {
+    poll = (use fs: &os.File, ev: io.PollEvent, timeout: i32) -> Result(bool, io.Error) {
         p: [1] PollDescription = .[.{
             fd = data.fd,
             in_events = ev,
@@ -270,7 +270,7 @@ __file_stream_vtable := io.Stream_Vtable.{
 
         runtime.platform.__poll(p, timeout);
 
-        return .None, p[0].out_events == ev;
+        return .{ Ok = p[0].out_events == ev };
     }
 }
 
