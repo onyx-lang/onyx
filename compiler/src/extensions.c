@@ -111,6 +111,10 @@ static i32 extension_recv(CompilerExtension *ext, void *buf, i32 maxlen) {
     return 0;
 }
 
+static b32 extension_poll_recv(CompilerExtension *ext) {
+    return 0;
+}
+
 static void extension_kill(CompilerExtension *ext) {
 }
 
@@ -272,8 +276,6 @@ static AstNode * parse_code(ProceduralMacroExpansionKind kind, char *code, i32 c
     return result;
 }
 
-// TODO This function should return something like `TypeMatch`, and then have several
-// out parameters based on what happened: the generated node, errors, expansion id used, etc
 TypeMatch compiler_extension_expand_macro(
     int extension_id,
     ProceduralMacroExpansionKind kind,
