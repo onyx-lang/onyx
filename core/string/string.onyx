@@ -335,7 +335,7 @@ str.strip_leading_whitespace :: (s: &str) {
             s.count -= 1;
         }
 
-        case #default do return;
+        case _ do return;
     }
 }
 
@@ -356,7 +356,7 @@ str.strip_trailing_whitespace :: (s: &str) {
             s.count -= 1;
         }
 
-        case #default do return;
+        case _ do return;
     }
 }
 
@@ -533,7 +533,7 @@ str.read_alphanum :: (s: &str) -> str {
                 out.count += 1;
             }
 
-            case #default {
+            case _ {
                 break break;
             }
         }

@@ -370,7 +370,7 @@ format_va :: (output: &Format_Output, format: str, va: [] any) -> str {
                         continue continue;
                     }
 
-                    case #default do break break;
+                    case _ do break break;
                 }
             }
 
@@ -534,7 +534,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
             output->write(io.buffer_stream_to_str(&stream));
         }
 
-        case #default {
+        case _ {
             info := get_type_info(v.type);
 
             if info.kind == .Struct {
@@ -663,7 +663,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                     case i16, u16 do value = cast(u64) *(cast(&u16) v.data);
                     case i32, u32 do value = cast(u64) *(cast(&u32) v.data);
                     case i64, u64 do value = cast(u64) *(cast(&u64) v.data);
-                    case #default do assert(false, "Bad enum backing type");
+                    case _ do assert(false, "Bad enum backing type");
                 }
 
                 if !formatting.interpret_numbers {
@@ -721,7 +721,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                     case i16, u16 do tag_value = cast(u64) *(cast(&u16) v.data);
                     case i32, u32 do tag_value = cast(u64) *(cast(&u32) v.data);
                     case i64, u64 do tag_value = cast(u64) *(cast(&u64) v.data);
-                    case #default do assert(false, "Bad union backing type");
+                    case _ do assert(false, "Bad union backing type");
                 }
 
                 variant := array.first(u.variants, [x](x.tag_value == ~~tag_value));

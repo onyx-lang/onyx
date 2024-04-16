@@ -79,7 +79,7 @@ token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
         case #char "-" {
             switch data[offset] {
                 case #char "0" .. #char "9" ---
-                case #default {
+                case _ {
                     err.kind = .Illegal_Character;
                     err.pos  = token.position;
                     break break;
@@ -163,7 +163,7 @@ skip_whitespace :: (use tkn: ^Tokenizer) {
                 offset += 1;
             }
 
-            case #default {
+            case _ {
                 break break;
             }
         }
@@ -209,12 +209,12 @@ skip_escape :: (use tkn: ^Tokenizer) {
                          #char "A" .. #char "F",
                          #char "a" .. #char "f" ---
 
-                    case #default do return;
+                    case _ do return;
                 }
             }
         }
 
-        case #default {
+        case _ {
             next_character(tkn);
         }
     }

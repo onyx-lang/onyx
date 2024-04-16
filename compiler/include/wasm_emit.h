@@ -775,6 +775,8 @@ typedef struct OnyxWasmModule {
     i32 *tls_size_ptr;
     i32 *heap_start_ptr;
     u64 stack_base_idx;
+    u64 stack_restore_idx;
+    u64 stack_return_location_idx;
     u64 closure_base_idx;
     u64 stack_trace_idx;
     CallingConvention curr_cc;

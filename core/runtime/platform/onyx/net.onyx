@@ -54,7 +54,7 @@ __net_sock_bind :: (s: SocketData, addr: &SocketAddress) -> bool {
             return __net_bind_host(s, host.host, host.port);
         }
 
-        case #default do return false;
+        case _ do return false;
     }
 }
 
@@ -109,7 +109,7 @@ __net_sock_connect :: (s: SocketData, addr: &SocketAddress) -> io.Error {
     translate_error :: (s: SocketError) => switch s {
         case .None => io.Error.None;
         case .ConnectFailed => .ConnectFailed;
-        case #default => .OperationFailed;
+        case _ => .OperationFailed;
     }
 }
 

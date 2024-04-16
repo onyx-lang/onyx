@@ -26,7 +26,7 @@ Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
 Result.is_ok :: (r: #Self) -> bool {
     return switch r {
         case .Ok => true;
-        case #default => false;
+        case _   => false;
     };
 }
 
@@ -34,7 +34,7 @@ Result.is_ok :: (r: #Self) -> bool {
 Result.is_err :: (r: #Self) -> bool {
     return switch r {
         case .Err => true;
-        case #default => false;
+        case _ => false;
     };
 }
 
@@ -42,7 +42,7 @@ Result.is_err :: (r: #Self) -> bool {
 Result.ok :: (r: #Self) -> Optional(r.Ok_Type) {
     return switch r {
         case .Ok as v => Optional.make(v);
-        case #default => .{};
+        case _ => .{};
     };
 }
 
@@ -50,7 +50,7 @@ Result.ok :: (r: #Self) -> Optional(r.Ok_Type) {
 Result.err :: (r: #Self) -> Optional(r.Err_Type) {
     return switch r {
         case .Err as v => Optional.make(v);
-        case #default => .{};
+        case _ => .{};
     };
 }
 
@@ -72,7 +72,7 @@ Result.unwrap :: (r: #Self) -> r.Ok_Type {
 Result.unwrap_or_default :: (r: #Self) -> r.Ok_Type {
     return switch r {
         case .Ok as v => v;
-        case #default => .{};
+        case _ => .{};
     };
 }
 
@@ -81,7 +81,7 @@ Result.unwrap_or_default :: (r: #Self) -> r.Ok_Type {
 Result.expect :: (r: #Self, msg: str) -> r.Ok_Type {
     switch r {
         case .Ok as v do return v;
-        case #default {
+        case _ {
             assert(false, msg);
             return .{};
         }
@@ -110,7 +110,7 @@ Result.and_then :: (r: #Self, f: (r.Ok_Type) -> Result($R, r.Err_Type)) -> Resul
 Result.or_else :: (r: #Self, generate: () -> typeof r) => {
     return switch r {
         case .Ok as v   => v;
-        case #default => generate();
+        case _ => generate();
     };
 }
 

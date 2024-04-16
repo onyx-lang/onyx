@@ -84,7 +84,7 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
             return true;
         }
 
-        case #default {
+        case _ {
             if info.kind == .Enum {
                 val := str_to_i64(to_parse);
                 

@@ -113,7 +113,7 @@ parse_value :: (use parser: ^Parser) -> (Value, Error) {
             return_value = cast(^_Value) value;
         }
 
-        case #default {
+        case _ {
             consume_token(parser);
             return Value.{return_value}, .{ .Unexpected_Token, current.position };
         }
@@ -316,7 +316,7 @@ unescape_string :: (token: Token, allocator: Allocator) -> str {
                 }
             }
 
-            case #default {
+            case _ {
                 buffer[buffer_write] = c;
                 i += 1;
                 buffer_write += 1;

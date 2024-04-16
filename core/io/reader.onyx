@@ -560,7 +560,7 @@ skip_whitespace :: (use reader: &Reader) {
                 start += 1;
             }
 
-            case #default do return;
+            case _ do return;
         }
     }
 }

@@ -39,8 +39,9 @@ spawn :: (t: &Thread, data: &$T, func: (&T) -> void) {
     memory.set(tls_base, 0, __tls_size);
 
     stack_base := raw_alloc(alloc.heap_allocator, 1 << 20);
+    stack_top  := memory.ptr_add(stack_base, 1 << 20);
 
-    runtime.platform.__spawn_thread(t.id, tls_base, stack_base, func, data);
+    runtime.platform.__spawn_thread(t.id, tls_base, stack_top, func, data);
 }
 
 /// Waits for a thread to finish before returning.

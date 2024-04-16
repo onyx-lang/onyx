@@ -10,7 +10,7 @@ base16_to_hex :: (s: str) -> u32 {
             case #char "0" .. #char "9" do res += ~~(it - #char "0");
             case #char "a" .. #char "f" do res += ~~(it - #char "a" + 10);
             case #char "A" .. #char "F" do res += ~~(it - #char "A" + 10);
-            case #default do break break;
+            case _ do break break;
         }
     }
 
@@ -107,7 +107,7 @@ parse_packet :: (bit_provider: &BitIterator) -> &Packet {
             return p;
         }
 
-        case #default {
+        case _ {
             packets: [..] &Packet;
 
             l_type := read_bits(bit_provider, 1);
@@ -140,7 +140,7 @@ packet_sum_version :: (p: &Packet) -> u64 {
     switch p.type {
         case 4 do return ~~p.version;
 
-        case #default {
+        case _ {
             sum: u64;
             for (cast (&Packet_Operator) p).subpackets {
                 sum += packet_sum_version(it);

@@ -173,7 +173,7 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
             case 13 => #char "D";
             case 14 => #char "E";
             case 15 => #char "F";
-            case #default => #char "X";
+            case _ => #char "X";
         };
     }
 }

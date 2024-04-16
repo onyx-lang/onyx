@@ -198,7 +198,7 @@ write_escaped_str :: (use writer: &Writer, s: str) {
             case #char "\"" { write_byte(writer, #char "\\"); write_byte(writer, #char "\""); }
             case #char "\\" { write_byte(writer, #char "\\"); write_byte(writer, #char "\\"); }
 
-            case #default {
+            case _ {
                 // @Speed
                 write_byte(writer, ch);
             }

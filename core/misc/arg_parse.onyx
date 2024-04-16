@@ -68,7 +68,7 @@ arg_parse :: (c_args: [] cstr, output: any) -> bool {
                         *(cast(&str) (cast([&] u8) data_base + member.offset)) = value->unwrap();
                     }
 
-                    case #default {
+                    case _ {
                         printf("Unsupported argument type, {}.\n", output.type);
                         return false;
                     }
