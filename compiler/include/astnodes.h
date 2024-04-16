@@ -120,7 +120,11 @@
                                \
     NODE(ZeroValue)            \
                                \
-    NODE(JsNode)               
+    NODE(JsNode)               \
+                               \
+    NODE(CompilerExtension)    \
+    NODE(ProceduralMacro)      \
+    NODE(ProceduralExpansion)
 
 #define NODE(name) typedef struct Ast ## name Ast ## name;
 AST_NODES
@@ -254,6 +258,10 @@ typedef enum AstKind {
     Ast_Kind_Zero_Value,
 
     Ast_Kind_Js_Code,
+
+    Ast_Kind_Compiler_Extension,
+    Ast_Kind_Procedural_Macro,
+    Ast_Kind_Procedural_Expansion,
 
     Ast_Kind_Count
 } AstKind;
@@ -1635,6 +1643,33 @@ struct AstJsNode {
 };
 
 
+struct AstCompilerExtension {
+    AstNode_base;
+
+    OnyxToken *name;
+    bh_arr(AstProceduralMacro *) proc_macros;
+
+    i32 extension_id;
+};
+
+struct AstProceduralMacro {
+    AstNode_base;
+
+    // name is stored in the `token`
+
+    AstCompilerExtension *extension;
+};
+
+struct AstProceduralExpansion {
+    AstTyped_base;
+
+    AstTyped *proc_macro;
+    OnyxToken *expansion_body;
+
+    u32 expansion_id;
+};
+
+
 typedef struct EntityJobData {
     enum TypeMatch (*func)(void *job_data);
     void *job_data;
@@ -1671,6 +1706,8 @@ typedef enum EntityType {
     Entity_Type_Static_If,
     Entity_Type_String_Literal,
     Entity_Type_File_Contents,
+    Entity_Type_Compiler_Extension,
+    Entity_Type_Procedural_Expansion,
     Entity_Type_Enum,
     Entity_Type_Enum_Value,
     Entity_Type_Type_Alias,
@@ -1744,6 +1781,8 @@ typedef struct Entity {
         AstDirectiveLibrary   *library;
         EntityJobData         *job_data;
         AstJsNode             *js;
+        AstCompilerExtension  *compiler_extension;
+        AstProceduralExpansion *proc_expansion;
     };
 } Entity;
 
@@ -1865,6 +1904,34 @@ typedef struct DefinedVariable {
 } DefinedVariable;
 
 
+typedef enum ProceduralMacroExpansionKind {
+    PMEK_Expression,
+    PMEK_Statement,
+    PMEK_Top_Level
+} ProceduralMacroExpansionKind;
+
+typedef enum CompilerExtensionState {
+    COMP_EXT_STATE_SPAWNING,
+    COMP_EXT_STATE_INITIATING,
+    COMP_EXT_STATE_READY,
+    COMP_EXT_STATE_EXPANDING,
+} CompilerExtensionState;
+
+typedef struct CompilerExtension {
+    u64 pid;
+    u64 send_file;
+    u64 recv_file;
+
+    char *name;
+
+    i32 current_expansion_id;
+    CompilerExtensionState state;
+
+    bh_arena arena;
+
+    b32 alive : 1;
+} CompilerExtension;
+
 typedef struct CompileOptions CompileOptions;
 struct CompileOptions {
     bh_allocator allocator;
@@ -1876,6 +1943,7 @@ struct CompileOptions {
     b32 print_static_if_results : 1;
     b32 no_colors               : 1;
     b32 no_file_contents        : 1;
+    b32 no_compiler_extensions  : 1;
 
     b32 use_post_mvp_features : 1;
     b32 use_multi_threading   : 1;
@@ -1941,6 +2009,9 @@ struct Context {
 
     struct SymbolInfoTable *symbol_info;
     struct OnyxDocInfo     *doc_info;
+
+    bh_arr(CompilerExtension) extensions;
+    u32 next_expansion_id;
 
     CheckerData checker;
     ContextCaches caches;
@@ -2172,6 +2243,20 @@ void track_declaration_for_tags(AstNode *);
 void track_declaration_for_symbol_info(OnyxFilePos, AstNode *);
 void track_documentation_for_symbol_info(AstNode *, AstBinding *);
 void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved);
+
+
+// Compiler Extensions
+TypeMatch compiler_extension_start(const char *name, const char *containing_filename, i32 *out_extension_id);
+TypeMatch compiler_extension_expand_macro(
+    int extension_id,
+    ProceduralMacroExpansionKind kind,
+    const char *macro_name,
+    OnyxToken *body,
+    Entity *entity,
+    AstNode **out_node,
+    u32 *out_expansion_id,
+    b32 wait_for_response);
+
 
 // NOTE: Useful inlined functions
 static inline b32 is_lval(AstNode* node) {

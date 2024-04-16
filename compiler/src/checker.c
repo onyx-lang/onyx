@@ -931,7 +931,10 @@ CheckStatus check_call(AstCall** pcall) {
 
     char* err_msg = NULL;
     fill_in_arguments(&call->args, (AstNode *) callee, &err_msg, 0);
-    if (err_msg != NULL) ERROR(call->token->pos, err_msg);
+    if (err_msg != NULL) {
+        onyx_report_error(callee->token->pos, Error_Critical, "Here is the function being called.");
+        ERROR(call->token->pos, err_msg);
+    }
 
     bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values;
     bh_arr_each(AstArgument *, arg, arg_arr) {
@@ -2654,6 +2657,8 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Foreign_Block: break;
         case Ast_Kind_Zero_Value: break;
         case Ast_Kind_Interface: break;
+        case Ast_Kind_Compiler_Extension: break;
+        case Ast_Kind_Procedural_Macro: break;
 
         default:
             retval = Check_Error;
