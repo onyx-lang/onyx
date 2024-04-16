@@ -24,18 +24,22 @@ digest :: (s: &io.Stream) -> ?MD5_Digest {
 
     bytes_to_digest: [64] u8;
     while true {
-        err, byte_count := io.stream_read(s, bytes_to_digest);
+        switch io.stream_read(s, bytes_to_digest) {
+            case .Err as err {
+                if err != .EOF {
+                    return .None;
+                }
+                break break;
+            }
+            case .Ok as byte_count {
+                if byte_count < 64 {
+                    remaining_bytes_to_digest = byte_count;
+                    break break;
+                }
 
-        if err != .None && err != .EOF {
-            return .{};
+                do_cycle(&dig, bytes_to_digest);
+            }
         }
-
-        if byte_count < 64 {
-            remaining_bytes_to_digest = byte_count;
-            break;
-        }
-
-        do_cycle(&dig, bytes_to_digest);
     }
 
     dig->_finish(bytes_to_digest[0..remaining_bytes_to_digest]);
