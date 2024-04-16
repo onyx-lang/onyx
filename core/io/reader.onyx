@@ -599,11 +599,11 @@ lines :: (r: &Reader, inplace := false, allocator := context.allocator) =>
         r = r,
         inplace = inplace,
         allocator = allocator,
-    }, (ctx: $C) -> (str, bool) {
+    }, (ctx: $C) -> ? str {
         line := ctx.r->read_line(consume_newline=true, inplace=ctx.inplace, allocator=ctx.allocator);
 
-        if line.count > 0 do return line, true;
-        else do return "", false;
+        if line.count > 0 do return line;
+        else do return .None;
     });
 
 

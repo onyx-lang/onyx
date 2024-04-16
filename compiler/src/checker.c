@@ -398,6 +398,7 @@ CheckStatus check_for(AstFor* fornode) {
         // HACK: This assumes the Iterator type only has a single type argument.
         given_type = iter_type->Struct.poly_sln[0].type;
         fornode->loop_type = For_Loop_Iterator;
+        fornode->var->flags |= Ast_Flag_Address_Taken;
     }
 
     if (given_type == NULL)

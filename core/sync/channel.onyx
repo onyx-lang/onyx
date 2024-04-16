@@ -58,10 +58,7 @@ Channel.as_iter :: (chan: &Channel) -> Iterator(chan.T) {
     return iter.generator(
         &.{chan = chan},
         ctx => {
-            v := ctx.chan->recv();
-            if v do return v->unwrap(), true;
-
-            return .{}, false;
+            return ctx.chan->recv();
         }
     );
 }

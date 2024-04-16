@@ -26,8 +26,7 @@ BitIterator :: struct {
     bit_idx: i32;
 
     next :: (b: &BitIterator) -> u32 {
-        v, _ := iter.take_one(b.iter, no_close=true);
-        return v;
+        return iter.next(b.iter) ?? 0;
     }
 }
 
@@ -38,8 +37,8 @@ bit_iterator :: (values: [] u8) -> &BitIterator {
     c.value_idx = 0;
     c.bit_idx = 7;
 
-    next :: (use c: &BitIterator) -> (u32, bool) {
-        if value_idx >= values.count do return 0, false;
+    next :: (use c: &BitIterator) -> ? u32 {
+        if value_idx >= values.count do return .None;
 
         defer {
             bits_read += 1;
@@ -52,7 +51,7 @@ bit_iterator :: (values: [] u8) -> &BitIterator {
 
         ret := 0;
         if (values[value_idx] & ~~(1 << bit_idx)) != 0 do ret = 1;
-        return ret, true;
+        return ret;
     }
 
     return c;

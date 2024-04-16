@@ -199,10 +199,10 @@ as_iter :: (list: &List) =>
     core.iter.generator(&.{current = list.first}, (ctx) => {
         if ctx.current != null {
             defer ctx.current = ctx.current.next;
-            return ctx.current.data, true;
+            return Optional.make(ctx.current.data);
         }
 
-        return .{}, false;
+        return .None;
     });
 
 #overload

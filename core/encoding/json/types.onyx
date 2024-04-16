@@ -103,12 +103,12 @@ Value.as_array_iter :: (v: Value) -> Iterator(Value) {
 
     return iter.generator(
         &.{ arr = cast(&_Value_Array, cast(&_Value, v)).array_, index = 0 },
-        ctx => {
+        (ctx: $C) -> ? Value {
             if ctx.index < ctx.arr.count {
                 defer ctx.index += 1;
-                return ctx.arr[ctx.index], true;
+                return ctx.arr[ctx.index];
             }
-            return .{}, false;
+            return .None;
         }
     );
 }
@@ -119,13 +119,13 @@ Value.as_map_iter :: (v: Value) -> Iterator(Pair(str, Value)) {
 
     return iter.generator(
         &.{ obj = cast(&_Value_Object, cast(&_Value, v)).object_, index = 0 },
-        ctx => {
+        (ctx: $C) -> ? Pair(str, Value) {
             if ctx.index < ctx.obj.count {
                 defer ctx.index += 1;
                 v := &ctx.obj[ctx.index];
-                return Pair.make(v.key, v.value), true;
+                return Pair.make(v.key, v.value);
             }
-            return .{}, false;
+            return .None;
         }
     );
 }

@@ -419,7 +419,7 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 /// using the `#remove` directive in a for-loop.
 Iterator :: struct (Iter_Type: type_expr) {
     data:   rawptr;
-    next:   (data: rawptr) -> (Iter_Type, bool);
+    next:   (data: rawptr) -> Optional(Iter_Type);
     close:  (data: rawptr) -> void = null_proc;
     remove: (data: rawptr) -> void = null_proc;
 }

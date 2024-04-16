@@ -887,9 +887,9 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             char_lit->token = expect_token(parser, Token_Type_Literal_Char);
             char_lit->was_char_literal = 1;
 
-            i8 dest = '\0';
-            i32 length = string_process_escape_seqs((char *) &dest, char_lit->token->text, 1);
-            char_lit->value.i = (u32) dest;
+            char dest[2];
+            i32 length = string_process_escape_seqs((char *) dest, char_lit->token->text, 1);
+            char_lit->value.i = (u32) dest[0];
 
             if (length != 1) {
                 onyx_report_error(char_lit->token->pos, Error_Critical, "Expected only a single character in character literal.");
@@ -954,9 +954,9 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 char_lit->token = expect_token(parser, Token_Type_Literal_String);
                 char_lit->was_char_literal = 1;
 
-                i8 dest = '\0';
-                i32 length = string_process_escape_seqs((char *) &dest, char_lit->token->text, 1);
-                char_lit->value.i = (u32) dest;
+                char dest[2];
+                i32 length = string_process_escape_seqs((char *) dest, char_lit->token->text, 1);
+                char_lit->value.i = (u32) dest[0];
 
                 if (length != 1) {
                     onyx_report_error(char_lit->token->pos, Error_Critical, "Expected only a single character in character literal.");
@@ -4463,10 +4463,10 @@ static void parse_top_level_statements_until(OnyxParser* parser, TokenType tt) {
 
 // NOTE: This returns a void* so I don't need to cast it everytime I use it
 void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstKind kind) {
-    void* node = bh_alloc(alloc, size);
+    AstNode* node = bh_alloc(alloc, size);
 
     memset(node, 0, size);
-    *(AstKind *) node = kind;
+    node->kind = kind;
 
     return node;
 }

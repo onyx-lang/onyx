@@ -17,7 +17,7 @@ line_points :: (l: Line) -> Iterator(Point) {
 
     if l.x1 != l.x2 && l.y1 != l.y2 {
         if math.abs(l.x1 - l.x2) != math.abs(l.y1 - l.y2) {
-            return .{ null, ((a:rawptr) => .{0,0}, false), null_proc };
+            return iter.empty(Point);
         }
     }
 
@@ -28,11 +28,11 @@ line_points :: (l: Line) -> Iterator(Point) {
     c.dx = 1 if l.x2 > l.x1 else -1 if l.x2 < l.x1 else 0;
     c.dy = 1 if l.y2 > l.y1 else -1 if l.y2 < l.y1 else 0;
 
-    next :: (use c: &Context) -> (Point, bool) {
-        if curr_t > max_t do return .{0,0}, false;
+    next :: (use c: &Context) -> ? Point {
+        if curr_t > max_t do return .None;
 
         defer curr_t += 1;
-        return .{ l.x1 + curr_t * dx, l.y1 + curr_t * dy }, true;
+        return Point.{ l.x1 + curr_t * dx, l.y1 + curr_t * dy };
     }
 
     return .{c, next, cfree};

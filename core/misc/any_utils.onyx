@@ -152,7 +152,7 @@ any_to_map :: (v: any) -> ? Map(str, any) {
 any_iter :: (arr: any) -> Iterator(any) {
     base_ptr, elem_type, count := any_as_array(arr);
     if count == 0 {
-        return .{ null, ((_: rawptr) => any.{}, false) };
+        return .{ null, (_: rawptr) => Optional.empty(any) };
     }
 
     return iter.generator(
@@ -164,13 +164,13 @@ any_iter :: (arr: any) -> Iterator(any) {
             index     = 0,
         },
 
-        (ctx: $T) -> (any, bool) {
+        (ctx: $T) -> ? any {
             if ctx.index < ctx.count {
                 defer ctx.index += 1;
-                return any.{ cast([&] u8) ctx.base_ptr + ctx.elem_size * ctx.index, ctx.elem_type }, true;
+                return any.{ cast([&] u8) ctx.base_ptr + ctx.elem_size * ctx.index, ctx.elem_type };
             }
 
-            return .{}, false;
+            return .None;
         }
     );
 }
