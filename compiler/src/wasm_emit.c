@@ -851,7 +851,7 @@ EMIT_FUNC(stack_address, u32 offset, OnyxToken *token) {
 
     WIL(token, WI_LOCAL_GET, mod->stack_base_idx);
 
-    if (offset > 0) {
+    if (offset != 0) {
         WIL(token, WI_PTR_CONST, offset);
         WI(token, WI_PTR_ADD);
     }
@@ -1606,9 +1606,6 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
     if (!it_is_local) emit_local_location(mod, &code, var, &offset);
 
     {
-        WIL(for_node->token, WI_LOCAL_GET, iterator_data_ptr);
-        WIL(for_node->token, WI_LOCAL_GET, iterator_next_func);
-
         // CLEANUP: Calling a function is way too f-ing complicated. FACTOR IT!!
         u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
 
@@ -1625,19 +1622,22 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
 
         WID(for_node->token, WI_GLOBAL_GET, stack_top_idx);
         WID(for_node->token, WI_PTR_CONST, reserve_size);
-        WI(for_node->token, WI_PTR_ADD);
+        WI(for_node->token, WI_PTR_SUB);
         WID(for_node->token, WI_GLOBAL_SET, stack_top_idx);
 
+        WIL(for_node->token, WI_LOCAL_GET, iterator_data_ptr);
+        WID(for_node->token, WI_GLOBAL_GET, stack_top_idx);
+        WIL(for_node->token, WI_LOCAL_GET, iterator_next_func);
         i32 type_idx = generate_type_idx(mod, next_func_type.type);
         WID(for_node->token, WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
 
         WID(for_node->token, WI_GLOBAL_GET, stack_top_idx);
+        WID(for_node->token, WI_GLOBAL_GET, stack_top_idx);
         WID(for_node->token, WI_PTR_CONST, reserve_size);
-        WI(for_node->token, WI_PTR_SUB);
+        WI(for_node->token, WI_PTR_ADD);
         WID(for_node->token, WI_GLOBAL_SET, stack_top_idx);
 
-        WID(for_node->token, WI_GLOBAL_GET, stack_top_idx);
-        emit_load_instruction(mod, &code, return_type, reserve_size - return_size);
+        emit_load_instruction(mod, &code, return_type, 0);
     }
 
     WIL(for_node->token, WI_LOCAL_SET, iterator_done_bool);
@@ -2175,6 +2175,7 @@ EMIT_FUNC(call, AstCall* call) {
     bh_arr(WasmInstruction) code = *pcode;
 
     u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
+    u64 stack_top_restore_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     u64 stack_top_store_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
 
     OnyxToken* call_token = call->token;
@@ -2185,9 +2186,10 @@ EMIT_FUNC(call, AstCall* call) {
     // in later.
     u32 reserve_space_patch = bh_arr_length(code);
     WID(call_token, WI_GLOBAL_GET, stack_top_idx);
-    WIL(call_token, WI_LOCAL_TEE, stack_top_store_local);
+    WIL(call_token, WI_LOCAL_TEE, stack_top_restore_local);
     WID(call_token, WI_PTR_CONST, 0);                           // This will be filled in later.
-    WI(call_token, WI_PTR_ADD);
+    WI(call_token, WI_PTR_SUB);
+    WIL(call_token, WI_LOCAL_TEE, stack_top_store_local);
     WID(call_token, WI_GLOBAL_SET, stack_top_idx);
 
     u32 reserve_size  = 0;
@@ -2212,17 +2214,15 @@ EMIT_FUNC(call, AstCall* call) {
             place_on_stack = 1;
         }
 
+        if (arg->pass_as_any || arg->va_kind != VA_Kind_Not_VA) {
+            place_on_stack = 1;
+        }
+
         if (arg->va_kind != VA_Kind_Not_VA) {
             // This is a variadic argument and needs to be written to the stack. If the starting
             // location of the vararg array hasn't been noted, note it.
             if (vararg_offset < 0) vararg_offset = reserve_size;
-
-            place_on_stack = 1;
             vararg_count += 1;
-        }
-
-        if (arg->pass_as_any) {
-            place_on_stack = 1;
         }
 
         if (arg->value->kind == Ast_Kind_Struct_Literal && onyx_type_is_stored_in_memory(arg->value->type)) {
@@ -2255,8 +2255,6 @@ EMIT_FUNC(call, AstCall* call) {
                 Type *any_type = type_build_from_ast(context.ast_alloc, builtin_any_type);
                 assert(any_type);
 
-                u32 arg_size = type_size_of(any_type);
-
                 u64 ugly_temporary = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
                 WIL(call_token, WI_LOCAL_SET, ugly_temporary);
 
@@ -2271,10 +2269,10 @@ EMIT_FUNC(call, AstCall* call) {
                 local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
-                WIL(call_token, WI_I32_CONST, reserve_size);
-                WI(call_token, WI_I32_ADD);
+                WIL(call_token, WI_PTR_CONST, reserve_size);
+                WI(call_token, WI_PTR_ADD);
 
-                reserve_size += arg_size;
+                reserve_size += type_size_of(any_type);
             }
         }
     }
@@ -2290,11 +2288,11 @@ EMIT_FUNC(call, AstCall* call) {
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WID(call_token, WI_PTR_CONST, vararg_any_offsets[i]);
                 WI(call_token, WI_PTR_ADD);
-                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], vararg_offset + i * any_size);
+                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], reserve_size);
 
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WID(call_token, WI_I32_CONST, vararg_any_types[i]);
-                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Type_Index], vararg_offset + i * any_size + POINTER_SIZE);
+                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Type_Index], reserve_size + POINTER_SIZE);
 
                 reserve_size += any_size;
             }
@@ -2348,7 +2346,16 @@ EMIT_FUNC(call, AstCall* call) {
     u32 return_size = type_size_of(return_type);
     assert(return_size % type_alignment_of(return_type) == 0);
 
-    if (cc == CC_Return_Stack) reserve_size += return_size;
+    u32 return_location = 0;
+    if (cc == CC_Return_Stack) {
+        return_location = reserve_size;
+
+        WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+        WID(call_token, WI_PTR_CONST, return_location);
+        WI(call_token, WI_PTR_ADD);
+
+        reserve_size += return_size;
+    }
 
     if (context.options->stack_trace_enabled) {
         emit_stack_address(mod, &code, mod->stack_trace_idx, NULL);
@@ -2383,21 +2390,22 @@ EMIT_FUNC(call, AstCall* call) {
     }
 
     if (reserve_size > 0) {
-        WIL(call_token, WI_LOCAL_GET,  stack_top_store_local);
+        WIL(call_token, WI_LOCAL_GET,  stack_top_restore_local);
         WID(call_token, WI_GLOBAL_SET, stack_top_idx);
 
         bh_align(reserve_size, 16);
         code[reserve_space_patch + 2].data.l = reserve_size;
 
     } else {
-        fori (i, 0, 5) code[reserve_space_patch + i].type = WI_NOP;
+        fori (i, 0, 6) code[reserve_space_patch + i].type = WI_NOP;
     }
 
     if (cc == CC_Return_Stack) {
-        WID(call_token, WI_GLOBAL_GET, stack_top_idx);
-        emit_load_with_ignored_instruction(mod, &code, return_type, reserve_size - return_size, call->ignored_return_value_count);
+        WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+        emit_load_with_ignored_instruction(mod, &code, return_type, return_location, call->ignored_return_value_count);
     }
 
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     *pcode = code;
 }
@@ -3346,12 +3354,7 @@ EMIT_FUNC(array_literal, AstArrayLiteral* al) {
         emit_store_instruction(mod, &code, al->type->Array.elem, local_offset + i * elem_size);
     }
 
-    WIL(al->token, WI_LOCAL_GET, mod->stack_base_idx);
-    if (local_offset > 0) {
-        WIL(al->token, WI_PTR_CONST, local_offset);
-        WI(al->token, WI_PTR_ADD);
-    }
-
+    emit_stack_address(mod, &code, local_offset, al->token);
     *pcode = code;
 }
 
@@ -3365,13 +3368,7 @@ EMIT_FUNC(range_literal, AstRangeLiteral* range) {
     emit_values_into_contiguous_memory(mod, &code, mod->stack_base_idx,
             range->type, local_offset, 3, values);
 
-    WIL(range->token, WI_LOCAL_GET, mod->stack_base_idx);
-
-    if (local_offset > 0) {
-        WIL(NULL, WI_PTR_CONST, local_offset);
-        WI(NULL, WI_PTR_ADD);
-    }
-
+    emit_stack_address(mod, &code, local_offset, range->token);
     *pcode = code;
 }
 
@@ -3961,13 +3958,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
             emit_values_into_contiguous_memory(mod, &code, mod->stack_base_idx,
                     callsite->type, local_offset, 3, values);
 
-            WIL(NULL, WI_LOCAL_GET, mod->stack_base_idx);
-
-            if (local_offset > 0) {
-                WIL(NULL, WI_PTR_CONST, local_offset);
-                WI(NULL, WI_PTR_ADD);
-            }
-
+            emit_stack_address(mod, &code, local_offset, NULL);
             break;
         }
 
@@ -4211,10 +4202,8 @@ EMIT_FUNC(return, AstReturn* ret) {
             emit_generic_store_instruction(mod, &code, (AstTyped *) result_destination, NULL);
 
         } else if (mod->curr_cc == CC_Return_Stack) {
-            WIL(NULL, WI_LOCAL_GET, mod->stack_base_idx);
-            WID(NULL, WI_I32_CONST, type_size_of(ret->expr->type));
-            WI(NULL, WI_I32_SUB);
-
+            assert(mod->stack_return_location_idx);
+            WIL(NULL, WI_LOCAL_GET, mod->stack_return_location_idx);
             emit_expression(mod, &code, ret->expr);
             emit_store_instruction(mod, &code, ret->expr->type, 0);
 
@@ -4288,19 +4277,21 @@ EMIT_FUNC(stack_enter, u64 stacksize) {
 
     u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
 
-    // HACK: slightly... There will be space for 5 instructions
+    // HACK: slightly... There will be space for 6 instructions
     if (stacksize == 0) {
         code[0] = (WasmInstruction) { WI_GLOBAL_GET, { .l = stack_top_idx } };
-        code[1] = (WasmInstruction) { WI_LOCAL_SET,  { .l = mod->stack_base_idx} };
+        code[1] = (WasmInstruction) { WI_LOCAL_SET,  { .l = mod->stack_restore_idx} };
         code[2] = (WasmInstruction) { WI_NOP,        0 };
         code[3] = (WasmInstruction) { WI_NOP,        0 };
         code[4] = (WasmInstruction) { WI_NOP,        0 };
+        code[5] = (WasmInstruction) { WI_NOP,        0 };
     } else {
         code[0] = (WasmInstruction) { WI_GLOBAL_GET, { .l = stack_top_idx } };
-        code[1] = (WasmInstruction) { WI_LOCAL_TEE,  { .l = mod->stack_base_idx} };
+        code[1] = (WasmInstruction) { WI_LOCAL_TEE,  { .l = mod->stack_restore_idx} };
         code[2] = (WasmInstruction) { WI_I32_CONST,  { .l = stacksize } };
-        code[3] = (WasmInstruction) { WI_I32_ADD,    0 };
-        code[4] = (WasmInstruction) { WI_GLOBAL_SET, { .l = stack_top_idx } };
+        code[3] = (WasmInstruction) { WI_I32_SUB,    0 };
+        code[4] = (WasmInstruction) { WI_LOCAL_TEE,  { .l = mod->stack_base_idx} };
+        code[5] = (WasmInstruction) { WI_GLOBAL_SET, { .l = stack_top_idx } };
     }
 
     *pcode = code;
@@ -4401,35 +4392,37 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
 
         param_type++;
     }
+
+    if (type_function_get_cc(ft) == CC_Return_Stack) {
+        *(t++) = onyx_type_to_wasm_type(&basic_types[Basic_Kind_Rawptr]);
+        param_count += 1;
+    }
+
     *(t++) = ':';
 
     WasmType return_type = onyx_type_to_wasm_type(ft->Function.return_type);
-
     *(t++) = (char) return_type;
+
     *t = '\0';
 
-    i32 type_idx = 0;
     i32 index = shgeti(mod->type_map, type_repr_buf);
     if (index != -1) {
-        type_idx = mod->type_map[index].value;
-    } else {
-        // NOTE: Make a new type
-        WasmFuncType* type = (WasmFuncType*) bh_alloc(mod->allocator, sizeof(WasmFuncType) + sizeof(WasmType) * param_count);
-        type->return_type = return_type;
-        type->param_count = param_count;
-
-        fori (i, 0, type->param_count) {
-            type->param_types[i] = type_repr_buf[i];
-        }
-
-        bh_arr_push(mod->types, type);
-
-        shput(mod->type_map, type_repr_buf, mod->next_type_idx);
-        type_idx = mod->next_type_idx;
-        mod->next_type_idx++;
+        return mod->type_map[index].value;
     }
 
-    return type_idx;
+    // NOTE: Make a new type
+    WasmFuncType* type = (WasmFuncType*) bh_alloc(mod->allocator, sizeof(WasmFuncType) + sizeof(WasmType) * param_count);
+    type->return_type = return_type;
+    type->param_count = param_count;
+
+    fori (i, 0, type->param_count) {
+        type->param_types[i] = type_repr_buf[i];
+    }
+
+    bh_arr_push(mod->types, type);
+
+    shput(mod->type_map, type_repr_buf, mod->next_type_idx);
+    return mod->next_type_idx++;
 }
 
 static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func) {
@@ -4539,6 +4532,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     bh_arr_new(mod->allocator, wasm_func.code, 16);
 
     mod->current_func_idx = func_idx;
+    mod->stack_return_location_idx = 0;
 
     debug_begin_function(mod, func_idx, fd->token, get_function_name(fd));
 
@@ -4591,21 +4585,28 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
             }
         }
 
-        mod->local_alloc->param_count = localidx;
-
         mod->curr_cc = type_function_get_cc(fd->type);
         assert(mod->curr_cc != CC_Undefined);
 
+        if (mod->curr_cc == CC_Return_Stack) {
+            // When returning on the stack, the location to write
+            // the result to is passed as the last parameter.
+            mod->stack_return_location_idx = localidx | LOCAL_IS_WASM;
+            localidx += 1;
+            
+            // TODO: Make this next line work.
+            // debug_introduce_symbol_by_name(mod, "$return", DSL_REGISTER, mod->stack_return_location_idx, &basic_types[Basic_Kind_Rawptr]);
+        }
+
+        mod->local_alloc->param_count = localidx;
+
         bh_arr_clear(mod->stack_leave_patches);
 
-        debug_emit_instruction(mod, fd->token);
-        debug_emit_instruction(mod, fd->token);
-        debug_emit_instruction(mod, fd->token);
-        debug_emit_instruction(mod, fd->token);
-        debug_emit_instruction(mod, fd->token);
-        bh_arr_insert_end(wasm_func.code, 5);
-        fori (i, 0, 5) wasm_func.code[i] = (WasmInstruction) { WI_NOP, 0 };
+        fori (i, 0, 6) debug_emit_instruction(mod, fd->token);
+        bh_arr_insert_end(wasm_func.code, 6);
+        fori (i, 0, 6) wasm_func.code[i] = (WasmInstruction) { WI_NOP, 0 };
 
+        mod->stack_restore_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
         mod->stack_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
         debug_function_set_ptr_idx(mod, func_idx, mod->stack_base_idx);
 
@@ -4636,11 +4637,11 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
             debug_emit_instruction(mod, NULL);
 
             u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
-            bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_LOCAL_GET,  { .l = mod->stack_base_idx } }));
+            bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_LOCAL_GET,  { .l = mod->stack_restore_idx } }));
             bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_GLOBAL_SET, { .l = stack_top_idx } }));
 
             bh_arr_each(PatchInfo, patch, mod->stack_leave_patches) {
-                wasm_func.code[patch->instruction_index + 0] = (WasmInstruction) { WI_LOCAL_GET,  { .l = mod->stack_base_idx } };
+                wasm_func.code[patch->instruction_index + 0] = (WasmInstruction) { WI_LOCAL_GET,  { .l = mod->stack_restore_idx } };
                 wasm_func.code[patch->instruction_index + 1] = (WasmInstruction) { WI_GLOBAL_SET, { .l = stack_top_idx } };
             }
         }
@@ -5278,6 +5279,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 
         .stack_top_ptr = NULL,
         .stack_base_idx = 0,
+        .stack_restore_idx = 0,
+        .stack_return_location_idx = 0,
 
         .closure_base_idx = 0,
 
@@ -5528,7 +5531,7 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
         WasmImport mem_import = {
             .kind   = WASM_FOREIGN_MEMORY,
             .min    = options->memory_min_size,
-            .max    = options->memory_max_size, // NOTE: Why not use all 4 Gigs of memory?
+            .max    = options->memory_max_size,
             .shared = context.options->use_multi_threading && context.options->runtime != Runtime_Onyx,
 
             .mod    = options->import_memory_module_name,
@@ -5569,7 +5572,10 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
         module->export_count++;
     }
 
-    u32 datum_offset = options->null_reserve_size;
+    i32 datum_offset = options->null_reserve_size;
+
+    datum_offset += options->stack_size;
+
     bh_arr_each(WasmDatum, datum, module->data) {
         assert(datum->id > 0);
 
@@ -5610,7 +5616,7 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
                 WasmFunc *func = &module->funcs[patch->index];
 
                 assert(func->code[patch->location].type == WI_PTR_CONST);
-                func->code[patch->location].data.l = (u64) datum->offset_ + patch->offset;
+                func->code[patch->location].data.l = (i64) datum->offset_ + patch->offset;
                 break;
             }
 
@@ -5640,10 +5646,10 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
 
     assert(module->stack_top_ptr && module->heap_start_ptr);
 
-    *module->stack_top_ptr = datum_offset;
-    bh_align(*module->stack_top_ptr, options->stack_alignment);
+    *module->stack_top_ptr = options->null_reserve_size + options->stack_size;
+    *module->heap_start_ptr = datum_offset;
 
-    *module->heap_start_ptr = *module->stack_top_ptr + options->stack_size;
+    bh_align(*module->stack_top_ptr, options->stack_alignment);
     bh_align(*module->heap_start_ptr, 16);
 
     if (module->tls_size_ptr) {
@@ -5698,10 +5704,6 @@ b32 onyx_wasm_build_link_options_from_node(OnyxWasmLinkOptions *opts, AstTyped *
     b32 out_is_valid;
 
     // TODO: These should be properly error handled.
-    assert(type_lookup_member(link_options_type, "stack_first", &smem));
-    opts->stack_first = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid) != 0;
-    if (!out_is_valid) return 0;
-
     assert(type_lookup_member(link_options_type, "stack_size", &smem));
     opts->stack_size = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid);
     if (!out_is_valid) return 0;
