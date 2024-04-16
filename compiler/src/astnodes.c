@@ -171,6 +171,8 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Static If",
     "String Literal",
     "File Contents",
+    "CompilerExtension",
+    "Procedural Expansion",
     "Enum",
     "Enum Value",
     "Type Alias",

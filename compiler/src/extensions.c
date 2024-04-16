@@ -16,6 +16,7 @@
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
 #include <signal.h>
 #include <sys/wait.h>
+#include <sys/poll.h>
 
 static void extension_send(CompilerExtension *ext, void *data, i32 len) {
     if (!ext->alive) return;
@@ -29,6 +30,16 @@ static void extension_send(CompilerExtension *ext, void *data, i32 len) {
             return;
         }
     }
+}
+
+static b32 extension_poll_recv(CompilerExtension *ext) {
+    struct pollfd fd;
+    fd.events = POLL_IN;
+    fd.fd = ext->recv_file;
+
+    poll(&fd, 1, 0);
+
+    return (fd.revents & POLL_IN) != 0;
 }
 
 static i32 extension_recv(CompilerExtension *ext, void *buf, i32 maxlen) {
@@ -162,49 +173,61 @@ static char *extension_recv_str(CompilerExtension *ext, i32 *out_len) {
 
 
 
-i32 compiler_extension_start(const char *name, const char *containing_filename) {
-    CompilerExtension ext;
-    bh_arena_init(&ext.arena, global_heap_allocator, 32 * 1024);
+TypeMatch compiler_extension_start(const char *name, const char *containing_filename, i32 *out_extension_id) {
+    if (*out_extension_id == 0) {
+        char* parent_folder = bh_path_get_parent(containing_filename, global_scratch_allocator);
 
-    char* parent_folder = bh_path_get_parent(containing_filename, global_scratch_allocator);
+        // CLEANUP: Should the include folders be different than the other include files list?
+        char *path = bh_strdup(
+                global_scratch_allocator,
+                bh_lookup_file((char *) name, parent_folder, ".wasm", 0, context.options->included_folders, 0)
+        );
 
-    // CLEANUP: Should the include folders be different than the other include files list?
-    char *path = bh_strdup(
-            global_scratch_allocator,
-            bh_lookup_file((char *) name, parent_folder, ".wasm", 0, context.options->included_folders, 0)
-    );
+        if (!bh_file_exists(path)) {
+            return TYPE_MATCH_FAILED;
+        }
 
-    if (!bh_file_exists(path)) {
-        return -1;
+        CompilerExtension ext;
+        ext.state = COMP_EXT_STATE_SPAWNING;
+        bh_arena_init(&ext.arena, global_heap_allocator, 32 * 1024);
+
+        if (!extension_spawn(&ext, path)) {
+            return TYPE_MATCH_FAILED;
+        }
+
+        ext.alive = 1;
+        bh_arr_push(context.extensions, ext);
+        *out_extension_id = bh_arr_length(context.extensions); // This makes the extension_id 1 indexed.
+
+        // Init message is 5 ints as defined in `core/onyx/compiler_extension`
+        i32 init_msg[5];
+        init_msg[0] = MSG_HOST_INIT;
+        init_msg[1] = VERSION_MAJOR;
+        init_msg[2] = VERSION_MINOR;
+        init_msg[3] = VERSION_PATCH;
+        init_msg[4] = 1;
+
+        extension_send(&ext, init_msg, sizeof(init_msg));
+
+        return TYPE_MATCH_YIELD;
+
+    } else {
+        CompilerExtension *ext = &context.extensions[*out_extension_id - 1];
+
+        ext->state = COMP_EXT_STATE_INITIATING;
+
+        b32 compiler_extension_negotiate_capabilities(CompilerExtension *ext);
+        b32 negotiated = compiler_extension_negotiate_capabilities(ext);
+        if (!negotiated) {
+            return TYPE_MATCH_FAILED;
+        }
+
+        ext->state = COMP_EXT_STATE_READY;
+        return TYPE_MATCH_SUCCESS;
     }
-
-    if (!extension_spawn(&ext, path)) {
-        return -1;
-    }
-
-    ext.alive = 1;
-
-    b32 compiler_extension_negotiate_capabilities(CompilerExtension *ext);
-    b32 negotiated = compiler_extension_negotiate_capabilities(&ext);
-    if (!negotiated) {
-        return -1;
-    }
-
-    bh_arr_push(context.extensions, ext);
-    return bh_arr_length(context.extensions) -1;
 }
 
 b32 compiler_extension_negotiate_capabilities(CompilerExtension *ext) {
-    // Init message is 5 ints as defined in `core/onyx/compiler_extension`
-    i32 init_msg[5];
-    init_msg[0] = MSG_HOST_INIT;
-    init_msg[1] = VERSION_MAJOR;
-    init_msg[2] = VERSION_MINOR;
-    init_msg[3] = VERSION_PATCH;
-    init_msg[4] = 1;
-
-    extension_send(ext, init_msg, sizeof(init_msg));
-
     if (extension_recv_int(ext) != MSG_EXT_INIT) {
         extension_kill(ext);
         return 0;
@@ -258,28 +281,43 @@ TypeMatch compiler_extension_expand_macro(
     OnyxToken *body,
     Entity *entity,
     AstNode **out_node,
-    u32 *expansion_id
+    u32 *expansion_id,
+    b32 wait_for_response
 ) {
-    if (extension_id < 0 || extension_id >= bh_arr_length(context.extensions)) return TYPE_MATCH_FAILED;
+    if (extension_id <= 0 || extension_id > bh_arr_length(context.extensions)) return TYPE_MATCH_FAILED;
 
-    CompilerExtension *ext = &context.extensions[extension_id];
+    CompilerExtension *ext = &context.extensions[extension_id - 1];
     bh_arena_clear(&ext->arena);
 
     if (!ext->alive) return TYPE_MATCH_FAILED;
 
-    *expansion_id = ++context.next_expansion_id;
-    
-    extension_send_int(ext, MSG_HOST_EXPAND_MACRO);
-    extension_send_int(ext, *expansion_id);
-    extension_send_int(ext, kind);
-    extension_send_str(ext, body->pos.filename);
-    extension_send_int(ext, body->pos.line);
-    extension_send_int(ext, body->pos.column);
-    extension_send_int(ext, 0);
-    extension_send_str(ext, macro_name);
-    extension_send_bytes(ext, body->text, body->length);
+    if (ext->state != COMP_EXT_STATE_READY && ext->current_expansion_id != (i32) *expansion_id) {
+        return TYPE_MATCH_YIELD;
+    }
+
+    // If the extension is in the ready state, then it is waiting for an expansion request.
+    // We can issue this expansion request and flag that the extension is now in the expanding state.
+    if (ext->state == COMP_EXT_STATE_READY) {
+        *expansion_id = ++context.next_expansion_id;
+        ext->current_expansion_id = *expansion_id;
+        ext->state = COMP_EXT_STATE_EXPANDING;
+        
+        extension_send_int(ext, MSG_HOST_EXPAND_MACRO);
+        extension_send_int(ext, *expansion_id);
+        extension_send_int(ext, kind);
+        extension_send_str(ext, body->pos.filename);
+        extension_send_int(ext, body->pos.line);
+        extension_send_int(ext, body->pos.column);
+        extension_send_int(ext, 0);
+        extension_send_str(ext, macro_name);
+        extension_send_bytes(ext, body->text, body->length);
+    }
 
     while (1) {
+        if (!wait_for_response && !extension_poll_recv(ext)) {
+            return TYPE_MATCH_YIELD;
+        }
+
         int msg_type = extension_recv_int(ext);
         switch (msg_type) {
             case MSG_EXT_INIT:
@@ -353,6 +391,9 @@ TypeMatch compiler_extension_expand_macro(
                 }
 
                 *out_node = parse_code(kind, code, code_length, entity, body->pos);
+
+                ext->state = COMP_EXT_STATE_READY;
+                ext->current_expansion_id = 0;
                 return TYPE_MATCH_SUCCESS;
             }
 

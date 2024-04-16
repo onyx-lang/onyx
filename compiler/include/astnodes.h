@@ -1665,6 +1665,8 @@ struct AstProceduralExpansion {
 
     AstTyped *proc_macro;
     OnyxToken *expansion_body;
+
+    u32 expansion_id;
 };
 
 
@@ -1908,12 +1910,22 @@ typedef enum ProceduralMacroExpansionKind {
     PMEK_Top_Level
 } ProceduralMacroExpansionKind;
 
+typedef enum CompilerExtensionState {
+    COMP_EXT_STATE_SPAWNING,
+    COMP_EXT_STATE_INITIATING,
+    COMP_EXT_STATE_READY,
+    COMP_EXT_STATE_EXPANDING,
+} CompilerExtensionState;
+
 typedef struct CompilerExtension {
-    u32 pid;
+    u64 pid;
     u64 send_file;
     u64 recv_file;
 
     char *name;
+
+    i32 current_expansion_id;
+    CompilerExtensionState state;
 
     bh_arena arena;
 
@@ -2234,7 +2246,7 @@ void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved);
 
 
 // Compiler Extensions
-i32 compiler_extension_start(const char *name, const char *containing_filename);
+TypeMatch compiler_extension_start(const char *name, const char *containing_filename, i32 *out_extension_id);
 TypeMatch compiler_extension_expand_macro(
     int extension_id,
     ProceduralMacroExpansionKind kind,
@@ -2242,7 +2254,8 @@ TypeMatch compiler_extension_expand_macro(
     OnyxToken *body,
     Entity *entity,
     AstNode **out_node,
-    u32 *out_expansion_id);
+    u32 *out_expansion_id,
+    b32 wait_for_response);
 
 
 // NOTE: Useful inlined functions
