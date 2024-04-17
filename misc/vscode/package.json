@@ -93,6 +93,11 @@
                     },
                     "launch": {
                         "properties": {
+                            "onyxPath": {
+                                "type": "string",
+                                "description": "The path to your Onyx installation. Generally $HOME/.onyx",
+                                "default": ""
+                            },
                             "wasmFile": {
                                 "type": "string",
                                 "description": "The WASM file for debugging, compiled with the --debug flag.",
@@ -122,7 +127,7 @@
                         "type": "onyx",
                         "request": "attach",
                         "stopOnEntry": true,
-                        "socketPath": "/tmp/ovm-debug.0000"
+                        "socketPath": "${command:pickSession}"
                     },
                     {
                         "name": "Onyx Launch",

@@ -568,8 +568,14 @@ void onyx_run_initialize(b32 debug_enabled) {
         i32 getpid();
         i32 pid = getpid();
 
-        char *env_path = getenv("ONYX_PATH");
-        char *socket_path = bh_aprintf(bh_heap_allocator(), "%s/debug.%d", env_path, pid);
+        char *socket_path = NULL;
+        if (context.options->debug_socket != NULL) {
+            socket_path = context.options->debug_socket;
+
+        } else {
+            char *env_path = getenv("ONYX_PATH");
+            socket_path = bh_aprintf(bh_heap_allocator(), "%s/debug.%d", env_path, pid);
+        }
 
         void wasm_config_set_listen_path(wasm_config_t *config, char *listen_path);
         wasm_config_set_listen_path(wasm_config, socket_path);
