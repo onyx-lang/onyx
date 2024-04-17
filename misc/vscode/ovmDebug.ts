@@ -299,8 +299,10 @@ export class OVMDebugSession extends LoggingDebugSession {
 
 		this.sendEvent(new LogOutputEvent(`Spawning Onyx debug session\nSocket: ${debugSocketPath}\nWorking Dir: ${args.workingDir}\n`, LogLevel.Log));
 
+		let onyx_path = `${args.onyxPath}/bin/onyx`
+
 		if (args.wasmFile) {
-			this.running_process = child_process.spawn("onyx", ["run", "--debug", "--debug-socket", debugSocketPath, args.wasmFile], {
+			this.running_process = child_process.spawn(onyx_path, ["run", "--debug", "--debug-socket", debugSocketPath, args.wasmFile], {
 				"cwd": args.workingDir,	
 				"env": {
 					"ONYX_PATH": args.onyxPath,
@@ -308,7 +310,7 @@ export class OVMDebugSession extends LoggingDebugSession {
 			});
 
 		} else if (args.onyxFiles) {
-			this.running_process = child_process.spawn("/home/brendan/.onyx/bin/onyx", ["run", "--debug",  "--debug-socket", debugSocketPath,...args.onyxFiles], {
+			this.running_process = child_process.spawn(onyx_path, ["run", "--debug",  "--debug-socket", debugSocketPath,...args.onyxFiles], {
 				"cwd": args.workingDir,
 				"env": {
 					"ONYX_PATH": args.onyxPath,

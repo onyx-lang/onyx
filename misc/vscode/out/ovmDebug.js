@@ -209,8 +209,9 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
                 fs.unlinkSync(debugSocketPath);
             }
             this.sendEvent(new logger_1.LogOutputEvent(`Spawning Onyx debug session\nSocket: ${debugSocketPath}\nWorking Dir: ${args.workingDir}\n`, logger_1.LogLevel.Log));
+            let onyx_path = `${args.onyxPath}/bin/onyx`;
             if (args.wasmFile) {
-                this.running_process = child_process.spawn("onyx", ["run", "--debug", "--debug-socket", debugSocketPath, args.wasmFile], {
+                this.running_process = child_process.spawn(onyx_path, ["run", "--debug", "--debug-socket", debugSocketPath, args.wasmFile], {
                     "cwd": args.workingDir,
                     "env": {
                         "ONYX_PATH": args.onyxPath,
@@ -218,7 +219,7 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
                 });
             }
             else if (args.onyxFiles) {
-                this.running_process = child_process.spawn("/home/brendan/.onyx/bin/onyx", ["run", "--debug", "--debug-socket", debugSocketPath, ...args.onyxFiles], {
+                this.running_process = child_process.spawn(onyx_path, ["run", "--debug", "--debug-socket", debugSocketPath, ...args.onyxFiles], {
                     "cwd": args.workingDir,
                     "env": {
                         "ONYX_PATH": args.onyxPath,
