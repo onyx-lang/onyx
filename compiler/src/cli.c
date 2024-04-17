@@ -354,6 +354,9 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
             options->debug_info_enabled = 1;
             options->stack_trace_enabled = 1;
         }
+        else if (!strcmp(argv[i], "--debug-socket")) {
+            options->debug_socket = argv[++i];
+        }
         else if (!strcmp(argv[i], "--debug-info")) {
             options->debug_info_enabled = 1;
             options->stack_trace_enabled = 1;
@@ -560,6 +563,9 @@ static void print_subcommand_help(const char *subcommand) {
 
     if (!strcmp(subcommand, "run") || !strcmp(subcommand, "r")) {
         bh_printf(build_docstring, subcommand, "[-- program args]");
+        bh_printf(
+            C_LBLUE "    --debug-socket " C_GREY "addr         " C_NORM "Specifies the address or port used for the debug server.\n"
+        );
         return;
     }
 

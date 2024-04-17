@@ -1980,6 +1980,8 @@ struct CompileOptions {
     b32 debug_info_enabled;
     b32 stack_trace_enabled;
 
+    char *debug_socket;
+
     i32    passthrough_argument_count;
     char** passthrough_argument_data;
 

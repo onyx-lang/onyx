@@ -87,16 +87,6 @@ function activate(context) {
         }
         console.appendLine(`Onyx executable is: ${executable}`);
         if (onyx_path) {
-            //let serverOptions: vslc.ServerOptions = {
-            //	command: executable,
-            //	args: ["lsp"],
-            //	transport: vslc.TransportKind.stdio,
-            //	options: {
-            //		env: {
-            //			"ONYX_PATH": onyx_path
-            //		}
-            //	}
-            //};
             let serverOptions = () => __awaiter(this, void 0, void 0, function* () {
                 return cp.spawn(executable, ["lsp"], {
                     detached: true,

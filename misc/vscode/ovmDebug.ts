@@ -12,8 +12,9 @@ import { Subject } from "await-notify";
 import * as net from "node:net";
 import * as child_process from "node:child_process";
 import { ChildProcess } from 'node:child_process';
-import { openStdin } from 'node:process';
-
+import * as fs from "node:fs";
+import { LogOutputEvent, LogLevel } from '@vscode/debugadapter/lib/logger';
+import { debug } from 'node:console';
 
 interface IOVMAttachRequestArguments extends DebugProtocol.AttachRequestArguments {
     socketPath?: string;
@@ -23,6 +24,7 @@ interface IOVMAttachRequestArguments extends DebugProtocol.AttachRequestArgument
 interface IOVMLaunchRequestArguments extends DebugProtocol.AttachRequestArguments {
     wasmFile?: string;
     onyxFiles?: [string];
+	onyxPath: string;
 	workingDir: string;
     stopOnEntry?: boolean;
 }
@@ -290,14 +292,29 @@ export class OVMDebugSession extends LoggingDebugSession {
 	}
 
     protected async launchRequest(response: DebugProtocol.LaunchResponse, args: IOVMLaunchRequestArguments, request?: DebugProtocol.Request): Promise<void> {
+		let debugSocketPath = "/tmp/onyx-debug-socket";
+		if (fs.existsSync(debugSocketPath)) {
+			fs.unlinkSync(debugSocketPath);
+		}
+
+		this.sendEvent(new LogOutputEvent(`Spawning Onyx debug session\nSocket: ${debugSocketPath}\nWorking Dir: ${args.workingDir}\n`, LogLevel.Log));
+
+		let onyx_path = `${args.onyxPath}/bin/onyx`
+
 		if (args.wasmFile) {
-			this.running_process = child_process.spawn("onyx-run", ["--debug", args.wasmFile], {
+			this.running_process = child_process.spawn(onyx_path, ["run", "--debug", "--debug-socket", debugSocketPath, args.wasmFile], {
 				"cwd": args.workingDir,	
+				"env": {
+					"ONYX_PATH": args.onyxPath,
+				}
 			});
 
 		} else if (args.onyxFiles) {
-			this.running_process = child_process.spawn("onyx", ["run", "--debug", ...args.onyxFiles], {
+			this.running_process = child_process.spawn(onyx_path, ["run", "--debug",  "--debug-socket", debugSocketPath,...args.onyxFiles], {
 				"cwd": args.workingDir,
+				"env": {
+					"ONYX_PATH": args.onyxPath,
+				}
 			});
 
 		} else {
@@ -309,18 +326,66 @@ export class OVMDebugSession extends LoggingDebugSession {
 			return;
 		}
 
+		if (!this.running_process.pid) {
+			this.sendErrorResponse(response, {
+				format: "Failed to spawn Onyx debug session.",
+				id: 1
+			} as DebugProtocol.Message);
+
+			return;
+		}
+
 		this.running_process.stdout.setEncoding("utf-8");
 		this.running_process.stdout.on("data", (chunk) => {
 			this.sendEvent(new OutputEvent(chunk, "console"));
 		});
 
-		this.attachRequest(response, {"socketPath": "/tmp/ovm-debug.0000", "stopOnEntry": args.stopOnEntry});
+		this.sendEvent(new LogOutputEvent(`Process is spawned: ${this.running_process.pid}\n`, LogLevel.Log));
+
+		let done_hack = false;
+
+		let success = Promise.race([
+			new Promise((res, rej) => setTimeout(() => res(false), 2000)),
+			new Promise(async (res, rej) => {
+				while (!done_hack) {
+					if (fs.existsSync(debugSocketPath)) {
+						res(true);
+					}
+
+					await new Promise((res, rej) => setTimeout(res, 100));
+				}
+			})
+		])
+
+		done_hack = true;
+
+		if (!success) {
+			this.sendErrorResponse(response, {
+				format: "Failed to spawn Onyx debug session.",
+				id: 1
+			} as DebugProtocol.Message);
+			return;
+		}
+
+		// This "sleep" is very hacky and needs to be replaced. The problem
+		// is the we need to wait until the socket exists.
+
+		await this.attachRequest(response, {"socketPath": debugSocketPath, "stopOnEntry": args.stopOnEntry});
     }
 
     protected async attachRequest(response: DebugProtocol.AttachResponse, args: IOVMAttachRequestArguments, request?: DebugProtocol.Request): Promise<void> {
+		this.sendEvent(new LogOutputEvent(`Connecting to process\n`, LogLevel.Log));
 		await this._configurationDone.wait(1000);
 
-		await this.debugger.connect(args.socketPath);
+		try {
+			await this.debugger.connect(args.socketPath);
+		} catch (e) {
+			this.sendEvent(new LogOutputEvent(`Error connecting to session: ${e.toString()}`, LogLevel.Error));
+			this.sendErrorResponse(response, 41);
+			return;
+		}
+
+		this.sendEvent(new LogOutputEvent(`Connected to process`, LogLevel.Log));
 
 		this._clientConnected = true;
 		this._clientConnectedNotifier.notify();
@@ -522,6 +587,7 @@ class OVMDebugger extends EventEmitter {
 
 		return new Promise((res, rej) => {
 			this.client.on("connect", res);
+			this.client.on("error", rej);
 		});
 	}
 
