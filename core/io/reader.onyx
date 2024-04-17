@@ -24,6 +24,14 @@ Reader :: struct {
 
     error: Error;
     done: bool; // If an .EOF was reached.
+
+    newline_format: NewLineFormat;
+}
+
+#local
+NewLineFormat :: enum {
+    LF;
+    CRLF;
 }
 
 Reader.make :: reader_make;
@@ -52,12 +60,18 @@ Reader.skip_whitespace :: skip_whitespace;
 Reader.skip_bytes :: skip_bytes;
 Reader.lines :: lines;
 
-reader_make :: (s: &Stream, buffer_size := 4096, allocator := context.allocator) -> Reader {
+reader_make :: (
+    s: &Stream,
+    buffer_size := 4096,
+    allocator := context.allocator,
+    newline_format := NewLineFormat.LF
+) -> Reader {
     assert(s.vtable != null, "Stream vtable was not setup correctly.");
 
     reader: Reader;
     reader.stream = s;
     reader.error = .None;
+    reader.newline_format = newline_format;
 
     memory.alloc_slice(&reader.buffer, buffer_size, allocator);
     reader.buffer_allocator = allocator;
@@ -69,7 +83,7 @@ reader_make :: (s: &Stream, buffer_size := 4096, allocator := context.allocator)
 
 reader_reset :: (use reader: &Reader) {
     start, end = 0, 0;
-    last_byte = #char "\0";
+    last_byte = '\0';
     done = false;
 }
 
@@ -235,15 +249,15 @@ read_i32 :: (use reader: &Reader) -> i32 {
 
     is_negative := false;
     curr, err := peek_byte(reader);
-    if curr == #char "-" {
+    if curr == '-' {
         is_negative = true;
         start += 1;
     }
 
     curr, err = peek_byte(reader);
-    while curr >= #char "0" && curr <= #char "9" {
+    while curr >= '0' && curr <= '9' {
         n *= 10;
-        n += cast(u32) (curr - #char "0"); 
+        n += cast(u32) (curr - '0'); 
 
         start += 1;
         curr, err = peek_byte(reader);
@@ -261,15 +275,15 @@ read_i64 :: (use reader: &Reader) -> i64 {
 
     is_negative := false;
     curr, err := peek_byte(reader);
-    if curr == #char "-" {
+    if curr == '-' {
         is_negative = true;
         start += 1;
     }
 
     curr, err = peek_byte(reader);
-    while curr >= #char "0" && curr <= #char "9" {
+    while curr >= '0' && curr <= '9' {
         n *= 10;
-        n += cast(u64) (curr - #char "0"); 
+        n += cast(u64) (curr - '0'); 
 
         start += 1;
         curr, err = peek_byte(reader);
@@ -286,9 +300,9 @@ read_u32 :: (use reader: &Reader) -> u32 {
     skip_whitespace(reader);
 
     curr, err := peek_byte(reader);
-    while curr >= #char "0" && curr <= #char "9" {
+    while curr >= '0' && curr <= '9' {
         n *= 10;
-        n += cast(u32) (curr - #char "0"); 
+        n += cast(u32) (curr - '0'); 
 
         start += 1;
         curr, err = peek_byte(reader);
@@ -304,9 +318,9 @@ read_u64 :: (use reader: &Reader) -> u64 {
     skip_whitespace(reader);
 
     curr, err := peek_byte(reader);
-    while curr >= #char "0" && curr <= #char "9" {
+    while curr >= '0' && curr <= '9' {
         n *= 10;
-        n += cast(u64) (curr - #char "0"); 
+        n += cast(u64) (curr - '0'); 
 
         start += 1;
         curr, err = peek_byte(reader);
@@ -329,8 +343,14 @@ read_line :: (use reader: &Reader, consume_newline := true, allocator := context
         count := start;
         defer start = count;
 
-        while count < end && buffer[count] != #char "\n" {
+        while count < end && buffer[count] != '\n' {
             count += 1;
+        }
+
+        if newline_format == .CRLF && count >= 1 {
+            if buffer[count - 1] == '\r' && !consume_newline {
+                count -= 1;
+            }
         }
 
         if consume_newline && count < end {
@@ -348,12 +368,19 @@ read_line :: (use reader: &Reader, consume_newline := true, allocator := context
         }
 
         count := start;
-        while count < end && buffer[count] != #char "\n" {
+        while count < end && buffer[count] != '\n' {
             count += 1;
         }
 
-        if buffer[count] == #char "\n" {
+        if buffer[count] == '\n' {
             if consume_newline && count < end do count += 1;
+
+            if newline_format == .CRLF && count >= 1 {
+                if buffer[count - 1] == '\r' && !consume_newline {
+                    count -= 1;
+                }
+            }
+
             done = true;
         }
 
@@ -395,11 +422,11 @@ read_word :: (use reader: &Reader, numeric_allowed := false, allocator := contex
 
         while count < end {
             curr := buffer[count];
-            if  (curr >= #char "a" && curr <= #char "z") ||
-                (curr >= #char "A" && curr <= #char "Z") ||
-                 curr == #char "_" {
+            if  (curr >= 'a' && curr <= 'z') ||
+                (curr >= 'A' && curr <= 'Z') ||
+                 curr == '_' {
                 count += 1;
-            } elseif numeric_allowed && (curr >= #char "0" && curr <= #char "9") {
+            } elseif numeric_allowed && (curr >= '0' && curr <= '9') {
                 count += 1;
             } else {
                 break;
@@ -415,11 +442,11 @@ read_word :: (use reader: &Reader, numeric_allowed := false, allocator := contex
         count := start;
         while count < end {
             curr := buffer[count];
-            if  (curr >= #char "a" && curr <= #char "z") ||
-                (curr >= #char "A" && curr <= #char "Z") ||
-                 curr == #char "_" {
+            if  (curr >= 'a' && curr <= 'z') ||
+                (curr >= 'A' && curr <= 'Z') ||
+                 curr == '_' {
                 count += 1;
-            } elseif numeric_allowed && (curr >= #char "0" && curr <= #char "9") {
+            } elseif numeric_allowed && (curr >= '0' && curr <= '9') {
                 count += 1;
             } else {
                 done = true;
@@ -539,7 +566,7 @@ advance_line :: (use reader: &Reader) {
         }
 
         defer start += 1;
-        if buffer[start] == #char "\n" {
+        if buffer[start] == '\n' {
             return;
         }
     }
@@ -556,7 +583,7 @@ skip_whitespace :: (use reader: &Reader) {
         }
 
         switch buffer[start] {
-            case #char " ", #char "\t", #char "\n", #char "\r" {
+            case ' ', '\t', '\n', '\r' {
                 start += 1;
             }
 
