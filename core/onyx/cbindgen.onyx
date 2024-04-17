@@ -119,7 +119,7 @@ generate_c_binding :: (use binding_config: Binding_Config) -> bool {
 module_path :: (file_path: str) -> str {
     out := file_path;
     while out.count > 0 {
-        if out[out.count - 1] == #char "/" || out[out.count - 1] == #char "\\" do break;
+        if out[out.count - 1] == '/' || out[out.count - 1] == '\\' do break;
         out.count -= 1;
     }
 
@@ -158,7 +158,7 @@ compile_c_file :: (
         }
 
         if flags != "" {
-            for string.split(flags, #char " ") do args << it;
+            for string.split(flags, ' ') do args << it;
         }
 
         args << "-o";

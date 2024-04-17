@@ -66,48 +66,48 @@ encode :: #match {
     },
 
     (w: ^io.Writer, v: [] $T) -> Encoding_Error {
-        io.write_byte(w, #char "[");
+        io.write_byte(w, '[');
 
         for i in v.count {
-            if i > 0 do io.write_byte(w, #char ",");
+            if i > 0 do io.write_byte(w, ',');
 
             err := encode(w, v[i]);
             if err != .None do return err;
         }
 
-        io.write_byte(w, #char "]");
+        io.write_byte(w, ']');
         return .None;
     },
 
     (w: ^io.Writer, v: [..] $T) -> Encoding_Error {
-        io.write_byte(w, #char "[");
+        io.write_byte(w, '[');
 
         for i in v.count {
-            if i > 0 do io.write_byte(w, #char ",");
+            if i > 0 do io.write_byte(w, ',');
 
             err := encode(w, v[i]);
             if err != .None do return err;
         }
 
-        io.write_byte(w, #char "]");
+        io.write_byte(w, ']');
         return .None;
     },
 
     (w: ^io.Writer, v: Map(str, $T)) -> Encoding_Error {
-        io.write_byte(w, #char "{");
+        io.write_byte(w, '{');
 
         for i in v.entries.count {
-            if i > 0 do io.write_byte(w, #char ",");
+            if i > 0 do io.write_byte(w, ',');
             entry := ^v.entries[i];
 
             io.write_escaped_str(w, entry.key);
-            io.write_byte(w, #char ":");
+            io.write_byte(w, ':');
 
             err := encode(w, entry.value);
             if err != .None do return err;
         }
 
-        io.write_byte(w, #char "}");
+        io.write_byte(w, '}');
         return .None;
     },
 
@@ -121,20 +121,20 @@ encode :: #match {
             case .Array   do   encode(w, v->as_array());
 
             case .Object {
-                io.write_byte(w, #char "{");
+                io.write_byte(w, '{');
                 obj := cast(^_Value_Object) cast(^_Value) v;
 
                 for i in obj.object_.count {
-                    if i > 0 do io.write_byte(w, #char ",");
+                    if i > 0 do io.write_byte(w, ',');
 
                     io.write_escaped_str(w, obj.object_[i].key);
-                    io.write_byte(w, #char ":");
+                    io.write_byte(w, ':');
 
                     err := encode(w, obj.object_[i].value);
                     if err != .None do return err;
                 }
 
-                io.write_byte(w, #char "}");
+                io.write_byte(w, '}');
             }
 
             case _ {

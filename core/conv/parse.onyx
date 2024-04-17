@@ -29,7 +29,7 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
         case bool {
             dest := cast(&bool) target;
             *dest = false;
-            if to_parse[0] == #char "t" || to_parse[0] == #char "T" {
+            if to_parse[0] == 't' || to_parse[0] == 'T' {
                 *dest = true;
             }
             return true;
@@ -71,7 +71,7 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
             
             // If the string does *look* like a quoted string,
             // simply return a copy of the whole string.
-            if to_parse[0] != #char "\"" {
+            if to_parse[0] != '"' {
                 *dest = string.copy(to_parse, string_allocator);
                 return true;
             }
@@ -80,7 +80,7 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
             line := to_parse;
             string.advance(&line);
 
-            *dest = string.read_until(&line, #char "\"") |> string.copy(string_allocator); // @BUG // This does not handle escaped strings!
+            *dest = string.read_until(&line, '"') |> string.copy(string_allocator); // @BUG // This does not handle escaped strings!
             return true;
         }
 

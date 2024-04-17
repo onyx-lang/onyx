@@ -69,7 +69,7 @@ print :: #match #locked {
         if !x do return;
 
         io.write(&stdio.print_writer, x);
-        if x[x.count - 1] == #char "\n" && stdio.auto_flush do __flush_stdio();
+        if x[x.count - 1] == '\n' && stdio.auto_flush do __flush_stdio();
     },
 
     (x)    => { io.write(&stdio.print_writer, x); },
@@ -147,7 +147,7 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
 
         temp[0] = map_to_ascii(val >> 4);
         temp[1] = map_to_ascii(val & 15);
-        temp[2] = #char " ";
+        temp[2] = ' ';
 
         runtime.platform.__output_string(~~temp);
 
@@ -157,23 +157,23 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
 
     map_to_ascii :: (x: u8) -> u8 {
         return switch x {
-            case 0 =>  #char "0";
-            case 1 =>  #char "1";
-            case 2 =>  #char "2";
-            case 3 =>  #char "3";
-            case 4 =>  #char "4";
-            case 5 =>  #char "5";
-            case 6 =>  #char "6";
-            case 7 =>  #char "7";
-            case 8 =>  #char "8";
-            case 9 =>  #char "9";
-            case 10 => #char "A";
-            case 11 => #char "B";
-            case 12 => #char "C";
-            case 13 => #char "D";
-            case 14 => #char "E";
-            case 15 => #char "F";
-            case _ => #char "X";
+            case 0 =>  '0';
+            case 1 =>  '1';
+            case 2 =>  '2';
+            case 3 =>  '3';
+            case 4 =>  '4';
+            case 5 =>  '5';
+            case 6 =>  '6';
+            case 7 =>  '7';
+            case 8 =>  '8';
+            case 9 =>  '9';
+            case 10 => 'A';
+            case 11 => 'B';
+            case 12 => 'C';
+            case 13 => 'D';
+            case 14 => 'E';
+            case 15 => 'F';
+            case _ => 'X';
         };
     }
 }

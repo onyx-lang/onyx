@@ -89,12 +89,12 @@ main :: (args: [] cstr) {
             string.advance(&file, 3);
 
 			i := 35;
-            m, file~ := string.bisect(file, #char "\n");
+            m, file~ := string.bisect(file, '\n');
             for ch in m {
 				switch ch {
-					case #char "0" do mask[i] = 0;
-					case #char "1" do mask[i] = 1;
-					case #char "X" do mask[i] = 2;
+					case '0' do mask[i] = 0;
+					case '1' do mask[i] = 1;
+					case 'X' do mask[i] = 2;
 				}
 
 				i -= 1;

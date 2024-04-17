@@ -60,11 +60,11 @@ main :: (args: [] cstr) {
 
     z := 0;
     while !string.empty(file) {
-        line, file~ := string.bisect(file, #char "\n");
+        line, file~ := string.bisect(file, '\n');
 
         x := 0;
         for ch in line {
-            if ch == #char "#" do map.put(&cubes, .{ x, 0, z, 0 }, .{ alive = true });
+            if ch == '#' do map.put(&cubes, .{ x, 0, z, 0 }, .{ alive = true });
 
             x += 1;
         }

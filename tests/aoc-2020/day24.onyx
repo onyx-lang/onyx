@@ -41,24 +41,24 @@ main :: (args: [] cstr) {
 		s := 0;
 		for ch in line do switch s {
 			case 0 do switch ch {
-				case #char "e" do loc.x += 1;
-				case #char "w" do loc.x -= 1;
-				case #char "n" do s = 1;
-				case #char "s" do s = 2;
+				case 'e' do loc.x += 1;
+				case 'w' do loc.x -= 1;
+				case 'n' do s = 1;
+				case 's' do s = 2;
 			}
 
 			case 1 {
 				switch ch {
-					case #char "e" { loc.x += 1; loc.y -= 1; }
-					case #char "w" { loc.y -= 1; }
+					case 'e' { loc.x += 1; loc.y -= 1; }
+					case 'w' { loc.y -= 1; }
 				}
 				s = 0;
 			}
 
 			case 2 {
 				switch ch {
-					case #char "e" { loc.y += 1; }
-					case #char "w" { loc.x -= 1; loc.y += 1; }
+					case 'e' { loc.y += 1; }
+					case 'w' { loc.x -= 1; loc.y += 1; }
 				}
 				s = 0;
 			}

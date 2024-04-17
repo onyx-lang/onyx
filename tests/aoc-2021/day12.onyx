@@ -26,7 +26,7 @@ main :: (args) => {
         line := io.read_line(&reader, consume_newline=true);
 
         left, right := do {
-            parts := string.split(line, #char "-");
+            parts := string.split(line, '-');
             defer memory.free_slice(&parts);
             return string.strip_whitespace(parts[0]), string.strip_whitespace(parts[1]);
         };
@@ -54,7 +54,7 @@ main :: (args) => {
 
     cannot_visit_multiple :: (name) => {
         c := name[0];
-        return c >= #char "a" && c <= #char "z";
+        return c >= 'a' && c <= 'z';
     }
 
     edge_map: Map(str, [] str);

@@ -471,7 +471,7 @@ str_to_ipv4 :: (ip: str) -> u32 {
     res: u32;
     shift := 0;
     for 4 {
-        octet := string.read_until(&ip_, #char ".");
+        octet := string.read_until(&ip_, '.');
         string.advance(&ip_, 1);
 
         res |= cast(u32) (conv.str_to_i64(octet) & cast(i64) 0xFF) << shift;

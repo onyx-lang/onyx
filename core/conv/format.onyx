@@ -266,9 +266,9 @@ format_va :: (output: &Format_Output, format: str, va: [] any) -> str {
         ch := format[i];
         formatting := Format.{};
 
-        if ch == #char "{" {
-            if format[i + 1] == #char "{" {
-                output->write(#char "{");
+        if ch == '{' {
+            if format[i + 1] == '{' {
+                output->write('{');
                 i += 1;
                 continue;
             }
@@ -286,18 +286,18 @@ format_va :: (output: &Format_Output, format: str, va: [] any) -> str {
 
                 ch = format[i];
                 switch ch {
-                    case #char "*" {
+                    case '*' {
                         i += 1;
                         formatting.dereference = true;
                     }
 
-                    case #char "." {
+                    case '.' {
                         i += 1;
 
                         digits := 0;
-                        while format[i] >= #char "0" && format[i] <= #char "9" {
+                        while format[i] >= '0' && format[i] <= '9' {
                             digits *= 10;
-                            digits += ~~(format[i] - #char "0");
+                            digits += ~~(format[i] - '0');
                             i += 1;
                         }
 
@@ -305,63 +305,63 @@ format_va :: (output: &Format_Output, format: str, va: [] any) -> str {
                         formatting.digits_after_decimal = digits;
                     }
 
-                    case #char "p" {
+                    case 'p' {
                         i += 1;
                         formatting.pretty_printing = true;
                     }
 
-                    case #char "x" {
+                    case 'x' {
                         i += 1;
                         formatting.base = 16;
                     }
 
-                    case #char "b" {
+                    case 'b' {
                         i += 1;
 
                         digits := 0;
-                        while format[i] >= #char "0" && format[i] <= #char "9" {
+                        while format[i] >= '0' && format[i] <= '9' {
                             digits *= 10;
-                            digits += ~~(format[i] - #char "0");
+                            digits += ~~(format[i] - '0');
                             i += 1;
                         }
 
                         formatting.base = ~~digits;
                     }
 
-                    case #char "w" {
+                    case 'w' {
                         i += 1;
 
                         digits := 0;
-                        while format[i] >= #char "0" && format[i] <= #char "9" {
+                        while format[i] >= '0' && format[i] <= '9' {
                             digits *= 10;
-                            digits += ~~(format[i] - #char "0");
+                            digits += ~~(format[i] - '0');
                             i += 1;
                         }
 
                         formatting.minimum_width = digits;
                     }
 
-                    case #char "!" {
+                    case '!' {
                         i += 1;
                         formatting.custom_format = false;
                     }
 
-                    case #char "\"" {
+                    case '"' {
                         i += 1;
                         formatting.quote_strings = true;
                     }
 
-                    case #char "'" {
+                    case '\'' {
                         i += 1;
                         formatting.single_quote_strings = true;
                     }
 
-                    case #char "d" {
+                    case 'd' {
                         i += 1;
                         formatting.interpret_numbers = false;
                     }
 
-                    case #char "}" {
+                    case '}' {
                         arg := va[vararg_index];
                         vararg_index += 1;
                         format_any(output, &formatting, arg);
@@ -380,9 +380,9 @@ format_va :: (output: &Format_Output, format: str, va: [] any) -> str {
             }
         }
 
-        if ch == #char "}" {
-            if format[i + 1] == #char "}" {
-                output->write(#char "}");
+        if ch == '}' {
+            if format[i + 1] == '}' {
+                output->write('}');
                 i += 1;
                 continue;
             }
@@ -499,7 +499,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
             // @Todo // escape '"' when quote_strings is enabled.
             output->write(to_output);
             if to_output.count < width && !(formatting.quote_strings || formatting.single_quote_strings) {
-                for width - to_output.count do output->write(#char " ");
+                for width - to_output.count do output->write(' ');
             }
 
             if formatting.quote_strings do output->write("\"");
@@ -558,8 +558,8 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                         if member != s.members.data do output->write(", ");
 
                         if formatting.pretty_printing {
-                            output->write(#char "\n");
-                            for i in format.indentation do output->write(#char " ");
+                            output->write('\n');
+                            for i in format.indentation do output->write(' ');
                         }
 
                         output->write(member.name);
@@ -570,8 +570,8 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 }
                 
                 if formatting.pretty_printing {
-                    output->write(#char "\n");
-                    for i in formatting.indentation do output->write(#char " ");
+                    output->write('\n');
+                    for i in formatting.indentation do output->write(' ');
                     output->write("}");
                     
                 } else {
@@ -621,7 +621,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
 
                     if formatting.pretty_printing {
                         output->write("\n");
-                        for _ in format.indentation do output->write(#char " ");
+                        for _ in format.indentation do output->write(' ');
                     }
 
                     format_any(output, &format, .{ cast([&] u8) data + get_type_info(a.of).size * i, a.of });
@@ -631,8 +631,8 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 if formatting.pretty_printing {
                     format.indentation -= 4;
                     output->write("\n");
-                    for _ in format.indentation do output->write(#char " ");
-                    output->write(#char "]");
+                    for _ in format.indentation do output->write(' ');
+                    output->write(']');
 
                 } else {
                     output->write(" ]");

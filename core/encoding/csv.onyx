@@ -84,7 +84,7 @@ CSV.ingress :: (csv: &CSV, reader: &io.Reader, headers_present := true) -> bool 
         header_line := reader->read_line(allocator=context.temp_allocator)
                     |> string.strip_trailing_whitespace();
 
-        for header in string.split_iter(header_line, #char ",") {
+        for header in string.split_iter(header_line, ',') {
             member := array.first(output_type_info.members, [](do {
                 if tag := array.first(it.tags, [t](t.type == CSV_Column)); tag {
                     return any_as(*tag, CSV_Column).name == header;
@@ -105,7 +105,7 @@ CSV.ingress :: (csv: &CSV, reader: &io.Reader, headers_present := true) -> bool 
     for line in reader->lines(allocator = context.temp_allocator) {
         out: csv.Output_Type;
 
-        for entry in string.split_iter(string.strip_trailing_whitespace(line), #char ",")
+        for entry in string.split_iter(string.strip_trailing_whitespace(line), ',')
                 |> iter.enumerate()
         {
             header := &any_headers[entry.index];

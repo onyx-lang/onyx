@@ -28,14 +28,14 @@ main :: (args) => {
     to_try := heap.make(queued, (x, y) => x.cost - y.cost);
     tried := set.make(pos);
 
-    to_try << .{ 0, 0, -cast(i32) (cells[0] - #char "0") };
+    to_try << .{ 0, 0, -cast(i32) (cells[0] - '0') };
 
     minimum := 0;
     while !heap.empty(&to_try) {
         try := heap.remove_top(&to_try)->unwrap();
         tried << .{try.x, try.y};
 
-        cell_value := cast(u32) (cells[(try.y % height) * width + (try.x % width)] - #char "0");
+        cell_value := cast(u32) (cells[(try.y % height) * width + (try.x % width)] - '0');
         cell_value = ((cell_value - 1 + (try.y / height) + (try.x / width)) % 9) + 1;
         cell_value += try.cost;
 
@@ -76,7 +76,7 @@ main :: (args) => {
             if y > 0 do a = min_paths[(y - 1) * width * 5 + x];
             if x > 0 do b = min_paths[y * width * 5 + (x - 1)];
 
-            cell_value := cast(u32) (cells[(y % height) * width + (x % width)] - #char "0");
+            cell_value := cast(u32) (cells[(y % height) * width + (x % width)] - '0');
             cell_value = ((cell_value - 1 + (y / height) + (x / width)) % 9) + 1;
 
             min_paths[y * width * 5 + x] = math.min(a, b) + cell_value;

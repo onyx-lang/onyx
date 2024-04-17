@@ -85,7 +85,7 @@ any_nested_selector :: (v: any, member_name: str) -> any {
     t := get_type_info(v.type);
     if t.kind != .Struct do return .{};
 
-    part_name, next_name := string.bisect(member_name, #char ".");
+    part_name, next_name := string.bisect(member_name, '.');
 
     member := get_struct_member(v.type, part_name);
     if member {

@@ -1393,6 +1393,7 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
             case 'v':  *dest++ = '\v'; total_len++; break;
             case 'e':  *dest++ = '\e'; total_len++; break;
             case '"':  *dest++ = '"';  total_len++; break;
+            case '\'': *dest++ = '\''; total_len++; break;
             case '\\': *dest++ = '\\'; total_len++; break;
             case 'x': {
                 u8 ch1 = src[i + 1];

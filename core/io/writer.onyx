@@ -180,7 +180,7 @@ write_format_va :: (use writer: &Writer, format: str, va: [] any) {
 }
 
 write_escaped_str :: (use writer: &Writer, s: str) {
-    write_byte(writer, #char "\"");
+    write_byte(writer, '"');
 
     while i := 0; i < s.count {
         defer i += 1;
@@ -188,15 +188,15 @@ write_escaped_str :: (use writer: &Writer, s: str) {
 
         // @Incomplete
         switch ch {
-            case #char "\n" { write_byte(writer, #char "\\"); write_byte(writer, #char "n");  }
-            case #char "\r" { write_byte(writer, #char "\\"); write_byte(writer, #char "r");  }
-            case #char "\t" { write_byte(writer, #char "\\"); write_byte(writer, #char "t");  }
-            case #char "\v" { write_byte(writer, #char "\\"); write_byte(writer, #char "v");  }
-            case #char "\b" { write_byte(writer, #char "\\"); write_byte(writer, #char "b");  }
-            case #char "\f" { write_byte(writer, #char "\\"); write_byte(writer, #char "f");  }
-            case #char "\0" { write_byte(writer, #char "\\"); write_byte(writer, #char "0");  }
-            case #char "\"" { write_byte(writer, #char "\\"); write_byte(writer, #char "\""); }
-            case #char "\\" { write_byte(writer, #char "\\"); write_byte(writer, #char "\\"); }
+            case '\n' { write_byte(writer, '\\'); write_byte(writer, 'n');  }
+            case '\r' { write_byte(writer, '\\'); write_byte(writer, 'r');  }
+            case '\t' { write_byte(writer, '\\'); write_byte(writer, 't');  }
+            case '\v' { write_byte(writer, '\\'); write_byte(writer, 'v');  }
+            case '\b' { write_byte(writer, '\\'); write_byte(writer, 'b');  }
+            case '\f' { write_byte(writer, '\\'); write_byte(writer, 'f');  }
+            case '\0' { write_byte(writer, '\\'); write_byte(writer, '0');  }
+            case '"'  { write_byte(writer, '\\'); write_byte(writer, '"'); }
+            case '\\' { write_byte(writer, '\\'); write_byte(writer, '\\'); }
 
             case _ {
                 // @Speed
@@ -205,7 +205,7 @@ write_escaped_str :: (use writer: &Writer, s: str) {
         } 
     }
 
-    write_byte(writer, #char "\"");
+    write_byte(writer, '"');
 }
 
 write :: #match {

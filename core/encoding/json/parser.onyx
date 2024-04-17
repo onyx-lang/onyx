@@ -241,7 +241,7 @@ unescape_string :: (token: Token, allocator: Allocator) -> str {
 
     i := 0;
     for c in s {
-        if c == #char "\\" || c == #char "\"" || c < #char " " {
+        if c == '\\' || c == '"' || c < ' ' {
             break;
         }
 
@@ -260,54 +260,54 @@ unescape_string :: (token: Token, allocator: Allocator) -> str {
         c := s[i];
 
         switch c {
-            case #char "\\" {
+            case '\\' {
                 i += 1;
                 if i >= s.count do break break;
 
                 switch s[i] {
-                    case #char "\"", #char "\\",  #char "/" {
+                    case '"', '\\',  '/' {
                         buffer[buffer_write] = s[i];
                         i += 1;
                         buffer_write += 1;
                     }
 
-                    case #char "n" {
-                        buffer[buffer_write] = #char "\n";
+                    case 'n' {
+                        buffer[buffer_write] = '\n';
                         i += 1;
                         buffer_write += 1;
                     }
 
-                    case #char "t" {
-                        buffer[buffer_write] = #char "\t";
+                    case 't' {
+                        buffer[buffer_write] = '\t';
                         i += 1;
                         buffer_write += 1;
                     }
 
-                    case #char "r" {
-                        buffer[buffer_write] = #char "\r";
+                    case 'r' {
+                        buffer[buffer_write] = '\r';
                         i += 1;
                         buffer_write += 1;
                     }
 
-                    case #char "b" {
-                        buffer[buffer_write] = #char "\b";
+                    case 'b' {
+                        buffer[buffer_write] = '\b';
                         i += 1;
                         buffer_write += 1;
                     }
 
-                    case #char "f" {
-                        buffer[buffer_write] = #char "\f";
+                    case 'f' {
+                        buffer[buffer_write] = '\f';
                         i += 1;
                         buffer_write += 1;
                     }
 
-                    case #char "v" {
-                        buffer[buffer_write] = #char "\v";
+                    case 'v' {
+                        buffer[buffer_write] = '\v';
                         i += 1;
                         buffer_write += 1;
                     }
 
-                    case #char "u" {
+                    case 'u' {
                         i += 1;
                         wrote, consumed := parse_and_write_utf8_character(s[i..s.length], ~~&buffer[buffer_write]);
                         buffer_write += wrote;

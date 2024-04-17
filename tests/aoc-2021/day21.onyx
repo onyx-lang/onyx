@@ -41,8 +41,8 @@ main :: () {
         l1 := r->read_line(consume_newline=true);
         l2 := r->read_line(consume_newline=true);
 
-        _, s1 := string.bisect(l1, #char ":");
-        _, s2 := string.bisect(l2, #char ":");
+        _, s1 := string.bisect(l1, ':');
+        _, s2 := string.bisect(l2, ':');
 
         string.strip_whitespace(&s1);
         string.strip_whitespace(&s2);
@@ -194,8 +194,8 @@ main :: () {
         l1 := r->read_line(consume_newline=true);
         l2 := r->read_line(consume_newline=true);
 
-        _, s1 := string.bisect(l1, #char ":");
-        _, s2 := string.bisect(l2, #char ":");
+        _, s1 := string.bisect(l1, ':');
+        _, s2 := string.bisect(l2, ':');
 
         string.strip_whitespace(&s1);
         string.strip_whitespace(&s2);

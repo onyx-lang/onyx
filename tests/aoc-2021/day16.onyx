@@ -7,9 +7,9 @@ base16_to_hex :: (s: str) -> u32 {
     for s {
         res *= 16;
         switch it {
-            case #char "0" .. #char "9" do res += ~~(it - #char "0");
-            case #char "a" .. #char "f" do res += ~~(it - #char "a" + 10);
-            case #char "A" .. #char "F" do res += ~~(it - #char "A" + 10);
+            case '0' .. '9' do res += ~~(it - '0');
+            case 'a' .. 'f' do res += ~~(it - 'a' + 10);
+            case 'A' .. 'F' do res += ~~(it - 'A' + 10);
             case _ do break break;
         }
     }

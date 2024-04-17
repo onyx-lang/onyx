@@ -210,8 +210,8 @@ scan_for_monsters :: (forest: [&] u8, ori: TO, width: u32, height: u32) -> bool 
 
             for my in 0 .. sea_monster_height {
                 for mx in 0 .. sea_monster_width {
-                    if sea_monster[mx + my * sea_monster_width] != #char "#" do continue;
-                    if *index_square_with_orientation(forest, ori, width, x + mx, y + my) != #char "." do continue;
+                    if sea_monster[mx + my * sea_monster_width] != '#' do continue;
+                    if *index_square_with_orientation(forest, ori, width, x + mx, y + my) != '.' do continue;
 
                     is_monster = false;
                     break break;
@@ -221,10 +221,10 @@ scan_for_monsters :: (forest: [&] u8, ori: TO, width: u32, height: u32) -> bool 
             if is_monster {
                 for my in 0 .. sea_monster_height {
                     for mx in 0 .. sea_monster_width {
-                        if sea_monster[mx + my * sea_monster_width] != #char "#" do continue;
-                        if *index_square_with_orientation(forest, ori, width, x + mx, y + my) != #char "#" do continue;
+                        if sea_monster[mx + my * sea_monster_width] != '#' do continue;
+                        if *index_square_with_orientation(forest, ori, width, x + mx, y + my) != '#' do continue;
 
-                        *index_square_with_orientation(forest, ori, width, x + mx, y + my) = #char "o";
+                        *index_square_with_orientation(forest, ori, width, x + mx, y + my) = 'o';
                     }
                 }
 
@@ -266,10 +266,10 @@ main :: (args: [] cstr) {
         td := cast([&] bool) raw_alloc(tile_allocator, sizeof TileData);
 
         for y in 0 .. 10 {
-            line, file~ := string.bisect(file, #char "\n");
+            line, file~ := string.bisect(file, '\n');
 
             for x in 0 .. 10 {
-                td[x + y * TILE_DATA_WIDTH] = (line[x] == #char "#");
+                td[x + y * TILE_DATA_WIDTH] = (line[x] == '#');
             }
         }
 
@@ -353,8 +353,8 @@ main :: (args: [] cstr) {
                 for fx in 0 .. 8 {
                     res := *index_square_with_orientation(cast([&] bool) tile.data.data, tile.orientation, 10, fx + 1, fy + 1);
                     loc := (y * 12 * 8 * 8) + (fy * 12 * 8) + (x * 8) + fx;
-                    if res do forest[loc] = #char "#";
-                    else   do forest[loc] = #char ".";
+                    if res do forest[loc] = '#';
+                    else   do forest[loc] = '.';
                 }
             }
         }
@@ -365,7 +365,7 @@ main :: (args: [] cstr) {
     }
     
     safe_count := 0;
-    for c in forest do if c == #char "#" do safe_count += 1;
+    for c in forest do if c == '#' do safe_count += 1;
 
     printf("Safe count: {}\n", safe_count);
 }
