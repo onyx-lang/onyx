@@ -201,6 +201,10 @@ static SymresStatus symres_union_type(AstUnionType* u_node) {
 
         assert(variant->type_node);
         SymresStatus ss = symres_type(&variant->type_node);
+        if (ss == Symres_Success && variant->explicit_tag_value) {
+            ss = symres_expression(&variant->explicit_tag_value);
+        }
+
         if (ss != Symres_Success) {
             u_node->flags &= ~Ast_Flag_Type_Is_Resolved;
             scope_leave();

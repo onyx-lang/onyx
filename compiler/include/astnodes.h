@@ -1105,6 +1105,8 @@ struct AstUnionType {
 struct AstUnionVariant {
     AstTyped_base;
     bh_arr(AstTyped *) meta_tags;
+
+    AstTyped *explicit_tag_value;
 };
 struct AstPolyUnionType {
     AstType_base;

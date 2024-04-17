@@ -2799,6 +2799,10 @@ static AstUnionType* parse_union(OnyxParser* parser) {
         variant->meta_tags = meta_tags;
         variant->token = expect_token(parser, Token_Type_Symbol);
 
+        if (consume_token_if_next(parser, Token_Type_Keyword_As)) {
+            variant->explicit_tag_value = parse_factor(parser);
+        }
+
         expect_token(parser, ':');
 
         variant->type_node = parse_type(parser);

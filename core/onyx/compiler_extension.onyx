@@ -13,7 +13,7 @@ use core.io
 // Types
 
 IncomingMessage :: union {
-    Init: struct {
+    Init as 0: struct {
         compiler_version_major: u32
         compiler_version_minor: u32
         compiler_version_patch: u32
@@ -21,29 +21,29 @@ IncomingMessage :: union {
         max_protocol_version_supported: u32
     }
 
-    Terminate: struct {
+    Terminate as 1: struct {
     }
 
-    ExpandMacro: ExpansionInfo
+    ExpandMacro as 2: ExpansionInfo
 }
 
 OutgoingMessage :: union {
-    Init: struct {
+    Init as 0: struct {
         protocol_version: u32
         name: str
     }
 
-    ErrorReport: struct {
+    ErrorReport as 1: struct {
         position: Position
         msg: str
     }
 
-    Expansion: struct {
+    Expansion as 2: struct {
         id: u32
         code: Result(str, ExpansionFailureReason)
     }
 
-    InjectCode: struct {
+    InjectCode as 3: struct {
         code: str
     }
 }

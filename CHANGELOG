@@ -9,6 +9,8 @@ Additions:
 - Alternative syntax for binding documentation using `///`.
 - **Experimental** compiler extensions feature, currently used to create procedural macros.
 - `core.misc.any_deep_copy`
+- Ability to explicitly specify tag value for tagged unions.
+    - `Variant as value: type`, i.e. `Foo as 3: i32`
 
 Removals:
 - Deprecated the use of `#default` in case statements. Use `_` instead.

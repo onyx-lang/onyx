@@ -824,9 +824,21 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 UnionVariant* uv = bh_alloc_item(alloc, UnionVariant);
                 uv->name = bh_strdup(alloc, variant->token->text);
                 uv->token = variant->token;
-                uv->tag_value = next_tag_value++;
                 uv->meta_tags = variant->meta_tags;
                 uv->type = variant->type;
+
+                if (variant->explicit_tag_value) {
+                    b32 success;
+                    uv->tag_value = get_expression_integer_value(variant->explicit_tag_value, &success);
+                    next_tag_value = uv->tag_value + 1;
+
+                    if (!success) {
+                        onyx_report_error(variant->token->pos, Error_Critical, "Expected a compile-time known integer for explicit value of variant.");
+                        return NULL;
+                    }
+                } else {
+                    uv->tag_value = next_tag_value++;
+                }
 
                 shput(u_type->Union.variants, variant->token->text, uv);
                 token_toggle_end(variant->token);

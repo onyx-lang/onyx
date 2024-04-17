@@ -3366,6 +3366,9 @@ CheckStatus check_union(AstUnionType *u_node) {
     bh_arr_each(AstUnionVariant *, variant, u_node->variants) {
         CHECK(type, &(* variant)->type_node);
         CHECK(meta_tags, (* variant)->meta_tags);
+        if ((*variant)->explicit_tag_value) {
+            CHECK(expression, &(* variant)->explicit_tag_value);
+        }
     }
 
     type_build_from_ast(context.ast_alloc, (AstType *) u_node);
