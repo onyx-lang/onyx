@@ -613,8 +613,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                 i64 lower = ((AstNumLit *) rl->low)->value.l;
                 i64 upper = ((AstNumLit *) rl->high)->value.l;
 
-                // NOTE: This is inclusive!!!!
-                fori (case_value, lower, upper + 1) {
+                fori (case_value, lower, upper) {
                     if (add_case_to_switch_statement(switchnode, case_value, sc, rl->token->pos))
                         return Check_Error;
                 }

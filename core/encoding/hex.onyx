@@ -24,9 +24,9 @@ decode :: (s: str, allocator := context.allocator) -> str {
 
     digit_to_value :: (it: u8) -> u32 {
         return ~~ switch it {
-            case '0' .. '9' => it - '0';
-            case 'a' .. 'f' => it - 'a' + 10;
-            case 'A' .. 'F' => it - 'A' + 10;
+            case '0' ..= '9' => it - '0';
+            case 'a' ..= 'f' => it - 'a' + 10;
+            case 'A' ..= 'F' => it - 'A' + 10;
             case _ => 0;
         };
     }

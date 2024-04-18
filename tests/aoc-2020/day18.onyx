@@ -6,7 +6,7 @@ parse_factor :: (file: &str) -> u64 {
 	string.strip_leading_whitespace(file);
 
 	switch file.data[0] {
-		case '0' .. '9' {
+		case '0' ..= '9' {
 			return conv.parse_int(file);
 		}
 

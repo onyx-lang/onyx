@@ -66,7 +66,7 @@ token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
         case ',' do token.kind = .Comma;
         case ':' do token.kind = .Colon;
 
-        case 'a' .. 'z' {
+        case 'a' ..= 'z' {
             token.kind = .Invalid;
             skip_alpha_numeric(tkn);
 
@@ -78,7 +78,7 @@ token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
 
         case '-' {
             switch data[offset] {
-                case '0' .. '9' ---
+                case '0' ..= '9' ---
                 case _ {
                     err.kind = .Illegal_Character;
                     err.pos  = token.position;
@@ -89,7 +89,7 @@ token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
             fallthrough;
         }
 
-        case '0' .. '9' {
+        case '0' ..= '9' {
             token.kind = .Integer;
             skip_numeric(tkn);
 
@@ -174,7 +174,7 @@ skip_whitespace :: (use tkn: ^Tokenizer) {
 skip_alpha_numeric :: (use tkn: ^Tokenizer) {
     while offset < data.count {
         switch data[offset] {
-            case 'A' .. 'Z', 'a' .. 'z', '0' .. '9', '_' {
+            case 'A' ..= 'Z', 'a' ..= 'z', '0' ..= '9', '_' {
                 next_character(tkn);
                 continue;
             }
@@ -188,7 +188,7 @@ skip_alpha_numeric :: (use tkn: ^Tokenizer) {
 skip_numeric :: (use tkn: ^Tokenizer) {
     while offset < data.count {
         switch data[offset] {
-            case '0' .. '9' {
+            case '0' ..= '9' {
                 next_character(tkn);
                 continue;
             }
@@ -205,9 +205,9 @@ skip_escape :: (use tkn: ^Tokenizer) {
             for i in 4 {
                 ch, _ := next_character(tkn);
                 switch ch {
-                    case '0' .. '9',
-                         'A' .. 'F',
-                         'a' .. 'f' ---
+                    case '0' ..= '9',
+                         'A' ..= 'F',
+                         'a' ..= 'f' ---
 
                     case _ do return;
                 }

@@ -527,9 +527,9 @@ str.read_alphanum :: (s: &str) -> str {
 
     for ch in *s {
         switch ch {
-            case 'a' .. 'z',
-                 'A' .. 'Z',
-                 '0' .. '9' {
+            case 'a' ..= 'z',
+                 'A' ..= 'Z',
+                 '0' ..= '9' {
                 out.count += 1;
             }
 

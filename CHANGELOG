@@ -19,6 +19,7 @@ Changes:
 There are several *breaking* changes in this release related to core library APIs.
 - `Iterator.next` now returns `? T` instead of `(T, bool)`
 - `io.Stream` uses `Result(T, Error)` for return types instead of `(Error, T)`
+- `switch` over a `range` is no longer inclusive by default, since `..=` exists now.
 
 There are also several non-breaking changes.
 - The internal memory layout is different. See pull request #133 for details.
