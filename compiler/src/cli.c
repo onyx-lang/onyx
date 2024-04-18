@@ -433,7 +433,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .no_stale_code           = 0,
         .show_all_errors         = 0,
 
-        .enable_optional_semicolons = 0,
+        .enable_optional_semicolons = 1,
 
         .runtime = Runtime_Onyx,
 
