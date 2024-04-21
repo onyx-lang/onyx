@@ -505,7 +505,6 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         case ONYX_COMPILE_ACTION_RUN:
         case ONYX_COMPILE_ACTION_WATCH:
         case ONYX_COMPILE_ACTION_COMPILE:
-        case ONYX_COMPILE_ACTION_RUN_WASM:
             cli_parse_compilation_options(&options, arg_parse_start, argc, argv);
             break;
 
@@ -519,6 +518,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             break;
 
+        case ONYX_COMPILE_ACTION_RUN_WASM:
         case ONYX_COMPILE_ACTION_PRINT_HELP:
         case ONYX_COMPILE_ACTION_PRINT_VERSION:
         case ONYX_COMPILE_ACTION_DOCUMENT:
