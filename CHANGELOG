@@ -1,6 +1,6 @@
 Release 0.1.11
 --------------
-Not released yet
+21st April 2024
 
 Additions:
 - Ability specify where piped arguments are placed using `_`.
@@ -14,6 +14,7 @@ Additions:
 
 Removals:
 - Deprecated the use of `#default` in case statements. Use `_` instead.
+- Removed `iter.take_one`. Use `iter.next` instead.
 
 Changes:
 There are several *breaking* changes in this release related to core library APIs.
