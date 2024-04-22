@@ -233,10 +233,12 @@ flat_map :: (it: Iterator($T), transform: (T) -> Iterator($R)) =>
             while true {
                 if mi.get_new_inner {
                     mi.get_new_inner = false;
-                    t := next(mi.iterator);
-                    if !t do break;
-
-                    mi.inner_iter = mi.transform(t);
+                    switch next(mi.iterator) {
+                        case .None do break break;
+                        case .Some as t {
+                            mi.inner_iter = mi.transform(t);
+                        }
+                    }
                 }
 
                 value := next(mi.inner_iter);
@@ -259,10 +261,12 @@ flat_map :: (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> Iterator($R)) =
             while true {
                 if mi.get_new_inner {
                     mi.get_new_inner = false;
-                    t := next(mi.iterator);
-                    if !t do break;
-
-                    mi.inner_iter = mi.transform(t, mi.ctx);
+                    switch next(mi.iterator) {
+                        case .None do break break;
+                        case .Some as t {
+                            mi.inner_iter = mi.transform(t, mi.ctx);
+                        }
+                    }
                 }
 
                 value := next(mi.inner_iter);
