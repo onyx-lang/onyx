@@ -374,6 +374,18 @@ all_types_peeled_off:
             return NULL;
         }
 
+        case Ast_Kind_Compiler_Extension: {
+            AstCompilerExtension *ext = (AstCompilerExtension *) node;
+
+            bh_arr_each(AstProceduralMacro *, pmac, ext->proc_macros) {
+                if (token_text_equals((*pmac)->token, symbol)) {
+                    return (AstNode *) *pmac;
+                }
+            }
+
+            return NULL;
+        }
+
         default: break;
     }
 
@@ -1381,6 +1393,7 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
             case 'v':  *dest++ = '\v'; total_len++; break;
             case 'e':  *dest++ = '\e'; total_len++; break;
             case '"':  *dest++ = '"';  total_len++; break;
+            case '\'': *dest++ = '\''; total_len++; break;
             case '\\': *dest++ = '\\'; total_len++; break;
             case 'x': {
                 u8 ch1 = src[i + 1];

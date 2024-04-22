@@ -110,7 +110,7 @@ main :: (args: [] cstr) {
     defer array.free(&player2);
 
     string.advance_line(&file); // 'Player 1:'
-    while file[0] != #char "\n" {
+    while file[0] != '\n' {
         card := cast(u32, conv.parse_int(&file));
         array.push(&player1, card);
 

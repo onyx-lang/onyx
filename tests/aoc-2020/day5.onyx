@@ -11,14 +11,14 @@ main :: (args: [] cstr) {
     max_val := 0;
 
     while true {
-        line := string.read_until(&contents, #char "\n");
+        line := string.read_until(&contents, '\n');
         string.advance(&contents);
         if line.count == 0 do break;
 
         val := 0;
         for ch in line {
             val *= 2;
-            if ch == #char "B" || ch == #char "R" do val += 1;
+            if ch == 'B' || ch == 'R' do val += 1;
         }
 
         max_val = math.max(max_val, val);

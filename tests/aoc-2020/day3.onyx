@@ -24,7 +24,7 @@ main :: (args: [] cstr) {
     width := 0;
     height := 0;
     while true {
-        line := string.read_until(&contents, #char "\n");
+        line := string.read_until(&contents, '\n');
         string.advance(&contents, 1);
         if line.count == 0 do break;
 
@@ -53,7 +53,7 @@ main :: (args: [] cstr) {
 
             p.x %= width;
 
-            if forest[p.x + p.y * width] == #char "#" do tree_count += 1;
+            if forest[p.x + p.y * width] == '#' do tree_count += 1;
         }
 
         tree_prod *= tree_count;

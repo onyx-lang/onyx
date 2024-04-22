@@ -119,6 +119,10 @@ static const char* ast_node_names[] = {
 
     "JS CODE",
 
+    "COMPILER EXTENSION",
+    "PROCEDURAL MACRO",
+    "PROCEDURAL EXPANSION",
+
     "AST_NODE_KIND_COUNT",
 };
 
@@ -167,6 +171,8 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Static If",
     "String Literal",
     "File Contents",
+    "CompilerExtension",
+    "Procedural Expansion",
     "Enum",
     "Enum Value",
     "Type Alias",
@@ -1468,6 +1474,8 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
 
 TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
     AstTyped *node = *pnode;
+
+    if (!node->type) return TYPE_MATCH_YIELD;
 
     if ((node->type->kind == Type_Kind_Basic && node->type->Basic.kind == Basic_Kind_Rawptr)
         || (node->type->kind == Type_Kind_Pointer)

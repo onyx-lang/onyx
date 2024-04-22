@@ -89,6 +89,8 @@ typedef enum TokenType {
 
     Token_Type_Doc_Comment,
 
+    Token_Type_Proc_Macro_Body,
+
     Token_Type_Count,
 } TokenType;
 

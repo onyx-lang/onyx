@@ -31,7 +31,7 @@ Template_Directory :: () -> str {
             |> string.copy();
 }
 
-Version :: SemVer.{0, 1, 10}
+Version :: SemVer.{0, 1, 11}
 
 
 
@@ -824,7 +824,7 @@ run_native_library_installation :: (folder: str) -> (bool, str) {
 
     info_print("Install", "Running installation of '{}'\n", folder);    
 
-    args := string.split(inner_config.native_library_build->unwrap(), #char " ", context.temp_allocator);
+    args := string.split(inner_config.native_library_build->unwrap(), ' ', context.temp_allocator);
     cmd  := args[0];
     args  = args[1 .. args.count];
 
@@ -877,7 +877,7 @@ native_library_is_up_to_date :: (folder: str) -> bool {
 }
 
 run_command_and_forward_output :: (cmd: str) => {
-    args := string.split(cmd, #char " ", context.temp_allocator);
+    args := string.split(cmd, ' ', context.temp_allocator);
     prog := args[0];
     args  = args[1 .. args.count];
 
@@ -943,11 +943,11 @@ SemVer :: struct {
     parse :: (semver: &SemVer, to_parse_: str, _: Allocator) -> bool {
         to_parse := to_parse_;
 
-        major := string.read_until(&to_parse, #char ".") |> conv.str_to_i64();
+        major := string.read_until(&to_parse, '.') |> conv.str_to_i64();
         string.advance(&to_parse);
-        minor := string.read_until(&to_parse, #char ".") |> conv.str_to_i64();
+        minor := string.read_until(&to_parse, '.') |> conv.str_to_i64();
         string.advance(&to_parse);
-        patch := string.read_until(&to_parse, #char ".") |> conv.str_to_i64();
+        patch := string.read_until(&to_parse, '.') |> conv.str_to_i64();
 
         if major == 0 && minor == 0 && patch == 0 do return false;
 
@@ -1026,10 +1026,10 @@ Git :: struct {
         git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", repo]);
         r := io.reader_make(&git_proc);
         for r->lines(inplace=true) {
-            last_slash := string.last_index_of(it, #char "/");
+            last_slash := string.last_index_of(it, '/');
             tag_name   := it[last_slash+1 .. it.count-1];
 
-            if tag_name[0] != #char "v" do continue;
+            if tag_name[0] != 'v' do continue;
             string.advance(&tag_name);
 
             version: SemVer;
@@ -1485,13 +1485,13 @@ IniConfig :: struct {
     while true {
         r->skip_whitespace();
         if r->is_empty() do return true;
-        if p, _ := r->peek_byte(); p == #char "[" do return true;
+        if p, _ := r->peek_byte(); p == '[' do return true;
 
-        dep := r->read_until(#char "=") |> string.strip_trailing_whitespace();
+        dep := r->read_until('=') |> string.strip_trailing_whitespace();
         r->read_byte();
         r->skip_whitespace();
 
-        version_str := r->read_until(#char "\n") |> string.strip_trailing_whitespace();
+        version_str := r->read_until('\n') |> string.strip_trailing_whitespace();
         version: SemVer;
         conv.parse_any(&version, version_str);
         dependencies.dependencies[dep] = version;
@@ -1512,13 +1512,13 @@ IniConfig :: struct {
     while true {
         r->skip_whitespace();
         if r->is_empty() do return true;
-        if p, _ := r->peek_byte(); p == #char "[" do return true;
+        if p, _ := r->peek_byte(); p == '[' do return true;
 
-        dep := r->read_until(#char "=") |> string.strip_trailing_whitespace();
+        dep := r->read_until('=') |> string.strip_trailing_whitespace();
         r->read_byte();
         r->skip_whitespace();
 
-        folder := r->read_until(#char "\n") |> string.strip_trailing_whitespace();
+        folder := r->read_until('\n') |> string.strip_trailing_whitespace();
         dependencies.folders[dep] = folder;
     }
 

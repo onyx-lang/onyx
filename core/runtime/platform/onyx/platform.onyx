@@ -40,26 +40,37 @@ Supports_TTY :: true
 }
 
 __output_string :: (s: str) -> u32 {
-    err, wrote := io.stream_write(&__stdout, s);
+    wrote := io.stream_write(&__stdout, s).Ok ?? 0;
     return wrote;
 }
 
 __output_error :: (s: str) -> u32 {
-    err, wrote := io.stream_write(&__stderr, s);
+    wrote := io.stream_write(&__stderr, s).Ok ?? 0;
     return wrote;
 }
 
 __read_from_input :: (buffer: [] u8) -> i32 {
-    err, read := io.stream_read(&__stdin, buffer);
-    if err == .ReadPending do return 0;
-    if err != .None do return -1;
-    return read;
+    switch io.stream_read(&__stdin, buffer) {
+        case .Err as err {
+            if err == .ReadPending do return 0;
+            return -1;
+        }
+
+        case .Ok as read {
+            return read;
+        }
+    }
 }
 
 __wait_for_input :: (timeout: i32) -> bool {
-    err, ready := io.stream_poll(&__stdin, .Read, timeout);
-    if err != .None do return false;
-    return ready;
+    switch io.stream_poll(&__stdin, .Read, timeout) {
+        case .Err as err {
+            return false;
+        }
+        case .Ok as ready{
+            return ready;
+        }
+    }
 }
 
 

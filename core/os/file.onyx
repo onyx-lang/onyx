@@ -67,7 +67,7 @@ get_contents_from_file :: (file: &File) -> str {
 
     data := cast([&] u8) raw_alloc(context.allocator, size);
 
-    _, prev_loc := io.stream_tell(file);
+    prev_loc := io.stream_tell(file).Ok ?? 0;
     io.stream_seek(file, 0, .Start);
 
     io.stream_read(file, .{ data, size });

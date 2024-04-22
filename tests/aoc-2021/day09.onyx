@@ -76,7 +76,7 @@ main :: (args) => {
         io.skip_whitespace(&reader);
 
         for line.count {
-            heightmap[Pos.{it, height}] = Cell.{cast(u32) (line[it] - #char "0")};
+            heightmap[Pos.{it, height}] = Cell.{cast(u32) (line[it] - '0')};
         }
 
         width = line.count;

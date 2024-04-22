@@ -74,11 +74,11 @@ main :: (args: [] cstr) {
     gos.height = 0;
 
     while !string.empty(file) {
-        line, file~ := string.bisect(file, #char "\n");
+        line, file~ := string.bisect(file, '\n');
         for ch in line do switch ch {
-            case #char "." do array.push(&gos.seats, SeatState.Floor);
-            case #char "L" do array.push(&gos.seats, SeatState.Empty);
-            case #char "#" do array.push(&gos.seats, SeatState.Occupied);
+            case '.' do array.push(&gos.seats, SeatState.Floor);
+            case 'L' do array.push(&gos.seats, SeatState.Empty);
+            case '#' do array.push(&gos.seats, SeatState.Occupied);
         }
 
         gos.width = line.count;

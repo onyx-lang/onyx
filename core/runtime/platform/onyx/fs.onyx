@@ -85,40 +85,45 @@ __file_stream_vtable := io.Stream_Vtable.{
         return (.None) if now >= 0 else .BadFile;
     },
 
-    tell = (use fs: &os.File) -> (io.Error, u32) {
-        return .None, __file_tell(data);
+    tell = (use fs: &os.File) -> Result(u32, io.Error) {
+        return .{ Ok = __file_tell(data) };
     },
 
-    read = (use fs: &os.File, buffer: [] u8) -> (io.Error, u32) {
+    read = (use fs: &os.File, buffer: [] u8) -> Result(u32, io.Error) {
         bytes_read: u64;
         error := __file_read(data, buffer, &bytes_read);
-        return error, ~~bytes_read;
+        if error != .None do return .{ Err = error };
+        return .{ Ok = ~~bytes_read };
     },
 
-    read_at = (use fs: &os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
+    read_at = (use fs: &os.File, at: u32, buffer: [] u8) -> Result(u32, io.Error) {
         __file_seek(data, at, .Start);
         bytes_read: u64;
         error := __file_read(data, buffer, &bytes_read);
-        return error, ~~bytes_read;
+        if error != .None do return .{ Err = error };
+        return .{ Ok = ~~bytes_read };
     },
 
-    read_byte = (use fs: &os.File) -> (io.Error, u8) {
+    read_byte = (use fs: &os.File) -> Result(u8, io.Error) {
         byte: u8;
         error := __file_read(data, ~~ cast([1] u8) &byte, null);
-        return error, byte;
+        if error != .None do return .{ Err = error };
+        return .{ Ok = byte };
     },
 
-    write = (use fs: &os.File, buffer: [] u8) -> (io.Error, u32) {
+    write = (use fs: &os.File, buffer: [] u8) -> Result(u32, io.Error) {
         bytes_wrote: u64;
         error := __file_write(data, buffer, &bytes_wrote);
-        return error, ~~bytes_wrote;
+        if error != .None do return .{ Err = error };
+        return .{ Err = ~~bytes_wrote };
     },
 
-    write_at = (use fs: &os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
+    write_at = (use fs: &os.File, at: u32, buffer: [] u8) -> Result(u32, io.Error) {
         __file_seek(data, at, .Start);
         bytes_wrote: u64;
         error := __file_write(data, buffer, &bytes_wrote);
-        return error, ~~bytes_wrote;
+        if error != .None do return .{ Err = error };
+        return .{ Ok = ~~bytes_wrote };
     },
 
     write_byte = (use fs: &os.File, byte: u8) -> io.Error {
@@ -141,7 +146,7 @@ __file_stream_vtable := io.Stream_Vtable.{
         return __file_size(data);
     },
 
-    poll = (use fs: &os.File, ev: io.PollEvent, timeout: i32) -> (io.Error, bool) {
+    poll = (use fs: &os.File, ev: io.PollEvent, timeout: i32) -> Result(bool, io.Error) {
         fds: [1] PollDescription;
         fds[0] = .{
             fd = ~~data,
@@ -151,10 +156,10 @@ __file_stream_vtable := io.Stream_Vtable.{
         __poll(fds, timeout);
 
         if fds[0].out_events == .Closed {
-            return .EOF, ev == .Closed;
+            return .{ Err = .EOF }; 
         }
 
-        return .None, fds[0].out_events == ev;
+        return .{ Ok = fds[0].out_events == ev };
     }
 };
 

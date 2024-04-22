@@ -1,0 +1,6 @@
+use core.hash.md5
+use core{println}
+
+main :: () {
+    println(md5.digest("This is a really long string to test the MD5 hashing capabilities of the Onyx standard library. There should not be any bugs in something as simple and well-defined like the MD5 implementation")->as_hex_str());
+}

@@ -1,18 +1,36 @@
 Release 0.1.11
 --------------
-Not released yet
+21st April 2024
 
 Additions:
 - Ability specify where piped arguments are placed using `_`.
     - `x |> foo(y, _) == foo(y, x)`
+- Alternative syntax for `case #default ...`. You can now just write `case _ ...`.
+- Alternative syntax for binding documentation using `///`.
+- **Experimental** compiler extensions feature, currently used to create procedural macros.
+- `core.misc.any_deep_copy`
+- Ability to explicitly specify tag value for tagged unions.
+    - `Variant as value: type`, i.e. `Foo as 3: i32`
 
 Removals:
+- Deprecated the use of `#default` in case statements. Use `_` instead.
+- Removed `iter.take_one`. Use `iter.next` instead.
 
 Changes:
+There are several *breaking* changes in this release related to core library APIs.
+- `Iterator.next` now returns `? T` instead of `(T, bool)`
+- `io.Stream` uses `Result(T, Error)` for return types instead of `(Error, T)`
+- `switch` over a `range` is no longer inclusive by default, since `..=` exists now.
+- Enabled optional semicolons by default.
+    - `//+optional-semicolons` is no longer necessary.
+
+There are also several non-breaking changes.
+- The internal memory layout is different. See pull request #133 for details.
 
 Bugfixes:
 
 Contributors:
+
 
 
 Release 0.1.10

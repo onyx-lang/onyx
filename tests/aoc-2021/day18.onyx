@@ -189,7 +189,7 @@ SnailNum.parse :: (line: &str) -> &SnailNum {
     string.advance(line);  // [
 
     root := SnailNum.make();
-    if line.data[0] == #char "[" {
+    if line.data[0] == '[' {
         root->set_left(SnailNum.parse(line));
     } else {
         root.left_val = ~~ conv.str_to_i64(line);
@@ -197,7 +197,7 @@ SnailNum.parse :: (line: &str) -> &SnailNum {
 
     string.advance(line);  // ,
 
-    if line.data[0] == #char "[" {
+    if line.data[0] == '[' {
         root->set_right(SnailNum.parse(line));
     } else {
         root.right_val = ~~ conv.str_to_i64(line);

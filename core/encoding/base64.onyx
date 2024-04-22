@@ -32,8 +32,8 @@ encode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
         c := data[data.count - 1];
         out << encode_map[c >> 2];
         out << encode_map[(c & 0x3) << 4];
-        out << #char "=";
-        out << #char "=";
+        out << '=';
+        out << '=';
 
     } elseif data.count % 3 == 2 {
         c1 := data[data.count - 2];
@@ -41,7 +41,7 @@ encode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
         out << encode_map[c1 >> 2];
         out << encode_map[((c1 & 0x3) << 4) | ((c2 & 0xf0) >> 4)];
         out << encode_map[(c2 & 0xf) << 2];
-        out << #char "=";
+        out << '=';
     }
 
     return out;
@@ -60,18 +60,18 @@ decode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
         c3 := data[i + 2];
         c4 := data[i + 3];
 
-        v1 := decode_map[c1 - #char "+"];
-        v2 := decode_map[c2 - #char "+"];
-        v3 := decode_map[c3 - #char "+"];
-        v4 := decode_map[c4 - #char "+"];
+        v1 := decode_map[c1 - '+'];
+        v2 := decode_map[c2 - '+'];
+        v3 := decode_map[c3 - '+'];
+        v4 := decode_map[c4 - '+'];
 
         o1 := (v1 << 2)         | ((v2 & 0x30) >> 4);
         o2 := ((v2 & 0xf) << 4) | ((v3 & 0x3c) >> 2);
         o3 := ((v3 & 0x3) << 6) | (v4 & 0x3f);
 
         out << o1;
-        if c3 != #char "=" do out << o2;
-        if c4 != #char "=" do out << o3;
+        if c3 != '=' do out << o2;
+        if c4 != '=' do out << o3;
     }
 
     return out;
@@ -82,7 +82,7 @@ decode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
 encode_map := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 // Use as:
-//     decode_map[ch - #char "+"];
+//     decode_map[ch - '+'];
 #local
 decode_map := u8.[
     62, // +

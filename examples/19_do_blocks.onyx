@@ -39,7 +39,7 @@ main :: (args: [] cstr) {
 
 #if false {
     left, right := do {
-        parts := string.split(line, #char "|");
+        parts := string.split(line, '|');
         defer memory.free_slice(^parts);
         return parts[0], parts[1];
     };
@@ -52,7 +52,7 @@ main :: (args: [] cstr) {
 #if false {
     left, right: str;
     {
-        parts := string.split(line, #char "|");
+        parts := string.split(line, '|');
         left, right = parts[0], parts[1];
         memory.free_slice(^parts);
     }

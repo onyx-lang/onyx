@@ -398,6 +398,7 @@ CheckStatus check_for(AstFor* fornode) {
         // HACK: This assumes the Iterator type only has a single type argument.
         given_type = iter_type->Struct.poly_sln[0].type;
         fornode->loop_type = For_Loop_Iterator;
+        fornode->var->flags |= Ast_Flag_Address_Taken;
     }
 
     if (given_type == NULL)
@@ -612,8 +613,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                 i64 lower = ((AstNumLit *) rl->low)->value.l;
                 i64 upper = ((AstNumLit *) rl->high)->value.l;
 
-                // NOTE: This is inclusive!!!!
-                fori (case_value, lower, upper + 1) {
+                fori (case_value, lower, upper) {
                     if (add_case_to_switch_statement(switchnode, case_value, sc, rl->token->pos))
                         return Check_Error;
                 }
@@ -930,7 +930,10 @@ CheckStatus check_call(AstCall** pcall) {
 
     char* err_msg = NULL;
     fill_in_arguments(&call->args, (AstNode *) callee, &err_msg, 0);
-    if (err_msg != NULL) ERROR(call->token->pos, err_msg);
+    if (err_msg != NULL) {
+        onyx_report_error(callee->token->pos, Error_Critical, "Here is the function being called.");
+        ERROR(call->token->pos, err_msg);
+    }
 
     bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values;
     bh_arr_each(AstArgument *, arg, arg_arr) {
@@ -2653,6 +2656,8 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Foreign_Block: break;
         case Ast_Kind_Zero_Value: break;
         case Ast_Kind_Interface: break;
+        case Ast_Kind_Compiler_Extension: break;
+        case Ast_Kind_Procedural_Macro: break;
 
         default:
             retval = Check_Error;
@@ -3360,6 +3365,9 @@ CheckStatus check_union(AstUnionType *u_node) {
     bh_arr_each(AstUnionVariant *, variant, u_node->variants) {
         CHECK(type, &(* variant)->type_node);
         CHECK(meta_tags, (* variant)->meta_tags);
+        if ((*variant)->explicit_tag_value) {
+            CHECK(expression, &(* variant)->explicit_tag_value);
+        }
     }
 
     type_build_from_ast(context.ast_alloc, (AstType *) u_node);

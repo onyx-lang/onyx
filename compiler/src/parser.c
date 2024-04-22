@@ -887,9 +887,9 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             char_lit->token = expect_token(parser, Token_Type_Literal_Char);
             char_lit->was_char_literal = 1;
 
-            i8 dest = '\0';
+            char dest[2];
             i32 length = string_process_escape_seqs((char *) &dest, char_lit->token->text, 1);
-            char_lit->value.i = (u32) dest;
+            char_lit->value.i = (u32) dest[0];
 
             if (length != 1) {
                 onyx_report_error(char_lit->token->pos, Error_Critical, "Expected only a single character in character literal.");
@@ -954,9 +954,9 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 char_lit->token = expect_token(parser, Token_Type_Literal_String);
                 char_lit->was_char_literal = 1;
 
-                i8 dest = '\0';
+                char dest[2];
                 i32 length = string_process_escape_seqs((char *) &dest, char_lit->token->text, 1);
-                char_lit->value.i = (u32) dest;
+                char_lit->value.i = (u32) dest[0];
 
                 if (length != 1) {
                     onyx_report_error(char_lit->token->pos, Error_Critical, "Expected only a single character in character literal.");
@@ -1201,6 +1201,17 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 method_call->right = (AstTyped *) parse_function_call(parser, (AstTyped *) method);
 
                 retval = (AstTyped *) method_call;
+                break;
+            }
+
+            case Token_Type_Proc_Macro_Body: {
+                OnyxToken *tkn = expect_token(parser, Token_Type_Proc_Macro_Body);
+                AstProceduralExpansion *proc_expand = make_node(AstProceduralExpansion, Ast_Kind_Procedural_Expansion);
+                proc_expand->token = tkn - 1;
+                proc_expand->expansion_body = tkn;
+                proc_expand->proc_macro = retval;
+
+                retval = (AstTyped *) proc_expand;
                 break;
             }
 
@@ -2086,13 +2097,35 @@ static AstNode* parse_statement(OnyxParser* parser) {
     }
 
     if (needs_semicolon) {
-        if (!consume_token_if_next(parser, ';')) {
-            onyx_report_error((parser->curr - 1)->pos, Error_Critical, "Expected a semi-colon after this token.");
-            parser->hit_unexpected_token = 1;
+        // Allows for not needing the semicolon when the '}' is on the same line.
+        //     if x { print() }
+        if (peek_token(0)->type != '}') {
+            if (!consume_token_if_next(parser, ';')) {
+                onyx_report_error((parser->curr - 1)->pos, Error_Critical, "Expected a semi-colon after this token.");
+                parser->hit_unexpected_token = 1;
+            }
         }
     }
 
     return retval;
+}
+
+static AstNode *parse_statements_until(OnyxParser *parser, TokenType end_token) {
+    AstNode **next = NULL;
+    AstNode *root = NULL;
+    while (!consume_token_if_next(parser, end_token)) {
+        AstNode *stmt = parse_statement(parser);
+        if (!root) {
+            root = stmt;
+            next = &root->next;
+        } else {
+            *next = stmt;
+            while (stmt->next != NULL)  stmt = stmt->next;
+            next = &stmt->next;
+        }
+    }
+
+    return root;
 }
 
 static AstBlock* parse_block(OnyxParser* parser, b32 make_a_new_scope, char* block_name) {
@@ -2769,6 +2802,10 @@ static AstUnionType* parse_union(OnyxParser* parser) {
         AstUnionVariant *variant = make_node(AstUnionVariant, Ast_Kind_Union_Variant);
         variant->meta_tags = meta_tags;
         variant->token = expect_token(parser, Token_Type_Symbol);
+
+        if (consume_token_if_next(parser, Token_Type_Keyword_As)) {
+            variant->explicit_tag_value = parse_factor(parser);
+        }
 
         expect_token(parser, ':');
 
@@ -3706,6 +3743,31 @@ static AstForeignBlock* parse_foreign_block(OnyxParser* parser, OnyxToken *token
     return fb;
 }
 
+static AstCompilerExtension* parse_compiler_extension(OnyxParser* parser, OnyxToken *token) {
+    AstCompilerExtension *ext = make_node(AstCompilerExtension, Ast_Kind_Compiler_Extension);
+    ext->token = token;
+
+    ext->name = expect_token(parser, Token_Type_Literal_String);
+    
+    bh_arr_new(global_heap_allocator, ext->proc_macros, 2);
+    expect_token(parser, '{');
+    while (!consume_token_if_next(parser, '}')) {
+        if (parser->hit_unexpected_token) break;
+        
+        AstProceduralMacro *pmacro = make_node(AstProceduralMacro, Ast_Kind_Procedural_Macro);
+        pmacro->token = expect_token(parser, Token_Type_Symbol);
+        pmacro->extension = ext;
+
+        bh_arr_push(ext->proc_macros, pmacro);
+
+        if (parser->curr->type != '}')
+            expect_token(parser, ',');
+    }
+
+    ENTITY_SUBMIT(ext);
+    return ext;
+}
+
 static AstTyped* parse_top_level_expression(OnyxParser* parser) {
     if (parser->curr->type == Token_Type_Keyword_Global)    return parse_global_declaration(parser);
     if (parser->curr->type == Token_Type_Keyword_Struct)    return (AstTyped *) parse_struct(parser);
@@ -3746,6 +3808,10 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
         if (parse_possible_directive(parser, "foreign")) {
             AstForeignBlock *foreign = parse_foreign_block(parser, parser->curr - 2);
             return (AstTyped *) foreign;
+        }
+
+        if (parse_possible_directive(parser, "compiler_extension")) {
+            return (AstTyped *) parse_compiler_extension(parser, parser->curr - 2);
         }
     }
 
@@ -3865,6 +3931,16 @@ static void parse_implicit_injection(OnyxParser* parser) {
     if (injection_expression->kind != Ast_Kind_Field_Access) {
         onyx_report_error(parser->curr->pos, Error_Critical, "Expected binding target to end in something like '.xyz'.");
         parser->hit_unexpected_token = 1;
+        return;
+    }
+
+    if (peek_token(0)->type == Token_Type_Proc_Macro_Body) {
+        AstProceduralExpansion *proc_expand = make_node(AstProceduralExpansion, Ast_Kind_Procedural_Expansion);
+        proc_expand->token = injection_expression->token;
+        proc_expand->expansion_body = expect_token(parser, Token_Type_Proc_Macro_Body);
+        proc_expand->proc_macro = (AstTyped *) injection_expression;
+
+        ENTITY_SUBMIT(proc_expand);
         return;
     }
 
@@ -4463,10 +4539,10 @@ static void parse_top_level_statements_until(OnyxParser* parser, TokenType tt) {
 
 // NOTE: This returns a void* so I don't need to cast it everytime I use it
 void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstKind kind) {
-    void* node = bh_alloc(alloc, size);
+    AstNode* node = bh_alloc(alloc, size);
 
     memset(node, 0, size);
-    *(AstKind *) node = kind;
+    node->kind = kind;
 
     return node;
 }
@@ -4516,6 +4592,25 @@ void onyx_parser_free(OnyxParser* parser) {
     bh_arr_free(parser->stored_tags);
     bh_arr_free(parser->current_function_stack);
     bh_arr_free(parser->documentation_tokens);
+}
+
+AstTyped *onyx_parse_expression(OnyxParser *parser, Scope *scope) {
+    parser->current_scope = scope;
+    AstTyped *expr = parse_expression(parser, 0);
+
+    return expr;
+}
+
+AstNode  *onyx_parse_statement(OnyxParser *parser, Scope *scope) {
+    parser->current_scope = scope;
+    AstNode *stmt = parse_statements_until(parser, Token_Type_End_Stream);
+
+    return stmt;
+}
+
+void onyx_parse_top_level_statements(OnyxParser *parser, Scope *scope) {
+    parser->current_scope = scope;
+    parse_top_level_statements_until(parser, Token_Type_End_Stream);
 }
 
 void onyx_parse(OnyxParser *parser) {

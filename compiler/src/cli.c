@@ -94,6 +94,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     C_LBLUE "    --print-static-if-results   " C_NORM "Prints the conditional result of every " C_YELLOW "#if" C_NORM " statement\n"
     "\n"
     C_LBLUE "    --no-file-contents          " C_NORM "Disables " C_YELLOW "#file_contents" C_NORM " for security\n"
+    C_LBLUE "    --no-compiler-extensions    " C_NORM "Disables " C_YELLOW "#compiler_extension" C_NORM " for security\n"
     "\n";
 
 static const char *self_upgrade_docstring = DOCSTRING_HEADER
@@ -271,6 +272,9 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
         else if (!strcmp(argv[i], "--no-file-contents")) {
             options->no_file_contents = 1;
         }
+        else if (!strcmp(argv[i], "--no-compiler-extensions")) {
+            options->no_compiler_extensions = 1;
+        }
         else if (!strcmp(argv[i], "--wasm-mvp")) {
             options->use_post_mvp_features = 0;
         }
@@ -429,7 +433,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .no_stale_code           = 0,
         .show_all_errors         = 0,
 
-        .enable_optional_semicolons = 0,
+        .enable_optional_semicolons = 1,
 
         .runtime = Runtime_Onyx,
 
@@ -501,7 +505,6 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         case ONYX_COMPILE_ACTION_RUN:
         case ONYX_COMPILE_ACTION_WATCH:
         case ONYX_COMPILE_ACTION_COMPILE:
-        case ONYX_COMPILE_ACTION_RUN_WASM:
             cli_parse_compilation_options(&options, arg_parse_start, argc, argv);
             break;
 
@@ -515,6 +518,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             break;
 
+        case ONYX_COMPILE_ACTION_RUN_WASM:
         case ONYX_COMPILE_ACTION_PRINT_HELP:
         case ONYX_COMPILE_ACTION_PRINT_VERSION:
         case ONYX_COMPILE_ACTION_DOCUMENT:

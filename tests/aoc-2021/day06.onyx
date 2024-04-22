@@ -7,7 +7,7 @@ main :: (args) => {
     use reader := io.reader_make(&file);
     start_str := io.read_all(&reader);
 
-    start_list := string.split(start_str, #char ",");
+    start_list := string.split(start_str, ',');
 
     fish: [9] i64;
     for start_list {

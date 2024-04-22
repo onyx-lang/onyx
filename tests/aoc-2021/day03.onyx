@@ -11,9 +11,9 @@ read_binary :: (r: &io.Reader) -> i32 {
 
     curr, err := io.peek_byte(r);
     if err != .None do return n;
-    while curr == #char "0" || curr == #char "1" {
+    while curr == '0' || curr == '1' {
         n *= 2;
-        n += cast(u32) (curr - #char "0"); 
+        n += cast(u32) (curr - '0'); 
 
         r.start += 1;
         curr, err = io.peek_byte(r);

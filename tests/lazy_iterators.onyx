@@ -9,10 +9,10 @@ count_iterator :: (lo: $T, hi: T, step: T = 1) -> Iterator(T) {
         (ctx) => {
             if ctx.current <= ctx.high {
                 defer ctx.current += ctx.step;
-                return ctx.current, true;
+                return Optional.make(ctx.current);
             }
 
-            return 0, false;
+            return .None;
         },
 
         (ctx) => {

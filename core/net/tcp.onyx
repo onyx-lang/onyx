@@ -68,11 +68,11 @@ TCP_Connection.iter_open :: (use conn: &TCP_Connection) {
     conn.event_cursor = 0;
 }
 
-TCP_Connection.iter_next :: (use conn: &TCP_Connection) -> (TCP_Event, bool) {
-    if event_cursor == events.count do return .{}, false;
+TCP_Connection.iter_next :: (use conn: &TCP_Connection) -> ? TCP_Event {
+    if event_cursor == events.count do return .None;
 
     defer event_cursor += 1;
-    return events[event_cursor], true;
+    return events[event_cursor];
 }
 
 TCP_Connection.iter_close :: (use conn: &TCP_Connection) {

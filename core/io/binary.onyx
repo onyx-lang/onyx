@@ -48,13 +48,13 @@ binary_reader_make :: (s: &Stream) -> BinaryReader {
 }
 
 binary_read_byte :: (use br: &BinaryReader) -> u8 {
-    _, byte := stream_read_byte(stream);
+    byte := stream_read_byte(stream).Ok ?? 0;
     return byte;
 }
 
 binary_read :: (use br: &BinaryReader, $T: type_expr) -> T {
     buf: [sizeof T] u8;
-    _, bytes_read := stream_read(stream, ~~ buf);
+    bytes_read := stream_read(stream, ~~ buf).Ok ?? 0;
 
     return *(cast(&T) buf);
 }
@@ -71,7 +71,7 @@ binary_read_slice :: (use br: &BinaryReader,
     }
 
     sl := memory.make_slice(u8, size * sizeof T, allocator = allocator);
-    _, bytes_read := stream_read(stream, sl);
+    bytes_read := stream_read(stream, sl).Ok ?? 0;
 
     return .{ data = cast(&T) sl.data, count = size };
 }

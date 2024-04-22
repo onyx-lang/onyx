@@ -119,20 +119,20 @@ as_iter :: (b: &Bucket_Array($T)) -> Iterator(T) {
     c.bucket_idx = 0;
     c.elem_idx   = 0;
 
-    next :: (use c: &Context($T)) -> (T, bool) {
+    next :: (use c: &Context($T)) -> ? T {
         use core.intrinsics.onyx
 
         bucket := &ba.buckets[bucket_idx];
         while elem_idx == bucket.count {
             bucket_idx += 1;
-            if bucket_idx == ba.buckets.count do return .{}, false;
+            if bucket_idx == ba.buckets.count do return .None;
 
             bucket = &ba.buckets[bucket_idx];
             elem_idx = 0;
         }
 
         defer elem_idx += 1;
-        return bucket.data[elem_idx], true;
+        return bucket.data[elem_idx];
     }
 
     return .{

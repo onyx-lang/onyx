@@ -51,7 +51,7 @@ main :: (args: [] cstr) {
 
     offset: i64 = 0;
     while !string.empty(file) {
-        if file.data[0] == #char "x" {
+        if file.data[0] == 'x' {
             string.advance(&file, 2);
         } else {
             bus := conv.parse_int(&file);

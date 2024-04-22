@@ -82,7 +82,7 @@ length :: (s: str) => s.count;
 length :: (s: cstr) -> u32 {
     len := 0;
     c: [&] u8 = s;
-    while c[0] != #char "\0" {
+    while c[0] != '\0' {
         len += 1;
         c += 1;
     }
@@ -241,8 +241,8 @@ str.equal_insensitive :: (s1, s2: str) -> bool {
 
         c1 := s1[i];
         c2 := s2[i];
-        if c1 >= #char "A" && c1 <= #char "Z" do c1 += 32;
-        if c2 >= #char "A" && c2 <= #char "Z" do c2 += 32;
+        if c1 >= 'A' && c1 <= 'Z' do c1 += 32;
+        if c2 >= 'A' && c2 <= 'Z' do c2 += 32;
         if c1 != c2 do return false;
     }
     return true;
@@ -330,7 +330,7 @@ str.strip_leading_whitespace :: #match #local {}
 #overload
 str.strip_leading_whitespace :: (s: &str) {
     while s.count > 0 do switch s.data[0] {
-        case #char " ", #char "\t", #char "\n", #char "\r" {
+        case ' ', '\t', '\n', '\r' {
             s.data += 1;
             s.count -= 1;
         }
@@ -352,7 +352,7 @@ str.strip_trailing_whitespace :: #match #local {}
 #overload
 str.strip_trailing_whitespace :: (s: &str) {
     while s.count >= 1 do switch s.data[s.count - 1] {
-        case #char " ", #char "\t", #char "\n", #char "\r" {
+        case ' ', '\t', '\n', '\r' {
             s.count -= 1;
         }
 
@@ -369,7 +369,7 @@ str.strip_trailing_whitespace :: (s: str) -> str {
 
 str.to_uppercase :: (s: str) -> str {
     for& ch in s {
-        if *ch >= #char "a" && *ch <= #char "z" {
+        if *ch >= 'a' && *ch <= 'z' {
             *ch -= 32;
         }
     }
@@ -379,7 +379,7 @@ str.to_uppercase :: (s: str) -> str {
 
 str.to_lowercase :: (s: str) -> str {
     for& ch in s {
-        if *ch >= #char "A" && *ch <= #char "Z" {
+        if *ch >= 'A' && *ch <= 'Z' {
             *ch += 32;
         }
     }
@@ -527,9 +527,9 @@ str.read_alphanum :: (s: &str) -> str {
 
     for ch in *s {
         switch ch {
-            case #char "a" .. #char "z",
-                 #char "A" .. #char "Z",
-                 #char "0" .. #char "9" {
+            case 'a' ..= 'z',
+                 'A' ..= 'Z',
+                 '0' ..= '9' {
                 out.count += 1;
             }
 
@@ -574,7 +574,7 @@ str.advance_line :: (s: &str) {
     if s.count == 0 do return;
 
     adv := 0;
-    while s.data[adv] != #char "\n" && adv <= s.count do adv += 1;
+    while s.data[adv] != '\n' && adv <= s.count do adv += 1;
 
     s.data += adv + 1;
     s.count -= adv + 1;
@@ -609,14 +609,14 @@ str.split_iter :: (s: str, delim: u8) -> Iterator(str) {
     return iter.generator(
         &.{ s = s, delim = delim },
 
-        (ctx: &$T) -> (str, bool) {
+        (ctx: &$T) -> ? str {
             if string.empty(ctx.s) {
-                return "", false;
+                return .None;
             }
 
             ret: str;
             ret, ctx.s = bisect(ctx.s, ctx.delim);
-            return ret, true;
+            return ret;
         }
     );
 }
@@ -626,14 +626,14 @@ str.split_iter :: (s: str, delim: str) -> Iterator(str) {
     return iter.generator(
         &.{ s = s, delim = delim },
 
-        (ctx: &$T) -> (str, bool) {
+        (ctx: &$T) -> ? str {
             if string.empty(ctx.s) {
-                return "", false;
+                return .None;
             }
 
             ret: str;
             ret, ctx.s = bisect(ctx.s, ctx.delim);
-            return ret, true;
+            return ret;
         }
     );
 }
