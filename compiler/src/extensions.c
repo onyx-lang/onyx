@@ -165,10 +165,16 @@ static char *extension_recv_str(CompilerExtension *ext, i32 *out_len) {
 
     bh_allocator a = bh_arena_allocator(&ext->arena);
     char *buf = bh_alloc(a, len + 1);
+    if (!buf) {
+        printf("ERROR: Code expansion of %d bytes is too large.\n", len);
+        return NULL;
+    }
 
     i32 bytes_read = 0; 
     while (bytes_read < len) {
-        bytes_read += extension_recv(ext, buf, len);
+        if (!ext->alive) break;
+
+        bytes_read += extension_recv(ext, buf + bytes_read, len);
     }
 
     buf[bytes_read] = '\0';
@@ -193,7 +199,7 @@ TypeMatch compiler_extension_start(const char *name, const char *containing_file
 
         CompilerExtension ext;
         ext.state = COMP_EXT_STATE_SPAWNING;
-        bh_arena_init(&ext.arena, global_heap_allocator, 32 * 1024);
+        bh_arena_init(&ext.arena, global_heap_allocator, 1 * 1024 * 1024); // 1MB
 
         if (!extension_spawn(&ext, path)) {
             return TYPE_MATCH_FAILED;
@@ -324,7 +330,7 @@ TypeMatch compiler_extension_expand_macro(
         switch (msg_type) {
             case MSG_EXT_INIT:
                 extension_kill(ext);
-                onyx_report_error(body->pos, Error_Critical, "Procotol error when talking to '%s'.", ext->name);
+                onyx_report_error(body->pos, Error_Critical, "Protocol error when talking to '%s'.", ext->name);
                 return TYPE_MATCH_FAILED;
 
             case MSG_EXT_ERROR_REPORT: {
@@ -387,7 +393,12 @@ TypeMatch compiler_extension_expand_macro(
                 }
 
                 i32 code_length;
-                char *code = bh_strdup(context.ast_alloc, extension_recv_str(ext, &code_length));
+                char *code = extension_recv_str(ext, &code_length);
+                if (!code) {
+                    return TYPE_MATCH_FAILED;
+                }
+
+                code = bh_strdup(context.ast_alloc, code);
                 if (context.options->verbose_output == 2) {
                     bh_printf("Expansion '%d':\n%s\n", *expansion_id, code);
                 }

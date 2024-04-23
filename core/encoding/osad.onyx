@@ -74,6 +74,15 @@ serialize :: (v: any, w: &io.Writer) -> bool {
         }
 
         case .Slice, .Dynamic_Array {
+            if v.type == str {
+                untyped_slice := cast(&array.Untyped_Array, v.data);
+                base: [&] u8 = untyped_slice.data;
+                count:       = untyped_slice.count;
+                output_u32(w, count);
+                io.write_str(w, str.{ base, count });
+                break;
+            }
+
             s_info := cast(&type_info.Type_Info_Slice, info);
 
             untyped_slice := cast(&array.Untyped_Array, v.data);

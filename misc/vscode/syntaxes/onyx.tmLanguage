@@ -594,6 +594,18 @@
 					<key>name</key>
 					<string>keyword.tag.onyx</string>
 				</dict>
+				<dict>
+					<key>match</key>
+					<string>\b(\b[[:alpha:]_]+[[:alnum:]_\.]*\b)\s*!\{</string>
+					<key>captures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.tag.onyx</string>
+						</dict>
+					</dict>
+				</dict>
 			</array>
 		</dict>
 	</dict>
