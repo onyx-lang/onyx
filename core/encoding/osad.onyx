@@ -33,7 +33,7 @@ serialize :: (v: any) -> ? [] u8 {
         return .{};
     }
 
-    return string.as_str(stream);
+    return str.as_str(stream);
 }
 
 #overload

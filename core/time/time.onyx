@@ -156,7 +156,7 @@ strftime :: (format_: [] u8, tm: &Timestamp) -> str {
 
     strftime(&w, format_, tm);
 
-    return string.as_str(&s);
+    return str.as_str(&s);
 }
 
 #overload
@@ -166,7 +166,7 @@ strftime :: (buf: [] u8, format_: [] u8, tm: &Timestamp) -> str {
 
     strftime(&w, format_, tm);
 
-    return string.as_str(&s);
+    return str.as_str(&s);
 }
 
 #local weekdays   := str.[ "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" ];

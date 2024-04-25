@@ -3928,11 +3928,6 @@ static void parse_implicit_injection(OnyxParser* parser) {
     }
 
     AstFieldAccess *injection_expression = (AstFieldAccess *) parse_type(parser);
-    if (injection_expression->kind != Ast_Kind_Field_Access) {
-        onyx_report_error(parser->curr->pos, Error_Critical, "Expected binding target to end in something like '.xyz'.");
-        parser->hit_unexpected_token = 1;
-        return;
-    }
 
     if (peek_token(0)->type == Token_Type_Proc_Macro_Body) {
         AstProceduralExpansion *proc_expand = make_node(AstProceduralExpansion, Ast_Kind_Procedural_Expansion);
@@ -3941,6 +3936,32 @@ static void parse_implicit_injection(OnyxParser* parser) {
         proc_expand->proc_macro = (AstTyped *) injection_expression;
 
         ENTITY_SUBMIT(proc_expand);
+        return;
+    }
+
+    // Experimental syntax for overload adding.
+    //
+    // overload :: #match {}
+    // overload <- (...) { ... }
+    // 
+    // if (peek_token(0)->type == Token_Type_Left_Arrow) {
+    //     AstDirectiveAddOverload *add_overload = make_node(AstDirectiveAddOverload, Ast_Kind_Directive_Add_Overload);
+    //     add_overload->overloaded_function = (AstNode *) injection_expression;
+    //     add_overload->token = expect_token(parser, Token_Type_Left_Arrow);
+    //     add_overload->order = parser->overload_count++;
+    //     add_overload->overload = parse_expression(parser, 0);
+
+    //     if (add_overload->overload) {
+    //         add_overload->overload->flags &= ~Ast_Flag_Function_Is_Lambda;
+    //     }
+
+    //     ENTITY_SUBMIT(add_overload);
+    //     return;
+    // }
+
+    if (injection_expression->kind != Ast_Kind_Field_Access) {
+        onyx_report_error(parser->curr->pos, Error_Critical, "Expected binding target to end in something like '.xyz'.");
+        parser->hit_unexpected_token = 1;
         return;
     }
 
@@ -4020,7 +4041,9 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
         case Token_Type_Symbol: {
             // Handle implicit injections as 'Foo.bar ::' or 'Foo(T).bar ::'
-            if (peek_token(1)->type == '.' || peek_token(1)->type == '(') {
+            if (   peek_token(1)->type == '.'
+                || peek_token(1)->type == '('
+                || peek_token(1)->type == Token_Type_Left_Arrow) {
                 parse_implicit_injection(parser);
                 return;
             }

@@ -50,7 +50,7 @@ main :: (args: [] cstr) {
 
     arg_parse.arg_parse(args, &global_arguments);
 
-    command   := args[0] |> string.as_str();
+    command   := args[0] |> str.as_str();
     arguments := args[1..args.count];
 
     loaded_config_file := false;
@@ -205,13 +205,13 @@ run_add_command :: (args: [] cstr) {
         return;
     }
 
-    dep_name := string.as_str(args[0]);
+    dep_name := str.as_str(args[0]);
     dep_repo := Git.get_full_repo_uri(dep_name);
 
     version: SemVer;
     if args.count > 1 {
-        if !conv.parse_any(&version, string.as_str(args[1])) {
-            error_print("Failed to parse version number given: {}\n", string.as_str(args[1]));
+        if !conv.parse_any(&version, str.as_str(args[1])) {
+            error_print("Failed to parse version number given: {}\n", str.as_str(args[1]));
             return;
         }
 
@@ -223,7 +223,7 @@ run_add_command :: (args: [] cstr) {
         error_print("Dependency '{}' already specified at version '{}'.\n", dep_name, config.dependencies[dep_name]?.version);
 
     } elseif version->is_zero() {
-        error_print("Unable to find latest version of '{}'\n", string.as_str(args[0]));
+        error_print("Unable to find latest version of '{}'\n", str.as_str(args[0]));
 
     } else {
         config.dependencies[dep_name] = .{
@@ -246,7 +246,7 @@ run_remove_command :: (args: [] cstr) {
         return;
     }
 
-    dep := string.as_str(args[0]);
+    dep := str.as_str(args[0]);
 
     if config.dependencies->has(dep) {
         version := config.dependencies->get(dep)->unwrap().version;
@@ -406,7 +406,7 @@ run_rebuild_command :: (args: [] cstr)  {
         return;
     }
 
-    dep := string.as_str(args[0]);
+    dep := str.as_str(args[0]);
     if config.dependencies->has(dep) {
         dep = config.dependencies->get(dep)->unwrap().source.Git->unwrap();
     }
@@ -482,7 +482,7 @@ run_list_versions :: (args: [] cstr) {
         return;
     }
 
-    pack := string.as_str(args[0]);
+    pack := str.as_str(args[0]);
 
     pack      = Git.get_full_repo_uri(pack);
     versions := Git.get_available_versions(pack);
@@ -516,7 +516,7 @@ Arguments:
 }
 run_new_command :: (args: [] cstr) {
     if args.count >= 1 {
-        if string.as_str(args[0]) == "--list" {
+        if str.as_str(args[0]) == "--list" {
             printf("List of installed templates\n");
             for os.list_directory(Template_Directory()) {
                 if !string.ends_with(it->name(), ".json") do continue;
@@ -531,11 +531,11 @@ run_new_command :: (args: [] cstr) {
     directory     := ".";
 
     if args.count >= 1 {
-        template_name = string.as_str(args[0]);
+        template_name = str.as_str(args[0]);
     }
 
     if args.count >= 2 {
-        directory = string.as_str(args[1]);
+        directory = str.as_str(args[1]);
     }
 
     if os.list_directory(directory)->count(x => true) > 0 {
@@ -640,7 +640,7 @@ Arguments:
 run_build_command :: (args: [] cstr) {
     build_config := "default";
     if args.count >= 1 {
-        build_config = string.as_str(args[0]);
+        build_config = str.as_str(args[0]);
     }
 
     maybe_bc := config.build_configs[build_config];

@@ -4,7 +4,7 @@ use core {package, *}
 
 
 /// Generic procedure for turning something into a string.
-as_str :: #match -> str {}
+str.as_str :: #match -> str {}
 
 #local HasAsStrMethod :: interface (T: type_expr) {
     t as T;
@@ -13,7 +13,7 @@ as_str :: #match -> str {}
 }
 
 #overload #order 10000
-as_str :: macro (t: $T/HasAsStrMethod) -> str {
+str.as_str :: macro (t: $T/HasAsStrMethod) -> str {
     return T.as_str(t);
 }
 
@@ -49,7 +49,7 @@ str.copy_into :: (orig: str, dest: str) {
     memory.copy(dest.data, orig.data, len);
 }
 
-#overload as_str :: from_cstr
+#overload str.as_str :: from_cstr
 from_cstr :: (s: cstr) -> str {
     return .{ data = s, count = length(s) };
 }
@@ -59,7 +59,7 @@ from_cstr :: (s: cstr) -> str {
 ///
 /// This only needs to be done when the string does not contain a `\0` byte on the end,
 /// which is most of the time. If you know that the string has a `\0` byte, simply use `s.data`.
-to_cstr_on_stack :: macro (s_: str) -> cstr {
+str.to_cstr_on_stack :: macro (s_: str) -> cstr {
     use core.alloc
     use core.memory
 
@@ -189,7 +189,7 @@ str.contains :: (s: str, substr: str) -> bool {
 }
 
 
-join :: (strs: [] str, sep: str, allocator := context.allocator) -> str {
+str.join :: (strs: [] str, sep: str, allocator := context.allocator) -> str {
     if strs.count == 0 do return "";
 
     len_sum := array.fold(strs, 0, [v, acc](acc + v.length));
@@ -213,7 +213,7 @@ join :: (strs: [] str, sep: str, allocator := context.allocator) -> str {
 // @TODO
 // Check this for edge cases and other bugs. I'm not confident
 // it will work perfectly yet.                   - brendanfh 2020/12/21
-compare :: (str1: str, str2: str) -> i32 {
+str.compare :: (str1: str, str2: str) -> i32 {
     i := 0;
     while i < str1.count && i < str2.count {
         if str1[i] == str2[i] do i += 1;
@@ -697,11 +697,15 @@ dyn_str.retreat :: macro (x: &dyn_str, chars := 1) {
 // These definitions exist to allow you to still say `string.XYZ`, instead of `str.XYZ`
 // That being said, `str.XYZ` should be the preferred way for the future.
 
+as_str :: str.as_str
 free :: str.free
 copy :: str.copy
 temp_copy :: str.temp_copy
 copy_into :: str.copy_into
+to_cstr_on_stack :: str.to_cstr_on_stack
 concat :: str.concat
+join :: str.join
+compare :: str.compare
 contains :: str.contains
 equal :: str.equal
 equal_insensitive :: str.equal_insensitive

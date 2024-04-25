@@ -101,7 +101,7 @@ SocketAddress :: union {
 
 SocketAddress.addr_as_str :: (this: &SocketAddress, allocator := context.allocator) -> str {
     return switch *this {
-        case .Unix as path => string.as_str(cast(cstr) path);
+        case .Unix as path => str.as_str(cast(cstr) path);
         case .Inet as inet => do {
             str_addr := ipv4_to_str(inet.addr);
             out := make(dyn_str, allocator);
