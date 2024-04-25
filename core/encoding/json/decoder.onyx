@@ -34,11 +34,11 @@ _Decode_Error :: struct {
     pos:    Position;
 }
 
-Decode_Error :: #distinct ^_Decode_Error;
+Decode_Error :: #distinct &_Decode_Error;
 
-Decode_Error.has_error :: (this: Decode_Error) => cast(^_Decode_Error) this != null;
-Decode_Error.message   :: (this: Decode_Error) => (cast(^_Decode_Error) this).errmsg;
-Decode_Error.position  :: (this: Decode_Error) => (cast(^_Decode_Error) this).pos;
+Decode_Error.has_error :: (this: Decode_Error) => cast(&_Decode_Error) this != null;
+Decode_Error.message   :: (this: Decode_Error) => (cast(&_Decode_Error) this).errmsg;
+Decode_Error.position  :: (this: Decode_Error) => (cast(&_Decode_Error) this).pos;
 
 /// Decodes a string into a Json object, and returns the Json object and
 /// and a `Decode_Error` that is non-null if an error occured.

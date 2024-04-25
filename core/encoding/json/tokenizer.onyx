@@ -47,7 +47,7 @@ Position :: struct {
 }
 
 #package
-token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
+token_get :: (use tkn: &Tokenizer) -> (Token, Error) {
     err := Error.{};
 
     skip_whitespace(tkn);
@@ -139,7 +139,7 @@ token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
 }
 
 #local
-next_character :: (use tkn: ^Tokenizer) -> (u8, bool) {
+next_character :: (use tkn: &Tokenizer) -> (u8, bool) {
     if offset >= data.count do return 0, false;
 
     retval := data[offset];
@@ -150,7 +150,7 @@ next_character :: (use tkn: ^Tokenizer) -> (u8, bool) {
 }
 
 #local
-skip_whitespace :: (use tkn: ^Tokenizer) {
+skip_whitespace :: (use tkn: &Tokenizer) {
     while offset < data.count {
         switch data[offset] {
             case '\t', ' ', '\r', '\v' {
@@ -171,7 +171,7 @@ skip_whitespace :: (use tkn: ^Tokenizer) {
 }
 
 #local
-skip_alpha_numeric :: (use tkn: ^Tokenizer) {
+skip_alpha_numeric :: (use tkn: &Tokenizer) {
     while offset < data.count {
         switch data[offset] {
             case 'A' ..= 'Z', 'a' ..= 'z', '0' ..= '9', '_' {
@@ -185,7 +185,7 @@ skip_alpha_numeric :: (use tkn: ^Tokenizer) {
 }
 
 #local
-skip_numeric :: (use tkn: ^Tokenizer) {
+skip_numeric :: (use tkn: &Tokenizer) {
     while offset < data.count {
         switch data[offset] {
             case '0' ..= '9' {
@@ -199,7 +199,7 @@ skip_numeric :: (use tkn: ^Tokenizer) {
 }
 
 #local
-skip_escape :: (use tkn: ^Tokenizer) {
+skip_escape :: (use tkn: &Tokenizer) {
     switch data[offset] {
         case 'u' {
             for i in 4 {

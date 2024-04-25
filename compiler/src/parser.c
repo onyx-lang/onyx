@@ -652,10 +652,9 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
-        case '&':
-        case '^': {
+        case '&': {
             AstAddressOf* aof_node = make_node(AstAddressOf, Ast_Kind_Address_Of);
-            aof_node->token = parser->curr->type == '^' ? expect_token(parser, '^') : expect_token(parser, '&'); // HACK
+            aof_node->token = expect_token(parser, '&');
             aof_node->expr  = parse_factor(parser);
 
             retval = (AstTyped *) aof_node;
@@ -1574,7 +1573,7 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
         for_node->no_close = 1;
     }
 
-    if (consume_token_if_next(parser, '^') || consume_token_if_next(parser, '&')) {
+    if (consume_token_if_next(parser, '&')) {
         for_node->by_pointer = 1;
     }
 
@@ -1654,13 +1653,12 @@ static AstSwitchCase* parse_case_stmt(OnyxParser* parser) {
         parser->parse_quick_functions = 1;
 
         if (   next_tokens_are(parser, 3, Token_Type_Keyword_As, '&', Token_Type_Symbol)
-            || next_tokens_are(parser, 3, Token_Type_Keyword_As, '^', Token_Type_Symbol)
             || next_tokens_are(parser, 2, Token_Type_Keyword_As, Token_Type_Symbol)
         ) {
             expect_token(parser, Token_Type_Keyword_As);
 
             b32 is_pointer = 0;
-            if (consume_token_if_next(parser, '&') || consume_token_if_next(parser, '^'))
+            if (consume_token_if_next(parser, '&'))
                 is_pointer = 1;
 
             OnyxToken *capture_symbol = expect_token(parser, Token_Type_Symbol);
@@ -1908,7 +1906,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
             // fallthrough
         }
 
-        case '(': case '+': case '-': case '!': case '*': case '^': case '&':
+        case '(': case '+': case '-': case '!': case '*': case '&':
         case Token_Type_Literal_Integer:
         case Token_Type_Literal_Float:
         case Token_Type_Literal_String:
@@ -2313,12 +2311,10 @@ static AstType* parse_type(OnyxParser* parser) {
         if (parser->hit_unexpected_token) return root;
 
         switch ((u16) parser->curr->type) {
-            case '&':
-            case '^': {
+            case '&': {
                 AstPointerType* new = make_node(AstPointerType, Ast_Kind_Pointer_Type);
                 new->flags |= Basic_Flag_Pointer;
-                // new->token = expect_token(parser, '^');
-                new->token = parser->curr->type == '^' ? expect_token(parser, '^') : expect_token(parser, '&'); // HACK
+                new->token = expect_token(parser, '&');
 
                 *next_insertion = (AstType *) new;
                 next_insertion = &new->elem;
@@ -2333,7 +2329,7 @@ static AstType* parse_type(OnyxParser* parser) {
                     new = make_node(AstSliceType, Ast_Kind_Slice_Type);
                     new->token = open_bracket;
 
-                } else if (parser->curr->type == '&' || parser->curr->type == '^') {
+                } else if (parser->curr->type == '&') {
                     consume_token(parser);
 
                     new = make_node(AstMultiPointerType, Ast_Kind_Multi_Pointer_Type);
@@ -4163,8 +4159,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 // These cases have to happen first because these are not necessarily "binary operators",
                 // they are just things that I want to be able to overload. []= is technically a ternary
                 // operator so all these things are horribly named anyway.
-                if (next_tokens_are(parser, 3, '^', '[', ']')
-                    || next_tokens_are(parser, 3, '&', '[', ']')) {
+                if (next_tokens_are(parser, 3, '&', '[', ']')) {
                     consume_tokens(parser, 3);
                     operator->operator = Binary_Op_Ptr_Subscript;
                     goto operator_determined;

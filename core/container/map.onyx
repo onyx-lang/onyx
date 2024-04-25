@@ -183,7 +183,7 @@ Map.delete :: (use map: &Map, key: map.Key_Type) {
 ///     }
 /// or:
 ///     m->update("test", [v](*v += 10));
-Map.update :: macro (map: ^Map, key: map.Key_Type, body: Code) {
+Map.update :: macro (map: &Map, key: map.Key_Type, body: Code) {
     lookup_ :: lookup
     lr := lookup_(map, key);
 

@@ -17,26 +17,26 @@ make_parser :: (data: [] u8, allocator := context.allocator) -> Parser {
     parser: Parser;
     parser.tokenizer = Tokenizer.{ data = data };
     parser.allocator = allocator;
-    consume_token(^parser);
+    consume_token(&parser);
     return parser;
 }
 
 #package
 parse :: (data: [] u8, allocator := context.allocator) -> (Value, Error) {
     parser := make_parser(data, allocator);
-    return parse_value(^parser);
+    return parse_value(&parser);
 }
 
 #local
-consume_token :: (use parser: ^Parser) -> (Token, Error) {
+consume_token :: (use parser: &Parser) -> (Token, Error) {
     error: Error;
     previous_token = current_token;
-    current_token, error = token_get(^tokenizer);
+    current_token, error = token_get(&tokenizer);
     return previous_token, error;
 }
 
 #local
-consume_token_if_next :: (use parser: ^Parser, kind: Token.Kind) -> bool {
+consume_token_if_next :: (use parser: &Parser, kind: Token.Kind) -> bool {
     if current_token.kind == kind {
         consume_token(parser);
         return true;
@@ -46,7 +46,7 @@ consume_token_if_next :: (use parser: ^Parser, kind: Token.Kind) -> bool {
 }
 
 #local
-expect_token :: (use parser: ^Parser, kind: Token.Kind) -> (Token, Error) {
+expect_token :: (use parser: &Parser, kind: Token.Kind) -> (Token, Error) {
     previous :=  current_token;
     consume_token(parser);
     error := Error.{ .None, previous.position };
@@ -55,8 +55,8 @@ expect_token :: (use parser: ^Parser, kind: Token.Kind) -> (Token, Error) {
 }
 
 #package
-parse_value :: (use parser: ^Parser) -> (Value, Error) {
-    return_value: ^_Value = null;
+parse_value :: (use parser: &Parser) -> (Value, Error) {
+    return_value: &_Value = null;
 
     current := current_token;
     switch current.kind {
@@ -103,14 +103,14 @@ parse_value :: (use parser: ^Parser) -> (Value, Error) {
             value, err := parse_array(parser);
             if err.kind != .None do return value, err;
 
-            return_value = cast(^_Value) value;
+            return_value = cast(&_Value) value;
         }
 
         case .Open_Brace {
             value, err := parse_object(parser);
             if err.kind != .None do return value, err;
 
-            return_value = cast(^_Value) value;
+            return_value = cast(&_Value) value;
         }
 
         case _ {
@@ -123,7 +123,7 @@ parse_value :: (use parser: ^Parser) -> (Value, Error) {
 }
 
 #local
-parse_array :: (use parser: ^Parser) -> (Value, Error) {
+parse_array :: (use parser: &Parser) -> (Value, Error) {
     value := new(_Value_Array, allocator);
 
     _, err := expect_token(parser, .Open_Bracket);
@@ -136,7 +136,7 @@ parse_array :: (use parser: ^Parser) -> (Value, Error) {
             free(elem, allocator);
         }
 
-        array.free(^arr);
+        array.free(&arr);
     }
 
     while current_token.kind != .Close_Bracket {
@@ -146,7 +146,7 @@ parse_array :: (use parser: ^Parser) -> (Value, Error) {
             return Value.{value}, err;
         }
 
-        array.push(^arr, elem);
+        array.push(&arr, elem);
 
         if !consume_token_if_next(parser, .Comma) {
             break;
@@ -165,14 +165,14 @@ parse_array :: (use parser: ^Parser) -> (Value, Error) {
 
 
 #local
-parse_object :: (use parser: ^Parser) -> (Value, Error) {
+parse_object :: (use parser: &Parser) -> (Value, Error) {
     value := new(_Value_Object, allocator);
 
     _, err := expect_token(parser, .Open_Brace);
     if err.kind != .None do return Value.{value}, err;
 
     // This uses the context allocators because the array resizing needs to happen in a general purpose heap allocator
-    array.init(^value.object_, allocator=context.allocator);
+    array.init(&value.object_, allocator=context.allocator);
     defer if err.kind != .None {
         free(Value.{value}, allocator);
     }
@@ -210,7 +210,7 @@ parse_object :: (use parser: ^Parser) -> (Value, Error) {
             }
         }
 
-        array.push(^value.object_, .{
+        array.push(&value.object_, .{
             key = key,
             value = elem
         });

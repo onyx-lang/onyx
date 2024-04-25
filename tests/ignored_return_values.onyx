@@ -13,7 +13,7 @@ Foo :: struct {
     m: str;
 }
 
-Foo.method :: (f: ^Foo) -> (i32, i32, str) {
+Foo.method :: (f: &Foo) -> (i32, i32, str) {
     return f.x, f.y, f.m;
 }
 
@@ -29,5 +29,5 @@ main :: () {
     core.println(x);
 
     y := 1;
-    core.println(y + Foo.method(^f));
+    core.println(y + Foo.method(&f));
 }
