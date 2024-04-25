@@ -377,7 +377,7 @@ TypeMatch compiler_extension_expand_macro(
                 if (id != *expansion_id) {
                     // PROTOCOL ERROR
                     extension_kill(ext);
-                    onyx_report_error(body->pos, Error_Critical, "Procotol error when talking to '%s'.", ext->name);
+                    onyx_report_error(body->pos, Error_Critical, "Protocol error when talking to '%s'.", ext->name);
                     return TYPE_MATCH_FAILED;
                 }
 
@@ -412,7 +412,7 @@ TypeMatch compiler_extension_expand_macro(
 
             default:
                 extension_kill(ext);
-                onyx_report_error(body->pos, Error_Critical, "Procotol error when talking to '%s'.", ext->name);
+                onyx_report_error(body->pos, Error_Critical, "Protocol error when talking to '%s'.", ext->name);
                 return TYPE_MATCH_FAILED;
         }
     }
