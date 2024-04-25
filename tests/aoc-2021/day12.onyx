@@ -6,8 +6,8 @@ Communative_Pair :: struct (T: type_expr) where hash.Hashable(T) {
     a, b: T;
 }
 
-#match hash.to_u32 (p: Communative_Pair($T)) => {
-    return hash.to_u32(p.a) * hash.to_u32(p.b);
+#overload hash.hash :: (p: Communative_Pair($T)) => {
+    return hash.hash(p.a) * hash.hash(p.b);
 }
 
 #operator == (p1, p2: Communative_Pair($T)) => {

@@ -12,7 +12,8 @@ State :: struct {
 }
 
 // Nicer way of printing a Map.
-#match io.write (w: &io.Writer, x: &Map($K, $V)) {
+#overload
+io.write :: (w: &io.Writer, x: &Map($K, $V)) {
     io.write(w, "{\n");
     for e in x.entries {
         io.write(w, "    {} => {}\n", e.key, e.value);

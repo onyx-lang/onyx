@@ -6,7 +6,7 @@ queued :: struct { x, y: i32; cost: i32; };
 #operator == (u1, u2: queued) => u1.x == u2.x && u1.y == u2.y;
 
 pos :: struct { x, y: i32; }
-#match hash.to_u32 (p: pos) => p.x * 12462341 + p.y * 1231247823;
+#overload hash.hash :: (p: pos) => p.x * 12462341 + p.y * 1231247823;
 #operator == (p1, p2: pos) => p1.x == p2.x && p1.y == p2.y;
 
 main :: (args) => {

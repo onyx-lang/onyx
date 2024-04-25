@@ -110,7 +110,7 @@ make :: (backing: Allocator, arena_size: u32) -> Arena {
     };
 }
 
-#match core.alloc.as_allocator make_allocator
+#overload core.alloc.as_allocator :: make_allocator
 make_allocator :: (rs: &Arena) -> Allocator {
     return Allocator.{
         func = arena_alloc_proc,

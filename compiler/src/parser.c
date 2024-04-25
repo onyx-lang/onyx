@@ -4199,7 +4199,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(operator);
                 return;
             }
-            else if (parse_possible_directive(parser, "match") || parse_possible_directive(parser, "overload")) {
+            else if (parse_possible_directive(parser, "overload")) {
                 AstDirectiveAddOverload *add_overload = make_node(AstDirectiveAddOverload, Ast_Kind_Directive_Add_Overload);
                 add_overload->token = dir_token;
 
@@ -4216,16 +4216,9 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 add_overload->overloaded_function = (AstNode *) parse_expression(parser, 0);
                 parser->parse_calls = 1;
 
-                // Allow for
-                //      #match
-                //      something :: (....) {
-                //      }
-                //
-                // This will make converting something to a overloaded
-                // function easier and require less copying by the programmer.
-                if (next_tokens_are(parser, 2, ':', ':')) {
-                    consume_tokens(parser, 2);
-                }
+                expect_token(parser, ':');
+                expect_token(parser, ':');
+                if (parser->hit_unexpected_token) return;
 
                 add_overload->overload = parse_expression(parser, 0);
                 add_overload->overload->flags &= ~Ast_Flag_Function_Is_Lambda;

@@ -7,7 +7,8 @@ Vec2 :: struct {
 	y: i32 = 0;
 }
 
-#match hash.to_u32 (v: Vec2) -> u32 {
+#overload
+hash.hash :: (v: Vec2) -> u32 {
 	return v.x * 11 + v.y * 17;
 }
 

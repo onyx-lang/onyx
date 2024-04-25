@@ -141,7 +141,8 @@ decode_line :: (left, right: str) -> u32 {
 }
 
 // Nicer way of printing a Map.
-#match io.write (w: &io.Writer, x: &Map($K, $V)) {
+#overload
+io.write :: (w: &io.Writer, x: &Map($K, $V)) {
     io.write(w, "{\n");
     for e in x.entries {
         io.write(w, "    {} => {}\n", e.key, e.value);
@@ -149,7 +150,8 @@ decode_line :: (left, right: str) -> u32 {
     io.write(w, "}");
 }
 
-#match hash.to_u32 (x: u8) => cast(u32) x;
+#overload
+hash.hash :: (x: u8) => cast(u32) x;
 
 #operator == (a, b: [] $T) -> bool {
     if a.count != b.count do return false;

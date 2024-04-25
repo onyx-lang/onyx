@@ -3,7 +3,7 @@
 use core {*}
 
 Pos :: struct {x, y:i32;}
-#match hash.to_u32 (use p: Pos) => x * 45238271 + y * 34725643;
+#overload hash.hash :: (use p: Pos) => x * 45238271 + y * 34725643;
 #operator == (p1, p2: Pos) => p1.x == p2.x && p1.y == p2.y;
 
 main :: (args) => {

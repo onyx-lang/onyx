@@ -257,7 +257,7 @@ buffer_stream_free :: (use bs: &BufferStream) {
     }
 }
 
-#overload str.as_str buffer_stream_to_str
+#overload str.as_str :: buffer_stream_to_str
 buffer_stream_to_str :: (use bs: &BufferStream) -> str {
     if !write_enabled do return null_str;
 

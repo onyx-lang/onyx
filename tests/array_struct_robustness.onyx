@@ -5,7 +5,8 @@ use core {*}
 Vec2 :: struct { x: i32; y: i32; }
 
 // Overload print() to print Vec2's.
-#match io.write (use writer: &io.Writer, use v: Vec2) {
+#overload
+io.write :: (use writer: &io.Writer, use v: Vec2) {
     io.write_format(writer, "Vec2({}, {})", x, y);
 }
 

@@ -122,7 +122,7 @@ Set.empty :: (use set: &Set) -> bool {
     return entries.count == 0;
 }
 
-#overload core.iter.as_iter as_iter
+#overload core.iter.as_iter :: Set.as_iter
 Set.as_iter :: (s: &Set) =>
     core.iter.generator(
         &.{ s = s, i = 0 },

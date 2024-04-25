@@ -3,7 +3,7 @@
 use core {*}
 
 Pos :: struct {x,y: i32;}
-#match hash.to_u32 (use p: Pos) => x * 13 & 17 * y;
+#overload hash.hash :: (use p: Pos) => x * 13 & 17 * y;
 #operator == (p1, p2: Pos) => p1.x == p2.x && p1.y == p2.y;
 
 Cell :: struct {
@@ -56,7 +56,8 @@ find_span :: macro (low: Pos) -> u32 {
     return included.count;
 }
 
-#match io.write (w: &io.Writer, x: &Map($K, $V)) {
+#overload
+io.write :: (w: &io.Writer, x: &Map($K, $V)) {
     io.write(w, "{\n");
     for e in x.entries {
         io.write(w, "    {} => {}\n", e.key, e.value);

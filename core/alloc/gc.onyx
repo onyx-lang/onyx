@@ -64,7 +64,7 @@ clear :: (hs: &GCState) {
     hs.first = null;
 }
 
-#match core.alloc.as_allocator make_allocator
+#overload core.alloc.as_allocator :: make_allocator
 make_allocator :: (hs: &GCState) -> Allocator {
     return Allocator.{
         func = gc_alloc_proc,
@@ -72,27 +72,29 @@ make_allocator :: (hs: &GCState) -> Allocator {
     };
 }
 
-auto :: #match {
-    macro () {
-        use core.alloc {package, gc}
-        
-        gcs := gc.make();
-        old_allocator := context.allocator;
-        context.allocator = alloc.as_allocator(&gcs);
-        defer {
-            gc.clear(&gcs);
-            context.allocator = old_allocator;
-        }
-    },
+auto :: #match {}
 
-    macro (body: Code) -> i32 {
-        auto :: auto
-
-        auto(); 
-        #unquote body;
-
-        return 0;
+#overload
+auto :: macro () {
+    use core.alloc {package, gc}
+    
+    gcs := gc.make();
+    old_allocator := context.allocator;
+    context.allocator = alloc.as_allocator(&gcs);
+    defer {
+        gc.clear(&gcs);
+        context.allocator = old_allocator;
     }
+}
+
+#overload
+auto :: macro (body: Code) -> i32 {
+    auto :: auto
+
+    auto(); 
+    #unquote body;
+
+    return 0;
 }
 
 

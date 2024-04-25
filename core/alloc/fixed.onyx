@@ -33,7 +33,7 @@ fixed_allocator_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u
 
 make :: (buffer: [] u8) => FixedAllocator.{ buffer, 0 }
 
-#match core.alloc.as_allocator make_allocator
+#overload core.alloc.as_allocator :: make_allocator
 make_allocator :: (fa_data: &FixedAllocator) => Allocator.{
     func = fixed_allocator_proc,
     data = fa_data,

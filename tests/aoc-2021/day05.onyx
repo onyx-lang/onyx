@@ -39,7 +39,7 @@ line_points :: (l: Line) -> Iterator(Point) {
 }
 
 Point :: struct {x, y: u32;}
-#match hash.to_u32 (use p: Point) => x * 146307 + y * 172363;
+#overload hash.hash :: (use p: Point) => x * 146307 + y * 172363;
 #operator == (p1, p2: Point) => p1.x == p2.x && p1.y == p2.y;
 
 main :: (args) => {
