@@ -1631,10 +1631,7 @@ static AstSwitchCase* parse_case_stmt(OnyxParser* parser) {
     AstSwitchCase *sc_node = make_node(AstSwitchCase, Ast_Kind_Switch_Case);
     sc_node->token = expect_token(parser, Token_Type_Keyword_Case);
 
-    if (
-        parse_possible_directive(parser, "default") ||
-        parse_placeholder(parser)
-    ) {
+    if (parse_placeholder(parser)) {
         sc_node->is_default = 1;
 
     } else {
