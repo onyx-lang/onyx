@@ -4,41 +4,41 @@ use core {*}
 
 // Returns the number of fields
 process_passport :: (contents: &str) -> u32 {
-    field_count := 0;
+    field_count := 0
 
     while true {
-        line := string.read_until(contents, '\n');
-        string.advance(contents, 1);
-        if line.count == 0 do break;
+        line := string.read_until(contents, '\n')
+        string.advance(contents, 1)
+        if line.count == 0 do break
 
-        fields := string.split(line, ' ');
-        defer cfree(fields.data);
+        fields := string.split(line, ' ')
+        defer cfree(fields.data)
 
         for field in fields {
-            data := string.split(field, ':');
-            defer cfree(data.data);
+            data := string.split(field, ':')
+            defer cfree(data.data)
 
             if !string.equal(data[0], "cid") {
-                field_count += 1;
+                field_count += 1
             }
         }
     }
 
-    return field_count;
+    return field_count
 }
 
 // This does not include part 2 because it is gross and
 // not worth the effort to implement it.
 main :: (args: [] cstr) {
-    contents := #file_contents "./input/day4.txt";
+    contents := #file_contents "./input/day4.txt"
 
-    valid_passports := 0;
+    valid_passports := 0
     while true {
-        if contents.count == 0 do break;
+        if contents.count == 0 do break
 
-        field_count := process_passport(&contents);
-        if field_count == 7 do valid_passports += 1;
+        field_count := process_passport(&contents)
+        if field_count == 7 do valid_passports += 1
     }
 
-    printf("Valid passports: {}\n", valid_passports);
+    printf("Valid passports: {}\n", valid_passports)
 }

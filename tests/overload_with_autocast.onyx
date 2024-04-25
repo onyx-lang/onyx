@@ -10,9 +10,9 @@ overloaded :: #match {
 }
 
 main :: (args: [] cstr) {
-    x: i32 = 1234;
-    overloaded(~~x, 4);
+    x: i32 = 1234
+    overloaded(~~x, 4)
 
-    y: i32 = 1234;
-    overloaded(~~x, "Test");
+    y: i32 = 1234
+    overloaded(~~x, "Test")
 }

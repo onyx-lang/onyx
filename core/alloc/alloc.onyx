@@ -24,16 +24,16 @@ as_allocator :: #match {
 from_stack :: macro (size: u32) -> rawptr {
     // This should do something about the alignment...
     // Everything so far has assume that the stack is aligned to 16 bytes.
-    __stack_top = cast([&]u8, __stack_top) - size;
-    return __stack_top;
+    __stack_top = cast([&]u8, __stack_top) - size
+    return __stack_top
 }
 
 /// Allocates memory from the stack to form a slice of `T` with length `size`.
 ///
 /// **DO NOT USE THIS IN A LOOP! You cannot free memory allocated off the stack.**
 array_from_stack :: macro ($T: type_expr, size: u32) -> [] T {
-    __stack_top = cast([&]u8, __stack_top) - size * sizeof T;
-    return (cast([&]T) __stack_top)[0 .. size];
+    __stack_top = cast([&]u8, __stack_top) - size * sizeof T
+    return (cast([&]T) __stack_top)[0 .. size]
 }
 
 /// Moves a value on to the heap. Useful for cases like this in
@@ -42,62 +42,62 @@ array_from_stack :: macro ($T: type_expr, size: u32) -> [] T {
 ///         return alloc.on_heap(Foo.{
 ///             name = "...",
 ///             age  = 42
-///         });
+///         })
 ///     }
 on_heap :: macro (v: $V) -> &V {
     use core
 
-    out := cast(&V) raw_alloc(context.allocator, sizeof V);
-    core.memory.set(out, 0, sizeof V);
-    *out = v;
-    return out;
+    out := cast(&V) raw_alloc(context.allocator, sizeof V)
+    core.memory.set(out, 0, sizeof V)
+    *out = v
+    return out
 }
 
 /// Like `alloc.on_heap`, but allocates on the temporary allocator.
 on_temp :: macro (v: $V) -> &V {
     use core
 
-    out := cast(&V) raw_alloc(context.temp_allocator, sizeof V);
-    core.memory.set(out, 0, sizeof V);
-    *out = v;
-    return out;
+    out := cast(&V) raw_alloc(context.temp_allocator, sizeof V)
+    core.memory.set(out, 0, sizeof V)
+    *out = v
+    return out
 }
 
 /// Copies the internal closure data of a function to the provided allocator,
 /// and returns the new closed function.
 copy_closure :: (f: $F/type_is_function, a: Allocator) -> F {
-    if !f.closure do return f;
+    if !f.closure do return f
 
     //
     // The size of the closure block is stored at offset 0 inside of the closure data.
-    closure_size := *cast(&u32, f.closure);
-    new_closure := raw_alloc(a, closure_size);
-    memory.copy(new_closure, f.closure, closure_size);
+    closure_size := *cast(&u32, f.closure)
+    new_closure := raw_alloc(a, closure_size)
+    memory.copy(new_closure, f.closure, closure_size)
 
-    return F.{ f.__funcidx, new_closure };
+    return F.{ f.__funcidx, new_closure }
 }
 
 TEMPORARY_ALLOCATOR_SIZE :: 1 << 16; // 16Kb
 
 // The global heap allocator, set up upon program intialization.
-heap_allocator : Allocator;
+heap_allocator : Allocator
 
 // The global temp allocator, set up upon program intialization.
 #local #thread_local
-temp_state     : arena.ArenaState;
+temp_state     : arena.ArenaState
 
 #thread_local
-temp_allocator : Allocator;
+temp_allocator : Allocator
 
 /// Initializes the thread-local temporary allocator.
 ///
 /// You do not need to call this. It is called automatically on thread initialization.
 init_temp_allocator :: () {
-    temp_state = arena.make(heap_allocator, TEMPORARY_ALLOCATOR_SIZE);
-    temp_allocator = as_allocator(&temp_state);
+    temp_state = arena.make(heap_allocator, TEMPORARY_ALLOCATOR_SIZE)
+    temp_allocator = as_allocator(&temp_state)
 }
 
 /// Resets the temporary allocator, effectively freeing all allocations made in the temporary allocator.
 clear_temp_allocator :: () {
-    arena.clear(&temp_state);
+    arena.clear(&temp_state)
 }

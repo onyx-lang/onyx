@@ -3,49 +3,49 @@
 use core {*}
 
 main :: (args: [] cstr) {
-    defer println("At the end!");
-    i := 0;
+    defer println("At the end!")
+    i := 0
     while i < 10 {
-        defer i += 1;
-        defer printf("Index is {}\n", i);
+        defer i += 1
+        defer printf("Index is {}\n", i)
 
         if i == 3 {
-            printf("Skipping {}!!\n", i);
-            continue;
+            printf("Skipping {}!!\n", i)
+            continue
         }
 
-        print("Doing something with ");
+        print("Doing something with ")
     }
-    printf("i is {}\n", i);
+    printf("i is {}\n", i)
 
-    println("\n\n===================================");
-    i = 0;
+    println("\n\n===================================")
+    i = 0
     while i < 10 {
-        defer i += 1;
-        defer printf("Index is {}\n", i);
+        defer i += 1
+        defer printf("Index is {}\n", i)
 
         if i == 3 {
-            printf("Skipping {}!!\n", i);
-            break;
+            printf("Skipping {}!!\n", i)
+            break
         }
 
-        print("Doing something with ");
+        print("Doing something with ")
     }
-    printf("i is {}\n", i);
+    printf("i is {}\n", i)
 
-    println("\n\n===================================");
+    println("\n\n===================================")
     switch i {
         case 4 {
-            defer println("Deferred!");
+            defer println("Deferred!")
             {
-                defer println("In block deferred!");
-                fallthrough;
+                defer println("In block deferred!")
+                fallthrough
             }
-            println("Case 4!");
+            println("Case 4!")
         }
 
         case _ {
-            println("Default!");
+            println("Default!")
         }
     }
 }

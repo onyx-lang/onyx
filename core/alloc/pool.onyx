@@ -13,8 +13,8 @@ package core.alloc.pool
 use core
 
 PoolAllocator :: struct (Elem: type_expr) {
-    buffer     : [] Elem;
-    first_free : &Elem;
+    buffer     : [] Elem
+    first_free : &Elem
 
     alloc :: pool_alloc
     free  :: pool_free
@@ -24,37 +24,37 @@ PoolAllocator :: struct (Elem: type_expr) {
 pool_allocator_proc :: (pool: &PoolAllocator($Elem), aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     switch aa {
         case .Alloc {
-            assert(size == sizeof Elem, "Allocating wrong size from pool allocator.");
-            return pool_alloc(pool);
+            assert(size == sizeof Elem, "Allocating wrong size from pool allocator.")
+            return pool_alloc(pool)
         }
 
         case .Resize {
-            assert(false, "Cannot resize in a pool allocator!");
-            return null;
+            assert(false, "Cannot resize in a pool allocator!")
+            return null
         }
 
         case .Free {
-            pool_free(pool, ~~ oldptr);
-            return null;
+            pool_free(pool, ~~ oldptr)
+            return null
         }
     }
 
-    return null;
+    return null
 }
 
 pool_alloc :: (pool: &PoolAllocator($Elem)) -> &Elem {
-    if pool.first_free == null do return null;
+    if pool.first_free == null do return null
 
-    defer pool.first_free = cast(&Elem) *(cast(&rawptr) pool.first_free);
-    return pool.first_free;
+    defer pool.first_free = cast(&Elem) *(cast(&rawptr) pool.first_free)
+    return pool.first_free
 }
 
 pool_free :: (pool: &PoolAllocator($Elem), elem: &Elem) {
     // @TODO
     // Add a check that the elem pointer is actually in the buffer?? 
     
-    *(cast(&rawptr) elem) = cast(rawptr) pool.first_free;
-    pool.first_free = elem;
+    *(cast(&rawptr) elem) = cast(rawptr) pool.first_free
+    pool.first_free = elem
 }
 
 
@@ -65,18 +65,18 @@ pool_free :: (pool: &PoolAllocator($Elem), elem: &Elem) {
 // its guaranteed that the size allocated for the buffer is a multiple of the size
 // of Elem.
 make :: (buffer: [] $Elem) -> PoolAllocator(Elem) {
-    assert(sizeof Elem >= sizeof rawptr, "Cannot have a pool allocator of a type less than a rawptr in size.");
+    assert(sizeof Elem >= sizeof rawptr, "Cannot have a pool allocator of a type less than a rawptr in size.")
 
     for i in 0 .. buffer.count - 1 {
-        *(cast(&rawptr) &buffer[i]) = cast(rawptr) &buffer[i + 1];
+        *(cast(&rawptr) &buffer[i]) = cast(rawptr) &buffer[i + 1]
     }
 
-    *(cast(&rawptr) &buffer[buffer.count - 1]) = null;
+    *(cast(&rawptr) &buffer[buffer.count - 1]) = null
 
     return .{
         buffer     = buffer,
         first_free = &buffer[0],
-    };
+    }
 }
 
 #overload core.alloc.as_allocator :: make_allocator
@@ -84,5 +84,5 @@ make_allocator :: (pool: &PoolAllocator($Elem)) -> Allocator {
     return Allocator.{
         func = #solidify pool_allocator_proc { Elem = Elem },
         data = pool,
-    };
+    }
 }

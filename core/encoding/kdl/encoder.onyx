@@ -8,69 +8,69 @@ use core.string {contains}
 
 write :: (d: &Document, w: &io.Writer) {
     for d.nodes {
-        write_node(it, w);
-        io.write(w, "\n");
+        write_node(it, w)
+        io.write(w, "\n")
     }
 }
 
 write_node :: (n: &Node, w: &io.Writer, indentation := 0) {
-    for indentation * KDL_TAB_SIZE do io.write(w, " ");
+    for indentation * KDL_TAB_SIZE do io.write(w, " ")
 
     n.type_annotation->with([ta] {
-        io.write_format(w, "({}) ", ta);
-    });
+        io.write_format(w, "({}) ", ta)
+    })
 
-    if contains(n.node, "//") do io.write_format(w, "{\"}", n.node);
-    else do io.write(w, n.node);
-    io.write(w, " ");
+    if contains(n.node, "//") do io.write_format(w, "{\"}", n.node)
+    else do io.write(w, n.node)
+    io.write(w, " ")
 
     for n.values {
-        write_value(it, w);
-        io.write(w, " ");
+        write_value(it, w)
+        io.write(w, " ")
     }
 
     for n.props->as_iter() {
-        io.write_format(w, "{}=", it.key);
-        write_value(it.value, w);
-        io.write(w, " ");
+        io.write_format(w, "{}=", it.key)
+        write_value(it.value, w)
+        io.write(w, " ")
     }
 
     if n.children {
-        io.write(w, "{\n");
+        io.write(w, "{\n")
 
         for n.children {
-            write_node(it, w, indentation + 1);
+            write_node(it, w, indentation + 1)
         }
 
-        for indentation * KDL_TAB_SIZE do io.write(w, " ");
-        io.write(w, "}");
+        for indentation * KDL_TAB_SIZE do io.write(w, " ")
+        io.write(w, "}")
     }
 
-    io.write(w, "\n");
+    io.write(w, "\n")
 }
 
 write_value :: (v: Value, w: &io.Writer) {
     v.type_annotation->with([ta] {
-        io.write_format(w, "({}) ", ta);
-    });
+        io.write_format(w, "({}) ", ta)
+    })
 
     switch v.data {
         case .String as s {
-            io.write_format(w, "{\"}", s);
+            io.write_format(w, "{\"}", s)
         }
 
         case .Number as n do switch n {
-            case .Integer as i do io.write_format(w, "{}", i);
-            case .Float as f   do io.write_format(w, "{}", f);
-            case .String as s  do io.write_format(w, "{\"}", s);
+            case .Integer as i do io.write_format(w, "{}", i)
+            case .Float as f   do io.write_format(w, "{}", f)
+            case .String as s  do io.write_format(w, "{\"}", s)
         }
 
         case .Boolean as b {
-            io.write_format(w, "{}", b);
+            io.write_format(w, "{}", b)
         }
 
         case .Null {
-            io.write_format(w, "null");
+            io.write_format(w, "null")
         }
     }
 }

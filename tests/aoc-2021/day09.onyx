@@ -3,128 +3,128 @@
 use core {*}
 
 Pos :: struct {x,y: i32;}
-#overload hash.hash :: (use p: Pos) => x * 13 & 17 * y;
-#operator == (p1, p2: Pos) => p1.x == p2.x && p1.y == p2.y;
+#overload hash.hash :: (use p: Pos) => x * 13 & 17 * y
+#operator == (p1, p2: Pos) => p1.x == p2.x && p1.y == p2.y
 
 Cell :: struct {
-    height: i32;
+    height: i32
     dx: i32 = 0;  // height - (right of cell).height
     dy: i32 = 0;  // height - (below cell).height
 }
 
 find_span :: macro (low: Pos) -> u32 {
-    queued:    [..] Pos;
-    included:  [..] Pos;
-    potential: [..] Pos;
+    queued:    [..] Pos
+    included:  [..] Pos
+    potential: [..] Pos
 
-    queued << low;
+    queued << low
 
     while queued.count != 0 {
-        t := queued[0];
-        array.delete(&queued, 0);
+        t := queued[0]
+        array.delete(&queued, 0)
 
-        top := &heightmap[t];
-        if top.height == 9 do continue;
+        top := &heightmap[t]
+        if top.height == 9 do continue
 
-        included << t;
+        included << t
 
-        array.clear(&potential);
+        array.clear(&potential)
         if t.x < width - 1 && top.dx < 0 {
-            potential << Pos.{t.x+1,t.y};
+            potential << Pos.{t.x+1,t.y}
         }
         if t.y < height - 1 && top.dy < 0 {
-            potential << Pos.{t.x,t.y+1};
+            potential << Pos.{t.x,t.y+1}
         }
         if t.x > 0 {
             if heightmap[Pos.{t.x-1,t.y}]->unwrap().height > 0 {
-                potential << Pos.{t.x-1,t.y};
+                potential << Pos.{t.x-1,t.y}
             }
         }
         if t.y > 0 {
             if heightmap[Pos.{t.x,t.y-1}]->unwrap().height > 0 {
-                potential << Pos.{t.x,t.y-1};
+                potential << Pos.{t.x,t.y-1}
             }
         }
 
         for p in potential {
             if !array.contains(included, p) && !array.contains(queued, p) {
-                queued << p;
+                queued << p
             }
         }
     }
 
-    return included.count;
+    return included.count
 }
 
 #overload
 io.write :: (w: &io.Writer, x: &Map($K, $V)) {
-    io.write(w, "{\n");
+    io.write(w, "{\n")
     for e in x.entries {
-        io.write(w, "    {} => {}\n", e.key, e.value);
+        io.write(w, "    {} => {}\n", e.key, e.value)
     }
-    io.write(w, "}");
+    io.write(w, "}")
 }
 
 main :: (args) => {
-    use file := os.open("./tests/aoc-2021/input/day09.txt")->unwrap();
-    use reader := io.reader_make(&file);
+    use file := os.open("./tests/aoc-2021/input/day09.txt")->unwrap()
+    use reader := io.reader_make(&file)
 
-    heightmap: Map(Pos, Cell);
+    heightmap: Map(Pos, Cell)
 
-    height, width := 0, 0;
+    height, width := 0, 0
     while !io.reader_empty(&reader) {
-        line := io.read_line(&reader, consume_newline=false, inplace=true);
-        io.skip_whitespace(&reader);
+        line := io.read_line(&reader, consume_newline=false, inplace=true)
+        io.skip_whitespace(&reader)
 
         for line.count {
-            heightmap[Pos.{it, height}] = Cell.{cast(u32) (line[it] - '0')};
+            heightmap[Pos.{it, height}] = Cell.{cast(u32) (line[it] - '0')}
         }
 
-        width = line.count;
-        height += 1;
+        width = line.count
+        height += 1
     }
 
     for y in height - 1 do for x in width {
         map.update(&heightmap, .{x,y}) {
-            it.dy = it.height - heightmap[Pos.{x,y+1}]->unwrap().height;
+            it.dy = it.height - heightmap[Pos.{x,y+1}]->unwrap().height
         }
     }
     for x in width - 1 do for y in height {
         map.update(&heightmap, .{x,y}) {
-            it.dx = it.height - heightmap[Pos.{x+1,y}]->unwrap().height;
+            it.dx = it.height - heightmap[Pos.{x+1,y}]->unwrap().height
         }
     }
 
-    lowest: [..] Pos;
-    risk_sum := 0;
+    lowest: [..] Pos
+    risk_sum := 0
     for y in height do for x in width {
-        h := &heightmap[Pos.{x,y}];
-        if x < width  - 1 && h.dx >= 0 do continue;
-        if y < height - 1 && h.dy >= 0 do continue;
+        h := &heightmap[Pos.{x,y}]
+        if x < width  - 1 && h.dx >= 0 do continue
+        if y < height - 1 && h.dy >= 0 do continue
 
         if x > 0 {
-            if heightmap[Pos.{x-1, y}]->unwrap().dx <= 0 do continue;
+            if heightmap[Pos.{x-1, y}]->unwrap().dx <= 0 do continue
         }
 
         if y > 0 {
-            if heightmap[Pos.{x, y-1}]->unwrap().dy <= 0 do continue;
+            if heightmap[Pos.{x, y-1}]->unwrap().dy <= 0 do continue
         }
 
-        lowest << .{x, y};
-        risk_sum += h.height + 1;
+        lowest << .{x, y}
+        risk_sum += h.height + 1
     }
 
-    printf("Part 1: {}\n", risk_sum);
+    printf("Part 1: {}\n", risk_sum)
 
-    lowest_count: Map(Pos, i32);
-    for low in lowest do lowest_count[low] = find_span(low);
+    lowest_count: Map(Pos, i32)
+    for low in lowest do lowest_count[low] = find_span(low)
 
-    array.quicksort(lowest_count.entries, (a, b) => b.value - a.value);
+    array.quicksort(lowest_count.entries, (a, b) => b.value - a.value)
 
     answer := iter.as_iter(lowest_count.entries)
            |> iter.map((x) => x.value)
            |> iter.take(3)
-           |> iter.fold(1, (x, y) => x * y);
+           |> iter.fold(1, (x, y) => x * y)
 
-    printf("Part 2: {}\n", answer);
+    printf("Part 2: {}\n", answer)
 }

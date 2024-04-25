@@ -7,10 +7,10 @@ use core.intrinsics.wasm {wasm :: package}
 BLOCK_SIZE :: 32
 
 Hasher :: struct {
-    data: [64] u8;
-    data_length: u32;
-    bit_length: u64;
-    state: [8] u32;
+    data: [64] u8
+    data_length: u32
+    bit_length: u64
+    state: [8] u32
 }
 
 Hasher.make :: () -> #Self {
@@ -25,136 +25,136 @@ Hasher.make :: () -> #Self {
             0x1f83d9ab,
             0x5be0cd19
         ]
-    };
+    }
 }
 
 Hasher.update :: (self: &#Self, data: [] u8) {
     for i in 0 .. data.count {
-        self.data[self.data_length] = data[i];
-        self.data_length += 1;
+        self.data[self.data_length] = data[i]
+        self.data_length += 1
 
         if self.data_length == 64 {
-            do_cycle(self, self.data);
-            self.bit_length += 512;
-            self.data_length = 0;
+            do_cycle(self, self.data)
+            self.bit_length += 512
+            self.data_length = 0
         }
     }
 }
 
 Hasher.final :: (self: &#Self) -> [BLOCK_SIZE] u8 {
-    out: [BLOCK_SIZE] u8;
+    out: [BLOCK_SIZE] u8
 
-    i := self.data_length;
+    i := self.data_length
     if self.data_length < 56 {
-        self.data[i] = 0x80;
-        i += 1;
+        self.data[i] = 0x80
+        i += 1
         while i < 56 {
-            self.data[i] = 0;
-            i += 1;
+            self.data[i] = 0
+            i += 1
         }
     }
     else {
-        self.data[i] = 0x80;
-        i += 1;
+        self.data[i] = 0x80
+        i += 1
         while i < 64 {
-            self.data[i] = 0;
-            i += 1;
+            self.data[i] = 0
+            i += 1
         }
-        do_cycle(self, self.data);
-        memory.set(&self.data, 0, 56);
+        do_cycle(self, self.data)
+        memory.set(&self.data, 0, 56)
     }
 
-    self.bit_length += ~~(self.data_length * 8);
-    self.data[63] = cast(u8, self.bit_length >> 0);
-    self.data[62] = cast(u8, self.bit_length >> 8);
-    self.data[61] = cast(u8, self.bit_length >> 16);
-    self.data[60] = cast(u8, self.bit_length >> 24);
-    self.data[59] = cast(u8, self.bit_length >> 32);
-    self.data[58] = cast(u8, self.bit_length >> 40);
-    self.data[57] = cast(u8, self.bit_length >> 48);
-    self.data[56] = cast(u8, self.bit_length >> 56);
-    do_cycle(self, self.data);
+    self.bit_length += ~~(self.data_length * 8)
+    self.data[63] = cast(u8, self.bit_length >> 0)
+    self.data[62] = cast(u8, self.bit_length >> 8)
+    self.data[61] = cast(u8, self.bit_length >> 16)
+    self.data[60] = cast(u8, self.bit_length >> 24)
+    self.data[59] = cast(u8, self.bit_length >> 32)
+    self.data[58] = cast(u8, self.bit_length >> 40)
+    self.data[57] = cast(u8, self.bit_length >> 48)
+    self.data[56] = cast(u8, self.bit_length >> 56)
+    do_cycle(self, self.data)
 
     for i in 0 .. 4 {
-        out[i + 0]  = ~~((self.state[0] >> (24 - i * 8)) & 0xff);
-        out[i + 4]  = ~~((self.state[1] >> (24 - i * 8)) & 0xff);
-        out[i + 8]  = ~~((self.state[2] >> (24 - i * 8)) & 0xff);
-        out[i + 12] = ~~((self.state[3] >> (24 - i * 8)) & 0xff);
-        out[i + 16] = ~~((self.state[4] >> (24 - i * 8)) & 0xff);
-        out[i + 20] = ~~((self.state[5] >> (24 - i * 8)) & 0xff);
-        out[i + 24] = ~~((self.state[6] >> (24 - i * 8)) & 0xff);
-        out[i + 28] = ~~((self.state[7] >> (24 - i * 8)) & 0xff);
+        out[i + 0]  = ~~((self.state[0] >> (24 - i * 8)) & 0xff)
+        out[i + 4]  = ~~((self.state[1] >> (24 - i * 8)) & 0xff)
+        out[i + 8]  = ~~((self.state[2] >> (24 - i * 8)) & 0xff)
+        out[i + 12] = ~~((self.state[3] >> (24 - i * 8)) & 0xff)
+        out[i + 16] = ~~((self.state[4] >> (24 - i * 8)) & 0xff)
+        out[i + 20] = ~~((self.state[5] >> (24 - i * 8)) & 0xff)
+        out[i + 24] = ~~((self.state[6] >> (24 - i * 8)) & 0xff)
+        out[i + 28] = ~~((self.state[7] >> (24 - i * 8)) & 0xff)
     }
 
-    return out;
+    return out
 }
 
 hash :: #match #local {}
 
 #overload
 hash :: (x: str) -> [BLOCK_SIZE] u8 {
-    h := Hasher.make();
-    h->update(x);
-    return h->final();
+    h := Hasher.make()
+    h->update(x)
+    return h->final()
 }
 
 
 #local
 do_cycle :: (self: &Hasher, data: [] u8) {
-    m: [64] u32;
+    m: [64] u32
 
     for i in 0 .. 16 {
-        j := 4 * i;
+        j := 4 * i
         m[i] = (cast(u32, data[j]) << 24) |
                (cast(u32, data[j + 1]) << 16) |
                (cast(u32, data[j + 2]) << 8) |
-               (cast(u32, data[j + 3]));
+               (cast(u32, data[j + 3]))
     }
 
     for i in 16 .. 64 {
-        m[i] = SIG1(m[i - 2]) + m[i - 7] + SIG0(m[i - 15]) + m[i - 16];
+        m[i] = SIG1(m[i - 2]) + m[i - 7] + SIG0(m[i - 15]) + m[i - 16]
     }
 
-    a := self.state[0];
-    b := self.state[1];
-    c := self.state[2];
-    d := self.state[3];
-    e := self.state[4];
-    f := self.state[5];
-    g := self.state[6];
-    h := self.state[7];
+    a := self.state[0]
+    b := self.state[1]
+    c := self.state[2]
+    d := self.state[3]
+    e := self.state[4]
+    f := self.state[5]
+    g := self.state[6]
+    h := self.state[7]
 
     for i in 0 .. 64 {
-        t1 := h + EP1(e) + CH(e, f, g) + k[i] + m[i];
-        t2 := EP0(a) + MAJ(a, b, c);
-        h = g;
-        g = f;
-        f = e;
-        e = d + t1;
-        d = c;
-        c = b;
-        b = a;
-        a = t1 + t2;
+        t1 := h + EP1(e) + CH(e, f, g) + k[i] + m[i]
+        t2 := EP0(a) + MAJ(a, b, c)
+        h = g
+        g = f
+        f = e
+        e = d + t1
+        d = c
+        c = b
+        b = a
+        a = t1 + t2
     }
 
 
-    self.state[0] += a;
-    self.state[1] += b;
-    self.state[2] += c;
-    self.state[3] += d;
-    self.state[4] += e;
-    self.state[5] += f;
-    self.state[6] += g;
-    self.state[7] += h;
+    self.state[0] += a
+    self.state[1] += b
+    self.state[2] += c
+    self.state[3] += d
+    self.state[4] += e
+    self.state[5] += f
+    self.state[6] += g
+    self.state[7] += h
 }
 
 #local {
-    CH   :: macro (x, y, z: u32) => (x & y) ^ (~x & z);
-    MAJ  :: macro (x, y, z: u32) => (x & y) ^ (x & z) ^ (y & z);
-    EP0  :: macro (x: u32) => wasm.rotr_i32(x, 2) ^ wasm.rotr_i32(x, 13) ^ wasm.rotr_i32(x, 22);
-    EP1  :: macro (x: u32) => wasm.rotr_i32(x, 6) ^ wasm.rotr_i32(x, 11) ^ wasm.rotr_i32(x, 25);
-    SIG0 :: macro (x: u32) => wasm.rotr_i32(x, 7) ^ wasm.rotr_i32(x, 18) ^ ((x) >> 3);
-    SIG1 :: macro (x: u32) => wasm.rotr_i32(x, 17) ^ wasm.rotr_i32(x, 19) ^ ((x) >> 10);
+    CH   :: macro (x, y, z: u32) => (x & y) ^ (~x & z)
+    MAJ  :: macro (x, y, z: u32) => (x & y) ^ (x & z) ^ (y & z)
+    EP0  :: macro (x: u32) => wasm.rotr_i32(x, 2) ^ wasm.rotr_i32(x, 13) ^ wasm.rotr_i32(x, 22)
+    EP1  :: macro (x: u32) => wasm.rotr_i32(x, 6) ^ wasm.rotr_i32(x, 11) ^ wasm.rotr_i32(x, 25)
+    SIG0 :: macro (x: u32) => wasm.rotr_i32(x, 7) ^ wasm.rotr_i32(x, 18) ^ ((x) >> 3)
+    SIG1 :: macro (x: u32) => wasm.rotr_i32(x, 17) ^ wasm.rotr_i32(x, 19) ^ ((x) >> 10)
 }
 
 #local
@@ -167,4 +167,4 @@ k := u32.[
     0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
     0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
     0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
-];
+]

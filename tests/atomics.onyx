@@ -5,63 +5,63 @@ use core {*}
 use core.intrinsics.atomics {*}
 
 Shared_Data :: struct {
-    arr: [] i32;
+    arr: [] i32
 }
 
 // This is a shared global
-shared_mutex : sync.Mutex;
+shared_mutex : sync.Mutex
 
 // This is a thread-local global
 #thread_local partial_arr : [] i32
 
 // This is shared, and exists to test that initializing new threads
 // does not re-execute the intialization segments.
-test_var := 5678;
+test_var := 5678
 
 print_from_other_thread :: (sd) => {
     // Creating high contention for the shared resource
     for i in 10000 {
-        sync.scoped_mutex(&shared_mutex);
+        sync.scoped_mutex(&shared_mutex)
         for &v in sd.arr {
-            *v += 1;
+            *v += 1
         }
     }
 
     // Using the thread-local variable
-    partial_arr = make([] i32, 5);
-    for i in 5 do partial_arr[i] = i * i;
+    partial_arr = make([] i32, 5)
+    for i in 5 do partial_arr[i] = i * i
     
     // Not printing on threads since the test case looks for EXACT string matches
-    // printf("On a worker thread: {}\n", partial_arr);
+    // printf("On a worker thread: {}\n", partial_arr)
 }
 
 main :: (args) => {
-    sync.mutex_init(&shared_mutex);
+    sync.mutex_init(&shared_mutex)
 
-    test_var = 1234;
-    println(test_var);
+    test_var = 1234
+    println(test_var)
 
-    sd: Shared_Data;
-    sd.arr = make([] i32, 1000);
-    array.fill(sd.arr, 0);
+    sd: Shared_Data
+    sd.arr = make([] i32, 1000)
+    array.fill(sd.arr, 0)
 
-    threads : [4] thread.Thread;
+    threads : [4] thread.Thread
     for &t in threads {
-        thread.spawn(t, &sd, print_from_other_thread);
-        printf("Spawned thread {}\n", t.id);
+        thread.spawn(t, &sd, print_from_other_thread)
+        printf("Spawned thread {}\n", t.id)
     }
 
-    memory.alloc_slice(&partial_arr, 10);
-    for i in 10 do partial_arr[i] = i;
+    memory.alloc_slice(&partial_arr, 10)
+    for i in 10 do partial_arr[i] = i
 
-    printf("Waiting...\n");
+    printf("Waiting...\n")
     for &t in threads {
-        thread.join(t);
-        printf("Thread {} joined!\n", t.id);
+        thread.join(t)
+        printf("Thread {} joined!\n", t.id)
     }
-    printf("{}\n", sd.arr);
-    printf("On the main thread: {}\n", partial_arr);
-    println(test_var);
+    printf("{}\n", sd.arr)
+    printf("On the main thread: {}\n", partial_arr)
+    println(test_var)
 }
 
 

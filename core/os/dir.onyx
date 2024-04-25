@@ -1,7 +1,7 @@
 package core.os
 
 #if !runtime.platform.Supports_Directories {
-    #error "Cannot include this file. Platform not supported.";
+    #error "Cannot include this file. Platform not supported."
 }
 
 use core.string
@@ -10,29 +10,29 @@ use runtime
 
 #local fs :: runtime.platform
 
-Directory :: fs.DirectoryData;
+Directory :: fs.DirectoryData
 
 DirectoryEntry :: struct {
-    type        : FileType;
-    identifier  : u32;
-    name_length : u32;
-    name_data   : [256] u8;
+    type        : FileType
+    identifier  : u32
+    name_length : u32
+    name_data   : [256] u8
 
-    name :: (use dir: &DirectoryEntry) => str.{ ~~name_data, name_length };
+    name :: (use dir: &DirectoryEntry) => str.{ ~~name_data, name_length }
 }
 
 dir_open :: (path: str) -> (Directory, bool) {
-    dir: Directory;
-    success := fs.__dir_open(path, &dir);
-    return dir, success;
+    dir: Directory
+    success := fs.__dir_open(path, &dir)
+    return dir, success
 }
 
 dir_close :: (dir: Directory) {
-    fs.__dir_close(dir);
+    fs.__dir_close(dir)
 }
 
 dir_read :: (dir: Directory, out_entry: &DirectoryEntry) -> bool {
-    return fs.__dir_read(dir, out_entry);
+    return fs.__dir_read(dir, out_entry)
 }
 
 dir_create :: fs.__dir_create
@@ -45,50 +45,50 @@ getcwd :: fs.__getcwd
 
 list_directory :: (path: str) -> Iterator(DirectoryEntry) {
     Context :: struct {
-        dir: Directory;
-        opened := false;
+        dir: Directory
+        opened := false
     }
 
     next :: (use c: &Context) -> ? DirectoryEntry {
-        if !opened do return .None;
+        if !opened do return .None
 
-        entry: DirectoryEntry;
+        entry: DirectoryEntry
         if !dir_read(dir, &entry) {
-            return .None;
+            return .None
         }
 
-        return entry;
+        return entry
     }
 
     close :: (use c: &Context) {
         if opened {
-            dir_close(dir);
+            dir_close(dir)
         }
 
-        cfree(c);
+        cfree(c)
     }
 
-    c := new(Context);
+    c := new(Context)
     if dir, success := dir_open(path); success {
-        c.dir = dir;
-        c.opened = true;
+        c.dir = dir
+        c.opened = true
     }
 
-    return .{ c, next, close };
+    return .{ c, next, close }
 }
 
 remove_directory :: (path: str) -> bool {
     // This is quite a bit of space, and could result in a stack overrun
     // if the directory being deleted has a lot of descendents.
-    full_path_buffer: [512] u8;
+    full_path_buffer: [512] u8
 
     for list_directory(path) {
-        full_path := conv.format(full_path_buffer, "{}{}{}", path, PATH_SEP, it->name());
+        full_path := conv.format(full_path_buffer, "{}{}{}", path, PATH_SEP, it->name())
 
         if it.type == .Directory {
-            if !remove_directory(full_path) do return false;
+            if !remove_directory(full_path) do return false
         } else {
-            remove_file(full_path);
+            remove_file(full_path)
         }
     }
 

@@ -3,68 +3,68 @@
 use core {*}
 
 find_contiguous_subarray_with_sum :: (nums: [..] u64, sum: u64) -> (i32, i32) {
-    start := 0;
-    end   := 0;
-    con_sum: u64 = nums[0];
+    start := 0
+    end   := 0
+    con_sum: u64 = nums[0]
 
     for i in 1 .. nums.count {
-        end += 1;
-        con_sum += nums[end];
+        end += 1
+        con_sum += nums[end]
 
-        if con_sum == sum do break;
+        if con_sum == sum do break
 
         while con_sum > sum && start <= end {
-            con_sum -= nums[start];
-            start += 1;
+            con_sum -= nums[start]
+            start += 1
 
-            if con_sum == sum do break break;
+            if con_sum == sum do break break
         }
     }
 
-    return start, end;
+    return start, end
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./input/day9.txt";
+    contents := #file_contents "./input/day9.txt"
 
-    file := contents;
+    file := contents
 
-    nums := array.make(u64, 32);
-    defer array.free(&nums);
+    nums := array.make(u64, 32)
+    defer array.free(&nums)
 
     while !string.empty(file) {
-        num := conv.parse_int(&file);
-        array.push(&nums, num);
+        num := conv.parse_int(&file)
+        array.push(&nums, num)
     }
 
-    preamble_length :: 25;
+    preamble_length :: 25
 
-    invalid: u64;
+    invalid: u64
     for i in 0 .. nums.count {
-        if i < preamble_length do continue;
+        if i < preamble_length do continue
 
-        success := false;
+        success := false
         for j in 0 .. preamble_length - 1 {
             for k in j + 1 .. preamble_length {
                 if nums[i - j - 1] + nums[i - k - 1] == nums[i] {
-                    success = true;
-                    break break;
+                    success = true
+                    break break
                 }
             }
         }
 
         if !success {
-            invalid = nums[i];
-            break;
+            invalid = nums[i]
+            break
         }
     }
 
-    printf("Invalid number: {}\n", invalid);
+    printf("Invalid number: {}\n", invalid)
 
-    start, end := find_contiguous_subarray_with_sum(nums, invalid);
+    start, end := find_contiguous_subarray_with_sum(nums, invalid)
 
-    max := array.fold(nums.data[start .. end + 1], cast(u64) 0, math.max);
-    min := array.fold(nums.data[start .. end + 1], cast(u64) max, math.min);
+    max := array.fold(nums.data[start .. end + 1], cast(u64) 0, math.max)
+    min := array.fold(nums.data[start .. end + 1], cast(u64) max, math.min)
 
-    printf("Extrema sum: {}\n", min + max);
+    printf("Extrema sum: {}\n", min + max)
 }

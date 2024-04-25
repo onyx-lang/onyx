@@ -3,42 +3,42 @@
 use core {*}
 
 Communative_Pair :: struct (T: type_expr) where hash.Hashable(T) {
-    a, b: T;
+    a, b: T
 }
 
 #overload hash.hash :: (p: Communative_Pair($T)) => {
-    return hash.hash(p.a) * hash.hash(p.b);
+    return hash.hash(p.a) * hash.hash(p.b)
 }
 
 #operator == (p1, p2: Communative_Pair($T)) => {
-    if p1.a == p2.a && p1.b == p2.b do return true;
-    if p1.a == p2.b && p1.b == p2.a do return true;
-    return false;
+    if p1.a == p2.a && p1.b == p2.b do return true
+    if p1.a == p2.b && p1.b == p2.a do return true
+    return false
 }
 
 main :: (args) => {
-    use file := os.open("./tests/aoc-2021/input/day12.txt")->unwrap();
-    use reader := io.reader_make(&file);
+    use file := os.open("./tests/aoc-2021/input/day12.txt")->unwrap()
+    use reader := io.reader_make(&file)
 
-    verticies: Set(str);
-    edges: Set(Communative_Pair(str));
+    verticies: Set(str)
+    edges: Set(Communative_Pair(str))
     while !io.reader_empty(&reader) {
-        line := io.read_line(&reader, consume_newline=true);
+        line := io.read_line(&reader, consume_newline=true)
 
         left, right := do {
-            parts := string.split(line, '-');
-            defer memory.free_slice(&parts);
-            return string.strip_whitespace(parts[0]), string.strip_whitespace(parts[1]);
-        };
+            parts := string.split(line, '-')
+            defer memory.free_slice(&parts)
+            return string.strip_whitespace(parts[0]), string.strip_whitespace(parts[1])
+        }
 
-        edges << .{ left, right };
-        verticies << left;
-        verticies << right;
+        edges << .{ left, right }
+        verticies << left
+        verticies << right
     }
 
     Node :: struct { name: str; child_idx: u32; second_visit: bool; }
-    node_stack: [..] Node;
-    node_stack << .{ "start", 0, false };
+    node_stack: [..] Node
+    node_stack << .{ "start", 0, false }
 
     children_of :: (edges: &$T, name: str) -> Iterator(str) {
         return iter.concat(
@@ -49,51 +49,51 @@ main :: (args) => {
             iter.as_iter(edges)
             ->filter((x, [name]) => x.b == name)
             ->map(x => x.a)
-        );
+        )
     }
 
     cannot_visit_multiple :: (name) => {
-        c := name[0];
-        return c >= 'a' && c <= 'z';
+        c := name[0]
+        return c >= 'a' && c <= 'z'
     }
 
-    edge_map: Map(str, [] str);
+    edge_map: Map(str, [] str)
     for v in iter.as_iter(&verticies) {
-        edge_map[*v] = children_of(&edges, *v) |> iter.to_array();
+        edge_map[*v] = children_of(&edges, *v) |> iter.to_array()
     }
 
-    paths_count := 0;
+    paths_count := 0
     while node_stack.count != 0 {
-        node_idx := node_stack.count - 1;
-        defer node_stack[node_idx].child_idx += 1;
+        node_idx := node_stack.count - 1
+        defer node_stack[node_idx].child_idx += 1
 
-        children := edge_map[node_stack[node_idx].name] ?? .[];
-        valid := node_stack[node_idx].child_idx < children.count;
+        children := edge_map[node_stack[node_idx].name] ?? .[]
+        valid := node_stack[node_idx].child_idx < children.count
 
         if valid {
-            child := children[node_stack[node_idx].child_idx];
-            second_visit := node_stack[node_idx].second_visit;
+            child := children[node_stack[node_idx].child_idx]
+            second_visit := node_stack[node_idx].second_visit
 
             if cannot_visit_multiple(child) {
-                visit_count := 0;
+                visit_count := 0
                 for& node_stack {
-                    if it.name == child do visit_count += 1;
+                    if it.name == child do visit_count += 1
                 }
 
                 if visit_count >= 1 {
-                    if second_visit || child == "start" do continue;
+                    if second_visit || child == "start" do continue
 
-                    second_visit = true;
+                    second_visit = true
                 }
             }
 
-            if child == "end" do paths_count += 1;
-            else              do node_stack << .{ child, 0, second_visit };
+            if child == "end" do paths_count += 1
+            else              do node_stack << .{ child, 0, second_visit }
 
         } else {
-            array.pop(&node_stack);
+            array.pop(&node_stack)
         }
     }
 
-    printf("Part 2: {}\n", paths_count);
+    printf("Part 2: {}\n", paths_count)
 }

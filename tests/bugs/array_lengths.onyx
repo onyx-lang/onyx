@@ -3,27 +3,27 @@
 use core { * }
 
 An_Enum :: enum {
-   A;
-   B;
-   C;
-   D;
+   A
+   B
+   C
+   D
 
-   Count;
+   Count
 }
 
 A_Struct :: struct {
-   a: i32;
-   b: i32;
-   c: i32;
+   a: i32
+   b: i32
+   c: i32
 }
 
 main :: () {
-   arr1: [cast(i32)(3 * 4 - 5)]f32;
-   arr2: [cast(i32)An_Enum.Count]A_Struct;
+   arr1: [cast(i32)(3 * 4 - 5)]f32
+   arr2: [cast(i32)An_Enum.Count]A_Struct
 
-   println(arr1.count == (3 * 4 - 5));
-   println((sizeof typeof (arr1)) == (3 * 4 - 5) * sizeof f32);
+   println(arr1.count == (3 * 4 - 5))
+   println((sizeof typeof (arr1)) == (3 * 4 - 5) * sizeof f32)
 
-   println(arr2.count == ~~An_Enum.Count);
-   println((sizeof typeof (arr2)) == ~~An_Enum.Count * sizeof A_Struct);
+   println(arr2.count == ~~An_Enum.Count)
+   println((sizeof typeof (arr2)) == ~~An_Enum.Count * sizeof A_Struct)
 }

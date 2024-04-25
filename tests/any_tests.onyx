@@ -1,41 +1,41 @@
 use core {*}
 
 Foo :: struct {
-    name: str;
-    numbers: [] i32;
+    name: str
+    numbers: [] i32
 }
 
 print_anys :: (args: ..any) {
     for arg in args {
-        stdio.print_writer->write_format_va("{}\n", .[ arg ]);
+        stdio.print_writer->write_format_va("{}\n", .[ arg ])
     }
 
-    stdio.stream->flush();
+    stdio.stream->flush()
 }
 
 delayed_print_anys :: (args: ..any) -> (#type () -> void) {
-    copied_args := misc.any_deep_copy(cast([] any) args);
+    copied_args := misc.any_deep_copy(cast([] any) args)
 
     return ([copied_args]) {
         for arg in copied_args {
-            stdio.print_writer->write_format_va("DELAYED: {}\n", .[ arg ]);
+            stdio.print_writer->write_format_va("DELAYED: {}\n", .[ arg ])
         }
 
-        stdio.stream->flush();
-    };
+        stdio.stream->flush()
+    }
 }
 
 main :: () {
     f := Foo.{
         "Test",
         Slice.copy(.[2, 3, 5, 7, 11])
-    };
+    }
 
-    println(f);
+    println(f)
 
-    print_anys(f);
+    print_anys(f)
     
-    func := delayed_print_anys(f, "works");
-    func();
+    func := delayed_print_anys(f, "works")
+    func()
 }
 

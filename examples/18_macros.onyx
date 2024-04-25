@@ -6,25 +6,25 @@
 main :: (args: [] cstr) {
     // A macro in Onyx looks just like a procedure, just with the word "macro" in front of it.
     a_simple_macro :: macro () {
-        println("This is a simple macro");
+        println("This is a simple macro")
     }
 
-    a_simple_macro();
+    a_simple_macro()
 
     // The powerful thing about macros is that they can access variables from their enclosing scope.
     // For example, this macro prints the value of 'x'.
     print_x :: macro () {
-        printf("x is {}\n", x);
+        printf("x is {}\n", x)
     }
 
     {
-        x := 10;
+        x := 10
         print_x(); 
     }
 
     {
-        x := "a message";
-        print_x();
+        x := "a message"
+        print_x()
     }
 
     // Macros can take on two different forms depending on if they return a value or not.
@@ -33,14 +33,14 @@ main :: (args: [] cstr) {
     // from the calling-site's scope. Below is a simple expression macro.
 
     add_x_y :: macro () -> i32 {
-        return x + y;
+        return x + y
     }
 
     {
-        x := 10;
-        y := 20;
-        z := add_x_y();
-        printf("x + y is {}\n", z);
+        x := 10
+        y := 20
+        z := add_x_y()
+        printf("x + y is {}\n", z)
     }
 
     // Macros that do not return a value are called "block macros". Block macros behave differently
@@ -49,26 +49,26 @@ main :: (args: [] cstr) {
     // return in the caller.
 
     block_macro :: macro () {
-        defer println("Block macro's deferred print.");
+        defer println("Block macro's deferred print.")
 
-        println("Block macro's print.");
+        println("Block macro's print.")
     }
 
     block_macro_that_returns :: macro () {
-        println("Returning...");
-        return;
+        println("Returning...")
+        return
     }
 
     calls_block_macro :: () {
-        block_macro();
+        block_macro()
 
-        println("This would be doing some work.");
+        println("This would be doing some work.")
 
-        block_macro_that_returns();
-        println("This will never be printed");
+        block_macro_that_returns()
+        println("This will never be printed")
     }
 
-    calls_block_macro();
+    calls_block_macro()
 
 
     // A powerful feature of Onyx that enables macros to be very useful is code blocks.
@@ -77,50 +77,50 @@ main :: (args: [] cstr) {
     // of code you want to capture. Notice that this uses '::' because this is a compile-time
     // value.
     simple_code :: [] {
-        println("This is a code block!");
+        println("This is a code block!")
     }
 
     // You can then use the '#unquote' directive to place the code wherever you need it.
     // We can paste it 3 times for examples in
-    #unquote simple_code;
-    #unquote simple_code;
-    #unquote simple_code;
+    #unquote simple_code
+    #unquote simple_code
+    #unquote simple_code
 
     // Because simple_code is a compile-time value, it can be passed to procedures as so:
     triple :: ($body: Code) {
-        println("Running 3 times!");
-        #unquote body;
-        #unquote body;
-        #unquote body;
+        println("Running 3 times!")
+        #unquote body
+        #unquote body
+        #unquote body
     }
 
-    triple(simple_code);
+    triple(simple_code)
 
     // Because macros just alias their parameter names to the values passed, you don't need the
     // compile-time parameter (the '$').
     triple_macro :: macro (body: Code) {
-        println("Running 3 times in a macro!");
-        #unquote body;
-        #unquote body;
-        #unquote body;
+        println("Running 3 times in a macro!")
+        #unquote body
+        #unquote body
+        #unquote body
     }
 
-    triple_macro(simple_code);
+    triple_macro(simple_code)
 
     // As another small shorthand, if a code block only contains one expression (like the code block above),
     // then you can write by wrapping the expression in [](...).
-    triple_macro([](println("Short code block!")));
+    triple_macro([](println("Short code block!")))
 
     // As yet another small piece of syntactic sugar, you can pass a code block to a macro or procedure in
     // the following way:
 
     cool_block :: macro (param: i32, body: Code) {
-        local_variable := param * 2;
-        #unquote body;
+        local_variable := param * 2
+        #unquote body
     }
 
     cool_block(10) {
-        println(local_variable);
+        println(local_variable)
     }
 
     // Whenever there is a call at the statement level, the compiler will look one token ahead and see if there

@@ -12,14 +12,14 @@ package core.encoding.ini
 //
 //     Config :: struct {
 //         metadata: struct {
-//             name: str;
-//             version: str;
-//         };
+//             name: str
+//             version: str
+//         }
 //     
 //         player_settings: struct {
-//             speed: f32;
-//             display_name: str;
-//         };
+//             speed: f32
+//             display_name: str
+//         }
 //     }
 //
 // This corresponds to an ini file with the following data:
@@ -45,15 +45,15 @@ use runtime
 //
 // Represents if the parsing was successful or encountered an error.
 IniParseResult :: enum {
-    Success;
-    Error;
+    Success
+    Error
 }
 
 //
 // Represents an error that occured while parsing.
 IniParseError :: struct {
-    msg: str;
-    line: u32;
+    msg: str
+    line: u32
 }
 
 //
@@ -66,82 +66,82 @@ parse_ini_file :: macro (r: &io.Reader, output_ptr: &$T/type_is_struct) => {
     // No need to make the actual implementation polymorphic.
     // That can work with an any, but this macro provides proper errors
     // a pointer to a structure is not provided.
-    return parse_ini_file_inner(r, output_ptr);
+    return parse_ini_file_inner(r, output_ptr)
 }
 
 #local
 parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, IniParseError) {
     info :: runtime.info
 
-    line := 1;
+    line := 1
     error :: macro (msg: str) {
-        return .Error, .{ msg, line };
+        return .Error, .{ msg, line }
     }
 
     next_line :: macro () {
-        r->advance_line();
-        line += 1;
+        r->advance_line()
+        line += 1
     }
 
-    output: any;
+    output: any
     if t := info.get_type_info(output_ptr.type); t.kind != .Pointer {
-        error("Expected pointer type for parameter.");
+        error("Expected pointer type for parameter.")
     } else {
-        output.data = *cast(&rawptr) output_ptr.data;
-        output.type = (cast(&info.Type_Info_Pointer) t).to;
+        output.data = *cast(&rawptr) output_ptr.data
+        output.type = (cast(&info.Type_Info_Pointer) t).to
     }
 
-    alloc.arena.auto(dest=[](context.temp_allocator));
+    alloc.arena.auto(dest=[](context.temp_allocator))
 
-    active_item_ptr  := null;
-    active_item_type := void;
+    active_item_ptr  := null
+    active_item_type := void
 
-    r->skip_whitespace();
+    r->skip_whitespace()
     while !(r->is_empty()) {
-        defer r->skip_whitespace();
+        defer r->skip_whitespace()
 
         if b, e := r->peek_byte(); b == '[' {
-            assert(r->read_byte() == '[', "expected [");
-            section_name := r->read_until(']', allocator=context.temp_allocator);
-            assert(r->read_byte() == ']', "expected ]");
+            assert(r->read_byte() == '[', "expected [")
+            section_name := r->read_until(']', allocator=context.temp_allocator)
+            assert(r->read_byte() == ']', "expected ]")
 
-            stripped_section_name := string.strip_whitespace(section_name);
-            member := info.get_struct_member(output.type, stripped_section_name);
+            stripped_section_name := string.strip_whitespace(section_name)
+            member := info.get_struct_member(output.type, stripped_section_name)
             if member == null {
-                error(msg = aprintf("'{}' is not a valid section name.", stripped_section_name));
+                error(msg = aprintf("'{}' is not a valid section name.", stripped_section_name))
             }
 
-            active_item_ptr  = cast([&] u8) output.data + member.offset;
-            active_item_type = member.type;
+            active_item_ptr  = cast([&] u8) output.data + member.offset
+            active_item_type = member.type
 
-            parse_method := info.get_struct_method(active_item_type, "parse_ini");
+            parse_method := info.get_struct_method(active_item_type, "parse_ini")
             if parse_method != null {
-                next_line();
+                next_line()
 
-                f := *cast(&(rawptr, &io.Reader) -> bool) parse_method.data;
+                f := *cast(&(rawptr, &io.Reader) -> bool) parse_method.data
                 if !f(active_item_ptr, r) {
-                    error(msg = aprintf("Failed parsing."));
+                    error(msg = aprintf("Failed parsing."))
                 }
 
-                r->read_until('[', inplace=true);
+                r->read_until('[', inplace=true)
             }
 
-            continue;
+            continue
 
         } elseif e != .None {
-            if e == .EOF do break;
-            error(msg = aprintf("Error reading file: {}", e));
+            if e == .EOF do break
+            error(msg = aprintf("Error reading file: {}", e))
         }
 
-        defer next_line();
+        defer next_line()
 
-        field_name := r->read_until('=', allocator=context.temp_allocator);
-        assert(r->read_byte() == '=', "expected =");
+        field_name := r->read_until('=', allocator=context.temp_allocator)
+        assert(r->read_byte() == '=', "expected =")
 
-        field := info.get_struct_member(active_item_type, string.strip_whitespace(field_name));
-        target := cast([&] u8) active_item_ptr + field.offset;
-        value_string := r->read_until('\n', allocator=context.temp_allocator);
-        parsed_successfully := conv.parse_any(target, field.type, value_string);
+        field := info.get_struct_member(active_item_type, string.strip_whitespace(field_name))
+        target := cast([&] u8) active_item_ptr + field.offset
+        value_string := r->read_until('\n', allocator=context.temp_allocator)
+        parsed_successfully := conv.parse_any(target, field.type, value_string)
 
         if !parsed_successfully {
             //
@@ -150,18 +150,18 @@ parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, Ini
             if field.type == str {
                 *cast(&str) target = value_string
                                   |> string.strip_whitespace()
-                                  |> string.copy();
+                                  |> string.copy()
 
             } else {
-                error(aprintf("Failed to parse value of type '{}' from string '{}'.", field.type, value_string));
+                error(aprintf("Failed to parse value of type '{}' from string '{}'.", field.type, value_string))
             }
         }
 
     } else {
-        error("Empty file");
+        error("Empty file")
     }
 
-    return .Success, .{"",0};
+    return .Success, .{"",0}
 }
 
 
@@ -171,47 +171,47 @@ write_ini_file :: macro (w: &io.Writer, output: $T/type_is_struct, leave_empty_s
     write_ini_file_inner :: write_ini_file_inner
 
     // See note above in parse_ini_file.
-    return write_ini_file_inner(w, output, leave_empty_strings);
+    return write_ini_file_inner(w, output, leave_empty_strings)
 }
 
 #local
 write_ini_file_inner :: (w: &io.Writer, output: any, leave_empty_strings := false) -> bool {
     info :: runtime.info
 
-    output_info := cast(&info.Type_Info_Struct) info.get_type_info(output.type);
-    if output_info.kind != .Struct do return false;
+    output_info := cast(&info.Type_Info_Struct) info.get_type_info(output.type)
+    if output_info.kind != .Struct do return false
 
     for& output_info.members {
-        io.write_format(w, "[{}]\n", it.name);
-        defer io.write(w, "\n");
+        io.write_format(w, "[{}]\n", it.name)
+        defer io.write(w, "\n")
 
-        member_info := cast(&info.Type_Info_Struct) info.get_type_info(it.type);
-        if member_info.kind != .Struct do continue;
+        member_info := cast(&info.Type_Info_Struct) info.get_type_info(it.type)
+        if member_info.kind != .Struct do continue
 
-        member_data := cast([&] u8) output.data + it.offset;
+        member_data := cast([&] u8) output.data + it.offset
 
         if write_method := info.get_struct_method(it.type, "write_ini"); write_method != null {
-            wm := *cast(&(rawptr, &io.Writer) -> bool) write_method.data;
+            wm := *cast(&(rawptr, &io.Writer) -> bool) write_method.data
             if !wm(member_data, w) {
-                return false;
+                return false
             }
 
-            continue;
+            continue
         }
 
         for& prop in member_info.members {
             if !leave_empty_strings && prop.type == str {
                 if cast(&str, member_data + prop.offset).length == 0 {
-                    continue;
+                    continue
                 }
             }
 
             io.write_format_va(w, "{}={}\n", .[
                 .{&prop.name, str},
                 .{member_data + prop.offset, prop.type}
-            ]);
+            ])
         }
     }
 
-    return true;
+    return true
 }

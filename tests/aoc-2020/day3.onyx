@@ -3,35 +3,35 @@
 use core {*}
 
 Point :: struct {
-    x, y : i32;
+    x, y : i32
 }
 
 LineInterp :: struct {
-    ox, oy : i32;
-    dx, dy : i32;
+    ox, oy : i32
+    dx, dy : i32
 }
 
 line_interp_at :: (use li: LineInterp, t: i32) -> Point {
-    return .{ ox + dx * t, oy + dy * t };
+    return .{ ox + dx * t, oy + dy * t }
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./input/day3.txt";
+    contents := #file_contents "./input/day3.txt"
 
-    forest := array.make(u8, 1024);
-    defer array.free(&forest);
+    forest := array.make(u8, 1024)
+    defer array.free(&forest)
 
-    width := 0;
-    height := 0;
+    width := 0
+    height := 0
     while true {
-        line := string.read_until(&contents, '\n');
-        string.advance(&contents, 1);
-        if line.count == 0 do break;
+        line := string.read_until(&contents, '\n')
+        string.advance(&contents, 1)
+        if line.count == 0 do break
 
-        width = line.count;
-        height = height + 1;
+        width = line.count
+        height = height + 1
 
-        for ch in line do array.push(&forest, ch);
+        for ch in line do array.push(&forest, ch)
     }
 
     lis := LineInterp.[
@@ -40,24 +40,24 @@ main :: (args: [] cstr) {
         .{ 0, 0, 5, 1 },
         .{ 0, 0, 7, 1 },
         .{ 0, 0, 1, 2 },
-    ];
+    ]
 
-    tree_prod: u64 = 1;
+    tree_prod: u64 = 1
 
     for li in lis {
-        tree_count: u64 = 0;
+        tree_count: u64 = 0
         while i := 0; true {
             p := line_interp_at(li, i); 
             if p.y >= height || p.y < 0 do break; 
-            i += 1;
+            i += 1
 
-            p.x %= width;
+            p.x %= width
 
-            if forest[p.x + p.y * width] == '#' do tree_count += 1;
+            if forest[p.x + p.y * width] == '#' do tree_count += 1
         }
 
-        tree_prod *= tree_count;
+        tree_prod *= tree_count
     }
 
-    printf("Tree product: {}\n", tree_prod);
+    printf("Tree product: {}\n", tree_prod)
 }

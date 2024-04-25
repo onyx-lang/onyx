@@ -4,33 +4,33 @@ use core.memory
 
 
 BinaryWriter :: struct {
-    stream: &Stream;
+    stream: &Stream
 }
 
 binary_writer_make :: (s: &Stream) -> BinaryWriter {
-    assert(s.vtable != null, "Stream vtable was not setup correctly.");
+    assert(s.vtable != null, "Stream vtable was not setup correctly.")
 
-    return BinaryWriter.{ s };
+    return BinaryWriter.{ s }
 }
 
 binary_write_byte :: (use bw: &BinaryWriter, byte: u8) {
-    stream_write_byte(stream, byte);
+    stream_write_byte(stream, byte)
 }
 
 binary_write :: (use bw: &BinaryWriter, $T: type_expr, v: &T) {
-    stream_write(stream, .{ ~~ v, sizeof T });
+    stream_write(stream, .{ ~~ v, sizeof T })
 }
 
 binary_write_slice :: (use bw: &BinaryWriter, sl: [] $T, output_size := false) {
-    assert(false, "binary_write_slice is not working at the moment");
-    if output_size do binary_write(bw, i32, sl.count);
+    assert(false, "binary_write_slice is not working at the moment")
+    if output_size do binary_write(bw, i32, sl.count)
 
     bytes := ([] u8).{
         data = cast(&u8) &sl.data[0],
         count = sizeof T * sl.count,
-    };
+    }
 
-    stream_write(stream, bytes);
+    stream_write(stream, bytes)
 }
 
 
@@ -38,25 +38,25 @@ binary_write_slice :: (use bw: &BinaryWriter, sl: [] $T, output_size := false) {
 
 
 BinaryReader :: struct {
-    stream: &Stream;
+    stream: &Stream
 }
 
 binary_reader_make :: (s: &Stream) -> BinaryReader {
-    assert(s.vtable != null, "Stream vtable was not setup correctly.");
+    assert(s.vtable != null, "Stream vtable was not setup correctly.")
 
-    return BinaryReader.{ s };
+    return BinaryReader.{ s }
 }
 
 binary_read_byte :: (use br: &BinaryReader) -> u8 {
-    byte := stream_read_byte(stream).Ok ?? 0;
-    return byte;
+    byte := stream_read_byte(stream).Ok ?? 0
+    return byte
 }
 
 binary_read :: (use br: &BinaryReader, $T: type_expr) -> T {
-    buf: [sizeof T] u8;
-    bytes_read := stream_read(stream, ~~ buf).Ok ?? 0;
+    buf: [sizeof T] u8
+    bytes_read := stream_read(stream, ~~ buf).Ok ?? 0
 
-    return *(cast(&T) buf);
+    return *(cast(&T) buf)
 }
 
 binary_read_slice :: (use br: &BinaryReader,
@@ -64,14 +64,14 @@ binary_read_slice :: (use br: &BinaryReader,
     size := 0, read_size := false,
     allocator := context.allocator) -> [] T {
 
-    assert(false, "binary_write_slice is not working at the moment");
+    assert(false, "binary_write_slice is not working at the moment")
     
     if size == 0 && read_size {
-        size = binary_read(br, i32);
+        size = binary_read(br, i32)
     }
 
-    sl := memory.make_slice(u8, size * sizeof T, allocator = allocator);
-    bytes_read := stream_read(stream, sl).Ok ?? 0;
+    sl := memory.make_slice(u8, size * sizeof T, allocator = allocator)
+    bytes_read := stream_read(stream, sl).Ok ?? 0
 
-    return .{ data = cast(&T) sl.data, count = size };
+    return .{ data = cast(&T) sl.data, count = size }
 }

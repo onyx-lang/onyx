@@ -15,281 +15,281 @@ use core {Result, string, io}
 SocketData :: #distinct i32
 
 __net_sock_create :: (af: SocketFamily, type: SocketType, proto: SocketProto) -> Result(SocketData, io.Error) {
-    sock: SocketData;
+    sock: SocketData
 
-    err := __net_create_socket(&sock, af, type, proto);
+    err := __net_create_socket(&sock, af, type, proto)
     if err != .None {
-        return .{ Err = .CreationFailed };
+        return .{ Err = .CreationFailed }
     }
     
-    return .{ Ok = sock };
+    return .{ Ok = sock }
 }
 
-__net_sock_status :: (s: SocketData) => SocketStatus.Unknown;
+__net_sock_status :: (s: SocketData) => SocketStatus.Unknown
 
 __net_sock_opt_flag :: (s: SocketData, sockopt: SocketOption, flag: bool) -> bool {
-    __net_setting_flag(s, sockopt, flag);
-    return true;
+    __net_setting_flag(s, sockopt, flag)
+    return true
 }
 
 __net_sock_opt_time :: (s: SocketData, sockopt: SocketOption, time: ? u64) -> bool {
-    return false;
+    return false
 }
 
 __net_sock_opt_size :: (s: SocketData, sockopt: SocketOption, size: i64) -> bool {
-    return false;
+    return false
 }
 
 __net_sock_bind :: (s: SocketData, addr: &SocketAddress) -> bool {
     switch *addr {
         case .Unix as &path {
-            return __net_bind_unix(s, ~~path);
+            return __net_bind_unix(s, ~~path)
         }
 
         case .Inet as ipv4 {
-            return __net_bind_ipv4(s, ipv4.addr, ipv4.port);
+            return __net_bind_ipv4(s, ipv4.addr, ipv4.port)
         }
 
         case .HostPort as host {
-            return __net_bind_host(s, host.host, host.port);
+            return __net_bind_host(s, host.host, host.port)
         }
 
-        case _ do return false;
+        case _ do return false
     }
 }
 
 __net_sock_listen :: (s: SocketData, backlog: i32) -> bool {
-    return __net_listen(s, backlog) >= 0;
+    return __net_listen(s, backlog) >= 0
 }
 
 __net_sock_accept :: (s: SocketData, out: &SocketAddress) -> Result(SocketData, io.Error) {
-    addr_buf: [512] u8;
-    addr_len := 512;
+    addr_buf: [512] u8
+    addr_len := 512
 
-    sock := __net_accept(s, &addr_buf, &addr_len);
+    sock := __net_accept(s, &addr_buf, &addr_len)
     if cast(i32) sock == -1
     {
-        return .{ Err = .OperationFailed };
+        return .{ Err = .OperationFailed }
     }
 
     if cast(i32) sock == -2
     {
-        return .{ Err = .NoData };
+        return .{ Err = .NoData }
     }
 
-    addr: &sockaddr_t = ~~addr_buf;
-    sockaddr_to_socket_address(addr, out);
+    addr: &sockaddr_t = ~~addr_buf
+    sockaddr_to_socket_address(addr, out)
 
-    return .{ Ok = sock };
+    return .{ Ok = sock }
 }
 
 __net_sock_connect :: (s: SocketData, addr: &SocketAddress) -> io.Error {
     switch *addr {
         case .Unix as &path {
             return __net_connect_unix(s, ~~path)
-                |> translate_error();
+                |> translate_error()
         }
 
         case .Inet as i {
             return __net_connect_ipv4(s, i.addr, i.port)
-                |> translate_error();
+                |> translate_error()
         }
 
         case .Inet6 as i {
             return __net_connect_ipv6(s, i.addr, i.port)
-                |> translate_error();
+                |> translate_error()
         }
 
         case .HostPort as h {
             return __net_connect_host(s, h.host, h.port)
-                |> translate_error();
+                |> translate_error()
         }
     }
 
     translate_error :: (s: SocketError) => switch s {
-        case .None => io.Error.None;
-        case .ConnectFailed => .ConnectFailed;
-        case _ => .OperationFailed;
+        case .None => io.Error.None
+        case .ConnectFailed => .ConnectFailed
+        case _ => .OperationFailed
     }
 }
 
 __net_sock_recv_from :: (s: SocketData, buf: [] u8, out: &SocketAddress) -> Result(i32, io.Error) {
-    addr_buf: [512] u8;
-    addr_len := 512;
+    addr_buf: [512] u8
+    addr_len := 512
 
-    recieved := __net_recvfrom(s, buf, &addr_buf, &addr_len);
+    recieved := __net_recvfrom(s, buf, &addr_buf, &addr_len)
     if recieved == -1
     {
-        return .{ Err = .EOF };
+        return .{ Err = .EOF }
     }
 
     if recieved == -2
     {
-        return .{ Err = .NoData };
+        return .{ Err = .NoData }
     }
 
     addr: &sockaddr_t = ~~ &addr_buf;    
-    sockaddr_to_socket_address(addr, out);
+    sockaddr_to_socket_address(addr, out)
 
-    return .{ Ok = recieved };
+    return .{ Ok = recieved }
 }
 
 __net_sock_send_to :: (s: SocketData, buf: [] u8, addr: &SocketAddress) -> Result(i32, io.Error) {
     sent := switch *addr {
-        case .Unix as &path => __net_sendto_unix(s, buf, ~~path);
-        case .Inet as i     => __net_sendto_ipv4(s, buf, i.addr, i.port);
-        case .Inet6 as i    => __net_sendto_ipv6(s, buf, i.addr, i.port);
-        case .HostPort as h => __net_sendto_host(s, buf, h.host, h.port);
-    };
+        case .Unix as &path => __net_sendto_unix(s, buf, ~~path)
+        case .Inet as i     => __net_sendto_ipv4(s, buf, i.addr, i.port)
+        case .Inet6 as i    => __net_sendto_ipv6(s, buf, i.addr, i.port)
+        case .HostPort as h => __net_sendto_host(s, buf, h.host, h.port)
+    }
 
     if sent == -1
     {
         // If there was an error sending data, call the connection closed.
-        return .{ Err = .EOF };
+        return .{ Err = .EOF }
     }
 
     if sent == -2
     {
         // -2 is used for signalling a non-blocking send that did not successfully
         // send anything.
-        return .{ Err = .NoData };
+        return .{ Err = .NoData }
     }
 
-    return .{ Ok = sent };
+    return .{ Ok = sent }
 }
 
 __net_sock_recv :: (s: SocketData, buf: [] u8) -> Result(i32, io.Error) {
-    recieved := __net_recv(s, buf);
+    recieved := __net_recv(s, buf)
     if recieved == 0 || recieved == -1
     {
         // If there was an error sending data, call the connection closed.
-        return .{ Err = .EOF };
+        return .{ Err = .EOF }
     }
 
     if recieved == -2
     {
-        return .{ Err = .NoData };
+        return .{ Err = .NoData }
     }
 
-    return .{ Ok = recieved };
+    return .{ Ok = recieved }
 }
 
 __net_sock_send :: (s: SocketData, buf: [] u8) -> Result(i32, io.Error) {
-    sent := __net_send(s, buf);
+    sent := __net_send(s, buf)
     if sent == -1
     {
         // If there was an error sending data, call the connection closed.
-        return .{ Err = .EOF };
+        return .{ Err = .EOF }
     }
 
     if sent == -2
     {
         // -2 is used for signalling a non-blocking send that did not successfully
         // send anything.
-        return .{ Err = .NoData };
+        return .{ Err = .NoData }
     }
 
-    return .{ Ok = sent };
+    return .{ Ok = sent }
 }
 
 __net_sock_shutdown :: (s: SocketData, how: SocketShutdown) -> io.Error {
     if __net_shutdown(s, cast(u32) how) < 0 {
-        return .OperationFailed;
+        return .OperationFailed
     }
 
-    return .None;
+    return .None
 }
 
 __net_sock_close :: (s: SocketData) -> void {
-    __net_close_socket(s);
+    __net_close_socket(s)
 }
 
 __net_resolve :: (host: str, port: u16, out_addrs: [] ResolveResult) -> i32 {
-    host_str      := string.to_cstr_on_stack(host);
-    original_info := __net_resolve_start(host_str, port);
+    host_str      := string.to_cstr_on_stack(host)
+    original_info := __net_resolve_start(host_str, port)
 
-    data: [512] u8;
+    data: [512] u8
 
-    out_len := 0;
+    out_len := 0
 
-    info := original_info;
+    info := original_info
     while out_len < out_addrs.count; info != 0 {
-        info = __net_resolve_next(info, data);
+        info = __net_resolve_next(info, data)
 
         family  := *cast(& SocketFamily) &data[0]; // Do we need to transfer the family?
-        type    := *cast(& SocketType)   &data[4];
-        proto   := *cast(& SocketProto)  &data[8];
+        type    := *cast(& SocketType)   &data[4]
+        proto   := *cast(& SocketProto)  &data[8]
 
         addr := switch family {
             case .Inet => do {
-                addr_in: &sockaddr_in_t = ~~&data[12];
-                return SocketAddress.{ Inet = .{ beu16_to_leu16(addr_in.port), addr_in.addr } };
+                addr_in: &sockaddr_in_t = ~~&data[12]
+                return SocketAddress.{ Inet = .{ beu16_to_leu16(addr_in.port), addr_in.addr } }
             }
 
             case .Inet6 => do {
-                addr_in6: &sockaddr_in6_t = ~~&data[12];
-                return SocketAddress.{ Inet6 = .{ beu16_to_leu16(addr_in6.port), addr_in6.addr } };
+                addr_in6: &sockaddr_in6_t = ~~&data[12]
+                return SocketAddress.{ Inet6 = .{ beu16_to_leu16(addr_in6.port), addr_in6.addr } }
             }
 
             case .Unix => do {
-                addr_un: &sockaddr_un_t = ~~&data[12];
-                return SocketAddress.{ Unix = addr_un.path };
+                addr_un: &sockaddr_un_t = ~~&data[12]
+                return SocketAddress.{ Unix = addr_un.path }
             }
-        };
+        }
 
-        out_addrs[out_len] = .{ family, type, proto, addr };
-        out_len += 1;
+        out_addrs[out_len] = .{ family, type, proto, addr }
+        out_len += 1
     }
 
-    __net_resolve_end(original_info);
-    return out_len;
+    __net_resolve_end(original_info)
+    return out_len
 }
 
 
 #package {
     SocketError :: enum {
-        None :: 0x00;
-        BadSettings :: 0x01;
-        ConnectFailed :: 0x02;
+        None :: 0x00
+        BadSettings :: 0x01
+        ConnectFailed :: 0x02
     }
 
     sockaddr_t :: struct {
-        family: u16;
+        family: u16
     }
 
     sockaddr_un_t :: struct {
-        family: u16;
-        path: [256] u8;
+        family: u16
+        path: [256] u8
     }
 
     sockaddr_in_t :: struct {
-        family: u16;
-        port: u16;
-        addr: u32;
+        family: u16
+        port: u16
+        addr: u32
     }
 
     sockaddr_in6_t :: struct {
-        family: u16;
-        port: u16;
-        flowinfo: u32;
-        addr: [16] u8;
+        family: u16
+        port: u16
+        flowinfo: u32
+        addr: [16] u8
     }
 
     sockaddr_to_socket_address :: (addr: &sockaddr_t, out: &SocketAddress) {
         switch addr.family {
             case 1 {
-                addr_un: &sockaddr_un_t = ~~addr;
-                *out = .{ Unix = addr_un.path };
+                addr_un: &sockaddr_un_t = ~~addr
+                *out = .{ Unix = addr_un.path }
             }
 
             case 2 {
-                addr_in: &sockaddr_in_t = ~~addr;
-                *out = .{ Inet = .{ beu16_to_leu16(addr_in.port), addr_in.addr } };
+                addr_in: &sockaddr_in_t = ~~addr
+                *out = .{ Inet = .{ beu16_to_leu16(addr_in.port), addr_in.addr } }
             }
 
             case 10, 30 {
-                addr_in6: &sockaddr_in6_t = ~~addr;
-                *out = .{ Inet6 = .{ beu16_to_leu16(addr_in6.port), addr_in6.addr } };
+                addr_in6: &sockaddr_in6_t = ~~addr
+                *out = .{ Inet6 = .{ beu16_to_leu16(addr_in6.port), addr_in6.addr } }
             }
         }
     }
@@ -328,9 +328,9 @@ __net_resolve :: (host: str, port: u16, out_addrs: [] ResolveResult) -> i32 {
     }
 
     beu16_to_leu16 :: (x: u16) -> u16 {
-        lo := x & 0xff;
-        hi := (x & 0xff00) >> 8;
+        lo := x & 0xff
+        hi := (x & 0xff00) >> 8
 
-        return hi | (lo << 8);
+        return hi | (lo << 8)
     }
 }

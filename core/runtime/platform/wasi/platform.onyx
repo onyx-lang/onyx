@@ -54,157 +54,157 @@ Supports_Env_Vars :: true
 __output_string :: (s: str) -> u32 {
     STDOUT_FILENO :: 1
 
-    vec := IOVec.{ buf = cast(u32) s.data, len = s.count };
-    tmp : Size;
-    fd_write(STDOUT_FILENO, &vec, 1, &tmp);
-    fd_datasync(STDOUT_FILENO);
-    return tmp;
+    vec := IOVec.{ buf = cast(u32) s.data, len = s.count }
+    tmp : Size
+    fd_write(STDOUT_FILENO, &vec, 1, &tmp)
+    fd_datasync(STDOUT_FILENO)
+    return tmp
 }
 
-__exit :: (status: i32) do proc_exit(status);
+__exit :: (status: i32) do proc_exit(status)
 
 __read_from_input :: (buffer: [] u8) -> i32 {
     STDIN_FILENO :: 0
 
-    vec := IOVec.{ buf = cast(i32) buffer.data, len = buffer.count };
-    read: Size;
-    error := fd_read(STDIN_FILENO, &vec, 1, &read);
-    if error != .Success do return -1;
+    vec := IOVec.{ buf = cast(i32) buffer.data, len = buffer.count }
+    read: Size
+    error := fd_read(STDIN_FILENO, &vec, 1, &read)
+    if error != .Success do return -1
 
-    return read;
+    return read
 }
 
 __wait_for_input :: (timeout: i32) -> bool {
     STDIN_FILENO :: 0
 
-    events := 1;
-    subscriptions: [2] Subscription;
+    events := 1
+    subscriptions: [2] Subscription
 
-    fd_tagged: SubscriptionTagged;
-    fd_tagged.tag = .FDRead;
-    fd_tagged.fd_read = .{ file_descriptor = STDIN_FILENO };
+    fd_tagged: SubscriptionTagged
+    fd_tagged.tag = .FDRead
+    fd_tagged.fd_read = .{ file_descriptor = STDIN_FILENO }
     subscriptions[0] = .{
         userdata = 0,
         u = fd_tagged,
-    };
+    }
 
-    clock_tagged: SubscriptionTagged;
+    clock_tagged: SubscriptionTagged
     if timeout > 0 {
-        events += 1;
-        clock_tagged.tag = .Clock;
+        events += 1
+        clock_tagged.tag = .Clock
         clock_tagged.clock = .{
             id = .Realtime,
             timeout = cast(u64) timeout * 1000000,
             precision = 1,
-        };
+        }
 
         subscriptions[1] = .{
             userdata = 0,
             u = clock_tagged,
-        };
+        }
     }
 
-    event: [2] Event;
-    number_of_events: u32;
+    event: [2] Event
+    number_of_events: u32
 
-    error_code := poll_oneoff(~~subscriptions, ~~event, 2, &number_of_events);
+    error_code := poll_oneoff(~~subscriptions, ~~event, 2, &number_of_events)
 
-    if number_of_events == 0 do return false;
-    if event[0].type == .Clock do return false;
+    if number_of_events == 0 do return false
+    if event[0].type == .Clock do return false
 
-    return event[0].fd_readwrite.nbytes > 0;
+    return event[0].fd_readwrite.nbytes > 0
 }
 
 __sleep :: (milliseconds: u32) {
-    tagged: SubscriptionTagged;
-    tagged.tag = .Clock;
+    tagged: SubscriptionTagged
+    tagged.tag = .Clock
     tagged.clock = .{
         id = .Realtime,
         timeout = cast(u64) milliseconds * 1000000,
         precision = 1,
         flags = ~~0,
-    };
+    }
 
     subscription := Subscription.{
         userdata = 0,
         u = tagged,
-    };
+    }
 
-    event: Event;
-    number_of_events: u32;
+    event: Event
+    number_of_events: u32
 
-    error_code := poll_oneoff(&subscription, &event, 1, &number_of_events);
+    error_code := poll_oneoff(&subscription, &event, 1, &number_of_events)
 }
 
 __time :: () -> i64 {
-    time: Timestamp;
+    time: Timestamp
     if clock_time_get(.Realtime, 1, &time) != .Success {
-        return 0;
+        return 0
     }
 
     // Need to return in milliseconds, not nanoseconds.
-    return time / 1000000;
+    return time / 1000000
 }
 
 __random_get :: (buf: [] u8) {
-    random_get(buf.data, buf.length);
+    random_get(buf.data, buf.length)
 }
 
 PollDescription :: struct {
-    fd: wasi.FileDescriptor;
-    in_events: core.io.PollEvent;
-    out_events: core.io.PollEvent;
+    fd: wasi.FileDescriptor
+    in_events: core.io.PollEvent
+    out_events: core.io.PollEvent
 }
 
 __poll :: (fds: [] PollDescription, timeout: i32) -> void {
-    count := fds.count;
+    count := fds.count
     if timeout == 0 {
-        timeout = 1;
+        timeout = 1
     }
 
     if timeout > 0 {
         count += 1; 
     }
 
-    subs := core.alloc.array_from_stack(wasi.Subscription, count);
+    subs := core.alloc.array_from_stack(wasi.Subscription, count)
     for i in fds.count {
-        subs[i].userdata = ~~ i;
+        subs[i].userdata = ~~ i
         subs[i].u.tag = switch fds[i].in_events {
-            case .None => .FDRead;
-            case .Read => .FDRead;
-            case .Write => .FDWrite;
-            case .Closed => .FDRead;
-        };
-        subs[i].u.u.fd_read = .{ file_descriptor = cast(i32) fds[i].fd };
+            case .None => .FDRead
+            case .Read => .FDRead
+            case .Write => .FDWrite
+            case .Closed => .FDRead
+        }
+        subs[i].u.u.fd_read = .{ file_descriptor = cast(i32) fds[i].fd }
     }
 
     if timeout > 0 {
-        subs[count - 1].userdata = 0;
-        subs[count - 1].u.tag = .Clock;
+        subs[count - 1].userdata = 0
+        subs[count - 1].u.tag = .Clock
         subs[count - 1].u.u.clock = .{
             id = .Realtime,
             timeout = cast(u64) timeout * 1000000,
             precision = 1,
-        };
+        }
     }
 
-    events := core.alloc.array_from_stack(wasi.Event, count);
-    number_of_events: u32;
+    events := core.alloc.array_from_stack(wasi.Event, count)
+    number_of_events: u32
 
-    error_code := wasi.poll_oneoff(~~subs.data, ~~events.data, count, &number_of_events);
-    if error_code != .Success do return;
+    error_code := wasi.poll_oneoff(~~subs.data, ~~events.data, count, &number_of_events)
+    if error_code != .Success do return
 
-    if number_of_events == 0 do return;
+    if number_of_events == 0 do return
     for ev in events[0 .. number_of_events] {
         if ev.type !=.Clock {
             if ev.fd_readwrite.nbytes > 0 {
-                i := cast(i32) ev.userdata;
-                fds[i].out_events = fds[i].in_events;
+                i := cast(i32) ev.userdata
+                fds[i].out_events = fds[i].in_events
             }
 
             if ev.fd_readwrite.flags & .ReadWriteHangUp {
-                i := cast(i32) ev.userdata;
-                fds[i].out_events = .Closed;
+                i := cast(i32) ev.userdata
+                fds[i].out_events = .Closed
             }
         }
     }
@@ -213,20 +213,20 @@ __poll :: (fds: [] PollDescription, timeout: i32) -> void {
 
 // Sets up everything needed for execution.
 __start :: () {
-    __runtime_initialize();
-    context.thread_id = 0;
+    __runtime_initialize()
+    context.thread_id = 0
 
     #if (typeof MAIN_PKG.main) == #type () -> void {
-        MAIN_PKG.main();
+        MAIN_PKG.main()
 
     } else {
-        args : [] cstr;
-        argv_buf_size : Size;
-        args_sizes_get(&args.count, &argv_buf_size);
+        args : [] cstr
+        argv_buf_size : Size
+        args_sizes_get(&args.count, &argv_buf_size)
 
-        args = core.memory.make_slice(cstr, args.count);
-        argv_buf := cast(cstr) calloc(argv_buf_size);
-        args_get(args.data, argv_buf);
+        args = core.memory.make_slice(cstr, args.count)
+        argv_buf := cast(cstr) calloc(argv_buf_size)
+        args_get(args.data, argv_buf)
 
 
         // This post processing of the argv array needs to happen if the target is using
@@ -237,24 +237,24 @@ __start :: () {
         // 64-bit pointers. This loops expands the 32-bit pointers into 64-bit pointers
         // while not clobbering any of them.
         while i := cast(i32) (args.count - 1); i >= 0 {
-            defer i -= 1;
+            defer i -= 1
 
-            args[i] = cast(cstr) (cast([&] u32) args.data)[i];
+            args[i] = cast(cstr) (cast([&] u32) args.data)[i]
         }
 
-        MAIN_PKG.main(args);
+        MAIN_PKG.main(args)
     }
 
-    __flush_stdio();
+    __flush_stdio()
 }
 
 
 #if runtime.Multi_Threading_Enabled {
     #local ThreadData :: struct {
-        id: i32;
-        tls_base, stack_base: rawptr;
-        func: (data: rawptr) -> void;
-        data: rawptr;
+        id: i32
+        tls_base, stack_base: rawptr
+        func: (data: rawptr) -> void
+        data: rawptr
     }
 
     __spawn_thread :: (
@@ -264,9 +264,9 @@ __start :: () {
     {
         thread_data := core.alloc.on_heap(ThreadData.{
             id, tls_base, stack_base, func, data
-        });
+        })
 
-        wasi.thread_spawn(thread_data);
+        wasi.thread_spawn(thread_data)
     }
 
     // Currently, WASI does not provide a way to kill a thread preemptively.
@@ -274,8 +274,8 @@ __start :: () {
 
     #export "wasi_thread_start"
     (wasi_tid: u32, use td: &ThreadData) {
-        runtime._thread_start(id, tls_base, stack_base, func, data);
-        runtime._thread_exit(id);
+        runtime._thread_start(id, tls_base, stack_base, func, data)
+        runtime._thread_exit(id)
     }
 }
 

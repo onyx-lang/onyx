@@ -8,76 +8,76 @@ use core {*}
 ///
 /// This procedure is not very useful and should be considered deprecated.
 decode :: (data: str, allocator := context.allocator, print_errors := true) -> Json {
-    json: Json;
-    json.allocator = allocator;
-    json.root = cast(Value) null;
+    json: Json
+    json.allocator = allocator
+    json.root = cast(Value) null
 
-    root, err := parse(data, allocator);
+    root, err := parse(data, allocator)
     if err.kind != .None && print_errors {
         switch err.kind {
-            case .EOF do printf("Reached EOF\n");
-            case .Illegal_Character do printf("Illegal Character: {}\n", err.pos);
-            case .String_Unterminated do printf("Unterminated String: {}\n", err.pos);
-            case .Unexpected_Token do printf("Unexpected Token: {}\n", err.pos);
+            case .EOF do printf("Reached EOF\n")
+            case .Illegal_Character do printf("Illegal Character: {}\n", err.pos)
+            case .String_Unterminated do printf("Unterminated String: {}\n", err.pos)
+            case .Unexpected_Token do printf("Unexpected Token: {}\n", err.pos)
         }
 
-        return json;
+        return json
     }
 
-    json.root = root;
-    return json;
+    json.root = root
+    return json
 }
 
 #local
 _Decode_Error :: struct {
-    errmsg: str;
-    pos:    Position;
+    errmsg: str
+    pos:    Position
 }
 
-Decode_Error :: #distinct &_Decode_Error;
+Decode_Error :: #distinct &_Decode_Error
 
-Decode_Error.has_error :: (this: Decode_Error) => cast(&_Decode_Error) this != null;
-Decode_Error.message   :: (this: Decode_Error) => (cast(&_Decode_Error) this).errmsg;
-Decode_Error.position  :: (this: Decode_Error) => (cast(&_Decode_Error) this).pos;
+Decode_Error.has_error :: (this: Decode_Error) => cast(&_Decode_Error) this != null
+Decode_Error.message   :: (this: Decode_Error) => (cast(&_Decode_Error) this).errmsg
+Decode_Error.position  :: (this: Decode_Error) => (cast(&_Decode_Error) this).pos
 
 /// Decodes a string into a Json object, and returns the Json object and
 /// and a `Decode_Error` that is non-null if an error occured.
 ///
 /// This procedure should be considered deprecated in favor of `decode_with_result`.
 decode_with_error :: (data: str, allocator := context.allocator) -> (Json, Decode_Error) {
-    json: Json;
-    json.allocator = allocator;
-    json.root = null_value();
+    json: Json
+    json.allocator = allocator
+    json.root = null_value()
 
-    root, err := parse(data, allocator);
+    root, err := parse(data, allocator)
 
     if err.kind != .None {
-        decode_error := new_temp(_Decode_Error);
-        decode_error.pos = err.pos;
+        decode_error := new_temp(_Decode_Error)
+        decode_error.pos = err.pos
         switch err.kind {
-            case .EOF                  do decode_error.errmsg = "Reached EOF";
-            case .Illegal_Character    do decode_error.errmsg = "Illegal Character";
-            case .String_Unterminated  do decode_error.errmsg = "Unterminated String";
-            case .Unexpected_Token     do decode_error.errmsg = "Unexpected Token";
+            case .EOF                  do decode_error.errmsg = "Reached EOF"
+            case .Illegal_Character    do decode_error.errmsg = "Illegal Character"
+            case .String_Unterminated  do decode_error.errmsg = "Unterminated String"
+            case .Unexpected_Token     do decode_error.errmsg = "Unexpected Token"
         }
 
-        return json, Decode_Error.{decode_error};
+        return json, Decode_Error.{decode_error}
     }
 
-    json.root = root;
-    return json, Decode_Error.{null};
+    json.root = root
+    return json, Decode_Error.{null}
 }
 
 /// Decodes a string into a possible Json object. If parsing fails, an error is returned instead.
 decode_with_result :: (data: str, allocator := context.allocator) -> Result(Json, Error) {
-    root, err := parse(data, allocator);
+    root, err := parse(data, allocator)
     if err.kind != .None {
-        return .{ Err = err };
+        return .{ Err = err }
     }
 
     return .{
         Ok = .{ allocator, root }
-    };
+    }
 }
 
 /// Decodes a string into any Onyx type.
@@ -85,10 +85,10 @@ decode_with_result :: (data: str, allocator := context.allocator) -> Result(Json
 /// Internally uses `decode_with_result` and `as_any`.
 decode_into :: (data: str, out: &$T) -> Error {
     obj := decode_with_result(data)->catch([err] {
-        return return err;
-    });
-    defer delete(obj);
+        return return err
+    })
+    defer delete(obj)
 
-    as_any(obj.root, out);
-    return .{ .None };
+    as_any(obj.root, out)
+    return .{ .None }
 }

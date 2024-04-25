@@ -1,11 +1,11 @@
 use core {printf}
 
 main :: () {
-    printf("cmp(1, 2): {}\n", cmp(1, 2));
-    printf("cmp(2, 2): {}\n", cmp(2, 2));
-    printf("cmp(3, 2): {}\n", cmp(3, 2));
+    printf("cmp(1, 2): {}\n", cmp(1, 2))
+    printf("cmp(2, 2): {}\n", cmp(2, 2))
+    printf("cmp(3, 2): {}\n", cmp(3, 2))
 }
 
 cmp :: (a: i32, b: i32) -> i32 {
-    return 0 if a == b else -1 if a < b else 1;
+    return 0 if a == b else -1 if a < b else 1
 }

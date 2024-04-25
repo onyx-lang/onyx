@@ -10,15 +10,15 @@ use runtime
 ///
 /// *This structure does not represent or store timezone information.*
 Timestamp :: struct #size (sizeof u32 * 12) {
-    sec:   i32;
-    min:   i32;
-    hour:  i32;
-    mday:  i32;
-    mon:   i32;
-    year:  i32;
-    wday:  i32;
-    yday:  i32;
-    isdst: i32;
+    sec:   i32
+    min:   i32
+    hour:  i32
+    mday:  i32
+    mon:   i32
+    year:  i32
+    wday:  i32
+    yday:  i32
+    isdst: i32
 }
 
 /// Converts a Date into a Timestamp.
@@ -27,48 +27,48 @@ Timestamp.from_date :: (d: Date) -> Timestamp {
         year = d.year - 1900,
         mday = d.day,
         mon  = d.month
-    };
+    }
 }
 
 /// Converts the month, day and year fields into a `Date`.
 Timestamp.as_date :: (t: Timestamp) -> Date {
-    return Date.make(t.year + 1900, t.mon + 1, t.mday);
+    return Date.make(t.year + 1900, t.mon + 1, t.mday)
 }
 
 Timestamp.to_epoch :: to_epoch
 
 /// Formats a timestamp into a string.
 Timestamp.format :: (t: Timestamp, format := "%Y-%m-%d %H:%M:%S") -> str {
-    t_ := t;
-    return strftime(format, &t_);
+    t_ := t
+    return strftime(format, &t_)
 }
 
 #tag conv.Custom_Format_Proc.{ Timestamp }
 (output: &conv.Format_Output, format: &conv.Format, time: &Timestamp) {
-    time_buf: [64] u8;
-    to_output := strftime(time_buf, "%Y-%m-%d %H:%M:%S", time);
+    time_buf: [64] u8
+    to_output := strftime(time_buf, "%Y-%m-%d %H:%M:%S", time)
 
-    output->write(to_output);
+    output->write(to_output)
 }
 
 #tag conv.Custom_Parse_Proc.{ Timestamp }
 (time: &Timestamp, data: str, _: Allocator) -> bool {
-    return strptime(data, "%Y-%m-%d %H:%M:%S", time);
+    return strptime(data, "%Y-%m-%d %H:%M:%S", time)
 }
 
 /// Returns the current system time at UTC-0.
 now :: () -> Timestamp {
-    current_time: i64;
+    current_time: i64
     #if runtime.platform.Supports_Time {
-        current_time = runtime.platform.__time();
+        current_time = runtime.platform.__time()
     } else {
-        current_time = 0;
+        current_time = 0
     }
 
     //
     // Localtime operates on seconds, while os.time
     // returns milliseconds.
-    return gmtime(current_time / 1000);
+    return gmtime(current_time / 1000)
 }
 
 to_epoch :: tm_to_time
@@ -83,9 +83,9 @@ localtime :: time_to_tm
 
 #overload
 localtime :: (seconds: u64) -> Timestamp {
-    t: Timestamp;
-    localtime(seconds, &t);
-    return t;
+    t: Timestamp
+    localtime(seconds, &t)
+    return t
 }
 
 
@@ -99,9 +99,9 @@ gmtime :: time_to_tm
 
 #overload
 gmtime :: (seconds: u64) -> Timestamp {
-    t: Timestamp;
-    gmtime(seconds, &t);
-    return t;
+    t: Timestamp
+    gmtime(seconds, &t)
+    return t
 }
 
 strftime :: #match #local {}
@@ -151,95 +151,95 @@ strftime :: #match #local {}
 /// **%%** Percent-sign
 #overload
 strftime :: (format_: [] u8, tm: &Timestamp) -> str {
-    s := io.buffer_stream_make();
-    w := io.writer_make(&s, 0);
+    s := io.buffer_stream_make()
+    w := io.writer_make(&s, 0)
 
-    strftime(&w, format_, tm);
+    strftime(&w, format_, tm)
 
-    return str.as_str(&s);
+    return str.as_str(&s)
 }
 
 #overload
 strftime :: (buf: [] u8, format_: [] u8, tm: &Timestamp) -> str {
-    s := io.buffer_stream_make(buf, fixed=true);
-    w := io.writer_make(&s, 0);
+    s := io.buffer_stream_make(buf, fixed=true)
+    w := io.writer_make(&s, 0)
 
-    strftime(&w, format_, tm);
+    strftime(&w, format_, tm)
 
-    return str.as_str(&s);
+    return str.as_str(&s)
 }
 
-#local weekdays   := str.[ "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" ];
-#local monthnames := str.[ "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december" ];
+#local weekdays   := str.[ "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" ]
+#local monthnames := str.[ "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december" ]
 
 #overload
 strftime :: (w: &io.Writer, format_: [] u8, tm: &Timestamp) {
-    format := format_;
+    format := format_
 
     while format.length > 0 {
-        c := format[0];
+        c := format[0]
         switch c {
             case '%' {
-                string.advance(&format);
+                string.advance(&format)
                 switch format[0] {
                     case 'A', 'a' {
-                        day := weekdays[tm.wday];
-                        len := 3 if format[0] == 'a' else day.length;
+                        day := weekdays[tm.wday]
+                        len := 3 if format[0] == 'a' else day.length
 
-                        io.write_format(w, "{}{}", day[0]->to_upper(), day[1..len]);
+                        io.write_format(w, "{}{}", day[0]->to_upper(), day[1..len])
                     }
 
                     case 'B', 'b', 'h' {
-                        mon := monthnames[tm.mon];
-                        len := 3 if format[0] != 'B' else mon.length;
+                        mon := monthnames[tm.mon]
+                        len := 3 if format[0] != 'B' else mon.length
 
-                        io.write_format(w, "{}{}", mon[0]->to_upper(), mon[1..len]);
+                        io.write_format(w, "{}{}", mon[0]->to_upper(), mon[1..len])
                     }
 
                     case 'd', 'e' {
-                        io.write_format(w, "{w2}", tm.mday);
+                        io.write_format(w, "{w2}", tm.mday)
                     }
 
                     case 'D' {
-                        io.write_format(w, "{w2}/{w2}/{}", tm.mon + 1, tm.mday, tm.year - 100 if tm.year >= 100 else tm.year);
+                        io.write_format(w, "{w2}/{w2}/{}", tm.mon + 1, tm.mday, tm.year - 100 if tm.year >= 100 else tm.year)
                     }
 
-                    case 'H' do io.write_format(w, "{w2}", tm.hour);
-                    case 'I' do io.write_format(w, "{w2}", hour_to_12h(tm.hour));
-                    case 'j' do io.write_format(w, "{}", tm.yday + 1);
-                    case 'm' do io.write_format(w, "{w2}", tm.mon + 1);
-                    case 'M' do io.write_format(w, "{w2}", tm.min);
-                    case 'p' do io.write(w, "am" if tm.hour < 12 else "pm");
+                    case 'H' do io.write_format(w, "{w2}", tm.hour)
+                    case 'I' do io.write_format(w, "{w2}", hour_to_12h(tm.hour))
+                    case 'j' do io.write_format(w, "{}", tm.yday + 1)
+                    case 'm' do io.write_format(w, "{w2}", tm.mon + 1)
+                    case 'M' do io.write_format(w, "{w2}", tm.min)
+                    case 'p' do io.write(w, "am" if tm.hour < 12 else "pm")
 
                     case 'r' {
                         io.write_format(w, "{w2}:{w2}:{w2} {}", hour_to_12h(tm.hour), tm.min, tm.sec,
-                            "am" if tm.hour < 12 else "pm");
+                            "am" if tm.hour < 12 else "pm")
                     }
 
                     case 'R' {
-                        io.write_format(w, "{w2}:{w2}", tm.hour, tm.min);
+                        io.write_format(w, "{w2}:{w2}", tm.hour, tm.min)
                     }
 
-                    case 'S' do io.write_format(w, "{w2}", tm.sec);
-                    case 'T' do io.write_format(w, "{}", tm.wday);
-                    case 'Y' do io.write_format(w, "{}", tm.year + 1900);
-                    case 'y' do io.write_format(w, "{w2}", tm.year - 100 if tm.year >= 100 else tm.year);
-                    case '%' do io.write(w, "%");
+                    case 'S' do io.write_format(w, "{w2}", tm.sec)
+                    case 'T' do io.write_format(w, "{}", tm.wday)
+                    case 'Y' do io.write_format(w, "{}", tm.year + 1900)
+                    case 'y' do io.write_format(w, "{w2}", tm.year - 100 if tm.year >= 100 else tm.year)
+                    case '%' do io.write(w, "%")
                 }
             }
 
             case _ {
-                io.write(w, c);
+                io.write(w, c)
             }
         }
 
-        string.advance(&format);
+        string.advance(&format)
     }
 
     hour_to_12h :: (h: i32) -> i32 {
-        if h == 0 do return 12;
-        if h <= 12 do return h;
-        return h - 12;
+        if h == 0 do return 12
+        if h <= 12 do return h
+        return h - 12
     }
 }
 
@@ -248,13 +248,13 @@ strptime :: #match #local {}
 /// Parses a string into a `Timestamp`.
 #overload
 strptime :: (buf: [] u8, format: [] u8) -> ? Timestamp {
-    t: Timestamp;
+    t: Timestamp
 
     if strptime(buf, format, &t) {
-        return t;
+        return t
     }
 
-    return .None;
+    return .None
 }
 
 /// Parses a string into a `Timestamp`. Returns `true` if the parsing was successful.
@@ -262,288 +262,288 @@ strptime :: (buf: [] u8, format: [] u8) -> ? Timestamp {
 strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
     use core {*}
 
-    buf := buf_;
-    format := format_;
+    buf := buf_
+    format := format_
 
-    working := true;
+    working := true
     while working && buf.length > 0 && format.length > 0 {
-        c := format[0];
+        c := format[0]
         switch c {
             case '%' {
-                string.advance(&format);
+                string.advance(&format)
                 switch format[0] {
                     case 'a', 'A' {
                         for i in weekdays.count {
-                            w := weekdays[i];
+                            w := weekdays[i]
                             if string.equal_insensitive(w, buf[0 .. w.length]) {
-                                string.advance(&buf, w.length);
-                                tm.wday = i;
-                                break break;
+                                string.advance(&buf, w.length)
+                                tm.wday = i
+                                break break
 
                             } elseif string.equal_insensitive(w[0 .. 3], buf[0 .. 3]) {
-                                string.advance(&buf, 3);
-                                tm.wday = i;
-                                break break;
+                                string.advance(&buf, 3)
+                                tm.wday = i
+                                break break
                             }
                         }
 
-                        tm.wday = -1;
-                        working = false;
+                        tm.wday = -1
+                        working = false
                     }
 
                     case 'b', 'B', 'h' {
                         for i in monthnames.count {
-                            m := monthnames[i];
+                            m := monthnames[i]
                             if string.equal_insensitive(m, buf[0 .. m.length]) {
-                                string.advance(&buf, m.length);
-                                tm.mon = i;
-                                break break;
+                                string.advance(&buf, m.length)
+                                tm.mon = i
+                                break break
 
                             } elseif string.equal_insensitive(m[0 .. 3], buf[0 .. 3]) {
-                                string.advance(&buf, 3);
-                                tm.mon = i;
-                                break break;
+                                string.advance(&buf, 3)
+                                tm.mon = i
+                                break break
                             }
                         }
 
-                        tm.mon = -1;
-                        working = false;
+                        tm.mon = -1
+                        working = false
                     }
 
                     case 'd', 'e' {
-                        working = parse_number_and_advance(&buf, &tm.mday, 1, 31, 0);
+                        working = parse_number_and_advance(&buf, &tm.mday, 1, 31, 0)
                     }
 
                     case 'D' {
-                        working = parse_number_and_advance(&buf, &tm.mon, 1, 12, -1);
-                        if !working do break;
+                        working = parse_number_and_advance(&buf, &tm.mon, 1, 12, -1)
+                        if !working do break
 
                         if buf[0] == '/' {
-                            string.advance(&buf);
-                            working = parse_number_and_advance(&buf, &tm.mday, 1, 31, 0);
-                            if !working do break;
+                            string.advance(&buf)
+                            working = parse_number_and_advance(&buf, &tm.mday, 1, 31, 0)
+                            if !working do break
 
                             if buf[0] == '/' {
-                                string.advance(&buf);
-                                working = parse_number_and_advance(&buf, &tm.year, 0, 99, 0);
+                                string.advance(&buf)
+                                working = parse_number_and_advance(&buf, &tm.year, 0, 99, 0)
                                 if working && tm.year < 69 {
-                                    tm.year += 100;
+                                    tm.year += 100
                                 }
                             }
                         }
                     }
 
-                    case 'H' do working = parse_number_and_advance(&buf, &tm.hour, 0, 23, 0);
-                    case 'I' do working = parse_number_and_advance(&buf, &tm.hour, 1, 12, 0);
-                    case 'j' do working = parse_number_and_advance(&buf, &tm.yday, 1, 366, -1);
-                    case 'm' do working = parse_number_and_advance(&buf, &tm.mon, 1, 12, -1);
-                    case 'M' do working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0);
-                    case 'n', 't' do string.strip_leading_whitespace(&buf);
+                    case 'H' do working = parse_number_and_advance(&buf, &tm.hour, 0, 23, 0)
+                    case 'I' do working = parse_number_and_advance(&buf, &tm.hour, 1, 12, 0)
+                    case 'j' do working = parse_number_and_advance(&buf, &tm.yday, 1, 366, -1)
+                    case 'm' do working = parse_number_and_advance(&buf, &tm.mon, 1, 12, -1)
+                    case 'M' do working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0)
+                    case 'n', 't' do string.strip_leading_whitespace(&buf)
 
                     case 'p' {
                         if string.equal_insensitive(buf[0 .. 2], "am") {
-                            if tm.hour == 12 do tm.hour = 0;
-                            string.advance(&buf, 2);
+                            if tm.hour == 12 do tm.hour = 0
+                            string.advance(&buf, 2)
 
                         } elseif string.equal_insensitive(buf[0 .. 2], "pm") {
-                            if tm.hour < 12 do tm.hour += 12;
-                            string.advance(&buf, 2);
+                            if tm.hour < 12 do tm.hour += 12
+                            string.advance(&buf, 2)
 
                         } else {
-                            working = false;
+                            working = false
                         }
                     }
 
                     case 'r' {
-                        working = parse_number_and_advance(&buf, &tm.hour, 1, 12, 0);
-                        if !working do break;
+                        working = parse_number_and_advance(&buf, &tm.hour, 1, 12, 0)
+                        if !working do break
 
                         if buf[0] == ':' {
-                            string.advance(&buf);
+                            string.advance(&buf)
 
-                            working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0);
-                            if !working do break;
+                            working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0)
+                            if !working do break
 
                             if buf[0] == ':' {
-                                string.advance(&buf);
+                                string.advance(&buf)
 
-                                working = parse_number_and_advance(&buf, &tm.sec, 0, 59, 0);
-                                if !working do break;
+                                working = parse_number_and_advance(&buf, &tm.sec, 0, 59, 0)
+                                if !working do break
 
-                                string.strip_leading_whitespace(&buf);
+                                string.strip_leading_whitespace(&buf)
 
                                 if string.equal_insensitive(buf[0 .. 2], "am") {
-                                    if tm.hour == 12 do tm.hour = 0;
-                                    string.advance(&buf, 2);
+                                    if tm.hour == 12 do tm.hour = 0
+                                    string.advance(&buf, 2)
 
                                 } elseif string.equal_insensitive(buf[0 .. 2], "pm") {
-                                    if tm.hour < 12 do tm.hour += 12;
-                                    string.advance(&buf, 2);
+                                    if tm.hour < 12 do tm.hour += 12
+                                    string.advance(&buf, 2)
 
                                 } else {
-                                    working = false;
+                                    working = false
                                 }
                             }
                         }
                     }
 
                     case 'R' {
-                        working = parse_number_and_advance(&buf, &tm.hour, 1, 12, 0);
-                        if !working do break;
+                        working = parse_number_and_advance(&buf, &tm.hour, 1, 12, 0)
+                        if !working do break
 
                         if buf[0] == ':' {
-                            string.advance(&buf);
+                            string.advance(&buf)
 
-                            working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0);
+                            working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0)
                         }
                     }
 
-                    case 'S' do working = parse_number_and_advance(&buf, &tm.sec, 0, 59, 0);
+                    case 'S' do working = parse_number_and_advance(&buf, &tm.sec, 0, 59, 0)
 
                     case 'T' {
-                        working = parse_number_and_advance(&buf, &tm.hour, 1, 12, 0);
-                        if !working do break;
+                        working = parse_number_and_advance(&buf, &tm.hour, 1, 12, 0)
+                        if !working do break
 
                         if buf[0] == ':' {
-                            string.advance(&buf);
+                            string.advance(&buf)
 
-                            working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0);
-                            if !working do break;
+                            working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0)
+                            if !working do break
 
                             if buf[0] == ':' {
-                                string.advance(&buf);
+                                string.advance(&buf)
 
-                                working = parse_number_and_advance(&buf, &tm.sec, 0, 59, 0);
+                                working = parse_number_and_advance(&buf, &tm.sec, 0, 59, 0)
                             }
                         }
                     }
 
-                    case 'w' do working = parse_number_and_advance(&buf, &tm.wday, 0, 6, 0);
-                    case 'Y' do working = parse_number_and_advance(&buf, &tm.year, 1900, 65535, -1900);
+                    case 'w' do working = parse_number_and_advance(&buf, &tm.wday, 0, 6, 0)
+                    case 'Y' do working = parse_number_and_advance(&buf, &tm.year, 1900, 65535, -1900)
 
                     case 'y' {
-                        working = parse_number_and_advance(&buf, &tm.year, 0, 99, 0);
+                        working = parse_number_and_advance(&buf, &tm.year, 0, 99, 0)
                         if working && tm.year < 69 {
-                            tm.year += 100;
+                            tm.year += 100
                         }
                     }
 
                     case '%' {
                         if buf[0] != '%' {
-                            working = false;
+                            working = false
                         }
-                        string.advance(&buf);
+                        string.advance(&buf)
                     }
 
                     case _ {
-                        working = false;
+                        working = false
                     }
                 }
             }
 
             case ' ', '\t', '\r', '\n', '\f', '\v' {
-                string.strip_leading_whitespace(&buf);
+                string.strip_leading_whitespace(&buf)
             }
 
             case _ {
                 if c != buf[0] {
-                    working = false;
+                    working = false
 
                 } else {
-                    string.advance(&buf);
+                    string.advance(&buf)
                 }
             }
         }
 
-        string.advance(&format);
+        string.advance(&format)
     }
 
-    return working;
+    return working
 
     //
     // Helper function used above
     parse_number_and_advance :: (buf: &[] u8, result: &i32, low, high, offset: i32) -> bool {
         use core {string}
 
-        n := 0;
+        n := 0
         while buf.count > 0 {
-            c := buf.data[0];
+            c := buf.data[0]
             if c < '0' || c > '9' {
-                break;
+                break
             }
 
-            n *= 10;
-            n += ~~(c - '0');
-            string.advance(buf);
+            n *= 10
+            n += ~~(c - '0')
+            string.advance(buf)
         }
 
         if n >= low && n <= high {
-            *result = n + offset;
-            return true;
+            *result = n + offset
+            return true
         }
 
-        return false;
+        return false
     }
 }
 
 #local
 time_to_tm :: (ts: i64, tm: &Timestamp) {
-    leapyear :: (year) => year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    leapyear :: (year) => year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
 
     #persist year_lengths := ([12] i64).[
         i64.[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
         i64.[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
-    ];
+    ]
 
-    year := 1970;
-    dayclock := ts % 86400;
-    dayno := ts / 86400;
+    year := 1970
+    dayclock := ts % 86400
+    dayno := ts / 86400
 
-    tm.sec = ~~(dayclock % 60);
-    tm.min = ~~((dayclock % 3600) / 60);
-    tm.hour = ~~(dayclock / 3600);
-    tm.wday = ~~((dayno + 4) % 7);
+    tm.sec = ~~(dayclock % 60)
+    tm.min = ~~((dayclock % 3600) / 60)
+    tm.hour = ~~(dayclock / 3600)
+    tm.wday = ~~((dayno + 4) % 7)
     while true {
-        yearsize := 366 if leapyear(year) else 365;
+        yearsize := 366 if leapyear(year) else 365
         if dayno >= ~~yearsize {
-            dayno -= ~~yearsize;
-            year += 1;
+            dayno -= ~~yearsize
+            year += 1
         } else {
-            break;
+            break
         }
     }
 
-    tm.year = ~~(year - 1900);
-    tm.yday = ~~dayno;
+    tm.year = ~~(year - 1900)
+    tm.yday = ~~dayno
 
-    mon := 0;
-    year_length: [] i64 = year_lengths[1 if leapyear(year) else 0];
+    mon := 0
+    year_length: [] i64 = year_lengths[1 if leapyear(year) else 0]
     while dayno >= year_length[mon] {
-        dayno -= year_length[mon];
-        mon   += 1;
+        dayno -= year_length[mon]
+        mon   += 1
     }
-    tm.mon = ~~mon;
-    tm.mday = ~~(dayno + 1);
-    tm.isdst = 0;
+    tm.mon = ~~mon
+    tm.mday = ~~(dayno + 1)
+    tm.isdst = 0
 }
 
 #local
 tm_to_time :: (tm: Timestamp) -> i64 {
-    y := cast(i64, tm.year + 1900);
-    m := cast(i64, tm.mon + 1);
+    y := cast(i64, tm.year + 1900)
+    m := cast(i64, tm.mon + 1)
     if m <= 2 {
-        y -= 1;
-        m += 12;
+        y -= 1
+        m += 12
     }
-    d := cast(i64, tm.mday);
-    h := cast(i64, tm.hour);
-    mi := cast(i64, tm.min);
-    s := cast(i64, tm.sec);
+    d := cast(i64, tm.mday)
+    h := cast(i64, tm.hour)
+    mi := cast(i64, tm.min)
+    s := cast(i64, tm.sec)
 
     return (365 * y + y / 4 - y / 100 + y / 400 + 3 * (m + 1) / 5 + 30 * m + d - 719561) * 86400 +
         3600 * h +
         60 * mi +
-        s;
+        s
 }
 
 

@@ -12,30 +12,30 @@ package core.alloc.ring
 use core
 
 RingState :: struct {
-    base_ptr : rawptr;
-    size     : u32;
-    curr     : u32;
+    base_ptr : rawptr
+    size     : u32
+    curr     : u32
 }
 
 #local
 ring_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
-    ss := cast(&RingState) data;
+    ss := cast(&RingState) data
 
     if aa == .Alloc {
-        retval := null;
+        retval := null
         if ss.curr + size < ss.size {
-            retval = cast([&] u8) ss.base_ptr + ss.curr;
-            ss.curr += size;
+            retval = cast([&] u8) ss.base_ptr + ss.curr
+            ss.curr += size
         }
         elseif size <= ss.size {
-            retval = ss.base_ptr;
-            ss.curr = size;
+            retval = ss.base_ptr
+            ss.curr = size
         }
 
-        return retval;
+        return retval
     }
 
-    return null;
+    return null
 }
 
 make :: (buffer: [] u8) -> RingState {
@@ -43,7 +43,7 @@ make :: (buffer: [] u8) -> RingState {
         base_ptr = buffer.data,
         size     = buffer.count,
         curr     = 0,
-    };
+    }
 }
 
 #overload core.alloc.as_allocator :: make_allocator
@@ -51,6 +51,6 @@ make_allocator :: (rs: &RingState) -> Allocator {
     return .{
         func = ring_alloc_proc,
         data = rs,
-    };
+    }
 }
 

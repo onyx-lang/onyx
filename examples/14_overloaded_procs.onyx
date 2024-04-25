@@ -40,24 +40,24 @@ main :: (args: [] cstr) {
     // See the overloaded procedure defined below.
 
     // This works as you would expect.
-    print_type(10);
-    print_type(3.14159f);
-    print_type("Hello, overloaded procedures!");
+    print_type(10)
+    print_type(3.14159f)
+    print_type("Hello, overloaded procedures!")
 
-    print_type(Person.{ "Joe", 38 });
+    print_type(Person.{ "Joe", 38 })
 
     // Some internal data structures like Map and Set use an overloaded procedure to provide a hash
     // for the keys of the data. This procedure is core.hash.to_u32. If you want to have a set of 
     // a datatype you made, or a map with keys of a datatype you made, you need to provide an overload
     // to core.hash.to_u32 for your datatype. In this program, that definition is at the end of the file.
-    person_set := set.make(Person);
-    person_set << .{ "Joe", 38 };
-    person_set << .{ "Jane", 36 };
-    person_set << .{ "Joe", 38 };
+    person_set := set.make(Person)
+    person_set << .{ "Joe", 38 }
+    person_set << .{ "Jane", 36 }
+    person_set << .{ "Joe", 38 }
 
     // "Joe" will only be printed once.
     for person in set.as_iter(^person_set) {
-        println(person);
+        println(person)
     }
 }
 
@@ -73,7 +73,7 @@ print_type :: #match {
 // this work for any type in
 
 #match #order 10 print_type (x: $T) {
-    printf("Fallback case: called with a {} ({})\n", T, x);
+    printf("Fallback case: called with a {} ({})\n", T, x)
 }
 
 // There are a couple things going on here. The #match directive takes two "parameters": the overloaded
@@ -95,10 +95,10 @@ Person :: struct { name: str; age: i32; }
 
 // The overload option for hashing a person in
 #match hash.to_u32 (use p: Person) -> u32 {
-    return hash.to_u32(name) * 16239563 + age;
+    return hash.to_u32(name) * 16239563 + age
 }
 
 // Ignore this for now, but it is needed in order to make a set of Persons.
 #operator == (p1: Person, p2: Person) -> bool {
-    return p1.name == p2.name && p1.age == p2.age;
+    return p1.name == p2.name && p1.age == p2.age
 }

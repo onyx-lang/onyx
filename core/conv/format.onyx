@@ -8,53 +8,53 @@ use core.io
 use runtime
 
 #package {
-    custom_formatters: Map(type_expr, #type (&Format_Output, &Format, rawptr) -> void);
-    custom_parsers   : Map(type_expr, #type (rawptr, str, Allocator) -> bool);
+    custom_formatters: Map(type_expr, #type (&Format_Output, &Format, rawptr) -> void)
+    custom_parsers   : Map(type_expr, #type (rawptr, str, Allocator) -> bool)
 }
 
 /// This procedure is run before main() as it is an #init procedure.
 /// It looks for all custom formatting and parsing definitions and
 /// registers them to be used in format_any and parse_any.
 custom_formatters_initialized :: #init () {
-    map.init(&custom_formatters);
-    map.init(&custom_parsers);
+    map.init(&custom_formatters)
+    map.init(&custom_parsers)
 
     #if Enable_Custom_Formatters {
-        use runtime.info {*};
+        use runtime.info {*}
 
         for type_idx in type_table.count {
-            type := type_table[type_idx];
-            if type.kind != .Struct do continue;
+            type := type_table[type_idx]
+            if type.kind != .Struct do continue
 
-            s_info := cast(&Type_Info_Struct) type;
+            s_info := cast(&Type_Info_Struct) type
             for s_info.tags {
                 if it.type == Custom_Format {
-                    custom_format := cast(&Custom_Format) it.data;
-                    custom_formatters[cast(type_expr) type_idx] = custom_format.format;
+                    custom_format := cast(&Custom_Format) it.data
+                    custom_formatters[cast(type_expr) type_idx] = custom_format.format
                 }
 
                 if it.type == Custom_Parse {
-                    custom_parse := cast(&Custom_Parse) it.data;
-                    custom_parsers[cast(type_expr) type_idx] = custom_parse.parse;
+                    custom_parse := cast(&Custom_Parse) it.data
+                    custom_parsers[cast(type_expr) type_idx] = custom_parse.parse
                 }
             } 
         }
 
-        format_procedures := get_procedures_with_tag(Custom_Format_Proc);
-        defer delete(&format_procedures);
+        format_procedures := get_procedures_with_tag(Custom_Format_Proc)
+        defer delete(&format_procedures)
 
         for p in format_procedures {
-            custom_format := p.tag;
-            custom_formatters[custom_format.type] = *cast(&(&Format_Output, &Format, rawptr) -> void, &p.func);
+            custom_format := p.tag
+            custom_formatters[custom_format.type] = *cast(&(&Format_Output, &Format, rawptr) -> void, &p.func)
         }
 
 
-        parse_procedures := get_procedures_with_tag(Custom_Parse_Proc);
-        defer delete(&parse_procedures);
+        parse_procedures := get_procedures_with_tag(Custom_Parse_Proc)
+        defer delete(&parse_procedures)
 
         for p in parse_procedures {
-            custom_parse := p.tag;
-            custom_parsers[custom_parse.type] = *cast(&(rawptr, str, Allocator) -> bool, &p.func);
+            custom_parse := p.tag
+            custom_parsers[custom_parse.type] = *cast(&(rawptr, str, Allocator) -> bool, &p.func)
         }
     }
 }
@@ -62,14 +62,14 @@ custom_formatters_initialized :: #init () {
 /// Registers a formatting function for a particular type. This type is
 /// inferred from the type of the third argument in the given function.
 register_custom_formatter :: (formatter: (&Format_Output, &Format, &$T) -> void) {
-    custom_formatters[T] = formatter;
+    custom_formatters[T] = formatter
 }
 
 
 /// Registers a parsing function for a particular type. This type is
 /// inferred from the type of the first argument in the given function.
 register_custom_parser :: (parser: (&$T, str, Allocator) -> bool) {
-    custom_parsers[T] = parser;
+    custom_parsers[T] = parser
 }
 
 
@@ -78,7 +78,7 @@ register_custom_parser :: (parser: (&$T, str, Allocator) -> bool) {
 ///     @conv.Custom_Format.{ format_structure }
 ///     TheStructure :: struct { ... }
 Custom_Format :: struct {
-    format: (&Format_Output, &Format, rawptr) -> void;
+    format: (&Format_Output, &Format, rawptr) -> void
 }
 
 
@@ -88,7 +88,7 @@ Custom_Format :: struct {
 ///     @conv.Custom_Format_Proc.{ TheStructure }
 ///     format_structure :: (output: &conv.Format_Output, format: &conv.Format, data: &TheStructure) { ... }
 Custom_Format_Proc :: struct {
-    type: type_expr;
+    type: type_expr
 }
 
 
@@ -97,7 +97,7 @@ Custom_Format_Proc :: struct {
 ///     @conv.Custom_Parse.{ parse_structure }
 ///     TheStructure :: struct { ... }
 Custom_Parse :: struct {
-    parse: (rawptr, str, Allocator) -> bool;
+    parse: (rawptr, str, Allocator) -> bool
 }
 
 
@@ -107,7 +107,7 @@ Custom_Parse :: struct {
 ///     @conv.Custom_Parse_Proc.{ TheStructure }
 ///     parse_structure :: (data: &TheStructure, input: str, allocator: Allocator) -> bool { ... }
 Custom_Parse_Proc :: struct {
-    type: type_expr;
+    type: type_expr
 }
 
 /// Passed to any custom formatter. Wraps outputting data to any source,
@@ -115,45 +115,45 @@ Custom_Parse_Proc :: struct {
 /// When the internal buffer is filled, `flush` is called to empty the
 /// buffer to the final destination.
 Format_Output :: struct {
-    data: [&] u8;
-    count: u32;
-    capacity: u32;
+    data: [&] u8
+    count: u32
+    capacity: u32
 
     // When the data buffer fills, this procedure
     // is called with the data, allowing for the
     // buffer to be cleared and more to be written.
-    flush: Format_Flush_Callback;
+    flush: Format_Flush_Callback
 
     write :: #match {
         (use output: &Format_Output, c: u8) {
             if count >= capacity {
-                if flush.func == null_proc                   do return;
-                if !flush.func(flush.data, data[0 .. count]) do return;
-                count = 0;
+                if flush.func == null_proc                   do return
+                if !flush.func(flush.data, data[0 .. count]) do return
+                count = 0
             }
 
-            data[count] = c;
-            count += 1;
+            data[count] = c
+            count += 1
         },
 
         (use output: &Format_Output, s: str) {
             for c in s {
                 if count >= capacity {
-                    if flush.func == null_proc                   do return;
-                    if !flush.func(flush.data, data[0 .. count]) do return;
-                    count = 0;
+                    if flush.func == null_proc                   do return
+                    if !flush.func(flush.data, data[0 .. count]) do return
+                    count = 0
                 }
 
-                data[count] = c;
-                count += 1;
+                data[count] = c
+                count += 1
             }
         }
     }
 }
 
 Format_Flush_Callback :: struct {
-    data: rawptr = null;
-    func: (rawptr, str) -> bool = null_proc;
+    data: rawptr = null
+    func: (rawptr, str) -> bool = null_proc
 }
 
 
@@ -167,15 +167,15 @@ Format :: struct {
     interpret_numbers    := true;         // d to disable
     digits_after_decimal := cast(u32) 4;  // .2
 
-    indentation   := cast(u32) 0;
+    indentation   := cast(u32) 0
     base          := cast(u64) 10;        // b16
     minimum_width := cast(u32) 0;         // w12
 }
 
 #local
 flush_to_dyn_str :: (dynstr: &dyn_str, to_write: str) => {
-    array.concat(dynstr, to_write);
-    return true;
+    array.concat(dynstr, to_write)
+    return true
 }
 
 
@@ -190,8 +190,8 @@ str_format_va :: format_va
 builtin.logf :: (level: builtin.Log_Level, format: str, va: ..any) {
     use core {conv}
 
-    buf: [2048] u8;
-    log(level, conv.format_va(buf, format, cast([] any) va));
+    buf: [2048] u8
+    log(level, conv.format_va(buf, format, cast([] any) va))
 }
 
 
@@ -211,21 +211,21 @@ format :: (output: &Format_Output, format: str, va: ..any) -> str {
 
 #overload
 format :: (format: str, va: ..any) -> str {
-    out := make(dyn_str);
-    return format_va(&out, format, ~~va);
+    out := make(dyn_str)
+    return format_va(&out, format, ~~va)
 }
 
 #overload
 format :: (buffer: &dyn_str, format: str, va: ..any) -> str {
-    internal_buffer : [256] u8;
+    internal_buffer : [256] u8
     output := Format_Output.{
         ~~internal_buffer, 0, internal_buffer.count,
         flush=.{ buffer, flush_to_dyn_str }
-    };
+    }
 
-    final := format_va(&output, format, ~~va);
-    string.concat(buffer, final);
-    return *buffer;
+    final := format_va(&output, format, ~~va)
+    string.concat(buffer, final)
+    return *buffer
 }
 
 /// Like `format`, but takes the arguments as an array of `any`s, not a variadic argument array.
@@ -233,165 +233,165 @@ format_va :: #match {}
 
 #overload
 format_va :: (buffer: [] u8, format: str, va: [] any, flush := Format_Flush_Callback.{}) -> str {
-    output := Format_Output.{ buffer.data, 0, buffer.count, flush };
-    return format_va(&output, format, va);
+    output := Format_Output.{ buffer.data, 0, buffer.count, flush }
+    return format_va(&output, format, va)
 }
 
 #overload
 format_va :: (format: [] u8, va: [] any, allocator := context.allocator) -> str {
-    out := make(dyn_str, allocator=allocator);
-    return format_va(&out, format, ~~va);
+    out := make(dyn_str, allocator=allocator)
+    return format_va(&out, format, ~~va)
 }
 
 #overload
 format_va :: (buffer: &dyn_str, format: str, va: [] any) -> str {
-    internal_buffer : [256] u8;
+    internal_buffer : [256] u8
     output := Format_Output.{
         ~~internal_buffer, 0, internal_buffer.count,
         flush=.{ buffer, flush_to_dyn_str }
-    };
+    }
 
-    final := format_va(&output, format, va);
-    string.concat(buffer, final);
-    return *buffer;
+    final := format_va(&output, format, va)
+    string.concat(buffer, final)
+    return *buffer
 }
 
 #overload
 format_va :: (output: &Format_Output, format: str, va: [] any) -> str {
-    vararg_index := 0;
+    vararg_index := 0
 
     while i := 0; i < format.count {
-        defer i += 1;
+        defer i += 1
 
-        ch := format[i];
-        formatting := Format.{};
+        ch := format[i]
+        formatting := Format.{}
 
         if ch == '{' {
             if format[i + 1] == '{' {
-                output->write('{');
-                i += 1;
-                continue;
+                output->write('{')
+                i += 1
+                continue
             }
 
-            format_piece     := format[i .. i+1];
-            completed_format := false;
+            format_piece     := format[i .. i+1]
+            completed_format := false
 
-            i += 1;
+            i += 1
             while true {
                 if i >= format.length {
-                    break;
+                    break
                 }
                 
-                format_piece.length += 1;
+                format_piece.length += 1
 
-                ch = format[i];
+                ch = format[i]
                 switch ch {
                     case '*' {
-                        i += 1;
-                        formatting.dereference = true;
+                        i += 1
+                        formatting.dereference = true
                     }
 
                     case '.' {
-                        i += 1;
+                        i += 1
 
-                        digits := 0;
+                        digits := 0
                         while format[i] >= '0' && format[i] <= '9' {
-                            digits *= 10;
-                            digits += ~~(format[i] - '0');
-                            i += 1;
+                            digits *= 10
+                            digits += ~~(format[i] - '0')
+                            i += 1
                         }
 
-                        ch = format[i];
-                        formatting.digits_after_decimal = digits;
+                        ch = format[i]
+                        formatting.digits_after_decimal = digits
                     }
 
                     case 'p' {
-                        i += 1;
-                        formatting.pretty_printing = true;
+                        i += 1
+                        formatting.pretty_printing = true
                     }
 
                     case 'x' {
-                        i += 1;
-                        formatting.base = 16;
+                        i += 1
+                        formatting.base = 16
                     }
 
                     case 'b' {
-                        i += 1;
+                        i += 1
 
-                        digits := 0;
+                        digits := 0
                         while format[i] >= '0' && format[i] <= '9' {
-                            digits *= 10;
-                            digits += ~~(format[i] - '0');
-                            i += 1;
+                            digits *= 10
+                            digits += ~~(format[i] - '0')
+                            i += 1
                         }
 
-                        formatting.base = ~~digits;
+                        formatting.base = ~~digits
                     }
 
                     case 'w' {
-                        i += 1;
+                        i += 1
 
-                        digits := 0;
+                        digits := 0
                         while format[i] >= '0' && format[i] <= '9' {
-                            digits *= 10;
-                            digits += ~~(format[i] - '0');
-                            i += 1;
+                            digits *= 10
+                            digits += ~~(format[i] - '0')
+                            i += 1
                         }
 
-                        formatting.minimum_width = digits;
+                        formatting.minimum_width = digits
                     }
 
                     case '!' {
-                        i += 1;
-                        formatting.custom_format = false;
+                        i += 1
+                        formatting.custom_format = false
                     }
 
                     case '"' {
-                        i += 1;
-                        formatting.quote_strings = true;
+                        i += 1
+                        formatting.quote_strings = true
                     }
 
                     case '\'' {
-                        i += 1;
-                        formatting.single_quote_strings = true;
+                        i += 1
+                        formatting.single_quote_strings = true
                     }
 
                     case 'd' {
-                        i += 1;
-                        formatting.interpret_numbers = false;
+                        i += 1
+                        formatting.interpret_numbers = false
                     }
 
                     case '}' {
-                        arg := va[vararg_index];
-                        vararg_index += 1;
-                        format_any(output, &formatting, arg);
-                        completed_format = true;
+                        arg := va[vararg_index]
+                        vararg_index += 1
+                        format_any(output, &formatting, arg)
+                        completed_format = true
 
-                        continue continue;
+                        continue continue
                     }
 
-                    case _ do break break;
+                    case _ do break break
                 }
             }
 
             if !completed_format {
-                output->write(format_piece);
-                continue;
+                output->write(format_piece)
+                continue
             }
         }
 
         if ch == '}' {
             if format[i + 1] == '}' {
-                output->write('}');
-                i += 1;
-                continue;
+                output->write('}')
+                i += 1
+                continue
             }
         }
 
-        output->write(ch);
+        output->write(ch)
     }
 
-    return .{ output.data, output.count };
+    return .{ output.data, output.count }
 }
 
 
@@ -399,21 +399,21 @@ format_va :: (output: &Format_Output, format: str, va: [] any) -> str {
 /// If a custom formatter is specified for the type, that is used instead.
 /// This procedure is generally not used directly; instead, through format or format_va.
 format_any :: (output: &Format_Output, formatting: &Format, v: any) {
-    use runtime.info {*};
+    use runtime.info {*}
 
     //
     // Dereference the any if the '*' format specifier was given.
     // Ignored if the value given is not a pointer.
     if formatting.dereference {
-        ti := get_type_info(v.type);
+        ti := get_type_info(v.type)
         if ti.kind == .Pointer {
-            formatting.dereference = false;
+            formatting.dereference = false
 
-            new_any: any;
-            new_any.type = (cast(&Type_Info_Pointer) ti).to;
-            new_any.data = *(cast(&rawptr) v.data);
-            format_any(output, formatting, new_any);
-            return;
+            new_any: any
+            new_any.type = (cast(&Type_Info_Pointer) ti).to
+            new_any.data = *(cast(&rawptr) v.data)
+            format_any(output, formatting, new_any)
+            return
         }
     }
 
@@ -421,323 +421,323 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
     // Use a custom formatter, if one is registered for the type.
     if formatting.custom_format {
         custom_formatters->get(v.type)->with([formatter] {
-            formatter(output, formatting, v.data);
-            return;
-        });
+            formatter(output, formatting, v.data)
+            return
+        })
     }
 
     switch v.type {
         case bool {
-            value := *(cast(&bool) v.data);
-            if value do output->write("true");
-            else     do output->write("false");
+            value := *(cast(&bool) v.data)
+            if value do output->write("true")
+            else     do output->write("false")
         }
 
         case u8 {
-            value := *(cast(&u8) v.data);
+            value := *(cast(&u8) v.data)
 
             if formatting.interpret_numbers {
-                output->write(value);
+                output->write(value)
 
             } else {
-                ibuf : [128] u8;
-                istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true);
-                output->write(istr);
+                ibuf : [128] u8
+                istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true)
+                output->write(istr)
             }
         }
 
         int_case :: macro (T: type_expr) {
             case T {
-                value := *(cast(&T) v.data);
+                value := *(cast(&T) v.data)
 
-                ibuf : [128] u8;
-                istr := i64_to_str(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width);
-                output->write(istr);
+                ibuf : [128] u8
+                istr := i64_to_str(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width)
+                output->write(istr)
             }
         }
 
         uint_case :: macro (T: type_expr) {
             case T {
-                value := *(cast(&T) v.data);
+                value := *(cast(&T) v.data)
 
-                ibuf : [128] u8;
-                istr := u64_to_str(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width);
-                output->write(istr);
+                ibuf : [128] u8
+                istr := u64_to_str(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width)
+                output->write(istr)
             }
         }
 
-        int_case(i8);
-        int_case(i16);
-        int_case(i32);
-        int_case(i64);
-        uint_case(u16);
-        uint_case(u32);
-        uint_case(u64);
+        int_case(i8)
+        int_case(i16)
+        int_case(i32)
+        int_case(i64)
+        uint_case(u16)
+        uint_case(u32)
+        uint_case(u64)
 
         case f32 {
-            value := *(cast(&f32) v.data);
+            value := *(cast(&f32) v.data)
 
-            fbuf : [128] u8;
-            fstr := f64_to_str(~~value, ~~fbuf, formatting.digits_after_decimal);
-            output->write(fstr);
+            fbuf : [128] u8
+            fstr := f64_to_str(~~value, ~~fbuf, formatting.digits_after_decimal)
+            output->write(fstr)
         }
 
         case f64 {
-            value := *(cast(&f64) v.data);
+            value := *(cast(&f64) v.data)
 
-            fbuf : [128] u8;
-            fstr := f64_to_str(~~value, ~~fbuf, formatting.digits_after_decimal);
-            output->write(fstr);
+            fbuf : [128] u8
+            fstr := f64_to_str(~~value, ~~fbuf, formatting.digits_after_decimal)
+            output->write(fstr)
         }
 
         case str {
-            if formatting.quote_strings do output->write("\"");
-            if formatting.single_quote_strings do output->write("'");
-            width := formatting.minimum_width;
-            to_output := *cast(&str) v.data;
+            if formatting.quote_strings do output->write("\"")
+            if formatting.single_quote_strings do output->write("'")
+            width := formatting.minimum_width
+            to_output := *cast(&str) v.data
 
             // @Todo // escape '"' when quote_strings is enabled.
-            output->write(to_output);
+            output->write(to_output)
             if to_output.count < width && !(formatting.quote_strings || formatting.single_quote_strings) {
-                for width - to_output.count do output->write(' ');
+                for width - to_output.count do output->write(' ')
             }
 
-            if formatting.quote_strings do output->write("\"");
-            if formatting.single_quote_strings do output->write("'");
+            if formatting.quote_strings do output->write("\"")
+            if formatting.single_quote_strings do output->write("'")
         }
 
         case rawptr {
-            value := *(cast(&rawptr) v.data);
+            value := *(cast(&rawptr) v.data)
 
             if value == null {
-                output->write("(null)");
+                output->write("(null)")
             } else {
-                ibuf : [128] u8;
-                istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true);
-                output->write(istr);
+                ibuf : [128] u8
+                istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true)
+                output->write(istr)
             }
         }
 
         case type_expr {
-            value := *(cast(&type_expr) v.data);
+            value := *(cast(&type_expr) v.data)
 
             buf : [256] u8;          
 
             // This is a little gross but the only way to output the type name for a type_expr
             // is through a io.Writer. That should maybe be changed in the future? Also, I think
             // 256 bytes is enough for the name of a type but I'm not entirely sure...
-            stream := io.buffer_stream_make(~~buf, fixed=true);
-            writer := io.writer_make(&stream, 0);
-            write_type_name(&writer, value);
-            io.writer_flush(&writer);
+            stream := io.buffer_stream_make(~~buf, fixed=true)
+            writer := io.writer_make(&stream, 0)
+            write_type_name(&writer, value)
+            io.writer_flush(&writer)
 
-            output->write(io.buffer_stream_to_str(&stream));
+            output->write(io.buffer_stream_to_str(&stream))
         }
 
         case _ {
-            info := get_type_info(v.type);
+            info := get_type_info(v.type)
 
             if info.kind == .Struct {
-                s := cast(&Type_Info_Struct) info;
+                s := cast(&Type_Info_Struct) info
 
                 if s.name.count > 0 {
-                    output->write(s.name);
-                    output->write(" { ");
+                    output->write(s.name)
+                    output->write(" { ")
                 } else {
-                    output->write("{ ");
+                    output->write("{ ")
                 }
 
                 {
-                    format := *formatting;
-                    format.quote_strings = true;
+                    format := *formatting
+                    format.quote_strings = true
                     if format.pretty_printing {
-                        format.indentation += 4;
+                        format.indentation += 4
                     }
                     
                     for &member in s.members {
-                        if member != s.members.data do output->write(", ");
+                        if member != s.members.data do output->write(", ")
 
                         if formatting.pretty_printing {
-                            output->write('\n');
-                            for i in format.indentation do output->write(' ');
+                            output->write('\n')
+                            for i in format.indentation do output->write(' ')
                         }
 
-                        output->write(member.name);
-                        output->write(" = ");
+                        output->write(member.name)
+                        output->write(" = ")
 
-                        format_any(output, &format, .{ cast([&] u8) v.data + member.offset, member.type });
+                        format_any(output, &format, .{ cast([&] u8) v.data + member.offset, member.type })
                     }
                 }
                 
                 if formatting.pretty_printing {
-                    output->write('\n');
-                    for i in formatting.indentation do output->write(' ');
-                    output->write("}");
+                    output->write('\n')
+                    for i in formatting.indentation do output->write(' ')
+                    output->write("}")
                     
                 } else {
-                    output->write(" }");
+                    output->write(" }")
                 }
             }
 
             if info.kind == .Function {
-                output->write("func[");
+                output->write("func[")
 
-                value := *(cast(&i32) v.data);
+                value := *(cast(&i32) v.data)
 
-                ibuf : [128] u8;
-                istr := i64_to_str(~~value, 10, ~~ibuf);
-                output->write(istr);
+                ibuf : [128] u8
+                istr := i64_to_str(~~value, 10, ~~ibuf)
+                output->write(istr)
 
-                output->write("]");
+                output->write("]")
             }
 
             if info.kind == .Pointer || info.kind == .Multi_Pointer {
-                value := *(cast(&rawptr) v.data);
+                value := *(cast(&rawptr) v.data)
 
-                ibuf : [128] u8;
-                istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true);
-                output->write(istr);
+                ibuf : [128] u8
+                istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true)
+                output->write(istr)
             }
 
             // This assumes that the following type_info kinds are basically the same.
             if info.kind == .Dynamic_Array || info.kind == .Slice || info.kind == .Variadic_Argument {
                 if formatting.pretty_printing {
-                    output->write("[");
+                    output->write("[")
                 } else {
-                    output->write("[ ");
+                    output->write("[ ")
                 }
 
-                a := cast(&Type_Info_Dynamic_Array) info;
-                arr := cast(&array.Untyped_Array) v.data;
-                data  := arr.data;
-                count := arr.count;
+                a := cast(&Type_Info_Dynamic_Array) info
+                arr := cast(&array.Untyped_Array) v.data
+                data  := arr.data
+                count := arr.count
 
-                format := *formatting;
-                format.quote_strings = true;
-                if format.pretty_printing do format.indentation += 4;
+                format := *formatting
+                format.quote_strings = true
+                if format.pretty_printing do format.indentation += 4
 
                 for i in count {
-                    if i != 0 do output->write(", ");
+                    if i != 0 do output->write(", ")
 
                     if formatting.pretty_printing {
-                        output->write("\n");
-                        for _ in format.indentation do output->write(' ');
+                        output->write("\n")
+                        for _ in format.indentation do output->write(' ')
                     }
 
-                    format_any(output, &format, .{ cast([&] u8) data + get_type_info(a.of).size * i, a.of });
+                    format_any(output, &format, .{ cast([&] u8) data + get_type_info(a.of).size * i, a.of })
                 }
 
 
                 if formatting.pretty_printing {
-                    format.indentation -= 4;
-                    output->write("\n");
-                    for _ in format.indentation do output->write(' ');
-                    output->write(']');
+                    format.indentation -= 4
+                    output->write("\n")
+                    for _ in format.indentation do output->write(' ')
+                    output->write(']')
 
                 } else {
-                    output->write(" ]");
+                    output->write(" ]")
                 }
             }
 
             if info.kind == .Array {
-                output->write("[ ");
+                output->write("[ ")
 
-                a := cast(&Type_Info_Array) info;
-                data := v.data;
+                a := cast(&Type_Info_Array) info
+                data := v.data
 
                 for i in a.count {
-                    if i != 0 do output->write(", ");
+                    if i != 0 do output->write(", ")
 
-                    format_any(output, formatting, .{ cast([&] u8) data + get_type_info(a.of).size * i, a.of });
+                    format_any(output, formatting, .{ cast([&] u8) data + get_type_info(a.of).size * i, a.of })
                 }
 
-                output->write(" ]");
+                output->write(" ]")
             }
 
             if info.kind == .Enum {
-                e := cast(&Type_Info_Enum) info;
+                e := cast(&Type_Info_Enum) info
 
-                value: u64;
+                value: u64
                 switch e.backing_type {
-                    case i8,  u8  do value = cast(u64) *(cast(&u8) v.data);
-                    case i16, u16 do value = cast(u64) *(cast(&u16) v.data);
-                    case i32, u32 do value = cast(u64) *(cast(&u32) v.data);
-                    case i64, u64 do value = cast(u64) *(cast(&u64) v.data);
-                    case _ do assert(false, "Bad enum backing type");
+                    case i8,  u8  do value = cast(u64) *(cast(&u8) v.data)
+                    case i16, u16 do value = cast(u64) *(cast(&u16) v.data)
+                    case i32, u32 do value = cast(u64) *(cast(&u32) v.data)
+                    case i64, u64 do value = cast(u64) *(cast(&u64) v.data)
+                    case _ do assert(false, "Bad enum backing type")
                 }
 
                 if !formatting.interpret_numbers {
-                    format_any(output, formatting, .{&value, u64});
-                    break;
+                    format_any(output, formatting, .{&value, u64})
+                    break
                 }
 
                 if !e.is_flags {
                     for &member in e.members {
                         if value == member.value {
-                            output->write(member.name);
-                            break break;
+                            output->write(member.name)
+                            break break
                         }
                     }
 
-                    output->write("UNKNOWN");
+                    output->write("UNKNOWN")
 
                 } else {
-                    first := true;
+                    first := true
                     for &member in e.members {
                         if value & member.value != 0 {
-                            if !first do output->write(" | ");
-                            output->write(member.name);
-                            first = false;
+                            if !first do output->write(" | ")
+                            output->write(member.name)
+                            first = false
                         }
                     }
 
                     if first {
-                        output->write("None");
+                        output->write("None")
                     }
                 }
             }
 
             if info.kind == .Distinct {
-                d := cast(&Type_Info_Distinct) info;
+                d := cast(&Type_Info_Distinct) info
 
                 if formatting.interpret_numbers {
-                    output->write(d.name);
-                    output->write("[");
+                    output->write(d.name)
+                    output->write("[")
                 }
 
-                format_any(output, formatting, any.{ v.data, d.base_type });
+                format_any(output, formatting, any.{ v.data, d.base_type })
 
                 if formatting.interpret_numbers {
-                    output->write("]");
+                    output->write("]")
                 }
             }
 
             if info.kind == .Union {
-                u := cast(&Type_Info_Union) info;
+                u := cast(&Type_Info_Union) info
 
-                tag_value: u64;
+                tag_value: u64
                 switch e := u.tag_enum->info()->as_enum(); e.backing_type {
-                    case i8,  u8  do tag_value = cast(u64) *(cast(&u8) v.data);
-                    case i16, u16 do tag_value = cast(u64) *(cast(&u16) v.data);
-                    case i32, u32 do tag_value = cast(u64) *(cast(&u32) v.data);
-                    case i64, u64 do tag_value = cast(u64) *(cast(&u64) v.data);
-                    case _ do assert(false, "Bad union backing type");
+                    case i8,  u8  do tag_value = cast(u64) *(cast(&u8) v.data)
+                    case i16, u16 do tag_value = cast(u64) *(cast(&u16) v.data)
+                    case i32, u32 do tag_value = cast(u64) *(cast(&u32) v.data)
+                    case i64, u64 do tag_value = cast(u64) *(cast(&u64) v.data)
+                    case _ do assert(false, "Bad union backing type")
                 }
 
-                variant := array.first(u.variants, [x](x.tag_value == ~~tag_value));
+                variant := array.first(u.variants, [x](x.tag_value == ~~tag_value))
 
                 if !variant {
-                    output->write("unknown_variant");
-                    return;
+                    output->write("unknown_variant")
+                    return
                 }
 
-                output->write(variant.name);
+                output->write(variant.name)
                 if variant.type != void {
-                    output->write("(");
-                    format := *formatting;
-                    format.quote_strings = true;
-                    format_any(output, &format, any.{ cast([&] u8) v.data + u.alignment, variant.type });
-                    output->write(")");
+                    output->write("(")
+                    format := *formatting
+                    format.quote_strings = true
+                    format_any(output, &format, any.{ cast([&] u8) v.data + u.alignment, variant.type })
+                    output->write(")")
                 }
             }
         }

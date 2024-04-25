@@ -3,22 +3,22 @@
 use core {*}
 
 main :: (args: [] cstr) {
-    x := 10 + 3 * 5;
+    x := 10 + 3 * 5
 
     // The basic syntax of a switch statement:
     switch x {
-        case 10 do println("x was 10.");
+        case 10 do println("x was 10.")
 
         case 25 {
-            println("x was 25.");
-            println("Multiple statments go between '{}'.");
+            println("x was 25.")
+            println("Multiple statments go between '{}'.")
         }
 
         case _ {
-            println("Default case reached.");
+            println("Default case reached.")
         }
     }
-    println("\n");
+    println("\n")
 
     // There are several semantic differences between Onyx switch statements and
     // C/C++ switch statements. The most obvious one is that there is no implicit
@@ -27,39 +27,39 @@ main :: (args: [] cstr) {
     // as so:
 
     switch x {
-        case 10 do println("x was 10.");
+        case 10 do println("x was 10.")
 
         case 25 {
-            println("x was 25.");
-            println("Multiple statments go between '{}'.");
+            println("x was 25.")
+            println("Multiple statments go between '{}'.")
             fallthrough; // Now we fallthrough
         }
 
         case _ {
-            println("Default case reached.");
+            println("Default case reached.")
         }
     }
-    println("\n");
+    println("\n")
 
     // The other semantic different is that each case introduces a lexical block where
     // local variables can be defined, and statements can be deferred. Take this
     // interesting example:
 
     switch 5 {
-        case 3 do println("This will never be reached.");
+        case 3 do println("This will never be reached.")
 
         case 5 {
-            x := math.max(20, 50);
-            defer printf("x in case '5' is {}.\n", x);
+            x := math.max(20, 50)
+            defer printf("x in case '5' is {}.\n", x)
 
-            if x >= 40 do fallthrough;
+            if x >= 40 do fallthrough
 
-            println("This statement will never be reached.");
+            println("This statement will never be reached.")
         }
 
         case _ {
-            println("Default case reached.");
+            println("Default case reached.")
         }
     }
-    println("\n");
+    println("\n")
 }

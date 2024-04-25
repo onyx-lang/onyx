@@ -14,57 +14,57 @@ use runtime.platform { __output_string }
     // Export a common initialization procedure that should
     // always be invoked before using anything in Onyx.
     #export "_initialize" () {
-        __runtime_initialize();
+        __runtime_initialize()
         context.thread_id = 0;    
     }
 }
 
 #local
 __output_uint :: (n: u64) {
-    buf: [128] u8;
-    i := 127;
+    buf: [128] u8
+    i := 127
     while n > 0 && i >= 0 {
-        buf[i] = ~~('0' + n % 10);
-        i -= 1;
-        n /= 10;
+        buf[i] = ~~('0' + n % 10)
+        i -= 1
+        n /= 10
     }
 
-    __output_string(buf[i .. 128]);
+    __output_string(buf[i .. 128])
 }
 
 // The default assert handler. This assumes that __output_string
 // and __exit are defined in the 'runtime' package.
 __assert_handler :: (msg: str, site: CallSite) {
-    __output_string("Assert failed: ");
-    __output_string(msg);
+    __output_string("Assert failed: ")
+    __output_string(msg)
 
 
     #if Stack_Trace_Enabled {
-        __output_string("\n");
-        trace := info.get_stack_trace();
+        __output_string("\n")
+        trace := info.get_stack_trace()
         for trace[1..trace.length] {
-            __output_string(" in ");
-            __output_string(it.info.func_name);
-            __output_string(" (");
-            __output_string(it.info.file);
-            __output_string(":");
-            __output_uint(~~it.current_line);
-            __output_string(")\n");
+            __output_string(" in ")
+            __output_string(it.info.func_name)
+            __output_string(" (")
+            __output_string(it.info.file)
+            __output_string(":")
+            __output_uint(~~it.current_line)
+            __output_string(")\n")
         }
 
     } else {
         if site.file.data != null {
-            __output_string(" in ");
-            __output_string(site.file);
+            __output_string(" in ")
+            __output_string(site.file)
         }
     }
 
-    __output_string("\n");
+    __output_string("\n")
 
-    core.intrinsics.wasm.unreachable();
+    core.intrinsics.wasm.unreachable()
 
     // This will never return
-    return;
+    return
 }
 
 // This procedure should only be called once at the very begining
@@ -73,14 +73,14 @@ __assert_handler :: (msg: str, site: CallSite) {
 // on the main thread. Finally it runs initialization procedures, which
 // should only happen once.
 __runtime_initialize :: () {
-    __initialize_data_segments();
+    __initialize_data_segments()
 
-    alloc.heap.init();
-    __thread_initialize();
+    alloc.heap.init()
+    __thread_initialize()
 
-    #if Multi_Threading_Enabled do thread.__initialize();
+    #if Multi_Threading_Enabled do thread.__initialize()
 
-    __run_init_procedures();
+    __run_init_procedures()
 }
 
 // Use this procedure to initialize everything needed in the
@@ -90,44 +90,44 @@ __thread_initialize :: () {
 
     // This should only be true for the main thread.
     if __tls_base == null {
-        __tls_base = raw_alloc(alloc.heap_allocator, __tls_size);
-        memory.set(__tls_base, 0, __tls_size);
+        __tls_base = raw_alloc(alloc.heap_allocator, __tls_size)
+        memory.set(__tls_base, 0, __tls_size)
     }
 
-    alloc.init_temp_allocator();
+    alloc.init_temp_allocator()
 
-    __initialize(&context);
-    context.allocator = alloc.heap_allocator;
-    context.temp_allocator = alloc.temp_allocator;
-    context.assert_handler = __assert_handler;
+    __initialize(&context)
+    context.allocator = alloc.heap_allocator
+    context.temp_allocator = alloc.temp_allocator
+    context.assert_handler = __assert_handler
 
     //
     // The default log level is Info. This seems reasonable, but it does
     // mean that all Debug messages will be omitted unless it is changed
     // manually.
-    default_log_level(.Info);
+    default_log_level(.Info)
 
-    __stdio_init();
+    __stdio_init()
 }
 
 #if Multi_Threading_Enabled {
     _thread_start :: (id: i32, tls_base: rawptr, stack_base: rawptr, func: (data: rawptr) -> void, data: rawptr) {
-        __tls_base = tls_base;
-        __stack_top = stack_base;
+        __tls_base = tls_base
+        __stack_top = stack_base
 
-        context.thread_id = id;
+        context.thread_id = id
 
-        __thread_initialize();
+        __thread_initialize()
 
-        func(data);
+        func(data)
 
-        __flush_stdio();
+        __flush_stdio()
 
-        core.thread.__exited(id);
+        core.thread.__exited(id)
     }
 
     _thread_exit :: (id: i32) {
-        // raw_free(alloc.heap_allocator, __tls_base);
-        // core.thread.__exited(id);
+        // raw_free(alloc.heap_allocator, __tls_base)
+        // core.thread.__exited(id)
     }
 }

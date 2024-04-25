@@ -5,10 +5,10 @@ use core
 // [..] T == Array(T)
 //   where
 // Array :: struct (T: type_expr) {
-//     data      : &T;
-//     count     : u32;
-//     capacity  : u32;
-//     allocator : Allocator;
+//     data      : &T
+//     count     : u32
+//     capacity  : u32
+//     allocator : Allocator
 // }
 
 // ---------------------------------
@@ -22,122 +22,122 @@ Array.make :: #match #local {}
 /// from the `allocator`.
 #overload
 Array.make :: ($T: type_expr, capacity := 4, allocator := context.allocator) -> [..] T {
-    arr : [..] T;
-    Array.init(&arr, capacity, allocator);
-    return arr;
+    arr : [..] T
+    Array.init(&arr, capacity, allocator)
+    return arr
 }
 
 /// Creates a new dynamic array as a *copy* of the provided array.
 #overload
 Array.make :: (base: [] $T, allocator := context.allocator) -> [..] T {
-    arr: [..] T;
-    Array.init(&arr, base.count, allocator);
-    for& base do arr << *it;
-    return arr;
+    arr: [..] T
+    Array.init(&arr, base.count, allocator)
+    for& base do arr << *it
+    return arr
 }
 
 #overload
 __make_overload :: macro (_: &[..] $T, allocator := context.allocator) -> [..] T {
-    return Array.make(T, allocator=allocator);
+    return Array.make(T, allocator=allocator)
 }
 
 #overload
 __make_overload :: macro (_: &[..] $T, capacity: u32, allocator := context.allocator) -> [..] T {
-    return Array.make(T, capacity, allocator);
+    return Array.make(T, capacity, allocator)
 }
 
 /// Initializes a dynamic array.
 Array.init :: (arr: &[..] $T, capacity := 4, allocator := context.allocator) {
-    arr.count = 0;
-    arr.capacity = capacity;
-    arr.allocator = allocator;
-    arr.data = raw_alloc(allocator, sizeof T * arr.capacity);
+    arr.count = 0
+    arr.capacity = capacity
+    arr.allocator = allocator
+    arr.data = raw_alloc(allocator, sizeof T * arr.capacity)
 }
 
 /// Frees a dynamic array.
 Array.free :: (arr: &[..] $T) {
-    arr.count = 0;
-    arr.capacity = 0;
+    arr.count = 0
+    arr.capacity = 0
 
-    if arr.data != null do raw_free(arr.allocator, arr.data);
-    arr.data = null;
+    if arr.data != null do raw_free(arr.allocator, arr.data)
+    arr.data = null
 }
 
 #overload
 builtin.delete :: macro (x: &[..] $T) {
-    Array.free(x);
+    Array.free(x)
 }
 
 Array.copy :: #match #locked {
     (arr: &[..] $T, allocator := context.allocator) -> [..] T {
-        new_arr : [..] T;
-        Array.init(&new_arr, arr.count, allocator);
-        new_arr.count = arr.count;
+        new_arr : [..] T
+        Array.init(&new_arr, arr.count, allocator)
+        new_arr.count = arr.count
 
-        for i in 0 .. arr.count do new_arr.data[i] = arr.data[i];
-        return new_arr;
+        for i in 0 .. arr.count do new_arr.data[i] = arr.data[i]
+        return new_arr
     },
 
     (arr: [] $T, allocator := context.allocator) -> [] T {
-        new_arr := builtin.make([] T, arr.count);
-        for i in 0 .. arr.count do new_arr.data[i] = arr.data[i];
-        return new_arr;
+        new_arr := builtin.make([] T, arr.count)
+        for i in 0 .. arr.count do new_arr.data[i] = arr.data[i]
+        return new_arr
     }
 }
 
 /// Copies a sub-array of a dynamic-array.
 ///
-///     arr := array.make(.[ 2, 3, 5, 7, 11 ]);
-///     sub := array.copy_range(&arr, 2 .. 5);
+///     arr := array.make(.[ 2, 3, 5, 7, 11 ])
+///     sub := array.copy_range(&arr, 2 .. 5)
 ///     println(sub); // 5, 7, 11
 Array.copy_range :: (arr: &[..] $T, r: range, allocator := context.allocator) -> [..] T {
-    new_arr : [..] T;
-    Array.init(&new_arr, r.high - r.low, allocator);
-    new_arr.count = r.high - r.low;
+    new_arr : [..] T
+    Array.init(&new_arr, r.high - r.low, allocator)
+    new_arr.count = r.high - r.low
 
-    for i in r do new_arr.data[i] = arr.data[i];
-    return new_arr;
+    for i in r do new_arr.data[i] = arr.data[i]
+    return new_arr
 }
 
 /// Clears a dynamic array.
 ///
 /// Note: This does not clear or free the memory for the dynamic array.
 Array.clear :: (arr: &[..] $T) {
-    arr.count = 0;
+    arr.count = 0
 }
 
 /// Resizes a dynamic array if it does not have enough capacity.
 ///
 /// If this procedure returns `true`, `arr.capacity` will be greater than or equal to `capacity`.
 Array.ensure_capacity :: (arr: &[..] $T, capacity: u32) -> bool {
-    if arr.capacity >= capacity do return true;
-    if arr.data == null do Array.init(arr);
+    if arr.capacity >= capacity do return true
+    if arr.data == null do Array.init(arr)
 
-    while capacity > arr.capacity do arr.capacity <<= 1;
-    new_data := raw_resize(arr.allocator, arr.data, sizeof T * arr.capacity);
-    if new_data == null do return false;
-    arr.data = new_data;
-    return true;
+    while capacity > arr.capacity do arr.capacity <<= 1
+    new_data := raw_resize(arr.allocator, arr.data, sizeof T * arr.capacity)
+    if new_data == null do return false
+    arr.data = new_data
+    return true
 }
 
 /// Appends a zeroed-element to the end of the array, and returns a pointer to it.
 Array.alloc_one :: (arr: &[..] $T) -> &T {
-    if !Array.ensure_capacity(arr, arr.count + 1) do return null;
-    arr.count += 1;
-    return &arr.data[arr.count - 1];
+    if !Array.ensure_capacity(arr, arr.count + 1) do return null
+    arr.count += 1
+    return &arr.data[arr.count - 1]
 }
 
 /// Appends `x` to the end of the array.
 Array.push :: (arr: &[..] $T, x: T) -> bool {
-    if !Array.ensure_capacity(arr, arr.count + 1) do return false;
-    arr.data[arr.count] = x;
-    arr.count += 1;
-    return true;
+    if !Array.ensure_capacity(arr, arr.count + 1) do return false
+    arr.data[arr.count] = x
+    arr.count += 1
+    return true
 }
 
 // Semi-useful shortcut for adding something to an array.
 #operator << macro (arr: [..] $T, v: T) {
-    Array.push(&arr, v);
+    Array.push(&arr, v)
 }
 
 
@@ -148,104 +148,104 @@ Array.insert :: #match #local {}
 
 #overload
 Array.insert :: (arr: &[..] $T, idx: u32, x: T) -> bool {
-    if idx > arr.count do return false;
-    if !Array.ensure_capacity(arr, arr.count + 1) do return false;
+    if idx > arr.count do return false
+    if !Array.ensure_capacity(arr, arr.count + 1) do return false
 
-    arr.count += 1;
+    arr.count += 1
     while i := arr.count; i > idx {
-        arr.data[i] = arr.data[i - 1];
-        i -= 1;
+        arr.data[i] = arr.data[i - 1]
+        i -= 1
     }
 
-    arr.data[idx] = x;
-    return true;
+    arr.data[idx] = x
+    return true
 }
 
 #overload
 Array.insert :: (arr: &[..] $T, idx: u32, new_arr: [] T) -> bool {
-    if idx > arr.count do return false;
-    if !Array.ensure_capacity(arr, arr.count + new_arr.count) do return false;
+    if idx > arr.count do return false
+    if !Array.ensure_capacity(arr, arr.count + new_arr.count) do return false
 
-    arr.count += new_arr.count;
+    arr.count += new_arr.count
     while i := arr.count; i > idx {
-        arr.data[i] = arr.data[i - new_arr.count];
-        i -= 1;
+        arr.data[i] = arr.data[i - new_arr.count]
+        i -= 1
     }
 
     for i in 0 .. new_arr.count {
-        arr.data[i + idx] = new_arr[i];
+        arr.data[i + idx] = new_arr[i]
     }
-    return true;
+    return true
 }
 
 /// Inserts a zeroed-element at `idx`.
 Array.insert_empty :: (arr: &[..] $T, idx: u32) -> bool {
-    if idx > arr.count do return false;
-    if !Array.ensure_capacity(arr, arr.count + 1) do return false;
+    if idx > arr.count do return false
+    if !Array.ensure_capacity(arr, arr.count + 1) do return false
 
-    arr.count += 1;
+    arr.count += 1
     while i := arr.count; i > idx {
-        arr.data[i] = arr.data[i - 1];
-        i -= 1;
+        arr.data[i] = arr.data[i - 1]
+        i -= 1
     }
 
-    return true;
+    return true
 }
 
 /// Removes all instances of `elem` from the array.
 ///
 /// Uses `==` to test for equality.
 Array.remove :: (arr: &[..] $T, elem: T) {
-    move := 0;
+    move := 0
 
     while i := 0; i < arr.count - move {
-        defer i += 1;
+        defer i += 1
 
         while i + move < arr.count && arr.data[i + move] == elem {
-            move += 1;
+            move += 1
         }
 
-        if move != 0 do arr.data[i] = arr.data[i + move];
+        if move != 0 do arr.data[i] = arr.data[i + move]
     }
 
-    arr.count -= move;
+    arr.count -= move
 }
 
 /// Removes the element at index `idx` from the array and returns it.
 ///
 /// Maintains order of the array.
 Array.delete :: (arr: &[..] $T, idx: u32) -> T {
-    if idx >= arr.count do return .{};
+    if idx >= arr.count do return .{}
 
-    to_return := arr.data[idx];
+    to_return := arr.data[idx]
     for i in idx .. arr.count - 1 {
-        arr.data[i] = arr.data[i + 1];
+        arr.data[i] = arr.data[i + 1]
     }
 
-    arr.count -= 1;
-    return to_return;
+    arr.count -= 1
+    return to_return
 }
 
 /// Removes the element at index `idx` from the array and returns it.
 ///
 /// Order is not guaranteed to be preserved.
 Array.fast_delete :: (arr: &[..] $T, idx: u32) -> T {
-    if idx >= arr.count do return .{};
+    if idx >= arr.count do return .{}
 
-    to_return := arr.data[idx];
-    if idx != arr.count - 1 do arr.data[idx] = arr.data[arr.count - 1];
-    arr.count -= 1;
+    to_return := arr.data[idx]
+    if idx != arr.count - 1 do arr.data[idx] = arr.data[arr.count - 1]
+    arr.count -= 1
 
-    return to_return;
+    return to_return
 }
 
 /// Removes `n` elements from the end of the array.
 Array.pop :: (arr: &[..] $T, n := 1) -> T {
-    if arr.count == 0 do return .{};
+    if arr.count == 0 do return .{}
 
-    c := core.math.min(n, arr.count);
-    arr.count -= n;
-    return arr.data[arr.count];
+    c := core.math.min(n, arr.count)
+    arr.count -= n
+    return arr.data[arr.count]
 }
 
 
@@ -254,50 +254,50 @@ Array.concat :: #match #local {}
 
 #overload
 Array.concat :: (arr: &[..] $T, other: [] T) {
-    if !Array.ensure_capacity(arr, arr.count + other.count) do return;
+    if !Array.ensure_capacity(arr, arr.count + other.count) do return
 
-    core.memory.copy(arr.data + arr.count, other.data, other.count * sizeof T);
-    arr.count += other.count;
+    core.memory.copy(arr.data + arr.count, other.data, other.count * sizeof T)
+    arr.count += other.count
 }
 
 #overload
 Array.concat :: (arr: &[..] $T, other: Iterator(T)) {
     for other {
-        Array.push(arr, it);
+        Array.push(arr, it)
     }
 }
 
 /// Removes all elements for which the given predicate does not hold.
 ///
-///     arr := array.make(.[ 1, 2, 3, 4, 5 ]);
-///     array.filter(&arr, [v](v % 2 == 0));
+///     arr := array.make(.[ 1, 2, 3, 4, 5 ])
+///     array.filter(&arr, [v](v % 2 == 0))
 ///     println(arr); // 2, 4
 Array.filter :: macro (arr: &[..] $T, body: Code) {
-    move := 0;
+    move := 0
 
     while i := 0; i < arr.count - move {
-        defer i += 1;
+        defer i += 1
 
         while i + move < arr.count {
-            it := arr.data[i + move];
-            if #unquote body(it) do break;
-            move += 1;
+            it := arr.data[i + move]
+            if #unquote body(it) do break
+            move += 1
         }
 
-        if move != 0 do arr.data[i] = arr.data[i + move];
+        if move != 0 do arr.data[i] = arr.data[i + move]
     }
 
-    arr.count -= move;
+    arr.count -= move
 }
 
 
 /// Useful structure when talking about dynamic arrays where you don't know of what
 /// type they store. For example, when passing a dynamic array as an 'any' argument.
 Untyped_Array :: struct {
-    data: rawptr;
-    count: u32;
-    capacity: u32;
-    allocator: Allocator;
+    data: rawptr
+    count: u32
+    capacity: u32
+    allocator: Allocator
 }
 
 

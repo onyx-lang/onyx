@@ -5,77 +5,77 @@ PART :: 2
 use core {*}
 
 read_binary :: (r: &io.Reader) -> i32 {
-    n := 0;
+    n := 0
 
-    io.skip_whitespace(r);
+    io.skip_whitespace(r)
 
-    curr, err := io.peek_byte(r);
-    if err != .None do return n;
+    curr, err := io.peek_byte(r)
+    if err != .None do return n
     while curr == '0' || curr == '1' {
-        n *= 2;
+        n *= 2
         n += cast(u32) (curr - '0'); 
 
-        r.start += 1;
-        curr, err = io.peek_byte(r);
-        if err != .None || r.start == r.end do break;
+        r.start += 1
+        curr, err = io.peek_byte(r)
+        if err != .None || r.start == r.end do break
     }
 
-    return n;
+    return n
 }
 
 main :: (args) => {
     BITS :: 12
 
-    use file := os.open("./tests/aoc-2021/input/day03.txt")->unwrap();
-    use reader := io.reader_make(&file);
+    use file := os.open("./tests/aoc-2021/input/day03.txt")->unwrap()
+    use reader := io.reader_make(&file)
 
-    nums: [..] i32;
+    nums: [..] i32
     while !io.reader_empty(&reader) {
-        nums << read_binary(&reader);
+        nums << read_binary(&reader)
     }
 
-    num1 := 0;
+    num1 := 0
     for BITS {
-        one_count := 0;
+        one_count := 0
         for num in nums {
-            if num & (1 << it) != 0 do one_count += 1;
+            if num & (1 << it) != 0 do one_count += 1
         }
 
-        if one_count >= (nums.count / 2) do num1 |= (1 << it);
+        if one_count >= (nums.count / 2) do num1 |= (1 << it)
     }
 
-    num2 := ((1 << BITS) - 1) & (~num1);
+    num2 := ((1 << BITS) - 1) & (~num1)
 
-    printf("Part 1: {}\n", num1 * num2);
+    printf("Part 1: {}\n", num1 * num2)
 
-    oxygen_array := array.copy(&nums);
-    co2_array    := array.copy(&nums);
+    oxygen_array := array.copy(&nums)
+    co2_array    := array.copy(&nums)
 
     filter_array :: macro (arr: [..] i32, index: i32, comparison: Code) {
-        A := 0;
-        B := (arr.count + 1) / 2;
+        A := 0
+        B := (arr.count + 1) / 2
 
         // Count the number of ones
         for arr {
-            if (it & (1 << index)) != 0 do A += 1;
+            if (it & (1 << index)) != 0 do A += 1
         }
 
-        expected := (1 << index) if (#unquote comparison) else 0;
+        expected := (1 << index) if (#unquote comparison) else 0
 
         while i := 0; i < arr.count {
-            defer i += 1;
+            defer i += 1
 
             if (arr[i] & (1 << index)) != expected {
-                array.fast_delete(&arr, i);
-                i -= 1;
+                array.fast_delete(&arr, i)
+                i -= 1
             }
         }
     }
 
     for iter.as_iter(range.{ BITS - 1, 0, -1 }) {
-        filter_array(oxygen_array, it, [](A >= B));
-        filter_array(co2_array,    it, [](A <  B));
+        filter_array(oxygen_array, it, [](A >= B))
+        filter_array(co2_array,    it, [](A <  B))
     }
 
-    printf("Part 2: {}\n", oxygen_array[0] * co2_array[0]);
+    printf("Part 2: {}\n", oxygen_array[0] * co2_array[0])
 }

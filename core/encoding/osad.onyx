@@ -25,130 +25,130 @@ serialize :: #match #local {}
 
 #overload
 serialize :: (v: any) -> ? [] u8 {
-    writer, stream := io.string_builder();
-    defer cfree(stream);
+    writer, stream := io.string_builder()
+    defer cfree(stream)
 
     if !serialize(any.{v.data, v.type}, &writer) {
-        delete(stream);
-        return .{};
+        delete(stream)
+        return .{}
     }
 
-    return str.as_str(stream);
+    return str.as_str(stream)
 }
 
 #overload
 serialize :: (v: any, w: &io.Writer) -> bool {
-    info := type_info.get_type_info(v.type);
+    info := type_info.get_type_info(v.type)
 
     switch info.kind {
         // Cannot serialize a pointer.
         case .Pointer {
-            log(.Debug, "Core", "OSAD: Cannot serialize a pointer.");
-            return false;
+            log(.Debug, "Core", "OSAD: Cannot serialize a pointer.")
+            return false
         }
 
         case .Basic {
             if v.type == rawptr {
-                log(.Debug, "Core", "OSAD: Cannot serialize a pointer.");
-                return false;
+                log(.Debug, "Core", "OSAD: Cannot serialize a pointer.")
+                return false
             }
 
             // Output the raw bytes of the primitive type.
-            io.write_str(w, str.{ v.data, info.size });
+            io.write_str(w, str.{ v.data, info.size })
         }
 
         case .Function {
-            log(.Debug, "Core", "OSAD: Cannot serialize a function.");
-            return false;
+            log(.Debug, "Core", "OSAD: Cannot serialize a function.")
+            return false
         }
 
         case .Array {
-            a_info := cast(&type_info.Type_Info_Array, info);
+            a_info := cast(&type_info.Type_Info_Array, info)
 
-            base: [&] u8 = ~~v.data;
-            elem_size := type_info.size_of(a_info.of);
+            base: [&] u8 = ~~v.data
+            elem_size := type_info.size_of(a_info.of)
 
             for a_info.count {
-                try(serialize(any.{base + elem_size * it, a_info.of}, w));
+                try(serialize(any.{base + elem_size * it, a_info.of}, w))
             }
         }
 
         case .Slice, .Dynamic_Array {
             if v.type == str {
-                untyped_slice := cast(&array.Untyped_Array, v.data);
-                base: [&] u8 = untyped_slice.data;
-                count:       = untyped_slice.count;
-                output_u32(w, count);
-                io.write_str(w, str.{ base, count });
-                break;
+                untyped_slice := cast(&array.Untyped_Array, v.data)
+                base: [&] u8 = untyped_slice.data
+                count:       = untyped_slice.count
+                output_u32(w, count)
+                io.write_str(w, str.{ base, count })
+                break
             }
 
-            s_info := cast(&type_info.Type_Info_Slice, info);
+            s_info := cast(&type_info.Type_Info_Slice, info)
 
-            untyped_slice := cast(&array.Untyped_Array, v.data);
-            base: [&] u8 = untyped_slice.data;
-            count:       = untyped_slice.count;
-            elem_size := type_info.size_of(s_info.of);
+            untyped_slice := cast(&array.Untyped_Array, v.data)
+            base: [&] u8 = untyped_slice.data
+            count:       = untyped_slice.count
+            elem_size := type_info.size_of(s_info.of)
 
-            output_u32(w, count);
+            output_u32(w, count)
             for count {
-                try(serialize(any.{base + elem_size * it, s_info.of}, w));
+                try(serialize(any.{base + elem_size * it, s_info.of}, w))
             }
         }
 
         case .Enum {
-            e_info := cast(&type_info.Type_Info_Enum, info);
-            try(serialize(any.{ v.data, e_info.backing_type }, w));
+            e_info := cast(&type_info.Type_Info_Enum, info)
+            try(serialize(any.{ v.data, e_info.backing_type }, w))
         }
 
         case .Distinct {
-            d_info := cast(&type_info.Type_Info_Distinct, info);
-            try(serialize(any.{ v.data, d_info.base_type }, w));
+            d_info := cast(&type_info.Type_Info_Distinct, info)
+            try(serialize(any.{ v.data, d_info.base_type }, w))
         }
 
         case .Struct {
-            s_info := cast(&type_info.Type_Info_Struct, info);
+            s_info := cast(&type_info.Type_Info_Struct, info)
 
-            base: [&] u8 = ~~v.data;
+            base: [&] u8 = ~~v.data
 
             for& member in s_info.members {
-                try(serialize(any.{ base + member.offset, member.type }, w));
+                try(serialize(any.{ base + member.offset, member.type }, w))
             }
         }
 
         case .Union {
-            u_info := cast(&type_info.Type_Info_Union, info);
+            u_info := cast(&type_info.Type_Info_Union, info)
 
-            base: [&] u8 = ~~v.data;
+            base: [&] u8 = ~~v.data
 
-            tag_value: u64;
+            tag_value: u64
             switch e := u_info.tag_enum->info()->as_enum(); e.backing_type {
-                case i8,  u8  do tag_value = cast(u64) *(cast(&u8) v.data);
-                case i16, u16 do tag_value = cast(u64) *(cast(&u16) v.data);
-                case i32, u32 do tag_value = cast(u64) *(cast(&u32) v.data);
-                case i64, u64 do tag_value = cast(u64) *(cast(&u64) v.data);
-                case _ do assert(false, "Bad union backing type");
+                case i8,  u8  do tag_value = cast(u64) *(cast(&u8) v.data)
+                case i16, u16 do tag_value = cast(u64) *(cast(&u16) v.data)
+                case i32, u32 do tag_value = cast(u64) *(cast(&u32) v.data)
+                case i64, u64 do tag_value = cast(u64) *(cast(&u64) v.data)
+                case _ do assert(false, "Bad union backing type")
             }
 
-            variant := array.first(u_info.variants, [x](x.tag_value == ~~tag_value));
+            variant := array.first(u_info.variants, [x](x.tag_value == ~~tag_value))
 
             if !variant {
-                output_u32(w, 0xffffffff);
-                break;
+                output_u32(w, 0xffffffff)
+                break
             }
 
-            output_u32(w, ~~tag_value);
+            output_u32(w, ~~tag_value)
 
-            try(serialize(any.{ base + u_info.alignment, variant.type }, w));
+            try(serialize(any.{ base + u_info.alignment, variant.type }, w))
         }
     }
 
-    return true;
+    return true
 
 
     output_u32 :: macro (w: &io.Writer, i: u32) {
-        v: u32 = i;
-        io.write_str(w, str.{ ~~&v, 4 });
+        v: u32 = i
+        io.write_str(w, str.{ ~~&v, 4 })
     }
 }
 
@@ -161,127 +161,127 @@ deserialize :: #match #local {}
 
 #overload
 deserialize :: ($T: type_expr, s: str, allocator := context.allocator) -> ?T {
-    reader, stream := io.reader_from_string(s);
-    defer cfree(stream);
+    reader, stream := io.reader_from_string(s)
+    defer cfree(stream)
 
-    target: T;
+    target: T
     if !deserialize(&target, T, &reader, allocator) {
         // This could leak memory if we partially deserialized something.
-        return .{};
+        return .{}
     }
 
-    return target;
+    return target
 }
 
 #overload
 deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := context.allocator) -> bool {
-    info := type_info.get_type_info(type);
+    info := type_info.get_type_info(type)
 
     switch info.kind {
         case .Pointer {
-            log(.Debug, "Core", "OSAD: Cannot deserialize a pointer.");
-            return false;
+            log(.Debug, "Core", "OSAD: Cannot deserialize a pointer.")
+            return false
         }
 
         case .Function {
-            log(.Debug, "Core", "OSAD: Cannot deserialize a function.");
-            return false;
+            log(.Debug, "Core", "OSAD: Cannot deserialize a function.")
+            return false
         }
 
         case .Basic {
-            err := io.read_fill_buffer(r, .{ target, info.size });
-            // if err != .None do logf(.Warning, "Deserialize hit end of file.");
-            return err == .None;
+            err := io.read_fill_buffer(r, .{ target, info.size })
+            // if err != .None do logf(.Warning, "Deserialize hit end of file.")
+            return err == .None
         }
 
         case .Enum {
-            e_info := cast(&type_info.Type_Info_Enum, info);
-            try(deserialize(target, e_info.backing_type, r, allocator));
+            e_info := cast(&type_info.Type_Info_Enum, info)
+            try(deserialize(target, e_info.backing_type, r, allocator))
         }
 
         case .Distinct {
-            d_info := cast(&type_info.Type_Info_Distinct, info);
-            try(deserialize(target, d_info.base_type, r, allocator));
+            d_info := cast(&type_info.Type_Info_Distinct, info)
+            try(deserialize(target, d_info.base_type, r, allocator))
         }
 
         case .Array {
-            a_info := cast(&type_info.Type_Info_Array, info);
+            a_info := cast(&type_info.Type_Info_Array, info)
 
-            base: [&] u8 = target;
-            elem_size := type_info.size_of(a_info.of);
+            base: [&] u8 = target
+            elem_size := type_info.size_of(a_info.of)
 
             for a_info.count {
-                try(deserialize(base + it * elem_size, a_info.of, r, allocator));
+                try(deserialize(base + it * elem_size, a_info.of, r, allocator))
             }
         }
 
         case .Slice, .Dynamic_Array {
-            s_info := cast(&type_info.Type_Info_Slice, info);
-            elem_size := type_info.size_of(s_info.of);
+            s_info := cast(&type_info.Type_Info_Slice, info)
+            elem_size := type_info.size_of(s_info.of)
 
-            count := read_u32(r);
+            count := read_u32(r)
 
-            untyped_slice := cast(&array.Untyped_Array, target);
-            untyped_slice.count = count;
-            untyped_slice.data = raw_alloc(allocator, elem_size * count);
-            memory.set(untyped_slice.data, 0, elem_size * count);
+            untyped_slice := cast(&array.Untyped_Array, target)
+            untyped_slice.count = count
+            untyped_slice.data = raw_alloc(allocator, elem_size * count)
+            memory.set(untyped_slice.data, 0, elem_size * count)
 
             if info.kind == .Dynamic_Array {
-                untyped_slice.capacity = count;
-                untyped_slice.allocator = allocator;
+                untyped_slice.capacity = count
+                untyped_slice.allocator = allocator
             }
 
-            base: [&] u8 = untyped_slice.data;
+            base: [&] u8 = untyped_slice.data
 
             for count {
-                try(deserialize(base + it * elem_size, s_info.of, r, allocator));
+                try(deserialize(base + it * elem_size, s_info.of, r, allocator))
             }
         }
 
         case .Struct {
-            s_info := cast(&type_info.Type_Info_Struct, info);
+            s_info := cast(&type_info.Type_Info_Struct, info)
 
-            base: [&] u8 = target;
+            base: [&] u8 = target
 
             for& member in s_info.members {
-                try(deserialize(base + member.offset, member.type, r, allocator));
+                try(deserialize(base + member.offset, member.type, r, allocator))
             }
         }
 
         case .Union {
-            u_info := cast(&type_info.Type_Info_Union, info);
+            u_info := cast(&type_info.Type_Info_Union, info)
 
-            base: [&] u8 = target;
-            variant_value := read_u32(r);
-            variant := array.first(u_info.variants, [x](x.tag_value == ~~variant_value));
+            base: [&] u8 = target
+            variant_value := read_u32(r)
+            variant := array.first(u_info.variants, [x](x.tag_value == ~~variant_value))
             if !variant {
-                memory.set(target, 0, u_info.size);
-                break;
+                memory.set(target, 0, u_info.size)
+                break
             }
 
             switch e := u_info.tag_enum->info()->as_enum(); e.backing_type {
-                case i8,  u8  do *(cast(&u8)  target) = ~~variant_value;
-                case i16, u16 do *(cast(&u16) target) = ~~variant_value;
-                case i32, u32 do *(cast(&u32) target) = ~~variant_value;
-                case i64, u64 do *(cast(&u64) target) = ~~variant_value;
-                case _ do assert(false, "Bad union backing type");
+                case i8,  u8  do *(cast(&u8)  target) = ~~variant_value
+                case i16, u16 do *(cast(&u16) target) = ~~variant_value
+                case i32, u32 do *(cast(&u32) target) = ~~variant_value
+                case i64, u64 do *(cast(&u64) target) = ~~variant_value
+                case _ do assert(false, "Bad union backing type")
             }
 
-            try(deserialize(base + u_info.alignment, variant.type, r));
+            try(deserialize(base + u_info.alignment, variant.type, r))
         }
     }
 
-    return true;
+    return true
 
     read_u32 :: macro (r: &io.Reader) -> u32 {
-        dest: u32;
-        io.read_fill_buffer(r, str.{~~&dest, 4});
-        return dest;
+        dest: u32
+        io.read_fill_buffer(r, str.{~~&dest, 4})
+        return dest
     }
 }
 
 
 #local
 try :: macro (x: $T) {
-    if !x do return false;
+    if !x do return false
 }

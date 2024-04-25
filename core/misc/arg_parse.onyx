@@ -11,15 +11,15 @@ use runtime
 ///
 ///     Options :: struct {
 ///         @"--option_1"
-///         option_1: str;
+///         option_1: str
 ///     
 ///         @"--option_2", "-o2"
-///         option_2: bool;
+///         option_2: bool
 ///     }
 ///     
 ///     main :: (args) => {
-///         o: Options;
-///         arg_parse.arg_parse(args, &o);
+///         o: Options
+///         arg_parse.arg_parse(args, &o)
 ///     }
 ///
 /// Options that are strings and integers expect an argument after
@@ -27,55 +27,55 @@ use runtime
 /// false and are true if one or more of the option values are present.
 arg_parse :: (c_args: [] cstr, output: any) -> bool {
     arg_iter := iter.as_iter(c_args) |>
-                iter.map(string.from_cstr);
-    defer arg_iter.close(arg_iter.data);
+                iter.map(string.from_cstr)
+    defer arg_iter.close(arg_iter.data)
 
-    use runtime.info {*};
+    use runtime.info {*}
 
-    ptr_type := cast(&Type_Info_Pointer) get_type_info(output.type);
-    if ptr_type.kind != .Pointer do return false;
+    ptr_type := cast(&Type_Info_Pointer) get_type_info(output.type)
+    if ptr_type.kind != .Pointer do return false
 
-    arg_type := cast(&Type_Info_Struct) get_type_info(ptr_type.to);
-    if arg_type.kind != .Struct do return false;
+    arg_type := cast(&Type_Info_Struct) get_type_info(ptr_type.to)
+    if arg_type.kind != .Struct do return false
 
-    data_base := *cast(&rawptr) output.data;
+    data_base := *cast(&rawptr) output.data
 
     for #no_close arg in arg_iter {
         for &member in arg_type.members {
             for &tag in member.tags {
-                if tag.type != str do continue;
+                if tag.type != str do continue
 
-                to_match := *cast(&str) tag.data;
-                if arg != to_match do continue;
+                to_match := *cast(&str) tag.data
+                if arg != to_match do continue
 
                 switch member.type {
                     case bool {
-                        *(cast(&bool) (cast([&] u8) data_base + member.offset)) = !*(cast(&bool) (cast([&] u8) data_base + member.offset));
+                        *(cast(&bool) (cast([&] u8) data_base + member.offset)) = !*(cast(&bool) (cast([&] u8) data_base + member.offset))
                     }
 
                     case i32 {
-                        value_str := iter.next(arg_iter);
-                        if !value_str do return false;
+                        value_str := iter.next(arg_iter)
+                        if !value_str do return false
 
-                        value := conv.str_to_i64(value_str->unwrap());
-                        *(cast(&i32) (cast([&] u8) data_base + member.offset)) = ~~value;
+                        value := conv.str_to_i64(value_str->unwrap())
+                        *(cast(&i32) (cast([&] u8) data_base + member.offset)) = ~~value
                     }
 
                     case str {
-                        value := iter.next(arg_iter);
-                        if !value do return false;
+                        value := iter.next(arg_iter)
+                        if !value do return false
 
-                        *(cast(&str) (cast([&] u8) data_base + member.offset)) = value->unwrap();
+                        *(cast(&str) (cast([&] u8) data_base + member.offset)) = value->unwrap()
                     }
 
                     case _ {
-                        printf("Unsupported argument type, {}.\n", output.type);
-                        return false;
+                        printf("Unsupported argument type, {}.\n", output.type)
+                        return false
                     }
                 }
             }
         }
     }
 
-    return true;
+    return true
 }

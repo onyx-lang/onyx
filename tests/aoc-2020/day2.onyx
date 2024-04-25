@@ -5,35 +5,35 @@ package main
 use core {*}
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./input/day2.txt";
-    reader, stream := io.reader_from_string(contents);
-    defer cfree(stream);
+    contents := #file_contents "./input/day2.txt"
+    reader, stream := io.reader_from_string(contents)
+    defer cfree(stream)
 
-    valid := 0;
+    valid := 0
 
     while !io.reader_empty(&reader) {
-        lo := io.read_u32(&reader);
+        lo := io.read_u32(&reader)
 
-        io.read_byte(&reader);
-        hi := io.read_u32(&reader);
+        io.read_byte(&reader)
+        hi := io.read_u32(&reader)
 
-        io.read_byte(&reader);
-        ch := io.read_byte(&reader);
+        io.read_byte(&reader)
+        ch := io.read_byte(&reader)
 
-        io.skip_bytes(&reader, 2);
-        pw := io.read_line(&reader);
+        io.skip_bytes(&reader, 2)
+        pw := io.read_line(&reader)
 
         // Part 1
-        // count := 0;
-        // for c in pw do if c == ch do count += 1;
-        // if count >= lo && count <= hi do valid += 1;
+        // count := 0
+        // for c in pw do if c == ch do count += 1
+        // if count >= lo && count <= hi do valid += 1
 
         // Part 2
-        count := 0;
-        if pw[lo - 1] == ch do count += 1;
-        if pw[hi - 1] == ch do count += 1;
-        if count == 1 do valid += 1;
+        count := 0
+        if pw[lo - 1] == ch do count += 1
+        if pw[hi - 1] == ch do count += 1
+        if count == 1 do valid += 1
     }
 
-    printf("Number valid: {}\n", valid);
+    printf("Number valid: {}\n", valid)
 }

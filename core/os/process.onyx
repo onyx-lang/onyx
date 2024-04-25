@@ -1,7 +1,7 @@
 package core.os
 
 #if !runtime.platform.Supports_Processes {
-    #error "Cannot include this file. Platform not supported.";
+    #error "Cannot include this file. Platform not supported."
 }
 
 use core {Pair, cptr, Result, tprintf}
@@ -21,17 +21,17 @@ use runtime.platform {
 
 /// Represents a spawned OS process.
 Process :: struct {
-    use stream: io.Stream;
-    process_handle: ProcessData;
+    use stream: io.Stream
+    process_handle: ProcessData
 }
 
 /// Represents options for process creation.
 ProcessSpawnOpts :: struct {
-    capture_io: bool;
+    capture_io: bool
     non_blocking_io: bool; 
     detach: bool; // setsid on linux
-    dir: str;
-    environment: [] Pair(str, str);
+    dir: str
+    environment: [] Pair(str, str)
 }
 
 /// Spawns a new OS process. This operation is always assumed to succeed.
@@ -47,81 +47,81 @@ process_spawn :: (path: str, args: [] str, non_blocking_io := false, starting_di
         detach = false,
         dir = starting_directory,
         environment = .{},
-    };
+    }
 
-    return process_spawn(path, args, &opts);
+    return process_spawn(path, args, &opts)
 }
 
 #overload
 process_spawn :: (path: str, args: [] str, opts: &ProcessSpawnOpts) -> Process {
-    env_data := null;
+    env_data := null
     if opts.environment {
-        env: [..] cptr(u8);
+        env: [..] cptr(u8)
         for &e in opts.environment {
-            key_value := tprintf("{}={}\0", e.first, e.second);
-            env << cptr.make(key_value.data);
+            key_value := tprintf("{}={}\0", e.first, e.second)
+            env << cptr.make(key_value.data)
         }
-        env << .{ 0 };
+        env << .{ 0 }
 
-        env_data = env.data;
+        env_data = env.data
     }
 
-    handle := __process_spawn(path, args, env_data, opts);
+    handle := __process_spawn(path, args, env_data, opts)
 
     return .{
         .{ &process_stream_vtable },
         handle,
-    };
+    }
 }
 
 /// Force kills a subprocess.
 process_kill :: (use p: &Process) -> bool {
-    return __process_kill(process_handle);
+    return __process_kill(process_handle)
 }
 
 /// Waits for a process to exit.
 process_wait :: (use p: &Process) => {
-    return __process_wait(process_handle);
+    return __process_wait(process_handle)
 }
 
 /// Frees internal resources used by a process. Should be called after process_kill or process_wait.
 process_destroy :: (use p: &Process) => {
-    __process_destroy(process_handle);
+    __process_destroy(process_handle)
 }
 
 #local Process_Read_Error :: enum {
-    None         :: 0x00;
-    Process_Dead :: 0x01;
+    None         :: 0x00
+    Process_Dead :: 0x01
     Unknown      :: 0x02; 
 }
 
 #local process_stream_vtable := io.Stream_Vtable.{
     read = (use p: &Process, buffer: [] u8) -> Result(u32, io.Error) {
         // Read from the process stdout
-        if cast(i64) process_handle == 0 do return .{ Err = .BadFile };
+        if cast(i64) process_handle == 0 do return .{ Err = .BadFile }
 
-        bytes_read := __process_read(process_handle, buffer);
+        bytes_read := __process_read(process_handle, buffer)
         if bytes_read < 0 {
             switch cast(Process_Read_Error) -bytes_read {
-                case .None do return .{ Ok = 0 };
-                case .Process_Dead do return .{ Err = .EOF };
-                case .Unknown do return .{ Err = .BadFile };
+                case .None do return .{ Ok = 0 }
+                case .Process_Dead do return .{ Err = .EOF }
+                case .Unknown do return .{ Err = .BadFile }
             }
         }
-        return .{ Ok = bytes_read };
+        return .{ Ok = bytes_read }
     },
 
     write = (use p: &Process, buffer: [] u8) -> Result(u32, io.Error) {
         // Write to the process stdin
-        if cast(i64) process_handle == 0 do return .{ Err = .BadFile };
+        if cast(i64) process_handle == 0 do return .{ Err = .BadFile }
 
-        bytes_written := __process_write(process_handle, buffer);
-        return .{ Ok = bytes_written };
+        bytes_written := __process_write(process_handle, buffer)
+        return .{ Ok = bytes_written }
     },
 
     close = (use p: &Process) -> io.Error {
-        process_kill(p);
-        return .None;
+        process_kill(p)
+        return .None
     }
 }
 
@@ -129,16 +129,16 @@ process_destroy :: (use p: &Process) => {
 ///
 /// This is not the best format for this data, as it is impossible to get the exit status.
 ProcessResult :: enum {
-    Success     :: 0x00;
-    FailedToRun :: 0x01;
-    Error       :: 0x02;
-    InternalErr :: 0x03;
+    Success     :: 0x00
+    FailedToRun :: 0x01
+    Error       :: 0x02
+    InternalErr :: 0x03
 }
 
 /// Represents the exit state and output of a process.
 ProcessResultOutput :: struct {
-    result: ProcessResult;
-    output: str;
+    result: ProcessResult
+    output: str
 }
 
 
@@ -148,13 +148,13 @@ ProcessResultOutput :: struct {
 
 /// Stores configuration used by the builder pattern for processes.
 Command :: struct {
-    _path: str;
-    _args: [..] str;
-    _env: [..] Pair(str, str);
-    _dir: str;
+    _path: str
+    _args: [..] str
+    _env: [..] Pair(str, str)
+    _dir: str
 
-    _process: ? Process;
-    _opts: ProcessSpawnOpts;
+    _process: ? Process
+    _opts: ProcessSpawnOpts
 }
 
 /// Produces a new `Command` for the process builder.
@@ -162,94 +162,94 @@ Command :: struct {
 ///     os.command()
 ///         ->path("executable_path")
 ///         ->args(.["argument", "list"])
-///         ->run();
+///         ->run()
 command :: () -> &Command {
-    return new(Command);
+    return new(Command)
 }
 
 /// Sets the path of the command.
 Command.path :: (cmd: &Command, path: str) -> &Command {
-    cmd._path = path;
-    return cmd;
+    cmd._path = path
+    return cmd
 }
 
 /// Appends arguments to the argument array of the command.
 Command.args :: (cmd: &Command, args: [] str) -> &Command {
-    array.concat(&cmd._args, args);
-    return cmd;
+    array.concat(&cmd._args, args)
+    return cmd
 }
 
 /// Sets an environment variable.
 Command.env :: (cmd: &Command, key, value: str) -> &Command {
-    cmd._env << .{ key, value };
-    return cmd;
+    cmd._env << .{ key, value }
+    return cmd
 }
 
 /// Sets the working directory of the command.
 Command.dir :: (cmd: &Command, dir: str) -> &Command {
-    cmd._dir = dir;
-    return cmd;
+    cmd._dir = dir
+    return cmd
 }
 
 /// Runs the command, wait until it completes, and capture output.
 Command.output :: (cmd: &Command) -> Result(str, ProcessResultOutput) {
     if !cmd._process {
-        cmd._opts.capture_io = true;
-        cmd._opts.non_blocking_io = false;
-        cmd._opts.detach = false;
+        cmd._opts.capture_io = true
+        cmd._opts.non_blocking_io = false
+        cmd._opts.detach = false
 
-        cmd->start();
-        if !cmd._process do return .{ Err = .{ .Error, "Failed to spawn process" } };
+        cmd->start()
+        if !cmd._process do return .{ Err = .{ .Error, "Failed to spawn process" } }
     }
 
-    r := io.reader_make(cmd._process->unwrap_ptr());
-    output := io.read_all(&r);
-    io.reader_free(&r);
+    r := io.reader_make(cmd._process->unwrap_ptr())
+    output := io.read_all(&r)
+    io.reader_free(&r)
 
-    res := cmd->wait();
+    res := cmd->wait()
     if res != .Success {
-        return .{ Err = .{ res, output } };
+        return .{ Err = .{ res, output } }
     }
 
-    return .{ Ok = output };
+    return .{ Ok = output }
 }
 
 /// Runs the command and waits until it completes.
 Command.run :: (cmd: &Command) -> ProcessResult {
-    cmd->start();
-    return cmd->wait();
+    cmd->start()
+    return cmd->wait()
 }
 
 /// Starts the command with the mapped I/O.
 Command.start_with_output :: (cmd: &Command) -> &Command {
-    cmd._opts.capture_io = true;
-    return cmd->start();
+    cmd._opts.capture_io = true
+    return cmd->start()
 }
 
 /// Starts the command.
 Command.start :: (cmd: &Command) -> &Command {
-    cmd._opts.environment = cmd._env;
-    cmd._opts.dir = cmd._dir;
+    cmd._opts.environment = cmd._env
+    cmd._opts.dir = cmd._dir
 
-    cmd._process = process_spawn(cmd._path, cmd._args, &cmd._opts);
-    return cmd;
+    cmd._process = process_spawn(cmd._path, cmd._args, &cmd._opts)
+    return cmd
 }
 
 /// Wait for the command to complete.
 Command.wait :: (cmd: &Command) -> ProcessResult {
-    if !cmd._process do return .Error;
+    if !cmd._process do return .Error
 
-    res := process_wait(cmd._process->unwrap_ptr());
-    process_destroy(cmd._process->unwrap_ptr());
+    res := process_wait(cmd._process->unwrap_ptr())
+    process_destroy(cmd._process->unwrap_ptr())
 
-    cmd->destroy();
-    return res;
+    cmd->destroy()
+    return res
 }
 
 /// Destroys all internal information of a command. Automatically called by `Command.wait`.
 Command.destroy :: (cmd: &Command) {
-    delete(&cmd._args);
-    delete(&cmd._env);
-    cfree(cmd);
+    delete(&cmd._args)
+    delete(&cmd._env)
+    cfree(cmd)
 }
 

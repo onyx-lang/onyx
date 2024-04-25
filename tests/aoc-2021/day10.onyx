@@ -3,70 +3,70 @@
 use core {*}
 
 main :: (args) => {
-    use file := os.open("./tests/aoc-2021/input/day10.txt")->unwrap();
-    use reader := io.reader_make(&file);
+    use file := os.open("./tests/aoc-2021/input/day10.txt")->unwrap()
+    use reader := io.reader_make(&file)
 
-    bracket_map: Map(u8, u8);
-    bracket_map['('] = ')';
-    bracket_map['['] = ']';
-    bracket_map['{'] = '}';
-    bracket_map['<'] = '>';
+    bracket_map: Map(u8, u8)
+    bracket_map['('] = ')'
+    bracket_map['['] = ']'
+    bracket_map['{'] = '}'
+    bracket_map['<'] = '>'
 
-    score_map: Map(u8, u32);
-    score_map[')'] = 3;
-    score_map[']'] = 57;
-    score_map['}'] = 1197;
-    score_map['>'] = 25137;
+    score_map: Map(u8, u32)
+    score_map[')'] = 3
+    score_map[']'] = 57
+    score_map['}'] = 1197
+    score_map['>'] = 25137
 
-    corrupted_score := 0;
-    completion_scores: [..] u64;
+    corrupted_score := 0
+    completion_scores: [..] u64
     while !io.reader_empty(&reader) {
-        line := io.read_line(&reader, consume_newline=false, inplace=true);
-        io.skip_whitespace(&reader);
+        line := io.read_line(&reader, consume_newline=false, inplace=true)
+        io.skip_whitespace(&reader)
 
-        char_stack: [..] u8;
-        defer array.free(&char_stack);
+        char_stack: [..] u8
+        defer array.free(&char_stack)
         for ch in line {
             switch ch {
                 case '(', '[', '<', '{' {
-                    char_stack << bracket_map[ch]->unwrap();
+                    char_stack << bracket_map[ch]->unwrap()
                 }
 
                 case ')', ']', '>', '}' {
-                    x := array.pop(&char_stack);
+                    x := array.pop(&char_stack)
                     if x != ch {
-                        // printf("Expected '{}', found '{}' instead.\n", x, ch);
-                        corrupted_score += score_map[ch]->unwrap();
-                        continue continue;
+                        // printf("Expected '{}', found '{}' instead.\n", x, ch)
+                        corrupted_score += score_map[ch]->unwrap()
+                        continue continue
                     }
                 }
             }
         }
 
-        assert(char_stack.count != 0, "Invalid input.");
+        assert(char_stack.count != 0, "Invalid input.")
 
-        complete_score: u64 = 0;
+        complete_score: u64 = 0
         while char_stack.count != 0 {
-            complete_score *= 5;
+            complete_score *= 5
             switch array.pop(&char_stack) {
-                case ')' do complete_score += 1;
-                case ']' do complete_score += 2;
-                case '}' do complete_score += 3;
-                case '>' do complete_score += 4;
+                case ')' do complete_score += 1
+                case ']' do complete_score += 2
+                case '}' do complete_score += 3
+                case '>' do complete_score += 4
             }
         }
 
-        completion_scores << complete_score;
+        completion_scores << complete_score
     }
 
-    printf("Part 1: {}\n", corrupted_score);
+    printf("Part 1: {}\n", corrupted_score)
 
     array.quicksort(completion_scores, (x, y) => {
-        if x == y do return 0;
-        if x < y do return -1;
-        return 1;
-    });
+        if x == y do return 0
+        if x < y do return -1
+        return 1
+    })
 
-    println(completion_scores);
-    printf("Part 2: {}\n", completion_scores[completion_scores.count / 2]);
+    println(completion_scores)
+    printf("Part 2: {}\n", completion_scores[completion_scores.count / 2])
 }

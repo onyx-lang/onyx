@@ -19,54 +19,54 @@ use core
 /// network, it would call `semaphore_post` to release the resource,
 /// allowing another thread to use it.
 Semaphore :: struct {
-    mutex   : Mutex;
-    counter : i32;
+    mutex   : Mutex
+    counter : i32
 }
 
 /// Initializes a semaphore with the specified value.
 semaphore_init :: (s: &Semaphore, value: i32) {
-    s.counter = value;
+    s.counter = value
 
-    mutex_init(&s.mutex);
+    mutex_init(&s.mutex)
 }
 
 
 /// Destroys a semaphore.
 semaphore_destroy :: (s: &Semaphore) {
-    mutex_destroy(&s.mutex);
+    mutex_destroy(&s.mutex)
 }
 
 
 /// Increment the counter in a semaphore by `count`.
 semaphore_post :: (s: &Semaphore, count := 1) {
-    if count == 0 do return;
+    if count == 0 do return
     
-    scoped_mutex(&s.mutex);
-    s.counter += count;
+    scoped_mutex(&s.mutex)
+    s.counter += count
 
     // @Bug
     // This is susceptible to starvation. Semaphores should have a queue
     // or something like that.
     #if runtime.platform.Supports_Futexes {
-        runtime.platform.__futex_wake(&s.counter, count);
+        runtime.platform.__futex_wake(&s.counter, count)
     }
 }
 
 /// Waits until the thread is able to decrement one from the semaphore.
 semaphore_wait :: (s: &Semaphore) {
     while true {
-        mutex_lock(&s.mutex);
+        mutex_lock(&s.mutex)
         if s.counter > 0 {
-            s.counter -= 1;
+            s.counter -= 1
 
-            mutex_unlock(&s.mutex);
-            return;
+            mutex_unlock(&s.mutex)
+            return
 
         } else {
-            mutex_unlock(&s.mutex);
+            mutex_unlock(&s.mutex)
 
             #if runtime.platform.Supports_Futexes {
-                runtime.platform.__futex_wait(&s.counter, 0, -1);
+                runtime.platform.__futex_wait(&s.counter, 0, -1)
             }
         }
     }

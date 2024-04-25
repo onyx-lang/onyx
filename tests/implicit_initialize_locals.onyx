@@ -4,20 +4,20 @@ use core {*}
 
 main :: (args) => {
     {
-        x: [] i32;
-        printf("data: {}  count: {}\n", x.data, x.count);
+        x: [] i32
+        printf("data: {}  count: {}\n", x.data, x.count)
 
-        y := ([] i32).{ ~~ 0x100, 100 };
-        printf("data: {}  count: {}\n", y.data, y.count);
+        y := ([] i32).{ ~~ 0x100, 100 }
+        printf("data: {}  count: {}\n", y.data, y.count)
     }
 
     {
-        arr: [..] i32;
-        printf("{*p}\n", cast(&array.Untyped_Array) &arr);
+        arr: [..] i32
+        printf("{*p}\n", cast(&array.Untyped_Array) &arr)
 
-        people: Map(str, i32);
-        people["Joe"] = 12;
-        people["Jane"] = 34;
-        printf("{*p}\n", &people.entries);
+        people: Map(str, i32)
+        people["Joe"] = 12
+        people["Jane"] = 34
+        printf("{*p}\n", &people.entries)
     }
 }

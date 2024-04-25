@@ -4,15 +4,15 @@ use runtime
 Some_Structure :: struct {
     @"Some tag"
     some_method :: () {
-        println("Called the method!");
+        println("Called the method!")
     }
 }
 
 main :: () {
-    the_type   := Some_Structure;
-    the_method := *cast(&()->void, the_type->info()->as_struct().methods[0].func.data);
-    the_tag    := misc.any_as(runtime.info.get_tags_for_procedure(the_method)[0], str);
-    println(*the_tag);
+    the_type   := Some_Structure
+    the_method := *cast(&()->void, the_type->info()->as_struct().methods[0].func.data)
+    the_tag    := misc.any_as(runtime.info.get_tags_for_procedure(the_method)[0], str)
+    println(*the_tag)
 
-    the_method();
+    the_method()
 }

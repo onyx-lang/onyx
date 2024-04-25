@@ -8,22 +8,22 @@ use core.math
 use core {Optional}
 
 #local SetValue :: interface (T: type_expr) {
-    t as T;
+    t as T
 
-    { hash.hash(t) } -> u32;
-    { t == t } -> bool;
+    { hash.hash(t) } -> u32
+    { t == t } -> bool
 }
 
 Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
-    allocator : Allocator;
+    allocator : Allocator
 
-    hashes  : [] i32;
-    entries : [..] Entry(Elem_Type);
+    hashes  : [] i32
+    entries : [..] Entry(Elem_Type)
 
     Entry :: struct (T: type_expr) {
-        next  : i32;
-        hash  : u32;
-        value : T;
+        next  : i32
+        hash  : u32
+        value : T
     }
 }
 
@@ -31,95 +31,95 @@ builtin.Set :: Set
 
 
 Set.make :: ($T: type_expr, allocator := context.allocator) -> Set(T) {
-    set : Set(T);
-    Set.init(&set, allocator=allocator);
-    return set;
+    set : Set(T)
+    Set.init(&set, allocator=allocator)
+    return set
 }
 
 #overload
 builtin.__make_overload :: macro (x: &Set, allocator: Allocator) =>
-    #this_package.Set.make(x.Elem_Type, allocator = allocator);
+    #this_package.Set.make(x.Elem_Type, allocator = allocator)
 
 Set.init :: (set: &Set($T), allocator := context.allocator) {
-    set.allocator = allocator;
+    set.allocator = allocator
 
-    memory.alloc_slice(&set.hashes, 8, allocator=allocator);
-    Array.fill(set.hashes, -1);
+    memory.alloc_slice(&set.hashes, 8, allocator=allocator)
+    Array.fill(set.hashes, -1)
 
     Array.init(&set.entries, 4, allocator=allocator); 
 }
 
 Set.free :: (use set: &Set) {
-    memory.free_slice(&hashes, allocator=allocator);
-    Array.free(&entries);
+    memory.free_slice(&hashes, allocator=allocator)
+    Array.free(&entries)
 }
 
 #overload
 builtin.delete :: #this_package.Set.free
 
 Set.insert :: (use set: &Set, value: set.Elem_Type) {
-    if hashes.data == null do Set.init(set);
-    lr := lookup(set, value);
+    if hashes.data == null do Set.init(set)
+    lr := lookup(set, value)
 
-    if lr.entry_index >= 0 do return;
+    if lr.entry_index >= 0 do return
 
-    entries << .{ hashes[lr.hash_index], lr.hash, value };
-    hashes[lr.hash_index] = entries.count - 1;
+    entries << .{ hashes[lr.hash_index], lr.hash, value }
+    hashes[lr.hash_index] = entries.count - 1
 
-    if full(set) do grow(set);
+    if full(set) do grow(set)
 }
 
 #operator << macro (set: Set($T), value: T) {
-    #this_package.Set.insert(&set, value);
+    #this_package.Set.insert(&set, value)
 }
 
 Set.has :: (use set: &Set, value: set.Elem_Type) -> bool {
-    lr := lookup(set, value);
-    return lr.entry_index >= 0;
+    lr := lookup(set, value)
+    return lr.entry_index >= 0
 }
 
 Set.get :: (use set: &Set, value: set.Elem_Type) -> set.Elem_Type {
-    lr := lookup(set, value);
-    return entries[lr.entry_index].value if lr.entry_index >= 0 else set.Elem_Type.{};
+    lr := lookup(set, value)
+    return entries[lr.entry_index].value if lr.entry_index >= 0 else set.Elem_Type.{}
 }
 
 Set.get_ptr :: (use set: &Set, value: set.Elem_Type) -> &set.Elem_Type {
-    lr := lookup(set, value);
-    return (&entries[lr.entry_index].value) if lr.entry_index >= 0 else null;
+    lr := lookup(set, value)
+    return (&entries[lr.entry_index].value) if lr.entry_index >= 0 else null
 }
 
 Set.get_opt :: (use set: &Set, value: set.Elem_Type) -> ? set.Elem_Type {
-    lr := lookup(set, value);
-    if lr.entry_index >= 0 do entries[lr.entry_index].value;
+    lr := lookup(set, value)
+    if lr.entry_index >= 0 do entries[lr.entry_index].value
 
-    return .{};
+    return .{}
 }
 
 Set.remove :: (use set: &Set, value: set.Elem_Type) {
-    lr := lookup(set, value);
-    if lr.entry_index < 0 do return;
+    lr := lookup(set, value)
+    if lr.entry_index < 0 do return
 
-    if lr.entry_prev < 0   do hashes[lr.hash_index]       = entries[lr.entry_index].next;
-    else                   do entries[lr.entry_prev].next = entries[lr.entry_index].next;
+    if lr.entry_prev < 0   do hashes[lr.hash_index]       = entries[lr.entry_index].next
+    else                   do entries[lr.entry_prev].next = entries[lr.entry_index].next
 
     if lr.entry_index == entries.count - 1 {
-        Array.pop(&entries);
-        return;
+        Array.pop(&entries)
+        return
     }
 
-    Array.fast_delete(&entries, lr.entry_index);
-    last := lookup(set, entries[lr.entry_index].value);
-    if last.entry_prev >= 0    do entries[last.entry_prev].next = lr.entry_index;
-    else                       do hashes[last.hash_index] = lr.entry_index;
+    Array.fast_delete(&entries, lr.entry_index)
+    last := lookup(set, entries[lr.entry_index].value)
+    if last.entry_prev >= 0    do entries[last.entry_prev].next = lr.entry_index
+    else                       do hashes[last.hash_index] = lr.entry_index
 }
 
 Set.clear :: (use set: &Set) {
-    Array.fill(hashes, -1);
-    Array.clear(&entries);
+    Array.fill(hashes, -1)
+    Array.clear(&entries)
 }
 
 Set.empty :: (use set: &Set) -> bool {
-    return entries.count == 0;
+    return entries.count == 0
 }
 
 #overload core.iter.as_iter :: Set.as_iter
@@ -129,11 +129,11 @@ Set.as_iter :: (s: &Set) =>
 
         (ctx) => {
             if ctx.i < ctx.s.entries.count {
-                defer ctx.i += 1;
-                return Optional.make(&ctx.s.entries.data[ctx.i].value);
+                defer ctx.i += 1
+                return Optional.make(&ctx.s.entries.data[ctx.i].value)
             }
-            return .None;
-        });
+            return .None
+        })
 
 //
 // Private symbols
@@ -141,54 +141,54 @@ Set.as_iter :: (s: &Set) =>
 
 #local {
     SetLookupResult :: struct {
-        hash_index  : i32 = -1;
-        entry_index : i32 = -1;
-        entry_prev  : i32 = -1;
-        hash        : u32 = 0;
+        hash_index  : i32 = -1
+        entry_index : i32 = -1
+        entry_prev  : i32 = -1
+        hash        : u32 = 0
     }
 
     lookup :: (use set: &Set, value: set.Elem_Type) -> SetLookupResult {
-        lr := SetLookupResult.{};
+        lr := SetLookupResult.{}
 
         hash_value: u32 = hash.hash(value); // You cannot have a set of this type without defining a hash function.
-        lr.hash = hash_value;
+        lr.hash = hash_value
 
-        lr.hash_index = hash_value % hashes.count;
-        lr.entry_index = hashes[lr.hash_index];
+        lr.hash_index = hash_value % hashes.count
+        lr.entry_index = hashes[lr.hash_index]
 
         while lr.entry_index >= 0 {
             if entries[lr.entry_index].hash == hash_value {
-                if entries[lr.entry_index].value == value do return lr;
+                if entries[lr.entry_index].value == value do return lr
             }
 
-            lr.entry_prev = lr.entry_index;
-            lr.entry_index = entries[lr.entry_index].next;
+            lr.entry_prev = lr.entry_index
+            lr.entry_index = entries[lr.entry_index].next
         }
 
-        return lr;
+        return lr
     }
 
-    full :: (use set: &Set) => entries.count >= (hashes.count >> 2) * 3;
+    full :: (use set: &Set) => entries.count >= (hashes.count >> 2) * 3
 
     grow :: (use set: &Set) {
-        new_size := math.max(hashes.count << 1, 8);
-        rehash(set, new_size);
+        new_size := math.max(hashes.count << 1, 8)
+        rehash(set, new_size)
     }
 
     rehash :: (use set: &Set, new_size: i32) {
-        memory.free_slice(&hashes, allocator);
-        hashes = builtin.make([] u32, new_size, allocator=allocator);
-        Array.fill(hashes, -1);
+        memory.free_slice(&hashes, allocator)
+        hashes = builtin.make([] u32, new_size, allocator=allocator)
+        Array.fill(hashes, -1)
 
-        for &entry in entries do entry.next = -1;
+        for &entry in entries do entry.next = -1
 
-        index := 0;
+        index := 0
         for &entry in entries {
-            defer index += 1;
+            defer index += 1
 
-            hash_index := entry.hash % hashes.count;
-            entries[index].next = hashes[hash_index];
-            hashes[hash_index] = index;
+            hash_index := entry.hash % hashes.count
+            entries[index].next = hashes[hash_index]
+            hashes[hash_index] = index
         }
     }
 }

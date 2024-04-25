@@ -7,8 +7,8 @@ use core.memory
 // [] $T == Slice(T)
 //   where
 // Slice :: struct (T: type_expr) {
-//     data: &T;
-//     count: u32;
+//     data: &T
+//     count: u32
 // }
 //
 
@@ -16,38 +16,38 @@ use core.memory
 ///
 ///     use core {slice, println}
 ///
-///     sl := slice.make(i32, 10);
-///     println(sl);
+///     sl := slice.make(i32, 10)
+///     println(sl)
 ///     // 0 0 0 0 0 0 0 0 0 0
 Slice.make :: ($T: type_expr, length: u32, allocator := context.allocator) -> [] T {
-    data := raw_alloc(allocator, sizeof T * length);
-    memory.set(data, 0, sizeof T * length);
-    return .{ data, length };
+    data := raw_alloc(allocator, sizeof T * length)
+    memory.set(data, 0, sizeof T * length)
+    return .{ data, length }
 }
 
 /// Initializes a slice of type `T` to have a length of `length`, using the allocator provided.
 ///
 ///     use core {slice, println}
 ///
-///     sl: [] i32;
-///     slice.init(&sl, 10);
-///     println(sl);
+///     sl: [] i32
+///     slice.init(&sl, 10)
+///     println(sl)
 ///     // 0 0 0 0 0 0 0 0 0 0
 Slice.init :: (sl: &[] $T, length: u32, allocator := context.allocator) {
-    sl.count = length;
-    sl.data = raw_alloc(allocator, sizeof T * length);
-    memory.set(sl.data, 0, sizeof T * length);
+    sl.count = length
+    sl.data = raw_alloc(allocator, sizeof T * length)
+    memory.set(sl.data, 0, sizeof T * length)
 }
 
 /// Frees the data inside the slice.
 /// The slice is taken by pointer because this procedure also sets the data pointer to `null`, and the length to `0`,
 /// to prevent accidental future use of the slice.
 Slice.free :: (sl: &[] $T, allocator := context.allocator) {
-    if sl.data == null do return;
+    if sl.data == null do return
 
-    raw_free(allocator, sl.data);
-    sl.data = null;
-    sl.count = 0;
+    raw_free(allocator, sl.data)
+    sl.data = null
+    sl.count = 0
 }
 
 //
@@ -56,25 +56,25 @@ Slice.free :: (sl: &[] $T, allocator := context.allocator) {
 __make_overload :: macro (_: &[] $T, count: u32, allocator := context.allocator) -> [] T {
     use core.memory
 
-    ret := Slice.make(T, count, allocator);
-    memory.set(ret.data, 0, sizeof T * count);
-    return ret;
+    ret := Slice.make(T, count, allocator)
+    memory.set(ret.data, 0, sizeof T * count)
+    return ret
 }
 
 //
-// Allows for delete(&sl);
+// Allows for delete(&sl)
 #overload
 builtin.delete :: macro (x: &[] $T, allocator := context.allocator) {
-    Slice.free(x, allocator);
+    Slice.free(x, allocator)
 }
 
 
 /// Copies a slice to a new slice, allocated from the provided allocator.
 Slice.copy :: (sl: [] $T, allocator := context.allocator) -> [] T {
-    data := raw_alloc(allocator, sl.count * sizeof T);
-    memory.copy(data, sl.data, sl.count * sizeof T);
+    data := raw_alloc(allocator, sl.count * sizeof T)
+    memory.copy(data, sl.data, sl.count * sizeof T)
 
-    return .{ data = data, count = sl.count };
+    return .{ data = data, count = sl.count }
 }
 
 
@@ -82,76 +82,76 @@ Slice.copy :: (sl: [] $T, allocator := context.allocator) -> [] T {
 ///
 ///     use core {slice, println}
 ///
-///     arr := i32.[1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+///     arr := i32.[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 ///
 ///     // Move element at index 4 to index 8
-///     slice.transplant(arr, 4, 8);
+///     slice.transplant(arr, 4, 8)
 ///
-///     println(arr);
+///     println(arr)
 ///     // 1 2 3 4 6 7 8 9 5 10
 Slice.transplant :: (arr: [] $T, old_index: i32, new_index: i32) -> bool {
-    if old_index < 0 || old_index >= arr.count do return false;
-    if new_index < 0 || new_index >= arr.count do return false;
-    if old_index == new_index do return true;
+    if old_index < 0 || old_index >= arr.count do return false
+    if new_index < 0 || new_index >= arr.count do return false
+    if old_index == new_index do return true
 
-    value := arr.data[old_index];
+    value := arr.data[old_index]
 
     if old_index < new_index { // Moving forward
         while i := old_index; i < new_index {
-            defer i += 1;
-            arr.data[i] = arr.data[i + 1];
+            defer i += 1
+            arr.data[i] = arr.data[i + 1]
         }
 
     } else { // Moving backward
         while i := old_index; i > new_index {
-            defer i -= 1;
-            arr.data[i] = arr.data[i - 1];
+            defer i -= 1
+            arr.data[i] = arr.data[i - 1]
         }
     }
 
-    arr.data[new_index] = value;
-    return true;
+    arr.data[new_index] = value
+    return true
 }
 
 /// Get an element from a slice, with negative and wrap-around indexing.
 Slice.get :: (arr: [] $T, idx: i32) -> T {
-    if arr.count == 0 do return .{};
+    if arr.count == 0 do return .{}
 
-    while idx < 0          do idx += arr.count;
-    while idx >= arr.count do idx -= arr.count;
+    while idx < 0          do idx += arr.count
+    while idx >= arr.count do idx -= arr.count
 
-    return arr.data[idx];
+    return arr.data[idx]
 }
 
 /// Get a pointer to an element from a slice, with negative and wrap-around indexing.
 Slice.get_ptr :: (arr: [] $T, idx: i32) -> &T {
-    if arr.count == 0 do return null;
+    if arr.count == 0 do return null
 
-    while idx < 0          do idx += arr.count;
-    while idx >= arr.count do idx -= arr.count;
+    while idx < 0          do idx += arr.count
+    while idx >= arr.count do idx -= arr.count
 
-    return &arr.data[idx];
+    return &arr.data[idx]
 }
 
 /// Set a value in a slice, with negative and wrap-around indexing.
 Slice.set :: (arr: [] $T, idx: i32, value: T) {
-    if arr.count == 0 do return;
+    if arr.count == 0 do return
 
-    while idx < 0          do idx += arr.count;
-    while idx >= arr.count do idx -= arr.count;
+    while idx < 0          do idx += arr.count
+    while idx >= arr.count do idx -= arr.count
 
-    arr.data[idx] = value;
+    arr.data[idx] = value
 }
 
 Slice.contains :: #match #locked {
     (arr: [] $T, x: T) -> bool {
-        for it in arr do if it == x do return true;
-        return false;
+        for it in arr do if it == x do return true
+        return false
     }, 
 
     macro (arr: [] $T, $cmp: Code) -> bool {
-        for it in arr do if #unquote cmp(it) do return true;
-        return false;
+        for it in arr do if #unquote cmp(it) do return true
+        return false
     }
 }
 
@@ -165,38 +165,38 @@ Slice.contains :: #match #locked {
 /// You can simply say:
 ///
 ///     if !arr { ... }
-Slice.empty :: (arr: [] $T) => arr.count == 0;
+Slice.empty :: (arr: [] $T) => arr.count == 0
 
 /// Uses `+` to sum all elements in the slice.
 Slice.sum :: (arr: [] $T, start: T = 0) -> T {
-    sum := start;
-    for it in arr do sum += it;
-    return sum;
+    sum := start
+    for it in arr do sum += it
+    return sum
 }
 
 /// Uses `*` to multiply all elements in the slice.
 Slice.product :: (arr: [] $T, start: T = 1) -> T {
-    prod := start;
-    for it in arr do prod *= it;
-    return prod;
+    prod := start
+    for it in arr do prod *= it
+    return prod
 }
 
 /// Uses `+` to add the elements together.
 /// Then use `/ i32` to divide by the number of elements.
 /// Both of these are assumed to work.
 Slice.average :: (arr: [] $T) -> T {
-    sum := cast(T) 0;
-    for it in *arr do sum += it;
+    sum := cast(T) 0
+    for it in *arr do sum += it
 
-    return sum / cast(T) arr.count;
+    return sum / cast(T) arr.count
 }
 
 /// Reverses a slice in-place.
 Slice.reverse :: (arr: [] $T) {
     for i in arr.count / 2 {
-        tmp := arr[i];
-        arr[i] = arr[arr.count - 1 - i];
-        arr[arr.count - 1 - i] = tmp;
+        tmp := arr[i]
+        arr[i] = arr[arr.count - 1 - i]
+        arr[arr.count - 1 - i] = tmp
     }
 }
 
@@ -212,45 +212,45 @@ Slice.sort :: #match #local {}
 #overload
 Slice.sort :: (arr: [] $T, cmp: (T, T) -> i32) -> [] T {
     for i in 1 .. arr.count {
-        x := arr.data[i];
-        j := i - 1;
+        x := arr.data[i]
+        j := i - 1
 
         // @ShortCircuitLogicalOps
         // This is written this way because '&&' does not short circuit right now.
         while j >= 0 {
             if cmp(arr.data[j], x) > 0 {
-                arr.data[j + 1] = arr.data[j];
-                j -= 1;
+                arr.data[j + 1] = arr.data[j]
+                j -= 1
             } else {
-                break;
+                break
             }
         }
 
-        arr.data[j + 1] = x;
+        arr.data[j + 1] = x
     }
 
-    return arr;
+    return arr
 }
 
 #overload
 Slice.sort :: (arr: [] $T, cmp: (&T, &T) -> i32) -> [] T {
     for i in 1 .. arr.count {
-        j := i;
+        j := i
 
         while j > 0 {
             if cmp(&arr.data[j - 1], &arr.data[j]) > 0 {
-                tmp := arr.data[j];
-                arr.data[j] = arr.data[j - 1];
-                arr.data[j - 1] = tmp;
+                tmp := arr.data[j]
+                arr.data[j] = arr.data[j - 1]
+                arr.data[j - 1] = tmp
 
-                j -= 1;
+                j -= 1
             } else {
-                break;
+                break
             }
         }
     }
 
-    return arr;
+    return arr
 }
 
 /// Quicksort a slice.
@@ -263,48 +263,48 @@ Slice.quicksort :: #match #locked {
 
 #local {
     quicksort_impl :: (arr: [] $T, cmp: $PredicateFunction, lo, hi: i32) {
-        if lo < 0 || hi < 0 do return;
-        if lo >= hi do return;
+        if lo < 0 || hi < 0 do return
+        if lo >= hi do return
 
-        pivot := quicksort_partition(arr, cmp, lo, hi);
-        quicksort_impl(arr, cmp, lo, pivot - 1);
-        quicksort_impl(arr, cmp, pivot + 1, hi);
+        pivot := quicksort_partition(arr, cmp, lo, hi)
+        quicksort_impl(arr, cmp, lo, pivot - 1)
+        quicksort_impl(arr, cmp, pivot + 1, hi)
     }
 
     quicksort_partition :: #match #local {}
 
     #overload
     quicksort_partition :: (arr: [] $T, cmp: (T, T) -> i32, lo, hi: i32) -> i32 {
-        pivot := arr[hi];
-        i := lo - 1;
+        pivot := arr[hi]
+        i := lo - 1
 
         for j in lo .. hi+1 {
             if cmp(arr[j], pivot) <= 0 {
-                i += 1;
-                tmp := arr[i];
-                arr[i] = arr[j];
-                arr[j] = tmp;
+                i += 1
+                tmp := arr[i]
+                arr[i] = arr[j]
+                arr[j] = tmp
             }
         }
 
-        return i;
+        return i
     }
 
     #overload
     quicksort_partition :: (arr: [] $T, cmp: (&T, &T) -> i32, lo, hi: i32) -> i32 {
-        pivot := &arr[hi];
-        i := lo - 1;
+        pivot := &arr[hi]
+        i := lo - 1
 
         for j in lo .. hi+1 {
             if cmp(&arr[j], pivot) <= 0 {
-                i += 1;
-                tmp := arr[i];
-                arr[i] = arr[j];
-                arr[j] = tmp;
+                i += 1
+                tmp := arr[i]
+                arr[i] = arr[j]
+                arr[j] = tmp
             }
         }
 
-        return i;
+        return i
     }
 }
 
@@ -314,21 +314,21 @@ Slice.quicksort :: #match #locked {
 /// This assumes that the elements are sorted in some fashion,
 /// such that equal elements would be next to each other.
 Slice.unique :: (arr: &[] $T) {
-    idx := 0;
+    idx := 0
     while i := 0; i < arr.count - 1 {
-        defer i += 1;
+        defer i += 1
 
         if idx != i {
-            arr.data[idx] = arr.data[i];
+            arr.data[idx] = arr.data[i]
         }
 
         if !(arr.data[i] == arr.data[i + 1]) {
-            idx += 1;
+            idx += 1
         }
     }
 
-    arr.data[idx] = arr.data[arr.count - 1];
-    arr.count = idx + 1;
+    arr.data[idx] = arr.data[arr.count - 1]
+    arr.count = idx + 1
 }
 
 
@@ -336,89 +336,89 @@ Slice.unique :: (arr: &[] $T) {
 ///
 ///     use core {slice, println}
 ///
-///     arr := i32.[1, 2, 3, 4, 5];
+///     arr := i32.[1, 2, 3, 4, 5]
 ///
-///     slice.fold(arr, 0, (it, acc) => it + acc) |> println();
+///     slice.fold(arr, 0, (it, acc) => it + acc) |> println()
 ///     
 ///     // OR
 ///     
-///     slice.fold(arr, 0, [it, acc](it + acc)) |> println();
+///     slice.fold(arr, 0, [it, acc](it + acc)) |> println()
 Slice.fold :: #match #local {}
 
 #overload
 Slice.fold :: (arr: [] $T, init: $R, f: (T, R) -> R) -> R {
-    val := init;
-    for it in arr do val = f(it, val);
-    return val;
+    val := init
+    for it in arr do val = f(it, val)
+    return val
 }
 
 #overload
 Slice.fold :: macro (arr: [] $T, init: $R, body: Code) -> R {
-    acc := init;
-    for it in arr do acc = #unquote body(it, acc);
-    return acc;
+    acc := init
+    for it in arr do acc = #unquote body(it, acc)
+    return acc
 }
 
 /// Returns `true` if *every* element in the slice meets the predicate test.
 Slice.every :: #match #local {}
 
 #overload
-Slice.every :: macro (arr: [] $T, predicate: (T) -> bool) => Slice.every(arr, [it](predicate(it)));
+Slice.every :: macro (arr: [] $T, predicate: (T) -> bool) => Slice.every(arr, [it](predicate(it)))
 
 #overload
 Slice.every :: macro (arr: [] $T, predicate_body: Code) -> bool {
     for arr {
-        if !(#unquote predicate_body(it)) do return false;
+        if !(#unquote predicate_body(it)) do return false
     }
-    return true;
+    return true
 }
 
 /// Returns `true` if *at least one* element in the slice meets the predicate test.
 Slice.some :: #match #local {}
 
 #overload
-Slice.some :: macro (arr: [] $T, predicate: (T) -> bool) => Slice.some(arr, [it](predicate(it)));
+Slice.some :: macro (arr: [] $T, predicate: (T) -> bool) => Slice.some(arr, [it](predicate(it)))
 
 #overload
 Slice.some :: macro (arr: [] $T/type_is_struct, predicate_body: Code) -> bool {
     for & arr {
-        if #unquote predicate_body(it) do return true;
+        if #unquote predicate_body(it) do return true
     }
-    return false;
+    return false
 }
 
 #overload
 Slice.some :: macro (arr: [] $T, predicate_body: Code) -> bool {
     for arr {
-        if #unquote predicate_body(it) do return true;
+        if #unquote predicate_body(it) do return true
     }
-    return false;
+    return false
 }
 
 /// Sets all elements in a slice to be `value`.
 Slice.fill :: (arr: [] $T, value: T) {
     for i in arr.count {
-        arr[i] = value;
+        arr[i] = value
     }
 }
 
 /// Sets all elements in the range to be `value`.
 Slice.fill_range :: (arr: [] $T, r: range, value: T) {
     for i in r {
-        if i >= arr.count || i < 0 do continue;
-        arr[i] = value;
+        if i >= arr.count || i < 0 do continue
+        arr[i] = value
     }
 }
 
 /// Converts a slice to a linked list.
 Slice.to_list :: (arr: [] $T, allocator := context.allocator) -> List(T) {
-    new_list := list.make(T, allocator);
+    new_list := list.make(T, allocator)
 
     for &it in arr {
-        list.push_end(&new_list, *it);
+        list.push_end(&new_list, *it)
     }
 
-    return new_list;
+    return new_list
 }
 
 /// Returns the index of the first element that matches the predicate.
@@ -429,30 +429,30 @@ Slice.find :: #match #local {}
 #overload
 Slice.find :: (arr: [] $T, value: T) -> i32 {
     for i in arr.count {
-        if value == arr.data[i] do return i;
+        if value == arr.data[i] do return i
     }
 
-    return -1;
+    return -1
 }
 
 #overload
 Slice.find :: macro (arr: [] $T/type_is_struct, pred: Code) -> i32 {
     for i in arr.count {
-        it := &arr[i];
-        if #unquote pred(it) do return i;
+        it := &arr[i]
+        if #unquote pred(it) do return i
     }
 
-    return -1;
+    return -1
 }
 
 #overload
 Slice.find :: macro (arr: [] $T, pred: Code) -> i32 {
     for i in arr.count {
-        it := arr[i];
-        if #unquote pred(it) do return i;
+        it := arr[i]
+        if #unquote pred(it) do return i
     }
 
-    return -1;
+    return -1
 }
 
 /// Returns a pointer to the first element that equals `value`, compared using `==`.
@@ -460,10 +460,10 @@ Slice.find :: macro (arr: [] $T, pred: Code) -> i32 {
 /// Returns `null` if no matching element is found.
 Slice.find_ptr :: (arr: [] $T, value: T) -> &T {
     for &it in arr {
-        if value == *it do return it;
+        if value == *it do return it
     }
 
-    return null;
+    return null
 }
 
 /// Returns an optional of the first element that the code block evaluates to a truthy value.
@@ -471,33 +471,33 @@ Slice.find_opt :: #match {
     macro (arr: [] $T/type_is_struct, cond: Code) -> ? T {
         for& it in arr {
             if #unquote cond(it) {
-                return *it;
+                return *it
             }
         }
-        return .{};
+        return .{}
     },
 
     macro (arr: [] $T, cond: Code) -> ? T {
         for it in arr {
             if #unquote cond(it) {
-                return it;
+                return it
             }
         }
-        return .{};
+        return .{}
     },
 }
 
 Slice.first :: #match #locked {
     macro (arr: [] $T, predicate: (T) -> bool) -> &T {
-        return Slice.first(arr, [it](predicate(it)));
+        return Slice.first(arr, [it](predicate(it)))
     },
 
     macro (arr: [] $T/type_is_struct, predicate_body: Code) -> &T {
         for & arr {
-            if #unquote predicate_body(it) do return it;
+            if #unquote predicate_body(it) do return it
         }
 
-        return null;
+        return null
     },
 
     macro (arr: [] $T, predicate_body: Code) -> &T {
@@ -505,11 +505,11 @@ Slice.first :: #match #locked {
         // not a pointer (same as contains), when T is not a
         // structure.
         for &it_ptr in arr {
-            it := *it_ptr;
-            if #unquote predicate_body(it) do return it_ptr;
+            it := *it_ptr
+            if #unquote predicate_body(it) do return it_ptr
         }
 
-        return null;
+        return null
     }
 }
 
@@ -517,15 +517,15 @@ Slice.first :: #match #locked {
 Slice.count_where :: #match #local {}
 
 #overload
-Slice.count_where :: macro (arr: [] $T, predicate: (T) -> bool) => Slice.count_where(arr, [it](predicate(it)));
+Slice.count_where :: macro (arr: [] $T, predicate: (T) -> bool) => Slice.count_where(arr, [it](predicate(it)))
 
 #overload
 Slice.count_where :: macro (arr: [] $T, predicate_body: Code) -> u32 {
-    count: u32 = 0;
+    count: u32 = 0
     for arr {
-        if #unquote predicate_body(it) do count += 1;
+        if #unquote predicate_body(it) do count += 1
     }
-    return count;
+    return count
 }
 
 
@@ -537,13 +537,13 @@ Slice.windows :: (arr: [] $T, width: i32) -> Iterator([] T) {
         &.{ arr=arr, width=width, pos=0 },
         ctx => {
             if ctx.pos + ctx.width < ctx.arr.count {
-                defer ctx.pos += 1;
-                return ctx.arr.data[ctx.pos .. ctx.pos+ctx.width], true;
+                defer ctx.pos += 1
+                return ctx.arr.data[ctx.pos .. ctx.pos+ctx.width], true
             }
 
-            return .{}, false;
+            return .{}, false
         }
-    );
+    )
 }
 
 /// Creates an iterator of chunks over the elements of the slice.
@@ -555,15 +555,15 @@ Slice.chunks :: (arr: [] $T, width: i32) -> Iterator([] T) {
         &.{ arr=arr, width=width, pos=0 },
         ctx => {
             if ctx.pos < ctx.arr.count {
-                defer ctx.pos += ctx.width;
+                defer ctx.pos += ctx.width
 
-                end := core.math.min(ctx.pos+ctx.width, ctx.arr.count);
-                return ctx.arr.data[ctx.pos .. end], true;
+                end := core.math.min(ctx.pos+ctx.width, ctx.arr.count)
+                return ctx.arr.data[ctx.pos .. end], true
             }
 
-            return .{}, false;
+            return .{}, false
         }
-    );
+    )
 }
 
 
@@ -576,71 +576,71 @@ Slice.group_by :: #match #local {}
 
 #overload
 Slice.group_by :: macro (arr: [] $T, comp: (T, T) -> bool, allocator := context.allocator) -> [..] [] T {
-    return Slice.group_by(arr, [a, b](comp(a, b)), allocator);
+    return Slice.group_by(arr, [a, b](comp(a, b)), allocator)
 }
 
 #overload
 Slice.group_by :: macro (arr_: [] $T, comp: Code, allocator := context.allocator) -> [..] [] T {
-    out := builtin.make([..] [] T, allocator);
-    if arr_.count == 0 do return out;
+    out := builtin.make([..] [] T, allocator)
+    if arr_.count == 0 do return out
 
-    start := 0;
-    arr := arr_;
+    start := 0
+    arr := arr_
     for i in 1 .. arr.count {
         if !#unquote comp(arr[start], arr[i]) {
-            out << arr[start .. i];
-            start = i;
+            out << arr[start .. i]
+            start = i
         }
     }
 
-    out << arr[start .. arr.count];
-    return out;
+    out << arr[start .. arr.count]
+    return out
 }
 
 
 
 #local HasEquals :: interface (T: type_expr) {
-    t as T;
-    { t == t } -> bool;
+    t as T
+    { t == t } -> bool
 }
 
 Slice.equal :: (arr1: [] $T/HasEquals, arr2: [] T) -> bool {
-    if arr1.count != arr2.count do return false;
+    if arr1.count != arr2.count do return false
 
     for i in arr1.count {
-        if !(arr1[i] == arr2[i]) do return false;
+        if !(arr1[i] == arr2[i]) do return false
     }
 
-    return true;
+    return true
 }
 
 
 #local fold_idx_elem :: (arr: [] $T, $cmp: Code) -> (i32, T) {
-    idx  := 0;
-    elem := arr[0];
+    idx  := 0
+    elem := arr[0]
 
     for i in 1 .. arr.count {
-        A := &arr[i];
-        B := &elem;
+        A := &arr[i]
+        B := &elem
         if #unquote cmp {
-            idx  = i;
-            elem = arr[i];
+            idx  = i
+            elem = arr[i]
         }
     }
 
-    return idx, elem;
+    return idx, elem
 }
 
 /// Returns the largest element in the array, using `>` to compare.
 Slice.greatest :: macro (arr: [] $T) -> (i32, T) {
     fold_idx_elem :: fold_idx_elem
-    return fold_idx_elem(arr, [](*A > *B));
+    return fold_idx_elem(arr, [](*A > *B))
 }
 
 /// Returns the smallest element in the array, using `<` to compare.
 Slice.least :: macro (arr: [] $T) -> (i32, T) {
     fold_idx_elem :: fold_idx_elem
-    return fold_idx_elem(arr, [](*A < *B));
+    return fold_idx_elem(arr, [](*A < *B))
 }
 
 

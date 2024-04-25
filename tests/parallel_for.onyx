@@ -1,19 +1,19 @@
 use core {sync, iter, println}
 
 main :: () {
-    sum := 0;
+    sum := 0
 
     thread_data := .{
         sum = &sum,
         mutex = sync.Mutex.{},
-    };
-    sync.mutex_init(&thread_data.mutex);
+    }
+    sync.mutex_init(&thread_data.mutex)
 
     iter.parallel_for(0 .. 10000, 4, &thread_data) {
-        sync.scoped_mutex(&thread_data.mutex);
-        *thread_data.sum += it;
+        sync.scoped_mutex(&thread_data.mutex)
+        *thread_data.sum += it
     }
 
-    println(sum);
+    println(sum)
 }
 

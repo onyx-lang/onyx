@@ -8,22 +8,22 @@ use core {
 
 
 main :: () {
-    output: dyn_str;
-    defer string.free(&output);
+    output: dyn_str
+    defer string.free(&output)
 
-    string.append(&output, "Hello");
-    string.append(&output, "World");
-    string.append(&output, '!');
+    string.append(&output, "Hello")
+    string.append(&output, "World")
+    string.append(&output, '!')
 
-    string.insert(&output, 5, ", ");
+    string.insert(&output, 5, ", ")
 
-    println(output);
+    println(output)
 
 
     // `conv.format` appends to the dynamic string. Use
     // `string.clear` to empty it first.
-    string.clear(&output);
-    conv.format(&output, "This is another {}.", "sentence");
+    string.clear(&output)
+    conv.format(&output, "This is another {}.", "sentence")
 
-    println(output);
+    println(output)
 }

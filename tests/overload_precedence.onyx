@@ -9,10 +9,10 @@ overloaded :: #match {
 }
 
 main :: (args: [] cstr) {
-    overloaded(10);
-    overloaded(x=10);
-    overloaded(r=10);
-    overloaded(z=10);
+    overloaded(10)
+    overloaded(x=10)
+    overloaded(r=10)
+    overloaded(z=10)
 }
 
 #overload #order 3

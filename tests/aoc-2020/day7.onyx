@@ -3,133 +3,133 @@
 use core {*}
 
 BagGraph :: struct {
-    nodes    : [..] &BagNode;
-    node_map : map.Map(str, &BagNode);
+    nodes    : [..] &BagNode
+    node_map : map.Map(str, &BagNode)
 }
 
 BagNode :: struct {
-    color : str;
+    color : str
     // Part 1
-    // contained_in : [..] BagContainment;
+    // contained_in : [..] BagContainment
 
     // Part 2
-    contain : [..] BagContainment;
+    contain : [..] BagContainment
 }
 
 BagContainment :: struct {
-    bag : &BagNode;
-    count : u32;
+    bag : &BagNode
+    count : u32
 }
 
 bg_init :: (use graph: &BagGraph) {
-    array.init(&nodes, 16);
-    map.init(&node_map);
+    array.init(&nodes, 16)
+    map.init(&node_map)
 }
 
 bg_free :: (use graph: &BagGraph) {
-    array.free(&nodes);
-    map.free(&node_map);
+    array.free(&nodes)
+    map.free(&node_map)
 }
 
 bg_get_node :: (use graph: &BagGraph, name: str) -> &BagNode {
-    node := map.get(&node_map, name) ?? null;
+    node := map.get(&node_map, name) ?? null
 
     if node == null {
-        node = calloc(sizeof BagNode);
+        node = calloc(sizeof BagNode)
         // Part 1
-        // array.init(&node.contained_in, 2);
+        // array.init(&node.contained_in, 2)
         // Part 2
-        array.init(&node.contain, 2);
-        node.color = name;
+        array.init(&node.contain, 2)
+        node.color = name
 
-        array.push(&nodes, node);
-        map.put(&node_map, node.color, node);
+        array.push(&nodes, node)
+        map.put(&node_map, node.color, node)
     }
 
-    return node;
+    return node
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./input/day7.txt";
+    contents := #file_contents "./input/day7.txt"
 
-    file := contents;
+    file := contents
 
-    graph : BagGraph;
-    bg_init(&graph);
-    defer bg_free(&graph);
+    graph : BagGraph
+    bg_init(&graph)
+    defer bg_free(&graph)
 
     while true {
-        name := string.read_until(&file, ' ', 1);
-        if name.count == 0 do break;
+        name := string.read_until(&file, ' ', 1)
+        if name.count == 0 do break
 
-        container := bg_get_node(&graph, name);
+        container := bg_get_node(&graph, name)
 
-        string.read_until(&file, ' ', 2);
+        string.read_until(&file, ' ', 2)
 
         while true {
-            if string.starts_with(file, " no") do break;
+            if string.starts_with(file, " no") do break
 
-            count := cast(u32, conv.parse_int(&file));
-            string.advance(&file, 1);
+            count := cast(u32, conv.parse_int(&file))
+            string.advance(&file, 1)
 
-            contained_name := string.read_until(&file, ' ', 1);
-            contained := bg_get_node(&graph, contained_name);
+            contained_name := string.read_until(&file, ' ', 1)
+            contained := bg_get_node(&graph, contained_name)
 
             // Part 1
             // array.push(&contained.contained_in, BagContainment.{
             //     bag = container,
             //     count = count
-            // });
+            // })
 
             // Part 2
-            array.push(&container.contain, .{ bag = contained, count = count });
+            array.push(&container.contain, .{ bag = contained, count = count })
 
-            bag_word := string.read_until_any(&file, 1, ' ', '\n');
-            if bag_word[bag_word.count - 1] == '.' do break;
+            bag_word := string.read_until_any(&file, 1, ' ', '\n')
+            if bag_word[bag_word.count - 1] == '.' do break
         }
 
-        string.advance_line(&file);
+        string.advance_line(&file)
     }
 
     // Part 1
-    // to_process_bags : [..] &BagNode;
-    // processed_bags: [..] &BagNode;
+    // to_process_bags : [..] &BagNode
+    // processed_bags: [..] &BagNode
 
-    // array.init(&to_process_bags);
-    // array.init(&processed_bags, 32);
-    // array.push(&to_process_bags, bg_get_node(&graph, "shiny gold"));
+    // array.init(&to_process_bags)
+    // array.init(&processed_bags, 32)
+    // array.push(&to_process_bags, bg_get_node(&graph, "shiny gold"))
 
     // while to_process_bags.count > 0 {
-    //     bag := array.pop(&to_process_bags);
-    //     array.push(&processed_bags, bag);
+    //     bag := array.pop(&to_process_bags)
+    //     array.push(&processed_bags, bag)
     //     
     //     for container in bag.contained_in {
     //         if !array.contains(&processed_bags, container.bag) && !array.contains(&to_process_bags, container.bag) {
-    //             // printf("Adding {} to process.\n", container.bag.color);
-    //             array.push(&to_process_bags, container.bag);
+    //             // printf("Adding {} to process.\n", container.bag.color)
+    //             array.push(&to_process_bags, container.bag)
     //         }
     //     }
     // }
 
-    // printf("Count: {}\n", processed_bags.count - 1);
+    // printf("Count: {}\n", processed_bags.count - 1)
     
     // Part 2
-    to_process := array.make(&BagNode);
-    multiplier := array.make(u32);
-    array.push(&to_process, bg_get_node(&graph, "shiny gold"));
-    array.push(&multiplier, 1);
+    to_process := array.make(&BagNode)
+    multiplier := array.make(u32)
+    array.push(&to_process, bg_get_node(&graph, "shiny gold"))
+    array.push(&multiplier, 1)
 
-    count := 0;
+    count := 0
     while to_process.count > 0 {
-        bag := array.pop(&to_process);
-        mul := array.pop(&multiplier);
-        count += mul;
+        bag := array.pop(&to_process)
+        mul := array.pop(&multiplier)
+        count += mul
 
         for bc in bag.contain {
-            array.push(&to_process, bc.bag);
-            array.push(&multiplier, bc.count * mul);
+            array.push(&to_process, bc.bag)
+            array.push(&multiplier, bc.count * mul)
         }
     }
 
-    printf("Count: {}\n", count - 1);
+    printf("Count: {}\n", count - 1)
 }

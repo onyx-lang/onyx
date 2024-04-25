@@ -3,67 +3,67 @@ use core {*}
 Cell :: u8
 
 Board :: struct {
-    cells  : [25] Cell;
-    marked : [25] bool;
+    cells  : [25] Cell
+    marked : [25] bool
 
-    has_won : bool;
-    won_on  : Cell;
+    has_won : bool
+    won_on  : Cell
 }
 
 board_score :: (use b: &Board) => {
-    sum_of_unmarked := 0;
-    for 25 do if !marked[it] do sum_of_unmarked += ~~cells[it];
-    return sum_of_unmarked * ~~won_on;
+    sum_of_unmarked := 0
+    for 25 do if !marked[it] do sum_of_unmarked += ~~cells[it]
+    return sum_of_unmarked * ~~won_on
 }
 
 main :: (args) => {
-    use file := os.open("./tests/aoc-2021/input/day04.txt")->unwrap();
-    use reader := io.reader_make(&file);
+    use file := os.open("./tests/aoc-2021/input/day04.txt")->unwrap()
+    use reader := io.reader_make(&file)
 
-    numbers_line := io.read_line(&reader, inplace=true, consume_newline=true);
-    numbers_str  := string.split(numbers_line, ',');
-    numbers := memory.make_slice(Cell, numbers_str.count);
-    for numbers_str.count do numbers[it] = ~~ conv.parse_int(numbers_str[it]);
+    numbers_line := io.read_line(&reader, inplace=true, consume_newline=true)
+    numbers_str  := string.split(numbers_line, ',')
+    numbers := memory.make_slice(Cell, numbers_str.count)
+    for numbers_str.count do numbers[it] = ~~ conv.parse_int(numbers_str[it])
 
-    boards: [..] Board;
+    boards: [..] Board
     while !io.reader_empty(&reader) {
-        board := array.alloc_one(&boards);
-        board.has_won = false;
-        memory.set(&board.marked, 0, sizeof typeof board.marked);
+        board := array.alloc_one(&boards)
+        board.has_won = false
+        memory.set(&board.marked, 0, sizeof typeof board.marked)
 
         for 25 {
-            board.cells[it] = ~~ io.read_u32(&reader);
+            board.cells[it] = ~~ io.read_u32(&reader)
         }
 
-        io.skip_whitespace(&reader);
+        io.skip_whitespace(&reader)
     }
 
-    winning_board: &Board = null;
-    worst_board  : &Board = null;
+    winning_board: &Board = null
+    worst_board  : &Board = null
 
     for called in numbers {
         for & board in boards {
-            if board.has_won do continue;
+            if board.has_won do continue
 
             // Whatever the last board we touch is must be the worst one.
-            worst_board = board;
+            worst_board = board
 
             for 25 {
                 if board.cells[it] == called {
-                    board.marked[it] = true;
+                    board.marked[it] = true
 
-                    x, y := it % 5, it / 5;
-                    v_marked_count := 0;
-                    h_marked_count := 0;
-                    for 5 do if board.marked[it + y * 5] do h_marked_count += 1;
-                    for 5 do if board.marked[x + it * 5] do v_marked_count += 1;
+                    x, y := it % 5, it / 5
+                    v_marked_count := 0
+                    h_marked_count := 0
+                    for 5 do if board.marked[it + y * 5] do h_marked_count += 1
+                    for 5 do if board.marked[x + it * 5] do v_marked_count += 1
 
                     if v_marked_count == 5 || h_marked_count == 5 {
-                        board.won_on  = called;
-                        board.has_won = true;
+                        board.won_on  = called
+                        board.has_won = true
 
                         if winning_board == null {
-                            winning_board = board;
+                            winning_board = board
                         }
                     }
                 }
@@ -71,8 +71,8 @@ main :: (args) => {
         }
     }
 
-    winning_board_score := board_score(winning_board);
-    worst_board_score   := board_score(worst_board);
-    printf("Part 1: {}\n", winning_board_score);
-    printf("Part 2: {}\n", worst_board_score);
+    winning_board_score := board_score(winning_board)
+    worst_board_score   := board_score(worst_board)
+    printf("Part 1: {}\n", winning_board_score)
+    printf("Part 2: {}\n", worst_board_score)
 }

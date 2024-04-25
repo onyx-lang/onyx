@@ -2,12 +2,12 @@
 use core {*}
 
 main :: () {
-    s := "The quick brown fox jumps over the lazy dog";
-    println(s);
+    s := "The quick brown fox jumps over the lazy dog"
+    println(s)
 
-    encoded := encoding.hex.encode(s);
-    println(encoded);
+    encoded := encoding.hex.encode(s)
+    println(encoded)
     
-    decoded := encoding.hex.decode(encoded);
-    println(decoded);
+    decoded := encoding.hex.decode(encoded)
+    println(decoded)
 }

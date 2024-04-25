@@ -5,22 +5,22 @@ use core.io
 use core {println}
 
 main :: (args: [] cstr) {
-    some_string := "This is a test string that can be read.\n\n\n\n\n\n1234 4567";
+    some_string := "This is a test string that can be read.\n\n\n\n\n\n1234 4567"
 
-    sstream := io.buffer_stream_make(some_string);
-    sreader := io.reader_make(&sstream);
+    sstream := io.buffer_stream_make(some_string)
+    sreader := io.reader_make(&sstream)
 
     for i in 0 .. 2 {
-        word := io.read_word(&sreader, allocator=context.temp_allocator);
-        println(word);
+        word := io.read_word(&sreader, allocator=context.temp_allocator)
+        println(word)
     }
 
-    println(io.read_line(&sreader, consume_newline=false, allocator=context.temp_allocator));
+    println(io.read_line(&sreader, consume_newline=false, allocator=context.temp_allocator))
 
-    a := io.read_u32(&sreader);
-    b := io.read_u32(&sreader);
+    a := io.read_u32(&sreader)
+    b := io.read_u32(&sreader)
 
-    println(a);
-    println(b);
-    println(a + b);
+    println(a)
+    println(b)
+    println(a + b)
 }

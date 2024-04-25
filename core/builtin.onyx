@@ -28,9 +28,9 @@ use runtime
 // The builtin string and C-string types.
 // A string is simply a slice of bytes, and a c-string is a pointer
 // to byte, with a null-terminator ('\0') at the end.
-str     :: #type   [] u8;
-cstr    :: #type  [&] u8;
-dyn_str :: #type [..] u8;
+str     :: #type   [] u8
+cstr    :: #type  [&] u8
+dyn_str :: #type [..] u8
 
 
 
@@ -46,9 +46,9 @@ dyn_str :: #type [..] u8;
 /// For example, range.{ 0, 100, 2 } would iterate over the even numbers, and
 /// range.{ 100, 0, -1 } would count backwards from 100 to 0 (and including 0).
 range :: struct {
-    low  : i32;
-    high : i32;
-    step : i32 = 1;
+    low  : i32
+    high : i32
+    step : i32 = 1
 }
 
 /// To have parity between range32 and range64
@@ -57,9 +57,9 @@ range32 :: range
 
 /// This is the same as the `range` type, except with 64-bit integers.
 range64 :: struct {
-    low  : i64;
-    high : i64;
-    step : i64 = 1;
+    low  : i64
+    high : i64
+    step : i64 = 1
 }
 
 
@@ -74,7 +74,7 @@ null :: cast(rawptr) 0
 /// checking. `null_proc`, or any procedure marked with `#null`, is assignable
 /// to any function type, regardless of if the types match. For example,
 ///
-///     f: (i32) -> i32 = null_proc;
+///     f: (i32) -> i32 = null_proc
 ///
 /// Even though `null_proc` is a `() -> void` function, it bypasses that check
 /// and gets assigned to `f`. If f is called, there will be a runtime exception.
@@ -93,14 +93,14 @@ null_str  :: str.{ null, 0 }
 /// The 'context' is used to store thread-local configuration for things like
 /// allocators, loggers, exception handles, and other things. It is thread
 /// local so every threads gets its own copy.
-#thread_local context : OnyxContext;
+#thread_local context : OnyxContext
 
 ///
 /// This is the type of the 'context' global variable.
 OnyxContext :: struct {
     // The allocator used by default by the standard library. It is by
     // default the global heap allocator.
-    allocator      : Allocator;
+    allocator      : Allocator
 
     // The allocator used for all "temporary" things. By default, the
     // temp_allocator is a thread-local arena allocator, that has to
@@ -108,41 +108,41 @@ OnyxContext :: struct {
     // is "temporary" is up to your program; you can clear the
     // temporary allocator when you see fit. Generally this is at the
     // start of the main loop of your program.
-    temp_allocator : Allocator;
+    temp_allocator : Allocator
 
     // The procedure to call when allocating space for a closure.
     // The default is to allocate using the `temp_allocator`.
-    closure_allocate: (size: i32) -> rawptr = default_closure_allocate;
+    closure_allocate: (size: i32) -> rawptr = default_closure_allocate
 
     // Defines what happens when `log()` is called. Defaults to a
     // logger that filters log messages by their severity.
-    logger         : Logger = .{ default_logger_proc, &default_logger };
+    logger         : Logger = .{ default_logger_proc, &default_logger }
 
     // Defines what happens when an `assert()` check fails. Defaults
     // to printing the error and running an unreachable instruction,
     // causing a fault.
-    assert_handler : (msg: str, site: CallSite) -> void;
+    assert_handler : (msg: str, site: CallSite) -> void
 
     // The thread_id of the current thread. The main thread is
     // 0, and subsequent threads are given incremental ids.
-    thread_id      : i32;
+    thread_id      : i32
 
     // Allows you to place any data on the context that you want to.
-    user_data: rawptr;
-    user_data_type: type_expr;
+    user_data: rawptr
+    user_data_type: type_expr
 }
 
 //
 // Define helper methods for setting and retrieving the user_data
 // stored on the context.
 OnyxContext.set_user_data :: macro (c: &OnyxContext, data: &$T) {
-    c.user_data = data;
-    c.user_data_type = T;
+    c.user_data = data
+    c.user_data_type = T
 }
 
 OnyxContext.get_user_data :: macro (c: &OnyxContext, $T: type_expr) -> &T {
-    if c.user_data_type != T do return null;
-    return ~~ c.user_data;
+    if c.user_data_type != T do return null
+    return ~~ c.user_data
 }
 
 
@@ -154,7 +154,7 @@ OnyxContext.get_user_data :: macro (c: &OnyxContext, $T: type_expr) -> &T {
 /// assert handler.
 assert :: (cond: bool, msg: str, site := #callsite) {
     if !cond {
-        context.assert_handler(msg, site);
+        context.assert_handler(msg, site)
     }
 }
 
@@ -164,28 +164,28 @@ assert :: (cond: bool, msg: str, site := #callsite) {
 //
 
 Log_Level :: enum {
-    Debug;
-    Info;
-    Warning;
-    Error;
-    Critical;
+    Debug
+    Info
+    Warning
+    Error
+    Critical
 }
 
 Logger :: struct {
-    func : (data: rawptr, level: Log_Level, msg: str, module: str) -> void;
-    data : rawptr;
+    func : (data: rawptr, level: Log_Level, msg: str, module: str) -> void
+    data : rawptr
 }
 
 log :: #match #local {}
 
 #overload
 log :: (level: Log_Level, msg: str) {
-    context.logger.func(context.logger.data, level, msg, "");
+    context.logger.func(context.logger.data, level, msg, "")
 }
 
 #overload
 log :: (level: Log_Level, module, msg: str) {
-    context.logger.func(context.logger.data, level, msg, module);
+    context.logger.func(context.logger.data, level, msg, module)
 }
 
 
@@ -194,27 +194,27 @@ log :: (level: Log_Level, module, msg: str) {
 // A sensible default logger.
 //
 Default_Logger :: struct {
-    minimum_level: Log_Level;
+    minimum_level: Log_Level
 
-    log :: default_logger_proc;
+    log :: default_logger_proc
 }
 
-#local #thread_local default_logger: Default_Logger;
+#local #thread_local default_logger: Default_Logger
 
 default_log_level :: (level: Log_Level) {
-    default_logger.minimum_level = level;
+    default_logger.minimum_level = level
 }
 
 #if runtime.runtime != .Custom {
     #local default_logger_proc :: (logger: &Default_Logger, level: Log_Level, msg: str, module: str) {
-        use core;
+        use core
 
-        if level < logger.minimum_level do return;
+        if level < logger.minimum_level do return
 
         if module {
-            core.printf("[{}][{}] {}\n", level, module, msg);
+            core.printf("[{}][{}] {}\n", level, module, msg)
         } else {
-            core.printf("[{}] {}\n", level, msg);
+            core.printf("[{}] {}\n", level, msg)
         }
     }
 
@@ -226,7 +226,7 @@ default_log_level :: (level: Log_Level) {
 
 
 #local default_closure_allocate :: (size: i32) -> rawptr {
-    return raw_alloc(context.temp_allocator, size);
+    return raw_alloc(context.temp_allocator, size)
 }
 
 
@@ -238,14 +238,14 @@ default_log_level :: (level: Log_Level) {
 //
 
 Allocator :: struct {
-    data: rawptr;
-    func: (data: rawptr, action: AllocationAction, size: u32, align: u32, old_ptr: rawptr) -> rawptr;
+    data: rawptr
+    func: (data: rawptr, action: AllocationAction, size: u32, align: u32, old_ptr: rawptr) -> rawptr
 }
 
 AllocationAction :: enum {
-    Alloc;
-    Free;
-    Resize;
+    Alloc
+    Free
+    Resize
 }
 
 #local
@@ -254,17 +254,17 @@ Default_Allocation_Alignment :: 16
 //
 // Helper procedure to allocate out of an allocator.
 raw_alloc :: (use a: Allocator, size: u32, alignment := Default_Allocation_Alignment) -> rawptr {
-    return func(data, AllocationAction.Alloc, size, alignment, null);
+    return func(data, AllocationAction.Alloc, size, alignment, null)
 }
 
 /// Helper procedure to resize an allocation from an allocator.
 raw_resize :: (use a: Allocator, ptr: rawptr, size: u32, alignment := Default_Allocation_Alignment) -> rawptr {
-    return func(data, AllocationAction.Resize, size, alignment, ptr);
+    return func(data, AllocationAction.Resize, size, alignment, ptr)
 }
 
 /// Helper procedure to free an allocation from an allocator.
 raw_free :: (use a: Allocator, ptr: rawptr) {
-    func(data, AllocationAction.Free, 0, 0, ptr);
+    func(data, AllocationAction.Free, 0, 0, ptr)
 }
 
 Allocator.alloc :: raw_alloc
@@ -272,17 +272,17 @@ Allocator.resize :: raw_resize
 Allocator.free :: raw_free
 
 Allocator.move :: macro (use a: Allocator, v: $V) -> &V {
-    out := cast(&V) a->alloc(sizeof V);
-    *out = v;
-    return out;
+    out := cast(&V) a->alloc(sizeof V)
+    *out = v
+    return out
 }
 
 /// Helper function to allocate using the allocator in the context structure.
-calloc  :: (size: u32)              => raw_alloc(context.allocator, size);
+calloc  :: (size: u32)              => raw_alloc(context.allocator, size)
 /// Helper function to resize using the allocator in the context structure.
-cresize :: (ptr: rawptr, size: u32) => raw_resize(context.allocator, ptr, size);
+cresize :: (ptr: rawptr, size: u32) => raw_resize(context.allocator, ptr, size)
 /// Helper function to free using the allocator in the context structure.
-cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
+cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr)
 
 
 //
@@ -298,63 +298,63 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
     new :: ($T: type_expr, allocator := context.allocator) -> &T {
         use core.intrinsics.onyx { __initialize }
 
-        res := cast(&T) raw_alloc(allocator, sizeof T);
-        memory.set(res, 0, sizeof T);
-        __initialize(res);
+        res := cast(&T) raw_alloc(allocator, sizeof T)
+        memory.set(res, 0, sizeof T)
+        __initialize(res)
 
-        return res;
+        return res
     }
 
     #overload
     new :: (T: type_expr, allocator := context.allocator) -> rawptr {
         type_info :: runtime.info
 
-        info := type_info.get_type_info(T);
-        size := type_info.size_of(T);
-        if size == 0 do return null;
+        info := type_info.get_type_info(T)
+        size := type_info.size_of(T)
+        if size == 0 do return null
 
-        res := raw_alloc(allocator, size);
-        memory.set(res, 0, size);
+        res := raw_alloc(allocator, size)
+        memory.set(res, 0, size)
 
         if info.kind == .Struct {
-            s_info := cast(&type_info.Type_Info_Struct) info;
+            s_info := cast(&type_info.Type_Info_Struct) info
             for s_info.members {
                 if it.default != null {
-                    member_size := type_info.size_of(it.type);
-                    memory.copy(cast([&] u8) res + it.offset, it.default, member_size);
+                    member_size := type_info.size_of(it.type)
+                    memory.copy(cast([&] u8) res + it.offset, it.default, member_size)
                 }
             }
         }
 
-        return res;
+        return res
     }
 
     new_temp :: macro (T: type_expr) => {
-        return new(T, allocator=context.temp_allocator);
+        return new(T, allocator=context.temp_allocator)
     }
 
     make :: #match #local {}
 
     #overload
     make :: macro ($T: type_expr, allocator := context.allocator) => {
-        return __make_overload(cast(&T) null, allocator=allocator);
+        return __make_overload(cast(&T) null, allocator=allocator)
     }
 
     #overload
     make :: macro ($T: type_expr, n: u32, allocator := context.allocator) => {
-        return __make_overload(cast(&T) null, n, allocator=allocator);
+        return __make_overload(cast(&T) null, n, allocator=allocator)
     }
 
     make_temp :: #match #local {}
 
     #overload
     make_temp :: macro (T: type_expr) => {
-        return make(T, allocator=context.temp_allocator);
+        return make(T, allocator=context.temp_allocator)
     }
 
     #overload
     make_temp :: macro (T: type_expr, n: u32) => {
-        return make(T, n, allocator=context.temp_allocator);
+        return make(T, n, allocator=context.temp_allocator)
     }
 
     ///
@@ -381,16 +381,16 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 
     #local
     Destroyable :: interface (T: type_expr) {
-        t as T;
+        t as T
 
-        { T.destroy(&t) } -> void;
+        { T.destroy(&t) } -> void
     }
 
     #overload #order 1000
     delete :: macro (x: &$T/Destroyable) {
-        x_ := x;
-        T.destroy(x_);
-        cfree(x_);
+        x_ := x
+        T.destroy(x_)
+        cfree(x_)
     }
 }
 
@@ -418,10 +418,10 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 /// returned from some underlying data store. Invoked automatically
 /// using the `#remove` directive in a for-loop.
 Iterator :: struct (Iter_Type: type_expr) {
-    data:   rawptr;
-    next:   (data: rawptr) -> Optional(Iter_Type);
-    close:  (data: rawptr) -> void = null_proc;
-    remove: (data: rawptr) -> void = null_proc;
+    data:   rawptr
+    next:   (data: rawptr) -> Optional(Iter_Type)
+    close:  (data: rawptr) -> void = null_proc
+    remove: (data: rawptr) -> void = null_proc
 }
 
 
@@ -432,8 +432,8 @@ Iterator :: struct (Iter_Type: type_expr) {
 /// for types like '? i32'. In other words, '? i32' is equivalent to
 /// 'Optional(i32)'.
 Optional :: union (Value_Type: type_expr) {
-    None: void;
-    Some: Value_Type;
+    None: void
+    Some: Value_Type
 }
 
 
@@ -442,8 +442,8 @@ Optional :: union (Value_Type: type_expr) {
 /// compiler support, this structure exists to allow for placing
 /// methods onto slices. See `core/container/slice.onyx` for examples.
 Slice :: struct (T: type_expr) {
-    data: [&] T;
-    count: i32;
+    data: [&] T
+    count: i32
 }
 
 
@@ -451,10 +451,10 @@ Slice :: struct (T: type_expr) {
 /// This structure exists to allow for placing methods onto dynamic arrays.
 /// See `core/container/array.onyx` for examples.
 Array :: struct (T: type_expr) {
-    data: [&] T;
-    count: i32;
-    capacity: i32;
-    allocator: Allocator;
+    data: [&] T
+    count: i32
+    capacity: i32
+    allocator: Allocator
 }
 
 
@@ -463,9 +463,9 @@ Array :: struct (T: type_expr) {
 /// the function to get the address of the calling site, which can be used for error
 /// printing, unique hashes, and much more.
 CallSite :: struct {
-    file   : str;
-    line   : u32;
-    column : u32;
+    file   : str
+    line   : u32
+    column : u32
 }
 
 
@@ -474,8 +474,8 @@ CallSite :: struct {
 /// Using the `core.misc` library, you can easily manipulate `any`s
 /// and build runtime polymorphism.
 any :: struct {
-    data: rawptr;
-    type: type_expr;
+    data: rawptr
+    type: type_expr
 }
 
 /// Represents a code block that can be passed around at compile-time.
@@ -502,7 +502,7 @@ __implicit_bool_cast :: #match -> bool {}
 /// Internal procedure to allocate space for the captures in a closure. This will be soon
 /// changed to a configurable way, but for now it simply allocates out of the heap allocator.
 __closure_block_allocate :: (size: i32) -> rawptr {
-    return context.closure_allocate(size);
+    return context.closure_allocate(size)
 }
 
 
@@ -519,48 +519,48 @@ Link_Options :: struct {
     stack_size      := 16 * 65536;  // 16 pages * 65536 bytes per page = 1 MiB stack
 
     // The alignment of the start addres of the stack.
-    stack_alignment := 16;
+    stack_alignment := 16
 
     // How large the reserved section at the start
     // of memory should be. Because `null` is a valid
     // address in WASM, it makes sense to reserve some
     // memory at the beginning of the binary so `null`
     // always points to nothing.
-    null_reserve_size := 16;
+    null_reserve_size := 16
 
     // Controls if/how the WASM memory will be imported.
-    import_memory := IMPORT_MEMORY_DEFAULT;
-    import_memory_module_name := IMPORT_MEMORY_MODULE_NAME_DEFAULT;
-    import_memory_import_name := IMPORT_MEMORY_IMPORT_NAME_DEFAULT;
+    import_memory := IMPORT_MEMORY_DEFAULT
+    import_memory_module_name := IMPORT_MEMORY_MODULE_NAME_DEFAULT
+    import_memory_import_name := IMPORT_MEMORY_IMPORT_NAME_DEFAULT
 
     // Controls if/how the WASM memory will be exported.
-    export_memory := true;
-    export_memory_name := "memory";
+    export_memory := true
+    export_memory_name := "memory"
 
     // Controls if/how the WASM function table will be exported.
-    export_func_table := true;
-    export_func_table_name := "__indirect_function_table";
+    export_func_table := true
+    export_func_table_name := "__indirect_function_table"
 
     // Controls the minimum and maximum number of pages for WASM memory.
-    memory_min_size := 1024;
-    memory_max_size := 65536;
+    memory_min_size := 1024
+    memory_max_size := 65536
 }
 
 // Define settings for the link options depending on the runtime.
 #local {
     #if runtime.runtime == .Onyx || (runtime.runtime == .Js && runtime.Multi_Threading_Enabled) {
-        IMPORT_MEMORY_DEFAULT :: true;
-        IMPORT_MEMORY_MODULE_NAME_DEFAULT :: "onyx";
-        IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: "memory";
+        IMPORT_MEMORY_DEFAULT :: true
+        IMPORT_MEMORY_MODULE_NAME_DEFAULT :: "onyx"
+        IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: "memory"
     } else {
         #if runtime.runtime == .Wasi && runtime.Multi_Threading_Enabled {
-            IMPORT_MEMORY_DEFAULT :: true;
-            IMPORT_MEMORY_MODULE_NAME_DEFAULT :: "env";
-            IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: "memory";
+            IMPORT_MEMORY_DEFAULT :: true
+            IMPORT_MEMORY_MODULE_NAME_DEFAULT :: "env"
+            IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: "memory"
         } else {
-            IMPORT_MEMORY_DEFAULT :: false;
-            IMPORT_MEMORY_MODULE_NAME_DEFAULT :: "";
-            IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: "";
+            IMPORT_MEMORY_DEFAULT :: false
+            IMPORT_MEMORY_MODULE_NAME_DEFAULT :: ""
+            IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: ""
         }
     }
 }
@@ -594,6 +594,6 @@ any_package :: cast(package_id) 0
 /// and not programmer friendly, this way of doing it has been deprecated in
 /// favor of  using '..any', which provides type information along with the data.
 vararg :: #type &struct {
-    data:  rawptr;
-    count: i32;
+    data:  rawptr
+    count: i32
 }

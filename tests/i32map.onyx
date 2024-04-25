@@ -5,25 +5,25 @@ package main
 use core {*}
 
 main :: (args: [] cstr) {
-    imap : Map(i32, str);
-    map.init(&imap);
+    imap : Map(i32, str)
+    map.init(&imap)
     defer {
-        print("Freeing map\n");
-        map.free(&imap);
+        print("Freeing map\n")
+        map.free(&imap)
     }
-    map.put(&imap, 50, "Hello ");
-    imap->put(1234, "World!");
+    map.put(&imap, 50, "Hello ")
+    imap->put(1234, "World!")
 
-    println(map.has(&imap, 50));
-    println(map.has(&imap, 51));
+    println(map.has(&imap, 50))
+    println(map.has(&imap, 51))
 
-    printf("{}{}\n", map.get(&imap, 50)->unwrap(), map.get(&imap, 1234)->unwrap());
+    printf("{}{}\n", map.get(&imap, 50)->unwrap(), map.get(&imap, 1234)->unwrap())
 
-    printf("{*p}\n", &imap);
+    printf("{*p}\n", &imap)
 
-    map.delete(&imap, 50);
-    println(map.has(&imap, 50));
+    map.delete(&imap, 50)
+    println(map.has(&imap, 50))
 
-    map.clear(&imap);
-    println(map.has(&imap, 1234));
+    map.clear(&imap)
+    println(map.has(&imap, 1234))
 }

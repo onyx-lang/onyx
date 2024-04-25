@@ -1,10 +1,10 @@
 use core {*}
 
 Speak :: interface (T: type_expr) {
-    t as T;
+    t as T
 
-    { speak(t, str.{}) } -> void;
-    { yell(t, str.{}) } -> void;
+    { speak(t, str.{}) } -> void
+    { yell(t, str.{}) } -> void
 
     speak :: #match {}
 }
@@ -16,40 +16,40 @@ Dog :: struct {_: i32}
 
 #overload
 Speak.speak :: (d: Dog, msg: str) {
-    printf("Woof!  {}\n", msg);
+    printf("Woof!  {}\n", msg)
 }
 
 #overload
 Speak.yell :: (d: Dog, msg: str) {
-    printf("WOOF!  {}\n", string.temp_copy(msg) |> string.to_uppercase());
+    printf("WOOF!  {}\n", string.temp_copy(msg) |> string.to_uppercase())
 }
 
 Cat :: struct {_: i32}
 
 #overload
 Speak.speak :: (d: Cat, msg: str) {
-    printf("Meow!  {}\n", msg);
+    printf("Meow!  {}\n", msg)
 }
 
 #overload
 Speak.yell :: (d: Cat, msg: str) {
-    printf("MEOW!  {}\n", msg);
+    printf("MEOW!  {}\n", msg)
 }
 
 
 speak_things :: (thing: $T/Speak) {
-    Speak.speak(thing, "Message 1");
-    Speak.speak(thing, "Another message!");
-    Speak.speak(thing, "Such cool message!");
+    Speak.speak(thing, "Message 1")
+    Speak.speak(thing, "Another message!")
+    Speak.speak(thing, "Such cool message!")
     
-    Speak.yell(thing, "Yell this.");
+    Speak.yell(thing, "Yell this.")
 }
 
 
 main :: () {
-    dog := Dog.{};
-    cat := Cat.{};
+    dog := Dog.{}
+    cat := Cat.{}
 
-    speak_things(dog);
-    speak_things(cat);
+    speak_things(dog)
+    speak_things(cat)
 }

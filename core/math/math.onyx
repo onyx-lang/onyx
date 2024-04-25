@@ -24,64 +24,64 @@ use core.intrinsics.wasm
 //
 
 sin :: (t: f32) -> f32 {
-    while t >=  PI do t -= TAU;
-    while t <= -PI do t += TAU;
+    while t >=  PI do t -= TAU
+    while t <= -PI do t += TAU
 
-    res := 0.0f;
+    res := 0.0f
 
-    plus_minus := 1.0f;
-    n := 13;
+    plus_minus := 1.0f
+    n := 13
     while n > 1 {
-        res += plus_minus;
-        res *= t * t / cast(f32) (n * n - n);
+        res += plus_minus
+        res *= t * t / cast(f32) (n * n - n)
 
-        plus_minus = -plus_minus;
-        n -= 2;
+        plus_minus = -plus_minus
+        n -= 2
     }
 
-    res += 1.0f;
-    res *= t;
-    return res;
+    res += 1.0f
+    res *= t
+    return res
 }
 
 cos :: (t: f32) -> f32 {
-    while t >=  PI do t -= TAU;
-    while t <= -PI do t += TAU;
+    while t >=  PI do t -= TAU
+    while t <= -PI do t += TAU
 
-    res := 0.0f;
+    res := 0.0f
 
-    plus_minus := 1.0f;
-    n := 12;
+    plus_minus := 1.0f
+    n := 12
     while n > 1 {
-        res += plus_minus;
-        res *= t * t / cast(f32) (n * n - n);
+        res += plus_minus
+        res *= t * t / cast(f32) (n * n - n)
 
-        plus_minus = -plus_minus;
-        n -= 2;
+        plus_minus = -plus_minus
+        n -= 2
     }
 
-    res += 1.0f;
-    return res;
+    res += 1.0f
+    return res
 }
 
 asin :: (t: f32) -> f32 {
-    assert(false, "asin is not implemented yet!");
-    return 0;
+    assert(false, "asin is not implemented yet!")
+    return 0
 }
 
 acos :: (t: f32) -> f32 {
-    assert(false, "acos is not implemented yet!");
-    return 0;
+    assert(false, "acos is not implemented yet!")
+    return 0
 }
 
 atan :: (t: f32) -> f32 {
-    assert(false, "atan is not implemented yet!");
-    return 0;
+    assert(false, "atan is not implemented yet!")
+    return 0
 }
 
 atan2 :: (t: f32) -> f32 {
-    assert(false, "atan2 is not implemented yet!");
-    return 0;
+    assert(false, "atan2 is not implemented yet!")
+    return 0
 }
 
 
@@ -95,31 +95,31 @@ atan2 :: (t: f32) -> f32 {
 //
 
 sinh :: (t: $T) -> T {
-    et := exp(t);
-    return (et - (1 / et)) / 2;
+    et := exp(t)
+    return (et - (1 / et)) / 2
 }
 
 cosh :: (t: $T) -> T {
-    et := exp(t);
-    return (et + (1 / et)) / 2;
+    et := exp(t)
+    return (et + (1 / et)) / 2
 }
 
 tanh :: (t: $T) -> T {
-    et := exp(t);
-    one_over_et := 1 / et;
-    return (et - one_over_et) / (et + one_over_et);
+    et := exp(t)
+    one_over_et := 1 / et
+    return (et - one_over_et) / (et + one_over_et)
 }
 
 asinh :: (t: $T) -> T {
-    return ~~ ln(cast(f32) (t + sqrt(t * t + 1)));
+    return ~~ ln(cast(f32) (t + sqrt(t * t + 1)))
 }
 
 acosh :: (t: $T) -> T {
-    return ~~ ln(cast(f32) (t + sqrt(t * t - 1)));
+    return ~~ ln(cast(f32) (t + sqrt(t * t - 1)))
 }
 
 atanh :: (t: $T) -> T {
-    return ~~ ln(cast(f32) ((1 + t) / (1 - t))) / 2;
+    return ~~ ln(cast(f32) ((1 + t) / (1 - t))) / 2
 }
 
 
@@ -137,22 +137,22 @@ atanh :: (t: $T) -> T {
 
 // FIX: This definition is very wrong. It casts E to be whatever the type of the argument is,
 // which if it is an integer, will be 2! This should always return a floating point number!
-exp :: (p: $T) -> T do return pow(base = cast(T) E, p = p);
+exp :: (p: $T) -> T do return pow(base = cast(T) E, p = p)
 
 pow :: #match {
     // Fast implementation of power when raising to an integer power.
     (base: $T, p: i32) -> T {
-        if base == 0 do return 0;
-        if p == 0    do return 1;
+        if base == 0 do return 0
+        if p == 0    do return 1
 
-        a: T = 1;
+        a: T = 1
         while p > 0 {
-            if p % 2 == 1 do a *= base;
-            p = p >> 1;
-            base *= base;
+            if p % 2 == 1 do a *= base
+            p = p >> 1
+            base *= base
         }
 
-        return a;
+        return a
     },
 
     // Also make the implementation work for 64-bit integers.
@@ -160,87 +160,87 @@ pow :: #match {
 
     // Generic power implementation for integers using square roots.
     (base: $T, p: T) -> T {
-        if p == 0 do return 1;
-        if p < 0  do return 1 / pow(base, -p);
+        if p == 0 do return 1
+        if p < 0  do return 1 / pow(base, -p)
 
         if p >= 1 {
-            tmp := pow(p = p / 2, base = base);
-            return tmp * tmp;
+            tmp := pow(p = p / 2, base = base)
+            return tmp * tmp
         }
 
-        low  : T = 0;
-        high : T = 1;
+        low  : T = 0
+        high : T = 1
 
-        sqr := sqrt(base);
-        acc := sqr;
-        mid := high / 2;
+        sqr := sqrt(base)
+        acc := sqr
+        mid := high / 2
 
         while abs(mid - p) > 0.00001 {
-            sqr = sqrt(sqr);
+            sqr = sqrt(sqr)
 
             if mid <= p {
-                low = mid;
-                acc *= sqr;
+                low = mid
+                acc *= sqr
             } else {
-                high = mid;
-                acc /= sqr;
+                high = mid
+                acc /= sqr
             }
 
-            mid = (low + high) / 2;
+            mid = (low + high) / 2
         }
 
-        return acc;
+        return acc
     }
 }
 
 power_mod :: (base: u32, exp: u32, mod: u32) -> u32 {
-    t: u64 = 1;
-    e: u64 = ~~exp;
-    b: u64 = ~~base;
-    m: u64 = ~~mod;
+    t: u64 = 1
+    e: u64 = ~~exp
+    b: u64 = ~~base
+    m: u64 = ~~mod
 
     while e > 0 {
-        if e % 2 != 0 do t = (t * b) % m;
+        if e % 2 != 0 do t = (t * b) % m
 
-        b = (b * b) % m;
-        e /= 2;
+        b = (b * b) % m
+        e /= 2
     }
 
-    return ~~(t % m);
+    return ~~(t % m)
 }
 
 ln :: (a: f32) -> f32 {
     // FIX: This is probably not the most numerically stable solution.
     if a < 1 {
-        return -ln(1 / a);
-        // log2 := 63 - cast(i32) clz_i64(cast(i64) (1 / a));
-        // x    := a / cast(f32) (1 << log2);
-        // res  := -8.6731532f + (129.946172f + (-558.971892f + (843.967330f - 409.109529f * x) * x) * x) * x;
+        return -ln(1 / a)
+        // log2 := 63 - cast(i32) clz_i64(cast(i64) (1 / a))
+        // x    := a / cast(f32) (1 << log2)
+        // res  := -8.6731532f + (129.946172f + (-558.971892f + (843.967330f - 409.109529f * x) * x) * x) * x
         // return res + cast(f32) log2 * 0.69314718f; // ln(2) = 0.69314718
     }
 
-    log2 := 63 - cast(i32) wasm.clz_i64(cast(i64) a);
-    x    := a / cast(f32) (1 << log2);
-    res  := -1.7417939f + (2.8212026f + (-1.4699568f + (0.44717955f - 0.056570851f * x) * x) * x) * x;
+    log2 := 63 - cast(i32) wasm.clz_i64(cast(i64) a)
+    x    := a / cast(f32) (1 << log2)
+    res  := -1.7417939f + (2.8212026f + (-1.4699568f + (0.44717955f - 0.056570851f * x) * x) * x) * x
     res  += cast(f32) log2 * 0.69314718; // ln(2) = 0.69314718
-    return res;
+    return res
 }
 
 log :: (a: $T, base: $R) -> T {
-    if a <= 0 || base <= 0 do return 0;
-    return ~~(ln(cast(f32) a) / ln(cast(f32) base));
+    if a <= 0 || base <= 0 do return 0
+    return ~~(ln(cast(f32) a) / ln(cast(f32) base))
 }
 
 ilog2 :: #match #local {}
 
 #overload
 ilog2 :: (a: u32) -> u32 {
-    return 31 - wasm.clz_i32(a);
+    return 31 - wasm.clz_i32(a)
 }
 
 #overload
 ilog2 :: (a: u64) -> u64 {
-    return 63 - wasm.clz_i64(a);
+    return 63 - wasm.clz_i64(a)
 }
 
 
@@ -248,12 +248,12 @@ fmod :: #match #local {}
 
 #overload
 fmod :: (x, y: f64) -> f64 {
-    return x - trunc(x / y) * y;
+    return x - trunc(x / y) * y
 }
 
 #overload
 fmod :: (x, y: f32) -> f32 {
-    return x - trunc(x / y) * y;
+    return x - trunc(x / y) * y
 }
 
 
@@ -267,39 +267,39 @@ fmod :: (x, y: f32) -> f32 {
 // as values.
 max_fast :: #match #local { wasm.max_f32, wasm.max_f64 }
 max :: (a: $T, b: T) -> T {
-    return a if a >= b else b;
+    return a if a >= b else b
 }
 
 min_fast :: #match #local { wasm.min_f32, wasm.min_f64 }
 min :: (a: $T, b: T) -> T {
-    return a if a <= b else b;
+    return a if a <= b else b
 }
 
 clamp :: (v: $T, lo: T, hi: T) -> T {
-    if v < lo do return lo;
-    if v > hi do return hi;
-    return v;
+    if v < lo do return lo
+    if v > hi do return hi
+    return v
 }
 
 sqrt :: #match #local { wasm.sqrt_f32, wasm.sqrt_f64, sqrt_poly }
 sqrt_poly :: (x: $T) -> T {
-    return ~~ wasm.sqrt_f64(~~ x);
+    return ~~ wasm.sqrt_f64(~~ x)
 }
 
 abs_fast :: #match #local { wasm.abs_f32, wasm.abs_f64 }
 abs :: (x: $T) -> T {
-    return x if x >= 0 else -x;
+    return x if x >= 0 else -x
 }
 
 sign :: (x: $T) -> T {
-    if x > 0 do return 1;
-    if x < 0 do return cast(T) -1;
-    return 0;
+    if x > 0 do return 1
+    if x < 0 do return cast(T) -1
+    return 0
 }
 
 copysign :: #match #local { wasm.copysign_f32, wasm.copysign_f64, copysign_poly }
 copysign_poly :: (x: $T, y: T) -> T {
-    return abs(x) * sign(y);
+    return abs(x) * sign(y)
 }
 
 
@@ -329,52 +329,52 @@ rotate_right :: #match #local { wasm.rotr_i32,   wasm.rotr_i64   }
 
 
 lerp :: (t: f32, a: $T, b: T) -> T {
-    return ~~(~~a * (1 - t) + ~~b * t);
+    return ~~(~~a * (1 - t) + ~~b * t)
 }
 
 choose :: (n: $T, k: T) -> T {
-    assert(T == i32 || T == i64 || T == u32 || T == u64, "bad type for choose function");
+    assert(T == i32 || T == i64 || T == u32 || T == u64, "bad type for choose function")
 
-    ret := 1;
+    ret := 1
     for i in (n - k + 1) .. (n + 1) {
-        ret *= i;
+        ret *= i
     }
 
     for i in 1 .. (k + 1) {
-        ret /= i;
+        ret /= i
     }
 
-    return ret;
+    return ret
 }
 
 gcd :: (a: $T, b: T) -> T {
-    if a < 0 do a = -a;
-    if b < 0 do b = -b;
+    if a < 0 do a = -a
+    if b < 0 do b = -b
 
-    if b == 0 do return a;
-    return gcd(b, a % b);
+    if b == 0 do return a
+    return gcd(b, a % b)
 }
 
 lcm :: (a: $T, b: T) -> T {
-    return (a * b) / gcd(a, b);
+    return (a * b) / gcd(a, b)
 }
 
 is_nan :: #match #local {}
 
 #overload
 is_nan :: (x: f32) -> bool {
-    v := x;
-    i := *cast(&u32) &v;
+    v := x
+    i := *cast(&u32) &v
     return (i & 0x7f800000) == 0x7f800000 &&
-           (i & 0x007fffff) != 0;
+           (i & 0x007fffff) != 0
 }
 
 #overload
 is_nan :: (x: f64) -> bool {
-    v := x;
-    i := *cast(&u64) &v;
+    v := x
+    i := *cast(&u64) &v
     return (i & 0x7ff0000000000000) == 0x7ff0000000000000 &&
-           (i & 0x000fffffffffffff) != 0;
+           (i & 0x000fffffffffffff) != 0
 }
 
 
@@ -382,18 +382,18 @@ is_inf :: #match #local {}
 
 #overload
 is_inf :: (x: f32) -> bool {
-    v := x;
-    i := *cast(&u32) &v;
+    v := x
+    i := *cast(&u32) &v
     return (i & 0x7f800000) == 0x7f800000 &&
-           (i & 0x007fffff) == 0;
+           (i & 0x007fffff) == 0
 }
 
 #overload
 is_inf :: (x: f64) -> bool {
-    v := x;
-    i := *cast(&u64) &v;
+    v := x
+    i := *cast(&u64) &v
     return (i & 0x7ff0000000000000) == 0x7ff0000000000000 &&
-           (i & 0x000fffffffffffff) == 0;
+           (i & 0x000fffffffffffff) == 0
 }
 
 
@@ -408,10 +408,10 @@ use core {test}
 
 @test.test.{"GCD works"}
 (t: &test.T) {
-    t->assert(gcd(35, 18) == 1, "gcd(35, 18) == 1");
-    t->assert(gcd(35, 15) == 5, "gcd(35, 15) == 5");
-    t->assert(gcd(35, 21) == 7, "gcd(35, 21) == 7");
-    t->assert(gcd(35, 70) == 35, "gcd(35, 70) == 35");
+    t->assert(gcd(35, 18) == 1, "gcd(35, 18) == 1")
+    t->assert(gcd(35, 15) == 5, "gcd(35, 15) == 5")
+    t->assert(gcd(35, 21) == 7, "gcd(35, 21) == 7")
+    t->assert(gcd(35, 70) == 35, "gcd(35, 70) == 35")
 }
 
 }

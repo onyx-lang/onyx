@@ -7,49 +7,49 @@ use core {*}
 
 main :: (args: [] cstr) {
 
-    foo(10);
-    foo(30);
-    foo(60);
-    result := foo(100);
-    println(result);
+    foo(10)
+    foo(30)
+    foo(60)
+    result := foo(100)
+    println(result)
 
-    cached_fib(10) |> println();
-    cached_fib(80) |> println();
+    cached_fib(10) |> println()
+    cached_fib(80) |> println()
 
 }
 
 foo :: (x: i32) -> i32 {
-    #persist total := 0;
+    #persist total := 0
 
-    total += x;
-    return total;
+    total += x
+    return total
 }
 
 
 cached_fib :: (n: u64) -> u64 {
-    #persist cache : map.Map(u64, u64);
-    _ :: #init () { map.init(&cache); };
+    #persist cache : map.Map(u64, u64)
+    _ :: #init () { map.init(&cache); }
 
-    if n <= 1 do return n;
+    if n <= 1 do return n
 
-    map.get(&cache, n)->with([n] { return n; });
+    map.get(&cache, n)->with([n] { return n; })
 
-    res := cached_fib(n - 1) + cached_fib(n - 2);
-    map.put(&cache, n, res);
+    res := cached_fib(n - 1) + cached_fib(n - 2)
+    map.put(&cache, n, res)
 
-    print_cache_size();
+    print_cache_size()
 
-    return res;
+    return res
 
     // This can see cache because it is statically lexically scoped.
     print_cache_size :: () {
-        #persist a := 0;
+        #persist a := 0
         if a % 10 == 0 {
-            print("\n");
-            a = 0;
+            print("\n")
+            a = 0
         }
-        a += 1;
+        a += 1
 
-        printf("{} ", cache.entries.count);
+        printf("{} ", cache.entries.count)
     }
 }

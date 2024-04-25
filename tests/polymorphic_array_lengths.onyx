@@ -3,21 +3,21 @@
 use core {*}
 
 main :: (args: [] cstr) {
-    arr := u32.[ 1, 2, 3, 4, 5 ];
-    for elem in array_to_slice(arr) do printf("{} ", elem);
+    arr := u32.[ 1, 2, 3, 4, 5 ]
+    for elem in array_to_slice(arr) do printf("{} ", elem)
 
-    roots : [20] f32;
-    compute_roots(roots);
+    roots : [20] f32
+    compute_roots(roots)
 
-    for root in roots do println(root);
+    for root in roots do println(root)
 
     array_to_slice :: (arr: [$N] $T) -> [] T {
-        return (#type [] T).{ ~~arr, N };
+        return (#type [] T).{ ~~arr, N }
     }
 
     compute_roots :: (arr: [$N] f32) {
         for i in 0 .. N {
-            arr[i] = math.sqrt(cast(f32) i);
+            arr[i] = math.sqrt(cast(f32) i)
         }
     }
 }

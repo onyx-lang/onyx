@@ -3,51 +3,51 @@ package core.os
 use runtime
 
 TTY_State :: struct {
-    rows: i32;
-    cols: i32;
-    stdin_is_tty: bool;
-    stdout_is_tty: bool;
-    stderr_is_tty: bool;
-    echo: bool;
-    input_buffered: bool;
-    input_linefeeds: bool;
+    rows: i32
+    cols: i32
+    stdin_is_tty: bool
+    stdout_is_tty: bool
+    stderr_is_tty: bool
+    echo: bool
+    input_buffered: bool
+    input_linefeeds: bool
 }
 
 tty_sane :: () {
-    state := tty_get();
-    state.echo = true;
-    state.input_buffered = true;
-    tty_set(&state);
+    state := tty_get()
+    state.echo = true
+    state.input_buffered = true
+    tty_set(&state)
 }
 
 tty_raw :: () {
-    state := tty_get();
-    state.echo = false;
-    state.input_buffered = false;
-    tty_set(&state);
+    state := tty_get()
+    state.echo = false
+    state.input_buffered = false
+    tty_set(&state)
 }
 
 #if runtime.platform.Supports_TTY {
 
 tty_get :: () -> TTY_State {
-    state: TTY_State;
-    runtime.platform.__tty_get(&state);
-    return state;
+    state: TTY_State
+    runtime.platform.__tty_get(&state)
+    return state
 }
 
 tty_set :: (state: &TTY_State) -> bool {
-    return runtime.platform.__tty_set(state);
+    return runtime.platform.__tty_set(state)
 }
 
 } else {
 
 tty_get :: () -> TTY_State {
-    assert(false, "core.os.tty_get not supported on this platform.");
+    assert(false, "core.os.tty_get not supported on this platform.")
 }
 
 tty_set :: (state: &TTY_State) -> bool {
-    assert(false, "core.os.tty_get not supported on this platform.");
-    return false;
+    assert(false, "core.os.tty_get not supported on this platform.")
+    return false
 }
 
 }

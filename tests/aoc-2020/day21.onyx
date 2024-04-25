@@ -11,163 +11,163 @@ use core {*}
 
 Ingredient :: struct {
     // This will just be a pointer into the file contents.
-    name       : str      = .{ null, 0 };
-    appears_on : [..] u32 = .{ null, 0, 0, .{ null, null_proc } };
+    name       : str      = .{ null, 0 }
+    appears_on : [..] u32 = .{ null, 0, 0, .{ null, null_proc } }
 
-    allergen   : str      = .{ null, 0 };
+    allergen   : str      = .{ null, 0 }
 }
 
 Allergen :: struct {
-    name       : str      = .{ null, 0 };
-    appears_on : [..] u32 = .{ null, 0, 0, .{ null, null_proc } };
+    name       : str      = .{ null, 0 }
+    appears_on : [..] u32 = .{ null, 0, 0, .{ null, null_proc } }
 }
 
 Food :: struct {
-    ingredients : [..] str;
-    allergens   : [..] str;
+    ingredients : [..] str
+    allergens   : [..] str
 }
 
-ingredient_map : map.Map(str, Ingredient);
-allergen_map   : map.Map(str, Allergen);
+ingredient_map : map.Map(str, Ingredient)
+allergen_map   : map.Map(str, Allergen)
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./input/day21.txt";
+    contents := #file_contents "./input/day21.txt"
 
-    file := contents;
+    file := contents
 
-    map.init(&ingredient_map);
-    map.init(&allergen_map);
+    map.init(&ingredient_map)
+    map.init(&allergen_map)
     defer {
-        map.free(&ingredient_map);
-        map.free(&allergen_map);
+        map.free(&ingredient_map)
+        map.free(&allergen_map)
     }
 
-    foods := array.make(Food);
-    defer array.free(&foods);
+    foods := array.make(Food)
+    defer array.free(&foods)
 
-    line_num := 0;
+    line_num := 0
     while !string.empty(file) {
-        food : Food;
-        array.init(&food.ingredients, 16);
-        array.init(&food.allergens);
+        food : Food
+        array.init(&food.ingredients, 16)
+        array.init(&food.allergens)
 
         while file[0] != '(' {
-            ingredient_name := string.read_alphanum(&file);
+            ingredient_name := string.read_alphanum(&file)
             string.advance(&file, 1); // ' '
 
-            array.push(&food.ingredients, ingredient_name);
+            array.push(&food.ingredients, ingredient_name)
 
             ingredient := map.get(&ingredient_map, ingredient_name) ?? .{
                 name = ingredient_name,
                 appears_on = make([..] u32, 4)
-            };
+            }
 
-            array.push(&ingredient.appears_on, line_num);
+            array.push(&ingredient.appears_on, line_num)
 
-            map.put(&ingredient_map, ingredient_name, ingredient);
+            map.put(&ingredient_map, ingredient_name, ingredient)
         }
 
         string.advance(&file, 10); // '(contains '
 
         while file[0] != ')' {
-            allergen_name := string.read_alphanum(&file);
+            allergen_name := string.read_alphanum(&file)
             if file[0] == ',' do string.advance(&file, 2); // ', '
 
-            array.push(&food.allergens, allergen_name);
+            array.push(&food.allergens, allergen_name)
 
             allergen := map.get(&allergen_map, allergen_name) ?? .{
                 name = allergen_name,
                 appears_on = make([..] u32, 4)
-            };
+            }
 
-            array.push(&allergen.appears_on, line_num);
+            array.push(&allergen.appears_on, line_num)
 
-            map.put(&allergen_map, allergen_name, allergen);
+            map.put(&allergen_map, allergen_name, allergen)
         }
 
-        array.push(&foods, food);
+        array.push(&foods, food)
         
-        string.advance_line(&file);
-        line_num += 1;
+        string.advance_line(&file)
+        line_num += 1
     }
 
-    definitely_safe := array.make(str);
-    defer array.free(&definitely_safe);
+    definitely_safe := array.make(str)
+    defer array.free(&definitely_safe)
 
     for &ingredient_entry in ingredient_map.entries {
-        potential_allergens := array.make(str);
-        defer array.free(&potential_allergens);
+        potential_allergens := array.make(str)
+        defer array.free(&potential_allergens)
 
         for food_num in ingredient_entry.value.appears_on {
             for &allergen_name in foods[food_num].allergens {
-                array.push(&potential_allergens, *allergen_name);
+                array.push(&potential_allergens, *allergen_name)
             }
         }
 
-        potential_allergen_count := 0;
+        potential_allergen_count := 0
         for &allergen_name in potential_allergens {
-            c := array_count_contains(&potential_allergens, *allergen_name, string.equal);
-            allergen := map.get(&allergen_map, *allergen_name)->unwrap();
+            c := array_count_contains(&potential_allergens, *allergen_name, string.equal)
+            allergen := map.get(&allergen_map, *allergen_name)->unwrap()
             if c == allergen.appears_on.count {
-                potential_allergen_count += 1;
+                potential_allergen_count += 1
             }
         }
 
         if potential_allergen_count == 0 {
-            array.push(&definitely_safe, ingredient_entry.key);
+            array.push(&definitely_safe, ingredient_entry.key)
         }
     }
 
-    total_safe := 0;
+    total_safe := 0
     for safe in definitely_safe {
-        ingredient := map.get(&ingredient_map, safe)->unwrap();
-        total_safe += ingredient.appears_on.count;
+        ingredient := map.get(&ingredient_map, safe)->unwrap()
+        total_safe += ingredient.appears_on.count
 
-        map.delete(&ingredient_map, safe);
+        map.delete(&ingredient_map, safe)
     }
 
-    printf("Total safe: {}\n", total_safe);
+    printf("Total safe: {}\n", total_safe)
 
-    matched_ingredients := array.make(Ingredient);
-    defer array.free(&matched_ingredients);
+    matched_ingredients := array.make(Ingredient)
+    defer array.free(&matched_ingredients)
 
     while !map.empty(&ingredient_map) {
         for &allergen_entry in allergen_map.entries {
-            match_count := 0;
-            matching_ingredient_name := str.{ null, 0 };
+            match_count := 0
+            matching_ingredient_name := str.{ null, 0 }
 
             for &ingredient_entry in ingredient_map.entries {
-                matches := true;
+                matches := true
 
                 for ap in allergen_entry.value.appears_on {
-                    if !array.contains(ingredient_entry.value.appears_on, ap) do matches = false;
+                    if !array.contains(ingredient_entry.value.appears_on, ap) do matches = false
                 }
 
                 if matches {
-                    match_count += 1;
-                    matching_ingredient_name = ingredient_entry.key;
+                    match_count += 1
+                    matching_ingredient_name = ingredient_entry.key
                 }
             }
 
             if match_count == 1 {
-                ingredient := map.get(&ingredient_map, matching_ingredient_name)->unwrap();
-                map.delete(&ingredient_map, matching_ingredient_name);
+                ingredient := map.get(&ingredient_map, matching_ingredient_name)->unwrap()
+                map.delete(&ingredient_map, matching_ingredient_name)
 
-                ingredient.allergen = allergen_entry.key;
-                array.push(&matched_ingredients, ingredient);
+                ingredient.allergen = allergen_entry.key
+                array.push(&matched_ingredients, ingredient)
             }
         }
     }
 
-    array.sort(matched_ingredients, (i1: &Ingredient, i2: &Ingredient) => string.compare(i1.allergen, i2.allergen));
+    array.sort(matched_ingredients, (i1: &Ingredient, i2: &Ingredient) => string.compare(i1.allergen, i2.allergen))
 
-    for &mi in matched_ingredients do printf("{} -> {}\n", mi.name, mi.allergen);
-    for &mi in matched_ingredients do printf("{},", mi.name);
-    println("\n(Don't copy the last ','!)");
+    for &mi in matched_ingredients do printf("{} -> {}\n", mi.name, mi.allergen)
+    for &mi in matched_ingredients do printf("{},", mi.name)
+    println("\n(Don't copy the last ','!)")
 }
 
 array_count_contains :: (arr: &[..] $T, x: T, equal: (T, T) -> bool) -> u32 {
-    count := 0;
-    for &it in *arr do if equal(*it, x) do count += 1;
-    return count;
+    count := 0
+    for &it in *arr do if equal(*it, x) do count += 1
+    return count
 }

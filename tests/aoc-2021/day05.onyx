@@ -3,77 +3,77 @@
 use core {*}
 
 Line :: struct {
-    x1, y1: i32;
-    x2, y2: i32;
+    x1, y1: i32
+    x2, y2: i32
 }
 
 line_points :: (l: Line) -> Iterator(Point) {
     Context :: struct {
-        l: Line;
-        dx, dy: i32;
-        curr_t: i32;
-        max_t: i32;
+        l: Line
+        dx, dy: i32
+        curr_t: i32
+        max_t: i32
     }
 
     if l.x1 != l.x2 && l.y1 != l.y2 {
         if math.abs(l.x1 - l.x2) != math.abs(l.y1 - l.y2) {
-            return iter.empty(Point);
+            return iter.empty(Point)
         }
     }
 
-    c := new(Context);
-    c.l = l;
-    c.curr_t = 0;
-    c.max_t = math.max(math.abs(l.x1 - l.x2), math.abs(l.y1 - l.y2));
-    c.dx = 1 if l.x2 > l.x1 else -1 if l.x2 < l.x1 else 0;
-    c.dy = 1 if l.y2 > l.y1 else -1 if l.y2 < l.y1 else 0;
+    c := new(Context)
+    c.l = l
+    c.curr_t = 0
+    c.max_t = math.max(math.abs(l.x1 - l.x2), math.abs(l.y1 - l.y2))
+    c.dx = 1 if l.x2 > l.x1 else -1 if l.x2 < l.x1 else 0
+    c.dy = 1 if l.y2 > l.y1 else -1 if l.y2 < l.y1 else 0
 
     next :: (use c: &Context) -> ? Point {
-        if curr_t > max_t do return .None;
+        if curr_t > max_t do return .None
 
-        defer curr_t += 1;
-        return Point.{ l.x1 + curr_t * dx, l.y1 + curr_t * dy };
+        defer curr_t += 1
+        return Point.{ l.x1 + curr_t * dx, l.y1 + curr_t * dy }
     }
 
-    return .{c, next, cfree};
+    return .{c, next, cfree}
 }
 
 Point :: struct {x, y: u32;}
-#overload hash.hash :: (use p: Point) => x * 146307 + y * 172363;
-#operator == (p1, p2: Point) => p1.x == p2.x && p1.y == p2.y;
+#overload hash.hash :: (use p: Point) => x * 146307 + y * 172363
+#operator == (p1, p2: Point) => p1.x == p2.x && p1.y == p2.y
 
 main :: (args) => {
-    use file := os.open("./tests/aoc-2021/input/day05.txt")->unwrap();
-    use reader := io.reader_make(&file);
+    use file := os.open("./tests/aoc-2021/input/day05.txt")->unwrap()
+    use reader := io.reader_make(&file)
 
-    lines: [..] Line;
+    lines: [..] Line
 
     while !io.reader_empty(&reader) {
-        x1 := io.read_u32(&reader);
-        io.skip_bytes(&reader, 1);
-        y1 := io.read_u32(&reader);
-        io.skip_bytes(&reader, 4);
+        x1 := io.read_u32(&reader)
+        io.skip_bytes(&reader, 1)
+        y1 := io.read_u32(&reader)
+        io.skip_bytes(&reader, 4)
 
-        x2 := io.read_u32(&reader);
-        io.skip_bytes(&reader, 1);
-        y2 := io.read_u32(&reader);
-        io.skip_whitespace(&reader);
+        x2 := io.read_u32(&reader)
+        io.skip_bytes(&reader, 1)
+        y2 := io.read_u32(&reader)
+        io.skip_whitespace(&reader)
 
-        lines << .{x1, y1, x2, y2};
+        lines << .{x1, y1, x2, y2}
     }
 
-    point_count: Map(Point, u32);
+    point_count: Map(Point, u32)
 
     for &line in lines {
         for p in line_points(*line) {
-            point_count[p] = (point_count[p] ?? 0) + 1;
+            point_count[p] = (point_count[p] ?? 0) + 1
         }
     }
 
-    count := 0;
+    count := 0
     for & point_count.entries {
-        if it.value >= 2 do count += 1;
+        if it.value >= 2 do count += 1
     }
 
-    printf("Part 2: {}\n", count);
+    printf("Part 2: {}\n", count)
 }

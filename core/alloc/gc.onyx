@@ -18,50 +18,50 @@ use runtime
 use core {package, *}
 
 GCState :: struct {
-    backing_allocator: Allocator;
-    first: &GCLink;
+    backing_allocator: Allocator
+    first: &GCLink
 }
 
 GCLink :: struct {
-    prev: &GCLink;
-    next: &GCLink;
-    magic_number: u32;
+    prev: &GCLink
+    next: &GCLink
+    magic_number: u32
 }
 
 make :: (backing := context.allocator) -> GCState {
-    hs: GCState;
-    hs.backing_allocator = backing;
-    return hs;
+    hs: GCState
+    hs.backing_allocator = backing
+    return hs
 }
 
 clear :: (hs: &GCState) {
     Debug_Printing :: #defined(runtime.vars.Enable_GC_Debug)
 
-    count := 0;
-    size := 0;
+    count := 0
+    size := 0
 
     while l := hs.first; l != null {
-        n := l.next;
+        n := l.next
 
         if l.magic_number == GC_Link_Magic_Number {
             #if Debug_Printing {
-                count += 1;
-                size += *cast(&u32) (cast([&] u8) l - 8);
+                count += 1
+                size += *cast(&u32) (cast([&] u8) l - 8)
             }
 
-            l.magic_number = 0;
-            raw_free(hs.backing_allocator, l);
+            l.magic_number = 0
+            raw_free(hs.backing_allocator, l)
         }
 
-        l = n;
+        l = n
     }
 
     #if Debug_Printing {
-        logf(.Debug, "Garbage collected items: {}", count);
-        logf(.Debug, "Garbage collected bytes: {}", size);
+        logf(.Debug, "Garbage collected items: {}", count)
+        logf(.Debug, "Garbage collected bytes: {}", size)
     }
 
-    hs.first = null;
+    hs.first = null
 }
 
 #overload core.alloc.as_allocator :: make_allocator
@@ -69,7 +69,7 @@ make_allocator :: (hs: &GCState) -> Allocator {
     return Allocator.{
         func = gc_alloc_proc,
         data = hs
-    };
+    }
 }
 
 auto :: #match {}
@@ -78,12 +78,12 @@ auto :: #match {}
 auto :: macro () {
     use core.alloc {package, gc}
     
-    gcs := gc.make();
-    old_allocator := context.allocator;
-    context.allocator = alloc.as_allocator(&gcs);
+    gcs := gc.make()
+    old_allocator := context.allocator
+    context.allocator = alloc.as_allocator(&gcs)
     defer {
-        gc.clear(&gcs);
-        context.allocator = old_allocator;
+        gc.clear(&gcs)
+        context.allocator = old_allocator
     }
 }
 
@@ -92,9 +92,9 @@ auto :: macro (body: Code) -> i32 {
     auto :: auto
 
     auto(); 
-    #unquote body;
+    #unquote body
 
-    return 0;
+    return 0
 }
 
 
@@ -105,10 +105,10 @@ GC_Manually_Free_Magic_Number :: 0xface1337
 
 #local gc_alloc_proc :: (data: &GCState, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
 
-    old: &GCLink;
+    old: &GCLink
 
     if oldptr != null {
-        old = (cast([&] GCLink) oldptr) - 1;
+        old = (cast([&] GCLink) oldptr) - 1
 
         //
         // If this allocated space was not from an gc allocator,
@@ -116,19 +116,19 @@ GC_Manually_Free_Magic_Number :: 0xface1337
         if old.magic_number != GC_Link_Magic_Number {
             return data.backing_allocator.func(
                 data.backing_allocator.data, aa, size, align, oldptr
-            );
+            )
         }
     }
 
     if aa == .Resize || aa == .Free {
         if old.prev {
-            old.prev.next = old.next;
+            old.prev.next = old.next
         } else {
-            data.first = old.next;
+            data.first = old.next
         }
 
         if old.next {
-            old.next.prev = old.prev;
+            old.next.prev = old.prev
         }
     }
 
@@ -138,35 +138,35 @@ GC_Manually_Free_Magic_Number :: 0xface1337
 
     newptr: &GCLink = data.backing_allocator.func(
         data.backing_allocator.data, aa,
-        size + sizeof GCLink, align, old);
+        size + sizeof GCLink, align, old)
 
     if aa == .Alloc || aa == .Resize {
         if newptr != null {
-            newptr.magic_number = GC_Link_Magic_Number;
-            newptr.next = data.first;
-            newptr.prev = null;
+            newptr.magic_number = GC_Link_Magic_Number
+            newptr.next = data.first
+            newptr.prev = null
 
             if data.first != null {
-                data.first.prev = newptr;
+                data.first.prev = newptr
             }
 
-            data.first = newptr;
+            data.first = newptr
         }
     }
 
-    return cast([&] GCLink, newptr) + 1;
+    return cast([&] GCLink, newptr) + 1
 }
 
 /// Removes an allocation from the garbage collectors tracking list,
 /// so it will not be freed automatically.
 untrack :: (ptr: rawptr) -> bool {
-    link: &GCLink = (cast([&] GCLink) ptr) - 1;
+    link: &GCLink = (cast([&] GCLink) ptr) - 1
 
     if link.magic_number != GC_Link_Magic_Number {
-        return false;
+        return false
     }
 
-    link.magic_number = GC_Manually_Free_Magic_Number;
-    return true;
+    link.magic_number = GC_Manually_Free_Magic_Number
+    return true
 }
 

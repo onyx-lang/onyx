@@ -3,76 +3,76 @@
 use core {*}
 
 parse_factor :: (file: &str) -> u64 {
-	string.strip_leading_whitespace(file);
+	string.strip_leading_whitespace(file)
 
 	switch file.data[0] {
 		case '0' ..= '9' {
-			return conv.parse_int(file);
+			return conv.parse_int(file)
 		}
 
 		case '(' {
-            string.advance(file, 1);
+            string.advance(file, 1)
 
-			value := parse_expression_mul(file);
+			value := parse_expression_mul(file)
 
-            string.strip_leading_whitespace(file);
-            string.advance(file, 1);
+            string.strip_leading_whitespace(file)
+            string.advance(file, 1)
 
-			return value;
+			return value
 		}
 	}
 	
-	return 0;
+	return 0
 }
 
 parse_expression_add :: (file: &str) -> u64 {
-	string.strip_leading_whitespace(file);
+	string.strip_leading_whitespace(file)
 
-	left := parse_factor(file);
+	left := parse_factor(file)
 
-	string.strip_leading_whitespace(file);
+	string.strip_leading_whitespace(file)
 	while file.data[0] == '+' {
-		op    := file.data[0];
-        string.advance(file, 1);
+		op    := file.data[0]
+        string.advance(file, 1)
 
-		right := parse_factor(file);
+		right := parse_factor(file)
 
-		left += right;
+		left += right
 
-		string.strip_leading_whitespace(file);
+		string.strip_leading_whitespace(file)
 	}
 
-	return left;
+	return left
 }
 
 parse_expression_mul :: (file: &str) -> u64 {
-    string.strip_leading_whitespace(file);
+    string.strip_leading_whitespace(file)
 
-	left := parse_expression_add(file);
+	left := parse_expression_add(file)
 
-    string.strip_leading_whitespace(file);
+    string.strip_leading_whitespace(file)
 	while file.data[0] == '*' {
-		op    := file.data[0];
-        string.advance(file, 1);
+		op    := file.data[0]
+        string.advance(file, 1)
 
-		right := parse_expression_add(file);
+		right := parse_expression_add(file)
 
-		left *= right;
+		left *= right
 
-		string.strip_leading_whitespace(file);
+		string.strip_leading_whitespace(file)
 	}
 
-	return left;
+	return left
 }
 
 main :: (args: [] cstr) {
-	contents := #file_contents "./input/day18.txt";
-    file := contents;
+	contents := #file_contents "./input/day18.txt"
+    file := contents
 
-	total: u64 = 0;
+	total: u64 = 0
 	while !string.empty(file) {
-		total += parse_expression_mul(&file);
+		total += parse_expression_mul(&file)
 	}
 
-	printf("Total: {}\n", total);
+	printf("Total: {}\n", total)
 }

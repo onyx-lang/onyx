@@ -13,8 +13,8 @@ set  :: core.intrinsics.wasm.memory_fill
 //
 // Initializes a slice by allocating memory for it out of the allocator.
 alloc_slice :: (sl: &[] $T, count: i32, allocator := context.allocator) {
-    sl.data  = raw_alloc(allocator, sizeof T * count);
-    sl.count = count;
+    sl.data  = raw_alloc(allocator, sizeof T * count)
+    sl.count = count
 }
 
 //
@@ -39,27 +39,27 @@ align :: #match #local {}
 #overload
 align :: (size: &u64, align: u64) {
     if *size % align != 0 {
-        *size += align - (*size % align);
+        *size += align - (*size % align)
     }
 }
 
 #overload
 align :: (size: u64, align: u64) -> u64 {
     if size % align != 0 {
-        size += align - (size % align);
+        size += align - (size % align)
     }
-    return size;
+    return size
 }
 
 #overload
 align :: (size: u32, align: u32) -> u32 {
     if size % align != 0 {
-        size += align - (size % align);
+        size += align - (size % align)
     }
-    return size;
+    return size
 }
 
 ptr_add :: macro (p: rawptr, d: i32) -> rawptr {
-    return cast([&] u8, p) + d;
+    return cast([&] u8, p) + d
 }
 

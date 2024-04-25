@@ -4,32 +4,32 @@ use core {*}
 
 main :: (args: [] cstr) {
     baked_proc :: (x: $T, $func: (T) -> typeof x) -> T {
-        return func(x);
+        return func(x)
     }
 
     baked_proc(10, (x: i32) -> i32 { return x * 2; })
-    |> println();
+    |> println()
 
     compose :: (a: $A, f: (A) -> $B, g: (B) -> $C) -> C {
-        return g(f(a));
+        return g(f(a))
     }
 
     Number :: interface (T: type_expr) {
-        t as T;
+        t as T
 
-        { t * t } -> T;
+        { t * t } -> T
     }
 
     dumb :: (ZZZ: $T) -> #auto where Number(T) {
-        return ZZZ * 2;
+        return ZZZ * 2
     }
 
-    compose(10.0f, dumb, (ABC) => ABC + 3) |> println();
+    compose(10.0f, dumb, (ABC) => ABC + 3) |> println()
 
-    double  :: macro (x) => x * 2;
-    convert :: macro (x: $T, $TO: type_expr) => cast(TO) x;
-    add     :: macro (x: $T, y: T) => x + y;
-    map     :: macro (x: $T, f: (T) -> $R) => f(x);
+    double  :: macro (x) => x * 2
+    convert :: macro (x: $T, $TO: type_expr) => cast(TO) x
+    add     :: macro (x: $T, y: T) => x + y
+    map     :: macro (x: $T, f: (T) -> $R) => f(x)
 
     5 |> double()
       |> map(x => x * 3) 
@@ -37,44 +37,44 @@ main :: (args: [] cstr) {
       |> double()
       |> convert(f32)
       |> map(x => x * 4 + 2)
-      |> println();
+      |> println()
 
 
     // This does not work at the moment
     #if false {
         Color :: enum {
-            Red; Orange; Yellow; Blue;
+            Red; Orange; Yellow; Blue
         }
 
         Guy :: struct {
-            best_friend: &Guy;
-            favorite_color: Color;
+            best_friend: &Guy
+            favorite_color: Color
         }
 
         nightmare :: (x: (typeof(z.best_friend), $K) -> void,
                       y: (typeof(x)) -> $R,
                       z: &$SomeType,
                       w: R) {
-            k := y(x);
+            k := y(x)
         }
 
         dummy1 :: (a: $T, b: typeof(a.favorite_color)) -> void {
-            printf("dummy1 got T={}, typeof(a.favorite_color)={}\n", a, typeof(b));
+            printf("dummy1 got T={}, typeof(a.favorite_color)={}\n", a, typeof(b))
         }
 
         dummy2 :: (f: (a: &Guy, b: $C) -> void) -> C {
-            printf("dummy2 got C={}\n", C);
+            printf("dummy2 got C={}\n", C)
 
-            other_guy := new(Guy);
-            f(other_guy, .Orange);
+            other_guy := new(Guy)
+            f(other_guy, .Orange)
 
-            default: C;
-            return default;
+            default: C
+            return default
         }
 
-        guy := new(Guy);
-        guy.best_friend = guy;
+        guy := new(Guy)
+        guy.best_friend = guy
 
-        nightmare(dummy1, dummy2, guy, .Orange);
+        nightmare(dummy1, dummy2, guy, .Orange)
     }
 }

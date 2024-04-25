@@ -3,135 +3,135 @@
 use core {*}
 
 Field :: struct {
-	name : str = "";
+	name : str = ""
 
-	column : i32 = -1;
+	column : i32 = -1
 
-	lower0 : u32 = 0;
-	upper0 : u32 = 0;
-	lower1 : u32 = 0;
-	upper1 : u32 = 0;
+	lower0 : u32 = 0
+	upper0 : u32 = 0
+	lower1 : u32 = 0
+	upper1 : u32 = 0
 }
 
 field_valid :: (use field: &Field, n: u32) -> bool {
-	return (lower0 <= n && n <= upper0) || (lower1 <= n && n <= upper1);
+	return (lower0 <= n && n <= upper0) || (lower1 <= n && n <= upper1)
 }
 
-total_scanning_error := 0;
+total_scanning_error := 0
 
 read_ticket_and_validate :: (file: &str, fields: [..] Field, ticket_store: [&] u32) -> bool {
-	retval := true;
+	retval := true
 
 	for i in 0 .. fields.count {
-		n := cast(u32, conv.parse_int(file));
-		ticket_store[i] = n;
+		n := cast(u32, conv.parse_int(file))
+		ticket_store[i] = n
 
-		if file.data[0] == ',' do string.advance(file, 1);
+		if file.data[0] == ',' do string.advance(file, 1)
 
-		valid_count := 0;
+		valid_count := 0
 		for &field in fields {
-			if field_valid(field, n) do valid_count += 1;
+			if field_valid(field, n) do valid_count += 1
 		}
 
 		if valid_count == 0 {
-			total_scanning_error += n;
-			retval = false;
+			total_scanning_error += n
+			retval = false
 		}
 	}
 
-    string.advance_line(file);
-	return retval;
+    string.advance_line(file)
+	return retval
 }
 
 main :: (args: [] cstr) {
-	contents := #file_contents "./input/day16.txt";
+	contents := #file_contents "./input/day16.txt"
 
-	file := contents;
+	file := contents
 
-	fields := array.make(Field, 20);
-	defer array.free(&fields);
+	fields := array.make(Field, 20)
+	defer array.free(&fields)
 
 	// Read until the first empty line
 	while file.data[0] != '\n' {
-		field := Field.{};
+		field := Field.{}
 		field.name, file = string.bisect(file, ':');		
 
-		string.advance(&file, 1);
-		field.lower0 = ~~ conv.parse_int(&file);
+		string.advance(&file, 1)
+		field.lower0 = ~~ conv.parse_int(&file)
 
-		string.advance(&file, 1);
-		field.upper0 = ~~ conv.parse_int(&file);
+		string.advance(&file, 1)
+		field.upper0 = ~~ conv.parse_int(&file)
 
-		string.advance(&file, 4);
-		field.lower1 = ~~ conv.parse_int(&file);
+		string.advance(&file, 4)
+		field.lower1 = ~~ conv.parse_int(&file)
 
-		string.advance(&file, 1);
-		field.upper1 = ~~ conv.parse_int(&file);
+		string.advance(&file, 1)
+		field.upper1 = ~~ conv.parse_int(&file)
 
-		string.advance_line(&file);
+		string.advance_line(&file)
 
-		array.push(&fields, field);
+		array.push(&fields, field)
 	}
 
-	for i in 0 .. 2 do string.advance_line(&file);
+	for i in 0 .. 2 do string.advance_line(&file)
 
-	my_ticket := array.make(u32, fields.count);
-	defer array.free(&my_ticket);
-	read_ticket_and_validate(&file, fields, my_ticket.data);
+	my_ticket := array.make(u32, fields.count)
+	defer array.free(&my_ticket)
+	read_ticket_and_validate(&file, fields, my_ticket.data)
 
-	for i in 0 .. 2 do string.advance_line(&file);
+	for i in 0 .. 2 do string.advance_line(&file)
 
-	ticket_data := array.make(u32, 1024);
-	defer array.free(&ticket_data);
+	ticket_data := array.make(u32, 1024)
+	defer array.free(&ticket_data)
 
 	while !string.empty(file) {
-		array.ensure_capacity(&ticket_data, ticket_data.count + fields.count);
+		array.ensure_capacity(&ticket_data, ticket_data.count + fields.count)
 		if read_ticket_and_validate(&file, fields, ~~ &ticket_data[ticket_data.count]) {
-			ticket_data.count += fields.count;
+			ticket_data.count += fields.count
 		}
 	}
 
-	printf("Scanning error: {}\n", total_scanning_error);
+	printf("Scanning error: {}\n", total_scanning_error)
 
-	cols_to_assign := array.make(u32, fields.count);
-	defer array.free(&cols_to_assign);
+	cols_to_assign := array.make(u32, fields.count)
+	defer array.free(&cols_to_assign)
 
-	for i in 0 .. fields.count do array.push(&cols_to_assign, i);
+	for i in 0 .. fields.count do array.push(&cols_to_assign, i)
 
 	while cols_to_assign.count > 0 {
 		for col in cols_to_assign {
-			work_count := 0;
-			recent_work: &Field = null;
+			work_count := 0
+			recent_work: &Field = null
 
 			for &field in fields {
-				if field.column != -1 do continue;
-				works := true;
+				if field.column != -1 do continue
+				works := true
 
 				for row in 0 .. (ticket_data.count / fields.count) {
 					if !field_valid(field, ticket_data[col + fields.count * row]) {
-						works = false;
-						break;
+						works = false
+						break
 					}
 				}
 
 				if works {
-					work_count += 1;
-					recent_work = field;
+					work_count += 1
+					recent_work = field
 				}
 			}
 
 			if work_count == 1 {
-				recent_work.column = col;
-				array.remove(&cols_to_assign, col);
-				break;
+				recent_work.column = col
+				array.remove(&cols_to_assign, col)
+				break
 			}
 		}
 	}
 
-	prod: u64 = 1;
+	prod: u64 = 1
 	for &field in fields {
-		if string.starts_with(field.name, "departure") do prod *= ~~my_ticket[field.column];
+		if string.starts_with(field.name, "departure") do prod *= ~~my_ticket[field.column]
 	}
 
-	printf("Departure multiply: {}\n", prod);
+	printf("Departure multiply: {}\n", prod)
 }

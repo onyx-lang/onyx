@@ -11,34 +11,34 @@ use core {*}
 
 main :: (args: [] cstr) {
     // A dummy array to demonstrate.
-    arr := i32.[ 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 ];
+    arr := i32.[ 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 ]
 
     // In Onyx a slice type is simply written as an empty pair of
     // square brackets, with the type of elements of the slice
     // immediately following.
-    slice : [] i32;
+    slice : [] i32
 
     // Slices have two members, data and count. You can set them directly.
-    slice.data  = ^arr[3];
-    slice.count = 4;
+    slice.data  = ^arr[3]
+    slice.count = 4
 
     // You can iterate over slices directly using a for-loop.
-    for elem in slice do printf("{} ", elem);
-    print("\n");
+    for elem in slice do printf("{} ", elem)
+    print("\n")
 
     // Another equivalent way of writing lines 22 and 23 is to
     // use the array subscript notation, but provide a range for
     // the index as so. This is generally called the slice literal
     // notation.
-    slice = arr[3 .. 7];
+    slice = arr[3 .. 7]
 
     // Printing it out to verify it is the same.
-    for elem in slice do printf("{} ", elem);
-    print("\n");
+    for elem in slice do printf("{} ", elem)
+    print("\n")
 
     // Since strings are represented as slices in Onyx, substrings
     // are easily accessed using the same slice literal syntax.
-    some_string := "This is a test string for demoing purposes.";
-    substr      := some_string.data[10 .. 14];
-    println(substr);
+    some_string := "This is a test string for demoing purposes."
+    substr      := some_string.data[10 .. 14]
+    println(substr)
 }

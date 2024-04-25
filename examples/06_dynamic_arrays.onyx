@@ -15,7 +15,7 @@ main :: (args: [] cstr) {
     // Declaring dynamic arrays in Onyx looks like this. The
     // '..' makes it a dynamic array, as opposed to a slice
     // or fixed size array.
-    arr : [..] i32;
+    arr : [..] i32
 
     // Currently, there are no implicit procedure calls anywhere
     // in the language because I find explicitly specifying
@@ -25,25 +25,25 @@ main :: (args: [] cstr) {
     // array explicitly. The 'defer' simply runs array.free at the
     // end of this procedure scope. We will talk more about how to
     // use the defer keyword later.
-    array.init(^arr);
-    defer array.free(^arr);
+    array.init(^arr)
+    defer array.free(^arr)
 
     // Once the dynamic array has been initialized, we can begin
     // to use it. The most common function you will probably use
     // is array.push. It simply appends a new element to end of
     // the array.
-    for i in 0 .. 10 do array.push(^arr, i);
+    for i in 0 .. 10 do array.push(^arr, i)
 
     // Now if we print the array, we will see the numbers from 0 to 9.
-    println(arr);
+    println(arr)
 
     // We can remove elements from the end using array.pop.
-    for i in 0 .. 4 do array.pop(^arr);
-    println(arr);
+    for i in 0 .. 4 do array.pop(^arr)
+    println(arr)
 
     // We can insert elements at the beginning using array.insert.
-    for i in 6 .. 10 do array.insert(^arr, 0, i);
-    println(arr);
+    for i in 6 .. 10 do array.insert(^arr, 0, i)
+    println(arr)
 
     // There are many other useful functions in the core.array package.
     // You can look in core/array.onyx for a list of all of them.

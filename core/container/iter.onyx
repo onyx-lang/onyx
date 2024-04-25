@@ -13,28 +13,28 @@ use core.intrinsics.types {type_is_struct}
 //
 // Iterator is a builtin type known by the compiler, as Iterators
 // can be used in for-loops natively without any translation.
-Iterator.filter :: filter;
-Iterator.map :: map;
-Iterator.flat_map :: flat_map;
-Iterator.zip :: zip;
+Iterator.filter :: filter
+Iterator.map :: map
+Iterator.flat_map :: flat_map
+Iterator.zip :: zip
 
-Iterator.take :: take;
-Iterator.take_while :: take_while;
-Iterator.skip :: skip;
-Iterator.skip_while :: skip_while;
+Iterator.take :: take
+Iterator.take_while :: take_while
+Iterator.skip :: skip
+Iterator.skip_while :: skip_while
 
-Iterator.flatten :: flatten;
-Iterator.enumerate :: enumerate;
+Iterator.flatten :: flatten
+Iterator.enumerate :: enumerate
 
-Iterator.find :: find;
-Iterator.fold :: fold;
-Iterator.fold1 :: fold1;
-Iterator.count :: count;
-Iterator.some :: some;
-Iterator.every :: every;
-Iterator.sum   :: sum;
-Iterator.collect :: to_array;
-Iterator.collect_map :: to_map;
+Iterator.find :: find
+Iterator.fold :: fold
+Iterator.fold1 :: fold1
+Iterator.count :: count
+Iterator.some :: some
+Iterator.every :: every
+Iterator.sum   :: sum
+Iterator.collect :: to_array
+Iterator.collect_map :: to_map
 
 
 
@@ -47,25 +47,25 @@ as_iter :: #match -> Iterator {}
 /// Helper interface to test if something can be passed to
 /// as_iter successfully.
 Iterable :: interface (T: type_expr) {
-    t as T;
-    { as_iter(t) } -> Iterator;
+    t as T
+    { as_iter(t) } -> Iterator
 }
 
 /// Helper function to get the next value out of an iterator.
 next :: (it: Iterator) -> ? it.Iter_Type {
-    return it.next(it.data);
+    return it.next(it.data)
 }
 
 /// Helper function to get the next value out of an iterator, but translated to an optional.
 /// Returns `None` if the iterator was empty, `Some(value)` otherwise.
 next_opt :: (it: Iterator) -> ? it.Iter_Type {
-    return it.next(it.data);
+    return it.next(it.data)
 }
 
 /// Helper function to close an iterator, if a close function is defined.
 close :: (it: Iterator) {
     if it.close != null_proc {
-        it.close(it.data);
+        it.close(it.data)
     }
 }
 
@@ -75,9 +75,9 @@ empty :: ($T: type_expr) -> Iterator(T) {
     return .{
         // CLEANUP: Fix the compiler bug that makes this not able to a closure.
         next = #solidify ($T: type_expr, _: rawptr) -> ? T {
-            return .None;
+            return .None
         } { T = T }
-    };
+    }
 }
 
 
@@ -90,10 +90,10 @@ counter :: (start: type = 0, $type: type_expr = i32) -> Iterator(type) {
     return generator(
         &.{ i = start },
         ctx => {
-            defer ctx.i += 1;
-            return Optional.make(ctx.i);
+            defer ctx.i += 1
+            return Optional.make(ctx.i)
         }
-    );
+    )
 }
 
 
@@ -107,28 +107,28 @@ counter :: (start: type = 0, $type: type_expr = i32) -> Iterator(type) {
 
 #overload #order 10000
 as_iter :: (x: &$T/ImplicitIterator) => {
-    x->iter_open();
-    return generator_no_copy(x, T.iter_next, T.iter_close);
+    x->iter_open()
+    return generator_no_copy(x, T.iter_next, T.iter_close)
 }
 
 #local
 ImplicitIterator :: interface (T: type_expr) {
-    t as T;
+    t as T
 
-    { t->iter_open() } -> void;
-    t->iter_next();
-    { t->iter_close() } -> void;
+    { t->iter_open() } -> void
+    t->iter_next()
+    { t->iter_close() } -> void
 }
 
 
 #overload #order 10000
-as_iter :: macro (x: $T/HasAsIter) => x->as_iter();
+as_iter :: macro (x: $T/HasAsIter) => x->as_iter()
 
 #local
 HasAsIter :: interface (T: type_expr) {
-    t as T;
+    t as T
 
-    { t->as_iter() } -> Iterator;
+    { t->as_iter() } -> Iterator
 }
 
 
@@ -148,18 +148,18 @@ filter :: (it: Iterator($T), predicate: (T) -> bool) =>
         &.{ iterator = it, predicate = predicate },
 
         fi => {
-            value := next(fi.iterator);
+            value := next(fi.iterator)
             if value {
                 while !fi.predicate(value->unwrap()) {
-                    value = next(fi.iterator);
-                    if !value do break;
+                    value = next(fi.iterator)
+                    if !value do break
                 }
-                return value;
+                return value
             }
-            return value;
+            return value
         },
 
-        fi => { close(fi.iterator); });
+        fi => { close(fi.iterator); })
 
 #overload
 filter :: (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool) =>
@@ -167,18 +167,18 @@ filter :: (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool) =>
         &.{ iterator = it, predicate = predicate, ctx = ctx },
 
         (fi: $C) -> ? T {
-            value := next(fi.iterator);
+            value := next(fi.iterator)
             if value {
                 while !fi.predicate(value->unwrap(), fi.ctx) {
-                    value = next(fi.iterator);
-                    if !value do return .None;
+                    value = next(fi.iterator)
+                    if !value do return .None
                 }
-                return value;
+                return value
             }
-            return .None;
+            return .None
         },
 
-        fi => { close(fi.iterator); });
+        fi => { close(fi.iterator); })
 
 
 /// Transforms every value that comes out of an iterator
@@ -191,11 +191,11 @@ map :: (it: Iterator($T), transform: (T) -> $R) =>
         &.{ iterator = it, transform = transform },
 
         (mi: $C) -> ? R {
-            v := next(mi.iterator);
+            v := next(mi.iterator)
             return switch v {
-                case .Some as v => Optional.make(mi.transform(v));
-                case .None      => .None;
-            };
+                case .Some as v => Optional.make(mi.transform(v))
+                case .None      => .None
+            }
         },
 
         mi => { close(mi.iterator); })
@@ -206,11 +206,11 @@ map :: (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> $R) =>
         &.{ iterator = it, transform = transform, ctx = ctx },
 
         (mi: $C) -> ? R {
-            v := next(mi.iterator);
+            v := next(mi.iterator)
             return switch v {
-                case .Some as v => Optional.make(mi.transform(v, mi.ctx));
-                case .None      => .None;
-            };
+                case .Some as v => Optional.make(mi.transform(v, mi.ctx))
+                case .None      => .None
+            }
         },
 
         mi => { close(mi.iterator); })
@@ -232,22 +232,22 @@ flat_map :: (it: Iterator($T), transform: (T) -> Iterator($R)) =>
         mi => {
             while true {
                 if mi.get_new_inner {
-                    mi.get_new_inner = false;
+                    mi.get_new_inner = false
                     switch next(mi.iterator) {
-                        case .None do break break;
+                        case .None do break break
                         case .Some as t {
-                            mi.inner_iter = mi.transform(t);
+                            mi.inner_iter = mi.transform(t)
                         }
                     }
                 }
 
-                value := next(mi.inner_iter);
-                if value do return value;
+                value := next(mi.inner_iter)
+                if value do return value
 
-                mi.get_new_inner = true;
+                mi.get_new_inner = true
             }
 
-            return .None;
+            return .None
         },
 
         mi => { close(mi.iterator); })
@@ -260,22 +260,22 @@ flat_map :: (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> Iterator($R)) =
         mi => {
             while true {
                 if mi.get_new_inner {
-                    mi.get_new_inner = false;
+                    mi.get_new_inner = false
                     switch next(mi.iterator) {
-                        case .None do break break;
+                        case .None do break break
                         case .Some as t {
-                            mi.inner_iter = mi.transform(t, mi.ctx);
+                            mi.inner_iter = mi.transform(t, mi.ctx)
                         }
                     }
                 }
 
-                value := next(mi.inner_iter);
-                if value do return value;
+                value := next(mi.inner_iter)
+                if value do return value
 
-                mi.get_new_inner = true;
+                mi.get_new_inner = true
             }
 
-            return .None;
+            return .None
         },
 
         mi => { close(mi.iterator); })
@@ -290,14 +290,14 @@ take :: (it: Iterator($T), count: u32) -> Iterator(T) {
 
         ti => {
             if ti.remaining > 0 {
-                ti.remaining -= 1;
-                return next(ti.iterator);
+                ti.remaining -= 1
+                return next(ti.iterator)
             }
             
-            return .None;
+            return .None
         },
 
-        ti => { close(ti.iterator); });
+        ti => { close(ti.iterator); })
 }
 
 
@@ -307,17 +307,17 @@ take_while :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
         &.{ iterator = it, predicate = predicate },
 
         ti => {
-            value := next(ti.iterator);
+            value := next(ti.iterator)
             if value {
                 if ti.predicate(value->unwrap()) {
-                    return value;
+                    return value
                 }
             }
 
-            return .None;
+            return .None
         },
 
-        ti => { close(ti.iterator); });
+        ti => { close(ti.iterator); })
 }
 
 
@@ -328,19 +328,19 @@ skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
 
         (si: $C) -> ? T {
             while !si.skipped && si.to_skip > 0 {
-                si.to_skip -= 1;
-                value := next(si.iterator);
+                si.to_skip -= 1
+                value := next(si.iterator)
 
                 if !value {
-                    si.skipped = true;
-                    return .None;
+                    si.skipped = true
+                    return .None
                 }
             }
 
-            return next(si.iterator);
+            return next(si.iterator)
         },
 
-        si => { close(si.iterator); });
+        si => { close(si.iterator); })
 }
 
 
@@ -354,23 +354,23 @@ skip_while :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
 
         (si: $C) -> ? T {
             while !si.skipped {
-                value := next(si.iterator);
+                value := next(si.iterator)
 
                 if !value {
-                    si.skipped = true;
-                    return .None;
+                    si.skipped = true
+                    return .None
                 }
 
                 if !si.predicate(value->unwrap()) {
-                    si.skipped = true;
-                    return value;
+                    si.skipped = true
+                    return value
                 }
             }
 
-            return next(si.iterator);
+            return next(si.iterator)
         },
 
-        si => { close(si.iterator); });
+        si => { close(si.iterator); })
 }
 
 #overload
@@ -380,23 +380,23 @@ skip_while :: (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool) -> Iter
 
         si => {
             while !si.skipped {
-                value := next(si.iterator);
+                value := next(si.iterator)
 
                 if !value {
-                    si.skipped = true;
-                    return .None;
+                    si.skipped = true
+                    return .None
                 }
 
                 if !si.predicate(value->unwrap(), si.ctx) {
-                    si.skipped = true;
-                    return value;
+                    si.skipped = true
+                    return value
                 }
             }
 
-            return next(si.iterator);
+            return next(si.iterator)
         },
 
-        si => { close(si.iterator); });
+        si => { close(si.iterator); })
 }
 
 
@@ -407,17 +407,17 @@ zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R)) -> Iterator(P
         &.{ left_iter = left_iterator, right_iter = right_iterator },
 
         zi => {
-            v1 := next(zi.left_iter);
-            v2 := next(zi.right_iter);
+            v1 := next(zi.left_iter)
+            v2 := next(zi.right_iter)
 
             if v1 && v2 {
-                return Optional.make(Pair.make(v1->unwrap(), v2->unwrap()));
+                return Optional.make(Pair.make(v1->unwrap(), v2->unwrap()))
             }
 
-            return .None;
+            return .None
         },
 
-        zi => { close(zi.left_iter); close(zi.right_iter); });
+        zi => { close(zi.left_iter); close(zi.right_iter); })
 }
 
 
@@ -433,19 +433,19 @@ flatten :: (i: Iterator($T), f: (T) -> ? $R) -> Iterator(R) {
 
         fi => {
             while true {
-                v := next(fi.i);
-                if !v do break;
+                v := next(fi.i)
+                if !v do break
 
-                v2 := v->and_then(fi.f);
+                v2 := v->and_then(fi.f)
                 if v2 {
-                    return v2;
+                    return v2
                 }
             }
-            return .None;
+            return .None
         },
 
         fi => { close(fi.i); }
-    );
+    )
 }
 
 
@@ -460,42 +460,42 @@ concat :: (iters: ..Iterator($T)) -> Iterator(T) {
 
         c => {
             while c.idx < c.iters.count {
-                curr_iter := c.iters[c.idx];
-                value := next(curr_iter);
-                if value do return value;
+                curr_iter := c.iters[c.idx]
+                value := next(curr_iter)
+                if value do return value
 
-                c.idx += 1;
+                c.idx += 1
             }
 
-            return .None;
+            return .None
         },
         
         c => {
             for& c.iters {
-                close(*it);
+                close(*it)
             }
-        });
+        })
 }
 
 /// Yields the same value indefinitely. Useful with `iter.zip`.
 const :: (value: $T) -> Iterator(T) {
-    return generator(&.{ v = value }, c => Optional.make(c.v));
+    return generator(&.{ v = value }, c => Optional.make(c.v))
 }
 
 /// Yields a single value, then stops.
 single :: (value: $T, dispose: (T) -> void = null_proc) -> Iterator(T) {
     return generator(&.{ v = value, yielded = false, dispose = dispose }, c => {
         if !c.yielded {
-            c.yielded = true;
-            return Optional.make(c.v);
+            c.yielded = true
+            return Optional.make(c.v)
         }
 
-        return .None;
+        return .None
     }, c => {
         if c.dispose != null_proc {
-            c.dispose(c.v);
+            c.dispose(c.v)
         }
-    });
+    })
 }
 
 
@@ -506,7 +506,7 @@ enumerate :: #match #local {}
 
 #overload
 enumerate :: macro (it: $T/Iterable, start_index: i32 = 0) =>
-    #this_package.enumerate(#this_package.as_iter(it), start_index);
+    #this_package.enumerate(#this_package.as_iter(it), start_index)
 
 #overload
 enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Value(T)) {
@@ -514,22 +514,22 @@ enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Va
         &.{ iterator = it, current_index = start_index },
 
         ec => {
-            value := next(ec.iterator);
+            value := next(ec.iterator)
             if value {
-                defer ec.current_index += 1;
+                defer ec.current_index += 1
                 return Enumeration_Value(T).{ ec.current_index, value->unwrap() }
-                    |> Optional.make();
+                    |> Optional.make()
             }
 
-            return .None;
+            return .None
         },
 
-        ec => { close(ec.iterator); });
+        ec => { close(ec.iterator); })
 }
 
 #local Enumeration_Value :: struct (T: type_expr) {
-    index: i32;
-    value: T;
+    index: i32
+    value: T
 }
 
 
@@ -560,13 +560,13 @@ from_array :: (arr: [] $T/type_is_struct) => generator(
 
     ctx => {
         if ctx.current < ctx.count {
-            defer ctx.current += 1;
-            return &ctx.data[ctx.current] |> Optional.make();
+            defer ctx.current += 1
+            return &ctx.data[ctx.current] |> Optional.make()
         }
 
-        return .None;
+        return .None
     }
-);
+)
 
 #overload
 from_array :: (arr: [] $T, by_pointer: bool) => generator(
@@ -574,13 +574,13 @@ from_array :: (arr: [] $T, by_pointer: bool) => generator(
 
     ctx => {
         if ctx.current < ctx.count {
-            defer ctx.current += 1;
-            return &ctx.data[ctx.current] |> Optional.make();
+            defer ctx.current += 1
+            return &ctx.data[ctx.current] |> Optional.make()
         }
 
-        return .None;
+        return .None
     }
-);
+)
 
 #overload
 from_array :: (arr: [] $T) => generator(
@@ -588,13 +588,13 @@ from_array :: (arr: [] $T) => generator(
 
     ctx => {
         if ctx.current < ctx.count {
-            defer ctx.current += 1;
-            return ctx.data[ctx.current] |> Optional.make();
+            defer ctx.current += 1
+            return ctx.data[ctx.current] |> Optional.make()
         }
 
-        return .None;
+        return .None
     }
-);
+)
 
 
 /// Iterators created from pointers to dynamic arrays are
@@ -602,20 +602,20 @@ from_array :: (arr: [] $T) => generator(
 #local
 generic_dynamic_array_as_iter :: (x: &[..] $T, $access: Code, $return_type: type_expr) => {
     Context :: struct (T: type_expr) {
-        arr: &[..] T;
-        current: u32;
+        arr: &[..] T
+        current: u32
     }
 
-    c := new_temp(Context(T));
-    c.arr = x;
+    c := new_temp(Context(T))
+    c.arr = x
 
     next :: (use _: &Context($T), $access: Code) => {
         if current < arr.count {
-            defer current += 1;
-            return (#unquote access) |> Optional.make();
+            defer current += 1
+            return (#unquote access) |> Optional.make()
 
         } else {
-            return .None;
+            return .None
         }
     }
 
@@ -623,28 +623,28 @@ generic_dynamic_array_as_iter :: (x: &[..] $T, $access: Code, $return_type: type
         //
         // This is current - 1 because current will have already
         // been incremented by the time this element calls #remove.
-        array.delete(arr, current - 1);
-        current -= 1;
+        array.delete(arr, current - 1)
+        current -= 1
     }
 
     return return_type.{
         data  = c,
         next  = #solidify next { T = T, access = access },
         remove = #solidify remove { T = T },
-    };
+    }
 }
 
 
 #overload
 as_iter :: macro (x: &[..] $T) => {
     G :: generic_dynamic_array_as_iter
-    return G(x, [](arr.data[current]), Iterator(T));
+    return G(x, [](arr.data[current]), Iterator(T))
 }
 
 #overload
 as_iter :: macro (x: &[..] $T, by_pointer: bool) => {
     G :: generic_dynamic_array_as_iter
-    return G(x, [](&arr.data[current]), Iterator(&T));
+    return G(x, [](&arr.data[current]), Iterator(&T))
 }
 
 #overload
@@ -653,21 +653,21 @@ as_iter :: (r: range) => generator(
     (ctx: $C) -> ? i32 {
         if ctx.r.step > 0 {
             if ctx.v >= ctx.r.high {
-                return .None;
+                return .None
             } else {
-                defer ctx.v += ctx.r.step;
-                return ctx.v;
+                defer ctx.v += ctx.r.step
+                return ctx.v
             }
 
         } else {
             if ctx.v < ctx.r.high {
-                return .None;
+                return .None
             } else {
-                defer ctx.v += ctx.r.step;
-                return ctx.v;
+                defer ctx.v += ctx.r.step
+                return ctx.v
             }
         }
-    });
+    })
 
 
 #overload
@@ -676,21 +676,21 @@ as_iter :: (r: range64) => generator(
     (ctx: $C) -> ? i64 {
         if ctx.r.step > 0 {
             if ctx.v < ctx.r.high {
-                defer ctx.v += ctx.r.step;
-                return ctx.v;
+                defer ctx.v += ctx.r.step
+                return ctx.v
             } else {
-                return .None;
+                return .None
             }
 
         } else {
             if ctx.v >= ctx.r.high {
-                defer ctx.v += ctx.r.step;
-                return ctx.v;
+                defer ctx.v += ctx.r.step
+                return ctx.v
             } else {
-                return .None;
+                return .None
             }
         }
-    });
+    })
 
 
 //
@@ -701,17 +701,17 @@ find :: #match #local {}
 
 #overload
 find :: macro (it: $T/Iterable, predicate: $F) =>
-    #this_package.find(#this_package.as_iter(it), predicate);
+    #this_package.find(#this_package.as_iter(it), predicate)
 
 #overload
 find :: (it: Iterator($T), predicate: (T) -> bool) -> ? T {
     for v in it {
         if predicate(v) {
-            return v;
+            return v
         }
     }
 
-    return .{};
+    return .{}
 }
 
 
@@ -722,17 +722,17 @@ fold :: #match #local {}
 
 #overload
 fold :: macro (it: $T/Iterable, init: $R, combine: $S) =>
-    #this_package.fold(#this_package.as_iter(it), init, combine);
+    #this_package.fold(#this_package.as_iter(it), init, combine)
 
 #overload
 fold :: (it: Iterator($T), initial_value: $R, combine: (T, R) -> R) -> R {
-    result := initial_value;
+    result := initial_value
 
     for value in it {
-        result = combine(value, result);
+        result = combine(value, result)
     }
 
-    return result;
+    return result
 }
 
 /// Incremently calls `combine` on the yielded value and the
@@ -742,19 +742,19 @@ fold1 :: #match #local {}
 
 #overload
 fold1 :: macro (it: $T/Iterable, combine: $S) =>
-    #this_package.fold1(#this_package.as_iter(it), combine);
+    #this_package.fold1(#this_package.as_iter(it), combine)
 
 #overload
 fold1 :: (it: Iterator($T), combine: (T, T) -> T) -> ? T {
-    maybe_result := next(it);
-    if !maybe_result do return .None;
+    maybe_result := next(it)
+    if !maybe_result do return .None
 
-    result := maybe_result->unwrap();
+    result := maybe_result->unwrap()
     for value in it {
-        result = combine(value, result);
+        result = combine(value, result)
     }
 
-    return result;
+    return result
 }
 
 
@@ -763,13 +763,13 @@ count :: #match #local {}
 
 #overload
 count :: macro (it: $T/Iterable, cond: $F) =>
-    #this_package.count(#this_package.as_iter(it), cond);
+    #this_package.count(#this_package.as_iter(it), cond)
 
 #overload
 count :: (it: Iterator($T), cond: (T) -> bool) -> i32 {
-    c := 0;
-    for value in it do if cond(value) do c += 1;
-    return c;
+    c := 0
+    for value in it do if cond(value) do c += 1
+    return c
 }
 
 
@@ -779,12 +779,12 @@ some :: #match #local {}
 
 #overload
 some :: macro (it: $T/Iterable, cond: $F) =>
-    #this_package.some(#this_package.as_iter(it), cond);
+    #this_package.some(#this_package.as_iter(it), cond)
 
 #overload
 some :: (it: Iterator($T), cond: (T) -> bool) -> bool {
-    for value in it do if cond(value) do return true;
-    return false;
+    for value in it do if cond(value) do return true
+    return false
 }
 
 
@@ -793,12 +793,12 @@ every :: #match #local {}
 
 #overload
 every :: macro (it: $T/Iterable, cond: $F) =>
-    #this_package.every(#this_package.as_iter(it), cond);
+    #this_package.every(#this_package.as_iter(it), cond)
 
 #overload
 every :: (it: Iterator($T), cond: (T) -> bool) -> bool {
-    for value in it do if !cond(value) do return false;
-    return true;
+    for value in it do if !cond(value) do return false
+    return true
 }
 
 /// Returns the sum of all yield values, using the `+` operator.
@@ -806,37 +806,37 @@ sum :: #match #local {}
 
 #overload
 sum :: macro (it: $T/Iterable) =>
-    #this_package.sum(#this_package.as_iter(it));
+    #this_package.sum(#this_package.as_iter(it))
 
 #overload
 sum :: (it: Iterator($T)) -> T {
-    val := T.{};
+    val := T.{}
 
     for v in it {
-        val = val + v;
+        val = val + v
     }
 
-    return val;
+    return val
 }
 
 
 /// Places all yielded values into a dynamically allocated array,
 /// using the allocator provided (context.allocator by default).
 to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
-    arr := array.make(T, allocator=allocator);
-    for v in it do array.push(&arr, v);
+    arr := array.make(T, allocator=allocator)
+    for v in it do array.push(&arr, v)
 
-    return arr;
+    return arr
 }
 
 /// Places all yielded values into a Map, with the `first` member
 /// being the key, and the `second` member being the value.
 to_map :: (it: Iterator(Pair($K, $V)), allocator := context.allocator) -> Map(K, V) {
-    m := builtin.make(Map(K, V), allocator=allocator);
+    m := builtin.make(Map(K, V), allocator=allocator)
     for p in it {
-        m->put(p.first, p.second);
+        m->put(p.first, p.second)
     }
-    return m;
+    return m
 }
 
 /// Collects elements into an array, or a map, depending on if the
@@ -860,13 +860,13 @@ prod :: #match #local {}
 
 #overload
 prod :: macro (x: $I/Iterable, y: $I2/Iterable) => {
-    return #this_package.prod(x, #this_package.as_iter(y));
+    return #this_package.prod(x, #this_package.as_iter(y))
 }
 
 #overload
 prod :: (x: $I1/Iterable, y_iter: Iterator($Y)) => {
     // TODO: Remove this unwrap here
-    y_val := next(y_iter)->unwrap();
+    y_val := next(y_iter)->unwrap()
 
     return generator(
         &.{
@@ -878,22 +878,22 @@ prod :: (x: $I1/Iterable, y_iter: Iterator($Y)) => {
         },
 
         ctx => {
-            x_val := next(ctx.x_iter);
+            x_val := next(ctx.x_iter)
             if x_val {
-                return Optional.make(Pair.make(x_val, ctx.y_val));
+                return Optional.make(Pair.make(x_val, ctx.y_val))
             }
 
-            new_y_val = next(ctx.y_iter);
-            if !new_y_val do return .None;
+            new_y_val = next(ctx.y_iter)
+            if !new_y_val do return .None
 
-            ctx.y_val = new_y_val->unwrap();
-            ctx.x_iter = as_iter(ctx.x);
-            x_val = next(ctx.x_iter);
-            if !x_val do return .None;
+            ctx.y_val = new_y_val->unwrap()
+            ctx.x_iter = as_iter(ctx.x)
+            x_val = next(ctx.x_iter)
+            if !x_val do return .None
 
-            return Optional.make(Pair.make(x_val, ctx.y_val));
+            return Optional.make(Pair.make(x_val, ctx.y_val))
         }
-    );
+    )
 }
 
 
@@ -903,33 +903,33 @@ prod :: (x: $I1/Iterable, y_iter: Iterator($Y)) => {
 /// Python:
 ///     results = [it * 2 for it in [1, 2, 3, 4, 5]]
 /// Onyx:
-///     results := iter.comp(u32.[1, 2, 3, 4, 5], [it](it * 2));
+///     results := iter.comp(u32.[1, 2, 3, 4, 5], [it](it * 2))
 comp :: #match #local {}
 
 #overload
 comp :: macro (i: Iterator(&$V), value: Code) => {
-    it: V;
-    a := make([..] typeof #unquote value);
+    it: V
+    a := make([..] typeof #unquote value)
 
     for __it in i {
-        it := *__it;
-        a << (#unquote value(it));
+        it := *__it
+        a << (#unquote value(it))
     }
-    return a;
+    return a
 }
 
 #overload
 comp :: macro (i: Iterator($V), value: Code) => {
-    it: V;
-    a := make([..] typeof #unquote value);
+    it: V
+    a := make([..] typeof #unquote value)
 
-    for i do a << (#unquote value(it));
-    return a;
+    for i do a << (#unquote value(it))
+    return a
 }
 
 #overload
 comp :: macro (i: $I/Iterable, value: Code) =>
-    #this_package.comp(#this_package.as_iter(i), value);
+    #this_package.comp(#this_package.as_iter(i), value)
 
 
 /// Using the polymorph solving system, you can write type
@@ -942,25 +942,25 @@ generator :: #match #local {}
 
 #overload
 generator :: (ctx: &$Ctx, gen: (&Ctx) -> ? $T) -> Iterator(T) {
-    v := raw_alloc(context.temp_allocator, sizeof Ctx);
-    core.memory.copy(v, ctx, sizeof Ctx);
+    v := raw_alloc(context.temp_allocator, sizeof Ctx)
+    core.memory.copy(v, ctx, sizeof Ctx)
 
     return .{
         data = v,
         next = gen
-    };
+    }
 }
 
 #overload
 generator :: (ctx: &$Ctx, gen: (&Ctx) -> ? $T, close: (&Ctx) -> void) -> Iterator(T) {
-    v := raw_alloc(context.temp_allocator, sizeof Ctx);
-    core.memory.copy(v, ctx, sizeof Ctx);
+    v := raw_alloc(context.temp_allocator, sizeof Ctx)
+    core.memory.copy(v, ctx, sizeof Ctx)
 
     return .{
         data = v,
         next = gen,
         close = close
-    };
+    }
 }
 
 generator_no_copy :: #match #local {}
@@ -985,30 +985,30 @@ generator_no_copy :: (ctx: &$Ctx, gen: (&Ctx) -> ? $T, close: (&Ctx) -> void) =>
 
     #overload
     distributor :: macro (it: $T/Iterable) =>
-        #this_package.distributor(#this_package.as_iter(it));
+        #this_package.distributor(#this_package.as_iter(it))
 
     #overload
     distributor :: (it: Iterator) -> Iterator(it.Iter_Type) {
         Context :: struct (T: type_expr) {
-            mutex: sync.Mutex;
-            iterator: Iterator(T);
-            ended := false;
+            mutex: sync.Mutex
+            iterator: Iterator(T)
+            ended := false
         }
 
         next :: (use c: &Context($T)) -> ? T {
-            if ended do return .None;
-            sync.scoped_mutex(&mutex);
+            if ended do return .None
+            sync.scoped_mutex(&mutex)
 
-            v := iterator.next(iterator.data);
+            v := iterator.next(iterator.data)
             if !v {
-                ended = true;
+                ended = true
             }
-            return v;
+            return v
         }
 
         close :: (use c: &Context($T)) {
-            sync.mutex_destroy(&c.mutex);
-            cfree(c);
+            sync.mutex_destroy(&c.mutex)
+            cfree(c)
         }
 
         // This iterator's context is allocated from the heap because
@@ -1016,18 +1016,18 @@ generator_no_copy :: (ctx: &$Ctx, gen: (&Ctx) -> ? $T, close: (&Ctx) -> void) =>
         // in parallel programs. Programs such as those *might* make
         // a lot of iterators in their theads and I don't want to cause
         // the distributor's context be overwritten.
-        c := new(Context(it.Iter_Type));
-        sync.mutex_init(&c.mutex);
-        c.iterator = it;
+        c := new(Context(it.Iter_Type))
+        sync.mutex_init(&c.mutex)
+        c.iterator = it
 
-        return .{c, #solidify next {T=it.Iter_Type}, #solidify close {T=it.Iter_Type}};
+        return .{c, #solidify next {T=it.Iter_Type}, #solidify close {T=it.Iter_Type}}
     }
 
     /// Allows you to easily write a parallelized for-loop over an iterator.
     /// For example,
     /// 
     ///     iter.parallel_for(1 .. 100, 4, &.{}) {
-    ///         printf("Thread {} has {}!\n", context.thread_id, it);
+    ///         printf("Thread {} has {}!\n", context.thread_id, it)
     ///     }
     parallel_for :: #match #local {}
 
@@ -1038,7 +1038,7 @@ generator_no_copy :: (ctx: &$Ctx, gen: (&Ctx) -> ? $T, close: (&Ctx) -> void) =>
             thread_count,
             thread_data,
             body
-        );
+        )
     }
 
     #overload
@@ -1046,22 +1046,22 @@ generator_no_copy :: (ctx: &$Ctx, gen: (&Ctx) -> ? $T, close: (&Ctx) -> void) =>
         use core {thread, alloc}
 
         if thread_count != 0 {
-            dist := #this_package.distributor(iter);
-            t_data := &.{iter = &dist, data = thread_data};
+            dist := #this_package.distributor(iter)
+            t_data := &.{iter = &dist, data = thread_data}
 
-            threads := alloc.array_from_stack(thread.Thread, thread_count - 1);
-            for& threads do thread.spawn(it, t_data, #solidify thread_function {body=body});
+            threads := alloc.array_from_stack(thread.Thread, thread_count - 1)
+            for& threads do thread.spawn(it, t_data, #solidify thread_function {body=body})
 
-            thread_function(t_data, body);
+            thread_function(t_data, body)
 
-            for& threads do thread.join(it);
-            if dist.close != null_proc do dist.close(dist.data);
+            for& threads do thread.join(it)
+            if dist.close != null_proc do dist.close(dist.data)
         }
 
         thread_function :: (__data: &$T, $body: Code) {
-            thread_data := __data.data;
+            thread_data := __data.data
             for #no_close *__data.iter {
-                #unquote body;
+                #unquote body
             }
         }
     }

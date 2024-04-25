@@ -14,21 +14,21 @@ use core
 
 
 FixedAllocator :: struct {
-    buffer: [] u8;
-    end: u32;
+    buffer: [] u8
+    end: u32
 }
 
 #local
 fixed_allocator_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     fa_data := cast(&FixedAllocator) data;  
 
-    if aa != .Alloc do return null;
-    if size > fa_data.buffer.count - fa_data.end do return null;
+    if aa != .Alloc do return null
+    if size > fa_data.buffer.count - fa_data.end do return null
 
-    aligned_end := cast(u32) core.memory.align(fa_data.end, align);
-    defer fa_data.end = aligned_end + size;
+    aligned_end := cast(u32) core.memory.align(fa_data.end, align)
+    defer fa_data.end = aligned_end + size
     
-    return fa_data.buffer.data + aligned_end;
+    return fa_data.buffer.data + aligned_end
 }
 
 make :: (buffer: [] u8) => FixedAllocator.{ buffer, 0 }
@@ -40,5 +40,5 @@ make_allocator :: (fa_data: &FixedAllocator) => Allocator.{
 }
 
 reset :: (data: &FixedAllocator) {
-    data.end = 0;
+    data.end = 0
 }

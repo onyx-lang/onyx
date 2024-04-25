@@ -5,21 +5,21 @@ use core {array, slice}
 tagged_globals: [] &Tagged_Global
 
 Tagged_Global :: struct {
-    data: rawptr;
-    type: type_expr;
-    tags: [] any;
-    pack: package_id;
+    data: rawptr
+    type: type_expr
+    tags: [] any
+    pack: package_id
 }
 
 #local GGWT_Result :: struct (T: type_expr) {
-    data: rawptr;
-    type: type_expr;
-    tag: &T;
-    pack: package_id;
+    data: rawptr
+    type: type_expr
+    tag: &T
+    pack: package_id
 }
 
 get_globals_with_tag :: ($tag_type: type_expr) -> [] GGWT_Result(tag_type) {
-    results := make([..] GGWT_Result(tag_type));
+    results := make([..] GGWT_Result(tag_type))
 
     for glob in tagged_globals {
         slice.find_opt(glob.tags, [v](v.type == tag_type))->with([tag] {
@@ -28,10 +28,10 @@ get_globals_with_tag :: ($tag_type: type_expr) -> [] GGWT_Result(tag_type) {
                 type = glob.type,
                 tag = cast(&tag_type) tag.data,
                 pack = glob.pack,
-            });
-        });
+            })
+        })
     }
 
-    return results;
+    return results
 }
 

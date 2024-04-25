@@ -22,15 +22,15 @@ use runtime
 // Every thread contains its own copy of standard input and output options.
 #thread_local stdio : struct {
     // Two-way stream of standard input and output.
-    stream       : io.Stream;
+    stream       : io.Stream
 
     // These fields are used to create a buffer of standard output.
-    print_stream : io.BufferStream;
-    print_writer : io.Writer;
+    print_stream : io.BufferStream
+    print_writer : io.Writer
 
     // When this is true, the print_stream is flushed when the last character
     // is a newline. When this is false, all flushing is entirely manual.
-    auto_flush : bool;
+    auto_flush : bool
 }
 
 //
@@ -38,26 +38,26 @@ use runtime
 // `stdio` object. This should not be called more than once per thread,
 // so you will likely never need to call it.
 __stdio_init :: () {
-    stdio.print_stream = io.buffer_stream_make(2048, context.allocator);
-    stdio.print_writer = io.writer_make(&stdio.print_stream, 0);
+    stdio.print_stream = io.buffer_stream_make(2048, context.allocator)
+    stdio.print_writer = io.writer_make(&stdio.print_stream, 0)
 
-    stdio.stream = .{ vtable = &stdio_vtable, flags = .Block_On_Read };
+    stdio.stream = .{ vtable = &stdio_vtable, flags = .Block_On_Read }
 
-    stdio.auto_flush = true;
+    stdio.auto_flush = true
 }
 
 
 //
 // Internal procedure to flush data from the print_stream to standard
-// output. Can be used directly, or through io.stream_flush(&stdio.stream);
+// output. Can be used directly, or through io.stream_flush(&stdio.stream)
 __flush_stdio :: () {
-    if stdio.print_stream.data.count == 0 do return;
+    if stdio.print_stream.data.count == 0 do return
 
     &stdio.print_stream
         |> io.buffer_stream_to_str()
-        |> runtime.platform.__output_string();
+        |> runtime.platform.__output_string()
 
-    &stdio.print_stream |> io.stream_flush();
+    &stdio.print_stream |> io.stream_flush()
 }
 
 //
@@ -66,10 +66,10 @@ __flush_stdio :: () {
 // that are sent directly to io.write.
 print :: #match #locked {
     (x: str) {
-        if !x do return;
+        if !x do return
 
-        io.write(&stdio.print_writer, x);
-        if x[x.count - 1] == '\n' && stdio.auto_flush do __flush_stdio();
+        io.write(&stdio.print_writer, x)
+        if x[x.count - 1] == '\n' && stdio.auto_flush do __flush_stdio()
     },
 
     (x)    => { io.write(&stdio.print_writer, x); },
@@ -80,37 +80,37 @@ print :: #match #locked {
 // Helper procedure that prints something, then prints a newline.
 println :: (x) => {
     use core
-    core.print(x);
-    core.print("\n");
+    core.print(x)
+    core.print("\n")
 }
 
 //
 // Standard formatted print to standard output.
 printf :: (format: str, va: ..any) {
-    buffer: [1024] u8;
+    buffer: [1024] u8
     print(conv.format_va(buffer, format, va, .{ null,
         (_: rawptr, to_output: str) -> bool {
-            io.write(&stdio.print_writer, to_output);
-            __flush_stdio();
-            return true;
+            io.write(&stdio.print_writer, to_output)
+            __flush_stdio()
+            return true
         }
-    }));
+    }))
 }
 
 #if #defined(runtime.platform.__output_error) {
     //
     // Prints to standard error, if available.
     eprintf :: (format: str, va: ..any) {
-        buffer: [1024] u8;
+        buffer: [1024] u8
         runtime.platform.__output_error(
             conv.format_va(buffer, format, va, .{
                 null,
                 (ctx: rawptr, to_output: str) -> bool {
-                    runtime.platform.__output_error(to_output);
-                    return true;
+                    runtime.platform.__output_error(to_output)
+                    return true
                 }
             })
-        );
+        )
     }
 }
 
@@ -118,18 +118,18 @@ printf :: (format: str, va: ..any) {
 // Prints to a dynamically allocated string, and returns the string.
 // It is the callers responsibility to free the string.
 aprintf :: (format: str, va: ..any) -> str {
-    buffer: [8196] u8;
-    out := conv.format_va(buffer, format, va);
-    return string.copy(out);
+    buffer: [8196] u8
+    out := conv.format_va(buffer, format, va)
+    return string.copy(out)
 }
 
 //
 // Prints to a dynamically allocated string in the temporary allocator,
 // and returns the string. 
 tprintf :: (format: str, va: ..any) -> str {
-    buffer: [8196] u8;
-    out := conv.format_va(buffer, format, va);
-    return string.copy(out, allocator=context.temp_allocator);
+    buffer: [8196] u8
+    out := conv.format_va(buffer, format, va)
+    return string.copy(out, allocator=context.temp_allocator)
 }
 
 
@@ -139,42 +139,42 @@ tprintf :: (format: str, va: ..any) -> str {
 // stdio.stream, because if those are corrupted due to a heap/memory
 // bug, they cannot be used.
 __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
-    temp: [3] u8;
+    temp: [3] u8
 
-    u8_ptr := cast([&] u8) ptr;
+    u8_ptr := cast([&] u8) ptr
     for i in byte_count {
-        val := u8_ptr[i];
+        val := u8_ptr[i]
 
-        temp[0] = map_to_ascii(val >> 4);
-        temp[1] = map_to_ascii(val & 15);
-        temp[2] = ' ';
+        temp[0] = map_to_ascii(val >> 4)
+        temp[1] = map_to_ascii(val & 15)
+        temp[2] = ' '
 
-        runtime.platform.__output_string(~~temp);
+        runtime.platform.__output_string(~~temp)
 
-        if i % bytes_per_line == (bytes_per_line - 1) do runtime.platform.__output_string("\n");
+        if i % bytes_per_line == (bytes_per_line - 1) do runtime.platform.__output_string("\n")
     }
 
 
     map_to_ascii :: (x: u8) -> u8 {
         return switch x {
-            case 0 =>  '0';
-            case 1 =>  '1';
-            case 2 =>  '2';
-            case 3 =>  '3';
-            case 4 =>  '4';
-            case 5 =>  '5';
-            case 6 =>  '6';
-            case 7 =>  '7';
-            case 8 =>  '8';
-            case 9 =>  '9';
-            case 10 => 'A';
-            case 11 => 'B';
-            case 12 => 'C';
-            case 13 => 'D';
-            case 14 => 'E';
-            case 15 => 'F';
-            case _ => 'X';
-        };
+            case 0 =>  '0'
+            case 1 =>  '1'
+            case 2 =>  '2'
+            case 3 =>  '3'
+            case 4 =>  '4'
+            case 5 =>  '5'
+            case 6 =>  '6'
+            case 7 =>  '7'
+            case 8 =>  '8'
+            case 9 =>  '9'
+            case 10 => 'A'
+            case 11 => 'B'
+            case 12 => 'C'
+            case 13 => 'D'
+            case 14 => 'E'
+            case 15 => 'F'
+            case _ => 'X'
+        }
     }
 }
 
@@ -187,40 +187,40 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
 // The v-table for the stream in stdio.
 #local stdio_vtable := io.Stream_Vtable.{
     read = (_: &io.Stream, buffer: [] u8) -> Result(u32, io.Error) {
-        __flush_stdio();
-        bytes_read := runtime.platform.__read_from_input(buffer);
-        if bytes_read <= 0 do return .{ Err = .EOF };
+        __flush_stdio()
+        bytes_read := runtime.platform.__read_from_input(buffer)
+        if bytes_read <= 0 do return .{ Err = .EOF }
 
-        return .{ Ok = bytes_read };
+        return .{ Ok = bytes_read }
     },
 
     read_byte = (_: &io.Stream) -> Result(u8, io.Error) {
-        __flush_stdio();
-        buf: [1] u8;
-        bytes_read := runtime.platform.__read_from_input(buf);
-        if bytes_read <= 0 do return .{ Err = .EOF };
+        __flush_stdio()
+        buf: [1] u8
+        bytes_read := runtime.platform.__read_from_input(buf)
+        if bytes_read <= 0 do return .{ Err = .EOF }
 
-        return .{ Ok = buf[0] };
+        return .{ Ok = buf[0] }
     },
 
     write = (_: &io.Stream, buffer: [] u8) -> Result(u32, io.Error) {
-        return io.stream_write(&stdio.print_stream, buffer);
+        return io.stream_write(&stdio.print_stream, buffer)
     },
 
     write_byte = (_: &io.Stream, byte: u8) -> io.Error {
-        return io.stream_write_byte(&stdio.print_stream, byte);
+        return io.stream_write_byte(&stdio.print_stream, byte)
     },
 
     flush = (_: &io.Stream) -> io.Error {
-        __flush_stdio();
-        return .None;
+        __flush_stdio()
+        return .None
     },
 
     poll = (_: &io.Stream, ev: io.PollEvent, timeout: i32) -> Result(bool, io.Error) {
         // TODO: This might not be right, as maybe sometimes you can't actually
         // write because a the output was closed?
-        if ev == .Write do return .{ Ok = true };
+        if ev == .Write do return .{ Ok = true }
 
-        return .{ Ok = runtime.platform.__wait_for_input(timeout) };
+        return .{ Ok = runtime.platform.__wait_for_input(timeout) }
     }
 }

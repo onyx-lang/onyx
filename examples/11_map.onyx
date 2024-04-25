@@ -8,13 +8,13 @@ main :: (args: [] cstr) {
     // provide an 'any-to-any' hash map in it's core libraries.
 
     // To use it, simply create one like so:
-    ages : Map(str, u32);
-    map.init(&ages);
-    defer map.free(&ages);
+    ages : Map(str, u32)
+    map.init(&ages)
+    defer map.free(&ages)
 
     // Alternatively you can use the map.make function to achieve the
     // same thing:
-    // ages := map.make(str, u32, default = 0);
+    // ages := map.make(str, u32, default = 0)
 
     // The defer statement ensures that the map memory will be freed
     // when this procedure exits, no matter through which way. The
@@ -22,26 +22,26 @@ main :: (args: [] cstr) {
     // returned when the map does not contain the requested key.
 
     // To put an entry into the map, use the map.put procedure.
-    map.put(&ages, "Dwight", 32);
-    map.put(&ages, "Jim", 25);
-    map.put(&ages, "Pam", 24);
+    map.put(&ages, "Dwight", 32)
+    map.put(&ages, "Jim", 25)
+    map.put(&ages, "Pam", 24)
 
     // To retrieve an entry's value, use the map.get procedure.
     print_age :: (ages: &Map(str, u32), name: str) {
-        age := map.get(ages, name);
-        printf("{}'s age is {}.\n", name, age);
+        age := map.get(ages, name)
+        printf("{}'s age is {}.\n", name, age)
     }
 
-    print_age(&ages, "Dwight");
-    print_age(&ages, "Jim");
-    print_age(&ages, "Pam");
-    print_age(&ages, "Michael");
+    print_age(&ages, "Dwight")
+    print_age(&ages, "Jim")
+    print_age(&ages, "Pam")
+    print_age(&ages, "Michael")
 
     // You may noticed if you ran this program that it prints Michael's
     // age is 0. This is because there was entry for the key 'Michael',
     // and we provided the default of '0'. To ensure that a key is in the
     // map, use the map.has procedure
 
-    println(map.has(&ages, "Dwight"));
-    println(map.has(&ages, "Michael"));
+    println(map.has(&ages, "Dwight"))
+    println(map.has(&ages, "Michael"))
 }

@@ -3,25 +3,25 @@
 use core {*}
 
 using_callsite :: (value: $T, site := #callsite) {
-    println(value);
-    path := string.split(site.file, ~~('\\' if runtime.compiler_os == .Windows else '/'));
-    printf("I was called from {}:{}:{}\n", path[path.count - 1], site.line, site.column);
+    println(value)
+    path := string.split(site.file, ~~('\\' if runtime.compiler_os == .Windows else '/'))
+    printf("I was called from {}:{}:{}\n", path[path.count - 1], site.line, site.column)
 }
 
 main :: (args: [] cstr) {
-    using_callsite("Hello");
-    using_callsite(1234.0f);
+    using_callsite("Hello")
+    using_callsite(1234.0f)
 
-    something := Something.{};
-    something->method();
+    something := Something.{}
+    something->method()
 }
 
 
 Something :: struct {
-    member := cast(u32) 1234;
+    member := cast(u32) 1234
 
     method :: (use s: &Something) {
-        using_callsite(member);
+        using_callsite(member)
     }
 }
 
