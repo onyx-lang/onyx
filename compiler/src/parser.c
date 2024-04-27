@@ -529,7 +529,7 @@ static void parse_arguments(OnyxParser* parser, TokenType end_token, Arguments* 
     }
 }
 
-static b32 arg_is_placeholder(AstTyped *arg) {
+static b32 value_is_placeholder(AstTyped *arg) {
     if (arg->kind != Ast_Kind_Symbol) return 0;
     if (arg->token->length > 1) return 0;
     if (arg->token->text[0] != '_') return 0;
@@ -559,7 +559,7 @@ static AstCall* parse_function_call(OnyxParser *parser, AstTyped *callee) {
     bh_arr_each(AstTyped *, arg, call_node->args.values) {
         if ((*arg) == NULL) continue;
 
-        if (arg_is_placeholder(*arg)) {
+        if (value_is_placeholder(*arg)) {
             if (call_node->placeholder_argument_position > 0) {
                 onyx_report_error((*arg)->token->pos, Error_Critical, "Cannot have more than one placeholder argument ('_').");
             }
@@ -1763,6 +1763,11 @@ static i32 parse_possible_compound_symbol_declaration(OnyxParser* parser, AstNod
         // See comment in parse_possible_symbol_declaration about "#auto"
         if (!parse_possible_directive(parser, "auto")) {
             type_for_all = parse_type(parser);
+
+            // Placeholders (_) are discarded and allow for type inference.
+            if (value_is_placeholder((AstTyped *) type_for_all)) {
+                type_for_all = NULL;
+            }
         }
 
         forll (AstLocal, local, first_local, next) {
@@ -1820,6 +1825,11 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
             // typed on the first assignment.
         } else {
             type_node = parse_type(parser);
+
+            // Placeholders (_) are discarded and allow for type inference.
+            if (value_is_placeholder((AstTyped *) type_node)) {
+                type_node = NULL;
+            }
         }
     }
 
@@ -3264,6 +3274,10 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
             func_def->return_type = (AstType *) &basic_type_auto_return;
         } else {
             func_def->return_type = parse_return_type(parser, &func_def->named_return_locals);
+
+            if (value_is_placeholder((AstTyped *) func_def->return_type)) {
+                func_def->return_type = (AstType *) &basic_type_auto_return;
+            }
         }
     }
 
