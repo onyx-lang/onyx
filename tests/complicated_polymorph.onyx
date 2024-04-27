@@ -20,7 +20,7 @@ main :: (args: [] cstr) {
         { t * t } -> T
     }
 
-    dumb :: (ZZZ: $T) -> #auto where Number(T) {
+    dumb :: (ZZZ: $T) -> _ where Number(T) {
         return ZZZ * 2
     }
 

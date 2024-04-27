@@ -1755,14 +1755,11 @@ static i32 parse_possible_compound_symbol_declaration(OnyxParser* parser, AstNod
     if (parser->curr->type != '=') {
         AstType* type_for_all = NULL;
 
-        // See comment in parse_possible_symbol_declaration about "#auto"
-        if (!parse_possible_directive(parser, "auto")) {
-            type_for_all = parse_type(parser);
+        type_for_all = parse_type(parser);
 
-            // Placeholders (_) are discarded and allow for type inference.
-            if (value_is_placeholder((AstTyped *) type_for_all)) {
-                type_for_all = NULL;
-            }
+        // Placeholders (_) are discarded and allow for type inference.
+        if (value_is_placeholder((AstTyped *) type_for_all)) {
+            type_for_all = NULL;
         }
 
         forll (AstLocal, local, first_local, next) {
@@ -1814,17 +1811,11 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
 
     AstType* type_node = NULL;
     if (parser->curr->type != '=') {
-        if (parse_possible_directive(parser, "auto")) {
-            // Do nothing here.
-            // This allows for "x: #auto" to declare an x that will automatically be
-            // typed on the first assignment.
-        } else {
-            type_node = parse_type(parser);
+        type_node = parse_type(parser);
 
-            // Placeholders (_) are discarded and allow for type inference.
-            if (value_is_placeholder((AstTyped *) type_node)) {
-                type_node = NULL;
-            }
+        // Placeholders (_) are discarded and allow for type inference.
+        if (value_is_placeholder((AstTyped *) type_node)) {
+            type_node = NULL;
         }
     }
 
@@ -3263,14 +3254,10 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
     }
 
     if (consume_token_if_next(parser, Token_Type_Right_Arrow)) {
-        if (parse_possible_directive(parser, "auto")) {
-            func_def->return_type = (AstType *) &basic_type_auto_return;
-        } else {
-            func_def->return_type = parse_return_type(parser, &func_def->named_return_locals);
+        func_def->return_type = parse_return_type(parser, &func_def->named_return_locals);
 
-            if (value_is_placeholder((AstTyped *) func_def->return_type)) {
-                func_def->return_type = (AstType *) &basic_type_auto_return;
-            }
+        if (value_is_placeholder((AstTyped *) func_def->return_type)) {
+            func_def->return_type = (AstType *) &basic_type_auto_return;
         }
     }
 

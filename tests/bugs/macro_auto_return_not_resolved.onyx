@@ -4,9 +4,9 @@ use core {*}
 
 Point :: struct { x, y: i32; }
 
-#overload hash.hash :: macro (p: Point) -> #auto do return p.x * 1000 + p.y
+#overload hash.hash :: macro (p: Point) -> _ do return p.x * 1000 + p.y
 
-#operator == macro (p1: Point, p2: Point) -> #auto {
+#operator == macro (p1: Point, p2: Point) -> _ {
     return p1.x == p2.x && p1.y == p2.y
 }
 
