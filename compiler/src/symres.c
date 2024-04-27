@@ -485,8 +485,13 @@ static SymresStatus symres_if_expression(AstIfExpression* if_expr) {
 }
 
 static SymresStatus symres_pipe(AstBinaryOp** pipe) {
-    AstCall* call_node = (AstCall *) (*pipe)->right;
-    if (call_node->kind != Ast_Kind_Call) {
+    AstCall* base_call_node = (AstCall *) (*pipe)->right;
+    AstCall* call_node = base_call_node;
+    if (call_node->kind == Ast_Kind_Method_Call) {
+        call_node = (AstCall *) ((AstBinaryOp *) call_node)->right;
+    }
+
+    if (!call_node || call_node->kind != Ast_Kind_Call) {
         onyx_report_error((*pipe)->token->pos, Error_Critical, "Pipe operator expected call on right side.");
         return Symres_Error;
     }
@@ -504,10 +509,10 @@ static SymresStatus symres_pipe(AstBinaryOp** pipe) {
         call_node->args.values[0] = (AstTyped *) make_argument(context.ast_alloc, (*pipe)->left);
     }
 
-    call_node->next = (*pipe)->next;
-    *pipe = (AstBinaryOp *) call_node;
+    base_call_node->next = (*pipe)->next;
+    *pipe = (AstBinaryOp *) base_call_node;
 
-    SYMRES(expression, (AstTyped **) &call_node);
+    SYMRES(expression, (AstTyped **) pipe);
     return Symres_Success;
 }
 
