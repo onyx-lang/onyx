@@ -4278,7 +4278,9 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 inject->token = dir_token;
                 inject->full_loc = (AstTyped *) injection_point;
                 inject->binding = parse_top_level_binding(parser, injection_point->token);
-                flush_doc_tokens(parser, &inject->binding->documentation_string, &inject->binding->documentation_token_old);
+                if (inject->binding) {
+                    flush_doc_tokens(parser, &inject->binding->documentation_string, &inject->binding->documentation_token_old);
+                }
 
                 ENTITY_SUBMIT(inject);
                 return;
