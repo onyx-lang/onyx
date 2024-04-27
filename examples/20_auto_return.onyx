@@ -6,7 +6,7 @@
 main :: (args: [] cstr) {
     // If you don't want to explicitly write the return type
     // of a function, you can use #auto:
-    f :: (x: i32) -> #auto {
+    f :: (x: i32) -> _ {
         return x * 2
     }
 
@@ -27,7 +27,7 @@ main :: (args: [] cstr) {
     // come from? The only way to do this is use an auto-return
     // type and let the compiler fill it in.
 
-    consume :: (it: $T) -> #auto where iter.Iterable(T) {
+    consume :: (it: $T) -> _ where iter.Iterable(T) {
         consume_inner :: macro (it: Iterator($V)) -> [] V {
             arr: [..] V
             for v in it do arr << v
