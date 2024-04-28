@@ -1709,10 +1709,7 @@ void track_documentation_for_symbol_info(AstNode *node, AstBinding *binding) {
     if (!bh_imap_has(&syminfo->node_to_id, (u64) node)) return;
 
     u64 symbol_id = bh_imap_get(&syminfo->node_to_id, (u64) node);
-    if (binding->documentation_token_old) {
-        syminfo->symbols[symbol_id].documentation        = binding->documentation_token_old->text;
-        syminfo->symbols[symbol_id].documentation_length = binding->documentation_token_old->length;
-    } else if (binding->documentation_string) {
+    if (binding->documentation_string) {
         syminfo->symbols[symbol_id].documentation = binding->documentation_string;
         syminfo->symbols[symbol_id].documentation_length = strlen(binding->documentation_string);
     } else {

@@ -258,12 +258,7 @@ static void flush_stored_tags(OnyxParser *parser, bh_arr(AstTyped *) *out_arr) {
     *out_arr = arr;
 }
 
-static void flush_doc_tokens(OnyxParser *parser, const char **out_string, OnyxToken **out_token) {
-    if (parser->last_documentation_token) {
-        if (out_token) *out_token = parser->last_documentation_token;
-        parser->last_documentation_token = NULL;
-    }
-
+static void flush_doc_tokens(OnyxParser *parser, const char **out_string) {
     if (bh_arr_is_empty(parser->documentation_tokens)) {
         if (out_string) *out_string = "";
         return;
@@ -3970,7 +3965,7 @@ static void parse_implicit_injection(OnyxParser* parser) {
         consume_token(parser);
         inject->binding = parse_top_level_binding(parser, inject->token);
         if (inject->binding) {
-            flush_doc_tokens(parser, &inject->binding->documentation_string, &inject->binding->documentation_token_old);
+            flush_doc_tokens(parser, &inject->binding->documentation_string);
         }
 
     } else {
@@ -4251,7 +4246,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 inject->full_loc = (AstTyped *) injection_point;
                 inject->binding = parse_top_level_binding(parser, injection_point->token);
                 if (inject->binding) {
-                    flush_doc_tokens(parser, &inject->binding->documentation_string, &inject->binding->documentation_token_old);
+                    flush_doc_tokens(parser, &inject->binding->documentation_string);
                 }
 
                 ENTITY_SUBMIT(inject);
@@ -4312,13 +4307,6 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(jsNode);
                 return;
             }
-            else if (parse_possible_directive(parser, "doc")) {
-                // This is a future feature I want to add to the language, proper docstrings.
-                // For now (and so I start documenting thing...), #doc can be used anywhere
-                // at top level, followed by a string to add a doc string.
-                parser->last_documentation_token = expect_token(parser, Token_Type_Literal_String);
-                return;
-            }
             else {
                 OnyxToken* directive_token = expect_token(parser, '#');
                 OnyxToken* symbol_token = parser->curr;
@@ -4353,7 +4341,7 @@ submit_binding_to_entities:
     {
         if (!binding) return;
 
-        flush_doc_tokens(parser, &binding->documentation_string, &binding->documentation_token_old);
+        flush_doc_tokens(parser, &binding->documentation_string);
 
         //
         // If this binding is inside an #inject block,
@@ -4577,7 +4565,6 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     parser.tag_depth = 0;
     parser.overload_count = 0;
     parser.injection_point = NULL;
-    parser.last_documentation_token = NULL;
     parser.allow_package_expressions = 0;
     parser.documentation_tokens = NULL;
 
@@ -4637,7 +4624,7 @@ void onyx_parse(OnyxParser *parser) {
 
     {
         const char *doc_string = NULL;
-        flush_doc_tokens(parser, &doc_string, NULL);
+        flush_doc_tokens(parser, &doc_string);
         if (doc_string && strlen(doc_string) > 0) {
             bh_arr_push(parser->package->doc_strings, doc_string);
         }

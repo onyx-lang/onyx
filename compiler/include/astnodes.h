@@ -1162,9 +1162,6 @@ struct AstBinding       {
     AstTyped_base;
     AstNode* node;
 
-    // Used for the old '#doc' scheme
-    OnyxToken *documentation_token_old;
-
     // Used for the new `///` scheme
     const char *documentation_string;
 };
