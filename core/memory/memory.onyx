@@ -19,16 +19,16 @@ alloc_slice :: (sl: &[] $T, count: i32, allocator := context.allocator) {
 
 //
 // Constructs an intialized slice of `T` with `count` elements from the allocator.
-make_slice :: core.slice.make
+make_slice :: Slice.make
 
 //
 // Releases the memory for the slice, as well as setting the fields of the
 // slice to be 0 so it cannot be used again.
-free_slice :: core.slice.free
+free_slice :: Slice.free
 
 //
 // Copies a slice into a new slice, allocated from the allocator.
-copy_slice :: core.slice.copy
+copy_slice :: Slice.copy
 
 //
 // Aligns a number to the next multiple of `align`. Can be used

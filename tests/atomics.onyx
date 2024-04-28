@@ -43,7 +43,7 @@ main :: (args) => {
 
     sd: Shared_Data
     sd.arr = make([] i32, 1000)
-    array.fill(sd.arr, 0)
+    Array.fill(sd.arr, 0)
 
     threads : [4] thread.Thread
     for &t in threads {

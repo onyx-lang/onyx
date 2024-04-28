@@ -11,7 +11,7 @@ S :: struct {
 
 main :: (args) => {
     v: S
-    array.init(&v.some_array)
+    Array.init(&v.some_array)
 
     do_something_with_S(&v)
 

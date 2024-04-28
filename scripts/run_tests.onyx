@@ -46,8 +46,8 @@ Test_Case :: struct {
 find_onyx_files :: (root: str, cases: &[..] Test_Case) {
     for os.list_directory(root) {
         path_buffer: [512] u8
-        if string.ends_with(it->name(), ".onyx") {
-            test_case := string.concat(path_buffer, root, "/", it->name()) |> string.copy()
+        if str.ends_with(it->name(), ".onyx") {
+            test_case := str.concat(path_buffer, root, "/", it->name()) |> str.copy()
             expected_file := test_case[0 .. (test_case.count - 5)]
 
             if !os.file_exists(expected_file) {
@@ -55,11 +55,11 @@ find_onyx_files :: (root: str, cases: &[..] Test_Case) {
                 continue
             }
 
-            array.push(cases, .{ test_case, expected_file })
+            Array.push(cases, .{ test_case, expected_file })
         }
 
         if it.type == .Directory {
-            find_onyx_files(string.concat(path_buffer, root, "/", it->name()), cases)
+            find_onyx_files(str.concat(path_buffer, root, "/", it->name()), cases)
         }
     }
 
@@ -113,7 +113,7 @@ main :: (args) => {
         case .Windows do exec_context.onyx_cmd = "onyx.exe"
     }
 
-    cases := array.make(Test_Case, capacity=256)
+    cases := Array.make(Test_Case, capacity=256)
     find_onyx_files(settings.test_folder, &cases)
 
     iter.parallel_for(cases, settings.threads, &exec_context) {
@@ -140,7 +140,7 @@ main :: (args) => {
                 thread_data.at_least_one_test_failed = true
 
                 sync.critical_section(&thread_data.failed_tests_mutex) {
-                    array.push(thread_data.failed_tests, it.source_file)
+                    Array.push(thread_data.failed_tests, it.source_file)
                 }
 
                 continue
@@ -164,7 +164,7 @@ main :: (args) => {
             thread_data.at_least_one_test_failed = true
 
             sync.critical_section(&thread_data.failed_tests_mutex) {
-                array.push(thread_data.failed_tests, it.source_file)
+                Array.push(thread_data.failed_tests, it.source_file)
             }
         }
     }

@@ -1,4 +1,4 @@
-package core.slice
+package core
 
 use core.intrinsics.types {type_is_struct}
 use core.memory
@@ -642,43 +642,3 @@ Slice.least :: macro (arr: [] $T) -> (i32, T) {
     fold_idx_elem :: fold_idx_elem
     return fold_idx_elem(arr, [](*A < *B))
 }
-
-
-//
-// Everything below here only exists for backwards compatibility.
-//
-
-transplant  :: Slice.transplant
-get         :: Slice.get
-get_ptr     :: Slice.get_ptr
-set         :: Slice.set
-contains    :: Slice.contains
-empty       :: Slice.empty
-sum         :: Slice.sum
-product     :: Slice.product
-average     :: Slice.average
-reverse     :: Slice.reverse
-sort        :: Slice.sort
-quicksort   :: Slice.quicksort
-unique      :: Slice.unique
-fold        :: Slice.fold
-every       :: Slice.every
-some        :: Slice.some
-group_by    :: Slice.group_by
-fill        :: Slice.fill
-fill_range  :: Slice.fill_range
-to_list     :: Slice.to_list
-find        :: Slice.find
-find_ptr    :: Slice.find_ptr
-find_opt    :: Slice.find_opt
-first       :: Slice.first
-count_where :: Slice.count_where
-windows     :: Slice.windows
-chunks      :: Slice.chunks
-greatest    :: Slice.greatest
-least       :: Slice.least
-free        :: Slice.free
-copy        :: Slice.copy
-make        :: Slice.make
-init        :: Slice.init
-

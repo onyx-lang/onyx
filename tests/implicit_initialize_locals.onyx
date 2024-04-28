@@ -13,7 +13,7 @@ main :: (args) => {
 
     {
         arr: [..] i32
-        printf("{*p}\n", cast(&array.Untyped_Array) &arr)
+        printf("{*p}\n", cast(&Untyped_Array) &arr)
 
         people: Map(str, i32)
         people["Joe"] = 12

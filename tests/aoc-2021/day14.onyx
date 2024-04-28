@@ -82,8 +82,8 @@ main :: (args) => {
         mode[it.key.second] = (mode[it.key.second] ?? .{}) + it.value.now
     }
 
-    maximum := array.fold(mode.entries, cast(u64) 0, (x, y) => math.max(x.value, y))
-    minimum := array.fold(mode.entries, maximum, (x, y) => math.min(x.value, y))
+    maximum := Array.fold(mode.entries, cast(u64) 0, (x, y) => math.max(x.value, y))
+    minimum := Array.fold(mode.entries, maximum, (x, y) => math.min(x.value, y))
 
     println(&mode)
     printf("Part 2: {}\n", maximum - minimum - 1)

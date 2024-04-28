@@ -1,7 +1,6 @@
 package core.io
 
 use core.conv
-use core.string
 use core.memory
 
 // io.Writer is a buffered-writer. The important thing to not forget
@@ -121,7 +120,7 @@ write_str :: (use writer: &Writer, s: str) {
 }
 
 write_cstr :: (use writer: &Writer, cs: cstr) {
-    s := string.from_cstr(cs)
+    s := str.as_str(cs)
     write_str(writer, s)
 }
 

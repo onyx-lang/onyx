@@ -130,13 +130,13 @@ parse_array :: (use parser: &Parser) -> (Value, Error) {
     if err.kind != .None do return Value.{value}, err
 
     // This uses the context allocators because the array resizing needs to happen in a general purpose heap allocator
-    arr := array.make(Value, allocator=context.allocator)
+    arr := Array.make(Value, allocator=context.allocator)
     defer if err.kind != .None {
         for elem in arr {
             free(elem, allocator)
         }
 
-        array.free(&arr)
+        Array.free(&arr)
     }
 
     while current_token.kind != .Close_Bracket {
@@ -146,7 +146,7 @@ parse_array :: (use parser: &Parser) -> (Value, Error) {
             return Value.{value}, err
         }
 
-        array.push(&arr, elem)
+        Array.push(&arr, elem)
 
         if !consume_token_if_next(parser, .Comma) {
             break
@@ -172,7 +172,7 @@ parse_object :: (use parser: &Parser) -> (Value, Error) {
     if err.kind != .None do return Value.{value}, err
 
     // This uses the context allocators because the array resizing needs to happen in a general purpose heap allocator
-    array.init(&value.object_, allocator=context.allocator)
+    Array.init(&value.object_, allocator=context.allocator)
     defer if err.kind != .None {
         free(Value.{value}, allocator)
     }
@@ -204,13 +204,13 @@ parse_object :: (use parser: &Parser) -> (Value, Error) {
                 if elem.key == key {
                     err.kind = .Duplicate_Keys
                     err.pos  = key_token.pos
-                    string.free(key, allocator)
+                    str.free(key, allocator)
                     return Value.{value}, err
                 }
             }
         }
 
-        array.push(&value.object_, .{
+        Array.push(&value.object_, .{
             key = key,
             value = elem
         })
@@ -249,11 +249,11 @@ unescape_string :: (token: Token, allocator: Allocator) -> str {
     }
 
     if i == s.count {
-        return string.copy(s, allocator)
+        return str.copy(s, allocator)
     }
 
     buffer := memory.make_slice(u8, s.count, allocator=allocator)
-    string.copy_into(s.data[0 .. i], buffer)
+    str.copy_into(s.data[0 .. i], buffer)
     buffer_write := i
 
     while i < s.count {

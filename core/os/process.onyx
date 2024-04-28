@@ -5,7 +5,6 @@ package core.os
 }
 
 use core {Pair, cptr, Result, tprintf}
-use core.array
 use core.io
 use runtime
 
@@ -175,7 +174,7 @@ Command.path :: (cmd: &Command, path: str) -> &Command {
 
 /// Appends arguments to the argument array of the command.
 Command.args :: (cmd: &Command, args: [] str) -> &Command {
-    array.concat(&cmd._args, args)
+    Array.concat(&cmd._args, args)
     return cmd
 }
 

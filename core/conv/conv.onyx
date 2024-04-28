@@ -4,7 +4,6 @@ package core.conv
     Enable_Custom_Formatters :: true
 }
 
-use core.string
 use core.math
 
 /// Converts a string into an integer. Works with positive and
@@ -21,21 +20,21 @@ str_to_i64 :: macro (s: str, base: u32 = 10) -> i64 {
 
 #overload
 str_to_i64 :: (s: &str, base: u32 = 10) -> i64 {
-    string.strip_leading_whitespace(s)
+    str.strip_leading_whitespace(s)
 
     value: i64 = 0
     mul := 1
 
     if s.data[0] == '-' {
         mul = -1
-        string.advance(s, 1)
+        str.advance(s, 1)
     }
 
     if s.data[0] == '+' {
-         string.advance(s, 1)
+         str.advance(s, 1)
     }
 
-    while !string.empty(*s) {
+    while !str.empty(*s) {
         switch c := s.data[0]; c {
             case '0' ..= '9' {
                 value *= ~~base
@@ -59,7 +58,7 @@ str_to_i64 :: (s: &str, base: u32 = 10) -> i64 {
             case _ do break break
         }
 
-        string.advance(s)
+        str.advance(s)
     }
 
     return value * ~~mul
@@ -78,13 +77,13 @@ str_to_f64 :: macro (s: str) -> f64 {
 
 #overload
 str_to_f64 :: (s: &str) -> f64 {
-    string.strip_leading_whitespace(s)
+    str.strip_leading_whitespace(s)
 
     sign := parse_sign(s)
     value, _ := parse_digits(s);    
 
     if s.data[0] == '.' {
-        string.advance(s, 1)
+        str.advance(s, 1)
         fraction, fraction_digits := parse_digits(s)
         while fraction_digits > 0 {
             fraction_digits -= 1
@@ -96,7 +95,7 @@ str_to_f64 :: (s: &str) -> f64 {
     value *= sign
 
     if s.data[0] != 'e' && s.data[0] != 'E' do return value
-    string.advance(s, 1)
+    str.advance(s, 1)
 
     exponent_sign := parse_sign(s)
     exponent, _   := parse_digits(s)
@@ -117,8 +116,8 @@ str_to_f64 :: (s: &str) -> f64 {
 
     parse_sign :: (s: &str) -> f64 {
         switch s.data[0] {
-            case '-' { string.advance(s, 1); return -1; }
-            case '+' { string.advance(s, 1); return  1; }
+            case '-' { str.advance(s, 1); return -1; }
+            case '+' { str.advance(s, 1); return  1; }
             case _  { return 1; }
         }
     }
@@ -129,7 +128,7 @@ str_to_f64 :: (s: &str) -> f64 {
         while s.count > 0 do switch s.data[0] {
             case '0' ..= '9' {
                 value = value * 10 + ~~cast(i32)(s.data[0] - '0')
-                string.advance(s, 1)
+                str.advance(s, 1)
                 count += 1
             }
 

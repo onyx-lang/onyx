@@ -21,7 +21,7 @@ encode_string :: (v: $T, allocator := context.allocator) -> (str, Encoding_Error
         return "", err
     }
 
-    s := string.copy(io.buffer_stream_to_str(&stream), allocator)
+    s := str.copy(io.buffer_stream_to_str(&stream), allocator)
     return s, .None
 }
 
@@ -190,7 +190,7 @@ encode :: (w: &io.Writer, data: any) -> Encoding_Error {
             io.write(w, "[")
 
             a := cast(&Type_Info_Dynamic_Array) info
-            arr := cast(&core.array.Untyped_Array) data.data
+            arr := cast(&core.Untyped_Array) data.data
             count := arr.count
 
             for i in count {
@@ -219,11 +219,11 @@ encode :: (w: &io.Writer, data: any) -> Encoding_Error {
 
             for &member in s.members {
                 key := member.name
-                if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
+                if tag := Array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
                     key = (cast(&Custom_Key) tag.data).key
                 }
 
-                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
+                if tag := Array.first(member.tags, [t](t.type == type_expr)); tag != null {
                     if *cast(&type_expr, tag.data) == Ignore {
                         continue
                     }
@@ -312,7 +312,7 @@ from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> 
             a_info := cast(&Type_Info_Array) t_info
 
             v := new(_Value_Array, allocator)
-            array.init(&v.array_, a_info.count, allocator)
+            Array.init(&v.array_, a_info.count, allocator)
 
             for i in a_info.count {
                 v.array_ << from_any(a_info.of, memory.ptr_add(input, size_of(a_info.of) * i))
@@ -325,15 +325,15 @@ from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> 
             // Strings are handled differently
             if type == str {
                 v := new(_Value_String, allocator)
-                v.str_ = string.copy(*cast(&str) input, allocator)
+                v.str_ = str.copy(*cast(&str) input, allocator)
                 return Value.{v}
             }
 
             s_info := cast(&Type_Info_Slice) t_info
-            s := cast(&core.array.Untyped_Array) input
+            s := cast(&core.Untyped_Array) input
 
             v := new(_Value_Array, allocator)
-            array.init(&v.array_, s.count, allocator)
+            Array.init(&v.array_, s.count, allocator)
 
             for i in s.count {
                 v.array_ << from_any(s_info.of, memory.ptr_add(s.data, size_of(s_info.of) * i))
@@ -346,15 +346,15 @@ from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> 
             s_info := cast(&Type_Info_Struct) t_info
 
             v := new(_Value_Object, allocator)
-            array.init(&v.object_, s_info.members.count, allocator)
+            Array.init(&v.object_, s_info.members.count, allocator)
 
             for& member in s_info.members {
                 key := member.name
-                if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
+                if tag := Array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
                     key = (cast(&Custom_Key) tag.data).key
                 }
 
-                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
+                if tag := Array.first(member.tags, [t](t.type == type_expr)); tag != null {
                     if *cast(&type_expr, tag.data) == Ignore {
                         continue
                     }
@@ -436,7 +436,7 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
         }
 
         case .Dynamic_Array {
-            s := cast(&core.array.Untyped_Array) out
+            s := cast(&core.Untyped_Array) out
             if s.count == 0 {
                 to_copy := value->as_array()
 
@@ -450,12 +450,12 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
         case .Slice {
             // Strings are handled differently
             if type == str {
-                *cast(&str) out = string.copy(value->as_str())
+                *cast(&str) out = str.copy(value->as_str())
                 return
             }
 
             s_info := cast(&Type_Info_Slice) t_info
-            s := cast(&core.array.Untyped_Array) out
+            s := cast(&core.Untyped_Array) out
 
             if s.count == 0 {
                 if s.data != null {
@@ -481,11 +481,11 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
 
             for& member in s_info.members {
                 key := member.name
-                if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
+                if tag := Array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
                     key = (cast(&Custom_Key) tag.data).key
                 }
 
-                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
+                if tag := Array.first(member.tags, [t](t.type == type_expr)); tag != null {
                     if *cast(&type_expr, tag.data) == Ignore {
                         continue
                     }

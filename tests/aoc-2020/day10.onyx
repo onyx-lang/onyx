@@ -3,8 +3,8 @@
 use core {*}
 
 count_ending_paths :: (nums: [..] u32) -> u64 {
-    tally := array.make(u64, nums.count)
-    defer array.free(&tally)
+    tally := Array.make(u64, nums.count)
+    defer Array.free(&tally)
 
     for &t in tally do *t = 0
     tally[nums.count - 1] = 1
@@ -27,18 +27,18 @@ main :: (args: [] cstr) {
 
     file := contents
 
-    nums := array.make(u32)
-    defer array.free(&nums)
+    nums := Array.make(u32)
+    defer Array.free(&nums)
 
-    while !string.empty(file) {
-        array.push(&nums, ~~ conv.parse_int(&file)); 
-        string.advance_line(&file)
+    while !str.empty(file) {
+        Array.push(&nums, ~~ conv.parse_int(&file)); 
+        str.advance_line(&file)
     }
 
     // Slight hack, but having 0 in the array makes both parts easier
-    array.push(&nums, 0)
+    Array.push(&nums, 0)
 
-    array.sort(nums, (a, b) => a - b)
+    Array.sort(nums, (a, b) => a - b)
 
     diffs: [3] u32
     for &d in diffs do *d = 0

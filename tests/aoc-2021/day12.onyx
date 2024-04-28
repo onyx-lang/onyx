@@ -26,9 +26,8 @@ main :: (args) => {
         line := io.read_line(&reader, consume_newline=true)
 
         left, right := do {
-            parts := string.split(line, '-')
-            defer memory.free_slice(&parts)
-            return string.strip_whitespace(parts[0]), string.strip_whitespace(parts[1])
+            left, right := str.bisect(line, '-')
+            return str.strip_whitespace(left), str.strip_whitespace(right)
         }
 
         edges << .{ left, right }
@@ -91,7 +90,7 @@ main :: (args) => {
             else              do node_stack << .{ child, 0, second_visit }
 
         } else {
-            array.pop(&node_stack)
+            Array.pop(&node_stack)
         }
     }
 

@@ -92,11 +92,11 @@ main :: () {
     // just how many elements are currently in the array. To facilitate using dynamic
     // arrays, there are many procedures in the core.array package. Take this example.
     dyn_arr : [..] i32
-    core.array.init(^dyn_arr)
-    defer core.array.free(^dyn_arr)
+    Array.init(^dyn_arr)
+    defer Array.free(^dyn_arr)
 
     for i in 0 .. 10 {
-        core.array.push(^dyn_arr, i * i * i)
+        Array.push(^dyn_arr, i * i * i)
     }
 
     core.printf("dyn_arr is {}\n", dyn_arr)

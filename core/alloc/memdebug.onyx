@@ -13,7 +13,6 @@ use core {Result}
 use core.alloc
 use core.net
 use core.io
-use core.slice
 use core.encoding.osad
 use runtime
 
@@ -108,7 +107,7 @@ memdebug_proc :: (m: &MemDebugState, action: AllocationAction, size: u32, align:
     trace: [] MemDebugStackNode = .[]
     stack_trace := runtime.info.get_stack_trace()
     if stack_trace {
-        slice.init(&trace, stack_trace.count, context.temp_allocator)
+        Slice.init(&trace, stack_trace.count, context.temp_allocator)
         for i in stack_trace.count {
             info := stack_trace[i].info
             trace[i] = .{

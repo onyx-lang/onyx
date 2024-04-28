@@ -155,19 +155,19 @@ packet_reduce :: (p: &Packet) -> u64 {
     op := cast(&Packet_Operator) p
     switch p.type {
         case 0 {
-            return array.fold(op.subpackets, cast(u64) 0, (x, y) => y + packet_reduce(x))
+            return Array.fold(op.subpackets, cast(u64) 0, (x, y) => y + packet_reduce(x))
         }
 
         case 1 {
-            return array.fold(op.subpackets, cast(u64) 1, (x, y) => y * packet_reduce(x))
+            return Array.fold(op.subpackets, cast(u64) 1, (x, y) => y * packet_reduce(x))
         }
         
         case 2 {
-            return array.fold(op.subpackets, cast(u64) -1, (x, y) => math.min(y, packet_reduce(x)))
+            return Array.fold(op.subpackets, cast(u64) -1, (x, y) => math.min(y, packet_reduce(x)))
         }
 
         case 3 {
-            return array.fold(op.subpackets, cast(u64) 0, (x, y) => math.max(y, packet_reduce(x)))
+            return Array.fold(op.subpackets, cast(u64) 0, (x, y) => math.max(y, packet_reduce(x)))
         }
         
         case 4 {

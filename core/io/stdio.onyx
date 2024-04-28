@@ -120,7 +120,7 @@ printf :: (format: str, va: ..any) {
 aprintf :: (format: str, va: ..any) -> str {
     buffer: [8196] u8
     out := conv.format_va(buffer, format, va)
-    return string.copy(out)
+    return str.copy(out)
 }
 
 //
@@ -129,7 +129,7 @@ aprintf :: (format: str, va: ..any) -> str {
 tprintf :: (format: str, va: ..any) -> str {
     buffer: [8196] u8
     out := conv.format_va(buffer, format, va)
-    return string.copy(out, allocator=context.temp_allocator)
+    return str.copy(out, allocator=context.temp_allocator)
 }
 
 

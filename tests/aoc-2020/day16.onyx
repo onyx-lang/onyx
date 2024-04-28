@@ -26,7 +26,7 @@ read_ticket_and_validate :: (file: &str, fields: [..] Field, ticket_store: [&] u
 		n := cast(u32, conv.parse_int(file))
 		ticket_store[i] = n
 
-		if file.data[0] == ',' do string.advance(file, 1)
+		if file.data[0] == ',' do str.advance(file, 1)
 
 		valid_count := 0
 		for &field in fields {
@@ -39,7 +39,7 @@ read_ticket_and_validate :: (file: &str, fields: [..] Field, ticket_store: [&] u
 		}
 	}
 
-    string.advance_line(file)
+    str.advance_line(file)
 	return retval
 }
 
@@ -48,44 +48,44 @@ main :: (args: [] cstr) {
 
 	file := contents
 
-	fields := array.make(Field, 20)
-	defer array.free(&fields)
+	fields := Array.make(Field, 20)
+	defer Array.free(&fields)
 
 	// Read until the first empty line
 	while file.data[0] != '\n' {
 		field := Field.{}
-		field.name, file = string.bisect(file, ':');		
+		field.name, file = str.bisect(file, ':');		
 
-		string.advance(&file, 1)
+		str.advance(&file, 1)
 		field.lower0 = ~~ conv.parse_int(&file)
 
-		string.advance(&file, 1)
+		str.advance(&file, 1)
 		field.upper0 = ~~ conv.parse_int(&file)
 
-		string.advance(&file, 4)
+		str.advance(&file, 4)
 		field.lower1 = ~~ conv.parse_int(&file)
 
-		string.advance(&file, 1)
+		str.advance(&file, 1)
 		field.upper1 = ~~ conv.parse_int(&file)
 
-		string.advance_line(&file)
+		str.advance_line(&file)
 
-		array.push(&fields, field)
+		Array.push(&fields, field)
 	}
 
-	for i in 0 .. 2 do string.advance_line(&file)
+	for i in 0 .. 2 do str.advance_line(&file)
 
-	my_ticket := array.make(u32, fields.count)
-	defer array.free(&my_ticket)
+	my_ticket := Array.make(u32, fields.count)
+	defer Array.free(&my_ticket)
 	read_ticket_and_validate(&file, fields, my_ticket.data)
 
-	for i in 0 .. 2 do string.advance_line(&file)
+	for i in 0 .. 2 do str.advance_line(&file)
 
-	ticket_data := array.make(u32, 1024)
-	defer array.free(&ticket_data)
+	ticket_data := Array.make(u32, 1024)
+	defer Array.free(&ticket_data)
 
-	while !string.empty(file) {
-		array.ensure_capacity(&ticket_data, ticket_data.count + fields.count)
+	while !str.empty(file) {
+		Array.ensure_capacity(&ticket_data, ticket_data.count + fields.count)
 		if read_ticket_and_validate(&file, fields, ~~ &ticket_data[ticket_data.count]) {
 			ticket_data.count += fields.count
 		}
@@ -93,10 +93,10 @@ main :: (args: [] cstr) {
 
 	printf("Scanning error: {}\n", total_scanning_error)
 
-	cols_to_assign := array.make(u32, fields.count)
-	defer array.free(&cols_to_assign)
+	cols_to_assign := Array.make(u32, fields.count)
+	defer Array.free(&cols_to_assign)
 
-	for i in 0 .. fields.count do array.push(&cols_to_assign, i)
+	for i in 0 .. fields.count do Array.push(&cols_to_assign, i)
 
 	while cols_to_assign.count > 0 {
 		for col in cols_to_assign {
@@ -122,7 +122,7 @@ main :: (args: [] cstr) {
 
 			if work_count == 1 {
 				recent_work.column = col
-				array.remove(&cols_to_assign, col)
+				Array.remove(&cols_to_assign, col)
 				break
 			}
 		}
@@ -130,7 +130,7 @@ main :: (args: [] cstr) {
 
 	prod: u64 = 1
 	for &field in fields {
-		if string.starts_with(field.name, "departure") do prod *= ~~my_ticket[field.column]
+		if str.starts_with(field.name, "departure") do prod *= ~~my_ticket[field.column]
 	}
 
 	printf("Departure multiply: {}\n", prod)

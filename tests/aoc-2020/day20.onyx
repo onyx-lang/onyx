@@ -66,7 +66,7 @@ reverse_binary :: (n_: u32, digits := TILE_DATA_WIDTH) -> u32 {
 
 build_edges :: (tile: [] bool, a := context.allocator) -> [] u32 {
     edges : [..] u32
-    array.init(&edges, 8, allocator=a)
+    Array.init(&edges, 8, allocator=a)
 
     for y in u32.[0, 9] {
         edge := 0
@@ -75,7 +75,7 @@ build_edges :: (tile: [] bool, a := context.allocator) -> [] u32 {
             if tile[x + y * TILE_DATA_WIDTH] do edge |= 1
         }
 
-        array.push(&edges, edge)
+        Array.push(&edges, edge)
     }    
 
     for x in u32.[0, 9] {
@@ -85,10 +85,10 @@ build_edges :: (tile: [] bool, a := context.allocator) -> [] u32 {
             if tile[x + y * TILE_DATA_WIDTH] do edge |= 1
         }
 
-        array.push(&edges, edge)
+        Array.push(&edges, edge)
     }    
 
-    for i in 0 .. 4 do array.push(&edges, reverse_binary(edges[i]))
+    for i in 0 .. 4 do Array.push(&edges, reverse_binary(edges[i]))
 
     return edges.data[0 .. 8]
 }
@@ -241,11 +241,11 @@ main :: (args: [] cstr) {
 
     file := contents;    
 
-    tiles := array.make(Tile)
-    defer array.free(&tiles)
+    tiles := Array.make(Tile)
+    defer Array.free(&tiles)
 
-    tile_map := map.make(u32, &Tile)
-    defer map.free(&tile_map)
+    tile_map := Map.make(u32, &Tile)
+    defer Map.free(&tile_map)
 
     tile_data := make([] TileData, 200)
     defer delete(&tile_data)
@@ -257,16 +257,16 @@ main :: (args: [] cstr) {
     tile_data_ring := alloc.ring.make(.{ ~~tile_data.data, 200 * sizeof TileData })
     tile_allocator := alloc.ring.make_allocator(&tile_data_ring)
 
-    while !string.empty(file) {
-        string.advance(&file, 5); // 'Tile '
+    while !str.empty(file) {
+        str.advance(&file, 5); // 'Tile '
         id := cast(u32, conv.parse_int(&file))
 
-        string.advance_line(&file)
+        str.advance_line(&file)
 
         td := cast([&] bool) raw_alloc(tile_allocator, sizeof TileData)
 
         for y in 0 .. 10 {
-            line, file~ := string.bisect(file, '\n')
+            line, file~ := str.bisect(file, '\n')
 
             for x in 0 .. 10 {
                 td[x + y * TILE_DATA_WIDTH] = (line[x] == '#')
@@ -276,17 +276,17 @@ main :: (args: [] cstr) {
         tile_data := td[0 .. TILE_DATA_HEIGHT * TILE_DATA_WIDTH]
         edges := build_edges(tile_data, tile_allocator)
 
-        array.push(&tiles, .{
+        Array.push(&tiles, .{
             id = id,
             orientation = TO.N,
             data = tile_data,
             edges = edges,
         })
 
-        string.advance_line(&file)
+        str.advance_line(&file)
     }
 
-    for &t in tiles do map.put(&tile_map, t.id, t)
+    for &t in tiles do Map.put(&tile_map, t.id, t)
 
     prod: u64 = 1
     top_left_id := 0
@@ -321,33 +321,33 @@ main :: (args: [] cstr) {
         pos_x   : i32
         pos_y   : i32
     }
-    to_process := array.make(tile_pos_state)
-    defer array.free(&to_process)
+    to_process := Array.make(tile_pos_state)
+    defer Array.free(&to_process)
     
-    array.push(&to_process, .{ .{ top_left_id, TO.F }, 0, 0 })
+    Array.push(&to_process, .{ .{ top_left_id, TO.F }, 0, 0 })
     while to_process.count > 0 {
         tid := to_process[0]
-        array.delete(&to_process, 0)
+        Array.delete(&to_process, 0)
 
         if grid[tid.pos_x + 12 * tid.pos_y] != 0 do continue
         
-        tile_ptr := map.get(&tile_map, tid.match.tile)->unwrap()
+        tile_ptr := Map.get(&tile_map, tid.match.tile)->unwrap()
         tile_ptr.pos_x = tid.pos_x
         tile_ptr.pos_y = tid.pos_y
         grid[tid.pos_x + 12 * tid.pos_y] = tid.match.tile
 
         apply_orientation(tile_ptr, tid.match.ori)
 
-        if tile_ptr.edges_match.top.tile    != 0 do array.push(&to_process, .{ tile_ptr.edges_match.top,    tid.pos_x, tid.pos_y - 1 })
-        if tile_ptr.edges_match.bottom.tile != 0 do array.push(&to_process, .{ tile_ptr.edges_match.bottom, tid.pos_x, tid.pos_y + 1 })
-        if tile_ptr.edges_match.left.tile   != 0 do array.push(&to_process, .{ tile_ptr.edges_match.left,   tid.pos_x - 1, tid.pos_y })
-        if tile_ptr.edges_match.right.tile  != 0 do array.push(&to_process, .{ tile_ptr.edges_match.right,  tid.pos_x + 1, tid.pos_y })
+        if tile_ptr.edges_match.top.tile    != 0 do Array.push(&to_process, .{ tile_ptr.edges_match.top,    tid.pos_x, tid.pos_y - 1 })
+        if tile_ptr.edges_match.bottom.tile != 0 do Array.push(&to_process, .{ tile_ptr.edges_match.bottom, tid.pos_x, tid.pos_y + 1 })
+        if tile_ptr.edges_match.left.tile   != 0 do Array.push(&to_process, .{ tile_ptr.edges_match.left,   tid.pos_x - 1, tid.pos_y })
+        if tile_ptr.edges_match.right.tile  != 0 do Array.push(&to_process, .{ tile_ptr.edges_match.right,  tid.pos_x + 1, tid.pos_y })
     }
 
     forest : [12 * 8 * 12 * 8] u8
     for y in 0 .. 12 {
         for x in 0 .. 12 {
-            tile := map.get(&tile_map, grid[y * 12 + x])->unwrap()
+            tile := Map.get(&tile_map, grid[y * 12 + x])->unwrap()
 
             for fy in 0 .. 8 {
                 for fx in 0 .. 8 {

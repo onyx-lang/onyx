@@ -41,31 +41,31 @@ main :: (args: [] cstr) {
     file := contents
 
     est := cast(u32, conv.parse_int(&file))
-    string.advance_line(&file)
+    str.advance_line(&file)
 
-    buses := array.make(i64)
-    defer array.free(&buses)
+    buses := Array.make(i64)
+    defer Array.free(&buses)
 
-    rems := array.make(i64)
-    defer array.free(&rems)
+    rems := Array.make(i64)
+    defer Array.free(&rems)
 
     offset: i64 = 0
-    while !string.empty(file) {
+    while !str.empty(file) {
         if file.data[0] == 'x' {
-            string.advance(&file, 2)
+            str.advance(&file, 2)
         } else {
             bus := conv.parse_int(&file)
-            array.push(&buses, ~~bus)
-            array.push(&rems, bus - offset)
+            Array.push(&buses, ~~bus)
+            Array.push(&rems, bus - offset)
 
-            string.advance(&file, 1)
+            str.advance(&file, 1)
         }
 
         offset += 1
     }
 
     // Part 1
-    // min := array.fold(&buses, 0xffffffff, math.min)
+    // min := Array.fold(&buses, 0xffffffff, math.min)
 
     // take_bus := 0
     // depart   := 0

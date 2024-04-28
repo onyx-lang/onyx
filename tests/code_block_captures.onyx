@@ -5,7 +5,7 @@ main :: () {
 
     x := 5
 
-    val := slice.find_opt(arr, [n](n > x))
+    val := Slice.find_opt(arr, [n](n > x))
     val->with([captured_name] {
         println(captured_name)
     })

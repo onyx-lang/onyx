@@ -10,7 +10,6 @@ package core.io
 
 use core.memory
 use core.math
-use core.array
 use core.iter
 
 Reader :: struct {
@@ -111,12 +110,12 @@ reader_empty :: (use reader: &Reader) -> bool {
 }
 
 read_all :: (use reader: &Reader, allocator := context.allocator) -> [] u8 {
-    output := array.make(u8, 128, allocator=allocator)
+    output := Array.make(u8, 128, allocator=allocator)
 
     while !reader_empty(reader) {
         buffered := reader_get_buffered(reader)
         if buffered > 0 {
-            array.ensure_capacity(&output, output.count + buffered)
+            Array.ensure_capacity(&output, output.count + buffered)
             memory.copy(output.data + output.count, buffer.data, buffered)
             output.count += buffered
             start = end
@@ -385,7 +384,7 @@ read_line :: (use reader: &Reader, consume_newline := true, allocator := context
         }
 
         if count != start {
-            array.ensure_capacity(&out, out.count + (count - start))
+            Array.ensure_capacity(&out, out.count + (count - start))
             memory.copy(out.data + out.count, buffer.data + start, count - start)
             out.count += count - start
             start = count
@@ -455,7 +454,7 @@ read_word :: (use reader: &Reader, numeric_allowed := false, allocator := contex
         }
 
         if count != start {
-            array.ensure_capacity(&out, out.count + (count - start))
+            Array.ensure_capacity(&out, out.count + (count - start))
             memory.copy(out.data + out.count, buffer.data + start, count - start)
             out.count += count - start
             start = count
@@ -522,7 +521,7 @@ read_until :: (use reader: &Reader, until: u8, skip: u32 = 0, allocator := conte
         }
 
         if count != start {
-            array.ensure_capacity(&out, out.count + (count - start))
+            Array.ensure_capacity(&out, out.count + (count - start))
             memory.copy(out.data + out.count, buffer.data + start, count - start)
             out.count += count - start
             start = count

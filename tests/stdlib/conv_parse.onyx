@@ -8,7 +8,7 @@ main :: () {
     conv.parse(Food, "2") |> println()
 
     "12 34 56 78 90"
-    |> string.split_iter(" ")
+    |> str.split_iter(" ")
     |> iter.map(x => conv.parse(i32, x))
     |> iter.collect()
     |> println()

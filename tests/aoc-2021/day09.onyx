@@ -21,14 +21,14 @@ find_span :: macro (low: Pos) -> u32 {
 
     while queued.count != 0 {
         t := queued[0]
-        array.delete(&queued, 0)
+        Array.delete(&queued, 0)
 
         top := &heightmap[t]
         if top.height == 9 do continue
 
         included << t
 
-        array.clear(&potential)
+        Array.clear(&potential)
         if t.x < width - 1 && top.dx < 0 {
             potential << Pos.{t.x+1,t.y}
         }
@@ -47,7 +47,7 @@ find_span :: macro (low: Pos) -> u32 {
         }
 
         for p in potential {
-            if !array.contains(included, p) && !array.contains(queued, p) {
+            if !Array.contains(included, p) && !Array.contains(queued, p) {
                 queued << p
             }
         }
@@ -85,12 +85,12 @@ main :: (args) => {
     }
 
     for y in height - 1 do for x in width {
-        map.update(&heightmap, .{x,y}) {
+        Map.update(&heightmap, .{x,y}) {
             it.dy = it.height - heightmap[Pos.{x,y+1}]->unwrap().height
         }
     }
     for x in width - 1 do for y in height {
-        map.update(&heightmap, .{x,y}) {
+        Map.update(&heightmap, .{x,y}) {
             it.dx = it.height - heightmap[Pos.{x+1,y}]->unwrap().height
         }
     }
@@ -119,7 +119,7 @@ main :: (args) => {
     lowest_count: Map(Pos, i32)
     for low in lowest do lowest_count[low] = find_span(low)
 
-    array.quicksort(lowest_count.entries, (a, b) => b.value - a.value)
+    Array.quicksort(lowest_count.entries, (a, b) => b.value - a.value)
 
     answer := iter.as_iter(lowest_count.entries)
            |> iter.map((x) => x.value)

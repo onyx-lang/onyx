@@ -21,13 +21,13 @@ main :: (args) => {
     use reader := io.reader_make(&file)
 
     numbers_line := io.read_line(&reader, inplace=true, consume_newline=true)
-    numbers_str  := string.split(numbers_line, ',')
+    numbers_str  := str.split(numbers_line, ',')
     numbers := memory.make_slice(Cell, numbers_str.count)
     for numbers_str.count do numbers[it] = ~~ conv.parse_int(numbers_str[it])
 
     boards: [..] Board
     while !io.reader_empty(&reader) {
-        board := array.alloc_one(&boards)
+        board := Array.alloc_one(&boards)
         board.has_won = false
         memory.set(&board.marked, 0, sizeof typeof board.marked)
 

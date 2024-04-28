@@ -236,7 +236,7 @@ buffer_stream_make :: #match #locked {
         // Make a copy of the data using the provided allocator.
         data: [..] u8 = .{ initial_data.data, initial_data.count, initial_data.count }
         if !fixed {
-            data = array.make(initial_data, allocator)
+            data = Array.make(initial_data, allocator)
         }
 
         return .{ .{ vtable = &buffer_stream_vtable }, data, fixed=fixed }
@@ -313,7 +313,7 @@ buffer_stream_vtable := Stream_Vtable.{
 
         if curr_pos + buffer.count >= data.capacity {
             if fixed do return .{ Err = .EOF }
-            if !array.ensure_capacity(&data, curr_pos + buffer.count) do return .{ Err = .EOF }
+            if !Array.ensure_capacity(&data, curr_pos + buffer.count) do return .{ Err = .EOF }
         }
 
         memory.copy(&data.data[curr_pos], buffer.data, buffer.count)
@@ -328,7 +328,7 @@ buffer_stream_vtable := Stream_Vtable.{
 
         if at + buffer.count >= data.capacity {
             if fixed do return .{ Err = .EOF }
-            if !array.ensure_capacity(&data, at + buffer.count) do return .{ Err = .EOF }
+            if !Array.ensure_capacity(&data, at + buffer.count) do return .{ Err = .EOF }
         }
 
         memory.copy(&data.data[at], buffer.data, buffer.count)
@@ -342,7 +342,7 @@ buffer_stream_vtable := Stream_Vtable.{
 
         if curr_pos + 1 >= data.capacity {
             if fixed do return .EOF
-            if !array.ensure_capacity(&data, data.count + 1) do return .EOF
+            if !Array.ensure_capacity(&data, data.count + 1) do return .EOF
         }
 
         data[curr_pos] = byte
@@ -360,7 +360,7 @@ buffer_stream_vtable := Stream_Vtable.{
         if !write_enabled || fixed do return .NotImplemented
 
         curr_pos = 0
-        array.clear(&data)
+        Array.clear(&data)
 
         return .None
     },

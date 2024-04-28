@@ -11,8 +11,6 @@ package core.encoding.csv
 //
 
 use core
-use core.string
-use core.array
 use core.iter
 use core.conv
 use core.io
@@ -82,11 +80,11 @@ CSV.ingress :: (csv: &CSV, reader: &io.Reader, headers_present := true) -> bool 
 
     if headers_present {
         header_line := reader->read_line(allocator=context.temp_allocator)
-                    |> string.strip_trailing_whitespace()
+                    |> str.strip_trailing_whitespace()
 
-        for header in string.split_iter(header_line, ',') {
-            member := array.first(output_type_info.members, [](do {
-                if tag := array.first(it.tags, [t](t.type == CSV_Column)); tag {
+        for header in str.split_iter(header_line, ',') {
+            member := Array.first(output_type_info.members, [](do {
+                if tag := Array.first(it.tags, [t](t.type == CSV_Column)); tag {
                     return any_as(*tag, CSV_Column).name == header
                 }
 
@@ -105,7 +103,7 @@ CSV.ingress :: (csv: &CSV, reader: &io.Reader, headers_present := true) -> bool 
     for line in reader->lines(allocator = context.temp_allocator) {
         out: csv.Output_Type
 
-        for entry in string.split_iter(string.strip_trailing_whitespace(line), ',')
+        for entry in str.split_iter(str.strip_trailing_whitespace(line), ',')
                 |> iter.enumerate()
         {
             header := &any_headers[entry.index]
@@ -114,7 +112,7 @@ CSV.ingress :: (csv: &CSV, reader: &io.Reader, headers_present := true) -> bool 
             target := cast([&] u8) &out + header.offset
 
             if header.type == str {
-                *cast(&str) target = string.copy(entry.value)
+                *cast(&str) target = str.copy(entry.value)
             } else {
                 conv.parse_any(target, header.type, entry.value)
             }
@@ -136,7 +134,7 @@ CSV.egress :: (csv: &CSV, writer: &io.Writer, include_headers := true) {
         for &member in output_type_info.members {
             if !#first do io.write(writer, ",")
 
-            if tag := array.first(member.tags, [t](t.type == CSV_Column)); tag {
+            if tag := Array.first(member.tags, [t](t.type == CSV_Column)); tag {
                 io.write(writer, any_as(*tag, CSV_Column).name)
             } else {
                 io.write(writer, member.name)

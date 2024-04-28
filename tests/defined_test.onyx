@@ -5,5 +5,5 @@ use core {*}
 main :: (args: [] cstr) {
     println(#defined(stdio))
     println(#defined(foobar))
-    println(#defined(array.Untyped_Array.foo))
+    println(#defined(Untyped_Array.foo))
 }

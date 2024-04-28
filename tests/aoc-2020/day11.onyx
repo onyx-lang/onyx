@@ -68,25 +68,25 @@ main :: (args: [] cstr) {
     file := contents
 
     gos : GameOfSeats
-    array.init(&gos.seats, 32)
-    defer array.free(&gos.seats)
+    Array.init(&gos.seats, 32)
+    defer Array.free(&gos.seats)
 
     gos.height = 0
 
-    while !string.empty(file) {
-        line, file~ := string.bisect(file, '\n')
+    while !str.empty(file) {
+        line, file~ := str.bisect(file, '\n')
         for ch in line do switch ch {
-            case '.' do array.push(&gos.seats, SeatState.Floor)
-            case 'L' do array.push(&gos.seats, SeatState.Empty)
-            case '#' do array.push(&gos.seats, SeatState.Occupied)
+            case '.' do Array.push(&gos.seats, SeatState.Floor)
+            case 'L' do Array.push(&gos.seats, SeatState.Empty)
+            case '#' do Array.push(&gos.seats, SeatState.Occupied)
         }
 
         gos.width = line.count
         gos.height += 1
     }
 
-    array.init(&gos.temp, gos.seats.count)
-    defer array.free(&gos.temp)
+    Array.init(&gos.temp, gos.seats.count)
+    defer Array.free(&gos.temp)
 
     while gos_iter(&gos) ---
 

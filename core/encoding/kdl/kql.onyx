@@ -1,7 +1,7 @@
 package core.encoding.kdl
 #allow_stale_code
 
-use core {iter, alloc, array, string}
+use core {iter, alloc}
 
 Document.query     :: query_doc
 Document.query_all :: query_doc_all
@@ -105,16 +105,16 @@ query_next :: (ctx: &QueryIterator) -> ? &Node {
             }
         }
 
-        last_query := array.get_ptr(ctx.stack, -1)
+        last_query := Array.get_ptr(ctx.stack, -1)
         if !last_query do break
 
         while last_query.current_child < last_query.node.children.length {
             ctx.stack << .{ last_query.node.children[last_query.current_child], 0 }
             last_query.current_child += 1
-            last_query = array.get_ptr(ctx.stack, -1)
+            last_query = Array.get_ptr(ctx.stack, -1)
         }
 
-        defer array.pop(&ctx.stack)
+        defer Array.pop(&ctx.stack)
         for ctx.q.matches_any {
             if query_selector_matches(it, ctx.stack) {
                 return last_query.node
@@ -241,9 +241,9 @@ operate_on_values :: (v1, v2: Value, op: AttributeOp) -> bool {
         case .Equal    => left == right
         case .NotEqual => left != right
 
-        case .StartsWith => string.starts_with(left, right)
-        case .EndsWith   => string.ends_with(left, right)
-        case .Contains   => string.contains(left, right)
+        case .StartsWith => str.starts_with(left, right)
+        case .EndsWith   => str.ends_with(left, right)
+        case .Contains   => str.contains(left, right)
 
         case _ => false
     }
@@ -334,7 +334,7 @@ parse_query :: (q: str, al: Allocator) -> Query {
         query.matches_any << parse_selector(&parser)
 
         skip_whitespace(&parser)
-        if string.starts_with(parser->rem(), "||") {
+        if str.starts_with(parser->rem(), "||") {
             parser.cursor += 2
             skip_whitespace(&parser)
         }
@@ -382,13 +382,13 @@ parse_selector :: (p: &QueryParser) -> &Selector {
 
         skip_whitespace(p)
 
-        if string.starts_with(p->rem(), "||") {
+        if str.starts_with(p->rem(), "||") {
             break
         }
     }
 
     // Reverse the segments here so it is easier to process with later.
-    array.reverse(s.segments)
+    Array.reverse(s.segments)
 
     return s
 }
@@ -402,7 +402,7 @@ parse_matcher :: (p: &QueryParser) -> ? &Matcher {
     })
 
     if p.query[p.cursor] != '[' {
-        if string.starts_with(p->rem(), "top()") {
+        if str.starts_with(p->rem(), "top()") {
             p.cursor += 5
             m.details << .{
                 accessor = .{ Scope = .{} },
@@ -437,9 +437,9 @@ parse_matcher :: (p: &QueryParser) -> ? &Matcher {
 
         accessor: MatcherAccessor
 
-        if string.starts_with(p->rem(), "val(") {
+        if str.starts_with(p->rem(), "val(") {
             p.cursor += 4; // "("
-            if string.starts_with(p->rem(), ")") {
+            if str.starts_with(p->rem(), ")") {
                 p.cursor += 1
                 accessor = .{ Arg = 0 }
 
@@ -447,18 +447,18 @@ parse_matcher :: (p: &QueryParser) -> ? &Matcher {
                 index := parse_number(p)
                 accessor = .{ Arg = index }
 
-                if string.starts_with(p->rem(), ")") {
+                if str.starts_with(p->rem(), ")") {
                     p.cursor += 1
                 }
             }
         }
 
-        elseif string.starts_with(p->rem(), "prop(") {
+        elseif str.starts_with(p->rem(), "prop(") {
             p.cursor += 5; // "prop("
             prop_id := parse_identifier(p)
             accessor = .{ Prop = prop_id }
 
-            if string.starts_with(p->rem(), ")") {
+            if str.starts_with(p->rem(), ")") {
                 p.cursor += 1
             }
         }
@@ -475,21 +475,21 @@ parse_matcher :: (p: &QueryParser) -> ? &Matcher {
 
         if p.query[p.cursor] != ']' {
             rem := p->rem()
-            if     string.starts_with(rem, "=")  { op = .Equal; p.cursor += 1; }
-            elseif string.starts_with(rem, "!=") { op = .NotEqual; p.cursor += 2; }
-            elseif string.starts_with(rem, "<=") { op = .Lte; p.cursor += 2; }
-            elseif string.starts_with(rem, ">=") { op = .Gte; p.cursor += 2; }
-            elseif string.starts_with(rem, "<")  { op = .Lt; p.cursor += 1; }
-            elseif string.starts_with(rem, ">")  { op = .Gt; p.cursor += 1; }
-            elseif string.starts_with(rem, "^=") { op = .StartsWith; p.cursor += 2; }
-            elseif string.starts_with(rem, "$=") { op = .EndsWith; p.cursor += 2; }
-            elseif string.starts_with(rem, "*=") { op = .Contains; p.cursor += 2; }
+            if     str.starts_with(rem, "=")  { op = .Equal; p.cursor += 1; }
+            elseif str.starts_with(rem, "!=") { op = .NotEqual; p.cursor += 2; }
+            elseif str.starts_with(rem, "<=") { op = .Lte; p.cursor += 2; }
+            elseif str.starts_with(rem, ">=") { op = .Gte; p.cursor += 2; }
+            elseif str.starts_with(rem, "<")  { op = .Lt; p.cursor += 1; }
+            elseif str.starts_with(rem, ">")  { op = .Gt; p.cursor += 1; }
+            elseif str.starts_with(rem, "^=") { op = .StartsWith; p.cursor += 2; }
+            elseif str.starts_with(rem, "$=") { op = .EndsWith; p.cursor += 2; }
+            elseif str.starts_with(rem, "*=") { op = .Contains; p.cursor += 2; }
 
             skip_whitespace(p)
 
             // TODO Make any value work!
             v := Value.{ data = .{ String = "" } }
-            if string.starts_with(p->rem(), "\"") {
+            if str.starts_with(p->rem(), "\"") {
                 p.cursor += 1
                 v.data = .{
                     String = read_until(p, '"')

@@ -1,6 +1,6 @@
-package core.string
+package core
 
-use core {package, *}
+use core
 
 
 /// Generic procedure for turning something into a string.
@@ -49,9 +49,16 @@ str.copy_into :: (orig: str, dest: str) {
     memory.copy(dest.data, orig.data, len)
 }
 
-#overload str.as_str :: from_cstr
-from_cstr :: (s: cstr) -> str {
-    return .{ data = s, count = length(s) }
+#overload str.as_str :: str.from_cstr
+str.from_cstr :: (s: cstr) -> str {
+    len := 0
+    p := s
+    while p[0] != '\0' {
+        p += 1
+        len += 1
+    }
+
+    return .{ data = s, count = len }
 }
 
 /// Converts a `str` into a `cstr` by copying the memory of the string to the stack,
@@ -71,24 +78,6 @@ str.to_cstr_on_stack :: macro (s_: str) -> cstr {
     return result
 }
 
-
-// Does this still need to exist?
-length :: #match #local {}
-
-#overload
-length :: (s: str) => s.count
-
-#overload
-length :: (s: cstr) -> u32 {
-    len := 0
-    c: [&] u8 = s
-    while c[0] != '\0' {
-        len += 1
-        c += 1
-    }
-
-    return len
-}
 
 
 str.concat :: #match #local {}
@@ -143,7 +132,7 @@ str.concat :: (buffer: [] u8, strings: ..str) -> str {
 #overload
 str.concat :: (into: &dyn_str, strings: ..str) -> str {
     for s in strings {
-        array.ensure_capacity(into, into.count + s.count)
+        Array.ensure_capacity(into, into.count + s.count)
         memory.copy(into.data + into.count, s.data, s.count)
         into.count += s.count
     }
@@ -152,7 +141,7 @@ str.concat :: (into: &dyn_str, strings: ..str) -> str {
 
 #overload
 str.concat :: (into: &dyn_str, chars: ..u8) -> str {
-    array.ensure_capacity(into, into.count + chars.count)
+    Array.ensure_capacity(into, into.count + chars.count)
     for c in chars {
         memory.copy(into.data + into.count, cast(rawptr) &.[c], 1)
         into.count += 1
@@ -192,7 +181,7 @@ str.contains :: (s: str, substr: str) -> bool {
 str.join :: (strs: [] str, sep: str, allocator := context.allocator) -> str {
     if strs.count == 0 do return ""
 
-    len_sum := array.fold(strs, 0, [v, acc](acc + v.length))
+    len_sum := Array.fold(strs, 0, [v, acc](acc + v.length))
     out := make(str, len_sum + (strs.count - 1) * sep.count)
 
     i := 0
@@ -316,13 +305,13 @@ str.strip_whitespace :: #match #local {}
 
 #overload
 str.strip_whitespace :: (s: &str) {
-    strip_leading_whitespace(s)
-    strip_trailing_whitespace(s)
+    str.strip_leading_whitespace(s)
+    str.strip_trailing_whitespace(s)
 }
 
 #overload
 str.strip_whitespace :: (s:  str) =>
-    s |> strip_leading_whitespace() |> strip_trailing_whitespace()
+    s |> str.strip_leading_whitespace() |> str.strip_trailing_whitespace()
 
 
 str.strip_leading_whitespace :: #match #local {}
@@ -342,7 +331,7 @@ str.strip_leading_whitespace :: (s: &str) {
 #overload
 str.strip_leading_whitespace :: (s: str) -> str {
     out := s
-    strip_leading_whitespace(&out)
+    str.strip_leading_whitespace(&out)
     return out
 }
 
@@ -363,7 +352,7 @@ str.strip_trailing_whitespace :: (s: &str) {
 #overload
 str.strip_trailing_whitespace :: (s: str) -> str {
     out := s
-    strip_trailing_whitespace(&out)
+    str.strip_trailing_whitespace(&out)
     return out
 }
 
@@ -401,7 +390,7 @@ str.trim_start :: (s: &str, char: u8) {
 #overload
 str.trim_start :: (s: str, char: u8) -> str {
     out := s
-    trim_start(&out, char)
+    str.trim_start(&out, char)
     return out
 }
 
@@ -418,7 +407,7 @@ str.trim_end :: (s: &str, char: u8) {
 #overload
 str.trim_end :: (s: str, char: u8) -> str {
     out := s
-    trim_end(&out, char)
+    str.trim_end(&out, char)
     return out
 }
 
@@ -610,12 +599,12 @@ str.split_iter :: (s: str, delim: u8) -> Iterator(str) {
         &.{ s = s, delim = delim },
 
         (ctx: &$T) -> ? str {
-            if string.empty(ctx.s) {
+            if str.empty(ctx.s) {
                 return .None
             }
 
             ret: str
-            ret, ctx.s = bisect(ctx.s, ctx.delim)
+            ret, ctx.s = str.bisect(ctx.s, ctx.delim)
             return ret
         }
     )
@@ -627,12 +616,12 @@ str.split_iter :: (s: str, delim: str) -> Iterator(str) {
         &.{ s = s, delim = delim },
 
         (ctx: &$T) -> ? str {
-            if string.empty(ctx.s) {
+            if str.empty(ctx.s) {
                 return .None
             }
 
             ret: str
-            ret, ctx.s = bisect(ctx.s, ctx.delim)
+            ret, ctx.s = str.bisect(ctx.s, ctx.delim)
             return ret
         }
     )
@@ -649,7 +638,7 @@ str.bisect :: #match #local {}
 
 #overload
 str.bisect :: (s: str, c: u8) -> (str, str) {
-    index := index_of(s, c); 
+    index := str.index_of(s, c); 
     if index == -1 {
         return s, ""
     }
@@ -659,7 +648,7 @@ str.bisect :: (s: str, c: u8) -> (str, str) {
 
 #overload
 str.bisect :: (s: str, substr: str) -> (str, str) {
-    index := index_of(s, substr)
+    index := str.index_of(s, substr)
     if index == -1 {
         return s, ""
     }
@@ -672,72 +661,20 @@ str.bisect :: (s: str, substr: str) -> (str, str) {
 //
 
 str.to_dyn_str :: (x: str, allocator := context.allocator) -> dyn_str {
-    use core.array
-    return array.make(x, allocator)
+    return Array.make(x, allocator)
 }
 
 dyn_str.append :: #match {
     macro (x: &dyn_str, other: str) {
-        use core.array
-        array.concat(x, other)
+        Array.concat(x, other)
     }, 
 
     macro (x: &dyn_str, other: u8) {
-        use core.array
-        array.push(x, other)
+        Array.push(x, other)
     }, 
 }
 
 dyn_str.retreat :: macro (x: &dyn_str, chars := 1) {
-    use core.array
-    array.pop(x, chars)
+    Array.pop(x, chars)
 }
-
-
-// These definitions exist to allow you to still say `string.XYZ`, instead of `str.XYZ`
-// That being said, `str.XYZ` should be the preferred way for the future.
-
-as_str :: str.as_str
-free :: str.free
-copy :: str.copy
-temp_copy :: str.temp_copy
-copy_into :: str.copy_into
-to_cstr_on_stack :: str.to_cstr_on_stack
-concat :: str.concat
-join :: str.join
-compare :: str.compare
-contains :: str.contains
-equal :: str.equal
-equal_insensitive :: str.equal_insensitive
-starts_with :: str.starts_with
-ends_with :: str.ends_with
-empty :: str.empty
-index_of :: str.index_of
-last_index_of :: str.last_index_of
-strip_whitespace :: str.strip_whitespace
-strip_leading_whitespace :: str.strip_leading_whitespace
-strip_trailing_whitespace :: str.strip_trailing_whitespace
-to_lowercase :: str.to_lowercase
-to_uppercase :: str.to_uppercase
-trim_start :: str.trim_start
-trim_end :: str.trim_end
-advance :: str.advance
-replace :: str.replace
-read_until :: str.read_until
-read_alphanum :: str.read_alphanum
-read_until_any :: str.read_until_any
-advance_line :: str.advance_line
-split :: str.split
-split_iter :: str.split_iter
-bisect :: str.bisect
-
-to_dyn_str :: str.to_dyn_str
-delete :: dyn_str.delete
-append :: dyn_str.append
-clear  :: dyn_str.clear
-retreat :: dyn_str.retreat
-insert :: dyn_str.insert
-
-// DEPRECATED: Use `string.copy` instead
-alloc_copy :: str.copy
 

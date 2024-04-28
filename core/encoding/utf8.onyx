@@ -1,8 +1,6 @@
 package core.encoding.utf8
 #allow_stale_code
 
-use core.string
-use core.array
 use core.iter
 
 rune :: i32
@@ -11,7 +9,7 @@ Max_Chars :: 4
 
 append_rune :: (s: &dyn_str, r: rune) -> str {
     buffer: [Max_Chars] u8
-    string.append(s, encode_rune(buffer, r))
+    dyn_str.append(s, encode_rune(buffer, r))
     return *s
 }
 
@@ -21,7 +19,7 @@ advance_rune :: #match #local {}
 advance_rune :: (s: str, n := 1) -> str {
     t := s
     for n {
-        t = string.advance(t, rune_length_from_first_byte(t[0]))
+        t = str.advance(t, rune_length_from_first_byte(t[0]))
     }
     return t
 }
@@ -29,7 +27,7 @@ advance_rune :: (s: str, n := 1) -> str {
 #overload
 advance_rune :: (s: &str, n := 1) {
     for n {
-        string.advance(s, rune_length_from_first_byte(s.data[0]))
+        str.advance(s, rune_length_from_first_byte(s.data[0]))
     }
 }
 
@@ -102,13 +100,13 @@ full_rune :: (buffer: [] u8) -> bool {
     // be a valid rune.
     if buffer.length < len do return false
 
-    return array.every(buffer[1 .. buffer.length], [c](c & 0xC0 == 0x80))
+    return Array.every(buffer[1 .. buffer.length], [c](c & 0xC0 == 0x80))
 }
 
 rune_count :: (s: str) -> i32 {
     w := s
     count := 0
-    while !string.empty(w) {
+    while !str.empty(w) {
         advance_rune(&w)
         count += 1
     }
@@ -147,10 +145,10 @@ runes :: (s: str) -> Iterator(RuneIterValue) {
     return iter.generator(
         &.{ s = s },
         (ctx: $C) -> ? RuneIterValue {
-            if string.empty(ctx.s) do return .None
+            if str.empty(ctx.s) do return .None
 
             r, len := decode_rune(ctx.s)
-            defer string.advance(&ctx.s, len)
+            defer str.advance(&ctx.s, len)
 
             return RuneIterValue.{ r, ctx.s[0..len] }
         }            
@@ -166,7 +164,7 @@ slice :: (s: str, low, high: i32) -> str {
     for high - low {
         _, b := decode_rune(tmp)
         bytes += b
-        string.advance(&tmp, b)
+        str.advance(&tmp, b)
     }
 
     return advanced.data[0 .. bytes]

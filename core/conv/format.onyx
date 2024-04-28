@@ -1,8 +1,6 @@
 package core.conv
 
-use core.map
-use core.string
-use core.array
+use core
 use core.math
 use core.io
 use runtime
@@ -16,8 +14,8 @@ use runtime
 /// It looks for all custom formatting and parsing definitions and
 /// registers them to be used in format_any and parse_any.
 custom_formatters_initialized :: #init () {
-    map.init(&custom_formatters)
-    map.init(&custom_parsers)
+    Map.init(&custom_formatters)
+    Map.init(&custom_parsers)
 
     #if Enable_Custom_Formatters {
         use runtime.info {*}
@@ -174,7 +172,7 @@ Format :: struct {
 
 #local
 flush_to_dyn_str :: (dynstr: &dyn_str, to_write: str) => {
-    array.concat(dynstr, to_write)
+    Array.concat(dynstr, to_write)
     return true
 }
 
@@ -224,7 +222,7 @@ format :: (buffer: &dyn_str, format: str, va: ..any) -> str {
     }
 
     final := format_va(&output, format, ~~va)
-    string.concat(buffer, final)
+    str.concat(buffer, final)
     return *buffer
 }
 
@@ -252,7 +250,7 @@ format_va :: (buffer: &dyn_str, format: str, va: [] any) -> str {
     }
 
     final := format_va(&output, format, va)
-    string.concat(buffer, final)
+    str.concat(buffer, final)
     return *buffer
 }
 
@@ -608,7 +606,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 }
 
                 a := cast(&Type_Info_Dynamic_Array) info
-                arr := cast(&array.Untyped_Array) v.data
+                arr := cast(&core.Untyped_Array) v.data
                 data  := arr.data
                 count := arr.count
 
@@ -724,7 +722,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                     case _ do assert(false, "Bad union backing type")
                 }
 
-                variant := array.first(u.variants, [x](x.tag_value == ~~tag_value))
+                variant := Array.first(u.variants, [x](x.tag_value == ~~tag_value))
 
                 if !variant {
                     output->write("unknown_variant")

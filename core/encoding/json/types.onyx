@@ -227,14 +227,12 @@ get_idx :: (v: Value, idx: i32) -> Value {
 
 set :: #match {
     macro (v: Value, key: str, value: Value, dont_copy_key := false) {
-        use core {string}
-
         _Value :: _Value
         _Value_Object :: _Value_Object
 
         v_ := cast(&_Value) v
         if v_.type == .Object {
-            k := key if dont_copy_key else string.copy(key)
+            k := key if dont_copy_key else str.copy(key)
 
             (cast(&_Value_Object) v_).object_ << .{ k, dont_copy_key, value }
         }
@@ -248,12 +246,10 @@ set :: #match {
         _Value :: _Value
         Value :: Value
 
-        use core {string}
-
         v_ := cast(&_Value) v
         if v_.type != .Object do return 0
-        k := key if dont_copy_key else string.copy(key)
-        val := value if dont_copy_value else string.copy(value)
+        k := key if dont_copy_key else str.copy(key)
+        val := value if dont_copy_value else str.copy(value)
 
         json_value := _Value_String.{
             str_ = val,
@@ -286,7 +282,7 @@ free :: (v: Value, allocator: Allocator) {
             for elem in v_arr.array_ {
                 free(elem, allocator)
             }
-            array.free(&v_arr.array_)
+            Array.free(&v_arr.array_)
         }
 
         case .Object {
@@ -295,7 +291,7 @@ free :: (v: Value, allocator: Allocator) {
                 if !entry.dont_free_key do raw_free(allocator, entry.key.data)
                 free(entry.value, allocator)
             }
-            array.free(&v_obj.object_)
+            Array.free(&v_obj.object_)
         }
     }
 

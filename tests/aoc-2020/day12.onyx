@@ -37,12 +37,12 @@ main :: (args: [] cstr) {
     file := contents
 
     ship := Ship.{ fx = 10, fy = -1 }
-    while !string.empty(file) {
+    while !str.empty(file) {
         dir := file[0]
-        string.advance(&file, 1)
+        str.advance(&file, 1)
 
         val := cast(u32, conv.parse_int(&file))
-        string.advance_line(&file); 
+        str.advance_line(&file); 
         
         switch dir {
             case 'N' do ship.fy -= val

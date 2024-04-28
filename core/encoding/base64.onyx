@@ -8,14 +8,12 @@
 package core.encoding.base64
 #allow_stale_code
 
-use core.array
-
 
 /// Encodes the given data in base64 into a new buffer, allocated
 /// from the allocator provided. It is the callers responsibilty
 /// to free this memory.
 encode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
-    out := array.make(u8, allocator=allocator)
+    out := Array.make(u8, allocator=allocator)
 
     for i in range.{0, data.count - 2, 3} {
         c1 := data[i + 0]
@@ -52,7 +50,7 @@ encode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
 decode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
     if data.count % 4 != 0 do return null_str
 
-    out := array.make(u8, allocator=allocator)
+    out := Array.make(u8, allocator=allocator)
 
     for i in range.{0, data.count, 4} {
         c1 := data[i + 0]

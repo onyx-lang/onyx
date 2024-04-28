@@ -1,4 +1,4 @@
-package core.map
+package core
 
 use core
 use core.hash
@@ -232,7 +232,7 @@ Map.format_map :: (output: &conv.Format_Output, format: &conv.Format, x: &Map($K
 ///         .{ "foo",  456 },
 ///     ])
 Map.literal :: ($Key: type_expr, $Value: type_expr, values: [] MapLiteralValue(Key, Value)) => {
-    m := core.map.make(Key, Value)
+    m := Map.make(Key, Value)
     for & values {
         m->put(it.key, it.value)
     }
@@ -286,7 +286,7 @@ Map.as_iter :: (m: &Map) =>
     }
 
     lookup :: (use map: &Map, key: map.Key_Type) -> MapLookupResult {
-        if hashes.data == null do init(map)
+        if hashes.data == null do Map.init(map)
         lr := MapLookupResult.{}
 
         hash_value: u32 = hash.hash(key)
@@ -331,25 +331,3 @@ Map.as_iter :: (m: &Map) =>
         }
     }
 }
-
-//
-// Everything below here only exists for backwards compatibility.
-//
-
-make :: Map.make
-init :: Map.init
-free :: Map.free
-copy :: Map.copy
-has :: Map.has
-get :: Map.get
-get_ptr :: Map.get_ptr
-get_opt :: Map.get_opt
-get_ptr_or_create :: Map.get_ptr_or_create
-put :: Map.put
-delete :: Map.delete
-update :: Map.update
-clear :: Map.clear
-empty :: Map.empty
-literal :: Map.literal
-as_iter :: Map.as_iter
-

@@ -7,7 +7,7 @@ main :: (args) => {
     use reader := io.reader_make(&file)
     start_str := io.read_all(&reader)
 
-    start_list := string.split(start_str, ',')
+    start_list := str.split(start_str, ',')
 
     fish: [9] i64
     for start_list {
@@ -22,6 +22,6 @@ main :: (args) => {
         fish[8] = new_fish
     }
 
-    total := array.sum(fish)
+    total := Array.sum(fish)
     printf("Part 2: {}\n", total)
 }

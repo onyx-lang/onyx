@@ -1,9 +1,8 @@
 package core.encoding.osad
 #allow_stale_code
 
+use core
 use core.io
-use core.string
-use core.array
 use core.memory
 use runtime
 
@@ -75,7 +74,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
 
         case .Slice, .Dynamic_Array {
             if v.type == str {
-                untyped_slice := cast(&array.Untyped_Array, v.data)
+                untyped_slice := cast(&core.Untyped_Array, v.data)
                 base: [&] u8 = untyped_slice.data
                 count:       = untyped_slice.count
                 output_u32(w, count)
@@ -85,7 +84,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
 
             s_info := cast(&type_info.Type_Info_Slice, info)
 
-            untyped_slice := cast(&array.Untyped_Array, v.data)
+            untyped_slice := cast(&core.Untyped_Array, v.data)
             base: [&] u8 = untyped_slice.data
             count:       = untyped_slice.count
             elem_size := type_info.size_of(s_info.of)
@@ -130,7 +129,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
                 case _ do assert(false, "Bad union backing type")
             }
 
-            variant := array.first(u_info.variants, [x](x.tag_value == ~~tag_value))
+            variant := Array.first(u_info.variants, [x](x.tag_value == ~~tag_value))
 
             if !variant {
                 output_u32(w, 0xffffffff)
@@ -221,7 +220,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := con
 
             count := read_u32(r)
 
-            untyped_slice := cast(&array.Untyped_Array, target)
+            untyped_slice := cast(&core.Untyped_Array, target)
             untyped_slice.count = count
             untyped_slice.data = raw_alloc(allocator, elem_size * count)
             memory.set(untyped_slice.data, 0, elem_size * count)
@@ -253,7 +252,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := con
 
             base: [&] u8 = target
             variant_value := read_u32(r)
-            variant := array.first(u_info.variants, [x](x.tag_value == ~~variant_value))
+            variant := Array.first(u_info.variants, [x](x.tag_value == ~~variant_value))
             if !variant {
                 memory.set(target, 0, u_info.size)
                 break

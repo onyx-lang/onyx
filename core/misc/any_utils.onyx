@@ -1,9 +1,8 @@
 package core.misc
 
 use runtime
+use core
 use core.iter
-use core.array
-use core.string
 use core.memory
 
 use runtime.info {
@@ -85,7 +84,7 @@ any_nested_selector :: (v: any, member_name: str) -> any {
     t := get_type_info(v.type)
     if t.kind != .Struct do return .{}
 
-    part_name, next_name := string.bisect(member_name, '.')
+    part_name, next_name := str.bisect(member_name, '.')
 
     member := get_struct_member(v.type, part_name)
     if member {
@@ -208,7 +207,7 @@ any_as_array :: (arr: any) -> (rawptr, type_expr, u32) {
         }
 
         case .Slice, .Dynamic_Array, .Variadic_Argument {
-            a := cast(&array.Untyped_Array) arr.data
+            a := cast(&core.Untyped_Array) arr.data
             return a.data, (cast(&Type_Info_Dynamic_Array) info).of, a.count
         }
 

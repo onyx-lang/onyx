@@ -1,8 +1,5 @@
 package core.conv
 
-use core.map
-use core.string
-use core.array
 use core.math
 use core.memory
 use runtime
@@ -72,15 +69,15 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
             // If the string does *look* like a quoted string,
             // simply return a copy of the whole string.
             if to_parse[0] != '"' {
-                *dest = string.copy(to_parse, string_allocator)
+                *dest = str.copy(to_parse, string_allocator)
                 return true
             }
 
 
             line := to_parse
-            string.advance(&line)
+            str.advance(&line)
 
-            *dest = string.read_until(&line, '"') |> string.copy(string_allocator); // @BUG // This does not handle escaped strings!
+            *dest = str.read_until(&line, '"') |> str.copy(string_allocator); // @BUG // This does not handle escaped strings!
             return true
         }
 

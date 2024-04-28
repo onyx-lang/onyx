@@ -48,8 +48,8 @@ main :: (args) => {
 
     printf("Part 1: {}\n", num1 * num2)
 
-    oxygen_array := array.copy(&nums)
-    co2_array    := array.copy(&nums)
+    oxygen_array := Array.copy(&nums)
+    co2_array    := Array.copy(&nums)
 
     filter_array :: macro (arr: [..] i32, index: i32, comparison: Code) {
         A := 0
@@ -66,7 +66,7 @@ main :: (args) => {
             defer i += 1
 
             if (arr[i] & (1 << index)) != expected {
-                array.fast_delete(&arr, i)
+                Array.fast_delete(&arr, i)
                 i -= 1
             }
         }

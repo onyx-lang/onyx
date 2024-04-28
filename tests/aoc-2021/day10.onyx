@@ -25,7 +25,7 @@ main :: (args) => {
         io.skip_whitespace(&reader)
 
         char_stack: [..] u8
-        defer array.free(&char_stack)
+        defer Array.free(&char_stack)
         for ch in line {
             switch ch {
                 case '(', '[', '<', '{' {
@@ -33,7 +33,7 @@ main :: (args) => {
                 }
 
                 case ')', ']', '>', '}' {
-                    x := array.pop(&char_stack)
+                    x := Array.pop(&char_stack)
                     if x != ch {
                         // printf("Expected '{}', found '{}' instead.\n", x, ch)
                         corrupted_score += score_map[ch]->unwrap()
@@ -48,7 +48,7 @@ main :: (args) => {
         complete_score: u64 = 0
         while char_stack.count != 0 {
             complete_score *= 5
-            switch array.pop(&char_stack) {
+            switch Array.pop(&char_stack) {
                 case ')' do complete_score += 1
                 case ']' do complete_score += 2
                 case '}' do complete_score += 3
@@ -61,7 +61,7 @@ main :: (args) => {
 
     printf("Part 1: {}\n", corrupted_score)
 
-    array.quicksort(completion_scores, (x, y) => {
+    Array.quicksort(completion_scores, (x, y) => {
         if x == y do return 0
         if x < y do return -1
         return 1

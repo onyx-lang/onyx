@@ -48,14 +48,14 @@ bitmask_p2 :: (mask: Bitmask, val: u64) -> Iterator(u64) {
 
     iterator_close :: (data: rawptr) {
         bmi := cast(&BitmaskIter) data
-        array.free(&bmi.floating_indicies)
+        Array.free(&bmi.floating_indicies)
         cfree(bmi)
     }
 
     bmi := new(BitmaskIter)
     bmi.done = false
 
-    array.init(&bmi.floating_indicies, 8)
+    Array.init(&bmi.floating_indicies, 8)
 
 	v := val
 	for i in 0 .. MASK_SIZE {
@@ -63,7 +63,7 @@ bitmask_p2 :: (mask: Bitmask, val: u64) -> Iterator(u64) {
 
 		if mask[i] == 2 {
             v &= ~(1 << cast(u64) i)
-			array.push(&bmi.floating_indicies, cast(u8) i)
+			Array.push(&bmi.floating_indicies, cast(u8) i)
 		}
 	}
 
@@ -77,19 +77,19 @@ main :: (args: [] cstr) {
 
 	file := contents
 
-	mem := map.make(u64, u64)
-	defer map.free(&mem)
+	mem := Map.make(u64, u64)
+	defer Map.free(&mem)
 
 	mask : Bitmask
 	for &m in mask do *m = 2
 
-	while !string.empty(file) {
-		word := string.read_alphanum(&file)
-		if string.equal(word, "mask") {
-            string.advance(&file, 3)
+	while !str.empty(file) {
+		word := str.read_alphanum(&file)
+		if str.equal(word, "mask") {
+            str.advance(&file, 3)
 
 			i := 35
-            m, file~ := string.bisect(file, '\n')
+            m, file~ := str.bisect(file, '\n')
             for ch in m {
 				switch ch {
 					case '0' do mask[i] = 0
@@ -100,23 +100,23 @@ main :: (args: [] cstr) {
 				i -= 1
 			}
 		}
-		elseif string.equal(word, "mem") {
-			string.advance(&file, 1)
+		elseif str.equal(word, "mem") {
+			str.advance(&file, 1)
 
 			addr := cast(u64, conv.parse_int(&file))
-			string.advance(&file, 4)
+			str.advance(&file, 4)
 
 			val := cast(u64, conv.parse_int(&file))
 
 			// Part 1
-			// map.put(&mem, addr, bitmask_p1(mask, val))
+			// Map.put(&mem, addr, bitmask_p1(mask, val))
 
 			// Part 2
             for real_addr in bitmask_p2(mask, addr) {
-                map.put(&mem, real_addr, val)
+                Map.put(&mem, real_addr, val)
             }
 
-			string.advance_line(&file)
+			str.advance_line(&file)
 		}	
 	}	
 

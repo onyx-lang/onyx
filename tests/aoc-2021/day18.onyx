@@ -186,7 +186,7 @@ SnailNum.magnitude :: (use n: &SnailNum) => {
 }
 
 SnailNum.parse :: (line: &str) -> &SnailNum {
-    string.advance(line);  // [
+    str.advance(line);  // [
 
     root := SnailNum.make()
     if line.data[0] == '[' {
@@ -195,7 +195,7 @@ SnailNum.parse :: (line: &str) -> &SnailNum {
         root.left_val = ~~ conv.str_to_i64(line)
     }
 
-    string.advance(line);  // ,
+    str.advance(line);  // ,
 
     if line.data[0] == '[' {
         root->set_right(SnailNum.parse(line))
@@ -203,7 +203,7 @@ SnailNum.parse :: (line: &str) -> &SnailNum {
         root.right_val = ~~ conv.str_to_i64(line)
     }
 
-    string.advance(line); // ]
+    str.advance(line); // ]
 
     return root
 }

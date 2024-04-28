@@ -4,7 +4,7 @@ use core {*}
 
 BagGraph :: struct {
     nodes    : [..] &BagNode
-    node_map : map.Map(str, &BagNode)
+    node_map : Map(str, &BagNode)
 }
 
 BagNode :: struct {
@@ -22,28 +22,28 @@ BagContainment :: struct {
 }
 
 bg_init :: (use graph: &BagGraph) {
-    array.init(&nodes, 16)
-    map.init(&node_map)
+    Array.init(&nodes, 16)
+    Map.init(&node_map)
 }
 
 bg_free :: (use graph: &BagGraph) {
-    array.free(&nodes)
-    map.free(&node_map)
+    Array.free(&nodes)
+    Map.free(&node_map)
 }
 
 bg_get_node :: (use graph: &BagGraph, name: str) -> &BagNode {
-    node := map.get(&node_map, name) ?? null
+    node := Map.get(&node_map, name) ?? null
 
     if node == null {
         node = calloc(sizeof BagNode)
         // Part 1
         // array.init(&node.contained_in, 2)
         // Part 2
-        array.init(&node.contain, 2)
+        Array.init(&node.contain, 2)
         node.color = name
 
-        array.push(&nodes, node)
-        map.put(&node_map, node.color, node)
+        Array.push(&nodes, node)
+        Map.put(&node_map, node.color, node)
     }
 
     return node
@@ -59,20 +59,20 @@ main :: (args: [] cstr) {
     defer bg_free(&graph)
 
     while true {
-        name := string.read_until(&file, ' ', 1)
+        name := str.read_until(&file, ' ', 1)
         if name.count == 0 do break
 
         container := bg_get_node(&graph, name)
 
-        string.read_until(&file, ' ', 2)
+        str.read_until(&file, ' ', 2)
 
         while true {
-            if string.starts_with(file, " no") do break
+            if str.starts_with(file, " no") do break
 
             count := cast(u32, conv.parse_int(&file))
-            string.advance(&file, 1)
+            str.advance(&file, 1)
 
-            contained_name := string.read_until(&file, ' ', 1)
+            contained_name := str.read_until(&file, ' ', 1)
             contained := bg_get_node(&graph, contained_name)
 
             // Part 1
@@ -82,13 +82,13 @@ main :: (args: [] cstr) {
             // })
 
             // Part 2
-            array.push(&container.contain, .{ bag = contained, count = count })
+            Array.push(&container.contain, .{ bag = contained, count = count })
 
-            bag_word := string.read_until_any(&file, 1, ' ', '\n')
+            bag_word := str.read_until_any(&file, 1, ' ', '\n')
             if bag_word[bag_word.count - 1] == '.' do break
         }
 
-        string.advance_line(&file)
+        str.advance_line(&file)
     }
 
     // Part 1
@@ -114,20 +114,20 @@ main :: (args: [] cstr) {
     // printf("Count: {}\n", processed_bags.count - 1)
     
     // Part 2
-    to_process := array.make(&BagNode)
-    multiplier := array.make(u32)
-    array.push(&to_process, bg_get_node(&graph, "shiny gold"))
-    array.push(&multiplier, 1)
+    to_process := Array.make(&BagNode)
+    multiplier := Array.make(u32)
+    Array.push(&to_process, bg_get_node(&graph, "shiny gold"))
+    Array.push(&multiplier, 1)
 
     count := 0
     while to_process.count > 0 {
-        bag := array.pop(&to_process)
-        mul := array.pop(&multiplier)
+        bag := Array.pop(&to_process)
+        mul := Array.pop(&multiplier)
         count += mul
 
         for bc in bag.contain {
-            array.push(&to_process, bc.bag)
-            array.push(&multiplier, bc.count * mul)
+            Array.push(&to_process, bc.bag)
+            Array.push(&multiplier, bc.count * mul)
         }
     }
 

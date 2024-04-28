@@ -345,7 +345,7 @@ socket_recv :: (s: &Socket, maxlen := 1024, allocator := context.allocator) -> ?
         return .{}
     }
 
-    return slice.copy(buffer[0 .. res.Ok->unwrap()], allocator)
+    return Slice.copy(buffer[0 .. res.Ok->unwrap()], allocator)
 }
 
 socket_recv_into :: (s: &Socket, buffer: [] u8) -> i32 {
@@ -471,8 +471,8 @@ str_to_ipv4 :: (ip: str) -> u32 {
     res: u32
     shift := 0
     for 4 {
-        octet := string.read_until(&ip_, '.')
-        string.advance(&ip_, 1)
+        octet := str.read_until(&ip_, '.')
+        str.advance(&ip_, 1)
 
         res |= cast(u32) (conv.str_to_i64(octet) & cast(i64) 0xFF) << shift
         shift += 8
@@ -497,7 +497,7 @@ ipv6_to_str :: (addr: [16] u8) -> str {
     return iter.as_iter(addr)
         ->map(x => tprintf("{w2b16}", cast(u32) x))
         ->collect()
-        |> string.join(" ")
+        |> str.join(" ")
 }
 
 

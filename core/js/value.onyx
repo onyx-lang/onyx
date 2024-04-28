@@ -3,7 +3,6 @@ package core.js
 
 use core.iter
 use core.math
-use core.array
 use core.alloc
 
 /// Used to represent a JavaScript value.
@@ -388,7 +387,7 @@ ValuePool.add :: (vp: &ValuePool, v: Value) {
 }
 
 ValuePool.remove :: (vp: &ValuePool, v: Value) {
-    array.filter(&vp.values, [x](cast(u64) x != cast(u64) v))
+    Array.filter(&vp.values, [x](cast(u64) x != cast(u64) v))
 }
 
 ValuePool.release_all :: (vp: &ValuePool) {
@@ -396,7 +395,7 @@ ValuePool.release_all :: (vp: &ValuePool) {
         __free(v)
     }
 
-    array.clear(&vp.values)
+    Array.clear(&vp.values)
 }
 
 ValuePool.destroy :: (vp: &ValuePool) {

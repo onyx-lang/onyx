@@ -30,13 +30,13 @@ main :: (args: [] cstr) {
     println(test)
 
     strings := str.[ "This ", "is ", "a ", "test." ]
-    result  := array.sum(cast([] str) strings, start="")
+    result  := Array.sum(cast([] str) strings, start="")
     println(result)
 
     // As a side note, '==' is already overloaded for strings in the
     // standard library, so you can do this:
 
-    if array.contains(cast([] str) strings, "is ") {
+    if Array.contains(cast([] str) strings, "is ") {
         println("The array contains 'is '.")
     } else {
         println("The array does NOT contain 'is '.")

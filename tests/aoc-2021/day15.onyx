@@ -1,6 +1,7 @@
 #load "core/module"
 
 use core {*}
+use core.heap {Heap}
 
 queued :: struct { x, y: i32; cost: i32; }
 #operator == (u1, u2: queued) => u1.x == u2.x && u1.y == u2.y
@@ -25,14 +26,14 @@ main :: (args) => {
 
     width := cells.count / height
 
-    to_try := heap.make(queued, (x, y) => x.cost - y.cost)
-    tried := set.make(pos)
+    to_try := Heap.make(queued, (x, y) => x.cost - y.cost)
+    tried := Set.make(pos)
 
     to_try << .{ 0, 0, -cast(i32) (cells[0] - '0') }
 
     minimum := 0
-    while !heap.empty(&to_try) {
-        try := heap.remove_top(&to_try)->unwrap()
+    while !Heap.empty(&to_try) {
+        try := Heap.remove_top(&to_try)->unwrap()
         tried << .{try.x, try.y}
 
         cell_value := cast(u32) (cells[(try.y % height) * width + (try.x % width)] - '0')
@@ -47,7 +48,7 @@ main :: (args) => {
         attempt_add :: macro (cond: Code, dx, dy: i32) {
             if #unquote cond {
                 if !(tried->has(.{try.x + dx, try.y + dy})) {
-                    if found := array.find_ptr(to_try.data, .{try.x + dx, try.y + dy, 0}); found != null {
+                    if found := Array.find_ptr(to_try.data, .{try.x + dx, try.y + dy, 0}); found != null {
                         found.cost = math.min(cell_value, found.cost)
                     } else {
                         to_try << .{try.x + dx, try.y + dy, cell_value }
@@ -65,7 +66,7 @@ main :: (args) => {
     printf("Part 2: {}\n", minimum)
 
 /*      NAIVE SOLUTION
-        min_paths := array.make(u32, capacity=cells.count*25)
+        min_paths := Array.make(u32, capacity=cells.count*25)
         min_paths.count = cells.count * 25
         memory.set(min_paths.data, 0, sizeof u32 * min_paths.count * 25)
 

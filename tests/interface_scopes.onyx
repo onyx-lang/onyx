@@ -21,7 +21,7 @@ Speak.speak :: (d: Dog, msg: str) {
 
 #overload
 Speak.yell :: (d: Dog, msg: str) {
-    printf("WOOF!  {}\n", string.temp_copy(msg) |> string.to_uppercase())
+    printf("WOOF!  {}\n", str.temp_copy(msg) |> str.to_uppercase())
 }
 
 Cat :: struct {_: i32}

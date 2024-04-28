@@ -3,7 +3,6 @@ package core.iter
 use core
 use core.memory
 use core.alloc
-use core.array
 use runtime
 
 use core {Pair}
@@ -623,7 +622,7 @@ generic_dynamic_array_as_iter :: (x: &[..] $T, $access: Code, $return_type: type
         //
         // This is current - 1 because current will have already
         // been incremented by the time this element calls #remove.
-        array.delete(arr, current - 1)
+        Array.delete(arr, current - 1)
         current -= 1
     }
 
@@ -823,8 +822,8 @@ sum :: (it: Iterator($T)) -> T {
 /// Places all yielded values into a dynamically allocated array,
 /// using the allocator provided (context.allocator by default).
 to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
-    arr := array.make(T, allocator=allocator)
-    for v in it do array.push(&arr, v)
+    arr := Array.make(T, allocator=allocator)
+    for v in it do Array.push(&arr, v)
 
     return arr
 }

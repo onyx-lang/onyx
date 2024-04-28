@@ -100,14 +100,14 @@ free :: (d: Document) {
 
 #local
 free_node :: (al: Allocator, n: &Node) {
-    string.free(n.node, al)
-    n.type_annotation->with([t] { string.free(t, al); })
+    str.free(n.node, al)
+    n.type_annotation->with([t] { str.free(t, al); })
 
     for& v in n.values do free_value(al, v)
     delete(&n.values); // This should use the allocator inside of the array
 
     for n.props->as_iter() {
-        string.free(it.key, al)
+        str.free(it.key, al)
         free_value(al, &it.value)
     }
     delete(&n.props)
@@ -117,16 +117,16 @@ free_node :: (al: Allocator, n: &Node) {
 
 #local
 free_value :: (al: Allocator, v: &Value) {
-    v.type_annotation->with([t] { string.free(t, al); })
+    v.type_annotation->with([t] { str.free(t, al); })
 
     switch v.data {
         case .String as s {
-            string.free(s, al)
+            str.free(s, al)
         }
 
         case .Number as num do switch num {
             case .String as s {
-                string.free(s, al)
+                str.free(s, al)
             } 
 
             case _ ---

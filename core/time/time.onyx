@@ -2,7 +2,6 @@ package core.time
 
 use core
 use core.io
-use core.string
 use core.conv
 use runtime
 
@@ -180,7 +179,7 @@ strftime :: (w: &io.Writer, format_: [] u8, tm: &Timestamp) {
         c := format[0]
         switch c {
             case '%' {
-                string.advance(&format)
+                str.advance(&format)
                 switch format[0] {
                     case 'A', 'a' {
                         day := weekdays[tm.wday]
@@ -233,7 +232,7 @@ strftime :: (w: &io.Writer, format_: [] u8, tm: &Timestamp) {
             }
         }
 
-        string.advance(&format)
+        str.advance(&format)
     }
 
     hour_to_12h :: (h: i32) -> i32 {
@@ -270,18 +269,18 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
         c := format[0]
         switch c {
             case '%' {
-                string.advance(&format)
+                str.advance(&format)
                 switch format[0] {
                     case 'a', 'A' {
                         for i in weekdays.count {
                             w := weekdays[i]
-                            if string.equal_insensitive(w, buf[0 .. w.length]) {
-                                string.advance(&buf, w.length)
+                            if str.equal_insensitive(w, buf[0 .. w.length]) {
+                                str.advance(&buf, w.length)
                                 tm.wday = i
                                 break break
 
-                            } elseif string.equal_insensitive(w[0 .. 3], buf[0 .. 3]) {
-                                string.advance(&buf, 3)
+                            } elseif str.equal_insensitive(w[0 .. 3], buf[0 .. 3]) {
+                                str.advance(&buf, 3)
                                 tm.wday = i
                                 break break
                             }
@@ -294,13 +293,13 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                     case 'b', 'B', 'h' {
                         for i in monthnames.count {
                             m := monthnames[i]
-                            if string.equal_insensitive(m, buf[0 .. m.length]) {
-                                string.advance(&buf, m.length)
+                            if str.equal_insensitive(m, buf[0 .. m.length]) {
+                                str.advance(&buf, m.length)
                                 tm.mon = i
                                 break break
 
-                            } elseif string.equal_insensitive(m[0 .. 3], buf[0 .. 3]) {
-                                string.advance(&buf, 3)
+                            } elseif str.equal_insensitive(m[0 .. 3], buf[0 .. 3]) {
+                                str.advance(&buf, 3)
                                 tm.mon = i
                                 break break
                             }
@@ -319,12 +318,12 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                         if !working do break
 
                         if buf[0] == '/' {
-                            string.advance(&buf)
+                            str.advance(&buf)
                             working = parse_number_and_advance(&buf, &tm.mday, 1, 31, 0)
                             if !working do break
 
                             if buf[0] == '/' {
-                                string.advance(&buf)
+                                str.advance(&buf)
                                 working = parse_number_and_advance(&buf, &tm.year, 0, 99, 0)
                                 if working && tm.year < 69 {
                                     tm.year += 100
@@ -338,16 +337,16 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                     case 'j' do working = parse_number_and_advance(&buf, &tm.yday, 1, 366, -1)
                     case 'm' do working = parse_number_and_advance(&buf, &tm.mon, 1, 12, -1)
                     case 'M' do working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0)
-                    case 'n', 't' do string.strip_leading_whitespace(&buf)
+                    case 'n', 't' do str.strip_leading_whitespace(&buf)
 
                     case 'p' {
-                        if string.equal_insensitive(buf[0 .. 2], "am") {
+                        if str.equal_insensitive(buf[0 .. 2], "am") {
                             if tm.hour == 12 do tm.hour = 0
-                            string.advance(&buf, 2)
+                            str.advance(&buf, 2)
 
-                        } elseif string.equal_insensitive(buf[0 .. 2], "pm") {
+                        } elseif str.equal_insensitive(buf[0 .. 2], "pm") {
                             if tm.hour < 12 do tm.hour += 12
-                            string.advance(&buf, 2)
+                            str.advance(&buf, 2)
 
                         } else {
                             working = false
@@ -359,26 +358,26 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                         if !working do break
 
                         if buf[0] == ':' {
-                            string.advance(&buf)
+                            str.advance(&buf)
 
                             working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0)
                             if !working do break
 
                             if buf[0] == ':' {
-                                string.advance(&buf)
+                                str.advance(&buf)
 
                                 working = parse_number_and_advance(&buf, &tm.sec, 0, 59, 0)
                                 if !working do break
 
-                                string.strip_leading_whitespace(&buf)
+                                str.strip_leading_whitespace(&buf)
 
-                                if string.equal_insensitive(buf[0 .. 2], "am") {
+                                if str.equal_insensitive(buf[0 .. 2], "am") {
                                     if tm.hour == 12 do tm.hour = 0
-                                    string.advance(&buf, 2)
+                                    str.advance(&buf, 2)
 
-                                } elseif string.equal_insensitive(buf[0 .. 2], "pm") {
+                                } elseif str.equal_insensitive(buf[0 .. 2], "pm") {
                                     if tm.hour < 12 do tm.hour += 12
-                                    string.advance(&buf, 2)
+                                    str.advance(&buf, 2)
 
                                 } else {
                                     working = false
@@ -392,7 +391,7 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                         if !working do break
 
                         if buf[0] == ':' {
-                            string.advance(&buf)
+                            str.advance(&buf)
 
                             working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0)
                         }
@@ -405,13 +404,13 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                         if !working do break
 
                         if buf[0] == ':' {
-                            string.advance(&buf)
+                            str.advance(&buf)
 
                             working = parse_number_and_advance(&buf, &tm.min, 0, 59, 0)
                             if !working do break
 
                             if buf[0] == ':' {
-                                string.advance(&buf)
+                                str.advance(&buf)
 
                                 working = parse_number_and_advance(&buf, &tm.sec, 0, 59, 0)
                             }
@@ -432,7 +431,7 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                         if buf[0] != '%' {
                             working = false
                         }
-                        string.advance(&buf)
+                        str.advance(&buf)
                     }
 
                     case _ {
@@ -442,7 +441,7 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
             }
 
             case ' ', '\t', '\r', '\n', '\f', '\v' {
-                string.strip_leading_whitespace(&buf)
+                str.strip_leading_whitespace(&buf)
             }
 
             case _ {
@@ -450,12 +449,12 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
                     working = false
 
                 } else {
-                    string.advance(&buf)
+                    str.advance(&buf)
                 }
             }
         }
 
-        string.advance(&format)
+        str.advance(&format)
     }
 
     return working
@@ -463,8 +462,6 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
     //
     // Helper function used above
     parse_number_and_advance :: (buf: &[] u8, result: &i32, low, high, offset: i32) -> bool {
-        use core {string}
-
         n := 0
         while buf.count > 0 {
             c := buf.data[0]
@@ -474,7 +471,7 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: &Timestamp) -> bool {
 
             n *= 10
             n += ~~(c - '0')
-            string.advance(buf)
+            str.advance(buf)
         }
 
         if n >= low && n <= high {

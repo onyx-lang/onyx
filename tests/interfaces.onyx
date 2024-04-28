@@ -3,7 +3,6 @@
 use core
 use core.hash
 use core.conv
-use core.array
 use core.iter
 
 use core {println, printf}
@@ -90,13 +89,13 @@ consume :: macro (x: $T/iter.Iterable) => {
     consume_inner :: #match {
         // Iterator over pointers get dereferenced
         macro (iter: Iterator(&$T)) -> [..] T {
-            arr := array.make(T)
+            arr := Array.make(T)
             for iter do arr << *it
             return arr
         },
 
         macro (iter: Iterator($T)) -> [..] T {
-            arr := array.make(T)
+            arr := Array.make(T)
             for iter do arr << it
             return arr
         },
@@ -137,7 +136,7 @@ main :: (args: [] cstr) {
     // println(bit_math(3.0, 4.0))
 
     a := consume(f32.[4,2,4,7,4])
-    defer array.free(&a)
+    defer Array.free(&a)
     println(a)
 
     consume(1 .. 10) |> println()

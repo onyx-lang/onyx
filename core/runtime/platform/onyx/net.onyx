@@ -10,7 +10,7 @@ use core.net {
     SocketStatus,
     ResolveResult
 }
-use core {Result, string, io}
+use core {Result, io}
 
 SocketData :: #distinct i32
 
@@ -205,7 +205,7 @@ __net_sock_close :: (s: SocketData) -> void {
 }
 
 __net_resolve :: (host: str, port: u16, out_addrs: [] ResolveResult) -> i32 {
-    host_str      := string.to_cstr_on_stack(host)
+    host_str      := str.to_cstr_on_stack(host)
     original_info := __net_resolve_start(host_str, port)
 
     data: [512] u8

@@ -7,8 +7,8 @@ part_1 :: (contents: &str) -> u32 {
     for &ch in chars do *ch = false
 
     while true {
-        line := string.read_until(contents, '\n')
-        string.advance(contents, 1)
+        line := str.read_until(contents, '\n')
+        str.advance(contents, 1)
         if line.count == 0 do break
 
         for ch in line do chars[~~ch - cast(u32) 'a'] = true
@@ -26,8 +26,8 @@ part_2 :: (contents: &str) -> u32 {
 
     person_count := 0
     while true {
-        line := string.read_until(contents, '\n')
-        string.advance(contents, 1)
+        line := str.read_until(contents, '\n')
+        str.advance(contents, 1)
         if line.count == 0 do break
         
         person_count += 1

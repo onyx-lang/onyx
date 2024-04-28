@@ -12,9 +12,7 @@ package core.encoding.kdl
 use core {tprintf, Result, printf}
 use core.io
 use core.memory
-use core.slice
 use core.encoding.utf8
-use core.string
 
 #package
 Tokenizer :: struct {
@@ -63,7 +61,7 @@ Tokenizer.peek_char :: (self: &#Self) -> ? u32 {
     codepoint_length := utf8.rune_length_from_first_byte(self.doc[self.cursor])
     if self.cursor + codepoint_length > self.doc.length do return .None
     
-    value := utf8.decode_rune(string.advance(self.doc, self.cursor))
+    value := utf8.decode_rune(str.advance(self.doc, self.cursor))
     return value
 }
 
@@ -73,7 +71,7 @@ Tokenizer.eat_char :: (self: &#Self) -> ? u32 {
     codepoint_length := utf8.rune_length_from_first_byte(self.doc[self.cursor])
     if self.cursor + codepoint_length > self.doc.length do return .None
     
-    value := utf8.decode_rune(string.advance(self.doc, self.cursor))
+    value := utf8.decode_rune(str.advance(self.doc, self.cursor))
     self.cursor += codepoint_length
 
     return value
@@ -421,14 +419,14 @@ Parser.parse_value :: (self: &#Self, token: Token) -> ? Value {
     switch token {
         case .Raw_String as s {
             return Value.{
-                data = .{ String = string.copy(s, self.result_allocator) }
+                data = .{ String = str.copy(s, self.result_allocator) }
             }
         }
 
         case .String as s {
             // TODO: Handle escaped strings here
             return Value.{
-                data = .{ String = string.copy(s, self.result_allocator) }
+                data = .{ String = str.copy(s, self.result_allocator) }
             }
         }
         
@@ -454,7 +452,7 @@ Parser.parse_value :: (self: &#Self, token: Token) -> ? Value {
             // TODO: parse numbers
 
             return Value.{
-                data = .{ String = string.copy(w, self.result_allocator) }
+                data = .{ String = str.copy(w, self.result_allocator) }
             }
         }
 
@@ -540,14 +538,14 @@ Parser.parse_into_string :: (self: &#Self, tkn: Token) -> ? str {
             0x202F, 0x205F,
             0x3000
         ]
-        return slice.contains(chars, [it](it == c))
+        return Slice.contains(chars, [it](it == c))
     }
 
     is_newline :: (c: u32) -> bool {
         #persist chars := u32.[
             0xd, 0xa, 0x85, 0xc, 0x2028, 0x2029
         ]
-        return slice.contains(chars, [it](it == c))
+        return Slice.contains(chars, [it](it == c))
     }
 
     is_id :: (c: u32) -> bool {
@@ -558,7 +556,7 @@ Parser.parse_into_string :: (self: &#Self, tkn: Token) -> ? str {
             '\\', '/', '(', ')', '{', '}', '<', '>', ';', '[', ']', '=', ',', '"'
         ]
 
-        return !slice.contains(chars, [it](it == c))
+        return !Slice.contains(chars, [it](it == c))
     }
 
     is_id_start :: (c: u32) -> bool {
@@ -570,7 +568,7 @@ Parser.parse_into_string :: (self: &#Self, tkn: Token) -> ? str {
         if is_newline(c) do return true
 
         #persist chars := u32.[ ';', ')', '}', '/', '\\', '=' ]
-        return slice.contains(chars, [it](it == c))
+        return Slice.contains(chars, [it](it == c))
     }
 
     if_next_token_is :: macro (p: &Parser, $type: Token.tag_enum, body: Code) {

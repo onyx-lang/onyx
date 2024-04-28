@@ -29,12 +29,12 @@ main :: (args: [] cstr) {
 
     file := contents
 
-    nums := array.make(u64, 32)
-    defer array.free(&nums)
+    nums := Array.make(u64, 32)
+    defer Array.free(&nums)
 
-    while !string.empty(file) {
+    while !str.empty(file) {
         num := conv.parse_int(&file)
-        array.push(&nums, num)
+        Array.push(&nums, num)
     }
 
     preamble_length :: 25
@@ -63,8 +63,8 @@ main :: (args: [] cstr) {
 
     start, end := find_contiguous_subarray_with_sum(nums, invalid)
 
-    max := array.fold(nums.data[start .. end + 1], cast(u64) 0, math.max)
-    min := array.fold(nums.data[start .. end + 1], cast(u64) max, math.min)
+    max := Array.fold(nums.data[start .. end + 1], cast(u64) 0, math.max)
+    min := Array.fold(nums.data[start .. end + 1], cast(u64) max, math.min)
 
     printf("Extrema sum: {}\n", min + max)
 }

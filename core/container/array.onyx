@@ -1,4 +1,4 @@
-package core.array
+package core
 
 use core
 
@@ -299,62 +299,3 @@ Untyped_Array :: struct {
     capacity: u32
     allocator: Allocator
 }
-
-
-
-
-
-//
-// Everything below here only exists for backwards compatibility.
-//
-
-make :: Array.make
-init :: Array.init
-free :: Array.free
-copy :: Array.copy
-copy_range :: Array.copy_range
-clear :: Array.clear
-ensure_capacity :: Array.ensure_capacity
-alloc_one :: Array.alloc_one
-push :: Array.push
-insert :: Array.insert
-insert_empty :: Array.insert_empty
-remove :: Array.remove
-delete :: Array.delete
-fast_delete :: Array.fast_delete
-pop :: Array.pop
-concat :: Array.concat
-filter :: Array.filter
-
-
-
-// Things that work with slices and arrays
-
-transplant  :: Slice.transplant
-get         :: Slice.get
-get_ptr     :: Slice.get_ptr
-set         :: Slice.set
-contains    :: Slice.contains
-empty       :: Slice.empty
-sum         :: Slice.sum
-product     :: Slice.product
-average     :: Slice.average
-reverse     :: Slice.reverse
-sort        :: Slice.sort
-quicksort   :: Slice.quicksort
-unique      :: Slice.unique
-fold        :: Slice.fold
-every       :: Slice.every
-some        :: Slice.some
-fill        :: Slice.fill
-fill_range  :: Slice.fill_range
-to_list     :: Slice.to_list
-find        :: Slice.find
-find_ptr    :: Slice.find_ptr
-find_opt    :: Slice.find_opt
-first       :: Slice.first
-count_where :: Slice.count_where
-windows     :: Slice.windows
-chunks      :: Slice.chunks
-greatest    :: Slice.greatest
-least       :: Slice.least

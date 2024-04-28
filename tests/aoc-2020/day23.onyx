@@ -59,23 +59,23 @@ main :: (args: [] cstr) {
     // Easier think about in zero-indexed
     for &cup in cups_data do *cup -= 1
 
-    array.init(&cups, 1000000)
-    defer array.free(&cups)
+    Array.init(&cups, 1000000)
+    defer Array.free(&cups)
 
-    for cup in cups_data do array.push(&cups, cup)
+    for cup in cups_data do Array.push(&cups, cup)
 
     // Part 1
-    // simulate(array.to_slice(&cups))
+    // simulate(Array.to_slice(&cups))
     
     // Part 2
-    for i in 9 .. 1000000 do array.push(&cups, i)
+    for i in 9 .. 1000000 do Array.push(&cups, i)
     simulate(cups, 10000000)
 
     // Undo the zero-indexing
     for &cup in cups do *cup += 1
 
     // Part 1
-    // one_idx := get_idx(array.to_slice(&cups), 1)
+    // one_idx := get_idx(Array.to_slice(&cups), 1)
     // for i in 1 .. 9 {
     //     printf("{}", cast(i32) cups[w(one_idx + i)])
     // }

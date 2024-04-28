@@ -1,4 +1,4 @@
-package core.set
+package core
 
 use core
 use core.hash
@@ -193,20 +193,3 @@ Set.as_iter :: (s: &Set) =>
     }
 }
 
-
-//
-// Everything below here only exists for backwards compatibility.
-//
-
-make     :: Set.make
-init     :: Set.init
-free     :: Set.free
-has      :: Set.has
-get      :: Set.get
-get_ptr  :: Set.get_ptr
-get_opt  :: Set.get_opt
-insert   :: Set.insert
-remove   :: Set.remove
-clear    :: Set.clear
-empty    :: Set.empty
-as_iter  :: Set.as_iter

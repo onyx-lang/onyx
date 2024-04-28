@@ -28,18 +28,18 @@ segments := ([7] bool).[
 decode_line :: (left, right: str) -> u32 {
     solved_segments: Map(u8, u32)
 
-    left_segments := string.split(left, ' ')
+    left_segments := str.split(left, ' ')
     defer memory.free_slice(&left_segments)
 
     // Look for 1.
-    one_data := *array.first(left_segments, (x) => x.count == 2)
+    one_data := *Array.first(left_segments, (x) => x.count == 2)
 
     // Look for 7.
-    seven_data := *array.first(left_segments, (x) => x.count == 3)
+    seven_data := *Array.first(left_segments, (x) => x.count == 3)
 
     // Solve the top segment
     for s in seven_data {
-        if !array.contains(one_data, s) {
+        if !Array.contains(one_data, s) {
             solved_segments[s] = 1
         }
     }
@@ -49,7 +49,7 @@ decode_line :: (left, right: str) -> u32 {
         if it.count != 5 do continue
 
         in_count := 0
-        for a in one_data do if array.contains(it, a) do in_count += 1
+        for a in one_data do if Array.contains(it, a) do in_count += 1
 
         if in_count == 2 {
             three_data = it
@@ -58,13 +58,13 @@ decode_line :: (left, right: str) -> u32 {
     }
 
     // Look for 4.
-    four_data := *array.first(left_segments, (x) => x.count == 4)
+    four_data := *Array.first(left_segments, (x) => x.count == 4)
 
     // Solve for middle segment
     for f in four_data {
         for t in three_data {
             if t == f {
-                if !array.contains(one_data, t) {
+                if !Array.contains(one_data, t) {
                     solved_segments[t] = 4
                     break break
                 }
@@ -91,7 +91,7 @@ decode_line :: (left, right: str) -> u32 {
             if solved_segments[it] ?? 0 == 4 do continue
             for o in one_data do if it == o do continue continue
 
-            if array.contains(seg, it) {
+            if Array.contains(seg, it) {
                 five_data = seg; 
                 break break
             }
@@ -113,17 +113,17 @@ decode_line :: (left, right: str) -> u32 {
         if solved_segments[it] ?? 0 == 0 do solved_segments[it] = 3
     }
 
-    for *array.first(left_segments, (x) => x.count == 7)  {
+    for *Array.first(left_segments, (x) => x.count == 7)  {
         if solved_segments[it] ?? 0 == 0 {
             solved_segments[it] = 5
         }
     }
 
     sum := 0
-    words := string.split(right, ' ')
+    words := str.split(right, ' ')
     defer memory.free_slice(&words)
     for& words {
-        string.strip_whitespace(it)
+        str.strip_whitespace(it)
         
         num_segments : [7] bool
         for w in *it do num_segments[solved_segments[w] ?? 0 - 1] = true
@@ -167,17 +167,17 @@ main :: (args) => {
     while !io.reader_empty(&reader) {
         line := io.read_line(&reader, consume_newline=true, inplace=true)
         left, right := do {
-            parts := string.split(line, '|')
+            parts := str.split(line, '|')
             defer memory.free_slice(&parts)
             return parts[0], parts[1]
         }
-        string.strip_whitespace(&left)
-        string.strip_whitespace(&right)
+        str.strip_whitespace(&left)
+        str.strip_whitespace(&right)
 
         #if PART == 1 {
-            words := string.split(right, ' ')
+            words := str.split(right, ' ')
             for& words {
-                string.strip_whitespace(it)
+                str.strip_whitespace(it)
                 switch it.count {
                     case 2, 3, 4, 7 do answer += 1
                 }

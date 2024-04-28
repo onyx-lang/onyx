@@ -3,9 +3,9 @@ use core {*}
 
 main :: () {
     s: dyn_str
-    defer string.free(&s)
+    defer dyn_str.free(&s)
 
-    string.append(&s, .['a', 'z'])
+    dyn_str.append(&s, .['a', 'z'])
 
     println(s)
 

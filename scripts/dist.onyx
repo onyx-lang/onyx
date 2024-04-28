@@ -33,7 +33,7 @@ run :: (command: [] str) -> bool {
 }
 
 main :: () {
-    args := array.make(.["tar", "cvzf", "onyx-latest-linux-source.tar.gz"])
+    args := Array.make(.["tar", "cvzf", "onyx-latest-linux-source.tar.gz"])
 
     for FOLDERS do args << it
     for FILES do args << it

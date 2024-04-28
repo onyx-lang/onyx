@@ -21,12 +21,12 @@ power_mod :: (base: u32, exp: u32, mod: u32) -> u32 {
 dlp_bsgs :: (n: u32, a: u32, b: u32) -> u32 {
     m := cast(u32) math.ceil(math.sqrt(cast(f64) n))
 
-    t := map.make(u32, u32)
-    defer map.free(&t)
+    t := Map.make(u32, u32)
+    defer Map.free(&t)
 
     tmp: u64 = 1
     for i in 0 .. m {
-        map.put(&t, ~~tmp, i)
+        Map.put(&t, ~~tmp, i)
         tmp = (tmp * ~~a) % ~~n
     }
 
@@ -34,8 +34,8 @@ dlp_bsgs :: (n: u32, a: u32, b: u32) -> u32 {
 
     tmp = ~~b
     for i in 0 .. m {
-        if map.has(&t, ~~tmp) {
-            v := map.get(&t, ~~tmp) ?? 0
+        if Map.has(&t, ~~tmp) {
+            v := Map.get(&t, ~~tmp) ?? 0
             return i * m + v; 
         }
 

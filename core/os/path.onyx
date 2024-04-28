@@ -1,7 +1,6 @@
 package core.os
 
 use runtime
-use core.string
 use core.conv
 
 #local Path_Allocator :: context.temp_allocator
@@ -20,7 +19,7 @@ use core.conv
 ///
 /// Modifies the string in place, as the length will never be longer.
 path_clean :: (path: str, allocator := Path_Allocator) -> str {
-    if path == "" do return string.copy(".", Path_Allocator)
+    if path == "" do return str.copy(".", Path_Allocator)
 
     rooted := path[0] == PATH_SEP
     n := path.length
@@ -29,7 +28,7 @@ path_clean :: (path: str, allocator := Path_Allocator) -> str {
     r, dotdot := 0, 0
 
     if rooted {
-        string.append(&out, PATH_SEP)
+        dyn_str.append(&out, PATH_SEP)
         r, dotdot = 1, 1
     }
 
@@ -46,26 +45,26 @@ path_clean :: (path: str, allocator := Path_Allocator) -> str {
             }
             elseif !rooted {
                 if out.length > 0 {
-                    string.append(&out, PATH_SEP)
+                    dyn_str.append(&out, PATH_SEP)
                 }
-                string.append(&out, "..")
+                dyn_str.append(&out, "..")
                 dotdot = out.length
             }
         }
         else {
             if (rooted && out.length != 1) || (!rooted && out.length != 0) {
-                string.append(&out, PATH_SEP)
+                dyn_str.append(&out, PATH_SEP)
             }
 
             while r < n && path[r] != PATH_SEP {
-                string.append(&out, path[r])
+                dyn_str.append(&out, path[r])
                 r += 1
             }
         }
     }
 
     if out.length == 0 {
-        string.append(&out, ".")
+        dyn_str.append(&out, ".")
     }
 
     return out
@@ -112,14 +111,14 @@ path_extension :: (path: str) -> str {
 path_basename :: (path: str) -> str {
     if path == "" do return "."
 
-    start := string.last_index_of(path, PATH_SEP)
-    end   := string.last_index_of(path, '.')
+    start := str.last_index_of(path, PATH_SEP)
+    end   := str.last_index_of(path, '.')
     return path[start + 1 .. end]
 }
 
 /// Splits the last path element off.
 path_split :: (path: str) -> (str, str) {
-    index := string.last_index_of(path, PATH_SEP)
+    index := str.last_index_of(path, PATH_SEP)
     return path[0 .. index], path[index+1 .. path.length]
 }
 

@@ -19,15 +19,15 @@ combat :: (player1: &[..] u32, player2: &[..] u32) -> u32 {
     while player1.count > 0 && player2.count > 0 {
         p1 := player1.data[0]
         p2 := player2.data[0]
-        array.delete(player1, 0)
-        array.delete(player2, 0)
+        Array.delete(player1, 0)
+        Array.delete(player2, 0)
 
         if p1 > p2 {
-            array.push(player1, p1)
-            array.push(player1, p2)
+            Array.push(player1, p1)
+            Array.push(player1, p2)
         } else {
-            array.push(player2, p2)
-            array.push(player2, p1)
+            Array.push(player2, p2)
+            Array.push(player2, p1)
         }
     }
 
@@ -59,26 +59,26 @@ encode_hands :: (alloc: Allocator, p1: &[..] u32, p2: &[..] u32) -> str {
 }
 
 recursive_combat :: (player1: &[..] u32, player2: &[..] u32) -> u32 {
-    hand_seen := map.make(str, bool)
-    defer map.free(&hand_seen)
+    hand_seen := Map.make(str, bool)
+    defer Map.free(&hand_seen)
 
     while player1.count > 0 && player2.count > 0 {
         enc_hand := encode_hands(key_alloc, player1, player2)
-        if map.has(&hand_seen, enc_hand) do return 1
-        map.put(&hand_seen, enc_hand, true)
+        if Map.has(&hand_seen, enc_hand) do return 1
+        Map.put(&hand_seen, enc_hand, true)
 
         p1 := player1.data[0]
         p2 := player2.data[0]
-        array.delete(player1, 0)
-        array.delete(player2, 0)
+        Array.delete(player1, 0)
+        Array.delete(player2, 0)
 
         round_win := 0
 
         if player1.count >= p1 && player2.count >= p2 {
-            p1_copy := array.copy_range(player1, 0 .. p1)
-            p2_copy := array.copy_range(player2, 0 .. p2)
-            defer array.free(&p1_copy)
-            defer array.free(&p2_copy)
+            p1_copy := Array.copy_range(player1, 0 .. p1)
+            p2_copy := Array.copy_range(player2, 0 .. p2)
+            defer Array.free(&p1_copy)
+            defer Array.free(&p2_copy)
 
             round_win = recursive_combat(&p1_copy, &p2_copy)
         } else {
@@ -87,11 +87,11 @@ recursive_combat :: (player1: &[..] u32, player2: &[..] u32) -> u32 {
         }
 
         if round_win == 1 {
-            array.push(player1, p1)
-            array.push(player1, p2)
+            Array.push(player1, p1)
+            Array.push(player1, p2)
         } else {
-            array.push(player2, p2)
-            array.push(player2, p1)
+            Array.push(player2, p2)
+            Array.push(player2, p1)
         }
     }
 
@@ -104,33 +104,33 @@ main :: (args: [] cstr) {
 
     file := contents
 
-    player1 := array.make(u32)
-    player2 := array.make(u32)
-    defer array.free(&player1)
-    defer array.free(&player2)
+    player1 := Array.make(u32)
+    player2 := Array.make(u32)
+    defer Array.free(&player1)
+    defer Array.free(&player2)
 
-    string.advance_line(&file); // 'Player 1:'
+    str.advance_line(&file); // 'Player 1:'
     while file[0] != '\n' {
         card := cast(u32, conv.parse_int(&file))
-        array.push(&player1, card)
+        Array.push(&player1, card)
 
-        string.advance_line(&file)
+        str.advance_line(&file)
     }
 
-    string.advance_line(&file); // '\n'
-    string.advance_line(&file); // 'Player 2:'
-    while !string.empty(file) {
+    str.advance_line(&file); // '\n'
+    str.advance_line(&file); // 'Player 2:'
+    while !str.empty(file) {
         card := cast(u32, conv.parse_int(&file))
-        array.push(&player2, card)
+        Array.push(&player2, card)
 
-        string.advance_line(&file)
+        str.advance_line(&file)
     }
 
     {
-        player1_copy := array.copy(&player1)
-        player2_copy := array.copy(&player2)
-        defer array.free(&player1_copy)
-        defer array.free(&player2_copy)
+        player1_copy := Array.copy(&player1)
+        player2_copy := Array.copy(&player2)
+        defer Array.free(&player1_copy)
+        defer Array.free(&player2_copy)
 
         combat_score := combat(&player1_copy, &player2_copy)
         printf("Answer: {}\n", combat_score)
@@ -140,10 +140,10 @@ main :: (args: [] cstr) {
         key_arena = alloc.arena.make(context.allocator, 1 << 14)
         key_alloc = alloc.arena.make_allocator(&key_arena)
 
-        player1_copy := array.copy(&player1)
-        player2_copy := array.copy(&player2)
-        defer array.free(&player1_copy)
-        defer array.free(&player2_copy)
+        player1_copy := Array.copy(&player1)
+        player2_copy := Array.copy(&player2)
+        defer Array.free(&player1_copy)
+        defer Array.free(&player2_copy)
 
         winner := recursive_combat(&player1_copy, &player2_copy)
 

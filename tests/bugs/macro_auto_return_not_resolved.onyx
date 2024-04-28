@@ -11,11 +11,11 @@ Point :: struct { x, y: i32; }
 }
 
 main :: (args) => {
-    S := set.make(Point)
+    S := Set.make(Point)
 
     S << Point.{ 1, 2 }
     S << Point.{ 2, 3 }
     S << Point.{ 1, 2 }
 
-    set.has(&S, Point.{ 1, 2 }) |> println()
+    Set.has(&S, Point.{ 1, 2 }) |> println()
 }

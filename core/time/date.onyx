@@ -134,9 +134,9 @@ Date.is_after :: (d1, d2: Date) -> bool {
 
 @conv.Custom_Parse_Proc.{ Date }
 (d: &Date, text: str, _: Allocator) -> bool {
-    year,  t  := string.bisect(text, '-')
-    month, t~ := string.bisect(t,    '-')
-    day,   t~ := string.bisect(t,    '-')
+    year,  t  := str.bisect(text, '-')
+    month, t~ := str.bisect(t,    '-')
+    day,   t~ := str.bisect(t,    '-')
 
     d.year  = ~~  conv.str_to_i64(year)
     d.month = ~~ (conv.str_to_i64(month) - 1)

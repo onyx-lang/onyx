@@ -5,14 +5,14 @@ use core {*}
 main :: (args: [] cstr) {
     contents := #file_contents "./input/day5.txt"
 
-    vals := array.make(u32)
-    defer array.free(&vals)
+    vals := Array.make(u32)
+    defer Array.free(&vals)
 
     max_val := 0
 
     while true {
-        line := string.read_until(&contents, '\n')
-        string.advance(&contents)
+        line := str.read_until(&contents, '\n')
+        str.advance(&contents)
         if line.count == 0 do break
 
         val := 0
@@ -22,11 +22,11 @@ main :: (args: [] cstr) {
         }
 
         max_val = math.max(max_val, val)
-        array.push(&vals, val)
+        Array.push(&vals, val)
     }
 
     missing := 0
-    array.sort(vals, cmp_asc)
+    Array.sort(vals, cmp_asc)
     for i in 0 .. vals.count - 1 {
         if vals[i + 1] - vals[i] != 1 do missing = vals[i] + 1
     }

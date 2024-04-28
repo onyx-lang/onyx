@@ -41,11 +41,11 @@ main :: () {
         l1 := r->read_line(consume_newline=true)
         l2 := r->read_line(consume_newline=true)
 
-        _, s1 := string.bisect(l1, ':')
-        _, s2 := string.bisect(l2, ':')
+        _, s1 := str.bisect(l1, ':')
+        _, s2 := str.bisect(l2, ':')
 
-        string.strip_whitespace(&s1)
-        string.strip_whitespace(&s2)
+        str.strip_whitespace(&s1)
+        str.strip_whitespace(&s2)
 
         p1.square = ~~ (conv.str_to_i64(s1) - 1)
         p2.square = ~~ (conv.str_to_i64(s2) - 1)
@@ -194,11 +194,11 @@ main :: () {
         l1 := r->read_line(consume_newline=true)
         l2 := r->read_line(consume_newline=true)
 
-        _, s1 := string.bisect(l1, ':')
-        _, s2 := string.bisect(l2, ':')
+        _, s1 := str.bisect(l1, ':')
+        _, s2 := str.bisect(l2, ':')
 
-        string.strip_whitespace(&s1)
-        string.strip_whitespace(&s2)
+        str.strip_whitespace(&s1)
+        str.strip_whitespace(&s2)
 
         p1.square = cast(i32) (conv.str_to_i64(s1) - 1)
         p2.square = cast(i32) (conv.str_to_i64(s2) - 1)
