@@ -27,34 +27,34 @@ FileData :: struct {
 __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError) {
     // Requesting all of the rights because why not.
     rights :=
-        Rights.DataSync
-        | Rights.Read
-        | Rights.Seek
-        | Rights.FdStatSetFlags
-        | Rights.Sync
-        | Rights.Tell
-        | Rights.Write
-        | Rights.Advise
-        | Rights.Allocate
-        | Rights.PathCreateDirectory
-        | Rights.PathCreateFile
-        | Rights.PathLinkSource
-        | Rights.PathLinkTarget
-        | Rights.PathOpen
-        | Rights.ReadDir
-        | Rights.PathReadlink
-        | Rights.PathRenameSource
-        | Rights.PathRenameTarget
-        | Rights.PathFilestatGet
-        | Rights.PathFilestateSetSize
-        | Rights.PathFilestateSetTimes
-        | Rights.FilestatGet
-        | Rights.FilestatSetSize
-        | Rights.FilestatSetTimes
-        | Rights.PathSymlink
-        | Rights.PathRemoveDirectory
-        | Rights.PathUnlinkFile
-        | Rights.PollFDReadWrite;
+        Rights.DataSync |
+        Rights.Read |
+        Rights.Seek |
+        Rights.FdStatSetFlags |
+        Rights.Sync |
+        Rights.Tell |
+        Rights.Write |
+        Rights.Advise |
+        Rights.Allocate |
+        Rights.PathCreateDirectory |
+        Rights.PathCreateFile |
+        Rights.PathLinkSource |
+        Rights.PathLinkTarget |
+        Rights.PathOpen |
+        Rights.ReadDir |
+        Rights.PathReadlink |
+        Rights.PathRenameSource |
+        Rights.PathRenameTarget |
+        Rights.PathFilestatGet |
+        Rights.PathFilestateSetSize |
+        Rights.PathFilestateSetTimes |
+        Rights.FilestatGet |
+        Rights.FilestatSetSize |
+        Rights.FilestatSetTimes |
+        Rights.PathSymlink |
+        Rights.PathRemoveDirectory |
+        Rights.PathUnlinkFile |
+        Rights.PollFDReadWrite;
 
     open_flags := cast(OFlags) 0;
     fd_flags := FDFlags.Sync;
