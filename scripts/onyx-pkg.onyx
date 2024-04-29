@@ -28,7 +28,7 @@ Protocols :: str.[
 // NOTE: This returns a string that ends with the path separator.
 Template_Directory :: () -> str {
     return os.path_join(os.path_directory(#file), "pkg_templates")
-            |> string.copy()
+            |> str.copy()
 }
 
 Version :: SemVer.{0, 1, 11}
@@ -66,7 +66,7 @@ main :: (args: [] cstr) {
     }
 
     if arguments.count > 0 {
-        if string.from_cstr(arguments[0]) == "--help" {
+        if str.from_cstr(arguments[0]) == "--help" {
             show_help_for_command(command_tag.tag)
             os.exit(1)
         }
@@ -160,7 +160,7 @@ run_init_command :: (args: [] cstr) {
         while true {
             print(f)
             line := r->read_line(consume_newline=true, allocator=context.temp_allocator)
-                    |> string.strip_whitespace()
+                    |> str.strip_whitespace()
 
             if !line {
                 *dest = default
@@ -170,7 +170,7 @@ run_init_command :: (args: [] cstr) {
             if conv.parse_any(dest, T, line, context.allocator) do break
 
             if T == str {
-                *cast(&str) dest = string.copy(line)
+                *cast(&str) dest = str.copy(line)
                 break
             }
         }
@@ -437,8 +437,8 @@ run_publish_command :: (args: [] cstr) {
     while true {
         printf("Is this a m[a]jor, m[i]nor, or [p]atch release? or [c]ancel? (a/i/p/c) ")
         input := r->read_line(consume_newline=true, inplace=true)
-                 |> string.strip_whitespace()
-                 |> string.to_lowercase()
+                 |> str.strip_whitespace()
+                 |> str.to_lowercase()
 
         switch input {
             case "a" {
@@ -519,7 +519,7 @@ run_new_command :: (args: [] cstr) {
         if str.as_str(args[0]) == "--list" {
             printf("List of installed templates\n")
             for os.list_directory(Template_Directory()) {
-                if !string.ends_with(it->name(), ".json") do continue
+                if !str.ends_with(it->name(), ".json") do continue
 
                 printf("    {}\n", os.path_basename(it->name()))
             }
@@ -567,7 +567,7 @@ run_new_command :: (args: [] cstr) {
 
         printf("{}: ", it.value["description"]->as_str())
         line := input->read_line(consume_newline=true, allocator=context.temp_allocator)
-                |> string.strip_whitespace()
+                |> str.strip_whitespace()
 
         vars->put(it.key, line)
     }
@@ -582,7 +582,7 @@ run_new_command :: (args: [] cstr) {
         command := it->as_str()
         info_print("Running", "{}\n", command)
 
-        args := string.split(command, ' ', context.temp_allocator)
+        args := str.split(command, ' ', context.temp_allocator)
         cmd  := args[0]
         args  = args[1 .. args.count]
 
@@ -619,11 +619,11 @@ run_new_command :: (args: [] cstr) {
 
         to_process := contents
         while to_process {
-            to_output, to_process~ := string.bisect(to_process, "{{")
-            string.append(&output, to_output)
+            to_output, to_process~ := str.bisect(to_process, "{{")
+            dyn_str.append(&output, to_output)
 
-            var_name, to_process~ := string.bisect(to_process, "}}")
-            string.append(&output, vars->get(var_name) ?? "")
+            var_name, to_process~ := str.bisect(to_process, "}}")
+            dyn_str.append(&output, vars->get(var_name) ?? "")
         }
 
         return output
@@ -789,22 +789,22 @@ read_config_from_installed_dependency :: (dependency_folder: str) -> ? Config {
 strip_protocol_and_www_from_repo :: (repo: str) -> str {
     to_return := repo
 
-    if string.contains(to_return, "://") {
-        _, to_return~ := string.bisect(to_return, "://")
+    if str.contains(to_return, "://") {
+        _, to_return~ := str.bisect(to_return, "://")
     }
 
-    if string.starts_with(to_return, "www.") {
+    if str.starts_with(to_return, "www.") {
         to_return = to_return["www.".count .. to_return.count]
     }
 
-    if string.ends_with(to_return, ".git") {
+    if str.ends_with(to_return, ".git") {
         to_return = to_return[0 .. to_return.count - ".git".count]
     }
 
     #if runtime.compiler_os == .Windows {
-        to_return = string.copy(to_return)
+        to_return = str.copy(to_return)
 
-        string.replace(to_return, '/', '\\')
+        str.replace(to_return, '/', '\\')
     }
 
     return to_return
@@ -824,7 +824,7 @@ run_native_library_installation :: (folder: str) -> (bool, str) {
 
     info_print("Install", "Running installation of '{}'\n", folder);    
 
-    args := string.split(inner_config.native_library_build->unwrap(), ' ', context.temp_allocator)
+    args := str.split(inner_config.native_library_build->unwrap(), ' ', context.temp_allocator)
     cmd  := args[0]
     args  = args[1 .. args.count]
 
@@ -877,7 +877,7 @@ native_library_is_up_to_date :: (folder: str) -> bool {
 }
 
 run_command_and_forward_output :: (cmd: str) => {
-    args := string.split(cmd, ' ', context.temp_allocator)
+    args := str.split(cmd, ' ', context.temp_allocator)
     prog := args[0]
     args  = args[1 .. args.count]
 
@@ -943,11 +943,11 @@ SemVer :: struct {
     parse :: (semver: &SemVer, to_parse_: str, _: Allocator) -> bool {
         to_parse := to_parse_
 
-        major := string.read_until(&to_parse, '.') |> conv.str_to_i64()
-        string.advance(&to_parse)
-        minor := string.read_until(&to_parse, '.') |> conv.str_to_i64()
-        string.advance(&to_parse)
-        patch := string.read_until(&to_parse, '.') |> conv.str_to_i64()
+        major := str.read_until(&to_parse, '.') |> conv.str_to_i64()
+        str.advance(&to_parse)
+        minor := str.read_until(&to_parse, '.') |> conv.str_to_i64()
+        str.advance(&to_parse)
+        patch := str.read_until(&to_parse, '.') |> conv.str_to_i64()
 
         if major == 0 && minor == 0 && patch == 0 do return false
 
@@ -1012,7 +1012,7 @@ Git :: struct {
                 r := tprintf("{}{}", proto, tprintf(it, package_search))
                 git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", r])
                 if os.process_wait(&git_proc) == .Success {
-                    return r |> string.copy()
+                    return r |> str.copy()
                 }
             }
         }
@@ -1026,11 +1026,11 @@ Git :: struct {
         git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", repo])
         r := io.reader_make(&git_proc)
         for r->lines(inplace=true) {
-            last_slash := string.last_index_of(it, '/')
+            last_slash := str.last_index_of(it, '/')
             tag_name   := it[last_slash+1 .. it.count-1]
 
             if tag_name[0] != 'v' do continue
-            string.advance(&tag_name)
+            str.advance(&tag_name)
 
             version: SemVer
             if conv.parse_any(&version, tag_name) {
@@ -1102,10 +1102,10 @@ Git :: struct {
             }
 
             rolling_parent := make(dyn_str)
-            path := string.split(actual_dest, os.PATH_SEP)
+            path := str.split(actual_dest, os.PATH_SEP)
             for path[0 .. path.length-1] {
-                string.append(&rolling_parent, it)
-                string.append(&rolling_parent, os.PATH_SEP)
+                dyn_str.append(&rolling_parent, it)
+                dyn_str.append(&rolling_parent, os.PATH_SEP)
 
                 if !os.dir_exists(rolling_parent) {
                     os.dir_create(rolling_parent)
@@ -1428,7 +1428,7 @@ read_old_config :: (path: str) -> ? Config {
     }
 
     for inner_config.dependencies.dependencies.entries {
-        c.dependencies->put(it.key[string.last_index_of(it.key, '/')+1 .. it.key.length], .{
+        c.dependencies->put(it.key[str.last_index_of(it.key, '/')+1 .. it.key.length], .{
             name = it.key,
             version = it.value,
             source = .{ Git = it.key }
@@ -1487,11 +1487,11 @@ IniConfig :: struct {
         if r->is_empty() do return true
         if p, _ := r->peek_byte(); p == '[' do return true
 
-        dep := r->read_until('=') |> string.strip_trailing_whitespace()
+        dep := r->read_until('=') |> str.strip_trailing_whitespace()
         r->read_byte()
         r->skip_whitespace()
 
-        version_str := r->read_until('\n') |> string.strip_trailing_whitespace()
+        version_str := r->read_until('\n') |> str.strip_trailing_whitespace()
         version: SemVer
         conv.parse_any(&version, version_str)
         dependencies.dependencies[dep] = version
@@ -1514,11 +1514,11 @@ IniConfig :: struct {
         if r->is_empty() do return true
         if p, _ := r->peek_byte(); p == '[' do return true
 
-        dep := r->read_until('=') |> string.strip_trailing_whitespace()
+        dep := r->read_until('=') |> str.strip_trailing_whitespace()
         r->read_byte()
         r->skip_whitespace()
 
-        folder := r->read_until('\n') |> string.strip_trailing_whitespace()
+        folder := r->read_until('\n') |> str.strip_trailing_whitespace()
         dependencies.folders[dep] = folder
     }
 
@@ -1535,7 +1535,7 @@ IniConfig :: struct {
 
 load_old_config_file :: () -> bool {
     file_data := os.get_contents(global_arguments.config_file)
-    if string.empty(file_data) {
+    if str.empty(file_data) {
         return false
     }
 

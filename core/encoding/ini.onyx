@@ -35,7 +35,6 @@ package core.encoding.ini
 
 use core.alloc
 use core.conv
-use core.string
 use core.io
 
 use core { aprintf }
@@ -105,7 +104,7 @@ parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, Ini
             section_name := r->read_until(']', allocator=context.temp_allocator)
             assert(r->read_byte() == ']', "expected ]")
 
-            stripped_section_name := string.strip_whitespace(section_name)
+            stripped_section_name := str.strip_whitespace(section_name)
             member := info.get_struct_member(output.type, stripped_section_name)
             if member == null {
                 error(msg = aprintf("'{}' is not a valid section name.", stripped_section_name))
@@ -138,7 +137,7 @@ parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, Ini
         field_name := r->read_until('=', allocator=context.temp_allocator)
         assert(r->read_byte() == '=', "expected =")
 
-        field := info.get_struct_member(active_item_type, string.strip_whitespace(field_name))
+        field := info.get_struct_member(active_item_type, str.strip_whitespace(field_name))
         target := cast([&] u8) active_item_ptr + field.offset
         value_string := r->read_until('\n', allocator=context.temp_allocator)
         parsed_successfully := conv.parse_any(target, field.type, value_string)
@@ -149,8 +148,8 @@ parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, Ini
             // of text. No need to force the quotes.
             if field.type == str {
                 *cast(&str) target = value_string
-                                  |> string.strip_whitespace()
-                                  |> string.copy()
+                                  |> str.strip_whitespace()
+                                  |> str.copy()
 
             } else {
                 error(aprintf("Failed to parse value of type '{}' from string '{}'.", field.type, value_string))
