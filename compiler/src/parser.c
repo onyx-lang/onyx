@@ -3204,9 +3204,10 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
     bh_arr(AstPolyParam) polymorphic_vars = NULL;
     bh_arr_new(global_heap_allocator, polymorphic_vars, 4);
 
+    void *prev_poly_params = parser->polymorph_context.poly_params;
     parser->polymorph_context.poly_params = &polymorphic_vars;
     parse_function_params(parser, func_def);
-    parser->polymorph_context.poly_params = NULL;
+    parser->polymorph_context.poly_params = prev_poly_params;
 
     if (bh_arr_length(polymorphic_vars) > 0) {
         func_def->kind = Ast_Kind_Polymorphic_Proc;

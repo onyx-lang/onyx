@@ -1,0 +1,16 @@
+use core {*}
+
+foo :: (x: [] Pair(i32, #type () -> bool)) {
+    for x {
+        it.second() |> println()
+    }
+}
+
+main :: () {
+    foo(.[
+        .{0, () => {
+            println("Worked")
+            return false
+        }}
+    ])
+}
