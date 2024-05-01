@@ -1,3 +1,27 @@
+Release 0.1.12
+--------------
+Not released yet
+
+Additions:
+- Ability to pipe into a method call.
+    - `x |> y->z() === y->z(x)`
+- Ability to use `_` where `#auto` is used.
+    - This will be come the default soon and `#auto` will be removed.
+
+Removals:
+
+Changes:
+- `str.as_str` is now preferred over `string.as_str`
+- `str.compare` is now preferred over `string.compare`
+- `str.to_cstr_on_stack` is now preferred over `string.to_cstr_on_stack`
+- `str.join` is now preferred over `string.join`
+
+Bugfixes:
+- Fixed WASI compilation due to syntax issue.
+
+Contributors:
+
+
 Release 0.1.11
 --------------
 21st April 2024
