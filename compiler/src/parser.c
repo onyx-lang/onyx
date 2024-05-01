@@ -1319,8 +1319,11 @@ static BinaryOp binary_op_from_current_token(OnyxParser *parser) {
     BinaryOp op = binary_op_from_token_type(parser->curr->type);
 
     if (op == Binary_Op_Count && parser->curr->type == Token_Type_Inserted_Semicolon) {
-        if (peek_token(1)->type == Token_Type_Pipe) {
-            consume_token(parser);
+        int n = 1;
+        while (peek_token(n)->type == Token_Type_Comment) n++;
+
+        if (peek_token(n)->type == Token_Type_Pipe) {
+            fori (i, 0, n) consume_token(parser);
             op = Binary_Op_Pipe;
         }
     }
