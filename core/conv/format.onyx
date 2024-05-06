@@ -163,6 +163,7 @@ Format :: struct {
     dereference          := false;        // *
     custom_format        := true;         // ! to disable
     interpret_numbers    := true;         // d to disable
+    unpack_any           := false;        // a
     digits_after_decimal := cast(u32) 4;  // .2
 
     indentation   := cast(u32) 0
@@ -359,6 +360,11 @@ format_va :: (output: &Format_Output, format: str, va: [] any) -> str {
                         formatting.interpret_numbers = false
                     }
 
+                    case 'a' {
+                        i += 1;
+                        formatting.unpack_any = true;
+                    }
+
                     case '}' {
                         arg := va[vararg_index]
                         vararg_index += 1
@@ -530,6 +536,15 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
             io.writer_flush(&writer)
 
             output->write(io.buffer_stream_to_str(&stream))
+        }
+
+        case any {
+            if !formatting.unpack_any do fallthrough
+
+            formatting.unpack_any = false
+
+            value := *cast(& any) v.data
+            format_any(output, formatting, value)
         }
 
         case _ {
