@@ -25,81 +25,53 @@ FileData :: struct {
 }
 
 __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError) {
-    // Requesting all of the rights because why not.
-    rights :=
-        Rights.DataSync |
-        Rights.Read |
-        Rights.Seek |
-        Rights.FdStatSetFlags |
-        Rights.Sync |
-        Rights.Tell |
-        Rights.Write |
-        Rights.Advise |
-        Rights.Allocate |
-        Rights.PathCreateDirectory |
-        Rights.PathCreateFile |
-        Rights.PathLinkSource |
-        Rights.PathLinkTarget |
-        Rights.PathOpen |
-        Rights.ReadDir |
-        Rights.PathReadlink |
-        Rights.PathRenameSource |
-        Rights.PathRenameTarget |
-        Rights.PathFilestatGet |
-        Rights.PathFilestateSetSize |
-        Rights.PathFilestateSetTimes |
-        Rights.FilestatGet |
-        Rights.FilestatSetSize |
-        Rights.FilestatSetTimes |
-        Rights.PathSymlink |
-        Rights.PathRemoveDirectory |
-        Rights.PathUnlinkFile |
-        Rights.PollFDReadWrite
-
+    rights     := wasi.Rights.{}
     open_flags := cast(OFlags) 0
-    fd_flags := FDFlags.Sync
+    fd_flags   := cast(FDFlags) 0
 
     switch mode {
-        case .Write {
-            open_flags |= OFlags.Creat | OFlags.Trunc
-            rights     |= Rights.Write | Rights.Seek | Rights.Tell
-        }
-
         case .Append {
             open_flags |= OFlags.Creat
-            rights     |= Rights.Write | Rights.Seek | Rights.Tell
-            fd_flags   |= FDFlags.Append
         }
 
-        case .Read {
-            rights |= Rights.Read | Rights.Seek | Rights.Tell
+        case .Write {
+            open_flags |= OFlags.Creat | OFlags.Trunc
         }
     }
 
-    file := FileData.{ fd = -1 }
+    switch mode {
+        case .Append {
+            fd_flags |= FDFlags.Append
+            fallthrough
+        }
+
+        case .Write {
+            rights |= Rights.Write | Rights.Seek | Rights.Tell
+            rights |= Rights.DataSync | Rights.FdStatSetFlags
+            rights |= Rights.Sync | Rights.Allocate | Rights.Advise
+            rights |= Rights.FilestatSetSize | Rights.FilestatSetTimes
+        }
+
+        case .Read {
+            rights |= Rights.Read | Rights.Seek | Rights.Tell | Rights.FilestatGet;
+        }
+    }
+
+    file := FileData.{ fd = 0 }
     file.mode   = mode
     file.rights = rights
     file.flags  = fd_flags
 
     // Currently the directory's file descriptor appears to always be 3
-    // However, this is not necessarily correct, so also try a preopened directory
-    for DIR_FD in .[ 3, 4 ] {
-        if err := wasi.path_open(
-            DIR_FD,
-            .SymLinkFollow,
-            path,
-            open_flags,
-            rights,
-            rights,
-            fd_flags,
-            &file.fd)
-            err == .Success {
-                return file, .None
-        }
+    err := wasi.path_open(3, .{}, path, open_flags, rights, rights, fd_flags, &file.fd)
+    if err == .Success {
+        return file, .None
     }
 
-    // @TODO // provide a better error code.
-    return file, .NotFound
+    return .{}, switch err {
+        // TODO: Return better error statuses.
+        case _ => .NotFound
+    }
 }
 
 __file_close :: (file: FileData) -> os.FileError {
