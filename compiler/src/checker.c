@@ -146,8 +146,15 @@ CheckStatus check_return(AstReturn* retnode) {
                 bh_arr_length(context.checker.expected_return_type_stack));
     }
 
-    expected_return_type = context.checker.expected_return_type_stack[bh_arr_length(context.checker.expected_return_type_stack) - retnode->count - 1];
-    named_return_values  = context.checker.named_return_values_stack[bh_arr_length(context.checker.named_return_values_stack) - retnode->count - 1];
+    if (retnode->from_proc) {
+        expected_return_type = context.checker.expected_return_type_stack[0];
+        named_return_values  = context.checker.named_return_values_stack[0];
+    } else {
+        i32 idx = bh_arr_length(context.checker.expected_return_type_stack) - retnode->count - 1;
+        expected_return_type = context.checker.expected_return_type_stack[idx];
+        named_return_values  = context.checker.named_return_values_stack[idx];
+    }
+
 
 retry_return_expr_check:
 

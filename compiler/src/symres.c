@@ -485,8 +485,24 @@ static SymresStatus symres_if_expression(AstIfExpression* if_expr) {
 }
 
 static SymresStatus symres_pipe(AstBinaryOp** pipe) {
+    if ((*pipe)->right->kind == Ast_Kind_Unary_Op) {
+        AstUnaryOp *the_try = (AstUnaryOp *) (*pipe)->right;
+        if (the_try->operation == Unary_Op_Try) {
+            // Shuffle the tree!
+            AstBinaryOp *the_pipe = *pipe;
+
+            the_pipe->right = the_try->expr;
+            the_try->expr   = (AstTyped *) the_pipe;
+            *pipe           = (AstBinaryOp *) the_try;
+
+            SYMRES(expression, (AstTyped **) pipe);
+            return Symres_Success;
+        }
+    }
+
     AstCall* base_call_node = (AstCall *) (*pipe)->right;
     AstCall* call_node = base_call_node;
+
     if (call_node->kind == Ast_Kind_Method_Call) {
         call_node = (AstCall *) ((AstBinaryOp *) call_node)->right;
     }
