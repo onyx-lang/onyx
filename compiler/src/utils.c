@@ -1196,10 +1196,22 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
                 if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
 
                 assert(arg_arr[arg_pos]->kind == Ast_Kind_Argument);
+
                 TypeMatch tm = unify_node_and_type_(&arg_arr[arg_pos]->value, formal_params[arg_pos], permanent);
                 if (tm == TYPE_MATCH_YIELD) return tm;
                 if (tm == TYPE_MATCH_SPECIAL) return tm;
                 if (tm == TYPE_MATCH_FAILED) {
+                    // Handle the weird case of `x: any` as an argument.
+                    if (formal_params[arg_pos]->id == any_type_id) {
+                        resolve_expression_type(arg_arr[arg_pos]->value);
+                        if (error != NULL) {
+                            arg_arr[arg_pos]->pass_as_any = 1;
+                        }
+
+                        arg_arr[arg_pos]->va_kind = VA_Kind_Not_VA;
+                        break;
+                    }
+
                     if (error != NULL) {
                         AstArgument *the_arg = (void *) arg_arr[arg_pos];
                         if (the_arg->used_as_lval_of_method_call) {
@@ -1226,13 +1238,6 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
                                 node_get_type_name(arg_arr[arg_pos]->value));
                     }
                     return tm;
-                }
-
-                if (arg_arr[arg_pos]->value->type && arg_arr[arg_pos]->value->type->id != any_type_id && formal_params[arg_pos]->id == any_type_id) {
-                    resolve_expression_type(arg_arr[arg_pos]->value);
-                    if (error != NULL) {
-                        arg_arr[arg_pos]->pass_as_any = 1;
-                    }
                 }
 
                 arg_arr[arg_pos]->va_kind = VA_Kind_Not_VA;

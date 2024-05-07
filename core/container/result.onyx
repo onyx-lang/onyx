@@ -174,7 +174,7 @@ __implicit_bool_cast :: macro (r: Result($O, $E)) => cast(Result(O, E).tag_enum,
 #operator ? macro (r: Result($T, $E)) -> T {
     switch res := r; res {
         case .Ok as v do return v;
-        case .Err as v do return return .{ Err = v };
+        case .Err as v do return #from_proc .{ Err = v };
     }
 }
 

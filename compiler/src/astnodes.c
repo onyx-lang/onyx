@@ -755,11 +755,18 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     Type* node_type = get_expression_type(node);
     if (types_are_compatible(node_type, type)) return TYPE_MATCH_SUCCESS;
 
-    Type* any_type = type_build_from_ast(context.ast_alloc, builtin_any_type);
-    if (any_type == NULL) return TYPE_MATCH_YIELD;
-    i64 any_id = any_type->id;
 
-    if (node_type && node_type->id != any_id && type->id == any_id) return TYPE_MATCH_SUCCESS;
+    // 'any' matches any type. This is commented out because it was causing
+    // many issues with incorrect implementations in the rest of the compiler
+    // since this bypasses all normal type checking and forces the rest of the 
+    // compiler to handle "mismatched" types. This should be properly fixed soon,
+    // but will remain commented out for now.
+    //
+    // Type* any_type = type_build_from_ast(context.ast_alloc, builtin_any_type);
+    // if (any_type == NULL) return TYPE_MATCH_YIELD;
+    // i64 any_id = any_type->id;
+    // if (node_type && node_type->id != any_id && type->id == any_id) return TYPE_MATCH_SUCCESS;
+    //
 
     // Here are some of the ways you can unify a node with a type if the type of the
     // node does not match the given type:

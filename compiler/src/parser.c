@@ -1870,6 +1870,10 @@ static AstReturn* parse_return_stmt(OnyxParser* parser) {
         return_node->count += 1;
     }
 
+    if (parse_possible_directive(parser, "from_proc")) {
+        return_node->from_proc = 1;
+    }
+
     AstTyped* expr = NULL;
 
     if (parser->curr->type != ';' && parser->curr->type != Token_Type_Inserted_Semicolon) {
