@@ -334,7 +334,17 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
         return res;
     }
 
-    new_temp :: macro (T: type_expr) => {
+    #overload
+    new :: macro (v: $T, allocator := context.allocator) -> &T {
+        use core
+
+        out := cast(&T) raw_alloc(allocator, sizeof T);
+        core.memory.set(out, 0, sizeof T);
+        *out = v;
+        return out;
+    }
+
+    new_temp :: macro (T) => {
         return new(T, allocator=context.temp_allocator);
     }
 
