@@ -42,11 +42,11 @@ tty_set :: (state: &TTY_State) -> bool {
 } else {
 
 tty_get :: () -> TTY_State {
-    assert(false, "core.os.tty_get not supported on this platform.");
+    panic("core.os.tty_get not supported on this platform.");
 }
 
 tty_set :: (state: &TTY_State) -> bool {
-    assert(false, "core.os.tty_get not supported on this platform.");
+    panic("core.os.tty_get not supported on this platform.");
     return false;
 }
 

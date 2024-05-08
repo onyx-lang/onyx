@@ -148,7 +148,7 @@ OnyxContext.get_user_data :: macro (c: &OnyxContext, $T: type_expr) -> &T {
 
 
 // CLEANUP: Does assert() need to be in the builtin file?
-// It uses context.assert_handler, but does it needt to be here?
+// It uses context.assert_handler, but does it need to be here?
 
 /// Checks if the condition is true. If not, invoke the context's
 /// assert handler.
@@ -156,6 +156,11 @@ assert :: (cond: bool, msg: str, site := #callsite) {
     if !cond {
         context.assert_handler(msg, site);
     }
+}
+
+/// Causes a runtime panic with the specified error message.
+panic :: (msg: str, site := #callsite) {
+    context.assert_handler(msg, site);
 }
 
 

@@ -335,7 +335,7 @@ compile_c_file :: (
                             if is_pointer(p) {
                                 string.append(call_signature, "p");
                             } else {
-                                assert(false, tprintf("Unsupported type in function pointer: {}", p));
+                                panic(tprintf("Unsupported type in function pointer: {}", p));
                             }
                         }
                     }
@@ -373,7 +373,7 @@ compile_c_file :: (
         if last_arg_is_return_value {
             return_type := slice.get(method_info.parameter_types, -1);
             if return_type->info().kind != .Pointer {
-                assert(false, tprintf("last_arg_is_return_value requires last parameter to be a pointer. ({} in {})", method_info.parameter_types, method_name));
+                panic(tprintf("last_arg_is_return_value requires last parameter to be a pointer. ({} in {})", method_info.parameter_types, method_name));
             }
 
             return_type = return_type->info()->as_pointer().to;
@@ -432,8 +432,8 @@ compile_c_file :: (
             case .Multi_Pointer do return "ptr"; 
             case .Array do return "ptr";
 
-            case .Function do return "i32"; // assert(false, "Passing functions between wasm and c is not yet supported.");
-            case .Slice do assert(false, "Passing a slice from c to wasm is not yet supported.");
+            case .Function do return "i32"; // panic("Passing functions between wasm and c is not yet supported.");
+            case .Slice do panic("Passing a slice from c to wasm is not yet supported.");
             case .Enum do return type_to_wasm_type((cast(&Type_Info_Enum) param_info).backing_type);
             case .Distinct do return type_to_wasm_type((cast(&Type_Info_Distinct) param_info).base_type);
 
@@ -448,11 +448,11 @@ compile_c_file :: (
                     return type_to_wasm_type(s_info.members[0].type);
                 }
 
-                assert(false, "Passing structures between wasm and c is not yet supported.");
+                panic("Passing structures between wasm and c is not yet supported.");
             }
 
             case .Union {
-                assert(false, "Passing unions between wasm and c is not yet supported.");
+                panic("Passing unions between wasm and c is not yet supported.");
             }
         }
 
@@ -487,7 +487,7 @@ compile_c_file :: (
 
             case .Pointer do return "WASM_I32"; // This will also have to depend on the pointer size...
             case .Multi_Pointer do return "WASM_I32"; // This will also have to depend on the pointer size...
-            case .Function do return "WASM_I32, WASM_I32, WASM_I32"; // assert(false, "Passing functions between wasm and c is not yet supported.");
+            case .Function do return "WASM_I32, WASM_I32, WASM_I32"; // panic("Passing functions between wasm and c is not yet supported.");
             case .Array do return "WASM_I32";
             case .Slice do return "WASM_I32,WASM_I32";
             case .Enum do return type_encoding((cast(&Type_Info_Enum) param_info).backing_type);
@@ -499,7 +499,7 @@ compile_c_file :: (
                     return type_encoding(s_info.members[0].type);
                 }
 
-                // assert(false, "Passing structures between wasm and c is not yet supported.");
+                // panic("Passing structures between wasm and c is not yet supported.");
                 return "WASM_I32";
             }
         }
