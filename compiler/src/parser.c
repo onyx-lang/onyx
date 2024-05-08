@@ -3466,8 +3466,15 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
         char text[512];
         memset(text, 0, 512);
         strncat(text, "__type_", 511);
+
         token_toggle_end(param->token);
-        strncat(text, param->token->text, 511);
+        if (!strcmp(param->token->text, "_")) {
+            int index = param - params;
+            int len = strnlen(text, 511);
+            snprintf(text + len, 511 - len, "%d", index);
+        } else {
+            strncat(text, param->token->text, 511);
+        }
         token_toggle_end(param->token);
 
         OnyxToken* new_token = bh_alloc(parser->allocator, sizeof(OnyxToken));
