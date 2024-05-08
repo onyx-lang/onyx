@@ -35,11 +35,14 @@ static void print_error_text(char *text) {
 static void print_underline(OnyxError *err, i32 len, i32 first_non_whitespace, b32 colored_printing) {
     char* pointer_str = bh_alloc_array(global_scratch_allocator, char, len);
     memset(pointer_str, ' ', len);
-    memcpy(pointer_str - 1, err->pos.line_start, first_non_whitespace);
-    memset(pointer_str + first_non_whitespace - 1, ' ', err->pos.column - first_non_whitespace);
-    memset(pointer_str + err->pos.column - 1, '~', err->pos.length - 1);
-    pointer_str[err->pos.column - 2] = '^';
-    pointer_str[err->pos.column + err->pos.length - 1] = 0;
+    
+    int c = err->pos.column - 1;
+    int l = err->pos.length;
+
+    memcpy(pointer_str, err->pos.line_start, first_non_whitespace);
+    memset(pointer_str + c + 1, '~', l - 1);
+    pointer_str[c] = '^';
+    pointer_str[c + l] = 0;
 
     if (colored_printing) bh_printf("\033[91m");
     bh_printf("%s\n", pointer_str);
@@ -60,7 +63,7 @@ static void print_detailed_message_v1(OnyxError *err, bh_file_contents* fc, b32 
     if (colored_printing) bh_printf("\033[94m");
     bh_printf("%b\n", err->pos.line_start, linelength);
     
-    fori (i, 0, numlen) bh_printf(" ");
+    fori (i, 0, numlen - 1) bh_printf(" ");
     print_underline(err, linelength, first_char, colored_printing);
 }
 
@@ -113,7 +116,7 @@ static void print_detailed_message_v2(OnyxError* err, bh_file_contents* fc, b32 
 
     if (colored_printing) bh_printf("\033[90m");
     fori (i, 0, numlen - 3) bh_printf(" ");
-    bh_printf("|  ");
+    bh_printf("| ");
     if (colored_printing) bh_printf("\033[94m");
 
     print_underline(err, linelength, first_char, colored_printing);
