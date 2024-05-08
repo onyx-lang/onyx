@@ -98,7 +98,7 @@ Optional.unwrap :: (o: ?$T) -> T {
     switch o {
         case .Some as v do return v;
         case _ {
-            assert(false, "Unwrapping empty Optional.");
+            panic("Unwrapping empty Optional.");
             return .{};
         }
     }
@@ -111,7 +111,7 @@ Optional.unwrap_ptr :: (o: & ?$T) -> &T {
     switch o {
         case .Some as &v do return v;
         case _ {
-            assert(false, "Unwrapping empty Optional.");
+            panic("Unwrapping empty Optional.");
             return .{};
         }
     }
@@ -124,7 +124,7 @@ Optional.expect :: (o: ?$T, message: str) -> T {
     switch o {
         case .Some as v do return v;
         case _ {
-            assert(false, message);
+            panic(message);
             return .{};
         }
     }
@@ -137,7 +137,7 @@ Optional.expect_ptr :: (o: & ?$T, message: str) -> &T {
     switch o {
         case .Some as &v do return v;
         case _ {
-            assert(false, message);
+            panic(message);
             return .{};
         }
     }

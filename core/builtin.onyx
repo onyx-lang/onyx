@@ -148,7 +148,7 @@ OnyxContext.get_user_data :: macro (c: &OnyxContext, $T: type_expr) -> &T {
 
 
 // CLEANUP: Does assert() need to be in the builtin file?
-// It uses context.assert_handler, but does it needt to be here?
+// It uses context.assert_handler, but does it need to be here?
 
 /// Checks if the condition is true. If not, invoke the context's
 /// assert handler.
@@ -156,6 +156,11 @@ assert :: (cond: bool, msg: str, site := #callsite) {
     if !cond {
         context.assert_handler(msg, site);
     }
+}
+
+/// Causes a runtime panic with the specified error message.
+panic :: (msg: str, site := #callsite) {
+    context.assert_handler(msg, site);
 }
 
 
@@ -329,7 +334,17 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
         return res;
     }
 
-    new_temp :: macro (T: type_expr) => {
+    #overload
+    new :: macro (v: $T, allocator := context.allocator) -> &T {
+        use core
+
+        out := cast(&T) raw_alloc(allocator, sizeof T);
+        core.memory.set(out, 0, sizeof T);
+        *out = v;
+        return out;
+    }
+
+    new_temp :: macro (T) => {
         return new(T, allocator=context.temp_allocator);
     }
 

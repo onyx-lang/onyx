@@ -61,7 +61,7 @@ Result.unwrap :: (r: #Self) -> r.Ok_Type {
         case .Ok as v do return v;
         case .Err as err {
             msg := tprintf("Unwrapping Result with error '{}'.", err);
-            assert(false, msg);
+            panic(msg);
             return .{};
         }
     }
@@ -82,7 +82,7 @@ Result.expect :: (r: #Self, msg: str) -> r.Ok_Type {
     switch r {
         case .Ok as v do return v;
         case _ {
-            assert(false, msg);
+            panic(msg);
             return .{};
         }
     }
