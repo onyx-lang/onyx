@@ -18,11 +18,9 @@ delayed_print_anys :: (args: ..any) -> (#type () -> void) {
 
     return ([copied_args]) {
         for arg in copied_args {
-            stdio.print_writer->write_format_va("DELAYED: {}\n", .[ arg ])
+            printf("DELAYED: {a}\n", arg)
         }
-
-        stdio.stream->flush()
-    }
+    };
 }
 
 main :: () {

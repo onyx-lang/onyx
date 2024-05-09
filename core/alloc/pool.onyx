@@ -29,7 +29,7 @@ pool_allocator_proc :: (pool: &PoolAllocator($Elem), aa: AllocationAction, size:
         }
 
         case .Resize {
-            assert(false, "Cannot resize in a pool allocator!")
+            panic("Cannot resize in a pool allocator!")
             return null
         }
 

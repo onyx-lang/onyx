@@ -98,7 +98,7 @@ Optional.unwrap :: (o: ?$T) -> T {
     switch o {
         case .Some as v do return v
         case _ {
-            assert(false, "Unwrapping empty Optional.")
+            panic("Unwrapping empty Optional.")
             return .{}
         }
     }
@@ -111,7 +111,7 @@ Optional.unwrap_ptr :: (o: & ?$T) -> &T {
     switch o {
         case .Some as &v do return v
         case _ {
-            assert(false, "Unwrapping empty Optional.")
+            panic("Unwrapping empty Optional.")
             return .{}
         }
     }
@@ -124,7 +124,7 @@ Optional.expect :: (o: ?$T, message: str) -> T {
     switch o {
         case .Some as v do return v
         case _ {
-            assert(false, message)
+            panic(message)
             return .{}
         }
     }
@@ -137,7 +137,7 @@ Optional.expect_ptr :: (o: & ?$T, message: str) -> &T {
     switch o {
         case .Some as &v do return v
         case _ {
-            assert(false, message)
+            panic(message)
             return .{}
         }
     }
@@ -180,56 +180,6 @@ Optional.with :: macro (o: ?$T, body: Code) {
     }
 }
 
-/// Creates a scope that the `?` operator on an Optional type can
-/// return to, instead of returning from the enclosing function.
-///
-/// Useful when chaining a bunch of operations that *could* fail,
-/// while having a clean and easy escape hatch.
-///
-///     Optional.try() {
-///         x := operation_1()?
-///         y := operation_2(x)?
-///         z := operation_3(x, y)?
-///         opreation_4(z)
-///     }
-///     println("Done")
-///
-/// In this example, if any of the operations fail, the execution
-/// will cleanly go to `println` statement.
-///
-/// To know when something returned `None`, you can either use the second
-/// parameter called `catch`, which is simply a block of code to be run.
-/// Or you can use the return result from the function as so:
-/// 
-///     // Sadly, cannot use the nicer syntax, `try() { ... }`
-///     completed := Optional.try(#quote {
-///         // ...
-///     })
-Optional.try :: macro (body: Code, catch: Code = []{}) -> bool {
-    //
-    // Using a 'do'-expression block to introduce a new
-    // 'return' location. This way, when the code in the `body`
-    // does a `return return`, it will target this do-block.
-    _ := do -> u32 {
-        //
-        // Insert the body of interest.
-        #unquote body
-
-        //
-        // If execution makes it here, everything was successfuly
-        // and no `return return`s were encountered. Return true.
-        return return true
-    }
-
-    #unquote catch
-
-    //
-    // If execution makes it here, there was an unexpected early
-    // return. Return false to signal the caller of this.
-    return false
-}
-
-
 Optional.hash :: (o: ?$T/core.hash.Hashable) => switch o {
     case .Some as v => core.hash.hash(v)
     case _          => 0
@@ -263,7 +213,7 @@ Optional.hash :: (o: ?$T/core.hash.Hashable) => switch o {
 #operator ? macro (opt: ?$T) -> T {
     switch value := opt; value {
         case .Some as v do return v
-        case _ do return return .{}
+        case _ do return #from_proc .{}
     }
 }
 

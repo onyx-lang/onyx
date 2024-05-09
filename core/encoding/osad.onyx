@@ -126,7 +126,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
                 case i16, u16 do tag_value = cast(u64) *(cast(&u16) v.data)
                 case i32, u32 do tag_value = cast(u64) *(cast(&u32) v.data)
                 case i64, u64 do tag_value = cast(u64) *(cast(&u64) v.data)
-                case _ do assert(false, "Bad union backing type")
+                case _ do panic("Bad union backing type")
             }
 
             variant := Array.first(u_info.variants, [x](x.tag_value == ~~tag_value))
@@ -263,7 +263,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := con
                 case i16, u16 do *(cast(&u16) target) = ~~variant_value
                 case i32, u32 do *(cast(&u32) target) = ~~variant_value
                 case i64, u64 do *(cast(&u64) target) = ~~variant_value
-                case _ do assert(false, "Bad union backing type")
+                case _ do panic("Bad union backing type")
             }
 
             try(deserialize(base + u_info.alignment, variant.type, r))

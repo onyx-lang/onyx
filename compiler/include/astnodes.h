@@ -3,7 +3,7 @@
 
 #define VERSION_MAJOR 0
 #define VERSION_MINOR 1
-#define VERSION_PATCH 11
+#define VERSION_PATCH 12
 
 #include "stb_ds.h"
 #include "lex.h"
@@ -830,7 +830,7 @@ struct AstDirectiveSolidify {
 };
 
 // Intruction Node
-struct AstReturn        { AstNode_base; AstTyped* expr; u32 count; }; // Note: This count is one less than it should be, because internal codegen with macros would have to know about this and that is error prone.
+struct AstReturn        { AstNode_base; AstTyped* expr; u32 count; b32 from_proc: 1; }; // Note: This count is one less than it should be, because internal codegen with macros would have to know about this and that is error prone.
 struct AstJump          { AstNode_base; JumpType jump; u32 count; };
 
 // Structure Nodes

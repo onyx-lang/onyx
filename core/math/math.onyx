@@ -65,22 +65,22 @@ cos :: (t: f32) -> f32 {
 }
 
 asin :: (t: f32) -> f32 {
-    assert(false, "asin is not implemented yet!")
+    panic("asin is not implemented yet!")
     return 0
 }
 
 acos :: (t: f32) -> f32 {
-    assert(false, "acos is not implemented yet!")
+    panic("acos is not implemented yet!")
     return 0
 }
 
 atan :: (t: f32) -> f32 {
-    assert(false, "atan is not implemented yet!")
+    panic("atan is not implemented yet!")
     return 0
 }
 
 atan2 :: (t: f32) -> f32 {
-    assert(false, "atan2 is not implemented yet!")
+    panic("atan2 is not implemented yet!")
     return 0
 }
 
