@@ -5,9 +5,14 @@ Not released yet
 Additions:
 - Ability to pipe into a method call.
     - `x |> y->z() === y->z(x)`
+- Ability to pipe into a try operator.
+    - `x |> y()?` === y(x)?`
 - Ability to use `_` where `#auto` is used.
     - This will be come the default soon and `#auto` will be removed.
 - `return #from_proc` to return all the way from the procedure.
+- Variant of `new` that accepts an r-value and places it in the heap.
+- Builtin `panic` procedure that is equivalent to `assert(false, ...)`
+- Format parameter "a" that unpacks an `any` and formats its internal value.
 
 Removals:
 - `Optional.try` as it is incompatible with new semantics of `?`.
@@ -22,6 +27,7 @@ Changes:
 Bugfixes:
 - Fixed WASI compilation due to syntax issue.
 - Fixed WASI platform `__file_open` implementation for wasmtime.
+- Weird edge case when using multiple placeholder arguments in a quick procedure.
 
 Contributors:
 
