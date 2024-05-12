@@ -1077,6 +1077,39 @@ static i32 output_name_section(OnyxWasmModule* module, bh_buffer* buff) {
     return buff->length - prev_len;
 }
 
+#define VERSION__(m,i,p) "v" #m "." #i "." #p
+#define VERSION_(m,i,p) VERSION__(m,i,p)
+#define VERSION VERSION_(VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH)
+
+static i32 output_producer_section(OnyxWasmModule* module, bh_buffer *buff) {
+    i32 prev_len = buff->length;
+
+    bh_buffer_write_byte(buff, WASM_SECTION_ID_CUSTOM);
+
+    bh_buffer prod_buff;
+    bh_buffer_init(&prod_buff, buff->allocator, 128);
+
+    output_custom_section_name("producers", &prod_buff);
+
+    output_unsigned_integer(2, &prod_buff);
+
+    output_name("language", 8, &prod_buff);
+    output_unsigned_integer(1, &prod_buff);
+    output_name("onyx", 4, &prod_buff);
+    output_name(VERSION, strlen(VERSION), &prod_buff);
+
+    output_name("processed-by", 12, &prod_buff);
+    output_unsigned_integer(1, &prod_buff);
+    output_name("onyx", 4, &prod_buff);
+    output_name(VERSION, strlen(VERSION), &prod_buff);
+
+    output_unsigned_integer(prod_buff.length, buff);
+    bh_buffer_concat(buff, prod_buff);
+    bh_buffer_free(&prod_buff);
+
+    return buff->length - prev_len;
+}
+
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer) {
     bh_buffer_init(buffer, global_heap_allocator, 128);
     bh_buffer_append(buffer, WASM_MAGIC_STRING, 4);
@@ -1104,6 +1137,8 @@ void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer)
     if (context.options->generate_name_section) {
         output_name_section(module, buffer);
     }
+
+    output_producer_section(module, buffer);
 
     // TODO: Consider if this should always be included?
     // It can amount to a lot of extra data.

@@ -13,6 +13,7 @@ Additions:
 - Variant of `new` that accepts an r-value and places it in the heap.
 - Builtin `panic` procedure that is equivalent to `assert(false, ...)`
 - Format parameter "a" that unpacks an `any` and formats its internal value.
+- `--generate-name-section` CLI flag
 
 Removals:
 - `Optional.try` as it is incompatible with new semantics of `?`.
