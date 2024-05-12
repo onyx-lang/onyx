@@ -1077,7 +1077,7 @@ static i32 output_name_section(OnyxWasmModule* module, bh_buffer* buff) {
     return buff->length - prev_len;
 }
 
-#define VERSION__(m,i,p) "v" #m "." #i "." #p
+#define VERSION__(m,i,p) #m "." #i "." #p
 #define VERSION_(m,i,p) VERSION__(m,i,p)
 #define VERSION VERSION_(VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH)
 
