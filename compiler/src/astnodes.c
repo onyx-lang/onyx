@@ -1569,6 +1569,21 @@ char* get_function_name(AstFunction* func) {
     return "unnamed_proc";
 }
 
+char* get_function_assembly_name(AstFunction* func) {
+    if (func->kind != Ast_Kind_Function) return "unnamed_proc";
+
+    if (func->name != NULL) return func->assembly_name;
+
+    if (func->exported_name != NULL) {
+        return bh_aprintf(global_scratch_allocator,
+                "%b",
+                func->exported_name->text,
+                func->exported_name->length);
+    }
+
+    return "unnamed_proc";
+}
+
 char* generate_name_within_scope(Scope *scope, OnyxToken* symbol) {
     char name[512];
     memset(name, 0, 512);

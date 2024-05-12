@@ -3863,6 +3863,7 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
             if (func->intrinsic_name == NULL) func->intrinsic_name = symbol;
 
             func->name = generate_name_within_scope(parser->current_scope, symbol);
+            func->assembly_name = func->name;
             func->flags &= ~Ast_Flag_Function_Is_Lambda;
             break;
         }

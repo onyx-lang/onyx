@@ -867,7 +867,7 @@ AstFunction* polymorphic_proc_solidify(AstFunction* pp, bh_arr(AstPolySolution) 
     shput(pp->concrete_funcs, unique_key, solidified_func);
 
     if (solidified_func.func->name) {
-        solidified_func.func->name = bh_aprintf(
+        solidified_func.func->assembly_name = bh_aprintf(
             global_heap_allocator,
             "%s$%s",
             solidified_func.func->name,
