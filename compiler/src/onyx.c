@@ -842,6 +842,8 @@ static void onyx_watch(CompileOptions *compile_opts) {
 #endif
 
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+#include <sys/wait.h>
+
 static void perform_self_upgrade(CompileOptions *opts, char *version) {
     // TODO: cleanup    
     
