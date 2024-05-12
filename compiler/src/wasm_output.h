@@ -156,8 +156,6 @@ static i32 output_funcsection(OnyxWasmModule* module, bh_buffer* buff) {
 }
 
 static i32 output_tablesection(OnyxWasmModule* module, bh_buffer* buff) {
-    // if (bh_arr_length(module->elems) == 0) return 0;
-
     i32 prev_len = buff->length;
     bh_buffer_write_byte(buff, WASM_SECTION_ID_TABLE);
 
@@ -183,7 +181,6 @@ static i32 output_tablesection(OnyxWasmModule* module, bh_buffer* buff) {
 
 static i32 output_memorysection(OnyxWasmModule* module, bh_buffer* buff) {
     // :ProperLinking
-    // if (context.options->use_multi_threading) return 0;
     if (!module->needs_memory_section) return 0;
 
     i32 prev_len = buff->length;
@@ -1042,6 +1039,44 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
 }
 #endif
 
+static i32 output_name_section(OnyxWasmModule* module, bh_buffer* buff) {
+    i32 prev_len = buff->length;
+
+    bh_buffer_write_byte(buff, WASM_SECTION_ID_CUSTOM);
+
+    bh_buffer name_buff;
+    bh_buffer_init(&name_buff, buff->allocator, 128);
+
+    output_custom_section_name("name", &name_buff);
+
+    output_unsigned_integer(1, &name_buff); // 1 for function names
+
+    bh_buffer func_name_buff;
+    bh_buffer_init(&func_name_buff, buff->allocator, 128);
+
+    output_unsigned_integer(bh_arr_length(module->funcs), &func_name_buff);
+    bh_arr_each(WasmFunc, func, module->funcs) {
+        if (func->name == NULL) continue;
+
+        u64 func_idx = func - module->funcs;
+        func_idx += module->next_foreign_func_idx;
+
+        output_unsigned_integer(func_idx, &func_name_buff);
+
+        output_name(func->name, strlen(func->name), &func_name_buff);
+    }
+
+    output_unsigned_integer(func_name_buff.length, &name_buff);
+    bh_buffer_concat(&name_buff, func_name_buff);
+    bh_buffer_free(&func_name_buff);
+
+    output_unsigned_integer(name_buff.length, buff);
+    bh_buffer_concat(buff, name_buff);
+    bh_buffer_free(&name_buff);
+
+    return buff->length - prev_len;
+}
+
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer) {
     bh_buffer_init(buffer, global_heap_allocator, 128);
     bh_buffer_append(buffer, WASM_MAGIC_STRING, 4);
@@ -1065,6 +1100,10 @@ void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer)
     output_codesection(module, buffer);
     output_datasection(module, buffer);
     output_onyx_libraries_section(module, buffer);
+
+    if (context.options->generate_name_section) {
+        output_name_section(module, buffer);
+    }
 
     // TODO: Consider if this should always be included?
     // It can amount to a lot of extra data.

@@ -63,7 +63,7 @@ static void insert_poly_slns_into_scope(Scope* scope, bh_arr(AstPolySolution) sl
 // NOTE: This might return a volatile string. Do not store it without copying it.
 static char* build_poly_solution_key(AstPolySolution* sln) {
     if (sln->kind == PSK_Type) {
-        return (char *) type_get_unique_name(sln->type);
+        return bh_aprintf(context.ast_alloc, "@%d", sln->type->id);
 
     } else if (sln->kind == PSK_Value) {
         static char buffer[256];
@@ -93,12 +93,13 @@ static char* build_poly_slns_unique_key(bh_arr(AstPolySolution) slns) {
     fori (i, 0, 1024) key_buf[i] = 0;
 
     bh_arr_each(AstPolySolution, sln, slns) {
+        if (sln != slns) strncat(key_buf, "$", 1023);
+
         token_toggle_end(sln->poly_sym->token);
 
         strncat(key_buf, sln->poly_sym->token->text, 1023);
         strncat(key_buf, "=", 1023);
         strncat(key_buf, build_poly_solution_key(sln), 1023);
-        strncat(key_buf, ";", 1023);
 
         token_toggle_end(sln->poly_sym->token);
     }
@@ -864,6 +865,15 @@ AstFunction* polymorphic_proc_solidify(AstFunction* pp, bh_arr(AstPolySolution) 
 
     // NOTE: Cache the function for later use, reducing duplicate functions.
     shput(pp->concrete_funcs, unique_key, solidified_func);
+
+    if (solidified_func.func->name) {
+        solidified_func.func->name = bh_aprintf(
+            global_heap_allocator,
+            "%s$%s",
+            solidified_func.func->name,
+            unique_key
+        );
+    }
 
     return (AstFunction *) &node_that_signals_a_yield;
 }

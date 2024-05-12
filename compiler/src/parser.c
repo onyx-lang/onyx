@@ -3847,30 +3847,6 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
     return parse_expression(parser, 1);
 }
 
-static char* generate_name_within_scope(OnyxParser* parser, OnyxToken* symbol) {
-    char name[512];
-    memset(name, 0, 512);
-
-    bh_arr(char *) names=NULL;
-    bh_arr_new(global_heap_allocator, names, 4);
-
-    Scope* scope = parser->current_scope;
-    while (scope != NULL) {
-        bh_arr_push(names, scope->name);
-        scope = scope->parent;
-    }
-
-    bh_arr_each(char *, n, names) {
-        if (*n == NULL) continue;
-
-        strncat(name, *n, 511);
-        strncat(name, ".", 511);
-    }
-    bh_arr_free(names);
-
-    return bh_aprintf(global_heap_allocator, "%s%b", name, symbol->text, symbol->length);
-}
-
 static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol) {
     OnyxToken *after_second_colon = expect_token(parser, ':');
     if (after_second_colon) after_second_colon += 1;
@@ -3886,7 +3862,7 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
 
             if (func->intrinsic_name == NULL) func->intrinsic_name = symbol;
 
-            func->name = generate_name_within_scope(parser, symbol);
+            func->name = generate_name_within_scope(parser->current_scope, symbol);
             func->flags &= ~Ast_Flag_Function_Is_Lambda;
             break;
         }
@@ -3895,13 +3871,13 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
             AstMacro* macro = (AstMacro *) node;
 
             AstFunction* func = (AstFunction *) macro->body;
-            func->name = generate_name_within_scope(parser, symbol);
+            func->name = generate_name_within_scope(parser->current_scope, symbol);
             break;
         }
 
         case Ast_Kind_Directive_Init: break;
 
-        case Ast_Kind_Global: ((AstGlobal *) node)->name = generate_name_within_scope(parser, symbol);
+        case Ast_Kind_Global: ((AstGlobal *) node)->name = generate_name_within_scope(parser->current_scope, symbol);
 
         case Ast_Kind_Overloaded_Function:
         case Ast_Kind_StrLit:
@@ -3917,7 +3893,7 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
         case Ast_Kind_Distinct_Type:
         case Ast_Kind_Union_Type:
         case Ast_Kind_Poly_Union_Type:
-            ((AstStructType *) node)->name = generate_name_within_scope(parser, symbol);
+            ((AstStructType *) node)->name = generate_name_within_scope(parser->current_scope, symbol);
             goto default_case;
 
         case Ast_Kind_Type_Alias:
