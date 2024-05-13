@@ -357,6 +357,7 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
             options->debug_session = 1;
             options->debug_info_enabled = 1;
             options->stack_trace_enabled = 1;
+            options->generate_name_section = 1;
         }
         else if (!strcmp(argv[i], "--debug-socket")) {
             options->debug_socket = argv[++i];
@@ -364,9 +365,11 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
         else if (!strcmp(argv[i], "--debug-info")) {
             options->debug_info_enabled = 1;
             options->stack_trace_enabled = 1;
+            options->generate_name_section = 1;
         }
         else if (!strcmp(argv[i], "--stack-trace")) {
             options->stack_trace_enabled = 1;
+            options->generate_name_section = 1;
         }
         else if (!strcmp(argv[i], "--perf")) {
             options->running_perf = 1;
