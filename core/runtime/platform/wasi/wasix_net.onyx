@@ -101,8 +101,7 @@ __net_sock_connect :: (s: SocketData, addr: &SocketAddress) -> io.Error {
         case .Success => .None;
         case .ConnRefused,
              .ConnAborted,
-             .ConnReset
-             => .ConnectFailed;
+             .ConnReset => .ConnectFailed;
 
         case _ => .OperationFailed;
     };
