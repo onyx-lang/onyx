@@ -544,6 +544,7 @@ typedef struct WasmFunc {
     LocalAllocator locals;
     bh_arr(WasmInstruction) code;
     OnyxToken *location;
+    char *name;
 } WasmFunc;
 
 typedef struct WasmGlobal {

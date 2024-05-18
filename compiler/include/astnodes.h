@@ -1419,6 +1419,7 @@ struct AstFunction {
     AstBlock *body;
 
     char* name;
+    char* assembly_name;
 
     // NOTE: This is NULL, unless this function was generated from a polymorphic
     // procedure call. Then it is set to the token of the call node.
@@ -1949,6 +1950,7 @@ struct CompileOptions {
     b32 generate_foreign_info : 1;
     b32 generate_type_info    : 1;
     b32 generate_method_info  : 1;
+    b32 generate_name_section : 1;
     b32 no_core               : 1;
     b32 no_stale_code         : 1;
     b32 show_all_errors       : 1;
@@ -2167,6 +2169,8 @@ char *get_expression_string_value(AstTyped* node, b32 *out_is_valid);
 
 b32 cast_is_legal(Type* from_, Type* to_, char** err_msg);
 char* get_function_name(AstFunction* func);
+char* get_function_assembly_name(AstFunction* func);
+char* generate_name_within_scope(Scope *scope, OnyxToken* symbol);
 
 TypeMatch implicit_cast_to_bool(AstTyped **pnode);
 

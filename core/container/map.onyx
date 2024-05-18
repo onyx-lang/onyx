@@ -307,12 +307,7 @@ Map.as_iter :: (m: &Map) =>
         hashes = builtin.make([] u32, new_size, allocator=allocator)
         Array.fill(hashes, -1)
 
-        for &entry in entries do entry.next = -1
-
-        index := 0
-        for &entry in entries {
-            defer index += 1
-
+        for &entry, index in entries {
             hash_index := entry.hash % hashes.count
             entries[index].next = hashes[hash_index]
             hashes[hash_index] = index

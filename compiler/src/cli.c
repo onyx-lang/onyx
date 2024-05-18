@@ -80,6 +80,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     C_LBLUE "    --no-type-info              " C_NORM "Disables generating type information\n"
     C_LBLUE "    --generate-method-info      " C_NORM "Populate method information in type information structures\n"
     C_LBLUE "    --generate-foreign-info     " C_NORM "Generate information for foreign blocks\n"
+    C_LBLUE "    --generate-name-section     " C_NORM "Generate the 'name' custom section for better debugging\n"
     C_LBLUE "    --no-stale-code             " C_NORM "Disables use of " C_YELLOW "#allow_stale_code" C_NORM " directive\n"
     "\n"
     C_LBLUE "    --doc " C_GREY "doc_file              " C_NORM "Generate a .odoc file, Onyx's documentation format used by " C_YELLOW "onyx-doc-gen\n"
@@ -287,6 +288,9 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
         else if (!strcmp(argv[i], "--generate-method-info")) {
             options->generate_method_info = 1;
         }
+        else if (!strcmp(argv[i], "--generate-name-section")) {
+            options->generate_name_section = 1;
+        }
         else if (!strcmp(argv[i], "--no-type-info")) {
             options->generate_type_info = 0;
         }
@@ -353,6 +357,7 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
             options->debug_session = 1;
             options->debug_info_enabled = 1;
             options->stack_trace_enabled = 1;
+            options->generate_name_section = 1;
         }
         else if (!strcmp(argv[i], "--debug-socket")) {
             options->debug_socket = argv[++i];
@@ -360,9 +365,11 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
         else if (!strcmp(argv[i], "--debug-info")) {
             options->debug_info_enabled = 1;
             options->stack_trace_enabled = 1;
+            options->generate_name_section = 1;
         }
         else if (!strcmp(argv[i], "--stack-trace")) {
             options->stack_trace_enabled = 1;
+            options->generate_name_section = 1;
         }
         else if (!strcmp(argv[i], "--perf")) {
             options->running_perf = 1;
