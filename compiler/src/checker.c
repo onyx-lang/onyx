@@ -3812,6 +3812,11 @@ CheckStatus check_process_directive(AstNode* directive) {
         // Check if this line is even necessary
         inject->binding->token = inject->symbol;
 
+        if (inject->binding->kind == Ast_Kind_Function || inject->binding->kind == Ast_Kind_Polymorphic_Proc) {
+            AstFunction *func = (void *) inject->binding;
+            func->name = generate_name_within_scope(scope, inject->symbol);
+        }
+
         Package *pac = NULL;
         if (inject->dest->kind == Ast_Kind_Package) {
             pac = ((AstPackage *) inject->dest)->package;

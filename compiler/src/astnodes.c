@@ -1555,18 +1555,56 @@ TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
 }
 
 char* get_function_name(AstFunction* func) {
-    if (func->kind != Ast_Kind_Function) return "<procedure>";
+    if (func->kind != Ast_Kind_Function) return "unnamed_proc";
 
     if (func->name != NULL) return func->name;
 
     if (func->exported_name != NULL) {
         return bh_aprintf(global_scratch_allocator,
-                "EXPORTED:%b",
+                "%b",
                 func->exported_name->text,
                 func->exported_name->length);
     }
 
-    return "<anonymous procedure>";
+    return "unnamed_proc";
+}
+
+char* get_function_assembly_name(AstFunction* func) {
+    if (func->kind != Ast_Kind_Function) return "unnamed_proc";
+
+    if (func->name != NULL) return func->assembly_name;
+
+    if (func->exported_name != NULL) {
+        return bh_aprintf(global_scratch_allocator,
+                "%b",
+                func->exported_name->text,
+                func->exported_name->length);
+    }
+
+    return "unnamed_proc";
+}
+
+char* generate_name_within_scope(Scope *scope, OnyxToken* symbol) {
+    char name[512];
+    memset(name, 0, 512);
+
+    bh_arr(char *) names=NULL;
+    bh_arr_new(global_heap_allocator, names, 4);
+
+    while (scope != NULL) {
+        bh_arr_push(names, scope->name);
+        scope = scope->parent;
+    }
+
+    bh_arr_each(char *, n, names) {
+        if (*n == NULL) continue;
+
+        strncat(name, *n, 511);
+        strncat(name, ".", 511);
+    }
+    bh_arr_free(names);
+
+    return bh_aprintf(global_heap_allocator, "%s%b", name, symbol->text, symbol->length);
 }
 
 AstNode* strip_aliases(AstNode* n) {

@@ -19,6 +19,7 @@
     #include <sys/socket.h>
     #include <sys/un.h>
     #include <sys/syscall.h>
+    #include <sys/random.h>
     #include <poll.h>
     #include <termios.h>
     #include <sys/ioctl.h>

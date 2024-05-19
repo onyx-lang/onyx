@@ -31,7 +31,7 @@ Template_Directory :: () -> str {
             |> string.copy();
 }
 
-Version :: SemVer.{0, 1, 11}
+Version :: SemVer.{0, 1, 12}
 
 
 

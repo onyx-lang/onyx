@@ -1,0 +1,6 @@
+[Info][Core] 0x1282A0 = alloc(size=12, align=16, oldptr=(null))
+[Info][Core] 0x1282C0 = alloc(size=12, align=16, oldptr=(null))
+Value 1: Foo { x = 123, y = 456, z = 678 }
+Value 2: Foo { x = 10, y = 20, z = 30 }
+[Info][Core] (null) = free(size=0, align=0, oldptr=0x1282C0)
+[Info][Core] (null) = free(size=0, align=0, oldptr=0x1282A0)
