@@ -499,12 +499,6 @@ EMIT_FUNC_NO_ARGS(initialize_data_segments_body) {
 
     bh_arr(WasmInstruction) code = *pcode;
 
-    //
-    // Because this code is generated direction in the function
-    // it is assumed that EVERY data entry will be entered by
-    // this point. If data section entries can be entered after
-    // function body generation starts, this code will have to
-    // move to a link phase thing.
     i32 index = 0;
     bh_arr_each(WasmDatum, datum, mod->data) {
         assert(datum->id > 0);

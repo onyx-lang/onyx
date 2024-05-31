@@ -2326,7 +2326,9 @@ static AstType* parse_type(OnyxParser* parser) {
     AstType* root = NULL;
     AstType** next_insertion = &root;
 
-    while (1) {
+    b32 type_can_be_done = 0;
+
+    while (next_insertion != NULL) {
         if (parser->hit_unexpected_token) return root;
 
         switch ((u16) parser->curr->type) {
@@ -2339,6 +2341,7 @@ static AstType* parse_type(OnyxParser* parser) {
 
                 *next_insertion = (AstType *) new;
                 next_insertion = &new->elem;
+                type_can_be_done = 0;
                 break;
             }
 
@@ -2377,11 +2380,13 @@ static AstType* parse_type(OnyxParser* parser) {
                 expect_token(parser, ']');
                 *next_insertion = (AstType *) new;
                 next_insertion = &((AstSliceType *) new)->elem;
+                type_can_be_done = 0;
                 break;
             }
 
             case '$': {
                 parse_polymorphic_variable(parser, &next_insertion);
+                type_can_be_done = 1;
                 break;
             }
 
@@ -2426,6 +2431,7 @@ static AstType* parse_type(OnyxParser* parser) {
                 if (peek_token(0)->type != '.')
                     next_insertion = NULL;
 
+                type_can_be_done = 1;
                 break;
             }
 
@@ -2433,6 +2439,7 @@ static AstType* parse_type(OnyxParser* parser) {
                 AstStructType* s_node = parse_struct(parser);
                 *next_insertion = (AstType *) s_node;
                 next_insertion = NULL;
+                type_can_be_done = 1;
                 break;
             }
 
@@ -2446,6 +2453,7 @@ static AstType* parse_type(OnyxParser* parser) {
             case '-': {
                 *next_insertion = (AstType *) parse_expression(parser, 0);
                 next_insertion = NULL;
+                type_can_be_done = 1;
                 break;
             }
 
@@ -2453,12 +2461,14 @@ static AstType* parse_type(OnyxParser* parser) {
                 OnyxToken* matching = find_matching_paren(parser->curr);
                 *next_insertion = parse_function_type(parser, parser->curr);
                 next_insertion = NULL;
+                type_can_be_done = 1;
                 break;
             }
 
             case Token_Type_Keyword_Typeof: {
                 *next_insertion = (AstType *) parse_typeof(parser);
                 next_insertion = NULL;
+                type_can_be_done = 1;
                 break;
             }
 
@@ -2476,6 +2486,7 @@ static AstType* parse_type(OnyxParser* parser) {
                 *next_insertion = (AstType *) pc_type;
 
                 next_insertion = (AstType **) &params[0];
+                type_can_be_done = 0;
                 break;
             }
 
@@ -2487,6 +2498,7 @@ static AstType* parse_type(OnyxParser* parser) {
 
                     *next_insertion = (AstType *) parser->injection_point;
                     next_insertion = NULL;
+                    type_can_be_done = 1;
                     break;
                 }
             }
@@ -2498,6 +2510,7 @@ static AstType* parse_type(OnyxParser* parser) {
                 field->expr  = (AstTyped *) *next_insertion;
 
                 *next_insertion = (AstType *) field;
+                type_can_be_done = 1;
                 break;
             }
 
@@ -2505,8 +2518,10 @@ static AstType* parse_type(OnyxParser* parser) {
                 next_insertion = NULL;
                 break;
         }
+    }
 
-        if (next_insertion == NULL) break;
+    if (!type_can_be_done) {
+        onyx_report_error(root->token->pos, Error_Critical, "Incomplete type when parsing.");
     }
 
     return root;
