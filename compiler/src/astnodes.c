@@ -1740,13 +1740,12 @@ AstStructLiteral* make_optional_literal_some(bh_allocator a, AstTyped *expr, Typ
     AstStructLiteral *opt_lit = onyx_ast_node_new(a, sizeof(AstStructLiteral), Ast_Kind_Struct_Literal);
     opt_lit->token = expr->token;
 
-    arguments_initialize(&opt_lit->args);
-    arguments_ensure_length(&opt_lit->args, 2);
-    opt_lit->args.values[0] = (AstTyped *) make_int_literal(a, 1); // 1 is Some
-    opt_lit->args.values[1] = expr;
+    bh_arr_new(context.ast_alloc, opt_lit->values_to_initialize, 2);
+    bh_arr_push(opt_lit->values_to_initialize, ((ValueWithOffset) { (AstTyped *) make_int_literal(a, 1), 0 })); // 1 is Some
+    bh_arr_push(opt_lit->values_to_initialize, ((ValueWithOffset) { expr, opt_type->Union.alignment }));
 
     opt_lit->type = opt_type;
-    opt_lit->args.values[0]->type = opt_type->Union.tag_type;
+    opt_lit->values_to_initialize[0].value->type = opt_type->Union.tag_type;
 
     opt_lit->flags |= Ast_Flag_Has_Been_Checked;
     return opt_lit;
@@ -1758,13 +1757,12 @@ AstStructLiteral* make_union_variant_of_void(bh_allocator a, Type* union_type, O
 
     assert(variant->type == &basic_types[Basic_Kind_Void]);
 
-    arguments_initialize(&lit->args);
-    arguments_ensure_length(&lit->args, 2);
-    lit->args.values[0] = (AstTyped *) make_int_literal(a, variant->tag_value);
-    lit->args.values[1] = (AstTyped *) make_zero_value(a, token, variant->type);
+    bh_arr_new(context.ast_alloc, lit->values_to_initialize, 2);
+    bh_arr_push(lit->values_to_initialize, ((ValueWithOffset) { (AstTyped *) make_int_literal(a, variant->tag_value), 0 }));
+    bh_arr_push(lit->values_to_initialize, ((ValueWithOffset) { (AstTyped *) make_zero_value(a, token, variant->type), union_type->Union.alignment }));
 
     lit->type = union_type;
-    lit->args.values[0]->type = union_type->Union.tag_type;
+    lit->values_to_initialize[0].value->type = union_type->Union.tag_type;
 
     lit->flags |= Ast_Flag_Has_Been_Checked;
     return lit;

@@ -1672,6 +1672,14 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
 }
 
 CheckStatus check_struct_literal(AstStructLiteral* sl) {
+    if (sl->extension_value) {
+        CHECK(expression, &sl->extension_value);
+
+        // Use the type of the extension value if no type of the structure literal was given.
+        if (!sl->type && sl->extension_value->type) {
+            sl->type = sl->extension_value->type;
+        }
+    }
 
     if (sl->type == NULL) {
         // NOTE: This is used for automatically typed struct literals. If there is no provided
@@ -1694,8 +1702,16 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
             YIELD(sl->token->pos, "Trying to resolve type of struct literal.");
     }
 
+    if (sl->values_to_initialize == NULL) {
+        bh_arr_new(global_heap_allocator, sl->values_to_initialize, 2);
+    }
+
     if (sl->type->kind == Type_Kind_Union) {
         if ((sl->flags & Ast_Flag_Has_Been_Checked) != 0) return Check_Success;
+        
+        if (sl->extension_value) {
+            ERROR_(sl->token->pos, "Cannot use field-update syntax on '%s' because it is a 'union'.", type_get_name(sl->type));
+        }
 
         Type *union_type = sl->type;
 
@@ -1706,8 +1722,15 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
             AstNumLit *tag_value = make_int_literal(context.ast_alloc, uv->tag_value);
             tag_value->type = union_type->Union.tag_type;
 
-            bh_arr_push(sl->args.values, (AstTyped *) tag_value);
-            bh_arr_push(sl->args.values, (AstTyped *) make_zero_value(context.ast_alloc, sl->token, uv->type));
+            bh_arr_push(sl->values_to_initialize, ((ValueWithOffset) {
+                (AstTyped *) tag_value,
+                0
+            }));
+
+            bh_arr_push(sl->values_to_initialize, ((ValueWithOffset) {
+                (AstTyped *) make_zero_value(context.ast_alloc, sl->token, uv->type),
+                union_type->Union.alignment
+            }));
 
             sl->flags |= Ast_Flag_Has_Been_Checked;
             return Check_Success;
@@ -1742,20 +1765,29 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         AstNumLit *tag_value = make_int_literal(context.ast_alloc, matched_variant->tag_value);
         tag_value->type = union_type->Union.tag_type;
 
-        bh_arr_push(sl->args.values, (AstTyped *) tag_value);
-        bh_arr_push(sl->args.values, value->value);
+        bh_arr_push(sl->values_to_initialize, ((ValueWithOffset) {
+            (AstTyped *) tag_value,
+            0
+        }));
+
+        bh_arr_push(sl->values_to_initialize, ((ValueWithOffset) {
+            value->value,
+            union_type->Union.alignment
+        }));
 
         sl->flags |= Ast_Flag_Has_Been_Checked;
         return Check_Success;
     }
 
     if (!type_is_structlike_strict(sl->type)) {
+        if ((sl->flags & Ast_Flag_Has_Been_Checked) != 0) return Check_Success;
+
         //
         // If there are no given arguments to a structure literal, it is treated as a 'zero-value',
         // and can be used to create a completely zeroed value of any type.
         if (bh_arr_length(sl->args.values) == 0 && bh_arr_length(sl->args.named_values) == 0) {
             AstZeroValue *zv = make_zero_value(context.ast_alloc, sl->token, sl->type);
-            bh_arr_push(sl->args.values, (AstTyped *) zv);
+            bh_arr_push(sl->values_to_initialize, ((ValueWithOffset) { (AstTyped *) zv, 0 }));
 
             sl->flags |= Ast_Flag_Has_Been_Checked;
             return Check_Success;
@@ -1776,14 +1808,9 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
                        type_get_name(sl->args.values[0]->type));
             }
 
-            sl->flags |= Ast_Flag_Has_Been_Checked;
-            return Check_Success;
-        }
+            bh_arr_push(sl->values_to_initialize, ((ValueWithOffset) { sl->args.values[0], 0 }));
 
-        if ((sl->flags & Ast_Flag_Has_Been_Checked) != 0) {
-            assert(sl->args.values);
-            assert(sl->args.values[0]);
-            assert(sl->args.values[0]->kind == Ast_Kind_Zero_Value);
+            sl->flags |= Ast_Flag_Has_Been_Checked;
             return Check_Success;
         }
 
@@ -1792,6 +1819,17 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         ERROR_(sl->token->pos,
                 "'%s' is not constructable using a struct literal.",
                 type_get_name(sl->type));
+    }
+
+    bh_arr_clear(sl->values_to_initialize);
+
+    if (sl->extension_value) {
+        TYPE_CHECK(&sl->extension_value, sl->type) {
+            ERROR_(sl->token->pos, "Expected base value for field-update to be of type '%s', but it was '%s' instead.",
+                type_get_name(sl->type), type_get_name(sl->extension_value->type));
+        }
+
+        bh_arr_push(sl->values_to_initialize, ((ValueWithOffset) { sl->extension_value, 0 }));
     }
 
     i32 mem_count = type_structlike_mem_count(sl->type);
@@ -1803,18 +1841,18 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         if (!fill_in_arguments(&sl->args, (AstNode *) sl, &err_msg, 1)) {
             onyx_report_error(sl->token->pos, Error_Critical, err_msg);
 
-            bh_arr_each(AstTyped *, value, sl->args.values) {
-                if (*value == NULL) {
-                    i32 member_idx = value - sl->args.values; // Pointer subtraction hack
-                    StructMember smem;
-                    type_lookup_member_by_idx(sl->type, member_idx, &smem);
+            // bh_arr_each(AstTyped *, value, sl->args.values) {
+            //     if (*value == NULL) {
+            //         i32 member_idx = value - sl->args.values; // Pointer subtraction hack
+            //         StructMember smem;
+            //         type_lookup_member_by_idx(sl->type, member_idx, &smem);
 
-                    onyx_report_error(sl->token->pos, Error_Critical,
-                        "Value not given for %d%s member, '%s', for type '%s'.",
-                        member_idx + 1, bh_num_suffix(member_idx + 1),
-                        smem.name, type_get_name(sl->type));
-                }
-            }
+            //         onyx_report_error(sl->token->pos, Error_Critical,
+            //             "Value not given for %d%s member, '%s', for type '%s'.",
+            //             member_idx + 1, bh_num_suffix(member_idx + 1),
+            //             smem.name, type_get_name(sl->type));
+            //     }
+            // }
 
             return Check_Error;
         }
@@ -1852,6 +1890,10 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
                     smem.name,
                     type_get_name(formal),
                     node_get_type_name(*actual));
+        }
+
+        if (!sl->extension_value || (*actual)->kind != Ast_Kind_Zero_Value) {
+            bh_arr_push(sl->values_to_initialize, ((ValueWithOffset) { *actual, smem.offset }));
         }
 
         sl->flags &= ((*actual)->flags & Ast_Flag_Comptime) | (sl->flags &~ Ast_Flag_Comptime);

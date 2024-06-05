@@ -456,7 +456,19 @@ static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, Ast
     expect_token(parser, '.');
     expect_token(parser, '{');
 
+    if (consume_token_if_next(parser, Token_Type_Dot_Dot)) {
+        sl->extension_value = parse_expression(parser, 0);
+
+        if (peek_token(0)->type != '}') {
+            expect_token(parser, ',');
+        }
+    }
+
     parse_arguments(parser, '}', &sl->args);
+
+    if (sl->extension_value && bh_arr_length(sl->args.values) > 0) {
+        onyx_report_error(sl->token->pos, Error_Critical, "All initializers must be named when using '..value' in a struct literal.");
+    }
 
     *ret = (AstTyped *) sl;
     return 1;
