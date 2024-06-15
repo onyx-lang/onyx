@@ -3804,12 +3804,12 @@ static AstCompilerExtension* parse_compiler_extension(OnyxParser* parser, OnyxTo
     ext->token = token;
 
     ext->name = expect_token(parser, Token_Type_Literal_String);
-    
+
     bh_arr_new(global_heap_allocator, ext->proc_macros, 2);
     expect_token(parser, '{');
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) break;
-        
+
         AstProceduralMacro *pmacro = make_node(AstProceduralMacro, Ast_Kind_Procedural_Macro);
         pmacro->token = expect_token(parser, Token_Type_Symbol);
         pmacro->extension = ext;
@@ -3976,7 +3976,7 @@ static void parse_implicit_injection(OnyxParser* parser) {
     //
     // overload :: #match {}
     // overload <- (...) { ... }
-    // 
+    //
     // if (peek_token(0)->type == Token_Type_Left_Arrow) {
     //     AstDirectiveAddOverload *add_overload = make_node(AstDirectiveAddOverload, Ast_Kind_Directive_Add_Overload);
     //     add_overload->overloaded_function = (AstNode *) injection_expression;
@@ -4225,6 +4225,10 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
                 } else {
                     operator->order = parser->overload_count++;
+                }
+
+                if (next_tokens_are(parser, 2, ':', ':')) {
+                    consume_tokens(parser, 2);
                 }
 
                 operator->overload = parse_expression(parser, 0);

@@ -25,6 +25,7 @@ Iterator.skip_while :: skip_while;
 
 Iterator.flatten :: flatten;
 Iterator.enumerate :: enumerate;
+Iterator.group_by :: group_by;
 
 Iterator.find :: find;
 Iterator.fold :: fold;
@@ -972,6 +973,47 @@ generator_no_copy :: (ctx: &$Ctx, gen: (&Ctx) -> ? $T) =>
 #overload
 generator_no_copy :: (ctx: &$Ctx, gen: (&Ctx) -> ? $T, close: (&Ctx) -> void) =>
     Iterator(T).{ ctx, gen, close }
+
+
+/// Groups like elements together using the provided comparison function.
+/// `cmp` should return `true` if the two elements are equal.
+/// The items should be sorted in such a way that the equal items appear next to each other. 
+group_by :: (it: Iterator($T), cmp: (T, T) -> bool) -> Iterator(Pair(T, Iterator(T))) {
+    return generator(
+        &.{ outer_iter = it, cmp = cmp, key_item = next(it), yielded_key = false }
+
+        (ctx: &$Ctx) -> ? Pair(T, Iterator(T)) {
+            if !ctx.key_item do return .None
+
+            ctx.yielded_key = false
+
+            return Pair.make(
+                ctx.key_item->unwrap(),
+                generator_no_copy(ctx, ctx => {
+                    if !ctx.yielded_key {
+                        ctx.yielded_key = true
+                        return ctx.key_item
+                    }
+
+                    switch next(ctx.outer_iter) {
+                        case .None {
+                            ctx.key_item = .None
+                            return .None
+                        }
+                        case .Some as next_item {
+                            if ctx.cmp(ctx.key_item->unwrap(), next_item) {
+                                return next_item
+                            }
+
+                            ctx.key_item = next_item
+                            return .None
+                        }
+                    }
+                })
+            )
+        }
+    )
+}
 
 
 
