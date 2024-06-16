@@ -1,0 +1,25 @@
+use core {*}
+
+Person :: struct { age: i32; name: str }
+
+main :: () {
+    random.set_seed(1234)
+
+    people := iter.comp(1 ..= 30, [](Person.{
+        random.between(1, 10)
+        random.string(10, alpha_numeric=true)
+    }))
+
+    people->sort((a, b) => a.age - b.age)
+
+    group_iter := iter.as_iter(people)
+        |> iter.group_by((a, b) => a.age == b.age)
+    
+    for group in group_iter {
+        printf("People of age {}:\n", group.first.age)
+
+        for v in group.second {
+            printf("    {}\n", v.name)
+        }
+    }
+}

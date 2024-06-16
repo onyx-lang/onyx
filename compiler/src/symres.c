@@ -611,6 +611,10 @@ static SymresStatus symres_struct_literal(AstStructLiteral* sl) {
 
     SYMRES(arguments, &sl->args);
 
+    if (sl->extension_value) {
+        SYMRES(expression, &sl->extension_value);
+    }
+
     return Symres_Success;
 }
 

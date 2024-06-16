@@ -628,6 +628,11 @@ typedef struct ForeignReference {
     AstTyped *import_name;
 } ForeignReference;
 
+typedef struct ValueWithOffset {
+    AstTyped *value;
+    u32 offset;
+} ValueWithOffset;
+
 
 // Base Nodes
 #define AstNode_base \
@@ -757,6 +762,11 @@ struct AstStructLiteral {
     Arguments args;
 
     Type *generated_inferred_type;
+
+    // Value used when you do .{ ..value, val = 123 }
+    AstTyped *extension_value;
+
+    bh_arr(ValueWithOffset) values_to_initialize;
 };
 struct AstArrayLiteral {
     AstTyped_base;

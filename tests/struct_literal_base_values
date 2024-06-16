@@ -1,0 +1,3 @@
+Foo { name = "Phil", age = 34 }
+Foo { name = "Joe", age = 34 }
+Foo { name = "Joe", age = 10 }

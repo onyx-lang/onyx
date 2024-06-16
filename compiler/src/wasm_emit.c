@@ -532,7 +532,7 @@ EMIT_FUNC(stack_enter,                     u64 stacksize);
 EMIT_FUNC(zero_value,                      WasmType wt);
 EMIT_FUNC(zero_value_for_type,             Type* type, OnyxToken* where, AstTyped *alloc_node);
 EMIT_FUNC(stack_address,                   u32 offset, OnyxToken *token);
-EMIT_FUNC(values_into_contiguous_memory,   u64 base_ptr_local, Type *type, u32 offset, i32 value_count, AstTyped **values);
+EMIT_FUNC(values_into_contiguous_memory,   u64 base_ptr_local, u32 offset, u32 value_count, ValueWithOffset *values);
 EMIT_FUNC(struct_literal_into_contiguous_memory, AstStructLiteral* sl, u64 base_ptr_local, u32 offset);
 EMIT_FUNC(wasm_copy,                       OnyxToken *token);
 EMIT_FUNC(wasm_fill,                       OnyxToken *token);
@@ -3159,38 +3159,35 @@ EMIT_FUNC(wasm_memory_equal, OnyxToken *token) {
     *pcode = code;
 }
 
-EMIT_FUNC(values_into_contiguous_memory, u64 base_ptr_local, Type *type, u32 offset, i32 value_count, AstTyped **values) {
+EMIT_FUNC(values_into_contiguous_memory, u64 base_ptr_local, u32 offset, u32 value_count, ValueWithOffset *values) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    assert(onyx_type_is_stored_in_memory(type));
-    assert(value_count == (i32) type_structlike_mem_count(type));
-
-    StructMember smem;
     fori (i, 0, value_count) {
-        type_lookup_member_by_idx(type, i, &smem);
+        AstTyped *value = values[i].value;
+        u32 value_offset = values[i].offset;
 
         // When emitting a structure literal into memory, simply place it directly into the memory.
         // Otherwise, the structure literal would be placed somewhere in memory, and then needlessly
         // copied to its final destination.
-        if (values[i]->kind == Ast_Kind_Struct_Literal && onyx_type_is_stored_in_memory(values[i]->type)) {
-            emit_struct_literal_into_contiguous_memory(mod, &code, (AstStructLiteral *) values[i], base_ptr_local, smem.offset + offset);
+        if (value->kind == Ast_Kind_Struct_Literal && onyx_type_is_stored_in_memory(value->type)) {
+            emit_struct_literal_into_contiguous_memory(mod, &code, (AstStructLiteral *) value, base_ptr_local, value_offset + offset);
 
         // When emitting a zero-value, simple zero the bytes in memory. Otherwise you run into the
         // same problem described above.
-        } else if (values[i]->kind == Ast_Kind_Zero_Value && onyx_type_is_stored_in_memory(values[i]->type)) {
+        } else if (value->kind == Ast_Kind_Zero_Value && onyx_type_is_stored_in_memory(value->type)) {
             WIL(NULL, WI_LOCAL_GET, base_ptr_local);
-            WIL(NULL, WI_PTR_CONST, smem.offset + offset);
+            WIL(NULL, WI_PTR_CONST, value_offset + offset);
             WI(NULL, WI_PTR_ADD);
 
             WIL(NULL, WI_I32_CONST, 0);
-            WIL(NULL, WI_I32_CONST, type_size_of(values[i]->type));
+            WIL(NULL, WI_I32_CONST, type_size_of(value->type));
 
             emit_wasm_fill(mod, &code, NULL);
 
         } else {
             WIL(NULL, WI_LOCAL_GET, base_ptr_local);
-            emit_expression(mod, &code, values[i]);
-            emit_store_instruction(mod, &code, values[i]->type, smem.offset + offset);
+            emit_expression(mod, &code, value);
+            emit_store_instruction(mod, &code, value->type, value_offset + offset);
         }
     }
 
@@ -3198,15 +3195,15 @@ EMIT_FUNC(values_into_contiguous_memory, u64 base_ptr_local, Type *type, u32 off
 }
 
 EMIT_FUNC(struct_literal_into_contiguous_memory, AstStructLiteral* sl, u64 base_ptr_local, u32 offset) {
-    emit_values_into_contiguous_memory(mod, pcode, base_ptr_local, sl->type, offset, bh_arr_length(sl->args.values), sl->args.values);
+    emit_values_into_contiguous_memory(mod, pcode, base_ptr_local, offset, bh_arr_length(sl->values_to_initialize), sl->values_to_initialize);
 }
 
 EMIT_FUNC(struct_literal, AstStructLiteral* sl) {
     bh_arr(WasmInstruction) code = *pcode;
 
     if (!onyx_type_is_stored_in_memory(sl->type)) {
-        bh_arr_each(AstTyped *, val, sl->args.values) {
-            emit_expression(mod, &code, *val);
+        bh_arr_each(ValueWithOffset, val, sl->values_to_initialize) {
+            emit_expression(mod, &code, val->value);
         }
 
         *pcode = code;
@@ -3358,9 +3355,15 @@ EMIT_FUNC(range_literal, AstRangeLiteral* range) {
     u64 local_offset = emit_local_allocation(mod, &code, (AstTyped *) range);
     assert((local_offset & LOCAL_IS_WASM) == 0);
 
-    AstTyped *values[] = { range->low, range->high, range->step };
-    emit_values_into_contiguous_memory(mod, &code, mod->stack_base_idx,
-            range->type, local_offset, 3, values);
+    i32 elem_size = range->type->Struct.alignment;
+
+    ValueWithOffset values[] = {
+        range->low,  elem_size * 0,
+        range->high, elem_size * 1,
+        range->step, elem_size * 2,
+    };
+
+    emit_values_into_contiguous_memory(mod, &code, mod->stack_base_idx, local_offset, 3, values);
 
     emit_stack_address(mod, &code, local_offset, range->token);
     *pcode = code;
@@ -3948,9 +3951,12 @@ EMIT_FUNC(expression, AstTyped* expr) {
             u64 local_offset = emit_local_allocation(mod, &code, (AstTyped *) callsite);
             assert((local_offset & LOCAL_IS_WASM) == 0);
 
-            AstTyped *values[] = { (AstTyped *) callsite->filename, (AstTyped *) callsite->line, (AstTyped *) callsite->column };
-            emit_values_into_contiguous_memory(mod, &code, mod->stack_base_idx,
-                    callsite->type, local_offset, 3, values);
+            ValueWithOffset values[] = {
+                (AstTyped *) callsite->filename, 0,
+                (AstTyped *) callsite->line,     2 * POINTER_SIZE,
+                (AstTyped *) callsite->column,   3 * POINTER_SIZE
+            };
+            emit_values_into_contiguous_memory(mod, &code, mod->stack_base_idx, local_offset, 3, values);
 
             emit_stack_address(mod, &code, local_offset, NULL);
             break;
