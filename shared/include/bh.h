@@ -503,7 +503,7 @@ void   bh_dir_close(bh_dir dir);
 
 
 
-#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+#if defined(_BH_LINUX)
     typedef struct bh_file_watch {
         int inotify_fd;
         int kill_pipe[2];
@@ -511,7 +511,7 @@ void   bh_dir_close(bh_dir dir);
         fd_set fds;
     } bh_file_watch;
 #endif
-#if defined(_BH_WINDOWS)
+#if defined(_BH_WINDOWS) || defined(_BH_DARWIN)
     // TODO: Make these work on Windows and MacOS
     typedef u32 bh_file_watch;
 #endif
@@ -2155,7 +2155,7 @@ void bh_dir_close(bh_dir dir) {
 
 #undef DIR_SEPARATOR
 
-#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+#if defined(_BH_LINUX)
 
 bh_file_watch bh_file_watch_new() {
     // TODO: Proper error checking
