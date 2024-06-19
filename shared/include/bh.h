@@ -45,9 +45,6 @@
 
 #if defined(_BH_LINUX) || defined(_BH_WINDOWS)
     #include <malloc.h>
-#endif
-
-#if defined(_BH_LINUX)
     #include <sys/inotify.h>
 #endif
 
@@ -506,7 +503,7 @@ void   bh_dir_close(bh_dir dir);
 
 
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     typedef struct bh_file_watch {
         int inotify_fd;
         int kill_pipe[2];
@@ -514,7 +511,7 @@ void   bh_dir_close(bh_dir dir);
         fd_set fds;
     } bh_file_watch;
 #endif
-#if defined(_BH_WINDOWS) || defined(_BH_DARWIN)
+#if defined(_BH_WINDOWS)
     // TODO: Make these work on Windows and MacOS
     typedef u32 bh_file_watch;
 #endif
@@ -2158,7 +2155,7 @@ void bh_dir_close(bh_dir dir) {
 
 #undef DIR_SEPARATOR
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
 
 bh_file_watch bh_file_watch_new() {
     // TODO: Proper error checking
