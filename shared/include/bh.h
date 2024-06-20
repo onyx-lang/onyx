@@ -45,6 +45,9 @@
 
 #if defined(_BH_LINUX) || defined(_BH_WINDOWS)
     #include <malloc.h>
+#endif
+
+#if defined(_BH_LINUX)
     #include <sys/inotify.h>
 #endif
 
