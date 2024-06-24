@@ -13,6 +13,6 @@ op2 :: () -> bool {
 }
 
 main :: () {
-    (op1() && op2()) |> println()
+    (op2() && op1()) |> println()
     (op1() || op2()) |> println()
 }
