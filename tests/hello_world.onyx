@@ -5,5 +5,5 @@ package main
 use core {*}
 
 main :: (args: [] cstr) {
-    println("Hello, World!");
+    println("Hello, World!")
 }

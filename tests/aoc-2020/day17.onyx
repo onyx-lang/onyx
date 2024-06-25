@@ -3,116 +3,116 @@
 use core {package, *}
 
 OverloadsEqual :: interface (T: type_expr) {
-    t as T;
-    { T.equals(t, t) } -> bool;
+    t as T
+    { T.equals(t, t) } -> bool
 }
 
-#operator == macro (t: $T/OverloadsEqual, s: T) => t->equals(s);
+#operator == macro (t: $T/OverloadsEqual, s: T) => t->equals(s)
 
 
 CubePos :: struct {
-    x, y, z, w : i32;
+    x, y, z, w : i32
 }
 
 CubePos.hash :: (c: CubePos) => {
-    hash: u32 = 7;
-    hash += hash << 5 + core.hash.to_u32(c.x);
-    hash += hash << 5 + core.hash.to_u32(c.y);
-    hash += hash << 5 + core.hash.to_u32(c.z);
-    hash += hash << 5 + core.hash.to_u32(c.w);
-    return hash;
+    hash: u32 = 7
+    hash += hash << 5 + core.hash.to_u32(c.x)
+    hash += hash << 5 + core.hash.to_u32(c.y)
+    hash += hash << 5 + core.hash.to_u32(c.z)
+    hash += hash << 5 + core.hash.to_u32(c.w)
+    return hash
 }
 
 CubePos.equals :: (a, b: CubePos) => {
     return (a.x == b.x) &&
            (a.y == b.y) &&
            (a.z == b.z) &&
-           (a.w == b.w);
+           (a.w == b.w)
 }
 
 
 CubeState :: struct {
-    alive := false;
-    next  := false;
+    alive := false
+    next  := false
 }
 
 get_neighbor_count :: (cubes: &Map(CubePos, CubeState), pos: CubePos) -> u32 {
-    count := 0;
+    count := 0
 
     for x in -1 .. 2 do for y in -1 .. 2 do for z in -1 .. 2 do for w in -1 .. 2 {
-        if x == 0 && y == 0 && z == 0 && w == 0 do continue;
-        key := CubePos.{ pos.x + x, pos.y + y, pos.z + z, pos.w + w };
-        map.get(cubes, key)->with([s] {
-            if s.alive do count += 1;
-        });
+        if x == 0 && y == 0 && z == 0 && w == 0 do continue
+        key := CubePos.{ pos.x + x, pos.y + y, pos.z + z, pos.w + w }
+        Map.get(cubes, key)->with([s] {
+            if s.alive do count += 1
+        })
     }
 
-    return count;
+    return count
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./input/day17.txt";
+    contents := #file_contents "./input/day17.txt"
 
-    file := contents;
+    file := contents
 
-    cubes := map.make(CubePos, CubeState);
-    defer map.free(&cubes);
+    cubes := Map.make(CubePos, CubeState)
+    defer Map.free(&cubes)
 
-    z := 0;
-    while !string.empty(file) {
-        line, file~ := string.bisect(file, '\n');
+    z := 0
+    while !str.empty(file) {
+        line, file~ := str.bisect(file, '\n')
 
-        x := 0;
+        x := 0
         for ch in line {
-            if ch == '#' do map.put(&cubes, .{ x, 0, z, 0 }, .{ alive = true });
+            if ch == '#' do Map.put(&cubes, .{ x, 0, z, 0 }, .{ alive = true })
 
-            x += 1;
+            x += 1
         }
 
-        z += 1;
+        z += 1
     }
 
-    cubes_to_consider := array.make(CubePos);
-    defer array.free(&cubes_to_consider);
+    cubes_to_consider := Array.make(CubePos)
+    defer Array.free(&cubes_to_consider)
 
     for i in 0 .. 6 {
         for &cube_entry in cubes.entries {
             if cube_entry.value.alive {
                 for x in -1 .. 2 do for y in -1 .. 2 do for z in -1 .. 2 do for w in -1 .. 2 {
-                    array.push(&cubes_to_consider, .{
+                    Array.push(&cubes_to_consider, .{
                         cube_entry.key.x + x,
                         cube_entry.key.y + y,
                         cube_entry.key.z + z,
                         cube_entry.key.w + w
-                    });
+                    })
                 }
             }
         }
 
         for &cube in cubes_to_consider {
-            state  := map.get(&cubes, *cube) ?? .{};
-            ncount := get_neighbor_count(&cubes, *cube);
+            state  := Map.get(&cubes, *cube) ?? .{}
+            ncount := get_neighbor_count(&cubes, *cube)
             
             if state.alive {
-                state.next = ncount == 2 || ncount == 3;
+                state.next = ncount == 2 || ncount == 3
             } else {
-                state.next = ncount == 3;
+                state.next = ncount == 3
             }
 
-            map.put(&cubes, *cube, state);
+            Map.put(&cubes, *cube, state)
         }
 
         for &cube in cubes_to_consider {
-            state := map.get(&cubes, *cube) ?? .{};
-            state.alive = state.next;
-            map.put(&cubes, *cube, state);
+            state := Map.get(&cubes, *cube) ?? .{}
+            state.alive = state.next
+            Map.put(&cubes, *cube, state)
         }
 
-        array.clear(&cubes_to_consider);
+        Array.clear(&cubes_to_consider)
     }
 
-    active_count := 0;
-    for &cube_entry in cubes.entries do if cube_entry.value.alive do active_count += 1;
+    active_count := 0
+    for &cube_entry in cubes.entries do if cube_entry.value.alive do active_count += 1
 
-    printf("Active count: {}\n", active_count);
+    printf("Active count: {}\n", active_count)
 }

@@ -426,11 +426,6 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
 
 static void write_doc_notes(bh_buffer *buffer, AstBinding *binding) {
     if (binding) {
-        if (binding->documentation_token_old) {
-            write_string(buffer, binding->documentation_token_old->length, binding->documentation_token_old->text);
-            return;
-        }
-
         if (binding->documentation_string) {
             write_string(buffer, strlen(binding->documentation_string), (char *) binding->documentation_string);
             return;

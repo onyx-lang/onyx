@@ -3,20 +3,20 @@
 use core {*}
 
 main :: (args: [] cstr) {
-    ba := bucket_array.make(i32, 4);
-    for i in 24 do ba << i;
+    ba := bucket_array.make(i32, 4)
+    for i in 24 do ba << i
 
-    printf("ba[10] is {}.\n", ba[10]);
+    printf("ba[10] is {}.\n", ba[10])
 
-    sum := 0;
+    sum := 0
     bucket_array.for_each(ba, [value] {
-        printf("[{}] -> {}\n", bucket_index, *value);
-        sum += *value;
-    });
+        printf("[{}] -> {}\n", bucket_index, *value)
+        sum += *value
+    })
 
     for it in bucket_array.as_iter(&ba) {
-        printf("{}\n", it);
+        printf("{}\n", it)
     }
 
-    printf("Sum is {}\n", sum);
+    printf("Sum is {}\n", sum)
 }

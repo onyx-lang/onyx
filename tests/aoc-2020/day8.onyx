@@ -3,83 +3,83 @@
 use core {*}
 
 OpCode :: enum (u16) {
-    Nop; Acc; Jmp;
+    Nop; Acc; Jmp
 }
 
 Instruction :: struct {
-    opcode  : OpCode;
-    operand : i16;
+    opcode  : OpCode
+    operand : i16
 }
 
 // Returns if the program successfully exited.
 get_acc_value :: (instrs: [..] Instruction, ret_acc: &i32) -> bool {
-    already_been := map.make(i32, bool);
-    defer map.free(&already_been);
+    already_been := Map.make(i32, bool)
+    defer Map.free(&already_been)
 
-    ip   := 0;
-    acc  := 0;
-    succ := false;
+    ip   := 0
+    acc  := 0
+    succ := false
     while true {
         if ip >= instrs.count {
-            succ = true;
-            break;
+            succ = true
+            break
         }
         
-        if map.has(&already_been, ip) do break;
-        map.put(&already_been, ip, true);
+        if Map.has(&already_been, ip) do break
+        Map.put(&already_been, ip, true)
 
         switch instrs[ip].opcode {
-            case OpCode.Nop do ip += 1;
+            case OpCode.Nop do ip += 1
             case OpCode.Acc {
-                acc += ~~instrs[ip].operand;
-                ip += 1;
+                acc += ~~instrs[ip].operand
+                ip += 1
             }
-            case OpCode.Jmp do ip += ~~instrs[ip].operand;
+            case OpCode.Jmp do ip += ~~instrs[ip].operand
         }
     }
 
-    *ret_acc = acc;
-    return succ;
+    *ret_acc = acc
+    return succ
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./input/day8.txt";
+    contents := #file_contents "./input/day8.txt"
 
-    file := contents;
+    file := contents
 
-    instrs := array.make(Instruction, 32);
-    defer array.free(&instrs);
+    instrs := Array.make(Instruction, 32)
+    defer Array.free(&instrs)
 
-    while !string.empty(file) {
-        word := file.data[0 .. 3];
-        string.advance(&file, 4);
+    while !str.empty(file) {
+        word := file.data[0 .. 3]
+        str.advance(&file, 4)
 
-        sign := file.data[0];
-        string.advance(&file, 1);
-        val := cast(i32) conv.parse_int(&file);
+        sign := file.data[0]
+        str.advance(&file, 1)
+        val := cast(i32) conv.parse_int(&file)
 
-        string.advance_line(&file);
+        str.advance_line(&file)
 
-        if sign == '-' do val *= -1;
+        if sign == '-' do val *= -1
 
-        opcode : OpCode;
-        if     string.equal(word, "nop") do opcode = OpCode.Nop;
-        elseif string.equal(word, "acc") do opcode = OpCode.Acc;
-        elseif string.equal(word, "jmp") do opcode = OpCode.Jmp;
+        opcode : OpCode
+        if     str.equal(word, "nop") do opcode = OpCode.Nop
+        elseif str.equal(word, "acc") do opcode = OpCode.Acc
+        elseif str.equal(word, "jmp") do opcode = OpCode.Jmp
 
-        array.push(&instrs, .{ opcode, ~~val });
+        Array.push(&instrs, .{ opcode, ~~val })
     }
 
-    acc: i32;
+    acc: i32
     for &instr in instrs {
-        if     instr.opcode == OpCode.Nop do instr.opcode = OpCode.Jmp;
-        elseif instr.opcode == OpCode.Jmp do instr.opcode = OpCode.Nop;
+        if     instr.opcode == OpCode.Nop do instr.opcode = OpCode.Jmp
+        elseif instr.opcode == OpCode.Jmp do instr.opcode = OpCode.Nop
 
-        if get_acc_value(instrs, &acc) do break;
+        if get_acc_value(instrs, &acc) do break
 
-        if     instr.opcode == OpCode.Nop do instr.opcode = OpCode.Jmp;
-        elseif instr.opcode == OpCode.Jmp do instr.opcode = OpCode.Nop;
+        if     instr.opcode == OpCode.Nop do instr.opcode = OpCode.Jmp
+        elseif instr.opcode == OpCode.Jmp do instr.opcode = OpCode.Nop
     }
 
-    printf("Accumulator value: {}\n", acc);
+    printf("Accumulator value: {}\n", acc)
 }

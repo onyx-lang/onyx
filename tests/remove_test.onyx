@@ -3,16 +3,16 @@
 use core {*}
 
 main :: (args) => {
-    x: [..] i32;
-    for 25 do x << it;
+    x: [..] i32
+    for 25 do x << it
 
-    println(x);
+    println(x)
 
     for iter.as_iter(&x) {
         if it % 2 == 0 {
-            #remove;
+            #remove
         }
     }
 
-    println(x);
+    println(x)
 }

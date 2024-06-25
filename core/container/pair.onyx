@@ -9,34 +9,34 @@ package core
 /// and equatable.
 @conv.Custom_Format.{#solidify _format {First_Type=First_Type, Second_Type=Second_Type}}
 Pair :: struct (First_Type: type_expr, Second_Type: type_expr) {
-    first: First_Type;
-    second: Second_Type;
+    first: First_Type
+    second: Second_Type
 }
 
-Pair.make :: macro (x: $X, y: $Y) => #this_package.Pair(X, Y).{x, y};
+Pair.make :: macro (x: $X, y: $Y) => #this_package.Pair(X, Y).{x, y}
 
 Pair._format :: (output: &conv.Format_Output, format: &conv.Format, p: &Pair($First_Type, $Second_Type)) {
-    conv.format(output, "({}, {})", p.first, p.second);
+    conv.format(output, "({}, {})", p.first, p.second)
 }
 
 #overload
 hash.hash :: (p: Pair($First_Type/hash.Hashable, $Second_Type/hash.Hashable)) => {
-    h := 7;
-    h += h << 5 + hash.hash(p.first);
-    h += h << 5 + hash.hash(p.second);
-    return h;
+    h := 7
+    h += h << 5 + hash.hash(p.first)
+    h += h << 5 + hash.hash(p.second)
+    return h
 }
 
 
 #operator == (p1, p2: Pair($First_Type/Equatable, $Second_Type/Equatable)) => {
-    return p1.first == p2.first && p1.second == p2.second;
+    return p1.first == p2.first && p1.second == p2.second
 }
 
 #operator != (p1, p2: Pair($First_Type/Equatable, $Second_Type/Equatable)) => {
-    return !(p1.first == p2.first) || !(p1.second == p2.second);
+    return !(p1.first == p2.first) || !(p1.second == p2.second)
 }
 
 #local Equatable :: interface (T: type_expr) {
-    t as T;
-    { t == t } -> bool;
+    t as T
+    { t == t } -> bool
 }

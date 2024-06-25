@@ -27,14 +27,14 @@ main :: (args: [] cstr) {
     // take a pointer to anything in the varargs because they are placed on the stack
     // and will "disappear" when the procedure returns.
     typed_varargs :: (args: ..i32) {
-        print("Typed variadic arguments: ");
+        print("Typed variadic arguments: ")
         for x in args {
-            printf("{} ", x);
+            printf("{} ", x)
         }
-        print("\n");
+        print("\n")
     }
 
-    typed_varargs(1, 2, 3, 4);
+    typed_varargs(1, 2, 3, 4)
 
     // This part about "untyped-varargs" is now entirely deprecated. The new
     // way of using '..any' is so much better. The language still has support
@@ -57,20 +57,20 @@ main :: (args: [] cstr) {
     // 'printf' used to use this:
     //
     //   printf :: (format: str, va: ...) -> void
-    //   printf("%i %f %l %d", int, float, long, double);
+    //   printf("%i %f %l %d", int, float, long, double)
     //
     // untyped_varargs :: (args: ...) {
-    //     print("Untyped variadic arguments: ");
+    //     print("Untyped variadic arguments: ")
 
-    //     x: i32;
+    //     x: i32
     //     while vararg_get(args, ^x) {
-    //         printf("{} ", cast(rawptr) x);
+    //         printf("{} ", cast(rawptr) x)
     //     }
 
-    //     print("\n");
+    //     print("\n")
     // }
 
-    // untyped_varargs(1.0f, 2.0f, 3.0f, 4.0f);
+    // untyped_varargs(1.0f, 2.0f, 3.0f, 4.0f)
 
 
 
@@ -81,14 +81,14 @@ main :: (args: [] cstr) {
     // lookup type information at runtime. 'printf' already uses this for its '{}' format
     // specifiers, and it knows how to print type names.
     any_varargs :: (args: ..any) {
-        print("Any variadic arguments: ");
+        print("Any variadic arguments: ")
 
         for arg in args {
-            printf("{}, ", arg.type);
+            printf("{}, ", arg.type)
         }
 
-        print("\n");
+        print("\n")
     }
 
-    any_varargs(1, 2.0f, "test", any_varargs);
+    any_varargs(1, 2.0f, "test", any_varargs)
 }

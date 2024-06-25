@@ -15,42 +15,42 @@ use core {Result, io, string}
 
 
 Document :: struct {
-    allocator: Allocator;
-    nodes: [..] &Node;
+    allocator: Allocator
+    nodes: [..] &Node
 }
 
 Node :: struct {
-    node: str;
-    type_annotation: ? str;
-    values: [..] Value;
-    props: Map(str, Value);
-    children: [..] &Node;
+    node: str
+    type_annotation: ? str
+    values: [..] Value
+    props: Map(str, Value)
+    children: [..] &Node
 }
 
 Value :: struct {
-    data: Value_Data;
-    type_annotation: ? str;
+    data: Value_Data
+    type_annotation: ? str
 
     Value_Data :: union {
-        String: str;
-        Number: KDL_Number;
-        Boolean: bool;
-        Null: void;
+        String: str
+        Number: KDL_Number
+        Boolean: bool
+        Null: void
     }
 }
 
 KDL_Number :: union {
-    Integer: i64;
-    Float: f64;
-    String: str;
+    Integer: i64
+    Float: f64
+    String: str
 }
 
 /// Creates a new KDL document, using the allocator provided.
 new_doc :: (allocator := context.allocator) -> Document {
-    doc: Document;
-    doc.allocator = allocator;
-    doc.nodes = make([..] &Node, allocator);
-    return doc;
+    doc: Document
+    doc.allocator = allocator
+    doc.nodes = make([..] &Node, allocator)
+    return doc
 }
 
 
@@ -61,31 +61,31 @@ parse :: #match #local -> Result(Document, Parse_Error) {}
 
 #overload
 parse :: (s: str, allocator := context.allocator) -> Result(Document, Parse_Error) {
-    doc: Document;
-    doc.allocator = allocator;
+    doc: Document
+    doc.allocator = allocator
 
-    parser := Parser.make(s);
-    error  := parser->parse(&doc);
+    parser := Parser.make(s)
+    error  := parser->parse(&doc)
 
     if error.None {
-        return .{ Ok = doc };
+        return .{ Ok = doc }
     } else {
-        return .{ Err = error };
+        return .{ Err = error }
     }
 }
 
 #overload
 parse :: (r: &io.Reader, allocator := context.allocator) -> Result(Document, Parse_Error) {
-    doc: Document;
-    doc.allocator = allocator;
+    doc: Document
+    doc.allocator = allocator
 
-    parser := Parser.make(r);
-    error  := parser->parse(&doc);
+    parser := Parser.make(r)
+    error  := parser->parse(&doc)
 
     if error.None {
-        return .{ Ok = doc };
+        return .{ Ok = doc }
     } else {
-        return .{ Err = error };
+        return .{ Err = error }
     }
 }
 
@@ -94,39 +94,39 @@ builtin.delete :: free
 
 /// Releases all resources allocated for the document.
 free :: (d: Document) {
-    for d.nodes do free_node(d.allocator, it);
-    delete(&d.nodes);
+    for d.nodes do free_node(d.allocator, it)
+    delete(&d.nodes)
 }
 
 #local
 free_node :: (al: Allocator, n: &Node) {
-    string.free(n.node, al);
-    n.type_annotation->with([t] { string.free(t, al); });
+    str.free(n.node, al)
+    n.type_annotation->with([t] { str.free(t, al); })
 
-    for& v in n.values do free_value(al, v);
+    for& v in n.values do free_value(al, v)
     delete(&n.values); // This should use the allocator inside of the array
 
     for n.props->as_iter() {
-        string.free(it.key, al);
-        free_value(al, &it.value);
+        str.free(it.key, al)
+        free_value(al, &it.value)
     }
-    delete(&n.props);
+    delete(&n.props)
 
-    for n.children do free_node(al, it);
+    for n.children do free_node(al, it)
 }
 
 #local
 free_value :: (al: Allocator, v: &Value) {
-    v.type_annotation->with([t] { string.free(t, al); });
+    v.type_annotation->with([t] { str.free(t, al); })
 
     switch v.data {
         case .String as s {
-            string.free(s, al);
+            str.free(s, al)
         }
 
         case .Number as num do switch num {
             case .String as s {
-                string.free(s, al);
+                str.free(s, al)
             } 
 
             case _ ---

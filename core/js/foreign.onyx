@@ -42,12 +42,12 @@ use core.alloc
     }
 
     #export "__allocate_arg_buf" (args: i32) -> rawptr {
-        return alloc.heap_allocator->alloc(args * sizeof Value);
+        return alloc.heap_allocator->alloc(args * sizeof Value)
     }
 
     #export "__free_arg_buf" (buf: rawptr) {
-        if buf == null do return;
+        if buf == null do return
 
-        alloc.heap_allocator->free(buf);
+        alloc.heap_allocator->free(buf)
     }
 }

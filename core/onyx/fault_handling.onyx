@@ -1,16 +1,16 @@
 package core.os
 
 Fault_Handler :: struct {
-    handle: (rawptr) -> void;
-    ctx: rawptr;
+    handle: (rawptr) -> void
+    ctx: rawptr
 }
 
 register_fault_handler :: (ctx: rawptr, handle: (rawptr) -> void) {
-    fault_handlers << .{ handle, ctx };
+    fault_handlers << .{ handle, ctx }
 
     if !global_fault_handle_registered {
-        assert(__register_cleanup(#export_name global_fault_handler), "Failed to register global fault handler");
-        global_fault_handle_registered = true;
+        assert(__register_cleanup(#export_name global_fault_handler), "Failed to register global fault handler")
+        global_fault_handle_registered = true
     }
 }
 
@@ -21,12 +21,12 @@ register_fault_handler :: (ctx: rawptr, handle: (rawptr) -> void) {
 
     global_fault_handler :: () {
         for fault_handlers {
-            it.handle(it.ctx);
+            it.handle(it.ctx)
         }
     }
 
     fault_handlers: [..] Fault_Handler
-    global_fault_handle_registered := false;
+    global_fault_handle_registered := false
 }
 
 

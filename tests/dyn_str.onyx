@@ -1,4 +1,3 @@
-use core.string
 use core.conv
 use core
 
@@ -8,22 +7,22 @@ use core {
 
 
 main :: () {
-    output: dyn_str;
-    defer string.free(&output);
+    output: dyn_str
+    defer dyn_str.free(&output)
 
-    string.append(&output, "Hello");
-    string.append(&output, "World");
-    string.append(&output, '!');
+    dyn_str.append(&output, "Hello")
+    dyn_str.append(&output, "World")
+    dyn_str.append(&output, '!')
 
-    string.insert(&output, 5, ", ");
+    dyn_str.insert(&output, 5, ", ")
 
-    println(output);
+    println(output)
 
 
     // `conv.format` appends to the dynamic string. Use
-    // `string.clear` to empty it first.
-    string.clear(&output);
-    conv.format(&output, "This is another {}.", "sentence");
+    // `dyn_str.clear` to empty it first.
+    dyn_str.clear(&output)
+    conv.format(&output, "This is another {}.", "sentence")
 
-    println(output);
+    println(output)
 }

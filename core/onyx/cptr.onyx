@@ -16,14 +16,14 @@ package core
 
 @conv.Custom_Format.{ #solidify cptr.format {T=T} }
 cptr :: struct (T: type_expr) {
-    data: u64;
+    data: u64
 }
 
 //
 // Creates a new C-pointer from an Onyx pointer.
 cptr.make :: macro (ptr: &$T) -> cptr(T) {
     __cptr_make :: __cptr_make
-    return .{ __cptr_make(ptr) };
+    return .{ __cptr_make(ptr) }
 }
 
 //
@@ -34,26 +34,26 @@ cptr.read :: #match {
     (this: cptr(void)) -> void { },
 
     (this: cptr($T)) -> T {
-        buf: [sizeof T] u8;
-        __cptr_read(this.data, ~~buf, sizeof T);
-        return *cast(&T) buf;
+        buf: [sizeof T] u8
+        __cptr_read(this.data, ~~buf, sizeof T)
+        return *cast(&T) buf
     },
 
     (this: cptr($T), buffer: [] u8) {
-        __cptr_read(this.data, ~~buffer.data, buffer.length);
+        __cptr_read(this.data, ~~buffer.data, buffer.length)
     }
 }
 
 //
 // Helper procedures for quickly reading an integer of various sizes.
-cptr.read_u8  :: (this: cptr(u8))  => __cptr_read_u8(this.data);
-cptr.read_u16 :: (this: cptr(u16)) => __cptr_read_u16(this.data);
-cptr.read_u32 :: (this: cptr(u32)) => __cptr_read_u32(this.data);
-cptr.read_u64 :: (this: cptr(u64)) => __cptr_read_u64(this.data);
-cptr.read_i8  :: (this: cptr(i8))  => cast(i8)  __cptr_read_u8(this.data);
-cptr.read_i16 :: (this: cptr(i16)) => cast(i16) __cptr_read_u16(this.data);
-cptr.read_i32 :: (this: cptr(i32)) => cast(i32) __cptr_read_u32(this.data);
-cptr.read_i64 :: (this: cptr(i64)) => cast(i64) __cptr_read_u64(this.data);
+cptr.read_u8  :: (this: cptr(u8))  => __cptr_read_u8(this.data)
+cptr.read_u16 :: (this: cptr(u16)) => __cptr_read_u16(this.data)
+cptr.read_u32 :: (this: cptr(u32)) => __cptr_read_u32(this.data)
+cptr.read_u64 :: (this: cptr(u64)) => __cptr_read_u64(this.data)
+cptr.read_i8  :: (this: cptr(i8))  => cast(i8)  __cptr_read_u8(this.data)
+cptr.read_i16 :: (this: cptr(i16)) => cast(i16) __cptr_read_u16(this.data)
+cptr.read_i32 :: (this: cptr(i32)) => cast(i32) __cptr_read_u32(this.data)
+cptr.read_i64 :: (this: cptr(i64)) => cast(i64) __cptr_read_u64(this.data)
 
 //
 // When given a non-zero-sized dest, this procedure
@@ -62,7 +62,7 @@ cptr.read_i64 :: (this: cptr(i64)) => cast(i64) __cptr_read_u64(this.data);
 // procedure returns the length of the string as given
 // by strlen(). This exists because iterating byte by byte
 // using __cptr_read_u8 would be slow compared to strlen().
-cptr.extract_str :: (this: cptr(u8), dest: [] u8) => __cptr_extract_str(this.data, dest);
+cptr.extract_str :: (this: cptr(u8), dest: [] u8) => __cptr_extract_str(this.data, dest)
 
 //
 // This procedure attempts to convert a C-pointer back into an
@@ -71,35 +71,35 @@ cptr.to_rawptr :: (this: cptr($T)) -> &T {
     // I'm treating NULL as more of a concept, than as an actual value here,
     // because if something returns a NULL pointer, it should logically map
     // to the same idea as 'null' in Onyx.
-    if this.data == 0 do return null;
+    if this.data == 0 do return null
 
     use core.intrinsics.wasm
     // Using 1 instead of 0 because a null pointer (0) converts
     // to the memory address 0, not the base address for the WASM
     // memory.
-    mem_base_ptr := __cptr_make(cast(rawptr) 1);
-    assert(mem_base_ptr <= this.data + 1 && (this.data + 1) >> 16 <= mem_base_ptr + ~~(wasm.memory_size()), "Invalid conversion from cptr to rawptr: pointer value out of Onyx memory range.");
-    return ~~(this.data - mem_base_ptr + 1);
+    mem_base_ptr := __cptr_make(cast(rawptr) 1)
+    assert(mem_base_ptr <= this.data + 1 && (this.data + 1) >> 16 <= mem_base_ptr + ~~(wasm.memory_size()), "Invalid conversion from cptr to rawptr: pointer value out of Onyx memory range.")
+    return ~~(this.data - mem_base_ptr + 1)
 }
 
 cptr.as_unsafe :: (this: cptr($T), $new_type: type_expr) -> cptr(new_type) {
-    return .{ this.data };
+    return .{ this.data }
 }
 
 cptr.at :: (this: cptr($T), index: i32) -> T {
-    elem := this + index;
-    return elem->read();
+    elem := this + index
+    return elem->read()
 }
 
 cptr.format :: (output: &conv.Format_Output, format: &conv.Format, p: &cptr($T)) {
-    conv.format(output, "cptr({})[0x{b16}]", T, p.data);
+    conv.format(output, "cptr({})[0x{b16}]", T, p.data)
 }
 
 
 //
 // Allows for pointer addition.
 #operator + macro (p: cptr($T), v: i32) -> cptr(T) {
-    return .{ p.data + ~~(v * sizeof T) };
+    return .{ p.data + ~~(v * sizeof T) }
 }
 
 #local {

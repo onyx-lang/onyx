@@ -1,55 +1,55 @@
 use core {*}
 
 Foo :: enum {
-    Val1;
-    Val2;
-    Val3;
+    Val1
+    Val2
+    Val3
 }
 
 assignment_test :: () {
     v: Foo = switch 3 {
-        case 1 => .Val1;
-        case 2 => .Val2;
-        case 3 => .Val3;
-    };
+        case 1 => .Val1
+        case 2 => .Val2
+        case 3 => .Val3
+    }
 
-    printf("{}\n", v);
+    printf("{}\n", v)
 }
 
 quick_map_test :: () {
-    println(quick_map(3));
+    println(quick_map(3))
 
     quick_map :: (n: i32) -> Foo {
         return switch n {
-            case 4 => .Val1;
-            case 5 => .Val2;
-            case 6 => .Val3;
-            case _ => .Val1;
-        };
+            case 4 => .Val1
+            case 5 => .Val2
+            case 6 => .Val3
+            case _ => .Val1
+        }
     }
 }
 
 quick_union_map :: () { 
 
-    quick_map(SomeUnion.{ x = 123 }) |> println();
-    quick_map(SomeUnion.{ y = 12.34 }) |> println();
-    quick_map(SomeUnion.{ z = "A string" }) |> println();
+    quick_map(SomeUnion.{ x = 123 }) |> println()
+    quick_map(SomeUnion.{ y = 12.34 }) |> println()
+    quick_map(SomeUnion.{ z = "A string" }) |> println()
 
     SomeUnion :: union {
-        x: i32;
-        y: f32;
-        z: str;
+        x: i32
+        y: f32
+        z: str
     }
 
     quick_map :: (v: $T) => switch v {
-        case .z as val => val;
-        case .y as val => conv.format("{}", val);
-        case .x as val => conv.format("{}", val);
+        case .z as val => val
+        case .y as val => conv.format("{}", val)
+        case .x as val => conv.format("{}", val)
     }
 }
 
 main :: () {
-    assignment_test();
-    quick_map_test();
-    quick_union_map();
+    assignment_test()
+    quick_map_test()
+    quick_union_map()
 }

@@ -1,22 +1,20 @@
 package core.encoding.kdl
 #allow_stale_code
 
-use core {string}
-
 Value.as_str :: (v: Value) -> ? str {
-    return v.data.String;
+    return v.data.String
 }
 
 Value.as_int :: (v: Value) -> ? i64 {
-    return v.data.Number?.Integer;
+    return v.data.Number?.Integer
 }
 
 Value.as_float :: (v: Value) -> ? f64 {
-    return v.data.Number?.Float;
+    return v.data.Number?.Float
 }
 
 Value.as_bool :: (v: Value) -> ? bool {
-    return v.data.Boolean;
+    return v.data.Boolean
 }
 
 
@@ -27,31 +25,31 @@ Document.create_node :: (d: &Document, name: str) -> &Node {
         values = make([..] Value, d.allocator),
         props = make(Map(str, Value), d.allocator),
         children = make([..] &Node, d.allocator)
-    });
+    })
 }
 
 
 Node.add_value :: (n: &Node, value: Value.Value_Data) {
-    n.values << Value.{data = value};
+    n.values << Value.{data = value}
 }
 
 Node.set_prop :: (n: &Node, name: str, value: Value.Value_Data) {
     n.props->put(
-        string.copy(name, n.props.allocator),
+        str.copy(name, n.props.allocator),
         .{ data = value }
-    );
+    )
 }
 
 Node.value :: (n: &Node, index := 0) -> ? Value {
-    if index >= n.values.length do return .{};
+    if index >= n.values.length do return .{}
 
-    return n.values[index];
+    return n.values[index]
 }
 
 Node.value_or_null :: (n: &Node, index := 0) -> Value {
     if index >= n.values.length do return .{
         data = .{ Null = .{} }
-    };
+    }
 
-    return n.values[index];
+    return n.values[index]
 }

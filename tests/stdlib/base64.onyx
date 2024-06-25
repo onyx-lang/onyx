@@ -8,7 +8,7 @@ decode_test :: () {
         "bGlnaHQgd28=",
         "bGlnaHQgd29y",
     ] {
-        core.println(base64.decode(it));
+        core.println(base64.decode(it))
     }
 }
 
@@ -20,14 +20,14 @@ encode_test :: () {
         "light wor",
         "light work",
     ] {
-        encoded := base64.encode(it);
-        core.println(encoded);
+        encoded := base64.encode(it)
+        core.println(encoded)
     }
 }
 
 main :: () {
-    decode_test();
-    core.println("\n");
-    encode_test();
+    decode_test()
+    core.println("\n")
+    encode_test()
 }
 

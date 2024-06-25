@@ -3,9 +3,9 @@
 use core {*}
 
 Foo :: struct {
-    x, y: i32;
-    name: str;
-    age: i32;
+    x, y: i32
+    name: str
+    age: i32
 }
 
 get_foo :: () -> Foo {
@@ -13,15 +13,15 @@ get_foo :: () -> Foo {
         x = 10, y = 20,
         name = "Foo bar",
         age = 42,
-    };
+    }
 }
 
 main :: (args: [] cstr) {
-    printf("{}\n", "Hello World!".count);
+    printf("{}\n", "Hello World!".count)
 
-    println(get_foo().name);
-    println(get_foo().x);
-    println(get_foo().age);
+    println(get_foo().name)
+    println(get_foo().x)
+    println(get_foo().age)
 
-    println((Foo.{ 0, 0, "Worked!", 0 }).name);
+    println((Foo.{ 0, 0, "Worked!", 0 }).name)
 }

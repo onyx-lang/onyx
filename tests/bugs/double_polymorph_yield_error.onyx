@@ -1,13 +1,13 @@
 use core {package, *}
 
 q :: (v: &$C, g: (&C) -> $T) {
-    println(*v);
-    println(g(v));
-    println(T);
+    println(*v)
+    println(g(v))
+    println(T)
 }
 
 main :: () {
-    v := 5;
+    v := 5
 
-    q(&v, _ => false);
+    q(&v, _ => false)
 }

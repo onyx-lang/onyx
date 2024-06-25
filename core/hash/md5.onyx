@@ -11,45 +11,45 @@ digest :: #match #local {}
 /// Produces an MD5 digest of a string. This is guaranteed to succeed.
 #overload
 digest :: (x: str) -> MD5_Digest {
-    string_stream := io.buffer_stream_make(x, write_enabled=false);
-    return digest(&string_stream)?;
+    string_stream := io.buffer_stream_make(x, write_enabled=false)
+    return digest(&string_stream)?
 }
 
 /// Produces an MD5 digest of a stream. This is not guaranteed to succeed, as the stream may fail part way through.
 #overload
 digest :: (s: &io.Stream) -> ?MD5_Digest {
-    dig := MD5_Digest.make();
+    dig := MD5_Digest.make()
 
-    remaining_bytes_to_digest := 0;
+    remaining_bytes_to_digest := 0
 
-    bytes_to_digest: [64] u8;
+    bytes_to_digest: [64] u8
     while true {
         switch io.stream_read(s, bytes_to_digest) {
             case .Err as err {
                 if err != .EOF {
-                    return .None;
+                    return .None
                 }
-                break break;
+                break break
             }
             case .Ok as byte_count {
                 if byte_count < 64 {
-                    remaining_bytes_to_digest = byte_count;
-                    break break;
+                    remaining_bytes_to_digest = byte_count
+                    break break
                 }
 
-                do_cycle(&dig, bytes_to_digest);
+                do_cycle(&dig, bytes_to_digest)
             }
         }
     }
 
-    dig->_finish(bytes_to_digest[0..remaining_bytes_to_digest]);
-    return dig;
+    dig->_finish(bytes_to_digest[0..remaining_bytes_to_digest])
+    return dig
 }
 
 
 MD5_Digest :: struct {
-    a, b, c, d: u32;
-    bytes_digested: u64;
+    a, b, c, d: u32
+    bytes_digested: u64
 }
 
 MD5_Digest.make :: () => MD5_Digest.{
@@ -61,94 +61,94 @@ MD5_Digest.make :: () => MD5_Digest.{
 }
 
 MD5_Digest.reset :: (self: &#Self) {
-    *self = MD5_Digest.make();
+    *self = MD5_Digest.make()
 }
 
 MD5_Digest._finish :: (self: &#Self, tail: [] u8) {
-    assert(tail.count < 64, "Tail too long");
+    assert(tail.count < 64, "Tail too long")
 
-    bytes_to_digest: [64] u8;
-    memory.copy(~~bytes_to_digest, tail.data, tail.count);
-    bytes_to_digest[tail.count] = 0x80;
+    bytes_to_digest: [64] u8
+    memory.copy(~~bytes_to_digest, tail.data, tail.count)
+    bytes_to_digest[tail.count] = 0x80
 
     if tail.count >= 56 {
-        do_cycle(self, bytes_to_digest, accumulate=false);
-        memory.set(~~bytes_to_digest, 0, 64);
+        do_cycle(self, bytes_to_digest, accumulate=false)
+        memory.set(~~bytes_to_digest, 0, 64)
     }
 
-    self.bytes_digested += ~~tail.count;
-    *cast(&u64, &bytes_to_digest[56]) = self.bytes_digested * 8;
+    self.bytes_digested += ~~tail.count
+    *cast(&u64, &bytes_to_digest[56]) = self.bytes_digested * 8
 
-    do_cycle(self, bytes_to_digest, accumulate=false);
+    do_cycle(self, bytes_to_digest, accumulate=false)
 }
 
 /// Returns a temporary byte array of the hash.
 MD5_Digest.as_str :: (self: #Self) -> [] u8 {
-    result := make_temp([] u8, 16);
-    for i in 0  .. 4  do result[i] = ~~((self.a & (0xff << shift(i))) >> shift(i));
-    for i in 4  .. 8  do result[i] = ~~((self.b & (0xff << shift(i))) >> shift(i));
-    for i in 8  .. 12 do result[i] = ~~((self.c & (0xff << shift(i))) >> shift(i));
-    for i in 12 .. 16 do result[i] = ~~((self.d & (0xff << shift(i))) >> shift(i));
-    return result;
+    result := make_temp([] u8, 16)
+    for i in 0  .. 4  do result[i] = ~~((self.a & (0xff << shift(i))) >> shift(i))
+    for i in 4  .. 8  do result[i] = ~~((self.b & (0xff << shift(i))) >> shift(i))
+    for i in 8  .. 12 do result[i] = ~~((self.c & (0xff << shift(i))) >> shift(i))
+    for i in 12 .. 16 do result[i] = ~~((self.d & (0xff << shift(i))) >> shift(i))
+    return result
 }
 
 /// Returns a temporary string of the hash.
 MD5_Digest.as_hex_str :: (self: #Self) -> str {
-    result := make_temp([..] u8, 32);
-    for i in 0  .. 4  do conv.format(&result, "{w2b16}", (self.a & (0xff << shift(i)) >> shift(i)));
-    for i in 4  .. 8  do conv.format(&result, "{w2b16}", (self.b & (0xff << shift(i)) >> shift(i)));
-    for i in 8  .. 12 do conv.format(&result, "{w2b16}", (self.c & (0xff << shift(i)) >> shift(i)));
-    for i in 12 .. 16 do conv.format(&result, "{w2b16}", (self.d & (0xff << shift(i)) >> shift(i)));
-    return result;
+    result := make_temp([..] u8, 32)
+    for i in 0  .. 4  do conv.format(&result, "{w2b16}", (self.a & (0xff << shift(i)) >> shift(i)))
+    for i in 4  .. 8  do conv.format(&result, "{w2b16}", (self.b & (0xff << shift(i)) >> shift(i)))
+    for i in 8  .. 12 do conv.format(&result, "{w2b16}", (self.c & (0xff << shift(i)) >> shift(i)))
+    for i in 12 .. 16 do conv.format(&result, "{w2b16}", (self.d & (0xff << shift(i)) >> shift(i)))
+    return result
 }
 
 #local
-shift :: macro (x: u32) => ((x & 3) << 3);
+shift :: macro (x: u32) => ((x & 3) << 3)
 
 #local
 do_cycle :: (digest: &MD5_Digest, bytes: [64] u8, accumulate := true) {
     // This assumes a little-endian implementation, but that 
     // is assumed by WebAssembly.
-    M: [&] u32 = ~~bytes;
+    M: [&] u32 = ~~bytes
 
-    a := digest.a;
-    b := digest.b;
-    c := digest.c;
-    d := digest.d;
+    a := digest.a
+    b := digest.b
+    c := digest.c
+    d := digest.d
 
     for i in 0 .. 64 {
-        F, g: u32;
+        F, g: u32
         if 0 <= i && i <= 15 {
-            F = (b & c) | (~b & d);
-            g = i;
+            F = (b & c) | (~b & d)
+            g = i
         }
         elseif 16 <= i && i <= 31 {
-            F = (d & b) | (~d & c);
-            g = (5 * i + 1) % 16;
+            F = (d & b) | (~d & c)
+            g = (5 * i + 1) % 16
         }
         elseif 32 <= i && i <= 47 {
-            F = b ^ (c ^ d);
-            g = (3 * i + 5) % 16;
+            F = b ^ (c ^ d)
+            g = (3 * i + 5) % 16
         }
         elseif 48 <= i && i <= 63 {
-            F = c ^ (b | ~d);
-            g = (7 * i) % 16;
+            F = c ^ (b | ~d)
+            g = (7 * i) % 16
         }
 
-        F += a + K[i] + M[g];
-        a = d;
-        d = c;
-        c = b;
-        b += rotl_i32(F, shifts[i]);
+        F += a + K[i] + M[g]
+        a = d
+        d = c
+        c = b
+        b += rotl_i32(F, shifts[i])
     }
 
-    digest.a += a;
-    digest.b += b;
-    digest.c += c;
-    digest.d += d;
+    digest.a += a
+    digest.b += b
+    digest.c += c
+    digest.d += d
 
     if accumulate {
-        digest.bytes_digested += 64;
+        digest.bytes_digested += 64
     }
 }
 
@@ -159,7 +159,7 @@ do_cycle :: (digest: &MD5_Digest, bytes: [64] u8, accumulate := true) {
         5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,
         4, 11, 16, 23,  4, 11, 16, 23,  4, 11, 16, 23,  4, 11, 16, 23,
         6, 10, 15, 21,  6, 10, 15, 21,  6, 10, 15, 21,  6, 10, 15, 21
-    ];
+    ]
 
     K := u32.[
         0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee,

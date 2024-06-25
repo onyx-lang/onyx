@@ -3,89 +3,89 @@
 use core {*}
 
 inv_mod :: (a_: i64, m_: i64) -> i64 {
-    if m_ <= 1 do return 0;
+    if m_ <= 1 do return 0
 
-    a := a_; m := m_;
-    x: i64 = 0; y: i64 = 1;
+    a := a_; m := m_
+    x: i64 = 0; y: i64 = 1
 
     while a > 1 {
-        quot  := a / m;
-        temp1 := m;
-        m      = a % m;
-        a      = temp1;
-        temp2 := x;
-        x      = y - quot * x;
-        y      = temp2;
+        quot  := a / m
+        temp1 := m
+        m      = a % m
+        a      = temp1
+        temp2 := x
+        x      = y - quot * x
+        y      = temp2
     }
 
-    if y < 0 do y += m_;
-    return y;
+    if y < 0 do y += m_
+    return y
 }
 
 chinese_remainder_theorem :: (mods: [..] i64, rems: [..] i64) -> i64 {
-    N: i64 = 1;
-    for n in mods do N *= n;
+    N: i64 = 1
+    for n in mods do N *= n
     
-    res: i64 = 0;
+    res: i64 = 0
     for i in 0 .. mods.count {
-        n := N / mods[i];
-        res += rems[i] * inv_mod(n, mods[i]) * n;
+        n := N / mods[i]
+        res += rems[i] * inv_mod(n, mods[i]) * n
     }
 
-    return res % N;
+    return res % N
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./input/day13.txt";
+    contents := #file_contents "./input/day13.txt"
 
-    file := contents;
+    file := contents
 
-    est := cast(u32, conv.parse_int(&file));
-    string.advance_line(&file);
+    est := cast(u32, conv.parse_int(&file))
+    str.advance_line(&file)
 
-    buses := array.make(i64);
-    defer array.free(&buses);
+    buses := Array.make(i64)
+    defer Array.free(&buses)
 
-    rems := array.make(i64);
-    defer array.free(&rems);
+    rems := Array.make(i64)
+    defer Array.free(&rems)
 
-    offset: i64 = 0;
-    while !string.empty(file) {
+    offset: i64 = 0
+    while !str.empty(file) {
         if file.data[0] == 'x' {
-            string.advance(&file, 2);
+            str.advance(&file, 2)
         } else {
-            bus := conv.parse_int(&file);
-            array.push(&buses, ~~bus);
-            array.push(&rems, bus - offset);
+            bus := conv.parse_int(&file)
+            Array.push(&buses, ~~bus)
+            Array.push(&rems, bus - offset)
 
-            string.advance(&file, 1);
+            str.advance(&file, 1)
         }
 
-        offset += 1;
+        offset += 1
     }
 
     // Part 1
-    // min := array.fold(&buses, 0xffffffff, math.min);
+    // min := Array.fold(&buses, 0xffffffff, math.min)
 
-    // take_bus := 0;
-    // depart   := 0;
+    // take_bus := 0
+    // depart   := 0
 
     // for i in 0 .. min {
     //     for bus in buses {
     //         if (i + est) % bus == 0 {
-    //             take_bus = bus;
-    //             depart = i + est;
-    //             break break;
+    //             take_bus = bus
+    //             depart = i + est
+    //             break break
     //         }
     //     }
     // }
 
-    // result := take_bus * (depart - est);
-    // printf("Bus: {}\n", take_bus);
-    // printf("Depart at: {}\n", depart);
-    // printf("Result: {}\n", result);
+    // result := take_bus * (depart - est)
+    // printf("Bus: {}\n", take_bus)
+    // printf("Depart at: {}\n", depart)
+    // printf("Result: {}\n", result)
 
     // Part 2
     result := chinese_remainder_theorem(buses, rems); 
-    printf("Result: {}\n", result);
+    printf("Result: {}\n", result)
 }

@@ -4,17 +4,17 @@ use core {*}
 
 main :: (args: [] cstr) {
 
-    S := set.make(i32);
+    S := Set.make(i32)
 
-    set.insert(&S, 5);
-    set.insert(&S, 5);
-    set.insert(&S, 6);
-    for entry in S.entries do println(entry.value);
+    Set.insert(&S, 5)
+    Set.insert(&S, 5)
+    Set.insert(&S, 6)
+    for entry in S.entries do println(entry.value)
 
-    println(set.has(&S, 5));
+    println(Set.has(&S, 5))
 
-    println("--------------");
-    set.remove(&S, 5);
-    for entry in S.entries do println(entry.value);
-    println(set.has(&S, 5));
+    println("--------------")
+    Set.remove(&S, 5)
+    for entry in S.entries do println(entry.value)
+    println(Set.has(&S, 5))
 }

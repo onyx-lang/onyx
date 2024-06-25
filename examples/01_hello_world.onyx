@@ -37,7 +37,7 @@ use core
 // In Onyx, `main` can either take 0 or 1 parameter(s), that being the command-line
 // arguments passed. In programs that do not need them, they can simply be omitted.
 main :: () {
-    core.println("Hello, World!");
+    core.println("Hello, World!")
 }
 
 

@@ -10,12 +10,12 @@ main :: (args: [] cstr) {
     // write a "return" statement. The type of thing(s) being returned
     // dictates the type of the do-block.
     x := do {
-        a := 10;
-        b := 5;
-        return a * b;
-    };
+        a := 10
+        b := 5
+        return a * b
+    }
 
-    printf("x is a {} with value {}.\n", typeof x, x);
+    printf("x is a {} with value {}.\n", typeof x, x)
 
 
     // There can be multiple return statements, in which case the
@@ -23,12 +23,12 @@ main :: (args: [] cstr) {
     // and provides the type. This is the same rule as auto-returned-typed
     // which will be discussed in a later example.
     y := do {
-        if x <= 10 do return 10.0f;
+        if x <= 10 do return 10.0f
         return 40; // This will cast to a f32, because the first return
                    // was of type f32.
-    };
+    }
 
-    printf("y is a {} with value {}.\n", typeof y, y);
+    printf("y is a {} with value {}.\n", typeof y, y)
 
 
     // In all honesty, I barely use this feature of the language because
@@ -39,10 +39,10 @@ main :: (args: [] cstr) {
 
 #if false {
     left, right := do {
-        parts := string.split(line, '|');
-        defer memory.free_slice(^parts);
-        return parts[0], parts[1];
-    };
+        parts := string.split(line, '|')
+        defer memory.free_slice(^parts)
+        return parts[0], parts[1]
+    }
 }
 
     // I had a string that I wanted to split into two parts, but wanted to
@@ -50,11 +50,11 @@ main :: (args: [] cstr) {
     // I could have written it like this instead:
 
 #if false {
-    left, right: str;
+    left, right: str
     {
-        parts := string.split(line, '|');
-        left, right = parts[0], parts[1];
-        memory.free_slice(^parts);
+        parts := string.split(line, '|')
+        left, right = parts[0], parts[1]
+        memory.free_slice(^parts)
     }
 }
 
