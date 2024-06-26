@@ -170,15 +170,16 @@ Result.catch :: macro (r: Result($T, $E), on_err: Code) -> T {
 #overload
 __implicit_bool_cast :: macro (r: Result($O, $E)) => cast(Result(O, E).tag_enum, r) == .Ok;
 
+#operator! :: macro (r: Result($T, $E)) => r->unwrap()
 
-#operator ? macro (r: Result($T, $E)) -> T {
+#operator? :: macro (r: Result($T, $E)) -> T {
     switch res := r; res {
         case .Ok as v do return v;
         case .Err as v do return #from_proc .{ Err = v };
     }
 }
 
-#operator ?? macro (r: Result($T, $E), v: T) -> T {
+#operator?? :: macro (r: Result($T, $E), v: T) -> T {
     return switch res := r; res {
         case .Ok as val => val;
         case .Err => v;
