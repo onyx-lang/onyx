@@ -575,7 +575,7 @@ advance_line :: (use reader: &Reader) {
 skip_whitespace :: (use reader: &Reader) {
     if reader_empty(reader) do return;
 
-    while start < end {
+    while start <= end {
         if start == end {
             if fill_err := reader_read_next_chunk(reader); fill_err != .None {
                 return;
