@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -e
+# set -e
 
 DIST_DIR="./dist"
 
