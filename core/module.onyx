@@ -32,6 +32,8 @@ use runtime
 #load "./hash/sha256"
 #load "./hash/sha1"
 
+#load "./crypto/hmac"
+
 #load "./string/string"
 #load "./string/buffer"
 #load "./string/char_utils"
