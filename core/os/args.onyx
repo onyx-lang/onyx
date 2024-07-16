@@ -1,0 +1,16 @@
+package core.os
+
+use runtime
+use core.iter
+
+args :: (allocator := context.allocator) -> (result: [] str) {
+    args := runtime.platform.__args(allocator)
+
+    result = make([] str, args.count, allocator)
+    for a, i in args {
+        result[i] = args[i] |> str.as_str()
+    }
+
+    return
+}
+
