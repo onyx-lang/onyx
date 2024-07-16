@@ -1647,7 +1647,7 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
         unaryop->type = unaryop->expr->type;
     }
 
-    if (unaryop->operation == Unary_Op_Try) {
+    if (unaryop->operation == Unary_Op_Try || unaryop->operation == Unary_Op_Unwrap) {
         AstCall* call = unaryop_try_operator_overload(unaryop);
         if (call == (AstCall *) &node_that_signals_a_yield) YIELD(unaryop->token->pos, "Waiting on potential operator overload.");
         if (call != NULL && call != &context.checker.__op_maybe_overloaded) {
@@ -1658,7 +1658,11 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
             return Check_Success;
         }
 
-        ERROR_(unaryop->token->pos, "'%s' does not support '?' operator.", type_get_name(unaryop->expr->type));
+        if (unaryop->operation == Unary_Op_Try)
+            ERROR_(unaryop->token->pos, "'%s' does not support '?' operator.", type_get_name(unaryop->expr->type));
+
+        if (unaryop->operation == Unary_Op_Unwrap)
+            ERROR_(unaryop->token->pos, "'%s' does not support '!' operator.", type_get_name(unaryop->expr->type));
     }
 
 

@@ -577,6 +577,7 @@ token_parsed:
         case Token_Type_Empty_Block:
         case Token_Type_Proc_Macro_Body:
         case '?':
+        case '!':
         case ')':
         case '}':
         case ']':

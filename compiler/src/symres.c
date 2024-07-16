@@ -487,7 +487,7 @@ static SymresStatus symres_if_expression(AstIfExpression* if_expr) {
 static SymresStatus symres_pipe(AstBinaryOp** pipe) {
     if ((*pipe)->right->kind == Ast_Kind_Unary_Op) {
         AstUnaryOp *the_try = (AstUnaryOp *) (*pipe)->right;
-        if (the_try->operation == Unary_Op_Try) {
+        if (the_try->operation == Unary_Op_Try || the_try->operation == Unary_Op_Unwrap) {
             // Shuffle the tree!
             AstBinaryOp *the_pipe = *pipe;
 
@@ -1700,6 +1700,10 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 UnaryOp unop = Unary_Op_Count;
                 if (operator->operator_token->type == (TokenType) '?') {
                     unop = Unary_Op_Try;
+                }
+
+                if (operator->operator_token->type == (TokenType) '!') {
+                    unop = Unary_Op_Unwrap;
                 }
 
                 if (unop == Unary_Op_Count) {

@@ -784,7 +784,7 @@ void cleanup_compilation() {
     bh_managed_heap_free(&mh);
 }
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
 
 #include <signal.h>
 
@@ -912,7 +912,7 @@ int main(int argc, char *argv[]) {
             }
             break;
 
-        #ifdef _BH_LINUX
+        #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         case ONYX_COMPILE_ACTION_WATCH:
             onyx_watch(&compile_opts);
             break;

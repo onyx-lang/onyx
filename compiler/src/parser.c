@@ -1174,6 +1174,17 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 break;
             }
 
+            case '!': {
+                AstUnaryOp* unop = make_node(AstUnaryOp, Ast_Kind_Unary_Op);
+                unop->token = expect_token(parser, '!');
+                unop->operation = Unary_Op_Unwrap;
+
+                unop->expr = retval;
+
+                retval = (AstTyped *) unop;
+                break;
+            }
+
             case Token_Type_Inserted_Semicolon: {
                 //
                 // This is a special case for -> method calls because they should be able to be split across

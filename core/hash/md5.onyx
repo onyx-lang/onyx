@@ -4,6 +4,21 @@ package core.hash.md5
 use core {io, memory, conv}
 use core.intrinsics.wasm {rotl_i32}
 
+BLOCK_SIZE :: 16
+
+/// Produces an MD5 digest of a string or stream.
+hash :: #match #local {}
+
+#overload
+hash :: (x: str) -> [BLOCK_SIZE] u8 {
+    return digest(x)->as_bytes();
+}
+
+#overload
+hash :: (s: &io.Stream) -> ? [BLOCK_SIZE] u8 {
+    return digest(s)?->as_bytes();
+}
+
 
 /// Produces an MD5 digest of a string or stream.
 digest :: #match #local {}
@@ -82,7 +97,17 @@ MD5_Digest._finish :: (self: &#Self, tail: [] u8) {
     do_cycle(self, bytes_to_digest, accumulate=false)
 }
 
-/// Returns a temporary byte array of the hash.
+/// Returns a byte array of the hash.
+MD5_Digest.as_bytes :: (self: #Self) -> [BLOCK_SIZE] u8 {
+    result: [16] u8;
+    for i in 0  .. 4  do result[i] = ~~((self.a & (0xff << shift(i))) >> shift(i));
+    for i in 4  .. 8  do result[i] = ~~((self.b & (0xff << shift(i))) >> shift(i));
+    for i in 8  .. 12 do result[i] = ~~((self.c & (0xff << shift(i))) >> shift(i));
+    for i in 12 .. 16 do result[i] = ~~((self.d & (0xff << shift(i))) >> shift(i));
+    return result;
+}
+
+/// Returns a temporary allocated byte array of the hash.
 MD5_Digest.as_str :: (self: #Self) -> [] u8 {
     result := make_temp([] u8, 16)
     for i in 0  .. 4  do result[i] = ~~((self.a & (0xff << shift(i))) >> shift(i))
@@ -92,7 +117,7 @@ MD5_Digest.as_str :: (self: #Self) -> [] u8 {
     return result
 }
 
-/// Returns a temporary string of the hash.
+/// Returns a temporary string of the hash in hexadecimal format.
 MD5_Digest.as_hex_str :: (self: #Self) -> str {
     result := make_temp([..] u8, 32)
     for i in 0  .. 4  do conv.format(&result, "{w2b16}", (self.a & (0xff << shift(i)) >> shift(i)))

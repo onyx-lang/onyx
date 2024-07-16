@@ -1,0 +1,86 @@
+package core.crypto
+#allow_stale_code
+
+use core.hash
+use core.alloc
+use core.memory
+
+HashingAlgorithm :: enum {
+	MD5
+	SHA1
+	SHA256
+}
+
+#local
+_get_block_size :: (ha: HashingAlgorithm) => switch ha {
+	case .MD5    => 64
+	case .SHA1   => 64
+	case .SHA256 => 64
+	case _       => 0
+}
+
+#local
+_get_output_size :: (ha: HashingAlgorithm) => switch ha {
+	case .MD5    => 16
+	case .SHA1   => 20
+	case .SHA256 => 32
+}
+
+#local
+_hash :: (ha: HashingAlgorithm, bytes: [] u8, a: Allocator) -> [] u8 {
+	return switch ha {
+		case .MD5    => hash.md5.hash(bytes) |> str.copy(a)
+		case .SHA1   => hash.sha1.hash(bytes) |> str.copy(a)
+		case .SHA256 => hash.sha256.hash(bytes) |> str.copy(a)
+	}
+}
+
+/// Computes the Hashed Message Authentication Code of the provided data, with the provided key, using the specified algorithm.
+hmac :: (data: [] u8, key: [] u8, alg: HashingAlgorithm) -> [] u8 {
+	arena := alloc.arena.make(context.allocator, 16*1024)
+	defer alloc.arena.free(&arena)
+
+	a := alloc.as_allocator(&arena)
+
+	block_size := _get_block_size(alg)
+
+	k_prime := do {
+		res := key
+		if key.length > block_size {
+			res = _hash(alg, key, a)
+		}
+
+		if res.length < block_size {
+			new_res := make([] u8, block_size, a)
+			memory.set(new_res.data, 0, block_size)
+			memory.copy(new_res.data, res.data, res.length)
+			return new_res
+		}
+
+		return res
+	}
+
+	out_key := do {
+		res := str.copy(k_prime, a)
+		for &c in res do *c ^= 0x5c
+		return res
+	}
+
+	in_key := do {
+		res := str.copy(k_prime, a)
+		for &c in res do *c ^= 0x36
+		return res
+	}
+
+	inner := make(dyn_str, in_key.length + data.length, a)	
+	inner->concat(in_key)
+	inner->concat(data)
+	hashed_inner := _hash(alg, inner, a)
+
+	outer := make(dyn_str, out_key.length + hashed_inner.length, a)
+	outer->concat(out_key)
+	outer->concat(hashed_inner)
+	hashed_outer := _hash(alg, outer, context.allocator)
+
+	return hashed_outer
+}

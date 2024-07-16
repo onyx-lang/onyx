@@ -53,6 +53,8 @@
 
 #if defined(_BH_DARWIN)
     #include <sys/malloc.h>
+    #include <sys/event.h>
+    #include <sys/types.h>
 #endif
 
 #include <stdlib.h>
@@ -506,7 +508,7 @@ void   bh_dir_close(bh_dir dir);
 
 
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX)
     typedef struct bh_file_watch {
         int inotify_fd;
         int kill_pipe[2];
@@ -514,8 +516,14 @@ void   bh_dir_close(bh_dir dir);
         fd_set fds;
     } bh_file_watch;
 #endif
-#if defined(_BH_WINDOWS) || defined(_BH_DARWIN)
-    // TODO: Make these work on Windows and MacOS
+#if defined(_BH_DARWIN)
+    typedef struct bh_file_watch {
+        int kqueue_fd;
+        struct kevent *listeners;
+    } bh_file_watch;
+#endif
+#if defined(_BH_WINDOWS)
+    // TODO: Make these work on Windows
     typedef u32 bh_file_watch;
 #endif
 
@@ -2158,7 +2166,7 @@ void bh_dir_close(bh_dir dir) {
 
 #undef DIR_SEPARATOR
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX)
 
 bh_file_watch bh_file_watch_new() {
     // TODO: Proper error checking
@@ -2206,6 +2214,52 @@ void bh_file_watch_stop(bh_file_watch *w) {
 }
 
 #endif // ifdef _BH_LINUX
+
+#if defined(_BH_DARWIN)
+
+bh_file_watch bh_file_watch_new() {
+    bh_file_watch w;
+
+    w.kqueue_fd = kqueue();
+
+    w.listeners = NULL;
+    bh_arr_new(bh_heap_allocator(), w.listeners, 4);
+
+    return w;
+}
+
+void bh_file_watch_free(bh_file_watch *w) {
+    bh_arr_each(struct kevent, ev, w->listeners) {
+        close(ev->ident);
+    }
+
+    bh_arr_free(w->listeners);
+    close(w->kqueue_fd);
+}
+
+void bh_file_watch_add(bh_file_watch *w, const char *filename) {
+    int new_fd = open(filename, O_EVTONLY);
+
+    struct kevent new_event;
+    EV_SET(&new_event, new_fd, EVFILT_VNODE, EV_ADD | EV_ENABLE | EV_CLEAR, 
+               NOTE_WRITE | NOTE_EXTEND | NOTE_ATTRIB | NOTE_LINK | NOTE_RENAME | NOTE_REVOKE, 0, NULL);
+
+    bh_arr_push(w->listeners, new_event);
+}
+
+b32 bh_file_watch_wait(bh_file_watch *w) {
+    struct kevent events;
+
+    int nev = kevent(w->kqueue_fd, w->listeners, bh_arr_length(w->listeners), &events, 1, NULL);
+    if (nev == -1) return 0;
+
+    return 1;
+}
+
+void bh_file_watch_stop(bh_file_watch *w) {
+}
+
+#endif // ifdef _BH_DARWIN
 
 #endif // ifndef BH_NO_FILE
 

@@ -107,6 +107,18 @@ ProcessData :: #distinct u64
     __random_get        :: (buf: [] u8) -> void ---
 }
 
+__args :: (allocator: Allocator) -> [] cstr {
+    args : [] cstr;
+    argv_buf_size : i32;
+    __args_sizes_get(&args.count, &argv_buf_size);
+
+    args = make([] cstr, args.count, allocator);
+    argv_buf := cast([&] u8) allocator->alloc(argv_buf_size);
+    __args_get(args.data, argv_buf);
+
+    return args;
+}
+
 #if !#defined(runtime.vars.no_entrypoint) {
     use main
     #local MAIN_FUNCTION :: main.main
@@ -147,14 +159,7 @@ __start :: () {
         MAIN_FUNCTION()
 
     } else {
-        args : [] cstr
-        argv_buf_size : i32
-        __args_sizes_get(&args.count, &argv_buf_size)
-
-        args = memory.make_slice(cstr, args.count)
-        argv_buf := cast(cstr) calloc(argv_buf_size)
-        __args_get(args.data, argv_buf)
-
+        args := __args(context.allocator)
         MAIN_FUNCTION(args)
     }
 

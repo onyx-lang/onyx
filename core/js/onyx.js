@@ -83,7 +83,6 @@ Onyx.create = function(wasm_code) {
     return WebAssembly.instantiate(wasm_code, import_object)
         .then(function(wasm_module) {
             instance.memory = wasm_module.instance.exports.memory
-            instance.data = new DataView(instance.memory.buffer)
             instance.instance = wasm_module.instance
 
             return instance
@@ -151,9 +150,10 @@ globalThis.Onyx.prototype = {
 
     load_slice_of_values: function(addr, len) {
         const results = []
+        const data = new DataView(this.memory.buffer)
         for (var i = 0; i < len; i++) {
             results.push(
-                this.load_value(this.data.getBigUint64(addr + i * 8, true))
+                this.load_value(data.getBigUint64(addr + i * 8, true))
             )
         }
         return results
@@ -279,9 +279,11 @@ Onyx.register_module("__syscall", function(instance) { return {
         var wasmFunc = instance.instance.exports.__indirect_function_table.get(funcidx)
 
         return instance.store_value(function() {
+            var data = new DataView(instance.memory.buffer)
+
             var argptr = instance.instance.exports.__allocate_arg_buf(arguments.length)
             for (var i = 0; i < arguments.length; i++) {
-                instance.data.setBigUint64(argptr + i * 8, instance.store_value(arguments[i]), true)
+                data.setBigUint64(argptr + i * 8, instance.store_value(arguments[i]), true)
             }
 
             var thisArg = instance.store_value(this)

@@ -1,0 +1,29 @@
+use core.crypto {hmac}
+use core.hash {sha256}
+use core.encoding {base64, hex}
+use core {printf, print}
+
+MESSAGE :: """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed auctor tortor enim. Nam consectetur nec leo at viverra. Nunc venenatis mauris dui, et interdum velit egestas in. Nulla efficitur odio nulla, sed aliquet metus aliquam eu. Aliquam egestas interdum mi, sed mattis nibh interdum in. Proin vulputate sapien eget ipsum consequat fringilla. Duis vestibulum bibendum placerat.
+
+Proin non lacinia arcu, sit amet vestibulum nisl. Vestibulum sed enim feugiat, dignissim massa ac, pellentesque mi. Pellentesque nec orci sem. Sed consectetur nunc a iaculis imperdiet. Integer id quam pellentesque, ultricies nulla quis, pellentesque eros. Nulla facilisi. Aenean ornare ut nisl id pretium. In hac habitasse platea dictumst. Phasellus mattis libero vitae venenatis aliquet. Phasellus vitae eros vitae tortor tincidunt suscipit vitae nec lacus. Aliquam nibh lacus, volutpat non neque vitae, rhoncus ornare ex. Vestibulum in diam nibh. Cras elementum egestas mattis. Maecenas condimentum ligula in malesuada egestas. Nam a enim in mi volutpat mollis. Curabitur ac tristique sapien.
+
+Quisque ligula felis, placerat sit amet magna quis, consectetur sollicitudin eros. Nulla ac neque lobortis, ultrices ex sed, aliquam neque. Quisque sed egestas ipsum, eu placerat lacus. Ut et consectetur mauris, in aliquam nunc. Aenean consectetur nunc vel felis laoreet bibendum. Proin tempus magna ut orci consectetur hendrerit. Quisque ut gravida dolor. Duis pellentesque sed quam sed egestas. Integer porttitor erat in imperdiet elementum. Suspendisse sagittis sem ac neque feugiat feugiat. Integer mollis fringilla nibh at aliquet. Aliquam lorem ipsum, auctor vitae aliquam et, venenatis et sem. Cras efficitur malesuada purus, sed molestie diam.
+
+Aenean bibendum nisi nunc, mollis facilisis est vulputate sed. Aenean at elit sollicitudin, pulvinar nunc at, scelerisque lorem. Fusce at augue laoreet, dictum elit finibus, ultrices lorem. Praesent in odio vitae ante posuere convallis nec in lorem. Aenean ac egestas ante. In vehicula justo nisl. Praesent non ornare nibh. Cras gravida velit elit, eget aliquam quam vulputate vel. Nunc dapibus varius finibus. Interdum et malesuada fames ac ante ipsum primis in faucibus. Donec a risus nec nisi vulputate finibus. Phasellus luctus quam quis ligula congue rutrum. Proin lobortis lectus nisl, eu ornare eros tincidunt nec. Vivamus dictum risus vel efficitur pellentesque. Vivamus est sapien, pharetra et vestibulum sed, posuere vitae tortor. Nullam eleifend, magna sit amet pharetra auctor, magna lacus ultrices ligula, vel iaculis magna dolor ut diam.
+
+Nulla cursus nunc eget nisl efficitur euismod. Morbi nibh ipsum, scelerisque eget consequat quis, elementum at turpis. Nulla luctus eleifend arcu sed venenatis. Proin ornare consectetur blandit. Nunc dignissim leo sed luctus mollis. Nam fringilla mattis ex id lacinia. Quisque tincidunt eros ligula. Mauris quis neque at enim aliquam luctus eget volutpat tellus. Aenean sit amet sapien vitae dui venenatis porta. Sed vehicula mauris viverra pharetra lobortis. Maecenas nisl dui, fermentum ac laoreet ac, rhoncus quis ante. Phasellus consequat pharetra mi, ac varius ligula. Nam mollis sapien at felis egestas, in scelerisque massa sodales. Donec et felis sed ligula facilisis tincidunt."""
+
+KEY :: "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+print_str :: (s: [] u8) {
+	for x in s {
+		printf("{w2b16}", cast(u32) x)
+	}
+	print("\n")
+}
+
+main :: () {
+	sha256.hash(MESSAGE) |> str.copy() |> print_str()
+	hmac(MESSAGE, KEY, .SHA256) |> print_str()
+}

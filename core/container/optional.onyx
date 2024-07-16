@@ -162,6 +162,13 @@ Optional.or_return :: #match {
     },
 }
 
+Optional.into_result :: macro (o: ?$T, err: $R) -> Result(T, R) {
+    switch value := o; value {
+        case .Some as v do return .{ Ok = v }
+        case _          do return .{ Err = err }
+    }
+}
+
 Optional.catch :: macro (o: ?$T, body: Code) -> T {
     switch value := o; value {
         case .Some as v do return v
@@ -185,7 +192,7 @@ Optional.hash :: (o: ?$T/core.hash.Hashable) => switch o {
     case _          => 0
 }
 
-#operator == (o1, o2: ?$T) -> bool {
+#operator== :: (o1, o2: ?$T) -> bool {
     if cast(Optional(T).tag_enum, o1) != cast(Optional(T).tag_enum, o2) do return false
     if o1.tag == .None do return true
 
@@ -194,14 +201,14 @@ Optional.hash :: (o: ?$T/core.hash.Hashable) => switch o {
     return v1 == v2
 }
 
-#operator ?? macro (opt: ?$T, default: T) -> T {
+#operator?? :: macro (opt: ?$T, default: T) -> T {
     return switch value := opt; value {
         case .Some as v => v
         case _          => default
     }
 }
 
-#operator ?? macro (opt: ?$T, catch: Code) -> T {
+#operator?? :: macro (opt: ?$T, catch: Code) -> T {
     switch value := opt; value {
         case .Some as v do return v
         case _ ---
@@ -210,12 +217,14 @@ Optional.hash :: (o: ?$T/core.hash.Hashable) => switch o {
     #unquote catch
 }
 
-#operator ? macro (opt: ?$T) -> T {
+#operator? :: macro (opt: ?$T) -> T {
     switch value := opt; value {
         case .Some as v do return v
         case _ do return #from_proc .{}
     }
 }
+
+#operator! :: macro (o: ? $T) => o->unwrap()
 
 
 #overload

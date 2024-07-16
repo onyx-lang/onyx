@@ -2019,6 +2019,63 @@ EMIT_FUNC(binop, AstBinaryOp* binop) {
         return;
     }
 
+    if (binop->operation == Binary_Op_Bool_And) {
+        emit_enter_structured_block(mod, &code, SBT_Basic_Block, binop->token);
+
+        u64 tmp_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+
+        emit_expression(mod, &code, binop->left);
+        if (binop->left->type->kind == Type_Kind_Function) {
+            WI(NULL, WI_DROP);
+        }
+
+        WIL(NULL, WI_LOCAL_TEE, tmp_local);
+        WI(NULL, WI_I32_EQZ);
+        WIL(NULL, WI_COND_JUMP, 0);
+
+        emit_expression(mod, &code, binop->right);
+        if (binop->right->type->kind == Type_Kind_Function) {
+            WI(NULL, WI_DROP);
+        }
+
+        WIL(NULL, WI_LOCAL_SET, tmp_local);
+        emit_leave_structured_block(mod, &code);
+
+        WIL(NULL, WI_LOCAL_GET, tmp_local);
+        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+
+        *pcode = code;
+        return;
+    }
+
+    if (binop->operation == Binary_Op_Bool_Or) {
+        emit_enter_structured_block(mod, &code, SBT_Basic_Block, binop->token);
+
+        u64 tmp_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+
+        emit_expression(mod, &code, binop->left);
+        if (binop->left->type->kind == Type_Kind_Function) {
+            WI(NULL, WI_DROP);
+        }
+
+        WIL(NULL, WI_LOCAL_TEE, tmp_local);
+        WIL(NULL, WI_COND_JUMP, 0);
+
+        emit_expression(mod, &code, binop->right);
+        if (binop->right->type->kind == Type_Kind_Function) {
+            WI(NULL, WI_DROP);
+        }
+
+        WIL(NULL, WI_LOCAL_SET, tmp_local);
+        emit_leave_structured_block(mod, &code);
+
+        WIL(NULL, WI_LOCAL_GET, tmp_local);
+        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+
+        *pcode = code;
+        return;
+    }
+
     b32 is_sign_significant = 0;
     switch (binop->operation) {
         case Binary_Op_Divide:  case Binary_Op_Modulus:

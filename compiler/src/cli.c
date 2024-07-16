@@ -44,7 +44,7 @@ static const char* top_level_docstring = DOCSTRING_HEADER
     C_LBLUE "    run " C_GREY "files        " C_NORM "Compiles and runs an Onyx program " C_GREY "(onyx r)" C_NORM "\n"
 #endif
     C_LBLUE "    check " C_GREY "files      " C_NORM "Checks syntax and types of a program\n"
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
     C_LBLUE "    watch            " C_NORM "Continuously rebuilds a program on file changes\n"
 #endif
 #ifdef ONYX_RUNTIME_LIBRARY
@@ -203,7 +203,7 @@ static void cli_determine_action(CompileOptions *options, int *first_sub_arg, in
     }
     #endif
 
-    #ifdef _BH_LINUX
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     if (!strcmp(argv[1], "watch")) {
         options->action = ONYX_COMPILE_ACTION_WATCH;
         *first_sub_arg = 2;

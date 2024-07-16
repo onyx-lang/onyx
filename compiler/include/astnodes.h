@@ -335,6 +335,7 @@ typedef enum UnaryOp {
     Unary_Op_Cast,
     Unary_Op_Auto_Cast,
     Unary_Op_Try,
+    Unary_Op_Unwrap,
 
     Unary_Op_Count,
 } UnaryOp;
