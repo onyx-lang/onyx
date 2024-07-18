@@ -2489,9 +2489,16 @@ CheckStatus check_size_of(AstSizeOf* so) {
     if (so->so_type == NULL)
         YIELD(so->token->pos, "Trying to resolve type to take the size of.");
 
+    // HACK
+    if (
+        (so->so_type->kind == Type_Kind_Struct && so->so_type->Struct.status == SPS_Start) ||
+        (so->so_type->kind == Type_Kind_Union && so->so_type->Union.status == SPS_Start)
+    ) {
+        YIELD(so->token->pos, "Waiting until type has a size.");
+    }
+
     so->size = type_size_of(so->so_type);
     so->flags |= Ast_Flag_Comptime;
-
     return Check_Success;
 }
 
@@ -2501,6 +2508,14 @@ CheckStatus check_align_of(AstAlignOf* ao) {
     ao->ao_type = type_build_from_ast(context.ast_alloc, ao->ao_ast_type);
     if (ao->ao_type == NULL)
         YIELD(ao->token->pos, "Trying to resolve type to take the alignment of.");
+
+    // HACK
+    if (
+        (ao->ao_type->kind == Type_Kind_Struct && ao->ao_type->Struct.status == SPS_Start) ||
+        (ao->ao_type->kind == Type_Kind_Union && ao->ao_type->Union.status == SPS_Start)
+    ) {
+        YIELD(ao->token->pos, "Waiting until type has an alignment.");
+    }
 
     ao->alignment = type_alignment_of(ao->ao_type);
     ao->flags |= Ast_Flag_Comptime;

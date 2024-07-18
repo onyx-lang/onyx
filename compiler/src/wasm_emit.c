@@ -2186,6 +2186,7 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
         case Unary_Op_Cast: emit_cast(mod, &code, unop); break;
 
         case Unary_Op_Try: // Should be handled in operator overload
+        case Unary_Op_Unwrap: 
         case Unary_Op_Count:
             break;
     }
