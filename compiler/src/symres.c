@@ -162,10 +162,10 @@ static SymresStatus symres_union_type(AstUnionType* u_node) {
     u_node->flags |= Ast_Flag_Comptime;
 
     if (!u_node->tag_backing_type) {
-        int n = (32 - bh_clz(bh_arr_length(u_node->variants))) >> 3;
-        if      (n <= 1) u_node->tag_backing_type = (AstType *) &basic_type_u8;
-        else if (n == 2) u_node->tag_backing_type = (AstType *) &basic_type_u16;
-        else if (n == 3) u_node->tag_backing_type = (AstType *) &basic_type_u32;
+        int n = (31 - bh_clz(bh_arr_length(u_node->variants) - 1)) >> 3;
+        if      (n == 0) u_node->tag_backing_type = (AstType *) &basic_type_u8;
+        else if (n == 1) u_node->tag_backing_type = (AstType *) &basic_type_u16;
+        else if (n <= 3) u_node->tag_backing_type = (AstType *) &basic_type_u32;
         else {
             onyx_report_error(u_node->token->pos, Error_Critical, "Too many union variants. How did you even do this...?");
             return Symres_Error;
