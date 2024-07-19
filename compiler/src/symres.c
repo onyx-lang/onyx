@@ -161,6 +161,17 @@ static SymresStatus symres_union_type(AstUnionType* u_node) {
     if (u_node->flags & Ast_Flag_Type_Is_Resolved) return Symres_Success;
     u_node->flags |= Ast_Flag_Comptime;
 
+    if (!u_node->tag_backing_type) {
+        int n = (32 - bh_clz(bh_arr_length(u_node->variants))) >> 3;
+        if      (n <= 1) u_node->tag_backing_type = (AstType *) &basic_type_u8;
+        else if (n == 2) u_node->tag_backing_type = (AstType *) &basic_type_u16;
+        else if (n == 3) u_node->tag_backing_type = (AstType *) &basic_type_u32;
+        else {
+            onyx_report_error(u_node->token->pos, Error_Critical, "Too many union variants. How did you even do this...?");
+            return Symres_Error;
+        }
+    }
+
     SYMRES(type, &u_node->tag_backing_type);
 
     if (u_node->meta_tags) {
@@ -168,8 +179,6 @@ static SymresStatus symres_union_type(AstUnionType* u_node) {
             SYMRES(expression, meta);
         }
     }
-
-    u_node->flags |= Ast_Flag_Type_Is_Resolved;
 
     assert(u_node->scope);
     scope_enter(u_node->scope);
@@ -211,6 +220,8 @@ static SymresStatus symres_union_type(AstUnionType* u_node) {
             return ss;
         }
     }
+
+    u_node->flags |= Ast_Flag_Type_Is_Resolved;
 
     scope_leave();
     return Symres_Success;
