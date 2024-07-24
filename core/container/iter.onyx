@@ -866,8 +866,7 @@ prod :: macro (x: $I/Iterable, y: $I2/Iterable) => {
 
 #overload
 prod :: (x: $I1/Iterable, y_iter: Iterator($Y)) => {
-    // TODO: Remove this unwrap here
-    y_val := next(y_iter)->unwrap();
+    y_val := next(y_iter)
 
     return generator(
         &.{
@@ -879,22 +878,32 @@ prod :: (x: $I1/Iterable, y_iter: Iterator($Y)) => {
         },
 
         ctx => {
-            x_val := next(ctx.x_iter);
-            if x_val {
-                return Optional.make(Pair.make(x_val, ctx.y_val));
+            switch ctx.y_val {
+                case .Some as y {
+                    next(ctx.x_iter)->with([x] {
+                        return Optional.make(Pair.make(x, y))
+                    })
+                }
+
+                case .None do return .None
             }
 
-            new_y_val = next(ctx.y_iter);
-            if !new_y_val do return .None;
+            switch next(ctx.y_iter) {
+                case .None do return .None
 
-            ctx.y_val = new_y_val->unwrap();
-            ctx.x_iter = as_iter(ctx.x);
-            x_val = next(ctx.x_iter);
-            if !x_val do return .None;
+                case .Some as new_y_val {
+                    ctx.y_val = new_y_val
 
-            return Optional.make(Pair.make(x_val, ctx.y_val));
+                    close(ctx.x_iter)
+                    ctx.x_iter = as_iter(ctx.x)
+                    x_val := next(ctx.x_iter)
+                    if !x_val do return .None
+                    
+                    return Optional.make(Pair.make(x_val!, ctx.y_val!))
+                }
+            }
         }
-    );
+    )
 }
 
 
@@ -910,7 +919,7 @@ comp :: #match #local {}
 #overload
 comp :: macro (i: Iterator(&$V), value: Code) => {
     it: V;
-    a := make([..] typeof #unquote value);
+    a := make([..] typeof #unquote value(it));
 
     for __it in i {
         it := *__it;
@@ -922,7 +931,7 @@ comp :: macro (i: Iterator(&$V), value: Code) => {
 #overload
 comp :: macro (i: Iterator($V), value: Code) => {
     it: V;
-    a := make([..] typeof #unquote value);
+    a := make([..] typeof #unquote value(it));
 
     for i do a << (#unquote value(it));
     return a;
