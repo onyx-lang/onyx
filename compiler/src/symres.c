@@ -415,6 +415,7 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
         expr->kind == Ast_Kind_Poly_Union_Type ||
         expr->kind == Ast_Kind_Slice_Type ||
         expr->kind == Ast_Kind_DynArr_Type ||
+        expr->kind == Ast_Kind_Distinct_Type ||
         expr->kind == Ast_Kind_Interface ||
         expr->kind == Ast_Kind_Compiler_Extension) {
         force_a_lookup = 1;
