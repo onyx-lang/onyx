@@ -880,6 +880,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             // :fallthrough
         }
 
+        case Token_Type_Keyword_Struct:
         case '?': {
             AstType *type = parse_type(parser);
             retval = (AstTyped *) type;
