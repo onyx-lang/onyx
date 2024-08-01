@@ -37,6 +37,9 @@ Iterator.sum   :: sum;
 Iterator.collect :: to_array;
 Iterator.collect_map :: to_map;
 
+Iterator.from :: as_iter
+Iterator.next :: next
+
 
 
 /// The standard function to convert something to an Iterator.

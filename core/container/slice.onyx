@@ -78,6 +78,16 @@ Slice.copy :: (sl: [] $T, allocator := context.allocator) -> [] T {
 }
 
 
+/// Creates a new slice and populates by performing the transform function on each element of the existing slice.
+Slice.map :: (sl: [] $T, transform: (T) -> $R, allocator := context.allocator) -> [] R {
+    new_slice := Slice.make(R, sl.count, allocator)
+    for v, i in sl {
+        new_slice[i] = transform(v)
+    }
+    return new_slice
+}
+
+
 /// Moves an element to a new index, ensuring that order of other elements is retained.
 ///
 ///     use core {slice, println}
