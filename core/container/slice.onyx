@@ -79,12 +79,38 @@ Slice.copy :: (sl: [] $T, allocator := context.allocator) -> [] T {
 
 
 /// Creates a new slice and populates by performing the transform function on each element of the existing slice.
+Slice.map :: #match #local {}
+
+#overload
 Slice.map :: (sl: [] $T, transform: (T) -> $R, allocator := context.allocator) -> [] R {
     new_slice := Slice.make(R, sl.count, allocator)
-    for v, i in sl {
-        new_slice[i] = transform(v)
-    }
+    for v, i in sl do new_slice[i] = transform(v)
     return new_slice
+}
+
+#overload
+Slice.map :: macro (sl: [] $T, transform: Code, allocator := context.allocator) => {
+    _s := sl
+    new_slice := Slice.make(typeof #unquote transform(sl[0]), _s.count, allocator)
+    for v, i in _s do new_slice[i] = #unquote transform(v)
+    return new_slice
+}
+
+
+/// Modifies a slice in-place without allocating any memory and returns the original slice.
+Slice.map_inplace :: #match #local {}
+
+#overload
+Slice.map_inplace :: (sl: [] $T, transform: (T) -> T, allocator := context.allocator) => {
+    for &v in sl do *v = transform(*v)
+    return sl
+}
+
+#overload
+Slice.map_inplace :: macro (sl: [] $T, transform: Code, allocator := context.allocator) => {
+    _s := sl
+    for &v in _s do *v = #unquote transform(*v)
+    return _s
 }
 
 
@@ -366,6 +392,27 @@ Slice.fold :: (arr: [] $T, init: $R, f: (T, R) -> R) -> R {
 Slice.fold :: macro (arr: [] $T, init: $R, body: Code) -> R {
     acc := init;
     for it in arr do acc = #unquote body(it, acc);
+    return acc;
+}
+
+
+Slice.fold1 :: #match #local {}
+
+#overload
+Slice.fold1 :: (arr: [] $T, f: (T, T) -> T) -> ? T {
+    if arr.count == 0 do return .None
+
+    val := arr[0];
+    for it in arr[1 .. arr.count] do val = f(it, val);
+    return val;
+}
+
+#overload
+Slice.fold1 :: macro (arr: [] $T, body: Code) -> ? T {
+    if arr.count == 0 do return .None
+
+    acc := arr[0];
+    for it in arr[1 .. arr.count] do acc = #unquote body(it, acc);
     return acc;
 }
 

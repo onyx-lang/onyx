@@ -13,6 +13,13 @@ use core.intrinsics.types {type_is_struct}
 //
 // Iterator is a builtin type known by the compiler, as Iterators
 // can be used in for-loops natively without any translation.
+
+Iterator.from :: as_iter
+Iterator.next :: next
+Iterator.next_opt :: next_opt
+Iterator.empty :: empty
+Iterator.counter :: counter
+
 Iterator.filter :: filter;
 Iterator.map :: map;
 Iterator.flat_map :: flat_map;
@@ -37,8 +44,10 @@ Iterator.sum   :: sum;
 Iterator.collect :: to_array;
 Iterator.collect_map :: to_map;
 
-Iterator.from :: as_iter
-Iterator.next :: next
+Iterator.generator :: generator
+Iterator.generator_no_copy :: generator_no_copy
+Iterator.comp :: comp
+Iterator.prod :: prod
 
 
 
