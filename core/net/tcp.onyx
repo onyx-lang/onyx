@@ -267,9 +267,7 @@ tcp_server_pulse :: (use server: &TCP_Server) -> bool {
         }
     }
 
-    clients_with_messages := wait_to_get_client_messages(server);
-    defer if clients_with_messages.data != null do cfree(clients_with_messages.data);
-
+    use clients_with_messages := wait_to_get_client_messages(server);
     for clients_with_messages {
         if it.state != .Alive do continue;
 
