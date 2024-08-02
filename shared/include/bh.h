@@ -190,6 +190,14 @@ static inline const char* bh_num_suffix(u64 i) {
     }
 }
 
+static inline u32 bh_clz(u32 i) {
+    #ifdef _BH_WINDOWS
+    return __lzcnt(i);
+    #else
+    return __builtin_clz(i);
+    #endif
+}
+
 
 
 

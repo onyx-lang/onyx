@@ -2186,6 +2186,7 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
         case Unary_Op_Cast: emit_cast(mod, &code, unop); break;
 
         case Unary_Op_Try: // Should be handled in operator overload
+        case Unary_Op_Unwrap: 
         case Unary_Op_Count:
             break;
     }
@@ -3827,13 +3828,13 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 emit_expression(mod, &code, field->expr);
                 u64 source_base_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
                 WIL(NULL, WI_LOCAL_TEE, source_base_ptr);
-                emit_load_instruction(mod, &code, &basic_types[Basic_Kind_U32], 0);
+                emit_load_instruction(mod, &code, field->type->Union.tag_type, 0);
                 WIL(NULL, WI_I32_CONST, field->idx);
                 WI(NULL, WI_I32_EQ);
                 emit_enter_structured_block(mod, &code, SBT_Basic_If, field->token);
                     emit_stack_address(mod, &code, intermediate_local, field->token);
                     WIL(NULL, WI_I32_CONST, 1); // 1 is Some
-                    emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], 0);
+                    emit_store_instruction(mod, &code, field->type->Union.tag_type, 0);
 
                     emit_stack_address(mod, &code, intermediate_local + type_alignment_of(field->type), field->token);
                     WIL(NULL, WI_LOCAL_GET, source_base_ptr);
@@ -3852,7 +3853,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 WI(NULL, WI_ELSE);
                     emit_stack_address(mod, &code, intermediate_local, field->token);
                     WIL(NULL, WI_I32_CONST, 0); // 0 is None
-                    emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], 0);
+                    emit_store_instruction(mod, &code, field->type->Union.tag_type, 0);
                 emit_leave_structured_block(mod, &code);
 
                 local_raw_free(mod->local_alloc, WASM_TYPE_PTR);

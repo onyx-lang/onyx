@@ -97,6 +97,13 @@ Value.as_map :: (v: Value) -> Map(str, Value) {
     return m
 }
 
+Value.as_entry_array :: (v: Value) -> [] _Value_Object_Entry {
+    if cast(rawptr) v == null do return .{};
+    if (cast(^_Value) v).type != .Object do return .{};
+
+    return cast(&_Value_Object, cast(&_Value, v)).object_
+}
+
 Value.as_array_iter :: (v: Value) -> Iterator(Value) {
     if cast(rawptr) v == null           do return iter.empty(Value)
     if (cast(&_Value) v).type != .Array do return iter.empty(Value)
@@ -184,15 +191,18 @@ _Value_Array :: struct {
     array_: [..] Value
 }
 
+#local
+_Value_Object_Entry :: struct {
+    key   : str
+    dont_free_key := false
+
+    value : Value
+}
+
 #package
 _Value_Object :: struct {
     use base := _Value.{ type = .Object }
-    object_: [..] struct {
-        key   : str
-        dont_free_key := false
-
-        value : Value
-    }
+    object_: [..] _Value_Object_Entry
 }
 
 #operator [] get

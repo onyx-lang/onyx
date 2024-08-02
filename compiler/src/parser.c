@@ -874,6 +874,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             // :fallthrough
         }
 
+        case Token_Type_Keyword_Struct:
         case '?': {
             AstType *type = parse_type(parser);
             retval = (AstTyped *) type;
@@ -2767,7 +2768,7 @@ static AstUnionType* parse_union(OnyxParser* parser) {
         AstType *backing_type = parse_type(parser);
         u_node->tag_backing_type = backing_type;
     } else {
-        u_node->tag_backing_type = (AstType *) &basic_type_u32;
+        u_node->tag_backing_type = NULL;
     }
 
     if (consume_token_if_next(parser, '(')) {

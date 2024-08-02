@@ -788,6 +788,8 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             u32 alignment = 0;
             u32 next_tag_value = 0;
 
+            assert(union_->tag_backing_type);
+
             AstEnumType* tag_enum_node = onyx_ast_node_new(alloc, sizeof(AstEnumType), Ast_Kind_Enum_Type);
             tag_enum_node->token = union_->token;
             tag_enum_node->name = bh_aprintf(alloc, "%s.tag_enum", union_->name);

@@ -1,6 +1,30 @@
-Release 0.1.12
+Release 0.1.13
 --------------
 Not released yet
+
+Additions:
+- Unwrap operator, `x!`.
+    - Similar to try operator (`x?`), but panics if value is not present.
+- "Field update" syntax. A shorthand to change a field of a structure.
+    - `.{ ..old_value, field = new_value }`
+- `onyx watch` now works on MacOS.
+- `iter.group_by`
+- `core.os.args`
+- `core.crypto.hmac`
+- `core.encoding.json.Value.as_entry_array`
+
+Removals:
+
+Changes:
+- `&&` and `||` now short-circuit.
+- The size of tag field for unions is now dependent on the number of variants.
+
+Bugfixes:
+
+
+Release 0.1.12
+--------------
+19th May 2024
 
 Additions:
 - Ability to pipe into a method call.
