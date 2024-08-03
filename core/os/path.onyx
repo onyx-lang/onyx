@@ -1,7 +1,6 @@
 package core.os
 
 use runtime
-use core.string
 use core.conv
 
 #local Path_Allocator :: context.temp_allocator
@@ -20,76 +19,76 @@ use core.conv
 ///
 /// Modifies the string in place, as the length will never be longer.
 path_clean :: (path: str, allocator := Path_Allocator) -> str {
-    if path == "" do return string.copy(".", Path_Allocator);
+    if path == "" do return str.copy(".", Path_Allocator)
 
-    rooted := path[0] == PATH_SEP;
-    n := path.length;
+    rooted := path[0] == PATH_SEP
+    n := path.length
 
-    out := make(dyn_str, path.length, allocator=context.temp_allocator);
-    r, dotdot := 0, 0;
+    out := make(dyn_str, path.length, allocator=context.temp_allocator)
+    r, dotdot := 0, 0
 
     if rooted {
-        string.append(&out, PATH_SEP);
-        r, dotdot = 1, 1;
+        dyn_str.append(&out, PATH_SEP)
+        r, dotdot = 1, 1
     }
 
     while r < n {
-        if     path[r] == PATH_SEP do r += 1;
-        elseif path[r] == '.' && (r+1 == n || path[r + 1] == PATH_SEP) do r += 1;
+        if     path[r] == PATH_SEP do r += 1
+        elseif path[r] == '.' && (r+1 == n || path[r + 1] == PATH_SEP) do r += 1
         elseif path[r] == '.' && path[r + 1] == '.' && (r+2 == n || path[r+2] == PATH_SEP) {
-            r += 2;
+            r += 2
             if out.length > dotdot {
-                out.length -= 1;
+                out.length -= 1
                 while out.length > dotdot && out[out.length] != PATH_SEP {
-                    out.length -= 1;
+                    out.length -= 1
                 }
             }
             elseif !rooted {
                 if out.length > 0 {
-                    string.append(&out, PATH_SEP);
+                    dyn_str.append(&out, PATH_SEP)
                 }
-                string.append(&out, "..");
-                dotdot = out.length;
+                dyn_str.append(&out, "..")
+                dotdot = out.length
             }
         }
         else {
             if (rooted && out.length != 1) || (!rooted && out.length != 0) {
-                string.append(&out, PATH_SEP);
+                dyn_str.append(&out, PATH_SEP)
             }
 
             while r < n && path[r] != PATH_SEP {
-                string.append(&out, path[r]);
-                r += 1;
+                dyn_str.append(&out, path[r])
+                r += 1
             }
         }
     }
 
     if out.length == 0 {
-        string.append(&out, ".");
+        dyn_str.append(&out, ".")
     }
 
-    return out;
+    return out
 }
 
 /// Concatenates path elements, and returns cleaned output.
 ///
 /// This uses the temporary allocator, so a copy may be needed.
 path_join :: (path: ..str) -> str {
-    out := make(dyn_str, allocator=context.temp_allocator);
+    out := make(dyn_str, allocator=context.temp_allocator)
     
     for p in path {
-        conv.format(&out, "{}{}", p, PATH_SEP);
+        conv.format(&out, "{}{}", p, PATH_SEP)
     }
 
-    return path_clean(out);
+    return path_clean(out)
 }
 
 /// Returns everything but the last element in the path.
 ///
 /// This is then cleaned and copied into the temporary allocator.
 path_directory :: (path: str) -> str {
-    dir, _ := path_split(path);
-    return path_clean(dir);
+    dir, _ := path_split(path)
+    return path_clean(dir)
 }
 
 /// Returns the extension of the file on the end of the path, if present.
@@ -99,10 +98,10 @@ path_directory :: (path: str) -> str {
 ///     path_extension("foo/bar.txt") -> "txt"
 path_extension :: (path: str) -> str {
     for i in range.{ path.length - 1, 0, -1 } {
-        if path[i] == PATH_SEP do break;
-        if path[i] == '.' do return path[i .. path.length];
+        if path[i] == PATH_SEP do break
+        if path[i] == '.' do return path[i .. path.length]
     }
-    return "";
+    return ""
 }
 
 /// Returns the last element of the path, sans its extension.
@@ -110,16 +109,16 @@ path_extension :: (path: str) -> str {
 ///     path_basename("foo.txt") -> "foo"
 ///     path_basename("test/bar.txt") -> "bar"
 path_basename :: (path: str) -> str {
-    if path == "" do return ".";
+    if path == "" do return "."
 
-    start := string.last_index_of(path, PATH_SEP);
-    end   := string.last_index_of(path, '.');
-    return path[start + 1 .. end];
+    start := str.last_index_of(path, PATH_SEP)
+    end   := str.last_index_of(path, '.')
+    return path[start + 1 .. end]
 }
 
 /// Splits the last path element off.
 path_split :: (path: str) -> (str, str) {
-    index := string.last_index_of(path, PATH_SEP);
-    return path[0 .. index], path[index+1 .. path.length];
+    index := str.last_index_of(path, PATH_SEP)
+    return path[0 .. index], path[index+1 .. path.length]
 }
 

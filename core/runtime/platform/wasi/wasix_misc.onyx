@@ -4,41 +4,41 @@ use wasi
 use core.os
 
 __futex_wait :: (addr: rawptr, expected: i32, timeout: i32) -> i32 {
-    tm: wasi.OptionTimestamp;
+    tm: wasi.OptionTimestamp
     if timeout < 0 {
-        tm = .None;
+        tm = .None
     } else {
-        tm = .{ Some = ~~timeout };
+        tm = .{ Some = ~~timeout }
     }
 
-    out: bool;
-    if wasi.futex_wait(addr, expected, &tm, &out) != .Success do return 0;
-    return 1 if out else 0;
+    out: bool
+    if wasi.futex_wait(addr, expected, &tm, &out) != .Success do return 0
+    return 1 if out else 0
 }
 
 __futex_wake :: (addr: rawptr, maximum: i32) -> i32 {
-    out: bool;
+    out: bool
     if (maximum == -1) {
-        if wasi.futex_wake_all(addr, &out) != .Success do return 0;
+        if wasi.futex_wake_all(addr, &out) != .Success do return 0
     } else {
-        if wasi.futex_wake(addr, &out) != .Success do return 0;
+        if wasi.futex_wake(addr, &out) != .Success do return 0
     }
 
-    return 1 if out else 0;
+    return 1 if out else 0
 }
 
 __tty_get :: (tty: &os.TTY_State) {
-    state: wasi.TTY;
-    if wasi.tty_get(&state) != .Success do return;
+    state: wasi.TTY
+    if wasi.tty_get(&state) != .Success do return
 
-    tty.rows = state.rows;
-    tty.cols = state.cols;
-    tty.stdin_is_tty = state.stdin_tty;
-    tty.stdout_is_tty = state.stdout_tty;
-    tty.stderr_is_tty = state.stderr_tty;
-    tty.echo = state.echo;
-    tty.input_buffered = state.line_buffered;
-    tty.input_linefeeds = state.line_feeds;
+    tty.rows = state.rows
+    tty.cols = state.cols
+    tty.stdin_is_tty = state.stdin_tty
+    tty.stdout_is_tty = state.stdout_tty
+    tty.stderr_is_tty = state.stderr_tty
+    tty.echo = state.echo
+    tty.input_buffered = state.line_buffered
+    tty.input_linefeeds = state.line_feeds
 }
 
 __tty_set :: (tty: &os.TTY_State) -> bool {
@@ -51,22 +51,22 @@ __tty_set :: (tty: &os.TTY_State) -> bool {
         echo = tty.echo,
         line_buffered = tty.input_buffered,
         line_feeds = tty.input_linefeeds
-    };
+    }
 
-    wasi.tty_set(&state);
-    return true;
+    wasi.tty_set(&state)
+    return true
 }
 
 __chdir :: (path: str) -> bool {
-    return wasi.chdir(path) == .Success;
+    return wasi.chdir(path) == .Success
 }
 
 __getcwd :: () -> str {
-    #persist buf: [1024] u8;
-    len := 1024;
+    #persist buf: [1024] u8
+    len := 1024
     if wasi.getcwd(~~buf, &len) == .Success {
-        return buf[0 .. len];
+        return buf[0 .. len]
     }
 
-    return "";
+    return ""
 }

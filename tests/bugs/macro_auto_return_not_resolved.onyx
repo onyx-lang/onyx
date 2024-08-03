@@ -4,18 +4,18 @@ use core {*}
 
 Point :: struct { x, y: i32; }
 
-#match hash.to_u32 macro (p: Point) -> #auto do return p.x * 1000 + p.y;
+#overload hash.hash :: macro (p: Point) -> _ do return p.x * 1000 + p.y
 
-#operator == macro (p1: Point, p2: Point) -> #auto {
-    return p1.x == p2.x && p1.y == p2.y;
+#operator == macro (p1: Point, p2: Point) -> _ {
+    return p1.x == p2.x && p1.y == p2.y
 }
 
 main :: (args) => {
-    S := set.make(Point);
+    S := Set.make(Point)
 
-    S << Point.{ 1, 2 };
-    S << Point.{ 2, 3 };
-    S << Point.{ 1, 2 };
+    S << Point.{ 1, 2 }
+    S << Point.{ 2, 3 }
+    S << Point.{ 1, 2 }
 
-    set.has(&S, Point.{ 1, 2 }) |> println();
+    Set.has(&S, Point.{ 1, 2 }) |> println()
 }

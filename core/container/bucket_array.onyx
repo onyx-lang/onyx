@@ -4,16 +4,15 @@ package core.bucket_array
 #allow_stale_code
 
 use core
-use core.array
 use core.iter
 
 Bucket_Array :: struct (T: type_expr) {
-    allocator : Allocator;
-    elements_per_bucket : i32;
-    buckets : [..] Bucket(T);
+    allocator : Allocator
+    elements_per_bucket : i32
+    buckets : [..] Bucket(T)
 
     Bucket :: struct (T: type_expr) {
-        count : i32;
+        count : i32
         data : [&] T; // Actually an array of elements_per_bucket things, but putting that
                       // that into the type system makes these cumbersome to work with.
     }
@@ -22,128 +21,128 @@ Bucket_Array :: struct (T: type_expr) {
 make :: ($T: type_expr, elements: i32,
          array_allocator := context.allocator, bucket_allocator := context.allocator) -> Bucket_Array(T) {
 
-    buckets : Bucket_Array(T);
-    init(&buckets, elements);
-    return buckets;
+    buckets : Bucket_Array(T)
+    init(&buckets, elements)
+    return buckets
 }
 
 init :: (use b: &Bucket_Array($T), elements: i32,
          array_allocator := context.allocator, bucket_allocator := context.allocator) {
     
-    allocator = bucket_allocator;
-    b.elements_per_bucket = elements;
-    buckets   = array.make(Bucket_Array.Bucket(T), allocator=array_allocator);
+    allocator = bucket_allocator
+    b.elements_per_bucket = elements
+    buckets   = Array.make(Bucket_Array.Bucket(T), allocator=array_allocator)
 
-    initial_bucket := alloc_bucket(b);
-    array.push(&buckets, initial_bucket);
+    initial_bucket := alloc_bucket(b)
+    Array.push(&buckets, initial_bucket)
 }
 
 // Frees all the buckets
 clear :: (use b: &Bucket_Array($T)) {
     for &bucket in &buckets {
-        raw_free(bucket_allocator, bucket.data);
-        bucket.count = 0;
+        raw_free(bucket_allocator, bucket.data)
+        bucket.count = 0
     }
 
-    array.clear(&buckets);
+    Array.clear(&buckets)
 }
 
 #operator [] macro (b: Bucket_Array($T), idx: i32) -> T {
     get :: get
-    return get(&b, idx);
+    return get(&b, idx)
 }
 
 #operator &[] macro (b: Bucket_Array($T), idx: i32) -> &T {
     get_ptr :: get_ptr
-    return get_ptr(&b, idx);
+    return get_ptr(&b, idx)
 }
 
 get :: (use b: &Bucket_Array($T), idx: i32) -> T {
-    bucket_index := idx / elements_per_bucket;
-    elem_index   := idx % elements_per_bucket;
-    return buckets[bucket_index].data[elem_index];
+    bucket_index := idx / elements_per_bucket
+    elem_index   := idx % elements_per_bucket
+    return buckets[bucket_index].data[elem_index]
 }
 
 get_ptr :: (use b: &Bucket_Array($T), idx: i32) -> &T {
-    bucket_index := idx / elements_per_bucket;
-    elem_index   := idx % elements_per_bucket;
-    return &buckets[bucket_index].data[elem_index];
+    bucket_index := idx / elements_per_bucket
+    elem_index   := idx % elements_per_bucket
+    return &buckets[bucket_index].data[elem_index]
 }
 
 push :: (use b: &Bucket_Array($T), elem: T) {
-    last_bucket := &buckets[buckets.count - 1];
+    last_bucket := &buckets[buckets.count - 1]
     if last_bucket.count < elements_per_bucket {
-        last_bucket.data[last_bucket.count] = elem;
-        last_bucket.count += 1;
+        last_bucket.data[last_bucket.count] = elem
+        last_bucket.count += 1
 
     } else {
-        new_bucket := alloc_bucket(b);
-        array.push(&buckets, new_bucket);
+        new_bucket := alloc_bucket(b)
+        Array.push(&buckets, new_bucket)
 
-        last_bucket = &buckets[buckets.count - 1];
-        last_bucket.data[last_bucket.count] = elem;
-        last_bucket.count += 1;
+        last_bucket = &buckets[buckets.count - 1]
+        last_bucket.data[last_bucket.count] = elem
+        last_bucket.count += 1
     }
 }
 
 #operator << macro (b: Bucket_Array($T), elem: T) {
-    #this_package.push(&b, elem);
+    #this_package.push(&b, elem)
 }
 
 pop :: (use b: &Bucket_Array($T)) {
-    last_bucket := &buckets[buckets.count - 1];
-    last_bucket.count -= 1;
+    last_bucket := &buckets[buckets.count - 1]
+    last_bucket.count -= 1
 }
 
 // Give you a pointer to the bucket data via 'it'.
 for_each :: macro (b: Bucket_Array($T), body: Code) {
     for &bucket in b.buckets {
         for bucket_index in bucket.count {
-            it := &bucket.data[bucket_index];
+            it := &bucket.data[bucket_index]
 
-            #unquote body(it);
+            #unquote body(it)
         }
     }
 }
 
-#match iter.as_iter as_iter
+#overload iter.as_iter :: as_iter
 as_iter :: (b: &Bucket_Array($T)) -> Iterator(T) {
     Context :: struct (T: type_expr) {
-        ba         : &Bucket_Array(T);
-        bucket_idx : i32;
-        elem_idx   : i32;
+        ba         : &Bucket_Array(T)
+        bucket_idx : i32
+        elem_idx   : i32
     }
 
-    c := new(Context(T));
-    c.ba = b;
-    c.bucket_idx = 0;
-    c.elem_idx   = 0;
+    c := new(Context(T))
+    c.ba = b
+    c.bucket_idx = 0
+    c.elem_idx   = 0
 
     next :: (use c: &Context($T)) -> ? T {
         use core.intrinsics.onyx
 
-        bucket := &ba.buckets[bucket_idx];
+        bucket := &ba.buckets[bucket_idx]
         while elem_idx == bucket.count {
-            bucket_idx += 1;
-            if bucket_idx == ba.buckets.count do return .None;
+            bucket_idx += 1
+            if bucket_idx == ba.buckets.count do return .None
 
-            bucket = &ba.buckets[bucket_idx];
-            elem_idx = 0;
+            bucket = &ba.buckets[bucket_idx]
+            elem_idx = 0
         }
 
-        defer elem_idx += 1;
-        return bucket.data[elem_idx];
+        defer elem_idx += 1
+        return bucket.data[elem_idx]
     }
 
     return .{
         data = c,
         next = #solidify next { T=T },
         close = cfree,
-    };
+    }
 }
 
 #package
 alloc_bucket :: (use b: &Bucket_Array($T)) -> Bucket_Array.Bucket(T) {
-    data := raw_alloc(allocator, sizeof T * elements_per_bucket);
-    return .{ 0, data };
+    data := raw_alloc(allocator, sizeof T * elements_per_bucket)
+    return .{ 0, data }
 }

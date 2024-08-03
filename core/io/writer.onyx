@@ -1,7 +1,6 @@
 package core.io
 
 use core.conv
-use core.string
 use core.memory
 
 // io.Writer is a buffered-writer. The important thing to not forget
@@ -11,12 +10,12 @@ use core.memory
 // of writer_make, all buffering will be disabled.
 
 Writer :: struct {
-    stream : &Stream;
+    stream : &Stream
 
-    error  : Error;
+    error  : Error
 
-    buffer: [] u8;
-    buffer_filled: u32;
+    buffer: [] u8
+    buffer_filled: u32
 }
 
 Writer.make :: writer_make
@@ -42,149 +41,149 @@ Writer.write_escaped_str :: write_escaped_str
 
 
 writer_make :: (s: &Stream, buffer_size := 4096) -> Writer {
-    assert(s.vtable != null, "Stream vtable was not setup correctly.");
+    assert(s.vtable != null, "Stream vtable was not setup correctly.")
 
-    w := Writer.{s};
+    w := Writer.{s}
 
     if buffer_size > 0 {
-        w.buffer = make([] u8, buffer_size, context.allocator);
+        w.buffer = make([] u8, buffer_size, context.allocator)
     }
 
-    return w;
+    return w
 }
 
 #overload delete :: writer_free
 writer_free :: (w: &Writer) {
-    writer_flush(w);
-    delete(&w.buffer);
+    writer_flush(w)
+    delete(&w.buffer)
 }
 
 writer_flush :: (w: &Writer) {
-    if w.buffer_filled == 0 do return;
+    if w.buffer_filled == 0 do return
 
-    err := stream_write(w.stream, w.buffer[0 .. w.buffer_filled]).Err ?? Error.None;
+    err := stream_write(w.stream, w.buffer[0 .. w.buffer_filled]).Err ?? Error.None
     if err != .None {
-        w.error = err;
+        w.error = err
     }
 
-    w.buffer_filled = 0;
+    w.buffer_filled = 0
 }
 
 writer_consume_error :: (w: &Writer) -> Error {
-    defer w.error = .None;
-    return w.error;
+    defer w.error = .None
+    return w.error
 }
 
 writer_remaining_capacity :: (w: &Writer) -> u32 {
-    return w.buffer.count - w.buffer_filled;
+    return w.buffer.count - w.buffer_filled
 }
 
 string_builder :: (allocator := context.allocator) -> (Writer, &BufferStream) {
-    new_stream := new(BufferStream, allocator=allocator);
-    *new_stream = buffer_stream_make();
+    new_stream := new(BufferStream, allocator=allocator)
+    *new_stream = buffer_stream_make()
 
-    return writer_make(new_stream, 0), new_stream;
+    return writer_make(new_stream, 0), new_stream
 }
 
 write_byte :: (use writer: &Writer, byte: u8) {
     if buffer.count == 0 {
         if err := stream_write_byte(stream, byte); err != .None {
-            writer.error = err;
+            writer.error = err
         }
 
     } else {
         if writer_remaining_capacity(writer) == 0 {
-            writer_flush(writer);
+            writer_flush(writer)
         }
 
-        buffer[buffer_filled] = byte;
-        buffer_filled += 1;
+        buffer[buffer_filled] = byte
+        buffer_filled += 1
     }
 }
 
 write_str :: (use writer: &Writer, s: str) {
     if buffer.count == 0 {
         if err := stream_write(stream, s).Err ?? Error.None; err != .None {
-            writer.error = err;
+            writer.error = err
         }
 
     } elseif writer_remaining_capacity(writer) > s.count {
-        memory.copy(&buffer[buffer_filled], s.data, s.count);
-        buffer_filled += s.count;
+        memory.copy(&buffer[buffer_filled], s.data, s.count)
+        buffer_filled += s.count
 
     } else {
-        writer_flush(writer);
+        writer_flush(writer)
         if err := stream_write(stream, s).Err ?? Error.None; err != .None {
-            writer.error = err;
+            writer.error = err
         }
     }
 }
 
 write_cstr :: (use writer: &Writer, cs: cstr) {
-    s := string.from_cstr(cs);
-    write_str(writer, s);
+    s := str.as_str(cs)
+    write_str(writer, s)
 }
 
 write_i32 :: (use writer: &Writer, n: i32, base: u32 = 10) {
-    buf : [256] u8;
-    s := conv.i64_to_str(cast(i64) n, cast(u64) base, ~~buf);
-    write_str(writer, s);
+    buf : [256] u8
+    s := conv.i64_to_str(cast(i64) n, cast(u64) base, ~~buf)
+    write_str(writer, s)
 }
 
 write_i64 :: (use writer: &Writer, n: i64, base: u64 = 10) {
-    buf : [256] u8;
-    s := conv.i64_to_str(n, base, ~~buf);
-    write_str(writer, s);
+    buf : [256] u8
+    s := conv.i64_to_str(n, base, ~~buf)
+    write_str(writer, s)
 }
 
 write_f32 :: (use writer: &Writer, f: f32) {
-    buf : [256] u8;
-    s := conv.f64_to_str(cast(f64) f, ~~buf);
-    write_str(writer, s);
+    buf : [256] u8
+    s := conv.f64_to_str(cast(f64) f, ~~buf)
+    write_str(writer, s)
 }
 
 write_f64 :: (use writer: &Writer, f: f64) {
-    buf : [256] u8;
-    s := conv.f64_to_str(f, ~~buf);
-    write_str(writer, s);
+    buf : [256] u8
+    s := conv.f64_to_str(f, ~~buf)
+    write_str(writer, s)
 }
 
 write_bool :: (use writer: &Writer, b: bool) {
-    if b do write_str(writer, "true");
-    else do write_str(writer, "false");
+    if b do write_str(writer, "true")
+    else do write_str(writer, "false")
 }
 
 write_ptr :: (use writer: &Writer, p: &void) {
-    write_i64(writer, cast(i64) p, 16);
+    write_i64(writer, cast(i64) p, 16)
 }
 
 write_range :: (use writer: &Writer, r: range, sep := " ") {
     for i in r {
-        write_i32(writer, i);
-        if i + r.step < r.high do write_str(writer, sep);
+        write_i32(writer, i)
+        if i + r.step < r.high do write_str(writer, sep)
     }
 }
 
 write_format :: (use writer: &Writer, format: str, va: ..any) {
-    write_format_va(writer, format, ~~ va);
+    write_format_va(writer, format, ~~ va)
 }
 
 write_format_va :: (use writer: &Writer, format: str, va: [] any) {
     flush :: (writer, to_output) => {
-        write_str(writer, to_output);
-        return true;
+        write_str(writer, to_output)
+        return true
     }
 
-    buffer: [2048] u8;
-    write_str(writer, conv.format_va(buffer, format, va, .{writer, flush}));
+    buffer: [2048] u8
+    write_str(writer, conv.format_va(buffer, format, va, .{writer, flush}))
 }
 
 write_escaped_str :: (use writer: &Writer, s: str) {
-    write_byte(writer, '"');
+    write_byte(writer, '"')
 
     while i := 0; i < s.count {
-        defer i += 1;
-        ch := s[i];
+        defer i += 1
+        ch := s[i]
 
         // @Incomplete
         switch ch {
@@ -200,12 +199,12 @@ write_escaped_str :: (use writer: &Writer, s: str) {
 
             case _ {
                 // @Speed
-                write_byte(writer, ch);
+                write_byte(writer, ch)
             }
         } 
     }
 
-    write_byte(writer, '"');
+    write_byte(writer, '"')
 }
 
 write :: #match {
@@ -221,6 +220,6 @@ write :: #match {
     // Catch all for any type. Has a high order so you can easily override it.
     #order 1000 macro (w: &Writer, a: $T) {
         write_format :: write_format
-        write_format(w, "{}", a);
+        write_format(w, "{}", a)
     }
 }

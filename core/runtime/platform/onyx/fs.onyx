@@ -6,9 +6,9 @@ FileData :: #distinct i64
 DirectoryData :: #distinct u64
 
 PollDescription :: struct {
-    fd: u64;
-    in_events: io.PollEvent;
-    out_events: io.PollEvent;
+    fd: u64
+    in_events: io.PollEvent
+    out_events: io.PollEvent
 }
 
 #foreign "onyx_runtime" {
@@ -44,10 +44,10 @@ PollDescription :: struct {
 }
 
 __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError) {
-    handle: FileData;
-    error := __file_open_impl(path, mode, &handle);
+    handle: FileData
+    error := __file_open_impl(path, mode, &handle)
 
-    return handle, error;
+    return handle, error
 }
 
 // Export symbols from #foreign table
@@ -63,103 +63,103 @@ __dir_create   :: __dir_create
 __dir_remove   :: __dir_remove
 
 __chdir :: (path: str) -> bool {
-    #persist buf: [1024] u8;
-    memory.copy(~~buf, path.data, math.min(1023, path.length));
+    #persist buf: [1024] u8
+    memory.copy(~~buf, path.data, math.min(1023, path.length))
 
-    return __dir_chdir(~~ buf);
+    return __dir_chdir(~~ buf)
 }
 
 __getcwd :: () -> str {
-    #persist buf: [1024] u8;
-    length := __dir_cwd(.{ ~~buf, 1024 });
+    #persist buf: [1024] u8
+    length := __dir_cwd(.{ ~~buf, 1024 })
     if length < 0 {
-        return "";
+        return ""
     }
 
-    return buf[0 .. length];
+    return buf[0 .. length]
 }
 
 __file_stream_vtable := io.Stream_Vtable.{
     seek = (use fs: &os.File, to: i32, whence: io.SeekFrom) -> io.Error {
-        now := __file_seek(data, to, whence);
-        return (.None) if now >= 0 else .BadFile;
+        now := __file_seek(data, to, whence)
+        return (.None) if now >= 0 else .BadFile
     },
 
     tell = (use fs: &os.File) -> Result(u32, io.Error) {
-        return .{ Ok = __file_tell(data) };
+        return .{ Ok = __file_tell(data) }
     },
 
     read = (use fs: &os.File, buffer: [] u8) -> Result(u32, io.Error) {
-        bytes_read: u64;
-        error := __file_read(data, buffer, &bytes_read);
-        if error != .None do return .{ Err = error };
-        return .{ Ok = ~~bytes_read };
+        bytes_read: u64
+        error := __file_read(data, buffer, &bytes_read)
+        if error != .None do return .{ Err = error }
+        return .{ Ok = ~~bytes_read }
     },
 
     read_at = (use fs: &os.File, at: u32, buffer: [] u8) -> Result(u32, io.Error) {
-        __file_seek(data, at, .Start);
-        bytes_read: u64;
-        error := __file_read(data, buffer, &bytes_read);
-        if error != .None do return .{ Err = error };
-        return .{ Ok = ~~bytes_read };
+        __file_seek(data, at, .Start)
+        bytes_read: u64
+        error := __file_read(data, buffer, &bytes_read)
+        if error != .None do return .{ Err = error }
+        return .{ Ok = ~~bytes_read }
     },
 
     read_byte = (use fs: &os.File) -> Result(u8, io.Error) {
-        byte: u8;
-        error := __file_read(data, ~~ cast([1] u8) &byte, null);
-        if error != .None do return .{ Err = error };
-        return .{ Ok = byte };
+        byte: u8
+        error := __file_read(data, ~~ cast([1] u8) &byte, null)
+        if error != .None do return .{ Err = error }
+        return .{ Ok = byte }
     },
 
     write = (use fs: &os.File, buffer: [] u8) -> Result(u32, io.Error) {
-        bytes_wrote: u64;
-        error := __file_write(data, buffer, &bytes_wrote);
-        if error != .None do return .{ Err = error };
-        return .{ Err = ~~bytes_wrote };
+        bytes_wrote: u64
+        error := __file_write(data, buffer, &bytes_wrote)
+        if error != .None do return .{ Err = error }
+        return .{ Err = ~~bytes_wrote }
     },
 
     write_at = (use fs: &os.File, at: u32, buffer: [] u8) -> Result(u32, io.Error) {
-        __file_seek(data, at, .Start);
-        bytes_wrote: u64;
-        error := __file_write(data, buffer, &bytes_wrote);
-        if error != .None do return .{ Err = error };
-        return .{ Ok = ~~bytes_wrote };
+        __file_seek(data, at, .Start)
+        bytes_wrote: u64
+        error := __file_write(data, buffer, &bytes_wrote)
+        if error != .None do return .{ Err = error }
+        return .{ Ok = ~~bytes_wrote }
     },
 
     write_byte = (use fs: &os.File, byte: u8) -> io.Error {
-        b := byte;
-        bytes_wrote: u64;
-        error := __file_write(data, .{ &b, 1 }, &bytes_wrote);
-        return error;
+        b := byte
+        bytes_wrote: u64
+        error := __file_write(data, .{ &b, 1 }, &bytes_wrote)
+        return error
     },
 
     close = (use fs: &os.File) -> io.Error {
-        __file_close(data);
-        return .None;
+        __file_close(data)
+        return .None
     },
 
     flush = (use fs: &os.File) -> io.Error {
-        return __file_flush(data);
+        return __file_flush(data)
     },
 
     size = (use fs: &os.File) -> i32 {
-        return __file_size(data);
+        return __file_size(data)
     },
 
     poll = (use fs: &os.File, ev: io.PollEvent, timeout: i32) -> Result(bool, io.Error) {
-        fds: [1] PollDescription;
+        fds: [1] PollDescription
         fds[0] = .{
             fd = ~~data,
             in_events = ev
-        };
+        }
 
-        __poll(fds, timeout);
+        __poll(fds, timeout)
 
         if fds[0].out_events == .Closed {
             return .{ Err = .EOF }; 
         }
 
-        return .{ Ok = fds[0].out_events == ev };
+        return .{ Ok = fds[0].out_events == ev }
     }
-};
+}
 

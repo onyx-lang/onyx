@@ -3,20 +3,20 @@
 use core {*}
 
 main :: () {
-    tree: &avl_tree.AVL_Tree(i32);
+    tree: &avl_tree.AVL_Tree(i32)
 
-    avl_tree.insert(&tree, 20);
-    avl_tree.insert(&tree, 5);
-    avl_tree.insert(&tree, 8);
-    avl_tree.insert(&tree, 25);
-    avl_tree.insert(&tree, 0);
-    avl_tree.insert(&tree, 15);
-    avl_tree.insert(&tree, 10);
+    avl_tree.insert(&tree, 20)
+    avl_tree.insert(&tree, 5)
+    avl_tree.insert(&tree, 8)
+    avl_tree.insert(&tree, 25)
+    avl_tree.insert(&tree, 0)
+    avl_tree.insert(&tree, 15)
+    avl_tree.insert(&tree, 10)
 
-    avl_tree.print(tree);
-    print("\n");
+    avl_tree.print(tree)
+    print("\n")
 
-    printf("Contains {}? {}\n", 7, avl_tree.contains(tree, 7));
-    printf("Contains {}? {}\n", 15, avl_tree.contains(tree, 15));
-    printf("Contains {}? {}\n", 0, avl_tree.contains(tree, 0));
+    printf("Contains {}? {}\n", 7, avl_tree.contains(tree, 7))
+    printf("Contains {}? {}\n", 15, avl_tree.contains(tree, 15))
+    printf("Contains {}? {}\n", 0, avl_tree.contains(tree, 0))
 }

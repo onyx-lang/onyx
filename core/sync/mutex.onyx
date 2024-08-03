@@ -24,22 +24,22 @@ use core.thread { Thread_ID }
 ///     Atomically set it to 0.
 ///     Notify at most 1 other thread about this change.
 Mutex :: struct {
-    lock  : i32;
-    owner : Thread_ID;
+    lock  : i32
+    owner : Thread_ID
 }
 
 
 /// Initializes a new mutex.
 mutex_init :: (m: &Mutex) {
-    m.lock = 0;
-    m.owner = -1;
+    m.lock = 0
+    m.owner = -1
 }
 
 
 /// Destroys a mutex.
 mutex_destroy :: (m: &Mutex) {
-    m.lock = -1;
-    m.owner = -1;
+    m.lock = -1
+    m.owner = -1
 }
 
 /// Locks a mutex. If the mutex is currently held by another thread,
@@ -48,63 +48,63 @@ mutex_destroy :: (m: &Mutex) {
 /// is used to avoid having to spin loop.
 mutex_lock :: (m: &Mutex) {
     while __atomic_cmpxchg(&m.lock, 0, 1) == 1 {
-        if m.owner == context.thread_id do return;
+        if m.owner == context.thread_id do return
 
         #if runtime.platform.Supports_Futexes {
-            runtime.platform.__futex_wait(&m.lock, 1, -1);
+            runtime.platform.__futex_wait(&m.lock, 1, -1)
         } else {
             while (m.lock == 1) ---
         }
     }
 
-    m.owner = context.thread_id;
+    m.owner = context.thread_id
 }
 
 /// Unlocks a mutex, if the calling thread currently holds the mutex.
 /// In a JavaScript based implementation, the __atomic_notify intrinsic
 /// is used to wake up one waiting thread.
 mutex_unlock :: (m: &Mutex) {
-    if m.owner != context.thread_id do return;
+    if m.owner != context.thread_id do return
     
-    m.owner = -1;
-    __atomic_store(&m.lock, 0);
+    m.owner = -1
+    __atomic_store(&m.lock, 0)
 
     #if runtime.platform.Supports_Futexes {
-        runtime.platform.__futex_wake(&m.lock, 1);
+        runtime.platform.__futex_wake(&m.lock, 1)
     }
 }
 
 /// Helpful macro for making a particular block be protected by a macro.
 ///
-///     m: sync.Mutx;
-///     sync.mutex_init(&m);
+///     m: sync.Mutx
+///     sync.mutex_init(&m)
 ///     
 ///     {
-///        sync.scoped_mutex(&m);
+///        sync.scoped_mutex(&m)
 ///        // Everything here is done by one thread at a time.
 ///     }
 scoped_mutex :: macro (m: &Mutex) {
     ml :: mutex_lock
     mu :: mutex_unlock
 
-    ml(m);
-    defer mu(m);
+    ml(m)
+    defer mu(m)
 }
 
 /// Abstracts the pattern decribed in scoped_mutex by automatically
 /// calling scoped_mutex in the block of code given.
 ///
-///     m: sync.Mutx;
-///     sync.mutex_init(&m);
+///     m: sync.Mutx
+///     sync.mutex_init(&m)
 ///     
 ///     sync.critical_section(&m) {
 ///        // Everything here is done by one thread at a time.
 ///     }
 critical_section :: macro (m: &Mutex, body: Code) -> i32 {
-    scoped_mutex :: scoped_mutex;
-    scoped_mutex(m);
+    scoped_mutex :: scoped_mutex
+    scoped_mutex(m)
 
-    #unquote body;
+    #unquote body
 
-    return 0;
+    return 0
 }

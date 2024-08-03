@@ -4,13 +4,13 @@ use core.encoding.osad
 use core {printf}
 
 Foo :: struct {
-    nums: [] i32;
-    bar: Bar;
+    nums: [] i32
+    bar: Bar
 }
 
 Bar :: struct {
-    name: str;
-    foos: [] Foo;
+    name: str
+    foos: [] Foo
 }
 
 main :: () {
@@ -23,13 +23,13 @@ main :: () {
                 .{ .[ 4, 5, 6 ], .{} },
             ]
         }
-    };
+    }
 
-    s := osad.serialize(f)->unwrap();
+    s := osad.serialize(f)->unwrap()
 
-    new_f := osad.deserialize(Foo, s)->unwrap();
+    new_f := osad.deserialize(Foo, s)->unwrap()
 
 
-    printf("{p}\n", f);
-    printf("{p}\n", new_f);
+    printf("{p}\n", f)
+    printf("{p}\n", new_f)
 }

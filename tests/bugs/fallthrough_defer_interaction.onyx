@@ -5,40 +5,40 @@ use core {*}
 custom_iterator :: () -> Iterator(i32) {
 
     next :: (data: rawptr) -> ? i32 {
-        return 1234;
+        return 1234
     }
 
     close :: (data: rawptr) {
-        println("Closing the iterator");
+        println("Closing the iterator")
     }
 
     return .{
         data = null,
         next = next,
         close = close,
-    };
+    }
 }
 
 main :: (args: [] cstr) {
 
     switch 10 {
-        case 5 do println("Never");
+        case 5 do println("Never")
 
         case 10 {
-            count := 5;
+            count := 5
             for i in custom_iterator() {
-                println(i);
-                defer println("World");
+                println(i)
+                defer println("World")
 
-                count -= 1;
+                count -= 1
 
                 // :FIXEDBUG This was were it was breaking; the iterator close didn't run here.
-                if count == 0 do fallthrough;
+                if count == 0 do fallthrough
             }
         }
 
         case _ {
-            println("Default case");
+            println("Default case")
         }
     }
 }

@@ -16,50 +16,50 @@ package core.sync
 /// Represents a generational barrier, so the same barrier
 /// can be used safely multiple times.
 Barrier :: struct {
-    mutex : Mutex;
-    cond  : Condition_Variable;
+    mutex : Mutex
+    cond  : Condition_Variable
 
-    index        : i32;
-    generation   : i32;
-    thread_count : i32;
+    index        : i32
+    generation   : i32
+    thread_count : i32
 }
 
 
 /// Initializes a new generational barrier with `thread_count` threads.
 barrier_init :: (b: &Barrier, thread_count: i32) {
-    mutex_init(&b.mutex);
-    condition_init(&b.cond);
+    mutex_init(&b.mutex)
+    condition_init(&b.cond)
 
-    b.index = 0;
-    b.generation = 0;
-    b.thread_count = thread_count;
+    b.index = 0
+    b.generation = 0
+    b.thread_count = thread_count
 }
 
 
 /// Destroys a generational barrier.
 barrier_destroy :: (b: &Barrier) {
-    mutex_destroy(&b.mutex);
-    condition_destroy(&b.cond);
+    mutex_destroy(&b.mutex)
+    condition_destroy(&b.cond)
 }
 
 /// Signals that a thread has reached the barrier.
 /// The last thread to reach the barrier will wake up all other threads.
 barrier_wait :: (b: &Barrier) {
-    mutex_lock(&b.mutex);
-    defer mutex_unlock(&b.mutex);
+    mutex_lock(&b.mutex)
+    defer mutex_unlock(&b.mutex)
 
-    local_gen := b.generation;
-    b.index += 1;
+    local_gen := b.generation
+    b.index += 1
 
     if b.index < b.thread_count {
         while local_gen == b.generation && b.index < b.thread_count {
-            condition_wait(&b.cond, &b.mutex);
+            condition_wait(&b.cond, &b.mutex)
         }
-        return;
+        return
     }
 
-    b.index = 0;
-    b.generation += 1;
-    condition_broadcast(&b.cond);
-    return;
+    b.index = 0
+    b.generation += 1
+    condition_broadcast(&b.cond)
+    return
 }

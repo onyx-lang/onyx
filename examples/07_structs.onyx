@@ -14,81 +14,81 @@ main :: (args: [] cstr) {
     // This is the basic struct syntax. Members are declared just like
     // local variables in procedures.
     Person :: struct {
-        name   : str;
-        age    : u32;
-        height : u32;
+        name   : str
+        age    : u32
+        height : u32
     }
 
     // Structs can be passed by value to procedures.
     print_person :: (person: Person) {
-        printf("Person({}, {}, {})\n", person.name, person.age, person.height);
+        printf("Person({}, {}, {})\n", person.name, person.age, person.height)
 
         // Structs can also be printed using a single '{}' in printf.
-        printf("{}\n", person);
+        printf("{}\n", person)
     }
 
     // This is the verbose way to declare a local variable with a struct
     // type and initialize its values.
-    person : Person;
-    person.name = "Joe";
-    person.age = 37;
-    person.height = 168;
+    person : Person
+    person.name = "Joe"
+    person.age = 37
+    person.height = 168
 
-    print_person(person);
+    print_person(person)
 
     // A quicker way to write the same thing as above is to use struct literals.
     // Like array literals, the struct name goes before the '.', and then the
     // members are listed off in the order that the appear in the struct definition.
-    other_person := Person.{ "Joe", 37, 168 };
-    print_person(other_person);
+    other_person := Person.{ "Joe", 37, 168 }
+    print_person(other_person)
 
     // You can also name the members in the struct literal, if a different order makes
     // sense in a particular situtation.
-    one_more_person := Person.{ age = 37, height = 168, name = "Joe" };
-    print_person(one_more_person);
+    one_more_person := Person.{ age = 37, height = 168, name = "Joe" }
+    print_person(one_more_person)
 
 
-    print_spacer();
+    print_spacer()
 
     // One capability that Onyx structs have is default values for struct members.
     // These are only used when a member is omitted from a struct literal at the
     // moment. This means that the following example does NOT initialize the members
     // to their defaults:
     //
-    //          vec : Vector2f;
+    //          vec : Vector2f
     //
     Vector2f :: struct {
-        x : f32 = 12;
-        y : f32 = 34;
+        x : f32 = 12
+        y : f32 = 34
     }
 
     print_vector2f :: (vec: Vector2f) {
-        printf("{}", vec);
+        printf("{}", vec)
     }
 
     // This does initialize the members to their defaults.
-    vec := Vector2f.{};
-    print_vector2f(vec);
-    print("\n");
+    vec := Vector2f.{}
+    print_vector2f(vec)
+    print("\n")
 
 
 
 
-    print_spacer();
+    print_spacer()
 
     // Structs in Onyx can behave like C unions, simply by using the '#union' directive.
     FloatIntUnion :: struct #union {
-        i : i32;
-        f : f32;
+        i : i32
+        f : f32
     }
 
-    fiu : FloatIntUnion;
-    fiu.f = 0.5f;
-    printf("Integer representation of 0.5: {}\n", fiu.i);
+    fiu : FloatIntUnion
+    fiu.f = 0.5f
+    printf("Integer representation of 0.5: {}\n", fiu.i)
 
 
 
-    print_spacer();
+    print_spacer()
 
     // Onyx does not support "inheritance" in structures because it is trying to stay
     // away from that OOP mindset. Instead, Onyx supports a composition way of structuring data.
@@ -98,23 +98,23 @@ main :: (args: [] cstr) {
 
     // We define two dummy structs that will be composed.
     ComponentOne :: struct {
-        name     : str;
-        position : Vector2f;
+        name     : str
+        position : Vector2f
     }
 
     ComponentTwo :: struct {
-        velocity     : Vector2f;
-        acceleration : Vector2f;
+        velocity     : Vector2f
+        acceleration : Vector2f
     }
 
     // `Thing` is a composition of two different structs. All of the members from ComponentOne
     // and ComponentTwo can be used directly, without needing to say something like,
     // '.component_one.name'.
     Thing :: struct {
-        use component_one : ComponentOne;
-        use component_two : ComponentTwo;
+        use component_one : ComponentOne
+        use component_two : ComponentTwo
 
-        another_data_member : i32;
+        another_data_member : i32
     }
 
     thing := Thing.{
@@ -122,30 +122,30 @@ main :: (args: [] cstr) {
         component_two = ComponentTwo.{ Vector2f.{ 10, 10 }, Vector2f.{ 0, 0 } },
 
         another_data_member = 1234,
-    };
+    }
 
-    printf("{}, ({}, {})\n", thing.name, thing.velocity.x, thing.velocity.y);
+    printf("{}, ({}, {})\n", thing.name, thing.velocity.x, thing.velocity.y)
 
     // This is very useful in many different situtations. Another useful feature is an implicit
     // pointer conversion between two structs, A and B, if A is the first member of B, and is used.
     // For example, we can pass `thing` to this procedure, even though it is not a ComponentOne.
     // The first member is a ComponentOne and is used, so a implicit pointer conversion is always safe.
     do_something_with_component_one :: (c: ^ComponentOne) {
-        printf("ComponentOne's name is {}.\n", c.name);
+        printf("ComponentOne's name is {}.\n", c.name)
     }
 
-    do_something_with_component_one(^thing);
+    do_something_with_component_one(^thing)
 
 
 
-    print_spacer();
+    print_spacer()
 
     // One final thing to talk about is structs with parameters, or parameterized structs.
     // Structs in Onyx can take in compile-time known values as arguments, and use them in the struct body.
     // For exmaple,
     ParamStruct :: struct (T: type_expr, N: i32) {
-        t_member   : T;
-        array_of_T : [N] T;
+        t_member   : T
+        array_of_T : [N] T
     }
 
     // This struct takes in two parameters: A type expression T, and an integer N. It has two members.
@@ -155,16 +155,16 @@ main :: (args: [] cstr) {
     param_struct_instance := ParamStruct(f32, 10).{
         t_member = 3.14159,
         array_of_T = .[ 2, 3, 5, 7, 11, 13, 17, 19, 23, 29 ],
-    };
+    }
 
-    println("param_struct_instance values:");
-    println(param_struct_instance.t_member);
-    for elem in param_struct_instance.array_of_T do printf("{} ", elem);
-    print("\n");
-
-
+    println("param_struct_instance values:")
+    println(param_struct_instance.t_member)
+    for elem in param_struct_instance.array_of_T do printf("{} ", elem)
+    print("\n")
 
 
-    print_spacer :: () do println("\n===========================================");
+
+
+    print_spacer :: () do println("\n===========================================")
 }
 

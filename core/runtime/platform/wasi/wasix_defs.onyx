@@ -8,133 +8,133 @@ EventFDFlags :: enum {
 }
 
 TTY :: struct {
-    cols: u32;
-    rows: u32;
-    width: u32;
-    height: u32;
-    stdin_tty: bool;
-    stdout_tty: bool;
-    stderr_tty: bool;
-    echo: bool;
-    line_buffered: bool;
-    line_feeds: bool;
+    cols: u32
+    rows: u32
+    width: u32
+    height: u32
+    stdin_tty: bool
+    stdout_tty: bool
+    stderr_tty: bool
+    echo: bool
+    line_buffered: bool
+    line_feeds: bool
 }
 
 OptionTimestamp :: union #tag_type u8 {
-    None: void;
-    Some: Timestamp;
+    None: void
+    Some: Timestamp
 }
 
 SockStatus :: enum {
-    Opening;
-    Opened;
-    Closed;
-    Failed;
+    Opening
+    Opened
+    Closed
+    Failed
 }
 
 AddrIPv4 :: struct {
-    n0, n1, h0, h1: u8;
+    n0, n1, h0, h1: u8
 }
 
 AddrIPv6 :: struct {
-    n0, n1, n2, n3, h0, h1, h2, h3: u8;
-    flow_info1: u16;
-    flow_info0: u16;
-    scope_id1: u16;
-    scope_id0: u16;
+    n0, n1, n2, n3, h0, h1, h2, h3: u8
+    flow_info1: u16
+    flow_info0: u16
+    scope_id1: u16
+    scope_id0: u16
 }
 
 Addr :: union #tag_type u8 {
     Unspec: struct {
-        n0: u8;
-    };
+        n0: u8
+    }
 
-    Ipv4: AddrIPv4;
+    Ipv4: AddrIPv4
 
-    Ipv6: AddrIPv6;
+    Ipv6: AddrIPv6
 
-    Unix: [108] u8;
+    Unix: [108] u8
 }
 
 AddrPort :: union #tag_type u8 {
     Unspec: struct {
-        port: u16;
-        n0: u8;
-    };
+        port: u16
+        n0: u8
+    }
 
     Ipv4: struct {
-        port: u16;
-        addr: AddrIPv4;
-    };
+        port: u16
+        addr: AddrIPv4
+    }
 
     Ipv6: struct {
-        port: u16;
-        addr: AddrIPv6;
-    };
+        port: u16
+        addr: AddrIPv6
+    }
 
     Unix: struct {
-        path: [108] u8;
+        path: [108] u8
     }
 }
 
 AddressFamily :: enum {
-    Unspec;
-    Inet;
-    Inet6;
+    Unspec
+    Inet
+    Inet6
     Unix;    
 }
 
 SockType :: enum {
-    Unused;
-    Stream;
-    Dgram;
-    Raw;
-    Seqpacket;
+    Unused
+    Stream
+    Dgram
+    Raw
+    Seqpacket
 }
 
 SockProto :: enum {
-    IP;
-    ICMP;
-    IGMP;
+    IP
+    ICMP
+    IGMP
     IPIP :: 4;    
-    TCP :: 6;
-    EGP :: 8;
-    PUP :: 12;
-    UDP :: 17;
-    IDP :: 22;
-    DCCP :: 33;
-    IPV6 :: 41;
-    ICMPV6 :: 58;
+    TCP :: 6
+    EGP :: 8
+    PUP :: 12
+    UDP :: 17
+    IDP :: 22
+    DCCP :: 33
+    IPV6 :: 41
+    ICMPV6 :: 58
 }
 
 SockOption :: enum {
-    Noop;
-    ReusePort;
-    ReuseAddr;
-    NoDelay;
-    DontRoute;
-    OnlyV6;
-    Broadcast;
-    MulticastLoopV4;
-    MulticastLoopV6;
-    Promiscuous;
-    Listening;
-    LastError;
-    KeepAlive;
-    Linger;
-    OOBInline;
-    RecvBufSize;
-    SendBufSize;
-    RecvLowat;
-    SendLowat;
-    RecvTimeout;
-    SendTimeout;
-    ConnectTimeout;
-    AcceptTimeout;
-    TTL;
-    MulticastTTLV5;
-    Type;
-    Proto;
+    Noop
+    ReusePort
+    ReuseAddr
+    NoDelay
+    DontRoute
+    OnlyV6
+    Broadcast
+    MulticastLoopV4
+    MulticastLoopV6
+    Promiscuous
+    Listening
+    LastError
+    KeepAlive
+    Linger
+    OOBInline
+    RecvBufSize
+    SendBufSize
+    RecvLowat
+    SendLowat
+    RecvTimeout
+    SendTimeout
+    ConnectTimeout
+    AcceptTimeout
+    TTL
+    MulticastTTLV5
+    Type
+    Proto
 }
 
 #foreign WASIX_VERSION {

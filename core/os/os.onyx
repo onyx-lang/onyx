@@ -3,11 +3,11 @@ package core.os
 use runtime
 
 #if !runtime.platform.Supports_Os {
-    #error "Cannot include this file. Platform not supported.";
+    #error "Cannot include this file. Platform not supported."
 }
 
 exit :: (exitcode: i32) {
-    runtime.platform.__exit(exitcode);
+    runtime.platform.__exit(exitcode)
 }
 
 #if #defined(runtime.platform.__sleep) {
@@ -17,5 +17,5 @@ exit :: (exitcode: i32) {
 #if #defined(runtime.platform.__time) {
     time :: runtime.platform.__time
 } else {
-    time :: () => u64.{0};
+    time :: () => u64.{0}
 }

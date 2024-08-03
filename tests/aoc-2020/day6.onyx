@@ -3,54 +3,54 @@
 use core {*}
 
 part_1 :: (contents: &str) -> u32 {
-    chars : [26] bool;
-    for &ch in chars do *ch = false;
+    chars : [26] bool
+    for &ch in chars do *ch = false
 
     while true {
-        line := string.read_until(contents, '\n');
-        string.advance(contents, 1);
-        if line.count == 0 do break;
+        line := str.read_until(contents, '\n')
+        str.advance(contents, 1)
+        if line.count == 0 do break
 
-        for ch in line do chars[~~ch - cast(u32) 'a'] = true;
+        for ch in line do chars[~~ch - cast(u32) 'a'] = true
     }
 
-    sum := 0;
-    for ch in chars do if ch do sum += 1;
+    sum := 0
+    for ch in chars do if ch do sum += 1
 
-    return sum;
+    return sum
 }
 
 part_2 :: (contents: &str) -> u32 {
-    chars : [26] u32;
-    for &ch in chars do *ch = 0;
+    chars : [26] u32
+    for &ch in chars do *ch = 0
 
-    person_count := 0;
+    person_count := 0
     while true {
-        line := string.read_until(contents, '\n');
-        string.advance(contents, 1);
-        if line.count == 0 do break;
+        line := str.read_until(contents, '\n')
+        str.advance(contents, 1)
+        if line.count == 0 do break
         
-        person_count += 1;
+        person_count += 1
 
-        for ch in line do chars[~~ch - cast(u32) 'a'] += 1;
+        for ch in line do chars[~~ch - cast(u32) 'a'] += 1
     }
 
-    sum := 0;
-    for ch in chars do if ch == person_count do sum += 1;
+    sum := 0
+    for ch in chars do if ch == person_count do sum += 1
 
-    return sum;
+    return sum
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./input/day6.txt";
+    contents := #file_contents "./input/day6.txt"
 
-    unique_sum := 0;
+    unique_sum := 0
     while true {
-        if contents.count == 0 do break;
+        if contents.count == 0 do break
 
-        unique := part_1(&contents);
-        unique_sum += unique;
+        unique := part_1(&contents)
+        unique_sum += unique
     }
 
-    printf("Unique sum: {}\n", unique_sum);
+    printf("Unique sum: {}\n", unique_sum)
 }

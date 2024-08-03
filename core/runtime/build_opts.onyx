@@ -2,23 +2,23 @@ package runtime
 
 // runtime: Runtime    This is set by the compiler
 Runtime :: enum {
-    Onyx   :: 1;
-    Wasi   :: 2;
-    Js     :: 3;
-    Custom :: 4;
+    Onyx   :: 1
+    Wasi   :: 2
+    Js     :: 3
+    Custom :: 4
 }
 
 // compiler_os        This is set by the compiler. It is not called 'os' because that conflicts with the 'core.os' package.
 OS :: enum {
-    Linux       :: 1;
-    Windows     :: 2;
-    MacOS       :: 3;
+    Linux       :: 1
+    Windows     :: 2
+    MacOS       :: 3
 }
 
 // arch: Arch         This is set by the compiler.
 Arch :: enum {
-    Unknown     :: 0;
-    X86_64      :: 1;
-    X86_32      :: 2;
-    AARCH64     :: 3;
+    Unknown     :: 0
+    X86_64      :: 1
+    X86_32      :: 2
+    AARCH64     :: 3
 }

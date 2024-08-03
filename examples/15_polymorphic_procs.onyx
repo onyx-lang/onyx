@@ -9,7 +9,7 @@
 // You might start by writing it for just integer types as so in
 
 max :: (a: i32, b: i32) -> i32 {
-    return a if a > b else b;
+    return a if a > b else b
 }
 
 // This will work as advertised, but if you try to call it with something other than
@@ -20,7 +20,7 @@ max :: (a: i32, b: i32) -> i32 {
 // To write max in a polymorphic way, you can do it in this way:
 
 max :: (a: $Type, b: Type) -> Type {
-    return a if a > b else b;
+    return a if a > b else b
 }
 
 // In this example, 'Type' is a polymorphic variable, meaning that it is solved for
@@ -52,7 +52,7 @@ push :: (arr: ^[..] T, value: $T) {
 // One final example is a single compose function:
 
 compose :: (a: $A, f: (A) -> $B, g: (B) -> $C) -> C {
-    return g(f(a));
+    return g(f(a))
 }
 
 }

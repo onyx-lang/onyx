@@ -1,50 +1,50 @@
 package core.io
 
 Error :: enum {
-    None           :: 0x00;
+    None           :: 0x00
 
     // The procedure is not implemented for this kind of stream.
-    NotImplemented :: 0x01;
+    NotImplemented :: 0x01
 
     // The stream reached the end.
-    EOF            :: 0x02;
+    EOF            :: 0x02
 
     // The vtable was not set for this stream.
-    NoVtable       :: 0x03;
+    NoVtable       :: 0x03
 
     // A seek was outside the bounds of the stream.
-    OutOfBounds    :: 0x04;
+    OutOfBounds    :: 0x04
 
     // The file or stream was not found.
-    NotFound       :: 0x05;
+    NotFound       :: 0x05
 
     // The file or stream was not initialized correctly.
-    BadFile        :: 0x06;
+    BadFile        :: 0x06
 
     // Some underlying buffer used in stream processing is full.
-    BufferFull     :: 0x07;
+    BufferFull     :: 0x07
 
     // While trying to read from a stream, multiple reads failed in a row.
-    NoProgress     :: 0x08;
+    NoProgress     :: 0x08
 
     // Not possible to unread.
-    InvalidUnread  :: 0x09;
+    InvalidUnread  :: 0x09
 
     // When reading from a stream, no data was read, but data will become available soon.
-    ReadPending    :: 0x0a;
+    ReadPending    :: 0x0a
 
     // When reading from a stream, no data was read, and data will not become available soon.
-    ReadLater      :: 0x0b;
+    ReadLater      :: 0x0b
 
     // A socket tried to connect to an endpoint and failed.
-    ConnectFailed  :: 0x0c;
+    ConnectFailed  :: 0x0c
 
     // Sockets only. Signals that no data was recieved from a non-blocking operation.
-    NoData     :: 0x0d;
+    NoData     :: 0x0d
 
     // Failed to create an object.
-    CreationFailed :: 0x0e;
+    CreationFailed :: 0x0e
 
     // The operation failed.
-    OperationFailed :: 0x0f;
+    OperationFailed :: 0x0f
 }

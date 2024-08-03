@@ -3,76 +3,76 @@
 use core {*}
 
 Pos :: struct {x, y:i32;}
-#match hash.to_u32 (use p: Pos) => x * 45238271 + y * 34725643;
-#operator == (p1, p2: Pos) => p1.x == p2.x && p1.y == p2.y;
+#overload hash.hash :: (use p: Pos) => x * 45238271 + y * 34725643
+#operator == (p1, p2: Pos) => p1.x == p2.x && p1.y == p2.y
 
 main :: (args) => {
-    use file := os.open("./tests/aoc-2021/input/day11.txt")->unwrap();
-    use reader := io.reader_make(&file);
+    use file := os.open("./tests/aoc-2021/input/day11.txt")->unwrap()
+    use reader := io.reader_make(&file)
 
-    octopuses: [..] u32;
+    octopuses: [..] u32
     while !io.reader_empty(&reader) {
-        line := io.read_line(&reader, consume_newline=false, inplace=true);
-        io.skip_whitespace(&reader);
+        line := io.read_line(&reader, consume_newline=false, inplace=true)
+        io.skip_whitespace(&reader)
 
-        for ch in line do octopuses << ~~(ch - '0');
+        for ch in line do octopuses << ~~(ch - '0')
     }
 
     get_octopus :: macro (x, y) => {
-        if x < 0 || y < 0 || x >= 10 || y >= 10 do return -1;
-        return octopuses[y * 10 + x];
+        if x < 0 || y < 0 || x >= 10 || y >= 10 do return -1
+        return octopuses[y * 10 + x]
     }
 
     set_octopus :: macro (x, y, v: i32) {
         if !(x < 0 || y < 0 || x >= 10 || y >= 10) {
-            octopuses[y * 10 + x] = v;
+            octopuses[y * 10 + x] = v
         }
     }
 
     inc_octopus :: macro (x, y) => {
-        if x < 0 || y < 0 || x >= 10 || y >= 10 do return -1;
-        octopuses[y * 10 + x] += 1;
-        return octopuses[y * 10 + x];
+        if x < 0 || y < 0 || x >= 10 || y >= 10 do return -1
+        octopuses[y * 10 + x] += 1
+        return octopuses[y * 10 + x]
     }
 
-    flash_count := 0;
+    flash_count := 0
 
-    step := 0;
-    sync_step := 0;
+    step := 0
+    sync_step := 0
     while true {
-        step += 1;
-        for &o in octopuses do *o += 1;
+        step += 1
+        for &o in octopuses do *o += 1
 
-        #persist to_flash: Set(Pos);
+        #persist to_flash: Set(Pos)
         for y in 10 do for x in 10 {
             if get_octopus(x, y) >= 10 {
-                to_flash << .{x, y};
+                to_flash << .{x, y}
             }
         }
 
         for flash in iter.as_iter(&to_flash) {
             for y in -1 .. 2 do for x in -1 .. 2 {
-                if y == 0 && x == 0 do continue;
+                if y == 0 && x == 0 do continue
 
                 if inc_octopus(flash.x + x, flash.y + y) >= 10 {
-                    to_flash << .{flash.x + x, flash.y + y};
+                    to_flash << .{flash.x + x, flash.y + y}
                 }
             }
         }
 
         for flash in iter.as_iter(&to_flash) {
-            set_octopus(flash.x, flash.y, 0);
-            if step <= 100 do flash_count += 1;
+            set_octopus(flash.x, flash.y, 0)
+            if step <= 100 do flash_count += 1
         }
 
         if to_flash.entries.count == 100 {
-            sync_step = step;
-            break;
+            sync_step = step
+            break
         }
 
-        to_flash->clear();
+        to_flash->clear()
     }
 
-    printf("Part 1: {}\n", flash_count);
-    printf("Part 2: {}\n", sync_step);
+    printf("Part 1: {}\n", flash_count)
+    printf("Part 2: {}\n", sync_step)
 }

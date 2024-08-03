@@ -12,31 +12,31 @@ Allocation_Action_Strings := str.[
     "alloc",
     "free",
     "resize",
-];
+]
 
 #local
 logging_allocator_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
-    allocator := cast(&Allocator) data;
-    res := allocator.func(allocator.data, aa, size, align, oldptr);
+    allocator := cast(&Allocator) data
+    res := allocator.func(allocator.data, aa, size, align, oldptr)
 
     use core { tprintf }
     msg := tprintf("{} = {}(size={}, align={}, oldptr={})",
-        res, Allocation_Action_Strings[cast(u32) aa], size, align, oldptr);
+        res, Allocation_Action_Strings[cast(u32) aa], size, align, oldptr)
 
-    log(.Info, "Core", msg);
+    log(.Info, "Core", msg)
 
-    trace := runtime.info.get_stack_trace();
-    defer if trace do delete(&trace);
+    trace := runtime.info.get_stack_trace()
+    defer if trace do delete(&trace)
     for trace {
-        log(.Info, "Core", tprintf("in {} ({}:{})", it.info.func_name, it.info.file, it.current_line));
+        log(.Info, "Core", tprintf("in {} ({}:{})", it.info.func_name, it.info.file, it.current_line))
     }
 
-    return res;
+    return res
 }
 
 logging_allocator :: (alloc: &Allocator) -> Allocator {
     return Allocator.{
         func = logging_allocator_proc,
         data = alloc,
-    };
+    }
 }

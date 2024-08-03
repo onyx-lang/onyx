@@ -3,7 +3,7 @@ use core {*}
 
 SomeNamespace :: struct {
     foo :: () {
-        println("Aliasing is working");
+        println("Aliasing is working")
     }
 }
 
@@ -11,13 +11,13 @@ main :: (args) => {
     {
         SN :: SomeNamespace
 
-        SN.foo();
+        SN.foo()
     }
 
     {
         // This is no longer a feature, and cannot be used anymore
-        //     use SomeNamespace;
+        //     use SomeNamespace
 
-        SomeNamespace.foo();
+        SomeNamespace.foo()
     }
 }
