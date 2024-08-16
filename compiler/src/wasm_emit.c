@@ -5382,6 +5382,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     sh_new_arena(module.exports);
     sh_new_arena(module.loaded_file_info);
     sh_new_arena(module.string_literals);
+    sh_new_arena(module.custom_sections);
 
     bh_imap_init(&module.index_map, global_heap_allocator, 128);
     bh_imap_init(&module.local_map, global_heap_allocator, 16);
@@ -5476,6 +5477,21 @@ void emit_entity(Entity* ent) {
 
             if (ent->expr->kind == Ast_Kind_Directive_Library) {
                 bh_arr_push(module->libraries, ent->library->library_name);
+            }
+
+            if (ent->expr->kind == Ast_Kind_Directive_Wasm_Section) {
+                AstDirectiveWasmSection *section = (AstDirectiveWasmSection *) ent->expr;
+
+                WasmCustomSection custom;
+                custom.name = section->name;
+                custom.contents = section->contents;
+                custom.len = section->length;
+
+                if (shgeti(module->custom_sections, section->name) >= 0) {
+                    onyx_report_warning(section->token->pos, "Duplicate definitions for custom section '%s'.", section->name);
+                }
+
+                shput(module->custom_sections, section->name, custom);
             }
             break;
         }

@@ -1812,6 +1812,13 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             package->package = current_entity->package;
             return Symres_Complete;
         }
+
+        case Ast_Kind_Directive_Wasm_Section: {
+            AstDirectiveWasmSection *section = (AstDirectiveWasmSection *) directive;
+            SYMRES(expression, &section->section_name);
+            SYMRES(expression, &section->section_contents);
+            return Symres_Success;
+        }
     
         default: assert("Bad directive in symres_process_directive" && 0); break;
     }

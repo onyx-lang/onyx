@@ -48,7 +48,7 @@
     NODE(DirectiveRemove)      \
     NODE(DirectiveFirst)       \
     NODE(DirectiveExportName)  \
-    NODE(DirectiveThisPackage) \
+    NODE(DirectiveWasmSection) \
                                \
     NODE(Return)               \
     NODE(Jump)                 \
@@ -243,6 +243,7 @@ typedef enum AstKind {
     Ast_Kind_Directive_First,
     Ast_Kind_Directive_Export_Name,
     Ast_Kind_Directive_This_Package,
+    Ast_Kind_Directive_Wasm_Section,
     Ast_Kind_Call_Site,
 
     Ast_Kind_Code_Block,
@@ -1580,6 +1581,18 @@ struct AstDirectiveExportName {
     AstFunction *func;
     AstStrLit   *name;
     b32 created_export_entity : 1;
+};
+
+struct AstDirectiveWasmSection {
+    AstNode_base;
+    AstTyped *section_name;
+    AstTyped *section_contents;
+
+    char *name;
+    char *contents;
+    u32 length;
+
+    b32 from_file : 1;
 };
 
 

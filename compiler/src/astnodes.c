@@ -104,6 +104,7 @@ static const char* ast_node_names[] = {
     "FIRST",
     "EXPORT NAME",
     "THIS PACKAGE",
+    "WASM SECTION",
     "CALL SITE",
 
     "CODE BLOCK",

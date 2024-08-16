@@ -584,6 +584,12 @@ typedef struct WasmDatum {
     ptr data;
 } WasmDatum;
 
+typedef struct WasmCustomSection {
+    char *name;
+    char *contents;
+    u32 len;
+} WasmCustomSection;
+
 typedef enum DatumPatchInfoKind {
     Datum_Patch_Instruction,
     Datum_Patch_Data,
@@ -761,6 +767,8 @@ typedef struct OnyxWasmModule {
     b32 needs_memory_section;
     u32 memory_min_size;
     u32 memory_max_size;
+
+    Table(WasmCustomSection) custom_sections;
 
     bh_arr(JsPartial)     js_partials;
 

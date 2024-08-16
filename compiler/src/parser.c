@@ -4382,6 +4382,20 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 parser->last_documentation_token = expect_token(parser, Token_Type_Literal_String);
                 return;
             }
+            else if (parse_possible_directive(parser, "wasm_section")) {
+                AstDirectiveWasmSection *section = make_node(AstDirectiveWasmSection, Ast_Kind_Directive_Wasm_Section);
+                section->token = parser->curr - 2;
+                section->section_name = parse_expression(parser, 0);
+
+                if (parse_possible_directive(parser, "file")) {
+                    section->from_file = 1;
+                }
+
+                section->section_contents = parse_expression(parser, 0);
+
+                ENTITY_SUBMIT(section);
+                return;
+            }
             else {
                 OnyxToken* directive_token = expect_token(parser, '#');
                 OnyxToken* symbol_token = parser->curr;

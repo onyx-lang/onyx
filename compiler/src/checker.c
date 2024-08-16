@@ -3889,6 +3889,48 @@ CheckStatus check_process_directive(AstNode* directive) {
         return Check_Complete;
     }
 
+    if (directive->kind == Ast_Kind_Directive_Wasm_Section) {
+        AstDirectiveWasmSection *section = (AstDirectiveWasmSection *) directive;
+
+        CHECK(expression, &section->section_name);
+        CHECK(expression, &section->section_contents);
+
+        if (section->section_name->kind     != Ast_Kind_StrLit) ERROR(section->token->pos, "Expect section name to be a compile-time known string.");
+        if (section->section_contents->kind != Ast_Kind_StrLit) ERROR(section->token->pos, "Expect section contents to be a compile-time known string.");
+
+        AstStrLit *symbol = (AstStrLit *) section->section_name;
+        char* temp_str    = bh_alloc_array(global_scratch_allocator, char, symbol->token->length);
+        string_process_escape_seqs(temp_str, symbol->token->text, symbol->token->length);
+        section->name = bh_strdup(global_heap_allocator, temp_str);
+
+        symbol   = (AstStrLit *) section->section_contents;
+        temp_str = bh_alloc_array(global_scratch_allocator, char, symbol->token->length + 1);
+        u32 content_length = string_process_escape_seqs(temp_str, symbol->token->text, symbol->token->length);
+
+        if (section->from_file) {
+            const char *containing_filename = section->token->pos.filename;
+            char *parent_folder = bh_path_get_parent(containing_filename, global_scratch_allocator);
+
+            char *path = bh_strdup(
+                global_scratch_allocator,
+                bh_lookup_file(temp_str, parent_folder, "", 0, NULL, 0)
+            );
+
+            if (!bh_file_exists(path)) {
+                ERROR_(section->token->pos, "Failed to open file '%s' for custom section.", path);
+            }
+
+            bh_file_contents contents = bh_file_read_contents(global_heap_allocator, path);
+            section->contents = contents.data;
+            section->length = contents.length;
+        } else {
+            section->contents = bh_strdup(global_heap_allocator, temp_str);
+            section->length = content_length;
+        }
+
+        return Check_Success;
+    }
+
     return Check_Success;
 }
 
