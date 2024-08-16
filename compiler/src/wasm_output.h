@@ -1120,7 +1120,6 @@ i32 output_custom_section(OnyxWasmModule *module, bh_buffer *buff, WasmCustomSec
 
     output_custom_section_name(section->name, &inner_buff);
 
-    output_unsigned_integer(section->len, &inner_buff);
     bh_buffer_append(&inner_buff, section->contents, section->len);
 
     output_unsigned_integer(inner_buff.length, buff);

@@ -891,7 +891,7 @@ int main(int argc, char *argv[]) {
             if (compile_opts.help_subcommand) {
                 print_subcommand_help(compile_opts.help_subcommand);
             } else {
-                bh_printf(top_level_docstring);
+                print_top_level_docs(&compile_opts);
             }
             return 0;
         }
