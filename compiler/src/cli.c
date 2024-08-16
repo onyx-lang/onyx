@@ -667,7 +667,10 @@ static void print_commands_in_directory(char *dir, bh_allocator allocator) {
 static void print_top_level_docs(CompileOptions *options) {
     bh_printf(top_level_docstring);
 
+    bh_printf(C_BOLD "Global custom commands:\n" C_NORM);
     print_commands_in_directory(bh_aprintf(options->allocator, "%s/tools", options->core_installation), options->allocator);
+
+    bh_printf(C_NORM C_BOLD "\nLocal custom commands:\n" C_NORM);
     print_commands_in_directory("./.onyx", options->allocator);
 }
 
