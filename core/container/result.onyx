@@ -186,4 +186,12 @@ __implicit_bool_cast :: macro (r: Result($O, $E)) => cast(Result(O, E).tag_enum,
     };
 }
 
+#operator?? :: macro (r: Result($T, $E), handler: Code) -> T {
+    return switch res := r; res {
+        case .Ok as val => val;
+        case .Err as e {
+            #unquote handler(e)
+        }
+    };
+}
 
