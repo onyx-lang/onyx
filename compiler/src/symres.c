@@ -669,9 +669,13 @@ static SymresStatus symres_proc_expansion(AstProceduralExpansion **pexp, Procedu
     exp->proc_macro = (AstTyped *) strip_aliases((AstNode *) exp->proc_macro);
 
     if (exp->proc_macro->kind != Ast_Kind_Procedural_Macro) {
-        onyx_report_error(exp->token->pos, Error_Critical, "Procedural macro expansion expected a procedural macro before the '!', but got '%s' instead.",
-            onyx_ast_node_kind_string(exp->proc_macro->kind));
-        return Symres_Error;
+        if (context.cycle_almost_detected) {
+            onyx_report_error(exp->token->pos, Error_Critical, "Procedural macro expansion expected a procedural macro before the '!', but got '%s' instead.",
+                onyx_ast_node_kind_string(exp->proc_macro->kind));
+            return Symres_Error;
+        }
+
+        return Symres_Yield_Micro;
     }
 
     AstProceduralMacro *proc_macro = (AstProceduralMacro *) exp->proc_macro;
