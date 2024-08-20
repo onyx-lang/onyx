@@ -3878,7 +3878,7 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
             return (AstTyped *) foreign;
         }
 
-        if (parse_possible_directive(parser, "compiler_extension")) {
+        if (parse_possible_directive(parser, "compiler_extension") || parse_possible_directive(parser, "extension")) {
             return (AstTyped *) parse_compiler_extension(parser, parser->curr - 2);
         }
     }
@@ -4697,6 +4697,11 @@ AstNode  *onyx_parse_statement(OnyxParser *parser, Scope *scope) {
 }
 
 void onyx_parse_top_level_statements(OnyxParser *parser, Scope *scope) {
+    if (peek_token(0)->type == Token_Type_Keyword_Package) {
+        parser->package = parse_file_package(parser);
+        assert(parser->package);
+    }
+
     parser->current_scope = scope;
     parse_top_level_statements_until(parser, Token_Type_End_Stream);
 }

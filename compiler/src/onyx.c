@@ -516,6 +516,13 @@ static void dump_cycles() {
     }
 }
 
+// TODO: relocate this function
+static void send_stalled_hooks() {
+    bh_arr_each(CompilerExtension, ext, context.extensions) {
+        compiler_extension_hook_stalled(ext->id);
+    }
+}
+
 static i32 onyx_compile() {
     u64 start_time = bh_time_curr();
 
@@ -592,11 +599,13 @@ static i32 onyx_compile() {
                 if (ent->macro_attempts > highest_watermark) {
                     entity_heap_insert_existing(&context.entities, ent);
 
-                    if (context.cycle_almost_detected == 3) {
+                    if (context.cycle_almost_detected == 4) {
                         dump_cycles();
-                    } else {
-                        context.cycle_almost_detected += 1;
+                    } else if (context.cycle_almost_detected == 3) {
+                        send_stalled_hooks();
                     }
+
+                    context.cycle_almost_detected += 1;
                 }
             }
             else if (watermarked_node->macro_attempts < ent->macro_attempts) {

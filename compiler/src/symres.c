@@ -2103,7 +2103,7 @@ static SymresStatus symres_compiler_extension(AstCompilerExtension *ext) {
     }
 
     token_toggle_end(ext->name);
-    TypeMatch status = compiler_extension_start(ext->name->text, ext->token->pos.filename, &ext->extension_id);
+    TypeMatch status = compiler_extension_start(ext->name->text, ext->token->pos.filename, current_entity, &ext->extension_id);
     token_toggle_end(ext->name);
 
     if (status == TYPE_MATCH_FAILED) {

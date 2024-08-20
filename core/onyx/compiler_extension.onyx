@@ -10,6 +10,56 @@ use core.alloc {package, arena}
 use core.encoding.osad
 use core.io
 
+// PROTOCOL VERSION 1
+// 
+// OUTGOING
+//
+// INIT (0)             send info about extension
+//     version (u32)
+//     name (str)
+//
+// REPORT (1)           report an error
+//     position (Position)
+//     msg (str)
+//
+// EXPANSION (2)        response to ExpandMacro
+//     id (u32)
+//     code (Result(str, Reason))
+//
+// INJECT (3)           add code to top level scope
+//     code (str)
+//
+//
+// INCOMING
+//
+// INIT (0)
+//     version_major (u32)
+//     version_minor (u32)
+//     version_patch (u32)
+//     max_protocol_version (u32)
+//
+// TERMINATE (1)
+//
+// EXPANDMACRO (2)
+//     id (u32)
+//     location (ExpansionLocation)
+//     position (Position)
+//     macro_name (str)
+//     body (str)
+//
+
+// PROTOCOL VERSION 2 CHANGES
+//
+// OUTGOING INIT (0)
+//     added `hooks ([] i32)` after `name`
+//
+// OUTGOING ACKNOWLEDGEHOOK (4)
+//     Added
+//
+// INCOMING HOOK (3)
+//     Added
+
+
 // Types
 
 IncomingMessage :: union {
@@ -25,12 +75,19 @@ IncomingMessage :: union {
     }
 
     ExpandMacro as 2: ExpansionInfo
+
+    Hook as 3: struct {
+        id: u32
+        info: HookInfo
+    }
 }
 
 OutgoingMessage :: union {
     Init as 0: struct {
         protocol_version: u32
         name: str
+
+        hooks: [] i32
     }
 
     ErrorReport as 1: struct {
@@ -45,6 +102,10 @@ OutgoingMessage :: union {
 
     InjectCode as 3: struct {
         code: str
+    }
+
+    AcknowledgeHook as 4: struct {
+        id: u32
     }
 }
 
@@ -74,6 +135,14 @@ Position :: struct {
     length: u32
 }
 
+HookInfo :: union {
+    None: void
+
+    Stalled: struct {}
+
+    Count: void
+}
+
 
 // Code
 
@@ -81,39 +150,67 @@ ExtensionContext :: struct {
     protocol_version: u32
     name: str
     proc_macros: Map(str, #type (&ExtensionContext, ExpansionInfo) -> Result(str, ExpansionFailureReason))
+    hook_handlers: [cast(i32) HookInfo.tag_enum.Count] (&ExtensionContext, HookInfo) -> void
 
     arena: arena.Arena
+
+    reader: io.Reader
+
+    running: bool
 }
 
 ExtensionContext.make :: (name: str) -> (res: ExtensionContext) {
     res.name = name
-    res.protocol_version = 1
+    res.protocol_version = 2
 
     res.proc_macros = make(typeof res.proc_macros)
     res.arena = arena.make(context.allocator, 32 * 1024)
+    res.reader = io.Reader.make(&stdio.stream)
     return
 }
 
 ExtensionContext.start :: (self: &#Self, callback: (&#Self, msg: IncomingMessage) -> void) {
-    use stdin_reader := io.Reader.make(&stdio.stream)
+    self.running = true
 
-    while true {
+    while self.running {
         msg: IncomingMessage
-        if !osad.deserialize(&msg, typeof msg, &stdin_reader, alloc.as_allocator(&self.arena)) {
+        if !osad.deserialize(&msg, typeof msg, &self.reader, alloc.as_allocator(&self.arena)) {
             break
         }
 
         switch msg {
             case .Init as &init {
+                use hooks := make([..] i32)
+                for h, i in self.hook_handlers {
+                    if h != null_proc {
+                        hooks->push(i)
+                    }
+                }
+
                 self->send(.{
                     Init = .{
-                        protocol_version = self.protocol_version,
+                        protocol_version = self.protocol_version
                         name = self.name
+                        hooks = hooks
                     }
                 })
             }
 
             case .Terminate do break break
+
+            case .Hook as &hk {
+                handler := self.hook_handlers[~~~ hk.info.tag]
+
+                if handler != null_proc {
+                    handler(self, hk.info)
+                }
+
+                self->send(.{
+                    AcknowledgeHook = .{
+                        id = hk.id
+                    }
+                })
+            }
 
             case .ExpandMacro as em {
                 if self.proc_macros->has(em.macro_name) {
@@ -149,6 +246,11 @@ ExtensionContext.send :: (self: &#Self, msg: OutgoingMessage) {
 ExtensionContext.handle_macro :: (self: &#Self, name: str, func: (&ExtensionContext, ExpansionInfo) -> Result(str, ExpansionFailureReason)) {
     self.proc_macros->put(name, func)
 }
+
+ExtensionContext.handle_hook :: (self: &#Self, hook: HookInfo.tag_enum, func: (&ExtensionContext, HookInfo) -> void) {
+    self.hook_handlers[~~hook] = func
+}
+
 
 
 map_position :: (base_pos: Position, pos: Position) => {
