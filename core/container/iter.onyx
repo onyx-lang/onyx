@@ -16,6 +16,7 @@ use core.intrinsics.types {type_is_struct}
 
 Iterator.from :: as_iter
 Iterator.next :: next
+Iterator.close :: close
 Iterator.next_opt :: next_opt
 Iterator.empty :: empty
 Iterator.counter :: counter

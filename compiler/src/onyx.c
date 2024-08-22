@@ -458,7 +458,7 @@ static b32 process_entity(Entity* ent) {
 }
 
 // Just having fun with some visual output - brendanfh 2020/12/14
-#if defined(_BH_LINUX)
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
 static void output_dummy_progress_bar() {
     EntityHeap* eh = &context.entities;
     if (bh_arr_length(eh->entities) == 0) return;
@@ -532,7 +532,7 @@ static i32 onyx_compile() {
     while (!bh_arr_is_empty(context.entities.entities)) {
         Entity* ent = entity_heap_top(&context.entities);
 
-#if defined(_BH_LINUX)
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
         if (context.options->fun_output) {
             output_dummy_progress_bar();
 

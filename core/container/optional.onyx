@@ -37,7 +37,7 @@ Optional.from_ptr :: macro (p: &$T) -> ?T {
 
 /// Extracts the value from the Optional, or uses a default if
 /// no value is present.
-Optional.value_or :: (o: ?$T, default: T) => switch o {
+Optional.value_or :: macro (o: ?$T, default: T) => switch o {
     case .Some as v => v;
     case _          => default;
 }

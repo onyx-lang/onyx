@@ -159,6 +159,16 @@ Slice.get :: (arr: [] $T, idx: i32) -> T {
     return arr.data[idx];
 }
 
+/// Get an element from a slice, with negative and wrap-around indexing.
+Slice.get_opt :: (arr: [] $T, idx: i32) -> ? T {
+    if arr.count == 0 do return .None
+
+    while idx < 0          do idx += arr.count
+    while idx >= arr.count do idx -= arr.count
+
+    return arr.data[idx]
+}
+
 /// Get a pointer to an element from a slice, with negative and wrap-around indexing.
 Slice.get_ptr :: (arr: [] $T, idx: i32) -> &T {
     if arr.count == 0 do return null;

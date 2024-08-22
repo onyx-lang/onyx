@@ -114,6 +114,7 @@ TCP_Server.pulse           :: tcp_server_pulse
 TCP_Server.send            :: tcp_server_send
 TCP_Server.broadcast       :: tcp_server_broadcast
 TCP_Server.handle_events   :: tcp_server_handle_events
+TCP_Server.event_iter      :: tcp_server_event_iter
 TCP_Server.kill_client     :: tcp_server_kill_client
 TCP_Server.transfer_client :: tcp_server_transfer_client
 
@@ -331,10 +332,36 @@ tcp_server_broadcast :: (use server: &TCP_Server, data: [] u8, except: &TCP_Serv
 
 tcp_server_handle_events :: macro (server: &TCP_Server, handler: Code) {
     while server->pulse() {
-        for iter.as_iter(&server.connection) {
+        for Iterator.from(&server.connection) {
             switch it.kind do #unquote handler(it);
         }
     }
+}
+
+tcp_server_event_iter :: (server: &TCP_Server) -> Iterator(TCP_Event) {
+    return Iterator.generator(
+        &.{ server = server, inner_iter = Optional.empty(Iterator(TCP_Event)) }
+
+        (ctx: $C) -> ? TCP_Event {
+            while true {
+                if !ctx.inner_iter {
+                    ctx.server->pulse()
+
+                    ctx.inner_iter = Iterator.from(&ctx.server.connection)
+                }
+
+                i := ctx.inner_iter!
+                next := Iterator.next(i)
+
+                if next do return next
+
+                Iterator.close(i)
+                ctx.inner_iter = .None
+            }
+
+            return .None
+        }
+    )
 }
 
 tcp_server_kill_client :: (use server: &TCP_Server, client: &TCP_Server.Client) {
