@@ -339,8 +339,8 @@ tcp_server_handle_events :: macro (server: &TCP_Server, handler: Code) {
 }
 
 tcp_server_event_iter :: (server: &TCP_Server) -> Iterator(TCP_Event) {
-    return Iterator.generator(
-        &.{ server = server, inner_iter = Optional.empty(Iterator(TCP_Event)) }
+    return Iterator.generator_no_copy(
+        new(.{ server = server, inner_iter = Optional.empty(Iterator(TCP_Event)) })
 
         (ctx: $C) -> ? TCP_Event {
             while true {
@@ -411,7 +411,7 @@ TCP_Client :: struct {
 
 #local
 wait_to_get_client_messages :: (use server: &TCP_Server) -> [] &TCP_Server.Client {
-    active_clients := alloc.array_from_stack(&TCP_Server.Client, client_count);
+    active_clients := alloc.array_from_stack(&TCP_Server.Client, client_count + 1);
     active_clients.count = 0;
 
     for clients {
@@ -438,11 +438,17 @@ wait_to_get_client_messages :: (use server: &TCP_Server) -> [] &TCP_Server.Clien
         return .{ null, 0 };
     }
 
-    status_buffer := alloc.array_from_stack(Socket_Poll_Status, client_count);
+    // HACK This is making a large assumption about the layout of the TCP_Server.Client.
+    // This is assuming that the `socket` member is the first thing, and this this
+    // type punning trick can work.
+    active_clients[active_clients.count] = ~~ &server.socket
+    active_clients.count += 1
+
+    status_buffer := alloc.array_from_stack(Socket_Poll_Status, active_clients.count);
     socket_poll_all(cast([] &Socket) active_clients, status_buffer, pulse_time_ms);
 
     recv_clients: [..] &TCP_Server.Client;
-    for it in client_count {
+    for it in active_clients.count - 1 {
         if status_buffer[it] == .Readable {
             //
             // If there is already a Ready event present for this client,
