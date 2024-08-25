@@ -48,7 +48,7 @@
     NODE(DirectiveRemove)      \
     NODE(DirectiveFirst)       \
     NODE(DirectiveExportName)  \
-    NODE(DirectiveThisPackage) \
+    NODE(DirectiveWasmSection) \
                                \
     NODE(Return)               \
     NODE(Jump)                 \
@@ -243,6 +243,7 @@ typedef enum AstKind {
     Ast_Kind_Directive_First,
     Ast_Kind_Directive_Export_Name,
     Ast_Kind_Directive_This_Package,
+    Ast_Kind_Directive_Wasm_Section,
     Ast_Kind_Call_Site,
 
     Ast_Kind_Code_Block,
@@ -1579,6 +1580,18 @@ struct AstDirectiveExportName {
     b32 created_export_entity : 1;
 };
 
+struct AstDirectiveWasmSection {
+    AstNode_base;
+    AstTyped *section_name;
+    AstTyped *section_contents;
+
+    char *name;
+    char *contents;
+    u32 length;
+
+    b32 from_file : 1;
+};
+
 
 struct AstCallSite {
     AstTyped_base;
@@ -1926,9 +1939,12 @@ typedef enum CompilerExtensionState {
     COMP_EXT_STATE_INITIATING,
     COMP_EXT_STATE_READY,
     COMP_EXT_STATE_EXPANDING,
+    COMP_EXT_STATE_HANDLING_HOOK,
 } CompilerExtensionState;
 
 typedef struct CompilerExtension {
+    u32 id;
+
     u64 pid;
     u64 send_file;
     u64 recv_file;
@@ -1938,9 +1954,13 @@ typedef struct CompilerExtension {
     i32 current_expansion_id;
     CompilerExtensionState state;
 
+    Entity *entity;
+
     bh_arena arena;
 
     b32 alive : 1;
+
+    b32 supports_stalled_hook : 1;
 } CompilerExtension;
 
 typedef struct CompileOptions CompileOptions;
@@ -2043,7 +2063,7 @@ struct Context {
     u64 microseconds_per_state[Entity_State_Count];
     u64 microseconds_per_type[Entity_Type_Count];
 
-    u32 cycle_almost_detected : 2;
+    u32 cycle_almost_detected : 3;
     b32 cycle_detected : 1;
 
     b32 builtins_initialized : 1;
@@ -2262,7 +2282,7 @@ void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved);
 
 
 // Compiler Extensions
-TypeMatch compiler_extension_start(const char *name, const char *containing_filename, i32 *out_extension_id);
+TypeMatch compiler_extension_start(const char *name, const char *containing_filename, Entity *ent, i32 *out_extension_id);
 TypeMatch compiler_extension_expand_macro(
     int extension_id,
     ProceduralMacroExpansionKind kind,
@@ -2272,6 +2292,7 @@ TypeMatch compiler_extension_expand_macro(
     AstNode **out_node,
     u32 *out_expansion_id,
     b32 wait_for_response);
+TypeMatch compiler_extension_hook_stalled(int extension_id);
 
 
 // NOTE: Useful inlined functions

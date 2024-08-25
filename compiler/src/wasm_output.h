@@ -1110,6 +1110,25 @@ static i32 output_producer_section(OnyxWasmModule* module, bh_buffer *buff) {
     return buff->length - prev_len;
 }
 
+i32 output_custom_section(OnyxWasmModule *module, bh_buffer *buff, WasmCustomSection *section) {
+    i32 prev_len = buff->length;
+
+    bh_buffer_write_byte(buff, WASM_SECTION_ID_CUSTOM);
+
+    bh_buffer inner_buff;
+    bh_buffer_init(&inner_buff, buff->allocator, 128);
+
+    output_custom_section_name(section->name, &inner_buff);
+
+    bh_buffer_append(&inner_buff, section->contents, section->len);
+
+    output_unsigned_integer(inner_buff.length, buff);
+    bh_buffer_concat(buff, inner_buff);
+    bh_buffer_free(&inner_buff);
+
+    return buff->length - prev_len;
+}
+
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer) {
     bh_buffer_init(buffer, global_heap_allocator, 128);
     bh_buffer_append(buffer, WASM_MAGIC_STRING, 4);
@@ -1139,6 +1158,10 @@ void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer)
     }
 
     output_producer_section(module, buffer);
+
+    fori (i, 0, shlen(module->custom_sections)) {
+        output_custom_section(module, buffer, &module->custom_sections[i].value);
+    }
 
     // TODO: Consider if this should always be included?
     // It can amount to a lot of extra data.

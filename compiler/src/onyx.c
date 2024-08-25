@@ -458,7 +458,7 @@ static b32 process_entity(Entity* ent) {
 }
 
 // Just having fun with some visual output - brendanfh 2020/12/14
-#if defined(_BH_LINUX)
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
 static void output_dummy_progress_bar() {
     EntityHeap* eh = &context.entities;
     if (bh_arr_length(eh->entities) == 0) return;
@@ -516,6 +516,13 @@ static void dump_cycles() {
     }
 }
 
+// TODO: relocate this function
+static void send_stalled_hooks() {
+    bh_arr_each(CompilerExtension, ext, context.extensions) {
+        compiler_extension_hook_stalled(ext->id);
+    }
+}
+
 static i32 onyx_compile() {
     u64 start_time = bh_time_curr();
 
@@ -525,7 +532,7 @@ static i32 onyx_compile() {
     while (!bh_arr_is_empty(context.entities.entities)) {
         Entity* ent = entity_heap_top(&context.entities);
 
-#if defined(_BH_LINUX)
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
         if (context.options->fun_output) {
             output_dummy_progress_bar();
 
@@ -592,11 +599,13 @@ static i32 onyx_compile() {
                 if (ent->macro_attempts > highest_watermark) {
                     entity_heap_insert_existing(&context.entities, ent);
 
-                    if (context.cycle_almost_detected == 3) {
+                    if (context.cycle_almost_detected == 4) {
                         dump_cycles();
-                    } else {
-                        context.cycle_almost_detected += 1;
+                    } else if (context.cycle_almost_detected == 3) {
+                        send_stalled_hooks();
                     }
+
+                    context.cycle_almost_detected += 1;
                 }
             }
             else if (watermarked_node->macro_attempts < ent->macro_attempts) {
@@ -891,7 +900,7 @@ int main(int argc, char *argv[]) {
             if (compile_opts.help_subcommand) {
                 print_subcommand_help(compile_opts.help_subcommand);
             } else {
-                bh_printf(top_level_docstring);
+                print_top_level_docs(&compile_opts);
             }
             return 0;
         }

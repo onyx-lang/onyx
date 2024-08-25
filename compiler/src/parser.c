@@ -3853,7 +3853,7 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
             return (AstTyped *) foreign;
         }
 
-        if (parse_possible_directive(parser, "compiler_extension")) {
+        if (parse_possible_directive(parser, "compiler_extension") || parse_possible_directive(parser, "extension")) {
             return (AstTyped *) parse_compiler_extension(parser, parser->curr - 2);
         }
     }
@@ -4342,6 +4342,20 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(jsNode);
                 return;
             }
+            else if (parse_possible_directive(parser, "wasm_section")) {
+                AstDirectiveWasmSection *section = make_node(AstDirectiveWasmSection, Ast_Kind_Directive_Wasm_Section);
+                section->token = parser->curr - 2;
+                section->section_name = parse_expression(parser, 0);
+
+                if (parse_possible_directive(parser, "file")) {
+                    section->from_file = 1;
+                }
+
+                section->section_contents = parse_expression(parser, 0);
+
+                ENTITY_SUBMIT(section);
+                return;
+            }
             else {
                 OnyxToken* directive_token = expect_token(parser, '#');
                 OnyxToken* symbol_token = parser->curr;
@@ -4642,6 +4656,11 @@ AstNode  *onyx_parse_statement(OnyxParser *parser, Scope *scope) {
 }
 
 void onyx_parse_top_level_statements(OnyxParser *parser, Scope *scope) {
+    if (peek_token(0)->type == Token_Type_Keyword_Package) {
+        parser->package = parse_file_package(parser);
+        assert(parser->package);
+    }
+
     parser->current_scope = scope;
     parse_top_level_statements_until(parser, Token_Type_End_Stream);
 }

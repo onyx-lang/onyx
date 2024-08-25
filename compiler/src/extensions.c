@@ -6,11 +6,15 @@
 #define MSG_HOST_INIT          0
 #define MSG_HOST_TERMINATE     1
 #define MSG_HOST_EXPAND_MACRO  2
+#define MSG_HOST_HOOK          3
 
-#define MSG_EXT_INIT         0
-#define MSG_EXT_ERROR_REPORT 1
-#define MSG_EXT_EXPANSION    2
-#define MSG_EXT_INJECT_CODE  3
+#define MSG_EXT_INIT             0
+#define MSG_EXT_ERROR_REPORT     1
+#define MSG_EXT_EXPANSION        2
+#define MSG_EXT_INJECT_CODE      3
+#define MSG_EXT_ACKNOWLEDGE_HOOK 4
+
+#define HOOK_STALLED 1
 
 
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
@@ -183,7 +187,7 @@ static char *extension_recv_str(CompilerExtension *ext, i32 *out_len) {
 
 
 
-TypeMatch compiler_extension_start(const char *name, const char *containing_filename, i32 *out_extension_id) {
+TypeMatch compiler_extension_start(const char *name, const char *containing_filename, Entity *ent, i32 *out_extension_id) {
     if (*out_extension_id == 0) {
         char* parent_folder = bh_path_get_parent(containing_filename, global_scratch_allocator);
 
@@ -200,14 +204,16 @@ TypeMatch compiler_extension_start(const char *name, const char *containing_file
         CompilerExtension ext;
         ext.state = COMP_EXT_STATE_SPAWNING;
         bh_arena_init(&ext.arena, global_heap_allocator, 1 * 1024 * 1024); // 1MB
+        ext.entity = ent;
 
         if (!extension_spawn(&ext, path)) {
             return TYPE_MATCH_FAILED;
         }
 
         ext.alive = 1;
+        ext.id = bh_arr_length(context.extensions) + 1;
+        *out_extension_id = ext.id;
         bh_arr_push(context.extensions, ext);
-        *out_extension_id = bh_arr_length(context.extensions); // This makes the extension_id 1 indexed.
 
         // Init message is 5 ints as defined in `core/onyx/compiler_extension`
         i32 init_msg[5];
@@ -247,6 +253,16 @@ b32 compiler_extension_negotiate_capabilities(CompilerExtension *ext) {
     char *extension_name           = extension_recv_str(ext, NULL);
 
     ext->name = bh_strdup(context.ast_alloc, extension_name);
+
+    // handle "hooks"
+    if (extension_protocol_version >= 2) {
+        int hook_count = extension_recv_int(ext);
+        fori (i, 0, hook_count) {
+            int hook = extension_recv_int(ext);
+
+            if (hook == 1) ext->supports_stalled_hook = 1;
+        }
+    }
     
     if (context.options->verbose_output >= 1) {
         bh_printf("Extension '%s' loaded with protocol version %d\n", extension_name, extension_protocol_version);
@@ -282,6 +298,62 @@ static AstNode * parse_code(ProceduralMacroExpansionKind kind, char *code, i32 c
     return result;
 }
 
+static b32 handle_common_messages(CompilerExtension *ext, int msg_type, OnyxToken *tkn, Entity *entity) {
+    switch (msg_type) {
+        case MSG_EXT_INIT:
+            extension_kill(ext);
+            onyx_report_error(tkn->pos, Error_Critical, "Protocol error when talking to '%s'.", ext->name);
+            return 0;
+
+        case MSG_EXT_ERROR_REPORT: {
+            char *filename = extension_recv_str(ext, NULL);
+            u32 line = extension_recv_int(ext);
+            u32 column = extension_recv_int(ext);
+            u32 length = extension_recv_int(ext);
+            char *msg =  extension_recv_str(ext, NULL);
+
+            OnyxFilePos pos;
+            pos.column = column + (line == tkn->pos.line ? 2 : 0);
+            pos.line = line;
+            pos.filename = tkn->pos.filename;
+            pos.length = length;
+
+            i32 line_diff = line - tkn->pos.line;
+            if (line_diff == 0) {
+                pos.line_start = tkn->pos.line_start; 
+            } else {
+                char *c = tkn->text;
+                while (*c && line_diff > 0) {
+                    while (*c && *c != '\n') c++;
+                    line_diff -= 1;
+                    c++;
+                }
+
+                pos.line_start = c;
+            }
+
+            onyx_report_error(pos, Error_Critical, msg);
+            break;
+        }
+
+        case MSG_EXT_INJECT_CODE: {
+            i32 code_length;
+            char *code = bh_strdup(context.ast_alloc, extension_recv_str(ext, &code_length));
+
+            parse_code(PMEK_Top_Level, code, code_length, entity, tkn->pos);
+            break;
+        }
+
+        default:
+            extension_kill(ext);
+            onyx_report_error(tkn->pos, Error_Critical, "Protocol error when talking to '%s'.", ext->name);
+            return 0;
+    }
+
+    return 1;
+}
+
+
 TypeMatch compiler_extension_expand_macro(
     int extension_id,
     ProceduralMacroExpansionKind kind,
@@ -295,13 +367,14 @@ TypeMatch compiler_extension_expand_macro(
     if (extension_id <= 0 || extension_id > bh_arr_length(context.extensions)) return TYPE_MATCH_FAILED;
 
     CompilerExtension *ext = &context.extensions[extension_id - 1];
-    bh_arena_clear(&ext->arena);
 
     if (!ext->alive) return TYPE_MATCH_FAILED;
 
     if (ext->state != COMP_EXT_STATE_READY && ext->current_expansion_id != (i32) *expansion_id) {
         return TYPE_MATCH_YIELD;
     }
+
+    bh_arena_clear(&ext->arena);
 
     // If the extension is in the ready state, then it is waiting for an expansion request.
     // We can issue this expansion request and flag that the extension is now in the expanding state.
@@ -327,93 +400,92 @@ TypeMatch compiler_extension_expand_macro(
         }
 
         int msg_type = extension_recv_int(ext);
-        switch (msg_type) {
-            case MSG_EXT_INIT:
+
+        if (msg_type == MSG_EXT_EXPANSION) {
+            u32 id = extension_recv_int(ext);
+            if (id != *expansion_id) {
+                // PROTOCOL ERROR
                 extension_kill(ext);
                 onyx_report_error(body->pos, Error_Critical, "Protocol error when talking to '%s'.", ext->name);
                 return TYPE_MATCH_FAILED;
-
-            case MSG_EXT_ERROR_REPORT: {
-                char *filename = extension_recv_str(ext, NULL);
-                u32 line = extension_recv_int(ext);
-                u32 column = extension_recv_int(ext);
-                u32 length = extension_recv_int(ext);
-                char *msg =  extension_recv_str(ext, NULL);
-
-                OnyxFilePos pos;
-                pos.column = column + (line == body->pos.line ? 2 : 0);
-                pos.line = line;
-                pos.filename = body->pos.filename;
-                pos.length = length;
-
-                i32 line_diff = line - body->pos.line;
-                if (line_diff == 0) {
-                    pos.line_start = body->pos.line_start; 
-                } else {
-                    char *c = body->text;
-                    while (*c && line_diff > 0) {
-                        while (*c && *c != '\n') c++;
-                        line_diff -= 1;
-                        c++;
-                    }
-
-                    pos.line_start = c;
-                }
-
-                onyx_report_error(pos, Error_Critical, msg);
-                break;
             }
 
-            case MSG_EXT_INJECT_CODE: {
-                i32 code_length;
-                char *code = bh_strdup(context.ast_alloc, extension_recv_str(ext, &code_length));
-
-                parse_code(PMEK_Top_Level, code, code_length, entity, body->pos);
-                break;
-            }
-
-            case MSG_EXT_EXPANSION: {
-                u32 id = extension_recv_int(ext);
-                if (id != *expansion_id) {
-                    // PROTOCOL ERROR
-                    extension_kill(ext);
-                    onyx_report_error(body->pos, Error_Critical, "Protocol error when talking to '%s'.", ext->name);
-                    return TYPE_MATCH_FAILED;
+            int status = extension_recv_int(ext);
+            if (status == 0) {
+                int reason = extension_recv_int(ext);
+                switch (reason) {
+                    // TODO: Make this an enum
+                    case 0: onyx_report_error(body->pos, Error_Critical, "Macro expansion '%s' is not supported by '%s'.", macro_name, ext->name); break;
+                    // case 1: onyx_report_error(body->pos, Error_Critical, "Macro expansion '%s' failed because of a syntax error.", macro_name); break;
                 }
-
-                int status = extension_recv_int(ext);
-                if (status == 0) {
-                    int reason = extension_recv_int(ext);
-                    switch (reason) {
-                        // TODO: Make this an enum
-                        case 0: onyx_report_error(body->pos, Error_Critical, "Macro expansion '%s' is not supported by '%s'.", macro_name, ext->name); break;
-                        // case 1: onyx_report_error(body->pos, Error_Critical, "Macro expansion '%s' failed because of a syntax error.", macro_name); break;
-                    }
-                    return TYPE_MATCH_FAILED;
-                }
-
-                i32 code_length;
-                char *code = extension_recv_str(ext, &code_length);
-                if (!code) {
-                    return TYPE_MATCH_FAILED;
-                }
-
-                code = bh_strdup(context.ast_alloc, code);
-                if (context.options->verbose_output == 2) {
-                    bh_printf("Expansion '%d':\n%s\n", *expansion_id, code);
-                }
-
-                *out_node = parse_code(kind, code, code_length, entity, body->pos);
-
-                ext->state = COMP_EXT_STATE_READY;
-                ext->current_expansion_id = 0;
-                return TYPE_MATCH_SUCCESS;
-            }
-
-            default:
-                extension_kill(ext);
-                onyx_report_error(body->pos, Error_Critical, "Protocol error when talking to '%s'.", ext->name);
                 return TYPE_MATCH_FAILED;
+            }
+
+            i32 code_length;
+            char *code = extension_recv_str(ext, &code_length);
+            if (!code) {
+                return TYPE_MATCH_FAILED;
+            }
+
+            code = bh_strdup(context.ast_alloc, code);
+            if (context.options->verbose_output == 2) {
+                bh_printf("Expansion '%d':\n%s\n", *expansion_id, code);
+            }
+
+            *out_node = parse_code(kind, code, code_length, entity, body->pos);
+
+            ext->state = COMP_EXT_STATE_READY;
+            ext->current_expansion_id = 0;
+            return TYPE_MATCH_SUCCESS;
+        }
+
+        if (!handle_common_messages(ext, msg_type, body, entity)) {
+            return TYPE_MATCH_FAILED;
+        }
+    }
+}
+
+
+TypeMatch compiler_extension_hook_stalled(int extension_id) {
+    if (extension_id <= 0 || extension_id > bh_arr_length(context.extensions)) return TYPE_MATCH_FAILED;
+
+    CompilerExtension *ext = &context.extensions[extension_id - 1];
+    if (!ext->supports_stalled_hook) return TYPE_MATCH_FAILED;
+
+    if (!ext->alive) return TYPE_MATCH_FAILED;
+
+    if (ext->state != COMP_EXT_STATE_READY) {
+        return TYPE_MATCH_FAILED;
+    }
+
+    bh_arena_clear(&ext->arena);
+
+    ext->state = COMP_EXT_STATE_HANDLING_HOOK;
+    
+    extension_send_int(ext, MSG_HOST_HOOK);
+    extension_send_int(ext, HOOK_STALLED);
+    extension_send_int(ext, HOOK_STALLED);
+
+    OnyxToken *tkn = ext->entity->compiler_extension->token;
+
+    while (1) {
+        int msg_type = extension_recv_int(ext);
+
+        if (msg_type == MSG_EXT_ACKNOWLEDGE_HOOK) {
+            u32 id = extension_recv_int(ext);
+            if (id != HOOK_STALLED) {
+                // PROTOCOL ERROR
+                extension_kill(ext);
+                onyx_report_error(tkn->pos, Error_Critical, "Protocol error when talking to '%s'.", ext->name);
+                return TYPE_MATCH_FAILED;
+            }
+
+            ext->state = COMP_EXT_STATE_READY;
+            return TYPE_MATCH_SUCCESS;
+        }
+
+        if (!handle_common_messages(ext, msg_type, tkn, ext->entity)) {
+            return TYPE_MATCH_FAILED;
         }
     }
 }

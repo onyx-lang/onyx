@@ -643,42 +643,83 @@ run_build_command :: (args: [] cstr) {
         build_config = str.as_str(args[0])
     }
 
+    run_build_configuration(build_config)
+}
+
+run_build_configuration :: (build_config: str) -> bool {
     maybe_bc := config.build_configs[build_config]
     if !maybe_bc {
-        error_print("Unrecognized build configuration '{}'.\n", build_config)
-        return
+        error_print("Unrecognized build configuration '{}'\n", build_config)
+        return false
     }
 
-    info_print("Building", "Compiling with build configuration '{}'.\n", build_config)
-
     bc := maybe_bc->unwrap()
+    switch bc {
+        case .CompileOnyx as c {
+            info_print("Building", "Compiling '{}'\n", c.target)
 
-    args: [..] str
-    args << "build"
+            command := os.command()
+            command->path("onyx")
 
-    for bc.include {  args << "-I"; args << it; }
-    for bc.defines do args << tprintf("-D{}", it)
-    for bc.args    do args << it
-    
-    args << "-r"
-    args << bc.runtime
+            command->args(.[ "build" ])
+            for c.include do command->args(.["-I", it])
+            for c.defines do command->args(.[tprintf("-D{}", it)])
 
-    args << "-o"
-    args << bc.target
+            command->args(c.args)
 
-    for bc.sources do args << it
+            command->args(.["-r", c.runtime])
+            command->args(.["-o", c.target])
 
-    p := os.process_spawn("onyx", args)
-    r := io.reader_make(&p)
-    output := io.read_all(&r)
-    switch os.process_wait(&p) {
-        case .Success {
-            info_print("Built", "Successfully compiled with build configuration '{}'.\n", build_config)
+            command->args(c.sources)
+
+            switch command->output() {
+                case .Ok as output {
+                    info_print("Built", "Compiled '{}'\n", c.target);
+                    return true
+                }
+
+                case .Err as e {
+                    error_print("Failed to compile '{}'\n", c.target);
+                    println(e.output);
+                    return false
+                }
+            }
         }
 
-        case _ {
-            error_print("Failed to compile with build configuration '{}'.\n", build_config)
-            println(output)
+        case .RunCommands as cmds {
+            for cmd in cmds {
+                cmd_str := str.join(cmd, " ")
+                info_print("Executing", "{}\n", cmd_str)
+
+                command := os.command()
+                command->path(cmd[0])
+                command->args(cmd[1 .. cmd.length])
+
+                switch command->output() {
+                    case .Ok as output {
+                        info_print("Executed", "{}\n", cmd_str)
+                    }
+
+                    case .Err as e {
+                        error_print("Failed to run '{}'\n", str.join(cmd, " "))
+                        println(e.output)
+                        return false
+                    }
+                }
+            }
+
+            return true
+        }
+
+        case .Collection as steps {
+            info_print("Running", "Running collection '{}'\n", build_config)
+            for step in steps {
+                if !run_build_configuration(step) {
+                    return false
+                }
+            }
+
+            return true
         }
     }
 }
@@ -1182,13 +1223,17 @@ DependencySource :: union {
     Git: str
 }
 
-BuildConfig :: struct {
-    include: [..] str
-    args: [..] str
-    defines: [..] str
-    sources: [..] str
-    runtime: str
-    target: str
+BuildConfig :: union {
+    CompileOnyx: struct {
+        include: [..] str
+        args: [..] str
+        defines: [..] str
+        sources: [..] str
+        runtime: str
+        target: str
+    }
+    RunCommands: [] [] str
+    Collection: [] str
 }
 
 load_config_file :: () -> bool {
@@ -1244,33 +1289,71 @@ load_config :: (path: str) -> ? Config {
 
     for doc->query_all("top() > build > []") {
         b: BuildConfig
-        b.runtime = "onyx"
-        b.target = "out.wasm"
 
-        load_string(it, "runtime", &b.runtime)
-        load_string(it, "target", &b.target)
+        kind := it->value_or_null()->as_str() ?? "compile"
+        switch kind {
+            case "compile" {
+                runtime := "onyx"
+                target  := "out.wasm"
 
-        for it->query_all("include") {
-            Array.concat(&b.include,
-                iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
+                include, defines, args, sources: [..] str
+
+                load_string(it, "runtime", &runtime)
+                load_string(it, "target", &target)
+
+                for it->query_all("include") {
+                    Array.concat(&include,
+                        iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
+                }
+
+                for it->query_all("define") {
+                    Array.concat(&defines,
+                        iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
+                }
+
+                for it->query_all("args") {
+                    Array.concat(&args,
+                        iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
+                }
+
+                for it->query_all("source") {
+                    Array.concat(&sources,
+                        iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
+                }
+
+                c.build_configs[it.node] = .{
+                    CompileOnyx = .{
+                        include, args, defines, sources, runtime, target
+                    }
+                }
+            }
+
+            case "shell" {
+                commands := it->query_all("run")
+                    |> Iterator.map(x => {
+                        return cast([] str, 
+                            Iterator.from(x.values)
+                            |> Iterator.flatten(y => y.*->as_str())
+                            |> Iterator.collect()
+                        )
+                    })
+                    |> Iterator.collect()
+
+                c.build_configs[it.node] = .{
+                    RunCommands = commands
+                }
+            }
+
+            case "collection" {
+                steps := it->query_all("build")
+                    |> Iterator.flatten(x => x->value_or_null()->as_str())
+                    |> Iterator.collect()
+
+                c.build_configs[it.node] = .{
+                    Collection = steps
+                }
+            }
         }
-
-        for it->query_all("define") {
-            Array.concat(&b.defines,
-                iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
-        }
-
-        for it->query_all("args") {
-            Array.concat(&b.args,
-                iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
-        }
-
-        for it->query_all("source") {
-            Array.concat(&b.sources,
-                iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
-        }
-
-        c.build_configs[it.node] = b
     }
 
     for doc->query_all("top() > dependencies > []") {

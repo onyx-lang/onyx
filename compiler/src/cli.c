@@ -220,7 +220,14 @@ static void cli_determine_action(CompileOptions *options, int *first_sub_arg, in
     #endif
 
 
-    char *script_filename = bh_aprintf(options->allocator, "%s/tools/%s.wasm", options->core_installation, argv[1]);
+    // First try `./.onyx` for the executable.
+    char *script_filename = bh_aprintf(options->allocator, "./.onyx/%s.wasm", argv[1]);
+
+    // If that doesn't exist, then try the core installation.
+    if (!bh_file_exists(script_filename)) {
+        script_filename = bh_aprintf(options->allocator, "%s/tools/%s.wasm", options->core_installation, argv[1]);
+    }
+
     if (bh_file_exists(script_filename)) {
         options->action = ONYX_COMPILE_ACTION_RUN_WASM;
         options->target_file = script_filename;
@@ -584,5 +591,86 @@ static void print_subcommand_help(const char *subcommand) {
     bh_printf(C_RED  "error" C_NORM ": Unknown command: '%s'\n", subcommand);
     bh_printf(C_GREY " hint: Run 'onyx --help' for valid commands.\n");
     exit(1);
+}
+
+
+
+static char *get_description_for_subcommand(char *path, bh_allocator allocator) {
+    bh_file_contents contents = bh_file_read_contents(allocator, path);
+
+    if (contents.data == NULL) return NULL;
+
+    u8 *d = contents.data;
+    char *out = NULL;
+
+    i32 cursor = 8; // Skip magic bytes and version.
+    while (cursor < contents.length) {
+        char kind = d[cursor++];
+        int section_length = uleb128_to_uint(d, &cursor);
+
+        // If not a custom section, skip it.
+        if (kind != 0) {
+            cursor += section_length;
+            continue;
+        }
+
+        int previous_cursor = cursor;
+        int name_length = uleb128_to_uint(d, &cursor);
+
+        if (strncmp("onyx-command-description", &d[cursor], name_length)) {
+            cursor = previous_cursor + section_length;
+            continue;
+        }
+
+        cursor += name_length;
+        int description_length = section_length - (cursor - previous_cursor);
+        out = bh_alloc_array(allocator, char, description_length + 1);
+        memcpy(out, &d[cursor], description_length);
+        out[description_length] = 0;
+
+        break;
+    }
+
+    bh_file_contents_free(&contents);
+    return out;
+}
+
+static void print_commands_in_directory(char *dir, bh_allocator allocator) {
+    bh_dir d = bh_dir_open(dir);
+
+    if (!d) return;
+
+    bh_dirent ent;
+    while (bh_dir_read(d, &ent)) {
+        if (bh_str_ends_with(ent.name, ".wasm")) {
+            ent.name[ent.name_length - 5] = 0; // Remove the .wasm from the name
+            bh_printf(C_LBLUE "    %s", ent.name);
+
+            fori (i, 0, 21 - ent.name_length) bh_printf(" ");
+
+            char *description = get_description_for_subcommand(
+                bh_aprintf(allocator, "%s/%s.wasm", dir, ent.name),
+                allocator
+            );
+
+            if (!description) {
+                bh_printf(C_GREY " Description not provided\n");
+            } else {
+                bh_printf(C_NORM " %s\n", description);
+            }
+        }
+    }
+
+    bh_dir_close(d);
+}
+
+static void print_top_level_docs(CompileOptions *options) {
+    bh_printf(top_level_docstring);
+
+    bh_printf(C_BOLD "Global custom commands:\n" C_NORM);
+    print_commands_in_directory(bh_aprintf(options->allocator, "%s/tools", options->core_installation), options->allocator);
+
+    bh_printf(C_NORM C_BOLD "\nLocal custom commands:\n" C_NORM);
+    print_commands_in_directory("./.onyx", options->allocator);
 }
 

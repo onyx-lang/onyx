@@ -1,0 +1,8 @@
+use core {*}
+
+#wasm_section "test-section" "This is the contents of the test section"
+#wasm_section "test-section-2" #file "./custom_section.onyx"
+
+main :: () {
+    println("Worked.");
+}
