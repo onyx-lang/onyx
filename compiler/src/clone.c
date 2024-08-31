@@ -122,6 +122,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Capture_Local: return sizeof(AstCaptureLocal);
         case Ast_Kind_Union_Type: return sizeof(AstUnionType);
         case Ast_Kind_Union_Variant: return sizeof(AstUnionVariant);
+        case Ast_Kind_Procedural_Expansion: return sizeof(AstProceduralExpansion);
 
         default: break;
     }
@@ -706,6 +707,10 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
         case Ast_Kind_Capture_Local:
             C(AstCaptureLocal, type_node);
+            break;
+
+        case Ast_Kind_Procedural_Expansion:
+            C(AstProceduralExpansion, proc_macro);
             break;
     }
 

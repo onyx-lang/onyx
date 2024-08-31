@@ -2137,6 +2137,10 @@ static AstNode *parse_statements_until(OnyxParser *parser, TokenType end_token) 
     AstNode *root = NULL;
     while (!consume_token_if_next(parser, end_token)) {
         AstNode *stmt = parse_statement(parser);
+        if (parser->hit_unexpected_token) {
+            break;
+        }
+
         if (!root) {
             root = stmt;
             next = &root->next;

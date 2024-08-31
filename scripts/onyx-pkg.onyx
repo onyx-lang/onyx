@@ -41,17 +41,18 @@ use core.encoding {kdl}
 use runtime
 
 global_arguments: struct {
-    #tag "--config-file"
+    @"--config-file"
     config_file := "./onyx-pkg.kdl"
 } = .{}
 
-main :: (args: [] cstr) {
+main :: () {
+    args := os.args()
     config = .{}
 
     arg_parse.arg_parse(args, &global_arguments)
 
-    command   := args[0] |> str.as_str()
-    arguments := args[1..args.count]
+    command   := args[0]
+    arguments := args[1 .. args.count]
 
     loaded_config_file := false
     defer if loaded_config_file do store_config_file()
@@ -66,7 +67,7 @@ main :: (args: [] cstr) {
     }
 
     if arguments.count > 0 {
-        if str.from_cstr(arguments[0]) == "--help" {
+        if arguments[0] == "--help" {
             show_help_for_command(command_tag.tag)
             os.exit(1)
         }
@@ -82,8 +83,8 @@ main :: (args: [] cstr) {
         loaded_config_file = true
     }
 
-    assert(command_tag.type == #type ([] cstr) -> void, "BAD TYPE FOR COMMAND PROCEDURE!")
-    (*cast(&([] cstr) -> void) &command_tag.func)(arguments)
+    assert(command_tag.type == #type ([] str) -> void, "BAD TYPE FOR COMMAND PROCEDURE!")
+    (*cast(&([] str) -> void) &command_tag.func)(arguments)
 }
 
 Command :: struct {
@@ -96,8 +97,8 @@ Command :: struct {
     require_config_file := true
 }
 
-#tag Command.{ "help", "Show this help message", "", require_config_file=false }
-run_help_command :: (args: [] cstr) {
+@Command.{ "help", "Show this help message", "", require_config_file=false }
+run_help_command :: (args: [] str) {
     printf("Onyx toolchain version {}\n", Version)
     printf("\n")
     printf("Package dependency resolver and synchronizer for Onyx.\n")
@@ -147,8 +148,8 @@ show_help_for_command :: (cmd: &Command) {
 }
 
 
-#tag Command.{ "init", "Initialize a new project in the current directory", "", require_config_file=false }
-run_init_command :: (args: [] cstr) {
+@Command.{ "init", "Initialize a new project in the current directory", "", require_config_file=false }
+run_init_command :: (args: [] str) {
     if os.file_exists(global_arguments.config_file) {
         error_print("Config file present; project already initialized.\n")
         return
@@ -190,7 +191,7 @@ run_init_command :: (args: [] cstr) {
     store_config_file()
 }
 
-#tag Command.{ "add", "Add a new dependency to the project", "package-url [version]",
+@Command.{ "add", "Add a new dependency to the project", "package-url [version]",
 """
     package-url      Git repository to clone for the package. This can be anything that
                      git knows how to clone.
@@ -199,19 +200,19 @@ run_init_command :: (args: [] cstr) {
                      version is used.
 """
 }
-run_add_command :: (args: [] cstr) {
+run_add_command :: (args: [] str) {
     if args.count < 1 {
         error_print("Expected package URL")
         return
     }
 
-    dep_name := str.as_str(args[0])
+    dep_name := args[0]
     dep_repo := Git.get_full_repo_uri(dep_name)
 
     version: SemVer
     if args.count > 1 {
-        if !conv.parse_any(&version, str.as_str(args[1])) {
-            error_print("Failed to parse version number given: {}\n", str.as_str(args[1]))
+        if !conv.parse_any(&version, args[1]) {
+            error_print("Failed to parse version number given: {}\n", args[1])
             return
         }
 
@@ -223,7 +224,7 @@ run_add_command :: (args: [] cstr) {
         error_print("Dependency '{}' already specified at version '{}'.\n", dep_name, config.dependencies[dep_name]?.version)
 
     } elseif version->is_zero() {
-        error_print("Unable to find latest version of '{}'\n", str.as_str(args[0]))
+        error_print("Unable to find latest version of '{}'\n", args[0])
 
     } else {
         config.dependencies[dep_name] = .{
@@ -235,18 +236,18 @@ run_add_command :: (args: [] cstr) {
     }
 }
 
-#tag Command.{ "remove", "Remove a dependency", "package-or-url",
+@Command.{ "remove", "Remove a dependency", "package-or-url",
 """
     package-or-url   Git repository name or package name on disk to remove.
 """
 }
-run_remove_command :: (args: [] cstr) {
+run_remove_command :: (args: [] str) {
     if args.count < 1 {
         error_print("Expected package name.\n")
         return
     }
 
-    dep := str.as_str(args[0])
+    dep := args[0]
 
     if config.dependencies->has(dep) {
         version := config.dependencies->get(dep)->unwrap().version
@@ -258,8 +259,8 @@ run_remove_command :: (args: [] cstr) {
     error_print("Dependency '{}' is not currently used.\n", dep)
 }
 
-#tag Command.{ "show", "Show dependencies and versions", "" }
-run_show_command :: (args: [] cstr) {
+@Command.{ "show", "Show dependencies and versions", "" }
+run_show_command :: (args: [] str) {
     printf("Package name        : {}\n", config.package_name)
     printf("Package description : {}\n", config.package_description)
     printf("Package url         : {}\n", config.package_url)
@@ -279,8 +280,8 @@ run_show_command :: (args: [] cstr) {
     print("\n")
 }
 
-#tag Command.{ "update", "Update dependencies to newest compatible versions", "" }
-run_update_command :: (args: [] cstr) {
+@Command.{ "update", "Update dependencies to newest compatible versions", "" }
+run_update_command :: (args: [] str) {
     info_print("Info", "Updating dependencies to newest compatible versions.\n")
     for& config.dependencies.entries {
         if it.value.locked {
@@ -299,7 +300,7 @@ run_update_command :: (args: [] cstr) {
     }
 }
 
-#tag Command.{ "sync", "Synchronize local dependency folder", "[..flags]",
+@Command.{ "sync", "Synchronize local dependency folder", "[..flags]",
 """
 Flags:
     --clean          Remove directories of unneeded dependencies. This is not the default
@@ -308,12 +309,12 @@ Flags:
     --skip-native    Skips compiling native libraries during synchronization.
 """
 }
-run_sync_command :: (args: [] cstr) {
+run_sync_command :: (args: [] str) {
     Sync_Options :: struct {
-        #tag "--clean"
+        @"--clean"
         clean := false
 
-        #tag "--skip-native"
+        @"--skip-native"
         skip_native := false
     }
     options: Sync_Options
@@ -395,18 +396,18 @@ run_sync_command :: (args: [] cstr) {
     build_package_file_to_load()
 }
 
-#tag Command.{ "rebuild", "Rebuild native library for a package", "package-or-url",
+@Command.{ "rebuild", "Rebuild native library for a package", "package-or-url",
 """
     package-or-url   Git repository name or package name on disk to rebuild.
 """
 }
-run_rebuild_command :: (args: [] cstr)  {
+run_rebuild_command :: (args: [] str)  {
     if args.count < 1 {
         error_print("Expected package name.\n")
         return
     }
 
-    dep := str.as_str(args[0])
+    dep := args[0]
     if config.dependencies->has(dep) {
         dep = config.dependencies->get(dep)->unwrap().source.Git->unwrap()
     }
@@ -421,8 +422,8 @@ run_rebuild_command :: (args: [] cstr)  {
     }
 }
 
-#tag Command.{ "publish", "Create a published version of this package", "" }
-run_publish_command :: (args: [] cstr) {
+@Command.{ "publish", "Create a published version of this package", "" }
+run_publish_command :: (args: [] str) {
     // @TODO // Better error handling and reporting, as this is a delicate process.
 
     if !os.dir_exists(".git") {
@@ -476,13 +477,13 @@ run_publish_command :: (args: [] cstr) {
     }
 }
 
-#tag Command.{ "list-versions", "List all installable versions of a remote package", "[package-url]", require_config_file=false }
-run_list_versions :: (args: [] cstr) {
+@Command.{ "list-versions", "List all installable versions of a remote package", "[package-url]", require_config_file=false }
+run_list_versions :: (args: [] str) {
     if args.count < 1 {
         return
     }
 
-    pack := str.as_str(args[0])
+    pack := args[0]
 
     pack      = Git.get_full_repo_uri(pack)
     versions := Git.get_available_versions(pack)
@@ -495,16 +496,16 @@ run_list_versions :: (args: [] cstr) {
     }
 }
 
-#tag Command.{
+@Command.{
     "migrate", "Migrate an old Onyx package", "",
     require_config_file = false,
 }
-run_migrate_command :: (args: [] cstr) {
+run_migrate_command :: (args: [] str) {
     config = read_old_config("./onyx-pkg.ini")->unwrap()
     store_config_file()
 }
 
-#tag Command.{
+@Command.{
     "new", "Create a new project from a template in the current directory", "(template_name | --list) [directory]",
 """
 Arguments:
@@ -514,9 +515,9 @@ Arguments:
 """,
     require_config_file = false
 }
-run_new_command :: (args: [] cstr) {
+run_new_command :: (args: [] str) {
     if args.count >= 1 {
-        if str.as_str(args[0]) == "--list" {
+        if args[0] == "--list" {
             printf("List of installed templates\n")
             for os.list_directory(Template_Directory()) {
                 if !str.ends_with(it->name(), ".json") do continue
@@ -531,11 +532,11 @@ run_new_command :: (args: [] cstr) {
     directory     := "."
 
     if args.count >= 1 {
-        template_name = str.as_str(args[0])
+        template_name = args[0]
     }
 
     if args.count >= 2 {
-        directory = str.as_str(args[1])
+        directory = args[1]
     }
 
     if os.list_directory(directory)->count(x => true) > 0 {
@@ -630,17 +631,17 @@ run_new_command :: (args: [] cstr) {
     }
 }
 
-#tag Command.{
+@Command.{
     "build", "Builds the package using the build configuration specified the package file", "[build_config]",
     """
 Arguments:
     build_config     The name of the configuration to use (defaults to 'default').
     """
 }
-run_build_command :: (args: [] cstr) {
+run_build_command :: (args: [] str) {
     build_config := "default"
     if args.count >= 1 {
-        build_config = str.as_str(args[0])
+        build_config = args[0]
     }
 
     run_build_configuration(build_config)
@@ -674,13 +675,13 @@ run_build_configuration :: (build_config: str) -> bool {
 
             switch command->output() {
                 case .Ok as output {
-                    info_print("Built", "Compiled '{}'\n", c.target);
+                    info_print("Built", "Compiled '{}'\n", c.target)
                     return true
                 }
 
                 case .Err as e {
-                    error_print("Failed to compile '{}'\n", c.target);
-                    println(e.output);
+                    error_print("Failed to compile '{}'\n", c.target)
+                    println(e.output)
                     return false
                 }
             }
@@ -972,8 +973,8 @@ build_package_file_to_load :: () {
 
 
 
-#tag conv.Custom_Parse.{parse}
-#tag conv.Custom_Format.{format}
+@conv.Custom_Parse.{parse}
+@conv.Custom_Format.{format}
 SemVer :: struct {
     major, minor, patch: i32
 

@@ -24,10 +24,21 @@ use runtime
 /// Options that are strings and integers expect an argument after
 /// them to specify their value. Options that are bool default to
 /// false and are true if one or more of the option values are present.
+arg_parse :: #match #local {}
+
+#overload
 arg_parse :: (c_args: [] cstr, output: any) -> bool {
-    arg_iter := iter.as_iter(c_args) |>
-                iter.map(x => str.as_str(x))
-    defer arg_iter.close(arg_iter.data)
+    args := Iterator.from(c_args) |>
+            Iterator.map(string.from_cstr) |>
+            Iterator.collect()
+
+    return arg_parse(args, output)
+}
+
+#overload
+arg_parse :: (args: [] str, output: any) -> bool {
+    arg_iter := Iterator.from(args)
+    defer Iterator.close(arg_iter)
 
     use runtime.info {*}
 
