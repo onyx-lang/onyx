@@ -29,7 +29,7 @@ arg_parse :: #match #local {}
 #overload
 arg_parse :: (c_args: [] cstr, output: any) -> bool {
     args := Iterator.from(c_args) |>
-            Iterator.map(string.from_cstr) |>
+            Iterator.map(str.from_cstr) |>
             Iterator.collect()
 
     return arg_parse(args, output)
