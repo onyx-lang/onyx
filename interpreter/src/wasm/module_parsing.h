@@ -888,10 +888,10 @@ static void parse_instruction(build_context *ctx) {
         case 0xB9: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_F64)); break;
         case 0xBA: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_F64)); break;
         case 0xBB: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_CVT_F32,   OVM_TYPE_F64)); break;
-        case 0xBC: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_TRANSMUTE_F32, OVM_TYPE_I32)); break;
-        case 0xBD: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_TRANSMUTE_F64, OVM_TYPE_I64)); break;
-        case 0xBE: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_TRANSMUTE_I32, OVM_TYPE_F32)); break;
-        case 0xBF: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_TRANSMUTE_I64, OVM_TYPE_F64)); break;
+        case 0xBC: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_TRANSMUTE, OVM_TYPE_I32)); break;
+        case 0xBD: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_TRANSMUTE, OVM_TYPE_I64)); break;
+        case 0xBE: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_TRANSMUTE, OVM_TYPE_F32)); break;
+        case 0xBF: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_TRANSMUTE, OVM_TYPE_F64)); break;
         case 0xC0: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_CVT_I8_S, OVM_TYPE_I32)); break;
         case 0xC1: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_CVT_I16_S, OVM_TYPE_I32)); break;
         case 0xC2: ovm_code_builder_add_unop (&ctx->builder, OVM_TYPED_INSTR(OVMI_CVT_I8_S, OVM_TYPE_I64)); break;

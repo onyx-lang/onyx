@@ -223,7 +223,7 @@ struct ovm_func_t {
 
         i32 external_func_idx;
 
-        void (*compiled_func)(ovm_state_t *, ovm_value_t *args);
+        void (*compiled_func)(ovm_state_t *state, ovm_value_t *args);
     };
 };
 
@@ -325,55 +325,50 @@ struct ovm_instr_t {
 #define OVMI_BR_Z              0x28   // br pc + a if %b == 0
 #define OVMI_BR_NZ             0x29   // br pc + a if %b != 0
 #define OVMI_BRI               0x2a   // br pc + %a             // Relative branching
-#define OVMI_BRI_Z             0x2b   // br pc + %a if %b == 0
-#define OVMI_BRI_NZ            0x2c   // br pc + %a if %b != 0
 
-#define OVMI_CLZ               0x2d   // %r = clz(%a)
-#define OVMI_CTZ               0x2e   // %r = ctr(%a)
-#define OVMI_POPCNT            0x2f   // %r = popcnt(%a)
-#define OVMI_ROTL              0x30   // %r = rotl(%a, %b)
-#define OVMI_ROTR              0x31   // %r = rotr(%a, %b)
+#define OVMI_CLZ               0x2b   // %r = clz(%a)
+#define OVMI_CTZ               0x2c   // %r = ctr(%a)
+#define OVMI_POPCNT            0x2d   // %r = popcnt(%a)
+#define OVMI_ROTL              0x2e   // %r = rotl(%a, %b)
+#define OVMI_ROTR              0x2f   // %r = rotr(%a, %b)
 
 // These instructions are only implemented for floats.
-#define OVMI_ABS               0x32   // %r = |%a|
-#define OVMI_NEG               0x33   // %r = -%a
-#define OVMI_CEIL              0x34   // %r = ceil(%a)
-#define OVMI_FLOOR             0x35   // %r = floor(%a)
-#define OVMI_TRUNC             0x36   // %r = trunc(%a)
-#define OVMI_NEAREST           0x37   // %r = nearest(%a)
-#define OVMI_SQRT              0x38   // %r = sqrt(%a)
-#define OVMI_MIN               0x39   // %r = min(%a, %b)
-#define OVMI_MAX               0x3a   // %r = max(%a, %b)
-#define OVMI_COPYSIGN          0x3b   // %r = copysign(%a, %b)
+#define OVMI_ABS               0x30   // %r = |%a|
+#define OVMI_NEG               0x31   // %r = -%a
+#define OVMI_CEIL              0x32   // %r = ceil(%a)
+#define OVMI_FLOOR             0x33   // %r = floor(%a)
+#define OVMI_TRUNC             0x34   // %r = trunc(%a)
+#define OVMI_NEAREST           0x35   // %r = nearest(%a)
+#define OVMI_SQRT              0x36   // %r = sqrt(%a)
+#define OVMI_MIN               0x37   // %r = min(%a, %b)
+#define OVMI_MAX               0x38   // %r = max(%a, %b)
+#define OVMI_COPYSIGN          0x39   // %r = copysign(%a, %b)
 
 // For conversion operations, the "type" of the instruction is
 // destination type, the type in the name is the source type.
 //
 // There are a couple of cast operations that are not available,
 // such as unsigned conversion from 32-bit integers to floats.
-#define OVMI_CVT_I8            0x3c   // %r = (t) %a
-#define OVMI_CVT_I8_S          0x3d   // %r = (t) %a (sign aware)
-#define OVMI_CVT_I16           0x3e   // %r = (t) %a
-#define OVMI_CVT_I16_S         0x3f   // %r = (t) %a (sign aware)
-#define OVMI_CVT_I32           0x40   // %r = (t) %a
-#define OVMI_CVT_I32_S         0x41   // %r = (t) %a (sign aware)
-#define OVMI_CVT_I64           0x42   // %r = (t) %a
-#define OVMI_CVT_I64_S         0x43   // %r = (t) %a (sign aware)
-#define OVMI_CVT_F32           0x44   // %r = (t) %a
-#define OVMI_CVT_F32_S         0x45   // %r = (t) %a (sign aware)
-#define OVMI_CVT_F64           0x46   // %r = (t) %a
-#define OVMI_CVT_F64_S         0x47   // %r = (t) %a (sign aware)
-#define OVMI_TRANSMUTE_I32     0x48   // %r = *(t *) &%a (reinterpret bytes)
-#define OVMI_TRANSMUTE_I64     0x49   // %r = *(t *) &%a (reinterpret bytes)
-#define OVMI_TRANSMUTE_F32     0x4a   // %r = *(t *) &%a (reinterpret bytes)
-#define OVMI_TRANSMUTE_F64     0x4b   // %r = *(t *) &%a (reinterpret bytes)
+#define OVMI_CVT_I8            0x3a   // %r = (t) %a
+#define OVMI_CVT_I8_S          0x3b   // %r = (t) %a (sign aware)
+#define OVMI_CVT_I16           0x3c   // %r = (t) %a
+#define OVMI_CVT_I16_S         0x3d   // %r = (t) %a (sign aware)
+#define OVMI_CVT_I32           0x3e   // %r = (t) %a
+#define OVMI_CVT_I32_S         0x3f   // %r = (t) %a (sign aware)
+#define OVMI_CVT_I64           0x40   // %r = (t) %a
+#define OVMI_CVT_I64_S         0x41   // %r = (t) %a (sign aware)
+#define OVMI_CVT_F32           0x42   // %r = (t) %a
+#define OVMI_CVT_F32_S         0x43   // %r = (t) %a (sign aware)
+#define OVMI_CVT_F64           0x44   // %r = (t) %a
+#define OVMI_CVT_F64_S         0x45   // %r = (t) %a (sign aware)
+#define OVMI_TRANSMUTE         0x46   // %r = *(t *) &%a (reinterpret bytes)
 
-#define OVMI_CMPXCHG           0x4c   // %r = %r == %a ? %b : %r
+#define OVMI_CMPXCHG           0x47   // %r = %r == %a ? %b : %r
 
-#define OVMI_BREAK             0x4d
+#define OVMI_BREAK             0x48
 
-#define OVMI_MEM_SIZE          0x4e   // %r = <size in bytes of memory>
-#define OVMI_MEM_GROW          0x4f   // %r = <grow memory, return new size in bytes>
+#define OVMI_MEM_SIZE          0x49   // %r = <size in bytes of memory>
+#define OVMI_MEM_GROW          0x4a   // %r = <grow memory, return new size in bytes>
 
 //
 // OVM_TYPED_INSTR(OVMI_ADD, OVM_TYPE_I32) == instruction for adding i32s

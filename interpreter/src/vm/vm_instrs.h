@@ -396,11 +396,9 @@ OVMI_INSTR_EXEC(calli) {
 //
 
 OVMI_INSTR_EXEC(br)     { state->pc += instr->a; NEXT_OP; }
-OVMI_INSTR_EXEC(bri)    { state->pc += VAL(instr->a).i32; NEXT_OP; }
-OVMI_INSTR_EXEC(br_nz)  { if (VAL(instr->b).i32 != 0) state->pc += instr->a; NEXT_OP; }
-OVMI_INSTR_EXEC(bri_nz) { if (VAL(instr->b).i32 != 0) state->pc += VAL(instr->a).i32; NEXT_OP; }
 OVMI_INSTR_EXEC(br_z)   { if (VAL(instr->b).i32 == 0) state->pc += instr->a; NEXT_OP; }
-OVMI_INSTR_EXEC(bri_z)  { if (VAL(instr->b).i32 == 0) state->pc += VAL(instr->a).i32; NEXT_OP; }
+OVMI_INSTR_EXEC(br_nz)  { if (VAL(instr->b).i32 != 0) state->pc += instr->a; NEXT_OP; }
+OVMI_INSTR_EXEC(bri)    { state->pc += VAL(instr->a).i32; NEXT_OP; }
 
 
 //
@@ -599,8 +597,6 @@ static ovmi_instr_exec_t OVMI_DISPATCH_NAME[] = {
     IROW_UNTYPED(br_z)
     IROW_UNTYPED(br_nz)
     IROW_UNTYPED(bri)
-    IROW_UNTYPED(bri_z)
-    IROW_UNTYPED(bri_nz)
     IROW_INT(clz)
     IROW_INT(ctz)
     IROW_INT(popcount)
@@ -628,10 +624,7 @@ static ovmi_instr_exec_t OVMI_DISPATCH_NAME[] = {
     NULL, NULL, NULL, D(cvt_f32_s_i32), D(cvt_f32_s_i64), NULL, D(cvt_f32_s_f64), NULL,
     NULL, NULL, NULL, D(cvt_f64_i32), D(cvt_f64_i64), D(cvt_f64_f32), NULL, NULL,
     NULL, NULL, NULL, D(cvt_f64_s_i32), D(cvt_f64_s_i64), D(cvt_f64_s_f32), NULL, NULL,
-    NULL, NULL, NULL, D(transmute_i32_f32), NULL, NULL, NULL, NULL,
-    NULL, NULL, NULL, NULL, D(transmute_i64_f64), NULL, NULL, NULL,
-    NULL, NULL, NULL, NULL, NULL, D(transmute_f32_i32), NULL, NULL,
-    NULL, NULL, NULL, NULL, NULL, NULL, D(transmute_f64_i64), NULL,
+    NULL, NULL, NULL, D(transmute_i32_f32), D(transmute_i64_f64), D(transmute_f32_i32), D(transmute_f64_i64), NULL,
     IROW_INT(cmpxchg)
     IROW_SAME(illegal)
     IROW_UNTYPED(mem_size)
