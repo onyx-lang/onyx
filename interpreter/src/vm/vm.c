@@ -111,12 +111,13 @@ void ovm_program_modify_static_int(ovm_program_t *program, int arr, int idx, int
     program->static_integers[array.start_idx + idx] = new_value;
 }
 
-int ovm_program_register_func(ovm_program_t *program, char *name, i32 instr, i32 param_count, i32 value_number_count) {
+int ovm_program_register_func(ovm_program_t *program, char *name, i32 instr, i32 end_instr, i32 param_count, i32 value_number_count) {
     ovm_func_t func;
     func.kind = OVM_FUNC_INTERNAL;
     func.id = bh_arr_length(program->funcs);
     func.name = name;
     func.start_instr = instr;
+    func.end_instr = end_instr;
     func.param_count = param_count;
     func.value_number_count = value_number_count;
 

@@ -949,7 +949,14 @@ static void parse_code_section(build_context *ctx) {
         ovm_code_builder_add_return(&ctx->builder);
 
         char *func_name = bh_aprintf(bh_heap_allocator(), "wasm_loaded_%d", func_idx);
-        ovm_program_register_func(ctx->program, func_name, ctx->builder.start_instr, ctx->builder.param_count, ctx->builder.highest_value_number + 1);
+        ovm_program_register_func(
+            ctx->program,
+            func_name,
+            ctx->builder.start_instr,
+            bh_arr_length(ctx->program->code),
+            ctx->builder.param_count,
+            ctx->builder.highest_value_number + 1
+        );
 
         ovm_code_builder_free(&ctx->builder);
         debug_info_builder_end_func(&ctx->debug_builder);

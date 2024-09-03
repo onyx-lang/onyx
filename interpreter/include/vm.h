@@ -13,6 +13,7 @@ typedef u32 ovm_instr_kind_t;
 typedef struct ovm_store_t ovm_store_t;
 typedef struct ovm_engine_t ovm_engine_t;
 typedef struct ovm_program_t ovm_program_t;
+typedef struct ovm_native_context_t ovm_native_context_t;
 typedef struct ovm_state_t ovm_state_t;
 typedef struct ovm_stack_frame_t ovm_stack_frame_t;
 typedef enum   ovm_func_kind_t ovm_func_kind_t;
@@ -74,6 +75,12 @@ struct ovm_value_t {
     ovm_valtype_t type;
 };
 
+struct ovm_native_context_t {
+    void *code;
+
+    void *next_func_start;
+};
+
 
 //
 // Represents a program that is runnable by the
@@ -90,6 +97,8 @@ struct ovm_program_t {
 
     i32 register_count;
     ovm_store_t *store;
+
+    ovm_native_context_t native;
 };
 
 ovm_program_t *ovm_program_new(ovm_store_t *store);
@@ -97,7 +106,7 @@ void ovm_program_delete(ovm_program_t *program);
 void ovm_program_add_instructions(ovm_program_t *program, i32 instr_count, ovm_instr_t *instrs);
 
 int  ovm_program_register_static_ints(ovm_program_t *program, int len, int *data);
-int  ovm_program_register_func(ovm_program_t *program, char *name, i32 instr, i32 param_count, i32 value_number_count);
+int  ovm_program_register_func(ovm_program_t *program, char *name, i32 instr, i32 end_instr, i32 param_count, i32 value_number_count);
 int  ovm_program_register_external_func(ovm_program_t *program, char *name, i32 param_count, i32 external_func_idx);
 void ovm_program_begin_func(ovm_program_t *program, char *name, i32 param_count, i32 value_number_count);
 void ovm_program_modify_static_int(ovm_program_t *program, int arr, int idx, int new_value);
@@ -192,7 +201,8 @@ struct ovm_stack_frame_t {
 //
 enum ovm_func_kind_t {
     OVM_FUNC_INTERNAL,
-    OVM_FUNC_EXTERNAL
+    OVM_FUNC_EXTERNAL,
+    OVM_FUNC_NATIVE,
 };
 
 struct ovm_func_t {
@@ -206,8 +216,14 @@ struct ovm_func_t {
     i32 value_number_count;
 
     union {
-        i32 start_instr;
+        struct {
+            i32 start_instr;
+            i32 end_instr;
+        };
+
         i32 external_func_idx;
+
+        void (*compiled_func)(ovm_state_t *, ovm_value_t *args);
     };
 };
 

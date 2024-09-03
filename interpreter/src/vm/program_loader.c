@@ -82,7 +82,7 @@ bool ovm_program_load_from_file(ovm_program_t *program, ovm_engine_t *engine, ch
         bh_file_read(&file, &param_count, sizeof(i32));
         bh_file_read(&file, &value_number_count, sizeof(i32));
 
-        ovm_program_register_func(program, "LOADED", start_instr, param_count, value_number_count);
+        ovm_program_register_func(program, "LOADED", start_instr, -1, param_count, value_number_count);
     }
 
     //
