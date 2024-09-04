@@ -1134,6 +1134,7 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg, b32 in
             } else {
                 if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "No value given for %d%s argument.", idx + 1, bh_num_suffix(idx + 1));
                 success = 0;
+                break;
             }
         }
     }
@@ -1228,7 +1229,8 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
                             }
                         }
 
-                        error->pos = arg_arr[arg_pos]->token->pos;
+                        if (arg_arr[arg_pos]->token) error->pos = arg_arr[arg_pos]->token->pos;
+
                         error->text = bh_aprintf(global_heap_allocator,
                                 "The procedure '%s' expects a value of type '%s' for %d%s parameter, got '%s'.",
                                 func_name,
@@ -1310,7 +1312,7 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
 type_checking_done:
     if (arg_pos < func_type->needed_param_count) {
         if (error != NULL) {
-            error->pos = location->pos;
+            if (location) error->pos = location->pos;
             error->text = bh_aprintf(global_heap_allocator,
                     "Too few arguments to function call. Expected at least %d argument%s, but only got %d.",
                     func_type->needed_param_count, bh_num_plural(func_type->needed_param_count), arg_pos);
@@ -1320,7 +1322,7 @@ type_checking_done:
 
     if (arg_pos < (u32) arg_count) {
         if (error != NULL) {
-            error->pos = location->pos;
+            if (location) error->pos = location->pos;
             error->text = bh_aprintf(global_heap_allocator,
                     "Too many arguments to function call. Expected at most %d argument%s, but got %d.",
                     arg_pos, bh_num_plural(arg_pos), arg_count);
