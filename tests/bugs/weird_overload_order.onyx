@@ -1,0 +1,26 @@
+// This test case isn't *strictly* working...
+// You should be able to rearrange these overloads and have it still work.
+
+use core {*}
+
+Foo :: struct { _: i32 }
+
+Foo.overload :: #match #local {}
+
+#overload
+Foo.overload :: (f: Foo, a: str, $b: type_expr) -> ? b {
+    return .{ Some = .{} }
+}
+
+#overload
+Foo.overload :: (f: Foo, a: str) -> ? str {
+    return "Working"
+}
+
+
+main :: () {
+    f := Foo.{}
+
+    Foo.overload(f, "test", u32) |> println()
+    Foo.overload(f, "test") |> println()
+}

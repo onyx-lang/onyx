@@ -330,12 +330,8 @@ run_sync_command :: (args: [] str) {
         downgrade_if_necessary: bool
     }
 
-    dependencies_to_install   := make([..] To_Install)
-    dependencies_installed    := make(Map(str, SemVer))
-    defer {
-        delete(&dependencies_to_install)
-        delete(&dependencies_installed)
-    }
+    use dependencies_to_install := make([..] To_Install)
+    use dependencies_installed  := make(Map(str, SemVer))
 
     for& config.dependencies.entries {
         dependencies_to_install << .{
@@ -391,6 +387,11 @@ run_sync_command :: (args: [] str) {
         }
 
         dependencies_installed[repo] = to_install.version
+    }
+
+    if !run_tool_installation(".") {
+        error_print("Aborting sync.\n")
+        return
     }
 
     build_package_file_to_load()
@@ -647,6 +648,9 @@ run_build_command :: (args: [] str) {
     run_build_configuration(build_config)
 }
 
+run_build_configuration :: #match #local {}
+
+#overload
 run_build_configuration :: (build_config: str) -> bool {
     maybe_bc := config.build_configs[build_config]
     if !maybe_bc {
@@ -655,12 +659,21 @@ run_build_configuration :: (build_config: str) -> bool {
     }
 
     bc := maybe_bc->unwrap()
+    return run_build_configuration(bc, build_config)
+}
+
+#overload
+run_build_configuration :: (bc: BuildConfig, build_config := "") -> bool {
     switch bc {
         case .CompileOnyx as c {
             info_print("Building", "Compiling '{}'\n", c.target)
 
             command := os.command()
             command->path("onyx")
+
+            if c.working_dir {
+                command->dir(c.working_dir)
+            }
 
             command->args(.[ "build" ])
             for c.include do command->args(.["-I", it])
@@ -779,8 +792,10 @@ install_package :: (pack: Package, downgrade_if_necessary := false, skip_native_
     
     if skip_native_compilation do return true, package_folder
 
-    install_success := run_native_library_installation(package_folder)
-    return install_success, package_folder
+    native_install_success := run_native_library_installation(package_folder)
+    tool_install_success   := run_tool_installation(package_folder)
+
+    return native_install_success && tool_install_success, package_folder
 }
 
 uninstall_package :: (pack: Package) -> bool {
@@ -916,6 +931,41 @@ native_library_is_up_to_date :: (folder: str) -> bool {
     if !os.file_stat(inner_package_file, &package_stat) do return false
 
     return target_stat.modified_time >= package_stat.modified_time
+}
+
+run_tool_installation :: (folder: str) -> bool {
+    inner_config := read_config_from_installed_dependency(folder) ?? [] {
+        error_print("Failed to parse onyx-pkg.kdl in '{}'.\n", folder)
+        return #from_proc false
+    }
+
+    if inner_config.tools->empty() do return true
+
+    if !os.dir_exists(".onyx") {
+        if !os.dir_create(".onyx") {
+            error_print("Failed to create tool directory, '.onyx'.\n")
+            return false
+        }
+    }
+
+    for Iterator.from(inner_config.tools) {
+        bc := it.value
+        bc = .{
+            CompileOnyx = .{
+                ..bc.CompileOnyx!,
+                target = tprintf(".onyx/{}.wasm", it.key),
+                working_dir = folder,
+                args = Array.make(.["--no-compiler-extensions"])
+            }
+        }
+
+        if !run_build_configuration(bc) {
+            error_print("Failed to install tool '{}' from '{}'.\n", it.key, inner_config.package_name)
+            return false
+        }
+    }
+
+    return true
 }
 
 run_command_and_forward_output :: (cmd: str) => {
@@ -1207,6 +1257,8 @@ Config :: struct {
 
     build_configs: Map(str, BuildConfig)
 
+    tools: Map(str, BuildConfig)
+
     dependencies: Map(str, Dependency)
 
     _source_doc: ? kdl.Document
@@ -1232,6 +1284,7 @@ BuildConfig :: union {
         sources: [..] str
         runtime: str
         target: str
+        working_dir: str
     }
     RunCommands: [] [] str
     Collection: [] str
@@ -1288,6 +1341,21 @@ load_config :: (path: str) -> ? Config {
         load_string(p, "build", &c.native_library_build)
     })
 
+    for doc->query_all("top() > tools > []") {
+        sources: [..] str
+
+        for it->query_all("source") {
+            Array.concat(&sources,
+                Iterator.from(it.values)->flatten(x => (*x)->as_str()))
+        }
+
+        c.tools[it.node] = .{
+            CompileOnyx = .{
+                sources = sources
+            }
+        }
+    }
+
     for doc->query_all("top() > build > []") {
         b: BuildConfig
 
@@ -1324,7 +1392,7 @@ load_config :: (path: str) -> ? Config {
 
                 c.build_configs[it.node] = .{
                     CompileOnyx = .{
-                        include, args, defines, sources, runtime, target
+                        include, args, defines, sources, runtime, target, working_dir = ""
                     }
                 }
             }
