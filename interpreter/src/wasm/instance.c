@@ -9,7 +9,6 @@ static_assert(sizeof(ovm_value_t) == sizeof(wasm_val_t), "Size of ovm_value_t sh
 typedef struct wasm_ovm_binding wasm_ovm_binding;
 struct wasm_ovm_binding {
     int func_idx;
-    ovm_engine_t  *engine;
     ovm_state_t   *state;
     ovm_program_t *program;
 
@@ -106,7 +105,7 @@ static wasm_trap_t *wasm_to_ovm_func_call_binding(void *vbinding, const wasm_val
         WASM_TO_OVM(args->data[i], vals[i]);
     }
 
-    ovm_value_t ovm_res = ovm_func_call(binding->engine, binding->state, binding->program, binding->func_idx, args->size, vals);
+    ovm_value_t ovm_res = ovm_func_call(binding->state, binding->program, binding->func_idx, args->size, vals);
 
     // Check for error (trap).
     if (ovm_res.type == OVM_TYPE_ERR) {
@@ -232,7 +231,6 @@ static void prepare_instance(wasm_instance_t *instance, const wasm_extern_vec_t 
     // Create function objects
     fori (i, 0, (int) instance->module->functypes.size) {
         wasm_ovm_binding *binding = bh_alloc(instance->store->engine->store->arena_allocator, sizeof(*binding));
-        binding->engine   = ovm_engine;
         binding->func_idx = bh_arr_length(instance->funcs);
         binding->program  = ovm_program;
         binding->state    = ovm_state;

@@ -156,6 +156,64 @@ void ovm_program_add_instructions(ovm_program_t *program, i32 instr_count, ovm_i
 }
 
 
+static void ovm_native_allocate_codespace(ovm_native_context_t *native) {
+    void *new_addr = mmap(native->code, native->code_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+    // TODO: #native Error handling
+    if (new_addr == MAP_FAILED) return;
+
+    if (native->code) {
+        memcpy(new_addr, native->code, native->code_size);
+        munmap(native_code, native->code_size);
+    }
+
+    native->code = new_addr;
+}
+
+static void ovm_native_prepare(ovm_native_context_t *native) {
+    native->code_size = 1024 * 1024; // 1MB to start
+    native->code = NULL;
+    ovm_native_allocate_codespace(native);
+
+    native->next_func_start = 0;
+}
+
+static void convert_func_to_native(ovm_program_t *program, ovm_func_t *func) {
+    bh_buffer code_buffer;
+    bh_buffer_init(&code_buffer, bh_heap_allocator(), 0x1000);
+
+    // populate the code_buffer here using other wizardry.
+    if (!ovm_generate_native_code(program, func, &code_buffer)) {
+        // TODO: #native handle errors
+    }
+
+    ovm_native_context_t *native = &program->native;
+    bh_align(native->next_func_start, 16);
+
+    while (native->code_size < native->next_func_start + code_buffer.length) {
+        native->code_size *= 2;
+        ovm_native_allocate_codespace(native);
+        // TODO: #native handle errors
+    }
+
+    memcpy(&native->code[native->next_func_start], code_buffer.data, code_buffer.length);
+
+    func->kind = OVM_FUNC_NATIVE;
+    func->compiled_func = (void *) &native->code[native->next_func_start];
+
+    native->next_func_start += code_buffer.length;
+    bh_buffer_free(&code_buffer);
+}
+
+void ovm_program_convert_funcs_to_native(ovm_program_t *program) {
+    ovm_native_prepare(&program->native);
+
+    bh_arr_each(ovm_func_t, func, program->funcs) {
+        convert_func_to_native(program, func);
+    }
+}
+
+
 //
 // Engine
 ovm_engine_t *ovm_engine_new(ovm_store_t *store) {
@@ -377,7 +435,7 @@ static ovm_stack_frame_t ovm__func_teardown_stack_frame(ovm_state_t *state) {
     return frame;
 }
 
-ovm_value_t ovm_func_call(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program, i32 func_idx, i32 param_count, ovm_value_t *params) {
+ovm_value_t ovm_func_call(ovm_state_t *state, ovm_program_t *program, i32 func_idx, i32 param_count, ovm_value_t *params) {
     ovm_func_t *func = &program->funcs[func_idx];
     ovm_assert(func->value_number_count >= func->param_count);
 
@@ -392,7 +450,7 @@ ovm_value_t ovm_func_call(ovm_engine_t *engine, ovm_state_t *state, ovm_program_
             }
 
             state->pc = func->start_instr;
-            ovm_value_t result = ovm_run_code(engine, state, program);
+            ovm_value_t result = ovm_run_code(state, program);
 
             state->call_depth -= 1;
             return result;
@@ -409,6 +467,14 @@ ovm_value_t ovm_func_call(ovm_engine_t *engine, ovm_state_t *state, ovm_program_
 
             state->call_depth -= 1;
             return result;
+        }
+
+        case OVM_FUNC_NATIVE: {
+            if (func->param_count != param_count) {
+                // TODO: #native error handling
+            }
+
+            return func->compiled_func(state, params);
         }
 
         default: return (ovm_value_t) {};
@@ -539,8 +605,7 @@ static void __ovm_debug_hook(ovm_engine_t *engine, ovm_state_t *state) {
 #define OVMI_DIVIDE_CHECK_HOOK(ctype) if (VAL(instr->b).ctype == 0) __ovm_trigger_exception(state)
 #include "./vm_instrs.h"
 
-ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program) {
-    ovm_assert(engine);
+ovm_value_t ovm_run_code(ovm_state_t *state, ovm_program_t *program) {
     ovm_assert(state);
     ovm_assert(program);
 
@@ -550,7 +615,7 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
     }
 
     ovm_instr_t *code = program->code;
-    u8 *memory = engine->memory;
+    u8 *memory = state->engine->memory;
     ovm_value_t *values = state->__frame_values;
     ovm_instr_t *instr = &code[state->pc];
 
@@ -558,7 +623,7 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
 }
 
 
-void ovm_print_stack_trace(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program) {
+void ovm_print_stack_trace(ovm_state_t *state, ovm_program_t *program) {
     int i = 0;
     bh_arr_rev_each(ovm_stack_frame_t, frame, state->stack_frames) {
         ovm_func_t *func = frame->func;

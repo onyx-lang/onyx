@@ -77,8 +77,9 @@ struct ovm_value_t {
 
 struct ovm_native_context_t {
     void *code;
+    u64 code_size;
 
-    void *next_func_start;
+    u64 next_func_start;
 };
 
 
@@ -104,6 +105,7 @@ struct ovm_program_t {
 ovm_program_t *ovm_program_new(ovm_store_t *store);
 void ovm_program_delete(ovm_program_t *program);
 void ovm_program_add_instructions(ovm_program_t *program, i32 instr_count, ovm_instr_t *instrs);
+void ovm_program_convert_funcs_to_native(ovm_program_t *program);
 
 int  ovm_program_register_static_ints(ovm_program_t *program, int len, int *data);
 int  ovm_program_register_func(ovm_program_t *program, char *name, i32 instr, i32 end_instr, i32 param_count, i32 value_number_count);
@@ -223,7 +225,7 @@ struct ovm_func_t {
 
         i32 external_func_idx;
 
-        void (*compiled_func)(ovm_state_t *state, ovm_value_t *args);
+        ovm_value_t (*compiled_func)(ovm_state_t *state, ovm_value_t *args);
     };
 };
 
@@ -242,9 +244,9 @@ ovm_func_t  *ovm_func_new();
 ovm_instr_t *ovm_func_add_instruction(ovm_func_t *func, ovm_instr_kind_t instr, ovm_valtype_t type);
 void         ovm_func_delete(ovm_func_t *func);
 
-ovm_value_t ovm_func_call(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program, i32 func_idx,
+ovm_value_t ovm_func_call(ovm_state_t *state, ovm_program_t *program, i32 func_idx,
         i32 param_count, ovm_value_t *params);
-ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program);
+ovm_value_t ovm_run_code(ovm_state_t *state, ovm_program_t *program);
 
 //
 // Instruction encoding
@@ -377,6 +379,10 @@ struct ovm_instr_t {
 
 
 void ovm_disassemble(ovm_program_t *program, u32 instr_addr, bh_buffer *instr_text);
+
+
+// TODO: #native add #if
+b32 ovm_generate_native_code(ovm_program_t *program, ovm_func_t *func, bh_buffer *code);
 
 #endif
 
