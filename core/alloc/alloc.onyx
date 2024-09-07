@@ -8,7 +8,8 @@ package core.alloc
 #load "./pool"
 #load "./logging"
 #load "./gc"
-#load "./memdebug"
+#load "./debug"
+#load "./memwatch"
 
 use core.memory
 use core.intrinsics.types {type_is_function}
@@ -100,4 +101,15 @@ init_temp_allocator :: () {
 /// Resets the temporary allocator, effectively freeing all allocations made in the temporary allocator.
 clear_temp_allocator :: () {
     arena.clear(&temp_state);
+}
+
+
+report_leaks_in_scope :: macro () {
+    use core.alloc
+
+    use __ha := alloc.debug.make(context.allocator)
+
+    __old_allocator := context.allocator
+    context.allocator = alloc.as_allocator(&__ha)
+    defer context.allocator = __old_allocator
 }

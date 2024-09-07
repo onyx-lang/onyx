@@ -1,0 +1,177 @@
+package core.alloc.debug
+#allow_stale_code
+
+use core.alloc
+use core.memory
+use runtime.info { Stack_Frame, get_stack_trace }
+
+Debug_Max_Stack_Frames :: 6
+
+Debug_Header_Magic_Number      :: 0x7e577e50
+Debug_Header_Magic_Number_Mask :: 0xfffffff0
+
+Debug_Allocation_State :: enum {
+    Bad       :: 0
+    Allocated :: 2
+    Freed     :: 4
+}
+
+Debug_Header :: struct #align 16 {
+    next: &Debug_Header
+    prev: &Debug_Header
+
+    frames: [Debug_Max_Stack_Frames] Stack_Frame
+    frame_count: u32
+
+    size: u32
+
+    magic_number: u32
+}
+
+Debug_State :: struct {
+    backing: Allocator
+    first: &Debug_Header
+}
+
+make :: (backing_allocator: Allocator) -> Debug_State {
+    return .{ backing_allocator, null }
+}
+
+#overload
+alloc.as_allocator :: (s: &Debug_State) -> Allocator {
+    return .{ s, debug_alloc }
+}
+
+Debug_State.destroy :: (s: &Debug_State) {
+    walker := s.first
+    while walker {
+        n := walker.next
+        if get_state(walker) == .Allocated {
+            logf(
+                .Warning,
+                "Memory leaked at {} ({} bytes)",
+                cast([&] Debug_Header) walker + 1,
+                walker.size
+            )
+            log_stack_trace(walker.frames[0 .. walker.frame_count], .Warning)
+
+            s.backing.func(s.backing.data, .Free, 0, 0, walker)
+        }
+        walker = n
+    }
+
+    s.first = null
+}
+
+
+#local
+debug_alloc :: (state: &Debug_State, action: AllocationAction, size, align: u32, oldptr: rawptr) -> rawptr {
+    old: &Debug_Header
+    if oldptr {
+        old = cast([&] Debug_Header) oldptr - 1
+
+        if old.magic_number & Debug_Header_Magic_Number_Mask != Debug_Header_Magic_Number {
+            log(.Debug, "Debug allocator got something that doesn't look like it was allocated from it. Maybe corrupt memory?")
+            return state.backing.func(state.backing.data, action, size, align, oldptr)
+        }
+    }
+
+    if action == .Resize || action == .Free {
+        remove_entry_from_list(state, old)
+    }
+
+    ret: & Debug_Header
+
+    switch action {
+        case .Alloc {
+            debug_header: &Debug_Header = state.backing.func(state.backing.data, action, size + sizeof Debug_Header, align, null)
+
+            debug_header.magic_number = Debug_Header_Magic_Number + ~~Debug_Allocation_State.Allocated
+            debug_header.frame_count = get_stack_trace(debug_header.frames, 1).count
+            debug_header.size = size
+
+            ret = debug_header
+        }
+
+        case .Free {
+            if get_state(old) == .Freed {
+                report_double_free(old)
+                return null
+            }
+
+            old.magic_number = Debug_Header_Magic_Number + ~~Debug_Allocation_State.Freed
+            old.frame_count = get_stack_trace(old.frames, 1).count
+
+            state.backing.func(state.backing.data, action, size + sizeof Debug_Header, align, old)
+        }
+
+        case .Resize {
+            if get_state(old) == .Freed {
+                report_double_free(old)
+            }
+
+            old.magic_number = Debug_Header_Magic_Number + ~~Debug_Allocation_State.Freed
+
+            debug_header: &Debug_Header = state.backing.func(state.backing.data, action, size + sizeof Debug_Header, align, old)
+
+            debug_header.magic_number = Debug_Header_Magic_Number + ~~Debug_Allocation_State.Allocated
+            debug_header.frame_count = get_stack_trace(debug_header.frames, 1).count
+            debug_header.size = size
+
+            ret = debug_header
+        }
+    }
+
+    if ret != null {
+        ret.next = state.first
+        ret.prev = null
+
+        if state.first != null {
+            state.first.prev = ret
+        }
+
+        state.first = ret
+        return cast([&] Debug_Header) ret + 1
+    }
+
+    return null
+}
+
+#local
+log_stack_trace :: (trace: [] Stack_Frame, severity: Log_Level) {
+    for &t in trace {
+        logf(severity, "     {} at {}:{}", t.info.func_name, t.info.file, t.current_line)
+    }
+}
+
+#local
+get_state :: (h: &Debug_Header) -> Debug_Allocation_State {
+    if (h.magic_number & Debug_Header_Magic_Number_Mask) != Debug_Header_Magic_Number {
+        return .Bad
+    }
+
+    return ~~(h.magic_number & ~Debug_Header_Magic_Number_Mask)
+}
+
+#local
+remove_entry_from_list :: (state: &Debug_State, header: &Debug_Header) {
+    if header.prev {
+        header.prev.next = header.next
+    } else {
+        state.first = header.next
+    }
+
+    if header.next {
+        header.next.prev = header.prev
+    }
+}
+
+#local
+report_double_free :: (header: &Debug_Header) {
+    logf(.Warning, "Double free detected on {}. Tried to free here:", cast([&] Debug_Header) header + 1)
+    use trace := get_stack_trace(2)
+    log_stack_trace(trace, .Warning)
+
+    log(.Warning, "Was already freed here:")
+    log_stack_trace(header.frames[0 .. header.frame_count], .Warning)
+}

@@ -74,7 +74,7 @@ builtin.delete :: Map.free
 
 /// Destroys a map and frees all memory.
 Map.free :: (use map: &Map) {
-    if hashes.data != null  do memory.free_slice(&hashes, allocator=allocator);
+    if hashes.data != null  do Slice.free(&hashes, allocator=allocator);
     if entries.data != null do Array.free(&entries);
 }
 
