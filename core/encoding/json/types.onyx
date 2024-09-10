@@ -85,11 +85,11 @@ Value.as_array :: (v: Value) -> [..] Value {
     return (cast(^_Value_Array) cast(^_Value) v).array_;
 }
 
-Value.as_map :: (v: Value) -> Map(str, Value) {
+Value.as_map :: (v: Value, allocator := context.allocator) -> Map(str, Value) {
     if cast(rawptr) v == null do return .{};
     if (cast(^_Value) v).type != .Object do return .{};
 
-    m: Map(str, Value);
+    m := make(Map(str, Value), allocator)
     for ^(cast(^_Value_Object, cast(^_Value, v))).object_ {
         m->put(it.key, it.value);
     }
@@ -315,6 +315,32 @@ free :: (v: Value, allocator: Allocator) {
 #overload
 free :: (use j: Json) {
     free(root, allocator);
+}
+
+/// Frees a single Value, non-recursively.
+free_value :: (v: Value, allocator: Allocator) {
+    switch v_ := cast(&_Value) v; v_.type {
+        case .String {
+            v_str := cast(&_Value_String) v_
+            if !v_str.str_.data do return
+
+            if !v_str.dont_free {
+                raw_free(allocator, v_str.str_.data)
+            }
+        }
+
+        case .Array {
+            v_arr := cast(&_Value_Array) v_
+            Array.free(&v_arr.array_)
+        }
+
+        case .Object {
+            v_obj := cast(&_Value_Object) v_
+            Array.free(&v_obj.object_)
+        }
+    }
+
+    raw_free(allocator, cast(&_Value) v)
 }
 
 static_string :: (s: str) -> _Value_String {

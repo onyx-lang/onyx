@@ -293,6 +293,13 @@ from_any :: macro (v: ^$T, allocator := context.allocator) -> Value {
 }
 
 #overload
+from_any :: macro (v: $T, allocator := context.allocator) -> Value {
+    from_any :: from_any
+    x := v
+    return from_any(T, &x, allocator)
+}
+
+#overload
 from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> Value {
     use runtime.info;
 
