@@ -1,3 +1,6 @@
+///
+/// **EXPERIMENTAL**: JWT support is under active development.
+/// The public interface for this package is subject to change.
 package core.crypto.keys
 #allow_stale_code
 
@@ -123,8 +126,8 @@ JWT.parse :: (token: str, signing_key: str, allocator := context.allocator) -> R
         |> Result.transform(x => x.root)
         |> Result.transform_err(x => JWT_Parse_Error.Invalid_Body)?
         |> free_after_use(
-            (x, [allocator]) => json.free_value(x, allocator)
             (x, [allocator]) => json.Value.as_map(x, allocator)
+            (x, [allocator]) => json.free_value(x, allocator)
         )
 
     token := JWT.{}
@@ -181,7 +184,7 @@ verify_string :: (s: str, method: JWT_Signing_Method, data: any, signature: str)
 }
 
 #local
-free_after_use :: (x: $T, free: (T) -> void, f: (T) -> $R) -> R {
+free_after_use :: (x: $T, f: (T) -> $R, free: (T) -> void) -> R {
     defer { free(x) }
     return f(x)
 }
