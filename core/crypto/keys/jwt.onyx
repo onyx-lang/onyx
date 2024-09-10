@@ -148,7 +148,10 @@ JWT.parse :: (token: str, signing_key: str, allocator := context.allocator) -> R
         signature
     )
 
-    if !valid do return .{ Err = .Invalid_Signature }
+    if !valid {
+        token->destroy()
+        return .{ Err = .Invalid_Signature }
+    }
 
     return .{ Ok = token }
 }
