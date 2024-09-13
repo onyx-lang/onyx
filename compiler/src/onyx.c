@@ -348,7 +348,7 @@ static b32 process_load_entity(Entity* ent) {
         return 1;
 
     } else if (include->kind == Ast_Kind_Load_Path) {
-        // bh_arr_push(context.options->included_folders, include->name);
+        onyx_report_warning(include->token->pos, "'#load_path' has been deprecated and no longer does anything.");
 
     } else if (include->kind == Ast_Kind_Library_Path) {
         bh_arr_push(context.wasm_module->library_paths, include->name);
