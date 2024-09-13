@@ -19,9 +19,12 @@ Additions:
 - `Slice.get_opt`
 - `Iterator.from`
 - `iter.group_by`
+- `core.alloc.debug`
 - `core.os.args`
 - `core.crypto.hmac`
+- `core.crypto.keys`
 - `core.encoding.json.Value.as_entry_array`
+- `core.encoding.base64 { encode_url, decode_url }`
 
 Removals:
 
@@ -29,6 +32,7 @@ Changes:
 - `&&` and `||` now short-circuit.
 - The size of tag field for unions is now dependent on the number of variants.
 - Parsing structs no longer sometimes needs `#type`.
+- Renamed `core.alloc.memdebug` to `core.alloc.memwatch`.
 
 Bugfixes:
 - Bug when injecting into a `#distinct` type.
