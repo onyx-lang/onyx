@@ -3913,7 +3913,7 @@ CheckStatus check_process_directive(AstNode* directive) {
 
             char *path = bh_strdup(
                 global_scratch_allocator,
-                bh_lookup_file(temp_str, parent_folder, "", 0, NULL, 0)
+                bh_lookup_file(temp_str, parent_folder, NULL, NULL, NULL)
             );
 
             if (!bh_file_exists(path)) {

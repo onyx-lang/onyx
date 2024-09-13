@@ -1,6 +1,6 @@
 // This test does not make a whole ton of sense, but it does thoroughly test the #persist local capability.
 
-#load "core/module"
+
 
 use core {*}
 
