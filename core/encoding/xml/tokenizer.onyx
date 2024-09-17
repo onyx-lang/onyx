@@ -1,11 +1,13 @@
 package core.encoding.xml
 #allow_stale_code
 
+use core.alloc {arena, as_allocator}
 use core.io
 use core.encoding.utf8
 
 Tokenizer :: struct {
-    a: Allocator
+    arena: arena.Arena
+
     s: &io.Stream
     r: io.Reader
 
@@ -66,7 +68,7 @@ Token.Kind :: union {
 
 
 Tokenizer.make :: (a: Allocator, s: &io.Stream) -> (tkn: Tokenizer) {
-    tkn.a = a
+    tkn.arena = arena.make(a, 16384)
     tkn.s = s
     tkn.r = io.Reader.make(s)
     tkn.offset = 0
@@ -78,6 +80,7 @@ Tokenizer.make :: (a: Allocator, s: &io.Stream) -> (tkn: Tokenizer) {
 }
 
 Tokenizer.destroy :: (self: &#Self) {
+    arena.free(&self.arena)
     self.r->free()
 }
 
@@ -118,7 +121,7 @@ Tokenizer.skip_whitespace :: (self: &#Self) {
 Tokenizer.scan_ident :: (self: &#Self) -> Token.Kind {
     namespaced := false
 
-    ident := make(dyn_str, 8, self.a)
+    ident := make(dyn_str, 32, as_allocator(&self.arena))
 
     while is_ident_rune(self.current) {
         utf8.append_rune(&ident, self.current)
@@ -200,7 +203,7 @@ Tokenizer.scan_comment :: (self: &#Self) -> bool {
 }
 
 Tokenizer.scan_string :: (self: &#Self, end: utf8.rune = '<', multiline := true) -> (str, bool) {
-    out := make(dyn_str, 8, self.a)
+    out := make(dyn_str, 32, as_allocator(&self.arena))
 
     while true {
         if self.current == -1 do err(.Early_EOF)

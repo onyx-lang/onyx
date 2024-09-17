@@ -1,9 +1,11 @@
 package core.encoding.xml
 #allow_stale_code
 
+use core { string }
+
 Document :: struct {
-    allocator: Allocator
     elements: [..] Element
+    strings: string.StringPool
 }
 
 Element :: struct {
@@ -12,39 +14,26 @@ Element :: struct {
     name: str
     parent: Element.Index
     attributes: [..] Attribute
-    values: [..] Value
+    children: [..] Child
 }
 
 Attribute :: struct {
     key, value: str
 }
 
-Value :: union {
-    Content: str
+Child :: union {
+    Text: str
     Element: Element.Index
 }
 
 Document.destroy :: (doc: &Document) {
+    delete(&doc.strings)
+
     for &el in doc.elements {
-        doc.allocator->free(el.name.data)
-
-        for attr in el.attributes {
-            doc.allocator->free(attr.key.data)
-            doc.allocator->free(attr.value.data)
-        }
         delete(&el.attributes)
-
-        for v in el.values {
-            switch v {
-                case .Content as c {
-                    doc.allocator->free(c.data)
-                }
-
-                case _ ---
-            }
-        }
-        delete(&el.values)
+        delete(&el.children)
     }
+
     delete(&doc.elements)
 }
 

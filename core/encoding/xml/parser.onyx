@@ -3,6 +3,7 @@ package core.encoding.xml
 
 use core {Result, tprintf}
 use core.io
+use core.string
 
 ParseError :: union {
     None: void
@@ -31,7 +32,7 @@ parse_from_stream :: (s: &io.Stream, allocator := context.allocator) -> Result(D
     use t := Tokenizer.make(allocator, s)
 
     doc: Document
-    doc.allocator = allocator
+    doc.strings  = string.StringPool.make(allocator = allocator)
     doc.elements = make([..] Element, 16, allocator)
 
     element, parent: Element.Index
@@ -48,11 +49,11 @@ parse_from_stream :: (s: &io.Stream, allocator := context.allocator) -> Result(D
                     if element == 0 {
                         parent = element
                     } else {
-                        doc.elements[parent].values->push(.{ Element = element })
+                        doc.elements[parent].children->push(.{ Element = element })
                     }
 
                     doc.elements[element].parent = parent
-                    doc.elements[element].name = ident
+                    doc.elements[element].name = doc.strings->add(ident)
 
                     parse_attributes(&doc, &doc.elements[element].attributes, &t)?
 
@@ -87,8 +88,6 @@ parse_from_stream :: (s: &io.Stream, allocator := context.allocator) -> Result(D
                             }
                         }
                     }
-
-                    allocator->free(got.data)
 
                     parent = doc.elements[element].parent
                     element = parent
@@ -128,7 +127,6 @@ parse_from_stream :: (s: &io.Stream, allocator := context.allocator) -> Result(D
                                 // parse_prologue(&doc, &t)?
                             // } else {
                                 skip_element(&t)?
-                                allocator->free(ident.data)
                             // }
                         }
 
@@ -156,7 +154,9 @@ parse_from_stream :: (s: &io.Stream, allocator := context.allocator) -> Result(D
             body_text, ok := t->scan_string()
             if !ok do return .{ Err = .{ Token_Error = t.error } }
 
-            doc.elements[element].values->push(.{ Content = body_text })
+            doc.elements[element].children->push(.{
+                Text = doc.strings->add(body_text)
+            })
         }
     }
 
@@ -171,8 +171,8 @@ parse_attributes :: (doc: &Document, attrs: &[..] Attribute, t: &Tokenizer) -> R
         value := expect(t, .String)?
 
         attr := Attribute.{
-            key = key.kind.Identifier!
-            value = value.kind.String!
+            key = doc.strings->add(key.kind.Identifier!)
+            value = doc.strings->add(value.kind.String!)
         }
         attrs->push(attr)
     }
@@ -192,14 +192,6 @@ skip_element :: (t: &Tokenizer) -> Result(i32, ParseError) {
             case .Gt {
                 to_close -= 1
                 if to_close == 0 do break break
-            }
-
-            case .Identifier as ident {
-                t.a->free(ident.data)
-            }
-
-            case .String as s {
-                t.a->free(s.data)
             }
 
             case _ ---

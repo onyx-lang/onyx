@@ -3,7 +3,7 @@ Child: Element {
     parent = 0, 
     attributes = [
     ], 
-    values = [
+    children = [
         Element(2), 
         Element(3)
     ]
@@ -14,7 +14,7 @@ Child: Element {
     parent = 0, 
     attributes = [
     ], 
-    values = [
+    children = [
         Element(5), 
         Element(6)
     ]
@@ -25,7 +25,7 @@ Child: Element {
     parent = 0, 
     attributes = [
     ], 
-    values = [
+    children = [
         Element(8), 
         Element(9)
     ]
@@ -36,7 +36,7 @@ Child: Element {
     parent = 0, 
     attributes = [
     ], 
-    values = [
+    children = [
         Element(11), 
         Element(12)
     ]
@@ -47,7 +47,7 @@ Child: Element {
     parent = 0, 
     attributes = [
     ], 
-    values = [
+    children = [
         Element(14), 
         Element(15)
     ]
@@ -58,7 +58,7 @@ Child: Element {
     parent = 0, 
     attributes = [
     ], 
-    values = [
+    children = [
         Element(17), 
         Element(18)
     ]
