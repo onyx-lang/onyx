@@ -1,0 +1,51 @@
+package core.encoding.xml
+#allow_stale_code
+
+Document :: struct {
+    allocator: Allocator
+    elements: [..] Element
+}
+
+Element :: struct {
+    Index :: u32
+
+    name: str
+    parent: Element.Index
+    attributes: [..] Attribute
+    values: [..] Value
+}
+
+Attribute :: struct {
+    key, value: str
+}
+
+Value :: union {
+    Content: str
+    Element: Element.Index
+}
+
+Document.destroy :: (doc: &Document) {
+    for &el in doc.elements {
+        doc.allocator->free(el.name.data)
+
+        for attr in el.attributes {
+            doc.allocator->free(attr.key.data)
+            doc.allocator->free(attr.value.data)
+        }
+        delete(&el.attributes)
+
+        for v in el.values {
+            switch v {
+                case .Content as c {
+                    doc.allocator->free(c.data)
+                }
+
+                case _ ---
+            }
+        }
+        delete(&el.values)
+    }
+    delete(&doc.elements)
+}
+
+
