@@ -74,7 +74,6 @@ Tokenizer.make :: (a: Allocator, s: &io.Stream) -> (tkn: Tokenizer) {
     tkn.line_offset = 0
 
     tkn->advance()
-
     return
 }
 

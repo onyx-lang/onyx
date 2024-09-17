@@ -221,6 +221,7 @@ expect :: (t: &Tokenizer, type: Token.Kind.tag_enum) -> Result(Token, ParseError
 
 #local
 create_element :: (doc: &Document) -> Element.Index {
-    doc.elements->alloc_one()
+    e := doc.elements->alloc_one()
+    *e = .{}
     return doc.elements.count - 1
 }
