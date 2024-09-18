@@ -76,6 +76,10 @@ Tokenizer.make :: (a: Allocator, s: &io.Stream) -> (tkn: Tokenizer) {
     tkn.line_offset = 0
 
     tkn->advance()
+    if tkn.current == 0xFEFF {
+        tkn->advance()
+    }
+
     return
 }
 
