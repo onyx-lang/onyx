@@ -54,6 +54,7 @@ Reader.read_line :: read_line
 Reader.read_word :: read_word
 Reader.read_until :: read_until
 Reader.peek_byte :: peek_byte
+Reader.peek_bytes :: peek_bytes
 Reader.advance_line :: advance_line
 Reader.skip_whitespace :: skip_whitespace
 Reader.skip_bytes :: skip_bytes
@@ -552,6 +553,22 @@ peek_byte :: (use reader: &Reader, advance := 0) -> (u8, Error) {
     }
 
     return buffer[start + advance], .None
+}
+
+peek_bytes :: (use reader: &Reader, advance: u32, length: u32) -> (str, Error) {
+    if reader_empty(reader) do return "", .EOF
+
+    if start == end {
+        if fill_err := reader_read_next_chunk(reader); fill_err != .None {
+            return "", fill_err
+        }
+    }
+
+    if start + advance + length >= end {
+        return "", .EOF
+    }
+
+    return buffer[start + advance .. start + advance + length], .None
 }
 
 advance_line :: (use reader: &Reader) {

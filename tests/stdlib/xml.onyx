@@ -1,0 +1,46 @@
+package main
+
+use core.encoding.xml
+use core {printf}
+
+test_doc :: """
+<?xml version="1.0" encoding="utf-8"?>
+<ListOfData Source="madeitup" Significance="None">
+    <Datapoint>
+        <Name>Name 1</Name>
+        <Value>123.45</Value>
+    </Datapoint>
+    <Datapoint>
+        <Name>Name 2</Name>
+        <Value>123.45</Value>
+    </Datapoint>
+    <Datapoint>
+        <Name>Name 3</Name>
+        <Value>123.45</Value>
+    </Datapoint>
+    <Datapoint>
+        <Name>Name 4</Name>
+        <Value>123.45</Value>
+    </Datapoint>
+    <Datapoint>
+        <Name>Name 5</Name>
+        <Value>123.45</Value>
+    </Datapoint>
+    <Datapoint>
+        <Name>Name 6</Name>
+        <Value>123.45</Value>
+    </Datapoint>
+</ListOfData>
+"""
+
+main :: () {
+    use doc := xml.parse(test_doc)!
+
+    for ch in doc->children(0) {
+        printf("Child: {*p}\n", &doc.elements[ch])
+
+        name  := doc.elements[doc->child_with_name(ch, "Name")!].children[0].Text!
+        value := doc.elements[doc->child_with_name(ch, "Value")!].children[0].Text!
+        printf("Name (value): {'} ({})\n", name, value)
+    }
+}

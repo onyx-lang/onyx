@@ -93,8 +93,8 @@ Result.expect :: (r: #Self, msg: str) -> r.Ok_Type {
 ///     Err(e) => Err(e)
 Result.transform :: (r: Result($T, $E), f: (T) -> $R) -> Result(R, E) {
     return switch r {
-        case .Ok as v => .{ Ok = f(v) }
-        case .Err as v => .{ Err = v }
+        case .Ok as v => Result(R, E).{ Ok = f(v) }
+        case .Err as e => Result(R, E).{ Err = e }
     }
 }
 

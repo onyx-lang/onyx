@@ -54,6 +54,14 @@ Array.init :: (arr: &[..] $T, capacity := 4, allocator := context.allocator) {
     arr.data = raw_alloc(allocator, sizeof T * arr.capacity)
 }
 
+Array.raw_from_slice :: (sl: [] $T, allocator: Allocator) -> (arr: [..] T) {
+    arr.data = sl.data
+    arr.count = sl.count
+    arr.capacity = sl.count
+    arr.allocator = allocator
+    return
+}
+
 /// Frees a dynamic array.
 Array.free :: (arr: &[..] $T) {
     arr.count = 0

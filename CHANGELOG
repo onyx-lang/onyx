@@ -8,18 +8,35 @@ Additions:
 - "Field update" syntax. A shorthand to change a field of a structure.
     - `.{ ..old_value, field = new_value }`
 - `onyx watch` now works on MacOS.
+- `#wasm_section` directive to add custom sections to the WASM binary.
+- Custom commands per project
+    - Installed in a `.onyx` directory
+- `onyx pkg build` can now run shell commands and multi-stage builds.
+- `Stalled` compiler hook to allow for code injection when the compiler stalls.
+- `Slice.map`
+- `Slice.map_inplace`
+- `Slice.fold1`
+- `Slice.get_opt`
+- `Iterator.from`
 - `iter.group_by`
+- `core.alloc.debug`
 - `core.os.args`
 - `core.crypto.hmac`
+- `core.crypto.keys`
 - `core.encoding.json.Value.as_entry_array`
+- `core.encoding.base64 { encode_url, decode_url }`
 
 Removals:
 
 Changes:
 - `&&` and `||` now short-circuit.
 - The size of tag field for unions is now dependent on the number of variants.
+- Parsing structs no longer sometimes needs `#type`.
+- Renamed `core.alloc.memdebug` to `core.alloc.memwatch`.
 
 Bugfixes:
+- Bug when injecting into a `#distinct` type.
+
 
 
 Release 0.1.12

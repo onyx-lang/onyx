@@ -1936,6 +1936,8 @@ static AstNode* parse_statement(OnyxParser* parser) {
         case Token_Type_Literal_String:
         case Token_Type_Keyword_Cast:
             retval = (AstNode *) parse_compound_expression(parser, 1);
+            if (!retval) break;
+
             if (retval->kind == Ast_Kind_Call || retval->kind == Ast_Kind_Method_Call) {
                 if (parser->curr->type == '{') {
                     AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);

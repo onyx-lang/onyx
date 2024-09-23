@@ -1,0 +1,23 @@
+package core.encoding.xml
+#allow_stale_code
+
+Document.children :: (doc: &Document, parent: Element.Index) -> Iterator(Element.Index) {
+    if doc.elements.count <= parent do return Iterator.empty(Element.Index)
+
+    return Iterator.from(doc.elements[parent].children)
+        |> Iterator.flatten(x => x.Element)
+}
+
+Document.child_with_name :: (doc: &Document, parent: Element.Index, name: str) -> ? Element.Index {
+    if doc.elements.count <= parent do return .None
+
+    for v in doc.elements[parent].children {
+        v.Element->with([e] {
+            if doc.elements[e].name == name {
+                return e
+            }
+        })
+    }
+
+    return .None
+}

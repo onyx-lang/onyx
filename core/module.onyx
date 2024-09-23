@@ -33,6 +33,7 @@ use runtime
 #load "./hash/sha1"
 
 #load "./crypto/hmac"
+#load "./crypto/keys/jwt"
 
 #load "./string/string"
 #load "./string/buffer"
@@ -68,6 +69,7 @@ use runtime
 #load "./encoding/utf8"
 #load "./encoding/osad"
 #load_all "./encoding/json"
+#load_all "./encoding/xml"
 #load "./encoding/kdl/kdl"
 
 #load "./runtime/common"

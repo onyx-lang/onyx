@@ -55,18 +55,31 @@ Date.add_days :: (d: Date, days: i32) -> Date {
     nd := d
     nd.day += days
 
-    while true {
-        duration := Date.month_duration_in_days(nd.year, nd.month)
-        if nd.day <= duration {
-            break
+    if days >= 0 {
+        while true {
+            duration := Date.month_duration_in_days(nd.year, nd.month)
+            if nd.day <= duration {
+                break
+            }
+
+            nd.day -= duration
+            nd.month += 1
+
+            if nd.month >= 12 {
+                nd.month = 0
+                nd.year += 1
+            }
         }
+    } else {
+        while nd.day < 1 {
+            nd.month -= 1
+            if nd.month < 0 {
+                nd.month = 11
+                nd.year -= 1
+            }
 
-        nd.day -= duration
-        nd.month += 1
-
-        if nd.month >= 12 {
-            nd.month = 0
-            nd.year += 1
+            duration := Date.month_duration_in_days(nd.year, nd.month)
+            nd.day += duration
         }
     }
 

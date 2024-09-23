@@ -1,0 +1,15 @@
+package main
+
+use core {*}
+
+main :: () {
+    m := Map.literal(i32, str, .[
+        .{ 10, "asdf" }
+        .{ 20, "asdf" }
+        .{ 30, "asdf" }
+    ])
+
+    println(m[10] |> Optional.transform(x => x.length)!)
+
+    m[30]->into_result("Expected 30 to exist!")! |> println()
+}

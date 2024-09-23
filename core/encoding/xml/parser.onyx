@@ -1,0 +1,219 @@
+package core.encoding.xml
+#allow_stale_code
+
+use core {Result, tprintf}
+use core.io
+use core.string
+
+ParseError :: union {
+    None: void
+    Error: str
+    Expected_Token: Token.Kind.tag_enum
+    Invalid_Token: str
+    Token_Error: Tokenizer.Error
+}
+
+parse :: #match #local {}
+
+#overload
+parse :: (s: str, allocator := context.allocator) -> Result(Document, ParseError) {
+    use stream := io.buffer_stream_make(s)
+    return parse(&stream, allocator)
+}
+
+#overload
+parse :: (s: &io.Stream, allocator := context.allocator) -> Result(Document, ParseError) {
+    return parse_from_stream(s, allocator)
+}
+
+
+#local
+parse_from_stream :: (s: &io.Stream, allocator := context.allocator) -> Result(Document, ParseError) {
+    use t := Tokenizer.make(allocator, s)
+
+    doc: Document
+    doc.strings  = string.StringPool.make(allocator = allocator)
+    doc.elements = make([..] Element, 16, allocator)
+
+    element, parent: Element.Index
+
+    while true {
+        t->skip_whitespace()
+
+        if t.current == '<' {
+            t->advance()
+
+            switch open_tkn := t->scan(); open_tkn.kind {
+                case .Identifier as ident {
+                    element = create_element(&doc)
+                    if element == 0 {
+                        parent = element
+                    } else {
+                        doc.elements[parent].children->push(.{ Element = element })
+                    }
+
+                    doc.elements[element].parent = parent
+                    doc.elements[element].name = doc.strings->add(ident)
+
+                    parse_attributes(&doc, &doc.elements[element].attributes, &t)?
+
+                    // TODO: Add doctype checking
+
+                    end_tkn := t->scan()
+                    switch end_tkn.kind {
+                        case .Gt do parent = element
+
+                        case .Slash {
+                            expect(&t, .Gt)?
+                            parent = doc.elements[element].parent
+                            element = parent
+                        }
+
+                        case _ {
+                            return .{ Err = .{ Invalid_Token = tprintf("Expected closing tag, but got '{}'", end_tkn) } }
+                        }
+                    }
+                }
+
+                case .Slash {
+                    ident := expect(&t, .Identifier)?
+                    expect(&t, .Gt)?
+
+                    got := ident.kind.Identifier!
+
+                    if doc.elements[element].name != got {
+                        return .{
+                            Err = .{
+                                Error = tprintf("Mismatched closing tag. Expected '{}' but got '{}'.", doc.elements[element].name, got)
+                            }
+                        }
+                    }
+
+                    parent = doc.elements[element].parent
+                    element = parent
+                }
+
+                case .Exclamation {
+                    next := t->scan()
+                    switch next.kind {
+                        case .Identifier as ident {
+                            if ident == "DOCTYPE" {
+                                // TODO Handle doctypes...
+
+                                skip_element(&t)?
+                            }
+                        }
+
+                        case .Dash {
+                            expect(&t, .Dash)?
+                            t->scan_comment()
+                        }
+
+                        case _ {
+                            return .{
+                                Err = .{
+                                    Error = tprintf("Invalid token after '<!', got '{}'", next)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                case .Question {
+                    next := t->scan()
+                    switch next.kind {
+                        case .Identifier as ident {
+                            // if ident == "xml" {
+                                // parse_prologue(&doc, &t)?
+                            // } else {
+                                skip_element(&t)?
+                            // }
+                        }
+
+                        case _ {
+                            return .{
+                                Err = .{
+                                    Error = "Expected '<?xml'"
+                                }
+                            }
+                        }
+                    }
+                }
+
+                case _ {
+                    return .{ Err = .{ Invalid_Token = tprintf("Invalid token '<': ", open_tkn) } }
+                }
+            }
+        }
+
+        elseif t.current == -1 {
+            break
+        }
+
+        else {
+            body_text, ok := t->scan_string()
+            if !ok do return .{ Err = .{ Token_Error = t.error } }
+
+            doc.elements[element].children->push(.{
+                Text = doc.strings->add(body_text)
+            })
+        }
+    }
+
+    return .{ Ok = doc }
+}
+
+#local
+parse_attributes :: (doc: &Document, attrs: &[..] Attribute, t: &Tokenizer) -> Result(i32, ParseError) {
+    while t->peek().kind.tag == .Identifier {
+        key := expect(t, .Identifier)?
+        expect(t, .Eq)?
+        value := expect(t, .String)?
+
+        attr := Attribute.{
+            key = doc.strings->add(key.kind.Identifier!)
+            value = doc.strings->add(value.kind.String!)
+        }
+        attrs->push(attr)
+    }
+
+    return .{ Ok = .{} }
+}
+
+
+#local
+skip_element :: (t: &Tokenizer) -> Result(i32, ParseError) {
+    to_close := 1
+    while true {
+        tkn := t->scan()
+        switch tkn.kind {
+            case .EOF do return .{ Err = .{ Token_Error = .Early_EOF } }
+            case .Lt do to_close += 1
+            case .Gt {
+                to_close -= 1
+                if to_close == 0 do break break
+            }
+
+            case _ ---
+        }
+    }
+
+    return .{ Ok = 0 }
+}
+
+#local
+expect :: (t: &Tokenizer, type: Token.Kind.tag_enum) -> Result(Token, ParseError) {
+    tkn := t->scan()
+    if tkn.kind.tag == type {
+        return .{ Ok = tkn }
+    }
+
+    return .{ Err = .{ Expected_Token = type } }
+}
+
+#local
+create_element :: (doc: &Document) -> Element.Index {
+    e := doc.elements->alloc_one()
+    *e = .{}
+    return doc.elements.count - 1
+}

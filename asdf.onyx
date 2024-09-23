@@ -1,0 +1,13 @@
+use core {*}
+
+main :: () {
+    x := 10
+
+    f := ([x]) => x * 2
+
+    g :: (f: () -> $R) -> R {
+        return f()
+    }
+
+    g(f) |> println() // Should return 10
+}
