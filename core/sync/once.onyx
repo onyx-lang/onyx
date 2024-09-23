@@ -7,8 +7,8 @@ package core.sync
 
 /// Represents something will only happen once.
 Once :: struct {
-    done: bool;
-    mutex: Mutex;
+    done: bool
+    mutex: Mutex
 }
 
 Once.exec :: #match #local {}
@@ -16,19 +16,19 @@ Once.exec :: #match #local {}
 /// Run a function with no arguments once.
 #overload
 Once.exec :: (o: &Once, f: () -> $R) {
-    scoped_mutex(&o.mutex);
-    if o.done do return;
+    scoped_mutex(&o.mutex)
+    if o.done do return
 
-    o.done = true;
-    f();
+    o.done = true
+    f()
 }
 
 /// Run a function with one argument once.
 #overload
 Once.exec :: (o: &Once, ctx: $Ctx, f: (Ctx) -> $R) {
-    scoped_mutex(&o.mutex);
-    if o.done do return;
+    scoped_mutex(&o.mutex)
+    if o.done do return
 
-    o.done = true;
-    f(ctx);
+    o.done = true
+    f(ctx)
 }

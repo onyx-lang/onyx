@@ -5,29 +5,29 @@ use core {*}
 main :: (args: [] cstr) {
     NewPolyStruct :: struct (T: type_expr, N: i32) {
         x : [N] T; 
-        y : [N] f32;
+        y : [N] f32
     }
 
-    nps : NewPolyStruct(i32, 4);
+    nps : NewPolyStruct(i32, 4)
 
-    for &x in nps.x do *x = 12345;
-    for &y in nps.y do *y = 67890;
+    for &x in nps.x do *x = 12345
+    for &y in nps.y do *y = 67890
 
-    for x in nps.x do println(x);
+    for x in nps.x do println(x)
 
 
 
     
 
     SimpleWithDefault :: struct (T: type_expr, default: str) {
-        x : T;
+        x : T
         str_member : str = default; 
     }
 
-    swd := SimpleWithDefault(i32, "Hello World!").{ x = 1234 };
-    println(swd.x);
-    println(swd.str_member);
-    poly_match(swd);
+    swd := SimpleWithDefault(i32, "Hello World!").{ x = 1234 }
+    println(swd.x)
+    println(swd.str_member)
+    poly_match(swd)
 
-    poly_match :: (swd: SimpleWithDefault($T, $D)) do println(D);
+    poly_match :: (swd: SimpleWithDefault($T, $D)) do println(D)
 }

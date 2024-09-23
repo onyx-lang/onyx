@@ -1,9 +1,8 @@
 package core.misc
 
 use runtime
+use core
 use core.iter
-use core.array
-use core.string
 use core.memory
 
 use runtime.info {
@@ -22,83 +21,83 @@ use runtime.info {
 // much of the rest of the standard library uses `as_...` for
 // conversion.
 as_any :: to_any
-to_any :: macro (x: &$T) => any.{x, T};
+to_any :: macro (x: &$T) => any.{x, T}
 
 any_as :: (a: any, $T: type_expr) -> &T {
-    if a.type != T do return null;
-    return cast(&T) a.data;
+    if a.type != T do return null
+    return cast(&T) a.data
 }
 
 /// Dereference a pointer any.
 any_dereference :: (v: any) -> any {
-    t := get_type_info(v.type);
+    t := get_type_info(v.type)
     if t.kind == .Pointer {
-        p := cast(&Type_Info_Pointer) t;
-        return any.{*cast(&rawptr) v.data, p.to};
+        p := cast(&Type_Info_Pointer) t
+        return any.{*cast(&rawptr) v.data, p.to}
     }
 
-    return v;
+    return v
 }
 
 /// Unwraps an optional any, if the any is an optional. `? T -> T`
 any_unwrap :: (v: any) -> any {
     if union_constructed_from(v.type, Optional) {
-        t := v.type->info()->as_union();
+        t := v.type->info()->as_union()
         return any.{
             cast([&] u8, v.data) + t.alignment,
             t.variants[1].type
-        };
+        }
     }
 
-    return v;
+    return v
 }
 
 
 /// Subscript an array-like any.
 any_subscript :: (v: any, index: i32) -> any {
-    base_ptr, elem_type, count := any_as_array(v);
+    base_ptr, elem_type, count := any_as_array(v)
     if index >= count || index < 0 {
-        return .{ null, void };
+        return .{ null, void }
     }
 
     return any.{
         cast([&] u8) base_ptr + get_type_info(elem_type).size * index,
         elem_type
-    };
+    }
 }
 
 /// Select a member from an any.
 any_selector :: (v: any, member_name: str) -> any {
-    t := get_type_info(v.type);
+    t := get_type_info(v.type)
     if t.kind == .Struct {
-        member := get_struct_member(v.type, member_name);
+        member := get_struct_member(v.type, member_name)
         if member != null {
-            return any.{cast([&] u8) v.data + member.offset, member.type};
+            return any.{cast([&] u8) v.data + member.offset, member.type}
         }
     }
 
-    return .{null, void};
+    return .{null, void}
 }
 
 /// Like `any_selector`, but works with selecting \"foo.bar.joe\".
 any_nested_selector :: (v: any, member_name: str) -> any {
-    t := get_type_info(v.type);
-    if t.kind != .Struct do return .{};
+    t := get_type_info(v.type)
+    if t.kind != .Struct do return .{}
 
-    part_name, next_name := string.bisect(member_name, '.');
+    part_name, next_name := str.bisect(member_name, '.')
 
-    member := get_struct_member(v.type, part_name);
+    member := get_struct_member(v.type, part_name)
     if member {
         if next_name {
-            return any_nested_selector(any.{cast([&] u8) v.data + member.offset, member.type}, next_name);
+            return any_nested_selector(any.{cast([&] u8) v.data + member.offset, member.type}, next_name)
         }
 
         return any.{
             cast([&] u8, v.data) + member.offset, member.type
-        };
+        }
     }
 
-    return .{null, void};
+    return .{null, void}
 }
 
 any_member :: #match #locked {
@@ -106,14 +105,14 @@ any_member :: #match #locked {
         return any.{
             cast([&] u8, v.data) + member_offset,
             member_type
-        };
+        }
     },
 
     (v: any, member: &Type_Info_Struct.Member) -> any {
         return any.{
             cast([&] u8, v.data) + member.offset,
             member.type
-        };
+        }
     }
 }
 
@@ -122,37 +121,37 @@ any_member :: #match #locked {
 /// representing the value of each field.
 ///
 ///     T :: struct {
-///         x := 123;
-///         y := "test";
+///         x := 123
+///         y := "test"
 ///     }
 ///     
-///     m := any_to_map(T.{});
+///     m := any_to_map(T.{})
 ///
 /// `m` would have two keys, "x" and "y".
 any_to_map :: (v: any) -> ? Map(str, any) {
-    vals := v;
+    vals := v
     if vals.type->info().kind == .Pointer {
-        vals = any_dereference(vals);
+        vals = any_dereference(vals)
     }
 
-    val_info := vals.type->info()->as_struct();
+    val_info := vals.type->info()->as_struct()
     if val_info.kind != .Struct {
-        return .{};
+        return .{}
     }
 
-    out: Map(str, any);
+    out: Map(str, any)
     for & val_info.members {
-        out->put(it.name, any_selector(vals, it.name));
+        out->put(it.name, any_selector(vals, it.name))
     }
 
-    return out;
+    return out
 }
 
 /// Creates an iterator out of an array-like any.
 any_iter :: (arr: any) -> Iterator(any) {
-    base_ptr, elem_type, count := any_as_array(arr);
+    base_ptr, elem_type, count := any_as_array(arr)
     if count == 0 {
-        return .{ null, (_: rawptr) => Optional.empty(any) };
+        return .{ null, (_: rawptr) => Optional.empty(any) }
     }
 
     return iter.generator(
@@ -166,13 +165,13 @@ any_iter :: (arr: any) -> Iterator(any) {
 
         (ctx: $T) -> ? any {
             if ctx.index < ctx.count {
-                defer ctx.index += 1;
-                return any.{ cast([&] u8) ctx.base_ptr + ctx.elem_size * ctx.index, ctx.elem_type };
+                defer ctx.index += 1
+                return any.{ cast([&] u8) ctx.base_ptr + ctx.elem_size * ctx.index, ctx.elem_type }
             }
 
-            return .None;
+            return .None
         }
-    );
+    )
 }
 
 
@@ -180,40 +179,40 @@ any_iter :: (arr: any) -> Iterator(any) {
 ///
 /// Copies the slice to a new slice, and all of the `any` data members.
 any_deep_copy :: (args: [] any, allocator := context.allocator) -> (result: [] any) {
-    result = make([] any, args.count, allocator);
+    result = make([] any, args.count, allocator)
     
     for arg, i in args {
-        size := get_type_info(arg.type).size;
+        size := get_type_info(arg.type).size
 
-        new_data := allocator->alloc(size);
-        if !new_data do continue;
+        new_data := allocator->alloc(size)
+        if !new_data do continue
 
-        memory.copy(new_data, arg.data, size);
+        memory.copy(new_data, arg.data, size)
 
-        result[i] = any.{ new_data, arg.type };
+        result[i] = any.{ new_data, arg.type }
     }
 
-    return;
+    return
 }
 
 
 #local
 any_as_array :: (arr: any) -> (rawptr, type_expr, u32) {
-    info := get_type_info(arr.type);
+    info := get_type_info(arr.type)
 
     switch info.kind {
         case .Array {
-            a := cast(&Type_Info_Array) info;
-            return arr.data, a.of, a.count;
+            a := cast(&Type_Info_Array) info
+            return arr.data, a.of, a.count
         }
 
         case .Slice, .Dynamic_Array, .Variadic_Argument {
-            a := cast(&array.Untyped_Array) arr.data;
-            return a.data, (cast(&Type_Info_Dynamic_Array) info).of, a.count;
+            a := cast(&core.Untyped_Array) arr.data
+            return a.data, (cast(&Type_Info_Dynamic_Array) info).of, a.count
         }
 
         case _ {
-            return null, void, 0;
+            return null, void, 0
         }
     }
 }

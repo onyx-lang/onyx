@@ -2,7 +2,6 @@ package core.test
 #allow_stale_code
 
 use core
-use core.array
 use core.string
 use runtime
 
@@ -22,22 +21,22 @@ use core {printf}
 ///     (t: &core.test.T) {
 ///     }
 test :: struct {
-    name: str;
+    name: str
 }
 
 
 /// Testing context
 T :: struct {
-    current_test_case: &Test_Case;
+    current_test_case: &Test_Case
 }
 
 T.assert :: (t: &T, cond: bool, name := "", site := #callsite) {
     t.current_test_case.assertions << .{
         name, cond, site
-    };
+    }
 
     if !cond {
-        t.current_test_case.passed = false;
+        t.current_test_case.passed = false
     }
 }
 
@@ -46,47 +45,47 @@ T.assert :: (t: &T, cond: bool, name := "", site := #callsite) {
 /// Runs all test cases in the provide packages.
 /// If no packages are provided, ALL package tests are run.
 run_tests :: (packages: [] package_id = .[], log := true) -> bool {
-    ctx: T;
+    ctx: T
 
-    cases := gather_test_cases(packages);
-    defer delete(&cases);
+    cases := gather_test_cases(packages)
+    defer delete(&cases)
 
-    failed_cases := make([..] &Test_Case);
+    failed_cases := make([..] &Test_Case)
 
-    if log do printf("Running {} test cases...\n", cases.count);
+    if log do printf("Running {} test cases...\n", cases.count)
     for & cases {
-        ctx.current_test_case = it;
+        ctx.current_test_case = it
 
         // Assume the test case passed until it didn't.
-        it.passed = true;
+        it.passed = true
 
-        it.runner(&ctx);
+        it.runner(&ctx)
 
         if !it.passed {
-            failed_cases << it;
+            failed_cases << it
         }
     }
 
     if log {
         printf("Results: {} / {} test cases passed.\n",
-            cases.count - failed_cases.length, cases.count);
+            cases.count - failed_cases.length, cases.count)
 
-        if failed_cases.count > 0 do printf("Failing test cases:\n");
+        if failed_cases.count > 0 do printf("Failing test cases:\n")
 
         for failed_cases {
-            printf("[{}]\n", it.name if !string.empty(it.name) else "Unnamed test");
+            printf("[{}]\n", it.name if !str.empty(it.name) else "Unnamed test")
 
             for & it.assertions {
-                if it.passed do continue;
+                if it.passed do continue
 
                 printf("    {} at {}:{}\n",
-                    it.name if !string.empty(it.name) else "Unnamed assertion",
-                    it.loc.file, it.loc.line);
+                    it.name if !str.empty(it.name) else "Unnamed assertion",
+                    it.loc.file, it.loc.line)
             }
         }
     }
 
-    return failed_cases.count == 0;
+    return failed_cases.count == 0
 }
 
 
@@ -97,48 +96,48 @@ run_tests :: (packages: [] package_id = .[], log := true) -> bool {
 //
 
 #local
-runner_proc :: #type (&T) -> void;
+runner_proc :: #type (&T) -> void
 
 #local
 Test_Case :: struct {
-    name: str;
-    runner: (&T) -> void;
+    name: str
+    runner: (&T) -> void
 
-    passed := false;
-    assertions: [..] Assertion = make([..] Assertion);
+    passed := false
+    assertions: [..] Assertion = make([..] Assertion)
 
     Assertion :: struct {
-        name: str;
-        passed: bool;
-        loc: CallSite;
+        name: str
+        passed: bool
+        loc: CallSite
     }
 }
 
 #local
 gather_test_cases :: (packages: [] package_id) -> [] Test_Case {
-    result := make([..] Test_Case);
+    result := make([..] Test_Case)
 
-    procs1 := runtime.info.get_procedures_with_tag(test);
-    defer delete(&procs1);
+    procs1 := runtime.info.get_procedures_with_tag(test)
+    defer delete(&procs1)
 
     for procs1 {
-        if packages.count == 0 || array.contains(packages, it.pack) {
-            result << .{it.tag.name, *cast(&runner_proc) &it.func};
+        if packages.count == 0 || Array.contains(packages, it.pack) {
+            result << .{it.tag.name, *cast(&runner_proc) &it.func}
         }
     }
 
 
-    procs2 := runtime.info.get_procedures_with_tag(type_expr);
-    defer delete(&procs2);
+    procs2 := runtime.info.get_procedures_with_tag(type_expr)
+    defer delete(&procs2)
 
     for procs2 {
-        if packages.count != 0 && !array.contains(packages, it.pack) do continue;
+        if packages.count != 0 && !Array.contains(packages, it.pack) do continue
 
         if *it.tag == test {
-            tag := cast(&test) it.tag;
-            result << .{"", *cast(&runner_proc) &it.func};
+            tag := cast(&test) it.tag
+            result << .{"", *cast(&runner_proc) &it.func}
         }
     }
 
-    return result;
+    return result
 }

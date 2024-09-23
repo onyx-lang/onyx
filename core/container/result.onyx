@@ -17,52 +17,52 @@ use core {Optional}
 /// of type T, or an Err value of type E. `status` contains either
 /// .Ok, or .Err depending on which is currently held.
 Result :: union (Ok_Type: type_expr, Err_Type: type_expr) {
-    Err: Err_Type;
-    Ok: Ok_Type;
+    Err: Err_Type
+    Ok: Ok_Type
 }
 
 
 /// Returns true if the result contains an Ok value.
 Result.is_ok :: (r: #Self) -> bool {
     return switch r {
-        case .Ok => true;
-        case _   => false;
-    };
+        case .Ok => true
+        case _   => false
+    }
 }
 
 /// Returns true if the result contains an Err value.
 Result.is_err :: (r: #Self) -> bool {
     return switch r {
-        case .Err => true;
-        case _ => false;
-    };
+        case .Err => true
+        case _ => false
+    }
 }
 
 /// Returns an Optional of the Ok type.
 Result.ok :: (r: #Self) -> Optional(r.Ok_Type) {
     return switch r {
-        case .Ok as v => Optional.make(v);
-        case _ => .{};
-    };
+        case .Ok as v => Optional.make(v)
+        case _ => .{}
+    }
 }
 
 /// Returns an Optional of the Err type.
 Result.err :: (r: #Self) -> Optional(r.Err_Type) {
     return switch r {
-        case .Err as v => Optional.make(v);
-        case _ => .{};
-    };
+        case .Err as v => Optional.make(v)
+        case _ => .{}
+    }
 }
 
 /// Forcefully extracts the Ok value out of the Result. If the
 /// result contains an Err, an assertion is thrown.
 Result.unwrap :: (r: #Self) -> r.Ok_Type {
     switch r {
-        case .Ok as v do return v;
+        case .Ok as v do return v
         case .Err as err {
-            msg := tprintf("Unwrapping Result with error '{}'.", err);
-            panic(msg);
-            return .{};
+            msg := tprintf("Unwrapping Result with error '{}'.", err)
+            panic(msg)
+            return .{}
         }
     }
 }
@@ -71,19 +71,19 @@ Result.unwrap :: (r: #Self) -> r.Ok_Type {
 /// result contains an Err, the empty .{} value is returned.
 Result.unwrap_or_default :: (r: #Self) -> r.Ok_Type {
     return switch r {
-        case .Ok as v => v;
-        case _ => .{};
-    };
+        case .Ok as v => v
+        case _ => .{}
+    }
 }
 
 /// Tries to extract the Ok value out of the Result. If the
 /// result contains an Err, a custom assertion message is thrown.
 Result.expect :: (r: #Self, msg: str) -> r.Ok_Type {
     switch r {
-        case .Ok as v do return v;
+        case .Ok as v do return v
         case _ {
-            panic(msg);
-            return .{};
+            panic(msg)
+            return .{}
         }
     }
 }
@@ -93,53 +93,53 @@ Result.expect :: (r: #Self, msg: str) -> r.Ok_Type {
 ///     Err(e) => Err(e)
 Result.transform :: (r: Result($T, $E), f: (T) -> $R) -> Result(R, E) {
     return switch r {
-        case .Ok as v => Result(R, E).{ Ok = f(v) };
-        case .Err as e => Result(R, E).{ Err = e };
-    };
+        case .Ok as v => Result(R, E).{ Ok = f(v) }
+        case .Err as e => Result(R, E).{ Err = e }
+    }
 }
 
 /// Monadic chaining operation.
 Result.and_then :: (r: #Self, f: (r.Ok_Type) -> Result($R, r.Err_Type)) -> Result(R, r.Err_Type) {
     return switch r {
-        case .Ok as v  => f(v);
-        case .Err as v => .{ Err = v };
-    };
+        case .Ok as v  => f(v)
+        case .Err as v => .{ Err = v }
+    }
 }
 
 /// If the Result contains Err, generate is called to make a value
 Result.or_else :: (r: #Self, generate: () -> typeof r) => {
     return switch r {
-        case .Ok as v   => v;
-        case _ => generate();
-    };
+        case .Ok as v   => v
+        case _ => generate()
+    }
 }
 
 /// If result contains Err, the error is returned from the enclosing
 /// procedure. Otherwise, the Ok value is returned.
 ///
 ///     f :: () -> Result(i32, str) {
-///         return .{ Err = "Oh no..." };
+///         return .{ Err = "Oh no..." }
 ///     }
 ///     
 ///     g :: () -> Result(str, str) {
 ///         // This returns from g with the error returned from f.
-///         v := f()->forward_err();
-///         println(v);
+///         v := f()->forward_err()
+///         println(v)
 ///         
-///         return .{ Ok = "Success!" };
+///         return .{ Ok = "Success!" }
 ///     }
 Result.forward_err :: macro (r: Result($T, $E)) -> T {
     switch res := r; res {
-        case .Ok as v  do return v;
-        case .Err as v do return return .{ Err = v };
+        case .Ok as v  do return v
+        case .Err as v do return return .{ Err = v }
     }
 }
 
 /// If result contains Err, the error is mapped to a new error type.
 Result.transform_err :: macro (r: Result($T, $E), f: (E) -> $N) -> Result(T, N) {
     switch res := r; res {
-        case .Ok  as v do return .{ Ok = v };
-        case .Err as v do return .{ Err = f(v) };
+        case .Ok  as v do return .{ Ok = v }
+        case .Err as v do return .{ Err = f(v) }
     }
 }
 
@@ -147,8 +147,8 @@ Result.transform_err :: macro (r: Result($T, $E), f: (E) -> $N) -> Result(T, N) 
 /// enclosing procedure. Otherwise, the Ok value is returned.
 Result.or_return :: macro (r: Result($T, $E), v: $V) -> T {
     switch res := r; res {
-        case .Ok as v  do return v;
-        case .Err do return return v;
+        case .Ok as v  do return v
+        case .Err do return return v
     }
 }
 
@@ -160,30 +160,30 @@ Result.or_return :: macro (r: Result($T, $E), v: $V) -> T {
 /// This procedure is subject to change.
 Result.catch :: macro (r: Result($T, $E), on_err: Code) -> T {
     switch res := r; res {
-        case .Ok as v  do return v;
+        case .Ok as v  do return v
         case .Err as err {
-            #unquote on_err(err);
+            #unquote on_err(err)
         }
     }
 }
 
 #overload
-__implicit_bool_cast :: macro (r: Result($O, $E)) => cast(Result(O, E).tag_enum, r) == .Ok;
+__implicit_bool_cast :: macro (r: Result($O, $E)) => cast(Result(O, E).tag_enum, r) == .Ok
 
 #operator! :: macro (r: Result($T, $E)) => r->unwrap()
 
 #operator? :: macro (r: Result($T, $E)) -> T {
     switch res := r; res {
-        case .Ok as v do return v;
-        case .Err as v do return #from_proc .{ Err = v };
+        case .Ok as v do return v
+        case .Err as v do return #from_proc .{ Err = v }
     }
 }
 
 #operator?? :: macro (r: Result($T, $E), v: T) -> T {
     return switch res := r; res {
-        case .Ok as val => val;
-        case .Err => v;
-    };
+        case .Ok as val => val
+        case .Err => v
+    }
 }
 
 #operator?? :: macro (r: Result($T, $E), handler: Code) -> T {

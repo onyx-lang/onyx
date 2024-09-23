@@ -2,9 +2,9 @@
 use core {*}
 
 main :: () {
-    a := 1;
-    b := a + do { a += 1; return a; };
-    printf("{} == 3\n", b);
+    a := 1
+    b := a + do { a += 1; return a; }
+    printf("{} == 3\n", b)
 }
 
 

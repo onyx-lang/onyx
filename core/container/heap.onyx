@@ -1,54 +1,54 @@
 package core.heap
 
 Heap :: struct (T: type_expr) {
-    data: [..] T;
-    compare: (T, T) -> i32 = null_proc;
+    data: [..] T
+    compare: (T, T) -> i32 = null_proc
 }
 
 #overload
 __make_overload :: macro (_: &Heap($T), allocator: Allocator) -> Heap(T) {
-    return #this_package.Heap.make(T);
+    return #this_package.Heap.make(T)
 }
 
 #overload
 delete :: (h: &Heap) {
-    delete(&h.data);
+    delete(&h.data)
 }
 
 Heap.make :: ($T: type_expr, cmp: (T, T) -> i32 = null_proc) -> Heap(T) {
-    h: Heap(T);
-    Heap.init(&h, cmp);
-    return h;
+    h: Heap(T)
+    Heap.init(&h, cmp)
+    return h
 }
 
 Heap.init :: (use heap: &Heap, cmp: (heap.T, heap.T) -> i32 = null_proc) {
-    Array.init(&data);
-    compare = cmp;
+    Array.init(&data)
+    compare = cmp
 }
 
 Heap.insert :: (use heap: &Heap, v: heap.T) {
-    data << v;
-    shift_up(heap, data.count - 1);
+    data << v
+    shift_up(heap, data.count - 1)
 }
 
 #operator << macro (heap: Heap($T), v: T) {
-    #this_package.Heap.insert(&heap, v);
+    #this_package.Heap.insert(&heap, v)
 }
 
-Heap.empty :: macro (heap: &Heap) => heap.data.count == 0;
+Heap.empty :: macro (heap: &Heap) => heap.data.count == 0
 
 Heap.peek_top :: (use heap: &Heap) -> ? heap.T {
-    if data.count == 0 do return .None;
-    return data[0];
+    if data.count == 0 do return .None
+    return data[0]
 }
 
 Heap.remove_top :: (use heap: &Heap) -> ? heap.T {
-    if data.count == 0 do return .None;
+    if data.count == 0 do return .None
 
-    x := data[0];
-    data->fast_delete(0);
-    shift_down(heap, 0);
-    return x;
+    x := data[0]
+    data->fast_delete(0)
+    shift_down(heap, 0)
+    return x
 }
 
 Heap.remove :: macro (heap: &Heap, cond: Code) -> ? heap.T {
@@ -56,13 +56,13 @@ Heap.remove :: macro (heap: &Heap, cond: Code) -> ? heap.T {
 
     for e, i in heap.data {
         if #unquote cond(e) {
-            x := heap.data->fast_delete(i);
-            shift_down(heap, i);
-            return x;
+            x := heap.data->fast_delete(i)
+            shift_down(heap, i)
+            return x
         }
     }
 
-    return .None;
+    return .None
 }
 
 
@@ -84,43 +84,43 @@ remove :: Heap.remove
 
     shift_down :: (use heap: &Heap, idx: i32) {
         while true {
-            min_index := idx;
+            min_index := idx
 
-            l := heap_lchild(idx);
+            l := heap_lchild(idx)
             if l < data.count {
                 if compare(data[l], data[min_index]) < 0 {
-                    min_index = l;
+                    min_index = l
                 }
             }
 
-            r := heap_rchild(idx);
+            r := heap_rchild(idx)
             if r < data.count {
                 if compare(data[r], data[min_index]) < 0 {
-                    min_index = r;
+                    min_index = r
                 }
             }
 
             if idx != min_index {
-                tmp := data[idx];
-                data[idx] = data[min_index];
-                data[min_index] = tmp;
-                idx = min_index;
-                continue;
+                tmp := data[idx]
+                data[idx] = data[min_index]
+                data[min_index] = tmp
+                idx = min_index
+                continue
             }
 
-            break;
+            break
         }
     }
 
     shift_up :: (use heap: &Heap, idx: i32) {
         while idx > 0 {
-            parent := heap_parent(idx);
-            if compare(data[parent], data[idx]) <= 0 do break;
+            parent := heap_parent(idx)
+            if compare(data[parent], data[idx]) <= 0 do break
 
-            tmp := data[parent];
-            data[parent] = data[idx];
-            data[idx] = tmp;
-            idx = parent;
+            tmp := data[parent]
+            data[parent] = data[idx]
+            data[idx] = tmp
+            idx = parent
         }
     }
 }

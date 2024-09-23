@@ -1,0 +1,20 @@
+//+optional-semicolons
+
+use core {*}
+
+FirstExt :: #compiler_extension "./first_extension.onyx" {
+    double, debug
+}
+
+main :: () {
+    use dummy_package { foo }
+    foo()
+
+    x := 10
+
+    y := FirstExt.double!{
+        x + 5
+    }
+
+    FirstExt.debug!{ y * 2 }
+}

@@ -3,67 +3,67 @@
 use core {*}
 
 power_mod :: (base: u32, exp: u32, mod: u32) -> u32 {
-    t: u64 = 1;
-    e: u64 = ~~exp;
-    b: u64 = ~~base;
-    m: u64 = ~~mod;
+    t: u64 = 1
+    e: u64 = ~~exp
+    b: u64 = ~~base
+    m: u64 = ~~mod
 
     while e > 0 {
-        if e % 2 != 0 do t = (t * b) % m;
+        if e % 2 != 0 do t = (t * b) % m
 
-        b = (b * b) % m;
-        e /= 2;
+        b = (b * b) % m
+        e /= 2
     }
 
-    return ~~(t % m);
+    return ~~(t % m)
 }
 
 dlp_bsgs :: (n: u32, a: u32, b: u32) -> u32 {
-    m := cast(u32) math.ceil(math.sqrt(cast(f64) n));
+    m := cast(u32) math.ceil(math.sqrt(cast(f64) n))
 
-    t := map.make(u32, u32);
-    defer map.free(&t);
+    t := Map.make(u32, u32)
+    defer Map.free(&t)
 
-    tmp: u64 = 1;
+    tmp: u64 = 1
     for i in 0 .. m {
-        map.put(&t, ~~tmp, i);
-        tmp = (tmp * ~~a) % ~~n;
+        Map.put(&t, ~~tmp, i)
+        tmp = (tmp * ~~a) % ~~n
     }
 
-    f := power_mod(a, n - 1 - m, n);
+    f := power_mod(a, n - 1 - m, n)
 
-    tmp = ~~b;
+    tmp = ~~b
     for i in 0 .. m {
-        if map.has(&t, ~~tmp) {
-            v := map.get(&t, ~~tmp) ?? 0;
+        if Map.has(&t, ~~tmp) {
+            v := Map.get(&t, ~~tmp) ?? 0
             return i * m + v; 
         }
 
-        tmp = (tmp * ~~f) % ~~n;
+        tmp = (tmp * ~~f) % ~~n
     }
 
-    return 0;
+    return 0
 }
 
 transform_subject :: (subject: u32, loop_size: u32) -> u32 {
-    value: u64 = 1;
-    for i in 0 .. loop_size do value = (value * ~~subject) % 20201227;
-    return cast(u32) value;
+    value: u64 = 1
+    for i in 0 .. loop_size do value = (value * ~~subject) % 20201227
+    return cast(u32) value
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./input/day25.txt";
+    contents := #file_contents "./input/day25.txt"
 
-    file := contents;
+    file := contents
 
-    card_pub_key := cast(u32, conv.parse_int(&file));
-    door_pub_key := cast(u32, conv.parse_int(&file));
+    card_pub_key := cast(u32, conv.parse_int(&file))
+    door_pub_key := cast(u32, conv.parse_int(&file))
 
-    card_loop_secret := dlp_bsgs(20201227, 7, card_pub_key);
-    door_loop_secret := dlp_bsgs(20201227, 7, door_pub_key);
+    card_loop_secret := dlp_bsgs(20201227, 7, card_pub_key)
+    door_loop_secret := dlp_bsgs(20201227, 7, door_pub_key)
 
-    encryption_key_0 := transform_subject(door_pub_key, card_loop_secret);
-    encryption_key_1 := transform_subject(card_pub_key, door_loop_secret);
+    encryption_key_0 := transform_subject(door_pub_key, card_loop_secret)
+    encryption_key_1 := transform_subject(card_pub_key, door_loop_secret)
 
-    printf("{} == {}\n", encryption_key_0, encryption_key_1);
+    printf("{} == {}\n", encryption_key_0, encryption_key_1)
 }

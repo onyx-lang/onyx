@@ -15,22 +15,22 @@ use core.sync
 ///
 /// Simply the wrapped allocator and the mutex.
 AtomicAllocator :: struct {
-    a: Allocator;
-    m: sync.Mutex;
+    a: Allocator
+    m: sync.Mutex
 }
 
 /// Creates a new AtomicAllocator over an existing allocator.
 make :: (a: Allocator) -> AtomicAllocator {
-    atomic: AtomicAllocator = .{ a = a };
+    atomic: AtomicAllocator = .{ a = a }
 
-    sync.mutex_init(&atomic.m);
+    sync.mutex_init(&atomic.m)
 
-    return atomic;
+    return atomic
 }
 
 /// Makes an allocator out of the atomic allocator state.
 make_allocator :: (atomic: &AtomicAllocator) =>
-    Allocator.{ atomic, atomic_alloc };
+    Allocator.{ atomic, atomic_alloc }
 
 #overload
 alloc.as_allocator :: make_allocator
@@ -38,8 +38,8 @@ alloc.as_allocator :: make_allocator
 
 #local
 atomic_alloc :: (atomic: &AtomicAllocator, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
-    sync.scoped_mutex(&atomic.m);
-    return atomic.a.func(atomic.a.data, aa, size, align, oldptr);
+    sync.scoped_mutex(&atomic.m)
+    return atomic.a.func(atomic.a.data, aa, size, align, oldptr)
 }
 
 

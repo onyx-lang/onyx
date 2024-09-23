@@ -34,15 +34,15 @@ hash :: #match -> u32 {
     (key: i32)    -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
     (key: i64)    -> u32 { return cast(u32) (cast(u64) 0xcbf29ce7 ^ cast(u64) key); },
     (key: str)    -> u32 {
-        hash: u32 = 5381;
-        for ch in key do hash += (hash << 5) + ~~ch;
-        return hash;
+        hash: u32 = 5381
+        for ch in key do hash += (hash << 5) + ~~ch
+        return hash
     },
     (key: type_expr) -> u32 { return hash(cast(u32) key); },
     (key: bool)   -> u32 { return 1 if key else 0; },
 
     (key: $T/type_is_enum) -> u32 {
-        return hash(cast(T.__backing_type) key);
+        return hash(cast(T.__backing_type) key)
     },
 
     #order 10000
@@ -54,13 +54,13 @@ hash :: #match -> u32 {
 // Useful in datastructure when the ability to hash is dependent on whether
 // the stored type is hashable. See core/container/pair.onyx for an example.
 Hashable :: interface (T: type_expr) {
-    t as T;
-    { hash(t) } -> u32;
+    t as T
+    { hash(t) } -> u32
 }
 
 #local
 HasHashMethod :: interface (T: type_expr) {
-    t as T;
-    { t->hash() } -> u32;
+    t as T
+    { t->hash() } -> u32
 }
 

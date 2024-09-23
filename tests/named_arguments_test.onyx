@@ -4,26 +4,26 @@ use core {*}
 
 main :: (args: [] cstr) {
     foo :: (x: i32, y: f32) {
-        printf("x is {}\n", x);
-        printf("y is {}\n", y);
+        printf("x is {}\n", x)
+        printf("y is {}\n", y)
     }
 
-    foo(10, 20);
-    foo(y = 10, x = 20);
+    foo(10, 20)
+    foo(y = 10, x = 20)
 
 
-    println("\n\n=========================");
+    println("\n\n=========================")
 
     poly_named :: (x: $T, y: [$N] T) {
-        println(x);
-        println(y);
+        println(x)
+        println(y)
     }
 
-    poly_named(10, u32.[ 10, 20, 30 ]);
-    poly_named(y = f32.[ 10, 20, 30 ], 10.0f);
+    poly_named(10, u32.[ 10, 20, 30 ])
+    poly_named(y = f32.[ 10, 20, 30 ], 10.0f)
 
 
-    println("\n\n=========================");
+    println("\n\n=========================")
 
     poly_overloaded :: #match {
         (y: [$N] $T) { print("MATCHED Y: "); println(y); },
@@ -31,26 +31,26 @@ main :: (args: [] cstr) {
         (z: $T)      { print("MATCHED Z: "); println(z); },
     }
 
-    poly_overloaded(u32.[ 10, 20 ]);
-    poly_overloaded(10);
-    poly_overloaded(z = 10);
+    poly_overloaded(u32.[ 10, 20 ])
+    poly_overloaded(10)
+    poly_overloaded(z = 10)
 
 
-    println("\n\n=========================");
+    println("\n\n=========================")
 
     overload_with_varargs :: (x: i32, y: i32, z: ..f32) {
-        println(x);
-        println(y);
+        println(x)
+        println(y)
 
-        for elem in z do printf("{} ", elem);
-        print("\n");
+        for elem in z do printf("{} ", elem)
+        print("\n")
     }
 
-    overload_with_varargs(10, 20, 30, 40, 50);
+    overload_with_varargs(10, 20, 30, 40, 50)
 
 
 
-    println("\n\n=========================");
+    println("\n\n=========================")
 
     lotza_options :: (
         options_a : bool,
@@ -65,11 +65,11 @@ main :: (args: [] cstr) {
             options_a, options_b,
             options_c, options_d,
             options_e, options_f,
-            options_g);
+            options_g)
     }
 
-    lotza_options(options_e = true, options_c = false, /* option_a */ false, /* option_b */ true);
-    lotza_options(options_e = true, options_c = false, options_a = true);
+    lotza_options(options_e = true, options_c = false, /* option_a */ false, /* option_b */ true)
+    lotza_options(options_e = true, options_c = false, options_a = true)
 
 
     // This currently does not work and would require a lot of rewriting of compiler internals to make work.
@@ -79,7 +79,7 @@ main :: (args: [] cstr) {
         ($T: type_expr, z: [$N] T) { printf("MATCHED Z {}\n", z); },
     }
 
-    named_baked_overloaded_parameters(i32, 10);
-    named_baked_overloaded_parameters(i32, u32.[ 10, 20, 30 ]);
-    named_baked_overloaded_parameters(i32, z = u32.[ 10, 40, 90 ]);
+    named_baked_overloaded_parameters(i32, 10)
+    named_baked_overloaded_parameters(i32, u32.[ 10, 20, 30 ])
+    named_baked_overloaded_parameters(i32, z = u32.[ 10, 40, 90 ])
 }

@@ -15,13 +15,13 @@ use core.memory
 /// until the pool is cleared or freed.
 ///
 StringPool :: struct {
-    arena: arena.Arena;
+    arena: arena.Arena
 }
 
 StringPool.make  :: pool_make
-StringPool.add   :: pool_add;
-StringPool.flush :: pool_flush;
-StringPool.free  :: pool_free;
+StringPool.add   :: pool_add
+StringPool.flush :: pool_flush
+StringPool.free  :: pool_free
 
 ///
 /// Creates a StringPool.
@@ -33,23 +33,23 @@ pool_make :: (maximum_string_length := 16384, allocator := context.allocator) =>
 ///
 /// Copies a string into the pool, returning the copied string.
 pool_add :: (sp: &StringPool, s: str) -> str {
-    allocator := alloc.as_allocator(&sp.arena);
+    allocator := alloc.as_allocator(&sp.arena)
 
-    new_str := make(str, s.count, allocator);
-    memory.copy(new_str.data, s.data, s.count);
-    return new_str;
+    new_str := make(str, s.count, allocator)
+    memory.copy(new_str.data, s.data, s.count)
+    return new_str
 }
 
 ///
 /// Clears all entries in the pool.
 pool_flush :: (sp: &StringPool) {
-    arena.clear(&sp.arena);
+    arena.clear(&sp.arena)
 }
 
 ///
 /// Completely frees all memory in the pool.
 pool_free :: (sp: &StringPool) {
-    arena.free(&sp.arena);
+    arena.free(&sp.arena)
 }
 
 #overload

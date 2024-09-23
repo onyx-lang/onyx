@@ -8,73 +8,71 @@
 package core.encoding.base64
 #allow_stale_code
 
-use core.array
-
 
 /// Encodes the given data in base64 into a new buffer, allocated
 /// from the allocator provided. It is the callers responsibilty
 /// to free this memory.
 encode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
-    out := array.make(u8, allocator=allocator);
+    out := Array.make(u8, allocator=allocator)
 
     for i in range.{0, data.count - 2, 3} {
-        c1 := data[i + 0];
-        c2 := data[i + 1];
-        c3 := data[i + 2];
+        c1 := data[i + 0]
+        c2 := data[i + 1]
+        c3 := data[i + 2]
 
-        out << encode_map[c1 >> 2];
-        out << encode_map[((c1 & 0x3) << 4) | ((c2 & 0xf0) >> 4)];
-        out << encode_map[((c2 & 0xf) << 2) | ((c3 & 0xc0) >> 6)];
-        out << encode_map[c3 & 0x3f];
+        out << encode_map[c1 >> 2]
+        out << encode_map[((c1 & 0x3) << 4) | ((c2 & 0xf0) >> 4)]
+        out << encode_map[((c2 & 0xf) << 2) | ((c3 & 0xc0) >> 6)]
+        out << encode_map[c3 & 0x3f]
     }
 
     if data.count % 3 == 1 {
-        c := data[data.count - 1];
-        out << encode_map[c >> 2];
-        out << encode_map[(c & 0x3) << 4];
-        out << '=';
-        out << '=';
+        c := data[data.count - 1]
+        out << encode_map[c >> 2]
+        out << encode_map[(c & 0x3) << 4]
+        out << '='
+        out << '='
 
     } elseif data.count % 3 == 2 {
-        c1 := data[data.count - 2];
-        c2 := data[data.count - 1];
-        out << encode_map[c1 >> 2];
-        out << encode_map[((c1 & 0x3) << 4) | ((c2 & 0xf0) >> 4)];
-        out << encode_map[(c2 & 0xf) << 2];
-        out << '=';
+        c1 := data[data.count - 2]
+        c2 := data[data.count - 1]
+        out << encode_map[c1 >> 2]
+        out << encode_map[((c1 & 0x3) << 4) | ((c2 & 0xf0) >> 4)]
+        out << encode_map[(c2 & 0xf) << 2]
+        out << '='
     }
 
-    return out;
+    return out
 }
 
 /// Decodes the given base64 data into a new buffer, allocated
 /// from the allocator provided.
 decode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
-    if data.count % 4 != 0 do return null_str;
+    if data.count % 4 != 0 do return null_str
 
-    out := array.make(u8, allocator=allocator);
+    out := Array.make(u8, allocator=allocator)
 
     for i in range.{0, data.count, 4} {
-        c1 := data[i + 0];
-        c2 := data[i + 1];
-        c3 := data[i + 2];
-        c4 := data[i + 3];
+        c1 := data[i + 0]
+        c2 := data[i + 1]
+        c3 := data[i + 2]
+        c4 := data[i + 3]
 
-        v1 := decode_map[c1 - '+'];
-        v2 := decode_map[c2 - '+'];
-        v3 := decode_map[c3 - '+'];
-        v4 := decode_map[c4 - '+'];
+        v1 := decode_map[c1 - '+']
+        v2 := decode_map[c2 - '+']
+        v3 := decode_map[c3 - '+']
+        v4 := decode_map[c4 - '+']
 
-        o1 := (v1 << 2)         | ((v2 & 0x30) >> 4);
-        o2 := ((v2 & 0xf) << 4) | ((v3 & 0x3c) >> 2);
-        o3 := ((v3 & 0x3) << 6) | (v4 & 0x3f);
+        o1 := (v1 << 2)         | ((v2 & 0x30) >> 4)
+        o2 := ((v2 & 0xf) << 4) | ((v3 & 0x3c) >> 2)
+        o3 := ((v3 & 0x3) << 6) | (v4 & 0x3f)
 
-        out << o1;
-        if c3 != '=' do out << o2;
-        if c4 != '=' do out << o3;
+        out << o1
+        if c3 != '=' do out << o2
+        if c4 != '=' do out << o3
     }
 
-    return out;
+    return out
 }
 
 
@@ -168,13 +166,13 @@ decode_url :: (data: [] u8, allocator := context.allocator) -> [] u8 {
 
 
 #local
-encode_map := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+encode_map := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
 #local
 encode_url_map := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
 // Use as:
-//     decode_map[ch - '+'];
+//     decode_map[ch - '+']
 #local
 decode_map := u8.[
     62, // +
@@ -193,7 +191,7 @@ decode_map := u8.[
     26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
     36, 37, 38, 39, 40, 41, 42, 43, 44, 45,
     46, 47, 48, 49, 50, 51,
-];
+]
 
 // Use as:
 //     decode_url_map[ch - '-'];

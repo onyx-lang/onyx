@@ -5,17 +5,17 @@ use core {*}
 MyString :: #distinct str
 
 main :: () {
-    x := MyString.{ "this works" };
+    x := MyString.{ "this works" }
 
-    y: ? MyString = MyString.{ "an optional works" };
+    y: ? MyString = MyString.{ "an optional works" }
 
-    println(x);
-    println(y);
-    println(y->unwrap());
-    println(y ?? MyString.{"alternate"});
+    println(x)
+    println(y)
+    println(y->unwrap())
+    println(y ?? MyString.{"alternate"})
 
-    z := y ?? x;
-    printf("{}\n", z);
+    z := y ?? x
+    printf("{}\n", z)
 }
 
 

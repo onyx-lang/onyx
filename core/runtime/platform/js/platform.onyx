@@ -33,48 +33,48 @@ __exit            :: (status: i32) -> void #foreign "host" "exit" ---
 __time            :: ()            -> i64  #foreign "host" "time" ---
 
 #if !#defined(__read_from_input) {
-    __read_from_input :: (buf: [] u8)  -> u32 do return 0;
+    __read_from_input :: (buf: [] u8)  -> u32 do return 0
 }
 
-__wait_for_input :: (timeout: i32) => true;
+__wait_for_input :: (timeout: i32) => true
 
 __args :: (a: Allocator) -> [] cstr do return .[];
 
 __futex_wait :: (addr: rawptr, expected: i32, timeout: i32) -> i32 {
     use core.intrinsics.atomics {__atomic_wait}
     if context.thread_id != 0 {
-        __atomic_wait(cast(&i32) addr, expected, ~~timeout);
-        return 0;
+        __atomic_wait(cast(&i32) addr, expected, ~~timeout)
+        return 0
     }
-    return 1;
+    return 1
 }
 
 __futex_wake :: (addr: rawptr, maximum: i32) -> i32 {
     use core.intrinsics.atomics {__atomic_notify}
-    __atomic_notify(addr, maximum);
-    return 1;
+    __atomic_notify(addr, maximum)
+    return 1
 }
 
 PollDescription :: struct {
-    fd: i32;
-    input, out: io.PollEvent;
+    fd: i32
+    input, out: io.PollEvent
 }
 __poll :: (fds: [] PollDescription, timeout := -1) {}
 
 // Sets up everything needed for execution.
 __start :: () {
-    __runtime_initialize();
-    context.thread_id = 0;
+    __runtime_initialize()
+    context.thread_id = 0
 
     #if (typeof main.main) == #type () -> void {
-        main.main();
+        main.main()
 
     } else {
-        args: [] cstr = .{ null, 0 };
-        main.main(args);
+        args: [] cstr = .{ null, 0 }
+        main.main(args)
     }
 
-    __flush_stdio();
+    __flush_stdio()
 }
 
 #if Multi_Threading_Enabled {

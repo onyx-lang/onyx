@@ -1,0 +1,51 @@
+diff --git a/compiler/src/lex.c b/compiler/src/lex.c
+index 8f0c828a..8b24b27c 100644
+--- a/compiler/src/lex.c
++++ b/compiler/src/lex.c
+@@ -381,17 +381,30 @@ whitespace_skipped:
+         goto token_parsed;
+     }
+ 
+-    if (tokenizer->curr[0] == '!' && tokenizer->curr[1] == '{') {
+-        INCREMENT_CURR_TOKEN(tokenizer);
+-        INCREMENT_CURR_TOKEN(tokenizer);
++    if (tokenizer->curr[0] == '[' && tokenizer->curr[1] == '[') {
++        i32 bracket_count = 0;
++        while (tokenizer->curr != tokenizer->end && tokenizer->curr[0] == '[') {
++            bracket_count += 1;
++            INCREMENT_CURR_TOKEN(tokenizer);
++        }
+ 
+         tk.text = tokenizer->curr;
+ 
+-        i32 bracket_count = 0;
+         i32 len = 0;
+-        while ((bracket_count > 0 || tokenizer->curr[0] != '}') && tokenizer->curr != tokenizer->end) {
+-            if (tokenizer->curr[0] == '{') bracket_count += 1;
+-            if (tokenizer->curr[0] == '}') bracket_count -= 1;
++        while (tokenizer->curr != tokenizer->end) {
++            i32 end_brackets = 0;
++            fori (i, 0, bracket_count) {
++                if (tokenizer->curr[0] != ']') break;
++                end_brackets++;
++            }
++
++            if (end_brackets == bracket_count) {
++                fori (i, 0, bracket_count) {
++                    INCREMENT_CURR_TOKEN(tokenizer);
++                }
++
++                break;
++            }
+ 
+             len++;
+             INCREMENT_CURR_TOKEN(tokenizer);
+@@ -399,8 +412,6 @@ whitespace_skipped:
+ 
+         tk.type = Token_Type_Proc_Macro_Body;
+         tk.length = len;
+-
+-        INCREMENT_CURR_TOKEN(tokenizer);
+         goto token_parsed;
+     }
+ 

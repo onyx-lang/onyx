@@ -17,7 +17,7 @@ decode_test :: () {
         "bGlnaHQgd29yayBhbmQgbGVz",
         "bGlnaHQgd29yayBhbmQgbGVzcw==",
     ] {
-        core.println(base64.decode(it));
+        core.println(base64.decode(it))
     }
 }
 
@@ -37,8 +37,8 @@ encode_test :: () {
         "light work and les",
         "light work and less",
     ] {
-        encoded := base64.encode(it);
-        core.println(encoded);
+        encoded := base64.encode(it)
+        core.println(encoded)
     }
 }
 
@@ -84,9 +84,9 @@ encode_url_test :: () {
 }
 
 main :: () {
-    decode_test();
-    core.println("\n");
-    encode_test();
+    decode_test()
+    core.println("\n")
+    encode_test()
 
     decode_url_test()
     core.println("\n")

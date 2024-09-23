@@ -1,20 +1,20 @@
 use core {package, *}
 
 f :: ctx => {
-    x, y := 123, 456.0f;
+    x, y := 123, 456.0f
     if ctx.a > 0 {
-        return Pair.make(x, y), false;
+        return Pair.make(x, y), false
     }
 
-    return .{}, true;
+    return .{}, true
 }
 
 g :: (c: $Ctx, f: (Ctx) -> ($T, bool)) -> T {
-    t, _ := f(c);
-    return t;
+    t, _ := f(c)
+    return t
 }
 
 main :: () {
-    p := g(.{a = 10}, f);
-    printf("{}\n", p);
+    p := g(.{a = 10}, f)
+    printf("{}\n", p)
 }

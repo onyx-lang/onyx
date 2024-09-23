@@ -7,5 +7,5 @@ use core {package, test}
 core.Running_Tests :: true 
 
 main :: () {
-    test.run_tests();
+    test.run_tests()
 }

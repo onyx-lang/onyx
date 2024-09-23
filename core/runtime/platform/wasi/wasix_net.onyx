@@ -16,172 +16,172 @@ use core {Result, string, io}
 SocketData :: wasi.FileDescriptor
 
 __net_sock_create :: (af: SocketFamily, type: SocketType, proto: SocketProto) -> Result(SocketData, io.Error) {
-    family    := cast(wasi.AddressFamily) cast(u32) af;
+    family    := cast(wasi.AddressFamily) cast(u32) af
     socktype  := switch type {
-        case .Stream => wasi.SockType.Stream;
-        case .Dgram  => wasi.SockType.Dgram;
-    };
-    sockproto := cast(wasi.SockProto) cast(u32) proto;
+        case .Stream => wasi.SockType.Stream
+        case .Dgram  => wasi.SockType.Dgram
+    }
+    sockproto := cast(wasi.SockProto) cast(u32) proto
 
-    sock: wasi.FileDescriptor;
-    err := wasi.sock_open(family, socktype, sockproto, &sock);
+    sock: wasi.FileDescriptor
+    err := wasi.sock_open(family, socktype, sockproto, &sock)
 
     if err == .Success {
-        return .{ Ok = sock };
+        return .{ Ok = sock }
     }
 
-    return .{ Err = .CreationFailed };
+    return .{ Err = .CreationFailed }
 }
 
 __net_sock_status :: (s: SocketData) -> SocketStatus {
-    status: wasi.SockStatus;
+    status: wasi.SockStatus
     if wasi.sock_status(s, &status) != .Success {
-        return .Errored;
+        return .Errored
     }
 
     return switch status {
-        case .Opening => .Opening;
-        case .Opened  => .Open;
-        case .Closed  => .Closed;
-        case .Failed  => .Errored;
-    };
+        case .Opening => .Opening
+        case .Opened  => .Open
+        case .Closed  => .Closed
+        case .Failed  => .Errored
+    }
 }
 
 __net_sock_opt_flag :: (s: SocketData, sockopt: SocketOption, flag: bool) -> bool {
     if sockopt == .NonBlocking {
-        return wasi.fd_fdstat_set_flags(s, wasi.FDFlags.NonBlock if flag else 0) == .Success;
+        return wasi.fd_fdstat_set_flags(s, wasi.FDFlags.NonBlock if flag else 0) == .Success
     }
 
     opt := switch sockopt {
-        case .Broadcast => wasi.SockOption.Broadcast;
-        case .ReuseAddress => wasi.SockOption.ReuseAddr;
-        case _ => wasi.SockOption.Noop;
-    };
-    return wasi.sock_set_opt_flag(s, opt, flag) == .Success;
+        case .Broadcast => wasi.SockOption.Broadcast
+        case .ReuseAddress => wasi.SockOption.ReuseAddr
+        case _ => wasi.SockOption.Noop
+    }
+    return wasi.sock_set_opt_flag(s, opt, flag) == .Success
 }
 
 __net_sock_opt_time :: (s: SocketData, sockopt: SocketOption, time: ? u64) -> bool {
-    return false;
+    return false
 }
 
 __net_sock_opt_size :: (s: SocketData, sockopt: SocketOption, size: i64) -> bool {
-    return false;
+    return false
 }
 
 __net_sock_bind :: (s: SocketData, addr: &SocketAddress) -> bool {
-    target: wasi.AddrPort;
-    socket_addr_to_wasix_addr(addr, &target);
+    target: wasi.AddrPort
+    socket_addr_to_wasix_addr(addr, &target)
 
-    return wasi.sock_bind(s, &target) == .Success;
+    return wasi.sock_bind(s, &target) == .Success
 }
 
 __net_sock_listen :: (s: SocketData, backlog: i32) -> bool {
-    return wasi.sock_listen(s, backlog) == .Success;
+    return wasi.sock_listen(s, backlog) == .Success
 }
 
 __net_sock_accept :: (s: SocketData, out: &SocketAddress) -> Result(SocketData, io.Error) {
-    new_sock: SocketData;
-    addr: wasi.AddrPort;
+    new_sock: SocketData
+    addr: wasi.AddrPort
     switch wasi.sock_accept_v2(s, 0, &new_sock, &addr) {
         case .Success ---
-        case .Again do return .{ Err = .NoData };
-        case _ do return .{ Err = .OperationFailed };
+        case .Again do return .{ Err = .NoData }
+        case _ do return .{ Err = .OperationFailed }
     }
 
-    wasi_addr_to_socket_address(&addr, out);
+    wasi_addr_to_socket_address(&addr, out)
 
-    return .{ Ok = new_sock };
+    return .{ Ok = new_sock }
 }
 
 __net_sock_connect :: (s: SocketData, addr: &SocketAddress) -> io.Error {
-    target: wasi.AddrPort;
-    socket_addr_to_wasix_addr(addr, &target);
+    target: wasi.AddrPort
+    socket_addr_to_wasix_addr(addr, &target)
 
     return switch wasi.sock_connect(s, &target) {
-        case .Success => .None;
+        case .Success => .None
         case .ConnRefused,
              .ConnAborted,
-             .ConnReset => .ConnectFailed;
+             .ConnReset => .ConnectFailed
 
-        case _ => .OperationFailed;
-    };
+        case _ => .OperationFailed
+    }
 }
 
 __net_sock_recv_from :: (s: SocketData, buf: [] u8, out: &SocketAddress) -> Result(i32, io.Error) {
-    vec := wasi.IOVec.{ buf = cast(i32) buf.data, len = buf.count };
+    vec := wasi.IOVec.{ buf = cast(i32) buf.data, len = buf.count }
 
-    out_len: u32;
-    out_flags: wasi.ROFlags;
-    sender: wasi.AddrPort;
+    out_len: u32
+    out_flags: wasi.ROFlags
+    sender: wasi.AddrPort
     return switch wasi.sock_recv_from(s, &vec, 1, 0, &out_len, &out_flags, &sender) {
         case .Success => do {
-            wasi_addr_to_socket_address(&sender, out);
-            return Result(i32, io.Error).{ Ok = out_len };
-        };
-        case .Again   => .{ Err = .NoData };
-        case _ => .{ Err = .EOF };
-    };
+            wasi_addr_to_socket_address(&sender, out)
+            return Result(i32, io.Error).{ Ok = out_len }
+        }
+        case .Again   => .{ Err = .NoData }
+        case _ => .{ Err = .EOF }
+    }
 }
 
 __net_sock_send_to :: (s: SocketData, buf: [] u8, addr: &SocketAddress) -> Result(i32, io.Error) {
-    vec := wasi.IOVec.{ buf = cast(i32) buf.data, len = buf.count };
+    vec := wasi.IOVec.{ buf = cast(i32) buf.data, len = buf.count }
 
-    out_len: u32;
-    target: wasi.AddrPort;
-    socket_addr_to_wasix_addr(addr, &target);
+    out_len: u32
+    target: wasi.AddrPort
+    socket_addr_to_wasix_addr(addr, &target)
     return switch wasi.sock_send_to(s, &vec, 1, 0, &target, &out_len) {
-        case .Success => Result(i32, io.Error).{ Ok = out_len };
-        case .Again   => Result(i32, io.Error).{ Err = .NoData };
-        case _ => Result(i32, io.Error).{ Err = .EOF };
-    };
+        case .Success => Result(i32, io.Error).{ Ok = out_len }
+        case .Again   => Result(i32, io.Error).{ Err = .NoData }
+        case _ => Result(i32, io.Error).{ Err = .EOF }
+    }
 }
 
 __net_sock_recv :: (s: SocketData, buf: [] u8) -> Result(i32, io.Error) {
-    vec := wasi.IOVec.{ buf = cast(i32) buf.data, len = buf.count };
+    vec := wasi.IOVec.{ buf = cast(i32) buf.data, len = buf.count }
 
-    out_len: u32;
-    out_flags: wasi.ROFlags;
+    out_len: u32
+    out_flags: wasi.ROFlags
     return switch wasi.sock_recv(s, &vec, 1, 0, &out_len, &out_flags) {
-        case .Success => Result(i32, io.Error).{ Ok = out_len };
-        case .Again   => Result(i32, io.Error).{ Err = .NoData };
-        case _ => Result(i32, io.Error).{ Err = .EOF };
-    };
+        case .Success => Result(i32, io.Error).{ Ok = out_len }
+        case .Again   => Result(i32, io.Error).{ Err = .NoData }
+        case _ => Result(i32, io.Error).{ Err = .EOF }
+    }
 }
 
 __net_sock_send :: (s: SocketData, buf: [] u8) -> Result(i32, io.Error) {
-    vec := wasi.IOVec.{ buf = cast(i32) buf.data, len = buf.count };
+    vec := wasi.IOVec.{ buf = cast(i32) buf.data, len = buf.count }
 
-    out_len: u32;
+    out_len: u32
     return switch wasi.sock_send(s, &vec, 1, 0, &out_len) {
-        case .Success => Result(i32, io.Error).{ Ok = out_len };
-        case .Again   => Result(i32, io.Error).{ Err = .NoData };
-        case _ => Result(i32, io.Error).{ Err = .EOF };
-    };
+        case .Success => Result(i32, io.Error).{ Ok = out_len }
+        case .Again   => Result(i32, io.Error).{ Err = .NoData }
+        case _ => Result(i32, io.Error).{ Err = .EOF }
+    }
 }
 
 __net_sock_shutdown :: (s: SocketData, how: SocketShutdown) -> io.Error {
     sd := switch how {
-        case .Read => wasi.SDFlags.RD;
-        case .Write => wasi.SDFlags.WR;
-        case .ReadWrite => wasi.SDFlags.RD | wasi.SDFlags.WR;
-    };
+        case .Read => wasi.SDFlags.RD
+        case .Write => wasi.SDFlags.WR
+        case .ReadWrite => wasi.SDFlags.RD | wasi.SDFlags.WR
+    }
 
     return switch wasi.sock_shutdown(s, sd) {
-        case .Success => .None;
-        case _ => .OperationFailed;
-    };
+        case .Success => .None
+        case _ => .OperationFailed
+    }
 }
 
 __net_sock_close :: (s: SocketData) -> void {
-    wasi.fd_close(s);
+    wasi.fd_close(s)
 }
 
 __net_resolve :: (host: str, port: u16, out_addrs: [] ResolveResult) -> i32 {
-    use addrbuf := make([] wasi.Addr, out_addrs.count);
+    use addrbuf := make([] wasi.Addr, out_addrs.count)
 
-    results := 0;
-    err := wasi.resolve(host, port, addrbuf.data, addrbuf.count, &results);
-    if err != .Success do return 0;
+    results := 0
+    err := wasi.resolve(host, port, addrbuf.data, addrbuf.count, &results)
+    if err != .Success do return 0
 
     for &in_addr, index in addrbuf[0..results] {
         out_addr: ResolveResult; 
@@ -190,14 +190,14 @@ __net_resolve :: (host: str, port: u16, out_addrs: [] ResolveResult) -> i32 {
             case .Ipv6    => .Inet6
             case .Unix    => .Unix
             case _ => .Unknown
-        };
+        }
 
-       wasi_addr_no_port_to_socket_address(in_addr, port, &out_addr.addr);
+       wasi_addr_no_port_to_socket_address(in_addr, port, &out_addr.addr)
 
-        out_addrs[index] = out_addr;
+        out_addrs[index] = out_addr
     }
 
-    return results;
+    return results
 }
 
 
@@ -205,16 +205,16 @@ __net_resolve :: (host: str, port: u16, out_addrs: [] ResolveResult) -> i32 {
     socket_addr_to_wasix_addr :: (input: &SocketAddress, out: &wasi.AddrPort) {
         switch *input {
             case .Unix as &path {
-                *out = .{ Unix = .{ *cast(&[108] u8) path } };
+                *out = .{ Unix = .{ *cast(&[108] u8) path } }
             }
 
             case .Inet as &inet {
-                *out = .{ Ipv4 = .{ inet.port, *cast(&wasi.AddrIPv4)&inet.addr } };
+                *out = .{ Ipv4 = .{ inet.port, *cast(&wasi.AddrIPv4)&inet.addr } }
             }
 
             case .Inet6 as &inet {
                 // Not entirely right...
-                *out = .{ Ipv6 = .{ inet.port, *cast(&wasi.AddrIPv6)&inet.addr } };
+                *out = .{ Ipv6 = .{ inet.port, *cast(&wasi.AddrIPv6)&inet.addr } }
             }
 
             case .HostPort ---
@@ -226,16 +226,16 @@ __net_resolve :: (host: str, port: u16, out_addrs: [] ResolveResult) -> i32 {
             case .Unspec ---
 
             case .Ipv4 as &inet {
-                *out = .{ Inet = .{ inet.port, *cast(&u32)&inet.addr } };
+                *out = .{ Inet = .{ inet.port, *cast(&u32)&inet.addr } }
             }
 
             case .Ipv6 as &inet {
-                *out = .{ Inet6 = .{ inet.port, *cast(&[16] u8)&inet.addr } };
+                *out = .{ Inet6 = .{ inet.port, *cast(&[16] u8)&inet.addr } }
             }
 
             case .Unix as &unix {
-                p: [256] u8 = *cast(&[256] u8) &unix.path;
-                *out = .{ Unix = p };
+                p: [256] u8 = *cast(&[256] u8) &unix.path
+                *out = .{ Unix = p }
             }
         }
     }
@@ -245,16 +245,16 @@ __net_resolve :: (host: str, port: u16, out_addrs: [] ResolveResult) -> i32 {
             case .Unspec ---
 
             case .Ipv4 as &inet {
-                *out = .{ Inet = .{ port, *cast(&u32) inet } };
+                *out = .{ Inet = .{ port, *cast(&u32) inet } }
             }
 
             case .Ipv6 as &inet {
-                *out = .{ Inet6 = .{ port, *cast(&[16] u8) inet } };
+                *out = .{ Inet6 = .{ port, *cast(&[16] u8) inet } }
             }
 
             case .Unix as &unix {
-                p: [256] u8 = *cast(&[256] u8) unix;
-                *out = .{ Unix = p };
+                p: [256] u8 = *cast(&[256] u8) unix
+                *out = .{ Unix = p }
             }
         }
     }

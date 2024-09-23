@@ -3,48 +3,49 @@
 use core {*}
 
 Vec2 :: struct {
-	x: i32 = 0;
-	y: i32 = 0;
+	x: i32 = 0
+	y: i32 = 0
 }
 
-#match hash.to_u32 (v: Vec2) -> u32 {
-	return v.x * 11 + v.y * 17;
+#overload
+hash.hash :: (v: Vec2) -> u32 {
+	return v.x * 11 + v.y * 17
 }
 
 #operator == (v1: Vec2, v2: Vec2) -> bool {
-	return v1.x == v2.x && v1.y == v2.y;
+	return v1.x == v2.x && v1.y == v2.y
 }
 
 Hex_Directions := Vec2.[
 	Vec2.{  1, 0 }, Vec2.{  1, -1 }, Vec2.{ 0, -1 }, 
     Vec2.{ -1, 0 }, Vec2.{ -1,  1 }, Vec2.{ 0,  1 }, 
-];
+]
 
 Cell :: struct {
-	alive : bool = false;
+	alive : bool = false
 	next  : bool = false;	
 }
 
 main :: (args: [] cstr) {
-	contents := #file_contents "./input/day24.txt";
+	contents := #file_contents "./input/day24.txt"
 
-    file_stream := io.buffer_stream_make(contents);
-	file := io.reader_make(&file_stream);
+    file_stream := io.buffer_stream_make(contents)
+	file := io.reader_make(&file_stream)
 
-	grid := map.make(Vec2, Cell); // `true` is black
-	defer map.free(&grid);
+	grid := Map.make(Vec2, Cell); // `true` is black
+	defer Map.free(&grid)
 
 	while !io.reader_empty(&file) {
-		line := io.read_line(&file);
+		line := io.read_line(&file)
 
-		loc := Vec2.{ 0, 0 };
-		s := 0;
+		loc := Vec2.{ 0, 0 }
+		s := 0
 		for ch in line do switch s {
 			case 0 do switch ch {
-				case 'e' do loc.x += 1;
-				case 'w' do loc.x -= 1;
-				case 'n' do s = 1;
-				case 's' do s = 2;
+				case 'e' do loc.x += 1
+				case 'w' do loc.x -= 1
+				case 'n' do s = 1
+				case 's' do s = 2
 			}
 
 			case 1 {
@@ -52,7 +53,7 @@ main :: (args: [] cstr) {
 					case 'e' { loc.x += 1; loc.y -= 1; }
 					case 'w' { loc.y -= 1; }
 				}
-				s = 0;
+				s = 0
 			}
 
 			case 2 {
@@ -60,74 +61,74 @@ main :: (args: [] cstr) {
 					case 'e' { loc.y += 1; }
 					case 'w' { loc.x -= 1; loc.y += 1; }
 				}
-				s = 0;
+				s = 0
 			}
 		}
 
 
-		curr := map.get(&grid, loc) ?? .{};
-		map.put(&grid, loc, .{ alive = !curr.alive });
+		curr := Map.get(&grid, loc) ?? .{}
+		Map.put(&grid, loc, .{ alive = !curr.alive })
 	}
 
 	// Part 1
-	black_count := 0;
+	black_count := 0
 	for &cell in grid.entries {
-		if cell.value.alive do black_count += 1;
+		if cell.value.alive do black_count += 1
 	}	
-	printf("Black count: {}\n", black_count);
+	printf("Black count: {}\n", black_count)
 
 	// Part 2
-	cells_to_consider := array.make(Vec2);
-	defer array.free(&cells_to_consider);
+	cells_to_consider := Array.make(Vec2)
+	defer Array.free(&cells_to_consider)
 
 	for i in 0 .. 100 {
 		for &cell in grid.entries {
 			if cell.value.alive {
-				array.push(&cells_to_consider, cell.key);
+				Array.push(&cells_to_consider, cell.key)
 
 				for &dir in Hex_Directions {
-					array.push(&cells_to_consider, .{
+					Array.push(&cells_to_consider, .{
 						x = cell.key.x + dir.x,
 						y = cell.key.y + dir.y,
-					});
+					})
 				}
 			}
 		}
 
 		for &cell in cells_to_consider {
-			state  := map.get(&grid, *cell) ?? .{};
-			ncount := get_neighbor_count(&grid, *cell);
+			state  := Map.get(&grid, *cell) ?? .{}
+			ncount := get_neighbor_count(&grid, *cell)
 
 			if state.alive {
-				state.next = ncount == 1 || ncount == 2;
+				state.next = ncount == 1 || ncount == 2
 			} else {
-				state.next = ncount == 2;
+				state.next = ncount == 2
 			}
 
-			map.put(&grid, *cell, state);
+			Map.put(&grid, *cell, state)
 		}
 
 		for &cell in cells_to_consider {
-			map.update(&grid, *cell, [v]{ v.alive = v.next; });
+			Map.update(&grid, *cell, [v]{ v.alive = v.next; })
 		}
 
-		array.clear(&cells_to_consider);
+		Array.clear(&cells_to_consider)
 	}
 
-	black_count = 0;
+	black_count = 0
 	for &cell in grid.entries {
-		if cell.value.alive do black_count += 1;
+		if cell.value.alive do black_count += 1
 	}	
-	printf("GOL black count: {}\n", black_count);
+	printf("GOL black count: {}\n", black_count)
 }
 
-get_neighbor_count :: (grid: &map.Map(Vec2, Cell), pos: Vec2) -> u32 {
-	count := 0;
+get_neighbor_count :: (grid: &Map(Vec2, Cell), pos: Vec2) -> u32 {
+	count := 0
 
 	for &dir in Hex_Directions {
-		cell := map.get(grid, Vec2.{ x = pos.x + dir.x, y = pos.y + dir.y }) ?? .{};
-		if cell.alive do count += 1;
+		cell := Map.get(grid, Vec2.{ x = pos.x + dir.x, y = pos.y + dir.y }) ?? .{}
+		if cell.alive do count += 1
 	}
 
-	return count;
+	return count
 }

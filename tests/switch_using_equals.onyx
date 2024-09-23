@@ -3,30 +3,30 @@
 use core {*}
 
 Vector2 :: struct { x, y: i32; }
-#operator == macro (v1: Vector2, v2: Vector2) => v1.x == v2.x && v1.y == v2.y;
+#operator == macro (v1: Vector2, v2: Vector2) => v1.x == v2.x && v1.y == v2.y
 
 none_of_the_above :: [] {
     case _ {
-        println("Got default!");
+        println("Got default!")
     }
 }
 
 main :: (args: [] cstr) {
     for .[ "Some", "Thing", "Other" ] {
         switch it {
-            case "Thing" do println("Got thing!");
-            case "Some"  do println("Got some!");
-            #unquote none_of_the_above;
+            case "Thing" do println("Got thing!")
+            case "Some"  do println("Got some!")
+            #unquote none_of_the_above
         }
     }
 
-    v := Vector2.{ 1, 0 };
+    v := Vector2.{ 1, 0 }
     switch v {
-        case .{ 0, 0 } do println("0, 0");
-        case .{ 0, 1 } do println("0, 1");
-        case .{ 1, 0 } do println("1, 0");
-        case .{ 1, 1 } do println("1, 1");
+        case .{ 0, 0 } do println("0, 0")
+        case .{ 0, 1 } do println("0, 1")
+        case .{ 1, 0 } do println("1, 0")
+        case .{ 1, 1 } do println("1, 1")
 
-        #unquote none_of_the_above;
+        #unquote none_of_the_above
     }
 }

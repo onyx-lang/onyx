@@ -3,30 +3,29 @@
 use core
 use core.hash
 use core.conv
-use core.array
 use core.iter
 
 use core {println, printf}
 
 Hashable :: interface (T: type_expr) {
-    t as T;
+    t as T
 
-    { hash.to_u32(t) } -> u32;
+    { hash.to_u32(t) } -> u32
 }
 
 try_hash :: #match {
     macro (x: $T) where Hashable(T) {
-        println(hash.to_u32(x));
+        println(hash.to_u32(x))
     },
     (x: any) {
-        printf("{} is not hashable!\n", x.type);
+        printf("{} is not hashable!\n", x.type)
     },
 }
 
 CanCastTo :: interface (T: type_expr, D: type_expr) {
-    t as T;
+    t as T
 
-    { cast(D) t } -> D;
+    { cast(D) t } -> D
 }
 
 // I don't know why this doesn't work... It is complaining that it couldn't match
@@ -43,40 +42,40 @@ cast_able_to_int :: #match {
 }
 
 do_math :: macro (x, y: $T) -> T where SemiRing(T) {
-    return x + y + x * y;
+    return x + y + x * y
 }
 
 SemiRing :: interface (T: type_expr) {
-    t as T;
+    t as T
 
-    {t + t} -> T;
-    {t * t} -> T;
+    {t + t} -> T
+    {t * t} -> T
 }
 
 bit_math :: (x, y: $T) -> T where BitField(T) {
-    return (x & y) | (x ^ y);
+    return (x & y) | (x ^ y)
 }
 
 BitField :: interface (T: type_expr) {
-    t as T;
+    t as T
 
-    { ~t } -> T;
-    { t & t } -> T;
-    { t | t } -> T;
-    { t ^ t } -> T;
+    { ~t } -> T
+    { t & t } -> T
+    { t | t } -> T
+    { t ^ t } -> T
 }
 
 #tag conv.Custom_Format.{ Complex.format }
 Complex :: struct {
-    x, y: f32;
+    x, y: f32
 
     format :: (output: &conv.Format_Output, format: &conv.Format, c: &Complex) {
-        conv.format(output, "{.2} + {.2}i", c.x, c.y);
+        conv.format(output, "{.2} + {.2}i", c.x, c.y)
     }
 }
 
-#operator + (c1, c2: Complex) => Complex.{ c1.x + c2.x, c1.y + c2.y };
-#operator * (c1, c2: Complex) => Complex.{ c1.x * c2.x - c1.y * c2.y, c1.x * c2.y + c1.y * c2.x };
+#operator + (c1, c2: Complex) => Complex.{ c1.x + c2.x, c1.y + c2.y }
+#operator * (c1, c2: Complex) => Complex.{ c1.x * c2.x - c1.y * c2.y, c1.x * c2.y + c1.y * c2.x }
 
 consume :: macro (x: $T/iter.Iterable) => {
     // This is a weird limitation of the Onyx type system.
@@ -90,66 +89,66 @@ consume :: macro (x: $T/iter.Iterable) => {
     consume_inner :: #match {
         // Iterator over pointers get dereferenced
         macro (iter: Iterator(&$T)) -> [..] T {
-            arr := array.make(T);
-            for iter do arr << *it;
-            return arr;
+            arr := Array.make(T)
+            for iter do arr << *it
+            return arr
         },
 
         macro (iter: Iterator($T)) -> [..] T {
-            arr := array.make(T);
-            for iter do arr << it;
-            return arr;
+            arr := Array.make(T)
+            for iter do arr << it
+            return arr
         },
     }
 
-    iterator := iter.as_iter(x);
-    return consume_inner(iterator);
+    iterator := iter.as_iter(x)
+    return consume_inner(iterator)
 }
 
 
 ReturnsArray :: interface (T: type_expr, N: i32) {
-    t as T;
+    t as T
 
-    { t->make_an_array() } -> [N] i32;
+    { t->make_an_array() } -> [N] i32
 }
 
 MakeArray :: struct {
-    member: i32;
+    member: i32
 
     make_an_array :: (self: &MakeArray) -> [5] i32 {
-        return .[ 1, 2, 3, 4, 5 ];
+        return .[ 1, 2, 3, 4, 5 ]
     }
 }
 
 run_make_array :: (x: $T) where ReturnsArray(T, 5) {
-    x->make_an_array() |> println();
+    x->make_an_array() |> println()
 }
 
 main :: (args: [] cstr) {
-    try_hash("This is a test");
-    try_hash(context);
-    try_hash(context.allocator);
+    try_hash("This is a test")
+    try_hash(context)
+    try_hash(context.allocator)
 
-    printf("{p}\n", do_math(3, 4));
-    println(do_math(Complex.{ 10, 20 }, .{ 30, 40 }));
+    printf("{p}\n", do_math(3, 4))
+    println(do_math(Complex.{ 10, 20 }, .{ 30, 40 }))
 
-    println(bit_math(3, 5));
-    // println(bit_math(3.0, 4.0));
+    println(bit_math(3, 5))
+    // println(bit_math(3.0, 4.0))
 
-    a := consume(f32.[4,2,4,7,4]);
-    defer array.free(&a);
-    println(a);
+    a := consume(f32.[4,2,4,7,4])
+    defer Array.free(&a)
+    println(a)
 
-    consume(1 .. 10) |> println();
+    consume(1 .. 10) |> println()
 
-    println(cast_able_to_int(12.34));
-    println(cast_able_to_int("test"));
+    println(cast_able_to_int(12.34))
+    println(cast_able_to_int("test"))
 
-    println(cast_able(12.34, i32));
-    println(cast_able("foo", i32));
+    println(cast_able(12.34, i32))
+    println(cast_able("foo", i32))
 
-    b: [10] i32;
-    println(cast_able(b, [] i32));
+    b: [10] i32
+    println(cast_able(b, [] i32))
 
-    run_make_array(&MakeArray.{});
+    run_make_array(&MakeArray.{})
 }

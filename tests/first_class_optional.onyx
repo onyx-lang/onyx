@@ -2,20 +2,20 @@ use core
 use core {println}
 
 foo :: (x: ?i32) -> i32 {
-    return x? + 10;
+    return x? + 10
 }
 
 bar :: (x: ?i32) -> ?i32 {
-    return x? * 2;
+    return x? * 2
 }
 
 main :: () {
-    println(foo(.{}));
-    println(foo(20));
+    println(foo(.{}))
+    println(foo(20))
 
-    println(bar(.{}));
-    println(bar(20));
+    println(bar(.{}))
+    println(bar(20))
 
-    println(bar(foo(.{})));
-    println(bar(foo(20)));
+    println(bar(foo(.{})))
+    println(bar(foo(20)))
 }

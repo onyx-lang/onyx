@@ -34,8 +34,8 @@
 
 
 ValidKey :: interface (T: type_expr) {
-    hash.to_u32(T);
-    T == T;
+    hash.to_u32(T)
+    T == T
 }
 
 
@@ -45,7 +45,7 @@ Hashable :: interface (T: type_expr) {
 
     // This syntax seems pretty clean, but it introduces some complications when
     // you actually think about using the type T in the expected type expression.
-    { hash.to_u32(T) } -> u32;
+    { hash.to_u32(T) } -> u32
 }
 
 Ring :: interface (T: type_expr) {
@@ -55,9 +55,9 @@ Ring :: interface (T: type_expr) {
     // Is this okay? Or should you have to say `typeof T` in the type expression?
     // Or should the syntax for interfaces change?
 
-    { T + T } -> T;
-    { T - T } -> T;
-    { T * T } -> T;
+    { T + T } -> T
+    { T - T } -> T
+    { T * T } -> T
 }
 
 Ring :: interface (t: $T) {
@@ -68,9 +68,9 @@ Ring :: interface (t: $T) {
     // always be expected before types in interfaces. Also, all types should just be
     // a single symbol.
 
-    { t + t } -> T;
-    { t - t } -> T;
-    { t * t } -> T;
+    { t + t } -> T
+    { t - t } -> T
+    { t * t } -> T
 
     //
     // The only problem I have with this syntax is that it is a little confusing when
