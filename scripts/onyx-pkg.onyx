@@ -27,8 +27,9 @@ Protocols :: str.[
 //
 // NOTE: This returns a string that ends with the path separator.
 Template_Directory :: () -> str {
-    return os.path_join(os.path_directory(#file), "pkg_templates")
-            |> string.copy()
+    return os.path_directory(#file)
+        |> os.path_join("pkg_templates")
+        |> str.copy()
 }
 
 Version :: SemVer.{0, 1, 12}
@@ -37,7 +38,7 @@ Version :: SemVer.{0, 1, 12}
 
 
 use core {package, *}
-use core.encoding {kdl}
+use core.encoding {kdl, json}
 use runtime
 
 global_arguments: struct {
@@ -161,7 +162,7 @@ run_init_command :: (args: [] str) {
         while true {
             print(f)
             line := r->read_line(consume_newline=true, allocator=context.temp_allocator)
-                    |> string.strip_whitespace()
+                    |> str.strip_whitespace()
 
             if !line {
                 *dest = default
@@ -171,7 +172,7 @@ run_init_command :: (args: [] str) {
             if conv.parse_any(dest, T, line, context.allocator) do break
 
             if T == str {
-                *cast(&str) dest = string.copy(line)
+                *cast(&str) dest = str.copy(line)
                 break
             }
         }
@@ -439,8 +440,8 @@ run_publish_command :: (args: [] str) {
     while true {
         printf("Is this a m[a]jor, m[i]nor, or [p]atch release? or [c]ancel? (a/i/p/c) ")
         input := r->read_line(consume_newline=true, inplace=true)
-                 |> string.strip_whitespace()
-                 |> string.to_lowercase()
+                 |> str.strip_whitespace()
+                 |> str.to_lowercase()
 
         switch input {
             case "a" {
@@ -507,7 +508,7 @@ run_migrate_command :: (args: [] str) {
 }
 
 @Command.{
-    "new", "Create a new project from a template in the current directory", "(template_name | --list) [directory]",
+    "new", "Create a new project from a template in the specified directory", "(template_name | --list | --create) [directory]",
 """
 Arguments:
     template_name    Template name to create.
@@ -521,10 +522,57 @@ run_new_command :: (args: [] str) {
         if args[0] == "--list" {
             printf("List of installed templates\n")
             for os.list_directory(Template_Directory()) {
-                if !string.ends_with(it->name(), ".json") do continue
+                if !str.ends_with(it->name(), ".json") do continue
 
                 printf("    {}\n", os.path_basename(it->name()))
             }
+            return
+        }
+
+        if args[0] == "--create" {
+            destination := do {
+                if args.count == 1 do return "template.json"
+                return args[1]
+            }
+
+            printf("Creating '{}' from the current directory\n", destination)
+
+            files: Map(str, str)
+            to_process := make([..] str)
+            to_process->push(".")
+
+            for folder in Iterator.from(&to_process) {
+                for entry in os.list_directory(folder) {
+                    name := entry->name()
+                    fullpath := os.path_join(folder, name)
+
+                    if entry.type == .Directory {
+                        if name == ".git" || name == "lib" || name == "bin" {
+                            info_print("Skipping", "Skipping folder {}\n", name)
+                            continue
+                        }
+
+                        to_process->push(fullpath)
+                    }
+
+                    if entry.type == .RegularFile {
+                        files->put(
+                            fullpath
+                            os.get_contents(fullpath)
+                        )
+                    }
+                }
+            }
+
+            use output := os.open(destination, .Write)->expect("Failed to open output file")
+            use writer := io.Writer.make(&output, 0)
+
+            writer->write("{\"variables\":{},")
+            writer->write("\"commands\":[],")
+            writer->write("\"files\":")
+            json.encode(&writer, files)
+            writer->write("}")
+
             return
         }
     }
@@ -553,23 +601,24 @@ run_new_command :: (args: [] str) {
     }
 
     use core.encoding {json}
-    template, err := json.decode_with_error(os.get_contents(template_file))
-    if err->has_error() {
+    template_res := json.decode_with_result(os.get_contents(template_file))
+    if template_res.Err {
         error_print("Failed to parse template file.\n")
-        print(err->message())
+        print(template_res.Err!)
         return
     }
 
     vars := make(Map(str, str))
     input := io.reader_make(&stdio.stream)
 
+    template := template_res.Ok!
     template_variables := template.root["variables"]->as_map()
     for template_variables->as_iter() {
         assert(it.value["type"]->as_str() == "string", "Only string types are supported right now in template variables.")
 
         printf("{}: ", it.value["description"]->as_str())
         line := input->read_line(consume_newline=true, allocator=context.temp_allocator)
-                |> string.strip_whitespace()
+                |> str.strip_whitespace()
 
         vars->put(it.key, line)
     }
@@ -584,7 +633,7 @@ run_new_command :: (args: [] str) {
         command := it->as_str()
         info_print("Running", "{}\n", command)
 
-        args := string.split(command, ' ', context.temp_allocator)
+        args := command->split(' ', context.temp_allocator)
         cmd  := args[0]
         args  = args[1 .. args.count]
 
@@ -602,6 +651,18 @@ run_new_command :: (args: [] str) {
             switch it.second->type() {
                 case .String {
                     info_print("Creating", tprintf("{}\n", destination))
+
+                    { 
+                        folders := it.first->split('/')
+                        folders = folders[0 .. folders.count - 1]
+                        target := dir
+                        for folder in folders {
+                            target = os.path_join(target, folder)
+                            if !os.dir_exists(target) {
+                                os.dir_create(target)
+                            }
+                        }
+                    }
 
                     contents := process_contents(it.second->as_str(), vars)
                     use file := os.open(destination, .Write).Ok?
@@ -621,11 +682,11 @@ run_new_command :: (args: [] str) {
 
         to_process := contents
         while to_process {
-            to_output, to_process~ := string.bisect(to_process, "{{")
-            string.append(&output, to_output)
+            to_output, to_process~ := str.bisect(to_process, "{{")
+            dyn_str.append(&output, to_output)
 
-            var_name, to_process~ := string.bisect(to_process, "}}")
-            string.append(&output, vars->get(var_name) ?? "")
+            var_name, to_process~ := str.bisect(to_process, "}}")
+            dyn_str.append(&output, vars->get(var_name) ?? "")
         }
 
         return output
@@ -846,22 +907,22 @@ read_config_from_installed_dependency :: (dependency_folder: str) -> ? Config {
 strip_protocol_and_www_from_repo :: (repo: str) -> str {
     to_return := repo
 
-    if string.contains(to_return, "://") {
-        _, to_return~ := string.bisect(to_return, "://")
+    if str.contains(to_return, "://") {
+        _, to_return~ := str.bisect(to_return, "://")
     }
 
-    if string.starts_with(to_return, "www.") {
+    if str.starts_with(to_return, "www.") {
         to_return = to_return["www.".count .. to_return.count]
     }
 
-    if string.ends_with(to_return, ".git") {
+    if str.ends_with(to_return, ".git") {
         to_return = to_return[0 .. to_return.count - ".git".count]
     }
 
     #if runtime.compiler_os == .Windows {
-        to_return = string.copy(to_return)
+        to_return = str.copy(to_return)
 
-        string.replace(to_return, '/', '\\')
+        str.replace(to_return, '/', '\\')
     }
 
     return to_return
@@ -881,7 +942,7 @@ run_native_library_installation :: (folder: str) -> (bool, str) {
 
     info_print("Install", "Running installation of '{}'\n", folder);    
 
-    args := string.split(inner_config.native_library_build->unwrap(), ' ', context.temp_allocator)
+    args := str.split(inner_config.native_library_build->unwrap(), ' ', context.temp_allocator)
     cmd  := args[0]
     args  = args[1 .. args.count]
 
@@ -969,7 +1030,7 @@ run_tool_installation :: (folder: str) -> bool {
 }
 
 run_command_and_forward_output :: (cmd: str) => {
-    args := string.split(cmd, ' ', context.temp_allocator)
+    args := str.split(cmd, ' ', context.temp_allocator)
     prog := args[0]
     args  = args[1 .. args.count]
 
@@ -1035,11 +1096,11 @@ SemVer :: struct {
     parse :: (semver: &SemVer, to_parse_: str, _: Allocator) -> bool {
         to_parse := to_parse_
 
-        major := string.read_until(&to_parse, '.') |> conv.str_to_i64()
-        string.advance(&to_parse)
-        minor := string.read_until(&to_parse, '.') |> conv.str_to_i64()
-        string.advance(&to_parse)
-        patch := string.read_until(&to_parse, '.') |> conv.str_to_i64()
+        major := str.read_until(&to_parse, '.') |> conv.str_to_i64()
+        str.advance(&to_parse)
+        minor := str.read_until(&to_parse, '.') |> conv.str_to_i64()
+        str.advance(&to_parse)
+        patch := str.read_until(&to_parse, '.') |> conv.str_to_i64()
 
         if major == 0 && minor == 0 && patch == 0 do return false
 
@@ -1104,7 +1165,7 @@ Git :: struct {
                 r := tprintf("{}{}", proto, tprintf(it, package_search))
                 git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", r])
                 if os.process_wait(&git_proc) == .Success {
-                    return r |> string.copy()
+                    return r |> str.copy()
                 }
             }
         }
@@ -1118,11 +1179,11 @@ Git :: struct {
         git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", repo])
         r := io.reader_make(&git_proc)
         for r->lines(inplace=true) {
-            last_slash := string.last_index_of(it, '/')
+            last_slash := str.last_index_of(it, '/')
             tag_name   := it[last_slash+1 .. it.count-1]
 
             if tag_name[0] != 'v' do continue
-            string.advance(&tag_name)
+            str.advance(&tag_name)
 
             version: SemVer
             if conv.parse_any(&version, tag_name) {
@@ -1194,10 +1255,10 @@ Git :: struct {
             }
 
             rolling_parent := make(dyn_str)
-            path := string.split(actual_dest, os.PATH_SEP)
+            path := str.split(actual_dest, os.PATH_SEP)
             for path[0 .. path.length-1] {
-                string.append(&rolling_parent, it)
-                string.append(&rolling_parent, os.PATH_SEP)
+                dyn_str.append(&rolling_parent, it)
+                dyn_str.append(&rolling_parent, os.PATH_SEP)
 
                 if !os.dir_exists(rolling_parent) {
                     os.dir_create(rolling_parent)
@@ -1580,7 +1641,7 @@ read_old_config :: (path: str) -> ? Config {
     }
 
     for inner_config.dependencies.dependencies.entries {
-        c.dependencies->put(it.key[string.last_index_of(it.key, '/')+1 .. it.key.length], .{
+        c.dependencies->put(it.key[str.last_index_of(it.key, '/')+1 .. it.key.length], .{
             name = it.key,
             version = it.value,
             source = .{ Git = it.key }
@@ -1639,11 +1700,11 @@ IniConfig :: struct {
         if r->is_empty() do return true
         if p, _ := r->peek_byte(); p == '[' do return true
 
-        dep := r->read_until('=') |> string.strip_trailing_whitespace()
+        dep := r->read_until('=') |> str.strip_trailing_whitespace()
         r->read_byte()
         r->skip_whitespace()
 
-        version_str := r->read_until('\n') |> string.strip_trailing_whitespace()
+        version_str := r->read_until('\n') |> str.strip_trailing_whitespace()
         version: SemVer
         conv.parse_any(&version, version_str)
         dependencies.dependencies[dep] = version
@@ -1666,11 +1727,11 @@ IniConfig :: struct {
         if r->is_empty() do return true
         if p, _ := r->peek_byte(); p == '[' do return true
 
-        dep := r->read_until('=') |> string.strip_trailing_whitespace()
+        dep := r->read_until('=') |> str.strip_trailing_whitespace()
         r->read_byte()
         r->skip_whitespace()
 
-        folder := r->read_until('\n') |> string.strip_trailing_whitespace()
+        folder := r->read_until('\n') |> str.strip_trailing_whitespace()
         dependencies.folders[dep] = folder
     }
 
@@ -1687,7 +1748,7 @@ IniConfig :: struct {
 
 load_old_config_file :: () -> bool {
     file_data := os.get_contents(global_arguments.config_file)
-    if string.empty(file_data) {
+    if str.empty(file_data) {
         return false
     }
 
