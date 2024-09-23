@@ -87,7 +87,7 @@ Value.as_array :: (v: Value) -> [..] Value {
 
 Value.as_map :: (v: Value, allocator := context.allocator) -> Map(str, Value) {
     if cast(rawptr) v == null do return .{}
-    if (cast(^_Value) v).type != .Object do return .{}
+    if (cast(&_Value) v).type != .Object do return .{}
 
     m := make(Map(str, Value), allocator)
     for& (cast(&_Value_Object, cast(&_Value, v))).object_ {

@@ -2530,7 +2530,11 @@ static AstType* parse_type(OnyxParser* parser) {
     }
 
     if (!type_can_be_done) {
-        onyx_report_error(root->token->pos, Error_Critical, "Incomplete type when parsing.");
+        if (root) {
+            onyx_report_error(root->token->pos, Error_Critical, "Incomplete type when parsing.");
+        } else {
+            onyx_report_error(parser->curr->pos, Error_Critical, "Expected a type here.");
+        }
     }
 
     return root;
