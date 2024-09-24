@@ -25,6 +25,7 @@ Additions:
 - `core.crypto.keys`
 - `core.encoding.json.Value.as_entry_array`
 - `core.encoding.base64 { encode_url, decode_url }`
+- `core.encoding.xml`
 
 Removals:
 
