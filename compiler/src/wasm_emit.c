@@ -577,6 +577,15 @@ static void ensure_node_has_been_submitted_for_emission(AstNode *node) {
     entity_heap_insert_existing(&context.entities, node->entity);
 }
 
+static void ensure_type_has_been_submitted_for_emission(OnyxWasmModule *mod, Type *type) {
+    assert(type);
+
+    if (type->flags & Ast_Flag_Has_Been_Scheduled_For_Emit) return;
+    type->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
+
+    bh_arr_push(mod->types_enqueued_for_info, type->id);
+}
+
 #include "wasm_intrinsics.h"
 #include "wasm_type_table.h"
 
@@ -2299,6 +2308,7 @@ EMIT_FUNC(call, AstCall* call) {
             if (arg->va_kind == VA_Kind_Any) {
                 vararg_any_offsets[vararg_count - 1] = reserve_size;
                 vararg_any_types[vararg_count - 1] = arg->value->type->id;
+                ensure_type_has_been_submitted_for_emission(mod, arg->value->type);
             }
 
             reserve_size += type_size_of(arg->value->type);
@@ -2317,6 +2327,7 @@ EMIT_FUNC(call, AstCall* call) {
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WID(call_token, WI_I32_CONST, arg->value->type->id);
                 emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Type_Index], reserve_size + 4);
+                ensure_type_has_been_submitted_for_emission(mod, arg->value->type);
 
                 local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
@@ -3586,12 +3597,17 @@ EMIT_FUNC(expression, AstTyped* expr) {
         if (type->flags & Ast_Flag_Expr_Ignored) return;
 
         if (type->type_id != 0) {
-            WID(NULL, WI_I32_CONST, ((AstType *) expr)->type_id);
-        } else {
-            Type* t = type_build_from_ast(context.ast_alloc, type);
-            WID(NULL, WI_I32_CONST, t->id);
-        }
+            WID(NULL, WI_I32_CONST, type->type_id);
 
+            Type *t = type_lookup_by_id(type->type_id);
+            assert(t);
+            ensure_type_has_been_submitted_for_emission(mod, t);
+        } else {
+            Type *t = type_build_from_ast(context.ast_alloc, type);
+            WID(NULL, WI_I32_CONST, t->id);
+
+            ensure_type_has_been_submitted_for_emission(mod, t);
+        }
 
         *pcode = code;
         return;
@@ -4525,6 +4541,7 @@ EMIT_FUNC(stack_trace_blob, AstFunction *fd)  {
     emit_raw_string(mod, name, strlen(name), &func_name_id, (u64 *) &node_data[16]);
     *((u32 *) &node_data[8]) = fd->token->pos.line;
     *((u32 *) &node_data[20]) = fd->type->id;
+    ensure_type_has_been_submitted_for_emission(mod, fd->type);
 
     WasmDatum stack_node_data = ((WasmDatum) {
         .data = node_data,
@@ -4939,6 +4956,7 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
     if (node_is_type((AstNode *) node)) {
         Type* constructed_type = type_build_from_ast(context.ast_alloc, (AstType *) node);
         CE(i32, 0) = constructed_type->id;
+        ensure_type_has_been_submitted_for_emission(ctx->module, constructed_type);
         return 1;
     }
 
@@ -5139,7 +5157,7 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
 
     if (context.options->generate_type_info) {
         if (type_table_node != NULL && (AstMemRes *) type_table_node == memres) {
-            u64 table_location = build_type_table(mod);
+            u64 table_location = prepare_type_table(mod);
             memres->data_id = table_location;
             return;
         }
@@ -5299,6 +5317,18 @@ static void emit_js_node(OnyxWasmModule* mod, AstJsNode *js) {
     bh_arr_push(mod->js_partials, partial);
 }
 
+static void flush_enqueued_types_for_info(OnyxWasmModule *mod) {
+    if (mod->global_type_table_data_id < 0) return;
+
+    while (bh_arr_length(mod->types_enqueued_for_info) > 0) {
+        i32 type_id = bh_arr_pop(mod->types_enqueued_for_info);
+
+        Type *type = type_lookup_by_id(type_id);
+        build_type_info_for_type(mod, type);
+    }
+}
+
+
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     OnyxWasmModule module = {
         .allocator = alloc,
@@ -5355,7 +5385,11 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .foreign_blocks = NULL,
         .next_foreign_block_idx = 0,
 
-        .procedures_with_tags = NULL
+        .procedures_with_tags = NULL,
+
+        .types_enqueued_for_info = NULL,
+        .global_type_table_data_id = -1,
+        .type_info_size = 0,
     };
 
     bh_arena* eid = bh_alloc(global_heap_allocator, sizeof(bh_arena));
@@ -5397,6 +5431,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(global_heap_allocator, module.all_procedures, 4);
     bh_arr_new(global_heap_allocator, module.data_patches, 4);
     bh_arr_new(global_heap_allocator, module.code_patches, 4);
+
+    bh_arr_new(global_heap_allocator, module.types_enqueued_for_info, 32);
 
 #ifdef ENABLE_DEBUG_INFO
     module.debug_context = bh_alloc_item(context.ast_alloc, DebugContext);
@@ -5511,6 +5547,9 @@ void emit_entity(Entity* ent) {
     }
 
     ent->state = Entity_State_Finalized;
+
+    // HACK
+    flush_enqueued_types_for_info(module);
 }
 
 void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options) {
@@ -5712,9 +5751,7 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
                 assert(datum_to_alter->id == patch->index);
 
                 u32 *addr = (u32 *) bh_pointer_add(datum_to_alter->data, patch->location);
-                if (*addr != 0) {
-                    *addr += (u32) datum->offset_ + patch->offset;
-                }
+                *addr += (u32) datum->offset_ + patch->offset;
 
                 break;
             }

@@ -791,6 +791,10 @@ typedef struct OnyxWasmModule {
     CallingConvention curr_cc;
     i32 null_proc_func_idx;
 
+    i32 global_type_table_data_id;
+    i32 type_info_size;
+    bh_arr(i32) types_enqueued_for_info;
+
     b32 has_stack_locals : 1;
     b32 doing_linking : 1;
 
