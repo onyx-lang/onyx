@@ -19,6 +19,9 @@ Thread_ID :: #type i32
 Thread :: struct {
     id    : Thread_ID;
     alive : bool;
+
+    stack_base : rawptr
+    tls_base   : rawptr
 }
 
 /// Spawns a new thread using the runtime.__spawn_thread function.
@@ -35,13 +38,13 @@ spawn :: (t: &Thread, data: &$T, func: (&T) -> void) {
 
     thread_map->put(t.id, t);
 
-    tls_base := raw_alloc(alloc.heap_allocator, __tls_size);
-    memory.set(tls_base, 0, __tls_size);
+    t.tls_base = raw_alloc(alloc.heap_allocator, __tls_size);
+    memory.set(t.tls_base, 0, __tls_size);
 
-    stack_base := raw_alloc(alloc.heap_allocator, 1 << 20);
-    stack_top  := memory.ptr_add(stack_base, 1 << 20);
+    t.stack_base = raw_alloc(alloc.heap_allocator, 1 << 20);
+    stack_top   := memory.ptr_add(t.stack_base, 1 << 20);
 
-    runtime.platform.__spawn_thread(t.id, tls_base, stack_top, func, data);
+    runtime.platform.__spawn_thread(t.id, t.tls_base, stack_top, func, data);
 }
 
 /// Waits for a thread to finish before returning.
@@ -78,16 +81,20 @@ __initialize :: () {
 /// Special procedure that is called when a thread exits,
 /// or by kill() above.
 __exited :: (id: i32) {
-    sync.scoped_mutex(&thread_mutex);
+    sync.scoped_mutex(&thread_mutex)
 
-    thread := thread_map->get(id) ?? null;
+    thread := thread_map->get(id) ?? null
     if thread != null {
-        thread.alive = false;
+        raw_free(alloc.heap_allocator, thread.stack_base)
+        raw_free(alloc.heap_allocator, thread.tls_base)
+
+        thread.alive = false
+
         #if runtime.platform.Supports_Futexes {
-            runtime.platform.__futex_wake(&thread.id, 1);
+            runtime.platform.__futex_wake(&thread.id, 1)
         }
 
-        thread_map->delete(id);
+        thread_map->delete(id)
     }
 }
 
