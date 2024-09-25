@@ -688,7 +688,7 @@ static i32 build_type_info_for_union(struct TypeBuilderContext *ctx, Type *type)
             // any data member
             bh_buffer_align(&ctx->buffer, 4);
             u32 data_loc = ctx->buffer.length;
-            u32 func_idx = 0; // get_element_idx(module, node);
+            u32 func_idx = get_element_idx(ctx->module, node);
             bh_buffer_write_u32(&ctx->buffer, func_idx);
             bh_buffer_write_u32(&ctx->buffer, 0);
             
@@ -707,7 +707,6 @@ static i32 build_type_info_for_union(struct TypeBuilderContext *ctx, Type *type)
     bh_buffer_align(&ctx->buffer, 4);
     u32 method_data_base = ctx->buffer.length;
 
-    i = 0;
     bh_arr_each(StructMethodData, method, method_data) {
         WRITE_SLICE(method->name_loc, method->name_len);
         WRITE_PTR(method->data_loc); 
@@ -857,38 +856,44 @@ static void build_type_info_for_type(OnyxWasmModule *module, Type *type) {
         bh_arr_push(module->data_patches, patch);
     }
 
+    WasmDatum *type_table_data = &module->data[module->global_type_table_data_id - 1];
+    i32 next_location = type_table_data->length;
+    type_table_data->length += 2 * POINTER_SIZE;
+    *(i32 *) &((u8 *) type_table_data->data)[next_location] = type->id;
+
     DatumPatchInfo patch;
     patch.kind = Datum_Patch_Data;
     patch.data_id = type_info_data.id;
     patch.offset = offset;
     patch.index = module->global_type_table_data_id;
-    patch.location = type->id * POINTER_SIZE;
+    patch.location = next_location + POINTER_SIZE;
     bh_arr_push(module->data_patches, patch);
 
+    *module->type_info_entry_count += 1;
     module->type_info_size += type_info_data.length;
+    module->type_info_size += 8;
 }
 
 static u64 prepare_type_table(OnyxWasmModule* module) {
     // This is the data behind the "type_table" slice in runtime/info/types.onyx
     u32 type_count = bh_arr_length(type_map.entries) + 1;
-    Table_Info_Type* table_info = bh_alloc_array(global_heap_allocator, Table_Info_Type, type_count); // HACK
-    memset(table_info, 0, type_count * sizeof(Table_Info_Type));
-
-    // if (context.options->verbose_output == 1) {
-    //     bh_printf("Type table size: %d bytes.\n", table_buffer.length);
-    // }
+    void* table_info = bh_alloc_array(global_heap_allocator, u8, 2 * type_count * POINTER_SIZE);
+    memset(table_info, 0, 2 * type_count * POINTER_SIZE);
 
     WasmDatum type_table_data = {
         .alignment = POINTER_SIZE,
-        .length = type_count * POINTER_SIZE,
+        .length = 0,
         .data = table_info,
     };
     emit_data_entry(module, &type_table_data);
     module->global_type_table_data_id = type_table_data.id;
 
     Table_Info_Type* tmp_data = bh_alloc(global_heap_allocator, 2 * POINTER_SIZE);
+
     tmp_data[0] = 0;
-    tmp_data[1] = type_count;
+    tmp_data[1] = 0;
+    module->type_info_entry_count = &tmp_data[1];
+
     WasmDatum type_table_global_data = {
         .alignment = POINTER_SIZE,
         .length = 2 * POINTER_SIZE,
@@ -903,8 +908,6 @@ static u64 prepare_type_table(OnyxWasmModule* module) {
     patch.index = type_table_global_data.id;
     patch.location = 0;
     bh_arr_push(module->data_patches, patch);
-
-    module->type_info_size += type_table_global_data.length;
 
     return type_table_global_data.id;
 

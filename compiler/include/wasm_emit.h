@@ -793,6 +793,7 @@ typedef struct OnyxWasmModule {
 
     i32 global_type_table_data_id;
     i32 type_info_size;
+    i32 *type_info_entry_count;
     bh_arr(i32) types_enqueued_for_info;
 
     b32 has_stack_locals : 1;

@@ -4534,18 +4534,16 @@ EMIT_FUNC(stack_trace_blob, AstFunction *fd)  {
     assert(!(mod->stack_trace_idx & LOCAL_IS_WASM));
 
     u64 file_name_id, func_name_id;
-    u8* node_data = bh_alloc_array(context.ast_alloc, u8, 6 * POINTER_SIZE);
+    u8* node_data = bh_alloc_array(context.ast_alloc, u8, 5 * POINTER_SIZE);
 
     char *name = get_function_name(fd);
     emit_raw_string(mod, (char *) fd->token->pos.filename, strlen(fd->token->pos.filename), &file_name_id, (u64 *) &node_data[4]);
     emit_raw_string(mod, name, strlen(name), &func_name_id, (u64 *) &node_data[16]);
     *((u32 *) &node_data[8]) = fd->token->pos.line;
-    *((u32 *) &node_data[20]) = fd->type->id;
-    ensure_type_has_been_submitted_for_emission(mod, fd->type);
 
     WasmDatum stack_node_data = ((WasmDatum) {
         .data = node_data,
-        .length = 6 * POINTER_SIZE,
+        .length = 5 * POINTER_SIZE,
         .alignment = POINTER_SIZE,
     });
     u32 stack_node_data_id = emit_data_entry(mod, &stack_node_data);
@@ -5552,6 +5550,12 @@ void emit_entity(Entity* ent) {
     flush_enqueued_types_for_info(module);
 }
 
+
+static i32 cmp_type_info(const void *a, const void *b) {
+    return *(i32 *) a - *(i32 *) b;
+}
+
+
 void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options) {
     // If the pointer size is going to change,
     // the code will probably need to be altered.
@@ -5759,6 +5763,9 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
             default: assert(0);
         }
     }
+
+    WasmDatum *type_table_data = &module->data[module->global_type_table_data_id - 1];
+    qsort(type_table_data->data, *module->type_info_entry_count, 2 * POINTER_SIZE, cmp_type_info);
 
     assert(module->stack_top_ptr && module->heap_start_ptr);
 
