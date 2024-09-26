@@ -14,7 +14,7 @@
 // most cases, but can easily break and require you to write the code without it. This
 // is being address and hopefully in the next couple months it will be much more robust.
 
-#load "core/module"
+
 
 use core {*}
 

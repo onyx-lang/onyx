@@ -128,14 +128,14 @@ static void context_init(CompileOptions* opts) {
         .state = Entity_State_Parse_Builtin,
         .type = Entity_Type_Load_File,
         .package = NULL,
-        .include = create_load(context.ast_alloc, "core/builtin"),
+        .include = create_load(context.ast_alloc, "core:builtin"),
     }));
 
     entity_heap_insert(&context.entities, ((Entity) {
         .state = Entity_State_Parse_Builtin,
         .type = Entity_Type_Load_File,
         .package = NULL,
-        .include = create_load(context.ast_alloc, "core/runtime/build_opts"),
+        .include = create_load(context.ast_alloc, "core:runtime/build_opts"),
     }));
 
     if (context.options->runtime != Runtime_Custom) {
@@ -143,31 +143,31 @@ static void context_init(CompileOptions* opts) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context.ast_alloc, "core/runtime/info/types"),
+            .include = create_load(context.ast_alloc, "core:runtime/info/types"),
         }));
         runtime_info_foreign_entity = entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context.ast_alloc, "core/runtime/info/foreign_blocks"),
+            .include = create_load(context.ast_alloc, "core:runtime/info/foreign_blocks"),
         }));
         runtime_info_proc_tags_entity = entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context.ast_alloc, "core/runtime/info/proc_tags"),
+            .include = create_load(context.ast_alloc, "core:runtime/info/proc_tags"),
         }));
         runtime_info_global_tags_entity = entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context.ast_alloc, "core/runtime/info/global_tags"),
+            .include = create_load(context.ast_alloc, "core:runtime/info/global_tags"),
         }));
         runtime_info_stack_trace_entity = entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context.ast_alloc, "core/runtime/info/stack_trace"),
+            .include = create_load(context.ast_alloc, "core:runtime/info/stack_trace"),
         }));
     }
 
@@ -195,7 +195,7 @@ static void context_init(CompileOptions* opts) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context.ast_alloc, "core/module"),
+            .include = create_load(context.ast_alloc, "core:module"),
         }));
     }
 
@@ -216,9 +216,9 @@ static void context_init(CompileOptions* opts) {
     }
 
     if (context.options->verbose_output > 0) {
-        bh_printf("File search path:\n");
-        bh_arr_each(const char *, p, context.options->included_folders) {
-            bh_printf("\t%s\n", *p);
+        bh_printf("Mapped folders:\n");
+        bh_arr_each(bh_mapped_folder, p, context.options->mapped_folders) {
+            bh_printf("\t%s: %s\n", p->name, p->folder);
         }
         bh_printf("\n");
     }
@@ -284,7 +284,7 @@ static b32 process_load_entity(Entity* ent) {
 
         char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
 
-        char* filename = bh_lookup_file(include->name, parent_folder, ".onyx", 1, context.options->included_folders, 1);
+        char* filename = bh_lookup_file(include->name, parent_folder, ".onyx", NULL, context.options->mapped_folders);
         char* formatted_name = bh_strdup(global_heap_allocator, filename);
 
         return process_source_file(formatted_name, include->token->pos);
@@ -348,7 +348,7 @@ static b32 process_load_entity(Entity* ent) {
         return 1;
 
     } else if (include->kind == Ast_Kind_Load_Path) {
-        bh_arr_push(context.options->included_folders, include->name);
+        onyx_report_warning(include->token->pos, "'#load_path' has been deprecated and no longer does anything.");
 
     } else if (include->kind == Ast_Kind_Library_Path) {
         bh_arr_push(context.wasm_module->library_paths, include->name);

@@ -1,6 +1,6 @@
 
-#load "core/module"
-#load "core/encoding/ini"
+
+#load "core:encoding/ini"
 
 //
 // A list of repository URLs to get packages from.

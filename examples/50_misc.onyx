@@ -66,5 +66,5 @@ main :: (args) => {
     multiple_declaration_improvements();
 }
 
-#load "core/module"
+
 use core {*}
