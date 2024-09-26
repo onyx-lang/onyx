@@ -641,6 +641,8 @@ static i32 onyx_compile() {
     u64 duration = bh_time_duration(start_time);
 
     if (context.options->verbose_output > 0) {
+        printf("Type table size: %d bytes\n", context.wasm_module->type_info_size);
+
         // TODO: Replace these with bh_printf when padded formatting is added.
         printf("\nStatistics:\n");
         printf("    Time taken: %lf ms\n", (double) duration);

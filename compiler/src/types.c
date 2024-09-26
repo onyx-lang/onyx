@@ -649,10 +649,12 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             Type* concrete = NULL;
             if (pc_type->callee->kind == Ast_Kind_Poly_Struct_Type) {
                 AstPolyStructType* ps_type = (AstPolyStructType *) pc_type->callee;
+                type_build_from_ast_inner(alloc, (AstType *) ps_type, 0);
                 concrete = polymorphic_struct_lookup(ps_type, slns, pc_type->token->pos, (pc_type->flags & Ast_Flag_Header_Check_No_Error) == 0);
             }
             else if (pc_type->callee->kind == Ast_Kind_Poly_Union_Type) {
                 AstPolyUnionType* pu_type = (AstPolyUnionType *) pc_type->callee;
+                type_build_from_ast_inner(alloc, (AstType *) pu_type, 0);
                 concrete = polymorphic_union_lookup(pu_type, slns, pc_type->token->pos, (pc_type->flags & Ast_Flag_Header_Check_No_Error) == 0);
             }
 
