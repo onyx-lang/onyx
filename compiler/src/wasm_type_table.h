@@ -4,9 +4,68 @@
 typedef struct StructMethodData {
     u32 name_loc;
     u32 name_len;
-    u32 type;
     u32 data_loc;
+    Type *type;
 } StructMethodData;
+
+typedef struct MethodDataInfo {
+    u32 base;
+    u32 count;
+} MethodDataInfo;
+
+struct TypeBuilderContext {
+    bh_buffer buffer;
+    bh_arr(u32) patches;
+
+    OnyxWasmModule *module;
+    ConstExprContext constexpr_ctx;
+};
+
+#define PATCH (bh_arr_push(ctx->patches, ctx->buffer.length))
+
+#define WRITE_PTR(val) \
+    bh_buffer_align(&ctx->buffer, POINTER_SIZE); \
+    PATCH; \
+    bh_buffer_write_u32(&ctx->buffer, val);
+
+#define WRITE_SLICE(ptr, count) \
+    WRITE_PTR(ptr); \
+    bh_buffer_write_u32(&ctx->buffer, count);
+
+
+static void write_type_idx(struct TypeBuilderContext *ctx, Type *type) {
+    bh_buffer_write_u32(&ctx->buffer, type->id);
+    ensure_type_has_been_submitted_for_emission(ctx->module, type);
+}
+
+static u32 build_constexpr(
+        AstTyped *value,
+        bh_buffer *buffer,
+        ConstExprContext *constexpr_ctx
+) {
+    if ((value->flags & Ast_Flag_Comptime) == 0) {
+        return 0;
+    }
+
+    u32 size = type_size_of(value->type);
+    bh_buffer_align(buffer, type_alignment_of(value->type));
+
+    bh_buffer_grow(buffer, buffer->length + size);
+    constexpr_ctx->data = buffer->data;
+    if (!emit_constexpr_(constexpr_ctx, value, buffer->length)) {
+        return 0;
+
+    } else {
+        buffer->length += size;
+        return buffer->length - size;
+    }
+}
+
+#if (POINTER_SIZE == 4)
+    #define Table_Info_Type u32
+#else
+    #error "Expected POINTER_SIZE to be 4"
+#endif
 
 static void build_polymorphic_solutions_array(
         bh_arr(AstPolySolution) slns,
@@ -50,154 +109,180 @@ static void build_polymorphic_solutions_array(
     }
 }
 
-static u32 build_constexpr(
-        AstTyped *value,
-        bh_buffer *buffer,
-        ConstExprContext *constexpr_ctx
+static void write_polymorphic_solutions_array(
+        bh_arr(AstPolySolution) slns,
+        struct TypeBuilderContext *ctx,
+        u32 *param_locations
 ) {
-    if ((value->flags & Ast_Flag_Comptime) == 0) {
-        return 0;
-    }
+    u32 i = 0;    
+    bh_arr_each(AstPolySolution, sln, slns) {
+        WRITE_PTR(param_locations[i++]);
 
-    u32 size = type_size_of(value->type);
-    bh_buffer_align(buffer, type_alignment_of(value->type));
-
-    bh_buffer_grow(buffer, buffer->length + size);
-    constexpr_ctx->data = buffer->data;
-    if (!emit_constexpr_(constexpr_ctx, value, buffer->length)) {
-        return 0;
-
-    } else {
-        buffer->length += size;
-        return buffer->length - size;
+        if (sln->kind == PSK_Type) {
+            write_type_idx(ctx, &basic_types[Basic_Kind_Type_Index]);
+        } else {
+            write_type_idx(ctx, sln->value->type);
+        }
     }
 }
 
-#if (POINTER_SIZE == 4)
-    #define Table_Info_Type u32
-#else
-    #error "Expected POINTER_SIZE to be 4"
-#endif
+static void build_tag_array(
+        bh_arr(AstTyped *) tags,
+        struct TypeBuilderContext *ctx,
+        u32 *tag_locations
+) {
+    u32 i = 0;
+    bh_arr_each(AstTyped *, tag, tags) {
+        AstTyped* value = *tag;
+        assert(value->flags & Ast_Flag_Comptime);
+        assert(value->type);
+
+        tag_locations[i++] = build_constexpr(value, &ctx->buffer, &ctx->constexpr_ctx);
+    }
+}
+
+static void write_tag_array(
+        bh_arr(AstTyped *) tags,
+        struct TypeBuilderContext *ctx,
+        u32 *tag_locations
+) {
+    fori (i, 0, bh_arr_length(tags)) {
+        WRITE_PTR(tag_locations[i]);
+        write_type_idx(ctx, tags[i]->type);
+    }
+}
+
+static MethodDataInfo write_method_data(struct TypeBuilderContext *ctx, Type *type) {
+    bh_arr(StructMethodData) method_data=NULL;
+
+    if (!context.options->generate_method_info) {
+        goto no_methods;
+    }
+
+    AstType *ast_type = type->ast_type;
+    Scope *scope = get_scope_from_node((AstNode *) ast_type);
+    if (!scope) goto no_methods;
+
+    fori (i, 0, shlen(scope->symbols)) {
+        AstFunction* node = (AstFunction *) strip_aliases(scope->symbols[i].value);
+        if (node->kind != Ast_Kind_Function) continue;
+        assert(node->entity);
+        assert(node->entity->function == node);
+
+        // Name
+        char *name = scope->symbols[i].key;
+        u32 name_loc = ctx->buffer.length;
+        u32 name_len = strlen(name);
+        bh_buffer_append(&ctx->buffer, name, name_len);
+
+        // any data member
+        bh_buffer_align(&ctx->buffer, 4);
+        u32 data_loc = ctx->buffer.length;
+        u32 func_idx = get_element_idx(ctx->module, node);
+        bh_buffer_write_u32(&ctx->buffer, func_idx);
+        bh_buffer_write_u32(&ctx->buffer, 0);
+        
+        bh_arr_push(method_data, ((StructMethodData) {
+            .name_loc = name_loc,
+            .name_len = name_len,
+            .data_loc = data_loc,
+            .type     = node->type,
+        }));
+    }
+
+  no_methods:
+
+    bh_buffer_align(&ctx->buffer, 4);
+    u32 method_data_base = ctx->buffer.length;
+    u32 method_data_count = bh_arr_length(method_data);
+
+    bh_arr_each(StructMethodData, method, method_data) {
+        WRITE_SLICE(method->name_loc, method->name_len);
+        WRITE_PTR(method->data_loc); 
+        write_type_idx(ctx, method->type);
+    }
+
+    bh_arr_free(method_data);
+    
+    return ((MethodDataInfo) { method_data_base, method_data_count });
+}
 
 
-struct TypeBuilderContext {
-    bh_buffer buffer;
-    bh_arr(u32) patches;
 
-    OnyxWasmModule *module;
-    ConstExprContext constexpr_ctx;
-};
-
-#define PATCH (bh_arr_push(ctx->patches, ctx->buffer.length))
-
-#define WRITE_PTR(val) \
-    bh_buffer_align(&ctx->buffer, POINTER_SIZE); \
-    PATCH; \
-    bh_buffer_write_u32(&ctx->buffer, val);
-
-#define WRITE_SLICE(ptr, count) \
-    WRITE_PTR(ptr); \
-    bh_buffer_write_u32(&ctx->buffer, count);
-
-
-static i32 build_type_info_for_basic(struct TypeBuilderContext *ctx, Type *type) {
+static void write_type_info_header(struct TypeBuilderContext *ctx, Type *type) {
     bh_buffer_write_u32(&ctx->buffer, type->kind);
     bh_buffer_write_u32(&ctx->buffer, type_size_of(type));
     bh_buffer_write_u32(&ctx->buffer, type_alignment_of(type));
+}
+
+
+
+static i32 build_type_info_for_basic(struct TypeBuilderContext *ctx, Type *type) {
+    write_type_info_header(ctx, type);
     bh_buffer_write_u32(&ctx->buffer, type->Basic.kind);
     return 0;
 }
 
 static i32 build_type_info_for_pointer(struct TypeBuilderContext *ctx, Type *type) {
-    bh_buffer_write_u32(&ctx->buffer, type->kind);
-    bh_buffer_write_u32(&ctx->buffer, type_size_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type_alignment_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type->Pointer.elem->id);
-    ensure_type_has_been_submitted_for_emission(ctx->module, type->Pointer.elem);
+    write_type_info_header(ctx, type);
+    write_type_idx(ctx, type->Pointer.elem);
     return 0;
 }
 
 static i32 build_type_info_for_multipointer(struct TypeBuilderContext *ctx, Type *type) {
-    bh_buffer_write_u32(&ctx->buffer, type->kind);
-    bh_buffer_write_u32(&ctx->buffer, type_size_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type_alignment_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type->MultiPointer.elem->id);
-    ensure_type_has_been_submitted_for_emission(ctx->module, type->MultiPointer.elem);
+    write_type_info_header(ctx, type);
+    write_type_idx(ctx, type->MultiPointer.elem);
     return 0;
 }
 
 static i32 build_type_info_for_array(struct TypeBuilderContext *ctx, Type *type) {
-    bh_buffer_write_u32(&ctx->buffer, type->kind);
-    bh_buffer_write_u32(&ctx->buffer, type_size_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type_alignment_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type->Array.elem->id);
+    write_type_info_header(ctx, type);
+    write_type_idx(ctx, type->Array.elem);
     bh_buffer_write_u32(&ctx->buffer, type->Array.count);
-    ensure_type_has_been_submitted_for_emission(ctx->module, type->Array.elem);
     return 0;
 }
 
 static i32 build_type_info_for_slice(struct TypeBuilderContext *ctx, Type *type) {
-    bh_buffer_write_u32(&ctx->buffer, type->kind);
-    bh_buffer_write_u32(&ctx->buffer, type_size_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type_alignment_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type->Slice.elem->id);
-    ensure_type_has_been_submitted_for_emission(ctx->module, type->Slice.elem);
+    write_type_info_header(ctx, type);
+    write_type_idx(ctx, type->Slice.elem);
     return 0;
 }
 
 static i32 build_type_info_for_dynarray(struct TypeBuilderContext *ctx, Type *type) {
-    bh_buffer_write_u32(&ctx->buffer, type->kind);
-    bh_buffer_write_u32(&ctx->buffer, type_size_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type_alignment_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type->DynArray.elem->id);
-    ensure_type_has_been_submitted_for_emission(ctx->module, type->DynArray.elem);
+    write_type_info_header(ctx, type);
+    write_type_idx(ctx, type->DynArray.elem);
     return 0;
 }
 
 static i32 build_type_info_for_varargs(struct TypeBuilderContext *ctx, Type *type) {
-    bh_buffer_write_u32(&ctx->buffer, type->kind);
-    bh_buffer_write_u32(&ctx->buffer, type_size_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type_alignment_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type->VarArgs.elem->id);
-    ensure_type_has_been_submitted_for_emission(ctx->module, type->VarArgs.elem);
+    write_type_info_header(ctx, type);
+    write_type_idx(ctx, type->VarArgs.elem);
     return 0;
 }
 
 static i32 build_type_info_for_compound(struct TypeBuilderContext *ctx, Type *type) {
-    u32 components_count = type->Compound.count;
-    fori (i, 0, components_count) {
-        u32 type_idx = type->Compound.types[i]->id;
-        bh_buffer_write_u32(&ctx->buffer, type_idx);
-        ensure_type_has_been_submitted_for_emission(ctx->module, type->Compound.types[i]);
+    fori (i, 0, type->Compound.count) {
+        write_type_idx(ctx, type->Compound.types[i]);
     }
 
-    bh_buffer_align(&ctx->buffer, 8);
     i32 offset = ctx->buffer.length;
 
-    bh_buffer_write_u32(&ctx->buffer, type->kind);
-    bh_buffer_write_u32(&ctx->buffer, type_size_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type_alignment_of(type));
-    WRITE_SLICE(0, components_count);
+    write_type_info_header(ctx, type);
+    WRITE_SLICE(0, type->Compound.count);
 
     return offset;
 }
 
 static i32 build_type_info_for_function(struct TypeBuilderContext *ctx, Type *type) {
-    u32 parameters_count = type->Function.param_count;
-    fori (i, 0, parameters_count) {
-        u32 type_idx = type->Function.params[i]->id;
-        bh_buffer_write_u32(&ctx->buffer, type_idx);
-        ensure_type_has_been_submitted_for_emission(ctx->module, type->Function.params[i]);
+    fori (i, 0, type->Function.param_count) {
+        write_type_idx(ctx, type->Function.params[i]);
     }
 
     i32 offset = ctx->buffer.length;
-    bh_buffer_write_u32(&ctx->buffer, type->kind);
-    bh_buffer_write_u32(&ctx->buffer, type_size_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type_alignment_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type->Function.return_type->id);
-    ensure_type_has_been_submitted_for_emission(ctx->module, type->Function.return_type);
+    write_type_info_header(ctx, type);
+    write_type_idx(ctx, type->Function.return_type);
 
-    WRITE_SLICE(0, parameters_count);
+    WRITE_SLICE(0, type->Function.param_count);
 
     bh_buffer_write_u32(&ctx->buffer, type->Function.vararg_arg_pos > 0 ? 1 : 0);
 
@@ -222,25 +307,22 @@ static i32 build_type_info_for_enum(struct TypeBuilderContext *ctx, Type *type) 
     bh_arr_each(AstEnumValue *, value, ast_enum->values) {
         u32 name_loc = name_locations[i++];
 
-        bh_buffer_align(&ctx->buffer, 8);
-        WRITE_SLICE(name_loc, (*value)->token->length);
-
         assert((*value)->value->kind == Ast_Kind_NumLit);
         AstNumLit *num = (AstNumLit *) (*value)->value;
+
+        WRITE_SLICE(name_loc, (*value)->token->length);
         bh_buffer_write_u64(&ctx->buffer, num->value.l);
     }
 
     u32 name_base = ctx->buffer.length;
     u32 name_length = strlen(type->Enum.name);
     bh_buffer_append(&ctx->buffer, type->Enum.name, name_length);
-    bh_buffer_align(&ctx->buffer, 8);
 
+    bh_buffer_align(&ctx->buffer, 4);
     i32 offset = ctx->buffer.length;
-    bh_buffer_write_u32(&ctx->buffer, type->kind);
-    bh_buffer_write_u32(&ctx->buffer, type_size_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type_alignment_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type->Enum.backing->id);
-    ensure_type_has_been_submitted_for_emission(ctx->module, type->Enum.backing);
+
+    write_type_info_header(ctx, type);
+    write_type_idx(ctx, type->Enum.backing);
     WRITE_SLICE(name_base, name_length);
     WRITE_SLICE(member_base, member_count);
     bh_buffer_write_u32(&ctx->buffer, type->Enum.is_flags ? 1 : 0);
@@ -302,30 +384,17 @@ static i32 build_type_info_for_struct(struct TypeBuilderContext *ctx, Type *type
         }
 
         bh_arr(AstTyped *) meta_tags = mem->meta_tags;
-        assert(meta_tags);
 
-        bh_arr(u64) meta_tag_locations=NULL;
+        bh_arr(u32) meta_tag_locations=NULL;
         bh_arr_new(global_heap_allocator, meta_tag_locations, bh_arr_length(meta_tags));
 
-        int j = 0;
-        bh_arr_each(AstTyped *, meta, meta_tags) {
-            AstTyped* value = *meta;                        
-            assert(value->flags & Ast_Flag_Comptime);
-            assert(value->type);
-
-            meta_tag_locations[j++] = build_constexpr(value, &ctx->buffer, &ctx->constexpr_ctx);
-        }
+        build_tag_array(meta_tags, ctx, meta_tag_locations);
 
         bh_buffer_align(&ctx->buffer, 8);
-        meta_locations[i] = ctx->buffer.length;
-
-        fori (k, 0, bh_arr_length(meta_tags)) {
-            WRITE_SLICE(meta_tag_locations[k], meta_tags[k]->type->id);
-            ensure_type_has_been_submitted_for_emission(ctx->module, meta_tags[k]->type);
-        }
+        meta_locations[i++] = ctx->buffer.length;
+        write_tag_array(meta_tags, ctx, meta_tag_locations);
 
         bh_arr_free(meta_tag_locations);
-        i += 1;
     }
 
     bh_buffer_align(&ctx->buffer, 8);
@@ -342,8 +411,7 @@ static i32 build_type_info_for_struct(struct TypeBuilderContext *ctx, Type *type
 
         WRITE_SLICE(name_loc, strlen(mem->name));
         bh_buffer_write_u32(&ctx->buffer, mem->offset);
-        bh_buffer_write_u32(&ctx->buffer, mem->type->id);
-        ensure_type_has_been_submitted_for_emission(ctx->module, mem->type);
+        write_type_idx(ctx, mem->type);
         bh_buffer_write_byte(&ctx->buffer, mem->used ? 1 : 0);
         
         WRITE_PTR(value_loc);
@@ -355,91 +423,17 @@ static i32 build_type_info_for_struct(struct TypeBuilderContext *ctx, Type *type
     u32 params_base = ctx->buffer.length;
 
     // Polymorphic solution any array
-    i = 0;
-    bh_arr_each(AstPolySolution, sln, s->poly_sln) {
-        WRITE_PTR(param_locations[i++]);
-
-        if (sln->kind == PSK_Type) {
-            bh_buffer_write_u32(&ctx->buffer, basic_types[Basic_Kind_Type_Index].id);
-            ensure_type_has_been_submitted_for_emission(ctx->module, &basic_types[Basic_Kind_Type_Index]);
-        } else {
-            bh_buffer_write_u32(&ctx->buffer, sln->value->type->id);
-            ensure_type_has_been_submitted_for_emission(ctx->module, sln->value->type);
-        }
-    }
+    write_polymorphic_solutions_array(s->poly_sln, ctx, param_locations);
 
     // Struct tag array
-    i = 0;
-    bh_arr_each(AstTyped *, tag, s->meta_tags) {
-        AstTyped* value = *tag;                        
-        assert(value->flags & Ast_Flag_Comptime);
-        assert(value->type);
-
-        struct_tag_locations[i++] = build_constexpr(value, &ctx->buffer, &ctx->constexpr_ctx);
-    }
+    build_tag_array(s->meta_tags, ctx, struct_tag_locations);
 
     // Struct methods
-    bh_arr(StructMethodData) method_data=NULL;
-
-    AstType *ast_type = type->ast_type;
-    if (!context.options->generate_method_info) {
-        goto no_methods;
-    }
-
-    if (ast_type && ast_type->kind == Ast_Kind_Struct_Type) {
-        AstStructType *struct_type  = (AstStructType *) ast_type;
-        Scope*         struct_scope = struct_type->scope;
-
-        if (struct_scope == NULL) goto no_methods;
-
-        fori (i, 0, shlen(struct_scope->symbols)) {
-            AstFunction* node = (AstFunction *) strip_aliases(struct_scope->symbols[i].value);
-            if (node->kind != Ast_Kind_Function) continue;
-            assert(node->entity);
-            assert(node->entity->function == node);
-
-            // Name
-            char *name = struct_scope->symbols[i].key;
-            u32 name_loc = ctx->buffer.length;
-            u32 name_len = strlen(name);
-            bh_buffer_append(&ctx->buffer, name, name_len);
-
-            // any data member
-            bh_buffer_align(&ctx->buffer, 4);
-            u32 data_loc = ctx->buffer.length;
-            u32 func_idx = get_element_idx(ctx->module, node);
-            bh_buffer_write_u32(&ctx->buffer, func_idx);
-            bh_buffer_write_u32(&ctx->buffer, 0);
-            
-            bh_arr_push(method_data, ((StructMethodData) {
-                .name_loc = name_loc,
-                .name_len = name_len,
-                .type     = node->type->id,
-                .data_loc = data_loc,
-            }));
-            ensure_type_has_been_submitted_for_emission(ctx->module, node->type);
-        }
-    }
-
-    no_methods:
-
-    bh_buffer_align(&ctx->buffer, 4);
-    u32 method_data_base = ctx->buffer.length;
-
-    i = 0;
-    bh_arr_each(StructMethodData, method, method_data) {
-        WRITE_SLICE(method->name_loc, method->name_len);
-        WRITE_PTR(method->data_loc); 
-        bh_buffer_write_u32(&ctx->buffer, method->type);
-    }
+    MethodDataInfo method_data_info = write_method_data(ctx, type);
 
     bh_buffer_align(&ctx->buffer, 8);
     u32 struct_tag_base = ctx->buffer.length;
-
-    fori (i, 0, bh_arr_length(s->meta_tags)) {
-        WRITE_SLICE(struct_tag_locations[i], s->meta_tags[i]->type->id);
-        ensure_type_has_been_submitted_for_emission(ctx->module, s->meta_tags[i]->type);
-    }
+    write_tag_array(s->meta_tags, ctx, struct_tag_locations);
 
     // Struct name
     u32 name_base = 0;
@@ -453,9 +447,7 @@ static i32 build_type_info_for_struct(struct TypeBuilderContext *ctx, Type *type
     bh_buffer_align(&ctx->buffer, 8);
 
     i32 offset = ctx->buffer.length;
-    bh_buffer_write_u32(&ctx->buffer, type->kind);
-    bh_buffer_write_u32(&ctx->buffer, type_size_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type_alignment_of(type));
+    write_type_info_header(ctx, type);
 
     if (type->Struct.constructed_from != NULL) {
         bh_buffer_write_u32(&ctx->buffer, type->Struct.constructed_from->type_id);
@@ -470,9 +462,7 @@ static i32 build_type_info_for_struct(struct TypeBuilderContext *ctx, Type *type
     WRITE_SLICE(members_base, s->mem_count);
     WRITE_SLICE(params_base, bh_arr_length(s->poly_sln));
     WRITE_SLICE(struct_tag_base, bh_arr_length(s->meta_tags));
-    WRITE_SLICE(method_data_base, bh_arr_length(method_data));
-
-    bh_arr_free(method_data);
+    WRITE_SLICE(method_data_info.base, method_data_info.count);
 
     return offset;
 }
@@ -517,16 +507,14 @@ static i32 build_type_info_for_polystruct(struct TypeBuilderContext *ctx, Type *
     u32 tags_base = ctx->buffer.length;
 
     fori (i, 0, tags_count) {
-        WRITE_SLICE(tag_locations[i], type->PolyStruct.meta_tags[i]->type->id);
-        ensure_type_has_been_submitted_for_emission(ctx->module, type->PolyStruct.meta_tags[i]->type);
+        WRITE_PTR(tag_locations[i]);
+        write_type_idx(ctx, type->PolyStruct.meta_tags[i]->type);
     }
 
     bh_buffer_align(&ctx->buffer, 8);
 
     i32 offset = ctx->buffer.length;
-    bh_buffer_write_u32(&ctx->buffer, type->kind);
-    bh_buffer_write_u32(&ctx->buffer, 0);
-    bh_buffer_write_u32(&ctx->buffer, 0);
+    write_type_info_header(ctx, type);
     WRITE_SLICE(name_base, name_length);
     WRITE_SLICE(tags_base, tags_count);
 
@@ -539,13 +527,9 @@ static i32 build_type_info_for_distinct(struct TypeBuilderContext *ctx, Type *ty
     bh_buffer_align(&ctx->buffer, 8);
 
     i32 offset = ctx->buffer.length;
-    bh_buffer_write_u32(&ctx->buffer, type->kind);
-    bh_buffer_write_u32(&ctx->buffer, type_size_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type_alignment_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type->Distinct.base_type->id);
+    write_type_info_header(ctx, type);
+    write_type_idx(ctx, type->Distinct.base_type);
     WRITE_SLICE(0, name_length);
-
-    ensure_type_has_been_submitted_for_emission(ctx->module, type->Distinct.base_type);
 
     return offset;
 }
@@ -587,30 +571,17 @@ static i32 build_type_info_for_union(struct TypeBuilderContext *ctx, Type *type)
         }
 
         bh_arr(AstTyped *) meta_tags = uv->meta_tags;
-        assert(meta_tags);
 
-        bh_arr(u64) meta_tag_locations=NULL;
+        bh_arr(u32) meta_tag_locations=NULL;
         bh_arr_new(global_heap_allocator, meta_tag_locations, bh_arr_length(meta_tags));
 
-        int j = 0;
-        bh_arr_each(AstTyped *, meta, meta_tags) {
-            AstTyped* value = *meta;                        
-            assert(value->flags & Ast_Flag_Comptime);
-            assert(value->type);
-
-            meta_tag_locations[j++] = build_constexpr(value, &ctx->buffer, &ctx->constexpr_ctx);
-        }
+        build_tag_array(meta_tags, ctx, meta_tag_locations);
 
         bh_buffer_align(&ctx->buffer, 8);
-        meta_locations[i] = ctx->buffer.length;
-
-        fori (k, 0, bh_arr_length(meta_tags)) {
-            WRITE_SLICE(meta_tag_locations[k], meta_tags[k]->type->id);
-            ensure_type_has_been_submitted_for_emission(ctx->module, meta_tags[k]->type);
-        }
+        meta_locations[i++] = ctx->buffer.length;
+        write_tag_array(meta_tags, ctx, meta_tag_locations);
 
         bh_arr_free(meta_tag_locations);
-        i += 1;
     }
 
     bh_buffer_align(&ctx->buffer, 8);
@@ -626,100 +597,26 @@ static i32 build_type_info_for_union(struct TypeBuilderContext *ctx, Type *type)
 
         WRITE_SLICE(name_loc, strlen(uv->name));
         bh_buffer_write_u32(&ctx->buffer, uv->tag_value);
-        bh_buffer_write_u32(&ctx->buffer, uv->type->id);
-        ensure_type_has_been_submitted_for_emission(ctx->module, uv->type);
+        write_type_idx(ctx, uv->type);
 
         WRITE_SLICE(meta_loc, bh_arr_length(uv->meta_tags));
     }
 
-    bh_buffer_align(&ctx->buffer, 8);
-    u32 params_base = ctx->buffer.length;
 
     // Polymorphic solution any array
-    i = 0;
-    bh_arr_each(AstPolySolution, sln, u->poly_sln) {
-        WRITE_PTR(param_locations[i++]);
-
-        if (sln->kind == PSK_Type) {
-            bh_buffer_write_u32(&ctx->buffer, basic_types[Basic_Kind_Type_Index].id);
-            ensure_type_has_been_submitted_for_emission(ctx->module, &basic_types[Basic_Kind_Type_Index]);
-        } else {
-            bh_buffer_write_u32(&ctx->buffer, sln->value->type->id);
-            ensure_type_has_been_submitted_for_emission(ctx->module, sln->value->type);
-        }
-    }
+    bh_buffer_align(&ctx->buffer, 8);
+    u32 params_base = ctx->buffer.length;
+    write_polymorphic_solutions_array(u->poly_sln, ctx, param_locations);
 
     // Union tag array
-    i = 0;
-    bh_arr_each(AstTyped *, tag, u->meta_tags) {
-        AstTyped* value = *tag;                        
-        assert(value->flags & Ast_Flag_Comptime);
-        assert(value->type);
-
-        struct_tag_locations[i++] = build_constexpr(value, &ctx->buffer, &ctx->constexpr_ctx);
-    }
+    build_tag_array(u->meta_tags, ctx, struct_tag_locations);
 
     // Union methods
-    bh_arr(StructMethodData) method_data=NULL;
-
-    AstType *ast_type = type->ast_type;
-    if (!context.options->generate_method_info) {
-        goto no_methods;
-    }
-
-    if (ast_type && ast_type->kind == Ast_Kind_Union_Type) {
-        AstUnionType *union_type  = (AstUnionType *) ast_type;
-        Scope*        union_scope = union_type->scope;
-
-        if (union_scope == NULL) goto no_methods;
-
-        fori (i, 0, shlen(union_scope->symbols)) {
-            AstFunction* node = (AstFunction *) strip_aliases(union_scope->symbols[i].value);
-            if (node->kind != Ast_Kind_Function) continue;
-            assert(node->entity);
-            assert(node->entity->function == node);
-
-            // Name
-            char *name = union_scope->symbols[i].key;
-            u32 name_loc = ctx->buffer.length;
-            u32 name_len = strlen(name);
-            bh_buffer_append(&ctx->buffer, name, name_len);
-
-            // any data member
-            bh_buffer_align(&ctx->buffer, 4);
-            u32 data_loc = ctx->buffer.length;
-            u32 func_idx = get_element_idx(ctx->module, node);
-            bh_buffer_write_u32(&ctx->buffer, func_idx);
-            bh_buffer_write_u32(&ctx->buffer, 0);
-            
-            bh_arr_push(method_data, ((StructMethodData) {
-                .name_loc = name_loc,
-                .name_len = name_len,
-                .type     = node->type->id,
-                .data_loc = data_loc,
-            }));
-            ensure_type_has_been_submitted_for_emission(ctx->module, node->type);
-        }
-    }
-
-    no_methods:
-
-    bh_buffer_align(&ctx->buffer, 4);
-    u32 method_data_base = ctx->buffer.length;
-
-    bh_arr_each(StructMethodData, method, method_data) {
-        WRITE_SLICE(method->name_loc, method->name_len);
-        WRITE_PTR(method->data_loc); 
-        bh_buffer_write_u32(&ctx->buffer, method->type);
-    }
+    MethodDataInfo method_data_info = write_method_data(ctx, type);
 
     bh_buffer_align(&ctx->buffer, 8);
-    
     u32 union_tag_base = ctx->buffer.length;
-    fori (i, 0, bh_arr_length(u->meta_tags)) {
-        WRITE_SLICE(struct_tag_locations[i], u->meta_tags[i]->type->id);
-        ensure_type_has_been_submitted_for_emission(ctx->module, u->meta_tags[i]->type);
-    }
+    write_tag_array(u->meta_tags, ctx, struct_tag_locations);
 
     // Union name
     u32 name_base = 0;
@@ -730,28 +627,26 @@ static i32 build_type_info_for_union(struct TypeBuilderContext *ctx, Type *type)
         bh_buffer_append(&ctx->buffer, u->name, name_length);
     }
 
-    bh_buffer_align(&ctx->buffer, 8);
+    bh_buffer_align(&ctx->buffer, 4);
     i32 offset = ctx->buffer.length;
-    bh_buffer_write_u32(&ctx->buffer, type->kind);
-    bh_buffer_write_u32(&ctx->buffer, type_size_of(type));
-    bh_buffer_write_u32(&ctx->buffer, type_alignment_of(type));
+    write_type_info_header(ctx, type);
 
     if (type->Union.constructed_from != NULL) {
         bh_buffer_write_u32(&ctx->buffer, type->Union.constructed_from->type_id);
+
+        Type *constructed_from = type_lookup_by_id(type->Union.constructed_from->type_id);
+        ensure_type_has_been_submitted_for_emission(ctx->module, constructed_from);
     } else {
         bh_buffer_write_u32(&ctx->buffer, 0);
     }
 
-    bh_buffer_write_u32(&ctx->buffer, type->Union.tag_type->id);
-    ensure_type_has_been_submitted_for_emission(ctx->module, type->Union.tag_type);
+    write_type_idx(ctx, type->Union.tag_type);
 
     WRITE_SLICE(name_base, name_length);
     WRITE_SLICE(variants_base, variant_count);
     WRITE_SLICE(params_base, bh_arr_length(u->poly_sln));
     WRITE_SLICE(union_tag_base, bh_arr_length(u->meta_tags));
-    WRITE_SLICE(method_data_base, bh_arr_length(method_data));
-
-    bh_arr_free(method_data);
+    WRITE_SLICE(method_data_info.base, method_data_info.count);
 
     return offset;
 }
@@ -784,16 +679,14 @@ static i32 build_type_info_for_polyunion(struct TypeBuilderContext *ctx, Type *t
     u32 tags_base = ctx->buffer.length;
 
     fori (i, 0, tags_count) {
-        WRITE_SLICE(tag_locations[i], type->PolyUnion.meta_tags[i]->type->id);
-        ensure_type_has_been_submitted_for_emission(ctx->module, type->PolyUnion.meta_tags[i]->type);
+        WRITE_PTR(tag_locations[i]);
+        write_type_idx(ctx, type->PolyUnion.meta_tags[i]->type);
     }
 
     bh_buffer_align(&ctx->buffer, 8);
 
     i32 offset = ctx->buffer.length;
-    bh_buffer_write_u32(&ctx->buffer, type->kind);
-    bh_buffer_write_u32(&ctx->buffer, 0);
-    bh_buffer_write_u32(&ctx->buffer, 0);
+    write_type_info_header(ctx, type);
     WRITE_SLICE(name_base, name_length);
     WRITE_SLICE(tags_base, tags_count);
 
@@ -872,6 +765,8 @@ static void build_type_info_for_type(OnyxWasmModule *module, Type *type) {
     *module->type_info_entry_count += 1;
     module->type_info_size += type_info_data.length;
     module->type_info_size += 8;
+
+    bh_arr_free(ctx.patches);
 }
 
 static u64 prepare_type_table(OnyxWasmModule* module) {
