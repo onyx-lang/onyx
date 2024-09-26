@@ -1350,10 +1350,19 @@ static BinaryOp binary_op_from_current_token(OnyxParser *parser) {
 
     if (op == Binary_Op_Count && parser->curr->type == Token_Type_Inserted_Semicolon) {
         int n = 1;
-        while (peek_token(n)->type == Token_Type_Comment) n++;
+
+        while (peek_token(n)->type == Token_Type_Comment) {
+            n++;
+        }
 
         if (peek_token(n)->type == Token_Type_Pipe) {
-            fori (i, 0, n) consume_token(parser);
+            // This is a slight hack. Though we have peeked ahead n tokens in order
+            // to skip the potential comments, `consume_token` will eat the comments
+            // automatically, so we don't need to call `consume_token` n times, just
+            // once.
+            //                                              - brendanfh, 2024/09/25
+            consume_token(parser);
+
             op = Binary_Op_Pipe;
         }
     }
