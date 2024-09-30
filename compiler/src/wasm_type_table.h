@@ -414,7 +414,11 @@ static i32 build_type_info_for_struct(struct TypeBuilderContext *ctx, Type *type
         write_type_idx(ctx, mem->type);
         bh_buffer_write_byte(&ctx->buffer, mem->used ? 1 : 0);
         
-        WRITE_PTR(value_loc);
+        if (value_loc == 0) {
+            bh_buffer_write_u32(&ctx->buffer, 0);
+        } else {
+            WRITE_PTR(value_loc);
+        }
 
         WRITE_SLICE(meta_loc, bh_arr_length(mem->meta_tags));
     }
