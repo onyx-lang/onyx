@@ -519,6 +519,33 @@ static SymresStatus symres_pipe(AstBinaryOp** pipe) {
         call_node = (AstCall *) ((AstBinaryOp *) call_node)->right;
     }
 
+    if (call_node->kind != Ast_Kind_Call) {
+        AstCall *new_call = onyx_ast_node_new(context.ast_alloc, sizeof(AstCall), Ast_Kind_Call);
+        new_call->token = call_node->token;
+        new_call->callee = (AstTyped *) call_node;
+        arguments_initialize(&new_call->args);
+
+        (*pipe)->right = (AstTyped *) new_call;
+        base_call_node = new_call;
+        call_node = new_call;
+    }
+
+    if (call_node->callee->kind == Ast_Kind_Unary_Field_Access) {
+        AstAlias *left_alias = onyx_ast_node_new(context.ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
+        left_alias->token = (*pipe)->left->token;
+        left_alias->alias = (*pipe)->left;
+        (*pipe)->left = (AstTyped *) left_alias;
+
+        AstFieldAccess *implicit_field_access = make_field_access(context.ast_alloc, (AstTyped *) left_alias, NULL);
+        implicit_field_access->token = call_node->callee->token;
+
+        call_node->callee = (AstTyped *) implicit_field_access;
+
+        AstAddressOf *address_of = make_address_of(context.ast_alloc, (*pipe)->left);
+        address_of->can_be_removed = 1;
+        (*pipe)->left = (AstTyped *) address_of;
+    }
+
     if (!call_node || call_node->kind != Ast_Kind_Call) {
         onyx_report_error((*pipe)->token->pos, Error_Critical, "Pipe operator expected call on right side.");
         return Symres_Error;
