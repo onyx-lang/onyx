@@ -677,7 +677,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         case '.': {
             if (parse_possible_struct_literal(parser, NULL, &retval)) return retval;
             if (parse_possible_array_literal(parser, NULL, &retval))  return retval;
-            if (parse_possible_unary_field_access(parser, &retval))   return retval;
+            if (parse_possible_unary_field_access(parser, &retval))   break;
             goto no_match;
         }
 
