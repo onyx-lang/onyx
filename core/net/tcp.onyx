@@ -1,7 +1,7 @@
 package core.net
 
 #if !runtime.platform.Supports_Networking {
-    #error "Cannot include this file. Platform not supported.";
+    #error "Cannot include this file. Platform not supported."
 }
 
 use core.thread
@@ -15,78 +15,78 @@ use runtime
 // Should TCP_Connection be an abstraction of both the client and the server?
 // Or is there not enough shared between them to justify that?
 TCP_Connection :: struct {
-    socket: Socket;
+    socket: Socket
 
-    event_allocator: Allocator;
-    events: [..] TCP_Event;
-    event_cursor := 0;
+    event_allocator: Allocator
+    events: [..] TCP_Event
+    event_cursor := 0
 }
 
 TCP_Event :: struct {
-    kind: Kind;
-    data: rawptr;
+    kind: Kind
+    data: rawptr
 
     Kind :: enum {
-        Undefined;
-        Connection;
-        Disconnection;
-        Data;
-        Ready;
+        Undefined
+        Connection
+        Disconnection
+        Data
+        Ready
     }
 
     Connection :: struct {
-        address : &SocketAddress;
+        address : &SocketAddress
 
         // This is only set when the event is coming from the server.
-        client  : &TCP_Server.Client;
+        client  : &TCP_Server.Client
     }
 
     Disconnection :: struct {
-        address: &SocketAddress;
+        address: &SocketAddress
 
         // This is only set when the event is coming from the server.
-        client  : &TCP_Server.Client;
+        client  : &TCP_Server.Client
     }
 
     Data :: struct {
-        address: &SocketAddress;
+        address: &SocketAddress
         // This is only set when the event is coming from the server.
-        client  : &TCP_Server.Client;
+        client  : &TCP_Server.Client
 
-        contents: [] u8;
+        contents: [] u8
     }
 
     Ready :: struct {
-        address: &SocketAddress;
+        address: &SocketAddress
         // This is only set when the event is coming from the server.
-        client : &TCP_Server.Client;
+        client : &TCP_Server.Client
     }
 }
 
 // Iterator implementation for TCP_Connection
 TCP_Connection.iter_open :: (use conn: &TCP_Connection) {
-    conn.event_cursor = 0;
+    conn.event_cursor = 0
 }
 
 TCP_Connection.iter_next :: (use conn: &TCP_Connection) -> ? TCP_Event {
-    if event_cursor == events.count do return .None;
+    if event_cursor == events.count do return .None
 
-    defer event_cursor += 1;
-    return events[event_cursor];
+    defer event_cursor += 1
+    return events[event_cursor]
 }
 
 TCP_Connection.iter_close :: (use conn: &TCP_Connection) {
     for events {
         switch it.kind {
             case .Data {
-                raw_free(event_allocator, (cast(&TCP_Event.Data) it.data).contents.data);
+                raw_free(event_allocator, (cast(&TCP_Event.Data) it.data).contents.data)
             }
         }
 
-        raw_free(event_allocator, it.data);
+        raw_free(event_allocator, it.data)
     }
 
-    array.clear(&events);
+    array.clear(&events)
 }
 
 
@@ -95,17 +95,16 @@ TCP_Connection.iter_close :: (use conn: &TCP_Connection) {
 //
 
 TCP_Server :: struct {
-    use connection: TCP_Connection;
+    use connection: TCP_Connection
 
-    client_allocator: Allocator;
-    clients: [] &Client;
+    clients: [] ? Client
     client_count: u32; // max clients is stored as clients.count.
 
-    alive         := true;
-    pulse_time_ms := 500;
+    alive         := true
+    pulse_time_ms := 500
 
-    emit_data_events := true;
-    emit_ready_event_multiple_times := false;
+    emit_data_events := true
+    emit_ready_event_multiple_times := false
 }
 
 TCP_Server.listen          :: tcp_server_listen
@@ -119,82 +118,81 @@ TCP_Server.kill_client     :: tcp_server_kill_client
 TCP_Server.transfer_client :: tcp_server_transfer_client
 
 TCP_Server.Client :: struct {
-    use socket  : Socket;
-    address : SocketAddress;
-    state   : State;
-    server  : &TCP_Server;
+    use socket  : Socket
+    address : SocketAddress
+    state   : State
+    server  : &TCP_Server
 
-    recv_ready_event_present := false;
+    recv_ready_event_present := false
 
     State :: enum {
-        Alive;
-        Being_Killed;
-        Dying;
-        Dead;
+        Alive
+        Being_Killed
+        Dying
+        Dead
     }
 }
 
 TCP_Server.Client.read_complete :: (use this: &TCP_Server.Client) {
-    recv_ready_event_present = false;
+    recv_ready_event_present = false
 }
 
-TCP_Server.Client.transfer :: (use this: &TCP_Server.Client, new_server: &TCP_Server) -> ? &TCP_Server.Client {
-    return tcp_server_transfer_client(server, this, new_server);
+TCP_Server.Client.transfer :: (use this: &TCP_Server.Client, new_server: &TCP_Server) -> ? TCP_Server.Client {
+    return tcp_server_transfer_client(server, this, new_server)
 }
 
 TCP_Server.Client.detach :: (use this: &TCP_Server.Client) -> (res: Socket) {
-    res = this.socket;
+    res = this.socket
 
     for& server.clients {
-        if *it == this {
-            raw_free(server.client_allocator, this);
-            *it = null;
-            server.client_count -= 1;
-            break;
+        if it->unwrap_ptr() == this {
+            *it = .None
+            server.client_count -= 1
+            break
         }
     }
     
-    return;
+    return
 }
 
 tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> &TCP_Server {
     maybe_socket := socket_create(.Inet, .Stream, .IP); // IPv6?
-    if maybe_socket.Err do return null;
+    if maybe_socket.Err do return null
 
-    socket := maybe_socket.Ok->unwrap();
+    socket := maybe_socket.Ok->unwrap()
 
-    server := new(TCP_Server, allocator=allocator);
-    server.socket = socket;
-    server.event_allocator = allocator;
+    server := new(TCP_Server, allocator=allocator)
+    server.socket = socket
+    server.event_allocator = allocator
 
-    server.client_count = 0;
-    server.client_allocator = allocator;
-    server.clients = make([] &TCP_Server.Client, max_clients, allocator=allocator);
-    array.fill(server.clients, null);
+    server.client_count = 0
+    server.clients = make([] ? TCP_Server.Client, max_clients, allocator=allocator)
+    array.fill(server.clients, .None)
 
-    return server;
+    return server
 }
 
 tcp_server_listen :: (use server: &TCP_Server, port: u16) -> bool {
-    sa: SocketAddress;
-    make_ipv4_address(&sa, "0.0.0.0", port);
-    if !socket->bind(&sa) do return false;
+    sa: SocketAddress
+    make_ipv4_address(&sa, "0.0.0.0", port)
+    if !socket->bind(&sa) do return false
 
-    socket->listen();
-    socket->option(.NonBlocking, true);
-    return true;
+    socket->listen()
+    socket->option(.NonBlocking, true)
+    return true
 }
 
 tcp_server_stop :: (use server: &TCP_Server) {
-    server.alive = false;
+    server.alive = false
 
-    for clients {
-        if !it do continue;
+    for& clients {
+        if !*it do continue
 
-        if it.state == .Alive do server->kill_client(it);
+        client := it->unwrap_ptr()
+        if client.state == .Alive do server->kill_client(client)
     }
 
-    server.socket->close();
+    server.socket->close()
 }
 
 tcp_server_pulse :: (use server: &TCP_Server) -> bool {
@@ -202,29 +200,32 @@ tcp_server_pulse :: (use server: &TCP_Server) -> bool {
     // Check for new connection
     if client_count < clients.count {
         socket->accept().Ok->with([client_data] {
-            client := new(TCP_Server.Client, allocator=client_allocator);
-            client.server = server;
-            client.state = .Alive;
-            client.socket = client_data.socket;
-            client.address = client_data.addr;
+            client := Slice.first(clients, [cl](cl.None))
+            if !client {
+                client_data.socket->close()
+                break
+            }
 
-            for& clients do if *it == null { *it = client; break; }
-            server.client_count += 1;
+            *client = TCP_Server.Client.{}
+            cl := client->unwrap_ptr()
+            cl.server = server
+            cl.state = .Alive
+            cl.socket = client_data.socket
+            cl.address = client_data.addr
 
-            conn_event := new(TCP_Event.Connection, allocator=server.event_allocator);
-            conn_event.address = &client.address;
-            conn_event.client = client;
+            server.client_count += 1
 
-            server.events << .{ .Connection, conn_event };
-        });
+            conn_event := new(TCP_Event.Connection, allocator=server.event_allocator)
+            conn_event.address = &cl.address
+            conn_event.client = cl
+
+            server.events << .{ .Connection, conn_event }
+        })
     }
 
     // 
     // Process dead clients
-    for& clients {
-        client := *it;
-        if !client do continue;
-
+    for& maybe_client in clients do maybe_client.*->with([client] {
         switch client.state {
             case .Being_Killed {
                 // Before, there was not a "being killed" state and the code made
@@ -238,43 +239,44 @@ tcp_server_pulse :: (use server: &TCP_Server) -> bool {
                 // the loop below that checks for dying clients will never see the
                 // dying client. To remedy this, "Being_Killed" was added as another
                 // shutdown phase. TLDR: This is a hack; refactor this.
-                client.state = .Dying;
+                client.state = .Dying
             }
 
             case .Dying {
-                raw_free(server.client_allocator, client);
-                *it = null;
-                server.client_count -= 1;
+                *maybe_client = .None
+                server.client_count -= 1
             }
         }
-    }
+    })
 
     if client_count == 0 {
         // Wait for a client to connect.
-        status_buffer: [1] Socket_Poll_Status;
-        socket_poll_all(.[&socket], status_buffer, -1);
-        return server.alive;
+        status_buffer: [1] Socket_Poll_Status
+        socket_poll_all(.[&socket], status_buffer, -1)
+        return server.alive
 
-    } else do for clients {
+    } else do for& clients {
         // If we have some clients, make sure their sockets are still alive.
         // There were issues detecting this in the poll() function so we do
         // do it explictly here.
 
-        if it == null do continue;
-        if it.state != .Alive do continue;
+        if !*it do continue
 
-        if !it.socket->is_alive() {
-            tcp_server_kill_client(server, it);
+        client := it->unwrap_ptr()
+        if client.state != .Alive do continue
+
+        if !client.socket->is_alive() {
+            tcp_server_kill_client(server, client)
         }
     }
 
-    use clients_with_messages := wait_to_get_client_messages(server);
-    for clients_with_messages {
-        if it.state != .Alive do continue;
+    use clients_with_messages := wait_to_get_client_messages(server)
+    for client in clients_with_messages {
+        if client.state != .Alive do continue
 
         if server.emit_data_events {
-            msg_buffer: [1024] u8;
-            bytes_read := it.socket->recv_into(msg_buffer);
+            msg_buffer: [1024] u8
+            bytes_read := client.socket->recv_into(msg_buffer)
 
             // If exactly 0 bytes are read from the buffer, it means that the
             // client has shutdown and future communication should be terminated.
@@ -282,58 +284,62 @@ tcp_server_pulse :: (use server: &TCP_Server) -> bool {
             // If a negative number of bytes are read, then an error has occured
             // and the client should also be marked as dead.
             if bytes_read <= 0 {
-                tcp_server_kill_client(server, it);
-                continue;
+                tcp_server_kill_client(server, client)
+                continue
             }
 
-            data_event := new(TCP_Event.Data, allocator=server.event_allocator);
-            data_event.client  = it;
-            data_event.address = &it.address;
-            data_event.contents = memory.copy_slice(msg_buffer[0 .. bytes_read], allocator=server.event_allocator);
-            server.events << .{ .Data, data_event };
+            data_event := new(TCP_Event.Data, allocator=server.event_allocator)
+            data_event.client  = client
+            data_event.address = &client.address
+            data_event.contents = memory.copy_slice(msg_buffer[0 .. bytes_read], allocator=server.event_allocator)
+            server.events << .{ .Data, data_event }
 
-        } elseif !it.recv_ready_event_present {
-            it.recv_ready_event_present = true;
-            ready_event := new(TCP_Event.Ready, allocator=server.event_allocator);
-            ready_event.client  = it;
-            ready_event.address = &it.address;
-            server.events << .{ .Ready, ready_event };
+        } elseif !client.recv_ready_event_present {
+            client.recv_ready_event_present = true
+            ready_event := new(TCP_Event.Ready, allocator=server.event_allocator)
+            ready_event.client  = client
+            ready_event.address = &client.address
+            server.events << .{ .Ready, ready_event }
         }
     }
 
-    for clients {
-        if it == null do continue;
-        if it.state == .Dying {
-            disconnect_event := new(TCP_Event.Disconnection, allocator=server.event_allocator);
-            disconnect_event.client  = it;
-            disconnect_event.address = &it.address;
-            server.events << .{ .Disconnection, disconnect_event };
+    for& clients {
+        if !*it do continue
+        
+        client := it->unwrap_ptr()
+        if client.state == .Dying {
+            disconnect_event := new(TCP_Event.Disconnection, allocator=server.event_allocator)
+            disconnect_event.client  = client
+            disconnect_event.address = &client.address
+            server.events << .{ .Disconnection, disconnect_event }
         }
     }
 
-    client_count = array.count_where(clients, [v](v != null));
+    client_count = Array.count_where(clients, [v](!v.None))
 
-    return server.alive;
+    return server.alive
 }
 
 tcp_server_send :: (use server: &TCP_Server, client: &TCP_Server.Client, data: [] u8) {
-    client.socket->send(data);
+    client.socket->send(data)
 }
 
 tcp_server_broadcast :: (use server: &TCP_Server, data: [] u8, except: &TCP_Server.Client = null) {
-    for clients {
-        if it == null do continue;
-        if it.state != .Alive do continue;
-        if it == except do continue;
+    for& clients {
+        if !*it do continue
 
-        it.socket->send(data);
+        client := it->unwrap_ptr()
+        if client.state != .Alive do continue
+        if client == except do continue
+
+        client.socket->send(data)
     }
 }
 
 tcp_server_handle_events :: macro (server: &TCP_Server, handler: Code) {
     while server->pulse() {
         for Iterator.from(&server.connection) {
-            switch it.kind do #unquote handler(it);
+            switch it.kind do #unquote handler(it)
         }
     }
 }
@@ -365,35 +371,34 @@ tcp_server_event_iter :: (server: &TCP_Server) -> Iterator(TCP_Event) {
 }
 
 tcp_server_kill_client :: (use server: &TCP_Server, client: &TCP_Server.Client) {
-    client.state = .Being_Killed;
-    client.socket->shutdown(.ReadWrite);
-    client.socket->close();
+    client.state = .Being_Killed
+    client.socket->shutdown(.ReadWrite)
+    client.socket->close()
 }
 
-tcp_server_transfer_client :: (server: &TCP_Server, client: &TCP_Server.Client, other_server: &TCP_Server) -> ? &TCP_Server.Client {
-    if other_server.client_count >= other_server.clients.count do return .None;
+tcp_server_transfer_client :: (server: &TCP_Server, client: &TCP_Server.Client, other_server: &TCP_Server) -> ? TCP_Server.Client {
+    if other_server.client_count >= other_server.clients.count do return .None
 
-    transferred_client := other_server.client_allocator->move(*client);
-    transferred_client.server = other_server;
+    transferred_client := *client
+    transferred_client.server = other_server
 
     for& other_server.clients {
-        if *it == null {
-            *it = transferred_client;
-            break;
+        if !*it {
+            *it = transferred_client
+            break
         }
     }
-    other_server.client_count += 1;
+    other_server.client_count += 1
 
     for& server.clients {
-        if *it == client {
-            raw_free(server.client_allocator, client);
-            *it = null;
-            server.client_count -= 1;
-            break;
+        if it->unwrap_ptr() == client {
+            *it = .None
+            server.client_count -= 1
+            break
         }
     }
 
-    return transferred_client;
+    return transferred_client
 }
 
 
@@ -403,7 +408,7 @@ tcp_server_transfer_client :: (server: &TCP_Server, client: &TCP_Server.Client, 
 //
 
 TCP_Client :: struct {
-    use connection: TCP_Connection;
+    use connection: TCP_Connection
 }
 
 
@@ -411,17 +416,18 @@ TCP_Client :: struct {
 
 #local
 wait_to_get_client_messages :: (use server: &TCP_Server) -> [] &TCP_Server.Client {
-    active_clients := alloc.array_from_stack(&TCP_Server.Client, client_count + 1);
-    active_clients.count = 0;
+    active_clients := alloc.array_from_stack(&TCP_Server.Client, client_count + 1)
+    active_clients.count = 0
 
-    for clients {
-        if it == null do continue;
+    for& clients {
+        if !*it do continue
 
-        if it.state == .Alive {
-            if !it.socket->is_alive() do continue;
+        client := it->unwrap_ptr()
+        if client.state == .Alive {
+            if !client.socket->is_alive() do continue
 
-            active_clients[active_clients.count] = it;
-            active_clients.count += 1;
+            active_clients[active_clients.count] = client
+            active_clients.count += 1
         }
     }
 
@@ -435,7 +441,7 @@ wait_to_get_client_messages :: (use server: &TCP_Server) -> [] &TCP_Server.Clien
     // to immediately return, and enter a sort of complicated "spin loop"
     // in order to not stall worker threads.
     if active_clients.count == 0 {
-        return .{ null, 0 };
+        return .{ null, 0 }
     }
 
     // HACK This is making a large assumption about the layout of the TCP_Server.Client.
@@ -444,10 +450,10 @@ wait_to_get_client_messages :: (use server: &TCP_Server) -> [] &TCP_Server.Clien
     active_clients[active_clients.count] = ~~ &server.socket
     active_clients.count += 1
 
-    status_buffer := alloc.array_from_stack(Socket_Poll_Status, active_clients.count);
-    socket_poll_all(cast([] &Socket) active_clients, status_buffer, pulse_time_ms);
+    status_buffer := alloc.array_from_stack(Socket_Poll_Status, active_clients.count)
+    socket_poll_all(cast([] &Socket) active_clients, status_buffer, pulse_time_ms)
 
-    recv_clients: [..] &TCP_Server.Client;
+    recv_clients: [..] &TCP_Server.Client
     for it in active_clients.count - 1 {
         if status_buffer[it] == .Readable {
             //
@@ -458,15 +464,15 @@ wait_to_get_client_messages :: (use server: &TCP_Server) -> [] &TCP_Server.Clien
             // read, the TCP server will enter a spin loop, effectively ignoring
             // the polling. This shouldn't be too bad because in most cases the
             // code will immediately parse the response.
-            if active_clients[it].recv_ready_event_present && !emit_ready_event_multiple_times do continue;
+            if active_clients[it].recv_ready_event_present && !emit_ready_event_multiple_times do continue
 
-            recv_clients << active_clients[it];
+            recv_clients << active_clients[it]
         }
 
         if status_buffer[it] == .Closed {
-            tcp_server_kill_client(server, active_clients[it]);
+            tcp_server_kill_client(server, active_clients[it])
         }
     }
 
-    return recv_clients;
+    return recv_clients
 }
