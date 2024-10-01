@@ -88,7 +88,7 @@ static b32 extension_spawn(CompilerExtension *ext, const char *path) {
             dup2(comp_to_ext[0], 0);
             dup2(ext_to_comp[1], 1);
 
-            execlp("onyx", "onyx", "run", path, NULL);
+            execlp("onyx", "onyx", "run", "--no-compiler-extensions", "--no-file-contents", path, NULL);
             exit(1);
             break;
 
