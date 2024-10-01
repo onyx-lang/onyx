@@ -5209,7 +5209,7 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
         token_toggle_end(filename_token);
         char* temp_fn     = bh_alloc_array(global_scratch_allocator, char, filename_token->length);
         i32   temp_fn_len = string_process_escape_seqs(temp_fn, filename_token->text, filename_token->length);
-        char* filename    = bh_lookup_file(temp_fn, parent_folder, "", 0, NULL, 0);
+        char* filename    = bh_lookup_file(temp_fn, parent_folder, NULL, NULL, NULL);
         fc->filename      = bh_strdup(global_heap_allocator, filename);
         token_toggle_end(filename_token);
     }
@@ -5270,7 +5270,7 @@ static void emit_js_node(OnyxWasmModule* mod, AstJsNode *js) {
         i32   temp_fn_len = string_process_escape_seqs(temp_fn, filename_token->text, filename_token->length);
         char* filename    = bh_strdup(
             global_heap_allocator,
-            bh_lookup_file(temp_fn, parent_folder, "", 0, NULL, 0)
+            bh_lookup_file(temp_fn, parent_folder, NULL, NULL, NULL)
         );
 
         token_toggle_end(filename_token);

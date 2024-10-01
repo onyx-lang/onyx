@@ -1,4 +1,4 @@
-#load "core/module"
+
 use core {*}
 
 Person_Vtable :: struct {
