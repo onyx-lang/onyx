@@ -3354,46 +3354,20 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
     }
     u32 elem_size = type_size_of(elem_type);
 
-    u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     u64 rptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     WIL(NULL, WI_LOCAL_SET, rptr_local);
-    WIL(NULL, WI_LOCAL_SET, lptr_local);
+
+    if (offset != 0) {
+        WIL(NULL, WI_PTR_CONST, offset);
+        WI(NULL, WI_PTR_ADD);
+    }
 
     WIL(NULL, WI_LOCAL_GET, rptr_local);
-    WID(NULL, WI_I32_CONST, 0);
-    WI(NULL, WI_I32_NE);
-    emit_enter_structured_block(mod, &code, SBT_Basic_If, NULL);
-
-    {
-        WIL(NULL, WI_LOCAL_GET, lptr_local);
-        if (offset != 0) {
-            WIL(NULL, WI_PTR_CONST, offset);
-            WI(NULL, WI_PTR_ADD);
-        }
-
-        WIL(NULL, WI_LOCAL_GET, rptr_local);
-        WIL(NULL, WI_I32_CONST, elem_count * elem_size);
-        emit_wasm_copy(mod, &code, NULL);
-    }
-
-    WI(NULL, WI_ELSE);
-
-    { // If the source ptr is null (0), then just copy in 0 bytes.
-        WIL(NULL, WI_LOCAL_GET, lptr_local);
-        if (offset != 0) {
-            WIL(NULL, WI_PTR_CONST, offset);
-            WI(NULL, WI_PTR_ADD);
-        }
-
-        WIL(NULL, WI_I32_CONST, 0);
-        WIL(NULL, WI_I32_CONST, elem_count * elem_size);
-        emit_wasm_fill(mod, &code, NULL);
-    }
+    WIL(NULL, WI_I32_CONST, elem_count * elem_size);
+    emit_wasm_copy(mod, &code, NULL);
 
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-
-    emit_leave_structured_block(mod, &code);
+    
     *pcode = code;
     return;
 }

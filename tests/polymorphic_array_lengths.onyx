@@ -4,19 +4,15 @@ use core {*}
 
 main :: (args: [] cstr) {
     arr := u32.[ 1, 2, 3, 4, 5 ];
-    for elem in array_to_slice(arr) do printf("{} ", elem);
+    for elem in cast([] u32) arr do printf("{} ", elem);
 
     roots : [20] f32;
     compute_roots(roots);
 
     for root in roots do println(root);
 
-    array_to_slice :: (arr: [$N] $T) -> [] T {
-        return (#type [] T).{ ~~arr, N };
-    }
-
-    compute_roots :: (arr: [$N] f32) {
-        for i in 0 .. N {
+    compute_roots :: (arr: [] f32) {
+        for i in 0 .. arr.count {
             arr[i] = math.sqrt(cast(f32) i);
         }
     }

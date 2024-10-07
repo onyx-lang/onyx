@@ -1836,6 +1836,7 @@ b32 type_is_structlike_strict(Type* type) {
 b32 type_should_be_passed_like_a_struct(Type *type) {
     if (type == NULL) return 0;
     if (type->kind == Type_Kind_Struct)   return 1;
+    if (type->kind == Type_Kind_Array)    return 1;
     if (type->kind == Type_Kind_Slice)    return 1;
     if (type->kind == Type_Kind_DynArray) return 1;
     if (type->kind == Type_Kind_Function) return 1;
