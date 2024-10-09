@@ -23,19 +23,19 @@ custom_formatters_initialized :: #init () {
         use runtime.info {*};
 
         for type_idx in type_table.count {
-            type := type_table[type_idx];
+            type := type_table[type_idx].info;
             if type.kind != .Struct do continue;
 
             s_info := cast(&Type_Info_Struct) type;
             for s_info.tags {
                 if it.type == Custom_Format {
                     custom_format := cast(&Custom_Format) it.data;
-                    custom_formatters[cast(type_expr) type_idx] = custom_format.format;
+                    custom_formatters[type_table[type_idx].type] = custom_format.format;
                 }
 
                 if it.type == Custom_Parse {
                     custom_parse := cast(&Custom_Parse) it.data;
-                    custom_parsers[cast(type_expr) type_idx] = custom_parse.parse;
+                    custom_parsers[type_table[type_idx].type] = custom_parse.parse;
                 }
             } 
         }

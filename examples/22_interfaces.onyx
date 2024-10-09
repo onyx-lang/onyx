@@ -140,6 +140,6 @@ main :: (args) => {
     overloaded_procedure_example();
 }
 
-#load "core/module"
+
 use core {*}
 use core.intrinsics.onyx {*}

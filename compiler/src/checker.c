@@ -3545,6 +3545,13 @@ CheckStatus check_function_header(AstFunction* func) {
         if (local->type->kind != Type_Kind_Array && type_size_of(local->type) == 0) {
             ERROR(local->token->pos, "Function parameters cannot have 'void' as their type.");
         }
+
+        if (local->type->kind == Type_Kind_Array && type_size_of(local->type) >= 128) {
+            onyx_report_warning(local->token->pos, "Since arrays are passed by value, this array parameter would copy %d bytes per function call. Unless this is what you want, you should make this parameter a slice instead ('[] %s').",
+                type_size_of(local->type),
+                type_get_name(local->type->Array.elem)
+            );
+        }
     }
 
     if (func->return_type != NULL) CHECK(type, &func->return_type);
@@ -3913,7 +3920,7 @@ CheckStatus check_process_directive(AstNode* directive) {
 
             char *path = bh_strdup(
                 global_scratch_allocator,
-                bh_lookup_file(temp_str, parent_folder, "", 0, NULL, 0)
+                bh_lookup_file(temp_str, parent_folder, NULL, NULL, NULL)
             );
 
             if (!bh_file_exists(path)) {
