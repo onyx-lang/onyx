@@ -421,6 +421,7 @@ void prepare_builtins() {
     builtin_code_type = NULL;
     builtin_link_options_type = NULL;
     builtin_package_id_type = NULL;
+    builtin_stack_trace_type = NULL;
 
     type_table_node = NULL;
     foreign_blocks_node = NULL;
@@ -624,6 +625,7 @@ void initalize_special_globals() {
 
         if (context.options->stack_trace_enabled) {
             builtin_stack_trace_type = (AstType *) symbol_raw_resolve(p->scope, "Stack_Trace");
+            assert(builtin_stack_trace_type);
         }
     }
 }

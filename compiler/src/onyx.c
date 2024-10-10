@@ -176,6 +176,7 @@ static void context_init(CompileOptions* opts) {
     builtin_tls_base.entity = NULL;
     builtin_tls_size.entity = NULL;
     builtin_closure_base.entity = NULL;
+    builtin_stack_trace.entity = NULL;
 
     add_entities_for_node(NULL, (AstNode *) &builtin_stack_top, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_heap_start, context.global_scope, NULL);
@@ -823,11 +824,9 @@ static void onyx_watch_run_executable(const char *target) {
 static void onyx_watch(CompileOptions *compile_opts) {
     signal(SIGINT, onyx_watch_stop);
 
-    b32 watch_run = compile_opts->action == ONYX_COMPILE_ACTION_WATCH_RUN;
+    b32 run_the_program = compile_opts->action == ONYX_COMPILE_ACTION_WATCH_RUN;
 
-    b32 running_watch = 1;
-
-    do {
+    while (1) {
         bh_printf("\e[2J\e[?25l\n");
         bh_printf("\e[3;1H");
 
@@ -850,7 +849,7 @@ static void onyx_watch(CompileOptions *compile_opts) {
             bh_printf("\e[30;101m Error%s %d \e[0m", bh_num_plural(errors), errors);
         }
 
-        if (watch_run && successful_compilation) {
+        if (run_the_program && successful_compilation) {
             bh_printf("\n\n\nRunning your program...\n");
             onyx_watch_run_executable(compile_opts->target_file);
         }
@@ -865,22 +864,19 @@ static void onyx_watch(CompileOptions *compile_opts) {
 
         b32 wait_successful = bh_file_watch_wait(&watches);
 
-        if (watch_run) {
-            if (watch_run_pid > 0) {
-                int status;
-                killpg(watch_run_pid, SIGTERM);
-                waitpid(watch_run_pid, &status, 0);
-                watch_run_pid = 0;
-            }
-        }
-
-        if (!wait_successful) {
-            running_watch = 0;
+        if (run_the_program && watch_run_pid > 0) {
+            int status;
+            killpg(watch_run_pid, SIGTERM);
+            waitpid(watch_run_pid, &status, 0);
+            watch_run_pid = -1;
         }
 
         bh_file_watch_free(&watches);
 
-    } while(running_watch);
+        if (!wait_successful) {
+            break;
+        }
+    }
 
 
     bh_printf("\e[2J\e[1;1H\e[?25h\n");
