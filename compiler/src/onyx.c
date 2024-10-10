@@ -984,9 +984,11 @@ int main(int argc, char *argv[]) {
             }
             break;
 
+        #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         case ONYX_COMPILE_ACTION_WATCH_RUN:
             onyx_watch(&compile_opts);
             break;
+        #endif
         #endif
 
         #if defined(_BH_LINUX) || defined(_BH_DARWIN)
