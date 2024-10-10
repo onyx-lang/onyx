@@ -794,17 +794,36 @@ void cleanup_compilation() {
 }
 
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
-
 #include <signal.h>
+#include <sys/wait.h>
 
 static bh_file_watch watches;
+static i32 watch_run_pid = -1;
 
 static void onyx_watch_stop(int sig) {
     bh_file_watch_stop(&watches);
 }
 
+static void onyx_watch_run_executable(const char *target) {
+    watch_run_pid = fork();
+    switch (watch_run_pid) {
+        case -1: bh_printf("error: fork() failed\n"); break;
+        case 0:
+            setpgid(0, getpid());
+            close(STDIN_FILENO);
+            open("/dev/null", O_RDONLY);
+            execlp("onyx", "onyx", "run", target, NULL);
+            exit(1);
+            break;
+        default:
+            break;
+    }
+}
+
 static void onyx_watch(CompileOptions *compile_opts) {
     signal(SIGINT, onyx_watch_stop);
+
+    b32 watch_run = compile_opts->action == ONYX_COMPILE_ACTION_WATCH_RUN;
 
     b32 running_watch = 1;
 
@@ -812,9 +831,11 @@ static void onyx_watch(CompileOptions *compile_opts) {
         bh_printf("\e[2J\e[?25l\n");
         bh_printf("\e[3;1H");
 
-        if (do_compilation(compile_opts) == ONYX_COMPILER_PROGRESS_SUCCESS) {
+        b32 successful_compilation = do_compilation(compile_opts) == ONYX_COMPILER_PROGRESS_SUCCESS;
+
+        if (successful_compilation) {
             onyx_flush_module();
-            bh_printf("\e[92mNo errors.\n");
+            bh_printf("\e[92mNo errors!\n");
         }
 
         char time_buf[128] = {0};
@@ -829,6 +850,11 @@ static void onyx_watch(CompileOptions *compile_opts) {
             bh_printf("\e[30;101m Error%s %d \e[0m", bh_num_plural(errors), errors);
         }
 
+        if (watch_run && successful_compilation) {
+            bh_printf("\n\n\nRunning your program...\n");
+            onyx_watch_run_executable(compile_opts->target_file);
+        }
+
         watches = bh_file_watch_new();
 
         bh_arr_each(bh_file_contents, file, context.loaded_files) {
@@ -837,11 +863,23 @@ static void onyx_watch(CompileOptions *compile_opts) {
 
         cleanup_compilation();
 
-        if (!bh_file_watch_wait(&watches)) {
+        b32 wait_successful = bh_file_watch_wait(&watches);
+
+        if (watch_run) {
+            if (watch_run_pid > 0) {
+                int status;
+                killpg(watch_run_pid, SIGTERM);
+                waitpid(watch_run_pid, &status, 0);
+                watch_run_pid = 0;
+            }
+        }
+
+        if (!wait_successful) {
             running_watch = 0;
         }
 
         bh_file_watch_free(&watches);
+
     } while(running_watch);
 
 
@@ -944,6 +982,10 @@ int main(int argc, char *argv[]) {
             if (!onyx_run_wasm_file(context.options->target_file)) {
                 compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
             }
+            break;
+
+        case ONYX_COMPILE_ACTION_WATCH_RUN:
+            onyx_watch(&compile_opts);
             break;
         #endif
 
