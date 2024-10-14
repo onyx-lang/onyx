@@ -47,6 +47,9 @@ static const char* top_level_docstring = DOCSTRING_HEADER
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     C_LBLUE "    watch            " C_NORM "Continuously rebuilds a program on file changes\n"
 #endif
+#if (defined(_BH_LINUX) || defined(_BH_DARWIN)) && defined(ONYX_RUNTIME_LIBRARY)
+    C_LBLUE "    run-watch        " C_NORM "Continuously rebuilds and runs a program on file changes " C_GREY "(onyx rw)" C_NORM "\n"
+#endif
 #ifdef ONYX_RUNTIME_LIBRARY
     "\n"
     C_LBLUE "    package " C_GREY "cmd      " C_NORM "Package manager " C_GREY "(onyx pkg cmd)" C_NORM "\n"
@@ -206,6 +209,14 @@ static void cli_determine_action(CompileOptions *options, int *first_sub_arg, in
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     if (!strcmp(argv[1], "watch")) {
         options->action = ONYX_COMPILE_ACTION_WATCH;
+        *first_sub_arg = 2;
+        return;
+    }
+    #endif
+
+    #if (defined(_BH_LINUX) || defined(_BH_DARWIN)) && defined(ONYX_RUNTIME_LIBRARY)
+    if (!strcmp(argv[1], "run-watch") || !strcmp(argv[1], "rw")) {
+        options->action = ONYX_COMPILE_ACTION_WATCH_RUN;
         *first_sub_arg = 2;
         return;
     }
@@ -536,6 +547,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         case ONYX_COMPILE_ACTION_CHECK:
         case ONYX_COMPILE_ACTION_RUN:
         case ONYX_COMPILE_ACTION_WATCH:
+        case ONYX_COMPILE_ACTION_WATCH_RUN:
         case ONYX_COMPILE_ACTION_COMPILE:
             cli_parse_compilation_options(&options, arg_parse_start, argc, argv);
             break;
@@ -593,7 +605,8 @@ static void print_subcommand_help(const char *subcommand) {
         return;
     }
 
-    if (!strcmp(subcommand, "run") || !strcmp(subcommand, "r")) {
+    if (!strcmp(subcommand, "run") || !strcmp(subcommand, "r")
+        || !strcmp(subcommand, "run-watch") || !strcmp(subcommand, "rw")) {
         bh_printf(build_docstring, subcommand, "[-- program args]");
         bh_printf(
             C_LBLUE "    --debug-socket " C_GREY "addr         " C_NORM "Specifies the address or port used for the debug server.\n"
