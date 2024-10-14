@@ -22,5 +22,7 @@ main :: () {
 
     use parsed_token := keys.JWT.parse(token, KEY)!
     printf("{p}\n", parsed_token.headers)
-    printf("{p}\n", parsed_token.claims)
+    for Iterator.from(parsed_token.claims) {
+        printf("Key: {}\n", it.key)
+    }
 }
