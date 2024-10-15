@@ -19,7 +19,7 @@ use core
 #local Enable_Clear_Freed_Memory :: #defined(runtime.vars.Enable_Heap_Clear_Freed_Memory)
 #local Enable_Stack_Trace :: runtime.Stack_Trace_Enabled
 
-#load "core/intrinsics/wasm"
+#load "core:intrinsics/wasm"
 
 #if runtime.Multi_Threading_Enabled {
     use core {sync}

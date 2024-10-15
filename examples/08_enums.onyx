@@ -4,7 +4,7 @@
 // expressions. This is going to improve in the future, but for the moment,
 // enums are rather limited.
 
-#load "core/module"
+
 
 use core {*}
 

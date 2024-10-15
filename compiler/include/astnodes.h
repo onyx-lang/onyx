@@ -2000,7 +2000,7 @@ struct CompileOptions {
 
     Runtime runtime;
 
-    bh_arr(const char *) included_folders;
+    bh_arr(bh_mapped_folder) mapped_folders;
     bh_arr(const char *) files;
     const char* target_file;
     const char* documentation_file;
