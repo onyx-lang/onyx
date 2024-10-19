@@ -1,14 +1,11 @@
 0xFFFC0
-any { 
-    data = 0x128610, 
-    type = Foo
-}
+Foo
 Foo { x = 123, y = 456, z = 678 }
-1: any { data = 0x117C60, type = i32 }
-Str: any { data = 0x117C70, type = [] u8 }
-other: any { data = 0x117C80, type = [] u8 }
-12.3399: any { data = 0x117C90, type = f64 }
-Foo { x = 123, y = 456, z = 678 }: any { data = 0x128610, type = Foo }
+1: i32
+Str: [] u8
+other: [] u8
+12.3399: f64
+Foo { x = 123, y = 456, z = 678 }: Foo
 ASDF
 true
 14

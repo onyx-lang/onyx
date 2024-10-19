@@ -119,12 +119,14 @@ Array.clear :: (arr: &[..] $T) {
 /// If this procedure returns `true`, `arr.capacity` will be greater than or equal to `capacity`.
 Array.ensure_capacity :: (arr: &[..] $T, capacity: u32) -> bool {
     if arr.capacity >= capacity do return true;
-    if arr.data == null do Array.init(arr);
+    if arr.data == null do Array.init(arr, capacity);
 
     while capacity > arr.capacity do arr.capacity <<= 1;
     new_data := raw_resize(arr.allocator, arr.data, sizeof T * arr.capacity);
     if new_data == null do return false;
     arr.data = new_data;
+
+    memory.set(memory.ptr_add(arr.data, sizeof T * arr.count), 0, memory.ptr_add(arr.data, sizeof T * (arr.capacity - arr.count)))
     return true;
 }
 

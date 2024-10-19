@@ -1,4 +1,4 @@
-#load "core/module"
+
 use core {*}
 
 // Operator overloading allows you to define what it means to perform

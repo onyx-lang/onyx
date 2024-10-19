@@ -15,7 +15,7 @@
 //   - 'variadic argument' is shortened to 'vararg' in many situtations
 
 
-#load "core/module"
+
 
 use core {*}
 

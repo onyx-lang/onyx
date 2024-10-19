@@ -15,7 +15,7 @@
 // This file will give examples of all of these things, as well as some of the gotchas
 // you need to be aware of.
 
-#load "core/module"
+
 
 use core {*}
 
