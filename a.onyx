@@ -1,0 +1,11 @@
+use core {*}
+
+main :: () {
+    arr := .[1, 2, 3, 4]
+
+    arr
+        |> Iterator.from()
+        |> .fold1((x, y) => x + y)
+        |> .unwrap
+        |> println
+}
