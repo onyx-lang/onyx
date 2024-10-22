@@ -126,7 +126,11 @@ Array.ensure_capacity :: (arr: &[..] $T, capacity: u32) -> bool {
     if new_data == null do return false;
     arr.data = new_data;
 
-    memory.set(memory.ptr_add(arr.data, sizeof T * arr.count), 0, memory.ptr_add(arr.data, sizeof T * (arr.capacity - arr.count)))
+    core.memory.set(
+        core.memory.ptr_add(arr.data, sizeof T * arr.count),
+        0,
+        sizeof T * (arr.capacity - arr.count)
+    )
     return true;
 }
 
