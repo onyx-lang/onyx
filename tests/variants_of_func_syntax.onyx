@@ -1,0 +1,27 @@
+use core {*}
+
+main :: () {
+    capture_me := 1234
+
+    f := () { println("() {} works") }
+    g := () -> _ { println("() -> _ {} works") }
+    h := () use (capture_me) { println("() use (...) {} works") }
+    i := () use (capture_me) -> _ { println("() use (...) {} -> _ works") }
+    j := () => { println("() => {} works") }
+    k := (x: i32) => { println("(x: i32) => {} works") }
+    l: (i32) -> void = (x) => { println("(x) => {} works") }
+    m: (i32) -> void = (x) use (capture_me) => { println("(x) use (...) => {} works") }
+    n := () use (capture_me) => { println("() use (...) => {} works") }
+    o := (x: i32) use (capture_me) => { println("(x: i32) use (...) => {} works") }
+
+    f()
+    g()
+    h()
+    i()
+    j()
+    k(0)
+    l(0)
+    m(0)
+    n()
+    o(0)
+}
