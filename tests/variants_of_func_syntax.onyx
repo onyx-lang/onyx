@@ -3,25 +3,44 @@ use core {*}
 main :: () {
     capture_me := 1234
 
-    f := () { println("() {} works") }
-    g := () -> _ { println("() -> _ {} works") }
-    h := () use (capture_me) { println("() use (...) {} works") }
-    i := () use (capture_me) -> _ { println("() use (...) {} -> _ works") }
-    j := () => { println("() => {} works") }
-    k := (x: i32) => { println("(x: i32) => {} works") }
-    l: (i32) -> void = (x) => { println("(x) => {} works") }
-    m: (i32) -> void = (x) use (capture_me) => { println("(x) use (...) => {} works") }
-    n := () use (capture_me) => { println("() use (...) => {} works") }
-    o := (x: i32) use (capture_me) => { println("(x: i32) use (...) => {} works") }
+    f1  := () { println("() {} works") }
+    f2  := () use (capture_me) { println("() use (...) {} works") }
+    f3  := () -> _ { println("() -> _ {} works") }
+    f4  := () use (capture_me) -> _ { println("() use (...) -> _ {} works") }
+    f5  := () => { println("() => {} works") }
+    f6  := () use (capture_me) => { println("() use (...) => {} works") }
+    f7  : (i32) -> void = (x) => { println("(x) => {} works") }
+    f8  : (i32) -> void = (x) use (capture_me) => { println("(x) use (...) => {} works") }
+    f9  := (x: i32) => { println("(x: i32) => {} works") }
+    f10 := (x: i32) use (capture_me) => { println("(x: i32) use (...) => {} works") }
 
-    f()
-    g()
-    h()
-    i()
-    j()
-    k(0)
-    l(0)
-    m(0)
-    n()
-    o(0)
+    call_func :: #match {
+        (f: () -> void) {
+            f()
+            if f.closure {
+                printf("closure size: {}\n", *cast(&u32) f.closure)
+            }
+            print("\n")
+        }
+
+        (f: (i32) -> void) {
+            f(0)
+            if f.closure {
+                printf("closure size: {}\n", *cast(&u32) f.closure)
+            }
+            print("\n")
+        }
+    }
+
+
+    call_func(f1)
+    call_func(f2)
+    call_func(f3)
+    call_func(f4)
+    call_func(f5)
+    call_func(f6)
+    call_func(f7)
+    call_func(f8)
+    call_func(f9)
+    call_func(f10)
 }
