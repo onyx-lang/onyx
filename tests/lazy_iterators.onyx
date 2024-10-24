@@ -32,7 +32,7 @@ main :: (args: [] cstr) {
                     count_iterator(1.0f, 20.0f)
                     |> iter.map(x => x * 2)
                     |> iter.filter(lower_bound, (x, l) => x > ~~l)
-                    |> iter.map((x, [addition]) => x + ~~addition)
+                    |> iter.map((x) use (addition) => x + ~~addition)
                     |> iter.take(5);
 
         for v in quick_iterator {

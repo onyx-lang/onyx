@@ -1,0 +1,19 @@
+use core {*}
+
+main :: () {
+    message := "A test message"
+    arr     := Array.make(i32.[ 1, 2, 3, 6 ])
+
+    i := Iterator.from(arr)
+        // |> .map((x: i32) use (message) => Pair.make(x, message))
+        |> .filter((x: i32) use (message) -> _ {
+            // printf("{}\n", message)
+            printf("{}\n", message.length)
+            return message.data[x] == ' '
+        })
+
+    for i {
+        printf("{}\n", it)
+    }
+}
+
