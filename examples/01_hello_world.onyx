@@ -14,7 +14,7 @@ package main
 // option to disable loading the standard library, if that is needed. For the sake
 // of completeness, the following line manually includes the standard library, but
 // this is not necessary.
-#load "core/module"
+
 
 
 // To use packages, use the 'use' keyword. The 'core' package houses all of the

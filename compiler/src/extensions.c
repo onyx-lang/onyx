@@ -191,10 +191,9 @@ TypeMatch compiler_extension_start(const char *name, const char *containing_file
     if (*out_extension_id == 0) {
         char* parent_folder = bh_path_get_parent(containing_filename, global_scratch_allocator);
 
-        // CLEANUP: Should the include folders be different than the other include files list?
         char *path = bh_strdup(
                 global_scratch_allocator,
-                bh_lookup_file((char *) name, parent_folder, ".wasm", 0, context.options->included_folders, 0)
+                bh_lookup_file((char *) name, parent_folder, NULL, NULL, NULL)
         );
 
         if (!bh_file_exists(path)) {

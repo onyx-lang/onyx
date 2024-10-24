@@ -1,5 +1,5 @@
-#load "core/module"
-#load "core/intrinsics/atomics"
+
+#load "core:intrinsics/atomics"
 
 use core {*}
 use core.intrinsics.atomics {*}
