@@ -3043,20 +3043,24 @@ EMIT_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
         source_expr = (AstTyped *) ((AstFieldAccess *) source_expr)->expr;
     }
 
-    if (source_expr->kind == Ast_Kind_Subscript
-        && source_expr->type->kind != Type_Kind_Pointer && source_expr->type->kind != Type_Kind_MultiPointer) {
+    b32 is_pointer = source_expr->type->kind == Type_Kind_Pointer || source_expr->type->kind == Type_Kind_MultiPointer;
+
+    if (source_expr->kind == Ast_Kind_Subscript && !is_pointer) {
         u64 o2 = 0;
         emit_subscript_location(mod, &code, (AstSubscript *) source_expr, &o2);
         offset += o2;
 
-    } else if ((source_expr->kind == Ast_Kind_Local || source_expr->kind == Ast_Kind_Param)
-        && source_expr->type->kind != Type_Kind_Pointer && source_expr->type->kind != Type_Kind_MultiPointer) {
+    } else if ((source_expr->kind == Ast_Kind_Local || source_expr->kind == Ast_Kind_Param) && !is_pointer) {
         u64 o2 = 0;
         emit_local_location(mod, &code, (AstLocal *) source_expr, &o2);
         offset += o2;
 
-    } else if (source_expr->kind == Ast_Kind_Memres
-        && source_expr->type->kind != Type_Kind_Pointer && source_expr->type->kind != Type_Kind_MultiPointer) {
+    } else if (source_expr->kind == Ast_Kind_Capture_Local && !is_pointer) {
+        u64 o2 = 0;
+        emit_capture_local_location(mod, &code, (AstCaptureLocal *) source_expr, &o2);
+        offset += o2;
+
+    } else if (source_expr->kind == Ast_Kind_Memres && !is_pointer) {
         emit_memory_reservation_location(mod, &code, (AstMemRes *) source_expr);
 
     } else {
