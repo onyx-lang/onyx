@@ -3448,11 +3448,19 @@ static b32 parse_possible_quick_function_definition_no_consume(OnyxParser* parse
 
     if (parser->curr->type != '(') return 0;
 
-    OnyxToken* matching_paren = find_matching_paren(parser->curr);
-    if (matching_paren == NULL) return 0;
+    i32 offset = 1;
+    while (peek_token(offset)->type != ')') {
+        if (peek_token(offset)->type != Token_Type_Symbol) return 0;
+        offset += 1;
+
+        if (peek_token(offset)->type == ')') break;
+
+        if (peek_token(offset)->type != ',') return 0;
+        offset += 1;
+    }
 
     // :LinearTokenDependent
-    OnyxToken* token_after_paren = matching_paren + 1;
+    OnyxToken* token_after_paren = peek_token(offset + 1);
     if (token_after_paren->type == Token_Type_Fat_Right_Arrow)
         return 1;
 
