@@ -3402,22 +3402,22 @@ static b32 parse_possible_function_definition_no_consume(OnyxParser* parser) {
     }
 
     int offset = 1;
-    while (1) {
-        if (peek_token(offset)->type == Token_Type_Keyword_Use) offset += 1;
-        if (peek_token(offset)->type == '$') offset += 1;
-        if (peek_token(offset)->type == Token_Type_Symbol) {
+
+keep_going:
+    if (peek_token(offset)->type == Token_Type_Keyword_Use) offset += 1;
+    if (peek_token(offset)->type == '$') offset += 1;
+    if (peek_token(offset)->type == Token_Type_Symbol) {
+        offset += 1;
+        if (peek_token(offset)->type == ',') {
             offset += 1;
-            if (peek_token(offset)->type == ',') {
-                offset += 1;
-                continue;
+            goto keep_going;
 
-            } else if (peek_token(offset)->type == ':') {
-                return 1;
-            }
+        } else if (peek_token(offset)->type == ':') {
+            return 1;
         }
-
-        return 0;
     }
+
+    return 0;
 }
 
 static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret) {
