@@ -35,6 +35,7 @@ static b32 onyx_type_is_stored_in_memory(Type *type) {
     if (type_struct_is_just_one_basic_value(type)) return 0;
 
     return type->kind == Type_Kind_Struct
+        || type->kind == Type_Kind_Array
         || type->kind == Type_Kind_DynArray
         || type->kind == Type_Kind_Union;
 }
@@ -519,7 +520,6 @@ EMIT_FUNC(compound_store,                  Type* type, u64 offset, b32 location_
 EMIT_FUNC(struct_store,                    Type* type, u32 offset);
 EMIT_FUNC(struct_literal,                  AstStructLiteral* sl);
 EMIT_FUNC(struct_as_separate_values,       Type *type, u32 offset);
-EMIT_FUNC(array_store,                     Type* type, u32 offset);
 EMIT_FUNC(array_literal,                   AstArrayLiteral* al);
 EMIT_FUNC(range_literal,                   AstRangeLiteral* range);
 EMIT_FUNC_NO_ARGS(load_slice);
@@ -1006,7 +1006,7 @@ EMIT_FUNC(assignment_of_array, AstTyped* left, AstTyped* right) {
         u64 offset = 0;
         emit_location_return_offset(mod, &code, left, &offset);
         emit_expression(mod, &code, right);
-        emit_array_store(mod, &code, rtype, offset);
+        emit_struct_store(mod, &code, rtype, offset);
     }
 
     *pcode = code;
@@ -1046,11 +1046,6 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
 
     if (onyx_type_is_stored_in_memory(type)) {
         emit_struct_store(mod, pcode, type, offset);
-        return;
-    }
-
-    if (type->kind == Type_Kind_Array) {
-        emit_array_store(mod, pcode, type, offset);
         return;
     }
 
@@ -3342,36 +3337,6 @@ EMIT_FUNC(struct_as_separate_values, Type *type, u32 offset) {
     }
 
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-    *pcode = code;
-    return;
-}
-
-EMIT_FUNC(array_store, Type* type, u32 offset) {
-    assert(type->kind == Type_Kind_Array);
-    bh_arr(WasmInstruction) code = *pcode;
-
-    Type* elem_type = type;
-    u32 elem_count = 1;
-    while (elem_type->kind == Type_Kind_Array) {
-        elem_count *= elem_type->Array.count;
-        elem_type = elem_type->Array.elem;
-    }
-    u32 elem_size = type_size_of(elem_type);
-
-    u64 rptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-    WIL(NULL, WI_LOCAL_SET, rptr_local);
-
-    if (offset != 0) {
-        WIL(NULL, WI_PTR_CONST, offset);
-        WI(NULL, WI_PTR_ADD);
-    }
-
-    WIL(NULL, WI_LOCAL_GET, rptr_local);
-    WIL(NULL, WI_I32_CONST, elem_count * elem_size);
-    emit_wasm_copy(mod, &code, NULL);
-
-    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-    
     *pcode = code;
     return;
 }
