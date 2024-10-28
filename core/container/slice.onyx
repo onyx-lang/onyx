@@ -598,17 +598,15 @@ Slice.count_where :: macro (arr: [] $T, predicate_body: Code) -> u32 {
 
 /// Creates an iterator of a sliding window over the elements of the slice, with width `width`.
 Slice.windows :: (arr: [] $T, width: i32) -> Iterator([] T) {
-    use core {iter}
-
-    return iter.generator(
+    return Iterator.generator(
         &.{ arr=arr, width=width, pos=0 },
         ctx => {
             if ctx.pos + ctx.width < ctx.arr.count {
                 defer ctx.pos += 1;
-                return ctx.arr.data[ctx.pos .. ctx.pos+ctx.width], true;
+                return Optional.make(ctx.arr.data[ctx.pos .. ctx.pos+ctx.width])
             }
 
-            return .{}, false;
+            return .None
         }
     );
 }
@@ -616,19 +614,19 @@ Slice.windows :: (arr: [] $T, width: i32) -> Iterator([] T) {
 /// Creates an iterator of chunks over the elements of the slice.
 /// Each chunk has size `width`, with the last chunk having size `arr.count % width`.
 Slice.chunks :: (arr: [] $T, width: i32) -> Iterator([] T) {
-    use core {iter}
-
-    return iter.generator(
+    return Iterator.generator(
         &.{ arr=arr, width=width, pos=0 },
         ctx => {
+            use core {math}
+
             if ctx.pos < ctx.arr.count {
                 defer ctx.pos += ctx.width;
 
-                end := core.math.min(ctx.pos+ctx.width, ctx.arr.count);
-                return ctx.arr.data[ctx.pos .. end], true;
+                end := math.min(ctx.pos+ctx.width, ctx.arr.count);
+                return Optional.make(ctx.arr.data[ctx.pos .. end])
             }
 
-            return .{}, false;
+            return .None
         }
     );
 }
