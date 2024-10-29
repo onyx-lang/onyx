@@ -601,7 +601,7 @@ Slice.windows :: (arr: [] $T, width: i32) -> Iterator([] T) {
     return Iterator.generator(
         &.{ arr=arr, width=width, pos=0 },
         ctx => {
-            if ctx.pos + ctx.width < ctx.arr.count {
+            if ctx.pos + ctx.width <= ctx.arr.count {
                 defer ctx.pos += 1;
                 return Optional.make(ctx.arr.data[ctx.pos .. ctx.pos+ctx.width])
             }
