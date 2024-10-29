@@ -31,8 +31,11 @@ Additions:
 Removals:
 
 Changes:
+- Capture/closure syntax is now `(params) use (captures) ...`.
+    - `(x: i32) use (variable) -> str { ... }`
+    - `(x) use (variable) => { ... }`
 - `&&` and `||` now short-circuit.
-- `[N] T` are now passed by value.
+- Fixed-sized arrays (`[N] T`) are now passed by value.
 - The size of tag field for unions is now dependent on the number of variants.
 - Parsing structs no longer sometimes needs `#type`.
 - Renamed `core.alloc.memdebug` to `core.alloc.memwatch`.
