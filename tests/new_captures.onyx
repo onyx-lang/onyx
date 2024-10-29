@@ -1,0 +1,27 @@
+use core {*}
+
+main :: () {
+    message := "A test message"
+    arr     := .[ 1, 2, 3, 6 ]
+
+    do_something :: (arr: [] $T, f: (T) -> void) {
+        for arr {
+            f(it)
+        }
+    }
+
+    do_something(arr, (elem: i32) use (message) {
+        printf("{}: {}\n", message, elem)
+    })
+
+    i := Iterator.from(arr)
+        |> .map((x: i32) use (message) => Pair.make(x, message))
+        |> .filter((x) use (message) => {
+            return message[x.first] == ' '
+        })
+
+    for i {
+        printf("{}\n", it)
+    }
+}
+

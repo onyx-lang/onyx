@@ -43,11 +43,11 @@ main :: (args) => {
     children_of :: (edges: &$T, name: str) -> Iterator(str) {
         return iter.concat(
             iter.as_iter(edges)
-            ->filter((x, [name]) => x.a == name)
+            ->filter((x) use (name) => x.a == name)
             ->map(x => x.b),
 
             iter.as_iter(edges)
-            ->filter((x, [name]) => x.b == name)
+            ->filter((x) use (name) => x.b == name)
             ->map(x => x.a)
         );
     }
