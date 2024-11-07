@@ -4246,7 +4246,6 @@ EMIT_FUNC(return, AstReturn* ret) {
             b32 need_to_copy_to_separate_buffer_to_avoid_corrupted_from_deferred_calls = 0;
             u64 return_value_buffer;
             if (onyx_type_is_stored_in_memory(ret->expr->type)
-                && !is_lval((AstNode *) ret->expr)
                 && bh_arr_length(mod->deferred_stmts) > 0) {
                 need_to_copy_to_separate_buffer_to_avoid_corrupted_from_deferred_calls = 1;
 

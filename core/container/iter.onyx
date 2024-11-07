@@ -38,6 +38,8 @@ Iterator.group_by :: group_by;
 Iterator.find :: find;
 Iterator.fold :: fold;
 Iterator.fold1 :: fold1;
+Iterator.scan :: scan
+Iterator.scan1 :: scan1
 Iterator.count :: count;
 Iterator.some :: some;
 Iterator.every :: every;
@@ -769,6 +771,71 @@ fold1 :: (it: Iterator($T), combine: (T, T) -> T) -> ? T {
     }
 
     return result;
+}
+
+
+
+///
+scan :: #match #local {}
+
+#overload
+scan :: macro (it: $T/Iterable, init: $R, combine: $S) =>
+    #this_package.scan(#this_package.as_iter(it), init, combine)
+
+#overload
+scan :: (it: Iterator($T), initial_value: $R, combine: (T, R) -> R) -> Iterator(R) {
+    return generator(
+        &.{ value = initial_value, combine = combine, iterator = it }
+
+        (ctx: &$C) -> ? R {
+            switch next(ctx.iterator) {
+                case .None do return .None
+                case .Some as yielded {
+                    ctx.value = ctx.combine(yielded, ctx.value)
+                    return ctx.value
+                }
+            }
+        }
+
+        (ctx: &$C) {
+            close(ctx.iterator)
+        }
+    )
+}
+
+
+///
+scan1 :: #match #local {}
+
+#overload
+scan1 :: macro (it: $T/Iterable, combine: $S) =>
+    #this_package.scan1(#this_package.as_iter(it), combine)
+
+#overload
+scan1 :: (it: Iterator($T), combine: (T, T) -> T) -> Iterator(T) {
+    return generator(
+        &.{ value = next(it), combine = combine, iterator = it }
+
+        (ctx: &$C) -> ? T {
+            if !ctx.value do return .None
+
+            defer {
+                ctx.value = switch next(ctx.iterator) {
+                    case .Some as yielded => do -> ? T {
+                        return ctx.combine(yielded, ctx.value!)
+                    }
+
+                    case .None => (? T).{ None = .{} }
+                }
+            }
+
+            return ctx.value
+        }
+
+        (ctx: &$C) {
+            close(ctx.iterator)
+        }
+    )
 }
 
 
