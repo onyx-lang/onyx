@@ -426,6 +426,58 @@ Slice.fold1 :: macro (arr: [] $T, body: Code) -> ? T {
     return acc;
 }
 
+
+Slice.scan :: #match #local {}
+
+#overload
+Slice.scan :: (arr: [] $T, init: $R, f: (T, R) -> R) -> [] R {
+    results := builtin.make([] R, arr.length)
+    acc := init
+    for it, index in arr {
+        acc = f(it, acc)
+        results[index] = acc
+    }
+    return results
+}
+
+#overload
+Slice.scan :: macro (arr: [] $T, init: $R, body: Code) -> [] R {
+    results := builtin.make([] R, arr.length)
+    acc := init
+    for it, index in arr {
+        acc = #unquote body(it, acc)
+        results[index] = acc
+    }
+    return results
+}
+
+
+Slice.scan1 :: #match #local {}
+
+#overload
+Slice.scan1 :: (arr: [] $T, f: (T, T) -> T) -> [] T {
+    if !arr do return .{}
+
+    results := builtin.make([] T, arr.length)
+    results[0] = arr[0]
+    for it, index in arr[1 .. arr.length] {
+        results[index+1] = f(it, results[index])
+    }
+    return results
+}
+
+#overload
+Slice.scan1 :: macro (arr: [] $T, body: Code) -> [] T {
+    if !arr do return .{}
+
+    results := builtin.make([] T, arr.length)
+    results[0] = arr[0]
+    for it, index in arr[1 .. arr.length] {
+        results[index+1] = #unquote body(it, results[index])
+    }
+    return results
+}
+
 /// Returns `true` if *every* element in the slice meets the predicate test.
 Slice.every :: #match #local {}
 
