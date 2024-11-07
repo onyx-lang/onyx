@@ -1604,7 +1604,8 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
     }
 
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
-    emit_enter_structured_block(mod, &code, SBT_Continue_Loop, for_node->token);
+    emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
+    emit_enter_structured_block(mod, &code, SBT_Continue_Block, for_node->token);
 
         // CLEANUP: Calling a function is way too f-ing complicated. FACTOR IT!!
         u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
@@ -1639,7 +1640,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
 
     emit_load_instruction(mod, &code, &basic_types[Basic_Kind_U8], 0);
     WI(for_node->token, WI_I32_EQZ);
-    WID(for_node->token, WI_COND_JUMP, 0x01);
+    WID(for_node->token, WI_COND_JUMP, 0x02);
 
     u64 offset = 0;
     emit_local_location(mod, &code, var, &offset);
@@ -1649,15 +1650,17 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
 
     emit_block(mod, &code, for_node->stmt, 0);
 
+    emit_leave_structured_block(mod, &code); // CONTINUE_BLOCK
+
     emit_for__epilogue(mod, &code, for_node, iter_local, index_local);
 
     WID(for_node->token, WI_JUMP, 0x00);
 
-    emit_leave_structured_block(mod, &code);
-    emit_leave_structured_block(mod, &code);
+    emit_leave_structured_block(mod, &code); // BASIC_LOOP
+    emit_leave_structured_block(mod, &code); // BREAKABLE_BLOCK
 
     emit_deferred_stmts(mod, &code);
-    emit_leave_structured_block(mod, &code);
+    emit_leave_structured_block(mod, &code); // BASIC_BLOCK
 
     bh_arr_pop(mod->for_remove_info);
 
