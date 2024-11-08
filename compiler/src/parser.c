@@ -4087,6 +4087,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
     if (parse_possible_tag(parser)) return;
 
+  retry_because_inserted_semicolon:
     switch ((u16) parser->curr->type) {
         case Token_Type_Keyword_Use: {
             OnyxToken *use_token = expect_token(parser, Token_Type_Keyword_Use);
@@ -4112,6 +4113,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 binding = parse_top_level_binding(parser, symbol);
                 bh_arr_pop(parser->current_symbol_stack);
 
+                // bh_printf("%b: %d\n", symbol->text, symbol->length, private_kind);
                 if (binding != NULL) binding->flags |= private_kind;
 
                 goto submit_binding_to_entities;
@@ -4425,8 +4427,11 @@ static void parse_top_level_statement(OnyxParser* parser) {
         }
 
         case ';':
-        case Token_Type_Inserted_Semicolon:
             break;
+
+        case Token_Type_Inserted_Semicolon:
+            consume_token(parser);
+            goto retry_because_inserted_semicolon;
 
         default:
             onyx_report_error(parser->curr->pos, Error_Critical, "Unexpected token in top-level statement, '%s'", token_name(parser->curr));
