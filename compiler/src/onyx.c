@@ -242,7 +242,7 @@ static void parse_source_file(bh_file_contents* file_contents) {
     onyx_parser_free(&parser);
 }
 
-static b32 process_source_file(char* filename, OnyxFilePos error_pos) {
+static b32 process_source_file(char* filename) {
     bh_arr_each(bh_file_contents, fc, context.loaded_files) {
         // Duplicates are detected here and since these filenames will be the full path,
         // string comparing them should be all that is necessary.
@@ -252,13 +252,6 @@ static b32 process_source_file(char* filename, OnyxFilePos error_pos) {
     bh_file file;
     bh_file_error err = bh_file_open(&file, filename);
     if (err != BH_FILE_ERROR_NONE) {
-        if (context.cycle_detected) {
-            if (error_pos.filename == NULL) {
-                onyx_report_error(error_pos, Error_Command_Line_Arg, "Failed to open file %s", filename);
-            } else {
-                onyx_report_error(error_pos, Error_Critical, "Failed to open file %s", filename);
-            }
-        }
         return 0;
     }
 
@@ -284,26 +277,33 @@ static b32 process_load_entity(Entity* ent) {
         if (parent_file == NULL) parent_file = ".";
 
         char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
+        char* filename      = bh_search_for_mapped_file(
+            include->name,
+            parent_folder,
+            ".onyx",
+            context.options->mapped_folders
+        );
 
-        char* filename = bh_lookup_file(include->name, parent_folder, ".onyx", NULL, context.options->mapped_folders);
-        char* formatted_name = bh_strdup(global_heap_allocator, filename);
+        if (filename == NULL) {
+            OnyxFilePos error_pos = include->token->pos;
+            if (error_pos.filename == NULL) {
+                onyx_report_error(error_pos, Error_Command_Line_Arg, "Failed to open file '%s'", include->name);
+            } else {
+                onyx_report_error(error_pos, Error_Critical, "Failed to open file '%s'", include->name);
+            }
+            return 0;
+        }
 
-        return process_source_file(formatted_name, include->token->pos);
+        return process_source_file(filename);
 
     } else if (include->kind == Ast_Kind_Load_All) {
         const char* parent_file = include->token->pos.filename;
         if (parent_file == NULL) parent_file = ".";
 
         char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
-        char folder[512];
-        if (bh_str_starts_with(include->name, "./")) {
-            bh_snprintf(folder, 511, "%s/%s", parent_folder, include->name + 2);
-        } else {
-            bh_snprintf(folder, 511, "%s", include->name);
-        }
 
+        char* folder = bh_search_for_mapped_file(include->name, parent_folder, "", context.options->mapped_folders);
         bh_path_convert_separators(folder);
-        // This does not take into account #load_path'd folders...
 
         bh_arr(char *) folders_to_process = NULL;
         bh_arr_new(global_heap_allocator, folders_to_process, 2);

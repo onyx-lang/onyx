@@ -479,6 +479,8 @@ typedef struct bh_mapped_folder {
 // 'mapped_folders' is bh_arr(bh_mapped_folder).
 char* bh_lookup_file(char* filename, char* relative_to, char *suffix, const char ** included_folders, bh_mapped_folder* mapped_folders);
 
+char* bh_search_for_mapped_file(char* filename, char* relative_to, char *suffix, bh_mapped_folder* mapped_folders);
+
 #define bh_file_read_contents(allocator_, x) _Generic((x), \
     bh_file*: bh_file_read_contents_bh_file, \
     const char*: bh_file_read_contents_direct, \
@@ -2109,6 +2111,79 @@ char* bh_lookup_file(
     }
 
     return bh_path_get_full_name(fn, BH_INTERNAL_ALLOCATOR);
+}
+
+char* bh_search_for_mapped_file(char* filename, char* relative_to, char *suffix, bh_mapped_folder* mapped_folders) {
+    assert(relative_to != NULL);
+
+    static char path[512];
+    fori (i, 0, 512) path[i] = 0;
+
+    static char fn[256];
+    fori (i, 0, 256) fn[i] = 0;
+
+    if (suffix && !bh_str_ends_with(filename, suffix)) {
+        bh_snprintf(fn, 256, "%s%s", filename, suffix);
+    } else {
+        bh_snprintf(fn, 256, "%s", filename);
+    }
+
+    b32 contains_colon = 0;
+
+    fori (i, 0, 256) {
+        if (fn[i] == ':') contains_colon = 1;
+        if (fn[i] == '/') fn[i] = DIR_SEPARATOR;
+    }
+
+    // Absolute path
+    if (fn[0] == '/') {
+        if (bh_file_exists(fn)) {
+            return bh_path_get_full_name(fn, BH_INTERNAL_ALLOCATOR);
+        }
+    }
+
+    // mapped_folder:filename
+    if (contains_colon) {
+        char *source_name = fn;
+        char *subpath     = NULL;
+
+        fori (i, 0, 256) {
+            if (fn[i] == ':') {
+                fn[i] = '\0';
+                subpath = &fn[i + 1];
+                break;
+            }
+        }
+
+        assert(subpath);
+
+        bh_arr_each(bh_mapped_folder, folder, mapped_folders) {
+            if (!strncmp(source_name, folder->name, 256)) {
+                if (folder->folder[strlen(folder->folder) - 1] != DIR_SEPARATOR)
+                    bh_snprintf(path, 512, "%s%c%s", folder->folder, DIR_SEPARATOR, subpath);
+                else
+                    bh_snprintf(path, 512, "%s%s", folder->folder, subpath);
+
+                if (bh_file_exists(path))
+                    return bh_path_get_full_name(path, BH_INTERNAL_ALLOCATOR);
+
+                break;
+            }
+        }
+
+        return NULL;
+    }
+
+    // Fallback to relative to, "relative_to"
+    if (relative_to[strlen(relative_to) - 1] != DIR_SEPARATOR)
+        bh_snprintf(path, 512, "%s%c%s", relative_to, DIR_SEPARATOR, fn);
+    else
+        bh_snprintf(path, 512, "%s%s", relative_to, fn);
+
+    if (bh_file_exists(path))
+        return bh_path_get_full_name(path, BH_INTERNAL_ALLOCATOR);
+
+    return NULL;
 }
 
 //
