@@ -17,8 +17,6 @@ DirectoryEntry :: struct {
     identifier  : u32;
     name_length : u32;
     name_data   : [256] u8;
-
-
 }
 
 /// Returns the `str` of the name, pointing into the `DirectoryEntry` for data.
