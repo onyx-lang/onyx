@@ -3,7 +3,5 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ0ZXN0IiwiaWF0IjoxMjM0NTY3ODkwfQ.
     "alg" => "HS256"
     "typ" => "JWT"
 }
-{
-    "iss" => Value[0x131670]
-    "iat" => Value[0x131800]
-}
+Key: iss
+Key: iat

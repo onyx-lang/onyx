@@ -20,7 +20,7 @@ isPrime :: (n: i64) => {
 prime_generator :: () => iter.counter(2, i64)->filter(isPrime)
 
 iter.range :: (min: $T, max: T) =>
-    iter.counter(min, T)->take_while((x, [max]) => x < max)
+    iter.counter(min, T)->take_while((x) use (max) => x < max)
 
 main :: () {
     for prime in prime_generator() |> iter.take(10) {

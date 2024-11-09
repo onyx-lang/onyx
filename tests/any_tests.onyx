@@ -16,7 +16,7 @@ print_anys :: (args: ..any) {
 delayed_print_anys :: (args: ..any) -> (#type () -> void) {
     copied_args := misc.any_deep_copy(cast([] any) args);
 
-    return ([copied_args]) {
+    return () use (copied_args) {
         for arg in copied_args {
             printf("DELAYED: {a}\n", arg);
         }

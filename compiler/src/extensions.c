@@ -88,7 +88,7 @@ static b32 extension_spawn(CompilerExtension *ext, const char *path) {
             dup2(comp_to_ext[0], 0);
             dup2(ext_to_comp[1], 1);
 
-            execlp("onyx", "onyx", "run", path, NULL);
+            execlp("onyx", "onyx", "run", "--no-compiler-extensions", "--no-file-contents", path, NULL);
             exit(1);
             break;
 
@@ -191,10 +191,9 @@ TypeMatch compiler_extension_start(const char *name, const char *containing_file
     if (*out_extension_id == 0) {
         char* parent_folder = bh_path_get_parent(containing_filename, global_scratch_allocator);
 
-        // CLEANUP: Should the include folders be different than the other include files list?
         char *path = bh_strdup(
                 global_scratch_allocator,
-                bh_lookup_file((char *) name, parent_folder, ".wasm", 0, context.options->included_folders, 0)
+                bh_lookup_file((char *) name, parent_folder, NULL, NULL, NULL)
         );
 
         if (!bh_file_exists(path)) {

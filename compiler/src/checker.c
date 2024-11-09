@@ -1783,6 +1783,50 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         return Check_Success;
     }
 
+    if (sl->type->kind == Type_Kind_Array) {
+        if (bh_arr_length(sl->args.named_values) > 0) {
+            ERROR_(sl->token->pos, "Cannot specify named values when creating a '%s'.", type_get_name(sl->type));
+        }
+
+        i32 value_count = bh_arr_length(sl->args.values);
+        if (value_count == 0) {
+            AstZeroValue *zv = make_zero_value(context.ast_alloc, sl->token, sl->type);
+            bh_arr_push(sl->values_to_initialize, ((ValueWithOffset) { (AstTyped *) zv, 0 }));
+
+            sl->flags |= Ast_Flag_Has_Been_Checked;
+            return Check_Success;
+        }
+
+        if (value_count != sl->type->Array.count) {
+            ERROR_(sl->token->pos,
+                    "Expected exactly '%d' values when constructing a '%s', but got '%d' value%s.",
+                    sl->type->Array.count,
+                    type_get_name(sl->type),
+                    value_count,
+                    bh_num_plural(value_count));
+        }
+
+        Type* type_to_match = sl->type->Array.elem;
+        i32 offset = 0;
+        bh_arr_each(AstTyped *, pval, sl->args.values) {
+            CHECK(expression, pval);
+
+            TYPE_CHECK(pval, type_to_match) {
+                ERROR_(sl->token->pos,
+                       "Mismatched type. Expected something of type '%s', got '%s'.",
+                       type_get_name(type_to_match),
+                       type_get_name((*pval)->type));
+            }
+
+            bh_arr_push(sl->values_to_initialize, ((ValueWithOffset) { *pval, offset }));
+            offset += type_size_of(type_to_match);
+            bh_align(offset, type_alignment_of(type_to_match));
+        }
+
+        return Check_Success;
+    }
+
+
     if (!type_is_structlike_strict(sl->type)) {
         if ((sl->flags & Ast_Flag_Has_Been_Checked) != 0) return Check_Success;
 
@@ -3545,6 +3589,13 @@ CheckStatus check_function_header(AstFunction* func) {
         if (local->type->kind != Type_Kind_Array && type_size_of(local->type) == 0) {
             ERROR(local->token->pos, "Function parameters cannot have 'void' as their type.");
         }
+
+        if (local->type->kind == Type_Kind_Array && type_size_of(local->type) >= 128) {
+            onyx_report_warning(local->token->pos, "Since arrays are passed by value, this array parameter would copy %d bytes per function call. Unless this is what you want, you should make this parameter a slice instead ('[] %s').",
+                type_size_of(local->type),
+                type_get_name(local->type->Array.elem)
+            );
+        }
     }
 
     if (func->return_type != NULL) CHECK(type, &func->return_type);
@@ -3913,7 +3964,7 @@ CheckStatus check_process_directive(AstNode* directive) {
 
             char *path = bh_strdup(
                 global_scratch_allocator,
-                bh_lookup_file(temp_str, parent_folder, "", 0, NULL, 0)
+                bh_lookup_file(temp_str, parent_folder, NULL, NULL, NULL)
             );
 
             if (!bh_file_exists(path)) {

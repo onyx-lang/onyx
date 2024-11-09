@@ -1,6 +1,6 @@
 // This is a needlessly complicated test of some of the newer features with structs.
 
-#load "core/module"
+
 
 use core {*}
 

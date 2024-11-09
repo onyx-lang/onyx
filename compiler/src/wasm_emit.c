@@ -35,6 +35,7 @@ static b32 onyx_type_is_stored_in_memory(Type *type) {
     if (type_struct_is_just_one_basic_value(type)) return 0;
 
     return type->kind == Type_Kind_Struct
+        || type->kind == Type_Kind_Array
         || type->kind == Type_Kind_DynArray
         || type->kind == Type_Kind_Union;
 }
@@ -519,7 +520,6 @@ EMIT_FUNC(compound_store,                  Type* type, u64 offset, b32 location_
 EMIT_FUNC(struct_store,                    Type* type, u32 offset);
 EMIT_FUNC(struct_literal,                  AstStructLiteral* sl);
 EMIT_FUNC(struct_as_separate_values,       Type *type, u32 offset);
-EMIT_FUNC(array_store,                     Type* type, u32 offset);
 EMIT_FUNC(array_literal,                   AstArrayLiteral* al);
 EMIT_FUNC(range_literal,                   AstRangeLiteral* range);
 EMIT_FUNC_NO_ARGS(load_slice);
@@ -575,6 +575,15 @@ static void ensure_node_has_been_submitted_for_emission(AstNode *node) {
   submit_normal_node:
     entity_change_state(&context.entities, node->entity, Entity_State_Code_Gen);
     entity_heap_insert_existing(&context.entities, node->entity);
+}
+
+static void ensure_type_has_been_submitted_for_emission(OnyxWasmModule *mod, Type *type) {
+    assert(type);
+
+    if (type->flags & Ast_Flag_Has_Been_Scheduled_For_Emit) return;
+    type->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
+
+    bh_arr_push(mod->types_enqueued_for_info, type->id);
 }
 
 #include "wasm_intrinsics.h"
@@ -997,7 +1006,7 @@ EMIT_FUNC(assignment_of_array, AstTyped* left, AstTyped* right) {
         u64 offset = 0;
         emit_location_return_offset(mod, &code, left, &offset);
         emit_expression(mod, &code, right);
-        emit_array_store(mod, &code, rtype, offset);
+        emit_struct_store(mod, &code, rtype, offset);
     }
 
     *pcode = code;
@@ -1037,11 +1046,6 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
 
     if (onyx_type_is_stored_in_memory(type)) {
         emit_struct_store(mod, pcode, type, offset);
-        return;
-    }
-
-    if (type->kind == Type_Kind_Array) {
-        emit_array_store(mod, pcode, type, offset);
         return;
     }
 
@@ -1600,7 +1604,8 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
     }
 
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
-    emit_enter_structured_block(mod, &code, SBT_Continue_Loop, for_node->token);
+    emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
+    emit_enter_structured_block(mod, &code, SBT_Continue_Block, for_node->token);
 
         // CLEANUP: Calling a function is way too f-ing complicated. FACTOR IT!!
         u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
@@ -1635,7 +1640,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
 
     emit_load_instruction(mod, &code, &basic_types[Basic_Kind_U8], 0);
     WI(for_node->token, WI_I32_EQZ);
-    WID(for_node->token, WI_COND_JUMP, 0x01);
+    WID(for_node->token, WI_COND_JUMP, 0x02);
 
     u64 offset = 0;
     emit_local_location(mod, &code, var, &offset);
@@ -1645,15 +1650,17 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
 
     emit_block(mod, &code, for_node->stmt, 0);
 
+    emit_leave_structured_block(mod, &code); // CONTINUE_BLOCK
+
     emit_for__epilogue(mod, &code, for_node, iter_local, index_local);
 
     WID(for_node->token, WI_JUMP, 0x00);
 
-    emit_leave_structured_block(mod, &code);
-    emit_leave_structured_block(mod, &code);
+    emit_leave_structured_block(mod, &code); // BASIC_LOOP
+    emit_leave_structured_block(mod, &code); // BREAKABLE_BLOCK
 
     emit_deferred_stmts(mod, &code);
-    emit_leave_structured_block(mod, &code);
+    emit_leave_structured_block(mod, &code); // BASIC_BLOCK
 
     bh_arr_pop(mod->for_remove_info);
 
@@ -2299,6 +2306,7 @@ EMIT_FUNC(call, AstCall* call) {
             if (arg->va_kind == VA_Kind_Any) {
                 vararg_any_offsets[vararg_count - 1] = reserve_size;
                 vararg_any_types[vararg_count - 1] = arg->value->type->id;
+                ensure_type_has_been_submitted_for_emission(mod, arg->value->type);
             }
 
             reserve_size += type_size_of(arg->value->type);
@@ -2317,6 +2325,7 @@ EMIT_FUNC(call, AstCall* call) {
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WID(call_token, WI_I32_CONST, arg->value->type->id);
                 emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Type_Index], reserve_size + 4);
+                ensure_type_has_been_submitted_for_emission(mod, arg->value->type);
 
                 local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
@@ -3032,20 +3041,24 @@ EMIT_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
         source_expr = (AstTyped *) ((AstFieldAccess *) source_expr)->expr;
     }
 
-    if (source_expr->kind == Ast_Kind_Subscript
-        && source_expr->type->kind != Type_Kind_Pointer && source_expr->type->kind != Type_Kind_MultiPointer) {
+    b32 is_pointer = source_expr->type->kind == Type_Kind_Pointer || source_expr->type->kind == Type_Kind_MultiPointer;
+
+    if (source_expr->kind == Ast_Kind_Subscript && !is_pointer) {
         u64 o2 = 0;
         emit_subscript_location(mod, &code, (AstSubscript *) source_expr, &o2);
         offset += o2;
 
-    } else if ((source_expr->kind == Ast_Kind_Local || source_expr->kind == Ast_Kind_Param)
-        && source_expr->type->kind != Type_Kind_Pointer && source_expr->type->kind != Type_Kind_MultiPointer) {
+    } else if ((source_expr->kind == Ast_Kind_Local || source_expr->kind == Ast_Kind_Param) && !is_pointer) {
         u64 o2 = 0;
         emit_local_location(mod, &code, (AstLocal *) source_expr, &o2);
         offset += o2;
 
-    } else if (source_expr->kind == Ast_Kind_Memres
-        && source_expr->type->kind != Type_Kind_Pointer && source_expr->type->kind != Type_Kind_MultiPointer) {
+    } else if (source_expr->kind == Ast_Kind_Capture_Local && !is_pointer) {
+        u64 o2 = 0;
+        emit_capture_local_location(mod, &code, (AstCaptureLocal *) source_expr, &o2);
+        offset += o2;
+
+    } else if (source_expr->kind == Ast_Kind_Memres && !is_pointer) {
         emit_memory_reservation_location(mod, &code, (AstMemRes *) source_expr);
 
     } else {
@@ -3331,62 +3344,6 @@ EMIT_FUNC(struct_as_separate_values, Type *type, u32 offset) {
     return;
 }
 
-EMIT_FUNC(array_store, Type* type, u32 offset) {
-    assert(type->kind == Type_Kind_Array);
-    bh_arr(WasmInstruction) code = *pcode;
-
-    Type* elem_type = type;
-    u32 elem_count = 1;
-    while (elem_type->kind == Type_Kind_Array) {
-        elem_count *= elem_type->Array.count;
-        elem_type = elem_type->Array.elem;
-    }
-    u32 elem_size = type_size_of(elem_type);
-
-    u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-    u64 rptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-    WIL(NULL, WI_LOCAL_SET, rptr_local);
-    WIL(NULL, WI_LOCAL_SET, lptr_local);
-
-    WIL(NULL, WI_LOCAL_GET, rptr_local);
-    WID(NULL, WI_I32_CONST, 0);
-    WI(NULL, WI_I32_NE);
-    emit_enter_structured_block(mod, &code, SBT_Basic_If, NULL);
-
-    {
-        WIL(NULL, WI_LOCAL_GET, lptr_local);
-        if (offset != 0) {
-            WIL(NULL, WI_PTR_CONST, offset);
-            WI(NULL, WI_PTR_ADD);
-        }
-
-        WIL(NULL, WI_LOCAL_GET, rptr_local);
-        WIL(NULL, WI_I32_CONST, elem_count * elem_size);
-        emit_wasm_copy(mod, &code, NULL);
-    }
-
-    WI(NULL, WI_ELSE);
-
-    { // If the source ptr is null (0), then just copy in 0 bytes.
-        WIL(NULL, WI_LOCAL_GET, lptr_local);
-        if (offset != 0) {
-            WIL(NULL, WI_PTR_CONST, offset);
-            WI(NULL, WI_PTR_ADD);
-        }
-
-        WIL(NULL, WI_I32_CONST, 0);
-        WIL(NULL, WI_I32_CONST, elem_count * elem_size);
-        emit_wasm_fill(mod, &code, NULL);
-    }
-
-    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-
-    emit_leave_structured_block(mod, &code);
-    *pcode = code;
-    return;
-}
-
 EMIT_FUNC(array_literal, AstArrayLiteral* al) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -3586,12 +3543,17 @@ EMIT_FUNC(expression, AstTyped* expr) {
         if (type->flags & Ast_Flag_Expr_Ignored) return;
 
         if (type->type_id != 0) {
-            WID(NULL, WI_I32_CONST, ((AstType *) expr)->type_id);
-        } else {
-            Type* t = type_build_from_ast(context.ast_alloc, type);
-            WID(NULL, WI_I32_CONST, t->id);
-        }
+            WID(NULL, WI_I32_CONST, type->type_id);
 
+            Type *t = type_lookup_by_id(type->type_id);
+            assert(t);
+            ensure_type_has_been_submitted_for_emission(mod, t);
+        } else {
+            Type *t = type_build_from_ast(context.ast_alloc, type);
+            WID(NULL, WI_I32_CONST, t->id);
+
+            ensure_type_has_been_submitted_for_emission(mod, t);
+        }
 
         *pcode = code;
         return;
@@ -4287,7 +4249,6 @@ EMIT_FUNC(return, AstReturn* ret) {
             b32 need_to_copy_to_separate_buffer_to_avoid_corrupted_from_deferred_calls = 0;
             u64 return_value_buffer;
             if (onyx_type_is_stored_in_memory(ret->expr->type)
-                && !is_lval((AstNode *) ret->expr)
                 && bh_arr_length(mod->deferred_stmts) > 0) {
                 need_to_copy_to_separate_buffer_to_avoid_corrupted_from_deferred_calls = 1;
 
@@ -4518,17 +4479,16 @@ EMIT_FUNC(stack_trace_blob, AstFunction *fd)  {
     assert(!(mod->stack_trace_idx & LOCAL_IS_WASM));
 
     u64 file_name_id, func_name_id;
-    u8* node_data = bh_alloc_array(context.ast_alloc, u8, 6 * POINTER_SIZE);
+    u8* node_data = bh_alloc_array(context.ast_alloc, u8, 5 * POINTER_SIZE);
 
     char *name = get_function_name(fd);
     emit_raw_string(mod, (char *) fd->token->pos.filename, strlen(fd->token->pos.filename), &file_name_id, (u64 *) &node_data[4]);
     emit_raw_string(mod, name, strlen(name), &func_name_id, (u64 *) &node_data[16]);
     *((u32 *) &node_data[8]) = fd->token->pos.line;
-    *((u32 *) &node_data[20]) = fd->type->id;
 
     WasmDatum stack_node_data = ((WasmDatum) {
         .data = node_data,
-        .length = 6 * POINTER_SIZE,
+        .length = 5 * POINTER_SIZE,
         .alignment = POINTER_SIZE,
     });
     u32 stack_node_data_id = emit_data_entry(mod, &stack_node_data);
@@ -4939,6 +4899,7 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
     if (node_is_type((AstNode *) node)) {
         Type* constructed_type = type_build_from_ast(context.ast_alloc, (AstType *) node);
         CE(i32, 0) = constructed_type->id;
+        ensure_type_has_been_submitted_for_emission(ctx->module, constructed_type);
         return 1;
     }
 
@@ -5139,7 +5100,7 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
 
     if (context.options->generate_type_info) {
         if (type_table_node != NULL && (AstMemRes *) type_table_node == memres) {
-            u64 table_location = build_type_table(mod);
+            u64 table_location = prepare_type_table(mod);
             memres->data_id = table_location;
             return;
         }
@@ -5209,7 +5170,7 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
         token_toggle_end(filename_token);
         char* temp_fn     = bh_alloc_array(global_scratch_allocator, char, filename_token->length);
         i32   temp_fn_len = string_process_escape_seqs(temp_fn, filename_token->text, filename_token->length);
-        char* filename    = bh_lookup_file(temp_fn, parent_folder, "", 0, NULL, 0);
+        char* filename    = bh_lookup_file(temp_fn, parent_folder, NULL, NULL, NULL);
         fc->filename      = bh_strdup(global_heap_allocator, filename);
         token_toggle_end(filename_token);
     }
@@ -5270,7 +5231,7 @@ static void emit_js_node(OnyxWasmModule* mod, AstJsNode *js) {
         i32   temp_fn_len = string_process_escape_seqs(temp_fn, filename_token->text, filename_token->length);
         char* filename    = bh_strdup(
             global_heap_allocator,
-            bh_lookup_file(temp_fn, parent_folder, "", 0, NULL, 0)
+            bh_lookup_file(temp_fn, parent_folder, NULL, NULL, NULL)
         );
 
         token_toggle_end(filename_token);
@@ -5298,6 +5259,18 @@ static void emit_js_node(OnyxWasmModule* mod, AstJsNode *js) {
 
     bh_arr_push(mod->js_partials, partial);
 }
+
+static void flush_enqueued_types_for_info(OnyxWasmModule *mod) {
+    if (mod->global_type_table_data_id < 0) return;
+
+    while (bh_arr_length(mod->types_enqueued_for_info) > 0) {
+        i32 type_id = bh_arr_pop(mod->types_enqueued_for_info);
+
+        Type *type = type_lookup_by_id(type_id);
+        build_type_info_for_type(mod, type);
+    }
+}
+
 
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     OnyxWasmModule module = {
@@ -5355,7 +5328,11 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .foreign_blocks = NULL,
         .next_foreign_block_idx = 0,
 
-        .procedures_with_tags = NULL
+        .procedures_with_tags = NULL,
+
+        .types_enqueued_for_info = NULL,
+        .global_type_table_data_id = -1,
+        .type_info_size = 0,
     };
 
     bh_arena* eid = bh_alloc(global_heap_allocator, sizeof(bh_arena));
@@ -5397,6 +5374,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(global_heap_allocator, module.all_procedures, 4);
     bh_arr_new(global_heap_allocator, module.data_patches, 4);
     bh_arr_new(global_heap_allocator, module.code_patches, 4);
+
+    bh_arr_new(global_heap_allocator, module.types_enqueued_for_info, 32);
 
 #ifdef ENABLE_DEBUG_INFO
     module.debug_context = bh_alloc_item(context.ast_alloc, DebugContext);
@@ -5511,7 +5490,16 @@ void emit_entity(Entity* ent) {
     }
 
     ent->state = Entity_State_Finalized;
+
+    // HACK
+    flush_enqueued_types_for_info(module);
 }
+
+
+static i32 cmp_type_info(const void *a, const void *b) {
+    return *(i32 *) a - *(i32 *) b;
+}
+
 
 void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options) {
     // If the pointer size is going to change,
@@ -5712,9 +5700,7 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
                 assert(datum_to_alter->id == patch->index);
 
                 u32 *addr = (u32 *) bh_pointer_add(datum_to_alter->data, patch->location);
-                if (*addr != 0) {
-                    *addr += (u32) datum->offset_ + patch->offset;
-                }
+                *addr += (u32) datum->offset_ + patch->offset;
 
                 break;
             }
@@ -5722,6 +5708,9 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
             default: assert(0);
         }
     }
+
+    WasmDatum *type_table_data = &module->data[module->global_type_table_data_id - 1];
+    qsort(type_table_data->data, *module->type_info_entry_count, 2 * POINTER_SIZE, cmp_type_info);
 
     assert(module->stack_top_ptr && module->heap_start_ptr);
 

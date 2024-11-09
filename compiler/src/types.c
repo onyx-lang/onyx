@@ -649,10 +649,12 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             Type* concrete = NULL;
             if (pc_type->callee->kind == Ast_Kind_Poly_Struct_Type) {
                 AstPolyStructType* ps_type = (AstPolyStructType *) pc_type->callee;
+                type_build_from_ast_inner(alloc, (AstType *) ps_type, 0);
                 concrete = polymorphic_struct_lookup(ps_type, slns, pc_type->token->pos, (pc_type->flags & Ast_Flag_Header_Check_No_Error) == 0);
             }
             else if (pc_type->callee->kind == Ast_Kind_Poly_Union_Type) {
                 AstPolyUnionType* pu_type = (AstPolyUnionType *) pc_type->callee;
+                type_build_from_ast_inner(alloc, (AstType *) pu_type, 0);
                 concrete = polymorphic_union_lookup(pu_type, slns, pc_type->token->pos, (pc_type->flags & Ast_Flag_Header_Check_No_Error) == 0);
             }
 
@@ -1834,6 +1836,7 @@ b32 type_is_structlike_strict(Type* type) {
 b32 type_should_be_passed_like_a_struct(Type *type) {
     if (type == NULL) return 0;
     if (type->kind == Type_Kind_Struct)   return 1;
+    if (type->kind == Type_Kind_Array)    return 1;
     if (type->kind == Type_Kind_Slice)    return 1;
     if (type->kind == Type_Kind_DynArray) return 1;
     if (type->kind == Type_Kind_Function) return 1;
@@ -1876,6 +1879,7 @@ b32 type_is_sl_constructable(Type* type) {
         case Type_Kind_DynArray: return 1;
         case Type_Kind_Function: return 1;
         case Type_Kind_Union:    return 1;
+        case Type_Kind_Array:    return 1;
         default: return 0;
     }
 }

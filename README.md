@@ -37,18 +37,20 @@ use core {*}
 Person :: struct { age: i32; name: str }
 
 main :: () {
-    // Generate a list of random people
-    people := iter.comp(0 .. 30, [](Person.{
-        random.between(1, 10)
-        random.string(10, alpha_numeric=true)
-    }))
+    // Generate a list of 30 random people
+    people := Iterator.from(0 .. 30)
+        |> Iterator.map(_ => Person.{
+            random.between(1, 10)
+            random.string(10, alpha_numeric=true)
+        })
+        |> Iterator.collect()
 
     // Sort them by age
-    people->sort((a, b) => a.age - b.age)
+    Slice.sort(people, (a, b) => a.age - b.age)
 
     // Group them by age
-    group_iter := iter.as_iter(people)
-        |> iter.group_by((a, b) => a.age == b.age)
+    group_iter := Iterator.from(people)
+        |> Iterator.group_by((a, b) => a.age == b.age)
 
     // Print the groups of people
     for group in group_iter {
