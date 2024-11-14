@@ -158,7 +158,7 @@ compile_c_file :: (
         }
 
         if flags != "" {
-            for string.split(flags, ' ') do args << it
+            for str.split(flags, ' ') do args << it
         }
 
         args << "-o"
@@ -233,14 +233,14 @@ compile_c_file :: (
         io.write(writer, type_encoding(method_info.return_type))
         io.write(writer, ")) {\n")
 
-        method_name := slice.find_opt(ff.tags, [it](it.type == customize))
+        method_name := Slice.find_opt(ff.tags, [it](it.type == customize))
                        ->transform(x => misc.any_as(x, customize).symbol_name) ?? ff.name
 
         if name_map != null_proc {
             method_name = name_map(method_name)
         }
 
-        switch slice.find_opt(ff.tags, [it](it.type == func_body))
+        switch Slice.find_opt(ff.tags, [it](it.type == func_body))
                    ->transform(x => misc.any_as(x, func_body).body)
         {
             case .Some as body {
@@ -251,7 +251,7 @@ compile_c_file :: (
             case .None {
                 print_body(
                     writer, method_name, method_info, cast_map,
-                    slice.some(ff.tags, [it](
+                    Slice.some(ff.tags, [it](
                         misc.any_as(*it, type_expr)
                         |> Optional.from_ptr()
                         |> Optional.transform(x => x == last_arg_is_return_value)
@@ -305,7 +305,7 @@ compile_c_file :: (
                     map_to_dyncall(p, &call_signature)
                 }
 
-                string.append(&call_signature, ")")
+                dyn_str.append(&call_signature, ")")
                 map_to_dyncall(func_info.return_type, &call_signature)
 
                 io.write_format(&callw, "(void *) runtime->wasm_func_from_idx(runtime->wasm_func_table, P({}, i32), \"{}\")", param_num, cast(str) call_signature)
@@ -319,21 +319,21 @@ compile_c_file :: (
                     }
 
                     switch p {
-                        case void do string.append(call_signature, "v")
-                        case bool do string.append(call_signature, "B")
-                        case i8   do string.append(call_signature, "c")
-                        case u8   do string.append(call_signature, "C")
-                        case i16  do string.append(call_signature, "s")
-                        case u16  do string.append(call_signature, "S")
-                        case i32  do string.append(call_signature, "i")
-                        case u32  do string.append(call_signature, "I")
-                        case i64  do string.append(call_signature, "l")
-                        case u64  do string.append(call_signature, "L")
-                        case f32  do string.append(call_signature, "f")
-                        case f64  do string.append(call_signature, "d")
+                        case void do dyn_str.append(call_signature, "v")
+                        case bool do dyn_str.append(call_signature, "B")
+                        case i8   do dyn_str.append(call_signature, "c")
+                        case u8   do dyn_str.append(call_signature, "C")
+                        case i16  do dyn_str.append(call_signature, "s")
+                        case u16  do dyn_str.append(call_signature, "S")
+                        case i32  do dyn_str.append(call_signature, "i")
+                        case u32  do dyn_str.append(call_signature, "I")
+                        case i64  do dyn_str.append(call_signature, "l")
+                        case u64  do dyn_str.append(call_signature, "L")
+                        case f32  do dyn_str.append(call_signature, "f")
+                        case f64  do dyn_str.append(call_signature, "d")
                         case _ {
                             if is_pointer(p) {
-                                string.append(call_signature, "p")
+                                dyn_str.append(call_signature, "p")
                             } else {
                                 panic(tprintf("Unsupported type in function pointer: {}", p))
                             }
@@ -343,7 +343,7 @@ compile_c_file :: (
 
             } elseif it_info.kind == .Struct && it_info->as_struct().constructed_from != cptr {
                 param_type := it
-                name := slice.find_opt(cast_map, [x](x.type == param_type))
+                name := Slice.find_opt(cast_map, [x](x.type == param_type))
                     ->transform(x => x.name)
                     ->expect(tprintf("Structures used as parameter arguments MUST have a definition in the 'cast_map' in '{}'.", method_name))
 
@@ -371,13 +371,13 @@ compile_c_file :: (
         call_str := io.buffer_stream_to_str(call)
         call_str  = call_str[0 .. call_str.count - 2]
         if last_arg_is_return_value {
-            return_type := slice.get(method_info.parameter_types, -1)
+            return_type := Slice.get(method_info.parameter_types, -1)
             if return_type->info().kind != .Pointer {
                 panic(tprintf("last_arg_is_return_value requires last parameter to be a pointer. ({} in {})", method_info.parameter_types, method_name))
             }
 
             return_type = return_type->info()->as_pointer().to
-            type_name := slice.find_opt(cast_map, [x](x.type == return_type))
+            type_name := Slice.find_opt(cast_map, [x](x.type == return_type))
                 ->transform(x => x.name)
                 ->expect(tprintf("Types used as last argument return values MUST have a definition in the 'cast_map' in '{}'.", method_name))
 
