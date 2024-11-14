@@ -4,10 +4,10 @@
 void onyx_errors_init(bh_arr(bh_file_contents)* files) {
     context.errors.file_contents = files;
 
-    bh_arena_init(&context.errors.msg_arena, global_heap_allocator, 16 * 1024);
+    bh_arena_init(&context.errors.msg_arena, context.gp_alloc, 16 * 1024);
     context.errors.msg_alloc = bh_arena_allocator(&context.errors.msg_arena);
 
-    bh_arr_new(global_heap_allocator, context.errors.errors, 4);
+    bh_arr_new(context.gp_alloc, context.errors.errors, 4);
 }
 
 static void print_error_text(char *text) {
@@ -33,7 +33,7 @@ static void print_error_text(char *text) {
 }
 
 static void print_underline(OnyxError *err, i32 len, i32 first_non_whitespace, b32 colored_printing) {
-    char* pointer_str = bh_alloc_array(global_scratch_allocator, char, len);
+    char* pointer_str = bh_alloc_array(context.scratch_alloc, char, len);
     memset(pointer_str, ' ', len);
     
     int c = err->pos.column - 1;

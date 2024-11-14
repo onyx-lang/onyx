@@ -1130,7 +1130,7 @@ i32 output_custom_section(OnyxWasmModule *module, bh_buffer *buff, WasmCustomSec
 }
 
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer) {
-    bh_buffer_init(buffer, global_heap_allocator, 128);
+    bh_buffer_init(buffer, context.gp_alloc, 128);
     bh_buffer_append(buffer, WASM_MAGIC_STRING, 4);
     bh_buffer_append(buffer, WASM_VERSION, 4);
 
@@ -1186,7 +1186,7 @@ static i32 compare_js_partials(const void *p1, const void *p2) {
 }
 
 void onyx_wasm_module_write_js_partials_to_buffer(OnyxWasmModule* module, bh_buffer* buffer) {
-    bh_buffer_init(buffer, global_heap_allocator, 128);
+    bh_buffer_init(buffer, context.gp_alloc, 128);
 
     qsort(module->js_partials,
         bh_arr_length(module->js_partials),

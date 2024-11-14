@@ -66,7 +66,7 @@ static void type_register(Type* type) {
 }
 
 void types_init() {
-#define MAKE_MAP(x) (memset(&x, 0, sizeof(x)), bh_imap_init(&x, global_heap_allocator, 255))
+#define MAKE_MAP(x) (memset(&x, 0, sizeof(x)), bh_imap_init(&x, context.gp_alloc, 255))
     MAKE_MAP(type_map);
     MAKE_MAP(type_pointer_map);
     MAKE_MAP(type_multi_pointer_map);
@@ -435,7 +435,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
 
                 s_type->Struct.memarr = NULL;
                 sh_new_arena(s_type->Struct.members);
-                bh_arr_new(global_heap_allocator, s_type->Struct.memarr, s_type->Struct.mem_count);
+                bh_arr_new(context.gp_alloc, s_type->Struct.memarr, s_type->Struct.mem_count);
 
             } else {
                 s_type = s_node->pending_type;
@@ -626,7 +626,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             }
 
             bh_arr(AstPolySolution) slns = NULL;
-            bh_arr_new(global_heap_allocator, slns, bh_arr_length(pc_type->params));
+            bh_arr_new(context.gp_alloc, slns, bh_arr_length(pc_type->params));
             bh_arr_each(AstNode *, given, pc_type->params) {
                 if (node_is_type(*given)) {
                     Type* param_type = type_build_from_ast_inner(alloc, (AstType *) *given, 1);
@@ -690,7 +690,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             bh_align(comp_type->Compound.size, 4);
 
             comp_type->Compound.linear_members = NULL;
-            bh_arr_new(global_heap_allocator, comp_type->Compound.linear_members, comp_type->Compound.count);
+            bh_arr_new(context.gp_alloc, comp_type->Compound.linear_members, comp_type->Compound.count);
             build_linear_types_with_offset(comp_type, &comp_type->Compound.linear_members, 0);
 
             type_register(comp_type);
@@ -750,7 +750,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 u_type->Union.variants = NULL;
                 u_type->Union.variants_ordered = NULL;
                 sh_new_arena(u_type->Union.variants);
-                bh_arr_new(global_heap_allocator, u_type->Union.variants_ordered, bh_arr_length(union_->variants));
+                bh_arr_new(context.gp_alloc, u_type->Union.variants_ordered, bh_arr_length(union_->variants));
             } else {
                 u_type = union_->pending_type;
             }
@@ -947,7 +947,7 @@ Type* type_build_compound_type(bh_allocator alloc, AstCompound* compound) {
     bh_align(comp_type->Compound.size, 4);
 
     comp_type->Compound.linear_members = NULL;
-    bh_arr_new(global_heap_allocator, comp_type->Compound.linear_members, comp_type->Compound.count);
+    bh_arr_new(context.gp_alloc, comp_type->Compound.linear_members, comp_type->Compound.count);
     build_linear_types_with_offset(comp_type, &comp_type->Compound.linear_members, 0);
 
     type_register(comp_type);
@@ -971,7 +971,7 @@ Type* type_build_implicit_type_of_struct_literal(bh_allocator alloc, AstStructLi
 
     type->Struct.memarr = NULL;
     sh_new_arena(type->Struct.members);
-    bh_arr_new(global_heap_allocator, type->Struct.memarr, type->Struct.mem_count);
+    bh_arr_new(context.gp_alloc, type->Struct.memarr, type->Struct.mem_count);
 
     u32 size = 0;
     u32 offset = 0;
@@ -1277,28 +1277,28 @@ const char* type_get_unique_name(Type* type) {
 
     switch (type->kind) {
         case Type_Kind_Basic: return type->Basic.name;
-        case Type_Kind_Pointer: return bh_aprintf(global_scratch_allocator, "&%s", type_get_unique_name(type->Pointer.elem));
-        case Type_Kind_MultiPointer: return bh_aprintf(global_scratch_allocator, "[&] %s", type_get_unique_name(type->Pointer.elem));
-        case Type_Kind_Array: return bh_aprintf(global_scratch_allocator, "[%d] %s", type->Array.count, type_get_unique_name(type->Array.elem));
+        case Type_Kind_Pointer: return bh_aprintf(context.scratch_alloc, "&%s", type_get_unique_name(type->Pointer.elem));
+        case Type_Kind_MultiPointer: return bh_aprintf(context.scratch_alloc, "[&] %s", type_get_unique_name(type->Pointer.elem));
+        case Type_Kind_Array: return bh_aprintf(context.scratch_alloc, "[%d] %s", type->Array.count, type_get_unique_name(type->Array.elem));
         case Type_Kind_Struct:
             if (type->Struct.name)
-                return bh_aprintf(global_scratch_allocator, "%s@%l", type->Struct.name, type->id);
+                return bh_aprintf(context.scratch_alloc, "%s@%l", type->Struct.name, type->id);
             else
-                return bh_aprintf(global_scratch_allocator, "%s@%l", "<anonymous struct>", type->id);
+                return bh_aprintf(context.scratch_alloc, "%s@%l", "<anonymous struct>", type->id);
         case Type_Kind_Enum:
             if (type->Enum.name)
-                return bh_aprintf(global_scratch_allocator, "%s@%l", type->Enum.name, type->id);
+                return bh_aprintf(context.scratch_alloc, "%s@%l", type->Enum.name, type->id);
             else
-                return bh_aprintf(global_scratch_allocator, "%s@%l", "<anonymous enum>", type->id);
+                return bh_aprintf(context.scratch_alloc, "%s@%l", "<anonymous enum>", type->id);
         case Type_Kind_Union:
             if (type->Union.name)
-                return bh_aprintf(global_scratch_allocator, "%s@%l", type->Union.name, type->id);
+                return bh_aprintf(context.scratch_alloc, "%s@%l", type->Union.name, type->id);
             else
-                return bh_aprintf(global_scratch_allocator, "%s@%l", "<anonymous union>", type->id);
+                return bh_aprintf(context.scratch_alloc, "%s@%l", "<anonymous union>", type->id);
 
-        case Type_Kind_Slice: return bh_aprintf(global_scratch_allocator, "[] %s", type_get_unique_name(type->Slice.elem));
-        case Type_Kind_VarArgs: return bh_aprintf(global_scratch_allocator, "..%s", type_get_unique_name(type->VarArgs.elem));
-        case Type_Kind_DynArray: return bh_aprintf(global_scratch_allocator, "[..] %s", type_get_unique_name(type->DynArray.elem));
+        case Type_Kind_Slice: return bh_aprintf(context.scratch_alloc, "[] %s", type_get_unique_name(type->Slice.elem));
+        case Type_Kind_VarArgs: return bh_aprintf(context.scratch_alloc, "..%s", type_get_unique_name(type->VarArgs.elem));
+        case Type_Kind_DynArray: return bh_aprintf(context.scratch_alloc, "[..] %s", type_get_unique_name(type->DynArray.elem));
 
         case Type_Kind_Function: {
             char buf[1024];
@@ -1318,7 +1318,7 @@ const char* type_get_unique_name(Type* type) {
             strncat(buf, ") -> ", 1023);
             strncat(buf, type_get_unique_name(type->Function.return_type), 1023);
 
-            return bh_aprintf(global_scratch_allocator, "%s", buf);
+            return bh_aprintf(context.scratch_alloc, "%s", buf);
         }
 
         case Type_Kind_Compound: {
@@ -1333,11 +1333,11 @@ const char* type_get_unique_name(Type* type) {
             }
             strncat(buf, ")", 1023);
 
-            return bh_aprintf(global_scratch_allocator, "%s", buf);
+            return bh_aprintf(context.scratch_alloc, "%s", buf);
         }
 
         case Type_Kind_Distinct: {
-            return bh_aprintf(global_scratch_allocator, "%s@%l", type->Distinct.name, type->id);
+            return bh_aprintf(context.scratch_alloc, "%s@%l", type->Distinct.name, type->id);
         }
 
         default: return "unknown (not null)";
@@ -1349,9 +1349,9 @@ const char* type_get_name(Type* type) {
 
     switch (type->kind) {
         case Type_Kind_Basic: return type->Basic.name;
-        case Type_Kind_Pointer: return bh_aprintf(global_scratch_allocator, "&%s", type_get_name(type->Pointer.elem));
-        case Type_Kind_MultiPointer: return bh_aprintf(global_scratch_allocator, "[&] %s", type_get_name(type->Pointer.elem));
-        case Type_Kind_Array: return bh_aprintf(global_scratch_allocator, "[%d] %s", type->Array.count, type_get_name(type->Array.elem));
+        case Type_Kind_Pointer: return bh_aprintf(context.scratch_alloc, "&%s", type_get_name(type->Pointer.elem));
+        case Type_Kind_MultiPointer: return bh_aprintf(context.scratch_alloc, "[&] %s", type_get_name(type->Pointer.elem));
+        case Type_Kind_Array: return bh_aprintf(context.scratch_alloc, "[%d] %s", type->Array.count, type_get_name(type->Array.elem));
 
         case Type_Kind_PolyStruct:
             return type->PolyStruct.name;
@@ -1377,9 +1377,9 @@ const char* type_get_name(Type* type) {
             else
                 return "<anonymous union>";
 
-        case Type_Kind_Slice: return bh_aprintf(global_scratch_allocator, "[] %s", type_get_name(type->Slice.elem));
-        case Type_Kind_VarArgs: return bh_aprintf(global_scratch_allocator, "..%s", type_get_name(type->VarArgs.elem));
-        case Type_Kind_DynArray: return bh_aprintf(global_scratch_allocator, "[..] %s", type_get_name(type->DynArray.elem));
+        case Type_Kind_Slice: return bh_aprintf(context.scratch_alloc, "[] %s", type_get_name(type->Slice.elem));
+        case Type_Kind_VarArgs: return bh_aprintf(context.scratch_alloc, "..%s", type_get_name(type->VarArgs.elem));
+        case Type_Kind_DynArray: return bh_aprintf(context.scratch_alloc, "[..] %s", type_get_name(type->DynArray.elem));
 
         case Type_Kind_Function: {
             char buf[512];
@@ -1395,7 +1395,7 @@ const char* type_get_name(Type* type) {
             strncat(buf, ") -> ", 511);
             strncat(buf, type_get_name(type->Function.return_type), 511);
 
-            return bh_aprintf(global_scratch_allocator, "%s", buf);
+            return bh_aprintf(context.scratch_alloc, "%s", buf);
         }
 
         case Type_Kind_Compound: {
@@ -1410,11 +1410,11 @@ const char* type_get_name(Type* type) {
             }
             strncat(buf, ")", 511);
 
-            return bh_aprintf(global_scratch_allocator, "%s", buf);
+            return bh_aprintf(context.scratch_alloc, "%s", buf);
         }
 
         case Type_Kind_Distinct: {
-            return bh_aprintf(global_scratch_allocator, "%s", type->Distinct.name);
+            return bh_aprintf(context.scratch_alloc, "%s", type->Distinct.name);
         }
 
         default: return "unknown";

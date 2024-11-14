@@ -2036,6 +2036,12 @@ struct Context {
     bh_arena                  ast_arena;
     bh_allocator token_alloc, ast_alloc;
 
+    bh_scratch scratch;
+    bh_allocator scratch_alloc;
+
+    bh_managed_heap heap;
+    bh_allocator gp_alloc; // General purpose allocator 
+
     bh_arr(bh_file_contents) loaded_files;
 
     // NOTE: This is defined in onyxwasm.h

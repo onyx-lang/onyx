@@ -594,16 +594,16 @@ void initialize_builtins(bh_allocator a) {
     }
 
     init_procedures = NULL;
-    bh_arr_new(global_heap_allocator, init_procedures, 4);
+    bh_arr_new(context.gp_alloc, init_procedures, 4);
 
     fori (i, 0, Binary_Op_Count) {
         operator_overloads[i] = NULL;
-        bh_arr_new(global_heap_allocator, operator_overloads[i], 4);
+        bh_arr_new(context.gp_alloc, operator_overloads[i], 4);
     }
 
     fori (i, 0, Unary_Op_Count) {
         unary_operator_overloads[i] = NULL;
-        bh_arr_new(global_heap_allocator, unary_operator_overloads[i], 4);
+        bh_arr_new(context.gp_alloc, unary_operator_overloads[i], 4);
     }
 
     IntrinsicMap* intrinsic = &builtin_intrinsics[0];

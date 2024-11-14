@@ -71,7 +71,7 @@ static void eh_shift_down(EntityHeap* entities, i32 index) {
 }
 
 void entity_heap_init(EntityHeap* entities) {
-    bh_arena_init(&entities->entity_arena, global_heap_allocator, 32 * 1024);
+    bh_arena_init(&entities->entity_arena, context.gp_alloc, 32 * 1024);
 }
 
 // Allocates the entity in the entity heap. Don't quite feel this is necessary...
@@ -91,8 +91,8 @@ void entity_heap_insert_existing(EntityHeap* entities, Entity* e) {
     if (e->entered_in_queue) return;
 
     if (entities->entities == NULL) {
-        bh_arr_new(global_heap_allocator, entities->entities, 128);
-        bh_arr_new(global_heap_allocator, entities->quick_unsorted_entities, 128);
+        bh_arr_new(context.gp_alloc, entities->entities, 128);
+        bh_arr_new(context.gp_alloc, entities->quick_unsorted_entities, 128);
     }
 
     if (e->state <= Entity_State_Introduce_Symbols) {
@@ -173,7 +173,7 @@ void entity_change_state(EntityHeap* entities, Entity *ent, EntityState new_stat
 }
 
 void entity_heap_add_job(EntityHeap *entities, TypeMatch (*func)(void *), void *job_data) {
-    EntityJobData *job = bh_alloc(global_heap_allocator, sizeof(*job));
+    EntityJobData *job = bh_alloc(context.gp_alloc, sizeof(*job));
     job->func = func;
     job->job_data = job_data;
     

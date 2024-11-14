@@ -1274,7 +1274,7 @@ char *get_expression_string_value(AstTyped* node, b32 *out_is_valid) {
         // CLEANUP: Maybe this should allocate on the heap?
         // I guess if in all cases the memory is allocated on the heap,
         // then the caller can free the memory.
-        char* strdata = bh_alloc_array(global_heap_allocator, char, str->token->length + 1);
+        char* strdata = bh_alloc_array(context.gp_alloc, char, str->token->length + 1);
         i32 length  = string_process_escape_seqs(strdata, str->token->text, str->token->length);
         strdata[length] = '\0';
 
@@ -1466,11 +1466,11 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
 
     if (fromidx != -1 && toidx != -1) {
         if (!cast_legality[fromidx][toidx]) {
-            *err_msg = bh_aprintf(global_heap_allocator, "Cast from '%s' to '%s' is not allowed.", type_get_name(from_), type_get_name(to_));
+            *err_msg = bh_aprintf(context.gp_alloc, "Cast from '%s' to '%s' is not allowed.", type_get_name(from_), type_get_name(to_));
             return 0;
         }
     } else {
-        *err_msg = bh_aprintf(global_heap_allocator, "Cast from '%s' to '%s' is not allowed.", type_get_name(from_), type_get_name(to_));
+        *err_msg = bh_aprintf(context.gp_alloc, "Cast from '%s' to '%s' is not allowed.", type_get_name(from_), type_get_name(to_));
         return 0;
     }
 
@@ -1524,7 +1524,7 @@ TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
     }
 
     if (context.caches.implicit_cast_to_bool_cache.entries == NULL) {
-        bh_imap_init(&context.caches.implicit_cast_to_bool_cache, global_heap_allocator, 8);
+        bh_imap_init(&context.caches.implicit_cast_to_bool_cache, context.gp_alloc, 8);
     }
 
     if (!bh_imap_has(&context.caches.implicit_cast_to_bool_cache, (u64) node)) {
@@ -1561,7 +1561,7 @@ char* get_function_name(AstFunction* func) {
     if (func->name != NULL) return func->name;
 
     if (func->exported_name != NULL) {
-        return bh_aprintf(global_scratch_allocator,
+        return bh_aprintf(context.scratch_alloc,
                 "%b",
                 func->exported_name->text,
                 func->exported_name->length);
@@ -1576,7 +1576,7 @@ char* get_function_assembly_name(AstFunction* func) {
     if (func->name != NULL) return func->assembly_name;
 
     if (func->exported_name != NULL) {
-        return bh_aprintf(global_scratch_allocator,
+        return bh_aprintf(context.scratch_alloc,
                 "%b",
                 func->exported_name->text,
                 func->exported_name->length);
@@ -1590,7 +1590,7 @@ char* generate_name_within_scope(Scope *scope, OnyxToken* symbol) {
     memset(name, 0, 512);
 
     bh_arr(char *) names=NULL;
-    bh_arr_new(global_heap_allocator, names, 4);
+    bh_arr_new(context.gp_alloc, names, 4);
 
     while (scope != NULL) {
         bh_arr_push(names, scope->name);
@@ -1605,7 +1605,7 @@ char* generate_name_within_scope(Scope *scope, OnyxToken* symbol) {
     }
     bh_arr_free(names);
 
-    return bh_aprintf(global_heap_allocator, "%s%b", name, symbol->text, symbol->length);
+    return bh_aprintf(context.gp_alloc, "%s%b", name, symbol->text, symbol->length);
 }
 
 AstNode* strip_aliases(AstNode* n) {
@@ -1771,8 +1771,8 @@ AstStructLiteral* make_union_variant_of_void(bh_allocator a, Type* union_type, O
 
 
 void arguments_initialize(Arguments* args) {
-    if (args->values == NULL)       bh_arr_new(global_heap_allocator, args->values, 2);
-    if (args->named_values == NULL) bh_arr_new(global_heap_allocator, args->named_values, 2);
+    if (args->values == NULL)       bh_arr_new(context.gp_alloc, args->values, 2);
+    if (args->named_values == NULL) bh_arr_new(context.gp_alloc, args->named_values, 2);
 
     // CLEANUP: I'm not sure if I need to initialize these to NULL values, but it doesn't hurt.
     fori (i, 0, 2) {
@@ -1808,7 +1808,7 @@ void arguments_copy(Arguments* dest, Arguments* src) {
 void arguments_clone(Arguments* dest, Arguments* src) {
     dest->used_argument_count = -1;
     dest->named_values = src->named_values;
-    dest->values = bh_arr_copy(global_heap_allocator, src->values);
+    dest->values = bh_arr_copy(context.gp_alloc, src->values);
 }
 
 void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src) {
@@ -1816,8 +1816,8 @@ void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src) {
     dest->values = NULL;
     dest->named_values = NULL;
 
-    bh_arr_new(global_heap_allocator, dest->named_values, bh_arr_length(src->named_values));
-    bh_arr_new(global_heap_allocator, dest->values, bh_arr_length(src->values));
+    bh_arr_new(context.gp_alloc, dest->named_values, bh_arr_length(src->named_values));
+    bh_arr_new(context.gp_alloc, dest->values, bh_arr_length(src->values));
 
     bh_arr_each(AstNamedValue *, nv, src->named_values)
         bh_arr_push(dest->named_values, (AstNamedValue *) ast_clone(a, *nv));
@@ -1894,7 +1894,7 @@ AstPolyCallType* convert_call_to_polycall(AstCall* call) {
     pct->token  = call->token;
     pct->next   = call->next;
     pct->callee = (AstType *) call->callee;
-    pct->params = (AstNode **) bh_arr_copy(global_heap_allocator, call->args.values);
+    pct->params = (AstNode **) bh_arr_copy(context.gp_alloc, call->args.values);
     bh_arr_each(AstNode *, pp, pct->params) {
         if ((*pp)->kind == Ast_Kind_Argument) {
             *pp = (AstNode *) (*(AstArgument **) pp)->value;

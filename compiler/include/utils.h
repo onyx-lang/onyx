@@ -2,12 +2,6 @@
 
 #include "astnodes.h"
 
-extern bh_scratch global_scratch;
-extern bh_allocator global_scratch_allocator;
-
-extern bh_managed_heap global_heap;
-extern bh_allocator global_heap_allocator;
-
 const char* onyx_ast_node_kind_string(AstKind kind);
 
 Package* package_lookup(char* package_name);

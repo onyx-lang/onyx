@@ -11,10 +11,6 @@
     #endif
 #endif
 
-#ifndef BH_INTERNAL_ALLOCATOR
-    #define BH_INTERNAL_ALLOCATOR (bh_heap_allocator())
-#endif
-
 
 // NOTE: For lseek64
 #define _LARGEFILE64_SOURCE
@@ -477,9 +473,9 @@ typedef struct bh_mapped_folder {
 // This function returns a volatile pointer. Do not store it without copying!
 // `included_folders` is bh_arr(const char *).
 // 'mapped_folders' is bh_arr(bh_mapped_folder).
-char* bh_lookup_file(char* filename, char* relative_to, char *suffix, const char ** included_folders, bh_mapped_folder* mapped_folders);
+char* bh_lookup_file(char* filename, char* relative_to, char *suffix, const char ** included_folders, bh_mapped_folder* mapped_folders, bh_allocator allocator);
 
-char* bh_search_for_mapped_file(char* filename, char* relative_to, char *suffix, bh_mapped_folder* mapped_folders);
+char* bh_search_for_mapped_file(char* filename, char* relative_to, char *suffix, bh_mapped_folder* mapped_folders, bh_allocator allocator);
 
 #define bh_file_read_contents(allocator_, x) _Generic((x), \
     bh_file*: bh_file_read_contents_bh_file, \
@@ -673,7 +669,7 @@ typedef struct bh__arr {
 #define bh_arr(T)                    T*
 #define bh__arrhead(arr)             (((bh__arr *)(arr)) - 1)
 
-#define bh_arr_allocator(arr)        (arr ? bh__arrhead(arr)->allocator : BH_INTERNAL_ALLOCATOR)
+#define bh_arr_allocator(arr)        (arr ? bh__arrhead(arr)->allocator : bh_heap_allocator())
 #define bh_arr_length(arr)           (arr ? bh__arrhead(arr)->length : 0)
 #define bh_arr_capacity(arr)         (arr ? bh__arrhead(arr)->capacity : 0)
 #define bh_arr_size(arr)             (arr ? bh__arrhead(arr)->capacity * sizeof(*(arr)) : 0)
@@ -2036,7 +2032,8 @@ char* bh_lookup_file(
     char* relative_to,
     char *suffix,
     bh_arr(const char *) included_folders,
-    bh_arr(bh_mapped_folder) mapped_folders
+    bh_arr(bh_mapped_folder) mapped_folders,
+    bh_allocator allocator
 ) {
     assert(relative_to != NULL);
 
@@ -2065,7 +2062,7 @@ char* bh_lookup_file(
         else
             bh_snprintf(path, 512, "%s%s", relative_to, fn + 2);
 
-        if (bh_file_exists(path)) return bh_path_get_full_name(path, BH_INTERNAL_ALLOCATOR);
+        if (bh_file_exists(path)) return bh_path_get_full_name(path, allocator);
 
         return path;
     }
@@ -2092,7 +2089,7 @@ char* bh_lookup_file(
                     bh_snprintf(path, 512, "%s%s", folder->folder, subpath);
 
                 if (bh_file_exists(path))
-                    return bh_path_get_full_name(path, BH_INTERNAL_ALLOCATOR);
+                    return bh_path_get_full_name(path, allocator);
 
                 break;
             }
@@ -2106,14 +2103,14 @@ char* bh_lookup_file(
             else
                 bh_snprintf(path, 512, "%s%s", *folder, fn);
 
-            if (bh_file_exists(path)) return bh_path_get_full_name(path, BH_INTERNAL_ALLOCATOR);
+            if (bh_file_exists(path)) return bh_path_get_full_name(path, allocator);
         }
     }
 
-    return bh_path_get_full_name(fn, BH_INTERNAL_ALLOCATOR);
+    return bh_path_get_full_name(fn, allocator);
 }
 
-char* bh_search_for_mapped_file(char* filename, char* relative_to, char *suffix, bh_mapped_folder* mapped_folders) {
+char* bh_search_for_mapped_file(char* filename, char* relative_to, char *suffix, bh_mapped_folder* mapped_folders, bh_allocator allocator) {
     assert(relative_to != NULL);
 
     static char path[512];
@@ -2138,7 +2135,7 @@ char* bh_search_for_mapped_file(char* filename, char* relative_to, char *suffix,
     // Absolute path
     if (fn[0] == '/') {
         if (bh_file_exists(fn)) {
-            return bh_path_get_full_name(fn, BH_INTERNAL_ALLOCATOR);
+            return bh_path_get_full_name(fn, allocator);
         }
     }
 
@@ -2165,7 +2162,7 @@ char* bh_search_for_mapped_file(char* filename, char* relative_to, char *suffix,
                     bh_snprintf(path, 512, "%s%s", folder->folder, subpath);
 
                 if (bh_file_exists(path))
-                    return bh_path_get_full_name(path, BH_INTERNAL_ALLOCATOR);
+                    return bh_path_get_full_name(path, allocator);
 
                 break;
             }
@@ -2181,7 +2178,7 @@ char* bh_search_for_mapped_file(char* filename, char* relative_to, char *suffix,
         bh_snprintf(path, 512, "%s%s", relative_to, fn);
 
     if (bh_file_exists(path))
-        return bh_path_get_full_name(path, BH_INTERNAL_ALLOCATOR);
+        return bh_path_get_full_name(path, allocator);
 
     return NULL;
 }

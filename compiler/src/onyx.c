@@ -1,11 +1,12 @@
 // #define BH_DEBUG
 
-extern struct bh_allocator global_heap_allocator;
-
-#define STBDS_REALLOC(_,p,s) (bh_resize(global_heap_allocator, p, s))
-#define STBDS_FREE(_,p) (bh_free(global_heap_allocator, p))
-
-#define BH_INTERNAL_ALLOCATOR (global_heap_allocator)
+// It would preferable to set the internal allocator used by STBDS to
+// be context.gp_alloc. However, STBDS does not provide a context parameter
+// or any mechanism to retrieve the context dynamically. For now, any
+// tables or datastructures allocated from STBDS need to be manually freed.
+//
+// #define STBDS_REALLOC(_,p,s) (bh_resize(context.gp_alloc, p, s))
+// #define STBDS_FREE(_,p) (bh_free(context.gp_alloc, p))
 
 #define BH_DEFINE
 #define BH_NO_TABLE
@@ -88,6 +89,13 @@ static Entity *runtime_info_stack_trace_entity;
 static void context_init(CompileOptions* opts) {
     memset(&context, 0, sizeof context);
 
+    bh_scratch_init(&context.scratch, bh_heap_allocator(), 256 * 1024); // NOTE: 256 KiB
+    context.scratch_alloc = bh_scratch_allocator(&context.scratch);
+
+    bh_managed_heap_init(&context.heap);
+    context.gp_alloc = bh_managed_heap_allocator(&context.heap);
+    // context.gp_alloc = bh_heap_allocator();
+
     types_init();
     prepare_builtins();
 
@@ -102,7 +110,7 @@ static void context_init(CompileOptions* opts) {
     internal_location.filename = "<compiler internal>";
     internal_location.line     = 1;
     internal_location.column   = 1;
-    context.global_scope = scope_create(global_heap_allocator, NULL, internal_location);
+    context.global_scope = scope_create(context.gp_alloc, NULL, internal_location);
     sh_new_arena(context.packages);
 
     // NOTE: This will be initialized upon the first call to entity_heap_insert.
@@ -111,15 +119,15 @@ static void context_init(CompileOptions* opts) {
 
     onyx_errors_init(&context.loaded_files);
 
-    context.token_alloc = global_heap_allocator;
+    context.token_alloc = context.gp_alloc;
 
     // NOTE: Create the arena where tokens and AST nodes will exist
     // Prevents nodes from being scattered across memory due to fragmentation
-    bh_arena_init(&context.ast_arena, global_heap_allocator, 16 * 1024 * 1024); // 16MB
+    bh_arena_init(&context.ast_arena, context.gp_alloc, 16 * 1024 * 1024); // 16MB
     context.ast_alloc = bh_arena_allocator(&context.ast_arena);
 
-    context.wasm_module = bh_alloc_item(global_heap_allocator, OnyxWasmModule);
-    *context.wasm_module = onyx_wasm_module_create(global_heap_allocator);
+    context.wasm_module = bh_alloc_item(context.gp_alloc, OnyxWasmModule);
+    *context.wasm_module = onyx_wasm_module_create(context.gp_alloc);
 
     entity_heap_init(&context.entities);
 
@@ -201,19 +209,19 @@ static void context_init(CompileOptions* opts) {
     }
 
     if (context.options->generate_symbol_info_file) {
-        context.symbol_info = bh_alloc_item(global_heap_allocator, SymbolInfoTable);
-        bh_imap_init(&context.symbol_info->node_to_id, global_heap_allocator, 512);
-        bh_arr_new(global_heap_allocator, context.symbol_info->symbols, 128);
-        bh_arr_new(global_heap_allocator, context.symbol_info->symbols_resolutions, 128);
+        context.symbol_info = bh_alloc_item(context.gp_alloc, SymbolInfoTable);
+        bh_imap_init(&context.symbol_info->node_to_id, context.gp_alloc, 512);
+        bh_arr_new(context.gp_alloc, context.symbol_info->symbols, 128);
+        bh_arr_new(context.gp_alloc, context.symbol_info->symbols_resolutions, 128);
         sh_new_arena(context.symbol_info->files);
     }
 
     if (context.options->documentation_file) {
-        context.doc_info = bh_alloc_item(global_heap_allocator, OnyxDocInfo);
+        context.doc_info = bh_alloc_item(context.gp_alloc, OnyxDocInfo);
         memset(context.doc_info, 0, sizeof(OnyxDocInfo));
-        bh_arr_new(global_heap_allocator, context.doc_info->procedures, 128);
-        bh_arr_new(global_heap_allocator, context.doc_info->structures, 128);
-        bh_arr_new(global_heap_allocator, context.doc_info->enumerations, 128);
+        bh_arr_new(context.gp_alloc, context.doc_info->procedures, 128);
+        bh_arr_new(context.gp_alloc, context.doc_info->structures, 128);
+        bh_arr_new(context.gp_alloc, context.doc_info->enumerations, 128);
     }
 
     if (context.options->verbose_output > 0) {
@@ -228,6 +236,8 @@ static void context_init(CompileOptions* opts) {
 static void context_free() {
     bh_arena_free(&context.ast_arena);
     bh_arr_free(context.loaded_files);
+    bh_scratch_free(&context.scratch);
+    bh_managed_heap_free(&context.heap);
 }
 
 static void parse_source_file(bh_file_contents* file_contents) {
@@ -276,12 +286,13 @@ static b32 process_load_entity(Entity* ent) {
         const char* parent_file = include->token->pos.filename;
         if (parent_file == NULL) parent_file = ".";
 
-        char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
+        char* parent_folder = bh_path_get_parent(parent_file, context.scratch_alloc);
         char* filename      = bh_search_for_mapped_file(
             include->name,
             parent_folder,
             ".onyx",
-            context.options->mapped_folders
+            context.options->mapped_folders,
+            context.gp_alloc
         );
 
         if (filename == NULL) {
@@ -300,15 +311,21 @@ static b32 process_load_entity(Entity* ent) {
         const char* parent_file = include->token->pos.filename;
         if (parent_file == NULL) parent_file = ".";
 
-        char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
+        char* parent_folder = bh_path_get_parent(parent_file, context.scratch_alloc);
 
-        char* folder = bh_search_for_mapped_file(include->name, parent_folder, "", context.options->mapped_folders);
+        char* folder = bh_search_for_mapped_file(
+            include->name,
+            parent_folder,
+            "",
+            context.options->mapped_folders,
+            context.gp_alloc
+        );
         bh_path_convert_separators(folder);
 
         bh_arr(char *) folders_to_process = NULL;
-        bh_arr_new(global_heap_allocator, folders_to_process, 2);
+        bh_arr_new(context.gp_alloc, folders_to_process, 2);
 
-        bh_arr_push(folders_to_process, bh_strdup(global_scratch_allocator, folder));
+        bh_arr_push(folders_to_process, bh_strdup(context.scratch_alloc, folder));
 
         while (bh_arr_length(folders_to_process) > 0) {
             char *folder = bh_arr_pop(folders_to_process);
@@ -325,7 +342,7 @@ static b32 process_load_entity(Entity* ent) {
                     bh_snprintf(fullpath, 511, "%s/%s", folder, entry.name);
                     bh_path_convert_separators(fullpath);
 
-                    char* formatted_name = bh_path_get_full_name(fullpath, global_heap_allocator);
+                    char* formatted_name = bh_path_get_full_name(fullpath, context.gp_alloc);
 
                     AstInclude* new_include = onyx_ast_node_new(context.ast_alloc, sizeof(AstInclude), Ast_Kind_Load_File);
                     new_include->token = include->token;
@@ -337,7 +354,7 @@ static b32 process_load_entity(Entity* ent) {
                     if (!strcmp(entry.name, ".") || !strcmp(entry.name, "..")) continue;
 
                     bh_snprintf(fullpath, 511, "%s/%s", folder, entry.name);
-                    char* formatted_name = bh_path_get_full_name(fullpath, global_scratch_allocator); // Could this overflow the scratch allocator?
+                    char* formatted_name = bh_path_get_full_name(fullpath, context.scratch_alloc); // Could this overflow the scratch allocator?
 
                     bh_arr_push(folders_to_process, formatted_name);
                 }
@@ -707,11 +724,11 @@ static CompilerProgress onyx_flush_module() {
 
     if (context.options->use_multi_threading && !context.options->use_post_mvp_features) {
         bh_file data_file;
-        if (bh_file_create(&data_file, bh_aprintf(global_scratch_allocator, "%s.data", context.options->target_file)) != BH_FILE_ERROR_NONE)
+        if (bh_file_create(&data_file, bh_aprintf(context.scratch_alloc, "%s.data", context.options->target_file)) != BH_FILE_ERROR_NONE)
             return ONYX_COMPILER_PROGRESS_FAILED_OUTPUT;
 
-        OnyxWasmModule* data_module = bh_alloc_item(global_heap_allocator, OnyxWasmModule);
-        *data_module = onyx_wasm_module_create(global_heap_allocator);
+        OnyxWasmModule* data_module = bh_alloc_item(context.gp_alloc, OnyxWasmModule);
+        *data_module = onyx_wasm_module_create(context.gp_alloc);
 
         data_module->data = context.wasm_module->data;
         context.wasm_module->data = NULL;
@@ -729,7 +746,7 @@ static CompilerProgress onyx_flush_module() {
         if (
             bh_file_create(
                 &js_file,
-                bh_aprintf(global_heap_allocator, "%s.js", context.options->target_file)
+                bh_aprintf(context.gp_alloc, "%s.js", context.options->target_file)
             ) != BH_FILE_ERROR_NONE
         ) {
             return ONYX_COMPILER_PROGRESS_FAILED_OUTPUT;
@@ -775,15 +792,7 @@ static b32 onyx_run() {
 }
 #endif
 
-static bh_managed_heap mh;
-
 CompilerProgress do_compilation(CompileOptions *compile_opts) {
-    bh_scratch_init(&global_scratch, bh_heap_allocator(), 256 * 1024); // NOTE: 256 KiB
-    global_scratch_allocator = bh_scratch_allocator(&global_scratch);
-
-    bh_managed_heap_init(&mh);
-    global_heap_allocator = bh_managed_heap_allocator(&mh);
-    // global_heap_allocator = bh_heap_allocator();
     context_init(compile_opts);
 
     return onyx_compile();
@@ -791,9 +800,6 @@ CompilerProgress do_compilation(CompileOptions *compile_opts) {
 
 void cleanup_compilation() {
     context_free();
-
-    bh_scratch_free(&global_scratch);
-    bh_managed_heap_free(&mh);
 }
 
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
@@ -974,7 +980,7 @@ int main(int argc, char *argv[]) {
             break;
 
         case ONYX_COMPILE_ACTION_RUN_WASM:
-            global_heap_allocator = bh_heap_allocator();
+            context.gp_alloc = bh_heap_allocator();
             context_init(&compile_opts);
             compiler_progress = ONYX_COMPILER_PROGRESS_SUCCESS;
             if (!onyx_run_wasm_file(context.options->target_file)) {

@@ -964,7 +964,7 @@ static bh_arr(AstTyped *) flatten_nested_array_literals_for_emit(AstArrayLiteral
     *elem_type = et;
 
     bh_arr(AstTyped *) result = NULL;
-    bh_arr_new(global_heap_allocator, result, ec);
+    bh_arr_new(context.gp_alloc, result, ec);
     flatten_nested_array_literals_for_emit_helper(&result, al);
 
     return result;
@@ -1590,7 +1590,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
         type_lookup_member_by_idx(for_node->iter->type, 2, &close_func_type);
         i32 close_type_idx = generate_type_idx(mod, close_func_type.type);
 
-        WasmInstruction* close_instructions = bh_alloc_array(global_heap_allocator, WasmInstruction, 8);
+        WasmInstruction* close_instructions = bh_alloc_array(context.gp_alloc, WasmInstruction, 8);
         close_instructions[0] = (WasmInstruction) { WI_LOCAL_GET,     { .l = iterator_close_func } };
         close_instructions[1] = (WasmInstruction) { WI_I32_CONST,     { .l = mod->null_proc_func_idx } };
         close_instructions[2] = (WasmInstruction) { WI_I32_NE,        { .l = 0x00 } };
@@ -1732,7 +1732,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
     bh_arr(WasmInstruction) code = *pcode;
 
     bh_imap block_map;
-    bh_imap_init(&block_map, global_heap_allocator, bh_arr_length(switch_node->cases));
+    bh_imap_init(&block_map, context.gp_alloc, bh_arr_length(switch_node->cases));
 
     u64 expr_result_local = 0;
     if (switch_node->is_expr) {
@@ -2258,8 +2258,8 @@ EMIT_FUNC(call, AstCall* call) {
     u32* vararg_any_offsets=NULL;
     u32* vararg_any_types=NULL;
     if (call->va_kind == VA_Kind_Any) {
-        vararg_any_offsets = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(call->args.values));
-        vararg_any_types   = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(call->args.values));
+        vararg_any_offsets = bh_alloc_array(context.scratch_alloc, u32, bh_arr_length(call->args.values));
+        vararg_any_types   = bh_alloc_array(context.scratch_alloc, u32, bh_arr_length(call->args.values));
     }
 
     bh_arr_each(AstTyped *, parg, call->args.values) {
@@ -3164,7 +3164,7 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     if (location_first) WIL(NULL, WI_LOCAL_SET, loc_idx);
 
     i32 elem_count = type_linear_member_count(type);
-    u64 *temp_locals = bh_alloc_array(global_scratch_allocator, u64, elem_count);
+    u64 *temp_locals = bh_alloc_array(context.scratch_alloc, u64, elem_count);
 
     forir (i, elem_count - 1, 0) {
         type_linear_member_lookup(type, i, &two);
@@ -3195,7 +3195,7 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
     // This shouldn't be necessary because the scratch allocator doesn't free.
-    bh_free(global_scratch_allocator, temp_locals);
+    bh_free(context.scratch_alloc, temp_locals);
 
     *pcode = code;
 }
@@ -3850,7 +3850,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
                     // that I cannot find a good way to factor them all without just introducing a ton of complexity.
                     fori (i, 0, total_linear_members - idx - field_linear_members) WI(NULL, WI_DROP);
 
-                    u64 *temporaries = bh_alloc_array(global_scratch_allocator, u64, field_linear_members);
+                    u64 *temporaries = bh_alloc_array(context.scratch_alloc, u64, field_linear_members);
                     fori (i, 0, field_linear_members) temporaries[i] = 0;
 
                     TypeWithOffset two = { 0 };
@@ -3873,7 +3873,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
                         local_raw_free(mod->local_alloc, wt);
                     }
 
-                    bh_free(global_scratch_allocator, temporaries);
+                    bh_free(context.scratch_alloc, temporaries);
                 }
             }
 
@@ -4730,7 +4730,7 @@ static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
     OnyxToken *foreign_import = fd->foreign.import_name->token;
 
     if (fd->is_foreign_dyncall) {
-        module = bh_aprintf(global_heap_allocator, "dyncall:%b", foreign_module->text, foreign_module->length);
+        module = bh_aprintf(context.gp_alloc, "dyncall:%b", foreign_module->text, foreign_module->length);
 
         char type_encoding[65] = {0};
         encode_type_as_dyncall_symbol(type_encoding, fd->type->Function.return_type);
@@ -4739,11 +4739,11 @@ static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
             encode_type_as_dyncall_symbol(type_encoding, param->local->type);
         }
 
-        name = bh_aprintf(global_heap_allocator, "%b:%s", foreign_import->text, foreign_import->length, type_encoding);
+        name = bh_aprintf(context.gp_alloc, "%b:%s", foreign_import->text, foreign_import->length, type_encoding);
 
     } else {
-        module = bh_aprintf(global_heap_allocator, "%b", foreign_module->text, foreign_module->length);
-        name = bh_aprintf(global_heap_allocator, "%b", foreign_import->text, foreign_import->length);
+        module = bh_aprintf(context.gp_alloc, "%b", foreign_module->text, foreign_module->length);
+        name = bh_aprintf(context.gp_alloc, "%b", foreign_import->text, foreign_import->length);
     }
 
     WasmImport import = {
@@ -4812,7 +4812,7 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
 
     i32 global_idx = (i32) bh_imap_get(&module->index_map, (u64) global);
 
-    bh_arr_new(global_heap_allocator, glob.initial_value, 1);
+    bh_arr_new(context.gp_alloc, glob.initial_value, 1);
 
     switch (global_type) {
         case WASM_TYPE_INT32:   bh_arr_push(glob.initial_value, ((WasmInstruction) { WI_I32_CONST, 0 })); break;
@@ -4839,7 +4839,7 @@ static void emit_raw_string(OnyxWasmModule* mod, char *data, i32 len, u64 *out_d
     // NOTE: Allocating more than necessary, but there are no cases
     // in a string literal that create more bytes than already
     // existed. You can create less however ('\n' => 0x0a).
-    char* strdata = bh_alloc_array(global_heap_allocator, char, len + 1);
+    char* strdata = bh_alloc_array(context.gp_alloc, char, len + 1);
     i32 length  = string_process_escape_seqs(strdata, data, len);
 
     i32 index = shgeti(mod->string_literals, (char *) strdata);
@@ -4848,7 +4848,7 @@ static void emit_raw_string(OnyxWasmModule* mod, char *data, i32 len, u64 *out_d
         *out_data_id = sti.data_id;
         *out_len = sti.len;
 
-        bh_free(global_heap_allocator, strdata);
+        bh_free(context.gp_alloc, strdata);
         return;
     }
 
@@ -5134,7 +5134,7 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
         u8* data = NULL;
         if (memres->initial_value != NULL) {
             assert(!memres->threadlocal);
-            data = bh_alloc(global_heap_allocator, size);
+            data = bh_alloc(context.gp_alloc, size);
         }
 
         WasmDatum datum = {
@@ -5163,15 +5163,15 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
         const char* parent_file = fc->token->pos.filename;
         if (parent_file == NULL) parent_file = ".";
 
-        char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
+        char* parent_folder = bh_path_get_parent(parent_file, context.scratch_alloc);
 
         OnyxToken *filename_token = fc->filename_expr->token;
 
         token_toggle_end(filename_token);
-        char* temp_fn     = bh_alloc_array(global_scratch_allocator, char, filename_token->length);
+        char* temp_fn     = bh_alloc_array(context.scratch_alloc, char, filename_token->length);
         i32   temp_fn_len = string_process_escape_seqs(temp_fn, filename_token->text, filename_token->length);
-        char* filename    = bh_lookup_file(temp_fn, parent_folder, NULL, NULL, NULL);
-        fc->filename      = bh_strdup(global_heap_allocator, filename);
+        char* filename    = bh_lookup_file(temp_fn, parent_folder, NULL, NULL, NULL, context.scratch_alloc);
+        fc->filename      = bh_strdup(context.gp_alloc, filename);
         token_toggle_end(filename_token);
     }
 
@@ -5194,8 +5194,8 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     // if the filename is prefixed with a './' or '.\\' then it should be relative to the
     // file in which is was inclded. The loaded file info above should probably use the full
     // file path in order to avoid duplicates.
-    bh_file_contents contents = bh_file_read_contents(global_heap_allocator, fc->filename);
-    u8* actual_data = bh_alloc(global_heap_allocator, contents.length + 1);
+    bh_file_contents contents = bh_file_read_contents(context.gp_alloc, fc->filename);
+    u8* actual_data = bh_alloc(context.gp_alloc, contents.length + 1);
     u32 length = contents.length + 1;
     memcpy(actual_data, contents.data, contents.length);
     actual_data[contents.length] = 0;
@@ -5222,16 +5222,16 @@ static void emit_js_node(OnyxWasmModule* mod, AstJsNode *js) {
         const char* parent_file = js->token->pos.filename;
         if (parent_file == NULL) parent_file = ".";
 
-        char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
+        char* parent_folder = bh_path_get_parent(parent_file, context.scratch_alloc);
 
         OnyxToken *filename_token = js->filepath->token;
         token_toggle_end(filename_token);
 
-        char* temp_fn     = bh_alloc_array(global_scratch_allocator, char, filename_token->length);
+        char* temp_fn     = bh_alloc_array(context.scratch_alloc, char, filename_token->length);
         i32   temp_fn_len = string_process_escape_seqs(temp_fn, filename_token->text, filename_token->length);
         char* filename    = bh_strdup(
-            global_heap_allocator,
-            bh_lookup_file(temp_fn, parent_folder, NULL, NULL, NULL)
+            context.gp_alloc,
+            bh_lookup_file(temp_fn, parent_folder, NULL, NULL, NULL, context.scratch_alloc)
         );
 
         token_toggle_end(filename_token);
@@ -5243,8 +5243,8 @@ static void emit_js_node(OnyxWasmModule* mod, AstJsNode *js) {
             return;
         }
 
-        bh_file_contents file_contents = bh_file_read_contents(global_heap_allocator, filename);
-        contents = bh_alloc(global_heap_allocator, file_contents.length + 1);
+        bh_file_contents file_contents = bh_file_read_contents(context.gp_alloc, filename);
+        contents = bh_alloc(context.gp_alloc, file_contents.length + 1);
         memcpy(contents, file_contents.data, file_contents.length);
         contents[file_contents.length] = 0;
         bh_file_contents_free(&file_contents);
@@ -5335,8 +5335,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .type_info_size = 0,
     };
 
-    bh_arena* eid = bh_alloc(global_heap_allocator, sizeof(bh_arena));
-    bh_arena_init(eid, global_heap_allocator, 16 * 1024 * 1024);
+    bh_arena* eid = bh_alloc(context.gp_alloc, sizeof(bh_arena));
+    bh_arena_init(eid, context.gp_alloc, 16 * 1024 * 1024);
     module.extended_instr_data = eid;
     module.extended_instr_alloc = bh_arena_allocator(eid);
 
@@ -5351,8 +5351,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(alloc, module.js_partials, 4);
     bh_arr_new(alloc, module.for_remove_info, 4);
 
-    bh_arr_new(global_heap_allocator, module.return_location_stack, 4);
-    bh_arr_new(global_heap_allocator, module.structured_jump_target, 16);
+    bh_arr_new(context.gp_alloc, module.return_location_stack, 4);
+    bh_arr_new(context.gp_alloc, module.structured_jump_target, 16);
     bh_arr_set_length(module.structured_jump_target, 0);
 
     sh_new_arena(module.type_map);
@@ -5361,25 +5361,25 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     sh_new_arena(module.string_literals);
     sh_new_arena(module.custom_sections);
 
-    bh_imap_init(&module.index_map, global_heap_allocator, 128);
-    bh_imap_init(&module.local_map, global_heap_allocator, 16);
-    bh_imap_init(&module.elem_map,  global_heap_allocator, 16);
+    bh_imap_init(&module.index_map, context.gp_alloc, 128);
+    bh_imap_init(&module.local_map, context.gp_alloc, 16);
+    bh_imap_init(&module.elem_map,  context.gp_alloc, 16);
 
-    bh_arr_new(global_heap_allocator, module.deferred_stmts, 4);
-    bh_arr_new(global_heap_allocator, module.local_allocations, 4);
-    bh_arr_new(global_heap_allocator, module.stack_leave_patches, 4);
-    bh_arr_new(global_heap_allocator, module.foreign_blocks, 4);
-    bh_arr_new(global_heap_allocator, module.procedures_with_tags, 4);
-    bh_arr_new(global_heap_allocator, module.globals_with_tags, 4);
-    bh_arr_new(global_heap_allocator, module.all_procedures, 4);
-    bh_arr_new(global_heap_allocator, module.data_patches, 4);
-    bh_arr_new(global_heap_allocator, module.code_patches, 4);
+    bh_arr_new(context.gp_alloc, module.deferred_stmts, 4);
+    bh_arr_new(context.gp_alloc, module.local_allocations, 4);
+    bh_arr_new(context.gp_alloc, module.stack_leave_patches, 4);
+    bh_arr_new(context.gp_alloc, module.foreign_blocks, 4);
+    bh_arr_new(context.gp_alloc, module.procedures_with_tags, 4);
+    bh_arr_new(context.gp_alloc, module.globals_with_tags, 4);
+    bh_arr_new(context.gp_alloc, module.all_procedures, 4);
+    bh_arr_new(context.gp_alloc, module.data_patches, 4);
+    bh_arr_new(context.gp_alloc, module.code_patches, 4);
 
-    bh_arr_new(global_heap_allocator, module.types_enqueued_for_info, 32);
+    bh_arr_new(context.gp_alloc, module.types_enqueued_for_info, 32);
 
 #ifdef ENABLE_DEBUG_INFO
     module.debug_context = bh_alloc_item(context.ast_alloc, DebugContext);
-    module.debug_context->allocator = global_heap_allocator;
+    module.debug_context->allocator = context.gp_alloc;
     module.debug_context->next_file_id = 0;
     module.debug_context->next_sym_id = 0;
     module.debug_context->last_token = NULL;
@@ -5388,11 +5388,11 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     module.debug_context->funcs = NULL;
 
     sh_new_arena(module.debug_context->file_info);
-    bh_arr_new(global_heap_allocator, module.debug_context->sym_info, 32);
-    bh_arr_new(global_heap_allocator, module.debug_context->sym_patches, 32);
-    bh_arr_new(global_heap_allocator, module.debug_context->funcs, 16);
+    bh_arr_new(context.gp_alloc, module.debug_context->sym_info, 32);
+    bh_arr_new(context.gp_alloc, module.debug_context->sym_patches, 32);
+    bh_arr_new(context.gp_alloc, module.debug_context->funcs, 16);
 
-    bh_buffer_init(&module.debug_context->op_buffer, global_heap_allocator, 1024);
+    bh_buffer_init(&module.debug_context->op_buffer, context.gp_alloc, 1024);
 #endif
 
     return module;

@@ -78,7 +78,7 @@ void onyx_docs_emit_symbol_info(const char *dest) {
             (int (*)(const void *, const void*)) sort_symbol_resolutions);
 
     bh_buffer file_section;
-    bh_buffer_init(&file_section, global_heap_allocator, 2048);
+    bh_buffer_init(&file_section, context.gp_alloc, 2048);
     fori (i, 0, shlen(syminfo->files)) {
         char *filename = syminfo->files[i].key;
         u32   file_id  = syminfo->files[i].value;
@@ -88,10 +88,10 @@ void onyx_docs_emit_symbol_info(const char *dest) {
     }
 
     bh_buffer sym_def_section;
-    bh_buffer_init(&sym_def_section, global_heap_allocator, 2048);
+    bh_buffer_init(&sym_def_section, context.gp_alloc, 2048);
 
     bh_buffer docs_section;
-    bh_buffer_init(&docs_section, global_heap_allocator, 4096);
+    bh_buffer_init(&docs_section, context.gp_alloc, 4096);
 
     bh_arr_each(SymbolInfo, sym, syminfo->symbols) {
         bh_buffer_write_u32(&sym_def_section, sym->id);
@@ -113,7 +113,7 @@ void onyx_docs_emit_symbol_info(const char *dest) {
     }
 
     bh_buffer sym_res_section;
-    bh_buffer_init(&sym_res_section, global_heap_allocator, 2048);
+    bh_buffer_init(&sym_res_section, context.gp_alloc, 2048);
     bh_arr_each(SymbolResolution, sym, syminfo->symbols_resolutions) {
         bh_buffer_write_u32(&sym_res_section, sym->file_id);
         bh_buffer_write_u32(&sym_res_section, sym->line);
@@ -123,7 +123,7 @@ void onyx_docs_emit_symbol_info(const char *dest) {
     }
 
     bh_buffer header_section;
-    bh_buffer_init(&header_section, global_heap_allocator, 16);
+    bh_buffer_init(&header_section, context.gp_alloc, 16);
     bh_buffer_append(&header_section, "OSYM", 4);
 
     u32 header_size = 32;
@@ -471,7 +471,7 @@ static b32 write_doc_procedure(bh_buffer *buffer, AstBinding *binding, AstNode *
 
 static void write_doc_constraints(bh_buffer *buffer, ConstraintContext *constraints, bh_arr(AstPolyParam) poly_params) {
     bh_buffer tmp_buffer;
-    bh_buffer_init(&tmp_buffer, global_scratch_allocator, 256);
+    bh_buffer_init(&tmp_buffer, context.scratch_alloc, 256);
 
     u32 constraint_count_patch = buffer->length;
     bh_buffer_write_u32(buffer, 0);
@@ -604,7 +604,7 @@ static b32 write_doc_overloaded_function(bh_buffer *buffer, AstBinding *binding,
     AstOverloadedFunction *ofunc = (void *) proc;
 
     bh_imap all_overloads;
-    bh_imap_init(&all_overloads, global_heap_allocator, bh_arr_length(ofunc->overloads) * 2);
+    bh_imap_init(&all_overloads, context.gp_alloc, bh_arr_length(ofunc->overloads) * 2);
     build_all_overload_options(ofunc->overloads, &all_overloads);
 
     write_entity_header(buffer, binding, ofunc->token->pos);
@@ -651,7 +651,7 @@ static b32 write_doc_polymorphic_proc(bh_buffer *buffer, AstBinding *binding, As
     // Parameter types
 
     bh_buffer param_type_buf;
-    bh_buffer_init(&param_type_buf, global_scratch_allocator, 256);
+    bh_buffer_init(&param_type_buf, context.scratch_alloc, 256);
 
     bh_buffer_write_u32(buffer, bh_arr_length(func->params));
     bh_arr_each(AstParam, param, func->params) {
@@ -742,7 +742,7 @@ static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *
         write_entity_header(buffer, binding, node->token->pos);
 
         bh_buffer type_buf;
-        bh_buffer_init(&type_buf, global_scratch_allocator, 256);
+        bh_buffer_init(&type_buf, context.scratch_alloc, 256);
 
         bh_buffer_write_u32(buffer, bh_arr_length(struct_node->members));
         bh_arr_each(AstStructMember *, psmem, struct_node->members) {
@@ -815,7 +815,7 @@ static b32 write_doc_union_type(bh_buffer *buffer, AstBinding *binding, AstNode 
         write_entity_header(buffer, binding, node->token->pos);
 
         bh_buffer type_buf;
-        bh_buffer_init(&type_buf, global_scratch_allocator, 256);
+        bh_buffer_init(&type_buf, context.scratch_alloc, 256);
 
         bh_buffer_write_u32(buffer, bh_arr_length(union_node->variants));
         bh_arr_each(AstUnionVariant*, puv, union_node->variants) {
@@ -877,7 +877,7 @@ static b32 write_doc_distinct_type(bh_buffer *buffer, AstBinding *binding, AstNo
     write_entity_header(buffer, binding, node->token->pos);
 
     bh_buffer type_buf;
-    bh_buffer_init(&type_buf, global_scratch_allocator, 256);
+    bh_buffer_init(&type_buf, context.scratch_alloc, 256);
     write_type_node(&type_buf, distinct_node->base_type);
     write_string(buffer, type_buf.length, (char *) type_buf.data);
     bh_buffer_free(&type_buf);
@@ -914,7 +914,7 @@ void onyx_docs_emit_odoc(const char *dest) {
 
 
     bh_buffer doc_buffer;
-    bh_buffer_init(&doc_buffer, global_heap_allocator, 16 * 1024);
+    bh_buffer_init(&doc_buffer, context.gp_alloc, 16 * 1024);
 
     bh_buffer_append(&doc_buffer, Doc_Magic_Bytes, 4);
     bh_buffer_write_u32(&doc_buffer, 1);

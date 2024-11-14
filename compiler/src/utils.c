@@ -1,4 +1,4 @@
-#define BH_INTERNAL_ALLOCATOR (global_heap_allocator)
+#define BH_INTERNAL_ALLOCATOR (context.gp_alloc)
 #define BH_DEBUG
 
 #include "utils.h"
@@ -9,12 +9,6 @@
 #include "astnodes.h"
 #include "errors.h"
 #include "doc.h"
-
-bh_scratch global_scratch;
-bh_allocator global_scratch_allocator;
-
-bh_managed_heap global_heap;
-bh_allocator global_heap_allocator;
 
 //
 // Program info and packages
@@ -46,7 +40,7 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
         package->use_package_entities = NULL;
         package->id = ++context.next_package_id;
         package->parent_id = -1;
-        bh_arr_new(global_heap_allocator, package->sub_packages, 4);
+        bh_arr_new(context.gp_alloc, package->sub_packages, 4);
 
         if (!strcmp(pac_name, "builtin")) {
             package->private_scope = scope_create(alloc, context.global_scope, pos);
@@ -78,7 +72,7 @@ void package_track_use_package(Package* package, Entity* entity) {
     assert(entity);
 
     if (package->use_package_entities == NULL) {
-        bh_arr_new(global_heap_allocator, package->use_package_entities, 4);
+        bh_arr_new(context.gp_alloc, package->use_package_entities, 4);
     }
 
     bh_arr_push(package->use_package_entities, entity);
@@ -597,7 +591,7 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
     // CLEANUP SPEED: This currently rebuilds the complete set of overloads every time one is looked up.
     // This should be cached in the AstOverloadedFunction or somewhere like that.
     bh_imap all_overloads;
-    bh_imap_init(&all_overloads, global_heap_allocator, bh_arr_length(overloads) * 2);
+    bh_imap_init(&all_overloads, context.gp_alloc, bh_arr_length(overloads) * 2);
     build_all_overload_options(overloads, &all_overloads);
 
     AstTyped *matched_overload = NULL;
@@ -661,7 +655,7 @@ AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type*
     if (type->kind != Type_Kind_Function) return NULL;
 
     bh_imap all_overloads;
-    bh_imap_init(&all_overloads, global_heap_allocator, bh_arr_length(overloads) * 2);
+    bh_imap_init(&all_overloads, context.gp_alloc, bh_arr_length(overloads) * 2);
     build_all_overload_options(overloads, &all_overloads);
 
     AstTyped *matched_overload = NULL;
@@ -686,7 +680,7 @@ AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type*
 }
 
 void report_unable_to_match_overload(AstCall* call, bh_arr(OverloadOption) overloads) {
-    char* arg_str = bh_alloc(global_scratch_allocator, 1024);
+    char* arg_str = bh_alloc(context.scratch_alloc, 1024);
     arg_str[0] = '\0';
 
     bh_arr_each(AstTyped *, arg, call->args.values) {
@@ -716,12 +710,12 @@ void report_unable_to_match_overload(AstCall* call, bh_arr(OverloadOption) overl
 
     onyx_report_error(call->token->pos, Error_Critical, "Unable to match overloaded function with provided argument types: (%s)", arg_str);
 
-    bh_free(global_scratch_allocator, arg_str);
+    bh_free(context.scratch_alloc, arg_str);
 
     // CLEANUP SPEED: This currently rebuilds the complete set of overloads every time one is looked up.
     // This should be cached in the AstOverloadedFunction or somewhere like that.
     bh_imap all_overloads;
-    bh_imap_init(&all_overloads, global_heap_allocator, bh_arr_length(overloads) * 2);
+    bh_imap_init(&all_overloads, context.gp_alloc, bh_arr_length(overloads) * 2);
     build_all_overload_options(overloads, &all_overloads);
 
     i32 i = 1;
@@ -829,7 +823,7 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
     assert(template->type->kind == Type_Kind_Function);
 
     bh_arr(AstNode *) nodes_that_need_entities=NULL;
-    bh_arr_new(global_heap_allocator, nodes_that_need_entities, 4);
+    bh_arr_new(context.gp_alloc, nodes_that_need_entities, 4);
 
     AstBlock* expansion = (AstBlock *) ast_clone_with_captured_entities(context.ast_alloc, template->body, &nodes_that_need_entities);
     expansion->rules = Block_Rule_Macro;
@@ -1101,20 +1095,20 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg, b32 in
             token_toggle_end(named_value->token);
             i32 idx = lookup_idx_by_name(provider, named_value->token->text);
             if (idx == -1) {
-                if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "'%s' is not a valid named parameter here.", named_value->token->text);
+                if (err_msg) *err_msg = bh_aprintf(context.scratch_alloc, "'%s' is not a valid named parameter here.", named_value->token->text);
                 token_toggle_end(named_value->token);
                 return 0;
             }
 
             // assert(idx < bh_arr_length(args->values));
             if (idx >= bh_arr_length(args->values)) {
-                if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "Error placing value with name '%s' at index '%d'.", named_value->token->text, idx);
+                if (err_msg) *err_msg = bh_aprintf(context.scratch_alloc, "Error placing value with name '%s' at index '%d'.", named_value->token->text, idx);
                 token_toggle_end(named_value->token);
                 return 0;
             }
 
             if (args->values[idx] != NULL && args->values[idx] != named_value->value) {
-                if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "Multiple values given for parameter named '%s'.", named_value->token->text);
+                if (err_msg) *err_msg = bh_aprintf(context.scratch_alloc, "Multiple values given for parameter named '%s'.", named_value->token->text);
                 token_toggle_end(named_value->token);
                 return 0;
             }
@@ -1132,7 +1126,7 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg, b32 in
                 assert(provider->token);
                 args->values[idx] = (AstTyped *) make_zero_value(context.ast_alloc, provider->token, NULL);
             } else {
-                if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "No value given for %d%s argument.", idx + 1, bh_num_suffix(idx + 1));
+                if (err_msg) *err_msg = bh_aprintf(context.scratch_alloc, "No value given for %d%s argument.", idx + 1, bh_num_suffix(idx + 1));
                 success = 0;
                 break;
             }
@@ -1141,7 +1135,7 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg, b32 in
 
     i32 maximum_arguments = maximum_argument_count(provider);
     if (bh_arr_length(args->values) > maximum_arguments) {
-        if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "Too many values provided. Expected at most %d.", maximum_arguments);
+        if (err_msg) *err_msg = bh_aprintf(context.scratch_alloc, "Too many values provided. Expected at most %d.", maximum_arguments);
         success = 0;
     }
 
@@ -1222,7 +1216,7 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
                                 // and its because it wanted a &T, but got a T. This is likely
                                 // due to the fact that the method call argument is not an lval.
                                 error->pos = arg_arr[arg_pos]->token->pos;
-                                error->text = bh_aprintf(global_heap_allocator,
+                                error->text = bh_aprintf(context.gp_alloc,
                                         "This method expects a pointer to the first argument, which normally `->` would do automatically, but in this case, the left-hand side is not an l-value, so its address cannot be taken. Try storing it in a temporary variable first, then calling the method."
                                 );
                                 return tm;
@@ -1231,7 +1225,7 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
 
                         if (arg_arr[arg_pos]->token) error->pos = arg_arr[arg_pos]->token->pos;
 
-                        error->text = bh_aprintf(global_heap_allocator,
+                        error->text = bh_aprintf(context.gp_alloc,
                                 "The procedure '%s' expects a value of type '%s' for %d%s parameter, got '%s'.",
                                 func_name,
                                 type_get_name(formal_params[arg_pos]),
@@ -1273,7 +1267,7 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
                 if (tm == TYPE_MATCH_FAILED) {
                     if (error != NULL) {
                         error->pos = arg_arr[arg_pos]->token->pos,
-                        error->text = bh_aprintf(global_heap_allocator,
+                        error->text = bh_aprintf(context.gp_alloc,
                             "The procedure '%s' expects a value of type '%s' for the variadic parameter, got '%s'.",
                             func_name,
                             type_get_name(variadic_type),
@@ -1313,7 +1307,7 @@ type_checking_done:
     if (arg_pos < func_type->needed_param_count) {
         if (error != NULL) {
             if (location) error->pos = location->pos;
-            error->text = bh_aprintf(global_heap_allocator,
+            error->text = bh_aprintf(context.gp_alloc,
                     "Too few arguments to function call. Expected at least %d argument%s, but only got %d.",
                     func_type->needed_param_count, bh_num_plural(func_type->needed_param_count), arg_pos);
         }
@@ -1323,7 +1317,7 @@ type_checking_done:
     if (arg_pos < (u32) arg_count) {
         if (error != NULL) {
             if (location) error->pos = location->pos;
-            error->text = bh_aprintf(global_heap_allocator,
+            error->text = bh_aprintf(context.gp_alloc,
                     "Too many arguments to function call. Expected at most %d argument%s, but got %d.",
                     arg_pos, bh_num_plural(arg_pos), arg_count);
         }
@@ -1587,7 +1581,7 @@ u32 levenshtein_distance(const char *str1, const char *str2) {
     i32 m = strlen(str1) + 1;
     i32 n = strlen(str2) + 1;
 
-    i32 *d = bh_alloc_array(global_scratch_allocator, i32, m * n);
+    i32 *d = bh_alloc_array(context.scratch_alloc, i32, m * n);
     fori (i, 0, m * n) d[i] = 0;
 
     fori (i, 0, m) d[i * n + 0] = i;

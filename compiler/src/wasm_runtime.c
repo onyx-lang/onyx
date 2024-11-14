@@ -105,15 +105,15 @@ static void *locate_symbol_in_dynamic_library(LinkLibraryContext *ctx, char *lib
     char *library_name;
 
     #ifdef _BH_LINUX
-    library_name = bh_lookup_file(libname, ".", ".so", (const char **) ctx->library_paths, NULL);
+    library_name = bh_lookup_file(libname, ".", ".so", (const char **) ctx->library_paths, NULL, context.gp_alloc);
     #endif
 
     #ifdef _BH_DARWIN
-    library_name = bh_lookup_file(libname, ".", ".dylib", (const char **) ctx->library_paths, NULL);
+    library_name = bh_lookup_file(libname, ".", ".dylib", (const char **) ctx->library_paths, NULL, context.gp_alloc);
     #endif
 
     #ifdef _BH_WINDOWS
-    library_name = bh_lookup_file(libname, ".", ".dll", (const char **) ctx->library_paths, NULL);
+    library_name = bh_lookup_file(libname, ".", ".dll", (const char **) ctx->library_paths, NULL, context.gp_alloc);
     #endif
 
     return locate_symbol_in_dynamic_library_raw(library_name, sym);

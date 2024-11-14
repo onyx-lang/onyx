@@ -1,7 +1,7 @@
 #include "astnodes.h"
 #include "types.h"
 #undef BH_INTERNAL_ALLOCATOR
-#define BH_INTERNAL_ALLOCATOR (global_heap_allocator)
+#define BH_INTERNAL_ALLOCATOR (context.gp_alloc)
 #define BH_DEBUG
 #include "parser.h"
 #include "utils.h"
@@ -549,16 +549,16 @@ CheckStatus check_switch(AstSwitch* switchnode) {
         switch (switchnode->switch_kind) {
             case Switch_Kind_Integer:
                 switchnode->min_case = 0xffffffffffffffff;
-                bh_imap_init(&switchnode->case_map, global_heap_allocator, 4);
+                bh_imap_init(&switchnode->case_map, context.gp_alloc, 4);
                 break;
 
             case Switch_Kind_Use_Equals:
-                bh_arr_new(global_heap_allocator, switchnode->case_exprs, 4);
+                bh_arr_new(context.gp_alloc, switchnode->case_exprs, 4);
                 break;
 
             case Switch_Kind_Union:
                 switchnode->min_case = 1;
-                bh_imap_init(&switchnode->case_map, global_heap_allocator, 4);
+                bh_imap_init(&switchnode->case_map, context.gp_alloc, 4);
 
                 u32 variants = type_union_get_variant_count(switchnode->expr->type);
                 switchnode->union_variants_handled = bh_alloc_array(context.ast_alloc, u8, variants);
@@ -576,7 +576,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
     if (switchnode->cases == NULL) {
         CHECK(block, switchnode->case_block);
 
-        bh_arr_new(global_heap_allocator, switchnode->cases, 4);
+        bh_arr_new(context.gp_alloc, switchnode->cases, 4);
         if (collect_switch_case_blocks(switchnode, switchnode->case_block) != Check_Success) {
             return Check_Error;
         }
@@ -962,7 +962,7 @@ CheckStatus check_call(AstCall** pcall) {
 
             // HACK CLEANUP
             OnyxToken* str_token = bh_alloc(context.ast_alloc, sizeof(OnyxToken));
-            str_token->text  = bh_strdup(global_heap_allocator, (char *) call->token->pos.filename);
+            str_token->text  = bh_strdup(context.gp_alloc, (char *) call->token->pos.filename);
             str_token->length = strlen(call->token->pos.filename);
             str_token->pos = call->token->pos;
             str_token->type = Token_Type_Literal_String;
@@ -1490,7 +1490,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
         u64 cache_key = 0;
         if (binop->left->type && binop->right->type) {
             if (!context.checker.__binop_impossible_cache[binop->operation].hashes) {
-                bh_imap_init(&context.checker.__binop_impossible_cache[binop->operation], global_heap_allocator, 256);
+                bh_imap_init(&context.checker.__binop_impossible_cache[binop->operation], context.gp_alloc, 256);
             }
 
             cache_key = ((u64) (binop->left->type->id) << 32ll) | (u64) binop->right->type->id;
@@ -1707,7 +1707,7 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
     }
 
     if (sl->values_to_initialize == NULL) {
-        bh_arr_new(global_heap_allocator, sl->values_to_initialize, 2);
+        bh_arr_new(context.gp_alloc, sl->values_to_initialize, 2);
     }
 
     if (sl->type->kind == Type_Kind_Union) {
@@ -3212,7 +3212,7 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* ofunc) {
     b32 done = 1;
 
     bh_imap all_overloads;
-    bh_imap_init(&all_overloads, global_heap_allocator, 4);
+    bh_imap_init(&all_overloads, context.gp_alloc, 4);
     build_all_overload_options(ofunc->overloads, &all_overloads);
 
     bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
@@ -3904,9 +3904,9 @@ CheckStatus check_process_directive(AstNode* directive) {
         }
 
         AstStrLit *symbol = (AstStrLit *) library->library_symbol;
-        char* temp_name     = bh_alloc_array(global_scratch_allocator, char, symbol->token->length);
+        char* temp_name     = bh_alloc_array(context.scratch_alloc, char, symbol->token->length);
         i32   temp_name_len = string_process_escape_seqs(temp_name, symbol->token->text, symbol->token->length);
-        library->library_name = bh_strdup(global_heap_allocator, temp_name);
+        library->library_name = bh_strdup(context.gp_alloc, temp_name);
         return Check_Success;
     }
 
@@ -3950,32 +3950,32 @@ CheckStatus check_process_directive(AstNode* directive) {
         if (section->section_contents->kind != Ast_Kind_StrLit) ERROR(section->token->pos, "Expect section contents to be a compile-time known string.");
 
         AstStrLit *symbol = (AstStrLit *) section->section_name;
-        char* temp_str    = bh_alloc_array(global_scratch_allocator, char, symbol->token->length);
+        char* temp_str    = bh_alloc_array(context.scratch_alloc, char, symbol->token->length);
         string_process_escape_seqs(temp_str, symbol->token->text, symbol->token->length);
-        section->name = bh_strdup(global_heap_allocator, temp_str);
+        section->name = bh_strdup(context.gp_alloc, temp_str);
 
         symbol   = (AstStrLit *) section->section_contents;
-        temp_str = bh_alloc_array(global_scratch_allocator, char, symbol->token->length + 1);
+        temp_str = bh_alloc_array(context.scratch_alloc, char, symbol->token->length + 1);
         u32 content_length = string_process_escape_seqs(temp_str, symbol->token->text, symbol->token->length);
 
         if (section->from_file) {
             const char *containing_filename = section->token->pos.filename;
-            char *parent_folder = bh_path_get_parent(containing_filename, global_scratch_allocator);
+            char *parent_folder = bh_path_get_parent(containing_filename, context.scratch_alloc);
 
             char *path = bh_strdup(
-                global_scratch_allocator,
-                bh_lookup_file(temp_str, parent_folder, NULL, NULL, NULL)
+                context.scratch_alloc,
+                bh_lookup_file(temp_str, parent_folder, NULL, NULL, NULL, context.scratch_alloc)
             );
 
             if (!bh_file_exists(path)) {
                 ERROR_(section->token->pos, "Failed to open file '%s' for custom section.", path);
             }
 
-            bh_file_contents contents = bh_file_read_contents(global_heap_allocator, path);
+            bh_file_contents contents = bh_file_read_contents(context.gp_alloc, path);
             section->contents = contents.data;
             section->length = contents.length;
         } else {
-            section->contents = bh_strdup(global_heap_allocator, temp_str);
+            section->contents = bh_strdup(context.gp_alloc, temp_str);
             section->length = content_length;
         }
 
@@ -4026,7 +4026,7 @@ CheckStatus check_interface_constraint(AstConstraint *constraint) {
         }
     }
 
-    bh_arr_new(global_heap_allocator, constraint->exprs, bh_arr_length(constraint->interface->exprs));
+    bh_arr_new(context.gp_alloc, constraint->exprs, bh_arr_length(constraint->interface->exprs));
     bh_arr_each(InterfaceConstraint, ic, constraint->interface->exprs) {
         InterfaceConstraint new_ic = {0};
         new_ic.expr = (AstTyped *) ast_clone(context.ast_alloc, (AstNode *) ic->expr);
@@ -4183,7 +4183,7 @@ CheckStatus check_constraint(AstConstraint *constraint) {
 
                     TYPE_CHECK(&ic->expr, ic->expected_type) {
                         if (!ic->invert_condition) {
-                            ic->error_msg = bh_aprintf(global_heap_allocator, "Expected expression to be of type %s, got expression of type %s.",
+                            ic->error_msg = bh_aprintf(context.gp_alloc, "Expected expression to be of type %s, got expression of type %s.",
                                     type_get_name(ic->expected_type), type_get_name(ic->expr->type));
                             goto constraint_error;
                         }

@@ -709,7 +709,7 @@ static SymresStatus symres_proc_expansion(AstProceduralExpansion **pexp, Procedu
 
     token_toggle_end(proc_macro->token);
     // HACK store this differently so a copy is not necessary here.
-    char *macro_name = bh_strdup(global_scratch_allocator, proc_macro->token->text);
+    char *macro_name = bh_strdup(context.scratch_alloc, proc_macro->token->text);
     token_toggle_end(proc_macro->token);
 
     AstNode *expansion = NULL;

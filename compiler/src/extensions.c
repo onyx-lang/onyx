@@ -189,11 +189,11 @@ static char *extension_recv_str(CompilerExtension *ext, i32 *out_len) {
 
 TypeMatch compiler_extension_start(const char *name, const char *containing_filename, Entity *ent, i32 *out_extension_id) {
     if (*out_extension_id == 0) {
-        char* parent_folder = bh_path_get_parent(containing_filename, global_scratch_allocator);
+        char* parent_folder = bh_path_get_parent(containing_filename, context.scratch_alloc);
 
         char *path = bh_strdup(
-                global_scratch_allocator,
-                bh_lookup_file((char *) name, parent_folder, NULL, NULL, NULL)
+                context.scratch_alloc,
+                bh_lookup_file((char *) name, parent_folder, NULL, NULL, NULL, context.scratch_alloc)
         );
 
         if (!bh_file_exists(path)) {
@@ -202,7 +202,7 @@ TypeMatch compiler_extension_start(const char *name, const char *containing_file
 
         CompilerExtension ext;
         ext.state = COMP_EXT_STATE_SPAWNING;
-        bh_arena_init(&ext.arena, global_heap_allocator, 1 * 1024 * 1024); // 1MB
+        bh_arena_init(&ext.arena, context.gp_alloc, 1 * 1024 * 1024); // 1MB
         ext.entity = ent;
 
         if (!extension_spawn(&ext, path)) {

@@ -292,7 +292,7 @@ static i32 build_type_info_for_function(struct TypeBuilderContext *ctx, Type *ty
 static i32 build_type_info_for_enum(struct TypeBuilderContext *ctx, Type *type) {
     AstEnumType* ast_enum = (AstEnumType *) type->ast_type;
     u32  member_count   = bh_arr_length(ast_enum->values);
-    u32* name_locations = bh_alloc_array(global_heap_allocator, u32, member_count);
+    u32* name_locations = bh_alloc_array(context.gp_alloc, u32, member_count);
 
     u32 i = 0;
     bh_arr_each(AstEnumValue *, value, ast_enum->values) {
@@ -332,11 +332,11 @@ static i32 build_type_info_for_enum(struct TypeBuilderContext *ctx, Type *type) 
 
 static i32 build_type_info_for_struct(struct TypeBuilderContext *ctx, Type *type) {
     TypeStruct* s = &type->Struct;
-    u32* name_locations = bh_alloc_array(global_scratch_allocator, u32, s->mem_count);
-    u32* param_locations = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(s->poly_sln));
-    u32* value_locations = bh_alloc_array(global_scratch_allocator, u32, s->mem_count);
-    u32* meta_locations = bh_alloc_array(global_scratch_allocator, u32, s->mem_count);
-    u32* struct_tag_locations = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(s->meta_tags));
+    u32* name_locations = bh_alloc_array(context.scratch_alloc, u32, s->mem_count);
+    u32* param_locations = bh_alloc_array(context.scratch_alloc, u32, bh_arr_length(s->poly_sln));
+    u32* value_locations = bh_alloc_array(context.scratch_alloc, u32, s->mem_count);
+    u32* meta_locations = bh_alloc_array(context.scratch_alloc, u32, s->mem_count);
+    u32* struct_tag_locations = bh_alloc_array(context.scratch_alloc, u32, bh_arr_length(s->meta_tags));
     memset(value_locations, 0, s->mem_count * sizeof(u32));
     memset(meta_locations, 0, s->mem_count * sizeof(u32));
     memset(struct_tag_locations, 0, bh_arr_length(s->meta_tags) * sizeof(u32));
@@ -386,7 +386,7 @@ static i32 build_type_info_for_struct(struct TypeBuilderContext *ctx, Type *type
         bh_arr(AstTyped *) meta_tags = mem->meta_tags;
 
         bh_arr(u32) meta_tag_locations=NULL;
-        bh_arr_new(global_heap_allocator, meta_tag_locations, bh_arr_length(meta_tags));
+        bh_arr_new(context.gp_alloc, meta_tag_locations, bh_arr_length(meta_tags));
 
         build_tag_array(meta_tags, ctx, meta_tag_locations);
 
@@ -472,7 +472,7 @@ static i32 build_type_info_for_struct(struct TypeBuilderContext *ctx, Type *type
 }
 
 static i32 build_type_info_for_polystruct(struct TypeBuilderContext *ctx, Type *type) {
-    u32* tag_locations = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(type->PolyStruct.meta_tags));
+    u32* tag_locations = bh_alloc_array(context.scratch_alloc, u32, bh_arr_length(type->PolyStruct.meta_tags));
     memset(tag_locations, 0, sizeof(u32) * bh_arr_length(type->PolyStruct.meta_tags));
 
     u32 name_base = ctx->buffer.length;
@@ -541,10 +541,10 @@ static i32 build_type_info_for_distinct(struct TypeBuilderContext *ctx, Type *ty
 static i32 build_type_info_for_union(struct TypeBuilderContext *ctx, Type *type) {
     TypeUnion* u = &type->Union;
     u32 variant_count = bh_arr_length(u->variants_ordered);
-    u32* name_locations = bh_alloc_array(global_scratch_allocator, u32, variant_count);
-    u32* param_locations = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(u->poly_sln));
-    u32* meta_locations = bh_alloc_array(global_scratch_allocator, u32, variant_count);
-    u32* struct_tag_locations = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(u->meta_tags));
+    u32* name_locations = bh_alloc_array(context.scratch_alloc, u32, variant_count);
+    u32* param_locations = bh_alloc_array(context.scratch_alloc, u32, bh_arr_length(u->poly_sln));
+    u32* meta_locations = bh_alloc_array(context.scratch_alloc, u32, variant_count);
+    u32* struct_tag_locations = bh_alloc_array(context.scratch_alloc, u32, bh_arr_length(u->meta_tags));
     memset(meta_locations, 0, variant_count * sizeof(u32));
     memset(struct_tag_locations, 0, bh_arr_length(u->meta_tags) * sizeof(u32));
 
@@ -577,7 +577,7 @@ static i32 build_type_info_for_union(struct TypeBuilderContext *ctx, Type *type)
         bh_arr(AstTyped *) meta_tags = uv->meta_tags;
 
         bh_arr(u32) meta_tag_locations=NULL;
-        bh_arr_new(global_heap_allocator, meta_tag_locations, bh_arr_length(meta_tags));
+        bh_arr_new(context.gp_alloc, meta_tag_locations, bh_arr_length(meta_tags));
 
         build_tag_array(meta_tags, ctx, meta_tag_locations);
 
@@ -656,7 +656,7 @@ static i32 build_type_info_for_union(struct TypeBuilderContext *ctx, Type *type)
 }
 
 static i32 build_type_info_for_polyunion(struct TypeBuilderContext *ctx, Type *type) {
-    u32* tag_locations = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(type->PolyUnion.meta_tags));
+    u32* tag_locations = bh_alloc_array(context.scratch_alloc, u32, bh_arr_length(type->PolyUnion.meta_tags));
     memset(tag_locations, 0, sizeof(u32) * bh_arr_length(type->PolyUnion.meta_tags));
 
     u32 name_base = ctx->buffer.length;
@@ -703,8 +703,8 @@ static void build_type_info_for_type(OnyxWasmModule *module, Type *type) {
     struct TypeBuilderContext ctx = {0};
     ctx.module = module;
 
-    bh_buffer_init(&ctx.buffer, global_heap_allocator, 512);
-    bh_arr_new(global_heap_allocator, ctx.patches, 16);
+    bh_buffer_init(&ctx.buffer, context.gp_alloc, 512);
+    bh_arr_new(context.gp_alloc, ctx.patches, 16);
 
     u32 type_table_info_data_id = NEXT_DATA_ID(module);
 
@@ -776,7 +776,7 @@ static void build_type_info_for_type(OnyxWasmModule *module, Type *type) {
 static u64 prepare_type_table(OnyxWasmModule* module) {
     // This is the data behind the "type_table" slice in runtime/info/types.onyx
     u32 type_count = bh_arr_length(type_map.entries) + 1;
-    void* table_info = bh_alloc_array(global_heap_allocator, u8, 2 * type_count * POINTER_SIZE);
+    void* table_info = bh_alloc_array(context.gp_alloc, u8, 2 * type_count * POINTER_SIZE);
     memset(table_info, 0, 2 * type_count * POINTER_SIZE);
 
     WasmDatum type_table_data = {
@@ -787,7 +787,7 @@ static u64 prepare_type_table(OnyxWasmModule* module) {
     emit_data_entry(module, &type_table_data);
     module->global_type_table_data_id = type_table_data.id;
 
-    Table_Info_Type* tmp_data = bh_alloc(global_heap_allocator, 2 * POINTER_SIZE);
+    Table_Info_Type* tmp_data = bh_alloc(context.gp_alloc, 2 * POINTER_SIZE);
 
     tmp_data[0] = 0;
     tmp_data[1] = 0;
@@ -819,7 +819,7 @@ static u64 prepare_type_table(OnyxWasmModule* module) {
 
 static u64 build_foreign_blocks(OnyxWasmModule* module) {
     bh_arr(u32) base_patch_locations=NULL;
-    bh_arr_new(global_heap_allocator, base_patch_locations, 256);
+    bh_arr_new(context.gp_alloc, base_patch_locations, 256);
 
 #define PATCH (bh_arr_push(base_patch_locations, foreign_buffer.length))
 #define PATCH_AT(x) (bh_arr_push(base_patch_locations, (x)))
@@ -840,11 +840,11 @@ static u64 build_foreign_blocks(OnyxWasmModule* module) {
         #define Foreign_Block_Type u64
     #endif
     u32 block_count = bh_arr_length(module->foreign_blocks);
-    Foreign_Block_Type* foreign_info = bh_alloc_array(global_heap_allocator, Foreign_Block_Type, block_count); // HACK
+    Foreign_Block_Type* foreign_info = bh_alloc_array(context.gp_alloc, Foreign_Block_Type, block_count); // HACK
     memset(foreign_info, 0, block_count * sizeof(Foreign_Block_Type));
 
     bh_buffer foreign_buffer;
-    bh_buffer_init(&foreign_buffer, global_heap_allocator, 4096);
+    bh_buffer_init(&foreign_buffer, context.gp_alloc, 4096);
 
     u32 foreign_info_data_id = NEXT_DATA_ID(module);
 
@@ -864,11 +864,11 @@ static u64 build_foreign_blocks(OnyxWasmModule* module) {
 
         u32 funcs_length = 0;
 
-        u32 *name_offsets = bh_alloc_array(global_scratch_allocator, u32, shlen(fb->scope->symbols));
-        u32 *name_lengths = bh_alloc_array(global_scratch_allocator, u32, shlen(fb->scope->symbols));
-        u32 *func_types   = bh_alloc_array(global_scratch_allocator, u32, shlen(fb->scope->symbols));
-        u32 *tag_offsets  = bh_alloc_array(global_scratch_allocator, u32, shlen(fb->scope->symbols));
-        u32 *tag_lengths  = bh_alloc_array(global_scratch_allocator, u32, shlen(fb->scope->symbols));
+        u32 *name_offsets = bh_alloc_array(context.scratch_alloc, u32, shlen(fb->scope->symbols));
+        u32 *name_lengths = bh_alloc_array(context.scratch_alloc, u32, shlen(fb->scope->symbols));
+        u32 *func_types   = bh_alloc_array(context.scratch_alloc, u32, shlen(fb->scope->symbols));
+        u32 *tag_offsets  = bh_alloc_array(context.scratch_alloc, u32, shlen(fb->scope->symbols));
+        u32 *tag_lengths  = bh_alloc_array(context.scratch_alloc, u32, shlen(fb->scope->symbols));
 
         fori (i, 0, shlen(fb->scope->symbols)) {
             AstFunction *func = (AstFunction *) fb->scope->symbols[i].value;
@@ -983,7 +983,7 @@ static u64 build_foreign_blocks(OnyxWasmModule* module) {
         bh_arr_push(module->data_patches, patch);
     }
 
-    Foreign_Block_Type* tmp_data = bh_alloc(global_heap_allocator, 2 * POINTER_SIZE);
+    Foreign_Block_Type* tmp_data = bh_alloc(context.gp_alloc, 2 * POINTER_SIZE);
     tmp_data[0] = 0;
     tmp_data[1] = block_count;
     WasmDatum foreign_table_global_data = {
@@ -1014,7 +1014,7 @@ static u64 build_foreign_blocks(OnyxWasmModule* module) {
 
 static u64 build_tagged_procedures(OnyxWasmModule *module) {
     bh_arr(u32) base_patch_locations=NULL;
-    bh_arr_new(global_heap_allocator, base_patch_locations, 256);
+    bh_arr_new(context.gp_alloc, base_patch_locations, 256);
 
 #define PATCH (bh_arr_push(base_patch_locations, tag_proc_buffer.length))
 #define WRITE_PTR(val) \
@@ -1033,11 +1033,11 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
         #define Tagged_Procedure_Type u64
     #endif
     u32 proc_count = bh_arr_length(module->procedures_with_tags);
-    Tagged_Procedure_Type* tag_proc_info = bh_alloc_array(global_heap_allocator, Tagged_Procedure_Type, proc_count); // HACK
+    Tagged_Procedure_Type* tag_proc_info = bh_alloc_array(context.gp_alloc, Tagged_Procedure_Type, proc_count); // HACK
     memset(tag_proc_info, 0, proc_count * sizeof(Tagged_Procedure_Type));
 
     bh_buffer tag_proc_buffer;
-    bh_buffer_init(&tag_proc_buffer, global_heap_allocator, 4096);
+    bh_buffer_init(&tag_proc_buffer, context.gp_alloc, 4096);
 
     u32 proc_info_data_id = NEXT_DATA_ID(module);
 
@@ -1056,8 +1056,8 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
         AstFunction *func = *pfunc;
 
         u32 tag_count = bh_arr_length(func->tags);
-        u32 *tag_data_offsets = bh_alloc_array(global_scratch_allocator, u32, tag_count);
-        u32 *tag_data_types   = bh_alloc_array(global_scratch_allocator, u32, tag_count);
+        u32 *tag_data_offsets = bh_alloc_array(context.scratch_alloc, u32, tag_count);
+        u32 *tag_data_types   = bh_alloc_array(context.scratch_alloc, u32, tag_count);
 
         u32 tag_index = 0;
         bh_arr_each(AstTyped *, ptag, func->tags) {
@@ -1136,7 +1136,7 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
         bh_arr_push(module->data_patches, patch);
     }
 
-    Tagged_Procedure_Type* tmp_data = bh_alloc(global_heap_allocator, 2 * POINTER_SIZE);
+    Tagged_Procedure_Type* tmp_data = bh_alloc(context.gp_alloc, 2 * POINTER_SIZE);
     tmp_data[0] = 0;
     tmp_data[1] = proc_count;
     WasmDatum proc_table_global_data = {
@@ -1166,7 +1166,7 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
 
 static u64 build_tagged_globals(OnyxWasmModule *module) {
     bh_arr(u32) base_patch_locations=NULL;
-    bh_arr_new(global_heap_allocator, base_patch_locations, 256);
+    bh_arr_new(context.gp_alloc, base_patch_locations, 256);
 
 #define PATCH (bh_arr_push(base_patch_locations, tag_global_buffer.length))
 #define WRITE_PTR(val) \
@@ -1185,11 +1185,11 @@ static u64 build_tagged_globals(OnyxWasmModule *module) {
         #define Tagged_Global_Type u64
     #endif
     u32 global_count = bh_arr_length(module->globals_with_tags);
-    Tagged_Global_Type* tag_global_info = bh_alloc_array(global_heap_allocator, Tagged_Global_Type, global_count); // HACK
+    Tagged_Global_Type* tag_global_info = bh_alloc_array(context.gp_alloc, Tagged_Global_Type, global_count); // HACK
     memset(tag_global_info, 0, global_count * sizeof(Tagged_Global_Type));
 
     bh_buffer tag_global_buffer;
-    bh_buffer_init(&tag_global_buffer, global_heap_allocator, 4096);
+    bh_buffer_init(&tag_global_buffer, context.gp_alloc, 4096);
 
     u32 global_info_data_id = NEXT_DATA_ID(module);
 
@@ -1208,8 +1208,8 @@ static u64 build_tagged_globals(OnyxWasmModule *module) {
         AstMemRes *memres = *pmemres;
 
         u32 tag_count = bh_arr_length(memres->tags);
-        u32 *tag_data_offsets = bh_alloc_array(global_scratch_allocator, u32, tag_count);
-        u32 *tag_data_types   = bh_alloc_array(global_scratch_allocator, u32, tag_count);
+        u32 *tag_data_offsets = bh_alloc_array(context.scratch_alloc, u32, tag_count);
+        u32 *tag_data_types   = bh_alloc_array(context.scratch_alloc, u32, tag_count);
 
         u32 tag_index = 0;
         bh_arr_each(AstTyped *, ptag, memres->tags) {
@@ -1296,7 +1296,7 @@ static u64 build_tagged_globals(OnyxWasmModule *module) {
         bh_arr_push(module->data_patches, patch);
     }
 
-    Tagged_Procedure_Type* tmp_data = bh_alloc(global_heap_allocator, 2 * POINTER_SIZE);
+    Tagged_Procedure_Type* tmp_data = bh_alloc(context.gp_alloc, 2 * POINTER_SIZE);
     tmp_data[0] = 0;
     tmp_data[1] = global_count;
     WasmDatum global_table_global_data = {
