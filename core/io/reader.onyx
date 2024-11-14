@@ -38,7 +38,7 @@ Reader.reset :: reader_reset
 Reader.free :: reader_free
 Reader.from_string :: reader_from_string
 Reader.get_buffered :: reader_get_buffered
-Reader.ensure_buffered :: reader_ensure_buffere
+Reader.ensure_buffered :: reader_ensure_buffered
 Reader.is_empty :: reader_empty
 Reader.empty    :: reader_empty
 Reader.read_all :: read_all

@@ -1,4 +1,4 @@
-package core.threadthread
+package core.thread
 
 use runtime
 use core {*}
