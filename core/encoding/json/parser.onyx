@@ -172,7 +172,7 @@ parse_object :: (use parser: &Parser) -> (Value, Error) {
     if err.kind != .None do return Value.{value}, err
 
     // This uses the context allocators because the array resizing needs to happen in a general purpose heap allocator
-    Array.init(&value.object_, allocator=context.allocator)
+    Array.init(&value.object_, allocator=allocator)
     defer if err.kind != .None {
         free(Value.{value}, allocator)
     }
