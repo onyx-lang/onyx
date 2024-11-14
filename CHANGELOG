@@ -1,6 +1,6 @@
 Release 0.1.13
 --------------
-Not released yet
+8th November 2024
 
 Additions:
 - Unwrap operator, `x!`.
@@ -8,6 +8,7 @@ Additions:
 - "Field update" syntax. A shorthand to change a field of a structure.
     - `.{ ..old_value, field = new_value }`
 - `onyx watch` now works on MacOS.
+- `onyx run-watch` to automatically re-run the program on changes.
 - `#wasm_section` directive to add custom sections to the WASM binary.
 - Custom commands per project
     - Installed in a `.onyx` directory
@@ -25,17 +26,23 @@ Additions:
 - `core.crypto.keys`
 - `core.encoding.json.Value.as_entry_array`
 - `core.encoding.base64 { encode_url, decode_url }`
+- `core.encoding.xml`
 
 Removals:
 
 Changes:
+- Capture/closure syntax is now `(params) use (captures) ...`.
+    - `(x: i32) use (variable) -> str { ... }`
+    - `(x) use (variable) => { ... }`
 - `&&` and `||` now short-circuit.
+- Fixed-sized arrays (`[N] T`) are now passed by value.
 - The size of tag field for unions is now dependent on the number of variants.
 - Parsing structs no longer sometimes needs `#type`.
 - Renamed `core.alloc.memdebug` to `core.alloc.memwatch`.
 
 Bugfixes:
 - Bug when injecting into a `#distinct` type.
+- Many, many random bugs.
 
 
 

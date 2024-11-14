@@ -1,4 +1,4 @@
-// Notice this time, we are not adding, 'package main' or '#load "core/module"'
+// Notice this time, we are not adding, 'package main' or ''
 // to the top of the file, since every file is automatically part of the
 // main package unless specified otherwise, and every compilations includes
 // the standard library.

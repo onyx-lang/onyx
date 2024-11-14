@@ -1,0 +1,27 @@
+use core {*}
+
+Vec2 :: [2] f32
+Vec2i :: [2] i32
+
+foo :: (a: Vec2) -> void {
+    printf("{} {}\n", a, a + a)
+}
+
+f2 :: () -> Vec2 {
+    return .[4, 7]
+}
+
+ioo :: (a: Vec2i) -> void {
+    printf("{} {}\n", a, a + a)
+}
+
+i2 :: () -> Vec2i {
+    return .[4, 7]
+}
+
+main :: () {
+    foo(f2())
+    ioo(i2())
+}
+
+

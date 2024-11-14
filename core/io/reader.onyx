@@ -38,6 +38,7 @@ Reader.reset :: reader_reset
 Reader.free :: reader_free
 Reader.from_string :: reader_from_string
 Reader.get_buffered :: reader_get_buffered
+Reader.ensure_buffered :: reader_ensure_buffere
 Reader.is_empty :: reader_empty
 Reader.empty    :: reader_empty
 Reader.read_all :: read_all
@@ -108,6 +109,24 @@ reader_get_buffered :: (use reader: &Reader) -> i32 {
 
 reader_empty :: (use reader: &Reader) -> bool {
     return done && reader_get_buffered(reader) == 0
+}
+
+reader_ensure_buffered :: (use reader: &Reader, bytes: u32) -> Error {
+    if bytes > buffer.length do return .OutOfBounds
+
+    if start == end && end == 0 {
+        return .EOF
+    }
+
+    while start + bytes > end {
+        // This handles the weird case where a stream could be
+        // waiting for data to arrive and continually returning None
+        if err := reader_read_next_chunk(reader); err != .None {
+            return err
+        }
+    }
+
+    return .None
 }
 
 read_all :: (use reader: &Reader, allocator := context.allocator) -> [] u8 {

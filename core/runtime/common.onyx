@@ -121,13 +121,10 @@ __thread_initialize :: () {
 
         func(data)
 
-        __flush_stdio()
-
-        core.thread.__exited(id)
+        __flush_stdio();
     }
 
     _thread_exit :: (id: i32) {
-        // raw_free(alloc.heap_allocator, __tls_base)
-        // core.thread.__exited(id)
+        core.thread.__exited(id);
     }
 }

@@ -21,7 +21,7 @@
         ".gitignore": "*.wasm\nlib\nbin",
         "onyx-pkg.kdl": "package {\n    name \"{{name}}\"\n    author \"{{author}}\"\n    url \"{{url}}\"\n    description \"{{description}}\"\n    version \"0.0.1\"\n}\n\nconfig {\n    dependency_source_path \"./lib\"\n    dependency_binary_path \"./bin\"\n}\n\nlsp {\n    mode \"project\"\n    source_files \"src/main.onyx\"\n    include_dirs \"\"\n    working_dir \".\"\n}",
         "src": {
-            "main.onyx": "#load \"lib/packages\"\n\nuse core {println}\n\nmain :: () {\n    println(\"Hello Onyx!\");\n}\n"
+            "main.onyx": "#load \"./../lib/packages\"\n\nuse core {println}\n\nmain :: () {\n    println(\"Hello Onyx!\");\n}\n"
         }
     },
     "commands": [

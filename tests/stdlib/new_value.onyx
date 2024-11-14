@@ -7,8 +7,6 @@ Foo :: struct {
 }
 
 main :: () {
-    context.allocator = alloc.log.logging_allocator(&alloc.heap_allocator)
-
     v1 := new(Foo.{
         123
         456

@@ -656,6 +656,36 @@ str.bisect :: (s: str, substr: str) -> (str, str) {
     return s[0 .. index], s[index+substr.length .. s.length]
 }
 
+
+str.tokenize :: (s: str, charset: [] u8) => {
+    Token :: struct {
+        text: str
+        is_separator: bool
+    }
+
+    next :: (use _: &$C) -> ? Token {
+        if start >= s.length {
+            return .None
+        }
+
+        i := start
+        is_separator := Slice.some(charset, [a](a == s[i]))
+        while i < s.length {
+            c   := s[i]
+            sep := Slice.some(charset, [a](a == c))
+
+            if sep != is_separator do break
+
+            i += 1
+        }
+
+        defer start = i
+        return Token.{ s[start .. i], is_separator }
+    }
+
+    return Iterator.generator(&.{ s = s, start = 0, charset = charset }, next)
+}
+
 //
 // Used by dyn_str
 //

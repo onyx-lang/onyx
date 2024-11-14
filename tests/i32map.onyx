@@ -1,6 +1,6 @@
 package main
 
-#load "core/module"
+
 
 use core {*}
 

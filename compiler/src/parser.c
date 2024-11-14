@@ -671,7 +671,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         case '.': {
             if (parse_possible_struct_literal(parser, NULL, &retval)) return retval;
             if (parse_possible_array_literal(parser, NULL, &retval))  return retval;
-            if (parse_possible_unary_field_access(parser, &retval))   return retval;
+            if (parse_possible_unary_field_access(parser, &retval))   break;
             goto no_match;
         }
 
@@ -1344,10 +1344,19 @@ static BinaryOp binary_op_from_current_token(OnyxParser *parser) {
 
     if (op == Binary_Op_Count && parser->curr->type == Token_Type_Inserted_Semicolon) {
         int n = 1;
-        while (peek_token(n)->type == Token_Type_Comment) n++;
+
+        while (peek_token(n)->type == Token_Type_Comment) {
+            n++;
+        }
 
         if (peek_token(n)->type == Token_Type_Pipe) {
-            fori (i, 0, n) consume_token(parser);
+            // This is a slight hack. Though we have peeked ahead n tokens in order
+            // to skip the potential comments, `consume_token` will eat the comments
+            // automatically, so we don't need to call `consume_token` n times, just
+            // once.
+            //                                              - brendanfh, 2024/09/25
+            consume_token(parser);
+
             op = Binary_Op_Pipe;
         }
     }
@@ -3072,19 +3081,6 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
 
     OnyxToken* symbol;
     while (!consume_token_if_next(parser, ')')) {
-        if (consume_token_if_next(parser, '[') && !func->captures) {
-            func->captures = parse_capture_list(parser, ']');
-            consume_token_if_next(parser, ',');
-
-            if (bh_arr_length(parser->current_function_stack) == 1) continue;
-
-            AstFunction *parent_func = parser->current_function_stack[bh_arr_length(parser->current_function_stack) - 2];
-            if (parent_func->kind == Ast_Kind_Polymorphic_Proc) {
-                func->flags |= Ast_Flag_Function_Is_Lambda_Inside_PolyProc;
-            }
-            continue;
-        }
-
         do {
             if (parser->hit_unexpected_token) return;
 
@@ -3281,6 +3277,19 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
         name = bh_aprintf(global_heap_allocator, "%b", current_symbol->text, current_symbol->length);
     }
 
+    if (consume_token_if_next(parser, Token_Type_Keyword_Use)) {
+        expect_token(parser, '(');
+        func_def->captures = parse_capture_list(parser, ')');
+        consume_token_if_next(parser, ',');
+
+        if (bh_arr_length(parser->current_function_stack) > 1) {
+            AstFunction *parent_func = parser->current_function_stack[bh_arr_length(parser->current_function_stack) - 2];
+            if (parent_func->kind == Ast_Kind_Polymorphic_Proc) {
+                func_def->flags |= Ast_Flag_Function_Is_Lambda_Inside_PolyProc;
+            }
+        }
+    }
+
     if (consume_token_if_next(parser, Token_Type_Fat_Right_Arrow)) {
         func_def->return_type = (AstType *) &basic_type_auto_return;
 
@@ -3361,46 +3370,26 @@ function_defined:
 }
 
 static b32 parse_possible_function_definition_no_consume(OnyxParser* parser) {
-    if (parser->curr->type == '(') {
-        OnyxToken* matching_paren = find_matching_paren(parser->curr);
-        if (matching_paren == NULL) return 0;
+    if (parser->curr->type != '(') return 0;
 
-        if (next_tokens_are(parser, 3, '(', ')', Token_Type_Fat_Right_Arrow)) return 0;
+    if (peek_token(1)->type == ')') {
+        return 1;
+    }
 
-        // :LinearTokenDependent
-        OnyxToken* token_after_paren = matching_paren + 1;
+    int offset = 1;
 
-        // Allow for:
-        //     foo :: ()
-        //         -> i32 {}
-        //
-        //     bar :: ()
-        //     { }
-        if (token_after_paren->type == Token_Type_Inserted_Semicolon)
-            token_after_paren += 1;
+keep_going:
+    if (peek_token(offset)->type == Token_Type_Keyword_Use) offset += 1;
+    if (peek_token(offset)->type == '$') offset += 1;
+    if (peek_token(offset)->type == Token_Type_Symbol) {
+        offset += 1;
+        if (peek_token(offset)->type == ',') {
+            offset += 1;
+            goto keep_going;
 
-        if (token_after_paren->type != Token_Type_Right_Arrow
-            && token_after_paren->type != '{'
-            && token_after_paren->type != Token_Type_Keyword_Do
-            && token_after_paren->type != Token_Type_Empty_Block
-            && token_after_paren->type != Token_Type_Keyword_Where
-            && token_after_paren->type != Token_Type_Fat_Right_Arrow)
-            return 0;
-
-        // :LinearTokenDependent
-        b32 is_params = (parser->curr + 1) == matching_paren;
-        OnyxToken* tmp_token = parser->curr;
-        while (!is_params && tmp_token < matching_paren) {
-            if (tmp_token->type == ':') is_params = 1;
-
-            tmp_token++;
+        } else if (peek_token(offset)->type == ':') {
+            return 1;
         }
-
-        if (peek_token(1)->type == '[' && (matching_paren - 1)->type == ']') {
-            is_params = 1;
-        }
-
-        return is_params;
     }
 
     return 0;
@@ -3434,15 +3423,26 @@ static b32 parse_possible_quick_function_definition_no_consume(OnyxParser* parse
 
     if (parser->curr->type != '(') return 0;
 
-    OnyxToken* matching_paren = find_matching_paren(parser->curr);
-    if (matching_paren == NULL) return 0;
+    i32 offset = 1;
+    while (peek_token(offset)->type != ')') {
+        if (peek_token(offset)->type != Token_Type_Symbol) return 0;
+        offset += 1;
+
+        if (peek_token(offset)->type == ')') break;
+
+        if (peek_token(offset)->type != ',') return 0;
+        offset += 1;
+    }
 
     // :LinearTokenDependent
-    OnyxToken* token_after_paren = matching_paren + 1;
-    if (token_after_paren->type != Token_Type_Fat_Right_Arrow)
-        return 0;
+    OnyxToken* token_after_paren = peek_token(offset + 1);
+    if (token_after_paren->type == Token_Type_Fat_Right_Arrow)
+        return 1;
 
-    return 1;
+    if (token_after_paren->type == Token_Type_Keyword_Use)
+        return 1;
+
+    return 0;
 }
 
 static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped** ret) {
@@ -3465,20 +3465,20 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
         while (!consume_token_if_next(parser, ')')) {
             if (parser->hit_unexpected_token) return 0;
 
-            if (consume_token_if_next(parser, '[') && !captures) {
-                captures = parse_capture_list(parser, ']');
+            QuickParam param = { 0 };
+            if (consume_token_if_next(parser, '$')) param.is_baked = 1;
+            param.token = expect_token(parser, Token_Type_Symbol);
 
-            } else {
-                QuickParam param = { 0 };
-                if (consume_token_if_next(parser, '$')) param.is_baked = 1;
-                param.token = expect_token(parser, Token_Type_Symbol);
-
-                bh_arr_push(params, param);
-            }
+            bh_arr_push(params, param);
 
             if (parser->curr->type != ')') {
                 expect_token(parser, ',');
             }
+        }
+
+        if (consume_token_if_next(parser, Token_Type_Keyword_Use)) {
+            expect_token(parser, '(');
+            captures = parse_capture_list(parser, ')');
         }
     }
 
@@ -4062,6 +4062,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
     if (parse_possible_tag(parser)) return;
 
+  retry_because_inserted_semicolon:
     switch ((u16) parser->curr->type) {
         case Token_Type_Keyword_Use: {
             OnyxToken *use_token = expect_token(parser, Token_Type_Keyword_Use);
@@ -4087,6 +4088,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 binding = parse_top_level_binding(parser, symbol);
                 bh_arr_pop(parser->current_symbol_stack);
 
+                // bh_printf("%b: %d\n", symbol->text, symbol->length, private_kind);
                 if (binding != NULL) binding->flags |= private_kind;
 
                 goto submit_binding_to_entities;
@@ -4385,8 +4387,11 @@ static void parse_top_level_statement(OnyxParser* parser) {
         }
 
         case ';':
-        case Token_Type_Inserted_Semicolon:
             break;
+
+        case Token_Type_Inserted_Semicolon:
+            consume_token(parser);
+            goto retry_because_inserted_semicolon;
 
         default:
             onyx_report_error(parser->curr->pos, Error_Critical, "Unexpected token in top-level statement, '%s'", token_name(parser->curr));

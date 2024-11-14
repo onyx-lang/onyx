@@ -65,5 +65,5 @@ main :: (args: [] cstr) {
 
 }
 
-#load "core/module"
+
 use core {*}

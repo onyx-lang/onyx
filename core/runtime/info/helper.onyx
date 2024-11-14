@@ -317,9 +317,9 @@ get_struct_by_name :: (name: str) -> type_expr {
     index := 0
     for type_table {
         defer index += 1
-        if it.kind != .Struct do continue
+        if it.info.kind != .Struct do continue
 
-        if (cast(&Type_Info_Struct) it).name == name do return cast(type_expr) index
+        if (cast(&Type_Info_Struct) it.info).name == name do return cast(type_expr) index
     }
 
     return void
@@ -354,8 +354,8 @@ for_all_types :: macro (body: Code) {
     use runtime
 
     for runtime.info.type_table.count {
-        type_info := runtime.info.type_table[it]
-        type_idx  : type_expr = ~~ it
+        type_info := runtime.info.type_table[it].info
+        type_idx  := runtime.info.type_table[it].type
 
         #unquote body(type_info, type_idx)
     }

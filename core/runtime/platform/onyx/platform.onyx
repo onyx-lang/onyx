@@ -13,9 +13,9 @@ use runtime {
 #load "./env"
 #load "./net"
 
-#load "core/onyx/cptr"
-#load "core/onyx/cbindgen"
-// #load "core/onyx/fault_handling"
+#load "core:onyx/cptr"
+#load "core:onyx/cbindgen"
+// #load "core:onyx/fault_handling"
 
 // Platform supports
 Supports_Files :: true

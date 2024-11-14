@@ -193,7 +193,7 @@ query_selector_matches :: (s: &Selector, trail: [] QueryStack) -> bool {
 #local
 query_matcher_matches :: (s: &Matcher, node: &Node) =>
     iter.as_iter(s.details)
-    |> iter.every((d, [node]) => {
+    |> iter.every((d) use (node) => {
         if d.accessor.Scope do return false
 
         if d.accessor.Node {

@@ -128,14 +128,14 @@ static void context_init(CompileOptions* opts) {
         .state = Entity_State_Parse_Builtin,
         .type = Entity_Type_Load_File,
         .package = NULL,
-        .include = create_load(context.ast_alloc, "core/builtin"),
+        .include = create_load(context.ast_alloc, "core:builtin"),
     }));
 
     entity_heap_insert(&context.entities, ((Entity) {
         .state = Entity_State_Parse_Builtin,
         .type = Entity_Type_Load_File,
         .package = NULL,
-        .include = create_load(context.ast_alloc, "core/runtime/build_opts"),
+        .include = create_load(context.ast_alloc, "core:runtime/build_opts"),
     }));
 
     if (context.options->runtime != Runtime_Custom) {
@@ -143,31 +143,31 @@ static void context_init(CompileOptions* opts) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context.ast_alloc, "core/runtime/info/types"),
+            .include = create_load(context.ast_alloc, "core:runtime/info/types"),
         }));
         runtime_info_foreign_entity = entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context.ast_alloc, "core/runtime/info/foreign_blocks"),
+            .include = create_load(context.ast_alloc, "core:runtime/info/foreign_blocks"),
         }));
         runtime_info_proc_tags_entity = entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context.ast_alloc, "core/runtime/info/proc_tags"),
+            .include = create_load(context.ast_alloc, "core:runtime/info/proc_tags"),
         }));
         runtime_info_global_tags_entity = entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context.ast_alloc, "core/runtime/info/global_tags"),
+            .include = create_load(context.ast_alloc, "core:runtime/info/global_tags"),
         }));
         runtime_info_stack_trace_entity = entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context.ast_alloc, "core/runtime/info/stack_trace"),
+            .include = create_load(context.ast_alloc, "core:runtime/info/stack_trace"),
         }));
     }
 
@@ -176,6 +176,7 @@ static void context_init(CompileOptions* opts) {
     builtin_tls_base.entity = NULL;
     builtin_tls_size.entity = NULL;
     builtin_closure_base.entity = NULL;
+    builtin_stack_trace.entity = NULL;
 
     add_entities_for_node(NULL, (AstNode *) &builtin_stack_top, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_heap_start, context.global_scope, NULL);
@@ -195,7 +196,7 @@ static void context_init(CompileOptions* opts) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context.ast_alloc, "core/module"),
+            .include = create_load(context.ast_alloc, "core:module"),
         }));
     }
 
@@ -216,9 +217,9 @@ static void context_init(CompileOptions* opts) {
     }
 
     if (context.options->verbose_output > 0) {
-        bh_printf("File search path:\n");
-        bh_arr_each(const char *, p, context.options->included_folders) {
-            bh_printf("\t%s\n", *p);
+        bh_printf("Mapped folders:\n");
+        bh_arr_each(bh_mapped_folder, p, context.options->mapped_folders) {
+            bh_printf("\t%s: %s\n", p->name, p->folder);
         }
         bh_printf("\n");
     }
@@ -241,7 +242,7 @@ static void parse_source_file(bh_file_contents* file_contents) {
     onyx_parser_free(&parser);
 }
 
-static b32 process_source_file(char* filename, OnyxFilePos error_pos) {
+static b32 process_source_file(char* filename) {
     bh_arr_each(bh_file_contents, fc, context.loaded_files) {
         // Duplicates are detected here and since these filenames will be the full path,
         // string comparing them should be all that is necessary.
@@ -251,13 +252,6 @@ static b32 process_source_file(char* filename, OnyxFilePos error_pos) {
     bh_file file;
     bh_file_error err = bh_file_open(&file, filename);
     if (err != BH_FILE_ERROR_NONE) {
-        if (context.cycle_detected) {
-            if (error_pos.filename == NULL) {
-                onyx_report_error(error_pos, Error_Command_Line_Arg, "Failed to open file %s", filename);
-            } else {
-                onyx_report_error(error_pos, Error_Critical, "Failed to open file %s", filename);
-            }
-        }
         return 0;
     }
 
@@ -283,26 +277,33 @@ static b32 process_load_entity(Entity* ent) {
         if (parent_file == NULL) parent_file = ".";
 
         char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
+        char* filename      = bh_search_for_mapped_file(
+            include->name,
+            parent_folder,
+            ".onyx",
+            context.options->mapped_folders
+        );
 
-        char* filename = bh_lookup_file(include->name, parent_folder, ".onyx", 1, context.options->included_folders, 1);
-        char* formatted_name = bh_strdup(global_heap_allocator, filename);
+        if (filename == NULL) {
+            OnyxFilePos error_pos = include->token->pos;
+            if (error_pos.filename == NULL) {
+                onyx_report_error(error_pos, Error_Command_Line_Arg, "Failed to open file '%s'", include->name);
+            } else {
+                onyx_report_error(error_pos, Error_Critical, "Failed to open file '%s'", include->name);
+            }
+            return 0;
+        }
 
-        return process_source_file(formatted_name, include->token->pos);
+        return process_source_file(filename);
 
     } else if (include->kind == Ast_Kind_Load_All) {
         const char* parent_file = include->token->pos.filename;
         if (parent_file == NULL) parent_file = ".";
 
         char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
-        char folder[512];
-        if (bh_str_starts_with(include->name, "./")) {
-            bh_snprintf(folder, 511, "%s/%s", parent_folder, include->name + 2);
-        } else {
-            bh_snprintf(folder, 511, "%s", include->name);
-        }
 
+        char* folder = bh_search_for_mapped_file(include->name, parent_folder, "", context.options->mapped_folders);
         bh_path_convert_separators(folder);
-        // This does not take into account #load_path'd folders...
 
         bh_arr(char *) folders_to_process = NULL;
         bh_arr_new(global_heap_allocator, folders_to_process, 2);
@@ -348,7 +349,7 @@ static b32 process_load_entity(Entity* ent) {
         return 1;
 
     } else if (include->kind == Ast_Kind_Load_Path) {
-        bh_arr_push(context.options->included_folders, include->name);
+        onyx_report_warning(include->token->pos, "'#load_path' has been deprecated and no longer does anything.");
 
     } else if (include->kind == Ast_Kind_Library_Path) {
         bh_arr_push(context.wasm_module->library_paths, include->name);
@@ -641,6 +642,8 @@ static i32 onyx_compile() {
     u64 duration = bh_time_duration(start_time);
 
     if (context.options->verbose_output > 0) {
+        printf("Type table size: %d bytes\n", context.wasm_module->type_info_size);
+
         // TODO: Replace these with bh_printf when padded formatting is added.
         printf("\nStatistics:\n");
         printf("    Time taken: %lf ms\n", (double) duration);
@@ -794,27 +797,46 @@ void cleanup_compilation() {
 }
 
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
-
 #include <signal.h>
+#include <sys/wait.h>
 
 static bh_file_watch watches;
+static i32 watch_run_pid = -1;
 
 static void onyx_watch_stop(int sig) {
     bh_file_watch_stop(&watches);
 }
 
+static void onyx_watch_run_executable(const char *target) {
+    watch_run_pid = fork();
+    switch (watch_run_pid) {
+        case -1: bh_printf("error: fork() failed\n"); break;
+        case 0:
+            setpgid(0, getpid());
+            close(STDIN_FILENO);
+            open("/dev/null", O_RDONLY);
+            execlp("onyx", "onyx", "run", target, NULL);
+            exit(1);
+            break;
+        default:
+            break;
+    }
+}
+
 static void onyx_watch(CompileOptions *compile_opts) {
     signal(SIGINT, onyx_watch_stop);
 
-    b32 running_watch = 1;
+    b32 run_the_program = compile_opts->action == ONYX_COMPILE_ACTION_WATCH_RUN;
 
-    do {
+    while (1) {
         bh_printf("\e[2J\e[?25l\n");
         bh_printf("\e[3;1H");
 
-        if (do_compilation(compile_opts) == ONYX_COMPILER_PROGRESS_SUCCESS) {
+        b32 successful_compilation = do_compilation(compile_opts) == ONYX_COMPILER_PROGRESS_SUCCESS;
+
+        if (successful_compilation) {
             onyx_flush_module();
-            bh_printf("\e[92mNo errors.\n");
+            bh_printf("\e[92mNo errors!\n");
         }
 
         char time_buf[128] = {0};
@@ -829,6 +851,11 @@ static void onyx_watch(CompileOptions *compile_opts) {
             bh_printf("\e[30;101m Error%s %d \e[0m", bh_num_plural(errors), errors);
         }
 
+        if (run_the_program && successful_compilation) {
+            bh_printf("\n\n\nRunning your program...\n");
+            onyx_watch_run_executable(compile_opts->target_file);
+        }
+
         watches = bh_file_watch_new();
 
         bh_arr_each(bh_file_contents, file, context.loaded_files) {
@@ -837,12 +864,21 @@ static void onyx_watch(CompileOptions *compile_opts) {
 
         cleanup_compilation();
 
-        if (!bh_file_watch_wait(&watches)) {
-            running_watch = 0;
+        b32 wait_successful = bh_file_watch_wait(&watches);
+
+        if (run_the_program && watch_run_pid > 0) {
+            int status;
+            killpg(watch_run_pid, SIGTERM);
+            waitpid(watch_run_pid, &status, 0);
+            watch_run_pid = -1;
         }
 
         bh_file_watch_free(&watches);
-    } while(running_watch);
+
+        if (!wait_successful) {
+            break;
+        }
+    }
 
 
     bh_printf("\e[2J\e[1;1H\e[?25h\n");
@@ -945,6 +981,12 @@ int main(int argc, char *argv[]) {
                 compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
             }
             break;
+
+        #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+        case ONYX_COMPILE_ACTION_WATCH_RUN:
+            onyx_watch(&compile_opts);
+            break;
+        #endif
         #endif
 
         #if defined(_BH_LINUX) || defined(_BH_DARWIN)

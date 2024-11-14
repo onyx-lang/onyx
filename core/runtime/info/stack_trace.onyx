@@ -16,7 +16,6 @@ Stack_Node :: struct {
     file: str
     line: u32
     func_name: str
-    func_type: type_expr
 }
 
 Stack_Trace :: struct {

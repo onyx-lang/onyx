@@ -1,6 +1,6 @@
 
 
-#load "core/module"
+
 
 use core {package, test}
 

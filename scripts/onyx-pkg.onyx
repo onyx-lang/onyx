@@ -1,6 +1,6 @@
 
-#load "core/module"
-#load "core/encoding/ini"
+
+#load "core:encoding/ini"
 
 //
 // A list of repository URLs to get packages from.
@@ -27,17 +27,18 @@ Protocols :: str.[
 //
 // NOTE: This returns a string that ends with the path separator.
 Template_Directory :: () -> str {
-    return os.path_join(os.path_directory(#file), "pkg_templates")
-            |> str.copy()
+    return os.path_directory(#file)
+        |> os.path_join("pkg_templates")
+        |> str.copy()
 }
 
-Version :: SemVer.{0, 1, 12}
+Version :: SemVer.{0, 1, 13}
 
 
 
 
 use core {package, *}
-use core.encoding {kdl}
+use core.encoding {kdl, json}
 use runtime
 
 global_arguments: struct {
@@ -221,7 +222,7 @@ run_add_command :: (args: [] str) {
     }
 
     if config.dependencies->has(dep_name) {
-        error_print("Dependency '{}' already specified at version '{}'.\n", dep_name, config.dependencies[dep_name]?.version)
+        error_print("Dependency '{}' already specified at version '{}'.\n", dep_name, config.dependencies[dep_name]?.target)
 
     } elseif version->is_zero() {
         error_print("Unable to find latest version of '{}'\n", args[0])
@@ -229,7 +230,7 @@ run_add_command :: (args: [] str) {
     } else {
         config.dependencies[dep_name] = .{
             name = dep_name,
-            version = version,
+            target = .{ version = version },
             source = .{ Git = dep_repo }
         }
         info_print("Added", "'{}' version {}\n", dep_name, version)
@@ -250,7 +251,7 @@ run_remove_command :: (args: [] str) {
     dep := args[0]
 
     if config.dependencies->has(dep) {
-        version := config.dependencies->get(dep)->unwrap().version
+        version := config.dependencies->get(dep)->unwrap().target.version
         config.dependencies->delete(dep)
         info_print("Removed", "'{}' version {}\n", dep, version)
         return
@@ -289,14 +290,20 @@ run_update_command :: (args: [] str) {
             continue
         }
 
-        repo := it.value.source.Git ?? [] { continue; }
-        new_version := Git.get_latest_compatible_version(repo, it.value.version)
-
-        if it.value.version != new_version {
-            info_print("Update", "{}  {} -> {}\n", it.key, it.value.version, new_version)
+        if it.value.target.branch {
+            info_print("Skipping", "{} because it references a branch, not a version.\n", it.key)
+            continue
         }
 
-        it.value.version = new_version
+        repo := it.value.source.Git ?? [] { continue; }
+        version := it.value.target.version!
+        new_version := Git.get_latest_compatible_version(repo, version)
+
+        if version != new_version {
+            info_print("Update", "{}  {} -> {}\n", it.key, version, new_version)
+        }
+
+        it.value.target = .{ version = new_version }
     }
 }
 
@@ -331,11 +338,11 @@ run_sync_command :: (args: [] str) {
     }
 
     use dependencies_to_install := make([..] To_Install)
-    use dependencies_installed  := make(Map(str, SemVer))
+    use dependencies_installed  := make(Map(str, Dependency.Target))
 
     for& config.dependencies.entries {
         dependencies_to_install << .{
-            .{it.value.source, it.value.version}, true
+            .{it.value.source, it.value.target}, true
         }
     }
 
@@ -369,24 +376,26 @@ run_sync_command :: (args: [] str) {
         for& inner_config.dependencies.entries {
             key := it.value.source.Git ?? [] { continue; }
             dep := dependencies_installed[key]
-            if dep {
-                // TODO : Check if this is right? Could this accidentally forcefully upgrade a package?
-                if it.value.version->is_newer(dep->unwrap()) {
-                    uninstall_package(.{it.value.source, it.value.version})
-                    dependencies_installed->delete(key)
-                    dependencies_to_install << .{ .{it.value.source, it.value.version}, false }
+            if !dep || it.value.target.branch {
+                dependencies_to_install << .{ .{ it.value.source, it.value.target }, false }
+            } elseif dep {
+                version := it.value.target.version ?? [] { continue }
 
-                } elseif !(it.value.version->is_compatible(dep->unwrap())) {
+                // TODO : Check if this is right? Could this accidentally forcefully upgrade a package?
+                if version->is_newer(dep!.version!) {
+                    uninstall_package(.{it.value.source, it.value.target})
+                    dependencies_installed->delete(key)
+                    dependencies_to_install << .{ .{it.value.source, it.value.target}, false }
+
+                } elseif !(version->is_compatible(dep!.version!)) {
                     // TODO: Explain this more
                     error_print("Different major versions of '{}' being used!\n", it.key)
                     os.exit(1)
                 }
-            } else {
-                dependencies_to_install << .{ .{it.value.source, it.value.version}, false }
             }
         }
 
-        dependencies_installed[repo] = to_install.version
+        dependencies_installed->put(repo, to_install.target)
     }
 
     if !run_tool_installation(".") {
@@ -507,7 +516,7 @@ run_migrate_command :: (args: [] str) {
 }
 
 @Command.{
-    "new", "Create a new project from a template in the current directory", "(template_name | --list) [directory]",
+    "new", "Create a new project from a template in the specified directory", "(template_name | --list | --create) [directory]",
 """
 Arguments:
     template_name    Template name to create.
@@ -525,6 +534,53 @@ run_new_command :: (args: [] str) {
 
                 printf("    {}\n", os.path_basename(it->name()))
             }
+            return
+        }
+
+        if args[0] == "--create" {
+            destination := do {
+                if args.count == 1 do return "template.json"
+                return args[1]
+            }
+
+            printf("Creating '{}' from the current directory\n", destination)
+
+            files: Map(str, str)
+            to_process := make([..] str)
+            to_process->push(".")
+
+            for folder in Iterator.from(&to_process) {
+                for entry in os.list_directory(folder) {
+                    name := entry->name()
+                    fullpath := os.path_join(folder, name)
+
+                    if entry.type == .Directory {
+                        if name == ".git" || name == "lib" || name == "bin" {
+                            info_print("Skipping", "Skipping folder {}\n", name)
+                            continue
+                        }
+
+                        to_process->push(fullpath)
+                    }
+
+                    if entry.type == .RegularFile {
+                        files->put(
+                            fullpath
+                            os.get_contents(fullpath)
+                        )
+                    }
+                }
+            }
+
+            use output := os.open(destination, .Write)->expect("Failed to open output file")
+            use writer := io.Writer.make(&output, 0)
+
+            writer->write("{\"variables\":{},")
+            writer->write("\"commands\":[],")
+            writer->write("\"files\":")
+            json.encode(&writer, files)
+            writer->write("}")
+
             return
         }
     }
@@ -553,16 +609,17 @@ run_new_command :: (args: [] str) {
     }
 
     use core.encoding {json}
-    template, err := json.decode_with_error(os.get_contents(template_file))
-    if err->has_error() {
+    template_res := json.decode_with_result(os.get_contents(template_file))
+    if template_res.Err {
         error_print("Failed to parse template file.\n")
-        print(err->message())
+        print(template_res.Err!)
         return
     }
 
     vars := make(Map(str, str))
     input := io.reader_make(&stdio.stream)
 
+    template := template_res.Ok!
     template_variables := template.root["variables"]->as_map()
     for template_variables->as_iter() {
         assert(it.value["type"]->as_str() == "string", "Only string types are supported right now in template variables.")
@@ -584,7 +641,7 @@ run_new_command :: (args: [] str) {
         command := it->as_str()
         info_print("Running", "{}\n", command)
 
-        args := str.split(command, ' ', context.temp_allocator)
+        args := command->split(' ', context.temp_allocator)
         cmd  := args[0]
         args  = args[1 .. args.count]
 
@@ -602,6 +659,18 @@ run_new_command :: (args: [] str) {
             switch it.second->type() {
                 case .String {
                     info_print("Creating", tprintf("{}\n", destination))
+
+                    { 
+                        folders := it.first->split('/')
+                        folders = folders[0 .. folders.count - 1]
+                        target := dir
+                        for folder in folders {
+                            target = os.path_join(target, folder)
+                            if !os.dir_exists(target) {
+                                os.dir_create(target)
+                            }
+                        }
+                    }
 
                     contents := process_contents(it.second->as_str(), vars)
                     use file := os.open(destination, .Write).Ok?
@@ -760,36 +829,47 @@ install_package :: (pack: Package, downgrade_if_necessary := false, skip_native_
     }
     package_folder := get_install_path_of_repo(repo)
 
-    if os.file_exists(package_folder) {
-        installed_version := get_installed_version_of_package(repo)
+    switch pack.target {
+    case .version as version {
+        if os.file_exists(package_folder) {
+            installed_version := get_installed_version_of_package(repo)
 
-        if installed_version == pack.version {
-            info_print("Exists", "{}  {}\n", repo, installed_version)
+            if installed_version == version {
+                info_print("Exists", "{}  {}\n", repo, installed_version)
 
-            success := true
-            if !native_library_is_up_to_date(package_folder) {
-                success = run_native_library_installation(package_folder)
+                success := true
+                if !native_library_is_up_to_date(package_folder) {
+                    success = run_native_library_installation(package_folder)
+                }
+
+                return success, package_folder
             }
 
-            return success, package_folder
+            if installed_version->is_newer(version) && !downgrade_if_necessary {
+                error_print("Refusing to downgrade '{}' from {} to {}.\n", repo, installed_version, version)
+                return false, ""
+            }
+
+            // :PRETTY
+            verb := "Upgrading" if version->is_newer(installed_version) else "Downgrading"
+            info_print(verb, "{}  {} -> {}\n", repo, installed_version, version)
+            uninstall_package(pack)
         }
 
-        if installed_version->is_newer(pack.version) && !downgrade_if_necessary {
-            error_print("Refusing to downgrade '{}' from {} to {}.\n", repo, installed_version, pack.version)
+        if !Git.clone_version(repo, version) {
+            error_print("Failed to fetch {} version {}.\n", repo, version)
             return false, ""
         }
-
-        // :PRETTY
-        verb := "Upgrading" if pack.version->is_newer(installed_version) else "Downgrading"
-        info_print(verb, "{}  {} -> {}\n", repo, installed_version, pack.version)
-        uninstall_package(pack)
     }
 
-    if !Git.clone_version(repo, pack.version) {
-        error_print("Failed to fetch {} version {}.\n", repo, pack.version)
-        return false, ""
+    case .branch as branch {
+        if !Git.clone_branch(repo, branch) {
+            error_print("Failed to fetch {} on branch {}.\n", repo, branch)
+            return false, ""
+        }
     }
-    
+    }
+
     if skip_native_compilation do return true, package_folder
 
     native_install_success := run_native_library_installation(package_folder)
@@ -1087,7 +1167,7 @@ SemVer :: struct {
 
 Package :: struct {
     source: DependencySource
-    version: SemVer
+    target: Dependency.Target
 }
 
 #if runtime.compiler_os == .Linux || runtime.compiler_os == .MacOS {
@@ -1183,42 +1263,80 @@ Git :: struct {
         }
 
         if successfully_cloned {
-            install_dest := strip_protocol_and_www_from_repo(repo)
+            return _move_to_permanent_storage(repo, temporary_dest)
+        }
 
-            // Move the cloned repository to its permanent location.
-            actual_dest := os.path_join(config.dependency_source_path, install_dest)
-            if os.dir_exists(actual_dest) {
+        return successfully_cloned
+    }
+
+    clone_branch :: (repo: str, branch: str) -> bool {
+        info_print("Fetch", "{}  {}\n", repo, branch)
+
+        temporary_dest := os.path_join(config.dependency_source_path, ".cloned")
+        os.remove_directory(temporary_dest)
+
+        successfully_cloned := do -> bool {
+            for proto in Protocols {
+                // Use 'git clone' to clone the bare minimum amount to get the released version.
+                proto_repo  := tprintf("{}{}", proto, repo)
+                git_proc    := os.process_spawn(git_path, .["clone", "--single-branch", "--depth", "1", "-b", branch, proto_repo, temporary_dest])
+                result      := os.process_wait(&git_proc)
+
+                if result == .Success do return true
+            }
+
+            error_print("Failed to clone {}/{}\n", repo, branch)
+            return false
+        }
+
+        if successfully_cloned {
+            return _move_to_permanent_storage(repo, temporary_dest, true)
+        }
+
+        return successfully_cloned
+    }
+
+    _move_to_permanent_storage :: (repo: str, temporary_dest: str, overwrite := false) -> bool {
+        install_dest := strip_protocol_and_www_from_repo(repo)
+
+        // Move the cloned repository to its permanent location.
+        actual_dest := os.path_join(config.dependency_source_path, install_dest)
+        if os.dir_exists(actual_dest) {
+            if overwrite {
+                os.remove_directory(actual_dest)
+
+            } else {
                 error_print("Expected {} to not exist when fetching '{}'.\n", actual_dest, repo)
                 os.remove_directory(temporary_dest)
                 return false
             }
+        }
 
-            rolling_parent := make(dyn_str)
-            path := str.split(actual_dest, os.PATH_SEP)
-            for path[0 .. path.length-1] {
-                dyn_str.append(&rolling_parent, it)
-                dyn_str.append(&rolling_parent, os.PATH_SEP)
+        rolling_parent := make(dyn_str)
+        path := str.split(actual_dest, os.PATH_SEP)
+        for path[0 .. path.length-1] {
+            dyn_str.append(&rolling_parent, it)
+            dyn_str.append(&rolling_parent, os.PATH_SEP)
 
-                if !os.dir_exists(rolling_parent) {
-                    os.dir_create(rolling_parent)
-                }
-            }
-
-            if !os.dir_rename(temporary_dest, actual_dest) {
-                error_print("Failed to move temporary package to final destination when fetching '{}'.\n", repo)
-                os.remove_directory(temporary_dest)
-                return false
-            }
-
-            // Remove the .git folder, as it is unneeded.
-            unnecessary_git_dir := os.path_join(actual_dest, ".git")
-            if !os.remove_directory(unnecessary_git_dir) {
-                error_print("Failed to delete .git folder of '{}'.\n", repo)
-                return false
+            if !os.dir_exists(rolling_parent) {
+                os.dir_create(rolling_parent)
             }
         }
 
-        return successfully_cloned
+        if !os.dir_rename(temporary_dest, actual_dest) {
+            error_print("Failed to move temporary package to final destination when fetching '{}'.\n", repo)
+            os.remove_directory(temporary_dest)
+            return false
+        }
+
+        // Remove the .git folder, as it is unneeded.
+        unnecessary_git_dir := os.path_join(actual_dest, ".git")
+        if !os.remove_directory(unnecessary_git_dir) {
+            error_print("Failed to delete .git folder of '{}'.\n", repo)
+            return false
+        }
+
+        return true
     }
 
     publish_version :: () -> bool {
@@ -1266,7 +1384,11 @@ Config :: struct {
 
 Dependency :: struct {
     name: str
-    version: SemVer
+    Target :: union {
+        version: SemVer
+        branch: str
+    }
+    target: Target
     locked: bool
     source: DependencySource
 }
@@ -1429,8 +1551,17 @@ load_config :: (path: str) -> ? Config {
         d: Dependency
         d.name = it.node
 
-        version_str := it->value_or_null()->as_str() ?? ""
-        conv.parse_any(&d.version, version_str)
+        if it.values.length == 0 {
+            it.props->get("branch")->with([branch] {
+                d.target = .{ branch = branch->as_str() ?? "" }
+            })
+
+        } else {
+            version_str := it->value_or_null()->as_str() ?? ""
+            version: SemVer
+            conv.parse_any(&version, version_str)
+            d.target = .{ version = version }
+        }
 
         it.props->get("git")->with([src] {
             d.source = .{ Git = src->as_str() ?? "" }
@@ -1515,7 +1646,15 @@ store_config :: (path: str) -> bool {
             dep_node := doc->create_node(it.key)
             dependency_node.children << dep_node
 
-            dep_node->add_value(.{ String = tprintf("{}", it.value.version) })
+            switch it.value.target {
+                case .version as ver {
+                    dep_node->add_value(.{ String = tprintf("{}", ver) })
+                }
+
+                case .branch as br {
+                    dep_node.props->put("branch", .{ data = .{ String = br } })
+                }
+            }
 
             switch it.value.source {
                 case .Git as s {
@@ -1582,7 +1721,7 @@ read_old_config :: (path: str) -> ? Config {
     for inner_config.dependencies.dependencies.entries {
         c.dependencies->put(it.key[str.last_index_of(it.key, '/')+1 .. it.key.length], .{
             name = it.key,
-            version = it.value,
+            target = .{ version = it.value },
             source = .{ Git = it.key }
         })
     }

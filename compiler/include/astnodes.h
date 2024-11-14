@@ -3,7 +3,7 @@
 
 #define VERSION_MAJOR 0
 #define VERSION_MINOR 1
-#define VERSION_PATCH 12
+#define VERSION_PATCH 13
 
 #include "stb_ds.h"
 #include "lex.h"
@@ -1876,6 +1876,7 @@ enum CompileAction {
     ONYX_COMPILE_ACTION_RUN,
     ONYX_COMPILE_ACTION_RUN_WASM,
     ONYX_COMPILE_ACTION_WATCH,
+    ONYX_COMPILE_ACTION_WATCH_RUN,
     ONYX_COMPILE_ACTION_DOCUMENT,
     ONYX_COMPILE_ACTION_PRINT_HELP,
     ONYX_COMPILE_ACTION_PRINT_VERSION,
@@ -1996,7 +1997,7 @@ struct CompileOptions {
 
     Runtime runtime;
 
-    bh_arr(const char *) included_folders;
+    bh_arr(bh_mapped_folder) mapped_folders;
     bh_arr(const char *) files;
     const char* target_file;
     const char* documentation_file;

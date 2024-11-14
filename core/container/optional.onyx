@@ -35,6 +35,14 @@ Optional.from_ptr :: macro (p: &$T) -> ?T {
     return .None
 }
 
+/// Wraps a pointer in an optional. If the pointer is null, then the optional
+/// is None. If the pointer is non-null, then the optional is Some.
+Optional.wrap_ptr :: macro (p: &$T) -> ?&T {
+    p_ := p
+    if p_ do return p_
+    return .None
+}
+
 /// Extracts the value from the Optional, or uses a default if
 /// no value is present.
 Optional.value_or :: macro (o: ?$T, default: T) => switch o {

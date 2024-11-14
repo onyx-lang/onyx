@@ -126,8 +126,8 @@ JWT.parse :: (token: str, signing_key: str, allocator := context.allocator) -> R
         |> Result.transform(x => x.root)
         |> Result.transform_err(x => JWT_Parse_Error.Invalid_Body)?
         |> free_after_use(
-            (x, [allocator]) => json.Value.as_map(x, allocator)
-            (x, [allocator]) => json.free_value(x, allocator)
+            (x) use (allocator) => json.Value.as_map(x, allocator)
+            (x) use (allocator) => json.free_value(x, allocator)
         )
 
     token := JWT.{}

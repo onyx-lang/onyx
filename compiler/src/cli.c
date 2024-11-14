@@ -47,6 +47,9 @@ static const char* top_level_docstring = DOCSTRING_HEADER
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     C_LBLUE "    watch            " C_NORM "Continuously rebuilds a program on file changes\n"
 #endif
+#if (defined(_BH_LINUX) || defined(_BH_DARWIN)) && defined(ONYX_RUNTIME_LIBRARY)
+    C_LBLUE "    run-watch        " C_NORM "Continuously rebuilds and runs a program on file changes " C_GREY "(onyx rw)" C_NORM "\n"
+#endif
 #ifdef ONYX_RUNTIME_LIBRARY
     "\n"
     C_LBLUE "    package " C_GREY "cmd      " C_NORM "Package manager " C_GREY "(onyx pkg cmd)" C_NORM "\n"
@@ -68,7 +71,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     C_BOLD "Flags:\n" C_NORM
     C_LBLUE "    -o, --output " C_GREY "target_file    " C_NORM "Specify the target file " C_GREY "(default: out.wasm)\n"
     C_LBLUE "    -r, --runtime " C_GREY "runtime       " C_NORM "Specifies the runtime " C_GREY "(onyx, wasi, js, custom)\n"
-    C_LBLUE "    -I, --include " C_GREY "dir           " C_NORM "Include a directory in the search path\n"
+    C_LBLUE "    --map-dir " C_GREY "name:folder       " C_NORM "Adds a mapped directory\n"
     "\n"
     C_LBLUE "    --debug                     " C_NORM "Output a debugable build\n"
     C_LBLUE "    --feature " C_GREY "feature           " C_NORM "Enable an experimental language feature\n"
@@ -211,6 +214,14 @@ static void cli_determine_action(CompileOptions *options, int *first_sub_arg, in
     }
     #endif
 
+    #if (defined(_BH_LINUX) || defined(_BH_DARWIN)) && defined(ONYX_RUNTIME_LIBRARY)
+    if (!strcmp(argv[1], "run-watch") || !strcmp(argv[1], "rw")) {
+        options->action = ONYX_COMPILE_ACTION_WATCH_RUN;
+        *first_sub_arg = 2;
+        return;
+    }
+    #endif
+
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     if (!strcmp(argv[1], "self-upgrade")) {
         options->action = ONYX_COMPILE_ACTION_SELF_UPGRADE;
@@ -320,7 +331,24 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
             }
         }
         else if (!strcmp(argv[i], "-I") || !strcmp(argv[i], "--include")) {
-            bh_arr_push(options->included_folders, argv[++i]);
+            OnyxFilePos fp = {0};
+            onyx_report_warning(fp, "%s has been removed in favor of --map-dir", argv[i++]);
+        }
+        else if (!strcmp(argv[i], "--map-dir")) {
+            char *arg = argv[++i];
+            int len = strnlen(arg, 256);
+
+            char *name = arg;
+            char *folder = NULL;
+            fori (i, 0, len) if (arg[i] == ':') {
+                arg[i] = '\0';
+                folder = &arg[i + 1];
+            }
+
+            bh_mapped_folder mf;
+            mf.name = name;
+            mf.folder = folder;
+            bh_arr_push(options->mapped_folders, mf);
         }
         else if (!strncmp(argv[i], "-D", 2)) {
             i32 len = strlen(argv[i]);
@@ -477,7 +505,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     };
 
     bh_arr_new(alloc, options.files, 2);
-    bh_arr_new(alloc, options.included_folders, 2);
+    bh_arr_new(alloc, options.mapped_folders, 2);
     bh_arr_new(alloc, options.defined_variables, 2);
 
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
@@ -505,9 +533,10 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         exit(1);
     }
 
-    // NOTE: Add the current folder
-    bh_arr_push(options.included_folders, options.core_installation);
-    bh_arr_push(options.included_folders, ".");
+    bh_arr_push(options.mapped_folders, ((bh_mapped_folder) {
+        .name = "core",
+        .folder = bh_aprintf(alloc, "%s/core", options.core_installation)
+    }));
 
     if (argc == 1) return options;
 
@@ -518,6 +547,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         case ONYX_COMPILE_ACTION_CHECK:
         case ONYX_COMPILE_ACTION_RUN:
         case ONYX_COMPILE_ACTION_WATCH:
+        case ONYX_COMPILE_ACTION_WATCH_RUN:
         case ONYX_COMPILE_ACTION_COMPILE:
             cli_parse_compilation_options(&options, arg_parse_start, argc, argv);
             break;
@@ -565,7 +595,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
 static void compile_opts_free(CompileOptions* opts) {
     bh_arr_free(opts->files);
-    bh_arr_free(opts->included_folders);
+    bh_arr_free(opts->mapped_folders);
 }
 
 static void print_subcommand_help(const char *subcommand) {
@@ -575,7 +605,8 @@ static void print_subcommand_help(const char *subcommand) {
         return;
     }
 
-    if (!strcmp(subcommand, "run") || !strcmp(subcommand, "r")) {
+    if (!strcmp(subcommand, "run") || !strcmp(subcommand, "r")
+        || !strcmp(subcommand, "run-watch") || !strcmp(subcommand, "rw")) {
         bh_printf(build_docstring, subcommand, "[-- program args]");
         bh_printf(
             C_LBLUE "    --debug-socket " C_GREY "addr         " C_NORM "Specifies the address or port used for the debug server.\n"
