@@ -78,14 +78,6 @@ static void introduce_defined_variables() {
     }
 }
 
-// HACK
-static u32 special_global_entities_remaining = 5;
-static Entity *runtime_info_types_entity;
-static Entity *runtime_info_foreign_entity;
-static Entity *runtime_info_proc_tags_entity;
-static Entity *runtime_info_global_tags_entity;
-static Entity *runtime_info_stack_trace_entity;
-
 static void context_init(CompileOptions* opts) {
     memset(&context, 0, sizeof context);
 
@@ -104,9 +96,6 @@ static void context_init(CompileOptions* opts) {
 
     types_init(&context);
     prepare_builtins(&context);
-
-    // HACK
-    special_global_entities_remaining = 5;
 
     context.options = opts;
     context.cycle_detected = 0;
@@ -142,31 +131,34 @@ static void context_init(CompileOptions* opts) {
     }));
 
     if (context.options->runtime != Runtime_Custom) {
-        runtime_info_types_entity = entity_heap_insert(&context.entities, ((Entity) {
+        // HACK
+        context.special_global_entities.remaining = 5;
+
+        context.special_global_entities.runtime_info_types_entity = entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
             .include = create_load(context.ast_alloc, "core:runtime/info/types"),
         }));
-        runtime_info_foreign_entity = entity_heap_insert(&context.entities, ((Entity) {
+        context.special_global_entities.runtime_info_foreign_entity = entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
             .include = create_load(context.ast_alloc, "core:runtime/info/foreign_blocks"),
         }));
-        runtime_info_proc_tags_entity = entity_heap_insert(&context.entities, ((Entity) {
+        context.special_global_entities.runtime_info_proc_tags_entity = entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
             .include = create_load(context.ast_alloc, "core:runtime/info/proc_tags"),
         }));
-        runtime_info_global_tags_entity = entity_heap_insert(&context.entities, ((Entity) {
+        context.special_global_entities.runtime_info_global_tags_entity = entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
             .include = create_load(context.ast_alloc, "core:runtime/info/global_tags"),
         }));
-        runtime_info_stack_trace_entity = entity_heap_insert(&context.entities, ((Entity) {
+        context.special_global_entities.runtime_info_stack_trace_entity = entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
@@ -417,19 +409,19 @@ static b32 process_entity(Entity* ent) {
             }
 
             // GROSS
-            if (special_global_entities_remaining == 0) {
-                special_global_entities_remaining--;
+            if (context.special_global_entities.remaining == 0) {
+                context.special_global_entities.remaining--;
                 initalize_special_globals(&context);
             }
 
             if (process_load_entity(ent)) {
                 // GROSS
-                if (ent == runtime_info_types_entity
-                    || ent == runtime_info_proc_tags_entity
-                    || ent == runtime_info_global_tags_entity
-                    || ent == runtime_info_foreign_entity
-                    || ent == runtime_info_stack_trace_entity) {
-                    special_global_entities_remaining--;
+                if (   ent == context.special_global_entities.runtime_info_types_entity
+                    || ent == context.special_global_entities.runtime_info_proc_tags_entity
+                    || ent == context.special_global_entities.runtime_info_global_tags_entity
+                    || ent == context.special_global_entities.runtime_info_foreign_entity
+                    || ent == context.special_global_entities.runtime_info_stack_trace_entity) {
+                    context.special_global_entities.remaining--;
                 }
 
                 ent->state = Entity_State_Finalized;
@@ -635,8 +627,8 @@ static i32 onyx_compile() {
             u64 perf_end = bh_time_curr_micro();
 
             u64 duration = perf_end - perf_start;
-            context.microseconds_per_type[perf_entity_type] += duration;
-            context.microseconds_per_state[perf_entity_state] += duration;
+            context.stats.microseconds_per_type[perf_entity_type] += duration;
+            context.stats.microseconds_per_state[perf_entity_state] += duration;
         }
     }
 
@@ -652,8 +644,8 @@ static i32 onyx_compile() {
         // TODO: Replace these with bh_printf when padded formatting is added.
         printf("\nStatistics:\n");
         printf("    Time taken: %lf ms\n", (double) duration);
-        printf("    Processed %llu lines (%f lines/second).\n", context.lexer_lines_processed, ((f32) 1000 * context.lexer_lines_processed) / (duration));
-        printf("    Processed %llu tokens (%f tokens/second).\n", context.lexer_tokens_processed, ((f32) 1000 * context.lexer_tokens_processed) / (duration));
+        printf("    Processed %llu lines (%f lines/second).\n", context.stats.lexer_lines_processed, ((f32) 1000 * context.stats.lexer_lines_processed) / (duration));
+        printf("    Processed %llu tokens (%f tokens/second).\n", context.stats.lexer_tokens_processed, ((f32) 1000 * context.stats.lexer_tokens_processed) / (duration));
         printf("\n");
     }
 
@@ -671,11 +663,11 @@ static i32 onyx_compile() {
 
     if (context.options->running_perf) {
         fori (i, 0, Entity_State_Count) {
-            printf("| %27s | %10llu us |\n", entity_state_strings[i], context.microseconds_per_state[i]);
+            printf("| %27s | %10llu us |\n", entity_state_strings[i], context.stats.microseconds_per_state[i]);
         }
         printf("\n");
         fori (i, 0, Entity_Type_Count) {
-            printf("| %27s | %10llu us |\n", entity_type_strings[i], context.microseconds_per_type[i]);
+            printf("| %27s | %10llu us |\n", entity_type_strings[i], context.stats.microseconds_per_type[i]);
         }
         printf("\n");
     }

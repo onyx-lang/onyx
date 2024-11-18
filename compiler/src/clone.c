@@ -2,13 +2,10 @@
 #include "parser.h"
 #include "utils.h"
 
-// Weird flags that shouldn't be used too often because they complicate things
-static b32 dont_copy_structs = 0;
-
 static inline b32 should_clone(AstNode* node) {
     if (node->flags & Ast_Flag_No_Clone) return 0;
 
-    if (dont_copy_structs) {
+    if (context.cloner.dont_copy_structs) {
         if (node->kind == Ast_Kind_Struct_Type) return 0;
         if (node->kind == Ast_Kind_Function)    return 0;
         if (node->kind == Ast_Kind_Polymorphic_Proc) return 0;
@@ -176,8 +173,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
     if (node == NULL) return NULL;
     if (!should_clone(node)) return node;
 
-    static int clone_depth = 0;
-    clone_depth++;
+    context.cloner.clone_depth++;
 
     i32 node_size = ast_kind_to_size(node);
     // bh_printf("Cloning %s with size %d\n", onyx_ast_node_kind_string(node->kind), node_size);
@@ -505,7 +501,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             AstFunction* sf = (AstFunction *) node;
 
             // Check if we are cloning a function inside of a function.
-            if (clone_depth > 1) {
+            if (context.cloner.clone_depth > 1) {
                 // If we are, and the inner function has a scope, this means that
                 // the inner function does not capture anything, and is not polymorphic.
                 // Therefore, it should be treated as a normal function and not cloned
@@ -515,7 +511,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
                 // either polymorphic and/or it has captures. In either case, we have
                 // to clone the function internally below.
                 if (df->scope != NULL) {
-                    clone_depth--;
+                    context.cloner.clone_depth--;
                     return node;
                 }
             }
@@ -545,12 +541,12 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             bh_arr_each(AstParam, param, sf->params) {
                 AstParam new_param = { 0 };
 
-                dont_copy_structs = 1;
+                context.cloner.dont_copy_structs = 1;
                 new_param.local = (AstLocal *) ast_clone(a, param->local);
                 new_param.local->flags &= ~Ast_Flag_Param_Symbol_Dirty;
                 new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
                 new_param.use_processed = 0;
-                dont_copy_structs = 0;
+                context.cloner.dont_copy_structs = 0;
 
                 new_param.vararg_kind = param->vararg_kind;
                 new_param.is_used = param->is_used;
@@ -585,7 +581,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
                 df->scope_to_lookup_captured_values = NULL;
             }
 
-            if (clone_depth > 1 && captured_entities) {
+            if (context.cloner.clone_depth > 1 && captured_entities) {
                 sf->flags |= Ast_Flag_Function_Is_Lambda_Inside_PolyProc;
                 df->flags &= ~Ast_Flag_Function_Is_Lambda_Inside_PolyProc;
                 E(df);
@@ -714,7 +710,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             break;
     }
 
-    clone_depth--;
+    context.cloner.clone_depth--;
     return nn;
 }
 
@@ -738,12 +734,12 @@ AstFunction* clone_function_header(bh_allocator a, AstFunction* func) {
     bh_arr_each(AstParam, param, func->params) {
         AstParam new_param;
 
-        dont_copy_structs = 1;
+        context.cloner.dont_copy_structs = 1;
         new_param.local = (AstLocal *) ast_clone(a, param->local);
         new_param.local->flags &= ~Ast_Flag_Param_Symbol_Dirty;
         new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
         new_param.use_processed = 0;
-        dont_copy_structs = 0;
+        context.cloner.dont_copy_structs = 0;
 
         new_param.vararg_kind = param->vararg_kind;
         new_param.is_used = param->is_used;

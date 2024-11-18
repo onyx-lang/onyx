@@ -3,22 +3,11 @@
 // Polymorphic Procedures
 //
 
-// This flag is used by some of the procedures that try working with polymorphic things,
-// but need to wait until more information is known. Instead of passing a out parameter
-// into each of these procedures, a single global variable is used instead. If the type
-// checker ever gets multi-threaded, this would have to become a threadlocal variable.
-static b32 flag_to_yield = 0;
-
-// This flag is used in the very special case that you are passing a polymorphic procedure
-// to a polymorphic procedure, and you have enough information to instantiate said procedure
-// in order to resolve the type of one of the return values.
-static b32 doing_nested_polymorph_lookup = 0;
-
 // The name is pretty self-descriptive, but this is a node that is returned from things
 // like polymorphic_proc_lookup when it is determined that everything works so far, but
 // the caller must yield in order to finish checking this polymorphic procedure.
-AstTyped node_that_signals_a_yield = { Ast_Kind_Function, 0 };
-AstTyped node_that_signals_failure = { Ast_Kind_Error, 0 };
+const AstTyped node_that_signals_a_yield = { Ast_Kind_Function, 0 };
+const AstTyped node_that_signals_failure = { Ast_Kind_Error, 0 };
 
 static void ensure_polyproc_cache_is_created(AstFunction* pp) {
     if (pp->concrete_funcs == NULL)        sh_new_arena(pp->concrete_funcs);
@@ -497,7 +486,7 @@ static AstTyped* try_lookup_based_on_partial_function_type(AstFunction *pp, AstF
         ft->partial_function_type = type_build_from_ast(context.ast_alloc, (AstType *) ft);
         ft->return_type = old_return_type;
         if (!ft->partial_function_type) {
-            doing_nested_polymorph_lookup = 1;
+            context.polymorph.doing_nested_polymorph_lookup = 1;
             return NULL;
         }
 
@@ -511,11 +500,11 @@ static AstTyped* try_lookup_based_on_partial_function_type(AstFunction *pp, AstF
             result->type == NULL
         || (result->type->kind == Type_Kind_Function && result->type->Function.return_type == context.types.auto_return)))
     {
-        doing_nested_polymorph_lookup = 1;
+        context.polymorph.doing_nested_polymorph_lookup = 1;
         result = NULL;
     }
     if (result == &node_that_signals_a_yield) {
-        doing_nested_polymorph_lookup = 1;
+        context.polymorph.doing_nested_polymorph_lookup = 1;
         result = NULL;
     }
 
@@ -660,7 +649,7 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
         }
 
         Type* resolved_type = type_build_from_ast(context.ast_alloc, (AstType *) value);
-        if (resolved_type == NULL) flag_to_yield = 1;
+        if (resolved_type == NULL) context.polymorph.flag_to_yield = 1;
 
         *resolved = ((PolySolveResult) { PSK_Type, .actual = resolved_type });
 
@@ -669,7 +658,7 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
 
         param_type = type_build_from_ast(context.ast_alloc, param_type_expr);
         if (param_type == NULL) {
-            flag_to_yield = 1;
+            context.polymorph.flag_to_yield = 1;
             err_msg->text = "Waiting to know type for polymorphic value.";
             return;
         }
@@ -696,7 +685,7 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
             return;
         }
 
-        if (tm == TYPE_MATCH_YIELD) flag_to_yield = 1;
+        if (tm == TYPE_MATCH_YIELD) context.polymorph.flag_to_yield = 1;
 
         if ((value_to_use->flags & Ast_Flag_Comptime) == 0) {
             if (err_msg) {
@@ -729,13 +718,13 @@ TypeMatch find_polymorphic_sln(AstPolySolution *out, AstPolyParam *param, AstFun
         default: if (err_msg) err_msg->text = "Invalid polymorphic parameter kind. This is a compiler bug.";
     }
 
-    if (doing_nested_polymorph_lookup) {
-        doing_nested_polymorph_lookup = 0;
+    if (context.polymorph.doing_nested_polymorph_lookup) {
+        context.polymorph.doing_nested_polymorph_lookup = 0;
         return TYPE_MATCH_SPECIAL;
     }
 
-    if (flag_to_yield) {
-        flag_to_yield = 0;
+    if (context.polymorph.flag_to_yield) {
+        context.polymorph.flag_to_yield = 0;
         return TYPE_MATCH_YIELD;
     }
 
@@ -780,7 +769,7 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstFunction* pp, PolyProcLo
         if (query->entity->state == Entity_State_Finalized) return query->slns;
         if (query->entity->state == Entity_State_Failed)    return NULL;
 
-        flag_to_yield = 1;
+        context.polymorph.flag_to_yield = 1;
         return NULL;
     }
 
@@ -808,7 +797,7 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstFunction* pp, PolyProcLo
     bh_imap_put(&pp->active_queries, (u64) actual, (u64) query);
     add_entities_for_node(NULL, (AstNode *) query, NULL, NULL);
 
-    flag_to_yield = 1;
+    context.polymorph.flag_to_yield = 1;
     return NULL;
 }
 
@@ -825,8 +814,8 @@ AstFunction* polymorphic_proc_lookup(AstFunction* pp, PolyProcLookupMethod pp_lo
 
     bh_arr(AstPolySolution) slns = find_polymorphic_slns(pp, pp_lookup, actual, tkn, 1);
     if (slns == NULL) {
-        if (flag_to_yield) {
-            flag_to_yield = 0;
+        if (context.polymorph.flag_to_yield) {
+            context.polymorph.flag_to_yield = 0;
             return (AstFunction *) &node_that_signals_a_yield;
         }
 
@@ -936,8 +925,8 @@ AstNode* polymorphic_proc_try_solidify(AstFunction* pp, bh_arr(AstPolySolution) 
 AstFunction* polymorphic_proc_build_only_header(AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual) {
     ensure_polyproc_cache_is_created(pp);
     bh_arr(AstPolySolution) slns = find_polymorphic_slns(pp, pp_lookup, actual, NULL, 0);
-    if (flag_to_yield) {
-        flag_to_yield = 0;
+    if (context.polymorph.flag_to_yield) {
+        context.polymorph.flag_to_yield = 0;
         return (AstFunction *) &node_that_signals_a_yield;
     }
     if (slns == NULL) return NULL;

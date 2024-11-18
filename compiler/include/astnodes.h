@@ -1922,6 +1922,24 @@ typedef struct CheckerData {
     bh_arr(bh_arr(AstLocal *)) named_return_values_stack;
 } CheckerData;
 
+typedef struct ClonerData {
+    u32 clone_depth;
+    b32 dont_copy_structs;
+} ClonerData;
+
+typedef struct PolymorphData {
+    // This flag is used by some of the procedures that try working with polymorphic things,
+    // but need to wait until more information is known. Instead of passing a out parameter
+    // into each of these procedures, a single global variable is used instead. If the type
+    // checker ever gets multi-threaded, this would have to become a threadlocal variable.
+    b32 flag_to_yield;
+
+    // This flag is used in the very special case that you are passing a polymorphic procedure
+    // to a polymorphic procedure, and you have enough information to instantiate said procedure
+    // in order to resolve the type of one of the return values.
+    b32 doing_nested_polymorph_lookup;
+} PolymorphData;
+
 typedef struct ContextCaches {
     bh_imap implicit_cast_to_bool_cache;
 } ContextCaches;
@@ -2112,6 +2130,25 @@ struct TypeStore {
     Type* auto_return;
 };
 
+typedef struct CompilerStats CompilerStats;
+struct CompilerStats {
+    u64 lexer_lines_processed;
+    u64 lexer_tokens_processed;
+
+    u64 microseconds_per_state[Entity_State_Count];
+    u64 microseconds_per_type[Entity_Type_Count];
+};
+
+typedef struct SpecialGlobalEntities SpecialGlobalEntities;
+struct SpecialGlobalEntities {
+    u32 remaining;
+    Entity *runtime_info_types_entity;
+    Entity *runtime_info_foreign_entity;
+    Entity *runtime_info_proc_tags_entity;
+    Entity *runtime_info_global_tags_entity;
+    Entity *runtime_info_stack_trace_entity;
+};
+
 typedef struct Context Context;
 struct Context {
     Table(Package *)      packages;
@@ -2149,8 +2186,11 @@ struct Context {
     CompilerBasicTypes basic_types;
     TypeStore types;
 
-    CheckerData checker;
+    CheckerData   checker;
+    ClonerData    cloner;
+    PolymorphData polymorph;
     ContextCaches caches;
+
 
     // TODO: Move these
     bh_arr(OverloadOption) operator_overloads[Binary_Op_Count];
@@ -2164,11 +2204,10 @@ struct Context {
     u32 next_type_id;
     u32 next_entity_id;
 
-    u64 lexer_lines_processed;
-    u64 lexer_tokens_processed;
+    CompilerStats stats;
 
-    u64 microseconds_per_state[Entity_State_Count];
-    u64 microseconds_per_type[Entity_Type_Count];
+    // HACK
+    SpecialGlobalEntities special_global_entities;
 
     u32 cycle_almost_detected : 3;
     b32 cycle_detected : 1;

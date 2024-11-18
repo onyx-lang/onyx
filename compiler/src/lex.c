@@ -625,8 +625,8 @@ void onyx_lex_tokens(OnyxTokenizer* tokenizer) {
         tk = onyx_get_token(tokenizer);
     } while (tk->type != Token_Type_End_Stream);
 
-    context.lexer_lines_processed += tokenizer->line_number - 1;
-    context.lexer_tokens_processed += bh_arr_length(tokenizer->tokens);
+    context.stats.lexer_lines_processed += tokenizer->line_number - 1;
+    context.stats.lexer_tokens_processed += bh_arr_length(tokenizer->tokens);
 }
 
 b32 token_equals(OnyxToken* tkn1, OnyxToken* tkn2) {
