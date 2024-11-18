@@ -225,16 +225,13 @@ struct Type {
     };
 };
 
-extern bh_imap type_map;
-
-extern Type basic_types[];
-
+struct Context;
 struct AstType;
 struct AstFunction;
 struct AstCompound;
 struct AstStructLiteral;
 
-void types_init();
+void types_init(struct Context *context);
 void types_dump_type_info();
 Type* type_lookup_by_id(u32 id);
 

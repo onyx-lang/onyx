@@ -161,7 +161,7 @@ retry_return_expr_check:
     if (retnode->expr) {
         CHECK(expression, &retnode->expr);
 
-        if (*expected_return_type == &type_auto_return) {
+        if (*expected_return_type == context.types.auto_return) {
             resolve_expression_type(retnode->expr);
             if (retnode->expr->type == NULL)
                 YIELD_ERROR(retnode->token->pos, "Unable to determine the automatic return type here.");
@@ -188,12 +188,12 @@ retry_return_expr_check:
         }
 
     } else {
-        if (*expected_return_type == &type_auto_return) {
-            *expected_return_type = &basic_types[Basic_Kind_Void];
+        if (*expected_return_type == context.types.auto_return) {
+            *expected_return_type = context.types.basic[Basic_Kind_Void];
             return Check_Success;
         }
 
-        if ((*expected_return_type) != &basic_types[Basic_Kind_Void]) {
+        if ((*expected_return_type) != context.types.basic[Basic_Kind_Void]) {
             if (!named_return_values) {
                 ERROR_(retnode->token->pos,
                     "Returning from non-void function without a value. Expected a value of type '%s'.",
@@ -310,13 +310,13 @@ CheckStatus check_for(AstFor* fornode) {
     }
 
     // @HACK This should be built elsewhere...
-    builtin_range_type_type = type_build_from_ast(context.ast_alloc, builtin_range_type);
-    if (builtin_range_type_type == NULL) YIELD(fornode->token->pos, "Waiting for 'range' structure to be built.");
+    context.builtins.range_type_type = type_build_from_ast(context.ast_alloc, context.builtins.range_type);
+    if (context.builtins.range_type_type == NULL) YIELD(fornode->token->pos, "Waiting for 'range' structure to be built.");
 
     Type* given_type = NULL;
 
     fornode->loop_type = For_Loop_Invalid;
-    if (types_are_compatible(iter_type, &basic_types[Basic_Kind_I32])) {
+    if (types_are_compatible(iter_type, context.types.basic[Basic_Kind_I32])) {
         if (fornode->by_pointer) {
             ERROR(error_loc, "Cannot iterate by pointer over a range.");
         }
@@ -326,27 +326,27 @@ CheckStatus check_for(AstFor* fornode) {
         CHECK(range_literal, &rl);
         fornode->iter = (AstTyped *) rl;
 
-        given_type = builtin_range_type_type->Struct.memarr[0]->type;
+        given_type = context.builtins.range_type_type->Struct.memarr[0]->type;
         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
         fornode->loop_type = For_Loop_Range;
     }
-    else if (types_are_compatible(iter_type, &basic_types[Basic_Kind_I64])) {
+    else if (types_are_compatible(iter_type, context.types.basic[Basic_Kind_I64])) {
         if (fornode->by_pointer) {
             ERROR(error_loc, "Cannot iterate by pointer over a range.");
         }
 
         AstNumLit* low_0    = make_int_literal(context.ast_alloc, 0);
-        low_0->type = &basic_types[Basic_Kind_I64];
+        low_0->type = context.types.basic[Basic_Kind_I64];
         
         AstRangeLiteral* rl = make_range_literal(context.ast_alloc, (AstTyped *) low_0, fornode->iter);
         CHECK(range_literal, &rl);
         fornode->iter = (AstTyped *) rl;
 
-        given_type = builtin_range64_type_type->Struct.memarr[0]->type;
+        given_type = context.builtins.range64_type_type->Struct.memarr[0]->type;
         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
         fornode->loop_type = For_Loop_Range;
     }
-    else if (types_are_compatible(iter_type, builtin_range_type_type)) {
+    else if (types_are_compatible(iter_type, context.builtins.range_type_type)) {
         if (fornode->by_pointer) {
             ERROR(error_loc, "Cannot iterate by pointer over a range.");
         }
@@ -357,7 +357,7 @@ CheckStatus check_for(AstFor* fornode) {
         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
         fornode->loop_type = For_Loop_Range;
     }
-    else if (types_are_compatible(iter_type, builtin_range64_type_type)) {
+    else if (types_are_compatible(iter_type, context.builtins.range64_type_type)) {
         if (fornode->by_pointer) {
             ERROR(error_loc, "Cannot iterate by pointer over a range.");
         }
@@ -397,7 +397,7 @@ CheckStatus check_for(AstFor* fornode) {
 
         fornode->loop_type = For_Loop_DynArr;
     }
-    else if (type_constructed_from_poly(iter_type, builtin_iterator_type)) {
+    else if (type_constructed_from_poly(iter_type, context.builtins.iterator_type)) {
         if (fornode->by_pointer) {
             ERROR(error_loc, "Cannot iterate by pointer over an iterator.");
         }
@@ -449,7 +449,7 @@ fornode_expr_checked:
     old_inside_for_iterator = context.checker.inside_for_iterator;
     context.checker.inside_for_iterator = 0;
     iter_type = fornode->iter->type;
-    if (type_constructed_from_poly(iter_type, builtin_iterator_type)) {
+    if (type_constructed_from_poly(iter_type, context.builtins.iterator_type)) {
         context.checker.inside_for_iterator = 1;
     }
 
@@ -972,7 +972,7 @@ CheckStatus check_call(AstCall** pcall) {
             filename->kind  = Ast_Kind_StrLit;
             filename->token = str_token;
             filename->data_id = 0;
-            filename->type_node = builtin_string_type;
+            filename->type_node = context.builtins.string_type;
 
             add_entities_for_node(NULL, (AstNode *) filename, NULL, NULL);
             callsite->filename = filename;
@@ -980,8 +980,8 @@ CheckStatus check_call(AstCall** pcall) {
             callsite->line   = make_int_literal(context.ast_alloc, call->token->pos.line);
             callsite->column = make_int_literal(context.ast_alloc, call->token->pos.column);
 
-            convert_numlit_to_type(callsite->line,   &basic_types[Basic_Kind_U32], 1);
-            convert_numlit_to_type(callsite->column, &basic_types[Basic_Kind_U32], 1);
+            convert_numlit_to_type(callsite->line,   context.types.basic[Basic_Kind_U32], 1);
+            convert_numlit_to_type(callsite->column, context.types.basic[Basic_Kind_U32], 1);
 
             callsite->collapsed = 1;
             *arg_value = (AstTyped *) callsite;
@@ -997,21 +997,30 @@ CheckStatus check_call(AstCall** pcall) {
         token_toggle_end(callee->intrinsic_name);
         char* intr_name = callee->intrinsic_name->text;
 
-        i32 index;
-        if ((index = shgeti(intrinsic_table, intr_name)) == -1) {
+        OnyxIntrinsic intrinsic = 0xffffffff;
+        const IntrinsicMap *im = &builtin_intrinsics[0];
+        while (im->name) {
+            if (!strcmp(im->name, intr_name)) {
+                intrinsic = im->intrinsic;
+                break;
+            }
+            im++;
+        }
+
+        if (intrinsic == 0xffffffff) {
             onyx_report_error(callee->token->pos, Error_Critical, "Intrinsic not supported, '%s'.", intr_name);
             token_toggle_end(callee->intrinsic_name);
             return Check_Error;
         }
 
-        call->intrinsic = intrinsic_table[index].value;
+        call->intrinsic = intrinsic;
 
         token_toggle_end(callee->intrinsic_name);
     }
 
     call->va_kind = VA_Kind_Not_VA;
     call->type = callee->type->Function.return_type;
-    if (call->type == &type_auto_return && call->callee->kind != Ast_Kind_Macro) {
+    if (call->type == context.types.auto_return && call->callee->kind != Ast_Kind_Macro) {
         YIELD(call->token->pos, "Waiting for auto-return type to be solved.");
     }
 
@@ -1054,7 +1063,7 @@ static void report_bad_binaryop(AstBinaryOp* binop) {
 }
 
 static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* third_argument) {
-    if (bh_arr_length(operator_overloads[binop->operation]) == 0) return &context.checker.__op_maybe_overloaded;
+    if (bh_arr_length(context.operator_overloads[binop->operation]) == 0) return &context.checker.__op_maybe_overloaded;
 
     if (binop->overload_args == NULL || binop->overload_args->values[1] == NULL) {
         if (binop->overload_args == NULL) {
@@ -1086,7 +1095,7 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* thi
         if (third_argument != NULL) binop->overload_args->values[2] = (AstTyped *) make_argument(context.ast_alloc, third_argument);
     }
 
-    AstTyped* overload = find_matching_overload_by_arguments(operator_overloads[binop->operation], binop->overload_args);
+    AstTyped* overload = find_matching_overload_by_arguments(context.operator_overloads[binop->operation], binop->overload_args);
     if (overload == NULL || overload == (AstTyped *) &node_that_signals_a_yield) return (AstCall *) overload;
 
     AstCall* implicit_call = onyx_ast_node_new(context.ast_alloc, sizeof(AstCall), Ast_Kind_Call);
@@ -1099,7 +1108,7 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* thi
 }
 
 static AstCall* unaryop_try_operator_overload(AstUnaryOp* unop) {
-    if (bh_arr_length(unary_operator_overloads[unop->operation]) == 0) return &context.checker.__op_maybe_overloaded;
+    if (bh_arr_length(context.unary_operator_overloads[unop->operation]) == 0) return &context.checker.__op_maybe_overloaded;
 
     if (unop->overload_args == NULL || unop->overload_args->values[0] == NULL) {
         if (unop->overload_args == NULL) {
@@ -1111,7 +1120,7 @@ static AstCall* unaryop_try_operator_overload(AstUnaryOp* unop) {
         unop->overload_args->values[0] = (AstTyped *) make_argument(context.ast_alloc, unop->expr);
     }
 
-    AstTyped* overload = find_matching_overload_by_arguments(unary_operator_overloads[unop->operation], unop->overload_args);
+    AstTyped* overload = find_matching_overload_by_arguments(context.unary_operator_overloads[unop->operation], unop->overload_args);
     if (overload == NULL || overload == (AstTyped *) &node_that_signals_a_yield) return (AstCall *) overload;
 
     AstCall* implicit_call = onyx_ast_node_new(context.ast_alloc, sizeof(AstCall), Ast_Kind_Call);
@@ -1212,7 +1221,7 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
 
                 } else {
                     fori (i, 0, store_expr_count) {
-                        if (right_type->Compound.types[i] == &basic_types[Basic_Kind_Void]) {
+                        if (right_type->Compound.types[i] == context.types.basic[Basic_Kind_Void]) {
                             ERROR(lhs->exprs[i]->token->pos, "Due to inference, this variables type would be 'void', which is not allowed.");
                         }
 
@@ -1223,7 +1232,7 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
                 }
 
             } else {
-                if (right_type == &basic_types[Basic_Kind_Void]) {
+                if (right_type == context.types.basic[Basic_Kind_Void]) {
                     ERROR(binop->left->token->pos, "Due to inference, this variables type would be 'void', which is not allowed.");
                 }
 
@@ -1269,7 +1278,7 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
                 node_get_type_name(binop->left));
     }
 
-    binop->type = &basic_types[Basic_Kind_Void];
+    binop->type = context.types.basic[Basic_Kind_Void];
 
     return Check_Success;
 }
@@ -1343,8 +1352,8 @@ CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
     if (ltype == NULL) YIELD(binop->token->pos, "Waiting for left-type to be known.");
     if (rtype == NULL) YIELD(binop->token->pos, "Waiting for right-type to be known.");
 
-    if (ltype->kind == Type_Kind_Pointer) ltype = &basic_types[Basic_Kind_Rawptr];
-    if (rtype->kind == Type_Kind_Pointer) rtype = &basic_types[Basic_Kind_Rawptr];
+    if (ltype->kind == Type_Kind_Pointer) ltype = context.types.basic[Basic_Kind_Rawptr];
+    if (rtype->kind == Type_Kind_Pointer) rtype = context.types.basic[Basic_Kind_Rawptr];
 
     if (!types_are_compatible(ltype, rtype)) {
         b32 left_ac  = node_is_auto_cast((AstNode *) binop->left);
@@ -1366,7 +1375,7 @@ CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
         return Check_Error;
     }
 
-    binop->type = &basic_types[Basic_Kind_Bool];
+    binop->type = context.types.basic[Basic_Kind_Bool];
     if (binop->flags & Ast_Flag_Comptime) {
         // NOTE: Not a binary op
         *pbinop = (AstBinaryOp *) ast_reduce(context.ast_alloc, (AstTyped *) binop);
@@ -1406,7 +1415,7 @@ CheckStatus check_binaryop_bool(AstBinaryOp** pbinop) {
         return Check_Error;
     }
 
-    binop->type = &basic_types[Basic_Kind_Bool];
+    binop->type = context.types.basic[Basic_Kind_Bool];
 
     if (binop->flags & Ast_Flag_Comptime) {
         // NOTE: Not a binary op
@@ -1426,7 +1435,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
 
     if (binop->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
-    if (binop->operation == Binary_Op_Assign && binop->left->kind == Ast_Kind_Subscript && bh_arr_length(operator_overloads[Binary_Op_Subscript_Equals]) > 0) {
+    if (binop->operation == Binary_Op_Assign && binop->left->kind == Ast_Kind_Subscript && bh_arr_length(context.operator_overloads[Binary_Op_Subscript_Equals]) > 0) {
         AstSubscript* sub = (AstSubscript *) binop->left;
 
         if (binop->potential_substitute == NULL) {
@@ -1584,7 +1593,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
 
     // NOTE: Enum flags with '&' result in a boolean value
     if (binop->type->kind == Type_Kind_Enum && binop->type->Enum.is_flags && binop->operation == Binary_Op_And) {
-         binop->type = &basic_types[Basic_Kind_Bool];
+         binop->type = context.types.basic[Basic_Kind_Bool];
     }
 
     if (context.checker.all_checks_are_final) {
@@ -2012,22 +2021,22 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
     CHECK(expression, &range->low);
     CHECK(expression, &range->high);
 
-    builtin_range_type_type = type_build_from_ast(context.ast_alloc, builtin_range_type);
-    builtin_range64_type_type = type_build_from_ast(context.ast_alloc, builtin_range64_type);
-    if (builtin_range_type_type   == NULL) YIELD(range->token->pos, "Waiting for 'range' structure to be built.");
-    if (builtin_range64_type_type == NULL) YIELD(range->token->pos, "Waiting for 'range64' structure to be built.");
+    context.builtins.range_type_type = type_build_from_ast(context.ast_alloc, context.builtins.range_type);
+    context.builtins.range64_type_type = type_build_from_ast(context.ast_alloc, context.builtins.range64_type);
+    if (context.builtins.range_type_type   == NULL) YIELD(range->token->pos, "Waiting for 'range' structure to be built.");
+    if (context.builtins.range64_type_type == NULL) YIELD(range->token->pos, "Waiting for 'range64' structure to be built.");
 
     Type* expected_range_type = NULL;
-    TYPE_QUERY(&range->low, &basic_types[Basic_Kind_I32]) {
-        TYPE_QUERY(&range->high, &basic_types[Basic_Kind_I32]) {
-            expected_range_type = builtin_range_type_type;
+    TYPE_QUERY(&range->low, context.types.basic[Basic_Kind_I32]) {
+        TYPE_QUERY(&range->high, context.types.basic[Basic_Kind_I32]) {
+            expected_range_type = context.builtins.range_type_type;
         }
     }
 
     if (expected_range_type == NULL) {
-        TYPE_QUERY(&range->low, &basic_types[Basic_Kind_I64]) {
-            TYPE_QUERY(&range->high, &basic_types[Basic_Kind_I64]) {
-                expected_range_type = builtin_range64_type_type;
+        TYPE_QUERY(&range->low, context.types.basic[Basic_Kind_I64]) {
+            TYPE_QUERY(&range->high, context.types.basic[Basic_Kind_I64]) {
+                expected_range_type = context.builtins.range64_type_type;
             }
         }
     }
@@ -2094,7 +2103,7 @@ CheckStatus check_if_expression(AstIfExpression* if_expr) {
     CHECK(expression, &if_expr->true_expr);
     CHECK(expression, &if_expr->false_expr);
 
-    TYPE_CHECK(&if_expr->cond, &basic_types[Basic_Kind_Bool]) {
+    TYPE_CHECK(&if_expr->cond, context.types.basic[Basic_Kind_Bool]) {
         TypeMatch implicit_cast = implicit_cast_to_bool(&if_expr->cond);
         if (implicit_cast == TYPE_MATCH_YIELD) YIELD(if_expr->token->pos, "Waiting for implicit cast to bool to check.");
         if (implicit_cast == TYPE_MATCH_FAILED) {
@@ -2126,7 +2135,7 @@ CheckStatus check_do_block(AstDoBlock** pdoblock) {
 
     CHECK(block, doblock->block);
 
-    if (doblock->type == &type_auto_return) doblock->type = &basic_types[Basic_Kind_Void];
+    if (doblock->type == context.types.auto_return) doblock->type = context.types.basic[Basic_Kind_Void];
 
     bh_arr_pop(context.checker.expected_return_type_stack);
     bh_arr_pop(context.checker.named_return_values_stack);
@@ -2139,7 +2148,7 @@ CheckStatus check_address_of(AstAddressOf** paof) {
     AstAddressOf* aof = *paof;
 
     AstTyped* expr = (AstTyped *) strip_aliases((AstNode *) aof->expr);
-    if (expr->kind == Ast_Kind_Subscript && bh_arr_length(operator_overloads[Binary_Op_Ptr_Subscript]) > 0) {
+    if (expr->kind == Ast_Kind_Subscript && bh_arr_length(context.operator_overloads[Binary_Op_Ptr_Subscript]) > 0) {
         if (aof->potential_substitute == NULL) {
             CHECK(expression, &((AstSubscript *) expr)->addr);
             CHECK(expression, &((AstSubscript *) expr)->expr);
@@ -2219,7 +2228,7 @@ CheckStatus check_dereference(AstDereference* deref) {
     if (!type_is_pointer(deref->expr->type))
         ERROR(deref->token->pos, "Cannot dereference non-pointer value.");
 
-    if (deref->expr->type == basic_type_rawptr.basic_type)
+    if (deref->expr->type == context.types.basic[Basic_Kind_Rawptr])
         ERROR(deref->token->pos, "Cannot dereference 'rawptr'. Cast to another pointer type first.");
 
     deref->type = deref->expr->type->Pointer.elem;
@@ -2273,7 +2282,7 @@ CheckStatus check_subscript(AstSubscript** psub) {
         sub->addr = (AstTyped *) fa;
     }
 
-    if (types_are_compatible(sub->expr->type, builtin_range_type_type)) {
+    if (types_are_compatible(sub->expr->type, context.builtins.range_type_type)) {
         Type *of = type_get_contained_type(sub->addr->type);
         if (of == NULL) {
             // FIXME: Slice creation should be allowed for slice types and dynamic array types, like it
@@ -2376,7 +2385,7 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
                 if (!field->type_node) {
                     AstPolyCallType* pctype = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
                     pctype->token = field->token;
-                    pctype->callee = builtin_optional_type;
+                    pctype->callee = context.builtins.optional_type;
                     bh_arr_new(context.ast_alloc, pctype->params, 1);
                     bh_arr_push(pctype->params, (AstNode *) uv->type->ast_type);
 
@@ -2465,7 +2474,7 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     }
 
     char* type_name = (char *) node_get_type_name(field->expr);
-    if (field->expr->type == &basic_types[Basic_Kind_Type_Index]) {
+    if (field->expr->type == context.types.basic[Basic_Kind_Type_Index]) {
         Type *actual_type = type_build_from_ast(context.ast_alloc, (AstType *) field->expr);
         type_name = (char *) type_get_name(actual_type);
     }
@@ -2586,7 +2595,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
             type_build_from_ast(context.ast_alloc, (AstType*) expr);
         }
 
-        expr->type = &basic_types[Basic_Kind_Type_Index];
+        expr->type = context.types.basic[Basic_Kind_Type_Index];
         return Check_Success;
     }
 
@@ -2679,8 +2688,8 @@ CheckStatus check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_Call_Site:
             // NOTE: This has to be set here because if it were to be set in the parser,
-            // builtin_callsite_type wouldn't be known when parsing the builtin.onyx file.
-            expr->type_node = builtin_callsite_type;
+            // context.builtins.callsite_type wouldn't be known when parsing the builtin.onyx file.
+            expr->type_node = context.builtins.callsite_type;
             break;
 
         case Ast_Kind_If_Expression:
@@ -2809,7 +2818,7 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert, b32 expected_ex
         CHECK(expression, pexpr);
     }
 
-    Type* code_type = type_build_from_ast(context.ast_alloc, builtin_code_type);
+    Type* code_type = type_build_from_ast(context.ast_alloc, context.builtins.code_type);
 
     TYPE_CHECK(&insert->code_expr, code_type) {
         ERROR_(insert->token->pos, "#unquote expected a value of type 'Code', got '%s'.",
@@ -2861,7 +2870,7 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert, b32 expected_ex
             AstDoBlock* doblock = (AstDoBlock *) onyx_ast_node_new(context.ast_alloc, sizeof(AstDoBlock), Ast_Kind_Do_Block);
             doblock->token = cloned_block->token;
             doblock->block = body_block;
-            doblock->type = &type_auto_return;
+            doblock->type = context.types.auto_return;
             doblock->next = cloned_block->next;
 
             cloned_block = (AstNode *) doblock;
@@ -2965,7 +2974,7 @@ CheckStatus check_directive_export_name(AstDirectiveExportName *ename) {
         memset(name, 0, sizeof(AstStrLit));
         name->kind  = Ast_Kind_StrLit;
         name->token = name_token;
-        name->type_node = builtin_string_type;
+        name->type_node = context.builtins.string_type;
 
         add_entities_for_node(NULL, (AstNode *) name, NULL, NULL);
         ename->name = name;
@@ -2985,7 +2994,7 @@ CheckStatus check_directive_export_name(AstDirectiveExportName *ename) {
         memset(name, 0, sizeof(AstStrLit));
         name->kind  = Ast_Kind_StrLit;
         name->token = ename->func->exported_name;
-        name->type_node = builtin_string_type;
+        name->type_node = context.builtins.string_type;
 
         add_entities_for_node(NULL, (AstNode *) name, NULL, NULL);
         ename->name = name;
@@ -3051,7 +3060,7 @@ CheckStatus check_statement(AstNode** pstmt) {
                 CHECK(type, &typed_stmt->type_node);
 
                 if (!node_is_type((AstNode *) typed_stmt->type_node)) {
-                    if (typed_stmt->type_node->type == &basic_types[Basic_Kind_Type_Index]) {
+                    if (typed_stmt->type_node->type == context.types.basic[Basic_Kind_Type_Index]) {
                         onyx_report_error(stmt->token->pos, Error_Critical, "The type of this local variable is a runtime-known type, not a compile-time known type.");
 
                         if (typed_stmt->type_node->kind == Ast_Kind_Param) {
@@ -3074,7 +3083,7 @@ CheckStatus check_statement(AstNode** pstmt) {
                 }
             }
             
-            if (typed_stmt->type != NULL && typed_stmt->type == &basic_types[Basic_Kind_Void]) {
+            if (typed_stmt->type != NULL && typed_stmt->type == context.types.basic[Basic_Kind_Void]) {
                 ERROR(stmt->token->pos, "This local variable has a type of 'void', which is not allowed.");
             }
 
@@ -3177,8 +3186,8 @@ CheckStatus check_function(AstFunction* func) {
 
         if (status == Check_Success &&
             !(func->body->flags & Ast_Flag_Block_Returns) &&
-            *bh_arr_last(context.checker.expected_return_type_stack) != &basic_types[Basic_Kind_Void] &&
-            *bh_arr_last(context.checker.expected_return_type_stack) != &type_auto_return &&
+            *bh_arr_last(context.checker.expected_return_type_stack) != context.types.basic[Basic_Kind_Void] &&
+            *bh_arr_last(context.checker.expected_return_type_stack) != context.types.auto_return &&
             !func->is_intrinsic &&
             !func->is_foreign
         ) {
@@ -3194,8 +3203,8 @@ CheckStatus check_function(AstFunction* func) {
         }
     }
 
-    if (*bh_arr_last(context.checker.expected_return_type_stack) == &type_auto_return) {
-        *bh_arr_last(context.checker.expected_return_type_stack) = &basic_types[Basic_Kind_Void];
+    if (*bh_arr_last(context.checker.expected_return_type_stack) == context.types.auto_return) {
+        *bh_arr_last(context.checker.expected_return_type_stack) = context.types.basic[Basic_Kind_Void];
     }
 
     func->flags |= Ast_Flag_Has_Been_Checked;
@@ -3282,7 +3291,7 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* ofunc) {
                 if (!func->type->Function.return_type) continue;
 
                 Type *return_type = func->type->Function.return_type;
-                if (return_type == &type_auto_return) continue;
+                if (return_type == context.types.auto_return) continue;
 
                 if (!types_are_compatible(return_type, ofunc->expected_return_type)) {
                     report_incorrect_overload_expected_type(return_type, ofunc->expected_return_type, func->token, ofunc->token);
@@ -3544,10 +3553,10 @@ CheckStatus check_function_header(AstFunction* func) {
 
         if (param->vararg_kind == VA_Kind_Untyped) {
             // HACK
-            if (builtin_vararg_type_type == NULL)
-                builtin_vararg_type_type = type_build_from_ast(context.ast_alloc, builtin_vararg_type);
+            if (context.builtins.vararg_type_type == NULL)
+                context.builtins.vararg_type_type = type_build_from_ast(context.ast_alloc, context.builtins.vararg_type);
 
-            local->type = builtin_vararg_type_type;
+            local->type = context.builtins.vararg_type_type;
         }
 
         if (param->default_value != NULL) {
@@ -3891,7 +3900,7 @@ CheckStatus check_process_directive(AstNode* directive) {
             }
         }
 
-        bh_arr_push(init_procedures, (AstFunction *) init->init_proc);
+        bh_arr_push(context.builtins.init_procedures, (AstFunction *) init->init_proc);
         return Check_Complete;
     }
 
@@ -4390,7 +4399,7 @@ CheckStatus check_js_node(AstJsNode *js) {
     if (js->order_expr) {
         CHECK(expression, &js->order_expr);
 
-        TYPE_CHECK(&js->order_expr, &basic_types[Basic_Kind_I32]) {
+        TYPE_CHECK(&js->order_expr, context.types.basic[Basic_Kind_I32]) {
             ERROR_(js->token->pos, "Expected an expression of type 'i32' for '#order', but got a '%s' instead.", type_get_name(js->order_expr->type));
         }
 

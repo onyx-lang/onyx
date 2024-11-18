@@ -518,7 +518,7 @@ EMIT_FUNC_NO_ARGS(initialize_data_segments_body) {
 EMIT_FUNC_NO_ARGS(run_init_procedures) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    bh_arr_each(AstFunction *, func, init_procedures) {
+    bh_arr_each(AstFunction *, func, context.builtins.init_procedures) {
         CodePatchInfo code_patch;
         code_patch.kind = Code_Patch_Callee;
         code_patch.func_idx = mod->current_func_idx;

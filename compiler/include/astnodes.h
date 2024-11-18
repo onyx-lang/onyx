@@ -2024,6 +2024,94 @@ struct CompileOptions {
     char *upgrade_version;
 };
 
+typedef struct CompilerBasicTypes CompilerBasicTypes;
+struct CompilerBasicTypes {
+    AstBasicType type_void;
+    AstBasicType type_bool;
+    AstBasicType type_i8;
+    AstBasicType type_u8;
+    AstBasicType type_i16;
+    AstBasicType type_u16;
+    AstBasicType type_i32;
+    AstBasicType type_u32;
+    AstBasicType type_i64;
+    AstBasicType type_u64;
+    AstBasicType type_f32;
+    AstBasicType type_f64;
+    AstBasicType type_rawptr;
+    AstBasicType type_type_expr; // :TypeExprHack
+
+    AstBasicType type_int_unsized;
+    AstBasicType type_float_unsized;
+
+    AstBasicType type_i8x16;
+    AstBasicType type_i16x8;
+    AstBasicType type_i32x4;
+    AstBasicType type_i64x2;
+    AstBasicType type_f32x4;
+    AstBasicType type_f64x2;
+    AstBasicType type_v128;
+
+    AstBasicType type_auto_return;
+};
+
+typedef struct CompilerBuiltins CompilerBuiltins;
+struct CompilerBuiltins {
+    AstGlobal heap_start;
+    AstGlobal stack_top;
+    AstGlobal tls_base;
+    AstGlobal tls_size;
+    AstGlobal closure_base;
+    AstGlobal stack_trace;
+    AstType  *string_type;
+    AstType  *cstring_type;
+    AstType  *range_type;
+    Type     *range_type_type;
+    AstType  *range64_type;
+    Type     *range64_type_type;
+    AstType  *vararg_type;
+    Type     *vararg_type_type;
+    AstTyped *context_variable;
+    AstType  *allocator_type;
+    AstType  *iterator_type;
+    AstType  *optional_type;
+    AstType  *callsite_type;
+    AstType  *any_type;
+    AstType  *code_type;
+    AstType  *link_options_type;
+    AstType  *package_id_type;
+    AstType  *stack_trace_type;
+    AstType  *slice_type;
+    AstType  *array_type;
+    AstTyped *type_table_node;
+    AstTyped *foreign_blocks_node;
+    AstType  *foreign_block_type;
+    AstTyped *tagged_procedures_node;
+    AstTyped *tagged_globals_node;
+    AstFunction *initialize_data_segments;
+    AstFunction *run_init_procedures;
+    AstFunction *closure_block_allocate;
+    bh_arr(AstFunction *) init_procedures;
+    AstOverloadedFunction *implicit_bool_cast;
+    AstOverloadedFunction *dispose_used_local;
+};
+
+typedef struct TypeStore TypeStore;
+struct TypeStore {
+    bh_imap type_map;
+
+    bh_imap pointer_map;
+    bh_imap multi_pointer_map;
+    bh_imap array_map;
+    bh_imap slice_map;
+    bh_imap dynarr_map;
+    bh_imap vararg_map;
+    Table(u64) func_map;
+
+    Type* basic[Basic_Kind_Count];
+    Type* auto_return;
+};
+
 typedef struct Context Context;
 struct Context {
     Table(Package *)      packages;
@@ -2057,8 +2145,17 @@ struct Context {
     bh_arr(CompilerExtension) extensions;
     u32 next_expansion_id;
 
+    CompilerBuiltins builtins;
+    CompilerBasicTypes basic_types;
+    TypeStore types;
+
     CheckerData checker;
     ContextCaches caches;
+
+    // TODO: Move these
+    bh_arr(OverloadOption) operator_overloads[Binary_Op_Count];
+    bh_arr(OverloadOption) unary_operator_overloads[Unary_Op_Count];
+
     OnyxErrors errors;
     b32 errors_enabled;
 
@@ -2081,81 +2178,10 @@ struct Context {
 
 extern Context context;
 
-// NOTE: Basic internal types constructed in the parser
-extern AstBasicType basic_type_void;
-extern AstBasicType basic_type_bool;
-extern AstBasicType basic_type_i8;
-extern AstBasicType basic_type_u8;
-extern AstBasicType basic_type_i16;
-extern AstBasicType basic_type_u16;
-extern AstBasicType basic_type_i32;
-extern AstBasicType basic_type_u32;
-extern AstBasicType basic_type_i64;
-extern AstBasicType basic_type_u64;
-extern AstBasicType basic_type_f32;
-extern AstBasicType basic_type_f64;
-extern AstBasicType basic_type_rawptr;
-extern AstBasicType basic_type_type_expr; // :TypeExprHack
-
-extern AstBasicType basic_type_int_unsized;
-extern AstBasicType basic_type_float_unsized;
-
-extern AstBasicType basic_type_i8x16;
-extern AstBasicType basic_type_i16x8;
-extern AstBasicType basic_type_i32x4;
-extern AstBasicType basic_type_i64x2;
-extern AstBasicType basic_type_f32x4;
-extern AstBasicType basic_type_f64x2;
-extern AstBasicType basic_type_v128;
-
-// HACK
-// :AutoReturnType
-extern Type type_auto_return;
-extern AstBasicType basic_type_auto_return;
-
-extern AstGlobal builtin_heap_start;
-extern AstGlobal builtin_stack_top;
-extern AstGlobal builtin_tls_base;
-extern AstGlobal builtin_tls_size;
-extern AstGlobal builtin_closure_base;
-extern AstGlobal builtin_stack_trace;
-extern AstType  *builtin_string_type;
-extern AstType  *builtin_cstring_type;
-extern AstType  *builtin_range_type;
-extern Type     *builtin_range_type_type;
-extern AstType  *builtin_range64_type;
-extern Type     *builtin_range64_type_type;
-extern AstType  *builtin_vararg_type;
-extern Type     *builtin_vararg_type_type;
-extern AstTyped *builtin_context_variable;
-extern AstType  *builtin_allocator_type;
-extern AstType  *builtin_iterator_type;
-extern AstType  *builtin_optional_type;
-extern AstType  *builtin_callsite_type;
-extern AstType  *builtin_any_type;
-extern AstType  *builtin_code_type;
-extern AstType  *builtin_link_options_type;
-extern AstType  *builtin_package_id_type;
-extern AstType  *builtin_stack_trace_type;
-extern AstType  *builtin_slice_type;
-extern AstType  *builtin_array_type;
-extern AstTyped *type_table_node;
-extern AstTyped *foreign_blocks_node;
-extern AstType  *foreign_block_type;
-extern AstTyped *tagged_procedures_node;
-extern AstTyped *tagged_globals_node;
-extern AstFunction *builtin_initialize_data_segments;
-extern AstFunction *builtin_run_init_procedures;
-extern AstFunction *builtin_closure_block_allocate;
-extern bh_arr(AstFunction *) init_procedures;
-extern AstOverloadedFunction *builtin_implicit_bool_cast;
-extern AstOverloadedFunction *builtin_dispose_used_local;
-
-
 typedef struct BuiltinSymbol {
     char*    package;
     char*    sym;
-    AstNode* node;
+    u32      offset; // Offset into the context structure where the builtin node lives
 } BuiltinSymbol;
 
 extern const BuiltinSymbol builtin_symbols[];
@@ -2165,16 +2191,12 @@ typedef struct IntrinsicMap {
     OnyxIntrinsic intrinsic;
 } IntrinsicMap;
 
-typedef Table(OnyxIntrinsic) IntrinsicTable;
-extern IntrinsicTable intrinsic_table;
+extern const IntrinsicMap builtin_intrinsics[];
 
-extern bh_arr(OverloadOption) operator_overloads[Binary_Op_Count];
-extern bh_arr(OverloadOption) unary_operator_overloads[Unary_Op_Count];
-
-void prepare_builtins();
-void initialize_builtins(bh_allocator a);
-void initalize_special_globals();
-void introduce_build_options(bh_allocator a);
+void prepare_builtins(Context *context);
+void initialize_builtins(Context *context);
+void initalize_special_globals(Context *context);
+void introduce_build_options(Context *context);
 
 
 // NOTE: Useful not inlined functions
@@ -2355,7 +2377,7 @@ static inline b32 node_is_addressable_literal(AstNode* node) {
 static inline Type* get_expression_type(AstTyped* expr) {
     switch (expr->kind) {
         case Ast_Kind_Block: case Ast_Kind_If: case Ast_Kind_While: return NULL;
-        case Ast_Kind_Typeof: return &basic_types[Basic_Kind_Type_Index];
+        case Ast_Kind_Typeof: return context.types.basic[Basic_Kind_Type_Index];
         default: return expr->type;
     }
 }

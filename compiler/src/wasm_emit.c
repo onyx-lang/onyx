@@ -1396,7 +1396,7 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local, i64 index_local) {
     u64 INT_CONST = WI_I32_CONST;
     u64 INT_ADD = WI_I32_ADD;
 
-    if (high_mem.type == &basic_types[Basic_Kind_I64]) {
+    if (high_mem.type == context.types.basic[Basic_Kind_I64]) {
         INT_GE = WI_I64_GE_S;
         INT_LT = WI_I64_LT_S;
         INT_CONST = WI_I64_CONST;
@@ -1608,7 +1608,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
     emit_enter_structured_block(mod, &code, SBT_Continue_Block, for_node->token);
 
         // CLEANUP: Calling a function is way too f-ing complicated. FACTOR IT!!
-        u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
+        u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &context.builtins.stack_top);
 
         StructMember next_func_type;
         type_lookup_member_by_idx(for_node->iter->type, 1, &next_func_type);
@@ -1638,7 +1638,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
 
     WIL(for_node->token, WI_LOCAL_TEE, iterator_done_res);
 
-    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_U8], 0);
+    emit_load_instruction(mod, &code, context.types.basic[Basic_Kind_U8], 0);
     WI(for_node->token, WI_I32_EQZ);
     WID(for_node->token, WI_COND_JUMP, 0x02);
 
@@ -2233,7 +2233,7 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
 EMIT_FUNC(call, AstCall* call) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
+    u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &context.builtins.stack_top);
     u64 stack_top_restore_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     u64 stack_top_store_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
 
@@ -2312,7 +2312,7 @@ EMIT_FUNC(call, AstCall* call) {
             reserve_size += type_size_of(arg->value->type);
 
             if (arg->pass_as_any) {
-                Type *any_type = type_build_from_ast(context.ast_alloc, builtin_any_type);
+                Type *any_type = type_build_from_ast(context.ast_alloc, context.builtins.any_type);
                 assert(any_type);
 
                 u64 ugly_temporary = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
@@ -2320,11 +2320,11 @@ EMIT_FUNC(call, AstCall* call) {
 
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WIL(call_token, WI_LOCAL_GET, ugly_temporary);
-                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], reserve_size + 0);
+                emit_store_instruction(mod, &code, context.types.basic[Basic_Kind_Rawptr], reserve_size + 0);
 
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WID(call_token, WI_I32_CONST, arg->value->type->id);
-                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Type_Index], reserve_size + 4);
+                emit_store_instruction(mod, &code, context.types.basic[Basic_Kind_Type_Index], reserve_size + 4);
                 ensure_type_has_been_submitted_for_emission(mod, arg->value->type);
 
                 local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
@@ -2342,18 +2342,18 @@ EMIT_FUNC(call, AstCall* call) {
         case VA_Kind_Any: {
             vararg_offset = reserve_size;
 
-            i32 any_size = type_size_of(type_build_from_ast(context.ast_alloc, builtin_any_type));
+            i32 any_size = type_size_of(type_build_from_ast(context.ast_alloc, context.builtins.any_type));
 
             fori (i, 0, vararg_count) {
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WID(call_token, WI_PTR_CONST, vararg_any_offsets[i]);
                 WI(call_token, WI_PTR_ADD);
-                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], reserve_size);
+                emit_store_instruction(mod, &code, context.types.basic[Basic_Kind_Rawptr], reserve_size);
 
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WID(call_token, WI_I32_CONST, vararg_any_types[i]);
-                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Type_Index], reserve_size + POINTER_SIZE);
+                emit_store_instruction(mod, &code, context.types.basic[Basic_Kind_Type_Index], reserve_size + POINTER_SIZE);
 
                 reserve_size += any_size;
             }
@@ -2378,13 +2378,13 @@ EMIT_FUNC(call, AstCall* call) {
                 WID(call_token, WI_PTR_CONST, vararg_offset);
                 WI(call_token, WI_PTR_ADD);
             }
-            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], reserve_size);
+            emit_store_instruction(mod, &code, context.types.basic[Basic_Kind_Rawptr], reserve_size);
 
             // NOTE: There may be 4 uninitialized bytes here, because pointers are only 4 bytes in WASM.
 
             WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
             WID(call_token, WI_I32_CONST, vararg_count);
-            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], reserve_size + POINTER_SIZE);
+            emit_store_instruction(mod, &code, context.types.basic[Basic_Kind_I32], reserve_size + POINTER_SIZE);
 
             WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
             if (reserve_size > 0) {
@@ -2421,9 +2421,9 @@ EMIT_FUNC(call, AstCall* call) {
     if (context.options->stack_trace_enabled) {
         emit_stack_address(mod, &code, mod->stack_trace_idx, NULL);
         WIL(NULL, WI_I32_CONST, call->token->pos.line);
-        emit_store_instruction(mod, &code, &basic_types[Basic_Kind_U32], 8);
+        emit_store_instruction(mod, &code, context.types.basic[Basic_Kind_U32], 8);
 
-        u64 stack_trace_pass_global = bh_imap_get(&mod->index_map, (u64) &builtin_stack_trace);
+        u64 stack_trace_pass_global = bh_imap_get(&mod->index_map, (u64) &context.builtins.stack_trace);
         emit_stack_address(mod, &code, mod->stack_trace_idx, NULL);
         WIL(NULL, WI_GLOBAL_SET, stack_trace_pass_global);
     }
@@ -2443,7 +2443,7 @@ EMIT_FUNC(call, AstCall* call) {
     } else {
         emit_expression(mod, &code, call->callee);
 
-        u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_closure_base);
+        u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &context.builtins.closure_base);
         WIL(NULL, WI_GLOBAL_SET, global_closure_base_idx);
 
         i32 type_idx = generate_type_idx(mod, call->callee->type);
@@ -3076,7 +3076,7 @@ EMIT_FUNC(memory_reservation_location, AstMemRes* memres) {
     ensure_node_has_been_submitted_for_emission((AstNode *) memres);
 
     if (memres->threadlocal) {
-        u64 tls_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_tls_base);
+        u64 tls_base_idx = bh_imap_get(&mod->index_map, (u64) &context.builtins.tls_base);
 
         CodePatchInfo code_patch;
         code_patch.kind = Code_Patch_Tls_Offset;
@@ -3389,10 +3389,10 @@ EMIT_FUNC_NO_ARGS(load_slice) {
 
     u64 ugly_temporary = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     WIL(NULL, WI_LOCAL_TEE, ugly_temporary);
-    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], 0);
+    emit_load_instruction(mod, &code, context.types.basic[Basic_Kind_Rawptr], 0);
 
     WIL(NULL, WI_LOCAL_GET, ugly_temporary);
-    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_I32], POINTER_SIZE);
+    emit_load_instruction(mod, &code, context.types.basic[Basic_Kind_I32], POINTER_SIZE);
 
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
@@ -3698,18 +3698,18 @@ EMIT_FUNC(expression, AstTyped* expr) {
             code_patch.kind = Code_Patch_Callee;
             code_patch.func_idx = mod->current_func_idx;
             code_patch.instr = bh_arr_length(code);
-            code_patch.node_related_to_patch = (AstNode *) builtin_closure_block_allocate;
+            code_patch.node_related_to_patch = (AstNode *) context.builtins.closure_block_allocate;
             bh_arr_push(mod->code_patches, code_patch);
             WIL(NULL, WI_CALL, 0);
 
-            ensure_node_has_been_submitted_for_emission((AstNode *) builtin_closure_block_allocate);
+            ensure_node_has_been_submitted_for_emission((AstNode *) context.builtins.closure_block_allocate);
 
             u64 capture_block_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
             WIL(NULL, WI_LOCAL_TEE, capture_block_ptr);
 
             WIL(NULL, WI_LOCAL_GET, capture_block_ptr);
             WIL(NULL, WI_I32_CONST, func->captures->total_size_in_bytes);
-            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_U32], 0);
+            emit_store_instruction(mod, &code, context.types.basic[Basic_Kind_U32], 0);
 
             // Populate the block
             bh_arr_each(AstCaptureLocal *, capture, func->captures->captures) {
@@ -4298,7 +4298,7 @@ EMIT_FUNC(stack_enter, u64 stacksize) {
 
     bh_align(stacksize, 16);
 
-    u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
+    u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &context.builtins.stack_top);
 
     // HACK: slightly... There will be space for 6 instructions
     if (stacksize == 0) {
@@ -4368,7 +4368,7 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_nod
         emit_zero_value_for_type(mod, &code, type->Distinct.base_type, where, alloc_node);
 
     } else {
-        if (type == &basic_types[Basic_Kind_Void]) {
+        if (type == context.types.basic[Basic_Kind_Void]) {
             return;
         }
 
@@ -4395,7 +4395,7 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     while (params_left-- > 0) {
         switch (type_get_param_pass(*param_type)) {
             case Param_Pass_By_Value:            *(t++) = (char) onyx_type_to_wasm_type(*param_type); break;
-            case Param_Pass_By_Implicit_Pointer: *(t++) = (char) onyx_type_to_wasm_type(&basic_types[Basic_Kind_Rawptr]); break;
+            case Param_Pass_By_Implicit_Pointer: *(t++) = (char) onyx_type_to_wasm_type(context.types.basic[Basic_Kind_Rawptr]); break;
 
             case Param_Pass_By_Multiple_Values: {
                 u32 mem_count = type_structlike_mem_count(*param_type);
@@ -4417,7 +4417,7 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     }
 
     if (type_function_get_cc(ft) == CC_Return_Stack) {
-        *(t++) = onyx_type_to_wasm_type(&basic_types[Basic_Kind_Rawptr]);
+        *(t++) = onyx_type_to_wasm_type(context.types.basic[Basic_Kind_Rawptr]);
         param_count += 1;
     }
 
@@ -4506,16 +4506,16 @@ EMIT_FUNC(stack_trace_blob, AstFunction *fd)  {
     bh_arr_push(mod->data_patches, patch);
 
     u64 offset = 0;
-    u64 stack_trace_pass_global = bh_imap_get(&mod->index_map, (u64) &builtin_stack_trace);
+    u64 stack_trace_pass_global = bh_imap_get(&mod->index_map, (u64) &context.builtins.stack_trace);
 
     emit_location_return_offset(mod, &code, (AstTyped *) fd->stack_trace_local, &offset);
     WIL(NULL, WI_GLOBAL_GET, stack_trace_pass_global);
-    emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], offset);
+    emit_store_instruction(mod, &code, context.types.basic[Basic_Kind_Rawptr], offset);
 
     offset = 0;
     emit_location_return_offset(mod, &code, (AstTyped *) fd->stack_trace_local, &offset);
     emit_data_relocation(mod, &code, stack_node_data_id);
-    emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], offset + 4);
+    emit_store_instruction(mod, &code, context.types.basic[Basic_Kind_Rawptr], offset + 4);
 
     *pcode = code;
 }
@@ -4535,7 +4535,7 @@ static i32 assign_function_index(OnyxWasmModule *mod, AstFunction *fd) {
 static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     i32 func_idx = assign_function_index(mod, fd);
 
-    if (fd == builtin_initialize_data_segments && !mod->doing_linking) {
+    if (fd == context.builtins.initialize_data_segments && !mod->doing_linking) {
         // This is a large hack, but is necessary.
         // This particular function (__initialize_data_segments) should not be generated
         // until the module is in its linking phase. This is because we have to wait
@@ -4559,7 +4559,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
     debug_begin_function(mod, func_idx, fd->token, get_function_name(fd));
 
-    if (fd == builtin_initialize_data_segments && context.options->use_post_mvp_features) {
+    if (fd == context.builtins.initialize_data_segments && context.options->use_post_mvp_features) {
         emit_initialize_data_segments_body(mod, &wasm_func.code);
 
         debug_emit_instruction(mod, NULL);
@@ -4572,7 +4572,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         return;
     }
 
-    if (fd == builtin_run_init_procedures) {
+    if (fd == context.builtins.run_init_procedures) {
         emit_run_init_procedures(mod, &wasm_func.code);
 
         debug_emit_instruction(mod, NULL);
@@ -4618,7 +4618,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
             localidx += 1;
             
             // TODO: Make this next line work.
-            // debug_introduce_symbol_by_name(mod, "$return", DSL_REGISTER, mod->stack_return_location_idx, &basic_types[Basic_Kind_Rawptr]);
+            // debug_introduce_symbol_by_name(mod, "$return", DSL_REGISTER, mod->stack_return_location_idx, context.types.basic[Basic_Kind_Rawptr]);
         }
 
         mod->local_alloc->param_count = localidx;
@@ -4639,7 +4639,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
             debug_emit_instruction(mod, NULL);
             debug_emit_instruction(mod, NULL);
 
-            u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_closure_base);
+            u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &context.builtins.closure_base);
             bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_GLOBAL_GET, { .l = global_closure_base_idx } }));
             bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_LOCAL_SET,  { .l = mod->closure_base_idx } }));
         }
@@ -4659,7 +4659,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
             debug_emit_instruction(mod, NULL);
             debug_emit_instruction(mod, NULL);
 
-            u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
+            u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &context.builtins.stack_top);
             bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_LOCAL_GET,  { .l = mod->stack_restore_idx } }));
             bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_GLOBAL_SET, { .l = stack_top_idx } }));
 
@@ -4825,13 +4825,13 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
 
     bh_arr_set_at(module->globals, global_idx, glob);
 
-    if (global == &builtin_stack_top)
+    if (global == &context.builtins.stack_top)
         module->stack_top_ptr = &module->globals[global_idx].initial_value[0].data.i1;
 
-    if (global == &builtin_heap_start)
+    if (global == &context.builtins.heap_start)
         module->heap_start_ptr = &module->globals[global_idx].initial_value[0].data.i1;
 
-    if (global == &builtin_tls_size)
+    if (global == &context.builtins.tls_size)
         module->tls_size_ptr = &module->globals[global_idx].initial_value[0].data.i1;
 }
 
@@ -5099,26 +5099,26 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
     u64 size = type_size_of(effective_type);
 
     if (context.options->generate_type_info) {
-        if (type_table_node != NULL && (AstMemRes *) type_table_node == memres) {
+        if (context.builtins.type_table_node != NULL && (AstMemRes *) context.builtins.type_table_node == memres) {
             u64 table_location = prepare_type_table(mod);
             memres->data_id = table_location;
             return;
         }
 
-        if (tagged_procedures_node != NULL && (AstMemRes *) tagged_procedures_node == memres) {
+        if (context.builtins.tagged_procedures_node != NULL && (AstMemRes *) context.builtins.tagged_procedures_node == memres) {
             u64 tagged_procedures_location = build_tagged_procedures(mod);
             memres->data_id = tagged_procedures_location;
             return;
         }
 
-        if (tagged_globals_node != NULL && (AstMemRes *) tagged_globals_node == memres) {
+        if (context.builtins.tagged_globals_node != NULL && (AstMemRes *) context.builtins.tagged_globals_node == memres) {
             u64 tagged_globals_location = build_tagged_globals(mod);
             memres->data_id = tagged_globals_location;
             return;
         }
     }
 
-    if (foreign_blocks_node != NULL && (AstMemRes *) foreign_blocks_node == memres) {
+    if (context.builtins.foreign_blocks_node != NULL && (AstMemRes *) context.builtins.foreign_blocks_node == memres) {
         u64 foreign_blocks_location = build_foreign_blocks(mod);
         memres->data_id = foreign_blocks_location;
         return;
@@ -5632,7 +5632,7 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
 
         WasmExport closure_export = {
             .kind = WASM_FOREIGN_GLOBAL,
-            .idx  = bh_imap_get(&module->index_map, (u64) &builtin_closure_base),
+            .idx  = bh_imap_get(&module->index_map, (u64) &context.builtins.closure_base),
         };
 
         shput(module->exports, "__closure_base", closure_export);
@@ -5654,7 +5654,7 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
 
     // Now that we know where the data elements will go (and to avoid a lot of patches),
     // we can emit the __initialize_data_segments function.
-    emit_function(module, builtin_initialize_data_segments);
+    emit_function(module, context.builtins.initialize_data_segments);
 
 #ifdef ENABLE_DEBUG_INFO
     if (module->debug_context) {
@@ -5762,9 +5762,9 @@ b32 onyx_wasm_build_link_options_from_node(OnyxWasmLinkOptions *opts, AstTyped *
     node = (AstTyped *) strip_aliases((AstNode *) node);
 
     assert(node && node->kind == Ast_Kind_Struct_Literal);
-    assert(builtin_link_options_type);
+    assert(context.builtins.link_options_type);
 
-    Type *link_options_type = type_build_from_ast(context.ast_alloc, builtin_link_options_type);
+    Type *link_options_type = type_build_from_ast(context.ast_alloc, context.builtins.link_options_type);
 
     AstStructLiteral *input = (AstStructLiteral *) node;
 

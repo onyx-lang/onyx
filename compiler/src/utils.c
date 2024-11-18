@@ -58,7 +58,7 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
             AstPackage* package_node = onyx_ast_node_new(alloc, sizeof(AstPackage), Ast_Kind_Package);
             package_node->package_name = package->name;
             package_node->package = package;
-            package_node->type_node = builtin_package_id_type;
+            package_node->type_node = context.builtins.package_id_type;
             package_node->flags |= Ast_Flag_Comptime;
 
             symbol_raw_introduce(context.global_scope, pac_name, pos, (AstNode *) package_node);
@@ -346,7 +346,7 @@ all_types_peeled_off:
 
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* stype = ((AstPolyStructType *) node);
-            if ((AstType *) node == builtin_array_type) {
+            if ((AstType *) node == context.builtins.array_type) {
                 // We have to ascend on the builtin Array type because it
                 // "extends" the Slice type. This is the only structure
                 // that works this way. It might be worth considering
@@ -401,7 +401,7 @@ static AstNode* try_symbol_raw_resolve_from_poly_sln(bh_arr(AstPolySolution) sln
         if (token_text_equals(sln->poly_sym->token, symbol)) {
             if (sln->kind == PSK_Type) {
                 AstTypeRawAlias* alias = onyx_ast_node_new(context.ast_alloc, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
-                alias->type = &basic_types[Basic_Kind_Type_Index];
+                alias->type = context.types.basic[Basic_Kind_Type_Index];
                 alias->to = sln->type;
                 return (AstNode *) alias;
 
@@ -766,7 +766,7 @@ static TypeMatch ensure_overload_returns_correct_type_job(void *raw_data) {
     if (!func->type->Function.return_type) return TYPE_MATCH_YIELD;
 
     Type *return_type = func->type->Function.return_type;
-    if (return_type == &type_auto_return) return TYPE_MATCH_YIELD;
+    if (return_type == context.types.auto_return) return TYPE_MATCH_YIELD;
 
     // See the note about using Polymorphic Structures as expected return types,
     // in check_overloaded_function().
@@ -833,7 +833,7 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
 
     AstNode* subst = (AstNode *) expansion;
 
-    if (template->type->Function.return_type != &basic_types[Basic_Kind_Void]) {
+    if (template->type->Function.return_type != context.types.basic[Basic_Kind_Void]) {
         expansion->rules = Block_Rule_Do_Block;
 
         AstDoBlock* doblock = (AstDoBlock *) onyx_ast_node_new(context.ast_alloc, sizeof(AstDoBlock), Ast_Kind_Do_Block);
@@ -866,7 +866,7 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
 
     // HACK HACK HACK This is probably very wrong. I don't know what guarentees that
     // the paramters and arguments are going to be in the same order exactly.
-    Type *any_type = type_build_from_ast(context.ast_alloc, builtin_any_type);
+    Type *any_type = type_build_from_ast(context.ast_alloc, context.builtins.any_type);
     fori (i, 0, bh_arr_length(call->args.values)) {
         AstNode *value = (AstNode *) ((AstArgument *) call->args.values[i])->value;
         assert(template->params[i].local->type);
@@ -1052,7 +1052,7 @@ static i32 non_baked_argument_count(Arguments* args) {
 i32 get_argument_buffer_size(TypeFunction* type, Arguments* args) {
     i32 non_vararg_param_count = (i32) type->param_count;
     if (non_vararg_param_count > 0) {
-        if (type->params[type->param_count - 1] == builtin_vararg_type_type) non_vararg_param_count--;
+        if (type->params[type->param_count - 1] == context.builtins.vararg_type_type) non_vararg_param_count--;
         if (type->params[type->param_count - 1]->kind == Type_Kind_VarArgs)  non_vararg_param_count--;
     }
 
@@ -1168,7 +1168,7 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
 
     Type **formal_params = func_type->params;
     Type* variadic_type = NULL;
-    i64 any_type_id = type_build_from_ast(context.ast_alloc, builtin_any_type)->id;
+    i64 any_type_id = type_build_from_ast(context.ast_alloc, context.builtins.any_type)->id;
 
     ArgState arg_state = AS_Expecting_Exact;
     u32 arg_pos = 0;

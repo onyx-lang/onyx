@@ -31,8 +31,6 @@ typedef struct OnyxErrors {
     bh_arr(OnyxError) errors;
 } OnyxErrors;
 
-extern OnyxErrors msgs;
-
 void onyx_errors_init(bh_arr(bh_file_contents)* files);
 void onyx_errors_enable();
 void onyx_errors_disable();

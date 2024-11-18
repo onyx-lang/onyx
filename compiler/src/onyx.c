@@ -94,10 +94,16 @@ static void context_init(CompileOptions* opts) {
 
     bh_managed_heap_init(&context.heap);
     context.gp_alloc = bh_managed_heap_allocator(&context.heap);
-    // context.gp_alloc = bh_heap_allocator();
 
-    types_init();
-    prepare_builtins();
+    context.token_alloc = context.gp_alloc;
+
+    // NOTE: Create the arena where tokens and AST nodes will exist
+    // Prevents nodes from being scattered across memory due to fragmentation
+    bh_arena_init(&context.ast_arena, context.gp_alloc, 16 * 1024 * 1024); // 16MB
+    context.ast_alloc = bh_arena_allocator(&context.ast_arena);
+
+    types_init(&context);
+    prepare_builtins(&context);
 
     // HACK
     special_global_entities_remaining = 5;
@@ -113,18 +119,7 @@ static void context_init(CompileOptions* opts) {
     context.global_scope = scope_create(context.gp_alloc, NULL, internal_location);
     sh_new_arena(context.packages);
 
-    // NOTE: This will be initialized upon the first call to entity_heap_insert.
-    context.entities.next_id  = 0;
-    context.entities.entities = NULL;
-
     onyx_errors_init(&context.loaded_files);
-
-    context.token_alloc = context.gp_alloc;
-
-    // NOTE: Create the arena where tokens and AST nodes will exist
-    // Prevents nodes from being scattered across memory due to fragmentation
-    bh_arena_init(&context.ast_arena, context.gp_alloc, 16 * 1024 * 1024); // 16MB
-    context.ast_alloc = bh_arena_allocator(&context.ast_arena);
 
     context.wasm_module = bh_alloc_item(context.gp_alloc, OnyxWasmModule);
     *context.wasm_module = onyx_wasm_module_create(context.gp_alloc);
@@ -179,19 +174,12 @@ static void context_init(CompileOptions* opts) {
         }));
     }
 
-    builtin_heap_start.entity = NULL;
-    builtin_stack_top.entity = NULL;
-    builtin_tls_base.entity = NULL;
-    builtin_tls_size.entity = NULL;
-    builtin_closure_base.entity = NULL;
-    builtin_stack_trace.entity = NULL;
-
-    add_entities_for_node(NULL, (AstNode *) &builtin_stack_top, context.global_scope, NULL);
-    add_entities_for_node(NULL, (AstNode *) &builtin_heap_start, context.global_scope, NULL);
-    add_entities_for_node(NULL, (AstNode *) &builtin_tls_base, context.global_scope, NULL);
-    add_entities_for_node(NULL, (AstNode *) &builtin_tls_size, context.global_scope, NULL);
-    add_entities_for_node(NULL, (AstNode *) &builtin_closure_base, context.global_scope, NULL);
-    add_entities_for_node(NULL, (AstNode *) &builtin_stack_trace, context.global_scope, NULL);
+    add_entities_for_node(NULL, (AstNode *) &context.builtins.stack_top, context.global_scope, NULL);
+    add_entities_for_node(NULL, (AstNode *) &context.builtins.heap_start, context.global_scope, NULL);
+    add_entities_for_node(NULL, (AstNode *) &context.builtins.tls_base, context.global_scope, NULL);
+    add_entities_for_node(NULL, (AstNode *) &context.builtins.tls_size, context.global_scope, NULL);
+    add_entities_for_node(NULL, (AstNode *) &context.builtins.closure_base, context.global_scope, NULL);
+    add_entities_for_node(NULL, (AstNode *) &context.builtins.stack_trace, context.global_scope, NULL);
 
     // NOTE: Add all files passed by command line to the queue
     bh_arr_each(const char *, filename, opts->files) {
@@ -423,15 +411,15 @@ static b32 process_entity(Entity* ent) {
         case Entity_State_Parse:
             if (!context.builtins_initialized) {
                 context.builtins_initialized = 1;
-                initialize_builtins(context.ast_alloc);
-                introduce_build_options(context.ast_alloc);
+                initialize_builtins(&context);
+                introduce_build_options(&context);
                 introduce_defined_variables();
             }
 
             // GROSS
             if (special_global_entities_remaining == 0) {
                 special_global_entities_remaining--;
-                initalize_special_globals();
+                initalize_special_globals(&context);
             }
 
             if (process_load_entity(ent)) {
@@ -700,7 +688,7 @@ static void link_wasm_module() {
     assert(runtime_var_package);
 
     AstTyped *link_options_node = (AstTyped *) symbol_raw_resolve(runtime_var_package->scope, "link_options");
-    Type *link_options_type = type_build_from_ast(context.ast_alloc, builtin_link_options_type);
+    Type *link_options_type = type_build_from_ast(context.ast_alloc, context.builtins.link_options_type);
 
     assert(unify_node_and_type(&link_options_node, link_options_type) == TYPE_MATCH_SUCCESS);
 

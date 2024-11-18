@@ -33,7 +33,7 @@ void insert_poly_sln_into_scope(Scope* scope, AstPolySolution *sln) {
             node = onyx_ast_node_new(context.ast_alloc, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
             ((AstTypeRawAlias *) node)->token = sln->poly_sym->token;
             ((AstTypeRawAlias *) node)->to = sln->type;
-            ((AstTypeRawAlias *) node)->type = &basic_types[Basic_Kind_Type_Index];
+            ((AstTypeRawAlias *) node)->type = context.types.basic[Basic_Kind_Type_Index];
             ((AstTypeRawAlias *) node)->type_id = sln->type->id;
             break;
 
@@ -261,7 +261,7 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
         // This check does not strictly need the `type_auto_return` check,
         // but it does prevent bugs if the auto return type placeholder is
         // accidentally inserted into the real type.
-        if (elem.type_expr == (AstType *) target && elem.actual != &type_auto_return) {
+        if (elem.type_expr == (AstType *) target && elem.actual != context.types.auto_return) {
             result.kind = elem.kind;
 
             assert(elem.kind != PSK_Undefined);
@@ -493,7 +493,7 @@ static AstTyped* lookup_param_in_arguments(AstFunction* func, AstPolyParam* para
 static AstTyped* try_lookup_based_on_partial_function_type(AstFunction *pp, AstFunctionType *ft) {
     if (ft->partial_function_type == NULL) {
         AstType *old_return_type = ft->return_type;
-        ft->return_type = (AstType *) &basic_type_void;
+        ft->return_type = (AstType *) &context.basic_types.type_void;
         ft->partial_function_type = type_build_from_ast(context.ast_alloc, (AstType *) ft);
         ft->return_type = old_return_type;
         if (!ft->partial_function_type) {
@@ -509,7 +509,7 @@ static AstTyped* try_lookup_based_on_partial_function_type(AstFunction *pp, AstF
     // If the result is not ready (NULL, yield flag, no type, or `type_auto_return` as return type), wait.
     if (result && (
             result->type == NULL
-        || (result->type->kind == Type_Kind_Function && result->type->Function.return_type == &type_auto_return)))
+        || (result->type->kind == Type_Kind_Function && result->type->Function.return_type == context.types.auto_return)))
     {
         doing_nested_polymorph_lookup = 1;
         result = NULL;
@@ -648,7 +648,7 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
 
     Type*    param_type = NULL;
     AstType *param_type_expr = func->params[param->idx].local->type_node;
-    if (param_type_expr == (AstType *) &basic_type_type_expr) {
+    if (param_type_expr == (AstType *) &context.basic_types.type_type_expr) {
         if (!node_is_type((AstNode *) value)) {
             if (err_msg) {
                 err_msg->pos = value->token->pos;
@@ -1119,7 +1119,7 @@ char* build_poly_struct_name(char *name, Type* type) {
 
     // Special case for `? T`
     if (type->kind == Type_Kind_Union
-        && type->Union.constructed_from == builtin_optional_type) {
+        && type->Union.constructed_from == context.builtins.optional_type) {
         strncat(name_buf, "? ", 255);
         strncat(name_buf, type_get_name(type->Union.poly_sln[0].type), 255);
 

@@ -119,7 +119,7 @@ static void write_polymorphic_solutions_array(
         WRITE_PTR(param_locations[i++]);
 
         if (sln->kind == PSK_Type) {
-            write_type_idx(ctx, &basic_types[Basic_Kind_Type_Index]);
+            write_type_idx(ctx, context.types.basic[Basic_Kind_Type_Index]);
         } else {
             write_type_idx(ctx, sln->value->type);
         }
@@ -775,7 +775,7 @@ static void build_type_info_for_type(OnyxWasmModule *module, Type *type) {
 
 static u64 prepare_type_table(OnyxWasmModule* module) {
     // This is the data behind the "type_table" slice in runtime/info/types.onyx
-    u32 type_count = bh_arr_length(type_map.entries) + 1;
+    u32 type_count = bh_arr_length(context.types.type_map.entries) + 1;
     void* table_info = bh_alloc_array(context.gp_alloc, u8, 2 * type_count * POINTER_SIZE);
     memset(table_info, 0, 2 * type_count * POINTER_SIZE);
 

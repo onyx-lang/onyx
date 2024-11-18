@@ -211,8 +211,8 @@ AstNumLit* ast_reduce_type_compare(bh_allocator a, AstBinaryOp* node) {
     res->token = node->token;
     res->flags |= node->flags;
     res->flags |= Ast_Flag_Comptime;
-    res->type_node = (AstType *) &basic_type_bool;
-    res->type = &basic_types[Basic_Kind_Bool];
+    res->type_node = (AstType *) &context.basic_types.type_bool;
+    res->type = context.types.basic[Basic_Kind_Bool];
     res->next = node->next;
 
     switch (node->operation) {
@@ -454,12 +454,12 @@ void promote_numlit_to_larger(AstNumLit* num) {
         // NOTE: Int32, Int16, Int8
         i64 val = (i64) num->value.i;
         num->value.l = val;
-        num->type = &basic_types[Basic_Kind_I64];
+        num->type = context.types.basic[Basic_Kind_I64];
     } else if (num->type->Basic.size <= 4) {
         // NOTE: Float32
         f64 val = (f64) num->value.f;
         num->value.d = val;
-        num->type = &basic_types[Basic_Kind_F64];
+        num->type = context.types.basic[Basic_Kind_F64];
     }
 }
 
@@ -671,7 +671,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
             int index = 0;
             if ((index = shgeti(type->Union.variants, node->token->text)) != -1) {
                 UnionVariant *uv = type->Union.variants[index].value;
-                if (uv->type != &basic_types[Basic_Kind_Void]) {
+                if (uv->type != context.types.basic[Basic_Kind_Void]) {
                     if (permanent) {
                         onyx_report_error(node->token->pos, Error_Critical,
                             "Shorthand union literal syntax '.%s' is not all for this variant, because its type is not void; it is '%s'. Use the longer syntax, '.{ %s = value }'",
@@ -763,7 +763,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // compiler to handle "mismatched" types. This should be properly fixed soon,
     // but will remain commented out for now.
     //
-    // Type* any_type = type_build_from_ast(context.ast_alloc, builtin_any_type);
+    // Type* any_type = type_build_from_ast(context.ast_alloc, context.builtins.any_type);
     // if (any_type == NULL) return TYPE_MATCH_YIELD;
     // i64 any_id = any_type->id;
     // if (node_type && node_type->id != any_id && type->id == any_id) return TYPE_MATCH_SUCCESS;
@@ -776,7 +776,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // value placeholder, fill in that placeholder with the actual type.
     // :AutoReturnType
     if (node_type && node_type->kind == Type_Kind_Function
-        && node_type->Function.return_type == &type_auto_return
+        && node_type->Function.return_type == context.types.auto_return
         && type->kind == Type_Kind_Function) {
 
         node_type->Function.return_type = type->Function.return_type;
@@ -800,7 +800,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // String literals implicitly become c-strings for convience.
     if (node->kind == Ast_Kind_StrLit
         && type->kind == Type_Kind_MultiPointer
-        && type->MultiPointer.elem == &basic_types[Basic_Kind_U8]) {
+        && type->MultiPointer.elem == context.types.basic[Basic_Kind_U8]) {
 
         if (permanent) {
             AstStrLit *strlit = (AstStrLit *) node;
@@ -870,7 +870,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // If the destination type is an optional, and the node's type is a value of
     // the same underlying type, then we can construct an optional with a value
     // implicitly. This makes working with optionals barable.
-    if (type_constructed_from_poly(type, builtin_optional_type)) {
+    if (type_constructed_from_poly(type, context.builtins.optional_type)) {
         TypeMatch match = unify_node_and_type_(pnode, type->Union.poly_sln[0].type, permanent);
         if (match == TYPE_MATCH_SUCCESS) {
             if (permanent) {
@@ -1036,12 +1036,12 @@ Type* query_expression_type(AstTyped *node) {
     }
 
     if (node_is_type((AstNode *) node)) {
-        return &basic_types[Basic_Kind_Type_Index];
+        return context.types.basic[Basic_Kind_Type_Index];
     }
 
     if (node->kind == Ast_Kind_Array_Literal && node->type == NULL) {
         AstArrayLiteral* al = (AstArrayLiteral *) node;
-        Type* elem_type = &basic_types[Basic_Kind_Void];
+        Type* elem_type = context.types.basic[Basic_Kind_Void];
         if (bh_arr_length(al->values) > 0) {
             elem_type = query_expression_type(al->values[0]);
         }
@@ -1072,7 +1072,7 @@ Type* query_expression_type(AstTyped *node) {
     // assigned a void type. This is cleared before the procedure
     // is solidified.
     if (node->kind == Ast_Kind_Polymorphic_Proc) {
-        return &basic_types[Basic_Kind_Void];
+        return context.types.basic[Basic_Kind_Void];
     }
 
     if (node->kind == Ast_Kind_Macro) {
@@ -1091,14 +1091,14 @@ Type* query_expression_type(AstTyped *node) {
             b32 big    = bh_abs(((AstNumLit *) node)->value.l) >= (1ll << 32);
             b32 unsign = ((AstNumLit *) node)->was_hex_literal;
 
-            if (((AstNumLit *) node)->was_char_literal) return &basic_types[Basic_Kind_U8];
-            else if ( big && !unsign) return &basic_types[Basic_Kind_I64];
-            else if ( big &&  unsign) return &basic_types[Basic_Kind_U64];
-            else if (!big && !unsign) return &basic_types[Basic_Kind_I32];
-            else if (!big &&  unsign) return &basic_types[Basic_Kind_U32];
+            if (((AstNumLit *) node)->was_char_literal) return context.types.basic[Basic_Kind_U8];
+            else if ( big && !unsign) return context.types.basic[Basic_Kind_I64];
+            else if ( big &&  unsign) return context.types.basic[Basic_Kind_U64];
+            else if (!big && !unsign) return context.types.basic[Basic_Kind_I32];
+            else if (!big &&  unsign) return context.types.basic[Basic_Kind_U32];
         }
         else if (node->type->Basic.kind == Basic_Kind_Float_Unsized) {
-            return &basic_types[Basic_Kind_F64];
+            return context.types.basic[Basic_Kind_F64];
         }
     }
 
@@ -1137,12 +1137,12 @@ Type* resolve_expression_type(AstTyped* node) {
     }
 
     if (node_is_type((AstNode *) node)) {
-        return &basic_types[Basic_Kind_Type_Index];
+        return context.types.basic[Basic_Kind_Type_Index];
     }
 
     if (node->kind == Ast_Kind_Array_Literal && node->type == NULL) {
         AstArrayLiteral* al = (AstArrayLiteral *) node;
-        Type* elem_type = &basic_types[Basic_Kind_Void];
+        Type* elem_type = context.types.basic[Basic_Kind_Void];
         if (bh_arr_length(al->values) > 0) {
             elem_type = resolve_expression_type(al->values[0]);
         }
@@ -1181,7 +1181,7 @@ Type* resolve_expression_type(AstTyped* node) {
     // assigned a void type. This is cleared before the procedure
     // is solidified.
     if (node->kind == Ast_Kind_Polymorphic_Proc) {
-        node->type = &basic_types[Basic_Kind_Void];
+        node->type = context.types.basic[Basic_Kind_Void];
     }
 
     if (node->kind == Ast_Kind_Macro) {
@@ -1189,7 +1189,7 @@ Type* resolve_expression_type(AstTyped* node) {
     }
 
     if (node->kind == Ast_Kind_Package) {
-        node->type_node = builtin_package_id_type;
+        node->type_node = context.builtins.package_id_type;
         node->type = type_build_from_ast(context.ast_alloc, node->type_node);
     }
 
@@ -1201,14 +1201,14 @@ Type* resolve_expression_type(AstTyped* node) {
             b32 big    = bh_abs(((AstNumLit *) node)->value.l) >= (1ll << 32);
             b32 unsign = ((AstNumLit *) node)->was_hex_literal;
 
-            if (((AstNumLit *) node)->was_char_literal) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U8], 1);
-            else if ( big && !unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I64], 1);
-            else if ( big &&  unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U64], 1);
-            else if (!big && !unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I32], 1);
-            else if (!big &&  unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U32], 1);
+            if (((AstNumLit *) node)->was_char_literal) convert_numlit_to_type((AstNumLit *) node, context.types.basic[Basic_Kind_U8], 1);
+            else if ( big && !unsign) convert_numlit_to_type((AstNumLit *) node, context.types.basic[Basic_Kind_I64], 1);
+            else if ( big &&  unsign) convert_numlit_to_type((AstNumLit *) node, context.types.basic[Basic_Kind_U64], 1);
+            else if (!big && !unsign) convert_numlit_to_type((AstNumLit *) node, context.types.basic[Basic_Kind_I32], 1);
+            else if (!big &&  unsign) convert_numlit_to_type((AstNumLit *) node, context.types.basic[Basic_Kind_U32], 1);
         }
         else if (node->type->Basic.kind == Basic_Kind_Float_Unsized) {
-            convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_F64], 1);
+            convert_numlit_to_type((AstNumLit *) node, context.types.basic[Basic_Kind_F64], 1);
         }
     }
 
@@ -1412,7 +1412,7 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
 
     if (from->kind == Type_Kind_Function) {
         *err_msg = "Can only cast a function to a 'u32'.";
-        return to == &basic_types[Basic_Kind_U32];
+        return to == context.types.basic[Basic_Kind_U32];
     }
 
     if (   (type_is_simd(to) && !type_is_simd(from))
@@ -1489,11 +1489,11 @@ TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
         || (node->type->kind == Type_Kind_Pointer)
         || (node->type->kind == Type_Kind_MultiPointer)) {
         AstNumLit *zero = make_int_literal(context.ast_alloc, 0);
-        zero->type = &basic_types[Basic_Kind_Rawptr];
+        zero->type = context.types.basic[Basic_Kind_Rawptr];
 
         AstBinaryOp* cmp = make_binary_op(context.ast_alloc, Binary_Op_Not_Equal, node, (AstTyped *) zero);
         cmp->token = node->token;
-        cmp->type = &basic_types[Basic_Kind_Bool];
+        cmp->type = context.types.basic[Basic_Kind_Bool];
 
         *pnode = (AstTyped *) cmp;
         return TYPE_MATCH_SUCCESS;
@@ -1517,7 +1517,7 @@ TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
         zero->type = smem.type;
 
         AstBinaryOp* cmp = make_binary_op(context.ast_alloc, Binary_Op_Not_Equal, (AstTyped *) field, (AstTyped *) zero);
-        cmp->type = &basic_types[Basic_Kind_Bool];
+        cmp->type = context.types.basic[Basic_Kind_Bool];
 
         *pnode = (AstTyped *) cmp;
         return TYPE_MATCH_SUCCESS;
@@ -1538,7 +1538,7 @@ TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
     }
 
     Arguments *args = (Arguments *) bh_imap_get(&context.caches.implicit_cast_to_bool_cache, (u64) node);
-    AstFunction *overload = (AstFunction *) find_matching_overload_by_arguments(builtin_implicit_bool_cast->overloads, args);
+    AstFunction *overload = (AstFunction *) find_matching_overload_by_arguments(context.builtins.implicit_bool_cast->overloads, args);
 
     if (overload == NULL)                                       return TYPE_MATCH_FAILED;
     if (overload == (AstFunction *) &node_that_signals_a_yield) return TYPE_MATCH_YIELD;
@@ -1619,8 +1619,8 @@ AstNode* strip_aliases(AstNode* n) {
 AstNumLit* make_bool_literal(bh_allocator a, b32 b) {
     AstNumLit* bl = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
     bl->flags |= Ast_Flag_Comptime;
-    bl->type_node = (AstType *) &basic_type_bool;
-    bl->type = &basic_types[Basic_Kind_Bool];
+    bl->type_node = (AstType *) &context.basic_types.type_bool;
+    bl->type = context.types.basic[Basic_Kind_Bool];
 
     bl->value.i = b ? 1 : 0;
     return bl;
@@ -1631,9 +1631,9 @@ AstNumLit* make_int_literal(bh_allocator a, i64 i) {
     num->flags |= Ast_Flag_Comptime;
 
     if (bh_abs(i) >= (1ll << 32))
-        num->type_node = (AstType *) &basic_type_i64;
+        num->type_node = (AstType *) &context.basic_types.type_i64;
     else
-        num->type_node = (AstType *) &basic_type_i32;
+        num->type_node = (AstType *) &context.basic_types.type_i32;
 
     num->value.l = i;
     return num;
@@ -1643,7 +1643,7 @@ AstNumLit* make_float_literal(bh_allocator a, f64 d) {
     // NOTE: Use convert_numlit_to_type to make this a concrete float
     AstNumLit* num = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
     num->flags |= Ast_Flag_Comptime;
-    num->type_node = (AstType *) &basic_type_float_unsized;
+    num->type_node = (AstType *) &context.basic_types.type_float_unsized;
     num->value.d = d;
     return num;
 }
@@ -1658,7 +1658,7 @@ AstRangeLiteral* make_range_literal(bh_allocator a, AstTyped* low, AstTyped* hig
 AstStrLit* make_string_literal(bh_allocator a, OnyxToken *token) {
     AstStrLit *str = onyx_ast_node_new(a, sizeof(AstStrLit), Ast_Kind_StrLit);
     str->flags |= Ast_Flag_Comptime;
-    str->type_node = builtin_string_type;
+    str->type_node = context.builtins.string_type;
     str->token = token;
     return str;
 }
@@ -1756,7 +1756,7 @@ AstStructLiteral* make_union_variant_of_void(bh_allocator a, Type* union_type, O
     AstStructLiteral *lit = onyx_ast_node_new(a, sizeof(AstStructLiteral), Ast_Kind_Struct_Literal);
     lit->token = token;
 
-    assert(variant->type == &basic_types[Basic_Kind_Void]);
+    assert(variant->type == context.types.basic[Basic_Kind_Void]);
 
     bh_arr_new(context.ast_alloc, lit->values_to_initialize, 2);
     bh_arr_push(lit->values_to_initialize, ((ValueWithOffset) { (AstTyped *) make_int_literal(a, variant->tag_value), 0 }));
@@ -1911,7 +1911,7 @@ void insert_auto_dispose_call(bh_allocator a, AstLocal *local) {
 
     AstCall *dispose_call = onyx_ast_node_new(a, sizeof(AstCall), Ast_Kind_Call);
     dispose_call->token = local->token;
-    dispose_call->callee = (AstTyped *) builtin_dispose_used_local;
+    dispose_call->callee = (AstTyped *) context.builtins.dispose_used_local;
 
     arguments_initialize(&dispose_call->args);
     bh_arr_push(dispose_call->args.values, (AstTyped *) make_argument(a, (AstTyped *) aof));

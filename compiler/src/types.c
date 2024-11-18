@@ -6,49 +6,6 @@
 #include "errors.h"
 #include "parser.h"
 
-// NOTE: These have to be in the same order as Basic
-Type basic_types[] = {
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_void, { Basic_Kind_Void,                    0,                       0,  1, "void"   } },
-
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_bool, { Basic_Kind_Bool,   Basic_Flag_Boolean,                       1,  1, "bool"   } },
-
-    { Type_Kind_Basic, 0, 0, NULL,                        { Basic_Kind_Int_Unsized, Basic_Flag_Integer,                  0,  0, "unsized int" } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_i8,  { Basic_Kind_I8,     Basic_Flag_Integer,                       1,  1, "i8"     } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_u8,  { Basic_Kind_U8,     Basic_Flag_Integer | Basic_Flag_Unsigned, 1,  1, "u8"     } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_i16, { Basic_Kind_I16,    Basic_Flag_Integer,                       2,  2, "i16"    } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_u16, { Basic_Kind_U16,    Basic_Flag_Integer | Basic_Flag_Unsigned, 2,  2, "u16"    } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_i32, { Basic_Kind_I32,    Basic_Flag_Integer,                       4,  4, "i32"    } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_u32, { Basic_Kind_U32,    Basic_Flag_Integer | Basic_Flag_Unsigned, 4,  4, "u32"    } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_i64, { Basic_Kind_I64,    Basic_Flag_Integer,                       8,  8, "i64"    } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_u64, { Basic_Kind_U64,    Basic_Flag_Integer | Basic_Flag_Unsigned, 8,  8, "u64"    } },
-
-    { Type_Kind_Basic, 0, 0, NULL,                        { Basic_Kind_Float_Unsized, Basic_Flag_Float,                  0,  0, "unsized float" } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_f32, { Basic_Kind_F32,    Basic_Flag_Float,                         4,  4, "f32"    } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_f64, { Basic_Kind_F64,    Basic_Flag_Float,                         8,  4, "f64"    } },
-
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_rawptr, { Basic_Kind_Rawptr, Basic_Flag_Pointer,                    POINTER_SIZE,  POINTER_SIZE, "rawptr" } },
-
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_i8x16, { Basic_Kind_I8X16,  Basic_Flag_SIMD,                        16, 16, "i8x16" } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_i16x8, { Basic_Kind_I16X8,  Basic_Flag_SIMD,                        16, 16, "i16x8" } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_i32x4, { Basic_Kind_I32X4,  Basic_Flag_SIMD,                        16, 16, "i32x4" } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_i64x2, { Basic_Kind_I64X2,  Basic_Flag_SIMD,                        16, 16, "i64x2" } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_f32x4, { Basic_Kind_F32X4,  Basic_Flag_SIMD,                        16, 16, "f32x4" } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_f64x2, { Basic_Kind_F64X2,  Basic_Flag_SIMD,                        16, 16, "f64x2" } },
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_v128,  { Basic_Kind_V128,   Basic_Flag_SIMD,                        16, 16, "v128"  } },
-
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_type_expr, { Basic_Kind_Type_Index, Basic_Flag_Type_Index,          4,  4, "type_expr" } },
-};
-
-// TODO: Document this!!
-       bh_imap type_map;
-static bh_imap type_pointer_map;
-static bh_imap type_multi_pointer_map;
-static bh_imap type_array_map;
-static bh_imap type_slice_map;
-static bh_imap type_dynarr_map;
-static bh_imap type_vararg_map;
-static Table(u64) type_func_map;
-
 static Type* type_create(TypeKind kind, bh_allocator a, u32 extra_type_pointer_count) {
     Type* type = bh_alloc(a, sizeof(Type) + sizeof(Type *) * extra_type_pointer_count);
     memset(type, 0, sizeof(Type));
@@ -62,35 +19,65 @@ static void type_register(Type* type) {
     type->id = ++context.next_type_id;
     if (type->ast_type) type->ast_type->type_id = type->id;
 
-    bh_imap_put(&type_map, type->id, (u64) type);
+    bh_imap_put(&context.types.type_map, type->id, (u64) type);
 }
 
-void types_init() {
-#define MAKE_MAP(x) (memset(&x, 0, sizeof(x)), bh_imap_init(&x, context.gp_alloc, 255))
-    MAKE_MAP(type_map);
-    MAKE_MAP(type_pointer_map);
-    MAKE_MAP(type_multi_pointer_map);
-    MAKE_MAP(type_array_map);
-    MAKE_MAP(type_slice_map);
-    MAKE_MAP(type_dynarr_map);
-    MAKE_MAP(type_vararg_map);
-
-    type_func_map = NULL;
-    sh_new_arena(type_func_map);
-
-    fori (i, 0, Basic_Kind_Count) type_register(&basic_types[i]);
+void types_init(Context *context) {
+#define MAKE_MAP(x) (memset(&x, 0, sizeof(x)), bh_imap_init(&x, context->gp_alloc, 255))
+    MAKE_MAP(context->types.type_map);
+    MAKE_MAP(context->types.pointer_map);
+    MAKE_MAP(context->types.multi_pointer_map);
+    MAKE_MAP(context->types.array_map);
+    MAKE_MAP(context->types.slice_map);
+    MAKE_MAP(context->types.dynarr_map);
+    MAKE_MAP(context->types.vararg_map);
 #undef MAKE_MAP
+
+    context->types.func_map = NULL;
+    sh_new_arena(context->types.func_map);
+
+    fori (i, 0, Basic_Kind_Count) {
+        context->types.basic[i] = bh_alloc_item(context->ast_alloc, Type);
+    }
+
+    *context->types.basic[Basic_Kind_Void]          = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_void,      { Basic_Kind_Void,                    0,                       0,  1, "void"   } });
+    *context->types.basic[Basic_Kind_Bool]          = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_bool,      { Basic_Kind_Bool,   Basic_Flag_Boolean,                       1,  1, "bool"   } });
+    *context->types.basic[Basic_Kind_Int_Unsized]   = ((Type) { Type_Kind_Basic, 0, 0, NULL,                                             { Basic_Kind_Int_Unsized, Basic_Flag_Integer,                  0,  0, "unsized int" } });
+    *context->types.basic[Basic_Kind_I8]            = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_i8,        { Basic_Kind_I8,     Basic_Flag_Integer,                       1,  1, "i8"     } });
+    *context->types.basic[Basic_Kind_U8]            = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_u8,        { Basic_Kind_U8,     Basic_Flag_Integer | Basic_Flag_Unsigned, 1,  1, "u8"     } });
+    *context->types.basic[Basic_Kind_I16]           = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_i16,       { Basic_Kind_I16,    Basic_Flag_Integer,                       2,  2, "i16"    } });
+    *context->types.basic[Basic_Kind_U16]           = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_u16,       { Basic_Kind_U16,    Basic_Flag_Integer | Basic_Flag_Unsigned, 2,  2, "u16"    } });
+    *context->types.basic[Basic_Kind_I32]           = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_i32,       { Basic_Kind_I32,    Basic_Flag_Integer,                       4,  4, "i32"    } });
+    *context->types.basic[Basic_Kind_U32]           = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_u32,       { Basic_Kind_U32,    Basic_Flag_Integer | Basic_Flag_Unsigned, 4,  4, "u32"    } });
+    *context->types.basic[Basic_Kind_I64]           = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_i64,       { Basic_Kind_I64,    Basic_Flag_Integer,                       8,  8, "i64"    } });
+    *context->types.basic[Basic_Kind_U64]           = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_u64,       { Basic_Kind_U64,    Basic_Flag_Integer | Basic_Flag_Unsigned, 8,  8, "u64"    } });
+    *context->types.basic[Basic_Kind_Float_Unsized] = ((Type) { Type_Kind_Basic, 0, 0, NULL,                                             { Basic_Kind_Float_Unsized, Basic_Flag_Float,                  0,  0, "unsized float" } });
+    *context->types.basic[Basic_Kind_F32]           = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_f32,       { Basic_Kind_F32,    Basic_Flag_Float,                         4,  4, "f32"    } });
+    *context->types.basic[Basic_Kind_F64]           = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_f64,       { Basic_Kind_F64,    Basic_Flag_Float,                         8,  4, "f64"    } });
+    *context->types.basic[Basic_Kind_Rawptr]        = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_rawptr,    { Basic_Kind_Rawptr, Basic_Flag_Pointer,                       POINTER_SIZE,  POINTER_SIZE, "rawptr" } });
+    *context->types.basic[Basic_Kind_I8X16]         = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_i8x16,     { Basic_Kind_I8X16,  Basic_Flag_SIMD,                          16, 16, "i8x16" } });
+    *context->types.basic[Basic_Kind_I16X8]         = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_i16x8,     { Basic_Kind_I16X8,  Basic_Flag_SIMD,                          16, 16, "i16x8" } });
+    *context->types.basic[Basic_Kind_I32X4]         = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_i32x4,     { Basic_Kind_I32X4,  Basic_Flag_SIMD,                          16, 16, "i32x4" } });
+    *context->types.basic[Basic_Kind_I64X2]         = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_i64x2,     { Basic_Kind_I64X2,  Basic_Flag_SIMD,                          16, 16, "i64x2" } });
+    *context->types.basic[Basic_Kind_F32X4]         = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_f32x4,     { Basic_Kind_F32X4,  Basic_Flag_SIMD,                          16, 16, "f32x4" } });
+    *context->types.basic[Basic_Kind_F64X2]         = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_f64x2,     { Basic_Kind_F64X2,  Basic_Flag_SIMD,                          16, 16, "f64x2" } });
+    *context->types.basic[Basic_Kind_V128]          = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_v128,      { Basic_Kind_V128,   Basic_Flag_SIMD,                          16, 16, "v128"  } });
+    *context->types.basic[Basic_Kind_Type_Index]    = ((Type) { Type_Kind_Basic, 0, 0, (AstType *) &context->basic_types.type_type_expr, { Basic_Kind_Type_Index, Basic_Flag_Type_Index,                4,  4,   "type_expr" } });
+
+    fori (i, 0, Basic_Kind_Count) {
+        type_register(context->types.basic[i]);
+    }
 }
 
 void types_dump_type_info() {
-    bh_arr_each(bh__imap_entry, entry, type_map.entries) {
+    bh_arr_each(bh__imap_entry, entry, context.types.type_map.entries) {
         bh_printf("%d -> %s\n", entry->key, type_get_name((Type *) entry->value));
     }
 }
 
 Type* type_lookup_by_id(u32 id) {
-    if (bh_imap_has(&type_map, id)) {
-        return (Type *) bh_imap_get(&type_map, id);
+    if (bh_imap_has(&context.types.type_map, id)) {
+        return (Type *) bh_imap_get(&context.types.type_map, id);
     }
 
     return NULL;
@@ -103,7 +90,7 @@ b32 types_are_compatible_(Type* t1, Type* t2, b32 recurse_pointers) {
     if (t1 == NULL || t2 == NULL) return 0;
     if (t1->id == t2->id) return 1;
 
-    if (t1 == &type_auto_return || t2 == &type_auto_return) {
+    if (t1 == context.types.auto_return || t2 == context.types.auto_return) {
         return 0;
     }
 
@@ -344,11 +331,11 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             }
 
             char* name = (char *) type_get_unique_name(func_type);
-            if (func_type->Function.return_type != &type_auto_return) {
-                i32 index = shgeti(type_func_map, name);
+            if (func_type->Function.return_type != context.types.auto_return) {
+                i32 index = shgeti(context.types.func_map, name);
                 if (index != -1) {
-                    u64 id = type_func_map[index].value;
-                    Type* existing_type = (Type *) bh_imap_get(&type_map, id);
+                    u64 id = context.types.func_map[index].value;
+                    Type* existing_type = (Type *) bh_imap_get(&context.types.type_map, id);
 
                     // LEAK LEAK LEAK the func_type that is created
                     return existing_type;
@@ -356,7 +343,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
             }
 
             type_register(func_type);
-            shput(type_func_map, name, func_type->id);
+            shput(context.types.func_map, name, func_type->id);
 
             return func_type;
         }
@@ -906,11 +893,11 @@ Type* type_build_function_type(bh_allocator alloc, AstFunction* func) {
 
     // CopyPaste from above in type_build_from_ast
     char* name = (char *) type_get_unique_name(func_type);
-    if (func_type->Function.return_type != &type_auto_return) {
-        i32 index = shgeti(type_func_map, name);
+    if (func_type->Function.return_type != context.types.auto_return) {
+        i32 index = shgeti(context.types.func_map, name);
         if (index != -1) {
-            u64 id = type_func_map[index].value;
-            Type* existing_type = (Type *) bh_imap_get(&type_map, id);
+            u64 id = context.types.func_map[index].value;
+            Type* existing_type = (Type *) bh_imap_get(&context.types.type_map, id);
 
             // LEAK LEAK LEAK the func_type that is created
             return existing_type;
@@ -918,7 +905,7 @@ Type* type_build_function_type(bh_allocator alloc, AstFunction* func) {
     }
 
     type_register(func_type);
-    shput(type_func_map, name, func_type->id);
+    shput(context.types.func_map, name, func_type->id);
 
     return func_type;
 }
@@ -1047,9 +1034,9 @@ Type* type_make_pointer(bh_allocator alloc, Type* to) {
     if (to == (Type *) &node_that_signals_failure) return to;
 
     assert(to->id > 0);
-    u64 ptr_id = bh_imap_get(&type_pointer_map, to->id);
+    u64 ptr_id = bh_imap_get(&context.types.pointer_map, to->id);
     if (ptr_id > 0) {
-        Type* ptr_type = (Type *) bh_imap_get(&type_map, ptr_id);
+        Type* ptr_type = (Type *) bh_imap_get(&context.types.type_map, ptr_id);
         return ptr_type;
 
     } else {
@@ -1059,7 +1046,7 @@ Type* type_make_pointer(bh_allocator alloc, Type* to) {
         ptr_type->Pointer.elem = to;
 
         type_register(ptr_type);
-        bh_imap_put(&type_pointer_map, to->id, ptr_type->id);
+        bh_imap_put(&context.types.pointer_map, to->id, ptr_type->id);
 
         return ptr_type;
     }
@@ -1070,9 +1057,9 @@ Type* type_make_multi_pointer(bh_allocator alloc, Type* to) {
     if (to == (Type *) &node_that_signals_failure) return to;
 
     assert(to->id > 0);
-    u64 ptr_id = bh_imap_get(&type_multi_pointer_map, to->id);
+    u64 ptr_id = bh_imap_get(&context.types.multi_pointer_map, to->id);
     if (ptr_id > 0) {
-        Type* ptr_type = (Type *) bh_imap_get(&type_map, ptr_id);
+        Type* ptr_type = (Type *) bh_imap_get(&context.types.type_map, ptr_id);
         return ptr_type;
 
     } else {
@@ -1083,7 +1070,7 @@ Type* type_make_multi_pointer(bh_allocator alloc, Type* to) {
         ptr_type->MultiPointer.elem = to;
 
         type_register(ptr_type);
-        bh_imap_put(&type_multi_pointer_map, to->id, ptr_type->id);
+        bh_imap_put(&context.types.multi_pointer_map, to->id, ptr_type->id);
 
         return ptr_type;
     }
@@ -1095,9 +1082,9 @@ Type* type_make_array(bh_allocator alloc, Type* to, u32 count) {
 
     assert(to->id > 0);
     u64 key = ((((u64) to->id) << 32) | (u64) count);
-    u64 array_id = bh_imap_get(&type_array_map, key);
+    u64 array_id = bh_imap_get(&context.types.array_map, key);
     if (array_id > 0) {
-        Type* array_type = (Type *) bh_imap_get(&type_map, array_id);
+        Type* array_type = (Type *) bh_imap_get(&context.types.type_map, array_id);
         return array_type;
 
     } else {
@@ -1107,7 +1094,7 @@ Type* type_make_array(bh_allocator alloc, Type* to, u32 count) {
         arr_type->Array.size = count * type_size_of(to);
 
         type_register(arr_type);
-        bh_imap_put(&type_array_map, key, arr_type->id);
+        bh_imap_put(&context.types.array_map, key, arr_type->id);
 
         return arr_type;
     }
@@ -1118,20 +1105,20 @@ Type* type_make_slice(bh_allocator alloc, Type* of) {
     if (of == (Type *) &node_that_signals_failure) return of;
 
     assert(of->id > 0);
-    u64 slice_id = bh_imap_get(&type_slice_map, of->id);
+    u64 slice_id = bh_imap_get(&context.types.slice_map, of->id);
     if (slice_id > 0) {
-        Type* slice_type = (Type *) bh_imap_get(&type_map, slice_id);
+        Type* slice_type = (Type *) bh_imap_get(&context.types.type_map, slice_id);
         return slice_type;
 
     } else {
         Type* slice_type = type_create(Type_Kind_Slice, alloc, 0);
         type_register(slice_type);
-        bh_imap_put(&type_slice_map, of->id, slice_type->id);
+        bh_imap_put(&context.types.slice_map, of->id, slice_type->id);
 
         type_make_multi_pointer(alloc, of);
         slice_type->Slice.elem = of;
 
-        AstPolyStructType* pslice_type = (AstPolyStructType *) builtin_slice_type;
+        AstPolyStructType* pslice_type = (AstPolyStructType *) context.builtins.slice_type;
         OnyxFilePos pos = { 0 };
         slice_type->Slice.scope = scope_create(context.ast_alloc, pslice_type->scope, pos);
 
@@ -1144,20 +1131,20 @@ Type* type_make_dynarray(bh_allocator alloc, Type* of) {
     if (of == (Type *) &node_that_signals_failure) return of;
 
     assert(of->id > 0);
-    u64 dynarr_id = bh_imap_get(&type_dynarr_map, of->id);
+    u64 dynarr_id = bh_imap_get(&context.types.dynarr_map, of->id);
     if (dynarr_id > 0) {
-        Type* dynarr = (Type *) bh_imap_get(&type_map, dynarr_id);
+        Type* dynarr = (Type *) bh_imap_get(&context.types.type_map, dynarr_id);
         return dynarr;
 
     } else {
         Type* dynarr = type_create(Type_Kind_DynArray, alloc, 0);
         type_register(dynarr);
-        bh_imap_put(&type_dynarr_map, of->id, dynarr->id);
+        bh_imap_put(&context.types.dynarr_map, of->id, dynarr->id);
 
         type_make_multi_pointer(alloc, of);
         dynarr->DynArray.elem = of;
 
-        AstPolyStructType* dynarr_type = (AstPolyStructType *) builtin_array_type;
+        AstPolyStructType* dynarr_type = (AstPolyStructType *) context.builtins.array_type;
         OnyxFilePos pos = { 0 };
         dynarr->DynArray.scope = scope_create(context.ast_alloc, dynarr_type->scope, pos);
 
@@ -1170,15 +1157,15 @@ Type* type_make_varargs(bh_allocator alloc, Type* of) {
     if (of == (Type *) &node_that_signals_failure) return of;
 
     assert(of->id > 0);
-    u64 vararg_id = bh_imap_get(&type_vararg_map, of->id);
+    u64 vararg_id = bh_imap_get(&context.types.vararg_map, of->id);
     if (vararg_id > 0) {
-        Type* va_type = (Type *) bh_imap_get(&type_map, vararg_id);
+        Type* va_type = (Type *) bh_imap_get(&context.types.type_map, vararg_id);
         return va_type;
 
     } else {
         Type* va_type = type_create(Type_Kind_VarArgs, alloc, 0);
         type_register(va_type);
-        bh_imap_put(&type_vararg_map, of->id, va_type->id);
+        bh_imap_put(&context.types.vararg_map, of->id, va_type->id);
 
         type_make_multi_pointer(alloc, of);
         va_type->VarArgs.elem = of;
@@ -1455,24 +1442,24 @@ b32 type_is_ready_for_lookup(Type* type) {
 }
 
 static const StructMember slice_members[] = {
-    { 0,            0, NULL,                         "data",   NULL, NULL, -1, 0, 0 },
-    { POINTER_SIZE, 1, &basic_types[Basic_Kind_U32], "count",  NULL, NULL, -1, 0, 0 },
-    { POINTER_SIZE, 1, &basic_types[Basic_Kind_U32], "size",   NULL, NULL, -1, 0, 0 },
-    { POINTER_SIZE, 1, &basic_types[Basic_Kind_U32], "length", NULL, NULL, -1, 0, 0 },
+    { 0,            0, NULL, "data",   NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE, 1, NULL, "count",  NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE, 1, NULL, "size",   NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE, 1, NULL, "length", NULL, NULL, -1, 0, 0 },
 };
 
 static const StructMember array_members[] = {
-    { 0,                0, NULL,                         "data",      NULL, NULL, -1, 0, 0 },
-    { POINTER_SIZE,     1, &basic_types[Basic_Kind_U32], "count",     NULL, NULL, -1, 0, 0 },
-    { POINTER_SIZE + 4, 2, &basic_types[Basic_Kind_U32], "capacity",  NULL, NULL, -1, 0, 0 },
-    { POINTER_SIZE + 8, 3, NULL,                         "allocator", NULL, NULL, -1, 0, 0 },
-    { POINTER_SIZE,     1, &basic_types[Basic_Kind_U32], "size",      NULL, NULL, -1, 0, 0 },
-    { POINTER_SIZE,     1, &basic_types[Basic_Kind_U32], "length",    NULL, NULL, -1, 0, 0 },
+    { 0,                0, NULL, "data",      NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE,     1, NULL, "count",     NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE + 4, 2, NULL, "capacity",  NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE + 8, 3, NULL, "allocator", NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE,     1, NULL, "size",      NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE,     1, NULL, "length",    NULL, NULL, -1, 0, 0 },
 };
 
 static const StructMember func_members[] = {
-    { 0,                0, &basic_types[Basic_Kind_U32],    "__funcidx",    NULL, NULL, -1, 0, 0 },
-    { POINTER_SIZE,     1, &basic_types[Basic_Kind_Rawptr], "closure",      NULL, NULL, -1, 0, 0 },
+    { 0,                0, NULL, "__funcidx",    NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE,     1, NULL, "closure",      NULL, NULL, -1, 0, 0 },
 };
 
 static const StructMember union_members[] = {
@@ -1498,6 +1485,7 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
                 if (strcmp(slice_members[i].name, member) == 0) {
                     *smem = slice_members[i];
                     if (smem->idx == 0) smem->type = type_make_multi_pointer(context.ast_alloc, type->Slice.elem);
+                    else                smem->type = context.types.basic[Basic_Kind_U32];
 
                     return 1;
                 }
@@ -1509,8 +1497,9 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
             fori (i, 0, (i64) (sizeof(array_members) / sizeof(StructMember))) {
                 if (strcmp(array_members[i].name, member) == 0) {
                     *smem = array_members[i];
-                    if (smem->idx == 0) smem->type = type_make_multi_pointer(context.ast_alloc, type->DynArray.elem);
-                    if (smem->idx == 3) smem->type = type_build_from_ast(context.ast_alloc, builtin_allocator_type);
+                    if      (smem->idx == 0) smem->type = type_make_multi_pointer(context.ast_alloc, type->DynArray.elem);
+                    else if (smem->idx == 3) smem->type = type_build_from_ast(context.ast_alloc, context.builtins.allocator_type);
+                    else                     smem->type = context.types.basic[Basic_Kind_U32];
 
                     return 1;
                 }
@@ -1522,6 +1511,9 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
             fori (i, 0, (i64) (sizeof(func_members) / sizeof(StructMember))) {
                 if (strcmp(func_members[i].name, member) == 0) {
                     *smem = func_members[i];
+                    if (smem->idx == 0) smem->type = context.types.basic[Basic_Kind_U32];
+                    if (smem->idx == 1) smem->type = context.types.basic[Basic_Kind_Rawptr];
+
                     return 1;
                 }
             }
@@ -1563,6 +1555,7 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
 
             *smem = slice_members[idx];
             if (smem->idx == 0) smem->type = type_make_multi_pointer(context.ast_alloc, type->Slice.elem);
+            else                smem->type = context.types.basic[Basic_Kind_U32];
 
             return 1;
         }
@@ -1571,8 +1564,9 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
             if (idx > 4) return 0;
 
             *smem = array_members[idx];
-            if (idx == 0) smem->type = type_make_multi_pointer(context.ast_alloc, type->DynArray.elem);
-            if (idx == 3) smem->type = type_build_from_ast(context.ast_alloc, builtin_allocator_type);
+            if      (idx == 0) smem->type = type_make_multi_pointer(context.ast_alloc, type->DynArray.elem);
+            else if (idx == 3) smem->type = type_build_from_ast(context.ast_alloc, context.builtins.allocator_type);
+            else               smem->type = context.types.basic[Basic_Kind_U32];
 
             return 1;
         }
@@ -1581,6 +1575,9 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
             if (idx > 1) return 0;
 
             *smem = func_members[idx];
+            if (idx == 0) smem->type = context.types.basic[Basic_Kind_U32];
+            if (idx == 1) smem->type = context.types.basic[Basic_Kind_Rawptr];
+            
             return 1;
         }
 
@@ -1627,7 +1624,7 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
                 two->offset = 0;
             }
             if (idx == 1) {
-                two->type = &basic_types[Basic_Kind_U32];
+                two->type = context.types.basic[Basic_Kind_U32];
                 two->offset = POINTER_SIZE;
             }
 
@@ -1639,15 +1636,15 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
                 two->offset = 0;
             }
             if (idx == 1) {
-                two->type = &basic_types[Basic_Kind_U32];
+                two->type = context.types.basic[Basic_Kind_U32];
                 two->offset = POINTER_SIZE;
             }
             if (idx == 2) {
-                two->type = &basic_types[Basic_Kind_U32];
+                two->type = context.types.basic[Basic_Kind_U32];
                 two->offset = POINTER_SIZE + 4;
             }
             if (idx == 3 || idx == 4) {
-                Type* allocator_type = type_build_from_ast(context.ast_alloc, builtin_allocator_type);
+                Type* allocator_type = type_build_from_ast(context.ast_alloc, context.builtins.allocator_type);
                 type_linear_member_lookup(allocator_type, idx - 3, two);
                 two->offset += POINTER_SIZE + 8;
             }
@@ -1658,11 +1655,11 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
 
         case Type_Kind_Function:
             if (idx == 0) {
-                two->type = &basic_types[Basic_Kind_U32];
+                two->type = context.types.basic[Basic_Kind_U32];
                 two->offset = 0;
             }
             if (idx == 1) {
-                two->type = &basic_types[Basic_Kind_Rawptr];
+                two->type = context.types.basic[Basic_Kind_Rawptr];
                 two->offset = POINTER_SIZE;
             }
             return 1;

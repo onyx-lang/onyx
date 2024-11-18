@@ -163,9 +163,9 @@ static SymresStatus symres_union_type(AstUnionType* u_node) {
 
     if (!u_node->tag_backing_type) {
         int n = (31 - bh_clz(bh_arr_length(u_node->variants) - 1)) >> 3;
-        if      (n == 0) u_node->tag_backing_type = (AstType *) &basic_type_u8;
-        else if (n == 1) u_node->tag_backing_type = (AstType *) &basic_type_u16;
-        else if (n <= 3) u_node->tag_backing_type = (AstType *) &basic_type_u32;
+        if      (n == 0) u_node->tag_backing_type = (AstType *) &context.basic_types.type_u8;
+        else if (n == 1) u_node->tag_backing_type = (AstType *) &context.basic_types.type_u16;
+        else if (n <= 3) u_node->tag_backing_type = (AstType *) &context.basic_types.type_u32;
         else {
             onyx_report_error(u_node->token->pos, Error_Critical, "Too many union variants. How did you even do this...?");
             return Symres_Error;
@@ -275,9 +275,9 @@ static SymresStatus symres_type(AstType** type) {
             AstPolyStructType* pst_node = (AstPolyStructType *) *type;
             assert(pst_node->scope);
 
-            if (*type == builtin_array_type) {
-                assert(((AstPolyStructType *) builtin_slice_type)->scope);
-                pst_node->scope->parent = ((AstPolyStructType *) builtin_slice_type)->scope;
+            if (*type == context.builtins.array_type) {
+                assert(((AstPolyStructType *) context.builtins.slice_type)->scope);
+                pst_node->scope->parent = ((AstPolyStructType *) context.builtins.slice_type)->scope;
             }
             break;
         }
@@ -815,8 +815,8 @@ static SymresStatus symres_expression(AstTyped** expr) {
             SYMRES(expression, &((AstRangeLiteral *)(*expr))->high);
 
             // :EliminatingSymres
-            SYMRES(type, &builtin_range_type);
-            SYMRES(type, &builtin_range64_type);
+            SYMRES(type, &context.builtins.range_type);
+            SYMRES(type, &context.builtins.range64_type);
             break;
 
         case Ast_Kind_Polymorphic_Proc:
@@ -840,12 +840,12 @@ static SymresStatus symres_expression(AstTyped** expr) {
         case Ast_Kind_StrLit: {
             AstStrLit* str = (AstStrLit *) *expr;
             if (str->is_cstr) {
-                SYMRES(type, &builtin_cstring_type);
-                str->type_node = builtin_cstring_type;
+                SYMRES(type, &context.builtins.cstring_type);
+                str->type_node = context.builtins.cstring_type;
 
             } else {
-                SYMRES(type, &builtin_string_type);
-                str->type_node = builtin_string_type;
+                SYMRES(type, &context.builtins.string_type);
+                str->type_node = context.builtins.string_type;
             }
             break;
         }
@@ -1372,8 +1372,8 @@ SymresStatus symres_function_header(AstFunction* func) {
             stack_trace_token->text = bh_strdup(context.ast_alloc, "__stack_trace ");
             stack_trace_token->pos = func->token->pos;
 
-            assert(builtin_stack_trace_type);
-            func->stack_trace_local = make_local(context.ast_alloc, stack_trace_token, builtin_stack_trace_type);
+            assert(context.builtins.stack_trace_type);
+            func->stack_trace_local = make_local(context.ast_alloc, stack_trace_token, context.builtins.stack_trace_type);
             func->stack_trace_local->flags |= Ast_Flag_Decl_Followed_By_Init;
         }
 
@@ -1754,7 +1754,7 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                     return Symres_Error;
                 }
 
-                add_overload_option(&unary_operator_overloads[unop], operator->order, operator->overload);
+                add_overload_option(&context.unary_operator_overloads[unop], operator->order, operator->overload);
                 return Symres_Success;
             }
 
@@ -1763,7 +1763,7 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 return Symres_Error;
             }
 
-            add_overload_option(&operator_overloads[operator->operator], operator->order, operator->overload);
+            add_overload_option(&context.operator_overloads[operator->operator], operator->order, operator->overload);
             break;
         }
 

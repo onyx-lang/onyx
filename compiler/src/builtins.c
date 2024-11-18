@@ -18,121 +18,55 @@ static OnyxToken basic_type_f64_token       = { Token_Type_Symbol, 3, "f64 " };
 static OnyxToken basic_type_rawptr_token    = { Token_Type_Symbol, 6, "rawptr " };
 static OnyxToken basic_type_type_expr_token = { Token_Type_Symbol, 9, "type_expr " };
 
-AstBasicType basic_type_void      = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_void_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_Void]  };
-AstBasicType basic_type_bool      = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_bool_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_Bool]  };
-AstBasicType basic_type_i8        = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i8_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I8]    };
-AstBasicType basic_type_u8        = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u8_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_U8]    };
-AstBasicType basic_type_i16       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i16_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I16]   };
-AstBasicType basic_type_u16       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u16_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_U16]   };
-AstBasicType basic_type_i32       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i32_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I32]   };
-AstBasicType basic_type_u32       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u32_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_U32]   };
-AstBasicType basic_type_i64       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i64_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I64]   };
-AstBasicType basic_type_u64       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u64_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_U64]   };
-AstBasicType basic_type_f32       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_f32_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_F32]   };
-AstBasicType basic_type_f64       = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_f64_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_F64]   };
-AstBasicType basic_type_rawptr    = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_rawptr_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_Rawptr] };
-AstBasicType basic_type_type_expr = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_type_expr_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_Type_Index] };
-
-// NOTE: Types used for numeric literals
-AstBasicType basic_type_int_unsized   = { Ast_Kind_Basic_Type, 0, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_Int_Unsized] };
-AstBasicType basic_type_float_unsized = { Ast_Kind_Basic_Type, 0, NULL, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_Float_Unsized] };
-
-static OnyxToken simd_token = { Token_Type_Symbol, 0, "", { 0 } };
-AstBasicType basic_type_i8x16 = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I8X16] };
-AstBasicType basic_type_i16x8 = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I16X8] };
-AstBasicType basic_type_i32x4 = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I32X4] };
-AstBasicType basic_type_i64x2 = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_I64X2] };
-AstBasicType basic_type_f32x4 = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_F32X4] };
-AstBasicType basic_type_f64x2 = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_F64X2] };
-AstBasicType basic_type_v128  = { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, NULL, &basic_types[Basic_Kind_V128]  };
-
-// HACK
-// :AutoReturnType
-Type         type_auto_return = { 0 };
-AstBasicType basic_type_auto_return = { Ast_Kind_Basic_Type, 0, &simd_token, NULL, NULL, 0, NULL, &type_auto_return };
-
 static OnyxToken builtin_heap_start_token  = { Token_Type_Symbol, 12, "__heap_start ", { 0 } };
 static OnyxToken builtin_stack_top_token   = { Token_Type_Symbol, 11, "__stack_top ",  { 0 } };
 static OnyxToken builtin_tls_base_token    = { Token_Type_Symbol, 10, "__tls_base ",  { 0 } };
 static OnyxToken builtin_tls_size_token    = { Token_Type_Symbol, 10, "__tls_size ",  { 0 } };
 static OnyxToken builtin_closure_base_token = { Token_Type_Symbol, 14, "__closure_base ",  { 0 } };
 static OnyxToken builtin_stack_trace_token = { Token_Type_Symbol, 0, " ", { 0 } };
-AstGlobal builtin_heap_start  = { Ast_Kind_Global, Ast_Flag_Const, &builtin_heap_start_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
-AstGlobal builtin_stack_top   = { Ast_Kind_Global, 0, &builtin_stack_top_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
-AstGlobal builtin_tls_base    = { Ast_Kind_Global, 0, &builtin_tls_base_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
-AstGlobal builtin_tls_size    = { Ast_Kind_Global, 0, &builtin_tls_size_token, NULL, NULL, (AstType *) &basic_type_u32, NULL };
-AstGlobal builtin_closure_base = { Ast_Kind_Global, 0, &builtin_closure_base_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
-AstGlobal builtin_stack_trace = { Ast_Kind_Global, 0, &builtin_stack_trace_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
 
-AstType  *builtin_string_type;
-AstType  *builtin_cstring_type;
-AstType  *builtin_range_type;
-Type     *builtin_range_type_type;
-AstType  *builtin_range64_type;
-Type     *builtin_range64_type_type;
-AstType  *builtin_vararg_type;
-Type     *builtin_vararg_type_type;
-AstTyped *builtin_context_variable;
-AstType  *builtin_allocator_type;
-AstType  *builtin_iterator_type;
-AstType  *builtin_optional_type;
-AstType  *builtin_callsite_type;
-AstType  *builtin_any_type;
-AstType  *builtin_code_type;
-AstType  *builtin_link_options_type;
-AstType  *builtin_package_id_type;
-AstType  *builtin_stack_trace_type;
-AstType  *builtin_array_type;
-AstType  *builtin_slice_type;
+static OnyxToken simd_token = { Token_Type_Symbol, 0, "", { 0 } };
 
-AstTyped    *type_table_node = NULL;
-AstTyped    *foreign_blocks_node = NULL;
-AstType     *foreign_block_type = NULL;
-AstTyped    *tagged_procedures_node = NULL;
-AstTyped    *tagged_globals_node = NULL;
-AstFunction *builtin_initialize_data_segments = NULL;
-AstFunction *builtin_run_init_procedures = NULL;
-AstFunction *builtin_closure_block_allocate = NULL;
-bh_arr(AstFunction *) init_procedures = NULL;
-AstOverloadedFunction *builtin_implicit_bool_cast;
-AstOverloadedFunction *builtin_dispose_used_local;
 
 const BuiltinSymbol builtin_symbols[] = {
-    { NULL, "void",       (AstNode *) &basic_type_void },
-    { NULL, "bool",       (AstNode *) &basic_type_bool },
-    { NULL, "i8",         (AstNode *) &basic_type_i8 },
-    { NULL, "u8",         (AstNode *) &basic_type_u8 },
-    { NULL, "i16",        (AstNode *) &basic_type_i16 },
-    { NULL, "u16",        (AstNode *) &basic_type_u16 },
-    { NULL, "i32",        (AstNode *) &basic_type_i32 },
-    { NULL, "u32",        (AstNode *) &basic_type_u32 },
-    { NULL, "i64",        (AstNode *) &basic_type_i64 },
-    { NULL, "u64",        (AstNode *) &basic_type_u64 },
-    { NULL, "f32",        (AstNode *) &basic_type_f32 },
-    { NULL, "f64",        (AstNode *) &basic_type_f64 },
-    { NULL, "rawptr",     (AstNode *) &basic_type_rawptr },
-    { NULL, "type_expr",  (AstNode *) &basic_type_type_expr },
+    #define OFFSET(member) (isize) &((Context *) 0)->basic_types.member
+    { NULL, "void",       OFFSET(type_void) },
+    { NULL, "bool",       OFFSET(type_bool) },
+    { NULL, "i8",         OFFSET(type_i8) },
+    { NULL, "u8",         OFFSET(type_u8) },
+    { NULL, "i16",        OFFSET(type_i16) },
+    { NULL, "u16",        OFFSET(type_u16) },
+    { NULL, "i32",        OFFSET(type_i32) },
+    { NULL, "u32",        OFFSET(type_u32) },
+    { NULL, "i64",        OFFSET(type_i64) },
+    { NULL, "u64",        OFFSET(type_u64) },
+    { NULL, "f32",        OFFSET(type_f32) },
+    { NULL, "f64",        OFFSET(type_f64) },
+    { NULL, "rawptr",     OFFSET(type_rawptr) },
+    { NULL, "type_expr",  OFFSET(type_type_expr) },
 
-    { "simd", "i8x16",    (AstNode *) &basic_type_i8x16 },
-    { "simd", "i16x8",    (AstNode *) &basic_type_i16x8 },
-    { "simd", "i32x4",    (AstNode *) &basic_type_i32x4 },
-    { "simd", "i64x2",    (AstNode *) &basic_type_i64x2 },
-    { "simd", "f32x4",    (AstNode *) &basic_type_f32x4 },
-    { "simd", "f64x2",    (AstNode *) &basic_type_f64x2 },
-    { "simd", "v128",     (AstNode *) &basic_type_v128  },
+    { "simd", "i8x16",    OFFSET(type_i8x16) },
+    { "simd", "i16x8",    OFFSET(type_i16x8) },
+    { "simd", "i32x4",    OFFSET(type_i32x4) },
+    { "simd", "i64x2",    OFFSET(type_i64x2) },
+    { "simd", "f32x4",    OFFSET(type_f32x4) },
+    { "simd", "f64x2",    OFFSET(type_f64x2) },
+    { "simd", "v128",     OFFSET(type_v128 ) },
+    #undef OFFSET
 
-    { "builtin", "__heap_start", (AstNode *) &builtin_heap_start },
-    { "builtin", "__stack_top",  (AstNode *) &builtin_stack_top },
-    { "builtin", "__tls_base",   (AstNode *) &builtin_tls_base },
-    { "builtin", "__tls_size",   (AstNode *) &builtin_tls_size },
-    { "builtin", "__closure_base",   (AstNode *) &builtin_closure_base },
+    #define OFFSET(member) (isize) &((Context *) 0)->builtins.member
+    { "builtin", "__heap_start", OFFSET(heap_start) },
+    { "builtin", "__stack_top",  OFFSET(stack_top) },
+    { "builtin", "__tls_base",   OFFSET(tls_base) },
+    { "builtin", "__tls_size",   OFFSET(tls_size) },
+    { "builtin", "__closure_base",   OFFSET(closure_base) },
+    #undef OFFSET
 
-    { NULL, NULL, NULL },
+    { NULL, NULL, 0 },
 };
 
-IntrinsicTable intrinsic_table;
 
-static IntrinsicMap builtin_intrinsics[] = {
+const IntrinsicMap builtin_intrinsics[] = {
     { "unreachable",  ONYX_INTRINSIC_UNREACHABLE },
 
     { "memory_size",  ONYX_INTRINSIC_MEMORY_SIZE  },
@@ -400,241 +334,236 @@ static IntrinsicMap builtin_intrinsics[] = {
     { NULL, ONYX_INTRINSIC_UNDEFINED },
 };
 
-bh_arr(OverloadOption) operator_overloads[Binary_Op_Count] = { 0 };
-bh_arr(OverloadOption) unary_operator_overloads[Unary_Op_Count] = { 0 };
+void prepare_builtins(Context *context) {
+    // `types_init()` needs to be called first so the pointers in context->types.basic are valid
+    assert(context->types.basic[Basic_Kind_Void]);
 
-void prepare_builtins() {
-    builtin_string_type = NULL;
-    builtin_cstring_type = NULL;
-    builtin_range_type = NULL;
-    builtin_range_type_type = NULL;
-    builtin_range64_type = NULL;
-    builtin_range64_type_type = NULL;
-    builtin_vararg_type = NULL;
-    builtin_vararg_type_type = NULL;
-    builtin_context_variable = NULL;
-    builtin_allocator_type = NULL;
-    builtin_iterator_type = NULL;
-    builtin_optional_type = NULL;
-    builtin_callsite_type = NULL;
-    builtin_any_type = NULL;
-    builtin_code_type = NULL;
-    builtin_link_options_type = NULL;
-    builtin_package_id_type = NULL;
-    builtin_stack_trace_type = NULL;
+    context->basic_types.type_void      = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_void_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_Void]  });
+    context->basic_types.type_bool      = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_bool_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_Bool]  });
+    context->basic_types.type_i8        = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i8_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_I8]    });
+    context->basic_types.type_u8        = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u8_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_U8]    });
+    context->basic_types.type_i16       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i16_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_I16]   });
+    context->basic_types.type_u16       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u16_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_U16]   });
+    context->basic_types.type_i32       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i32_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_I32]   });
+    context->basic_types.type_u32       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u32_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_U32]   });
+    context->basic_types.type_i64       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i64_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_I64]   });
+    context->basic_types.type_u64       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u64_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_U64]   });
+    context->basic_types.type_f32       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_f32_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_F32]   });
+    context->basic_types.type_f64       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_f64_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_F64]   });
+    context->basic_types.type_rawptr    = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_rawptr_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_Rawptr] });
+    context->basic_types.type_type_expr = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_type_expr_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_Type_Index] });
 
-    type_table_node = NULL;
-    foreign_blocks_node = NULL;
-    foreign_block_type = NULL;
-    tagged_procedures_node = NULL;
-    tagged_globals_node = NULL;
-    builtin_initialize_data_segments = NULL;
-    builtin_run_init_procedures = NULL;
-    init_procedures = NULL;
-    builtin_implicit_bool_cast = NULL;
-    builtin_dispose_used_local = NULL;
+    // NOTE: Types used for numeric literals
+    context->basic_types.type_int_unsized   = ((AstBasicType) { Ast_Kind_Basic_Type, 0, NULL, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_Int_Unsized] });
+    context->basic_types.type_float_unsized = ((AstBasicType) { Ast_Kind_Basic_Type, 0, NULL, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_Float_Unsized] });
 
-    basic_type_void.scope = NULL;
-    basic_type_bool.scope = NULL;
-    basic_type_i8.scope = NULL;
-    basic_type_u8.scope = NULL;
-    basic_type_i16.scope = NULL;
-    basic_type_u16.scope = NULL;
-    basic_type_i32.scope = NULL;
-    basic_type_u32.scope = NULL;
-    basic_type_i64.scope = NULL;
-    basic_type_u64.scope = NULL;
-    basic_type_f32.scope = NULL;
-    basic_type_f64.scope = NULL;
-    basic_type_rawptr.scope = NULL;
-    basic_type_type_expr.scope = NULL;
+    context->basic_types.type_i8x16 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_I8X16] });
+    context->basic_types.type_i16x8 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_I16X8] });
+    context->basic_types.type_i32x4 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_I32X4] });
+    context->basic_types.type_i64x2 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_I64X2] });
+    context->basic_types.type_f32x4 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_F32X4] });
+    context->basic_types.type_f64x2 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_F64X2] });
+    context->basic_types.type_v128  = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, NULL, context->types.basic[Basic_Kind_V128]  });
+
+    // HACK
+    // :AutoReturnType
+    context->types.auto_return = bh_alloc_item(context->ast_alloc, Type);
+    context->basic_types.type_auto_return = ((AstBasicType) { Ast_Kind_Basic_Type, 0, &simd_token, NULL, NULL, 0, NULL, context->types.auto_return });
+
+    // Builtins
+    context->builtins.heap_start   = ((AstGlobal) { Ast_Kind_Global, Ast_Flag_Const, &builtin_heap_start_token, NULL, NULL, (AstType *) &context->basic_types.type_rawptr, NULL });
+    context->builtins.stack_top    = ((AstGlobal) { Ast_Kind_Global, 0, &builtin_stack_top_token, NULL, NULL, (AstType *) &context->basic_types.type_rawptr, NULL });
+    context->builtins.tls_base     = ((AstGlobal) { Ast_Kind_Global, 0, &builtin_tls_base_token, NULL, NULL, (AstType *) &context->basic_types.type_rawptr, NULL });
+    context->builtins.tls_size     = ((AstGlobal) { Ast_Kind_Global, 0, &builtin_tls_size_token, NULL, NULL, (AstType *) &context->basic_types.type_u32, NULL });
+    context->builtins.closure_base = ((AstGlobal) { Ast_Kind_Global, 0, &builtin_closure_base_token, NULL, NULL, (AstType *) &context->basic_types.type_rawptr, NULL });
+    context->builtins.stack_trace  = ((AstGlobal) { Ast_Kind_Global, 0, &builtin_stack_trace_token, NULL, NULL, (AstType *) &context->basic_types.type_rawptr, NULL });
 }
 
-void initialize_builtins(bh_allocator a) {
+void initialize_builtins(Context *context) {
+    bh_allocator a = context->gp_alloc;
+
     BuiltinSymbol* bsym = (BuiltinSymbol *) &builtin_symbols[0];
     while (bsym->sym != NULL) {
-        if (bsym->package == NULL)
-            symbol_builtin_introduce(context.global_scope, bsym->sym, bsym->node);
-        else {
-            Package* p = package_lookup_or_create(bsym->package, context.global_scope, a, context.global_scope->created_at);
+        AstNode *node = (AstNode *) bh_pointer_add(context, bsym->offset);
+
+        if (bsym->package == NULL) {
+            symbol_builtin_introduce(context->global_scope, bsym->sym, node);
+
+        } else {
+            Package* p = package_lookup_or_create(bsym->package, context->global_scope, a, context->global_scope->created_at);
             assert(p);
 
-            symbol_builtin_introduce(p->scope, bsym->sym, bsym->node);
+            symbol_builtin_introduce(p->scope, bsym->sym, node);
         }
+
         bsym++;
     }
 
-    Package* p = package_lookup_or_create("builtin", context.global_scope, a, context.global_scope->created_at);
+    Package* p = package_lookup_or_create("builtin", context->global_scope, a, context->global_scope->created_at);
 
-    builtin_string_type = (AstType *) symbol_raw_resolve(p->scope, "str");
-    if (builtin_string_type == NULL) {
+    context->builtins.string_type = (AstType *) symbol_raw_resolve(p->scope, "str");
+    if (context->builtins.string_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'str' struct not found in builtin package.");
         return;
     }
 
-    builtin_cstring_type = (AstType *) symbol_raw_resolve(p->scope, "cstr");
-    if (builtin_cstring_type == NULL) {
+    context->builtins.cstring_type = (AstType *) symbol_raw_resolve(p->scope, "cstr");
+    if (context->builtins.cstring_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'cstr' type not found in builtin package.");
         return;
     }
 
-    builtin_range_type = (AstType *) symbol_raw_resolve(p->scope, "range");
-    if (builtin_range_type == NULL) {
+    context->builtins.range_type = (AstType *) symbol_raw_resolve(p->scope, "range");
+    if (context->builtins.range_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'range' struct not found in builtin package.");
         return;
     }
 
-    builtin_range64_type = (AstType *) symbol_raw_resolve(p->scope, "range64");
-    if (builtin_range64_type == NULL) {
+    context->builtins.range64_type = (AstType *) symbol_raw_resolve(p->scope, "range64");
+    if (context->builtins.range64_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'range64' struct not found in builtin package.");
         return;
     }
 
-    builtin_vararg_type = (AstType *) symbol_raw_resolve(p->scope, "vararg");
-    if (builtin_range_type == NULL) {
+    context->builtins.vararg_type = (AstType *) symbol_raw_resolve(p->scope, "vararg");
+    if (context->builtins.range_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'vararg' struct not found in builtin package.");
         return;
     }
 
-    builtin_context_variable = (AstTyped *) symbol_raw_resolve(p->scope, "context");
-    if (builtin_context_variable == NULL) {
+    context->builtins.context_variable = (AstTyped *) symbol_raw_resolve(p->scope, "context");
+    if (context->builtins.context_variable == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'context' variable not found in builtin package.");
         return;
     }
 
-    builtin_allocator_type = (AstType *) symbol_raw_resolve(p->scope, "Allocator");
-    if (builtin_allocator_type == NULL) {
+    context->builtins.allocator_type = (AstType *) symbol_raw_resolve(p->scope, "Allocator");
+    if (context->builtins.allocator_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Allocator' struct not found in builtin package.");
         return;
     }
 
-    builtin_iterator_type = (AstType *) symbol_raw_resolve(p->scope, "Iterator");
-    if (builtin_iterator_type == NULL) {
+    context->builtins.iterator_type = (AstType *) symbol_raw_resolve(p->scope, "Iterator");
+    if (context->builtins.iterator_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Iterator' struct not found in builtin package.");
         return;
     }
 
-    builtin_optional_type = (AstType *) symbol_raw_resolve(p->scope, "Optional");
-    if (builtin_optional_type == NULL) {
+    context->builtins.optional_type = (AstType *) symbol_raw_resolve(p->scope, "Optional");
+    if (context->builtins.optional_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Optional' struct not found in builtin package.");
         return;
     }
 
-    builtin_callsite_type = (AstType *) symbol_raw_resolve(p->scope, "CallSite");
-    if (builtin_callsite_type == NULL) {
+    context->builtins.callsite_type = (AstType *) symbol_raw_resolve(p->scope, "CallSite");
+    if (context->builtins.callsite_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'CallSite' struct not found in builtin package.");
         return;
     }
 
-    builtin_any_type = (AstType *) symbol_raw_resolve(p->scope, "any");
-    if (builtin_any_type == NULL) {
+    context->builtins.any_type = (AstType *) symbol_raw_resolve(p->scope, "any");
+    if (context->builtins.any_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'any' struct not found in builtin package.");
         return;
     }
 
-    builtin_code_type = (AstType *) symbol_raw_resolve(p->scope, "Code");
-    if (builtin_code_type == NULL) {
+    context->builtins.code_type = (AstType *) symbol_raw_resolve(p->scope, "Code");
+    if (context->builtins.code_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Code' struct not found in builtin package.");
         return;
     }
 
-    builtin_array_type = (AstType *) symbol_raw_resolve(p->scope, "Array");
-    if (builtin_array_type == NULL) {
+    context->builtins.array_type = (AstType *) symbol_raw_resolve(p->scope, "Array");
+    if (context->builtins.array_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Array' struct not found in builtin package.");
         return;
     }
 
-    builtin_slice_type = (AstType *) symbol_raw_resolve(p->scope, "Slice");
-    if (builtin_slice_type == NULL) {
+    context->builtins.slice_type = (AstType *) symbol_raw_resolve(p->scope, "Slice");
+    if (context->builtins.slice_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Slice' struct not found in builtin package.");
         return;
     }
 
-    builtin_initialize_data_segments = (AstFunction *) symbol_raw_resolve(p->scope, "__initialize_data_segments");
-    if (builtin_initialize_data_segments == NULL || builtin_initialize_data_segments->kind != Ast_Kind_Function) {
+    context->builtins.initialize_data_segments = (AstFunction *) symbol_raw_resolve(p->scope, "__initialize_data_segments");
+    if (context->builtins.initialize_data_segments == NULL || context->builtins.initialize_data_segments->kind != Ast_Kind_Function) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__initialize_data_segments' procedure not found in builtin package.");
         return;
     }
 
-    builtin_run_init_procedures = (AstFunction *) symbol_raw_resolve(p->scope, "__run_init_procedures");
-    if (builtin_run_init_procedures == NULL || builtin_run_init_procedures->kind != Ast_Kind_Function) {
+    context->builtins.run_init_procedures = (AstFunction *) symbol_raw_resolve(p->scope, "__run_init_procedures");
+    if (context->builtins.run_init_procedures == NULL || context->builtins.run_init_procedures->kind != Ast_Kind_Function) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__run_init_procedures' procedure not found.");
         return;
     }
 
-    builtin_implicit_bool_cast = (AstOverloadedFunction *) symbol_raw_resolve(p->scope, "__implicit_bool_cast");
-    if (builtin_implicit_bool_cast == NULL || builtin_implicit_bool_cast->kind != Ast_Kind_Overloaded_Function) {
+    context->builtins.implicit_bool_cast = (AstOverloadedFunction *) symbol_raw_resolve(p->scope, "__implicit_bool_cast");
+    if (context->builtins.implicit_bool_cast == NULL || context->builtins.implicit_bool_cast->kind != Ast_Kind_Overloaded_Function) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__implicit_bool_cast' #match procedure not found.");
         return;
     }
 
-    builtin_dispose_used_local = (AstOverloadedFunction *) symbol_raw_resolve(p->scope, "__dispose_used_local");
-    if (builtin_dispose_used_local == NULL || builtin_dispose_used_local->kind != Ast_Kind_Overloaded_Function) {
+    context->builtins.dispose_used_local = (AstOverloadedFunction *) symbol_raw_resolve(p->scope, "__dispose_used_local");
+    if (context->builtins.dispose_used_local == NULL || context->builtins.dispose_used_local->kind != Ast_Kind_Overloaded_Function) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__dispose_used_local' #match procedure not found.");
         return;
     }
 
-    builtin_closure_block_allocate = (AstFunction *) symbol_raw_resolve(p->scope, "__closure_block_allocate");
-    if (builtin_closure_block_allocate == NULL || builtin_closure_block_allocate->kind != Ast_Kind_Function) {
+    context->builtins.closure_block_allocate = (AstFunction *) symbol_raw_resolve(p->scope, "__closure_block_allocate");
+    if (context->builtins.closure_block_allocate == NULL || context->builtins.closure_block_allocate->kind != Ast_Kind_Function) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__closure_block_allocate' procedure not found.");
         return;
     }
 
 
-    builtin_link_options_type = (AstType *) symbol_raw_resolve(p->scope, "Link_Options");
-    if (builtin_link_options_type == NULL) {
+    context->builtins.link_options_type = (AstType *) symbol_raw_resolve(p->scope, "Link_Options");
+    if (context->builtins.link_options_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Link_Options' type not found.");
         return;
     }
 
-    builtin_package_id_type = (AstType *) symbol_raw_resolve(p->scope, "package_id");
-    if (builtin_package_id_type == NULL) {
+    context->builtins.package_id_type = (AstType *) symbol_raw_resolve(p->scope, "package_id");
+    if (context->builtins.package_id_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'package_id' type not found.");
         return;
     }
 
-    init_procedures = NULL;
-    bh_arr_new(context.gp_alloc, init_procedures, 4);
+    context->builtins.init_procedures = NULL;
+    bh_arr_new(context->gp_alloc, context->builtins.init_procedures, 4);
 
     fori (i, 0, Binary_Op_Count) {
-        operator_overloads[i] = NULL;
-        bh_arr_new(context.gp_alloc, operator_overloads[i], 4);
+        context->operator_overloads[i] = NULL;
+        bh_arr_new(context->gp_alloc, context->operator_overloads[i], 4);
     }
 
     fori (i, 0, Unary_Op_Count) {
-        unary_operator_overloads[i] = NULL;
-        bh_arr_new(context.gp_alloc, unary_operator_overloads[i], 4);
-    }
-
-    IntrinsicMap* intrinsic = &builtin_intrinsics[0];
-    intrinsic_table = NULL;
-    while (intrinsic->name != NULL) {
-        shput(intrinsic_table, intrinsic->name, intrinsic->intrinsic);
-        intrinsic++;
+        context->unary_operator_overloads[i] = NULL;
+        bh_arr_new(context->gp_alloc, context->unary_operator_overloads[i], 4);
     }
 }
 
-void initalize_special_globals() {
+void initalize_special_globals(Context *context) {
     Package *p = package_lookup("runtime.info");
     if (p != NULL) {
-        type_table_node     = (AstTyped *) symbol_raw_resolve(p->scope, "type_table");
-        foreign_blocks_node = (AstTyped *) symbol_raw_resolve(p->scope, "foreign_blocks");
-        foreign_block_type  = (AstType *)  symbol_raw_resolve(p->scope, "foreign_block");
-        tagged_procedures_node = (AstTyped *) symbol_raw_resolve(p->scope, "tagged_procedures");
-        tagged_globals_node = (AstTyped *) symbol_raw_resolve(p->scope, "tagged_globals");
+        context->builtins.type_table_node     = (AstTyped *) symbol_raw_resolve(p->scope, "type_table");
+        context->builtins.foreign_blocks_node = (AstTyped *) symbol_raw_resolve(p->scope, "foreign_blocks");
+        context->builtins.foreign_block_type  = (AstType *)  symbol_raw_resolve(p->scope, "foreign_block");
+        context->builtins.tagged_procedures_node = (AstTyped *) symbol_raw_resolve(p->scope, "tagged_procedures");
+        context->builtins.tagged_globals_node = (AstTyped *) symbol_raw_resolve(p->scope, "tagged_globals");
 
-        if (context.options->stack_trace_enabled) {
-            builtin_stack_trace_type = (AstType *) symbol_raw_resolve(p->scope, "Stack_Trace");
-            assert(builtin_stack_trace_type);
+        if (context->options->stack_trace_enabled) {
+            context->builtins.stack_trace_type = (AstType *) symbol_raw_resolve(p->scope, "Stack_Trace");
         }
     }
 }
 
-void introduce_build_options(bh_allocator a) {
-    Package* p = package_lookup_or_create("runtime", context.global_scope, a, context.global_scope->created_at);
+void introduce_build_options(Context *context) {
+    bh_allocator a = context->ast_alloc;
+
+    Package* p = package_lookup_or_create("runtime", context->global_scope, a, context->global_scope->created_at);
 
     // HACK creating this for later
-    package_lookup_or_create("runtime.vars", p->scope, a, context.global_scope->created_at);
+    package_lookup_or_create("runtime.vars", p->scope, a, context->global_scope->created_at);
 
     AstType* Runtime_Type = (AstType *) symbol_raw_resolve(p->scope, "Runtime");
     if (Runtime_Type == NULL) {
@@ -642,29 +571,29 @@ void introduce_build_options(bh_allocator a) {
         return;
     }
 
-    AstNumLit* runtime_type = make_int_literal(a, context.options->runtime);
+    AstNumLit* runtime_type = make_int_literal(a, context->options->runtime);
     runtime_type->type_node = Runtime_Type;
     add_entities_for_node(NULL, (AstNode *) runtime_type, NULL, NULL);
     symbol_builtin_introduce(p->scope, "runtime", (AstNode *) runtime_type);
 
-    AstNumLit* multi_threaded = make_int_literal(a, context.options->use_multi_threading);
-    multi_threaded->type_node = (AstType *) &basic_type_bool;
+    AstNumLit* multi_threaded = make_int_literal(a, context->options->use_multi_threading);
+    multi_threaded->type_node = (AstType *) &context->basic_types.type_bool;
     symbol_builtin_introduce(p->scope, "Multi_Threading_Enabled", (AstNode *) multi_threaded);
 
-    AstNumLit* debug_mode = make_int_literal(a, context.options->debug_info_enabled);
-    debug_mode->type_node = (AstType *) &basic_type_bool;
+    AstNumLit* debug_mode = make_int_literal(a, context->options->debug_info_enabled);
+    debug_mode->type_node = (AstType *) &context->basic_types.type_bool;
     symbol_builtin_introduce(p->scope, "Debug_Mode_Enabled", (AstNode *) debug_mode);
 
-    AstNumLit* stack_trace = make_int_literal(a, context.options->stack_trace_enabled);
-    stack_trace->type_node = (AstType *) &basic_type_bool;
+    AstNumLit* stack_trace = make_int_literal(a, context->options->stack_trace_enabled);
+    stack_trace->type_node = (AstType *) &context->basic_types.type_bool;
     symbol_builtin_introduce(p->scope, "Stack_Trace_Enabled", (AstNode *) stack_trace);
 
     AstNumLit* version_major = make_int_literal(a, VERSION_MAJOR);
-    version_major->type_node = (AstType *) &basic_type_i32;
+    version_major->type_node = (AstType *) &context->basic_types.type_i32;
     AstNumLit* version_minor = make_int_literal(a, VERSION_MINOR);
-    version_minor->type_node = (AstType *) &basic_type_i32;
+    version_minor->type_node = (AstType *) &context->basic_types.type_i32;
     AstNumLit* version_patch = make_int_literal(a, VERSION_PATCH);
-    version_patch->type_node = (AstType *) &basic_type_i32;
+    version_patch->type_node = (AstType *) &context->basic_types.type_i32;
     symbol_builtin_introduce(p->scope, "onyx_version_major", (AstNode *) version_major);
     symbol_builtin_introduce(p->scope, "onyx_version_minor", (AstNode *) version_minor);
     symbol_builtin_introduce(p->scope, "onyx_version_patch", (AstNode *) version_patch);
@@ -712,9 +641,9 @@ void introduce_build_options(bh_allocator a) {
     add_entities_for_node(NULL, (AstNode *) arch_type, NULL, NULL);
     symbol_builtin_introduce(p->scope, "arch", (AstNode *) arch_type);
 
-    if (context.options->generate_foreign_info) {
+    if (context->options->generate_foreign_info) {
         AstNumLit* foreign_info = make_int_literal(a, 1);
-        foreign_info->type_node = (AstType *) &basic_type_bool;
+        foreign_info->type_node = (AstType *) &context->basic_types.type_bool;
         symbol_builtin_introduce(p->scope, "Generated_Foreign_Info", (AstNode *) foreign_info);
     }
 }

@@ -283,7 +283,7 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
 
     switch (node->kind) {
         case Ast_Kind_Basic_Type:
-            if (((AstBasicType *) node)->basic_type == &type_auto_return) {
+            if (((AstBasicType *) node)->basic_type == context.types.auto_return) {
                 bh_buffer_write_string(buffer, "#auto");
             } else {
                 bh_buffer_write_string(buffer, (char *) ((AstBasicType *) node)->basic_type->Basic.name);
@@ -337,7 +337,7 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
             return;
 
         case Ast_Kind_Poly_Call_Type:
-            if (((AstPolyCallType *) node)->callee == (AstType *) builtin_optional_type) {
+            if (((AstPolyCallType *) node)->callee == (AstType *) context.builtins.optional_type) {
                 bh_buffer_write_string(buffer, "? ");
                 write_type_node(buffer, ((AstPolyCallType *) node)->params[0]);
                 return;

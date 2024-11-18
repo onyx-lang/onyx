@@ -835,10 +835,10 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
 
         output_custom_section_name("ovm_debug_types", &section_buff);
 
-        i32 type_count = bh_arr_length(type_map.entries);
+        i32 type_count = bh_arr_length(context.types.type_map.entries);
         output_unsigned_integer(type_count, &section_buff);
 
-        bh_arr_each(bh__imap_entry, entry, type_map.entries) {
+        bh_arr_each(bh__imap_entry, entry, context.types.type_map.entries) {
             u32 id     = entry->key;
             Type *type = (Type *) entry->value;
             const char *name = type_get_name(type);
@@ -858,7 +858,7 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
                 if (type->Basic.kind == Basic_Kind_Type_Index) {
                     output_unsigned_integer(5, &section_buff);
                     output_unsigned_integer(2, &section_buff);
-                    output_unsigned_integer(basic_types[Basic_Kind_U32].id, &section_buff);
+                    output_unsigned_integer(context.types.basic[Basic_Kind_U32]->id, &section_buff);
                     continue;
                 }
 
@@ -866,7 +866,7 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
                     // rawptr -> ^void
                     output_unsigned_integer(2, &section_buff);
                     output_unsigned_integer(1, &section_buff);
-                    output_unsigned_integer(basic_types[Basic_Kind_Void].id, &section_buff);
+                    output_unsigned_integer(context.types.basic[Basic_Kind_Void]->id, &section_buff);
                     continue;
                 }
 
