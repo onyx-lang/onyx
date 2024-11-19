@@ -1920,6 +1920,12 @@ typedef struct CheckerData {
     Entity *current_entity;
     bh_arr(Type **) expected_return_type_stack;
     bh_arr(bh_arr(AstLocal *)) named_return_values_stack;
+
+    u32 current_checking_level;
+
+    Scope *current_scope;
+    b32 report_unresolved_symbols;
+    b32 resolved_a_symbol;
 } CheckerData;
 
 typedef struct ClonerData {

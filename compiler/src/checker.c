@@ -127,7 +127,6 @@ CheckStatus check_directive_export_name(AstDirectiveExportName *ename);
 
 #define STATEMENT_LEVEL 1
 #define EXPRESSION_LEVEL 2
-u32 current_checking_level=0;
 
 static inline void fill_in_type(AstTyped* node) {
     if (node->type == NULL) {
@@ -918,10 +917,10 @@ CheckStatus check_call(AstCall** pcall) {
 
     if (call->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
-    u32 current_checking_level_store = current_checking_level;
+    u32 current_checking_level_store = context.checker.current_checking_level;
     CHECK(expression, &call->callee);
     CHECK(arguments, &call->args);
-    current_checking_level = current_checking_level_store;
+    context.checker.current_checking_level = current_checking_level_store;
 
     AstFunction* callee=NULL;
     CHECK(resolve_callee, call, (AstTyped **) &callee);
@@ -1077,9 +1076,9 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* thi
 
             u32 current_all_checks_are_final = context.checker.all_checks_are_final;
             context.checker.all_checks_are_final = 0;
-            u32 current_checking_level_store = current_checking_level;
+            u32 current_checking_level_store = context.checker.current_checking_level;
             CheckStatus cs = check_address_of((AstAddressOf **) &binop->overload_args->values[0]);
-            current_checking_level = current_checking_level_store;
+            context.checker.current_checking_level = current_checking_level_store;
             context.checker.all_checks_are_final   = current_all_checks_are_final;
 
             if (cs == Check_Yield_Macro)      return (AstCall *) &node_that_signals_a_yield;
@@ -1158,7 +1157,7 @@ static CheckStatus assign_type_or_check(AstTyped **node, Type *type, OnyxToken *
 
 CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
-    if (current_checking_level == EXPRESSION_LEVEL)
+    if (context.checker.current_checking_level == EXPRESSION_LEVEL)
         ERROR(binop->token->pos, "Assignment not valid in expression.");
 
     if (!is_lval((AstNode *) binop->left))
@@ -1439,11 +1438,11 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
         AstSubscript* sub = (AstSubscript *) binop->left;
 
         if (binop->potential_substitute == NULL) {
-            u32 current_checking_level_store = current_checking_level;
+            u32 current_checking_level_store = context.checker.current_checking_level;
             CHECK(expression, &sub->addr);
             CHECK(expression, &sub->expr);
             CHECK(expression, &binop->right);
-            current_checking_level = current_checking_level_store;
+            context.checker.current_checking_level = current_checking_level_store;
 
             AstBinaryOp *op = onyx_ast_node_new(context.ast_alloc, sizeof(AstBinaryOp), Ast_Kind_Binary_Op);
             op->token = binop->token;
@@ -1466,10 +1465,10 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
 
     }
 
-    u32 current_checking_level_store = current_checking_level;
+    u32 current_checking_level_store = context.checker.current_checking_level;
     CHECK(expression, &binop->left);
     CHECK(expression, &binop->right);
-    current_checking_level = current_checking_level_store;
+    context.checker.current_checking_level = current_checking_level_store;
 
     // :UnaryFieldAccessIsGross
     if (binop->left->kind == Ast_Kind_Unary_Field_Access || binop->right->kind == Ast_Kind_Unary_Field_Access) {
@@ -2614,7 +2613,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
     }
 
     fill_in_type(expr);
-    current_checking_level = EXPRESSION_LEVEL;
+    context.checker.current_checking_level = EXPRESSION_LEVEL;
 
     CheckStatus retval = Check_Success;
     switch (expr->kind) {
@@ -3022,7 +3021,7 @@ CheckStatus check_capture_block(AstCaptureBlock *block) {
 CheckStatus check_statement(AstNode** pstmt) {
     AstNode* stmt = *pstmt;
 
-    current_checking_level = STATEMENT_LEVEL;
+    context.checker.current_checking_level = STATEMENT_LEVEL;
 
     switch (stmt->kind) {
         case Ast_Kind_Jump:       return Check_Success;
