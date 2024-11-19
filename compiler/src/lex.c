@@ -129,8 +129,10 @@ static inline b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, 
 }
 
 const char *token_type_name(TokenType tkn_type) {
+    static char hack_tmp_buffer[32];
     if (tkn_type < Token_Type_Ascii_End) {
-        return bh_aprintf(context.scratch_alloc, "%c", (char) tkn_type);
+        bh_snprintf(hack_tmp_buffer, 31, "%c", (char) tkn_type);
+        return hack_tmp_buffer;
     } else {
         return token_type_names[tkn_type - Token_Type_Ascii_End];
     }
@@ -140,7 +142,9 @@ const char* token_name(OnyxToken * tkn) {
     TokenType tkn_type = tkn->type;
 
     if (tkn_type == Token_Type_Symbol) {
-        return bh_aprintf(context.scratch_alloc, "%b", tkn->text, tkn->length);
+        static char hack_tmp_buffer[512];
+        bh_snprintf(hack_tmp_buffer, 511, "%b", tkn->text, tkn->length);
+        return hack_tmp_buffer;
     }
 
     return token_type_name(tkn_type);
@@ -595,8 +599,10 @@ token_parsed:
     return &tokenizer->tokens[bh_arr_length(tokenizer->tokens) - 1];
 }
 
-OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc) {
+OnyxTokenizer onyx_tokenizer_create(Context *context, bh_file_contents *fc) {
     OnyxTokenizer tknizer = {
+        .context = context,
+
         .start          = fc->data,
         .curr           = fc->data,
         .end            = bh_pointer_add(fc->data, fc->length),
@@ -607,11 +613,11 @@ OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc
         .line_start     = fc->data,
         .tokens         = NULL,
 
-        .optional_semicolons = context.options->enable_optional_semicolons,
+        .optional_semicolons = context->options->enable_optional_semicolons,
         .insert_semicolon = 0,
     };
 
-    bh_arr_new(allocator, tknizer.tokens, 1 << 12);
+    bh_arr_new(context->token_alloc, tknizer.tokens, 1 << 12);
     return tknizer;
 }
 
@@ -625,8 +631,8 @@ void onyx_lex_tokens(OnyxTokenizer* tokenizer) {
         tk = onyx_get_token(tokenizer);
     } while (tk->type != Token_Type_End_Stream);
 
-    context.stats.lexer_lines_processed += tokenizer->line_number - 1;
-    context.stats.lexer_tokens_processed += bh_arr_length(tokenizer->tokens);
+    tokenizer->context->stats.lexer_lines_processed += tokenizer->line_number - 1;
+    tokenizer->context->stats.lexer_tokens_processed += bh_arr_length(tokenizer->tokens);
 }
 
 b32 token_equals(OnyxToken* tkn1, OnyxToken* tkn2) {

@@ -426,7 +426,7 @@ static i32 output_locals(WasmFunc* func, bh_buffer* buff) {
 static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer* buff) {
     i32 leb_len;
     u8* leb;
-
+    
     if (instr->type == WI_NOP && !context.options->debug_info_enabled) return;
 
     if (instr->type & SIMD_INSTR_MASK) {

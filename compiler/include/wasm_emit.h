@@ -711,6 +711,7 @@ typedef struct JsPartial {
 } JsPartial;
 
 typedef struct OnyxWasmModule {
+    Context *context;
     bh_allocator allocator;
 
     bh_arena    *extended_instr_data;
@@ -826,10 +827,10 @@ typedef struct OnyxWasmLinkOptions {
     u32 memory_max_size;
 } OnyxWasmLinkOptions;
 
-b32 onyx_wasm_build_link_options_from_node(OnyxWasmLinkOptions *opts, struct AstTyped *node);
+b32 onyx_wasm_build_link_options_from_node(Context *context, OnyxWasmLinkOptions *opts, struct AstTyped *node);
 
-OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc);
-void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options);
+void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module);
+void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLinkOptions *options);
 void onyx_wasm_module_free(OnyxWasmModule* module);
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer);
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);

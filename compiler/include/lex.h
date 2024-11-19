@@ -3,10 +3,6 @@
 
 #include "bh.h"
 
-// NOTE: Used for global statistics
-extern u64 lexer_lines_processed;
-extern u64 lexer_tokens_processed;
-
 typedef enum TokenType {
     Token_Type_Ascii_End            = 256,
     Token_Type_Unknown              = 256,
@@ -111,6 +107,8 @@ typedef struct OnyxToken {
 } OnyxToken;
 
 typedef struct OnyxTokenizer {
+    struct Context *context;
+
     char *start, *curr, *end;
 
     const char* filename;
@@ -128,7 +126,7 @@ const char *token_type_name(TokenType tkn_type);
 const char* token_name(OnyxToken *tkn);
 void token_toggle_end(OnyxToken* tkn);
 OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer);
-OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc);
+OnyxTokenizer onyx_tokenizer_create(struct Context *context, bh_file_contents *fc);
 void onyx_tokenizer_free(OnyxTokenizer* tokenizer);
 void onyx_lex_tokens(OnyxTokenizer* tokenizer);
 

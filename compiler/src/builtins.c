@@ -387,142 +387,142 @@ void initialize_builtins(Context *context) {
         AstNode *node = (AstNode *) bh_pointer_add(context, bsym->offset);
 
         if (bsym->package == NULL) {
-            symbol_builtin_introduce(context->global_scope, bsym->sym, node);
+            symbol_builtin_introduce(context, context->global_scope, bsym->sym, node);
 
         } else {
-            Package* p = package_lookup_or_create(bsym->package, context->global_scope, a, context->global_scope->created_at);
+            Package* p = package_lookup_or_create(context, bsym->package, context->global_scope, context->global_scope->created_at);
             assert(p);
 
-            symbol_builtin_introduce(p->scope, bsym->sym, node);
+            symbol_builtin_introduce(context, p->scope, bsym->sym, node);
         }
 
         bsym++;
     }
 
-    Package* p = package_lookup_or_create("builtin", context->global_scope, a, context->global_scope->created_at);
+    Package* p = package_lookup_or_create(context, "builtin", context->global_scope, context->global_scope->created_at);
 
-    context->builtins.string_type = (AstType *) symbol_raw_resolve(p->scope, "str");
+    context->builtins.string_type = (AstType *) symbol_raw_resolve(context, p->scope, "str");
     if (context->builtins.string_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'str' struct not found in builtin package.");
         return;
     }
 
-    context->builtins.cstring_type = (AstType *) symbol_raw_resolve(p->scope, "cstr");
+    context->builtins.cstring_type = (AstType *) symbol_raw_resolve(context, p->scope, "cstr");
     if (context->builtins.cstring_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'cstr' type not found in builtin package.");
         return;
     }
 
-    context->builtins.range_type = (AstType *) symbol_raw_resolve(p->scope, "range");
+    context->builtins.range_type = (AstType *) symbol_raw_resolve(context, p->scope, "range");
     if (context->builtins.range_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'range' struct not found in builtin package.");
         return;
     }
 
-    context->builtins.range64_type = (AstType *) symbol_raw_resolve(p->scope, "range64");
+    context->builtins.range64_type = (AstType *) symbol_raw_resolve(context, p->scope, "range64");
     if (context->builtins.range64_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'range64' struct not found in builtin package.");
         return;
     }
 
-    context->builtins.vararg_type = (AstType *) symbol_raw_resolve(p->scope, "vararg");
+    context->builtins.vararg_type = (AstType *) symbol_raw_resolve(context, p->scope, "vararg");
     if (context->builtins.range_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'vararg' struct not found in builtin package.");
         return;
     }
 
-    context->builtins.context_variable = (AstTyped *) symbol_raw_resolve(p->scope, "context");
+    context->builtins.context_variable = (AstTyped *) symbol_raw_resolve(context, p->scope, "context");
     if (context->builtins.context_variable == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'context' variable not found in builtin package.");
         return;
     }
 
-    context->builtins.allocator_type = (AstType *) symbol_raw_resolve(p->scope, "Allocator");
+    context->builtins.allocator_type = (AstType *) symbol_raw_resolve(context, p->scope, "Allocator");
     if (context->builtins.allocator_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Allocator' struct not found in builtin package.");
         return;
     }
 
-    context->builtins.iterator_type = (AstType *) symbol_raw_resolve(p->scope, "Iterator");
+    context->builtins.iterator_type = (AstType *) symbol_raw_resolve(context, p->scope, "Iterator");
     if (context->builtins.iterator_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Iterator' struct not found in builtin package.");
         return;
     }
 
-    context->builtins.optional_type = (AstType *) symbol_raw_resolve(p->scope, "Optional");
+    context->builtins.optional_type = (AstType *) symbol_raw_resolve(context, p->scope, "Optional");
     if (context->builtins.optional_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Optional' struct not found in builtin package.");
         return;
     }
 
-    context->builtins.callsite_type = (AstType *) symbol_raw_resolve(p->scope, "CallSite");
+    context->builtins.callsite_type = (AstType *) symbol_raw_resolve(context, p->scope, "CallSite");
     if (context->builtins.callsite_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'CallSite' struct not found in builtin package.");
         return;
     }
 
-    context->builtins.any_type = (AstType *) symbol_raw_resolve(p->scope, "any");
+    context->builtins.any_type = (AstType *) symbol_raw_resolve(context, p->scope, "any");
     if (context->builtins.any_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'any' struct not found in builtin package.");
         return;
     }
 
-    context->builtins.code_type = (AstType *) symbol_raw_resolve(p->scope, "Code");
+    context->builtins.code_type = (AstType *) symbol_raw_resolve(context, p->scope, "Code");
     if (context->builtins.code_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Code' struct not found in builtin package.");
         return;
     }
 
-    context->builtins.array_type = (AstType *) symbol_raw_resolve(p->scope, "Array");
+    context->builtins.array_type = (AstType *) symbol_raw_resolve(context, p->scope, "Array");
     if (context->builtins.array_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Array' struct not found in builtin package.");
         return;
     }
 
-    context->builtins.slice_type = (AstType *) symbol_raw_resolve(p->scope, "Slice");
+    context->builtins.slice_type = (AstType *) symbol_raw_resolve(context, p->scope, "Slice");
     if (context->builtins.slice_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Slice' struct not found in builtin package.");
         return;
     }
 
-    context->builtins.initialize_data_segments = (AstFunction *) symbol_raw_resolve(p->scope, "__initialize_data_segments");
+    context->builtins.initialize_data_segments = (AstFunction *) symbol_raw_resolve(context, p->scope, "__initialize_data_segments");
     if (context->builtins.initialize_data_segments == NULL || context->builtins.initialize_data_segments->kind != Ast_Kind_Function) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__initialize_data_segments' procedure not found in builtin package.");
         return;
     }
 
-    context->builtins.run_init_procedures = (AstFunction *) symbol_raw_resolve(p->scope, "__run_init_procedures");
+    context->builtins.run_init_procedures = (AstFunction *) symbol_raw_resolve(context, p->scope, "__run_init_procedures");
     if (context->builtins.run_init_procedures == NULL || context->builtins.run_init_procedures->kind != Ast_Kind_Function) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__run_init_procedures' procedure not found.");
         return;
     }
 
-    context->builtins.implicit_bool_cast = (AstOverloadedFunction *) symbol_raw_resolve(p->scope, "__implicit_bool_cast");
+    context->builtins.implicit_bool_cast = (AstOverloadedFunction *) symbol_raw_resolve(context, p->scope, "__implicit_bool_cast");
     if (context->builtins.implicit_bool_cast == NULL || context->builtins.implicit_bool_cast->kind != Ast_Kind_Overloaded_Function) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__implicit_bool_cast' #match procedure not found.");
         return;
     }
 
-    context->builtins.dispose_used_local = (AstOverloadedFunction *) symbol_raw_resolve(p->scope, "__dispose_used_local");
+    context->builtins.dispose_used_local = (AstOverloadedFunction *) symbol_raw_resolve(context, p->scope, "__dispose_used_local");
     if (context->builtins.dispose_used_local == NULL || context->builtins.dispose_used_local->kind != Ast_Kind_Overloaded_Function) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__dispose_used_local' #match procedure not found.");
         return;
     }
 
-    context->builtins.closure_block_allocate = (AstFunction *) symbol_raw_resolve(p->scope, "__closure_block_allocate");
+    context->builtins.closure_block_allocate = (AstFunction *) symbol_raw_resolve(context, p->scope, "__closure_block_allocate");
     if (context->builtins.closure_block_allocate == NULL || context->builtins.closure_block_allocate->kind != Ast_Kind_Function) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__closure_block_allocate' procedure not found.");
         return;
     }
 
 
-    context->builtins.link_options_type = (AstType *) symbol_raw_resolve(p->scope, "Link_Options");
+    context->builtins.link_options_type = (AstType *) symbol_raw_resolve(context, p->scope, "Link_Options");
     if (context->builtins.link_options_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Link_Options' type not found.");
         return;
     }
 
-    context->builtins.package_id_type = (AstType *) symbol_raw_resolve(p->scope, "package_id");
+    context->builtins.package_id_type = (AstType *) symbol_raw_resolve(context, p->scope, "package_id");
     if (context->builtins.package_id_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'package_id' type not found.");
         return;
@@ -543,16 +543,16 @@ void initialize_builtins(Context *context) {
 }
 
 void initalize_special_globals(Context *context) {
-    Package *p = package_lookup("runtime.info");
+    Package *p = package_lookup(context, "runtime.info");
     if (p != NULL) {
-        context->builtins.type_table_node     = (AstTyped *) symbol_raw_resolve(p->scope, "type_table");
-        context->builtins.foreign_blocks_node = (AstTyped *) symbol_raw_resolve(p->scope, "foreign_blocks");
-        context->builtins.foreign_block_type  = (AstType *)  symbol_raw_resolve(p->scope, "foreign_block");
-        context->builtins.tagged_procedures_node = (AstTyped *) symbol_raw_resolve(p->scope, "tagged_procedures");
-        context->builtins.tagged_globals_node = (AstTyped *) symbol_raw_resolve(p->scope, "tagged_globals");
+        context->builtins.type_table_node     = (AstTyped *) symbol_raw_resolve(context, p->scope, "type_table");
+        context->builtins.foreign_blocks_node = (AstTyped *) symbol_raw_resolve(context, p->scope, "foreign_blocks");
+        context->builtins.foreign_block_type  = (AstType *)  symbol_raw_resolve(context, p->scope, "foreign_block");
+        context->builtins.tagged_procedures_node = (AstTyped *) symbol_raw_resolve(context, p->scope, "tagged_procedures");
+        context->builtins.tagged_globals_node = (AstTyped *) symbol_raw_resolve(context, p->scope, "tagged_globals");
 
         if (context->options->stack_trace_enabled) {
-            context->builtins.stack_trace_type = (AstType *) symbol_raw_resolve(p->scope, "Stack_Trace");
+            context->builtins.stack_trace_type = (AstType *) symbol_raw_resolve(context, p->scope, "Stack_Trace");
         }
     }
 }
@@ -560,43 +560,43 @@ void initalize_special_globals(Context *context) {
 void introduce_build_options(Context *context) {
     bh_allocator a = context->ast_alloc;
 
-    Package* p = package_lookup_or_create("runtime", context->global_scope, a, context->global_scope->created_at);
+    Package* p = package_lookup_or_create(context, "runtime", context->global_scope, context->global_scope->created_at);
 
     // HACK creating this for later
-    package_lookup_or_create("runtime.vars", p->scope, a, context->global_scope->created_at);
+    package_lookup_or_create(context, "runtime.vars", p->scope, context->global_scope->created_at);
 
-    AstType* Runtime_Type = (AstType *) symbol_raw_resolve(p->scope, "Runtime");
+    AstType* Runtime_Type = (AstType *) symbol_raw_resolve(context, p->scope, "Runtime");
     if (Runtime_Type == NULL) {
         onyx_report_error((OnyxFilePos) {0}, Error_Critical, "'Runtime' type not found in package runtime.");
         return;
     }
 
-    AstNumLit* runtime_type = make_int_literal(a, context->options->runtime);
+    AstNumLit* runtime_type = make_int_literal(context, context->options->runtime);
     runtime_type->type_node = Runtime_Type;
-    add_entities_for_node(NULL, (AstNode *) runtime_type, NULL, NULL);
-    symbol_builtin_introduce(p->scope, "runtime", (AstNode *) runtime_type);
+    add_entities_for_node(&context->entities, NULL, (AstNode *) runtime_type, NULL, NULL);
+    symbol_builtin_introduce(context, p->scope, "runtime", (AstNode *) runtime_type);
 
-    AstNumLit* multi_threaded = make_int_literal(a, context->options->use_multi_threading);
+    AstNumLit* multi_threaded = make_int_literal(context, context->options->use_multi_threading);
     multi_threaded->type_node = (AstType *) &context->basic_types.type_bool;
-    symbol_builtin_introduce(p->scope, "Multi_Threading_Enabled", (AstNode *) multi_threaded);
+    symbol_builtin_introduce(context, p->scope, "Multi_Threading_Enabled", (AstNode *) multi_threaded);
 
-    AstNumLit* debug_mode = make_int_literal(a, context->options->debug_info_enabled);
+    AstNumLit* debug_mode = make_int_literal(context, context->options->debug_info_enabled);
     debug_mode->type_node = (AstType *) &context->basic_types.type_bool;
-    symbol_builtin_introduce(p->scope, "Debug_Mode_Enabled", (AstNode *) debug_mode);
+    symbol_builtin_introduce(context, p->scope, "Debug_Mode_Enabled", (AstNode *) debug_mode);
 
-    AstNumLit* stack_trace = make_int_literal(a, context->options->stack_trace_enabled);
+    AstNumLit* stack_trace = make_int_literal(context, context->options->stack_trace_enabled);
     stack_trace->type_node = (AstType *) &context->basic_types.type_bool;
-    symbol_builtin_introduce(p->scope, "Stack_Trace_Enabled", (AstNode *) stack_trace);
+    symbol_builtin_introduce(context, p->scope, "Stack_Trace_Enabled", (AstNode *) stack_trace);
 
-    AstNumLit* version_major = make_int_literal(a, VERSION_MAJOR);
+    AstNumLit* version_major = make_int_literal(context, VERSION_MAJOR);
     version_major->type_node = (AstType *) &context->basic_types.type_i32;
-    AstNumLit* version_minor = make_int_literal(a, VERSION_MINOR);
+    AstNumLit* version_minor = make_int_literal(context, VERSION_MINOR);
     version_minor->type_node = (AstType *) &context->basic_types.type_i32;
-    AstNumLit* version_patch = make_int_literal(a, VERSION_PATCH);
+    AstNumLit* version_patch = make_int_literal(context, VERSION_PATCH);
     version_patch->type_node = (AstType *) &context->basic_types.type_i32;
-    symbol_builtin_introduce(p->scope, "onyx_version_major", (AstNode *) version_major);
-    symbol_builtin_introduce(p->scope, "onyx_version_minor", (AstNode *) version_minor);
-    symbol_builtin_introduce(p->scope, "onyx_version_patch", (AstNode *) version_patch);
+    symbol_builtin_introduce(context, p->scope, "onyx_version_major", (AstNode *) version_major);
+    symbol_builtin_introduce(context, p->scope, "onyx_version_minor", (AstNode *) version_minor);
+    symbol_builtin_introduce(context, p->scope, "onyx_version_patch", (AstNode *) version_patch);
 
 
     i32 os;
@@ -610,16 +610,16 @@ void introduce_build_options(Context *context) {
         os = 3;
     #endif
 
-    AstType* OS_Type = (AstType *) symbol_raw_resolve(p->scope, "OS");
+    AstType* OS_Type = (AstType *) symbol_raw_resolve(context, p->scope, "OS");
     if (OS_Type == NULL) {
         onyx_report_error((OnyxFilePos) {0}, Error_Critical, "'OS' type not found in package runtime.");
         return;
     }
 
-    AstNumLit* os_type = make_int_literal(a, os);
+    AstNumLit* os_type = make_int_literal(context, os);
     os_type->type_node = OS_Type;
-    add_entities_for_node(NULL, (AstNode *) os_type, NULL, NULL);
-    symbol_builtin_introduce(p->scope, "compiler_os", (AstNode *) os_type);
+    add_entities_for_node(&context->entities, NULL, (AstNode *) os_type, NULL, NULL);
+    symbol_builtin_introduce(context, p->scope, "compiler_os", (AstNode *) os_type);
 
     i32 arch = 0;
     #if defined(__x86_64__) || defined(_M_X64)
@@ -630,21 +630,21 @@ void introduce_build_options(Context *context) {
         arch = 3; // AARCH64;
     #endif
 
-    AstType* Arch_Type = (AstType *) symbol_raw_resolve(p->scope, "Arch");
+    AstType* Arch_Type = (AstType *) symbol_raw_resolve(context, p->scope, "Arch");
     if (Arch_Type == NULL) {
         onyx_report_error((OnyxFilePos) {0}, Error_Critical, "'Arch' type not found in package runtime.");
         return;
     }
 
-    AstNumLit* arch_type = make_int_literal(a, arch);
+    AstNumLit* arch_type = make_int_literal(context, arch);
     arch_type->type_node = Arch_Type;
-    add_entities_for_node(NULL, (AstNode *) arch_type, NULL, NULL);
-    symbol_builtin_introduce(p->scope, "arch", (AstNode *) arch_type);
+    add_entities_for_node(&context->entities, NULL, (AstNode *) arch_type, NULL, NULL);
+    symbol_builtin_introduce(context, p->scope, "arch", (AstNode *) arch_type);
 
     if (context->options->generate_foreign_info) {
-        AstNumLit* foreign_info = make_int_literal(a, 1);
+        AstNumLit* foreign_info = make_int_literal(context, 1);
         foreign_info->type_node = (AstType *) &context->basic_types.type_bool;
-        symbol_builtin_introduce(p->scope, "Generated_Foreign_Info", (AstNode *) foreign_info);
+        symbol_builtin_introduce(context, p->scope, "Generated_Foreign_Info", (AstNode *) foreign_info);
     }
 }
 
