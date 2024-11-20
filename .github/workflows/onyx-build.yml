@@ -16,7 +16,7 @@ on:
 jobs:
   setup:
     name: Set up
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       VERSION: ${{ steps.setup.outputs.VERSION }}
       DOING_RELEASE: ${{ steps.setup.outputs.DOING_RELEASE }}
@@ -41,27 +41,27 @@ jobs:
       matrix:
         include:
           - build: linux-amd64
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             runtime_library: ovmwasm
             artifact_name: 'onyx-linux-ovm-amd64'
           - build: linux-amd64
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             runtime_library: wasmer
             artifact_name: 'onyx-linux-wasmer-amd64'
           - build: linux-amd64
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             runtime_library: none
             artifact_name: 'onyx-linux-none-amd64' 
           - build: linux-arm64
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             runtime_library: ovmwasm
             artifact_name: 'onyx-linux-ovm-arm64'
           - build: linux-arm64
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             runtime_library: wasmer
             artifact_name: 'onyx-linux-wasmer-arm64'
           - build: linux-arm64
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             runtime_library: none
             artifact_name: 'onyx-linux-none-arm64' 
           - build: darwin-arm64
