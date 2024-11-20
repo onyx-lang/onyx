@@ -584,15 +584,13 @@ static i32 onyx_compile(Context *context) {
         // before the "key" node that will unblock the progress. This means a more sophisticated
         // cycle detection algorithm must be used.
         //
-        static Entity* watermarked_node = NULL;
-        static u32 highest_watermark = 0;
         if (!changed) {
-            if (!watermarked_node) {
-                watermarked_node = ent;
-                highest_watermark = bh_max(highest_watermark, ent->macro_attempts);
+            if (!context->watermarked_node) {
+                context->watermarked_node = ent;
+                context->highest_watermark = bh_max(context->highest_watermark, ent->macro_attempts);
             }
-            else if (watermarked_node == ent) {
-                if (ent->macro_attempts > highest_watermark) {
+            else if (context->watermarked_node == ent) {
+                if (ent->macro_attempts > context->highest_watermark) {
                     entity_heap_insert_existing(&context->entities, ent);
 
                     if (context->cycle_almost_detected == 4) {
@@ -604,12 +602,12 @@ static i32 onyx_compile(Context *context) {
                     context->cycle_almost_detected += 1;
                 }
             }
-            else if (watermarked_node->macro_attempts < ent->macro_attempts) {
-                watermarked_node = ent;
-                highest_watermark = bh_max(highest_watermark, ent->macro_attempts);
+            else if (context->watermarked_node->macro_attempts < ent->macro_attempts) {
+                context->watermarked_node = ent;
+                context->highest_watermark = bh_max(context->highest_watermark, ent->macro_attempts);
             }
         } else {
-            watermarked_node = NULL;
+            context->watermarked_node = NULL;
             context->cycle_almost_detected = 0;
         }
 

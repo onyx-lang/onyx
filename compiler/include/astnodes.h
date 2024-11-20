@@ -1936,6 +1936,8 @@ typedef struct CheckerData {
 typedef struct ClonerData {
     u32 clone_depth;
     b32 dont_copy_structs;
+
+    bh_arr(AstNode *) captured_entities;
 } ClonerData;
 
 typedef struct PolymorphData {
@@ -2213,6 +2215,9 @@ struct Context {
 
     // HACK
     SpecialGlobalEntities special_global_entities;
+
+    Entity* watermarked_node;
+    u32 highest_watermark;
 
     u32 cycle_almost_detected : 3;
     b32 cycle_detected : 1;

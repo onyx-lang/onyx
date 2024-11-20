@@ -38,6 +38,10 @@ type enum onyx_pump_t {
 onyx_context_t *onyx_context_create();
 void onyx_context_free(onyx_context_t *ctx);
 
+/// Call after all options have been set and before the first `onyx_pump`.
+void onyx_options_ready(onyx_context_t *ctx);
+onyx_pump_t onyx_pump(onyx_context_t *ctx);
+
 //
 // Options
 //

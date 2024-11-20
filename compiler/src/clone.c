@@ -127,15 +127,13 @@ static inline i32 ast_kind_to_size(AstNode* node) {
     return 0;
 }
 
-static bh_arr(AstNode *) captured_entities=NULL;
-
 AstNode* ast_clone_with_captured_entities(Context *context, void* n, bh_arr(AstNode *)* ents) {
-    captured_entities = *ents;
+    context->cloner.captured_entities = *ents;
 
     AstNode* cloned = ast_clone(context, n);
 
-    *ents = captured_entities;
-    captured_entities = NULL;
+    *ents = context->cloner.captured_entities;
+    context->cloner.captured_entities = NULL;
     return cloned;
 }
 
@@ -158,9 +156,9 @@ AstNode* ast_clone_list(Context *context, void* n) {
 }
 
 #define E(ent) do { \
-    assert(captured_entities); \
+    assert(context->cloner.captured_entities); \
     ent->entity = NULL; \
-    bh_arr_push(captured_entities, (AstNode *) ent); \
+    bh_arr_push(context->cloner.captured_entities, (AstNode *) ent); \
     } while (0);
     
 
@@ -525,15 +523,15 @@ AstNode* ast_clone(Context *context, void* n) {
             df->nodes_that_need_entities_after_clone = NULL;
             bh_arr_new(context->gp_alloc, df->nodes_that_need_entities_after_clone, 1);
 
-            bh_arr(AstNode *) old_captured_entities = captured_entities;
-            captured_entities = df->nodes_that_need_entities_after_clone;
+            bh_arr(AstNode *) old_captured_entities = context->cloner.captured_entities;
+            context->cloner.captured_entities = df->nodes_that_need_entities_after_clone;
 
             df->return_type = (AstType *) ast_clone(context, sf->return_type);
             df->body = (AstBlock *) ast_clone(context, sf->body);
             df->captures = (AstCaptureBlock *) ast_clone(context, sf->captures);
 
-            df->nodes_that_need_entities_after_clone = captured_entities;
-            captured_entities = old_captured_entities;
+            df->nodes_that_need_entities_after_clone = context->cloner.captured_entities;
+            context->cloner.captured_entities = old_captured_entities;
 
             df->params = NULL;
             bh_arr_new(context->ast_alloc, df->params, bh_arr_length(sf->params));
@@ -581,7 +579,7 @@ AstNode* ast_clone(Context *context, void* n) {
                 df->scope_to_lookup_captured_values = NULL;
             }
 
-            if (context->cloner.clone_depth > 1 && captured_entities) {
+            if (context->cloner.clone_depth > 1 && context->cloner.captured_entities) {
                 sf->flags |= Ast_Flag_Function_Is_Lambda_Inside_PolyProc;
                 df->flags &= ~Ast_Flag_Function_Is_Lambda_Inside_PolyProc;
                 E(df);
@@ -766,10 +764,10 @@ void clone_function_body(Context *context, AstFunction* dest, AstFunction* sourc
 
     dest->nodes_that_need_entities_after_clone = NULL;
     bh_arr_new(context->gp_alloc, dest->nodes_that_need_entities_after_clone, 1);
-    captured_entities = dest->nodes_that_need_entities_after_clone;
+    context->cloner.captured_entities = dest->nodes_that_need_entities_after_clone;
 
     dest->body = (AstBlock *) ast_clone(context, source->body);
     
-    dest->nodes_that_need_entities_after_clone = captured_entities;
-    captured_entities = NULL;
+    dest->nodes_that_need_entities_after_clone = context->cloner.captured_entities;
+    context->cloner.captured_entities = NULL;
 }
