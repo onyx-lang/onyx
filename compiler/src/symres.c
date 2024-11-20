@@ -85,8 +85,8 @@ SYMRES_FUNC(symbol, AstNode** symbol_node) {
             char *closest = find_closest_symbol_in_scope_and_parents(context, context->checker.current_scope, token->text);
             token_toggle_end(token);
 
-            if (closest) onyx_report_error(token->pos, Error_Critical, "Unable to resolve symbol '%b'. Did you mean '%s'?", token->text, token->length, closest);
-            else         onyx_report_error(token->pos, Error_Critical, "Unable to resolve symbol '%b'.", token->text, token->length);
+            if (closest) ONYX_ERROR(token->pos, Error_Critical, "Unable to resolve symbol '%b'. Did you mean '%s'?", token->text, token->length, closest);
+            else         ONYX_ERROR(token->pos, Error_Critical, "Unable to resolve symbol '%b'.", token->text, token->length);
 
             return Symres_Error;
         } else {
@@ -163,7 +163,7 @@ SYMRES_FUNC(union_type, AstUnionType* u_node) {
         else if (n == 1) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u16;
         else if (n <= 3) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u32;
         else {
-            onyx_report_error(u_node->token->pos, Error_Critical, "Too many union variants. How did you even do this...?");
+            ONYX_ERROR(u_node->token->pos, Error_Critical, "Too many union variants. How did you even do this...?");
             return Symres_Error;
         }
     }
@@ -359,7 +359,7 @@ SYMRES_FUNC(call, AstCall** pcall) {
     AstCall *call = *pcall;
 
     if (call->placeholder_argument_position > 0) {
-        onyx_report_error(call->token->pos, Error_Critical, "This call contains an argument placeholder '_', but it was not piped into.");
+        ONYX_ERROR(call->token->pos, Error_Critical, "This call contains an argument placeholder '_', but it was not piped into.");
         return Symres_Error;
     }
 
@@ -446,13 +446,13 @@ SYMRES_FUNC(field_access, AstFieldAccess** fa) {
             }
 
             if (closest) {
-                onyx_report_error((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Did you mean '%s'?",
+                ONYX_ERROR((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Did you mean '%s'?",
                     (*fa)->token->text,
                     (*fa)->token->length,
                     package_name,
                     closest);
             } else {
-                onyx_report_error((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Perhaps it is defined in a file that was not loaded?",
+                ONYX_ERROR((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Perhaps it is defined in a file that was not loaded?",
                     (*fa)->token->text,
                     (*fa)->token->length,
                     package_name);
@@ -465,7 +465,7 @@ SYMRES_FUNC(field_access, AstFieldAccess** fa) {
 
     } else if (force_a_lookup) {
         if (context->cycle_detected || context->cycle_almost_detected >= 2) {
-            onyx_report_error((*fa)->token->pos, Error_Critical, "'%b' does not exist here. This is a bad error message.",
+            ONYX_ERROR((*fa)->token->pos, Error_Critical, "'%b' does not exist here. This is a bad error message.",
                 (*fa)->token->text,
                 (*fa)->token->length);
             return Symres_Error;
@@ -543,7 +543,7 @@ SYMRES_FUNC(pipe, AstBinaryOp** pipe) {
     }
 
     if (!call_node || call_node->kind != Ast_Kind_Call) {
-        onyx_report_error((*pipe)->token->pos, Error_Critical, "Pipe operator expected call on right side.");
+        ONYX_ERROR((*pipe)->token->pos, Error_Critical, "Pipe operator expected call on right side.");
         return Symres_Error;
     }
 
@@ -590,7 +590,7 @@ SYMRES_FUNC(method_call, AstBinaryOp** mcall) {
         if ((*mcall)->left == NULL) return Symres_Error;
 
         if ((*mcall)->right->kind != Ast_Kind_Call) {
-            onyx_report_error((*mcall)->token->pos, Error_Critical, "'->' expected procedure call on right side.");
+            ONYX_ERROR((*mcall)->token->pos, Error_Critical, "'->' expected procedure call on right side.");
             return Symres_Error;
         }
 
@@ -693,7 +693,7 @@ SYMRES_FUNC(proc_expansion, AstProceduralExpansion **pexp, ProceduralMacroExpans
 
     if (exp->proc_macro->kind != Ast_Kind_Procedural_Macro) {
         if (context->cycle_almost_detected) {
-            onyx_report_error(exp->token->pos, Error_Critical, "Procedural macro expansion expected a procedural macro before the '!', but got '%s' instead.",
+            ONYX_ERROR(exp->token->pos, Error_Critical, "Procedural macro expansion expected a procedural macro before the '!', but got '%s' instead.",
                 onyx_ast_node_kind_string(exp->proc_macro->kind));
             return Symres_Error;
         }
@@ -711,6 +711,7 @@ SYMRES_FUNC(proc_expansion, AstProceduralExpansion **pexp, ProceduralMacroExpans
     AstNode *expansion = NULL;
 
     TypeMatch expansion_state = compiler_extension_expand_macro(
+        context,
         proc_macro->extension->extension_id,
         exp_kind,
         macro_name,
@@ -721,7 +722,7 @@ SYMRES_FUNC(proc_expansion, AstProceduralExpansion **pexp, ProceduralMacroExpans
         context->cycle_almost_detected > 0);
 
     if (expansion_state == TYPE_MATCH_FAILED) {
-        onyx_report_error(exp->token->pos, Error_Critical, "Procedural macro expansion failed. See other errors generated by procedural macro.");
+        ONYX_ERROR(exp->token->pos, Error_Critical, "Procedural macro expansion failed. See other errors generated by procedural macro.");
         return Symres_Error;
     }
 
@@ -731,7 +732,7 @@ SYMRES_FUNC(proc_expansion, AstProceduralExpansion **pexp, ProceduralMacroExpans
 
     if (expansion == NULL) {
         if (exp_kind == PMEK_Expression) {
-            onyx_report_error(exp->token->pos, Error_Critical, "Expected this procedural macro to expand to an expression, but it expanded to nothing.");
+            ONYX_ERROR(exp->token->pos, Error_Critical, "Expected this procedural macro to expand to an expression, but it expanded to nothing.");
             return Symres_Error;
         }
 
@@ -939,7 +940,7 @@ SYMRES_FUNC(if, AstIfWhile* ifnode) {
     if (ifnode->kind == Ast_Kind_Static_If) {
         if ((ifnode->flags & Ast_Flag_Static_If_Resolved) == 0) {
             if (context->cycle_detected) {
-                onyx_report_error(ifnode->token->pos, Error_Waiting_On, "Waiting on static if resolution.");
+                ONYX_ERROR(ifnode->token->pos, Error_Waiting_On, "Waiting on static if resolution.");
                 return Symres_Error;
             } else {
                 return Symres_Yield_Macro;
@@ -1086,7 +1087,7 @@ SYMRES_FUNC(directive_solidify, AstDirectiveSolidify** psolid) {
     }
 
     if (!solid->poly_proc || solid->poly_proc->kind != Ast_Kind_Polymorphic_Proc) {
-        onyx_report_error(solid->token->pos, Error_Critical, "Expected polymorphic procedure in #solidify directive.");
+        ONYX_ERROR(solid->token->pos, Error_Critical, "Expected polymorphic procedure in #solidify directive.");
         return Symres_Error;
     }
     
@@ -1103,25 +1104,25 @@ SYMRES_FUNC(directive_defined, AstDirectiveDefined** pdefined) {
 
     b32 has_to_be_resolved = context->cycle_almost_detected >= 1;
 
-    onyx_errors_disable();
+    onyx_errors_disable(context);
     context->checker.resolved_a_symbol = 0;
     SymresStatus ss = symres_expression(context, &defined->expr);
     if (has_to_be_resolved && ss != Symres_Success && !context->checker.resolved_a_symbol) {
         // The symbol definitely was not found and there is no chance that it could be found.
         defined->is_defined = 0;
 
-        onyx_errors_enable();
+        onyx_errors_enable(context);
         return Symres_Success;
     }
 
     if (ss == Symres_Success) {
         defined->is_defined = 1;
 
-        onyx_errors_enable();
+        onyx_errors_enable(context);
         return Symres_Success;
     }
 
-    onyx_errors_enable();
+    onyx_errors_enable(context);
     return Symres_Yield_Macro;
 }
 
@@ -1140,7 +1141,7 @@ SYMRES_FUNC(capture_block, AstCaptureBlock *block, Scope *captured_scope) {
 
         if (!resolved) {
             // Should this do a yield? In there any case that that would make sense?
-            onyx_report_error(token->pos, Error_Critical, "'%b' is not found in the enclosing scope.",
+            ONYX_ERROR(token->pos, Error_Critical, "'%b' is not found in the enclosing scope.",
                     token->text, token->length);
             return Symres_Error;
         }
@@ -1267,7 +1268,7 @@ SYMRES_FUNC(function_header, AstFunction* func) {
     func->flags |= Ast_Flag_Comptime;
 
     if (!(func->flags & Ast_Flag_Function_Is_Lambda) && func->captures) {
-        onyx_report_error(func->captures->token->pos, Error_Critical, "This procedure cannot capture values as it is not defined in an expression.");
+        ONYX_ERROR(func->captures->token->pos, Error_Critical, "This procedure cannot capture values as it is not defined in an expression.");
         return Symres_Error;
     }
 
@@ -1295,7 +1296,7 @@ SYMRES_FUNC(function_header, AstFunction* func) {
     bh_arr_each(AstParam, param, func->params) {
         if (param->default_value != NULL) {
             SYMRES(expression, &param->default_value);
-            if (onyx_has_errors()) return Symres_Error;
+            if (onyx_has_errors(context)) return Symres_Error;
         }
     }
 
@@ -1435,11 +1436,11 @@ SYMRES_FUNC(function, AstFunction* func) {
                     param->use_processed = 1;
 
                 } else if (param->local->type != NULL) {
-                    onyx_report_error(param->local->token->pos, Error_Critical, "Can only 'use' structures or pointers to structures.");
+                    ONYX_ERROR(param->local->token->pos, Error_Critical, "Can only 'use' structures or pointers to structures.");
 
                 } else {
                     // :ExplicitTyping
-                    onyx_report_error(param->local->token->pos, Error_Critical, "Cannot deduce type of parameter '%b'; Try adding it explicitly.",
+                    ONYX_ERROR(param->local->token->pos, Error_Critical, "Cannot deduce type of parameter '%b'; Try adding it explicitly.",
                         param->local->token->text,
                         param->local->token->length);
                 }
@@ -1501,7 +1502,7 @@ SYMRES_FUNC(package, AstPackage* package) {
 
     } else {
         if (context->checker.report_unresolved_symbols) {
-            onyx_report_error(package->token->pos, Error_Critical,
+            ONYX_ERROR(package->token->pos, Error_Critical,
                     "Package '%s' not found in included source files.",
                     package->package_name);
             return Symres_Error;
@@ -1554,7 +1555,7 @@ SYMRES_FUNC(enum, AstEnumType* enum_node) {
                 } else if (type_is_integer(n_value->type)) {
                     next_assign_value = n_value->value.l;
                 } else {
-                    onyx_report_error((*value)->token->pos, Error_Critical, "expected numeric integer literal for enum initialization, got '%s'", type_get_name(context, n_value->type));
+                    ONYX_ERROR((*value)->token->pos, Error_Critical, "expected numeric integer literal for enum initialization, got '%s'", type_get_name(context, n_value->type));
                     return Symres_Error;
                 }
 
@@ -1566,7 +1567,7 @@ SYMRES_FUNC(enum, AstEnumType* enum_node) {
                 }
 
                 if (context->cycle_detected) {
-                    onyx_report_error((*value)->token->pos, Error_Critical, "Expected compile time known value for enum initialization.");
+                    ONYX_ERROR((*value)->token->pos, Error_Critical, "Expected compile time known value for enum initialization.");
                     return Symres_Error;
                 }
 
@@ -1656,7 +1657,7 @@ SYMRES_FUNC(polyproc, AstFunction* pp) {
         AstParam *param = &pp->params[p->idx];
         if (param->default_value != NULL) {
             SYMRES(expression, &param->default_value);
-            if (onyx_has_errors()) return Symres_Error;
+            if (onyx_has_errors(context)) return Symres_Error;
         }
     }
 
@@ -1682,7 +1683,7 @@ SYMRES_FUNC(process_directive, AstNode* directive) {
             AstOverloadedFunction *ofunc = (AstOverloadedFunction *) strip_aliases((AstNode *) add_overload->overloaded_function);
             if (ofunc->kind == Ast_Kind_Symbol) {
                 if (context->cycle_detected) {
-                    onyx_report_error(add_overload->token->pos, Error_Waiting_On, "Waiting for matched procedure to be known.");
+                    ONYX_ERROR(add_overload->token->pos, Error_Waiting_On, "Waiting for matched procedure to be known.");
                     return Symres_Error;
                 }
 
@@ -1690,21 +1691,21 @@ SYMRES_FUNC(process_directive, AstNode* directive) {
             }
 
             if (ofunc->kind != Ast_Kind_Overloaded_Function) {
-                onyx_report_error(add_overload->token->pos, Error_Critical, "#overload directive expects a matched procedure, got '%s'.",
+                ONYX_ERROR(add_overload->token->pos, Error_Critical, "#overload directive expects a matched procedure, got '%s'.",
                             onyx_ast_node_kind_string(ofunc->kind));
                 return Symres_Error;
             }
 
             if (ofunc->locked) {
-                onyx_report_error(add_overload->token->pos, Error_Critical, "Cannot add match option here as the original #match was declared as #locked.");
-                onyx_report_error(ofunc->token->pos, Error_Critical, "Here is the original #match.");
+                ONYX_ERROR(add_overload->token->pos, Error_Critical, "Cannot add match option here as the original #match was declared as #locked.");
+                ONYX_ERROR(ofunc->token->pos, Error_Critical, "Here is the original #match.");
                 return Symres_Error;
             }
 
             if (ofunc->only_local_functions) {
                 if (!token_same_file(add_overload->token, ofunc->token)) {
-                    onyx_report_error(add_overload->token->pos, Error_Critical, "Cannot add match option here as this option is not within the same file as the original #match declared with #local.");
-                    onyx_report_error(ofunc->token->pos, Error_Critical, "Here is the original #match.");
+                    ONYX_ERROR(add_overload->token->pos, Error_Critical, "Cannot add match option here as this option is not within the same file as the original #match declared with #local.");
+                    ONYX_ERROR(ofunc->token->pos, Error_Critical, "Here is the original #match.");
                     return Symres_Error;
                 }
             }
@@ -1723,7 +1724,7 @@ SYMRES_FUNC(process_directive, AstNode* directive) {
 
             AstFunction* overload = get_function_from_node((AstNode *) operator->overload);
             if (overload == NULL) {
-                onyx_report_error(operator->token->pos, Error_Critical, "This cannot be used as an operator overload.");
+                ONYX_ERROR(operator->token->pos, Error_Critical, "This cannot be used as an operator overload.");
                 return Symres_Error;
             }
 
@@ -1733,7 +1734,7 @@ SYMRES_FUNC(process_directive, AstNode* directive) {
             // CLEANUP This is not written well at all...
             if (operator->operator == Binary_Op_Count) {
                 if (bh_arr_length(overload->params) != 1) {
-                    onyx_report_error(operator->token->pos, Error_Critical, "Expected exactly 1 argument for unary operator overload.");
+                    ONYX_ERROR(operator->token->pos, Error_Critical, "Expected exactly 1 argument for unary operator overload.");
                     return Symres_Error;
                 }
 
@@ -1747,7 +1748,7 @@ SYMRES_FUNC(process_directive, AstNode* directive) {
                 }
 
                 if (unop == Unary_Op_Count) {
-                    onyx_report_error(operator->token->pos, Error_Critical, "Unknown operator.");
+                    ONYX_ERROR(operator->token->pos, Error_Critical, "Unknown operator.");
                     return Symres_Error;
                 }
 
@@ -1756,7 +1757,7 @@ SYMRES_FUNC(process_directive, AstNode* directive) {
             }
 
             if (operator->operator != Binary_Op_Subscript_Equals && bh_arr_length(overload->params) != 2) {
-                onyx_report_error(operator->token->pos, Error_Critical, "Expected exactly 2 arguments for binary operator overload.");
+                ONYX_ERROR(operator->token->pos, Error_Critical, "Expected exactly 2 arguments for binary operator overload.");
                 return Symres_Error;
             }
 
@@ -1770,7 +1771,7 @@ SYMRES_FUNC(process_directive, AstNode* directive) {
             SYMRES(expression, &export->export_name_expr);
 
             if (export->export->kind == Ast_Kind_Polymorphic_Proc) {
-                onyx_report_error(export->token->pos, Error_Critical, "Cannot export a polymorphic function.");
+                ONYX_ERROR(export->token->pos, Error_Critical, "Cannot export a polymorphic function.");
                 return Symres_Error;
             }
 
@@ -1779,12 +1780,12 @@ SYMRES_FUNC(process_directive, AstNode* directive) {
                 func->is_exported = 1;
 
                 if (func->is_foreign) {
-                    onyx_report_error(export->token->pos, Error_Critical, "Cannot export a foreign function.");
+                    ONYX_ERROR(export->token->pos, Error_Critical, "Cannot export a foreign function.");
                     return Symres_Error;
                 }
 
                 if (func->is_intrinsic) {
-                    onyx_report_error(export->token->pos, Error_Critical, "Cannot export an intrinsic function.");
+                    ONYX_ERROR(export->token->pos, Error_Critical, "Cannot export an intrinsic function.");
                     return Symres_Error;
                 }
             }
@@ -1820,7 +1821,7 @@ SYMRES_FUNC(process_directive, AstNode* directive) {
                 AstTyped *full_loc = (AstTyped *) strip_aliases((AstNode *) inject->full_loc);
 
                 if (full_loc->kind != Ast_Kind_Field_Access) {
-                    onyx_report_error(inject->token->pos, Error_Critical, "#inject expects a dot expression (a.b) for the injection point.");
+                    ONYX_ERROR(inject->token->pos, Error_Critical, "#inject expects a dot expression (a.b) for the injection point.");
                     return Symres_Error;
                 }
 
@@ -1890,7 +1891,7 @@ SYMRES_FUNC(constraint, AstConstraint* constraint) {
 
         case Constraint_Phase_Checking_Expressions: {
             SymresStatus ss;
-            onyx_errors_disable();
+            onyx_errors_disable(context);
 
             fori (i, constraint->expr_idx, bh_arr_length(constraint->exprs)) {
                 InterfaceConstraint* ic = &constraint->exprs[i];
@@ -1900,7 +1901,7 @@ SYMRES_FUNC(constraint, AstConstraint* constraint) {
                 // way to factor this?
                 ss = symres_expression(context, &ic->expr);
                 if (ss == Symres_Yield_Macro) {
-                    onyx_errors_enable();
+                    onyx_errors_enable(context);
                     return ss;
                 }
 
@@ -1915,7 +1916,7 @@ SYMRES_FUNC(constraint, AstConstraint* constraint) {
                 if (ic->expected_type_expr) {
                     ss = symres_type(context, &ic->expected_type_expr);
                     if (ss == Symres_Yield_Macro) {
-                        onyx_errors_enable();
+                        onyx_errors_enable(context);
                         return ss;
                     }
                 }
@@ -1923,12 +1924,12 @@ SYMRES_FUNC(constraint, AstConstraint* constraint) {
                 continue;
 
               constraint_error:
-                onyx_errors_enable();
+                onyx_errors_enable(context);
                 *constraint->report_status = Constraint_Check_Status_Failed;
                 return Symres_Error;
             }
 
-            onyx_errors_enable();
+            onyx_errors_enable(context);
             return Symres_Success;
         }
 
@@ -1963,11 +1964,11 @@ SYMRES_FUNC(polyquery, AstPolyQuery *query) {
         if (param->local->type_node != NULL) {
             context->checker.resolved_a_symbol = 0;
 
-            onyx_errors_disable();
+            onyx_errors_disable(context);
             param->local->flags |= Ast_Flag_Symbol_Invisible;
             symres_type(context, &param->local->type_node);
             param->local->flags &= ~Ast_Flag_Symbol_Invisible;
-            onyx_errors_enable();
+            onyx_errors_enable(context);
             
             if (context->checker.resolved_a_symbol) query->successful_symres = 1;
         }
@@ -1984,7 +1985,7 @@ SYMRES_FUNC(foreign_block, AstForeignBlock *fb) {
     SYMRES(expression, &fb->module_name);
 
     if (fb->module_name->kind != Ast_Kind_StrLit) {
-        onyx_report_error(fb->token->pos, Error_Critical, "Expected module name to be a compile-time string literal.");
+        ONYX_ERROR(fb->token->pos, Error_Critical, "Expected module name to be a compile-time string literal.");
         return Symres_Error;
     }
 
@@ -1992,7 +1993,7 @@ SYMRES_FUNC(foreign_block, AstForeignBlock *fb) {
         Entity *ent = *pent;
         if (ent->type == Entity_Type_Function_Header) {
             if (ent->function->body->next != NULL) {
-                onyx_report_error(ent->function->token->pos, Error_Critical, "Procedures declared in a #foreign block should not have bodies.");
+                ONYX_ERROR(ent->function->token->pos, Error_Critical, "Procedures declared in a #foreign block should not have bodies.");
                 return Symres_Error;
             }
 
@@ -2038,7 +2039,7 @@ SYMRES_FUNC(include, AstInclude* include) {
     SYMRES(expression, &include->name_node);
 
     if (include->name_node->kind != Ast_Kind_StrLit) {
-        onyx_report_error(include->token->pos, Error_Critical, "Expected compile-time known string literal here. Got '%s'.", onyx_ast_node_kind_string(include->name_node->kind));
+        ONYX_ERROR(include->token->pos, Error_Critical, "Expected compile-time known string literal here. Got '%s'.", onyx_ast_node_kind_string(include->name_node->kind));
         return Symres_Error;
     }
 
@@ -2057,7 +2058,7 @@ SYMRES_FUNC(file_contents, AstFileContents* fc) {
     SYMRES(expression, &fc->filename_expr);
 
     if (fc->filename_expr->kind != Ast_Kind_StrLit) {
-        onyx_report_error(fc->token->pos, Error_Critical, "Expected given expression to be a compile-time stirng literal.");
+        ONYX_ERROR(fc->token->pos, Error_Critical, "Expected given expression to be a compile-time stirng literal.");
         return Symres_Error;
     }
 
@@ -2096,7 +2097,7 @@ SYMRES_FUNC(import, AstImport* import) {
                 if (context->checker.report_unresolved_symbols) {
                     // TODO: Change package->name to package->qualified_name when
                     // merged with the documentation generation branch.
-                    onyx_report_error(qi->symbol_name->pos, Error_Critical, 
+                    ONYX_ERROR(qi->symbol_name->pos, Error_Critical, 
                             "The symbol '%b' was not found the package '%s'.",
                             qi->symbol_name->text, qi->symbol_name->length, package->package->name);
 
@@ -2123,16 +2124,16 @@ SYMRES_FUNC(js_node, AstJsNode* js) {
 
 SYMRES_FUNC(compiler_extension, AstCompilerExtension *ext) {
     if (context->options->no_compiler_extensions) {
-        onyx_report_error(ext->token->pos, Error_Critical, "Compiler extensions are disabled in this compilation.");
+        ONYX_ERROR(ext->token->pos, Error_Critical, "Compiler extensions are disabled in this compilation.");
         return Symres_Error;
     }
 
     token_toggle_end(ext->name);
-    TypeMatch status = compiler_extension_start(ext->name->text, ext->token->pos.filename, context->checker.current_entity, &ext->extension_id);
+    TypeMatch status = compiler_extension_start(context, ext->name->text, ext->token->pos.filename, context->checker.current_entity, &ext->extension_id);
     token_toggle_end(ext->name);
 
     if (status == TYPE_MATCH_FAILED) {
-        onyx_report_error(ext->token->pos, Error_Critical, "Failed to initialize this compiler extension.");
+        ONYX_ERROR(ext->token->pos, Error_Critical, "Failed to initialize this compiler extension.");
         return Symres_Error;
     }
 

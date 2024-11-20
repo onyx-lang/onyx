@@ -144,10 +144,10 @@ b32 symbol_raw_introduce(Context *context, Scope* scope, char* name, OnyxFilePos
         if (index != -1) {
             AstNode *node = scope->symbols[index].value;
             if (node != symbol) {
-                onyx_report_error(pos, Error_Critical, "Redeclaration of symbol '%s'.", name);
+                ONYX_ERROR(pos, Error_Critical, "Redeclaration of symbol '%s'.", name);
 
                 if (node->token) {
-                    onyx_report_error(node->token->pos, Error_Critical, "Previous declaration was here.");
+                    ONYX_ERROR(node->token->pos, Error_Critical, "Previous declaration was here.");
                 }
 
                 return 0;
@@ -705,7 +705,7 @@ void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(Ove
         }
     }
 
-    onyx_report_error(call->token->pos, Error_Critical, "Unable to match overloaded function with provided argument types: (%s)", arg_str);
+    ONYX_ERROR(call->token->pos, Error_Critical, "Unable to match overloaded function with provided argument types: (%s)", arg_str);
 
     bh_free(context->scratch_alloc, arg_str);
 
@@ -718,18 +718,18 @@ void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(Ove
     i32 i = 1;
     bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
         AstTyped* node = (AstTyped *) strip_aliases((AstNode *) entry->key);
-        onyx_report_error(node->token->pos, Error_Critical, "Here is one of the overloads. %d/%d", i++, bh_arr_length(all_overloads.entries));
+        ONYX_ERROR(node->token->pos, Error_Critical, "Here is one of the overloads. %d/%d", i++, bh_arr_length(all_overloads.entries));
     }
 
     bh_imap_free(&all_overloads);
 }
 
 void report_incorrect_overload_expected_type(Context *context, Type *given, Type *expected, OnyxToken *overload, OnyxToken *group) {
-    onyx_report_error(overload->pos, Error_Critical,
+    ONYX_ERROR(overload->pos, Error_Critical,
             "Expected this overload option to return '%s', but instead it returns '%s'.",
             type_get_name(context, expected), type_get_name(context, given));
 
-    onyx_report_error(group->pos, Error_Critical, "Here is where the overloaded function was defined.");
+    ONYX_ERROR(group->pos, Error_Critical, "Here is where the overloaded function was defined.");
 }
 
 static TypeMatch ensure_overload_returns_correct_type_job(Context *context, void *raw_data) {
@@ -793,7 +793,7 @@ void ensure_overload_returns_correct_type(Context *context, AstTyped *overload, 
     // Errors are only disabled when doing something non-permantent, like checking an interface
     // constraint, so this is a cheap way to tell if that is where we are coming from.
     //
-    if (group->expected_return_type && onyx_errors_are_enabled()) {
+    if (group->expected_return_type && onyx_errors_are_enabled(context)) {
         OverloadReturnTypeCheck *data = bh_alloc_item(context->ast_alloc, OverloadReturnTypeCheck);
         data->expected_type = group->expected_return_type;
         data->node = overload;
@@ -871,7 +871,7 @@ void expand_macro(Context *context, AstCall** pcall, AstFunction* template) {
         Type *param_type = template->params[i].local->type;
         if (param_type == any_type
             || (param_type->kind == Type_Kind_VarArgs && param_type->VarArgs.elem == any_type)) {
-            onyx_report_error(macro->token->pos, Error_Critical, "Currently, macros do not support arguments of type 'any' or '..any'.");
+            ONYX_ERROR(macro->token->pos, Error_Critical, "Currently, macros do not support arguments of type 'any' or '..any'.");
         }
 
         symbol_introduce(context, argument_scope, template->params[i].local->token, value);

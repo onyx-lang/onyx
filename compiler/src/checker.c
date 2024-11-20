@@ -14,7 +14,7 @@
 
 #define YIELD(loc, msg) do { \
     if (context->cycle_detected) { \
-        onyx_report_error(loc, Error_Waiting_On, msg); \
+        ONYX_ERROR(loc, Error_Waiting_On, msg); \
         return Check_Error; \
     } else { \
         return Check_Yield_Macro; \
@@ -23,7 +23,7 @@
 
 #define YIELD_(loc, msg, ...) do { \
     if (context->cycle_detected) { \
-        onyx_report_error(loc, Error_Waiting_On, msg, __VA_ARGS__); \
+        ONYX_ERROR(loc, Error_Waiting_On, msg, __VA_ARGS__); \
         return Check_Error; \
     } else { \
         return Check_Yield_Macro; \
@@ -32,7 +32,7 @@
 
 #define YIELD_ERROR(loc, msg) do { \
     if (context->cycle_detected) { \
-        onyx_report_error(loc, Error_Critical, msg); \
+        ONYX_ERROR(loc, Error_Critical, msg); \
         return Check_Error; \
     } else { \
         return Check_Yield_Macro; \
@@ -40,12 +40,12 @@
     } while (0)
 
 #define ERROR(loc, msg) do { \
-    onyx_report_error(loc, Error_Critical, msg); \
+    ONYX_ERROR(loc, Error_Critical, msg); \
     return Check_Error; \
     } while (0)
 
 #define ERROR_(loc, msg, ...) do { \
-    onyx_report_error(loc, Error_Critical, msg, __VA_ARGS__); \
+    ONYX_ERROR(loc, Error_Critical, msg, __VA_ARGS__); \
     return Check_Error; \
     } while (0)
 
@@ -435,7 +435,7 @@ CHECK_FUNC(for, AstFor* fornode) {
         ERROR_(error_loc, "Cannot iterate over a '%s'.", type_get_name(context, iter_type));
 
     if (fornode->no_close && fornode->loop_type != For_Loop_Iterator) {
-        onyx_report_warning(error_loc, "Warning: #no_close here is meaningless as the iterable is not an iterator.");
+        ONYX_WARNING(error_loc, "Warning: #no_close here is meaningless as the iterable is not an iterator.");
     }
 
     fornode->flags |= Ast_Flag_Has_Been_Checked;
@@ -468,7 +468,7 @@ static b32 add_case_to_switch_statement(Context *context, AstSwitch* switchnode,
     switchnode->max_case = bh_max(switchnode->max_case, case_value);
 
     if (bh_imap_has(&switchnode->case_map, case_value)) {
-        onyx_report_error(pos, Error_Critical, "Multiple cases for values '%d'.", case_value);
+        ONYX_ERROR(pos, Error_Critical, "Multiple cases for values '%d'.", case_value);
         return 1;
     }
 
@@ -709,7 +709,7 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
       check_switch_case_block:
         if (switchnode->is_expr) {
             if (!sc->body_is_expr) {
-                onyx_report_error(sc->token->pos, Error_Critical, "Inside a switch expression, all cases must return a value.");
+                ONYX_ERROR(sc->token->pos, Error_Critical, "Inside a switch expression, all cases must return a value.");
                 ERROR(sc->token->pos, "Change the case statement to look like 'case X => expr'.");
             }
         } else {
@@ -937,7 +937,7 @@ CHECK_FUNC(call, AstCall** pcall) {
     char* err_msg = NULL;
     fill_in_arguments(context, &call->args, (AstNode *) callee, &err_msg, 0);
     if (err_msg != NULL) {
-        onyx_report_error(callee->token->pos, Error_Critical, "Here is the function being called.");
+        ONYX_ERROR(callee->token->pos, Error_Critical, "Here is the function being called.");
         ERROR(call->token->pos, err_msg);
     }
 
@@ -1007,7 +1007,7 @@ CHECK_FUNC(call, AstCall** pcall) {
         }
 
         if (intrinsic == 0xffffffff) {
-            onyx_report_error(callee->token->pos, Error_Critical, "Intrinsic not supported, '%s'.", intr_name);
+            ONYX_ERROR(callee->token->pos, Error_Critical, "Intrinsic not supported, '%s'.", intr_name);
             token_toggle_end(callee->intrinsic_name);
             return Check_Error;
         }
@@ -1027,7 +1027,7 @@ CHECK_FUNC(call, AstCall** pcall) {
     TypeMatch tm = check_arguments_against_type(context, &call->args, &callee->type->Function, &call->va_kind,
                                                 call->token, get_function_name(context, callee), &error);
     if (tm == TYPE_MATCH_FAILED) {
-        onyx_submit_error(error);
+        onyx_submit_error(context, error);
         return Check_Error;
     }
 
@@ -1045,17 +1045,17 @@ CHECK_FUNC(call, AstCall** pcall) {
     }
 
     if (callee->kind == Ast_Kind_Function && callee->deprecated_warning) {
-        onyx_report_warning(callee->token->pos, "Calling a deprecated function: %b",
+        ONYX_WARNING(callee->token->pos, "Calling a deprecated function: %b",
             callee->deprecated_warning->token->text, callee->deprecated_warning->token->length);
 
-        onyx_report_warning(call->token->pos, "Here is where the deprecated function was called.");
+        ONYX_WARNING(call->token->pos, "Here is where the deprecated function was called.");
     }
 
     return Check_Success;
 }
 
 static void report_bad_binaryop(Context *context, AstBinaryOp* binop) {
-    onyx_report_error(binop->token->pos, Error_Critical, "Binary operator '%s' not understood for arguments of type '%s' and '%s'.",
+    ONYX_ERROR(binop->token->pos, Error_Critical, "Binary operator '%s' not understood for arguments of type '%s' and '%s'.",
             binaryop_string[binop->operation],
             node_get_type_name(context, binop->left),
             node_get_type_name(context, binop->right));
@@ -1895,7 +1895,7 @@ CHECK_FUNC(struct_literal, AstStructLiteral* sl) {
     if ((sl->flags & Ast_Flag_Has_Been_Checked) == 0) {
         char* err_msg = NULL;
         if (!fill_in_arguments(context, &sl->args, (AstNode *) sl, &err_msg, 1)) {
-            onyx_report_error(sl->token->pos, Error_Critical, err_msg);
+            ONYX_ERROR(sl->token->pos, Error_Critical, err_msg);
 
             // bh_arr_each(AstTyped *, value, sl->args.values) {
             //     if (*value == NULL) {
@@ -1903,7 +1903,7 @@ CHECK_FUNC(struct_literal, AstStructLiteral* sl) {
             //         StructMember smem;
             //         type_lookup_member_by_idx(sl->type, member_idx, &smem);
 
-            //         onyx_report_error(sl->token->pos, Error_Critical,
+            //         ONYX_ERROR(sl->token->pos, Error_Critical,
             //             "Value not given for %d%s member, '%s', for type '%s'.",
             //             member_idx + 1, bh_num_suffix(member_idx + 1),
             //             smem.name, type_get_name(context, sl->type));
@@ -2644,7 +2644,7 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
 
         case Ast_Kind_Global:
             if (expr->type == NULL) {
-                onyx_report_error(expr->token->pos, Error_Critical, "Global with unknown type.");
+                ONYX_ERROR(expr->token->pos, Error_Critical, "Global with unknown type.");
                 retval = Check_Error;
             }
             break;
@@ -2776,7 +2776,7 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
 
         default:
             retval = Check_Error;
-            onyx_report_error(expr->token->pos, Error_Critical, "UNEXPECTED INTERNAL COMPILER ERROR");
+            ONYX_ERROR(expr->token->pos, Error_Critical, "UNEXPECTED INTERNAL COMPILER ERROR");
             DEBUG_HERE;
             break;
     }
@@ -2827,15 +2827,15 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
     }
 
     if (!code_block->is_expression && expected_expression) {
-        onyx_report_error(insert->token->pos, Error_Critical, "Expected a code block that is an expression here, but got a code block that is statements.");
-        onyx_report_error(code_block->token->pos, Error_Critical, "Try changing { expr } into ( expr ) here.");
+        ONYX_ERROR(insert->token->pos, Error_Critical, "Expected a code block that is an expression here, but got a code block that is statements.");
+        ONYX_ERROR(code_block->token->pos, Error_Critical, "Try changing { expr } into ( expr ) here.");
         return Check_Error;
     }
 
     u32 bound_symbol_count = bh_arr_length(code_block->binding_symbols);
     u32 bound_expr_count   = bh_arr_length(insert->binding_exprs);
     if (bound_symbol_count > bound_expr_count) {
-        onyx_report_error(insert->token->pos, Error_Critical,
+        ONYX_ERROR(insert->token->pos, Error_Critical,
                 "Expected at least %d argument%s to unquote code block, only got %d.",
                 bound_symbol_count, bh_num_plural(bound_symbol_count), bound_expr_count);
         ERROR(code_block->token->pos, "Here is the code block being unquoted.");
@@ -3055,10 +3055,10 @@ CHECK_FUNC(statement, AstNode** pstmt) {
 
                 if (!node_is_type((AstNode *) typed_stmt->type_node)) {
                     if (typed_stmt->type_node->type == context->types.basic[Basic_Kind_Type_Index]) {
-                        onyx_report_error(stmt->token->pos, Error_Critical, "The type of this local variable is a runtime-known type, not a compile-time known type.");
+                        ONYX_ERROR(stmt->token->pos, Error_Critical, "The type of this local variable is a runtime-known type, not a compile-time known type.");
 
                         if (typed_stmt->type_node->kind == Ast_Kind_Param) {
-                            onyx_report_error(stmt->token->pos, Error_Critical, "Try adding a '$' to the parameter name to make this a compile-time known type.");
+                            ONYX_ERROR(stmt->token->pos, Error_Critical, "Try adding a '$' to the parameter name to make this a compile-time known type.");
                         }
 
                         return Check_Error;
@@ -3131,7 +3131,7 @@ CHECK_FUNC(block, AstBlock* block) {
             case Check_Failed:
             case Check_Error:
                 if (block->macro_generated_from) {
-                    onyx_report_error(
+                    ONYX_ERROR(
                         block->macro_generated_from->pos,
                         Error_Critical,
                         "Error in 'macro' that was generated from here."
@@ -3186,7 +3186,7 @@ CHECK_FUNC(function, AstFunction* func) {
             !func->is_foreign
         ) {
             status = Check_Error;
-            onyx_report_error(func->token->pos, Error_Critical, "Not all code paths return a value.");
+            ONYX_ERROR(func->token->pos, Error_Critical, "Not all code paths return a value.");
         }
 
         if (status == Check_Error && func->generated_from && context->cycle_detected == 0)
@@ -3225,7 +3225,7 @@ CHECK_FUNC(overloaded_function, AstOverloadedFunction* ofunc) {
         if (   node->kind != Ast_Kind_Function
             && node->kind != Ast_Kind_Polymorphic_Proc
             && node->kind != Ast_Kind_Macro) {
-            onyx_report_error(node->token->pos, Error_Critical, "Overload option not procedure or macro. Got '%s'",
+            ONYX_ERROR(node->token->pos, Error_Critical, "Overload option not procedure or macro. Got '%s'",
                 onyx_ast_node_kind_string(node->kind));
 
             bh_imap_free(&all_overloads);
@@ -3308,7 +3308,7 @@ CHECK_FUNC(meta_tags, bh_arr(AstTyped *) tags) {
             resolve_expression_type(context, *meta);
 
             if (((*meta)->flags & Ast_Flag_Comptime) == 0) {
-                onyx_report_error((*meta)->token->pos, Error_Critical, "#tag expressions are expected to be compile-time known.");
+                ONYX_ERROR((*meta)->token->pos, Error_Critical, "#tag expressions are expected to be compile-time known.");
                 return Check_Error;
             }
         }
@@ -3495,11 +3495,11 @@ CHECK_FUNC(union, AstUnionType *u_node) {
 
 CHECK_FUNC(temp_function_header, AstFunction* func) {
     if (func->flags & Ast_Flag_Header_Check_No_Error) {
-        onyx_errors_disable();
+        onyx_errors_disable(context);
     }
 
     CheckStatus cs = check_function_header(context, func);
-    onyx_errors_enable();
+    onyx_errors_enable(context);
 
     if (cs == Check_Error)  return Check_Failed;
     if (cs != Check_Success) return cs;
@@ -3594,7 +3594,7 @@ CHECK_FUNC(function_header, AstFunction* func) {
         }
 
         if (local->type->kind == Type_Kind_Array && type_size_of(local->type) >= 128) {
-            onyx_report_warning(local->token->pos, "Since arrays are passed by value, this array parameter would copy %d bytes per function call. Unless this is what you want, you should make this parameter a slice instead ('[] %s').",
+            ONYX_WARNING(local->token->pos, "Since arrays are passed by value, this array parameter would copy %d bytes per function call. Unless this is what you want, you should make this parameter a slice instead ('[] %s').",
                 type_size_of(local->type),
                 type_get_name(context, local->type->Array.elem)
             );
@@ -3653,7 +3653,7 @@ CHECK_FUNC(memres, AstMemRes* memres) {
 
     if (memres->initial_value != NULL) {
         if (memres->threadlocal) {
-            onyx_report_error(memres->token->pos, Error_Critical, "'#thread_local' variables cannot have an initializer at the moment.");
+            ONYX_ERROR(memres->token->pos, Error_Critical, "'#thread_local' variables cannot have an initializer at the moment.");
             return Check_Error;
         }
 
@@ -3842,7 +3842,7 @@ CHECK_FUNC(process_directive, AstNode* directive) {
             YIELD(directive->token->pos, "Waiting for exported type to be known.");
 
         if (exported->kind != Ast_Kind_Function) {
-            onyx_report_error(export->token->pos, Error_Critical, "Cannot export something that is not a procedure.");
+            ONYX_ERROR(export->token->pos, Error_Critical, "Cannot export something that is not a procedure.");
             ERROR(exported->token->pos, "Here is the thing being exported that is not a procedure.");
         }
 
@@ -4085,7 +4085,7 @@ CHECK_FUNC(interface_constraint, AstConstraint *constraint) {
 }
 
 CHECK_FUNC(expression_constraint, AstConstraint *constraint) {
-    onyx_errors_enable();
+    onyx_errors_enable(context);
 
     AstTyped* expr = constraint->const_expr;
 
@@ -4131,14 +4131,14 @@ CHECK_FUNC(constraint, AstConstraint *constraint) {
         }
 
         case Constraint_Phase_Checking_Expressions: {
-            onyx_errors_disable();
+            onyx_errors_disable(context);
 
             fori (i, constraint->expr_idx, bh_arr_length(constraint->exprs)) {
                 InterfaceConstraint* ic = &constraint->exprs[i];
 
                 CheckStatus cs = check_expression(context, &ic->expr);
                 if (cs == Check_Return_To_Symres || cs == Check_Yield_Macro) {
-                    onyx_errors_enable();
+                    onyx_errors_enable(context);
                     return cs;
                 }
 
@@ -4153,7 +4153,7 @@ CHECK_FUNC(constraint, AstConstraint *constraint) {
                 if (ic->expected_type_expr) {
                     cs = check_type(context, &ic->expected_type_expr);
                     if (cs == Check_Return_To_Symres || cs == Check_Yield_Macro) {
-                        onyx_errors_enable();
+                        onyx_errors_enable(context);
                         return cs;
                     }
 
@@ -4179,7 +4179,7 @@ CHECK_FUNC(constraint, AstConstraint *constraint) {
                             ic->expected_type = type_lookup_by_id(context, ic->expected_type_expr->type_id);
 
                         } else {
-                            onyx_errors_enable();
+                            onyx_errors_enable(context);
                             YIELD_ERROR(ic->expected_type_expr->token->pos, "Waiting on expected type expression to be resolved.");
                         }
                     }
@@ -4197,13 +4197,13 @@ CHECK_FUNC(constraint, AstConstraint *constraint) {
                 continue;
 
               constraint_error:
-                onyx_errors_enable();
+                onyx_errors_enable(context);
                 *constraint->report_status = Constraint_Check_Status_Failed;
                 return Check_Failed;
             }
 
             // HACK HACK HACK
-            onyx_errors_enable();
+            onyx_errors_enable(context);
             *constraint->report_status = Constraint_Check_Status_Success;
             return Check_Complete;
         }
@@ -4211,7 +4211,7 @@ CHECK_FUNC(constraint, AstConstraint *constraint) {
         default: break;
     }
 
-    onyx_errors_enable();
+    onyx_errors_enable(context);
     return Check_Success;
 }
 
@@ -4251,21 +4251,21 @@ CHECK_FUNC(constraint_context, ConstraintContext *cc, Scope *scope, OnyxFilePos 
                     }
 
                     if (constraint->flags & Ast_Flag_Constraint_Is_Expression) {
-                        onyx_report_error(error_pos, Error_Critical, "Where clause did not evaluate to true.");
+                        ONYX_ERROR(error_pos, Error_Critical, "Where clause did not evaluate to true.");
                     }
                     else {
-                        onyx_report_error(error_pos, Error_Critical, "Failed to satisfy constraint where %s.", constraint_map);
+                        ONYX_ERROR(error_pos, Error_Critical, "Failed to satisfy constraint where %s.", constraint_map);
                     }
 
                     if (error_msg) {
-                        onyx_report_error(error_pos, Error_Critical, error_msg);
+                        ONYX_ERROR(error_pos, Error_Critical, error_msg);
                     }
 
                     if (!(constraint->flags & Ast_Flag_Constraint_Is_Expression)) {
-                        onyx_report_error(constraint->token->pos, Error_Critical, "Here is where the interface was used.");
+                        ONYX_ERROR(constraint->token->pos, Error_Critical, "Here is where the interface was used.");
                     }
 
-                    onyx_report_error(pos, Error_Critical, "Here is the code that caused this constraint to be checked.");
+                    ONYX_ERROR(pos, Error_Critical, "Here is the code that caused this constraint to be checked.");
 
                     return Check_Error;
 
@@ -4347,9 +4347,9 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
                 if (query->successful_symres || solved_something) continue;
 
                 if (query->error_on_fail || context->cycle_detected) {
-                    onyx_report_error(query->token->pos, Error_Critical, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
-                    if (err_msg.text != NULL) onyx_submit_error(err_msg);
-                    if (query->error_loc) onyx_report_error(query->error_loc->pos, Error_Critical, "Here is where the call is located."); // :ErrorMessage
+                    ONYX_ERROR(query->token->pos, Error_Critical, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
+                    if (err_msg.text != NULL) onyx_submit_error(context, err_msg);
+                    if (query->error_loc) ONYX_ERROR(query->error_loc->pos, Error_Critical, "Here is where the call is located."); // :ErrorMessage
                 }
 
                 return Check_Failed;
@@ -4462,7 +4462,7 @@ void check_entity(Context *context, Entity* ent) {
 
         case Entity_Type_File_Contents:
             if (context->options->no_file_contents) {
-                onyx_report_error(ent->expr->token->pos, Error_Critical, "#file_contents is disabled for this compilation.");
+                ONYX_ERROR(ent->expr->token->pos, Error_Critical, "#file_contents is disabled for this compilation.");
             }
             cs = Check_Complete;
             break;

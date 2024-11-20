@@ -46,6 +46,6 @@ b32  onyx_has_errors(struct Context *context);
 void onyx_clear_errors(struct Context *context);
 
 #define ONYX_ERROR(pos, rank, ...) (onyx_report_error(context, (pos), (rank), __VA_ARGS__))
-#define ONYX_WARNING(pos, rank, ...) (onyx_report_warning(context, (pos), (rank), __VA_ARGS__))
+#define ONYX_WARNING(pos, ...) (onyx_report_warning(context, (pos), __VA_ARGS__))
 
 #endif

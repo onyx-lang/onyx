@@ -330,10 +330,6 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
                 options->enable_optional_semicolons = 1;
             }
         }
-        else if (!strcmp(argv[i], "-I") || !strcmp(argv[i], "--include")) {
-            OnyxFilePos fp = {0};
-            onyx_report_warning(fp, "%s has been removed in favor of --map-dir", argv[i++]);
-        }
         else if (!strcmp(argv[i], "--map-dir")) {
             char *arg = argv[++i];
             int len = strnlen(arg, 256);

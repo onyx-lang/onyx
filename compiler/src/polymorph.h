@@ -30,7 +30,7 @@ void insert_poly_sln_into_scope(Context *context, Scope* scope, AstPolySolution 
             // CLEANUP: Maybe clone this?
             // assert(sln->value->flags & Ast_Flag_Comptime);
             if ((sln->value->flags & Ast_Flag_Comptime) == 0) {
-                onyx_report_error(sln->value->token->pos, Error_Critical, "Expected value to be compile time known.");
+                ONYX_ERROR(sln->value->token->pos, Error_Critical, "Expected value to be compile time known.");
                 return;
             }
 
@@ -887,10 +887,10 @@ AstNode* polymorphic_proc_try_solidify(Context *context, AstFunction* pp, bh_arr
             valid_argument_count++;
         } else {
             if (pp->name) {
-                onyx_report_error(tkn->pos, Error_Critical, "'%b' is not a type variable of '%s'.",
+                ONYX_ERROR(tkn->pos, Error_Critical, "'%b' is not a type variable of '%s'.",
                     sln->poly_sym->token->text, sln->poly_sym->token->length, pp->name);
             } else {
-                onyx_report_error(tkn->pos, Error_Critical, "'%b' is not a type variable of '%b'.",
+                ONYX_ERROR(tkn->pos, Error_Critical, "'%b' is not a type variable of '%b'.",
                     sln->poly_sym->token->text, sln->poly_sym->token->length,
                     pp->token->text, pp->token->length);
             }
@@ -1172,7 +1172,7 @@ Type* polymorphic_struct_lookup(Context *context, AstPolyStructType* ps_type, bh
     }
 
     if (bh_arr_length(slns) != bh_arr_length(ps_type->poly_params)) {
-        onyx_report_error(pos, Error_Critical, "Wrong number of arguments for '%s'. Expected %d, got %d.",
+        ONYX_ERROR(pos, Error_Critical, "Wrong number of arguments for '%s'. Expected %d, got %d.",
             ps_type->name,
             bh_arr_length(ps_type->poly_params),
             bh_arr_length(slns));
@@ -1245,7 +1245,7 @@ Type* polymorphic_union_lookup(Context *context, AstPolyUnionType* pu_type, bh_a
     }
 
     if (bh_arr_length(slns) != bh_arr_length(pu_type->poly_params)) {
-        onyx_report_error(pos, Error_Critical, "Wrong number of arguments for '%s'. Expected %d, got %d.",
+        ONYX_ERROR(pos, Error_Critical, "Wrong number of arguments for '%s'. Expected %d, got %d.",
             pu_type->name,
             bh_arr_length(pu_type->poly_params),
             bh_arr_length(slns));

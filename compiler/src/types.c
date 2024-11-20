@@ -359,7 +359,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
                 // NOTE: Currently, the count_expr has to be an I32 literal
                 if (a_node->count_expr->type->kind != Type_Kind_Basic
                     || a_node->count_expr->type->Basic.kind != Basic_Kind_I32) {
-                    onyx_report_error(type_node->token->pos, Error_Critical, "Array type expects type 'i32' for size, got '%s'.",
+                    ONYX_ERROR(type_node->token->pos, Error_Critical, "Array type expects type 'i32' for size, got '%s'.",
                         type_get_name(context, a_node->count_expr->type));
                     return NULL;
                 }
@@ -369,10 +369,10 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
 
                 if (!valid) {
                     if (!(a_node->count_expr->flags & Ast_Flag_Comptime)) {
-                        onyx_report_error(a_node->token->pos, Error_Critical, "Array type size must be a constant.");
+                        ONYX_ERROR(a_node->token->pos, Error_Critical, "Array type size must be a constant.");
                     }
                     else {
-                        onyx_report_error(a_node->token->pos, Error_Critical, "Array type size expression must be 'i32', got '%s'.",
+                        ONYX_ERROR(a_node->token->pos, Error_Critical, "Array type size expression must be 'i32', got '%s'.",
                             type_get_name(context, a_node->count_expr->type));
                     }
 
@@ -380,7 +380,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
                 }
 
                 if ((i32)count < 0) {
-                    onyx_report_error(a_node->token->pos, Error_Critical, "Array type size must be a positive integer.");
+                    ONYX_ERROR(a_node->token->pos, Error_Critical, "Array type size must be a positive integer.");
                     return NULL;
                 }
             }
@@ -436,7 +436,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
 
                 if ((*member)->type == NULL) {
                     if (context->cycle_detected) {
-                        onyx_report_error((* member)->token->pos, Error_Critical, "Unable to figure out the type of this structure member.");
+                        ONYX_ERROR((* member)->token->pos, Error_Critical, "Unable to figure out the type of this structure member.");
                     }
 
                     s_node->pending_type_is_valid = 0;
@@ -450,7 +450,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
 
                 mem_alignment = type_alignment_of((*member)->type);
                 if (mem_alignment <= 0) {
-                    onyx_report_error((*member)->token->pos, Error_Critical, "Invalid member type: %s. Has alignment %d", type_get_name(context, (*member)->type), mem_alignment);
+                    ONYX_ERROR((*member)->token->pos, Error_Critical, "Invalid member type: %s. Has alignment %d", type_get_name(context, (*member)->type), mem_alignment);
                     return NULL;
                 }
 
@@ -462,7 +462,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
 
                 token_toggle_end((*member)->token);
                 if (shgeti(s_type->Struct.members, (*member)->token->text) != -1) {
-                    onyx_report_error((*member)->token->pos, Error_Critical, "Duplicate struct member, '%s'.", (*member)->token->text);
+                    ONYX_ERROR((*member)->token->pos, Error_Critical, "Duplicate struct member, '%s'.", (*member)->token->text);
                     token_toggle_end((*member)->token);
                     return NULL;
                 }
@@ -598,8 +598,8 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
                 // If it is an unresolved field access or symbol, just return because an error will be printed elsewhere.
                 if (pc_type->callee->kind == Ast_Kind_Field_Access || pc_type->callee->kind == Ast_Kind_Symbol) return NULL;
 
-                onyx_report_error(pc_type->token->pos, Error_Critical, "Cannot instantiate a concrete type off of a non-polymorphic type.");
-                onyx_report_error(pc_type->callee->token->pos, Error_Critical, "Here is the type trying to be instantiated. (%s)", onyx_ast_node_kind_string(pc_type->callee->kind));
+                ONYX_ERROR(pc_type->token->pos, Error_Critical, "Cannot instantiate a concrete type off of a non-polymorphic type.");
+                ONYX_ERROR(pc_type->callee->token->pos, Error_Critical, "Here is the type trying to be instantiated. (%s)", onyx_ast_node_kind_string(pc_type->callee->kind));
                 return NULL;
             }
 
@@ -745,7 +745,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
 
                 if (!variant->type) {
                     if (context->cycle_detected) {
-                        onyx_report_error(variant->token->pos, Error_Critical, "Unable to figure out the type of this union variant.");
+                        ONYX_ERROR(variant->token->pos, Error_Critical, "Unable to figure out the type of this union variant.");
                     }
 
                     union_->pending_type_is_valid = 0;
@@ -786,7 +786,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
 
                 u32 var_alignment = type_alignment_of(variant->type);
                 if (var_alignment <= 0) {
-                    onyx_report_error(variant->token->pos, Error_Critical, "Invalid variant type '%s', has alignment %d", type_get_name(context, variant->type), var_alignment);
+                    ONYX_ERROR(variant->token->pos, Error_Critical, "Invalid variant type '%s', has alignment %d", type_get_name(context, variant->type), var_alignment);
                     return NULL;
                 }
 
@@ -794,7 +794,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
 
                 token_toggle_end(variant->token);
                 if (shgeti(u_type->Union.variants, variant->token->text) != -1) {
-                    onyx_report_error(variant->token->pos, Error_Critical, "Duplicate union variant, '%s'.", variant->token->text);
+                    ONYX_ERROR(variant->token->pos, Error_Critical, "Duplicate union variant, '%s'.", variant->token->text);
                     token_toggle_end(variant->token);
                     return NULL;
                 }
@@ -814,7 +814,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
                     next_tag_value = uv->tag_value + 1;
 
                     if (!success) {
-                        onyx_report_error(variant->token->pos, Error_Critical, "Expected a compile-time known integer for explicit value of variant.");
+                        ONYX_ERROR(variant->token->pos, Error_Critical, "Expected a compile-time known integer for explicit value of variant.");
                         return NULL;
                     }
                 } else {
@@ -960,7 +960,7 @@ Type* type_build_implicit_type_of_struct_literal(Context *context, AstStructLite
         Type* member_type = resolve_expression_type(context, nv->value);
         if (member_type == NULL) {
             if (!is_query) {
-                onyx_report_error(nv->value->token->pos, Error_Critical, "Unable to resolve type of this member when trying to construct an inferred type of the structure literal.");
+                ONYX_ERROR(nv->value->token->pos, Error_Critical, "Unable to resolve type of this member when trying to construct an inferred type of the structure literal.");
             }
 
             return NULL;
@@ -1202,7 +1202,7 @@ b32 type_struct_member_apply_use(Context *context, Type *s_type, StructMember *s
     }
 
     if (used_type->kind != Type_Kind_Struct) {
-        onyx_report_error(smem->token->pos, Error_Critical, "Can only use things of structure, or pointer to structure type.");
+        ONYX_ERROR(smem->token->pos, Error_Critical, "Can only use things of structure, or pointer to structure type.");
         return 0;
     }
 
@@ -1219,7 +1219,7 @@ b32 type_struct_member_apply_use(Context *context, Type *s_type, StructMember *s
         }
 
         if (shgeti(s_type->Struct.members, nsmem->name) != -1) {
-            onyx_report_error(smem->token->pos, Error_Critical, "Used name '%s' conflicts with existing struct member.", nsmem->name);
+            ONYX_ERROR(smem->token->pos, Error_Critical, "Used name '%s' conflicts with existing struct member.", nsmem->name);
             return 0;
         }
 

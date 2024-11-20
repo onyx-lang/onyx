@@ -18,6 +18,11 @@ static AstNode error_node = { Ast_Kind_Error, 0, NULL, NULL };
 #define ENTITY_SUBMIT(node)                 (submit_entity_in_scope(parser, (AstNode *) (node), parser->current_scope, parser->package))
 #define ENTITY_SUBMIT_IN_SCOPE(node, scope) (submit_entity_in_scope(parser, (AstNode *) (node), scope, parser->package))
 
+#undef ONYX_ERROR
+#undef ONYX_WARNING
+#define ONYX_ERROR(pos, rank, ...) (onyx_report_error(parser->context, (pos), (rank), __VA_ARGS__))
+#define ONYX_WARNING(pos, ...) (onyx_report_warning(parser->context, (pos), __VA_ARGS__))
+
 void submit_entity_in_scope(OnyxParser* parser, AstNode* node, Scope* scope, Package* package) {
     if (bh_arr_length(parser->alternate_entity_placement_stack) == 0) {
         add_entities_for_node(&parser->context->entities, NULL, node, scope, package);
@@ -139,7 +144,7 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type) {
     }
 
     if (token->type != token_type) {
-        onyx_report_error(token->pos, Error_Critical, "expected token '%s', got '%s'.", token_type_name(token_type), token_name(token));
+        ONYX_ERROR(token->pos, Error_Critical, "expected token '%s', got '%s'.", token_type_name(token_type), token_name(token));
         parser->hit_unexpected_token = 1;
         // :LinearTokenDependent
         parser->curr = &parser->tokenizer->tokens[bh_arr_length(parser->tokenizer->tokens) - 1];
@@ -200,7 +205,7 @@ static b32 next_tokens_are(OnyxParser* parser, i32 n, ...) {
 
 static void expect_no_stored_tags_pos(OnyxParser *parser, OnyxFilePos pos) {
     if (bh_arr_length(parser->stored_tags) > 0) {
-        onyx_report_error(pos, Error_Critical, "#tag is not allowed on this element.");
+        ONYX_ERROR(pos, Error_Critical, "#tag is not allowed on this element.");
         parser->hit_unexpected_token = 1;
     }
 }
@@ -464,7 +469,7 @@ static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, Ast
     parse_arguments(parser, '}', &sl->args);
 
     if (sl->extension_value && bh_arr_length(sl->args.values) > 0) {
-        onyx_report_error(sl->token->pos, Error_Critical, "All initializers must be named when using '..value' in a struct literal.");
+        ONYX_ERROR(sl->token->pos, Error_Critical, "All initializers must be named when using '..value' in a struct literal.");
     }
 
     *ret = (AstTyped *) sl;
@@ -570,7 +575,7 @@ static AstCall* parse_function_call(OnyxParser *parser, AstTyped *callee) {
 
         if (value_is_placeholder(*arg)) {
             if (call_node->placeholder_argument_position > 0) {
-                onyx_report_error((*arg)->token->pos, Error_Critical, "Cannot have more than one placeholder argument ('_').");
+                ONYX_ERROR((*arg)->token->pos, Error_Critical, "Cannot have more than one placeholder argument ('_').");
             }
 
             call_node->placeholder_argument_position = (arg - call_node->args.values) + 1;
@@ -792,7 +797,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
         case Token_Type_Keyword_Package: {
             if (!parser->allow_package_expressions)
-                onyx_report_warning(peek_token(-1)->pos, "Use of deprecated feature: package expression.");
+                ONYX_WARNING(peek_token(-1)->pos, "Use of deprecated feature: package expression.");
 
             retval = (AstTyped *) parse_package_expression(parser);
             break;
@@ -902,7 +907,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             char_lit->value.i = (u32) dest[0];
 
             if (length != 1) {
-                onyx_report_error(char_lit->token->pos, Error_Critical, "Expected only a single character in character literal.");
+                ONYX_ERROR(char_lit->token->pos, Error_Critical, "Expected only a single character in character literal.");
             }
 
             retval = (AstTyped *) char_lit;
@@ -969,7 +974,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 char_lit->value.i = (u32) dest[0];
 
                 if (length != 1) {
-                    onyx_report_error(char_lit->token->pos, Error_Critical, "Expected only a single character in character literal.");
+                    ONYX_ERROR(char_lit->token->pos, Error_Critical, "Expected only a single character in character literal.");
                 }
 
                 retval = (AstTyped *) char_lit;
@@ -1103,20 +1108,20 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             }
             else if (parse_possible_directive(parser, "Self")) {
                 if (parser->injection_point == NULL) {
-                    onyx_report_error((parser->curr - 2)->pos, Error_Critical, "#Self is only allowed in an #inject block.");
+                    ONYX_ERROR((parser->curr - 2)->pos, Error_Critical, "#Self is only allowed in an #inject block.");
                 }
 
                 retval = (AstTyped *) parser->injection_point;
                 break;
             }
 
-            onyx_report_error(parser->curr->pos, Error_Critical, "Invalid directive in expression.");
+            ONYX_ERROR(parser->curr->pos, Error_Critical, "Invalid directive in expression.");
             return NULL;
         }
 
         default:
         no_match:
-            onyx_report_error(parser->curr->pos, Error_Critical, "Unexpected token '%s'.", token_name(parser->curr));
+            ONYX_ERROR(parser->curr->pos, Error_Critical, "Unexpected token '%s'.", token_name(parser->curr));
             return NULL;
     }
 
@@ -1215,7 +1220,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
                 if (parser->curr->type != '(') {
                     // CLEANUP: This error message is horrendous.
-                    onyx_report_error(parser->curr->pos, Error_Critical, "Bad method call. Expected object->method(arguments), got something else.");
+                    ONYX_ERROR(parser->curr->pos, Error_Critical, "Bad method call. Expected object->method(arguments), got something else.");
                     break;
                 }
 
@@ -1976,7 +1981,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
                     if (dest->kind == Ast_Kind_Method_Call) {
                         dest = (AstCall *) ((AstBinaryOp *) dest)->right;
                         if (dest->kind != Ast_Kind_Call) {
-                            onyx_report_error(retval->token->pos, Error_Critical, "Expected function call on right side of '->'.");
+                            ONYX_ERROR(retval->token->pos, Error_Critical, "Expected function call on right side of '->'.");
                             needs_semicolon = 0;
                             break;
                         }
@@ -2045,7 +2050,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
                 AstLocal *out = NULL;
                 i32 res = parse_possible_symbol_declaration(parser, (AstNode **) &out);
                 if (res == 2) {
-                    onyx_report_error(use_token->pos, Error_Critical, "You cannot 'use' a binding in this way. Remove the 'use'.");
+                    ONYX_ERROR(use_token->pos, Error_Critical, "You cannot 'use' a binding in this way. Remove the 'use'.");
                     parser->hit_unexpected_token = 1;
                     break;
                 }
@@ -2150,7 +2155,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
         //     if x { print() }
         if (peek_token(0)->type != '}') {
             if (!consume_token_if_next(parser, ';')) {
-                onyx_report_error((parser->curr - 1)->pos, Error_Critical, "Expected a semi-colon after this token.");
+                ONYX_ERROR((parser->curr - 1)->pos, Error_Critical, "Expected a semi-colon after this token.");
                 parser->hit_unexpected_token = 1;
             }
         }
@@ -2232,7 +2237,7 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
     bh_arr(AstPolyParam) pv = NULL;
 
     if (parser->polymorph_context.poly_params == NULL)
-        onyx_report_error(parser->curr->pos, Error_Critical, "Polymorphic variable not valid here.");
+        ONYX_ERROR(parser->curr->pos, Error_Critical, "Polymorphic variable not valid here.");
     else
         pv = *parser->polymorph_context.poly_params;
 
@@ -2529,7 +2534,7 @@ static AstType* parse_type(OnyxParser* parser) {
             case '#': {
                 if (parse_possible_directive(parser, "Self")) {
                     if (parser->injection_point == NULL) {
-                        onyx_report_error((parser->curr - 2)->pos, Error_Critical, "#Self is only allowed in an #inject block.");
+                        ONYX_ERROR((parser->curr - 2)->pos, Error_Critical, "#Self is only allowed in an #inject block.");
                     }
 
                     *next_insertion = (AstType *) parser->injection_point;
@@ -2558,9 +2563,9 @@ static AstType* parse_type(OnyxParser* parser) {
 
     if (!type_can_be_done) {
         if (root) {
-            onyx_report_error(root->token->pos, Error_Critical, "Incomplete type when parsing.");
+            ONYX_ERROR(root->token->pos, Error_Critical, "Incomplete type when parsing.");
         } else {
-            onyx_report_error(parser->curr->pos, Error_Critical, "Expected a type here.");
+            ONYX_ERROR(parser->curr->pos, Error_Critical, "Expected a type here.");
         }
     }
 
@@ -2668,7 +2673,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
 
-            onyx_report_error(directive_token->pos, Error_Critical, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
+            ONYX_ERROR(directive_token->pos, Error_Critical, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
         }
     }
 
@@ -2751,8 +2756,8 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         //      them out of discussion for now. Initialized members should be treated special and
         //      deserve their own line.
         if (bh_arr_length(member_list_temp) > 1) {
-            if (member_is_used) onyx_report_error((member_list_temp[0] - 1)->pos, Error_Critical, "'use' is only allowed for a single struct member declaration. Try splitting this compound declaration into multiple lines.");
-            if (initial_value)  onyx_report_error(initial_value->token->pos, Error_Critical, "Intialized values are only allowed on single struct member declarations. Try splitting this compound initializer into multiple lines.");
+            if (member_is_used) ONYX_ERROR((member_list_temp[0] - 1)->pos, Error_Critical, "'use' is only allowed for a single struct member declaration. Try splitting this compound declaration into multiple lines.");
+            if (initial_value)  ONYX_ERROR(initial_value->token->pos, Error_Critical, "Intialized values are only allowed on single struct member declarations. Try splitting this compound initializer into multiple lines.");
         }
 
         bh_arr_each(OnyxToken *, member_name, member_list_temp) {
@@ -3220,7 +3225,7 @@ static AstOverloadedFunction* parse_overloaded_function(OnyxParser* parser, Onyx
 
     // This could be checked elsewhere?
     if (locked && local) {
-        onyx_report_error(token->pos, Error_Critical, "Only one of '#locked' and '#local' can be use at a time.");
+        ONYX_ERROR(token->pos, Error_Critical, "Only one of '#locked' and '#local' can be use at a time.");
     }
 
     AstOverloadedFunction* ofunc = make_node(AstOverloadedFunction, Ast_Kind_Overloaded_Function);
@@ -3377,7 +3382,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
 
-            onyx_report_error(directive_token->pos, Error_Critical, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
+            ONYX_ERROR(directive_token->pos, Error_Critical, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
         }
     }
 
@@ -3567,7 +3572,7 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
     } else {
         AstTyped* body = parse_expression(parser, 0);
         if (body == NULL) {
-            onyx_report_error(parser->curr->pos, Error_Critical, "Expected an expression here.");
+            ONYX_ERROR(parser->curr->pos, Error_Critical, "Expected an expression here.");
             parser->hit_unexpected_token = 1;
             return 0;
         }
@@ -3644,7 +3649,7 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
 
-            onyx_report_error(directive_token->pos, Error_Critical, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
+            ONYX_ERROR(directive_token->pos, Error_Critical, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
         }
     }
 
@@ -3766,7 +3771,7 @@ static AstMacro* parse_macro(OnyxParser* parser) {
         return macro;
     }
 
-    onyx_report_error(parser->curr->pos, Error_Critical, "'macro' expects to be followed by a producure definition.");
+    ONYX_ERROR(parser->curr->pos, Error_Critical, "'macro' expects to be followed by a producure definition.");
     return NULL;
 }
 
@@ -3974,7 +3979,7 @@ default_case:
 
 static void parse_implicit_injection(OnyxParser* parser) {
     if (parser->injection_point) {
-        onyx_report_error(parser->curr->pos, Error_Critical, "Implicit injection is not allowed here.");
+        ONYX_ERROR(parser->curr->pos, Error_Critical, "Implicit injection is not allowed here.");
         parser->hit_unexpected_token = 1;
         return;
     }
@@ -4012,7 +4017,7 @@ static void parse_implicit_injection(OnyxParser* parser) {
     // }
 
     if (injection_expression->kind != Ast_Kind_Field_Access) {
-        onyx_report_error(parser->curr->pos, Error_Critical, "Expected binding target to end in something like '.xyz'.");
+        ONYX_ERROR(parser->curr->pos, Error_Critical, "Expected binding target to end in something like '.xyz'.");
         parser->hit_unexpected_token = 1;
         return;
     }
@@ -4137,7 +4142,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 return;
             }
 
-            onyx_report_error(parser->curr->pos, Error_Critical, "Unexpected '(' at top-level.");
+            ONYX_ERROR(parser->curr->pos, Error_Critical, "Unexpected '(' at top-level.");
             parser->hit_unexpected_token = 1;
             break;
         }
@@ -4299,7 +4304,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 consume_token_if_next(parser, Token_Type_Inserted_Semicolon);
                 if (peek_token(0)->type == '{') {
                     if (parser->injection_point) {
-                        onyx_report_error(dir_token->pos, Error_Critical, "#inject blocks cannot be nested.");
+                        ONYX_ERROR(dir_token->pos, Error_Critical, "#inject blocks cannot be nested.");
                         return;
                     }
 
@@ -4410,10 +4415,10 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 OnyxToken* symbol_token = parser->curr;
                 consume_token(parser);
 
-                onyx_report_error(directive_token->pos, Error_Critical, "Unknown directive '#%b'.", symbol_token->text, symbol_token->length);
+                ONYX_ERROR(directive_token->pos, Error_Critical, "Unknown directive '#%b'.", symbol_token->text, symbol_token->length);
 
                 if (symbol_token->type > Token_Type_Keyword_Start && symbol_token->type < Token_Type_Keyword_End) {
-                    onyx_report_error(directive_token->pos, Error_Critical, "Did you mean the keyword, '%s'?",
+                    ONYX_ERROR(directive_token->pos, Error_Critical, "Did you mean the keyword, '%s'?",
                         token_name(symbol_token));
                 }
 
@@ -4431,7 +4436,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
             goto retry_because_inserted_semicolon;
 
         default:
-            onyx_report_error(parser->curr->pos, Error_Critical, "Unexpected token in top-level statement, '%s'", token_name(parser->curr));
+            ONYX_ERROR(parser->curr->pos, Error_Critical, "Unexpected token in top-level statement, '%s'", token_name(parser->curr));
             parser->hit_unexpected_token = 1;
             break;
     }
@@ -4630,7 +4635,7 @@ static Package* parse_file_package(OnyxParser* parser) {
 static void parse_top_level_statements_until(OnyxParser* parser, TokenType tt) {
     while (parser->curr->type != tt) {
         if (parser->hit_unexpected_token) break;
-        if (onyx_has_errors()) break;
+        if (onyx_has_errors(parser->context)) break;
         parse_top_level_statement(parser);
         consume_token_if_next(parser, ';');
     }

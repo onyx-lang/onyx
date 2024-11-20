@@ -507,7 +507,7 @@ b32 convert_numlit_to_type(Context *context, AstNumLit* num, Type* to_type, b32 
                             }
                 }
 
-                if (permanent) onyx_report_error(num->token->pos, Error_Critical, "Unsigned integer constant with value '%l' does not fit into %d-bits.",
+                if (permanent) ONYX_ERROR(num->token->pos, Error_Critical, "Unsigned integer constant with value '%l' does not fit into %d-bits.",
                         num->value.l,
                         type->Basic.size * 8);
 
@@ -534,7 +534,7 @@ b32 convert_numlit_to_type(Context *context, AstNumLit* num, Type* to_type, b32 
                             } break;
                 }
 
-                if (permanent) onyx_report_error(num->token->pos, Error_Critical, "Integer constant with value '%l' does not fit into %d-bits.",
+                if (permanent) ONYX_ERROR(num->token->pos, Error_Critical, "Integer constant with value '%l' does not fit into %d-bits.",
                         num->value.l,
                         type->Basic.size * 8);
             }
@@ -543,7 +543,7 @@ b32 convert_numlit_to_type(Context *context, AstNumLit* num, Type* to_type, b32 
         else if (type->Basic.flags & Basic_Flag_Float) {
             if (type->Basic.size == 4) {
                 if (bh_abs(num->value.l) >= (1 << 23)) {
-                    if (permanent) onyx_report_error(num->token->pos, Error_Critical, "Integer '%l' does not fit in 32-bit float exactly.", num->value.l);
+                    if (permanent) ONYX_ERROR(num->token->pos, Error_Critical, "Integer '%l' does not fit in 32-bit float exactly.", num->value.l);
                     return 0;
                 }
 
@@ -553,7 +553,7 @@ b32 convert_numlit_to_type(Context *context, AstNumLit* num, Type* to_type, b32 
             }
             if (type->Basic.size == 8) {
                 if (bh_abs(num->value.l) >= (1ll << 52)) {
-                    if (permanent) onyx_report_error(num->token->pos, Error_Critical, "Integer '%l' does not fit in 64-bit float exactly.", num->value.l);
+                    if (permanent) ONYX_ERROR(num->token->pos, Error_Critical, "Integer '%l' does not fit in 64-bit float exactly.", num->value.l);
                     return 0;
                 }
 
@@ -673,7 +673,7 @@ TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b
                 UnionVariant *uv = type->Union.variants[index].value;
                 if (uv->type != context->types.basic[Basic_Kind_Void]) {
                     if (permanent) {
-                        onyx_report_error(node->token->pos, Error_Critical,
+                        ONYX_ERROR(node->token->pos, Error_Critical,
                             "Shorthand union literal syntax '.%s' is not all for this variant, because its type is not void; it is '%s'. Use the longer syntax, '.{ %s = value }'",
                             node->token->text,
                             type_get_name(context, uv->type),
@@ -702,12 +702,12 @@ TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b
                 token_toggle_end(node->token);
 
                 if (closest) {
-                    onyx_report_error(node->token->pos, Error_Critical, "'%b' does not exist in '%s'. Did you mean '%s'?",
+                    ONYX_ERROR(node->token->pos, Error_Critical, "'%b' does not exist in '%s'. Did you mean '%s'?",
                         node->token->text, node->token->length,
                         type_get_name(context, type),
                         closest);
                 } else {
-                    onyx_report_error(node->token->pos, Error_Critical, "'%b' does not exist in '%s'.",
+                    ONYX_ERROR(node->token->pos, Error_Critical, "'%b' does not exist in '%s'.",
                         node->token->text, node->token->length, type_get_name(context, type));
                 }
 

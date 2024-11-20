@@ -18,6 +18,11 @@
 #include "wasm_emit.h"
 #include "utils.h"
 
+#undef ONYX_ERROR
+#undef ONYX_WARNING
+#define ONYX_ERROR(pos, rank, ...) (onyx_report_error(mod->context, (pos), (rank), __VA_ARGS__))
+#define ONYX_WARNING(pos, ...) (onyx_report_warning(mod->context, (pos), __VA_ARGS__))
+
 #define WASM_TYPE_INT32   0x7F
 #define WASM_TYPE_INT64   0x7E
 #define WASM_TYPE_FLOAT32 0x7D
@@ -724,7 +729,7 @@ EMIT_FUNC(structured_jump, AstJump* jump) {
         if (bh_arr_last(code).type != WI_JUMP)
             WID(jump->token, WI_JUMP, labelidx);
     } else {
-        onyx_report_error(jump->token->pos, Error_Critical, "Invalid structured jump.");
+        ONYX_ERROR(jump->token->pos, Error_Critical, "Invalid structured jump.");
     }
 
     *pcode = code;
@@ -766,7 +771,7 @@ EMIT_FUNC_RETURNING(u64, local_allocation, AstTyped* stmt) {
     // never used, therefore never declaring its type.
     if (stmt->type == NULL) {
         assert(stmt->kind == Ast_Kind_Local);
-        onyx_report_warning(stmt->token->pos, "Unused local variable with unassigned type.");
+        ONYX_WARNING(stmt->token->pos, "Unused local variable with unassigned type.");
         return 0;
     }
 
@@ -1066,7 +1071,7 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer || type->kind == Type_Kind_MultiPointer;
 
     if (!is_basic) {
-        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical,
+        ONYX_ERROR((OnyxFilePos) { 0 }, Error_Critical,
             "Failed to generate store instruction for type '%s'. (compiler bug)",
             type_get_name(mod->context, type));
     }
@@ -1213,7 +1218,7 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     WID(NULL, instr, ((WasmInstructionData) { alignment, offset }));
 
     if (instr == WI_NOP) {
-        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical,
+        ONYX_ERROR((OnyxFilePos) { 0 }, Error_Critical,
             "Failed to generate load instruction for type '%s'.",
             type_get_name(mod->context, type));
     }
@@ -1719,7 +1724,7 @@ EMIT_FUNC(for, AstFor* for_node) {
 
         case For_Loop_Slice:    emit_for_slice(mod, &code, for_node, iter_local, index_local); break;
         case For_Loop_Iterator: emit_for_iterator(mod, &code, for_node, iter_local, index_local); break;
-        default: onyx_report_error(for_node->token->pos, Error_Critical, "Invalid for loop type. You should probably not be seeing this...");
+        default: ONYX_ERROR(for_node->token->pos, Error_Critical, "Invalid for loop type. You should probably not be seeing this...");
     }
 
     local_free(mod->local_alloc, (AstTyped *) var);
@@ -2546,7 +2551,7 @@ EMIT_FUNC(method_call, AstBinaryOp *mcall) {
         bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values; \
         fori (i, 0, count) { \
             if (arg_arr[i]->value->kind != Ast_Kind_NumLit) { \
-                onyx_report_error(arg_arr[i]->token->pos, Error_Critical, \
+                ONYX_ERROR(arg_arr[i]->token->pos, Error_Critical, \
                         "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.", \
                         i, bh_num_suffix(i)); \
                 *pcode = code; \
@@ -2560,7 +2565,7 @@ EMIT_FUNC(method_call, AstBinaryOp *mcall) {
 #define SIMD_EXTRACT_LANE_INSTR(instr, arg_arr) \
     emit_expression(mod, &code, arg_arr[0]->value);\
     if (arg_arr[1]->value->kind != Ast_Kind_NumLit) { \
-        onyx_report_error(arg_arr[1]->token->pos, Error_Critical, "SIMD lane instructions expect a compile time lane number."); \
+        ONYX_ERROR(arg_arr[1]->token->pos, Error_Critical, "SIMD lane instructions expect a compile time lane number."); \
         *pcode = code; \
         return; \
     } \
@@ -2569,7 +2574,7 @@ EMIT_FUNC(method_call, AstBinaryOp *mcall) {
 #define SIMD_REPLACE_LANE_INSTR(instr, arg_arr) { \
     emit_expression(mod, &code, arg_arr[0]->value);\
     if (arg_arr[1]->value->kind != Ast_Kind_NumLit) { \
-        onyx_report_error(arg_arr[1]->token->pos, Error_Critical, "SIMD lane instructions expect a compile time lane number."); \
+        ONYX_ERROR(arg_arr[1]->token->pos, Error_Critical, "SIMD lane instructions expect a compile time lane number."); \
         *pcode = code; \
         return; \
     } \
@@ -2688,7 +2693,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
             bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values;
             fori (i, 0, 4) {
                 if (arg_arr[i]->value->kind != Ast_Kind_NumLit) {
-                    onyx_report_error(arg_arr[i]->token->pos, Error_Critical,
+                    ONYX_ERROR(arg_arr[i]->token->pos, Error_Critical,
                             "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.",
                             i, bh_num_suffix(i));
                     *pcode = code;
@@ -2705,7 +2710,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
             bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values;
             fori (i, 0, 2) {
                 if (arg_arr[i]->value->kind != Ast_Kind_NumLit) {
-                    onyx_report_error(arg_arr[i]->token->pos, Error_Critical,
+                    ONYX_ERROR(arg_arr[i]->token->pos, Error_Critical,
                             "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.",
                             i, bh_num_suffix(i));
                     *pcode = code;
@@ -2728,7 +2733,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
 
             fori (i, 0, 16) {
                 if (arg_arr[i + 2]->value->kind != Ast_Kind_NumLit) {
-                    onyx_report_error(arg_arr[i + 2]->token->pos, Error_Critical,
+                    ONYX_ERROR(arg_arr[i + 2]->token->pos, Error_Critical,
                             "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.",
                             i, bh_num_suffix(i));
                     *pcode = code;
@@ -3510,10 +3515,10 @@ EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
 
         default: {
             if (expr->token) {
-                onyx_report_error(expr->token->pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
+                ONYX_ERROR(expr->token->pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
             } else {
                 OnyxFilePos pos = {0};
-                onyx_report_error(pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
+                ONYX_ERROR(pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
             }
             break;
         }
@@ -3927,7 +3932,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
             WasmType backing_type = onyx_type_to_wasm_type(ev->type);
             if      (backing_type == WASM_TYPE_INT32) WID(NULL, WI_I32_CONST, num->value.i);
             else if (backing_type == WASM_TYPE_INT64) WID(NULL, WI_I64_CONST, num->value.l);
-            else onyx_report_error(ev->token->pos, Error_Critical, "Invalid backing type for enum.");
+            else ONYX_ERROR(ev->token->pos, Error_Critical, "Invalid backing type for enum.");
             break;
         }
 
@@ -3991,14 +3996,14 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Switch_Case: {
             // This error message should be moved to checking, but this is the
             // best place to do it right now.
-            onyx_report_error(expr->token->pos, Error_Critical, "'case' statements are only allowed in a 'switch' statement.");
+            ONYX_ERROR(expr->token->pos, Error_Critical, "'case' statements are only allowed in a 'switch' statement.");
             break;
         }
 
         case Ast_Kind_Code_Block: {
             // Like above, this error message should be moved to checking, but
             // this is the best place to do it right now.
-            onyx_report_error(expr->token->pos, Error_Critical, "'#quote' blocks are only to be used at compile-time. Using them as a runtime value is not allowed.");
+            ONYX_ERROR(expr->token->pos, Error_Critical, "'#quote' blocks are only to be used at compile-time. Using them as a runtime value is not allowed.");
             break;
         }
 
@@ -4374,7 +4379,7 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_nod
 
         WasmType wt = onyx_type_to_wasm_type(type);
         if (wt == WASM_TYPE_VOID) {
-            onyx_report_error(where->pos, Error_Critical, "Cannot produce a zero-value for this type.");
+            ONYX_ERROR(where->pos, Error_Critical, "Cannot produce a zero-value for this type.");
         }
         emit_zero_value(mod, &code, wt);
     }
@@ -4764,7 +4769,7 @@ static void emit_export_directive(OnyxWasmModule* mod, AstDirectiveExport* expor
     token_toggle_end(export->export_name);
 
     if (shgeti(mod->exports, export->export_name->text) != -1) {
-        onyx_report_error(export->token->pos, Error_Critical, "Duplicate export name, '%s'.", export->export_name->text);
+        ONYX_ERROR(export->token->pos, Error_Critical, "Duplicate export name, '%s'.", export->export_name->text);
         token_toggle_end(export->export_name);
         return;        
     }
@@ -4882,7 +4887,9 @@ static u32 emit_data_entry(OnyxWasmModule *mod, WasmDatum *datum) {
 
 static void emit_constexpr(ConstExprContext *ctx, AstTyped *node, u32 offset) {
     if (!emit_constexpr_(ctx, node, offset)) {
-        onyx_report_error(node->token->pos, Error_Critical,
+        onyx_report_error(
+            ctx->module->context,
+            node->token->pos, Error_Critical,
             "Cannot generate constant data for '%s'.",
             onyx_ast_node_kind_string(node->kind));
     }
@@ -5184,7 +5191,7 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     }
 
     if (!bh_file_exists(fc->filename)) {
-        onyx_report_error(fc->token->pos, Error_Critical,
+        ONYX_ERROR(fc->token->pos, Error_Critical,
                 "Unable to open file for reading, '%s'.",
                 fc->filename);
         return;
@@ -5237,7 +5244,7 @@ static void emit_js_node(OnyxWasmModule* mod, AstJsNode *js) {
         token_toggle_end(filename_token);
 
         if (!bh_file_exists(filename)) {
-            onyx_report_error(js->token->pos, Error_Critical,
+            ONYX_ERROR(js->token->pos, Error_Critical,
                     "Unable to open file for reading, '%s'.",
                     filename);
             return;
@@ -5274,7 +5281,7 @@ static void flush_enqueued_types_for_info(OnyxWasmModule *mod) {
 
 void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module) {
     *module = ((OnyxWasmModule) {
-        .allocator = context->ast_alloc,
+        .allocator = context->gp_alloc,
         .context = context,
 
         .type_map = NULL,
@@ -5466,7 +5473,7 @@ void emit_entity(Context *context, Entity* ent) {
                 custom.len = section->length;
 
                 if (shgeti(module->custom_sections, section->name) >= 0) {
-                    onyx_report_warning(section->token->pos, "Duplicate definitions for custom section '%s'.", section->name);
+                    onyx_report_warning(module->context, section->token->pos, "Duplicate definitions for custom section '%s'.", section->name);
                 }
 
                 shput(module->custom_sections, section->name, custom);

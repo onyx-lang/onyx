@@ -305,7 +305,7 @@ whitespace_skipped:
 
             if (*tokenizer->curr == '\n' && ch == '\'') {
                 tk.pos.length = (u16) len;
-                onyx_report_error(tk.pos, Error_Critical, "Character literal not terminated by end of line.");
+                onyx_report_error(tokenizer->context, tk.pos, Error_Critical, "Character literal not terminated by end of line.");
                 break;
             }
 
@@ -318,7 +318,7 @@ whitespace_skipped:
 
             INCREMENT_CURR_TOKEN(tokenizer);
             if (tokenizer->curr == tokenizer->end) {
-                onyx_report_error(tk.pos, Error_Critical, "String literal not closed. String literal starts here.");
+                onyx_report_error(tokenizer->context, tk.pos, Error_Critical, "String literal not closed. String literal starts here.");
                 break;
             }
         }

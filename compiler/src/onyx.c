@@ -106,7 +106,7 @@ static void context_init(Context *context, CompileOptions* opts) {
     context->global_scope = scope_create(context, NULL, internal_location);
     sh_new_arena(context->packages);
 
-    onyx_errors_init(&context->loaded_files);
+    onyx_errors_init(context, &context->loaded_files);
 
     context->wasm_module = bh_alloc_item(context->gp_alloc, OnyxWasmModule);
     onyx_wasm_module_initialize(context, context->wasm_module);
@@ -276,9 +276,9 @@ static b32 process_load_entity(Context *context, Entity* ent) {
         if (filename == NULL) {
             OnyxFilePos error_pos = include->token->pos;
             if (error_pos.filename == NULL) {
-                onyx_report_error(error_pos, Error_Command_Line_Arg, "Failed to open file '%s'", include->name);
+                ONYX_ERROR(error_pos, Error_Command_Line_Arg, "Failed to open file '%s'", include->name);
             } else {
-                onyx_report_error(error_pos, Error_Critical, "Failed to open file '%s'", include->name);
+                ONYX_ERROR(error_pos, Error_Critical, "Failed to open file '%s'", include->name);
             }
             return 0;
         }
@@ -309,7 +309,7 @@ static b32 process_load_entity(Context *context, Entity* ent) {
             char *folder = bh_arr_pop(folders_to_process);
             bh_dir dir = bh_dir_open(folder);
             if (dir == NULL) {
-                onyx_report_error(include->token->pos, Error_Critical, "Could not find or open folder '%s'.", folder);
+                ONYX_ERROR(include->token->pos, Error_Critical, "Could not find or open folder '%s'.", folder);
                 return 0;
             }
 
@@ -344,7 +344,7 @@ static b32 process_load_entity(Context *context, Entity* ent) {
         return 1;
 
     } else if (include->kind == Ast_Kind_Load_Path) {
-        onyx_report_warning(include->token->pos, "'#load_path' has been deprecated and no longer does anything.");
+        ONYX_WARNING(include->token->pos, "'#load_path' has been deprecated and no longer does anything.");
 
     } else if (include->kind == Ast_Kind_Library_Path) {
         bh_arr_push(context->wasm_module->library_paths, include->name);
@@ -381,9 +381,9 @@ static b32 process_entity(Context *context, Entity* ent) {
     switch (before_state) {
         case Entity_State_Error:
             if (ent->type != Entity_Type_Error) {
-                onyx_report_error(ent->expr->token->pos, Error_Critical, "Error entity unexpected. This is definitely a compiler bug");
+                ONYX_ERROR(ent->expr->token->pos, Error_Critical, "Error entity unexpected. This is definitely a compiler bug");
             } else {
-                onyx_report_error(ent->error->token->pos, Error_Critical, "Static error occured: '%b'", ent->error->error_msg->text, ent->error->error_msg->length);
+                ONYX_ERROR(ent->error->token->pos, Error_Critical, "Static error occured: '%b'", ent->error->error_msg->text, ent->error->error_msg->length);
             }
             break;
 
@@ -515,7 +515,7 @@ static void dump_cycles(Context *context) {
 // TODO: relocate this function
 static void send_stalled_hooks(Context *context) {
     bh_arr_each(CompilerExtension, ext, context->extensions) {
-        compiler_extension_hook_stalled(ext->id);
+        compiler_extension_hook_stalled(context, ext->id);
     }
 }
 
@@ -559,7 +559,7 @@ static i32 onyx_compile(Context *context) {
 
         // Mostly a preventative thing to ensure that even if somehow
         // errors were left disabled, they are re-enabled in this cycle.
-        onyx_errors_enable();
+        onyx_errors_enable(context);
         entity_heap_remove_top(&context->entities);
 
         u64 perf_start;
@@ -613,8 +613,8 @@ static i32 onyx_compile(Context *context) {
             context->cycle_almost_detected = 0;
         }
 
-        if (onyx_has_errors()) {
-            onyx_errors_print();
+        if (onyx_has_errors(context)) {
+            onyx_errors_print(context);
             return ONYX_COMPILER_PROGRESS_ERROR;
         }
 
@@ -632,7 +632,7 @@ static i32 onyx_compile(Context *context) {
 
     //
     // There should not be any errors printing here, but there might be warnings.
-    onyx_errors_print();
+    onyx_errors_print(context);
 
     u64 duration = bh_time_duration(start_time);
 
@@ -737,7 +737,7 @@ static CompilerProgress onyx_flush_module(Context *context) {
 
 #ifdef ONYX_RUNTIME_LIBRARY
 static b32 onyx_run_module(Context *context, bh_buffer code_buffer) {
-    onyx_run_initialize(context->options->debug_session);
+    onyx_run_initialize(context->options->debug_session, context->options->debug_socket);
 
     if (context->options->verbose_output > 0)
         bh_printf("Running program:\n");

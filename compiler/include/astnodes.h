@@ -2354,8 +2354,9 @@ void track_resolution_for_symbol_info(Context *context, AstNode *original, AstNo
 
 
 // Compiler Extensions
-TypeMatch compiler_extension_start(const char *name, const char *containing_filename, Entity *ent, i32 *out_extension_id);
+TypeMatch compiler_extension_start(Context *context, const char *name, const char *containing_filename, Entity *ent, i32 *out_extension_id);
 TypeMatch compiler_extension_expand_macro(
+    Context *context,
     int extension_id,
     ProceduralMacroExpansionKind kind,
     const char *macro_name,
@@ -2364,7 +2365,7 @@ TypeMatch compiler_extension_expand_macro(
     AstNode **out_node,
     u32 *out_expansion_id,
     b32 wait_for_response);
-TypeMatch compiler_extension_hook_stalled(int extension_id);
+TypeMatch compiler_extension_hook_stalled(Context *context, int extension_id);
 
 
 // NOTE: Useful inlined functions
