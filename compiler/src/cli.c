@@ -376,9 +376,6 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
         else if (!strcmp(argv[i], "--doc")) {
             options->documentation_file = argv[++i];
         }
-        else if (!strcmp(argv[i], "--tag")) {
-            options->generate_tag_file = 1;
-        }
         else if (!strcmp(argv[i], "--syminfo")) {
             options->generate_symbol_info_file = 1;
             options->symbol_info_file = argv[++i];
@@ -493,7 +490,6 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .passthrough_argument_count = 0,
         .passthrough_argument_data  = NULL,
 
-        .generate_tag_file = 0,
         .generate_symbol_info_file = 0,
         .generate_lsp_info_file = 0,
 

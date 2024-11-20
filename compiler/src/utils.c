@@ -1656,13 +1656,6 @@ char *find_closest_symbol_in_node(Context *context, AstNode* node, char *sym) {
 
 
 
-void track_declaration_for_tags(Context *context, AstNode *node) {
-    if (context->options->generate_tag_file) {
-        bh_arr_push(context->tag_locations, node);
-    }
-}
-
-
 static u32 symbol_info_get_file_id(SymbolInfoTable *syminfo, const char *filename) {
     u32 file_id;
     if (shgeti(syminfo->files, filename) == -1) {

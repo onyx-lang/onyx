@@ -7,12 +7,7 @@
 // Onyx Documentation generation
 
 void onyx_docs_submit(OnyxDocInfo *docs, AstBinding *binding);
-void onyx_docs_emit_odoc(const char *dest);
-
-
-// Tag generation
-
-void onyx_docs_emit_tags(char *dest);
+void onyx_docs_emit_odoc(Context *context, const char *dest);
 
 
 
@@ -53,6 +48,6 @@ struct SymbolInfoTable {
 	bh_imap node_to_id;
 };
 
-void onyx_docs_emit_symbol_info(const char *dest);
+void onyx_docs_emit_symbol_info(Context *context, const char *dest);
 
 #endif

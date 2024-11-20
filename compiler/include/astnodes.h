@@ -2021,7 +2021,6 @@ struct CompileOptions {
 
     b32 enable_optional_semicolons : 1;
 
-    b32 generate_tag_file         : 1;
     b32 generate_symbol_info_file : 1;
     b32 generate_lsp_info_file    : 1;
 
@@ -2181,10 +2180,6 @@ struct Context {
 
     // NOTE: This is defined in onyxwasm.h
     struct OnyxWasmModule* wasm_module;
-
-    // NOTE: All definitions (bindings, injections, aliases) are
-    // present in this list when generating CTags.
-    bh_arr(AstNode *) tag_locations;
 
     struct SymbolInfoTable *symbol_info;
     struct OnyxDocInfo     *doc_info;
@@ -2352,8 +2347,6 @@ Type* polymorphic_struct_lookup(Context *context, AstPolyStructType* ps_type, bh
 Type* polymorphic_union_lookup(Context *context, AstPolyUnionType* pu_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
 
 b32 resolve_intrinsic_interface_constraint(Context *context, AstConstraint *constraint);
-
-void track_declaration_for_tags(Context *context, AstNode *);
 
 void track_declaration_for_symbol_info(Context *context, OnyxFilePos, AstNode *);
 void track_documentation_for_symbol_info(Context *context, AstNode *, AstBinding *);

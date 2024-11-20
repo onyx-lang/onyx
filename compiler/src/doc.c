@@ -2,55 +2,6 @@
 #include "utils.h"
 #include "types.h"
 
-static i32 sort_tags(const void* a, const void* b) {
-    AstNode *n1 = *(AstNode **) a;
-    AstNode *n2 = *(AstNode **) b;
-
-    i32 diff;
-    if ((diff = strncmp(n1->token->text, n2->token->text, n2->token->length))) {
-        return diff;
-    }
-
-    return n1->token->length - n2->token->length;
-}
-
-
-void onyx_docs_emit_tags(char *dest) {
-    bh_file tags_file;
-    if (bh_file_create(&tags_file, dest) != BH_FILE_ERROR_NONE) {
-        bh_printf("Cannot create '%s'.\n", dest);
-        return;
-    }
-
-    bh_fprintf(&tags_file, "!_TAG_FILE_FORMAT\t2\n");
-    bh_fprintf(&tags_file, "!_TAG_FILE_SORTED\t1\n");
-    bh_fprintf(&tags_file, "!_TAG_OUTPUT_FILESEP\tslash\n");
-    bh_fprintf(&tags_file, "!_TAG_OUTPUT_MODE\tu-ctags\n");
-    bh_fprintf(&tags_file, "!_TAG_PROGRAM_AUTHOR\tOnyx Compiler\n");
-    bh_fprintf(&tags_file, "!_TAG_PROGRAM_NAME\tOnyx Compiler\n");
-    bh_fprintf(&tags_file, "!_TAG_PROGRAM_URL\thttps://github.com/onyx-lang/onyx\n");
-    bh_fprintf(&tags_file, "!_TAG_PROGRAM_VERSION\t0.1.0\n");
-
-    qsort(context.tag_locations, bh_arr_length(context.tag_locations), sizeof(AstNode *), sort_tags);
-
-    bh_arr_each(AstNode *, pnode, context.tag_locations) {
-        AstBinding *node = (AstBinding *) *pnode;
-        assert(node->kind == Ast_Kind_Binding);
-
-        i32 line_len = 0;
-        char *c = node->token->pos.line_start;
-        while (*c++ != '\n') line_len++;
-
-        bh_fprintf(&tags_file, "%b\t%s\t/^%b$/\n",
-                node->token->text, node->token->length,
-                node->token->pos.filename,
-                node->token->pos.line_start, line_len);
-
-    }
-
-    bh_file_close(&tags_file);
-}
-
 static i32 sort_symbol_resolutions(const SymbolResolution *a, const SymbolResolution *b) {
     if (a->file_id != b->file_id) {
         return a->file_id > b->file_id ? 1 : -1;
@@ -63,14 +14,14 @@ static i32 sort_symbol_resolutions(const SymbolResolution *a, const SymbolResolu
     return a->column > b->column ? 1 : -1;
 }
 
-void onyx_docs_emit_symbol_info(const char *dest) {
+void onyx_docs_emit_symbol_info(Context *context, const char *dest) {
     bh_file sym_file;
     if (bh_file_create(&sym_file, dest) != BH_FILE_ERROR_NONE) {
         bh_printf("Cannot create '%s'.\n", dest);
         return;
     }
 
-    SymbolInfoTable *syminfo = context.symbol_info;
+    SymbolInfoTable *syminfo = context->symbol_info;
 
     qsort(syminfo->symbols_resolutions,
             bh_arr_length(syminfo->symbols_resolutions),
@@ -78,7 +29,7 @@ void onyx_docs_emit_symbol_info(const char *dest) {
             (int (*)(const void *, const void*)) sort_symbol_resolutions);
 
     bh_buffer file_section;
-    bh_buffer_init(&file_section, context.gp_alloc, 2048);
+    bh_buffer_init(&file_section, context->gp_alloc, 2048);
     fori (i, 0, shlen(syminfo->files)) {
         char *filename = syminfo->files[i].key;
         u32   file_id  = syminfo->files[i].value;
@@ -88,10 +39,10 @@ void onyx_docs_emit_symbol_info(const char *dest) {
     }
 
     bh_buffer sym_def_section;
-    bh_buffer_init(&sym_def_section, context.gp_alloc, 2048);
+    bh_buffer_init(&sym_def_section, context->gp_alloc, 2048);
 
     bh_buffer docs_section;
-    bh_buffer_init(&docs_section, context.gp_alloc, 4096);
+    bh_buffer_init(&docs_section, context->gp_alloc, 4096);
 
     bh_arr_each(SymbolInfo, sym, syminfo->symbols) {
         bh_buffer_write_u32(&sym_def_section, sym->id);
@@ -99,7 +50,7 @@ void onyx_docs_emit_symbol_info(const char *dest) {
         bh_buffer_write_u32(&sym_def_section, sym->line);
         bh_buffer_write_u32(&sym_def_section, sym->column);
 
-        if (context.options->generate_lsp_info_file) {
+        if (context->options->generate_lsp_info_file) {
             if (sym->documentation_length > 0) {
                 bh_buffer_write_u32(&sym_def_section, docs_section.length);
                 bh_buffer_write_u32(&sym_def_section, sym->documentation_length);
@@ -113,7 +64,7 @@ void onyx_docs_emit_symbol_info(const char *dest) {
     }
 
     bh_buffer sym_res_section;
-    bh_buffer_init(&sym_res_section, context.gp_alloc, 2048);
+    bh_buffer_init(&sym_res_section, context->gp_alloc, 2048);
     bh_arr_each(SymbolResolution, sym, syminfo->symbols_resolutions) {
         bh_buffer_write_u32(&sym_res_section, sym->file_id);
         bh_buffer_write_u32(&sym_res_section, sym->line);
@@ -123,11 +74,11 @@ void onyx_docs_emit_symbol_info(const char *dest) {
     }
 
     bh_buffer header_section;
-    bh_buffer_init(&header_section, context.gp_alloc, 16);
+    bh_buffer_init(&header_section, context->gp_alloc, 16);
     bh_buffer_append(&header_section, "OSYM", 4);
 
     u32 header_size = 32;
-    if (context.options->generate_lsp_info_file) {
+    if (context->options->generate_lsp_info_file) {
         bh_buffer_write_u32(&header_section, 2);
         header_size = 40;
     } else {
@@ -141,7 +92,7 @@ void onyx_docs_emit_symbol_info(const char *dest) {
     bh_buffer_write_u32(&header_section, header_size + file_section.length + sym_def_section.length);
     bh_buffer_write_u32(&header_section, bh_arr_length(syminfo->symbols_resolutions));
 
-    if (context.options->generate_lsp_info_file) {
+    if (context->options->generate_lsp_info_file) {
         bh_buffer_write_u32(&header_section, header_size + file_section.length + sym_def_section.length + sym_res_section.length);
         bh_buffer_write_u32(&header_section, docs_section.length);
     }
@@ -151,7 +102,7 @@ void onyx_docs_emit_symbol_info(const char *dest) {
     bh_file_write(&sym_file, sym_def_section.data, sym_def_section.length);
     bh_file_write(&sym_file, sym_res_section.data, sym_res_section.length);
 
-    if (context.options->generate_lsp_info_file) {
+    if (context->options->generate_lsp_info_file) {
         bh_file_write(&sym_file, docs_section.data, docs_section.length);
     }
 
@@ -264,18 +215,18 @@ static void write_string(bh_buffer *buffer, i32 len, char *data) {
     bh_buffer_append(buffer, data, len);
 }
 
-static void write_location(bh_buffer *buffer, OnyxFilePos location) {
-    if (shgeti(context.doc_info->file_ids, location.filename) == -1) {
-        shput(context.doc_info->file_ids, location.filename, context.doc_info->next_file_id);
-        context.doc_info->next_file_id++;
+static void write_location(Context *context, bh_buffer *buffer, OnyxFilePos location) {
+    if (shgeti(context->doc_info->file_ids, location.filename) == -1) {
+        shput(context->doc_info->file_ids, location.filename, context->doc_info->next_file_id);
+        context->doc_info->next_file_id++;
     }
 
-    bh_buffer_write_u32(buffer, context.doc_info->file_ids[shgeti(context.doc_info->file_ids, location.filename)].value);
+    bh_buffer_write_u32(buffer, context->doc_info->file_ids[shgeti(context->doc_info->file_ids, location.filename)].value);
     bh_buffer_write_u32(buffer, location.line);
     bh_buffer_write_u32(buffer, location.column);
 }
 
-static void write_type_node(bh_buffer *buffer, void *vnode) {
+static void write_type_node(Context *context, bh_buffer *buffer, void *vnode) {
     AstNode *node = vnode;
     if (!node) goto unknown_case;
 
@@ -283,7 +234,7 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
 
     switch (node->kind) {
         case Ast_Kind_Basic_Type:
-            if (((AstBasicType *) node)->basic_type == context.types.auto_return) {
+            if (((AstBasicType *) node)->basic_type == context->types.auto_return) {
                 bh_buffer_write_string(buffer, "#auto");
             } else {
                 bh_buffer_write_string(buffer, (char *) ((AstBasicType *) node)->basic_type->Basic.name);
@@ -292,32 +243,32 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
 
         case Ast_Kind_Address_Of:
             bh_buffer_write_string(buffer, "&");
-            write_type_node(buffer, ((AstAddressOf *) node)->expr);
+            write_type_node(context, buffer, ((AstAddressOf *) node)->expr);
             return;
 
         case Ast_Kind_Pointer_Type:
             bh_buffer_write_string(buffer, "&");
-            write_type_node(buffer, ((AstPointerType *) node)->elem);
+            write_type_node(context, buffer, ((AstPointerType *) node)->elem);
             return;
 
         case Ast_Kind_Multi_Pointer_Type:
             bh_buffer_write_string(buffer, "[&] ");
-            write_type_node(buffer, ((AstPointerType *) node)->elem);
+            write_type_node(context, buffer, ((AstPointerType *) node)->elem);
             return;
 
         case Ast_Kind_Slice_Type:
             bh_buffer_write_string(buffer, "[] ");
-            write_type_node(buffer, ((AstSliceType *) node)->elem);
+            write_type_node(context, buffer, ((AstSliceType *) node)->elem);
             return;
 
         case Ast_Kind_VarArg_Type:
             bh_buffer_write_string(buffer, "..");
-            write_type_node(buffer, ((AstVarArgType *) node)->elem);
+            write_type_node(context, buffer, ((AstVarArgType *) node)->elem);
             return;
 
         case Ast_Kind_DynArr_Type:
             bh_buffer_write_string(buffer, "[..] ");
-            write_type_node(buffer, ((AstDynArrType *) node)->elem);
+            write_type_node(context, buffer, ((AstDynArrType *) node)->elem);
             return;
 
         case Ast_Kind_Struct_Type:
@@ -337,13 +288,13 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
             return;
 
         case Ast_Kind_Poly_Call_Type:
-            if (((AstPolyCallType *) node)->callee == (AstType *) context.builtins.optional_type) {
+            if (((AstPolyCallType *) node)->callee == (AstType *) context->builtins.optional_type) {
                 bh_buffer_write_string(buffer, "? ");
-                write_type_node(buffer, ((AstPolyCallType *) node)->params[0]);
+                write_type_node(context, buffer, ((AstPolyCallType *) node)->params[0]);
                 return;
             }
 
-            write_type_node(buffer, ((AstPolyCallType *) node)->callee);
+            write_type_node(context, buffer, ((AstPolyCallType *) node)->callee);
             if (node->flags & Ast_Flag_Poly_Call_From_Auto) return;
 
             bh_buffer_write_byte(buffer, '(');
@@ -353,7 +304,7 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
                     bh_buffer_write_string(buffer, ", ");
                 }
 
-                write_type_node(buffer, *param);
+                write_type_node(context, buffer, *param);
             }
 
             bh_buffer_write_byte(buffer, ')');
@@ -367,7 +318,7 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
                     bh_buffer_write_string(buffer, ", ");
                 }
 
-                write_type_node(buffer, *type);
+                write_type_node(context, buffer, *type);
             }
 
             bh_buffer_write_byte(buffer, ')');
@@ -381,32 +332,33 @@ static void write_type_node(bh_buffer *buffer, void *vnode) {
                     bh_buffer_write_string(buffer, ", ");
                 }
 
-                write_type_node(buffer, ((AstFunctionType *) node)->params[i]);
+                write_type_node(context, buffer, ((AstFunctionType *) node)->params[i]);
             }
 
             bh_buffer_write_string(buffer, ") -> ");
 
-            write_type_node(buffer, ((AstFunctionType *) node)->return_type);
+            write_type_node(context, buffer, ((AstFunctionType *) node)->return_type);
             return;
 
         case Ast_Kind_Field_Access:
-            write_type_node(buffer, ((AstFieldAccess *) node)->expr);
+            write_type_node(context, buffer, ((AstFieldAccess *) node)->expr);
             bh_buffer_write_byte(buffer, '.');
             bh_buffer_append(buffer, node->token->text, node->token->length);
             return;
 
         case Ast_Kind_Typeof:
             bh_buffer_write_string(buffer, (char *) type_get_name(
-                type_build_from_ast(context.ast_alloc, (AstType *) node)
+                context,
+                type_build_from_ast(context, (AstType *) node)
             ));
             return;
 
         case Ast_Kind_Alias:
-            write_type_node(buffer, ((AstAlias *) node)->alias);
+            write_type_node(context, buffer, ((AstAlias *) node)->alias);
             return;
 
         case Ast_Kind_Type_Alias:
-            write_type_node(buffer, ((AstTypeAlias *) node)->to);
+            write_type_node(context, buffer, ((AstTypeAlias *) node)->to);
             return;
 
         case Ast_Kind_Symbol:
@@ -440,7 +392,7 @@ static void write_doc_notes(bh_buffer *buffer, AstBinding *binding) {
     write_cstring(buffer, "");
 }
 
-static void write_entity_header(bh_buffer *buffer, AstBinding *binding, OnyxFilePos location) {
+static void write_entity_header(Context *context, bh_buffer *buffer, AstBinding *binding, OnyxFilePos location) {
     if (!binding) {
         bh_buffer_write_u32(buffer, 0);
         bh_buffer_write_u32(buffer, 1);
@@ -461,17 +413,17 @@ static void write_entity_header(bh_buffer *buffer, AstBinding *binding, OnyxFile
     }
 
     // Location
-    write_location(buffer, location);
+    write_location(context, buffer, location);
 
     // Notes
     write_doc_notes(buffer, binding);
 }
 
-static b32 write_doc_procedure(bh_buffer *buffer, AstBinding *binding, AstNode *proc);
+static b32 write_doc_procedure(Context *context, bh_buffer *buffer, AstBinding *binding, AstNode *proc);
 
-static void write_doc_constraints(bh_buffer *buffer, ConstraintContext *constraints, bh_arr(AstPolyParam) poly_params) {
+static void write_doc_constraints(Context *context, bh_buffer *buffer, ConstraintContext *constraints, bh_arr(AstPolyParam) poly_params) {
     bh_buffer tmp_buffer;
-    bh_buffer_init(&tmp_buffer, context.scratch_alloc, 256);
+    bh_buffer_init(&tmp_buffer, context->scratch_alloc, 256);
 
     u32 constraint_count_patch = buffer->length;
     bh_buffer_write_u32(buffer, 0);
@@ -481,7 +433,7 @@ static void write_doc_constraints(bh_buffer *buffer, ConstraintContext *constrai
         AstConstraint *constraint = *pconstraint;
 
         bh_buffer_clear(&tmp_buffer);
-        write_type_node(&tmp_buffer, constraint->interface);
+        write_type_node(context, &tmp_buffer, constraint->interface);
         bh_buffer_write_string(&tmp_buffer, "(");
 
         bh_arr_each(AstTyped *, ptype_arg, constraint->args) {
@@ -490,7 +442,7 @@ static void write_doc_constraints(bh_buffer *buffer, ConstraintContext *constrai
             }
 
             AstTyped *type_arg = *ptype_arg;
-            write_type_node(&tmp_buffer, type_arg);
+            write_type_node(context, &tmp_buffer, type_arg);
         }
 
         bh_buffer_write_string(&tmp_buffer, ")");
@@ -504,11 +456,11 @@ static void write_doc_constraints(bh_buffer *buffer, ConstraintContext *constrai
             if (!poly_param->implicit_interface) continue;
 
             bh_buffer_clear(&tmp_buffer);
-            write_type_node(&tmp_buffer, poly_param->implicit_interface);
+            write_type_node(context, &tmp_buffer, poly_param->implicit_interface);
             bh_buffer_write_string(&tmp_buffer, "(");
 
             poly_param->poly_sym->flags &= ~Ast_Flag_Symbol_Is_PolyVar;
-            write_type_node(&tmp_buffer, poly_param->poly_sym);
+            write_type_node(context, &tmp_buffer, poly_param->poly_sym);
             poly_param->poly_sym->flags |= Ast_Flag_Symbol_Is_PolyVar;
 
             bh_buffer_write_string(&tmp_buffer, ")");
@@ -523,7 +475,7 @@ static void write_doc_constraints(bh_buffer *buffer, ConstraintContext *constrai
     bh_buffer_free(&tmp_buffer);
 }
 
-static void write_doc_methods(bh_buffer *buffer, Scope *method_scope) {
+static void write_doc_methods(Context *context, bh_buffer *buffer, Scope *method_scope) {
     u32 count_patch = buffer->length;
     bh_buffer_write_u32(buffer, 0);
 
@@ -561,7 +513,7 @@ static void write_doc_methods(bh_buffer *buffer, Scope *method_scope) {
         binding->token = &tmp_name_token;
 
         method_count++;
-        write_doc_procedure(buffer, binding, (AstNode *) node);
+        write_doc_procedure(context, buffer, binding, (AstNode *) node);
 
         binding->token = old_token;
     }
@@ -569,13 +521,13 @@ static void write_doc_methods(bh_buffer *buffer, Scope *method_scope) {
     *((u32 *) bh_pointer_add(buffer->data, count_patch)) = method_count;
 }
 
-static b32 write_doc_function(bh_buffer *buffer, AstBinding *binding, AstNode *proc) {
+static b32 write_doc_function(Context *context, bh_buffer *buffer, AstBinding *binding, AstNode *proc) {
     AstFunction *func = (void *) proc;
     if (func->kind == Ast_Kind_Macro) {
         func = (void *) ((AstMacro *) proc)->body;
     }
 
-    write_entity_header(buffer, binding, func->token->pos);
+    write_entity_header(context, buffer, binding, func->token->pos);
 
     // Flags
     bh_buffer_write_u32(buffer, proc->kind == Ast_Kind_Macro ? Doc_Procedure_Flag_Macro : 0);
@@ -584,12 +536,12 @@ static b32 write_doc_function(bh_buffer *buffer, AstBinding *binding, AstNode *p
     bh_buffer_write_u32(buffer, bh_arr_length(func->params));
     bh_arr_each(AstParam, param, func->params) {
         write_string(buffer, param->local->token->length, param->local->token->text);
-        write_cstring(buffer, type_get_name(param->local->type));
+        write_cstring(buffer, type_get_name(context, param->local->type));
         write_cstring(buffer, "");
     }
 
     // Return type
-    write_cstring(buffer, type_get_name(func->type->Function.return_type));
+    write_cstring(buffer, type_get_name(context, func->type->Function.return_type));
 
     // Overload procs
     bh_buffer_write_u32(buffer, 0);
@@ -600,14 +552,14 @@ static b32 write_doc_function(bh_buffer *buffer, AstBinding *binding, AstNode *p
     return 1;
 }
 
-static b32 write_doc_overloaded_function(bh_buffer *buffer, AstBinding *binding, AstNode *proc) {
+static b32 write_doc_overloaded_function(Context *context, bh_buffer *buffer, AstBinding *binding, AstNode *proc) {
     AstOverloadedFunction *ofunc = (void *) proc;
 
     bh_imap all_overloads;
-    bh_imap_init(&all_overloads, context.gp_alloc, bh_arr_length(ofunc->overloads) * 2);
+    bh_imap_init(&all_overloads, context->gp_alloc, bh_arr_length(ofunc->overloads) * 2);
     build_all_overload_options(ofunc->overloads, &all_overloads);
 
-    write_entity_header(buffer, binding, ofunc->token->pos);
+    write_entity_header(context, buffer, binding, ofunc->token->pos);
 
     // Flags
     bh_buffer_write_u32(buffer, Doc_Procedure_Flag_Overloaded);
@@ -623,7 +575,7 @@ static b32 write_doc_overloaded_function(bh_buffer *buffer, AstBinding *binding,
     bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
         AstNode* node = strip_aliases((AstNode *) entry->key);
 
-        if (write_doc_procedure(buffer, NULL, node)) {
+        if (write_doc_procedure(context, buffer, NULL, node)) {
             proc_count += 1;
         }
     }
@@ -637,13 +589,13 @@ static b32 write_doc_overloaded_function(bh_buffer *buffer, AstBinding *binding,
     return 1;
 }
 
-static b32 write_doc_polymorphic_proc(bh_buffer *buffer, AstBinding *binding, AstNode *proc) {
+static b32 write_doc_polymorphic_proc(Context *context, bh_buffer *buffer, AstBinding *binding, AstNode *proc) {
     AstFunction *func = (void *) proc;
     if (func->kind == Ast_Kind_Macro) {
         func = (void *) ((AstMacro *) proc)->body;
     }
 
-    write_entity_header(buffer, binding, func->token->pos);
+    write_entity_header(context, buffer, binding, func->token->pos);
 
     // Flags
     bh_buffer_write_u32(buffer, proc->kind == Ast_Kind_Macro ? Doc_Procedure_Flag_Macro : 0);
@@ -651,7 +603,7 @@ static b32 write_doc_polymorphic_proc(bh_buffer *buffer, AstBinding *binding, As
     // Parameter types
 
     bh_buffer param_type_buf;
-    bh_buffer_init(&param_type_buf, context.scratch_alloc, 256);
+    bh_buffer_init(&param_type_buf, context->scratch_alloc, 256);
 
     bh_buffer_write_u32(buffer, bh_arr_length(func->params));
     bh_arr_each(AstParam, param, func->params) {
@@ -662,7 +614,7 @@ static b32 write_doc_polymorphic_proc(bh_buffer *buffer, AstBinding *binding, As
         else 
             write_string(buffer, param->local->token->length, param->local->token->text);
 
-        write_type_node(&param_type_buf, param->local->type_node);
+        write_type_node(context, &param_type_buf, param->local->type_node);
         write_string(buffer, param_type_buf.length, (char *) param_type_buf.data);
         write_cstring(buffer, "");
     }
@@ -670,7 +622,7 @@ static b32 write_doc_polymorphic_proc(bh_buffer *buffer, AstBinding *binding, As
 
     // Return type
     bh_buffer_clear(&param_type_buf);
-    write_type_node(&param_type_buf, func->return_type);
+    write_type_node(context, &param_type_buf, func->return_type);
     write_string(buffer, param_type_buf.length, (char *) param_type_buf.data);
     bh_buffer_free(&param_type_buf);
 
@@ -678,40 +630,40 @@ static b32 write_doc_polymorphic_proc(bh_buffer *buffer, AstBinding *binding, As
     bh_buffer_write_u32(buffer, 0);
 
     // Constraints
-    write_doc_constraints(buffer, &func->constraints, func->poly_params);
+    write_doc_constraints(context, buffer, &func->constraints, func->poly_params);
     return 1;
 }
 
-static b32 write_doc_procedure(bh_buffer *buffer, AstBinding *binding, AstNode *proc) {
+static b32 write_doc_procedure(Context *context, bh_buffer *buffer, AstBinding *binding, AstNode *proc) {
     if (proc->kind == Ast_Kind_Function) {
-        return write_doc_function(buffer, binding, proc);
+        return write_doc_function(context, buffer, binding, proc);
 
     } else if (proc->kind == Ast_Kind_Macro) {
         AstMacro *macro = (void *) proc;
 
         if (macro->body->kind == Ast_Kind_Function)
-            return write_doc_function(buffer, binding, proc);
+            return write_doc_function(context, buffer, binding, proc);
         else
-            return write_doc_polymorphic_proc(buffer, binding, proc);
+            return write_doc_polymorphic_proc(context, buffer, binding, proc);
 
     } else if (proc->kind == Ast_Kind_Overloaded_Function) {
-        return write_doc_overloaded_function(buffer, binding, proc);
+        return write_doc_overloaded_function(context, buffer, binding, proc);
 
     } else if (proc->kind == Ast_Kind_Polymorphic_Proc) {
-        return write_doc_polymorphic_proc(buffer, binding, proc);
+        return write_doc_polymorphic_proc(context, buffer, binding, proc);
     }
 
     return 0;
 }
 
-static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *node) {
+static b32 write_doc_structure(Context *context, bh_buffer *buffer, AstBinding *binding, AstNode *node) {
     Scope *method_scope = NULL;
 
     if (node->kind == Ast_Kind_Struct_Type) {
         AstStructType *struct_node = (void *) node;
-        method_scope = get_scope_from_node((AstNode *) struct_node);
+        method_scope = get_scope_from_node(context, (AstNode *) struct_node);
 
-        write_entity_header(buffer, binding, node->token->pos);
+        write_entity_header(context, buffer, binding, node->token->pos);
 
         Type *struct_type = struct_node->stcache;
         assert(struct_type);
@@ -721,7 +673,7 @@ static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *
             StructMember* mem = *pmem;
 
             write_cstring(buffer, mem->name);
-            write_cstring(buffer, type_get_name(mem->type));
+            write_cstring(buffer, type_get_name(context, mem->type));
             write_cstring(buffer, "");
 
             bh_buffer_write_u32(buffer, 0);
@@ -731,25 +683,25 @@ static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *
         bh_buffer_write_u32(buffer, 0);
 
         // Constraints
-        write_doc_constraints(buffer, &struct_node->constraints, NULL);
+        write_doc_constraints(context, buffer, &struct_node->constraints, NULL);
     }
     else if (node->kind == Ast_Kind_Poly_Struct_Type) {
         AstPolyStructType *poly_struct_node = (void *) node;
-        method_scope = get_scope_from_node((AstNode *) poly_struct_node);
+        method_scope = get_scope_from_node(context, (AstNode *) poly_struct_node);
 
         AstStructType *struct_node = poly_struct_node->base_struct;
 
-        write_entity_header(buffer, binding, node->token->pos);
+        write_entity_header(context, buffer, binding, node->token->pos);
 
         bh_buffer type_buf;
-        bh_buffer_init(&type_buf, context.scratch_alloc, 256);
+        bh_buffer_init(&type_buf, context->scratch_alloc, 256);
 
         bh_buffer_write_u32(buffer, bh_arr_length(struct_node->members));
         bh_arr_each(AstStructMember *, psmem, struct_node->members) {
             AstStructMember *smem = *psmem;
 
             bh_buffer_clear(&type_buf);
-            write_type_node(&type_buf, smem->type_node);
+            write_type_node(context, &type_buf, smem->type_node);
 
             write_string(buffer, smem->token->length, smem->token->text);
             write_string(buffer, type_buf.length, (char *) type_buf.data);
@@ -762,7 +714,7 @@ static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *
         bh_buffer_write_u32(buffer, bh_arr_length(poly_struct_node->poly_params));
         bh_arr_each(AstPolyStructParam, param, poly_struct_node->poly_params) {
             bh_buffer_clear(&type_buf);
-            write_type_node(&type_buf, param->type_node);
+            write_type_node(context, &type_buf, param->type_node);
 
             write_string(buffer, param->token->length, param->token->text);
             write_string(buffer, type_buf.length, (char *) type_buf.data);
@@ -770,24 +722,24 @@ static b32 write_doc_structure(bh_buffer *buffer, AstBinding *binding, AstNode *
         }
 
         // Constraints
-        write_doc_constraints(buffer, &struct_node->constraints, NULL);
+        write_doc_constraints(context, buffer, &struct_node->constraints, NULL);
 
         bh_buffer_free(&type_buf);
     }
 
-    write_doc_methods(buffer, method_scope);
+    write_doc_methods(context, buffer, method_scope);
 
     return 1;
 }
 
-static b32 write_doc_union_type(bh_buffer *buffer, AstBinding *binding, AstNode *node) {
+static b32 write_doc_union_type(Context *context, bh_buffer *buffer, AstBinding *binding, AstNode *node) {
     Scope *method_scope = NULL;
 
     if (node->kind == Ast_Kind_Union_Type) {
         AstUnionType *union_node = (void *) node;
-        method_scope = get_scope_from_node((AstNode *) union_node);
+        method_scope = get_scope_from_node(context, (AstNode *) union_node);
 
-        write_entity_header(buffer, binding, node->token->pos);
+        write_entity_header(context, buffer, binding, node->token->pos);
 
         Type *union_type = union_node->utcache;
         assert(union_type);
@@ -797,32 +749,32 @@ static b32 write_doc_union_type(bh_buffer *buffer, AstBinding *binding, AstNode 
             UnionVariant* uv = *puv;
 
             write_cstring(buffer, uv->name);
-            write_cstring(buffer, type_get_name(uv->type));
+            write_cstring(buffer, type_get_name(context, uv->type));
         }
 
         // Polymorph parameters
         bh_buffer_write_u32(buffer, 0);
 
         // Constraints
-        write_doc_constraints(buffer, &union_node->constraints, NULL);
+        write_doc_constraints(context, buffer, &union_node->constraints, NULL);
     }
     else if (node->kind == Ast_Kind_Poly_Union_Type) {
         AstPolyUnionType *poly_union_node = (void *) node;
-        method_scope = get_scope_from_node((AstNode *) poly_union_node);
+        method_scope = get_scope_from_node(context, (AstNode *) poly_union_node);
 
         AstUnionType *union_node = poly_union_node->base_union;
 
-        write_entity_header(buffer, binding, node->token->pos);
+        write_entity_header(context, buffer, binding, node->token->pos);
 
         bh_buffer type_buf;
-        bh_buffer_init(&type_buf, context.scratch_alloc, 256);
+        bh_buffer_init(&type_buf, context->scratch_alloc, 256);
 
         bh_buffer_write_u32(buffer, bh_arr_length(union_node->variants));
         bh_arr_each(AstUnionVariant*, puv, union_node->variants) {
             AstUnionVariant* uv = *puv;
 
             bh_buffer_clear(&type_buf);
-            write_type_node(&type_buf, uv->type_node);
+            write_type_node(context, &type_buf, uv->type_node);
 
             write_string(buffer, uv->token->length, uv->token->text);
             write_string(buffer, type_buf.length, (char *) type_buf.data);
@@ -832,7 +784,7 @@ static b32 write_doc_union_type(bh_buffer *buffer, AstBinding *binding, AstNode 
         bh_buffer_write_u32(buffer, bh_arr_length(poly_union_node->poly_params));
         bh_arr_each(AstPolyStructParam, param, poly_union_node->poly_params) {
             bh_buffer_clear(&type_buf);
-            write_type_node(&type_buf, param->type_node);
+            write_type_node(context, &type_buf, param->type_node);
 
             write_string(buffer, param->token->length, param->token->text);
             write_string(buffer, type_buf.length, (char *) type_buf.data);
@@ -840,20 +792,20 @@ static b32 write_doc_union_type(bh_buffer *buffer, AstBinding *binding, AstNode 
         }
 
         // Constraints
-        write_doc_constraints(buffer, &union_node->constraints, NULL);
+        write_doc_constraints(context, buffer, &union_node->constraints, NULL);
 
         bh_buffer_free(&type_buf);
     }
 
-    write_doc_methods(buffer, method_scope);
+    write_doc_methods(context, buffer, method_scope);
 
     return 1;
 }
 
-static b32 write_doc_enum(bh_buffer *buffer, AstBinding *binding, AstNode *node) {
+static b32 write_doc_enum(Context *context, bh_buffer *buffer, AstBinding *binding, AstNode *node) {
     AstEnumType *enum_node = (void *) node;
 
-    write_entity_header(buffer, binding, node->token->pos);
+    write_entity_header(context, buffer, binding, node->token->pos);
 
     bh_buffer_write_u32(buffer, bh_arr_length(enum_node->values));
     bh_arr_each(AstEnumValue *, pvalue, enum_node->values) {
@@ -871,24 +823,24 @@ static b32 write_doc_enum(bh_buffer *buffer, AstBinding *binding, AstNode *node)
     return 1;
 }
 
-static b32 write_doc_distinct_type(bh_buffer *buffer, AstBinding *binding, AstNode *node) {
+static b32 write_doc_distinct_type(Context *context, bh_buffer *buffer, AstBinding *binding, AstNode *node) {
     AstDistinctType *distinct_node = (void *) node;
 
-    write_entity_header(buffer, binding, node->token->pos);
+    write_entity_header(context, buffer, binding, node->token->pos);
 
     bh_buffer type_buf;
-    bh_buffer_init(&type_buf, context.scratch_alloc, 256);
-    write_type_node(&type_buf, distinct_node->base_type);
+    bh_buffer_init(&type_buf, context->scratch_alloc, 256);
+    write_type_node(context, &type_buf, distinct_node->base_type);
     write_string(buffer, type_buf.length, (char *) type_buf.data);
     bh_buffer_free(&type_buf);
 
-    write_doc_methods(buffer, distinct_node->scope);
+    write_doc_methods(context, buffer, distinct_node->scope);
 
     return 1;
 }
 
-static void write_doc_entity_array(bh_buffer *buffer, bh_arr(AstBinding *) arr,
-    b32 (*write_doc)(bh_buffer *buffer, AstBinding *, AstNode*),
+static void write_doc_entity_array(Context *context, bh_buffer *buffer, bh_arr(AstBinding *) arr,
+    b32 (*write_doc)(Context *context, bh_buffer *buffer, AstBinding *, AstNode*),
     u32 offset_write_location) {
     *((u32 *) bh_pointer_add(buffer->data, offset_write_location)) = buffer->length;
 
@@ -897,7 +849,7 @@ static void write_doc_entity_array(bh_buffer *buffer, bh_arr(AstBinding *) arr,
 
     u32 count = 0;
     bh_arr_each(AstBinding *, pbind, arr) {
-        if (write_doc(buffer, *pbind, (*pbind)->node)) {
+        if (write_doc(context, buffer, *pbind, (*pbind)->node)) {
             count++;
         }
     }
@@ -905,7 +857,7 @@ static void write_doc_entity_array(bh_buffer *buffer, bh_arr(AstBinding *) arr,
     *((u32 *) bh_pointer_add(buffer->data, count_patch)) = count;
 }
 
-void onyx_docs_emit_odoc(const char *dest) {
+void onyx_docs_emit_odoc(Context *context, const char *dest) {
     bh_file doc_file;
     if (bh_file_create(&doc_file, dest) != BH_FILE_ERROR_NONE) {
         bh_printf("Cannot create '%s'.\n", dest);
@@ -914,12 +866,12 @@ void onyx_docs_emit_odoc(const char *dest) {
 
 
     bh_buffer doc_buffer;
-    bh_buffer_init(&doc_buffer, context.gp_alloc, 16 * 1024);
+    bh_buffer_init(&doc_buffer, context->gp_alloc, 16 * 1024);
 
     bh_buffer_append(&doc_buffer, Doc_Magic_Bytes, 4);
     bh_buffer_write_u32(&doc_buffer, 1);
 
-    const char *program_name = context.options->target_file;
+    const char *program_name = context->options->target_file;
     write_cstring(&doc_buffer, program_name);
 
     bh_buffer_write_u32(&doc_buffer, bh_time_curr() / 1000);
@@ -938,7 +890,7 @@ void onyx_docs_emit_odoc(const char *dest) {
     // 
     *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 0)) = doc_buffer.length;
 
-    Table(Package *) packages = (void *) context.packages;
+    Table(Package *) packages = (void *) context->packages;
     bh_buffer_write_u32(&doc_buffer, shlenu(packages));
     fori (i, 0, shlen(packages)) {
         char *package_qualified_name = packages[i].key;
@@ -971,31 +923,31 @@ void onyx_docs_emit_odoc(const char *dest) {
     //
     // Procedure Info
     //
-    write_doc_entity_array(&doc_buffer, context.doc_info->procedures, write_doc_procedure, offset_table_index + 4);
+    write_doc_entity_array(context, &doc_buffer, context->doc_info->procedures, write_doc_procedure, offset_table_index + 4);
 
 
     //
     // Structure Info
     //
-    write_doc_entity_array(&doc_buffer, context.doc_info->structures, write_doc_structure, offset_table_index + 8);
+    write_doc_entity_array(context, &doc_buffer, context->doc_info->structures, write_doc_structure, offset_table_index + 8);
 
 
     //
     // Enum Info
     //
-    write_doc_entity_array(&doc_buffer, context.doc_info->enumerations, write_doc_enum, offset_table_index + 12);
+    write_doc_entity_array(context, &doc_buffer, context->doc_info->enumerations, write_doc_enum, offset_table_index + 12);
 
 
     //
     // Distinct Types Info
     //
-    write_doc_entity_array(&doc_buffer, context.doc_info->distinct_types, write_doc_distinct_type, offset_table_index + 16);
+    write_doc_entity_array(context, &doc_buffer, context->doc_info->distinct_types, write_doc_distinct_type, offset_table_index + 16);
 
 
     //
     // Union Info
     //
-    write_doc_entity_array(&doc_buffer, context.doc_info->unions, write_doc_union_type, offset_table_index + 20);
+    write_doc_entity_array(context, &doc_buffer, context->doc_info->unions, write_doc_union_type, offset_table_index + 20);
 
 
     //
@@ -1003,9 +955,9 @@ void onyx_docs_emit_odoc(const char *dest) {
     //
     *((u32 *) bh_pointer_add(doc_buffer.data, offset_table_index + 24)) = doc_buffer.length;
 
-    bh_buffer_write_u32(&doc_buffer, shlenu(context.doc_info->file_ids));
-    fori (i, 0, shlen(context.doc_info->file_ids)) {
-        const char *key = context.doc_info->file_ids[i].key;
+    bh_buffer_write_u32(&doc_buffer, shlenu(context->doc_info->file_ids));
+    fori (i, 0, shlen(context->doc_info->file_ids)) {
+        const char *key = context->doc_info->file_ids[i].key;
         
         bh_buffer_write_u32(&doc_buffer, 0);
         write_cstring(&doc_buffer, key);

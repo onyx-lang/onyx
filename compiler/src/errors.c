@@ -1,17 +1,17 @@
 #include "errors.h"
 #include "utils.h"
 
-void onyx_errors_init(bh_arr(bh_file_contents)* files) {
-    context.errors.file_contents = files;
+void onyx_errors_init(Context *context, bh_arr(bh_file_contents)* files) {
+    context->errors.file_contents = files;
 
-    bh_arena_init(&context.errors.msg_arena, context.gp_alloc, 16 * 1024);
-    context.errors.msg_alloc = bh_arena_allocator(&context.errors.msg_arena);
+    bh_arena_init(&context->errors.msg_arena, context->gp_alloc, 16 * 1024);
+    context->errors.msg_alloc = bh_arena_allocator(&context->errors.msg_arena);
 
-    bh_arr_new(context.gp_alloc, context.errors.errors, 4);
+    bh_arr_new(context->gp_alloc, context->errors.errors, 4);
 }
 
-static void print_error_text(char *text) {
-    if (context.options->no_colors) {
+static void print_error_text(char *text, b32 color) {
+    if (!color) {
         bh_printf("%s", text);
         return;
     }
@@ -33,7 +33,8 @@ static void print_error_text(char *text) {
 }
 
 static void print_underline(OnyxError *err, i32 len, i32 first_non_whitespace, b32 colored_printing) {
-    char* pointer_str = bh_alloc_array(context.scratch_alloc, char, len);
+    len = bh_min(len, 1024);
+    char* pointer_str = alloca(sizeof(char) * len);
     memset(pointer_str, ' ', len);
     
     int c = err->pos.column - 1;
@@ -72,13 +73,13 @@ static void print_detailed_message_v2(OnyxError* err, bh_file_contents* fc, b32 
         switch (err->rank) {
             case Error_Warning:
                 bh_printf("\033[93mwarning\033[0m: ");
-                print_error_text(err->text);
+                print_error_text(err->text, colored_printing);
                 bh_printf("\n\033[90m     at: %s:%l,%l\033[0m\n", err->pos.filename, err->pos.line, err->pos.column);
                 break;
 
             default:
                 bh_printf("\033[91merror\033[0m: ");
-                print_error_text(err->text);
+                print_error_text(err->text, colored_printing);
                 bh_printf("\n\033[90m   at: %s:%l,%l\033[0m\n", err->pos.filename, err->pos.line, err->pos.column);
                 break;
         }
@@ -86,13 +87,13 @@ static void print_detailed_message_v2(OnyxError* err, bh_file_contents* fc, b32 
         switch (err->rank) {
             case Error_Warning:
                 bh_printf("warning: ");
-                print_error_text(err->text);
+                print_error_text(err->text, colored_printing);
                 bh_printf("\n     at: %s:%l,%l\n", err->pos.filename, err->pos.line, err->pos.column);
                 break;
 
             default:
                 bh_printf("error: ");
-                print_error_text(err->text);
+                print_error_text(err->text, colored_printing);
                 bh_printf("\n   at: %s:%l,%l\n", err->pos.filename, err->pos.line, err->pos.column);
                 break;
         }
@@ -134,10 +135,10 @@ static void print_detailed_message_json(OnyxError* err, bh_file_contents* _fc, b
     );
 }
 
-static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
+static void print_detailed_message(Context *context, OnyxError* err, bh_file_contents* fc) {
     b32 colored_printing = 0;
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
-        colored_printing = !context.options->no_colors;
+        colored_printing = !context->options->no_colors;
     #endif
 
     if (!err->pos.filename) {
@@ -157,7 +158,7 @@ static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
         return;
     }
 
-    char *error_format = context.options->error_format;
+    char *error_format = context->options->error_format;
 
     if (!strcmp(error_format, "v2")) {
         print_detailed_message_v2(err, fc, colored_printing);
@@ -179,7 +180,7 @@ static i32 errors_sort(const void* v1, const void* v2) {
     return e2->rank - e1->rank;
 }
 
-void onyx_errors_print() {
+void onyx_errors_print(Context *context) {
     // NOTE: If the format of the error messages is ever changed,
     // update onyx_compile.vim and onyx.sublime-build to match
     // the new format. This way editor error highlighting is still
@@ -187,19 +188,19 @@ void onyx_errors_print() {
     //
     //                                      - brendanfh   2020/09/03
 
-    qsort(context.errors.errors, bh_arr_length(context.errors.errors), sizeof(OnyxError), errors_sort);
+    qsort(context->errors.errors, bh_arr_length(context->errors.errors), sizeof(OnyxError), errors_sort);
 
-    b32 error_format_json = !strcmp(context.options->error_format, "json");
+    b32 error_format_json = !strcmp(context->options->error_format, "json");
     if (error_format_json) bh_printf("[");
     
 
-    OnyxErrorRank last_rank = context.errors.errors[0].rank;
-    bh_arr_each(OnyxError, err, context.errors.errors) {
-        if (!context.options->show_all_errors && last_rank != err->rank) break;
+    OnyxErrorRank last_rank = context->errors.errors[0].rank;
+    bh_arr_each(OnyxError, err, context->errors.errors) {
+        if (!context->options->show_all_errors && last_rank != err->rank) break;
 
         bh_file_contents file_contents = { 0 };
         if (err->pos.filename) {
-            bh_arr_each(bh_file_contents, fc, *context.errors.file_contents) {
+            bh_arr_each(bh_file_contents, fc, *context->errors.file_contents) {
                 if (!strcmp(fc->filename, err->pos.filename)) {
                     file_contents = *fc;
                     break;
@@ -207,9 +208,9 @@ void onyx_errors_print() {
             }
         }
 
-        if (error_format_json && err != context.errors.errors) bh_printf(",");
+        if (error_format_json && err != context->errors.errors) bh_printf(",");
 
-        print_detailed_message(err, &file_contents);
+        print_detailed_message(context, err, &file_contents);
 
         last_rank = err->rank;
     }
@@ -217,45 +218,45 @@ void onyx_errors_print() {
     if (error_format_json) bh_printf("]");
 }
 
-void onyx_errors_enable() {
-    context.errors_enabled = 1;
+void onyx_errors_enable(Context *context) {
+    context->errors_enabled = 1;
 }
 
-void onyx_errors_disable() {
-    if (context.cycle_detected) {
-        context.errors_enabled = 1;
+void onyx_errors_disable(Context *context) {
+    if (context->cycle_detected) {
+        context->errors_enabled = 1;
         return;
     }
     
-    context.errors_enabled = 0;
+    context->errors_enabled = 0;
 }
 
-b32 onyx_errors_are_enabled() {
-    return context.errors_enabled;
+b32 onyx_errors_are_enabled(Context *context) {
+    return context->errors_enabled;
 }
 
-b32 onyx_has_errors() {
-    bh_arr_each(OnyxError, err, context.errors.errors) {
+b32 onyx_has_errors(Context *context) {
+    bh_arr_each(OnyxError, err, context->errors.errors) {
         if (err->rank >= Error_Waiting_On) return 1;
     }
 
     return 0;
 }
 
-void onyx_clear_errors() {
-    if (context.cycle_detected) return;
+void onyx_clear_errors(Context *context) {
+    if (context->cycle_detected) return;
 
-    bh_arr_set_length(context.errors.errors, 0);
+    bh_arr_set_length(context->errors.errors, 0);
 }
 
-void onyx_submit_error(OnyxError error) {
-    if (!context.errors_enabled) return;
+void onyx_submit_error(Context *context, OnyxError error) {
+    if (!context->errors_enabled) return;
 
-    bh_arr_push(context.errors.errors, error);
+    bh_arr_push(context->errors.errors, error);
 }
 
-void onyx_report_error(OnyxFilePos pos, OnyxErrorRank rank, char * format, ...) {
-    if (!context.errors_enabled) return;
+void onyx_report_error(Context *context, OnyxFilePos pos, OnyxErrorRank rank, char * format, ...) {
+    if (!context->errors_enabled) return;
 
     va_list vargs;
     va_start(vargs, format);
@@ -265,28 +266,28 @@ void onyx_report_error(OnyxFilePos pos, OnyxErrorRank rank, char * format, ...) 
     OnyxError err = {
         .pos = pos,
         .rank = rank,
-        .text = bh_strdup(context.errors.msg_alloc, msg),
+        .text = bh_strdup(context->errors.msg_alloc, msg),
     };
 
-    bh_arr_push(context.errors.errors, err);
+    bh_arr_push(context->errors.errors, err);
 }
 
-void onyx_submit_warning(OnyxError error) {
-    if (!context.errors_enabled) return;
+void onyx_submit_warning(Context *context, OnyxError error) {
+    if (!context->errors_enabled) return;
 
     bh_file_contents file_contents = { 0 };
-    bh_arr_each(bh_file_contents, fc, *context.errors.file_contents) {
+    bh_arr_each(bh_file_contents, fc, *context->errors.file_contents) {
         if (!strcmp(fc->filename, error.pos.filename)) {
             file_contents = *fc;
             break;
         }
     }
 
-    print_detailed_message(&error, &file_contents);
+    print_detailed_message(context, &error, &file_contents);
 }
 
-void onyx_report_warning(OnyxFilePos pos, char* format, ...) {
-    if (!context.errors_enabled) return;
+void onyx_report_warning(Context *context, OnyxFilePos pos, char* format, ...) {
+    if (!context->errors_enabled) return;
 
     va_list vargs;
     va_start(vargs, format);
@@ -296,8 +297,8 @@ void onyx_report_warning(OnyxFilePos pos, char* format, ...) {
     OnyxError err = {
         .pos = pos,
         .rank = Error_Warning,
-        .text = bh_strdup(context.errors.msg_alloc, msg),
+        .text = bh_strdup(context->errors.msg_alloc, msg),
     };
 
-    bh_arr_push(context.errors.errors, err);
+    bh_arr_push(context->errors.errors, err);
 }

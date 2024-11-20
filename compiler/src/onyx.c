@@ -109,7 +109,7 @@ static void context_init(Context *context, CompileOptions* opts) {
     onyx_errors_init(&context->loaded_files);
 
     context->wasm_module = bh_alloc_item(context->gp_alloc, OnyxWasmModule);
-    *context->wasm_module = onyx_wasm_module_create(context->gp_alloc);
+    onyx_wasm_module_initialize(context, context->wasm_module);
 
     entity_heap_init(context->gp_alloc, &context->entities);
 
@@ -647,16 +647,12 @@ static i32 onyx_compile(Context *context) {
         printf("\n");
     }
 
-    if (context->options->generate_tag_file) {
-        onyx_docs_emit_tags("./tags");
-    }
-
     if (context->options->generate_symbol_info_file) {
-        onyx_docs_emit_symbol_info(context->options->symbol_info_file);
+        onyx_docs_emit_symbol_info(context, context->options->symbol_info_file);
     }
 
     if (context->options->documentation_file != NULL) {
-        onyx_docs_emit_odoc(context->options->documentation_file);
+        onyx_docs_emit_odoc(context, context->options->documentation_file);
     }
 
     if (context->options->running_perf) {
@@ -684,9 +680,9 @@ static void link_wasm_module(Context *context) {
 
     OnyxWasmLinkOptions link_opts;
     // CLEANUP: Properly handle this case.
-    assert(onyx_wasm_build_link_options_from_node(&link_opts, link_options_node));
+    assert(onyx_wasm_build_link_options_from_node(context, &link_opts, link_options_node));
 
-    onyx_wasm_module_link(context->wasm_module, &link_opts);
+    onyx_wasm_module_link(context, context->wasm_module, &link_opts);
 }
 
 static CompilerProgress onyx_flush_module(Context *context) {
@@ -706,7 +702,7 @@ static CompilerProgress onyx_flush_module(Context *context) {
             return ONYX_COMPILER_PROGRESS_FAILED_OUTPUT;
 
         OnyxWasmModule* data_module = bh_alloc_item(context->gp_alloc, OnyxWasmModule);
-        *data_module = onyx_wasm_module_create(context->gp_alloc);
+        onyx_wasm_module_initialize(context, data_module);
 
         data_module->data = context->wasm_module->data;
         context->wasm_module->data = NULL;
@@ -952,17 +948,17 @@ int main(int argc, char *argv[]) {
         case ONYX_COMPILE_ACTION_RUN:
             compiler_progress = do_compilation(&context, &compile_opts);
             if (compiler_progress == ONYX_COMPILER_PROGRESS_SUCCESS) {
-                if (!onyx_run(context)) {
+                if (!onyx_run(&context)) {
                     compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
                 }
             }
             break;
 
         case ONYX_COMPILE_ACTION_RUN_WASM:
-            context->gp_alloc = bh_heap_allocator();
+            context.gp_alloc = bh_heap_allocator();
             context_init(&context, &compile_opts);
             compiler_progress = ONYX_COMPILER_PROGRESS_SUCCESS;
-            if (!onyx_run_wasm_file(&context, context->options->target_file)) {
+            if (!onyx_run_wasm_file(&context, context.options->target_file)) {
                 compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
             }
             break;

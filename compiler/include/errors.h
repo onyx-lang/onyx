@@ -31,16 +31,21 @@ typedef struct OnyxErrors {
     bh_arr(OnyxError) errors;
 } OnyxErrors;
 
-void onyx_errors_init(bh_arr(bh_file_contents)* files);
-void onyx_errors_enable();
-void onyx_errors_disable();
-b32 onyx_errors_are_enabled();
-void onyx_submit_error(OnyxError error);
-void onyx_report_error(OnyxFilePos pos, OnyxErrorRank rank, char * format, ...);
-void onyx_submit_warning(OnyxError error);
-void onyx_report_warning(OnyxFilePos pos, char* format, ...);
-void onyx_errors_print();
-b32  onyx_has_errors();
-void onyx_clear_errors();
+struct Context;
+
+void onyx_errors_init(struct Context *context, bh_arr(bh_file_contents)* files);
+void onyx_errors_enable(struct Context *context);
+void onyx_errors_disable(struct Context *context);
+b32 onyx_errors_are_enabled(struct Context *context);
+void onyx_submit_error(struct Context *context, OnyxError error);
+void onyx_report_error(struct Context *context, OnyxFilePos pos, OnyxErrorRank rank, char * format, ...);
+void onyx_submit_warning(struct Context *context, OnyxError error);
+void onyx_report_warning(struct Context *context, OnyxFilePos pos, char* format, ...);
+void onyx_errors_print(struct Context *context);
+b32  onyx_has_errors(struct Context *context);
+void onyx_clear_errors(struct Context *context);
+
+#define ONYX_ERROR(pos, rank, ...) (onyx_report_error(context, (pos), (rank), __VA_ARGS__))
+#define ONYX_WARNING(pos, rank, ...) (onyx_report_warning(context, (pos), (rank), __VA_ARGS__))
 
 #endif
