@@ -1341,7 +1341,7 @@ EMIT_FUNC(for__prologue, AstFor* for_node, u64 iter_local, i64 index_local) {
 
         WIL(for_node->token, WI_LOCAL_SET, index_local);
 
-        WasmInstruction* increment_instructions = bh_alloc_array(global_heap_allocator, WasmInstruction, 4);
+        WasmInstruction* increment_instructions = bh_alloc_array(mod->allocator, WasmInstruction, 4);
         increment_instructions[0] = (WasmInstruction) { WI_LOCAL_GET,     { .l = index_local } };
         increment_instructions[1] = (WasmInstruction) { WI_I32_CONST,     { .l = 1 } };
         increment_instructions[2] = (WasmInstruction) { WI_I32_ADD,       { .l = 0x00 } };
