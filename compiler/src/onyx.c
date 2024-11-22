@@ -39,8 +39,9 @@ typedef enum CompilerProgress {
     ONYX_COMPILER_PROGRESS_SUCCESS
 } CompilerProgress;
 
-static OnyxToken implicit_load_token = { '#', 1, 0, { 0, 0, 0, 0, 0 } };
 static AstInclude* create_load(bh_allocator alloc, char* filename) {
+    static const OnyxToken implicit_load_token = { '#', 1, 0, { 0, 0, 0, 0, 0 } };
+
     AstInclude* include_node = onyx_ast_node_new(alloc, sizeof(AstInclude), Ast_Kind_Load_File);
     include_node->name = filename;
     include_node->token = &implicit_load_token;

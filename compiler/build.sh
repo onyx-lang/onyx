@@ -1,6 +1,6 @@
 #!/bin/sh
 
-C_FILES="onyx astnodes builtins checker clone doc entities errors lex parser symres types utils wasm_emit extensions "
+C_FILES="library_main astnodes builtins checker clone doc entities errors lex parser symres types utils wasm_emit extensions "
 LIBS="-lpthread -ldl -lm"
 INCLUDES="-I./include -I../shared/include -I../shared/include/dyncall"
 
@@ -52,7 +52,7 @@ if [ "$ONYX_USE_DYNCALL" = "1" ] && [ "$ONYX_RUNTIME_LIBRARY" = "ovmwasm" ]; the
 fi
 
 echo "Compiling onyx"
-$ONYX_CC -o "onyx" \
+$ONYX_CC -shared -fPIC -o "libonyx.so" \
     $FLAGS $INCLUDES \
     $(echo "$C_FILES" | sed 's/ /\n/g;s/\([a-zA-Z_0-9]*\)\n/src\/\1.c\n/g;s/\n/ /g') \
     $LIBS

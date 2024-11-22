@@ -363,6 +363,7 @@ b32 bh_str_ends_with(char* str, char* end);
 b32 bh_str_contains(char *str, char *needle);
 u32 bh_str_last_index_of(char *str, char needle);
 char* bh_strdup(bh_allocator a, char* str);
+char* bh_strdup_len(bh_allocator a, char* str, i32 len);
 
 
 
@@ -1596,6 +1597,22 @@ char* bh_strdup(bh_allocator a, char* str) {
 
     char* t = buf;
     while ((*t++ = *str++));
+    return buf;
+}
+
+char* bh_strdup_len(bh_allocator a, char* str, i32 len) {
+    if (len < 0) {
+        len = strlen(str);
+    }
+
+    char* buf = bh_alloc(a, len + 1);
+
+    char* t = buf;
+    while (len-- > 0) {
+        *t++ = *str++;
+    }
+
+    *t = '\0';
     return buf;
 }
 

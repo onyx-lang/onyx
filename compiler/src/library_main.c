@@ -11,16 +11,31 @@
 #include "doc.h"
 #include "onyx.h"
 
+//
+// Types
+//
+
 struct onyx_context_t {
 	Context context;
 };
+
+
+//
+// Forward declarations of internal procedures
+//
+
+static AstInclude* create_load(Context *context, char* filename, int32_t length);
+static void create_and_add_defined_variable(Context *context, char *name, int32_t name_length, char *value, int32_t value_length);
+static void link_wasm_module(Context *context);
+
 
 //
 // Lifecycle
 //
 
+
 onyx_context_t *onyx_context_create() {
-	onyx_content_t *ctx = malloc(sizeof(*ctx));
+	onyx_context_t *ctx = malloc(sizeof(*ctx));
 
 	Context *context = &ctx->context;
 	memset(context, 0, sizeof *context);
@@ -41,7 +56,12 @@ onyx_context_t *onyx_context_create() {
     types_init(context);
     prepare_builtins(context);
 
+    // Options should be moved directly inside of the context instead of through a pointer...
     context->options = malloc(sizeof(* context->options));
+    memset(context->options, 0, sizeof(* context->options));
+    context->options->use_post_mvp_features = 1;
+    context->options->enable_optional_semicolons = 1;
+    context->options->generate_type_info = 1;
 
     OnyxFilePos internal_location = { 0 };
     internal_location.filename = "<compiler internal>";
@@ -57,6 +77,8 @@ onyx_context_t *onyx_context_create() {
     onyx_wasm_module_initialize(context, context->wasm_module);
 
     entity_heap_init(context->gp_alloc, &context->entities);
+
+    return ctx;
 }
 
 void onyx_context_free(onyx_context_t *ctx) {
@@ -76,14 +98,14 @@ void onyx_options_ready(onyx_context_t *ctx) {
         .state = Entity_State_Parse_Builtin,
         .type = Entity_Type_Load_File,
         .package = NULL,
-        .include = create_load(context->ast_alloc, "core:builtin"),
+        .include = create_load(context, "core:builtin", -1),
     }));
 
     entity_heap_insert(&context->entities, ((Entity) {
         .state = Entity_State_Parse_Builtin,
         .type = Entity_Type_Load_File,
         .package = NULL,
-        .include = create_load(context->ast_alloc, "core:runtime/build_opts"),
+        .include = create_load(context, "core:runtime/build_opts", -1),
     }));
 
     if (context->options->runtime != Runtime_Custom) {
@@ -94,31 +116,31 @@ void onyx_options_ready(onyx_context_t *ctx) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context->ast_alloc, "core:runtime/info/types"),
+            .include = create_load(context, "core:runtime/info/types", -1),
         }));
         context->special_global_entities.runtime_info_foreign_entity = entity_heap_insert(&context->entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context->ast_alloc, "core:runtime/info/foreign_blocks"),
+            .include = create_load(context, "core:runtime/info/foreign_blocks", -1),
         }));
         context->special_global_entities.runtime_info_proc_tags_entity = entity_heap_insert(&context->entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context->ast_alloc, "core:runtime/info/proc_tags"),
+            .include = create_load(context, "core:runtime/info/proc_tags", -1),
         }));
         context->special_global_entities.runtime_info_global_tags_entity = entity_heap_insert(&context->entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context->ast_alloc, "core:runtime/info/global_tags"),
+            .include = create_load(context, "core:runtime/info/global_tags", -1),
         }));
         context->special_global_entities.runtime_info_stack_trace_entity = entity_heap_insert(&context->entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context->ast_alloc, "core:runtime/info/stack_trace"),
+            .include = create_load(context, "core:runtime/info/stack_trace", -1),
         }));
     }
 
@@ -129,18 +151,12 @@ void onyx_options_ready(onyx_context_t *ctx) {
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.closure_base, context->global_scope, NULL);
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.stack_trace, context->global_scope, NULL);
 
-    // NOTE: Add all files passed by command line to the queue
-    bh_arr_each(const char *, filename, context->options->files) {
-        AstInclude* load_node = create_load(context->ast_alloc, (char *) *filename);
-        add_entities_for_node(&context->entities, NULL, (AstNode *) load_node, context->global_scope, NULL);
-    }
-
     if (!context->options->no_core) {
         entity_heap_insert(&context->entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(context->ast_alloc, "core:module"),
+            .include = create_load(context, "core:module", -1),
         }));
     }
 
@@ -169,23 +185,362 @@ void onyx_options_ready(onyx_context_t *ctx) {
     // }
 }
 
-onyx_pump_t onyx_pump(onyx_context_t *ctx) {
+static void parse_source_file(Context *context, bh_file_contents* file_contents) {
+    // :Remove passing the allocators as parameters
+    OnyxTokenizer tokenizer = onyx_tokenizer_create(context, file_contents);
+    onyx_lex_tokens(&tokenizer);
 
+    file_contents->line_count = tokenizer.line_number;
+
+    OnyxParser parser = onyx_parser_create(context, &tokenizer);
+    onyx_parse(&parser);
+    onyx_parser_free(&parser);
+}
+
+static b32 process_source_file(Context *context, char* filename) {
+    bh_arr_each(bh_file_contents, fc, context->loaded_files) {
+        // Duplicates are detected here and since these filenames will be the full path,
+        // string comparing them should be all that is necessary.
+        if (!strcmp(fc->filename, filename)) return 1;
+    }
+
+    bh_file file;
+    bh_file_error err = bh_file_open(&file, filename);
+    if (err != BH_FILE_ERROR_NONE) {
+        return 0;
+    }
+
+    bh_file_contents fc = bh_file_read_contents(context->token_alloc, &file);
+    bh_file_close(&file);
+
+    bh_arr_push(context->loaded_files, fc);
+
+    // if (context->options->verbose_output == 2)
+    //     bh_printf("Processing source file:    %s (%d bytes)\n", file.filename, fc.length);
+
+    parse_source_file(context, &bh_arr_last(context->loaded_files));
+    return 1;
+}
+
+static b32 process_load_entity(Context *context, Entity* ent) {
+    assert(ent->type == Entity_Type_Load_File || ent->type == Entity_Type_Load_Path);
+    AstInclude* include = ent->include;
+
+    if (include->kind == Ast_Kind_Load_File) {
+        // :RelativeFiles
+        const char* parent_file = include->token->pos.filename;
+        if (parent_file == NULL) parent_file = ".";
+
+        char* parent_folder = bh_path_get_parent(parent_file, context->scratch_alloc);
+        char* filename      = bh_search_for_mapped_file(
+            include->name,
+            parent_folder,
+            ".onyx",
+            context->options->mapped_folders,
+            context->gp_alloc
+        );
+
+        if (filename == NULL) {
+            OnyxFilePos error_pos = include->token->pos;
+            if (error_pos.filename == NULL) {
+                ONYX_ERROR(error_pos, Error_Command_Line_Arg, "Failed to open file '%s'", include->name);
+            } else {
+                ONYX_ERROR(error_pos, Error_Critical, "Failed to open file '%s'", include->name);
+            }
+            return 0;
+        }
+
+        return process_source_file(context, filename);
+
+    } else if (include->kind == Ast_Kind_Load_All) {
+        const char* parent_file = include->token->pos.filename;
+        if (parent_file == NULL) parent_file = ".";
+
+        char* parent_folder = bh_path_get_parent(parent_file, context->scratch_alloc);
+
+        char* folder = bh_search_for_mapped_file(
+            include->name,
+            parent_folder,
+            "",
+            context->options->mapped_folders,
+            context->gp_alloc
+        );
+        bh_path_convert_separators(folder);
+
+        bh_arr(char *) folders_to_process = NULL;
+        bh_arr_new(context->gp_alloc, folders_to_process, 2);
+
+        bh_arr_push(folders_to_process, bh_strdup(context->scratch_alloc, folder));
+
+        while (bh_arr_length(folders_to_process) > 0) {
+            char *folder = bh_arr_pop(folders_to_process);
+            bh_dir dir = bh_dir_open(folder);
+            if (dir == NULL) {
+                ONYX_ERROR(include->token->pos, Error_Critical, "Could not find or open folder '%s'.", folder);
+                return 0;
+            }
+
+            bh_dirent entry;
+            char fullpath[512];
+            while (bh_dir_read(dir, &entry)) {
+                if (entry.type == BH_DIRENT_FILE && bh_str_ends_with(entry.name, ".onyx")) {
+                    bh_snprintf(fullpath, 511, "%s/%s", folder, entry.name);
+                    bh_path_convert_separators(fullpath);
+
+                    char* formatted_name = bh_path_get_full_name(fullpath, context->gp_alloc);
+
+                    AstInclude* new_include = onyx_ast_node_new(context->ast_alloc, sizeof(AstInclude), Ast_Kind_Load_File);
+                    new_include->token = include->token;
+                    new_include->name = formatted_name;
+                    add_entities_for_node(&context->entities, NULL, (AstNode *) new_include, include->entity->scope, include->entity->package);
+                }
+
+                if (entry.type == BH_DIRENT_DIRECTORY && include->recursive) {
+                    if (!strcmp(entry.name, ".") || !strcmp(entry.name, "..")) continue;
+
+                    bh_snprintf(fullpath, 511, "%s/%s", folder, entry.name);
+                    char* formatted_name = bh_path_get_full_name(fullpath, context->scratch_alloc); // Could this overflow the scratch allocator?
+
+                    bh_arr_push(folders_to_process, formatted_name);
+                }
+            }
+
+            bh_dir_close(dir);
+        }
+
+        return 1;
+
+    } else if (include->kind == Ast_Kind_Load_Path) {
+        ONYX_WARNING(include->token->pos, "'#load_path' has been deprecated and no longer does anything.");
+
+    } else if (include->kind == Ast_Kind_Library_Path) {
+        bh_arr_push(context->wasm_module->library_paths, include->name);
+    }
+
+    return 1;
+}
+
+static b32 process_entity(Context *context, Entity* ent) {
+    EntityState before_state = ent->state;
+    switch (before_state) {
+        case Entity_State_Error:
+            if (ent->type != Entity_Type_Error) {
+                ONYX_ERROR(ent->expr->token->pos, Error_Critical, "Error entity unexpected. This is definitely a compiler bug");
+            } else {
+                ONYX_ERROR(ent->error->token->pos, Error_Critical, "Static error occured: '%b'", ent->error->error_msg->text, ent->error->error_msg->length);
+            }
+            break;
+
+        case Entity_State_Parse_Builtin:
+            process_load_entity(context, ent);
+            ent->state = Entity_State_Finalized;
+            break;
+
+        case Entity_State_Introduce_Symbols:
+            // Currently, introducing symbols is handled in the symbol resolution
+            // function. Maybe there should be a different place where that happens?
+            symres_entity(context, ent);
+            break;
+
+        case Entity_State_Parse:
+            if (!context->builtins_initialized) {
+                context->builtins_initialized = 1;
+                initialize_builtins(context);
+                introduce_build_options(context);
+                // introduce_defined_variables(context); TODO: put this back
+            }
+
+            // GROSS
+            if (context->special_global_entities.remaining == 0) {
+                context->special_global_entities.remaining--;
+                initalize_special_globals(context);
+            }
+
+            if (process_load_entity(context, ent)) {
+                // GROSS
+                if (   ent == context->special_global_entities.runtime_info_types_entity
+                    || ent == context->special_global_entities.runtime_info_proc_tags_entity
+                    || ent == context->special_global_entities.runtime_info_global_tags_entity
+                    || ent == context->special_global_entities.runtime_info_foreign_entity
+                    || ent == context->special_global_entities.runtime_info_stack_trace_entity) {
+                    context->special_global_entities.remaining--;
+                }
+
+                ent->state = Entity_State_Finalized;
+            } else {
+                ent->macro_attempts++;
+            }
+            break;
+
+        case Entity_State_Resolve_Symbols: symres_entity(context, ent); break;
+        case Entity_State_Check_Types:     check_entity(context, ent);  break;
+
+        case Entity_State_Code_Gen: {
+            if (context->options->action == ONYX_COMPILE_ACTION_CHECK) {
+                ent->state = Entity_State_Finalized;
+                break;
+            }
+
+            emit_entity(context, ent);
+            break;
+        }
+
+        default: break;
+    }
+
+    b32 changed = ent->state != before_state;
+    return changed;
+}
+
+static void dump_cycles(Context *context) {
+    context->cycle_detected = 1;
+    Entity* ent;
+
+    while (1) {
+        ent = entity_heap_top(&context->entities);
+        entity_heap_remove_top(&context->entities);
+        if (ent->state < Entity_State_Code_Gen) process_entity(context, ent);
+        else break;
+
+        if (bh_arr_length(context->entities.entities) == 0) {
+            break;
+        }
+    }
+}
+
+// TODO: relocate this function
+static void send_stalled_hooks(Context *context) {
+    bh_arr_each(CompilerExtension, ext, context->extensions) {
+        compiler_extension_hook_stalled(context, ext->id);
+    }
+}
+
+onyx_pump_t onyx_pump(onyx_context_t *ctx) {
+    Context *context = &ctx->context;
+
+    if (bh_arr_is_empty(context->entities.entities)) {
+        // Once the module has been linked, we are all done and ready to say everything compiled successfully!
+        if (context->wasm_module_linked) return ONYX_PUMP_DONE;
+
+        link_wasm_module(context);
+        context->wasm_module_linked = 1;
+        return ONYX_PUMP_DONE;
+    }
+
+    Entity* ent = entity_heap_top(&context->entities);
+
+    // Mostly a preventative thing to ensure that even if somehow
+    // errors were left disabled, they are re-enabled in this cycle.
+    onyx_errors_enable(context);
+    entity_heap_remove_top(&context->entities);
+
+    u64 perf_start;
+    EntityType perf_entity_type;
+    EntityState perf_entity_state;
+    if (context->options->running_perf) {
+        perf_start = bh_time_curr_micro();
+        perf_entity_type = ent->type;
+        perf_entity_state = ent->state;
+    }
+
+    b32 changed = process_entity(context, ent);
+
+    // NOTE: VERY VERY dumb cycle breaking. Basically, remember the first entity that did
+    // not change (i.e. did not make any progress). Then everytime an entity doesn't change,
+    // check if it is the same entity. If it is, it means all other entities that were processed
+    // between the two occurences didn't make any progress either, and there must be a cycle.
+    //                                                              - brendanfh 2021/02/06
+    //
+    // Because of the recent changes to the compiler architecture (again), this condition
+    // does not always hold anymore. There can be nodes that get scheduled multiple times
+    // before the "key" node that will unblock the progress. This means a more sophisticated
+    // cycle detection algorithm must be used.
+    //
+    if (!changed) {
+        if (!context->watermarked_node) {
+            context->watermarked_node = ent;
+            context->highest_watermark = bh_max(context->highest_watermark, ent->macro_attempts);
+        }
+        else if (context->watermarked_node == ent) {
+            if (ent->macro_attempts > context->highest_watermark) {
+                entity_heap_insert_existing(&context->entities, ent);
+
+                if (context->cycle_almost_detected == 4) {
+                    dump_cycles(context);
+                } else if (context->cycle_almost_detected == 3) {
+                    send_stalled_hooks(context);
+                }
+
+                context->cycle_almost_detected += 1;
+            }
+        }
+        else if (context->watermarked_node->macro_attempts < ent->macro_attempts) {
+            context->watermarked_node = ent;
+            context->highest_watermark = bh_max(context->highest_watermark, ent->macro_attempts);
+        }
+    } else {
+        context->watermarked_node = NULL;
+        context->cycle_almost_detected = 0;
+    }
+
+    if (onyx_has_errors(context)) {
+        return ONYX_PUMP_ERRORED;
+    }
+
+    if (ent->state != Entity_State_Finalized && ent->state != Entity_State_Failed)
+        entity_heap_insert_existing(&context->entities, ent);
+
+    if (context->options->running_perf) {
+        u64 perf_end = bh_time_curr_micro();
+
+        u64 duration = perf_end - perf_start;
+        context->stats.microseconds_per_type[perf_entity_type] += duration;
+        context->stats.microseconds_per_state[perf_entity_state] += duration;
+    }
+
+    return ONYX_PUMP_CONTINUE;
 }
 
 //
 // Options
 //
-void onyx_set_option_cstr(onyx_context_t *ctx, onyx_option_t opt, char *value) {
-
+int32_t onyx_set_option_cstr(onyx_context_t *ctx, onyx_option_t opt, char *value) {
+    return onyx_set_option_bytes(ctx, opt, value, strlen(value));
 }
 
-void onyx_set_option_bytes(onyx_context_t *ctx, onyx_option_t opt, char *value, int32_t length) {
-
+int32_t onyx_set_option_bytes(onyx_context_t *ctx, onyx_option_t opt, char *value, int32_t length) {
+    if (length < 0) length = strlen(value);
+    return 0;
 }
 
-void onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t value) {
+int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t value) {
+    switch (opt) {
+    case ONYX_OPTION_POST_MVP_FEATURES:      ctx->context.options->use_post_mvp_features = value; return 1;
+    case ONYX_OPTION_MULTI_THREADING:        ctx->context.options->use_multi_threading = value;  return 1;
+    case ONYX_OPTION_GENERATE_FOREIGN_INFO:  ctx->context.options->generate_foreign_info = value; return 1;
+    case ONYX_OPTION_GENERATE_TYPE_INFO:     ctx->context.options->generate_type_info = value; return 1;
+    case ONYX_OPTION_GENERATE_METHOD_INFO:   ctx->context.options->generate_method_info = value; return 1;
+    case ONYX_OPTION_GENERATE_DEBUG_INFO:    ctx->context.options->debug_info_enabled = value; return 1;
+    case ONYX_OPTION_GENERATE_STACK_TRACE:   ctx->context.options->stack_trace_enabled = value; return 1;
+    case ONYX_OPTION_DISABLE_CORE:           ctx->context.options->no_core = value; return 1;
+    case ONYX_OPTION_DISABLE_STALE_CODE:     ctx->context.options->no_stale_code = value; return 1;
+    case ONYX_OPTION_OPTIONAL_SEMICOLONS:    ctx->context.options->enable_optional_semicolons = value; return 1;
+    case ONYX_OPTION_DISABLE_FILE_CONTENTS:  ctx->context.options->no_file_contents = value; return 1;
+    case ONYX_OPTION_DISABLE_EXTENSIONS:     ctx->context.options->no_compiler_extensions = value; return 1;
+    case ONYX_OPTION_PLATFORM:               ctx->context.options->runtime = value; return 1;
 
+    default:
+        break;
+    }
+
+    return 0;
+}
+
+void onyx_add_defined_var(onyx_context_t *ctx, char *variable, int32_t variable_length, char *value, int32_t value_length) {
+    if (variable_length < 0) variable_length = strlen(variable);
+    if (value_length    < 0) value_length    = strlen(value);
+
+    create_and_add_defined_variable(&ctx->context, variable, variable_length, value, value_length);
 }
 
 //
@@ -195,17 +550,26 @@ void onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t value) 
 /// Adds a file to the compilation, following typical `#load` rules.
 /// 1. `foo:file.onyx` will search in the `foo` mapped folder.
 /// 2. `file.onyx` will search in the current directory for `file.onyx`.
-void onyx_include_file_cstr(onyx_context_t *ctx, char *filename) {
-    onyx_include_file(ctx, filename, strlen(filename));
+void onyx_include_file(onyx_context_t *ctx, char *filename, int32_t length) {
+    if (length < 0) length = strlen(filename);
+
+    AstInclude* load_node = create_load(&ctx->context, filename, -1);
+    add_entities_for_node(&ctx->context.entities, NULL, (AstNode *) load_node, ctx->context.global_scope, NULL);
 }
 
-void onyx_include_file(onyx_context_t *ctx, char *filename, int32_t length) {
+void onyx_add_mapped_dir(onyx_context_t *ctx, char *mapped_name, int32_t mapped_length, char *dir, int32_t dir_length) {
+    if (mapped_length < 0) mapped_length = strlen(mapped_name);
+    if (dir_length    < 0) dir_length    = strlen(dir);
 
+    bh_arr_push(ctx->context.options->mapped_folders, ((bh_mapped_folder) {
+        bh_strdup_len(ctx->context.ast_alloc, mapped_name, mapped_length),
+        bh_strdup_len(ctx->context.ast_alloc, dir, dir_length)
+    }));
 }
 
 /// Directly injects Onyx code as a new compilation unit
-void onyx_inject_code(onyx_context_t *ctx, uint32_t *code, u32 length) {
-	
+void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length) {
+    assert(0 && "unimplemented");
 }
 
 //
@@ -213,72 +577,114 @@ void onyx_inject_code(onyx_context_t *ctx, uint32_t *code, u32 length) {
 //
 
 int32_t onyx_error_count(onyx_context_t *ctx) {
-    return bh_arr_length(ctx->errors.errors);
+    return bh_arr_length(ctx->context.errors.errors);
 }
 
-const char *onyx_error_message(onyx_context_t *ctx, i32 error_idx) {
-    i32 error_count = onyx_error_count(ctx);
+const char *onyx_error_message(onyx_context_t *ctx, int32_t error_idx) {
+    int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return NULL;
 
-    return ctx->errors.errors[error_idx].text;
+    return ctx->context.errors.errors[error_idx].text;
 }
 
-const char *onyx_error_filename(onyx_context_t *ctx, i32 error_idx) {
-    i32 error_count = onyx_error_count(ctx);
+const char *onyx_error_filename(onyx_context_t *ctx, int32_t error_idx) {
+    int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return NULL;
 
-    return ctx->errors.errors[error_idx].pos.filename;
+    return ctx->context.errors.errors[error_idx].pos.filename;
 }
 
-int32_t onyx_error_line(onyx_context_t *ctx, i32 error_idx) {
-    i32 error_count = onyx_error_count(ctx);
-    if (error_idx < 0 || error_idx >= error_count) return NULL;
+int32_t onyx_error_line(onyx_context_t *ctx, int32_t error_idx) {
+    int32_t error_count = onyx_error_count(ctx);
+    if (error_idx < 0 || error_idx >= error_count) return 0;
 
-    return ctx->errors.errors[error_idx].pos.line;
+    return ctx->context.errors.errors[error_idx].pos.line;
 }
 
-int32_t onyx_error_column(onyx_context_t *ctx, i32 error_idx) {
-    i32 error_count = onyx_error_count(ctx);
-    if (error_idx < 0 || error_idx >= error_count) return NULL;
+int32_t onyx_error_column(onyx_context_t *ctx, int32_t error_idx) {
+    int32_t error_count = onyx_error_count(ctx);
+    if (error_idx < 0 || error_idx >= error_count) return 0;
 
-    return ctx->errors.errors[error_idx].pos.column;
+    return ctx->context.errors.errors[error_idx].pos.column;
 }
 
-int32_t onyx_error_length(onyx_context_t *ctx, i32 error_idx) {
-    i32 error_count = onyx_error_count(ctx);
-    if (error_idx < 0 || error_idx >= error_count) return NULL;
+int32_t onyx_error_length(onyx_context_t *ctx, int32_t error_idx) {
+    int32_t error_count = onyx_error_count(ctx);
+    if (error_idx < 0 || error_idx >= error_count) return 0;
 
-    return ctx->errors.errors[error_idx].pos.length;
+    return ctx->context.errors.errors[error_idx].pos.length;
 }
 
+
+static void ensure_wasm_has_been_generated(onyx_context_t *ctx) {
+    if (ctx->context.generated_wasm_buffer.length == 0) {
+        if (onyx_has_errors(&ctx->context)) return;
+        onyx_wasm_module_write_to_buffer(ctx->context.wasm_module, &ctx->context.generated_wasm_buffer);
+    }
+}
 
 int32_t onyx_wasm_output_length(onyx_context_t *ctx) {
-
+    ensure_wasm_has_been_generated(ctx);
+    return ctx->context.generated_wasm_buffer.length;
 }
 
 void onyx_wasm_output_write(onyx_context_t *ctx, void *buffer) {
-
+    ensure_wasm_has_been_generated(ctx);
+    memcpy(buffer, ctx->context.generated_wasm_buffer.data, ctx->context.generated_wasm_buffer.length);
 }
-#endif
 
 
 
-int main(int argc, char const *argv[]) {
-	onyx_context_t *ctx = onyx_context_create();
 
-	onyx_include_file_cstr(ctx, "hello.onyx");
 
-	while (onyx_pump(ctx) == ONYX_PUMP_CONTINUE) {
-		// Message processing, if enabled
-	}
+// Internal procedures
 
-	int64_t output_length = onyx_wasm_output_length(ctx);
-	void *output = malloc(output_length);
-	onyx_wasm_output_write(ctx, output);
+static AstInclude* create_load(Context *context, char* filename, int32_t length) {
+    static OnyxToken implicit_load_token = { '#', 1, 0, { 0, 0, 0, 0, 0 } };
+    
+    AstInclude* include_node = onyx_ast_node_new(context->ast_alloc, sizeof(AstInclude), Ast_Kind_Load_File);
+    include_node->name = bh_strdup_len(context->ast_alloc, filename, length);
+    include_node->token = &implicit_load_token;
 
-	FILE* output_fd = fopen("hello.wasm", "wb");
-	fwrite(output_fd, output, output_length);
-	fclose(output_fd);
+    return include_node;
+}
 
-	onyx_context_free(ctx);
+
+static void create_and_add_defined_variable(Context *context, char *name, int32_t name_length, char *value, int32_t value_length) {
+    OnyxToken *value_token = bh_alloc_item(context->ast_alloc, OnyxToken);
+    value_token->text = value;
+    value_token->length = value_length;
+
+    OnyxToken *name_token = bh_alloc_item(context->ast_alloc, OnyxToken);
+    name_token->text = name;
+    name_token->length = name_length;
+
+    Package *p = package_lookup(context, "runtime.vars");
+    assert(p);
+
+    AstStrLit *value_node = make_string_literal(context, value_token);
+    add_entities_for_node(&context->entities, NULL, (AstNode *) value_node, NULL, NULL);
+
+    AstBinding *binding = onyx_ast_node_new(context->ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
+    binding->token = name_token;
+    binding->node = (AstNode *) value_node;
+
+    add_entities_for_node(&context->entities, NULL, (AstNode *) binding, p->scope, p);
+}
+
+
+static void link_wasm_module(Context *context) {
+    Package *runtime_var_package = package_lookup(context, "runtime.vars");
+    assert(runtime_var_package);
+
+    AstTyped *link_options_node = (AstTyped *) symbol_raw_resolve(context, runtime_var_package->scope, "link_options");
+    Type *link_options_type = type_build_from_ast(context, context->builtins.link_options_type);
+
+    assert(unify_node_and_type(context, &link_options_node, link_options_type) == TYPE_MATCH_SUCCESS);
+
+    OnyxWasmLinkOptions link_opts;
+    // CLEANUP: Properly handle this case.
+    assert(onyx_wasm_build_link_options_from_node(context, &link_opts, link_options_node));
+
+    onyx_wasm_module_link(context, context->wasm_module, &link_opts);
 }

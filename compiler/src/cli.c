@@ -263,30 +263,30 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
         }
 
         if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
-            options->target_file = argv[++i];
+            options->target_file = argv[++i]; // :InCli
         }
         else if (!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-V")) {
-            options->verbose_output = 1;
+            options->verbose_output = 1; // :InCli
         }
         else if (!strcmp(argv[i], "--help")) {
-            options->action = ONYX_COMPILE_ACTION_PRINT_HELP;
+            options->action = ONYX_COMPILE_ACTION_PRINT_HELP;  // :InCli
             options->help_subcommand = argv[1];
             return;
         }
         else if (!strcmp(argv[i], "-VV")) {
-            options->verbose_output = 2;
+            options->verbose_output = 2; // :InCli
         }
         else if (!strcmp(argv[i], "-VVV")) {
-            options->verbose_output = 3;
+            options->verbose_output = 3; // :InCli
         }
         else if (!strcmp(argv[i], "--print-function-mappings")) {
-            options->print_function_mappings = 1;
+            options->print_function_mappings = 1; // :InCli
         }
         else if (!strcmp(argv[i], "--print-static-if-results")) {
-            options->print_static_if_results = 1;
+            options->print_static_if_results = 1; // :InCli
         }
         else if (!strcmp(argv[i], "--no-colors")) {
-            options->no_colors = 1;
+            options->no_colors = 1; // :InCli
         }
         else if (!strcmp(argv[i], "--no-file-contents")) {
             options->no_file_contents = 1;
@@ -319,10 +319,10 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
             options->no_stale_code = 1;
         }
         else if (!strcmp(argv[i], "--show-all-errors")) {
-            options->show_all_errors = 1;
+            options->show_all_errors = 1; // :InCli
         }
         else if (!strcmp(argv[i], "--error-format")) {
-            options->error_format = argv[++i];
+            options->error_format = argv[++i]; // :InCli
         }
         else if (!strcmp(argv[i], "--feature")) {
             char *next_arg = argv[++i];
@@ -370,14 +370,14 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
             }
         }
         else if (!strcmp(argv[i], "--doc")) {
-            options->documentation_file = argv[++i];
+            options->documentation_file = argv[++i]; // :InCli
         }
         else if (!strcmp(argv[i], "--syminfo")) {
-            options->generate_symbol_info_file = 1;
+            options->generate_symbol_info_file = 1; // :InCli
             options->symbol_info_file = argv[++i];
         }
         else if (!strcmp(argv[i], "--lspinfo")) {
-            options->generate_symbol_info_file = 1;
+            options->generate_symbol_info_file = 1; // :InCli
             options->generate_lsp_info_file = 1;
             options->symbol_info_file = argv[++i];
         }
@@ -388,7 +388,7 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
             options->generate_name_section = 1;
         }
         else if (!strcmp(argv[i], "--debug-socket")) {
-            options->debug_socket = argv[++i];
+            options->debug_socket = argv[++i]; // :InCli
         }
         else if (!strcmp(argv[i], "--debug-info")) {
             options->debug_info_enabled = 1;
@@ -407,7 +407,7 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
         // is not ANSI compatible and for a silly feature, I don't want to learn
         // how to properly do arbitrary graphics in it.
         else if (!strcmp(argv[i], "--fun") || !strcmp(argv[i], "-F")) {
-            options->fun_output = 1;
+            options->fun_output = 1; // :InCli
         }
 #endif
         else {

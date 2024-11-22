@@ -2180,8 +2180,9 @@ struct Context {
 
     bh_arr(bh_file_contents) loaded_files;
 
-    // NOTE: This is defined in onyxwasm.h
+    // NOTE: This is defined in wasm_emit.h
     struct OnyxWasmModule* wasm_module;
+    bh_buffer generated_wasm_buffer;
 
     struct SymbolInfoTable *symbol_info;
     struct OnyxDocInfo     *doc_info;
@@ -2223,6 +2224,7 @@ struct Context {
     b32 cycle_detected : 1;
 
     b32 builtins_initialized : 1;
+    b32 wasm_module_linked : 1;
 };
 
 typedef struct BuiltinSymbol {
