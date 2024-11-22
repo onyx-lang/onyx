@@ -196,7 +196,7 @@ void onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t value) 
 /// 1. `foo:file.onyx` will search in the `foo` mapped folder.
 /// 2. `file.onyx` will search in the current directory for `file.onyx`.
 void onyx_include_file_cstr(onyx_context_t *ctx, char *filename) {
-
+    onyx_include_file(ctx, filename, strlen(filename));
 }
 
 void onyx_include_file(onyx_context_t *ctx, char *filename, int32_t length) {
@@ -213,27 +213,42 @@ void onyx_inject_code(onyx_context_t *ctx, uint32_t *code, u32 length) {
 //
 
 int32_t onyx_error_count(onyx_context_t *ctx) {
-
+    return bh_arr_length(ctx->errors.errors);
 }
 
 const char *onyx_error_message(onyx_context_t *ctx, i32 error_idx) {
+    i32 error_count = onyx_error_count(ctx);
+    if (error_idx < 0 || error_idx >= error_count) return NULL;
 
+    return ctx->errors.errors[error_idx].text;
 }
 
 const char *onyx_error_filename(onyx_context_t *ctx, i32 error_idx) {
+    i32 error_count = onyx_error_count(ctx);
+    if (error_idx < 0 || error_idx >= error_count) return NULL;
 
+    return ctx->errors.errors[error_idx].pos.filename;
 }
 
 int32_t onyx_error_line(onyx_context_t *ctx, i32 error_idx) {
+    i32 error_count = onyx_error_count(ctx);
+    if (error_idx < 0 || error_idx >= error_count) return NULL;
 
+    return ctx->errors.errors[error_idx].pos.line;
 }
 
 int32_t onyx_error_column(onyx_context_t *ctx, i32 error_idx) {
+    i32 error_count = onyx_error_count(ctx);
+    if (error_idx < 0 || error_idx >= error_count) return NULL;
 
+    return ctx->errors.errors[error_idx].pos.column;
 }
 
 int32_t onyx_error_length(onyx_context_t *ctx, i32 error_idx) {
+    i32 error_count = onyx_error_count(ctx);
+    if (error_idx < 0 || error_idx >= error_count) return NULL;
 
+    return ctx->errors.errors[error_idx].pos.length;
 }
 
 

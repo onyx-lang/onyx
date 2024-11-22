@@ -5,7 +5,7 @@
 
 typedef struct onyx_context_t onyx_context_t;
 
-type enum onyx_option_t {
+typedef enum onyx_option_t {
 	ONYX_OPTION_NO_OP,
 	ONYX_OPTION_CURRENT_DIRECTORY,
 
@@ -24,7 +24,7 @@ type enum onyx_option_t {
 	ONYX_OPTION_DISABLE_EXTENSIONS,
 } onyx_option_t;
 
-type enum onyx_pump_t {
+typedef enum onyx_pump_t {
 	ONYX_PUMP_CONTINUE,
 	ONYX_PUMP_DONE,
 	ONYX_PUMP_ERRORED,
