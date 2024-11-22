@@ -1340,6 +1340,14 @@ EMIT_FUNC(for__prologue, AstFor* for_node, u64 iter_local, i64 index_local) {
         }
 
         WIL(for_node->token, WI_LOCAL_SET, index_local);
+
+        WasmInstruction* increment_instructions = bh_alloc_array(global_heap_allocator, WasmInstruction, 4);
+        increment_instructions[0] = (WasmInstruction) { WI_LOCAL_GET,     { .l = index_local } };
+        increment_instructions[1] = (WasmInstruction) { WI_I32_CONST,     { .l = 1 } };
+        increment_instructions[2] = (WasmInstruction) { WI_I32_ADD,       { .l = 0x00 } };
+        increment_instructions[3] = (WasmInstruction) { WI_LOCAL_SET,     { .l = index_local } };
+
+        emit_defer_code(mod, &code, increment_instructions, 4);
     }
 
     *pcode = code;
@@ -1408,9 +1416,8 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local, i64 index_local) {
         INT_ADD = WI_I64_ADD;
     }
 
-    emit_for__prologue(mod, &code, for_node, iter_local, index_local);
-
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
+    emit_for__prologue(mod, &code, for_node, iter_local, index_local);
     emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
     emit_enter_structured_block(mod, &code, SBT_Continue_Block, for_node->token);
 
@@ -1502,9 +1509,8 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local, i64 index_local) {
     WI(for_node->token, WI_PTR_ADD);
     WIL(for_node->token, WI_LOCAL_SET, end_ptr_local);
 
-    emit_for__prologue(mod, &code, for_node, iter_local, index_local);
-
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
+    emit_for__prologue(mod, &code, for_node, iter_local, index_local);
     emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
     emit_enter_structured_block(mod, &code, SBT_Continue_Block, for_node->token);
 
@@ -1582,13 +1588,13 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
         bh_arr_push(mod->for_remove_info, remove_info);
     }
 
-    emit_for__prologue(mod, &code, for_node, iter_local, index_local);
-
     AstLocal* var = for_node->var;
     assert((iter_local & LOCAL_IS_WASM) == 0);
 
     // Enter a deferred statement for the auto-close
     emit_enter_structured_block(mod, &code, SBT_Basic_Block, for_node->token);
+
+    emit_for__prologue(mod, &code, for_node, iter_local, index_local);
 
     if (!for_node->no_close) {
         StructMember close_func_type;
