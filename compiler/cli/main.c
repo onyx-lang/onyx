@@ -1,4 +1,3 @@
-#define BH_DEFINE
 #define BH_NO_TABLE
 #include "bh.h"
 
@@ -498,7 +497,7 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
             if (!strcmp(argv[i], "--")) {
                 cli_args->passthrough_argument_count = argc - i - 1;
                 cli_args->passthrough_argument_data  = &argv[i + 1];
-                return 1;
+                break;
             }
 
             // FLAG AFTER SOURCE FILES
@@ -512,13 +511,14 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
                 bh_printf(C_RED "error" C_NORM ": Expected only one '.wasm', or multiple '.onyx' files to be given.\n");
                 return 0;
             }
-
             cli_args->action = ONYX_COMPILE_ACTION_RUN_WASM;
             cli_args->target_file = argv[i];
 
             cli_args->passthrough_argument_count = argc - i - 1;
             cli_args->passthrough_argument_data  = &argv[i + 1];
-            return 1;
+
+            at_least_one_file = 1;
+            break;
         }
 
         at_least_one_file = 1;

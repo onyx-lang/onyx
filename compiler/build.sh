@@ -59,10 +59,12 @@ case "$(uname)" in
 esac
 
 echo "Compiling libonyx.$suffix"
-$ONYX_CC -shared -fPIC -o "libonyx.$suffix" \
-    $FLAGS $INCLUDES \
-    $(echo "$C_FILES" | sed 's/ /\n/g;s/\([a-zA-Z_0-9]*\)\n/src\/\1.c\n/g;s/\n/ /g') \
-    $LIBS
+for c_file in $(echo "$C_FILES" | sed 's/ /\n/g;s/\([a-zA-Z_0-9]*\)\n/src\/\1.c\n/g;s/\n/ /g'); do
+    $ONYX_CC $FLAGS $INCLUDES -fPIC -o $(basename $c_file).o -c $c_file
+done
 
 echo "Compiling onyx executable"
-$ONYX_CC $INCLUDES $FLAGS cli/main.c -o onyx -L . -lonyx -Wl,-rpath=. -Wl,-rpath=../lib
+$ONYX_CC $INCLUDES $FLAGS cli/main.c *.o -o onyx $LIBS
+$ONYX_CC -shared -o "libonyx.$suffix" *.o $LIBS
+
+rm *.o
