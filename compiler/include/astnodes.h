@@ -3,7 +3,8 @@
 
 #define VERSION_MAJOR 0
 #define VERSION_MINOR 1
-#define VERSION_PATCH 13
+#define VERSION_PATCH 14
+#define VERSION_SUFFIX "-preview"
 
 #include "stb_ds.h"
 #include "lex.h"

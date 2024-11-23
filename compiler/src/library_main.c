@@ -11,6 +11,9 @@
 #include "doc.h"
 #include "onyx.h"
 
+#define STRINGIFY_(x) #x
+#define STRINGIFY(x) STRINGIFY_(x)
+
 //
 // Types
 //
@@ -18,6 +21,39 @@
 struct onyx_context_t {
 	Context context;
 };
+
+
+//
+// Metadata
+//
+
+int32_t onyx_version_major() {
+    return VERSION_MAJOR;
+}
+
+int32_t onyx_version_minor() {
+    return VERSION_MINOR;
+}
+
+int32_t onyx_version_patch() {
+    return VERSION_PATCH;
+}
+
+char   *onyx_version_suffix() {
+    return VERSION_SUFFIX;
+}
+
+char   *onyx_version_build_time() {
+    return __TIMESTAMP__;
+}
+
+char   *onyx_version_runtime() {
+#ifdef ONYX_RUNTIME_LIBRARY
+    return STRINGIFY(ONYX_RUNTIME_LIBRARY);
+#else
+    return "none";
+#endif
+}
 
 
 //
@@ -522,6 +558,9 @@ int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t valu
     case ONYX_OPTION_GENERATE_METHOD_INFO:   ctx->context.options->generate_method_info = value; return 1;
     case ONYX_OPTION_GENERATE_DEBUG_INFO:    ctx->context.options->debug_info_enabled = value; return 1;
     case ONYX_OPTION_GENERATE_STACK_TRACE:   ctx->context.options->stack_trace_enabled = value; return 1;
+    case ONYX_OPTION_GENERATE_NAME_SECTION:  ctx->context.options->generate_name_section = value; return 1;
+    case ONYX_OPTION_GENERATE_SYMBOL_INFO:   ctx->context.options->generate_symbol_info_file = value; return 1;
+    case ONYX_OPTION_GENERATE_LSP_INFO:      ctx->context.options->generate_lsp_info_file = value; return 1;
     case ONYX_OPTION_DISABLE_CORE:           ctx->context.options->no_core = value; return 1;
     case ONYX_OPTION_DISABLE_STALE_CODE:     ctx->context.options->no_stale_code = value; return 1;
     case ONYX_OPTION_OPTIONAL_SEMICOLONS:    ctx->context.options->enable_optional_semicolons = value; return 1;
@@ -634,6 +673,30 @@ void onyx_wasm_output_write(onyx_context_t *ctx, void *buffer) {
 }
 
 
+
+//
+// Running WASM
+//
+
+void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv) {
+    onyx_run_initialize(0, NULL);
+
+    bh_buffer wasm_bytes;
+    wasm_bytes.data = buffer;
+    wasm_bytes.length = buffer_length;
+
+    onyx_run_wasm_code(wasm_bytes, argc, argv);
+}
+
+void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path) {
+    onyx_run_initialize(1, socket_path);
+
+    bh_buffer wasm_bytes;
+    wasm_bytes.data = buffer;
+    wasm_bytes.length = buffer_length;
+
+    onyx_run_wasm_code(wasm_bytes, argc, argv);
+}
 
 
 

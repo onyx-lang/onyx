@@ -619,7 +619,7 @@ void onyx_run_initialize(b32 debug_enabled, const char *debug_socket) {
     wasm_runtime.onyx_print_trap = &onyx_print_trap;
 }
 
-b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
+b32 onyx_run_wasm_code(bh_buffer wasm_bytes, int argc, char *argv[]) {
     runtime = &wasm_runtime;
     wasm_raw_bytes = wasm_bytes;
 

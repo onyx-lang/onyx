@@ -839,7 +839,7 @@ void onyx_wasm_module_write_js_partials_to_file(OnyxWasmModule* module, bh_file 
 
 #ifdef ONYX_RUNTIME_LIBRARY
 void onyx_run_initialize(b32 debug_enabled, const char *debug_socket);
-b32 onyx_run_wasm(bh_buffer code_buffer, int argc, char *argv[]);
+b32 onyx_run_wasm_code(bh_buffer code_buffer, int argc, char *argv[]);
 #endif
 
 #ifdef ENABLE_DEBUG_INFO

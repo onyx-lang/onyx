@@ -3,6 +3,16 @@
 
 #include <stdint.h>
 
+#if defined(_MSC_VER)
+    #define API __declspec(dllexport)
+#elif defined(__GNUC__)
+    #define API __attribute__((visibility("default")))
+#else
+    #define API
+    #pragma warning Unknown dynamic link import/export semantics.
+#endif
+
+
 typedef struct onyx_context_t onyx_context_t;
 
 typedef enum onyx_option_t {
@@ -17,6 +27,9 @@ typedef enum onyx_option_t {
 	ONYX_OPTION_GENERATE_METHOD_INFO,
 	ONYX_OPTION_GENERATE_DEBUG_INFO,
 	ONYX_OPTION_GENERATE_STACK_TRACE,
+	ONYX_OPTION_GENERATE_NAME_SECTION,
+	ONYX_OPTION_GENERATE_SYMBOL_INFO,
+	ONYX_OPTION_GENERATE_LSP_INFO,
 	ONYX_OPTION_DISABLE_CORE,
 	ONYX_OPTION_DISABLE_STALE_CODE,
 
@@ -24,6 +37,8 @@ typedef enum onyx_option_t {
 
 	ONYX_OPTION_DISABLE_FILE_CONTENTS,
 	ONYX_OPTION_DISABLE_EXTENSIONS,
+
+	ONYX_OPTION_COLLECT_PERF,
 
 	ONYX_OPTION_PLATFORM,
 } onyx_option_t;
@@ -43,23 +58,36 @@ typedef enum onyx_platform_t {
 
 
 //
+// Metadata
+//
+
+API int32_t onyx_version_major();
+API int32_t onyx_version_minor();
+API int32_t onyx_version_patch();
+API char   *onyx_version_suffix();
+API char   *onyx_version_build_time();
+API char   *onyx_version_runtime();
+
+
+
+//
 // Lifecycle
 //
 
-onyx_context_t *onyx_context_create();
-void onyx_context_free(onyx_context_t *ctx);
+API onyx_context_t *onyx_context_create();
+API void onyx_context_free(onyx_context_t *ctx);
 
 /// Call after all options have been set and before the first `onyx_pump`.
-void onyx_options_ready(onyx_context_t *ctx);
-onyx_pump_t onyx_pump(onyx_context_t *ctx);
+API void onyx_options_ready(onyx_context_t *ctx);
+API onyx_pump_t onyx_pump(onyx_context_t *ctx);
 
 //
 // Options
 //
-int32_t onyx_set_option_cstr(onyx_context_t *ctx, onyx_option_t opt, char *value);
-int32_t onyx_set_option_bytes(onyx_context_t *ctx, onyx_option_t opt, char *value, int32_t length);
-int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t value);
-void onyx_add_defined_var(onyx_context_t *ctx, char *variable, int32_t variable_length, char *value, int32_t value_length);
+API int32_t onyx_set_option_cstr(onyx_context_t *ctx, onyx_option_t opt, char *value);
+API int32_t onyx_set_option_bytes(onyx_context_t *ctx, onyx_option_t opt, char *value, int32_t length);
+API int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t value);
+API void onyx_add_defined_var(onyx_context_t *ctx, char *variable, int32_t variable_length, char *value, int32_t value_length);
 
 //
 // Loading code
@@ -68,25 +96,34 @@ void onyx_add_defined_var(onyx_context_t *ctx, char *variable, int32_t variable_
 /// Adds a file to the compilation, following typical `#load` rules.
 /// 1. `foo:file.onyx` will search in the `foo` mapped folder.
 /// 2. `file.onyx` will search in the current directory for `file.onyx`.
-void onyx_include_file(onyx_context_t *ctx, char *filename, int32_t length);
-void onyx_add_mapped_dir(onyx_context_t *ctx, char *mapped_name, int32_t mapped_length, char *dir, int32_t dir_length);
+API void onyx_include_file(onyx_context_t *ctx, char *filename, int32_t length);
+API void onyx_add_mapped_dir(onyx_context_t *ctx, char *mapped_name, int32_t mapped_length, char *dir, int32_t dir_length);
 
 /// Directly injects Onyx code as a new compilation unit
-void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length);
+API void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length);
 
 //
 // Output
 //
 
-int32_t     onyx_error_count(onyx_context_t *ctx);
-const char *onyx_error_message(onyx_context_t *ctx, int32_t error_idx);
-const char *onyx_error_filename(onyx_context_t *ctx, int32_t error_idx);
-int32_t     onyx_error_line(onyx_context_t *ctx, int32_t error_idx);
-int32_t     onyx_error_column(onyx_context_t *ctx, int32_t error_idx);
-int32_t     onyx_error_length(onyx_context_t *ctx, int32_t error_idx);
+API int32_t     onyx_error_count(onyx_context_t *ctx);
+API const char *onyx_error_message(onyx_context_t *ctx, int32_t error_idx);
+API const char *onyx_error_filename(onyx_context_t *ctx, int32_t error_idx);
+API int32_t     onyx_error_line(onyx_context_t *ctx, int32_t error_idx);
+API int32_t     onyx_error_column(onyx_context_t *ctx, int32_t error_idx);
+API int32_t     onyx_error_length(onyx_context_t *ctx, int32_t error_idx);
 
-int32_t onyx_wasm_output_length(onyx_context_t *ctx);
-void onyx_wasm_output_write(onyx_context_t *ctx, void *buffer);
+API int32_t onyx_wasm_output_length(onyx_context_t *ctx);
+API void onyx_wasm_output_write(onyx_context_t *ctx, void *buffer);
+
+
+//
+// Running WASM
+//
+
+API void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv);
+API void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path);
+
 #endif
 
 

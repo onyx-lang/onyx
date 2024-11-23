@@ -12,7 +12,7 @@ else
     FLAGS="$WARNINGS -O3"
 fi
 
-FLAGS="$FLAGS -DENABLE_DEBUG_INFO"
+FLAGS="$FLAGS -DENABLE_DEBUG_INFO -fvisibility=hidden"
 
 if [ ! -z ${ONYX_TARGET+x} ]; then
     FLAGS="$FLAGS --target=$ONYX_TARGET"
@@ -51,8 +51,18 @@ if [ "$ONYX_USE_DYNCALL" = "1" ] && [ "$ONYX_RUNTIME_LIBRARY" = "ovmwasm" ]; the
     FLAGS="$FLAGS -DUSE_DYNCALL"
 fi
 
-echo "Compiling onyx"
-$ONYX_CC -shared -fPIC -o "libonyx.so" \
+case "$(uname)" in
+    Linux)  suffix='so' ;;
+    *BSD)   suffix='so' ;;
+    Darwin) suffix='dylib' ;;
+    *)      suffix='dll' ;;
+esac
+
+echo "Compiling libonyx.$suffix"
+$ONYX_CC -shared -fPIC -o "libonyx.$suffix" \
     $FLAGS $INCLUDES \
     $(echo "$C_FILES" | sed 's/ /\n/g;s/\([a-zA-Z_0-9]*\)\n/src\/\1.c\n/g;s/\n/ /g') \
     $LIBS
+
+echo "Compiling onyx executable"
+$ONYX_CC $INCLUDES $FLAGS cli/main.c -o onyx -L . -lonyx -Wl,-rpath=. -Wl,-rpath=../lib

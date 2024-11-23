@@ -1005,7 +1005,7 @@ ptr bh_alloc(bh_allocator a, isize size) {
 
 ptr bh_alloc_aligned(bh_allocator a, isize size, isize alignment) {
     ptr ret = a.proc(a.data, bh_allocator_action_alloc, size, alignment, NULL,  0);
-    if (ret) memset(ret, 0, size);
+    if (ret != 0) memset(ret, 0, size);
     return ret;
 }
 
@@ -1934,10 +1934,12 @@ bh_file_contents bh_file_read_contents_bh_file(bh_allocator alloc, bh_file* file
 }
 
 bh_file_contents bh_file_read_contents_direct(bh_allocator alloc, const char* filename) {
-    bh_file file;
-    bh_file_open(&file, filename);
-    bh_file_contents fc = bh_file_read_contents(alloc, &file);
-    bh_file_close(&file);
+    bh_file file = {0};
+    bh_file_contents fc = {0};
+    if (bh_file_open(&file, filename) == BH_FILE_ERROR_NONE) {
+        fc = bh_file_read_contents(alloc, &file);
+        bh_file_close(&file);
+    }
     return fc;
 }
 
