@@ -1343,8 +1343,13 @@ EMIT_FUNC(for__prologue, AstFor* for_node, u64 iter_local, i64 index_local) {
 
         WasmInstruction* increment_instructions = bh_alloc_array(mod->allocator, WasmInstruction, 4);
         increment_instructions[0] = (WasmInstruction) { WI_LOCAL_GET,     { .l = index_local } };
-        increment_instructions[1] = (WasmInstruction) { WI_I32_CONST,     { .l = 1 } };
-        increment_instructions[2] = (WasmInstruction) { WI_I32_ADD,       { .l = 0x00 } };
+        if (type_is_small_integer(for_node->index_var->type)) {
+            increment_instructions[1] = (WasmInstruction) { WI_I32_CONST,     { .l = 1 } };
+            increment_instructions[2] = (WasmInstruction) { WI_I32_ADD,       { .l = 0x00 } };
+        } else {
+            increment_instructions[1] = (WasmInstruction) { WI_I64_CONST,     { .l = 1 } };
+            increment_instructions[2] = (WasmInstruction) { WI_I64_ADD,       { .l = 0x00 } };
+        }
         increment_instructions[3] = (WasmInstruction) { WI_LOCAL_SET,     { .l = index_local } };
 
         emit_defer_code(mod, &code, increment_instructions, 4);
