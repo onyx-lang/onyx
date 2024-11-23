@@ -56,6 +56,13 @@ typedef enum onyx_platform_t {
 	ONYX_PLATFORM_CUSTOM = 4,
 } onyx_platform_t;
 
+typedef enum onyx_error_t {
+    ONYX_ERROR_WARNING  = 2,
+    ONYX_ERROR_WAITING  = 3,
+    ONYX_ERROR_CRITICAL = 4,
+    ONYX_ERROR_CLI      = 5,
+} onyx_error_t;
+
 
 //
 // Metadata
@@ -106,12 +113,13 @@ API void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length);
 // Output
 //
 
-API int32_t     onyx_error_count(onyx_context_t *ctx);
-API const char *onyx_error_message(onyx_context_t *ctx, int32_t error_idx);
-API const char *onyx_error_filename(onyx_context_t *ctx, int32_t error_idx);
-API int32_t     onyx_error_line(onyx_context_t *ctx, int32_t error_idx);
-API int32_t     onyx_error_column(onyx_context_t *ctx, int32_t error_idx);
-API int32_t     onyx_error_length(onyx_context_t *ctx, int32_t error_idx);
+API int32_t       onyx_error_count(onyx_context_t *ctx);
+API const char   *onyx_error_message(onyx_context_t *ctx, int32_t error_idx);
+API const char   *onyx_error_filename(onyx_context_t *ctx, int32_t error_idx);
+API int32_t       onyx_error_line(onyx_context_t *ctx, int32_t error_idx);
+API int32_t       onyx_error_column(onyx_context_t *ctx, int32_t error_idx);
+API int32_t       onyx_error_length(onyx_context_t *ctx, int32_t error_idx);
+API onyx_error_t  onyx_error_rank(onyx_context_t *ctx, int32_t error_idx);
 
 API int32_t onyx_wasm_output_length(onyx_context_t *ctx);
 API void onyx_wasm_output_write(onyx_context_t *ctx, void *buffer);
@@ -126,24 +134,3 @@ API void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc,
 
 #endif
 
-
-
-// int main(int argc, char const *argv[]) {
-// 	onyx_context_t *ctx = onyx_context_create();
-// 
-// 	onyx_include_file_cstr(ctx, "hello.onyx");
-// 
-// 	while (onyx_pump(ctx) == ONYX_PUMP_CONTINUE) {
-// 		// Message processing, if enabled
-// 	}
-// 
-// 	int64_t output_length = onyx_wasm_output_length(ctx);
-// 	void *output = malloc(output_length);
-// 	onyx_wasm_output_write(ctx, output);
-// 
-// 	FILE* output_fd = fopen("hello.wasm", "wb");
-// 	fwrite(output_fd, output, output_length);
-// 	fclose(output_fd);
-// 
-// 	onyx_context_free(ctx);
-// }

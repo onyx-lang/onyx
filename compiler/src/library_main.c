@@ -654,6 +654,13 @@ int32_t onyx_error_length(onyx_context_t *ctx, int32_t error_idx) {
     return ctx->context.errors.errors[error_idx].pos.length;
 }
 
+onyx_error_t onyx_error_rank(onyx_context_t *ctx, int32_t error_idx) {
+    int32_t error_count = onyx_error_count(ctx);
+    if (error_idx < 0 || error_idx >= error_count) return 0;
+
+    return (onyx_error_t) ctx->context.errors.errors[error_idx].rank;
+}
+
 
 static void ensure_wasm_has_been_generated(onyx_context_t *ctx) {
     if (ctx->context.generated_wasm_buffer.length == 0) {

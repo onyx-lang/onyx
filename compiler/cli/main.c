@@ -806,6 +806,9 @@ int main(int argc, char *argv[]) {
             bh_file_write(&out_file, output, output_length);
             bh_file_close(&out_file);
             break;
+
+        default:
+            break;
         }
     }
   
