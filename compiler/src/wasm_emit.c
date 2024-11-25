@@ -5743,23 +5743,23 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
     }
 
 
-    if (context->options->print_function_mappings) {
-        bh_arr_each(AstFunction *, pfunc, module->all_procedures) {
-            AstFunction *func = *pfunc;
+    // if (context->options->print_function_mappings) {
+    //     bh_arr_each(AstFunction *, pfunc, module->all_procedures) {
+    //         AstFunction *func = *pfunc;
 
-            u64 func_idx = (u64) bh_imap_get(&module->index_map, (u64) func);
+    //         u64 func_idx = (u64) bh_imap_get(&module->index_map, (u64) func);
 
-            if (!func->is_foreign) {
-                func_idx += module->next_foreign_func_idx;
-            }
+    //         if (!func->is_foreign) {
+    //             func_idx += module->next_foreign_func_idx;
+    //         }
 
-            bh_printf("%d -> %s:%d:%d\n",
-                func_idx,
-                func->token->pos.filename,
-                func->token->pos.line,
-                func->token->pos.column);
-        }
-    }
+    //         bh_printf("%d -> %s:%d:%d\n",
+    //             func_idx,
+    //             func->token->pos.filename,
+    //             func->token->pos.line,
+    //             func->token->pos.column);
+    //     }
+    // }
 }
 
 void onyx_wasm_module_free(OnyxWasmModule* module) {

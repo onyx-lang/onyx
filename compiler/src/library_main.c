@@ -412,11 +412,6 @@ static b32 process_entity(Context *context, Entity* ent) {
         case Entity_State_Check_Types:     check_entity(context, ent);  break;
 
         case Entity_State_Code_Gen: {
-            if (context->options->action == ONYX_COMPILE_ACTION_CHECK) {
-                ent->state = Entity_State_Finalized;
-                break;
-            }
-
             emit_entity(context, ent);
             break;
         }
@@ -652,6 +647,25 @@ int32_t onyx_error_length(onyx_context_t *ctx, int32_t error_idx) {
     if (error_idx < 0 || error_idx >= error_count) return 0;
 
     return ctx->context.errors.errors[error_idx].pos.length;
+}
+
+int32_t onyx_error_line_text(onyx_context_t *ctx, int32_t error_idx, char *line_buffer, int max_length) {
+    int32_t error_count = onyx_error_count(ctx);
+    if (error_idx < 0 || error_idx >= error_count) return 0;
+
+    int line_length = 0;
+    char *walker = ctx->context.errors.errors[error_idx].pos.line_start;
+    if (!walker) return 0;
+
+    while (*walker && *walker++ != '\n') line_length++;
+
+    if (line_buffer != NULL && max_length > 0) {
+        i32 to_copy = bh_min(max_length - 1, line_length);
+        memcpy(line_buffer, ctx->context.errors.errors[error_idx].pos.line_start, to_copy);
+        line_buffer[to_copy] = '\0';
+    }
+
+    return line_length;
 }
 
 onyx_error_t onyx_error_rank(onyx_context_t *ctx, int32_t error_idx) {

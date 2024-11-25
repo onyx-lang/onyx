@@ -159,6 +159,8 @@ typedef struct CLIArgs {
     char *upgrade_version;
 } CLIArgs;
 
+#include "./error_printing.h"
+
 static void print_subcommand_help(const char *subcommand);
 
 static int32_t cli_args_init(CLIArgs *cli_args) {
@@ -768,14 +770,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (onyx_error_count(ctx) > 0) {
-        for (int i = 0; i < onyx_error_count(ctx); i++) {
-            const char *msg = onyx_error_message(ctx, i);
-            const char *file = onyx_error_filename(ctx, i);
-            int32_t line = onyx_error_line(ctx, i);
-
-            printf("ERROR %d: %s\n", i, msg);
-            printf("  %s:%d\n", file, line);
-        }
+        onyx_errors_print(ctx, cli_args.error_format, !cli_args.no_colors, cli_args.show_all_errors);
         return 1;
     }
 
@@ -806,10 +801,10 @@ int main(int argc, char *argv[]) {
             bh_file_write(&out_file, output, output_length);
             bh_file_close(&out_file);
             break;
+        }
 
         default:
             break;
-        }
     }
   
     return 0;

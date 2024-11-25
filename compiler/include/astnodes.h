@@ -2002,13 +2002,8 @@ typedef struct CompilerExtension {
 typedef struct CompileOptions CompileOptions;
 struct CompileOptions {
     bh_allocator allocator;
-    CompileAction action;
 
-    u32 verbose_output          : 2;
-    b32 fun_output              : 1;
-    b32 print_function_mappings : 1;
     b32 print_static_if_results : 1;
-    b32 no_colors               : 1;
     b32 no_file_contents        : 1;
     b32 no_compiler_extensions  : 1;
 
@@ -2032,27 +2027,12 @@ struct CompileOptions {
     Runtime runtime;
 
     bh_arr(bh_mapped_folder) mapped_folders;
-    bh_arr(const char *) files;
-    const char* target_file;
     const char* documentation_file;
     const char* symbol_info_file;
-    const char* help_subcommand;
-    bh_arr(DefinedVariable) defined_variables;
-
-    char* error_format;
 
     b32 debug_session;
     b32 debug_info_enabled;
     b32 stack_trace_enabled;
-
-    char *debug_socket;
-
-    i32    passthrough_argument_count;
-    char** passthrough_argument_data;
-
-    char *core_installation;
-
-    char *upgrade_version;
 };
 
 typedef struct CompilerBasicTypes CompilerBasicTypes;

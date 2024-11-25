@@ -119,6 +119,7 @@ API const char   *onyx_error_filename(onyx_context_t *ctx, int32_t error_idx);
 API int32_t       onyx_error_line(onyx_context_t *ctx, int32_t error_idx);
 API int32_t       onyx_error_column(onyx_context_t *ctx, int32_t error_idx);
 API int32_t       onyx_error_length(onyx_context_t *ctx, int32_t error_idx);
+API int32_t       onyx_error_line_text(onyx_context_t *ctx, int32_t error_idx, char *line_buffer, int max_length);
 API onyx_error_t  onyx_error_rank(onyx_context_t *ctx, int32_t error_idx);
 
 API int32_t onyx_wasm_output_length(onyx_context_t *ctx);

@@ -871,7 +871,7 @@ void onyx_docs_emit_odoc(Context *context, const char *dest) {
     bh_buffer_append(&doc_buffer, Doc_Magic_Bytes, 4);
     bh_buffer_write_u32(&doc_buffer, 1);
 
-    const char *program_name = context->options->target_file;
+    const char *program_name = "doc.odoc"; // context->options->target_file;
     write_cstring(&doc_buffer, program_name);
 
     bh_buffer_write_u32(&doc_buffer, bh_time_curr() / 1000);

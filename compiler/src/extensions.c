@@ -263,10 +263,6 @@ b32 compiler_extension_negotiate_capabilities(Context *context, CompilerExtensio
         }
     }
     
-    if (context->options->verbose_output >= 1) {
-        bh_printf("Extension '%s' loaded with protocol version %d\n", extension_name, extension_protocol_version);
-    }
-
     bh_arena_clear(&ext->arena);
     return 1;
 }
@@ -428,10 +424,6 @@ TypeMatch compiler_extension_expand_macro(
             }
 
             code = bh_strdup(context->ast_alloc, code);
-            if (context->options->verbose_output == 2) {
-                bh_printf("Expansion '%d':\n%s\n", *expansion_id, code);
-            }
-
             *out_node = parse_code(context, kind, code, code_length, entity, body->pos);
 
             ext->state = COMP_EXT_STATE_READY;

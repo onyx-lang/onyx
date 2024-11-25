@@ -39,7 +39,6 @@ void onyx_errors_disable(struct Context *context);
 b32 onyx_errors_are_enabled(struct Context *context);
 void onyx_submit_error(struct Context *context, OnyxError error);
 void onyx_report_error(struct Context *context, OnyxFilePos pos, OnyxErrorRank rank, char * format, ...);
-void onyx_submit_warning(struct Context *context, OnyxError error);
 void onyx_report_warning(struct Context *context, OnyxFilePos pos, char* format, ...);
 void onyx_errors_print(struct Context *context);
 b32  onyx_has_errors(struct Context *context);

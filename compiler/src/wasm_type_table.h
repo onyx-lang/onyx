@@ -945,11 +945,6 @@ static u64 build_foreign_blocks(OnyxWasmModule* module) {
         index++;
     }
 
-
-    if (module->context->options->verbose_output == 1) {
-        bh_printf("Foreign blocks size: %d bytes.\n", foreign_buffer.length);
-    }
-
     WasmDatum foreign_info_data = {
         .alignment = 8,
         .length = foreign_buffer.length,
@@ -1097,10 +1092,6 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
         ensure_type_has_been_submitted_for_emission(module, func->type);
         WRITE_SLICE(tag_array_base, tag_count);
         bh_buffer_write_u32(&tag_proc_buffer, func->entity->package->id);
-    }
-
-    if (module->context->options->verbose_output == 1) {
-        bh_printf("Tagged procedure size: %d bytes.\n", tag_proc_buffer.length);
     }
 
     WasmDatum proc_info_data = {
@@ -1257,10 +1248,6 @@ static u64 build_tagged_globals(OnyxWasmModule *module) {
         ensure_type_has_been_submitted_for_emission(module, memres->type);
         WRITE_SLICE(tag_array_base, tag_count);
         bh_buffer_write_u32(&tag_global_buffer, memres->entity->package->id);
-    }
-
-    if (module->context->options->verbose_output == 1) {
-        bh_printf("Tagged global size: %d bytes.\n", tag_global_buffer.length);
     }
 
     WasmDatum global_info_data = {
