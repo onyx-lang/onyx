@@ -2159,9 +2159,7 @@ void symres_entity(Context *context, Entity* ent) {
             symbol_introduce(context, context->checker.current_scope, ent->binding->token, ent->binding->node);
             track_documentation_for_symbol_info(context, ent->binding->node, ent->binding);
 
-            if (context->doc_info) {
-                onyx_docs_submit(context->doc_info, ent->binding);
-            }
+            onyx_docs_submit(context->doc_info, ent->binding);
 
             package_reinsert_use_packages(context, ent->package);
             next_state = Entity_State_Finalized;

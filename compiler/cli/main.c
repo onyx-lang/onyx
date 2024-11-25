@@ -84,8 +84,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     C_LBLUE "    --generate-name-section     " C_NORM "Generate the 'name' custom section for better debugging\n"
     C_LBLUE "    --no-stale-code             " C_NORM "Disables use of " C_YELLOW "#allow_stale_code" C_NORM " directive\n"
     "\n"
-    C_LBLUE "    --doc " C_GREY "doc_file              " C_NORM "Generate a .odoc file, Onyx's documentation format used by " C_YELLOW "onyx-doc-gen\n"
-    C_LBLUE "    --tag                       " C_NORM "Generate a C-Tag file\n"
+    C_LBLUE "    --doc                       " C_NORM "Generate a .odoc file, Onyx's documentation format used by " C_YELLOW "onyx-doc-gen\n"
     C_LBLUE "    --lspinfo " C_GREY "target_file       " C_NORM "Generate an LSP information file\n"
     "\n"
     C_LBLUE "    -V, --verbose               " C_NORM "Verbose output\n"
@@ -127,11 +126,6 @@ enum CompileAction {
     ONYX_COMPILE_ACTION_SELF_UPGRADE,
 };
 
-typedef struct DefinedVariable {
-    char *key;
-    char *value;
-} DefinedVariable;
-
 typedef struct CLIArgs {
     CompileAction action;
 
@@ -146,10 +140,7 @@ typedef struct CLIArgs {
     i32    passthrough_argument_count;
     char** passthrough_argument_data;
 
-    bh_arr(DefinedVariable) defined_variables;
-
     const char* target_file;
-    const char* documentation_file;
     const char* symbol_info_file;
     const char* help_subcommand;
 
@@ -424,12 +415,17 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
             i32 j=2;
             while (argv[i][j] != '=' && j < len) j++;
 
-            if (j < len) argv[i][j] = '\0';
+            char    *key = argv[i] + 2;
+            int32_t  key_len = j - 2;
+            char    *value = argv[i] + j + 1;
+            int32_t  value_len = len - j - 1;
 
-            DefinedVariable dv;
-            dv.key   = argv[i] + 2;
-            dv.value = argv[i] + j + 1;
-            bh_arr_push(cli_args->defined_variables, dv);
+            if (value_len <= 0) {
+                value = "true";
+                value_len = 4;
+            }
+
+            onyx_add_defined_var(ctx, key, key_len, value, value_len);
         }
         else if (!strcmp(argv[i], "-r") || !strcmp(argv[i], "--runtime")) {
             using_onyx_runtime = 0;
@@ -444,7 +440,7 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
             }
         }
         else if (!strcmp(argv[i], "--doc")) {
-            cli_args->documentation_file = argv[++i]; // :InCli
+            onyx_set_option_int(ctx, ONYX_OPTION_GENERATE_DOC_INFO, 1);
         }
         else if (!strcmp(argv[i], "--syminfo")) {
             onyx_set_option_int(ctx, ONYX_OPTION_GENERATE_SYMBOL_INFO, 1);
@@ -651,6 +647,63 @@ static void print_top_level_docs(CLIArgs *cli_args) {
     print_commands_in_directory("./.onyx");
 }
 
+static int32_t output_files_to_disk(onyx_context_t *ctx, const char *filename) {
+    int64_t output_length = onyx_output_length(ctx, ONYX_OUTPUT_TYPE_WASM);
+    if (output_length > 0) {
+        void *output = malloc(output_length);
+        onyx_output_write(ctx, ONYX_OUTPUT_TYPE_WASM, output);
+
+        bh_file out_file;
+        if (bh_file_create(&out_file, filename) != BH_FILE_ERROR_NONE) {
+            bh_printf(C_RED "error" C_NORM ": Failed to open file for writing '%s'\n", filename);
+            return 0;
+        }
+
+        bh_file_write(&out_file, output, output_length);
+        bh_file_close(&out_file);
+
+        free(output);
+    }
+
+    output_length = onyx_output_length(ctx, ONYX_OUTPUT_TYPE_JS);
+    if (output_length > 0) {
+        void *output = malloc(output_length);
+        onyx_output_write(ctx, ONYX_OUTPUT_TYPE_JS, output);
+
+        bh_file out_file;
+        char *tmp_name = bh_bprintf("%s.js", filename);
+        if (bh_file_create(&out_file, tmp_name) != BH_FILE_ERROR_NONE) {
+            bh_printf(C_RED "error" C_NORM ": Failed to open file for writing '%s'\n", tmp_name);
+            return 0;
+        }
+
+        bh_file_write(&out_file, output, output_length);
+        bh_file_close(&out_file);
+
+        free(output);
+    }
+
+    output_length = onyx_output_length(ctx, ONYX_OUTPUT_TYPE_ODOC);
+    if (output_length > 0) {
+        void *output = malloc(output_length);
+        onyx_output_write(ctx, ONYX_OUTPUT_TYPE_ODOC, output);
+
+        bh_file out_file;
+        char *tmp_name = bh_bprintf("%s.odoc", filename);
+        if (bh_file_create(&out_file, tmp_name) != BH_FILE_ERROR_NONE) {
+            bh_printf(C_RED "error" C_NORM ": Failed to open file for writing '%s'\n", tmp_name);
+            return 0;
+        }
+
+        bh_file_write(&out_file, output, output_length);
+        bh_file_close(&out_file);
+
+        free(output);
+    }
+
+    return 1;
+}
+
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
 #include <sys/wait.h>
 
@@ -688,6 +741,113 @@ static void perform_self_upgrade(CLIArgs *cli_args, char *version) {
 }
 #endif
 
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+#include <signal.h>
+#include <sys/wait.h>
+
+static bh_file_watch watches;
+static i32 watch_run_pid = -1;
+
+static void onyx_watch_stop(int sig) {
+    bh_file_watch_stop(&watches);
+}
+
+static void onyx_watch_run_executable(const char *target) {
+    watch_run_pid = fork();
+    switch (watch_run_pid) {
+        case -1: bh_printf("error: fork() failed\n"); break;
+        case 0:
+            setpgid(0, getpid());
+            close(STDIN_FILENO);
+            open("/dev/null", O_RDONLY);
+            execlp("onyx", "onyx", "run", target, NULL);
+            exit(1);
+            break;
+        default:
+            break;
+    }
+}
+
+static void onyx_watch(CLIArgs *cli_args, int arg_parse_start, int argc, char **argv) {
+    signal(SIGINT, onyx_watch_stop);
+
+    b32 run_the_program = cli_args->action == ONYX_COMPILE_ACTION_WATCH_RUN;
+
+    while (1) {
+        bh_printf("\e[2J\e[?25l\n");
+        bh_printf("\e[3;1H");
+
+        onyx_context_t *ctx = onyx_context_create();
+        onyx_add_mapped_dir(ctx, "core", -1, bh_bprintf("%s/core", cli_args->core_installation), -1);
+        onyx_set_option_int(ctx, ONYX_OPTION_PLATFORM, ONYX_PLATFORM_ONYX);
+
+        if (!cli_parse_compilation_options(cli_args, ctx, arg_parse_start, argc, argv)) {
+            return;
+        }
+
+        onyx_options_ready(ctx);
+        while (onyx_pump(ctx) == ONYX_PUMP_CONTINUE) {
+            // doing the compilation
+        }
+
+        i32 error_count = onyx_error_count(ctx);
+        if (error_count == 0) {
+            output_files_to_disk(ctx, cli_args->target_file);
+
+            bh_printf("\e[92mNo errors!\n");
+        } else {
+            onyx_errors_print(ctx, cli_args->error_format, !cli_args->no_colors, cli_args->show_all_errors);
+        }
+
+        char time_buf[128] = {0};
+        time_t now = time(NULL);
+        strftime(time_buf, 128, "%X", localtime(&now));
+        bh_printf("\e[1;1H\e[30;105m Onyx %d.%d.%d%s \e[30;104m Built %s \e[0m", 
+            onyx_version_major(),
+            onyx_version_minor(),
+            onyx_version_patch(),
+            onyx_version_suffix(),
+            time_buf
+        );
+
+        if (error_count == 0) {
+            bh_printf("\e[30;102m Errors 0 \e[0m");
+        } else {
+            bh_printf("\e[30;101m Error%s %d \e[0m", bh_num_plural(error_count), error_count);
+        }
+
+        if (run_the_program && error_count == 0) {
+            bh_printf("\n\n\nRunning your program...\n");
+            onyx_watch_run_executable(cli_args->target_file);
+        }
+
+        watches = bh_file_watch_new();
+
+        fori (i, 0, onyx_stat(ctx, ONYX_STAT_FILE_COUNT)) {
+            bh_file_watch_add(&watches, onyx_stat_filepath(ctx, i));
+        }
+
+        onyx_context_free(ctx);
+
+        b32 wait_successful = bh_file_watch_wait(&watches);
+
+        if (run_the_program && watch_run_pid > 0) {
+            int status;
+            killpg(watch_run_pid, SIGTERM);
+            waitpid(watch_run_pid, &status, 0);
+            watch_run_pid = -1;
+        }
+
+        bh_file_watch_free(&watches);
+
+        if (!wait_successful) {
+            break;
+        }
+    }
+
+    bh_printf("\e[2J\e[1;1H\e[?25h\n");
+}
+#endif
 
 int main(int argc, char *argv[]) {
     CLIArgs cli_args;
@@ -733,6 +893,13 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    if (cli_args.action == ONYX_COMPILE_ACTION_WATCH || cli_args.action == ONYX_COMPILE_ACTION_WATCH_RUN) {
+        onyx_watch(&cli_args, arg_parse_start, argc, argv);
+        return 0;
+    }
+    #endif
+
     onyx_context_t *ctx = onyx_context_create();
     onyx_add_mapped_dir(ctx, "core", -1, bh_bprintf("%s/core", cli_args.core_installation), -1);
     onyx_set_option_int(ctx, ONYX_OPTION_PLATFORM, ONYX_PLATFORM_ONYX);
@@ -773,33 +940,30 @@ int main(int argc, char *argv[]) {
         onyx_errors_print(ctx, cli_args.error_format, !cli_args.no_colors, cli_args.show_all_errors);
         return 1;
     }
-
-    int64_t output_length = onyx_wasm_output_length(ctx);
-    void *output = malloc(output_length);
-    onyx_wasm_output_write(ctx, output);
   
-    onyx_context_free(ctx);
-
     switch (cli_args.action) {
         case ONYX_COMPILE_ACTION_RUN:
         case ONYX_COMPILE_ACTION_PACKAGE: {
+            int64_t output_length = onyx_output_length(ctx, ONYX_OUTPUT_TYPE_WASM);
+            void *output = malloc(output_length);
+            onyx_output_write(ctx, ONYX_OUTPUT_TYPE_WASM, output);
+            onyx_context_free(ctx);
+
             if (cli_args.debug_session) {
                 onyx_run_wasm_with_debug(output, output_length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data, cli_args.debug_socket);
             } else {
                 onyx_run_wasm(output, output_length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data);
             }
+
+            free(output);
             break;
         }
 
         case ONYX_COMPILE_ACTION_COMPILE: {
-            bh_file out_file;
-            if (bh_file_create(&out_file, cli_args.target_file) != BH_FILE_ERROR_NONE) {
-                bh_printf(C_RED "error" C_NORM ": Failed to open file for writing '%s'\n", cli_args.target_file);
+            if (!output_files_to_disk(ctx, cli_args.target_file)) {
                 return 1;
             }
 
-            bh_file_write(&out_file, output, output_length);
-            bh_file_close(&out_file);
             break;
         }
 
@@ -807,5 +971,6 @@ int main(int argc, char *argv[]) {
             break;
     }
   
+    onyx_context_free(ctx);
     return 0;
 }

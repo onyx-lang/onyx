@@ -1601,6 +1601,8 @@ char* bh_strdup(bh_allocator a, char* str) {
 }
 
 char* bh_strdup_len(bh_allocator a, char* str, i32 len) {
+    if (!str) return NULL;
+
     if (len < 0) {
         len = strlen(str);
     }

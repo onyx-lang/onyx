@@ -127,6 +127,7 @@ void onyx_docs_emit_symbol_info(Context *context, const char *dest) {
 //
 
 void onyx_docs_submit(OnyxDocInfo *docs, AstBinding *binding) {
+    if (!docs) return;
     if (!binding->entity || !binding->entity->package) return;
 
     AstNode *node = binding->node;
@@ -857,13 +858,12 @@ static void write_doc_entity_array(Context *context, bh_buffer *buffer, bh_arr(A
     *((u32 *) bh_pointer_add(buffer->data, count_patch)) = count;
 }
 
-void onyx_docs_emit_odoc(Context *context, const char *dest) {
-    bh_file doc_file;
-    if (bh_file_create(&doc_file, dest) != BH_FILE_ERROR_NONE) {
-        bh_printf("Cannot create '%s'.\n", dest);
+void onyx_docs_generate_odoc(Context *context, bh_buffer *out_buffer) {
+    if (!context->doc_info) {
+        out_buffer->data = NULL;
+        out_buffer->length = 0;
         return;
     }
-
 
     bh_buffer doc_buffer;
     bh_buffer_init(&doc_buffer, context->gp_alloc, 16 * 1024);
@@ -871,7 +871,7 @@ void onyx_docs_emit_odoc(Context *context, const char *dest) {
     bh_buffer_append(&doc_buffer, Doc_Magic_Bytes, 4);
     bh_buffer_write_u32(&doc_buffer, 1);
 
-    const char *program_name = "doc.odoc"; // context->options->target_file;
+    const char *program_name = "out.wasm";
     write_cstring(&doc_buffer, program_name);
 
     bh_buffer_write_u32(&doc_buffer, bh_time_curr() / 1000);
@@ -963,9 +963,7 @@ void onyx_docs_emit_odoc(Context *context, const char *dest) {
         write_cstring(&doc_buffer, key);
     }
 
-
-    bh_file_write(&doc_file, doc_buffer.data, doc_buffer.length);
-    bh_file_close(&doc_file);
+    *out_buffer = doc_buffer;
 }
 
 

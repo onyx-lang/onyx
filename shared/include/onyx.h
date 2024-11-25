@@ -30,6 +30,7 @@ typedef enum onyx_option_t {
 	ONYX_OPTION_GENERATE_NAME_SECTION,
 	ONYX_OPTION_GENERATE_SYMBOL_INFO,
 	ONYX_OPTION_GENERATE_LSP_INFO,
+	ONYX_OPTION_GENERATE_DOC_INFO,
 	ONYX_OPTION_DISABLE_CORE,
 	ONYX_OPTION_DISABLE_STALE_CODE,
 
@@ -62,6 +63,18 @@ typedef enum onyx_error_t {
     ONYX_ERROR_CRITICAL = 4,
     ONYX_ERROR_CLI      = 5,
 } onyx_error_t;
+
+typedef enum onyx_output_type_t {
+	ONYX_OUTPUT_TYPE_WASM = 0,
+	ONYX_OUTPUT_TYPE_JS   = 1,
+	ONYX_OUTPUT_TYPE_ODOC = 2,
+} onyx_output_type_t;
+
+typedef enum onyx_stat_t {
+	ONYX_STAT_FILE_COUNT  = 1,
+	ONYX_STAT_LINE_COUNT  = 2,
+	ONYX_STAT_TOKEN_COUNT = 3,
+} onyx_stat_t;
 
 
 //
@@ -110,7 +123,7 @@ API void onyx_add_mapped_dir(onyx_context_t *ctx, char *mapped_name, int32_t map
 API void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length);
 
 //
-// Output
+// Errors 
 //
 
 API int32_t       onyx_error_count(onyx_context_t *ctx);
@@ -122,8 +135,20 @@ API int32_t       onyx_error_length(onyx_context_t *ctx, int32_t error_idx);
 API int32_t       onyx_error_line_text(onyx_context_t *ctx, int32_t error_idx, char *line_buffer, int max_length);
 API onyx_error_t  onyx_error_rank(onyx_context_t *ctx, int32_t error_idx);
 
-API int32_t onyx_wasm_output_length(onyx_context_t *ctx);
-API void onyx_wasm_output_write(onyx_context_t *ctx, void *buffer);
+
+//
+// Code generation
+//
+
+API int32_t onyx_output_length(onyx_context_t *ctx, onyx_output_type_t type);
+API void    onyx_output_write(onyx_context_t *ctx, onyx_output_type_t type, void *buffer);
+
+//
+// Compilation Info
+//
+
+API int64_t     onyx_stat(onyx_context_t *ctx, onyx_stat_t stat);
+API const char *onyx_stat_filepath(onyx_context_t *ctx, int32_t file_index);
 
 
 //

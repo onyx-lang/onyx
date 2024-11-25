@@ -2013,6 +2013,7 @@ struct CompileOptions {
     b32 generate_type_info    : 1;
     b32 generate_method_info  : 1;
     b32 generate_name_section : 1;
+    b32 generate_odoc         : 1;
     b32 no_core               : 1;
     b32 no_stale_code         : 1;
     b32 show_all_errors       : 1;
@@ -2027,7 +2028,6 @@ struct CompileOptions {
     Runtime runtime;
 
     bh_arr(bh_mapped_folder) mapped_folders;
-    const char* documentation_file;
     const char* symbol_info_file;
 
     b32 debug_session;
@@ -2160,10 +2160,13 @@ struct Context {
     bh_allocator gp_alloc; // General purpose allocator 
 
     bh_arr(bh_file_contents) loaded_files;
+    bh_arr(DefinedVariable) defined_variables;
 
     // NOTE: This is defined in wasm_emit.h
     struct OnyxWasmModule* wasm_module;
     bh_buffer generated_wasm_buffer;
+    bh_buffer generated_js_buffer;
+    bh_buffer generated_odoc_buffer;
 
     struct SymbolInfoTable *symbol_info;
     struct OnyxDocInfo     *doc_info;

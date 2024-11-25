@@ -61,7 +61,8 @@ char   *onyx_version_runtime() {
 //
 
 static AstInclude* create_load(Context *context, char* filename, int32_t length);
-static void create_and_add_defined_variable(Context *context, char *name, int32_t name_length, char *value, int32_t value_length);
+static void introduce_defined_variables(Context *context);
+static void create_and_add_defined_variable(Context *context, DefinedVariable *var);
 static void link_wasm_module(Context *context);
 
 
@@ -204,21 +205,13 @@ void onyx_options_ready(onyx_context_t *ctx) {
         sh_new_arena(context->symbol_info->files);
     }
 
-    if (context->options->documentation_file) {
+    if (context->options->generate_odoc) {
         context->doc_info = bh_alloc_item(context->gp_alloc, OnyxDocInfo);
         memset(context->doc_info, 0, sizeof(OnyxDocInfo));
         bh_arr_new(context->gp_alloc, context->doc_info->procedures, 128);
         bh_arr_new(context->gp_alloc, context->doc_info->structures, 128);
         bh_arr_new(context->gp_alloc, context->doc_info->enumerations, 128);
     }
-
-    // if (context->options->verbose_output > 0) {
-    //     bh_printf("Mapped folders:\n");
-    //     bh_arr_each(bh_mapped_folder, p, context->options->mapped_folders) {
-    //         bh_printf("\t%s: %s\n", p->name, p->folder);
-    //     }
-    //     bh_printf("\n");
-    // }
 }
 
 static void parse_source_file(Context *context, bh_file_contents* file_contents) {
@@ -383,7 +376,7 @@ static b32 process_entity(Context *context, Entity* ent) {
                 context->builtins_initialized = 1;
                 initialize_builtins(context);
                 introduce_build_options(context);
-                // introduce_defined_variables(context); TODO: put this back
+                introduce_defined_variables(context);
             }
 
             // GROSS
@@ -556,6 +549,7 @@ int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t valu
     case ONYX_OPTION_GENERATE_NAME_SECTION:  ctx->context.options->generate_name_section = value; return 1;
     case ONYX_OPTION_GENERATE_SYMBOL_INFO:   ctx->context.options->generate_symbol_info_file = value; return 1;
     case ONYX_OPTION_GENERATE_LSP_INFO:      ctx->context.options->generate_lsp_info_file = value; return 1;
+    case ONYX_OPTION_GENERATE_DOC_INFO:      ctx->context.options->generate_odoc = value; return 1;
     case ONYX_OPTION_DISABLE_CORE:           ctx->context.options->no_core = value; return 1;
     case ONYX_OPTION_DISABLE_STALE_CODE:     ctx->context.options->no_stale_code = value; return 1;
     case ONYX_OPTION_OPTIONAL_SEMICOLONS:    ctx->context.options->enable_optional_semicolons = value; return 1;
@@ -574,7 +568,10 @@ void onyx_add_defined_var(onyx_context_t *ctx, char *variable, int32_t variable_
     if (variable_length < 0) variable_length = strlen(variable);
     if (value_length    < 0) value_length    = strlen(value);
 
-    create_and_add_defined_variable(&ctx->context, variable, variable_length, value, value_length);
+    bh_arr_push(ctx->context.defined_variables, ((DefinedVariable) {
+        .key   = bh_strdup_len(ctx->context.ast_alloc, variable, variable_length),
+        .value = bh_strdup_len(ctx->context.ast_alloc, value, value_length),
+    }));
 }
 
 //
@@ -676,6 +673,10 @@ onyx_error_t onyx_error_rank(onyx_context_t *ctx, int32_t error_idx) {
 }
 
 
+//
+// Code Generation
+//
+
 static void ensure_wasm_has_been_generated(onyx_context_t *ctx) {
     if (ctx->context.generated_wasm_buffer.length == 0) {
         if (onyx_has_errors(&ctx->context)) return;
@@ -683,14 +684,77 @@ static void ensure_wasm_has_been_generated(onyx_context_t *ctx) {
     }
 }
 
-int32_t onyx_wasm_output_length(onyx_context_t *ctx) {
-    ensure_wasm_has_been_generated(ctx);
-    return ctx->context.generated_wasm_buffer.length;
+static void ensure_js_has_been_generated(onyx_context_t *ctx) {
+    if (ctx->context.generated_js_buffer.data == NULL) {
+        if (onyx_has_errors(&ctx->context)) return;
+        onyx_wasm_module_write_js_partials_to_buffer(ctx->context.wasm_module, &ctx->context.generated_js_buffer);
+    }
 }
 
-void onyx_wasm_output_write(onyx_context_t *ctx, void *buffer) {
-    ensure_wasm_has_been_generated(ctx);
-    memcpy(buffer, ctx->context.generated_wasm_buffer.data, ctx->context.generated_wasm_buffer.length);
+static void ensure_odoc_has_been_generated(onyx_context_t *ctx) {
+    if (ctx->context.generated_odoc_buffer.data == NULL) {
+        if (onyx_has_errors(&ctx->context)) return;
+        onyx_docs_generate_odoc(&ctx->context, &ctx->context.generated_odoc_buffer);
+    }
+}
+
+int32_t onyx_output_length(onyx_context_t *ctx, onyx_output_type_t type) {
+    switch (type) {
+    case ONYX_OUTPUT_TYPE_WASM:
+        ensure_wasm_has_been_generated(ctx);
+        return ctx->context.generated_wasm_buffer.length;
+
+    case ONYX_OUTPUT_TYPE_JS:
+        ensure_js_has_been_generated(ctx);
+        return ctx->context.generated_js_buffer.length;
+    
+    case ONYX_OUTPUT_TYPE_ODOC:
+        ensure_odoc_has_been_generated(ctx);
+        return ctx->context.generated_odoc_buffer.length;
+    }
+
+    return 0;
+}
+
+void onyx_output_write(onyx_context_t *ctx, onyx_output_type_t type, void *buffer) {
+    switch (type) {
+    case ONYX_OUTPUT_TYPE_WASM:
+        ensure_wasm_has_been_generated(ctx);
+        memcpy(buffer, ctx->context.generated_wasm_buffer.data, ctx->context.generated_wasm_buffer.length);
+        break;
+
+    case ONYX_OUTPUT_TYPE_JS:
+        ensure_js_has_been_generated(ctx);
+        memcpy(buffer, ctx->context.generated_js_buffer.data, ctx->context.generated_js_buffer.length);
+        break;
+
+    case ONYX_OUTPUT_TYPE_ODOC:
+        ensure_odoc_has_been_generated(ctx);
+        memcpy(buffer, ctx->context.generated_odoc_buffer.data, ctx->context.generated_odoc_buffer.length);
+        break;
+    }
+}
+
+
+//
+// Compilation Info
+//
+
+int64_t onyx_stat(onyx_context_t *ctx, onyx_stat_t stat) {
+    switch (stat) {
+        case ONYX_STAT_FILE_COUNT:  return bh_arr_length(ctx->context.loaded_files);
+        case ONYX_STAT_LINE_COUNT:  return ctx->context.stats.lexer_lines_processed;
+        case ONYX_STAT_TOKEN_COUNT: return ctx->context.stats.lexer_tokens_processed;
+        default: return -1;
+    }
+}
+
+const char *onyx_stat_filepath(onyx_context_t *ctx, int32_t file_index) {
+    if (file_index < 0 || file_index >= bh_arr_length(ctx->context.loaded_files)) {
+        return NULL;
+    }
+
+    return ctx->context.loaded_files[file_index].filename;
 }
 
 
@@ -733,15 +797,20 @@ static AstInclude* create_load(Context *context, char* filename, int32_t length)
     return include_node;
 }
 
+static void introduce_defined_variables(Context *context) {
+    bh_arr_each(DefinedVariable, var, context->defined_variables) {
+        create_and_add_defined_variable(context, var);
+    }
+}
 
-static void create_and_add_defined_variable(Context *context, char *name, int32_t name_length, char *value, int32_t value_length) {
+static void create_and_add_defined_variable(Context *context, DefinedVariable *var) {
     OnyxToken *value_token = bh_alloc_item(context->ast_alloc, OnyxToken);
-    value_token->text = value;
-    value_token->length = value_length;
+    value_token->text = var->value;
+    value_token->length = strlen(var->value);
 
     OnyxToken *name_token = bh_alloc_item(context->ast_alloc, OnyxToken);
-    name_token->text = name;
-    name_token->length = name_length;
+    name_token->text = var->key;
+    name_token->length = strlen(var->key);
 
     Package *p = package_lookup(context, "runtime.vars");
     assert(p);

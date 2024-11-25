@@ -4053,6 +4053,8 @@ static void parse_implicit_injection(OnyxParser* parser) {
 
 static void parse_top_level_statement(OnyxParser* parser) {
     AstFlags private_kind = 0;
+
+  retry_because_inserted_semicolon:
     if (bh_arr_length(parser->scope_flags) > 0)
         private_kind = bh_arr_last(parser->scope_flags);
 
@@ -4089,7 +4091,6 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
     if (parse_possible_tag(parser)) return;
 
-  retry_because_inserted_semicolon:
     switch ((u16) parser->curr->type) {
         case Token_Type_Keyword_Use: {
             OnyxToken *use_token = expect_token(parser, Token_Type_Keyword_Use);
