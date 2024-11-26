@@ -1168,12 +1168,6 @@ void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer)
     // output_onyx_func_offset_section(module, buffer);
 }
 
-void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file) {
-    bh_buffer master_buffer;
-    onyx_wasm_module_write_to_buffer(module, &master_buffer);
-
-    bh_file_write(&file, master_buffer.data, master_buffer.length);
-}
 
 
 
@@ -1197,11 +1191,3 @@ void onyx_wasm_module_write_js_partials_to_buffer(OnyxWasmModule* module, bh_buf
         bh_buffer_write_string(buffer, partial->code);
     }
 }
-
-void onyx_wasm_module_write_js_partials_to_file(OnyxWasmModule* module, bh_file file) {
-    bh_buffer js_buffer;
-    onyx_wasm_module_write_js_partials_to_buffer(module, &js_buffer);
-
-    bh_file_write(&file, js_buffer.data, js_buffer.length);
-}
-

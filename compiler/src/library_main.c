@@ -698,6 +698,13 @@ static void ensure_odoc_has_been_generated(onyx_context_t *ctx) {
     }
 }
 
+static void ensure_osym_has_been_generated(onyx_context_t *ctx) {
+    if (ctx->context.generated_osym_buffer.data == NULL) {
+        if (onyx_has_errors(&ctx->context)) return;
+        onyx_docs_emit_symbol_info(&ctx->context, &ctx->context.generated_osym_buffer);
+    }
+}
+
 int32_t onyx_output_length(onyx_context_t *ctx, onyx_output_type_t type) {
     switch (type) {
     case ONYX_OUTPUT_TYPE_WASM:
@@ -711,6 +718,10 @@ int32_t onyx_output_length(onyx_context_t *ctx, onyx_output_type_t type) {
     case ONYX_OUTPUT_TYPE_ODOC:
         ensure_odoc_has_been_generated(ctx);
         return ctx->context.generated_odoc_buffer.length;
+
+    case ONYX_OUTPUT_TYPE_OSYM:
+        ensure_osym_has_been_generated(ctx);
+        return ctx->context.generated_osym_buffer.length;
     }
 
     return 0;
@@ -731,6 +742,11 @@ void onyx_output_write(onyx_context_t *ctx, onyx_output_type_t type, void *buffe
     case ONYX_OUTPUT_TYPE_ODOC:
         ensure_odoc_has_been_generated(ctx);
         memcpy(buffer, ctx->context.generated_odoc_buffer.data, ctx->context.generated_odoc_buffer.length);
+        break;
+
+    case ONYX_OUTPUT_TYPE_OSYM:
+        ensure_osym_has_been_generated(ctx);
+        memcpy(buffer, ctx->context.generated_osym_buffer.data, ctx->context.generated_osym_buffer.length);
         break;
     }
 }

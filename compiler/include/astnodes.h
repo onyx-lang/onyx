@@ -2167,6 +2167,7 @@ struct Context {
     bh_buffer generated_wasm_buffer;
     bh_buffer generated_js_buffer;
     bh_buffer generated_odoc_buffer;
+    bh_buffer generated_osym_buffer;
 
     struct SymbolInfoTable *symbol_info;
     struct OnyxDocInfo     *doc_info;

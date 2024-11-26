@@ -14,14 +14,9 @@ static i32 sort_symbol_resolutions(const SymbolResolution *a, const SymbolResolu
     return a->column > b->column ? 1 : -1;
 }
 
-void onyx_docs_emit_symbol_info(Context *context, const char *dest) {
-    bh_file sym_file;
-    if (bh_file_create(&sym_file, dest) != BH_FILE_ERROR_NONE) {
-        bh_printf("Cannot create '%s'.\n", dest);
-        return;
-    }
-
+void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer) {
     SymbolInfoTable *syminfo = context->symbol_info;
+    if (!syminfo) return;
 
     qsort(syminfo->symbols_resolutions,
             bh_arr_length(syminfo->symbols_resolutions),
@@ -97,22 +92,20 @@ void onyx_docs_emit_symbol_info(Context *context, const char *dest) {
         bh_buffer_write_u32(&header_section, docs_section.length);
     }
 
-    bh_file_write(&sym_file, header_section.data, header_section.length);
-    bh_file_write(&sym_file, file_section.data, file_section.length);
-    bh_file_write(&sym_file, sym_def_section.data, sym_def_section.length);
-    bh_file_write(&sym_file, sym_res_section.data, sym_res_section.length);
+    bh_buffer_init(out_buffer, context->gp_alloc, header_section.length + file_section.length + sym_def_section.length + sym_res_section.length);
+    bh_buffer_append(out_buffer, header_section.data, header_section.length);
+    bh_buffer_append(out_buffer, file_section.data, file_section.length);
+    bh_buffer_append(out_buffer, sym_def_section.data, sym_def_section.length);
+    bh_buffer_append(out_buffer, sym_res_section.data, sym_res_section.length);
 
     if (context->options->generate_lsp_info_file) {
-        bh_file_write(&sym_file, docs_section.data, docs_section.length);
+        bh_buffer_append(out_buffer, docs_section.data, docs_section.length);
     }
-
-    bh_file_close(&sym_file);
 
     bh_buffer_free(&header_section);
     bh_buffer_free(&file_section);
     bh_buffer_free(&sym_def_section);
     bh_buffer_free(&sym_res_section);
-
 
     bh_arr_free(syminfo->symbols);
     bh_arr_free(syminfo->symbols_resolutions);

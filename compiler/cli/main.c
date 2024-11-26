@@ -647,7 +647,7 @@ static void print_top_level_docs(CLIArgs *cli_args) {
     print_commands_in_directory("./.onyx");
 }
 
-static int32_t output_files_to_disk(onyx_context_t *ctx, const char *filename) {
+static int32_t output_files_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, const char *filename) {
     int64_t output_length = onyx_output_length(ctx, ONYX_OUTPUT_TYPE_WASM);
     if (output_length > 0) {
         void *output = malloc(output_length);
@@ -699,6 +699,25 @@ static int32_t output_files_to_disk(onyx_context_t *ctx, const char *filename) {
         bh_file_close(&out_file);
 
         free(output);
+    }
+
+    if (cli_args->symbol_info_file) {
+        output_length = onyx_output_length(ctx, ONYX_OUTPUT_TYPE_OSYM);
+        if (output_length > 0) {
+            void *output = malloc(output_length);
+            onyx_output_write(ctx, ONYX_OUTPUT_TYPE_OSYM, output);
+
+            bh_file out_file;
+            if (bh_file_create(&out_file, cli_args->symbol_info_file) != BH_FILE_ERROR_NONE) {
+                bh_printf(C_RED "error" C_NORM ": Failed to open file for writing '%s'\n", cli_args->symbol_info_file);
+                return 0;
+            }
+
+            bh_file_write(&out_file, output, output_length);
+            bh_file_close(&out_file);
+
+            free(output);
+        }
     }
 
     return 1;
@@ -792,7 +811,7 @@ static void onyx_watch(CLIArgs *cli_args, int arg_parse_start, int argc, char **
 
         i32 error_count = onyx_error_count(ctx);
         if (error_count == 0) {
-            output_files_to_disk(ctx, cli_args->target_file);
+            output_files_to_disk(cli_args, ctx, cli_args->target_file);
 
             bh_printf("\e[92mNo errors!\n");
         } else {
@@ -960,7 +979,7 @@ int main(int argc, char *argv[]) {
         }
 
         case ONYX_COMPILE_ACTION_COMPILE: {
-            if (!output_files_to_disk(ctx, cli_args.target_file)) {
+            if (!output_files_to_disk(&cli_args, ctx, cli_args.target_file)) {
                 return 1;
             }
 

@@ -48,6 +48,6 @@ struct SymbolInfoTable {
 	bh_imap node_to_id;
 };
 
-void onyx_docs_emit_symbol_info(Context *context, const char *dest);
+void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer);
 
 #endif
