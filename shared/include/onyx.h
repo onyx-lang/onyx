@@ -77,6 +77,11 @@ typedef enum onyx_stat_t {
     ONYX_STAT_TOKEN_COUNT = 3,
 } onyx_stat_t;
 
+typedef enum onyx_event_type_t {
+    ONYX_EVENT_PHASE_START    = 1,
+    ONYX_EVENT_SYMBOL_DEFINED = 2,
+} onyx_event_type_t;
+
 
 //
 // Metadata
@@ -101,6 +106,17 @@ API void onyx_context_free(onyx_context_t *ctx);
 /// Call after all options have been set and before the first `onyx_pump`.
 API void onyx_options_ready(onyx_context_t *ctx);
 API onyx_pump_t onyx_pump(onyx_context_t *ctx);
+
+
+//
+// Events
+// 
+
+API int32_t           onyx_event_count(onyx_context_t *ctx);
+API onyx_event_type_t onyx_event_type(onyx_context_t *ctx, int event_idx);
+API int32_t           onyx_event_field_int(onyx_context_t *ctx, int event_idx, char *field);
+API const char       *onyx_event_field_str(onyx_context_t *ctx, int event_idx, char *field);
+
 
 //
 // Options

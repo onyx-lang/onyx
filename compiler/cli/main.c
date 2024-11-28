@@ -647,11 +647,11 @@ static void print_top_level_docs(CLIArgs *cli_args) {
     print_commands_in_directory("./.onyx");
 }
 
-static int32_t output_files_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, const char *filename) {
-    int64_t output_length = onyx_output_length(ctx, ONYX_OUTPUT_TYPE_WASM);
+static int32_t output_file_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, const char *filename, onyx_output_type_t type) {
+    int64_t output_length = onyx_output_length(ctx, type);
     if (output_length > 0) {
         void *output = malloc(output_length);
-        onyx_output_write(ctx, ONYX_OUTPUT_TYPE_WASM, output);
+        onyx_output_write(ctx, type, output);
 
         bh_file out_file;
         if (bh_file_create(&out_file, filename) != BH_FILE_ERROR_NONE) {
@@ -665,59 +665,16 @@ static int32_t output_files_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, cons
         free(output);
     }
 
-    output_length = onyx_output_length(ctx, ONYX_OUTPUT_TYPE_JS);
-    if (output_length > 0) {
-        void *output = malloc(output_length);
-        onyx_output_write(ctx, ONYX_OUTPUT_TYPE_JS, output);
+    return 1;
+}
 
-        bh_file out_file;
-        char *tmp_name = bh_bprintf("%s.js", filename);
-        if (bh_file_create(&out_file, tmp_name) != BH_FILE_ERROR_NONE) {
-            bh_printf(C_RED "error" C_NORM ": Failed to open file for writing '%s'\n", tmp_name);
-            return 0;
-        }
-
-        bh_file_write(&out_file, output, output_length);
-        bh_file_close(&out_file);
-
-        free(output);
-    }
-
-    output_length = onyx_output_length(ctx, ONYX_OUTPUT_TYPE_ODOC);
-    if (output_length > 0) {
-        void *output = malloc(output_length);
-        onyx_output_write(ctx, ONYX_OUTPUT_TYPE_ODOC, output);
-
-        bh_file out_file;
-        char *tmp_name = bh_bprintf("%s.odoc", filename);
-        if (bh_file_create(&out_file, tmp_name) != BH_FILE_ERROR_NONE) {
-            bh_printf(C_RED "error" C_NORM ": Failed to open file for writing '%s'\n", tmp_name);
-            return 0;
-        }
-
-        bh_file_write(&out_file, output, output_length);
-        bh_file_close(&out_file);
-
-        free(output);
-    }
+static int32_t output_files_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, const char *filename) {
+    if (!output_file_to_disk(cli_args, ctx, filename, ONYX_OUTPUT_TYPE_WASM)) return 0;
+    if (!output_file_to_disk(cli_args, ctx, bh_bprintf("%s.js", filename), ONYX_OUTPUT_TYPE_JS)) return 0;
+    if (!output_file_to_disk(cli_args, ctx, bh_bprintf("%s.odoc", filename), ONYX_OUTPUT_TYPE_ODOC)) return 0;
 
     if (cli_args->symbol_info_file) {
-        output_length = onyx_output_length(ctx, ONYX_OUTPUT_TYPE_OSYM);
-        if (output_length > 0) {
-            void *output = malloc(output_length);
-            onyx_output_write(ctx, ONYX_OUTPUT_TYPE_OSYM, output);
-
-            bh_file out_file;
-            if (bh_file_create(&out_file, cli_args->symbol_info_file) != BH_FILE_ERROR_NONE) {
-                bh_printf(C_RED "error" C_NORM ": Failed to open file for writing '%s'\n", cli_args->symbol_info_file);
-                return 0;
-            }
-
-            bh_file_write(&out_file, output, output_length);
-            bh_file_close(&out_file);
-
-            free(output);
-        }
+        if (!output_file_to_disk(cli_args, ctx, cli_args->symbol_info_file, ONYX_OUTPUT_TYPE_OSYM)) return 0;
     }
 
     return 1;
@@ -975,6 +932,15 @@ int main(int argc, char *argv[]) {
             }
 
             free(output);
+            break;
+        }
+
+        case ONYX_COMPILE_ACTION_CHECK: {
+            if (cli_args.symbol_info_file) {
+                if (!output_file_to_disk(&cli_args, ctx, cli_args.symbol_info_file, ONYX_OUTPUT_TYPE_OSYM)) {
+                    return 1;
+                }
+            }
             break;
         }
 
