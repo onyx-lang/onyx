@@ -2189,6 +2189,12 @@ struct Context {
     bh_arr(OverloadOption) operator_overloads[Binary_Op_Count];
     bh_arr(OverloadOption) unary_operator_overloads[Unary_Op_Count];
 
+    // The name is pretty self-descriptive, but this is a node that is returned from things
+    // like polymorphic_proc_lookup when it is determined that everything works so far, but
+    // the caller must yield in order to finish checking this polymorphic procedure.
+    AstTyped node_that_signals_a_yield;
+    AstTyped node_that_signals_failure;
+
     OnyxErrors errors;
     b32 errors_enabled;
 

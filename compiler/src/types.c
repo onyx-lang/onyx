@@ -641,7 +641,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
             bh_arr_free(slns);
 
             if (!concrete) return NULL;
-            if (concrete == (Type *) &node_that_signals_failure) return concrete;
+            if (concrete == (Type *) &context->node_that_signals_failure) return concrete;
             pc_type->resolved_type = concrete;
             return concrete;
         }
@@ -1021,7 +1021,7 @@ Type* type_build_implicit_type_of_struct_literal(Context *context, AstStructLite
 
 Type* type_make_pointer(Context *context, Type* to) {
     if (to == NULL) return NULL;
-    if (to == (Type *) &node_that_signals_failure) return to;
+    if (to == (Type *) &context->node_that_signals_failure) return to;
 
     assert(to->id > 0);
     u64 ptr_id = bh_imap_get(&context->types.pointer_map, to->id);
@@ -1044,7 +1044,7 @@ Type* type_make_pointer(Context *context, Type* to) {
 
 Type* type_make_multi_pointer(Context *context, Type* to) {
     if (to == NULL) return NULL;
-    if (to == (Type *) &node_that_signals_failure) return to;
+    if (to == (Type *) &context->node_that_signals_failure) return to;
 
     assert(to->id > 0);
     u64 ptr_id = bh_imap_get(&context->types.multi_pointer_map, to->id);
@@ -1068,7 +1068,7 @@ Type* type_make_multi_pointer(Context *context, Type* to) {
 
 Type* type_make_array(Context *context, Type* to, u32 count) {
     if (to == NULL) return NULL;
-    if (to == (Type *) &node_that_signals_failure) return to;
+    if (to == (Type *) &context->node_that_signals_failure) return to;
 
     assert(to->id > 0);
     u64 key = ((((u64) to->id) << 32) | (u64) count);
@@ -1092,7 +1092,7 @@ Type* type_make_array(Context *context, Type* to, u32 count) {
 
 Type* type_make_slice(Context *context, Type* of) {
     if (of == NULL) return NULL;
-    if (of == (Type *) &node_that_signals_failure) return of;
+    if (of == (Type *) &context->node_that_signals_failure) return of;
 
     assert(of->id > 0);
     u64 slice_id = bh_imap_get(&context->types.slice_map, of->id);
@@ -1118,7 +1118,7 @@ Type* type_make_slice(Context *context, Type* of) {
 
 Type* type_make_dynarray(Context *context, Type* of) {
     if (of == NULL) return NULL;
-    if (of == (Type *) &node_that_signals_failure) return of;
+    if (of == (Type *) &context->node_that_signals_failure) return of;
 
     assert(of->id > 0);
     u64 dynarr_id = bh_imap_get(&context->types.dynarr_map, of->id);
@@ -1144,7 +1144,7 @@ Type* type_make_dynarray(Context *context, Type* of) {
 
 Type* type_make_varargs(Context *context, Type* of) {
     if (of == NULL) return NULL;
-    if (of == (Type *) &node_that_signals_failure) return of;
+    if (of == (Type *) &context->node_that_signals_failure) return of;
 
     assert(of->id > 0);
     u64 vararg_id = bh_imap_get(&context->types.vararg_map, of->id);

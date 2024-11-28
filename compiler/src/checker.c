@@ -837,7 +837,7 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
             return Check_Error;
         }
 
-        if (new_callee == (AstTyped *) &node_that_signals_a_yield) {
+        if (new_callee == (AstTyped *) &context->node_that_signals_a_yield) {
             YIELD(call->token->pos, "Waiting for overloaded function option to pass type-checking.");
         }
 
@@ -852,7 +852,7 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
 
         AstTyped* new_callee = (AstTyped *) macro_resolve_header(context, (AstMacro *) callee, &call->args, call->token, 1);
         if (new_callee == NULL) return Check_Error;
-        if (new_callee == (AstTyped *) &node_that_signals_a_yield) {
+        if (new_callee == (AstTyped *) &context->node_that_signals_a_yield) {
             YIELD(call->token->pos, "Waiting for macro header to pass type-checking.");
         }
 
@@ -862,7 +862,7 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
     } else while (callee->kind == Ast_Kind_Polymorphic_Proc) {
         AstTyped* new_callee = (AstTyped *) polymorphic_proc_lookup(context, (AstFunction *) callee, PPLM_By_Arguments, &call->args, call->token);
         if (new_callee == NULL) return Check_Error;
-        if (new_callee == (AstTyped *) &node_that_signals_a_yield) {
+        if (new_callee == (AstTyped *) &context->node_that_signals_a_yield) {
             YIELD(call->token->pos, "Waiting for polymorphic procedure header to pass type-checking.");
         }
 
@@ -1081,7 +1081,7 @@ static AstCall* binaryop_try_operator_overload(Context *context, AstBinaryOp* bi
             context->checker.current_checking_level = current_checking_level_store;
             context->checker.all_checks_are_final   = current_all_checks_are_final;
 
-            if (cs == Check_Yield_Macro)      return (AstCall *) &node_that_signals_a_yield;
+            if (cs == Check_Yield_Macro)      return (AstCall *) &context->node_that_signals_a_yield;
             if (cs == Check_Error)            return NULL;
 
             binop->overload_args->values[0] = (AstTyped *) make_argument(context, binop->overload_args->values[0]);
@@ -1095,7 +1095,7 @@ static AstCall* binaryop_try_operator_overload(Context *context, AstBinaryOp* bi
     }
 
     AstTyped* overload = find_matching_overload_by_arguments(context, context->operator_overloads[binop->operation], binop->overload_args);
-    if (overload == NULL || overload == (AstTyped *) &node_that_signals_a_yield) return (AstCall *) overload;
+    if (overload == NULL || overload == (AstTyped *) &context->node_that_signals_a_yield) return (AstCall *) overload;
 
     AstCall* implicit_call = onyx_ast_node_new(context->ast_alloc, sizeof(AstCall), Ast_Kind_Call);
     implicit_call->token = binop->token;
@@ -1120,7 +1120,7 @@ static AstCall* unaryop_try_operator_overload(Context *context, AstUnaryOp* unop
     }
 
     AstTyped* overload = find_matching_overload_by_arguments(context, context->unary_operator_overloads[unop->operation], unop->overload_args);
-    if (overload == NULL || overload == (AstTyped *) &node_that_signals_a_yield) return (AstCall *) overload;
+    if (overload == NULL || overload == (AstTyped *) &context->node_that_signals_a_yield) return (AstCall *) overload;
 
     AstCall* implicit_call = onyx_ast_node_new(context->ast_alloc, sizeof(AstCall), Ast_Kind_Call);
     implicit_call->token = unop->token;
@@ -1454,7 +1454,7 @@ CHECK_FUNC(binaryop, AstBinaryOp** pbinop) {
         }
 
         AstCall* call = binaryop_try_operator_overload(context, binop->potential_substitute, binop->right);
-        if (call == (AstCall *) &node_that_signals_a_yield) YIELD(binop->token->pos, "Waiting on potential operator overload.");
+        if (call == (AstCall *) &context->node_that_signals_a_yield) YIELD(binop->token->pos, "Waiting on potential operator overload.");
         if (call != NULL) {
             call->next = binop->next;
             *(AstCall **) pbinop = call;
@@ -1510,7 +1510,7 @@ CHECK_FUNC(binaryop, AstBinaryOp** pbinop) {
 
         AstCall *implicit_call = binaryop_try_operator_overload(context, binop, NULL);
 
-        if (implicit_call == (AstCall *) &node_that_signals_a_yield)
+        if (implicit_call == (AstCall *) &context->node_that_signals_a_yield)
             YIELD(binop->token->pos, "Trying to resolve operator overload.");
 
         if (implicit_call != NULL && implicit_call != &context->checker.__op_maybe_overloaded) {
@@ -1657,7 +1657,7 @@ CHECK_FUNC(unaryop, AstUnaryOp** punop) {
 
     if (unaryop->operation == Unary_Op_Try || unaryop->operation == Unary_Op_Unwrap) {
         AstCall* call = unaryop_try_operator_overload(context, unaryop);
-        if (call == (AstCall *) &node_that_signals_a_yield) YIELD(unaryop->token->pos, "Waiting on potential operator overload.");
+        if (call == (AstCall *) &context->node_that_signals_a_yield) YIELD(unaryop->token->pos, "Waiting on potential operator overload.");
         if (call != NULL && call != &context->checker.__op_maybe_overloaded) {
             call->next = unaryop->next;
             *(AstCall **) punop = call;
@@ -2157,7 +2157,7 @@ CHECK_FUNC(address_of, AstAddressOf** paof) {
         }
 
         AstCall* call = binaryop_try_operator_overload(context, aof->potential_substitute, NULL);
-        if (call == (AstCall *) &node_that_signals_a_yield) YIELD(aof->token->pos, "Waiting for operator overload to possibly resolve.");
+        if (call == (AstCall *) &context->node_that_signals_a_yield) YIELD(aof->token->pos, "Waiting for operator overload to possibly resolve.");
         if (call != NULL) {
             call->next = aof->next;
             *(AstCall **) paof = call;
@@ -2245,7 +2245,7 @@ CHECK_FUNC(subscript, AstSubscript** psub) {
         AstBinaryOp* binop = (AstBinaryOp *) sub;
         AstCall *implicit_call = binaryop_try_operator_overload(context, binop, NULL);
 
-        if (implicit_call == (AstCall *) &node_that_signals_a_yield)
+        if (implicit_call == (AstCall *) &context->node_that_signals_a_yield)
             YIELD(sub->token->pos, "Trying to resolve operator overload.");
 
         if (implicit_call != NULL) {
@@ -2902,7 +2902,7 @@ CHECK_FUNC(directive_solidify, AstDirectiveSolidify** psolid) {
     }
 
     solid->resolved_proc = polymorphic_proc_try_solidify(context, solid->poly_proc, solid->known_polyvars, solid->token);
-    if (solid->resolved_proc == (AstNode *) &node_that_signals_a_yield) {
+    if (solid->resolved_proc == (AstNode *) &context->node_that_signals_a_yield) {
         solid->resolved_proc = NULL;
         YIELD(solid->token->pos, "Waiting for partially solidified procedure.");
     }
@@ -3579,7 +3579,7 @@ CHECK_FUNC(function_header, AstFunction* func) {
             YIELD(local->token->pos, "Waiting for parameter type to be known.");
         }
 
-        if (local->type == (Type *) &node_that_signals_failure) {
+        if (local->type == (Type *) &context->node_that_signals_failure) {
             return Check_Failed;
         }
 

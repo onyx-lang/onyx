@@ -611,7 +611,7 @@ AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadO
         // NOTE: Overload is not something that is known to be overloadable.
         if (overload == NULL) continue;
         if (overload->kind != Ast_Kind_Function) continue;
-        if (overload == (AstFunction *) &node_that_signals_a_yield || overload->type == NULL) {
+        if (overload == (AstFunction *) &context->node_that_signals_a_yield || overload->type == NULL) {
             // If it was not possible to create the type for this procedure, tell the
             // caller that this should yield and try again later.
 
@@ -619,7 +619,7 @@ AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadO
             // work in the future, then it has to take precedence over the other options available.
             bh_imap_free(&all_overloads);
             bh_arr_free(args.values);
-            return (AstTyped *) &node_that_signals_a_yield;
+            return (AstTyped *) &context->node_that_signals_a_yield;
         }
         assert(overload->type->kind == Type_Kind_Function);
 
@@ -639,7 +639,7 @@ AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadO
         if (tm == TYPE_MATCH_YIELD) {
             bh_imap_free(&all_overloads);
             bh_arr_free(args.values);
-            return (AstTyped *) &node_that_signals_a_yield;
+            return (AstTyped *) &context->node_that_signals_a_yield;
         }
     }
 
@@ -668,7 +668,7 @@ AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption
         }
 
         if (tm == TYPE_MATCH_YIELD) {
-            return (AstTyped *) &node_that_signals_a_yield;
+            return (AstTyped *) &context->node_that_signals_a_yield;
         }
     }
     
@@ -924,7 +924,7 @@ AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* 
             if (slns == NULL) {
                 if (context->polymorph.flag_to_yield) {
                     context->polymorph.flag_to_yield = 0;
-                    return (AstFunction *) &node_that_signals_a_yield;
+                    return (AstFunction *) &context->node_that_signals_a_yield;
                 }
 
                 return NULL;

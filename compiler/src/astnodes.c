@@ -728,7 +728,7 @@ TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b
     if (node->kind == Ast_Kind_Overloaded_Function) {
         AstTyped* func = find_matching_overload_by_type(context, ((AstOverloadedFunction *) node)->overloads, type);
         if (func == NULL) return TYPE_MATCH_FAILED;
-        if (func == (AstTyped *) &node_that_signals_a_yield) return TYPE_MATCH_YIELD;
+        if (func == (AstTyped *) &context->node_that_signals_a_yield) return TYPE_MATCH_YIELD;
 
         if (permanent) {
             ensure_overload_returns_correct_type(context, func, (AstOverloadedFunction *) node);
@@ -741,7 +741,7 @@ TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b
     if (node->kind == Ast_Kind_Polymorphic_Proc) {
         AstFunction* func = polymorphic_proc_lookup(context, (AstFunction *) node, PPLM_By_Function_Type, type, node->token);
         if (func == NULL) return TYPE_MATCH_FAILED;
-        if (func == (AstFunction *) &node_that_signals_a_yield) return TYPE_MATCH_YIELD;
+        if (func == (AstFunction *) &context->node_that_signals_a_yield) return TYPE_MATCH_YIELD;
 
         *pnode = (AstTyped *) func;
         node = *pnode;
@@ -1541,7 +1541,7 @@ TypeMatch implicit_cast_to_bool(Context *context, AstTyped **pnode) {
     AstFunction *overload = (AstFunction *) find_matching_overload_by_arguments(context, context->builtins.implicit_bool_cast->overloads, args);
 
     if (overload == NULL)                                       return TYPE_MATCH_FAILED;
-    if (overload == (AstFunction *) &node_that_signals_a_yield) return TYPE_MATCH_YIELD;
+    if (overload == (AstFunction *) &context->node_that_signals_a_yield) return TYPE_MATCH_YIELD;
 
     AstCall *implicit_call = onyx_ast_node_new(context->ast_alloc, sizeof(AstCall), Ast_Kind_Call);
     implicit_call->token = node->token;

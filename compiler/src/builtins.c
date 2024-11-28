@@ -377,6 +377,8 @@ void prepare_builtins(Context *context) {
     context->builtins.tls_size     = ((AstGlobal) { Ast_Kind_Global, 0, &builtin_tls_size_token, NULL, NULL, (AstType *) &context->basic_types.type_u32, NULL });
     context->builtins.closure_base = ((AstGlobal) { Ast_Kind_Global, 0, &builtin_closure_base_token, NULL, NULL, (AstType *) &context->basic_types.type_rawptr, NULL });
     context->builtins.stack_trace  = ((AstGlobal) { Ast_Kind_Global, 0, &builtin_stack_trace_token, NULL, NULL, (AstType *) &context->basic_types.type_rawptr, NULL });
+
+    context->node_that_signals_a_yield.kind = Ast_Kind_Function;
 }
 
 void initialize_builtins(Context *context) {

@@ -3,12 +3,6 @@
 // Polymorphic Procedures
 //
 
-// The name is pretty self-descriptive, but this is a node that is returned from things
-// like polymorphic_proc_lookup when it is determined that everything works so far, but
-// the caller must yield in order to finish checking this polymorphic procedure.
-const AstTyped node_that_signals_a_yield = { Ast_Kind_Function, 0 };
-const AstTyped node_that_signals_failure = { Ast_Kind_Error, 0 };
-
 static void ensure_polyproc_cache_is_created(Context *context, AstFunction* pp) {
     if (pp->concrete_funcs == NULL)        sh_new_arena(pp->concrete_funcs);
     if (pp->active_queries.hashes == NULL) bh_imap_init(&pp->active_queries, context->gp_alloc, 31);
@@ -504,7 +498,7 @@ static AstTyped* try_lookup_based_on_partial_function_type(Context *context, Ast
         context->polymorph.doing_nested_polymorph_lookup = 1;
         result = NULL;
     }
-    if (result == &node_that_signals_a_yield) {
+    if (result == &context->node_that_signals_a_yield) {
         context->polymorph.doing_nested_polymorph_lookup = 1;
         result = NULL;
     }
@@ -809,7 +803,7 @@ AstFunction* polymorphic_proc_lookup(Context *context, AstFunction* pp, PolyProc
 
     // Ensure the polymorphic procedure is ready to be solved for.
     assert(pp->entity);
-    if (pp->entity->state < Entity_State_Check_Types) return (AstFunction *) &node_that_signals_a_yield;
+    if (pp->entity->state < Entity_State_Check_Types) return (AstFunction *) &context->node_that_signals_a_yield;
 
     ensure_polyproc_cache_is_created(context, pp);
 
@@ -817,7 +811,7 @@ AstFunction* polymorphic_proc_lookup(Context *context, AstFunction* pp, PolyProc
     if (slns == NULL) {
         if (context->polymorph.flag_to_yield) {
             context->polymorph.flag_to_yield = 0;
-            return (AstFunction *) &node_that_signals_a_yield;
+            return (AstFunction *) &context->node_that_signals_a_yield;
         }
 
         return NULL;
@@ -865,7 +859,7 @@ AstFunction* polymorphic_proc_solidify(Context *context, AstFunction* pp, bh_arr
         );
     }
 
-    return (AstFunction *) &node_that_signals_a_yield;
+    return (AstFunction *) &context->node_that_signals_a_yield;
 }
 
 // NOTE: This can return either a AstFunction or an AstFunction, depending if enough parameters were
@@ -928,7 +922,7 @@ AstFunction* polymorphic_proc_build_only_header(Context *context, AstFunction* p
     bh_arr(AstPolySolution) slns = find_polymorphic_slns(context, pp, pp_lookup, actual, NULL, 0);
     if (context->polymorph.flag_to_yield) {
         context->polymorph.flag_to_yield = 0;
-        return (AstFunction *) &node_that_signals_a_yield;
+        return (AstFunction *) &context->node_that_signals_a_yield;
     }
     if (slns == NULL) return NULL;
 
@@ -956,7 +950,7 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstF
         if (solidified_func.func_header_entity->state == Entity_State_Finalized) return solidified_func.func;
         if (solidified_func.func_header_entity->state == Entity_State_Failed)    return NULL;
 
-        return (AstFunction *) &node_that_signals_a_yield;
+        return (AstFunction *) &context->node_that_signals_a_yield;
     }
 
     BH_MASK_SET(solidified_func.func->flags, !error_if_failed, Ast_Flag_Header_Check_No_Error);
@@ -975,7 +969,7 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstF
     // NOTE: Cache the function for later use.
     shput(pp->concrete_funcs, unique_key, solidified_func);
 
-    return (AstFunction *) &node_that_signals_a_yield;
+    return (AstFunction *) &context->node_that_signals_a_yield;
 }
 
 typedef struct AutoPolymorphVariable {
@@ -1196,7 +1190,7 @@ Type* polymorphic_struct_lookup(Context *context, AstPolyStructType* ps_type, bh
         }
 
         if (concrete_struct->entity_type->state == Entity_State_Failed) {
-            return (Type *) &node_that_signals_failure;
+            return (Type *) &context->node_that_signals_failure;
         }
 
         Type* cs_type = type_build_from_ast(context, (AstType *) concrete_struct);
@@ -1269,7 +1263,7 @@ Type* polymorphic_union_lookup(Context *context, AstPolyUnionType* pu_type, bh_a
         }
 
         if (concrete_union->entity->state == Entity_State_Failed) {
-            return (Type *) &node_that_signals_failure;
+            return (Type *) &context->node_that_signals_failure;
         }
 
         Type* cu_type = type_build_from_ast(context, (AstType *) concrete_union);
