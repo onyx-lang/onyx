@@ -1,3 +1,7 @@
+#ifndef BH_INTERNAL_ALLOCATOR
+    #define BH_INTERNAL_ALLOCATOR (context->gp_alloc)
+#endif
+
 #include "astnodes.h"
 #include "types.h"
 #include "parser.h"
@@ -932,7 +936,7 @@ CHECK_FUNC(call, AstCall** pcall) {
     }
 
     i32 arg_count = get_argument_buffer_size(context, &callee->type->Function, &call->args);
-    arguments_ensure_length(&call->args, arg_count);
+    arguments_ensure_length(context, &call->args, arg_count);
 
     char* err_msg = NULL;
     fill_in_arguments(context, &call->args, (AstNode *) callee, &err_msg, 0);
@@ -1889,7 +1893,7 @@ CHECK_FUNC(struct_literal, AstStructLiteral* sl) {
     }
 
     i32 mem_count = type_structlike_mem_count(sl->type);
-    arguments_ensure_length(&sl->args, mem_count);
+    arguments_ensure_length(context, &sl->args, mem_count);
 
     // :Idempotency
     if ((sl->flags & Ast_Flag_Has_Been_Checked) == 0) {

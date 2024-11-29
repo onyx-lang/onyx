@@ -2195,6 +2195,9 @@ struct Context {
     AstTyped node_that_signals_a_yield;
     AstTyped node_that_signals_failure;
 
+    // Currently, this only needs to exist so all the scope's symbol array can be freed later.
+    bh_arr(Scope *) scopes;
+
     OnyxErrors errors;
     b32 errors_enabled;
 
@@ -2298,8 +2301,8 @@ AstStructLiteral* make_union_variant_of_void(Context *context, Type* union_type,
 
 void arguments_initialize(Context *context, Arguments* args);
 b32 fill_in_arguments(Context *context, Arguments* args, AstNode* provider, char** err_msg, b32 insert_zero_values);
-void arguments_ensure_length(Arguments* args, u32 count);
-void arguments_copy(Arguments* dest, Arguments* src);
+void arguments_ensure_length(Context *context, Arguments* args, u32 count);
+void arguments_copy(Context *context, Arguments* dest, Arguments* src);
 void arguments_clone(Context *context, Arguments* dest, Arguments* src);
 void arguments_deep_clone(Context *context, Arguments* dest, Arguments* src);
 void arguments_remove_baked(Arguments* args);

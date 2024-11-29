@@ -108,6 +108,8 @@ void package_mark_as_used(Context *context, Package* package) {
 
 Scope* scope_create(Context *context, Scope* parent, OnyxFilePos created_at) {
     Scope* scope = bh_alloc_item(context->ast_alloc, Scope);
+    bh_arr_push(context->scopes, scope);
+
     scope->id = ++context->next_scope_id;
     scope->parent = parent;
     scope->created_at = created_at;
@@ -583,7 +585,7 @@ void build_all_overload_options(bh_arr(OverloadOption) overloads, bh_imap* all_o
 AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadOption) overloads, Arguments* param_args) {
     Arguments args;
     arguments_clone(context, &args, param_args);
-    arguments_ensure_length(&args, bh_arr_length(args.values) + bh_arr_length(args.named_values));
+    arguments_ensure_length(context, &args, bh_arr_length(args.values) + bh_arr_length(args.named_values));
 
     // CLEANUP SPEED: This currently rebuilds the complete set of overloads every time one is looked up.
     // This should be cached in the AstOverloadedFunction or somewhere like that.
@@ -595,7 +597,7 @@ AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadO
 
     bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
         AstTyped* node = (AstTyped *) strip_aliases((AstNode *) entry->key);
-        arguments_copy(&args, param_args);
+        arguments_copy(context, &args, param_args);
 
         AstFunction* overload = NULL;
         switch (node->kind) {
@@ -624,7 +626,7 @@ AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadO
         assert(overload->type->kind == Type_Kind_Function);
 
         arguments_remove_baked(&args);
-        arguments_ensure_length(&args, get_argument_buffer_size(context, &overload->type->Function, &args));
+        arguments_ensure_length(context, &args, get_argument_buffer_size(context, &overload->type->Function, &args));
 
         // NOTE: If the arguments cannot be placed successfully in the parameters list
         if (!fill_in_arguments(context, &args, (AstNode *) overload, NULL, 0)) continue;

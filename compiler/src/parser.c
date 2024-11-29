@@ -23,6 +23,9 @@ static AstNode error_node = { Ast_Kind_Error, 0, NULL, NULL };
 #define ONYX_ERROR(pos, rank, ...) (onyx_report_error(parser->context, (pos), (rank), __VA_ARGS__))
 #define ONYX_WARNING(pos, ...) (onyx_report_warning(parser->context, (pos), __VA_ARGS__))
 
+#undef BH_INTERNAL_ALLOCATOR
+#define BH_INTERNAL_ALLOCATOR (parser->context->gp_alloc)
+
 void submit_entity_in_scope(OnyxParser* parser, AstNode* node, Scope* scope, Package* package) {
     if (bh_arr_length(parser->alternate_entity_placement_stack) == 0) {
         add_entities_for_node(&parser->context->entities, NULL, node, scope, package);

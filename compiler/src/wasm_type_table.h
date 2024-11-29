@@ -1,6 +1,9 @@
 // This file is directly included in src/onxywasm.c
 // It is here purely to decrease the amount of clutter in the main file.
 
+#undef BH_INTERNAL_ALLOCATOR
+#define BH_INTERNAL_ALLOCATOR (ctx->context->gp_alloc)
+
 typedef struct StructMethodData {
     u32 name_loc;
     u32 name_len;
@@ -698,6 +701,9 @@ static i32 build_type_info_for_polyunion(struct TypeBuilderContext *ctx, Type *t
     return offset;
 }
 
+#undef BH_INTERNAL_ALLOCATOR
+#define BH_INTERNAL_ALLOCATOR (ctx.context->gp_alloc)
+
 static void build_type_info_for_type(OnyxWasmModule *module, Type *type) {
     bh_buffer buffer;
 
@@ -775,6 +781,9 @@ static void build_type_info_for_type(OnyxWasmModule *module, Type *type) {
     bh_arr_free(ctx.patches);
 }
 
+#undef BH_INTERNAL_ALLOCATOR
+#define BH_INTERNAL_ALLOCATOR (module->context->gp_alloc)
+
 static u64 prepare_type_table(OnyxWasmModule* module) {
     // This is the data behind the "type_table" slice in runtime/info/types.onyx
     u32 type_count = bh_arr_length(module->context->types.type_map.entries) + 1;
@@ -818,6 +827,9 @@ static u64 prepare_type_table(OnyxWasmModule* module) {
 }
 
 
+
+#undef BH_INTERNAL_ALLOCATOR
+#define BH_INTERNAL_ALLOCATOR (module->context->gp_alloc)
 
 static u64 build_foreign_blocks(OnyxWasmModule* module) {
     bh_arr(u32) base_patch_locations=NULL;

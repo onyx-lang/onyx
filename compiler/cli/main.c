@@ -651,6 +651,9 @@ static int32_t output_file_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, const
     int64_t output_length = onyx_output_length(ctx, type);
     if (output_length > 0) {
         void *output = malloc(output_length);
+        assert(output);
+        memset(output, 0, output_length);
+
         onyx_output_write(ctx, type, output);
 
         bh_file out_file;

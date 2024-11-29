@@ -1783,7 +1783,7 @@ void arguments_initialize(Context *context, Arguments* args) {
     args->used_argument_count = -1;
 }
 
-void arguments_ensure_length(Arguments* args, u32 count) {
+void arguments_ensure_length(Context *context, Arguments* args, u32 count) {
     // Make the array big enough
     bh_arr_grow(args->values, count);
 
@@ -1794,7 +1794,7 @@ void arguments_ensure_length(Arguments* args, u32 count) {
     bh_arr_set_length(args->values, bh_max(count, (u32) bh_arr_length(args->values)));
 }
 
-void arguments_copy(Arguments* dest, Arguments* src) {
+void arguments_copy(Context *context, Arguments* dest, Arguments* src) {
     dest->used_argument_count = -1;
     dest->named_values = src->named_values;
 

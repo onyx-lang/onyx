@@ -1,6 +1,9 @@
 #ifndef ONYXLEX_H
 #define ONYXLEX_H
 
+#ifndef BH_INTERNAL_ALLOCATOR
+    #define BH_INTERNAL_ALLOCATOR (context->gp_alloc)
+#endif
 #include "bh.h"
 
 typedef enum TokenType {

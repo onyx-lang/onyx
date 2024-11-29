@@ -107,6 +107,7 @@ onyx_context_t *onyx_context_create() {
     context->global_scope = scope_create(context, NULL, internal_location);
 
     sh_new_arena(context->packages);
+    bh_arr_new(context->gp_alloc, context->scopes, 128);
 
     onyx_errors_init(context, &context->loaded_files);
 
@@ -121,10 +122,18 @@ onyx_context_t *onyx_context_create() {
 void onyx_context_free(onyx_context_t *ctx) {
 	Context *context = &ctx->context;
 
+    bh_arr_each(Scope *, pscope, context->scopes) {
+        shfree((*pscope)->symbols);
+    }
+
+    onyx_wasm_module_free(context->wasm_module);
     bh_arena_free(&context->ast_arena);
     bh_arr_free(context->loaded_files);
+    bh_arr_free(context->scopes);
     bh_scratch_free(&context->scratch);
     bh_managed_heap_free(&context->heap);
+
+    free(context);
 }
 
 void onyx_options_ready(onyx_context_t *ctx) {

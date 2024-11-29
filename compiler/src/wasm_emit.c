@@ -23,6 +23,9 @@
 #define ONYX_ERROR(pos, rank, ...) (onyx_report_error(mod->context, (pos), (rank), __VA_ARGS__))
 #define ONYX_WARNING(pos, ...) (onyx_report_warning(mod->context, (pos), __VA_ARGS__))
 
+#undef BH_INTERNAL_ALLOCATOR
+#define BH_INTERNAL_ALLOCATOR (mod->context->gp_alloc)
+
 #define WASM_TYPE_INT32   0x7F
 #define WASM_TYPE_INT64   0x7E
 #define WASM_TYPE_FLOAT32 0x7D
@@ -594,6 +597,10 @@ static void ensure_type_has_been_submitted_for_emission(OnyxWasmModule *mod, Typ
 #include "wasm_intrinsics.h"
 #include "wasm_type_table.h"
 
+// Need to reset the allocator because it is changed in wasm_type_table.h
+#undef BH_INTERNAL_ALLOCATOR
+#define BH_INTERNAL_ALLOCATOR (mod->context->gp_alloc)
+
 EMIT_FUNC(function_body, AstFunction* fd) {
     if (fd->body == NULL) return;
 
@@ -951,7 +958,7 @@ static void flatten_nested_array_literals_for_emit_helper(bh_arr(AstTyped *) *po
     } else {
         bh_arr(AstTyped *) output = *poutput;
         fori (i, 0, elem_count) {
-            bh_arr_push(output, al->values[i]);
+            bh_arr_push_unsafe(output, al->values[i]);
         }
         *poutput = output;
     }
@@ -4817,7 +4824,7 @@ static void emit_export_directive(OnyxWasmModule* mod, AstDirectiveExport* expor
     return;
 }
 
-static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
+static void emit_global(OnyxWasmModule* mod, AstGlobal* global) {
     WasmType global_type = onyx_type_to_wasm_type(global->type);
 
     WasmGlobal glob = {
@@ -4826,9 +4833,9 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
         .initial_value = NULL,
     };
 
-    i32 global_idx = (i32) bh_imap_get(&module->index_map, (u64) global);
+    i32 global_idx = (i32) bh_imap_get(&mod->index_map, (u64) global);
 
-    bh_arr_new(module->context->gp_alloc, glob.initial_value, 1);
+    bh_arr_new(mod->context->gp_alloc, glob.initial_value, 1);
 
     switch (global_type) {
         case WASM_TYPE_INT32:   bh_arr_push(glob.initial_value, ((WasmInstruction) { WI_I32_CONST, 0 })); break;
@@ -4839,16 +4846,16 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
         default: assert("Invalid global type" && 0); break;
     }
 
-    bh_arr_set_at(module->globals, global_idx, glob);
+    bh_arr_set_at(mod->globals, global_idx, glob);
 
-    if (global == &module->context->builtins.stack_top)
-        module->stack_top_ptr = &module->globals[global_idx].initial_value[0].data.i1;
+    if (global == &mod->context->builtins.stack_top)
+        mod->stack_top_ptr = &mod->globals[global_idx].initial_value[0].data.i1;
 
-    if (global == &module->context->builtins.heap_start)
-        module->heap_start_ptr = &module->globals[global_idx].initial_value[0].data.i1;
+    if (global == &mod->context->builtins.heap_start)
+        mod->heap_start_ptr = &mod->globals[global_idx].initial_value[0].data.i1;
 
-    if (global == &module->context->builtins.tls_size)
-        module->tls_size_ptr = &module->globals[global_idx].initial_value[0].data.i1;
+    if (global == &mod->context->builtins.tls_size)
+        mod->tls_size_ptr = &mod->globals[global_idx].initial_value[0].data.i1;
 }
 
 static void emit_raw_string(OnyxWasmModule* mod, char *data, i32 len, u64 *out_data_id, u64 *out_len) {
@@ -4978,14 +4985,14 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
         patch.data_id = 0;
         patch.offset = 0;
         patch.node_to_use_if_data_id_is_null = (AstNode *) sl;
-        bh_arr_push(ctx->module->data_patches, patch);
+        bh_arr_push_unsafe(ctx->module->data_patches, patch);
 
         CodePatchInfo code_patch;
         code_patch.kind = Code_Patch_String_Length_In_Data;
         code_patch.func_idx = ctx->data_id; // Repurposing func_idx for this.
         code_patch.instr    = offset + POINTER_SIZE; // Repurposing instr for offset into section
         code_patch.node_related_to_patch = (AstNode *) sl;
-        bh_arr_push(ctx->module->code_patches, code_patch);
+        bh_arr_push_unsafe(ctx->module->code_patches, code_patch);
 
         break;
     }
@@ -5046,7 +5053,7 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
         // to get the actual data id of the addressed node.
         patch.node_to_use_if_data_id_is_null = expr;
 
-        bh_arr_push(ctx->module->data_patches, patch);
+        bh_arr_push_unsafe(ctx->module->data_patches, patch);
         break;
     }
 
@@ -5416,63 +5423,63 @@ void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module) {
 }
 
 void emit_entity(Context *context, Entity* ent) {
-    OnyxWasmModule* module = context->wasm_module;
-    module->current_func_idx = -1;
+    OnyxWasmModule* mod = context->wasm_module;
+    mod->current_func_idx = -1;
 
     switch (ent->type) {
         case Entity_Type_Foreign_Function_Header:
-            emit_foreign_function(module, ent->function);
-            bh_imap_put(&module->index_map, (u64) ent->function, module->next_foreign_func_idx++);
-            bh_arr_push(module->all_procedures, ent->function);
+            emit_foreign_function(mod, ent->function);
+            bh_imap_put(&mod->index_map, (u64) ent->function, mod->next_foreign_func_idx++);
+            bh_arr_push(mod->all_procedures, ent->function);
 
             if (ent->function->tags != NULL) {
-                bh_arr_push(module->procedures_with_tags, ent->function);
+                bh_arr_push(mod->procedures_with_tags, ent->function);
             }
             break;
 
         case Entity_Type_Function_Header:
             if (ent->function->flags & Ast_Flag_Proc_Is_Null) {
-                if (module->null_proc_func_idx == -1) module->null_proc_func_idx = get_element_idx(module, ent->function);
+                if (mod->null_proc_func_idx == -1) mod->null_proc_func_idx = get_element_idx(mod, ent->function);
             }
 
             if (ent->function->tags != NULL) {
-                bh_arr_push(module->procedures_with_tags, ent->function);
+                bh_arr_push(mod->procedures_with_tags, ent->function);
             }
             break;
 
         case Entity_Type_Global_Header:
-            bh_imap_put(&module->index_map, (u64) ent->global, module->next_global_idx++);
+            bh_imap_put(&mod->index_map, (u64) ent->global, mod->next_global_idx++);
             break;
 
         case Entity_Type_String_Literal: {
-            emit_string_literal(module, (AstStrLit *) ent->strlit);
+            emit_string_literal(mod, (AstStrLit *) ent->strlit);
             break;
         }
 
         case Entity_Type_File_Contents: {
-            emit_file_contents(module, (AstFileContents *) ent->file_contents);
+            emit_file_contents(mod, (AstFileContents *) ent->file_contents);
             break;
         }
 
         case Entity_Type_Memory_Reservation_Type: {
             if (ent->mem_res->tags != NULL) {
-                bh_arr_push(module->globals_with_tags, ent->mem_res);
+                bh_arr_push(mod->globals_with_tags, ent->mem_res);
             }
             break;
         }
 
         case Entity_Type_Memory_Reservation: {
-            emit_memory_reservation(module, (AstMemRes *) ent->mem_res);
+            emit_memory_reservation(mod, (AstMemRes *) ent->mem_res);
             break;
         }
 
         case Entity_Type_Process_Directive: {
             if (ent->expr->kind == Ast_Kind_Directive_Export) {
-                emit_export_directive(module, (AstDirectiveExport *) ent->expr);
+                emit_export_directive(mod, (AstDirectiveExport *) ent->expr);
             }
 
             if (ent->expr->kind == Ast_Kind_Directive_Library) {
-                bh_arr_push(module->libraries, ent->library->library_name);
+                bh_arr_push(mod->libraries, ent->library->library_name);
             }
 
             if (ent->expr->kind == Ast_Kind_Directive_Wasm_Section) {
@@ -5483,25 +5490,25 @@ void emit_entity(Context *context, Entity* ent) {
                 custom.contents = section->contents;
                 custom.len = section->length;
 
-                if (shgeti(module->custom_sections, section->name) >= 0) {
-                    onyx_report_warning(module->context, section->token->pos, "Duplicate definitions for custom section '%s'.", section->name);
+                if (shgeti(mod->custom_sections, section->name) >= 0) {
+                    onyx_report_warning(mod->context, section->token->pos, "Duplicate definitions for custom section '%s'.", section->name);
                 }
 
-                shput(module->custom_sections, section->name, custom);
+                shput(mod->custom_sections, section->name, custom);
             }
             break;
         }
 
         case Entity_Type_Foreign_Block: {
-            ent->foreign_block->foreign_block_number = module->next_foreign_block_idx++;
-            bh_arr_push(module->foreign_blocks, (AstForeignBlock *) ent->foreign_block);
+            ent->foreign_block->foreign_block_number = mod->next_foreign_block_idx++;
+            bh_arr_push(mod->foreign_blocks, (AstForeignBlock *) ent->foreign_block);
             break;
         }
 
-        case Entity_Type_Function: emit_function(module, ent->function); break;
-        case Entity_Type_Global:   emit_global(module,   ent->global); break;
+        case Entity_Type_Function: emit_function(mod, ent->function); break;
+        case Entity_Type_Global:   emit_global(mod,   ent->global); break;
 
-        case Entity_Type_JS:       emit_js_node(module, ent->js); break;
+        case Entity_Type_JS:       emit_js_node(mod, ent->js); break;
 
         default: break;
     }
@@ -5509,7 +5516,7 @@ void emit_entity(Context *context, Entity* ent) {
     ent->state = Entity_State_Finalized;
 
     // HACK
-    flush_enqueued_types_for_info(module);
+    flush_enqueued_types_for_info(mod);
 }
 
 
@@ -5517,6 +5524,9 @@ static i32 cmp_type_info(const void *a, const void *b) {
     return *(i32 *) a - *(i32 *) b;
 }
 
+
+#undef BH_INTERNAL_ALLOCATOR
+#define BH_INTERNAL_ALLOCATOR (context->gp_alloc)
 
 void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLinkOptions *options) {
     // If the pointer size is going to change,
@@ -5772,6 +5782,9 @@ void onyx_wasm_module_free(OnyxWasmModule* module) {
     bh_imap_free(&module->index_map);
     shfree(module->type_map);
     shfree(module->exports);
+    shfree(module->loaded_file_info);
+    shfree(module->string_literals);
+    shfree(module->custom_sections);
 }
 
 

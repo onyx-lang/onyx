@@ -11,6 +11,10 @@
     #endif
 #endif
 
+#ifndef BH_INTERNAL_ALLOCATOR
+    #define BH_INTERNAL_ALLOCATOR (bh_heap_allocator())
+#endif
+
 
 // NOTE: For lseek64
 #define _LARGEFILE64_SOURCE
@@ -670,7 +674,8 @@ typedef struct bh__arr {
 #define bh_arr(T)                    T*
 #define bh__arrhead(arr)             (((bh__arr *)(arr)) - 1)
 
-#define bh_arr_allocator(arr)        (arr ? bh__arrhead(arr)->allocator : bh_heap_allocator())
+#define bh_arr_allocator(arr)        (arr ? bh__arrhead(arr)->allocator : BH_INTERNAL_ALLOCATOR)
+#define bh_arr_allocator_assert(arr) (arr ? bh__arrhead(arr)->allocator : (assert(0 && "UNSET ALLOCATOR"), ((bh_allocator) {0})))
 #define bh_arr_length(arr)           (arr ? bh__arrhead(arr)->length : 0)
 #define bh_arr_capacity(arr)         (arr ? bh__arrhead(arr)->capacity : 0)
 #define bh_arr_size(arr)             (arr ? bh__arrhead(arr)->capacity * sizeof(*(arr)) : 0)
@@ -697,6 +702,10 @@ typedef struct bh__arr {
 
 #define bh_arr_push(arr, value)       ( \
     bh_arr_length(arr) + 1 > bh_arr_capacity(arr) ? bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), bh_arr_length(arr) + 1) : 0, \
+    arr[bh__arrhead(arr)->length++] = value)
+
+#define bh_arr_push_unsafe(arr, value)       ( \
+    bh_arr_length(arr) + 1 > bh_arr_capacity(arr) ? bh__arr_grow(bh_arr_allocator_assert(arr), (void **) &(arr), sizeof(*(arr)), bh_arr_length(arr) + 1) : 0, \
     arr[bh__arrhead(arr)->length++] = value)
 
 #define bh_arr_set_at(arr, n, value) ( \
