@@ -132,8 +132,6 @@ void onyx_context_free(onyx_context_t *ctx) {
     bh_arr_free(context->scopes);
     bh_scratch_free(&context->scratch);
     bh_managed_heap_free(&context->heap);
-
-    free(context);
 }
 
 void onyx_options_ready(onyx_context_t *ctx) {
