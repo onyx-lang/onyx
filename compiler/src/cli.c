@@ -10,7 +10,7 @@
     #define C_GREEN   "\e[33m"
     #define C_BLUE    "\e[34m"
     #define C_LBLUE   "\e[94m"
-#else 
+#else
     #define C_NORM
     #define C_BOLD
     #define C_RED
@@ -71,7 +71,8 @@ static const char *build_docstring = DOCSTRING_HEADER
     C_BOLD "Flags:\n" C_NORM
     C_LBLUE "    -o, --output " C_GREY "target_file    " C_NORM "Specify the target file " C_GREY "(default: out.wasm)\n"
     C_LBLUE "    -r, --runtime " C_GREY "runtime       " C_NORM "Specifies the runtime " C_GREY "(onyx, wasi, js, custom)\n"
-    C_LBLUE "    --map-dir " C_GREY "name:folder       " C_NORM "Adds a mapped directory\n"
+    C_LBLUE "    --map-dir " C_GREY "name:path    " C_NORM "Adds a mapped directory\n"
+    C_LBLUE "    --collection " C_GREY "name=path " C_NORM "Alias of --map-dir\n"
     "\n"
     C_LBLUE "    --debug                     " C_NORM "Output a debugable build\n"
     C_LBLUE "    --feature " C_GREY "feature           " C_NORM "Enable an experimental language feature\n"
@@ -334,13 +335,14 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
             OnyxFilePos fp = {0};
             onyx_report_warning(fp, "%s has been removed in favor of --map-dir", argv[i++]);
         }
-        else if (!strcmp(argv[i], "--map-dir")) {
+        else if (!strcmp(argv[i], "--map-dir") || !strcmp(argv[i], "--collection")) {
             char *arg = argv[++i];
             int len = strnlen(arg, 256);
 
             char *name = arg;
             char *folder = NULL;
-            fori (i, 0, len) if (arg[i] == ':') {
+            // name:path or name=path
+            fori (i, 0, len) if (arg[i] == ':' || arg[i] == '=') {
                 arg[i] = '\0';
                 folder = &arg[i + 1];
             }
@@ -423,7 +425,7 @@ static void cli_parse_compilation_options(CompileOptions *options, int arg_parse
             return;
         }
     }
-    
+
     fori (i, arg_parse_start, argc) {
         if (is_flag(argv[i])) {
             if (!strcmp(argv[i], "--")) {
@@ -704,4 +706,3 @@ static void print_top_level_docs(CompileOptions *options) {
     bh_printf(C_NORM C_BOLD "\nLocal custom commands:\n" C_NORM);
     print_commands_in_directory("./.onyx", options->allocator);
 }
-
