@@ -860,6 +860,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     if (cli_args.action == ONYX_COMPILE_ACTION_SELF_UPGRADE) {
         if (arg_parse_start < argc && !is_flag(argv[arg_parse_start])) {
             perform_self_upgrade(&cli_args, argv[arg_parse_start]);
@@ -872,7 +873,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     if (cli_args.action == ONYX_COMPILE_ACTION_WATCH || cli_args.action == ONYX_COMPILE_ACTION_WATCH_RUN) {
         onyx_watch(&cli_args, arg_parse_start, argc, argv);
         return 0;
