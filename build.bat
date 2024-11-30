@@ -1,7 +1,7 @@
 @echo off
 
 REM Compile the compiler
-set SOURCE_FILES=compiler/src/onyx.c compiler/src/astnodes.c compiler/src/builtins.c compiler/src/checker.c compiler/src/clone.c compiler/src/doc.c compiler/src/entities.c compiler/src/errors.c compiler/src/lex.c compiler/src/parser.c compiler/src/symres.c compiler/src/types.c compiler/src/utils.c compiler/src/wasm_emit.c compiler/src/wasm_runtime.c compiler/src/extensions.c
+set SOURCE_FILES=compiler/src/library_main.c compiler/cli/main.c compiler/src/astnodes.c compiler/src/builtins.c compiler/src/checker.c compiler/src/clone.c compiler/src/doc.c compiler/src/entities.c compiler/src/errors.c compiler/src/lex.c compiler/src/parser.c compiler/src/symres.c compiler/src/types.c compiler/src/utils.c compiler/src/wasm_emit.c compiler/src/wasm_runtime.c compiler/src/extensions.c
 
 if "%1" == "1" (
     set FLAGS=/Od /MTd /Z7

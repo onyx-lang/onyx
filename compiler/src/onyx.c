@@ -122,13 +122,6 @@ static void output_dummy_progress_bar(Context *context) {
 
     if (context->options->verbose_output > 0) {
         printf("Type table size: %d bytes\n", context->wasm_module->type_info_size);
-
-        // TODO: Replace these with bh_printf when padded formatting is added.
-        printf("\nStatistics:\n");
-        printf("    Time taken: %lf ms\n", (double) duration);
-        printf("    Processed %llu lines (%f lines/second).\n", context->stats.lexer_lines_processed, ((f32) 1000 * context->stats.lexer_lines_processed) / (duration));
-        printf("    Processed %llu tokens (%f tokens/second).\n", context->stats.lexer_tokens_processed, ((f32) 1000 * context->stats.lexer_tokens_processed) / (duration));
-        printf("\n");
     }
 
     if (context->options->running_perf) {
