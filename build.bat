@@ -23,6 +23,15 @@ if %ERRORLEVEL% neq 0 (
     exit /b %ERRORLEVEL%
 )
 
+set SOURCE_FILES=compiler/src/library_main.c compiler/src/astnodes.c compiler/src/builtins.c compiler/src/checker.c compiler/src/clone.c compiler/src/doc.c compiler/src/entities.c compiler/src/errors.c compiler/src/lex.c compiler/src/parser.c compiler/src/symres.c compiler/src/types.c compiler/src/utils.c compiler/src/wasm_emit.c compiler/src/wasm_runtime.c compiler/src/extensions.c
+cl.exe %FLAGS% /Icompiler/include /std:c17 /TC %SOURCE_FILES% /link /DLL /IGNORE:4217 %LINK_OPTIONS% /OUT:onyx.dll
+
+REM Don't continue if we had compilation errors. This prevents CI to succeed.
+if %ERRORLEVEL% neq 0 (
+    echo Compiler library compilation failed.
+    exit /b %ERRORLEVEL%
+)
+
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 del *.obj > NUL 2> NUL
@@ -50,8 +59,11 @@ if "%1" == "dist" (
     copy misc\onyx.sublime-syntax dist\misc\onyx.sublime-syntax
     copy misc\vscode\onyxlang-0.1.9.vsix dist\misc\onyxlang-0.1.9.vsix
 
+    mkdir dist\include
+    copy shared\include\onyx.h dist\include\onyx.h
     copy onyx_runtime.dll dist\onyx_runtime.dll
     copy onyx.exe dist\onyx.exe
+    copy onyx.dll dist\onyx.dll
 
     mkdir dist\tools
     copy scripts\onyx-pkg.onyx dist\tools\onyx-pkg.onyx
