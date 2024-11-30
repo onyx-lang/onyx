@@ -910,14 +910,54 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    u64 start_time = bh_time_curr();
+
     onyx_options_ready(ctx);
     while (onyx_pump(ctx) == ONYX_PUMP_CONTINUE) {
-        // doing the compilation
+        fori (i, 0, onyx_event_count(ctx)) {
+            switch (onyx_event_type(ctx, i)) {
+            case ONYX_EVENT_LOG:
+                if (cli_args.verbose_output > 0) {
+                    bh_printf("%s %s\n",
+                        cli_args.no_colors ? "INFO " : "\x1b[94mINFO\x1b[0m ",
+                        onyx_event_field_str(ctx, i, "message")
+                    );
+                }
+                break;
+
+            case ONYX_EVENT_ALL_TYPES_CHECKED:
+                break;
+
+            case ONYX_EVENT_SYMBOL_DEFINED:
+                // bh_printf("DEFINED SYMBOL AT %s:%d,%d\n",
+                //     onyx_event_field_str(ctx, i, "filename"),
+                //     onyx_event_field_int(ctx, i, "line"),
+                //     onyx_event_field_int(ctx, i, "column")
+                // );
+                break;
+            }
+        }
     }
+
+    u64 duration = bh_time_duration(start_time);
 
     if (onyx_error_count(ctx) > 0) {
         onyx_errors_print(ctx, cli_args.error_format, !cli_args.no_colors, cli_args.show_all_errors);
         return 1;
+    }
+
+    if (cli_args.verbose_output > 0) {
+        int tokens = onyx_stat(ctx, ONYX_STAT_TOKEN_COUNT);
+        int lines  = onyx_stat(ctx, ONYX_STAT_LINE_COUNT);
+
+        float tokens_per_sec = (1000.0f * tokens) / duration;
+        float lines_per_sec = (1000.0f * lines) / duration;
+
+        printf("\nStatistics:\n");
+        printf("    Time taken: %lf ms\n", (double) duration);
+        printf("    Processed %llu lines (%f lines/second).\n", lines, lines_per_sec);
+        printf("    Processed %llu tokens (%f tokens/second).\n", tokens, tokens_per_sec);
+        printf("\n");
     }
   
     switch (cli_args.action) {

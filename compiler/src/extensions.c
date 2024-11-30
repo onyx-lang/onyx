@@ -262,6 +262,15 @@ b32 compiler_extension_negotiate_capabilities(Context *context, CompilerExtensio
             if (hook == 1) ext->supports_stalled_hook = 1;
         }
     }
+
+    {
+        CompilerEvent *e = compiler_event_add(context, 1);
+        compiler_event_add_field_str(context, e, "message",
+            bh_aprintf(context->scratch_alloc, "Extension '%s' spawned with protocol version %d.",
+                ext->name, extension_protocol_version
+            )
+        );
+    }
     
     bh_arena_clear(&ext->arena);
     return 1;

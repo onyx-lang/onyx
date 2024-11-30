@@ -2142,6 +2142,33 @@ struct SpecialGlobalEntities {
     Entity *runtime_info_stack_trace_entity;
 };
 
+typedef struct CompilerEventField {
+    struct CompilerEventField *next;
+    char *field;
+    u32 type;
+    union {
+        char *s;
+        i32   i;
+    };
+} CompilerEventField;
+
+typedef struct CompilerEvent {
+    struct CompilerEvent *next;
+
+    u32 type;
+    CompilerEventField *first_field;
+} CompilerEvent;
+
+typedef struct EventSystem {
+    bh_arena     event_arena;
+    bh_allocator event_alloc;
+
+    i32 event_count;
+
+    CompilerEvent *first;
+    CompilerEvent *last;
+} EventSystem;
+
 struct Context {
     Table(Package *)      packages;
     EntityHeap            entities;
@@ -2197,6 +2224,8 @@ struct Context {
 
     // Currently, this only needs to exist so all the scope's symbol array can be freed later.
     bh_arr(Scope *) scopes;
+
+    EventSystem events;
 
     OnyxErrors errors;
     b32 errors_enabled;
@@ -2367,6 +2396,14 @@ TypeMatch compiler_extension_expand_macro(
     u32 *out_expansion_id,
     b32 wait_for_response);
 TypeMatch compiler_extension_hook_stalled(Context *context, int extension_id);
+
+
+// Compiler Events
+void compiler_events_init(Context *context);
+void compiler_events_clear(Context *context);
+CompilerEvent *compiler_event_add(Context *context, u32 event_type);
+void compiler_event_add_field_str(Context *context, CompilerEvent *event, char *field, char *value);
+void compiler_event_add_field_int(Context *context, CompilerEvent *event, char *field, i32 value);
 
 
 // NOTE: Useful inlined functions

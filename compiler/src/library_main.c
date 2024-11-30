@@ -92,6 +92,7 @@ onyx_context_t *onyx_context_create() {
 
     types_init(context);
     prepare_builtins(context);
+    compiler_events_init(context);
 
     // Options should be moved directly inside of the context instead of through a pointer...
     context->options = malloc(sizeof(* context->options));
@@ -410,11 +411,7 @@ static b32 process_entity(Context *context, Entity* ent) {
 
         case Entity_State_Resolve_Symbols: symres_entity(context, ent); break;
         case Entity_State_Check_Types:     check_entity(context, ent);  break;
-
-        case Entity_State_Code_Gen: {
-            emit_entity(context, ent);
-            break;
-        }
+        case Entity_State_Code_Gen:        emit_entity(context, ent);   break;
 
         default: break;
     }
@@ -448,6 +445,8 @@ static void send_stalled_hooks(Context *context) {
 
 onyx_pump_t onyx_pump(onyx_context_t *ctx) {
     Context *context = &ctx->context;
+
+    compiler_events_clear(context);
 
     if (bh_arr_is_empty(context->entities.entities)) {
         // Once the module has been linked, we are all done and ready to say everything compiled successfully!
@@ -500,6 +499,8 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
                     dump_cycles(context);
                 } else if (context->cycle_almost_detected == 3) {
                     send_stalled_hooks(context);
+                } else if (context->cycle_almost_detected == 2) {
+                    compiler_event_add(context, 4);
                 }
 
                 context->cycle_almost_detected += 1;
@@ -531,6 +532,73 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
 
     return ONYX_PUMP_CONTINUE;
 }
+
+//
+// Events
+//
+
+int32_t onyx_event_count(onyx_context_t *ctx) {
+    return ctx->context.events.event_count;
+}
+
+onyx_event_type_t onyx_event_type(onyx_context_t *ctx, int event_idx) {
+    if (event_idx >= ctx->context.events.event_count) return ONYX_EVENT_UNKWOWN;
+
+    CompilerEvent *ev = ctx->context.events.first;
+    while (event_idx-- > 0 && ev) {
+        ev = ev->next;
+    }
+
+    if (!ev) return ONYX_EVENT_UNKWOWN;
+
+    return (onyx_event_type_t) ev->type;
+}
+
+int32_t onyx_event_field_int(onyx_context_t *ctx, int event_idx, char *field) {
+    if (event_idx >= ctx->context.events.event_count) return 0;
+
+    CompilerEvent *ev = ctx->context.events.first;
+    while (ev && event_idx-- > 0) {
+        ev = ev->next;
+    }
+
+    if (!ev) return 0;
+
+    CompilerEventField *f = ev->first_field;
+    while (f && strcmp(f->field, field) != 0) {
+        f = f->next;
+    }
+
+    if (!f) return 0;
+    if (f->type != 1) return 0;
+
+    return f->i;
+}
+
+const char *onyx_event_field_str(onyx_context_t *ctx, int event_idx, char *field) {
+    if (event_idx >= ctx->context.events.event_count) return "";
+
+    CompilerEvent *ev = ctx->context.events.first;
+    while (ev && event_idx-- > 0) {
+        ev = ev->next;
+    }
+
+    if (!ev) return "";
+
+    CompilerEventField *f = ev->first_field;
+    while (f && strcmp(f->field, field) != 0) {
+        f = f->next;
+    }
+
+    if (!f) return "";
+    if (f->type != 0) return "";
+
+    return f->s;
+}
+
+
+
+
 
 //
 // Options

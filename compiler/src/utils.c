@@ -1741,3 +1741,59 @@ void track_resolution_for_symbol_info(Context *context, AstNode *original, AstNo
 }
 
 
+
+//
+// Compiler Events
+//
+
+void compiler_events_init(Context *context) {
+    bh_arena_init(&context->events.event_arena, context->gp_alloc, 1024 * 1024);
+    context->events.event_alloc = bh_arena_allocator(&context->events.event_arena);
+
+    // All other fields should be already set to 0/NULL.
+}
+
+void compiler_events_clear(Context *context) {
+    bh_arena_clear(&context->events.event_arena);
+    context->events.first = NULL;
+    context->events.last  = NULL;
+    context->events.event_count = 0;
+}
+
+CompilerEvent *compiler_event_add(Context *context, u32 event_type) {
+    CompilerEvent *new_event = bh_alloc_item(context->events.event_alloc, CompilerEvent);
+    new_event->type = event_type;
+    new_event->first_field = NULL;
+
+    new_event->next = context->events.last;
+    if (context->events.last) context->events.last->next = new_event;
+    context->events.last = new_event;
+    if (!context->events.first) context->events.first = new_event;
+
+    context->events.event_count++;
+
+    return new_event;
+}
+
+void compiler_event_add_field_str(Context *context, CompilerEvent *event, char *field, char *value) {
+    if (!value) return;
+
+    CompilerEventField *new_field = bh_alloc_item(context->events.event_alloc, CompilerEventField);
+    new_field->type = 0; // 0 for string
+    new_field->field = bh_strdup(context->events.event_alloc, field);
+    new_field->s = bh_strdup(context->events.event_alloc, value);
+
+    new_field->next = event->first_field;
+    event->first_field = new_field;
+}
+
+void compiler_event_add_field_int(Context *context, CompilerEvent *event, char *field, i32 value) {
+    CompilerEventField *new_field = bh_alloc_item(context->events.event_alloc, CompilerEventField);
+    new_field->type = 1; // 1 for int
+    new_field->field = bh_strdup(context->events.event_alloc, field);
+    new_field->i = value;
+
+    new_field->next = event->first_field;
+    event->first_field = new_field;
+}
+
