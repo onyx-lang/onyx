@@ -2734,6 +2734,11 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         bh_arr_clear(member_list_temp);
         while (!consume_token_if_next(parser, ':')) {
             if (parser->hit_unexpected_token) return NULL;
+            if (parser->curr->type == Token_Type_Doc_Comment) {
+                consume_token(parser);
+                continue;
+            }
+
             bh_arr_push(member_list_temp, expect_token(parser, Token_Type_Symbol));
 
             if (parser->curr->type != ':')
@@ -3670,6 +3675,10 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
 
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) return enum_node;
+        if (parser->curr->type == Token_Type_Doc_Comment) {
+            consume_token(parser);
+            continue;
+        }
 
         AstEnumValue* evalue = make_node(AstEnumValue, Ast_Kind_Enum_Value);
         evalue->token = expect_token(parser, Token_Type_Symbol);
