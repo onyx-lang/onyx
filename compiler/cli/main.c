@@ -979,7 +979,7 @@ int main(int argc, char *argv[]) {
             }
 
             free(output);
-            break;
+            return 0;
         }
 
         case ONYX_COMPILE_ACTION_CHECK: {
