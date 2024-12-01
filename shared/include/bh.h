@@ -2163,6 +2163,14 @@ char* bh_search_for_mapped_file(char* filename, char* relative_to, char *suffix,
     }
 
     // Absolute path
+    #ifdef _BH_WINDOWS
+    if (contains_colon && fn[1] == ':') { // Handle C:\...
+        if (bh_file_exists(fn)) {
+            return bh_path_get_full_name(fn, allocator);
+        }
+    }
+    #endif
+
     if (fn[0] == '/') {
         if (bh_file_exists(fn)) {
             return bh_path_get_full_name(fn, allocator);

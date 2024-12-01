@@ -161,6 +161,7 @@ static int32_t cli_args_init(CLIArgs *cli_args) {
     cli_args->error_format = "v2";
 
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    cli_args->no_colors = 0;
     cli_args->core_installation = getenv("ONYX_PATH");
 
     if (getenv("ONYX_ERROR_FORMAT")) {
@@ -169,6 +170,8 @@ static int32_t cli_args_init(CLIArgs *cli_args) {
     #endif
 
     #ifdef _BH_WINDOWS
+    cli_args->no_colors = 1;
+
     bh_allocator alloc = bh_heap_allocator();
     char *tmp_core_installation = bh_alloc_array(alloc, u8, 512);
     char *tmp_error_format      = bh_alloc_array(alloc, u8, 512);
