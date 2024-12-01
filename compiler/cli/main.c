@@ -158,6 +158,7 @@ static int32_t cli_args_init(CLIArgs *cli_args) {
     memset(cli_args, 0, sizeof(* cli_args));
 
     cli_args->target_file = "out.wasm";
+    cli_args->error_format = "v2";
 
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     cli_args->core_installation = getenv("ONYX_PATH");
