@@ -8,14 +8,14 @@ package core.encoding.json
 
 #package
 Tokenizer :: struct {
-    data: [] u8;
-    use position := Position.{ 0, 1, 1 };
+    data: [] u8
+    use position := Position.{ 0, 1, 1 }
 }
 
 #package
 Token :: struct {
     Kind :: enum {
-        Invalid;
+        Invalid
 
         Open_Brace;    // {
         Close_Brace;   // }
@@ -23,21 +23,21 @@ Token :: struct {
         Open_Bracket;  // [
         Close_Bracket; // ]
 
-        Comma;
-        Colon;
+        Comma
+        Colon
 
-        Null;
-        True;
-        False;
+        Null
+        True
+        False
 
-        Integer;
-        Float;
-        String;
+        Integer
+        Float
+        String
     }
 
-    kind: Kind = .Invalid;
-    text: str  = null_str;
-    use position := Position.{ 0, 1, 1 };
+    kind: Kind = .Invalid
+    text: str  = null_str
+    use position := Position.{ 0, 1, 1 }
 }
 
 #package
@@ -47,175 +47,175 @@ Position :: struct {
 }
 
 #package
-token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
-    err := Error.{};
+token_get :: (use tkn: &Tokenizer) -> (Token, Error) {
+    err := Error.{}
 
-    skip_whitespace(tkn);
-    token := Token.{};
-    token.position = tkn.position;
+    skip_whitespace(tkn)
+    token := Token.{}
+    token.position = tkn.position
 
-    curr_char := data[offset];
-    next_char, has_next := next_character(tkn);
-    if !has_next do return .{}, .{ .EOF, token.position };
+    curr_char := data[offset]
+    next_char, has_next := next_character(tkn)
+    if !has_next do return .{}, .{ .EOF, token.position }
 
     switch curr_char {
-        case '{' do token.kind = .Open_Brace;
-        case '}' do token.kind = .Close_Brace;
-        case '[' do token.kind = .Open_Bracket;
-        case ']' do token.kind = .Close_Bracket;
-        case ',' do token.kind = .Comma;
-        case ':' do token.kind = .Colon;
+        case '{' do token.kind = .Open_Brace
+        case '}' do token.kind = .Close_Brace
+        case '[' do token.kind = .Open_Bracket
+        case ']' do token.kind = .Close_Bracket
+        case ',' do token.kind = .Comma
+        case ':' do token.kind = .Colon
 
         case 'a' ..= 'z' {
-            token.kind = .Invalid;
-            skip_alpha_numeric(tkn);
+            token.kind = .Invalid
+            skip_alpha_numeric(tkn)
 
-            identifier := data.data[token.offset .. offset];
-            if identifier == "null"  do token.kind = .Null;
-            if identifier == "true"  do token.kind = .True;
-            if identifier == "false" do token.kind = .False;
+            identifier := data.data[token.offset .. offset]
+            if identifier == "null"  do token.kind = .Null
+            if identifier == "true"  do token.kind = .True
+            if identifier == "false" do token.kind = .False
         }
 
         case '-' {
             switch data[offset] {
                 case '0' ..= '9' ---
                 case _ {
-                    err.kind = .Illegal_Character;
-                    err.pos  = token.position;
-                    break break;
+                    err.kind = .Illegal_Character
+                    err.pos  = token.position
+                    break break
                 }
             }
 
-            fallthrough;
+            fallthrough
         }
 
         case '0' ..= '9' {
-            token.kind = .Integer;
-            skip_numeric(tkn);
+            token.kind = .Integer
+            skip_numeric(tkn)
 
             if data[offset] == '.' {
-                token.kind = .Float;
-                next_character(tkn);
-                skip_numeric(tkn);
+                token.kind = .Float
+                next_character(tkn)
+                skip_numeric(tkn)
             }
 
             if data[offset] == 'e' || data[offset] == 'E' {
-                next_character(tkn);
+                next_character(tkn)
                 if data[offset] == '-' || data[offset] == '+' {
-                    next_character(tkn);
+                    next_character(tkn)
                 }
-                skip_numeric(tkn);
+                skip_numeric(tkn)
             }
         }
 
         case '"' {
-            token.kind = .String;
+            token.kind = .String
 
             while offset < data.count {
-                ch := data[offset];
+                ch := data[offset]
                 if ch == '\n' {
-                    err.kind = .String_Unterminated;
-                    err.pos  = token.position;
-                    break break;
+                    err.kind = .String_Unterminated
+                    err.pos  = token.position
+                    break break
                 }
 
-                next_character(tkn);
+                next_character(tkn)
                 if ch == '"' {
-                    break;
+                    break
                 }
 
                 if ch == '\\' {
-                    skip_escape(tkn);
+                    skip_escape(tkn)
                 }
             }
         }
     }
 
-    token.text = data.data[token.offset .. offset];
+    token.text = data.data[token.offset .. offset]
 
-    if token.kind == .Invalid do err.kind = .Illegal_Character;
+    if token.kind == .Invalid do err.kind = .Illegal_Character
 
-    return token, err;
+    return token, err
 }
 
 #local
-next_character :: (use tkn: ^Tokenizer) -> (u8, bool) {
-    if offset >= data.count do return 0, false;
+next_character :: (use tkn: &Tokenizer) -> (u8, bool) {
+    if offset >= data.count do return 0, false
 
-    retval := data[offset];
-    offset += 1;
-    column += 1;
+    retval := data[offset]
+    offset += 1
+    column += 1
 
-    return retval, true;
+    return retval, true
 }
 
 #local
-skip_whitespace :: (use tkn: ^Tokenizer) {
+skip_whitespace :: (use tkn: &Tokenizer) {
     while offset < data.count {
         switch data[offset] {
             case '\t', ' ', '\r', '\v' {
-                next_character(tkn);
+                next_character(tkn)
             }
 
             case '\n' {
-                line += 1;
-                column = 1;
-                offset += 1;
+                line += 1
+                column = 1
+                offset += 1
             }
 
             case _ {
-                break break;
+                break break
             }
         }
     }
 }
 
 #local
-skip_alpha_numeric :: (use tkn: ^Tokenizer) {
+skip_alpha_numeric :: (use tkn: &Tokenizer) {
     while offset < data.count {
         switch data[offset] {
             case 'A' ..= 'Z', 'a' ..= 'z', '0' ..= '9', '_' {
-                next_character(tkn);
-                continue;
+                next_character(tkn)
+                continue
             }
         }
 
-        break;
+        break
     }
 }
 
 #local
-skip_numeric :: (use tkn: ^Tokenizer) {
+skip_numeric :: (use tkn: &Tokenizer) {
     while offset < data.count {
         switch data[offset] {
             case '0' ..= '9' {
-                next_character(tkn);
-                continue;
+                next_character(tkn)
+                continue
             }
         }
 
-        break;
+        break
     }
 }
 
 #local
-skip_escape :: (use tkn: ^Tokenizer) {
+skip_escape :: (use tkn: &Tokenizer) {
     switch data[offset] {
         case 'u' {
             for i in 4 {
-                ch, _ := next_character(tkn);
+                ch, _ := next_character(tkn)
                 switch ch {
                     case '0' ..= '9',
                          'A' ..= 'F',
                          'a' ..= 'f' ---
 
-                    case _ do return;
+                    case _ do return
                 }
             }
         }
 
         case _ {
-            next_character(tkn);
+            next_character(tkn)
         }
     }
 }

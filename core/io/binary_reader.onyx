@@ -13,72 +13,72 @@ package core.io.binary
 // the ttf library when that is added to the core modules folder.
 
 BinaryReader :: struct {
-    data : [] u8;
-    pos  : u32;
+    data : [] u8
+    pos  : u32
 }
 
 create_reader :: (data: [] u8, initial_pos := 0) -> BinaryReader {
-    return BinaryReader.{ data = data, pos = initial_pos };
+    return BinaryReader.{ data = data, pos = initial_pos }
 }
 
 seek :: (use br: &BinaryReader, new_pos: u32) -> u32 {
-    old_pos := pos;
-    pos = new_pos;
-    return old_pos;
+    old_pos := pos
+    pos = new_pos
+    return old_pos
 }
 
-tell :: (use br: &BinaryReader) -> u32 do return pos;
+tell :: (use br: &BinaryReader) -> u32 do return pos
 
 read_u8 :: (use br: &BinaryReader) -> u8 {
-    ret := data[pos];
-    pos += 1;
-    return ret;
+    ret := data[pos]
+    pos += 1
+    return ret
 }
 
-read_u16 :: (use br: &BinaryReader) -> u16 do return ~~(read_u8(br) << ~~8  | read_u8(br));
+read_u16 :: (use br: &BinaryReader) -> u16 do return ~~(read_u8(br) << ~~8  | read_u8(br))
 
 read_u32 :: (use br: &BinaryReader) -> u32 {
     // Encoding is big endian
-    ret: u32 = 0;
-    ret |= cast(u32) read_u8(br) << 24;
-    ret |= cast(u32) read_u8(br) << 16;
-    ret |= cast(u32) read_u8(br) << 8;
-    ret |= cast(u32) read_u8(br);
-    return ret;
+    ret: u32 = 0
+    ret |= cast(u32) read_u8(br) << 24
+    ret |= cast(u32) read_u8(br) << 16
+    ret |= cast(u32) read_u8(br) << 8
+    ret |= cast(u32) read_u8(br)
+    return ret
 }
 
 read_i16 :: (use br: &BinaryReader) -> i16 {
-    ret := read_u16(br);
-    if ret & ~~0x8000 != ~~0 do ret -= ~~(1 << 16);
-    return ret;
+    ret := read_u16(br)
+    if ret & ~~0x8000 != ~~0 do ret -= ~~(1 << 16)
+    return ret
 }
 
 read_i32 :: (use br: &BinaryReader) -> i32 {
-    return ~~read_u32(br);
+    return ~~read_u32(br)
 }
 
-read_fword :: (use br: &BinaryReader) -> i16 do return read_i16(br);
+read_fword :: (use br: &BinaryReader) -> i16 do return read_i16(br)
 
 read_2dot14 :: (use br: &BinaryReader) -> f32 {
-    val := cast(i32) read_i16(br);
-    return ~~val / cast(f32) (1 << 14);
+    val := cast(i32) read_i16(br)
+    return ~~val / cast(f32) (1 << 14)
 }
 
 read_fixed :: (use br: &BinaryReader) -> f32 {
-    val := read_i32(br);
-    return ~~val / cast(f32) (1 << 16);
+    val := read_i32(br)
+    return ~~val / cast(f32) (1 << 16)
 }
 
 read_string :: (use br: &BinaryReader, len: i32) -> str {
-    ret := data.data[pos .. pos + len];
-    pos += len;
-    return ret;
+    ret := data.data[pos .. pos + len]
+    pos += len
+    return ret
 }
 
 read_date :: (use br: &BinaryReader) -> u64 {
     mac_time := (cast(u64) (read_u32(br))) << 32 |
-                (cast(u64) (read_u32(br)));
-    utf_time := mac_time - 2082844800;
-    return utf_time;
+                (cast(u64) (read_u32(br)))
+    utf_time := mac_time - 2082844800
+    return utf_time
 }
 

@@ -14,217 +14,217 @@ Type_Info :: struct {
     // This must match the order of the elements in onyxtypes.h
     Kind :: enum {
         Invalid            :: 0x00; // Unused
-        Basic              :: 0x01;
-        Pointer            :: 0x02;
-        Multi_Pointer      :: 0x03;
-        Function           :: 0x04;
-        Struct             :: 0x05;
-        Polymorphic_Struct :: 0x06;
-        Compound           :: 0x07;
-        Array              :: 0x08;
-        Slice              :: 0x09;
-        Dynamic_Array      :: 0x0A;
-        Variadic_Argument  :: 0x0B;
-        Enum               :: 0x0C;
-        Distinct           :: 0x0D;
-        Union              :: 0x0E;
-        Polymorphic_Union  :: 0x0F;
+        Basic              :: 0x01
+        Pointer            :: 0x02
+        Multi_Pointer      :: 0x03
+        Function           :: 0x04
+        Struct             :: 0x05
+        Polymorphic_Struct :: 0x06
+        Compound           :: 0x07
+        Array              :: 0x08
+        Slice              :: 0x09
+        Dynamic_Array      :: 0x0A
+        Variadic_Argument  :: 0x0B
+        Enum               :: 0x0C
+        Distinct           :: 0x0D
+        Union              :: 0x0E
+        Polymorphic_Union  :: 0x0F
     }
 
-    kind := Kind.Invalid;
-    size: u32;
+    kind := Kind.Invalid
+    size: u32
 
     // Does this need to know alignment? Probably?
-    alignment: u32;
+    alignment: u32
 }
 
 Type_Info_Basic :: struct {
-    use base : Type_Info;
+    use base : Type_Info
 
     // This must match the order of the elements in BasicKind in onyxtypes.h
     Kind :: enum {
-        Void  :: 0x00;
-        Bool  :: 0x01;
+        Void  :: 0x00
+        Bool  :: 0x01
 
-        Unsized_Int :: 0x02;
-        I8    :: 0x03;
-        U8    :: 0x04;
-        I16   :: 0x05;
-        U16   :: 0x06;
-        I32   :: 0x07;
-        U32   :: 0x08;
-        I64   :: 0x09;
-        U64   :: 0x0a;
+        Unsized_Int :: 0x02
+        I8    :: 0x03
+        U8    :: 0x04
+        I16   :: 0x05
+        U16   :: 0x06
+        I32   :: 0x07
+        U32   :: 0x08
+        I64   :: 0x09
+        U64   :: 0x0a
 
-        Unsized_Float :: 0x0b;
-        F32   :: 0x0c;
-        F64   :: 0x0d;
+        Unsized_Float :: 0x0b
+        F32   :: 0x0c
+        F64   :: 0x0d
 
-        Rawptr :: 0x0e;
+        Rawptr :: 0x0e
 
-        I8X16 :: 0x0f;
-        I16X8 :: 0x10;
-        I32X4 :: 0x11;
-        I64X2 :: 0x12;
-        F32X4 :: 0x13;
-        F64X2 :: 0x14;
-        V128  :: 0x15;
+        I8X16 :: 0x0f
+        I16X8 :: 0x10
+        I32X4 :: 0x11
+        I64X2 :: 0x12
+        F32X4 :: 0x13
+        F64X2 :: 0x14
+        V128  :: 0x15
 
-        Type_Index :: 0x16;
+        Type_Index :: 0x16
     }
 
-    basic_kind: Kind;
+    basic_kind: Kind
 }
 
 Type_Info_Pointer :: struct {
-    use base : Type_Info;
+    use base : Type_Info
 
     // @Rename
-    to: type_expr;
+    to: type_expr
 }
 
 Type_Info_Multi_Pointer :: struct {
-    use base : Type_Info;
+    use base : Type_Info
 
     // @Rename
-    to: type_expr;
+    to: type_expr
 }
 
 Type_Info_Function :: struct {
-    use base : Type_Info;
+    use base : Type_Info
 
-    return_type:        type_expr;
-    parameter_types: [] type_expr;
+    return_type:        type_expr
+    parameter_types: [] type_expr
 
-    is_variadic: bool;
+    is_variadic: bool
 }
 
 Type_Info_Array :: struct {
-    use base : Type_Info;
+    use base : Type_Info
 
     // @Rename
-    of: type_expr;
-    count: u32;
+    of: type_expr
+    count: u32
 }
 
 Type_Info_Slice :: struct {
-    use base : Type_Info;
+    use base : Type_Info
 
     // @Rename
-    of: type_expr;
+    of: type_expr
 }
 
 Type_Info_Dynamic_Array :: struct {
-    use base : Type_Info;
+    use base : Type_Info
 
     // @Rename
-    of: type_expr;
+    of: type_expr
 }
 
 Type_Info_Variadic_Argument :: struct {
-    use base : Type_Info;
+    use base : Type_Info
 
     // @Rename
-    of: type_expr;
+    of: type_expr
 }
 
 Type_Info_Enum :: struct {
-    use base : Type_Info;
+    use base : Type_Info
 
     Member :: struct {
-        name: str;
+        name: str
         value: u64; // This assumes enums are always represented as ints.
     }
 
     // This is first for better alignment
-    backing_type: type_expr;
-    name: str;
-    members: [] Member;
+    backing_type: type_expr
+    name: str
+    members: [] Member
 
-    is_flags: bool;
+    is_flags: bool
 }
 
 Type_Info_Struct :: struct {
-    use base : Type_Info;
+    use base : Type_Info
 
     Member :: struct {
-        name: str;
-        offset: u32;
-        type: type_expr;
+        name: str
+        offset: u32
+        type: type_expr
 
-        used: bool;
+        used: bool
         default: rawptr; // Pointer to the initial value of the same type as the member.
                          // null if no default value is given, or if it is not compile time known.
 
                          // As another thought. This could become a thunk that get the default value
                          // at runtime or returns the value.
 
-        tags: [] any;
+        tags: [] any
     }
 
-    constructed_from: type_expr;
-    name: str;
-    members: [] Member;
-    parameters: [] any;
-    tags: [] any;
+    constructed_from: type_expr
+    name: str
+    members: [] Member
+    parameters: [] any
+    tags: [] any
 
     Method :: struct {
-        name: str;
-        func: any;
+        name: str
+        func: any
     }
-    methods: [] Method;
+    methods: [] Method
 }
 
 Type_Info_Polymorphic_Struct :: struct {
-    use base : Type_Info;
+    use base : Type_Info
 
-    name: str;
-    tags: [] any;
+    name: str
+    tags: [] any
 }
 
 Type_Info_Compound :: struct {
-    use base : Type_Info;
+    use base : Type_Info
 
-    components : [] type_expr;
+    components : [] type_expr
 }
 
 Type_Info_Distinct :: struct {
-    use base : Type_Info;
+    use base : Type_Info
 
-    base_type: type_expr;
-    name: str;
+    base_type: type_expr
+    name: str
 }
 
 Type_Info_Union :: struct {
-    use base : Type_Info;
+    use base : Type_Info
 
     Variant :: struct {
-        name: str;
-        tag_value: u32;
-        type: type_expr;
+        name: str
+        tag_value: u32
+        type: type_expr
 
-        tags: [] any;
+        tags: [] any
     }
 
-    constructed_from: type_expr;
-    tag_enum: type_expr;
-    name: str;
-    variants: [] Variant;
-    parameters: [] any;
-    tags: [] any;
+    constructed_from: type_expr
+    tag_enum: type_expr
+    name: str
+    variants: [] Variant
+    parameters: [] any
+    tags: [] any
 
     Method :: struct {
-        name: str;
-        func: any;
+        name: str
+        func: any
     }
-    methods: [] Method;
+    methods: [] Method
 }
 
 Type_Info_Polymorphic_Union :: struct {
-    use base : Type_Info;
+    use base : Type_Info
 
-    name: str;
-    tags: [] any;
+    name: str
+    tags: [] any
 }
 
 get_type_info :: (t: type_expr) -> &Type_Info {
@@ -256,20 +256,20 @@ get_type_info :: (t: type_expr) -> &Type_Info {
 
 type_expr.info :: get_type_info
 
-Type_Info.as_basic             :: (t: &Type_Info) => cast(&Type_Info_Basic, t);
-Type_Info.as_pointer           :: (t: &Type_Info) => cast(&Type_Info_Pointer, t);
-Type_Info.as_multi_pointer     :: (t: &Type_Info) => cast(&Type_Info_Multi_Pointer, t);
-Type_Info.as_function          :: (t: &Type_Info) => cast(&Type_Info_Function, t);
-Type_Info.as_array             :: (t: &Type_Info) => cast(&Type_Info_Array, t);
-Type_Info.as_slice             :: (t: &Type_Info) => cast(&Type_Info_Slice, t);
-Type_Info.as_dynamic_array     :: (t: &Type_Info) => cast(&Type_Info_Dynamic_Array, t);
-Type_Info.as_variadic_argument :: (t: &Type_Info) => cast(&Type_Info_Variadic_Argument, t);
-Type_Info.as_enum              :: (t: &Type_Info) => cast(&Type_Info_Enum, t);
-Type_Info.as_struct            :: (t: &Type_Info) => cast(&Type_Info_Struct, t);
-Type_Info.as_poly_struct       :: (t: &Type_Info) => cast(&Type_Info_Polymorphic_Struct, t);
-Type_Info.as_union             :: (t: &Type_Info) => cast(&Type_Info_Union, t);
-Type_Info.as_poly_union        :: (t: &Type_Info) => cast(&Type_Info_Polymorphic_Union, t);
-Type_Info.as_distinct          :: (t: &Type_Info) => cast(&Type_Info_Distinct, t);
-Type_Info.as_compound          :: (t: &Type_Info) => cast(&Type_Info_Compound, t);
+Type_Info.as_basic             :: (t: &Type_Info) => cast(&Type_Info_Basic, t)
+Type_Info.as_pointer           :: (t: &Type_Info) => cast(&Type_Info_Pointer, t)
+Type_Info.as_multi_pointer     :: (t: &Type_Info) => cast(&Type_Info_Multi_Pointer, t)
+Type_Info.as_function          :: (t: &Type_Info) => cast(&Type_Info_Function, t)
+Type_Info.as_array             :: (t: &Type_Info) => cast(&Type_Info_Array, t)
+Type_Info.as_slice             :: (t: &Type_Info) => cast(&Type_Info_Slice, t)
+Type_Info.as_dynamic_array     :: (t: &Type_Info) => cast(&Type_Info_Dynamic_Array, t)
+Type_Info.as_variadic_argument :: (t: &Type_Info) => cast(&Type_Info_Variadic_Argument, t)
+Type_Info.as_enum              :: (t: &Type_Info) => cast(&Type_Info_Enum, t)
+Type_Info.as_struct            :: (t: &Type_Info) => cast(&Type_Info_Struct, t)
+Type_Info.as_poly_struct       :: (t: &Type_Info) => cast(&Type_Info_Polymorphic_Struct, t)
+Type_Info.as_union             :: (t: &Type_Info) => cast(&Type_Info_Union, t)
+Type_Info.as_poly_union        :: (t: &Type_Info) => cast(&Type_Info_Polymorphic_Union, t)
+Type_Info.as_distinct          :: (t: &Type_Info) => cast(&Type_Info_Distinct, t)
+Type_Info.as_compound          :: (t: &Type_Info) => cast(&Type_Info_Compound, t)
 
 

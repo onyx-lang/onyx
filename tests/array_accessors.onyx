@@ -3,44 +3,44 @@
 use core {*}
 
 main :: () {
-   a: [2]f32;
+   a: [2]f32
 
-   println(a.x == 0);
-   println(a.y == 0);
-   println(a.r == 0);
-   println(a.g == 0);
+   println(a.x == 0)
+   println(a.y == 0)
+   println(a.r == 0)
+   println(a.g == 0)
 
-   a.x = 10;
-   a.y = 20;
+   a.x = 10
+   a.y = 20
 
-   println(a.x == 10);
-   println(a.y == 20);
-   println(a.r == 10);
-   println(a.g == 20);
+   println(a.x == 10)
+   println(a.y == 20)
+   println(a.r == 10)
+   println(a.g == 20)
 
-   b := f32.[0, 0, 0];
-   b.r = 3;
-   b.g = 2;
-   b.b = 1;
+   b := f32.[0, 0, 0]
+   b.r = 3
+   b.g = 2
+   b.b = 1
 
-   println(b.x == 3);
-   println(b.y == 2);
-   println(b.z == 1);
-   println(b.r == 3);
-   println(b.g == 2);
-   println(b.b == 1);
+   println(b.x == 3)
+   println(b.y == 2)
+   println(b.z == 1)
+   println(b.r == 3)
+   println(b.g == 2)
+   println(b.b == 1)
 
-   c := f32.[0, 0, 0, 0];
-   c.r, c.g, c.b, c.a = 1, 2, 3, 4;
-   c.x, c.y, c.z, c.w = 1, 2, 3, 4;
+   c := f32.[0, 0, 0, 0]
+   c.r, c.g, c.b, c.a = 1, 2, 3, 4
+   c.x, c.y, c.z, c.w = 1, 2, 3, 4
 
-   println(c.x == 1);
-   println(c.y == 2);
-   println(c.z == 3);
-   println(c.w == 4);
+   println(c.x == 1)
+   println(c.y == 2)
+   println(c.z == 3)
+   println(c.w == 4)
 
-   println(c.r == 1);
-   println(c.g == 2);
-   println(c.b == 3);
-   println(c.a == 4);
+   println(c.r == 1)
+   println(c.g == 2)
+   println(c.b == 3)
+   println(c.a == 4)
 }

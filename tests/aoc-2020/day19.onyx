@@ -4,46 +4,46 @@ use core {*}
 
 // nt -> t
 Term :: struct {
-    nt : u32;
+    nt : u32
 
     t  : u8;  // character
 }
 
 // nt0 -> nt1
 Unit :: struct {
-    nt0 : u32;
+    nt0 : u32
 
-    nt1 : u32;
+    nt1 : u32
 }
 
 // nt0 -> nt1 nt2
 Prod :: struct {
-    nt0 : u32;
+    nt0 : u32
 
-    nt1 : u32;
-    nt2 : u32;
+    nt1 : u32
+    nt2 : u32
 }
 
 Grammar :: struct {
-    terminate_rules  : [..] Term;
-    unit_rules       : [..] Unit;
-    production_rules : [..] Prod;
+    terminate_rules  : [..] Term
+    unit_rules       : [..] Unit
+    production_rules : [..] Prod
 
-    max_terminal     : u32;
+    max_terminal     : u32
 }
 
 grammar_init :: (use g: &Grammar) {
-    array.init(&terminate_rules);
-    array.init(&unit_rules);
-    array.init(&production_rules);
+    Array.init(&terminate_rules)
+    Array.init(&unit_rules)
+    Array.init(&production_rules)
 
-    max_terminal = 0;
+    max_terminal = 0
 }
 
 grammar_free :: (use g: &Grammar) {
-    array.free(&terminate_rules);
-    array.free(&unit_rules);
-    array.free(&production_rules);
+    Array.free(&terminate_rules)
+    Array.free(&unit_rules)
+    Array.free(&production_rules)
 }
 
 grammar_prepare :: (use g: &Grammar) {
@@ -51,39 +51,39 @@ grammar_prepare :: (use g: &Grammar) {
     for &solo in unit_rules {
         for &prod in production_rules {
             if prod.nt0 == solo.nt1 {
-                array.push(&production_rules, Prod.{ solo.nt0, prod.nt1, prod.nt2 });
+                Array.push(&production_rules, Prod.{ solo.nt0, prod.nt1, prod.nt2 })
             }
         }
 
         for &unit in terminate_rules {
             if unit.nt == solo.nt1 {
-                array.push(&terminate_rules, Term.{ solo.nt0, unit.t });
+                Array.push(&terminate_rules, Term.{ solo.nt0, unit.t })
             } 
         }
     }
 
-    array.quicksort(terminate_rules, (a, b) => (cast(i32) a.nt) - (cast(i32) b.nt));
-    array.quicksort(production_rules, (a, b) => (cast(i32) a.nt0) - (cast(i32) b.nt0));
+    Array.quicksort(terminate_rules, (a, b) => (cast(i32) a.nt) - (cast(i32) b.nt))
+    Array.quicksort(production_rules, (a, b) => (cast(i32) a.nt0) - (cast(i32) b.nt0))
 
     max_terminal = math.max(
         production_rules[production_rules.count - 1].nt0,
-        terminate_rules[terminate_rules.count - 1].nt) + 1;
+        terminate_rules[terminate_rules.count - 1].nt) + 1
 }
 
 cyk_algorithm :: (use grammar: &Grammar, input: str) -> bool {
-    dim_0 := input.count * max_terminal;
-    dim_1 := max_terminal;
-    dim_2 := 1;
+    dim_0 := input.count * max_terminal
+    dim_1 := max_terminal
+    dim_2 := 1
 
-    mem_size := sizeof bool * input.count * input.count * max_terminal;
-    T := cast([&] bool) calloc(mem_size);
-    defer cfree(T);
-    memory.set(T, ~~false, mem_size);
+    mem_size := sizeof bool * input.count * input.count * max_terminal
+    T := cast([&] bool) calloc(mem_size)
+    defer cfree(T)
+    memory.set(T, ~~false, mem_size)
 
     for s in 0 .. input.count {
         for &term in terminate_rules {
             if term.t == input[s] {
-                T[0 * dim_0 + s * dim_1 + term.nt * dim_2] = true;
+                T[0 * dim_0 + s * dim_1 + term.nt * dim_2] = true
             }
         }
     }
@@ -94,77 +94,77 @@ cyk_algorithm :: (use grammar: &Grammar, input: str) -> bool {
                 for &prod in production_rules {
                     if T[(p - 1) * dim_0 + s       * dim_1 + prod.nt1 * dim_2] &&
                        T[(l - p) * dim_0 + (s + p) * dim_1 + prod.nt2 * dim_2] {
-                        T[l * dim_0 + s * dim_1 + prod.nt0 * dim_2] = true;
+                        T[l * dim_0 + s * dim_1 + prod.nt0 * dim_2] = true
                     }
                 }
             }
         }   
     }
 
-    return T[(input.count - 1) * dim_0];
+    return T[(input.count - 1) * dim_0]
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./input/day19.txt";
+    contents := #file_contents "./input/day19.txt"
 
-    file := contents;
+    file := contents
 
-    grammar : Grammar;
-    grammar_init(&grammar);
-    defer grammar_free(&grammar);
+    grammar : Grammar
+    grammar_init(&grammar)
+    defer grammar_free(&grammar)
 
     while file[0] != '\n' {
-        nt0 := cast(u32, conv.parse_int(&file));
+        nt0 := cast(u32, conv.parse_int(&file))
 
-        string.advance(&file, 2); // ': '
+        str.advance(&file, 2); // ': '
 
         if file[0] == '"' {
-            string.advance(&file, 1); // '"'
-            t := file[0];
-            string.advance(&file, 1);
+            str.advance(&file, 1); // '"'
+            t := file[0]
+            str.advance(&file, 1)
 
-            array.push(&grammar.terminate_rules, Term.{ nt0, t });
+            Array.push(&grammar.terminate_rules, Term.{ nt0, t })
 
         } else {
             while true {
-                nt1 := cast(u32, conv.parse_int(&file));
+                nt1 := cast(u32, conv.parse_int(&file))
 
                 if file[0] == '\n' {
-                    array.push(&grammar.unit_rules, Unit.{ nt0, nt1 });
-                    break;
+                    Array.push(&grammar.unit_rules, Unit.{ nt0, nt1 })
+                    break
 
                 } else {
-                    string.advance(&file, 1); // ' '
+                    str.advance(&file, 1); // ' '
 
                     if next_ch := file[0]; next_ch >= '0' && next_ch <= '9' {
-                        nt2 := cast(u32, conv.parse_int(&file));
-                        array.push(&grammar.production_rules, Prod.{ nt0, nt1, nt2 });
+                        nt2 := cast(u32, conv.parse_int(&file))
+                        Array.push(&grammar.production_rules, Prod.{ nt0, nt1, nt2 })
 
-                        if file[0] == ' ' do string.advance(&file, 1);
+                        if file[0] == ' ' do str.advance(&file, 1)
                     } else {
-                        array.push(&grammar.unit_rules, Unit.{ nt0, nt1 });
+                        Array.push(&grammar.unit_rules, Unit.{ nt0, nt1 })
                     }
 
                     if file[0] == '|' {
-                        string.advance(&file, 1); // ' |'
+                        str.advance(&file, 1); // ' |'
                     } else {
-                        break;
+                        break
                     }
                 }
             }
         }
 
-        string.advance_line(&file);
+        str.advance_line(&file)
     }
 
-    grammar_prepare(&grammar);
+    grammar_prepare(&grammar)
 
-    valid_count := 0;
-    string.advance_line(&file);
-    while !string.empty(file) {
-        line, file~ := string.bisect(file, '\n');
-        if cyk_algorithm(&grammar, line) do valid_count += 1;
+    valid_count := 0
+    str.advance_line(&file)
+    while !str.empty(file) {
+        line, file~ := str.bisect(file, '\n')
+        if cyk_algorithm(&grammar, line) do valid_count += 1
     }
 
-    printf("Valid count: {}\n", valid_count);
+    printf("Valid count: {}\n", valid_count)
 }

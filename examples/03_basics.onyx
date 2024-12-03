@@ -25,11 +25,11 @@ main :: () {
     // The type of foo_ptr is ^i32, or a pointer to an i32. Another example of a pointer
     // is the cstr builtin. It is ^u8, which is what C would call a char*.
     //
-    foo     := 10;
-    foo_ptr := ^foo;
+    foo     := 10
+    foo_ptr := ^foo
 
-    core.printf("foo is {}\n", foo);
-    core.printf("foo_ptr is {}\n", foo_ptr);
+    core.printf("foo is {}\n", foo)
+    core.printf("foo_ptr is {}\n", foo_ptr)
 
 
     // An important type to know before proceeding is the range type. When designing
@@ -42,9 +42,9 @@ main :: () {
     // it is more common to use a range literal, which is written below. 'rng' represents
     // a range with a low of 5, a high of 25, and a step of 1. Currently there is no way
     // to specify the step in a range literal.
-    rng := 5 .. 25;
-    core.print("rng is ");
-    core.println(rng);
+    rng := 5 .. 25
+    core.print("rng is ")
+    core.println(rng)
 
     // Onyx has 3 different array-like types:
     //  * Fixed-size arrays, written [N] <type>, where N is a compile time know integer.
@@ -55,23 +55,23 @@ main :: () {
     // They are commonly seen as struct members or local variables. Here is an example
     // of creating and using a fixed size array. This uses a for-loop which we have not
     // looked at yet, but the example should be self-explanatory.
-    fixed_arr : [10] i32;
+    fixed_arr : [10] i32
     for i in 0 .. 10 {
-        fixed_arr[i] = i * i;
+        fixed_arr[i] = i * i
     }
-    core.printf("fixed_arr[3] is {}\n", fixed_arr[3]);
+    core.printf("fixed_arr[3] is {}\n", fixed_arr[3])
 
     // A quick thing to note about fixed size arrays is that they copy their contents
     // on assignment. In this example, another_arr declares space on the stack for 10
     // i32s just like fixed_arr did; However, unlike in C, when another_arr is assigned
     // to fixed_arr, the contents of fixed_arr are copied into another_arr by value. So,
     // even when fixed_arr[3] is changed, another_arr[3] is the same.
-    another_arr : [10] i32;
-    another_arr = fixed_arr;
+    another_arr : [10] i32
+    another_arr = fixed_arr
 
-    fixed_arr[3] = 1234;
+    fixed_arr[3] = 1234
 
-    core.printf("another_arr[3] is {}\n", another_arr[3]);
+    core.printf("another_arr[3] is {}\n", another_arr[3])
 
 
     // Slices are a concept not unique to Onyx. They represent a pointer and a count,
@@ -83,23 +83,23 @@ main :: () {
     // the 3rd element of slice_arr is accessed, it corresponds to the 6th element
     // of fixed_arr. It is important to know that this does NOT make a copy of the
     // data. It simply points into the same memory as fixed_arr.
-    slice_arr := fixed_arr[3 .. 9];
-    core.printf("slice_arr[3] is {}\n", slice_arr[3]);
+    slice_arr := fixed_arr[3 .. 9]
+    core.printf("slice_arr[3] is {}\n", slice_arr[3])
 
     // Dynamic arrays are the most common arrays used in practice. They represent a
     // pointer, a count, and a capacity. The extra capacity field allows implementations
     // to know how many elements can fit into the space allocated for the array, and not
     // just how many elements are currently in the array. To facilitate using dynamic
     // arrays, there are many procedures in the core.array package. Take this example.
-    dyn_arr : [..] i32;
-    core.array.init(^dyn_arr);
-    defer core.array.free(^dyn_arr);
+    dyn_arr : [..] i32
+    Array.init(^dyn_arr)
+    defer Array.free(^dyn_arr)
 
     for i in 0 .. 10 {
-        core.array.push(^dyn_arr, i * i * i);
+        Array.push(^dyn_arr, i * i * i)
     }
 
-    core.printf("dyn_arr is {}\n", dyn_arr);
+    core.printf("dyn_arr is {}\n", dyn_arr)
 
 
 
@@ -118,25 +118,25 @@ main :: () {
     // elseif keyword. Otherwise, you would have to write 'else do if', which I find to
     // be very ugly to read and is technically different, more on that later.
 
-    if_var := 5 * 2 + 3;
+    if_var := 5 * 2 + 3
     if if_var == 13 {
-        core.print("if_var was 13\n");
-        core.print("another statement here!\n");
+        core.print("if_var was 13\n")
+        core.print("another statement here!\n")
     }
-    elseif if_var == 14 do core.print("if_var was actually 14\n");
-    else do core.print("if_var wasn't 13 or 14\n");
+    elseif if_var == 14 do core.print("if_var was actually 14\n")
+    else do core.print("if_var wasn't 13 or 14\n")
 
     // Ifs, as well as whiles and switch statements, can have an initialization statement.
     // This statement is run before the condition is checked, and can be used to declare
     // variables that are scoped to the blocks of the if statement and all else statements.
 
     if hidden_if_var := 6; hidden_if_var > 5 {
-        core.print("hidden_if_var was greater than 5!\n");
+        core.print("hidden_if_var was greater than 5!\n")
     }
 
     // If you uncomment this line, you will get an error, since hidden_if_var is only accessible
     // inside the if's block.
-    // print(hidden_if_var);
+    // print(hidden_if_var)
 
 
     // Onyx has the standard top-test while loop, whose syntax is very similar to an if
@@ -146,13 +146,13 @@ main :: () {
     // for i to be 11.
 
     while i := 0; i < 10 {
-        core.printf("{} ", i);
-        i += 1;
+        core.printf("{} ", i)
+        i += 1
     } else {
-        core.print("The while loop never ran...");
+        core.print("The while loop never ran...")
     }
 
-    core.print("\n");
+    core.print("\n")
 
 
     // Onyx also has the standard 'break' and 'continue' statement found in many other
@@ -163,11 +163,11 @@ main :: () {
     // break or continue the loop that you want to. Take this example.
     while i := 0; i < 10 {
         while j := 0; j < 10 {
-            core.printf("{} {}\n", i, j);
+            core.printf("{} {}\n", i, j)
 
-            if i == 1 && j == 2 do break break;
-            j += 1;
+            if i == 1 && j == 2 do break break
+            j += 1
         }
-        i += 1;
+        i += 1
     }
 }

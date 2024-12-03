@@ -9,12 +9,17 @@ overloaded :: #match {
 }
 
 main :: (args: [] cstr) {
-    overloaded(10);
-    overloaded(x=10);
-    overloaded(r=10);
-    overloaded(z=10);
+    overloaded(10)
+    overloaded(x=10)
+    overloaded(r=10)
+    overloaded(z=10)
 }
 
-#match #order 3 overloaded (q: i32) { println("Option Q"); }
-#match #order 2 overloaded (r: i32) { println("Option R"); }
-#match #order 1 overloaded (m: i32) { println("Option M"); }
+#overload #order 3
+overloaded :: (q: i32) { println("Option Q"); }
+
+#overload #order 2 
+overloaded :: (r: i32) { println("Option R"); }
+
+#overload #order 1
+overloaded :: (m: i32) { println("Option M"); }

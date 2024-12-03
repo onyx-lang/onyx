@@ -7,22 +7,22 @@ use core {print, println, printf}
 runtime.vars.Enable_Heap_Debug :: true
 
 main :: () {
-    output := make(dyn_str);
-    defer delete(&output);
+    output := make(dyn_str)
+    defer delete(&output)
 
     for i in 0x1F0A0 .. 0x1F0E0 {
-        utf8.append_rune(&output, i);
+        utf8.append_rune(&output, i)
     }
 
-    tmp: str = output;
-    utf8.advance_rune(&tmp, 6);
+    tmp: str = output
+    utf8.advance_rune(&tmp, 6)
 
     for utf8.runes(tmp) {
-        printf("{} ", it.bytes);
+        printf("{} ", it.bytes)
     }
-    print("\n");
+    print("\n")
 
-    println(utf8.slice(output, 3, 10));
+    println(utf8.slice(output, 3, 10))
 
-    println(utf8.next_rune(tmp));
+    println(utf8.next_rune(tmp))
 }

@@ -5,7 +5,6 @@ package core.net
 }
 
 use core.thread
-use core.array
 use core.memory
 use core.alloc
 use core.os
@@ -86,7 +85,7 @@ TCP_Connection.iter_close :: (use conn: &TCP_Connection) {
         raw_free(event_allocator, it.data)
     }
 
-    array.clear(&events)
+    Array.clear(&events)
 }
 
 
@@ -98,7 +97,7 @@ TCP_Server :: struct {
     use connection: TCP_Connection
 
     clients: [] ? Client
-    client_count: u32; // max clients is stored as clients.count.
+    client_count: u32 // max clients is stored as clients.count.
 
     alive         := true
     pulse_time_ms := 500
@@ -167,7 +166,7 @@ tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> &TCP_S
 
     server.client_count = 0
     server.clients = make([] ? TCP_Server.Client, max_clients, allocator=allocator)
-    array.fill(server.clients, .None)
+    Array.fill(server.clients, .None)
 
     return server
 }

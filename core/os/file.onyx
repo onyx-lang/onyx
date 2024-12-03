@@ -1,7 +1,7 @@
 package core.os
 
 #if !runtime.platform.Supports_Files {
-    #error "Cannot include this file. Platform not supported.";
+    #error "Cannot include this file. Platform not supported."
 }
 
 use core {*}
@@ -12,46 +12,46 @@ use runtime
 
 
 FileError :: enum {
-    None       :: 0x00;
-    NotFound   :: 0x01;
-    Exists     :: 0x02;
-    Permission :: 0x03;
-    BadFile    :: 0x04;
-    BadMode    :: 0x05;
+    None       :: 0x00
+    NotFound   :: 0x01
+    Exists     :: 0x02
+    Permission :: 0x03
+    BadFile    :: 0x04
+    BadMode    :: 0x05
 }
 
 OpenMode :: enum {
-    Invalid :: 0x00;
-    Read    :: 0x01;
-    Write   :: 0x02;
-    Append  :: 0x03;
+    Invalid :: 0x00
+    Read    :: 0x01
+    Write   :: 0x02
+    Append  :: 0x03
 }
 
-FileData :: fs.FileData;
+FileData :: fs.FileData
 
 File :: struct {
-    use stream : io.Stream;
-    data   : fs.FileData;
+    use stream : io.Stream
+    data   : fs.FileData
 }
 
 // Most of these types were stollen directly from
 // man readdir(3), and the most reasonable types
 // were used for Windows.
 FileType :: enum {
-    Unknown     :: 0x00;
-    Block       :: 0x01;
-    Char        :: 0x02;
-    Directory   :: 0x03;
-    RegularFile :: 0x04;
-    SymLink     :: 0x05;
-    Other       :: 0x06;
+    Unknown     :: 0x00
+    Block       :: 0x01
+    Char        :: 0x02
+    Directory   :: 0x03
+    RegularFile :: 0x04
+    SymLink     :: 0x05
+    Other       :: 0x06
 }
 
 //
 // This is fairly minimal for right now.
 FileStat :: struct {
-    size: i64;
-    type: FileType;
+    size: i64
+    type: FileType
     change_time: u64;   // in milliseconds
     accessed_time: u64; // in milliseconds
     modified_time: u64; // in milliseconds
@@ -63,72 +63,72 @@ remove_file :: fs.__file_remove
 rename_file :: fs.__file_rename
 
 get_contents_from_file :: (file: &File) -> str {
-    size := cast(u32) io.stream_size(file);
+    size := cast(u32) io.stream_size(file)
 
-    data := cast([&] u8) raw_alloc(context.allocator, size);
+    data := cast([&] u8) raw_alloc(context.allocator, size)
 
-    prev_loc := io.stream_tell(file).Ok ?? 0;
-    io.stream_seek(file, 0, .Start);
+    prev_loc := io.stream_tell(file).Ok ?? 0
+    io.stream_seek(file, 0, .Start)
 
-    io.stream_read(file, .{ data, size });
+    io.stream_read(file, .{ data, size })
 
-    io.stream_seek(file, prev_loc, .Start);
+    io.stream_seek(file, prev_loc, .Start)
 
-    return data[0 .. size];
+    return data[0 .. size]
 }
 
 from_fd :: (fd: FileData) -> File {
-    file: File;
-    file.data = fd;
-    file.vtable = &fs.__file_stream_vtable;
-    return file;
+    file: File
+    file.data = fd
+    file.vtable = &fs.__file_stream_vtable
+    return file
 }
 
 open :: (path: str, mode := OpenMode.Read) -> Result(File, os.FileError) {
     file := File.{
         stream = .{ vtable = null },
         data   = .{},
-    };
+    }
 
-    file_data, error := fs.__file_open(path, mode);
-    if error != .None do return .{ Err = error };
+    file_data, error := fs.__file_open(path, mode)
+    if error != .None do return .{ Err = error }
 
-    file.data = file_data;
-    file.vtable = &fs.__file_stream_vtable;
-    return .{ Ok = file };
+    file.data = file_data
+    file.vtable = &fs.__file_stream_vtable
+    return .{ Ok = file }
 }
 
 close :: (file: &File) {
-    fs.__file_close(file.data);
-    file.stream.vtable = null;
+    fs.__file_close(file.data)
+    file.stream.vtable = null
 }
 
 #overload
 __dispose_used_local :: macro (file: &File) {
-    #this_package.close(file);
+    #this_package.close(file)
 }
 
 get_contents :: #match {
     get_contents_from_file,
 
     (path: str) -> str {
-        file := open(path, .Read)->or_return(null_str);
-        defer close(&file);
+        file := open(path, .Read)->or_return(null_str)
+        defer close(&file)
 
-        return get_contents(&file);
+        return get_contents(&file)
     }
 }
 
 is_file :: (path: str) -> bool {
-    s: FileStat;
-    if !file_stat(path, &s) do return false;
-    return s.type == .RegularFile;
+    s: FileStat
+    if !file_stat(path, &s) do return false
+    return s.type == .RegularFile
 }
 
 is_directory :: (path: str) -> bool {
-    s: FileStat;
-    if !file_stat(path, &s) do return false;
-    return s.type == .Directory;
+    s: FileStat
+    if !file_stat(path, &s) do return false
+    return s.type == .Directory
 }
 
 
@@ -138,53 +138,53 @@ is_directory :: (path: str) -> bool {
 //
 
 File_Logger :: struct {
-    file: &File;
-    filename: str;
-    allocator: Allocator;
+    file: &File
+    filename: str
+    allocator: Allocator
 
-    old_logger: Logger;
+    old_logger: Logger
 }
 
 file_logger_open :: (filename: str, allocator := context.allocator) -> Result(&File_Logger, str) {
-    file_logger := new(File_Logger, allocator);
-    file_logger.allocator = allocator;
-    file_logger.filename = filename;
+    file_logger := new(File_Logger, allocator)
+    file_logger.allocator = allocator
+    file_logger.filename = filename
 
-    file_logger.file = new(File, allocator);
+    file_logger.file = new(File, allocator)
 
     *file_logger.file = open(filename, mode=.Append)->catch([] {
-        raw_free(allocator, file_logger.file);
-        raw_free(allocator, file_logger);
+        raw_free(allocator, file_logger.file)
+        raw_free(allocator, file_logger)
 
-        return return .{ Err = "Unable to open file for logging." };
-    });
+        return return .{ Err = "Unable to open file for logging." }
+    })
 
-    return .{ Ok = file_logger };
+    return .{ Ok = file_logger }
 }
 
 file_logger_use :: (logger: &File_Logger) {
-    logger.old_logger = context.logger;
-    context.logger = .{ file_logger_proc, logger };
+    logger.old_logger = context.logger
+    context.logger = .{ file_logger_proc, logger }
 }
 
 file_logger_close :: (logger: &File_Logger) {
     if logger.old_logger.data {
-        context.logger = logger.old_logger;
+        context.logger = logger.old_logger
     }
 
-    close(logger.file);
+    close(logger.file)
 
-    raw_free(logger.allocator, logger.file);
-    raw_free(logger.allocator, logger);
+    raw_free(logger.allocator, logger.file)
+    raw_free(logger.allocator, logger)
 }
 
 #local
 file_logger_proc :: (logger: &File_Logger, level: Log_Level, msg: str, module: str) {
-    writer := io.writer_make(logger.file, 0);
+    writer := io.writer_make(logger.file, 0)
 
     if module {
-        io.write_format(&writer, "[{}][{}] {}\n", level, module, msg);
+        io.write_format(&writer, "[{}][{}] {}\n", level, module, msg)
     } else {
-        io.write_format(&writer, "[{}] {}\n", level, msg);
+        io.write_format(&writer, "[{}] {}\n", level, msg)
     }
 }

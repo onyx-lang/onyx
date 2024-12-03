@@ -3,28 +3,28 @@
 use core {package, println, printf}
 
 some_function :: () -> f32 {
-    println("In some function!");
-    return 1234;
+    println("In some function!")
+    return 1234
 }
 
 new_max :: (a: $T, b: T) -> T {
     // Much much better!
-    return a if a > b else b;
+    return a if a > b else b
 }
 
 V2 :: struct { x, y: f32; }
 
 main :: (args: [] cstr) {
 
-    condition := 12 > 34;
+    condition := 12 > 34
 
-    x := some_function() if condition else 5678.0f;
-    println(x);
+    x := some_function() if condition else 5678.0f
+    println(x)
 
-    println("True" if x > 5000 else "False" if false else "REALLY FALSE");
+    println("True" if x > 5000 else "False" if false else "REALLY FALSE")
 
-    println(new_max(10, 20));
+    println(new_max(10, 20))
 
-    v: V2 = (.{ 10, 20 }) if true else .{ 30, 40 };
-    printf("{}\n", v);
+    v: V2 = (.{ 10, 20 }) if true else .{ 30, 40 }
+    printf("{}\n", v)
 }

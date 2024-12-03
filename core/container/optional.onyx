@@ -30,9 +30,9 @@ Optional.empty :: macro (T: type_expr) => (?T).{ None = .{} };
 /// and a non-null pointer to be `Some`. This dereferences the valid
 /// pointer to return the data stored at the pointer's address.
 Optional.from_ptr :: macro (p: &$T) -> ?T {
-    p_ := p;
-    if p_ do return *p_;
-    return .None;
+    p_ := p
+    if p_ do return *p_
+    return .None
 }
 
 /// Wraps a pointer in an optional. If the pointer is null, then the optional
@@ -46,18 +46,18 @@ Optional.wrap_ptr :: macro (p: &$T) -> ?&T {
 /// Extracts the value from the Optional, or uses a default if
 /// no value is present.
 Optional.value_or :: macro (o: ?$T, default: T) => switch o {
-    case .Some as v => v;
-    case _          => default;
+    case .Some as v => v
+    case _          => default
 }
 
 /// Clears the value in the Optional, zeroing the memory of the value.
 Optional.reset :: (o: &?$T) {
-    *o = .None;
+    *o = .None
 }
 
 /// Sets the value in the Optional.
 Optional.set :: (o: &?$T, value: T) {
-    *o = .{ Some = value };
+    *o = .{ Some = value }
 }
 
 /// Flattens nested optionals.
@@ -65,28 +65,28 @@ Optional.set :: (o: &?$T, value: T) {
 Optional.flatten :: (o1: ? Optional($T)) -> ? T {
     switch o1 {
         case .Some as o2 {
-            return o2;
+            return o2
         }
 
         case .None ---
     }
 
-    return .None;
+    return .None
 }
 
 /// Monadic chaining operation.
 Optional.and_then :: (o: ?$T, transform: (T) -> ?$R) -> ?R {
     return switch o {
-        case .Some as v => transform(v);
-        case _          => .None;
-    };
+        case .Some as v => transform(v)
+        case _          => .None
+    }
 }
 
 /// Changes the value inside the optional, if present.
 Optional.transform :: (o: ?$T, transform: (T) -> $R) -> ?R {
     switch o {
-        case .Some as v do return .{ Some = transform(v) };
-        case _          do return .None;
+        case .Some as v do return .{ Some = transform(v) }
+        case _          do return .None
     }
 }
 
@@ -94,9 +94,9 @@ Optional.transform :: (o: ?$T, transform: (T) -> $R) -> ?R {
 /// provide a function to generate a value.
 Optional.or_else :: (o: ?$T, generate: () -> ?T) -> ?T {
     return switch o {
-        case .Some => o;
-        case _     => generate();
-    };
+        case .Some => o
+        case _     => generate()
+    }
 }
 
 /// Returns the value inside the optional, if there is one.
@@ -104,10 +104,10 @@ Optional.or_else :: (o: ?$T, generate: () -> ?T) -> ?T {
 /// handler must take care of it.
 Optional.unwrap :: (o: ?$T) -> T {
     switch o {
-        case .Some as v do return v;
+        case .Some as v do return v
         case _ {
-            panic("Unwrapping empty Optional.");
-            return .{};
+            panic("Unwrapping empty Optional.")
+            return .{}
         }
     }
 }
@@ -117,10 +117,10 @@ Optional.unwrap :: (o: ?$T) -> T {
 /// take care of it.
 Optional.unwrap_ptr :: (o: & ?$T) -> &T {
     switch o {
-        case .Some as &v do return v;
+        case .Some as &v do return v
         case _ {
-            panic("Unwrapping empty Optional.");
-            return .{};
+            panic("Unwrapping empty Optional.")
+            return .{}
         }
     }
 }
@@ -130,10 +130,10 @@ Optional.unwrap_ptr :: (o: & ?$T) -> &T {
 /// handler must take care of it.
 Optional.expect :: (o: ?$T, message: str) -> T {
     switch o {
-        case .Some as v do return v;
+        case .Some as v do return v
         case _ {
-            panic(message);
-            return .{};
+            panic(message)
+            return .{}
         }
     }
 }
@@ -143,10 +143,10 @@ Optional.expect :: (o: ?$T, message: str) -> T {
 /// take care of it.
 Optional.expect_ptr :: (o: & ?$T, message: str) -> &T {
     switch o {
-        case .Some as &v do return v;
+        case .Some as &v do return v
         case _ {
-            panic(message);
-            return .{};
+            panic(message)
+            return .{}
         }
     }
 }
@@ -154,17 +154,17 @@ Optional.expect_ptr :: (o: & ?$T, message: str) -> &T {
 Optional.or_return :: #match {
     macro (o: ?$T) -> T {
         switch value := o; value {
-            case .Some as v do return v;
+            case .Some as v do return v
             case _ {
-                return return .{};
+                return return .{}
             }
         }
     },
     macro (o: ?$T, return_value: $R) -> T {
         switch value := o; value {
-            case .Some as v do return v;
+            case .Some as v do return v
             case _ {
-                return return return_value;
+                return return return_value
             }
         }
     },
@@ -179,56 +179,56 @@ Optional.into_result :: macro (o: ?$T, err: $R) -> Result(T, R) {
 
 Optional.catch :: macro (o: ?$T, body: Code) -> T {
     switch value := o; value {
-        case .Some as v do return v;
+        case .Some as v do return v
         case .None {
-            #unquote body;
+            #unquote body
         }
     }
 }
 
 Optional.with :: macro (o: ?$T, body: Code) {
     switch o {
-        case .None ---;
+        case .None ---
         case .Some as it {
-            #unquote body(it);
+            #unquote body(it)
         }
     }
 }
 
 Optional.hash :: (o: ?$T/core.hash.Hashable) => switch o {
-    case .Some as v => core.hash.hash(v);
-    case _          => 0;
+    case .Some as v => core.hash.hash(v)
+    case _          => 0
 }
 
 #operator== :: (o1, o2: ?$T) -> bool {
-    if cast(Optional(T).tag_enum, o1) != cast(Optional(T).tag_enum, o2) do return false;
-    if o1.tag == .None do return true;
+    if cast(Optional(T).tag_enum, o1) != cast(Optional(T).tag_enum, o2) do return false
+    if o1.tag == .None do return true
 
-    v1 := o1->unwrap();
-    v2 := o2->unwrap();
-    return v1 == v2;
+    v1 := o1->unwrap()
+    v2 := o2->unwrap()
+    return v1 == v2
 }
 
 #operator?? :: macro (opt: ?$T, default: T) -> T {
     return switch value := opt; value {
-        case .Some as v => v;
-        case _          => default;
-    };
+        case .Some as v => v
+        case _          => default
+    }
 }
 
 #operator?? :: macro (opt: ?$T, catch: Code) -> T {
     switch value := opt; value {
-        case .Some as v do return v;
+        case .Some as v do return v
         case _ ---
     }
 
-    #unquote catch;
+    #unquote catch
 }
 
 #operator? :: macro (opt: ?$T) -> T {
     switch value := opt; value {
-        case .Some as v do return v;
-        case _ do return #from_proc .{};
+        case .Some as v do return v
+        case _ do return #from_proc .{}
     }
 }
 
@@ -236,5 +236,5 @@ Optional.hash :: (o: ?$T/core.hash.Hashable) => switch o {
 
 
 #overload
-__implicit_bool_cast :: macro (o: ?$T) => cast(Optional(T).tag_enum, o) == .Some;
+__implicit_bool_cast :: macro (o: ?$T) => cast(Optional(T).tag_enum, o) == .Some
 

@@ -28,28 +28,28 @@ use core
 }
 
 init :: () {
-    heap_state.free_list = null;
-    heap_state.next_alloc = cast(rawptr) (cast(uintptr) __heap_start + 8);
-    heap_state.remaining_space = (memory_size() << 16) - cast(u32) __heap_start;
+    heap_state.free_list = null
+    heap_state.next_alloc = cast(rawptr) (cast(uintptr) __heap_start + 8)
+    heap_state.remaining_space = (memory_size() << 16) - cast(u32) __heap_start
 
     use core.alloc { heap_allocator }
-    heap_allocator.data = &heap_state;
-    heap_allocator.func = heap_alloc_proc;
+    heap_allocator.data = &heap_state
+    heap_allocator.func = heap_alloc_proc
 
     #if runtime.Multi_Threading_Enabled {
-        sync.mutex_init(&heap_mutex);
+        sync.mutex_init(&heap_mutex)
     }
 }
 
-get_watermark  :: () => cast(u32) heap_state.next_alloc;
+get_watermark  :: () => cast(u32) heap_state.next_alloc
 get_freed_size :: () => {
-    total := 0;
-    block := heap_state.free_list;
+    total := 0
+    block := heap_state.free_list
     while block != null {
-        total += block.size;
-        block = block.next;
+        total += block.size
+        block = block.next
     }
-    return total;
+    return total
 }
 
 // See the comment in onyx_library.h as to why these don't exist anymore.
@@ -73,24 +73,24 @@ get_freed_size :: () => {
 
     // The global heap state
     heap_state : struct {
-        free_list       : &heap_freed_block;
-        next_alloc      : rawptr;
-        remaining_space : u32;
+        free_list       : &heap_freed_block
+        next_alloc      : rawptr
+        remaining_space : u32
     }
 
     heap_block :: struct {
-        size         : u32;
-        magic_number : u32;
+        size         : u32
+        magic_number : u32
     }
 
     heap_freed_block :: struct {
-        use base: heap_block;
-        next : &heap_freed_block;
-        prev : &heap_freed_block;
+        use base: heap_block
+        next : &heap_freed_block
+        prev : &heap_freed_block
     }
 
     heap_allocated_block :: struct {
-        use base: heap_block;
+        use base: heap_block
     }
 
     Allocated_Flag           :: 0x1
@@ -100,137 +100,137 @@ get_freed_size :: () => {
 
     // FIX: This does not respect the choice of alignment
     heap_alloc :: (size_: u32, align: u32) -> rawptr {
-        if size_ == 0 do return null;
+        if size_ == 0 do return null
 
-        #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(&heap_mutex);
+        #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(&heap_mutex)
 
-        size := size_ + sizeof heap_block;
-        size = math.max(size, sizeof heap_freed_block);
-        memory.align(~~&size, ~~align);
+        size := size_ + sizeof heap_block
+        size = math.max(size, sizeof heap_freed_block)
+        memory.align(~~&size, ~~align)
 
-        prev := &heap_state.free_list;
-        hb := heap_state.free_list;
+        prev := &heap_state.free_list
+        hb := heap_state.free_list
 
-        best_extra := 0xffffffff;
-        best: typeof hb = null;
-        best_prev: typeof prev = null;
+        best_extra := 0xffffffff
+        best: typeof hb = null
+        best_prev: typeof prev = null
 
         while hb != null {
             if hb.size >= size {
-                extra := hb.size - size;
+                extra := hb.size - size
                 if extra < best_extra {
-                    best = hb;
-                    best_prev = prev;
-                    best_extra = extra;
+                    best = hb
+                    best_prev = prev
+                    best_extra = extra
                 }
             }
 
-            prev = &hb.next;
-            hb = hb.next;
+            prev = &hb.next
+            hb = hb.next
         }
 
         if best != null {
             #if Enable_Debug {
-                assert(best.size & Allocated_Flag == 0, "Allocated block in free list.");
-                assert(best.magic_number == Free_Block_Magic_Number, "Malformed free block in free list.");
+                assert(best.size & Allocated_Flag == 0, "Allocated block in free list.")
+                assert(best.magic_number == Free_Block_Magic_Number, "Malformed free block in free list.")
             }
 
             if best.size - size >= Block_Split_Size {
-                new_block := cast(&heap_freed_block) (cast(uintptr) best + size);
-                new_block.size = best.size - size;
-                new_block.next = best.next;
-                new_block.prev = best.prev;
-                new_block.magic_number = Free_Block_Magic_Number;
-                best.size = size;
+                new_block := cast(&heap_freed_block) (cast(uintptr) best + size)
+                new_block.size = best.size - size
+                new_block.next = best.next
+                new_block.prev = best.prev
+                new_block.magic_number = Free_Block_Magic_Number
+                best.size = size
 
-                if best.next != null do best.next.prev = new_block;
-                *best_prev = new_block;
+                if best.next != null do best.next.prev = new_block
+                *best_prev = new_block
 
             } else {
-                if best.next != null do best.next.prev = best.prev;
-                *best_prev = best.next;
+                if best.next != null do best.next.prev = best.prev
+                *best_prev = best.next
             }
 
-            best.next = null;
-            best.prev = null;
-            best.magic_number = 0;
-            best.size |= Allocated_Flag;
-            best.magic_number = Alloc_Block_Magic_Number;
-            return cast(rawptr) (cast(uintptr) best + sizeof heap_allocated_block);
+            best.next = null
+            best.prev = null
+            best.magic_number = 0
+            best.size |= Allocated_Flag
+            best.magic_number = Alloc_Block_Magic_Number
+            return cast(rawptr) (cast(uintptr) best + sizeof heap_allocated_block)
         }
 
         if size < heap_state.remaining_space {
-            ret := cast(&heap_allocated_block) heap_state.next_alloc;
-            ret.size = size;
-            ret.size |= Allocated_Flag;
-            ret.magic_number = Alloc_Block_Magic_Number;
+            ret := cast(&heap_allocated_block) heap_state.next_alloc
+            ret.size = size
+            ret.size |= Allocated_Flag
+            ret.magic_number = Alloc_Block_Magic_Number
 
-            heap_state.next_alloc = cast(rawptr) (cast(uintptr) heap_state.next_alloc + size);
-            heap_state.remaining_space -= size;
+            heap_state.next_alloc = cast(rawptr) (cast(uintptr) heap_state.next_alloc + size)
+            heap_state.remaining_space -= size
 
-            return cast(rawptr) (cast(uintptr) ret + sizeof heap_allocated_block);
+            return cast(rawptr) (cast(uintptr) ret + sizeof heap_allocated_block)
         }
 
-        new_pages := ((size - heap_state.remaining_space) >> 16) + 1;
+        new_pages := ((size - heap_state.remaining_space) >> 16) + 1
         if memory_grow(new_pages) == -1 {
             // out of memory
-            return null;
+            return null
         }
-        heap_state.remaining_space += new_pages << 16;
+        heap_state.remaining_space += new_pages << 16
 
-        ret := cast(&heap_allocated_block) heap_state.next_alloc;
-        ret.size = size;
-        ret.size |= Allocated_Flag;
-        ret.magic_number = Alloc_Block_Magic_Number;
+        ret := cast(&heap_allocated_block) heap_state.next_alloc
+        ret.size = size
+        ret.size |= Allocated_Flag
+        ret.magic_number = Alloc_Block_Magic_Number
 
-        heap_state.next_alloc = cast(rawptr) (cast(uintptr) heap_state.next_alloc + size);
-        heap_state.remaining_space -= size;
+        heap_state.next_alloc = cast(rawptr) (cast(uintptr) heap_state.next_alloc + size)
+        heap_state.remaining_space -= size
 
-        return cast(rawptr) (cast(uintptr) ret + sizeof heap_allocated_block);
+        return cast(rawptr) (cast(uintptr) ret + sizeof heap_allocated_block)
     }
 
     heap_free :: (ptr: rawptr) {
-        #if Enable_Debug do assert(ptr != null, "Trying to free a null pointer.");
+        #if Enable_Debug do assert(ptr != null, "Trying to free a null pointer.")
 
-        hb_ptr := cast(&heap_freed_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
+        hb_ptr := cast(&heap_freed_block) (cast(uintptr) ptr - sizeof heap_allocated_block)
 
         //
         // If this block was originally allocated from the GC space,
         // and then marked an "manually managed", we can free the block
         // as normal here, but we have to go back some more bytes.
         if hb_ptr.magic_number == core.alloc.gc.GC_Manually_Free_Magic_Number  {
-            hb_ptr = ~~(cast(uintptr) (cast([&] core.alloc.gc.GCLink, ptr) - 1) - sizeof heap_allocated_block);
+            hb_ptr = ~~(cast(uintptr) (cast([&] core.alloc.gc.GCLink, ptr) - 1) - sizeof heap_allocated_block)
         }
 
-        #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(&heap_mutex);
+        #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(&heap_mutex)
 
         #if Enable_Debug {
             // RELOCATE
             trace :: macro () {
                 #if Enable_Stack_Trace {
-                    trace := runtime.info.get_stack_trace();
+                    trace := runtime.info.get_stack_trace()
                     for trace {
-                        log(.Error, "Core", core.tprintf("in {} ({}:{})", it.info.func_name, it.info.file, it.current_line));
+                        log(.Error, "Core", core.tprintf("in {} ({}:{})", it.info.func_name, it.info.file, it.current_line))
                     }
                 }
             }
 
             if cast(uintptr) hb_ptr < cast(uintptr) __heap_start {
-                log(.Error, "Core", "FREEING STATIC DATA");
-                trace();
-                return;
+                log(.Error, "Core", "FREEING STATIC DATA")
+                trace()
+                return
             }
 
             if hb_ptr.size & Allocated_Flag != Allocated_Flag {
-                log(.Error, "Core", "INVALID DOUBLE FREE");
-                trace();
-                return;
+                log(.Error, "Core", "INVALID DOUBLE FREE")
+                trace()
+                return
             }
 
             if hb_ptr.magic_number != Alloc_Block_Magic_Number {
-                log(.Error, "Core", "FREEING INVALID BLOCK");
-                trace();
-                return;
+                log(.Error, "Core", "FREEING INVALID BLOCK")
+                trace()
+                return
             }
 
         } else {
@@ -240,37 +240,37 @@ get_freed_size :: () => {
             //
 
             if cast(uintptr) hb_ptr < cast(uintptr) __heap_start {
-                return;
+                return
             }
 
             if hb_ptr.size & Allocated_Flag != Allocated_Flag {
-                return;
+                return
             }
 
             if hb_ptr.magic_number != Alloc_Block_Magic_Number {
-                return;
+                return
             }
         }
 
-        hb_ptr.size &= ~Allocated_Flag;
-        orig_size := hb_ptr.size - sizeof heap_allocated_block;
+        hb_ptr.size &= ~Allocated_Flag
+        orig_size := hb_ptr.size - sizeof heap_allocated_block
 
         #if Enable_Debug && Enable_Clear_Freed_Memory {
-            memory_fill(ptr, ~~0xcc, orig_size);
+            memory_fill(ptr, ~~0xcc, orig_size)
         }
 
         if cast(uintptr) hb_ptr + hb_ptr.size < cast(uintptr) heap_state.next_alloc {
-            next_block := cast(&heap_freed_block) (cast(uintptr) hb_ptr + hb_ptr.size);
+            next_block := cast(&heap_freed_block) (cast(uintptr) hb_ptr + hb_ptr.size)
 
             if next_block.size & Allocated_Flag == 0 && next_block.magic_number == Free_Block_Magic_Number {
-                hb_ptr.size += next_block.size;
+                hb_ptr.size += next_block.size
 
-                if next_block.next != null do next_block.next.prev = next_block.prev;
-                if next_block.prev != null do next_block.prev.next = next_block.next;
-                else                       do heap_state.free_list = next_block.next;
+                if next_block.next != null do next_block.next.prev = next_block.prev
+                if next_block.prev != null do next_block.prev.next = next_block.next
+                else                       do heap_state.free_list = next_block.next
 
-                next_block.next = null;
-                next_block.prev = null;
+                next_block.next = null
+                next_block.prev = null
             }
         }
 
@@ -283,88 +283,88 @@ get_freed_size :: () => {
         // now as it will envitably require hours of debugging one incorrect
         // statement.                               - brendanfh 2022/01/16
         {
-            walker := heap_state.free_list;
+            walker := heap_state.free_list
             while walker != null {
-                after_block := cast(&heap_freed_block) (cast(uintptr) walker + walker.size);
+                after_block := cast(&heap_freed_block) (cast(uintptr) walker + walker.size)
                 if after_block == hb_ptr {
-                    hb_ptr.next = null;
-                    hb_ptr.prev = null;
+                    hb_ptr.next = null
+                    hb_ptr.prev = null
 
-                    walker.size += hb_ptr.size;
-                    return;
+                    walker.size += hb_ptr.size
+                    return
                 }
-                walker = walker.next;
+                walker = walker.next
             }
         }
 
-        hb_ptr.magic_number = Free_Block_Magic_Number;
-        hb_ptr.prev = null;
-        hb_ptr.next = heap_state.free_list;
+        hb_ptr.magic_number = Free_Block_Magic_Number
+        hb_ptr.prev = null
+        hb_ptr.next = heap_state.free_list
 
-        if heap_state.free_list != null do heap_state.free_list.prev = hb_ptr;
-        heap_state.free_list = hb_ptr;
+        if heap_state.free_list != null do heap_state.free_list.prev = hb_ptr
+        heap_state.free_list = hb_ptr
     }
 
     heap_resize :: (ptr: rawptr, new_size_: u32, align: u32) -> rawptr {
-        if ptr == null do return heap_alloc(new_size_, align);
+        if ptr == null do return heap_alloc(new_size_, align)
 
-        #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(&heap_mutex);
+        #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(&heap_mutex)
 
-        new_size := new_size_ + sizeof heap_block;
-        new_size = math.max(new_size, sizeof heap_freed_block);
-        new_size = ~~memory.align(cast(u64) new_size, ~~align);
+        new_size := new_size_ + sizeof heap_block
+        new_size = math.max(new_size, sizeof heap_freed_block)
+        new_size = ~~memory.align(cast(u64) new_size, ~~align)
 
-        hb_ptr := cast(&heap_allocated_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
-        #if Enable_Debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on resize.");
-        hb_ptr.size &= ~Allocated_Flag;
+        hb_ptr := cast(&heap_allocated_block) (cast(uintptr) ptr - sizeof heap_allocated_block)
+        #if Enable_Debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on resize.")
+        hb_ptr.size &= ~Allocated_Flag
 
-        old_size := hb_ptr.size;
+        old_size := hb_ptr.size
 
         // If there is already enough space in the current allocated block,
         // just return the block that already exists and has the memory in it.
         if old_size >= new_size {
-            hb_ptr.size |= Allocated_Flag;
-            return ptr;
+            hb_ptr.size |= Allocated_Flag
+            return ptr
         }
 
         // If we are at the end of the allocation space, just extend it
         if cast(uintptr) hb_ptr + hb_ptr.size >= cast(uintptr) heap_state.next_alloc {
-            needed_size := cast(u32) memory.align(cast(u64) (new_size - old_size), 16);
+            needed_size := cast(u32) memory.align(cast(u64) (new_size - old_size), 16)
 
             if needed_size >= heap_state.remaining_space {
-                new_pages := ((needed_size - heap_state.remaining_space) >> 16) + 1;
+                new_pages := ((needed_size - heap_state.remaining_space) >> 16) + 1
                 if memory_grow(new_pages) == -1 {
                     // out of memory
-                    return null;
+                    return null
                 }
-                heap_state.remaining_space += new_pages << 16;
+                heap_state.remaining_space += new_pages << 16
             }
 
-            hb_ptr.size = new_size;
-            hb_ptr.size |= Allocated_Flag;
-            hb_ptr.magic_number = Alloc_Block_Magic_Number;
-            heap_state.next_alloc = cast(rawptr) (cast(uintptr) heap_state.next_alloc + needed_size);
-            heap_state.remaining_space -= needed_size;
-            return ptr;
+            hb_ptr.size = new_size
+            hb_ptr.size |= Allocated_Flag
+            hb_ptr.magic_number = Alloc_Block_Magic_Number
+            heap_state.next_alloc = cast(rawptr) (cast(uintptr) heap_state.next_alloc + needed_size)
+            heap_state.remaining_space -= needed_size
+            return ptr
         }
 
-        hb_ptr.size |= Allocated_Flag;
-        new_ptr := heap_alloc(new_size_, align);
-        #if runtime.Multi_Threading_Enabled do sync.mutex_lock(&heap_mutex);
+        hb_ptr.size |= Allocated_Flag
+        new_ptr := heap_alloc(new_size_, align)
+        #if runtime.Multi_Threading_Enabled do sync.mutex_lock(&heap_mutex)
 
-        memory_copy(new_ptr, ptr, old_size - sizeof heap_block);
-        heap_free(ptr);
-        return new_ptr;
+        memory_copy(new_ptr, ptr, old_size - sizeof heap_block)
+        heap_free(ptr)
+        return new_ptr
     }
 
     heap_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
         switch aa {
-            case .Alloc  do return heap_alloc(size, align);
-            case .Resize do return heap_resize(oldptr, size, align);
-            case .Free   do heap_free(oldptr);
+            case .Alloc  do return heap_alloc(size, align)
+            case .Resize do return heap_resize(oldptr, size, align)
+            case .Free   do heap_free(oldptr)
         }
 
-        return null;
+        return null
     }
 }
 

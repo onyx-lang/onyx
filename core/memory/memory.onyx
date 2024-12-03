@@ -13,22 +13,22 @@ set  :: core.intrinsics.wasm.memory_fill
 //
 // Initializes a slice by allocating memory for it out of the allocator.
 alloc_slice :: (sl: &[] $T, count: i32, allocator := context.allocator) {
-    sl.data  = raw_alloc(allocator, sizeof T * count);
-    sl.count = count;
+    sl.data  = raw_alloc(allocator, sizeof T * count)
+    sl.count = count
 }
 
 //
 // Constructs an intialized slice of `T` with `count` elements from the allocator.
-make_slice :: core.slice.make
+make_slice :: Slice.make
 
 //
 // Releases the memory for the slice, as well as setting the fields of the
 // slice to be 0 so it cannot be used again.
-free_slice :: core.slice.free
+free_slice :: Slice.free
 
 //
 // Copies a slice into a new slice, allocated from the allocator.
-copy_slice :: core.slice.copy
+copy_slice :: Slice.copy
 
 //
 // Aligns a number to the next multiple of `align`. Can be used
@@ -39,27 +39,27 @@ align :: #match #local {}
 #overload
 align :: (size: &u64, align: u64) {
     if *size % align != 0 {
-        *size += align - (*size % align);
+        *size += align - (*size % align)
     }
 }
 
 #overload
 align :: (size: u64, align: u64) -> u64 {
     if size % align != 0 {
-        size += align - (size % align);
+        size += align - (size % align)
     }
-    return size;
+    return size
 }
 
 #overload
 align :: (size: u32, align: u32) -> u32 {
     if size % align != 0 {
-        size += align - (size % align);
+        size += align - (size % align)
     }
-    return size;
+    return size
 }
 
 ptr_add :: macro (p: rawptr, d: i32) -> rawptr {
-    return cast([&] u8, p) + d;
+    return cast([&] u8, p) + d
 }
 

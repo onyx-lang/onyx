@@ -6,82 +6,82 @@ use core {*}
 
 
 Vec3 :: struct {
-    x, y, z: f32;
+    x, y, z: f32
 }
 
 get_a_value :: ($T: type_expr) -> T {
-    println("Got a value!");
-    return cast(T) 1234;
+    println("Got a value!")
+    return cast(T) 1234
 }
 
 Foo :: struct {
-    member1 := get_a_value(f32);
-    member2 := get_a_value(i32);
+    member1 := get_a_value(f32)
+    member2 := get_a_value(i32)
     
     get_member2_plus_three :: (foo: &Foo) -> i32 {
-        return foo.member2 + 3;
+        return foo.member2 + 3
     }
     
-    some_constant :: cast(i32) (10 + 209);
+    some_constant :: cast(i32) (10 + 209)
 }
 
 
 Foo2 :: struct {
-    member1: i32;
-    member2: f32;
+    member1: i32
+    member2: f32
     
     SubStruct :: struct {
-        name : str;
-        age  : i32;
+        name : str
+        age  : i32
     }
     
     get_member2_plus_three :: (foo: &$T) -> f32 {
-        return foo.member2 + 3;
+        return foo.member2 + 3
     }
     
-    some_constant :: cast(i32) (10 + 40 * 20);
+    some_constant :: cast(i32) (10 + 40 * 20)
 }
 
 PolyStruct :: struct (T: type_expr) {
-    member : T;
-    works  : (T) -> T = member_function;
+    member : T
+    works  : (T) -> T = member_function
     
     // NOTE(Brendan Hansen): Currently, these functions are just scoped to the
     // struct body, and they do not have access to the struct parameters.
     member_function :: (t: $T) -> T {
-        return t + 1;
+        return t + 1
     }
 }
 
 main :: (args: [] cstr) {
-    foo := Foo.{};
-    println(foo->get_member2_plus_three());
+    foo := Foo.{}
+    println(foo->get_member2_plus_three())
     
-    ps := PolyStruct(i32).{ 1234 };
-    println(ps.works(ps.member));
+    ps := PolyStruct(i32).{ 1234 }
+    println(ps.works(ps.member))
 
-    plus_one : (i32) -> i32 = PolyStruct.member_function;
-    println(plus_one(10));
+    plus_one : (i32) -> i32 = PolyStruct.member_function
+    println(plus_one(10))
     
-    println(foo.some_constant);
+    println(foo.some_constant)
     
-    person := Foo2.SubStruct.{ name = "Joe", age = 30 };
-    printf("{} is {}.\n", person.name, person.age);
+    person := Foo2.SubStruct.{ name = "Joe", age = 30 }
+    printf("{} is {}.\n", person.name, person.age)
 
     {
-        BasicallyANamespace.function_3();
+        BasicallyANamespace.function_3()
 
         // TODO: Revisit this test case when `use struct` is added.
-        // use BasicallyANamespace;
-        BasicallyANamespace.function_2();
+        // use BasicallyANamespace
+        BasicallyANamespace.function_2()
 
-        // use SubNamespace;
-        BasicallyANamespace.SubNamespace.function_4();
+        // use SubNamespace
+        BasicallyANamespace.SubNamespace.function_4()
     }
 
 
-    v := Vec3.{ 4, 9, 16 };
-    printf("V3({}, {}, {})\n", v.x, v.y, v.z);
+    v := Vec3.{ 4, 9, 16 }
+    printf("V3({}, {}, {})\n", v.x, v.y, v.z)
 }
 
 BasicallyANamespace :: struct {
@@ -91,8 +91,8 @@ BasicallyANamespace :: struct {
 
     SubNamespace :: struct {
         function_4 :: () {
-            function_1();
-            println("Function 4");
+            function_1()
+            println("Function 4")
         }
     }
 }

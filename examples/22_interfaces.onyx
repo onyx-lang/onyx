@@ -33,9 +33,9 @@ add_example :: () {
     // satisfy the interface.
 
     CanAdd :: interface (T: type_expr) {
-        t as T;
+        t as T
 
-        t + t;
+        t + t
     }
 
     // To use this interface, you must write a "where" clause for a procedure or
@@ -47,54 +47,54 @@ add_example :: () {
     // deep in the add procedure saying that you can not add your type. To
     // make these errors a little nicer, a type constraint can be used.
     add :: (x: $T, y: T) -> T where CanAdd(T) {
-        return x + y;
+        return x + y
     }
 
     // From the end-user point of view, there is nothing different about calling
     // a procedure with a type constraint (where clause).
-    x, y := 3, 4;
-    z    := add(x, y);
+    x, y := 3, 4
+    z    := add(x, y)
 
-    printf("add({}, {}) = {}\n", x, y, z);
+    printf("add({}, {}) = {}\n", x, y, z)
 }
 
 
 // These have to be defined out here because #operator and #match are only allowed
 // as top level expressions currently.
 NumberLike :: interface (T: type_expr) {
-    t as T;
+    t as T
 
     // The constraints here are a little stricter than before. This syntax
     // allows you to specify the expected type of the expression. If the type
     // of the expression and the type after the arrow do not match, then the
     // interface check fails.
-    {t + t} -> T;
-    {t - t} -> T;
-    {t * t} -> T;
+    {t + t} -> T
+    {t - t} -> T
+    {t * t} -> T
 }
 
 // Here, Vector2 has the type constraint of NumberLike for T. This constraint
 // is checked when Vector2 is constructed with any parameters.
 Vector2 :: struct (T: type_expr) where NumberLike(T) {
-    x := T.{};
-    y := T.{};
+    x := T.{}
+    y := T.{}
 }
 
-#operator + (x, y: Vector2($T)) => Vector2(T).{ x.x + y.x, x.y + y.y };
-#operator - (x, y: Vector2($T)) => Vector2(T).{ x.x - y.x, x.y - y.y };
-#operator * (x, y: Vector2($T)) => x.x * y.x + x.y * y.y;
+#operator + (x, y: Vector2($T)) => Vector2(T).{ x.x + y.x, x.y + y.y }
+#operator - (x, y: Vector2($T)) => Vector2(T).{ x.x - y.x, x.y - y.y }
+#operator * (x, y: Vector2($T)) => x.x * y.x + x.y * y.y
 
 struct_example :: () {
     // This will work fine because a value of type f32 will satisfy all the
     // constraints listed in NumberLike.
-    v1 := Vector2(f32).{};
-    println(v1);
+    v1 := Vector2(f32).{}
+    println(v1)
 
     // This will generate an error because the dot product definition of
     // multiplication of two Vector2(f32) results in a f32, which cannot
     // is not Vector2(f32).
-    // v2 := Vector2(Vector2(f32)).{};
-    // println(v2);
+    // v2 := Vector2(Vector2(f32)).{}
+    // println(v2)
 }
 
 
@@ -106,9 +106,9 @@ overloaded_procedure_example :: () {
 
     // Take this example. Here is the same CanAdd interface from before.
     CanAdd :: interface (T: type_expr) {
-        t as T;
+        t as T
 
-        t + t;
+        t + t
     }
 
     // This overloaded procedure has two procedures that have almost identical
@@ -120,24 +120,24 @@ overloaded_procedure_example :: () {
     // type can do to determine what procedure should be used.
     add_if_possible :: #match {
         (x: $T, y: T) -> T where CanAdd(T) {
-            return x + y;
+            return x + y
         },
 
         (x: $T, y: T) -> T {
-            println("It is not possible to add x and y. Returning x.");
-            return x;
+            println("It is not possible to add x and y. Returning x.")
+            return x
         },
     }
 
-    add_if_possible(3, 4) |> println();
-    add_if_possible("a", "b") |> println();
+    add_if_possible(3, 4) |> println()
+    add_if_possible("a", "b") |> println()
 }
 
 
 main :: (args) => {
-    add_example();
-    struct_example();
-    overloaded_procedure_example();
+    add_example()
+    struct_example()
+    overloaded_procedure_example()
 }
 
 

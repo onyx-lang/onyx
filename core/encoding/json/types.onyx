@@ -7,14 +7,14 @@ use core {*}
 _null_value := _Value.{}
 
 null_value :: () -> Value {
-    return Value.{^_null_value};
+    return Value.{&_null_value}
 }
 
 empty_object :: (allocator := context.allocator) -> Value {
     o := new(_Value_Object, allocator); 
-    o.type = .Object;
-    o.object_ = make(typeof o.object_, allocator);
-    return Value.{ o };
+    o.type = .Object
+    o.object_ = make(typeof o.object_, allocator)
+    return Value.{ o }
 }
 
 
@@ -23,197 +23,197 @@ Json :: struct {
     // It is not the allocator the arrays and objects however. Those
     // have their own allocator, which I'm assuming will always be
     // the general purpose heap allocator.
-    allocator: Allocator;
+    allocator: Allocator
 
-    root: Value;
+    root: Value
 }
 
 Error :: struct {
     Kind :: enum {
-        None;
-        EOF;
-        Illegal_Character;
-        String_Unterminated;
-        Unexpected_Token;
+        None
+        EOF
+        Illegal_Character
+        String_Unterminated
+        Unexpected_Token
     }
 
-    kind := Kind.None;
-    use pos := Position.{ 0, 1, 1 };
+    kind := Kind.None
+    use pos := Position.{ 0, 1, 1 }
 }
 
-Value :: #distinct ^_Value
+Value :: #distinct &_Value
 
 Value.type :: (v: Value) -> Value_Type {
-    if cast(rawptr) v == null do return .Null;
-    return (cast(^_Value) v).type;
+    if cast(rawptr) v == null do return .Null
+    return (cast(&_Value) v).type
 }
 
 Value.as_bool :: (v: Value) -> bool {
-    if cast(rawptr) v == null do return false;
+    if cast(rawptr) v == null do return false
 
-    if (cast(^_Value) v).type == .Bool do return (cast(^_Value_Bool) cast(^_Value) v).bool_;
-    return false;
+    if (cast(&_Value) v).type == .Bool do return (cast(&_Value_Bool) cast(&_Value) v).bool_
+    return false
 }
 
 Value.as_str :: (v: Value) -> str {
-    if cast(rawptr) v == null do return null_str;
+    if cast(rawptr) v == null do return null_str
 
-    if (cast(^_Value) v).type == .String do return (cast(^_Value_String) cast(^_Value) v).str_;
-    return "";
+    if (cast(&_Value) v).type == .String do return (cast(&_Value_String) cast(&_Value) v).str_
+    return ""
 }
 
 Value.as_int :: (v: Value) -> i64 {
-    if cast(rawptr) v == null do return 0;
+    if cast(rawptr) v == null do return 0
 
-    if (cast(^_Value) v).type == .Integer do return (cast(^_Value_Integer) cast(^_Value) v).int_;
-    if (cast(^_Value) v).type == .Float   do return ~~ (cast(^_Value_Float) cast(^_Value) v).float_;
-    return 0;
+    if (cast(&_Value) v).type == .Integer do return (cast(&_Value_Integer) cast(&_Value) v).int_
+    if (cast(&_Value) v).type == .Float   do return ~~ (cast(&_Value_Float) cast(&_Value) v).float_
+    return 0
 }
 
 Value.as_float :: (v: Value) -> f64 {
-    if cast(rawptr) v == null do return 0;
+    if cast(rawptr) v == null do return 0
 
-    if (cast(^_Value) v).type == .Float   do return (cast(^_Value_Float) cast(^_Value) v).float_;
-    if (cast(^_Value) v).type == .Integer do return ~~ (cast(^_Value_Integer) cast(^_Value) v).int_;
-    return 0;
+    if (cast(&_Value) v).type == .Float   do return (cast(&_Value_Float) cast(&_Value) v).float_
+    if (cast(&_Value) v).type == .Integer do return ~~ (cast(&_Value_Integer) cast(&_Value) v).int_
+    return 0
 }
 
 Value.as_array :: (v: Value) -> [..] Value {
-    if cast(rawptr) v == null do return .{};
-    if (cast(^_Value) v).type != .Array do return .{};
+    if cast(rawptr) v == null do return .{}
+    if (cast(&_Value) v).type != .Array do return .{}
 
-    return (cast(^_Value_Array) cast(^_Value) v).array_;
+    return (cast(&_Value_Array) cast(&_Value) v).array_
 }
 
 Value.as_map :: (v: Value, allocator := context.allocator) -> Map(str, Value) {
-    if cast(rawptr) v == null do return .{};
-    if (cast(^_Value) v).type != .Object do return .{};
+    if cast(rawptr) v == null do return .{}
+    if (cast(&_Value) v).type != .Object do return .{}
 
     m := make(Map(str, Value), allocator)
-    for ^(cast(^_Value_Object, cast(^_Value, v))).object_ {
-        m->put(it.key, it.value);
+    for& (cast(&_Value_Object, cast(&_Value, v))).object_ {
+        m->put(it.key, it.value)
     }
 
-    return m;
+    return m
 }
 
 Value.as_entry_array :: (v: Value) -> [] _Value_Object_Entry {
     if cast(rawptr) v == null do return .{};
-    if (cast(^_Value) v).type != .Object do return .{};
+    if (cast(&_Value) v).type != .Object do return .{};
 
     return cast(&_Value_Object, cast(&_Value, v)).object_
 }
 
 Value.as_array_iter :: (v: Value) -> Iterator(Value) {
-    if cast(rawptr) v == null           do return iter.empty(Value);
-    if (cast(^_Value) v).type != .Array do return iter.empty(Value);
+    if cast(rawptr) v == null           do return iter.empty(Value)
+    if (cast(&_Value) v).type != .Array do return iter.empty(Value)
 
     return iter.generator(
         &.{ arr = cast(&_Value_Array, cast(&_Value, v)).array_, index = 0 },
         (ctx: $C) -> ? Value {
             if ctx.index < ctx.arr.count {
-                defer ctx.index += 1;
-                return ctx.arr[ctx.index];
+                defer ctx.index += 1
+                return ctx.arr[ctx.index]
             }
-            return .None;
+            return .None
         }
-    );
+    )
 }
 
 Value.as_map_iter :: (v: Value) -> Iterator(Pair(str, Value)) {
-    if cast(rawptr) v == null            do return iter.empty(Pair(str, Value));
-    if (cast(^_Value) v).type != .Object do return iter.empty(Pair(str, Value));
+    if cast(rawptr) v == null            do return iter.empty(Pair(str, Value))
+    if (cast(&_Value) v).type != .Object do return iter.empty(Pair(str, Value))
 
     return iter.generator(
         &.{ obj = cast(&_Value_Object, cast(&_Value, v)).object_, index = 0 },
         (ctx: $C) -> ? Pair(str, Value) {
             if ctx.index < ctx.obj.count {
-                defer ctx.index += 1;
-                v := &ctx.obj[ctx.index];
-                return Pair.make(v.key, v.value);
+                defer ctx.index += 1
+                v := &ctx.obj[ctx.index]
+                return Pair.make(v.key, v.value)
             }
-            return .None;
+            return .None
         }
-    );
+    )
 }
 
 Value.is_null :: (v: Value) -> bool {
-    if cast(rawptr) v == null do return true;
-    return cast(^_Value) v == ^_null_value || (cast(^_Value) v).type == .Null;
+    if cast(rawptr) v == null do return true
+    return cast(&_Value) v == &_null_value || (cast(&_Value) v).type == .Null
 }
 
 Value_Type :: enum {
-    Null :: 0x00;
-    Bool;
-    Integer;
-    Float;
-    String;
-    Array;
-    Object;
+    Null :: 0x00
+    Bool
+    Integer
+    Float
+    String
+    Array
+    Object
 }
 
 #package
 _Value :: struct {
-    type := Value_Type.Null;
+    type := Value_Type.Null
 }
 
 
 #package
 _Value_Bool :: struct {
-    use base := _Value.{ type = .Bool };
-    bool_: bool;
+    use base := _Value.{ type = .Bool }
+    bool_: bool
 }
 
 #package
 _Value_Integer :: struct {
-    use base := _Value.{ type = .Integer };
-    int_: i64;
+    use base := _Value.{ type = .Integer }
+    int_: i64
 }
 
 #package
 _Value_Float :: struct {
-    use base := _Value.{ type = .Float };
-    float_: f64;
+    use base := _Value.{ type = .Float }
+    float_: f64
 }
 
 #package
 _Value_String :: struct {
-    use base := _Value.{ type = .String };
-    str_: str;
+    use base := _Value.{ type = .String }
+    str_: str
 
     // Set if the string should not be freed from the allocator.
-    dont_free := false;
+    dont_free := false
 }
 
 #package
 _Value_Array :: struct {
-    use base := _Value.{ type = .Array };
-    array_: [..] Value;
+    use base := _Value.{ type = .Array }
+    array_: [..] Value
 }
 
 #local
 _Value_Object_Entry :: struct {
-    key   : str;
-    dont_free_key := false;
+    key   : str
+    dont_free_key := false
 
-    value : Value;
+    value : Value
 }
 
 #package
 _Value_Object :: struct {
-    use base := _Value.{ type = .Object };
-    object_: [..] _Value_Object_Entry;
+    use base := _Value.{ type = .Object }
+    object_: [..] _Value_Object_Entry
 }
 
 #operator [] get
 get :: (v: Value, key: str) -> Value {
-    v_ := cast(^_Value) v;
-    if v_.type != .Object do return Value.{^_null_value};
+    v_ := cast(&_Value) v
+    if v_.type != .Object do return Value.{&_null_value}
 
-    for ^entry in (cast(^_Value_Object) v_).object_ {
-        if entry.key == key do return entry.value;
+    for &entry in (cast(&_Value_Object) v_).object_ {
+        if entry.key == key do return entry.value
     }
-    return Value.{^_null_value};
+    return Value.{&_null_value}
 }
 
 // This is an interesting operator overload, as it completely disables the
@@ -223,54 +223,50 @@ get :: (v: Value, key: str) -> Value {
 // but this is why I waited on adding overloading to '[]'.
 //
 // The above was remedied when I added distinct pointer types, which allows
-// this to not conflict with the subscript operator on a ^_Value.
+// this to not conflict with the subscript operator on a &_Value.
 #operator [] get_idx
 get_idx :: (v: Value, idx: i32) -> Value {
-    v_ := cast(^_Value) v;
-    if v_.type != .Array do return Value.{^_null_value};
+    v_ := cast(&_Value) v
+    if v_.type != .Array do return Value.{&_null_value}
 
-    v_arr := cast(^_Value_Array) v_;
-    if idx < 0 || idx >= v_arr.array_.count do return Value.{^_null_value};
+    v_arr := cast(&_Value_Array) v_
+    if idx < 0 || idx >= v_arr.array_.count do return Value.{&_null_value}
 
-    return v_arr.array_[idx];
+    return v_arr.array_[idx]
 }
 
 set :: #match {
     macro (v: Value, key: str, value: Value, dont_copy_key := false) {
-        use core {string}
-
         _Value :: _Value
-        _Value_Object :: _Value_Object;
+        _Value_Object :: _Value_Object
 
-        v_ := cast(^_Value) v;
+        v_ := cast(&_Value) v
         if v_.type == .Object {
-            k := key if dont_copy_key else string.copy(key);
+            k := key if dont_copy_key else str.copy(key)
 
-            (cast(^_Value_Object) v_).object_ << .{ k, dont_copy_key, value };
+            (cast(&_Value_Object) v_).object_ << .{ k, dont_copy_key, value }
         }
     },
 
     // Quick thing for allocating json values on the stack.
     macro (v: Value, key: str, value: str,
            dont_copy_key := false, dont_copy_value := false) -> i32 {
-        _Value_String :: _Value_String;
-        _Value_Object :: _Value_Object;
+        _Value_String :: _Value_String
+        _Value_Object :: _Value_Object
         _Value :: _Value
         Value :: Value
 
-        use core {string}
-
-        v_ := cast(^_Value) v;
-        if v_.type != .Object do return 0;
-        k := key if dont_copy_key else string.copy(key);
-        val := value if dont_copy_value else string.copy(value);
+        v_ := cast(&_Value) v
+        if v_.type != .Object do return 0
+        k := key if dont_copy_key else str.copy(key)
+        val := value if dont_copy_value else str.copy(value)
 
         json_value := _Value_String.{
             str_ = val,
             dont_free = dont_copy_value
-        };
+        }
 
-        (cast(^_Value_Object) v_).object_ << .{ k, dont_copy_key, ~~ cast(&_Value) ^json_value };
+        (cast(&_Value_Object) v_).object_ << .{ k, dont_copy_key, ~~ cast(&_Value) &json_value }
     }
 }
 
@@ -281,40 +277,40 @@ free :: #match #local {}
 
 #overload
 free :: (v: Value, allocator: Allocator) {
-    switch v_ := cast(^_Value) v; v_.type {
+    switch v_ := cast(&_Value) v; v_.type {
         case .String {
-            v_str := cast(^_Value_String) v_;
-            if !v_str.str_.data do return;
+            v_str := cast(&_Value_String) v_
+            if !v_str.str_.data do return
 
             if !v_str.dont_free {
-                raw_free(allocator, v_str.str_.data);
+                raw_free(allocator, v_str.str_.data)
             }
         }
 
         case .Array {
-            v_arr := cast(^_Value_Array) v_;
+            v_arr := cast(&_Value_Array) v_
             for elem in v_arr.array_ {
-                free(elem, allocator);
+                free(elem, allocator)
             }
-            array.free(^v_arr.array_);
+            Array.free(&v_arr.array_)
         }
 
         case .Object {
-            v_obj := cast(^_Value_Object) v_;
-            for ^entry in v_obj.object_ {
-                if !entry.dont_free_key do raw_free(allocator, entry.key.data);
-                free(entry.value, allocator);
+            v_obj := cast(&_Value_Object) v_
+            for &entry in v_obj.object_ {
+                if !entry.dont_free_key do raw_free(allocator, entry.key.data)
+                free(entry.value, allocator)
             }
-            array.free(^v_obj.object_);
+            Array.free(&v_obj.object_)
         }
     }
 
-    raw_free(allocator, cast(^_Value) v);
+    raw_free(allocator, cast(&_Value) v)
 }
 
 #overload
 free :: (use j: Json) {
-    free(root, allocator);
+    free(root, allocator)
 }
 
 /// Frees a single Value, non-recursively.
@@ -344,5 +340,5 @@ free_value :: (v: Value, allocator: Allocator) {
 }
 
 static_string :: (s: str) -> _Value_String {
-    return .{ str_ = s, dont_free = true };
+    return .{ str_ = s, dont_free = true }
 }

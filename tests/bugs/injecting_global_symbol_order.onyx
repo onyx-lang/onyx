@@ -1,20 +1,19 @@
 use core {
-    array,
     iter,
     math,
     println
 }
 
 isPrime :: (n: i64) => {
-    max := math.sqrt(n);
+    max := math.sqrt(n)
 
     for x in iter.range(cast(u64, 2), max) {
         if n % x == 0 {
-            return false;
+            return false
         }
     }
     
-    return true;
+    return true
 }
 
 prime_generator :: () => iter.counter(2, i64)->filter(isPrime)
@@ -24,6 +23,6 @@ iter.range :: (min: $T, max: T) =>
 
 main :: () {
     for prime in prime_generator() |> iter.take(10) {
-        println(prime);
+        println(prime)
     }
 }

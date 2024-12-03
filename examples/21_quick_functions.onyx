@@ -4,7 +4,7 @@
 // procedure like so:
 
 no_types :: (x: $__type_x, y: $__type_y) -> _ {
-    return x + ~~ y;
+    return x + ~~ y
 }
 
 // This doesn't look the best, but it does show the power of Onyx's type
@@ -15,7 +15,7 @@ no_types :: (x: $__type_x, y: $__type_y) -> _ {
 // Using the quick-function syntax, the above can be rewritten as so:
 
 quick_no_types :: (x, y) => {
-    return x + ~~y;
+    return x + ~~y
 }
 
 // The polymorphic variables for x and y are given the names __type_x and
@@ -23,16 +23,16 @@ quick_no_types :: (x, y) => {
 // to explicitly write the return type. In fact, because this function only
 // has one line of code, you can completely omit the {}'s and the return.
 
-quickest_no_types :: (x, y) => x + ~~y;
+quickest_no_types :: (x, y) => x + ~~y
 
 // This is very useful when passing a procedure as an argument to a higher-order
 // function. The `iter` package is a good example of this, as it designed to let
 // you chain iterator operations with pipes.
 
 main :: (args) => {
-    println(no_types(3, 4.0f));
-    println(quick_no_types(3, 4.0f));
-    println(quickest_no_types(3, 4.0f));
+    println(no_types(3, 4.0f))
+    println(quick_no_types(3, 4.0f))
+    println(quickest_no_types(3, 4.0f))
 
     // This is an example of what the iter package looks like.
     val := iter.as_iter(range.{ 20, 1, -1 })
@@ -40,8 +40,8 @@ main :: (args) => {
             |> iter.map(x => cast(f32) x)
             |> iter.filter(x => x > 20)
             |> iter.take(5)
-            |> iter.fold(0.0f, (x, y) => x + y);
-    println(val);
+            |> iter.fold(0.0f, (x, y) => x + y)
+    println(val)
 }
 
 

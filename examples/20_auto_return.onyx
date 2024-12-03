@@ -7,11 +7,11 @@ main :: (args: [] cstr) {
     // If you don't want to explicitly write the return type
     // of a function, you can use #auto:
     f :: (x: i32) -> _ {
-        return x * 2;
+        return x * 2
     }
 
-    y := f(10);
-    printf("Y({}): {}\n", typeof y, y);
+    y := f(10)
+    printf("Y({}): {}\n", typeof y, y)
 
     // That's really all you need to know... It is just a
     // convinent shorthand. However, like I said, there are
@@ -29,17 +29,17 @@ main :: (args: [] cstr) {
 
     consume :: (it: $T) -> _ where iter.Iterable(T) {
         consume_inner :: macro (it: Iterator($V)) -> [] V {
-            arr: [..] V;
-            for v in it do arr << v;
-            return arr;
+            arr: [..] V
+            for v in it do arr << v
+            return arr
         }
 
-        return consume_inner(iter.as_iter(it));
+        return consume_inner(iter.as_iter(it))
     }
 
 
-    arr := consume(range.{ 10, 1, -1 });
-    println(arr);
+    arr := consume(range.{ 10, 1, -1 })
+    println(arr)
 }
 
 

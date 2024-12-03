@@ -13,14 +13,14 @@ underscore_is_weird :: () {
     // example.
 
     multiple_returns :: () -> (i32, str) {
-        return 123, "Hello";
+        return 123, "Hello"
     }
 
-    _, s := multiple_returns();
-    printf("s: {}\n", s);
+    _, s := multiple_returns()
+    printf("s: {}\n", s)
 
-    i, _ := multiple_returns();
-    printf("i: {}\n\n", i);
+    i, _ := multiple_returns()
+    printf("i: {}\n\n", i)
 }
 
 multiple_declaration_improvements :: () {
@@ -30,11 +30,11 @@ multiple_declaration_improvements :: () {
     // the normal semantics of the language and looks like so.
 
     multiple_returns :: () -> (i32, str) {
-        return 123, "Hello";
+        return 123, "Hello"
     }
 
-    i, s := multiple_returns();
-    printf("i: {}\ns: {}\n\n", i, s);
+    i, s := multiple_returns()
+    printf("i: {}\ns: {}\n\n", i, s)
 
     //
     // However sometimes you want to declare one new variable and reuse
@@ -42,7 +42,7 @@ multiple_declaration_improvements :: () {
     // if you were to write the following, you would get an error saying
     // that 's' is already declared.
     //
-    //     k, s := multiple_returns();
+    //     k, s := multiple_returns()
     //
     // You're trying to declare a new variable k, while using the old variable
     // s in the same declaration. To get around this issue, there is a special
@@ -50,8 +50,8 @@ multiple_declaration_improvements :: () {
     // variable, but the same one as above. You simple place a ~ after the
     // variable that you want to reuse.
 
-    k, s~ := multiple_returns();
-    printf("k: {}\ns: {}\n\n", k, s);
+    k, s~ := multiple_returns()
+    printf("k: {}\ns: {}\n\n", k, s)
 
     //
     // Obviously this assumes that s is the same type as before. If the types
@@ -62,8 +62,8 @@ multiple_declaration_improvements :: () {
 //
 // A simple main to run all the examples.
 main :: (args) => {
-    underscore_is_weird();
-    multiple_declaration_improvements();
+    underscore_is_weird()
+    multiple_declaration_improvements()
 }
 
 

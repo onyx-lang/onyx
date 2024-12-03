@@ -4,349 +4,349 @@ use core
 use core.io
 
 write_type_name :: (writer: &io.Writer, t: type_expr) {
-    info := get_type_info(t);
-    if info == null do return;
+    info := get_type_info(t)
+    if info == null do return
 
     switch info.kind {
         case .Basic {
-            basic := cast(&Type_Info_Basic) info;
+            basic := cast(&Type_Info_Basic) info
 
             switch basic.basic_kind {
-                case .Void do io.write_str(writer, "void");
-                case .Bool do io.write_str(writer, "bool");
-                case .U8   do io.write_str(writer, "u8");
-                case .I8   do io.write_str(writer, "i8");
-                case .U16  do io.write_str(writer, "u16");
-                case .I16  do io.write_str(writer, "i16");
-                case .U32  do io.write_str(writer, "u32");
-                case .I32  do io.write_str(writer, "i32");
-                case .U64  do io.write_str(writer, "u64");
-                case .I64  do io.write_str(writer, "i64");
+                case .Void do io.write_str(writer, "void")
+                case .Bool do io.write_str(writer, "bool")
+                case .U8   do io.write_str(writer, "u8")
+                case .I8   do io.write_str(writer, "i8")
+                case .U16  do io.write_str(writer, "u16")
+                case .I16  do io.write_str(writer, "i16")
+                case .U32  do io.write_str(writer, "u32")
+                case .I32  do io.write_str(writer, "i32")
+                case .U64  do io.write_str(writer, "u64")
+                case .I64  do io.write_str(writer, "i64")
 
-                case .F32  do io.write_str(writer, "f32");
-                case .F64  do io.write_str(writer, "f64");
+                case .F32  do io.write_str(writer, "f32")
+                case .F64  do io.write_str(writer, "f64")
 
-                case .Rawptr do io.write_str(writer, "rawptr");
+                case .Rawptr do io.write_str(writer, "rawptr")
 
-                case .I8X16 do io.write_str(writer, "i8x16");
-                case .I16X8 do io.write_str(writer, "i16x8");
-                case .I32X4 do io.write_str(writer, "i32x4");
-                case .I64X2 do io.write_str(writer, "i64x2");
-                case .F32X4 do io.write_str(writer, "f32x4");
-                case .F64X2 do io.write_str(writer, "f64x2");
-                case .V128  do io.write_str(writer, "v128");
+                case .I8X16 do io.write_str(writer, "i8x16")
+                case .I16X8 do io.write_str(writer, "i16x8")
+                case .I32X4 do io.write_str(writer, "i32x4")
+                case .I64X2 do io.write_str(writer, "i64x2")
+                case .F32X4 do io.write_str(writer, "f32x4")
+                case .F64X2 do io.write_str(writer, "f64x2")
+                case .V128  do io.write_str(writer, "v128")
 
-                case .Type_Index do io.write_str(writer, "type_expr");
-                case .Unsized_Int do io.write_str(writer, "<unsized int>");
-                case .Unsized_Float do io.write_str(writer, "<unsized float>");
+                case .Type_Index do io.write_str(writer, "type_expr")
+                case .Unsized_Int do io.write_str(writer, "<unsized int>")
+                case .Unsized_Float do io.write_str(writer, "<unsized float>")
             }
         }
 
         case .Pointer {
-            pointer := cast(&Type_Info_Pointer) info;
-            io.write_str(writer, "&");
-            write_type_name(writer, pointer.to);
+            pointer := cast(&Type_Info_Pointer) info
+            io.write_str(writer, "&")
+            write_type_name(writer, pointer.to)
         }
 
         case .Multi_Pointer {
-            pointer := cast(&Type_Info_Multi_Pointer) info;
-            io.write_str(writer, "[&] ");
-            write_type_name(writer, pointer.to);
+            pointer := cast(&Type_Info_Multi_Pointer) info
+            io.write_str(writer, "[&] ")
+            write_type_name(writer, pointer.to)
         }
 
         case .Array {
-            arr := cast(&Type_Info_Array) info;
-            io.write_format(writer, "[{}] ", arr.count);
-            write_type_name(writer, arr.of);
+            arr := cast(&Type_Info_Array) info
+            io.write_format(writer, "[{}] ", arr.count)
+            write_type_name(writer, arr.of)
         }
 
         case .Slice {
-            slice := cast(&Type_Info_Slice) info;
-            io.write_str(writer, "[] ");
-            write_type_name(writer, slice.of);
+            slice := cast(&Type_Info_Slice) info
+            io.write_str(writer, "[] ")
+            write_type_name(writer, slice.of)
         }
 
         case .Dynamic_Array {
-            dyn := cast(&Type_Info_Dynamic_Array) info;
-            io.write_str(writer, "[..] ");
-            write_type_name(writer, dyn.of);
+            dyn := cast(&Type_Info_Dynamic_Array) info
+            io.write_str(writer, "[..] ")
+            write_type_name(writer, dyn.of)
         }
 
         case .Variadic_Argument {
-            va := cast(&Type_Info_Variadic_Argument) info;
-            io.write_str(writer, "..");
-            write_type_name(writer, va.of);
+            va := cast(&Type_Info_Variadic_Argument) info
+            io.write_str(writer, "..")
+            write_type_name(writer, va.of)
         }
 
         case .Enum {
-            e := cast(&Type_Info_Enum) info;
-            io.write_str(writer, e.name);
+            e := cast(&Type_Info_Enum) info
+            io.write_str(writer, e.name)
         }
 
         case .Struct {
-            s := cast(&Type_Info_Struct) info;
-            if s.name.count > 0 do io.write_str(writer, s.name);
-            else                do io.write_str(writer, "<anonymous struct>");
+            s := cast(&Type_Info_Struct) info
+            if s.name.count > 0 do io.write_str(writer, s.name)
+            else                do io.write_str(writer, "<anonymous struct>")
         }
 
         case .Polymorphic_Struct {
-            s := cast(&Type_Info_Polymorphic_Struct) info;
-            if s.name.count > 0 do io.write_str(writer, s.name);
-            else                do io.write_str(writer, "<anonymous polymorphic struct>");
+            s := cast(&Type_Info_Polymorphic_Struct) info
+            if s.name.count > 0 do io.write_str(writer, s.name)
+            else                do io.write_str(writer, "<anonymous polymorphic struct>")
         }
 
         case .Union {
-            u := cast(&Type_Info_Union) info;
-            if u.name.count > 0 do io.write_str(writer, u.name);
-            else                do io.write_str(writer, "<anonymous union>");
+            u := cast(&Type_Info_Union) info
+            if u.name.count > 0 do io.write_str(writer, u.name)
+            else                do io.write_str(writer, "<anonymous union>")
         }
 
         case .Polymorphic_Union {
-            u := cast(&Type_Info_Polymorphic_Union) info;
-            if u.name.count > 0 do io.write_str(writer, u.name);
-            else                do io.write_str(writer, "<anonymous polymorphic union>");
+            u := cast(&Type_Info_Polymorphic_Union) info
+            if u.name.count > 0 do io.write_str(writer, u.name)
+            else                do io.write_str(writer, "<anonymous polymorphic union>")
         }
 
         case .Compound {
-            comp := cast(&Type_Info_Compound) info;
-            io.write_str(writer, "(");
+            comp := cast(&Type_Info_Compound) info
+            io.write_str(writer, "(")
 
-            i := 0;
+            i := 0
             for type in comp.components {
-                if i != 0 do io.write_str(writer, ", ");
+                if i != 0 do io.write_str(writer, ", ")
 
-                write_type_name(writer, type);
-                i += 1;
+                write_type_name(writer, type)
+                i += 1
             }
-            io.write_str(writer, ")");
+            io.write_str(writer, ")")
         }
 
         case .Function {
-            f := cast(&Type_Info_Function) info;
-            io.write_str(writer, "(");
+            f := cast(&Type_Info_Function) info
+            io.write_str(writer, "(")
 
-            i := 0;
+            i := 0
             for type in f.parameter_types {
-                if i != 0 do io.write_str(writer, ", ");
+                if i != 0 do io.write_str(writer, ", ")
 
-                write_type_name(writer, type);
-                i += 1;
+                write_type_name(writer, type)
+                i += 1
             }
-            io.write_str(writer, ") -> ");
+            io.write_str(writer, ") -> ")
 
-            write_type_name(writer, f.return_type);
+            write_type_name(writer, f.return_type)
         }            
 
         case .Distinct {
-            d := cast(&Type_Info_Distinct) info;
-            io.write_str(writer, d.name);
+            d := cast(&Type_Info_Distinct) info
+            io.write_str(writer, d.name)
         }
     }
 }
 
 is_pointer :: (t: type_expr) -> bool {
-    if t == rawptr do return true;
-    info := get_type_info(t);
-    return info.kind == .Pointer || info.kind == .Multi_Pointer;
+    if t == rawptr do return true
+    info := get_type_info(t)
+    return info.kind == .Pointer || info.kind == .Multi_Pointer
 }
 
 size_of :: (t: type_expr) -> u32 {
-    info := get_type_info(t);
-    if info == null do return 0;
+    info := get_type_info(t)
+    if info == null do return 0
 
     return switch info.kind {
         case .Basic => do {
-            basic := cast(&Type_Info_Basic) info;
+            basic := cast(&Type_Info_Basic) info
 
             return switch basic.basic_kind {
-                case .Void => 0;
-                case .Bool, .U8, .I8 => 1;
-                case .U16, .I16 => 2;
-                case .U32, .I32, .F32, .Type_Index => 4;
-                case .U64, .I64, .F64 => 8;
-                case .I8X16, .I16X8, .I32X4, .I64X2, .F32X4, .F64X2, .V128 => 16;
-                case .Rawptr => sizeof rawptr;
+                case .Void => 0
+                case .Bool, .U8, .I8 => 1
+                case .U16, .I16 => 2
+                case .U32, .I32, .F32, .Type_Index => 4
+                case .U64, .I64, .F64 => 8
+                case .I8X16, .I16X8, .I32X4, .I64X2, .F32X4, .F64X2, .V128 => 16
+                case .Rawptr => sizeof rawptr
 
-                case .Unsized_Int => 0;
-                case .Unsized_Float => 0;
-            };
+                case .Unsized_Int => 0
+                case .Unsized_Float => 0
+            }
         }
 
         case .Pointer => sizeof rawptr
 
         case .Array => do {
-            arr := cast(&Type_Info_Array) info;
-            return size_of(arr.of) * arr.count;
+            arr := cast(&Type_Info_Array) info
+            return size_of(arr.of) * arr.count
         }
 
-        case .Slice => sizeof str;
-        case .Dynamic_Array => sizeof [..] void;
-        case .Variadic_Argument => sizeof str;
+        case .Slice => sizeof str
+        case .Dynamic_Array => sizeof [..] void
+        case .Variadic_Argument => sizeof str
         case .Enum => do {
-            e := cast(&Type_Info_Enum) info;
-            return e.size;
+            e := cast(&Type_Info_Enum) info
+            return e.size
         }
 
         case .Struct => do {
-            s := cast(&Type_Info_Struct) info;
-            return s.size;
+            s := cast(&Type_Info_Struct) info
+            return s.size
         }
 
-        case .Polymorphic_Struct => 0;
+        case .Polymorphic_Struct => 0
 
-        case .Compound => 0;
+        case .Compound => 0
 
-        case .Function => 4;
+        case .Function => 4
 
         case .Distinct => do {
-            d := cast(&Type_Info_Distinct) info;
-            return size_of(d.base_type);
+            d := cast(&Type_Info_Distinct) info
+            return size_of(d.base_type)
         }
 
-        case _ => 0;
-    };
+        case _ => 0
+    }
 }
 
 offset_of :: (T: type_expr, member_name: str) -> u32 {
-    info := get_type_info(T);
-    if info == null         do return 0;
-    if info.kind != .Struct do return 0;
+    info := get_type_info(T)
+    if info == null         do return 0
+    if info.kind != .Struct do return 0
 
-    struct_info := cast(&Type_Info_Struct) info;
+    struct_info := cast(&Type_Info_Struct) info
     for &m in struct_info.members {
-        if m.name == member_name do return m.offset;
+        if m.name == member_name do return m.offset
     }
 
     // Should this return something else if the member was not found?
-    return 0;
+    return 0
 }
 
 get_struct_member :: (S: type_expr, member_name: str) -> &Type_Info_Struct.Member {
-    info := cast(&Type_Info_Struct) get_type_info(S);
-    if info == null do return null;
-    if info.kind != .Struct do return null;
+    info := cast(&Type_Info_Struct) get_type_info(S)
+    if info == null do return null
+    if info.kind != .Struct do return null
 
     for& info.members {
-        if it.name == member_name do return it;
+        if it.name == member_name do return it
     }
 
-    return null;
+    return null
 }
 
 get_tags_for_member :: (S: type_expr, member_name: str) -> [] any {
-    ti := get_type_info(S);
-    if ti.kind != .Struct do return .[];
+    ti := get_type_info(S)
+    if ti.kind != .Struct do return .[]
     
     for & (cast(&Type_Info_Struct) ti).members {
         if it.name == member_name {
-            return it.tags;
+            return it.tags
         }
     }
     
-    return .[];
+    return .[]
 }
 
 struct_constructed_from :: (struct_type: type_expr, base_type: type_expr) -> bool {
-    struct_info := get_type_info(struct_type);
-    if struct_info.kind != .Struct do return false;
+    struct_info := get_type_info(struct_type)
+    if struct_info.kind != .Struct do return false
 
-    return (cast(&Type_Info_Struct) struct_info).constructed_from == base_type;
+    return (cast(&Type_Info_Struct) struct_info).constructed_from == base_type
 }
 
 struct_inherits :: (struct_type: type_expr, base_type: type_expr) -> bool {
-    struct_info := cast(&Type_Info_Struct) get_type_info(struct_type);
-    if struct_info.kind != .Struct do return false;
+    struct_info := cast(&Type_Info_Struct) get_type_info(struct_type)
+    if struct_info.kind != .Struct do return false
 
-    first_member := &struct_info.members[0];
-    return first_member.used && first_member.type == base_type;
+    first_member := &struct_info.members[0]
+    return first_member.used && first_member.type == base_type
 }
 
 union_constructed_from :: (union_type: type_expr, base_type: type_expr) -> bool {
-    union_info := get_type_info(union_type);
-    if union_info.kind != .Union do return false;
+    union_info := get_type_info(union_type)
+    if union_info.kind != .Union do return false
 
-    return (cast(&Type_Info_Union) union_info).constructed_from == base_type;
+    return (cast(&Type_Info_Union) union_info).constructed_from == base_type
 }
 
 
 #operator == (t1: Type_Info_Function, t2: Type_Info_Function) -> bool {
-    if t1.parameter_types.count != t2.parameter_types.count do return false;
-    if t1.return_type           != t2.return_type           do return false;
-    if t1.is_variadic           != t2.is_variadic           do return false;
+    if t1.parameter_types.count != t2.parameter_types.count do return false
+    if t1.return_type           != t2.return_type           do return false
+    if t1.is_variadic           != t2.is_variadic           do return false
 
     while i := 0; i < t1.parameter_types.count {
         // @Robustness // This does not handle nested procedure types
-        if t1.parameter_types[i] != t2.parameter_types[i] do return false;
+        if t1.parameter_types[i] != t2.parameter_types[i] do return false
     }
 
-    return true;
+    return true
 }
 
 enum_name :: (value: $Backing_Type) -> str {
-    info := get_type_info(Backing_Type);
-    if info.kind != .Enum do return null_str;
+    info := get_type_info(Backing_Type)
+    if info.kind != .Enum do return null_str
 
-    etype := cast(&Type_Info_Enum) info;
+    etype := cast(&Type_Info_Enum) info
     for &member in etype.members {
-        if member.value == ~~value do return member.name;
+        if member.value == ~~value do return member.name
     }
     
-    return null_str;
+    return null_str
 }
 
 enum_value :: ($E: type_expr, name: str) -> E {
     info := get_type_info(E); 
-    if info.kind != .Enum do return ~~0;
+    if info.kind != .Enum do return ~~0
 
-    etype := cast(&Type_Info_Enum) info;
+    etype := cast(&Type_Info_Enum) info
     for &member in etype.members {
-        if member.name == name do return ~~member.value;
+        if member.name == name do return ~~member.value
     }
 
-    return ~~0;
+    return ~~0
 }
 
 enum_values :: (E: type_expr) -> [] Type_Info_Enum.Member {
-    info := cast(&Type_Info_Enum) get_type_info(E);
-    if info.kind != .Enum do return .[];
+    info := cast(&Type_Info_Enum) get_type_info(E)
+    if info.kind != .Enum do return .[]
 
-    return info.members;
+    return info.members
 }
 
 get_struct_by_name :: (name: str) -> type_expr {
-    index := 0;
+    index := 0
     for type_table {
-        defer index += 1;
-        if it.info.kind != .Struct do continue;
+        defer index += 1
+        if it.info.kind != .Struct do continue
 
-        if (cast(&Type_Info_Struct) it.info).name == name do return cast(type_expr) index;
+        if (cast(&Type_Info_Struct) it.info).name == name do return cast(type_expr) index
     }
 
-    return void;
+    return void
 }
 
 get_struct_method :: (type: type_expr, method_name: str) -> &any {
-    info := cast(&Type_Info_Struct) get_type_info(type);
-    if info.kind != .Struct do return null;
+    info := cast(&Type_Info_Struct) get_type_info(type)
+    if info.kind != .Struct do return null
 
-    method := core.array.first(info.methods, [x](x.name == method_name));
-    if method != null do return &method.func;
-    return null;
+    method := Array.first(info.methods, [x](x.name == method_name))
+    if method != null do return &method.func
+    return null
 }
 
 populate_struct_vtable :: (table: &$Table_Type, struct_type: type_expr, safe := true) {
-    v_info := cast(&Type_Info_Struct) get_type_info(Table_Type);
-    if v_info.kind != .Struct do return;
+    v_info := cast(&Type_Info_Struct) get_type_info(Table_Type)
+    if v_info.kind != .Struct do return
 
     for& member in v_info.members {
-        if get_type_info(member.type).kind != .Function do continue;
+        if get_type_info(member.type).kind != .Function do continue
 
-        struct_method := get_struct_method(struct_type, member.name);
-        if struct_method == null do continue;
-        if safe && struct_method.type != member.type do continue;
+        struct_method := get_struct_method(struct_type, member.name)
+        if struct_method == null do continue
+        if safe && struct_method.type != member.type do continue
 
-        dest := cast(&()->void) (cast([&] u8) table + member.offset);
-        *dest = *cast(&()->void) struct_method.data;
+        dest := cast(&()->void) (cast([&] u8) table + member.offset)
+        *dest = *cast(&()->void) struct_method.data
     }
 }
 
@@ -354,9 +354,9 @@ for_all_types :: macro (body: Code) {
     use runtime
 
     for runtime.info.type_table.count {
-        type_info := runtime.info.type_table[it].info;
-        type_idx  := runtime.info.type_table[it].type;
+        type_info := runtime.info.type_table[it].info
+        type_idx  := runtime.info.type_table[it].type
 
-        #unquote body(type_info, type_idx);
+        #unquote body(type_info, type_idx)
     }
 }

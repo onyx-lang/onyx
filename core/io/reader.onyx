@@ -10,57 +10,56 @@ package core.io
 
 use core.memory
 use core.math
-use core.array
 use core.iter
 
 Reader :: struct {
-    stream: &Stream;
+    stream: &Stream
 
-    buffer: [] u8;
-    buffer_allocator: Allocator;
+    buffer: [] u8
+    buffer_allocator: Allocator
 
     start, end: u32; // The start and ending positions of the edges of the buffer "window".    
-    last_byte: i32;
+    last_byte: i32
 
-    error: Error;
+    error: Error
     done: bool; // If an .EOF was reached.
 
-    newline_format: NewLineFormat;
+    newline_format: NewLineFormat
 }
 
 #local
 NewLineFormat :: enum {
-    LF;
-    CRLF;
+    LF
+    CRLF
 }
 
-Reader.make :: reader_make;
-Reader.reset :: reader_reset;
-Reader.free :: reader_free;
-Reader.from_string :: reader_from_string;
-Reader.get_buffered :: reader_get_buffered;
+Reader.make :: reader_make
+Reader.reset :: reader_reset
+Reader.free :: reader_free
+Reader.from_string :: reader_from_string
+Reader.get_buffered :: reader_get_buffered
 Reader.ensure_buffered :: reader_ensure_buffered
-Reader.is_empty :: reader_empty;
-Reader.empty    :: reader_empty;
-Reader.read_all :: read_all;
-Reader.read_byte :: read_byte;
-Reader.unread_byte :: unread_byte;
-Reader.read_bytes :: read_bytes;
-Reader.read_fill_buffer :: read_fill_buffer;
-Reader.read_string :: read_string;
-Reader.read_i32 :: read_i32;
-Reader.read_i64 :: read_i64;
-Reader.read_u32 :: read_u32;
-Reader.read_u64 :: read_u64;
-Reader.read_line :: read_line;
-Reader.read_word :: read_word;
-Reader.read_until :: read_until;
-Reader.peek_byte :: peek_byte;
+Reader.is_empty :: reader_empty
+Reader.empty    :: reader_empty
+Reader.read_all :: read_all
+Reader.read_byte :: read_byte
+Reader.unread_byte :: unread_byte
+Reader.read_bytes :: read_bytes
+Reader.read_fill_buffer :: read_fill_buffer
+Reader.read_string :: read_string
+Reader.read_i32 :: read_i32
+Reader.read_i64 :: read_i64
+Reader.read_u32 :: read_u32
+Reader.read_u64 :: read_u64
+Reader.read_line :: read_line
+Reader.read_word :: read_word
+Reader.read_until :: read_until
+Reader.peek_byte :: peek_byte
 Reader.peek_bytes :: peek_bytes
-Reader.advance_line :: advance_line;
-Reader.skip_whitespace :: skip_whitespace;
-Reader.skip_bytes :: skip_bytes;
-Reader.lines :: lines;
+Reader.advance_line :: advance_line
+Reader.skip_whitespace :: skip_whitespace
+Reader.skip_bytes :: skip_bytes
+Reader.lines :: lines
 
 reader_make :: (
     s: &Stream,
@@ -68,48 +67,48 @@ reader_make :: (
     allocator := context.allocator,
     newline_format := NewLineFormat.LF
 ) -> Reader {
-    assert(s.vtable != null, "Stream vtable was not setup correctly.");
+    assert(s.vtable != null, "Stream vtable was not setup correctly.")
 
-    reader: Reader;
-    reader.stream = s;
-    reader.error = .None;
-    reader.newline_format = newline_format;
+    reader: Reader
+    reader.stream = s
+    reader.error = .None
+    reader.newline_format = newline_format
 
-    memory.alloc_slice(&reader.buffer, buffer_size, allocator);
-    reader.buffer_allocator = allocator;
+    memory.alloc_slice(&reader.buffer, buffer_size, allocator)
+    reader.buffer_allocator = allocator
 
-    reader_reset(&reader);
+    reader_reset(&reader)
 
-    return reader;
+    return reader
 }
 
 reader_reset :: (use reader: &Reader) {
-    start, end = 0, 0;
-    last_byte = '\0';
-    done = false;
+    start, end = 0, 0
+    last_byte = '\0'
+    done = false
 }
 
 #overload delete :: reader_free
 reader_free :: (use reader: &Reader) {
-    memory.free_slice(&buffer, buffer_allocator);
+    memory.free_slice(&buffer, buffer_allocator)
 }
 
 // You need to free the StringStream from the context.allocator when you use this. For example,
-//      reader, stream := reader_from_string(s);
-//      defer cfree(stream);
+//      reader, stream := reader_from_string(s)
+//      defer cfree(stream)
 reader_from_string :: (s: str) -> (Reader, &BufferStream) {
-    stream_ptr := new(BufferStream);
-    *stream_ptr = buffer_stream_make(s, fixed=true, write_enabled=false);
+    stream_ptr := new(BufferStream)
+    *stream_ptr = buffer_stream_make(s, fixed=true, write_enabled=false)
 
-    return reader_make(stream_ptr), stream_ptr;
+    return reader_make(stream_ptr), stream_ptr
 }
 
 reader_get_buffered :: (use reader: &Reader) -> i32 {
-    return end - start;
+    return end - start
 }
 
 reader_empty :: (use reader: &Reader) -> bool {
-    return done && reader_get_buffered(reader) == 0;
+    return done && reader_get_buffered(reader) == 0
 }
 
 reader_ensure_buffered :: (use reader: &Reader, bytes: u32) -> Error {
@@ -131,64 +130,64 @@ reader_ensure_buffered :: (use reader: &Reader, bytes: u32) -> Error {
 }
 
 read_all :: (use reader: &Reader, allocator := context.allocator) -> [] u8 {
-    output := array.make(u8, 128, allocator=allocator);
+    output := Array.make(u8, 128, allocator=allocator)
 
     while !reader_empty(reader) {
-        buffered := reader_get_buffered(reader);
+        buffered := reader_get_buffered(reader)
         if buffered > 0 {
-            array.ensure_capacity(&output, output.count + buffered);
-            memory.copy(output.data + output.count, buffer.data, buffered);
-            output.count += buffered;
-            start = end;
+            Array.ensure_capacity(&output, output.count + buffered)
+            memory.copy(output.data + output.count, buffer.data, buffered)
+            output.count += buffered
+            start = end
         }
 
         if err := reader_read_next_chunk(reader); err != .None && err != .ReadPending {
-            break;
+            break
         }
 
         if error != .None && error != .ReadPending && error != .EOF {
-            reader_consume_error(reader);
-            break;
+            reader_consume_error(reader)
+            break
         }
     }
 
-    return output;
+    return output
 }
 
 read_byte :: (use reader: &Reader) -> u8 {
     while start == end {
-        if reader_empty(reader) do return 0;
+        if reader_empty(reader) do return 0
 
         if error != .None {
-            reader_consume_error(reader);
-            return 0;
+            reader_consume_error(reader)
+            return 0
         }
 
         if err := reader_read_next_chunk(reader); err != .None {
-            return 0;
+            return 0
         }
     }
 
-    byte := buffer[start];
-    start += 1;
-    last_byte = cast(i32) byte;
-    return byte;
+    byte := buffer[start]
+    start += 1
+    last_byte = cast(i32) byte
+    return byte
 }
 
 unread_byte :: (use reader: &Reader) -> Error {
     if last_byte < 0 || (start == 0 && end > 0) {
-        return .InvalidUnread;
+        return .InvalidUnread
     }
 
     if start > 0 {
-        start -= 1;
+        start -= 1
     } else {
-        end = 1;
+        end = 1
     }
 
-    buffer[start] = cast(u8) last_byte;
-    last_byte = -1;
-    return .None;
+    buffer[start] = cast(u8) last_byte
+    last_byte = -1
+    return .None
 }
 
 //
@@ -198,156 +197,156 @@ unread_byte :: (use reader: &Reader) -> Error {
 // of the buffer. If the function exits with a .None error, the
 // buffer is filled completely.
 read_bytes :: (use reader: &Reader, bytes: [] u8) -> (i32, Error) {
-    n := bytes.count;
+    n := bytes.count
     if n == 0 {
-        if reader_get_buffered(reader) > 0 do return 0, .None;
-        return 0, reader_consume_error(reader);
+        if reader_get_buffered(reader) > 0 do return 0, .None
+        return 0, reader_consume_error(reader)
     }
 
-    write_index := 0;
+    write_index := 0
     while n > 0 && !reader_empty(reader) {
         if start < end {
-            to_write := math.min(n, end - start);
-            memory.copy(bytes.data + write_index, buffer.data + start, to_write);
-            n -= to_write;
-            write_index += to_write;
-            start += to_write;
+            to_write := math.min(n, end - start)
+            memory.copy(bytes.data + write_index, buffer.data + start, to_write)
+            n -= to_write
+            write_index += to_write
+            start += to_write
         }
 
-        if n == 0 do break;
+        if n == 0 do break
 
-        if  err := reader_read_next_chunk(reader);
+        if  err := reader_read_next_chunk(reader)
             err == .ReadPending || err == .ReadLater
         {
-            return write_index, err;
+            return write_index, err
         }
     }
 
-    last_byte = cast(i32) bytes[write_index - 1];
-    return write_index, .None;
+    last_byte = cast(i32) bytes[write_index - 1]
+    return write_index, .None
 }
 
 read_string :: (use reader: &Reader, bytes := 1, allocator := context.allocator) -> str {
-    buf := memory.make_slice(u8, bytes, allocator);
-    bytes_read, err := read_bytes(reader, buf);
-    return buf[0 .. bytes_read];
+    buf := memory.make_slice(u8, bytes, allocator)
+    bytes_read, err := read_bytes(reader, buf)
+    return buf[0 .. bytes_read]
 }
 
 read_fill_buffer :: (use reader: &Reader, bytes: [] u8) -> Error {
-    n := bytes.count;
+    n := bytes.count
     if n == 0 {
-        if reader_get_buffered(reader) > 0 do return .None;
-        return reader_consume_error(reader);
+        if reader_get_buffered(reader) > 0 do return .None
+        return reader_consume_error(reader)
     }
 
-    write_index := 0;
+    write_index := 0
     while n > 0 && !reader_empty(reader) {
-        to_write := math.min(n, end - start);
-        memory.copy(bytes.data + write_index, buffer.data + start, to_write);
-        n -= to_write;
-        write_index += to_write;
-        start += to_write;
+        to_write := math.min(n, end - start)
+        memory.copy(bytes.data + write_index, buffer.data + start, to_write)
+        n -= to_write
+        write_index += to_write
+        start += to_write
 
         if n > 0 {
-            reader_read_next_chunk(reader);
+            reader_read_next_chunk(reader)
         }
     }
 
-    last_byte = cast(i32) bytes[write_index - 1];
+    last_byte = cast(i32) bytes[write_index - 1]
 
     if reader_empty(reader) && n > 0 {
-        return .EOF;
+        return .EOF
     }
 
-    return .None;
+    return .None
 }
 
 read_i32 :: (use reader: &Reader) -> i32 {
-    n: i32 = 0;
+    n: i32 = 0
 
-    skip_whitespace(reader);
+    skip_whitespace(reader)
 
-    is_negative := false;
-    curr, err := peek_byte(reader);
+    is_negative := false
+    curr, err := peek_byte(reader)
     if curr == '-' {
-        is_negative = true;
-        start += 1;
+        is_negative = true
+        start += 1
     }
 
-    curr, err = peek_byte(reader);
+    curr, err = peek_byte(reader)
     while curr >= '0' && curr <= '9' {
-        n *= 10;
+        n *= 10
         n += cast(u32) (curr - '0'); 
 
-        start += 1;
-        curr, err = peek_byte(reader);
-        if err != .None || start == end do break;
+        start += 1
+        curr, err = peek_byte(reader)
+        if err != .None || start == end do break
     }
 
-    if is_negative do n = -n;
-    return n;
+    if is_negative do n = -n
+    return n
 }
 
 read_i64 :: (use reader: &Reader) -> i64 {
-    n: i64 = 0;
+    n: i64 = 0
 
-    skip_whitespace(reader);
+    skip_whitespace(reader)
 
-    is_negative := false;
-    curr, err := peek_byte(reader);
+    is_negative := false
+    curr, err := peek_byte(reader)
     if curr == '-' {
-        is_negative = true;
-        start += 1;
+        is_negative = true
+        start += 1
     }
 
-    curr, err = peek_byte(reader);
+    curr, err = peek_byte(reader)
     while curr >= '0' && curr <= '9' {
-        n *= 10;
+        n *= 10
         n += cast(u64) (curr - '0'); 
 
-        start += 1;
-        curr, err = peek_byte(reader);
-        if err != .None || start == end do break;
+        start += 1
+        curr, err = peek_byte(reader)
+        if err != .None || start == end do break
     }
 
-    if is_negative do n = -n;
-    return n;
+    if is_negative do n = -n
+    return n
 }
 
 read_u32 :: (use reader: &Reader) -> u32 {
-    n: u32 = 0;
+    n: u32 = 0
 
-    skip_whitespace(reader);
+    skip_whitespace(reader)
 
-    curr, err := peek_byte(reader);
+    curr, err := peek_byte(reader)
     while curr >= '0' && curr <= '9' {
-        n *= 10;
+        n *= 10
         n += cast(u32) (curr - '0'); 
 
-        start += 1;
-        curr, err = peek_byte(reader);
-        if err != .None || start == end do break;
+        start += 1
+        curr, err = peek_byte(reader)
+        if err != .None || start == end do break
     }
 
-    return n;
+    return n
 }
 
 read_u64 :: (use reader: &Reader) -> u64 {
-    n: u64 = 0;
+    n: u64 = 0
 
-    skip_whitespace(reader);
+    skip_whitespace(reader)
 
-    curr, err := peek_byte(reader);
+    curr, err := peek_byte(reader)
     while curr >= '0' && curr <= '9' {
-        n *= 10;
+        n *= 10
         n += cast(u64) (curr - '0'); 
 
-        start += 1;
-        curr, err = peek_byte(reader);
-        if err != .None || start == end do break;
+        start += 1
+        curr, err = peek_byte(reader)
+        if err != .None || start == end do break
     }
 
-    return n;
+    return n
 }
 
 read_line :: (use reader: &Reader, consume_newline := true, allocator := context.allocator, inplace := false) -> str {
@@ -360,72 +359,72 @@ read_line :: (use reader: &Reader, consume_newline := true, allocator := context
         // in length.
         while reader_read_next_chunk(reader) == .ReadPending ---
 
-        count := start;
-        defer start = count;
+        count := start
+        defer start = count
 
         while count < end && buffer[count] != '\n' {
-            count += 1;
+            count += 1
         }
 
         if newline_format == .CRLF && count >= 1 {
             if buffer[count - 1] == '\r' && !consume_newline {
-                count -= 1;
+                count -= 1
             }
         }
 
         if consume_newline && count < end {
-            count += 1;
+            count += 1
         }
 
-        return buffer[start .. count];
+        return buffer[start .. count]
     }
 
-    out := make(dyn_str, allocator);
+    out := make(dyn_str, allocator)
 
     while done := false; !done {
         if start == end {
             while reader_read_next_chunk(reader) == .ReadPending ---
         }
 
-        count := start;
+        count := start
         while count < end && buffer[count] != '\n' {
-            count += 1;
+            count += 1
         }
 
         if buffer[count] == '\n' {
-            if consume_newline && count < end do count += 1;
+            if consume_newline && count < end do count += 1
 
             if newline_format == .CRLF && count >= 1 {
                 if buffer[count - 1] == '\r' && !consume_newline {
-                    count -= 1;
+                    count -= 1
                 }
             }
 
-            done = true;
+            done = true
         }
 
         if count != start {
-            array.ensure_capacity(&out, out.count + (count - start));
-            memory.copy(out.data + out.count, buffer.data + start, count - start);
-            out.count += count - start;
-            start = count;
+            Array.ensure_capacity(&out, out.count + (count - start))
+            memory.copy(out.data + out.count, buffer.data + start, count - start)
+            out.count += count - start
+            start = count
         }
 
         if !done {
             while reader_read_next_chunk(reader) == .ReadPending ---
-            if error == .NoProgress do done = true;
+            if error == .NoProgress do done = true
         }
 
-        if reader_empty(reader) do done = true;
+        if reader_empty(reader) do done = true
     }
 
-    return out;
+    return out
 }
 
 read_word :: (use reader: &Reader, numeric_allowed := false, allocator := context.allocator, inplace := false) -> str {
-    skip_whitespace(reader);
+    skip_whitespace(reader)
     while reader_read_next_chunk(reader) == .ReadPending {
-        skip_whitespace(reader);
+        skip_whitespace(reader)
     }
 
     //
@@ -437,59 +436,59 @@ read_word :: (use reader: &Reader, numeric_allowed := false, allocator := contex
         // in length.
         while reader_read_next_chunk(reader) == .ReadPending ---
 
-        count := start;
-        defer start = count;
+        count := start
+        defer start = count
 
         while count < end {
-            curr := buffer[count];
+            curr := buffer[count]
             if  (curr >= 'a' && curr <= 'z') ||
                 (curr >= 'A' && curr <= 'Z') ||
                  curr == '_' {
-                count += 1;
+                count += 1
             } elseif numeric_allowed && (curr >= '0' && curr <= '9') {
-                count += 1;
+                count += 1
             } else {
-                break;
+                break
             }
         }
 
-        return buffer[start .. count];
+        return buffer[start .. count]
     }
 
-    out := make(dyn_str, allocator);
+    out := make(dyn_str, allocator)
 
     while done := false; !done {
-        count := start;
+        count := start
         while count < end {
-            curr := buffer[count];
+            curr := buffer[count]
             if  (curr >= 'a' && curr <= 'z') ||
                 (curr >= 'A' && curr <= 'Z') ||
                  curr == '_' {
-                count += 1;
+                count += 1
             } elseif numeric_allowed && (curr >= '0' && curr <= '9') {
-                count += 1;
+                count += 1
             } else {
-                done = true;
-                break;
+                done = true
+                break
             }
         }
 
         if count != start {
-            array.ensure_capacity(&out, out.count + (count - start));
-            memory.copy(out.data + out.count, buffer.data + start, count - start);
-            out.count += count - start;
-            start = count;
+            Array.ensure_capacity(&out, out.count + (count - start))
+            memory.copy(out.data + out.count, buffer.data + start, count - start)
+            out.count += count - start
+            start = count
         }
 
         if !done {
             while reader_read_next_chunk(reader) == .ReadPending ---
-            if error == .NoProgress do done = true;
+            if error == .NoProgress do done = true
         }
 
-        if reader_empty(reader) do done = true;
+        if reader_empty(reader) do done = true
     }
 
-    return out;
+    return out
 }
 
 read_until :: (use reader: &Reader, until: u8, skip: u32 = 0, allocator := context.allocator, consume_end := false, inplace := false) -> str {
@@ -502,77 +501,77 @@ read_until :: (use reader: &Reader, until: u8, skip: u32 = 0, allocator := conte
         // in length.
         while reader_read_next_chunk(reader) == .ReadPending ---
 
-        count := start;
-        defer start = count;
+        count := start
+        defer start = count
 
         while count < end {
-            curr := buffer[count];
+            curr := buffer[count]
             if curr != until {
-                count += 1;
+                count += 1
             } else {
-                if skip == 0 do break;
-                else do skip -= 1;
+                if skip == 0 do break
+                else do skip -= 1
             }
         }
 
         if consume_end && count < end {
-            count += 1;
+            count += 1
         }
 
-        return buffer[start .. count];
+        return buffer[start .. count]
     }
 
-    out := make(dyn_str, allocator);
+    out := make(dyn_str, allocator)
 
     while done := false; !done {
-        count := start;
+        count := start
         while count < end {
-            curr := buffer[count];
+            curr := buffer[count]
             if curr != until {
-                count += 1;
+                count += 1
             } else {
-                if skip == 0 do break;
-                else do skip -= 1;
+                if skip == 0 do break
+                else do skip -= 1
             }
         }
 
         if buffer[count] == until {
-            if consume_end && count < end do count += 1;
-            done = true;
+            if consume_end && count < end do count += 1
+            done = true
         }
 
         if count != start {
-            array.ensure_capacity(&out, out.count + (count - start));
-            memory.copy(out.data + out.count, buffer.data + start, count - start);
-            out.count += count - start;
-            start = count;
+            Array.ensure_capacity(&out, out.count + (count - start))
+            memory.copy(out.data + out.count, buffer.data + start, count - start)
+            out.count += count - start
+            start = count
         }
 
         if !done {
             while reader_read_next_chunk(reader) == .ReadPending ---
-            if error == .NoProgress do done = true;
+            if error == .NoProgress do done = true
         }
 
-        if reader_empty(reader) do done = true;
+        if reader_empty(reader) do done = true
     }
 
-    return out;
+    return out
 }
 
 peek_byte :: (use reader: &Reader, advance := 0) -> (u8, Error) {
-    if reader_empty(reader) do return 0, .EOF;
+    if reader_empty(reader) do return 0, .EOF
 
     if start == end {
         if fill_err := reader_read_next_chunk(reader); fill_err != .None {
-            return 0, fill_err;
+            return 0, fill_err
         }
     }
 
     if start + advance >= end {
-        return 0, .EOF;
+        return 0, .EOF
     }
 
-    return buffer[start + advance], .None;
+    return buffer[start + advance], .None
 }
 
 peek_bytes :: (use reader: &Reader, advance: u32, length: u32) -> (str, Error) {
@@ -592,69 +591,69 @@ peek_bytes :: (use reader: &Reader, advance: u32, length: u32) -> (str, Error) {
 }
 
 advance_line :: (use reader: &Reader) {
-    if reader_empty(reader) do return;
+    if reader_empty(reader) do return
 
     while true {
         if start == end {
             if fill_err := reader_read_next_chunk(reader); fill_err != .None {
-                return;
+                return
             }
         }
 
-        defer start += 1;
+        defer start += 1
         if buffer[start] == '\n' {
-            return;
+            return
         }
     }
 }
 
 skip_whitespace :: (use reader: &Reader) {
-    if reader_empty(reader) do return;
+    if reader_empty(reader) do return
 
     while start <= end {
         if start == end {
             if fill_err := reader_read_next_chunk(reader); fill_err != .None {
-                return;
+                return
             }
         }
 
         switch buffer[start] {
             case ' ', '\t', '\n', '\r' {
-                start += 1;
+                start += 1
             }
 
-            case _ do return;
+            case _ do return
         }
     }
 }
 
 skip_bytes :: (use reader: &Reader, bytes: u32) -> (i32, Error) {
-    if bytes == 0 do return 0, .None;
-    if reader_empty(reader) do return 0, .EOF;
+    if bytes == 0 do return 0, .None
+    if reader_empty(reader) do return 0, .EOF
 
-    remaining := bytes;
+    remaining := bytes
     while true {
-        skip := reader_get_buffered(reader);
+        skip := reader_get_buffered(reader)
         if skip == 0 {
             if fill_err := reader_read_next_chunk(reader); fill_err != .None {
-                return 0, fill_err;
+                return 0, fill_err
             }
 
-            skip = reader_get_buffered(reader);
+            skip = reader_get_buffered(reader)
         }
 
-        skip = math.min(skip, remaining);
-        start += skip;
-        remaining -= skip;
+        skip = math.min(skip, remaining)
+        start += skip
+        remaining -= skip
 
-        if remaining == 0 do return bytes, .None;
+        if remaining == 0 do return bytes, .None
 
         if error != .None {
-            return bytes - remaining, reader_consume_error(reader);
+            return bytes - remaining, reader_consume_error(reader)
         }
     }
 
-    return 0, .None;
+    return 0, .None
 }
 
 lines :: (r: &Reader, inplace := false, allocator := context.allocator) =>
@@ -663,16 +662,16 @@ lines :: (r: &Reader, inplace := false, allocator := context.allocator) =>
         inplace = inplace,
         allocator = allocator,
     }, (ctx: $C) -> ? str {
-        line := ctx.r->read_line(consume_newline=true, inplace=ctx.inplace, allocator=ctx.allocator);
+        line := ctx.r->read_line(consume_newline=true, inplace=ctx.inplace, allocator=ctx.allocator)
 
-        if line.count > 0 do return line;
-        else do return .None;
-    });
+        if line.count > 0 do return line
+        else do return .None
+    })
 
 
 #local reader_consume_error :: (use reader: &Reader) -> Error {
-    defer error = .None;
-    return error;
+    defer error = .None
+    return error
 }
 
 
@@ -691,15 +690,15 @@ lines :: (r: &Reader, inplace := false, allocator := context.allocator) =>
     if start > 0 {
         // This assumes that memory.copy behaves like memmove, in that the
         // buffer may overlap, but it should do the right thing.
-        memory.copy(buffer.data, buffer.data + start, end - start);
-        end -= start;
-        start = 0;
+        memory.copy(buffer.data, buffer.data + start, end - start)
+        end -= start
+        start = 0
     }
 
-    if done do return .None;
+    if done do return .None
 
     if end >= buffer.count {
-        return .BufferFull;
+        return .BufferFull
     }
 
     // If this stream will block on a read, use the data that is present
@@ -707,13 +706,13 @@ lines :: (r: &Reader, inplace := false, allocator := context.allocator) =>
     // 'stream_poll' that tests if the next read would block, but that
     // can happen later.
     if end > 0 && stream.flags & .Block_On_Read {
-        data_available := stream_poll(stream, .Read, 0).Ok ?? false;
-        if !data_available do return .None;
+        data_available := stream_poll(stream, .Read, 0).Ok ?? false
+        if !data_available do return .None
     }
 
-    read_result := stream_read(stream, buffer[end .. buffer.count]);
-    err := read_result.Err ?? Error.None;
-    n   := read_result.Ok ?? 0;
+    read_result := stream_read(stream, buffer[end .. buffer.count])
+    err := read_result.Err ?? Error.None
+    n   := read_result.Ok ?? 0
     
     //
     // ReadPending is not an error, just a signal that data is not ready
@@ -721,24 +720,24 @@ lines :: (r: &Reader, inplace := false, allocator := context.allocator) =>
     // if the end is equal to start because that means that the buffer is
     // completely empty.
     if err == .ReadPending || err == .ReadLater {
-        error = err;
-        return err if end == 0 else .None;
+        error = err
+        return err if end == 0 else .None
     }
 
-    end += n;
+    end += n
     if err != .None {
-        if err == .EOF     do done = true;
-        if err == .BadFile do done = true;
+        if err == .EOF     do done = true
+        if err == .BadFile do done = true
 
-        error = err;
-        return .None;
+        error = err
+        return .None
     }
 
     if n > 0 {
-        return .None;
+        return .None
     }
 
-    done = true;
-    error = .NoProgress;
-    return .None;
+    done = true
+    error = .NoProgress
+    return .None
 }

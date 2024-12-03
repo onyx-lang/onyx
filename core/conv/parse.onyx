@@ -1,8 +1,5 @@
 package core.conv
 
-use core.map
-use core.string
-use core.array
 use core.math
 use core.memory
 use runtime
@@ -13,131 +10,131 @@ parse_any :: #match {}
 
 #overload
 parse_any :: macro (v: &$T, to_parse: str, string_allocator := context.allocator) -> bool {
-    return #this_package.parse_any(v, T, to_parse, string_allocator);
+    return #this_package.parse_any(v, T, to_parse, string_allocator)
 }
 
 #overload
 parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_allocator := context.allocator) -> bool {
     custom_parsers->get(data_type)->with([parser] {
-        return parser(target, to_parse, string_allocator);
-    });
+        return parser(target, to_parse, string_allocator)
+    })
 
-    use runtime.info {*};
-    info := get_type_info(data_type);
+    use runtime.info {*}
+    info := get_type_info(data_type)
 
     switch data_type {
         case bool {
-            dest := cast(&bool) target;
-            *dest = false;
+            dest := cast(&bool) target
+            *dest = false
             if to_parse[0] == 't' || to_parse[0] == 'T' {
-                *dest = true;
+                *dest = true
             }
-            return true;
+            return true
         }
 
         integer_case :: macro (T: type_expr) {
             case T {
-                dest := cast(&T) target;
-                *dest = cast(T) str_to_i64(to_parse);
-                return true;
+                dest := cast(&T) target
+                *dest = cast(T) str_to_i64(to_parse)
+                return true
             }
         }
 
-        integer_case(i8);
-        integer_case(i16);
-        integer_case(i32);
-        integer_case(i64);
-        integer_case(u8);
-        integer_case(u16);
-        integer_case(u32);
-        integer_case(u64);
+        integer_case(i8)
+        integer_case(i16)
+        integer_case(i32)
+        integer_case(i64)
+        integer_case(u8)
+        integer_case(u16)
+        integer_case(u32)
+        integer_case(u64)
 
         case f32 {
-            dest := cast(&f32) target;
-            *dest = ~~ str_to_f64(to_parse);
-            return true;
+            dest := cast(&f32) target
+            *dest = ~~ str_to_f64(to_parse)
+            return true
         }
 
         case f64 {
-            dest := cast(&f64) target;
-            *dest = str_to_f64(to_parse);
-            return true;
+            dest := cast(&f64) target
+            *dest = str_to_f64(to_parse)
+            return true
         }
 
         case str {
-            if to_parse.count == 0 do return false;
+            if to_parse.count == 0 do return false
 
-            dest := cast(&str) target;
+            dest := cast(&str) target
             
             // If the string does *look* like a quoted string,
             // simply return a copy of the whole string.
             if to_parse[0] != '"' {
-                *dest = string.copy(to_parse, string_allocator);
-                return true;
+                *dest = str.copy(to_parse, string_allocator)
+                return true
             }
 
 
-            line := to_parse;
-            string.advance(&line);
+            line := to_parse
+            str.advance(&line)
 
-            *dest = string.read_until(&line, '"') |> string.copy(string_allocator); // @BUG // This does not handle escaped strings!
-            return true;
+            *dest = str.read_until(&line, '"') |> str.copy(string_allocator); // @BUG // This does not handle escaped strings!
+            return true
         }
 
         case _ {
             if info.kind == .Enum {
-                val := str_to_i64(to_parse);
+                val := str_to_i64(to_parse)
                 
-                einfo := info->as_enum();
+                einfo := info->as_enum()
                 switch einfo.backing_type {
-                    case i8,  u8  do *cast(&u8)  target = ~~val;
-                    case i16, u16 do *cast(&u16) target = ~~val;
-                    case i32, u32 do *cast(&u32) target = ~~val;
-                    case i64, u64 do *cast(&u64) target = ~~val;
+                    case i8,  u8  do *cast(&u8)  target = ~~val
+                    case i16, u16 do *cast(&u16) target = ~~val
+                    case i32, u32 do *cast(&u32) target = ~~val
+                    case i64, u64 do *cast(&u64) target = ~~val
                 }
 
-                return true;
+                return true
             }
 
             if info.kind == .Distinct {
-                d_info := cast(&Type_Info_Distinct) info;
-                return parse_any(target, d_info.base_type, to_parse, string_allocator);
+                d_info := cast(&Type_Info_Distinct) info
+                return parse_any(target, d_info.base_type, to_parse, string_allocator)
             }
 
             if info.kind == .Union && union_constructed_from(data_type, Optional) {
-                parsed_successful := parse_any(memory.ptr_add(target, info.alignment), info->as_union().variants[1].type, to_parse, string_allocator);
+                parsed_successful := parse_any(memory.ptr_add(target, info.alignment), info->as_union().variants[1].type, to_parse, string_allocator)
                 if !parsed_successful {
-                    *cast(& u8) target = ~~ Optional(void).tag_enum.None;
+                    *cast(& u8) target = ~~ Optional(void).tag_enum.None
                 } else {
-                    *cast(& u8) target = ~~ Optional(void).tag_enum.Some;
+                    *cast(& u8) target = ~~ Optional(void).tag_enum.Some
                 }
 
-                return true;
+                return true
             }
         }
     }
 
-    return false;
+    return false
 }
 
 
 /// Shortcut to parse a type `T` using `parse_any`.
 parse :: ($T: type_expr, to_parse: str) -> ? T {
-    v: T;
+    v: T
     if #this_package.parse_any(&v, to_parse) {
-        return v;
+        return v
     } else {
-        return .None;
+        return .None
     }
 }
 
 /// Shortcut to parse a type `T` using `parse_any`, and specify an allocator.
 parse_with_allocator :: ($T: type_expr, to_parse: str, allocator: Allocator) -> ? T {
-    v: T;
+    v: T
     if #this_package.parse_any(&v, to_parse, allocator) {
-        return v;
+        return v
     } else {
-        return .None;
+        return .None
     }
 }
 

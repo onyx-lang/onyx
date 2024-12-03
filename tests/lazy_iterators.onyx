@@ -8,62 +8,62 @@ count_iterator :: (lo: $T, hi: T, step: T = 1) -> Iterator(T) {
     
         (ctx) => {
             if ctx.current <= ctx.high {
-                defer ctx.current += ctx.step;
-                return Optional.make(ctx.current);
+                defer ctx.current += ctx.step
+                return Optional.make(ctx.current)
             }
 
-            return .None;
+            return .None
         },
 
         (ctx) => {
-            println("Closing the count iterator...");
+            println("Closing the count iterator...")
         }
-    );
+    )
 }
 
 main :: (args: [] cstr) {
     // Hopefully soon, the following will be possible.
 
     {
-        lower_bound := 10;
-        addition    := 42;
+        lower_bound := 10
+        addition    := 42
 
         quick_iterator :=
                     count_iterator(1.0f, 20.0f)
                     |> iter.map(x => x * 2)
                     |> iter.filter(lower_bound, (x, l) => x > ~~l)
                     |> iter.map((x) use (addition) => x + ~~addition)
-                    |> iter.take(5);
+                    |> iter.take(5)
 
         for v in quick_iterator {
-            println(v);
+            println(v)
         }
     }
 
     iterator := iter.as_iter(1 .. 11)
                 |> iter.map((x: i32) -> i32     { return x * 2; })
                 |> iter.filter((x: i32) -> bool { return x > 10; })
-                |> iter.map((x: i32) -> i32     { return x + 42; });
+                |> iter.map((x: i32) -> i32     { return x + 42; })
 
-    println("Starting the iteration...");
-    for i in iterator do println(i);
+    println("Starting the iteration...")
+    for i in iterator do println(i)
 
     arr := count_iterator(1, 10)
             |> iter.map((x: i32) -> i32     { return x * 2; })
             |> iter.filter((x: i32) -> bool { return x > 10; })
             |> iter.map((x: i32) -> i32     { return x + 42; })
-            |> iter.to_array();
+            |> iter.to_array()
 
-    println(arr[2]);
+    println(arr[2])
 
-    println("\nStarting the zipped iteration...");
+    println("\nStarting the zipped iteration...")
     zipped_iterator := count_iterator(1, 10)
                 |> iter.map(x => x * 2)
                 |> iter.filter(x => x > 10)
                 |> iter.map(x => x + 42)
-                |> iter.zip(iter.const(42.0f));
+                |> iter.zip(iter.const(42.0f))
 
     for value in zipped_iterator {
-        printf("{}   {}\n", value.first, value.second);
+        printf("{}   {}\n", value.first, value.second)
     }
 }

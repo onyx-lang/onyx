@@ -8,37 +8,37 @@ package builtin
 
 //
 // Allows for comparing `package_id`s
-#operator == macro (p1, p2: package_id) => cast(u32) p1 == cast(u32) p2;
-#operator != macro (p1, p2: package_id) => cast(u32) p1 != cast(u32) p2;
+#operator == macro (p1, p2: package_id) => cast(u32) p1 == cast(u32) p2
+#operator != macro (p1, p2: package_id) => cast(u32) p1 != cast(u32) p2
 
 //
 // Allows for basic array programming support
 
 // Array w/ array operations
-#operator + macro (l, r: [$N]$T) => __array_op_array(l, r, [a, b](a + b));
-#operator - macro (l, r: [$N]$T) => __array_op_array(l, r, [a, b](a - b));
-#operator * macro (l, r: [$N]$T) => __array_op_array(l, r, [a, b](a * b));
-#operator / macro (l, r: [$N]$T) => __array_op_array(l, r, [a, b](a / b));
+#operator + macro (l, r: [$N]$T) => __array_op_array(l, r, [a, b](a + b))
+#operator - macro (l, r: [$N]$T) => __array_op_array(l, r, [a, b](a - b))
+#operator * macro (l, r: [$N]$T) => __array_op_array(l, r, [a, b](a * b))
+#operator / macro (l, r: [$N]$T) => __array_op_array(l, r, [a, b](a / b))
 
 // Array w/ scalar operations
-#operator + macro (l: [$N]$T, r: T) => __array_op_scalar(l, r, [a, b](a + b));
-#operator - macro (l: [$N]$T, r: T) => __array_op_scalar(l, r, [a, b](a - b));
-#operator * macro (l: [$N]$T, r: T) => __array_op_scalar(l, r, [a, b](a * b));
-#operator / macro (l: [$N]$T, r: T) => __array_op_scalar(l, r, [a, b](a / b));
+#operator + macro (l: [$N]$T, r: T) => __array_op_scalar(l, r, [a, b](a + b))
+#operator - macro (l: [$N]$T, r: T) => __array_op_scalar(l, r, [a, b](a - b))
+#operator * macro (l: [$N]$T, r: T) => __array_op_scalar(l, r, [a, b](a * b))
+#operator / macro (l: [$N]$T, r: T) => __array_op_scalar(l, r, [a, b](a / b))
 
-#operator == macro (l, r: [$N]$T) => memory_equal(cast(rawptr)l, cast(rawptr)r, N * sizeof T);
-#operator != macro (l, r: [$N]$T) => !(l == r);
+#operator == macro (l, r: [$N]$T) => memory_equal(cast(rawptr)l, cast(rawptr)r, N * sizeof T)
+#operator != macro (l, r: [$N]$T) => !(l == r)
 
 memory_equal :: (a: rawptr, b: rawptr, count: i32) -> bool #intrinsic --- // So we don't have to include core.intrinsics
 
 __array_op_array :: macro (l, r: [$N]$T, $body: Code) -> [N]T {
-    res: [N]T;
-    for 0..N do res[it] = #unquote body(l[it], r[it]);
-    return res;
+    res: [N]T
+    for 0..N do res[it] = #unquote body(l[it], r[it])
+    return res
 }
 
 __array_op_scalar :: macro (l: [$N]$T, r: T, $body: Code) -> [N]T {
-    res: [N]T;
-    for 0..N do res[it] = #unquote body(l[it], r);
-    return res;
+    res: [N]T
+    for 0..N do res[it] = #unquote body(l[it], r)
+    return res
 }

@@ -5,41 +5,41 @@ use core.os
 use core {printf}
 
 count_increasing :: (arr: [] $T) -> u32 {
-    increased_count := 0;
+    increased_count := 0
     for 1 .. arr.count {
         if arr[it - 1] < arr[it] {
-            increased_count += 1;
+            increased_count += 1
         }
     }
 
-    return increased_count;
+    return increased_count
 }
 
 main :: (args) => {
-    file := os.open("./tests/aoc-2021/input/day01.txt")->expect("Error opening file");
-    reader := io.reader_make(&file);
-    defer os.close(&file);
+    file := os.open("./tests/aoc-2021/input/day01.txt")->expect("Error opening file")
+    reader := io.reader_make(&file)
+    defer os.close(&file)
 
-    nums: [..] i32;
+    nums: [..] i32
     while !io.reader_empty(&reader) {
-        nums << io.read_u32(&reader);
-        io.skip_whitespace(&reader);
+        nums << io.read_u32(&reader)
+        io.skip_whitespace(&reader)
     }
 
     { // Part 1
-        increased_count := count_increasing(nums);
-        printf("Part 1: {}\n", increased_count);
+        increased_count := count_increasing(nums)
+        printf("Part 1: {}\n", increased_count)
     }
 
     { // Part 2
-        windows: [..] i32;
+        windows: [..] i32
         for i in range.{ 0, nums.count - 2 } {
-            sum := 0;
-            for k in i .. i+3 do sum += nums[k];
-            windows << sum;
+            sum := 0
+            for k in i .. i+3 do sum += nums[k]
+            windows << sum
         }
 
-        increased_count := count_increasing(windows);
-        printf("Part 2: {}\n", increased_count);
+        increased_count := count_increasing(windows)
+        printf("Part 2: {}\n", increased_count)
     }
 }

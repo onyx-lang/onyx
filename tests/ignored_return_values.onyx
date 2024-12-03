@@ -1,33 +1,33 @@
 use core
 
 foo :: () -> (str, i32, bool, Allocator) {
-    return "hello", 123, false, .{};
+    return "hello", 123, false, .{}
 }
 
 takes_str :: (s: str) {
-    core.printf("Str: {}\n", s);
+    core.printf("Str: {}\n", s)
 }
 
 Foo :: struct {
-    x, y: i32;
-    m: str;
+    x, y: i32
+    m: str
 }
 
-Foo.method :: (f: ^Foo) -> (i32, i32, str) {
-    return f.x, f.y, f.m;
+Foo.method :: (f: &Foo) -> (i32, i32, str) {
+    return f.x, f.y, f.m
 }
 
 main :: () {
-    m, n := foo();
-    core.println(m);
-    core.println(n);
+    m, n := foo()
+    core.println(m)
+    core.println(n)
 
-    takes_str(foo());
+    takes_str(foo())
 
-    f := Foo.{ 12, 34, "Working!" };
-    x := f->method();
-    core.println(x);
+    f := Foo.{ 12, 34, "Working!" }
+    x := f->method()
+    core.println(x)
 
-    y := 1;
-    core.println(y + Foo.method(^f));
+    y := 1
+    core.println(y + Foo.method(&f))
 }

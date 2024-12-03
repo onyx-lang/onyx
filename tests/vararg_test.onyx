@@ -2,28 +2,28 @@ package main
 
 
 
-use core {*};
+use core {*}
 
 old_va_test :: (prefix: str, va: ..i32) {
-    println(prefix);
-    for v in va do println(v);
+    println(prefix)
+    for v in va do println(v)
 }
 
 new_va_test :: (prefix: str, va: ..any) {
-    println(prefix);
+    println(prefix)
 
     for i in 0 .. va.count {
         // The right way to do it is this:
-        // x := * misc.any_as(va[i], i32);
+        // x := * misc.any_as(va[i], i32)
 
-        x := *cast(&i32, va[i].data);
-        println(x);
+        x := *cast(&i32, va[i].data)
+        println(x)
     }
 }
 
 main :: (args: [] cstr) {
-    new_va_test("foo", 1, 2, 3.0f, 5.0f);
-    old_va_test("bar", 1);
+    new_va_test("foo", 1, 2, 3.0f, 5.0f)
+    old_va_test("bar", 1)
 
-    printf("Hello, {}, {}!\n", 1234, "World");
+    printf("Hello, {}, {}!\n", 1234, "World")
 }

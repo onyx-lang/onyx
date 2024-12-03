@@ -7,178 +7,178 @@ use core {package, *}
 use core.intrinsics.onyx { init }
 
 Color :: enum {
-    White;
-    Red;
-    Green;
-    Yellow;
-    Blue;
+    White
+    Red
+    Green
+    Yellow
+    Blue
 }
 
 print_color :: (color: Color, format: str, args: ..any) {
-    buffer: [2048] u8;
-    output := conv.str_format_va(buffer, format, args);
+    buffer: [2048] u8
+    output := conv.str_format_va(buffer, format, args)
 
     if (runtime.compiler_os == .Linux || runtime.compiler_os == .MacOS) && !settings.no_color {
-        color_code: str;
+        color_code: str
         switch color {
-            case .Red do color_code = "\x1b[91m";
-            case .Green do color_code ="\x1b[92m";
-            case .Yellow do color_code = "\x1b[93m";
-            case .Blue do color_code ="\x1b[94m";
-            case .White do fallthrough;
-            case _ do color_code = "\x1b[97m";
+            case .Red do color_code = "\x1b[91m"
+            case .Green do color_code ="\x1b[92m"
+            case .Yellow do color_code = "\x1b[93m"
+            case .Blue do color_code ="\x1b[94m"
+            case .White do fallthrough
+            case _ do color_code = "\x1b[97m"
         }
 
-        printf("{}{}\x1b[0m", color_code, output);
-        __flush_stdio();
+        printf("{}{}\x1b[0m", color_code, output)
+        __flush_stdio()
 
     } else {
         // No color output on Windows because most windows terminals suck.
-        print(output);
+        print(output)
     }
 }
 
 Test_Case :: struct {
-    source_file   : str;
-    expected_file : str;
+    source_file   : str
+    expected_file : str
 }
 
 find_onyx_files :: (root: str, cases: &[..] Test_Case) {
     for os.list_directory(root) {
-        path_buffer: [512] u8;
-        if string.ends_with(it->name(), ".onyx") {
-            test_case := string.concat(path_buffer, root, "/", it->name()) |> string.copy();
-            expected_file := test_case[0 .. (test_case.count - 5)];
+        path_buffer: [512] u8
+        if str.ends_with(it->name(), ".onyx") {
+            test_case := str.concat(path_buffer, root, "/", it->name()) |> str.copy()
+            expected_file := test_case[0 .. (test_case.count - 5)]
 
             if !os.file_exists(expected_file) {
-                print_color(.Yellow, "Skipping test case {} because an expected output file was not found.\n", test_case);
-                continue;
+                print_color(.Yellow, "Skipping test case {} because an expected output file was not found.\n", test_case)
+                continue
             }
 
-            array.push(cases, .{ test_case, expected_file });
+            Array.push(cases, .{ test_case, expected_file })
         }
 
         if it.type == .Directory {
-            find_onyx_files(string.concat(path_buffer, root, "/", it->name()), cases);
+            find_onyx_files(str.concat(path_buffer, root, "/", it->name()), cases)
         }
     }
 
-    return;
+    return
 }
 
-settings := Settings.{};
+settings := Settings.{}
 
 Settings :: struct {
     #tag "--debug", "-d"
-    debug := false;
+    debug := false
 
     #tag "--threads"
-    threads := 4;
+    threads := 4
 
     #tag "--no-color"
-    no_color := false;
+    no_color := false
 
     #tag "--tests"
-    test_folder := "./tests";
+    test_folder := "./tests"
 
     #tag "--compile-only"
-    compile_only := false;
+    compile_only := false
 }
 
 main :: (args) => {
-    arg_parse.arg_parse(args, &settings);
-    printf("Using {p*}\n", &settings);
+    arg_parse.arg_parse(args, &settings)
+    printf("Using {p*}\n", &settings)
 
     Execution_Context :: struct {
         // The executable to use when compiling
-        onyx_cmd: str;
-        at_least_one_test_failed := false;
+        onyx_cmd: str
+        at_least_one_test_failed := false
         compile_only := false;   // @Bug // why is this necessary? why is settings.compile_only false when in the thread code?
 
-        failed_tests: &[..] str;
-        failed_tests_mutex: sync.Mutex;
+        failed_tests: &[..] str
+        failed_tests_mutex: sync.Mutex
     }
-    exec_context := Execution_Context.{};
-    exec_context.compile_only = settings.compile_only;
+    exec_context := Execution_Context.{}
+    exec_context.compile_only = settings.compile_only
 
-    failed_tests := make([..] str);
-    exec_context.failed_tests = &failed_tests;
-    sync.mutex_init(&exec_context.failed_tests_mutex);
+    failed_tests := make([..] str)
+    exec_context.failed_tests = &failed_tests
+    sync.mutex_init(&exec_context.failed_tests_mutex)
 
     switch runtime.compiler_os {
         case .Linux, .MacOS {
-            exec_context.onyx_cmd = "./dist/bin/onyx";
-            if settings.debug do exec_context.onyx_cmd = "./bin/onyx-debug";
+            exec_context.onyx_cmd = "./dist/bin/onyx"
+            if settings.debug do exec_context.onyx_cmd = "./bin/onyx-debug"
         }
-        case .Windows do exec_context.onyx_cmd = "onyx.exe";
+        case .Windows do exec_context.onyx_cmd = "onyx.exe"
     }
 
-    cases := array.make(Test_Case, capacity=256);
-    find_onyx_files(settings.test_folder, &cases);
+    cases := Array.make(Test_Case, capacity=256)
+    find_onyx_files(settings.test_folder, &cases)
 
     iter.parallel_for(cases, settings.threads, &exec_context) {
         // Weird macros mean I have to forward external names
         use core {*}
-        print_color :: print_color;
+        print_color :: print_color
 
         cmd := os.command()
-            ->path(thread_data.onyx_cmd);
+            ->path(thread_data.onyx_cmd)
 
         if thread_data.compile_only {
-            printf("[{}]  Compiling test {}...\n", context.thread_id, it.source_file);
-            cmd->args(.["build", it.source_file]);
+            printf("[{}]  Compiling test {}...\n", context.thread_id, it.source_file)
+            cmd->args(.["build", it.source_file])
         } else {
-            printf("[{}]  Running test {}...\n", context.thread_id, it.source_file);
-            cmd->args(.["run", "--generate-method-info", it.source_file]);
+            printf("[{}]  Running test {}...\n", context.thread_id, it.source_file)
+            cmd->args(.["run", "--generate-method-info", it.source_file])
         }
 
-        output := cmd->output();
+        output := cmd->output()
         switch output {
             case .Err as exit {
                 // Error running the test case
-                print_color(.Red, "[{}]  Error '{}' in test case {}.\n{}", context.thread_id, exit.result, it.source_file, exit.output);
-                thread_data.at_least_one_test_failed = true;
+                print_color(.Red, "[{}]  Error '{}' in test case {}.\n{}", context.thread_id, exit.result, it.source_file, exit.output)
+                thread_data.at_least_one_test_failed = true
 
                 sync.critical_section(&thread_data.failed_tests_mutex) {
-                    array.push(thread_data.failed_tests, it.source_file);
+                    Array.push(thread_data.failed_tests, it.source_file)
                 }
 
-                continue;
+                continue
             }
 
             case .Ok ---
         }
 
-        if thread_data.compile_only do continue;
+        if thread_data.compile_only do continue
 
-        program_output := output.Ok->unwrap();
+        program_output := output.Ok->unwrap()
 
-        use expected_file := os.open(it.expected_file)->unwrap();
-        use expected_reader := io.reader_make(&expected_file);
-        expected_output := io.read_all(&expected_reader);
+        use expected_file := os.open(it.expected_file)->unwrap()
+        use expected_reader := io.reader_make(&expected_file)
+        expected_output := io.read_all(&expected_reader)
 
         if program_output != expected_output {
-            print_color(.Red, "[{}]  Output did not match for {}.\n", context.thread_id, it.source_file);
-            printf("Expected:\n{}\n", expected_output);
-            printf("Got:\n{}\n", program_output);
-            thread_data.at_least_one_test_failed = true;
+            print_color(.Red, "[{}]  Output did not match for {}.\n", context.thread_id, it.source_file)
+            printf("Expected:\n{}\n", expected_output)
+            printf("Got:\n{}\n", program_output)
+            thread_data.at_least_one_test_failed = true
 
             sync.critical_section(&thread_data.failed_tests_mutex) {
-                array.push(thread_data.failed_tests, it.source_file);
+                Array.push(thread_data.failed_tests, it.source_file)
             }
         }
     }
 
     if exec_context.at_least_one_test_failed {
-        print_color(.Red, "FAILED\n");
+        print_color(.Red, "FAILED\n")
 
         for failed_tests {
-            printf("  {}\n", it);
+            printf("  {}\n", it)
         }
 
-        os.exit(-1);
+        os.exit(-1)
 
     } else {
-        print_color(.Green, "SUCCESS\n");
+        print_color(.Green, "SUCCESS\n")
     }
 }

@@ -18,62 +18,62 @@ package core.sync
 /// outside of the browser.
 Condition_Variable :: struct {
     Node :: struct {
-        semaphore : Semaphore;
-        next      : &Node;
+        semaphore : Semaphore
+        next      : &Node
     }
 
-    mutex: Mutex;
-    queue: &Node;
+    mutex: Mutex
+    queue: &Node
 }
 
 /// Initializes a new condition variable.
 condition_init :: (c: &Condition_Variable) {
-    mutex_init(&c.mutex);
-    c.queue = null;
+    mutex_init(&c.mutex)
+    c.queue = null
 }
 
 /// Destroys a condition variable.
 condition_destroy :: (c: &Condition_Variable) {
-    if c.queue != null do condition_broadcast(c);
+    if c.queue != null do condition_broadcast(c)
 
-    mutex_destroy(&c.mutex);
+    mutex_destroy(&c.mutex)
 }
 
 /// Enters the thread in the wait-queue of the condition variable.
 /// If `m` is not null, the mutex will first be released before
 /// entering the queue, and then relocked before returning.
 condition_wait :: (c: &Condition_Variable, m: &Mutex) {
-    node: Condition_Variable.Node;
+    node: Condition_Variable.Node
 
-    mutex_lock(&c.mutex);
-    node.next = c.queue;
-    c.queue   = &node;
-    semaphore_init(&node.semaphore, 0);
-    mutex_unlock(&c.mutex);
+    mutex_lock(&c.mutex)
+    node.next = c.queue
+    c.queue   = &node
+    semaphore_init(&node.semaphore, 0)
+    mutex_unlock(&c.mutex)
 
-    if m != null do mutex_unlock(m);
-    semaphore_wait(&node.semaphore);
-    if m != null do mutex_lock(m);
+    if m != null do mutex_unlock(m)
+    semaphore_wait(&node.semaphore)
+    if m != null do mutex_lock(m)
 }
 
 
 /// Wakes up one thread from the wait-queue.
 condition_signal :: (c: &Condition_Variable) {
-    scoped_mutex(&c.mutex);
+    scoped_mutex(&c.mutex)
 
     if c.queue != null {
-        semaphore_post(&c.queue.semaphore);
-        c.queue = c.queue.next;
+        semaphore_post(&c.queue.semaphore)
+        c.queue = c.queue.next
     }
 }
 
 
 /// Wakes up all threads from the wait-queue.
 condition_broadcast :: (c: &Condition_Variable) {
-    scoped_mutex(&c.mutex);
+    scoped_mutex(&c.mutex)
 
     while c.queue != null {
-        semaphore_post(&c.queue.semaphore);
-        c.queue = c.queue.next;
+        semaphore_post(&c.queue.semaphore)
+        c.queue = c.queue.next
     }
 }

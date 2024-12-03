@@ -3,71 +3,71 @@ package core.time
 use core {package, *}
 
 Date :: struct {
-    year: i32;
+    year: i32
 
     // Note that `month` is 0-based.
-    month, day: i32;
+    month, day: i32
 }
 
 #local
-_month_durations := u32.[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+_month_durations := u32.[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 Date.month_duration_in_days :: (year: i32, month: i32) => {
-    d := _month_durations[month];
+    d := _month_durations[month]
 
     // February leap year case
     if month == 1 {
         if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) {
-            d += 1;
+            d += 1
         }
     }
 
-    return d;
+    return d
 }
 
 
 Date.make :: (year, month, day: i32) -> Date {
-    return .{ year, month - 1, day };
+    return .{ year, month - 1, day }
 }
 
 Date.today :: () -> Date {
-    return now()->as_date();
+    return now()->as_date()
 }
 
 Date.add_months :: (d: Date, months: i32) -> Date {
-    nd := d;
+    nd := d
 
-    nd.month += months;
+    nd.month += months
     while nd.month >= 12 {
-        nd.month -= 12;
-        nd.year += 1;
+        nd.month -= 12
+        nd.year += 1
     }
 
     while nd.month < 0 {
-        nd.month += 12;
-        nd.year -= 1;
+        nd.month += 12
+        nd.year -= 1
     }
 
-    return nd;
+    return nd
 }
 
 Date.add_days :: (d: Date, days: i32) -> Date {
-    nd := d;
-    nd.day += days;
+    nd := d
+    nd.day += days
 
     if days >= 0 {
         while true {
-            duration := Date.month_duration_in_days(nd.year, nd.month);
+            duration := Date.month_duration_in_days(nd.year, nd.month)
             if nd.day <= duration {
-                break;
+                break
             }
 
-            nd.day -= duration;
-            nd.month += 1;
+            nd.day -= duration
+            nd.month += 1
 
             if nd.month >= 12 {
-                nd.month = 0;
-                nd.year += 1;
+                nd.month = 0
+                nd.year += 1
             }
         }
     } else {
@@ -83,33 +83,33 @@ Date.add_days :: (d: Date, days: i32) -> Date {
         }
     }
 
-    return nd;
+    return nd
 }
 
 Date.day_of_week :: (d: Date) -> i32 {
-    if d.year < 1700 do return -1;
+    if d.year < 1700 do return -1
 
     #persist month_key := i32.[
         0, 3, 3, 6, 1, 4, 6, 2, 5, 0, 3, 5
-    ];
+    ]
 
     #persist century_key := i32.[
         4, 2, 0, 6, 4, 2, 0
-    ];
+    ]
 
-    dig := d.year % 100;
-    dig += dig / 4;
-    dig += month_key[d.month];
-    dig += century_key[(d.year / 100) - 17];
-    dig += d.day;
+    dig := d.year % 100
+    dig += dig / 4
+    dig += month_key[d.month]
+    dig += century_key[(d.year / 100) - 17]
+    dig += d.day
 
     if d.year % 4 == 0 && (d.year % 100 != 0 || d.year % 400 == 0) {
         if d.month == 0 || d.month == 1 {
-            dig -= 1;
+            dig -= 1
         }
     }
 
-    return dig % 7;
+    return dig % 7
 }
 
 Date.start_of_month :: (d: Date) -> Date {
@@ -117,7 +117,7 @@ Date.start_of_month :: (d: Date) -> Date {
         year = d.year,
         month = d.month,
         day = 1,
-    };
+    }
 }
 
 Date.end_of_month :: (d: Date) -> Date {
@@ -125,45 +125,45 @@ Date.end_of_month :: (d: Date) -> Date {
         year = d.year,
         month = d.month,
         day = Date.month_duration_in_days(d.year, d.month),
-    };
+    }
 }
 
 Date.is_before :: (d1, d2: Date) -> bool {
-    if d1.year  != d2.year  do return d1.year  < d2.year;
-    if d1.month != d2.month do return d1.month < d2.month;
-    return d1.day < d2.day;
+    if d1.year  != d2.year  do return d1.year  < d2.year
+    if d1.month != d2.month do return d1.month < d2.month
+    return d1.day < d2.day
 }
 
 Date.is_after :: (d1, d2: Date) -> bool {
-    if d1.year  != d2.year  do return d1.year  > d2.year;
-    if d1.month != d2.month do return d1.month > d2.month;
-    return d1.day > d2.day;
+    if d1.year  != d2.year  do return d1.year  > d2.year
+    if d1.month != d2.month do return d1.month > d2.month
+    return d1.day > d2.day
 }
 
 @conv.Custom_Format_Proc.{ Date }
 (output: &conv.Format_Output, format: &conv.Format, date: &Date) {
-    conv.format(output, "{}-{w2}-{w2}", date.year, date.month + 1, date.day);
+    conv.format(output, "{}-{w2}-{w2}", date.year, date.month + 1, date.day)
 }
 
 @conv.Custom_Parse_Proc.{ Date }
 (d: &Date, text: str, _: Allocator) -> bool {
-    year,  t  := string.bisect(text, '-');
-    month, t~ := string.bisect(t,    '-');
-    day,   t~ := string.bisect(t,    '-');
+    year,  t  := str.bisect(text, '-')
+    month, t~ := str.bisect(t,    '-')
+    day,   t~ := str.bisect(t,    '-')
 
-    d.year  = ~~  conv.str_to_i64(year);
-    d.month = ~~ (conv.str_to_i64(month) - 1);
-    d.day   = ~~  conv.str_to_i64(day);
+    d.year  = ~~  conv.str_to_i64(year)
+    d.month = ~~ (conv.str_to_i64(month) - 1)
+    d.day   = ~~  conv.str_to_i64(day)
 
-    return true;
+    return true
 }
 
 
-#operator  + macro (d: Date, days: i32) => d->add_days(days);
-#operator  - macro (d: Date, days: i32) => d->add_days(-days);
+#operator  + macro (d: Date, days: i32) => d->add_days(days)
+#operator  - macro (d: Date, days: i32) => d->add_days(-days)
 
 #operator == (d1, d2: Date) =>
     d1.year == d2.year &&
     d1.month == d2.month &&
-    d1.day == d2.day;
+    d1.day == d2.day
 

@@ -1,8 +1,6 @@
 package core.encoding.utf8
 #allow_stale_code
 
-use core.string
-use core.array
 use core.iter
 
 rune :: i32
@@ -10,164 +8,164 @@ rune :: i32
 Max_Chars :: 4
 
 append_rune :: (s: &dyn_str, r: rune) -> str {
-    buffer: [Max_Chars] u8;
-    string.append(s, encode_rune(buffer, r));
-    return *s;
+    buffer: [Max_Chars] u8
+    dyn_str.append(s, encode_rune(buffer, r))
+    return *s
 }
 
 advance_rune :: #match #local {}
 
 #overload
 advance_rune :: (s: str, n := 1) -> str {
-    t := s;
+    t := s
     for n {
-        t = string.advance(t, rune_length_from_first_byte(t[0]));
+        t = str.advance(t, rune_length_from_first_byte(t[0]))
     }
-    return t;
+    return t
 }
 
 #overload
 advance_rune :: (s: &str, n := 1) {
     for n {
-        string.advance(s, rune_length_from_first_byte(s.data[0]));
+        str.advance(s, rune_length_from_first_byte(s.data[0]))
     }
 }
 
 next_rune :: (s: str) -> str {
-    return s.data[0 .. rune_length_from_first_byte(s[0])];
+    return s.data[0 .. rune_length_from_first_byte(s[0])]
 }
 
 decode_rune :: (s: str) -> (rune, i32) {
-    len := rune_length_from_first_byte(s[0]);
-    if len == 1 do return (cast(rune) s[0]), 1;
+    len := rune_length_from_first_byte(s[0])
+    if len == 1 do return (cast(rune) s[0]), 1
 
-    mask := 0xFF >> (1 + len);
-    r: rune = ((cast(rune) s[0]) & mask);
+    mask := 0xFF >> (1 + len)
+    r: rune = ((cast(rune) s[0]) & mask)
 
     for len - 1 {
-        r = r << 6;
-        r = r | ~~(s[it + 1] & 0x3F);
+        r = r << 6
+        r = r | ~~(s[it + 1] & 0x3F)
     }
 
-    return r, len;
+    return r, len
 }
 
 decode_last_rune :: (s: str) -> (rune, i32) {
-    i := s.length - 1;
+    i := s.length - 1
     while i >= 0 && (s[i] & 0xC0 == 0x80) {
-        i -= 1;
+        i -= 1
     }
 
-    return decode_rune(s[i..s.length]);
+    return decode_rune(s[i..s.length])
 }
 
 encode_rune :: (buffer: [] u8, r: rune) -> str {
     if r <= 0x7F {
-        buffer[0] = ~~ r;
-        return buffer[0 .. 1];
+        buffer[0] = ~~ r
+        return buffer[0 .. 1]
     }
 
     if r <= 0x7FF {
-        buffer[0] = ~~(0xC0 | ((r >> 6) & 0x1F));
-        buffer[1] = ~~(0x80 | (r & 0x3F));
-        return buffer[0 .. 2];
+        buffer[0] = ~~(0xC0 | ((r >> 6) & 0x1F))
+        buffer[1] = ~~(0x80 | (r & 0x3F))
+        return buffer[0 .. 2]
     }
 
     if r >= 0xD800 && r <= 0xDFFF {
-        return buffer[0 .. 0];
+        return buffer[0 .. 0]
     }
 
     if r <= 0xFFFF {
-        buffer[0] = ~~(0xE0 | ((r >> 12) & 0x0F));
-        buffer[1] = ~~(0x80 | ((r >> 6) & 0x3F));
-        buffer[2] = ~~(0x80 | (r & 0x3F));
-        return buffer[0 .. 3];
+        buffer[0] = ~~(0xE0 | ((r >> 12) & 0x0F))
+        buffer[1] = ~~(0x80 | ((r >> 6) & 0x3F))
+        buffer[2] = ~~(0x80 | (r & 0x3F))
+        return buffer[0 .. 3]
     }
 
     if r <= 0x10FFFF {
-        buffer[0] = ~~(0xF0 | ((r >> 18) & 0x07));
-        buffer[1] = ~~(0x80 | ((r >> 12) & 0x3F));
-        buffer[2] = ~~(0x80 | ((r >> 6) & 0x3F));
-        buffer[3] = ~~(0x80 | (r & 0x3F));
-        return buffer[0 .. 4];
+        buffer[0] = ~~(0xF0 | ((r >> 18) & 0x07))
+        buffer[1] = ~~(0x80 | ((r >> 12) & 0x3F))
+        buffer[2] = ~~(0x80 | ((r >> 6) & 0x3F))
+        buffer[3] = ~~(0x80 | (r & 0x3F))
+        return buffer[0 .. 4]
     }
 
-    return buffer[0 .. 0];
+    return buffer[0 .. 0]
 }
 
 full_rune :: (buffer: [] u8) -> bool {
-    len := rune_length_from_first_byte(buffer[0]);
+    len := rune_length_from_first_byte(buffer[0])
 
     // If there are not enough bytes, then this cannot
     // be a valid rune.
-    if buffer.length < len do return false;
+    if buffer.length < len do return false
 
-    return array.every(buffer[1 .. buffer.length], [c](c & 0xC0 == 0x80));
+    return Array.every(buffer[1 .. buffer.length], [c](c & 0xC0 == 0x80))
 }
 
 rune_count :: (s: str) -> i32 {
-    w := s;
-    count := 0;
-    while !string.empty(w) {
-        advance_rune(&w);
-        count += 1;
+    w := s
+    count := 0
+    while !str.empty(w) {
+        advance_rune(&w)
+        count += 1
     }
 
-    return count;
+    return count
 }
 
 rune_length :: (r: rune) -> i32 {
-    if r <= 0x7f     do return 1;
-    if r <= 0x7ff    do return 2;
-    if r <= 0xffff   do return 3;
-    if r <= 0x10ffff do return 4;
+    if r <= 0x7f     do return 1
+    if r <= 0x7ff    do return 2
+    if r <= 0xffff   do return 3
+    if r <= 0x10ffff do return 4
 
-    return -1;
+    return -1
 }
 
 rune_length_from_first_byte :: (b: u8) -> i32 {
-    if b & 0x80 == 0x00 do return 1;
-    if b & 0xE0 == 0xC0 do return 2;
-    if b & 0xF0 == 0xE0 do return 3;
-    if b & 0xF8 == 0xF0 do return 4;
-    return -1;
+    if b & 0x80 == 0x00 do return 1
+    if b & 0xE0 == 0xC0 do return 2
+    if b & 0xF0 == 0xE0 do return 3
+    if b & 0xF8 == 0xF0 do return 4
+    return -1
 }
 
 rune_is_start :: (b: u8) -> bool {
-    return rune_length_from_first_byte(b) > 1;
+    return rune_length_from_first_byte(b) > 1
 }
 
 
 RuneIterValue :: struct {
-    rune: i32;
-    bytes: [] u8;
+    rune: i32
+    bytes: [] u8
 }
 
 runes :: (s: str) -> Iterator(RuneIterValue) {
     return iter.generator(
         &.{ s = s },
         (ctx: $C) -> ? RuneIterValue {
-            if string.empty(ctx.s) do return .None;
+            if str.empty(ctx.s) do return .None
 
-            r, len := decode_rune(ctx.s);
-            defer string.advance(&ctx.s, len);
+            r, len := decode_rune(ctx.s)
+            defer str.advance(&ctx.s, len)
 
-            return RuneIterValue.{ r, ctx.s[0..len] };
+            return RuneIterValue.{ r, ctx.s[0..len] }
         }            
-    );
+    )
 }
 
 
 slice :: (s: str, low, high: i32) -> str {
-    advanced := advance_rune(s, low);
-    tmp := advanced;
+    advanced := advance_rune(s, low)
+    tmp := advanced
 
-    bytes := 0;
+    bytes := 0
     for high - low {
-        _, b := decode_rune(tmp);
-        bytes += b;
-        string.advance(&tmp, b);
+        _, b := decode_rune(tmp)
+        bytes += b
+        str.advance(&tmp, b)
     }
 
-    return advanced.data[0 .. bytes];
+    return advanced.data[0 .. bytes]
 }

@@ -1,7 +1,7 @@
 package core.encoding.kdl
 #allow_stale_code
 
-use core {iter, alloc, array, string}
+use core {iter, alloc}
 
 Document.query     :: query_doc
 Document.query_all :: query_doc_all
@@ -18,59 +18,59 @@ query_all :: #match #local {
 }
 
 query_doc :: (d: &Document, query: str) -> ? &Node {
-    query_iter := query_doc_all(d, query);
-    node := iter.next(query_iter);
-    iter.close(query_iter);
+    query_iter := query_doc_all(d, query)
+    node := iter.next(query_iter)
+    iter.close(query_iter)
 
-    return node;
+    return node
 }
 
 query_doc_all :: (d: &Document, query: str) -> Iterator(&Node) {
-    arena := alloc.arena.make(context.allocator, 16 * 1024);
-    q     := parse_query(query, alloc.as_allocator(&arena));
+    arena := alloc.arena.make(context.allocator, 16 * 1024)
+    q     := parse_query(query, alloc.as_allocator(&arena))
 
-    ctx := QueryIterator.make(d, q, arena);
+    ctx := QueryIterator.make(d, q, arena)
 
     return iter.generator(
         &ctx,
         query_next,
         ctx => { alloc.arena.free(&ctx.arena); delete(&ctx.stack); }
-    );
+    )
 }
 
 query_node :: (n: &Node, query: str) -> ? &Node {
-    query_iter := query_node_all(n, query);
-    node := iter.next(query_iter);
-    iter.close(query_iter);
+    query_iter := query_node_all(n, query)
+    node := iter.next(query_iter)
+    iter.close(query_iter)
 
-    return node;
+    return node
 }
 
 query_node_all :: (n: &Node, query: str) -> Iterator(&Node) {
-    if n == null do return iter.empty(&Node);
+    if n == null do return iter.empty(&Node)
 
-    arena := alloc.arena.make(context.allocator, 16 * 1024);
-    q     := parse_query(query, alloc.as_allocator(&arena));
+    arena := alloc.arena.make(context.allocator, 16 * 1024)
+    q     := parse_query(query, alloc.as_allocator(&arena))
 
-    ctx := QueryIterator.make(null, q, arena);
-    ctx.stack << .{ n, 0 };
+    ctx := QueryIterator.make(null, q, arena)
+    ctx.stack << .{ n, 0 }
 
     return iter.generator(
         &ctx,
         query_next,
         ctx => { alloc.arena.free(&ctx.arena); delete(&ctx.stack); }
-    );
+    )
 }
 
 #local
 QueryIterator :: struct {
-    d: &Document;
-    q: Query;
-    stack: [..] QueryStack;
-    arena: alloc.arena.Arena;
+    d: &Document
+    q: Query
+    stack: [..] QueryStack
+    arena: alloc.arena.Arena
 
-    top_level_node := -1;
-    current_selector := 0;
+    top_level_node := -1
+    current_selector := 0
 }
 
 QueryIterator.make :: (
@@ -81,13 +81,13 @@ QueryIterator.make :: (
     return QueryIterator.{
         d = d, q = q, arena = arena,
         stack = make([..] QueryStack, 16)
-    };
+    }
 }
 
 #local
 QueryStack :: struct {
-    node: &Node;
-    current_child: i32;
+    node: &Node
+    current_child: i32
 }
 
 #local
@@ -96,174 +96,174 @@ query_next :: (ctx: &QueryIterator) -> ? &Node {
         if !ctx.stack {
             if ctx.d {
                 // If the stack is empty, populate with a node
-                ctx.top_level_node += 1;
-                if ctx.top_level_node >= ctx.d.nodes.length do break;
+                ctx.top_level_node += 1
+                if ctx.top_level_node >= ctx.d.nodes.length do break
 
-                ctx.stack << .{ ctx.d.nodes[ctx.top_level_node], 0 };
+                ctx.stack << .{ ctx.d.nodes[ctx.top_level_node], 0 }
             } else {
-                break;
+                break
             }
         }
 
-        last_query := array.get_ptr(ctx.stack, -1);
-        if !last_query do break;
+        last_query := Array.get_ptr(ctx.stack, -1)
+        if !last_query do break
 
         while last_query.current_child < last_query.node.children.length {
-            ctx.stack << .{ last_query.node.children[last_query.current_child], 0 };
-            last_query.current_child += 1;
-            last_query = array.get_ptr(ctx.stack, -1);
+            ctx.stack << .{ last_query.node.children[last_query.current_child], 0 }
+            last_query.current_child += 1
+            last_query = Array.get_ptr(ctx.stack, -1)
         }
 
-        defer array.pop(&ctx.stack);
+        defer Array.pop(&ctx.stack)
         for ctx.q.matches_any {
             if query_selector_matches(it, ctx.stack) {
-                return last_query.node;
+                return last_query.node
             }
         }
     }
 
-    return .None;
+    return .None
 }
 
 #local
 query_selector_matches :: (s: &Selector, trail: [] QueryStack) -> bool {
-    if !trail do return false;
+    if !trail do return false
 
-    node_index: i32 = trail.count - 1;
+    node_index: i32 = trail.count - 1
     if !query_matcher_matches(s.segments[0].matcher, trail[node_index].node) {
-        // logf(.Error, "NO MATCH BETWEEN '{*p}' and '{*p}'\n=======================", s.segments[0].matcher, trail[node_index].node);
-        return false;
+        // logf(.Error, "NO MATCH BETWEEN '{*p}' and '{*p}'\n=======================", s.segments[0].matcher, trail[node_index].node)
+        return false
     }
 
-    node_index -= 1;
+    node_index -= 1
     for segment in s.segments[1 .. s.segments.length] {
         switch segment.op->unwrap() {
             case .Child, .Descendant {
                 while node_index >= 0 {
                     if query_matcher_matches(segment.matcher, trail[node_index].node) {
                         // Continue from the outer for loop
-                        node_index -= 1;
-                        continue continue;
+                        node_index -= 1
+                        continue continue
                     }
 
                     if segment.op->unwrap() == .Child {
-                        break;
+                        break
                     }
 
-                    node_index -= 1;
+                    node_index -= 1
                 }
 
                 if segment->is_scope() {
-                    if node_index < 0 do return true;
+                    if node_index < 0 do return true
                 }
 
-                return false;
+                return false
             }
 
             case .Neighbor, .Sibling {
-                if node_index < 0 do return false;
+                if node_index < 0 do return false
 
-                parent_node := trail[node_index].node;
+                parent_node := trail[node_index].node
 
-                walker_index: i32 = trail[node_index].current_child - 1;
-                if walker_index <= 0 do return false;
+                walker_index: i32 = trail[node_index].current_child - 1
+                if walker_index <= 0 do return false
 
-                walker_index -= 1;
+                walker_index -= 1
                 while walker_index >= 0 {
-                    defer walker_index -= 1;
+                    defer walker_index -= 1
 
                     if query_matcher_matches(segment.matcher, parent_node.children[walker_index]) {
                         // Continue from the outer for loop
-                        continue continue;
+                        continue continue
                     }
 
                     if segment.op->unwrap() == .Neighbor {
-                        break;
+                        break
                     }
                 }
 
-                return false;
+                return false
             }
         }
     }
 
-    return true;
+    return true
 }
 
 #local
 query_matcher_matches :: (s: &Matcher, node: &Node) =>
     iter.as_iter(s.details)
     |> iter.every((d) use (node) => {
-        if d.accessor.Scope do return false;
+        if d.accessor.Scope do return false
 
         if d.accessor.Node {
-            name := node.node;
+            name := node.node
             if !d.value && d.op == .Equal {
-                return true;
+                return true
             }
 
             return operate_on_values(
                 .{ data = .{ String = name } },
                 d.value?,
                 d.op
-            );
+            )
         }
 
         d.accessor.Prop->with([prop] {
             if !d.value {
-                return node.props->has(prop);
+                return node.props->has(prop)
             }
 
-            return operate_on_values(node.props->get(prop)?, d.value?, d.op);
-        });
+            return operate_on_values(node.props->get(prop)?, d.value?, d.op)
+        })
 
         d.accessor.Arg->with([index] {
             if !d.value {
-                return index < node.values.length;
+                return index < node.values.length
             }
 
-            if index >= node.values.length do return false;
+            if index >= node.values.length do return false
 
-            return operate_on_values(node.values[index], d.value?, d.op);
-        });
+            return operate_on_values(node.values[index], d.value?, d.op)
+        })
 
-        return false;
+        return false
     })
 
 #local
 operate_on_values :: (v1, v2: Value, op: AttributeOp) -> bool {
-    v1_ := v1;
-    v2_ := v2;
-    left := v1_->as_str()?;
-    right := v2_->as_str()?;
+    v1_ := v1
+    v2_ := v2
+    left := v1_->as_str()?
+    right := v2_->as_str()?
 
     return switch op {
-        case .Equal    => left == right;
-        case .NotEqual => left != right;
+        case .Equal    => left == right
+        case .NotEqual => left != right
 
-        case .StartsWith => string.starts_with(left, right);
-        case .EndsWith   => string.ends_with(left, right);
-        case .Contains   => string.contains(left, right);
+        case .StartsWith => str.starts_with(left, right)
+        case .EndsWith   => str.ends_with(left, right)
+        case .Contains   => str.contains(left, right)
 
-        case _ => false;
-    };
+        case _ => false
+    }
 }
 
 
 #local
 Query :: struct {
-    matches_any: [..] &Selector;
+    matches_any: [..] &Selector
 }
 
 #local
 Selector :: struct {
-    segments: [..] &SelectorSegment;
+    segments: [..] &SelectorSegment
 }
 
 #local
 SelectorSegment :: struct {
-    op: ? SelectorOp;
-    matcher: &Matcher;
+    op: ? SelectorOp
+    matcher: &Matcher
 
     is_scope :: (s: &SelectorSegment) =>
         s.matcher.details.length == 1 &&
@@ -272,290 +272,290 @@ SelectorSegment :: struct {
 
 #local
 SelectorOp :: enum {
-    Child;
-    Descendant;
-    Neighbor;
-    Sibling;
+    Child
+    Descendant
+    Neighbor
+    Sibling
 }
 
 #local
 Matcher :: struct {
-    details: [..] MatcherDetails;
+    details: [..] MatcherDetails
 }
 
 #local
 MatcherDetails :: struct {
-    accessor: MatcherAccessor;
-    op: AttributeOp;
-    value: ? Value;
+    accessor: MatcherAccessor
+    op: AttributeOp
+    value: ? Value
 }
 
 #local
 MatcherAccessor :: union {
-    Scope: void;
-    Node: void;
-    Annotation: void;
-    Arg: u32;
-    Prop: str;
+    Scope: void
+    Node: void
+    Annotation: void
+    Arg: u32
+    Prop: str
 }
 
 #local
 AttributeOp :: enum {
-    Equal;
-    NotEqual;
-    Gt;
-    Gte;
-    Lt;
-    Lte;
-    StartsWith;
-    EndsWith;
-    Contains;
+    Equal
+    NotEqual
+    Gt
+    Gte
+    Lt
+    Lte
+    StartsWith
+    EndsWith
+    Contains
 }
 
 
 #local
 QueryParser :: struct {
-    query: str;
-    cursor: u32;
+    query: str
+    cursor: u32
 
-    al: Allocator;
+    al: Allocator
 }
 
 #local
 parse_query :: (q: str, al: Allocator) -> Query {
-    query: Query;
-    query.matches_any = make(typeof query.matches_any, al);
+    query: Query
+    query.matches_any = make(typeof query.matches_any, al)
 
-    parser: QueryParser;
-    parser.query = q;
-    parser.al = al;
+    parser: QueryParser
+    parser.query = q
+    parser.al = al
 
     while !reached_end(&parser) {
-        query.matches_any << parse_selector(&parser);
+        query.matches_any << parse_selector(&parser)
 
-        skip_whitespace(&parser);
-        if string.starts_with(parser->rem(), "||") {
-            parser.cursor += 2;
-            skip_whitespace(&parser);
+        skip_whitespace(&parser)
+        if str.starts_with(parser->rem(), "||") {
+            parser.cursor += 2
+            skip_whitespace(&parser)
         }
     }
 
-    return query;
+    return query
 }
 
 #local
 parse_selector :: (p: &QueryParser) -> &Selector {
     s := p.al->move(Selector.{
         segments = make([..] &SelectorSegment, p.al)
-    });
+    })
 
     while !reached_end(p) {
-        skip_whitespace(p);
+        skip_whitespace(p)
 
         switch parse_matcher(p) {
             case .Some as matcher {
                 segment := p.al->move(SelectorSegment.{
                     matcher = matcher
-                });
+                })
 
-                s.segments << segment;
+                s.segments << segment
 
-                skip_whitespace(p);
+                skip_whitespace(p)
                 if reached_end(p) {
-                    break break;
+                    break break
                 }
 
                 segment.op = switch p.query[p.cursor] {
-                    case '>' => SelectorOp.Child;
-                    case '+' => .Neighbor;
-                    case '~' => .Sibling;
-                    case _ => .Descendant;
-                };
+                    case '>' => SelectorOp.Child
+                    case '+' => .Neighbor
+                    case '~' => .Sibling
+                    case _ => .Descendant
+                }
 
                 if segment.op->unwrap() != .Descendant {
-                    p.cursor += 1;
+                    p.cursor += 1
                 }
             }
 
-            case .None do break break;
+            case .None do break break
         }
 
-        skip_whitespace(p);
+        skip_whitespace(p)
 
-        if string.starts_with(p->rem(), "||") {
-            break;
+        if str.starts_with(p->rem(), "||") {
+            break
         }
     }
 
     // Reverse the segments here so it is easier to process with later.
-    array.reverse(s.segments);
+    Array.reverse(s.segments)
 
-    return s;
+    return s
 }
 
 #local
 parse_matcher :: (p: &QueryParser) -> ? &Matcher {
-    if reached_end(p) do return .{};
+    if reached_end(p) do return .{}
 
     m := p.al->move(Matcher.{
         details = make([..] MatcherDetails, p.al)
-    });
+    })
 
     if p.query[p.cursor] != '[' {
-        if string.starts_with(p->rem(), "top()") {
-            p.cursor += 5;
+        if str.starts_with(p->rem(), "top()") {
+            p.cursor += 5
             m.details << .{
                 accessor = .{ Scope = .{} },
                 op = .Equal,
                 value = .None,
-            };
+            }
 
         } else {
-            id := parse_identifier(p);
+            id := parse_identifier(p)
 
             m.details << .{
                 accessor = .{ Node = .{} },
                 op = .Equal,
                 value = .{ Some = .{ data = .{ String = id } } }
-            };
+            }
         }
     }
 
     while p.query[p.cursor] == '[' {
-        p.cursor += 1;
+        p.cursor += 1
         
         if p.query[p.cursor] == ']' {
-            p.cursor += 1;
+            p.cursor += 1
 
             m.details << .{
                 accessor = .{ Node = .{} },
                 op = .Equal,
                 value = .None,
-            };
-            continue;
+            }
+            continue
         }
 
-        accessor: MatcherAccessor;
+        accessor: MatcherAccessor
 
-        if string.starts_with(p->rem(), "val(") {
+        if str.starts_with(p->rem(), "val(") {
             p.cursor += 4; // "("
-            if string.starts_with(p->rem(), ")") {
-                p.cursor += 1;
-                accessor = .{ Arg = 0 };
+            if str.starts_with(p->rem(), ")") {
+                p.cursor += 1
+                accessor = .{ Arg = 0 }
 
             } else {
-                index := parse_number(p);
-                accessor = .{ Arg = index };
+                index := parse_number(p)
+                accessor = .{ Arg = index }
 
-                if string.starts_with(p->rem(), ")") {
-                    p.cursor += 1;
+                if str.starts_with(p->rem(), ")") {
+                    p.cursor += 1
                 }
             }
         }
 
-        elseif string.starts_with(p->rem(), "prop(") {
+        elseif str.starts_with(p->rem(), "prop(") {
             p.cursor += 5; // "prop("
-            prop_id := parse_identifier(p);
-            accessor = .{ Prop = prop_id };
+            prop_id := parse_identifier(p)
+            accessor = .{ Prop = prop_id }
 
-            if string.starts_with(p->rem(), ")") {
-                p.cursor += 1;
+            if str.starts_with(p->rem(), ")") {
+                p.cursor += 1
             }
         }
 
         else {
-            prop_id := parse_identifier(p);
-            accessor = .{ Prop = prop_id };
+            prop_id := parse_identifier(p)
+            accessor = .{ Prop = prop_id }
         }
 
-        skip_whitespace(p);
+        skip_whitespace(p)
 
-        op := AttributeOp.Equal;
-        value: ? Value;
+        op := AttributeOp.Equal
+        value: ? Value
 
         if p.query[p.cursor] != ']' {
-            rem := p->rem();
-            if     string.starts_with(rem, "=")  { op = .Equal; p.cursor += 1; }
-            elseif string.starts_with(rem, "!=") { op = .NotEqual; p.cursor += 2; }
-            elseif string.starts_with(rem, "<=") { op = .Lte; p.cursor += 2; }
-            elseif string.starts_with(rem, ">=") { op = .Gte; p.cursor += 2; }
-            elseif string.starts_with(rem, "<")  { op = .Lt; p.cursor += 1; }
-            elseif string.starts_with(rem, ">")  { op = .Gt; p.cursor += 1; }
-            elseif string.starts_with(rem, "^=") { op = .StartsWith; p.cursor += 2; }
-            elseif string.starts_with(rem, "$=") { op = .EndsWith; p.cursor += 2; }
-            elseif string.starts_with(rem, "*=") { op = .Contains; p.cursor += 2; }
+            rem := p->rem()
+            if     str.starts_with(rem, "=")  { op = .Equal; p.cursor += 1; }
+            elseif str.starts_with(rem, "!=") { op = .NotEqual; p.cursor += 2; }
+            elseif str.starts_with(rem, "<=") { op = .Lte; p.cursor += 2; }
+            elseif str.starts_with(rem, ">=") { op = .Gte; p.cursor += 2; }
+            elseif str.starts_with(rem, "<")  { op = .Lt; p.cursor += 1; }
+            elseif str.starts_with(rem, ">")  { op = .Gt; p.cursor += 1; }
+            elseif str.starts_with(rem, "^=") { op = .StartsWith; p.cursor += 2; }
+            elseif str.starts_with(rem, "$=") { op = .EndsWith; p.cursor += 2; }
+            elseif str.starts_with(rem, "*=") { op = .Contains; p.cursor += 2; }
 
-            skip_whitespace(p);
+            skip_whitespace(p)
 
             // TODO Make any value work!
-            v := Value.{ data = .{ String = "" } };
-            if string.starts_with(p->rem(), "\"") {
-                p.cursor += 1;
+            v := Value.{ data = .{ String = "" } }
+            if str.starts_with(p->rem(), "\"") {
+                p.cursor += 1
                 v.data = .{
                     String = read_until(p, '"')
-                };
-                p.cursor += 1;
+                }
+                p.cursor += 1
             }
 
-            value = v;
+            value = v
         }
 
         m.details << .{
             accessor,
             op,
             value
-        };
+        }
 
-        read_until(p, ']');
+        read_until(p, ']')
         if p.query[p.cursor] == ']' {
-            p.cursor += 1;
+            p.cursor += 1
         }
     }
 
-    return m;
+    return m
 }
 
 #local
 skip_whitespace :: (p: &QueryParser) {
     while p.query[p.cursor]->is_whitespace() {
-        p.cursor += 1;
-        if reached_end(p) do break;
+        p.cursor += 1
+        if reached_end(p) do break
     }
 }
 
 #local
-reached_end :: macro (p: &QueryParser) => p.cursor >= p.query.length;
+reached_end :: macro (p: &QueryParser) => p.cursor >= p.query.length
 
-QueryParser.rem :: (p: &QueryParser) => p.query[p.cursor .. p.query.length];
+QueryParser.rem :: (p: &QueryParser) => p.query[p.cursor .. p.query.length]
 
 #local
 parse_identifier :: (p: &QueryParser) -> str {
-    c := p.cursor;
+    c := p.cursor
     while !is_end_of_word(~~p.query[p.cursor]) && is_id(~~p.query[p.cursor]) && !reached_end(p) {
-        p.cursor += 1;
+        p.cursor += 1
     }
 
-    return p.query[c .. p.cursor];
+    return p.query[c .. p.cursor]
 }
 
 #local
 parse_number :: (p: &QueryParser) -> u32 {
-    v := 0;
+    v := 0
     while p.query[p.cursor]->is_num() && !reached_end(p) {
-        v *= 10;
-        v += cast(u32) (p.query[p.cursor] - '0');
-        p.cursor += 1;
+        v *= 10
+        v += cast(u32) (p.query[p.cursor] - '0')
+        p.cursor += 1
     }
 
-    return v;
+    return v
 }
 
 #local
 read_until :: (p: &QueryParser, c: u8) -> str {
-    start := p.cursor;
+    start := p.cursor
     while p.query[p.cursor] != c && !reached_end(p) {
-        p.cursor += 1;
+        p.cursor += 1
     }
 
-    return p.query[start .. p.cursor];
+    return p.query[start .. p.cursor]
 }

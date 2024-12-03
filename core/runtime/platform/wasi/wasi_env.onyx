@@ -1,56 +1,56 @@
 package runtime.platform
 
 use wasi { environ_get, environ_sizes_get, Size }
-use core {Pair, string, slice}
+use core {Pair}
 
 #local {
-    all_env: [] Pair(str, str);
+    all_env: [] Pair(str, str)
 }
 
 #local
 __lookup_all_envs :: () {
-    if all_env do return;
+    if all_env do return
 
-    allocator := context.allocator;
+    allocator := context.allocator
 
-    env_count, env_buf_size : Size;
-    environ_sizes_get(&env_count, &env_buf_size);
+    env_count, env_buf_size : Size
+    environ_sizes_get(&env_count, &env_buf_size)
 
-    env_var := make([] cstr, env_count, allocator);
-    env_buf := make([] u8, env_buf_size, allocator);
+    env_var := make([] cstr, env_count, allocator)
+    env_buf := make([] u8, env_buf_size, allocator)
 
-    environ_get(env_var.data, env_buf.data);
+    environ_get(env_var.data, env_buf.data)
 
     // Fix pointers to be only 4 bytes wide
     while i := cast(i32) (env_var.count - 1); i >= 0 {
-        defer i -= 1;
-        env_var[i] = cast(cstr) (cast([&]u32) env_var.data)[i];
+        defer i -= 1
+        env_var[i] = cast(cstr) (cast([&]u32) env_var.data)[i]
     }
 
-    result := make([..] Pair(str, str), env_count, allocator);
+    result := make([..] Pair(str, str), env_count, allocator)
     for env in env_var {
-        s := string.from_cstr(env);
-        var, val := string.bisect(s, '=');
-        result << .{var, val};
+        s := str.from_cstr(env)
+        var, val := str.bisect(s, '=')
+        result << .{var, val}
     }
 
-    delete(&env_var, allocator);
+    delete(&env_var, allocator)
 
-    all_env = result;
+    all_env = result
 }
 
 __get_all_env :: () -> [] Pair(str, str) {
-    __lookup_all_envs();
+    __lookup_all_envs()
 
-    return all_env;
+    return all_env
 }
 
 __get_env :: (key: str) -> ? str {
-    __lookup_all_envs();
+    __lookup_all_envs()
 
-    return slice.first(all_env, [v](v.first == key))
+    return Slice.first(all_env, [v](v.first == key))
         |> Optional.from_ptr()
-        |> Optional.transform(x => x.second);
+        |> Optional.transform(x => x.second)
 }
 
 

@@ -3,10 +3,10 @@
 use core {*}
 
 Test_VTable :: struct {
-    first  : (i32) -> i32;
-    second : (i32) -> i32;
+    first  : (i32) -> i32
+    second : (i32) -> i32
 
-    third  : (i32, i32) -> i32 = null_proc;
+    third  : (i32, i32) -> i32 = null_proc
 }
 
 test_vtable1 := Test_VTable.{
@@ -21,9 +21,9 @@ test_vtable2 := Test_VTable.{
 
 
 Test_Thing :: struct {
-    vt : &Test_VTable;
+    vt : &Test_VTable
 
-    data : i32;
+    data : i32
 }
 
 // because of the work i did above, this also works now.
@@ -31,26 +31,26 @@ dummy := () { println("hello world!"); }
 
 
 main :: (args: [] cstr) {
-    dummy();
+    dummy()
 
-    t := Test_Thing.{ &test_vtable1, 10 };
-    println(do_a_thing(&t));
+    t := Test_Thing.{ &test_vtable1, 10 }
+    println(do_a_thing(&t))
 
-    t.vt = &test_vtable2;
-    println(do_a_thing(&t));
+    t.vt = &test_vtable2
+    println(do_a_thing(&t))
 
-    tmp_vt := Test_VTable.{ first = test_vtable1.second, second = test_vtable2.first, third = math.max };
-    t.vt = &tmp_vt;
-    println(do_a_thing(&t));
+    tmp_vt := Test_VTable.{ first = test_vtable1.second, second = test_vtable2.first, third = math.max }
+    t.vt = &tmp_vt
+    println(do_a_thing(&t))
 
-    println(t.vt.first == test_vtable1.second);
+    println(t.vt.first == test_vtable1.second)
 
     do_a_thing :: (use t: &Test_Thing) -> i32 {
-        if vt.second == null_proc || vt.first == null_proc do return data;
+        if vt.second == null_proc || vt.first == null_proc do return data
 
-        res := data |> vt.second() |> vt.first();
-        if vt.third != null_proc do res = vt.third(res, 20);
+        res := data |> vt.second() |> vt.first()
+        if vt.third != null_proc do res = vt.third(res, 20)
 
-        return res;
+        return res
     }
 }

@@ -34,30 +34,30 @@ Supports_TTY :: true
 #library "onyx_runtime"
 
 #local {
-    __stdout: os.File;
-    __stderr: os.File;
-    __stdin:  os.File;
+    __stdout: os.File
+    __stderr: os.File
+    __stdin:  os.File
 }
 
 __output_string :: (s: str) -> u32 {
-    wrote := io.stream_write(&__stdout, s).Ok ?? 0;
-    return wrote;
+    wrote := io.stream_write(&__stdout, s).Ok ?? 0
+    return wrote
 }
 
 __output_error :: (s: str) -> u32 {
-    wrote := io.stream_write(&__stderr, s).Ok ?? 0;
-    return wrote;
+    wrote := io.stream_write(&__stderr, s).Ok ?? 0
+    return wrote
 }
 
 __read_from_input :: (buffer: [] u8) -> i32 {
     switch io.stream_read(&__stdin, buffer) {
         case .Err as err {
-            if err == .ReadPending do return 0;
-            return -1;
+            if err == .ReadPending do return 0
+            return -1
         }
 
         case .Ok as read {
-            return read;
+            return read
         }
     }
 }
@@ -65,10 +65,10 @@ __read_from_input :: (buffer: [] u8) -> i32 {
 __wait_for_input :: (timeout: i32) -> bool {
     switch io.stream_poll(&__stdin, .Read, timeout) {
         case .Err as err {
-            return false;
+            return false
         }
         case .Ok as ready{
-            return ready;
+            return ready
         }
     }
 }
@@ -128,42 +128,42 @@ __args :: (allocator: Allocator) -> [] cstr {
 }
 
 __start :: () {
-    fd: FileData;
-    __file_get_standard(1, &fd);
+    fd: FileData
+    __file_get_standard(1, &fd)
     __stdout = .{
         .{ &__file_stream_vtable },
         fd
-    };
+    }
     
-    __file_get_standard(2, &fd);
+    __file_get_standard(2, &fd)
     __stderr = .{
         .{ &__file_stream_vtable },
         fd
-    };
+    }
 
-    __file_get_standard(0, &fd);
+    __file_get_standard(0, &fd)
     __stdin = .{
         .{ &__file_stream_vtable, .Block_On_Read },
         fd
-    };
+    }
 
-    __runtime_initialize();
-    context.thread_id = 0;
+    __runtime_initialize()
+    context.thread_id = 0
 
     #if #defined(runtime.vars.MEMWATCH) {
         use core.alloc.memwatch
-        memwatch.enable_in_scope(context.allocator);
+        memwatch.enable_in_scope(context.allocator)
     }
 
     #if (typeof MAIN_FUNCTION) == #type () -> void { // An error on this line means no 'main.main' was found in your program.
-        MAIN_FUNCTION();
+        MAIN_FUNCTION()
 
     } else {
-        args := __args(context.allocator);
-        MAIN_FUNCTION(args);
+        args := __args(context.allocator)
+        MAIN_FUNCTION(args)
     }
 
-    __flush_stdio();
+    __flush_stdio()
 }
 
 #if Multi_Threading_Enabled {

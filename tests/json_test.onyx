@@ -9,62 +9,62 @@ main :: () {
         {
             "x": 2
         }
-    ]""");
-    defer delete(j);
+    ]""")
+    defer delete(j)
 
     arr: [] struct {
         @json.Custom_Key.{"x"}
         foo: i32
-    };
-    json.as_any(j.root, ^arr);
+    }
+    json.as_any(j.root, &arr)
 
-    core.println(arr);
+    core.println(arr)
 
-    json.encode(^core.stdio.print_writer, arr);
-    core.print("\n");
+    json.encode(&core.stdio.print_writer, arr)
+    core.print("\n")
 
-    core.println(j.root[0]["x"]->as_int());
+    core.println(j.root[0]["x"]->as_int())
 
-    ctx := json.from_any(^.{
+    ctx := json.from_any(&.{
         test = "Wow!",
         working = 123,
         data = .[1, 2, 3, 4, 5],
         people = .[ .{ name = "Joe" }, .{ "Bob" } ],
         other = j.root
-    });
-    json.encode(^core.stdio.print_writer, ctx);
+    })
+    json.encode(&core.stdio.print_writer, ctx)
 
-    core.print("\n");
+    core.print("\n")
 
-    o := json.empty_object();
-    defer json.free(o, context.allocator);
+    o := json.empty_object()
+    defer json.free(o, context.allocator)
 
-    json.set(o, "foo", json.from_any(^.{data=5}));
-    json.encode(^core.stdio.print_writer, o);
+    json.set(o, "foo", json.from_any(&.{data=5}))
+    json.encode(&core.stdio.print_writer, o)
 
-    v := json.decode_with_error("{ \"key1\": \"\\uD83C\\uDCA1\", \"key2\": \"\\u264C\" }");
-    core.print("\n");
-    core.println(v.root["key1"]->as_str());
+    v := json.decode_with_error("{ \"key1\": \"\\uD83C\\uDCA1\", \"key2\": \"\\u264C\" }")
+    core.print("\n")
+    core.println(v.root["key1"]->as_str())
 
 
     Union_Test :: struct {
-        v1: ? i32;
-        v2: ? i32;
+        v1: ? i32
+        v2: ? i32
     }
 
-    ut_json := json.decode_with_error("""{ "v1": null, "v2": 123 }""");
-    ut: Union_Test;
-    json.as_any(ut_json.root, &ut);
-    core.println(ut);
+    ut_json := json.decode_with_error("""{ "v1": null, "v2": 123 }""")
+    ut: Union_Test
+    json.as_any(ut_json.root, &ut)
+    core.println(ut)
 
-    json.encode(&core.stdio.print_writer, ut_json.root);
-    core.print("\n");
-    json.encode(&core.stdio.print_writer, ut);
-    core.print("\n");
+    json.encode(&core.stdio.print_writer, ut_json.root)
+    core.print("\n")
+    json.encode(&core.stdio.print_writer, ut)
+    core.print("\n")
 
     json.as_any(j.root, [] struct {
         @json.Custom_Key.{"x"}
         foo: i32
     })
-    |> core.println();
+    |> core.println()
 }

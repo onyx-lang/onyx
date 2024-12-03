@@ -3,48 +3,48 @@
 use core {*}
 
 count_ending_paths :: (nums: [..] u32) -> u64 {
-    tally := array.make(u64, nums.count);
-    defer array.free(&tally);
+    tally := Array.make(u64, nums.count)
+    defer Array.free(&tally)
 
-    for &t in tally do *t = 0;
-    tally[nums.count - 1] = 1;
+    for &t in tally do *t = 0
+    tally[nums.count - 1] = 1
 
     while i := cast(i32) (nums.count - 2); i >= 0 {
         for diff in 1 .. 4 {
-            if i + diff >= nums.count do continue;
+            if i + diff >= nums.count do continue
 
-            if nums[i + diff] - nums[i] <= 3 do tally[i] += tally[i + diff];
+            if nums[i + diff] - nums[i] <= 3 do tally[i] += tally[i + diff]
         }
 
-        i -= 1;
+        i -= 1
     }
 
-    return tally[0];
+    return tally[0]
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./input/day10.txt";
+    contents := #file_contents "./input/day10.txt"
 
-    file := contents;
+    file := contents
 
-    nums := array.make(u32);
-    defer array.free(&nums);
+    nums := Array.make(u32)
+    defer Array.free(&nums)
 
-    while !string.empty(file) {
-        array.push(&nums, ~~ conv.parse_int(&file)); 
-        string.advance_line(&file);
+    while !str.empty(file) {
+        Array.push(&nums, ~~ conv.parse_int(&file)); 
+        str.advance_line(&file)
     }
 
     // Slight hack, but having 0 in the array makes both parts easier
-    array.push(&nums, 0);
+    Array.push(&nums, 0)
 
-    array.sort(nums, (a, b) => a - b);
+    Array.sort(nums, (a, b) => a - b)
 
-    diffs: [3] u32;
-    for &d in diffs do *d = 0;
-    for i in 1 .. nums.count do diffs[nums[i] - nums[i - 1] - 1] += 1;
-    diffs[2] += 1;
+    diffs: [3] u32
+    for &d in diffs do *d = 0
+    for i in 1 .. nums.count do diffs[nums[i] - nums[i - 1] - 1] += 1
+    diffs[2] += 1
 
-    printf("Diff prod: {}\n", diffs[0] * diffs[2]);
-    printf("Arrangements: {}\n", count_ending_paths(nums));
+    printf("Diff prod: {}\n", diffs[0] * diffs[2])
+    printf("Arrangements: {}\n", count_ending_paths(nums))
 }

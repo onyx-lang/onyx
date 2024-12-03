@@ -13,20 +13,20 @@ use core {alloc} // These can included because this file is only included in non
 //
 
 Stack_Node :: struct {
-    file: str;
-    line: u32;
-    func_name: str;
+    file: str
+    line: u32
+    func_name: str
 }
 
 Stack_Trace :: struct {
-    prev: &Stack_Trace;
-    data: &Stack_Node;
-    current_line: u32;
+    prev: &Stack_Trace
+    data: &Stack_Node
+    current_line: u32
 }
 
 Stack_Frame :: struct {
-    info: &Stack_Node;
-    current_line: u32;
+    info: &Stack_Node
+    current_line: u32
 }
 
 #if runtime.Stack_Trace_Enabled {
@@ -35,9 +35,9 @@ get_stack_trace :: #match #local {}
 
 #overload
 get_stack_trace :: (offset := 0) -> [..] Stack_Frame {
-    trace := make([..] Stack_Frame, 8, alloc.temp_allocator);
+    trace := make([..] Stack_Frame, 8, alloc.temp_allocator)
 
-    walker := __stack_trace.prev;
+    walker := __stack_trace.prev
 
     for offset {
         if walker {
@@ -46,11 +46,11 @@ get_stack_trace :: (offset := 0) -> [..] Stack_Frame {
     }
 
     while walker {
-        trace << .{ walker.data, walker.current_line };
-        walker = walker.prev;
+        trace << .{ walker.data, walker.current_line }
+        walker = walker.prev
     }
 
-    return trace;
+    return trace
 }
 
 #overload

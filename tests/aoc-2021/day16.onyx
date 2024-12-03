@@ -3,208 +3,208 @@
 use core {*}
 
 base16_to_hex :: (s: str) -> u32 {
-    res := 0;
+    res := 0
     for s {
-        res *= 16;
+        res *= 16
         switch it {
-            case '0' ..= '9' do res += ~~(it - '0');
-            case 'a' ..= 'f' do res += ~~(it - 'a' + 10);
-            case 'A' ..= 'F' do res += ~~(it - 'A' + 10);
-            case _ do break break;
+            case '0' ..= '9' do res += ~~(it - '0')
+            case 'a' ..= 'f' do res += ~~(it - 'a' + 10)
+            case 'A' ..= 'F' do res += ~~(it - 'A' + 10)
+            case _ do break break
         }
     }
 
-    return res;
+    return res
 }
 
 BitIterator :: struct {
-    iter: Iterator(u32);
-    bits_read: u32;
+    iter: Iterator(u32)
+    bits_read: u32
 
-    values: [] u8;
-    value_idx: u32;
-    bit_idx: i32;
+    values: [] u8
+    value_idx: u32
+    bit_idx: i32
 
     next :: (b: &BitIterator) -> u32 {
-        return iter.next(b.iter) ?? 0;
+        return iter.next(b.iter) ?? 0
     }
 }
 
 bit_iterator :: (values: [] u8) -> &BitIterator {
-    c := new(BitIterator);
-    c.iter = .{ c, next, cfree };
-    c.values = values;
-    c.value_idx = 0;
-    c.bit_idx = 7;
+    c := new(BitIterator)
+    c.iter = .{ c, next, cfree }
+    c.values = values
+    c.value_idx = 0
+    c.bit_idx = 7
 
     next :: (use c: &BitIterator) -> ? u32 {
-        if value_idx >= values.count do return .None;
+        if value_idx >= values.count do return .None
 
         defer {
-            bits_read += 1;
-            bit_idx -= 1;
+            bits_read += 1
+            bit_idx -= 1
             if bit_idx < 0 {
-                value_idx += 1;
-                bit_idx = 7;
+                value_idx += 1
+                bit_idx = 7
             }
         }
 
-        ret := 0;
-        if (values[value_idx] & ~~(1 << bit_idx)) != 0 do ret = 1;
-        return ret;
+        ret := 0
+        if (values[value_idx] & ~~(1 << bit_idx)) != 0 do ret = 1
+        return ret
     }
 
-    return c;
+    return c
 }
 
 read_bits :: (bit_provider: &BitIterator, count: u32) -> u32 {
-    res := 0;
+    res := 0
     for count {
-        res *= 2;
+        res *= 2
         if bit := bit_provider->next(); bit == 1 {
-            res += 1;
+            res += 1
         }
     }
 
-    return res;
+    return res
 }
 
 
 Packet :: struct {
-    version: u32;
-    type:    u32;
+    version: u32
+    type:    u32
 }
 
 Packet_Literal :: struct {
-    use base: Packet;
-    value: u64;
+    use base: Packet
+    value: u64
 }
 
 Packet_Operator :: struct {
-    use base: Packet;
-    subpackets: [] &Packet;
+    use base: Packet
+    subpackets: [] &Packet
 }
 
 parse_packet :: (bit_provider: &BitIterator) -> &Packet {
-    version := read_bits(bit_provider, 3);
-    type    := read_bits(bit_provider, 3);
+    version := read_bits(bit_provider, 3)
+    type    := read_bits(bit_provider, 3)
 
     switch type {
         case 4 {
-            value: u64;
+            value: u64
             while true {
-                cont  := read_bits(bit_provider, 1);
-                value *= 16;
-                value += ~~read_bits(bit_provider, 4);
+                cont  := read_bits(bit_provider, 1)
+                value *= 16
+                value += ~~read_bits(bit_provider, 4)
 
-                if cont == 0 do break;
+                if cont == 0 do break
             }
 
-            p := new(Packet_Literal);
-            p.version = version;
-            p.type    = type;
-            p.value   = value;
-            return p;
+            p := new(Packet_Literal)
+            p.version = version
+            p.type    = type
+            p.value   = value
+            return p
         }
 
         case _ {
-            packets: [..] &Packet;
+            packets: [..] &Packet
 
-            l_type := read_bits(bit_provider, 1);
+            l_type := read_bits(bit_provider, 1)
             if l_type == 0 {
                 // Length encoded
-                bits_to_read := read_bits(bit_provider, 15);
-                curr_bits := bit_provider.bits_read;
+                bits_to_read := read_bits(bit_provider, 15)
+                curr_bits := bit_provider.bits_read
                 while bit_provider.bits_read < curr_bits + bits_to_read {
-                    packets << parse_packet(bit_provider);
+                    packets << parse_packet(bit_provider)
                 }
 
             } else {
                 // Count encoded
-                count := read_bits(bit_provider, 11);
+                count := read_bits(bit_provider, 11)
                 for count {
-                    packets << parse_packet(bit_provider);
+                    packets << parse_packet(bit_provider)
                 }
             }
 
-            p := new(Packet_Operator);
-            p.version    = version;
-            p.type       = type;
-            p.subpackets = packets;
-            return p;
+            p := new(Packet_Operator)
+            p.version    = version
+            p.type       = type
+            p.subpackets = packets
+            return p
         } 
     }
 }
 
 packet_sum_version :: (p: &Packet) -> u64 {
     switch p.type {
-        case 4 do return ~~p.version;
+        case 4 do return ~~p.version
 
         case _ {
-            sum: u64;
+            sum: u64
             for (cast (&Packet_Operator) p).subpackets {
-                sum += packet_sum_version(it);
+                sum += packet_sum_version(it)
             }
 
-            return sum + ~~p.version;
+            return sum + ~~p.version
         }
     }
 }
 
 packet_reduce :: (p: &Packet) -> u64 {
-    op := cast(&Packet_Operator) p;
+    op := cast(&Packet_Operator) p
     switch p.type {
         case 0 {
-            return array.fold(op.subpackets, cast(u64) 0, (x, y) => y + packet_reduce(x));
+            return Array.fold(op.subpackets, cast(u64) 0, (x, y) => y + packet_reduce(x))
         }
 
         case 1 {
-            return array.fold(op.subpackets, cast(u64) 1, (x, y) => y * packet_reduce(x));
+            return Array.fold(op.subpackets, cast(u64) 1, (x, y) => y * packet_reduce(x))
         }
         
         case 2 {
-            return array.fold(op.subpackets, cast(u64) -1, (x, y) => math.min(y, packet_reduce(x)));
+            return Array.fold(op.subpackets, cast(u64) -1, (x, y) => math.min(y, packet_reduce(x)))
         }
 
         case 3 {
-            return array.fold(op.subpackets, cast(u64) 0, (x, y) => math.max(y, packet_reduce(x)));
+            return Array.fold(op.subpackets, cast(u64) 0, (x, y) => math.max(y, packet_reduce(x)))
         }
         
         case 4 {
-            return (cast(&Packet_Literal) p).value;
+            return (cast(&Packet_Literal) p).value
         }
 
         case 5 {
-            return ~~(1 if packet_reduce(op.subpackets[0]) > packet_reduce(op.subpackets[1]) else 0);
+            return ~~(1 if packet_reduce(op.subpackets[0]) > packet_reduce(op.subpackets[1]) else 0)
         }
 
         case 6 {
-            return ~~(1 if packet_reduce(op.subpackets[0]) < packet_reduce(op.subpackets[1]) else 0);
+            return ~~(1 if packet_reduce(op.subpackets[0]) < packet_reduce(op.subpackets[1]) else 0)
         }
 
         case 7 {
-            return ~~(1 if packet_reduce(op.subpackets[0]) == packet_reduce(op.subpackets[1]) else 0);
+            return ~~(1 if packet_reduce(op.subpackets[0]) == packet_reduce(op.subpackets[1]) else 0)
         }
     }
 }
 
 
 main :: (args) => {
-    use file := os.open("./tests/aoc-2021/input/day16.txt")->unwrap();
-    use reader := io.reader_make(&file);
-    line   := io.read_line(&reader, consume_newline=false, inplace=true);
+    use file := os.open("./tests/aoc-2021/input/day16.txt")->unwrap()
+    use reader := io.reader_make(&file)
+    line   := io.read_line(&reader, consume_newline=false, inplace=true)
 
-    transmission: [..] u8;
+    transmission: [..] u8
     for i in range.{ 0, line.count, 2 } {
-        transmission << ~~(base16_to_hex(line[i .. i + 2]));
+        transmission << ~~(base16_to_hex(line[i .. i + 2]))
     }
 
-    bit_provider := bit_iterator(transmission);
-    packet := parse_packet(bit_provider);
+    bit_provider := bit_iterator(transmission)
+    packet := parse_packet(bit_provider)
 
-    result := packet_sum_version(packet);
-    printf("Part 1: {}\n", result);
+    result := packet_sum_version(packet)
+    printf("Part 1: {}\n", result)
 
-    result  = packet_reduce(packet);
-    printf("Part 2: {}\n", result);
+    result  = packet_reduce(packet)
+    printf("Part 2: {}\n", result)
 }

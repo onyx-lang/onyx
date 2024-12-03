@@ -13,7 +13,6 @@ use core {Result}
 use core.alloc
 use core.net
 use core.io
-use core.slice
 use core.encoding.osad
 use runtime
 
@@ -21,34 +20,34 @@ VERSION :: 1
 DEFAULT_PORT :: 4004
 
 MemWatchState :: struct {
-    wrapped_allocator: Allocator;
-    listen_addr: net.SocketAddress;
+    wrapped_allocator: Allocator
+    listen_addr: net.SocketAddress
 
-    socket: ? net.Socket;
-    writer: ? io.Writer;
+    socket: ? net.Socket
+    writer: ? io.Writer
 }
 
 MemWatchMsg :: union {
     Start: struct {
-        version: u32;
-        heap_base_address: u32;
-    };
+        version: u32
+        heap_base_address: u32
+    }
 
     Action: struct {
-        action: AllocationAction;
-        oldptr: u32;
-        newptr: u32;
-        size: u32;
-        align: u32;
-        trace: [] MemWatchStackNode;
-    };
+        action: AllocationAction
+        oldptr: u32
+        newptr: u32
+        size: u32
+        align: u32
+        trace: [] MemWatchStackNode
+    }
 }
 
 MemWatchStackNode :: struct {
-    file: str;
-    line: u32;
-    current_line: u32;
-    func_name: str;
+    file: str
+    line: u32
+    current_line: u32
+    func_name: str
 }
 
 
@@ -58,42 +57,42 @@ make :: (a: Allocator, listen_addr: &net.SocketAddress) -> MemWatchState {
         *listen_addr,
         .None,
         .None
-    };
+    }
 }
 
 free :: (m: &MemWatchState) {
-    io.writer_free(m.writer->unwrap_ptr());
-    m.socket->unwrap_ptr()->close();
+    io.writer_free(m.writer->unwrap_ptr())
+    m.socket->unwrap_ptr()->close()
 }
 
 wait_for_connection :: (m: &MemWatchState) -> Result(void, io.Error) {
-    listen_socket := net.socket_create(.Inet, .Stream, .ANY)?;
-    listen_socket->option(.ReuseAddress, true);
-    listen_socket->bind(&m.listen_addr);
-    listen_socket->listen(1);
-    result := listen_socket->accept()?;
+    listen_socket := net.socket_create(.Inet, .Stream, .ANY)?
+    listen_socket->option(.ReuseAddress, true)
+    listen_socket->bind(&m.listen_addr)
+    listen_socket->listen(1)
+    result := listen_socket->accept()?
 
-    m.socket = .{ Some = result.socket };
-    m.writer = .{ Some = io.writer_make(m.socket->unwrap_ptr(), 0) };
+    m.socket = .{ Some = result.socket }
+    m.writer = .{ Some = io.writer_make(m.socket->unwrap_ptr(), 0) }
 
-    memwatch_send_message(m, .{ Start = .{ version = VERSION, heap_base_address = cast(u32) __heap_start } });
+    memwatch_send_message(m, .{ Start = .{ version = VERSION, heap_base_address = cast(u32) __heap_start } })
 
-    return .{ Ok = .{} };
+    return .{ Ok = .{} }
 }
 
 enable_in_scope :: macro (a: Allocator, port := DEFAULT_PORT) {
     use core.alloc.memwatch
 
-    addr: net.SocketAddress;
-    net.make_ipv4_address(&addr, "0.0.0.0", ~~port);
+    addr: net.SocketAddress
+    net.make_ipv4_address(&addr, "0.0.0.0", ~~port)
 
-    old_allocator := a;
-    dbg := memwatch.make(old_allocator, &addr);
-    a = alloc.as_allocator(&dbg);
+    old_allocator := a
+    dbg := memwatch.make(old_allocator, &addr)
+    a = alloc.as_allocator(&dbg)
 
-    memwatch.wait_for_connection(&dbg);
+    memwatch.wait_for_connection(&dbg)
 
-    defer memwatch.free(&dbg);
+    defer memwatch.free(&dbg)
 }
 
 
@@ -102,18 +101,18 @@ alloc.as_allocator :: (memwatch: &MemWatchState) => Allocator.{ memwatch, memwat
 
 #local
 memwatch_proc :: (m: &MemWatchState, action: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
-    newptr := m.wrapped_allocator.func(m.wrapped_allocator.data, action, size, align, oldptr);
+    newptr := m.wrapped_allocator.func(m.wrapped_allocator.data, action, size, align, oldptr)
 
 
     trace: [] MemWatchStackNode = .[];
-    stack_trace := runtime.info.get_stack_trace();
+    stack_trace := runtime.info.get_stack_trace()
     if stack_trace {
-        slice.init(&trace, stack_trace.count, context.temp_allocator);
+        Slice.init(&trace, stack_trace.count, context.temp_allocator)
         for i in stack_trace.count {
-            info := stack_trace[i].info;
+            info := stack_trace[i].info
             trace[i] = .{
                 info.file, info.line, stack_trace[i].current_line, info.func_name
-            };
+            }
         }
     }
 
@@ -126,16 +125,16 @@ memwatch_proc :: (m: &MemWatchState, action: AllocationAction, size: u32, align:
             align,
             trace
         }
-    });
+    })
 
-    return newptr;
+    return newptr
 }
 
 
 #local
 memwatch_send_message :: (m: &MemWatchState, msg: MemWatchMsg) {
-    success := osad.serialize(msg, m.writer->unwrap_ptr());
+    success := osad.serialize(msg, m.writer->unwrap_ptr())
     if !success {
-        logf(.Warning, "MemWatch logging failed when sending.");
+        logf(.Warning, "MemWatch logging failed when sending.")
     }
 }

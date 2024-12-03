@@ -11,43 +11,43 @@ use core {*}
 main :: (args: [] cstr) {
     // To declare a simple, use the enum keyword.
     SimpleEnum :: enum {
-        Value1; Value2; Value3;
+        Value1; Value2; Value3
     }
 
-    println(cast(i32) SimpleEnum.Value1);
-    println(cast(i32) SimpleEnum.Value2);
-    println(cast(i32) SimpleEnum.Value3);
-    print("\n");
+    println(cast(i32) SimpleEnum.Value1)
+    println(cast(i32) SimpleEnum.Value2)
+    println(cast(i32) SimpleEnum.Value3)
+    print("\n")
 
 
     // Values can be given explicitly for some of the elements.
     OutOfOrder :: enum {
         Value1; // Defaults to 0
-        Value2 :: 10;
+        Value2 :: 10
         Value3; // Defaults to 11
     }
 
-    println(cast(i32) OutOfOrder.Value1);
-    println(cast(i32) OutOfOrder.Value2);
-    println(cast(i32) OutOfOrder.Value3);
-    print("\n");
+    println(cast(i32) OutOfOrder.Value1)
+    println(cast(i32) OutOfOrder.Value2)
+    println(cast(i32) OutOfOrder.Value3)
+    print("\n")
 
 
     // One common thing you might want to do in C is have an enum that
     // represents bit-wise flags. This is easy in Onyx by using the
     // #flags directive.
     FlaggedEnum :: enum #flags {
-        Value1; // Defaults to 1;
-        Value2; // Defaults to 2;
-        Value3; // Defaults to 4;
-        Value4; // Defaults to 8;
+        Value1; // Defaults to 1
+        Value2; // Defaults to 2
+        Value3; // Defaults to 4
+        Value4; // Defaults to 8
     }
 
-    println(cast(i32) FlaggedEnum.Value1);
-    println(cast(i32) FlaggedEnum.Value2);
-    println(cast(i32) FlaggedEnum.Value3);
-    println(cast(i32) FlaggedEnum.Value4);
-    print("\n");
+    println(cast(i32) FlaggedEnum.Value1)
+    println(cast(i32) FlaggedEnum.Value2)
+    println(cast(i32) FlaggedEnum.Value3)
+    println(cast(i32) FlaggedEnum.Value4)
+    print("\n")
 
     {
         // As a convenience, if the type of the enum can be determined from context,
@@ -55,11 +55,11 @@ main :: (args: [] cstr) {
         // For example,
         //
 
-        val := SimpleEnum.Value2;
+        val := SimpleEnum.Value2
 
         // Here .Value2 can be resolved from the context of "val".
         if val == .Value2 {
-            println("val is Value2");
+            println("val is Value2")
         }
     }
 }

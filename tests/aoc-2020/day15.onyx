@@ -2,42 +2,42 @@
 
 use core {*}
 
-initial_numbers := u32.[ 1, 20, 8, 12, 0, 14 ];
+initial_numbers := u32.[ 1, 20, 8, 12, 0, 14 ]
 
 spoken_times :: struct {
-    recent   : u32 = 0;
-    previous : u32 = 0;
+    recent   : u32 = 0
+    previous : u32 = 0
 }
 
 main :: (args: [] cstr) {
     // The current implementation of Map is rather slow at a large scale.
     // Any changes to the implementation of Map should be tested on this
     // file to validate if they 1) work and 2) are faster.
-    nums := map.make(u32, spoken_times);
-    defer map.free(&nums);
+    nums := Map.make(u32, spoken_times)
+    defer Map.free(&nums)
 
-    turn := 1;
-    last_num := 0;
+    turn := 1
+    last_num := 0
 
     for n in initial_numbers {
-        map.put(&nums, n, .{ recent = turn });
-        turn += 1;
-        last_num = n;
+        Map.put(&nums, n, .{ recent = turn })
+        turn += 1
+        last_num = n
     }
 
     while turn != 2021 {
-        st := map.get(&nums, last_num) ?? .{};
+        st := Map.get(&nums, last_num) ?? .{}
 
-        if st.previous == 0 do last_num = 0;
-        else                do last_num = st.recent - st.previous;
+        if st.previous == 0 do last_num = 0
+        else                do last_num = st.recent - st.previous
 
-        st = map.get(&nums, last_num) ?? .{};
-        st.previous = st.recent;
-        st.recent = turn;
-        map.put(&nums, last_num, st);
+        st = Map.get(&nums, last_num) ?? .{}
+        st.previous = st.recent
+        st.recent = turn
+        Map.put(&nums, last_num, st)
 
-        turn += 1;
+        turn += 1
     }
 
-    printf("2020th: {}\n", last_num);
+    printf("2020th: {}\n", last_num)
 }

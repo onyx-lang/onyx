@@ -4,21 +4,21 @@ use core { println }
 
 main :: (args: [] cstr) {
     // These functions will be used to demo the pipe operator.
-    Num    :: #type i32;
-    double :: (v: Num)         -> Num do return v * 2;
-    add    :: (a: Num, b: Num) -> Num do return a + b;
-    square :: (v: Num)         -> Num do return v * v;
+    Num    :: #type i32
+    double :: (v: Num)         -> Num do return v * 2
+    add    :: (a: Num, b: Num) -> Num do return a + b
+    square :: (v: Num)         -> Num do return v * v
 
     // Something you may find yourself doing often is changing function
     // calls together likes this:
-    println(square(add(double(4), 3)));
+    println(square(add(double(4), 3)))
 
     // I think we can agree that that line is hard to understand just
     // by looking at it. This kind of pattern appears very often, at
     // least in the way that I program, so I wanted to have a way to 
     // make this kind of operation cleaner. My solution was the pipe
     // operator (|>). The above code can be rewritten as so:
-    double(4) |> add(3) |> square() |> println();
+    double(4) |> add(3) |> square() |> println()
 
     // The pipe operator simply places the expression on its left into
     // the FIRST argument slot of the function call on its right. The

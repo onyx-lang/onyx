@@ -35,9 +35,9 @@ main :: (args: [] cstr) {
         // You can use everything inside of a package using a '*' between the include list.
         use core.string {*}
 
-        s := "   Some string ...";
+        s := "   Some string ..."
         t := strip_leading_whitespace(s); // This would have to be 'string.strip_leading_whitespace' otherwise.
-        println(t);
+        println(t)
     }
     
     {
@@ -53,15 +53,15 @@ main :: (args: [] cstr) {
         // procedure between two areas of concern.
 
         basically_a_method :: (use dummy: ^Dummy) {
-            printf("Dummy with name '{}', and age '{}'.\n", name, age);
+            printf("Dummy with name '{}', and age '{}'.\n", name, age)
         }
 
-        dummy := Dummy.{ "Phil", 15 };
-        basically_a_method(^dummy);
+        dummy := Dummy.{ "Phil", 15 }
+        basically_a_method(^dummy)
 
         Dummy :: struct {
-            name : str;
-            age  : i32;
+            name : str
+            age  : i32
         }
     }
     

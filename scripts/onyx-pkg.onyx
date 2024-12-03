@@ -269,7 +269,7 @@ run_show_command :: (args: [] str) {
     printf("Package version     : {}\n", config.package_version)
     print("\n")
 
-    max_width := array.fold(config.dependencies.entries, 0, (d, w) => {
+    max_width := Array.fold(config.dependencies.entries, 0, (d, w) => {
         return math.max(d.key.count, w)
     })
     format_str := tprintf("    {{w{}}} | {{}}\n", max_width)
@@ -348,7 +348,7 @@ run_sync_command :: (args: [] str) {
 
     while dependencies_to_install.count > 0 {
         alloc.clear_temp_allocator()
-        to_install := array.delete(&dependencies_to_install, 0)
+        to_install := Array.delete(&dependencies_to_install, 0)
 
         repo := to_install.source.Git ?? [] { continue; }
 
@@ -499,7 +499,7 @@ run_list_versions :: (args: [] str) {
     versions := Git.get_available_versions(pack)
     defer delete(&versions)
 
-    array.sort(versions, SemVer.compare)
+    Array.sort(versions, SemVer.compare)
 
     for versions {
         printf("{}\n", it)
@@ -1222,7 +1222,7 @@ Git :: struct {
         }
         defer delete(&versions)
 
-        array.sort(versions, SemVer.compare)
+        Array.sort(versions, SemVer.compare)
         latest := versions[0]
         return latest
     }
@@ -1234,7 +1234,7 @@ Git :: struct {
         }
         defer delete(&versions)
 
-        array.sort(versions, SemVer.compare)
+        Array.sort(versions, SemVer.compare)
         for versions {
             if current_version->is_compatible(it) do return it
         }
@@ -1493,22 +1493,22 @@ load_config :: (path: str) -> ? Config {
                 load_string(it, "target", &target)
 
                 for it->query_all("include") {
-                    array.concat(&include,
+                    Array.concat(&include,
                         iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
                 }
 
                 for it->query_all("define") {
-                    array.concat(&defines,
+                    Array.concat(&defines,
                         iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
                 }
 
                 for it->query_all("args") {
-                    array.concat(&args,
+                    Array.concat(&args,
                         iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
                 }
 
                 for it->query_all("source") {
-                    array.concat(&sources,
+                    Array.concat(&sources,
                         iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
                 }
 
@@ -1609,7 +1609,7 @@ store_config :: (path: str) -> bool {
         license_node := doc->create_node("license")
         license_node->add_value(.{ String = config.package_license })
 
-        array.concat(&package_node.children, .[
+        Array.concat(&package_node.children, .[
             name_node, author_node, url_node, description_node, version_node
         ])
     }
@@ -1672,7 +1672,7 @@ store_config :: (path: str) -> bool {
 
     config._source_doc->with([source] {
         for source->query_all("top() > []") {
-            if !array.contains(str.["package", "config", "native", "dependencies"], it.node) {
+            if !Array.contains(str.["package", "config", "native", "dependencies"], it.node) {
                 doc.nodes << it
             }
         }

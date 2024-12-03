@@ -1,98 +1,98 @@
 use core {package, *}
 
 GameOfSeats :: struct {
-    width  : u32;
-    height : u32;
-    seats  : [..] SeatState;
-    temp   : [..] SeatState;
+    width  : u32
+    height : u32
+    seats  : [..] SeatState
+    temp   : [..] SeatState
 }
 
 SeatState :: enum (u8) { OOB; Floor; Empty; Occupied; }
 
 gos_get_seat :: (use gos: &GameOfSeats, x: i32, y: i32) -> SeatState {
-    if x < 0 || y < 0 || x >= width || y >= height do return SeatState.OOB;
-    return seats[x + y * width];
+    if x < 0 || y < 0 || x >= width || y >= height do return SeatState.OOB
+    return seats[x + y * width]
 }
 
 gos_neighbors :: (use gos: &GameOfSeats, x: i32, y: i32, state := SeatState.Occupied) -> u32 {
-    count := 0;
+    count := 0
 
     for dy in -1 .. 2 {
         for dx in -1 .. 2 {
-            if dy == 0 && dx == 0 do continue;
+            if dy == 0 && dx == 0 do continue
 
-            t := 1;
-            seat := gos_get_seat(gos, x + dx, y + dy);
+            t := 1
+            seat := gos_get_seat(gos, x + dx, y + dy)
             while seat == SeatState.Floor {
-                t += 1;
-                seat = gos_get_seat(gos, x + dx * t, y + dy * t);
+                t += 1
+                seat = gos_get_seat(gos, x + dx * t, y + dy * t)
             }
 
-            if seat == state do count += 1;
+            if seat == state do count += 1
         }
     }
 
-    return count;
+    return count
 }
 
 gos_iter :: (use gos: &GameOfSeats) -> bool {
-    for i in 0 .. seats.count do temp[i] = seats[i];
+    for i in 0 .. seats.count do temp[i] = seats[i]
 
-    changed := false;
+    changed := false
     for y in 0 .. height {
         for x in 0 .. width {
-            occ_neighbors := gos_neighbors(gos, x, y);
+            occ_neighbors := gos_neighbors(gos, x, y)
 
             switch gos_get_seat(gos, x, y) {
                 case SeatState.Empty do if occ_neighbors == 0 {
-                    temp[x + y * width] = SeatState.Occupied;
-                    changed = true;
+                    temp[x + y * width] = SeatState.Occupied
+                    changed = true
                 }
 
                 case SeatState.Occupied do if occ_neighbors >= 5 {
-                    temp[x + y * width] = SeatState.Empty;
-                    changed = true;
+                    temp[x + y * width] = SeatState.Empty
+                    changed = true
                 }
             }
         }
     }
 
-    for i in 0 .. seats.count do seats[i] = temp[i];
+    for i in 0 .. seats.count do seats[i] = temp[i]
 
-    return changed;
+    return changed
 }
 
 main :: (args: [] cstr) {
-    contents := #file_contents "./input/day11.txt";
+    contents := #file_contents "./input/day11.txt"
 
-    file := contents;
+    file := contents
 
-    gos : GameOfSeats;
-    array.init(&gos.seats, 32);
-    defer array.free(&gos.seats);
+    gos : GameOfSeats
+    Array.init(&gos.seats, 32)
+    defer Array.free(&gos.seats)
 
-    gos.height = 0;
+    gos.height = 0
 
-    while !string.empty(file) {
-        line, file~ := string.bisect(file, '\n');
+    while !str.empty(file) {
+        line, file~ := str.bisect(file, '\n')
         for ch in line do switch ch {
-            case '.' do array.push(&gos.seats, SeatState.Floor);
-            case 'L' do array.push(&gos.seats, SeatState.Empty);
-            case '#' do array.push(&gos.seats, SeatState.Occupied);
+            case '.' do Array.push(&gos.seats, SeatState.Floor)
+            case 'L' do Array.push(&gos.seats, SeatState.Empty)
+            case '#' do Array.push(&gos.seats, SeatState.Occupied)
         }
 
-        gos.width = line.count;
-        gos.height += 1;
+        gos.width = line.count
+        gos.height += 1
     }
 
-    array.init(&gos.temp, gos.seats.count);
-    defer array.free(&gos.temp);
+    Array.init(&gos.temp, gos.seats.count)
+    defer Array.free(&gos.temp)
 
     while gos_iter(&gos) ---
 
-    occupied := 0;
-    for s in gos.seats do if s == SeatState.Occupied do occupied += 1;
+    occupied := 0
+    for s in gos.seats do if s == SeatState.Occupied do occupied += 1
     
-    printf("Occupied: {}\n", occupied);
+    printf("Occupied: {}\n", occupied)
 }
 

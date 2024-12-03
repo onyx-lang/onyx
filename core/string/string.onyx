@@ -1,20 +1,20 @@
-package core.string
+package core
 
-use core {package, *}
+use core
 
 
 /// Generic procedure for turning something into a string.
 str.as_str :: #match -> str {}
 
 #local HasAsStrMethod :: interface (T: type_expr) {
-    t as T;
+    t as T
 
-    { T.as_str(t) } -> str;
+    { T.as_str(t) } -> str
 }
 
 #overload #order 10000
 str.as_str :: macro (t: $T/HasAsStrMethod) -> str {
-    return T.as_str(t);
+    return T.as_str(t)
 }
 
 
@@ -25,33 +25,40 @@ str.free :: #match #locked {
 }
 
 str.copy :: (original: str, allocator := context.allocator) -> str {
-    if original.count == 0 do return .{};
+    if original.count == 0 do return .{}
 
-    new_str : str;
-    new_str.data = raw_alloc(allocator, sizeof u8 * original.count);
-    new_str.count = original.count;
-    str.copy_into(original, new_str);
-    return new_str;
+    new_str : str
+    new_str.data = raw_alloc(allocator, sizeof u8 * original.count)
+    new_str.count = original.count
+    str.copy_into(original, new_str)
+    return new_str
 }
 
 str.temp_copy :: (original: str) -> str {
-    if original.count == 0 do return .{};
+    if original.count == 0 do return .{}
 
-    new_str := make([] u8, original.count, allocator=context.temp_allocator);
-    str.copy_into(original, new_str);
-    return new_str;
+    new_str := make([] u8, original.count, allocator=context.temp_allocator)
+    str.copy_into(original, new_str)
+    return new_str
 }
 
 str.copy_into :: (orig: str, dest: str) {
-    len := orig.count;
-    if dest.count < len do len = dest.count;
+    len := orig.count
+    if dest.count < len do len = dest.count
 
-    memory.copy(dest.data, orig.data, len);
+    memory.copy(dest.data, orig.data, len)
 }
 
-#overload str.as_str :: from_cstr
-from_cstr :: (s: cstr) -> str {
-    return .{ data = s, count = length(s) };
+#overload str.as_str :: str.from_cstr
+str.from_cstr :: (s: cstr) -> str {
+    len := 0
+    p := s
+    while p[0] != '\0' {
+        p += 1
+        len += 1
+    }
+
+    return .{ data = s, count = len }
 }
 
 /// Converts a `str` into a `cstr` by copying the memory of the string to the stack,
@@ -63,46 +70,28 @@ str.to_cstr_on_stack :: macro (s_: str) -> cstr {
     use core.alloc
     use core.memory
 
-    s := s_;
-    result := alloc.from_stack(sizeof u8 * (s.count + 1));
-    memory.set(result, 0, s.count + 1);
-    memory.copy(result, s.data, s.count);
+    s := s_
+    result := alloc.from_stack(sizeof u8 * (s.count + 1))
+    memory.set(result, 0, s.count + 1)
+    memory.copy(result, s.data, s.count)
 
-    return result;
+    return result
 }
 
-
-// Does this still need to exist?
-length :: #match #local {}
-
-#overload
-length :: (s: str) => s.count;
-
-#overload
-length :: (s: cstr) -> u32 {
-    len := 0;
-    c: [&] u8 = s;
-    while c[0] != '\0' {
-        len += 1;
-        c += 1;
-    }
-
-    return len;
-}
 
 
 str.concat :: #match #local {}
 
 #overload
 str.concat :: (s1: str, s2: str, allocator := context.allocator) -> str {
-    len1 := s1.count;
-    len2 := s2.count;
+    len1 := s1.count
+    len2 := s2.count
 
-    data := cast([&] u8) raw_alloc(allocator, len1 + len2);
-    memory.copy(data, s1.data, len1);
-    memory.copy(data + len1, s2.data, len2);
+    data := cast([&] u8) raw_alloc(allocator, len1 + len2)
+    memory.copy(data, s1.data, len1)
+    memory.copy(data + len1, s2.data, len2)
 
-    return str.{ data, len1 + len2 };
+    return str.{ data, len1 + len2 }
 }
 
 // @Cleanup // Don't love that the allocator is necessary here,
@@ -112,52 +101,52 @@ str.concat :: (s1: str, s2: str, allocator := context.allocator) -> str {
 // could easily be changed since there is no ambiguity.
 #overload
 str.concat :: (allocator: Allocator, strings: ..str) -> str {
-    total_length := 0;
-    for s in strings do total_length += s.count;
+    total_length := 0
+    for s in strings do total_length += s.count
 
-    data := cast([&] u8) raw_alloc(allocator, total_length);
-    offset := 0;
+    data := cast([&] u8) raw_alloc(allocator, total_length)
+    offset := 0
     for s in strings {
-        memory.copy(data + offset, s.data, s.count);
-        offset += s.count;
+        memory.copy(data + offset, s.data, s.count)
+        offset += s.count
     }
 
-    return str.{ data, total_length };
+    return str.{ data, total_length }
 }
 
 #overload
 str.concat :: (buffer: [] u8, strings: ..str) -> str {
-    total_copied := 0;
+    total_copied := 0
     for s in strings {
         // Should never greater than, but better safe than sorry.
-        if total_copied >= buffer.count do break;
+        if total_copied >= buffer.count do break
 
-        bytes_to_copy := math.min(s.count, buffer.count - total_copied);
-        memory.copy(buffer.data + total_copied, s.data, bytes_to_copy);
-        total_copied += bytes_to_copy;
+        bytes_to_copy := math.min(s.count, buffer.count - total_copied)
+        memory.copy(buffer.data + total_copied, s.data, bytes_to_copy)
+        total_copied += bytes_to_copy
     }
 
-    return buffer[0 .. total_copied];
+    return buffer[0 .. total_copied]
 }
 
 #overload
 str.concat :: (into: &dyn_str, strings: ..str) -> str {
     for s in strings {
-        array.ensure_capacity(into, into.count + s.count);
-        memory.copy(into.data + into.count, s.data, s.count);
-        into.count += s.count;
+        Array.ensure_capacity(into, into.count + s.count)
+        memory.copy(into.data + into.count, s.data, s.count)
+        into.count += s.count
     }
-    return .{ into.data, into.count };
+    return .{ into.data, into.count }
 }
 
 #overload
 str.concat :: (into: &dyn_str, chars: ..u8) -> str {
-    array.ensure_capacity(into, into.count + chars.count);
+    Array.ensure_capacity(into, into.count + chars.count)
     for c in chars {
-        memory.copy(into.data + into.count, cast(rawptr) &.[c], 1);
-        into.count += 1;
+        memory.copy(into.data + into.count, cast(rawptr) &.[c], 1)
+        into.count += 1
     }
-    return .{ into.data, into.count };
+    return .{ into.data, into.count }
 }
 
 
@@ -165,48 +154,48 @@ str.contains :: #match #local {}
 
 #overload
 str.contains :: (s: str, c: u8) -> bool {
-    for ch in s do if ch == c do return true;
-    return false;
+    for ch in s do if ch == c do return true
+    return false
 }
 
 #overload
 str.contains :: (s: str, substr: str) -> bool {
     while i := 0; i < s.count {
-        defer i += 1;
+        defer i += 1
 
         while j := 0; j < substr.count {
             if s[i + j] != substr[j] {
-                continue continue;
+                continue continue
             }
 
-            j += 1;
+            j += 1
         }
 
-        return true;
+        return true
     }
 
-    return false;
+    return false
 }
 
 
 str.join :: (strs: [] str, sep: str, allocator := context.allocator) -> str {
-    if strs.count == 0 do return "";
+    if strs.count == 0 do return ""
 
-    len_sum := array.fold(strs, 0, [v, acc](acc + v.length));
-    out := make(str, len_sum + (strs.count - 1) * sep.count);
+    len_sum := Array.fold(strs, 0, [v, acc](acc + v.length))
+    out := make(str, len_sum + (strs.count - 1) * sep.count)
 
-    i := 0;
+    i := 0
     for strs {
         if !#first {
-            core.memory.copy(&out.data[i], sep.data, sep.count);
-            i += sep.count;
+            core.memory.copy(&out.data[i], sep.data, sep.count)
+            i += sep.count
         }
 
-        core.memory.copy(&out.data[i], it.data, it.count);
-        i += it.count;
+        core.memory.copy(&out.data[i], it.data, it.count)
+        i += it.count
     }
 
-    return out;
+    return out
 }
 
 
@@ -214,65 +203,65 @@ str.join :: (strs: [] str, sep: str, allocator := context.allocator) -> str {
 // Check this for edge cases and other bugs. I'm not confident
 // it will work perfectly yet.                   - brendanfh 2020/12/21
 str.compare :: (str1: str, str2: str) -> i32 {
-    i := 0;
+    i := 0
     while i < str1.count && i < str2.count {
-        if str1[i] == str2[i] do i += 1;
-        else                  do break;
+        if str1[i] == str2[i] do i += 1
+        else                  do break
     }
 
-    if i == str1.count && i == str2.count do return 0;
-    return ~~(str1[i] - str2[i]);
+    if i == str1.count && i == str2.count do return 0
+    return ~~(str1[i] - str2[i])
 }
 
 str.equal :: (str1: str, str2: str) -> bool {
-    if str1.count != str2.count do return false;
+    if str1.count != str2.count do return false
     while i := 0; i < str1.count {
-        if str1[i] != str2[i] do return false;
-        i += 1;
+        if str1[i] != str2[i] do return false
+        i += 1
     }
-    return true;
+    return true
 }
 
 str.equal_insensitive :: (s1, s2: str) -> bool {
-    if s1.count != s2.count do return false;
+    if s1.count != s2.count do return false
     while i := 0; i < s1.count {
-        defer i += 1;
-        if s1[i] == s2[i] do continue;
+        defer i += 1
+        if s1[i] == s2[i] do continue
 
-        c1 := s1[i];
-        c2 := s2[i];
-        if c1 >= 'A' && c1 <= 'Z' do c1 += 32;
-        if c2 >= 'A' && c2 <= 'Z' do c2 += 32;
-        if c1 != c2 do return false;
+        c1 := s1[i]
+        c2 := s2[i]
+        if c1 >= 'A' && c1 <= 'Z' do c1 += 32
+        if c2 >= 'A' && c2 <= 'Z' do c2 += 32
+        if c1 != c2 do return false
     }
-    return true;
+    return true
 }
 
 #operator == str.equal
-#operator != macro (s1: str, s2: str) => !(s1 == s2);
+#operator != macro (s1: str, s2: str) => !(s1 == s2)
 
 str.starts_with :: (s: str, prefix: str) -> bool {
-    if s.count < prefix.count do return false;
+    if s.count < prefix.count do return false
     while i := 0; i < prefix.count {
-        if s[i] != prefix[i] do return false;
-        i += 1;
+        if s[i] != prefix[i] do return false
+        i += 1
     }
-    return true;
+    return true
 }
 
 str.ends_with :: (s: str, suffix: str) -> bool {
-    if s.count < suffix.count do return false;
+    if s.count < suffix.count do return false
     while i := 0; i < suffix.count {
-        if s[s.count - 1 - i] != suffix[suffix.count - 1 - i] do return false;
-        i += 1;
+        if s[s.count - 1 - i] != suffix[suffix.count - 1 - i] do return false
+        i += 1
     }
-    return true;
+    return true
 }
 
-str.empty    :: (s: str) => s.count == 0 || s.data == null;
+str.empty    :: (s: str) => s.count == 0 || s.data == null
 
 is_empty :: (s: str) -> bool #deprecated "Use 'string.empty' instead." {
-    return s.count == 0 || s.data == null;
+    return s.count == 0 || s.data == null
 }
 
 str.index_of :: #match #local {}
@@ -280,35 +269,35 @@ str.index_of :: #match #local {}
 #overload
 str.index_of :: (s: str, c: u8) -> i32 {
     for s.count {
-        if s[it] == c do return it;
+        if s[it] == c do return it
     }
-    return -1;
+    return -1
 }
 
 #overload
 str.index_of :: (s: str, substr: str) -> i32 {
     while i := 0; i < s.count {
-        defer i += 1;
+        defer i += 1
 
         while j := 0; j < substr.count {
             if s[i + j] != substr[j] {
-                continue continue;
+                continue continue
             }
 
-            j += 1;
+            j += 1
         }
 
-        return i;
+        return i
     }
 
-    return -1;
+    return -1
 }
 
 str.last_index_of :: (s: str, c: u8) -> i32 {
     for range.{s.count-1, 0, -1} {
-        if s[it] == c do return it;
+        if s[it] == c do return it
     }
-    return -1;
+    return -1
 }
 
 
@@ -316,13 +305,13 @@ str.strip_whitespace :: #match #local {}
 
 #overload
 str.strip_whitespace :: (s: &str) {
-    strip_leading_whitespace(s);
-    strip_trailing_whitespace(s);
+    str.strip_leading_whitespace(s)
+    str.strip_trailing_whitespace(s)
 }
 
 #overload
 str.strip_whitespace :: (s:  str) =>
-    s |> strip_leading_whitespace() |> strip_trailing_whitespace()
+    s |> str.strip_leading_whitespace() |> str.strip_trailing_whitespace()
 
 
 str.strip_leading_whitespace :: #match #local {}
@@ -331,19 +320,19 @@ str.strip_leading_whitespace :: #match #local {}
 str.strip_leading_whitespace :: (s: &str) {
     while s.count > 0 do switch s.data[0] {
         case ' ', '\t', '\n', '\r' {
-            s.data += 1;
-            s.count -= 1;
+            s.data += 1
+            s.count -= 1
         }
 
-        case _ do return;
+        case _ do return
     }
 }
 
 #overload
 str.strip_leading_whitespace :: (s: str) -> str {
-    out := s;
-    strip_leading_whitespace(&out);
-    return out;
+    out := s
+    str.strip_leading_whitespace(&out)
+    return out
 }
 
 
@@ -353,38 +342,38 @@ str.strip_trailing_whitespace :: #match #local {}
 str.strip_trailing_whitespace :: (s: &str) {
     while s.count >= 1 do switch s.data[s.count - 1] {
         case ' ', '\t', '\n', '\r' {
-            s.count -= 1;
+            s.count -= 1
         }
 
-        case _ do return;
+        case _ do return
     }
 }
 
 #overload
 str.strip_trailing_whitespace :: (s: str) -> str {
-    out := s;
-    strip_trailing_whitespace(&out);
-    return out;
+    out := s
+    str.strip_trailing_whitespace(&out)
+    return out
 }
 
 str.to_uppercase :: (s: str) -> str {
     for& ch in s {
         if *ch >= 'a' && *ch <= 'z' {
-            *ch -= 32;
+            *ch -= 32
         }
     }
 
-    return s;
+    return s
 }
 
 str.to_lowercase :: (s: str) -> str {
     for& ch in s {
         if *ch >= 'A' && *ch <= 'Z' {
-            *ch += 32;
+            *ch += 32
         }
     }
 
-    return s;
+    return s
 }
 
 
@@ -393,16 +382,16 @@ str.trim_start :: #match #local {}
 #overload
 str.trim_start :: (s: &str, char: u8) {
     while s.data[0] == char {
-        s.data += 1;
-        s.count -= 1;
+        s.data += 1
+        s.count -= 1
     }
 }
 
 #overload
 str.trim_start :: (s: str, char: u8) -> str {
-    out := s;
-    trim_start(&out, char);
-    return out;
+    out := s
+    str.trim_start(&out, char)
+    return out
 }
 
 
@@ -411,15 +400,15 @@ str.trim_end :: #match #local {}
 #overload
 str.trim_end :: (s: &str, char: u8) {
     while s.data[s.count - 1] == char {
-        s.count -= 1;
+        s.count -= 1
     }
 }
 
 #overload
 str.trim_end :: (s: str, char: u8) -> str {
-    out := s;
-    trim_end(&out, char);
-    return out;
+    out := s
+    str.trim_end(&out, char)
+    return out
 }
 
 
@@ -427,26 +416,26 @@ str.advance :: #match #local {}
 
 #overload
 str.advance :: (s: &str, chars := 1) {
-    chars = math.min(chars, s.count);
+    chars = math.min(chars, s.count)
 
-    s.data += chars;
-    s.count -= chars;
+    s.data += chars
+    s.count -= chars
 }
 
 #overload
 str.advance :: (s: str, chars := 1) -> str {
-    chars = math.min(chars, s.count);
-    out := s;
+    chars = math.min(chars, s.count)
+    out := s
 
-    out.data += chars;
-    out.count -= chars;
+    out.data += chars
+    out.count -= chars
 
-    return out;
+    return out
 }
 
 str.replace :: (s: str, to_replace: u8, replace_with: u8) {
     for &c in s {
-        if *c == to_replace do *c = replace_with;
+        if *c == to_replace do *c = replace_with
     }
 }
 
@@ -454,152 +443,152 @@ str.read_until :: #match #local {}
 
 #overload
 str.read_until :: (s: &str, upto: u8, skip := 0) -> str {
-    if s.count == 0 do return "";
+    if s.count == 0 do return ""
 
-    out : str;
-    out.data = s.data;
-    out.count = 0;
+    out : str
+    out.data = s.data
+    out.count = 0
 
-    rem := skip;
+    rem := skip
     for ch in *s {
         if ch == upto {
-            if rem <= 0 do break;
-            else do rem -= 1;
+            if rem <= 0 do break
+            else do rem -= 1
         }
 
-        out.count += 1;
+        out.count += 1
     }
 
-    s.data += out.count;
-    s.count -= out.count;
+    s.data += out.count
+    s.count -= out.count
 
-    return out;
+    return out
 }
 
 #overload
 str.read_until :: (s: &str, upto: str, skip := 0) -> str {
-    if s.count == 0 do return "";
+    if s.count == 0 do return ""
 
-    out := str.{ data = s.data };
+    out := str.{ data = s.data }
 
-    rem := skip;
-    i := 0;
+    rem := skip
+    i := 0
     while i <= s.count - upto.count {
-        match := true;
-        j := i;
+        match := true
+        j := i
         for upto {
             if s.data[j] != it {
-                match = false;
-                break;
+                match = false
+                break
             }
 
-            j += 1;
+            j += 1
         }
 
         if match {
-            if rem <= 0 do break;
-            else do rem -= 1;
+            if rem <= 0 do break
+            else do rem -= 1
         }
 
-        i += 1;
+        i += 1
     }
 
     if i > s.count - upto.count {
-        out = *s;
-        s.data  += out.count;
-        s.count  = 0;
+        out = *s
+        s.data  += out.count
+        s.count  = 0
 
     } else {
-        out.count = i;
-        s.data  += out.count;
-        s.count -= out.count;
+        out.count = i
+        s.data  += out.count
+        s.count -= out.count
     }
 
-    return out;
+    return out
 }
 
 str.read_alphanum :: (s: &str) -> str {
-    if s.count == 0 do return "";
+    if s.count == 0 do return ""
 
-    out : str;
-    out.data = s.data;
-    out.count = 0;
+    out : str
+    out.data = s.data
+    out.count = 0
 
     for ch in *s {
         switch ch {
             case 'a' ..= 'z',
                  'A' ..= 'Z',
                  '0' ..= '9' {
-                out.count += 1;
+                out.count += 1
             }
 
             case _ {
-                break break;
+                break break
             }
         }
     }
 
-    s.data += out.count;
-    s.count -= out.count;
+    s.data += out.count
+    s.count -= out.count
 
-    return out;
+    return out
 }
 
 str.read_until_any :: (s: &str, skip: u32, uptos: ..u8) -> str {
-    if s.count == 0 do return "";
+    if s.count == 0 do return ""
 
-    out : str;
-    out.data = s.data;
-    out.count = 0;
+    out : str
+    out.data = s.data
+    out.count = 0
 
-    rem := skip;
+    rem := skip
     for ch in *s {
         for upto in uptos {
             if ch == upto {
-                if rem <= 0 do break break;
-                else do rem -= 1;
+                if rem <= 0 do break break
+                else do rem -= 1
             }
         }
 
-        out.count += 1;
+        out.count += 1
     }
 
-    s.data += out.count;
-    s.count -= out.count;
+    s.data += out.count
+    s.count -= out.count
 
-    return out;
+    return out
 }
 
 str.advance_line :: (s: &str) {
-    if s.count == 0 do return;
+    if s.count == 0 do return
 
-    adv := 0;
-    while s.data[adv] != '\n' && adv <= s.count do adv += 1;
+    adv := 0
+    while s.data[adv] != '\n' && adv <= s.count do adv += 1
 
-    s.data += adv + 1;
-    s.count -= adv + 1;
+    s.data += adv + 1
+    s.count -= adv + 1
 }
 
 str.split :: (s: str, delim: u8, allocator := context.allocator) -> []str {
-    delim_count := 0;
-    for i in 0 .. s.count do if s[i] == delim do delim_count += 1;
+    delim_count := 0
+    for i in 0 .. s.count do if s[i] == delim do delim_count += 1
 
-    strarr := cast([&] str) raw_alloc(allocator, sizeof str * (delim_count + 1));
+    strarr := cast([&] str) raw_alloc(allocator, sizeof str * (delim_count + 1))
 
-    curr_str := 0;
-    begin := 0;
+    curr_str := 0
+    begin := 0
 
     for i in 0 .. s.count {
         if s[i] == delim {
-            strarr[curr_str] = s.data[begin .. i];
-            begin = i + 1;
-            curr_str += 1;
+            strarr[curr_str] = s.data[begin .. i]
+            begin = i + 1
+            curr_str += 1
         }
     }
 
-    strarr[curr_str] = s.data[begin .. s.count];
+    strarr[curr_str] = s.data[begin .. s.count]
 
-    return strarr[0 .. delim_count + 1];
+    return strarr[0 .. delim_count + 1]
 }
 
 str.split_iter :: #match #local {}
@@ -610,15 +599,15 @@ str.split_iter :: (s: str, delim: u8) -> Iterator(str) {
         &.{ s = s, delim = delim },
 
         (ctx: &$T) -> ? str {
-            if string.empty(ctx.s) {
-                return .None;
+            if str.empty(ctx.s) {
+                return .None
             }
 
-            ret: str;
-            ret, ctx.s = bisect(ctx.s, ctx.delim);
-            return ret;
+            ret: str
+            ret, ctx.s = str.bisect(ctx.s, ctx.delim)
+            return ret
         }
-    );
+    )
 }
 
 #overload
@@ -627,15 +616,15 @@ str.split_iter :: (s: str, delim: str) -> Iterator(str) {
         &.{ s = s, delim = delim },
 
         (ctx: &$T) -> ? str {
-            if string.empty(ctx.s) {
-                return .None;
+            if str.empty(ctx.s) {
+                return .None
             }
 
-            ret: str;
-            ret, ctx.s = bisect(ctx.s, ctx.delim);
-            return ret;
+            ret: str
+            ret, ctx.s = str.bisect(ctx.s, ctx.delim)
+            return ret
         }
-    );
+    )
 }
 
 //
@@ -649,22 +638,22 @@ str.bisect :: #match #local {}
 
 #overload
 str.bisect :: (s: str, c: u8) -> (str, str) {
-    index := index_of(s, c); 
+    index := str.index_of(s, c); 
     if index == -1 {
-        return s, "";
+        return s, ""
     }
 
-    return s[0 .. index], s[index+1 .. s.length];
+    return s[0 .. index], s[index+1 .. s.length]
 }
 
 #overload
 str.bisect :: (s: str, substr: str) -> (str, str) {
-    index := index_of(s, substr);
+    index := str.index_of(s, substr)
     if index == -1 {
-        return s, "";
+        return s, ""
     }
 
-    return s[0 .. index], s[index+substr.length .. s.length];
+    return s[0 .. index], s[index+substr.length .. s.length]
 }
 
 
@@ -702,72 +691,20 @@ str.tokenize :: (s: str, charset: [] u8) => {
 //
 
 str.to_dyn_str :: (x: str, allocator := context.allocator) -> dyn_str {
-    use core.array
-    return array.make(x, allocator);
+    return Array.make(x, allocator)
 }
 
 dyn_str.append :: #match {
     macro (x: &dyn_str, other: str) {
-        use core.array
-        array.concat(x, other);
+        Array.concat(x, other)
     }, 
 
     macro (x: &dyn_str, other: u8) {
-        use core.array
-        array.push(x, other);
+        Array.push(x, other)
     }, 
 }
 
 dyn_str.retreat :: macro (x: &dyn_str, chars := 1) {
-    use core.array
-    array.pop(x, chars);
+    Array.pop(x, chars)
 }
-
-
-// These definitions exist to allow you to still say `string.XYZ`, instead of `str.XYZ`
-// That being said, `str.XYZ` should be the preferred way for the future.
-
-as_str :: str.as_str
-free :: str.free
-copy :: str.copy
-temp_copy :: str.temp_copy
-copy_into :: str.copy_into
-to_cstr_on_stack :: str.to_cstr_on_stack
-concat :: str.concat
-join :: str.join
-compare :: str.compare
-contains :: str.contains
-equal :: str.equal
-equal_insensitive :: str.equal_insensitive
-starts_with :: str.starts_with
-ends_with :: str.ends_with
-empty :: str.empty
-index_of :: str.index_of
-last_index_of :: str.last_index_of
-strip_whitespace :: str.strip_whitespace
-strip_leading_whitespace :: str.strip_leading_whitespace
-strip_trailing_whitespace :: str.strip_trailing_whitespace
-to_lowercase :: str.to_lowercase
-to_uppercase :: str.to_uppercase
-trim_start :: str.trim_start
-trim_end :: str.trim_end
-advance :: str.advance
-replace :: str.replace
-read_until :: str.read_until
-read_alphanum :: str.read_alphanum
-read_until_any :: str.read_until_any
-advance_line :: str.advance_line
-split :: str.split
-split_iter :: str.split_iter
-bisect :: str.bisect
-
-to_dyn_str :: str.to_dyn_str
-delete :: dyn_str.delete
-append :: dyn_str.append
-clear  :: dyn_str.clear
-retreat :: dyn_str.retreat
-insert :: dyn_str.insert
-
-// DEPRECATED: Use `string.copy` instead
-alloc_copy :: str.copy
 

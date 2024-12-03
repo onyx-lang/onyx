@@ -1,33 +1,33 @@
 use core {package, *}
 
 Foo :: struct {
-    use vtable: &VTable;
-    x: u32;
+    use vtable: &VTable
+    x: u32
 
     VTable :: struct {
-        f: (&Foo) -> void;
+        f: (&Foo) -> void
     }
 }
 
 good_foo := Foo.VTable.{
     f = (f) => {
-        println("FOOOO!!!");
-        println(f.x);
+        println("FOOOO!!!")
+        println(f.x)
     }
 }
 
 make_foo :: () -> &Foo {
-    foo := new(Foo);
-    foo.vtable = &good_foo;
-    foo.x = 1234;
+    foo := new(Foo)
+    foo.vtable = &good_foo
+    foo.x = 1234
 
-    printf("Made foo!\n");
-    return foo;
+    printf("Made foo!\n")
+    return foo
 }
 
 main :: () {
-    make_foo()->f();
+    make_foo()->f()
 
-    (Foo.{&good_foo, 5678})->f();
+    (Foo.{&good_foo, 5678})->f()
 }
 

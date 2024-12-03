@@ -3,125 +3,125 @@
 use core {*}
 
 MASK_SIZE :: 36
-Bitmask :: [MASK_SIZE] u8;
+Bitmask :: [MASK_SIZE] u8
 
 // Part 1
 bitmask_p1 :: (mask: Bitmask, val: u64) -> u64 {
-	res: u64 = 0;
-	bit: u64 = 1;
+	res: u64 = 0
+	bit: u64 = 1
 	for m in mask {
 		switch m {
-			case 1 do res |= bit;
-			case 2 do res |= (val & bit);
+			case 1 do res |= bit
+			case 2 do res |= (val & bit)
 		}	
 
-		bit <<= 1;
+		bit <<= 1
 	}
 
-	return res;
+	return res
 }
 
 // Part 2
 
 BitmaskIter :: struct {
-	floating_indicies : [..] u8;
-	val               : u64;
-	done              : bool;
+	floating_indicies : [..] u8
+	val               : u64
+	done              : bool
 }
 
 bitmask_p2 :: (mask: Bitmask, val: u64) -> Iterator(u64) {
     iterator_next :: (data: rawptr) -> ? u64 {
-        bmi := cast(&BitmaskIter) data;
-        if bmi.done do return .None;
+        bmi := cast(&BitmaskIter) data
+        if bmi.done do return .None
 
 		for ind in bmi.floating_indicies {
-			is_set := (bmi.val & (1 << cast(u64) ind)) != 0;
+			is_set := (bmi.val & (1 << cast(u64) ind)) != 0
 
-			bmi.val ^= 1 << cast(u64) ind;
+			bmi.val ^= 1 << cast(u64) ind
 
-			if !is_set do return bmi.val;
+			if !is_set do return bmi.val
 		}
 
-        bmi.done = true;
-        return bmi.val;
+        bmi.done = true
+        return bmi.val
     }
 
     iterator_close :: (data: rawptr) {
-        bmi := cast(&BitmaskIter) data;
-        array.free(&bmi.floating_indicies);
-        cfree(bmi);
+        bmi := cast(&BitmaskIter) data
+        Array.free(&bmi.floating_indicies)
+        cfree(bmi)
     }
 
-    bmi := new(BitmaskIter);
-    bmi.done = false;
+    bmi := new(BitmaskIter)
+    bmi.done = false
 
-    array.init(&bmi.floating_indicies, 8);
+    Array.init(&bmi.floating_indicies, 8)
 
-	v := val;
+	v := val
 	for i in 0 .. MASK_SIZE {
-		if mask[i] == 1 do v |= 1 << cast(u64) i;
+		if mask[i] == 1 do v |= 1 << cast(u64) i
 
 		if mask[i] == 2 {
-            v &= ~(1 << cast(u64) i);
-			array.push(&bmi.floating_indicies, cast(u8) i);
+            v &= ~(1 << cast(u64) i)
+			Array.push(&bmi.floating_indicies, cast(u8) i)
 		}
 	}
 
-	bmi.val = v;
+	bmi.val = v
 
-    return .{ bmi, iterator_next, iterator_close };
+    return .{ bmi, iterator_next, iterator_close }
 }
 
 main :: (args: [] cstr) {
-	contents := #file_contents "./input/day14.txt";
+	contents := #file_contents "./input/day14.txt"
 
-	file := contents;
+	file := contents
 
-	mem := map.make(u64, u64);
-	defer map.free(&mem);
+	mem := Map.make(u64, u64)
+	defer Map.free(&mem)
 
-	mask : Bitmask;
-	for &m in mask do *m = 2;
+	mask : Bitmask
+	for &m in mask do *m = 2
 
-	while !string.empty(file) {
-		word := string.read_alphanum(&file);
-		if string.equal(word, "mask") {
-            string.advance(&file, 3);
+	while !str.empty(file) {
+		word := str.read_alphanum(&file)
+		if str.equal(word, "mask") {
+            str.advance(&file, 3)
 
-			i := 35;
-            m, file~ := string.bisect(file, '\n');
+			i := 35
+            m, file~ := str.bisect(file, '\n')
             for ch in m {
 				switch ch {
-					case '0' do mask[i] = 0;
-					case '1' do mask[i] = 1;
-					case 'X' do mask[i] = 2;
+					case '0' do mask[i] = 0
+					case '1' do mask[i] = 1
+					case 'X' do mask[i] = 2
 				}
 
-				i -= 1;
+				i -= 1
 			}
 		}
-		elseif string.equal(word, "mem") {
-			string.advance(&file, 1);
+		elseif str.equal(word, "mem") {
+			str.advance(&file, 1)
 
-			addr := cast(u64, conv.parse_int(&file));
-			string.advance(&file, 4);
+			addr := cast(u64, conv.parse_int(&file))
+			str.advance(&file, 4)
 
-			val := cast(u64, conv.parse_int(&file));
+			val := cast(u64, conv.parse_int(&file))
 
 			// Part 1
-			// map.put(&mem, addr, bitmask_p1(mask, val));
+			// Map.put(&mem, addr, bitmask_p1(mask, val))
 
 			// Part 2
             for real_addr in bitmask_p2(mask, addr) {
-                map.put(&mem, real_addr, val);
+                Map.put(&mem, real_addr, val)
             }
 
-			string.advance_line(&file);
+			str.advance_line(&file)
 		}	
 	}	
 
-	s: u64 = 0;
-	for e in mem.entries do s += e.value;
+	s: u64 = 0
+	for e in mem.entries do s += e.value
 
-	printf("Sum: {}\n", s);
+	printf("Sum: {}\n", s)
 }
