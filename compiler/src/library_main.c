@@ -854,6 +854,7 @@ const char *onyx_stat_filepath(onyx_context_t *ctx, int32_t file_index) {
 // Running WASM
 //
 
+#ifdef ONYX_RUNTIME_LIBRARY
 void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv) {
     onyx_run_initialize(0, NULL);
 
@@ -873,6 +874,15 @@ void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, cha
 
     onyx_run_wasm_code(wasm_bytes, argc, argv);
 }
+#else
+void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv) {
+    printf("ERROR: Cannot run WASM code. No runtime was configured at the time Onyx was built");
+}
+
+void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path) {
+    printf("ERROR: Cannot run WASM code. No runtime was configured at the time Onyx was built");
+}
+#endif
 
 
 

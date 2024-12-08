@@ -70,6 +70,6 @@ FLAGS=""
 if [ ! -z ${ONYX_TARGET+x} ]; then
     FLAGS="$FLAGS --target=$ONYX_TARGET"
 fi
-$ONYX_CC -shared -o $FLAGS "libonyx.$suffix" *.o $LIBS
+$ONYX_CC -shared $FLAGS -o "libonyx.$suffix" *.o $LIBS
 
 rm *.o
