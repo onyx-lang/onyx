@@ -1,6 +1,6 @@
 #!/bin/sh
 
-C_FILES="onyx astnodes builtins checker clone doc entities errors lex parser symres types utils wasm_emit extensions "
+C_FILES="library_main astnodes builtins checker clone doc entities errors lex parser symres types utils wasm_emit extensions "
 LIBS="-lpthread -ldl -lm"
 INCLUDES="-I./include -I../shared/include -I../shared/include/dyncall"
 
@@ -12,7 +12,7 @@ else
     FLAGS="$WARNINGS -O3"
 fi
 
-FLAGS="$FLAGS -DENABLE_DEBUG_INFO"
+FLAGS="$FLAGS -DENABLE_DEBUG_INFO -fvisibility=hidden"
 
 if [ ! -z ${ONYX_TARGET+x} ]; then
     FLAGS="$FLAGS --target=$ONYX_TARGET"
@@ -51,8 +51,25 @@ if [ "$ONYX_USE_DYNCALL" = "1" ] && [ "$ONYX_RUNTIME_LIBRARY" = "ovmwasm" ]; the
     FLAGS="$FLAGS -DUSE_DYNCALL"
 fi
 
-echo "Compiling onyx"
-$ONYX_CC -o "onyx" \
-    $FLAGS $INCLUDES \
-    $(echo "$C_FILES" | sed 's/ /\n/g;s/\([a-zA-Z_0-9]*\)\n/src\/\1.c\n/g;s/\n/ /g') \
-    $LIBS
+case "$(uname)" in
+    Linux)  suffix='so' ;;
+    *BSD)   suffix='so' ;;
+    Darwin) suffix='dylib' ;;
+    *)      suffix='dll' ;;
+esac
+
+echo "Compiling libonyx.$suffix"
+for c_file in $(echo "$C_FILES" | sed 's/ /\n/g;s/\([a-zA-Z_0-9]*\)\n/src\/\1.c\n/g;s/\n/ /g'); do
+    $ONYX_CC $FLAGS $INCLUDES -fPIC -o $(basename $c_file).o -c $c_file
+done
+
+echo "Compiling onyx executable"
+$ONYX_CC $INCLUDES $FLAGS cli/main.c *.o -o onyx $LIBS
+
+FLAGS=""
+if [ ! -z ${ONYX_TARGET+x} ]; then
+    FLAGS="$FLAGS --target=$ONYX_TARGET"
+fi
+$ONYX_CC -shared $FLAGS -o "libonyx.$suffix" *.o $LIBS
+
+rm *.o

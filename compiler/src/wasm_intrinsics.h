@@ -253,7 +253,7 @@ EMIT_FUNC(intrinsic_atomic_wait, Type* type, OnyxToken* where) {
     return;
 
 bad_type:
-    onyx_report_error(where->pos, Error_Critical, "Bad type for atomic wait, '%s'. Only i32 and i64 are supported.", type_get_name(type));
+    ONYX_ERROR(where->pos, Error_Critical, "Bad type for atomic wait, '%s'. Only i32 and i64 are supported.", type_get_name(mod->context, type));
 }
 
 EMIT_FUNC_NO_ARGS(intrinsic_atomic_notify) {
@@ -290,7 +290,7 @@ EMIT_FUNC(intrinsic_atomic_load, Type* type, OnyxToken* where) {
     return;
 
 bad_type:
-    onyx_report_error(where->pos, Error_Critical, "Bad type for atomic load, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
+    ONYX_ERROR(where->pos, Error_Critical, "Bad type for atomic load, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(mod->context, type));
 }
 
 EMIT_FUNC(intrinsic_atomic_store, Type* type, OnyxToken* where) {
@@ -315,7 +315,7 @@ EMIT_FUNC(intrinsic_atomic_store, Type* type, OnyxToken* where) {
     return;
 
 bad_type:
-    onyx_report_error(where->pos, Error_Critical, "Bad type for atomic store, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
+    ONYX_ERROR(where->pos, Error_Critical, "Bad type for atomic store, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(mod->context, type));
 }
 
 EMIT_FUNC(intrinsic_atomic_add, Type* type, OnyxToken* where) {
@@ -340,7 +340,7 @@ EMIT_FUNC(intrinsic_atomic_add, Type* type, OnyxToken* where) {
     return;
 
 bad_type:
-    onyx_report_error(where->pos, Error_Critical, "Bad type for atomic add, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
+    ONYX_ERROR(where->pos, Error_Critical, "Bad type for atomic add, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(mod->context, type));
 }
 
 EMIT_FUNC(intrinsic_atomic_sub, Type* type, OnyxToken* where) {
@@ -365,7 +365,7 @@ EMIT_FUNC(intrinsic_atomic_sub, Type* type, OnyxToken* where) {
     return;
 
 bad_type:
-    onyx_report_error(where->pos, Error_Critical, "Bad type for atomic sub, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
+    ONYX_ERROR(where->pos, Error_Critical, "Bad type for atomic sub, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(mod->context, type));
 }
 
 EMIT_FUNC(intrinsic_atomic_and, Type* type, OnyxToken* where) {
@@ -390,7 +390,7 @@ EMIT_FUNC(intrinsic_atomic_and, Type* type, OnyxToken* where) {
     return;
 
 bad_type:
-    onyx_report_error(where->pos, Error_Critical, "Bad type for atomic and, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
+    ONYX_ERROR(where->pos, Error_Critical, "Bad type for atomic and, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(mod->context, type));
 }
 
 EMIT_FUNC(intrinsic_atomic_or, Type* type, OnyxToken* where) {
@@ -415,7 +415,7 @@ EMIT_FUNC(intrinsic_atomic_or, Type* type, OnyxToken* where) {
     return;
 
 bad_type:
-    onyx_report_error(where->pos, Error_Critical, "Bad type for atomic or, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
+    ONYX_ERROR(where->pos, Error_Critical, "Bad type for atomic or, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(mod->context, type));
 }
 
 EMIT_FUNC(intrinsic_atomic_xor, Type* type, OnyxToken* where) {
@@ -440,7 +440,7 @@ EMIT_FUNC(intrinsic_atomic_xor, Type* type, OnyxToken* where) {
     return;
 
 bad_type:
-    onyx_report_error(where->pos, Error_Critical, "Bad type for atomic xor, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
+    ONYX_ERROR(where->pos, Error_Critical, "Bad type for atomic xor, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(mod->context, type));
 }
 
 EMIT_FUNC(intrinsic_atomic_xchg, Type* type, OnyxToken* where) {
@@ -465,7 +465,7 @@ EMIT_FUNC(intrinsic_atomic_xchg, Type* type, OnyxToken* where) {
     return;
 
 bad_type:
-    onyx_report_error(where->pos, Error_Critical, "Bad type for atomic xchg, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
+    ONYX_ERROR(where->pos, Error_Critical, "Bad type for atomic xchg, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(mod->context, type));
 }
 
 EMIT_FUNC(intrinsic_atomic_cmpxchg, Type* type, OnyxToken* where) {
@@ -490,12 +490,12 @@ EMIT_FUNC(intrinsic_atomic_cmpxchg, Type* type, OnyxToken* where) {
     return;
 
 bad_type:
-    onyx_report_error(where->pos, Error_Critical, "Bad type for atomic cmpxchg, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
+    ONYX_ERROR(where->pos, Error_Critical, "Bad type for atomic cmpxchg, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(mod->context, type));
 }
 
 EMIT_FUNC_NO_ARGS(initialize_data_segments_body) {
     // :ProperLinking
-    if (!context.options->use_multi_threading || !context.options->use_post_mvp_features) return;
+    if (!mod->context->options->use_multi_threading || !mod->context->options->use_post_mvp_features) return;
 
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -518,7 +518,7 @@ EMIT_FUNC_NO_ARGS(initialize_data_segments_body) {
 EMIT_FUNC_NO_ARGS(run_init_procedures) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    bh_arr_each(AstFunction *, func, init_procedures) {
+    bh_arr_each(AstFunction *, func, mod->context->builtins.init_procedures) {
         CodePatchInfo code_patch;
         code_patch.kind = Code_Patch_Callee;
         code_patch.func_idx = mod->current_func_idx;
@@ -526,7 +526,7 @@ EMIT_FUNC_NO_ARGS(run_init_procedures) {
         code_patch.node_related_to_patch = (AstNode *) *func;
         bh_arr_push(mod->code_patches, code_patch);
 
-        ensure_node_has_been_submitted_for_emission((AstNode *) *func);
+        ensure_node_has_been_submitted_for_emission(mod->context, (AstNode *) *func);
 
         debug_emit_instruction(mod, NULL);
         bh_arr_push(code, ((WasmInstruction){ WI_CALL, 0 }));

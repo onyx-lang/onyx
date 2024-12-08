@@ -14,6 +14,7 @@ typedef struct PolymorphicContext {
 
 typedef struct OnyxParser {
     bh_allocator allocator;
+    Context *context;
 
     Package *package;
     Scope *file_scope;
@@ -67,7 +68,7 @@ typedef struct OnyxParser {
 
 const char* onyx_ast_node_kind_string(AstKind kind);
 void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstKind kind);
-OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer);
+OnyxParser onyx_parser_create(Context *context, OnyxTokenizer *tokenizer);
 void onyx_parser_free(OnyxParser* parser);
 void onyx_parse(OnyxParser *parser);
 AstTyped *onyx_parse_expression(OnyxParser *parser, Scope *scope);

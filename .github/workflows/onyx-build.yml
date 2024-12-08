@@ -65,29 +65,29 @@ jobs:
             runtime_library: none
             artifact_name: 'onyx-linux-none-arm64' 
           - build: darwin-arm64
-            os: macos-12
+            os: macos-13
             runtime_library: none
             target: aarch64-apple-darwin
             artifact_name: 'onyx-darwin-none-arm64'
           - build: darwin-arm64
-            os: macos-12
+            os: macos-13
             runtime_library: wasmer
             target: aarch64-apple-darwin
             artifact_name: 'onyx-darwin-wasmer-arm64'
           - build: darwin-amd64
-            os: macos-12
+            os: macos-13
             runtime_library: none
             artifact_name: 'onyx-darwin-none-amd64'
           - build: darwin-amd64
-            os: macos-12
+            os: macos-13
             runtime_library: wasmer
             artifact_name: 'onyx-darwin-wasmer-amd64'
           - build: darwin-amd64
-            os: macos-12
+            os: macos-13
             runtime_library: ovmwasm
             artifact_name: 'onyx-darwin-ovm-amd64'
           - build: darwin-arm64
-            os: macos-12
+            os: macos-13
             runtime_library: ovmwasm
             target: aarch64-apple-darwin
             artifact_name: 'onyx-darwin-ovm-arm64'
