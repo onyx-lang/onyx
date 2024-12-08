@@ -35,6 +35,7 @@ if %ERRORLEVEL% neq 0 (
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 del *.obj > NUL 2> NUL
+del *.exp > NUL 2> NUL
 del misc\icon_resource.res
 
 cl /MT /std:c17 /TC /I compiler/include /I shared/include /D_USRDLL /D_WINDLL runtime\onyx_runtime.c /link /DLL ws2_32.lib bcrypt.lib Synchronization.lib kernel32.lib /OUT:onyx_runtime.dll
@@ -64,6 +65,7 @@ if "%1" == "dist" (
     copy onyx_runtime.dll dist\onyx_runtime.dll
     copy onyx.exe dist\onyx.exe
     copy onyx.dll dist\onyx.dll
+    copy onyx.lib dist\onyx.lib
 
     mkdir dist\tools
     copy scripts\onyx-pkg.onyx dist\tools\onyx-pkg.onyx
