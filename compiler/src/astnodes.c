@@ -1555,6 +1555,20 @@ TypeMatch implicit_cast_to_bool(Context *context, AstTyped **pnode) {
     return TYPE_MATCH_YIELD;
 }
 
+static char *sanitize_name(bh_allocator a, const char *name) {
+    if (!name) return name;
+
+    char *sanitized = bh_strdup(a, name); 
+    char *c = sanitized;
+    while (*c) {
+        if (!char_is_alphanum(*c)) {
+            *c = '_';
+        }
+        c++;
+    }
+    return sanitized;
+}
+
 char* get_function_name(Context *context, AstFunction* func) {
     if (func->kind != Ast_Kind_Function) return "unnamed_proc";
 
@@ -1571,18 +1585,25 @@ char* get_function_name(Context *context, AstFunction* func) {
 }
 
 char* get_function_assembly_name(Context *context, AstFunction* func) {
-    if (func->kind != Ast_Kind_Function) return "unnamed_proc";
+    if (func->kind == Ast_Kind_Function) {
+        if (func->assembly_name != NULL) return func->assembly_name;
 
-    if (func->name != NULL) return func->assembly_name;
-
-    if (func->exported_name != NULL) {
-        return bh_aprintf(context->scratch_alloc,
-                "%b",
-                func->exported_name->text,
-                func->exported_name->length);
+        if (func->exported_name != NULL) {
+            return bh_aprintf(context->scratch_alloc,
+                    "%b",
+                    func->exported_name->text,
+                    func->exported_name->length);
+        }
     }
 
-    return "unnamed_proc";
+    if (func->token) {
+        return bh_aprintf(context->ast_alloc,
+            "unnamed_at_%s_%d",
+            sanitize_name(context->scratch_alloc, func->token->pos.filename),
+            func->token->pos.line);
+    }
+
+    return "unnamed";
 }
 
 char* generate_name_within_scope(Context *context, Scope *scope, OnyxToken* symbol) {
