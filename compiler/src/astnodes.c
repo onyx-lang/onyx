@@ -200,19 +200,19 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "JS",
 };
 
-AstNumLit* ast_reduce_type_compare(bh_allocator a, AstBinaryOp* node) {
-    AstType* left =  (AstType *) ast_reduce(a, node->left);
-    AstType* right = (AstType *) ast_reduce(a, node->right);
+AstNumLit* ast_reduce_type_compare(Context *context, AstBinaryOp* node) {
+    AstType* left =  (AstType *) ast_reduce(context, node->left);
+    AstType* right = (AstType *) ast_reduce(context, node->right);
 
-    Type* left_type  = type_build_from_ast(context.ast_alloc, left);
-    Type* right_type = type_build_from_ast(context.ast_alloc, right);
+    Type* left_type  = type_build_from_ast(context, left);
+    Type* right_type = type_build_from_ast(context, right);
 
-    AstNumLit* res = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
+    AstNumLit* res = onyx_ast_node_new(context->ast_alloc, sizeof(AstNumLit), Ast_Kind_NumLit);
     res->token = node->token;
     res->flags |= node->flags;
     res->flags |= Ast_Flag_Comptime;
-    res->type_node = (AstType *) &basic_type_bool;
-    res->type = &basic_types[Basic_Kind_Bool];
+    res->type_node = (AstType *) &context->basic_types.type_bool;
+    res->type = context->types.basic[Basic_Kind_Bool];
     res->next = node->next;
 
     switch (node->operation) {
@@ -254,25 +254,25 @@ AstNumLit* ast_reduce_type_compare(bh_allocator a, AstBinaryOp* node) {
     } \
     break;
 
-AstNumLit* ast_reduce_binop(bh_allocator a, AstBinaryOp* node) {
-    AstNumLit* left =  (AstNumLit *) ast_reduce(a, node->left);
-    AstNumLit* right = (AstNumLit *) ast_reduce(a, node->right);
+AstNumLit* ast_reduce_binop(Context *context, AstBinaryOp* node) {
+    AstNumLit* left =  (AstNumLit *) ast_reduce(context, node->left);
+    AstNumLit* right = (AstNumLit *) ast_reduce(context, node->right);
 
     if (node_is_type((AstNode *) left) && node_is_type((AstNode *) right)) {
         if (node->operation == Binary_Op_Equal || node->operation == Binary_Op_Not_Equal) {
-            return (AstNumLit *) ast_reduce_type_compare(a, node);
+            return (AstNumLit *) ast_reduce_type_compare(context, node);
         }
     }
 
     if (left->kind != Ast_Kind_NumLit) {
         b32 valid = 0;
-        AstNumLit *tmp = make_int_literal(a, get_expression_integer_value((AstTyped *) left, &valid));
+        AstNumLit *tmp = make_int_literal(context, get_expression_integer_value(context, (AstTyped *) left, &valid));
         if (valid) left = tmp;
     }
 
     if (right->kind != Ast_Kind_NumLit) {
         b32 valid = 0;
-        AstNumLit *tmp = make_int_literal(a, get_expression_integer_value((AstTyped *) right, &valid));
+        AstNumLit *tmp = make_int_literal(context, get_expression_integer_value(context, (AstTyped *) right, &valid));
         if (valid) right = tmp;
     }
 
@@ -282,7 +282,7 @@ AstNumLit* ast_reduce_binop(bh_allocator a, AstBinaryOp* node) {
         return (AstNumLit *) node;
     }
 
-    AstNumLit* res = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
+    AstNumLit* res = onyx_ast_node_new(context->ast_alloc, sizeof(AstNumLit), Ast_Kind_NumLit);
     res->token = node->token;
     res->flags |= node->flags;
     res->flags |= Ast_Flag_Comptime;
@@ -339,16 +339,16 @@ AstNumLit* ast_reduce_binop(bh_allocator a, AstBinaryOp* node) {
         res->value.l = op (operand)->value.l; \
     }
 
-AstTyped* ast_reduce_unaryop(bh_allocator a, AstUnaryOp* unop) {
+AstTyped* ast_reduce_unaryop(Context *context, AstUnaryOp* unop) {
     // GROSS
-    AstNumLit* operand = (AstNumLit *) ast_reduce(a, unop->expr);
+    AstNumLit* operand = (AstNumLit *) ast_reduce(context, unop->expr);
     unop->expr = (AstTyped *) operand;
 
     if (operand->kind != Ast_Kind_NumLit) {
         return (AstTyped *) unop;
     }
 
-    AstNumLit* res = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
+    AstNumLit* res = onyx_ast_node_new(context->ast_alloc, sizeof(AstNumLit), Ast_Kind_NumLit);
     res->token = unop->token;
     res->flags |= Ast_Flag_Comptime;
     res->type_node = unop->type_node;
@@ -435,41 +435,41 @@ AstTyped* ast_reduce_unaryop(bh_allocator a, AstUnaryOp* unop) {
     return (AstTyped *) res;
 }
 
-AstTyped* ast_reduce(bh_allocator a, AstTyped* node) {
+AstTyped* ast_reduce(Context *context, AstTyped* node) {
     assert(node->flags & Ast_Flag_Comptime);
 
     switch (node->kind) {
-        case Ast_Kind_Binary_Op:  return (AstTyped *) ast_reduce_binop(a, (AstBinaryOp *) node);
-        case Ast_Kind_Unary_Op:   return (AstTyped *) ast_reduce_unaryop(a, (AstUnaryOp *) node);
+        case Ast_Kind_Binary_Op:  return (AstTyped *) ast_reduce_binop(context, (AstBinaryOp *) node);
+        case Ast_Kind_Unary_Op:   return (AstTyped *) ast_reduce_unaryop(context, (AstUnaryOp *) node);
         case Ast_Kind_Enum_Value: return (AstTyped *) ((AstEnumValue *) node)->value;
-        case Ast_Kind_Alias:      return (AstTyped *) ast_reduce(a, ((AstAlias *) node)->alias);
+        case Ast_Kind_Alias:      return (AstTyped *) ast_reduce(context, ((AstAlias *) node)->alias);
         default:                  return node;
     }
 }
 
-void promote_numlit_to_larger(AstNumLit* num) {
+void promote_numlit_to_larger(Context *context, AstNumLit* num) {
     assert(num->type != NULL);
 
     if (type_is_integer(num->type) && num->type->Basic.size <= 4) {
         // NOTE: Int32, Int16, Int8
         i64 val = (i64) num->value.i;
         num->value.l = val;
-        num->type = &basic_types[Basic_Kind_I64];
+        num->type = context->types.basic[Basic_Kind_I64];
     } else if (num->type->Basic.size <= 4) {
         // NOTE: Float32
         f64 val = (f64) num->value.f;
         num->value.d = val;
-        num->type = &basic_types[Basic_Kind_F64];
+        num->type = context->types.basic[Basic_Kind_F64];
     }
 }
 
 // NOTE: Returns 1 if the conversion was successful.
-b32 convert_numlit_to_type(AstNumLit* num, Type* to_type, b32 permanent) {
+b32 convert_numlit_to_type(Context *context, AstNumLit* num, Type* to_type, b32 permanent) {
     if (num->type == NULL)
-        num->type = type_build_from_ast(context.ast_alloc, num->type_node);
+        num->type = type_build_from_ast(context, num->type_node);
     assert(num->type);
 
-    if (types_are_compatible(num->type, to_type)) return 1;
+    if (types_are_compatible(context, num->type, to_type)) return 1;
     if (!type_is_numeric(to_type)) return 0;
 
     Type *type = to_type;
@@ -507,7 +507,7 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type, b32 permanent) {
                             }
                 }
 
-                if (permanent) onyx_report_error(num->token->pos, Error_Critical, "Unsigned integer constant with value '%l' does not fit into %d-bits.",
+                if (permanent) ONYX_ERROR(num->token->pos, Error_Critical, "Unsigned integer constant with value '%l' does not fit into %d-bits.",
                         num->value.l,
                         type->Basic.size * 8);
 
@@ -534,7 +534,7 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type, b32 permanent) {
                             } break;
                 }
 
-                if (permanent) onyx_report_error(num->token->pos, Error_Critical, "Integer constant with value '%l' does not fit into %d-bits.",
+                if (permanent) ONYX_ERROR(num->token->pos, Error_Critical, "Integer constant with value '%l' does not fit into %d-bits.",
                         num->value.l,
                         type->Basic.size * 8);
             }
@@ -543,7 +543,7 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type, b32 permanent) {
         else if (type->Basic.flags & Basic_Flag_Float) {
             if (type->Basic.size == 4) {
                 if (bh_abs(num->value.l) >= (1 << 23)) {
-                    if (permanent) onyx_report_error(num->token->pos, Error_Critical, "Integer '%l' does not fit in 32-bit float exactly.", num->value.l);
+                    if (permanent) ONYX_ERROR(num->token->pos, Error_Critical, "Integer '%l' does not fit in 32-bit float exactly.", num->value.l);
                     return 0;
                 }
 
@@ -553,7 +553,7 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type, b32 permanent) {
             }
             if (type->Basic.size == 8) {
                 if (bh_abs(num->value.l) >= (1ll << 52)) {
-                    if (permanent) onyx_report_error(num->token->pos, Error_Critical, "Integer '%l' does not fit in 64-bit float exactly.", num->value.l);
+                    if (permanent) ONYX_ERROR(num->token->pos, Error_Critical, "Integer '%l' does not fit in 64-bit float exactly.", num->value.l);
                     return 0;
                 }
 
@@ -591,7 +591,7 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type, b32 permanent) {
 // TODO: This function should be able return a "yield" condition. There
 // are a couple cases that need to yield in order to be correct, like
 // polymorphic functions with a typeof for the return type.
-TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
+TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b32 permanent) {
     AstTyped* node = *pnode;
     if (type == NULL) return TYPE_MATCH_FAILED;
     if (node == NULL) return TYPE_MATCH_FAILED;
@@ -618,7 +618,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
 
         node->type = type;
 
-        add_entities_for_node(NULL, (AstNode *) node, NULL, NULL);
+        add_entities_for_node(&context->entities, NULL, (AstNode *) node, NULL, NULL);
         return TYPE_MATCH_SUCCESS;
     }
 
@@ -644,9 +644,9 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
             case Type_Kind_Slice: {
                 Type* elem_type = type->Slice.elem;
                 AstArrayLiteral* al = (AstArrayLiteral *) node;
-                array_type = type_make_array(context.ast_alloc, elem_type, bh_arr_length(al->values));
+                array_type = type_make_array(context, elem_type, bh_arr_length(al->values));
 
-                *pnode = (AstTyped *) make_cast(context.ast_alloc, node, type);
+                *pnode = (AstTyped *) make_cast(context, node, type);
 
                 break;
             }
@@ -661,7 +661,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         node->type = array_type;
         node->flags |= Ast_Flag_Array_Literal_Typed;
 
-        add_entities_for_node(NULL, (AstNode *) node, NULL, NULL);
+        add_entities_for_node(&context->entities, NULL, (AstNode *) node, NULL, NULL);
         return TYPE_MATCH_SUCCESS;
     }
 
@@ -671,12 +671,12 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
             int index = 0;
             if ((index = shgeti(type->Union.variants, node->token->text)) != -1) {
                 UnionVariant *uv = type->Union.variants[index].value;
-                if (uv->type != &basic_types[Basic_Kind_Void]) {
+                if (uv->type != context->types.basic[Basic_Kind_Void]) {
                     if (permanent) {
-                        onyx_report_error(node->token->pos, Error_Critical,
+                        ONYX_ERROR(node->token->pos, Error_Critical,
                             "Shorthand union literal syntax '.%s' is not all for this variant, because its type is not void; it is '%s'. Use the longer syntax, '.{ %s = value }'",
                             node->token->text,
-                            type_get_name(uv->type),
+                            type_get_name(context, uv->type),
                             node->token->text);
                     }
                     token_toggle_end(node->token);
@@ -684,7 +684,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
                 }
 
                 if (permanent) {
-                    AstStructLiteral *sl = make_union_variant_of_void(context.ast_alloc, type, node->token, uv);
+                    AstStructLiteral *sl = make_union_variant_of_void(context, type, node->token, uv);
                     *pnode = (AstTyped *) sl;
                 }
 
@@ -694,21 +694,21 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
             token_toggle_end(node->token);
         }
 
-        AstNode* resolved = try_symbol_resolve_from_type(type, node->token);
+        AstNode* resolved = try_symbol_resolve_from_type(context, type, node->token);
         if (resolved == NULL) {
-            if (context.cycle_detected) {
+            if (context->cycle_detected) {
                 token_toggle_end(node->token);
-                char *closest = find_closest_symbol_in_node((AstNode *) type->ast_type, node->token->text);
+                char *closest = find_closest_symbol_in_node(context, (AstNode *) type->ast_type, node->token->text);
                 token_toggle_end(node->token);
 
                 if (closest) {
-                    onyx_report_error(node->token->pos, Error_Critical, "'%b' does not exist in '%s'. Did you mean '%s'?",
+                    ONYX_ERROR(node->token->pos, Error_Critical, "'%b' does not exist in '%s'. Did you mean '%s'?",
                         node->token->text, node->token->length,
-                        type_get_name(type),
+                        type_get_name(context, type),
                         closest);
                 } else {
-                    onyx_report_error(node->token->pos, Error_Critical, "'%b' does not exist in '%s'.",
-                        node->token->text, node->token->length, type_get_name(type));
+                    ONYX_ERROR(node->token->pos, Error_Critical, "'%b' does not exist in '%s'.",
+                        node->token->text, node->token->length, type_get_name(context, type));
                 }
 
                 return TYPE_MATCH_FAILED;
@@ -718,7 +718,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         }
 
         if (permanent) {
-            track_resolution_for_symbol_info((AstNode *) node, resolved);
+            track_resolution_for_symbol_info(context, (AstNode *) node, resolved);
             *pnode = (AstTyped *) resolved;
         }
 
@@ -726,12 +726,12 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     }
 
     if (node->kind == Ast_Kind_Overloaded_Function) {
-        AstTyped* func = find_matching_overload_by_type(((AstOverloadedFunction *) node)->overloads, type);
+        AstTyped* func = find_matching_overload_by_type(context, ((AstOverloadedFunction *) node)->overloads, type);
         if (func == NULL) return TYPE_MATCH_FAILED;
-        if (func == (AstTyped *) &node_that_signals_a_yield) return TYPE_MATCH_YIELD;
+        if (func == (AstTyped *) &context->node_that_signals_a_yield) return TYPE_MATCH_YIELD;
 
         if (permanent) {
-            ensure_overload_returns_correct_type(func, (AstOverloadedFunction *) node);
+            ensure_overload_returns_correct_type(context, func, (AstOverloadedFunction *) node);
             *pnode = func;
         }
 
@@ -739,9 +739,9 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     }
 
     if (node->kind == Ast_Kind_Polymorphic_Proc) {
-        AstFunction* func = polymorphic_proc_lookup((AstFunction *) node, PPLM_By_Function_Type, type, node->token);
+        AstFunction* func = polymorphic_proc_lookup(context, (AstFunction *) node, PPLM_By_Function_Type, type, node->token);
         if (func == NULL) return TYPE_MATCH_FAILED;
-        if (func == (AstFunction *) &node_that_signals_a_yield) return TYPE_MATCH_YIELD;
+        if (func == (AstFunction *) &context->node_that_signals_a_yield) return TYPE_MATCH_YIELD;
 
         *pnode = (AstTyped *) func;
         node = *pnode;
@@ -753,8 +753,8 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     if (type->kind == Type_Kind_Function && (node->flags & Ast_Flag_Proc_Is_Null) != 0) return TYPE_MATCH_SUCCESS;
 
     // The normal case where everything works perfectly.
-    Type* node_type = get_expression_type(node);
-    if (types_are_compatible(node_type, type)) return TYPE_MATCH_SUCCESS;
+    Type* node_type = get_expression_type(context, node);
+    if (types_are_compatible(context, node_type, type)) return TYPE_MATCH_SUCCESS;
 
 
     // 'any' matches any type. This is commented out because it was causing
@@ -763,7 +763,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // compiler to handle "mismatched" types. This should be properly fixed soon,
     // but will remain commented out for now.
     //
-    // Type* any_type = type_build_from_ast(context.ast_alloc, builtin_any_type);
+    // Type* any_type = type_build_from_ast(context, context->builtins.any_type);
     // if (any_type == NULL) return TYPE_MATCH_YIELD;
     // i64 any_id = any_type->id;
     // if (node_type && node_type->id != any_id && type->id == any_id) return TYPE_MATCH_SUCCESS;
@@ -776,7 +776,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // value placeholder, fill in that placeholder with the actual type.
     // :AutoReturnType
     if (node_type && node_type->kind == Type_Kind_Function
-        && node_type->Function.return_type == &type_auto_return
+        && node_type->Function.return_type == context->types.auto_return
         && type->kind == Type_Kind_Function) {
 
         node_type->Function.return_type = type->Function.return_type;
@@ -787,8 +787,8 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // to the destination type, and if it is change the type to cast to.
     if (node_is_auto_cast((AstNode *) node)) {
         char* dummy;
-        Type* from_type = get_expression_type(((AstUnaryOp *) node)->expr);
-        if (!from_type || !cast_is_legal(from_type, type, &dummy)) {
+        Type* from_type = get_expression_type(context, ((AstUnaryOp *) node)->expr);
+        if (!from_type || !cast_is_legal(context, from_type, type, &dummy)) {
             return TYPE_MATCH_FAILED;
 
         } else {
@@ -800,7 +800,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // String literals implicitly become c-strings for convience.
     if (node->kind == Ast_Kind_StrLit
         && type->kind == Type_Kind_MultiPointer
-        && type->MultiPointer.elem == &basic_types[Basic_Kind_U8]) {
+        && type->MultiPointer.elem == context->types.basic[Basic_Kind_U8]) {
 
         if (permanent) {
             AstStrLit *strlit = (AstStrLit *) node;
@@ -821,9 +821,9 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         (node_type->kind == Type_Kind_Array || node_type->kind == Type_Kind_DynArray || node_type->kind == Type_Kind_VarArgs)) {
 
         char* dummy;
-        b32 legal = cast_is_legal(node_type, type, &dummy);
+        b32 legal = cast_is_legal(context, node_type, type, &dummy);
         if (permanent && legal) {
-            *pnode = (AstTyped *) make_cast(context.ast_alloc, node, type);
+            *pnode = (AstTyped *) make_cast(context, node, type);
         }
 
         return legal ? TYPE_MATCH_SUCCESS : TYPE_MATCH_FAILED;
@@ -846,7 +846,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
             AstSwitchCase *casestmt = *pcasestmt;
             if (!casestmt->body_is_expr) continue;
 
-            switch (unify_node_and_type_(&casestmt->expr, type, permanent)) {
+            switch (unify_node_and_type_(context, &casestmt->expr, type, permanent)) {
                 case TYPE_MATCH_SUCCESS: break;
                 case TYPE_MATCH_FAILED: return TYPE_MATCH_FAILED;
                 case TYPE_MATCH_YIELD: return TYPE_MATCH_YIELD;
@@ -855,7 +855,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         }
 
         if (switchnode->default_case) {
-            switch (unify_node_and_type_((AstTyped **) &switchnode->default_case, type, permanent)) {
+            switch (unify_node_and_type_(context, (AstTyped **) &switchnode->default_case, type, permanent)) {
                 case TYPE_MATCH_SUCCESS: break;
                 case TYPE_MATCH_FAILED: return TYPE_MATCH_FAILED;
                 case TYPE_MATCH_YIELD: return TYPE_MATCH_YIELD;
@@ -870,11 +870,11 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // If the destination type is an optional, and the node's type is a value of
     // the same underlying type, then we can construct an optional with a value
     // implicitly. This makes working with optionals barable.
-    if (type_constructed_from_poly(type, builtin_optional_type)) {
-        TypeMatch match = unify_node_and_type_(pnode, type->Union.poly_sln[0].type, permanent);
+    if (type_constructed_from_poly(type, context->builtins.optional_type)) {
+        TypeMatch match = unify_node_and_type_(context, pnode, type->Union.poly_sln[0].type, permanent);
         if (match == TYPE_MATCH_SUCCESS) {
             if (permanent) {
-                AstStructLiteral *opt_lit = make_optional_literal_some(context.ast_alloc, node, type);
+                AstStructLiteral *opt_lit = make_optional_literal_some(context, node, type);
 
                 *(AstStructLiteral **) pnode = opt_lit;
             }
@@ -888,7 +888,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
 
     // If the node is a numeric literal, try to convert it to the destination type.
     if (node->kind == Ast_Kind_NumLit) {
-        if (convert_numlit_to_type((AstNumLit *) node, type, permanent)) return TYPE_MATCH_SUCCESS;
+        if (convert_numlit_to_type(context, (AstNumLit *) node, type, permanent)) return TYPE_MATCH_SUCCESS;
         return TYPE_MATCH_FAILED;
     }
 
@@ -904,13 +904,13 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         if (expr_count != type->Compound.count) return TYPE_MATCH_FAILED;
 
         fori (i, 0, (i64) expr_count) {
-            TypeMatch tm = unify_node_and_type_(&compound->exprs[i], type->Compound.types[i], permanent);
+            TypeMatch tm = unify_node_and_type_(context, &compound->exprs[i], type->Compound.types[i], permanent);
             if (tm != TYPE_MATCH_SUCCESS) {
                 return tm;
             }
         }
 
-        compound->type = type_build_compound_type(context.ast_alloc, compound);
+        compound->type = type_build_compound_type(context, compound);
 
         return TYPE_MATCH_SUCCESS;
     }
@@ -918,8 +918,8 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     if (node->kind == Ast_Kind_If_Expression) {
         AstIfExpression* if_expr = (AstIfExpression *) node;
 
-        TypeMatch true_success  = unify_node_and_type_(&if_expr->true_expr,  type, permanent);
-        TypeMatch false_success = unify_node_and_type_(&if_expr->false_expr, type, permanent);
+        TypeMatch true_success  = unify_node_and_type_(context, &if_expr->true_expr,  type, permanent);
+        TypeMatch false_success = unify_node_and_type_(context, &if_expr->false_expr, type, permanent);
 
         if (true_success == TYPE_MATCH_SUCCESS && false_success == TYPE_MATCH_SUCCESS) {
             if (permanent) if_expr->type = type;
@@ -935,18 +935,18 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
 
     if (node->kind == Ast_Kind_Alias) {
         AstAlias* alias = (AstAlias *) node;
-        return unify_node_and_type_(&alias->alias, type, permanent);
+        return unify_node_and_type_(context, &alias->alias, type, permanent);
     }
 
     if (node->kind == Ast_Kind_Address_Of) {
         AstAddressOf *address_of = (AstAddressOf *) node;
         if (address_of->can_be_removed) {
             if (!permanent) {
-                return unify_node_and_type_(&address_of->expr, type, permanent);
+                return unify_node_and_type_(context, &address_of->expr, type, permanent);
 
             } else {
                 *pnode = (AstTyped *) address_of->expr;
-                return unify_node_and_type_(pnode, type, permanent);
+                return unify_node_and_type_(context, pnode, type, permanent);
             }
         }
     }
@@ -988,7 +988,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         i32 keep = 0;
 
         if (type->kind != Type_Kind_Compound) {
-            if (!types_are_compatible(node_type->Compound.types[0], type)) {
+            if (!types_are_compatible(context, node_type->Compound.types[0], type)) {
                 return TYPE_MATCH_FAILED;
             }
 
@@ -996,7 +996,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
 
         } else {
             fori (i, 0, type->Compound.count) {
-                if (!types_are_compatible(node_type->Compound.types[i], type->Compound.types[i])) {
+                if (!types_are_compatible(context, node_type->Compound.types[i], type->Compound.types[i])) {
                     return TYPE_MATCH_FAILED;
                 }
 
@@ -1018,36 +1018,36 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
 // code between them, but I think there enough minor differences that that
 // might not be possible.
 
-Type* query_expression_type(AstTyped *node) {
+Type* query_expression_type(Context *context, AstTyped *node) {
     if (node == NULL) return NULL;
 
     if (node->kind == Ast_Kind_Argument) {
-        return query_expression_type(((AstArgument *) node)->value);
+        return query_expression_type(context, ((AstArgument *) node)->value);
     }
 
     if (node->kind == Ast_Kind_If_Expression) {
         AstIfExpression* if_expr = (AstIfExpression *) node;
-        return query_expression_type(if_expr->true_expr);
+        return query_expression_type(context, if_expr->true_expr);
     }
 
     if (node->kind == Ast_Kind_Alias) {
         AstAlias* alias = (AstAlias *) node;
-        return query_expression_type(alias->alias);
+        return query_expression_type(context, alias->alias);
     }
 
     if (node_is_type((AstNode *) node)) {
-        return &basic_types[Basic_Kind_Type_Index];
+        return context->types.basic[Basic_Kind_Type_Index];
     }
 
     if (node->kind == Ast_Kind_Array_Literal && node->type == NULL) {
         AstArrayLiteral* al = (AstArrayLiteral *) node;
-        Type* elem_type = &basic_types[Basic_Kind_Void];
+        Type* elem_type = context->types.basic[Basic_Kind_Void];
         if (bh_arr_length(al->values) > 0) {
-            elem_type = query_expression_type(al->values[0]);
+            elem_type = query_expression_type(context, al->values[0]);
         }
 
         if (elem_type) {
-            return type_make_array(context.ast_alloc, elem_type, bh_arr_length(al->values));
+            return type_make_array(context, elem_type, bh_arr_length(al->values));
         }
     }
 
@@ -1064,7 +1064,7 @@ Type* query_expression_type(AstTyped *node) {
             return NULL;
         }
 
-        return type_build_implicit_type_of_struct_literal(context.ast_alloc, sl, 1);
+        return type_build_implicit_type_of_struct_literal(context, sl, 1);
     }
 
     // If polymorphic procedures HAVE to have a type, most likely
@@ -1072,33 +1072,33 @@ Type* query_expression_type(AstTyped *node) {
     // assigned a void type. This is cleared before the procedure
     // is solidified.
     if (node->kind == Ast_Kind_Polymorphic_Proc) {
-        return &basic_types[Basic_Kind_Void];
+        return context->types.basic[Basic_Kind_Void];
     }
 
     if (node->kind == Ast_Kind_Macro) {
-        return query_expression_type((AstTyped *) ((AstMacro *) node)->body);
+        return query_expression_type(context, (AstTyped *) ((AstMacro *) node)->body);
     }
 
     if (node->kind == Ast_Kind_Package) {
-        return type_build_from_ast(context.ast_alloc, node->type_node);
+        return type_build_from_ast(context, node->type_node);
     }
 
     if (node->type == NULL)
-        return type_build_from_ast(context.ast_alloc, node->type_node);
+        return type_build_from_ast(context, node->type_node);
 
     if (node->kind == Ast_Kind_NumLit && node->type->kind == Type_Kind_Basic) {
         if (node->type->Basic.kind == Basic_Kind_Int_Unsized) {
             b32 big    = bh_abs(((AstNumLit *) node)->value.l) >= (1ll << 32);
             b32 unsign = ((AstNumLit *) node)->was_hex_literal;
 
-            if (((AstNumLit *) node)->was_char_literal) return &basic_types[Basic_Kind_U8];
-            else if ( big && !unsign) return &basic_types[Basic_Kind_I64];
-            else if ( big &&  unsign) return &basic_types[Basic_Kind_U64];
-            else if (!big && !unsign) return &basic_types[Basic_Kind_I32];
-            else if (!big &&  unsign) return &basic_types[Basic_Kind_U32];
+            if (((AstNumLit *) node)->was_char_literal) return context->types.basic[Basic_Kind_U8];
+            else if ( big && !unsign) return context->types.basic[Basic_Kind_I64];
+            else if ( big &&  unsign) return context->types.basic[Basic_Kind_U64];
+            else if (!big && !unsign) return context->types.basic[Basic_Kind_I32];
+            else if (!big &&  unsign) return context->types.basic[Basic_Kind_U32];
         }
         else if (node->type->Basic.kind == Basic_Kind_Float_Unsized) {
-            return &basic_types[Basic_Kind_F64];
+            return context->types.basic[Basic_Kind_F64];
         }
     }
 
@@ -1106,53 +1106,53 @@ Type* query_expression_type(AstTyped *node) {
 }
 
 // See note above about query_expresion_type.
-Type* resolve_expression_type(AstTyped* node) {
+Type* resolve_expression_type(Context *context, AstTyped* node) {
     if (node == NULL) return NULL;
 
     if (node->kind == Ast_Kind_Compound) {
         bh_arr_each(AstTyped *, expr, ((AstCompound *) node)->exprs) {
-            resolve_expression_type(*expr);
+            resolve_expression_type(context, *expr);
         }
 
-        node->type = type_build_compound_type(context.ast_alloc, (AstCompound *) node);
+        node->type = type_build_compound_type(context, (AstCompound *) node);
         return node->type;
     }
 
     if (node->kind == Ast_Kind_Argument) {
-        node->type = resolve_expression_type(((AstArgument *) node)->value);
+        node->type = resolve_expression_type(context, ((AstArgument *) node)->value);
     }
 
     if (node->kind == Ast_Kind_If_Expression) {
         AstIfExpression* if_expr = (AstIfExpression *) node;
 
-        Type* ltype = resolve_expression_type(if_expr->true_expr);
-        unify_node_and_type(&if_expr->false_expr, ltype);
+        Type* ltype = resolve_expression_type(context, if_expr->true_expr);
+        unify_node_and_type(context, &if_expr->false_expr, ltype);
 
         if_expr->type = ltype;
     }
 
     if (node->kind == Ast_Kind_Alias) {
         AstAlias* alias = (AstAlias *) node;
-        alias->type = resolve_expression_type(alias->alias);
+        alias->type = resolve_expression_type(context, alias->alias);
     }
 
     if (node_is_type((AstNode *) node)) {
-        return &basic_types[Basic_Kind_Type_Index];
+        return context->types.basic[Basic_Kind_Type_Index];
     }
 
     if (node->kind == Ast_Kind_Array_Literal && node->type == NULL) {
         AstArrayLiteral* al = (AstArrayLiteral *) node;
-        Type* elem_type = &basic_types[Basic_Kind_Void];
+        Type* elem_type = context->types.basic[Basic_Kind_Void];
         if (bh_arr_length(al->values) > 0) {
-            elem_type = resolve_expression_type(al->values[0]);
+            elem_type = resolve_expression_type(context, al->values[0]);
         }
 
         if (elem_type) {
-            node->type = type_make_array(context.ast_alloc, elem_type, bh_arr_length(al->values));
+            node->type = type_make_array(context, elem_type, bh_arr_length(al->values));
             node->flags |= Ast_Flag_Array_Literal_Typed;
 
             if (node->entity == NULL) {
-                add_entities_for_node(NULL, (AstNode *) node, NULL, NULL);
+                add_entities_for_node(&context->entities, NULL, (AstNode *) node, NULL, NULL);
             }
         }
     }
@@ -1170,9 +1170,9 @@ Type* resolve_expression_type(AstTyped* node) {
             return NULL;
         }
 
-        sl->type = type_build_implicit_type_of_struct_literal(context.ast_alloc, sl, 0);
+        sl->type = type_build_implicit_type_of_struct_literal(context, sl, 0);
         if (sl->type) {
-            add_entities_for_node(NULL, (AstNode *) sl, NULL, NULL);
+            add_entities_for_node(&context->entities, NULL, (AstNode *) sl, NULL, NULL);
         }
     }
 
@@ -1181,44 +1181,44 @@ Type* resolve_expression_type(AstTyped* node) {
     // assigned a void type. This is cleared before the procedure
     // is solidified.
     if (node->kind == Ast_Kind_Polymorphic_Proc) {
-        node->type = &basic_types[Basic_Kind_Void];
+        node->type = context->types.basic[Basic_Kind_Void];
     }
 
     if (node->kind == Ast_Kind_Macro) {
-        return resolve_expression_type((AstTyped *) ((AstMacro *) node)->body);
+        return resolve_expression_type(context, (AstTyped *) ((AstMacro *) node)->body);
     }
 
     if (node->kind == Ast_Kind_Package) {
-        node->type_node = builtin_package_id_type;
-        node->type = type_build_from_ast(context.ast_alloc, node->type_node);
+        node->type_node = context->builtins.package_id_type;
+        node->type = type_build_from_ast(context, node->type_node);
     }
 
     if (node->type == NULL)
-        node->type = type_build_from_ast(context.ast_alloc, node->type_node);
+        node->type = type_build_from_ast(context, node->type_node);
 
     if (node->kind == Ast_Kind_NumLit && node->type->kind == Type_Kind_Basic) {
         if (node->type->Basic.kind == Basic_Kind_Int_Unsized) {
             b32 big    = bh_abs(((AstNumLit *) node)->value.l) >= (1ll << 32);
             b32 unsign = ((AstNumLit *) node)->was_hex_literal;
 
-            if (((AstNumLit *) node)->was_char_literal) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U8], 1);
-            else if ( big && !unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I64], 1);
-            else if ( big &&  unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U64], 1);
-            else if (!big && !unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I32], 1);
-            else if (!big &&  unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U32], 1);
+            if (((AstNumLit *) node)->was_char_literal) convert_numlit_to_type(context, (AstNumLit *) node, context->types.basic[Basic_Kind_U8], 1);
+            else if ( big && !unsign) convert_numlit_to_type(context, (AstNumLit *) node, context->types.basic[Basic_Kind_I64], 1);
+            else if ( big &&  unsign) convert_numlit_to_type(context, (AstNumLit *) node, context->types.basic[Basic_Kind_U64], 1);
+            else if (!big && !unsign) convert_numlit_to_type(context, (AstNumLit *) node, context->types.basic[Basic_Kind_I32], 1);
+            else if (!big &&  unsign) convert_numlit_to_type(context, (AstNumLit *) node, context->types.basic[Basic_Kind_U32], 1);
         }
         else if (node->type->Basic.kind == Basic_Kind_Float_Unsized) {
-            convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_F64], 1);
+            convert_numlit_to_type(context, (AstNumLit *) node, context->types.basic[Basic_Kind_F64], 1);
         }
     }
 
     return node->type;
 }
 
-i64 get_expression_integer_value(AstTyped* node, b32 *is_valid) {
+i64 get_expression_integer_value(Context *context, AstTyped* node, b32 *is_valid) {
     if (!node) return 0;
 
-    resolve_expression_type(node);
+    resolve_expression_type(context, node);
 
     if (is_valid) *is_valid = 1;
 
@@ -1231,7 +1231,7 @@ i64 get_expression_integer_value(AstTyped* node, b32 *is_valid) {
     }
 
     if (node->kind == Ast_Kind_Argument) {
-        return get_expression_integer_value(((AstArgument *) node)->value, is_valid);
+        return get_expression_integer_value(context, ((AstArgument *) node)->value, is_valid);
     }
 
     if (node->kind == Ast_Kind_Size_Of) {
@@ -1243,19 +1243,19 @@ i64 get_expression_integer_value(AstTyped* node, b32 *is_valid) {
     }
 
     if (node->kind == Ast_Kind_Alias) {
-        return get_expression_integer_value(((AstAlias *) node)->alias, is_valid);
+        return get_expression_integer_value(context, ((AstAlias *) node)->alias, is_valid);
     }
 
     if (node->kind == Ast_Kind_Enum_Value) {
-        return get_expression_integer_value(((AstEnumValue *) node)->value, is_valid);
+        return get_expression_integer_value(context, ((AstEnumValue *) node)->value, is_valid);
     }
 
     if (node->kind == Ast_Kind_Unary_Op && type_is_integer(node->type)) {
-        return get_expression_integer_value(((AstUnaryOp *) node)->expr, is_valid);
+        return get_expression_integer_value(context, ((AstUnaryOp *) node)->expr, is_valid);
     }
 
     if (node_is_type((AstNode*) node)) {
-        Type* type = type_build_from_ast(context.ast_alloc, (AstType *) node);
+        Type* type = type_build_from_ast(context, (AstType *) node);
         if (type) return type->id;
     }
 
@@ -1263,8 +1263,8 @@ i64 get_expression_integer_value(AstTyped* node, b32 *is_valid) {
     return 0;
 }
 
-char *get_expression_string_value(AstTyped* node, b32 *out_is_valid) {
-    resolve_expression_type(node);
+char *get_expression_string_value(Context *context, AstTyped* node, b32 *out_is_valid) {
+    resolve_expression_type(context, node);
 
     if (out_is_valid) *out_is_valid = 1;
 
@@ -1274,7 +1274,7 @@ char *get_expression_string_value(AstTyped* node, b32 *out_is_valid) {
         // CLEANUP: Maybe this should allocate on the heap?
         // I guess if in all cases the memory is allocated on the heap,
         // then the caller can free the memory.
-        char* strdata = bh_alloc_array(global_heap_allocator, char, str->token->length + 1);
+        char* strdata = bh_alloc_array(context->gp_alloc, char, str->token->length + 1);
         i32 length  = string_process_escape_seqs(strdata, str->token->text, str->token->length);
         strdata[length] = '\0';
 
@@ -1282,7 +1282,7 @@ char *get_expression_string_value(AstTyped* node, b32 *out_is_valid) {
     }
 
     if (node->kind == Ast_Kind_Alias) {
-        return get_expression_string_value(((AstAlias *) node)->alias, out_is_valid);
+        return get_expression_string_value(context, ((AstAlias *) node)->alias, out_is_valid);
     }
 
     if (out_is_valid) *out_is_valid = 0;
@@ -1304,7 +1304,7 @@ static const b32 cast_legality[][12] = {
     /* TYP */ { 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1,}
 };
 
-b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
+b32 cast_is_legal(Context *context, Type* from_, Type* to_, char** err_msg) {
     Type* from = from_;
     Type* to   = to_;
 
@@ -1320,11 +1320,11 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     if (from_->id == to_->id) return 1;
 
     if (to->kind == Type_Kind_Distinct) {
-        if (types_are_compatible(to->Distinct.base_type, from)) {
+        if (types_are_compatible(context, to->Distinct.base_type, from)) {
             return 1;
         }
 
-        if (from->kind == Type_Kind_Distinct && types_are_compatible(to, from->Distinct.base_type)) {
+        if (from->kind == Type_Kind_Distinct && types_are_compatible(context, to, from->Distinct.base_type)) {
             return 1;
         }
 
@@ -1333,11 +1333,11 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     }
 
     if (from->kind == Type_Kind_Distinct) {
-        if (types_are_compatible(from->Distinct.base_type, to)) {
+        if (types_are_compatible(context, from->Distinct.base_type, to)) {
             return 1;
         }
 
-        if (to->kind == Type_Kind_Distinct && types_are_compatible(from, to->Distinct.base_type)) {
+        if (to->kind == Type_Kind_Distinct && types_are_compatible(context, from, to->Distinct.base_type)) {
             return 1;
         }
 
@@ -1362,7 +1362,7 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     // CLEANUP: These error messages should be a lot better and actually
     // provide the types of the things in question.
     if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_Array) {
-        if (!types_are_compatible(to->Slice.elem, from->Array.elem)) {
+        if (!types_are_compatible(context, to->Slice.elem, from->Array.elem)) {
             *err_msg = "Array to slice cast is not valid here because the types are different.";
             return 0;
         } else {
@@ -1371,7 +1371,7 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     }
 
     if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_DynArray) {
-        //if (!types_are_compatible(to->Slice.elem, from->DynArray.elem)) {
+        //if (!types_are_compatible(context, to->Slice.elem, from->DynArray.elem)) {
         if (type_size_of(to->Slice.elem) != type_size_of(from->DynArray.elem)) {
             *err_msg = "Dynmaic array to slice cast is not valid here because the types are different sizes.";
             return 0;
@@ -1381,7 +1381,7 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     }
 
     if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_VarArgs) {
-        if (!types_are_compatible(to->Slice.elem, from->VarArgs.elem)) {
+        if (!types_are_compatible(context, to->Slice.elem, from->VarArgs.elem)) {
             *err_msg = "Variadic argument to slice cast is not valid here because the types are different.";
             return 0;
         } else {
@@ -1392,7 +1392,7 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     if (from->kind == Type_Kind_Slice || to->kind == Type_Kind_Slice) {
         if ((from->kind != Type_Kind_Slice || to->kind != Type_Kind_Slice)
             || to->Slice.elem->kind != Type_Kind_Pointer || from->Slice.elem->kind != Type_Kind_Pointer
-            || !types_are_compatible(from->Slice.elem, to->Slice.elem)) {
+            || !types_are_compatible(context, from->Slice.elem, to->Slice.elem)) {
             *err_msg = "Cannot only cast between slice types when both are a slice of compatible pointers.";
             return 0;
         } else {
@@ -1412,7 +1412,7 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
 
     if (from->kind == Type_Kind_Function) {
         *err_msg = "Can only cast a function to a 'u32'.";
-        return to == &basic_types[Basic_Kind_U32];
+        return to == context->types.basic[Basic_Kind_U32];
     }
 
     if (   (type_is_simd(to) && !type_is_simd(from))
@@ -1466,11 +1466,11 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
 
     if (fromidx != -1 && toidx != -1) {
         if (!cast_legality[fromidx][toidx]) {
-            *err_msg = bh_aprintf(global_heap_allocator, "Cast from '%s' to '%s' is not allowed.", type_get_name(from_), type_get_name(to_));
+            *err_msg = bh_aprintf(context->gp_alloc, "Cast from '%s' to '%s' is not allowed.", type_get_name(context, from_), type_get_name(context, to_));
             return 0;
         }
     } else {
-        *err_msg = bh_aprintf(global_heap_allocator, "Cast from '%s' to '%s' is not allowed.", type_get_name(from_), type_get_name(to_));
+        *err_msg = bh_aprintf(context->gp_alloc, "Cast from '%s' to '%s' is not allowed.", type_get_name(context, from_), type_get_name(context, to_));
         return 0;
     }
 
@@ -1480,7 +1480,7 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
 
 
 
-TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
+TypeMatch implicit_cast_to_bool(Context *context, AstTyped **pnode) {
     AstTyped *node = *pnode;
 
     if (!node->type) return TYPE_MATCH_YIELD;
@@ -1488,12 +1488,12 @@ TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
     if ((node->type->kind == Type_Kind_Basic && node->type->Basic.kind == Basic_Kind_Rawptr)
         || (node->type->kind == Type_Kind_Pointer)
         || (node->type->kind == Type_Kind_MultiPointer)) {
-        AstNumLit *zero = make_int_literal(context.ast_alloc, 0);
-        zero->type = &basic_types[Basic_Kind_Rawptr];
+        AstNumLit *zero = make_int_literal(context, 0);
+        zero->type = context->types.basic[Basic_Kind_Rawptr];
 
-        AstBinaryOp* cmp = make_binary_op(context.ast_alloc, Binary_Op_Not_Equal, node, (AstTyped *) zero);
+        AstBinaryOp* cmp = make_binary_op(context, Binary_Op_Not_Equal, node, (AstTyped *) zero);
         cmp->token = node->token;
-        cmp->type = &basic_types[Basic_Kind_Bool];
+        cmp->type = context->types.basic[Basic_Kind_Bool];
 
         *pnode = (AstTyped *) cmp;
         return TYPE_MATCH_SUCCESS;
@@ -1503,65 +1503,79 @@ TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
         node->type->kind == Type_Kind_DynArray ||
         node->type->kind == Type_Kind_VarArgs) {
         StructMember smem;
-        assert(type_lookup_member(node->type, "count", &smem));
+        assert(type_lookup_member(context, node->type, "count", &smem));
 
         // These fields are filled out here in order to prevent
         // going through the type checker one more time.
-        AstFieldAccess *field = make_field_access(context.ast_alloc, node, "count");
+        AstFieldAccess *field = make_field_access(context, node, "count");
         field->offset = smem.offset;
         field->idx = smem.idx;
         field->type = smem.type;
         field->flags |= Ast_Flag_Has_Been_Checked;
 
-        AstNumLit *zero = make_int_literal(context.ast_alloc, 0);
+        AstNumLit *zero = make_int_literal(context, 0);
         zero->type = smem.type;
 
-        AstBinaryOp* cmp = make_binary_op(context.ast_alloc, Binary_Op_Not_Equal, (AstTyped *) field, (AstTyped *) zero);
-        cmp->type = &basic_types[Basic_Kind_Bool];
+        AstBinaryOp* cmp = make_binary_op(context, Binary_Op_Not_Equal, (AstTyped *) field, (AstTyped *) zero);
+        cmp->type = context->types.basic[Basic_Kind_Bool];
 
         *pnode = (AstTyped *) cmp;
         return TYPE_MATCH_SUCCESS;
     }
 
-    if (context.caches.implicit_cast_to_bool_cache.entries == NULL) {
-        bh_imap_init(&context.caches.implicit_cast_to_bool_cache, global_heap_allocator, 8);
+    if (context->caches.implicit_cast_to_bool_cache.entries == NULL) {
+        bh_imap_init(&context->caches.implicit_cast_to_bool_cache, context->gp_alloc, 8);
     }
 
-    if (!bh_imap_has(&context.caches.implicit_cast_to_bool_cache, (u64) node)) {
-        AstArgument *implicit_arg = make_argument(context.ast_alloc, node);
+    if (!bh_imap_has(&context->caches.implicit_cast_to_bool_cache, (u64) node)) {
+        AstArgument *implicit_arg = make_argument(context, node);
 
-        Arguments *args = bh_alloc_item(context.ast_alloc, Arguments);
-        bh_arr_new(context.ast_alloc, args->values, 1);
+        Arguments *args = bh_alloc_item(context->ast_alloc, Arguments);
+        bh_arr_new(context->ast_alloc, args->values, 1);
         bh_arr_push(args->values, (AstTyped *) implicit_arg);
 
-        bh_imap_put(&context.caches.implicit_cast_to_bool_cache, (u64) node, (u64) args);
+        bh_imap_put(&context->caches.implicit_cast_to_bool_cache, (u64) node, (u64) args);
     }
 
-    Arguments *args = (Arguments *) bh_imap_get(&context.caches.implicit_cast_to_bool_cache, (u64) node);
-    AstFunction *overload = (AstFunction *) find_matching_overload_by_arguments(builtin_implicit_bool_cast->overloads, args);
+    Arguments *args = (Arguments *) bh_imap_get(&context->caches.implicit_cast_to_bool_cache, (u64) node);
+    AstFunction *overload = (AstFunction *) find_matching_overload_by_arguments(context, context->builtins.implicit_bool_cast->overloads, args);
 
     if (overload == NULL)                                       return TYPE_MATCH_FAILED;
-    if (overload == (AstFunction *) &node_that_signals_a_yield) return TYPE_MATCH_YIELD;
+    if (overload == (AstFunction *) &context->node_that_signals_a_yield) return TYPE_MATCH_YIELD;
 
-    AstCall *implicit_call = onyx_ast_node_new(context.ast_alloc, sizeof(AstCall), Ast_Kind_Call);
+    AstCall *implicit_call = onyx_ast_node_new(context->ast_alloc, sizeof(AstCall), Ast_Kind_Call);
     implicit_call->token = node->token;
     implicit_call->callee = (AstTyped *) overload;
     implicit_call->va_kind = VA_Kind_Not_VA;
     implicit_call->args.values = args->values;
 
     *(AstCall **) pnode = implicit_call;
-    bh_imap_delete(&context.caches.implicit_cast_to_bool_cache, (u64) node);
+    bh_imap_delete(&context->caches.implicit_cast_to_bool_cache, (u64) node);
 
     return TYPE_MATCH_YIELD;
 }
 
-char* get_function_name(AstFunction* func) {
+static char *sanitize_name(bh_allocator a, const char *name) {
+    if (!name) return name;
+
+    char *sanitized = bh_strdup(a, name); 
+    char *c = sanitized;
+    while (*c) {
+        if (!char_is_alphanum(*c)) {
+            *c = '_';
+        }
+        c++;
+    }
+    return sanitized;
+}
+
+char* get_function_name(Context *context, AstFunction* func) {
     if (func->kind != Ast_Kind_Function) return "unnamed_proc";
 
     if (func->name != NULL) return func->name;
 
     if (func->exported_name != NULL) {
-        return bh_aprintf(global_scratch_allocator,
+        return bh_aprintf(context->scratch_alloc,
                 "%b",
                 func->exported_name->text,
                 func->exported_name->length);
@@ -1570,27 +1584,34 @@ char* get_function_name(AstFunction* func) {
     return "unnamed_proc";
 }
 
-char* get_function_assembly_name(AstFunction* func) {
-    if (func->kind != Ast_Kind_Function) return "unnamed_proc";
+char* get_function_assembly_name(Context *context, AstFunction* func) {
+    if (func->kind == Ast_Kind_Function) {
+        if (func->assembly_name != NULL) return func->assembly_name;
 
-    if (func->name != NULL) return func->assembly_name;
-
-    if (func->exported_name != NULL) {
-        return bh_aprintf(global_scratch_allocator,
-                "%b",
-                func->exported_name->text,
-                func->exported_name->length);
+        if (func->exported_name != NULL) {
+            return bh_aprintf(context->scratch_alloc,
+                    "%b",
+                    func->exported_name->text,
+                    func->exported_name->length);
+        }
     }
 
-    return "unnamed_proc";
+    if (func->token) {
+        return bh_aprintf(context->ast_alloc,
+            "unnamed_at_%s_%d",
+            sanitize_name(context->scratch_alloc, func->token->pos.filename),
+            func->token->pos.line);
+    }
+
+    return "unnamed";
 }
 
-char* generate_name_within_scope(Scope *scope, OnyxToken* symbol) {
+char* generate_name_within_scope(Context *context, Scope *scope, OnyxToken* symbol) {
     char name[512];
     memset(name, 0, 512);
 
     bh_arr(char *) names=NULL;
-    bh_arr_new(global_heap_allocator, names, 4);
+    bh_arr_new(context->gp_alloc, names, 4);
 
     while (scope != NULL) {
         bh_arr_push(names, scope->name);
@@ -1605,7 +1626,7 @@ char* generate_name_within_scope(Scope *scope, OnyxToken* symbol) {
     }
     bh_arr_free(names);
 
-    return bh_aprintf(global_heap_allocator, "%s%b", name, symbol->text, symbol->length);
+    return bh_aprintf(context->gp_alloc, "%s%b", name, symbol->text, symbol->length);
 }
 
 AstNode* strip_aliases(AstNode* n) {
@@ -1616,63 +1637,63 @@ AstNode* strip_aliases(AstNode* n) {
     return n;
 }
 
-AstNumLit* make_bool_literal(bh_allocator a, b32 b) {
-    AstNumLit* bl = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
+AstNumLit* make_bool_literal(Context *context, b32 b) {
+    AstNumLit* bl = onyx_ast_node_new(context->ast_alloc, sizeof(AstNumLit), Ast_Kind_NumLit);
     bl->flags |= Ast_Flag_Comptime;
-    bl->type_node = (AstType *) &basic_type_bool;
-    bl->type = &basic_types[Basic_Kind_Bool];
+    bl->type_node = (AstType *) &context->basic_types.type_bool;
+    bl->type = context->types.basic[Basic_Kind_Bool];
 
     bl->value.i = b ? 1 : 0;
     return bl;
 }
 
-AstNumLit* make_int_literal(bh_allocator a, i64 i) {
-    AstNumLit* num = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
+AstNumLit* make_int_literal(Context *context, i64 i) {
+    AstNumLit* num = onyx_ast_node_new(context->ast_alloc, sizeof(AstNumLit), Ast_Kind_NumLit);
     num->flags |= Ast_Flag_Comptime;
 
     if (bh_abs(i) >= (1ll << 32))
-        num->type_node = (AstType *) &basic_type_i64;
+        num->type_node = (AstType *) &context->basic_types.type_i64;
     else
-        num->type_node = (AstType *) &basic_type_i32;
+        num->type_node = (AstType *) &context->basic_types.type_i32;
 
     num->value.l = i;
     return num;
 }
 
-AstNumLit* make_float_literal(bh_allocator a, f64 d) {
+AstNumLit* make_float_literal(Context *context, f64 d) {
     // NOTE: Use convert_numlit_to_type to make this a concrete float
-    AstNumLit* num = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
+    AstNumLit* num = onyx_ast_node_new(context->ast_alloc, sizeof(AstNumLit), Ast_Kind_NumLit);
     num->flags |= Ast_Flag_Comptime;
-    num->type_node = (AstType *) &basic_type_float_unsized;
+    num->type_node = (AstType *) &context->basic_types.type_float_unsized;
     num->value.d = d;
     return num;
 }
 
-AstRangeLiteral* make_range_literal(bh_allocator a, AstTyped* low, AstTyped* high) {
-    AstRangeLiteral* rl = onyx_ast_node_new(a, sizeof(AstRangeLiteral), Ast_Kind_Range_Literal);
+AstRangeLiteral* make_range_literal(Context *context, AstTyped* low, AstTyped* high) {
+    AstRangeLiteral* rl = onyx_ast_node_new(context->ast_alloc, sizeof(AstRangeLiteral), Ast_Kind_Range_Literal);
     rl->low = low;
     rl->high = high;
     return rl;
 }
 
-AstStrLit* make_string_literal(bh_allocator a, OnyxToken *token) {
-    AstStrLit *str = onyx_ast_node_new(a, sizeof(AstStrLit), Ast_Kind_StrLit);
+AstStrLit* make_string_literal(Context *context, OnyxToken *token) {
+    AstStrLit *str = onyx_ast_node_new(context->ast_alloc, sizeof(AstStrLit), Ast_Kind_StrLit);
     str->flags |= Ast_Flag_Comptime;
-    str->type_node = builtin_string_type;
+    str->type_node = context->builtins.string_type;
     str->token = token;
     return str;
 }
 
-AstBinaryOp* make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right) {
-    AstBinaryOp* binop_node = onyx_ast_node_new(a, sizeof(AstBinaryOp), Ast_Kind_Binary_Op);
+AstBinaryOp* make_binary_op(Context *context, BinaryOp operation, AstTyped* left, AstTyped* right) {
+    AstBinaryOp* binop_node = onyx_ast_node_new(context->ast_alloc, sizeof(AstBinaryOp), Ast_Kind_Binary_Op);
     binop_node->left  = left;
     binop_node->right = right;
     binop_node->operation = operation;
     return binop_node;
 }
 
-AstArgument* make_argument(bh_allocator a, AstTyped* value) {
-    AstArgument* arg = onyx_ast_node_new(a, sizeof(AstArgument), Ast_Kind_Argument);
+AstArgument* make_argument(Context *context, AstTyped* value) {
+    AstArgument* arg = onyx_ast_node_new(context->ast_alloc, sizeof(AstArgument), Ast_Kind_Argument);
     if (value->token) arg->token = value->token;
     arg->value = value;
     arg->type = value->type;
@@ -1681,8 +1702,8 @@ AstArgument* make_argument(bh_allocator a, AstTyped* value) {
     return arg;
 }
 
-AstFieldAccess* make_field_access(bh_allocator a, AstTyped* node, char* field) {
-    AstFieldAccess* fa = onyx_ast_node_new(a, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
+AstFieldAccess* make_field_access(Context *context, AstTyped* node, char* field) {
+    AstFieldAccess* fa = onyx_ast_node_new(context->ast_alloc, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
     if (node->token) fa->token = node->token;
     fa->field = field;
     fa->expr = node;
@@ -1690,38 +1711,38 @@ AstFieldAccess* make_field_access(bh_allocator a, AstTyped* node, char* field) {
     return fa;
 }
 
-AstAddressOf* make_address_of(bh_allocator a, AstTyped* node) {
-    AstAddressOf* ao = onyx_ast_node_new(a, sizeof(AstAddressOf), Ast_Kind_Address_Of);
+AstAddressOf* make_address_of(Context *context, AstTyped* node) {
+    AstAddressOf* ao = onyx_ast_node_new(context->ast_alloc, sizeof(AstAddressOf), Ast_Kind_Address_Of);
     if (node->token) ao->token = node->token;
     ao->expr = node;
 
     return ao;
 }
 
-AstLocal* make_local(bh_allocator a, OnyxToken* token, AstType* type_node) {
-    AstLocal* local = onyx_ast_node_new(a, sizeof(AstLocal), Ast_Kind_Local);
+AstLocal* make_local(Context *context, OnyxToken* token, AstType* type_node) {
+    AstLocal* local = onyx_ast_node_new(context->ast_alloc, sizeof(AstLocal), Ast_Kind_Local);
     local->token = token;
     local->type_node = type_node;
 
     return local;
 }
 
-AstLocal* make_local_with_type(bh_allocator a, OnyxToken* token, Type* type) {
-    AstLocal* local = onyx_ast_node_new(a, sizeof(AstLocal), Ast_Kind_Local);
+AstLocal* make_local_with_type(Context *context, OnyxToken* token, Type* type) {
+    AstLocal* local = onyx_ast_node_new(context->ast_alloc, sizeof(AstLocal), Ast_Kind_Local);
     local->token = token;
     local->type = type;
 
     return local;
 }
 
-AstNode* make_symbol(bh_allocator a, OnyxToken* sym) {
-    AstNode* symbol = onyx_ast_node_new(a, sizeof(AstTyped), Ast_Kind_Symbol);
+AstNode* make_symbol(Context *context, OnyxToken* sym) {
+    AstNode* symbol = onyx_ast_node_new(context->ast_alloc, sizeof(AstTyped), Ast_Kind_Symbol);
     symbol->token = sym;
     return symbol;
 }
 
-AstUnaryOp* make_cast(bh_allocator a, AstTyped* expr, Type* to) {
-    AstUnaryOp* cast = onyx_ast_node_new(a, sizeof(AstUnaryOp), Ast_Kind_Unary_Op);
+AstUnaryOp* make_cast(Context *context, AstTyped* expr, Type* to) {
+    AstUnaryOp* cast = onyx_ast_node_new(context->ast_alloc, sizeof(AstUnaryOp), Ast_Kind_Unary_Op);
     cast->token = expr->token;
     cast->operation = Unary_Op_Cast;
     cast->expr = expr;
@@ -1729,20 +1750,20 @@ AstUnaryOp* make_cast(bh_allocator a, AstTyped* expr, Type* to) {
     return cast;
 }
 
-AstZeroValue* make_zero_value(bh_allocator a, OnyxToken* token, Type* type) {
-    AstZeroValue* zero_value = onyx_ast_node_new(a, sizeof(AstZeroValue), Ast_Kind_Zero_Value);
+AstZeroValue* make_zero_value(Context *context, OnyxToken* token, Type* type) {
+    AstZeroValue* zero_value = onyx_ast_node_new(context->ast_alloc, sizeof(AstZeroValue), Ast_Kind_Zero_Value);
     zero_value->token = token;
     zero_value->flags |= Ast_Flag_Comptime;
     zero_value->type = type;
     return zero_value;
 }
 
-AstStructLiteral* make_optional_literal_some(bh_allocator a, AstTyped *expr, Type *opt_type) {
-    AstStructLiteral *opt_lit = onyx_ast_node_new(a, sizeof(AstStructLiteral), Ast_Kind_Struct_Literal);
+AstStructLiteral* make_optional_literal_some(Context *context, AstTyped *expr, Type *opt_type) {
+    AstStructLiteral *opt_lit = onyx_ast_node_new(context->ast_alloc, sizeof(AstStructLiteral), Ast_Kind_Struct_Literal);
     opt_lit->token = expr->token;
 
-    bh_arr_new(context.ast_alloc, opt_lit->values_to_initialize, 2);
-    bh_arr_push(opt_lit->values_to_initialize, ((ValueWithOffset) { (AstTyped *) make_int_literal(a, 1), 0 })); // 1 is Some
+    bh_arr_new(context->ast_alloc, opt_lit->values_to_initialize, 2);
+    bh_arr_push(opt_lit->values_to_initialize, ((ValueWithOffset) { (AstTyped *) make_int_literal(context, 1), 0 })); // 1 is Some
     bh_arr_push(opt_lit->values_to_initialize, ((ValueWithOffset) { expr, opt_type->Union.alignment }));
 
     opt_lit->type = opt_type;
@@ -1752,15 +1773,15 @@ AstStructLiteral* make_optional_literal_some(bh_allocator a, AstTyped *expr, Typ
     return opt_lit;
 }
 
-AstStructLiteral* make_union_variant_of_void(bh_allocator a, Type* union_type, OnyxToken* token, UnionVariant* variant) {
-    AstStructLiteral *lit = onyx_ast_node_new(a, sizeof(AstStructLiteral), Ast_Kind_Struct_Literal);
+AstStructLiteral* make_union_variant_of_void(Context *context, Type* union_type, OnyxToken* token, UnionVariant* variant) {
+    AstStructLiteral *lit = onyx_ast_node_new(context->ast_alloc, sizeof(AstStructLiteral), Ast_Kind_Struct_Literal);
     lit->token = token;
 
-    assert(variant->type == &basic_types[Basic_Kind_Void]);
+    assert(variant->type == context->types.basic[Basic_Kind_Void]);
 
-    bh_arr_new(context.ast_alloc, lit->values_to_initialize, 2);
-    bh_arr_push(lit->values_to_initialize, ((ValueWithOffset) { (AstTyped *) make_int_literal(a, variant->tag_value), 0 }));
-    bh_arr_push(lit->values_to_initialize, ((ValueWithOffset) { (AstTyped *) make_zero_value(a, token, variant->type), union_type->Union.alignment }));
+    bh_arr_new(context->ast_alloc, lit->values_to_initialize, 2);
+    bh_arr_push(lit->values_to_initialize, ((ValueWithOffset) { (AstTyped *) make_int_literal(context, variant->tag_value), 0 }));
+    bh_arr_push(lit->values_to_initialize, ((ValueWithOffset) { (AstTyped *) make_zero_value(context, token, variant->type), union_type->Union.alignment }));
 
     lit->type = union_type;
     lit->values_to_initialize[0].value->type = union_type->Union.tag_type;
@@ -1770,9 +1791,9 @@ AstStructLiteral* make_union_variant_of_void(bh_allocator a, Type* union_type, O
 }
 
 
-void arguments_initialize(Arguments* args) {
-    if (args->values == NULL)       bh_arr_new(global_heap_allocator, args->values, 2);
-    if (args->named_values == NULL) bh_arr_new(global_heap_allocator, args->named_values, 2);
+void arguments_initialize(Context *context, Arguments* args) {
+    if (args->values == NULL)       bh_arr_new(context->gp_alloc, args->values, 2);
+    if (args->named_values == NULL) bh_arr_new(context->gp_alloc, args->named_values, 2);
 
     // CLEANUP: I'm not sure if I need to initialize these to NULL values, but it doesn't hurt.
     fori (i, 0, 2) {
@@ -1783,7 +1804,7 @@ void arguments_initialize(Arguments* args) {
     args->used_argument_count = -1;
 }
 
-void arguments_ensure_length(Arguments* args, u32 count) {
+void arguments_ensure_length(Context *context, Arguments* args, u32 count) {
     // Make the array big enough
     bh_arr_grow(args->values, count);
 
@@ -1794,7 +1815,7 @@ void arguments_ensure_length(Arguments* args, u32 count) {
     bh_arr_set_length(args->values, bh_max(count, (u32) bh_arr_length(args->values)));
 }
 
-void arguments_copy(Arguments* dest, Arguments* src) {
+void arguments_copy(Context *context, Arguments* dest, Arguments* src) {
     dest->used_argument_count = -1;
     dest->named_values = src->named_values;
 
@@ -1805,25 +1826,25 @@ void arguments_copy(Arguments* dest, Arguments* src) {
 }
 
 // In clone, the named_values are not copied. This is used in find_matching_overload_by_arguments since it doesn't need them to be copied.
-void arguments_clone(Arguments* dest, Arguments* src) {
+void arguments_clone(Context *context, Arguments* dest, Arguments* src) {
     dest->used_argument_count = -1;
     dest->named_values = src->named_values;
-    dest->values = bh_arr_copy(global_heap_allocator, src->values);
+    dest->values = bh_arr_copy(context->gp_alloc, src->values);
 }
 
-void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src) {
+void arguments_deep_clone(Context *context, Arguments* dest, Arguments* src) {
     dest->used_argument_count = -1;
     dest->values = NULL;
     dest->named_values = NULL;
 
-    bh_arr_new(global_heap_allocator, dest->named_values, bh_arr_length(src->named_values));
-    bh_arr_new(global_heap_allocator, dest->values, bh_arr_length(src->values));
+    bh_arr_new(context->gp_alloc, dest->named_values, bh_arr_length(src->named_values));
+    bh_arr_new(context->gp_alloc, dest->values, bh_arr_length(src->values));
 
     bh_arr_each(AstNamedValue *, nv, src->named_values)
-        bh_arr_push(dest->named_values, (AstNamedValue *) ast_clone(a, *nv));
+        bh_arr_push(dest->named_values, (AstNamedValue *) ast_clone(context, *nv));
 
     bh_arr_each(AstTyped *, val, src->values)
-        bh_arr_push(dest->values, (AstTyped *) ast_clone(a, (AstNode *) *val));
+        bh_arr_push(dest->values, (AstTyped *) ast_clone(context, (AstNode *) *val));
 }
 
 void arguments_remove_baked(Arguments* args) {
@@ -1859,9 +1880,9 @@ void arguments_clear_baked_flags(Arguments* args) {
 }
 
 // GROSS: Using void* to avoid having to cast everything.
-const char* node_get_type_name(void* node) {
+const char* node_get_type_name(Context *context, void* node) {
     if (((AstNode *) node)->kind == Ast_Kind_Argument) {
-        return node_get_type_name(((AstArgument *) node)->value);
+        return node_get_type_name(context, ((AstArgument *) node)->value);
     }
 
     if (((AstNode *) node)->kind == Ast_Kind_Polymorphic_Proc) {
@@ -1873,28 +1894,28 @@ const char* node_get_type_name(void* node) {
     }
 
     if (((AstNode *) node)->kind == Ast_Kind_Alias) {
-        return node_get_type_name(((AstAlias *) node)->alias);
+        return node_get_type_name(context, ((AstAlias *) node)->alias);
     }
 
-    return type_get_name(((AstTyped *) node)->type);
+    return type_get_name(context, ((AstTyped *) node)->type);
 }
 
-b32 static_if_resolution(AstIf* static_if) {
+b32 static_if_resolution(Context *context, AstIf* static_if) {
     if (static_if->kind != Ast_Kind_Static_If) return 0;
 
     // assert(condition_value->kind == Ast_Kind_NumLit); // This should be right, right?
-    i64 value = get_expression_integer_value(static_if->cond, NULL);
+    i64 value = get_expression_integer_value(context, static_if->cond, NULL);
 
     return value != 0;
 }
 
-AstPolyCallType* convert_call_to_polycall(AstCall* call) {
+AstPolyCallType* convert_call_to_polycall(Context *context, AstCall* call) {
     // HACK HACK HACK
-    AstPolyCallType *pct = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
+    AstPolyCallType *pct = onyx_ast_node_new(context->ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
     pct->token  = call->token;
     pct->next   = call->next;
     pct->callee = (AstType *) call->callee;
-    pct->params = (AstNode **) bh_arr_copy(global_heap_allocator, call->args.values);
+    pct->params = (AstNode **) bh_arr_copy(context->gp_alloc, call->args.values);
     bh_arr_each(AstNode *, pp, pct->params) {
         if ((*pp)->kind == Ast_Kind_Argument) {
             *pp = (AstNode *) (*(AstArgument **) pp)->value;
@@ -1904,19 +1925,19 @@ AstPolyCallType* convert_call_to_polycall(AstCall* call) {
     return pct;
 }
 
-void insert_auto_dispose_call(bh_allocator a, AstLocal *local) {
-    AstAddressOf *aof = make_address_of(a, (AstTyped *) local);
+void insert_auto_dispose_call(Context *context, AstLocal *local) {
+    AstAddressOf *aof = make_address_of(context, (AstTyped *) local);
     aof->token = local->token;
     aof->can_be_removed = 1;
 
-    AstCall *dispose_call = onyx_ast_node_new(a, sizeof(AstCall), Ast_Kind_Call);
+    AstCall *dispose_call = onyx_ast_node_new(context->ast_alloc, sizeof(AstCall), Ast_Kind_Call);
     dispose_call->token = local->token;
-    dispose_call->callee = (AstTyped *) builtin_dispose_used_local;
+    dispose_call->callee = (AstTyped *) context->builtins.dispose_used_local;
 
-    arguments_initialize(&dispose_call->args);
-    bh_arr_push(dispose_call->args.values, (AstTyped *) make_argument(a, (AstTyped *) aof));
+    arguments_initialize(context, &dispose_call->args);
+    bh_arr_push(dispose_call->args.values, (AstTyped *) make_argument(context, (AstTyped *) aof));
 
-    AstDefer *defered = onyx_ast_node_new(a, sizeof(AstDefer), Ast_Kind_Defer);
+    AstDefer *defered = onyx_ast_node_new(context->ast_alloc, sizeof(AstDefer), Ast_Kind_Defer);
     defered->token = local->token;
     defered->stmt = (AstNode *) dispose_call;
 
@@ -1931,9 +1952,9 @@ void insert_auto_dispose_call(bh_allocator a, AstLocal *local) {
 }
 
 
-b32 resolve_intrinsic_interface_constraint(AstConstraint *constraint) {
+b32 resolve_intrinsic_interface_constraint(Context *context, AstConstraint *constraint) {
     AstInterface *interface = constraint->interface;
-    Type* type = type_build_from_ast(context.ast_alloc, (AstType *) constraint->args[0]);
+    Type* type = type_build_from_ast(context, (AstType *) constraint->args[0]);
     if (!type) return 0;
 
     if (!strcmp(interface->name, "type_is_bool"))     return type_is_bool(type);

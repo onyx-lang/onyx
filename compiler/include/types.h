@@ -225,50 +225,47 @@ struct Type {
     };
 };
 
-extern bh_imap type_map;
-
-extern Type basic_types[];
-
+struct Context;
 struct AstType;
 struct AstFunction;
 struct AstCompound;
 struct AstStructLiteral;
 
-void types_init();
-void types_dump_type_info();
-Type* type_lookup_by_id(u32 id);
+void types_init(struct Context *context);
+void types_dump_type_info(struct Context *context);
+Type* type_lookup_by_id(struct Context *context, u32 id);
 
-b32 types_are_compatible(Type* t1, Type* t2);
+b32 types_are_compatible(struct Context *context, Type* t1, Type* t2);
 u32 type_size_of(Type* type);
 u32 type_alignment_of(Type* type);
-Type* type_build_from_ast(bh_allocator alloc, struct AstType* type_node);
-Type* type_build_implicit_type_of_struct_literal(bh_allocator alloc, struct AstStructLiteral* lit, b32 is_query);
+Type* type_build_from_ast(struct Context *context, struct AstType* type_node);
+Type* type_build_implicit_type_of_struct_literal(struct Context *context, struct AstStructLiteral* lit, b32 is_query);
 
-Type* type_build_function_type(bh_allocator alloc, struct AstFunction* func);
-Type* type_build_compound_type(bh_allocator alloc, struct AstCompound* compound);
+Type* type_build_function_type(struct Context *context, struct AstFunction* func);
+Type* type_build_compound_type(struct Context *context, struct AstCompound* compound);
 
-Type* type_make_pointer(bh_allocator alloc, Type* to);
-Type* type_make_multi_pointer(bh_allocator alloc, Type* to);
-Type* type_make_array(bh_allocator alloc, Type* to, u32 count);
-Type* type_make_slice(bh_allocator alloc, Type* of);
-Type* type_make_dynarray(bh_allocator alloc, Type* of);
-Type* type_make_varargs(bh_allocator alloc, Type* of);
-Type* type_make_optional(bh_allocator alloc, Type* of);
+Type* type_make_pointer(struct Context *context, Type* to);
+Type* type_make_multi_pointer(struct Context *context, Type* to);
+Type* type_make_array(struct Context *context, Type* to, u32 count);
+Type* type_make_slice(struct Context *context, Type* of);
+Type* type_make_dynarray(struct Context *context, Type* of);
+Type* type_make_varargs(struct Context *context, Type* of);
+Type* type_make_optional(struct Context *context, Type* of);
 
-void build_linear_types_with_offset(Type* type, bh_arr(TypeWithOffset)* pdest, u32 offset);
-b32  type_struct_member_apply_use(bh_allocator alloc, Type *s_type, StructMember *smem);
+void build_linear_types_with_offset(struct Context *context, Type* type, bh_arr(TypeWithOffset)* pdest, u32 offset);
+b32  type_struct_member_apply_use(struct Context *context, Type *s_type, StructMember *smem);
 
-const char* type_get_unique_name(Type* type);
-const char* type_get_name(Type* type);
+const char* type_get_unique_name(struct Context *context, Type* type);
+const char* type_get_name(struct Context *context, Type* type);
 u32 type_get_alignment_log2(Type* type);
 Type* type_get_contained_type(Type* type);
 
 b32 type_is_ready_for_lookup(Type* type);
-b32 type_lookup_member(Type* type, char* member, StructMember* smem);
-b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem);
+b32 type_lookup_member(struct Context *context, Type* type, char* member, StructMember* smem);
+b32 type_lookup_member_by_idx(struct Context *context, Type* type, i32 idx, StructMember* smem);
 
 i32 type_linear_member_count(Type* type);
-b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two);
+b32 type_linear_member_lookup(struct Context *context, Type* type, i32 idx, TypeWithOffset* two);
 i32 type_get_idx_of_linear_member_with_offset(Type* type, u32 offset);
 
 b32 type_struct_is_simple(Type* type);

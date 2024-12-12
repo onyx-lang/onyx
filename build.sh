@@ -25,15 +25,26 @@ compile_all() {
 package_all() {
     rm -rf "$DIST_DIR"
     mkdir -p "$DIST_DIR"
+    mkdir -p "$DIST_DIR/lib"
+    mkdir -p "$DIST_DIR/include"
 
     echo "Installing on '$(uname -a)'"
     echo "Installing core libs"
     [ -d "$DIST_DIR/core" ] && rm -r "$DIST_DIR/core"
     cp -r ./core "$DIST_DIR/core"
 
+    case "$(uname)" in
+        Linux)  suffix='so' ;;
+        *BSD)   suffix='so' ;;
+        Darwin) suffix='dylib' ;;
+        *)      suffix='dll' ;;
+    esac
+
     echo "Installing core tools"
     mkdir -p "$DIST_DIR/bin"
     cp compiler/onyx "$DIST_DIR/bin/"
+    cp compiler/libonyx.$suffix "$DIST_DIR/lib/"
+    cp "shared/include/onyx.h" "$DIST_DIR/include/onyx.h"
 
     mkdir -p "$DIST_DIR/tools"
     mkdir -p "$DIST_DIR/tools/pkg_templates"
@@ -43,15 +54,6 @@ package_all() {
 
     if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
         echo "Installing runtime library"
-        mkdir -p "$DIST_DIR/lib"
-        mkdir -p "$DIST_DIR/include"
-
-        case "$(uname)" in
-            Linux)  suffix='so' ;;
-            *BSD)   suffix='so' ;;
-            Darwin) suffix='dylib' ;;
-            *)      suffix='dll' ;;
-        esac
 
         [ -f runtime/onyx_runtime.$suffix ] && cp runtime/onyx_runtime.$suffix "$DIST_DIR/lib/"
         cp "shared/include/onyx_library.h" "$DIST_DIR/include/onyx_library.h"
@@ -77,15 +79,11 @@ compress_all() {
     # Sign the binaries on MacOS
     [ "$(uname)" = 'Darwin' ] && \
         codesign -s - "$DIST_DIR/bin/onyx" && \
+        codesign -s - "$DIST_DIR/lib/libonyx.dylib" && \
         [ -f "$DIST_DIR/lib/onyx_runtime.dylib" ] && \
             codesign -s - "$DIST_DIR/lib/onyx_runtime.dylib"
 
-    if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
-        # When including a runtime library, include the lib and include folders
-        tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples include lib misc tools LICENSE
-    else
-        tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples misc tools LICENSE
-    fi
+    tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples include lib misc tools LICENSE
 
     mv onyx.tar.gz dist/
 }

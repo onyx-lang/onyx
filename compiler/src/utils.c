@@ -1,6 +1,3 @@
-#define BH_INTERNAL_ALLOCATOR (global_heap_allocator)
-#define BH_DEBUG
-
 #include "utils.h"
 #include "lex.h"
 #include "astnodes.h"
@@ -10,100 +7,94 @@
 #include "errors.h"
 #include "doc.h"
 
-bh_scratch global_scratch;
-bh_allocator global_scratch_allocator;
-
-bh_managed_heap global_heap;
-bh_allocator global_heap_allocator;
-
 //
 // Program info and packages
 //
 
-Package* package_lookup(char* package_name) {
-    i32 index = shgeti(context.packages, package_name);
+Package* package_lookup(Context *context, char* package_name) {
+    i32 index = shgeti(context->packages, package_name);
     if (index != -1) {
-        return context.packages[index].value;
+        return context->packages[index].value;
     } else {
         return NULL;
     }
 }
 
-Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_allocator alloc, OnyxFilePos pos) {
-    i32 index = shgeti(context.packages, package_name);
+Package* package_lookup_or_create(Context *context, char* package_name, Scope* parent_scope, OnyxFilePos pos) {
+    i32 index = shgeti(context->packages, package_name);
     if (index != -1) {
-        return context.packages[index].value;
+        return context->packages[index].value;
 
     } else {
-        Package* package = bh_alloc_item(alloc, Package);
+        Package* package = bh_alloc_item(context->ast_alloc, Package);
 
-        char* pac_name = bh_alloc_array(alloc, char, strlen(package_name) + 1);
+        char* pac_name = bh_alloc_array(context->ast_alloc, char, strlen(package_name) + 1);
         memcpy(pac_name, package_name, strlen(package_name) + 1);
         pac_name[strlen(package_name)] = '\0';
 
         package->name = pac_name;
         package->unqualified_name = pac_name + bh_str_last_index_of(pac_name, '.');
         package->use_package_entities = NULL;
-        package->id = ++context.next_package_id;
+        package->id = ++context->next_package_id;
         package->parent_id = -1;
-        bh_arr_new(global_heap_allocator, package->sub_packages, 4);
+        bh_arr_new(context->gp_alloc, package->sub_packages, 4);
 
         if (!strcmp(pac_name, "builtin")) {
-            package->private_scope = scope_create(alloc, context.global_scope, pos);
-            package->scope = context.global_scope;
+            package->private_scope = scope_create(context, context->global_scope, pos);
+            package->scope = context->global_scope;
         } else {
-            package->scope = scope_create(alloc, parent_scope, pos);
-            package->private_scope = scope_create(alloc, package->scope, pos);
+            package->scope = scope_create(context, parent_scope, pos);
+            package->private_scope = scope_create(context, package->scope, pos);
         }
 
-        shput(context.packages, pac_name, package);
+        shput(context->packages, pac_name, package);
 
         // The builtin package is special. The 'builtin' symbol will be
         // accessible even if you do not `use builtin`.
         if (!strcmp(pac_name, "builtin")) {
-            AstPackage* package_node = onyx_ast_node_new(alloc, sizeof(AstPackage), Ast_Kind_Package);
+            AstPackage* package_node = onyx_ast_node_new(context->ast_alloc, sizeof(AstPackage), Ast_Kind_Package);
             package_node->package_name = package->name;
             package_node->package = package;
-            package_node->type_node = builtin_package_id_type;
+            package_node->type_node = context->builtins.package_id_type;
             package_node->flags |= Ast_Flag_Comptime;
 
-            symbol_raw_introduce(context.global_scope, pac_name, pos, (AstNode *) package_node);
+            symbol_raw_introduce(context, context->global_scope, pac_name, pos, (AstNode *) package_node);
         }
 
         return package;
     }
 }
 
-void package_track_use_package(Package* package, Entity* entity) {
+void package_track_use_package(Context *context, Package* package, Entity* entity) {
     assert(entity);
 
     if (package->use_package_entities == NULL) {
-        bh_arr_new(global_heap_allocator, package->use_package_entities, 4);
+        bh_arr_new(context->gp_alloc, package->use_package_entities, 4);
     }
 
     bh_arr_push(package->use_package_entities, entity);
 }
 
-void package_reinsert_use_packages(Package* package) {
+void package_reinsert_use_packages(Context *context, Package* package) {
     if (!package) return;
     if (!package->use_package_entities) return;
 
     bh_arr_each(Entity *, use_package, package->use_package_entities) {
         (*use_package)->state = Entity_State_Resolve_Symbols;
         (*use_package)->macro_attempts = 0;
-        entity_heap_insert_existing(&context.entities, *use_package);
+        entity_heap_insert_existing(&context->entities, *use_package);
     } 
 
     bh_arr_set_length(package->use_package_entities, 0);
 }
 
-void package_mark_as_used(Package* package) {
+void package_mark_as_used(Context *context, Package* package) {
     if (!package) return;
     if (package->is_included_somewhere) return;
     package->is_included_somewhere = 1;
     
     bh_arr_each(Entity *, pent, package->buffered_entities) {
-        entity_heap_insert_existing(&context.entities, *pent);
+        entity_heap_insert_existing(&context->entities, *pent);
     }
 
     bh_arr_clear(package->buffered_entities);
@@ -115,9 +106,11 @@ void package_mark_as_used(Package* package) {
 // Scoping
 //
 
-Scope* scope_create(bh_allocator a, Scope* parent, OnyxFilePos created_at) {
-    Scope* scope = bh_alloc_item(a, Scope);
-    scope->id = ++context.next_scope_id;
+Scope* scope_create(Context *context, Scope* parent, OnyxFilePos created_at) {
+    Scope* scope = bh_alloc_item(context->ast_alloc, Scope);
+    bh_arr_push(context->scopes, scope);
+
+    scope->id = ++context->next_scope_id;
     scope->parent = parent;
     scope->created_at = created_at;
     scope->name = NULL;
@@ -128,22 +121,22 @@ Scope* scope_create(bh_allocator a, Scope* parent, OnyxFilePos created_at) {
     return scope;
 }
 
-void scope_include(Scope* target, Scope* source, OnyxFilePos pos) {
+void scope_include(Context *context, Scope* target, Scope* source, OnyxFilePos pos) {
     fori (i, 0, shlen(source->symbols)) {
-        symbol_raw_introduce(target, source->symbols[i].key, pos, source->symbols[i].value);
+        symbol_raw_introduce(context, target, source->symbols[i].key, pos, source->symbols[i].value);
     }
 }
 
-b32 symbol_introduce(Scope* scope, OnyxToken* tkn, AstNode* symbol) {
+b32 symbol_introduce(Context *context, Scope* scope, OnyxToken* tkn, AstNode* symbol) {
     token_toggle_end(tkn);
 
-    b32 ret = symbol_raw_introduce(scope, tkn->text, tkn->pos, symbol);
+    b32 ret = symbol_raw_introduce(context, scope, tkn->text, tkn->pos, symbol);
 
     token_toggle_end(tkn);
     return ret;
 }
 
-b32 symbol_raw_introduce(Scope* scope, char* name, OnyxFilePos pos, AstNode* symbol) {
+b32 symbol_raw_introduce(Context *context, Scope* scope, char* name, OnyxFilePos pos, AstNode* symbol) {
     if (!scope->symbols) {
         sh_new_arena(scope->symbols);
     }
@@ -153,10 +146,10 @@ b32 symbol_raw_introduce(Scope* scope, char* name, OnyxFilePos pos, AstNode* sym
         if (index != -1) {
             AstNode *node = scope->symbols[index].value;
             if (node != symbol) {
-                onyx_report_error(pos, Error_Critical, "Redeclaration of symbol '%s'.", name);
+                ONYX_ERROR(pos, Error_Critical, "Redeclaration of symbol '%s'.", name);
 
                 if (node->token) {
-                    onyx_report_error(node->token->pos, Error_Critical, "Previous declaration was here.");
+                    ONYX_ERROR(node->token->pos, Error_Critical, "Previous declaration was here.");
                 }
 
                 return 0;
@@ -166,17 +159,17 @@ b32 symbol_raw_introduce(Scope* scope, char* name, OnyxFilePos pos, AstNode* sym
     }
 
     shput(scope->symbols, name, symbol);
-    track_declaration_for_symbol_info(pos, symbol);
+    track_declaration_for_symbol_info(context, pos, symbol);
     return 1;
 }
 
-void symbol_builtin_introduce(Scope* scope, char* sym, AstNode *node) {
+void symbol_builtin_introduce(Context *context, Scope* scope, char* sym, AstNode *node) {
     if (!scope->symbols) sh_new_arena(scope->symbols);
 
     shput(scope->symbols, sym, node);
 }
 
-void symbol_subpackage_introduce(Package* parent, char* sym, AstPackage* subpackage) {
+void symbol_subpackage_introduce(Context *context, Package* parent, char* sym, AstPackage* subpackage) {
     Scope *scope = parent->scope;
     if (!scope->symbols) sh_new_arena(scope->symbols);
 
@@ -196,7 +189,7 @@ void symbol_subpackage_introduce(Package* parent, char* sym, AstPackage* subpack
     }
 }
 
-AstNode* symbol_raw_resolve_no_ascend(Scope* scope, char* sym) {
+AstNode* symbol_raw_resolve_no_ascend(Context *context, Scope* scope, char* sym) {
     if (!scope || !scope->symbols) return NULL;
 
     i32 index = shgeti(scope->symbols, sym);
@@ -211,12 +204,12 @@ AstNode* symbol_raw_resolve_no_ascend(Scope* scope, char* sym) {
     return NULL;
 }
 
-AstNode* symbol_raw_resolve_limited(Scope* start_scope, char* sym, i32 limit) {
+AstNode* symbol_raw_resolve_limited(Context *context, Scope* start_scope, char* sym, i32 limit) {
     Scope* scope = start_scope;
     AstNode *res = NULL;
 
     while (scope != NULL && limit-- > 0) {
-        res = symbol_raw_resolve_no_ascend(scope, sym);
+        res = symbol_raw_resolve_no_ascend(context, scope, sym);
         if (res) {
             return res;
         }
@@ -227,12 +220,12 @@ AstNode* symbol_raw_resolve_limited(Scope* start_scope, char* sym, i32 limit) {
     return NULL;
 }
 
-AstNode* symbol_raw_resolve(Scope* start_scope, char* sym) {
+AstNode* symbol_raw_resolve(Context *context, Scope* start_scope, char* sym) {
     Scope* scope = start_scope;
     AstNode *res = NULL;
 
     while (scope != NULL) {
-        res = symbol_raw_resolve_no_ascend(scope, sym);
+        res = symbol_raw_resolve_no_ascend(context, scope, sym);
         if (res) {
             return res;
         }
@@ -243,15 +236,15 @@ AstNode* symbol_raw_resolve(Scope* start_scope, char* sym) {
     return NULL;
 }
 
-AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
+AstNode* symbol_resolve(Context *context, Scope* start_scope, OnyxToken* tkn) {
     token_toggle_end(tkn);
-    AstNode* res = symbol_raw_resolve(start_scope, tkn->text);
+    AstNode* res = symbol_raw_resolve(context, start_scope, tkn->text);
     token_toggle_end(tkn);
 
     return res;
 }
 
-AstNode* try_symbol_raw_resolve_from_node(AstNode* node, char* symbol) {
+AstNode* try_symbol_raw_resolve_from_node(Context *context, AstNode* node, char* symbol) {
     // CLEANUP: I think this has a lot of duplication from get_scope_from_node.
     // There are some additional cases handled here, but I think the majority
     // of this code could be rewritten in terms of get_scope_from_node.
@@ -286,14 +279,14 @@ all_types_peeled_off:
 
             // CLEANUP
             if (package->package == NULL) {
-                package->package = package_lookup(package->package_name);
+                package->package = package_lookup(context, package->package_name);
             }
 
             if (package->package == NULL) {
                 return NULL;
             }
 
-            return symbol_raw_resolve_no_ascend(package->package->scope, symbol);
+            return symbol_raw_resolve_no_ascend(context, package->package->scope, symbol);
         } 
 
         case Ast_Kind_Foreign_Block:
@@ -302,18 +295,18 @@ all_types_peeled_off:
         case Ast_Kind_Poly_Union_Type:
         case Ast_Kind_Distinct_Type:
         case Ast_Kind_Interface: {
-            Scope* scope = get_scope_from_node(node);
-            return symbol_raw_resolve_no_ascend(scope, symbol);
+            Scope* scope = get_scope_from_node(context, node);
+            return symbol_raw_resolve_no_ascend(context, scope, symbol);
         }
 
         case Ast_Kind_Slice_Type:
         case Ast_Kind_DynArr_Type: {
-            Scope* scope = get_scope_from_node(node);
+            Scope* scope = get_scope_from_node(context, node);
 
             if (!scope)
                 return NULL;
 
-            return symbol_raw_resolve(scope, symbol);
+            return symbol_raw_resolve(context, scope, symbol);
         }
 
         case Ast_Kind_Struct_Type: {
@@ -325,11 +318,11 @@ all_types_peeled_off:
             // bleed to the top level scope.            AstNode *result = NULL;
             AstNode *result = NULL;
             if (stype->stcache != NULL) {
-                result = try_symbol_raw_resolve_from_type(stype->stcache, symbol);
+                result = try_symbol_raw_resolve_from_type(context, stype->stcache, symbol);
             }
 
             if (result == NULL && stype->scope) {
-                result = symbol_raw_resolve_no_ascend(stype->scope, symbol);
+                result = symbol_raw_resolve_no_ascend(context, stype->scope, symbol);
             }
 
             return result;
@@ -340,11 +333,11 @@ all_types_peeled_off:
 
             AstNode *result = NULL;
             if (utype->utcache != NULL) {
-                result = try_symbol_raw_resolve_from_type(utype->utcache, symbol);
+                result = try_symbol_raw_resolve_from_type(context, utype->utcache, symbol);
             }
 
             if (result == NULL && utype->scope) {
-                result = symbol_raw_resolve_no_ascend(utype->scope, symbol);
+                result = symbol_raw_resolve_no_ascend(context, utype->scope, symbol);
             }
 
             return result;
@@ -352,24 +345,24 @@ all_types_peeled_off:
 
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* stype = ((AstPolyStructType *) node);
-            if ((AstType *) node == builtin_array_type) {
+            if ((AstType *) node == context->builtins.array_type) {
                 // We have to ascend on the builtin Array type because it
                 // "extends" the Slice type. This is the only structure
                 // that works this way. It might be worth considering
                 // forcing the use the Slice functions, but then it can
                 // get confusing about where every function lives, ya know.
                 // Is "get" in Array or Slice.
-                return symbol_raw_resolve_limited(stype->scope, symbol, 2);
+                return symbol_raw_resolve_limited(context, stype->scope, symbol, 2);
 
             } else {
-                return symbol_raw_resolve_no_ascend(stype->scope, symbol);
+                return symbol_raw_resolve_no_ascend(context, stype->scope, symbol);
             }
         }
 
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pctype = (AstPolyCallType *) node;
             if (pctype->resolved_type) {
-                return try_symbol_raw_resolve_from_type(pctype->resolved_type, symbol);
+                return try_symbol_raw_resolve_from_type(context, pctype->resolved_type, symbol);
             }
             return NULL;
         }
@@ -392,22 +385,22 @@ all_types_peeled_off:
     return NULL;
 }
 
-AstNode* try_symbol_resolve_from_node(AstNode* node, OnyxToken* token) {
+AstNode* try_symbol_resolve_from_node(Context *context, AstNode* node, OnyxToken* token) {
     token_toggle_end(token);
-    AstNode* result = try_symbol_raw_resolve_from_node(node, token->text);
+    AstNode* result = try_symbol_raw_resolve_from_node(context, node, token->text);
     token_toggle_end(token);
 
     return result;
 }
 
-static AstNode* try_symbol_raw_resolve_from_poly_sln(bh_arr(AstPolySolution) slns, char *symbol) {
+static AstNode* try_symbol_raw_resolve_from_poly_sln(Context *context, bh_arr(AstPolySolution) slns, char *symbol) {
     if (slns == NULL) return NULL;
 
     bh_arr_each(AstPolySolution, sln, slns) {
         if (token_text_equals(sln->poly_sym->token, symbol)) {
             if (sln->kind == PSK_Type) {
-                AstTypeRawAlias* alias = onyx_ast_node_new(context.ast_alloc, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
-                alias->type = &basic_types[Basic_Kind_Type_Index];
+                AstTypeRawAlias* alias = onyx_ast_node_new(context->ast_alloc, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
+                alias->type = context->types.basic[Basic_Kind_Type_Index];
                 alias->to = sln->type;
                 return (AstNode *) alias;
 
@@ -420,30 +413,30 @@ static AstNode* try_symbol_raw_resolve_from_poly_sln(bh_arr(AstPolySolution) sln
     return NULL;
 }
 
-AstNode* try_symbol_raw_resolve_from_type(Type *type, char* symbol) {
+AstNode* try_symbol_raw_resolve_from_type(Context *context, Type *type, char* symbol) {
     while (type->kind == Type_Kind_Pointer) {
         type = type->Pointer.elem; 
     }
 
     switch (type->kind) {
         case Type_Kind_Basic: {
-            return symbol_raw_resolve_no_ascend(((AstBasicType *) type->ast_type)->scope, symbol);
+            return symbol_raw_resolve_no_ascend(context, ((AstBasicType *) type->ast_type)->scope, symbol);
         }
 
         case Type_Kind_Enum: {
-            return symbol_raw_resolve_no_ascend(((AstEnumType *) type->ast_type)->scope, symbol);
+            return symbol_raw_resolve_no_ascend(context, ((AstEnumType *) type->ast_type)->scope, symbol);
         }
 
         case Type_Kind_Slice: {
-            return symbol_raw_resolve(type->Slice.scope, symbol);
+            return symbol_raw_resolve(context, type->Slice.scope, symbol);
         }
 
         case Type_Kind_DynArray: {
-            return symbol_raw_resolve(type->DynArray.scope, symbol);
+            return symbol_raw_resolve(context, type->DynArray.scope, symbol);
         }
 
         case Type_Kind_Struct: {
-            AstNode *poly_sln_res = try_symbol_raw_resolve_from_poly_sln(type->Struct.poly_sln, symbol);
+            AstNode *poly_sln_res = try_symbol_raw_resolve_from_poly_sln(context, type->Struct.poly_sln, symbol);
             if (poly_sln_res) return poly_sln_res;
 
             i32 limit = 1;
@@ -452,11 +445,11 @@ AstNode* try_symbol_raw_resolve_from_type(Type *type, char* symbol) {
                 limit = 3;
             }
 
-            return symbol_raw_resolve_limited(type->Struct.scope, symbol, limit);
+            return symbol_raw_resolve_limited(context, type->Struct.scope, symbol, limit);
         }
 
         case Type_Kind_Union: {
-            AstNode *poly_sln_res = try_symbol_raw_resolve_from_poly_sln(type->Union.poly_sln, symbol);
+            AstNode *poly_sln_res = try_symbol_raw_resolve_from_poly_sln(context, type->Union.poly_sln, symbol);
             if (poly_sln_res) return poly_sln_res;
 
             if (!strcmp(symbol, "tag_enum")) {
@@ -469,19 +462,19 @@ AstNode* try_symbol_raw_resolve_from_type(Type *type, char* symbol) {
                 limit = 3;
             }
 
-            return symbol_raw_resolve_limited(type->Union.scope, symbol, limit);
+            return symbol_raw_resolve_limited(context, type->Union.scope, symbol, limit);
         }
 
         case Type_Kind_PolyStruct: {
-            return symbol_raw_resolve_no_ascend(type->PolyStruct.scope, symbol);
+            return symbol_raw_resolve_no_ascend(context, type->PolyStruct.scope, symbol);
         }
 
         case Type_Kind_PolyUnion: {
-            return symbol_raw_resolve_no_ascend(type->PolyUnion.scope, symbol);
+            return symbol_raw_resolve_no_ascend(context, type->PolyUnion.scope, symbol);
         }
 
         case Type_Kind_Distinct: {
-            return symbol_raw_resolve(type->Distinct.scope, symbol);
+            return symbol_raw_resolve(context, type->Distinct.scope, symbol);
         }
 
         default: return NULL;
@@ -490,9 +483,9 @@ AstNode* try_symbol_raw_resolve_from_type(Type *type, char* symbol) {
     return NULL;
 }
 
-AstNode* try_symbol_resolve_from_type(Type *type, OnyxToken *token) {
+AstNode* try_symbol_resolve_from_type(Context *context, Type *type, OnyxToken *token) {
     token_toggle_end(token);
-    AstNode* result = try_symbol_raw_resolve_from_type(type, token->text);
+    AstNode* result = try_symbol_raw_resolve_from_type(context, type, token->text);
     token_toggle_end(token);
 
     return result;
@@ -589,27 +582,27 @@ void build_all_overload_options(bh_arr(OverloadOption) overloads, bh_imap* all_o
     }
 }
 
-AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* param_args) {
+AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadOption) overloads, Arguments* param_args) {
     Arguments args;
-    arguments_clone(&args, param_args);
-    arguments_ensure_length(&args, bh_arr_length(args.values) + bh_arr_length(args.named_values));
+    arguments_clone(context, &args, param_args);
+    arguments_ensure_length(context, &args, bh_arr_length(args.values) + bh_arr_length(args.named_values));
 
     // CLEANUP SPEED: This currently rebuilds the complete set of overloads every time one is looked up.
     // This should be cached in the AstOverloadedFunction or somewhere like that.
     bh_imap all_overloads;
-    bh_imap_init(&all_overloads, global_heap_allocator, bh_arr_length(overloads) * 2);
+    bh_imap_init(&all_overloads, context->gp_alloc, bh_arr_length(overloads) * 2);
     build_all_overload_options(overloads, &all_overloads);
 
     AstTyped *matched_overload = NULL;
 
     bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
         AstTyped* node = (AstTyped *) strip_aliases((AstNode *) entry->key);
-        arguments_copy(&args, param_args);
+        arguments_copy(context, &args, param_args);
 
         AstFunction* overload = NULL;
         switch (node->kind) {
-            case Ast_Kind_Macro:            overload = macro_resolve_header((AstMacro *) node, param_args, NULL, 0); break;
-            case Ast_Kind_Polymorphic_Proc: overload = polymorphic_proc_build_only_header((AstFunction *) node, PPLM_By_Arguments, param_args); break;
+            case Ast_Kind_Macro:            overload = macro_resolve_header(context, (AstMacro *) node, param_args, NULL, 0); break;
+            case Ast_Kind_Polymorphic_Proc: overload = polymorphic_proc_build_only_header(context, (AstFunction *) node, PPLM_By_Arguments, param_args); break;
             case Ast_Kind_Function:
                 overload = (AstFunction *) node;
                 arguments_clear_baked_flags(&args);
@@ -620,7 +613,7 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
         // NOTE: Overload is not something that is known to be overloadable.
         if (overload == NULL) continue;
         if (overload->kind != Ast_Kind_Function) continue;
-        if (overload == (AstFunction *) &node_that_signals_a_yield || overload->type == NULL) {
+        if (overload == (AstFunction *) &context->node_that_signals_a_yield || overload->type == NULL) {
             // If it was not possible to create the type for this procedure, tell the
             // caller that this should yield and try again later.
 
@@ -628,18 +621,18 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
             // work in the future, then it has to take precedence over the other options available.
             bh_imap_free(&all_overloads);
             bh_arr_free(args.values);
-            return (AstTyped *) &node_that_signals_a_yield;
+            return (AstTyped *) &context->node_that_signals_a_yield;
         }
         assert(overload->type->kind == Type_Kind_Function);
 
         arguments_remove_baked(&args);
-        arguments_ensure_length(&args, get_argument_buffer_size(&overload->type->Function, &args));
+        arguments_ensure_length(context, &args, get_argument_buffer_size(context, &overload->type->Function, &args));
 
         // NOTE: If the arguments cannot be placed successfully in the parameters list
-        if (!fill_in_arguments(&args, (AstNode *) overload, NULL, 0)) continue;
+        if (!fill_in_arguments(context, &args, (AstNode *) overload, NULL, 0)) continue;
         
         VarArgKind va_kind;
-        TypeMatch tm = check_arguments_against_type(&args, &overload->type->Function, &va_kind, NULL, NULL, NULL);
+        TypeMatch tm = check_arguments_against_type(context, &args, &overload->type->Function, &va_kind, NULL, NULL, NULL);
         if (tm == TYPE_MATCH_SUCCESS) {
             matched_overload = node;
             break;
@@ -648,7 +641,7 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
         if (tm == TYPE_MATCH_YIELD) {
             bh_imap_free(&all_overloads);
             bh_arr_free(args.values);
-            return (AstTyped *) &node_that_signals_a_yield;
+            return (AstTyped *) &context->node_that_signals_a_yield;
         }
     }
 
@@ -657,11 +650,11 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
     return matched_overload;
 }
 
-AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type* type) {
+AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption) overloads, Type* type) {
     if (type->kind != Type_Kind_Function) return NULL;
 
     bh_imap all_overloads;
-    bh_imap_init(&all_overloads, global_heap_allocator, bh_arr_length(overloads) * 2);
+    bh_imap_init(&all_overloads, context->gp_alloc, bh_arr_length(overloads) * 2);
     build_all_overload_options(overloads, &all_overloads);
 
     AstTyped *matched_overload = NULL;
@@ -670,14 +663,14 @@ AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type*
         AstTyped* node = (AstTyped *) entry->key;
         if (node->kind == Ast_Kind_Overloaded_Function) continue;
 
-        TypeMatch tm = unify_node_and_type(&node, type);
+        TypeMatch tm = unify_node_and_type(context, &node, type);
         if (tm == TYPE_MATCH_SUCCESS) {
             matched_overload = node;
             break;
         }
 
         if (tm == TYPE_MATCH_YIELD) {
-            return (AstTyped *) &node_that_signals_a_yield;
+            return (AstTyped *) &context->node_that_signals_a_yield;
         }
     }
     
@@ -685,12 +678,12 @@ AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type*
     return matched_overload;
 }
 
-void report_unable_to_match_overload(AstCall* call, bh_arr(OverloadOption) overloads) {
-    char* arg_str = bh_alloc(global_scratch_allocator, 1024);
+void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(OverloadOption) overloads) {
+    char* arg_str = bh_alloc(context->scratch_alloc, 1024);
     arg_str[0] = '\0';
 
     bh_arr_each(AstTyped *, arg, call->args.values) {
-        strncat(arg_str, node_get_type_name(*arg), 1023);
+        strncat(arg_str, node_get_type_name(context, *arg), 1023);
 
         if (arg != &bh_arr_last(call->args.values))
             strncat(arg_str, ", ", 1023);
@@ -707,41 +700,41 @@ void report_unable_to_match_overload(AstCall* call, bh_arr(OverloadOption) overl
             token_toggle_end((*named_value)->token);
 
             strncat(arg_str, "=", 1023);
-            strncat(arg_str, node_get_type_name((*named_value)->value), 1023); // CHECK: this might say 'unknown'.
+            strncat(arg_str, node_get_type_name(context, (*named_value)->value), 1023); // CHECK: this might say 'unknown'.
 
             if (named_value != &bh_arr_last(call->args.named_values))
                 strncat(arg_str, ", ", 1023);
         }
     }
 
-    onyx_report_error(call->token->pos, Error_Critical, "Unable to match overloaded function with provided argument types: (%s)", arg_str);
+    ONYX_ERROR(call->token->pos, Error_Critical, "Unable to match overloaded function with provided argument types: (%s)", arg_str);
 
-    bh_free(global_scratch_allocator, arg_str);
+    bh_free(context->scratch_alloc, arg_str);
 
     // CLEANUP SPEED: This currently rebuilds the complete set of overloads every time one is looked up.
     // This should be cached in the AstOverloadedFunction or somewhere like that.
     bh_imap all_overloads;
-    bh_imap_init(&all_overloads, global_heap_allocator, bh_arr_length(overloads) * 2);
+    bh_imap_init(&all_overloads, context->gp_alloc, bh_arr_length(overloads) * 2);
     build_all_overload_options(overloads, &all_overloads);
 
     i32 i = 1;
     bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
         AstTyped* node = (AstTyped *) strip_aliases((AstNode *) entry->key);
-        onyx_report_error(node->token->pos, Error_Critical, "Here is one of the overloads. %d/%d", i++, bh_arr_length(all_overloads.entries));
+        ONYX_ERROR(node->token->pos, Error_Critical, "Here is one of the overloads. %d/%d", i++, bh_arr_length(all_overloads.entries));
     }
 
     bh_imap_free(&all_overloads);
 }
 
-void report_incorrect_overload_expected_type(Type *given, Type *expected, OnyxToken *overload, OnyxToken *group) {
-    onyx_report_error(overload->pos, Error_Critical,
+void report_incorrect_overload_expected_type(Context *context, Type *given, Type *expected, OnyxToken *overload, OnyxToken *group) {
+    ONYX_ERROR(overload->pos, Error_Critical,
             "Expected this overload option to return '%s', but instead it returns '%s'.",
-            type_get_name(expected), type_get_name(given));
+            type_get_name(context, expected), type_get_name(context, given));
 
-    onyx_report_error(group->pos, Error_Critical, "Here is where the overloaded function was defined.");
+    ONYX_ERROR(group->pos, Error_Critical, "Here is where the overloaded function was defined.");
 }
 
-static TypeMatch ensure_overload_returns_correct_type_job(void *raw_data) {
+static TypeMatch ensure_overload_returns_correct_type_job(Context *context, void *raw_data) {
     OverloadReturnTypeCheck *data = raw_data;
     Type *expected_type = data->expected_type;
     AstTyped *node      = data->node;
@@ -759,7 +752,7 @@ static TypeMatch ensure_overload_returns_correct_type_job(void *raw_data) {
     // were not actually used. This creates a problem here because this code
     // will still wait for them. As a cheap solution, if there is a cycle detected,
     // return success, even if the types may not match.
-    if (context.cycle_almost_detected > 0) {
+    if (context->cycle_almost_detected > 0) {
         return TYPE_MATCH_SUCCESS;
     }
 
@@ -772,7 +765,7 @@ static TypeMatch ensure_overload_returns_correct_type_job(void *raw_data) {
     if (!func->type->Function.return_type) return TYPE_MATCH_YIELD;
 
     Type *return_type = func->type->Function.return_type;
-    if (return_type == &type_auto_return) return TYPE_MATCH_YIELD;
+    if (return_type == context->types.auto_return) return TYPE_MATCH_YIELD;
 
     // See the note about using Polymorphic Structures as expected return types,
     // in check_overloaded_function().
@@ -783,32 +776,32 @@ static TypeMatch ensure_overload_returns_correct_type_job(void *raw_data) {
             return TYPE_MATCH_SUCCESS;
         }
 
-        report_incorrect_overload_expected_type(return_type, expected_type, func->token, data->group);
+        report_incorrect_overload_expected_type(context, return_type, expected_type, func->token, data->group);
         return TYPE_MATCH_FAILED;
     }
 
-    if (!types_are_compatible(return_type, expected_type)) {
-        report_incorrect_overload_expected_type(return_type, expected_type, func->token, data->group);
+    if (!types_are_compatible(context, return_type, expected_type)) {
+        report_incorrect_overload_expected_type(context, return_type, expected_type, func->token, data->group);
         return TYPE_MATCH_FAILED;
     }
 
     return TYPE_MATCH_SUCCESS;
 }
 
-void ensure_overload_returns_correct_type(AstTyped *overload, AstOverloadedFunction *group) {
+void ensure_overload_returns_correct_type(Context *context, AstTyped *overload, AstOverloadedFunction *group) {
     // This might not be entirely right as the type might not have been constructed yet, I think?
     //
     // Also, as a HACK, this does not check for the correct return type when errors are disabled.
     // Errors are only disabled when doing something non-permantent, like checking an interface
     // constraint, so this is a cheap way to tell if that is where we are coming from.
     //
-    if (group->expected_return_type && onyx_errors_are_enabled()) {
-        OverloadReturnTypeCheck *data = bh_alloc_item(context.ast_alloc, OverloadReturnTypeCheck);
+    if (group->expected_return_type && onyx_errors_are_enabled(context)) {
+        OverloadReturnTypeCheck *data = bh_alloc_item(context->ast_alloc, OverloadReturnTypeCheck);
         data->expected_type = group->expected_return_type;
         data->node = overload;
         data->group = group->token;
 
-        entity_heap_add_job(&context.entities, ensure_overload_returns_correct_type_job, data);
+        entity_heap_add_job(&context->entities, ensure_overload_returns_correct_type_job, data);
     }
 }
 
@@ -819,7 +812,7 @@ void ensure_overload_returns_correct_type(AstTyped *overload, AstOverloadedFunct
 //
 //
 // TODO: Write this documentation
-void expand_macro(AstCall** pcall, AstFunction* template) {
+void expand_macro(Context *context, AstCall** pcall, AstFunction* template) {
     AstCall* call = *pcall;
     AstMacro* macro = (AstMacro *) call->callee;
     assert(macro->kind == Ast_Kind_Macro);
@@ -829,9 +822,9 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
     assert(template->type->kind == Type_Kind_Function);
 
     bh_arr(AstNode *) nodes_that_need_entities=NULL;
-    bh_arr_new(global_heap_allocator, nodes_that_need_entities, 4);
+    bh_arr_new(context->gp_alloc, nodes_that_need_entities, 4);
 
-    AstBlock* expansion = (AstBlock *) ast_clone_with_captured_entities(context.ast_alloc, template->body, &nodes_that_need_entities);
+    AstBlock* expansion = (AstBlock *) ast_clone_with_captured_entities(context, template->body, &nodes_that_need_entities);
     expansion->rules = Block_Rule_Macro;
     expansion->scope = NULL;
     expansion->next = call->next;
@@ -839,10 +832,10 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
 
     AstNode* subst = (AstNode *) expansion;
 
-    if (template->type->Function.return_type != &basic_types[Basic_Kind_Void]) {
+    if (template->type->Function.return_type != context->types.basic[Basic_Kind_Void]) {
         expansion->rules = Block_Rule_Do_Block;
 
-        AstDoBlock* doblock = (AstDoBlock *) onyx_ast_node_new(context.ast_alloc, sizeof(AstDoBlock), Ast_Kind_Do_Block);
+        AstDoBlock* doblock = (AstDoBlock *) onyx_ast_node_new(context->ast_alloc, sizeof(AstDoBlock), Ast_Kind_Do_Block);
         doblock->token = expansion->token;
         doblock->block = expansion;
         doblock->type = template->type->Function.return_type;
@@ -851,10 +844,10 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
         expansion->next = NULL;
 
         if (template->named_return_locals) {
-            bh_arr_new(context.ast_alloc, doblock->named_return_locals, bh_arr_length(template->named_return_locals));
+            bh_arr_new(context->ast_alloc, doblock->named_return_locals, bh_arr_length(template->named_return_locals));
 
             bh_arr_each(AstLocal *, named_return, template->named_return_locals) {
-                AstLocal *cloned = (AstLocal *) ast_clone(context.ast_alloc, *named_return);
+                AstLocal *cloned = (AstLocal *) ast_clone(context, *named_return);
                 bh_arr_push(doblock->named_return_locals, cloned);
 
                 cloned->next = doblock->block->body;
@@ -865,14 +858,14 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
         subst = (AstNode *) doblock;
     }
 
-    Scope* argument_scope = scope_create(context.ast_alloc, NULL, call->token->pos);
+    Scope* argument_scope = scope_create(context, NULL, call->token->pos);
     if (expansion->binding_scope != NULL)
-        scope_include(argument_scope, expansion->binding_scope, call->token->pos);
+        scope_include(context, argument_scope, expansion->binding_scope, call->token->pos);
     expansion->binding_scope = argument_scope;
 
     // HACK HACK HACK This is probably very wrong. I don't know what guarentees that
     // the paramters and arguments are going to be in the same order exactly.
-    Type *any_type = type_build_from_ast(context.ast_alloc, builtin_any_type);
+    Type *any_type = type_build_from_ast(context, context->builtins.any_type);
     fori (i, 0, bh_arr_length(call->args.values)) {
         AstNode *value = (AstNode *) ((AstArgument *) call->args.values[i])->value;
         assert(template->params[i].local->type);
@@ -880,14 +873,14 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
         Type *param_type = template->params[i].local->type;
         if (param_type == any_type
             || (param_type->kind == Type_Kind_VarArgs && param_type->VarArgs.elem == any_type)) {
-            onyx_report_error(macro->token->pos, Error_Critical, "Currently, macros do not support arguments of type 'any' or '..any'.");
+            ONYX_ERROR(macro->token->pos, Error_Critical, "Currently, macros do not support arguments of type 'any' or '..any'.");
         }
 
-        symbol_introduce(argument_scope, template->params[i].local->token, value);
+        symbol_introduce(context, argument_scope, template->params[i].local->token, value);
     }
 
     if (template->poly_scope != NULL)
-        scope_include(argument_scope, template->poly_scope, call->token->pos);
+        scope_include(context, argument_scope, template->poly_scope, call->token->pos);
 
     if (bh_arr_length(nodes_that_need_entities) > 0) {
         // :CopyPaste from symres_function
@@ -905,12 +898,12 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
                 scope = static_if->defined_in_scope;
 
                 if (template->poly_scope) {
-                    scope = scope_create(context.ast_alloc, scope, static_if->token->pos);
-                    scope_include(scope, template->poly_scope, static_if->token->pos);
+                    scope = scope_create(context, scope, static_if->token->pos);
+                    scope_include(context, scope, template->poly_scope, static_if->token->pos);
                 }
             }
 
-            add_entities_for_node(NULL, *node, scope, macro->entity->package);
+            add_entities_for_node(&context->entities, NULL, *node, scope, macro->entity->package);
         }
     }
 
@@ -920,26 +913,26 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
     return;
 }
 
-AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed) {
+AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed) {
     switch (macro->body->kind) {
         case Ast_Kind_Function: return (AstFunction *) macro->body;
 
         case Ast_Kind_Polymorphic_Proc: {
             AstFunction* pp = (AstFunction *) macro->body;
-            ensure_polyproc_cache_is_created(pp);
+            ensure_polyproc_cache_is_created(context, pp);
 
-            bh_arr(AstPolySolution) slns = find_polymorphic_slns(pp, PPLM_By_Arguments, args, callsite, error_if_failed);
+            bh_arr(AstPolySolution) slns = find_polymorphic_slns(context, pp, PPLM_By_Arguments, args, callsite, error_if_failed);
 
             if (slns == NULL) {
-                if (flag_to_yield) {
-                    flag_to_yield = 0;
-                    return (AstFunction *) &node_that_signals_a_yield;
+                if (context->polymorph.flag_to_yield) {
+                    context->polymorph.flag_to_yield = 0;
+                    return (AstFunction *) &context->node_that_signals_a_yield;
                 }
 
                 return NULL;
             }
 
-            return polymorphic_proc_build_only_header_with_slns(pp, slns, error_if_failed);
+            return polymorphic_proc_build_only_header_with_slns(context, pp, slns, error_if_failed);
         }
 
         default: assert("Bad macro body type." && 0);
@@ -952,14 +945,14 @@ AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* c
 //
 // Arguments resolving
 //
-static i32 lookup_idx_by_name(AstNode* provider, char* name) {
+static i32 lookup_idx_by_name(Context *context, AstNode* provider, char* name) {
     switch (provider->kind) {
         case Ast_Kind_Struct_Literal: {
             AstStructLiteral* sl = (AstStructLiteral *) provider;
             assert(sl->type);
 
             StructMember s;
-            if (!type_lookup_member(sl->type, name, &s)) return -1;
+            if (!type_lookup_member(context, sl->type, name, &s)) return -1;
             if (s.included_through_use) return -1;
 
             return s.idx;
@@ -986,7 +979,7 @@ static i32 lookup_idx_by_name(AstNode* provider, char* name) {
     }
 }
 
-static AstNode* lookup_default_value_by_idx(AstNode* provider, i32 idx) {
+static AstNode* lookup_default_value_by_idx(Context *context, AstNode* provider, i32 idx) {
     switch (provider->kind) {
         case Ast_Kind_Struct_Literal: {
             AstStructLiteral* sl = (AstStructLiteral *) provider;
@@ -1011,7 +1004,7 @@ static AstNode* lookup_default_value_by_idx(AstNode* provider, i32 idx) {
             AstTyped* default_value = func->params[idx].default_value;
             if (default_value == NULL) return NULL;
 
-            AstArgument* arg = make_argument(context.ast_alloc, default_value);
+            AstArgument* arg = make_argument(context, default_value);
             return (AstNode *) arg;
         }
 
@@ -1055,10 +1048,10 @@ static i32 non_baked_argument_count(Arguments* args) {
     return count;
 }
 
-i32 get_argument_buffer_size(TypeFunction* type, Arguments* args) {
+i32 get_argument_buffer_size(Context *context, TypeFunction* type, Arguments* args) {
     i32 non_vararg_param_count = (i32) type->param_count;
     if (non_vararg_param_count > 0) {
-        if (type->params[type->param_count - 1] == builtin_vararg_type_type) non_vararg_param_count--;
+        if (type->params[type->param_count - 1] == context->builtins.vararg_type_type) non_vararg_param_count--;
         if (type->params[type->param_count - 1]->kind == Type_Kind_VarArgs)  non_vararg_param_count--;
     }
 
@@ -1067,7 +1060,7 @@ i32 get_argument_buffer_size(TypeFunction* type, Arguments* args) {
 
 // NOTE: The values array can be partially filled out, and is the resulting array.
 // Returns if all the values were filled in.
-b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg, b32 insert_zero_values) {
+b32 fill_in_arguments(Context *context, Arguments* args, AstNode* provider, char** err_msg, b32 insert_zero_values) {
 
     { // Delete baked arguments
         // :ArgumentResolvingIsComplicated
@@ -1099,22 +1092,22 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg, b32 in
             }
 
             token_toggle_end(named_value->token);
-            i32 idx = lookup_idx_by_name(provider, named_value->token->text);
+            i32 idx = lookup_idx_by_name(context, provider, named_value->token->text);
             if (idx == -1) {
-                if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "'%s' is not a valid named parameter here.", named_value->token->text);
+                if (err_msg) *err_msg = bh_aprintf(context->scratch_alloc, "'%s' is not a valid named parameter here.", named_value->token->text);
                 token_toggle_end(named_value->token);
                 return 0;
             }
 
             // assert(idx < bh_arr_length(args->values));
             if (idx >= bh_arr_length(args->values)) {
-                if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "Error placing value with name '%s' at index '%d'.", named_value->token->text, idx);
+                if (err_msg) *err_msg = bh_aprintf(context->scratch_alloc, "Error placing value with name '%s' at index '%d'.", named_value->token->text, idx);
                 token_toggle_end(named_value->token);
                 return 0;
             }
 
             if (args->values[idx] != NULL && args->values[idx] != named_value->value) {
-                if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "Multiple values given for parameter named '%s'.", named_value->token->text);
+                if (err_msg) *err_msg = bh_aprintf(context->scratch_alloc, "Multiple values given for parameter named '%s'.", named_value->token->text);
                 token_toggle_end(named_value->token);
                 return 0;
             }
@@ -1126,13 +1119,15 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg, b32 in
 
     b32 success = 1;
     fori (idx, 0, bh_arr_length(args->values)) {
-        if (args->values[idx] == NULL) args->values[idx] = (AstTyped *) lookup_default_value_by_idx(provider, idx);
+        if (args->values[idx] == NULL) {
+            args->values[idx] = (AstTyped *) lookup_default_value_by_idx(context, provider, idx);
+        }
         if (args->values[idx] == NULL) {
             if (insert_zero_values) {
                 assert(provider->token);
-                args->values[idx] = (AstTyped *) make_zero_value(context.ast_alloc, provider->token, NULL);
+                args->values[idx] = (AstTyped *) make_zero_value(context, provider->token, NULL);
             } else {
-                if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "No value given for %d%s argument.", idx + 1, bh_num_suffix(idx + 1));
+                if (err_msg) *err_msg = bh_aprintf(context->scratch_alloc, "No value given for %d%s argument.", idx + 1, bh_num_suffix(idx + 1));
                 success = 0;
                 break;
             }
@@ -1141,7 +1136,7 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg, b32 in
 
     i32 maximum_arguments = maximum_argument_count(provider);
     if (bh_arr_length(args->values) > maximum_arguments) {
-        if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "Too many values provided. Expected at most %d.", maximum_arguments);
+        if (err_msg) *err_msg = bh_aprintf(context->scratch_alloc, "Too many values provided. Expected at most %d.", maximum_arguments);
         success = 0;
     }
 
@@ -1159,7 +1154,7 @@ typedef enum ArgState {
     AS_Expecting_Untyped_VA,
 } ArgState;
 
-TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarArgKind* va_kind,
+TypeMatch check_arguments_against_type(Context *context, Arguments* args, TypeFunction* func_type, VarArgKind* va_kind,
                                        OnyxToken* location, char* func_name, OnyxError* error) {
     // In this function, if error is not NULL, then it is assumed that permanent changes can
     // be made. Otherwise, permanent changes should be avoided; only detecting issues should be done.
@@ -1170,11 +1165,11 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
     if (error) error->rank = Error_Critical;
 
     bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) args->values;
-    i32 arg_count = get_argument_buffer_size(func_type, args);
+    i32 arg_count = get_argument_buffer_size(context, func_type, args);
 
     Type **formal_params = func_type->params;
     Type* variadic_type = NULL;
-    i64 any_type_id = type_build_from_ast(context.ast_alloc, builtin_any_type)->id;
+    i64 any_type_id = type_build_from_ast(context, context->builtins.any_type)->id;
 
     ArgState arg_state = AS_Expecting_Exact;
     u32 arg_pos = 0;
@@ -1198,13 +1193,13 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
 
                 assert(arg_arr[arg_pos]->kind == Ast_Kind_Argument);
 
-                TypeMatch tm = unify_node_and_type_(&arg_arr[arg_pos]->value, formal_params[arg_pos], permanent);
+                TypeMatch tm = unify_node_and_type_(context, &arg_arr[arg_pos]->value, formal_params[arg_pos], permanent);
                 if (tm == TYPE_MATCH_YIELD) return tm;
                 if (tm == TYPE_MATCH_SPECIAL) return tm;
                 if (tm == TYPE_MATCH_FAILED) {
                     // Handle the weird case of `x: any` as an argument.
                     if (formal_params[arg_pos]->id == any_type_id) {
-                        resolve_expression_type(arg_arr[arg_pos]->value);
+                        resolve_expression_type(context, arg_arr[arg_pos]->value);
                         if (error != NULL) {
                             arg_arr[arg_pos]->pass_as_any = 1;
                         }
@@ -1222,7 +1217,7 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
                                 // and its because it wanted a &T, but got a T. This is likely
                                 // due to the fact that the method call argument is not an lval.
                                 error->pos = arg_arr[arg_pos]->token->pos;
-                                error->text = bh_aprintf(global_heap_allocator,
+                                error->text = bh_aprintf(context->gp_alloc,
                                         "This method expects a pointer to the first argument, which normally `->` would do automatically, but in this case, the left-hand side is not an l-value, so its address cannot be taken. Try storing it in a temporary variable first, then calling the method."
                                 );
                                 return tm;
@@ -1231,13 +1226,13 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
 
                         if (arg_arr[arg_pos]->token) error->pos = arg_arr[arg_pos]->token->pos;
 
-                        error->text = bh_aprintf(global_heap_allocator,
+                        error->text = bh_aprintf(context->gp_alloc,
                                 "The procedure '%s' expects a value of type '%s' for %d%s parameter, got '%s'.",
                                 func_name,
-                                type_get_name(formal_params[arg_pos]),
+                                type_get_name(context, formal_params[arg_pos]),
                                 arg_pos + 1,
                                 bh_num_suffix(arg_pos + 1),
-                                node_get_type_name(arg_arr[arg_pos]->value));
+                                node_get_type_name(context, arg_arr[arg_pos]->value));
                     }
                     return tm;
                 }
@@ -1252,7 +1247,7 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
                 if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
 
                 if (variadic_type->id == any_type_id) {
-                    resolve_expression_type(arg_arr[arg_pos]->value);
+                    resolve_expression_type(context, arg_arr[arg_pos]->value);
                     if (arg_arr[arg_pos]->value->type == NULL) {
                         if (error != NULL) {
                             error->pos = arg_arr[arg_pos]->token->pos;
@@ -1268,16 +1263,16 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
                 *va_kind = VA_Kind_Typed;
 
                 assert(arg_arr[arg_pos]->kind == Ast_Kind_Argument);
-                TypeMatch tm = unify_node_and_type_(&arg_arr[arg_pos]->value, variadic_type, permanent);
+                TypeMatch tm = unify_node_and_type_(context, &arg_arr[arg_pos]->value, variadic_type, permanent);
                 if (tm == TYPE_MATCH_YIELD) return tm;
                 if (tm == TYPE_MATCH_FAILED) {
                     if (error != NULL) {
                         error->pos = arg_arr[arg_pos]->token->pos,
-                        error->text = bh_aprintf(global_heap_allocator,
+                        error->text = bh_aprintf(context->gp_alloc,
                             "The procedure '%s' expects a value of type '%s' for the variadic parameter, got '%s'.",
                             func_name,
-                            type_get_name(variadic_type),
-                            node_get_type_name(arg_arr[arg_pos]->value));
+                            type_get_name(context, variadic_type),
+                            node_get_type_name(context, arg_arr[arg_pos]->value));
                     }
                     return tm;
                 }
@@ -1292,7 +1287,7 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
                 if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
 
                 assert(arg_arr[arg_pos]->kind == Ast_Kind_Argument);
-                resolve_expression_type(arg_arr[arg_pos]->value);
+                resolve_expression_type(context, arg_arr[arg_pos]->value);
                 if (arg_arr[arg_pos]->value->type == NULL) {
                     if (error != NULL) {
                         error->pos = arg_arr[arg_pos]->token->pos;
@@ -1313,7 +1308,7 @@ type_checking_done:
     if (arg_pos < func_type->needed_param_count) {
         if (error != NULL) {
             if (location) error->pos = location->pos;
-            error->text = bh_aprintf(global_heap_allocator,
+            error->text = bh_aprintf(context->gp_alloc,
                     "Too few arguments to function call. Expected at least %d argument%s, but only got %d.",
                     func_type->needed_param_count, bh_num_plural(func_type->needed_param_count), arg_pos);
         }
@@ -1323,7 +1318,7 @@ type_checking_done:
     if (arg_pos < (u32) arg_count) {
         if (error != NULL) {
             if (location) error->pos = location->pos;
-            error->text = bh_aprintf(global_heap_allocator,
+            error->text = bh_aprintf(context->gp_alloc,
                     "Too many arguments to function call. Expected at most %d argument%s, but got %d.",
                     arg_pos, bh_num_plural(arg_pos), arg_count);
         }
@@ -1451,7 +1446,7 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
 }
 
 
-static Scope **get_scope_from_node_helper(AstNode *node) {
+static Scope **get_scope_from_node_helper(Context *context, AstNode *node) {
     b32 used_pointer = 0;
 
     while (1) {
@@ -1500,13 +1495,13 @@ all_types_peeled_off:
         }
 
         case Ast_Kind_Slice_Type: {
-            Type *t = type_build_from_ast(context.ast_alloc, (AstType *) node);
+            Type *t = type_build_from_ast(context, (AstType *) node);
             if (t) return &t->Slice.scope;
             return NULL;
         }
         
         case Ast_Kind_DynArr_Type: {
-            Type *t = type_build_from_ast(context.ast_alloc, (AstType *) node);
+            Type *t = type_build_from_ast(context, (AstType *) node);
             if (t) return &t->DynArray.scope;
             return NULL;
         }
@@ -1532,7 +1527,7 @@ all_types_peeled_off:
         }
 
         case Ast_Kind_Poly_Call_Type: {
-            Type *t = type_build_from_ast(context.ast_alloc, (AstType *) node);
+            Type *t = type_build_from_ast(context, (AstType *) node);
             if (t) {
                 return &t->Struct.scope;
             }
@@ -1555,18 +1550,18 @@ all_types_peeled_off:
     return NULL;
 }
 
-Scope *get_scope_from_node(AstNode *node) {
+Scope *get_scope_from_node(Context *context, AstNode *node) {
     if (!node) return NULL;
 
-    Scope **pscope = get_scope_from_node_helper(node);
+    Scope **pscope = get_scope_from_node_helper(context, node);
     if (!pscope) return NULL;
     return *pscope;
 }
 
-Scope *get_scope_from_node_or_create(AstNode *node) {
+Scope *get_scope_from_node_or_create(Context *context, AstNode *node) {
     if (!node) return NULL;
 
-    Scope **pscope = get_scope_from_node_helper(node);
+    Scope **pscope = get_scope_from_node_helper(context, node);
     if (!pscope) return NULL;
 
     // Create the scope if it does not exist.
@@ -1577,17 +1572,17 @@ Scope *get_scope_from_node_or_create(AstNode *node) {
         OnyxFilePos pos = {0};
         if (node->token) pos = node->token->pos;
 
-        *pscope = scope_create(context.ast_alloc, NULL, pos);
+        *pscope = scope_create(context, NULL, pos);
     }
 
     return *pscope;
 }
 
-u32 levenshtein_distance(const char *str1, const char *str2) {
+u32 levenshtein_distance(Context *context, const char *str1, const char *str2) {
     i32 m = strlen(str1) + 1;
     i32 n = strlen(str2) + 1;
 
-    i32 *d = bh_alloc_array(global_scratch_allocator, i32, m * n);
+    i32 *d = bh_alloc_array(context->scratch_alloc, i32, m * n);
     fori (i, 0, m * n) d[i] = 0;
 
     fori (i, 0, m) d[i * n + 0] = i;
@@ -1608,7 +1603,7 @@ u32 levenshtein_distance(const char *str1, const char *str2) {
     return d[m * n - 1];
 }
 
-char *find_closest_symbol_in_scope(Scope *scope, char *sym, u32 *out_distance) {
+char *find_closest_symbol_in_scope(Context *context, Scope *scope, char *sym, u32 *out_distance) {
     *out_distance = 0x7fffffff;
 
     if (scope == NULL) return NULL;
@@ -1618,7 +1613,7 @@ char *find_closest_symbol_in_scope(Scope *scope, char *sym, u32 *out_distance) {
         if (scope->symbols[i].value && scope->symbols[i].value->flags & Ast_Flag_Symbol_Invisible) continue;
 
         char *key = scope->symbols[i].key;
-        u32 d = levenshtein_distance(key, sym); 
+        u32 d = levenshtein_distance(context, key, sym); 
         if (d < *out_distance) {
             *out_distance = d;
             closest = (char *) key;
@@ -1628,13 +1623,13 @@ char *find_closest_symbol_in_scope(Scope *scope, char *sym, u32 *out_distance) {
     return closest;
 }
 
-char *find_closest_symbol_in_scope_and_parents(Scope *scope, char *sym) {
+char *find_closest_symbol_in_scope_and_parents(Context *context, Scope *scope, char *sym) {
     u32 min_dist = 0x7fffffff;
     u32 tmp_dist; 
 
     char *closest = NULL;
     while (scope != NULL) {
-        char *tmp_closest = find_closest_symbol_in_scope(scope, sym, &tmp_dist);
+        char *tmp_closest = find_closest_symbol_in_scope(context, scope, sym, &tmp_dist);
         if (tmp_dist < min_dist) {
             min_dist = tmp_dist;
             closest = tmp_closest;
@@ -1646,28 +1641,21 @@ char *find_closest_symbol_in_scope_and_parents(Scope *scope, char *sym) {
     return closest;
 }
         
-char *find_closest_symbol_in_node(AstNode* node, char *sym) {
-    Scope *scope = get_scope_from_node(node);
+char *find_closest_symbol_in_node(Context *context, AstNode* node, char *sym) {
+    Scope *scope = get_scope_from_node(context, node);
     if (!scope) {
         if (node && node->kind == Ast_Kind_Poly_Call_Type) {
             AstPolyCallType* pcall = (AstPolyCallType *) node;
-            return find_closest_symbol_in_node((AstNode *) pcall->callee, sym);
+            return find_closest_symbol_in_node(context, (AstNode *) pcall->callee, sym);
         }
 
         return NULL;
     }
 
     u32 dist;
-    return find_closest_symbol_in_scope(scope, sym, &dist);
+    return find_closest_symbol_in_scope(context, scope, sym, &dist);
 }
 
-
-
-void track_declaration_for_tags(AstNode *node) {
-    if (context.options->generate_tag_file) {
-        bh_arr_push(context.tag_locations, node);
-    }
-}
 
 
 static u32 symbol_info_get_file_id(SymbolInfoTable *syminfo, const char *filename) {
@@ -1683,11 +1671,11 @@ static u32 symbol_info_get_file_id(SymbolInfoTable *syminfo, const char *filenam
     return file_id;
 }
 
-void track_declaration_for_symbol_info(OnyxFilePos pos, AstNode *node) {
-    if (!context.options->generate_symbol_info_file) return;
+void track_declaration_for_symbol_info(Context *context, OnyxFilePos pos, AstNode *node) {
+    if (!context->options->generate_symbol_info_file) return;
     if (pos.filename == NULL) return;
 
-    SymbolInfoTable *syminfo = context.symbol_info;
+    SymbolInfoTable *syminfo = context->symbol_info;
     assert(syminfo);
 
     if (bh_imap_has(&syminfo->node_to_id, (u64) node)) return;
@@ -1707,11 +1695,11 @@ void track_declaration_for_symbol_info(OnyxFilePos pos, AstNode *node) {
     bh_imap_put(&syminfo->node_to_id, (u64) node, (u64) symbol_id);
 }
 
-void track_documentation_for_symbol_info(AstNode *node, AstBinding *binding) {
-    if (!context.options->generate_lsp_info_file) return;
-    if (!context.options->generate_symbol_info_file) return;
+void track_documentation_for_symbol_info(Context *context, AstNode *node, AstBinding *binding) {
+    if (!context->options->generate_lsp_info_file) return;
+    if (!context->options->generate_symbol_info_file) return;
 
-    SymbolInfoTable *syminfo = context.symbol_info;
+    SymbolInfoTable *syminfo = context->symbol_info;
     assert(syminfo);
 
     if (!bh_imap_has(&syminfo->node_to_id, (u64) node)) return;
@@ -1729,11 +1717,11 @@ void track_documentation_for_symbol_info(AstNode *node, AstBinding *binding) {
     }
 }
 
-void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved) {
-    if (!context.options->generate_symbol_info_file) return;
+void track_resolution_for_symbol_info(Context *context, AstNode *original, AstNode *resolved) {
+    if (!context->options->generate_symbol_info_file) return;
     if (!resolved) return;
 
-    SymbolInfoTable *syminfo = context.symbol_info;
+    SymbolInfoTable *syminfo = context->symbol_info;
     assert(syminfo);
 
     if (!bh_imap_has(&syminfo->node_to_id, (u64) resolved)) return;
@@ -1752,4 +1740,60 @@ void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved) {
     bh_arr_push(syminfo->symbols_resolutions, res);
 }
 
+
+
+//
+// Compiler Events
+//
+
+void compiler_events_init(Context *context) {
+    bh_arena_init(&context->events.event_arena, context->gp_alloc, 1024 * 1024);
+    context->events.event_alloc = bh_arena_allocator(&context->events.event_arena);
+
+    // All other fields should be already set to 0/NULL.
+}
+
+void compiler_events_clear(Context *context) {
+    bh_arena_clear(&context->events.event_arena);
+    context->events.first = NULL;
+    context->events.last  = NULL;
+    context->events.event_count = 0;
+}
+
+CompilerEvent *compiler_event_add(Context *context, u32 event_type) {
+    CompilerEvent *new_event = bh_alloc_item(context->events.event_alloc, CompilerEvent);
+    new_event->type = event_type;
+    new_event->first_field = NULL;
+
+    new_event->next = context->events.last;
+    if (context->events.last) context->events.last->next = new_event;
+    context->events.last = new_event;
+    if (!context->events.first) context->events.first = new_event;
+
+    context->events.event_count++;
+
+    return new_event;
+}
+
+void compiler_event_add_field_str(Context *context, CompilerEvent *event, char *field, char *value) {
+    if (!value) return;
+
+    CompilerEventField *new_field = bh_alloc_item(context->events.event_alloc, CompilerEventField);
+    new_field->type = 0; // 0 for string
+    new_field->field = bh_strdup(context->events.event_alloc, field);
+    new_field->s = bh_strdup(context->events.event_alloc, value);
+
+    new_field->next = event->first_field;
+    event->first_field = new_field;
+}
+
+void compiler_event_add_field_int(Context *context, CompilerEvent *event, char *field, i32 value) {
+    CompilerEventField *new_field = bh_alloc_item(context->events.event_alloc, CompilerEventField);
+    new_field->type = 1; // 1 for int
+    new_field->field = bh_strdup(context->events.event_alloc, field);
+    new_field->i = value;
+
+    new_field->next = event->first_field;
+    event->first_field = new_field;
+}
 

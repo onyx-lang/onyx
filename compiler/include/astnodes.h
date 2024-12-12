@@ -3,7 +3,8 @@
 
 #define VERSION_MAJOR 0
 #define VERSION_MINOR 1
-#define VERSION_PATCH 13
+#define VERSION_PATCH 14
+#define VERSION_SUFFIX "-preview"
 
 #include "stb_ds.h"
 #include "lex.h"
@@ -1696,9 +1697,12 @@ struct AstProceduralExpansion {
     u32 expansion_id;
 };
 
+// Need to forward declare this for later on.
+typedef struct Context Context;
+
 
 typedef struct EntityJobData {
-    enum TypeMatch (*func)(void *job_data);
+    enum TypeMatch (*func)(Context *context, void *job_data);
     void *job_data;
 } EntityJobData;
 
@@ -1815,6 +1819,8 @@ typedef struct Entity {
 
 typedef struct EntityHeap {
     bh_arena entity_arena;
+    bh_allocator allocator;
+
     bh_arr(Entity *) entities;
     bh_arr(Entity *) quick_unsorted_entities;
     i32 next_id;
@@ -1825,7 +1831,7 @@ typedef struct EntityHeap {
     i32 all_count[Entity_State_Count][Entity_Type_Count];
 } EntityHeap;
 
-void entity_heap_init(EntityHeap* entities);
+void entity_heap_init(bh_allocator a, EntityHeap* entities);
 void entity_heap_insert_existing(EntityHeap* entities, Entity* e);
 Entity* entity_heap_insert(EntityHeap* entities, Entity e);
 Entity* entity_heap_top(EntityHeap* entities);
@@ -1833,14 +1839,14 @@ void entity_heap_change_top(EntityHeap* entities, Entity* new_top);
 void entity_heap_remove_top(EntityHeap* entities);
 void entity_change_type(EntityHeap* entities, Entity *ent, EntityType new_type);
 void entity_change_state(EntityHeap* entities, Entity *ent, EntityState new_state);
-void entity_heap_add_job(EntityHeap *entities, enum TypeMatch (*func)(void *), void *job_data);
+void entity_heap_add_job(EntityHeap *entities, enum TypeMatch (*func)(Context *, void *), void *job_data);
 
 // If target_arr is null, the entities will be placed directly in the heap.
-void add_entities_for_node(bh_arr(Entity *)* target_arr, AstNode* node, Scope* scope, Package* package);
+void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *)* target_arr, AstNode* node, Scope* scope, Package* package);
 
-void symres_entity(Entity* ent);
-void check_entity(Entity* ent);
-void emit_entity(Entity* ent);
+void symres_entity(Context *context, Entity* ent);
+void check_entity(Context *context, Entity* ent);
+void emit_entity(Context *context, Entity* ent);
 
 struct Package {
     char *name;
@@ -1920,7 +1926,33 @@ typedef struct CheckerData {
     Entity *current_entity;
     bh_arr(Type **) expected_return_type_stack;
     bh_arr(bh_arr(AstLocal *)) named_return_values_stack;
+
+    u32 current_checking_level;
+
+    Scope *current_scope;
+    b32 report_unresolved_symbols;
+    b32 resolved_a_symbol;
 } CheckerData;
+
+typedef struct ClonerData {
+    u32 clone_depth;
+    b32 dont_copy_structs;
+
+    bh_arr(AstNode *) captured_entities;
+} ClonerData;
+
+typedef struct PolymorphData {
+    // This flag is used by some of the procedures that try working with polymorphic things,
+    // but need to wait until more information is known. Instead of passing a out parameter
+    // into each of these procedures, a single global variable is used instead. If the type
+    // checker ever gets multi-threaded, this would have to become a threadlocal variable.
+    b32 flag_to_yield;
+
+    // This flag is used in the very special case that you are passing a polymorphic procedure
+    // to a polymorphic procedure, and you have enough information to instantiate said procedure
+    // in order to resolve the type of one of the return values.
+    b32 doing_nested_polymorph_lookup;
+} PolymorphData;
 
 typedef struct ContextCaches {
     bh_imap implicit_cast_to_bool_cache;
@@ -1970,13 +2002,8 @@ typedef struct CompilerExtension {
 typedef struct CompileOptions CompileOptions;
 struct CompileOptions {
     bh_allocator allocator;
-    CompileAction action;
 
-    u32 verbose_output          : 2;
-    b32 fun_output              : 1;
-    b32 print_function_mappings : 1;
     b32 print_static_if_results : 1;
-    b32 no_colors               : 1;
     b32 no_file_contents        : 1;
     b32 no_compiler_extensions  : 1;
 
@@ -1986,13 +2013,13 @@ struct CompileOptions {
     b32 generate_type_info    : 1;
     b32 generate_method_info  : 1;
     b32 generate_name_section : 1;
+    b32 generate_odoc         : 1;
     b32 no_core               : 1;
     b32 no_stale_code         : 1;
     b32 show_all_errors       : 1;
 
     b32 enable_optional_semicolons : 1;
 
-    b32 generate_tag_file         : 1;
     b32 generate_symbol_info_file : 1;
     b32 generate_lsp_info_file    : 1;
 
@@ -2001,30 +2028,147 @@ struct CompileOptions {
     Runtime runtime;
 
     bh_arr(bh_mapped_folder) mapped_folders;
-    bh_arr(const char *) files;
-    const char* target_file;
-    const char* documentation_file;
     const char* symbol_info_file;
-    const char* help_subcommand;
-    bh_arr(DefinedVariable) defined_variables;
-
-    char* error_format;
 
     b32 debug_session;
     b32 debug_info_enabled;
     b32 stack_trace_enabled;
-
-    char *debug_socket;
-
-    i32    passthrough_argument_count;
-    char** passthrough_argument_data;
-
-    char *core_installation;
-
-    char *upgrade_version;
 };
 
-typedef struct Context Context;
+typedef struct CompilerBasicTypes CompilerBasicTypes;
+struct CompilerBasicTypes {
+    AstBasicType type_void;
+    AstBasicType type_bool;
+    AstBasicType type_i8;
+    AstBasicType type_u8;
+    AstBasicType type_i16;
+    AstBasicType type_u16;
+    AstBasicType type_i32;
+    AstBasicType type_u32;
+    AstBasicType type_i64;
+    AstBasicType type_u64;
+    AstBasicType type_f32;
+    AstBasicType type_f64;
+    AstBasicType type_rawptr;
+    AstBasicType type_type_expr; // :TypeExprHack
+
+    AstBasicType type_int_unsized;
+    AstBasicType type_float_unsized;
+
+    AstBasicType type_i8x16;
+    AstBasicType type_i16x8;
+    AstBasicType type_i32x4;
+    AstBasicType type_i64x2;
+    AstBasicType type_f32x4;
+    AstBasicType type_f64x2;
+    AstBasicType type_v128;
+
+    AstBasicType type_auto_return;
+};
+
+typedef struct CompilerBuiltins CompilerBuiltins;
+struct CompilerBuiltins {
+    AstGlobal heap_start;
+    AstGlobal stack_top;
+    AstGlobal tls_base;
+    AstGlobal tls_size;
+    AstGlobal closure_base;
+    AstGlobal stack_trace;
+    AstType  *string_type;
+    AstType  *cstring_type;
+    AstType  *range_type;
+    Type     *range_type_type;
+    AstType  *range64_type;
+    Type     *range64_type_type;
+    AstType  *vararg_type;
+    Type     *vararg_type_type;
+    AstTyped *context_variable;
+    AstType  *allocator_type;
+    AstType  *iterator_type;
+    AstType  *optional_type;
+    AstType  *callsite_type;
+    AstType  *any_type;
+    AstType  *code_type;
+    AstType  *link_options_type;
+    AstType  *package_id_type;
+    AstType  *stack_trace_type;
+    AstType  *slice_type;
+    AstType  *array_type;
+    AstTyped *type_table_node;
+    AstTyped *foreign_blocks_node;
+    AstType  *foreign_block_type;
+    AstTyped *tagged_procedures_node;
+    AstTyped *tagged_globals_node;
+    AstFunction *initialize_data_segments;
+    AstFunction *run_init_procedures;
+    AstFunction *closure_block_allocate;
+    bh_arr(AstFunction *) init_procedures;
+    AstOverloadedFunction *implicit_bool_cast;
+    AstOverloadedFunction *dispose_used_local;
+};
+
+typedef struct TypeStore TypeStore;
+struct TypeStore {
+    bh_imap type_map;
+
+    bh_imap pointer_map;
+    bh_imap multi_pointer_map;
+    bh_imap array_map;
+    bh_imap slice_map;
+    bh_imap dynarr_map;
+    bh_imap vararg_map;
+    Table(u64) func_map;
+
+    Type* basic[Basic_Kind_Count];
+    Type* auto_return;
+};
+
+typedef struct CompilerStats CompilerStats;
+struct CompilerStats {
+    u64 lexer_lines_processed;
+    u64 lexer_tokens_processed;
+
+    u64 microseconds_per_state[Entity_State_Count];
+    u64 microseconds_per_type[Entity_Type_Count];
+};
+
+typedef struct SpecialGlobalEntities SpecialGlobalEntities;
+struct SpecialGlobalEntities {
+    u32 remaining;
+    Entity *runtime_info_types_entity;
+    Entity *runtime_info_foreign_entity;
+    Entity *runtime_info_proc_tags_entity;
+    Entity *runtime_info_global_tags_entity;
+    Entity *runtime_info_stack_trace_entity;
+};
+
+typedef struct CompilerEventField {
+    struct CompilerEventField *next;
+    char *field;
+    u32 type;
+    union {
+        char *s;
+        i32   i;
+    };
+} CompilerEventField;
+
+typedef struct CompilerEvent {
+    struct CompilerEvent *next;
+
+    u32 type;
+    CompilerEventField *first_field;
+} CompilerEvent;
+
+typedef struct EventSystem {
+    bh_arena     event_arena;
+    bh_allocator event_alloc;
+
+    i32 event_count;
+
+    CompilerEvent *first;
+    CompilerEvent *last;
+} EventSystem;
+
 struct Context {
     Table(Package *)      packages;
     EntityHeap            entities;
@@ -2036,14 +2180,21 @@ struct Context {
     bh_arena                  ast_arena;
     bh_allocator token_alloc, ast_alloc;
 
+    bh_scratch scratch;
+    bh_allocator scratch_alloc;
+
+    bh_managed_heap heap;
+    bh_allocator gp_alloc; // General purpose allocator 
+
     bh_arr(bh_file_contents) loaded_files;
+    bh_arr(DefinedVariable) defined_variables;
 
-    // NOTE: This is defined in onyxwasm.h
+    // NOTE: This is defined in wasm_emit.h
     struct OnyxWasmModule* wasm_module;
-
-    // NOTE: All definitions (bindings, injections, aliases) are
-    // present in this list when generating CTags.
-    bh_arr(AstNode *) tag_locations;
+    bh_buffer generated_wasm_buffer;
+    bh_buffer generated_js_buffer;
+    bh_buffer generated_odoc_buffer;
+    bh_buffer generated_osym_buffer;
 
     struct SymbolInfoTable *symbol_info;
     struct OnyxDocInfo     *doc_info;
@@ -2051,8 +2202,31 @@ struct Context {
     bh_arr(CompilerExtension) extensions;
     u32 next_expansion_id;
 
-    CheckerData checker;
+    CompilerBuiltins builtins;
+    CompilerBasicTypes basic_types;
+    TypeStore types;
+
+    CheckerData   checker;
+    ClonerData    cloner;
+    PolymorphData polymorph;
     ContextCaches caches;
+
+
+    // TODO: Move these
+    bh_arr(OverloadOption) operator_overloads[Binary_Op_Count];
+    bh_arr(OverloadOption) unary_operator_overloads[Unary_Op_Count];
+
+    // The name is pretty self-descriptive, but this is a node that is returned from things
+    // like polymorphic_proc_lookup when it is determined that everything works so far, but
+    // the caller must yield in order to finish checking this polymorphic procedure.
+    AstTyped node_that_signals_a_yield;
+    AstTyped node_that_signals_failure;
+
+    // Currently, this only needs to exist so all the scope's symbol array can be freed later.
+    bh_arr(Scope *) scopes;
+
+    EventSystem events;
+
     OnyxErrors errors;
     b32 errors_enabled;
 
@@ -2061,95 +2235,25 @@ struct Context {
     u32 next_type_id;
     u32 next_entity_id;
 
-    u64 lexer_lines_processed;
-    u64 lexer_tokens_processed;
+    CompilerStats stats;
 
-    u64 microseconds_per_state[Entity_State_Count];
-    u64 microseconds_per_type[Entity_Type_Count];
+    // HACK
+    SpecialGlobalEntities special_global_entities;
+
+    Entity* watermarked_node;
+    u32 highest_watermark;
 
     u32 cycle_almost_detected : 3;
     b32 cycle_detected : 1;
 
     b32 builtins_initialized : 1;
+    b32 wasm_module_linked : 1;
 };
-
-extern Context context;
-
-// NOTE: Basic internal types constructed in the parser
-extern AstBasicType basic_type_void;
-extern AstBasicType basic_type_bool;
-extern AstBasicType basic_type_i8;
-extern AstBasicType basic_type_u8;
-extern AstBasicType basic_type_i16;
-extern AstBasicType basic_type_u16;
-extern AstBasicType basic_type_i32;
-extern AstBasicType basic_type_u32;
-extern AstBasicType basic_type_i64;
-extern AstBasicType basic_type_u64;
-extern AstBasicType basic_type_f32;
-extern AstBasicType basic_type_f64;
-extern AstBasicType basic_type_rawptr;
-extern AstBasicType basic_type_type_expr; // :TypeExprHack
-
-extern AstBasicType basic_type_int_unsized;
-extern AstBasicType basic_type_float_unsized;
-
-extern AstBasicType basic_type_i8x16;
-extern AstBasicType basic_type_i16x8;
-extern AstBasicType basic_type_i32x4;
-extern AstBasicType basic_type_i64x2;
-extern AstBasicType basic_type_f32x4;
-extern AstBasicType basic_type_f64x2;
-extern AstBasicType basic_type_v128;
-
-// HACK
-// :AutoReturnType
-extern Type type_auto_return;
-extern AstBasicType basic_type_auto_return;
-
-extern AstGlobal builtin_heap_start;
-extern AstGlobal builtin_stack_top;
-extern AstGlobal builtin_tls_base;
-extern AstGlobal builtin_tls_size;
-extern AstGlobal builtin_closure_base;
-extern AstGlobal builtin_stack_trace;
-extern AstType  *builtin_string_type;
-extern AstType  *builtin_cstring_type;
-extern AstType  *builtin_range_type;
-extern Type     *builtin_range_type_type;
-extern AstType  *builtin_range64_type;
-extern Type     *builtin_range64_type_type;
-extern AstType  *builtin_vararg_type;
-extern Type     *builtin_vararg_type_type;
-extern AstTyped *builtin_context_variable;
-extern AstType  *builtin_allocator_type;
-extern AstType  *builtin_iterator_type;
-extern AstType  *builtin_optional_type;
-extern AstType  *builtin_callsite_type;
-extern AstType  *builtin_any_type;
-extern AstType  *builtin_code_type;
-extern AstType  *builtin_link_options_type;
-extern AstType  *builtin_package_id_type;
-extern AstType  *builtin_stack_trace_type;
-extern AstType  *builtin_slice_type;
-extern AstType  *builtin_array_type;
-extern AstTyped *type_table_node;
-extern AstTyped *foreign_blocks_node;
-extern AstType  *foreign_block_type;
-extern AstTyped *tagged_procedures_node;
-extern AstTyped *tagged_globals_node;
-extern AstFunction *builtin_initialize_data_segments;
-extern AstFunction *builtin_run_init_procedures;
-extern AstFunction *builtin_closure_block_allocate;
-extern bh_arr(AstFunction *) init_procedures;
-extern AstOverloadedFunction *builtin_implicit_bool_cast;
-extern AstOverloadedFunction *builtin_dispose_used_local;
-
 
 typedef struct BuiltinSymbol {
     char*    package;
     char*    sym;
-    AstNode* node;
+    u32      offset; // Offset into the context structure where the builtin node lives
 } BuiltinSymbol;
 
 extern const BuiltinSymbol builtin_symbols[];
@@ -2159,27 +2263,23 @@ typedef struct IntrinsicMap {
     OnyxIntrinsic intrinsic;
 } IntrinsicMap;
 
-typedef Table(OnyxIntrinsic) IntrinsicTable;
-extern IntrinsicTable intrinsic_table;
+extern const IntrinsicMap builtin_intrinsics[];
 
-extern bh_arr(OverloadOption) operator_overloads[Binary_Op_Count];
-extern bh_arr(OverloadOption) unary_operator_overloads[Unary_Op_Count];
-
-void prepare_builtins();
-void initialize_builtins(bh_allocator a);
-void initalize_special_globals();
-void introduce_build_options(bh_allocator a);
+void prepare_builtins(Context *context);
+void initialize_builtins(Context *context);
+void initalize_special_globals(Context *context);
+void introduce_build_options(Context *context);
 
 
 // NOTE: Useful not inlined functions
-AstTyped* ast_reduce(bh_allocator a, AstTyped* node);
-AstNode* ast_clone(bh_allocator a, void* n);
-AstNode* ast_clone_with_captured_entities(bh_allocator a, void* n, bh_arr(AstNode *)* ents);
-AstFunction* clone_function_header(bh_allocator a, AstFunction* func);
-void clone_function_body(bh_allocator a, AstFunction* dest, AstFunction* source);
+AstTyped* ast_reduce(Context *context, AstTyped* node);
+AstNode* ast_clone(Context *context, void* n);
+AstNode* ast_clone_with_captured_entities(Context *context, void* n, bh_arr(AstNode *)* ents);
+AstFunction* clone_function_header(Context *context, AstFunction* func);
+void clone_function_body(Context *context, AstFunction* dest, AstFunction* source);
 
-void promote_numlit_to_larger(AstNumLit* num);
-b32 convert_numlit_to_type(AstNumLit* num, Type* type, b32 permanent);
+void promote_numlit_to_larger(Context *context, AstNumLit* num);
+b32 convert_numlit_to_type(Context *context, AstNumLit* num, Type* type, b32 permanent);
 
 typedef enum TypeMatch {
     TYPE_MATCH_SUCCESS,
@@ -2188,74 +2288,74 @@ typedef enum TypeMatch {
     TYPE_MATCH_SPECIAL, // Only used for nest polymorph function lookups
 } TypeMatch;
 
-#define unify_node_and_type(node, type) (unify_node_and_type_((node), (type), 1))
-TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent);
+#define unify_node_and_type(ctx, node, type) (unify_node_and_type_((ctx), (node), (type), 1))
+TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b32 permanent);
 
 // resolve_expression_type is a permanent action that modifies
 // the node in whatever is necessary to cement a type into it.
-Type* resolve_expression_type(AstTyped* node);
+Type* resolve_expression_type(Context *context, AstTyped* node);
 
 // query_expression_type does not modify the node at all, but
 // does its best to deduce the type of the node without context.
-Type* query_expression_type(AstTyped *node);
+Type* query_expression_type(Context *context, AstTyped *node);
 
-i64   get_expression_integer_value(AstTyped* node, b32 *out_is_valid);
-char *get_expression_string_value(AstTyped* node, b32 *out_is_valid);
+i64   get_expression_integer_value(Context *context, AstTyped* node, b32 *out_is_valid);
+char *get_expression_string_value(Context *context, AstTyped* node, b32 *out_is_valid);
 
-b32 cast_is_legal(Type* from_, Type* to_, char** err_msg);
-char* get_function_name(AstFunction* func);
-char* get_function_assembly_name(AstFunction* func);
-char* generate_name_within_scope(Scope *scope, OnyxToken* symbol);
+b32 cast_is_legal(Context *context, Type* from_, Type* to_, char** err_msg);
+char* get_function_name(Context *context, AstFunction* func);
+char* get_function_assembly_name(Context *context, AstFunction* func);
+char* generate_name_within_scope(Context *context, Scope *scope, OnyxToken* symbol);
 
-TypeMatch implicit_cast_to_bool(AstTyped **pnode);
+TypeMatch implicit_cast_to_bool(Context *context, AstTyped **pnode);
 
 AstNode* strip_aliases(AstNode* node);
 
-AstNumLit*        make_bool_literal(bh_allocator, b32 b);
-AstNumLit*        make_int_literal(bh_allocator a, i64 value);
-AstNumLit*        make_float_literal(bh_allocator a, f64 value);
-AstRangeLiteral*  make_range_literal(bh_allocator a, AstTyped* low, AstTyped* high);
-AstStrLit*        make_string_literal(bh_allocator a, OnyxToken *token);
-AstBinaryOp*      make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right);
-AstArgument*      make_argument(bh_allocator a, AstTyped* value);
-AstFieldAccess*   make_field_access(bh_allocator a, AstTyped* node, char* field);
-AstAddressOf*     make_address_of(bh_allocator a, AstTyped* node);
-AstLocal*         make_local(bh_allocator a, OnyxToken* token, AstType* type_node);
-AstLocal*         make_local_with_type(bh_allocator a, OnyxToken* token, Type* type);
-AstNode*          make_symbol(bh_allocator a, OnyxToken* sym);
-AstUnaryOp*       make_cast(bh_allocator a, AstTyped* expr, Type* to);
-AstZeroValue*     make_zero_value(bh_allocator a, OnyxToken *token, Type* type);
-AstStructLiteral* make_optional_literal_some(bh_allocator a, AstTyped *expr, Type* opt_type);
-AstStructLiteral* make_union_variant_of_void(bh_allocator a, Type* union_type, OnyxToken* token, UnionVariant* variant);
+AstNumLit*        make_bool_literal(Context *context, b32 b);
+AstNumLit*        make_int_literal(Context *context, i64 value);
+AstNumLit*        make_float_literal(Context *context, f64 value);
+AstRangeLiteral*  make_range_literal(Context *context, AstTyped* low, AstTyped* high);
+AstStrLit*        make_string_literal(Context *context, OnyxToken *token);
+AstBinaryOp*      make_binary_op(Context *context, BinaryOp operation, AstTyped* left, AstTyped* right);
+AstArgument*      make_argument(Context *context, AstTyped* value);
+AstFieldAccess*   make_field_access(Context *context, AstTyped* node, char* field);
+AstAddressOf*     make_address_of(Context *context, AstTyped* node);
+AstLocal*         make_local(Context *context, OnyxToken* token, AstType* type_node);
+AstLocal*         make_local_with_type(Context *context, OnyxToken* token, Type* type);
+AstNode*          make_symbol(Context *context, OnyxToken* sym);
+AstUnaryOp*       make_cast(Context *context, AstTyped* expr, Type* to);
+AstZeroValue*     make_zero_value(Context *context, OnyxToken *token, Type* type);
+AstStructLiteral* make_optional_literal_some(Context *context, AstTyped *expr, Type* opt_type);
+AstStructLiteral* make_union_variant_of_void(Context *context, Type* union_type, OnyxToken* token, UnionVariant* variant);
 
-void arguments_initialize(Arguments* args);
-b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg, b32 insert_zero_values);
-void arguments_ensure_length(Arguments* args, u32 count);
-void arguments_copy(Arguments* dest, Arguments* src);
-void arguments_clone(Arguments* dest, Arguments* src);
-void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src);
+void arguments_initialize(Context *context, Arguments* args);
+b32 fill_in_arguments(Context *context, Arguments* args, AstNode* provider, char** err_msg, b32 insert_zero_values);
+void arguments_ensure_length(Context *context, Arguments* args, u32 count);
+void arguments_copy(Context *context, Arguments* dest, Arguments* src);
+void arguments_clone(Context *context, Arguments* dest, Arguments* src);
+void arguments_deep_clone(Context *context, Arguments* dest, Arguments* src);
 void arguments_remove_baked(Arguments* args);
 void arguments_clear_baked_flags(Arguments* args);
-TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarArgKind* va_kind,
+TypeMatch check_arguments_against_type(Context *context, Arguments* args, TypeFunction* func_type, VarArgKind* va_kind,
                                  OnyxToken* location, char* func_name, struct OnyxError* error);
-i32 get_argument_buffer_size(TypeFunction* type, Arguments* args);
+i32 get_argument_buffer_size(Context *, TypeFunction* type, Arguments* args);
 
 // GROSS: Using void* to avoid having to cast everything.
-const char* node_get_type_name(void* node);
+const char* node_get_type_name(Context *context, void* node);
 
-b32 static_if_resolution(AstIf* static_if);
+b32 static_if_resolution(Context *context, AstIf* static_if);
 
-void insert_poly_sln_into_scope(Scope* scope, AstPolySolution *sln);
-TypeMatch find_polymorphic_sln(AstPolySolution *out, AstPolyParam *param, AstFunction *func, PolyProcLookupMethod pp_lookup, ptr actual, OnyxError* err_msg);
-AstFunction* polymorphic_proc_lookup(AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken* tkn);
-AstFunction* polymorphic_proc_solidify(AstFunction* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
-AstNode* polymorphic_proc_try_solidify(AstFunction* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
-AstFunction* polymorphic_proc_build_only_header(AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual);
-AstFunction* polymorphic_proc_build_only_header_with_slns(AstFunction* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed);
-b32 potentially_convert_function_to_polyproc(AstFunction *func);
-AstPolyCallType* convert_call_to_polycall(AstCall* call);
+void insert_poly_sln_into_scope(Context *context, Scope* scope, AstPolySolution *sln);
+TypeMatch find_polymorphic_sln(Context *context, AstPolySolution *out, AstPolyParam *param, AstFunction *func, PolyProcLookupMethod pp_lookup, ptr actual, OnyxError* err_msg);
+AstFunction* polymorphic_proc_lookup(Context *context, AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken* tkn);
+AstFunction* polymorphic_proc_solidify(Context *context, AstFunction* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
+AstNode* polymorphic_proc_try_solidify(Context *context, AstFunction* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
+AstFunction* polymorphic_proc_build_only_header(Context *context, AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual);
+AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstFunction* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed);
+b32 potentially_convert_function_to_polyproc(Context *context, AstFunction *func);
+AstPolyCallType* convert_call_to_polycall(Context *context, AstCall* call);
 
-void insert_auto_dispose_call(bh_allocator a, AstLocal *local);
+void insert_auto_dispose_call(Context *context, AstLocal *local);
 
 typedef struct OverloadReturnTypeCheck {
     Type *expected_type;
@@ -2264,30 +2364,29 @@ typedef struct OverloadReturnTypeCheck {
 } OverloadReturnTypeCheck;
 
 void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 order, AstTyped* overload);
-AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* args);
-AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type* type);
-void report_unable_to_match_overload(AstCall* call, bh_arr(OverloadOption) overloads);
-void report_incorrect_overload_expected_type(Type *given, Type *expected, OnyxToken *overload, OnyxToken *group);
-void ensure_overload_returns_correct_type(AstTyped *overload, AstOverloadedFunction *group);
+AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadOption) overloads, Arguments* args);
+AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption) overloads, Type* type);
+void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(OverloadOption) overloads);
+void report_incorrect_overload_expected_type(Context *context, Type *given, Type *expected, OnyxToken *overload, OnyxToken *group);
+void ensure_overload_returns_correct_type(Context *context, AstTyped *overload, AstOverloadedFunction *group);
 
-void expand_macro(AstCall** pcall, AstFunction* template);
-AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed);
+void expand_macro(Context *context, AstCall** pcall, AstFunction* template);
+AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed);
 
-Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
-Type* polymorphic_union_lookup(AstPolyUnionType* pu_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
+Type* polymorphic_struct_lookup(Context *context, AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
+Type* polymorphic_union_lookup(Context *context, AstPolyUnionType* pu_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
 
-b32 resolve_intrinsic_interface_constraint(AstConstraint *constraint);
+b32 resolve_intrinsic_interface_constraint(Context *context, AstConstraint *constraint);
 
-void track_declaration_for_tags(AstNode *);
-
-void track_declaration_for_symbol_info(OnyxFilePos, AstNode *);
-void track_documentation_for_symbol_info(AstNode *, AstBinding *);
-void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved);
+void track_declaration_for_symbol_info(Context *context, OnyxFilePos, AstNode *);
+void track_documentation_for_symbol_info(Context *context, AstNode *, AstBinding *);
+void track_resolution_for_symbol_info(Context *context, AstNode *original, AstNode *resolved);
 
 
 // Compiler Extensions
-TypeMatch compiler_extension_start(const char *name, const char *containing_filename, Entity *ent, i32 *out_extension_id);
+TypeMatch compiler_extension_start(Context *context, const char *name, const char *containing_filename, Entity *ent, i32 *out_extension_id);
 TypeMatch compiler_extension_expand_macro(
+    Context *context,
     int extension_id,
     ProceduralMacroExpansionKind kind,
     const char *macro_name,
@@ -2296,7 +2395,15 @@ TypeMatch compiler_extension_expand_macro(
     AstNode **out_node,
     u32 *out_expansion_id,
     b32 wait_for_response);
-TypeMatch compiler_extension_hook_stalled(int extension_id);
+TypeMatch compiler_extension_hook_stalled(Context *context, int extension_id);
+
+
+// Compiler Events
+void compiler_events_init(Context *context);
+void compiler_events_clear(Context *context);
+CompilerEvent *compiler_event_add(Context *context, u32 event_type);
+void compiler_event_add_field_str(Context *context, CompilerEvent *event, char *field, char *value);
+void compiler_event_add_field_int(Context *context, CompilerEvent *event, char *field, i32 value);
 
 
 // NOTE: Useful inlined functions
@@ -2346,10 +2453,10 @@ static inline b32 node_is_addressable_literal(AstNode* node) {
         || (node->kind == Ast_Kind_Array_Literal);
 }
 
-static inline Type* get_expression_type(AstTyped* expr) {
+static inline Type* get_expression_type(Context *context, AstTyped* expr) {
     switch (expr->kind) {
         case Ast_Kind_Block: case Ast_Kind_If: case Ast_Kind_While: return NULL;
-        case Ast_Kind_Typeof: return &basic_types[Basic_Kind_Type_Index];
+        case Ast_Kind_Typeof: return context->types.basic[Basic_Kind_Type_Index];
         default: return expr->type;
     }
 }
@@ -2398,13 +2505,13 @@ static inline void convert_polyproc_to_function(AstFunction *func) {
     func->tags = NULL;
 }
 
-static inline void convert_function_to_polyproc(AstFunction *func) {
+static inline void convert_function_to_polyproc(Context *context, AstFunction *func) {
     if (func->kind != Ast_Kind_Function) return;
 
     func->kind = Ast_Kind_Polymorphic_Proc;
     func->parent_scope_of_poly_proc = func->scope->parent;
     func->scope = NULL;
-    if (func->entity) entity_change_type(&context.entities, func->entity, Entity_Type_Polymorphic_Proc);
+    if (func->entity) entity_change_type(&context->entities, func->entity, Entity_Type_Polymorphic_Proc);
 }
 
 #endif // #ifndef ONYXASTNODES_H
