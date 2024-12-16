@@ -62,10 +62,12 @@ if "%1" == "dist" (
 
     mkdir dist\include
     copy shared\include\onyx.h dist\include\onyx.h
-    copy onyx_runtime.dll dist\onyx_runtime.dll
+
+    mkdir dist\lib
+    copy onyx_runtime.dll dist\lib\onyx_runtime.dll
+    copy onyx.dll dist\lib\onyx.dll
+    copy onyx.lib dist\lib\onyx.lib
     copy onyx.exe dist\onyx.exe
-    copy onyx.dll dist\onyx.dll
-    copy onyx.lib dist\onyx.lib
 
     mkdir dist\tools
     copy scripts\onyx-pkg.onyx dist\tools\onyx-pkg.onyx
