@@ -5,9 +5,8 @@
 static const char* ast_node_names[] = {
     "ERROR",
     "PACKAGE",
-    "INCLUDE FILE",
-    "INCLUDE FOLDER",
-    "INCLUDE ALL IN FOLDER",
+    "LOAD",
+    "LOAD ALL IN FOLDER", // :Deprecated
     "INCLUDE LIBRARY PATH",
     "IMPORT",
     "MEMORY RESERVATION",

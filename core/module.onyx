@@ -68,8 +68,8 @@ use runtime
 #load "./encoding/hex"
 #load "./encoding/utf8"
 #load "./encoding/osad"
-#load_all "./encoding/json"
-#load_all "./encoding/xml"
+#load "./encoding/json"
+#load "./encoding/xml"
 #load "./encoding/kdl/kdl"
 
 #load "./runtime/common"
