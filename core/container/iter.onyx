@@ -52,6 +52,9 @@ Iterator.generator_no_copy :: generator_no_copy
 Iterator.comp :: comp
 Iterator.prod :: prod
 
+Iterator.single :: single
+Iterator.const  :: const
+
 
 
 /// The standard function to convert something to an Iterator.
