@@ -879,6 +879,12 @@ struct AstFor           {
 
     AstBlock *stmt;
 
+    // NOTE: This is set when a for-loop isn't over a primitive type
+    // and instead is over a custom type, such as `Iterator` or `Map`.
+    // To properly invoke `__for_expansion`, we need to store the prepared
+    // call, as there could be overloads we have to wait for by yielding.
+    AstCall *intermediate_macro_expansion;
+
     // ROBUSTNESS: This should be able to be set by a compile time variable at some point.
     // But for now, this will do.
     b32 by_pointer : 1;
@@ -2105,6 +2111,7 @@ struct CompilerBuiltins {
     bh_arr(AstFunction *) init_procedures;
     AstOverloadedFunction *implicit_bool_cast;
     AstOverloadedFunction *dispose_used_local;
+    AstOverloadedFunction *for_expansion;
 };
 
 typedef struct TypeStore TypeStore;
@@ -2356,6 +2363,8 @@ b32 potentially_convert_function_to_polyproc(Context *context, AstFunction *func
 AstPolyCallType* convert_call_to_polycall(Context *context, AstCall* call);
 
 void insert_auto_dispose_call(Context *context, AstLocal *local);
+
+AstCall * create_implicit_for_expansion_call(Context *context, AstFor *fornode);
 
 typedef struct OverloadReturnTypeCheck {
     Type *expected_type;

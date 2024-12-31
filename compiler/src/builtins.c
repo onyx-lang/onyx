@@ -511,6 +511,12 @@ void initialize_builtins(Context *context) {
         return;
     }
 
+    context->builtins.for_expansion = (AstOverloadedFunction *) symbol_raw_resolve(context, p->scope, "__for_expansion");
+    if (context->builtins.for_expansion == NULL || context->builtins.for_expansion->kind != Ast_Kind_Overloaded_Function) {
+        ONYX_ERROR((OnyxFilePos) { 0 }, Error_Critical, "'__for_expansion' #match procedure not found.");
+        return;
+    }
+
     context->builtins.closure_block_allocate = (AstFunction *) symbol_raw_resolve(context, p->scope, "__closure_block_allocate");
     if (context->builtins.closure_block_allocate == NULL || context->builtins.closure_block_allocate->kind != Ast_Kind_Function) {
         ONYX_ERROR((OnyxFilePos) { 0 }, Error_Critical, "'__closure_block_allocate' procedure not found.");

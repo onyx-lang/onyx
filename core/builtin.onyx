@@ -527,6 +527,15 @@ __dispose_used_local :: #match -> void {
 }
 
 
+__For_Expansion_Flags :: enum #flags {
+    BY_POINTER
+    NO_CLOSE
+}
+
+/// TODO: comment this
+__for_expansion :: #match -> void {}
+
+
 /// Defines all options for changing the memory layout, imports and exports,
 /// and more of an Onyx binary.
 Link_Options :: struct {

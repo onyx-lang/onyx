@@ -91,7 +91,7 @@ CHECK_FUNC(statement, AstNode** pstmt);
 CHECK_FUNC(return, AstReturn* retnode);
 CHECK_FUNC(if, AstIfWhile* ifnode);
 CHECK_FUNC(while, AstIfWhile* whilenode);
-CHECK_FUNC(for, AstFor* fornode);
+CHECK_FUNC(for, AstFor** pfornode);
 CHECK_FUNC(switch, AstSwitch* switchnode);
 CHECK_FUNC(call, AstCall** pcall);
 CHECK_FUNC(binaryop, AstBinaryOp** pbinop);
@@ -296,9 +296,20 @@ CHECK_FUNC(while, AstIfWhile* whilenode) {
     return Check_Success;
 }
 
-CHECK_FUNC(for, AstFor* fornode) {
+CHECK_FUNC(for, AstFor** pfornode) {
+    AstFor *fornode = *pfornode;
+
     b32 old_inside_for_iterator;
     if (fornode->flags & Ast_Flag_Has_Been_Checked) goto fornode_expr_checked;
+
+    if (fornode->index_var) {
+        fornode->index_var->flags |= Ast_Flag_Cannot_Take_Addr;
+        CHECK(expression, (AstTyped **) &fornode->index_var);
+
+        if (!type_is_integer(fornode->index_var->type)) {
+            ERROR_(fornode->index_var->token->pos, "Index for a for loop must be an integer type, but it is a '%s'.", type_get_name(context, fornode->index_var->type));
+        }
+    }
 
     CHECK(expression, &fornode->iter);
     resolve_expression_type(context, fornode->iter);
@@ -399,15 +410,27 @@ CHECK_FUNC(for, AstFor* fornode) {
 
         fornode->loop_type = For_Loop_DynArr;
     }
-    else if (type_constructed_from_poly(iter_type, context->builtins.iterator_type)) {
-        if (fornode->by_pointer) {
-            ERROR(error_loc, "Cannot iterate by pointer over an iterator.");
+    //else if (type_constructed_from_poly(iter_type, context->builtins.iterator_type)) {
+    //    if (fornode->by_pointer) {
+    //        ERROR(error_loc, "Cannot iterate by pointer over an iterator.");
+    //    }
+
+    //    // HACK: This assumes the Iterator type only has a single type argument.
+    //    given_type = iter_type->Struct.poly_sln[0].type;
+    //    fornode->loop_type = For_Loop_Iterator;
+    //    fornode->var->flags |= Ast_Flag_Address_Taken;
+    //}
+    else {
+        if (!fornode->intermediate_macro_expansion) {
+            fornode->intermediate_macro_expansion = create_implicit_for_expansion_call(context, fornode);
+            assert(fornode->intermediate_macro_expansion);
         }
 
-        // HACK: This assumes the Iterator type only has a single type argument.
-        given_type = iter_type->Struct.poly_sln[0].type;
-        fornode->loop_type = For_Loop_Iterator;
-        fornode->var->flags |= Ast_Flag_Address_Taken;
+        *pfornode = (AstFor *) fornode->intermediate_macro_expansion;
+        CHECK(call, (AstCall **) pfornode);
+
+        // This will likely never happen, because __for_expansion should be a macro which should cause a return to symres.
+        return Check_Return_To_Symres;
     }
 
     if (given_type == NULL)
@@ -421,15 +444,6 @@ CHECK_FUNC(for, AstFor* fornode) {
 
     } else {
         fornode->var->type = given_type;
-    }
-
-    if (fornode->index_var) {
-        fornode->index_var->flags |= Ast_Flag_Cannot_Take_Addr;
-        CHECK(expression, (AstTyped **) &fornode->index_var);
-
-        if (!type_is_integer(fornode->index_var->type)) {
-            ERROR_(fornode->index_var->token->pos, "Index for a for loop must be an integer type, but it is a '%s'.", type_get_name(context, fornode->index_var->type));
-        }
     }
 
     if (fornode->by_pointer)
@@ -1041,7 +1055,7 @@ CHECK_FUNC(call, AstCall** pcall) {
 
     if (tm == TYPE_MATCH_YIELD) YIELD(call->token->pos, "Waiting on argument type checking.");
 
-    call->flags   |= Ast_Flag_Has_Been_Checked;
+    call->flags |= Ast_Flag_Has_Been_Checked;
 
     if (call->kind == Ast_Kind_Call && call->callee->kind == Ast_Kind_Macro) {
         expand_macro(context, pcall, callee);
@@ -3029,7 +3043,7 @@ CHECK_FUNC(statement, AstNode** pstmt) {
         case Ast_Kind_If:         return check_if(context, (AstIfWhile *) stmt);
         case Ast_Kind_Static_If:  return check_if(context, (AstIfWhile *) stmt);
         case Ast_Kind_While:      return check_while(context, (AstIfWhile *) stmt);
-        case Ast_Kind_For:        return check_for(context, (AstFor *) stmt);
+        case Ast_Kind_For:        return check_for(context, (AstFor **) pstmt);
         case Ast_Kind_Switch:     return check_switch(context, (AstSwitch *) stmt);
         case Ast_Kind_Block:      return check_block(context, (AstBlock *) stmt);
         case Ast_Kind_Defer:      return check_statement(context, &((AstDefer *) stmt)->stmt);
@@ -3067,7 +3081,7 @@ CHECK_FUNC(statement, AstNode** pstmt) {
 
                         return Check_Error;
                     } else {
-                        ERROR(stmt->token->pos, "The type of this local is not a type.");
+                        ERROR_(stmt->token->pos, "The type of this local is not a type. It is a %s.", onyx_ast_node_kind_string(typed_stmt->type_node->kind));
                     }
                 }
 
