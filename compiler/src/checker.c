@@ -131,6 +131,14 @@ CHECK_FUNC(directive_export_name, AstDirectiveExportName *ename);
 #define STATEMENT_LEVEL 1
 #define EXPRESSION_LEVEL 2
 
+static void scope_enter(Context *context, Scope* new_scope) {
+    context->checker.current_scope = new_scope;
+}
+
+static void scope_leave(Context *context) {
+    context->checker.current_scope = context->checker.current_scope->parent;
+}
+
 static inline void fill_in_type(Context *context, AstTyped* node) {
     if (node->type == NULL) {
         if (check_type(context, &node->type_node) > Check_Errors_Start) return;
@@ -138,6 +146,34 @@ static inline void fill_in_type(Context *context, AstTyped* node) {
         node->type = type_build_from_ast(context, node->type_node);
     }
 }
+
+CHECK_FUNC(symbol, AstNode** symbol_node) {
+    OnyxToken* token = (*symbol_node)->token;
+    AstNode* res = symbol_resolve(context, context->checker.current_scope, token);
+
+    if (!res) { // :SymresStall
+        if (context->checker.report_unresolved_symbols) {
+            token_toggle_end(token);
+            char *closest = find_closest_symbol_in_scope_and_parents(context, context->checker.current_scope, token->text);
+            token_toggle_end(token);
+
+            if (closest) ONYX_ERROR(token->pos, Error_Critical, "Unable to resolve symbol '%b'. Did you mean '%s'?", token->text, token->length, closest);
+            else         ONYX_ERROR(token->pos, Error_Critical, "Unable to resolve symbol '%b'.", token->text, token->length);
+
+            return Check_Error;
+        } else {
+            return Check_Yield_Macro;
+        }
+
+    } else {
+        track_resolution_for_symbol_info(context, *symbol_node, res);
+        *symbol_node = res;
+        context->checker.resolved_a_symbol = 1;
+    }
+
+    return Check_Success;
+}
+
 
 CHECK_FUNC(return, AstReturn* retnode) {
     Type ** expected_return_type;
@@ -3325,6 +3361,14 @@ CHECK_FUNC(struct, AstStructType* s_node) {
     if (s_node->entity_defaults && s_node->entity_defaults->state < Entity_State_Check_Types)
         YIELD(s_node->token->pos, "Waiting for struct member defaults to pass symbol resolution.");
 
+    if (s_node->flags & Ast_Flag_Type_Is_Resolved) return Check_Success;
+
+    s_node->flags |= Ast_Flag_Type_Is_Resolved;
+    s_node->flags |= Ast_Flag_Comptime;
+
+    assert(s_node->scope);
+    scope_enter(context, s_node->scope);
+
     if (s_node->min_size_)      CHECK(expression, &s_node->min_size_);
     if (s_node->min_alignment_) CHECK(expression, &s_node->min_alignment_);
 
@@ -3332,6 +3376,8 @@ CHECK_FUNC(struct, AstStructType* s_node) {
         assert(s_node->polymorphic_arguments);
 
         fori (i, 0, (i64) bh_arr_length(s_node->polymorphic_argument_types)) {
+            CHECK(type, &s_node->polymorphic_argument_types[i]);
+
             Type *arg_type = type_build_from_ast(context, s_node->polymorphic_argument_types[i]);
             if (arg_type == NULL) YIELD(s_node->polymorphic_argument_types[i]->token->pos, "Waiting to build type for polymorph argument.");
 
@@ -3343,6 +3389,9 @@ CHECK_FUNC(struct, AstStructType* s_node) {
             if (i >= bh_arr_length(s_node->polymorphic_arguments)
                 || !s_node->polymorphic_arguments[i].value) continue;
 
+            if (s_node->polymorphic_arguments[i].value) {
+                CHECK(expression, &s_node->polymorphic_arguments[i].value);
+            }
 
             TYPE_CHECK(&s_node->polymorphic_arguments[i].value, arg_type) {
                 ERROR_(s_node->polymorphic_arguments[i].value->token->pos, "Expected value of type '%s', got '%s'.",
@@ -3355,16 +3404,31 @@ CHECK_FUNC(struct, AstStructType* s_node) {
     if (s_node->constraints.constraints) {
         s_node->constraints.produce_errors = (s_node->flags & Ast_Flag_Header_Check_No_Error) == 0;
 
+        if (s_node->constraints.constraints) {
+            bh_arr_each(AstConstraint *, constraint, s_node->constraints.constraints) {
+                // TODO: Check if this is correct!
+                CHECK(constraint, *constraint);
+            }
+        }
+
         OnyxFilePos pos = s_node->token->pos;
         if (s_node->polymorphic_error_loc.filename) {
             pos = s_node->polymorphic_error_loc;
         }
+
         CHECK(constraint_context, &s_node->constraints, s_node->scope, pos);
     }
 
     bh_arr_each(AstStructMember *, smem, s_node->members) {
-        if ((*smem)->type_node != NULL) {
-            CHECK(type, &(*smem)->type_node);
+        track_declaration_for_symbol_info(context, member->token->pos, (AstNode *) *smem);
+
+        if ((*smem)->type_node) {
+            CheckStatus cs = check_type(context, &(*smem)->type_node);
+            if (cs != Check_Success) {
+                s_node->flags &= ~Ast_Flag_Type_Is_Resolved;
+                scope_leave(context);
+                return cs;
+            }
         }
 
         if ((*smem)->type_node == NULL && (*smem)->initial_value != NULL) {
@@ -3406,6 +3470,7 @@ CHECK_FUNC(struct, AstStructType* s_node) {
     s_node->stcache = s_node->pending_type;
     s_node->stcache->Struct.status = SPS_Uses_Done;
 
+    scope_leave(context);
     return Check_Success;
 }
 

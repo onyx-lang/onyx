@@ -67,91 +67,94 @@ SYMRES_FUNC(macro, AstMacro* macro);
 SYMRES_FUNC(constraint, AstConstraint* constraint);
 SYMRES_FUNC(polyquery, AstPolyQuery *query);
 
-static void scope_enter(Context *context, Scope* new_scope) {
-    context->checker.current_scope = new_scope;
-}
+// static void scope_enter(Context *context, Scope* new_scope) {
+//     context->checker.current_scope = new_scope;
+// }
+// 
+// static void scope_leave(Context *context) {
+//     context->checker.current_scope = context->checker.current_scope->parent;
+// }
+// 
+// SYMRES_FUNC(symbol, AstNode** symbol_node) {
+//     OnyxToken* token = (*symbol_node)->token;
+//     AstNode* res = symbol_resolve(context, context->checker.current_scope, token);
+// 
+//     if (!res) { // :SymresStall
+//         if (context->checker.report_unresolved_symbols) {
+//             token_toggle_end(token);
+//             char *closest = find_closest_symbol_in_scope_and_parents(context, context->checker.current_scope, token->text);
+//             token_toggle_end(token);
+// 
+//             if (closest) ONYX_ERROR(token->pos, Error_Critical, "Unable to resolve symbol '%b'. Did you mean '%s'?", token->text, token->length, closest);
+//             else         ONYX_ERROR(token->pos, Error_Critical, "Unable to resolve symbol '%b'.", token->text, token->length);
+// 
+//             return Symres_Error;
+//         } else {
+//             return Symres_Yield_Macro;
+//         }
+// 
+//     } else {
+//         track_resolution_for_symbol_info(context, *symbol_node, res);
+//         *symbol_node = res;
+//         context->checker.resolved_a_symbol = 1;
+//     }
+// 
+//     return Symres_Success;
+// }
 
-static void scope_leave(Context *context) {
-    context->checker.current_scope = context->checker.current_scope->parent;
-}
+//SYMRES_FUNC(struct_type, AstStructType* s_node) {
+//    if (s_node->flags & Ast_Flag_Type_Is_Resolved) return Symres_Success;
+//
+//    s_node->flags |= Ast_Flag_Type_Is_Resolved;
+//    s_node->flags |= Ast_Flag_Comptime;
+//
+//    assert(s_node->scope);
+//    scope_enter(context, s_node->scope);
+//    
+//    if (s_node->min_size_)      SYMRES(expression, &s_node->min_size_);
+//    if (s_node->min_alignment_) SYMRES(expression, &s_node->min_alignment_);
 
-SYMRES_FUNC(symbol, AstNode** symbol_node) {
-    OnyxToken* token = (*symbol_node)->token;
-    AstNode* res = symbol_resolve(context, context->checker.current_scope, token);
+//    if (s_node->polymorphic_argument_types) {
+//        assert(s_node->polymorphic_arguments);
+//
+//        //
+//        // TODO FIX: Why are we setting ss and never using it??
+//        // 
+//        SymresStatus ss = Symres_Success, result;
+//        fori (i, 0, (i64) bh_arr_length(s_node->polymorphic_argument_types)) {
+//            result = symres_type(context, &s_node->polymorphic_argument_types[i]);
+//            if (result > ss) ss = result;
+//
+//            if (s_node->polymorphic_arguments[i].value) {
+//                result = symres_expression(context, &s_node->polymorphic_arguments[i].value);
+//                if (result > ss) ss = result;
+//            }
+//        }
+//    }
 
-    if (!res) { // :SymresStall
-        if (context->checker.report_unresolved_symbols) {
-            token_toggle_end(token);
-            char *closest = find_closest_symbol_in_scope_and_parents(context, context->checker.current_scope, token->text);
-            token_toggle_end(token);
+//     if (s_node->constraints.constraints) {
+//         bh_arr_each(AstConstraint *, constraint, s_node->constraints.constraints) {
+//             SYMRES(constraint, *constraint);
+//         }
+//     }
 
-            if (closest) ONYX_ERROR(token->pos, Error_Critical, "Unable to resolve symbol '%b'. Did you mean '%s'?", token->text, token->length, closest);
-            else         ONYX_ERROR(token->pos, Error_Critical, "Unable to resolve symbol '%b'.", token->text, token->length);
-
-            return Symres_Error;
-        } else {
-            return Symres_Yield_Macro;
-        }
-
-    } else {
-        track_resolution_for_symbol_info(context, *symbol_node, res);
-        *symbol_node = res;
-        context->checker.resolved_a_symbol = 1;
-    }
-
-    return Symres_Success;
-}
-
-SYMRES_FUNC(struct_type, AstStructType* s_node) {
-    if (s_node->flags & Ast_Flag_Type_Is_Resolved) return Symres_Success;
-
-    s_node->flags |= Ast_Flag_Type_Is_Resolved;
-    s_node->flags |= Ast_Flag_Comptime;
-
-    assert(s_node->scope);
-    scope_enter(context, s_node->scope);
-    
-    if (s_node->min_size_)      SYMRES(expression, &s_node->min_size_);
-    if (s_node->min_alignment_) SYMRES(expression, &s_node->min_alignment_);
-
-    if (s_node->polymorphic_argument_types) {
-        assert(s_node->polymorphic_arguments);
-
-        SymresStatus ss = Symres_Success, result;
-        fori (i, 0, (i64) bh_arr_length(s_node->polymorphic_argument_types)) {
-            result = symres_type(context, &s_node->polymorphic_argument_types[i]);
-            if (result > ss) ss = result;
-
-            if (s_node->polymorphic_arguments[i].value) {
-                result = symres_expression(context, &s_node->polymorphic_arguments[i].value);
-                if (result > ss) ss = result;
-            }
-        }
-    }
-
-    if (s_node->constraints.constraints) {
-        bh_arr_each(AstConstraint *, constraint, s_node->constraints.constraints) {
-            SYMRES(constraint, *constraint);
-        }
-    }
-
-    fori (i, 0, bh_arr_length(s_node->members)) {
-        AstStructMember *member = s_node->members[i];
-        track_declaration_for_symbol_info(context, member->token->pos, (AstNode *) member);
-
-        if (member->type_node) {
-            SymresStatus ss = symres_type(context, &member->type_node);
-            if (ss != Symres_Success) {
-                s_node->flags &= ~Ast_Flag_Type_Is_Resolved;
-                scope_leave(context);
-                return ss;
-            }
-        }
-    }
-
-    scope_leave(context);
-    return Symres_Success;
-}
+//     fori (i, 0, bh_arr_length(s_node->members)) {
+//         AstStructMember *member = s_node->members[i];
+//         track_declaration_for_symbol_info(context, member->token->pos, (AstNode *) member);
+// 
+//         if (member->type_node) {
+//             SymresStatus ss = symres_type(context, &member->type_node);
+//             if (ss != Symres_Success) {
+//                 s_node->flags &= ~Ast_Flag_Type_Is_Resolved;
+//                 scope_leave(context);
+//                 return ss;
+//             }
+//         }
+//     }
+// 
+//     scope_leave(context);
+//     return Symres_Success;
+// }
 
 SYMRES_FUNC(union_type, AstUnionType* u_node) {
     if (u_node->flags & Ast_Flag_Type_Is_Resolved) return Symres_Success;
