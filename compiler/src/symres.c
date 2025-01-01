@@ -157,27 +157,27 @@ SYMRES_FUNC(polyquery, AstPolyQuery *query);
 // }
 
 SYMRES_FUNC(union_type, AstUnionType* u_node) {
-    if (u_node->flags & Ast_Flag_Type_Is_Resolved) return Symres_Success;
-    u_node->flags |= Ast_Flag_Comptime;
+    // if (u_node->flags & Ast_Flag_Type_Is_Resolved) return Symres_Success;
+    // u_node->flags |= Ast_Flag_Comptime;
 
-    if (!u_node->tag_backing_type) {
-        int n = (31 - bh_clz(bh_arr_length(u_node->variants) - 1)) >> 3;
-        if      (n == 0) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u8;
-        else if (n == 1) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u16;
-        else if (n <= 3) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u32;
-        else {
-            ONYX_ERROR(u_node->token->pos, Error_Critical, "Too many union variants. How did you even do this...?");
-            return Symres_Error;
-        }
-    }
+    // if (!u_node->tag_backing_type) {
+    //     int n = (31 - bh_clz(bh_arr_length(u_node->variants) - 1)) >> 3;
+    //     if      (n == 0) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u8;
+    //     else if (n == 1) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u16;
+    //     else if (n <= 3) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u32;
+    //     else {
+    //         ONYX_ERROR(u_node->token->pos, Error_Critical, "Too many union variants. How did you even do this...?");
+    //         return Symres_Error;
+    //     }
+    // }
 
-    SYMRES(type, &u_node->tag_backing_type);
+    // SYMRES(type, &u_node->tag_backing_type);
 
-    if (u_node->meta_tags) {
-        bh_arr_each(AstTyped *, meta, u_node->meta_tags) {
-            SYMRES(expression, meta);
-        }
-    }
+    // if (u_node->meta_tags) {
+    //     bh_arr_each(AstTyped *, meta, u_node->meta_tags) {
+    //         SYMRES(expression, meta);
+    //     }
+    // }
 
     assert(u_node->scope);
     scope_enter(context, u_node->scope);
@@ -348,37 +348,37 @@ SYMRES_FUNC(local, AstLocal** local) {
     return Symres_Success;
 }
 
-SYMRES_FUNC(arguments, Arguments* args) {
-    bh_arr_each(AstTyped *, arg, args->values)
-        SYMRES(expression, arg);
+// SYMRES_FUNC(arguments, Arguments* args) {
+//     bh_arr_each(AstTyped *, arg, args->values)
+//         SYMRES(expression, arg);
+// 
+//     bh_arr_each(AstNamedValue *, named_arg, args->named_values)
+//         SYMRES(expression, &(*named_arg)->value);
+// 
+//     return Symres_Success;
+// }
 
-    bh_arr_each(AstNamedValue *, named_arg, args->named_values)
-        SYMRES(expression, &(*named_arg)->value);
-
-    return Symres_Success;
-}
-
-SYMRES_FUNC(call, AstCall** pcall) {
-    AstCall *call = *pcall;
-
-    if (call->placeholder_argument_position > 0) {
-        ONYX_ERROR(call->token->pos, Error_Critical, "This call contains an argument placeholder '_', but it was not piped into.");
-        return Symres_Error;
-    }
-
-    SYMRES(expression, (AstTyped **) &call->callee);
-    SYMRES(arguments, &call->args);
-
-    AstNode* callee = strip_aliases((AstNode *) call->callee);
-    if (callee->kind == Ast_Kind_Poly_Struct_Type ||
-        callee->kind == Ast_Kind_Poly_Union_Type) {
-        *pcall = (AstCall *) convert_call_to_polycall(context, call);
-        SYMRES(type, (AstType **) pcall);
-        return Symres_Success;
-    }
-
-    return Symres_Success;
-}
+// SYMRES_FUNC(call, AstCall** pcall) {
+//     AstCall *call = *pcall;
+// 
+//     if (call->placeholder_argument_position > 0) {
+//         ONYX_ERROR(call->token->pos, Error_Critical, "This call contains an argument placeholder '_', but it was not piped into.");
+//         return Symres_Error;
+//     }
+// 
+//     SYMRES(expression, (AstTyped **) &call->callee);
+//     SYMRES(arguments, &call->args);
+// 
+//     AstNode* callee = strip_aliases((AstNode *) call->callee);
+//     if (callee->kind == Ast_Kind_Poly_Struct_Type ||
+//         callee->kind == Ast_Kind_Poly_Union_Type) {
+//         *pcall = (AstCall *) convert_call_to_polycall(context, call);
+//         SYMRES(type, (AstType **) pcall);
+//         return Symres_Success;
+//     }
+// 
+//     return Symres_Success;
+// }
 
 SYMRES_FUNC(size_of, AstSizeOf* so) {
     SYMRES(type, &so->type_node);
@@ -1605,22 +1605,22 @@ SYMRES_FUNC(enum, AstEnumType* enum_node) {
     return Symres_Success;
 }
 
-SYMRES_FUNC(memres_type, AstMemRes** memres) {
-    SYMRES(type, &(*memres)->type_node);
-    return Symres_Success;
-}
+// SYMRES_FUNC(memres_type, AstMemRes** memres) {
+//     SYMRES(type, &(*memres)->type_node);
+//     return Symres_Success;
+// }
 
-SYMRES_FUNC(memres, AstMemRes** memres) {
-    if ((*memres)->initial_value != NULL) {
-        SYMRES(expression, &(*memres)->initial_value);
-    }
-
-    bh_arr_each(AstTyped *, ptag, (*memres)->tags) {
-        SYMRES(expression, ptag);
-    }
-
-    return Symres_Success;
-}
+// SYMRES_FUNC(memres, AstMemRes** memres) {
+//     if ((*memres)->initial_value != NULL) {
+//         SYMRES(expression, &(*memres)->initial_value);
+//     }
+// 
+//     bh_arr_each(AstTyped *, ptag, (*memres)->tags) {
+//         SYMRES(expression, ptag);
+//     }
+// 
+//     return Symres_Success;
+// }
 
 SYMRES_FUNC(struct_defaults, AstType* t) {
     if (t->kind != Ast_Kind_Struct_Type) return Symres_Error;

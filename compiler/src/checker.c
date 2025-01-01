@@ -945,6 +945,11 @@ CHECK_FUNC(call, AstCall** pcall) {
     //      9. Check types of formal and actual params against each other, handling varargs
     AstCall* call = *pcall;
 
+    if (call->placeholder_argument_position > 0) {
+        ONYX_ERROR(call->token->pos, Error_Critical, "This call contains an argument placeholder '_', but it was not piped into.");
+        return Symres_Error;
+    }
+
     if (call->kind == Ast_Kind_Call) {
         AstNode* callee = strip_aliases((AstNode *) call->callee);
         if (callee->kind == Ast_Kind_Poly_Struct_Type ||
@@ -3503,6 +3508,19 @@ CHECK_FUNC(struct_defaults, AstStructType* s_node) {
 }
 
 CHECK_FUNC(union, AstUnionType *u_node) {
+    if (u_node->flags & Ast_Flag_Type_Is_Resolved) return Check_Success;
+    u_node->flags |= Ast_Flag_Comptime;
+
+    if (!u_node->tag_backing_type) {
+        int n = (31 - bh_clz(bh_arr_length(u_node->variants) - 1)) >> 3;
+        if      (n == 0) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u8;
+        else if (n == 1) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u16;
+        else if (n <= 3) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u32;
+        else {
+            ERROR(u_node->token->pos, Error_Critical, "Too many union variants. How did you even do this...?");
+        }
+    }
+
     CHECK(type, &u_node->tag_backing_type);
 
     Type *tag_type = type_build_from_ast(context, u_node->tag_backing_type);
@@ -3722,8 +3740,7 @@ CHECK_FUNC(memres, AstMemRes* memres) {
 
     if (memres->initial_value != NULL) {
         if (memres->threadlocal) {
-            ONYX_ERROR(memres->token->pos, Error_Critical, "'#thread_local' variables cannot have an initializer at the moment.");
-            return Check_Error;
+            ERROR(memres->token->pos, Error_Critical, "'#thread_local' variables cannot have an initializer at the moment.");
         }
 
         CHECK(expression, &memres->initial_value);
@@ -3854,6 +3871,8 @@ CHECK_FUNC(type, AstType** ptype) {
     }
 
     type = original_type;
+
+    // CLEANUP: Should Type_Alias nodes just be made comptime at creation? Since they will always be set to comptime here?
     type->flags |= Ast_Flag_Comptime;
     while (type->kind == Ast_Kind_Type_Alias) {
         type->flags |= Ast_Flag_Comptime;
