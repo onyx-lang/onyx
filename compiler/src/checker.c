@@ -28,7 +28,7 @@
         ONYX_ERROR(loc, Error_Waiting_On, msg); \
         return Check_Error; \
     } else { \
-        return Check_Yield_Macro; \
+        return Check_Yield; \
     } \
     } while (0)
 
@@ -37,7 +37,7 @@
         ONYX_ERROR(loc, Error_Waiting_On, msg, __VA_ARGS__); \
         return Check_Error; \
     } else { \
-        return Check_Yield_Macro; \
+        return Check_Yield; \
     } \
     } while (0)
 
@@ -46,7 +46,7 @@
         ONYX_ERROR(loc, Error_Critical, msg); \
         return Check_Error; \
     } else { \
-        return Check_Yield_Macro; \
+        return Check_Yield; \
     } \
     } while (0)
 
@@ -85,7 +85,7 @@ typedef enum CheckStatus {
 
     Check_Errors_Start,
     Check_Return_To_Symres, // Return this node for further symres processing
-    Check_Yield_Macro,
+    Check_Yield,
     Check_Failed,           // The node is done processing and should be put in the state of Failed.
     Check_Error,    // There was an error when checking the node
 } CheckStatus;
@@ -169,7 +169,7 @@ CHECK_FUNC(symbol, AstNode** symbol_node) {
 
             return Check_Error;
         } else {
-            return Check_Yield_Macro;
+            return Check_Yield;
         }
 
     } else {
@@ -1192,7 +1192,7 @@ static AstCall* binaryop_try_operator_overload(Context *context, AstBinaryOp* bi
             context->checker.current_checking_level = current_checking_level_store;
             context->checker.all_checks_are_final   = current_all_checks_are_final;
 
-            if (cs == Check_Yield_Macro)      return (AstCall *) &context->node_that_signals_a_yield;
+            if (cs == Check_Yield)      return (AstCall *) &context->node_that_signals_a_yield;
             if (cs == Check_Error)            return NULL;
 
             binop->overload_args->values[0] = (AstTyped *) make_argument(context, binop->overload_args->values[0]);
@@ -2344,7 +2344,7 @@ CHECK_FUNC(address_of, AstAddressOf** paof) {
 
         if (aof->can_be_removed) {
             *(AstTyped **) paof = aof->expr;
-            return Check_Yield_Macro;
+            return Check_Yield;
         }
 
         ERROR_(aof->token->pos, "Cannot take the address of something that is not an l-value. %s", onyx_ast_node_kind_string(expr->kind));
@@ -2603,13 +2603,13 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
 
     //
     // This has to be cycle_almost_detected, not cycle_detected, because interface
-    // constraints relay on Check_Error being returned, not Check_Yield_Macro. For
+    // constraints relay on Check_Error being returned, not Check_Yield. For
     // this reason, I have to produce an error at the last minute, BEFORE the loop
     // enters a cycle detected state, when there is no point of return.
     if (!context->cycle_almost_detected && !context->cycle_detected) {
         // Skipping the slightly expensive symbol lookup
         // below by not using YIELD_ERROR.
-        return Check_Yield_Macro;
+        return Check_Yield;
     }
 
     char* type_name = (char *) node_get_type_name(context, field->expr);
@@ -3001,6 +3001,11 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
     return retval;
 }
 
+CHECK_FUNC(global_header, AstGlobal *global) {
+    CHECK(type, &global->type_node);
+    return Check_Success;
+}
+
 CHECK_FUNC(global, AstGlobal* global) {
     fill_in_type(context, (AstTyped *) global);
 
@@ -3131,7 +3136,7 @@ SYMRES_FUNC(directive_defined, AstDirectiveDefined** pdefined) {
     }
 
     onyx_errors_enable(context);
-    return Check_Yield_Macro;
+    return Check_Yield;
 }
 
 CHECK_FUNC(directive_solidify, AstDirectiveSolidify** psolid) {
@@ -3141,7 +3146,7 @@ CHECK_FUNC(directive_solidify, AstDirectiveSolidify** psolid) {
 
     if (solid->poly_proc && solid->poly_proc->kind == Ast_Kind_Directive_Solidify) {
         AstFunction* potentially_resolved_proc = (AstFunction *) ((AstDirectiveSolidify *) solid->poly_proc)->resolved_proc;
-        if (!potentially_resolved_proc) return Symres_Yield_Micro;
+        if (!potentially_resolved_proc) return Check_Yield;
 
         solid->poly_proc = potentially_resolved_proc;
     }
@@ -3211,7 +3216,7 @@ CHECK_FUNC(directive_export_name, AstDirectiveExportName *ename) {
     // to make string literals, tokens, exports, etc...
     if (ename->func->exported_name == NULL) {
         if (ename->created_export_entity) {
-            return Check_Yield_Macro;
+            return Check_Yield;
         }
 
         // In this case, we know the function is not exported.
@@ -3244,7 +3249,7 @@ CHECK_FUNC(directive_export_name, AstDirectiveExportName *ename) {
         add_entities_for_node(&context->entities, NULL, (AstNode *) export, NULL, NULL);
 
         ename->created_export_entity = 1;
-        return Check_Yield_Macro;
+        return Check_Yield;
 
     } else {
         AstStrLit* name = bh_alloc_item(context->ast_alloc, AstStrLit);
@@ -3260,7 +3265,7 @@ CHECK_FUNC(directive_export_name, AstDirectiveExportName *ename) {
     return Check_Success;
 }
 
-CHECK_FUNC(capture_block, AstCaptureBlock *block) {
+CHECK_FUNC(capture_block, AstCaptureBlock *block, Scope *captured_scope) {
     //
     // Reserve 8 bytes at the beginning of the closure block for the size of the closure.
     block->total_size_in_bytes = 8;
@@ -3486,7 +3491,7 @@ CHECK_FUNC(function, AstFunction* func) {
     if (func->body) {
         CheckStatus status = Check_Success;
         if (func->captures) {
-            status = check_capture_block(context, func->captures);
+            status = check_capture_block(context, func->captures, func->scope_to_lookup_captured_values);
         }
 
         if (status == Check_Success && func->stack_trace_local) {
@@ -3901,7 +3906,7 @@ CHECK_FUNC(function_header, AstFunction* func) {
     if (func->captures && !func->scope_to_lookup_captured_values) {
         if (func->flags & Ast_Flag_Function_Is_Lambda_Inside_PolyProc) return Symres_Complete;
 
-        return Symres_Yield_Macro;
+        return Symres_Yield;
     }
 
     b32 expect_default_param = 0;
@@ -3925,6 +3930,51 @@ CHECK_FUNC(function_header, AstFunction* func) {
     }
 
     scope_enter(context, func->scope);
+
+    bh_arr_each(AstParam, param, func->params) {
+        symbol_introduce(context, context->checker.current_scope, param->local->token, (AstNode *) param->local);
+    }
+
+    //
+    // We have to pre-check the type nodes of the parameters.
+    bh_arr_each(AstParam, param, func->params) {
+        if (param->local->type_node != NULL) {
+            param->local->type_node->flags |= (func->flags & Ast_Flag_Header_Check_No_Error);
+            CHECK_INVISIBLE(type, param->local, &param->local->type_node);
+        }
+    }
+
+    if (potentially_convert_function_to_polyproc(context, func)) {
+        return Check_Complete;
+    }
+
+    if (func->nodes_that_need_entities_after_clone && bh_arr_length(func->nodes_that_need_entities_after_clone) > 0 && func->entity) {
+        bh_arr_each(AstNode *, node, func->nodes_that_need_entities_after_clone) {
+            // This makes a lot of assumptions about how these nodes are being processed,
+            // and I don't want to start using this with other nodes without considering
+            // what the ramifications of that is.
+            assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents
+                    || (*node)->kind == Ast_Kind_Function || (*node)->kind == Ast_Kind_Polymorphic_Proc);
+
+            // Need to use current_scope->parent because current_scope is the function body scope.
+            Scope *scope = context->checker.current_scope->parent;
+
+            if ((*node)->kind == Ast_Kind_Static_If) {
+                AstIf *static_if = (AstIf *) *node;
+                assert(static_if->defined_in_scope);
+                scope = static_if->defined_in_scope;
+
+                if (func->poly_scope) {
+                    scope = scope_create(context, scope, static_if->token->pos);
+                    scope_include(context, scope, func->poly_scope, static_if->token->pos);
+                }
+            }
+
+            add_entities_for_node(&context->entities, NULL, *node, scope, func->entity->package);
+        }
+
+        bh_arr_set_length(func->nodes_that_need_entities_after_clone, 0);
+    }
 
     bh_arr_each(AstParam, param, func->params) {
         AstLocal* local = param->local;
@@ -4024,6 +4074,28 @@ CHECK_FUNC(function_header, AstFunction* func) {
         CHECK(expression, &func->foreign.module_name);
         CHECK(expression, &func->foreign.import_name);
     }
+
+    if (func->captures) {
+        CHECK(capture_block, func->captures, func->scope_to_lookup_captured_values);
+    }
+
+    if (context->options->stack_trace_enabled) {
+        if (!func->stack_trace_local) {
+            OnyxToken *stack_trace_token = bh_alloc_item(context->ast_alloc, OnyxToken);
+            stack_trace_token->type = Token_Type_Symbol;
+            stack_trace_token->length = 13;
+            stack_trace_token->text = bh_strdup(context->ast_alloc, "__stack_trace ");
+            stack_trace_token->pos = func->token->pos;
+
+            assert(context->builtins.stack_trace_type);
+            func->stack_trace_local = make_local(context, stack_trace_token, context->builtins.stack_trace_type);
+            func->stack_trace_local->flags |= Ast_Flag_Decl_Followed_By_Init;
+        }
+
+        CHECK(local, &func->stack_trace_local);
+    }
+
+    scope_leave(context);
 
     if (bh_arr_length(func->tags) > 0 || (func->flags & Ast_Flag_Proc_Is_Null) != 0) {
         func->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
@@ -4190,8 +4262,14 @@ CHECK_FUNC(type, AstType** ptype) {
             break;
         }
 
-        case Ast_Kind_Struct_Type: CHECK(struct, (AstStructType *) type)); break;
-        case Ast_Kind_Union_Type:  CHECK(union,  (AstUnionType *) type));  break;
+        //
+        // We do not recurse down to check structs, unions and enums at this point,
+        // as they should be checked separately using their entity. check_entity
+        // will automatically directive Entity_Type_Type_Alias to check_struct/union
+        // so we don't have to do it here.
+        //
+        // case Ast_Kind_Struct_Type: CHECK(struct, (AstStructType *) type)); break;
+        // case Ast_Kind_Union_Type:  CHECK(union,  (AstUnionType *) type));  break;
 
         case Ast_Kind_Enum_Type: break;
 
@@ -4263,7 +4341,7 @@ CHECK_FUNC(static_if, AstIf* static_if) {
     context->checker.expression_types_must_be_known = 1;
     CheckStatus result = check_expression(context, &static_if->cond);
     context->checker.expression_types_must_be_known = 0;
-    if (result == Check_Yield_Macro) return Check_Yield_Macro;
+    if (result == Check_Yield) return Check_Yield;
 
     if (result > Check_Errors_Start || !(static_if->cond->flags & Ast_Flag_Comptime)) {
         ERROR(static_if->token->pos, "Expected this condition to be compile time known.");
@@ -4557,7 +4635,7 @@ CHECK_FUNC(expression_constraint, AstConstraint *constraint) {
     CheckStatus result = check_expression(context, &expr);
     context->checker.expression_types_must_be_known = 0;
 
-    if (result == Check_Yield_Macro) return Check_Yield_Macro;
+    if (result == Check_Yield) return Check_Yield;
 
     if (result > Check_Errors_Start || !(expr->flags & Ast_Flag_Comptime)) {
         ERROR(expr->token->pos, "Where clauses must be a constant expressions.");
@@ -4601,7 +4679,7 @@ CHECK_FUNC(constraint, AstConstraint *constraint) {
                 InterfaceConstraint* ic = &constraint->exprs[i];
 
                 CheckStatus cs = check_expression(context, &ic->expr);
-                if (cs == Check_Return_To_Symres || cs == Check_Yield_Macro) {
+                if (cs == Check_Return_To_Symres || cs == Check_Yield) {
                     onyx_errors_enable(context);
                     return cs;
                 }
@@ -4616,7 +4694,7 @@ CHECK_FUNC(constraint, AstConstraint *constraint) {
 
                 if (ic->expected_type_expr) {
                     cs = check_type(context, &ic->expected_type_expr);
-                    if (cs == Check_Return_To_Symres || cs == Check_Yield_Macro) {
+                    if (cs == Check_Return_To_Symres || cs == Check_Yield) {
                         onyx_errors_enable(context);
                         return cs;
                     }
@@ -4762,7 +4840,7 @@ CHECK_FUNC(constraint_context, ConstraintContext *cc, Scope *scope, OnyxFilePos 
             add_entities_for_node(&context->entities, NULL, (AstNode *) cc->constraints[i], scope, NULL);
         }
 
-        return Check_Yield_Macro;
+        return Check_Yield;
     }
 }
 
@@ -4803,7 +4881,7 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
                 if (solved_something || query->successful_symres) {
                     return Check_Return_To_Symres;
                 } else {
-                    return Check_Yield_Macro;
+                    return Check_Yield;
                 }
 
             case TYPE_MATCH_YIELD:
@@ -4846,8 +4924,8 @@ CHECK_FUNC(arbitrary_job, EntityJobData *job) {
     switch (result) {
         case TYPE_MATCH_SUCCESS: return Check_Complete;
         case TYPE_MATCH_FAILED:  return Check_Error;
-        case TYPE_MATCH_YIELD:   return Check_Yield_Macro;
-        case TYPE_MATCH_SPECIAL: return Check_Yield_Macro;
+        case TYPE_MATCH_YIELD:   return Check_Yield;
+        case TYPE_MATCH_SPECIAL: return Check_Yield;
     }
 
     return Check_Error;
@@ -4885,17 +4963,111 @@ CHECK_FUNC(js_node, AstJsNode *js) {
     return Check_Success;
 }
 
+CHECK_FUNC(file_contents, AstFileContents* fc) {
+    CHECK(expression, &fc->filename_expr);
+
+    if (fc->filename_expr->kind != Ast_Kind_StrLit) {
+        ERROR(fc->token->pos, Error_Critical, "Expected given expression to be a compile-time stirng literal.");
+    }
+
+    if (context->options->no_file_contents) {
+        ERROR(ent->expr->token->pos, Error_Critical, "#file_contents is disabled for this compilation.");
+    }
+
+    return Check_Complete;
+}
+
+CHECK_FUNC(foreign_block, AstForeignBlock *fb) {
+    if (fb->scope == NULL)
+        fb->scope = scope_create(context, context->checker.current_scope, fb->token->pos);
+
+    CHECK(expression, &fb->module_name);
+
+    if (fb->module_name->kind != Ast_Kind_StrLit) {
+        ERROR(fb->token->pos, Error_Critical, "Expected module name to be a compile-time string literal.");
+    }
+
+    bh_arr_each(Entity *, pent, fb->captured_entities) {
+        Entity *ent = *pent;
+        if (ent->type == Entity_Type_Function_Header) {
+            if (ent->function->body->next != NULL) {
+                ERROR(ent->function->token->pos, Error_Critical, "Procedures declared in a #foreign block should not have bodies.");
+            }
+
+            ent->function->foreign.import_name = (AstTyped *) make_string_literal(context, ent->function->intrinsic_name);
+            ent->function->foreign.module_name = fb->module_name;
+            ent->function->is_foreign = 1;
+            ent->function->is_foreign_dyncall = fb->uses_dyncall;
+            ent->function->entity = NULL;
+            ent->function->entity_header = NULL;
+            ent->function->entity_body = NULL;
+
+            add_entities_for_node(&context->entities, NULL, (AstNode *) ent->function, ent->scope, ent->package);
+            continue;
+        }
+
+        if (ent->type == Entity_Type_Binding) {
+            AstBinding* new_binding = onyx_ast_node_new(context->ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
+            new_binding->token = ent->binding->token;
+            new_binding->node = ent->binding->node;
+
+            Entity e;
+            memset(&e, 0, sizeof(e));
+            e.type = Entity_Type_Binding;
+            e.state = Entity_State_Introduce_Symbols;
+            e.binding = new_binding;
+            e.scope = fb->scope;
+            e.package = ent->package;
+
+            entity_heap_insert(&context->entities, e);
+        }
+
+        if (ent->type != Entity_Type_Function) {
+            entity_heap_insert_existing(&context->entities, ent);
+        }
+    }
+
+    if (context->options->generate_foreign_info) {
+        // When generating foreign info, we have to pass this on to codegen
+        // so it can build the static data that goes in the binary.
+        return Check_Success;
+
+    } else {
+        return Check_Complete;
+    }
+}
+
 void check_entity(Context *context, Entity* ent) {
     CheckStatus cs = Check_Success;
+
     context->checker.current_entity = ent;
     context->checker.all_checks_are_final = 1;
+    context->checker.report_unresolved_symbols = context->cycle_detected; // TODO: Remove this flag
+
+    if (ent->scope) scope_enter(context, ent->scope);
 
     switch (ent->type) {
+        case Entity_Type_Binding: {
+            symbol_introduce(context, context->checker.current_scope, ent->binding->token, ent->binding->node);
+            track_documentation_for_symbol_info(context, ent->binding->node, ent->binding);
+
+            onyx_docs_submit(context->doc_info, ent->binding);
+
+            package_reinsert_use_packages(context, ent->package);
+            cs = Check_Complete;
+        }
+
+        case Entity_Type_Static_If:                cs = check_static_if(context, ent->statif_if); break;
+
+        case Entity_Type_Load_Path:
+        case Entity_Type_Load_File:                cs = check_include(context, ent->include); break;
+
         case Entity_Type_Foreign_Function_Header:
         case Entity_Type_Function_Header:          cs = check_function_header(context, ent->function); break;
         case Entity_Type_Temp_Function_Header:     cs = check_temp_function_header(context, ent->function); break;
         case Entity_Type_Function:                 cs = check_function(context, ent->function); break;
         case Entity_Type_Overloaded_Function:      cs = check_overloaded_function(context, ent->overloaded_function); break;
+        case Entity_Type_Global_Header:            cs = check_global_header(context, ent->global); break;
         case Entity_Type_Global:                   cs = check_global(context, ent->global); break;
         case Entity_Type_Struct_Member_Default:    cs = check_struct_defaults(context, (AstStructType *) ent->type_alias); break;
         case Entity_Type_Memory_Reservation_Type:  cs = check_memres_type(context, ent->mem_res); break;
@@ -4924,21 +5096,16 @@ void check_entity(Context *context, Entity* ent) {
                 cs = check_type(context, &ent->type_alias);
             break;
 
-        case Entity_Type_File_Contents:
-            if (context->options->no_file_contents) {
-                ONYX_ERROR(ent->expr->token->pos, Error_Critical, "#file_contents is disabled for this compilation.");
-            }
-            cs = Check_Complete;
-            break;
-
-        case Entity_Type_Job: cs = check_arbitrary_job(context, ent->job_data); break;
-        case Entity_Type_JS:  cs = check_js_node(context, ent->js); break;
+        case Entity_Type_File_Contents: cs = check_file_contents(context, ent->file_contents); break;
+        case Entity_Type_Job:           cs = check_arbitrary_job(context, ent->job_data); break;
+        case Entity_Type_JS:            cs = check_js_node(context, ent->js); break;
+        case Entity_Type_Foreign_Block: cs = check_foreign_block(context, ent->foreign_block); break;
 
         default: break;
     }
 
     switch (cs) {
-        case Check_Yield_Macro:      ent->macro_attempts++; break;
+        case Check_Yield:            ent->macro_attempts++; break;
         case Check_Success:          ent->state = Entity_State_Code_Gen;        goto clear_attempts;
         case Check_Complete:         ent->state = Entity_State_Finalized;       goto clear_attempts;
         case Check_Return_To_Symres: ent->state = Entity_State_Resolve_Symbols; goto clear_attempts;
@@ -4950,4 +5117,7 @@ void check_entity(Context *context, Entity* ent) {
 
         default: break;
     }
+
+    context->checker.current_scope = NULL;
+    context->checker.current_entity = NULL;
 }

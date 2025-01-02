@@ -1267,7 +1267,7 @@ SYMRES_FUNC(proc_expansion, AstProceduralExpansion **pexp, ProceduralMacroExpans
     // return Symres_Success;
 // }
 
-SYMRES_FUNC(function_header, AstFunction* func) {
+// SYMRES_FUNC(function_header, AstFunction* func) {
     // func->flags |= Ast_Flag_Comptime;
 
     // if (!(func->flags & Ast_Flag_Function_Is_Lambda) && func->captures) {
@@ -1303,87 +1303,87 @@ SYMRES_FUNC(function_header, AstFunction* func) {
     //     }
     // }
 
-    bh_arr_each(AstParam, param, func->params) {
-        symbol_introduce(context, context->checker.current_scope, param->local->token, (AstNode *) param->local);
-    }
+    // bh_arr_each(AstParam, param, func->params) {
+    //     symbol_introduce(context, context->checker.current_scope, param->local->token, (AstNode *) param->local);
+    // }
 
-    bh_arr_each(AstParam, param, func->params) {
-        if (param->local->type_node != NULL) {
-            SYMRES_INVISIBLE(type, param->local, &param->local->type_node);
-        }
-    }
+    // bh_arr_each(AstParam, param, func->params) {
+    //     if (param->local->type_node != NULL) {
+    //         SYMRES_INVISIBLE(type, param->local, &param->local->type_node);
+    //     }
+    // }
 
-    if (potentially_convert_function_to_polyproc(context, func)) {
-        return Symres_Complete;
-    }
+    // if (potentially_convert_function_to_polyproc(context, func)) {
+    //     return Symres_Complete;
+    // }
 
-    if (func->nodes_that_need_entities_after_clone && bh_arr_length(func->nodes_that_need_entities_after_clone) > 0 && func->entity) {
-        bh_arr_each(AstNode *, node, func->nodes_that_need_entities_after_clone) {
-            // This makes a lot of assumptions about how these nodes are being processed,
-            // and I don't want to start using this with other nodes without considering
-            // what the ramifications of that is.
-            assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents
-                    || (*node)->kind == Ast_Kind_Function || (*node)->kind == Ast_Kind_Polymorphic_Proc);
+    // if (func->nodes_that_need_entities_after_clone && bh_arr_length(func->nodes_that_need_entities_after_clone) > 0 && func->entity) {
+    //     bh_arr_each(AstNode *, node, func->nodes_that_need_entities_after_clone) {
+    //         // This makes a lot of assumptions about how these nodes are being processed,
+    //         // and I don't want to start using this with other nodes without considering
+    //         // what the ramifications of that is.
+    //         assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents
+    //                 || (*node)->kind == Ast_Kind_Function || (*node)->kind == Ast_Kind_Polymorphic_Proc);
 
-            // Need to use current_scope->parent because current_scope is the function body scope.
-            Scope *scope = context->checker.current_scope->parent;
+    //         // Need to use current_scope->parent because current_scope is the function body scope.
+    //         Scope *scope = context->checker.current_scope->parent;
 
-            if ((*node)->kind == Ast_Kind_Static_If) {
-                AstIf *static_if = (AstIf *) *node;
-                assert(static_if->defined_in_scope);
-                scope = static_if->defined_in_scope;
+    //         if ((*node)->kind == Ast_Kind_Static_If) {
+    //             AstIf *static_if = (AstIf *) *node;
+    //             assert(static_if->defined_in_scope);
+    //             scope = static_if->defined_in_scope;
 
-                if (func->poly_scope) {
-                    scope = scope_create(context, scope, static_if->token->pos);
-                    scope_include(context, scope, func->poly_scope, static_if->token->pos);
-                }
-            }
+    //             if (func->poly_scope) {
+    //                 scope = scope_create(context, scope, static_if->token->pos);
+    //                 scope_include(context, scope, func->poly_scope, static_if->token->pos);
+    //             }
+    //         }
 
-            add_entities_for_node(&context->entities, NULL, *node, scope, func->entity->package);
-        }
+    //         add_entities_for_node(&context->entities, NULL, *node, scope, func->entity->package);
+    //     }
 
-        bh_arr_set_length(func->nodes_that_need_entities_after_clone, 0);
-    }
+    //     bh_arr_set_length(func->nodes_that_need_entities_after_clone, 0);
+    // }
 
-    if (func->deprecated_warning) {
-        SYMRES(expression, (AstTyped **) &func->deprecated_warning);
-    }
-    
-    bh_arr_each(AstTyped *, pexpr, func->tags) {
-        SYMRES(expression, pexpr);
-    }
+    // if (func->deprecated_warning) {
+    //     SYMRES(expression, (AstTyped **) &func->deprecated_warning);
+    // }
+    // 
+    // bh_arr_each(AstTyped *, pexpr, func->tags) {
+    //     SYMRES(expression, pexpr);
+    // }
 
-    if (func->foreign.import_name) {
-        SYMRES(expression, &func->foreign.module_name);
-        SYMRES(expression, &func->foreign.import_name);
-    }
+    // if (func->foreign.import_name) {
+    //     SYMRES(expression, &func->foreign.module_name);
+    //     SYMRES(expression, &func->foreign.import_name);
+    // }
 
-    if (func->captures) {
-        SYMRES(capture_block, func->captures, func->scope_to_lookup_captured_values);
-    }
+    // if (func->captures) {
+    //     SYMRES(capture_block, func->captures, func->scope_to_lookup_captured_values);
+    // }
 
-    SYMRES(type, &func->return_type);
+    // SYMRES(type, &func->return_type);
 
-    if (context->options->stack_trace_enabled) {
-        if (!func->stack_trace_local) {
-            OnyxToken *stack_trace_token = bh_alloc_item(context->ast_alloc, OnyxToken);
-            stack_trace_token->type = Token_Type_Symbol;
-            stack_trace_token->length = 13;
-            stack_trace_token->text = bh_strdup(context->ast_alloc, "__stack_trace ");
-            stack_trace_token->pos = func->token->pos;
+    // if (context->options->stack_trace_enabled) {
+    //     if (!func->stack_trace_local) {
+    //         OnyxToken *stack_trace_token = bh_alloc_item(context->ast_alloc, OnyxToken);
+    //         stack_trace_token->type = Token_Type_Symbol;
+    //         stack_trace_token->length = 13;
+    //         stack_trace_token->text = bh_strdup(context->ast_alloc, "__stack_trace ");
+    //         stack_trace_token->pos = func->token->pos;
 
-            assert(context->builtins.stack_trace_type);
-            func->stack_trace_local = make_local(context, stack_trace_token, context->builtins.stack_trace_type);
-            func->stack_trace_local->flags |= Ast_Flag_Decl_Followed_By_Init;
-        }
+    //         assert(context->builtins.stack_trace_type);
+    //         func->stack_trace_local = make_local(context, stack_trace_token, context->builtins.stack_trace_type);
+    //         func->stack_trace_local->flags |= Ast_Flag_Decl_Followed_By_Init;
+    //     }
 
-        SYMRES(local, &func->stack_trace_local);
-    }
+    //     SYMRES(local, &func->stack_trace_local);
+    // }
 
-    scope_leave(context);
+    // scope_leave(context);
 
-    return Symres_Success;
-}
+    // return Symres_Success;
+// }
 
 SYMRES_FUNC(function, AstFunction* func) {
     if (func->entity_header && func->entity_header->state < Entity_State_Check_Types) return Symres_Yield_Macro;
@@ -1475,10 +1475,11 @@ SYMRES_FUNC(function, AstFunction* func) {
     return Symres_Success;
 }
 
-SYMRES_FUNC(global, AstGlobal* global) {
-    SYMRES(type, &global->type_node);
-    return Symres_Success;
-}
+// This was actuall global_header.
+// SYMRES_FUNC(global, AstGlobal* global) {
+//     SYMRES(type, &global->type_node);
+//     return Symres_Success;
+// }
 
 SYMRES_FUNC(overloaded_function, AstOverloadedFunction* ofunc) {
     bh_arr_each(OverloadOption, overload, ofunc->overloads) {
@@ -1981,60 +1982,60 @@ SYMRES_FUNC(polyquery, AstPolyQuery *query) {
     return Symres_Success;
 }
 
-SYMRES_FUNC(foreign_block, AstForeignBlock *fb) {
-    if (fb->scope == NULL)
-        fb->scope = scope_create(context, context->checker.current_scope, fb->token->pos);
-
-    SYMRES(expression, &fb->module_name);
-
-    if (fb->module_name->kind != Ast_Kind_StrLit) {
-        ONYX_ERROR(fb->token->pos, Error_Critical, "Expected module name to be a compile-time string literal.");
-        return Symres_Error;
-    }
-
-    bh_arr_each(Entity *, pent, fb->captured_entities) {
-        Entity *ent = *pent;
-        if (ent->type == Entity_Type_Function_Header) {
-            if (ent->function->body->next != NULL) {
-                ONYX_ERROR(ent->function->token->pos, Error_Critical, "Procedures declared in a #foreign block should not have bodies.");
-                return Symres_Error;
-            }
-
-            ent->function->foreign.import_name = (AstTyped *) make_string_literal(context, ent->function->intrinsic_name);
-            ent->function->foreign.module_name = fb->module_name;
-            ent->function->is_foreign = 1;
-            ent->function->is_foreign_dyncall = fb->uses_dyncall;
-            ent->function->entity = NULL;
-            ent->function->entity_header = NULL;
-            ent->function->entity_body = NULL;
-
-            add_entities_for_node(&context->entities, NULL, (AstNode *) ent->function, ent->scope, ent->package);
-            continue;
-        }
-
-        if (ent->type == Entity_Type_Binding) {
-            AstBinding* new_binding = onyx_ast_node_new(context->ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
-            new_binding->token = ent->binding->token;
-            new_binding->node = ent->binding->node;
-
-            Entity e;
-            memset(&e, 0, sizeof(e));
-            e.type = Entity_Type_Binding;
-            e.state = Entity_State_Introduce_Symbols;
-            e.binding = new_binding;
-            e.scope = fb->scope;
-            e.package = ent->package;
-
-            entity_heap_insert(&context->entities, e);
-        }
-
-        if (ent->type != Entity_Type_Function) {
-            entity_heap_insert_existing(&context->entities, ent);
-        }
-    }
-
-    return Symres_Complete;
-}
+// SYMRES_FUNC(foreign_block, AstForeignBlock *fb) {
+//     if (fb->scope == NULL)
+//         fb->scope = scope_create(context, context->checker.current_scope, fb->token->pos);
+// 
+//     SYMRES(expression, &fb->module_name);
+// 
+//     if (fb->module_name->kind != Ast_Kind_StrLit) {
+//         ONYX_ERROR(fb->token->pos, Error_Critical, "Expected module name to be a compile-time string literal.");
+//         return Symres_Error;
+//     }
+// 
+//     bh_arr_each(Entity *, pent, fb->captured_entities) {
+//         Entity *ent = *pent;
+//         if (ent->type == Entity_Type_Function_Header) {
+//             if (ent->function->body->next != NULL) {
+//                 ONYX_ERROR(ent->function->token->pos, Error_Critical, "Procedures declared in a #foreign block should not have bodies.");
+//                 return Symres_Error;
+//             }
+// 
+//             ent->function->foreign.import_name = (AstTyped *) make_string_literal(context, ent->function->intrinsic_name);
+//             ent->function->foreign.module_name = fb->module_name;
+//             ent->function->is_foreign = 1;
+//             ent->function->is_foreign_dyncall = fb->uses_dyncall;
+//             ent->function->entity = NULL;
+//             ent->function->entity_header = NULL;
+//             ent->function->entity_body = NULL;
+// 
+//             add_entities_for_node(&context->entities, NULL, (AstNode *) ent->function, ent->scope, ent->package);
+//             continue;
+//         }
+// 
+//         if (ent->type == Entity_Type_Binding) {
+//             AstBinding* new_binding = onyx_ast_node_new(context->ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
+//             new_binding->token = ent->binding->token;
+//             new_binding->node = ent->binding->node;
+// 
+//             Entity e;
+//             memset(&e, 0, sizeof(e));
+//             e.type = Entity_Type_Binding;
+//             e.state = Entity_State_Introduce_Symbols;
+//             e.binding = new_binding;
+//             e.scope = fb->scope;
+//             e.package = ent->package;
+// 
+//             entity_heap_insert(&context->entities, e);
+//         }
+// 
+//         if (ent->type != Entity_Type_Function) {
+//             entity_heap_insert_existing(&context->entities, ent);
+//         }
+//     }
+// 
+//     return Symres_Complete;
+// }
 
 SYMRES_FUNC(include, AstInclude* include) {
     if (include->name != NULL) return Symres_Goto_Parse;
@@ -2057,16 +2058,16 @@ SYMRES_FUNC(include, AstInclude* include) {
     return Symres_Goto_Parse;
 }
 
-SYMRES_FUNC(file_contents, AstFileContents* fc) {
-    SYMRES(expression, &fc->filename_expr);
-
-    if (fc->filename_expr->kind != Ast_Kind_StrLit) {
-        ONYX_ERROR(fc->token->pos, Error_Critical, "Expected given expression to be a compile-time stirng literal.");
-        return Symres_Error;
-    }
-
-    return Symres_Success;
-}
+// SYMRES_FUNC(file_contents, AstFileContents* fc) {
+//     SYMRES(expression, &fc->filename_expr);
+// 
+//     if (fc->filename_expr->kind != Ast_Kind_StrLit) {
+//         ONYX_ERROR(fc->token->pos, Error_Critical, "Expected given expression to be a compile-time stirng literal.");
+//         return Symres_Error;
+//     }
+// 
+//     return Symres_Success;
+// }
 
 SYMRES_FUNC(import, AstImport* import) {
     AstPackage* package = import->imported_package;
@@ -2117,13 +2118,13 @@ SYMRES_FUNC(import, AstImport* import) {
     return Symres_Complete;
 }
 
-SYMRES_FUNC(js_node, AstJsNode* js) {
-    if (js->order_expr) SYMRES(expression, &js->order_expr);
-    if (js->code)       SYMRES(expression, &js->code);
-    if (js->filepath)   SYMRES(expression, &js->filepath);
-
-    return Symres_Success;
-}
+// SYMRES_FUNC(js_node, AstJsNode* js) {
+//     if (js->order_expr) SYMRES(expression, &js->order_expr);
+//     if (js->code)       SYMRES(expression, &js->code);
+//     if (js->filepath)   SYMRES(expression, &js->filepath);
+// 
+//     return Symres_Success;
+// }
 
 SYMRES_FUNC(compiler_extension, AstCompilerExtension *ext) {
     if (context->options->no_compiler_extensions) {
@@ -2149,39 +2150,39 @@ SYMRES_FUNC(compiler_extension, AstCompilerExtension *ext) {
 
 
 void symres_entity(Context *context, Entity* ent) {
-    context->checker.current_entity = ent;
-    if (ent->scope) scope_enter(context, ent->scope);
+    // context->checker.current_entity = ent;
+    // if (ent->scope) scope_enter(context, ent->scope);
 
-    context->checker.report_unresolved_symbols = context->cycle_detected;
+    // context->checker.report_unresolved_symbols = context->cycle_detected;
 
-    SymresStatus ss = Symres_Success;
-    EntityState next_state = Entity_State_Check_Types;
+    // SymresStatus ss = Symres_Success;
+    // EntityState next_state = Entity_State_Check_Types;
 
     switch (ent->type) {
-        case Entity_Type_Binding: {
-            symbol_introduce(context, context->checker.current_scope, ent->binding->token, ent->binding->node);
-            track_documentation_for_symbol_info(context, ent->binding->node, ent->binding);
+        // case Entity_Type_Binding: {
+        //     symbol_introduce(context, context->checker.current_scope, ent->binding->token, ent->binding->node);
+        //     track_documentation_for_symbol_info(context, ent->binding->node, ent->binding);
 
-            onyx_docs_submit(context->doc_info, ent->binding);
+        //     onyx_docs_submit(context->doc_info, ent->binding);
 
-            package_reinsert_use_packages(context, ent->package);
-            next_state = Entity_State_Finalized;
-            break;
-        }
+        //     package_reinsert_use_packages(context, ent->package);
+        //     next_state = Entity_State_Finalized;
+        //     break;
+        // }
 
-        case Entity_Type_Static_If:               ss = symres_static_if(context, ent->static_if); break;
+        // case Entity_Type_Static_If:               ss = symres_static_if(context, ent->static_if); break;
 
-        case Entity_Type_Load_Path:
-        case Entity_Type_Load_File:               ss = symres_include(context, ent->include); break;
-        case Entity_Type_File_Contents:           ss = symres_file_contents(context, ent->file_contents); break;
-        case Entity_Type_JS:                      ss = symres_js_node(context, ent->js); break;
+        // case Entity_Type_Load_Path:
+        // case Entity_Type_Load_File:               ss = symres_include(context, ent->include); break;
+        // case Entity_Type_File_Contents:           ss = symres_file_contents(context, ent->file_contents); break;
+        // case Entity_Type_JS:                      ss = symres_js_node(context, ent->js); break;
 
         case Entity_Type_Foreign_Function_Header:
         case Entity_Type_Temp_Function_Header:
         case Entity_Type_Function_Header:         ss = symres_function_header(context, ent->function); break;
-        case Entity_Type_Function:                ss = symres_function(context, ent->function);        break;
+        // case Entity_Type_Function:                ss = symres_function(context, ent->function);        break;
 
-        case Entity_Type_Global_Header:           ss = symres_global(context, ent->global); break;
+        // case Entity_Type_Global_Header:           ss = symres_global(context, ent->global); break;
 
         case Entity_Type_Import:                  ss = symres_import(context, ent->import); break;
 
@@ -2190,26 +2191,26 @@ void symres_entity(Context *context, Entity* ent) {
                                                   next_state = Entity_State_Finalized;
                                                   break;
 
-        case Entity_Type_Interface:               ss = symres_interface(context, ent->interface); break;
+        // case Entity_Type_Interface:               ss = symres_interface(context, ent->interface); break;
 
         case Entity_Type_Overloaded_Function:     ss = symres_overloaded_function(context, ent->overloaded_function); break;
-        case Entity_Type_Expression:              ss = symres_expression(context, &ent->expr); break;
-        case Entity_Type_Type_Alias:              ss = symres_type(context, &ent->type_alias); break;
+        // case Entity_Type_Expression:              ss = symres_expression(context, &ent->expr); break;
+        // case Entity_Type_String_Literal:          ss = symres_expression(context, &ent->expr); break;
+        // case Entity_Type_Type_Alias:              ss = symres_type(context, &ent->type_alias); break;
         case Entity_Type_Enum:                    ss = symres_enum(context, ent->enum_type); break;
-        case Entity_Type_Memory_Reservation_Type: ss = symres_memres_type(context, &ent->mem_res); break;
-        case Entity_Type_Memory_Reservation:      ss = symres_memres(context, &ent->mem_res); break;
-        case Entity_Type_String_Literal:          ss = symres_expression(context, &ent->expr); break;
-        case Entity_Type_Struct_Member_Default:   ss = symres_struct_defaults(context, (AstType *) ent->type_alias); break;
-        case Entity_Type_Process_Directive:       ss = symres_process_directive(context, (AstNode *) ent->expr); break;
-        case Entity_Type_Macro:                   ss = symres_macro(context, ent->macro); break;
-        case Entity_Type_Constraint_Check:        ss = symres_constraint(context, ent->constraint); break;
-        case Entity_Type_Polymorph_Query:         ss = symres_polyquery(context, ent->poly_query); break;
-        case Entity_Type_Foreign_Block:           ss = symres_foreign_block(context, ent->foreign_block);
-                                                  if (context->options->generate_foreign_info) {
-                                                      next_state = Entity_State_Check_Types;
-                                                      ss = Symres_Success;
-                                                  }
-                                                  break;
+        // case Entity_Type_Memory_Reservation_Type: ss = symres_memres_type(context, &ent->mem_res); break;
+        // case Entity_Type_Memory_Reservation:      ss = symres_memres(context, &ent->mem_res); break;
+        // case Entity_Type_Struct_Member_Default:   ss = symres_struct_defaults(context, (AstType *) ent->type_alias); break;
+        // case Entity_Type_Process_Directive:       ss = symres_process_directive(context, (AstNode *) ent->expr); break;
+        // case Entity_Type_Macro:                   ss = symres_macro(context, ent->macro); break;
+        // case Entity_Type_Constraint_Check:        ss = symres_constraint(context, ent->constraint); break;
+        // case Entity_Type_Polymorph_Query:         ss = symres_polyquery(context, ent->poly_query); break;
+        // case Entity_Type_Foreign_Block:           ss = symres_foreign_block(context, ent->foreign_block);
+        //                                           if (context->options->generate_foreign_info) {
+        //                                               next_state = Entity_State_Check_Types;
+        //                                               ss = Symres_Success;
+        //                                           }
+        //                                           break;
         case Entity_Type_Compiler_Extension:      ss = symres_compiler_extension(context, ent->compiler_extension); break;
         case Entity_Type_Procedural_Expansion:    ss = symres_proc_expansion(context, &ent->proc_expansion, PMEK_Top_Level); break;
 
