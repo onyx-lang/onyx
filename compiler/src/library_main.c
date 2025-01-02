@@ -374,9 +374,9 @@ static b32 process_entity(Context *context, Entity* ent) {
             break;
 
         case Entity_State_Introduce_Symbols:
-            // Currently, introducing symbols is handled in the symbol resolution
+            // Currently, introducing symbols is handled in the checker
             // function. Maybe there should be a different place where that happens?
-            symres_entity(context, ent);
+            check_entity(context, ent);
             break;
 
         case Entity_State_Parse:
@@ -409,7 +409,7 @@ static b32 process_entity(Context *context, Entity* ent) {
             }
             break;
 
-        case Entity_State_Resolve_Symbols: symres_entity(context, ent); break;
+        // case Entity_State_Resolve_Symbols: symres_entity(context, ent); break;
         case Entity_State_Check_Types:     check_entity(context, ent);  break;
         case Entity_State_Code_Gen:        emit_entity(context, ent);   break;
 

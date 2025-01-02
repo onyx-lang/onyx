@@ -80,7 +80,7 @@ void package_reinsert_use_packages(Context *context, Package* package) {
     if (!package->use_package_entities) return;
 
     bh_arr_each(Entity *, use_package, package->use_package_entities) {
-        (*use_package)->state = Entity_State_Resolve_Symbols;
+        (*use_package)->state = Entity_State_Check_Types;
         (*use_package)->macro_attempts = 0;
         entity_heap_insert_existing(&context->entities, *use_package);
     } 

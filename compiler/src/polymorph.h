@@ -97,7 +97,7 @@ static b32 add_solidified_function_entities(Context *context, AstSolidifiedFunct
     solidified_func->func->flags |= Ast_Flag_From_Polymorphism;
 
     Entity func_header_entity = {
-        .state = Entity_State_Resolve_Symbols,
+        .state = Entity_State_Check_Types,
         .type = Entity_Type_Function_Header,
         .function = solidified_func->func,
         .package = NULL,
@@ -105,7 +105,7 @@ static b32 add_solidified_function_entities(Context *context, AstSolidifiedFunct
     };
 
     Entity func_entity = {
-        .state = Entity_State_Resolve_Symbols,
+        .state = Entity_State_Check_Types,
         .type = Entity_Type_Function,
         .function = solidified_func->func,
         .package = NULL,
@@ -956,7 +956,7 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstF
     BH_MASK_SET(solidified_func.func->flags, !error_if_failed, Ast_Flag_Header_Check_No_Error);
 
     Entity func_header_entity = {
-        .state = Entity_State_Resolve_Symbols,
+        .state = Entity_State_Check_Types,
         .type = Entity_Type_Temp_Function_Header,
         .function = solidified_func.func,
         .package = NULL,

@@ -6,6 +6,7 @@
 #include "types.h"
 #include "parser.h"
 #include "utils.h"
+#include "doc.h"
 
 // All of the `check` functions return a boolean that signals if an issue
 // was reached while processing the node. These error booleans propagate
@@ -20,7 +21,7 @@
     (node)->flags |= Ast_Flag_Symbol_Invisible; \
     CheckStatus cs = check_ ## kind (context, __VA_ARGS__); \
     (node)->flags &= ~Ast_Flag_Symbol_Invisible; \
-    if (cs > Symres_Errors_Start) return ss;         \
+    if (cs > Check_Errors_Start) return cs;      \
     } while (0)
 
 #define YIELD(loc, msg) do { \
@@ -50,6 +51,15 @@
     } \
     } while (0)
 
+#define YIELD_ERROR_(loc, msg, ...) do { \
+    if (context->cycle_detected) { \
+        ONYX_ERROR(loc, Error_Critical, msg, __VA_ARGS__); \
+        return Check_Error; \
+    } else { \
+        return Check_Yield; \
+    } \
+    } while (0)
+
 #define ERROR(loc, msg) do { \
     ONYX_ERROR(loc, Error_Critical, msg); \
     return Check_Error; \
@@ -63,15 +73,13 @@
 #define TYPE_CHECK_(expr, type, type_name)                                                      \
     TypeMatch type_name;                                                                        \
     type_name = unify_node_and_type(context, expr, type);                                       \
-    if (type_name == TYPE_MATCH_YIELD) YIELD((*expr)->token->pos, "Waiting on type checking."); \
-    if (type_name == TYPE_MATCH_SPECIAL) return Check_Return_To_Symres;                         \
+    if (type_name == TYPE_MATCH_YIELD || type_name == TYPE_MATCH_SPECIAL) YIELD((*expr)->token->pos, "Waiting on type checking."); \
     if (type_name == TYPE_MATCH_FAILED)
 
 #define TYPE_QUERY_(expr, type, type_name)                                                      \
     TypeMatch type_name;                                                                        \
     type_name = unify_node_and_type_(context, expr, type, 0);                                   \
-    if (type_name == TYPE_MATCH_YIELD) YIELD((*expr)->token->pos, "Waiting on type checking."); \
-    if (type_name == TYPE_MATCH_SPECIAL) return Check_Return_To_Symres;                         \
+    if (type_name == TYPE_MATCH_YIELD || type_name == TYPE_MATCH_SPECIAL) YIELD((*expr)->token->pos, "Waiting on type checking."); \
     if (type_name == TYPE_MATCH_SUCCESS)
 
 #define CONCAT(a, b) a##_##b
@@ -84,7 +92,8 @@ typedef enum CheckStatus {
     Check_Complete, // The node is done processing
 
     Check_Errors_Start,
-    Check_Return_To_Symres, // Return this node for further symres processing
+    // Check_Return_To_Symres, // Return this node for further symres processing
+    Check_Goto_Parse,
     Check_Yield,
     Check_Failed,           // The node is done processing and should be put in the state of Failed.
     Check_Error,    // There was an error when checking the node
@@ -127,18 +136,22 @@ CHECK_FUNC(memres, AstMemRes* memres);
 CHECK_FUNC(type, AstType** ptype);
 CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expression);
 CHECK_FUNC(directive_solidify, AstDirectiveSolidify** psolid);
+CHECK_FUNC(directive_defined, AstDirectiveDefined** pdefined);
 CHECK_FUNC(do_block, AstDoBlock** pdoblock);
 CHECK_FUNC(constraint, AstConstraint *constraint);
 CHECK_FUNC(constraint_context, ConstraintContext *cc, Scope *scope, OnyxFilePos pos);
 CHECK_FUNC(polyquery, AstPolyQuery *query);
 CHECK_FUNC(directive_first, AstDirectiveFirst *first);
 CHECK_FUNC(directive_export_name, AstDirectiveExportName *ename);
+CHECK_FUNC(proc_expansion, AstProceduralExpansion **pexp, ProceduralMacroExpansionKind kind);
+CHECK_FUNC(package, AstPackage* package);
 
 
 #define STATEMENT_LEVEL 1
 #define EXPRESSION_LEVEL 2
 
 static void scope_enter(Context *context, Scope* new_scope) {
+    assert(new_scope);
     context->checker.current_scope = new_scope;
 }
 
@@ -159,13 +172,13 @@ CHECK_FUNC(symbol, AstNode** symbol_node) {
     AstNode* res = symbol_resolve(context, context->checker.current_scope, token);
 
     if (!res) { // :SymresStall
-        if (context->checker.report_unresolved_symbols) {
+        if (context->cycle_detected) {
             token_toggle_end(token);
             char *closest = find_closest_symbol_in_scope_and_parents(context, context->checker.current_scope, token->text);
             token_toggle_end(token);
 
-            if (closest) ERROR(token->pos, "Unable to resolve symbol '%b'. Did you mean '%s'?", token->text, token->length, closest);
-            else         ERROR(token->pos, "Unable to resolve symbol '%b'.", token->text, token->length);
+            if (closest) ERROR_(token->pos, "Unable to resolve symbol '%b'. Did you mean '%s'?", token->text, token->length, closest);
+            else         ERROR_(token->pos, "Unable to resolve symbol '%b'.", token->text, token->length);
 
             return Check_Error;
         } else {
@@ -304,9 +317,11 @@ CHECK_FUNC(if, AstIfWhile* ifnode) {
 
     } else {
         if (ifnode->initialization != NULL) {
-            ifnode->scope = scope_create(context, context->checker.current_scope, ifnode->token->pos);
-            scope_enter(context, ifnode->scope);
+            if (!ifnode->scope) {
+                ifnode->scope = scope_create(context, context->checker.current_scope, ifnode->token->pos);
+            }
 
+            scope_enter(context, ifnode->scope);
             CHECK(statement_chain, &ifnode->initialization);
         }
 
@@ -328,7 +343,9 @@ CHECK_FUNC(if, AstIfWhile* ifnode) {
                 ifnode->flags |= Ast_Flag_Block_Returns;
         }
 
-        if (ifnode->initialization != NULL) scope_leave(context);
+        if (ifnode->initialization != NULL) {
+            scope_leave(context);
+        }
     }
 
     return Check_Success;
@@ -336,9 +353,11 @@ CHECK_FUNC(if, AstIfWhile* ifnode) {
 
 CHECK_FUNC(while, AstIfWhile* whilenode) {
     if (whilenode->initialization != NULL) {
-        whilenode->scope = scope_create(context, context->checker.current_scope, whilenode->token->pos);
-        scope_enter(context, whilenode->scope);
+        if (!whilenode->scope) {
+            whilenode->scope = scope_create(context, context->checker.current_scope, whilenode->token->pos);
+        }
 
+        scope_enter(context, whilenode->scope);
         CHECK(statement_chain, &whilenode->initialization);
     }
 
@@ -361,14 +380,17 @@ CHECK_FUNC(while, AstIfWhile* whilenode) {
         CHECK(statement, (AstNode **) &whilenode->false_stmt, NULL);
     }
 
-    if (whilenode->initialization != NULL) scope_leave(context);
+    if (whilenode->initialization != NULL) {
+        scope_leave(context);
+    }
 
     return Check_Success;
 }
 
 CHECK_FUNC(for, AstFor* fornode) {
-    if (!fornode->scope)
+    if (!fornode->scope) {
         fornode->scope = scope_create(context, context->checker.current_scope, fornode->token->pos);
+    }
 
     scope_enter(context, fornode->scope);
 
@@ -1013,7 +1035,7 @@ CHECK_FUNC(call, AstCall** pcall) {
 
     if (call->placeholder_argument_position > 0) {
         ONYX_ERROR(call->token->pos, Error_Critical, "This call contains an argument placeholder '_', but it was not piped into.");
-        return Symres_Error;
+        return Check_Error;
     }
 
     if (call->kind == Ast_Kind_Call) {
@@ -1142,17 +1164,15 @@ CHECK_FUNC(call, AstCall** pcall) {
         return Check_Error;
     }
 
-    if (tm == TYPE_MATCH_SPECIAL) {
-        return Check_Return_To_Symres;
+    if (tm == TYPE_MATCH_YIELD || tm == TYPE_MATCH_SPECIAL) {
+        YIELD(call->token->pos, "Waiting on argument type checking.");
     }
-
-    if (tm == TYPE_MATCH_YIELD) YIELD(call->token->pos, "Waiting on argument type checking.");
 
     call->flags   |= Ast_Flag_Has_Been_Checked;
 
     if (call->kind == Ast_Kind_Call && call->callee->kind == Ast_Kind_Macro) {
         expand_macro(context, pcall, callee);
-        return Check_Return_To_Symres;
+        return Check_Yield;
     }
 
     if (callee->kind == Ast_Kind_Function && callee->deprecated_warning) {
@@ -1605,7 +1625,6 @@ CHECK_FUNC(binaryop, AstBinaryOp** pbinop) {
 
     // NOTE: Try operator overloading before checking everything else.
     if (type_is_not_basic_or_pointer(binop->left->type) || type_is_not_basic_or_pointer(binop->right->type)) {
-
         u64 cache_key = 0;
         if (binop->left->type && binop->right->type) {
             if (!context->checker.__binop_impossible_cache[binop->operation].hashes) {
@@ -1733,7 +1752,7 @@ CHECK_FUNC(unaryop, AstUnaryOp** punop) {
     }
 
     if (unaryop->operation == Unary_Op_Cast) {
-        CHECK(type, &(*unaryop)->type_node);
+        CHECK(type, &unaryop->type_node);
 
         char* err;
         if (unaryop->type == NULL)
@@ -2251,6 +2270,86 @@ CHECK_FUNC(if_expression, AstIfExpression* if_expr) {
     return Check_Success;
 }
 
+CHECK_FUNC(pipe, AstBinaryOp** ppipe) {
+    AstBinaryOp *pipe = *ppipe;
+
+    //
+    // Handle x |> y()? or x |> y()!
+    if (pipe->right->kind == Ast_Kind_Unary_Op) {
+        AstUnaryOp *the_try = (AstUnaryOp *) pipe->right;
+        if (the_try->operation == Unary_Op_Try || the_try->operation == Unary_Op_Unwrap) {
+            // Shuffle the tree!
+            AstBinaryOp *the_pipe = pipe;
+
+            the_pipe->right = the_try->expr;
+            the_try->expr   = (AstTyped *) the_pipe;
+            *ppipe          = (AstBinaryOp *) the_try;
+
+            CHECK(expression, (AstTyped **) ppipe);
+            return Check_Success;
+        }
+    }
+
+    AstCall* base_call_node = (AstCall *) pipe->right;
+    AstCall* call_node = base_call_node;
+
+    if (call_node->kind == Ast_Kind_Method_Call) {
+        call_node = (AstCall *) ((AstBinaryOp *) call_node)->right;
+    }
+
+    //
+    // Handle x |> y === x |> y() === y(x)
+    if (call_node->kind != Ast_Kind_Call) {
+        AstCall *new_call = onyx_ast_node_new(context->ast_alloc, sizeof(AstCall), Ast_Kind_Call);
+        new_call->token = call_node->token;
+        new_call->callee = (AstTyped *) call_node;
+        arguments_initialize(context, &new_call->args);
+
+        pipe->right = (AstTyped *) new_call;
+        base_call_node = new_call;
+        call_node = new_call;
+    }
+
+    if (call_node->callee->kind == Ast_Kind_Unary_Field_Access) {
+        AstAlias *left_alias = onyx_ast_node_new(context->ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
+        left_alias->token = pipe->left->token;
+        left_alias->alias = pipe->left;
+        pipe->left = (AstTyped *) left_alias;
+
+        AstFieldAccess *implicit_field_access = make_field_access(context, (AstTyped *) left_alias, NULL);
+        implicit_field_access->token = call_node->callee->token;
+
+        call_node->callee = (AstTyped *) implicit_field_access;
+
+        AstAddressOf *address_of = make_address_of(context, pipe->left);
+        address_of->can_be_removed = 1;
+        pipe->left = (AstTyped *) address_of;
+    }
+
+    if (!call_node || call_node->kind != Ast_Kind_Call) {
+        ERROR(pipe->token->pos, "Pipe operator expected call on right side.");
+    }
+
+    // CLEANUP: Why is this here?
+    if (pipe->left == NULL) return Check_Error;
+
+    if (call_node->placeholder_argument_position > 0) {
+        assert(call_node->placeholder_argument_position - 1 < bh_arr_length(call_node->args.values));
+        call_node->args.values[call_node->placeholder_argument_position - 1] = (AstTyped *) make_argument(context, pipe->left);
+        call_node->placeholder_argument_position = 0;
+
+    } else {
+        bh_arr_insertn(call_node->args.values, 0, 1);
+        call_node->args.values[0] = (AstTyped *) make_argument(context, pipe->left);
+    }
+
+    base_call_node->next = pipe->next;
+    *ppipe = (AstBinaryOp *) base_call_node;
+
+    CHECK(expression, (AstTyped **) ppipe);
+    return Check_Success;
+}
+
 CHECK_FUNC(do_block, AstDoBlock** pdoblock) {
     AstDoBlock* doblock = *pdoblock;
     if (doblock->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
@@ -2458,18 +2557,39 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
     if (field->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
     CHECK(expression, &field->expr);
-    if (field->expr->type == NULL) {
-        YIELD(field->token->pos, "Trying to resolve type of source expression.");
-    }
-
-    if (field->expr->kind == Ast_Kind_Package) {
-        return Check_Return_To_Symres;
-    }
 
     if (field->token != NULL && field->field == NULL) {
         token_toggle_end(field->token);
         field->field = bh_strdup(context->ast_alloc, field->token->text);
         token_toggle_end(field->token);
+    }
+
+    AstTyped *expr;
+    {
+        expr = (AstTyped *) strip_aliases((AstNode *) field->expr);
+        while (expr->kind == Ast_Kind_Type_Alias) {
+            expr = (AstTyped *)((AstTypeAlias *) expr)->to;
+        }
+
+        if (expr->kind == Ast_Kind_Struct_Type ||
+            expr->kind == Ast_Kind_Poly_Struct_Type ||
+            expr->kind == Ast_Kind_Enum_Type ||
+            expr->kind == Ast_Kind_Type_Raw_Alias ||
+            expr->kind == Ast_Kind_Union_Type ||
+            expr->kind == Ast_Kind_Poly_Union_Type ||
+            expr->kind == Ast_Kind_Slice_Type ||
+            expr->kind == Ast_Kind_DynArr_Type ||
+            expr->kind == Ast_Kind_Distinct_Type ||
+            expr->kind == Ast_Kind_Interface ||
+            expr->kind == Ast_Kind_Compiler_Extension ||
+            expr->kind == Ast_Kind_Package) {
+            goto try_resolve_from_node;
+            // return Check_Return_To_Symres;
+        }
+    }
+
+    if (field->expr->type == NULL) {
+        YIELD(field->token->pos, "Trying to resolve type of source expression.");
     }
 
     if (!type_is_structlike(field->expr->type)) {
@@ -2592,12 +2712,17 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
     type_node = field->expr->type->ast_type;
 
     n = try_symbol_raw_resolve_from_type(context, field->expr->type, field->field);
-    if (!n) n = try_symbol_raw_resolve_from_node(context, (AstNode *) field->expr, field->field);
+    if (n) goto resolved;
 
+  try_resolve_from_node:
+    n = try_symbol_raw_resolve_from_node(context, (AstNode *) field->expr, field->field);
+
+  resolved:
     if (n) {
         track_resolution_for_symbol_info(context, (AstNode *) *pfield, n);
 
         *pfield = (AstFieldAccess *) n;
+        CHECK(expression, (AstTyped **) pfield);
         return Check_Success;
     }
 
@@ -2610,6 +2735,39 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
         // Skipping the slightly expensive symbol lookup
         // below by not using YIELD_ERROR.
         return Check_Yield;
+    }
+
+    if (expr->kind == Ast_Kind_Package) {
+        if (context->cycle_detected) {
+            char *closest = find_closest_symbol_in_node(context, (AstNode *) expr, field->field);
+
+            AstPackage *package = (AstPackage *) strip_aliases((AstNode *) field->expr);
+            char *package_name = "unknown (compiler bug)";
+            if (package && package->package) {
+                package_name = package->package->name;
+            }
+
+            if (closest) {
+                ERROR_(field->token->pos, "'%b' was not found in package '%s'. Did you mean '%s'?",
+                    field->token->text,
+                    field->token->length,
+                    package_name,
+                    closest);
+            } else {
+                ERROR_(field->token->pos, "'%b' was not found in package '%s'. Perhaps it is defined in a file that was not loaded?",
+                    field->token->text,
+                    field->token->length,
+                    package_name);
+            }
+        }
+
+        return Check_Yield;
+    }
+
+    if (context->cycle_detected || context->cycle_almost_detected >= 2) {
+        ERROR_(field->token->pos, "'%b' does not exist here. This is a bad error message.",
+            field->token->text,
+            field->token->length);
     }
 
     char* type_name = (char *) node_get_type_name(context, field->expr);
@@ -2629,12 +2787,53 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
     ERROR_(field->token->pos, "Field '%s' does not exist on '%s'.", field->field, type_name);
 }
 
+// CLEANUP: This is an experimental feature and might be removed in the future.
+// I noticed a common pattern when writing in Onyx is something that looks like this:
+//
+//     foo.member_function(&foo, ...)
+//
+// I decided it would be worth adding a bit of syntactic sugar for such as call. I
+// decided to use the '->' operator for this purpose. The snippet below is the exact
+// same as the snippet above (after the nodes have been processed by the function below)
+//
+//     foo->member_function(...)
 CHECK_FUNC(method_call, AstBinaryOp** pmcall) {
     AstBinaryOp* mcall = *pmcall;
 
+    CHECK(expression, &mcall->left);
+
+    if ((mcall->flags & Ast_Flag_Has_Been_Symres) == 0) {
+        if (mcall->left == NULL) return Check_Error;
+
+        if (mcall->right->kind != Ast_Kind_Call) {
+            ERROR(mcall->token->pos, "'->' expected procedure call on right side.");
+        }
+
+        //
+        // This is a small hack that makes chaining method calls
+        // work. Because check_method_call replaces the method call
+        // and marks it as completed, if there are multiple references
+        // to the same method call node, one of them will be left dangling.
+        // To remedy this, an alias node an be placed around the method call
+        // so that when check_method_call replaces it, it is replaced
+        // within the alias, and all references are updated.
+        if (mcall->left->kind == Ast_Kind_Method_Call) {
+            AstAlias *left_alias = onyx_ast_node_new(context->ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
+            left_alias->token = mcall->left->token;
+            left_alias->alias = mcall->left;
+
+            mcall->left = (AstTyped *) left_alias;
+        }
+
+        AstFieldAccess* implicit_field_access = make_field_access(context, mcall->left, NULL);
+        implicit_field_access->token = ((AstCall *) mcall->right)->callee->token;
+        ((AstCall *) mcall->right)->callee = (AstTyped *) implicit_field_access;
+
+        mcall->flags |= Ast_Flag_Has_Been_Symres;
+    }
+
     // :Idempotency
     if ((mcall->flags & Ast_Flag_Has_Been_Checked) == 0) {
-        CHECK(expression, &mcall->left);
         if (mcall->left->type == NULL) YIELD(mcall->token->pos, "Trying to resolve type of left hand side.");
 
         AstTyped* implicit_argument = mcall->left;
@@ -2664,6 +2863,7 @@ CHECK_FUNC(method_call, AstBinaryOp** pmcall) {
 
     CHECK(call, (AstCall **) &mcall->right);
 
+    // TODO: This doesn't look right? Does this ever happen? Check this...
     if (mcall->right->kind != Ast_Kind_Call) {
         *pmcall = (AstBinaryOp *) mcall->right;
 
@@ -2729,9 +2929,12 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
         // sentinels, so I only added that case here. This should
         // maybe be considered in the future because I think this
         // lack of double checking could be causing other bugs.
-        if ((*expr)->kind == Ast_Kind_Constraint_Sentinel) {
-            CHECK(type, &(*expr)->type_node);
+        if ((*pexpr)->kind == Ast_Kind_Constraint_Sentinel) {
+            CHECK(type, &(*pexpr)->type_node);
         }
+
+        CHECK(expression, (AstTyped **) pexpr);
+        return Check_Success;
     }
 
     AstTyped* expr = *pexpr;
@@ -2761,8 +2964,8 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
         // polymorphic procedures do not need to be checked. Their concrete instantiations
         // will be checked when they are created.
         
-        if (((AstFunction *) *expr)->captures) {
-            ((AstFunction *) *expr)->scope_to_lookup_captured_values = context->checker.current_scope;
+        if (((AstFunction *) expr)->captures) {
+            ((AstFunction *) expr)->scope_to_lookup_captured_values = context->checker.current_scope;
         }
 
         return Check_Success;
@@ -2787,11 +2990,11 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
     if (expr->kind == Ast_Kind_StrLit) {
         AstStrLit* str = (AstStrLit *) expr;
         if (str->is_cstr) {
-            SYMRES(type, &context->builtins.cstring_type);
+            CHECK(type, &context->builtins.cstring_type);
             str->type_node = context->builtins.cstring_type;
 
         } else {
-            SYMRES(type, &context->builtins.string_type);
+            CHECK(type, &context->builtins.string_type);
             str->type_node = context->builtins.string_type;
         }
     }
@@ -2803,15 +3006,14 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
     switch (expr->kind) {
         case Ast_Kind_Binary_Op: retval = check_binaryop(context, (AstBinaryOp **) pexpr); break;
         case Ast_Kind_Unary_Op:  retval = check_unaryop(context, (AstUnaryOp **) pexpr); break;
+        case Ast_Kind_Pipe:      retval = check_pipe(context, (AstBinaryOp **) pexpr); break;
 
         case Ast_Kind_Intrinsic_Call:
         case Ast_Kind_Call:     retval = check_call(context, (AstCall **) pexpr); break;
         case Ast_Kind_Argument: retval = check_argument(context, (AstArgument **) pexpr); break;
         case Ast_Kind_Block:    retval = check_block(context, (AstBlock *) expr); break;
 
-        case Ast_Kind_Symbol:
-            YIELD_(expr->token->pos, "Waiting to resolve symbol, '%b'.", expr->token->text, expr->token->length);
-            break;
+        case Ast_Kind_Symbol: assert(0); break;
 
         case Ast_Kind_Param:
             if (expr->flags & Ast_Flag_Param_Symbol_Dirty) {
@@ -2845,7 +3047,9 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
             break;
 
         case Ast_Kind_NumLit:
-            assert(expr->type != NULL);
+            if (!expr->type) {
+                return Check_Yield;
+            }
             break;
 
         case Ast_Kind_Struct_Literal:
@@ -2863,8 +3067,8 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
             if (expr->type == NULL)
                 YIELD(expr->token->pos, "Waiting for function type to be resolved.");
 
-            if (((AstFunction *) *expr)->captures) {
-                ((AstFunction *) *expr)->scope_to_lookup_captured_values = context->checker.current_scope;
+            if (((AstFunction *) expr)->captures) {
+                ((AstFunction *) expr)->scope_to_lookup_captured_values = context->checker.current_scope;
             }
 
             break;
@@ -2894,13 +3098,14 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
             CHECK(if_expression, (AstIfExpression *) expr);
             break;
 
-        case Ast_Kind_Alias:
+        case Ast_Kind_Alias: {
             AstAlias *alias = (AstAlias *) expr;
             CHECK_INVISIBLE(expression, alias, &alias->alias);
 
             expr->flags |= (((AstAlias *) expr)->alias->flags & Ast_Flag_Comptime);
             expr->type = ((AstAlias *) expr)->alias->type;
             break;
+        }
 
         case Ast_Kind_Directive_Insert:
             retval = check_insert_directive(context, (AstDirectiveInsert **) pexpr, 1);
@@ -3106,10 +3311,10 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
 
     insert->flags |= Ast_Flag_Has_Been_Checked;
 
-    return Check_Return_To_Symres;
+    return Check_Yield;
 }
 
-SYMRES_FUNC(directive_defined, AstDirectiveDefined** pdefined) {
+CHECK_FUNC(directive_defined, AstDirectiveDefined** pdefined) {
     AstDirectiveDefined* defined = *pdefined;
 
     b32 has_to_be_resolved = context->cycle_almost_detected >= 1;
@@ -3152,7 +3357,7 @@ CHECK_FUNC(directive_solidify, AstDirectiveSolidify** psolid) {
     }
 
     if (!solid->poly_proc || solid->poly_proc->kind != Ast_Kind_Polymorphic_Proc) {
-        ERROR(solid->token->pos, Error_Critical, "Expected polymorphic procedure in #solidify directive.");
+        ERROR(solid->token->pos, "Expected polymorphic procedure in #solidify directive.");
     }
 
     bh_arr_each(AstPolySolution, sln, solid->known_polyvars) {
@@ -3276,8 +3481,7 @@ CHECK_FUNC(capture_block, AstCaptureBlock *block, Scope *captured_scope) {
 
         if (!resolved) {
             // Should this do a yield? In there any case that that would make sense?
-            ERROR(token->pos, "'%b' is not found in the enclosing scope.", token->text, token->length);
-            return Symres_Error;
+            ERROR_(token->pos, "'%b' is not found in the enclosing scope.", token->text, token->length);
         }
 
         (*capture)->captured_value = resolved;
@@ -3313,14 +3517,27 @@ CHECK_FUNC(statement, AstNode** pstmt, b32 *remove) {
         case Ast_Kind_For:         return check_for(context, (AstFor *) stmt);
         case Ast_Kind_Switch:      return check_switch(context, (AstSwitch *) stmt);
         case Ast_Kind_Block:       return check_block(context, (AstBlock *) stmt);
-        case Ast_Kind_Defer:       return check_statement(context, &((AstDefer *) stmt)->stmt);
-        case Ast_Kind_Argument:    return check_expression(context, (AstTyped **) &((AstArugment *) stmt)->value); break;
+        case Ast_Kind_Defer:       return check_statement(context, &((AstDefer *) stmt)->stmt, remove);
+        case Ast_Kind_Argument:    return check_expression(context, (AstTyped **) &((AstArgument *) stmt)->value);
         case Ast_Kind_Directive_Remove: return check_remove_directive(context, (AstDirectiveRemove *) stmt);
         case Ast_Kind_Directive_Insert: return check_insert_directive(context, (AstDirectiveInsert **) pstmt, 0);
+        case Ast_Kind_Procedural_Expansion: return check_proc_expansion(context, (AstProceduralExpansion **) pstmt, PMEK_Statement);
 
-        case Ast_Kind_Procedural_Expansion: {
-            CHECK(proc_expansion, (AstProceduralExpansion **) pstmt, PMEK_Statement);
-        }
+
+        //
+        // Call and Binary op nodes need to be treated differently here, because they use the current_checking_level
+        // to determine if an assignment is legal.
+        //
+        case Ast_Kind_Call:
+            CHECK(call, (AstCall **) pstmt);
+            (*pstmt)->flags |= Ast_Flag_Expr_Ignored;
+            break;
+
+        case Ast_Kind_Binary_Op:
+            CHECK(binaryop, (AstBinaryOp **) pstmt);
+            (*pstmt)->flags |= Ast_Flag_Expr_Ignored;
+            return Check_Success;
+
 
         // NOTE: Local variable declarations used to be removed after the symbol
         // resolution phase because long long ago, all locals needed to be known
@@ -3375,6 +3592,8 @@ CHECK_FUNC(statement, AstNode** pstmt, b32 *remove) {
             (*pstmt)->flags |= Ast_Flag_Expr_Ignored;
             return Check_Success;
     }
+
+    return Check_Success;
 }
 
 CHECK_FUNC(statement_chain, AstNode** walker) {
@@ -3415,7 +3634,7 @@ CHECK_FUNC(block, AstBlock* block) {
 
     if (!block->body) {
         scope_leave(context);
-        return Symres_Success;
+        return Check_Success;
     }
 
     AstNode *last = block->body;
@@ -3445,9 +3664,9 @@ CHECK_FUNC(block, AstBlock* block) {
                 block->statement_idx++;
                 break;
 
-            case Check_Return_To_Symres:
-                block->statement_idx = 0;
-                return cs;
+            // case Check_Return_To_Symres:
+            //     block->statement_idx = 0;
+            //     return cs;
 
             case Check_Failed:
             case Check_Error:
@@ -3475,7 +3694,27 @@ CHECK_FUNC(block, AstBlock* block) {
     return Check_Success;
 }
 
+CHECK_FUNC(polyproc, AstFunction* pp) {
+    pp->flags |= Ast_Flag_Comptime;
+    pp->parent_scope_of_poly_proc = context->checker.current_scope;
+
+    bh_arr_each(AstPolyParam, p, pp->poly_params) {
+        if (p->kind != PSK_Value) continue;
+
+        AstParam *param = &pp->params[p->idx];
+        if (param->default_value != NULL) {
+            CHECK(expression, &param->default_value);
+            // if (onyx_has_errors(context)) return Symres_Error;
+        }
+    }
+
+    return Check_Complete;
+}
+
 CHECK_FUNC(function, AstFunction* func) {
+    if (func->kind == Ast_Kind_Polymorphic_Proc) return Check_Complete;
+    if (func->flags & Ast_Flag_Function_Is_Lambda_Inside_PolyProc) return Check_Complete;
+
     if (func->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
     if (func->entity_header && func->entity_header->state < Entity_State_Code_Gen)
         YIELD(func->token->pos, "Waiting for procedure header to pass type-checking");
@@ -3487,6 +3726,86 @@ CHECK_FUNC(function, AstFunction* func) {
 
     context->checker.inside_for_iterator = 0;
     if (context->checker.for_node_stack) bh_arr_clear(context->checker.for_node_stack);
+
+    assert(func->scope);
+
+    scope_enter(context, func->scope);
+
+    if ((func->flags & Ast_Flag_Has_Been_Symres) == 0) {
+        // :EliminatingSymres
+        bh_arr_each(AstParam, param, func->params) {
+            // CLEANUP: Currently, in order to 'use' parameters, the type must be completely
+            // resolved and built. This is excessive because all that should need to be known
+            // is the names of the members, since all that happens is implicit field accesses
+            // are placed in the scope. So instead, there should be a way to just query all the
+            // member names in the structure, without needing to know their type. This would be
+            // easy if it were not for 'use' statements in structs. It is made even more complicated
+            // by this situtation:
+            //
+            //     Foo :: struct (T: type_expr) {
+            //         use t : T;
+            //
+            //         something_else := 5 + 6 * 8;
+            //     }
+            //
+            // The 'use t : T' member requires completely knowing the type of T, to know which
+            // members should be brought in. At the moment, that requires completely building the
+            // type of Foo($T).
+            if (param->is_used && !param->use_processed) {
+                fill_in_type(context, (AstTyped *) param->local);
+                if (!param->local->type) {
+                    YIELD(param->local->token->pos, "Waiting for parameter type to be known.");
+                }
+
+                if (type_is_struct(param->local->type)) {
+                    Type* st;
+                    if (param->local->type->kind == Type_Kind_Struct) {
+                        st = param->local->type;
+                    } else {
+                        st = param->local->type->Pointer.elem;
+                    }
+
+                    if (st->Struct.status != SPS_Uses_Done) return Check_Yield;
+
+                    fori (i, 0, shlen(st->Struct.members)) {
+                        StructMember* value = st->Struct.members[i].value;
+                        AstFieldAccess* fa = make_field_access(context, (AstTyped *) param->local, value->name);
+                        symbol_raw_introduce(context, context->checker.current_scope, value->name, param->local->token->pos, (AstNode *) fa);
+                    }
+
+                    param->use_processed = 1;
+
+                } else if (param->local->type != NULL) {
+                    ONYX_ERROR(param->local->token->pos, Error_Critical, "Can only 'use' structures or pointers to structures.");
+
+                } else {
+                    // :ExplicitTyping
+                    ERROR_(param->local->token->pos, "Cannot deduce type of parameter '%b'; Try adding it explicitly.",
+                        param->local->token->text,
+                        param->local->token->length);
+                }
+            }
+        }
+
+        func->flags |= Ast_Flag_Has_Been_Symres;
+    }
+
+    if (func->named_return_locals) {
+        bh_arr_each(AstLocal *, named_return, func->named_return_locals) {
+            CHECK(local, named_return);
+        }
+
+        if (!func->named_return_locals_added) {
+            func->named_return_locals_added = 1;
+            
+            AstNode **prev = &func->body->body;
+            bh_arr_each(AstLocal *, named_return, func->named_return_locals) {
+                (*named_return)->next = *prev;
+                *prev = (AstNode *) *named_return;
+            }
+        }
+    }
+
 
     if (func->body) {
         CheckStatus status = Check_Success;
@@ -3527,6 +3846,8 @@ CHECK_FUNC(function, AstFunction* func) {
 
     func->flags |= Ast_Flag_Has_Been_Checked;
 
+    scope_leave(context);
+
     if (bh_arr_length(func->tags) > 0 || (func->flags & Ast_Flag_Proc_Is_Null) != 0) {
         func->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
         return Check_Success;
@@ -3536,6 +3857,14 @@ CHECK_FUNC(function, AstFunction* func) {
 }
 
 CHECK_FUNC(overloaded_function, AstOverloadedFunction* ofunc) {
+    bh_arr_each(OverloadOption, overload, ofunc->overloads) {
+        CHECK(expression, &overload->option);
+    }
+
+    if (ofunc->expected_return_node) {
+        CHECK(type, &ofunc->expected_return_node);
+    }
+
     b32 done = 1;
 
     bh_imap all_overloads;
@@ -3625,6 +3954,110 @@ CHECK_FUNC(overloaded_function, AstOverloadedFunction* ofunc) {
     return Check_Success;
 }
 
+CHECK_FUNC(package, AstPackage* package) {
+    if (package->package == NULL) {
+        if (!package->package_name) {
+            ERROR(package->token->pos, "Internal compiler error: Expected package to have a name");
+        }
+
+        package->package = package_lookup(context, package->package_name);
+    }
+
+    if (package->package) {
+        package_mark_as_used(context, package->package);
+        return Check_Success;
+
+    } else {
+        YIELD_ERROR_(package->token->pos, "Package '%s' not found in included source files.", package->package_name);
+    }
+}
+
+CHECK_FUNC(enum, AstEnumType* enum_node) {
+    if (!enum_node->backing_type) {
+        CHECK(type, (AstType **) &enum_node->backing);
+
+        enum_node->backing_type = type_build_from_ast(context, enum_node->backing);
+        if (enum_node->backing_type == NULL) {
+            YIELD(enum_node->token->pos, "Unable to construct the backing type of this enum.");
+        }
+    }
+
+    if (enum_node->scope == NULL) {
+        enum_node->scope = scope_create(context, context->checker.current_scope, enum_node->token->pos);
+
+        symbol_raw_introduce(context, enum_node->scope, "__backing_type", enum_node->token->pos, (AstNode *) enum_node->backing);
+
+        type_build_from_ast(context, (AstType *) enum_node);
+    }
+
+    scope_enter(context, enum_node->scope);
+
+    u64 next_assign_value = enum_node->is_flags ? 1 : 0;
+    bh_arr_each(AstEnumValue *, pvalue, enum_node->values) {
+        AstEnumValue *value = *pvalue;
+        if (value->flags & Ast_Flag_Has_Been_Checked) continue;
+
+        value->type = enum_node->etcache;
+        value->flags |= Ast_Flag_Comptime;
+
+        if (value->value != NULL) {
+            CHECK(expression, &value->value);
+
+            if (value->value->kind == Ast_Kind_Enum_Value) {
+                value->value = ((AstEnumValue *) value->value)->value;
+                value->value->type = enum_node->etcache;
+            }
+
+            if (value->value->kind == Ast_Kind_NumLit) {
+                AstNumLit *n_value = (AstNumLit *) value->value;
+                resolve_expression_type(context, (AstTyped *) n_value);
+
+                if (type_is_small_integer(n_value->type)) {
+                    next_assign_value = n_value->value.i;
+                } else if (type_is_integer(n_value->type)) {
+                    next_assign_value = n_value->value.l;
+                } else {
+                    ERROR_(value->token->pos, "expected numeric integer literal for enum initialization, got '%s'", type_get_name(context, n_value->type));
+                }
+
+                n_value->type = enum_node->etcache;
+
+            } else {
+                if (value->entity == NULL) {
+                    add_entities_for_node(&context->entities, NULL, (AstNode *) value, enum_node->scope, NULL);
+                }
+
+                YIELD(value->token->pos, "Expected compile time known value for enum initialization.");
+            }
+
+        } else {
+            AstNumLit* num = make_int_literal(context, next_assign_value);
+            num->type = enum_node->etcache;
+
+            value->value = (AstTyped *) num;
+        }
+
+        symbol_introduce(context, enum_node->scope, value->token, (AstNode *) value);
+
+        value->flags |= Ast_Flag_Comptime | Ast_Flag_Has_Been_Checked;
+
+        if (enum_node->is_flags) {
+            next_assign_value <<= 1;
+        } else {
+            next_assign_value++;
+        }
+    }
+
+    scope_leave(context);
+
+    // HACK this ensure that you can only lookup symbols in an Enum that are actually defined in the enum.
+    // However, during the symbol resolution of the values in an enum, they need to be able to see the
+    // enclosing scope.
+    enum_node->scope->parent = NULL;
+
+    return Check_Success;
+}
+
 CHECK_FUNC(meta_tags, bh_arr(AstTyped *) tags) {
     if (tags) {
         bh_arr_each(AstTyped *, meta, tags) {
@@ -3645,9 +4078,9 @@ CHECK_FUNC(struct, AstStructType* s_node) {
     if (s_node->entity_defaults && s_node->entity_defaults->state < Entity_State_Check_Types)
         YIELD(s_node->token->pos, "Waiting for struct member defaults to pass symbol resolution.");
 
-    if (s_node->flags & Ast_Flag_Type_Is_Resolved) return Check_Success;
+    // if (s_node->flags & Ast_Flag_Type_Is_Considered_Complete) return Check_Success;
 
-    s_node->flags |= Ast_Flag_Type_Is_Resolved;
+    // s_node->flags |= Ast_Flag_Type_Is_Considered_Complete;
     s_node->flags |= Ast_Flag_Comptime;
 
     assert(s_node->scope);
@@ -3704,29 +4137,30 @@ CHECK_FUNC(struct, AstStructType* s_node) {
     }
 
     bh_arr_each(AstStructMember *, smem, s_node->members) {
-        track_declaration_for_symbol_info(context, member->token->pos, (AstNode *) *smem);
+        AstStructMember *member = *smem;
+        track_declaration_for_symbol_info(context, member->token->pos, (AstNode *) member);
 
-        if ((*smem)->type_node) {
-            CheckStatus cs = check_type(context, &(*smem)->type_node);
+        if (member->type_node) {
+            CheckStatus cs = check_type(context, &member->type_node);
             if (cs != Check_Success) {
-                s_node->flags &= ~Ast_Flag_Type_Is_Resolved;
+                s_node->flags &= ~Ast_Flag_Type_Is_Considered_Complete;
                 scope_leave(context);
                 return cs;
             }
         }
 
-        if ((*smem)->type_node == NULL && (*smem)->initial_value != NULL) {
-            CHECK(expression, &(*smem)->initial_value);
+        if (member->type_node == NULL && member->initial_value != NULL) {
+            CHECK(expression, &member->initial_value);
 
-            fill_in_type(context, (*smem)->initial_value);
-            if ((*smem)->initial_value->type == NULL)
-                YIELD((*smem)->initial_value->token->pos, "Trying to resolve type for initial value for member.");
+            fill_in_type(context, member->initial_value);
+            if (member->initial_value->type == NULL)
+                YIELD(member->initial_value->token->pos, "Trying to resolve type for initial value for member.");
 
-            resolve_expression_type(context, (*smem)->initial_value);
-            if ((*smem)->type == NULL) (*smem)->type = (*smem)->initial_value->type;
+            resolve_expression_type(context, member->initial_value);
+            if (member->type == NULL) member->type = member->initial_value->type;
 
-            if ((*smem)->type == NULL) {
-                ERROR((*smem)->initial_value->token->pos, "Unable to deduce type of initial value. This is probably a compiler bug.");
+            if (member->type == NULL) {
+                ERROR(member->initial_value->token->pos, "Unable to deduce type of initial value. This is probably a compiler bug.");
             }
         }
     }
@@ -3764,6 +4198,10 @@ CHECK_FUNC(struct_defaults, AstStructType* s_node) {
     if (s_node->entity_type && s_node->entity_type->state == Entity_State_Failed)
         return Check_Failed;
 
+    if (s_node->scope) {
+        scope_enter(context, s_node->scope);
+    }
+
     CHECK(meta_tags, s_node->meta_tags);
 
     bh_arr_each(StructMember *, smem, s_node->stcache->Struct.memarr) {
@@ -3783,13 +4221,15 @@ CHECK_FUNC(struct_defaults, AstStructType* s_node) {
         CHECK(meta_tags, (*smem)->meta_tags);
     }
 
+    if (s_node->scope) scope_leave(context);
+
     return Check_Success;
 }
 
 CHECK_FUNC(union, AstUnionType *u_node) {
-    if (u_node->flags & Ast_Flag_Type_Is_Resolved) return Check_Success;
+    if (u_node->flags & Ast_Flag_Type_Is_Considered_Complete) return Check_Success;
     u_node->flags |= Ast_Flag_Comptime;
-    u_node->flags |= Ast_Flag_Type_Is_Resolved; // TODO: Check if this is correct?
+    u_node->flags |= Ast_Flag_Type_Is_Considered_Complete; // TODO: Check if this is correct?
 
     if (!u_node->tag_backing_type) {
         int n = (31 - bh_clz(bh_arr_length(u_node->variants) - 1)) >> 3;
@@ -3797,7 +4237,7 @@ CHECK_FUNC(union, AstUnionType *u_node) {
         else if (n == 1) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u16;
         else if (n <= 3) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u32;
         else {
-            ERROR(u_node->token->pos, Error_Critical, "Too many union variants. How did you even do this...?");
+            ERROR(u_node->token->pos, "Too many union variants. How did you even do this...?");
         }
     }
 
@@ -3827,7 +4267,7 @@ CHECK_FUNC(union, AstUnionType *u_node) {
             if (i >= bh_arr_length(u_node->polymorphic_arguments)
                 || !u_node->polymorphic_arguments[i].value) continue;
 
-            CHECK(expression, &u_node->polymorphic_arguments[i]);
+            CHECK(expression, &u_node->polymorphic_arguments[i].value);
 
             TYPE_CHECK(&u_node->polymorphic_arguments[i].value, arg_type) {
                 ERROR_(u_node->polymorphic_arguments[i].value->token->pos, "Expected value of type %s, got %s.",
@@ -3865,7 +4305,7 @@ CHECK_FUNC(union, AstUnionType *u_node) {
         }
 
         if (cs >= Check_Errors_Start) {
-            u_node->flags &= ~Ast_Flag_Type_Is_Resolved;
+            u_node->flags &= ~Ast_Flag_Type_Is_Considered_Complete;
             return cs;
         }
 
@@ -3900,17 +4340,21 @@ CHECK_FUNC(function_header, AstFunction* func) {
 
     if (!(func->flags & Ast_Flag_Function_Is_Lambda) && func->captures) {
         ONYX_ERROR(func->captures->token->pos, Error_Critical, "This procedure cannot capture values as it is not defined in an expression.");
-        return Symres_Error;
+        return Check_Error;
     }
 
     if (func->captures && !func->scope_to_lookup_captured_values) {
-        if (func->flags & Ast_Flag_Function_Is_Lambda_Inside_PolyProc) return Symres_Complete;
+        if (func->flags & Ast_Flag_Function_Is_Lambda_Inside_PolyProc) return Check_Complete;
 
-        return Symres_Yield;
+        return Check_Yield;
     }
 
     b32 expect_default_param = 0;
     b32 has_had_varargs = 0;
+
+    if (func->scope == NULL) {
+        func->scope = scope_create(context, context->checker.current_scope, func->token->pos);
+    }
 
     if (func->constraints.constraints != NULL && func->constraints.constraints_met == 0) {
         bh_arr_each(AstConstraint *, constraint, func->constraints.constraints) {
@@ -3923,10 +4367,6 @@ CHECK_FUNC(function_header, AstFunction* func) {
         if (func->generated_from) tkn = func->generated_from;
 
         CHECK(constraint_context, &func->constraints, func->scope, tkn->pos);
-    }
-
-    if (func->scope == NULL) {
-        func->scope = scope_create(context, context->checker.current_scope, func->token->pos);
     }
 
     scope_enter(context, func->scope);
@@ -3987,11 +4427,6 @@ CHECK_FUNC(function_header, AstFunction* func) {
         if (has_had_varargs && param->vararg_kind != VA_Kind_Not_VA) {
             ERROR(local->token->pos,
                     "Can only have one param that is of variable argument type.");
-        }
-
-        if (has_had_varargs && param->vararg_kind != VA_Kind_Not_VA) {
-            ERROR(local->token->pos,
-                    "Variable arguments must be last in parameter list");
         }
 
         if (param->vararg_kind == VA_Kind_Untyped) {
@@ -4124,7 +4559,7 @@ CHECK_FUNC(memres, AstMemRes* memres) {
 
     if (memres->initial_value != NULL) {
         if (memres->threadlocal) {
-            ERROR(memres->token->pos, Error_Critical, "'#thread_local' variables cannot have an initializer at the moment.");
+            ERROR(memres->token->pos, "'#thread_local' variables cannot have an initializer at the moment.");
         }
 
         CHECK(expression, &memres->initial_value);
@@ -4174,11 +4609,14 @@ CHECK_FUNC(type, AstType** ptype) {
     AstType* original_type = type;
     while (type->kind == Ast_Kind_Type_Alias)
         type = ((AstTypeAlias *) type)->to;
+    
+    if (type->kind == Ast_Kind_Symbol) {
+        CHECK(symbol, (AstNode **) ptype);
+    }
 
     if (type->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
     switch (type->kind) {
-        case Ast_Kind_Symbol: CHECK(symbol, (AstNode **) type); break;
         case Ast_Kind_Basic_Type: break;
 
         case Ast_Kind_Typeof: {
@@ -4241,7 +4679,7 @@ CHECK_FUNC(type, AstType** ptype) {
 
         case Ast_Kind_Array_Type: {
             AstArrayType* atype = (AstArrayType *) type;
-            CHECK(type, &a_node->elem);
+            CHECK(type, &atype->elem);
 
             if (atype->count_expr) {
                 CHECK(expression, &atype->count_expr);
@@ -4274,10 +4712,10 @@ CHECK_FUNC(type, AstType** ptype) {
         case Ast_Kind_Enum_Type: break;
 
         case Ast_Kind_Poly_Struct_Type: {
-            AstPolyStructType* pst_node = (AstPolyStructType *) *type;
+            AstPolyStructType* pst_node = (AstPolyStructType *) type;
             assert(pst_node->scope);
 
-            if (*type == context->builtins.array_type) {
+            if (type == context->builtins.array_type) {
                 assert(((AstPolyStructType *) context->builtins.slice_type)->scope);
                 pst_node->scope->parent = ((AstPolyStructType *) context->builtins.slice_type)->scope;
             }
@@ -4285,7 +4723,7 @@ CHECK_FUNC(type, AstType** ptype) {
         }
 
         case Ast_Kind_Poly_Union_Type: {
-            AstPolyUnionType* put_node = (AstPolyUnionType *) *type;
+            AstPolyUnionType* put_node = (AstPolyUnionType *) type;
             assert(put_node->scope);
             break;
         }
@@ -4309,14 +4747,14 @@ CHECK_FUNC(type, AstType** ptype) {
         }
 
         case Ast_Kind_Alias: {
-            AstAlias* alias = (AstAlias *) *type;
+            AstAlias* alias = (AstAlias *) type;
             CHECK_INVISIBLE(type, alias, (AstType **) &alias->alias);
 
             break;
         }
 
         case Ast_Kind_Distinct_Type: {
-            AstDistinctType *distinct = (AstDistinctType *) *type;
+            AstDistinctType *distinct = (AstDistinctType *) type;
             CHECK(type, &distinct->base_type);
             break;
         }
@@ -4338,9 +4776,12 @@ CHECK_FUNC(type, AstType** ptype) {
 }
 
 CHECK_FUNC(static_if, AstIf* static_if) {
+    if (static_if->flags & Ast_Flag_Dead) return Check_Complete;
+
     context->checker.expression_types_must_be_known = 1;
     CheckStatus result = check_expression(context, &static_if->cond);
     context->checker.expression_types_must_be_known = 0;
+
     if (result == Check_Yield) return Check_Yield;
 
     if (result > Check_Errors_Start || !(static_if->cond->flags & Ast_Flag_Comptime)) {
@@ -4377,9 +4818,112 @@ CHECK_FUNC(static_if, AstIf* static_if) {
 }
 
 CHECK_FUNC(process_directive, AstNode* directive) {
+    if (directive->kind == Ast_Kind_Directive_Add_Overload) {
+        AstDirectiveAddOverload *add_overload = (AstDirectiveAddOverload *) directive;
+
+        CHECK(expression, (AstTyped **) &add_overload->overloaded_function);
+        if (add_overload->overloaded_function == NULL) {
+            // NOTE: Error message will already be generated
+            return Check_Error;
+        }
+
+        AstOverloadedFunction *ofunc = (AstOverloadedFunction *) strip_aliases((AstNode *) add_overload->overloaded_function);
+        if (ofunc->kind != Ast_Kind_Overloaded_Function) {
+            YIELD_ERROR_(add_overload->token->pos, "#overload directive expects a matched procedure, got '%s'.",
+                        onyx_ast_node_kind_string(ofunc->kind));
+        }
+
+        if (ofunc->locked) {
+            ONYX_ERROR(add_overload->token->pos, Error_Critical, "Cannot add match option here as the original #match was declared as #locked.");
+            ONYX_ERROR(ofunc->token->pos, Error_Critical, "Here is the original #match.");
+            return Check_Error;
+        }
+
+        if (ofunc->only_local_functions) {
+            if (!token_same_file(add_overload->token, ofunc->token)) {
+                ONYX_ERROR(add_overload->token->pos, Error_Critical, "Cannot add match option here as this option is not within the same file as the original #match declared with #local.");
+                ONYX_ERROR(ofunc->token->pos, Error_Critical, "Here is the original #match.");
+                return Check_Error;
+            }
+        }
+
+        CHECK(expression, (AstTyped **) &add_overload->overload);
+        add_overload->overload->flags &= ~Ast_Flag_Function_Is_Lambda;
+
+        add_overload_option(&ofunc->overloads, add_overload->order, add_overload->overload);
+        return Check_Success;
+    }
+
+    if (directive->kind == Ast_Kind_Directive_Operator) {
+        AstDirectiveOperator *operator = (AstDirectiveOperator *) directive;
+        CHECK(expression, &operator->overload);
+        if (!operator->overload) {
+            return Check_Error;
+        }
+
+        AstFunction* overload = get_function_from_node((AstNode *) operator->overload);
+        if (overload == NULL) {
+            ERROR(operator->token->pos, "This cannot be used as an operator overload.");
+        }
+
+        overload->flags &= ~Ast_Flag_Function_Is_Lambda;
+        
+        // First try unary operator overloading
+        // CLEANUP This is not written well at all...
+        if (operator->operator == Binary_Op_Count) {
+            if (bh_arr_length(overload->params) != 1) {
+                ERROR(operator->token->pos, "Expected exactly 1 argument for unary operator overload.");
+            }
+
+            UnaryOp unop = Unary_Op_Count;
+            if (operator->operator_token->type == (TokenType) '?') {
+                unop = Unary_Op_Try;
+            }
+
+            if (operator->operator_token->type == (TokenType) '!') {
+                unop = Unary_Op_Unwrap;
+            }
+
+            if (unop == Unary_Op_Count) {
+                ERROR(operator->token->pos, "Unknown operator.");
+            }
+
+            add_overload_option(&context->unary_operator_overloads[unop], operator->order, operator->overload);
+            return Check_Success;
+        }
+
+        if (operator->operator != Binary_Op_Subscript_Equals && bh_arr_length(overload->params) != 2) {
+            ERROR(operator->token->pos, "Expected exactly 2 arguments for binary operator overload.");
+        }
+
+        add_overload_option(&context->operator_overloads[operator->operator], operator->order, operator->overload);
+        return Check_Success;
+    }
+
     if (directive->kind == Ast_Kind_Directive_Export) {
         AstDirectiveExport *export = (AstDirectiveExport *) directive;
+        CHECK(expression, &export->export);
+        CHECK(expression, &export->export_name_expr);
+
         AstTyped *exported = export->export;
+
+        if (exported->kind == Ast_Kind_Polymorphic_Proc) {
+            ERROR(export->token->pos, "Cannot export a polymorphic function.");
+        }
+
+        if (exported->kind == Ast_Kind_Function) {
+            AstFunction *func = (AstFunction *) export->export;
+            func->is_exported = 1;
+
+            if (func->is_foreign) {
+                ERROR(export->token->pos, "Cannot export a foreign function.");
+            }
+
+            if (func->is_intrinsic) {
+                ERROR(export->token->pos, "Cannot export an intrinsic function.");
+            }
+        }
+
         if (exported->entity && exported->entity->state <= Entity_State_Check_Types)
             YIELD(directive->token->pos, "Waiting for exported type to be known.");
 
@@ -4387,8 +4931,6 @@ CHECK_FUNC(process_directive, AstNode* directive) {
             ONYX_ERROR(export->token->pos, Error_Critical, "Cannot export something that is not a procedure.");
             ERROR(exported->token->pos, "Here is the thing being exported that is not a procedure.");
         }
-
-        CHECK(expression, &export->export_name_expr);
 
         if (export->export_name_expr->kind != Ast_Kind_StrLit) {
             ERROR_(export->token->pos, "Expected export name to be a string literal, got '%s'.", onyx_ast_node_kind_string(export->export_name_expr->kind));
@@ -4422,6 +4964,8 @@ CHECK_FUNC(process_directive, AstNode* directive) {
         if (init->dependencies) {
             i32 i = 0;
             bh_arr_each(AstDirectiveInit *, dependency, init->dependencies) {
+                CHECK(expression, (AstTyped **) dependency);
+                
                 AstTyped *d = (AstTyped *) strip_aliases((AstNode *) *dependency);
                 if (d->kind != Ast_Kind_Directive_Init) {
                     ERROR_(init->token->pos, "All dependencies of an #init must be another #init. The %d%s dependency was not.", i + 1, bh_num_suffix(i + 1));
@@ -4442,6 +4986,7 @@ CHECK_FUNC(process_directive, AstNode* directive) {
 
     if (directive->kind == Ast_Kind_Directive_Library) {
         AstDirectiveLibrary *library = (AstDirectiveLibrary *) directive;
+        CHECK(expression, &library->library_symbol);
 
         if (library->library_symbol->kind != Ast_Kind_StrLit) {
             ERROR_(library->token->pos, "#library directive expected compile-time known string for library name. Got '%s'.",
@@ -4457,6 +5002,24 @@ CHECK_FUNC(process_directive, AstNode* directive) {
 
     if (directive->kind == Ast_Kind_Injection) {
         AstInjection *inject = (AstInjection *) directive;
+
+        if (inject->dest == NULL) {
+            if (inject->full_loc == NULL) return Check_Error;
+
+            AstTyped *full_loc = (AstTyped *) strip_aliases((AstNode *) inject->full_loc);
+
+            if (full_loc->kind != Ast_Kind_Field_Access) {
+                ERROR(inject->token->pos, "#inject expects a dot expression (a.b) for the injection point.");
+                return Check_Error;
+            }
+
+            AstFieldAccess *acc = (AstFieldAccess *) full_loc;
+            inject->dest = acc->expr;
+            inject->symbol = acc->token;
+        }
+
+        CHECK(expression, &inject->dest);
+
         if (!node_is_type((AstNode *) inject->dest)) {
             CHECK(expression, &inject->dest);
         }
@@ -4482,6 +5045,13 @@ CHECK_FUNC(process_directive, AstNode* directive) {
         }
 
         add_entities_for_node(&context->entities, NULL, (AstNode *) inject->binding, scope, pac);
+        return Check_Complete;
+    }
+
+    if (directive->kind == Ast_Kind_Directive_This_Package) {
+        AstPackage *package = (AstPackage *) directive;
+        package->kind = Ast_Kind_Package;
+        package->package = context->checker.current_entity->package;
         return Check_Complete;
     }
 
@@ -4527,12 +5097,19 @@ CHECK_FUNC(process_directive, AstNode* directive) {
         return Check_Success;
     }
 
+    assert("Bad directive in check_process_directive" && 0);
+
     return Check_Success;
 }
 
 CHECK_FUNC(macro, AstMacro* macro) {
+    macro->flags |= Ast_Flag_Comptime;
+
     if (macro->body->kind == Ast_Kind_Function) {
         CHECK(function_header, (AstFunction *) macro->body);
+    }
+    else if (macro->body->kind == Ast_Kind_Polymorphic_Proc) {
+        CHECK(polyproc, (AstFunction *) macro->body);
     }
 
     return Check_Success;
@@ -4623,7 +5200,7 @@ CHECK_FUNC(interface_constraint, AstConstraint *constraint) {
     constraint->entity->scope = constraint->scope;
 
     constraint->phase = Constraint_Phase_Checking_Expressions;
-    return Check_Return_To_Symres;
+    return Check_Yield;
 }
 
 CHECK_FUNC(expression_constraint, AstConstraint *constraint) {
@@ -4659,9 +5236,14 @@ CHECK_FUNC(expression_constraint, AstConstraint *constraint) {
 
 CHECK_FUNC(constraint, AstConstraint *constraint) {
     switch (constraint->phase) {
+        // nocheckin
+        case Constraint_Phase_Waiting_To_Be_Queued: return Check_Success;
+
         case Constraint_Phase_Cloning_Expressions: {
-            if (constraint->interface->kind == Ast_Kind_Symbol) {
-                return Check_Return_To_Symres;
+            CHECK(expression, (AstTyped **) &constraint->interface);
+
+            bh_arr_each(AstTyped *, arg, constraint->args) {
+                CHECK(expression, arg);
             }
 
             if (constraint->flags & Ast_Flag_Constraint_Is_Expression) {
@@ -4679,7 +5261,7 @@ CHECK_FUNC(constraint, AstConstraint *constraint) {
                 InterfaceConstraint* ic = &constraint->exprs[i];
 
                 CheckStatus cs = check_expression(context, &ic->expr);
-                if (cs == Check_Return_To_Symres || cs == Check_Yield) {
+                if (cs == Check_Yield) {
                     onyx_errors_enable(context);
                     return cs;
                 }
@@ -4694,7 +5276,7 @@ CHECK_FUNC(constraint, AstConstraint *constraint) {
 
                 if (ic->expected_type_expr) {
                     cs = check_type(context, &ic->expected_type_expr);
-                    if (cs == Check_Return_To_Symres || cs == Check_Yield) {
+                    if (cs == Check_Yield) {
                         onyx_errors_enable(context);
                         return cs;
                     }
@@ -4845,11 +5427,42 @@ CHECK_FUNC(constraint_context, ConstraintContext *cc, Scope *scope, OnyxFilePos 
 }
 
 CHECK_FUNC(polyquery, AstPolyQuery *query) {
+    query->successful_symres = 0;
+
     if (query->function_header->scope == NULL)
         query->function_header->scope = scope_create(context, query->proc->parent_scope_of_poly_proc, query->token->pos);
 
-    CheckStatus header_check = check_temp_function_header(context, query->function_header);
-    if (header_check == Check_Return_To_Symres) return Check_Return_To_Symres;
+    scope_enter(context, query->function_header->scope);
+
+    {
+        u32 idx = 0;
+        bh_arr_each(AstParam, param, query->function_header->params) {
+            bh_arr_each(AstPolyParam, pp, query->proc->poly_params) {
+                if (pp->kind == PPK_Baked_Value && pp->idx == idx) goto skip_introducing_symbol;
+            }
+
+            symbol_introduce(context, context->checker.current_scope, param->local->token, (AstNode *) param->local);
+
+        skip_introducing_symbol:
+            idx++;
+        }
+    }
+
+    bh_arr_each(AstParam, param, query->function_header->params) {
+        if (param->local->type_node != NULL) {
+            context->checker.resolved_a_symbol = 0;
+
+            onyx_errors_disable(context);
+            param->local->flags |= Ast_Flag_Symbol_Invisible;
+            check_type(context, &param->local->type_node);
+            param->local->flags &= ~Ast_Flag_Symbol_Invisible;
+            onyx_errors_enable(context);
+            
+            if (context->checker.resolved_a_symbol) query->successful_symres = 1;
+        }
+    }
+
+    CHECK(temp_function_header, query->function_header);
 
     b32 solved_something = 0;
     i32 solved_count = 0;
@@ -4878,11 +5491,7 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
                 goto poly_var_solved;
 
             case TYPE_MATCH_SPECIAL:
-                if (solved_something || query->successful_symres) {
-                    return Check_Return_To_Symres;
-                } else {
-                    return Check_Yield;
-                }
+                return Check_Yield;
 
             case TYPE_MATCH_YIELD:
             case TYPE_MATCH_FAILED: {
@@ -4907,9 +5516,11 @@ poly_query_done:
         solved_count += 1;
     }
 
+    scope_leave(context);
+
     if (solved_count != bh_arr_length(query->proc->poly_params)) {
         if (solved_something || query->successful_symres) {
-            return Check_Return_To_Symres;
+            return Check_Yield;
         } else {
             return Check_Failed;
         }
@@ -4967,11 +5578,11 @@ CHECK_FUNC(file_contents, AstFileContents* fc) {
     CHECK(expression, &fc->filename_expr);
 
     if (fc->filename_expr->kind != Ast_Kind_StrLit) {
-        ERROR(fc->token->pos, Error_Critical, "Expected given expression to be a compile-time stirng literal.");
+        ERROR(fc->token->pos, "Expected given expression to be a compile-time stirng literal.");
     }
 
     if (context->options->no_file_contents) {
-        ERROR(ent->expr->token->pos, Error_Critical, "#file_contents is disabled for this compilation.");
+        ERROR(fc->token->pos, "#file_contents is disabled for this compilation.");
     }
 
     return Check_Complete;
@@ -4984,14 +5595,14 @@ CHECK_FUNC(foreign_block, AstForeignBlock *fb) {
     CHECK(expression, &fb->module_name);
 
     if (fb->module_name->kind != Ast_Kind_StrLit) {
-        ERROR(fb->token->pos, Error_Critical, "Expected module name to be a compile-time string literal.");
+        ERROR(fb->token->pos, "Expected module name to be a compile-time string literal.");
     }
 
     bh_arr_each(Entity *, pent, fb->captured_entities) {
         Entity *ent = *pent;
         if (ent->type == Entity_Type_Function_Header) {
             if (ent->function->body->next != NULL) {
-                ERROR(ent->function->token->pos, Error_Critical, "Procedures declared in a #foreign block should not have bodies.");
+                ERROR(ent->function->token->pos, "Procedures declared in a #foreign block should not have bodies.");
             }
 
             ent->function->foreign.import_name = (AstTyped *) make_string_literal(context, ent->function->intrinsic_name);
@@ -5037,12 +5648,174 @@ CHECK_FUNC(foreign_block, AstForeignBlock *fb) {
     }
 }
 
+CHECK_FUNC(include, AstInclude* include) {
+    if (include->name != NULL) return Check_Goto_Parse;
+
+    CHECK(expression, &include->name_node);
+
+    if (include->name_node->kind != Ast_Kind_StrLit) {
+        ERROR_(include->token->pos, "Expected compile-time known string literal here. Got '%s'.", onyx_ast_node_kind_string(include->name_node->kind));
+    }
+
+    OnyxToken* str_token = include->name_node->token;
+    if (str_token != NULL) {
+        token_toggle_end(str_token);
+        include->name = bh_strdup(context->ast_alloc, str_token->text);
+        string_process_escape_seqs(include->name, include->name, strlen(include->name));
+        token_toggle_end(str_token);
+    }
+
+    return Check_Goto_Parse;
+}
+
+CHECK_FUNC(import, AstImport* import) {
+    AstPackage* package = import->imported_package;
+    CHECK(package, package);
+
+    if (import->import_package_itself) {
+        OnyxToken *name = bh_arr_last(package->path);
+        name = import->qualified_package_name ? import->qualified_package_name : name;
+
+        symbol_introduce(context, context->checker.current_entity->scope, name, (AstNode *) package);
+    }
+
+    if (import->specified_imports) {
+        package_track_use_package(context, package->package, import->entity);
+
+        Scope *import_scope = package->package->scope;
+        if (import_scope == context->checker.current_scope) return Check_Complete;
+
+        // use X { * }
+        if (import->only == NULL) {
+            OnyxFilePos pos = import->token->pos;
+            scope_include(context, context->checker.current_scope, import_scope, pos);
+            return Check_Complete;
+        }
+
+
+        // use X { a, b, c }
+        bh_arr_each(QualifiedImport, qi, import->only) {
+            AstNode* imported = symbol_resolve(context, import_scope, qi->symbol_name);
+            if (imported == NULL) { // :SymresStall
+                YIELD_(qi->symbol_name->pos,
+                        "The symbol '%b' was not found the package '%s'.",
+                        qi->symbol_name->text, qi->symbol_name->length, package->package->name);
+
+                // if (context->checker.report_unresolved_symbols) {
+                //     // TODO: Change package->name to package->qualified_name when
+                //     // merged with the documentation generation branch.
+                //     ONYX_ERROR(qi->symbol_name->pos, Error_Critical, 
+                //             "The symbol '%b' was not found the package '%s'.",
+                //             qi->symbol_name->text, qi->symbol_name->length, package->package->name);
+
+                //     return Symres_Error;
+                // } else {
+                //     return Symres_Yield_Macro;
+                // }
+            }
+
+            symbol_introduce(context, context->checker.current_scope, qi->as_name, imported);
+        }
+    }
+
+    return Check_Complete;
+}
+
+CHECK_FUNC(compiler_extension, AstCompilerExtension *ext) {
+    if (context->options->no_compiler_extensions) {
+        ERROR(ext->token->pos, "Compiler extensions are disabled in this compilation.");
+    }
+
+    token_toggle_end(ext->name);
+    TypeMatch status = compiler_extension_start(context, ext->name->text, ext->token->pos.filename, context->checker.current_entity, &ext->extension_id);
+    token_toggle_end(ext->name);
+
+    if (status == TYPE_MATCH_FAILED) {
+        ERROR(ext->token->pos, "Failed to initialize this compiler extension.");
+    }
+
+    if (status == TYPE_MATCH_YIELD) {
+        return Check_Yield;
+    }
+
+    return Check_Complete;
+}
+
+CHECK_FUNC(proc_expansion, AstProceduralExpansion **pexp, ProceduralMacroExpansionKind exp_kind) {
+    AstProceduralExpansion *exp = *pexp;
+    CHECK(expression, &exp->proc_macro);
+
+    exp->proc_macro = (AstTyped *) strip_aliases((AstNode *) exp->proc_macro);
+
+    if (exp->proc_macro->kind != Ast_Kind_Procedural_Macro) {
+        YIELD_ERROR_(exp->token->pos, "Procedural macro expansion expected a procedural macro before the '!', but got '%s' instead.",
+                onyx_ast_node_kind_string(exp->proc_macro->kind));
+    }
+
+    AstProceduralMacro *proc_macro = (AstProceduralMacro *) exp->proc_macro;
+
+    token_toggle_end(proc_macro->token);
+    // HACK store this differently so a copy is not necessary here.
+    char *macro_name = bh_strdup(context->scratch_alloc, proc_macro->token->text);
+    token_toggle_end(proc_macro->token);
+
+    AstNode *expansion = NULL;
+
+    TypeMatch expansion_state = compiler_extension_expand_macro(
+        context,
+        proc_macro->extension->extension_id,
+        exp_kind,
+        macro_name,
+        exp->expansion_body,
+        context->checker.current_entity,
+        &expansion,
+        &exp->expansion_id,
+        context->cycle_almost_detected > 0);
+
+    if (expansion_state == TYPE_MATCH_FAILED) {
+        ERROR(exp->token->pos, "Procedural macro expansion failed. See other errors generated by procedural macro.");
+    }
+
+    if (expansion_state == TYPE_MATCH_YIELD) {
+        return Check_Yield;
+    }
+
+    if (expansion == NULL) {
+        if (exp_kind == PMEK_Expression) {
+            ERROR(exp->token->pos, "Expected this procedural macro to expand to an expression, but it expanded to nothing.");
+        }
+
+        if (exp_kind == PMEK_Statement) {
+            *(AstNode **) pexp = exp->next;
+            CHECK(expression, (AstTyped **) pexp);
+            return Check_Success;
+        }
+
+        // Top-level expansions do not turn into nodes, but instead will become other entities
+        // that will get queued separately.
+        return Check_Complete;
+    }
+
+    // Stitch the expansion into the tree.
+    AstNode *last_expanded_node = expansion;
+    while (last_expanded_node->next != NULL) last_expanded_node = last_expanded_node->next;
+    last_expanded_node->next = (*pexp)->next;
+
+    *pexp = (AstProceduralExpansion *) expansion;
+    switch (exp_kind) {
+        case PMEK_Expression: CHECK(expression, (AstTyped **) pexp); break;
+        case PMEK_Statement:  CHECK(statement, (AstNode **) pexp, NULL); break;
+        case PMEK_Top_Level:  return Check_Complete;
+    }
+
+    return Check_Success;
+}
+
 void check_entity(Context *context, Entity* ent) {
     CheckStatus cs = Check_Success;
 
     context->checker.current_entity = ent;
     context->checker.all_checks_are_final = 1;
-    context->checker.report_unresolved_symbols = context->cycle_detected; // TODO: Remove this flag
 
     if (ent->scope) scope_enter(context, ent->scope);
 
@@ -5054,10 +5827,10 @@ void check_entity(Context *context, Entity* ent) {
             onyx_docs_submit(context->doc_info, ent->binding);
 
             package_reinsert_use_packages(context, ent->package);
-            cs = Check_Complete;
-        }
 
-        case Entity_Type_Static_If:                cs = check_static_if(context, ent->statif_if); break;
+            cs = Check_Complete;
+            break;
+        }
 
         case Entity_Type_Load_Path:
         case Entity_Type_Load_File:                cs = check_include(context, ent->include); break;
@@ -5075,7 +5848,9 @@ void check_entity(Context *context, Entity* ent) {
         case Entity_Type_Static_If:                cs = check_static_if(context, ent->static_if); break;
         case Entity_Type_Macro:                    cs = check_macro(context, ent->macro); break;
         case Entity_Type_Constraint_Check:         cs = check_constraint(context, ent->constraint); break;
+        case Entity_Type_Polymorphic_Proc:         cs = check_polyproc(context, ent->poly_proc); break;
         case Entity_Type_Polymorph_Query:          cs = check_polyquery(context, ent->poly_query); break;
+        case Entity_Type_Enum:                     cs = check_enum(context, ent->enum_type); break;
         case Entity_Type_Enum_Value:               cs = check_expression(context, &ent->enum_value->value); break;
         case Entity_Type_Process_Directive:        cs = check_process_directive(context, (AstNode *) ent->expr); break;
         case Entity_Type_Interface:                cs = check_interface(context, ent->interface); break;
@@ -5100,6 +5875,10 @@ void check_entity(Context *context, Entity* ent) {
         case Entity_Type_Job:           cs = check_arbitrary_job(context, ent->job_data); break;
         case Entity_Type_JS:            cs = check_js_node(context, ent->js); break;
         case Entity_Type_Foreign_Block: cs = check_foreign_block(context, ent->foreign_block); break;
+        case Entity_Type_Import:        cs = check_import(context, ent->import); break;
+            
+        case Entity_Type_Compiler_Extension:   cs = check_compiler_extension(context, ent->compiler_extension); break;
+        case Entity_Type_Procedural_Expansion: cs = check_proc_expansion(context, &ent->proc_expansion, PMEK_Top_Level); break;
 
         default: break;
     }
@@ -5108,7 +5887,7 @@ void check_entity(Context *context, Entity* ent) {
         case Check_Yield:            ent->macro_attempts++; break;
         case Check_Success:          ent->state = Entity_State_Code_Gen;        goto clear_attempts;
         case Check_Complete:         ent->state = Entity_State_Finalized;       goto clear_attempts;
-        case Check_Return_To_Symres: ent->state = Entity_State_Resolve_Symbols; goto clear_attempts;
+        case Check_Goto_Parse:       ent->state = Entity_State_Parse;           goto clear_attempts;
         case Check_Failed:           ent->state = Entity_State_Failed;          goto clear_attempts;
 
     clear_attempts:

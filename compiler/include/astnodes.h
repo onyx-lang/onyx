@@ -284,7 +284,7 @@ typedef enum AstFlags {
     Ast_Flag_Address_Taken         = BH_BIT(7),
 
     // Type flags
-    Ast_Flag_Type_Is_Resolved      = BH_BIT(8),
+    Ast_Flag_Type_Is_Considered_Complete = BH_BIT(8),
 
     Ast_Flag_No_Clone              = BH_BIT(9),
 
@@ -1844,7 +1844,7 @@ void entity_heap_add_job(EntityHeap *entities, enum TypeMatch (*func)(Context *,
 // If target_arr is null, the entities will be placed directly in the heap.
 void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *)* target_arr, AstNode* node, Scope* scope, Package* package);
 
-void symres_entity(Context *context, Entity* ent);
+// void symres_entity(Context *context, Entity* ent);
 void check_entity(Context *context, Entity* ent);
 void emit_entity(Context *context, Entity* ent);
 
@@ -1930,7 +1930,6 @@ typedef struct CheckerData {
     u32 current_checking_level;
 
     Scope *current_scope;
-    b32 report_unresolved_symbols;
     b32 resolved_a_symbol;
 } CheckerData;
 

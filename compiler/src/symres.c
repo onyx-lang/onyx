@@ -394,91 +394,91 @@ SYMRES_FUNC(polyquery, AstPolyQuery *query);
 //     return Symres_Success;
 // }
 
-SYMRES_FUNC(field_access, AstFieldAccess** fa) {
-    if ((*fa)->expr == NULL) return Symres_Error;
-    SYMRES(expression, &(*fa)->expr);
-    if ((*fa)->expr == NULL) return Symres_Error;
-
-    AstTyped* expr = (AstTyped *) strip_aliases((AstNode *) (*fa)->expr);
-    while (expr->kind == Ast_Kind_Type_Alias) {
-        expr = (AstTyped *)((AstTypeAlias *) expr)->to;
-    }
-
-    b32 force_a_lookup = 0;
-
-    if (expr->kind == Ast_Kind_Struct_Type ||
-        expr->kind == Ast_Kind_Poly_Struct_Type ||
-        expr->kind == Ast_Kind_Enum_Type ||
-        expr->kind == Ast_Kind_Type_Raw_Alias ||
-        expr->kind == Ast_Kind_Union_Type ||
-        expr->kind == Ast_Kind_Poly_Union_Type ||
-        expr->kind == Ast_Kind_Slice_Type ||
-        expr->kind == Ast_Kind_DynArr_Type ||
-        expr->kind == Ast_Kind_Distinct_Type ||
-        expr->kind == Ast_Kind_Interface ||
-        expr->kind == Ast_Kind_Compiler_Extension) {
-        force_a_lookup = 1;
-    }
-
-    //
-    // If we are trying to access a field on an alias, we have to make sure
-    // the alias is "ready" to have a symbol looked up inside of it. This means
-    // the alias should have passed symbol resolution. If not, force a lookup
-    // and yield if the alias was not ready.
-    if ((*fa)->expr->kind == Ast_Kind_Alias) {
-        if ((*fa)->expr->entity && (*fa)->expr->entity->state < Entity_State_Check_Types) {
-            force_a_lookup = 1;
-        }
-    }
-
-    AstNode* resolution = try_symbol_resolve_from_node(context, (AstNode *) expr, (*fa)->token);
-    if (resolution) {
-        track_resolution_for_symbol_info(context, (AstNode *) *fa, resolution);
-        *((AstNode **) fa) = resolution;
-
-    } else if (expr->kind == Ast_Kind_Package) {
-        if (context->checker.report_unresolved_symbols) {
-            token_toggle_end((*fa)->token);
-            char *closest = find_closest_symbol_in_node(context, (AstNode *) expr, (*fa)->token->text);
-            token_toggle_end((*fa)->token);
-
-            AstPackage *package = (AstPackage *) strip_aliases((AstNode *) (*fa)->expr);
-            char *package_name = "unknown (compiler bug)";
-            if (package && package->package) {
-                package_name = package->package->name;
-            }
-
-            if (closest) {
-                ONYX_ERROR((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Did you mean '%s'?",
-                    (*fa)->token->text,
-                    (*fa)->token->length,
-                    package_name,
-                    closest);
-            } else {
-                ONYX_ERROR((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Perhaps it is defined in a file that was not loaded?",
-                    (*fa)->token->text,
-                    (*fa)->token->length,
-                    package_name);
-            }
-            return Symres_Error;
-
-        } else {
-            return Symres_Yield_Macro;
-        }
-
-    } else if (force_a_lookup) {
-        if (context->cycle_detected || context->cycle_almost_detected >= 2) {
-            ONYX_ERROR((*fa)->token->pos, Error_Critical, "'%b' does not exist here. This is a bad error message.",
-                (*fa)->token->text,
-                (*fa)->token->length);
-            return Symres_Error;
-        }
-
-        return Symres_Yield_Macro;
-    }
-
-    return Symres_Success;
-}
+// SYMRES_FUNC(field_access, AstFieldAccess** fa) {
+//     if ((*fa)->expr == NULL) return Symres_Error;
+//     SYMRES(expression, &(*fa)->expr);
+//     if ((*fa)->expr == NULL) return Symres_Error;
+// 
+//     AstTyped* expr = (AstTyped *) strip_aliases((AstNode *) (*fa)->expr);
+//     while (expr->kind == Ast_Kind_Type_Alias) {
+//         expr = (AstTyped *)((AstTypeAlias *) expr)->to;
+//     }
+// 
+//     b32 force_a_lookup = 0;
+// 
+//     if (expr->kind == Ast_Kind_Struct_Type ||
+//         expr->kind == Ast_Kind_Poly_Struct_Type ||
+//         expr->kind == Ast_Kind_Enum_Type ||
+//         expr->kind == Ast_Kind_Type_Raw_Alias ||
+//         expr->kind == Ast_Kind_Union_Type ||
+//         expr->kind == Ast_Kind_Poly_Union_Type ||
+//         expr->kind == Ast_Kind_Slice_Type ||
+//         expr->kind == Ast_Kind_DynArr_Type ||
+//         expr->kind == Ast_Kind_Distinct_Type ||
+//         expr->kind == Ast_Kind_Interface ||
+//         expr->kind == Ast_Kind_Compiler_Extension) {
+//         force_a_lookup = 1;
+//     }
+// 
+//     //
+//     // If we are trying to access a field on an alias, we have to make sure
+//     // the alias is "ready" to have a symbol looked up inside of it. This means
+//     // the alias should have passed symbol resolution. If not, force a lookup
+//     // and yield if the alias was not ready.
+//     if ((*fa)->expr->kind == Ast_Kind_Alias) {
+//         if ((*fa)->expr->entity && (*fa)->expr->entity->state < Entity_State_Check_Types) {
+//             force_a_lookup = 1;
+//         }
+//     }
+// 
+//     AstNode* resolution = try_symbol_resolve_from_node(context, (AstNode *) expr, (*fa)->token);
+//     if (resolution) {
+//         track_resolution_for_symbol_info(context, (AstNode *) *fa, resolution);
+//         *((AstNode **) fa) = resolution;
+// 
+//     } else if (expr->kind == Ast_Kind_Package) {
+//         if (context->checker.report_unresolved_symbols) {
+//             token_toggle_end((*fa)->token);
+//             char *closest = find_closest_symbol_in_node(context, (AstNode *) expr, (*fa)->token->text);
+//             token_toggle_end((*fa)->token);
+// 
+//             AstPackage *package = (AstPackage *) strip_aliases((AstNode *) (*fa)->expr);
+//             char *package_name = "unknown (compiler bug)";
+//             if (package && package->package) {
+//                 package_name = package->package->name;
+//             }
+// 
+//             if (closest) {
+//                 ONYX_ERROR((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Did you mean '%s'?",
+//                     (*fa)->token->text,
+//                     (*fa)->token->length,
+//                     package_name,
+//                     closest);
+//             } else {
+//                 ONYX_ERROR((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Perhaps it is defined in a file that was not loaded?",
+//                     (*fa)->token->text,
+//                     (*fa)->token->length,
+//                     package_name);
+//             }
+//             return Symres_Error;
+// 
+//         } else {
+//             return Symres_Yield_Macro;
+//         }
+// 
+//     } else if (force_a_lookup) {
+//         if (context->cycle_detected || context->cycle_almost_detected >= 2) {
+//             ONYX_ERROR((*fa)->token->pos, Error_Critical, "'%b' does not exist here. This is a bad error message.",
+//                 (*fa)->token->text,
+//                 (*fa)->token->length);
+//             return Symres_Error;
+//         }
+// 
+//         return Symres_Yield_Macro;
+//     }
+// 
+//     return Symres_Success;
+// }
 
 // SYMRES_FUNC(compound, AstCompound* compound) {
 //     bh_arr_each(AstTyped *, expr, compound->exprs) {
@@ -495,139 +495,129 @@ SYMRES_FUNC(field_access, AstFieldAccess** fa) {
 //     return Symres_Success;
 // }
 
-SYMRES_FUNC(pipe, AstBinaryOp** pipe) {
-    if ((*pipe)->right->kind == Ast_Kind_Unary_Op) {
-        AstUnaryOp *the_try = (AstUnaryOp *) (*pipe)->right;
-        if (the_try->operation == Unary_Op_Try || the_try->operation == Unary_Op_Unwrap) {
-            // Shuffle the tree!
-            AstBinaryOp *the_pipe = *pipe;
+// SYMRES_FUNC(pipe, AstBinaryOp** pipe) {
+//     if ((*pipe)->right->kind == Ast_Kind_Unary_Op) {
+//         AstUnaryOp *the_try = (AstUnaryOp *) (*pipe)->right;
+//         if (the_try->operation == Unary_Op_Try || the_try->operation == Unary_Op_Unwrap) {
+//             // Shuffle the tree!
+//             AstBinaryOp *the_pipe = *pipe;
+// 
+//             the_pipe->right = the_try->expr;
+//             the_try->expr   = (AstTyped *) the_pipe;
+//             *pipe           = (AstBinaryOp *) the_try;
+// 
+//             SYMRES(expression, (AstTyped **) pipe);
+//             return Symres_Success;
+//         }
+//     }
+// 
+//     AstCall* base_call_node = (AstCall *) (*pipe)->right;
+//     AstCall* call_node = base_call_node;
+// 
+//     if (call_node->kind == Ast_Kind_Method_Call) {
+//         call_node = (AstCall *) ((AstBinaryOp *) call_node)->right;
+//     }
+// 
+//     if (call_node->kind != Ast_Kind_Call) {
+//         AstCall *new_call = onyx_ast_node_new(context->ast_alloc, sizeof(AstCall), Ast_Kind_Call);
+//         new_call->token = call_node->token;
+//         new_call->callee = (AstTyped *) call_node;
+//         arguments_initialize(context, &new_call->args);
+// 
+//         (*pipe)->right = (AstTyped *) new_call;
+//         base_call_node = new_call;
+//         call_node = new_call;
+//     }
+// 
+//     if (call_node->callee->kind == Ast_Kind_Unary_Field_Access) {
+//         AstAlias *left_alias = onyx_ast_node_new(context->ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
+//         left_alias->token = (*pipe)->left->token;
+//         left_alias->alias = (*pipe)->left;
+//         (*pipe)->left = (AstTyped *) left_alias;
+// 
+//         AstFieldAccess *implicit_field_access = make_field_access(context, (AstTyped *) left_alias, NULL);
+//         implicit_field_access->token = call_node->callee->token;
+// 
+//         call_node->callee = (AstTyped *) implicit_field_access;
+// 
+//         AstAddressOf *address_of = make_address_of(context, (*pipe)->left);
+//         address_of->can_be_removed = 1;
+//         (*pipe)->left = (AstTyped *) address_of;
+//     }
+// 
+//     if (!call_node || call_node->kind != Ast_Kind_Call) {
+//         ONYX_ERROR((*pipe)->token->pos, Error_Critical, "Pipe operator expected call on right side.");
+//         return Symres_Error;
+//     }
+// 
+//     if ((*pipe)->left == NULL) return Symres_Error;
+// 
+//     if (call_node->placeholder_argument_position > 0) {
+//         assert(call_node->placeholder_argument_position - 1 < bh_arr_length(call_node->args.values));
+//         call_node->args.values[call_node->placeholder_argument_position - 1] = (AstTyped *) make_argument(context, (*pipe)->left);
+//         call_node->placeholder_argument_position = 0;
+// 
+//     } else {
+//         // :EliminatingSymres
+//         bh_arr_insertn(call_node->args.values, 0, 1);
+//         call_node->args.values[0] = (AstTyped *) make_argument(context, (*pipe)->left);
+//     }
+// 
+//     base_call_node->next = (*pipe)->next;
+//     *pipe = (AstBinaryOp *) base_call_node;
+// 
+//     SYMRES(expression, (AstTyped **) pipe);
+//     return Symres_Success;
+// }
 
-            the_pipe->right = the_try->expr;
-            the_try->expr   = (AstTyped *) the_pipe;
-            *pipe           = (AstBinaryOp *) the_try;
-
-            SYMRES(expression, (AstTyped **) pipe);
-            return Symres_Success;
-        }
-    }
-
-    AstCall* base_call_node = (AstCall *) (*pipe)->right;
-    AstCall* call_node = base_call_node;
-
-    if (call_node->kind == Ast_Kind_Method_Call) {
-        call_node = (AstCall *) ((AstBinaryOp *) call_node)->right;
-    }
-
-    if (call_node->kind != Ast_Kind_Call) {
-        AstCall *new_call = onyx_ast_node_new(context->ast_alloc, sizeof(AstCall), Ast_Kind_Call);
-        new_call->token = call_node->token;
-        new_call->callee = (AstTyped *) call_node;
-        arguments_initialize(context, &new_call->args);
-
-        (*pipe)->right = (AstTyped *) new_call;
-        base_call_node = new_call;
-        call_node = new_call;
-    }
-
-    if (call_node->callee->kind == Ast_Kind_Unary_Field_Access) {
-        AstAlias *left_alias = onyx_ast_node_new(context->ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
-        left_alias->token = (*pipe)->left->token;
-        left_alias->alias = (*pipe)->left;
-        (*pipe)->left = (AstTyped *) left_alias;
-
-        AstFieldAccess *implicit_field_access = make_field_access(context, (AstTyped *) left_alias, NULL);
-        implicit_field_access->token = call_node->callee->token;
-
-        call_node->callee = (AstTyped *) implicit_field_access;
-
-        AstAddressOf *address_of = make_address_of(context, (*pipe)->left);
-        address_of->can_be_removed = 1;
-        (*pipe)->left = (AstTyped *) address_of;
-    }
-
-    if (!call_node || call_node->kind != Ast_Kind_Call) {
-        ONYX_ERROR((*pipe)->token->pos, Error_Critical, "Pipe operator expected call on right side.");
-        return Symres_Error;
-    }
-
-    if ((*pipe)->left == NULL) return Symres_Error;
-
-    if (call_node->placeholder_argument_position > 0) {
-        assert(call_node->placeholder_argument_position - 1 < bh_arr_length(call_node->args.values));
-        call_node->args.values[call_node->placeholder_argument_position - 1] = (AstTyped *) make_argument(context, (*pipe)->left);
-        call_node->placeholder_argument_position = 0;
-
-    } else {
-        // :EliminatingSymres
-        bh_arr_insertn(call_node->args.values, 0, 1);
-        call_node->args.values[0] = (AstTyped *) make_argument(context, (*pipe)->left);
-    }
-
-    base_call_node->next = (*pipe)->next;
-    *pipe = (AstBinaryOp *) base_call_node;
-
-    SYMRES(expression, (AstTyped **) pipe);
-    return Symres_Success;
-}
-
-// CLEANUP: This is an experimental feature and might be removed in the future.
-// I noticed a common pattern when writing in Onyx is something that looks like this:
-//
-//     foo.member_function(^foo, ...)
-//
-// I decided it would be worth adding a bit of syntactic sugar for such as call. I
-// decided to use the '->' operator for this purpose. The snippet below is the exact
-// same as the snippet above (after the nodes have been processed by the function below)
-//
-//     foo->member_function(...)
-SYMRES_FUNC(method_call, AstBinaryOp** mcall) {
-    // :EliminatingSymres
-    
-    // We have to check this no matter what, because if we return to symbol resolution
-    // the left hand side could be something different. In particular this was a problem
-    // when expanding `some_map["value"]->unwrap()`, as the left hand side expands to a
-    // macro.
-    SYMRES(expression, &(*mcall)->left);
-
-    if (((*mcall)->flags & Ast_Flag_Has_Been_Symres) == 0) {
-        if ((*mcall)->left == NULL) return Symres_Error;
-
-        if ((*mcall)->right->kind != Ast_Kind_Call) {
-            ONYX_ERROR((*mcall)->token->pos, Error_Critical, "'->' expected procedure call on right side.");
-            return Symres_Error;
-        }
-
-        //
-        // This is a small hack that makes chaining method calls
-        // work. Because check_method_call replaces the method call
-        // and marks it as completed, if there are multiple references
-        // to the same method call node, one of them will be left dangling.
-        // To remedy this, an alias node an be placed around the method call
-        // so that when check_method_call replaces it, it is replaced
-        // within the alias, and all references are updated.
-        if ((*mcall)->left->kind == Ast_Kind_Method_Call) {
-            AstAlias *left_alias = onyx_ast_node_new(context->ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
-            left_alias->token = (*mcall)->left->token;
-            left_alias->alias = (*mcall)->left;
-
-            (*mcall)->left = (AstTyped *) left_alias;
-        }
-
-        AstFieldAccess* implicit_field_access = make_field_access(context, (*mcall)->left, NULL);
-        implicit_field_access->token = ((AstCall *) (*mcall)->right)->callee->token;
-        ((AstCall *) (*mcall)->right)->callee = (AstTyped *) implicit_field_access;
-        (*mcall)->flags |= Ast_Flag_Has_Been_Symres;
-    }
-
-    SYMRES(expression, (AstTyped **) &(*mcall)->right);
-
-    // TODO: This doesn't look right? Does this ever happen? Check this...
-    if ((*mcall)->right->kind != Ast_Kind_Call) {
-        *mcall = (AstBinaryOp *) (*mcall)->right;
-    }
-
-    return Symres_Success;
-}
+// SYMRES_FUNC(method_call, AstBinaryOp** mcall) {
+//     // :EliminatingSymres
+//     
+//     // We have to check this no matter what, because if we return to symbol resolution
+//     // the left hand side could be something different. In particular this was a problem
+//     // when expanding `some_map["value"]->unwrap()`, as the left hand side expands to a
+//     // macro.
+//     SYMRES(expression, &(*mcall)->left);
+// 
+//     if (((*mcall)->flags & Ast_Flag_Has_Been_Symres) == 0) {
+//         if ((*mcall)->left == NULL) return Symres_Error;
+// 
+//         if ((*mcall)->right->kind != Ast_Kind_Call) {
+//             ONYX_ERROR((*mcall)->token->pos, Error_Critical, "'->' expected procedure call on right side.");
+//             return Symres_Error;
+//         }
+// 
+//         //
+//         // This is a small hack that makes chaining method calls
+//         // work. Because check_method_call replaces the method call
+//         // and marks it as completed, if there are multiple references
+//         // to the same method call node, one of them will be left dangling.
+//         // To remedy this, an alias node an be placed around the method call
+//         // so that when check_method_call replaces it, it is replaced
+//         // within the alias, and all references are updated.
+//         if ((*mcall)->left->kind == Ast_Kind_Method_Call) {
+//             AstAlias *left_alias = onyx_ast_node_new(context->ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
+//             left_alias->token = (*mcall)->left->token;
+//             left_alias->alias = (*mcall)->left;
+// 
+//             (*mcall)->left = (AstTyped *) left_alias;
+//         }
+// 
+//         AstFieldAccess* implicit_field_access = make_field_access(context, (*mcall)->left, NULL);
+//         implicit_field_access->token = ((AstCall *) (*mcall)->right)->callee->token;
+//         ((AstCall *) (*mcall)->right)->callee = (AstTyped *) implicit_field_access;
+//         (*mcall)->flags |= Ast_Flag_Has_Been_Symres;
+//     }
+// 
+//     SYMRES(expression, (AstTyped **) &(*mcall)->right);
+// 
+//     // TODO: This doesn't look right? Does this ever happen? Check this...
+//     if ((*mcall)->right->kind != Ast_Kind_Call) {
+//         *mcall = (AstBinaryOp *) (*mcall)->right;
+//     }
+// 
+//     return Symres_Success;
+// }
 
 // SYMRES_FUNC(unaryop, AstUnaryOp** unaryop) {
 //     if ((*unaryop)->operation == Unary_Op_Cast) {
@@ -688,82 +678,82 @@ SYMRES_FUNC(method_call, AstBinaryOp** mcall) {
 //     return Symres_Success;
 // }
 
-SYMRES_FUNC(proc_expansion, AstProceduralExpansion **pexp, ProceduralMacroExpansionKind exp_kind) {
-    AstProceduralExpansion *exp = *pexp;
-    SYMRES(expression, &exp->proc_macro);
-
-    exp->proc_macro = (AstTyped *) strip_aliases((AstNode *) exp->proc_macro);
-
-    if (exp->proc_macro->kind != Ast_Kind_Procedural_Macro) {
-        if (context->cycle_almost_detected) {
-            ONYX_ERROR(exp->token->pos, Error_Critical, "Procedural macro expansion expected a procedural macro before the '!', but got '%s' instead.",
-                onyx_ast_node_kind_string(exp->proc_macro->kind));
-            return Symres_Error;
-        }
-
-        return Symres_Yield_Micro;
-    }
-
-    AstProceduralMacro *proc_macro = (AstProceduralMacro *) exp->proc_macro;
-
-    token_toggle_end(proc_macro->token);
-    // HACK store this differently so a copy is not necessary here.
-    char *macro_name = bh_strdup(context->scratch_alloc, proc_macro->token->text);
-    token_toggle_end(proc_macro->token);
-
-    AstNode *expansion = NULL;
-
-    TypeMatch expansion_state = compiler_extension_expand_macro(
-        context,
-        proc_macro->extension->extension_id,
-        exp_kind,
-        macro_name,
-        exp->expansion_body,
-        context->checker.current_entity,
-        &expansion,
-        &exp->expansion_id,
-        context->cycle_almost_detected > 0);
-
-    if (expansion_state == TYPE_MATCH_FAILED) {
-        ONYX_ERROR(exp->token->pos, Error_Critical, "Procedural macro expansion failed. See other errors generated by procedural macro.");
-        return Symres_Error;
-    }
-
-    if (expansion_state == TYPE_MATCH_YIELD) {
-        return Symres_Yield_Macro;
-    }
-
-    if (expansion == NULL) {
-        if (exp_kind == PMEK_Expression) {
-            ONYX_ERROR(exp->token->pos, Error_Critical, "Expected this procedural macro to expand to an expression, but it expanded to nothing.");
-            return Symres_Error;
-        }
-
-        if (exp_kind == PMEK_Statement) {
-            *(AstNode **) pexp = exp->next;
-            SYMRES(expression, (AstTyped **) pexp);
-            return Symres_Success;
-        }
-
-        // Top-level expansions do not turn into nodes, but instead will become other entities
-        // that will get queued separately.
-        return Symres_Complete;
-    }
-
-    // Stitch the expansion into the tree.
-    AstNode *last_expanded_node = expansion;
-    while (last_expanded_node->next != NULL) last_expanded_node = last_expanded_node->next;
-    last_expanded_node->next = (*pexp)->next;
-
-    *pexp = (AstProceduralExpansion *) expansion;
-    switch (exp_kind) {
-        case PMEK_Expression: SYMRES(expression, (AstTyped **) pexp); break;
-        case PMEK_Statement:  SYMRES(statement, (AstNode **) pexp, NULL); break;
-        case PMEK_Top_Level:  return Symres_Complete;
-    }
-
-    return Symres_Success;
-}
+// SYMRES_FUNC(proc_expansion, AstProceduralExpansion **pexp, ProceduralMacroExpansionKind exp_kind) {
+//     AstProceduralExpansion *exp = *pexp;
+//     SYMRES(expression, &exp->proc_macro);
+// 
+//     exp->proc_macro = (AstTyped *) strip_aliases((AstNode *) exp->proc_macro);
+// 
+//     if (exp->proc_macro->kind != Ast_Kind_Procedural_Macro) {
+//         if (context->cycle_almost_detected) {
+//             ONYX_ERROR(exp->token->pos, Error_Critical, "Procedural macro expansion expected a procedural macro before the '!', but got '%s' instead.",
+//                 onyx_ast_node_kind_string(exp->proc_macro->kind));
+//             return Symres_Error;
+//         }
+// 
+//         return Symres_Yield_Micro;
+//     }
+// 
+//     AstProceduralMacro *proc_macro = (AstProceduralMacro *) exp->proc_macro;
+// 
+//     token_toggle_end(proc_macro->token);
+//     // HACK store this differently so a copy is not necessary here.
+//     char *macro_name = bh_strdup(context->scratch_alloc, proc_macro->token->text);
+//     token_toggle_end(proc_macro->token);
+// 
+//     AstNode *expansion = NULL;
+// 
+//     TypeMatch expansion_state = compiler_extension_expand_macro(
+//         context,
+//         proc_macro->extension->extension_id,
+//         exp_kind,
+//         macro_name,
+//         exp->expansion_body,
+//         context->checker.current_entity,
+//         &expansion,
+//         &exp->expansion_id,
+//         context->cycle_almost_detected > 0);
+// 
+//     if (expansion_state == TYPE_MATCH_FAILED) {
+//         ONYX_ERROR(exp->token->pos, Error_Critical, "Procedural macro expansion failed. See other errors generated by procedural macro.");
+//         return Symres_Error;
+//     }
+// 
+//     if (expansion_state == TYPE_MATCH_YIELD) {
+//         return Symres_Yield_Macro;
+//     }
+// 
+//     if (expansion == NULL) {
+//         if (exp_kind == PMEK_Expression) {
+//             ONYX_ERROR(exp->token->pos, Error_Critical, "Expected this procedural macro to expand to an expression, but it expanded to nothing.");
+//             return Symres_Error;
+//         }
+// 
+//         if (exp_kind == PMEK_Statement) {
+//             *(AstNode **) pexp = exp->next;
+//             SYMRES(expression, (AstTyped **) pexp);
+//             return Symres_Success;
+//         }
+// 
+//         // Top-level expansions do not turn into nodes, but instead will become other entities
+//         // that will get queued separately.
+//         return Symres_Complete;
+//     }
+// 
+//     // Stitch the expansion into the tree.
+//     AstNode *last_expanded_node = expansion;
+//     while (last_expanded_node->next != NULL) last_expanded_node = last_expanded_node->next;
+//     last_expanded_node->next = (*pexp)->next;
+// 
+//     *pexp = (AstProceduralExpansion *) expansion;
+//     switch (exp_kind) {
+//         case PMEK_Expression: SYMRES(expression, (AstTyped **) pexp); break;
+//         case PMEK_Statement:  SYMRES(statement, (AstNode **) pexp, NULL); break;
+//         case PMEK_Top_Level:  return Symres_Complete;
+//     }
+// 
+//     return Symres_Success;
+// }
 
 // SYMRES_FUNC(expression, AstTyped** expr) {
     // if (node_is_type((AstNode *) *expr)) {
@@ -1385,95 +1375,95 @@ SYMRES_FUNC(proc_expansion, AstProceduralExpansion **pexp, ProceduralMacroExpans
     // return Symres_Success;
 // }
 
-SYMRES_FUNC(function, AstFunction* func) {
-    if (func->entity_header && func->entity_header->state < Entity_State_Check_Types) return Symres_Yield_Macro;
-    if (func->kind == Ast_Kind_Polymorphic_Proc) return Symres_Complete;
-    if (func->flags & Ast_Flag_Function_Is_Lambda_Inside_PolyProc) return Symres_Complete;
-    assert(func->scope);
-
-    scope_enter(context, func->scope);
-
-    if ((func->flags & Ast_Flag_Has_Been_Symres) == 0) {
-        // :EliminatingSymres
-        bh_arr_each(AstParam, param, func->params) {
-            // CLEANUP: Currently, in order to 'use' parameters, the type must be completely
-            // resolved and built. This is excessive because all that should need to be known
-            // is the names of the members, since all that happens is implicit field accesses
-            // are placed in the scope. So instead, there should be a way to just query all the
-            // member names in the structure, without needing to know their type. This would be
-            // easy if it were not for 'use' statements in structs. It is made even more complicated
-            // by this situtation:
-            //
-            //     Foo :: struct (T: type_expr) {
-            //         use t : T;
-            //
-            //         something_else := 5 + 6 * 8;
-            //     }
-            //
-            // The 'use t : T' member requires completely knowing the type of T, to know which
-            // members should be brought in. At the moment, that requires completely building the
-            // type of Foo($T).
-            if (param->is_used && !param->use_processed) {
-                if (param->local->type_node != NULL && param->local->type == NULL) {
-                    param->local->type = type_build_from_ast(context, param->local->type_node);
-
-                    if (param->local->type == NULL) return Symres_Yield_Macro;
-                }
-
-                if (type_is_struct(param->local->type)) {
-                    Type* st;
-                    if (param->local->type->kind == Type_Kind_Struct) {
-                        st = param->local->type;
-                    } else {
-                        st = param->local->type->Pointer.elem;
-                    }
-
-                    if (st->Struct.status != SPS_Uses_Done) return Symres_Yield_Macro;
-
-                    fori (i, 0, shlen(st->Struct.members)) {
-                        StructMember* value = st->Struct.members[i].value;
-                        AstFieldAccess* fa = make_field_access(context, (AstTyped *) param->local, value->name);
-                        symbol_raw_introduce(context, context->checker.current_scope, value->name, param->local->token->pos, (AstNode *) fa);
-                    }
-
-                    param->use_processed = 1;
-
-                } else if (param->local->type != NULL) {
-                    ONYX_ERROR(param->local->token->pos, Error_Critical, "Can only 'use' structures or pointers to structures.");
-
-                } else {
-                    // :ExplicitTyping
-                    ONYX_ERROR(param->local->token->pos, Error_Critical, "Cannot deduce type of parameter '%b'; Try adding it explicitly.",
-                        param->local->token->text,
-                        param->local->token->length);
-                }
-            }
-        }
-
-        func->flags |= Ast_Flag_Has_Been_Symres;
-    }
-
-    if (func->named_return_locals) {
-        bh_arr_each(AstLocal *, named_return, func->named_return_locals) {
-            SYMRES(local, named_return);
-        }
-
-        if (!func->named_return_locals_added) {
-            func->named_return_locals_added = 1;
-            
-            AstNode **prev = &func->body->body;
-            bh_arr_each(AstLocal *, named_return, func->named_return_locals) {
-                (*named_return)->next = *prev;
-                *prev = (AstNode *) *named_return;
-            }
-        }
-    }
-
-    SYMRES(block, func->body);
-
-    scope_leave(context);
-    return Symres_Success;
-}
+// SYMRES_FUNC(function, AstFunction* func) {
+//     if (func->entity_header && func->entity_header->state < Entity_State_Check_Types) return Symres_Yield_Macro;
+//     if (func->kind == Ast_Kind_Polymorphic_Proc) return Symres_Complete;
+//     if (func->flags & Ast_Flag_Function_Is_Lambda_Inside_PolyProc) return Symres_Complete;
+//     assert(func->scope);
+// 
+//     scope_enter(context, func->scope);
+// 
+//     if ((func->flags & Ast_Flag_Has_Been_Symres) == 0) {
+//         // :EliminatingSymres
+//         bh_arr_each(AstParam, param, func->params) {
+//             // CLEANUP: Currently, in order to 'use' parameters, the type must be completely
+//             // resolved and built. This is excessive because all that should need to be known
+//             // is the names of the members, since all that happens is implicit field accesses
+//             // are placed in the scope. So instead, there should be a way to just query all the
+//             // member names in the structure, without needing to know their type. This would be
+//             // easy if it were not for 'use' statements in structs. It is made even more complicated
+//             // by this situtation:
+//             //
+//             //     Foo :: struct (T: type_expr) {
+//             //         use t : T;
+//             //
+//             //         something_else := 5 + 6 * 8;
+//             //     }
+//             //
+//             // The 'use t : T' member requires completely knowing the type of T, to know which
+//             // members should be brought in. At the moment, that requires completely building the
+//             // type of Foo($T).
+//             if (param->is_used && !param->use_processed) {
+//                 if (param->local->type_node != NULL && param->local->type == NULL) {
+//                     param->local->type = type_build_from_ast(context, param->local->type_node);
+// 
+//                     if (param->local->type == NULL) return Symres_Yield_Macro;
+//                 }
+// 
+//                 if (type_is_struct(param->local->type)) {
+//                     Type* st;
+//                     if (param->local->type->kind == Type_Kind_Struct) {
+//                         st = param->local->type;
+//                     } else {
+//                         st = param->local->type->Pointer.elem;
+//                     }
+// 
+//                     if (st->Struct.status != SPS_Uses_Done) return Symres_Yield_Macro;
+// 
+//                     fori (i, 0, shlen(st->Struct.members)) {
+//                         StructMember* value = st->Struct.members[i].value;
+//                         AstFieldAccess* fa = make_field_access(context, (AstTyped *) param->local, value->name);
+//                         symbol_raw_introduce(context, context->checker.current_scope, value->name, param->local->token->pos, (AstNode *) fa);
+//                     }
+// 
+//                     param->use_processed = 1;
+// 
+//                 } else if (param->local->type != NULL) {
+//                     ONYX_ERROR(param->local->token->pos, Error_Critical, "Can only 'use' structures or pointers to structures.");
+// 
+//                 } else {
+//                     // :ExplicitTyping
+//                     ONYX_ERROR(param->local->token->pos, Error_Critical, "Cannot deduce type of parameter '%b'; Try adding it explicitly.",
+//                         param->local->token->text,
+//                         param->local->token->length);
+//                 }
+//             }
+//         }
+// 
+//         func->flags |= Ast_Flag_Has_Been_Symres;
+//     }
+// 
+//     if (func->named_return_locals) {
+//         bh_arr_each(AstLocal *, named_return, func->named_return_locals) {
+//             SYMRES(local, named_return);
+//         }
+// 
+//         if (!func->named_return_locals_added) {
+//             func->named_return_locals_added = 1;
+//             
+//             AstNode **prev = &func->body->body;
+//             bh_arr_each(AstLocal *, named_return, func->named_return_locals) {
+//                 (*named_return)->next = *prev;
+//                 *prev = (AstNode *) *named_return;
+//             }
+//         }
+//     }
+// 
+//     SYMRES(block, func->body);
+// 
+//     scope_leave(context);
+//     return Symres_Success;
+// }
 
 // This was actuall global_header.
 // SYMRES_FUNC(global, AstGlobal* global) {
@@ -1481,130 +1471,130 @@ SYMRES_FUNC(function, AstFunction* func) {
 //     return Symres_Success;
 // }
 
-SYMRES_FUNC(overloaded_function, AstOverloadedFunction* ofunc) {
-    bh_arr_each(OverloadOption, overload, ofunc->overloads) {
-        SYMRES(expression, &overload->option);
-    }
+// SYMRES_FUNC(overloaded_function, AstOverloadedFunction* ofunc) {
+//     bh_arr_each(OverloadOption, overload, ofunc->overloads) {
+//         SYMRES(expression, &overload->option);
+//     }
+// 
+//     if (ofunc->expected_return_node) {
+//         SYMRES(type, &ofunc->expected_return_node);
+//     }
+// 
+//     return Symres_Success;
+// }
 
-    if (ofunc->expected_return_node) {
-        SYMRES(type, &ofunc->expected_return_node);
-    }
+// SYMRES_FUNC(package, AstPackage* package) {
+//     if (package->package == NULL) {
+//         if (!package->package_name) return Symres_Error;
+// 
+//         package->package = package_lookup(context, package->package_name);
+//     }
+// 
+//     if (package->package) {
+//         package_mark_as_used(context, package->package);
+//         return Symres_Success;
+// 
+//     } else {
+//         if (context->checker.report_unresolved_symbols) {
+//             ONYX_ERROR(package->token->pos, Error_Critical,
+//                     "Package '%s' not found in included source files.",
+//                     package->package_name);
+//             return Symres_Error;
+//         } else {
+//             return Symres_Yield_Macro;
+//         }
+//     }
+// }
 
-    return Symres_Success;
-}
-
-SYMRES_FUNC(package, AstPackage* package) {
-    if (package->package == NULL) {
-        if (!package->package_name) return Symres_Error;
-
-        package->package = package_lookup(context, package->package_name);
-    }
-
-    if (package->package) {
-        package_mark_as_used(context, package->package);
-        return Symres_Success;
-
-    } else {
-        if (context->checker.report_unresolved_symbols) {
-            ONYX_ERROR(package->token->pos, Error_Critical,
-                    "Package '%s' not found in included source files.",
-                    package->package_name);
-            return Symres_Error;
-        } else {
-            return Symres_Yield_Macro;
-        }
-    }
-}
-
-SYMRES_FUNC(enum, AstEnumType* enum_node) {
-    if (!enum_node->backing_type) {
-        if (enum_node->backing == NULL) return Symres_Error;
-        if (enum_node->backing->kind == Ast_Kind_Symbol) SYMRES(symbol, (AstNode **) &enum_node->backing);
-
-        enum_node->backing_type = type_build_from_ast(context, enum_node->backing);
-    }
-
-    if (enum_node->scope == NULL) {
-        enum_node->scope = scope_create(context, context->checker.current_scope, enum_node->token->pos);
-
-        symbol_raw_introduce(context, enum_node->scope, "__backing_type", enum_node->token->pos, (AstNode *) enum_node->backing);
-
-        type_build_from_ast(context, (AstType *) enum_node);
-    }
-
-    scope_enter(context, enum_node->scope);
-
-    // :EliminatingSymres
-    u64 next_assign_value = enum_node->is_flags ? 1 : 0;
-    bh_arr_each(AstEnumValue *, value, enum_node->values) {
-        if ((*value)->flags & Ast_Flag_Has_Been_Checked) continue;
-
-        (*value)->type = enum_node->etcache;
-        (*value)->flags |= Ast_Flag_Comptime;
-
-        if ((*value)->value != NULL) {
-            SYMRES(expression, &(*value)->value);
-
-            if ((*value)->value->kind == Ast_Kind_Enum_Value) {
-                (*value)->value = ((AstEnumValue *) (*value)->value)->value;
-                (*value)->value->type = enum_node->etcache;
-            }
-
-            if ((*value)->value->kind == Ast_Kind_NumLit) {
-                AstNumLit *n_value = (AstNumLit *) (*value)->value;
-                resolve_expression_type(context, (AstTyped *) n_value);
-
-                if (type_is_small_integer(n_value->type)) {
-                    next_assign_value = n_value->value.i;
-                } else if (type_is_integer(n_value->type)) {
-                    next_assign_value = n_value->value.l;
-                } else {
-                    ONYX_ERROR((*value)->token->pos, Error_Critical, "expected numeric integer literal for enum initialization, got '%s'", type_get_name(context, n_value->type));
-                    return Symres_Error;
-                }
-
-                n_value->type = enum_node->etcache;
-
-            } else {
-                if ((*value)->entity == NULL) {
-                    add_entities_for_node(&context->entities, NULL, (AstNode *) (*value), enum_node->scope, NULL);
-                }
-
-                if (context->cycle_detected) {
-                    ONYX_ERROR((*value)->token->pos, Error_Critical, "Expected compile time known value for enum initialization.");
-                    return Symres_Error;
-                }
-
-                return Symres_Yield_Macro;
-            }
-
-        } else {
-            AstNumLit* num = make_int_literal(context, next_assign_value);
-            num->type = enum_node->etcache;
-
-            (*value)->value = (AstTyped *) num;
-        }
-
-        symbol_introduce(context, enum_node->scope, (*value)->token, (AstNode *) (*value));
-
-        (*value)->flags |= Ast_Flag_Comptime | Ast_Flag_Has_Been_Checked;
-
-        if (enum_node->is_flags) {
-            next_assign_value <<= 1;
-        } else {
-            next_assign_value++;
-        }
-    }
-
-    scope_leave(context);
-
-    // HACK this ensure that you can only lookup symbols in an Enum that are actually defined in the enum.
-    // However, during the symbol resolution of the values in an enum, they need to be able to see the
-    // enclosing scope.
-    enum_node->scope->parent = NULL;
-
-    return Symres_Success;
-}
+// SYMRES_FUNC(enum, AstEnumType* enum_node) {
+//     if (!enum_node->backing_type) {
+//         if (enum_node->backing == NULL) return Symres_Error;
+//         if (enum_node->backing->kind == Ast_Kind_Symbol) SYMRES(symbol, (AstNode **) &enum_node->backing);
+// 
+//         enum_node->backing_type = type_build_from_ast(context, enum_node->backing);
+//     }
+// 
+//     if (enum_node->scope == NULL) {
+//         enum_node->scope = scope_create(context, context->checker.current_scope, enum_node->token->pos);
+// 
+//         symbol_raw_introduce(context, enum_node->scope, "__backing_type", enum_node->token->pos, (AstNode *) enum_node->backing);
+// 
+//         type_build_from_ast(context, (AstType *) enum_node);
+//     }
+// 
+//     scope_enter(context, enum_node->scope);
+// 
+//     // :EliminatingSymres
+//     u64 next_assign_value = enum_node->is_flags ? 1 : 0;
+//     bh_arr_each(AstEnumValue *, value, enum_node->values) {
+//         if ((*value)->flags & Ast_Flag_Has_Been_Checked) continue;
+// 
+//         (*value)->type = enum_node->etcache;
+//         (*value)->flags |= Ast_Flag_Comptime;
+// 
+//         if ((*value)->value != NULL) {
+//             SYMRES(expression, &(*value)->value);
+// 
+//             if ((*value)->value->kind == Ast_Kind_Enum_Value) {
+//                 (*value)->value = ((AstEnumValue *) (*value)->value)->value;
+//                 (*value)->value->type = enum_node->etcache;
+//             }
+// 
+//             if ((*value)->value->kind == Ast_Kind_NumLit) {
+//                 AstNumLit *n_value = (AstNumLit *) (*value)->value;
+//                 resolve_expression_type(context, (AstTyped *) n_value);
+// 
+//                 if (type_is_small_integer(n_value->type)) {
+//                     next_assign_value = n_value->value.i;
+//                 } else if (type_is_integer(n_value->type)) {
+//                     next_assign_value = n_value->value.l;
+//                 } else {
+//                     ONYX_ERROR((*value)->token->pos, Error_Critical, "expected numeric integer literal for enum initialization, got '%s'", type_get_name(context, n_value->type));
+//                     return Symres_Error;
+//                 }
+// 
+//                 n_value->type = enum_node->etcache;
+// 
+//             } else {
+//                 if ((*value)->entity == NULL) {
+//                     add_entities_for_node(&context->entities, NULL, (AstNode *) (*value), enum_node->scope, NULL);
+//                 }
+// 
+//                 if (context->cycle_detected) {
+//                     ONYX_ERROR((*value)->token->pos, Error_Critical, "Expected compile time known value for enum initialization.");
+//                     return Symres_Error;
+//                 }
+// 
+//                 return Symres_Yield_Macro;
+//             }
+// 
+//         } else {
+//             AstNumLit* num = make_int_literal(context, next_assign_value);
+//             num->type = enum_node->etcache;
+// 
+//             (*value)->value = (AstTyped *) num;
+//         }
+// 
+//         symbol_introduce(context, enum_node->scope, (*value)->token, (AstNode *) (*value));
+// 
+//         (*value)->flags |= Ast_Flag_Comptime | Ast_Flag_Has_Been_Checked;
+// 
+//         if (enum_node->is_flags) {
+//             next_assign_value <<= 1;
+//         } else {
+//             next_assign_value++;
+//         }
+//     }
+// 
+//     scope_leave(context);
+// 
+//     // HACK this ensure that you can only lookup symbols in an Enum that are actually defined in the enum.
+//     // However, during the symbol resolution of the values in an enum, they need to be able to see the
+//     // enclosing scope.
+//     enum_node->scope->parent = NULL;
+// 
+//     return Symres_Success;
+// }
 
 // SYMRES_FUNC(memres_type, AstMemRes** memres) {
 //     SYMRES(type, &(*memres)->type_node);
@@ -1623,364 +1613,364 @@ SYMRES_FUNC(enum, AstEnumType* enum_node) {
 //     return Symres_Success;
 // }
 
-SYMRES_FUNC(struct_defaults, AstType* t) {
-    if (t->kind != Ast_Kind_Struct_Type) return Symres_Error;
+// SYMRES_FUNC(struct_defaults, AstType* t) {
+//     if (t->kind != Ast_Kind_Struct_Type) return Symres_Error;
+// 
+//     AstStructType* st = (AstStructType *) t;
+//     if (st->scope) scope_enter(context, st->scope);
+// 
+//     if (st->meta_tags) {
+//         bh_arr_each(AstTyped *, meta, st->meta_tags) {
+//             SYMRES(expression, meta);
+//         }
+//     }
+// 
+//     bh_arr_each(AstStructMember *, smem, st->members) {
+//         if ((*smem)->initial_value != NULL) {
+//             SYMRES(expression, &(*smem)->initial_value);
+//         }
+// 
+//         if ((*smem)->meta_tags != NULL) {
+//             bh_arr_each(AstTyped *, meta, (*smem)->meta_tags) {
+//                 SYMRES(expression, meta);
+//             }
+//         }
+//     }
+// 
+//     if (st->scope) scope_leave(context);
+//     return Symres_Success;
+// }
 
-    AstStructType* st = (AstStructType *) t;
-    if (st->scope) scope_enter(context, st->scope);
+// SYMRES_FUNC(polyproc, AstFunction* pp) {
+//     pp->flags |= Ast_Flag_Comptime;
+//     pp->parent_scope_of_poly_proc = context->checker.current_scope;
+// 
+//     bh_arr_each(AstPolyParam, p, pp->poly_params) {
+//         if (p->kind != PSK_Value) continue;
+// 
+//         AstParam *param = &pp->params[p->idx];
+//         if (param->default_value != NULL) {
+//             SYMRES(expression, &param->default_value);
+//             if (onyx_has_errors(context)) return Symres_Error;
+//         }
+//     }
+// 
+//     return Symres_Success;
+// }
 
-    if (st->meta_tags) {
-        bh_arr_each(AstTyped *, meta, st->meta_tags) {
-            SYMRES(expression, meta);
-        }
-    }
+// SYMRES_FUNC(static_if, AstIf* static_if) {
+//     if (static_if->flags & Ast_Flag_Dead) return Symres_Complete;
+// 
+//     SYMRES(expression, &static_if->cond);
+//     return Symres_Success;
+// }
 
-    bh_arr_each(AstStructMember *, smem, st->members) {
-        if ((*smem)->initial_value != NULL) {
-            SYMRES(expression, &(*smem)->initial_value);
-        }
+// SYMRES_FUNC(process_directive, AstNode* directive) {
+//     // :EliminatingSymres
+//     switch (directive->kind) {
+        // case Ast_Kind_Directive_Add_Overload: {
+        //     AstDirectiveAddOverload *add_overload = (AstDirectiveAddOverload *) directive;
 
-        if ((*smem)->meta_tags != NULL) {
-            bh_arr_each(AstTyped *, meta, (*smem)->meta_tags) {
-                SYMRES(expression, meta);
-            }
-        }
-    }
+        //     SYMRES(expression, (AstTyped **) &add_overload->overloaded_function);
+        //     if (add_overload->overloaded_function == NULL) return Symres_Error; // NOTE: Error message will already be generated
 
-    if (st->scope) scope_leave(context);
-    return Symres_Success;
-}
+        //     AstOverloadedFunction *ofunc = (AstOverloadedFunction *) strip_aliases((AstNode *) add_overload->overloaded_function);
+        //     if (ofunc->kind == Ast_Kind_Symbol) {
+        //         if (context->cycle_detected) {
+        //             ONYX_ERROR(add_overload->token->pos, Error_Waiting_On, "Waiting for matched procedure to be known.");
+        //             return Symres_Error;
+        //         }
 
-SYMRES_FUNC(polyproc, AstFunction* pp) {
-    pp->flags |= Ast_Flag_Comptime;
-    pp->parent_scope_of_poly_proc = context->checker.current_scope;
+        //         return Symres_Yield_Macro;
+        //     }
 
-    bh_arr_each(AstPolyParam, p, pp->poly_params) {
-        if (p->kind != PSK_Value) continue;
+        //     if (ofunc->kind != Ast_Kind_Overloaded_Function) {
+        //         ONYX_ERROR(add_overload->token->pos, Error_Critical, "#overload directive expects a matched procedure, got '%s'.",
+        //                     onyx_ast_node_kind_string(ofunc->kind));
+        //         return Symres_Error;
+        //     }
 
-        AstParam *param = &pp->params[p->idx];
-        if (param->default_value != NULL) {
-            SYMRES(expression, &param->default_value);
-            if (onyx_has_errors(context)) return Symres_Error;
-        }
-    }
+        //     if (ofunc->locked) {
+        //         ONYX_ERROR(add_overload->token->pos, Error_Critical, "Cannot add match option here as the original #match was declared as #locked.");
+        //         ONYX_ERROR(ofunc->token->pos, Error_Critical, "Here is the original #match.");
+        //         return Symres_Error;
+        //     }
 
-    return Symres_Success;
-}
+        //     if (ofunc->only_local_functions) {
+        //         if (!token_same_file(add_overload->token, ofunc->token)) {
+        //             ONYX_ERROR(add_overload->token->pos, Error_Critical, "Cannot add match option here as this option is not within the same file as the original #match declared with #local.");
+        //             ONYX_ERROR(ofunc->token->pos, Error_Critical, "Here is the original #match.");
+        //             return Symres_Error;
+        //         }
+        //     }
 
-SYMRES_FUNC(static_if, AstIf* static_if) {
-    if (static_if->flags & Ast_Flag_Dead) return Symres_Complete;
+        //     SYMRES(expression, (AstTyped **) &add_overload->overload);
+        //     add_overload->overload->flags &= ~Ast_Flag_Function_Is_Lambda;
 
-    SYMRES(expression, &static_if->cond);
-    return Symres_Success;
-}
+        //     add_overload_option(&ofunc->overloads, add_overload->order, add_overload->overload);
+        //     break;
+        // }
 
-SYMRES_FUNC(process_directive, AstNode* directive) {
-    // :EliminatingSymres
-    switch (directive->kind) {
-        case Ast_Kind_Directive_Add_Overload: {
-            AstDirectiveAddOverload *add_overload = (AstDirectiveAddOverload *) directive;
+        // case Ast_Kind_Directive_Operator: {
+        //     AstDirectiveOperator *operator = (AstDirectiveOperator *) directive;
+        //     SYMRES(expression, &operator->overload);
+        //     if (!operator->overload) return Symres_Error;
 
-            SYMRES(expression, (AstTyped **) &add_overload->overloaded_function);
-            if (add_overload->overloaded_function == NULL) return Symres_Error; // NOTE: Error message will already be generated
+        //     AstFunction* overload = get_function_from_node((AstNode *) operator->overload);
+        //     if (overload == NULL) {
+        //         ONYX_ERROR(operator->token->pos, Error_Critical, "This cannot be used as an operator overload.");
+        //         return Symres_Error;
+        //     }
 
-            AstOverloadedFunction *ofunc = (AstOverloadedFunction *) strip_aliases((AstNode *) add_overload->overloaded_function);
-            if (ofunc->kind == Ast_Kind_Symbol) {
-                if (context->cycle_detected) {
-                    ONYX_ERROR(add_overload->token->pos, Error_Waiting_On, "Waiting for matched procedure to be known.");
-                    return Symres_Error;
-                }
+        //     overload->flags &= ~Ast_Flag_Function_Is_Lambda;
+        //     
+        //     // First try unary operator overloading
+        //     // CLEANUP This is not written well at all...
+        //     if (operator->operator == Binary_Op_Count) {
+        //         if (bh_arr_length(overload->params) != 1) {
+        //             ONYX_ERROR(operator->token->pos, Error_Critical, "Expected exactly 1 argument for unary operator overload.");
+        //             return Symres_Error;
+        //         }
 
-                return Symres_Yield_Macro;
-            }
+        //         UnaryOp unop = Unary_Op_Count;
+        //         if (operator->operator_token->type == (TokenType) '?') {
+        //             unop = Unary_Op_Try;
+        //         }
 
-            if (ofunc->kind != Ast_Kind_Overloaded_Function) {
-                ONYX_ERROR(add_overload->token->pos, Error_Critical, "#overload directive expects a matched procedure, got '%s'.",
-                            onyx_ast_node_kind_string(ofunc->kind));
-                return Symres_Error;
-            }
+        //         if (operator->operator_token->type == (TokenType) '!') {
+        //             unop = Unary_Op_Unwrap;
+        //         }
 
-            if (ofunc->locked) {
-                ONYX_ERROR(add_overload->token->pos, Error_Critical, "Cannot add match option here as the original #match was declared as #locked.");
-                ONYX_ERROR(ofunc->token->pos, Error_Critical, "Here is the original #match.");
-                return Symres_Error;
-            }
+        //         if (unop == Unary_Op_Count) {
+        //             ONYX_ERROR(operator->token->pos, Error_Critical, "Unknown operator.");
+        //             return Symres_Error;
+        //         }
 
-            if (ofunc->only_local_functions) {
-                if (!token_same_file(add_overload->token, ofunc->token)) {
-                    ONYX_ERROR(add_overload->token->pos, Error_Critical, "Cannot add match option here as this option is not within the same file as the original #match declared with #local.");
-                    ONYX_ERROR(ofunc->token->pos, Error_Critical, "Here is the original #match.");
-                    return Symres_Error;
-                }
-            }
+        //         add_overload_option(&context->unary_operator_overloads[unop], operator->order, operator->overload);
+        //         return Symres_Success;
+        //     }
 
-            SYMRES(expression, (AstTyped **) &add_overload->overload);
-            add_overload->overload->flags &= ~Ast_Flag_Function_Is_Lambda;
+        //     if (operator->operator != Binary_Op_Subscript_Equals && bh_arr_length(overload->params) != 2) {
+        //         ONYX_ERROR(operator->token->pos, Error_Critical, "Expected exactly 2 arguments for binary operator overload.");
+        //         return Symres_Error;
+        //     }
 
-            add_overload_option(&ofunc->overloads, add_overload->order, add_overload->overload);
-            break;
-        }
+        //     add_overload_option(&context->operator_overloads[operator->operator], operator->order, operator->overload);
+        //     break;
+        // }
 
-        case Ast_Kind_Directive_Operator: {
-            AstDirectiveOperator *operator = (AstDirectiveOperator *) directive;
-            SYMRES(expression, &operator->overload);
-            if (!operator->overload) return Symres_Error;
+        // case Ast_Kind_Directive_Export: {
+        //     AstDirectiveExport *export = (AstDirectiveExport *) directive;
+        //     SYMRES(expression, &export->export);
+        //     SYMRES(expression, &export->export_name_expr);
 
-            AstFunction* overload = get_function_from_node((AstNode *) operator->overload);
-            if (overload == NULL) {
-                ONYX_ERROR(operator->token->pos, Error_Critical, "This cannot be used as an operator overload.");
-                return Symres_Error;
-            }
+        //     if (export->export->kind == Ast_Kind_Polymorphic_Proc) {
+        //         ONYX_ERROR(export->token->pos, Error_Critical, "Cannot export a polymorphic function.");
+        //         return Symres_Error;
+        //     }
 
-            overload->flags &= ~Ast_Flag_Function_Is_Lambda;
-            
-            // First try unary operator overloading
-            // CLEANUP This is not written well at all...
-            if (operator->operator == Binary_Op_Count) {
-                if (bh_arr_length(overload->params) != 1) {
-                    ONYX_ERROR(operator->token->pos, Error_Critical, "Expected exactly 1 argument for unary operator overload.");
-                    return Symres_Error;
-                }
+        //     if (export->export->kind == Ast_Kind_Function) {
+        //         AstFunction *func = (AstFunction *) export->export;
+        //         func->is_exported = 1;
 
-                UnaryOp unop = Unary_Op_Count;
-                if (operator->operator_token->type == (TokenType) '?') {
-                    unop = Unary_Op_Try;
-                }
+        //         if (func->is_foreign) {
+        //             ONYX_ERROR(export->token->pos, Error_Critical, "Cannot export a foreign function.");
+        //             return Symres_Error;
+        //         }
 
-                if (operator->operator_token->type == (TokenType) '!') {
-                    unop = Unary_Op_Unwrap;
-                }
+        //         if (func->is_intrinsic) {
+        //             ONYX_ERROR(export->token->pos, Error_Critical, "Cannot export an intrinsic function.");
+        //             return Symres_Error;
+        //         }
+        //     }
 
-                if (unop == Unary_Op_Count) {
-                    ONYX_ERROR(operator->token->pos, Error_Critical, "Unknown operator.");
-                    return Symres_Error;
-                }
+        //     break;
+        // }
 
-                add_overload_option(&context->unary_operator_overloads[unop], operator->order, operator->overload);
-                return Symres_Success;
-            }
+        // case Ast_Kind_Directive_Init: {
+        //     AstDirectiveInit *init = (AstDirectiveInit *) directive;
+        //     SYMRES(expression, &init->init_proc);
 
-            if (operator->operator != Binary_Op_Subscript_Equals && bh_arr_length(overload->params) != 2) {
-                ONYX_ERROR(operator->token->pos, Error_Critical, "Expected exactly 2 arguments for binary operator overload.");
-                return Symres_Error;
-            }
+        //     if (init->dependencies) {
+        //         bh_arr_each(AstDirectiveInit *, dependency, init->dependencies) {
+        //             SYMRES(expression, (AstTyped **) dependency);
+        //         }
+        //     }
 
-            add_overload_option(&context->operator_overloads[operator->operator], operator->order, operator->overload);
-            break;
-        }
+        //     break;
+        // }
 
-        case Ast_Kind_Directive_Export: {
-            AstDirectiveExport *export = (AstDirectiveExport *) directive;
-            SYMRES(expression, &export->export);
-            SYMRES(expression, &export->export_name_expr);
+        // case Ast_Kind_Directive_Library: {
+        //     AstDirectiveLibrary *library = (AstDirectiveLibrary *) directive;
+        //     SYMRES(expression, &library->library_symbol);
+        //     break;
+        // }
 
-            if (export->export->kind == Ast_Kind_Polymorphic_Proc) {
-                ONYX_ERROR(export->token->pos, Error_Critical, "Cannot export a polymorphic function.");
-                return Symres_Error;
-            }
+        // case Ast_Kind_Injection: {
+        //     AstInjection *inject = (AstInjection *) directive;
 
-            if (export->export->kind == Ast_Kind_Function) {
-                AstFunction *func = (AstFunction *) export->export;
-                func->is_exported = 1;
+        //     if (inject->dest == NULL) {
+        //         if (inject->full_loc == NULL) return Symres_Error;
 
-                if (func->is_foreign) {
-                    ONYX_ERROR(export->token->pos, Error_Critical, "Cannot export a foreign function.");
-                    return Symres_Error;
-                }
+        //         AstTyped *full_loc = (AstTyped *) strip_aliases((AstNode *) inject->full_loc);
 
-                if (func->is_intrinsic) {
-                    ONYX_ERROR(export->token->pos, Error_Critical, "Cannot export an intrinsic function.");
-                    return Symres_Error;
-                }
-            }
+        //         if (full_loc->kind != Ast_Kind_Field_Access) {
+        //             ONYX_ERROR(inject->token->pos, Error_Critical, "#inject expects a dot expression (a.b) for the injection point.");
+        //             return Symres_Error;
+        //         }
 
-            break;
-        }
+        //         AstFieldAccess *acc = (AstFieldAccess *) full_loc;
+        //         inject->dest = acc->expr;
+        //         inject->symbol = acc->token;
+        //     }
 
-        case Ast_Kind_Directive_Init: {
-            AstDirectiveInit *init = (AstDirectiveInit *) directive;
-            SYMRES(expression, &init->init_proc);
+        //     SYMRES(expression, &inject->dest);
+        //     // SYMRES(expression, &inject->to_inject);
+        //     break;
+        // }
 
-            if (init->dependencies) {
-                bh_arr_each(AstDirectiveInit *, dependency, init->dependencies) {
-                    SYMRES(expression, (AstTyped **) dependency);
-                }
-            }
+        // case Ast_Kind_Directive_This_Package: {
+        //     AstPackage *package = (AstPackage *) directive;
+        //     package->kind = Ast_Kind_Package;
+        //     package->package = context->checker.current_entity->package;
+        //     return Symres_Complete;
+        // }
 
-            break;
-        }
-
-        case Ast_Kind_Directive_Library: {
-            AstDirectiveLibrary *library = (AstDirectiveLibrary *) directive;
-            SYMRES(expression, &library->library_symbol);
-            break;
-        }
-
-        case Ast_Kind_Injection: {
-            AstInjection *inject = (AstInjection *) directive;
-
-            if (inject->dest == NULL) {
-                if (inject->full_loc == NULL) return Symres_Error;
-
-                AstTyped *full_loc = (AstTyped *) strip_aliases((AstNode *) inject->full_loc);
-
-                if (full_loc->kind != Ast_Kind_Field_Access) {
-                    ONYX_ERROR(inject->token->pos, Error_Critical, "#inject expects a dot expression (a.b) for the injection point.");
-                    return Symres_Error;
-                }
-
-                AstFieldAccess *acc = (AstFieldAccess *) full_loc;
-                inject->dest = acc->expr;
-                inject->symbol = acc->token;
-            }
-
-            SYMRES(expression, &inject->dest);
-            // SYMRES(expression, &inject->to_inject);
-            break;
-        }
-
-        case Ast_Kind_Directive_This_Package: {
-            AstPackage *package = (AstPackage *) directive;
-            package->kind = Ast_Kind_Package;
-            package->package = context->checker.current_entity->package;
-            return Symres_Complete;
-        }
-
-        case Ast_Kind_Directive_Wasm_Section: {
-            AstDirectiveWasmSection *section = (AstDirectiveWasmSection *) directive;
-            SYMRES(expression, &section->section_name);
-            SYMRES(expression, &section->section_contents);
-            return Symres_Success;
-        }
+        // case Ast_Kind_Directive_Wasm_Section: {
+        //     AstDirectiveWasmSection *section = (AstDirectiveWasmSection *) directive;
+        //     SYMRES(expression, &section->section_name);
+        //     SYMRES(expression, &section->section_contents);
+        //     return Symres_Success;
+        // }
     
-        default: assert("Bad directive in symres_process_directive" && 0); break;
-    }
+//         default: assert("Bad directive in symres_process_directive" && 0); break;
+//     }
+// 
+//     return Symres_Success;
+// }
 
-    return Symres_Success;
-}
+// SYMRES_FUNC(macro, AstMacro* macro) {
+//     macro->flags |= Ast_Flag_Comptime;
+// 
+//     if (macro->body->kind == Ast_Kind_Function) {
+//         SYMRES(function_header, (AstFunction *) macro->body);
+//     }
+//     else if (macro->body->kind == Ast_Kind_Polymorphic_Proc) {
+//         SYMRES(polyproc, (AstFunction *) macro->body);
+//     }
+// 
+//     return Symres_Success;
+// }
 
-SYMRES_FUNC(macro, AstMacro* macro) {
-    macro->flags |= Ast_Flag_Comptime;
+// SYMRES_FUNC(interface, AstInterface* interface) {
+//     bh_arr_each(InterfaceParam, param, interface->params) {
+//         SYMRES(type, &param->value_type);
+//     }
+// 
+//     return Symres_Success;
+// }
 
-    if (macro->body->kind == Ast_Kind_Function) {
-        SYMRES(function_header, (AstFunction *) macro->body);
-    }
-    else if (macro->body->kind == Ast_Kind_Polymorphic_Proc) {
-        SYMRES(polyproc, (AstFunction *) macro->body);
-    }
+// SYMRES_FUNC(constraint, AstConstraint* constraint) {
+//     switch (constraint->phase) {
+//         case Constraint_Phase_Cloning_Expressions:
+//         case Constraint_Phase_Waiting_To_Be_Queued: {
+//             SYMRES(expression, (AstTyped **) &constraint->interface);
+// 
+//             bh_arr_each(AstTyped *, arg, constraint->args) {
+//                 SYMRES(expression, arg);
+//             }
+// 
+//             return Symres_Success;
+//         }
+// 
+//         case Constraint_Phase_Checking_Expressions: {
+//             SymresStatus ss;
+//             onyx_errors_disable(context);
+// 
+//             fori (i, constraint->expr_idx, bh_arr_length(constraint->exprs)) {
+//                 InterfaceConstraint* ic = &constraint->exprs[i];
+// 
+//                 // Most of this logic was directly copied from the
+//                 // check_constraint code. There might be a better
+//                 // way to factor this?
+//                 ss = symres_expression(context, &ic->expr);
+//                 if (ss == Symres_Yield_Macro) {
+//                     onyx_errors_enable(context);
+//                     return ss;
+//                 }
+// 
+//                 if (ss == Symres_Error && !ic->invert_condition) {
+//                     goto constraint_error;
+//                 }
+// 
+//                 if (ss == Symres_Success && ic->invert_condition) {
+//                     goto constraint_error;
+//                 }
+// 
+//                 if (ic->expected_type_expr) {
+//                     ss = symres_type(context, &ic->expected_type_expr);
+//                     if (ss == Symres_Yield_Macro) {
+//                         onyx_errors_enable(context);
+//                         return ss;
+//                     }
+//                 }
+// 
+//                 continue;
+// 
+//               constraint_error:
+//                 onyx_errors_enable(context);
+//                 *constraint->report_status = Constraint_Check_Status_Failed;
+//                 return Symres_Error;
+//             }
+// 
+//             onyx_errors_enable(context);
+//             return Symres_Success;
+//         }
+// 
+//         default: break;
+//     }
+// 
+//     return Symres_Success;
+// }
 
-    return Symres_Success;
-}
-
-SYMRES_FUNC(interface, AstInterface* interface) {
-    bh_arr_each(InterfaceParam, param, interface->params) {
-        SYMRES(type, &param->value_type);
-    }
-
-    return Symres_Success;
-}
-
-SYMRES_FUNC(constraint, AstConstraint* constraint) {
-    switch (constraint->phase) {
-        case Constraint_Phase_Cloning_Expressions:
-        case Constraint_Phase_Waiting_To_Be_Queued: {
-            SYMRES(expression, (AstTyped **) &constraint->interface);
-
-            bh_arr_each(AstTyped *, arg, constraint->args) {
-                SYMRES(expression, arg);
-            }
-
-            return Symres_Success;
-        }
-
-        case Constraint_Phase_Checking_Expressions: {
-            SymresStatus ss;
-            onyx_errors_disable(context);
-
-            fori (i, constraint->expr_idx, bh_arr_length(constraint->exprs)) {
-                InterfaceConstraint* ic = &constraint->exprs[i];
-
-                // Most of this logic was directly copied from the
-                // check_constraint code. There might be a better
-                // way to factor this?
-                ss = symres_expression(context, &ic->expr);
-                if (ss == Symres_Yield_Macro) {
-                    onyx_errors_enable(context);
-                    return ss;
-                }
-
-                if (ss == Symres_Error && !ic->invert_condition) {
-                    goto constraint_error;
-                }
-
-                if (ss == Symres_Success && ic->invert_condition) {
-                    goto constraint_error;
-                }
-
-                if (ic->expected_type_expr) {
-                    ss = symres_type(context, &ic->expected_type_expr);
-                    if (ss == Symres_Yield_Macro) {
-                        onyx_errors_enable(context);
-                        return ss;
-                    }
-                }
-
-                continue;
-
-              constraint_error:
-                onyx_errors_enable(context);
-                *constraint->report_status = Constraint_Check_Status_Failed;
-                return Symres_Error;
-            }
-
-            onyx_errors_enable(context);
-            return Symres_Success;
-        }
-
-        default: break;
-    }
-
-    return Symres_Success;
-}
-
-SYMRES_FUNC(polyquery, AstPolyQuery *query) {
-    // :EliminatingSymres
-    query->successful_symres = 0;
-
-    if (query->function_header->scope == NULL)
-        query->function_header->scope = scope_create(context, query->proc->parent_scope_of_poly_proc, query->token->pos);
-
-    scope_enter(context, query->function_header->scope);
-
-    u32 idx = 0;
-    bh_arr_each(AstParam, param, query->function_header->params) {
-        bh_arr_each(AstPolyParam, pp, query->proc->poly_params) {
-            if (pp->kind == PPK_Baked_Value && pp->idx == idx) goto skip_introducing_symbol;
-        }
-
-        symbol_introduce(context, context->checker.current_scope, param->local->token, (AstNode *) param->local);
-
-    skip_introducing_symbol:
-        idx++;
-    }
-
-    bh_arr_each(AstParam, param, query->function_header->params) {
-        if (param->local->type_node != NULL) {
-            context->checker.resolved_a_symbol = 0;
-
-            onyx_errors_disable(context);
-            param->local->flags |= Ast_Flag_Symbol_Invisible;
-            symres_type(context, &param->local->type_node);
-            param->local->flags &= ~Ast_Flag_Symbol_Invisible;
-            onyx_errors_enable(context);
-            
-            if (context->checker.resolved_a_symbol) query->successful_symres = 1;
-        }
-    }
-
-    scope_leave(context);
-    return Symres_Success;
-}
+// SYMRES_FUNC(polyquery, AstPolyQuery *query) {
+//     // :EliminatingSymres
+//     query->successful_symres = 0;
+// 
+//     if (query->function_header->scope == NULL)
+//         query->function_header->scope = scope_create(context, query->proc->parent_scope_of_poly_proc, query->token->pos);
+// 
+//     scope_enter(context, query->function_header->scope);
+// 
+//     u32 idx = 0;
+//     bh_arr_each(AstParam, param, query->function_header->params) {
+//         bh_arr_each(AstPolyParam, pp, query->proc->poly_params) {
+//             if (pp->kind == PPK_Baked_Value && pp->idx == idx) goto skip_introducing_symbol;
+//         }
+// 
+//         symbol_introduce(context, context->checker.current_scope, param->local->token, (AstNode *) param->local);
+// 
+//     skip_introducing_symbol:
+//         idx++;
+//     }
+// 
+//     bh_arr_each(AstParam, param, query->function_header->params) {
+//         if (param->local->type_node != NULL) {
+//             context->checker.resolved_a_symbol = 0;
+// 
+//             onyx_errors_disable(context);
+//             param->local->flags |= Ast_Flag_Symbol_Invisible;
+//             symres_type(context, &param->local->type_node);
+//             param->local->flags &= ~Ast_Flag_Symbol_Invisible;
+//             onyx_errors_enable(context);
+//             
+//             if (context->checker.resolved_a_symbol) query->successful_symres = 1;
+//         }
+//     }
+// 
+//     scope_leave(context);
+//     return Symres_Success;
+// }
 
 // SYMRES_FUNC(foreign_block, AstForeignBlock *fb) {
 //     if (fb->scope == NULL)
@@ -2037,26 +2027,26 @@ SYMRES_FUNC(polyquery, AstPolyQuery *query) {
 //     return Symres_Complete;
 // }
 
-SYMRES_FUNC(include, AstInclude* include) {
-    if (include->name != NULL) return Symres_Goto_Parse;
-
-    SYMRES(expression, &include->name_node);
-
-    if (include->name_node->kind != Ast_Kind_StrLit) {
-        ONYX_ERROR(include->token->pos, Error_Critical, "Expected compile-time known string literal here. Got '%s'.", onyx_ast_node_kind_string(include->name_node->kind));
-        return Symres_Error;
-    }
-
-    OnyxToken* str_token = include->name_node->token;
-    if (str_token != NULL) {
-        token_toggle_end(str_token);
-        include->name = bh_strdup(context->ast_alloc, str_token->text);
-        string_process_escape_seqs(include->name, include->name, strlen(include->name));
-        token_toggle_end(str_token);
-    }
-
-    return Symres_Goto_Parse;
-}
+// SYMRES_FUNC(include, AstInclude* include) {
+//     if (include->name != NULL) return Symres_Goto_Parse;
+// 
+//     SYMRES(expression, &include->name_node);
+// 
+//     if (include->name_node->kind != Ast_Kind_StrLit) {
+//         ONYX_ERROR(include->token->pos, Error_Critical, "Expected compile-time known string literal here. Got '%s'.", onyx_ast_node_kind_string(include->name_node->kind));
+//         return Symres_Error;
+//     }
+// 
+//     OnyxToken* str_token = include->name_node->token;
+//     if (str_token != NULL) {
+//         token_toggle_end(str_token);
+//         include->name = bh_strdup(context->ast_alloc, str_token->text);
+//         string_process_escape_seqs(include->name, include->name, strlen(include->name));
+//         token_toggle_end(str_token);
+//     }
+// 
+//     return Symres_Goto_Parse;
+// }
 
 // SYMRES_FUNC(file_contents, AstFileContents* fc) {
 //     SYMRES(expression, &fc->filename_expr);
@@ -2069,54 +2059,54 @@ SYMRES_FUNC(include, AstInclude* include) {
 //     return Symres_Success;
 // }
 
-SYMRES_FUNC(import, AstImport* import) {
-    AstPackage* package = import->imported_package;
-    SYMRES(package, package);
-
-    if (import->import_package_itself) {
-        OnyxToken *name = bh_arr_last(package->path);
-        name = import->qualified_package_name ? import->qualified_package_name : name;
-
-        symbol_introduce(context, context->checker.current_entity->scope, name, (AstNode *) package);
-    }
-
-    if (import->specified_imports) {
-        package_track_use_package(context, package->package, import->entity);
-
-        Scope *import_scope = package->package->scope;
-        if (import_scope == context->checker.current_scope) return Symres_Complete;
-
-        // use X { * }
-        if (import->only == NULL) {
-            OnyxFilePos pos = import->token->pos;
-            scope_include(context, context->checker.current_scope, import_scope, pos);
-            return Symres_Complete;
-        }
-
-
-        // use X { a, b, c }
-        bh_arr_each(QualifiedImport, qi, import->only) {
-            AstNode* imported = symbol_resolve(context, import_scope, qi->symbol_name);
-            if (imported == NULL) { // :SymresStall
-                if (context->checker.report_unresolved_symbols) {
-                    // TODO: Change package->name to package->qualified_name when
-                    // merged with the documentation generation branch.
-                    ONYX_ERROR(qi->symbol_name->pos, Error_Critical, 
-                            "The symbol '%b' was not found the package '%s'.",
-                            qi->symbol_name->text, qi->symbol_name->length, package->package->name);
-
-                    return Symres_Error;
-                } else {
-                    return Symres_Yield_Macro;
-                }
-            }
-
-            symbol_introduce(context, context->checker.current_scope, qi->as_name, imported);
-        }
-    }
-
-    return Symres_Complete;
-}
+// SYMRES_FUNC(import, AstImport* import) {
+//     AstPackage* package = import->imported_package;
+//     SYMRES(package, package);
+// 
+//     if (import->import_package_itself) {
+//         OnyxToken *name = bh_arr_last(package->path);
+//         name = import->qualified_package_name ? import->qualified_package_name : name;
+// 
+//         symbol_introduce(context, context->checker.current_entity->scope, name, (AstNode *) package);
+//     }
+// 
+//     if (import->specified_imports) {
+//         package_track_use_package(context, package->package, import->entity);
+// 
+//         Scope *import_scope = package->package->scope;
+//         if (import_scope == context->checker.current_scope) return Symres_Complete;
+// 
+//         // use X { * }
+//         if (import->only == NULL) {
+//             OnyxFilePos pos = import->token->pos;
+//             scope_include(context, context->checker.current_scope, import_scope, pos);
+//             return Symres_Complete;
+//         }
+// 
+// 
+//         // use X { a, b, c }
+//         bh_arr_each(QualifiedImport, qi, import->only) {
+//             AstNode* imported = symbol_resolve(context, import_scope, qi->symbol_name);
+//             if (imported == NULL) { // :SymresStall
+//                 if (context->checker.report_unresolved_symbols) {
+//                     // TODO: Change package->name to package->qualified_name when
+//                     // merged with the documentation generation branch.
+//                     ONYX_ERROR(qi->symbol_name->pos, Error_Critical, 
+//                             "The symbol '%b' was not found the package '%s'.",
+//                             qi->symbol_name->text, qi->symbol_name->length, package->package->name);
+// 
+//                     return Symres_Error;
+//                 } else {
+//                     return Symres_Yield_Macro;
+//                 }
+//             }
+// 
+//             symbol_introduce(context, context->checker.current_scope, qi->as_name, imported);
+//         }
+//     }
+// 
+//     return Symres_Complete;
+// }
 
 // SYMRES_FUNC(js_node, AstJsNode* js) {
 //     if (js->order_expr) SYMRES(expression, &js->order_expr);
@@ -2126,30 +2116,30 @@ SYMRES_FUNC(import, AstImport* import) {
 //     return Symres_Success;
 // }
 
-SYMRES_FUNC(compiler_extension, AstCompilerExtension *ext) {
-    if (context->options->no_compiler_extensions) {
-        ONYX_ERROR(ext->token->pos, Error_Critical, "Compiler extensions are disabled in this compilation.");
-        return Symres_Error;
-    }
+// SYMRES_FUNC(compiler_extension, AstCompilerExtension *ext) {
+//     if (context->options->no_compiler_extensions) {
+//         ONYX_ERROR(ext->token->pos, Error_Critical, "Compiler extensions are disabled in this compilation.");
+//         return Symres_Error;
+//     }
+// 
+//     token_toggle_end(ext->name);
+//     TypeMatch status = compiler_extension_start(context, ext->name->text, ext->token->pos.filename, context->checker.current_entity, &ext->extension_id);
+//     token_toggle_end(ext->name);
+// 
+//     if (status == TYPE_MATCH_FAILED) {
+//         ONYX_ERROR(ext->token->pos, Error_Critical, "Failed to initialize this compiler extension.");
+//         return Symres_Error;
+//     }
+// 
+//     if (status == TYPE_MATCH_YIELD) {
+//         return Symres_Yield_Macro;
+//     }
+// 
+//     return Symres_Complete;
+// }
 
-    token_toggle_end(ext->name);
-    TypeMatch status = compiler_extension_start(context, ext->name->text, ext->token->pos.filename, context->checker.current_entity, &ext->extension_id);
-    token_toggle_end(ext->name);
 
-    if (status == TYPE_MATCH_FAILED) {
-        ONYX_ERROR(ext->token->pos, Error_Critical, "Failed to initialize this compiler extension.");
-        return Symres_Error;
-    }
-
-    if (status == TYPE_MATCH_YIELD) {
-        return Symres_Yield_Macro;
-    }
-
-    return Symres_Complete;
-}
-
-
-void symres_entity(Context *context, Entity* ent) {
+// void symres_entity(Context *context, Entity* ent) {
     // context->checker.current_entity = ent;
     // if (ent->scope) scope_enter(context, ent->scope);
 
@@ -2158,7 +2148,7 @@ void symres_entity(Context *context, Entity* ent) {
     // SymresStatus ss = Symres_Success;
     // EntityState next_state = Entity_State_Check_Types;
 
-    switch (ent->type) {
+    // switch (ent->type) {
         // case Entity_Type_Binding: {
         //     symbol_introduce(context, context->checker.current_scope, ent->binding->token, ent->binding->node);
         //     track_documentation_for_symbol_info(context, ent->binding->node, ent->binding);
@@ -2177,27 +2167,27 @@ void symres_entity(Context *context, Entity* ent) {
         // case Entity_Type_File_Contents:           ss = symres_file_contents(context, ent->file_contents); break;
         // case Entity_Type_JS:                      ss = symres_js_node(context, ent->js); break;
 
-        case Entity_Type_Foreign_Function_Header:
-        case Entity_Type_Temp_Function_Header:
-        case Entity_Type_Function_Header:         ss = symres_function_header(context, ent->function); break;
+        // case Entity_Type_Foreign_Function_Header:
+        // case Entity_Type_Temp_Function_Header:
+        // case Entity_Type_Function_Header:         ss = symres_function_header(context, ent->function); break;
         // case Entity_Type_Function:                ss = symres_function(context, ent->function);        break;
 
         // case Entity_Type_Global_Header:           ss = symres_global(context, ent->global); break;
 
-        case Entity_Type_Import:                  ss = symres_import(context, ent->import); break;
+        // case Entity_Type_Import:                  ss = symres_import(context, ent->import); break;
 
 
-        case Entity_Type_Polymorphic_Proc:        ss = symres_polyproc(context, ent->poly_proc);
-                                                  next_state = Entity_State_Finalized;
-                                                  break;
+        // case Entity_Type_Polymorphic_Proc:        ss = symres_polyproc(context, ent->poly_proc);
+        //                                           next_state = Entity_State_Finalized;
+        //                                           break;
 
         // case Entity_Type_Interface:               ss = symres_interface(context, ent->interface); break;
 
-        case Entity_Type_Overloaded_Function:     ss = symres_overloaded_function(context, ent->overloaded_function); break;
+        // case Entity_Type_Overloaded_Function:     ss = symres_overloaded_function(context, ent->overloaded_function); break;
         // case Entity_Type_Expression:              ss = symres_expression(context, &ent->expr); break;
         // case Entity_Type_String_Literal:          ss = symres_expression(context, &ent->expr); break;
         // case Entity_Type_Type_Alias:              ss = symres_type(context, &ent->type_alias); break;
-        case Entity_Type_Enum:                    ss = symres_enum(context, ent->enum_type); break;
+        // case Entity_Type_Enum:                    ss = symres_enum(context, ent->enum_type); break;
         // case Entity_Type_Memory_Reservation_Type: ss = symres_memres_type(context, &ent->mem_res); break;
         // case Entity_Type_Memory_Reservation:      ss = symres_memres(context, &ent->mem_res); break;
         // case Entity_Type_Struct_Member_Default:   ss = symres_struct_defaults(context, (AstType *) ent->type_alias); break;
@@ -2211,23 +2201,23 @@ void symres_entity(Context *context, Entity* ent) {
         //                                               ss = Symres_Success;
         //                                           }
         //                                           break;
-        case Entity_Type_Compiler_Extension:      ss = symres_compiler_extension(context, ent->compiler_extension); break;
-        case Entity_Type_Procedural_Expansion:    ss = symres_proc_expansion(context, &ent->proc_expansion, PMEK_Top_Level); break;
+        // case Entity_Type_Compiler_Extension:      ss = symres_compiler_extension(context, ent->compiler_extension); break;
+        // case Entity_Type_Procedural_Expansion:    ss = symres_proc_expansion(context, &ent->proc_expansion, PMEK_Top_Level); break;
 
-        default: break;
-    }
+    //     default: break;
+    // }
 
-    if (ss == Symres_Yield_Macro) ent->macro_attempts++;
-    if (ss == Symres_Yield_Micro) ent->micro_attempts++;
-    if (ss == Symres_Complete)    ent->state = Entity_State_Finalized;
-    if (ss == Symres_Goto_Parse)  ent->state = Entity_State_Parse;
-    if (ss == Symres_Error)       ent->state = Entity_State_Failed;
-    if (ss == Symres_Success) {
-        ent->macro_attempts = 0;
-        ent->micro_attempts = 0;
-        ent->state = next_state;
-    }
+    // if (ss == Symres_Yield_Macro) ent->macro_attempts++;
+    // if (ss == Symres_Yield_Micro) ent->micro_attempts++;
+    // if (ss == Symres_Complete)    ent->state = Entity_State_Finalized;
+    // if (ss == Symres_Goto_Parse)  ent->state = Entity_State_Parse;
+    // if (ss == Symres_Error)       ent->state = Entity_State_Failed;
+    // if (ss == Symres_Success) {
+    //     ent->macro_attempts = 0;
+    //     ent->micro_attempts = 0;
+    //     ent->state = next_state;
+    // }
 
-    context->checker.current_scope = NULL;
-    context->checker.current_entity = NULL;
-}
+    // context->checker.current_scope = NULL;
+    // context->checker.current_entity = NULL;
+// }
