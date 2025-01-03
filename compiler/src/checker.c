@@ -108,6 +108,7 @@ CHECK_FUNC(return, AstReturn* retnode);
 CHECK_FUNC(if, AstIfWhile* ifnode);
 CHECK_FUNC(while, AstIfWhile* whilenode);
 CHECK_FUNC(for, AstFor* fornode);
+CHECK_FUNC(case, AstSwitchCase *casenode);
 CHECK_FUNC(switch, AstSwitch* switchnode);
 CHECK_FUNC(call, AstCall** pcall);
 CHECK_FUNC(binaryop, AstBinaryOp** pbinop);
@@ -168,6 +169,8 @@ static inline void fill_in_type(Context *context, AstTyped* node) {
 }
 
 CHECK_FUNC(symbol, AstNode** symbol_node) {
+    if (context->checker.dont_resolve_symbols_hack) return Check_Yield;
+
     OnyxToken* token = (*symbol_node)->token;
     AstNode* res = symbol_resolve(context, context->checker.current_scope, token);
 
@@ -401,6 +404,7 @@ CHECK_FUNC(for, AstFor* fornode) {
     if (fornode->index_var) {
         fornode->index_var->flags |= Ast_Flag_Cannot_Take_Addr;
         CHECK(local, &fornode->index_var);
+        fill_in_type(context, (AstTyped *) fornode->index_var);
 
         if (!type_is_integer(fornode->index_var->type)) {
             ERROR_(fornode->index_var->token->pos, "Index for a for loop must be an integer type, but it is a '%s'.", type_get_name(context, fornode->index_var->type));
@@ -629,6 +633,35 @@ static CheckStatus collect_switch_case_blocks(Context *context, AstSwitch* switc
     return Check_Success;
 }
 
+CHECK_FUNC(case, AstSwitchCase *casenode) {
+    if (!casenode->is_default) {
+        bh_arr_each(AstTyped *, expr, casenode->values) {
+            CHECK(expression, expr);
+        }
+    }
+
+    if (casenode->capture) {
+        if (casenode->scope == NULL) {
+            casenode->scope = scope_create(context, context->checker.current_scope, casenode->token->pos);
+            symbol_introduce(context, casenode->scope, casenode->capture->token, (AstNode *) casenode->capture);
+        }
+
+        scope_enter(context, casenode->scope);
+    }
+
+    if (casenode->body_is_expr) {
+        CHECK(expression, &casenode->expr);
+    } else {
+        CHECK(block, casenode->block);
+    }
+
+    if (casenode->capture) {
+        scope_leave(context);
+    }
+
+    return Check_Success;
+}
+
 CHECK_FUNC(switch, AstSwitch* switchnode) {
     if (switchnode->initialization != NULL) {
         if (switchnode->scope == NULL) {
@@ -675,8 +708,9 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
 
             default: assert(0);
         }
+
+        switchnode->flags |= Ast_Flag_Has_Been_Checked;
     }
-    switchnode->flags |= Ast_Flag_Has_Been_Checked;
 
     // Should the case block code be checked here?
     // Or should this just exist to resolve macros and expand #unquotes
@@ -700,7 +734,7 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
         AstSwitchCase *sc = switchnode->cases[i];
 
         if (sc->capture && bh_arr_length(sc->values) != 1) {
-            ERROR(sc->token->pos, "Expected exactly one value in switch-case when using a capture, i.e. `case value: X { ... }`.");
+            ERROR(sc->token->pos, "Expected exactly one value in switch-case when using a capture, i.e. `case X as value { ... }`.");
         }
 
         if (sc->capture && switchnode->switch_kind != Switch_Kind_Union) {
@@ -1038,6 +1072,10 @@ CHECK_FUNC(call, AstCall** pcall) {
         return Check_Error;
     }
 
+    u32 current_checking_level_store = context->checker.current_checking_level;
+    CHECK(expression, &call->callee);
+    context->checker.current_checking_level = current_checking_level_store;
+
     if (call->kind == Ast_Kind_Call) {
         AstNode* callee = strip_aliases((AstNode *) call->callee);
         if (callee->kind == Ast_Kind_Poly_Struct_Type ||
@@ -1050,8 +1088,7 @@ CHECK_FUNC(call, AstCall** pcall) {
 
     if (call->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
-    u32 current_checking_level_store = context->checker.current_checking_level;
-    CHECK(expression, &call->callee);
+    current_checking_level_store = context->checker.current_checking_level;
     CHECK(arguments, &call->args);
     context->checker.current_checking_level = current_checking_level_store;
 
@@ -2861,13 +2898,14 @@ CHECK_FUNC(method_call, AstBinaryOp** pmcall) {
         mcall->flags |= Ast_Flag_Has_Been_Checked;
     }
 
-    CHECK(call, (AstCall **) &mcall->right);
-
     // TODO: This doesn't look right? Does this ever happen? Check this...
     if (mcall->right->kind != Ast_Kind_Call) {
         *pmcall = (AstBinaryOp *) mcall->right;
+        // CHECK(expression, (AstCall **) pmcall);
+        return Check_Yield;
 
     } else {
+        CHECK(call, (AstCall **) &mcall->right);
         mcall->type = mcall->right->type;
     }
 
@@ -3516,6 +3554,7 @@ CHECK_FUNC(statement, AstNode** pstmt, b32 *remove) {
         case Ast_Kind_While:       return check_while(context, (AstIfWhile *) stmt);
         case Ast_Kind_For:         return check_for(context, (AstFor *) stmt);
         case Ast_Kind_Switch:      return check_switch(context, (AstSwitch *) stmt);
+        case Ast_Kind_Switch_Case: return check_case(context, (AstSwitchCase *) stmt);
         case Ast_Kind_Block:       return check_block(context, (AstBlock *) stmt);
         case Ast_Kind_Defer:       return check_statement(context, &((AstDefer *) stmt)->stmt, remove);
         case Ast_Kind_Argument:    return check_expression(context, (AstTyped **) &((AstArgument *) stmt)->value);
@@ -4138,6 +4177,13 @@ CHECK_FUNC(struct, AstStructType* s_node) {
 
     bh_arr_each(AstStructMember *, smem, s_node->members) {
         AstStructMember *member = *smem;
+        if (member->initial_value) {
+            CHECK(expression, &member->initial_value);
+        }
+    }
+
+    bh_arr_each(AstStructMember *, smem, s_node->members) {
+        AstStructMember *member = *smem;
         track_declaration_for_symbol_info(context, member->token->pos, (AstNode *) member);
 
         if (member->type_node) {
@@ -4371,50 +4417,57 @@ CHECK_FUNC(function_header, AstFunction* func) {
 
     scope_enter(context, func->scope);
 
-    bh_arr_each(AstParam, param, func->params) {
-        symbol_introduce(context, context->checker.current_scope, param->local->token, (AstNode *) param->local);
-    }
+    // if (!(func->flags & Ast_Flag_Hack_Only_Check_Types)) {
+        // HACK document this
+        if (!context->checker.dont_resolve_symbols_hack) {
+            bh_arr_each(AstParam, param, func->params) {
+                symbol_introduce(context, context->checker.current_scope, param->local->token, (AstNode *) param->local);
+            }
 
-    //
-    // We have to pre-check the type nodes of the parameters.
-    bh_arr_each(AstParam, param, func->params) {
-        if (param->local->type_node != NULL) {
-            param->local->type_node->flags |= (func->flags & Ast_Flag_Header_Check_No_Error);
-            CHECK_INVISIBLE(type, param->local, &param->local->type_node);
-        }
-    }
-
-    if (potentially_convert_function_to_polyproc(context, func)) {
-        return Check_Complete;
-    }
-
-    if (func->nodes_that_need_entities_after_clone && bh_arr_length(func->nodes_that_need_entities_after_clone) > 0 && func->entity) {
-        bh_arr_each(AstNode *, node, func->nodes_that_need_entities_after_clone) {
-            // This makes a lot of assumptions about how these nodes are being processed,
-            // and I don't want to start using this with other nodes without considering
-            // what the ramifications of that is.
-            assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents
-                    || (*node)->kind == Ast_Kind_Function || (*node)->kind == Ast_Kind_Polymorphic_Proc);
-
-            // Need to use current_scope->parent because current_scope is the function body scope.
-            Scope *scope = context->checker.current_scope->parent;
-
-            if ((*node)->kind == Ast_Kind_Static_If) {
-                AstIf *static_if = (AstIf *) *node;
-                assert(static_if->defined_in_scope);
-                scope = static_if->defined_in_scope;
-
-                if (func->poly_scope) {
-                    scope = scope_create(context, scope, static_if->token->pos);
-                    scope_include(context, scope, func->poly_scope, static_if->token->pos);
+            //
+            // We have to pre-check the type nodes of the parameters.
+            bh_arr_each(AstParam, param, func->params) {
+                if (param->local->type_node != NULL) {
+                    param->local->type_node->flags |= (func->flags & Ast_Flag_Header_Check_No_Error);
+                    param->local->flags |= Ast_Flag_Symbol_Invisible;
+                    check_type(context, &param->local->type_node);
+                    param->local->flags &= ~Ast_Flag_Symbol_Invisible;
                 }
             }
 
-            add_entities_for_node(&context->entities, NULL, *node, scope, func->entity->package);
+            if (potentially_convert_function_to_polyproc(context, func)) {
+                return Check_Complete;
+            }
         }
 
-        bh_arr_set_length(func->nodes_that_need_entities_after_clone, 0);
-    }
+        if (func->nodes_that_need_entities_after_clone && bh_arr_length(func->nodes_that_need_entities_after_clone) > 0 && func->entity) {
+            bh_arr_each(AstNode *, node, func->nodes_that_need_entities_after_clone) {
+                // This makes a lot of assumptions about how these nodes are being processed,
+                // and I don't want to start using this with other nodes without considering
+                // what the ramifications of that is.
+                assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents
+                        || (*node)->kind == Ast_Kind_Function || (*node)->kind == Ast_Kind_Polymorphic_Proc);
+
+                // Need to use current_scope->parent because current_scope is the function body scope.
+                Scope *scope = context->checker.current_scope->parent;
+
+                if ((*node)->kind == Ast_Kind_Static_If) {
+                    AstIf *static_if = (AstIf *) *node;
+                    assert(static_if->defined_in_scope);
+                    scope = static_if->defined_in_scope;
+
+                    if (func->poly_scope) {
+                        scope = scope_create(context, scope, static_if->token->pos);
+                        scope_include(context, scope, func->poly_scope, static_if->token->pos);
+                    }
+                }
+
+                add_entities_for_node(&context->entities, NULL, *node, scope, func->entity->package);
+            }
+
+            bh_arr_set_length(func->nodes_that_need_entities_after_clone, 0);
+        }
+    // }
 
     bh_arr_each(AstParam, param, func->params) {
         AstLocal* local = param->local;
@@ -4612,6 +4665,8 @@ CHECK_FUNC(type, AstType** ptype) {
     
     if (type->kind == Ast_Kind_Symbol) {
         CHECK(symbol, (AstNode **) ptype);
+        type = *ptype;
+        original_type = type;
     }
 
     if (type->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
@@ -4660,13 +4715,15 @@ CHECK_FUNC(type, AstType** ptype) {
         case Ast_Kind_Function_Type: {
             AstFunctionType* ftype = (AstFunctionType *) type;
 
-            CHECK(type, &ftype->return_type);
+            // TODO: Document why return type has to come after parameter type... 
 
             if (ftype->param_count > 0) {
                 fori (i, 0, (i64) ftype->param_count) {
                     CHECK(type, &ftype->params[i]);
                 }
             }
+
+            CHECK(type, &ftype->return_type);
             break;
         }
 
@@ -4743,6 +4800,12 @@ CHECK_FUNC(type, AstType** ptype) {
                 }
             }
 
+            break;
+        }
+
+        case Ast_Kind_Type_Alias: {
+            AstTypeAlias *type_alias = (AstTypeAlias *) type;
+            CHECK(type, &type_alias->to);
             break;
         }
 
@@ -4942,6 +5005,8 @@ CHECK_FUNC(process_directive, AstNode* directive) {
         if (exported_func->exported_name == NULL) {
             exported_func->exported_name = export->export_name;
         }
+
+        return Check_Success;
     }
 
     if (directive->kind == Ast_Kind_Directive_Init) {
@@ -5018,18 +5083,14 @@ CHECK_FUNC(process_directive, AstNode* directive) {
             inject->symbol = acc->token;
         }
 
-        CHECK(expression, &inject->dest);
-
-        if (!node_is_type((AstNode *) inject->dest)) {
-            CHECK(expression, &inject->dest);
-        }
+        // TODO Document why this does not check the return value.
+        check_expression(context, &inject->dest);
 
         Scope *scope = get_scope_from_node_or_create(context, (AstNode *) inject->dest);
         if (scope == NULL) {
             YIELD_ERROR(inject->token->pos, "Cannot #inject here.");
         }
 
-        // Check if this line is even necessary
         inject->binding->token = inject->symbol;
 
         if (inject->binding->kind == Ast_Kind_Function || inject->binding->kind == Ast_Kind_Polymorphic_Proc) {
@@ -5432,6 +5493,11 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
     if (query->function_header->scope == NULL)
         query->function_header->scope = scope_create(context, query->proc->parent_scope_of_poly_proc, query->token->pos);
 
+    // query->function_header->flags |= Ast_Flag_Hack_Only_Check_Types;
+    context->checker.dont_resolve_symbols_hack = 1;
+    check_temp_function_header(context, query->function_header);
+    context->checker.dont_resolve_symbols_hack = 0;
+
     scope_enter(context, query->function_header->scope);
 
     {
@@ -5461,8 +5527,6 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
             if (context->checker.resolved_a_symbol) query->successful_symres = 1;
         }
     }
-
-    CHECK(temp_function_header, query->function_header);
 
     b32 solved_something = 0;
     i32 solved_count = 0;

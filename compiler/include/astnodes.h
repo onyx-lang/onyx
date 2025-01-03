@@ -327,7 +327,9 @@ typedef enum AstFlags {
 
     Ast_Flag_Constraint_Is_Expression = BH_BIT(28),
 
-    Ast_Flag_Has_Been_Scheduled_For_Emit = BH_BIT(29)
+    Ast_Flag_Has_Been_Scheduled_For_Emit = BH_BIT(29),
+
+    Ast_Flag_Hack_Only_Check_Types = BH_BIT(30)
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -1931,6 +1933,7 @@ typedef struct CheckerData {
 
     Scope *current_scope;
     b32 resolved_a_symbol;
+    b32 dont_resolve_symbols_hack;
 } CheckerData;
 
 typedef struct ClonerData {
