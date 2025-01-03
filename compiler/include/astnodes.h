@@ -1491,6 +1491,7 @@ struct AstFunction {
     b32 is_intrinsic       : 1;
 
     b32 named_return_locals_added : 1;
+    b32 ready_for_body_to_be_checked : 1;
 };
 
 struct AstCaptureBlock {

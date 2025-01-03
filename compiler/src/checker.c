@@ -3009,7 +3009,7 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
         // would have to wait for the entity to pass through, which the code generation does not know
         // about.
         CHECK(type, (AstType **) pexpr);
-        expr = strip_aliases((AstNode *) *pexpr);
+        expr = (AstTyped *) strip_aliases((AstNode *) *pexpr);
 
         // Don't try to construct a polystruct ahead of time because you can't.
         if (expr->kind != Ast_Kind_Poly_Struct_Type &&
@@ -3789,7 +3789,7 @@ CHECK_FUNC(function, AstFunction* func) {
     if (func->flags & Ast_Flag_Function_Is_Lambda_Inside_PolyProc) return Check_Complete;
 
     if (func->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
-    if (func->entity_header && func->entity_header->state < Entity_State_Code_Gen)
+    if (!func->ready_for_body_to_be_checked)
         YIELD(func->token->pos, "Waiting for procedure header to pass type-checking");
 
     bh_arr_clear(context->checker.expected_return_type_stack);
@@ -4151,9 +4151,6 @@ CHECK_FUNC(struct, AstStructType* s_node) {
     if (s_node->entity_defaults && s_node->entity_defaults->state < Entity_State_Check_Types)
         YIELD(s_node->token->pos, "Waiting for struct member defaults to pass symbol resolution.");
 
-    // if (s_node->flags & Ast_Flag_Type_Is_Considered_Complete) return Check_Success;
-
-    // s_node->flags |= Ast_Flag_Type_Is_Considered_Complete;
     s_node->flags |= Ast_Flag_Comptime;
 
     assert(s_node->scope);
@@ -4453,57 +4450,58 @@ CHECK_FUNC(function_header, AstFunction* func) {
 
     scope_enter(context, func->scope);
 
-    // if (!(func->flags & Ast_Flag_Hack_Only_Check_Types)) {
-        // HACK document this
-        if (!mode_enabled(context, CM_Dont_Resolve_Symbols)) {
-            bh_arr_each(AstParam, param, func->params) {
-                symbol_introduce(context, context->checker.current_scope, param->local->token, (AstNode *) param->local);
-            }
+    if (!mode_enabled(context, CM_Dont_Resolve_Symbols)) {
+        if (func->captures) {
+            CHECK(capture_block, func->captures, func->scope_to_lookup_captured_values);
+        }
 
-            //
-            // We have to pre-check the type nodes of the parameters.
-            bh_arr_each(AstParam, param, func->params) {
-                if (param->local->type_node != NULL) {
-                    param->local->type_node->flags |= (func->flags & Ast_Flag_Header_Check_No_Error);
-                    param->local->flags |= Ast_Flag_Symbol_Invisible;
-                    check_type(context, &param->local->type_node);
-                    param->local->flags &= ~Ast_Flag_Symbol_Invisible;
-                }
-            }
+        bh_arr_each(AstParam, param, func->params) {
+            symbol_introduce(context, context->checker.current_scope, param->local->token, (AstNode *) param->local);
+        }
 
-            if (potentially_convert_function_to_polyproc(context, func)) {
-                return Check_Complete;
+        //
+        // We have to pre-check the type nodes of the parameters.
+        bh_arr_each(AstParam, param, func->params) {
+            if (param->local->type_node != NULL) {
+                param->local->type_node->flags |= (func->flags & Ast_Flag_Header_Check_No_Error);
+                param->local->flags |= Ast_Flag_Symbol_Invisible;
+                check_type(context, &param->local->type_node);
+                param->local->flags &= ~Ast_Flag_Symbol_Invisible;
             }
         }
 
-        if (func->nodes_that_need_entities_after_clone && bh_arr_length(func->nodes_that_need_entities_after_clone) > 0 && func->entity) {
-            bh_arr_each(AstNode *, node, func->nodes_that_need_entities_after_clone) {
-                // This makes a lot of assumptions about how these nodes are being processed,
-                // and I don't want to start using this with other nodes without considering
-                // what the ramifications of that is.
-                assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents
-                        || (*node)->kind == Ast_Kind_Function || (*node)->kind == Ast_Kind_Polymorphic_Proc);
+        if (potentially_convert_function_to_polyproc(context, func)) {
+            return Check_Complete;
+        }
+    }
 
-                // Need to use current_scope->parent because current_scope is the function body scope.
-                Scope *scope = context->checker.current_scope->parent;
+    if (func->nodes_that_need_entities_after_clone && bh_arr_length(func->nodes_that_need_entities_after_clone) > 0 && func->entity) {
+        bh_arr_each(AstNode *, node, func->nodes_that_need_entities_after_clone) {
+            // This makes a lot of assumptions about how these nodes are being processed,
+            // and I don't want to start using this with other nodes without considering
+            // what the ramifications of that is.
+            assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents
+                    || (*node)->kind == Ast_Kind_Function || (*node)->kind == Ast_Kind_Polymorphic_Proc);
 
-                if ((*node)->kind == Ast_Kind_Static_If) {
-                    AstIf *static_if = (AstIf *) *node;
-                    assert(static_if->defined_in_scope);
-                    scope = static_if->defined_in_scope;
+            // Need to use current_scope->parent because current_scope is the function body scope.
+            Scope *scope = context->checker.current_scope->parent;
 
-                    if (func->poly_scope) {
-                        scope = scope_create(context, scope, static_if->token->pos);
-                        scope_include(context, scope, func->poly_scope, static_if->token->pos);
-                    }
+            if ((*node)->kind == Ast_Kind_Static_If) {
+                AstIf *static_if = (AstIf *) *node;
+                assert(static_if->defined_in_scope);
+                scope = static_if->defined_in_scope;
+
+                if (func->poly_scope) {
+                    scope = scope_create(context, scope, static_if->token->pos);
+                    scope_include(context, scope, func->poly_scope, static_if->token->pos);
                 }
-
-                add_entities_for_node(&context->entities, NULL, *node, scope, func->entity->package);
             }
 
-            bh_arr_set_length(func->nodes_that_need_entities_after_clone, 0);
+            add_entities_for_node(&context->entities, NULL, *node, scope, func->entity->package);
         }
-    // }
+
+        bh_arr_set_length(func->nodes_that_need_entities_after_clone, 0);
+    }
 
     bh_arr_each(AstParam, param, func->params) {
         AstLocal* local = param->local;
@@ -4591,16 +4589,14 @@ CHECK_FUNC(function_header, AstFunction* func) {
         }
     }
 
+    func->ready_for_body_to_be_checked = 1;
+
     func->type = type_build_function_type(context, func);
     if (func->type == NULL) YIELD(func->token->pos, "Waiting for function type to be constructed");
 
     if (func->foreign.import_name) {
         CHECK(expression, &func->foreign.module_name);
         CHECK(expression, &func->foreign.import_name);
-    }
-
-    if (func->captures) {
-        CHECK(capture_block, func->captures, func->scope_to_lookup_captured_values);
     }
 
     if (context->options->stack_trace_enabled) {
