@@ -1917,6 +1917,11 @@ typedef struct OnyxDocInfo {
     u32 next_file_id;
 } OnyxDocInfo;
 
+typedef enum CheckerMode {
+    CM_Dont_Resolve_Symbols    = BH_BIT(1),
+    CM_Dont_Check_Case_Bodies  = BH_BIT(2),
+    CM_Allow_Init_Expressions  = BH_BIT(3),
+} CheckerMode;
 
 typedef struct CheckerData {
     b32 expression_types_must_be_known;
@@ -1930,10 +1935,12 @@ typedef struct CheckerData {
     bh_arr(bh_arr(AstLocal *)) named_return_values_stack;
 
     u32 current_checking_level;
+    CheckerMode mode;
 
     Scope *current_scope;
+    bh_arr(Scope *) scope_stack;
+
     b32 resolved_a_symbol;
-    b32 dont_resolve_symbols_hack;
 } CheckerData;
 
 typedef struct ClonerData {

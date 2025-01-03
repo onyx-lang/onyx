@@ -154,10 +154,29 @@ CHECK_FUNC(package, AstPackage* package);
 static void scope_enter(Context *context, Scope* new_scope) {
     assert(new_scope);
     context->checker.current_scope = new_scope;
+    bh_arr_push(context->checker.scope_stack, new_scope);
 }
 
 static void scope_leave(Context *context) {
-    context->checker.current_scope = context->checker.current_scope->parent;
+    assert(bh_arr_length(context->checker.scope_stack) > 0);
+    bh_arr_pop(context->checker.scope_stack);
+    context->checker.current_scope = bh_arr_last(context->checker.scope_stack);
+}
+
+static void clear_modes(Context *context) {
+    context->checker.mode = 0;
+}
+
+static void enable_mode(Context *context, CheckerMode mode) {
+    context->checker.mode |= mode;
+}
+
+static void disable_mode(Context *context, CheckerMode mode) {
+    context->checker.mode &= ~mode;
+}
+
+static b32 mode_enabled(Context *context, CheckerMode mode) {
+    return (context->checker.mode & mode) != 0;
 }
 
 static inline void fill_in_type(Context *context, AstTyped* node) {
@@ -168,8 +187,21 @@ static inline void fill_in_type(Context *context, AstTyped* node) {
     }
 }
 
+static void reset_statement_idx_on_all_blocks(Context *context, AstBlock *block) {
+    block->statement_idx = 0;
+
+    AstNode *walker = block->body;
+    while (walker) {
+        if (walker->kind == Ast_Kind_Block) {
+            reset_statement_idx_on_all_blocks(context, (AstBlock *) walker);
+        }
+
+        walker = walker->next;
+    }
+}
+
 CHECK_FUNC(symbol, AstNode** symbol_node) {
-    if (context->checker.dont_resolve_symbols_hack) return Check_Yield;
+    if (mode_enabled(context, CM_Dont_Resolve_Symbols)) return Check_Yield;
 
     OnyxToken* token = (*symbol_node)->token;
     AstNode* res = symbol_resolve(context, context->checker.current_scope, token);
@@ -640,6 +672,8 @@ CHECK_FUNC(case, AstSwitchCase *casenode) {
         }
     }
 
+    if (mode_enabled(context, CM_Dont_Check_Case_Bodies)) return Check_Success;
+
     if (casenode->capture) {
         if (casenode->scope == NULL) {
             casenode->scope = scope_create(context, context->checker.current_scope, casenode->token->pos);
@@ -663,7 +697,7 @@ CHECK_FUNC(case, AstSwitchCase *casenode) {
 }
 
 CHECK_FUNC(switch, AstSwitch* switchnode) {
-    if (switchnode->initialization != NULL) {
+    if (switchnode->initialization) {
         if (switchnode->scope == NULL) {
             switchnode->scope = scope_create(context, context->checker.current_scope, switchnode->token->pos);
         }
@@ -717,7 +751,9 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
     // then the cases are consumed into the array or cases, THEN the blocks
     // are actually checked?
     if (switchnode->cases == NULL) {
+        enable_mode(context, CM_Dont_Check_Case_Bodies);
         CHECK(block, switchnode->case_block);
+        disable_mode(context, CM_Dont_Check_Case_Bodies);
 
         bh_arr_new(context->gp_alloc, switchnode->cases, 4);
         if (collect_switch_case_blocks(context, switchnode, switchnode->case_block) != Check_Success) {
@@ -725,10 +761,8 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
         }
 
         // This is important, otherwise if this block has to return to symbol resolution.
-        switchnode->case_block->statement_idx = 0;
+        reset_statement_idx_on_all_blocks(context, switchnode->case_block);
     }
-
-    b32 all_cases_return = 1;
 
     fori (i, switchnode->yield_return_index, bh_arr_length(switchnode->cases)) {
         AstSwitchCase *sc = switchnode->cases[i];
@@ -863,19 +897,19 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
             }
         }
 
-        if (sc->capture) {
-            if (sc->scope == NULL) {
-                sc->scope = scope_create(context, context->checker.current_scope, sc->token->pos);
-                symbol_introduce(context, sc->scope, sc->capture->token, (AstNode *) sc->capture);
-            }
+        switchnode->yield_return_index += 1;
+    }
 
-            scope_enter(context, sc->scope);
-        }
+    CHECK(block, switchnode->case_block);
+
+    b32 all_cases_return = 1;
+    bh_arr_each(AstSwitchCase *, pcase, switchnode->cases) {
+        AstSwitchCase *sc = *pcase;
 
         if (sc->body_is_expr) {
-            CHECK(expression, &sc->expr);
             if (switchnode->type == NULL) {
                 switchnode->type = resolve_expression_type(context, sc->expr);
+
             } else {
                 TYPE_CHECK(&sc->expr, switchnode->type) {
                     ERROR_(sc->token->pos, "Expected case expression to be of type '%s', got '%s'.",
@@ -885,16 +919,8 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
             }
 
         } else {
-            CHECK(block, sc->block);
-
             all_cases_return = all_cases_return && (sc->block->flags & Ast_Flag_Block_Returns);
         }
-
-        if (sc->capture) {
-            scope_leave(context);
-        }
-
-        switchnode->yield_return_index += 1;
     }
 
     if (switchnode->default_case) {
@@ -1072,11 +1098,11 @@ CHECK_FUNC(call, AstCall** pcall) {
         return Check_Error;
     }
 
-    u32 current_checking_level_store = context->checker.current_checking_level;
-    CHECK(expression, &call->callee);
-    context->checker.current_checking_level = current_checking_level_store;
-
     if (call->kind == Ast_Kind_Call) {
+        u32 current_checking_level_store = context->checker.current_checking_level;
+        CHECK(expression, &call->callee);
+        context->checker.current_checking_level = current_checking_level_store;
+
         AstNode* callee = strip_aliases((AstNode *) call->callee);
         if (callee->kind == Ast_Kind_Poly_Struct_Type ||
             callee->kind == Ast_Kind_Poly_Union_Type) {
@@ -1088,7 +1114,7 @@ CHECK_FUNC(call, AstCall** pcall) {
 
     if (call->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
-    current_checking_level_store = context->checker.current_checking_level;
+    u32 current_checking_level_store = context->checker.current_checking_level;
     CHECK(arguments, &call->args);
     context->checker.current_checking_level = current_checking_level_store;
 
@@ -2742,8 +2768,8 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
     // there might be an `#inject` that will add a symbol later. When a cycle is
     // detected however, it uses the levenschtein distance to find the closest symbol
     // to the attempted lookup.
-    AstNode *n;
-    AstType *type_node;
+    AstNode *n = NULL;
+    AstType *type_node = NULL;
 
   try_resolve_from_type:
     type_node = field->expr->type->ast_type;
@@ -2752,6 +2778,7 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
     if (n) goto resolved;
 
   try_resolve_from_node:
+    type_node = NULL;
     n = try_symbol_raw_resolve_from_node(context, (AstNode *) field->expr, field->field);
 
   resolved:
@@ -2982,7 +3009,7 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
         // would have to wait for the entity to pass through, which the code generation does not know
         // about.
         CHECK(type, (AstType **) pexpr);
-        expr = *pexpr;
+        expr = strip_aliases((AstNode *) *pexpr);
 
         // Don't try to construct a polystruct ahead of time because you can't.
         if (expr->kind != Ast_Kind_Poly_Struct_Type &&
@@ -3014,7 +3041,11 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
     }
 
     if (expr->kind == Ast_Kind_Directive_Init) {
-        ERROR(expr->token->pos, "#init declarations are not allowed in normal expressions, only in #after clauses.");
+        if (!mode_enabled(context, CM_Allow_Init_Expressions)) {
+            ERROR(expr->token->pos, "#init declarations are not allowed in normal expressions, only in #after clauses.");
+        }
+
+        return Check_Success;
     }
 
     // We have to set the type_node of string literals outside of the parser,
@@ -3672,7 +3703,10 @@ CHECK_FUNC(block, AstBlock* block) {
         scope_include(context, context->checker.current_scope, block->quoted_block_capture_scope, block->token->pos);
 
     if (!block->body) {
-        scope_leave(context);
+        if (block->rules & Block_Rule_New_Scope) {
+            scope_leave(context);
+        }
+
         return Check_Success;
     }
 
@@ -4267,7 +4301,9 @@ CHECK_FUNC(struct_defaults, AstStructType* s_node) {
         CHECK(meta_tags, (*smem)->meta_tags);
     }
 
-    if (s_node->scope) scope_leave(context);
+    if (s_node->scope) {
+        scope_leave(context);
+    }
 
     return Check_Success;
 }
@@ -4419,7 +4455,7 @@ CHECK_FUNC(function_header, AstFunction* func) {
 
     // if (!(func->flags & Ast_Flag_Hack_Only_Check_Types)) {
         // HACK document this
-        if (!context->checker.dont_resolve_symbols_hack) {
+        if (!mode_enabled(context, CM_Dont_Resolve_Symbols)) {
             bh_arr_each(AstParam, param, func->params) {
                 symbol_introduce(context, context->checker.current_scope, param->local->token, (AstNode *) param->local);
             }
@@ -5029,7 +5065,9 @@ CHECK_FUNC(process_directive, AstNode* directive) {
         if (init->dependencies) {
             i32 i = 0;
             bh_arr_each(AstDirectiveInit *, dependency, init->dependencies) {
+                enable_mode(context, CM_Allow_Init_Expressions);
                 CHECK(expression, (AstTyped **) dependency);
+                disable_mode(context, CM_Allow_Init_Expressions);
                 
                 AstTyped *d = (AstTyped *) strip_aliases((AstNode *) *dependency);
                 if (d->kind != Ast_Kind_Directive_Init) {
@@ -5222,7 +5260,9 @@ CHECK_FUNC(interface_constraint, AstConstraint *constraint) {
     assert(constraint->interface->scope);
     assert(constraint->interface->scope->parent == constraint->interface->entity->scope);
 
-    constraint->scope = scope_create(context, constraint->interface->scope, constraint->token->pos);
+    if (constraint->scope == NULL) {
+        constraint->scope = scope_create(context, constraint->interface->scope, constraint->token->pos);
+    }
 
     if (bh_arr_length(constraint->args) != bh_arr_length(constraint->interface->params)) {
         ERROR_(constraint->token->pos, "Wrong number of arguments given to interface. Expected %d, got %d.",
@@ -5494,9 +5534,9 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
         query->function_header->scope = scope_create(context, query->proc->parent_scope_of_poly_proc, query->token->pos);
 
     // query->function_header->flags |= Ast_Flag_Hack_Only_Check_Types;
-    context->checker.dont_resolve_symbols_hack = 1;
+    enable_mode(context, CM_Dont_Resolve_Symbols);
     check_temp_function_header(context, query->function_header);
-    context->checker.dont_resolve_symbols_hack = 0;
+    disable_mode(context, CM_Dont_Resolve_Symbols);
 
     scope_enter(context, query->function_header->scope);
 
@@ -5880,6 +5920,9 @@ void check_entity(Context *context, Entity* ent) {
 
     context->checker.current_entity = ent;
     context->checker.all_checks_are_final = 1;
+
+    bh_arr_clear(context->checker.scope_stack);
+    clear_modes(context);
 
     if (ent->scope) scope_enter(context, ent->scope);
 
