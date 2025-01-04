@@ -151,17 +151,19 @@ static i32 extension_recv_int(CompilerExtension *ext) {
     return i;
 }
 
-static char *extension_recv_bytes(CompilerExtension *ext, i32 len) {
-    bh_allocator a = bh_arena_allocator(&ext->arena);
-    char *buf = bh_alloc(a, len);
-
-    i32 bytes_read = 0;
-    while (bytes_read < len) {
-        bytes_read += extension_recv(ext, buf, len);
-    }
-
-    return buf;
-}
+// static char *extension_recv_bytes(CompilerExtension *ext, i32 len) {
+//     bh_allocator a = bh_arena_allocator(&ext->arena);
+//     char *buf = bh_alloc(a, len);
+// 
+//     i32 bytes_read = 0;
+//     while (bytes_read < len) {
+//         if (!ext->alive) break;
+// 
+//         bytes_read += extension_recv(ext, buf + bytes_read, len);
+//     }
+// 
+//     return buf;
+// }
 
 static char *extension_recv_str(CompilerExtension *ext, i32 *out_len) {
     i32 len = extension_recv_int(ext);
@@ -169,10 +171,7 @@ static char *extension_recv_str(CompilerExtension *ext, i32 *out_len) {
 
     bh_allocator a = bh_arena_allocator(&ext->arena);
     char *buf = bh_alloc(a, len + 1);
-    if (!buf) {
-        printf("ERROR: Code expansion of %d bytes is too large.\n", len);
-        return NULL;
-    }
+    if (!buf) return NULL;
 
     i32 bytes_read = 0; 
     while (bytes_read < len) {
@@ -343,6 +342,10 @@ static b32 handle_common_messages(Context *context, CompilerExtension *ext, int 
         case MSG_EXT_INJECT_CODE: {
             i32 code_length;
             char *code = bh_strdup(context->ast_alloc, extension_recv_str(ext, &code_length));
+            if (!code) {
+                ONYX_ERROR(tkn->pos, Error_Critical, "Code expansion of %d bytes is too large.", code_length);
+                return 0;
+            }
 
             parse_code(context, PMEK_Top_Level, code, code_length, entity, tkn->pos);
             break;

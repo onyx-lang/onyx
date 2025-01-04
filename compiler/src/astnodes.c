@@ -1554,7 +1554,7 @@ TypeMatch implicit_cast_to_bool(Context *context, AstTyped **pnode) {
     return TYPE_MATCH_YIELD;
 }
 
-static char *sanitize_name(bh_allocator a, const char *name) {
+static char *sanitize_name(bh_allocator a, char *name) {
     if (!name) return name;
 
     char *sanitized = bh_strdup(a, name); 
@@ -1598,7 +1598,7 @@ char* get_function_assembly_name(Context *context, AstFunction* func) {
     if (func->token) {
         return bh_aprintf(context->ast_alloc,
             "unnamed_at_%s_%d",
-            sanitize_name(context->scratch_alloc, func->token->pos.filename),
+            sanitize_name(context->scratch_alloc, (char *) func->token->pos.filename),
             func->token->pos.line);
     }
 

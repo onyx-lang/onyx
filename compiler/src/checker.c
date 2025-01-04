@@ -102,7 +102,7 @@ typedef enum CheckStatus {
 
 CHECK_FUNC(block, AstBlock* block);
 CHECK_FUNC(statement_chain, AstNode** start);
-CHECK_FUNC(statement, AstNode** pstmt, b32 *remove);
+CHECK_FUNC(statement, AstNode** pstmt);
 CHECK_FUNC(return, AstReturn* retnode);
 CHECK_FUNC(if, AstIfWhile* ifnode);
 CHECK_FUNC(while, AstIfWhile* whilenode);
@@ -336,14 +336,14 @@ CHECK_FUNC(if, AstIfWhile* ifnode) {
 
         if (static_if_resolution(context, ifnode)) {
             if (ifnode->true_stmt != NULL) {
-                CHECK(statement, (AstNode **) &ifnode->true_stmt, NULL);
+                CHECK(statement, (AstNode **) &ifnode->true_stmt);
                 ifnode->true_stmt->rules = Block_Rule_Macro;
                 ifnode->flags |= ifnode->true_stmt->flags & Ast_Flag_Block_Returns;
             }
 
         } else {
             if (ifnode->false_stmt != NULL) {
-                CHECK(statement, (AstNode **) &ifnode->false_stmt, NULL);
+                CHECK(statement, (AstNode **) &ifnode->false_stmt);
                 ifnode->false_stmt->rules = Block_Rule_Macro;
                 ifnode->flags |= ifnode->false_stmt->flags & Ast_Flag_Block_Returns;
             }
@@ -369,8 +369,8 @@ CHECK_FUNC(if, AstIfWhile* ifnode) {
             }
         }
 
-        if (ifnode->true_stmt)  CHECK(statement, (AstNode **) &ifnode->true_stmt, NULL);
-        if (ifnode->false_stmt) CHECK(statement, (AstNode **) &ifnode->false_stmt, NULL);
+        if (ifnode->true_stmt)  CHECK(statement, (AstNode **) &ifnode->true_stmt);
+        if (ifnode->false_stmt) CHECK(statement, (AstNode **) &ifnode->false_stmt);
 
         if (ifnode->true_stmt && ifnode->false_stmt) {
             if ((ifnode->true_stmt->flags & Ast_Flag_Block_Returns) && (ifnode->false_stmt->flags & Ast_Flag_Block_Returns))
@@ -405,13 +405,13 @@ CHECK_FUNC(while, AstIfWhile* whilenode) {
         }
     }
 
-    if (whilenode->true_stmt)  CHECK(statement, (AstNode **) &whilenode->true_stmt, NULL);
+    if (whilenode->true_stmt)  CHECK(statement, (AstNode **) &whilenode->true_stmt);
     if (whilenode->false_stmt) {
         if (whilenode->bottom_test) {
             ERROR(whilenode->token->pos, "while-loops with an 'else' clause cannot be bottom tested.");
         }
 
-        CHECK(statement, (AstNode **) &whilenode->false_stmt, NULL);
+        CHECK(statement, (AstNode **) &whilenode->false_stmt);
     }
 
     if (whilenode->initialization != NULL) {
@@ -2020,7 +2020,7 @@ CHECK_FUNC(struct_literal, AstStructLiteral* sl) {
             ERROR_(sl->token->pos, "Cannot specify named values when creating a '%s'.", type_get_name(context, sl->type));
         }
 
-        i32 value_count = bh_arr_length(sl->args.values);
+        u32 value_count = bh_arr_length(sl->args.values);
         if (value_count == 0) {
             AstZeroValue *zv = make_zero_value(context, sl->token, sl->type);
             bh_arr_push(sl->values_to_initialize, ((ValueWithOffset) { (AstTyped *) zv, 0 }));
@@ -3614,10 +3614,8 @@ CHECK_FUNC(capture_block, AstCaptureBlock *block, Scope *captured_scope) {
     return Check_Success;
 }
 
-CHECK_FUNC(statement, AstNode** pstmt, b32 *remove) {
+CHECK_FUNC(statement, AstNode** pstmt) {
     AstNode* stmt = *pstmt;
-
-    if (remove) *remove = 0;
 
     context->checker.current_checking_level = STATEMENT_LEVEL;
 
@@ -3632,7 +3630,7 @@ CHECK_FUNC(statement, AstNode** pstmt, b32 *remove) {
         case Ast_Kind_Switch:      return check_switch(context, (AstSwitch *) stmt);
         case Ast_Kind_Switch_Case: return check_case(context, (AstSwitchCase *) stmt);
         case Ast_Kind_Block:       return check_block(context, (AstBlock *) stmt);
-        case Ast_Kind_Defer:       return check_statement(context, &((AstDefer *) stmt)->stmt, remove);
+        case Ast_Kind_Defer:       return check_statement(context, &((AstDefer *) stmt)->stmt);
         case Ast_Kind_Argument:    return check_expression(context, (AstTyped **) &((AstArgument *) stmt)->value);
         case Ast_Kind_Directive_Remove: return check_remove_directive(context, (AstDirectiveRemove *) stmt);
         case Ast_Kind_Directive_Insert: return check_insert_directive(context, (AstDirectiveInsert **) pstmt, 0);
@@ -3695,16 +3693,23 @@ CHECK_FUNC(statement, AstNode** pstmt, b32 *remove) {
                 ERROR(stmt->token->pos, "This local variable has a type of 'void', which is not allowed.");
             }
 
-            if (typed_stmt->type == &context->node_that_signals_failure) {
+            //
+            // Investigate: Why is something return a "node" when it should be returning a type?
+            // Where is this value coming from? Likely in types.c...
+            //
+            if (typed_stmt->type == (Type *) &context->node_that_signals_failure) {
                 ERROR(stmt->token->pos, "Invalid type for this local variable.");
             }
 
             return Check_Success;
         }
 
-        case Ast_Kind_Import:
-            if (remove) *remove = 1;
-            break;
+        //
+        // I'm 99.99% sure this node can never appear here, but the code for it
+        // was there in the past so I am adding an assert false just in case it
+        // is actually possible through some mechanism I am unaware of.
+        //
+        case Ast_Kind_Import: assert(0); break;
 
         default:
             CHECK(expression, (AstTyped **) pstmt);
@@ -3716,19 +3721,9 @@ CHECK_FUNC(statement, AstNode** pstmt, b32 *remove) {
 }
 
 CHECK_FUNC(statement_chain, AstNode** walker) {
-    b32 remove = 0;
-
     while (*walker) {
-        CHECK(statement, walker, &remove);
-        if (remove) {
-            remove = 0;
-            AstNode* tmp = (*walker)->next;
-            (*walker)->next = NULL;
-            (*walker) = tmp;
-
-        } else {
-            walker = &(*walker)->next;
-        }
+        CHECK(statement, walker);
+        walker = &(*walker)->next;
     }
 
     return Check_Success;
@@ -3766,20 +3761,13 @@ CHECK_FUNC(block, AstBlock* block) {
         start = &(*start)->next;
     }
 
-    b32 remove = 0;
     while (*start) {
         if ((*start)->kind == Ast_Kind_Return) {
             block->flags |= Ast_Flag_Block_Returns;
         }
 
-        CheckStatus cs = check_statement(context, start, &remove);
-        if (remove) {
-            remove = 0;
-            AstNode *tmp = (*start)->next;
-            (*start)->next = NULL;
-            (*start) = tmp;
-
-        } else switch (cs) {
+        CheckStatus cs = check_statement(context, start);
+        switch (cs) {
             case Check_Success:
                 last = *start;
                 start = &(*start)->next;
@@ -5931,7 +5919,7 @@ CHECK_FUNC(proc_expansion, AstProceduralExpansion **pexp, ProceduralMacroExpansi
     *pexp = (AstProceduralExpansion *) expansion;
     switch (exp_kind) {
         case PMEK_Expression: CHECK(expression, (AstTyped **) pexp); break;
-        case PMEK_Statement:  CHECK(statement, (AstNode **) pexp, NULL); break;
+        case PMEK_Statement:  CHECK(statement, (AstNode **) pexp); break;
         case PMEK_Top_Level:  return Check_Complete;
     }
 

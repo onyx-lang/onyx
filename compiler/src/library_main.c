@@ -537,14 +537,14 @@ int32_t onyx_event_count(onyx_context_t *ctx) {
 }
 
 onyx_event_type_t onyx_event_type(onyx_context_t *ctx, int event_idx) {
-    if (event_idx >= ctx->context.events.event_count) return ONYX_EVENT_UNKWOWN;
+    if (event_idx >= ctx->context.events.event_count) return ONYX_EVENT_UNKNOWN;
 
     CompilerEvent *ev = ctx->context.events.first;
     while (event_idx-- > 0 && ev) {
         ev = ev->next;
     }
 
-    if (!ev) return ONYX_EVENT_UNKWOWN;
+    if (!ev) return ONYX_EVENT_UNKNOWN;
 
     return (onyx_event_type_t) ev->type;
 }

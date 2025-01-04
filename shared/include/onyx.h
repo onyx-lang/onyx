@@ -78,7 +78,7 @@ typedef enum onyx_stat_t {
 } onyx_stat_t;
 
 typedef enum onyx_event_type_t {
-    ONYX_EVENT_UNKWOWN           = 0,
+    ONYX_EVENT_UNKNOWN           = 0,
     ONYX_EVENT_LOG               = 1,
     ONYX_EVENT_PHASE_START       = 2,
     ONYX_EVENT_SYMBOL_DEFINED    = 3,
