@@ -284,8 +284,6 @@ typedef enum AstFlags {
     Ast_Flag_Address_Taken         = BH_BIT(7),
 
     // Type flags
-    Ast_Flag_Type_Is_Considered_Complete = BH_BIT(8),
-
     Ast_Flag_No_Clone              = BH_BIT(9),
 
     Ast_Flag_Cannot_Take_Addr      = BH_BIT(10),
@@ -328,8 +326,6 @@ typedef enum AstFlags {
     Ast_Flag_Constraint_Is_Expression = BH_BIT(28),
 
     Ast_Flag_Has_Been_Scheduled_For_Emit = BH_BIT(29),
-
-    Ast_Flag_Hack_Only_Check_Types = BH_BIT(30)
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -1524,7 +1520,6 @@ struct AstPolyQuery {
     AstFunction *function_header;
 
     b32 error_on_fail : 1;     // Whether or not to report errors on failing to match.
-    b32 successful_symres : 1; // If something successful happened in symbol resolution
 };
 
 
@@ -1847,7 +1842,6 @@ void entity_heap_add_job(EntityHeap *entities, enum TypeMatch (*func)(Context *,
 // If target_arr is null, the entities will be placed directly in the heap.
 void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *)* target_arr, AstNode* node, Scope* scope, Package* package);
 
-// void symres_entity(Context *context, Entity* ent);
 void check_entity(Context *context, Entity* ent);
 void emit_entity(Context *context, Entity* ent);
 

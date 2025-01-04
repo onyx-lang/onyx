@@ -409,7 +409,6 @@ static b32 process_entity(Context *context, Entity* ent) {
             }
             break;
 
-        // case Entity_State_Resolve_Symbols: symres_entity(context, ent); break;
         case Entity_State_Check_Types:     check_entity(context, ent);  break;
         case Entity_State_Code_Gen:        emit_entity(context, ent);   break;
 

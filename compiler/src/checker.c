@@ -92,7 +92,6 @@ typedef enum CheckStatus {
     Check_Complete, // The node is done processing
 
     Check_Errors_Start,
-    // Check_Return_To_Symres, // Return this node for further symres processing
     Check_Goto_Parse,
     Check_Yield,
     Check_Failed,           // The node is done processing and should be put in the state of Failed.
@@ -206,7 +205,7 @@ CHECK_FUNC(symbol, AstNode** symbol_node) {
     OnyxToken* token = (*symbol_node)->token;
     AstNode* res = symbol_resolve(context, context->checker.current_scope, token);
 
-    if (!res) { // :SymresStall
+    if (!res) {
         if (context->cycle_detected) {
             token_toggle_end(token);
             char *closest = find_closest_symbol_in_scope_and_parents(context, context->checker.current_scope, token->text);
@@ -435,6 +434,15 @@ CHECK_FUNC(for, AstFor* fornode) {
     CHECK(expression, &fornode->iter);
     resolve_expression_type(context, fornode->iter);
 
+    //
+    // These locals have to be checked after the iterator value to avoid incorrect
+    // symbol resolutions.
+    //
+    // for a in x {
+    //     for a in a { // <-
+    //     }
+    // }
+    //
     CHECK(local, &fornode->var);
     if (fornode->index_var) {
         fornode->index_var->flags |= Ast_Flag_Cannot_Take_Addr;
@@ -697,6 +705,15 @@ CHECK_FUNC(case, AstSwitchCase *casenode) {
 }
 
 CHECK_FUNC(switch, AstSwitch* switchnode) {
+    //
+    // Checking switches is quite complicated and tricky because of the feature-set Onyx
+    // supports. Switch bodies can contain arbitrary statements at parse-time, but must
+    // be expanded to a tree of block-nodes with case-nodes as the leaves. This complicates
+    // the checking, because case-bodies cannot be checked before they know the type of their
+    // captured variables (if there are any), but the case values must be checked before the
+    // switch node can do proper type checking.
+    // 
+
     if (switchnode->initialization) {
         if (switchnode->scope == NULL) {
             switchnode->scope = scope_create(context, context->checker.current_scope, switchnode->token->pos);
@@ -746,11 +763,13 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
         switchnode->flags |= Ast_Flag_Has_Been_Checked;
     }
 
-    // Should the case block code be checked here?
-    // Or should this just exist to resolve macros and expand #unquotes
-    // then the cases are consumed into the array or cases, THEN the blocks
-    // are actually checked?
     if (switchnode->cases == NULL) {
+        //
+        // Set CM_Dont_Check_Case_Bodies so the bodies of case nodes will be skipped.
+        // This avoids weird type-checking and symbol resolution issues when a case
+        // node comes from an #insert or macro expansion. They will be re-checked
+        // fully in the next check_block below.
+        //
         enable_mode(context, CM_Dont_Check_Case_Bodies);
         CHECK(block, switchnode->case_block);
         disable_mode(context, CM_Dont_Check_Case_Bodies);
@@ -2657,7 +2676,6 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
             expr->kind == Ast_Kind_Compiler_Extension ||
             expr->kind == Ast_Kind_Package) {
             goto try_resolve_from_node;
-            // return Check_Return_To_Symres;
         }
     }
 
@@ -3768,10 +3786,6 @@ CHECK_FUNC(block, AstBlock* block) {
                 block->statement_idx++;
                 break;
 
-            // case Check_Return_To_Symres:
-            //     block->statement_idx = 0;
-            //     return cs;
-
             case Check_Failed:
             case Check_Error:
                 if (block->macro_generated_from) {
@@ -3808,7 +3822,6 @@ CHECK_FUNC(polyproc, AstFunction* pp) {
         AstParam *param = &pp->params[p->idx];
         if (param->default_value != NULL) {
             CHECK(expression, &param->default_value);
-            // if (onyx_has_errors(context)) return Symres_Error;
         }
     }
 
@@ -3837,7 +3850,6 @@ CHECK_FUNC(function, AstFunction* func) {
     scope_enter(context, func->scope);
 
     if ((func->flags & Ast_Flag_Has_Been_Symres) == 0) {
-        // :EliminatingSymres
         bh_arr_each(AstParam, param, func->params) {
             // CLEANUP: Currently, in order to 'use' parameters, the type must be completely
             // resolved and built. This is excessive because all that should need to be known
@@ -5552,12 +5564,9 @@ CHECK_FUNC(constraint_context, ConstraintContext *cc, Scope *scope, OnyxFilePos 
 }
 
 CHECK_FUNC(polyquery, AstPolyQuery *query) {
-    query->successful_symres = 0;
-
     if (query->function_header->scope == NULL)
         query->function_header->scope = scope_create(context, query->proc->parent_scope_of_poly_proc, query->token->pos);
 
-    // query->function_header->flags |= Ast_Flag_Hack_Only_Check_Types;
     enable_mode(context, CM_Dont_Resolve_Symbols);
     check_temp_function_header(context, query->function_header);
     disable_mode(context, CM_Dont_Resolve_Symbols);
@@ -5578,6 +5587,7 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
         }
     }
 
+    b32 solved_something = 0;
     bh_arr_each(AstParam, param, query->function_header->params) {
         if (param->local->type_node != NULL) {
             context->checker.resolved_a_symbol = 0;
@@ -5588,11 +5598,12 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
             param->local->flags &= ~Ast_Flag_Symbol_Invisible;
             onyx_errors_enable(context);
             
-            if (context->checker.resolved_a_symbol) query->successful_symres = 1;
+            if (context->checker.resolved_a_symbol) {
+                solved_something = 1;
+            }
         }
     }
 
-    b32 solved_something = 0;
     i32 solved_count = 0;
     OnyxError err_msg = { 0 };
 
@@ -5623,7 +5634,7 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
 
             case TYPE_MATCH_YIELD:
             case TYPE_MATCH_FAILED: {
-                if (query->successful_symres || solved_something) continue;
+                if (solved_something) continue;
 
                 if (query->error_on_fail || context->cycle_detected) {
                     ONYX_ERROR(query->token->pos, Error_Critical, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
@@ -5647,7 +5658,7 @@ poly_query_done:
     scope_leave(context);
 
     if (solved_count != bh_arr_length(query->proc->poly_params)) {
-        if (solved_something || query->successful_symres) {
+        if (solved_something) {
             return Check_Yield;
         } else {
             return Check_Failed;
@@ -5824,22 +5835,10 @@ CHECK_FUNC(import, AstImport* import) {
         // use X { a, b, c }
         bh_arr_each(QualifiedImport, qi, import->only) {
             AstNode* imported = symbol_resolve(context, import_scope, qi->symbol_name);
-            if (imported == NULL) { // :SymresStall
+            if (imported == NULL) {
                 YIELD_(qi->symbol_name->pos,
-                        "The symbol '%b' was not found the package '%s'.",
+                        "The symbol '%b' was not found package '%s'.",
                         qi->symbol_name->text, qi->symbol_name->length, package->package->name);
-
-                // if (context->checker.report_unresolved_symbols) {
-                //     // TODO: Change package->name to package->qualified_name when
-                //     // merged with the documentation generation branch.
-                //     ONYX_ERROR(qi->symbol_name->pos, Error_Critical, 
-                //             "The symbol '%b' was not found the package '%s'.",
-                //             qi->symbol_name->text, qi->symbol_name->length, package->package->name);
-
-                //     return Symres_Error;
-                // } else {
-                //     return Symres_Yield_Macro;
-                // }
             }
 
             symbol_introduce(context, context->checker.current_scope, qi->as_name, imported);

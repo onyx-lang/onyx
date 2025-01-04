@@ -883,7 +883,7 @@ void expand_macro(Context *context, AstCall** pcall, AstFunction* template) {
         scope_include(context, argument_scope, template->poly_scope, call->token->pos);
 
     if (bh_arr_length(nodes_that_need_entities) > 0) {
-        // :CopyPaste from symres_function
+        // :CopyPaste from check_function
         bh_arr_each(AstNode *, node, nodes_that_need_entities) {
             // This makes a lot of assumptions about how these nodes are being processed,
             // and I don't want to start using this with other nodes without considering
