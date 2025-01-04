@@ -773,14 +773,13 @@ TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b
     // node does not match the given type:
     //
     // If the nodes type is a function type and that function has an automatic return
-    // value placeholder, fill in that placeholder with the actual type.
+    // value placeholder, wait for the return type to be solved by the function first.
     // :AutoReturnType
     if (node_type && node_type->kind == Type_Kind_Function
         && node_type->Function.return_type == context->types.auto_return
         && type->kind == Type_Kind_Function) {
 
-        node_type->Function.return_type = type->Function.return_type;
-        return TYPE_MATCH_SUCCESS;
+        return TYPE_MATCH_YIELD;
     }
 
     // If the node is an auto cast (~~) node, then check to see if the cast is legal

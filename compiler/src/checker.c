@@ -2437,19 +2437,8 @@ CHECK_FUNC(do_block, AstDoBlock** pdoblock) {
 
 CHECK_FUNC(address_of, AstAddressOf** paof) {
     AstAddressOf* aof = *paof;
-    CHECK(expression, &aof->expr);
 
     AstTyped* expr = (AstTyped *) strip_aliases((AstNode *) aof->expr);
-    if (node_is_type((AstNode *) expr)) {
-        AstPointerType *pt = onyx_ast_node_new(context->ast_alloc, sizeof(AstPointerType), Ast_Kind_Pointer_Type);
-        pt->token     = aof->token;
-        pt->elem      = (AstType *) expr;
-        pt->next      = aof->next;
-        *paof         = (AstAddressOf *) pt;
-        CHECK(type, (AstType **) &pt);
-        return Check_Success;
-    }
-
     if (expr->kind == Ast_Kind_Subscript && bh_arr_length(context->operator_overloads[Binary_Op_Ptr_Subscript]) > 0) {
         if (aof->potential_substitute == NULL) {
             CHECK(expression, &((AstSubscript *) expr)->addr);
@@ -2473,6 +2462,18 @@ CHECK_FUNC(address_of, AstAddressOf** paof) {
             CHECK(call, (AstCall **) paof);
             return Check_Success;
         }
+    }
+
+    CHECK(expression, &aof->expr);
+
+    if (node_is_type((AstNode *) expr)) {
+        AstPointerType *pt = onyx_ast_node_new(context->ast_alloc, sizeof(AstPointerType), Ast_Kind_Pointer_Type);
+        pt->token     = aof->token;
+        pt->elem      = (AstType *) expr;
+        pt->next      = aof->next;
+        *paof         = (AstAddressOf *) pt;
+        CHECK(type, (AstType **) &pt);
+        return Check_Success;
     }
 
     if (node_is_addressable_literal((AstNode *) aof->expr)) {
@@ -4963,7 +4964,8 @@ CHECK_FUNC(process_directive, AstNode* directive) {
         }
 
         AstKind kind = add_overload->overload->kind;
-        if (kind != Ast_Kind_Function && kind != Ast_Kind_Polymorphic_Proc && kind != Ast_Kind_Overloaded_Function) {
+        if (kind != Ast_Kind_Function && kind != Ast_Kind_Polymorphic_Proc && kind != Ast_Kind_Overloaded_Function && kind != Ast_Kind_Macro) {
+            // This check could be converted to something like `is_node_function_like()`?
             CHECK(expression, (AstTyped **) &add_overload->overload);
         }
 
