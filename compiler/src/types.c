@@ -220,6 +220,10 @@ b32 types_are_compatible(Context *context, Type* t1, Type* t2) {
             // If the above cases didn't catch it, then these union types are not compatible.
             return 0;
 
+        case Type_Kind_Invalid:
+            // I'm not 100% sure when this can happen, but if this happens, the types will automatically not match.
+            return 0;
+
         default:
             assert("Invalid type" && 0);
             break;

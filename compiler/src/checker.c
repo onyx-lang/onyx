@@ -2619,14 +2619,23 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
     AstFieldAccess* field = *pfield;
     if (field->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
-    CHECK(expression, &field->expr);
-
     if (field->token != NULL && field->field == NULL) {
         token_toggle_end(field->token);
         field->field = bh_strdup(context->ast_alloc, field->token->text);
         token_toggle_end(field->token);
     }
 
+    //
+    // Here we "pre-check" the expression to resolve any symbols, but maybe
+    // leave unknown types hanging around. This does not matter for any of
+    // the cases that exist below. If we are not looking at one of the cases
+    // below, we will "properly" check the expression type again. Not the 
+    // fastest way of going about this, but I am aiming for correctness
+    // at the moment.
+    //
+    //         - brendanfh 03 January 2025
+    //
+    check_expression(context, &field->expr);
     AstTyped *expr;
     {
         expr = (AstTyped *) strip_aliases((AstNode *) field->expr);
@@ -2650,6 +2659,8 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
             // return Check_Return_To_Symres;
         }
     }
+
+    CHECK(expression, &field->expr);
 
     if (field->expr->type == NULL) {
         YIELD(field->token->pos, "Trying to resolve type of source expression.");
@@ -3133,12 +3144,12 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
             // We do not need to check the type, because fill_in_type should already have done that for us.
             // CHECK(type, &(*expr)->type_node);
 
-            if (expr->type == NULL)
-                YIELD(expr->token->pos, "Waiting for function type to be resolved.");
-
             if (((AstFunction *) expr)->captures) {
                 ((AstFunction *) expr)->scope_to_lookup_captured_values = context->checker.current_scope;
             }
+
+            if (expr->type == NULL)
+                YIELD(expr->token->pos, "Waiting for function type to be resolved.");
 
             break;
 
@@ -3169,7 +3180,20 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
 
         case Ast_Kind_Alias: {
             AstAlias *alias = (AstAlias *) expr;
-            CHECK_INVISIBLE(expression, alias, &alias->alias);
+
+            //
+            // If an alias has an entity, do not force checking on it here.
+            // Wait for the alias to pass type-checking in the normal way.
+            // Otherwise, there can be weird cases where symbols resolve
+            // incorrectly because they are being checked in the wrong scope.
+            //
+            if (alias->entity && context->checker.current_entity != alias->entity) {
+                if (alias->entity->state < Entity_State_Code_Gen) {
+                    YIELD(expr->token->pos, "Waiting for alias to pass type checking.");
+                }
+            } else {
+                CHECK_INVISIBLE(expression, alias, &alias->alias);
+            }
 
             expr->flags |= (((AstAlias *) expr)->alias->flags & Ast_Flag_Comptime);
             expr->type = ((AstAlias *) expr)->alias->type;
@@ -3193,7 +3217,7 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
         }
 
         case Ast_Kind_Memres:
-            if (expr->type == NULL) YIELD(expr->token->pos, "Waiting to know globals type.");
+            if (expr->type == NULL || expr->type->kind == Type_Kind_Invalid) YIELD(expr->token->pos, "Waiting to know globals type.");
             break;
 
         case Ast_Kind_Directive_First:
@@ -3650,6 +3674,10 @@ CHECK_FUNC(statement, AstNode** pstmt, b32 *remove) {
                 ERROR(stmt->token->pos, "This local variable has a type of 'void', which is not allowed.");
             }
 
+            if (typed_stmt->type == &context->node_that_signals_failure) {
+                ERROR(stmt->token->pos, "Invalid type for this local variable.");
+            }
+
             return Check_Success;
         }
 
@@ -3789,8 +3817,9 @@ CHECK_FUNC(function, AstFunction* func) {
     if (func->flags & Ast_Flag_Function_Is_Lambda_Inside_PolyProc) return Check_Complete;
 
     if (func->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
-    if (!func->ready_for_body_to_be_checked)
+    if (!func->ready_for_body_to_be_checked || !func->type) {
         YIELD(func->token->pos, "Waiting for procedure header to pass type-checking");
+    }
 
     bh_arr_clear(context->checker.expected_return_type_stack);
     bh_arr_clear(context->checker.named_return_values_stack);
@@ -4191,12 +4220,12 @@ CHECK_FUNC(struct, AstStructType* s_node) {
     if (s_node->constraints.constraints) {
         s_node->constraints.produce_errors = (s_node->flags & Ast_Flag_Header_Check_No_Error) == 0;
 
-        if (s_node->constraints.constraints) {
-            bh_arr_each(AstConstraint *, constraint, s_node->constraints.constraints) {
-                // TODO: Check if this is correct!
-                CHECK(constraint, *constraint);
-            }
-        }
+        // if (s_node->constraints.constraints) {
+        //     bh_arr_each(AstConstraint *, constraint, s_node->constraints.constraints) {
+        //         // TODO: Check if this is correct!
+        //         CHECK(constraint, *constraint);
+        //     }
+        // }
 
         OnyxFilePos pos = s_node->token->pos;
         if (s_node->polymorphic_error_loc.filename) {
@@ -4218,12 +4247,7 @@ CHECK_FUNC(struct, AstStructType* s_node) {
         track_declaration_for_symbol_info(context, member->token->pos, (AstNode *) member);
 
         if (member->type_node) {
-            CheckStatus cs = check_type(context, &member->type_node);
-            if (cs != Check_Success) {
-                s_node->flags &= ~Ast_Flag_Type_Is_Considered_Complete;
-                scope_leave(context);
-                return cs;
-            }
+            CHECK(type, &member->type_node);
         }
 
         if (member->type_node == NULL && member->initial_value != NULL) {
@@ -4306,9 +4330,7 @@ CHECK_FUNC(struct_defaults, AstStructType* s_node) {
 }
 
 CHECK_FUNC(union, AstUnionType *u_node) {
-    if (u_node->flags & Ast_Flag_Type_Is_Considered_Complete) return Check_Success;
     u_node->flags |= Ast_Flag_Comptime;
-    u_node->flags |= Ast_Flag_Type_Is_Considered_Complete; // TODO: Check if this is correct?
 
     if (!u_node->tag_backing_type) {
         int n = (31 - bh_clz(bh_arr_length(u_node->variants) - 1)) >> 3;
@@ -4357,9 +4379,9 @@ CHECK_FUNC(union, AstUnionType *u_node) {
     }
 
     if (u_node->constraints.constraints) {
-        bh_arr_each(AstConstraint *, constraint, u_node->constraints.constraints) {
-            CHECK(constraint, *constraint);
-        }
+        // bh_arr_each(AstConstraint *, constraint, u_node->constraints.constraints) {
+        //     CHECK(constraint, *constraint);
+        // }
 
         u_node->constraints.produce_errors = (u_node->flags & Ast_Flag_Header_Check_No_Error) == 0;
 
@@ -4378,14 +4400,9 @@ CHECK_FUNC(union, AstUnionType *u_node) {
 
         assert(variant->type_node);
 
-        CheckStatus cs = check_type(context, &variant->type_node);
-        if (cs == Check_Success && variant->explicit_tag_value) {
-            cs = check_expression(context, &variant->explicit_tag_value);
-        }
-
-        if (cs >= Check_Errors_Start) {
-            u_node->flags &= ~Ast_Flag_Type_Is_Considered_Complete;
-            return cs;
+        CHECK(type, &variant->type_node);
+        if (variant->explicit_tag_value) {
+            CHECK(expression, &variant->explicit_tag_value);
         }
 
         CHECK(meta_tags, variant->meta_tags);
@@ -4436,9 +4453,9 @@ CHECK_FUNC(function_header, AstFunction* func) {
     }
 
     if (func->constraints.constraints != NULL && func->constraints.constraints_met == 0) {
-        bh_arr_each(AstConstraint *, constraint, func->constraints.constraints) {
-            CHECK(constraint, *constraint);
-        }
+        // bh_arr_each(AstConstraint *, constraint, func->constraints.constraints) {
+        //     CHECK(constraint, *constraint);
+        // }
 
         func->constraints.produce_errors = (func->flags & Ast_Flag_Header_Check_No_Error) == 0;
 
@@ -4551,6 +4568,7 @@ CHECK_FUNC(function_header, AstFunction* func) {
         }
 
         if (local->type == (Type *) &context->node_that_signals_failure) {
+            ONYX_ERROR(local->token->pos, Error_Critical, "BAD TYPE");
             return Check_Failed;
         }
 
@@ -4592,7 +4610,9 @@ CHECK_FUNC(function_header, AstFunction* func) {
     func->ready_for_body_to_be_checked = 1;
 
     func->type = type_build_function_type(context, func);
-    if (func->type == NULL) YIELD(func->token->pos, "Waiting for function type to be constructed");
+    if (func->type == NULL) {
+        YIELD(func->token->pos, "Waiting for function type to be constructed");
+    }
 
     if (func->foreign.import_name) {
         CHECK(expression, &func->foreign.module_name);
@@ -4942,7 +4962,11 @@ CHECK_FUNC(process_directive, AstNode* directive) {
             }
         }
 
-        CHECK(expression, (AstTyped **) &add_overload->overload);
+        AstKind kind = add_overload->overload->kind;
+        if (kind != Ast_Kind_Function && kind != Ast_Kind_Polymorphic_Proc && kind != Ast_Kind_Overloaded_Function) {
+            CHECK(expression, (AstTyped **) &add_overload->overload);
+        }
+
         add_overload->overload->flags &= ~Ast_Flag_Function_Is_Lambda;
 
         add_overload_option(&ofunc->overloads, add_overload->order, add_overload->overload);
