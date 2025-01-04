@@ -432,6 +432,9 @@ CHECK_FUNC(for, AstFor* fornode) {
     b32 old_inside_for_iterator;
     if (fornode->flags & Ast_Flag_Has_Been_Checked) goto fornode_expr_checked;
 
+    CHECK(expression, &fornode->iter);
+    resolve_expression_type(context, fornode->iter);
+
     CHECK(local, &fornode->var);
     if (fornode->index_var) {
         fornode->index_var->flags |= Ast_Flag_Cannot_Take_Addr;
@@ -442,9 +445,6 @@ CHECK_FUNC(for, AstFor* fornode) {
             ERROR_(fornode->index_var->token->pos, "Index for a for loop must be an integer type, but it is a '%s'.", type_get_name(context, fornode->index_var->type));
         }
     }
-
-    CHECK(expression, &fornode->iter);
-    resolve_expression_type(context, fornode->iter);
 
     Type* iter_type = fornode->iter->type;
     if (iter_type == NULL) YIELD(fornode->token->pos, "Waiting for iteration expression type to be known.");
@@ -2910,7 +2910,9 @@ CHECK_FUNC(method_call, AstBinaryOp** pmcall) {
 
     // :Idempotency
     if ((mcall->flags & Ast_Flag_Has_Been_Checked) == 0) {
-        if (mcall->left->type == NULL) YIELD(mcall->token->pos, "Trying to resolve type of left hand side.");
+        if (mcall->left->type == NULL) {
+            YIELD(mcall->token->pos, "Trying to resolve type of left hand side.");
+        }
 
         AstTyped* implicit_argument = mcall->left;
         AstCall* call_node = (AstCall *) mcall->right;
