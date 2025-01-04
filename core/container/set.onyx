@@ -36,6 +36,17 @@ Set.make :: ($T: type_expr, allocator := context.allocator) -> Set(T) {
     return set;
 }
 
+Set.from :: (arr: [] $T, allocator := context.allocator) -> Set(T) {
+    set : Set(T)
+    Set.init(&set, allocator=allocator)
+
+    for a in arr {
+        Set.insert(&set, a)
+    }
+
+    return set
+}
+
 #overload
 builtin.__make_overload :: macro (x: &Set, allocator: Allocator) =>
     #this_package.Set.make(x.Elem_Type, allocator = allocator);

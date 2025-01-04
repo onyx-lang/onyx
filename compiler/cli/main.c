@@ -945,8 +945,8 @@ int main(int argc, char *argv[]) {
 
     u64 duration = bh_time_duration(start_time);
 
-    if (onyx_error_count(ctx) > 0) {
-        onyx_errors_print(ctx, cli_args.error_format, !cli_args.no_colors, cli_args.show_all_errors);
+    onyx_errors_print(ctx, cli_args.error_format, !cli_args.no_colors, cli_args.show_all_errors);
+    if (onyx_errors_present(ctx)) {
         return 1;
     }
 

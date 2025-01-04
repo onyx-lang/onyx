@@ -487,7 +487,7 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
     // cycle detection algorithm must be used.
     //
     if (!changed) {
-        if (!context->watermarked_node) {
+        if (!context->watermarked_node || context->watermarked_node->macro_attempts < ent->macro_attempts) {
             context->watermarked_node = ent;
             context->highest_watermark = bh_max(context->highest_watermark, ent->macro_attempts);
         }
@@ -505,10 +505,6 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
 
                 context->cycle_almost_detected += 1;
             }
-        }
-        else if (context->watermarked_node->macro_attempts < ent->macro_attempts) {
-            context->watermarked_node = ent;
-            context->highest_watermark = bh_max(context->highest_watermark, ent->macro_attempts);
         }
     } else {
         context->watermarked_node = NULL;

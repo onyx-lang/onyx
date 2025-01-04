@@ -2143,6 +2143,15 @@ static AstNode* parse_statement(OnyxParser* parser) {
                 break;
             }
 
+            if (parse_possible_directive(parser, "error")) {
+                AstDirectiveError *error = make_node(AstDirectiveError, Ast_Kind_Directive_Error);
+                error->token = parser->curr - 2;
+                error->error_msg = expect_token(parser, Token_Type_Literal_String);
+
+                ENTITY_SUBMIT(error);
+                break;
+            }
+
             if (next_tokens_are(parser, 2, '#', Token_Type_Symbol)) {
                 retval = (AstNode *) parse_factor(parser);
                 break;

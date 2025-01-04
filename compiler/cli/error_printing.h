@@ -194,3 +194,14 @@ void onyx_errors_print(onyx_context_t *ctx, char *error_format, b32 colored_prin
     if (error_format_json) bh_printf("]");
 }
 
+b32 onyx_errors_present(onyx_context_t *ctx) {
+    fori (i, 0, onyx_error_count(ctx)) {
+        onyx_error_details_t err;
+        if (onyx_error_rank(ctx, i) >= ONYX_ERROR_WAITING) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
