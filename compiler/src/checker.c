@@ -581,7 +581,7 @@ CHECK_FUNC(for, AstFor** pfornode) {
         CHECK(call, (AstCall **) pfornode);
 
         // This will likely never happen, because __for_expansion should be a macro which should cause a return to symres.
-        return Check_Return_To_Symres;
+        return Check_Yield;
     }
 
     if (given_type == NULL)

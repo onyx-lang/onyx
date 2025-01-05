@@ -1952,6 +1952,7 @@ AstCall * create_implicit_for_expansion_call(Context *context, AstFor *fornode) 
     AstCall *call = onyx_ast_node_new(context->ast_alloc, sizeof(AstCall), Ast_Kind_Call);
     call->token = fornode->token;
     call->callee = (AstTyped *) context->builtins.for_expansion;
+    call->next = fornode->next;
 
     arguments_initialize(context, &call->args);
 
@@ -1970,6 +1971,7 @@ AstCall * create_implicit_for_expansion_call(Context *context, AstFor *fornode) 
     body_code_block->token = fornode->token;
     body_code_block->type_node = context->builtins.code_type;
     body_code_block->code = fornode->stmt;
+    ((AstBlock *) body_code_block->code)->rules = Block_Rule_Code_Block;
 
     bh_arr_new(context->ast_alloc, body_code_block->binding_symbols, 2);
     bh_arr_push(body_code_block->binding_symbols, fornode->var->token);
