@@ -179,6 +179,8 @@ AstNode* ast_clone(Context *context, void* n) {
     AstNode* nn = onyx_ast_node_new(context->ast_alloc, node_size, node->kind);
     memmove(nn, node, node_size);
 
+    nn->flags &= ~(Ast_Flag_Has_Been_Checked | Ast_Flag_Has_Been_Symres);
+
     switch ((u16) node->kind) {
         case Ast_Kind_Binary_Op:
         case Ast_Kind_Pipe:

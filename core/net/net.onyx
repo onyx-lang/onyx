@@ -407,6 +407,8 @@ socket_recvfrom :: (s: &Socket, buffer: [] u8) -> ? SocketRecvFromResult {
 
             return .{ Err = err };
         });
+
+        return .{ Ok = 0 }
     },
 
     write_byte = (use s: &Socket, byte: u8) -> io.Error {

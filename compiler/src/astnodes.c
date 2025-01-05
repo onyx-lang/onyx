@@ -588,9 +588,6 @@ b32 convert_numlit_to_type(Context *context, AstNumLit* num, Type* to_type, b32 
     return 0;
 }
 
-// TODO: This function should be able return a "yield" condition. There
-// are a couple cases that need to yield in order to be correct, like
-// polymorphic functions with a typeof for the return type.
 TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b32 permanent) {
     AstTyped* node = *pnode;
     if (type == NULL) return TYPE_MATCH_FAILED;
@@ -773,14 +770,13 @@ TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b
     // node does not match the given type:
     //
     // If the nodes type is a function type and that function has an automatic return
-    // value placeholder, fill in that placeholder with the actual type.
+    // value placeholder, wait for the return type to be solved by the function first.
     // :AutoReturnType
     if (node_type && node_type->kind == Type_Kind_Function
         && node_type->Function.return_type == context->types.auto_return
         && type->kind == Type_Kind_Function) {
 
-        node_type->Function.return_type = type->Function.return_type;
-        return TYPE_MATCH_SUCCESS;
+        return TYPE_MATCH_YIELD;
     }
 
     // If the node is an auto cast (~~) node, then check to see if the cast is legal
@@ -1555,7 +1551,7 @@ TypeMatch implicit_cast_to_bool(Context *context, AstTyped **pnode) {
     return TYPE_MATCH_YIELD;
 }
 
-static char *sanitize_name(bh_allocator a, const char *name) {
+static char *sanitize_name(bh_allocator a, char *name) {
     if (!name) return name;
 
     char *sanitized = bh_strdup(a, name); 
@@ -1599,7 +1595,7 @@ char* get_function_assembly_name(Context *context, AstFunction* func) {
     if (func->token) {
         return bh_aprintf(context->ast_alloc,
             "unnamed_at_%s_%d",
-            sanitize_name(context->scratch_alloc, func->token->pos.filename),
+            sanitize_name(context->scratch_alloc, (char *) func->token->pos.filename),
             func->token->pos.line);
     }
 
