@@ -2483,8 +2483,6 @@ CHECK_FUNC(address_of, AstAddressOf** paof) {
         }
     }
 
-    CHECK(expression, &aof->expr);
-
     if (node_is_type((AstNode *) expr)) {
         AstPointerType *pt = onyx_ast_node_new(context->ast_alloc, sizeof(AstPointerType), Ast_Kind_Pointer_Type);
         pt->token     = aof->token;
@@ -2494,6 +2492,8 @@ CHECK_FUNC(address_of, AstAddressOf** paof) {
         CHECK(type, (AstType **) &pt);
         return Check_Success;
     }
+
+    CHECK(expression, &aof->expr);
 
     if (node_is_addressable_literal((AstNode *) aof->expr)) {
         resolve_expression_type(context, aof->expr);
