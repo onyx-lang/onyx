@@ -97,7 +97,7 @@ static b32 add_solidified_function_entities(Context *context, AstSolidifiedFunct
     solidified_func->func->flags |= Ast_Flag_From_Polymorphism;
 
     Entity func_header_entity = {
-        .state = Entity_State_Resolve_Symbols,
+        .state = Entity_State_Check_Types,
         .type = Entity_Type_Function_Header,
         .function = solidified_func->func,
         .package = NULL,
@@ -105,7 +105,7 @@ static b32 add_solidified_function_entities(Context *context, AstSolidifiedFunct
     };
 
     Entity func_entity = {
-        .state = Entity_State_Resolve_Symbols,
+        .state = Entity_State_Check_Types,
         .type = Entity_Type_Function,
         .function = solidified_func->func,
         .package = NULL,
@@ -787,7 +787,6 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(Context *context, AstFuncti
     query->function_header->flags |= Ast_Flag_Header_Check_No_Error;
     query->function_header->scope = NULL;
     query->error_on_fail = necessary;
-    query->successful_symres = 1;
 
     bh_imap_put(&pp->active_queries, (u64) actual, (u64) query);
     add_entities_for_node(&context->entities, NULL, (AstNode *) query, NULL, NULL);
@@ -956,7 +955,7 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstF
     BH_MASK_SET(solidified_func.func->flags, !error_if_failed, Ast_Flag_Header_Check_No_Error);
 
     Entity func_header_entity = {
-        .state = Entity_State_Resolve_Symbols,
+        .state = Entity_State_Check_Types,
         .type = Entity_Type_Temp_Function_Header,
         .function = solidified_func.func,
         .package = NULL,
@@ -979,7 +978,7 @@ typedef struct AutoPolymorphVariable {
     AstType **replace;
 } AutoPolymorphVariable;
 
-// This should be called after all the parameter types have been symresed, but before anything
+// This should be called after all the parameter types have been had symbols resolved, but before anything
 // happens to the body.
 b32 potentially_convert_function_to_polyproc(Context *context, AstFunction *func) {
     bh_arr(AutoPolymorphVariable) auto_vars = NULL;

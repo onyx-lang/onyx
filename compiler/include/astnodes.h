@@ -284,8 +284,6 @@ typedef enum AstFlags {
     Ast_Flag_Address_Taken         = BH_BIT(7),
 
     // Type flags
-    Ast_Flag_Type_Is_Resolved      = BH_BIT(8),
-
     Ast_Flag_No_Clone              = BH_BIT(9),
 
     Ast_Flag_Cannot_Take_Addr      = BH_BIT(10),
@@ -327,7 +325,7 @@ typedef enum AstFlags {
 
     Ast_Flag_Constraint_Is_Expression = BH_BIT(28),
 
-    Ast_Flag_Has_Been_Scheduled_For_Emit = BH_BIT(29)
+    Ast_Flag_Has_Been_Scheduled_For_Emit = BH_BIT(29),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -1495,6 +1493,7 @@ struct AstFunction {
     b32 is_intrinsic       : 1;
 
     b32 named_return_locals_added : 1;
+    b32 ready_for_body_to_be_checked : 1;
 };
 
 struct AstCaptureBlock {
@@ -1527,7 +1526,6 @@ struct AstPolyQuery {
     AstFunction *function_header;
 
     b32 error_on_fail : 1;     // Whether or not to report errors on failing to match.
-    b32 successful_symres : 1; // If something successful happened in symbol resolution
 };
 
 
@@ -1850,7 +1848,6 @@ void entity_heap_add_job(EntityHeap *entities, enum TypeMatch (*func)(Context *,
 // If target_arr is null, the entities will be placed directly in the heap.
 void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *)* target_arr, AstNode* node, Scope* scope, Package* package);
 
-void symres_entity(Context *context, Entity* ent);
 void check_entity(Context *context, Entity* ent);
 void emit_entity(Context *context, Entity* ent);
 
@@ -1921,6 +1918,11 @@ typedef struct OnyxDocInfo {
     u32 next_file_id;
 } OnyxDocInfo;
 
+typedef enum CheckerMode {
+    CM_Dont_Resolve_Symbols    = BH_BIT(1),
+    CM_Dont_Check_Case_Bodies  = BH_BIT(2),
+    CM_Allow_Init_Expressions  = BH_BIT(3),
+} CheckerMode;
 
 typedef struct CheckerData {
     b32 expression_types_must_be_known;
@@ -1934,9 +1936,11 @@ typedef struct CheckerData {
     bh_arr(bh_arr(AstLocal *)) named_return_values_stack;
 
     u32 current_checking_level;
+    CheckerMode mode;
 
     Scope *current_scope;
-    b32 report_unresolved_symbols;
+    bh_arr(Scope *) scope_stack;
+
     b32 resolved_a_symbol;
 } CheckerData;
 

@@ -588,7 +588,7 @@ static char *get_description_for_subcommand(char *path) {
         int previous_cursor = cursor;
         int name_length = uleb128_to_uint(d, &cursor);
 
-        if (strncmp("onyx-command-description", &d[cursor], name_length)) {
+        if (strncmp("onyx-command-description", (const char *) &d[cursor], name_length)) {
             cursor = previous_cursor + section_length;
             continue;
         }
@@ -932,12 +932,18 @@ int main(int argc, char *argv[]) {
             case ONYX_EVENT_ALL_TYPES_CHECKED:
                 break;
 
+            case ONYX_EVENT_PHASE_START:
+                break;
+
             case ONYX_EVENT_SYMBOL_DEFINED:
                 // bh_printf("DEFINED SYMBOL AT %s:%d,%d\n",
                 //     onyx_event_field_str(ctx, i, "filename"),
                 //     onyx_event_field_int(ctx, i, "line"),
                 //     onyx_event_field_int(ctx, i, "column")
                 // );
+                break;
+
+            case ONYX_EVENT_UNKNOWN:
                 break;
             }
         }
@@ -959,8 +965,8 @@ int main(int argc, char *argv[]) {
 
         printf("\nStatistics:\n");
         printf("    Time taken: %lf ms\n", (double) duration);
-        printf("    Processed %llu lines (%f lines/second).\n", lines, lines_per_sec);
-        printf("    Processed %llu tokens (%f tokens/second).\n", tokens, tokens_per_sec);
+        printf("    Processed %d lines (%f lines/second).\n", lines, lines_per_sec);
+        printf("    Processed %d tokens (%f tokens/second).\n", tokens, tokens_per_sec);
         printf("\n");
     }
   

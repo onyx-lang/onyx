@@ -203,7 +203,7 @@ void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *) *target_arr, A
 
     Entity ent;
     ent.id = entities->next_id++;
-    ent.state = Entity_State_Resolve_Symbols;
+    ent.state = Entity_State_Check_Types;
     ent.package = package;
     ent.scope   = scope;
 
@@ -362,7 +362,6 @@ void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *) *target_arr, A
         }
 
         case Ast_Kind_Static_If: {
-            ent.state = Entity_State_Resolve_Symbols;
             ent.type = Entity_Type_Static_If;
             ent.static_if = (AstIf *) node;
             ENTITY_INSERT(ent);
@@ -394,7 +393,6 @@ void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *) *target_arr, A
         case Ast_Kind_Interface: {
             ent.type = Entity_Type_Interface;
             ent.interface = (AstInterface *) node;
-            ent.state = Entity_State_Resolve_Symbols;
             ENTITY_INSERT(ent);
             break;
         }
@@ -402,7 +400,6 @@ void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *) *target_arr, A
         case Ast_Kind_Constraint: {
             ent.type = Entity_Type_Constraint_Check;
             ent.constraint = (AstConstraint *) node;
-            ent.state = Entity_State_Resolve_Symbols;
             ENTITY_INSERT(ent);
             break;
         }
@@ -410,7 +407,6 @@ void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *) *target_arr, A
         case Ast_Kind_Foreign_Block: {
             ent.type = Entity_Type_Foreign_Block;
             ent.foreign_block = (AstForeignBlock *) node;
-            ent.state = Entity_State_Resolve_Symbols;
             ENTITY_INSERT(ent);
             break;
         }
@@ -418,7 +414,6 @@ void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *) *target_arr, A
         case Ast_Kind_Import: {
             ent.type = Entity_Type_Import;
             ent.import = (AstImport *) node;
-            ent.state = Entity_State_Resolve_Symbols;
             ENTITY_INSERT(ent);
             break;
         }
@@ -426,7 +421,6 @@ void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *) *target_arr, A
         case Ast_Kind_Js_Code: {
             ent.type = Entity_Type_JS;
             ent.js = (AstJsNode *) node;
-            ent.state = Entity_State_Resolve_Symbols;
             ENTITY_INSERT(ent);
             break;
         }
@@ -434,7 +428,6 @@ void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *) *target_arr, A
         case Ast_Kind_Compiler_Extension: {
             ent.type = Entity_Type_Compiler_Extension;
             ent.compiler_extension = (AstCompilerExtension *) node;
-            ent.state = Entity_State_Resolve_Symbols;
             ENTITY_INSERT(ent);
             break;
         }
@@ -442,7 +435,6 @@ void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *) *target_arr, A
         case Ast_Kind_Procedural_Expansion: {
             ent.type = Entity_Type_Procedural_Expansion;
             ent.proc_expansion = (AstProceduralExpansion *) node;
-            ent.state = Entity_State_Resolve_Symbols;
             ENTITY_INSERT(ent);
             break;
         }
