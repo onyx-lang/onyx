@@ -404,7 +404,6 @@ static f64 parse_float_token(OnyxToken *float_token) {
     return value;
 }
 
-// TODO: Make parsing numeric literals not rely on the C standard libary.
 static AstNumLit* parse_int_literal(OnyxParser* parser) {
     AstNumLit* int_node = make_node(AstNumLit, Ast_Kind_NumLit);
     int_node->token = expect_token(parser, Token_Type_Literal_Integer);

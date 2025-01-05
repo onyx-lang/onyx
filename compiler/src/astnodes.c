@@ -588,9 +588,6 @@ b32 convert_numlit_to_type(Context *context, AstNumLit* num, Type* to_type, b32 
     return 0;
 }
 
-// TODO: This function should be able return a "yield" condition. There
-// are a couple cases that need to yield in order to be correct, like
-// polymorphic functions with a typeof for the return type.
 TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b32 permanent) {
     AstTyped* node = *pnode;
     if (type == NULL) return TYPE_MATCH_FAILED;

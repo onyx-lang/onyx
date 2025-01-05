@@ -2957,7 +2957,10 @@ CHECK_FUNC(method_call, AstBinaryOp** pmcall) {
         mcall->flags |= Ast_Flag_Has_Been_Checked;
     }
 
-    // TODO: This doesn't look right? Does this ever happen? Check this...
+    //
+    // This can happen now that method calls which expand via a macro are not replaced and
+    // instead are passed all the way to the code generator.
+    //
     if (mcall->right->kind != Ast_Kind_Call) {
         *pmcall = (AstBinaryOp *) mcall->right;
         // CHECK(expression, (AstCall **) pmcall);
@@ -4223,13 +4226,6 @@ CHECK_FUNC(struct, AstStructType* s_node) {
     if (s_node->constraints.constraints) {
         s_node->constraints.produce_errors = (s_node->flags & Ast_Flag_Header_Check_No_Error) == 0;
 
-        // if (s_node->constraints.constraints) {
-        //     bh_arr_each(AstConstraint *, constraint, s_node->constraints.constraints) {
-        //         // TODO: Check if this is correct!
-        //         CHECK(constraint, *constraint);
-        //     }
-        // }
-
         OnyxFilePos pos = s_node->token->pos;
         if (s_node->polymorphic_error_loc.filename) {
             pos = s_node->polymorphic_error_loc;
@@ -4770,7 +4766,12 @@ CHECK_FUNC(type, AstType** ptype) {
         case Ast_Kind_Function_Type: {
             AstFunctionType* ftype = (AstFunctionType *) type;
 
-            // TODO: Document why return type has to come after parameter type... 
+            //
+            // We have to check the parameter types here before the return type,
+            // because when doing a nested polymorph lookup, the parameter types
+            // need to be constructable in order to create the polymorph variant
+            // and return type can be whatever (since it is replaced with void).
+            //
 
             if (ftype->param_count > 0) {
                 fori (i, 0, (i64) ftype->param_count) {
@@ -5145,7 +5146,12 @@ CHECK_FUNC(process_directive, AstNode* directive) {
             inject->symbol = acc->token;
         }
 
-        // TODO Document why this does not check the return value.
+        //
+        // We do not "properly" handle the check status of this function here, because
+        // we actually don't care if it is completely done type checking. We only care
+        // if we can get a scope from it. We are effectively just using this call as a
+        // means to resolve the symbols in the destination
+        //
         check_expression(context, &inject->dest);
 
         Scope *scope = get_scope_from_node_or_create(context, (AstNode *) inject->dest);
