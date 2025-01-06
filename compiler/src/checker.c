@@ -3256,6 +3256,11 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
         case Ast_Kind_Code_Block:
             expr->flags |= Ast_Flag_Comptime;
             fill_in_type(context, expr);
+            bh_arr_each(CodeBlockBindingSymbol, sym, ((AstCodeBlock *) expr)->binding_symbols) {
+                if (sym->type_node) {
+                    CHECK(type, &sym->type_node);
+                }
+            }
             break;
 
         case Ast_Kind_Do_Block: {
@@ -3381,8 +3386,11 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
         CHECK(expression, pexpr);
     }
 
-    Type* code_type = type_build_from_ast(context, context->builtins.code_type);
+    if (insert->skip_scope_index) {
+        CHECK(expression, &insert->skip_scope_index);
+    }
 
+    Type* code_type = type_build_from_ast(context, context->builtins.code_type);
     TYPE_CHECK(&insert->code_expr, code_type) {
         ERROR_(insert->token->pos, "#unquote expected a value of type 'Code', got '%s'.",
             type_get_name(context, insert->code_expr->type));
@@ -3413,10 +3421,23 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
     AstNode* cloned_block = ast_clone(context, code_block->code);
     cloned_block->next = insert->next;
 
+    i32 skip_scope_index = get_expression_integer_value(context, insert->skip_scope_index, NULL);
+    Scope *scope_for_cloned_block = NULL;
+    if (skip_scope_index > 0) {
+        Scope *skip_scope = context->checker.current_scope;
+        fori (i, 0, skip_scope_index) {
+            if (!skip_scope->parent) break;
+            skip_scope = skip_scope->parent;
+        }
+
+        scope_for_cloned_block = scope_create(context, skip_scope, cloned_block->token->pos);
+    }
+
     if (bound_expr_count > 0) {
         Scope **scope = NULL;
 
         if (cloned_block->kind == Ast_Kind_Block) {
+            ((AstBlock *) cloned_block)->scope = scope_for_cloned_block;
             scope = &((AstBlock *) cloned_block)->quoted_block_capture_scope;
 
         } else if (bound_symbol_count > 0) {
@@ -3428,6 +3449,7 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
             body_block->token = cloned_block->token;
             body_block->body = (AstNode *) return_node;
             body_block->rules = Block_Rule_Code_Block;
+            ((AstBlock *) body_block)->scope = scope_for_cloned_block;
             scope = &((AstBlock *) body_block)->quoted_block_capture_scope;
 
             AstDoBlock* doblock = (AstDoBlock *) onyx_ast_node_new(context->ast_alloc, sizeof(AstDoBlock), Ast_Kind_Do_Block);
@@ -3444,7 +3466,18 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
             *scope = scope_create(context, NULL, code_block->token->pos);
 
             fori (i, 0, bound_symbol_count) {
-                symbol_introduce(context, *scope, code_block->binding_symbols[i], (AstNode *) insert->binding_exprs[i]);
+                CodeBlockBindingSymbol sym = code_block->binding_symbols[i];
+                if (sym.type_node) {
+                    Type *type = type_build_from_ast(context, sym.type_node);
+
+                    TYPE_CHECK(&insert->binding_exprs[i], type) {
+                        ERROR_(insert->token->pos, "FIX ME!!! Expected type '%s' but got type '%s'.", 
+                               type_get_name(context, type), type_get_name(context, insert->binding_exprs[i]->type));
+                    }
+                }
+
+                AstNode *value = (void *) insert->binding_exprs[i];
+                symbol_introduce(context, *scope, sym.symbol, value);
             }
         }
     }

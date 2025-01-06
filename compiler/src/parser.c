@@ -862,8 +862,15 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 while (!consume_token_if_next(parser, ']')) {
                     if (parser->hit_unexpected_token) return (AstTyped *) code_block;
 
-                    OnyxToken *symbol = expect_token(parser, Token_Type_Symbol);
-                    bh_arr_push(code_block->binding_symbols, symbol);
+                    CodeBlockBindingSymbol sym;
+                    sym.symbol = expect_token(parser, Token_Type_Symbol);
+                    sym.type_node = NULL;
+
+                    if (consume_token_if_next(parser, ':')) {
+                        sym.type_node = parse_type(parser);
+                    }
+
+                    bh_arr_push(code_block->binding_symbols, sym);
 
                     if (parser->curr->type != ']')
                         expect_token(parser, ',');
@@ -1064,6 +1071,10 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                         if (parser->curr->type != ')')
                             expect_token(parser, ',');
                     }
+                }
+
+                if (parse_possible_directive(parser, "skip_scope")) {
+                    insert->skip_scope_index = parse_factor(parser);
                 }
 
                 retval = (AstTyped *) insert;

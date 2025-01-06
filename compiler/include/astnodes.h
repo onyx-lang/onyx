@@ -1613,12 +1613,17 @@ struct AstCallSite {
     b32 collapsed : 1;
 };
 
+typedef struct CodeBlockBindingSymbol {
+    OnyxToken *symbol;
+    AstType   *type_node; // This can be NULL if no type was given.
+} CodeBlockBindingSymbol;
+
 // Represents a "pastable" block of code.
 struct AstCodeBlock {
     AstTyped_base;
 
     AstNode *code;
-    bh_arr(OnyxToken *) binding_symbols;
+    bh_arr(CodeBlockBindingSymbol) binding_symbols;
 
     b32 is_expression: 1;
 };
@@ -1628,6 +1633,9 @@ struct AstDirectiveInsert {
 
     AstTyped *code_expr;
     bh_arr(AstTyped *) binding_exprs;
+
+    // Set when using #skip_scope
+    AstTyped *skip_scope_index;
 };
 
 struct AstDirectiveInit {
