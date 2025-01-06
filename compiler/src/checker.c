@@ -3471,8 +3471,9 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
                     Type *type = type_build_from_ast(context, sym.type_node);
 
                     TYPE_CHECK(&insert->binding_exprs[i], type) {
-                        ERROR_(insert->token->pos, "FIX ME!!! Expected type '%s' but got type '%s'.", 
-                               type_get_name(context, type), type_get_name(context, insert->binding_exprs[i]->type));
+                        ERROR_(insert->token->pos, "Expected type '%s' but got type '%s' for the '%d%s' argument to the code block.", 
+                               type_get_name(context, type), type_get_name(context, insert->binding_exprs[i]->type),
+                               i + 1, bh_num_suffix(i + 1));
                     }
                 }
 
