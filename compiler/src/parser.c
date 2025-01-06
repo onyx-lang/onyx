@@ -1630,48 +1630,49 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
     }
 
     //
-    // For loops can take on a lot of shapes.
+    // For loops can take on a lot of shapes. Look for "sym (:|,|in)".
     //     for value in iter
     //     for value: i64 in iter
     //     for value, index in iter
     //     for value: i64, index in iter
     //     for value: i64, index: i32 in iter
     //
+    bh_arr_new(parser->context->gp_alloc, for_node->indexing_variables, 1);
+
     if (next_tokens_are(parser, 2, Token_Type_Symbol, Token_Type_Keyword_In)
         || next_tokens_are(parser, 2, Token_Type_Symbol, ':')
         || next_tokens_are(parser, 2, Token_Type_Symbol, ',')
     ) {
-        for_node->var = make_local(
-            parser->context,
-            expect_token(parser, Token_Type_Symbol),
-            NULL
-        );
+        while (!consume_token_if_next(parser, Token_Type_Keyword_In)) {
+            if (parser->hit_unexpected_token) return for_node;
 
-        if (consume_token_if_next(parser, ':')) {
-            for_node->var->type_node = parse_type(parser);
-        }
-
-        if (consume_token_if_next(parser, ',')) {
-            for_node->index_var = make_local(
+            AstLocal *var = make_local(
                 parser->context,
                 expect_token(parser, Token_Type_Symbol),
-                (AstType *) &parser->context->basic_types.type_u32
+                NULL
             );
 
             if (consume_token_if_next(parser, ':')) {
-                for_node->index_var->type_node = parse_type(parser);
+                var->type_node = parse_type(parser);
+            }
+
+            bh_arr_push(for_node->indexing_variables, var);
+
+            if (peek_token(0)->type != Token_Type_Keyword_In) {
+                expect_token(parser, ',');
             }
         }
-
-        expect_token(parser, Token_Type_Keyword_In);
     } else {
         // HACK
         static char it_name[] = "it ";
         static OnyxToken it_token = { Token_Type_Symbol, 2, it_name, { 0 } };
 
         AstLocal* var_node = make_local(parser->context, &it_token, NULL);
-        for_node->var = var_node;
+        bh_arr_push(for_node->indexing_variables, var_node);
     }
+
+    for_node->var = for_node->indexing_variables[0];
+    if (bh_arr_length(for_node->indexing_variables) > 1) for_node->index_var = for_node->indexing_variables[1];
 
     for_node->iter = parse_expression(parser, 1);
     for_node->stmt = parse_block(parser, 1, NULL);

@@ -277,11 +277,22 @@ AstNode* ast_clone(Context *context, void* n) {
             C(AstDefer, stmt);
             break;
 
-        case Ast_Kind_For:
-            C(AstFor, var);
+        case Ast_Kind_For: {
+            AstFor* sf = (AstFor *) node;
+            AstFor* df = (AstFor *) nn;
+
+            df->indexing_variables = NULL;
+            bh_arr_new(context->gp_alloc, df->indexing_variables, bh_arr_length(sf->indexing_variables));
+            bh_arr_each(AstLocal *, iv, sf->indexing_variables)
+                bh_arr_push(df->indexing_variables, (AstLocal *) ast_clone(context, (AstTyped *) *iv));
+
+            df->var = df->indexing_variables[0];
+            if (bh_arr_length(df->indexing_variables) > 1) df->index_var = df->indexing_variables[1];
+
             C(AstFor, iter);
             C(AstFor, stmt);
             break;
+        }
 
         case Ast_Kind_If:
         case Ast_Kind_While:

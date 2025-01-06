@@ -866,9 +866,9 @@ struct AstFor           {
     // NOTE: Stores the iteration variable
     Scope *scope;
 
-    // NOTE: Local defining the iteration variable
-    AstLocal* var;
-    AstLocal* index_var;
+    AstLocal *var;
+    AstLocal *index_var;
+    bh_arr(AstLocal *) indexing_variables;
 
     // NOTE: This can be any expression, but it is checked that
     // it is of a type that we know how to iterate over.

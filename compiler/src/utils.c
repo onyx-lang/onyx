@@ -379,6 +379,24 @@ all_types_peeled_off:
             return NULL;
         }
 
+        case Ast_Kind_Code_Block: {
+            AstCodeBlock *block = (AstCodeBlock *) node;
+
+            if (!strcmp(symbol, "capture_count")) {
+                return (AstNode *) make_int_literal(context, bh_arr_length(block->binding_symbols));
+            }
+
+            if (bh_str_starts_with(symbol, "capture_type_")) {
+                char *num = symbol + 13; // go past the "capture_type_"
+                int idx = atoi(num); // TODO: Remove use of atoi here...
+                if (idx != 0 && idx <= bh_arr_length(block->binding_symbols)) {
+                    return (AstNode *) block->binding_symbols[idx - 1].type_node;
+                }
+            }
+
+            return NULL;
+        }
+
         default: break;
     }
 

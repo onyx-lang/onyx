@@ -336,15 +336,15 @@ CHECK_FUNC(if, AstIfWhile* ifnode) {
 
         if (static_if_resolution(context, ifnode)) {
             if (ifnode->true_stmt != NULL) {
+                ifnode->true_stmt->rules = Block_Rule_Macro & ~Block_Rule_New_Scope;
                 CHECK(statement, (AstNode **) &ifnode->true_stmt);
-                ifnode->true_stmt->rules = Block_Rule_Macro;
                 ifnode->flags |= ifnode->true_stmt->flags & Ast_Flag_Block_Returns;
             }
 
         } else {
             if (ifnode->false_stmt != NULL) {
+                ifnode->false_stmt->rules = Block_Rule_Macro & ~Block_Rule_New_Scope;
                 CHECK(statement, (AstNode **) &ifnode->false_stmt);
-                ifnode->false_stmt->rules = Block_Rule_Macro;
                 ifnode->flags |= ifnode->false_stmt->flags & Ast_Flag_Block_Returns;
             }
         }
@@ -433,15 +433,6 @@ CHECK_FUNC(for, AstFor** pfornode) {
     b32 old_inside_for_iterator;
     if (fornode->flags & Ast_Flag_Has_Been_Checked) goto fornode_expr_checked;
 
-    if (fornode->index_var) {
-        fornode->index_var->flags |= Ast_Flag_Cannot_Take_Addr;
-        CHECK(expression, (AstTyped **) &fornode->index_var);
-
-        if (!type_is_integer(fornode->index_var->type)) {
-            ERROR_(fornode->index_var->token->pos, "Index for a for loop must be an integer type, but it is a '%s'.", type_get_name(context, fornode->index_var->type));
-        }
-    }
-
     CHECK(expression, &fornode->iter);
     resolve_expression_type(context, fornode->iter);
 
@@ -454,16 +445,11 @@ CHECK_FUNC(for, AstFor** pfornode) {
     //     }
     // }
     //
-    CHECK(local, &fornode->var);
-    if (fornode->index_var) {
-        fornode->index_var->flags |= Ast_Flag_Cannot_Take_Addr;
-        CHECK(local, &fornode->index_var);
-        fill_in_type(context, (AstTyped *) fornode->index_var);
-
-        if (!type_is_integer(fornode->index_var->type)) {
-            ERROR_(fornode->index_var->token->pos, "Index for a for loop must be an integer type, but it is a '%s'.", type_get_name(context, fornode->index_var->type));
-        }
+    bh_arr_each(AstLocal *, index_variable, fornode->indexing_variables) {
+        CHECK(local, index_variable);
     }
+
+    assert(fornode->var == fornode->indexing_variables[0]);
 
     Type* iter_type = fornode->iter->type;
     if (iter_type == NULL) YIELD(fornode->token->pos, "Waiting for iteration expression type to be known.");
@@ -606,6 +592,19 @@ CHECK_FUNC(for, AstFor** pfornode) {
     if (fornode->no_close && fornode->loop_type != For_Loop_Iterator) {
         ONYX_WARNING(error_loc, "Warning: #no_close here is meaningless as the iterable is not an iterator.");
     }
+
+    if (fornode->index_var) {
+        fornode->index_var->flags |= Ast_Flag_Cannot_Take_Addr;
+        if (fornode->index_var->type_node == NULL) {
+            fornode->index_var->type_node = (AstType *) &context->basic_types.type_u32;
+        }
+        fill_in_type(context, (AstTyped *) fornode->index_var);
+
+        // if (!type_is_integer(fornode->index_var->type)) {
+        //     ERROR_(fornode->index_var->token->pos, "Index for a for loop must be an integer type, but it is a '%s'.", type_get_name(context, fornode->index_var->type));
+        // }
+    }
+
 
     fornode->flags |= Ast_Flag_Has_Been_Checked;
 
@@ -2572,7 +2571,7 @@ CHECK_FUNC(dereference, AstDereference* deref) {
     CHECK(expression, &deref->expr);
 
     if (!type_is_pointer(deref->expr->type))
-        ERROR(deref->token->pos, "Cannot dereference non-pointer value.");
+        ERROR_(deref->token->pos, "Cannot dereference non-pointer value, '%s'.", type_get_name(context, deref->expr->type));
 
     if (deref->expr->type == context->types.basic[Basic_Kind_Rawptr])
         ERROR(deref->token->pos, "Cannot dereference 'rawptr'. Cast to another pointer type first.");
@@ -2699,7 +2698,8 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
             expr->kind == Ast_Kind_Distinct_Type ||
             expr->kind == Ast_Kind_Interface ||
             expr->kind == Ast_Kind_Compiler_Extension ||
-            expr->kind == Ast_Kind_Package) {
+            expr->kind == Ast_Kind_Package ||
+            expr->kind == Ast_Kind_Code_Block) {
             goto try_resolve_from_node;
         }
     }
@@ -3258,7 +3258,7 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
             fill_in_type(context, expr);
             bh_arr_each(CodeBlockBindingSymbol, sym, ((AstCodeBlock *) expr)->binding_symbols) {
                 if (sym->type_node) {
-                    CHECK(type, &sym->type_node);
+                    CHECK(expression, (AstTyped **) &sym->type_node);
                 }
             }
             break;

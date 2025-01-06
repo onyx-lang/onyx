@@ -1973,9 +1973,13 @@ AstCall * create_implicit_for_expansion_call(Context *context, AstFor *fornode) 
     body_code_block->code = (AstNode *) fornode->stmt;
     ((AstBlock *) body_code_block->code)->rules = Block_Rule_Code_Block;
 
-    bh_arr_new(context->ast_alloc, body_code_block->binding_symbols, 2);
-    bh_arr_push(body_code_block->binding_symbols, ((CodeBlockBindingSymbol) { .symbol = fornode->var->token, .type_node = NULL }));
-    if (fornode->index_var) bh_arr_push(body_code_block->binding_symbols, ((CodeBlockBindingSymbol) { .symbol = fornode->index_var->token, .type_node = NULL }));
+    bh_arr_new(context->ast_alloc, body_code_block->binding_symbols, bh_arr_length(fornode->indexing_variables));
+    bh_arr_each(AstLocal *, indexing_variable, fornode->indexing_variables) {
+        CodeBlockBindingSymbol sym;
+        sym.symbol    = (*indexing_variable)->token;
+        sym.type_node = (*indexing_variable)->type_node;
+        bh_arr_push(body_code_block->binding_symbols, sym);
+    }
 
     i32 flags = 0;
     if (fornode->by_pointer) flags |= 1; // BY_POINTER
@@ -1983,23 +1987,13 @@ AstCall * create_implicit_for_expansion_call(Context *context, AstFor *fornode) 
     
     AstNumLit *flag_node = make_int_literal(context, flags);
 
-    AstTypeRawAlias *index_type = onyx_ast_node_new(context->ast_alloc, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
-    index_type->type = context->types.basic[Basic_Kind_Type_Index];
-    index_type->to = context->types.basic[Basic_Kind_I32];
-    if (fornode->index_var) {
-        assert(fornode->index_var->type);
-        index_type->to = fornode->index_var->type;
-    }
-
     // Arguments are: 
     //    Iterator
     //    Code block with 2 inputs (value, index)
     //    Flags
-    //    Index variable type
     bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) fornode->iter));
     bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) body_code_block));
     bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) flag_node));
-    bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) index_type));
 
     return call;
 }
