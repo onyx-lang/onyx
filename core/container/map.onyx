@@ -231,7 +231,8 @@ Map.format_map :: (output: &conv.Format_Output, format: &conv.Format, x: &Map($K
     } else {
         output->write("{ ");
         for& x.entries {
-            if !#first do output->write(", ");
+            // :RestoreThingsThatBrokeWithForLoopChanges
+            // if !#first do output->write(", ");
             conv.format(output, "{\"p} => {\"p}", it.key, it.value);
         }
         output->write(" }");

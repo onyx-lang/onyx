@@ -875,7 +875,7 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
             &call->args);
 
         if (new_callee == NULL) {
-            if (!context->cycle_detected) {
+            if (context->cycle_almost_detected < 2) {
                 YIELD(call->token->pos, "Waiting to know all options for overloaded function");
             }
 
