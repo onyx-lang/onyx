@@ -50,14 +50,15 @@ __array_op_scalar :: macro (l: [$N]$T, r: T, $body: Code) -> [N]T {
 //
 
 #overload
-__for_expansion :: macro (r: range, $flags: i32, $body: Code) where (body.capture_count == 1) {
+__for_expansion :: macro (_r: range, $flags: i32, $body: Code) where (body.capture_count == 1) {
+    r    := _r
     i    := r.low
     end  := r.high
     step := r.step
     
     while true {
-        if step < 0  && i >= end do break
-        if step >= 0 && i <  end do break
+        if step >= 0 && i >= end do break
+        if step <  0 && i <  end do break
         
         defer i += step
 
@@ -66,7 +67,8 @@ __for_expansion :: macro (r: range, $flags: i32, $body: Code) where (body.captur
 }
 
 #overload
-__for_expansion :: macro (r: range, $flags: i32, $body: Code) where (body.capture_count == 2) {
+__for_expansion :: macro (_r: range, $flags: i32, $body: Code) where (body.capture_count == 2) {
+    r    := _r
     i    := r.low
     end  := r.high
     step := r.step
@@ -78,8 +80,8 @@ __for_expansion :: macro (r: range, $flags: i32, $body: Code) where (body.captur
     }
 
     while true {
-        if step < 0  && i >= end do break
-        if step >= 0 && i <  end do break
+        if step >= 0 && i >= end do break
+        if step <  0 && i <  end do break
         
         defer i += step
         defer j += 1
@@ -89,14 +91,15 @@ __for_expansion :: macro (r: range, $flags: i32, $body: Code) where (body.captur
 }
 
 #overload
-__for_expansion :: macro (r: range64, $flags: i32, $body: Code) {
+__for_expansion :: macro (_r: range64, $flags: i32, $body: Code) {
+    r    := _r
     i    := r.low
     end  := r.high
     step := r.step
     
     while true {
-        if step < 0  && i >= end do break
-        if step >= 0 && i <  end do break
+        if step >= 0 && i >= end do break
+        if step <  0 && i <  end do break
         
         defer i += step
 
@@ -105,7 +108,8 @@ __for_expansion :: macro (r: range64, $flags: i32, $body: Code) {
 }
 
 #overload
-__for_expansion :: macro (r: range64, $flags: i32, $body: Code) where (body.capture_count == 2) {
+__for_expansion :: macro (_r: range64, $flags: i32, $body: Code) where (body.capture_count == 2) {
+    r    := _r
     i    := r.low
     end  := r.high
     step := r.step
@@ -117,8 +121,8 @@ __for_expansion :: macro (r: range64, $flags: i32, $body: Code) where (body.capt
     }
 
     while true {
-        if step < 0  && i >= end do break
-        if step >= 0 && i <  end do break
+        if step >= 0 && i >= end do break
+        if step <  0 && i <  end do break
         
         defer i += step
         defer j += 1
@@ -152,11 +156,12 @@ __for_expansion :: macro (n: i64, $flags: i32, $body: Code) {
 }
 
 #overload
-__for_expansion :: macro (s: [] $T, $flags: i32, $body: Code) where (flags & 1 == 0) {
-    i := 0
+__for_expansion :: macro (_s: [] $T, $flags: i32, $body: Code) where (flags & 1 == 0) {
+    s     := _s
     data  := s.data
     count := s.count
 
+    i := 0
     while i < count {
         defer i += 1
 
@@ -166,11 +171,12 @@ __for_expansion :: macro (s: [] $T, $flags: i32, $body: Code) where (flags & 1 =
 }
 
 #overload
-__for_expansion :: macro (s: [] $T, $flags: i32, $body: Code) where (flags & 1 != 0) {
-    i := 0
+__for_expansion :: macro (_s: [] $T, $flags: i32, $body: Code) where (flags & 1 != 0) {
+    s     := _s
     data  := s.data
     count := s.count
 
+    i := 0
     while i < count {
         defer i += 1
 
@@ -184,11 +190,11 @@ __for_expansion :: macro (s: [] $T, $flags: i32, $body: Code) where (flags & 1 !
 // Move these to iter.onyx
 #overload
 __for_expansion :: macro (iterator: Iterator($T), $flags: i32, $body: Code) where 
-    (flags & 1 == 0) && (body.capture_count == 1)
+    (flags & 1 == 0) && (body.capture_count == 2)
 {
     _iterator := iterator
 
-    #if flags & 2 != 0 {
+    #if flags & 2 == 0 {
         defer _iterator.close(_iterator.data)
     }
 
@@ -211,11 +217,11 @@ __for_expansion :: macro (iterator: Iterator($T), $flags: i32, $body: Code) wher
 
 #overload
 __for_expansion :: macro (iterator: Iterator($T), $flags: i32, $body: Code) where 
-    (flags & 1 != 0) && (body.capture_count == 1)
+    (flags & 1 == 0) && (body.capture_count == 1)
 {
     _iterator := iterator
 
-    #if (flags & 2 != 0) {
+    #if (flags & 2 == 0) {
         defer _iterator.close(_iterator.data)
     }
 
