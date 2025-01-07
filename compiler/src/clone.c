@@ -286,11 +286,7 @@ AstNode* ast_clone(Context *context, void* n) {
             bh_arr_each(AstLocal *, iv, sf->indexing_variables)
                 bh_arr_push(df->indexing_variables, (AstLocal *) ast_clone(context, (AstTyped *) *iv));
 
-            df->var = df->indexing_variables[0];
-            if (bh_arr_length(df->indexing_variables) > 1) df->index_var = df->indexing_variables[1];
-
             C(AstFor, iter);
-            C(AstFor, stmt);
             break;
         }
 

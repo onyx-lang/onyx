@@ -517,6 +517,12 @@ void initialize_builtins(Context *context) {
         return;
     }
 
+    context->builtins.for_expansion_flag_type = (AstType *) symbol_raw_resolve(context, p->scope, "__For_Expansion_Flags");
+    if (context->builtins.for_expansion_flag_type == NULL || context->builtins.for_expansion_flag_type->kind != Ast_Kind_Enum_Type) {
+        ONYX_ERROR((OnyxFilePos) { 0 }, Error_Critical, "'__For_Expansion_Flags' enum procedure not found.");
+        return;
+    }
+
     context->builtins.closure_block_allocate = (AstFunction *) symbol_raw_resolve(context, p->scope, "__closure_block_allocate");
     if (context->builtins.closure_block_allocate == NULL || context->builtins.closure_block_allocate->kind != Ast_Kind_Function) {
         ONYX_ERROR((OnyxFilePos) { 0 }, Error_Critical, "'__closure_block_allocate' procedure not found.");

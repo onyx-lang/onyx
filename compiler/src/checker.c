@@ -424,210 +424,233 @@ CHECK_FUNC(while, AstIfWhile* whilenode) {
 CHECK_FUNC(for, AstFor** pfornode) {
     AstFor *fornode = *pfornode;
 
-    if (!fornode->scope) {
-        fornode->scope = scope_create(context, context->checker.current_scope, fornode->token->pos);
-    }
-
-    scope_enter(context, fornode->scope);
-
-    b32 old_inside_for_iterator;
-    if (fornode->flags & Ast_Flag_Has_Been_Checked) goto fornode_expr_checked;
+    // HACK
+    CHECK(expression, (AstTyped **) &context->builtins.for_expansion_flag_type);
 
     CHECK(expression, &fornode->iter);
     resolve_expression_type(context, fornode->iter);
 
-    //
-    // These locals have to be checked after the iterator value to avoid incorrect
-    // symbol resolutions.
-    //
-    // for a in x {
-    //     for a in a { // <-
-    //     }
-    // }
-    //
     bh_arr_each(AstLocal *, index_variable, fornode->indexing_variables) {
-        CHECK(local, index_variable);
-    }
-
-    assert(fornode->var == fornode->indexing_variables[0]);
-
-    Type* iter_type = fornode->iter->type;
-    if (iter_type == NULL) YIELD(fornode->token->pos, "Waiting for iteration expression type to be known.");
-
-    OnyxFilePos error_loc = fornode->var->token->pos;
-    if (error_loc.filename == NULL) {
-        error_loc = fornode->token->pos;
-    }
-
-    // @HACK This should be built elsewhere...
-    context->builtins.range_type_type = type_build_from_ast(context, context->builtins.range_type);
-    if (context->builtins.range_type_type == NULL) YIELD(fornode->token->pos, "Waiting for 'range' structure to be built.");
-
-    Type* given_type = NULL;
-
-    fornode->loop_type = For_Loop_Invalid;
-    if (types_are_compatible(context, iter_type, context->types.basic[Basic_Kind_I32])) {
-        if (fornode->by_pointer) {
-            ERROR(error_loc, "Cannot iterate by pointer over a range.");
+        if ((*index_variable)->type_node) {
+            CHECK(type, &(*index_variable)->type_node);
         }
-
-        AstNumLit* low_0    = make_int_literal(context, 0);
-        AstRangeLiteral* rl = make_range_literal(context, (AstTyped *) low_0, fornode->iter);
-        CHECK(range_literal, &rl);
-        fornode->iter = (AstTyped *) rl;
-
-        given_type = context->builtins.range_type_type->Struct.memarr[0]->type;
-        fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
-        fornode->loop_type = For_Loop_Range;
-    }
-    else if (types_are_compatible(context, iter_type, context->types.basic[Basic_Kind_I64])) {
-        if (fornode->by_pointer) {
-            ERROR(error_loc, "Cannot iterate by pointer over a range.");
-        }
-
-        AstNumLit* low_0    = make_int_literal(context, 0);
-        low_0->type = context->types.basic[Basic_Kind_I64];
-        
-        AstRangeLiteral* rl = make_range_literal(context, (AstTyped *) low_0, fornode->iter);
-        CHECK(range_literal, &rl);
-        fornode->iter = (AstTyped *) rl;
-
-        given_type = context->builtins.range64_type_type->Struct.memarr[0]->type;
-        fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
-        fornode->loop_type = For_Loop_Range;
-    }
-    else if (types_are_compatible(context, iter_type, context->builtins.range_type_type)) {
-        if (fornode->by_pointer) {
-            ERROR(error_loc, "Cannot iterate by pointer over a range.");
-        }
-
-        // NOTE: Blindly copy the first range member's type which will
-        // be the low value.                - brendanfh 2020/09/04
-        given_type = iter_type->Struct.memarr[0]->type;
-        fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
-        fornode->loop_type = For_Loop_Range;
-    }
-    else if (types_are_compatible(context, iter_type, context->builtins.range64_type_type)) {
-        if (fornode->by_pointer) {
-            ERROR(error_loc, "Cannot iterate by pointer over a range.");
-        }
-
-        // NOTE: Blindly copy the first range member's type which will
-        // be the low value.                - brendanfh 2020/09/04
-        given_type = iter_type->Struct.memarr[0]->type;
-        fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
-        fornode->loop_type = For_Loop_Range;
-    }
-    else if (iter_type->kind == Type_Kind_Array) {
-        if (fornode->by_pointer) given_type = type_make_pointer(context, iter_type->Array.elem);
-        else                     given_type = iter_type->Array.elem;
-
-        fornode->loop_type = For_Loop_Array;
-    }
-    else if (iter_type->kind == Type_Kind_Slice) {
-        if (fornode->by_pointer) given_type = type_make_pointer(context, iter_type->Slice.elem);
-        else                     given_type = iter_type->Slice.elem;
-
-        fornode->loop_type = For_Loop_Slice;
-
-    }
-    else if (iter_type->kind == Type_Kind_VarArgs) {
-        if (fornode->by_pointer) {
-            ERROR_(error_loc, "Cannot iterate by pointer over '%s'.", type_get_name(context, iter_type));
-        }
-
-        given_type = iter_type->VarArgs.elem;
-
-        // NOTE: Slices are VarArgs are being treated the same here.
-        fornode->loop_type = For_Loop_Slice;
-    }
-    else if (iter_type->kind == Type_Kind_DynArray) {
-        if (fornode->by_pointer) given_type = type_make_pointer(context, iter_type->DynArray.elem);
-        else                     given_type = iter_type->DynArray.elem;
-
-        fornode->loop_type = For_Loop_DynArr;
-    }
-    //else if (type_constructed_from_poly(iter_type, context->builtins.iterator_type)) {
-    //    if (fornode->by_pointer) {
-    //        ERROR(error_loc, "Cannot iterate by pointer over an iterator.");
-    //    }
-
-    //    // HACK: This assumes the Iterator type only has a single type argument.
-    //    given_type = iter_type->Struct.poly_sln[0].type;
-    //    fornode->loop_type = For_Loop_Iterator;
-    //    fornode->var->flags |= Ast_Flag_Address_Taken;
-    //}
-    else {
-        if (!fornode->intermediate_macro_expansion) {
-            fornode->intermediate_macro_expansion = create_implicit_for_expansion_call(context, fornode);
-            assert(fornode->intermediate_macro_expansion);
-        }
-
-        *pfornode = (AstFor *) fornode->intermediate_macro_expansion;
-        CHECK(call, (AstCall **) pfornode);
-
-        // This will likely never happen, because __for_expansion should be a macro which should cause a return to symres.
-        return Check_Yield;
     }
 
-    if (given_type == NULL)
-        ERROR_(error_loc, "Cannot iterate over a '%s'.", type_get_name(context, iter_type));
-
-    if (fornode->var->type_node) {
-        fill_in_type(context, (AstTyped *) fornode->var);
-        TYPE_CHECK((AstTyped **) &fornode->var, given_type) {
-            ERROR_(error_loc, "Mismatched type for loop variable. You specified '%s', but it should be '%s'.", type_get_name(context, fornode->var->type), type_get_name(context, given_type));
-        }
-
-    } else {
-        fornode->var->type = given_type;
+    if (!fornode->intermediate_macro_expansion) {
+        fornode->intermediate_macro_expansion = create_implicit_for_expansion_call(context, fornode);
+        assert(fornode->intermediate_macro_expansion);
     }
+ 
+    *pfornode = (AstFor *) fornode->intermediate_macro_expansion;
+    CHECK(call, (AstCall **) pfornode);
+ 
+    // This will likely never happen, because __for_expansion should be a macro which should cause a return to symres.
+    return Check_Yield;
 
-    if (fornode->by_pointer)
-        fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
-
-    if (fornode->loop_type == For_Loop_Invalid)
-        ERROR_(error_loc, "Cannot iterate over a '%s'.", type_get_name(context, iter_type));
-
-    if (fornode->no_close && fornode->loop_type != For_Loop_Iterator) {
-        ONYX_WARNING(error_loc, "Warning: #no_close here is meaningless as the iterable is not an iterator.");
-    }
-
-    if (fornode->index_var) {
-        fornode->index_var->flags |= Ast_Flag_Cannot_Take_Addr;
-        if (fornode->index_var->type_node == NULL) {
-            fornode->index_var->type_node = (AstType *) &context->basic_types.type_u32;
-        }
-        fill_in_type(context, (AstTyped *) fornode->index_var);
-
-        // if (!type_is_integer(fornode->index_var->type)) {
-        //     ERROR_(fornode->index_var->token->pos, "Index for a for loop must be an integer type, but it is a '%s'.", type_get_name(context, fornode->index_var->type));
-        // }
-    }
-
-
-    fornode->flags |= Ast_Flag_Has_Been_Checked;
-
-
-fornode_expr_checked:
-    bh_arr_push(context->checker.for_node_stack, fornode);
-
-    old_inside_for_iterator = context->checker.inside_for_iterator;
-    context->checker.inside_for_iterator = 0;
-    iter_type = fornode->iter->type;
-    if (type_constructed_from_poly(iter_type, context->builtins.iterator_type)) {
-        context->checker.inside_for_iterator = 1;
-    }
-
-    do {
-        CheckStatus cs = check_block(context, fornode->stmt);
-        context->checker.inside_for_iterator = old_inside_for_iterator;
-        if (cs > Check_Errors_Start) return cs;
-    } while(0);
-
-    bh_arr_pop(context->checker.for_node_stack);
-    scope_leave(context);
-    return Check_Success;
+//     if (!fornode->scope) {
+//         fornode->scope = scope_create(context, context->checker.current_scope, fornode->token->pos);
+//     }
+// 
+//     scope_enter(context, fornode->scope);
+// 
+//     b32 old_inside_for_iterator;
+//     if (fornode->flags & Ast_Flag_Has_Been_Checked) goto fornode_expr_checked;
+// 
+//     CHECK(expression, &fornode->iter);
+//     resolve_expression_type(context, fornode->iter);
+// 
+//     //
+//     // These locals have to be checked after the iterator value to avoid incorrect
+//     // symbol resolutions.
+//     //
+//     // for a in x {
+//     //     for a in a { // <-
+//     //     }
+//     // }
+//     //
+//     bh_arr_each(AstLocal *, index_variable, fornode->indexing_variables) {
+//         CHECK(local, index_variable);
+//     }
+// 
+//     assert(fornode->var == fornode->indexing_variables[0]);
+// 
+//     Type* iter_type = fornode->iter->type;
+//     if (iter_type == NULL) YIELD(fornode->token->pos, "Waiting for iteration expression type to be known.");
+// 
+//     OnyxFilePos error_loc = fornode->var->token->pos;
+//     if (error_loc.filename == NULL) {
+//         error_loc = fornode->token->pos;
+//     }
+// 
+//     // @HACK This should be built elsewhere...
+//     context->builtins.range_type_type = type_build_from_ast(context, context->builtins.range_type);
+//     if (context->builtins.range_type_type == NULL) YIELD(fornode->token->pos, "Waiting for 'range' structure to be built.");
+// 
+//     Type* given_type = NULL;
+// 
+//     fornode->loop_type = For_Loop_Invalid;
+//     if (types_are_compatible(context, iter_type, context->types.basic[Basic_Kind_I32])) {
+//         if (fornode->by_pointer) {
+//             ERROR(error_loc, "Cannot iterate by pointer over a range.");
+//         }
+// 
+//         AstNumLit* low_0    = make_int_literal(context, 0);
+//         AstRangeLiteral* rl = make_range_literal(context, (AstTyped *) low_0, fornode->iter);
+//         CHECK(range_literal, &rl);
+//         fornode->iter = (AstTyped *) rl;
+// 
+//         given_type = context->builtins.range_type_type->Struct.memarr[0]->type;
+//         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
+//         fornode->loop_type = For_Loop_Range;
+//     }
+//     else if (types_are_compatible(context, iter_type, context->types.basic[Basic_Kind_I64])) {
+//         if (fornode->by_pointer) {
+//             ERROR(error_loc, "Cannot iterate by pointer over a range.");
+//         }
+// 
+//         AstNumLit* low_0    = make_int_literal(context, 0);
+//         low_0->type = context->types.basic[Basic_Kind_I64];
+//         
+//         AstRangeLiteral* rl = make_range_literal(context, (AstTyped *) low_0, fornode->iter);
+//         CHECK(range_literal, &rl);
+//         fornode->iter = (AstTyped *) rl;
+// 
+//         given_type = context->builtins.range64_type_type->Struct.memarr[0]->type;
+//         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
+//         fornode->loop_type = For_Loop_Range;
+//     }
+//     else if (types_are_compatible(context, iter_type, context->builtins.range_type_type)) {
+//         if (fornode->by_pointer) {
+//             ERROR(error_loc, "Cannot iterate by pointer over a range.");
+//         }
+// 
+//         // NOTE: Blindly copy the first range member's type which will
+//         // be the low value.                - brendanfh 2020/09/04
+//         given_type = iter_type->Struct.memarr[0]->type;
+//         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
+//         fornode->loop_type = For_Loop_Range;
+//     }
+//     else if (types_are_compatible(context, iter_type, context->builtins.range64_type_type)) {
+//         if (fornode->by_pointer) {
+//             ERROR(error_loc, "Cannot iterate by pointer over a range.");
+//         }
+// 
+//         // NOTE: Blindly copy the first range member's type which will
+//         // be the low value.                - brendanfh 2020/09/04
+//         given_type = iter_type->Struct.memarr[0]->type;
+//         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
+//         fornode->loop_type = For_Loop_Range;
+//     }
+//     else if (iter_type->kind == Type_Kind_Array) {
+//         if (fornode->by_pointer) given_type = type_make_pointer(context, iter_type->Array.elem);
+//         else                     given_type = iter_type->Array.elem;
+// 
+//         fornode->loop_type = For_Loop_Array;
+//     }
+//     else if (iter_type->kind == Type_Kind_Slice) {
+//         if (fornode->by_pointer) given_type = type_make_pointer(context, iter_type->Slice.elem);
+//         else                     given_type = iter_type->Slice.elem;
+// 
+//         fornode->loop_type = For_Loop_Slice;
+// 
+//     }
+//     else if (iter_type->kind == Type_Kind_VarArgs) {
+//         if (fornode->by_pointer) {
+//             ERROR_(error_loc, "Cannot iterate by pointer over '%s'.", type_get_name(context, iter_type));
+//         }
+// 
+//         given_type = iter_type->VarArgs.elem;
+// 
+//         // NOTE: Slices are VarArgs are being treated the same here.
+//         fornode->loop_type = For_Loop_Slice;
+//     }
+//     else if (iter_type->kind == Type_Kind_DynArray) {
+//         if (fornode->by_pointer) given_type = type_make_pointer(context, iter_type->DynArray.elem);
+//         else                     given_type = iter_type->DynArray.elem;
+// 
+//         fornode->loop_type = For_Loop_DynArr;
+//     }
+//     //else if (type_constructed_from_poly(iter_type, context->builtins.iterator_type)) {
+//     //    if (fornode->by_pointer) {
+//     //        ERROR(error_loc, "Cannot iterate by pointer over an iterator.");
+//     //    }
+// 
+//     //    // HACK: This assumes the Iterator type only has a single type argument.
+//     //    given_type = iter_type->Struct.poly_sln[0].type;
+//     //    fornode->loop_type = For_Loop_Iterator;
+//     //    fornode->var->flags |= Ast_Flag_Address_Taken;
+//     //}
+//     else {
+//         if (!fornode->intermediate_macro_expansion) {
+//             fornode->intermediate_macro_expansion = create_implicit_for_expansion_call(context, fornode);
+//             assert(fornode->intermediate_macro_expansion);
+//         }
+// 
+//         *pfornode = (AstFor *) fornode->intermediate_macro_expansion;
+//         CHECK(call, (AstCall **) pfornode);
+// 
+//         // This will likely never happen, because __for_expansion should be a macro which should cause a return to symres.
+//         return Check_Yield;
+//     }
+// 
+//     if (given_type == NULL)
+//         ERROR_(error_loc, "Cannot iterate over a '%s'.", type_get_name(context, iter_type));
+// 
+//     if (fornode->var->type_node) {
+//         fill_in_type(context, (AstTyped *) fornode->var);
+//         TYPE_CHECK((AstTyped **) &fornode->var, given_type) {
+//             ERROR_(error_loc, "Mismatched type for loop variable. You specified '%s', but it should be '%s'.", type_get_name(context, fornode->var->type), type_get_name(context, given_type));
+//         }
+// 
+//     } else {
+//         fornode->var->type = given_type;
+//     }
+// 
+//     if (fornode->by_pointer)
+//         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
+// 
+//     if (fornode->loop_type == For_Loop_Invalid)
+//         ERROR_(error_loc, "Cannot iterate over a '%s'.", type_get_name(context, iter_type));
+// 
+//     if (fornode->no_close && fornode->loop_type != For_Loop_Iterator) {
+//         ONYX_WARNING(error_loc, "Warning: #no_close here is meaningless as the iterable is not an iterator.");
+//     }
+// 
+//     if (fornode->index_var) {
+//         fornode->index_var->flags |= Ast_Flag_Cannot_Take_Addr;
+//         if (fornode->index_var->type_node == NULL) {
+//             fornode->index_var->type_node = (AstType *) &context->basic_types.type_u32;
+//         }
+//         fill_in_type(context, (AstTyped *) fornode->index_var);
+// 
+//         // if (!type_is_integer(fornode->index_var->type)) {
+//         //     ERROR_(fornode->index_var->token->pos, "Index for a for loop must be an integer type, but it is a '%s'.", type_get_name(context, fornode->index_var->type));
+//         // }
+//     }
+// 
+// 
+//     fornode->flags |= Ast_Flag_Has_Been_Checked;
+// 
+// 
+// fornode_expr_checked:
+//     bh_arr_push(context->checker.for_node_stack, fornode);
+// 
+//     old_inside_for_iterator = context->checker.inside_for_iterator;
+//     context->checker.inside_for_iterator = 0;
+//     iter_type = fornode->iter->type;
+//     if (type_constructed_from_poly(iter_type, context->builtins.iterator_type)) {
+//         context->checker.inside_for_iterator = 1;
+//     }
+// 
+//     do {
+//         CheckStatus cs = check_block(context, fornode->stmt);
+//         context->checker.inside_for_iterator = old_inside_for_iterator;
+//         if (cs > Check_Errors_Start) return cs;
+//     } while(0);
+// 
+//     bh_arr_pop(context->checker.for_node_stack);
+//     scope_leave(context);
+//     return Check_Success;
 }
 
 static b32 add_case_to_switch_statement(Context *context, AstSwitch* switchnode, u64 case_value, AstSwitchCase* casestmt, OnyxFilePos pos) {

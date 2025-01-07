@@ -1671,9 +1671,6 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
         bh_arr_push(for_node->indexing_variables, var_node);
     }
 
-    for_node->var = for_node->indexing_variables[0];
-    if (bh_arr_length(for_node->indexing_variables) > 1) for_node->index_var = for_node->indexing_variables[1];
-
     for_node->iter = parse_expression(parser, 1);
     for_node->stmt = parse_block(parser, 1, NULL);
 

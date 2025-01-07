@@ -866,8 +866,6 @@ struct AstFor           {
     // NOTE: Stores the iteration variable
     Scope *scope;
 
-    AstLocal *var;
-    AstLocal *index_var;
     bh_arr(AstLocal *) indexing_variables;
 
     // NOTE: This can be any expression, but it is checked that
@@ -2123,6 +2121,8 @@ struct CompilerBuiltins {
     bh_arr(AstFunction *) init_procedures;
     AstOverloadedFunction *implicit_bool_cast;
     AstOverloadedFunction *dispose_used_local;
+
+    AstType *for_expansion_flag_type;
     AstOverloadedFunction *for_expansion;
 };
 

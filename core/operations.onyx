@@ -42,3 +42,93 @@ __array_op_scalar :: macro (l: [$N]$T, r: T, $body: Code) -> [N]T {
     for 0..N do res[it] = #unquote body(l[it], r);
     return res;
 }
+
+
+
+//
+// Builtin for expansions
+//
+
+#overload
+__for_expansion :: macro (r: range, $flags: i32, body: Code) {
+    i    := r.low
+    end  := r.high
+    step := r.step
+    
+    while true {
+        if step < 0  && i >= end do break
+        if step >= 0 && i <  end do break
+        
+        defer i += step
+
+        #unquote body(i) #skip_scope(2)
+    }
+}
+
+#overload
+__for_expansion :: macro (r: range64, $flags: i32, body: Code) {
+    i    := r.low
+    end  := r.high
+    step := r.step
+    
+    while true {
+        if step < 0  && i >= end do break
+        if step >= 0 && i <  end do break
+        
+        defer i += step
+
+        #unquote body(i) #skip_scope(2)
+    }
+}
+
+#overload
+__for_expansion :: macro (n: i32, flags: i32, body: Code) {
+    i    := 0
+    end  := n
+    
+    while i < end {
+        defer i += step
+
+        #unquote body(i) #skip_scope(2)
+    }
+}
+
+#overload
+__for_expansion :: macro (n: i64, flags: i32, body: Code) {
+    i    : i64 = 0
+    end  : i64 = n
+    
+    while i < end {
+        defer i += step
+
+        #unquote body(i) #skip_scope(2)
+    }
+}
+
+#overload
+__for_expansion :: macro (s: [] $T, $flags: i32, body: Code) where (flags & 1 == 0) {
+    i := 0
+    data  := s.data
+    count := s.count
+
+    while i < count {
+        defer i += 1
+
+        v := data[i]
+        #unquote body(v, i) #skip_scope(2)
+    }
+}
+
+#overload
+__for_expansion :: macro (s: [] $T, $flags: i32, body: Code) where (flags & 1 != 0) {
+    i := 0
+    data  := s.data
+    count := s.count
+
+    while i < count {
+        defer i += 1
+
+        v := &data[i]
+        #unquote body(v, i) #skip_scope(2)
+    }
+}

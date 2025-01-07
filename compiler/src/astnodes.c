@@ -1986,14 +1986,17 @@ AstCall * create_implicit_for_expansion_call(Context *context, AstFor *fornode) 
     if (fornode->no_close)   flags |= 2; // NO_CLOSE
     
     AstNumLit *flag_node = make_int_literal(context, flags);
+    // flag_node->type_node = context->builtins.for_expansion_flag_type;
+    // flag_node->type = type_build_from_ast(context, context->builtins.for_expansion_flag_type);
+    // assert(flag_node->type);
 
     // Arguments are: 
     //    Iterator
     //    Code block with 2 inputs (value, index)
     //    Flags
     bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) fornode->iter));
-    bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) body_code_block));
     bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) flag_node));
+    bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) body_code_block));
 
     return call;
 }
