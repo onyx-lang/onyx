@@ -132,3 +132,57 @@ __for_expansion :: macro (s: [] $T, $flags: i32, body: Code) where (flags & 1 !=
         #unquote body(v, i) #skip_scope(2)
     }
 }
+
+
+//
+// Move these to iter.onyx
+#overload
+__for_expansion :: macro (iterator: Iterator($T), $flags: i32, $body: Code) where 
+    (flags & 1 == 0) && (body.capture_count == 1)
+{
+    _iterator := iterator
+
+    #if flags & 2 != 0 {
+        defer _iterator.close(_iterator.data)
+    }
+
+    #if #defined(body.capture_type_2) {
+        _i: body.capture_type_2
+    } else {
+        _i: i32
+    }
+
+    while true {
+        defer _i += 1
+
+        value := _iterator.next(_iterator.data)
+        if value.tag == .None do break
+
+        use core.memory
+        _it := *cast(&T) memory.ptr_add(&value, alignof ? T)
+
+        #unquote body(_it, _i) #skip_scope(2)
+    }
+}
+
+#overload
+__for_expansion :: macro (iterator: Iterator($T), $flags: i32, $body: Code) where 
+    (flags & 1 != 0) && (body.capture_count == 1)
+{
+    _iterator := iterator
+
+    #if (flags & 2 != 0) {
+        defer _iterator.close(_iterator.data)
+    }
+
+    while true {
+        value := _iterator.next(_iterator.data)
+        if value.tag == .None do break
+
+        use core.memory
+        _it := *cast(&T) memory.ptr_add(&value, alignof ? T)
+
+        #unquote body(_it) #skip_scope(2)
+    }
+}
+
