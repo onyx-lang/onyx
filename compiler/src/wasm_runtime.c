@@ -385,12 +385,39 @@ static void (* wasm_func_from_idx(wasm_table_t *func_table, unsigned int index, 
 
 #endif // USE_DYNCALL
 
+static char *lookup_func_name_in_name_section(i32 funcidx, i32 name_section, i32 *out_len) {
+    if (name_section == 0) return NULL;
+
+    i32 cursor = name_section;
+
+    // This is not the most robust checking, since there are other name
+    // subsections that could come before the func section. For the
+    // moment, Onyx only produces the func subsection in output_name_section.
+    u32 name_kind = uleb128_to_uint(wasm_raw_bytes.data, &cursor);
+    if (name_kind == 1) {
+        u32 func_count = uleb128_to_uint(wasm_raw_bytes.data, &cursor);
+        fori (i, 0, func_count) {
+            u32 idx = uleb128_to_uint(wasm_raw_bytes.data, &cursor);
+            u32 len = uleb128_to_uint(wasm_raw_bytes.data, &cursor);
+
+            if (idx == funcidx) {
+                *out_len = len;
+                return &wasm_raw_bytes.data[cursor];
+            }
+
+            cursor += len;
+        }
+    }
+
+    return NULL;
+}
+
 static void onyx_print_trap(wasm_trap_t* trap) {
     wasm_message_t msg;
     wasm_trap_message(trap, &msg);
     bh_printf("TRAP: %b\n", msg.data, msg.size);
 
-    i32 func_name_section = 0;
+    i32 name_section = 0;
 
     i32 cursor = 8; // skip the magic number and version
     while (cursor < wasm_raw_bytes.length) {
@@ -400,9 +427,9 @@ static void onyx_print_trap(wasm_trap_t* trap) {
         i32 section_start = cursor;
         if (section_number == 0) {
             u64 name_len = uleb128_to_uint(wasm_raw_bytes.data, &cursor);
-            if (!strncmp((const char *) wasm_raw_bytes.data + cursor, "_onyx_func_offsets", name_len)) {
+            if (!strncmp((const char *) wasm_raw_bytes.data + cursor, "name", name_len)) {
                 cursor += name_len;
-                func_name_section = cursor;
+                name_section = cursor;
                 break;
             }
         }
@@ -417,14 +444,13 @@ static void onyx_print_trap(wasm_trap_t* trap) {
         i32 func_idx   = wasm_frame_func_index(frames.data[i]);
         i32 mod_offset = wasm_frame_module_offset(frames.data[i]);
 
-        if (func_name_section > 0) {
-            i32 cursor = func_name_section + 4 * func_idx;
-            i32 func_offset = *(i32 *) (wasm_raw_bytes.data + cursor);
-            char* func_name = (char *) wasm_raw_bytes.data + func_name_section + func_offset;
+        i32   func_name_length;
+        char* func_name = lookup_func_name_in_name_section(func_idx, name_section, &func_name_length);
 
-            bh_printf("    func[%d]:%p at %s\n", func_idx, mod_offset, func_name);
+        if (func_name) {
+            bh_printf("    func[%d]:%p at %b\n", func_idx, mod_offset, func_name, func_name_length);
         } else {
-            bh_printf("    func[%d]\n", func_idx);
+            bh_printf("    func[%d]:%p\n", func_idx, mod_offset);
         }
     }
 }

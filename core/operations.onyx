@@ -195,7 +195,9 @@ __for_expansion :: macro (iterator: Iterator($T), $flags: i32, $body: Code) wher
     _iterator := iterator
 
     #if flags & 2 == 0 {
-        defer _iterator.close(_iterator.data)
+        defer if _iterator.close != null_proc {
+            _iterator.close(_iterator.data)
+        }
     }
 
     #if #defined(body.capture_type_2) {
@@ -222,7 +224,9 @@ __for_expansion :: macro (iterator: Iterator($T), $flags: i32, $body: Code) wher
     _iterator := iterator
 
     #if (flags & 2 == 0) {
-        defer _iterator.close(_iterator.data)
+        defer if _iterator.close != null_proc {
+            _iterator.close(_iterator.data)
+        }
     }
 
     while true {
