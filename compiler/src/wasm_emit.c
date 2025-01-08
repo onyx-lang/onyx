@@ -507,7 +507,6 @@ EMIT_FUNC(if,                              AstIfWhile* if_node);
 EMIT_FUNC(while,                           AstIfWhile* while_node);
 EMIT_FUNC(switch,                          AstSwitch* switch_node);
 EMIT_FUNC(defer,                           AstDefer* defer);
-EMIT_FUNC(defer_code,                      WasmInstruction* deferred_code, u32 code_count);
 EMIT_FUNC(deferred_stmt,                   DeferredStmt deferred_stmt);
 EMIT_FUNC_NO_ARGS(deferred_stmts);
 EMIT_FUNC(remove_directive,                AstDirectiveRemove* remove);
@@ -1282,6 +1281,12 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
         }
     }
 
+    if (while_node->has_first) {
+        while_node->first_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        WIL(while_node->token, WI_I32_CONST, 1);
+        WIL(while_node->token, WI_LOCAL_SET, while_node->first_local);
+    }
+
     if (while_node->false_stmt == NULL) {
         emit_enter_structured_block(mod, &code, SBT_Breakable_Block, while_node->token);
         emit_enter_structured_block(mod, &code, SBT_Continue_Loop, while_node->token);
@@ -1293,6 +1298,11 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
         }
 
         emit_block(mod, &code, while_node->true_stmt, 0);
+
+        if (while_node->has_first) {
+            WIL(while_node->token, WI_I32_CONST, 0);
+            WIL(while_node->token, WI_LOCAL_SET, while_node->first_local);
+        }
 
         if (while_node->bottom_test) {
             emit_expression(mod, &code, while_node->cond);
@@ -1313,6 +1323,11 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
         emit_enter_structured_block(mod, &code, SBT_Continue_Loop, while_node->token);
 
         emit_block(mod, &code, while_node->true_stmt, 0);
+
+        if (while_node->has_first) {
+            WIL(while_node->token, WI_I32_CONST, 0);
+            WIL(while_node->token, WI_LOCAL_SET, while_node->first_local);
+        }
 
         emit_expression(mod, &code, while_node->cond);
         WID(while_node->cond->token, WI_COND_JUMP, 0x00);
@@ -1527,16 +1542,6 @@ EMIT_FUNC(defer, AstDefer* defer) {
         .depth = bh_arr_length(mod->structured_jump_target),
         .defer_node= defer,
         .stmt = defer->stmt,
-    }));
-}
-
-EMIT_FUNC(defer_code, WasmInstruction* deferred_code, u32 code_count) {
-    bh_arr_push(mod->deferred_stmts, ((DeferredStmt) {
-        .type = Deferred_Stmt_Code,
-        .depth = bh_arr_length(mod->structured_jump_target),
-        .defer_node= NULL,
-        .instructions = deferred_code,
-        .instruction_count = code_count,
     }));
 }
 
@@ -3617,7 +3622,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_Directive_First: {
             AstDirectiveFirst *first = (AstDirectiveFirst *) expr;
-            WIL(first->token, WI_LOCAL_GET, first->for_node->first_local);
+            WIL(first->token, WI_LOCAL_GET, first->while_node->first_local);
             break;
         }
 

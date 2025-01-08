@@ -885,12 +885,8 @@ struct AstFor           {
     // But for now, this will do.
     b32 by_pointer : 1;
     b32 no_close   : 1;
-    b32 has_first  : 1;
-
-    // NOTE: This is used by the AstDirectiveFirst node for this
-    // for node to know which local variable to use.
-    u64 first_local;
 };
+
 struct AstIfWhile {
     AstNode_base;
 
@@ -911,7 +907,14 @@ struct AstIfWhile {
         };
 
         // Used by While
-        b32 bottom_test;
+        struct {
+            // NOTE: This is used by the AstDirectiveFirst node for this
+            // for node to know which local variable to use.
+            u64 first_local;
+            b32 has_first;
+
+            b32 bottom_test;
+        };
     };
 };
 typedef struct AstIfWhile AstIf;
@@ -1576,7 +1579,8 @@ struct AstDirectiveRemove {
 
 struct AstDirectiveFirst {
     AstTyped_base;
-    AstFor *for_node;
+
+    AstIfWhile *while_node;
 };
 
 struct AstDirectiveExportName {
@@ -1933,8 +1937,7 @@ typedef enum CheckerMode {
 typedef struct CheckerData {
     b32 expression_types_must_be_known;
     b32 all_checks_are_final;
-    b32 inside_for_iterator;
-    bh_arr(AstFor *) for_node_stack;
+    bh_arr(AstIfWhile *) while_node_stack;
     bh_imap __binop_impossible_cache[Binary_Op_Count];
     AstCall __op_maybe_overloaded;
     Entity *current_entity;

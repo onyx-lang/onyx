@@ -2143,14 +2143,6 @@ static AstNode* parse_statement(OnyxParser* parser) {
                 break;
             }
 
-            if (parse_possible_directive(parser, "remove")) {
-                // :LinearTokenDependent
-                AstDirectiveRemove *remove = make_node(AstDirectiveRemove, Ast_Kind_Directive_Remove);
-                remove->token = parser->curr - 2;
-                retval = (AstNode *) remove;
-                break;
-            }
-
             if (parse_possible_directive(parser, "error")) {
                 AstDirectiveError *error = make_node(AstDirectiveError, Ast_Kind_Directive_Error);
                 error->token = parser->curr - 2;

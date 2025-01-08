@@ -231,8 +231,7 @@ Map.format_map :: (output: &conv.Format_Output, format: &conv.Format, x: &Map($K
     } else {
         output->write("{ ");
         for& x.entries {
-            // :RestoreThingsThatBrokeWithForLoopChanges
-            // if !#first do output->write(", ");
+            if !#first do output->write(", ");
             conv.format(output, "{\"p} => {\"p}", it.key, it.value);
         }
         output->write(" }");
@@ -274,6 +273,40 @@ Map.as_iter :: (m: &Map) =>
 
             return .None;
         });
+
+
+/// Allows for looping over a map with a for-loop
+#overload
+__for_expansion :: macro (map: Map($K, $V), $flags: i32, $body: Code) where (body.capture_count == 2) {
+    m        := map
+    m_data   := m.entries.data
+    m_length := m.entries.length
+    i := 0
+    while i < m_length {
+        defer i += 1
+
+        #if flags & 1 != 0 {
+            #unquote body(m_data[i].key, &m_data[i].value) #skip_scope(2)
+        } else {
+            #unquote body(m_data[i].key, m_data[i].value) #skip_scope(2)
+        }
+    }
+}
+
+#overload
+__for_expansion :: macro (map: &Map($K, $V), $flags: i32, $body: Code) where (body.capture_count == 2) {
+    m := map
+    i := 0
+    while i < m.entries.length {
+        defer i += 1
+
+        #if flags & 1 != 0 {
+            #unquote body(m.entries[i].key, &m.entries[i].value) #skip_scope(2)
+        } else {
+            #unquote body(m.entries[i].key, m.entries[i].value) #skip_scope(2)
+        }
+    }
+}
 
 
 //

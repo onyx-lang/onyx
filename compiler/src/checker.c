@@ -405,7 +405,12 @@ CHECK_FUNC(while, AstIfWhile* whilenode) {
         }
     }
 
-    if (whilenode->true_stmt)  CHECK(statement, (AstNode **) &whilenode->true_stmt);
+    bh_arr_push(context->checker.while_node_stack, whilenode);
+
+    if (whilenode->true_stmt) {
+        CHECK(statement, (AstNode **) &whilenode->true_stmt);
+    }
+
     if (whilenode->false_stmt) {
         if (whilenode->bottom_test) {
             ERROR(whilenode->token->pos, "while-loops with an 'else' clause cannot be bottom tested.");
@@ -413,6 +418,8 @@ CHECK_FUNC(while, AstIfWhile* whilenode) {
 
         CHECK(statement, (AstNode **) &whilenode->false_stmt);
     }
+
+    bh_arr_pop(context->checker.while_node_stack);
 
     if (whilenode->initialization != NULL) {
         scope_leave(context);
@@ -3377,23 +3384,15 @@ CHECK_FUNC(directive_solidify, AstDirectiveSolidify** psolid) {
     return Check_Success;
 }
 
-CHECK_FUNC(remove_directive, AstDirectiveRemove *remove) {
-    if (!context->checker.inside_for_iterator) {
-        ERROR(remove->token->pos, "#remove is only allowed in the body of a for-loop over an iterator.");
-    }
-
-    return Check_Success;
-}
-
 CHECK_FUNC(directive_first, AstDirectiveFirst *first) {
-    if (bh_arr_length(context->checker.for_node_stack) == 0) {
-        ERROR(first->token->pos, "#first is only allowed in the body of a for-loop.");
+    if (bh_arr_length(context->checker.while_node_stack) == 0) {
+        ERROR(first->token->pos, "#first is only allowed in the body of a while-loop or for-loop.");
     }
 
-    first->for_node = bh_arr_last(context->checker.for_node_stack);
-    assert(first->for_node);
+    first->while_node = bh_arr_last(context->checker.while_node_stack);
+    assert(first->while_node);
 
-    first->for_node->has_first = 1;
+    first->while_node->has_first = 1;
 
     return Check_Success;
 }
@@ -3512,7 +3511,6 @@ CHECK_FUNC(statement, AstNode** pstmt) {
         case Ast_Kind_Defer:       return check_statement(context, &((AstDefer *) stmt)->stmt);
         case Ast_Kind_Argument:    return check_expression(context, (AstTyped **) &((AstArgument *) stmt)->value);
 
-        case Ast_Kind_Directive_Remove: return check_remove_directive(context, (AstDirectiveRemove *) stmt);
         case Ast_Kind_Directive_Insert: return check_insert_directive(context, (AstDirectiveInsert **) pstmt, 0);
         case Ast_Kind_Procedural_Expansion: return check_proc_expansion(context, (AstProceduralExpansion **) pstmt, PMEK_Statement);
 
@@ -3710,8 +3708,9 @@ CHECK_FUNC(function, AstFunction* func) {
     bh_arr_push(context->checker.expected_return_type_stack, &func->type->Function.return_type);
     bh_arr_push(context->checker.named_return_values_stack, func->named_return_locals);
 
-    context->checker.inside_for_iterator = 0;
-    if (context->checker.for_node_stack) bh_arr_clear(context->checker.for_node_stack);
+    if (context->checker.while_node_stack) {
+        bh_arr_clear(context->checker.while_node_stack);
+    }
 
     assert(func->scope);
 

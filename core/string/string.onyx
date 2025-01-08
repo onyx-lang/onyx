@@ -197,11 +197,10 @@ str.join :: (strs: [] str, sep: str, allocator := context.allocator) -> str {
 
     i := 0;
     for strs {
-        // :RestoreThingsThatBrokeWithForLoopChanges
-        // if !#first {
-        //     core.memory.copy(&out.data[i], sep.data, sep.count);
-        //     i += sep.count;
-        // }
+        if !#first {
+            core.memory.copy(&out.data[i], sep.data, sep.count);
+            i += sep.count;
+        }
 
         core.memory.copy(&out.data[i], it.data, it.count);
         i += it.count;

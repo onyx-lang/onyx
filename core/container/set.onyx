@@ -146,6 +146,39 @@ Set.as_iter :: (s: &Set) =>
             return .None;
         });
 
+/// Allows for looping over a Set with a for-loop
+#overload
+__for_expansion :: macro (set: Set($T), $flags: i32, $body: Code) where (body.capture_count == 1) {
+    s      := set
+    s_data := s.entries.data
+    s_len  := s.entries.length
+    i := 0
+    while i < s_len {
+        defer i += 1
+
+        #if flags & 1 != 0 {
+            #unquote body(&s_data[i].value) #skip_scope(2)
+        } else {
+            #unquote body(s_data[i].value) #skip_scope(2)
+        }
+    }
+}
+
+#overload
+__for_expansion :: macro (set: &Set($T), $flags: i32, $body: Code) where (body.capture_count == 1) {
+    s := set
+    i := 0
+    while i < s.entries.length {
+        defer i += 1
+
+        #if flags & 1 != 0 {
+            #unquote body(&s.entries[i].value) #skip_scope(2)
+        } else {
+            #unquote body(s.entries[i].value) #skip_scope(2)
+        }
+    }
+}
+
 //
 // Private symbols
 //
