@@ -385,7 +385,7 @@ static void (* wasm_func_from_idx(wasm_table_t *func_table, unsigned int index, 
 
 #endif // USE_DYNCALL
 
-static char *lookup_func_name_in_name_section(i32 funcidx, i32 name_section, i32 *out_len) {
+static char *lookup_func_name_in_name_section(u32 funcidx, i32 name_section, i32 *out_len) {
     if (name_section == 0) return NULL;
 
     i32 cursor = name_section;
@@ -441,7 +441,7 @@ static void onyx_print_trap(wasm_trap_t* trap) {
     wasm_frame_vec_t frames;
     wasm_trap_trace(trap, &frames);
     fori (i, 0, (i32) frames.size) {
-        i32 func_idx   = wasm_frame_func_index(frames.data[i]);
+        u32 func_idx   = wasm_frame_func_index(frames.data[i]);
         i32 mod_offset = wasm_frame_module_offset(frames.data[i]);
 
         i32   func_name_length;
