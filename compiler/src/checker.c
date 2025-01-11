@@ -458,8 +458,9 @@ CHECK_FUNC(for, AstFor** pfornode) {
     if (cs == Check_Error) {
         i32 vars = bh_arr_length(fornode->indexing_variables);
 
-        ERROR_(fornode->token->pos, "Unable to loop over a '%s' with %d captured argument%s.",
+        ERROR_(fornode->token->pos, "Unable to loop over a '%s'%s with %d captured argument%s.",
                type_get_name(context, fornode->iter->type),
+               fornode->by_pointer ? " by pointer," : "",
                vars,
                bh_num_plural(vars));
     }
