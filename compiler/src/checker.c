@@ -448,9 +448,25 @@ CHECK_FUNC(for, AstFor** pfornode) {
         assert(fornode->intermediate_macro_expansion);
     }
  
+    CheckStatus cs = check_call(context, (AstCall **) &fornode->intermediate_macro_expansion);
+    if (cs == Check_Yield) {
+        if (fornode->intermediate_macro_expansion->kind == Ast_Kind_Call) {
+            return Check_Yield;
+        }
+    }
+
+    if (cs == Check_Error) {
+        i32 vars = bh_arr_length(fornode->indexing_variables);
+
+        ERROR_(fornode->token->pos, "Unable to loop over a '%s' with %d captured argument%s.",
+               type_get_name(context, fornode->iter->type),
+               vars,
+               bh_num_plural(vars));
+    }
+
     *pfornode = (AstFor *) fornode->intermediate_macro_expansion;
-    CHECK(call, (AstCall **) pfornode);
- 
+    CHECK(expression, (AstTyped **) pfornode);
+
     return Check_Success;
 }
 
@@ -884,6 +900,14 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
         if (new_callee == NULL) {
             if (context->cycle_almost_detected < 2) {
                 YIELD(call->token->pos, "Waiting to know all options for overloaded function");
+            }
+
+            //
+            // When reporting an error about a for-loop expansion overload, don't report all the overloads
+            // as there are likely very many of them and the error message won't be very useful. Instead,
+            // a better error message will be printed in check_for.
+            if ((AstOverloadedFunction *) callee == context->builtins.for_expansion) {
+                return Check_Error;
             }
 
             report_unable_to_match_overload(context, call, ((AstOverloadedFunction *) callee)->overloads);
