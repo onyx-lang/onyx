@@ -1,0 +1,65 @@
+package core.sync
+
+use core.iter
+use core.array
+
+Channel :: struct (T: type_expr) {
+    _buf: [..] T;
+    _mutex: Mutex;
+    _condvar: Condition_Variable;
+
+    _is_open: bool;
+}
+
+Channel.make :: ($T: type_expr, allocator := context.allocator) -> (chan: Channel(T)) {
+    chan._buf = make([..] T, allocator);
+    mutex_init(&chan._mutex);
+    condition_init(&chan._condvar);
+    chan._is_open = true;
+    return;
+}
+
+Channel.close :: (chan: &Channel) {
+    chan._is_open = false;
+    condition_broadcast(&chan._condvar);
+}
+
+Channel.send :: (chan: &Channel, msg: chan.T) {
+    if !chan._is_open do return;
+
+    critical_section(&chan._mutex) {
+        array.push(&chan._buf, msg);
+        condition_broadcast(&chan._condvar);
+    }
+}
+
+Channel.poll :: (chan: &Channel) -> bool {
+    return chan._buf.length > 0;
+}
+
+Channel.recv :: (chan: &Channel) -> ? chan.T {
+    scoped_mutex(&chan._mutex);
+
+    while chan._buf.length == 0 && chan._is_open {
+        condition_wait(&chan._condvar, &chan._mutex);
+    }
+
+    if chan._buf.length == 0 {
+        return .None;
+    }
+
+    res := chan._buf[0];
+    array.delete(&chan._buf, 0);
+
+    return res;
+}
+
+Channel.as_iter :: (chan: &Channel) -> Iterator(chan.T) {
+    return iter.generator(
+        &.{chan = chan},
+        ctx => {
+            return ctx.chan->recv();
+        }
+    );
+}
+

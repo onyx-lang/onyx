@@ -13,7 +13,7 @@ struct onyx_socket_addr {
     unsigned int   addr;
 };
 
-static inline int onyx_socket_domain(int i) {
+static inline int onyx_socket_family(int i) {
     // :EnumDependent
     switch (i) {
         case 1: return AF_INET;
@@ -23,7 +23,7 @@ static inline int onyx_socket_domain(int i) {
     }
 }
 
-static inline int onyx_socket_protocol(int i) {
+static inline int onyx_socket_socktype(int i) {
     // :EnumDependent
     switch (i) {
         case 0: return SOCK_STREAM;
@@ -32,16 +32,35 @@ static inline int onyx_socket_protocol(int i) {
     }
 }
 
-ONYX_DEF(__net_create_socket, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
-    int domain = onyx_socket_domain(params->data[1].of.i32);
-    if (domain == -1) goto bad_settings;
+static inline int socket_family_to_onyx(int i) {
+    // :EnumDependent
+    switch (i) {
+        case AF_INET:  return 1;
+        case AF_INET6: return 2;
+        case AF_UNIX:  return 3;
+        default: return -1;
+    }
+}
 
-    int type = onyx_socket_protocol(params->data[2].of.i32);
+static inline int socket_socktype_to_onyx(int i) {
+    // :EnumDependent
+    switch (i) {
+        case SOCK_STREAM: return 0;
+        case SOCK_DGRAM:  return 1;
+        default: return -1;
+    }
+}
+
+ONYX_DEF(__net_create_socket, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    int family = onyx_socket_family(params->data[1].of.i32);
+    if (family == -1) goto bad_settings;
+
+    int type = onyx_socket_socktype(params->data[2].of.i32);
     if (type == -1) goto bad_settings;
 
     int proto = params->data[3].of.i32;
 
-    int sock = socket(domain, type, proto);
+    int sock = socket(family, type, proto);
     if (sock >= 0)
     {
         *((int *) ONYX_PTR(params->data[0].of.i32)) = sock;
@@ -389,7 +408,7 @@ ONYX_DEF(__net_recv, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
 
     if (received < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            results->data[0] = WASM_I32_VAL(received);
+            results->data[0] = WASM_I32_VAL(-2);
         }
     }
 
@@ -412,3 +431,49 @@ ONYX_DEF(__net_recvfrom, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WA
 
     return NULL;
 }
+
+ONYX_DEF(__net_resolve_start, (WASM_I32, WASM_I32), (WASM_I64)) {
+    char *hostname = ONYX_PTR(params->data[0].of.i32);
+    char portstr[8] = { 0 };
+    bh_snprintf(portstr, 8, "%d", params->data[1].of.i32);
+
+    struct addrinfo *result;
+    int err = getaddrinfo(hostname, portstr, NULL, &result);
+    if (err < 0) {
+        results->data[0] = WASM_I64_VAL(0);
+    } else {
+        results->data[0] = WASM_I64_VAL((u64) result);
+    }
+
+    return NULL;
+}
+
+ONYX_DEF(__net_resolve_next, (WASM_I64, WASM_I32, WASM_I32), (WASM_I64)) {
+    struct addrinfo *info = (struct addrinfo *) params->data[0].of.i64;
+    char *buf = ONYX_PTR(params->data[1].of.i32);
+
+    if (!info) {
+        results->data[0] = WASM_I64_VAL(0);
+        return NULL;
+    }
+
+    *(i32 *) &buf[0]  = socket_family_to_onyx(info->ai_family);
+    *(i32 *) &buf[4]  = socket_socktype_to_onyx(info->ai_socktype);
+    *(i32 *) &buf[8]  = info->ai_protocol;
+    memcpy(&buf[12], info->ai_addr, bh_min(info->ai_addrlen, params->data[2].of.i32 - 12));
+
+    results->data[0] = WASM_I64_VAL((u64) info->ai_next);
+    return NULL;
+}
+
+ONYX_DEF(__net_resolve_end, (WASM_I64), ()) {
+    struct addrinfo *info = (struct addrinfo *) params->data[0].of.i64;
+    
+    if (!info) return NULL;
+
+    freeaddrinfo(info);
+
+    return NULL;
+}
+
+

@@ -1,9 +1,7 @@
+/// This allocator simply wraps another allocator and
+/// prints every allocation/deallocation made by that 
+/// allocator.
 package core.alloc.log
-#package_doc """
-    This allocator simply wraps another allocator and
-    prints every allocation/deallocation made by that 
-    allocator.
-"""
 
 
 use core

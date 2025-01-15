@@ -3,12 +3,10 @@ package core.encoding.json
 
 use core {*}
 
-#doc """
-    Unsafely decodes a strings into a json object, returning an invalid
-    Json value if it failed to parse.
-
-    This procedure is not very useful and should be considered deprecated.
-"""
+/// Unsafely decodes a strings into a json object, returning an invalid
+/// Json value if it failed to parse.
+///
+/// This procedure is not very useful and should be considered deprecated.
 decode :: (data: str, allocator := context.allocator, print_errors := true) -> Json {
     json: Json;
     json.allocator = allocator;
@@ -38,18 +36,14 @@ _Decode_Error :: struct {
 
 Decode_Error :: #distinct ^_Decode_Error;
 
-#inject Decode_Error {
-    has_error :: (this: Decode_Error) => cast(^_Decode_Error) this != null;
-    message   :: (this: Decode_Error) => (cast(^_Decode_Error) this).errmsg;
-    position  :: (this: Decode_Error) => (cast(^_Decode_Error) this).pos;
-}
+Decode_Error.has_error :: (this: Decode_Error) => cast(^_Decode_Error) this != null;
+Decode_Error.message   :: (this: Decode_Error) => (cast(^_Decode_Error) this).errmsg;
+Decode_Error.position  :: (this: Decode_Error) => (cast(^_Decode_Error) this).pos;
 
-#doc """
-    Decodes a string into a Json object, and returns the Json object and
-    and a `Decode_Error` that is non-null if an error occured.
-
-    This procedure should be considered deprecated in favor of `decode_with_result`.
-"""
+/// Decodes a string into a Json object, and returns the Json object and
+/// and a `Decode_Error` that is non-null if an error occured.
+///
+/// This procedure should be considered deprecated in favor of `decode_with_result`.
 decode_with_error :: (data: str, allocator := context.allocator) -> (Json, Decode_Error) {
     json: Json;
     json.allocator = allocator;
@@ -74,9 +68,7 @@ decode_with_error :: (data: str, allocator := context.allocator) -> (Json, Decod
     return json, Decode_Error.{null};
 }
 
-#doc """
-    Decodes a string into a possible Json object. If parsing fails, an error is returned instead.
-"""
+/// Decodes a string into a possible Json object. If parsing fails, an error is returned instead.
 decode_with_result :: (data: str, allocator := context.allocator) -> Result(Json, Error) {
     root, err := parse(data, allocator);
     if err.kind != .None {
@@ -88,11 +80,9 @@ decode_with_result :: (data: str, allocator := context.allocator) -> Result(Json
     };
 }
 
-#doc """
-    Decodes a string into any Onyx type.
-
-    Internally uses `decode_with_result` and `as_any`.
-"""
+/// Decodes a string into any Onyx type.
+///
+/// Internally uses `decode_with_result` and `as_any`.
 decode_into :: (data: str, out: &$T) -> Error {
     obj := decode_with_result(data)->catch([err] {
         return return err;

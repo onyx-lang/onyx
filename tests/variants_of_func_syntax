@@ -1,0 +1,25 @@
+() {} works
+
+() use (...) {} works
+closure size: 12
+
+() -> _ {} works
+
+() use (...) -> _ {} works
+closure size: 12
+
+() => {} works
+
+() use (...) => {} works
+closure size: 12
+
+(x) => {} works
+
+(x) use (...) => {} works
+closure size: 12
+
+(x: i32) => {} works
+
+(x: i32) use (...) => {} works
+closure size: 12
+

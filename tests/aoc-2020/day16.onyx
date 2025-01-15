@@ -1,4 +1,4 @@
-#load "core/module"
+
 
 use core {*}
 
@@ -26,7 +26,7 @@ read_ticket_and_validate :: (file: &str, fields: [..] Field, ticket_store: [&] u
 		n := cast(u32, conv.parse_int(file));
 		ticket_store[i] = n;
 
-		if file.data[0] == #char "," do string.advance(file, 1);
+		if file.data[0] == ',' do string.advance(file, 1);
 
 		valid_count := 0;
 		for &field in fields {
@@ -52,9 +52,9 @@ main :: (args: [] cstr) {
 	defer array.free(&fields);
 
 	// Read until the first empty line
-	while file.data[0] != #char "\n" {
+	while file.data[0] != '\n' {
 		field := Field.{};
-		field.name, file = string.bisect(file, #char ":");		
+		field.name, file = string.bisect(file, ':');		
 
 		string.advance(&file, 1);
 		field.lower0 = ~~ conv.parse_int(&file);

@@ -1,4 +1,4 @@
-#load "core/module"
+
 
 use core {*}
 
@@ -65,66 +65,65 @@ find_span :: macro (low: Pos) -> u32 {
 }
 
 main :: (args) => {
-    for file in os.with_file("./tests/aoc-2021/input/day09.txt") {
-        reader := io.reader_make(file);
+    use file := os.open("./tests/aoc-2021/input/day09.txt")->unwrap();
+    use reader := io.reader_make(&file);
 
-        heightmap: Map(Pos, Cell);
+    heightmap: Map(Pos, Cell);
 
-        height, width := 0, 0;
-        while !io.reader_empty(&reader) {
-            line := io.read_line(&reader, consume_newline=false, inplace=true);
-            io.skip_whitespace(&reader);
+    height, width := 0, 0;
+    while !io.reader_empty(&reader) {
+        line := io.read_line(&reader, consume_newline=false, inplace=true);
+        io.skip_whitespace(&reader);
 
-            for line.count {
-                heightmap[Pos.{it, height}] = Cell.{cast(u32) (line[it] - #char "0")};
-            }
-
-            width = line.count;
-            height += 1;
+        for line.count {
+            heightmap[Pos.{it, height}] = Cell.{cast(u32) (line[it] - '0')};
         }
 
-        for y in height - 1 do for x in width {
-            map.update(&heightmap, .{x,y}) {
-                it.dy = it.height - heightmap[Pos.{x,y+1}]->unwrap().height;
-            }
-        }
-        for x in width - 1 do for y in height {
-            map.update(&heightmap, .{x,y}) {
-                it.dx = it.height - heightmap[Pos.{x+1,y}]->unwrap().height;
-            }
-        }
-
-        lowest: [..] Pos;
-        risk_sum := 0;
-        for y in height do for x in width {
-            h := &heightmap[Pos.{x,y}];
-            if x < width  - 1 && h.dx >= 0 do continue;
-            if y < height - 1 && h.dy >= 0 do continue;
-
-            if x > 0 {
-                if heightmap[Pos.{x-1, y}]->unwrap().dx <= 0 do continue;
-            }
-
-            if y > 0 {
-                if heightmap[Pos.{x, y-1}]->unwrap().dy <= 0 do continue;
-            }
-
-            lowest << .{x, y};
-            risk_sum += h.height + 1;
-        }
-
-        printf("Part 1: {}\n", risk_sum);
-
-        lowest_count: Map(Pos, i32);
-        for low in lowest do lowest_count[low] = find_span(low);
-
-        array.quicksort(lowest_count.entries, (a, b) => b.value - a.value);
-
-        answer := iter.as_iter(lowest_count.entries)
-               |> iter.map((x) => x.value)
-               |> iter.take(3)
-               |> iter.fold(1, (x, y) => x * y);
-
-        printf("Part 2: {}\n", answer);
+        width = line.count;
+        height += 1;
     }
+
+    for y in height - 1 do for x in width {
+        map.update(&heightmap, .{x,y}) {
+            it.dy = it.height - heightmap[Pos.{x,y+1}]->unwrap().height;
+        }
+    }
+    for x in width - 1 do for y in height {
+        map.update(&heightmap, .{x,y}) {
+            it.dx = it.height - heightmap[Pos.{x+1,y}]->unwrap().height;
+        }
+    }
+
+    lowest: [..] Pos;
+    risk_sum := 0;
+    for y in height do for x in width {
+        h := &heightmap[Pos.{x,y}];
+        if x < width  - 1 && h.dx >= 0 do continue;
+        if y < height - 1 && h.dy >= 0 do continue;
+
+        if x > 0 {
+            if heightmap[Pos.{x-1, y}]->unwrap().dx <= 0 do continue;
+        }
+
+        if y > 0 {
+            if heightmap[Pos.{x, y-1}]->unwrap().dy <= 0 do continue;
+        }
+
+        lowest << .{x, y};
+        risk_sum += h.height + 1;
+    }
+
+    printf("Part 1: {}\n", risk_sum);
+
+    lowest_count: Map(Pos, i32);
+    for low in lowest do lowest_count[low] = find_span(low);
+
+    array.quicksort(lowest_count.entries, (a, b) => b.value - a.value);
+
+    answer := iter.as_iter(lowest_count.entries)
+           |> iter.map((x) => x.value)
+           |> iter.take(3)
+           |> iter.fold(1, (x, y) => x * y);
+
+    printf("Part 2: {}\n", answer);
 }

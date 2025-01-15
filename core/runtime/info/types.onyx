@@ -3,7 +3,12 @@
 
 package runtime.info
 
-type_table : [] &Type_Info;
+Type_Entry :: struct {
+    type: type_expr
+    info: &Type_Info
+}
+
+type_table : [] Type_Entry
 
 Type_Info :: struct {
     // This must match the order of the elements in onyxtypes.h
@@ -223,35 +228,48 @@ Type_Info_Polymorphic_Union :: struct {
 }
 
 get_type_info :: (t: type_expr) -> &Type_Info {
-    // Grossness to get around the fact that type_exprs are not technically comparable, because in most
-    // cases you should not compare them as the number assigned to them is arbitrary.
-    if ~~t < cast(i32) 0 || ~~t >= cast(i32) type_table.count do return null;
+    ti := cast(i32) t
 
-    return type_table[cast(i32) t];
+    lo := 0
+    hi := type_table.count - 1
+    mid := (hi + lo) >> 1
+
+    while lo <= hi {
+        x := cast(i32) type_table[mid].type
+        if ti == x {
+            return type_table[mid].info
+        }
+
+        if x < ti {
+            lo = mid + 1
+        } else {
+            hi = mid - 1
+        }
+
+        mid = (hi + lo) >> 1
+    }
+
+    return null
 }
 
 
 
-#inject type_expr {
-    info :: get_type_info
-}
+type_expr.info :: get_type_info
 
-#inject Type_Info {
-    as_basic             :: (t: &Type_Info) => cast(&Type_Info_Basic, t);
-    as_pointer           :: (t: &Type_Info) => cast(&Type_Info_Pointer, t);
-    as_multi_pointer     :: (t: &Type_Info) => cast(&Type_Info_Multi_Pointer, t);
-    as_function          :: (t: &Type_Info) => cast(&Type_Info_Function, t);
-    as_array             :: (t: &Type_Info) => cast(&Type_Info_Array, t);
-    as_slice             :: (t: &Type_Info) => cast(&Type_Info_Slice, t);
-    as_dynamic_array     :: (t: &Type_Info) => cast(&Type_Info_Dynamic_Array, t);
-    as_variadic_argument :: (t: &Type_Info) => cast(&Type_Info_Variadic_Argument, t);
-    as_enum              :: (t: &Type_Info) => cast(&Type_Info_Enum, t);
-    as_struct            :: (t: &Type_Info) => cast(&Type_Info_Struct, t);
-    as_poly_struct       :: (t: &Type_Info) => cast(&Type_Info_Polymorphic_Struct, t);
-    as_union             :: (t: &Type_Info) => cast(&Type_Info_Union, t);
-    as_poly_union        :: (t: &Type_Info) => cast(&Type_Info_Polymorphic_Union, t);
-    as_distinct          :: (t: &Type_Info) => cast(&Type_Info_Distinct, t);
-    as_compound          :: (t: &Type_Info) => cast(&Type_Info_Compound, t);
-}
+Type_Info.as_basic             :: (t: &Type_Info) => cast(&Type_Info_Basic, t);
+Type_Info.as_pointer           :: (t: &Type_Info) => cast(&Type_Info_Pointer, t);
+Type_Info.as_multi_pointer     :: (t: &Type_Info) => cast(&Type_Info_Multi_Pointer, t);
+Type_Info.as_function          :: (t: &Type_Info) => cast(&Type_Info_Function, t);
+Type_Info.as_array             :: (t: &Type_Info) => cast(&Type_Info_Array, t);
+Type_Info.as_slice             :: (t: &Type_Info) => cast(&Type_Info_Slice, t);
+Type_Info.as_dynamic_array     :: (t: &Type_Info) => cast(&Type_Info_Dynamic_Array, t);
+Type_Info.as_variadic_argument :: (t: &Type_Info) => cast(&Type_Info_Variadic_Argument, t);
+Type_Info.as_enum              :: (t: &Type_Info) => cast(&Type_Info_Enum, t);
+Type_Info.as_struct            :: (t: &Type_Info) => cast(&Type_Info_Struct, t);
+Type_Info.as_poly_struct       :: (t: &Type_Info) => cast(&Type_Info_Polymorphic_Struct, t);
+Type_Info.as_union             :: (t: &Type_Info) => cast(&Type_Info_Union, t);
+Type_Info.as_poly_union        :: (t: &Type_Info) => cast(&Type_Info_Polymorphic_Union, t);
+Type_Info.as_distinct          :: (t: &Type_Info) => cast(&Type_Info_Distinct, t);
+Type_Info.as_compound          :: (t: &Type_Info) => cast(&Type_Info_Compound, t);
 
 

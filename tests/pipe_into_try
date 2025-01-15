@@ -1,0 +1,11 @@
+0xFFFC0
+Foo
+Foo { x = 123, y = 456, z = 678 }
+1: i32
+Str: [] u8
+other: [] u8
+12.3399: f64
+Foo { x = 123, y = 456, z = 678 }: Foo
+ASDF
+true
+14

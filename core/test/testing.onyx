@@ -8,32 +8,29 @@ use runtime
 
 use core {printf}
 
-#doc """
-    Test tag. Use this to mark a function as a test.
-
-    You can either use just the type name:
-
-        @core.test.test
-        (t: &core.test.T) {
-        }
-
-    Or you can specify a name using the full struct literal:
-
-        @core.test.test.{"Important test name"}
-        (t: &core.test.T) {
-        }
-"""
+/// Test tag. Use this to mark a function as a test.
+///
+/// You can either use just the type name:
+///
+///     @core.test.test
+///     (t: &core.test.T) {
+///     }
+///
+/// Or you can specify a name using the full struct literal:
+///
+///     @core.test.test.{"Important test name"}
+///     (t: &core.test.T) {
+///     }
 test :: struct {
     name: str;
 }
 
 
-#doc "Testing context"
+/// Testing context
 T :: struct {
     current_test_case: &Test_Case;
 }
 
-#inject
 T.assert :: (t: &T, cond: bool, name := "", site := #callsite) {
     t.current_test_case.assertions << .{
         name, cond, site
@@ -46,10 +43,8 @@ T.assert :: (t: &T, cond: bool, name := "", site := #callsite) {
 
 
 
-#doc """
-    Runs all test cases in the provide packages.
-    If no packages are provided, ALL package tests are run.
-"""
+/// Runs all test cases in the provide packages.
+/// If no packages are provided, ALL package tests are run.
 run_tests :: (packages: [] package_id = .[], log := true) -> bool {
     ctx: T;
 

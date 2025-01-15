@@ -37,7 +37,7 @@ next_rune :: (s: str) -> str {
     return s.data[0 .. rune_length_from_first_byte(s[0])];
 }
 
-decode_rune :: (s: str) -> (r: rune, size: i32) {
+decode_rune :: (s: str) -> (rune, i32) {
     len := rune_length_from_first_byte(s[0]);
     if len == 1 do return (cast(rune) s[0]), 1;
 
@@ -52,7 +52,7 @@ decode_rune :: (s: str) -> (r: rune, size: i32) {
     return r, len;
 }
 
-decode_last_rune :: (s: str) -> (r: rune, size: i32) {
+decode_last_rune :: (s: str) -> (rune, i32) {
     i := s.length - 1;
     while i >= 0 && (s[i] & 0xC0 == 0x80) {
         i -= 1;
@@ -146,13 +146,13 @@ RuneIterValue :: struct {
 runes :: (s: str) -> Iterator(RuneIterValue) {
     return iter.generator(
         &.{ s = s },
-        ctx => {
-            if string.empty(ctx.s) do return RuneIterValue.{}, false;
+        (ctx: $C) -> ? RuneIterValue {
+            if string.empty(ctx.s) do return .None;
 
             r, len := decode_rune(ctx.s);
             defer string.advance(&ctx.s, len);
 
-            return .{ r, ctx.s[0..len] }, true;
+            return RuneIterValue.{ r, ctx.s[0..len] };
         }            
     );
 }

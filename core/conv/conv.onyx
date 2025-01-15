@@ -7,11 +7,9 @@ package core.conv
 use core.string
 use core.math
 
-#doc """
-    Converts a string into an integer. Works with positive and
-    negative integers. If given a pointer to a string, will
-    modify the string to extract the integer part.
-"""
+/// Converts a string into an integer. Works with positive and
+/// negative integers. If given a pointer to a string, will
+/// modify the string to extract the integer part.
 str_to_i64 :: #match #local {}
 
 #overload
@@ -28,37 +26,37 @@ str_to_i64 :: (s: &str, base: u32 = 10) -> i64 {
     value: i64 = 0;
     mul := 1;
 
-    if s.data[0] == #char "-" {
+    if s.data[0] == '-' {
         mul = -1;
         string.advance(s, 1);
     }
 
-    if s.data[0] == #char "+" {
+    if s.data[0] == '+' {
          string.advance(s, 1);
     }
 
     while !string.empty(*s) {
         switch c := s.data[0]; c {
-            case #char "0" .. #char "9" {
+            case '0' ..= '9' {
                 value *= ~~base;
-                value += ~~(c - #char "0");
+                value += ~~(c - '0');
             }
 
-            case #char "A" .. #char "Z" {
+            case 'A' ..= 'Z' {
                 if base <= 10 do fallthrough;
 
                 value *= ~~base;
-                value += ~~((c - #char "A") + 10);
+                value += ~~((c - 'A') + 10);
             }
             
-            case #char "a" .. #char "z" {
+            case 'a' ..= 'z' {
                 if base <= 10 do fallthrough;
 
                 value *= ~~base;
-                value += ~~((c - #char "a") + 10);
+                value += ~~((c - 'a') + 10);
             }
 
-            case #default do break break;
+            case _ do break break;
         }
 
         string.advance(s);
@@ -68,7 +66,7 @@ str_to_i64 :: (s: &str, base: u32 = 10) -> i64 {
 }
 
 
-#doc "Converts a string to a floating point number."
+/// Converts a string to a floating point number.
 str_to_f64 :: #match #local {}
 
 #overload
@@ -85,7 +83,7 @@ str_to_f64 :: (s: &str) -> f64 {
     sign := parse_sign(s);
     value, _ := parse_digits(s);    
 
-    if s.data[0] == #char "." {
+    if s.data[0] == '.' {
         string.advance(s, 1);
         fraction, fraction_digits := parse_digits(s);
         while fraction_digits > 0 {
@@ -97,7 +95,7 @@ str_to_f64 :: (s: &str) -> f64 {
 
     value *= sign;
 
-    if s.data[0] != #char "e" && s.data[0] != #char "E" do return value;
+    if s.data[0] != 'e' && s.data[0] != 'E' do return value;
     string.advance(s, 1);
 
     exponent_sign := parse_sign(s);
@@ -119,35 +117,33 @@ str_to_f64 :: (s: &str) -> f64 {
 
     parse_sign :: (s: &str) -> f64 {
         switch s.data[0] {
-            case #char "-" { string.advance(s, 1); return -1; }
-            case #char "+" { string.advance(s, 1); return  1; }
-            case #default  { return 1; }
+            case '-' { string.advance(s, 1); return -1; }
+            case '+' { string.advance(s, 1); return  1; }
+            case _  { return 1; }
         }
     }
 
-    parse_digits :: (s: &str) -> (f64, digit_count: i32) {
+    parse_digits :: (s: &str) -> (f64, i32) {
         value: f64 = 0;
         count := 0;
         while s.count > 0 do switch s.data[0] {
-            case #char "0" .. #char "9" {
-                value = value * 10 + ~~cast(i32)(s.data[0] - #char "0");
+            case '0' ..= '9' {
+                value = value * 10 + ~~cast(i32)(s.data[0] - '0');
                 string.advance(s, 1);
                 count += 1;
             }
 
-            case #default do break break;
+            case _ do break break;
         }
         return value, count;
     }
 }
 
 
-#doc """
-    Converts an integer into a string using the buffer provided.
-    Supports upto base 64. If prefix is true, binary numbers are
-    prefixed with '0b' and hexadecimal numbers are prefixed with
-    '0x'.
-"""
+/// Converts an integer into a string using the buffer provided.
+/// Supports upto base 64. If prefix is true, binary numbers are
+/// prefixed with '0b' and hexadecimal numbers are prefixed with
+/// '0x'.
 i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
     is_neg := false;
     if n < 0 {
@@ -170,14 +166,14 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
         n /= base;
 
     } else {
-        c[0] = #char "0";
+        c[0] = '0';
         len += 1;
         c -= 1;
     }
 
     if min_length > 0 && len < min_length {
         for i in min_length - len {
-            c[0] = #char "0";
+            c[0] = '0';
             len += 1;
             c -= 1;
         }
@@ -185,26 +181,26 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
 
     if prefix {
         if base == 16 {
-            c[0] = #char "x";
+            c[0] = 'x';
             len += 1;
             c -= 1;
-            c[0] = #char "0";
+            c[0] = '0';
             len += 1;
             c -= 1;
         }
 
         if base == 2 {
-            c[0] = #char "b";
+            c[0] = 'b';
             len += 1;
             c -= 1;
-            c[0] = #char "0";
+            c[0] = '0';
             len += 1;
             c -= 1;
         }
     }
 
     if is_neg {
-        c[0] = #char "-";
+        c[0] = '-';
         len += 1;
         c -= 1;
     }
@@ -213,10 +209,8 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
 }
 
 
-#doc """
-    Converts an unsigned number into a string using the buffer provided.
-    Behaves like i64_to_str.
-"""
+/// Converts an unsigned number into a string using the buffer provided.
+/// Behaves like i64_to_str.
 u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
     c: [&] u8 = &buf[buf.count - 1];
     len := 0;
@@ -233,14 +227,14 @@ u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
         n /= base;
 
     } else {
-        c[0] = #char "0";
+        c[0] = '0';
         len += 1;
         c -= 1;
     }
 
     if min_length > 0 && len < min_length {
         for i in min_length - len {
-            c[0] = #char "0";
+            c[0] = '0';
             len += 1;
             c -= 1;
         }
@@ -248,19 +242,19 @@ u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
 
     if prefix {
         if base == 16 {
-            c[0] = #char "x";
+            c[0] = 'x';
             len += 1;
             c -= 1;
-            c[0] = #char "0";
+            c[0] = '0';
             len += 1;
             c -= 1;
         }
 
         if base == 2 {
-            c[0] = #char "b";
+            c[0] = 'b';
             len += 1;
             c -= 1;
-            c[0] = #char "0";
+            c[0] = '0';
             len += 1;
             c -= 1;
         }
@@ -269,13 +263,11 @@ u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
     return str.{ data = c + 1, count = len };
 }
 
-#doc """
-    Converts a floating point number into a string, using
-    the buffer provided.
-   
-    This is better than what used to be, but still relies on converting the integer
-    part of the float to an integer, which could overflow.
-"""
+/// Converts a floating point number into a string, using
+/// the buffer provided.
+///
+/// This is better than what used to be, but still relies on converting the integer
+/// part of the float to an integer, which could overflow.
 f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
     if math.is_nan(f) {
         return format(buf, "NaN");
@@ -290,7 +282,7 @@ f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
 
     if f < 0 {
         f = -f;
-        buf[0] = #char "-";
+        buf[0] = '-';
         len += 1;
     }
 
@@ -303,7 +295,7 @@ f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
     len += s1.count;
 
     if digits_after_decimal > 0 {
-        buf.data[len] = #char ".";
+        buf.data[len] = '.';
         len += 1;
 
         digits := "0123456789";

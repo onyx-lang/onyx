@@ -1,0 +1,66 @@
+Child: Element { 
+    name = "Datapoint", 
+    parent = 0, 
+    attributes = [
+    ], 
+    children = [
+        Element(2), 
+        Element(3)
+    ]
+}
+Name (value): 'Name 1' (123.45)
+Child: Element { 
+    name = "Datapoint", 
+    parent = 0, 
+    attributes = [
+    ], 
+    children = [
+        Element(5), 
+        Element(6)
+    ]
+}
+Name (value): 'Name 2' (123.45)
+Child: Element { 
+    name = "Datapoint", 
+    parent = 0, 
+    attributes = [
+    ], 
+    children = [
+        Element(8), 
+        Element(9)
+    ]
+}
+Name (value): 'Name 3' (123.45)
+Child: Element { 
+    name = "Datapoint", 
+    parent = 0, 
+    attributes = [
+    ], 
+    children = [
+        Element(11), 
+        Element(12)
+    ]
+}
+Name (value): 'Name 4' (123.45)
+Child: Element { 
+    name = "Datapoint", 
+    parent = 0, 
+    attributes = [
+    ], 
+    children = [
+        Element(14), 
+        Element(15)
+    ]
+}
+Name (value): 'Name 5' (123.45)
+Child: Element { 
+    name = "Datapoint", 
+    parent = 0, 
+    attributes = [
+    ], 
+    children = [
+        Element(17), 
+        Element(18)
+    ]
+}
+Name (value): 'Name 6' (123.45)

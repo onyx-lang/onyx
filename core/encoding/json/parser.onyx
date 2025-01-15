@@ -113,7 +113,7 @@ parse_value :: (use parser: ^Parser) -> (Value, Error) {
             return_value = cast(^_Value) value;
         }
 
-        case #default {
+        case _ {
             consume_token(parser);
             return Value.{return_value}, .{ .Unexpected_Token, current.position };
         }
@@ -172,7 +172,7 @@ parse_object :: (use parser: ^Parser) -> (Value, Error) {
     if err.kind != .None do return Value.{value}, err;
 
     // This uses the context allocators because the array resizing needs to happen in a general purpose heap allocator
-    array.init(^value.object_, allocator=context.allocator);
+    array.init(^value.object_, allocator=allocator);
     defer if err.kind != .None {
         free(Value.{value}, allocator);
     }
@@ -241,7 +241,7 @@ unescape_string :: (token: Token, allocator: Allocator) -> str {
 
     i := 0;
     for c in s {
-        if c == #char "\\" || c == #char "\"" || c < #char " " {
+        if c == '\\' || c == '"' || c < ' ' {
             break;
         }
 
@@ -249,65 +249,65 @@ unescape_string :: (token: Token, allocator: Allocator) -> str {
     }
 
     if i == s.count {
-        return string.alloc_copy(s, allocator);
+        return string.copy(s, allocator);
     }
 
     buffer := memory.make_slice(u8, s.count, allocator=allocator);
-    string.copy(s.data[0 .. i], buffer);
+    string.copy_into(s.data[0 .. i], buffer);
     buffer_write := i;
 
     while i < s.count {
         c := s[i];
 
         switch c {
-            case #char "\\" {
+            case '\\' {
                 i += 1;
                 if i >= s.count do break break;
 
                 switch s[i] {
-                    case #char "\"", #char "\\",  #char "/" {
+                    case '"', '\\',  '/' {
                         buffer[buffer_write] = s[i];
                         i += 1;
                         buffer_write += 1;
                     }
 
-                    case #char "n" {
-                        buffer[buffer_write] = #char "\n";
+                    case 'n' {
+                        buffer[buffer_write] = '\n';
                         i += 1;
                         buffer_write += 1;
                     }
 
-                    case #char "t" {
-                        buffer[buffer_write] = #char "\t";
+                    case 't' {
+                        buffer[buffer_write] = '\t';
                         i += 1;
                         buffer_write += 1;
                     }
 
-                    case #char "r" {
-                        buffer[buffer_write] = #char "\r";
+                    case 'r' {
+                        buffer[buffer_write] = '\r';
                         i += 1;
                         buffer_write += 1;
                     }
 
-                    case #char "b" {
-                        buffer[buffer_write] = #char "\b";
+                    case 'b' {
+                        buffer[buffer_write] = '\b';
                         i += 1;
                         buffer_write += 1;
                     }
 
-                    case #char "f" {
-                        buffer[buffer_write] = #char "\f";
+                    case 'f' {
+                        buffer[buffer_write] = '\f';
                         i += 1;
                         buffer_write += 1;
                     }
 
-                    case #char "v" {
-                        buffer[buffer_write] = #char "\v";
+                    case 'v' {
+                        buffer[buffer_write] = '\v';
                         i += 1;
                         buffer_write += 1;
                     }
 
-                    case #char "u" {
+                    case 'u' {
                         i += 1;
                         wrote, consumed := parse_and_write_utf8_character(s[i..s.length], ~~&buffer[buffer_write]);
                         buffer_write += wrote;
@@ -316,7 +316,7 @@ unescape_string :: (token: Token, allocator: Allocator) -> str {
                 }
             }
 
-            case #default {
+            case _ {
                 buffer[buffer_write] = c;
                 i += 1;
                 buffer_write += 1;

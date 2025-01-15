@@ -70,8 +70,13 @@ static void eh_shift_down(EntityHeap* entities, i32 index) {
     }
 }
 
-void entity_heap_init(EntityHeap* entities) {
-    bh_arena_init(&entities->entity_arena, global_heap_allocator, 32 * 1024);
+void entity_heap_init(bh_allocator a, EntityHeap* entities) {
+    memset(entities, 0, sizeof(*entities));
+    entities->allocator = a;
+
+    bh_arena_init(&entities->entity_arena, a, 32 * 1024);
+    bh_arr_new(a, entities->entities, 128);
+    bh_arr_new(a, entities->quick_unsorted_entities, 128);
 }
 
 // Allocates the entity in the entity heap. Don't quite feel this is necessary...
@@ -79,7 +84,7 @@ Entity* entity_heap_register(EntityHeap* entities, Entity e) {
     bh_allocator alloc = bh_arena_allocator(&entities->entity_arena);
     Entity* entity = bh_alloc_item(alloc, Entity);
     *entity = e;
-    entity->id = context.next_entity_id++;
+    entity->id = entities->next_id++;
     entity->macro_attempts = 0;
     entity->micro_attempts = 0;
     entity->entered_in_queue = 0;
@@ -89,11 +94,6 @@ Entity* entity_heap_register(EntityHeap* entities, Entity e) {
 
 void entity_heap_insert_existing(EntityHeap* entities, Entity* e) {
     if (e->entered_in_queue) return;
-
-    if (entities->entities == NULL) {
-        bh_arr_new(global_heap_allocator, entities->entities, 128);
-        bh_arr_new(global_heap_allocator, entities->quick_unsorted_entities, 128);
-    }
 
     if (e->state <= Entity_State_Introduce_Symbols) {
         bh_arr_push(entities->quick_unsorted_entities, e);
@@ -172,8 +172,8 @@ void entity_change_state(EntityHeap* entities, Entity *ent, EntityState new_stat
     ent->state = new_state;
 }
 
-void entity_heap_add_job(EntityHeap *entities, TypeMatch (*func)(void *), void *job_data) {
-    EntityJobData *job = bh_alloc(global_heap_allocator, sizeof(*job));
+void entity_heap_add_job(EntityHeap *entities, TypeMatch (*func)(Context *, void *), void *job_data) {
+    EntityJobData *job = bh_alloc(entities->allocator, sizeof(*job));
     job->func = func;
     job->job_data = job_data;
     
@@ -186,7 +186,7 @@ void entity_heap_add_job(EntityHeap *entities, TypeMatch (*func)(void *), void *
 }
 
 // NOTE(Brendan Hansen): Uses the entity heap in the context structure
-void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* scope, Package* package) {
+void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *) *target_arr, AstNode* node, Scope* scope, Package* package) {
 #define ENTITY_INSERT(_ent)                                     \
     entity = entity_heap_register(entities, _ent);              \
     if (target_arr) {                                           \
@@ -199,12 +199,11 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
 
     if (node->entity != NULL) return;
 
-    EntityHeap* entities = &context.entities;
     Entity* entity;
 
     Entity ent;
     ent.id = entities->next_id++;
-    ent.state = Entity_State_Resolve_Symbols;
+    ent.state = Entity_State_Check_Types;
     ent.package = package;
     ent.scope   = scope;
 
@@ -363,7 +362,6 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         }
 
         case Ast_Kind_Static_If: {
-            ent.state = Entity_State_Resolve_Symbols;
             ent.type = Entity_Type_Static_If;
             ent.static_if = (AstIf *) node;
             ENTITY_INSERT(ent);
@@ -384,6 +382,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         case Ast_Kind_Directive_Init:
         case Ast_Kind_Directive_Library:
         case Ast_Kind_Directive_This_Package:
+        case Ast_Kind_Directive_Wasm_Section:
         case Ast_Kind_Injection: {
             ent.type = Entity_Type_Process_Directive;
             ent.expr = (AstTyped *) node;
@@ -394,7 +393,6 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         case Ast_Kind_Interface: {
             ent.type = Entity_Type_Interface;
             ent.interface = (AstInterface *) node;
-            ent.state = Entity_State_Resolve_Symbols;
             ENTITY_INSERT(ent);
             break;
         }
@@ -402,7 +400,6 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         case Ast_Kind_Constraint: {
             ent.type = Entity_Type_Constraint_Check;
             ent.constraint = (AstConstraint *) node;
-            ent.state = Entity_State_Resolve_Symbols;
             ENTITY_INSERT(ent);
             break;
         }
@@ -410,7 +407,6 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         case Ast_Kind_Foreign_Block: {
             ent.type = Entity_Type_Foreign_Block;
             ent.foreign_block = (AstForeignBlock *) node;
-            ent.state = Entity_State_Resolve_Symbols;
             ENTITY_INSERT(ent);
             break;
         }
@@ -418,7 +414,27 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         case Ast_Kind_Import: {
             ent.type = Entity_Type_Import;
             ent.import = (AstImport *) node;
-            ent.state = Entity_State_Resolve_Symbols;
+            ENTITY_INSERT(ent);
+            break;
+        }
+
+        case Ast_Kind_Js_Code: {
+            ent.type = Entity_Type_JS;
+            ent.js = (AstJsNode *) node;
+            ENTITY_INSERT(ent);
+            break;
+        }
+
+        case Ast_Kind_Compiler_Extension: {
+            ent.type = Entity_Type_Compiler_Extension;
+            ent.compiler_extension = (AstCompilerExtension *) node;
+            ENTITY_INSERT(ent);
+            break;
+        }
+
+        case Ast_Kind_Procedural_Expansion: {
+            ent.type = Entity_Type_Procedural_Expansion;
+            ent.proc_expansion = (AstProceduralExpansion *) node;
             ENTITY_INSERT(ent);
             break;
         }

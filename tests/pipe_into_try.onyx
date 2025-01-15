@@ -1,0 +1,59 @@
+use core {*}
+
+f :: (x: Pair([5] any, #type () -> bool)) {
+    for x.first {
+        printf("{a}: {}\n", it, it.type)
+    }
+
+    x.second() |> println()
+}
+
+
+Foo :: struct { x, y, z: i32 }
+
+main :: () {
+    v := new(Foo.{
+        123
+        456
+        678
+    })
+    x := misc.as_any(v)
+
+    printf("{}\n", &x)
+    printf("{}\n", x.type)
+    printf("{a}\n", x)
+
+    f(.{
+        any.[
+            temp_any(1)
+            temp_any("Str")
+            temp_any("other")
+            temp_any(12.34)
+            x
+        ]
+        () -> _ {
+            println("ASDF")
+            return true
+        }
+    })
+
+    do_it()
+}
+
+asdf :: (x: i32) => Optional.make(x + 1)
+
+do_it :: () {
+    10
+    |> asdf()?
+    |> asdf()?
+    |> asdf()?
+    |> asdf()?
+    |> println()
+}
+
+temp_any :: macro (x: $T) => any.{
+    new_temp(x)
+    T
+}
+
+

@@ -1,0 +1,17 @@
+//+optional-semicolons
+
+use core {*}
+
+main :: () {
+    x := 1_000_000
+    println(x)
+
+    y := 100.12_34_56
+    println(y)
+
+    z := 1_23.4_56e3
+    println(z)
+
+    w := 1234.567e-4
+    println(w)
+}

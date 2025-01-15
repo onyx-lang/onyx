@@ -1,0 +1,23 @@
+use core {*}
+
+Foo :: struct {
+    x: i32 = 10
+    y: i32 = 20
+    z: i32 = 30
+}
+
+main :: () {
+    v1 := new(Foo.{
+        123
+        456
+        678
+    })
+    defer cfree(v1)
+
+    v2 := new(Foo)
+    defer cfree(v2)
+
+    printf("Value 1: {*}\n", v1)
+    printf("Value 2: {*}\n", v2)
+}
+

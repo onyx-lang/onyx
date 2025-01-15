@@ -1,0 +1,21 @@
+use core {*}
+
+main :: () {
+    iter.counter()
+    
+    // comment
+    // comment
+    // comment
+    |> iter.take(4)
+
+    // comment
+    |> iter.each([n] {
+        printf("{}\n", n)        
+    })
+}
+
+iter.each :: macro (i: Iterator($T), body: Code) {
+    for __it in i {
+        #unquote body(__it)
+    }
+}

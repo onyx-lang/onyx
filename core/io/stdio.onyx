@@ -69,7 +69,7 @@ print :: #match #locked {
         if !x do return;
 
         io.write(&stdio.print_writer, x);
-        if x[x.count - 1] == #char "\n" && stdio.auto_flush do __flush_stdio();
+        if x[x.count - 1] == '\n' && stdio.auto_flush do __flush_stdio();
     },
 
     (x)    => { io.write(&stdio.print_writer, x); },
@@ -100,7 +100,7 @@ printf :: (format: str, va: ..any) {
 #if #defined(runtime.platform.__output_error) {
     //
     // Prints to standard error, if available.
-    eprintf :: (format: str, va: ..any) -> str {
+    eprintf :: (format: str, va: ..any) {
         buffer: [1024] u8;
         runtime.platform.__output_error(
             conv.format_va(buffer, format, va, .{
@@ -120,7 +120,7 @@ printf :: (format: str, va: ..any) {
 aprintf :: (format: str, va: ..any) -> str {
     buffer: [8196] u8;
     out := conv.format_va(buffer, format, va);
-    return string.alloc_copy(out);
+    return string.copy(out);
 }
 
 //
@@ -129,7 +129,7 @@ aprintf :: (format: str, va: ..any) -> str {
 tprintf :: (format: str, va: ..any) -> str {
     buffer: [8196] u8;
     out := conv.format_va(buffer, format, va);
-    return string.alloc_copy(out, allocator=context.temp_allocator);
+    return string.copy(out, allocator=context.temp_allocator);
 }
 
 
@@ -147,7 +147,7 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
 
         temp[0] = map_to_ascii(val >> 4);
         temp[1] = map_to_ascii(val & 15);
-        temp[2] = #char " ";
+        temp[2] = ' ';
 
         runtime.platform.__output_string(~~temp);
 
@@ -157,23 +157,23 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
 
     map_to_ascii :: (x: u8) -> u8 {
         return switch x {
-            case 0 =>  #char "0";
-            case 1 =>  #char "1";
-            case 2 =>  #char "2";
-            case 3 =>  #char "3";
-            case 4 =>  #char "4";
-            case 5 =>  #char "5";
-            case 6 =>  #char "6";
-            case 7 =>  #char "7";
-            case 8 =>  #char "8";
-            case 9 =>  #char "9";
-            case 10 => #char "A";
-            case 11 => #char "B";
-            case 12 => #char "C";
-            case 13 => #char "D";
-            case 14 => #char "E";
-            case 15 => #char "F";
-            case #default => #char "X";
+            case 0 =>  '0';
+            case 1 =>  '1';
+            case 2 =>  '2';
+            case 3 =>  '3';
+            case 4 =>  '4';
+            case 5 =>  '5';
+            case 6 =>  '6';
+            case 7 =>  '7';
+            case 8 =>  '8';
+            case 9 =>  '9';
+            case 10 => 'A';
+            case 11 => 'B';
+            case 12 => 'C';
+            case 13 => 'D';
+            case 14 => 'E';
+            case 15 => 'F';
+            case _ => 'X';
         };
     }
 }
@@ -186,24 +186,24 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
 //
 // The v-table for the stream in stdio.
 #local stdio_vtable := io.Stream_Vtable.{
-    read = (_: &io.Stream, buffer: [] u8) -> (io.Error, u32) {
+    read = (_: &io.Stream, buffer: [] u8) -> Result(u32, io.Error) {
         __flush_stdio();
         bytes_read := runtime.platform.__read_from_input(buffer);
-        if bytes_read <= 0 do return .EOF, 0;
+        if bytes_read <= 0 do return .{ Err = .EOF };
 
-        return .None, bytes_read;
+        return .{ Ok = bytes_read };
     },
 
-    read_byte = (_: &io.Stream) -> (io.Error, u8) {
+    read_byte = (_: &io.Stream) -> Result(u8, io.Error) {
         __flush_stdio();
         buf: [1] u8;
         bytes_read := runtime.platform.__read_from_input(buf);
-        if bytes_read <= 0 do return .EOF, 0;
+        if bytes_read <= 0 do return .{ Err = .EOF };
 
-        return .None, buf[0];
+        return .{ Ok = buf[0] };
     },
 
-    write = (_: &io.Stream, buffer: [] u8) -> (io.Error, u32) {
+    write = (_: &io.Stream, buffer: [] u8) -> Result(u32, io.Error) {
         return io.stream_write(&stdio.print_stream, buffer);
     },
 
@@ -216,11 +216,11 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
         return .None;
     },
 
-    poll = (_: &io.Stream, ev: io.PollEvent, timeout: i32) -> (io.Error, bool) {
+    poll = (_: &io.Stream, ev: io.PollEvent, timeout: i32) -> Result(bool, io.Error) {
         // TODO: This might not be right, as maybe sometimes you can't actually
         // write because a the output was closed?
-        if ev == .Write do return .None, true;
+        if ev == .Write do return .{ Ok = true };
 
-        return .None, runtime.platform.__wait_for_input(timeout);
+        return .{ Ok = runtime.platform.__wait_for_input(timeout) };
     }
 }

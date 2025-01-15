@@ -3,45 +3,44 @@ PART :: 2
 use core {*}
 
 main :: (args) => {
-    for file in os.with_file("tests/aoc-2021/input/day02.txt") {
-        reader := io.reader_make(file);
+    use file := os.open("tests/aoc-2021/input/day02.txt")->unwrap();
+    use reader := io.reader_make(&file);
 
-        #if PART == 1 {
-            horizontal, vertical := 0, 0;
-            while !io.reader_empty(&reader) {
-                parts := string.split(io.read_line(&reader, inplace=true), #char " ");
-                defer memory.free_slice(&parts);
+    #if PART == 1 {
+        horizontal, vertical := 0, 0;
+        while !io.reader_empty(&reader) {
+            parts := string.split(io.read_line(&reader, inplace=true), ' ');
+            defer memory.free_slice(&parts);
 
-                value := cast(i32) conv.str_to_i64(parts[1]);
-                switch parts[0] {
-                    case "forward" do horizontal += value;
-                    case "down"    do vertical += value;
-                    case "up"      do vertical -= value;
-                }
+            value := cast(i32) conv.str_to_i64(parts[1]);
+            switch parts[0] {
+                case "forward" do horizontal += value;
+                case "down"    do vertical += value;
+                case "up"      do vertical -= value;
             }
-
-            printf("Part 1: {}\n", horizontal * vertical);
         }
 
-        #if PART == 2 {
-            horizontal, vertical, aim : i64;
-            horizontal, vertical, aim = 0, 0, 0;
-            while !io.reader_empty(&reader) {
-                parts := string.split(io.read_line(&reader, inplace=true), #char " ");
-                defer memory.free_slice(&parts);
+        printf("Part 1: {}\n", horizontal * vertical);
+    }
 
-                value := conv.str_to_i64(parts[1]);
-                switch parts[0] {
-                    case "forward" { 
-                        horizontal += value;
-                        vertical += aim * value;
-                    }
-                    case "down"    do aim += value;
-                    case "up"      do aim -= value;
+    #if PART == 2 {
+        horizontal, vertical, aim : i64;
+        horizontal, vertical, aim = 0, 0, 0;
+        while !io.reader_empty(&reader) {
+            parts := string.split(io.read_line(&reader, inplace=true), ' ');
+            defer memory.free_slice(&parts);
+
+            value := conv.str_to_i64(parts[1]);
+            switch parts[0] {
+                case "forward" { 
+                    horizontal += value;
+                    vertical += aim * value;
                 }
+                case "down"    do aim += value;
+                case "up"      do aim -= value;
             }
-
-            printf("Part 2: {}\n", horizontal * vertical);
         }
+
+        printf("Part 2: {}\n", horizontal * vertical);
     }
 }

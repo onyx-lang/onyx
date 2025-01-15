@@ -1,4 +1,4 @@
-#load "core/module"
+
 
 use core {*}
 
@@ -44,7 +44,7 @@ main :: (args: [] cstr) {
             println("Case 4!");
         }
 
-        case #default {
+        case _ {
             println("Default!");
         }
     }

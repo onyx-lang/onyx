@@ -21,7 +21,7 @@ encode_string :: (v: $T, allocator := context.allocator) -> (str, Encoding_Error
         return "", err;
     }
 
-    s := string.alloc_copy(io.buffer_stream_to_str(^stream), allocator);
+    s := string.copy(io.buffer_stream_to_str(^stream), allocator);
     return s, .None;
 }
 
@@ -66,48 +66,48 @@ encode :: #match {
     },
 
     (w: ^io.Writer, v: [] $T) -> Encoding_Error {
-        io.write_byte(w, #char "[");
+        io.write_byte(w, '[');
 
         for i in v.count {
-            if i > 0 do io.write_byte(w, #char ",");
+            if i > 0 do io.write_byte(w, ',');
 
             err := encode(w, v[i]);
             if err != .None do return err;
         }
 
-        io.write_byte(w, #char "]");
+        io.write_byte(w, ']');
         return .None;
     },
 
     (w: ^io.Writer, v: [..] $T) -> Encoding_Error {
-        io.write_byte(w, #char "[");
+        io.write_byte(w, '[');
 
         for i in v.count {
-            if i > 0 do io.write_byte(w, #char ",");
+            if i > 0 do io.write_byte(w, ',');
 
             err := encode(w, v[i]);
             if err != .None do return err;
         }
 
-        io.write_byte(w, #char "]");
+        io.write_byte(w, ']');
         return .None;
     },
 
     (w: ^io.Writer, v: Map(str, $T)) -> Encoding_Error {
-        io.write_byte(w, #char "{");
+        io.write_byte(w, '{');
 
         for i in v.entries.count {
-            if i > 0 do io.write_byte(w, #char ",");
+            if i > 0 do io.write_byte(w, ',');
             entry := ^v.entries[i];
 
             io.write_escaped_str(w, entry.key);
-            io.write_byte(w, #char ":");
+            io.write_byte(w, ':');
 
             err := encode(w, entry.value);
             if err != .None do return err;
         }
 
-        io.write_byte(w, #char "}");
+        io.write_byte(w, '}');
         return .None;
     },
 
@@ -121,23 +121,23 @@ encode :: #match {
             case .Array   do   encode(w, v->as_array());
 
             case .Object {
-                io.write_byte(w, #char "{");
+                io.write_byte(w, '{');
                 obj := cast(^_Value_Object) cast(^_Value) v;
 
                 for i in obj.object_.count {
-                    if i > 0 do io.write_byte(w, #char ",");
+                    if i > 0 do io.write_byte(w, ',');
 
                     io.write_escaped_str(w, obj.object_[i].key);
-                    io.write_byte(w, #char ":");
+                    io.write_byte(w, ':');
 
                     err := encode(w, obj.object_[i].value);
                     if err != .None do return err;
                 }
 
-                io.write_byte(w, #char "}");
+                io.write_byte(w, '}');
             }
 
-            case #default {
+            case _ {
                 return .Unsupported_Type;
             }
         }
@@ -252,10 +252,12 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
             }
         }
 
-        case #default {
+        case _ {
             return .Unsupported_Type;
         }
     }
+
+    return .None;
 }
 
 
@@ -291,6 +293,13 @@ from_any :: macro (v: ^$T, allocator := context.allocator) -> Value {
 }
 
 #overload
+from_any :: macro (v: $T, allocator := context.allocator) -> Value {
+    from_any :: from_any
+    x := v
+    return from_any(T, &x, allocator)
+}
+
+#overload
 from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> Value {
     use runtime.info;
 
@@ -323,7 +332,7 @@ from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> 
             // Strings are handled differently
             if type == str {
                 v := new(_Value_String, allocator);
-                v.str_ = string.alloc_copy(*cast(^str) input, allocator);
+                v.str_ = string.copy(*cast(^str) input, allocator);
                 return Value.{v};
             }
 
@@ -448,7 +457,7 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
         case .Slice {
             // Strings are handled differently
             if type == str {
-                *cast(^str) out = string.alloc_copy(value->as_str());
+                *cast(^str) out = string.copy(value->as_str());
                 return;
             }
 

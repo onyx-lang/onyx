@@ -1,0 +1,152 @@
+package core.hash.sha1
+#allow_stale_code
+
+use core {memory}
+use core.intrinsics.wasm {wasm :: package}
+
+BLOCK_SIZE :: 20
+
+Hasher :: struct {
+    data: [64] u8;
+    data_length: u32;
+    bit_length: u64;
+    state: [5] u32;
+}
+
+Hasher.make :: () -> #Self {
+    return .{
+        state = .[
+            0x67452301,
+            0xefcdab89,
+            0x98badcfe,
+            0x10325476,
+            0xc3d2e1f0
+        ],
+        data_length = 0,
+        bit_length = 0
+    };
+}
+
+Hasher.update :: (self: &#Self, data: [] u8) {
+    for i in 0 .. data.count {
+        self.data[self.data_length] = data[i];
+        self.data_length += 1;
+
+        if self.data_length == 64 {
+            do_cycle(self, self.data);
+            self.bit_length += 512;
+            self.data_length = 0;
+        }
+    }
+}
+
+Hasher.final :: (self: &#Self) -> [BLOCK_SIZE] u8 {
+    out: [BLOCK_SIZE] u8;
+
+    i := self.data_length;
+    if self.data_length < 56 {
+        self.data[i] = 0x80;
+        i += 1;
+        while i < 56 {
+            self.data[i] = 0;
+            i += 1;
+        }
+    }
+    else {
+        self.data[i] = 0x80;
+        i += 1;
+        while i < 64 {
+            self.data[i] = 0;
+            i += 1;
+        }
+        do_cycle(self, self.data);
+        memory.set(&self.data, 0, 56);
+    }
+
+    self.bit_length += ~~(self.data_length * 8);
+    self.data[63] = cast(u8, self.bit_length >> 0 );
+    self.data[62] = cast(u8, self.bit_length >> 8 );
+    self.data[61] = cast(u8, self.bit_length >> 16);
+    self.data[60] = cast(u8, self.bit_length >> 24);
+    self.data[59] = cast(u8, self.bit_length >> 32);
+    self.data[58] = cast(u8, self.bit_length >> 40);
+    self.data[57] = cast(u8, self.bit_length >> 48);
+    self.data[56] = cast(u8, self.bit_length >> 56);
+    do_cycle(self, self.data);
+
+    for i in 0 .. 4 {
+        out[i + 0]  = ~~((self.state[0] >> (24 - i * 8)) & 0xff);
+        out[i + 4]  = ~~((self.state[1] >> (24 - i * 8)) & 0xff);
+        out[i + 8]  = ~~((self.state[2] >> (24 - i * 8)) & 0xff);
+        out[i + 12] = ~~((self.state[3] >> (24 - i * 8)) & 0xff);
+        out[i + 16] = ~~((self.state[4] >> (24 - i * 8)) & 0xff);
+    }
+
+    return out;
+}
+
+hash :: #match #local {}
+
+#overload
+hash :: (x: str) -> [BLOCK_SIZE] u8 {
+    h := Hasher.make();
+    h->update(x);
+    return h->final();
+}
+
+
+#local
+do_cycle :: (self: &Hasher, data: [] u8) {
+    m: [80] u32;
+
+    for i in 0 .. 16 {
+        j := 4 * i;
+        m[i] = (cast(u32, data[j]) << 24) |
+               (cast(u32, data[j + 1]) << 16) |
+               (cast(u32, data[j + 2]) << 8) |
+               (cast(u32, data[j + 3]));
+    }
+
+    for i in 16 .. 80 {
+        m[i] = wasm.rotl_i32(m[i-3] ^ m[i-8] ^ m[i-14] ^ m[i-16], 1);
+    }
+
+    a := self.state[0];
+    b := self.state[1];
+    c := self.state[2];
+    d := self.state[3];
+    e := self.state[4];
+
+    for i in 0 .. 80 {
+        f, k: u32;
+
+        if 0 <= i && i <= 19 {
+            f = (b & c) | ((~b) & d);
+            k = 0x5A827999;
+        } elseif 20 <= i && i <= 39 {
+            f = b ^ c ^ d;
+            k = 0x6ED9EBA1;
+        } elseif 40 <= i && i <= 59 {
+            f = (b & c) | (b & d) | (c & d);
+            k = 0x8F1BBCDC;
+        } elseif 60 <= i && i <= 79 {
+            f = b ^ c ^ d;
+            k = 0xCA62C1D6;
+        }
+
+        temp := wasm.rotl_i32(a, 5) + f + e + k + m[i];
+        e = d;
+        d = c;
+        c = wasm.rotl_i32(b, 30);
+        b = a;
+        a = temp;
+    }
+
+
+    self.state[0] += a;
+    self.state[1] += b;
+    self.state[2] += c;
+    self.state[3] += d;
+    self.state[4] += e;
+}
+

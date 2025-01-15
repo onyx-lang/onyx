@@ -2,22 +2,20 @@ package core.sync
 
 // TODO: Free the semaphores after they are used.
 
-#doc """
-    A condition variable is used to implement a queue of threads
-    waiting for a condition to be true. Each thread joins the queue
-    using `condition_wait`. Then, another thread can signal that
-    the condition has changed and can "wake up" the first thread in
-    the queue using `condition_signal`. Alternatively, all threads
-    can be woken up using `condition_broadcast`.
-   
-    Condition variables are generally used to prevent spin checking
-    a condition and waiting for it to change. Instead, the thread
-    joins a wait-queue, and leave it up to another thread to wake
-    it up to continue processing. However sadly, in WebAssembly this
-    is not possible because with the atomic_wait and atomic_notify
-    instructions, which currently are not supported by any runtime
-    outside of the browser.
-"""
+/// A condition variable is used to implement a queue of threads
+/// waiting for a condition to be true. Each thread joins the queue
+/// using `condition_wait`. Then, another thread can signal that
+/// the condition has changed and can "wake up" the first thread in
+/// the queue using `condition_signal`. Alternatively, all threads
+/// can be woken up using `condition_broadcast`.
+///
+/// Condition variables are generally used to prevent spin checking
+/// a condition and waiting for it to change. Instead, the thread
+/// joins a wait-queue, and leave it up to another thread to wake
+/// it up to continue processing. However sadly, in WebAssembly this
+/// is not possible because with the atomic_wait and atomic_notify
+/// instructions, which currently are not supported by any runtime
+/// outside of the browser.
 Condition_Variable :: struct {
     Node :: struct {
         semaphore : Semaphore;
@@ -28,24 +26,22 @@ Condition_Variable :: struct {
     queue: &Node;
 }
 
-#doc "Initializes a new condition variable."
+/// Initializes a new condition variable.
 condition_init :: (c: &Condition_Variable) {
     mutex_init(&c.mutex);
     c.queue = null;
 }
 
-#doc "Destroys a condition variable."
+/// Destroys a condition variable.
 condition_destroy :: (c: &Condition_Variable) {
     if c.queue != null do condition_broadcast(c);
 
     mutex_destroy(&c.mutex);
 }
 
-#doc """
-    Enters the thread in the wait-queue of the condition variable.
-    If `m` is not null, the mutex will first be released before
-    entering the queue, and then relocked before returning.
-"""
+/// Enters the thread in the wait-queue of the condition variable.
+/// If `m` is not null, the mutex will first be released before
+/// entering the queue, and then relocked before returning.
 condition_wait :: (c: &Condition_Variable, m: &Mutex) {
     node: Condition_Variable.Node;
 
@@ -61,7 +57,7 @@ condition_wait :: (c: &Condition_Variable, m: &Mutex) {
 }
 
 
-#doc "Wakes up one thread from the wait-queue."
+/// Wakes up one thread from the wait-queue.
 condition_signal :: (c: &Condition_Variable) {
     scoped_mutex(&c.mutex);
 
@@ -72,7 +68,7 @@ condition_signal :: (c: &Condition_Variable) {
 }
 
 
-#doc "Wakes up all threads from the wait-queue."
+/// Wakes up all threads from the wait-queue.
 condition_broadcast :: (c: &Condition_Variable) {
     scoped_mutex(&c.mutex);
 

@@ -90,6 +90,7 @@ this document will serve as that "header file"
 ### Procedures
 - `__exit(code: i32) -> void`
 - `__sleep(milliseconds: i32) -> void`
+- `__args(allocator: Allocator) -> [] cstr`
 
 ### Values
 

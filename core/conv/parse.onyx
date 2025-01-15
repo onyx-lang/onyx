@@ -7,10 +7,8 @@ use core.math
 use core.memory
 use runtime
 
-#doc """
-    Parses many different types from a string into a value.
-    Uses a custom parser if one has been specified for the type given.
-"""
+/// Parses many different types from a string into a value.
+/// Uses a custom parser if one has been specified for the type given.
 parse_any :: #match {}
 
 #overload
@@ -31,7 +29,7 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
         case bool {
             dest := cast(&bool) target;
             *dest = false;
-            if to_parse[0] == #char "t" || to_parse[0] == #char "T" {
+            if to_parse[0] == 't' || to_parse[0] == 'T' {
                 *dest = true;
             }
             return true;
@@ -73,8 +71,8 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
             
             // If the string does *look* like a quoted string,
             // simply return a copy of the whole string.
-            if to_parse[0] != #char "\"" {
-                *dest = string.alloc_copy(to_parse, string_allocator);
+            if to_parse[0] != '"' {
+                *dest = string.copy(to_parse, string_allocator);
                 return true;
             }
 
@@ -82,11 +80,11 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
             line := to_parse;
             string.advance(&line);
 
-            *dest = string.read_until(&line, #char "\"") |> string.alloc_copy(string_allocator); // @BUG // This does not handle escaped strings!
+            *dest = string.read_until(&line, '"') |> string.copy(string_allocator); // @BUG // This does not handle escaped strings!
             return true;
         }
 
-        case #default {
+        case _ {
             if info.kind == .Enum {
                 val := str_to_i64(to_parse);
                 
@@ -123,9 +121,7 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
 }
 
 
-#doc """
-    Shortcut to parse a type `T` using `parse_any`.
-"""
+/// Shortcut to parse a type `T` using `parse_any`.
 parse :: ($T: type_expr, to_parse: str) -> ? T {
     v: T;
     if #this_package.parse_any(&v, to_parse) {
@@ -135,9 +131,7 @@ parse :: ($T: type_expr, to_parse: str) -> ? T {
     }
 }
 
-#doc """
-    Shortcut to parse a type `T` using `parse_any`, and specify an allocator.
-"""
+/// Shortcut to parse a type `T` using `parse_any`, and specify an allocator.
 parse_with_allocator :: ($T: type_expr, to_parse: str, allocator: Allocator) -> ? T {
     v: T;
     if #this_package.parse_any(&v, to_parse, allocator) {

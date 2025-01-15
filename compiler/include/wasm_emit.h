@@ -544,6 +544,7 @@ typedef struct WasmFunc {
     LocalAllocator locals;
     bh_arr(WasmInstruction) code;
     OnyxToken *location;
+    char *name;
 } WasmFunc;
 
 typedef struct WasmGlobal {
@@ -582,6 +583,12 @@ typedef struct WasmDatum {
     u32 length;
     ptr data;
 } WasmDatum;
+
+typedef struct WasmCustomSection {
+    char *name;
+    char *contents;
+    u32 len;
+} WasmCustomSection;
 
 typedef enum DatumPatchInfoKind {
     Datum_Patch_Instruction,
@@ -698,7 +705,13 @@ typedef struct ForRemoveInfo {
     i32 remove_func_type_idx;
 } ForRemoveInfo;
 
+typedef struct JsPartial {
+    u32 order;
+    char *code;
+} JsPartial;
+
 typedef struct OnyxWasmModule {
+    Context *context;
     bh_allocator allocator;
 
     bh_arena    *extended_instr_data;
@@ -756,6 +769,10 @@ typedef struct OnyxWasmModule {
     u32 memory_min_size;
     u32 memory_max_size;
 
+    Table(WasmCustomSection) custom_sections;
+
+    bh_arr(JsPartial)     js_partials;
+
     // NOTE: Set of things used when compiling; not part of the actual module
     u32 export_count;
     u32 next_type_idx;
@@ -768,10 +785,17 @@ typedef struct OnyxWasmModule {
     i32 *tls_size_ptr;
     i32 *heap_start_ptr;
     u64 stack_base_idx;
+    u64 stack_restore_idx;
+    u64 stack_return_location_idx;
     u64 closure_base_idx;
     u64 stack_trace_idx;
     CallingConvention curr_cc;
     i32 null_proc_func_idx;
+
+    i32 global_type_table_data_id;
+    i32 type_info_size;
+    i32 *type_info_entry_count;
+    bh_arr(i32) types_enqueued_for_info;
 
     b32 has_stack_locals : 1;
     b32 doing_linking : 1;
@@ -803,17 +827,19 @@ typedef struct OnyxWasmLinkOptions {
     u32 memory_max_size;
 } OnyxWasmLinkOptions;
 
-b32 onyx_wasm_build_link_options_from_node(OnyxWasmLinkOptions *opts, struct AstTyped *node);
+b32 onyx_wasm_build_link_options_from_node(Context *context, OnyxWasmLinkOptions *opts, struct AstTyped *node);
 
-OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc);
-void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options);
+void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module);
+void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLinkOptions *options);
 void onyx_wasm_module_free(OnyxWasmModule* module);
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer);
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);
+void onyx_wasm_module_write_js_partials_to_buffer(OnyxWasmModule* module, bh_buffer* buffer);
+void onyx_wasm_module_write_js_partials_to_file(OnyxWasmModule* module, bh_file file);
 
 #ifdef ONYX_RUNTIME_LIBRARY
-void onyx_run_initialize(b32 debug_enabled);
-b32 onyx_run_wasm(bh_buffer code_buffer, int argc, char *argv[]);
+void onyx_run_initialize(b32 debug_enabled, const char *debug_socket);
+b32 onyx_run_wasm_code(bh_buffer code_buffer, int argc, char *argv[]);
 #endif
 
 #ifdef ENABLE_DEBUG_INFO

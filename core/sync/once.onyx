@@ -5,15 +5,15 @@ package core.sync
 // function only once. It is simply a flag with a mutex.
 //
 
-#doc "Represents something will only happen once."
+/// Represents something will only happen once.
 Once :: struct {
     done: bool;
     mutex: Mutex;
 }
 
-#inject Once.exec :: #match #local {}
+Once.exec :: #match #local {}
 
-#doc "Run a function with no arguments once."
+/// Run a function with no arguments once.
 #overload
 Once.exec :: (o: &Once, f: () -> $R) {
     scoped_mutex(&o.mutex);
@@ -23,7 +23,7 @@ Once.exec :: (o: &Once, f: () -> $R) {
     f();
 }
 
-#doc "Run a function with one argument once."
+/// Run a function with one argument once.
 #overload
 Once.exec :: (o: &Once, ctx: $Ctx, f: (Ctx) -> $R) {
     scoped_mutex(&o.mutex);

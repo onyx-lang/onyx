@@ -1,0 +1,18 @@
+package main
+
+use core {*}
+
+op1 :: () -> bool {
+    println("OP1")
+    return true
+}
+
+op2 :: () -> bool {
+    println("OP2")
+    return false
+}
+
+main :: () {
+    (op2() && op1()) |> println()
+    (op1() || op2()) |> println()
+}

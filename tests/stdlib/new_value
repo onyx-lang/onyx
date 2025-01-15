@@ -1,0 +1,2 @@
+Value 1: Foo { x = 123, y = 456, z = 678 }
+Value 2: Foo { x = 10, y = 20, z = 30 }

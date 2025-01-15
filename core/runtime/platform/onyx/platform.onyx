@@ -13,9 +13,9 @@ use runtime {
 #load "./env"
 #load "./net"
 
-#load "core/onyx/cptr"
-#load "core/onyx/cbindgen"
-// #load "core/onyx/fault_handling"
+#load "core:onyx/cptr"
+#load "core:onyx/cbindgen"
+// #load "core:onyx/fault_handling"
 
 // Platform supports
 Supports_Files :: true
@@ -40,26 +40,37 @@ Supports_TTY :: true
 }
 
 __output_string :: (s: str) -> u32 {
-    err, wrote := io.stream_write(&__stdout, s);
+    wrote := io.stream_write(&__stdout, s).Ok ?? 0;
     return wrote;
 }
 
 __output_error :: (s: str) -> u32 {
-    err, wrote := io.stream_write(&__stderr, s);
+    wrote := io.stream_write(&__stderr, s).Ok ?? 0;
     return wrote;
 }
 
 __read_from_input :: (buffer: [] u8) -> i32 {
-    err, read := io.stream_read(&__stdin, buffer);
-    if err == .ReadPending do return 0;
-    if err != .None do return -1;
-    return read;
+    switch io.stream_read(&__stdin, buffer) {
+        case .Err as err {
+            if err == .ReadPending do return 0;
+            return -1;
+        }
+
+        case .Ok as read {
+            return read;
+        }
+    }
 }
 
 __wait_for_input :: (timeout: i32) -> bool {
-    err, ready := io.stream_poll(&__stdin, .Read, timeout);
-    if err != .None do return false;
-    return ready;
+    switch io.stream_poll(&__stdin, .Read, timeout) {
+        case .Err as err {
+            return false;
+        }
+        case .Ok as ready{
+            return ready;
+        }
+    }
 }
 
 
@@ -96,6 +107,18 @@ ProcessData :: #distinct u64
     __random_get        :: (buf: [] u8) -> void ---
 }
 
+__args :: (allocator: Allocator) -> [] cstr {
+    args : [] cstr;
+    argv_buf_size : i32;
+    __args_sizes_get(&args.count, &argv_buf_size);
+
+    args = make([] cstr, args.count, allocator);
+    argv_buf := cast([&] u8) allocator->alloc(argv_buf_size);
+    __args_get(args.data, argv_buf);
+
+    return args;
+}
+
 #if !#defined(runtime.vars.no_entrypoint) {
     use main
     #local MAIN_FUNCTION :: main.main
@@ -127,23 +150,16 @@ __start :: () {
     __runtime_initialize();
     context.thread_id = 0;
 
-    #if #defined(runtime.vars.MEMDEBUG) {
-        use core.alloc.memdebug
-        memdebug.enable_in_scope(context.allocator);
+    #if #defined(runtime.vars.MEMWATCH) {
+        use core.alloc.memwatch
+        memwatch.enable_in_scope(context.allocator);
     }
 
     #if (typeof MAIN_FUNCTION) == #type () -> void { // An error on this line means no 'main.main' was found in your program.
         MAIN_FUNCTION();
 
     } else {
-        args : [] cstr;
-        argv_buf_size : i32;
-        __args_sizes_get(&args.count, &argv_buf_size);
-
-        args = memory.make_slice(cstr, args.count);
-        argv_buf := cast(cstr) calloc(argv_buf_size);
-        __args_get(args.data, argv_buf);
-
+        args := __args(context.allocator);
         MAIN_FUNCTION(args);
     }
 

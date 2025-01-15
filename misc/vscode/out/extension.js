@@ -14,6 +14,7 @@ const vscode = require("vscode");
 const vsctmls = require("vscode-textmate-languageservice");
 const fs = require("fs");
 const vslc = require("vscode-languageclient/node");
+const cp = require("child_process");
 let client;
 function get_onyx_path() {
     let onyx_path = process.env['ONYX_PATH'];
@@ -84,12 +85,14 @@ function activate(context) {
             // Windows distributions are different
             executable = `${onyx_path}/onyx`;
         }
+        console.appendLine(`Onyx executable is: ${executable}`);
         if (onyx_path) {
-            let serverOptions = {
-                command: executable,
-                args: ["lsp"],
-                transport: vslc.TransportKind.stdio,
-            };
+            let serverOptions = () => __awaiter(this, void 0, void 0, function* () {
+                return cp.spawn(executable, ["lsp"], {
+                    detached: true,
+                    cwd: vscode.workspace.workspaceFolders[0].uri.fsPath
+                });
+            });
             let clientOptions = {
                 documentSelector: [
                     { scheme: "file", language: "onyx" },
@@ -97,6 +100,10 @@ function activate(context) {
                 connectionOptions: {
                     cancellationStrategy: null,
                     maxRestartCount: 5
+                },
+                uriConverters: {
+                    code2Protocol: (x) => x.fsPath,
+                    protocol2Code: (x) => vscode.Uri.parse(decodeURIComponent(x))
                 }
             };
             client = new vslc.LanguageClient("onyx-lsp", serverOptions, clientOptions);

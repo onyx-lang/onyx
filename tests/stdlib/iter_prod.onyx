@@ -1,0 +1,12 @@
+use core {*}
+
+main :: () {
+    for v in iter.prod(1 .. 5, .["test", "hello"]) {
+        println(v)
+    }
+
+    // Iterating over empty array doesn't break things
+    for v in iter.prod(1 .. 100, str.[]) {
+        println(v)
+    }
+}

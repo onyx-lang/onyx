@@ -100,10 +100,10 @@ parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, Ini
     while !(r->is_empty()) {
         defer r->skip_whitespace();
 
-        if b, e := r->peek_byte(); b == #char "[" {
-            assert(r->read_byte() == #char "[", "expected [");
-            section_name := r->read_until(#char "]", allocator=context.temp_allocator);
-            assert(r->read_byte() == #char "]", "expected ]");
+        if b, e := r->peek_byte(); b == '[' {
+            assert(r->read_byte() == '[', "expected [");
+            section_name := r->read_until(']', allocator=context.temp_allocator);
+            assert(r->read_byte() == ']', "expected ]");
 
             stripped_section_name := string.strip_whitespace(section_name);
             member := info.get_struct_member(output.type, stripped_section_name);
@@ -123,7 +123,7 @@ parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, Ini
                     error(msg = aprintf("Failed parsing."));
                 }
 
-                r->read_until(#char "[", inplace=true);
+                r->read_until('[', inplace=true);
             }
 
             continue;
@@ -135,12 +135,12 @@ parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, Ini
 
         defer next_line();
 
-        field_name := r->read_until(#char "=", allocator=context.temp_allocator);
-        assert(r->read_byte() == #char "=", "expected =");
+        field_name := r->read_until('=', allocator=context.temp_allocator);
+        assert(r->read_byte() == '=', "expected =");
 
         field := info.get_struct_member(active_item_type, string.strip_whitespace(field_name));
         target := cast([&] u8) active_item_ptr + field.offset;
-        value_string := r->read_until(#char "\n", allocator=context.temp_allocator);
+        value_string := r->read_until('\n', allocator=context.temp_allocator);
         parsed_successfully := conv.parse_any(target, field.type, value_string);
 
         if !parsed_successfully {
@@ -150,7 +150,7 @@ parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, Ini
             if field.type == str {
                 *cast(&str) target = value_string
                                   |> string.strip_whitespace()
-                                  |> string.alloc_copy();
+                                  |> string.copy();
 
             } else {
                 error(aprintf("Failed to parse value of type '{}' from string '{}'.", field.type, value_string));

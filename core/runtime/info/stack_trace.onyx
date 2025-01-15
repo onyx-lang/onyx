@@ -16,7 +16,6 @@ Stack_Node :: struct {
     file: str;
     line: u32;
     func_name: str;
-    func_type: type_expr;
 }
 
 Stack_Trace :: struct {
@@ -32,10 +31,20 @@ Stack_Frame :: struct {
 
 #if runtime.Stack_Trace_Enabled {
 
-get_stack_trace :: () -> [..] Stack_Frame {
+get_stack_trace :: #match #local {}
+
+#overload
+get_stack_trace :: (offset := 0) -> [..] Stack_Frame {
     trace := make([..] Stack_Frame, 8, alloc.temp_allocator);
 
     walker := __stack_trace.prev;
+
+    for offset {
+        if walker {
+            walker = walker.prev
+        }
+    }
+
     while walker {
         trace << .{ walker.data, walker.current_line };
         walker = walker.prev;
@@ -44,10 +53,38 @@ get_stack_trace :: () -> [..] Stack_Frame {
     return trace;
 }
 
+#overload
+get_stack_trace :: (buf: [] Stack_Frame, offset := 0) -> [] Stack_Frame {
+    walker := __stack_trace.prev
+
+    for offset {
+        if walker {
+            walker = walker.prev
+        }
+    }
+
+    i := 0
+    while walker && i < buf.count {
+        buf[i] = .{ walker.data, walker.current_line }
+        walker = walker.prev
+        i += 1
+    }
+
+    return buf[0 .. i]
+}
+
 } else {
 
-get_stack_trace :: () -> [] Stack_Frame {
-    return .[];
+get_stack_trace :: #match #local {}
+
+#overload
+get_stack_trace :: (offset := 0) -> [] Stack_Frame {
+    return .[]
+}
+
+#overload
+get_stack_trace :: (buf: [] Stack_Frame, offset := 0) -> [] Stack_Frame {
+    return buf[0 .. 0]
 }
     
 }

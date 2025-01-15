@@ -13,10 +13,8 @@ Foo :: struct {
     m: str;
 }
 
-#inject Foo {
-    method :: (f: ^Foo) -> (i32, i32, str) {
-        return f.x, f.y, f.m;
-    }
+Foo.method :: (f: ^Foo) -> (i32, i32, str) {
+    return f.x, f.y, f.m;
 }
 
 main :: () {

@@ -1,0 +1,19 @@
+//+optional-semicolons
+use core {*}
+
+main :: () {
+    println(typeof (0 .. 10))
+
+    x: u64 = 10
+    println(typeof (x .. 10))
+
+    y: i32
+
+    for iter.as_iter(0 .. x) |> iter.filter(x => x < 5) {
+        printf("{}: {}\n", typeof it, it)
+    }
+
+    for x ..= 15 {
+        println(it)
+    }
+}

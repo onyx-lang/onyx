@@ -1,0 +1,17 @@
+use core {*}
+
+Foo :: struct {
+	name: str
+}
+
+Foo.print :: (self: &#Self, y: str, x: i32) {
+	printf("{}: {}\n", self.name, x)
+}
+
+main :: () {
+	f := Foo.{"Test"}
+
+	x := 123
+
+	x |> f->print("asdf", _)
+}

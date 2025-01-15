@@ -26,80 +26,54 @@ FileData :: struct {
 
 __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError) {
     // Requesting all of the rights because why not.
-    rights :=
-        Rights.DataSync
-        | Rights.Read
-        | Rights.Seek
-        | Rights.FdStatSetFlags
-        | Rights.Sync
-        | Rights.Tell
-        | Rights.Write
-        | Rights.Advise
-        | Rights.Allocate
-        | Rights.PathCreateDirectory
-        | Rights.PathCreateFile
-        | Rights.PathLinkSource
-        | Rights.PathLinkTarget
-        | Rights.PathOpen
-        | Rights.ReadDir
-        | Rights.PathReadlink
-        | Rights.PathRenameSource
-        | Rights.PathRenameTarget
-        | Rights.PathFilestatGet
-        | Rights.PathFilestateSetSize
-        | Rights.PathFilestateSetTimes
-        | Rights.FilestatGet
-        | Rights.FilestatSetSize
-        | Rights.FilestatSetTimes
-        | Rights.PathSymlink
-        | Rights.PathRemoveDirectory
-        | Rights.PathUnlinkFile
-        | Rights.PollFDReadWrite;
-
-    open_flags := cast(OFlags) 0;
-    fd_flags := FDFlags.Sync;
+    rights     := wasi.Rights.{}
+    open_flags := cast(OFlags) 0
+    fd_flags   := cast(FDFlags) 0
 
     switch mode {
-        case .Write {
-            open_flags |= OFlags.Creat | OFlags.Trunc;
-            rights     |= Rights.Write | Rights.Seek | Rights.Tell;
-        }
-
         case .Append {
             open_flags |= OFlags.Creat;
-            rights     |= Rights.Write | Rights.Seek | Rights.Tell;
-            fd_flags   |= FDFlags.Append;
         }
 
-        case .Read {
-            rights |= Rights.Read | Rights.Seek | Rights.Tell;
+        case .Write {
+            open_flags |= OFlags.Creat | OFlags.Trunc;
         }
     }
 
-    file := FileData.{ fd = -1 };
+    switch mode {
+        case .Append {
+            fd_flags |= FDFlags.Append;
+            fallthrough;
+        }
+
+        case .Write {
+            rights |= Rights.Write | Rights.Seek | Rights.Tell;
+            rights |= Rights.DataSync | Rights.FdStatSetFlags;
+            rights |= Rights.Sync | Rights.Allocate | Rights.Advise;
+            rights |= Rights.FilestatSetSize | Rights.FilestatSetTimes;
+        }
+
+        case .Read {
+            rights |= Rights.Read | Rights.Seek | Rights.Tell | Rights.FilestatGet;
+        }
+    }
+
+    file := FileData.{ fd = 0 };
     file.mode   = mode;
     file.rights = rights;
     file.flags  = fd_flags;
 
-    // Currently the directory's file descriptor appears to always be 3
-    // However, this is not necessarily correct, so also try a preopened directory
-    for DIR_FD in .[ 3, 4 ] {
-        if err := wasi.path_open(
-            DIR_FD,
-            .SymLinkFollow,
-            path,
-            open_flags,
-            rights,
-            rights,
-            fd_flags,
-            &file.fd);
-            err == .Success {
-                return file, .None;
-        }
+    fd, resolved_path := resolve_fd_and_path(path)
+    err := wasi.path_open(fd, .{}, resolved_path, open_flags, rights, rights, fd_flags, &file.fd);
+
+    if err == .Success {
+        return file, .None;
     }
 
-    // @TODO // provide a better error code.
-    return file, .NotFound;
+    return .{}, switch err {
+        // TODO: Return better error statuses.
+        case _ => .NotFound
+    }
 }
 
 __file_close :: (file: FileData) -> os.FileError {
@@ -114,21 +88,22 @@ __file_stat :: (path: str, out: &os.FileStat) -> bool {
     fs: wasi.FileStat;
 
     exists := false;
-    for .[3, 4] { // Trying both preopened directories
-        err := wasi.path_filestat_get(it, .SymLinkFollow, path, &fs);
-        if err == .Success {
-            exists = true;
-            out.size = ~~ fs.size;
-            out.change_time = fs.ctim / 1000000;
-            out.accessed_time = fs.atim / 1000000;
-            out.modified_time = fs.mtim / 1000000;
 
-            switch fs.filetype {
-                case .RegularFile do out.type = .RegularFile;
-                case .Directory do out.type = .Directory;
-                case .SymLink do out.type = .SymLink;
-                case #default do out.type = .Unknown;
-            }
+    fd, resolved_path := resolve_fd_and_path(path)
+
+    err := wasi.path_filestat_get(fd, .SymLinkFollow, resolved_path, &fs);
+    if err == .Success {
+        exists = true;
+        out.size = ~~ fs.size;
+        out.change_time = fs.ctim / 1000000;
+        out.accessed_time = fs.atim / 1000000;
+        out.modified_time = fs.mtim / 1000000;
+
+        switch fs.filetype {
+            case .RegularFile do out.type = .RegularFile;
+            case .Directory do out.type = .Directory;
+            case .SymLink do out.type = .SymLink;
+            case _ do out.type = .Unknown;
         }
     }
 
@@ -139,30 +114,28 @@ __file_exists :: (path: str) -> bool {
     fs: wasi.FileStat;
 
     exists := false;
-    for .[3, 4] { // Trying both preopened directories
-        err := wasi.path_filestat_get(it, .SymLinkFollow, path, &fs);
-        if err == .Success do exists = true;
-    }
+    fd, resolved_path := resolve_fd_and_path(path)
+    err := wasi.path_filestat_get(fd, .SymLinkFollow, resolved_path, &fs);
+    if err == .Success do exists = true;
 
     return exists;
 }
 
 __file_remove :: (path: str) -> bool {
     removed := false;
-    for .[3, 4] { // Trying both preopened directories
-        err := wasi.path_unlink_file(it, path);
-        if err == .Success do removed = true;
-    }
+    fd, resolved_path := resolve_fd_and_path(path)
+    err := wasi.path_unlink_file(fd, resolved_path);
+    if err == .Success do removed = true;
 
     return removed;
 }
 
 __file_rename :: (old_path: str, new_path: str) -> bool {
     renamed := false;
-    for .[3, 4] { // Trying both preopened directories
-        err := wasi.path_rename(it, old_path, it, new_path);
-        if err == .Success do renamed = true;
-    }
+    fd, resolved_path := resolve_fd_and_path(old_path)
+    new_fd, new_resolved_path := resolve_fd_and_path(new_path)
+    err := wasi.path_rename(fd, old_path, new_fd, new_resolved_path);
+    if err == .Success do renamed = true;
 
     return renamed;
 }
@@ -177,62 +150,62 @@ __file_stream_vtable := io.Stream_Vtable.{
         return .None;
     },
 
-    tell = (use fs: &os.File) -> (io.Error, u32) {
+    tell = (use fs: &os.File) -> Result(u32, io.Error) {
         location : wasi.Filesize;
         error := wasi.fd_tell(data.fd, &location);
-        if error != .Success do return .BadFile, 0;
+        if error != .Success do return .{ Err = .BadFile };
 
-        return .None, ~~location;
+        return .{ Ok = ~~location };
     },
 
-    read = (use fs: &os.File, buffer: [] u8) -> (io.Error, u32) {
+    read = (use fs: &os.File, buffer: [] u8) -> Result(u32, io.Error) {
         bytes_read : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
         error := wasi.fd_read(data.fd, &vec, 1, &bytes_read);
-        if error != .Success do return .BadFile, 0;
+        if error != .Success do return .{ Err = .BadFile };
 
-        return .None, bytes_read;
+        return .{ Ok = bytes_read };
     },
 
-    read_at = (use fs: &os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
+    read_at = (use fs: &os.File, at: u32, buffer: [] u8) -> Result(u32, io.Error) {
         bytes_read : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
         error := wasi.fd_pread(data.fd, &vec, 1, ~~at, &bytes_read);
 
         // FIX: Maybe report io.Error.OutOfBounds if the 'at' was out of bounds?
-        if error != .Success do return .BadFile, 0;
+        if error != .Success do return .{ Err = .BadFile };
 
-        return .None, bytes_read;
+        return .{ Ok = bytes_read };
     },
 
-    read_byte = (use fs: &os.File) -> (io.Error, u8) {
+    read_byte = (use fs: &os.File) -> Result(u8, io.Error) {
         bytes_read : wasi.Size;
         byte  : u8;
         vec   := IOVec.{ buf = cast(u32) &byte, len = 1};
         error := wasi.fd_read(data.fd, &vec, 1, &bytes_read);
-        if error != .Success do return .BadFile, 0;
+        if error != .Success do return .{ Err = .BadFile };
 
-        return .None, byte;
+        return .{ Ok = byte };
     },
 
-    write = (use fs: &os.File, buffer: [] u8) -> (io.Error, u32) {
+    write = (use fs: &os.File, buffer: [] u8) -> Result(u32, io.Error) {
         bytes_written : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
         error := wasi.fd_write(data.fd, &vec, 1, &bytes_written);
-        if error != .Success do return .BadFile, 0;
+        if error != .Success do return .{ Err = .BadFile };
 
-        return .None, bytes_written;
+        return .{ Ok = bytes_written };
     },
 
-    write_at = (use fs: &os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
+    write_at = (use fs: &os.File, at: u32, buffer: [] u8) -> Result(u32, io.Error) {
         bytes_written : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
         error := wasi.fd_pwrite(data.fd, &vec, 1, ~~at, &bytes_written);
 
         // FIX: Maybe report io.Error.OutOfBounds if the 'at' was out of bounds?
-        if error != .Success do return .BadFile, 0;
+        if error != .Success do return .{ Err = .BadFile };
 
-        return .None, bytes_written;
+        return .{ Ok = bytes_written };
     },
 
     write_byte = (use fs: &os.File, byte: u8) -> io.Error {
@@ -262,7 +235,7 @@ __file_stream_vtable := io.Stream_Vtable.{
         return ~~ file_stat.size;
     },
 
-    poll = (use fs: &os.File, ev: io.PollEvent, timeout: i32) -> (io.Error, bool) {
+    poll = (use fs: &os.File, ev: io.PollEvent, timeout: i32) -> Result(bool, io.Error) {
         p: [1] PollDescription = .[.{
             fd = data.fd,
             in_events = ev,
@@ -270,7 +243,7 @@ __file_stream_vtable := io.Stream_Vtable.{
 
         runtime.platform.__poll(p, timeout);
 
-        return .None, p[0].out_events == ev;
+        return .{ Ok = p[0].out_events == ev };
     }
 }
 
@@ -285,22 +258,20 @@ DirectoryData :: &WasiDirectory;
 __dir_open :: (path: str, dir: &DirectoryData) -> bool {
     dir_fd: FileDescriptor;
 
-    DIR_PERMS  := Rights.PathOpen | .ReadDir | .PathReadlink | .FilestatGet | .PathFilestatGet;
-    FILE_PERMS := Rights.Read | .Seek | .Tell | .FilestatGet | .PollFDReadWrite;
+    DIR_PERMS  := Rights.PathOpen | .ReadDir | .PathReadlink | .FilestatGet;
 
-    for .[3, 4] {
-        err := wasi.path_open(it, .SymLinkFollow, path, .Directory, DIR_PERMS, FILE_PERMS, .Sync, &dir_fd);
-        if err != .Success do continue;
-
-        d := new(WasiDirectory);
-        d.dir_fd = dir_fd;
-        d.last_cookie = 0;
-
-        *dir = d;
-        return true;
+    fd, resolved_path := resolve_fd_and_path(path)
+    err := wasi.path_open(fd, .SymLinkFollow, resolved_path, .Directory, DIR_PERMS, .{}, .{}, &dir_fd);
+    if err != .Success {
+        return false;
     }
 
-    return false;
+    d := new(WasiDirectory);
+    d.dir_fd = dir_fd;
+    d.last_cookie = 0;
+
+    *dir = d;
+    return true;
 }
 
 __dir_close :: (dir: DirectoryData) {
@@ -323,7 +294,7 @@ __dir_read :: (dir: DirectoryData, out_entry: &os.DirectoryEntry) -> bool {
         case .Directory do out_entry.type = .Directory;
         case .RegularFile do out_entry.type = .RegularFile;
         case .SymLink do out_entry.type = .SymLink;
-        case #default do out_entry.type = .Other;
+        case _ do out_entry.type = .Other;
     }
 
     out_entry.identifier = ~~dirent.d_ino;
@@ -337,22 +308,90 @@ __dir_read :: (dir: DirectoryData, out_entry: &os.DirectoryEntry) -> bool {
 
 __dir_create :: (path: str) -> bool {
     created := false;
-    for .[3, 4] { // Trying both preopened directories
-        err := wasi.path_create_directory(it, path);
-        if err == .Success do created = true;
-    }
+    fd, resolved_path := resolve_fd_and_path(path)
+    err := wasi.path_create_directory(fd, resolved_path);
+    if err == .Success do created = true;
 
     return created;
 }
 
 __dir_remove :: (path: str) -> bool {
     removed := false;
-    for .[3, 4] { // Trying both preopened directories
-        err := wasi.path_remove_directory(it, path);
-        if err == .Success do removed = true;
-    }
+    fd, resolved_path := resolve_fd_and_path(path)
+    err := wasi.path_remove_directory(fd, resolved_path);
+    if err == .Success do removed = true;
 
     return removed;
+}
+
+
+#local {
+    preopened_dirs: [..] Pair(u32, str)
+
+    #init () {
+        names := make([..] Pair(u32, str))
+
+        while true {
+            fd := names.length + 3
+            prestat: wasi.PrestatTagged
+            switch wasi.fd_prestat_get(fd, &prestat) {
+                case .Success {}
+                case .NotSupported, .BadFile {
+                    preopened_dirs = names
+                    return
+                }
+                case _ {
+                    log(.Error, "Error loading pre-opened directories")
+                    return
+                }
+            }
+
+            name_len := prestat.u.dir.pr_name_len
+            name := make([] u8, name_len)
+            switch wasi.fd_prestat_dir_name(fd, name) {
+                case .Success {}
+                case _ {
+                    log(.Error, "Error loading pre-opened directories")
+                    return
+                }
+            }
+
+            // WASI preopens are not suppose to have a null-terminator,
+            // but some implementation do anyway, *and* report it in
+            // name length
+            while name[name.length - 1] == '\0' {
+                name.length -= 1
+            }
+
+            names->push(.{fd, name})
+        }
+    }
+
+    resolve_fd_and_path :: (path: str) -> (fd: u32, out: str) {
+        for preopened_dirs {
+            if path->starts_with(it.second) {
+                fd  = it.first
+
+                len := it.second.length
+                if it.second != "/" {
+                    len += 1
+                }
+
+                out = str.advance(path, len)
+
+                if out->empty() do out = "."
+                return
+            }
+        }
+
+        fd = 3
+        out = path
+        if out->empty() {
+            out = "."
+        }
+
+        return
+    }
 }
 
 

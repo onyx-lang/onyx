@@ -1,4 +1,4 @@
-#load "core/module"
+
 
 use core {*}
 
@@ -10,59 +10,59 @@ pos :: struct { x, y: i32; }
 #operator == (p1, p2: pos) => p1.x == p2.x && p1.y == p2.y;
 
 main :: (args) => {
-    for file in os.with_file("./tests/aoc-2021/input/day15.txt") {
-        reader := io.reader_make(file);
+    use file := os.open("./tests/aoc-2021/input/day15.txt")->unwrap();
+    use reader := io.reader_make(&file);
 
-        cells: [..] u8;
-        height := 0;
-        while !io.reader_empty(&reader) {
-            line := io.read_line(&reader, consume_newline=false, inplace=true);
-            io.skip_whitespace(&reader);
+    cells: [..] u8;
+    height := 0;
+    while !io.reader_empty(&reader) {
+        line := io.read_line(&reader, consume_newline=false, inplace=true);
+        io.skip_whitespace(&reader);
 
-            for line do cells << it;
-            height += 1;
+        for line do cells << it;
+        height += 1;
+    }
+
+    width := cells.count / height;
+
+    to_try := heap.make(queued, (x, y) => x.cost - y.cost);
+    tried := set.make(pos);
+
+    to_try << .{ 0, 0, -cast(i32) (cells[0] - '0') };
+
+    minimum := 0;
+    while !heap.empty(&to_try) {
+        try := heap.remove_top(&to_try)->unwrap();
+        tried << .{try.x, try.y};
+
+        cell_value := cast(u32) (cells[(try.y % height) * width + (try.x % width)] - '0');
+        cell_value = ((cell_value - 1 + (try.y / height) + (try.x / width)) % 9) + 1;
+        cell_value += try.cost;
+
+        if try.x == width * 5 - 1 && try.y == height * 5 - 1 {
+            minimum = cell_value;
+            break;
         }
 
-        width := cells.count / height;
-
-        to_try := heap.make(queued, (x, y) => x.cost - y.cost);
-        tried := set.make(pos);
-
-        to_try << .{ 0, 0, -cast(i32) (cells[0] - #char "0") };
-
-        minimum := 0;
-        while to_try.data.count != 0 {
-            try := heap.remove_top(&to_try);
-            tried << .{try.x, try.y};
-
-            cell_value := cast(u32) (cells[(try.y % height) * width + (try.x % width)] - #char "0");
-            cell_value = ((cell_value - 1 + (try.y / height) + (try.x / width)) % 9) + 1;
-            cell_value += try.cost;
-
-            if try.x == width * 5 - 1 && try.y == height * 5 - 1 {
-                minimum = cell_value;
-                break;
-            }
-
-            attempt_add :: macro (cond: Code, dx, dy: i32) {
-                if #unquote cond {
-                    if !(tried->has(.{try.x + dx, try.y + dy})) {
-                        if found := array.find_ptr(to_try.data, .{try.x + dx, try.y + dy, 0}); found != null {
-                            found.cost = math.min(cell_value, found.cost);
-                        } else {
-                            to_try << .{try.x + dx, try.y + dy, cell_value };
-                        }
+        attempt_add :: macro (cond: Code, dx, dy: i32) {
+            if #unquote cond {
+                if !(tried->has(.{try.x + dx, try.y + dy})) {
+                    if found := array.find_ptr(to_try.data, .{try.x + dx, try.y + dy, 0}); found != null {
+                        found.cost = math.min(cell_value, found.cost);
+                    } else {
+                        to_try << .{try.x + dx, try.y + dy, cell_value };
                     }
                 }
             }
-
-            attempt_add([](try.x > 0), -1, 0);
-            attempt_add([](try.x < width * 5 - 1), 1, 0);
-            attempt_add([](try.y > 0), 0, -1);
-            attempt_add([](try.y < height * 5 - 1), 0, 1);
         }
 
-        printf("Part 2: {}\n", minimum);
+        attempt_add([](try.x > 0), -1, 0);
+        attempt_add([](try.x < width * 5 - 1), 1, 0);
+        attempt_add([](try.y > 0), 0, -1);
+        attempt_add([](try.y < height * 5 - 1), 0, 1);
+    }
+
+    printf("Part 2: {}\n", minimum);
 
 /*      NAIVE SOLUTION
         min_paths := array.make(u32, capacity=cells.count*25);
@@ -76,7 +76,7 @@ main :: (args) => {
             if y > 0 do a = min_paths[(y - 1) * width * 5 + x];
             if x > 0 do b = min_paths[y * width * 5 + (x - 1)];
 
-            cell_value := cast(u32) (cells[(y % height) * width + (x % width)] - #char "0");
+            cell_value := cast(u32) (cells[(y % height) * width + (x % width)] - '0');
             cell_value = ((cell_value - 1 + (y / height) + (x / width)) % 9) + 1;
 
             min_paths[y * width * 5 + x] = math.min(a, b) + cell_value;
@@ -85,5 +85,4 @@ main :: (args) => {
         result := min_paths[width * height * 25 - 1];
         printf("Part 2: {}\n", result);
 */
-    }
 }

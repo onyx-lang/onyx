@@ -1,4 +1,4 @@
-#load "core/module"
+
 
 use core {*}
 
@@ -113,12 +113,12 @@ main :: (args: [] cstr) {
     grammar_init(&grammar);
     defer grammar_free(&grammar);
 
-    while file[0] != #char "\n" {
+    while file[0] != '\n' {
         nt0 := cast(u32, conv.parse_int(&file));
 
         string.advance(&file, 2); // ': '
 
-        if file[0] == #char "\"" {
+        if file[0] == '"' {
             string.advance(&file, 1); // '"'
             t := file[0];
             string.advance(&file, 1);
@@ -129,23 +129,23 @@ main :: (args: [] cstr) {
             while true {
                 nt1 := cast(u32, conv.parse_int(&file));
 
-                if file[0] == #char "\n" {
+                if file[0] == '\n' {
                     array.push(&grammar.unit_rules, Unit.{ nt0, nt1 });
                     break;
 
                 } else {
                     string.advance(&file, 1); // ' '
 
-                    if next_ch := file[0]; next_ch >= #char "0" && next_ch <= #char "9" {
+                    if next_ch := file[0]; next_ch >= '0' && next_ch <= '9' {
                         nt2 := cast(u32, conv.parse_int(&file));
                         array.push(&grammar.production_rules, Prod.{ nt0, nt1, nt2 });
 
-                        if file[0] == #char " " do string.advance(&file, 1);
+                        if file[0] == ' ' do string.advance(&file, 1);
                     } else {
                         array.push(&grammar.unit_rules, Unit.{ nt0, nt1 });
                     }
 
-                    if file[0] == #char "|" {
+                    if file[0] == '|' {
                         string.advance(&file, 1); // ' |'
                     } else {
                         break;
@@ -162,7 +162,7 @@ main :: (args: [] cstr) {
     valid_count := 0;
     string.advance_line(&file);
     while !string.empty(file) {
-        line, file~ := string.bisect(file, #char "\n");
+        line, file~ := string.bisect(file, '\n');
         if cyk_algorithm(&grammar, line) do valid_count += 1;
     }
 

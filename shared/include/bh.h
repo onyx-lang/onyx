@@ -53,6 +53,8 @@
 
 #if defined(_BH_DARWIN)
     #include <sys/malloc.h>
+    #include <sys/event.h>
+    #include <sys/types.h>
 #endif
 
 #include <stdlib.h>
@@ -186,6 +188,14 @@ static inline const char* bh_num_suffix(u64 i) {
 
         default: return "";
     }
+}
+
+static inline u32 bh_clz(u32 i) {
+    #ifdef _BH_WINDOWS
+    return __lzcnt(i);
+    #else
+    return __builtin_clz(i);
+    #endif
 }
 
 
@@ -357,6 +367,7 @@ b32 bh_str_ends_with(char* str, char* end);
 b32 bh_str_contains(char *str, char *needle);
 u32 bh_str_last_index_of(char *str, char needle);
 char* bh_strdup(bh_allocator a, char* str);
+char* bh_strdup_len(bh_allocator a, char* str, i32 len);
 
 
 
@@ -458,9 +469,18 @@ char* bh_path_get_full_name(char const* filename, bh_allocator a);
 char* bh_path_get_parent(char const* filename, bh_allocator a);
 char* bh_path_convert_separators(char* path);
 
+
+typedef struct bh_mapped_folder {
+    char *name;
+    char *folder;
+} bh_mapped_folder;
+
 // This function returns a volatile pointer. Do not store it without copying!
 // `included_folders` is bh_arr(const char *).
-char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_suffix, const char ** included_folders, b32 search_included_folders);
+// 'mapped_folders' is bh_arr(bh_mapped_folder).
+char* bh_lookup_file(char* filename, char* relative_to, char *suffix, const char ** included_folders, bh_mapped_folder* mapped_folders, bh_allocator allocator);
+
+char* bh_search_for_mapped_file(char* filename, char* relative_to, char *suffix, bh_mapped_folder* mapped_folders, bh_allocator allocator);
 
 #define bh_file_read_contents(allocator_, x) _Generic((x), \
     bh_file*: bh_file_read_contents_bh_file, \
@@ -506,7 +526,7 @@ void   bh_dir_close(bh_dir dir);
 
 
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX)
     typedef struct bh_file_watch {
         int inotify_fd;
         int kill_pipe[2];
@@ -514,8 +534,14 @@ void   bh_dir_close(bh_dir dir);
         fd_set fds;
     } bh_file_watch;
 #endif
-#if defined(_BH_WINDOWS) || defined(_BH_DARWIN)
-    // TODO: Make these work on Windows and MacOS
+#if defined(_BH_DARWIN)
+    typedef struct bh_file_watch {
+        int kqueue_fd;
+        struct kevent *listeners;
+    } bh_file_watch;
+#endif
+#if defined(_BH_WINDOWS)
+    // TODO: Make these work on Windows
     typedef u32 bh_file_watch;
 #endif
 
@@ -649,6 +675,7 @@ typedef struct bh__arr {
 #define bh__arrhead(arr)             (((bh__arr *)(arr)) - 1)
 
 #define bh_arr_allocator(arr)        (arr ? bh__arrhead(arr)->allocator : BH_INTERNAL_ALLOCATOR)
+#define bh_arr_allocator_assert(arr) (arr ? bh__arrhead(arr)->allocator : (assert(0 && "UNSET ALLOCATOR"), ((bh_allocator) {0})))
 #define bh_arr_length(arr)           (arr ? bh__arrhead(arr)->length : 0)
 #define bh_arr_capacity(arr)         (arr ? bh__arrhead(arr)->capacity : 0)
 #define bh_arr_size(arr)             (arr ? bh__arrhead(arr)->capacity * sizeof(*(arr)) : 0)
@@ -675,6 +702,10 @@ typedef struct bh__arr {
 
 #define bh_arr_push(arr, value)       ( \
     bh_arr_length(arr) + 1 > bh_arr_capacity(arr) ? bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), bh_arr_length(arr) + 1) : 0, \
+    arr[bh__arrhead(arr)->length++] = value)
+
+#define bh_arr_push_unsafe(arr, value)       ( \
+    bh_arr_length(arr) + 1 > bh_arr_capacity(arr) ? bh__arr_grow(bh_arr_allocator_assert(arr), (void **) &(arr), sizeof(*(arr)), bh_arr_length(arr) + 1) : 0, \
     arr[bh__arrhead(arr)->length++] = value)
 
 #define bh_arr_set_at(arr, n, value) ( \
@@ -983,7 +1014,7 @@ ptr bh_alloc(bh_allocator a, isize size) {
 
 ptr bh_alloc_aligned(bh_allocator a, isize size, isize alignment) {
     ptr ret = a.proc(a.data, bh_allocator_action_alloc, size, alignment, NULL,  0);
-    if (ret) memset(ret, 0, size);
+    if (ret != 0) memset(ret, 0, size);
     return ret;
 }
 
@@ -1578,6 +1609,24 @@ char* bh_strdup(bh_allocator a, char* str) {
     return buf;
 }
 
+char* bh_strdup_len(bh_allocator a, char* str, i32 len) {
+    if (!str) return NULL;
+
+    if (len < 0) {
+        len = strlen(str);
+    }
+
+    char* buf = bh_alloc(a, len + 1);
+
+    char* t = buf;
+    while (len-- > 0) {
+        *t++ = *str++;
+    }
+
+    *t = '\0';
+    return buf;
+}
+
 
 
 
@@ -1896,10 +1945,12 @@ bh_file_contents bh_file_read_contents_bh_file(bh_allocator alloc, bh_file* file
 }
 
 bh_file_contents bh_file_read_contents_direct(bh_allocator alloc, const char* filename) {
-    bh_file file;
-    bh_file_open(&file, filename);
-    bh_file_contents fc = bh_file_read_contents(alloc, &file);
-    bh_file_close(&file);
+    bh_file file = {0};
+    bh_file_contents fc = {0};
+    if (bh_file_open(&file, filename) == BH_FILE_ERROR_NONE) {
+        fc = bh_file_read_contents(alloc, &file);
+        bh_file_close(&file);
+    }
     return fc;
 }
 
@@ -2006,7 +2057,14 @@ char* bh_path_get_parent(char const* filename, bh_allocator a) {
 }
 
 // This function returns a volatile pointer. Do not store it without copying!
-char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_suffix, bh_arr(const char *) included_folders, b32 search_included_folders) {
+char* bh_lookup_file(
+    char* filename,
+    char* relative_to,
+    char *suffix,
+    bh_arr(const char *) included_folders,
+    bh_arr(bh_mapped_folder) mapped_folders,
+    bh_allocator allocator
+) {
     assert(relative_to != NULL);
 
     static char path[512];
@@ -2015,13 +2073,18 @@ char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_su
     static char fn[256];
     fori (i, 0, 256) fn[i] = 0;
 
-    if (!bh_str_ends_with(filename, suffix) && add_suffix) {
+    if (suffix && !bh_str_ends_with(filename, suffix)) {
         bh_snprintf(fn, 256, "%s%s", filename, suffix);
     } else {
         bh_snprintf(fn, 256, "%s", filename);
     }
 
-    fori (i, 0, 256) if (fn[i] == '/') fn[i] = DIR_SEPARATOR;
+    b32 contains_colon = 0;
+
+    fori (i, 0, 256) {
+        if (fn[i] == ':') contains_colon = 1;
+        if (fn[i] == '/') fn[i] = DIR_SEPARATOR;
+    }
 
     if (bh_str_starts_with(filename, "./")) {
         if (relative_to[strlen(relative_to) - 1] != DIR_SEPARATOR)
@@ -2029,23 +2092,133 @@ char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_su
         else
             bh_snprintf(path, 512, "%s%s", relative_to, fn + 2);
 
-        if (bh_file_exists(path)) return bh_path_get_full_name(path, BH_INTERNAL_ALLOCATOR);
+        if (bh_file_exists(path)) return bh_path_get_full_name(path, allocator);
 
         return path;
     }
 
-    if (search_included_folders) {
+    if (contains_colon && mapped_folders) {
+        char *source_name = fn;
+        char *subpath     = NULL;
+
+        fori (i, 0, 256) {
+            if (fn[i] == ':') {
+                fn[i] = '\0';
+                subpath = &fn[i + 1];
+                break;
+            }
+        }
+
+        assert(subpath);
+
+        bh_arr_each(bh_mapped_folder, folder, mapped_folders) {
+            if (!strncmp(source_name, folder->name, 256)) {
+                if (folder->folder[strlen(folder->folder) - 1] != DIR_SEPARATOR)
+                    bh_snprintf(path, 512, "%s%c%s", folder->folder, DIR_SEPARATOR, subpath);
+                else
+                    bh_snprintf(path, 512, "%s%s", folder->folder, subpath);
+
+                if (bh_file_exists(path))
+                    return bh_path_get_full_name(path, allocator);
+
+                break;
+            }
+        }
+    }
+
+    else if (included_folders) {
         bh_arr_each(const char *, folder, included_folders) {
             if ((*folder)[strlen(*folder) - 1] != DIR_SEPARATOR)
                 bh_snprintf(path, 512, "%s%c%s", *folder, DIR_SEPARATOR, fn);
             else
                 bh_snprintf(path, 512, "%s%s", *folder, fn);
 
-            if (bh_file_exists(path)) return bh_path_get_full_name(path, BH_INTERNAL_ALLOCATOR);
+            if (bh_file_exists(path)) return bh_path_get_full_name(path, allocator);
         }
     }
 
-    return fn;
+    return bh_path_get_full_name(fn, allocator);
+}
+
+char* bh_search_for_mapped_file(char* filename, char* relative_to, char *suffix, bh_mapped_folder* mapped_folders, bh_allocator allocator) {
+    assert(relative_to != NULL);
+
+    static char path[512];
+    fori (i, 0, 512) path[i] = 0;
+
+    static char fn[256];
+    fori (i, 0, 256) fn[i] = 0;
+
+    if (suffix && !bh_str_ends_with(filename, suffix)) {
+        bh_snprintf(fn, 256, "%s%s", filename, suffix);
+    } else {
+        bh_snprintf(fn, 256, "%s", filename);
+    }
+
+    b32 contains_colon = 0;
+
+    fori (i, 0, 256) {
+        if (fn[i] == ':') contains_colon = 1;
+        if (fn[i] == '/') fn[i] = DIR_SEPARATOR;
+    }
+
+    // Absolute path
+    #ifdef _BH_WINDOWS
+    if (contains_colon && fn[1] == ':') { // Handle C:\...
+        if (bh_file_exists(fn)) {
+            return bh_path_get_full_name(fn, allocator);
+        }
+    }
+    #endif
+
+    if (fn[0] == '/') {
+        if (bh_file_exists(fn)) {
+            return bh_path_get_full_name(fn, allocator);
+        }
+    }
+
+    // mapped_folder:filename
+    if (contains_colon) {
+        char *source_name = fn;
+        char *subpath     = NULL;
+
+        fori (i, 0, 256) {
+            if (fn[i] == ':') {
+                fn[i] = '\0';
+                subpath = &fn[i + 1];
+                break;
+            }
+        }
+
+        assert(subpath);
+
+        bh_arr_each(bh_mapped_folder, folder, mapped_folders) {
+            if (!strncmp(source_name, folder->name, 256)) {
+                if (folder->folder[strlen(folder->folder) - 1] != DIR_SEPARATOR)
+                    bh_snprintf(path, 512, "%s%c%s", folder->folder, DIR_SEPARATOR, subpath);
+                else
+                    bh_snprintf(path, 512, "%s%s", folder->folder, subpath);
+
+                if (bh_file_exists(path))
+                    return bh_path_get_full_name(path, allocator);
+
+                break;
+            }
+        }
+
+        return NULL;
+    }
+
+    // Fallback to relative to, "relative_to"
+    if (relative_to[strlen(relative_to) - 1] != DIR_SEPARATOR)
+        bh_snprintf(path, 512, "%s%c%s", relative_to, DIR_SEPARATOR, fn);
+    else
+        bh_snprintf(path, 512, "%s%s", relative_to, fn);
+
+    if (bh_file_exists(path))
+        return bh_path_get_full_name(path, allocator);
+
+    return NULL;
 }
 
 //
@@ -2158,7 +2331,7 @@ void bh_dir_close(bh_dir dir) {
 
 #undef DIR_SEPARATOR
 
-#ifdef _BH_LINUX
+#if defined(_BH_LINUX)
 
 bh_file_watch bh_file_watch_new() {
     // TODO: Proper error checking
@@ -2206,6 +2379,52 @@ void bh_file_watch_stop(bh_file_watch *w) {
 }
 
 #endif // ifdef _BH_LINUX
+
+#if defined(_BH_DARWIN)
+
+bh_file_watch bh_file_watch_new() {
+    bh_file_watch w;
+
+    w.kqueue_fd = kqueue();
+
+    w.listeners = NULL;
+    bh_arr_new(bh_heap_allocator(), w.listeners, 4);
+
+    return w;
+}
+
+void bh_file_watch_free(bh_file_watch *w) {
+    bh_arr_each(struct kevent, ev, w->listeners) {
+        close(ev->ident);
+    }
+
+    bh_arr_free(w->listeners);
+    close(w->kqueue_fd);
+}
+
+void bh_file_watch_add(bh_file_watch *w, const char *filename) {
+    int new_fd = open(filename, O_EVTONLY);
+
+    struct kevent new_event;
+    EV_SET(&new_event, new_fd, EVFILT_VNODE, EV_ADD | EV_ENABLE | EV_CLEAR, 
+               NOTE_WRITE | NOTE_EXTEND | NOTE_ATTRIB | NOTE_LINK | NOTE_RENAME | NOTE_REVOKE, 0, NULL);
+
+    bh_arr_push(w->listeners, new_event);
+}
+
+b32 bh_file_watch_wait(bh_file_watch *w) {
+    struct kevent events;
+
+    int nev = kevent(w->kqueue_fd, w->listeners, bh_arr_length(w->listeners), &events, 1, NULL);
+    if (nev == -1) return 0;
+
+    return 1;
+}
+
+void bh_file_watch_stop(bh_file_watch *w) {
+}
+
+#endif // ifdef _BH_DARWIN
 
 #endif // ifndef BH_NO_FILE
 

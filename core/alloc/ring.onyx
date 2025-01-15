@@ -1,15 +1,13 @@
+/// This allocator is great for temporary memory, such as returning
+/// a pointer from a function, or storing a formatted string. The
+/// memory allocated using this allocator does not need to be freed.
+/// The idea is that as you keep allocating you will "wrap around"
+/// and start writing over memory that was allocated before. For this
+/// reason, it is not safe to use this for any kind of permanent
+/// allocation. Also, be wary that you provide this allocator with
+/// a buffer big enough to store as much data as you are going to need
+/// at any given time. 
 package core.alloc.ring
-#package_doc """
-    This allocator is great for temporary memory, such as returning
-    a pointer from a function, or storing a formatted string. The
-    memory allocated using this allocator does not need to be freed.
-    The idea is that as you keep allocating you will "wrap around"
-    and start writing over memory that was allocated before. For this
-    reason, it is not safe to use this for any kind of permanent
-    allocation. Also, be wary that you provide this allocator with
-    a buffer big enough to store as much data as you are going to need
-    at any given time. 
-"""
 
 use core
 

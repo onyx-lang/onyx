@@ -1,0 +1,19 @@
+use core {*}
+
+Foo :: struct {
+    name: str
+    age: u32
+}
+
+main :: () {
+    joe := Foo.{"Joe", 34}
+
+    phil := .{ ..joe, name = "Phil" }
+
+    young_joe := .{ ..joe, age = 10 }
+
+    println(phil)
+    println(joe)
+    println(young_joe)
+}
+

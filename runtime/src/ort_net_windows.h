@@ -87,3 +87,15 @@ ONYX_DEF(__net_recv, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
 ONYX_DEF(__net_recvfrom, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 }
+
+ONYX_DEF(__net_resolve_start, (WASM_I32, WASM_I32), (WASM_I64)) {
+    return NULL;
+}
+
+ONYX_DEF(__net_resolve_next, (WASM_I64, WASM_I32, WASM_I32), (WASM_I64)) {
+    return NULL;
+}
+
+ONYX_DEF(__net_resolve_end, (WASM_I64), ()) {
+    return NULL;
+}

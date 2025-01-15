@@ -1,4 +1,4 @@
-#load "core/module"
+
 
 use core {*}
 
@@ -7,15 +7,15 @@ process_passport :: (contents: &str) -> u32 {
     field_count := 0;
 
     while true {
-        line := string.read_until(contents, #char "\n");
+        line := string.read_until(contents, '\n');
         string.advance(contents, 1);
         if line.count == 0 do break;
 
-        fields := string.split(line, #char " ");
+        fields := string.split(line, ' ');
         defer cfree(fields.data);
 
         for field in fields {
-            data := string.split(field, #char ":");
+            data := string.split(field, ':');
             defer cfree(data.data);
 
             if !string.equal(data[0], "cid") {

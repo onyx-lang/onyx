@@ -7,6 +7,15 @@ decode_test :: () {
         "bGlnaHQgdw==",
         "bGlnaHQgd28=",
         "bGlnaHQgd29y",
+        "bGlnaHQgd29yaw==",
+        "bGlnaHQgd29yayA=",
+        "bGlnaHQgd29yayBh",
+        "bGlnaHQgd29yayBhbg==",
+        "bGlnaHQgd29yayBhbmQ=",
+        "bGlnaHQgd29yayBhbmQgbA==",
+        "bGlnaHQgd29yayBhbmQgbGU=",
+        "bGlnaHQgd29yayBhbmQgbGVz",
+        "bGlnaHQgd29yayBhbmQgbGVzcw==",
     ] {
         core.println(base64.decode(it));
     }
@@ -19,9 +28,58 @@ encode_test :: () {
         "light wo",
         "light wor",
         "light work",
+        "light work ",
+        "light work a",
+        "light work an",
+        "light work and",
+        "light work and l",
+        "light work and le",
+        "light work and les",
+        "light work and less",
     ] {
         encoded := base64.encode(it);
         core.println(encoded);
+    }
+}
+
+decode_url_test :: () {
+    for .[
+        "TWFueSBoYW5kcyBtYWtlIGxpZ2h0IHdvcmsu",
+        "bGlnaHQgdw",
+        "bGlnaHQgd28",
+        "bGlnaHQgd29y",
+        "bGlnaHQgd29yaw",
+        "bGlnaHQgd29yayA",
+        "bGlnaHQgd29yayBh",
+        "bGlnaHQgd29yayBhbg",
+        "bGlnaHQgd29yayBhbmQ",
+        "bGlnaHQgd29yayBhbmQgbA",
+        "bGlnaHQgd29yayBhbmQgbGU",
+        "bGlnaHQgd29yayBhbmQgbGVz",
+        "bGlnaHQgd29yayBhbmQgbGVzcw",
+    ] {
+        core.println(base64.decode_url(it))
+    }
+}
+
+encode_url_test :: () {
+    for .[
+        "Many hands make light work.",
+        "light w",
+        "light wo",
+        "light wor",
+        "light work",
+        "light work ",
+        "light work a",
+        "light work an",
+        "light work and",
+        "light work and l",
+        "light work and le",
+        "light work and les",
+        "light work and less",
+    ] {
+        encoded := base64.encode_url(it)
+        core.println(encoded)
     }
 }
 
@@ -29,5 +87,9 @@ main :: () {
     decode_test();
     core.println("\n");
     encode_test();
+
+    decode_url_test()
+    core.println("\n")
+    encode_url_test()
 }
 

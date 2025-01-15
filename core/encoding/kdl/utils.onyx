@@ -3,59 +3,55 @@ package core.encoding.kdl
 
 use core {string}
 
-#inject Value {
-    as_str :: (v: Value) -> ? str {
-        return v.data.String;
-    }
-
-    as_int :: (v: Value) -> ? i64 {
-        return v.data.Number?.Integer;
-    }
-
-    as_float :: (v: Value) -> ? f64 {
-        return v.data.Number?.Float;
-    }
-
-    as_bool :: (v: Value) -> ? bool {
-        return v.data.Boolean;
-    }
+Value.as_str :: (v: Value) -> ? str {
+    return v.data.String;
 }
 
-#inject Document {
-    create_node :: (d: &Document, name: str) -> &Node {
-        return d.allocator->move(Node.{
-            node = name,
-            type_annotation = .None,
-            values = make([..] Value, d.allocator),
-            props = make(Map(str, Value), d.allocator),
-            children = make([..] &Node, d.allocator)
-        });
-    }
+Value.as_int :: (v: Value) -> ? i64 {
+    return v.data.Number?.Integer;
 }
 
-#inject Node {
-    add_value :: (n: &Node, value: Value.Value_Data) {
-        n.values << Value.{data = value};
-    }
+Value.as_float :: (v: Value) -> ? f64 {
+    return v.data.Number?.Float;
+}
 
-    set_prop :: (n: &Node, name: str, value: Value.Value_Data) {
-        n.props->put(
-            string.alloc_copy(name, n.props.allocator),
-            .{ data = value }
-        );
-    }
+Value.as_bool :: (v: Value) -> ? bool {
+    return v.data.Boolean;
+}
 
-    value :: (n: &Node, index := 0) -> ? Value {
-        if index >= n.values.length do return .{};
 
-        return n.values[index];
-    }
+Document.create_node :: (d: &Document, name: str) -> &Node {
+    return d.allocator->move(Node.{
+        node = name,
+        type_annotation = .None,
+        values = make([..] Value, d.allocator),
+        props = make(Map(str, Value), d.allocator),
+        children = make([..] &Node, d.allocator)
+    });
+}
 
-    value_or_null :: (n: &Node, index := 0) -> Value {
-        if index >= n.values.length do return .{
-            data = .{ Null = .{} }
-        };
 
-        return n.values[index];
-    }
+Node.add_value :: (n: &Node, value: Value.Value_Data) {
+    n.values << Value.{data = value};
+}
+
+Node.set_prop :: (n: &Node, name: str, value: Value.Value_Data) {
+    n.props->put(
+        string.copy(name, n.props.allocator),
+        .{ data = value }
+    );
+}
+
+Node.value :: (n: &Node, index := 0) -> ? Value {
+    if index >= n.values.length do return .{};
+
+    return n.values[index];
+}
+
+Node.value_or_null :: (n: &Node, index := 0) -> Value {
+    if index >= n.values.length do return .{
+        data = .{ Null = .{} }
+    };
+
+    return n.values[index];
 }

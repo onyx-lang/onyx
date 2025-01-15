@@ -1,4 +1,4 @@
-#load "core/module"
+
 
 use core {*}
 
@@ -60,7 +60,7 @@ main :: (args: [] cstr) {
 
         string.advance_line(&file);
 
-        if sign == #char "-" do val *= -1;
+        if sign == '-' do val *= -1;
 
         opcode : OpCode;
         if     string.equal(word, "nop") do opcode = OpCode.Nop;

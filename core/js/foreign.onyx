@@ -1,0 +1,53 @@
+
+package core.js
+
+use core.alloc
+
+#js #order 0 #file "./onyx.js"
+
+#package {
+    // Value
+    #foreign "__syscall" {
+        __free :: (value: Value) -> void ---
+        __delete :: (value: Value, prop: str) -> void ---
+        __new :: (value: Value, args: [] Value) -> Value ---
+
+        __dot :: (value: Value, name: str) -> Value ---
+        __sub :: (value: Value, idx: i32) -> Value ---
+        __set :: (value: Value, name: str, v: Value) -> void ---
+        __set_index :: (value: Value, index: i32, v: Value) -> void ---
+        __len :: (value: Value) -> i32 ---
+
+	__from_str  :: (s: str) -> Value ---
+	__from_arr  :: (a: [] Value) -> Value ---
+
+        // Call with zero-length to just retrieve length.
+        __to_str :: (v: Value, buf: [] u8) -> i32 ---
+
+        __call :: (func: Value, args: [] Value) -> Value ---
+        __method :: (value: Value, method: str, args: [] Value) -> Value ---
+
+        __instance_of :: (value: Value, class: Value) -> bool ---
+
+        __new_object :: () -> Value ---
+        __new_array  :: () -> Value ---
+
+        __copy_to_js   :: (arraybuf: Value, buf: [] u8) -> i32 ---
+        __copy_to_onyx :: (buf: [] u8, arraybuf: Value) -> i32 ---
+    }
+
+    // Func
+    #foreign "__syscall" {
+        __make_func :: (f: (Value, [] Value) -> Value) -> Func ---
+    }
+
+    #export "__allocate_arg_buf" (args: i32) -> rawptr {
+        return alloc.heap_allocator->alloc(args * sizeof Value);
+    }
+
+    #export "__free_arg_buf" (buf: rawptr) {
+        if buf == null do return;
+
+        alloc.heap_allocator->free(buf);
+    }
+}

@@ -1,10 +1,10 @@
-#load "core/module"
+
 
 use core {*}
 
 using_callsite :: (value: $T, site := #callsite) {
     println(value);
-    path := string.split(site.file, ~~(#char "\\" if runtime.compiler_os == .Windows else #char "/"));
+    path := string.split(site.file, ~~('\\' if runtime.compiler_os == .Windows else '/'));
     printf("I was called from {}:{}:{}\n", path[path.count - 1], site.line, site.column);
 }
 

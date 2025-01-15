@@ -1,7 +1,6 @@
 package core.map
 
 use core
-use core.array
 use core.hash
 use core.memory
 use core.math
@@ -10,11 +9,9 @@ use core.conv
 use core {Optional}
 use core.intrinsics.onyx { __initialize }
 
-#doc """
-    Map is a generic hash-map implementation that uses chaining.
-    Values can be of any type. Keys must of a type that supports
-    the core.hash.hash, and the '==' operator.
-"""
+/// Map is a generic hash-map implementation that uses chaining.
+/// Values can be of any type. Keys must of a type that supports
+/// the core.hash.hash, and the '==' operator.
 @conv.Custom_Format.{ #solidify format_map {K=Key_Type, V=Value_Type} }
 Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Type) {
     allocator : Allocator;
@@ -41,85 +38,72 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
     { t == t       } -> bool;
 }
 
-#inject Map {
-    init    :: init
-    has     :: has
-    get     :: get
-    get_ptr :: get_ptr
-    get_opt :: get_opt
-    get_ptr_or_create :: get_ptr_or_create
-    put     :: put
-    delete  :: delete
-    update  :: update
-    clear   :: clear
-    empty   :: empty
-    literal :: literal
-    as_iter :: as_iter
-}
 
-#inject builtin {
-    Map :: Map;
-}
+builtin.Map :: Map
 
 
-#doc """
-   Allows for creation of a Map using make().
-  
-       m := make(Map(str, i32));
-"""
+/// Allows for creation of a Map using make().
+///
+///     m := make(Map(str, i32));
 #overload
 __make_overload :: macro (x: &Map($K, $V), allocator := context.allocator) =>
-    #this_package.make(K, V, allocator);
+    #this_package.Map.make(K, V, allocator);
 
-#doc """
-   Creates and initializes a new map using the types provided.
-"""
-make :: macro ($Key: type_expr, $Value: type_expr, allocator := context.allocator) -> Map(Key, Value) {
+/// Creates and initializes a new map using the types provided.
+Map.make :: macro ($Key: type_expr, $Value: type_expr, allocator := context.allocator) -> Map(Key, Value) {
     map : Map(Key, Value);
-    #this_package.init(&map, allocator);
+    #this_package.Map.init(&map, allocator);
     return map;
 }
 
-#doc "Initializes a map."
-init :: (map: &Map($K, $V), allocator := context.allocator) {
+/// Initializes a map.
+Map.init :: (map: &Map($K, $V), allocator := context.allocator) {
     __initialize(map);
 
     map.allocator = allocator;
 
     map.hashes = builtin.make([] u32, 8, allocator=allocator);
-    array.fill(map.hashes, -1);
+    Array.fill(map.hashes, -1);
 
-    array.init(&map.entries, allocator=allocator);
+    Array.init(&map.entries, allocator=allocator);
 }
 
-#doc "Allows for deletion of a Map using `delete(&map)`."
-#match builtin.delete core.map.free
+// Allows for deletion of a Map using `delete(&map)`.
+#overload
+builtin.delete :: Map.free
 
-#doc """
-    Destroys a map and frees all memory.
-"""
-free :: (use map: &Map) {
-    if hashes.data != null  do memory.free_slice(&hashes, allocator=allocator);
-    if entries.data != null do array.free(&entries);
+/// Destroys a map and frees all memory.
+Map.free :: (use map: &Map) {
+    if hashes.data != null  do Slice.free(&hashes, allocator=allocator);
+    if entries.data != null do Array.free(&entries);
 }
 
-#doc """
-    Shallow copies a map using the allocator provided if one is provided, or the allocator on the old map otherwise.
-"""
-copy :: (oldMap: &Map, allocator: ? Allocator = .None) -> Map(oldMap.Key_Type, oldMap.Value_Type) {
+/// Shallow copies a map using the allocator provided if one is provided, or the allocator on the old map otherwise.
+Map.copy :: #match #local {}
+
+#overload
+Map.copy :: (oldMap: &Map, allocator: ? Allocator = .None) -> Map(oldMap.Key_Type, oldMap.Value_Type) {
     newMap: typeof *oldMap;
     newMap.allocator = allocator ?? oldMap.allocator;
-    newMap.hashes = array.copy(oldMap.hashes, newMap.allocator);
-    newMap.entries = array.copy(&oldMap.entries, newMap.allocator);
+    newMap.hashes = Array.copy(oldMap.hashes, newMap.allocator);
+    newMap.entries = Array.copy(&oldMap.entries, newMap.allocator);
 
     return newMap;
 }
 
-#doc """
-    Sets the value at the specified key, or creates a new entry
-    if the key was not already present.
-"""
-put :: (use map: &Map, key: map.Key_Type, value: map.Value_Type) {
+#overload
+Map.copy :: (oldMap: Map, allocator: ? Allocator = .None) -> Map(oldMap.Key_Type, oldMap.Value_Type) {
+    newMap: typeof oldMap
+    newMap.allocator = allocator ?? oldMap.allocator
+    newMap.hashes = Array.copy(oldMap.hashes, newMap.allocator)
+    newMap.entries = Array.copy(&oldMap.entries, newMap.allocator)
+
+    return newMap
+}
+
+/// Sets the value at the specified key, or creates a new entry
+/// if the key was not already present.
+Map.put :: (use map: &Map, key: map.Key_Type, value: map.Value_Type) {
     lr := lookup(map, key);
 
     if lr.entry_index >= 0 {
@@ -133,45 +117,34 @@ put :: (use map: &Map, key: map.Key_Type, value: map.Value_Type) {
     if full(map) do grow(map);
 }
 
-#doc """
-    Returns true if the map contains the key.
-"""
-has :: (use map: &Map, key: map.Key_Type) -> bool {
+/// Returns true if the map contains the key.
+Map.has :: (use map: &Map, key: map.Key_Type) -> bool {
     lr := lookup(map, key);
     return lr.entry_index >= 0;
 }
 
-#doc """
-    Returns the value at the specified key, or map.default_value if
-    the key is not present.
-
-    This is subject to change with the addition of Optional to the
-    standard library.
-"""
-get :: (use map: &Map, key: map.Key_Type) -> ? map.Value_Type {
+/// Returns the value at the specified key, or `.None` if the value
+/// is not present
+Map.get :: (use map: &Map, key: map.Key_Type) -> ? map.Value_Type {
     lr := lookup(map, key);
     if lr.entry_index >= 0 do return entries[lr.entry_index].value;
 
     return .{};
 }
 
-#doc """
-    Returns a pointer to the value at the specified key, or null if
-    the key is not present.
-"""
-get_ptr :: (use map: &Map, key: map.Key_Type) -> &map.Value_Type {
+/// Returns a pointer to the value at the specified key, or null if
+/// the key is not present.
+Map.get_ptr :: (use map: &Map, key: map.Key_Type) -> &map.Value_Type {
     lr := lookup(map, key);
     if lr.entry_index >= 0 do return &entries[lr.entry_index].value;
 
     return null;
 }
 
-#doc """
-    Returns a pointer to the value at the specified key. If the key
-    is not in the map, a new value is created and inserted, then the
-    pointer to that value is returned.
-"""
-get_ptr_or_create :: (use map: &Map, key: map.Key_Type) -> &map.Value_Type {
+/// Returns a pointer to the value at the specified key. If the key
+/// is not in the map, a new value is created and inserted, then the
+/// pointer to that value is returned.
+Map.get_ptr_or_create :: (use map: &Map, key: map.Key_Type) -> &map.Value_Type {
     lr := lookup(map, key);
     if lr.entry_index < 0 {
         put(map, key, .{});
@@ -181,22 +154,20 @@ get_ptr_or_create :: (use map: &Map, key: map.Key_Type) -> &map.Value_Type {
     return &entries[lr.entry_index].value;
 }
 
-#doc """
-    **DEPRECATED** - Use `map.get` instead.
-
-    Returns an Optional of the value at the specified key. The Optional
-    has a value if the key is present, otherwise the optional does not
-    have a value.
-"""
-get_opt :: (use map: &Map, key: map.Key_Type) -> ?map.Value_Type {
+/// **DEPRECATED** - Use `map.get` instead.
+///
+/// Returns an Optional of the value at the specified key. The Optional
+/// has a value if the key is present, otherwise the optional does not
+/// have a value.
+Map.get_opt :: (use map: &Map, key: map.Key_Type) -> ?map.Value_Type {
     lr := lookup(map, key);
     if lr.entry_index >= 0 do return Optional.make(entries[lr.entry_index].value);
 
     return .{};
 }
 
-#doc "Removes an entry from the map."
-delete :: (use map: &Map, key: map.Key_Type) {
+/// Removes an entry from the map.
+Map.delete :: (use map: &Map, key: map.Key_Type) {
     lr := lookup(map, key);
     if lr.entry_index < 0 do return;
 
@@ -204,30 +175,28 @@ delete :: (use map: &Map, key: map.Key_Type) {
     else                   do entries[lr.entry_prev].next = entries[lr.entry_index].next;
 
     if lr.entry_index == entries.count - 1 {
-        array.pop(&entries);
+        Array.pop(&entries);
         return;
     }
 
-    array.fast_delete(&entries, lr.entry_index);
+    Array.fast_delete(&entries, lr.entry_index);
     last := lookup(map, entries[lr.entry_index].key);
 
     if last.entry_prev >= 0    do entries[last.entry_prev].next = lr.entry_index;
     else                       do hashes[last.hash_index] = lr.entry_index;
 }
 
-#doc """
-Helper macro that finds a value by the key, and if it exists,
-runs the code, providing an `it` variable that is a pointer
-to the value.
-
-    m: Map(str, i32);
-    m->update("test") {
-        *it += 10;
-    }
-or:
-    m->update("test", [v](*v += 10));
-"""  
-update :: macro (map: ^Map, key: map.Key_Type, body: Code) {
+/// Helper macro that finds a value by the key, and if it exists,
+/// runs the code, providing an `it` variable that is a pointer
+/// to the value.
+/// 
+///     m: Map(str, i32);
+///     m->update("test") {
+///         *it += 10;
+///     }
+/// or:
+///     m->update("test", [v](*v += 10));
+Map.update :: macro (map: ^Map, key: map.Key_Type, body: Code) {
     lookup_ :: lookup
     lr := lookup_(map, key);
 
@@ -237,25 +206,21 @@ update :: macro (map: ^Map, key: map.Key_Type, body: Code) {
     }
 }
 
-#doc """
-    Removes all entries from the hash map. Does NOT
-    modify memory, so be wary of dangling pointers!
-"""
-clear :: (use map: &Map) {
+/// Removes all entries from the hash map. Does NOT
+/// modify memory, so be wary of dangling pointers!
+Map.clear :: (use map: &Map) {
     for i in 0 .. hashes.count do hashes.data[i] = -1;
     entries.count = 0;
 }
 
-#doc "Returns if the map does not contain any elements."
-empty :: (use map: &Map) -> bool {
+/// Returns if the map does not contain any elements.
+Map.empty :: (use map: &Map) -> bool {
     return entries.count == 0;
 }
 
-#doc """
-    Helper procedure to nicely format a Map when printing.
-    Rarely ever called directly, instead used by conv.format_any.
-"""
-format_map :: (output: &conv.Format_Output, format: &conv.Format, x: &Map($K, $V)) {
+/// Helper procedure to nicely format a Map when printing.
+/// Rarely ever called directly, instead used by conv.format_any.
+Map.format_map :: (output: &conv.Format_Output, format: &conv.Format, x: &Map($K, $V)) {
     if format.pretty_printing {
         output->write("{\n");
         for& x.entries {
@@ -273,15 +238,13 @@ format_map :: (output: &conv.Format_Output, format: &conv.Format, x: &Map($K, $V
     }
 }
 
-#doc """
-    Quickly create a Map with some entries.
-   
-        Map.literal(str, i32, .[
-            .{ "test", 123 },
-            .{ "foo",  456 },
-        ]);
-"""
-literal :: ($Key: type_expr, $Value: type_expr, values: [] MapLiteralValue(Key, Value)) => {
+/// Quickly create a Map with some entries.
+///
+///     Map.literal(str, i32, .[
+///         .{ "test", 123 },
+///         .{ "foo",  456 },
+///     ]);
+Map.literal :: ($Key: type_expr, $Value: type_expr, values: [] MapLiteralValue(Key, Value)) => {
     m := core.map.make(Key, Value);
     for & values {
         m->put(it.key, it.value);
@@ -296,30 +259,28 @@ MapLiteralValue :: struct (K: type_expr, V: type_expr) {
     value: V;
 }
 
-#doc """
-    Produces an iterator that yields all values of the map,
-    in an unspecified order, as Map is unordered.
-"""
-as_iter :: (m: &Map) =>
+/// Produces an iterator that yields all values of the map,
+/// in an unspecified order, as Map is unordered.
+Map.as_iter :: (m: &Map) =>
     core.iter.generator(
         &.{ m = m, i = 0 },
 
         ctx => {
             if ctx.i < ctx.m.entries.count {
                 defer ctx.i += 1;
-                return &ctx.m.entries.data[ctx.i], true;
+                return Optional.make(&ctx.m.entries.data[ctx.i]);
             }
 
-            return .{}, false;
+            return .None;
         });
 
 
 //
 // Helper operator overloads for accessing values, accessing
 // values by pointer, and setting values.
-#operator []  macro (map: Map($K, $V), key: K) -> ?V     { return #this_package.get(&map, key); }
-#operator &[] macro (map: Map($K, $V), key: K) -> &V     { return #this_package.get_ptr(&map, key); }
-#operator []= macro (map: Map($K, $V), key: K, value: V) { #this_package.put(&map, key, value); }
+#operator []  macro (map: Map($K, $V), key: K) -> ?V     { return #this_package.Map.get(&map, key); }
+#operator &[] macro (map: Map($K, $V), key: K) -> &V     { return #this_package.Map.get_ptr(&map, key); }
+#operator []= macro (map: Map($K, $V), key: K, value: V) { #this_package.Map.put(&map, key, value); }
 
 //
 // Private symbols
@@ -369,17 +330,34 @@ as_iter :: (m: &Map) =>
     rehash :: (use map: &Map, new_size: i32) {
         memory.free_slice(&hashes, allocator);
         hashes = builtin.make([] u32, new_size, allocator=allocator);
-        array.fill(hashes, -1);
+        Array.fill(hashes, -1);
 
-        for &entry in entries do entry.next = -1;
-
-        index := 0;
-        for &entry in entries {
-            defer index += 1;
-
+        for &entry, index in entries {
             hash_index := entry.hash % hashes.count;
             entries[index].next = hashes[hash_index];
             hashes[hash_index] = index;
         }
     }
 }
+
+//
+// Everything below here only exists for backwards compatibility.
+//
+
+make :: Map.make
+init :: Map.init
+free :: Map.free
+copy :: Map.copy
+has :: Map.has
+get :: Map.get
+get_ptr :: Map.get_ptr
+get_opt :: Map.get_opt
+get_ptr_or_create :: Map.get_ptr_or_create
+put :: Map.put
+delete :: Map.delete
+update :: Map.update
+clear :: Map.clear
+empty :: Map.empty
+literal :: Map.literal
+as_iter :: Map.as_iter
+

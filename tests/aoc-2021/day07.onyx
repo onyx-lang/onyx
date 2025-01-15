@@ -1,34 +1,33 @@
-#load "core/module"
+
 
 use core {*}
 
 main :: (args) => {
-    for file in os.with_file("./tests/aoc-2021/input/day07.txt") {
-        reader := io.reader_make(file);
-        nums := io.read_all(&reader)
-            |> string.split(#char ",")
-            |> iter.as_iter()
-            |> iter.map((x) => cast(i32) conv.parse_int(x))
-            |> iter.to_array();
+    use file := os.open("./tests/aoc-2021/input/day07.txt")->unwrap();
+    use reader := io.reader_make(&file);
+    nums := io.read_all(&reader)
+        |> string.split(',')
+        |> iter.as_iter()
+        |> iter.map((x) => cast(i32) conv.parse_int(x))
+        |> iter.to_array();
 
-        min := array.fold(nums, nums[0], math.min);
-        max := array.fold(nums, nums[0], math.max);
+    min := array.fold(nums, nums[0], math.min);
+    max := array.fold(nums, nums[0], math.max);
 
-        min_cost := 0x7fffffff;
-        best_middle := 0;
-        for middle in min .. max {
-            total_cost := 0;
-            for nums {
-                dist := math.abs(it - middle);
-                total_cost += dist * (dist + 1) / 2;    // math.choose(dist + 1, 2);
-            }
-
-            if total_cost < min_cost {
-                min_cost = total_cost;
-                best_middle = middle;
-            }
+    min_cost := 0x7fffffff;
+    best_middle := 0;
+    for middle in min .. max {
+        total_cost := 0;
+        for nums {
+            dist := math.abs(it - middle);
+            total_cost += dist * (dist + 1) / 2;    // math.choose(dist + 1, 2);
         }
 
-        printf("Part 2: {} with fuel {}\n", best_middle, min_cost);
+        if total_cost < min_cost {
+            min_cost = total_cost;
+            best_middle = middle;
+        }
     }
+
+    printf("Part 2: {} with fuel {}\n", best_middle, min_cost);
 }

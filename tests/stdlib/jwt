@@ -1,0 +1,7 @@
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ0ZXN0IiwiaWF0IjoxMjM0NTY3ODkwfQ.4VapgNAjlcllVk-LvapP6mkPCz_qI3Q9SyQE3bdh2y0
+{
+    "alg" => "HS256"
+    "typ" => "JWT"
+}
+Key: iss
+Key: iat

@@ -1,0 +1,4 @@
+Foo { name = "Test", numbers = [ 2, 3, 5, 7, 11 ] }
+Foo { name = "Test", numbers = [ 2, 3, 5, 7, 11 ] }
+DELAYED: Foo { name = "Test", numbers = [ 2, 3, 5, 7, 11 ] }
+DELAYED: works

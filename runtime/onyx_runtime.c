@@ -19,6 +19,7 @@
     #include <sys/socket.h>
     #include <sys/un.h>
     #include <sys/syscall.h>
+    #include <sys/random.h>
     #include <poll.h>
     #include <termios.h>
     #include <sys/ioctl.h>
@@ -120,6 +121,9 @@ ONYX_LIBRARY {
     ONYX_FUNC(__net_sendto_host)
     ONYX_FUNC(__net_recv)
     ONYX_FUNC(__net_recvfrom)
+    ONYX_FUNC(__net_resolve_start)
+    ONYX_FUNC(__net_resolve_next)
+    ONYX_FUNC(__net_resolve_end)
 
     ONYX_FUNC(__cptr_make)
     ONYX_FUNC(__cptr_read)

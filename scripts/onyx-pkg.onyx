@@ -1,6 +1,6 @@
 
-#load "core/module"
-#load "core/encoding/ini"
+
+#load "core:encoding/ini"
 
 //
 // A list of repository URLs to get packages from.
@@ -27,623 +27,782 @@ Protocols :: str.[
 //
 // NOTE: This returns a string that ends with the path separator.
 Template_Directory :: () -> str {
-    return os.path_join(os.path_directory(#file), "pkg_templates")
-            |> string.alloc_copy();
+    return os.path_directory(#file)
+        |> os.path_join("pkg_templates")
+        |> str.copy()
 }
 
-Version :: SemVer.{0, 1, 8}
+Version :: SemVer.{0, 1, 13}
 
 
 
 
 use core {package, *}
-use core.encoding {kdl}
+use core.encoding {kdl, json}
 use runtime
 
 global_arguments: struct {
-    #tag "--config-file"
-    config_file := "./onyx-pkg.kdl";
-} = .{};
+    @"--config-file"
+    config_file := "./onyx-pkg.kdl"
+} = .{}
 
-main :: (args: [] cstr) {
-    config = .{};
+main :: () {
+    args := os.args()
+    config = .{}
 
-    arg_parse.arg_parse(args, &global_arguments);
+    arg_parse.arg_parse(args, &global_arguments)
 
-    command   := args[0] |> string.as_str();
-    arguments := args[1..args.count];
+    command   := args[0]
+    arguments := args[1 .. args.count]
 
-    if command == "init" {
-        run_init_command(arguments);
-        store_config_file();
-        return;
+    loaded_config_file := false
+    defer if loaded_config_file do store_config_file()
+
+    command_procedures := runtime.info.get_procedures_with_tag(Command)
+    defer delete(&command_procedures)
+
+    command_tag := Array.first(command_procedures, [p](p.tag.command == command))
+    if !command_tag {
+        run_help_command(arguments)
+        return
     }
 
-    loaded_config_file := false;
-    defer if loaded_config_file do store_config_file();
-
-    command_procedures := runtime.info.get_procedures_with_tag(Command);
-    defer delete(&command_procedures);
-
-    command_tag := array.first(command_procedures, [p](p.tag.command == command));
-    if !command_tag {
-        run_help_command(arguments);
-        return;
+    if arguments.count > 0 {
+        if arguments[0] == "--help" {
+            show_help_for_command(command_tag.tag)
+            os.exit(1)
+        }
     }
 
     if command_tag.tag.require_config_file {
         if !load_config_file() {
-            error_print("Failed to open {}.\n", global_arguments.config_file);
-            info_print("", "Is this the root directory of an Onyx project?\n");
-            os.exit(1);
+            error_print("Failed to open {}.\n", global_arguments.config_file)
+            info_print("", "Is this the root directory of an Onyx project?\n")
+            os.exit(1)
         }
 
-        loaded_config_file = true;
+        loaded_config_file = true
     }
 
-    assert(command_tag.type == #type ([] cstr) -> void, "BAD TYPE FOR COMMAND PROCEDURE!");
-    (*cast(&([] cstr) -> void) &command_tag.func)(arguments);
+    assert(command_tag.type == #type ([] str) -> void, "BAD TYPE FOR COMMAND PROCEDURE!")
+    (*cast(&([] str) -> void) &command_tag.func)(arguments)
 }
 
 Command :: struct {
-    command: str;
-    description: str;
-    arguments: str;
+    command: str
+    description: str
+    arguments: str
 
-    argument_descriptions: str = "";
+    argument_descriptions: str = ""
 
-    require_config_file := true;
+    require_config_file := true
 }
 
-#tag Command.{ "help", "Show help.", "", require_config_file=false }
-run_help_command :: (args: [] cstr) {
-    printf("onyx pkg version {}\n", Version);
-    printf("Package dependency resolver and synchronizer for Onyx.\n\nUsage in\n");
+@Command.{ "help", "Show this help message", "", require_config_file=false }
+run_help_command :: (args: [] str) {
+    printf("Onyx toolchain version {}\n", Version)
+    printf("\n")
+    printf("Package dependency resolver and synchronizer for Onyx.\n")
+    printf("\n")
+    printf("Usage: onyx pkg cmd [..flags]\n")
+    printf("\n")
+    printf("Commands:\n")
 
-    command_procedures := runtime.info.get_procedures_with_tag(Command);
-    defer delete(&command_procedures);
+    command_procedures := runtime.info.get_procedures_with_tag(Command)
+    defer delete(&command_procedures)
+
+    max_command_width :=
+        iter.as_iter(command_procedures)
+        |> iter.map(x => x.tag.command.length)
+        |> iter.fold(0, (x, y) => math.max(x, y))
+
+    command_fmt := tprintf("{{w{}}}", max_command_width + 2)
+
     for command_procedures {
-        printf("{}\n", it.tag.description);
-        printf("        onyx pkg {} {}\n", it.tag.command, it.tag.arguments);
-
-        if it.tag.argument_descriptions.count > 0 {
-            lines := string.split(it.tag.argument_descriptions, #char "\n", context.temp_allocator);
-
-            print("\n");
-            for line in lines {
-                if line.count == 0 do continue;
-                printf("        {}\n", line);
-            }
-            print("\n");
-        }
-
-        print("\n");
+        color_print(
+            .{ .White, "    " },
+            .{ .Blue, tprintf(command_fmt, it.tag.command) },
+            .{ .White, " " },
+            .{ .White, it.tag.description },
+            .{ .White, "\n" },
+        )
     }
 }
 
-#tag Command.{ "init", "Initialize a new project.", "", require_config_file=false }
-run_init_command :: (args: [] cstr) {
+show_help_for_command :: (cmd: &Command) {
+    printf("Onyx toolchain version {}\n", Version)
+    printf("\n")
+    printf("Package dependency resolver and synchronizer for Onyx.\n")
+    printf("\n")
+    color_print(
+        .{ .White, "Usage: " },
+        .{ .Blue, "onyx pkg " },
+        .{ .Green, cmd.command },
+        .{ .White, " " },
+        .{ .Yellow, cmd.arguments },
+        .{ .White, "\n\n" },
+    )
+
+    printf("Description: {}\n", cmd.description)
+
+    println(cmd.argument_descriptions)
+}
+
+
+@Command.{ "init", "Initialize a new project in the current directory", "", require_config_file=false }
+run_init_command :: (args: [] str) {
     if os.file_exists(global_arguments.config_file) {
-        error_print("Config file present; project already initialized.\n");
-        return;
+        error_print("Config file present; project already initialized.\n")
+        return
     }
 
-    printf("Creating new project manifest in {}.\n\n", global_arguments.config_file);
+    printf("Creating new project manifest in {}.\n\n", global_arguments.config_file)
 
     read_field :: macro (f: str, dest: &$T, default: T) {
         while true {
-            print(f);
+            print(f)
             line := r->read_line(consume_newline=true, allocator=context.temp_allocator)
-                    |> string.strip_whitespace();
+                    |> str.strip_whitespace()
 
             if !line {
-                *dest = default;
-                break;
+                *dest = default
+                break
             }
 
-            if conv.parse_any(dest, T, line, context.allocator) do break;
+            if conv.parse_any(dest, T, line, context.allocator) do break
 
             if T == str {
-                *cast(&str) dest = string.alloc_copy(line);
-                break;
+                *cast(&str) dest = str.copy(line)
+                break
             }
         }
     }
 
-    config.dependency_binary_path = "./bin";
-    config.dependency_source_path = "./lib";
+    config.dependency_binary_path = "./bin"
+    config.dependency_source_path = "./lib"
 
     // @TODO // Validation for these fields.
-    r := io.reader_make(&stdio.stream);
-    read_field("Package name: ", &config.package_name, "");
-    read_field("Package description: ", &config.package_description, "");
-    read_field("Package url: ", &config.package_url, "");
-    read_field("Package author: ", &config.package_author, "");
-    read_field("Package version (0.0.1): ", &config.package_version, .{0, 0, 1});
+    r := io.reader_make(&stdio.stream)
+    read_field("Package name: ", &config.package_name, "")
+    read_field("Package description: ", &config.package_description, "")
+    read_field("Package url: ", &config.package_url, "")
+    read_field("Package author: ", &config.package_author, "")
+    read_field("Package version (0.0.1): ", &config.package_version, .{0, 0, 1})
+
+    store_config_file()
 }
 
-#tag Command.{ "add", "Add a new dependency to the project.", "package-url [version]",
+@Command.{ "add", "Add a new dependency to the project", "package-url [version]",
 """
-package-url      Git repository to clone for the package. This can be anything that
-                 git knows how to clone.
-verion           Semantic version number (Major.Minor.Patch). If omitted, the most recent
-                 version is used.
+    package-url      Git repository to clone for the package. This can be anything that
+                     git knows how to clone.
+    
+    verion           Semantic version number (Major.Minor.Patch). If omitted, the most recent
+                     version is used.
 """
 }
-run_add_command :: (args: [] cstr) {
+run_add_command :: (args: [] str) {
     if args.count < 1 {
-        error_print("Expected package URL");
-        return;
+        error_print("Expected package URL")
+        return
     }
 
-    dep_name := string.as_str(args[0]);
-    dep_repo := Git.get_full_repo_uri(dep_name);
+    dep_name := args[0]
+    dep_repo := Git.get_full_repo_uri(dep_name)
 
-    version: SemVer;
+    version: SemVer
     if args.count > 1 {
-        if !conv.parse_any(&version, string.as_str(args[1])) {
-            error_print("Failed to parse version number given: {}\n", string.as_str(args[1]));
-            return;
+        if !conv.parse_any(&version, args[1]) {
+            error_print("Failed to parse version number given: {}\n", args[1])
+            return
         }
 
     } else {
-        version = Git.get_latest_version(dep_repo);
+        version = Git.get_latest_version(dep_repo)
     }
 
     if config.dependencies->has(dep_name) {
-        error_print("Dependency '{}' already specified at version '{}'.\n", dep_name, config.dependencies[dep_name]?.version);
+        error_print("Dependency '{}' already specified at version '{}'.\n", dep_name, config.dependencies[dep_name]?.target)
 
     } elseif version->is_zero() {
-        error_print("Unable to find latest version of '{}'\n", string.as_str(args[0]));
+        error_print("Unable to find latest version of '{}'\n", args[0])
 
     } else {
         config.dependencies[dep_name] = .{
             name = dep_name,
-            version = version,
+            target = .{ version = version },
             source = .{ Git = dep_repo }
-        };
-        info_print("Added", "'{}' version {}\n", dep_name, version);
+        }
+        info_print("Added", "'{}' version {}\n", dep_name, version)
     }
 }
 
-#tag Command.{ "remove", "Remove a dependency.", "package-or-url",
+@Command.{ "remove", "Remove a dependency", "package-or-url",
 """
-package-or-url   Git repository name or package name on disk to remove.
+    package-or-url   Git repository name or package name on disk to remove.
 """
 }
-run_remove_command :: (args: [] cstr) {
+run_remove_command :: (args: [] str) {
     if args.count < 1 {
-        error_print("Expected package name.");
-        return;
+        error_print("Expected package name.\n")
+        return
     }
 
-    dep := string.as_str(args[0]);
+    dep := args[0]
 
     if config.dependencies->has(dep) {
-        version := config.dependencies->get(dep)->unwrap().version;
-        config.dependencies->delete(dep);
-        info_print("Removed", "'{}' version {}\n", dep, version);
-        return;
+        version := config.dependencies->get(dep)->unwrap().target.version
+        config.dependencies->delete(dep)
+        info_print("Removed", "'{}' version {}\n", dep, version)
+        return
     }
 
-    error_print("Dependency '{}' is not currently used.\n", dep);
+    error_print("Dependency '{}' is not currently used.\n", dep)
 }
 
-#tag Command.{ "show", "Show dependencies and versions.", "" }
-run_show_command :: (args: [] cstr) {
-    printf("Package name        : {}\n", config.package_name);
-    printf("Package description : {}\n", config.package_description);
-    printf("Package url         : {}\n", config.package_url);
-    printf("Package author      : {}\n", config.package_author);
-    printf("Package version     : {}\n", config.package_version);
-    print("\n");
+@Command.{ "show", "Show dependencies and versions", "" }
+run_show_command :: (args: [] str) {
+    printf("Package name        : {}\n", config.package_name)
+    printf("Package description : {}\n", config.package_description)
+    printf("Package url         : {}\n", config.package_url)
+    printf("Package author      : {}\n", config.package_author)
+    printf("Package version     : {}\n", config.package_version)
+    print("\n")
 
     max_width := array.fold(config.dependencies.entries, 0, (d, w) => {
-        return math.max(d.key.count, w);
-    });
-    format_str := tprintf("    {{w{}}} | {{}}\n", max_width);
+        return math.max(d.key.count, w)
+    })
+    format_str := tprintf("    {{w{}}} | {{}}\n", max_width)
 
-    print("Dependencies:\n");
+    print("Dependencies:\n")
     for config.dependencies.entries {
-        printf(format_str, it.key, it.value);
+        printf(format_str, it.key, it.value)
     }
-    print("\n");
+    print("\n")
 }
 
-#tag Command.{ "update", "Update dependencies to newest compatible versions.", "" }
-// @Feature // Add "locked" dependencies that will never update?
-run_update_command :: (args: [] cstr) {
-    info_print("Info", "Updating dependencies to newest compatible versions.\n");
+@Command.{ "update", "Update dependencies to newest compatible versions", "" }
+run_update_command :: (args: [] str) {
+    info_print("Info", "Updating dependencies to newest compatible versions.\n")
     for& config.dependencies.entries {
-        repo := it.value.source.Git ?? [] { continue; };
-        new_version := Git.get_latest_compatible_version(repo, it.value.version);
-
-        if it.value.version != new_version {
-            info_print("Update", "{}  {} -> {}\n", it.key, it.value.version, new_version);
+        if it.value.locked {
+            info_print("Skipping", "{} because it is locked.\n", it.key)
+            continue
         }
 
-        it.value.version = new_version;
+        if it.value.target.branch {
+            info_print("Skipping", "{} because it references a branch, not a version.\n", it.key)
+            continue
+        }
+
+        repo := it.value.source.Git ?? [] { continue; }
+        version := it.value.target.version!
+        new_version := Git.get_latest_compatible_version(repo, version)
+
+        if version != new_version {
+            info_print("Update", "{}  {} -> {}\n", it.key, version, new_version)
+        }
+
+        it.value.target = .{ version = new_version }
     }
 }
 
-#tag Command.{ "sync", "Synchronize local dependency folder.", "[--clean]",
+@Command.{ "sync", "Synchronize local dependency folder", "[..flags]",
 """
---clean          Remove directories of unneeded dependencies. This is not the default
-                 behavior, as it could break builds.
-
---skip-native    Skips compiling native libraries during synchronization.
+Flags:
+    --clean          Remove directories of unneeded dependencies. This is not the default
+                     behavior, as it could break builds.
+    
+    --skip-native    Skips compiling native libraries during synchronization.
 """
 }
-run_sync_command :: (args: [] cstr) {
+run_sync_command :: (args: [] str) {
     Sync_Options :: struct {
-        #tag "--clean"
-        clean := false;
+        @"--clean"
+        clean := false
 
-        #tag "--skip-native"
-        skip_native := false;
+        @"--skip-native"
+        skip_native := false
     }
-    options: Sync_Options;
-    arg_parse.arg_parse(args, &options);
+    options: Sync_Options
+    arg_parse.arg_parse(args, &options)
 
     if options.clean {
-        info_print("Cleaning", "Removing {} directory\n", config.dependency_source_path);
-        os.remove_directory(config.dependency_source_path);
+        info_print("Cleaning", "Removing {} directory\n", config.dependency_source_path)
+        os.remove_directory(config.dependency_source_path)
     }
 
     To_Install :: struct {
-        use pack: Package;
-        downgrade_if_necessary: bool;
+        use pack: Package
+        downgrade_if_necessary: bool
     }
 
-    dependencies_to_install   := make([..] To_Install);
-    dependencies_installed    := make(Map(str, SemVer));
-    defer {
-        delete(&dependencies_to_install);
-        delete(&dependencies_installed);
-    }
+    use dependencies_to_install := make([..] To_Install)
+    use dependencies_installed  := make(Map(str, Dependency.Target))
 
     for& config.dependencies.entries {
         dependencies_to_install << .{
-            .{it.value.source, it.value.version}, true
-        };
+            .{it.value.source, it.value.target}, true
+        }
     }
 
     while dependencies_to_install.count > 0 {
-        alloc.clear_temp_allocator();
-        to_install := array.delete(&dependencies_to_install, 0);
+        alloc.clear_temp_allocator()
+        to_install := array.delete(&dependencies_to_install, 0)
 
-        repo := to_install.source.Git ?? [] { continue; };
+        repo := to_install.source.Git ?? [] { continue; }
 
         if dependencies_installed->has(repo) {
-            continue;
+            continue
         }
 
-        success, installed_folder := install_package(to_install.pack, to_install.downgrade_if_necessary, options.skip_native);
+        success, installed_folder := install_package(to_install.pack, to_install.downgrade_if_necessary, options.skip_native)
         if !success {
-            error_print("Aborting sync.\n");
-            return;
+            error_print("Aborting sync.\n")
+            return
         }
 
         inner_config := read_config_from_installed_dependency(installed_folder) ?? [] {
-            error_print("Misconfigured onyx-pkg.kdl in '{}'. Omitting.\n", repo);
-            continue;
-        };
+            error_print("Misconfigured onyx-pkg.kdl in '{}'. Omitting.\n", repo)
+            continue
+        }
 
 
         if inner_config.package_version->is_zero() {
-            error_print("Expected a version for '{}' that is not '0.0.0'.\n", repo);
-            continue;
+            error_print("Expected a version for '{}' that is not '0.0.0'.\n", repo)
+            continue
         }
 
         for& inner_config.dependencies.entries {
-            key := it.value.source.Git ?? [] { continue; };
-            dep := dependencies_installed[key];
-            if dep {
-                // TODO : Check if this is right? Could this accidentally forcefully upgrade a package?
-                if it.value.version->is_newer(dep->unwrap()) {
-                    uninstall_package(.{it.value.source, it.value.version});
-                    dependencies_installed->delete(key);
-                    dependencies_to_install << .{ .{it.value.source, it.value.version}, false };
+            key := it.value.source.Git ?? [] { continue; }
+            dep := dependencies_installed[key]
+            if !dep || it.value.target.branch {
+                dependencies_to_install << .{ .{ it.value.source, it.value.target }, false }
+            } elseif dep {
+                version := it.value.target.version ?? [] { continue }
 
-                } elseif !(it.value.version->is_compatible(dep->unwrap())) {
+                // TODO : Check if this is right? Could this accidentally forcefully upgrade a package?
+                if version->is_newer(dep!.version!) {
+                    uninstall_package(.{it.value.source, it.value.target})
+                    dependencies_installed->delete(key)
+                    dependencies_to_install << .{ .{it.value.source, it.value.target}, false }
+
+                } elseif !(version->is_compatible(dep!.version!)) {
                     // TODO: Explain this more
-                    error_print("Different major versions of '{}' being used!\n", it.key);
-                    os.exit(1);
+                    error_print("Different major versions of '{}' being used!\n", it.key)
+                    os.exit(1)
                 }
-            } else {
-                dependencies_to_install << .{ .{it.value.source, it.value.version}, false };
             }
         }
 
-        dependencies_installed[repo] = to_install.version;
+        dependencies_installed->put(repo, to_install.target)
     }
 
-    build_package_file_to_load();
+    if !run_tool_installation(".") {
+        error_print("Aborting sync.\n")
+        return
+    }
+
+    build_package_file_to_load()
 }
 
-#tag Command.{ "rebuild", "Rebuild native library for a package", "package-or-url",
+@Command.{ "rebuild", "Rebuild native library for a package", "package-or-url",
 """
-package-or-url   Git repository name or package name on disk to remove.
+    package-or-url   Git repository name or package name on disk to rebuild.
 """
 }
-run_rebuild_command :: (args: [] cstr)  {
+run_rebuild_command :: (args: [] str)  {
     if args.count < 1 {
-        error_print("Expected package name.");
-        return;
+        error_print("Expected package name.\n")
+        return
     }
 
-    dep := string.as_str(args[0]);
+    dep := args[0]
     if config.dependencies->has(dep) {
-        dep = config.dependencies->get(dep)->unwrap().source.Git->unwrap();
+        dep = config.dependencies->get(dep)->unwrap().source.Git->unwrap()
     }
 
-    info_print("Rebuild", "{}\n", dep);
+    info_print("Rebuild", "{}\n", dep)
     if success, err := rebuild_native_library(dep); success {
-        info_print("Rebuilt", "{}\n", dep);
+        info_print("Rebuilt", "{}\n", dep)
     } else {
-        error_print("Rebuild failed.\n", dep);
-        println(err);
-        os.exit(1);
+        error_print("Rebuild failed.\n", dep)
+        println(err)
+        os.exit(1)
     }
 }
 
-#tag Command.{ "publish", "Bump version number and create a publishable version of the package", "" }
-run_publish_command :: (args: [] cstr) {
+@Command.{ "publish", "Create a published version of this package", "" }
+run_publish_command :: (args: [] str) {
     // @TODO // Better error handling and reporting, as this is a delicate process.
 
     if !os.dir_exists(".git") {
-        error_print("Not in Git repository.\n");
-        printf("It does not look like you are in a Git repository. In order to publish packages\n");
-        printf("with onyx-pkg, you have to initialize a Git repository in the current directory.\n\n");
-        return;
+        error_print("Not in Git repository.\n")
+        printf("It does not look like you are in a Git repository. In order to publish packages\n")
+        printf("with onyx-pkg, you have to initialize a Git repository in the current directory.\n\n")
+        return
     }
 
-    r := io.reader_make(&stdio.stream);
+    r := io.reader_make(&stdio.stream)
 
     while true {
-        printf("Is this a m[a]jor, m[i]nor, or [p]atch release? or [c]ancel? (a/i/p/c) ");
+        printf("Is this a m[a]jor, m[i]nor, or [p]atch release? or [c]ancel? (a/i/p/c) ")
         input := r->read_line(consume_newline=true, inplace=true)
-                 |> string.strip_whitespace()
-                 |> string.to_lowercase();
+                 |> str.strip_whitespace()
+                 |> str.to_lowercase()
 
         switch input {
             case "a" {
                 // Major version bump
-                config.package_version->bump_major();
+                config.package_version->bump_major()
             }
 
             case "i" {
                 // Minor version bump
-                config.package_version->bump_minor();
+                config.package_version->bump_minor()
             }
 
             case "p" {
                 // Patch version bump
-                config.package_version->bump_patch();
+                config.package_version->bump_patch()
             }
 
             case "c" {
-                return;
+                return
             }
 
-            case #default do continue;
+            case _ do continue
         }
 
-        break;
+        break
     }
 
-    store_config_file();
+    store_config_file()
 
-    info_print("Publishing", "Creating new published version\n");
+    info_print("Publishing", "Creating new published version\n")
     if Git.publish_version() {
-        info_print("Published", "Successfully published new version.\n");
+        info_print("Published", "Successfully published new version.\n")
     } else {
-        error_print("Failed to publish new version.\n");
+        error_print("Failed to publish new version.\n")
     }
 }
 
-#tag Command.{ "list-versions", "List all installable versions of a remote package.", "[package-url]", require_config_file=false }
-run_list_versions :: (args: [] cstr) {
+@Command.{ "list-versions", "List all installable versions of a remote package", "[package-url]", require_config_file=false }
+run_list_versions :: (args: [] str) {
     if args.count < 1 {
-        return;
+        return
     }
 
-    pack := string.as_str(args[0]);
+    pack := args[0]
 
-    pack      = Git.get_full_repo_uri(pack);
-    versions := Git.get_available_versions(pack);
-    defer delete(&versions);
+    pack      = Git.get_full_repo_uri(pack)
+    versions := Git.get_available_versions(pack)
+    defer delete(&versions)
 
-    array.sort(versions, SemVer.compare);
+    array.sort(versions, SemVer.compare)
 
     for versions {
-        printf("{}\n", it);
+        printf("{}\n", it)
     }
 }
 
-#tag Command.{
-    "migrate", "Migrate an old onyx-pkg.ini to the new onyx-pkg.kdl", "",
+@Command.{
+    "migrate", "Migrate an old Onyx package", "",
     require_config_file = false,
 }
-run_migrate_command :: (args: [] cstr) {
-    config = read_old_config("./onyx-pkg.ini")->unwrap();
-    store_config_file();
+run_migrate_command :: (args: [] str) {
+    config = read_old_config("./onyx-pkg.ini")->unwrap()
+    store_config_file()
 }
 
-#tag Command.{
-    "new", "Create a new project from a template in the current directory.", "(template_name | --list) [directory]",
+@Command.{
+    "new", "Create a new project from a template in the specified directory", "(template_name | --list | --create) [directory]",
 """
-template_name    Template name to create.
+Arguments:
+    template_name    Template name to create.
 
-directory        Directory in which to place the new package. Defaults to '.'.
-
+    directory        Directory in which to place the new package. Defaults to '.'.
 """,
     require_config_file = false
 }
-run_new_command :: (args: [] cstr) {
+run_new_command :: (args: [] str) {
     if args.count >= 1 {
-        if string.as_str(args[0]) == "--list" {
-            printf("List of installed templates\n");
+        if args[0] == "--list" {
+            printf("List of installed templates\n")
             for os.list_directory(Template_Directory()) {
-                if !string.ends_with(it->name(), ".json") do continue;
+                if !str.ends_with(it->name(), ".json") do continue
 
-                printf("    {}\n", os.path_basename(it->name()));
+                printf("    {}\n", os.path_basename(it->name()))
             }
-            return;
+            return
+        }
+
+        if args[0] == "--create" {
+            destination := do {
+                if args.count == 1 do return "template.json"
+                return args[1]
+            }
+
+            printf("Creating '{}' from the current directory\n", destination)
+
+            files: Map(str, str)
+            to_process := make([..] str)
+            to_process->push(".")
+
+            for folder in Iterator.from(&to_process) {
+                for entry in os.list_directory(folder) {
+                    name := entry->name()
+                    fullpath := os.path_join(folder, name)
+
+                    if entry.type == .Directory {
+                        if name == ".git" || name == "lib" || name == "bin" {
+                            info_print("Skipping", "Skipping folder {}\n", name)
+                            continue
+                        }
+
+                        to_process->push(fullpath)
+                    }
+
+                    if entry.type == .RegularFile {
+                        files->put(
+                            fullpath
+                            os.get_contents(fullpath)
+                        )
+                    }
+                }
+            }
+
+            use output := os.open(destination, .Write)->expect("Failed to open output file")
+            use writer := io.Writer.make(&output, 0)
+
+            writer->write("{\"variables\":{},")
+            writer->write("\"commands\":[],")
+            writer->write("\"files\":")
+            json.encode(&writer, files)
+            writer->write("}")
+
+            return
         }
     }
 
-    template_name := "default";
-    directory     := ".";
+    template_name := "default"
+    directory     := "."
 
     if args.count >= 1 {
-        template_name = string.as_str(args[0]);
+        template_name = args[0]
     }
 
     if args.count >= 2 {
-        directory = string.as_str(args[1]);
+        directory = args[1]
     }
 
     if os.list_directory(directory)->count(x => true) > 0 {
-        error_print("Refusing to initialize project in non-empty directory.\n");
-        return;
+        error_print("Refusing to initialize project in non-empty directory.\n")
+        return
     }
 
-    template_dir := Template_Directory();
-    template_file := os.path_join(template_dir, tprintf("{}.json", template_name));
+    template_dir := Template_Directory()
+    template_file := os.path_join(template_dir, tprintf("{}.json", template_name))
     if !os.file_exists(template_file) {
-        error_print("Template '{}' not found in {}\n", template_name, template_dir);
-        return;
+        error_print("Template '{}' not found in {}\n", template_name, template_dir)
+        return
     }
 
     use core.encoding {json}
-    template, err := json.decode_with_error(os.get_contents(template_file));
-    if err->has_error() {
-        error_print("Failed to parse template file.\n");
-        print(err->message());
-        return;
+    template_res := json.decode_with_result(os.get_contents(template_file))
+    if template_res.Err {
+        error_print("Failed to parse template file.\n")
+        print(template_res.Err!)
+        return
     }
 
-    vars := make(Map(str, str));
-    input := io.reader_make(&stdio.stream);
+    vars := make(Map(str, str))
+    input := io.reader_make(&stdio.stream)
 
-    template_variables := template.root["variables"]->as_map();
+    template := template_res.Ok!
+    template_variables := template.root["variables"]->as_map()
     for template_variables->as_iter() {
-        assert(it.value["type"]->as_str() == "string", "Only string types are supported right now in template variables.");
+        assert(it.value["type"]->as_str() == "string", "Only string types are supported right now in template variables.")
 
-        printf("{}: ", it.value["description"]->as_str());
+        printf("{}: ", it.value["description"]->as_str())
         line := input->read_line(consume_newline=true, allocator=context.temp_allocator)
-                |> string.strip_whitespace();
+                |> str.strip_whitespace()
 
-        vars->put(it.key, line);
+        vars->put(it.key, line)
     }
 
     if !os.dir_exists(directory) {
-        os.dir_create(directory);
+        os.dir_create(directory)
     }
 
-    populate_directory(directory, template.root["files"], &vars);
+    populate_directory(directory, template.root["files"], &vars)
 
     for template.root["commands"]->as_array_iter() {
-        command := it->as_str();
-        info_print("Running", "{}\n", command);
+        command := it->as_str()
+        info_print("Running", "{}\n", command)
 
-        args := string.split(command, ' ', context.temp_allocator);
-        cmd  := args[0];
-        args  = args[1 .. args.count];
+        args := command->split(' ', context.temp_allocator)
+        cmd  := args[0]
+        args  = args[1 .. args.count]
 
-        run_proc   := os.process_spawn(cmd, args, starting_directory=directory);
-        run_result := os.process_wait(&run_proc);
+        run_proc   := os.process_spawn(cmd, args, starting_directory=directory)
+        run_result := os.process_wait(&run_proc)
 
         if run_result != .Success {
-            error_print("Failed to run '{}'\n", command);
+            error_print("Failed to run '{}'\n", command)
         }
     }
 
     populate_directory :: (dir: str, files: json.Value, vars: &Map(str, str)) {
         for files->as_map_iter() {
-            destination := os.path_join(dir, it.first);
+            destination := os.path_join(dir, it.first)
             switch it.second->type() {
                 case .String {
-                    info_print("Creating", tprintf("{}\n", destination));
+                    info_print("Creating", tprintf("{}\n", destination))
 
-                    contents := process_contents(it.second->as_str(), vars);
-                    for os.with_file(destination, .Write) {
-                        io.stream_write(it, contents);
+                    { 
+                        folders := it.first->split('/')
+                        folders = folders[0 .. folders.count - 1]
+                        target := dir
+                        for folder in folders {
+                            target = os.path_join(target, folder)
+                            if !os.dir_exists(target) {
+                                os.dir_create(target)
+                            }
+                        }
                     }
+
+                    contents := process_contents(it.second->as_str(), vars)
+                    use file := os.open(destination, .Write).Ok?
+                    io.stream_write(&file, contents)
                 }
 
                 case .Object {
-                    os.dir_create(destination);
-                    populate_directory(destination, it.second, vars);
+                    os.dir_create(destination)
+                    populate_directory(destination, it.second, vars)
                 }
             }
         }
     }
 
     process_contents :: (contents: str, vars: &Map(str, str)) -> str {
-        output: dyn_str;
+        output: dyn_str
 
-        to_process := contents;
+        to_process := contents
         while to_process {
-            to_output, to_process~ := string.bisect(to_process, "{{");
-            string.append(&output, to_output);
+            to_output, to_process~ := str.bisect(to_process, "{{")
+            dyn_str.append(&output, to_output)
 
-            var_name, to_process~ := string.bisect(to_process, "}}");
-            string.append(&output, vars->get(var_name) ?? "");
+            var_name, to_process~ := str.bisect(to_process, "}}")
+            dyn_str.append(&output, vars->get(var_name) ?? "")
         }
 
-        return output;
+        return output
     }
 }
 
-#tag Command.{
-    "build", "Builds the project according to the build configuration specified the package file.", "[build_config]",
+@Command.{
+    "build", "Builds the package using the build configuration specified the package file", "[build_config]",
     """
-build_config     The name of the configuration to use (defaults to 'default').
+Arguments:
+    build_config     The name of the configuration to use (defaults to 'default').
     """
 }
-run_build_command :: (args: [] cstr) {
-    build_config := "default";
+run_build_command :: (args: [] str) {
+    build_config := "default"
     if args.count >= 1 {
-        build_config = string.as_str(args[0]);
+        build_config = args[0]
     }
 
-    maybe_bc := config.build_configs[build_config];
+    run_build_configuration(build_config)
+}
+
+run_build_configuration :: #match #local {}
+
+#overload
+run_build_configuration :: (build_config: str) -> bool {
+    maybe_bc := config.build_configs[build_config]
     if !maybe_bc {
-        error_print("Unrecognized build configuration '{}'.\n", build_config);
-        return;
+        error_print("Unrecognized build configuration '{}'\n", build_config)
+        return false
     }
 
-    info_print("Building", "Compiling with build configuration '{}'.\n", build_config);
+    bc := maybe_bc->unwrap()
+    return run_build_configuration(bc, build_config)
+}
 
-    bc := maybe_bc->unwrap();
+#overload
+run_build_configuration :: (bc: BuildConfig, build_config := "") -> bool {
+    switch bc {
+        case .CompileOnyx as c {
+            info_print("Building", "Compiling '{}'\n", c.target)
 
-    args: [..] str;
-    args << "build";
+            command := os.command()
+            command->path("onyx")
 
-    for bc.sources do args << it;
-    for bc.include {  args << "-I"; args << it; }
-    for bc.defines do args << tprintf("-D{}", it);
-    for bc.args    do args << it;
-    
-    args << "-r";
-    args << bc.runtime;
+            if c.working_dir {
+                command->dir(c.working_dir)
+            }
 
-    args << "-o";
-    args << bc.target;
+            command->args(.[ "build" ])
+            for c.include do command->args(.["-I", it])
+            for c.defines do command->args(.[tprintf("-D{}", it)])
 
-    p := os.process_spawn("onyx", args);
-    r := io.reader_make(&p);
-    output := io.read_all(&r);
-    switch os.process_wait(&p) {
-        case .Success {
-            info_print("Built", "Successfully compiled with build configuration '{}'.\n", build_config);
+            command->args(c.args)
+
+            command->args(.["-r", c.runtime])
+            command->args(.["-o", c.target])
+
+            command->args(c.sources)
+
+            switch command->output() {
+                case .Ok as output {
+                    info_print("Built", "Compiled '{}'\n", c.target)
+                    return true
+                }
+
+                case .Err as e {
+                    error_print("Failed to compile '{}'\n", c.target)
+                    println(e.output)
+                    return false
+                }
+            }
         }
 
-        case #default {
-            error_print("Failed to compile with build configuration '{}'.\n", build_config);
-            println(output);
+        case .RunCommands as cmds {
+            for cmd in cmds {
+                cmd_str := str.join(cmd, " ")
+                info_print("Executing", "{}\n", cmd_str)
+
+                command := os.command()
+                command->path(cmd[0])
+                command->args(cmd[1 .. cmd.length])
+
+                switch command->output() {
+                    case .Ok as output {
+                        info_print("Executed", "{}\n", cmd_str)
+                    }
+
+                    case .Err as e {
+                        error_print("Failed to run '{}'\n", str.join(cmd, " "))
+                        println(e.output)
+                        return false
+                    }
+                }
+            }
+
+            return true
+        }
+
+        case .Collection as steps {
+            info_print("Running", "Running collection '{}'\n", build_config)
+            for step in steps {
+                if !run_build_configuration(step) {
+                    return false
+                }
+            }
+
+            return true
         }
     }
 }
@@ -662,307 +821,353 @@ run_build_command :: (args: [] cstr) {
 }
 
 
-install_package :: (pack: Package, downgrade_if_necessary := false, skip_native_compilation := false) -> (bool, installed_folder: str) {
+install_package :: (pack: Package, downgrade_if_necessary := false, skip_native_compilation := false) -> (bool, str) {
     //
     // Currently this only supports Git-based packages.
     repo := pack.source.Git ?? [] {
-        return return false, "";
-    };
-    package_folder := get_install_path_of_repo(repo);
+        return return false, ""
+    }
+    package_folder := get_install_path_of_repo(repo)
 
-    if os.file_exists(package_folder) {
-        installed_version := get_installed_version_of_package(repo);
+    switch pack.target {
+    case .version as version {
+        if os.file_exists(package_folder) {
+            installed_version := get_installed_version_of_package(repo)
 
-        if installed_version == pack.version {
-            info_print("Exists", "{}  {}\n", repo, installed_version);
+            if installed_version == version {
+                info_print("Exists", "{}  {}\n", repo, installed_version)
 
-            success := true;
-            if !native_library_is_up_to_date(package_folder) {
-                success = run_native_library_installation(package_folder);
+                success := true
+                if !native_library_is_up_to_date(package_folder) {
+                    success = run_native_library_installation(package_folder)
+                }
+
+                return success, package_folder
             }
 
-            return success, package_folder;
+            if installed_version->is_newer(version) && !downgrade_if_necessary {
+                error_print("Refusing to downgrade '{}' from {} to {}.\n", repo, installed_version, version)
+                return false, ""
+            }
+
+            // :PRETTY
+            verb := "Upgrading" if version->is_newer(installed_version) else "Downgrading"
+            info_print(verb, "{}  {} -> {}\n", repo, installed_version, version)
+            uninstall_package(pack)
         }
 
-        if installed_version->is_newer(pack.version) && !downgrade_if_necessary {
-            error_print("Refusing to downgrade '{}' from {} to {}.\n", repo, installed_version, pack.version);
-            return false, "";
+        if !Git.clone_version(repo, version) {
+            error_print("Failed to fetch {} version {}.\n", repo, version)
+            return false, ""
         }
-
-        // :PRETTY
-        verb := "Upgrading" if pack.version->is_newer(installed_version) else "Downgrading";
-        info_print(verb, "{}  {} -> {}\n", repo, installed_version, pack.version);
-        uninstall_package(pack);
     }
 
-    if !Git.clone_version(repo, pack.version) {
-        error_print("Failed to fetch {} version {}.\n", repo, pack.version);
-        return false, "";
+    case .branch as branch {
+        if !Git.clone_branch(repo, branch) {
+            error_print("Failed to fetch {} on branch {}.\n", repo, branch)
+            return false, ""
+        }
     }
-    
-    if skip_native_compilation do return true, package_folder;
+    }
 
-    install_success := run_native_library_installation(package_folder);
-    return install_success, package_folder;
+    if skip_native_compilation do return true, package_folder
+
+    native_install_success := run_native_library_installation(package_folder)
+    tool_install_success   := run_tool_installation(package_folder)
+
+    return native_install_success && tool_install_success, package_folder
 }
 
 uninstall_package :: (pack: Package) -> bool {
-    repo := pack.source.Git?;
-    folder_name := strip_protocol_and_www_from_repo(repo);
-    package_folder := os.path_join(config.dependency_source_path, folder_name);
+    repo := pack.source.Git?
+    folder_name := strip_protocol_and_www_from_repo(repo)
+    package_folder := os.path_join(config.dependency_source_path, folder_name)
 
     if os.file_exists(package_folder) {
         // Should this check if the version to be deleted is the one that is actually installed?
-        attempt_remove_native_library(package_folder);
-        os.remove_directory(package_folder);
+        attempt_remove_native_library(package_folder)
+        os.remove_directory(package_folder)
 
         // This should maybe cleanup the parent directory if it is now empty.
-        return true;
+        return true
     }
 
-    return false;
+    return false
 }
 
 attempt_remove_native_library :: (package_folder: str) -> bool {
-    inner_config := read_config_from_installed_dependency(package_folder)?;
+    inner_config := read_config_from_installed_dependency(package_folder)?
 
-    if !inner_config.native_library do return false;
+    if !inner_config.native_library do return false
 
-    target := os.path_join(config.dependency_binary_path, tprintf("{}{}", inner_config.native_library->unwrap(), native_library_suffix));
-    os.remove_file(target);
-    return true;
+    target := os.path_join(config.dependency_binary_path, tprintf("{}{}", inner_config.native_library->unwrap(), native_library_suffix))
+    os.remove_file(target)
+    return true
 }
 
 rebuild_native_library :: (folder: str) -> (bool, str) {
-    cleaned_folder := get_install_path_of_repo(folder);
+    cleaned_folder := get_install_path_of_repo(folder)
 
-    attempt_remove_native_library(cleaned_folder);
+    attempt_remove_native_library(cleaned_folder)
 
-    success, build_error := run_native_library_installation(cleaned_folder);
-    return success, build_error;
+    success, build_error := run_native_library_installation(cleaned_folder)
+    return success, build_error
 }
 
 get_installed_version_of_package :: (package_path: str) -> SemVer {
-    inner_config := read_config_from_installed_dependency(get_install_path_of_repo(package_path));
-    return inner_config?.package_version;
+    inner_config := read_config_from_installed_dependency(get_install_path_of_repo(package_path))
+    return inner_config?.package_version
 }
 
 read_config_from_installed_dependency :: (dependency_folder: str) -> ? Config {
-    return load_config(tprintf("{}/onyx-pkg.kdl", dependency_folder));
+    return load_config(tprintf("{}/onyx-pkg.kdl", dependency_folder))
 }
 
 strip_protocol_and_www_from_repo :: (repo: str) -> str {
-    to_return := repo;
+    to_return := repo
 
-    if string.contains(to_return, "://") {
-        _, to_return~ := string.bisect(to_return, "://");
+    if str.contains(to_return, "://") {
+        _, to_return~ := str.bisect(to_return, "://")
     }
 
-    if string.starts_with(to_return, "www.") {
-        to_return = to_return["www.".count .. to_return.count];
+    if str.starts_with(to_return, "www.") {
+        to_return = to_return["www.".count .. to_return.count]
     }
 
-    if string.ends_with(to_return, ".git") {
-        to_return = to_return[0 .. to_return.count - ".git".count];
+    if str.ends_with(to_return, ".git") {
+        to_return = to_return[0 .. to_return.count - ".git".count]
     }
 
     #if runtime.compiler_os == .Windows {
-        to_return = string.alloc_copy(to_return);
+        to_return = str.copy(to_return)
 
-        string.replace(to_return, '/', '\\');
+        str.replace(to_return, '/', '\\')
     }
 
-    return to_return;
+    return to_return
 }
 
 get_install_path_of_repo :: (repo: str) -> str {
-    return os.path_join(config.dependency_source_path, strip_protocol_and_www_from_repo(repo));
+    return os.path_join(config.dependency_source_path, strip_protocol_and_www_from_repo(repo))
 }
 
 run_native_library_installation :: (folder: str) -> (bool, str) {
     inner_config := read_config_from_installed_dependency(folder) ?? [] {
-        error_print("Failed to parse onyx-pkg.kdl in '{}'.\n", folder);
-        return return false, "";
-    };
+        error_print("Failed to parse onyx-pkg.kdl in '{}'.\n", folder)
+        return return false, ""
+    }
 
-    if !inner_config.native_library_build do return true, "";
+    if !inner_config.native_library_build do return true, ""
 
     info_print("Install", "Running installation of '{}'\n", folder);    
 
-    args := string.split(inner_config.native_library_build->unwrap(), #char " ", context.temp_allocator);
-    cmd  := args[0];
-    args  = args[1 .. args.count];
+    args := str.split(inner_config.native_library_build->unwrap(), ' ', context.temp_allocator)
+    cmd  := args[0]
+    args  = args[1 .. args.count]
 
     {
-        build_proc     := os.process_spawn(cmd, args, starting_directory=folder);
-        build_result   := os.process_wait(&build_proc);
+        build_proc     := os.process_spawn(cmd, args, starting_directory=folder)
+        build_result   := os.process_wait(&build_proc)
 
-        build_reader := io.reader_make(&build_proc);
-        defer io.reader_free(&build_reader);
-        build_info := build_reader->read_all();
+        build_reader := io.reader_make(&build_proc)
+        defer io.reader_free(&build_reader)
+        build_info := build_reader->read_all()
 
         if build_result != .Success {
-            error_print("Failed to build native library in {}.\n", folder);
-            return false, build_info;
+            error_print("Failed to build native library in {}.\n", folder)
+            return false, build_info
         }
     }
 
     if !os.dir_exists(config.dependency_binary_path) {
         if !os.dir_create(config.dependency_binary_path) {
-            error_print("Failed to create native library directory, {}.\n", config.dependency_binary_path);
-            return false, "";
+            error_print("Failed to create native library directory, {}.\n", config.dependency_binary_path)
+            return false, ""
         }
     }
 
-    source_path := tprintf("{}/{}{}", folder, inner_config.native_library->unwrap(), native_library_suffix);
-    dest_path   := tprintf("{}/{}{}", config.dependency_binary_path, inner_config.native_library->unwrap(), native_library_suffix);
-    success := os.rename_file(source_path, dest_path);
+    source_path := tprintf("{}/{}{}", folder, inner_config.native_library->unwrap(), native_library_suffix)
+    dest_path   := tprintf("{}/{}{}", config.dependency_binary_path, inner_config.native_library->unwrap(), native_library_suffix)
+    success := os.rename_file(source_path, dest_path)
 
     if !success {
-        error_print("Failed to move native library to final destination.\n {} -> {}\n", source_path, dest_path);
+        error_print("Failed to move native library to final destination.\n {} -> {}\n", source_path, dest_path)
     }
 
-    return success, "";
+    return success, ""
 }
 
 native_library_is_up_to_date :: (folder: str) -> bool {
-    inner_config := read_config_from_installed_dependency(folder)?;
+    inner_config := read_config_from_installed_dependency(folder)?
 
     // If no native library, no worries.
-    if !inner_config.native_library do return true;
+    if !inner_config.native_library do return true
 
-    target := os.path_join(config.dependency_binary_path, tprintf("{}{}", inner_config.native_library->unwrap(), native_library_suffix));
-    inner_package_file := tprintf("{}/onyx-pkg.kdl", folder);
+    target := os.path_join(config.dependency_binary_path, tprintf("{}{}", inner_config.native_library->unwrap(), native_library_suffix))
+    inner_package_file := tprintf("{}/onyx-pkg.kdl", folder)
 
-    target_stat, package_stat: os.FileStat;
-    if !os.file_stat(target, &target_stat) do return false;
-    if !os.file_stat(inner_package_file, &package_stat) do return false;
+    target_stat, package_stat: os.FileStat
+    if !os.file_stat(target, &target_stat) do return false
+    if !os.file_stat(inner_package_file, &package_stat) do return false
 
-    return target_stat.modified_time >= package_stat.modified_time;
+    return target_stat.modified_time >= package_stat.modified_time
+}
+
+run_tool_installation :: (folder: str) -> bool {
+    inner_config := read_config_from_installed_dependency(folder) ?? [] {
+        error_print("Failed to parse onyx-pkg.kdl in '{}'.\n", folder)
+        return #from_proc false
+    }
+
+    if inner_config.tools->empty() do return true
+
+    if !os.dir_exists(".onyx") {
+        if !os.dir_create(".onyx") {
+            error_print("Failed to create tool directory, '.onyx'.\n")
+            return false
+        }
+    }
+
+    for Iterator.from(inner_config.tools) {
+        bc := it.value
+        bc = .{
+            CompileOnyx = .{
+                ..bc.CompileOnyx!,
+                target = tprintf(".onyx/{}.wasm", it.key),
+                working_dir = folder,
+                args = Array.make(.["--no-compiler-extensions"])
+            }
+        }
+
+        if !run_build_configuration(bc) {
+            error_print("Failed to install tool '{}' from '{}'.\n", it.key, inner_config.package_name)
+            return false
+        }
+    }
+
+    return true
 }
 
 run_command_and_forward_output :: (cmd: str) => {
-    args := string.split(cmd, #char " ", context.temp_allocator);
-    prog := args[0];
-    args  = args[1 .. args.count];
+    args := str.split(cmd, ' ', context.temp_allocator)
+    prog := args[0]
+    args  = args[1 .. args.count]
 
-    run_proc := os.process_spawn(prog, args);
-    r := io.reader_make(&run_proc);
+    run_proc := os.process_spawn(prog, args)
+    r := io.reader_make(&run_proc)
 
     while !r->empty() {
-        line := r->read_line(consume_newline=true);
-        print(line);
+        line := r->read_line(consume_newline=true)
+        print(line)
     }
 
-    return os.process_wait(&run_proc);
+    return os.process_wait(&run_proc)
 }
 
 build_package_file_to_load :: () {
     if !os.dir_exists(config.dependency_source_path) {
-        os.dir_create(config.dependency_source_path);
+        os.dir_create(config.dependency_source_path)
     }
 
-    filepath := os.path_join(config.dependency_source_path, "packages.onyx");
+    filepath := os.path_join(config.dependency_source_path, "packages.onyx")
 
     if os.file_exists(filepath) {
-        os.remove_file(filepath);
+        os.remove_file(filepath)
     }
 
-    for os.with_file(filepath, .Write) {
-        w := io.writer_make(it);
-        defer io.writer_free(&w);
+    use file := os.open(filepath, .Write).Ok?
+    use w := io.writer_make(&file)
 
-        io.write(&w, """
+    io.write(&w, """
 //
 // THIS FILE WAS AUTOMATICALLY GENERATED BY onyx pkg.
 // DO NOT MODIFY UNLESS YOU KNOW WHAT YOU ARE DOING.
 //
 
 // PACKAGE LOADING
-""");
+""")
 
-        for config.dependencies->as_iter() {
-            dependency_repo := it.value.source.Git ?? [] { continue; };
-            dependency_folder := strip_protocol_and_www_from_repo(dependency_repo);
+    for config.dependencies->as_iter() {
+        dependency_repo := it.value.source.Git ?? [] { continue; }
+        dependency_folder := strip_protocol_and_www_from_repo(dependency_repo)
 
-            io.write_format(&w,
-                "#load \"./{}/module.onyx\"\n",
-                dependency_folder);
-        }
-
-        io.write(&w, "\n\n// NATIVE LIBRARY PATH\n");
-
-        io.write_format(&w, "#library_path \"{}\"\n", config.dependency_binary_path);
+        io.write_format(&w,
+            "#load \"./{}/module.onyx\"\n",
+            dependency_folder)
     }
+
+    io.write(&w, "\n\n// NATIVE LIBRARY PATH\n")
+
+    io.write_format(&w, "#library_path \"{}\"\n", config.dependency_binary_path)
 }
 
 
 
-#tag conv.Custom_Parse.{parse}
-#tag conv.Custom_Format.{format}
+@conv.Custom_Parse.{parse}
+@conv.Custom_Format.{format}
 SemVer :: struct {
-    major, minor, patch: i32;
+    major, minor, patch: i32
 
     format :: (output: &conv.Format_Output, formatting: &conv.Format, semver: &SemVer) {
-        conv.format(output, "{}.{}.{}", semver.major, semver.minor, semver.patch);
+        conv.format(output, "{}.{}.{}", semver.major, semver.minor, semver.patch)
     }
 
     parse :: (semver: &SemVer, to_parse_: str, _: Allocator) -> bool {
-        to_parse := to_parse_;
+        to_parse := to_parse_
 
-        major := string.read_until(&to_parse, #char ".") |> conv.str_to_i64();
-        string.advance(&to_parse);
-        minor := string.read_until(&to_parse, #char ".") |> conv.str_to_i64();
-        string.advance(&to_parse);
-        patch := string.read_until(&to_parse, #char ".") |> conv.str_to_i64();
+        major := str.read_until(&to_parse, '.') |> conv.str_to_i64()
+        str.advance(&to_parse)
+        minor := str.read_until(&to_parse, '.') |> conv.str_to_i64()
+        str.advance(&to_parse)
+        patch := str.read_until(&to_parse, '.') |> conv.str_to_i64()
 
-        if major == 0 && minor == 0 && patch == 0 do return false;
+        if major == 0 && minor == 0 && patch == 0 do return false
 
-        semver.major = ~~ major;
-        semver.minor = ~~ minor;
-        semver.patch = ~~ patch;
-        return true;
+        semver.major = ~~ major
+        semver.minor = ~~ minor
+        semver.patch = ~~ patch
+        return true
     }
 
-    is_zero :: (use this: SemVer) => major == 0 && minor == 0 && patch == 0;
+    is_zero :: (use this: SemVer) => major == 0 && minor == 0 && patch == 0
 
     // -1 if a < b
     //  0 if a == b
     //  1 if a > b
     compare :: (a, b: SemVer) -> i32 {
-        if a.major != b.major do return math.sign(b.major - a.major);
-        if a.minor != b.minor do return math.sign(b.minor - a.minor);
-        return math.sign(b.patch - a.patch);
+        if a.major != b.major do return math.sign(b.major - a.major)
+        if a.minor != b.minor do return math.sign(b.minor - a.minor)
+        return math.sign(b.patch - a.patch)
     }
 
-    is_newer :: macro (from, to: SemVer) => from->compare(to) == -1;
+    is_newer :: macro (from, to: SemVer) => from->compare(to) == -1
 
     is_compatible :: (from, to: SemVer) -> bool {
-        return from.major == to.major;
+        return from.major == to.major
     }
 
     bump_major :: (use this: &SemVer) {
-        major += 1;
-        minor  = 0;
-        patch  = 0;
+        major += 1
+        minor  = 0
+        patch  = 0
     }
 
     bump_minor :: (use this: &SemVer) {
-        minor += 1;
-        patch  = 0;
+        minor += 1
+        patch  = 0
     }
 
     bump_patch :: (use this: &SemVer) {
-        patch += 1;
+        patch += 1
     }
 }
 
-#operator == macro (s1, s2: SemVer) => s1.major == s2.major && s1.minor == s2.minor && s1.patch == s2.patch;
-#operator != macro (s1, s2: SemVer) => !(s1 == s2);
+#operator == macro (s1, s2: SemVer) => s1.major == s2.major && s1.minor == s2.minor && s1.patch == s2.patch
+#operator != macro (s1, s2: SemVer) => !(s1 == s2)
 
 Package :: struct {
-    source: DependencySource;
-    version: SemVer;
+    source: DependencySource
+    target: Dependency.Target
 }
 
 #if runtime.compiler_os == .Linux || runtime.compiler_os == .MacOS {
@@ -976,363 +1181,491 @@ Git :: struct {
     get_full_repo_uri :: (package_search: str) -> str {
         for Known_Repositories {
             for proto in Protocols {
-                r := tprintf("{}{}", proto, tprintf(it, package_search));
-                git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", r]);
+                r := tprintf("{}{}", proto, tprintf(it, package_search))
+                git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", r])
                 if os.process_wait(&git_proc) == .Success {
-                    return r |> string.alloc_copy();
+                    return r |> str.copy()
                 }
             }
         }
 
-        return "";
+        return ""
     }
 
     get_available_versions :: (repo: str) -> [] SemVer {
-        versions := make([..] SemVer);
+        versions := make([..] SemVer)
 
-        git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", repo]);
-        r := io.reader_make(&git_proc);
+        git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", repo])
+        r := io.reader_make(&git_proc)
         for r->lines(inplace=true) {
-            last_slash := string.last_index_of(it, #char "/");
-            tag_name   := it[last_slash+1 .. it.count-1];
+            last_slash := str.last_index_of(it, '/')
+            tag_name   := it[last_slash+1 .. it.count-1]
 
-            if tag_name[0] != #char "v" do continue;
-            string.advance(&tag_name);
+            if tag_name[0] != 'v' do continue
+            str.advance(&tag_name)
 
-            version: SemVer;
+            version: SemVer
             if conv.parse_any(&version, tag_name) {
-                versions << version;
+                versions << version
             }
         }
 
-        os.process_wait(&git_proc);
+        os.process_wait(&git_proc)
 
-        return versions;
+        return versions
     }
 
     get_latest_version :: (repo: str) -> SemVer {
-        versions := get_available_versions(repo);
+        versions := get_available_versions(repo)
         if versions.count == 0 {
-            return .{0, 0, 0};
+            return .{0, 0, 0}
         }
-        defer delete(&versions);
+        defer delete(&versions)
 
-        array.sort(versions, SemVer.compare);
-        latest := versions[0];
-        return latest;
+        array.sort(versions, SemVer.compare)
+        latest := versions[0]
+        return latest
     }
 
     get_latest_compatible_version :: (repo: str, current_version: SemVer) -> SemVer {
-        versions := get_available_versions(repo);
+        versions := get_available_versions(repo)
         if versions.count == 0 {
-            return .{0, 0, 0};
+            return .{0, 0, 0}
         }
-        defer delete(&versions);
+        defer delete(&versions)
 
-        array.sort(versions, SemVer.compare);
+        array.sort(versions, SemVer.compare)
         for versions {
-            if current_version->is_compatible(it) do return it;
+            if current_version->is_compatible(it) do return it
         }
-        return .{0, 0, 0};
+        return .{0, 0, 0}
     }
 
     clone_version :: (repo: str, version: SemVer) -> bool {
-        info_print("Fetch", "{}  {}\n", repo, version);
+        info_print("Fetch", "{}  {}\n", repo, version)
 
-        version_str := tprintf("v{}", version);
-        temporary_dest := os.path_join(config.dependency_source_path, ".cloned");
+        version_str := tprintf("v{}", version)
+        temporary_dest := os.path_join(config.dependency_source_path, ".cloned")
 
-        os.remove_directory(temporary_dest);
+        os.remove_directory(temporary_dest)
 
         successfully_cloned := do -> bool {
             for proto in Protocols {
                 // Use 'git clone' to clone the bare minimum amount to get the released version.
-                proto_repo  := tprintf("{}{}", proto, repo);
-                git_proc    := os.process_spawn(git_path, .["clone", "--single-branch", "--depth", "1", "-b", version_str, proto_repo, temporary_dest]);
-                result      := os.process_wait(&git_proc);
+                proto_repo  := tprintf("{}{}", proto, repo)
+                git_proc    := os.process_spawn(git_path, .["clone", "--single-branch", "--depth", "1", "-b", version_str, proto_repo, temporary_dest])
+                result      := os.process_wait(&git_proc)
 
-                if result == .Success do return true;
+                if result == .Success do return true
             }
 
-            return false;
-        };
+            return false
+        }
 
         if successfully_cloned {
-            install_dest := strip_protocol_and_www_from_repo(repo);
+            return _move_to_permanent_storage(repo, temporary_dest)
+        }
 
-            // Move the cloned repository to its permanent location.
-            actual_dest := os.path_join(config.dependency_source_path, install_dest);
-            if os.dir_exists(actual_dest) {
-                error_print("Expected {} to not exist when fetching '{}'.\n", actual_dest, repo);
-                os.remove_directory(temporary_dest);
-                return false;
+        return successfully_cloned
+    }
+
+    clone_branch :: (repo: str, branch: str) -> bool {
+        info_print("Fetch", "{}  {}\n", repo, branch)
+
+        temporary_dest := os.path_join(config.dependency_source_path, ".cloned")
+        os.remove_directory(temporary_dest)
+
+        successfully_cloned := do -> bool {
+            for proto in Protocols {
+                // Use 'git clone' to clone the bare minimum amount to get the released version.
+                proto_repo  := tprintf("{}{}", proto, repo)
+                git_proc    := os.process_spawn(git_path, .["clone", "--single-branch", "--depth", "1", "-b", branch, proto_repo, temporary_dest])
+                result      := os.process_wait(&git_proc)
+
+                if result == .Success do return true
             }
 
-            rolling_parent := make(dyn_str);
-            path := string.split(actual_dest, os.PATH_SEP);
-            for path[0 .. path.length-1] {
-                string.append(&rolling_parent, it);
-                string.append(&rolling_parent, os.PATH_SEP);
+            error_print("Failed to clone {}/{}\n", repo, branch)
+            return false
+        }
 
-                if !os.dir_exists(rolling_parent) {
-                    os.dir_create(rolling_parent);
-                }
-            }
+        if successfully_cloned {
+            return _move_to_permanent_storage(repo, temporary_dest, true)
+        }
 
-            if !os.dir_rename(temporary_dest, actual_dest) {
-                error_print("Failed to move temporary package to final destination when fetching '{}'.\n", repo);
-                os.remove_directory(temporary_dest);
-                return false;
-            }
+        return successfully_cloned
+    }
 
-            // Remove the .git folder, as it is unneeded.
-            unnecessary_git_dir := os.path_join(actual_dest, ".git");
-            if !os.remove_directory(unnecessary_git_dir) {
-                error_print("Failed to delete .git folder of '{}'.\n", repo);
-                return false;
+    _move_to_permanent_storage :: (repo: str, temporary_dest: str, overwrite := false) -> bool {
+        install_dest := strip_protocol_and_www_from_repo(repo)
+
+        // Move the cloned repository to its permanent location.
+        actual_dest := os.path_join(config.dependency_source_path, install_dest)
+        if os.dir_exists(actual_dest) {
+            if overwrite {
+                os.remove_directory(actual_dest)
+
+            } else {
+                error_print("Expected {} to not exist when fetching '{}'.\n", actual_dest, repo)
+                os.remove_directory(temporary_dest)
+                return false
             }
         }
 
-        return successfully_cloned;
+        rolling_parent := make(dyn_str)
+        path := str.split(actual_dest, os.PATH_SEP)
+        for path[0 .. path.length-1] {
+            dyn_str.append(&rolling_parent, it)
+            dyn_str.append(&rolling_parent, os.PATH_SEP)
+
+            if !os.dir_exists(rolling_parent) {
+                os.dir_create(rolling_parent)
+            }
+        }
+
+        if !os.dir_rename(temporary_dest, actual_dest) {
+            error_print("Failed to move temporary package to final destination when fetching '{}'.\n", repo)
+            os.remove_directory(temporary_dest)
+            return false
+        }
+
+        // Remove the .git folder, as it is unneeded.
+        unnecessary_git_dir := os.path_join(actual_dest, ".git")
+        if !os.remove_directory(unnecessary_git_dir) {
+            error_print("Failed to delete .git folder of '{}'.\n", repo)
+            return false
+        }
+
+        return true
     }
 
     publish_version :: () -> bool {
         run_command :: macro (cmd: str, args: [] str) {
-            p := os.process_spawn(cmd, args);
+            p := os.process_spawn(cmd, args)
             if os.process_wait(&p) != .Success {
-                return false;
+                return false
             }
         }
 
-        run_command(git_path, .["add", global_arguments.config_file]);
-        run_command(git_path, .["commit", "-m", tprintf("version {}", config.package_version)]);
-        run_command(git_path, .["tag", tprintf("v{}", config.package_version)]);
-        run_command(git_path, .["push", "--tags"]);
-        run_command(git_path, .["push"]);
-        return true;
+        run_command(git_path, .["add", global_arguments.config_file])
+        run_command(git_path, .["commit", "-m", tprintf("version {}", config.package_version)])
+        run_command(git_path, .["tag", tprintf("v{}", config.package_version)])
+        run_command(git_path, .["push", "--tags"])
+        run_command(git_path, .["push"])
+        return true
     }
 }
 
 
 
-config: Config;
+config: Config
 Config :: struct {
-    package_name: str;
-    package_description: str;
-    package_url: str;
-    package_author: str;
-    package_version: SemVer;
-    package_license: str;
+    package_name: str
+    package_description: str
+    package_url: str
+    package_author: str
+    package_version: SemVer
+    package_license: str
 
-    dependency_source_path: str;
-    dependency_binary_path: str;
+    dependency_source_path: str
+    dependency_binary_path: str
 
-    native_library: ? str;
-    native_library_build: ? str;
+    native_library: ? str
+    native_library_build: ? str
 
-    build_configs: Map(str, BuildConfig);
+    build_configs: Map(str, BuildConfig)
 
-    dependencies: Map(str, Dependency);
+    tools: Map(str, BuildConfig)
 
-    _source_doc: ? kdl.Document;
+    dependencies: Map(str, Dependency)
+
+    _source_doc: ? kdl.Document
 }
 
 Dependency :: struct {
-    name: str;
-    version: SemVer;
-    source: DependencySource;
+    name: str
+    Target :: union {
+        version: SemVer
+        branch: str
+    }
+    target: Target
+    locked: bool
+    source: DependencySource
 }
 
 DependencySource :: union {
-    Unknown: void;
-    Git: str;
+    Unknown: void
+    Git: str
 }
 
-BuildConfig :: struct {
-    include: [..] str;
-    args: [..] str;
-    defines: [..] str;
-    sources: [..] str;
-    runtime: str;
-    target: str;
+BuildConfig :: union {
+    CompileOnyx: struct {
+        include: [..] str
+        args: [..] str
+        defines: [..] str
+        sources: [..] str
+        runtime: str
+        target: str
+        working_dir: str
+    }
+    RunCommands: [] [] str
+    Collection: [] str
 }
 
 load_config_file :: () -> bool {
-    _config := load_config(global_arguments.config_file);
+    _config := load_config(global_arguments.config_file)
     if !_config {
-        return false;
+        return false
     }
 
-    config = _config->unwrap();
-    return true;
+    config = _config->unwrap()
+    return true
 }
 
 store_config_file :: () -> bool {
-    return store_config(global_arguments.config_file);
+    return store_config(global_arguments.config_file)
 }
 
 load_config :: (path: str) -> ? Config {
-    contents := os.get_contents(path);
-    if !contents do return .{};
+    contents := os.get_contents(path)
+    if !contents do return .{}
 
-    defer delete(&contents);
-    doc := kdl.parse(contents).Ok?;
+    defer delete(&contents)
+    doc := kdl.parse(contents).Ok?
 
-    c: Config;
-    c._source_doc = doc;
-    c.dependency_source_path = "./lib";
-    c.dependency_binary_path = "./bin";
+    c: Config
+    c._source_doc = doc
+    c.dependency_source_path = "./lib"
+    c.dependency_binary_path = "./bin"
 
     doc->query("top() > package")->with([p] {
-        pack := p;
+        pack := p
 
-        load_string(pack, "name", &c.package_name);
-        load_string(pack, "author", &c.package_author);
-        load_string(pack, "description", &c.package_description);
-        load_string(pack, "url", &c.package_url);
-        load_string(pack, "license", &c.package_license);
+        load_string(pack, "name", &c.package_name)
+        load_string(pack, "author", &c.package_author)
+        load_string(pack, "description", &c.package_description)
+        load_string(pack, "url", &c.package_url)
+        load_string(pack, "license", &c.package_license)
 
-        version: str;
-        load_string(pack, "version", &version);
+        version: str
+        load_string(pack, "version", &version)
 
-        conv.parse_any(&c.package_version, version);
-    });
+        conv.parse_any(&c.package_version, version)
+    })
 
     doc->query("top() > config")->with([p] {
-        load_string(p, "dependency_source_path", &c.dependency_source_path);
-        load_string(p, "dependency_binary_path", &c.dependency_binary_path);
-    });
+        load_string(p, "dependency_source_path", &c.dependency_source_path)
+        load_string(p, "dependency_binary_path", &c.dependency_binary_path)
+    })
 
     doc->query("top() > native")->with([p] {
-        load_string(p, "library", &c.native_library);
-        load_string(p, "build", &c.native_library_build);
-    });
+        load_string(p, "library", &c.native_library)
+        load_string(p, "build", &c.native_library_build)
+    })
 
-    for doc->query_all("top() > build > []") {
-        b: BuildConfig;
-        b.runtime = "onyx";
-        b.target = "out.wasm";
-
-        load_string(it, "runtime", &b.runtime);
-        load_string(it, "target", &b.target);
-
-        for it->query_all("include") {
-            array.concat(&b.include,
-                iter.as_iter(it.values)->flatten(x => (*x)->as_str()));
-        }
-
-        for it->query_all("define") {
-            array.concat(&b.defines,
-                iter.as_iter(it.values)->flatten(x => (*x)->as_str()));
-        }
-
-        for it->query_all("args") {
-            array.concat(&b.args,
-                iter.as_iter(it.values)->flatten(x => (*x)->as_str()));
-        }
+    for doc->query_all("top() > tools > []") {
+        sources: [..] str
 
         for it->query_all("source") {
-            array.concat(&b.sources,
-                iter.as_iter(it.values)->flatten(x => (*x)->as_str()));
+            Array.concat(&sources,
+                Iterator.from(it.values)->flatten(x => (*x)->as_str()))
         }
 
-        c.build_configs[it.node] = b;
+        c.tools[it.node] = .{
+            CompileOnyx = .{
+                sources = sources
+            }
+        }
+    }
+
+    for doc->query_all("top() > build > []") {
+        b: BuildConfig
+
+        kind := it->value_or_null()->as_str() ?? "compile"
+        switch kind {
+            case "compile" {
+                runtime := "onyx"
+                target  := "out.wasm"
+
+                include, defines, args, sources: [..] str
+
+                load_string(it, "runtime", &runtime)
+                load_string(it, "target", &target)
+
+                for it->query_all("include") {
+                    array.concat(&include,
+                        iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
+                }
+
+                for it->query_all("define") {
+                    array.concat(&defines,
+                        iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
+                }
+
+                for it->query_all("args") {
+                    array.concat(&args,
+                        iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
+                }
+
+                for it->query_all("source") {
+                    array.concat(&sources,
+                        iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
+                }
+
+                c.build_configs[it.node] = .{
+                    CompileOnyx = .{
+                        include, args, defines, sources, runtime, target, working_dir = ""
+                    }
+                }
+            }
+
+            case "shell" {
+                commands := it->query_all("run")
+                    |> Iterator.map(x => {
+                        return cast([] str, 
+                            Iterator.from(x.values)
+                            |> Iterator.flatten(y => y.*->as_str())
+                            |> Iterator.collect()
+                        )
+                    })
+                    |> Iterator.collect()
+
+                c.build_configs[it.node] = .{
+                    RunCommands = commands
+                }
+            }
+
+            case "collection" {
+                steps := it->query_all("build")
+                    |> Iterator.flatten(x => x->value_or_null()->as_str())
+                    |> Iterator.collect()
+
+                c.build_configs[it.node] = .{
+                    Collection = steps
+                }
+            }
+        }
     }
 
     for doc->query_all("top() > dependencies > []") {
-        d: Dependency;
-        d.name = it.node;
+        d: Dependency
+        d.name = it.node
 
-        version_str := it->value_or_null()->as_str() ?? "";
-        conv.parse_any(&d.version, version_str);
+        if it.values.length == 0 {
+            it.props->get("branch")->with([branch] {
+                d.target = .{ branch = branch->as_str() ?? "" }
+            })
+
+        } else {
+            version_str := it->value_or_null()->as_str() ?? ""
+            version: SemVer
+            conv.parse_any(&version, version_str)
+            d.target = .{ version = version }
+        }
 
         it.props->get("git")->with([src] {
-            d.source = .{ Git = src->as_str() ?? "" };
-        });
+            d.source = .{ Git = src->as_str() ?? "" }
+        })
 
-        c.dependencies[d.name] = d;
+        it.props->get("locked")->with([locked] {
+            d.locked = locked->as_bool() ?? false
+        })
+
+        c.dependencies[d.name] = d
     }
 
-    return c;
+    return c
 
     load_string :: (p: &kdl.Node, field: str, target: &$T) {
         p->query(field)->with([n] {
             n->value_or_null()->as_str()->with([s] {
-                *target = s;
-            });
-        });
+                *target = s
+            })
+        })
     }
 }
 
 store_config :: (path: str) -> bool {
-    doc := kdl.new_doc();
+    doc := kdl.new_doc()
 
-    package_node := doc->create_node("package");
-    doc.nodes << package_node;
+    package_node := doc->create_node("package")
+    doc.nodes << package_node
     {
-        name_node := doc->create_node("name");
-        name_node->add_value(.{ String = config.package_name });
+        name_node := doc->create_node("name")
+        name_node->add_value(.{ String = config.package_name })
 
-        author_node := doc->create_node("author");
-        author_node->add_value(.{ String = config.package_author });
+        author_node := doc->create_node("author")
+        author_node->add_value(.{ String = config.package_author })
 
-        url_node := doc->create_node("url");
-        url_node->add_value(.{ String = config.package_url });
+        url_node := doc->create_node("url")
+        url_node->add_value(.{ String = config.package_url })
 
-        description_node := doc->create_node("description");
-        description_node->add_value(.{ String = config.package_description });
+        description_node := doc->create_node("description")
+        description_node->add_value(.{ String = config.package_description })
 
-        version_node := doc->create_node("version");
-        version_node->add_value(.{ String = tprintf("{}", config.package_version) });
+        version_node := doc->create_node("version")
+        version_node->add_value(.{ String = tprintf("{}", config.package_version) })
 
-        license_node := doc->create_node("license");
-        license_node->add_value(.{ String = config.package_license });
+        license_node := doc->create_node("license")
+        license_node->add_value(.{ String = config.package_license })
 
         array.concat(&package_node.children, .[
             name_node, author_node, url_node, description_node, version_node
-        ]);
+        ])
     }
 
-    config_node := doc->create_node("config");
-    doc.nodes << config_node;
+    config_node := doc->create_node("config")
+    doc.nodes << config_node
     {
-        source_path_node := doc->create_node("dependency_source_path");
-        source_path_node->add_value(.{ String = config.dependency_source_path });
-        config_node.children << source_path_node;
+        source_path_node := doc->create_node("dependency_source_path")
+        source_path_node->add_value(.{ String = config.dependency_source_path })
+        config_node.children << source_path_node
 
-        binary_path_node := doc->create_node("dependency_binary_path");
-        binary_path_node->add_value(.{ String = config.dependency_binary_path });
-        config_node.children << binary_path_node;
+        binary_path_node := doc->create_node("dependency_binary_path")
+        binary_path_node->add_value(.{ String = config.dependency_binary_path })
+        config_node.children << binary_path_node
     }
 
     if config.native_library {
-        native_node := doc->create_node("native");
-        doc.nodes << native_node;
+        native_node := doc->create_node("native")
+        doc.nodes << native_node
 
-        library_node := doc->create_node("library");
-        library_node->add_value(.{ String = config.native_library->unwrap() });
-        native_node.children << library_node;
+        library_node := doc->create_node("library")
+        library_node->add_value(.{ String = config.native_library->unwrap() })
+        native_node.children << library_node
 
-        build_node := doc->create_node("build");
-        build_node->add_value(.{ String = config.native_library_build ?? "" });
-        native_node.children << build_node;
+        build_node := doc->create_node("build")
+        build_node->add_value(.{ String = config.native_library_build ?? "" })
+        native_node.children << build_node
     }
 
     if !config.dependencies->empty() {
-        dependency_node := doc->create_node("dependencies");
-        doc.nodes << dependency_node;
+        dependency_node := doc->create_node("dependencies")
+        doc.nodes << dependency_node
         for config.dependencies->as_iter() {
-            dep_node := doc->create_node(it.key);
-            dependency_node.children << dep_node;
+            dep_node := doc->create_node(it.key)
+            dependency_node.children << dep_node
 
-            dep_node->add_value(.{ String = tprintf("{}", it.value.version) });
+            switch it.value.target {
+                case .version as ver {
+                    dep_node->add_value(.{ String = tprintf("{}", ver) })
+                }
+
+                case .branch as br {
+                    dep_node.props->put("branch", .{ data = .{ String = br } })
+                }
+            }
 
             switch it.value.source {
                 case .Git as s {
-                    dep_node.props["git"] = .{ data = .{ String = s } };
+                    dep_node.props["git"] = .{ data = .{ String = s } }
                 }
 
-                case #default ---
+                case _ ---
+            }
+
+            if it.value.locked {
+                dep_node.props["locked"] = .{ data = .{ Boolean = true } }
             }
         }
     }
@@ -1340,230 +1673,226 @@ store_config :: (path: str) -> bool {
     config._source_doc->with([source] {
         for source->query_all("top() > []") {
             if !array.contains(str.["package", "config", "native", "dependencies"], it.node) {
-                doc.nodes << it;
+                doc.nodes << it
             }
         }
-    });
+    })
 
-    file := os.open(path, .Write)->or_return(false);
-    defer os.close(&file);
+    file := os.open(path, .Write)->or_return(false)
+    defer os.close(&file)
 
-    w := io.writer_make(&file);
-    defer io.writer_free(&w);
+    w := io.writer_make(&file)
+    defer io.writer_free(&w)
 
-    kdl.write(&doc, &w);
+    kdl.write(&doc, &w)
 
-    return true;
+    return true
 }
 
 
 //  Old INI config code
 read_old_config :: (path: str) -> ? Config {
-    for os.with_file(path) {
-        r := io.reader_make(it);
-        defer io.reader_free(&r);
+    use file := os.open(path).Ok?
+    use r := io.reader_make(&file)
 
-        inner_config: IniConfig;
-        result, error := encoding.ini.parse_ini_file(&r, &inner_config);
+    inner_config: IniConfig
+    result, error := encoding.ini.parse_ini_file(&r, &inner_config)
 
-        if result != .Success {
-            return .{};
-        }
-
-        c: Config;
-
-        c.package_name = inner_config.metadata.name;
-        c.package_description = inner_config.metadata.description;
-        c.package_url = inner_config.metadata.url;
-        c.package_author = inner_config.metadata.author;
-        c.package_version = inner_config.metadata.version;
-
-        c.dependency_binary_path = inner_config.config.lib_bin_directory;
-        c.dependency_source_path = inner_config.config.lib_source_directory;
-
-        if inner_config.native_library.library {
-            c.native_library = inner_config.native_library.library;
-            c.native_library_build = inner_config.native_library.build_cmd;
-        }
-
-        for inner_config.dependencies.dependencies.entries {
-            c.dependencies->put(it.key[string.last_index_of(it.key, '/')+1 .. it.key.length], .{
-                name = it.key,
-                version = it.value,
-                source = .{ Git = it.key }
-            });
-        }
-
-        return c;
+    if result != .Success {
+        return .{}
     }
+
+    c: Config
+
+    c.package_name = inner_config.metadata.name
+    c.package_description = inner_config.metadata.description
+    c.package_url = inner_config.metadata.url
+    c.package_author = inner_config.metadata.author
+    c.package_version = inner_config.metadata.version
+
+    c.dependency_binary_path = inner_config.config.lib_bin_directory
+    c.dependency_source_path = inner_config.config.lib_source_directory
+
+    if inner_config.native_library.library {
+        c.native_library = inner_config.native_library.library
+        c.native_library_build = inner_config.native_library.build_cmd
+    }
+
+    for inner_config.dependencies.dependencies.entries {
+        c.dependencies->put(it.key[str.last_index_of(it.key, '/')+1 .. it.key.length], .{
+            name = it.key,
+            target = .{ version = it.value },
+            source = .{ Git = it.key }
+        })
+    }
+
+    return c
 }
 
 IniConfig :: struct {
     Metadata :: struct {
-        name:        str;
-        description: str;
-        url:         str;
-        author:      str;
-        version:     SemVer;
+        name:        str
+        description: str
+        url:         str
+        author:      str
+        version:     SemVer
     }
-    metadata: Metadata;
+    metadata: Metadata
 
     Config :: struct {
-        lib_source_directory: str = "./lib";
-        lib_bin_directory: str    = "./bin";
-        run_cmd: str;
-        debug_cmd: str;
-        test_cmd: str;
+        lib_source_directory: str = "./lib"
+        lib_bin_directory: str    = "./bin"
+        run_cmd: str
+        debug_cmd: str
+        test_cmd: str
     }
-    config: Config = .{};
+    config: Config = .{}
 
     Native_Library :: struct {
-        build_cmd: str;
-        library:   str;
+        build_cmd: str
+        library:   str
     }
-    native_library: Native_Library;
+    native_library: Native_Library
 
     Dependencies :: struct {
-        dependencies: Map(str, SemVer);
+        dependencies: Map(str, SemVer)
 
-        parse_ini :: parse_dependencies;
-        write_ini :: write_dependencies;
+        parse_ini :: parse_dependencies
+        write_ini :: write_dependencies
     }
-    dependencies: Dependencies;
+    dependencies: Dependencies
 
     Dependency_Folders :: struct {
         // Dependency to folder
-        folders: Map(str, str);
+        folders: Map(str, str)
 
-        parse_ini :: parse_dependency_folders;
-        write_ini :: write_dependency_folders;
+        parse_ini :: parse_dependency_folders
+        write_ini :: write_dependency_folders
     }
-    dependency_folders: Dependency_Folders;
+    dependency_folders: Dependency_Folders
 }
 
 #local parse_dependencies :: (dependencies: &IniConfig.Dependencies, r: &io.Reader) -> bool {
     while true {
-        r->skip_whitespace();
-        if r->is_empty() do return true;
-        if p, _ := r->peek_byte(); p == #char "[" do return true;
+        r->skip_whitespace()
+        if r->is_empty() do return true
+        if p, _ := r->peek_byte(); p == '[' do return true
 
-        dep := r->read_until(#char "=") |> string.strip_trailing_whitespace();
-        r->read_byte();
-        r->skip_whitespace();
+        dep := r->read_until('=') |> str.strip_trailing_whitespace()
+        r->read_byte()
+        r->skip_whitespace()
 
-        version_str := r->read_until(#char "\n") |> string.strip_trailing_whitespace();
-        version: SemVer;
-        conv.parse_any(&version, version_str);
-        dependencies.dependencies[dep] = version;
+        version_str := r->read_until('\n') |> str.strip_trailing_whitespace()
+        version: SemVer
+        conv.parse_any(&version, version_str)
+        dependencies.dependencies[dep] = version
     }
 
-    return true;
+    return true
 }
 
 #local write_dependencies :: (dependencies: &IniConfig.Dependencies, w: &io.Writer) -> bool {
     for& dependencies.dependencies.entries {
-        io.write_format(w, "{}={}\n", it.key, it.value);
+        io.write_format(w, "{}={}\n", it.key, it.value)
     }
 
-    return true;
+    return true
 }
 
 #local parse_dependency_folders :: (dependencies: &IniConfig.Dependency_Folders, r: &io.Reader) -> bool {
     while true {
-        r->skip_whitespace();
-        if r->is_empty() do return true;
-        if p, _ := r->peek_byte(); p == #char "[" do return true;
+        r->skip_whitespace()
+        if r->is_empty() do return true
+        if p, _ := r->peek_byte(); p == '[' do return true
 
-        dep := r->read_until(#char "=") |> string.strip_trailing_whitespace();
-        r->read_byte();
-        r->skip_whitespace();
+        dep := r->read_until('=') |> str.strip_trailing_whitespace()
+        r->read_byte()
+        r->skip_whitespace()
 
-        folder := r->read_until(#char "\n") |> string.strip_trailing_whitespace();
-        dependencies.folders[dep] = folder;
+        folder := r->read_until('\n') |> str.strip_trailing_whitespace()
+        dependencies.folders[dep] = folder
     }
 
-    return true;
+    return true
 }
 
 #local write_dependency_folders :: (dependencies: &IniConfig.Dependency_Folders, w: &io.Writer) -> bool {
     for& dependencies.folders.entries {
-        io.write_format(w, "{}={}\n", it.key, it.value);
+        io.write_format(w, "{}={}\n", it.key, it.value)
     }
 
-    return true;
+    return true
 }
 
 load_old_config_file :: () -> bool {
-    file_data := os.get_contents(global_arguments.config_file);
-    if string.empty(file_data) {
-        return false;
+    file_data := os.get_contents(global_arguments.config_file)
+    if str.empty(file_data) {
+        return false
     }
 
-    reader, stream := io.reader_from_string(file_data);
-    defer cfree(stream);
+    reader, stream := io.reader_from_string(file_data)
+    defer cfree(stream)
 
-    result, error := encoding.ini.parse_ini_file(&reader, &config);
+    result, error := encoding.ini.parse_ini_file(&reader, &config)
     if result != .Success {
-        eprintf("{w5} | {}\n", error.line, error.msg);
-        return false;
+        eprintf("{w5} | {}\n", error.line, error.msg)
+        return false
     }
 
-    return true;
+    return true
 }
 
 store_old_config_file :: () -> bool {
-    for os.with_file(global_arguments.config_file, .Write) {
-        writer := io.writer_make(it);
-        defer io.writer_free(&writer);
+    use file := os.open(global_arguments.config_file, .Write)->or_return(false)
+    use writer := io.writer_make(&file)
 
-        return encoding.ini.write_ini_file(&writer, config);
-    }
+    return encoding.ini.write_ini_file(&writer, config)
 }
 
 
 Color_Print :: struct {
     Color :: enum {
-        Black;
-        Red;
-        Green;
-        Yellow;
-        Blue;
-        Purple;
-        Cyan;
-        White;
-        __Unused;
-        Default;
+        Black
+        Red
+        Green
+        Yellow
+        Blue
+        Purple
+        Cyan
+        White
+        __Unused
+        Default
     }
 
-    color: Color;
-    text: str;
+    color: Color
+    text: str
 }
 
 color_print :: (segments: ..Color_Print) {
     for segments {
-        printf("\x1b[3{}m{}", cast(u32) it.color, it.text);
+        printf("\x1b[3{}m{}", cast(u32) it.color, it.text)
     }
 
-    print("\x1b[0m");
+    print("\x1b[0m")
 }
 
 error_print :: (text: str, va: ..any) {
-    buf: [1024] u8;
+    buf: [1024] u8
     color_print(
         .{ .Red, "       Error  " },
         .{ .Default, conv.format_va(buf, text, cast([] any) va) }
-    );
+    )
 }
 
 info_print :: (verb: str, text: str, va: ..any) {
-    buf: [1024] u8;
+    buf: [1024] u8
 
     // HACK
-    for 12 - cast(i32) verb.length do print(" ");
+    for 12 - cast(i32) verb.length do print(" ")
 
     color_print(
         .{ .Green, tprintf("{}  ", verb) },
         .{ .Default, conv.format_va(buf, text, cast([] any) va) }
-    );
+    )
 }
 

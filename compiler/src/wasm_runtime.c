@@ -103,17 +103,18 @@ static void *locate_symbol_in_dynamic_library_raw(char *libname, char *sym) {
 
 static void *locate_symbol_in_dynamic_library(LinkLibraryContext *ctx, char *libname, char *sym) {
     char *library_name;
+    bh_allocator alloc = bh_heap_allocator();
 
     #ifdef _BH_LINUX
-    library_name = bh_lookup_file(libname, ".", ".so", 1, (const char **) ctx->library_paths, 1);
+    library_name = bh_lookup_file(libname, ".", ".so", (const char **) ctx->library_paths, NULL, alloc);
     #endif
 
     #ifdef _BH_DARWIN
-    library_name = bh_lookup_file(libname, ".", ".dylib", 1, (const char **) ctx->library_paths, 1);
+    library_name = bh_lookup_file(libname, ".", ".dylib", (const char **) ctx->library_paths, NULL, alloc);
     #endif
 
     #ifdef _BH_WINDOWS
-    library_name = bh_lookup_file(libname, ".", ".dll", 1, (const char **) ctx->library_paths, 1);
+    library_name = bh_lookup_file(libname, ".", ".dll", (const char **) ctx->library_paths, NULL, alloc);
     #endif
 
     return locate_symbol_in_dynamic_library_raw(library_name, sym);
@@ -436,7 +437,7 @@ static void cleanup_wasm_objects() {
 }
 
 static wasm_trap_t *__error_on_call(void *env, const wasm_val_vec_t *args, wasm_val_vec_t *results) {
-    printf("Attempted to invoke imported function with no defintion, '%s'\n", (char *) env);
+    printf("[ERROR] Attempted to invoke imported function with no definition, '%s'\n", (char *) env);
     exit(1);
     return NULL;
 }
@@ -546,14 +547,14 @@ static b32 link_wasm_imports(
         continue;
 
     bad_import:
-        bh_printf("Couldn't find import %b.%b.\n", module_name->data, module_name->size, import_name->data, import_name->size);
+        bh_printf("Unable to find import '%b.%b'.\n", module_name->data, module_name->size, import_name->data, import_name->size);
         return 0;
     }
 
     return 1;
 }
 
-void onyx_run_initialize(b32 debug_enabled) {
+void onyx_run_initialize(b32 debug_enabled, const char *debug_socket) {
     wasm_config = wasm_config_new();
     if (!wasm_config) {
         cleanup_wasm_objects();
@@ -568,10 +569,16 @@ void onyx_run_initialize(b32 debug_enabled) {
         i32 getpid();
         i32 pid = getpid();
 
-        char *env_path = getenv("ONYX_PATH");
-        char *socket_path = bh_aprintf(bh_heap_allocator(), "%s/debug.%d", env_path, pid);
+        const char *socket_path = NULL;
+        if (debug_socket != NULL) {
+            socket_path = debug_socket;
 
-        void wasm_config_set_listen_path(wasm_config_t *config, char *listen_path);
+        } else {
+            char *env_path = getenv("ONYX_PATH");
+            socket_path = bh_aprintf(bh_heap_allocator(), "%s/debug.%d", env_path, pid);
+        }
+
+        void wasm_config_set_listen_path(wasm_config_t *config, const char *listen_path);
         wasm_config_set_listen_path(wasm_config, socket_path);
     #endif
 #endif
@@ -612,7 +619,7 @@ void onyx_run_initialize(b32 debug_enabled) {
     wasm_runtime.onyx_print_trap = &onyx_print_trap;
 }
 
-b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
+b32 onyx_run_wasm_code(bh_buffer wasm_bytes, int argc, char *argv[]) {
     runtime = &wasm_runtime;
     wasm_raw_bytes = wasm_bytes;
 

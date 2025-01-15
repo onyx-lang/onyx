@@ -24,11 +24,16 @@ use runtime
 #load "./conv/parse"
 
 #load "./math/math"
+#load "./math/consts"
 #load "./random/random"
 
 #load "./hash/hash"
 #load "./hash/md5"
 #load "./hash/sha256"
+#load "./hash/sha1"
+
+#load "./crypto/hmac"
+#load "./crypto/keys/jwt"
 
 #load "./string/string"
 #load "./string/buffer"
@@ -64,6 +69,7 @@ use runtime
 #load "./encoding/utf8"
 #load "./encoding/osad"
 #load_all "./encoding/json"
+#load_all "./encoding/xml"
 #load "./encoding/kdl/kdl"
 
 #load "./runtime/common"
@@ -81,6 +87,7 @@ use runtime
 
 #if runtime.platform.Supports_Os {
     #load "./os/os"
+    #load "./os/args"
 }
 
 #if runtime.platform.Supports_Processes {
@@ -118,6 +125,8 @@ use runtime
     #load "./sync/semaphore"
     #load "./sync/barrier"
     #load "./sync/once"
+    #load "./sync/channel"
+    #load "./sync/mutex_guard"
 }
 
 
@@ -134,5 +143,9 @@ use runtime
 }
 
 #if runtime.runtime == .Js {
+    #load "./js/value"
+    #load "./js/func"
+    #load "./js/foreign"
+
     #load "./runtime/platform/js/platform"
 }

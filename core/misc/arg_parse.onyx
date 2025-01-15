@@ -6,31 +6,40 @@ use core.conv
 use core.string
 use runtime
 
-#doc """
-    This is currently a very basic argument parsing library.
-    The options are given through a structure like so:
-   
-        Options :: struct {
-            @"--option_1"
-            option_1: str;
-        
-            @"--option_2", "-o2"
-            option_2: bool;
-        }
-   
-        main :: (args) => {
-            o: Options;
-            arg_parse.arg_parse(args, &o);
-        }
-   
-    Options that are strings and integers expect an argument after
-    them to specify their value. Options that are bool default to
-    false and are true if one or more of the option values are present.
-""" 
+/// This is currently a very basic argument parsing library.
+/// The options are given through a structure like so:
+///
+///     Options :: struct {
+///         @"--option_1"
+///         option_1: str;
+///     
+///         @"--option_2", "-o2"
+///         option_2: bool;
+///     }
+///     
+///     main :: (args) => {
+///         o: Options;
+///         arg_parse.arg_parse(args, &o);
+///     }
+///
+/// Options that are strings and integers expect an argument after
+/// them to specify their value. Options that are bool default to
+/// false and are true if one or more of the option values are present.
+arg_parse :: #match #local {}
+
+#overload
 arg_parse :: (c_args: [] cstr, output: any) -> bool {
-    arg_iter := iter.as_iter(c_args) |>
-                iter.map(string.from_cstr);
-    defer arg_iter.close(arg_iter.data);
+    args := iter.as_iter(c_args) |>
+            iter.map(string.from_cstr) |>
+            iter.collect();
+
+    return arg_parse(args, output);
+}
+
+#overload
+arg_parse :: (args: [] str, output: any) -> bool {
+    arg_iter := Iterator.from(args);
+    defer Iterator.close(arg_iter);
 
     use runtime.info {*};
 
@@ -56,21 +65,21 @@ arg_parse :: (c_args: [] cstr, output: any) -> bool {
                     }
 
                     case i32 {
-                        value_str, success := iter.take_one(arg_iter, no_close=true);
-                        if !success do return false;
+                        value_str := iter.next(arg_iter);
+                        if !value_str do return false;
 
-                        value := conv.str_to_i64(value_str);
+                        value := conv.str_to_i64(value_str->unwrap());
                         *(cast(&i32) (cast([&] u8) data_base + member.offset)) = ~~value;
                     }
 
                     case str {
-                        value, success := iter.take_one(arg_iter, no_close=true);
-                        if !success do return false;
+                        value := iter.next(arg_iter);
+                        if !value do return false;
 
-                        *(cast(&str) (cast([&] u8) data_base + member.offset)) = value;
+                        *(cast(&str) (cast([&] u8) data_base + member.offset)) = value->unwrap();
                     }
 
-                    case #default {
+                    case _ {
                         printf("Unsupported argument type, {}.\n", output.type);
                         return false;
                     }

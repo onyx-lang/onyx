@@ -1,26 +1,22 @@
 package core
 
 
-#doc """
-    A `Pair` represents a pair of values of heterogenous types.
-    This structure does not do much on its own; however, it
-    is useful because provides overloads for formatting, hashing
-    and equality. This means you can use a `Pair(T, R)` as a key
-    for a Map or Set out of the box, provided T and R are hashable
-    and equatable.
-"""
+/// A `Pair` represents a pair of values of heterogenous types.
+/// This structure does not do much on its own; however, it
+/// is useful because provides overloads for formatting, hashing
+/// and equality. This means you can use a `Pair(T, R)` as a key
+/// for a Map or Set out of the box, provided T and R are hashable
+/// and equatable.
 @conv.Custom_Format.{#solidify _format {First_Type=First_Type, Second_Type=Second_Type}}
 Pair :: struct (First_Type: type_expr, Second_Type: type_expr) {
     first: First_Type;
     second: Second_Type;
 }
 
-#inject Pair {
-    make :: macro (x: $X, y: $Y) => #this_package.Pair(X, Y).{x, y};
+Pair.make :: macro (x: $X, y: $Y) => #this_package.Pair(X, Y).{x, y};
 
-    _format :: (output: &conv.Format_Output, format: &conv.Format, p: &Pair($First_Type, $Second_Type)) {
-        conv.format(output, "({}, {})", p.first, p.second);
-    }
+Pair._format :: (output: &conv.Format_Output, format: &conv.Format, p: &Pair($First_Type, $Second_Type)) {
+    conv.format(output, "({}, {})", p.first, p.second);
 }
 
 #overload

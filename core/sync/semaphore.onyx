@@ -3,29 +3,27 @@ package core.sync
 use runtime
 use core
 
-#doc """
-    A semaphore represents a counter that can only be incremented
-    and decremented by one thread at a time. "Waiting" on a semaphore
-    means decrementing the counter by 1 if it is greater than 0, otherwise
-    waiting until the counter is incremented. "Posting" on a semaphore
-    means incrementing the counter by a certain value, in turn releasing
-    other threads that might have been waiting for the value to change.
-   
-    Semaphores are generally used for controlling access to shared
-    resources. For a contrived example, say only 4 threads can use
-    a given network connection at a time. A semaphore would be created
-    with a value of 4. When a thread wants to use the network connection,
-    it would use `semaphore_wait` to obtain the resource, or wait if
-    the network is currently available. When it is done using the
-    network, it would call `semaphore_post` to release the resource,
-    allowing another thread to use it.
-"""
+/// A semaphore represents a counter that can only be incremented
+/// and decremented by one thread at a time. "Waiting" on a semaphore
+/// means decrementing the counter by 1 if it is greater than 0, otherwise
+/// waiting until the counter is incremented. "Posting" on a semaphore
+/// means incrementing the counter by a certain value, in turn releasing
+/// other threads that might have been waiting for the value to change.
+///
+/// Semaphores are generally used for controlling access to shared
+/// resources. For a contrived example, say only 4 threads can use
+/// a given network connection at a time. A semaphore would be created
+/// with a value of 4. When a thread wants to use the network connection,
+/// it would use `semaphore_wait` to obtain the resource, or wait if
+/// the network is currently available. When it is done using the
+/// network, it would call `semaphore_post` to release the resource,
+/// allowing another thread to use it.
 Semaphore :: struct {
     mutex   : Mutex;
     counter : i32;
 }
 
-#doc "Initializes a semaphore with the specified value."
+/// Initializes a semaphore with the specified value.
 semaphore_init :: (s: &Semaphore, value: i32) {
     s.counter = value;
 
@@ -33,13 +31,13 @@ semaphore_init :: (s: &Semaphore, value: i32) {
 }
 
 
-#doc "Destroys a semaphore."
+/// Destroys a semaphore.
 semaphore_destroy :: (s: &Semaphore) {
     mutex_destroy(&s.mutex);
 }
 
 
-#doc "Increment the counter in a semaphore by `count`."
+/// Increment the counter in a semaphore by `count`.
 semaphore_post :: (s: &Semaphore, count := 1) {
     if count == 0 do return;
     
@@ -54,7 +52,7 @@ semaphore_post :: (s: &Semaphore, count := 1) {
     }
 }
 
-#doc "Waits until the thread is able to decrement one from the semaphore."
+/// Waits until the thread is able to decrement one from the semaphore.
 semaphore_wait :: (s: &Semaphore) {
     while true {
         mutex_lock(&s.mutex);

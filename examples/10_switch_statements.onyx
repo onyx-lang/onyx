@@ -1,4 +1,4 @@
-#load "core/module"
+
 
 use core {*}
 
@@ -14,7 +14,7 @@ main :: (args: [] cstr) {
             println("Multiple statments go between '{}'.");
         }
 
-        case #default {
+        case _ {
             println("Default case reached.");
         }
     }
@@ -35,7 +35,7 @@ main :: (args: [] cstr) {
             fallthrough; // Now we fallthrough
         }
 
-        case #default {
+        case _ {
             println("Default case reached.");
         }
     }
@@ -57,7 +57,7 @@ main :: (args: [] cstr) {
             println("This statement will never be reached.");
         }
 
-        case #default {
+        case _ {
             println("Default case reached.");
         }
     }

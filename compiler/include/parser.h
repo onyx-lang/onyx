@@ -14,6 +14,7 @@ typedef struct PolymorphicContext {
 
 typedef struct OnyxParser {
     bh_allocator allocator;
+    Context *context;
 
     Package *package;
     Scope *file_scope;
@@ -49,8 +50,11 @@ typedef struct OnyxParser {
 
     // Used by `#doc` directives to store their documentation
     // string. This is then used by binding nodes to capture
-    // documentation.
+    // documentation. DEPRECATED
     OnyxToken *last_documentation_token;
+
+    // Used by `///` doc comments
+    bh_arr(OnyxToken *) documentation_tokens;
 
     u16 tag_depth : 16;
 
@@ -64,8 +68,11 @@ typedef struct OnyxParser {
 
 const char* onyx_ast_node_kind_string(AstKind kind);
 void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstKind kind);
-OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer);
+OnyxParser onyx_parser_create(Context *context, OnyxTokenizer *tokenizer);
 void onyx_parser_free(OnyxParser* parser);
 void onyx_parse(OnyxParser *parser);
+AstTyped *onyx_parse_expression(OnyxParser *parser, Scope *scope);
+AstNode  *onyx_parse_statement(OnyxParser *parser, Scope *scope);
+void onyx_parse_top_level_statements(OnyxParser *parser, Scope *scope);
 
 #endif // #ifndef ONYXPARSER_H

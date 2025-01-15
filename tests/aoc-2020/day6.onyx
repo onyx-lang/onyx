@@ -1,4 +1,4 @@
-#load "core/module"
+
 
 use core {*}
 
@@ -7,11 +7,11 @@ part_1 :: (contents: &str) -> u32 {
     for &ch in chars do *ch = false;
 
     while true {
-        line := string.read_until(contents, #char "\n");
+        line := string.read_until(contents, '\n');
         string.advance(contents, 1);
         if line.count == 0 do break;
 
-        for ch in line do chars[~~ch - cast(u32) #char "a"] = true;
+        for ch in line do chars[~~ch - cast(u32) 'a'] = true;
     }
 
     sum := 0;
@@ -26,13 +26,13 @@ part_2 :: (contents: &str) -> u32 {
 
     person_count := 0;
     while true {
-        line := string.read_until(contents, #char "\n");
+        line := string.read_until(contents, '\n');
         string.advance(contents, 1);
         if line.count == 0 do break;
         
         person_count += 1;
 
-        for ch in line do chars[~~ch - cast(u32) #char "a"] += 1;
+        for ch in line do chars[~~ch - cast(u32) 'a'] += 1;
     }
 
     sum := 0;

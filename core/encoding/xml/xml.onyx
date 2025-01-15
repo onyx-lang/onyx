@@ -1,0 +1,40 @@
+package core.encoding.xml
+#allow_stale_code
+
+use core { string }
+
+Document :: struct {
+    elements: [..] Element
+    strings: string.StringPool
+}
+
+Element :: struct {
+    Index :: u32
+
+    name: str
+    parent: Element.Index
+    attributes: [..] Attribute
+    children: [..] Child
+}
+
+Attribute :: struct {
+    key, value: str
+}
+
+Child :: union {
+    Text: str
+    Element: Element.Index
+}
+
+Document.destroy :: (doc: &Document) {
+    delete(&doc.strings)
+
+    for &el in doc.elements {
+        delete(&el.attributes)
+        delete(&el.children)
+    }
+
+    delete(&doc.elements)
+}
+
+

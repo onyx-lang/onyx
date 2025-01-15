@@ -1,0 +1,35 @@
+//+optional-semicolons
+
+use core {println}
+
+main :: () {
+    arr := make([..] i32)
+
+    for i in 10 {
+        arr->push(i)
+    }
+
+    arr->fill(123)
+    arr->fill_range(3 .. 8, 456)
+    Array.fill_range(arr, 3 .. 5, 123456)
+
+    arr->some([x](x == 123)) |> println()
+
+    sli: [] i32 = arr
+
+    println(arr)
+
+    groups := sli->group_by([x, y](x == y))
+    println(groups)
+
+
+    // String methdos
+
+    hello := "Hello"->copy()->to_lowercase()->to_dyn_str()
+    hello->append(" World!")
+    println(hello)
+
+    hello_str: str = hello
+    hello_str->index_of('o') |> println()
+    hello_str->last_index_of('o') |> println()
+}

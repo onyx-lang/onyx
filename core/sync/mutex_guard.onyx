@@ -1,0 +1,50 @@
+package core.sync
+
+/// Represents a "guarded" value, i.e. one that is protected by a mutex.
+///
+/// The only way to access the value inside is by using the `with` method and
+/// passing in a code block that accepts a pointer to the value. This way,
+/// there is no way to access the value without locking a mutex. (Unless of
+/// course, you store the pointer somewhere else, but then you are just being
+/// a bad citizen of the programming language ;) ).
+MutexGuard :: struct (T: type_expr) {
+    _: [(sizeof T) + (sizeof Mutex)] u8;
+}
+
+MutexGuard.make :: #match #local {}
+
+#overload
+MutexGuard.make :: ($T: type_expr) -> MutexGuard(T) {
+    mg: _MutexGuard(T);
+    mutex_init(&mg.mutex);
+    return *cast(&MutexGuard(T)) &mg;
+}
+
+#overload
+MutexGuard.make :: (v: $T) -> MutexGuard(T) {
+    mg: _MutexGuard(T);
+    mutex_init(&mg.mutex);
+    mg.value = v;
+    return *cast(&MutexGuard(T)) &mg;
+}
+
+MutexGuard.with :: macro (__guard: &MutexGuard, body: Code) -> u32 {
+    _unwrap_mutex_guard :: _unwrap_mutex_guard
+
+    __unwrapped := _unwrap_mutex_guard(__guard);
+    sync.scoped_mutex(&__unwrapped.mutex);
+    #unquote body(&__unwrapped.value);
+
+    return 0;
+}
+
+
+#local
+_MutexGuard :: struct (T: type_expr) {
+    mutex: Mutex;
+    value: T;
+}
+
+#local _unwrap_mutex_guard :: macro (m: &MutexGuard($T)) -> &_MutexGuard(T) {
+    return ~~m;
+}

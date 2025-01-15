@@ -3,15 +3,11 @@ package core.encoding.kdl
 
 use core {iter, alloc, array, string}
 
-#inject Document {
-    query     :: query_doc
-    query_all :: query_doc_all
-}
+Document.query     :: query_doc
+Document.query_all :: query_doc_all
 
-#inject Node {
-    query     :: query_node
-    query_all :: query_node_all
-}
+Node.query     :: query_node
+Node.query_all :: query_node_all
 
 query :: #match #local {
     query_doc, query_node
@@ -23,11 +19,10 @@ query_all :: #match #local {
 
 query_doc :: (d: &Document, query: str) -> ? &Node {
     query_iter := query_doc_all(d, query);
-    node, cont := iter.next(query_iter);
+    node := iter.next(query_iter);
     iter.close(query_iter);
 
-    if cont do return node;
-    return .{};
+    return node;
 }
 
 query_doc_all :: (d: &Document, query: str) -> Iterator(&Node) {
@@ -45,11 +40,10 @@ query_doc_all :: (d: &Document, query: str) -> Iterator(&Node) {
 
 query_node :: (n: &Node, query: str) -> ? &Node {
     query_iter := query_node_all(n, query);
-    node, cont := iter.next(query_iter);
+    node := iter.next(query_iter);
     iter.close(query_iter);
 
-    if cont do return node;
-    return .{};
+    return node;
 }
 
 query_node_all :: (n: &Node, query: str) -> Iterator(&Node) {
@@ -79,7 +73,6 @@ QueryIterator :: struct {
     current_selector := 0;
 }
 
-#inject
 QueryIterator.make :: (
     d: &Document,
     q: Query,
@@ -98,7 +91,7 @@ QueryStack :: struct {
 }
 
 #local
-query_next :: (ctx: &QueryIterator) -> (&Node, bool) {
+query_next :: (ctx: &QueryIterator) -> ? &Node {
     while true {
         if !ctx.stack {
             if ctx.d {
@@ -124,12 +117,12 @@ query_next :: (ctx: &QueryIterator) -> (&Node, bool) {
         defer array.pop(&ctx.stack);
         for ctx.q.matches_any {
             if query_selector_matches(it, ctx.stack) {
-                return last_query.node, true;
+                return last_query.node;
             }
         }
     }
 
-    return .{}, false;
+    return .None;
 }
 
 #local
@@ -200,7 +193,7 @@ query_selector_matches :: (s: &Selector, trail: [] QueryStack) -> bool {
 #local
 query_matcher_matches :: (s: &Matcher, node: &Node) =>
     iter.as_iter(s.details)
-    |> iter.every((d, [node]) => {
+    |> iter.every((d) use (node) => {
         if d.accessor.Scope do return false;
 
         if d.accessor.Node {
@@ -252,7 +245,7 @@ operate_on_values :: (v1, v2: Value, op: AttributeOp) -> bool {
         case .EndsWith   => string.ends_with(left, right);
         case .Contains   => string.contains(left, right);
 
-        case #default => false;
+        case _ => false;
     };
 }
 
@@ -376,7 +369,7 @@ parse_selector :: (p: &QueryParser) -> &Selector {
                     case '>' => SelectorOp.Child;
                     case '+' => .Neighbor;
                     case '~' => .Sibling;
-                    case #default => .Descendant;
+                    case _ => .Descendant;
                 };
 
                 if segment.op->unwrap() != .Descendant {
@@ -533,7 +526,6 @@ skip_whitespace :: (p: &QueryParser) {
 #local
 reached_end :: macro (p: &QueryParser) => p.cursor >= p.query.length;
 
-#inject
 QueryParser.rem :: (p: &QueryParser) => p.query[p.cursor .. p.query.length];
 
 #local

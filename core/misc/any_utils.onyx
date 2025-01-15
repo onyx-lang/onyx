@@ -4,6 +4,7 @@ use runtime
 use core.iter
 use core.array
 use core.string
+use core.memory
 
 use runtime.info {
     get_type_info,
@@ -28,7 +29,7 @@ any_as :: (a: any, $T: type_expr) -> &T {
     return cast(&T) a.data;
 }
 
-#doc "Dereference a pointer any."
+/// Dereference a pointer any.
 any_dereference :: (v: any) -> any {
     t := get_type_info(v.type);
     if t.kind == .Pointer {
@@ -39,7 +40,7 @@ any_dereference :: (v: any) -> any {
     return v;
 }
 
-#doc "Unwraps an optional any, if the any is an optional. `? T -> T`"
+/// Unwraps an optional any, if the any is an optional. `? T -> T`
 any_unwrap :: (v: any) -> any {
     if union_constructed_from(v.type, Optional) {
         t := v.type->info()->as_union();
@@ -53,7 +54,7 @@ any_unwrap :: (v: any) -> any {
 }
 
 
-#doc "Subscript an array-like any."
+/// Subscript an array-like any.
 any_subscript :: (v: any, index: i32) -> any {
     base_ptr, elem_type, count := any_as_array(v);
     if index >= count || index < 0 {
@@ -66,7 +67,7 @@ any_subscript :: (v: any, index: i32) -> any {
     };
 }
 
-#doc "Select a member from an any."
+/// Select a member from an any.
 any_selector :: (v: any, member_name: str) -> any {
     t := get_type_info(v.type);
     if t.kind == .Struct {
@@ -79,12 +80,12 @@ any_selector :: (v: any, member_name: str) -> any {
     return .{null, void};
 }
 
-#doc "Like `any_selector`, but works with selecting \"foo.bar.joe\"."
+/// Like `any_selector`, but works with selecting \"foo.bar.joe\".
 any_nested_selector :: (v: any, member_name: str) -> any {
     t := get_type_info(v.type);
     if t.kind != .Struct do return .{};
 
-    part_name, next_name := string.bisect(member_name, #char ".");
+    part_name, next_name := string.bisect(member_name, '.');
 
     member := get_struct_member(v.type, part_name);
     if member {
@@ -100,8 +101,6 @@ any_nested_selector :: (v: any, member_name: str) -> any {
     return .{null, void};
 }
 
-#doc """
-"""
 any_member :: #match #locked {
     (v: any, member_type: type_expr, member_offset: u32) -> any {
         return any.{
@@ -118,20 +117,18 @@ any_member :: #match #locked {
     }
 }
 
-#doc """
-    Convert a structure or pointer to a structure to a Map with
-    keys representing the fields of the structure, and values
-    representing the value of each field.
-   
-        T :: struct {
-            x := 123;
-            y := "test";
-        }
-        
-        m := any_to_map(T.{});
-   
-    `m` would have two keys, "x" and "y".
-"""
+/// Convert a structure or pointer to a structure to a Map with
+/// keys representing the fields of the structure, and values
+/// representing the value of each field.
+///
+///     T :: struct {
+///         x := 123;
+///         y := "test";
+///     }
+///     
+///     m := any_to_map(T.{});
+///
+/// `m` would have two keys, "x" and "y".
 any_to_map :: (v: any) -> ? Map(str, any) {
     vals := v;
     if vals.type->info().kind == .Pointer {
@@ -151,11 +148,11 @@ any_to_map :: (v: any) -> ? Map(str, any) {
     return out;
 }
 
-#doc "Creates an iterator out of an array-like any."
+/// Creates an iterator out of an array-like any.
 any_iter :: (arr: any) -> Iterator(any) {
     base_ptr, elem_type, count := any_as_array(arr);
     if count == 0 {
-        return .{ null, ((_: rawptr) => any.{}, false) };
+        return .{ null, (_: rawptr) => Optional.empty(any) };
     }
 
     return iter.generator(
@@ -167,15 +164,36 @@ any_iter :: (arr: any) -> Iterator(any) {
             index     = 0,
         },
 
-        (ctx: $T) -> (any, bool) {
+        (ctx: $T) -> ? any {
             if ctx.index < ctx.count {
                 defer ctx.index += 1;
-                return any.{ cast([&] u8) ctx.base_ptr + ctx.elem_size * ctx.index, ctx.elem_type }, true;
+                return any.{ cast([&] u8) ctx.base_ptr + ctx.elem_size * ctx.index, ctx.elem_type };
             }
 
-            return .{}, false;
+            return .None;
         }
     );
+}
+
+
+/// Creates a deep copy of an array of `any`s.
+///
+/// Copies the slice to a new slice, and all of the `any` data members.
+any_deep_copy :: (args: [] any, allocator := context.allocator) -> (result: [] any) {
+    result = make([] any, args.count, allocator);
+    
+    for arg, i in args {
+        size := get_type_info(arg.type).size;
+
+        new_data := allocator->alloc(size);
+        if !new_data do continue;
+
+        memory.copy(new_data, arg.data, size);
+
+        result[i] = any.{ new_data, arg.type };
+    }
+
+    return;
 }
 
 
@@ -194,7 +212,7 @@ any_as_array :: (arr: any) -> (rawptr, type_expr, u32) {
             return a.data, (cast(&Type_Info_Dynamic_Array) info).of, a.count;
         }
 
-        case #default {
+        case _ {
             return null, void, 0;
         }
     }

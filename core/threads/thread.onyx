@@ -11,25 +11,24 @@ use core.intrinsics.atomics {*}
 }
 
 
-#doc "An id of a thread."
+/// An id of a thread.
 Thread_ID :: #type i32
 
-#doc """
-    Represents a thread. Currently, this is very simple; just the id
-    of the thread and whether or not it is alive.
-"""
+/// Represents a thread. Currently, this is very simple; just the id
+/// of the thread and whether or not it is alive.
 Thread :: struct {
     id    : Thread_ID;
     alive : bool;
+
+    stack_base : rawptr
+    tls_base   : rawptr
 }
 
-#doc """
-    Spawns a new thread using the runtime.__spawn_thread function.
-    The primary job of this function is to create the thread-local
-    storage and stack for the new thread, and pass those on.
-    Currently the stack size is not controllable, but that could
-    be remedied.
-"""
+/// Spawns a new thread using the runtime.__spawn_thread function.
+/// The primary job of this function is to create the thread-local
+/// storage and stack for the new thread, and pass those on.
+/// Currently the stack size is not controllable, but that could
+/// be remedied.
 spawn :: (t: &Thread, data: &$T, func: (&T) -> void) {
     sync.scoped_mutex(&thread_mutex);
 
@@ -39,19 +38,18 @@ spawn :: (t: &Thread, data: &$T, func: (&T) -> void) {
 
     thread_map->put(t.id, t);
 
-    tls_base := raw_alloc(alloc.heap_allocator, __tls_size);
-    memory.set(tls_base, 0, __tls_size);
+    t.tls_base = raw_alloc(alloc.heap_allocator, __tls_size);
+    memory.set(t.tls_base, 0, __tls_size);
 
-    stack_base := raw_alloc(alloc.heap_allocator, 1 << 20);
+    t.stack_base = raw_alloc(alloc.heap_allocator, 1 << 20);
+    stack_top   := memory.ptr_add(t.stack_base, 1 << 20);
 
-    runtime.platform.__spawn_thread(t.id, tls_base, stack_base, func, data);
+    runtime.platform.__spawn_thread(t.id, t.tls_base, stack_top, func, data);
 }
 
-#doc """
-    Waits for a thread to finish before returning.
-    If the thread was not alive in the first place,
-    immediately return.
-"""
+/// Waits for a thread to finish before returning.
+/// If the thread was not alive in the first place,
+/// immediately return.
 join :: (t: &Thread) {
     while t.alive {
         #if runtime.platform.Supports_Futexes {
@@ -63,10 +61,8 @@ join :: (t: &Thread) {
     }
 }
 
-#doc """
-    Forcefully kill a thread using runtime.__kill_thread.
-    Does nothing if the thread was not alive.
-"""
+/// Forcefully kill a thread using runtime.__kill_thread.
+/// Does nothing if the thread was not alive.
 kill :: (t: &Thread) -> i32 {
     if !t.alive do return -1;
 
@@ -76,29 +72,29 @@ kill :: (t: &Thread) -> i32 {
     return 1;
 }
 
-#doc """
-    Special procedure that should only be called once globally
-    that initialize the map of thread ids to thread data.
-"""
+/// Special procedure that should only be called once globally
+/// that initialize the map of thread ids to thread data.
 __initialize :: () {
     thread_map->init();
 }
 
-#doc """
-    Special procedure that is called when a thread exits,
-    or by kill() above.
-"""
+/// Special procedure that is called when a thread exits,
+/// or by kill() above.
 __exited :: (id: i32) {
-    sync.scoped_mutex(&thread_mutex);
+    sync.scoped_mutex(&thread_mutex)
 
-    thread := thread_map->get(id) ?? null;
+    thread := thread_map->get(id) ?? null
     if thread != null {
-        thread.alive = false;
+        raw_free(alloc.heap_allocator, thread.stack_base)
+        raw_free(alloc.heap_allocator, thread.tls_base)
+
+        thread.alive = false
+
         #if runtime.platform.Supports_Futexes {
-            runtime.platform.__futex_wake(&thread.id, 1);
+            runtime.platform.__futex_wake(&thread.id, 1)
         }
 
-        thread_map->delete(id);
+        thread_map->delete(id)
     }
 }
 

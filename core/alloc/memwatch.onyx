@@ -1,15 +1,13 @@
-package core.alloc.memdebug
+/// The memory debugger allocator wraps an existing allocator (normally the heap allocator),
+/// and reports on a TCP socket all of the allocation operations done to the underlying
+/// allocator. This listener on this socket can use this information to show useful information
+/// about the memory usage in the program.
+///
+/// This is best used when it starts at the very beginning of the program.
+/// The easiest way to use this is to define MEMWATCH in runtime.vars,
+/// or pass -DMEMWATCH on the command line. 
+package core.alloc.memwatch
 #allow_stale_code
-#package_doc """
-    The memory debugger allocator wraps an existing allocator (normally the heap allocator),
-    and reports on a TCP socket all of the allocation operations done to the underlying
-    allocator. This listener on this socket can use this information to show useful information
-    about the memory usage in the program.
-
-    This is best used when it starts at the very beginning of the program.
-    The easiest way to use this is to define MEMDEBUG in runtime.vars,
-    or pass -DMEMDEBUG on the command line. 
-"""
 
 use core {Result}
 use core.alloc
@@ -22,7 +20,7 @@ use runtime
 VERSION :: 1
 DEFAULT_PORT :: 4004
 
-MemDebugState :: struct {
+MemWatchState :: struct {
     wrapped_allocator: Allocator;
     listen_addr: net.SocketAddress;
 
@@ -30,7 +28,7 @@ MemDebugState :: struct {
     writer: ? io.Writer;
 }
 
-MemDebugMsg :: union {
+MemWatchMsg :: union {
     Start: struct {
         version: u32;
         heap_base_address: u32;
@@ -42,11 +40,11 @@ MemDebugMsg :: union {
         newptr: u32;
         size: u32;
         align: u32;
-        trace: [] MemDebugStackNode;
+        trace: [] MemWatchStackNode;
     };
 }
 
-MemDebugStackNode :: struct {
+MemWatchStackNode :: struct {
     file: str;
     line: u32;
     current_line: u32;
@@ -54,7 +52,7 @@ MemDebugStackNode :: struct {
 }
 
 
-make :: (a: Allocator, listen_addr: &net.SocketAddress) -> MemDebugState {
+make :: (a: Allocator, listen_addr: &net.SocketAddress) -> MemWatchState {
     return .{
         a,
         *listen_addr,
@@ -63,12 +61,12 @@ make :: (a: Allocator, listen_addr: &net.SocketAddress) -> MemDebugState {
     };
 }
 
-free :: (m: &MemDebugState) {
+free :: (m: &MemWatchState) {
     io.writer_free(m.writer->unwrap_ptr());
     m.socket->unwrap_ptr()->close();
 }
 
-wait_for_connection :: (m: &MemDebugState) -> Result(void, io.Error) {
+wait_for_connection :: (m: &MemWatchState) -> Result(void, io.Error) {
     listen_socket := net.socket_create(.Inet, .Stream, .ANY)?;
     listen_socket->option(.ReuseAddress, true);
     listen_socket->bind(&m.listen_addr);
@@ -78,34 +76,36 @@ wait_for_connection :: (m: &MemDebugState) -> Result(void, io.Error) {
     m.socket = .{ Some = result.socket };
     m.writer = .{ Some = io.writer_make(m.socket->unwrap_ptr(), 0) };
 
-    memdebug_send_message(m, .{ Start = .{ version = VERSION, heap_base_address = cast(u32) __heap_start } });
+    memwatch_send_message(m, .{ Start = .{ version = VERSION, heap_base_address = cast(u32) __heap_start } });
+
+    return .{ Ok = .{} };
 }
 
 enable_in_scope :: macro (a: Allocator, port := DEFAULT_PORT) {
-    use core.alloc.memdebug
+    use core.alloc.memwatch
 
     addr: net.SocketAddress;
     net.make_ipv4_address(&addr, "0.0.0.0", ~~port);
 
     old_allocator := a;
-    dbg := memdebug.make(old_allocator, &addr);
+    dbg := memwatch.make(old_allocator, &addr);
     a = alloc.as_allocator(&dbg);
 
-    memdebug.wait_for_connection(&dbg);
+    memwatch.wait_for_connection(&dbg);
 
-    defer memdebug.free(&dbg);
+    defer memwatch.free(&dbg);
 }
 
 
 #overload
-alloc.as_allocator :: (memdebug: &MemDebugState) => Allocator.{ memdebug, memdebug_proc }
+alloc.as_allocator :: (memwatch: &MemWatchState) => Allocator.{ memwatch, memwatch_proc }
 
 #local
-memdebug_proc :: (m: &MemDebugState, action: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+memwatch_proc :: (m: &MemWatchState, action: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     newptr := m.wrapped_allocator.func(m.wrapped_allocator.data, action, size, align, oldptr);
 
 
-    trace: [] MemDebugStackNode = .[];
+    trace: [] MemWatchStackNode = .[];
     stack_trace := runtime.info.get_stack_trace();
     if stack_trace {
         slice.init(&trace, stack_trace.count, context.temp_allocator);
@@ -117,7 +117,7 @@ memdebug_proc :: (m: &MemDebugState, action: AllocationAction, size: u32, align:
         }
     }
 
-    memdebug_send_message(m, .{
+    memwatch_send_message(m, .{
         Action = .{
             action,
             ~~oldptr,
@@ -133,9 +133,9 @@ memdebug_proc :: (m: &MemDebugState, action: AllocationAction, size: u32, align:
 
 
 #local
-memdebug_send_message :: (m: &MemDebugState, msg: MemDebugMsg) {
+memwatch_send_message :: (m: &MemWatchState, msg: MemWatchMsg) {
     success := osad.serialize(msg, m.writer->unwrap_ptr());
     if !success {
-        logf(.Warning, "MemDebug logging failed when sending.");
+        logf(.Warning, "MemWatch logging failed when sending.");
     }
 }

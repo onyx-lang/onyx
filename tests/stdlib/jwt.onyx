@@ -1,0 +1,28 @@
+use core.crypto.keys
+use core.encoding.json
+use core.time
+use core.alloc
+use core {printf}
+
+main :: () {
+    alloc.report_leaks_in_scope()
+
+    use claims := Map.literal(str, json.Value, .[
+        .{ "iss", json.from_any("test") }
+        .{ "iat", json.from_any(1234567890) }
+    ])
+
+    use tkn := keys.JWT.make_with_claims(.HS256, claims)
+
+    KEY  :: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    KEY2 :: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAABC"
+
+    use token := tkn->signed_string(KEY).Ok!
+    printf("{p}\n", token)
+
+    use parsed_token := keys.JWT.parse(token, KEY)!
+    printf("{p}\n", parsed_token.headers)
+    for Iterator.from(parsed_token.claims) {
+        printf("Key: {}\n", it.key)
+    }
+}

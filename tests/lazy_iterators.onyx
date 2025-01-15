@@ -1,4 +1,4 @@
-#load "core/module"
+
 
 use core {*}
 
@@ -9,10 +9,10 @@ count_iterator :: (lo: $T, hi: T, step: T = 1) -> Iterator(T) {
         (ctx) => {
             if ctx.current <= ctx.high {
                 defer ctx.current += ctx.step;
-                return ctx.current, true;
+                return Optional.make(ctx.current);
             }
 
-            return 0, false;
+            return .None;
         },
 
         (ctx) => {
@@ -32,7 +32,7 @@ main :: (args: [] cstr) {
                     count_iterator(1.0f, 20.0f)
                     |> iter.map(x => x * 2)
                     |> iter.filter(lower_bound, (x, l) => x > ~~l)
-                    |> iter.map((x, [addition]) => x + ~~addition)
+                    |> iter.map((x) use (addition) => x + ~~addition)
                     |> iter.take(5);
 
         for v in quick_iterator {

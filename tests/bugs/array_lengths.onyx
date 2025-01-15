@@ -1,4 +1,4 @@
-#load "core/module"
+
 
 use core { * }
 
@@ -22,8 +22,8 @@ main :: () {
    arr2: [cast(i32)An_Enum.Count]A_Struct;
 
    println(arr1.count == (3 * 4 - 5));
-   println(sizeof(typeof(arr1)) == (3 * 4 - 5) * sizeof(f32));
+   println((sizeof typeof (arr1)) == (3 * 4 - 5) * sizeof f32);
 
    println(arr2.count == ~~An_Enum.Count);
-   println(sizeof(typeof(arr2)) == ~~An_Enum.Count * sizeof(A_Struct));
+   println((sizeof typeof (arr2)) == ~~An_Enum.Count * sizeof A_Struct);
 }

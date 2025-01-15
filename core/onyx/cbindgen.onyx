@@ -41,7 +41,7 @@ package cbindgen
 
 use runtime
 
-#doc "Deprecated. Use `link_name`."
+/// Deprecated. Use `link_name`.
 customize :: struct {
     symbol_name: str;
 }
@@ -91,32 +91,27 @@ Binding_Config :: struct {
 }
 
 generate_c_binding :: (use binding_config: Binding_Config) -> bool {
-    wrote := false;
-    for file in os.with_file(output_file, .Write) {
-        writer := io.writer_make(file);
-        defer io.writer_free(&writer);
+    use file := os.open(output_file, .Write)->or_return(false);
+    use writer := io.writer_make(&file);
 
-        fb := runtime.info.get_foreign_block(foreign_block);
+    fb := runtime.info.get_foreign_block(foreign_block);
 
-        write_file_introduction(&writer, preamble, fb.module_name);
+    write_file_introduction(&writer, preamble, fb.module_name);
 
-        for fb.funcs {
-            for impl in custom_implementations {
-                if impl.name == it.name {
-                    io.write(&writer, impl.impl);
-                    io.write(&writer, "\n");
-                    continue continue;
-                }
+    for fb.funcs {
+        for impl in custom_implementations {
+            if impl.name == it.name {
+                io.write(&writer, impl.impl);
+                io.write(&writer, "\n");
+                continue continue;
             }
-
-            write_function_body(&writer, it, cast_map, name_map);
         }
 
-        write_library_block(&writer, fb.funcs);
-        wrote = true;
+        write_function_body(&writer, it, cast_map, name_map);
     }
 
-    return wrote;
+    write_library_block(&writer, fb.funcs);
+    return true;
 }
 
 //
@@ -124,7 +119,7 @@ generate_c_binding :: (use binding_config: Binding_Config) -> bool {
 module_path :: (file_path: str) -> str {
     out := file_path;
     while out.count > 0 {
-        if out[out.count - 1] == #char "/" || out[out.count - 1] == #char "\\" do break;
+        if out[out.count - 1] == '/' || out[out.count - 1] == '\\' do break;
         out.count -= 1;
     }
 
@@ -163,7 +158,7 @@ compile_c_file :: (
         }
 
         if flags != "" {
-            for string.split(flags, #char " ") do args << it;
+            for string.split(flags, ' ') do args << it;
         }
 
         args << "-o";
@@ -196,6 +191,8 @@ compile_c_file :: (
     #if runtime.compiler_os == .Windows {
         return true;
     }
+
+    return false;
 }
 
 #local {
@@ -334,11 +331,11 @@ compile_c_file :: (
                         case u64  do string.append(call_signature, "L");
                         case f32  do string.append(call_signature, "f");
                         case f64  do string.append(call_signature, "d");
-                        case #default {
+                        case _ {
                             if is_pointer(p) {
                                 string.append(call_signature, "p");
                             } else {
-                                assert(false, tprintf("Unsupported type in function pointer: {}", p));
+                                panic(tprintf("Unsupported type in function pointer: {}", p));
                             }
                         }
                     }
@@ -376,7 +373,7 @@ compile_c_file :: (
         if last_arg_is_return_value {
             return_type := slice.get(method_info.parameter_types, -1);
             if return_type->info().kind != .Pointer {
-                assert(false, tprintf("last_arg_is_return_value requires last parameter to be a pointer. ({} in {})", method_info.parameter_types, method_name));
+                panic(tprintf("last_arg_is_return_value requires last parameter to be a pointer. ({} in {})", method_info.parameter_types, method_name));
             }
 
             return_type = return_type->info()->as_pointer().to;
@@ -435,8 +432,8 @@ compile_c_file :: (
             case .Multi_Pointer do return "ptr"; 
             case .Array do return "ptr";
 
-            case .Function do return "i32"; // assert(false, "Passing functions between wasm and c is not yet supported.");
-            case .Slice do assert(false, "Passing a slice from c to wasm is not yet supported.");
+            case .Function do return "i32"; // panic("Passing functions between wasm and c is not yet supported.");
+            case .Slice do panic("Passing a slice from c to wasm is not yet supported.");
             case .Enum do return type_to_wasm_type((cast(&Type_Info_Enum) param_info).backing_type);
             case .Distinct do return type_to_wasm_type((cast(&Type_Info_Distinct) param_info).base_type);
 
@@ -451,11 +448,11 @@ compile_c_file :: (
                     return type_to_wasm_type(s_info.members[0].type);
                 }
 
-                assert(false, "Passing structures between wasm and c is not yet supported.");
+                panic("Passing structures between wasm and c is not yet supported.");
             }
 
             case .Union {
-                assert(false, "Passing unions between wasm and c is not yet supported.");
+                panic("Passing unions between wasm and c is not yet supported.");
             }
         }
 
@@ -490,7 +487,7 @@ compile_c_file :: (
 
             case .Pointer do return "WASM_I32"; // This will also have to depend on the pointer size...
             case .Multi_Pointer do return "WASM_I32"; // This will also have to depend on the pointer size...
-            case .Function do return "WASM_I32, WASM_I32, WASM_I32"; // assert(false, "Passing functions between wasm and c is not yet supported.");
+            case .Function do return "WASM_I32, WASM_I32"; // panic("Passing functions between wasm and c is not yet supported.");
             case .Array do return "WASM_I32";
             case .Slice do return "WASM_I32,WASM_I32";
             case .Enum do return type_encoding((cast(&Type_Info_Enum) param_info).backing_type);
@@ -502,7 +499,7 @@ compile_c_file :: (
                     return type_encoding(s_info.members[0].type);
                 }
 
-                // assert(false, "Passing structures between wasm and c is not yet supported.");
+                // panic("Passing structures between wasm and c is not yet supported.");
                 return "WASM_I32";
             }
         }

@@ -7,12 +7,7 @@
 // Onyx Documentation generation
 
 void onyx_docs_submit(OnyxDocInfo *docs, AstBinding *binding);
-void onyx_docs_emit_odoc(const char *dest);
-
-
-// Tag generation
-
-void onyx_docs_emit_tags(char *dest);
+void onyx_docs_generate_odoc(Context *context, bh_buffer *out_buffer);
 
 
 
@@ -24,7 +19,8 @@ struct SymbolInfo {
 	u32 file_id;
 	u32 line;
 	u32 column;
-	OnyxToken *documentation;
+	const char *documentation;
+	u32 documentation_length;
 };
 
 typedef struct SymbolResolution SymbolResolution;
@@ -52,6 +48,6 @@ struct SymbolInfoTable {
 	bh_imap node_to_id;
 };
 
-void onyx_docs_emit_symbol_info(const char *dest);
+void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer);
 
 #endif

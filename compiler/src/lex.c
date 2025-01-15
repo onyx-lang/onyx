@@ -4,10 +4,10 @@
 #include "errors.h"
 
 static const char* token_type_names[] = {
-    "TOKEN_TYPE_UNKNOWN",
-    "TOKEN_TYPE_END_STREAM",
+    "UNKNOWN",
+    "the end of file",
 
-    "TOKEN_TYPE_COMMENT",
+    "a comment",
 
     "", // start
     "package",
@@ -67,18 +67,23 @@ static const char* token_type_names[] = {
     ">>=",
     ">>>=",
     "..",
+    "..=",
     "~~",
     "??",
 
-    "TOKEN_TYPE_SYMBOL",
-    "TOKEN_TYPE_LITERAL_STRING",
-    "TOKEN_TYPE_LITERAL_CHAR",
-    "TOKEN_TYPE_LITERAL_INTEGER",
-    "TOKEN_TYPE_LITERAL_FLOAT",
+    "a symbol",
+    "a string",
+    "a character literal",
+    "an integer",
+    "a float",
     "true",
     "false",
 
-    "inserted semicolon",
+    "an inserted semicolon",
+
+    "a doc comment",
+
+    "a procedural macro body",
 
     "TOKEN_TYPE_COUNT"
 };
@@ -124,8 +129,10 @@ static inline b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, 
 }
 
 const char *token_type_name(TokenType tkn_type) {
+    static char hack_tmp_buffer[32];
     if (tkn_type < Token_Type_Ascii_End) {
-        return bh_aprintf(global_scratch_allocator, "%c", (char) tkn_type);
+        bh_snprintf(hack_tmp_buffer, 31, "%c", (char) tkn_type);
+        return hack_tmp_buffer;
     } else {
         return token_type_names[tkn_type - Token_Type_Ascii_End];
     }
@@ -135,7 +142,9 @@ const char* token_name(OnyxToken * tkn) {
     TokenType tkn_type = tkn->type;
 
     if (tkn_type == Token_Type_Symbol) {
-        return bh_aprintf(global_scratch_allocator, "%b", tkn->text, tkn->length);
+        static char hack_tmp_buffer[512];
+        bh_snprintf(hack_tmp_buffer, 511, "%b", tkn->text, tkn->length);
+        return hack_tmp_buffer;
     }
 
     return token_type_name(tkn_type);
@@ -211,14 +220,22 @@ whitespace_skipped:
     // Comments
     if (*tokenizer->curr == '/' && *(tokenizer->curr + 1) == '/') {
         tokenizer->curr += 2;
-        tk.type = Token_Type_Comment;
+
+        if (*tokenizer->curr == '/') {
+            tokenizer->curr += 1;
+            tk.type = Token_Type_Doc_Comment;
+        } else {
+            tk.type = Token_Type_Comment;
+        }
+
         tk.text = tokenizer->curr;
+        tk.pos.column = (u16)(tokenizer->curr - tokenizer->line_start) + 1;
 
         while (*tokenizer->curr != '\n' && tokenizer->curr != tokenizer->end) {
             INCREMENT_CURR_TOKEN(tokenizer);
         }
 
-        tk.length = tokenizer->curr - tk.text - 2;
+        tk.length = tokenizer->curr - tk.text;
 
         if (bh_arr_length(tokenizer->tokens) == 0 && bh_str_starts_with(tk.text, "+optional-semicolons")) {
             tokenizer->optional_semicolons = 1;
@@ -288,7 +305,7 @@ whitespace_skipped:
 
             if (*tokenizer->curr == '\n' && ch == '\'') {
                 tk.pos.length = (u16) len;
-                onyx_report_error(tk.pos, Error_Critical, "Character literal not terminated by end of line.");
+                onyx_report_error(tokenizer->context, tk.pos, Error_Critical, "Character literal not terminated by end of line.");
                 break;
             }
 
@@ -301,7 +318,7 @@ whitespace_skipped:
 
             INCREMENT_CURR_TOKEN(tokenizer);
             if (tokenizer->curr == tokenizer->end) {
-                onyx_report_error(tk.pos, Error_Critical, "String literal not closed. String literal starts here.");
+                onyx_report_error(tokenizer->context, tk.pos, Error_Critical, "String literal not closed. String literal starts here.");
                 break;
             }
         }
@@ -319,7 +336,7 @@ whitespace_skipped:
         INCREMENT_CURR_TOKEN(tokenizer);
         INCREMENT_CURR_TOKEN(tokenizer);
         u32 len = 3;
-        while (char_is_num(*(tokenizer->curr + 1)) || charset_contains("abcdefABCDEF", *(tokenizer->curr + 1))) {
+        while (char_is_num(*(tokenizer->curr + 1)) || charset_contains("abcdefABCDEF_", *(tokenizer->curr + 1))) {
             len++;
             INCREMENT_CURR_TOKEN(tokenizer);
         }
@@ -337,15 +354,20 @@ whitespace_skipped:
         tk.type = Token_Type_Literal_Integer;
 
         b32 hit_decimal = 0;
+        b32 hit_exponent = 0;
         if (*tokenizer->curr == '.') hit_decimal = 1;
 
         u32 len = 1;
         while (char_is_num(*(tokenizer->curr + 1))
-            || (!hit_decimal && *(tokenizer->curr + 1) == '.' && *(tokenizer->curr + 2) != '.')) {
+            || (*(tokenizer->curr + 1) == '_')
+            || (!hit_exponent && *(tokenizer->curr + 1) == 'e')
+            || (!hit_decimal && !hit_exponent && *(tokenizer->curr + 1) == '.' && *(tokenizer->curr + 2) != '.')
+            || (hit_exponent && *(tokenizer->curr + 1) == '-')) {
             len++;
             INCREMENT_CURR_TOKEN(tokenizer);
 
-            if (*tokenizer->curr == '.') hit_decimal = 1;
+            if (*tokenizer->curr == '.') hit_decimal  = 1;
+            if (*tokenizer->curr == 'e') hit_exponent = 1;
         }
 
         if (*(tokenizer->curr + 1) == 'f') {
@@ -355,8 +377,31 @@ whitespace_skipped:
             INCREMENT_CURR_TOKEN(tokenizer);
         }
 
-        if (hit_decimal) tk.type = Token_Type_Literal_Float;
+        if (hit_decimal || hit_exponent) tk.type = Token_Type_Literal_Float;
 
+        tk.length = len;
+
+        INCREMENT_CURR_TOKEN(tokenizer);
+        goto token_parsed;
+    }
+
+    if (tokenizer->curr[0] == '!' && tokenizer->curr[1] == '{') {
+        INCREMENT_CURR_TOKEN(tokenizer);
+        INCREMENT_CURR_TOKEN(tokenizer);
+
+        tk.text = tokenizer->curr;
+
+        i32 bracket_count = 0;
+        i32 len = 0;
+        while ((bracket_count > 0 || tokenizer->curr[0] != '}') && tokenizer->curr != tokenizer->end) {
+            if (tokenizer->curr[0] == '{') bracket_count += 1;
+            if (tokenizer->curr[0] == '}') bracket_count -= 1;
+
+            len++;
+            INCREMENT_CURR_TOKEN(tokenizer);
+        }
+
+        tk.type = Token_Type_Proc_Macro_Body;
         tk.length = len;
 
         INCREMENT_CURR_TOKEN(tokenizer);
@@ -434,7 +479,7 @@ whitespace_skipped:
 
     case '<':
         LITERAL_TOKEN("<=",          0, Token_Type_Less_Equal);
-        LITERAL_TOKEN("<-",          0, Token_Type_Right_Arrow);
+        LITERAL_TOKEN("<-",          0, Token_Type_Left_Arrow);
         LITERAL_TOKEN("<<=",         0, Token_Type_Shl_Equal);
         LITERAL_TOKEN("<<",          0, Token_Type_Shift_Left);
         break;
@@ -488,6 +533,7 @@ whitespace_skipped:
         break;
 
     case '.':
+        LITERAL_TOKEN("..=",         0, Token_Type_Dot_Dot_Equal);
         LITERAL_TOKEN("..",          0, Token_Type_Dot_Dot);
         break;
 
@@ -537,7 +583,9 @@ token_parsed:
         case Token_Type_Literal_Float:
         case Token_Type_Literal_Char:
         case Token_Type_Empty_Block:
+        case Token_Type_Proc_Macro_Body:
         case '?':
+        case '!':
         case ')':
         case '}':
         case ']':
@@ -551,8 +599,10 @@ token_parsed:
     return &tokenizer->tokens[bh_arr_length(tokenizer->tokens) - 1];
 }
 
-OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc) {
+OnyxTokenizer onyx_tokenizer_create(Context *context, bh_file_contents *fc) {
     OnyxTokenizer tknizer = {
+        .context = context,
+
         .start          = fc->data,
         .curr           = fc->data,
         .end            = bh_pointer_add(fc->data, fc->length),
@@ -563,11 +613,11 @@ OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc
         .line_start     = fc->data,
         .tokens         = NULL,
 
-        .optional_semicolons = context.options->enable_optional_semicolons,
+        .optional_semicolons = context->options->enable_optional_semicolons,
         .insert_semicolon = 0,
     };
 
-    bh_arr_new(allocator, tknizer.tokens, 1 << 12);
+    bh_arr_new(context->token_alloc, tknizer.tokens, 1 << 12);
     return tknizer;
 }
 
@@ -581,8 +631,8 @@ void onyx_lex_tokens(OnyxTokenizer* tokenizer) {
         tk = onyx_get_token(tokenizer);
     } while (tk->type != Token_Type_End_Stream);
 
-    context.lexer_lines_processed += tokenizer->line_number - 1;
-    context.lexer_tokens_processed += bh_arr_length(tokenizer->tokens);
+    tokenizer->context->stats.lexer_lines_processed += tokenizer->line_number - 1;
+    tokenizer->context->stats.lexer_tokens_processed += bh_arr_length(tokenizer->tokens);
 }
 
 b32 token_equals(OnyxToken* tkn1, OnyxToken* tkn2) {

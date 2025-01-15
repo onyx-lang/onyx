@@ -405,16 +405,15 @@ path_filestat_get       :: (fd: FileDescriptor, flags: LookupFlags, path: str, b
 path_filestat_set_times :: (fd: FileDescriptor, flags: LookupFlags, path: str, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno #foreign WASI_VERSION "path_filestat_set_times" ---
 
 path_link :: (fd: FileDescriptor, old_flags: LookupFlags, old_path: str, new_fd: FileDescriptor, new_path: str) -> Errno #foreign WASI_VERSION "path_link" ---
-path_open :: (fd: FileDescriptor
-    , dirflags: LookupFlags
-    , path: str
-    , oflags: OFlags
-    , fs_rights_base: Rights
-    , fs_rights_inherting: Rights
-    , fdflags: FDFlags
-    , opened_fd: &FileDescriptor
-    ) -> Errno
-     #foreign WASI_VERSION "path_open" ---
+path_open :: (fd: FileDescriptor,
+    dirflags: LookupFlags,
+    path: str,
+    oflags: OFlags,
+    fs_rights_base: Rights,
+    fs_rights_inherting: Rights,
+    fdflags: FDFlags,
+    opened_fd: &FileDescriptor,
+    ) -> Errno #foreign WASI_VERSION "path_open" ---
 
 path_readlink :: (fd: FileDescriptor, path: str, buf: &u8, buf_len: Size, bufused: &Size) -> Errno #foreign WASI_VERSION "path_readlink" ---
 path_remove_directory :: (fd: FileDescriptor, path: str) -> Errno #foreign WASI_VERSION "path_remove_directory" ---

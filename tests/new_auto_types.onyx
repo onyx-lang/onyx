@@ -1,0 +1,24 @@
+use core {*}
+
+main :: () {
+	x: _
+	x = 100
+	println(x)
+	println(typeof x)
+
+	func_with_auto_return() |> println()
+
+	a, b, c: _
+	a = "Test"
+	b = context.allocator
+	c = 45.56
+	println(typeof a)
+	println(typeof b)
+	println(typeof c)
+}
+
+func_with_auto_return :: () -> _ {
+	return 123
+}
+
+

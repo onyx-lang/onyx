@@ -1,0 +1,448 @@
+
+package core.js
+
+use core.iter
+use core.math
+use core.array
+use core.alloc
+
+/// Used to represent a JavaScript value.
+Value :: #distinct u64
+
+value :: Value.from
+
+Type :: enum {
+    Undefined :: 0;
+    Null      :: 1;
+    Boolean   :: 2;
+    Number    :: 3;
+    String    :: 4;
+    Symbol    :: 5;
+    Object    :: 6;
+    Function  :: 7;
+}
+
+Undefined  :: Value.{0}
+NaN        :: Value.{0x7ff8000000000000}
+Zero       :: Value.{0x7ff8000000000001}
+Null       :: Value.{0x7ff8000000000002}
+True       :: Value.{0x7ff8000000000003}
+False      :: Value.{0x7ff8000000000004}
+Global     :: Value.{0x7ff8000000000005}
+Onyx       :: Value.{0x7ff8000000000006}
+
+/// Creates a new JavaScript object and returns the `Value` handle to it.
+Value.new_object :: () -> Value {
+    v := __new_object();
+    __add_to_pool(v);
+    return v;
+}
+
+/// Creates a new JavaScript array and returns the `Value` handle to it.
+Value.new_array :: () -> Value {
+    v := __new_array();
+    __add_to_pool(v);
+    return v;
+}
+
+/// Converts an Onyx value into a JavaScript `Value`.
+///
+/// Currently, these types are supported: `i32`, `u32`, `i64`, `u64`, `f32`, `f64`, `bool`, str, `Value`, `Func`, and `Map(str, $V)`.
+Value.from :: #match {
+    (m: Map(str, $V)) -> ? Value {
+        result := Value.new_object();
+        __add_to_pool(result);
+
+        for &entry in m.entries {
+            result->set(entry.key, Value.from(entry.value) ?? Value.Undefined);
+        }
+
+        return result;
+    },
+
+    (a: any) -> ? Value {
+        switch a.type {
+            case i32, u32 {
+                // Integers are simply upcasted to float64s
+                v := cast(f64) *cast(&i32, a.data);
+                if v == 0 do return Zero;
+
+                return *cast(&Value) &v;
+            }
+
+            case i64, u64 {
+                // Integers are simply upcasted to float64s, even with a loss of precision
+                // Gotta love JS.
+                v := cast(f64) *cast(&i64, a.data);
+                if v == 0 do return Zero;
+
+                return *cast(&Value) &v;
+            }
+
+            case f32 {
+                v := cast(f64) *cast(&f32, a.data);
+                if v == 0 do return Zero;
+
+                return *cast(&Value) &v;
+            }
+
+            case f64 {
+                v := *cast(&f64, a.data);
+                if v == 0 do return Zero;
+
+                return *cast(&Value) &v;
+            }
+
+            case bool {
+                if *cast(&bool, a.data) do return True;
+                else                    do return False;
+            }
+        }
+
+        if a.type == str {
+            s := __from_str(*cast(&str) a.data);
+            __add_to_pool(s);
+            return s;
+        }
+
+        if a.type == #type (Value, [] Value) -> Value {
+            f := *cast(&(Value, [] Value) -> Value) a.data;
+            v := cast(Value) Func.from(f);
+            __add_to_pool(v);
+            return v;
+        }
+
+        if a.type == Value do return *cast(&Value) a.data;
+        if a.type == Func  do return *cast(&Value) a.data; // Funcs right now are just values
+
+        return .None;
+    }
+}
+
+/// Converts a `Value` into a `bool`. If the value is not internally of boolean type, `None` is returned.
+Value.as_bool :: (v: Value) -> ? bool {
+    if cast(u64) v == cast(u64) True  do return true;
+    if cast(u64) v == cast(u64) False do return false;
+
+    return .None;
+}
+
+/// Converts a `Value` into a `f64`. If the value is not internally of float type, `None` is returned.
+Value.as_float :: (v: Value) -> ? f64 {
+    v_u64 := cast(u64, v);
+    v_f64 := *cast(&f64, &v_u64);
+    if !math.is_nan(v_f64) {
+        return v_f64;
+    }
+
+    return .None;
+}
+
+/// Converts a `Value` into a `i32`. If the value is not internally of float type, `None` is returned.
+Value.as_int :: (v: Value) -> ? i32 {
+    v_u64 := cast(u64, v);
+    v_f64 := *cast(&f64, &v_u64);
+    if !math.is_nan(v_f64) {
+        return cast(i32) v_f64;
+    }
+
+    return .None;
+}
+
+/// Converts a `Value` into a `str`. If the value is not internally of str type, `None` is returned.
+///
+/// Note that this function returns a string that is allocated on the heap.
+/// The caller is responsible for managing the returned string.
+Value.as_str :: (v: Value) -> ? str {
+    len := __to_str(v, .[]);
+    if len < 0 do return .None;
+
+    ret := make(str, len);
+    __to_str(v, ret);
+    return ret;
+}
+
+/// Returns the internal type of the `Value`.
+Value.type :: (v: Value) -> Type {
+    v_u64 := cast(u64, v);
+
+    // TODO: Cleanup these magic constants.
+    if v_u64 == 0                  do return .Undefined;
+    if v_u64 == 0x7ff8000000000001 do return .Number;
+    if v_u64 == 0x7ff8000000000002 do return .Null;
+    if v_u64 == 0x7ff8000000000003 do return .Boolean;
+    if v_u64 == 0x7ff8000000000004 do return .Boolean;
+    if v_u64 == 0x7ff8000000000005 do return .Object;
+    if v_u64 == 0x7ff8000000000006 do return .Object;
+
+    if !math.is_nan(*cast(&f64, &v_u64)) do return .Number;
+
+    type_flag: u32 = ~~((v_u64 >> 32) & 7);
+    switch type_flag {
+        case 0 do return .Null;
+        case 1 do return .Object;
+        case 2 do return .String;
+        case 3 do return .Symbol;
+        case 4 do return .Function;
+    }
+
+    return .Undefined;
+}
+
+/// Calls a method on a `Value`.
+Value.call :: #match {
+    (v: Value, method: str, args: [] any) -> Value {
+        transform_args(args, [](__method(v, method, mapped_args)));
+    },
+
+    (v: Value, method: str, args: ..any) -> Value {
+        return Value.call(v, method, cast([] any) args);
+    }
+}
+
+/// Invokes the `Value` as though it is a JavaScript function.
+Value.invoke :: #match {
+    (v: Value, args: ..any) -> Value {
+        transform_args(args, [](__call(v, mapped_args)));
+    },
+
+    (v: Value, args: ..any) -> Value {
+        return Value.invoke(v, cast([] any) args);
+    }
+}
+
+/// Removes the `Value` from current `ValuePool`. This means that the `Value` will not be automatically collected, and must be released with `Value.release`.
+Value.leak :: (v: Value) -> Value {
+    if __current_pool {
+        __current_pool->remove(v);
+    }
+
+    return v;
+}
+
+/// Releases the `Value` from the JavaScript heap. The `Value` should not be used after this method is called.
+Value.release :: (v: Value) {
+    if __current_pool {
+        __current_pool->remove(v);
+    }
+
+    return __free(v);
+}
+
+/// Invokes the JavaScript `delete` operator on the specified property.
+Value.delete :: (v: Value, property: str) {
+    return __delete(v, property);
+}
+
+Value.equals :: (v1: Value, v2: Value) -> bool {
+    return cast(u64, v1) == cast(u64, v2) && cast(u64, v1) != cast(u64, NaN);
+}
+
+Value.is_null :: (v: Value) -> bool {
+    return cast(u64) v == cast(u64) Null;
+}
+
+Value.is_undefined :: (v: Value) -> bool {
+    return cast(u64) v == cast(u64) Undefined;
+}
+
+Value.is_nan :: (v: Value) -> bool {
+    return cast(u64) v == cast(u64) NaN;
+}
+
+/// Returns the evaluation of the `instanceof` operator in JavaScript.
+Value.instance_of :: (v: Value, base: Value) -> bool {
+    return __instance_of(v, base);
+}
+
+/// Invokes the `new` operator on the `Value`, with arguments `args`.
+Value.new :: (v: Value, args: ..any) -> Value {
+    transform_args(cast([] any) args, [](__new(v, mapped_args)));
+}
+
+/// Retrieves the evaluation of `v[prop]` in JavaScript.
+Value.get :: (v: Value, prop: str) -> Value {
+    r := __dot(v, prop);
+    __add_to_pool(r);
+    return r;
+}
+
+/// Retrieves the evaluation of `v[prop] = value` in JavaScript.
+Value.set :: #match #locked {
+    (v: Value, prop: str, value: Value) {
+        __set(v, prop, value);
+    },
+
+    (v: Value, prop: str, value: $T) {
+        js_value := Value.from(value) ?? Undefined;
+        __set(v, prop, js_value);
+        js_value->release();
+    },
+
+    (v: Value, index: i32, value: Value) {
+        __set_index(v, index, value);
+    },
+
+    (v: Value, index: i32, value: $T) {
+        js_value := Value.from(value) ?? Undefined;
+        __set_index(v, index, js_value);
+        js_value->release();
+    }
+}
+
+/// Special case for `->get("length")`. Because it is required so often, this optimization is quite nice.
+Value.length :: (v: Value) -> i32 {
+    return __len(v);
+}
+
+/// Retrieves the evaluation of `v[i]` in JavaScript.
+Value.index :: (v: Value, i: i32) -> Value {
+    r := __sub(v, i);
+    __add_to_pool(r);
+    return r;
+}
+
+/// JavaScript defines a "falsesy" value as undefined, null, false, 0, and "".
+/// All other values are "truthy".
+Value.truthy :: (v: Value) -> bool {
+    switch v->type() {
+        case .Undefined, .Null do return false;
+        case .Boolean do return cast(u64) v == cast(u64) True;
+        case .Number  do return cast(u64) v != cast(u64) Zero;
+        case .String  do return v->length() != 0;
+        case _ do return true;
+    }
+}
+
+/// Copies data from a Uint8Array in JS to a buffer in Onyx.
+/// Returns the number of bytes copied, or -1 if the value was not a Uint8Array.
+Value.copy_to_onyx :: (v: Value, buf: [] u8) -> i32 {
+    return __copy_to_onyx(buf, v);
+}
+
+
+/// Copies data into a Uint8Array in JS from a buffer in Onyx.
+/// Returns the number of bytes copied, or -1 if the value was not a Uint8Array.
+Value.copy_to_js :: (v: Value, buf: [] u8) -> i32 {
+    return __copy_to_js(v, buf);
+}
+
+
+#local
+transform_args :: macro (args: [] any, $body: Code) {
+    mapped_args:  [..] Value;
+    args_to_free: [..] Value;
+    defer {
+        for to_free in args_to_free {
+            to_free->release();
+        }
+
+        delete(&mapped_args);
+        delete(&args_to_free);
+    }
+    
+    for arg in args {
+        if arg.type == Value || arg.type == Func {
+            mapped_args << *cast(&Value, arg.data);
+
+        } else {
+            generated := Value.from(arg) ?? Undefined;
+            mapped_args << generated;
+            args_to_free << generated;
+        }
+    }
+
+    res := #unquote body;
+    __add_to_pool(res);
+    return res;
+}
+
+#overload
+builtin.delete :: (v: Value) {
+    __free(v);
+}
+
+
+#package
+#thread_local
+__current_pool: &ValuePool
+
+#package
+__add_to_pool :: macro (v: Value) {
+    if __current_pool {
+        if cast(u64) v != 0 {
+            __current_pool->add(v);
+        }
+    }
+}
+
+
+/// To aid in managing `Value`s that are created over the life time of the program,
+/// `ValuePool` collects all of the `Value`s and allows for releasing them all at once.
+ValuePool :: struct {
+    values: [..] Value = make([..] Value, alloc.heap_allocator);
+}
+
+ValuePool.add :: (vp: &ValuePool, v: Value) {
+    vp.values << v;
+}
+
+ValuePool.remove :: (vp: &ValuePool, v: Value) {
+    array.filter(&vp.values, [x](cast(u64) x != cast(u64) v));
+}
+
+ValuePool.release_all :: (vp: &ValuePool) {
+    for v in vp.values {
+        __free(v);
+    }
+
+    array.clear(&vp.values);
+}
+
+ValuePool.destroy :: (vp: &ValuePool) {
+    vp->release_all();
+    delete(&vp.values);
+}
+
+/// Gets the current `ValuePool` in use.
+get_pool :: () => __current_pool;
+
+/// Sets the `ValuePool` to use.
+set_pool :: (vp: &ValuePool) {
+    __current_pool = vp;
+}
+
+/// Creates a new `ValuePool` and uses it. The old `ValuePool` is forgotten.
+setup_default_pool :: () {
+    __current_pool = new(ValuePool);
+}
+
+/// Releases all objects in the current `ValuePool`.
+release_pooled_objects :: () {
+    if __current_pool {
+        __current_pool->release_all();
+    }
+}
+
+/// Helper macro to create a `ValuePool` that is scoped to a block.
+temp_pool :: #match {
+    macro (body: Code) -> u32 {
+        #this_package.temp_pool();
+
+        #unquote body;
+        return 0;
+    },
+
+    macro () {
+        __current_pool :: __current_pool
+
+        pool := #this_package.ValuePool.{};
+        defer delete(&pool);
+
+        old_pool := __current_pool;
+        __current_pool = &pool;
+        defer __current_pool = old_pool;
+    }
+}
+
+

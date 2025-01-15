@@ -9,9 +9,8 @@ Speak :: interface (T: type_expr) {
     speak :: #match {}
 }
 
-#inject Speak {
-    yell  :: #match {}
-}
+Speak.yell  :: #match {}
+
 
 Dog :: struct {_: i32}
 

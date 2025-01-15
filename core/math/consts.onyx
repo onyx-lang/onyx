@@ -1,0 +1,27 @@
+package core.math
+
+E      :: 2.71828182845904523536f
+PI     :: 3.14159265f
+TAU    :: 6.28318330f
+SQRT_2 :: 1.414213562f
+
+
+i8.MAX  :: 127
+i8.MIN  :: -128
+u8.MAX  :: 255
+u8.MIN  :: 0
+i16.MAX :: 32767
+i16.MIN :: -32768
+u16.MAX :: 65536
+u16.MIN :: 0
+i32.MAX :: 2147483647
+i32.MIN :: -2147483648
+u32.MAX :: 4294967296
+u32.MIN :: 0
+i64.MAX :: 9223372036854775807
+i64.MIN :: -9223372036854775807 // This is slightly incorrect because of a compiler bug
+u64.MAX :: 18446744073709551616
+u64.MIN :: 0
+
+
+

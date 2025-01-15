@@ -16,7 +16,7 @@ on:
 jobs:
   setup:
     name: Set up
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       VERSION: ${{ steps.setup.outputs.VERSION }}
       DOING_RELEASE: ${{ steps.setup.outputs.DOING_RELEASE }}
@@ -41,53 +41,53 @@ jobs:
       matrix:
         include:
           - build: linux-amd64
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             runtime_library: ovmwasm
             artifact_name: 'onyx-linux-ovm-amd64'
           - build: linux-amd64
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             runtime_library: wasmer
             artifact_name: 'onyx-linux-wasmer-amd64'
           - build: linux-amd64
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             runtime_library: none
             artifact_name: 'onyx-linux-none-amd64' 
           - build: linux-arm64
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             runtime_library: ovmwasm
             artifact_name: 'onyx-linux-ovm-arm64'
           - build: linux-arm64
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             runtime_library: wasmer
             artifact_name: 'onyx-linux-wasmer-arm64'
           - build: linux-arm64
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             runtime_library: none
             artifact_name: 'onyx-linux-none-arm64' 
           - build: darwin-arm64
-            os: macos-12
+            os: macos-13
             runtime_library: none
             target: aarch64-apple-darwin
             artifact_name: 'onyx-darwin-none-arm64'
           - build: darwin-arm64
-            os: macos-12
+            os: macos-13
             runtime_library: wasmer
             target: aarch64-apple-darwin
             artifact_name: 'onyx-darwin-wasmer-arm64'
           - build: darwin-amd64
-            os: macos-12
+            os: macos-13
             runtime_library: none
             artifact_name: 'onyx-darwin-none-amd64'
           - build: darwin-amd64
-            os: macos-12
+            os: macos-13
             runtime_library: wasmer
             artifact_name: 'onyx-darwin-wasmer-amd64'
           - build: darwin-amd64
-            os: macos-12
+            os: macos-13
             runtime_library: ovmwasm
             artifact_name: 'onyx-darwin-ovm-amd64'
           - build: darwin-arm64
-            os: macos-12
+            os: macos-13
             runtime_library: ovmwasm
             target: aarch64-apple-darwin
             artifact_name: 'onyx-darwin-ovm-arm64'
@@ -223,7 +223,7 @@ jobs:
           cmd.exe /c 'build.bat dist'
       
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: dist
@@ -245,7 +245,7 @@ jobs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
       - name: Create Release

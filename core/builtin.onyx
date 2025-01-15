@@ -35,21 +35,31 @@ dyn_str :: #type [..] u8;
 
 
 
-//
-// This is the type of a range literal (i.e. 1 .. 5).
-// This is a special type that the compiler knows how to iterator through.
-// So, one can simply write:
-//
-//      for x in 1 .. 5 { ... }
-//
-// Although not controllable from the literal syntax, there is a `step`
-// member that allows you control how many numbers to advance each iteration.
-// For example, range.{ 0, 100, 2 } would iterate over the even numbers, and
-// range.{ 100, 0, -1 } would count backwards from 100 to 0 (and including 0).
+/// This is the type of a range literal (i.e. 1 .. 5).
+/// This is a special type that the compiler knows how to iterator through.
+/// So, one can simply write:
+///
+///      for x in 1 .. 5 { ... }
+///
+/// Although not controllable from the literal syntax, there is a `step`
+/// member that allows you control how many numbers to advance each iteration.
+/// For example, range.{ 0, 100, 2 } would iterate over the even numbers, and
+/// range.{ 100, 0, -1 } would count backwards from 100 to 0 (and including 0).
 range :: struct {
     low  : i32;
     high : i32;
     step : i32 = 1;
+}
+
+/// To have parity between range32 and range64
+range32 :: range
+
+
+/// This is the same as the `range` type, except with 64-bit integers.
+range64 :: struct {
+    low  : i64;
+    high : i64;
+    step : i64 = 1;
 }
 
 
@@ -60,35 +70,33 @@ range :: struct {
 // casts to all other pointer types.
 null :: cast(rawptr) 0
 
-#doc """
-    `null_proc` is a special function that breaks the normal rules of type
-    checking. `null_proc`, or any procedure marked with `#null`, is assignable
-    to any function type, regardless of if the types match. For example,
-
-        f: (i32) -> i32 = null_proc;
-
-    Even though `null_proc` is a `() -> void` function, it bypasses that check
-    and gets assigned to `f`. If f is called, there will be a runtime exception.
-    This is by design.
-"""
+/// `null_proc` is a special function that breaks the normal rules of type
+/// checking. `null_proc`, or any procedure marked with `#null`, is assignable
+/// to any function type, regardless of if the types match. For example,
+///
+///     f: (i32) -> i32 = null_proc;
+///
+/// Even though `null_proc` is a `() -> void` function, it bypasses that check
+/// and gets assigned to `f`. If f is called, there will be a runtime exception.
+/// This is by design.
 null_proc :: () -> void #null ---
 
-//
-// I find myself wanting to return a completely nullified string like the
-// one below that I decided to added a builtin binding for it. This might
-// go away at some point and would just need to be defined in every file.
+///
+/// I find myself wanting to return a completely nullified string like the
+/// one below that I decided to added a builtin binding for it. This might
+/// go away at some point and would just need to be defined in every file.
 null_str  :: str.{ null, 0 }
 
 
 
-//
-// The 'context' is used to store thread-local configuration for things like
-// allocators, loggers, exception handles, and other things. It is thread
-// local so every threads gets its own copy.
+///
+/// The 'context' is used to store thread-local configuration for things like
+/// allocators, loggers, exception handles, and other things. It is thread
+/// local so every threads gets its own copy.
 #thread_local context : OnyxContext;
 
-//
-// This is the type of the 'context' global variable.
+///
+/// This is the type of the 'context' global variable.
 OnyxContext :: struct {
     // The allocator used by default by the standard library. It is by
     // default the global heap allocator.
@@ -127,29 +135,32 @@ OnyxContext :: struct {
 //
 // Define helper methods for setting and retrieving the user_data
 // stored on the context.
-#inject OnyxContext {
-    set_user_data :: macro (c: &OnyxContext, data: &$T) {
-        c.user_data = data;
-        c.user_data_type = T;
-    }
+OnyxContext.set_user_data :: macro (c: &OnyxContext, data: &$T) {
+    c.user_data = data;
+    c.user_data_type = T;
+}
 
-    get_user_data :: macro (c: &OnyxContext, $T: type_expr) -> &T {
-        if c.user_data_type != T do return null;
-        return ~~ c.user_data;
-    }
+OnyxContext.get_user_data :: macro (c: &OnyxContext, $T: type_expr) -> &T {
+    if c.user_data_type != T do return null;
+    return ~~ c.user_data;
 }
 
 
 
 // CLEANUP: Does assert() need to be in the builtin file?
-// It uses context.assert_handler, but does it needt to be here?
-//
-// Checks if the condition is true. If not, invoke the context's
-// assert handler.
+// It uses context.assert_handler, but does it need to be here?
+
+/// Checks if the condition is true. If not, invoke the context's
+/// assert handler.
 assert :: (cond: bool, msg: str, site := #callsite) {
     if !cond {
         context.assert_handler(msg, site);
     }
+}
+
+/// Causes a runtime panic with the specified error message.
+panic :: (msg: str, site := #callsite) {
+    context.assert_handler(msg, site);
 }
 
 
@@ -251,34 +262,31 @@ raw_alloc :: (use a: Allocator, size: u32, alignment := Default_Allocation_Align
     return func(data, AllocationAction.Alloc, size, alignment, null);
 }
 
-//
-// Helper procedure to resize an allocation from an allocator.
+/// Helper procedure to resize an allocation from an allocator.
 raw_resize :: (use a: Allocator, ptr: rawptr, size: u32, alignment := Default_Allocation_Alignment) -> rawptr {
     return func(data, AllocationAction.Resize, size, alignment, ptr);
 }
 
-//
-// Helper procedure to free an allocation from an allocator.
+/// Helper procedure to free an allocation from an allocator.
 raw_free :: (use a: Allocator, ptr: rawptr) {
     func(data, AllocationAction.Free, 0, 0, ptr);
 }
 
-#inject Allocator {
-    alloc :: raw_alloc
-    resize :: raw_resize
-    free :: raw_free
+Allocator.alloc :: raw_alloc
+Allocator.resize :: raw_resize
+Allocator.free :: raw_free
 
-    move :: macro (use a: Allocator, v: $V) -> &V {
-        out := cast(&V) a->alloc(sizeof V);
-        *out = v;
-        return out;
-    }
+Allocator.move :: macro (use a: Allocator, v: $V) -> &V {
+    out := cast(&V) a->alloc(sizeof V);
+    *out = v;
+    return out;
 }
 
-//
-// Helper function to allocate/free using allocator in the context structure.
+/// Helper function to allocate using the allocator in the context structure.
 calloc  :: (size: u32)              => raw_alloc(context.allocator, size);
+/// Helper function to resize using the allocator in the context structure.
 cresize :: (ptr: rawptr, size: u32) => raw_resize(context.allocator, ptr, size);
+/// Helper function to free using the allocator in the context structure.
 cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 
 
@@ -326,7 +334,17 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
         return res;
     }
 
-    new_temp :: macro (T: type_expr) => {
+    #overload
+    new :: macro (v: $T, allocator := context.allocator) -> &T {
+        use core
+
+        out := cast(&T) raw_alloc(allocator, sizeof T);
+        core.memory.set(out, 0, sizeof T);
+        *out = v;
+        return out;
+    }
+
+    new_temp :: macro (T) => {
         return new(T, allocator=context.temp_allocator);
     }
 
@@ -354,24 +372,24 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
         return make(T, n, allocator=context.temp_allocator);
     }
 
-    //
-    // This is a rather unique way of using the type matching system
-    // to select an overload. What is desired here is that when you say:
-    //
-    //    make(Foo)
-    //
-    // You match the overload for make that is designed for making a Foo.
-    // However, you cannot use the type matching system to match by value.
-    // In order to get around this, `make` will pass a null pointer to this
-    // match procedure, that is casted to be a *pointer* to the desired type.
-    // Therefore, if you want to add your own make overload, you have to add
-    // a match to `__make_overload` that takes a *pointer* to the desired
-    // type as the first argument, and then an allocator as the second.
-    // Optionally, you can take a parameter between them that is an integer,
-    // useful when constructing things like arrays.
-    //
-    // See core/container/array.onyx for an example.
-    //
+    ///
+    /// This is a rather unique way of using the type matching system
+    /// to select an overload. What is desired here is that when you say:
+    ///
+    ///    make(Foo)
+    ///
+    /// You match the overload for make that is designed for making a Foo.
+    /// However, you cannot use the type matching system to match by value.
+    /// In order to get around this, `make` will pass a null pointer to this
+    /// match procedure, that is casted to be a *pointer* to the desired type.
+    /// Therefore, if you want to add your own make overload, you have to add
+    /// a match to `__make_overload` that takes a *pointer* to the desired
+    /// type as the first argument, and then an allocator as the second.
+    /// Optionally, you can take a parameter between them that is an integer,
+    /// useful when constructing things like arrays.
+    ///
+    /// See core/container/array.onyx for an example.
+    ///
     __make_overload :: #match {}
 
     delete :: #match {}
@@ -392,58 +410,73 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 }
 
 
-#doc """
-   Represents a generic "iterator" or "generator" of a specific
-   type. Can be used in a for-loop natively.
 
-   `data` is used for contextual information and is passed to
-   the `next`, `close`, and `remove` procedures.
-
-   `next` is used to extract the next value out of the iterator.
-   It returns the next value, and a continuation flag. If the
-   flag is false, the value should be ignored and iteration should
-   stop.
-
-   `close` should called when the iterator has ended. This is
-   done automatically in for-loops, and in the `core.iter` library.
-   In for-loops, `close` is called no matter which way the for-loop
-   exits (`break`, `return`, etc). Using this rule, iterator can
-   be used to create "resources" that automatically close when you
-   are done with them.
-
-   `remove` is used to tell the iterator to remove the last value
-   returned from some underlying data store. Invoked automatically
-   using the `#remove` directive in a for-loop.
-"""
+/// Represents a generic "iterator" or "generator" of a specific
+/// type. Can be used in a for-loop natively.
+///
+/// `data` is used for contextual information and is passed to
+/// the `next`, `close`, and `remove` procedures.
+///
+/// `next` is used to extract the next value out of the iterator.
+/// It returns the next value, and a continuation flag. If the
+/// flag is false, the value should be ignored and iteration should
+/// stop.
+///
+/// `close` should called when the iterator has ended. This is
+/// done automatically in for-loops, and in the `core.iter` library.
+/// In for-loops, `close` is called no matter which way the for-loop
+/// exits (`break`, `return`, etc). Using this rule, iterator can
+/// be used to create "resources" that automatically close when you
+/// are done with them.
+///
+/// `remove` is used to tell the iterator to remove the last value
+/// returned from some underlying data store. Invoked automatically
+/// using the `#remove` directive in a for-loop.
 Iterator :: struct (Iter_Type: type_expr) {
     data:   rawptr;
-    next:   (data: rawptr) -> (Iter_Type, bool);
+    next:   (data: rawptr) -> Optional(Iter_Type);
     close:  (data: rawptr) -> void = null_proc;
     remove: (data: rawptr) -> void = null_proc;
 }
 
 
-#doc """
-    Optional represents the possibility of a value being empty, without
-    resorting to pointers and null-pointers. Most of the functionality
-    for Optional is defined in core/containers/optional.onyx. This
-    definition exists here because the compiler use it as the template
-    for types like '? i32'. In other words, '? i32' is equivalent to
-    'Optional(i32)'.
-"""
+/// Optional represents the possibility of a value being empty, without
+/// resorting to pointers and null-pointers. Most of the functionality
+/// for Optional is defined in core/containers/optional.onyx. This
+/// definition exists here because the compiler use it as the template
+/// for types like '? i32'. In other words, '? i32' is equivalent to
+/// 'Optional(i32)'.
 Optional :: union (Value_Type: type_expr) {
     None: void;
     Some: Value_Type;
 }
 
 
+/// This structure represents the slice types, `[] T`.
+/// While slices are a special type in Onyx, and therefore need extra
+/// compiler support, this structure exists to allow for placing
+/// methods onto slices. See `core/container/slice.onyx` for examples.
+Slice :: struct (T: type_expr) {
+    data: [&] T;
+    count: i32;
+}
 
-#doc """
-    This structure represents the result of a '#callsite' expression. Currently, #callsite
-    is only valid (and parsed) as a default value for a procedure parameter. It allows
-    the function to get the address of the calling site, which can be used for error
-    printing, unique hashes, and much more.
-"""
+
+/// This structure represents the dynamic array types, `[..] T`.
+/// This structure exists to allow for placing methods onto dynamic arrays.
+/// See `core/container/array.onyx` for examples.
+Array :: struct (T: type_expr) {
+    data: [&] T;
+    count: i32;
+    capacity: i32;
+    allocator: Allocator;
+}
+
+
+/// This structure represents the result of a '#callsite' expression. Currently, #callsite
+/// is only valid (and parsed) as a default value for a procedure parameter. It allows
+/// the function to get the address of the calling site, which can be used for error
+/// printing, unique hashes, and much more.
 CallSite :: struct {
     file   : str;
     line   : u32;
@@ -451,66 +484,52 @@ CallSite :: struct {
 }
 
 
-#doc """
-    This structure is used to represent any value in the language.
-    It contains a pointer to the data, and the type of the value.
-    Using the `core.misc` library, you can easily manipulate `any`s
-    and build runtime polymorphism.
-"""
+/// This structure is used to represent any value in the language.
+/// It contains a pointer to the data, and the type of the value.
+/// Using the `core.misc` library, you can easily manipulate `any`s
+/// and build runtime polymorphism.
 any :: struct {
     data: rawptr;
     type: type_expr;
 }
 
-#doc """
-    Represents a code block that can be passed around at compile-time.
-    This is commonly used with macros or polymorphic procedures to create
-    very power extensions to the syntax.
-"""
+/// Represents a code block that can be passed around at compile-time.
+/// This is commonly used with macros or polymorphic procedures to create
+/// very power extensions to the syntax.
 Code :: struct {_:i32;}
 
 
 
-#doc """
-    This procedure is a special compiler generated procedure that initializes all the data segments
-    in the program. It should only be called once, by the main thread, at the start of execution. It
-    is undefined behaviour if it is called more than once.
-"""
+/// This procedure is a special compiler generated procedure that initializes all the data segments
+/// in the program. It should only be called once, by the main thread, at the start of execution. It
+/// is undefined behaviour if it is called more than once.
 __initialize_data_segments :: () -> void ---
 
-#doc """
-    This is a special compiler generated procedure that calls all procedures specified with `#init`
-    in the specified order. It should theoretically only be called once on the main thread.
-"""
+/// This is a special compiler generated procedure that calls all procedures specified with `#init`
+/// in the specified order. It should theoretically only be called once on the main thread.
 __run_init_procedures :: () -> void ---
 
-#doc """
-    This overloaded procedure allow you to define an implicit rule for how to convert any value
-    into a boolean. A default is provided for ALL pointer types and array types, but this can
-    be used for structures or distinct types.
-"""
+/// This overloaded procedure allows you to define an implicit rule for how to convert any value
+/// into a boolean. A default is provided for ALL pointer types and array types, but this can
+/// be used for structures or distinct types.
 __implicit_bool_cast :: #match -> bool {}
 
-#doc """
-    Internal procedure to allocate space for the captures in a closure. This will be soon
-    changed to a configurable way, but for now it simply allocates out of the heap allocator.
-"""
+/// Internal procedure to allocate space for the captures in a closure. This will be soon
+/// changed to a configurable way, but for now it simply allocates out of the heap allocator.
 __closure_block_allocate :: (size: i32) -> rawptr {
     return context.closure_allocate(size);
 }
 
 
-#doc """
-    Defines all options for changing the memory layout, imports and exports,
-    and more of an Onyx binary.
-"""
-Link_Options :: struct {
-    // By default the memory layout of a binary is:
-    //   reserved | static-data | stack | heap
-    // But when stack_first is true, it is:
-    //   reserved | stack | static-data | heap
-    stack_first     := false;
+///
+__dispose_used_local :: #match -> void {
+    #order 10000 delete
+}
 
+
+/// Defines all options for changing the memory layout, imports and exports,
+/// and more of an Onyx binary.
+Link_Options :: struct {
     // The size, in bytes of the stack.
     stack_size      := 16 * 65536;  // 16 pages * 65536 bytes per page = 1 MiB stack
 
@@ -562,20 +581,18 @@ Link_Options :: struct {
 }
 
 
-#doc """
-    Special type used to represent a package at runtime.
-    For example,
-
-        x: package_id = package main
-
-    Currently, there is not much you can do with this; it is
-    only used by the runtime.info library if you want to filter
-    tags based on which package they are coming from.
-"""
+/// Special type used to represent a package at runtime.
+/// For example,
+///
+///     x: package_id = package main
+///
+/// Currently, there is not much you can do with this; it is
+/// only used by the runtime.info library if you want to filter
+/// tags based on which package they are coming from.
 package_id :: #distinct u32
 
-//
-// Special value used to represents any package.
+///
+/// Special value used to represents any package.
 any_package :: cast(package_id) 0
 
 //
@@ -586,12 +603,11 @@ any_package :: cast(package_id) 0
 // DEPRECATED THINGS
 //
 
-//
-// This is the special type of a paramter that was declared to have the type '...'.
-// This is an old feature of the language now called  'untyped varargs'. It had
-// a similar construction to varargs in C/C++. Because it is incredibly unsafe
-// and not programmer friendly, this way of doing it has been deprecated in
-// favor of  using '..any', which provides type information along with the data.
+/// This is the special type of a paramter that was declared to have the type '...'.
+/// This is an old feature of the language now called  'untyped varargs'. It had
+/// a similar construction to varargs in C/C++. Because it is incredibly unsafe
+/// and not programmer friendly, this way of doing it has been deprecated in
+/// favor of  using '..any', which provides type information along with the data.
 vararg :: #type &struct {
     data:  rawptr;
     count: i32;

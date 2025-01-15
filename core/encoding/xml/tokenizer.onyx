@@ -1,0 +1,344 @@
+package core.encoding.xml
+#allow_stale_code
+
+use core.alloc {arena, as_allocator}
+use core.io
+use core.encoding.utf8
+
+Tokenizer :: struct {
+    arena: arena.Arena
+
+    s: &io.Stream
+    r: io.Reader
+
+    current: utf8.rune
+    offset: i32
+    line: i32
+    line_offset: i32
+
+    error: Tokenizer.Error
+
+    peeked_token: ? Token
+}
+
+Tokenizer.Error :: enum {
+    None
+    Early_EOF
+    Unterminated_String
+    Unterminated_Comment
+    Unterminated_CDATA
+    Invalid_Double_Dash_In_Comment
+}
+
+Token :: struct {
+    kind: Token.Kind
+    pos: Token.Position
+}
+
+Token.Position :: struct {
+    offset: i32
+    line: i32
+    column: i32
+}
+
+Token.Kind :: union {
+    Invalid: void
+    Identifier: str
+    Literal: str
+    String: str
+
+    Double_Quote: void
+    Single_Quote: void
+    Colon: void
+
+    Eq: void
+    Lt: void
+    Gt: void
+    Exclamation: void
+    Question: void
+    Hash: void
+    Slash: void
+    Dash: void
+
+    Open_Bracket: void
+    Close_Bracket: void
+
+    EOF: void
+}
+
+
+Tokenizer.make :: (a: Allocator, s: &io.Stream) -> (tkn: Tokenizer) {
+    tkn.arena = arena.make(a, 16384)
+    tkn.s = s
+    tkn.r = io.Reader.make(s)
+    tkn.offset = 0
+    tkn.line = 1
+    tkn.line_offset = 0
+
+    tkn->advance()
+    if tkn.current == 0xFEFF {
+        tkn->advance()
+    }
+
+    return
+}
+
+Tokenizer.destroy :: (self: &#Self) {
+    arena.free(&self.arena)
+    self.r->free()
+}
+
+Tokenizer.advance :: (self: &#Self) {
+    if self.current == '\n' {
+        self.line_offset = self.offset
+        self.line += 1
+    }
+
+    if self.r->empty() {
+        self.current = -1
+        return
+    }
+
+    b := self.r->peek_byte()
+    rlen := utf8.rune_length_from_first_byte(b)
+    assert(rlen > 0, "Bad UTF8 Encoding")
+
+    rbuf: [4] u8
+    self.r->read_fill_buffer(rbuf[0 .. rlen])
+    self.offset += rlen
+
+    self.current = utf8.decode_rune(rbuf[0 .. rlen])
+    if self.current == 0 {
+        self.current = -1
+    }
+}
+
+Tokenizer.skip_whitespace :: (self: &#Self) {
+    while true {
+        switch self.current {
+            case ' ', '\t', '\r', '\n' do self->advance()
+            case _ do return
+        }
+    }
+}
+
+Tokenizer.scan_ident :: (self: &#Self) -> Token.Kind {
+    namespaced := false
+
+    ident := make(dyn_str, 32, as_allocator(&self.arena))
+
+    while is_ident_rune(self.current) {
+        utf8.append_rune(&ident, self.current)
+
+        self->advance()
+        if self.current == ':' {
+            if namespaced do break
+            namespaced = true
+        }
+    }
+
+    return .{ Identifier = ident }
+
+    is_ident_rune :: macro (x: utf8.rune) -> bool {
+        // TODO: Add support for letters and numbers in other languages
+        switch x {
+            case '_', '-', ':' do return true
+            case 'A'..='Z', 'a'..='z' do return true
+            case '0'..='9' do return true
+            case _ do return false
+        }
+    }
+}
+
+Tokenizer.skip_cdata :: (self: &#Self) -> bool {
+    CDATA_START :: "<![CDATA["
+    CDATA_END   :: "]]>"
+
+    start, err := self.r->peek_bytes(0, CDATA_START.count)
+    if err != .None do return true
+
+    if start != CDATA_START do return true
+
+    self.r->skip_bytes(CDATA_START.count)
+    while true {
+        self->advance()
+        if self.current < 0 {
+            self.error = .Unterminated_CDATA
+            return false
+        }
+
+        end, err := self.r->peek_bytes(0, CDATA_END.count)
+        if end == CDATA_END {
+            return true
+        }
+    }
+
+    return true
+}
+
+Tokenizer.scan_comment :: (self: &#Self) -> bool {
+    // For now, comment contents are discarded
+
+    while true {
+        self->advance()
+        if self.current < 0 {
+            self.error = .Unterminated_Comment
+            return false
+        }
+
+        if self.current == '-' {
+            b := self.r->peek_byte()
+            c := self.r->peek_byte(1)
+            if b == '-' {
+                if c == '>' {
+                    break
+                }
+
+                self.error = .Invalid_Double_Dash_In_Comment
+                return false
+            }
+        }
+    }
+
+    self->advance()
+    self->advance()
+
+    return true
+}
+
+Tokenizer.scan_string :: (self: &#Self, end: utf8.rune = '<', multiline := true) -> (str, bool) {
+    out := make(dyn_str, 32, as_allocator(&self.arena))
+
+    while true {
+        if self.current == -1 do err(.Early_EOF)
+
+        switch self.current {
+            case '<' {
+                if b := self.r->peek_byte(); b == '!' {
+                    if b := self.r->peek_byte(1); b == '[' {
+                        // CDATA
+                        if !self->skip_cdata() {
+                            return "", false
+                        }
+                    } else {
+                        if c := self.r->peek_byte(2); c == '-' && b == '-' {
+                            // Comment
+                            self.r->skip_bytes(3)
+                            self.offset += 3
+                            if !self->scan_comment() {
+                                return "", false
+                            }
+                        }
+                    }
+                }
+            }
+
+            case '\n' {
+                if !multiline do err(.Unterminated_String)
+            }
+        }
+
+        if self.current == end {
+            break
+        }
+
+        utf8.append_rune(&out, self.current)
+        self->advance()
+    }
+
+    str.strip_trailing_whitespace(~~ &out)
+
+    return out, true
+
+    err :: macro (e: Tokenizer.Error) {
+        self.error = e
+        delete(&out)
+        return "", false
+    }
+}
+
+
+Tokenizer.scan :: (self: &#Self) -> Token {
+    if self.peeked_token {
+        out := self.peeked_token!
+        self.peeked_token = .None
+        return out
+    }
+
+    self->skip_whitespace()
+
+    pos := pos_from_offset(self, self.offset)
+
+    if is_letter(self.current) {
+        return Token.{
+            kind = self->scan_ident()
+            pos = pos
+        }
+    }
+
+    ch := self.current
+    self->advance()
+
+    kind: Token.Kind
+    if ch == -1 {
+        return Token.{ .EOF, pos }
+    }
+
+    switch ch {
+        case '<' do kind = .Lt
+        case '>' do kind = .Gt
+        case '=' do kind = .Eq
+        case '!' do kind = .Exclamation
+        case '?' do kind = .Question
+        case '#' do kind = .Hash
+        case '/' do kind = .Slash
+        case '-' do kind = .Dash
+        case ':' do kind = .Colon
+
+        case '"', '\'' {
+            kind = .Invalid
+            s, ok := self->scan_string(ch, false)
+            if ok {
+                self->advance()
+                kind = .{ String = s }
+            }
+        }
+        
+        case _ {
+            kind = .Invalid
+        }
+    }
+
+    return Token.{ kind, pos }
+}
+
+Tokenizer.peek :: (self: &#Self) -> Token {
+    if self.peeked_token {
+        return self.peeked_token!
+    }
+
+    tkn := self->scan()
+    self.peeked_token = tkn
+    return tkn
+}
+
+
+
+#local
+is_letter :: (c: utf8.rune) -> bool {
+    switch c {
+        case '_', 'A'..='Z', 'a'..='z' do return true
+        case _ do return false
+    }
+}
+
+#local
+pos_from_offset :: (t: &Tokenizer, offset: i32) -> Token.Position {
+    line := t.line
+    column := offset - t.line_offset
+    return .{
+        offset = offset
+        line = line
+        column = column
+    }
+}

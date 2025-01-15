@@ -3,7 +3,7 @@
 // determine a return type with #auto, you can write a completely type free
 // procedure like so:
 
-no_types :: (x: $__type_x, y: $__type_y) -> #auto {
+no_types :: (x: $__type_x, y: $__type_y) -> _ {
     return x + ~~ y;
 }
 
@@ -44,5 +44,5 @@ main :: (args) => {
     println(val);
 }
 
-#load "core/module"
+
 use core {*}

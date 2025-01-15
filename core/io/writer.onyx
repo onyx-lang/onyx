@@ -19,6 +19,28 @@ Writer :: struct {
     buffer_filled: u32;
 }
 
+Writer.make :: writer_make
+Writer.free :: writer_free
+Writer.flush :: writer_flush
+Writer.consume_error :: writer_consume_error
+Writer.remaining_capacity :: writer_remaining_capacity
+
+Writer.write :: write
+Writer.write_byte :: write_byte
+Writer.write_str :: write_str
+Writer.write_cstr :: write_cstr
+Writer.write_i32 :: write_i32
+Writer.write_i64 :: write_i64
+Writer.write_f32 :: write_f32
+Writer.write_f64 :: write_f64
+Writer.write_bool :: write_bool
+Writer.write_ptr :: write_ptr
+Writer.write_range :: write_range
+Writer.write_format :: write_format
+Writer.write_format_va :: write_format_va
+Writer.write_escaped_str :: write_escaped_str
+
+
 writer_make :: (s: &Stream, buffer_size := 4096) -> Writer {
     assert(s.vtable != null, "Stream vtable was not setup correctly.");
 
@@ -31,8 +53,7 @@ writer_make :: (s: &Stream, buffer_size := 4096) -> Writer {
     return w;
 }
 
-//
-// Future-proofing the API
+#overload delete :: writer_free
 writer_free :: (w: &Writer) {
     writer_flush(w);
     delete(&w.buffer);
@@ -41,7 +62,7 @@ writer_free :: (w: &Writer) {
 writer_flush :: (w: &Writer) {
     if w.buffer_filled == 0 do return;
 
-    err, bytes_wrote := stream_write(w.stream, w.buffer[0 .. w.buffer_filled]);
+    err := stream_write(w.stream, w.buffer[0 .. w.buffer_filled]).Err ?? Error.None;
     if err != .None {
         w.error = err;
     }
@@ -83,7 +104,7 @@ write_byte :: (use writer: &Writer, byte: u8) {
 
 write_str :: (use writer: &Writer, s: str) {
     if buffer.count == 0 {
-        if err := stream_write(stream, s); err != .None {
+        if err := stream_write(stream, s).Err ?? Error.None; err != .None {
             writer.error = err;
         }
 
@@ -93,7 +114,7 @@ write_str :: (use writer: &Writer, s: str) {
 
     } else {
         writer_flush(writer);
-        if err := stream_write(stream, s); err != .None {
+        if err := stream_write(stream, s).Err ?? Error.None; err != .None {
             writer.error = err;
         }
     }
@@ -159,7 +180,7 @@ write_format_va :: (use writer: &Writer, format: str, va: [] any) {
 }
 
 write_escaped_str :: (use writer: &Writer, s: str) {
-    write_byte(writer, #char "\"");
+    write_byte(writer, '"');
 
     while i := 0; i < s.count {
         defer i += 1;
@@ -167,24 +188,24 @@ write_escaped_str :: (use writer: &Writer, s: str) {
 
         // @Incomplete
         switch ch {
-            case #char "\n" { write_byte(writer, #char "\\"); write_byte(writer, #char "n");  }
-            case #char "\r" { write_byte(writer, #char "\\"); write_byte(writer, #char "r");  }
-            case #char "\t" { write_byte(writer, #char "\\"); write_byte(writer, #char "t");  }
-            case #char "\v" { write_byte(writer, #char "\\"); write_byte(writer, #char "v");  }
-            case #char "\b" { write_byte(writer, #char "\\"); write_byte(writer, #char "b");  }
-            case #char "\f" { write_byte(writer, #char "\\"); write_byte(writer, #char "f");  }
-            case #char "\0" { write_byte(writer, #char "\\"); write_byte(writer, #char "0");  }
-            case #char "\"" { write_byte(writer, #char "\\"); write_byte(writer, #char "\""); }
-            case #char "\\" { write_byte(writer, #char "\\"); write_byte(writer, #char "\\"); }
+            case '\n' { write_byte(writer, '\\'); write_byte(writer, 'n');  }
+            case '\r' { write_byte(writer, '\\'); write_byte(writer, 'r');  }
+            case '\t' { write_byte(writer, '\\'); write_byte(writer, 't');  }
+            case '\v' { write_byte(writer, '\\'); write_byte(writer, 'v');  }
+            case '\b' { write_byte(writer, '\\'); write_byte(writer, 'b');  }
+            case '\f' { write_byte(writer, '\\'); write_byte(writer, 'f');  }
+            case '\0' { write_byte(writer, '\\'); write_byte(writer, '0');  }
+            case '"'  { write_byte(writer, '\\'); write_byte(writer, '"'); }
+            case '\\' { write_byte(writer, '\\'); write_byte(writer, '\\'); }
 
-            case #default {
+            case _ {
                 // @Speed
                 write_byte(writer, ch);
             }
         } 
     }
 
-    write_byte(writer, #char "\"");
+    write_byte(writer, '"');
 }
 
 write :: #match {

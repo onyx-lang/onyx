@@ -1,4 +1,4 @@
-#load "core/module"
+
 
 use core {*}
 
@@ -30,20 +30,20 @@ BitmaskIter :: struct {
 }
 
 bitmask_p2 :: (mask: Bitmask, val: u64) -> Iterator(u64) {
-    iterator_next :: (data: rawptr) -> (u64, bool) {
+    iterator_next :: (data: rawptr) -> ? u64 {
         bmi := cast(&BitmaskIter) data;
-        if bmi.done do return 0, false;
+        if bmi.done do return .None;
 
 		for ind in bmi.floating_indicies {
 			is_set := (bmi.val & (1 << cast(u64) ind)) != 0;
 
 			bmi.val ^= 1 << cast(u64) ind;
 
-			if !is_set do return bmi.val, true;
+			if !is_set do return bmi.val;
 		}
 
         bmi.done = true;
-        return bmi.val, true;
+        return bmi.val;
     }
 
     iterator_close :: (data: rawptr) {
@@ -89,12 +89,12 @@ main :: (args: [] cstr) {
             string.advance(&file, 3);
 
 			i := 35;
-            m, file~ := string.bisect(file, #char "\n");
+            m, file~ := string.bisect(file, '\n');
             for ch in m {
 				switch ch {
-					case #char "0" do mask[i] = 0;
-					case #char "1" do mask[i] = 1;
-					case #char "X" do mask[i] = 2;
+					case '0' do mask[i] = 0;
+					case '1' do mask[i] = 1;
+					case 'X' do mask[i] = 2;
 				}
 
 				i -= 1;

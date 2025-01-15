@@ -1,4 +1,4 @@
-#load "core/module"
+
 
 use core {*}
 
@@ -6,11 +6,11 @@ parse_factor :: (file: &str) -> u64 {
 	string.strip_leading_whitespace(file);
 
 	switch file.data[0] {
-		case #char "0" .. #char "9" {
+		case '0' ..= '9' {
 			return conv.parse_int(file);
 		}
 
-		case #char "(" {
+		case '(' {
             string.advance(file, 1);
 
 			value := parse_expression_mul(file);
@@ -31,7 +31,7 @@ parse_expression_add :: (file: &str) -> u64 {
 	left := parse_factor(file);
 
 	string.strip_leading_whitespace(file);
-	while file.data[0] == #char "+" {
+	while file.data[0] == '+' {
 		op    := file.data[0];
         string.advance(file, 1);
 
@@ -51,7 +51,7 @@ parse_expression_mul :: (file: &str) -> u64 {
 	left := parse_expression_add(file);
 
     string.strip_leading_whitespace(file);
-	while file.data[0] == #char "*" {
+	while file.data[0] == '*' {
 		op    := file.data[0];
         string.advance(file, 1);
 

@@ -1,0 +1,193 @@
+///
+/// **EXPERIMENTAL**: JWT support is under active development.
+/// The public interface for this package is subject to change.
+package core.crypto.keys
+#allow_stale_code
+
+use core { Result, tprintf, aprintf }
+use core.misc
+use core.crypto
+use core.encoding {json, base64}
+
+/// The algorithm used to secure the JWT.
+/// Currently, only `NONE` and `HS256` are supported, as they are the only
+/// required algorithms per RFC-7518. When the standard library of Onyx
+/// has support for RSA and ECDSA, more algorithms could be implemented.
+JWT_Signing_Method :: enum {
+    UNKNOWN
+
+    NONE
+    HS256
+}
+
+JWT_Signing_Method.as_alg :: (m: #Self) => switch m {
+    case .NONE  => "none"
+    case .HS256 => "HS256"
+}
+
+JWT_Signing_Method.from_alg :: (s: str) -> #Self {
+    if s->equal_insensitive("hs256") {
+        return .HS256
+    }
+
+    return .UNKNOWN
+}
+
+
+JWT :: struct {
+    method: JWT_Signing_Method
+    headers: Map(str, str)
+    claims: Map(str, json.Value)
+    
+    _body: dyn_str
+}
+
+JWT.make :: (method: JWT_Signing_Method) -> JWT {
+    return .{
+        method
+        Map.literal(str, str, .[
+            .{ "alg", method->as_alg() |> str.copy() }
+            .{ "typ", "JWT" |> str.copy() }
+        ])
+        make(Map(str, json.Value))
+    }
+}
+
+JWT.make_with_claims :: (
+    method: JWT_Signing_Method
+    claims: Map(str, json.Value)
+) -> JWT {
+    return .{
+        method
+        Map.literal(str, str, .[
+            .{ "alg", method->as_alg() |> str.copy() }
+            .{ "typ", "JWT" |> str.copy() }
+        ])
+        Map.copy(claims)
+    }
+}
+
+JWT.destroy :: (self: &#Self) {
+    for& self.headers.entries {
+        delete(&it.key, self.headers.allocator)
+        delete(&it.value, self.headers.allocator)
+    }
+    delete(&self.headers)
+
+    for& self.claims.entries {
+        delete(&it.key, self.claims.allocator)
+        delete(it.value, self.claims.allocator)
+    }
+    delete(&self.claims)
+
+    delete(&self._body)
+}
+
+JWT.signed_string :: (self: #Self, key: str) -> Result(str, i32) {
+    a := context.temp_allocator
+
+    payload := tprintf("{}.{}"
+        base64.encode_url(json.encode_string_opt(self.headers, a)!, a)
+        base64.encode_url(json.encode_string_opt(self.claims, a)!, a)
+    )
+
+    use signature := sign_string(payload, self.method, key)
+        |> Optional.or_return(Result(str, i32).{ Err = 0 })
+
+    signature_enc := base64.encode_url(signature, a)
+
+    return .{ Ok = aprintf("{}.{}", payload, signature_enc) }
+}
+
+
+
+JWT_Parse_Error :: enum {
+    Bad_Format
+    Invalid_Header
+    Invalid_Body
+    Invalid_Signature
+}
+
+JWT.parse :: (token: str, signing_key: str, allocator := context.allocator) -> Result(JWT, JWT_Parse_Error) {
+    header_enc, tmp := str.bisect(token, '.')
+    body_enc, signature_enc := str.bisect(tmp, '.')
+
+    if !signature_enc do return .{ Err = .Bad_Format }
+
+    use header := base64.decode_url(header_enc, context.temp_allocator)
+        |> json.decode_with_result(context.temp_allocator)
+        |> Result.transform(x => x.root)
+        |> Result.transform_err(x => JWT_Parse_Error.Invalid_Header)?
+        |> json.Value.as_map(allocator)
+
+    body_raw := base64.decode_url(body_enc, allocator)
+    body := body_raw
+        |> json.decode_with_result(allocator)
+        |> Result.transform(x => x.root)
+        |> Result.transform_err(x => JWT_Parse_Error.Invalid_Body)?
+        |> free_after_use(
+            (x) use (allocator) => json.Value.as_map(x, allocator)
+            (x) use (allocator) => json.free_value(x, allocator)
+        )
+
+    token := JWT.{}
+    token.claims = body
+    token.headers = make(Map(str, str), allocator)
+    for header.entries {
+        token.headers->put(it.key, it.value->as_str() |> str.copy(allocator))
+        delete(it.value, allocator)
+    }
+    token.method = JWT_Signing_Method.from_alg(token.headers->get("alg") ?? "")
+    token._body = Array.raw_from_slice(body_raw, allocator)
+
+    use signature := base64.decode_url(signature_enc)
+    valid := verify_string(
+        tprintf("{}.{}", header_enc, body_enc)
+        token.method
+        signing_key
+        signature
+    )
+
+    if !valid {
+        token->destroy()
+        return .{ Err = .Invalid_Signature }
+    }
+
+    return .{ Ok = token }
+}
+
+
+#local
+sign_string :: (s: str, method: JWT_Signing_Method, data: any) -> ? str {
+    switch method {
+        case .NONE do return s
+        case .HS256 {
+            key := misc.any_as(data, str)
+            if !key do return .None
+
+            return crypto.hmac(s, *key, .SHA256)
+        }
+    }
+    return .None
+}
+
+#local
+verify_string :: (s: str, method: JWT_Signing_Method, data: any, signature: str) -> bool {
+    switch method {
+        case .NONE do return true
+        case .HS256 {
+            key := misc.any_as(data, str)
+            if !key do return false
+
+            use hashed := crypto.hmac(s, *key, .SHA256)
+            return hashed == signature
+        }
+    }
+    return false
+}
+
+#local
+free_after_use :: (x: $T, f: (T) -> $R, free: (T) -> void) -> R {
+    defer { free(x) }
+    return f(x)
+}

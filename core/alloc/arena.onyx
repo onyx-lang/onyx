@@ -1,27 +1,23 @@
+/// This allocator is mostly used for making many fixed-size
+/// allocation (i.e. allocations that will not need to change
+/// in size, such as game entities or position structs). The
+/// power of this allocator over the heap allocator for this
+/// purpose is that it is much faster, since the logic is
+/// simpler. Another power of this allocator over something
+/// such as a dynamic array is that the dynamic array could
+/// relocate and cause any pointers to the data inside to
+/// become invalidated; this is definitely not behaviour you
+/// want. This arena allocator can grow as large as needed,
+/// while guaranteeing that the memory inside of it will
+/// never move.
 package core.alloc.arena
-#package_doc """
-    This allocator is mostly used for making many fixed-size
-    allocation (i.e. allocations that will not need to change
-    in size, such as game entities or position structs). The
-    power of this allocator over the heap allocator for this
-    purpose is that it is much faster, since the logic is
-    simpler. Another power of this allocator over something
-    such as a dynamic array is that the dynamic array could
-    relocate and cause any pointers to the data inside to
-    become invalidated; this is definitely not behaviour you
-    want. This arena allocator can grow as large as needed,
-    while guaranteeing that the memory inside of it will
-    never move.
-"""
 
 use core
 
 // Deprecated struct 'ArenaState'. Use 'Arena' instead.
 ArenaState :: Arena
 
-#doc """
-    Stores internal details used during arena allocations.
-"""
+/// Stores internal details used during arena allocations.
 Arena :: struct {
     backing_allocator : Allocator;
 
@@ -94,12 +90,10 @@ arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, 
     return null;
 }
 
-#doc """
-    Makes a new arena.
-
-    `arena_size` specifies the size of each individual arena page, which must be at least 4 bytes
-    in size (but should be quite a bit large).
-"""
+/// Makes a new arena.
+///
+/// `arena_size` specifies the size of each individual arena page, which must be at least 4 bytes
+/// in size (but should be quite a bit large).
 make :: (backing: Allocator, arena_size: u32) -> Arena {
     assert(arena_size >= 4, "Arena size was expected to be at least 4 bytes.");
     
@@ -124,9 +118,7 @@ make_allocator :: (rs: &Arena) -> Allocator {
     };
 }
 
-#doc """
-    Frees all pages in an arena.
-"""
+/// Frees all pages in an arena.
 free :: (arena: &Arena) {
     walker := arena.first_arena;
     trailer := walker;
@@ -141,9 +133,7 @@ free :: (arena: &Arena) {
     arena.size          = 0;
 }
 
-#doc """
-    Clears and frees every page, except for first page.
-"""
+/// Clears and frees every page, except for first page.
 clear :: (arena: &Arena) {
     walker := arena.first_arena.next;
 
@@ -157,9 +147,7 @@ clear :: (arena: &Arena) {
     arena.size = sizeof rawptr;
 }
 
-#doc """
-    Returns the number of pages in the arena.
-"""
+/// Returns the number of pages in the arena.
 get_allocated_arenas :: (arena: &Arena) -> u32 {
     arenas := 0;
     walker := arena.first_arena;
@@ -171,27 +159,23 @@ get_allocated_arenas :: (arena: &Arena) -> u32 {
     return arenas;
 }
 
-#doc """
-    Returns the number of bytes used by the arena.
-"""
+/// Returns the number of bytes used by the arena.
 get_allocated_bytes :: (arena: &Arena) -> u32 {
     return get_allocated_arenas(arena) * (arena.arena_size - 1) + arena.size;
 }
 
-#doc """
-    Creates an arena allocator and automatically applies it to the context's allocator
-    in the current scope.
-
-        foo :: () {
-            alloc.arena.auto();
-
-            // Lazily allocate everything, knowing that it will
-            // be freed when this function returns.
-            for 100 {
-                s := string.alloc_copy("Make a copy of me!");
-            }
-        }
-"""
+/// Creates an arena allocator and automatically applies it to the context's allocator
+/// in the current scope.
+///
+///     foo :: () {
+///         alloc.arena.auto();
+///     
+///         // Lazily allocate everything, knowing that it will
+///         // be freed when this function returns.
+///         for 100 {
+///             s := string.copy("Make a copy of me!");
+///         }
+///     }
 auto :: #match {
     macro (size := 32 * 1024, $dest: Code = [](context.allocator)) {
         use core.alloc {arena, heap_allocator}
@@ -217,19 +201,17 @@ auto :: #match {
     }
 }
 
-#doc """
-    Creates an arena allocator to be used as the temporary allocator
-    in the code block.
-
-        foo :: () {
-            alloc.arena.auto_temp() {
-                for 1000 {
-                    // Will be automatically freed
-                    x := new_temp(i32);
-                }
-            }
-        }
-"""
+/// Creates an arena allocator to be used as the temporary allocator
+/// in the code block.
+///
+///     foo :: () {
+///         alloc.arena.auto_temp() {
+///             for 1000 {
+///                 // Will be automatically freed
+///                 x := new_temp(i32);
+///             }
+///         }
+///     }
 auto_temp :: macro (body: Code) -> i32 {
     use core.alloc {arena, heap_allocator}
     a := arena.make(heap_allocator, 32 * 1024);

@@ -1,4 +1,4 @@
-#load "core/module"
+
 
 use core {*}
 
@@ -45,22 +45,22 @@ main :: (args: [] cstr) {
         string.advance_line(&file); 
         
         switch dir {
-            case #char "N" do ship.fy -= val;
-            case #char "E" do ship.fx += val;
-            case #char "S" do ship.fy += val;
-            case #char "W" do ship.fx -= val;
-            case #char "F" {
+            case 'N' do ship.fy -= val;
+            case 'E' do ship.fx += val;
+            case 'S' do ship.fy += val;
+            case 'W' do ship.fx -= val;
+            case 'F' {
                 ship.x += ship.fx * val;
                 ship.y += ship.fy * val;
             }
 
-            case #char "L" do switch val {
+            case 'L' do switch val {
                 case 90 do rotate_left(&ship);
                 case 180 do turn_around(&ship);
                 case 270 do rotate_right(&ship);
             }
 
-            case #char "R" do switch val {
+            case 'R' do switch val {
                 case 90 do rotate_right(&ship);
                 case 180 do turn_around(&ship);
                 case 270 do rotate_left(&ship);

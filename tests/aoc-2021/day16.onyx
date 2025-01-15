@@ -1,4 +1,4 @@
-#load "core/module"
+
 
 use core {*}
 
@@ -7,10 +7,10 @@ base16_to_hex :: (s: str) -> u32 {
     for s {
         res *= 16;
         switch it {
-            case #char "0" .. #char "9" do res += ~~(it - #char "0");
-            case #char "a" .. #char "f" do res += ~~(it - #char "a" + 10);
-            case #char "A" .. #char "F" do res += ~~(it - #char "A" + 10);
-            case #default do break break;
+            case '0' ..= '9' do res += ~~(it - '0');
+            case 'a' ..= 'f' do res += ~~(it - 'a' + 10);
+            case 'A' ..= 'F' do res += ~~(it - 'A' + 10);
+            case _ do break break;
         }
     }
 
@@ -26,8 +26,7 @@ BitIterator :: struct {
     bit_idx: i32;
 
     next :: (b: &BitIterator) -> u32 {
-        v, _ := iter.take_one(b.iter, no_close=true);
-        return v;
+        return iter.next(b.iter) ?? 0;
     }
 }
 
@@ -38,8 +37,8 @@ bit_iterator :: (values: [] u8) -> &BitIterator {
     c.value_idx = 0;
     c.bit_idx = 7;
 
-    next :: (use c: &BitIterator) -> (u32, bool) {
-        if value_idx >= values.count do return 0, false;
+    next :: (use c: &BitIterator) -> ? u32 {
+        if value_idx >= values.count do return .None;
 
         defer {
             bits_read += 1;
@@ -52,7 +51,7 @@ bit_iterator :: (values: [] u8) -> &BitIterator {
 
         ret := 0;
         if (values[value_idx] & ~~(1 << bit_idx)) != 0 do ret = 1;
-        return ret, true;
+        return ret;
     }
 
     return c;
@@ -108,7 +107,7 @@ parse_packet :: (bit_provider: &BitIterator) -> &Packet {
             return p;
         }
 
-        case #default {
+        case _ {
             packets: [..] &Packet;
 
             l_type := read_bits(bit_provider, 1);
@@ -141,7 +140,7 @@ packet_sum_version :: (p: &Packet) -> u64 {
     switch p.type {
         case 4 do return ~~p.version;
 
-        case #default {
+        case _ {
             sum: u64;
             for (cast (&Packet_Operator) p).subpackets {
                 sum += packet_sum_version(it);
@@ -191,22 +190,21 @@ packet_reduce :: (p: &Packet) -> u64 {
 
 
 main :: (args) => {
-    for file in os.with_file("./tests/aoc-2021/input/day16.txt") {
-        reader := io.reader_make(file);
-        line   := io.read_line(&reader, consume_newline=false, inplace=true);
+    use file := os.open("./tests/aoc-2021/input/day16.txt")->unwrap();
+    use reader := io.reader_make(&file);
+    line   := io.read_line(&reader, consume_newline=false, inplace=true);
 
-        transmission: [..] u8;
-        for i in range.{ 0, line.count, 2 } {
-            transmission << ~~(base16_to_hex(line[i .. i + 2]));
-        }
-
-        bit_provider := bit_iterator(transmission);
-        packet := parse_packet(bit_provider);
-
-        result := packet_sum_version(packet);
-        printf("Part 1: {}\n", result);
-
-        result  = packet_reduce(packet);
-        printf("Part 2: {}\n", result);
+    transmission: [..] u8;
+    for i in range.{ 0, line.count, 2 } {
+        transmission << ~~(base16_to_hex(line[i .. i + 2]));
     }
+
+    bit_provider := bit_iterator(transmission);
+    packet := parse_packet(bit_provider);
+
+    result := packet_sum_version(packet);
+    printf("Part 1: {}\n", result);
+
+    result  = packet_reduce(packet);
+    printf("Part 2: {}\n", result);
 }

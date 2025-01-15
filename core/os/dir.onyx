@@ -17,9 +17,15 @@ DirectoryEntry :: struct {
     identifier  : u32;
     name_length : u32;
     name_data   : [256] u8;
-
-    name :: (use dir: &DirectoryEntry) => str.{ ~~name_data, name_length };
 }
+
+/// Returns the `str` of the name, pointing into the `DirectoryEntry` for data.
+/// The string is valid for the lifetime of the `DirectoryEntry`.
+DirectoryEntry.name :: (use dir: &DirectoryEntry) => str.{ ~~name_data, name_length };
+
+/// Copies the name of the item into the provided allocator and returns it 
+DirectoryEntry.name_copy :: (use dir: DirectoryEntry, allocator := context.allocator) =>
+    str.copy(.{ ~~name_data, name_length }, allocator)
 
 dir_open :: (path: str) -> (Directory, bool) {
     dir: Directory;
@@ -49,15 +55,15 @@ list_directory :: (path: str) -> Iterator(DirectoryEntry) {
         opened := false;
     }
 
-    next :: (use c: &Context) -> (DirectoryEntry, bool) {
-        if !opened do return .{}, false;
+    next :: (use c: &Context) -> ? DirectoryEntry {
+        if !opened do return .None;
 
         entry: DirectoryEntry;
         if !dir_read(dir, &entry) {
-            return .{}, false;
+            return .None;
         }
 
-        return entry, true;
+        return entry;
     }
 
     close :: (use c: &Context) {

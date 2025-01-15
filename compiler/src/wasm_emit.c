@@ -18,6 +18,14 @@
 #include "wasm_emit.h"
 #include "utils.h"
 
+#undef ONYX_ERROR
+#undef ONYX_WARNING
+#define ONYX_ERROR(pos, rank, ...) (onyx_report_error(mod->context, (pos), (rank), __VA_ARGS__))
+#define ONYX_WARNING(pos, ...) (onyx_report_warning(mod->context, (pos), __VA_ARGS__))
+
+#undef BH_INTERNAL_ALLOCATOR
+#define BH_INTERNAL_ALLOCATOR (mod->context->gp_alloc)
+
 #define WASM_TYPE_INT32   0x7F
 #define WASM_TYPE_INT64   0x7E
 #define WASM_TYPE_FLOAT32 0x7D
@@ -35,6 +43,7 @@ static b32 onyx_type_is_stored_in_memory(Type *type) {
     if (type_struct_is_just_one_basic_value(type)) return 0;
 
     return type->kind == Type_Kind_Struct
+        || type->kind == Type_Kind_Array
         || type->kind == Type_Kind_DynArray
         || type->kind == Type_Kind_Union;
 }
@@ -223,7 +232,7 @@ static u32 debug_introduce_symbol(OnyxWasmModule *mod, OnyxToken *token, DebugSy
 
     if (token) {
         token_toggle_end(token);
-        sym_info.name = bh_strdup(context.ast_alloc, token->text);
+        sym_info.name = bh_strdup(mod->context->ast_alloc, token->text);
         token_toggle_end(token);
     } else {
         sym_info.name = NULL;
@@ -261,7 +270,7 @@ static u32 debug_get_file_id(OnyxWasmModule *mod, const char *name) {
         DebugFileInfo file_info;
         file_info.file_id = id;
 
-        bh_arr_each(bh_file_contents, fc, context.loaded_files) {
+        bh_arr_each(bh_file_contents, fc, mod->context->loaded_files) {
             if (!strcmp(fc->filename, name)) {
                 file_info.line_count = fc->line_count;
             }
@@ -297,7 +306,7 @@ static void debug_set_position(OnyxWasmModule *mod, OnyxToken *token) {
 //    - REP
 //    - SET, REP 0
 static void debug_emit_instruction(OnyxWasmModule *mod, OnyxToken *token) {
-    if (!context.options->debug_info_enabled) {
+    if (!mod->context->options->debug_info_enabled) {
         return;
     }
 
@@ -519,7 +528,6 @@ EMIT_FUNC(compound_store,                  Type* type, u64 offset, b32 location_
 EMIT_FUNC(struct_store,                    Type* type, u32 offset);
 EMIT_FUNC(struct_literal,                  AstStructLiteral* sl);
 EMIT_FUNC(struct_as_separate_values,       Type *type, u32 offset);
-EMIT_FUNC(array_store,                     Type* type, u32 offset);
 EMIT_FUNC(array_literal,                   AstArrayLiteral* al);
 EMIT_FUNC(range_literal,                   AstRangeLiteral* range);
 EMIT_FUNC_NO_ARGS(load_slice);
@@ -532,7 +540,7 @@ EMIT_FUNC(stack_enter,                     u64 stacksize);
 EMIT_FUNC(zero_value,                      WasmType wt);
 EMIT_FUNC(zero_value_for_type,             Type* type, OnyxToken* where, AstTyped *alloc_node);
 EMIT_FUNC(stack_address,                   u32 offset, OnyxToken *token);
-EMIT_FUNC(values_into_contiguous_memory,   u64 base_ptr_local, Type *type, u32 offset, i32 value_count, AstTyped **values);
+EMIT_FUNC(values_into_contiguous_memory,   u64 base_ptr_local, u32 offset, u32 value_count, ValueWithOffset *values);
 EMIT_FUNC(struct_literal_into_contiguous_memory, AstStructLiteral* sl, u64 base_ptr_local, u32 offset);
 EMIT_FUNC(wasm_copy,                       OnyxToken *token);
 EMIT_FUNC(wasm_fill,                       OnyxToken *token);
@@ -547,7 +555,7 @@ static void emit_raw_string(OnyxWasmModule* mod, char *data, i32 len, u64 *out_d
 static void emit_constexpr(ConstExprContext *ctx, AstTyped *node, u32 offset);
 static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset);
 
-static void ensure_node_has_been_submitted_for_emission(AstNode *node) {
+static void ensure_node_has_been_submitted_for_emission(Context *context, AstNode *node) {
     assert(node->entity);
 
     if (node->flags & Ast_Flag_Has_Been_Scheduled_For_Emit) return;
@@ -565,20 +573,33 @@ static void ensure_node_has_been_submitted_for_emission(AstNode *node) {
         func->entity_header->macro_attempts = 0;
         func->entity_body->macro_attempts = 0;
 
-        entity_change_state(&context.entities, func->entity_header, Entity_State_Code_Gen);
-        entity_change_state(&context.entities, func->entity_body, Entity_State_Code_Gen);
-        entity_heap_insert_existing(&context.entities, func->entity_header);
-        entity_heap_insert_existing(&context.entities, func->entity_body);
+        entity_change_state(&context->entities, func->entity_header, Entity_State_Code_Gen);
+        entity_change_state(&context->entities, func->entity_body, Entity_State_Code_Gen);
+        entity_heap_insert_existing(&context->entities, func->entity_header);
+        entity_heap_insert_existing(&context->entities, func->entity_body);
         return;
     }
 
   submit_normal_node:
-    entity_change_state(&context.entities, node->entity, Entity_State_Code_Gen);
-    entity_heap_insert_existing(&context.entities, node->entity);
+    entity_change_state(&context->entities, node->entity, Entity_State_Code_Gen);
+    entity_heap_insert_existing(&context->entities, node->entity);
+}
+
+static void ensure_type_has_been_submitted_for_emission(OnyxWasmModule *mod, Type *type) {
+    assert(type);
+
+    if (type->flags & Ast_Flag_Has_Been_Scheduled_For_Emit) return;
+    type->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
+
+    bh_arr_push(mod->types_enqueued_for_info, type->id);
 }
 
 #include "wasm_intrinsics.h"
 #include "wasm_type_table.h"
+
+// Need to reset the allocator because it is changed in wasm_type_table.h
+#undef BH_INTERNAL_ALLOCATOR
+#define BH_INTERNAL_ALLOCATOR (mod->context->gp_alloc)
 
 EMIT_FUNC(function_body, AstFunction* fd) {
     if (fd->body == NULL) return;
@@ -715,7 +736,7 @@ EMIT_FUNC(structured_jump, AstJump* jump) {
         if (bh_arr_last(code).type != WI_JUMP)
             WID(jump->token, WI_JUMP, labelidx);
     } else {
-        onyx_report_error(jump->token->pos, Error_Critical, "Invalid structured jump.");
+        ONYX_ERROR(jump->token->pos, Error_Critical, "Invalid structured jump.");
     }
 
     *pcode = code;
@@ -757,7 +778,7 @@ EMIT_FUNC_RETURNING(u64, local_allocation, AstTyped* stmt) {
     // never used, therefore never declaring its type.
     if (stmt->type == NULL) {
         assert(stmt->kind == Ast_Kind_Local);
-        onyx_report_warning(stmt->token->pos, "Unused local variable with unassigned type.");
+        ONYX_WARNING(stmt->token->pos, "Unused local variable with unassigned type.");
         return 0;
     }
 
@@ -851,7 +872,7 @@ EMIT_FUNC(stack_address, u32 offset, OnyxToken *token) {
 
     WIL(token, WI_LOCAL_GET, mod->stack_base_idx);
 
-    if (offset > 0) {
+    if (offset != 0) {
         WIL(token, WI_PTR_CONST, offset);
         WI(token, WI_PTR_ADD);
     }
@@ -937,13 +958,13 @@ static void flatten_nested_array_literals_for_emit_helper(bh_arr(AstTyped *) *po
     } else {
         bh_arr(AstTyped *) output = *poutput;
         fori (i, 0, elem_count) {
-            bh_arr_push(output, al->values[i]);
+            bh_arr_push_unsafe(output, al->values[i]);
         }
         *poutput = output;
     }
 }
 
-static bh_arr(AstTyped *) flatten_nested_array_literals_for_emit(AstArrayLiteral *al, Type **elem_type) {
+static bh_arr(AstTyped *) flatten_nested_array_literals_for_emit(Context *context, AstArrayLiteral *al, Type **elem_type) {
     u32 ec = 1;
     Type *et = al->type;
 
@@ -955,7 +976,7 @@ static bh_arr(AstTyped *) flatten_nested_array_literals_for_emit(AstArrayLiteral
     *elem_type = et;
 
     bh_arr(AstTyped *) result = NULL;
-    bh_arr_new(global_heap_allocator, result, ec);
+    bh_arr_new(context->gp_alloc, result, ec);
     flatten_nested_array_literals_for_emit_helper(&result, al);
 
     return result;
@@ -971,7 +992,7 @@ EMIT_FUNC(assignment_of_array, AstTyped* left, AstTyped* right) {
         AstArrayLiteral* al = (AstArrayLiteral *) right;
 
         Type* elem_type;
-        bh_arr(AstTyped *) values = flatten_nested_array_literals_for_emit(al, &elem_type);
+        bh_arr(AstTyped *) values = flatten_nested_array_literals_for_emit(mod->context, al, &elem_type);
 
         u32 elem_count = bh_arr_length(values);
         u32 elem_size = type_size_of(elem_type);
@@ -997,7 +1018,7 @@ EMIT_FUNC(assignment_of_array, AstTyped* left, AstTyped* right) {
         u64 offset = 0;
         emit_location_return_offset(mod, &code, left, &offset);
         emit_expression(mod, &code, right);
-        emit_array_store(mod, &code, rtype, offset);
+        emit_struct_store(mod, &code, rtype, offset);
     }
 
     *pcode = code;
@@ -1040,11 +1061,6 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
         return;
     }
 
-    if (type->kind == Type_Kind_Array) {
-        emit_array_store(mod, pcode, type, offset);
-        return;
-    }
-
     if (type_is_compound(type)) {
         emit_compound_store(mod, pcode, type, offset, 0);
         return;
@@ -1062,9 +1078,9 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer || type->kind == Type_Kind_MultiPointer;
 
     if (!is_basic) {
-        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical,
+        ONYX_ERROR((OnyxFilePos) { 0 }, Error_Critical,
             "Failed to generate store instruction for type '%s'. (compiler bug)",
-            type_get_name(type));
+            type_get_name(mod->context, type));
     }
 
     if (type->Basic.flags & Basic_Flag_Pointer) {
@@ -1209,9 +1225,9 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     WID(NULL, instr, ((WasmInstructionData) { alignment, offset }));
 
     if (instr == WI_NOP) {
-        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical,
+        ONYX_ERROR((OnyxFilePos) { 0 }, Error_Critical,
             "Failed to generate load instruction for type '%s'.",
-            type_get_name(type));
+            type_get_name(mod->context, type));
     }
 
     *pcode = code;
@@ -1229,7 +1245,7 @@ EMIT_FUNC(if, AstIfWhile* if_node) {
     }
 
     if (if_node->kind == Ast_Kind_Static_If) {
-        if (static_if_resolution(if_node)) {
+        if (static_if_resolution(mod->context, if_node)) {
             if (if_node->true_stmt) emit_block(mod, &code, if_node->true_stmt, 1);
         } else {
             if (if_node->false_stmt) emit_block(mod, &code, if_node->false_stmt, 1);
@@ -1331,6 +1347,19 @@ EMIT_FUNC(for__prologue, AstFor* for_node, u64 iter_local, i64 index_local) {
         }
 
         WIL(for_node->token, WI_LOCAL_SET, index_local);
+
+        WasmInstruction* increment_instructions = bh_alloc_array(mod->allocator, WasmInstruction, 4);
+        increment_instructions[0] = (WasmInstruction) { WI_LOCAL_GET,     { .l = index_local } };
+        if (type_is_small_integer(for_node->index_var->type)) {
+            increment_instructions[1] = (WasmInstruction) { WI_I32_CONST,     { .l = 1 } };
+            increment_instructions[2] = (WasmInstruction) { WI_I32_ADD,       { .l = 0x00 } };
+        } else {
+            increment_instructions[1] = (WasmInstruction) { WI_I64_CONST,     { .l = 1 } };
+            increment_instructions[2] = (WasmInstruction) { WI_I64_ADD,       { .l = 0x00 } };
+        }
+        increment_instructions[3] = (WasmInstruction) { WI_LOCAL_SET,     { .l = index_local } };
+
+        emit_defer_code(mod, &code, increment_instructions, 4);
     }
 
     *pcode = code;
@@ -1373,21 +1402,34 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local, i64 index_local) {
     AstStructLiteral *range = (AstStructLiteral *) for_node->iter;
     u64 offset = 0;
 
+    assert(for_node->iter->type);
+
     StructMember high_mem, step_mem;
-    type_lookup_member(builtin_range_type_type, "high", &high_mem);
-    type_lookup_member(builtin_range_type_type, "step", &step_mem);
+    type_lookup_member(mod->context, for_node->iter->type, "high", &high_mem);
+    type_lookup_member(mod->context, for_node->iter->type, "step", &step_mem);
     u64 high_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(high_mem.type));
     u64 step_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(step_mem.type));
 
-    emit_struct_as_separate_values(mod, &code, builtin_range_type_type, 0);
+    emit_struct_as_separate_values(mod, &code, for_node->iter->type, 0);
 
     WIL(for_node->token, WI_LOCAL_SET, step_local);
     WIL(for_node->token, WI_LOCAL_SET, high_local);
     WIL(for_node->token, WI_LOCAL_SET, iter_local);
 
-    emit_for__prologue(mod, &code, for_node, iter_local, index_local);
+    u64 INT_GE = WI_I32_GE_S;
+    u64 INT_LT = WI_I32_LT_S;
+    u64 INT_CONST = WI_I32_CONST;
+    u64 INT_ADD = WI_I32_ADD;
+
+    if (high_mem.type == mod->context->types.basic[Basic_Kind_I64]) {
+        INT_GE = WI_I64_GE_S;
+        INT_LT = WI_I64_LT_S;
+        INT_CONST = WI_I64_CONST;
+        INT_ADD = WI_I64_ADD;
+    }
 
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
+    emit_for__prologue(mod, &code, for_node, iter_local, index_local);
     emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
     emit_enter_structured_block(mod, &code, SBT_Continue_Block, for_node->token);
 
@@ -1398,28 +1440,28 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local, i64 index_local) {
         if (step_value->value.l >= 0) {
             WIL(for_node->token, WI_LOCAL_GET, iter_local);
             WIL(for_node->token, WI_LOCAL_GET, high_local);
-            WI(for_node->token, WI_I32_GE_S);
+            WI(for_node->token, INT_GE);
             WID(for_node->token, WI_COND_JUMP, 0x02);
         } else {
             WIL(for_node->token, WI_LOCAL_GET, iter_local);
             WIL(for_node->token, WI_LOCAL_GET, high_local);
-            WI(for_node->token, WI_I32_LT_S);
+            WI(for_node->token, INT_LT);
             WID(for_node->token, WI_COND_JUMP, 0x02);
         }
 
     } else {
         WIL(for_node->token, WI_LOCAL_GET, step_local);
-        WID(for_node->token, WI_I32_CONST, 0);
-        WI(for_node->token, WI_I32_GE_S);
+        WID(for_node->token, INT_CONST, 0);
+        WI(for_node->token, INT_GE);
         WID(for_node->token, WI_IF_START, 0x40);
             WIL(for_node->token, WI_LOCAL_GET, iter_local);
             WIL(for_node->token, WI_LOCAL_GET, high_local);
-            WI(for_node->token, WI_I32_GE_S);
+            WI(for_node->token, INT_GE);
             WID(for_node->token, WI_COND_JUMP, 0x03);
         WI(for_node->token, WI_ELSE);
             WIL(for_node->token, WI_LOCAL_GET, iter_local);
             WIL(for_node->token, WI_LOCAL_GET, high_local);
-            WI(for_node->token, WI_I32_LT_S);
+            WI(for_node->token, INT_LT);
             WID(for_node->token, WI_COND_JUMP, 0x03);
         WI(for_node->token, WI_IF_END);
     }
@@ -1431,7 +1473,7 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local, i64 index_local) {
 
     WIL(for_node->token, WI_LOCAL_GET, iter_local);
     WIL(for_node->token, WI_LOCAL_GET, step_local);
-    WI(for_node->token, WI_I32_ADD);
+    WI(for_node->token, INT_ADD);
     WIL(for_node->token, WI_LOCAL_SET, iter_local);
 
     emit_for__epilogue(mod, &code, for_node, iter_local, index_local);
@@ -1479,9 +1521,8 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local, i64 index_local) {
     WI(for_node->token, WI_PTR_ADD);
     WIL(for_node->token, WI_LOCAL_SET, end_ptr_local);
 
-    emit_for__prologue(mod, &code, for_node, iter_local, index_local);
-
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
+    emit_for__prologue(mod, &code, for_node, iter_local, index_local);
     emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
     emit_enter_structured_block(mod, &code, SBT_Continue_Block, for_node->token);
 
@@ -1534,8 +1575,8 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
     u64 iterator_next_func   = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
     u64 iterator_close_func  = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
     u64 iterator_remove_func = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
-    u64 iterator_done_bool   = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-    WI(for_node->token, WI_DROP);
+    u64 iterator_done_res    = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+    WI(for_node->token, WI_DROP); // TODO: These need to not be dropped but actually used because they are the closure pointers!
     WIL(for_node->token, WI_LOCAL_SET, iterator_remove_func);
     WI(for_node->token, WI_DROP);
     WIL(for_node->token, WI_LOCAL_SET, iterator_close_func);
@@ -1553,27 +1594,26 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
         remove_info.iterator_remove_func = iterator_remove_func;
 
         StructMember remove_func_type;
-        type_lookup_member_by_idx(for_node->iter->type, 3, &remove_func_type);
+        type_lookup_member_by_idx(mod->context, for_node->iter->type, 3, &remove_func_type);
         remove_info.remove_func_type_idx = generate_type_idx(mod, remove_func_type.type);
 
         bh_arr_push(mod->for_remove_info, remove_info);
     }
 
-    emit_for__prologue(mod, &code, for_node, iter_local, index_local);
-
     AstLocal* var = for_node->var;
-    b32 it_is_local = (b32) ((iter_local & LOCAL_IS_WASM) != 0);
-    u64 offset = 0;
+    assert((iter_local & LOCAL_IS_WASM) == 0);
 
     // Enter a deferred statement for the auto-close
     emit_enter_structured_block(mod, &code, SBT_Basic_Block, for_node->token);
 
+    emit_for__prologue(mod, &code, for_node, iter_local, index_local);
+
     if (!for_node->no_close) {
         StructMember close_func_type;
-        type_lookup_member_by_idx(for_node->iter->type, 2, &close_func_type);
+        type_lookup_member_by_idx(mod->context, for_node->iter->type, 2, &close_func_type);
         i32 close_type_idx = generate_type_idx(mod, close_func_type.type);
 
-        WasmInstruction* close_instructions = bh_alloc_array(global_heap_allocator, WasmInstruction, 8);
+        WasmInstruction* close_instructions = bh_alloc_array(mod->context->gp_alloc, WasmInstruction, 8);
         close_instructions[0] = (WasmInstruction) { WI_LOCAL_GET,     { .l = iterator_close_func } };
         close_instructions[1] = (WasmInstruction) { WI_I32_CONST,     { .l = mod->null_proc_func_idx } };
         close_instructions[2] = (WasmInstruction) { WI_I32_NE,        { .l = 0x00 } };
@@ -1587,19 +1627,14 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
     }
 
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
-    emit_enter_structured_block(mod, &code, SBT_Continue_Loop, for_node->token);
-
-    if (!it_is_local) emit_local_location(mod, &code, var, &offset);
-
-    {
-        WIL(for_node->token, WI_LOCAL_GET, iterator_data_ptr);
-        WIL(for_node->token, WI_LOCAL_GET, iterator_next_func);
+    emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
+    emit_enter_structured_block(mod, &code, SBT_Continue_Block, for_node->token);
 
         // CLEANUP: Calling a function is way too f-ing complicated. FACTOR IT!!
-        u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
+        u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &mod->context->builtins.stack_top);
 
         StructMember next_func_type;
-        type_lookup_member_by_idx(for_node->iter->type, 1, &next_func_type);
+        type_lookup_member_by_idx(mod->context, for_node->iter->type, 1, &next_func_type);
         Type* return_type = next_func_type.type->Function.return_type;
 
         u32 return_size = type_size_of(return_type);
@@ -1611,41 +1646,44 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
 
         WID(for_node->token, WI_GLOBAL_GET, stack_top_idx);
         WID(for_node->token, WI_PTR_CONST, reserve_size);
-        WI(for_node->token, WI_PTR_ADD);
+        WI(for_node->token, WI_PTR_SUB);
         WID(for_node->token, WI_GLOBAL_SET, stack_top_idx);
 
+        WIL(for_node->token, WI_LOCAL_GET, iterator_data_ptr);
+        WIL(for_node->token, WI_LOCAL_GET, iterator_next_func);
         i32 type_idx = generate_type_idx(mod, next_func_type.type);
         WID(for_node->token, WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
 
         WID(for_node->token, WI_GLOBAL_GET, stack_top_idx);
         WID(for_node->token, WI_PTR_CONST, reserve_size);
-        WI(for_node->token, WI_PTR_SUB);
+        WI(for_node->token, WI_PTR_ADD);
         WID(for_node->token, WI_GLOBAL_SET, stack_top_idx);
 
-        WID(for_node->token, WI_GLOBAL_GET, stack_top_idx);
-        emit_load_instruction(mod, &code, return_type, reserve_size - return_size);
-    }
+    WIL(for_node->token, WI_LOCAL_TEE, iterator_done_res);
 
-    WIL(for_node->token, WI_LOCAL_SET, iterator_done_bool);
-
-    if (!it_is_local) emit_store_instruction(mod, &code, var->type, offset);
-    else              WIL(for_node->token, WI_LOCAL_SET, iter_local);
-
-    WIL(for_node->token, WI_LOCAL_GET, iterator_done_bool);
+    emit_load_instruction(mod, &code, mod->context->types.basic[Basic_Kind_U8], 0);
     WI(for_node->token, WI_I32_EQZ);
-    WID(for_node->token, WI_COND_JUMP, 0x01);
+    WID(for_node->token, WI_COND_JUMP, 0x02);
+
+    u64 offset = 0;
+    emit_local_location(mod, &code, var, &offset);
+    WIL(for_node->token, WI_LOCAL_GET, iterator_done_res);
+    emit_load_instruction(mod, &code, var->type, type_alignment_of(return_type));
+    emit_store_instruction(mod, &code, var->type, offset);
 
     emit_block(mod, &code, for_node->stmt, 0);
+
+    emit_leave_structured_block(mod, &code); // CONTINUE_BLOCK
 
     emit_for__epilogue(mod, &code, for_node, iter_local, index_local);
 
     WID(for_node->token, WI_JUMP, 0x00);
 
-    emit_leave_structured_block(mod, &code);
-    emit_leave_structured_block(mod, &code);
+    emit_leave_structured_block(mod, &code); // BASIC_LOOP
+    emit_leave_structured_block(mod, &code); // BREAKABLE_BLOCK
 
     emit_deferred_stmts(mod, &code);
-    emit_leave_structured_block(mod, &code);
+    emit_leave_structured_block(mod, &code); // BASIC_BLOCK
 
     bh_arr_pop(mod->for_remove_info);
 
@@ -1654,7 +1692,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local, i64 index_local) {
     local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
     local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
     local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
-    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     *pcode = code;
 }
 
@@ -1704,7 +1742,7 @@ EMIT_FUNC(for, AstFor* for_node) {
 
         case For_Loop_Slice:    emit_for_slice(mod, &code, for_node, iter_local, index_local); break;
         case For_Loop_Iterator: emit_for_iterator(mod, &code, for_node, iter_local, index_local); break;
-        default: onyx_report_error(for_node->token->pos, Error_Critical, "Invalid for loop type. You should probably not be seeing this...");
+        default: ONYX_ERROR(for_node->token->pos, Error_Critical, "Invalid for loop type. You should probably not be seeing this...");
     }
 
     local_free(mod->local_alloc, (AstTyped *) var);
@@ -1717,7 +1755,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
     bh_arr(WasmInstruction) code = *pcode;
 
     bh_imap block_map;
-    bh_imap_init(&block_map, global_heap_allocator, bh_arr_length(switch_node->cases));
+    bh_imap_init(&block_map, mod->context->gp_alloc, bh_arr_length(switch_node->cases));
 
     u64 expr_result_local = 0;
     if (switch_node->is_expr) {
@@ -2011,6 +2049,63 @@ EMIT_FUNC(binop, AstBinaryOp* binop) {
         return;
     }
 
+    if (binop->operation == Binary_Op_Bool_And) {
+        emit_enter_structured_block(mod, &code, SBT_Basic_Block, binop->token);
+
+        u64 tmp_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+
+        emit_expression(mod, &code, binop->left);
+        if (binop->left->type->kind == Type_Kind_Function) {
+            WI(NULL, WI_DROP);
+        }
+
+        WIL(NULL, WI_LOCAL_TEE, tmp_local);
+        WI(NULL, WI_I32_EQZ);
+        WIL(NULL, WI_COND_JUMP, 0);
+
+        emit_expression(mod, &code, binop->right);
+        if (binop->right->type->kind == Type_Kind_Function) {
+            WI(NULL, WI_DROP);
+        }
+
+        WIL(NULL, WI_LOCAL_SET, tmp_local);
+        emit_leave_structured_block(mod, &code);
+
+        WIL(NULL, WI_LOCAL_GET, tmp_local);
+        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+
+        *pcode = code;
+        return;
+    }
+
+    if (binop->operation == Binary_Op_Bool_Or) {
+        emit_enter_structured_block(mod, &code, SBT_Basic_Block, binop->token);
+
+        u64 tmp_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+
+        emit_expression(mod, &code, binop->left);
+        if (binop->left->type->kind == Type_Kind_Function) {
+            WI(NULL, WI_DROP);
+        }
+
+        WIL(NULL, WI_LOCAL_TEE, tmp_local);
+        WIL(NULL, WI_COND_JUMP, 0);
+
+        emit_expression(mod, &code, binop->right);
+        if (binop->right->type->kind == Type_Kind_Function) {
+            WI(NULL, WI_DROP);
+        }
+
+        WIL(NULL, WI_LOCAL_SET, tmp_local);
+        emit_leave_structured_block(mod, &code);
+
+        WIL(NULL, WI_LOCAL_GET, tmp_local);
+        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+
+        *pcode = code;
+        return;
+    }
+
     b32 is_sign_significant = 0;
     switch (binop->operation) {
         case Binary_Op_Divide:  case Binary_Op_Modulus:
@@ -2121,6 +2216,7 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
         case Unary_Op_Cast: emit_cast(mod, &code, unop); break;
 
         case Unary_Op_Try: // Should be handled in operator overload
+        case Unary_Op_Unwrap: 
         case Unary_Op_Count:
             break;
     }
@@ -2160,7 +2256,8 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
 EMIT_FUNC(call, AstCall* call) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
+    u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &mod->context->builtins.stack_top);
+    u64 stack_top_restore_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     u64 stack_top_store_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
 
     OnyxToken* call_token = call->token;
@@ -2171,9 +2268,10 @@ EMIT_FUNC(call, AstCall* call) {
     // in later.
     u32 reserve_space_patch = bh_arr_length(code);
     WID(call_token, WI_GLOBAL_GET, stack_top_idx);
-    WIL(call_token, WI_LOCAL_TEE, stack_top_store_local);
+    WIL(call_token, WI_LOCAL_TEE, stack_top_restore_local);
     WID(call_token, WI_PTR_CONST, 0);                           // This will be filled in later.
-    WI(call_token, WI_PTR_ADD);
+    WI(call_token, WI_PTR_SUB);
+    WIL(call_token, WI_LOCAL_TEE, stack_top_store_local);
     WID(call_token, WI_GLOBAL_SET, stack_top_idx);
 
     u32 reserve_size  = 0;
@@ -2183,8 +2281,8 @@ EMIT_FUNC(call, AstCall* call) {
     u32* vararg_any_offsets=NULL;
     u32* vararg_any_types=NULL;
     if (call->va_kind == VA_Kind_Any) {
-        vararg_any_offsets = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(call->args.values));
-        vararg_any_types   = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(call->args.values));
+        vararg_any_offsets = bh_alloc_array(mod->context->scratch_alloc, u32, bh_arr_length(call->args.values));
+        vararg_any_types   = bh_alloc_array(mod->context->scratch_alloc, u32, bh_arr_length(call->args.values));
     }
 
     bh_arr_each(AstTyped *, parg, call->args.values) {
@@ -2198,17 +2296,15 @@ EMIT_FUNC(call, AstCall* call) {
             place_on_stack = 1;
         }
 
+        if (arg->pass_as_any || arg->va_kind != VA_Kind_Not_VA) {
+            place_on_stack = 1;
+        }
+
         if (arg->va_kind != VA_Kind_Not_VA) {
             // This is a variadic argument and needs to be written to the stack. If the starting
             // location of the vararg array hasn't been noted, note it.
             if (vararg_offset < 0) vararg_offset = reserve_size;
-
-            place_on_stack = 1;
             vararg_count += 1;
-        }
-
-        if (arg->pass_as_any) {
-            place_on_stack = 1;
         }
 
         if (arg->value->kind == Ast_Kind_Struct_Literal && onyx_type_is_stored_in_memory(arg->value->type)) {
@@ -2233,34 +2329,34 @@ EMIT_FUNC(call, AstCall* call) {
             if (arg->va_kind == VA_Kind_Any) {
                 vararg_any_offsets[vararg_count - 1] = reserve_size;
                 vararg_any_types[vararg_count - 1] = arg->value->type->id;
+                ensure_type_has_been_submitted_for_emission(mod, arg->value->type);
             }
 
             reserve_size += type_size_of(arg->value->type);
 
             if (arg->pass_as_any) {
-                Type *any_type = type_build_from_ast(context.ast_alloc, builtin_any_type);
+                Type *any_type = type_build_from_ast(mod->context, mod->context->builtins.any_type);
                 assert(any_type);
-
-                u32 arg_size = type_size_of(any_type);
 
                 u64 ugly_temporary = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
                 WIL(call_token, WI_LOCAL_SET, ugly_temporary);
 
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WIL(call_token, WI_LOCAL_GET, ugly_temporary);
-                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], reserve_size + 0);
+                emit_store_instruction(mod, &code, mod->context->types.basic[Basic_Kind_Rawptr], reserve_size + 0);
 
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WID(call_token, WI_I32_CONST, arg->value->type->id);
-                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Type_Index], reserve_size + 4);
+                emit_store_instruction(mod, &code, mod->context->types.basic[Basic_Kind_Type_Index], reserve_size + 4);
+                ensure_type_has_been_submitted_for_emission(mod, arg->value->type);
 
                 local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
-                WIL(call_token, WI_I32_CONST, reserve_size);
-                WI(call_token, WI_I32_ADD);
+                WIL(call_token, WI_PTR_CONST, reserve_size);
+                WI(call_token, WI_PTR_ADD);
 
-                reserve_size += arg_size;
+                reserve_size += type_size_of(any_type);
             }
         }
     }
@@ -2269,18 +2365,18 @@ EMIT_FUNC(call, AstCall* call) {
         case VA_Kind_Any: {
             vararg_offset = reserve_size;
 
-            i32 any_size = type_size_of(type_build_from_ast(context.ast_alloc, builtin_any_type));
+            i32 any_size = type_size_of(type_build_from_ast(mod->context, mod->context->builtins.any_type));
 
             fori (i, 0, vararg_count) {
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WID(call_token, WI_PTR_CONST, vararg_any_offsets[i]);
                 WI(call_token, WI_PTR_ADD);
-                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], vararg_offset + i * any_size);
+                emit_store_instruction(mod, &code, mod->context->types.basic[Basic_Kind_Rawptr], reserve_size);
 
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WID(call_token, WI_I32_CONST, vararg_any_types[i]);
-                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Type_Index], vararg_offset + i * any_size + POINTER_SIZE);
+                emit_store_instruction(mod, &code, mod->context->types.basic[Basic_Kind_Type_Index], reserve_size + POINTER_SIZE);
 
                 reserve_size += any_size;
             }
@@ -2305,13 +2401,13 @@ EMIT_FUNC(call, AstCall* call) {
                 WID(call_token, WI_PTR_CONST, vararg_offset);
                 WI(call_token, WI_PTR_ADD);
             }
-            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], reserve_size);
+            emit_store_instruction(mod, &code, mod->context->types.basic[Basic_Kind_Rawptr], reserve_size);
 
             // NOTE: There may be 4 uninitialized bytes here, because pointers are only 4 bytes in WASM.
 
             WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
             WID(call_token, WI_I32_CONST, vararg_count);
-            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], reserve_size + POINTER_SIZE);
+            emit_store_instruction(mod, &code, mod->context->types.basic[Basic_Kind_I32], reserve_size + POINTER_SIZE);
 
             WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
             if (reserve_size > 0) {
@@ -2334,14 +2430,23 @@ EMIT_FUNC(call, AstCall* call) {
     u32 return_size = type_size_of(return_type);
     assert(return_size % type_alignment_of(return_type) == 0);
 
-    if (cc == CC_Return_Stack) reserve_size += return_size;
+    u32 return_location = 0;
+    if (cc == CC_Return_Stack) {
+        return_location = reserve_size;
 
-    if (context.options->stack_trace_enabled) {
+        WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+        WID(call_token, WI_PTR_CONST, return_location);
+        WI(call_token, WI_PTR_ADD);
+
+        reserve_size += return_size;
+    }
+
+    if (mod->context->options->stack_trace_enabled) {
         emit_stack_address(mod, &code, mod->stack_trace_idx, NULL);
         WIL(NULL, WI_I32_CONST, call->token->pos.line);
-        emit_store_instruction(mod, &code, &basic_types[Basic_Kind_U32], 8);
+        emit_store_instruction(mod, &code, mod->context->types.basic[Basic_Kind_U32], 8);
 
-        u64 stack_trace_pass_global = bh_imap_get(&mod->index_map, (u64) &builtin_stack_trace);
+        u64 stack_trace_pass_global = bh_imap_get(&mod->index_map, (u64) &mod->context->builtins.stack_trace);
         emit_stack_address(mod, &code, mod->stack_trace_idx, NULL);
         WIL(NULL, WI_GLOBAL_SET, stack_trace_pass_global);
     }
@@ -2356,12 +2461,12 @@ EMIT_FUNC(call, AstCall* call) {
 
         WIL(NULL, WI_CALL, 0); // This will be patched later.
 
-        ensure_node_has_been_submitted_for_emission((AstNode *) call->callee);
+        ensure_node_has_been_submitted_for_emission(mod->context, (AstNode *) call->callee);
 
     } else {
         emit_expression(mod, &code, call->callee);
 
-        u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_closure_base);
+        u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &mod->context->builtins.closure_base);
         WIL(NULL, WI_GLOBAL_SET, global_closure_base_idx);
 
         i32 type_idx = generate_type_idx(mod, call->callee->type);
@@ -2369,21 +2474,22 @@ EMIT_FUNC(call, AstCall* call) {
     }
 
     if (reserve_size > 0) {
-        WIL(call_token, WI_LOCAL_GET,  stack_top_store_local);
+        WIL(call_token, WI_LOCAL_GET,  stack_top_restore_local);
         WID(call_token, WI_GLOBAL_SET, stack_top_idx);
 
         bh_align(reserve_size, 16);
         code[reserve_space_patch + 2].data.l = reserve_size;
 
     } else {
-        fori (i, 0, 5) code[reserve_space_patch + i].type = WI_NOP;
+        fori (i, 0, 6) code[reserve_space_patch + i].type = WI_NOP;
     }
 
     if (cc == CC_Return_Stack) {
-        WID(call_token, WI_GLOBAL_GET, stack_top_idx);
-        emit_load_with_ignored_instruction(mod, &code, return_type, reserve_size - return_size, call->ignored_return_value_count);
+        WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+        emit_load_with_ignored_instruction(mod, &code, return_type, return_location, call->ignored_return_value_count);
     }
 
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     *pcode = code;
 }
@@ -2417,7 +2523,7 @@ EMIT_FUNC(method_call, AstBinaryOp *mcall) {
 
     //
     // Create a local variable to store the result of the lookup.
-    AstLocal *tmp_local = make_local_with_type(context.ast_alloc, NULL, (*object)->type);
+    AstLocal *tmp_local = make_local_with_type(mod->context, NULL, (*object)->type);
     tmp_local->flags |= Ast_Flag_Decl_Followed_By_Init;
     u64 tmp_local_idx = emit_local_allocation(mod, &code, (AstTyped *) tmp_local);
     b32 tmp_is_wasm_local = (b32) ((tmp_local_idx & LOCAL_IS_WASM) != 0);
@@ -2442,7 +2548,7 @@ EMIT_FUNC(method_call, AstBinaryOp *mcall) {
     // of the local variable.
     AstArgument *first_arg = (AstArgument *) call_node->args.values[0];
     if (first_arg->value->kind == Ast_Kind_Address_Of && ((AstAddressOf *) first_arg->value)->can_be_removed) {
-        first_arg->value = (AstTyped *) make_address_of(context.ast_alloc, (AstTyped *) tmp_local);
+        first_arg->value = (AstTyped *) make_address_of(mod->context, (AstTyped *) tmp_local);
     } else {
         first_arg->value = (AstTyped *) tmp_local;
     }
@@ -2463,7 +2569,7 @@ EMIT_FUNC(method_call, AstBinaryOp *mcall) {
         bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values; \
         fori (i, 0, count) { \
             if (arg_arr[i]->value->kind != Ast_Kind_NumLit) { \
-                onyx_report_error(arg_arr[i]->token->pos, Error_Critical, \
+                ONYX_ERROR(arg_arr[i]->token->pos, Error_Critical, \
                         "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.", \
                         i, bh_num_suffix(i)); \
                 *pcode = code; \
@@ -2477,7 +2583,7 @@ EMIT_FUNC(method_call, AstBinaryOp *mcall) {
 #define SIMD_EXTRACT_LANE_INSTR(instr, arg_arr) \
     emit_expression(mod, &code, arg_arr[0]->value);\
     if (arg_arr[1]->value->kind != Ast_Kind_NumLit) { \
-        onyx_report_error(arg_arr[1]->token->pos, Error_Critical, "SIMD lane instructions expect a compile time lane number."); \
+        ONYX_ERROR(arg_arr[1]->token->pos, Error_Critical, "SIMD lane instructions expect a compile time lane number."); \
         *pcode = code; \
         return; \
     } \
@@ -2486,7 +2592,7 @@ EMIT_FUNC(method_call, AstBinaryOp *mcall) {
 #define SIMD_REPLACE_LANE_INSTR(instr, arg_arr) { \
     emit_expression(mod, &code, arg_arr[0]->value);\
     if (arg_arr[1]->value->kind != Ast_Kind_NumLit) { \
-        onyx_report_error(arg_arr[1]->token->pos, Error_Critical, "SIMD lane instructions expect a compile time lane number."); \
+        ONYX_ERROR(arg_arr[1]->token->pos, Error_Critical, "SIMD lane instructions expect a compile time lane number."); \
         *pcode = code; \
         return; \
     } \
@@ -2605,7 +2711,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
             bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values;
             fori (i, 0, 4) {
                 if (arg_arr[i]->value->kind != Ast_Kind_NumLit) {
-                    onyx_report_error(arg_arr[i]->token->pos, Error_Critical,
+                    ONYX_ERROR(arg_arr[i]->token->pos, Error_Critical,
                             "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.",
                             i, bh_num_suffix(i));
                     *pcode = code;
@@ -2622,7 +2728,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
             bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values;
             fori (i, 0, 2) {
                 if (arg_arr[i]->value->kind != Ast_Kind_NumLit) {
-                    onyx_report_error(arg_arr[i]->token->pos, Error_Critical,
+                    ONYX_ERROR(arg_arr[i]->token->pos, Error_Critical,
                             "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.",
                             i, bh_num_suffix(i));
                     *pcode = code;
@@ -2645,7 +2751,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
 
             fori (i, 0, 16) {
                 if (arg_arr[i + 2]->value->kind != Ast_Kind_NumLit) {
-                    onyx_report_error(arg_arr[i + 2]->token->pos, Error_Critical,
+                    ONYX_ERROR(arg_arr[i + 2]->token->pos, Error_Critical,
                             "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.",
                             i, bh_num_suffix(i));
                     *pcode = code;
@@ -2958,20 +3064,24 @@ EMIT_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
         source_expr = (AstTyped *) ((AstFieldAccess *) source_expr)->expr;
     }
 
-    if (source_expr->kind == Ast_Kind_Subscript
-        && source_expr->type->kind != Type_Kind_Pointer && source_expr->type->kind != Type_Kind_MultiPointer) {
+    b32 is_pointer = source_expr->type->kind == Type_Kind_Pointer || source_expr->type->kind == Type_Kind_MultiPointer;
+
+    if (source_expr->kind == Ast_Kind_Subscript && !is_pointer) {
         u64 o2 = 0;
         emit_subscript_location(mod, &code, (AstSubscript *) source_expr, &o2);
         offset += o2;
 
-    } else if ((source_expr->kind == Ast_Kind_Local || source_expr->kind == Ast_Kind_Param)
-        && source_expr->type->kind != Type_Kind_Pointer && source_expr->type->kind != Type_Kind_MultiPointer) {
+    } else if ((source_expr->kind == Ast_Kind_Local || source_expr->kind == Ast_Kind_Param) && !is_pointer) {
         u64 o2 = 0;
         emit_local_location(mod, &code, (AstLocal *) source_expr, &o2);
         offset += o2;
 
-    } else if (source_expr->kind == Ast_Kind_Memres
-        && source_expr->type->kind != Type_Kind_Pointer && source_expr->type->kind != Type_Kind_MultiPointer) {
+    } else if (source_expr->kind == Ast_Kind_Capture_Local && !is_pointer) {
+        u64 o2 = 0;
+        emit_capture_local_location(mod, &code, (AstCaptureLocal *) source_expr, &o2);
+        offset += o2;
+
+    } else if (source_expr->kind == Ast_Kind_Memres && !is_pointer) {
         emit_memory_reservation_location(mod, &code, (AstMemRes *) source_expr);
 
     } else {
@@ -2986,10 +3096,10 @@ EMIT_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
 EMIT_FUNC(memory_reservation_location, AstMemRes* memres) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    ensure_node_has_been_submitted_for_emission((AstNode *) memres);
+    ensure_node_has_been_submitted_for_emission(mod->context, (AstNode *) memres);
 
     if (memres->threadlocal) {
-        u64 tls_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_tls_base);
+        u64 tls_base_idx = bh_imap_get(&mod->index_map, (u64) &mod->context->builtins.tls_base);
 
         CodePatchInfo code_patch;
         code_patch.kind = Code_Patch_Tls_Offset;
@@ -3048,7 +3158,7 @@ EMIT_FUNC(compound_load, Type* type, u64 offset, i32 ignored_value_count) {
     mem_count -= ignored_value_count;
 
     if (mem_count == 1) {
-        type_linear_member_lookup(type, 0, &two);
+        type_linear_member_lookup(mod->context, type, 0, &two);
         emit_load_instruction(mod, &code, two.type, offset + two.offset); // two.offset should be 0
 
     } else {
@@ -3056,7 +3166,7 @@ EMIT_FUNC(compound_load, Type* type, u64 offset, i32 ignored_value_count) {
         WIL(NULL, WI_LOCAL_TEE, tmp_idx);
 
         fori (i, 0, mem_count) {
-            type_linear_member_lookup(type, i, &two);
+            type_linear_member_lookup(mod->context, type, i, &two);
             if (i != 0) WIL(NULL, WI_LOCAL_GET, tmp_idx);
             emit_load_instruction(mod, &code, two.type, offset + two.offset);
         }
@@ -3077,10 +3187,10 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     if (location_first) WIL(NULL, WI_LOCAL_SET, loc_idx);
 
     i32 elem_count = type_linear_member_count(type);
-    u64 *temp_locals = bh_alloc_array(global_scratch_allocator, u64, elem_count);
+    u64 *temp_locals = bh_alloc_array(mod->context->scratch_alloc, u64, elem_count);
 
     forir (i, elem_count - 1, 0) {
-        type_linear_member_lookup(type, i, &two);
+        type_linear_member_lookup(mod->context, type, i, &two);
 
         WasmType wt = onyx_type_to_wasm_type(two.type);
         if (wt != WASM_TYPE_VOID) {
@@ -3092,7 +3202,7 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     if (!location_first) WIL(NULL, WI_LOCAL_SET, loc_idx);
 
     fori (i, 0, elem_count) {
-        type_linear_member_lookup(type, i, &two);
+        type_linear_member_lookup(mod->context, type, i, &two);
 
         WasmType wt = onyx_type_to_wasm_type(two.type);
         if (wt != WASM_TYPE_VOID) {
@@ -3108,7 +3218,7 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
     // This shouldn't be necessary because the scratch allocator doesn't free.
-    bh_free(global_scratch_allocator, temp_locals);
+    bh_free(mod->context->scratch_alloc, temp_locals);
 
     *pcode = code;
 }
@@ -3116,7 +3226,7 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
 EMIT_FUNC(wasm_copy, OnyxToken *token) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (context.options->use_post_mvp_features) {
+    if (mod->context->options->use_post_mvp_features) {
         WIL(token, WI_MEMORY_COPY, 0x00);
     } else {
         emit_intrinsic_memory_copy(mod, &code);
@@ -3128,7 +3238,7 @@ EMIT_FUNC(wasm_copy, OnyxToken *token) {
 EMIT_FUNC(wasm_fill, OnyxToken *token) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (context.options->use_post_mvp_features) {
+    if (mod->context->options->use_post_mvp_features) {
         WID(token, WI_MEMORY_FILL, 0x00);
     } else {
         emit_intrinsic_memory_fill(mod, &code);
@@ -3143,38 +3253,35 @@ EMIT_FUNC(wasm_memory_equal, OnyxToken *token) {
     *pcode = code;
 }
 
-EMIT_FUNC(values_into_contiguous_memory, u64 base_ptr_local, Type *type, u32 offset, i32 value_count, AstTyped **values) {
+EMIT_FUNC(values_into_contiguous_memory, u64 base_ptr_local, u32 offset, u32 value_count, ValueWithOffset *values) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    assert(onyx_type_is_stored_in_memory(type));
-    assert(value_count == (i32) type_structlike_mem_count(type));
-
-    StructMember smem;
     fori (i, 0, value_count) {
-        type_lookup_member_by_idx(type, i, &smem);
+        AstTyped *value = values[i].value;
+        u32 value_offset = values[i].offset;
 
         // When emitting a structure literal into memory, simply place it directly into the memory.
         // Otherwise, the structure literal would be placed somewhere in memory, and then needlessly
         // copied to its final destination.
-        if (values[i]->kind == Ast_Kind_Struct_Literal && onyx_type_is_stored_in_memory(values[i]->type)) {
-            emit_struct_literal_into_contiguous_memory(mod, &code, (AstStructLiteral *) values[i], base_ptr_local, smem.offset + offset);
+        if (value->kind == Ast_Kind_Struct_Literal && onyx_type_is_stored_in_memory(value->type)) {
+            emit_struct_literal_into_contiguous_memory(mod, &code, (AstStructLiteral *) value, base_ptr_local, value_offset + offset);
 
         // When emitting a zero-value, simple zero the bytes in memory. Otherwise you run into the
         // same problem described above.
-        } else if (values[i]->kind == Ast_Kind_Zero_Value && onyx_type_is_stored_in_memory(values[i]->type)) {
+        } else if (value->kind == Ast_Kind_Zero_Value && onyx_type_is_stored_in_memory(value->type)) {
             WIL(NULL, WI_LOCAL_GET, base_ptr_local);
-            WIL(NULL, WI_PTR_CONST, smem.offset + offset);
+            WIL(NULL, WI_PTR_CONST, value_offset + offset);
             WI(NULL, WI_PTR_ADD);
 
             WIL(NULL, WI_I32_CONST, 0);
-            WIL(NULL, WI_I32_CONST, type_size_of(values[i]->type));
+            WIL(NULL, WI_I32_CONST, type_size_of(value->type));
 
             emit_wasm_fill(mod, &code, NULL);
 
         } else {
             WIL(NULL, WI_LOCAL_GET, base_ptr_local);
-            emit_expression(mod, &code, values[i]);
-            emit_store_instruction(mod, &code, values[i]->type, smem.offset + offset);
+            emit_expression(mod, &code, value);
+            emit_store_instruction(mod, &code, value->type, value_offset + offset);
         }
     }
 
@@ -3182,15 +3289,15 @@ EMIT_FUNC(values_into_contiguous_memory, u64 base_ptr_local, Type *type, u32 off
 }
 
 EMIT_FUNC(struct_literal_into_contiguous_memory, AstStructLiteral* sl, u64 base_ptr_local, u32 offset) {
-    emit_values_into_contiguous_memory(mod, pcode, base_ptr_local, sl->type, offset, bh_arr_length(sl->args.values), sl->args.values);
+    emit_values_into_contiguous_memory(mod, pcode, base_ptr_local, offset, bh_arr_length(sl->values_to_initialize), sl->values_to_initialize);
 }
 
 EMIT_FUNC(struct_literal, AstStructLiteral* sl) {
     bh_arr(WasmInstruction) code = *pcode;
 
     if (!onyx_type_is_stored_in_memory(sl->type)) {
-        bh_arr_each(AstTyped *, val, sl->args.values) {
-            emit_expression(mod, &code, *val);
+        bh_arr_each(ValueWithOffset, val, sl->values_to_initialize) {
+            emit_expression(mod, &code, val->value);
         }
 
         *pcode = code;
@@ -3244,7 +3351,7 @@ EMIT_FUNC(struct_as_separate_values, Type *type, u32 offset) {
     StructMember smem;
 
     fori (i, 0, mem_count) {
-        type_lookup_member_by_idx(type, i, &smem);
+        type_lookup_member_by_idx(mod->context, type, i, &smem);
 
         WIL(NULL, WI_LOCAL_GET, value_location);
         emit_load_instruction(mod, &code, smem.type, offset + smem.offset);
@@ -3256,62 +3363,6 @@ EMIT_FUNC(struct_as_separate_values, Type *type, u32 offset) {
     }
 
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-    *pcode = code;
-    return;
-}
-
-EMIT_FUNC(array_store, Type* type, u32 offset) {
-    assert(type->kind == Type_Kind_Array);
-    bh_arr(WasmInstruction) code = *pcode;
-
-    Type* elem_type = type;
-    u32 elem_count = 1;
-    while (elem_type->kind == Type_Kind_Array) {
-        elem_count *= elem_type->Array.count;
-        elem_type = elem_type->Array.elem;
-    }
-    u32 elem_size = type_size_of(elem_type);
-
-    u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-    u64 rptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-    WIL(NULL, WI_LOCAL_SET, rptr_local);
-    WIL(NULL, WI_LOCAL_SET, lptr_local);
-
-    WIL(NULL, WI_LOCAL_GET, rptr_local);
-    WID(NULL, WI_I32_CONST, 0);
-    WI(NULL, WI_I32_NE);
-    emit_enter_structured_block(mod, &code, SBT_Basic_If, NULL);
-
-    {
-        WIL(NULL, WI_LOCAL_GET, lptr_local);
-        if (offset != 0) {
-            WIL(NULL, WI_PTR_CONST, offset);
-            WI(NULL, WI_PTR_ADD);
-        }
-
-        WIL(NULL, WI_LOCAL_GET, rptr_local);
-        WIL(NULL, WI_I32_CONST, elem_count * elem_size);
-        emit_wasm_copy(mod, &code, NULL);
-    }
-
-    WI(NULL, WI_ELSE);
-
-    { // If the source ptr is null (0), then just copy in 0 bytes.
-        WIL(NULL, WI_LOCAL_GET, lptr_local);
-        if (offset != 0) {
-            WIL(NULL, WI_PTR_CONST, offset);
-            WI(NULL, WI_PTR_ADD);
-        }
-
-        WIL(NULL, WI_I32_CONST, 0);
-        WIL(NULL, WI_I32_CONST, elem_count * elem_size);
-        emit_wasm_fill(mod, &code, NULL);
-    }
-
-    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-
-    emit_leave_structured_block(mod, &code);
     *pcode = code;
     return;
 }
@@ -3332,12 +3383,7 @@ EMIT_FUNC(array_literal, AstArrayLiteral* al) {
         emit_store_instruction(mod, &code, al->type->Array.elem, local_offset + i * elem_size);
     }
 
-    WIL(al->token, WI_LOCAL_GET, mod->stack_base_idx);
-    if (local_offset > 0) {
-        WIL(al->token, WI_PTR_CONST, local_offset);
-        WI(al->token, WI_PTR_ADD);
-    }
-
+    emit_stack_address(mod, &code, local_offset, al->token);
     *pcode = code;
 }
 
@@ -3347,17 +3393,17 @@ EMIT_FUNC(range_literal, AstRangeLiteral* range) {
     u64 local_offset = emit_local_allocation(mod, &code, (AstTyped *) range);
     assert((local_offset & LOCAL_IS_WASM) == 0);
 
-    AstTyped *values[] = { range->low, range->high, range->step };
-    emit_values_into_contiguous_memory(mod, &code, mod->stack_base_idx,
-            range->type, local_offset, 3, values);
+    i32 elem_size = range->type->Struct.alignment;
 
-    WIL(range->token, WI_LOCAL_GET, mod->stack_base_idx);
+    ValueWithOffset values[] = {
+        range->low,  elem_size * 0,
+        range->high, elem_size * 1,
+        range->step, elem_size * 2,
+    };
 
-    if (local_offset > 0) {
-        WIL(NULL, WI_PTR_CONST, local_offset);
-        WI(NULL, WI_PTR_ADD);
-    }
+    emit_values_into_contiguous_memory(mod, &code, mod->stack_base_idx, local_offset, 3, values);
 
+    emit_stack_address(mod, &code, local_offset, range->token);
     *pcode = code;
 }
 
@@ -3366,10 +3412,10 @@ EMIT_FUNC_NO_ARGS(load_slice) {
 
     u64 ugly_temporary = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     WIL(NULL, WI_LOCAL_TEE, ugly_temporary);
-    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], 0);
+    emit_load_instruction(mod, &code, mod->context->types.basic[Basic_Kind_Rawptr], 0);
 
     WIL(NULL, WI_LOCAL_GET, ugly_temporary);
-    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_I32], POINTER_SIZE);
+    emit_load_instruction(mod, &code, mod->context->types.basic[Basic_Kind_I32], POINTER_SIZE);
 
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
@@ -3487,10 +3533,10 @@ EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
 
         default: {
             if (expr->token) {
-                onyx_report_error(expr->token->pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
+                ONYX_ERROR(expr->token->pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
             } else {
                 OnyxFilePos pos = {0};
-                onyx_report_error(pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
+                ONYX_ERROR(pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
             }
             break;
         }
@@ -3520,12 +3566,17 @@ EMIT_FUNC(expression, AstTyped* expr) {
         if (type->flags & Ast_Flag_Expr_Ignored) return;
 
         if (type->type_id != 0) {
-            WID(NULL, WI_I32_CONST, ((AstType *) expr)->type_id);
-        } else {
-            Type* t = type_build_from_ast(context.ast_alloc, type);
-            WID(NULL, WI_I32_CONST, t->id);
-        }
+            WID(NULL, WI_I32_CONST, type->type_id);
 
+            Type *t = type_lookup_by_id(mod->context, type->type_id);
+            assert(t);
+            ensure_type_has_been_submitted_for_emission(mod, t);
+        } else {
+            Type *t = type_build_from_ast(mod->context, type);
+            WID(NULL, WI_I32_CONST, t->id);
+
+            ensure_type_has_been_submitted_for_emission(mod, t);
+        }
 
         *pcode = code;
         return;
@@ -3620,7 +3671,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_StrLit: {
             // :ProperLinking
             AstStrLit *strlit = (AstStrLit *) expr;
-            ensure_node_has_been_submitted_for_emission((AstNode *) strlit);
+            ensure_node_has_been_submitted_for_emission(mod->context, (AstNode *) strlit);
             emit_data_relocation_for_node(mod, &code, (AstNode *) strlit);
 
             if (strlit->is_cstr == 0) {
@@ -3670,18 +3721,18 @@ EMIT_FUNC(expression, AstTyped* expr) {
             code_patch.kind = Code_Patch_Callee;
             code_patch.func_idx = mod->current_func_idx;
             code_patch.instr = bh_arr_length(code);
-            code_patch.node_related_to_patch = (AstNode *) builtin_closure_block_allocate;
+            code_patch.node_related_to_patch = (AstNode *) mod->context->builtins.closure_block_allocate;
             bh_arr_push(mod->code_patches, code_patch);
             WIL(NULL, WI_CALL, 0);
 
-            ensure_node_has_been_submitted_for_emission((AstNode *) builtin_closure_block_allocate);
+            ensure_node_has_been_submitted_for_emission(mod->context, (AstNode *) mod->context->builtins.closure_block_allocate);
 
             u64 capture_block_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
             WIL(NULL, WI_LOCAL_TEE, capture_block_ptr);
 
             WIL(NULL, WI_LOCAL_GET, capture_block_ptr);
             WIL(NULL, WI_I32_CONST, func->captures->total_size_in_bytes);
-            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_U32], 0);
+            emit_store_instruction(mod, &code, mod->context->types.basic[Basic_Kind_U32], 0);
 
             // Populate the block
             bh_arr_each(AstCaptureLocal *, capture, func->captures->captures) {
@@ -3762,13 +3813,13 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 emit_expression(mod, &code, field->expr);
                 u64 source_base_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
                 WIL(NULL, WI_LOCAL_TEE, source_base_ptr);
-                emit_load_instruction(mod, &code, &basic_types[Basic_Kind_U32], 0);
+                emit_load_instruction(mod, &code, field->type->Union.tag_type, 0);
                 WIL(NULL, WI_I32_CONST, field->idx);
                 WI(NULL, WI_I32_EQ);
                 emit_enter_structured_block(mod, &code, SBT_Basic_If, field->token);
                     emit_stack_address(mod, &code, intermediate_local, field->token);
                     WIL(NULL, WI_I32_CONST, 1); // 1 is Some
-                    emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], 0);
+                    emit_store_instruction(mod, &code, field->type->Union.tag_type, 0);
 
                     emit_stack_address(mod, &code, intermediate_local + type_alignment_of(field->type), field->token);
                     WIL(NULL, WI_LOCAL_GET, source_base_ptr);
@@ -3787,7 +3838,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 WI(NULL, WI_ELSE);
                     emit_stack_address(mod, &code, intermediate_local, field->token);
                     WIL(NULL, WI_I32_CONST, 0); // 0 is None
-                    emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], 0);
+                    emit_store_instruction(mod, &code, field->type->Union.tag_type, 0);
                 emit_leave_structured_block(mod, &code);
 
                 local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
@@ -3822,12 +3873,12 @@ EMIT_FUNC(expression, AstTyped* expr) {
                     // that I cannot find a good way to factor them all without just introducing a ton of complexity.
                     fori (i, 0, total_linear_members - idx - field_linear_members) WI(NULL, WI_DROP);
 
-                    u64 *temporaries = bh_alloc_array(global_scratch_allocator, u64, field_linear_members);
+                    u64 *temporaries = bh_alloc_array(mod->context->scratch_alloc, u64, field_linear_members);
                     fori (i, 0, field_linear_members) temporaries[i] = 0;
 
                     TypeWithOffset two = { 0 };
                     forir (i, field_linear_members - 1, 0) {
-                        type_linear_member_lookup(field->type, i, &two);
+                        type_linear_member_lookup(mod->context, field->type, i, &two);
 
                         WasmType wt = onyx_type_to_wasm_type(two.type);
                         temporaries[i] = local_raw_allocate(mod->local_alloc, wt);
@@ -3837,7 +3888,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
                     fori (i, 0, idx) WI(NULL, WI_DROP);
 
                     fori (i, 0, field_linear_members) {
-                        type_linear_member_lookup(field->type, i, &two);
+                        type_linear_member_lookup(mod->context, field->type, i, &two);
 
                         WIL(NULL, WI_LOCAL_GET, temporaries[i]);
 
@@ -3845,7 +3896,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
                         local_raw_free(mod->local_alloc, wt);
                     }
 
-                    bh_free(global_scratch_allocator, temporaries);
+                    bh_free(mod->context->scratch_alloc, temporaries);
                 }
             }
 
@@ -3899,7 +3950,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
             WasmType backing_type = onyx_type_to_wasm_type(ev->type);
             if      (backing_type == WASM_TYPE_INT32) WID(NULL, WI_I32_CONST, num->value.i);
             else if (backing_type == WASM_TYPE_INT64) WID(NULL, WI_I64_CONST, num->value.l);
-            else onyx_report_error(ev->token->pos, Error_Critical, "Invalid backing type for enum.");
+            else ONYX_ERROR(ev->token->pos, Error_Critical, "Invalid backing type for enum.");
             break;
         }
 
@@ -3914,7 +3965,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
             AstFileContents* fc = (AstFileContents *) expr;
 
             // :ProperLinking
-            ensure_node_has_been_submitted_for_emission((AstNode *) fc);
+            ensure_node_has_been_submitted_for_emission(mod->context, (AstNode *) fc);
             emit_data_relocation_for_node(mod, &code, (AstNode *) fc);
 
             CodePatchInfo code_patch;
@@ -3943,17 +3994,14 @@ EMIT_FUNC(expression, AstTyped* expr) {
             u64 local_offset = emit_local_allocation(mod, &code, (AstTyped *) callsite);
             assert((local_offset & LOCAL_IS_WASM) == 0);
 
-            AstTyped *values[] = { (AstTyped *) callsite->filename, (AstTyped *) callsite->line, (AstTyped *) callsite->column };
-            emit_values_into_contiguous_memory(mod, &code, mod->stack_base_idx,
-                    callsite->type, local_offset, 3, values);
+            ValueWithOffset values[] = {
+                (AstTyped *) callsite->filename, 0,
+                (AstTyped *) callsite->line,     2 * POINTER_SIZE,
+                (AstTyped *) callsite->column,   3 * POINTER_SIZE
+            };
+            emit_values_into_contiguous_memory(mod, &code, mod->stack_base_idx, local_offset, 3, values);
 
-            WIL(NULL, WI_LOCAL_GET, mod->stack_base_idx);
-
-            if (local_offset > 0) {
-                WIL(NULL, WI_PTR_CONST, local_offset);
-                WI(NULL, WI_PTR_ADD);
-            }
-
+            emit_stack_address(mod, &code, local_offset, NULL);
             break;
         }
 
@@ -3966,14 +4014,14 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Switch_Case: {
             // This error message should be moved to checking, but this is the
             // best place to do it right now.
-            onyx_report_error(expr->token->pos, Error_Critical, "'case' statements are only allowed in a 'switch' statement.");
+            ONYX_ERROR(expr->token->pos, Error_Critical, "'case' statements are only allowed in a 'switch' statement.");
             break;
         }
 
         case Ast_Kind_Code_Block: {
             // Like above, this error message should be moved to checking, but
             // this is the best place to do it right now.
-            onyx_report_error(expr->token->pos, Error_Critical, "'#quote' blocks are only to be used at compile-time. Using them as a runtime value is not allowed.");
+            ONYX_ERROR(expr->token->pos, Error_Critical, "'#quote' blocks are only to be used at compile-time. Using them as a runtime value is not allowed.");
             break;
         }
 
@@ -4176,8 +4224,12 @@ EMIT_FUNC(return, AstReturn* ret) {
     AstLocal* result_destination = NULL;
     i64 jump_label = get_structured_jump_label(mod, Jump_Type_Return, ret->count + 1);
 
+    if (ret->from_proc) {
+        jump_label = -1;
+    }
+
     //
-    // If this is return statement if an inner return of a `do` block,
+    // If this is return statement of an inner return of a `do` block,
     // we have to get the result destination out of the return location stack.
     // This can be computed as the -ret->count element.
     //
@@ -4197,10 +4249,8 @@ EMIT_FUNC(return, AstReturn* ret) {
             emit_generic_store_instruction(mod, &code, (AstTyped *) result_destination, NULL);
 
         } else if (mod->curr_cc == CC_Return_Stack) {
-            WIL(NULL, WI_LOCAL_GET, mod->stack_base_idx);
-            WID(NULL, WI_I32_CONST, type_size_of(ret->expr->type));
-            WI(NULL, WI_I32_SUB);
-
+            assert(mod->stack_return_location_idx);
+            WIL(NULL, WI_LOCAL_GET, mod->stack_return_location_idx);
             emit_expression(mod, &code, ret->expr);
             emit_store_instruction(mod, &code, ret->expr->type, 0);
 
@@ -4222,7 +4272,6 @@ EMIT_FUNC(return, AstReturn* ret) {
             b32 need_to_copy_to_separate_buffer_to_avoid_corrupted_from_deferred_calls = 0;
             u64 return_value_buffer;
             if (onyx_type_is_stored_in_memory(ret->expr->type)
-                && !is_lval((AstNode *) ret->expr)
                 && bh_arr_length(mod->deferred_stmts) > 0) {
                 need_to_copy_to_separate_buffer_to_avoid_corrupted_from_deferred_calls = 1;
 
@@ -4272,21 +4321,23 @@ EMIT_FUNC(stack_enter, u64 stacksize) {
 
     bh_align(stacksize, 16);
 
-    u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
+    u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &mod->context->builtins.stack_top);
 
-    // HACK: slightly... There will be space for 5 instructions
+    // HACK: slightly... There will be space for 6 instructions
     if (stacksize == 0) {
         code[0] = (WasmInstruction) { WI_GLOBAL_GET, { .l = stack_top_idx } };
-        code[1] = (WasmInstruction) { WI_LOCAL_SET,  { .l = mod->stack_base_idx} };
+        code[1] = (WasmInstruction) { WI_LOCAL_SET,  { .l = mod->stack_restore_idx} };
         code[2] = (WasmInstruction) { WI_NOP,        0 };
         code[3] = (WasmInstruction) { WI_NOP,        0 };
         code[4] = (WasmInstruction) { WI_NOP,        0 };
+        code[5] = (WasmInstruction) { WI_NOP,        0 };
     } else {
         code[0] = (WasmInstruction) { WI_GLOBAL_GET, { .l = stack_top_idx } };
-        code[1] = (WasmInstruction) { WI_LOCAL_TEE,  { .l = mod->stack_base_idx} };
+        code[1] = (WasmInstruction) { WI_LOCAL_TEE,  { .l = mod->stack_restore_idx} };
         code[2] = (WasmInstruction) { WI_I32_CONST,  { .l = stacksize } };
-        code[3] = (WasmInstruction) { WI_I32_ADD,    0 };
-        code[4] = (WasmInstruction) { WI_GLOBAL_SET, { .l = stack_top_idx } };
+        code[3] = (WasmInstruction) { WI_I32_SUB,    0 };
+        code[4] = (WasmInstruction) { WI_LOCAL_TEE,  { .l = mod->stack_base_idx} };
+        code[5] = (WasmInstruction) { WI_GLOBAL_SET, { .l = stack_top_idx } };
     }
 
     *pcode = code;
@@ -4318,7 +4369,7 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_nod
         TypeWithOffset two;
 
         fori (i, 0, mem_count) {
-            type_linear_member_lookup(type, i, &two);
+            type_linear_member_lookup(mod->context, type, i, &two);
             emit_zero_value_for_type(mod, &code, two.type, where, NULL);
         }
 
@@ -4340,13 +4391,13 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_nod
         emit_zero_value_for_type(mod, &code, type->Distinct.base_type, where, alloc_node);
 
     } else {
-        if (type == &basic_types[Basic_Kind_Void]) {
+        if (type == mod->context->types.basic[Basic_Kind_Void]) {
             return;
         }
 
         WasmType wt = onyx_type_to_wasm_type(type);
         if (wt == WASM_TYPE_VOID) {
-            onyx_report_error(where->pos, Error_Critical, "Cannot produce a zero-value for this type.");
+            ONYX_ERROR(where->pos, Error_Critical, "Cannot produce a zero-value for this type.");
         }
         emit_zero_value(mod, &code, wt);
     }
@@ -4367,14 +4418,14 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     while (params_left-- > 0) {
         switch (type_get_param_pass(*param_type)) {
             case Param_Pass_By_Value:            *(t++) = (char) onyx_type_to_wasm_type(*param_type); break;
-            case Param_Pass_By_Implicit_Pointer: *(t++) = (char) onyx_type_to_wasm_type(&basic_types[Basic_Kind_Rawptr]); break;
+            case Param_Pass_By_Implicit_Pointer: *(t++) = (char) onyx_type_to_wasm_type(mod->context->types.basic[Basic_Kind_Rawptr]); break;
 
             case Param_Pass_By_Multiple_Values: {
                 u32 mem_count = type_structlike_mem_count(*param_type);
                 StructMember smem;
 
                 fori (i, 0, mem_count) {
-                    type_lookup_member_by_idx(*param_type, i, &smem);
+                    type_lookup_member_by_idx(mod->context, *param_type, i, &smem);
                     *(t++) = (char) onyx_type_to_wasm_type(smem.type);
                 }
 
@@ -4387,39 +4438,41 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
 
         param_type++;
     }
+
+    if (type_function_get_cc(ft) == CC_Return_Stack) {
+        *(t++) = onyx_type_to_wasm_type(mod->context->types.basic[Basic_Kind_Rawptr]);
+        param_count += 1;
+    }
+
     *(t++) = ':';
 
     WasmType return_type = onyx_type_to_wasm_type(ft->Function.return_type);
-
     *(t++) = (char) return_type;
+
     *t = '\0';
 
-    i32 type_idx = 0;
     i32 index = shgeti(mod->type_map, type_repr_buf);
     if (index != -1) {
-        type_idx = mod->type_map[index].value;
-    } else {
-        // NOTE: Make a new type
-        WasmFuncType* type = (WasmFuncType*) bh_alloc(mod->allocator, sizeof(WasmFuncType) + sizeof(WasmType) * param_count);
-        type->return_type = return_type;
-        type->param_count = param_count;
-
-        fori (i, 0, type->param_count) {
-            type->param_types[i] = type_repr_buf[i];
-        }
-
-        bh_arr_push(mod->types, type);
-
-        shput(mod->type_map, type_repr_buf, mod->next_type_idx);
-        type_idx = mod->next_type_idx;
-        mod->next_type_idx++;
+        return mod->type_map[index].value;
     }
 
-    return type_idx;
+    // NOTE: Make a new type
+    WasmFuncType* type = (WasmFuncType*) bh_alloc(mod->allocator, sizeof(WasmFuncType) + sizeof(WasmType) * param_count);
+    type->return_type = return_type;
+    type->param_count = param_count;
+
+    fori (i, 0, type->param_count) {
+        type->param_types[i] = type_repr_buf[i];
+    }
+
+    bh_arr_push(mod->types, type);
+
+    shput(mod->type_map, type_repr_buf, mod->next_type_idx);
+    return mod->next_type_idx++;
 }
 
 static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func) {
-    ensure_node_has_been_submitted_for_emission((AstNode *) func);
+    ensure_node_has_been_submitted_for_emission(mod->context, (AstNode *) func);
 
     if (bh_imap_has(&mod->elem_map, (u64) func)) {
         return bh_imap_get(&mod->elem_map, (u64) func);
@@ -4449,17 +4502,16 @@ EMIT_FUNC(stack_trace_blob, AstFunction *fd)  {
     assert(!(mod->stack_trace_idx & LOCAL_IS_WASM));
 
     u64 file_name_id, func_name_id;
-    u8* node_data = bh_alloc_array(context.ast_alloc, u8, 6 * POINTER_SIZE);
+    u8* node_data = bh_alloc_array(mod->context->ast_alloc, u8, 5 * POINTER_SIZE);
 
-    char *name = get_function_name(fd);
+    char *name = get_function_name(mod->context, fd);
     emit_raw_string(mod, (char *) fd->token->pos.filename, strlen(fd->token->pos.filename), &file_name_id, (u64 *) &node_data[4]);
     emit_raw_string(mod, name, strlen(name), &func_name_id, (u64 *) &node_data[16]);
     *((u32 *) &node_data[8]) = fd->token->pos.line;
-    *((u32 *) &node_data[20]) = fd->type->id;
 
     WasmDatum stack_node_data = ((WasmDatum) {
         .data = node_data,
-        .length = 6 * POINTER_SIZE,
+        .length = 5 * POINTER_SIZE,
         .alignment = POINTER_SIZE,
     });
     u32 stack_node_data_id = emit_data_entry(mod, &stack_node_data);
@@ -4477,16 +4529,16 @@ EMIT_FUNC(stack_trace_blob, AstFunction *fd)  {
     bh_arr_push(mod->data_patches, patch);
 
     u64 offset = 0;
-    u64 stack_trace_pass_global = bh_imap_get(&mod->index_map, (u64) &builtin_stack_trace);
+    u64 stack_trace_pass_global = bh_imap_get(&mod->index_map, (u64) &mod->context->builtins.stack_trace);
 
     emit_location_return_offset(mod, &code, (AstTyped *) fd->stack_trace_local, &offset);
     WIL(NULL, WI_GLOBAL_GET, stack_trace_pass_global);
-    emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], offset);
+    emit_store_instruction(mod, &code, mod->context->types.basic[Basic_Kind_Rawptr], offset);
 
     offset = 0;
     emit_location_return_offset(mod, &code, (AstTyped *) fd->stack_trace_local, &offset);
     emit_data_relocation(mod, &code, stack_node_data_id);
-    emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], offset + 4);
+    emit_store_instruction(mod, &code, mod->context->types.basic[Basic_Kind_Rawptr], offset + 4);
 
     *pcode = code;
 }
@@ -4506,7 +4558,7 @@ static i32 assign_function_index(OnyxWasmModule *mod, AstFunction *fd) {
 static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     i32 func_idx = assign_function_index(mod, fd);
 
-    if (fd == builtin_initialize_data_segments && !mod->doing_linking) {
+    if (fd == mod->context->builtins.initialize_data_segments && !mod->doing_linking) {
         // This is a large hack, but is necessary.
         // This particular function (__initialize_data_segments) should not be generated
         // until the module is in its linking phase. This is because we have to wait
@@ -4521,14 +4573,16 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     WasmFunc wasm_func = { 0 };
     wasm_func.type_idx = type_idx;
     wasm_func.location = fd->token;
+    wasm_func.name = get_function_assembly_name(mod->context, fd);
 
     bh_arr_new(mod->allocator, wasm_func.code, 16);
 
     mod->current_func_idx = func_idx;
+    mod->stack_return_location_idx = 0;
 
-    debug_begin_function(mod, func_idx, fd->token, get_function_name(fd));
+    debug_begin_function(mod, func_idx, fd->token, get_function_name(mod->context, fd));
 
-    if (fd == builtin_initialize_data_segments && context.options->use_post_mvp_features) {
+    if (fd == mod->context->builtins.initialize_data_segments && mod->context->options->use_post_mvp_features) {
         emit_initialize_data_segments_body(mod, &wasm_func.code);
 
         debug_emit_instruction(mod, NULL);
@@ -4541,7 +4595,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         return;
     }
 
-    if (fd == builtin_run_init_procedures) {
+    if (fd == mod->context->builtins.run_init_procedures) {
         emit_run_init_procedures(mod, &wasm_func.code);
 
         debug_emit_instruction(mod, NULL);
@@ -4577,21 +4631,28 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
             }
         }
 
-        mod->local_alloc->param_count = localidx;
-
         mod->curr_cc = type_function_get_cc(fd->type);
         assert(mod->curr_cc != CC_Undefined);
 
+        if (mod->curr_cc == CC_Return_Stack) {
+            // When returning on the stack, the location to write
+            // the result to is passed as the last parameter.
+            mod->stack_return_location_idx = localidx | LOCAL_IS_WASM;
+            localidx += 1;
+            
+            // TODO: Make this next line work.
+            // debug_introduce_symbol_by_name(mod, "$return", DSL_REGISTER, mod->stack_return_location_idx, mod->context->types.basic[Basic_Kind_Rawptr]);
+        }
+
+        mod->local_alloc->param_count = localidx;
+
         bh_arr_clear(mod->stack_leave_patches);
 
-        debug_emit_instruction(mod, fd->token);
-        debug_emit_instruction(mod, fd->token);
-        debug_emit_instruction(mod, fd->token);
-        debug_emit_instruction(mod, fd->token);
-        debug_emit_instruction(mod, fd->token);
-        bh_arr_insert_end(wasm_func.code, 5);
-        fori (i, 0, 5) wasm_func.code[i] = (WasmInstruction) { WI_NOP, 0 };
+        fori (i, 0, 6) debug_emit_instruction(mod, fd->token);
+        bh_arr_insert_end(wasm_func.code, 6);
+        fori (i, 0, 6) wasm_func.code[i] = (WasmInstruction) { WI_NOP, 0 };
 
+        mod->stack_restore_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
         mod->stack_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
         debug_function_set_ptr_idx(mod, func_idx, mod->stack_base_idx);
 
@@ -4601,7 +4662,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
             debug_emit_instruction(mod, NULL);
             debug_emit_instruction(mod, NULL);
 
-            u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_closure_base);
+            u64 global_closure_base_idx = bh_imap_get(&mod->index_map, (u64) &mod->context->builtins.closure_base);
             bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_GLOBAL_GET, { .l = global_closure_base_idx } }));
             bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_LOCAL_SET,  { .l = mod->closure_base_idx } }));
         }
@@ -4621,12 +4682,12 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
             debug_emit_instruction(mod, NULL);
             debug_emit_instruction(mod, NULL);
 
-            u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
-            bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_LOCAL_GET,  { .l = mod->stack_base_idx } }));
+            u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &mod->context->builtins.stack_top);
+            bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_LOCAL_GET,  { .l = mod->stack_restore_idx } }));
             bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_GLOBAL_SET, { .l = stack_top_idx } }));
 
             bh_arr_each(PatchInfo, patch, mod->stack_leave_patches) {
-                wasm_func.code[patch->instruction_index + 0] = (WasmInstruction) { WI_LOCAL_GET,  { .l = mod->stack_base_idx } };
+                wasm_func.code[patch->instruction_index + 0] = (WasmInstruction) { WI_LOCAL_GET,  { .l = mod->stack_restore_idx } };
                 wasm_func.code[patch->instruction_index + 1] = (WasmInstruction) { WI_GLOBAL_SET, { .l = stack_top_idx } };
             }
         }
@@ -4692,7 +4753,7 @@ static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
     OnyxToken *foreign_import = fd->foreign.import_name->token;
 
     if (fd->is_foreign_dyncall) {
-        module = bh_aprintf(global_heap_allocator, "dyncall:%b", foreign_module->text, foreign_module->length);
+        module = bh_aprintf(mod->context->gp_alloc, "dyncall:%b", foreign_module->text, foreign_module->length);
 
         char type_encoding[65] = {0};
         encode_type_as_dyncall_symbol(type_encoding, fd->type->Function.return_type);
@@ -4701,11 +4762,11 @@ static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
             encode_type_as_dyncall_symbol(type_encoding, param->local->type);
         }
 
-        name = bh_aprintf(global_heap_allocator, "%b:%s", foreign_import->text, foreign_import->length, type_encoding);
+        name = bh_aprintf(mod->context->gp_alloc, "%b:%s", foreign_import->text, foreign_import->length, type_encoding);
 
     } else {
-        module = bh_aprintf(global_heap_allocator, "%b", foreign_module->text, foreign_module->length);
-        name = bh_aprintf(global_heap_allocator, "%b", foreign_import->text, foreign_import->length);
+        module = bh_aprintf(mod->context->gp_alloc, "%b", foreign_module->text, foreign_module->length);
+        name = bh_aprintf(mod->context->gp_alloc, "%b", foreign_import->text, foreign_import->length);
     }
 
     WasmImport import = {
@@ -4726,7 +4787,7 @@ static void emit_export_directive(OnyxWasmModule* mod, AstDirectiveExport* expor
     token_toggle_end(export->export_name);
 
     if (shgeti(mod->exports, export->export_name->text) != -1) {
-        onyx_report_error(export->token->pos, Error_Critical, "Duplicate export name, '%s'.", export->export_name->text);
+        ONYX_ERROR(export->token->pos, Error_Critical, "Duplicate export name, '%s'.", export->export_name->text);
         token_toggle_end(export->export_name);
         return;        
     }
@@ -4735,7 +4796,7 @@ static void emit_export_directive(OnyxWasmModule* mod, AstDirectiveExport* expor
     AstTyped *the_export = (AstTyped *) strip_aliases((AstNode *) export->export);
     assert(the_export);
 
-    ensure_node_has_been_submitted_for_emission((AstNode *) the_export);
+    ensure_node_has_been_submitted_for_emission(mod->context, (AstNode *) the_export);
 
     CodePatchInfo code_patch;
     code_patch.kind = Code_Patch_Export;
@@ -4763,7 +4824,7 @@ static void emit_export_directive(OnyxWasmModule* mod, AstDirectiveExport* expor
     return;
 }
 
-static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
+static void emit_global(OnyxWasmModule* mod, AstGlobal* global) {
     WasmType global_type = onyx_type_to_wasm_type(global->type);
 
     WasmGlobal glob = {
@@ -4772,9 +4833,9 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
         .initial_value = NULL,
     };
 
-    i32 global_idx = (i32) bh_imap_get(&module->index_map, (u64) global);
+    i32 global_idx = (i32) bh_imap_get(&mod->index_map, (u64) global);
 
-    bh_arr_new(global_heap_allocator, glob.initial_value, 1);
+    bh_arr_new(mod->context->gp_alloc, glob.initial_value, 1);
 
     switch (global_type) {
         case WASM_TYPE_INT32:   bh_arr_push(glob.initial_value, ((WasmInstruction) { WI_I32_CONST, 0 })); break;
@@ -4785,23 +4846,23 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
         default: assert("Invalid global type" && 0); break;
     }
 
-    bh_arr_set_at(module->globals, global_idx, glob);
+    bh_arr_set_at(mod->globals, global_idx, glob);
 
-    if (global == &builtin_stack_top)
-        module->stack_top_ptr = &module->globals[global_idx].initial_value[0].data.i1;
+    if (global == &mod->context->builtins.stack_top)
+        mod->stack_top_ptr = &mod->globals[global_idx].initial_value[0].data.i1;
 
-    if (global == &builtin_heap_start)
-        module->heap_start_ptr = &module->globals[global_idx].initial_value[0].data.i1;
+    if (global == &mod->context->builtins.heap_start)
+        mod->heap_start_ptr = &mod->globals[global_idx].initial_value[0].data.i1;
 
-    if (global == &builtin_tls_size)
-        module->tls_size_ptr = &module->globals[global_idx].initial_value[0].data.i1;
+    if (global == &mod->context->builtins.tls_size)
+        mod->tls_size_ptr = &mod->globals[global_idx].initial_value[0].data.i1;
 }
 
 static void emit_raw_string(OnyxWasmModule* mod, char *data, i32 len, u64 *out_data_id, u64 *out_len) {
     // NOTE: Allocating more than necessary, but there are no cases
     // in a string literal that create more bytes than already
     // existed. You can create less however ('\n' => 0x0a).
-    char* strdata = bh_alloc_array(global_heap_allocator, char, len + 1);
+    char* strdata = bh_alloc_array(mod->context->gp_alloc, char, len + 1);
     i32 length  = string_process_escape_seqs(strdata, data, len);
 
     i32 index = shgeti(mod->string_literals, (char *) strdata);
@@ -4810,7 +4871,7 @@ static void emit_raw_string(OnyxWasmModule* mod, char *data, i32 len, u64 *out_d
         *out_data_id = sti.data_id;
         *out_len = sti.len;
 
-        bh_free(global_heap_allocator, strdata);
+        bh_free(mod->context->gp_alloc, strdata);
         return;
     }
 
@@ -4844,7 +4905,9 @@ static u32 emit_data_entry(OnyxWasmModule *mod, WasmDatum *datum) {
 
 static void emit_constexpr(ConstExprContext *ctx, AstTyped *node, u32 offset) {
     if (!emit_constexpr_(ctx, node, offset)) {
-        onyx_report_error(node->token->pos, Error_Critical,
+        onyx_report_error(
+            ctx->module->context,
+            node->token->pos, Error_Critical,
             "Cannot generate constant data for '%s'.",
             onyx_ast_node_kind_string(node->kind));
     }
@@ -4859,8 +4922,9 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
     node = (AstTyped *) strip_aliases((AstNode *) node);
 
     if (node_is_type((AstNode *) node)) {
-        Type* constructed_type = type_build_from_ast(context.ast_alloc, (AstType *) node);
+        Type* constructed_type = type_build_from_ast(ctx->module->context, (AstType *) node);
         CE(i32, 0) = constructed_type->id;
+        ensure_type_has_been_submitted_for_emission(ctx->module, constructed_type);
         return 1;
     }
 
@@ -4893,7 +4957,7 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
         StructMember smem;
 
         fori (i, 0, mem_count) {
-            type_lookup_member_by_idx(sl_type, i, &smem);
+            type_lookup_member_by_idx(ctx->module->context, sl_type, i, &smem);
             retval &= emit_constexpr_(ctx, sl->args.values[i], smem.offset + offset);
         }
 
@@ -4912,7 +4976,7 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
     case Ast_Kind_StrLit: {
         AstStrLit* sl = (AstStrLit *) node;
 
-        ensure_node_has_been_submitted_for_emission((AstNode *) sl);
+        ensure_node_has_been_submitted_for_emission(ctx->module->context, (AstNode *) sl);
 
         DatumPatchInfo patch;
         patch.kind = Datum_Patch_Data;
@@ -4921,14 +4985,14 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
         patch.data_id = 0;
         patch.offset = 0;
         patch.node_to_use_if_data_id_is_null = (AstNode *) sl;
-        bh_arr_push(ctx->module->data_patches, patch);
+        bh_arr_push_unsafe(ctx->module->data_patches, patch);
 
         CodePatchInfo code_patch;
         code_patch.kind = Code_Patch_String_Length_In_Data;
         code_patch.func_idx = ctx->data_id; // Repurposing func_idx for this.
         code_patch.instr    = offset + POINTER_SIZE; // Repurposing instr for offset into section
         code_patch.node_related_to_patch = (AstNode *) sl;
-        bh_arr_push(ctx->module->code_patches, code_patch);
+        bh_arr_push_unsafe(ctx->module->code_patches, code_patch);
 
         break;
     }
@@ -4989,7 +5053,7 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
         // to get the actual data id of the addressed node.
         patch.node_to_use_if_data_id_is_null = expr;
 
-        bh_arr_push(ctx->module->data_patches, patch);
+        bh_arr_push_unsafe(ctx->module->data_patches, patch);
         break;
     }
 
@@ -5059,27 +5123,27 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
     u64 alignment = type_alignment_of(effective_type);
     u64 size = type_size_of(effective_type);
 
-    if (context.options->generate_type_info) {
-        if (type_table_node != NULL && (AstMemRes *) type_table_node == memres) {
-            u64 table_location = build_type_table(mod);
+    if (mod->context->options->generate_type_info) {
+        if (mod->context->builtins.type_table_node != NULL && (AstMemRes *) mod->context->builtins.type_table_node == memres) {
+            u64 table_location = prepare_type_table(mod);
             memres->data_id = table_location;
             return;
         }
 
-        if (tagged_procedures_node != NULL && (AstMemRes *) tagged_procedures_node == memres) {
+        if (mod->context->builtins.tagged_procedures_node != NULL && (AstMemRes *) mod->context->builtins.tagged_procedures_node == memres) {
             u64 tagged_procedures_location = build_tagged_procedures(mod);
             memres->data_id = tagged_procedures_location;
             return;
         }
 
-        if (tagged_globals_node != NULL && (AstMemRes *) tagged_globals_node == memres) {
+        if (mod->context->builtins.tagged_globals_node != NULL && (AstMemRes *) mod->context->builtins.tagged_globals_node == memres) {
             u64 tagged_globals_location = build_tagged_globals(mod);
             memres->data_id = tagged_globals_location;
             return;
         }
     }
 
-    if (foreign_blocks_node != NULL && (AstMemRes *) foreign_blocks_node == memres) {
+    if (mod->context->builtins.foreign_blocks_node != NULL && (AstMemRes *) mod->context->builtins.foreign_blocks_node == memres) {
         u64 foreign_blocks_location = build_foreign_blocks(mod);
         memres->data_id = foreign_blocks_location;
         return;
@@ -5095,7 +5159,7 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
         u8* data = NULL;
         if (memres->initial_value != NULL) {
             assert(!memres->threadlocal);
-            data = bh_alloc(global_heap_allocator, size);
+            data = bh_alloc(mod->context->gp_alloc, size);
         }
 
         WasmDatum datum = {
@@ -5124,15 +5188,15 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
         const char* parent_file = fc->token->pos.filename;
         if (parent_file == NULL) parent_file = ".";
 
-        char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
+        char* parent_folder = bh_path_get_parent(parent_file, mod->context->scratch_alloc);
 
         OnyxToken *filename_token = fc->filename_expr->token;
 
         token_toggle_end(filename_token);
-        char* temp_fn     = bh_alloc_array(global_scratch_allocator, char, filename_token->length);
+        char* temp_fn     = bh_alloc_array(mod->context->scratch_alloc, char, filename_token->length);
         i32   temp_fn_len = string_process_escape_seqs(temp_fn, filename_token->text, filename_token->length);
-        char* filename    = bh_lookup_file(temp_fn, parent_folder, "", 0, NULL, 0);
-        fc->filename      = bh_strdup(global_heap_allocator, filename);
+        char* filename    = bh_lookup_file(temp_fn, parent_folder, NULL, NULL, NULL, mod->context->scratch_alloc);
+        fc->filename      = bh_strdup(mod->context->gp_alloc, filename);
         token_toggle_end(filename_token);
     }
 
@@ -5145,7 +5209,7 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     }
 
     if (!bh_file_exists(fc->filename)) {
-        onyx_report_error(fc->token->pos, Error_Critical,
+        ONYX_ERROR(fc->token->pos, Error_Critical,
                 "Unable to open file for reading, '%s'.",
                 fc->filename);
         return;
@@ -5155,8 +5219,8 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     // if the filename is prefixed with a './' or '.\\' then it should be relative to the
     // file in which is was inclded. The loaded file info above should probably use the full
     // file path in order to avoid duplicates.
-    bh_file_contents contents = bh_file_read_contents(global_heap_allocator, fc->filename);
-    u8* actual_data = bh_alloc(global_heap_allocator, contents.length + 1);
+    bh_file_contents contents = bh_file_read_contents(mod->context->gp_alloc, fc->filename);
+    u8* actual_data = bh_alloc(mod->context->gp_alloc, contents.length + 1);
     u32 length = contents.length + 1;
     memcpy(actual_data, contents.data, contents.length);
     actual_data[contents.length] = 0;
@@ -5176,9 +5240,67 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     }));
 }
 
-OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
-    OnyxWasmModule module = {
-        .allocator = alloc,
+static void emit_js_node(OnyxWasmModule* mod, AstJsNode *js) {
+    char *contents = NULL;
+
+    if (js->filepath) {
+        const char* parent_file = js->token->pos.filename;
+        if (parent_file == NULL) parent_file = ".";
+
+        char* parent_folder = bh_path_get_parent(parent_file, mod->context->scratch_alloc);
+
+        OnyxToken *filename_token = js->filepath->token;
+        token_toggle_end(filename_token);
+
+        char* temp_fn     = bh_alloc_array(mod->context->scratch_alloc, char, filename_token->length);
+        i32   temp_fn_len = string_process_escape_seqs(temp_fn, filename_token->text, filename_token->length);
+        char* filename    = bh_strdup(
+            mod->context->gp_alloc,
+            bh_lookup_file(temp_fn, parent_folder, NULL, NULL, NULL, mod->context->scratch_alloc)
+        );
+
+        token_toggle_end(filename_token);
+
+        if (!bh_file_exists(filename)) {
+            ONYX_ERROR(js->token->pos, Error_Critical,
+                    "Unable to open file for reading, '%s'.",
+                    filename);
+            return;
+        }
+
+        bh_file_contents file_contents = bh_file_read_contents(mod->context->gp_alloc, filename);
+        contents = bh_alloc(mod->context->gp_alloc, file_contents.length + 1);
+        memcpy(contents, file_contents.data, file_contents.length);
+        contents[file_contents.length] = 0;
+        bh_file_contents_free(&file_contents);
+
+    } else {
+        contents = get_expression_string_value(mod->context, js->code, NULL);
+    }
+
+    JsPartial partial;
+    partial.order = js->order;
+    partial.code  = contents;
+
+    bh_arr_push(mod->js_partials, partial);
+}
+
+static void flush_enqueued_types_for_info(OnyxWasmModule *mod) {
+    if (mod->global_type_table_data_id < 0) return;
+
+    while (bh_arr_length(mod->types_enqueued_for_info) > 0) {
+        i32 type_id = bh_arr_pop(mod->types_enqueued_for_info);
+
+        Type *type = type_lookup_by_id(mod->context, type_id);
+        build_type_info_for_type(mod, type);
+    }
+}
+
+
+void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module) {
+    *module = ((OnyxWasmModule) {
+        .allocator = context->gp_alloc,
+        .context = context,
 
         .type_map = NULL,
         .next_type_idx = 0,
@@ -5219,6 +5341,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 
         .stack_top_ptr = NULL,
         .stack_base_idx = 0,
+        .stack_restore_idx = 0,
+        .stack_return_location_idx = 0,
 
         .closure_base_idx = 0,
 
@@ -5230,146 +5354,181 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .foreign_blocks = NULL,
         .next_foreign_block_idx = 0,
 
-        .procedures_with_tags = NULL
-    };
+        .procedures_with_tags = NULL,
 
-    bh_arena* eid = bh_alloc(global_heap_allocator, sizeof(bh_arena));
-    bh_arena_init(eid, global_heap_allocator, 16 * 1024 * 1024);
-    module.extended_instr_data = eid;
-    module.extended_instr_alloc = bh_arena_allocator(eid);
+        .types_enqueued_for_info = NULL,
+        .global_type_table_data_id = -1,
+        .type_info_size = 0,
+    });
 
-    bh_arr_new(alloc, module.types, 4);
-    bh_arr_new(alloc, module.funcs, 4);
-    bh_arr_new(alloc, module.imports, 4);
-    bh_arr_new(alloc, module.globals, 4);
-    bh_arr_new(alloc, module.data, 4);
-    bh_arr_new(alloc, module.elems, 4);
-    bh_arr_new(alloc, module.libraries, 4);
-    bh_arr_new(alloc, module.library_paths, 4);
-    bh_arr_new(alloc, module.for_remove_info, 4);
+    bh_arena* eid = bh_alloc(context->gp_alloc, sizeof(bh_arena));
+    bh_arena_init(eid, context->gp_alloc, 16 * 1024 * 1024);
+    module->extended_instr_data = eid;
+    module->extended_instr_alloc = bh_arena_allocator(eid);
 
-    bh_arr_new(global_heap_allocator, module.return_location_stack, 4);
-    bh_arr_new(global_heap_allocator, module.structured_jump_target, 16);
-    bh_arr_set_length(module.structured_jump_target, 0);
+    bh_arr_new(context->gp_alloc, module->types, 4);
+    bh_arr_new(context->gp_alloc, module->funcs, 4);
+    bh_arr_new(context->gp_alloc, module->imports, 4);
+    bh_arr_new(context->gp_alloc, module->globals, 4);
+    bh_arr_new(context->gp_alloc, module->data, 4);
+    bh_arr_new(context->gp_alloc, module->elems, 4);
+    bh_arr_new(context->gp_alloc, module->libraries, 4);
+    bh_arr_new(context->gp_alloc, module->library_paths, 4);
+    bh_arr_new(context->gp_alloc, module->js_partials, 4);
+    bh_arr_new(context->gp_alloc, module->for_remove_info, 4);
 
-    sh_new_arena(module.type_map);
-    sh_new_arena(module.exports);
-    sh_new_arena(module.loaded_file_info);
-    sh_new_arena(module.string_literals);
+    bh_arr_new(context->gp_alloc, module->return_location_stack, 4);
+    bh_arr_new(context->gp_alloc, module->structured_jump_target, 16);
+    bh_arr_set_length(module->structured_jump_target, 0);
 
-    bh_imap_init(&module.index_map, global_heap_allocator, 128);
-    bh_imap_init(&module.local_map, global_heap_allocator, 16);
-    bh_imap_init(&module.elem_map,  global_heap_allocator, 16);
+    sh_new_arena(module->type_map);
+    sh_new_arena(module->exports);
+    sh_new_arena(module->loaded_file_info);
+    sh_new_arena(module->string_literals);
+    sh_new_arena(module->custom_sections);
 
-    bh_arr_new(global_heap_allocator, module.deferred_stmts, 4);
-    bh_arr_new(global_heap_allocator, module.local_allocations, 4);
-    bh_arr_new(global_heap_allocator, module.stack_leave_patches, 4);
-    bh_arr_new(global_heap_allocator, module.foreign_blocks, 4);
-    bh_arr_new(global_heap_allocator, module.procedures_with_tags, 4);
-    bh_arr_new(global_heap_allocator, module.globals_with_tags, 4);
-    bh_arr_new(global_heap_allocator, module.all_procedures, 4);
-    bh_arr_new(global_heap_allocator, module.data_patches, 4);
-    bh_arr_new(global_heap_allocator, module.code_patches, 4);
+    bh_imap_init(&module->index_map, context->gp_alloc, 128);
+    bh_imap_init(&module->local_map, context->gp_alloc, 16);
+    bh_imap_init(&module->elem_map,  context->gp_alloc, 16);
+
+    bh_arr_new(context->gp_alloc, module->deferred_stmts, 4);
+    bh_arr_new(context->gp_alloc, module->local_allocations, 4);
+    bh_arr_new(context->gp_alloc, module->stack_leave_patches, 4);
+    bh_arr_new(context->gp_alloc, module->foreign_blocks, 4);
+    bh_arr_new(context->gp_alloc, module->procedures_with_tags, 4);
+    bh_arr_new(context->gp_alloc, module->globals_with_tags, 4);
+    bh_arr_new(context->gp_alloc, module->all_procedures, 4);
+    bh_arr_new(context->gp_alloc, module->data_patches, 4);
+    bh_arr_new(context->gp_alloc, module->code_patches, 4);
+
+    bh_arr_new(context->gp_alloc, module->types_enqueued_for_info, 32);
 
 #ifdef ENABLE_DEBUG_INFO
-    module.debug_context = bh_alloc_item(context.ast_alloc, DebugContext);
-    module.debug_context->allocator = global_heap_allocator;
-    module.debug_context->next_file_id = 0;
-    module.debug_context->next_sym_id = 0;
-    module.debug_context->last_token = NULL;
-    module.debug_context->sym_info = NULL;
-    module.debug_context->sym_patches = NULL;
-    module.debug_context->funcs = NULL;
+    module->debug_context = bh_alloc_item(context->ast_alloc, DebugContext);
+    module->debug_context->allocator = context->gp_alloc;
+    module->debug_context->next_file_id = 0;
+    module->debug_context->next_sym_id = 0;
+    module->debug_context->last_token = NULL;
+    module->debug_context->sym_info = NULL;
+    module->debug_context->sym_patches = NULL;
+    module->debug_context->funcs = NULL;
 
-    sh_new_arena(module.debug_context->file_info);
-    bh_arr_new(global_heap_allocator, module.debug_context->sym_info, 32);
-    bh_arr_new(global_heap_allocator, module.debug_context->sym_patches, 32);
-    bh_arr_new(global_heap_allocator, module.debug_context->funcs, 16);
+    sh_new_arena(module->debug_context->file_info);
+    bh_arr_new(context->gp_alloc, module->debug_context->sym_info, 32);
+    bh_arr_new(context->gp_alloc, module->debug_context->sym_patches, 32);
+    bh_arr_new(context->gp_alloc, module->debug_context->funcs, 16);
 
-    bh_buffer_init(&module.debug_context->op_buffer, global_heap_allocator, 1024);
+    bh_buffer_init(&module->debug_context->op_buffer, context->gp_alloc, 1024);
 #endif
-
-    return module;
 }
 
-void emit_entity(Entity* ent) {
-    OnyxWasmModule* module = context.wasm_module;
-    module->current_func_idx = -1;
+void emit_entity(Context *context, Entity* ent) {
+    OnyxWasmModule* mod = context->wasm_module;
+    mod->current_func_idx = -1;
 
     switch (ent->type) {
         case Entity_Type_Foreign_Function_Header:
-            emit_foreign_function(module, ent->function);
-            bh_imap_put(&module->index_map, (u64) ent->function, module->next_foreign_func_idx++);
-            bh_arr_push(module->all_procedures, ent->function);
+            emit_foreign_function(mod, ent->function);
+            bh_imap_put(&mod->index_map, (u64) ent->function, mod->next_foreign_func_idx++);
+            bh_arr_push(mod->all_procedures, ent->function);
 
             if (ent->function->tags != NULL) {
-                bh_arr_push(module->procedures_with_tags, ent->function);
+                bh_arr_push(mod->procedures_with_tags, ent->function);
             }
             break;
 
         case Entity_Type_Function_Header:
             if (ent->function->flags & Ast_Flag_Proc_Is_Null) {
-                if (module->null_proc_func_idx == -1) module->null_proc_func_idx = get_element_idx(module, ent->function);
+                if (mod->null_proc_func_idx == -1) mod->null_proc_func_idx = get_element_idx(mod, ent->function);
             }
 
             if (ent->function->tags != NULL) {
-                bh_arr_push(module->procedures_with_tags, ent->function);
+                bh_arr_push(mod->procedures_with_tags, ent->function);
             }
             break;
 
         case Entity_Type_Global_Header:
-            bh_imap_put(&module->index_map, (u64) ent->global, module->next_global_idx++);
+            bh_imap_put(&mod->index_map, (u64) ent->global, mod->next_global_idx++);
             break;
 
         case Entity_Type_String_Literal: {
-            emit_string_literal(module, (AstStrLit *) ent->strlit);
+            emit_string_literal(mod, (AstStrLit *) ent->strlit);
             break;
         }
 
         case Entity_Type_File_Contents: {
-            emit_file_contents(module, (AstFileContents *) ent->file_contents);
+            emit_file_contents(mod, (AstFileContents *) ent->file_contents);
             break;
         }
 
         case Entity_Type_Memory_Reservation_Type: {
             if (ent->mem_res->tags != NULL) {
-                bh_arr_push(module->globals_with_tags, ent->mem_res);
+                bh_arr_push(mod->globals_with_tags, ent->mem_res);
             }
             break;
         }
 
         case Entity_Type_Memory_Reservation: {
-            emit_memory_reservation(module, (AstMemRes *) ent->mem_res);
+            emit_memory_reservation(mod, (AstMemRes *) ent->mem_res);
             break;
         }
 
         case Entity_Type_Process_Directive: {
             if (ent->expr->kind == Ast_Kind_Directive_Export) {
-                emit_export_directive(module, (AstDirectiveExport *) ent->expr);
+                emit_export_directive(mod, (AstDirectiveExport *) ent->expr);
             }
 
             if (ent->expr->kind == Ast_Kind_Directive_Library) {
-                bh_arr_push(module->libraries, ent->library->library_name);
+                bh_arr_push(mod->libraries, ent->library->library_name);
+            }
+
+            if (ent->expr->kind == Ast_Kind_Directive_Wasm_Section) {
+                AstDirectiveWasmSection *section = (AstDirectiveWasmSection *) ent->expr;
+
+                WasmCustomSection custom;
+                custom.name = section->name;
+                custom.contents = section->contents;
+                custom.len = section->length;
+
+                if (shgeti(mod->custom_sections, section->name) >= 0) {
+                    onyx_report_warning(mod->context, section->token->pos, "Duplicate definitions for custom section '%s'.", section->name);
+                }
+
+                shput(mod->custom_sections, section->name, custom);
             }
             break;
         }
 
         case Entity_Type_Foreign_Block: {
-            ent->foreign_block->foreign_block_number = module->next_foreign_block_idx++;
-            bh_arr_push(module->foreign_blocks, (AstForeignBlock *) ent->foreign_block);
+            ent->foreign_block->foreign_block_number = mod->next_foreign_block_idx++;
+            bh_arr_push(mod->foreign_blocks, (AstForeignBlock *) ent->foreign_block);
             break;
         }
 
-        case Entity_Type_Function: emit_function(module, ent->function); break;
-        case Entity_Type_Global:   emit_global(module,   ent->global); break;
+        case Entity_Type_Function: emit_function(mod, ent->function); break;
+        case Entity_Type_Global:   emit_global(mod,   ent->global); break;
+
+        case Entity_Type_JS:       emit_js_node(mod, ent->js); break;
 
         default: break;
     }
 
     ent->state = Entity_State_Finalized;
+
+    // HACK
+    flush_enqueued_types_for_info(mod);
 }
 
-void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options) {
+
+static i32 cmp_type_info(const void *a, const void *b) {
+    return *(i32 *) a - *(i32 *) b;
+}
+
+
+#undef BH_INTERNAL_ALLOCATOR
+#define BH_INTERNAL_ALLOCATOR (context->gp_alloc)
+
+void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLinkOptions *options) {
     // If the pointer size is going to change,
     // the code will probably need to be altered.
     assert(POINTER_SIZE == 4);
@@ -5460,14 +5619,14 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
     module->memory_min_size = options->memory_min_size;
     module->memory_max_size = options->memory_max_size;
 
-    if (context.options->use_multi_threading || options->import_memory) {
+    if (context->options->use_multi_threading || options->import_memory) {
         module->needs_memory_section = 0;
 
         WasmImport mem_import = {
             .kind   = WASM_FOREIGN_MEMORY,
             .min    = options->memory_min_size,
-            .max    = options->memory_max_size, // NOTE: Why not use all 4 Gigs of memory?
-            .shared = context.options->use_multi_threading && context.options->runtime != Runtime_Onyx,
+            .max    = options->memory_max_size,
+            .shared = context->options->use_multi_threading && context->options->runtime != Runtime_Onyx,
 
             .mod    = options->import_memory_module_name,
             .name   = options->import_memory_import_name,
@@ -5497,9 +5656,20 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
 
         shput(module->exports, options->export_func_table_name, func_table_export);
         module->export_count++;
+
+        WasmExport closure_export = {
+            .kind = WASM_FOREIGN_GLOBAL,
+            .idx  = bh_imap_get(&module->index_map, (u64) &context->builtins.closure_base),
+        };
+
+        shput(module->exports, "__closure_base", closure_export);
+        module->export_count++;
     }
 
-    u32 datum_offset = options->null_reserve_size;
+    i32 datum_offset = options->null_reserve_size;
+
+    datum_offset += options->stack_size;
+
     bh_arr_each(WasmDatum, datum, module->data) {
         assert(datum->id > 0);
 
@@ -5511,7 +5681,7 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
 
     // Now that we know where the data elements will go (and to avoid a lot of patches),
     // we can emit the __initialize_data_segments function.
-    emit_function(module, builtin_initialize_data_segments);
+    emit_function(module, context->builtins.initialize_data_segments);
 
 #ifdef ENABLE_DEBUG_INFO
     if (module->debug_context) {
@@ -5540,7 +5710,7 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
                 WasmFunc *func = &module->funcs[patch->index];
 
                 assert(func->code[patch->location].type == WI_PTR_CONST);
-                func->code[patch->location].data.l = (u64) datum->offset_ + patch->offset;
+                func->code[patch->location].data.l = (i64) datum->offset_ + patch->offset;
                 break;
             }
 
@@ -5557,9 +5727,7 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
                 assert(datum_to_alter->id == patch->index);
 
                 u32 *addr = (u32 *) bh_pointer_add(datum_to_alter->data, patch->location);
-                if (*addr != 0) {
-                    *addr += (u32) datum->offset_ + patch->offset;
-                }
+                *addr += (u32) datum->offset_ + patch->offset;
 
                 break;
             }
@@ -5568,12 +5736,15 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
         }
     }
 
+    WasmDatum *type_table_data = &module->data[module->global_type_table_data_id - 1];
+    qsort(type_table_data->data, *module->type_info_entry_count, 2 * POINTER_SIZE, cmp_type_info);
+
     assert(module->stack_top_ptr && module->heap_start_ptr);
 
-    *module->stack_top_ptr = datum_offset;
-    bh_align(*module->stack_top_ptr, options->stack_alignment);
+    *module->stack_top_ptr = options->null_reserve_size + options->stack_size;
+    *module->heap_start_ptr = datum_offset;
 
-    *module->heap_start_ptr = *module->stack_top_ptr + options->stack_size;
+    bh_align(*module->stack_top_ptr, options->stack_alignment);
     bh_align(*module->heap_start_ptr, 16);
 
     if (module->tls_size_ptr) {
@@ -5582,23 +5753,23 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
     }
 
 
-    if (context.options->print_function_mappings) {
-        bh_arr_each(AstFunction *, pfunc, module->all_procedures) {
-            AstFunction *func = *pfunc;
+    // if (context->options->print_function_mappings) {
+    //     bh_arr_each(AstFunction *, pfunc, module->all_procedures) {
+    //         AstFunction *func = *pfunc;
 
-            u64 func_idx = (u64) bh_imap_get(&module->index_map, (u64) func);
+    //         u64 func_idx = (u64) bh_imap_get(&module->index_map, (u64) func);
 
-            if (!func->is_foreign) {
-                func_idx += module->next_foreign_func_idx;
-            }
+    //         if (!func->is_foreign) {
+    //             func_idx += module->next_foreign_func_idx;
+    //         }
 
-            bh_printf("%d -> %s:%d:%d\n",
-                func_idx,
-                func->token->pos.filename,
-                func->token->pos.line,
-                func->token->pos.column);
-        }
-    }
+    //         bh_printf("%d -> %s:%d:%d\n",
+    //             func_idx,
+    //             func->token->pos.filename,
+    //             func->token->pos.line,
+    //             func->token->pos.column);
+    //     }
+    // }
 }
 
 void onyx_wasm_module_free(OnyxWasmModule* module) {
@@ -5611,16 +5782,19 @@ void onyx_wasm_module_free(OnyxWasmModule* module) {
     bh_imap_free(&module->index_map);
     shfree(module->type_map);
     shfree(module->exports);
+    shfree(module->loaded_file_info);
+    shfree(module->string_literals);
+    shfree(module->custom_sections);
 }
 
 
-b32 onyx_wasm_build_link_options_from_node(OnyxWasmLinkOptions *opts, AstTyped *node) {
+b32 onyx_wasm_build_link_options_from_node(Context *context, OnyxWasmLinkOptions *opts, AstTyped *node) {
     node = (AstTyped *) strip_aliases((AstNode *) node);
 
     assert(node && node->kind == Ast_Kind_Struct_Literal);
-    assert(builtin_link_options_type);
+    assert(context->builtins.link_options_type);
 
-    Type *link_options_type = type_build_from_ast(context.ast_alloc, builtin_link_options_type);
+    Type *link_options_type = type_build_from_ast(context, context->builtins.link_options_type);
 
     AstStructLiteral *input = (AstStructLiteral *) node;
 
@@ -5628,56 +5802,52 @@ b32 onyx_wasm_build_link_options_from_node(OnyxWasmLinkOptions *opts, AstTyped *
     b32 out_is_valid;
 
     // TODO: These should be properly error handled.
-    assert(type_lookup_member(link_options_type, "stack_first", &smem));
-    opts->stack_first = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid) != 0;
+    assert(type_lookup_member(context, link_options_type, "stack_size", &smem));
+    opts->stack_size = get_expression_integer_value(context, input->args.values[smem.idx], &out_is_valid);
     if (!out_is_valid) return 0;
 
-    assert(type_lookup_member(link_options_type, "stack_size", &smem));
-    opts->stack_size = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid);
+    assert(type_lookup_member(context, link_options_type, "stack_alignment", &smem));
+    opts->stack_alignment = get_expression_integer_value(context, input->args.values[smem.idx], &out_is_valid);
     if (!out_is_valid) return 0;
 
-    assert(type_lookup_member(link_options_type, "stack_alignment", &smem));
-    opts->stack_alignment = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid);
+    assert(type_lookup_member(context, link_options_type, "null_reserve_size", &smem));
+    opts->null_reserve_size = get_expression_integer_value(context, input->args.values[smem.idx], &out_is_valid);
     if (!out_is_valid) return 0;
 
-    assert(type_lookup_member(link_options_type, "null_reserve_size", &smem));
-    opts->null_reserve_size = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid);
+    assert(type_lookup_member(context, link_options_type, "import_memory", &smem));
+    opts->import_memory = get_expression_integer_value(context, input->args.values[smem.idx], &out_is_valid) != 0;
     if (!out_is_valid) return 0;
 
-    assert(type_lookup_member(link_options_type, "import_memory", &smem));
-    opts->import_memory = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid) != 0;
+    assert(type_lookup_member(context, link_options_type, "import_memory_module_name", &smem));
+    opts->import_memory_module_name = get_expression_string_value(context, input->args.values[smem.idx], &out_is_valid);
     if (!out_is_valid) return 0;
 
-    assert(type_lookup_member(link_options_type, "import_memory_module_name", &smem));
-    opts->import_memory_module_name = get_expression_string_value(input->args.values[smem.idx], &out_is_valid);
+    assert(type_lookup_member(context, link_options_type, "import_memory_import_name", &smem));
+    opts->import_memory_import_name = get_expression_string_value(context, input->args.values[smem.idx], &out_is_valid);
     if (!out_is_valid) return 0;
 
-    assert(type_lookup_member(link_options_type, "import_memory_import_name", &smem));
-    opts->import_memory_import_name = get_expression_string_value(input->args.values[smem.idx], &out_is_valid);
+    assert(type_lookup_member(context, link_options_type, "export_memory", &smem));
+    opts->export_memory = get_expression_integer_value(context, input->args.values[smem.idx], &out_is_valid) != 0;
     if (!out_is_valid) return 0;
 
-    assert(type_lookup_member(link_options_type, "export_memory", &smem));
-    opts->export_memory = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid) != 0;
+    assert(type_lookup_member(context, link_options_type, "export_memory_name", &smem));
+    opts->export_memory_name = get_expression_string_value(context, input->args.values[smem.idx], &out_is_valid);
     if (!out_is_valid) return 0;
 
-    assert(type_lookup_member(link_options_type, "export_memory_name", &smem));
-    opts->export_memory_name = get_expression_string_value(input->args.values[smem.idx], &out_is_valid);
+    assert(type_lookup_member(context, link_options_type, "export_func_table", &smem));
+    opts->export_func_table = get_expression_integer_value(context, input->args.values[smem.idx], &out_is_valid) != 0;
     if (!out_is_valid) return 0;
 
-    assert(type_lookup_member(link_options_type, "export_func_table", &smem));
-    opts->export_func_table = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid) != 0;
+    assert(type_lookup_member(context, link_options_type, "export_func_table_name", &smem));
+    opts->export_func_table_name = get_expression_string_value(context, input->args.values[smem.idx], &out_is_valid);
     if (!out_is_valid) return 0;
 
-    assert(type_lookup_member(link_options_type, "export_func_table_name", &smem));
-    opts->export_func_table_name = get_expression_string_value(input->args.values[smem.idx], &out_is_valid);
+    assert(type_lookup_member(context, link_options_type, "memory_min_size", &smem));
+    opts->memory_min_size = get_expression_integer_value(context, input->args.values[smem.idx], &out_is_valid);
     if (!out_is_valid) return 0;
 
-    assert(type_lookup_member(link_options_type, "memory_min_size", &smem));
-    opts->memory_min_size = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid);
-    if (!out_is_valid) return 0;
-
-    assert(type_lookup_member(link_options_type, "memory_max_size", &smem));
-    opts->memory_max_size = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid);
+    assert(type_lookup_member(context, link_options_type, "memory_max_size", &smem));
+    opts->memory_max_size = get_expression_integer_value(context, input->args.values[smem.idx], &out_is_valid);
     if (!out_is_valid) return 0;
 
     return 1;

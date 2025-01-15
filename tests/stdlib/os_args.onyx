@@ -1,0 +1,6 @@
+use core {*}
+
+main :: (args: [] cstr) {
+    os.args() |> printf("New Args: {}\n", _)
+         args |> printf("Old Args: {}\n", _)
+}

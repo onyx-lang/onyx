@@ -1,11 +1,10 @@
 #ifndef ONYXLEX_H
 #define ONYXLEX_H
 
+#ifndef BH_INTERNAL_ALLOCATOR
+    #define BH_INTERNAL_ALLOCATOR (context->gp_alloc)
+#endif
 #include "bh.h"
-
-// NOTE: Used for global statistics
-extern u64 lexer_lines_processed;
-extern u64 lexer_tokens_processed;
 
 typedef enum TokenType {
     Token_Type_Ascii_End            = 256,
@@ -73,6 +72,7 @@ typedef enum TokenType {
     Token_Type_Sar_Equal,
 
     Token_Type_Dot_Dot,
+    Token_Type_Dot_Dot_Equal,
     Token_Type_Tilde_Tilde,
     Token_Type_Question_Question,
 
@@ -85,6 +85,10 @@ typedef enum TokenType {
     Token_Type_Literal_False,
 
     Token_Type_Inserted_Semicolon,
+
+    Token_Type_Doc_Comment,
+
+    Token_Type_Proc_Macro_Body,
 
     Token_Type_Count,
 } TokenType;
@@ -106,6 +110,8 @@ typedef struct OnyxToken {
 } OnyxToken;
 
 typedef struct OnyxTokenizer {
+    struct Context *context;
+
     char *start, *curr, *end;
 
     const char* filename;
@@ -123,7 +129,7 @@ const char *token_type_name(TokenType tkn_type);
 const char* token_name(OnyxToken *tkn);
 void token_toggle_end(OnyxToken* tkn);
 OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer);
-OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc);
+OnyxTokenizer onyx_tokenizer_create(struct Context *context, bh_file_contents *fc);
 void onyx_tokenizer_free(OnyxTokenizer* tokenizer);
 void onyx_lex_tokens(OnyxTokenizer* tokenizer);
 

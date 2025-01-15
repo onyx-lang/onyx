@@ -13,10 +13,8 @@ package core.sync
 // continue processing.
 //
 
-#doc """
-    Represents a generational barrier, so the same barrier
-    can be used safely multiple times.
-"""
+/// Represents a generational barrier, so the same barrier
+/// can be used safely multiple times.
 Barrier :: struct {
     mutex : Mutex;
     cond  : Condition_Variable;
@@ -27,7 +25,7 @@ Barrier :: struct {
 }
 
 
-#doc "Initializes a new generational barrier with `thread_count` threads."
+/// Initializes a new generational barrier with `thread_count` threads.
 barrier_init :: (b: &Barrier, thread_count: i32) {
     mutex_init(&b.mutex);
     condition_init(&b.cond);
@@ -38,16 +36,14 @@ barrier_init :: (b: &Barrier, thread_count: i32) {
 }
 
 
-#doc "Destroys a generational barrier."
+/// Destroys a generational barrier.
 barrier_destroy :: (b: &Barrier) {
     mutex_destroy(&b.mutex);
     condition_destroy(&b.cond);
 }
 
-#doc """
-    Signals that a thread has reached the barrier.
-    The last thread to reach the barrier will wake up all other threads.
-"""
+/// Signals that a thread has reached the barrier.
+/// The last thread to reach the barrier will wake up all other threads.
 barrier_wait :: (b: &Barrier) {
     mutex_lock(&b.mutex);
     defer mutex_unlock(&b.mutex);

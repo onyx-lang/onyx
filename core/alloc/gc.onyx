@@ -1,19 +1,17 @@
+/// "Garbage collection" is not somthing Onyx has. Even things
+/// like reference counted pointers is not something Onyx can
+/// do, because of Onyx's simpler semantics. That being said,
+/// with custom allocators and some careful design, GC is
+/// "achievable". This allocator wraps another allocator. With
+/// each allocation, a little extra space is allocated to build
+/// a linked list of all allocations made. This way, when the
+/// memory is done being used, everything can be freed automatically.
+///
+/// The `auto` macro makes this allocator very easy to use:
+///     core.alloc.gc.auto() {
+///         // Every allocation here will automatically be freed
+///     }
 package core.alloc.gc
-#package_doc """
-    "Garbage collection" is not somthing Onyx has. Even things
-    like reference counted pointers is not something Onyx can
-    do, because of Onyx's simpler semantics. That being said,
-    with custom allocators and some careful design, GC is
-    "achievable". This allocator wraps another allocator. With
-    each allocation, a little extra space is allocated to build
-    a linked list of all allocations made. This way, when the
-    memory is done being used, everything can be freed automatically.
-
-    The `auto` macro makes this allocator very easy to use:
-        core.alloc.gc.auto() {
-            // Every allocation here will automatically be freed
-        }
-"""
 
 
 use runtime
@@ -157,10 +155,8 @@ GC_Manually_Free_Magic_Number :: 0xface1337
     return cast([&] GCLink, newptr) + 1;
 }
 
-#doc """
-    Removes an allocation from the garbage collectors tracking list,
-    so it will not be freed automatically.
-"""
+/// Removes an allocation from the garbage collectors tracking list,
+/// so it will not be freed automatically.
 untrack :: (ptr: rawptr) -> bool {
     link: &GCLink = (cast([&] GCLink) ptr) - 1;
 
