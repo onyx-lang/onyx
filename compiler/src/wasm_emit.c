@@ -550,6 +550,8 @@ EMIT_FUNC_NO_ARGS(leave_structured_block);
 static u32 emit_data_entry(OnyxWasmModule *mod, WasmDatum *datum);
 static void emit_raw_string(OnyxWasmModule* mod, char *data, i32 len, u64 *out_data_id, u64 *out_len);
 
+static i32 emit_initialized_global_value(OnyxWasmModule *mod, Type *type, AstTyped *expr);
+
 static void emit_constexpr(ConstExprContext *ctx, AstTyped *node, u32 offset);
 static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset);
 
@@ -3346,12 +3348,22 @@ EMIT_FUNC(expression, AstTyped* expr) {
             AstAddressOf* aof = (AstAddressOf *) expr;
 
             if (node_is_addressable_literal((AstNode *) aof->expr)) {
-                aof->expr->flags |= Ast_Flag_Decl_Followed_By_Init;
-                aof->expr->flags |= Ast_Flag_Address_Taken;
-                emit_local_allocation(mod, &code, aof->expr);
-                emit_location(mod, &code, aof->expr);
-                emit_expression(mod, &code, aof->expr);
-                emit_store_instruction(mod, &code, aof->expr->type, 0);
+                if (aof->expr->flags & Ast_Flag_Comptime) {
+                    i32 data_id = emit_initialized_global_value(mod, aof->expr->type, aof->expr);
+                    emit_data_relocation(mod, &code, data_id);
+
+                    // We need to break early, because we cannot use the
+                    // emit_location below for this kind of address of node.
+                    break;
+
+                } else {
+                    aof->expr->flags |= Ast_Flag_Decl_Followed_By_Init;
+                    aof->expr->flags |= Ast_Flag_Address_Taken;
+                    emit_local_allocation(mod, &code, aof->expr);
+                    emit_location(mod, &code, aof->expr);
+                    emit_expression(mod, &code, aof->expr);
+                    emit_store_instruction(mod, &code, aof->expr->type, 0);
+                }
             }
 
             emit_location(mod, &code, aof->expr);
@@ -4698,6 +4710,34 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
 #undef CE
 }
 
+static i32 emit_initialized_global_value(OnyxWasmModule *mod, Type *type, AstTyped *expr) {
+    u64 alignment = type_alignment_of(type);
+    u64 size = type_size_of(type);
+
+    // :ProperLinking
+    u8* data = NULL;
+    if (expr != NULL) {
+        data = bh_alloc(mod->context->gp_alloc, size);
+    }
+
+    WasmDatum datum = {
+        .alignment = alignment,
+        .length = size,
+        .data = data,
+    };
+    i32 data_id = emit_data_entry(mod, &datum);
+
+    if (expr != NULL) {
+        ConstExprContext constexpr_ctx;
+        constexpr_ctx.module = mod;
+        constexpr_ctx.data = data;
+        constexpr_ctx.data_id = data_id;
+        emit_constexpr(&constexpr_ctx, expr, 0);
+    }
+
+    return data_id;
+}
+
 static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
     // :ProperLinking
     Type* effective_type = memres->type;
@@ -4737,27 +4777,7 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
         mod->next_tls_offset = memres->tls_offset + size;
 
     } else {
-        // :ProperLinking
-        u8* data = NULL;
-        if (memres->initial_value != NULL) {
-            assert(!memres->threadlocal);
-            data = bh_alloc(mod->context->gp_alloc, size);
-        }
-
-        WasmDatum datum = {
-            .alignment = alignment,
-            .length = size,
-            .data = data,
-        };
-        memres->data_id = emit_data_entry(mod, &datum);
-
-        if (memres->initial_value != NULL) {
-            ConstExprContext constexpr_ctx;
-            constexpr_ctx.module = mod;
-            constexpr_ctx.data = data;
-            constexpr_ctx.data_id = memres->data_id;
-            emit_constexpr(&constexpr_ctx, memres->initial_value, 0);
-        }
+        memres->data_id = emit_initialized_global_value(mod, effective_type, memres->initial_value);
     }
 }
 

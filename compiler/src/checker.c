@@ -3587,6 +3587,9 @@ CHECK_FUNC(statement, AstNode** pstmt) {
 
             if (typed_stmt->next != NULL && typed_stmt->next->kind == Ast_Kind_Binary_Op) {
                 AstBinaryOp *next = (AstBinaryOp *) typed_stmt->next;
+
+                //
+                // :BrokenFollowedByInitFlag
                 if (next->operation == Binary_Op_Assign && next->left == typed_stmt) {
                     typed_stmt->flags |= Ast_Flag_Decl_Followed_By_Init;
                 }
