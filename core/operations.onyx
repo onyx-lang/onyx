@@ -49,7 +49,7 @@ __array_op_scalar :: macro (l: [$N]$T, r: T, $body: Code) -> [N]T {
 // Builtin for expansions
 
 #overload
-__for_expansion :: macro (_s: [] $T, $flags: i32, $body: Code) where (flags & 1 == 0) {
+__for_expansion :: macro (_s: [] $T, $flags: __For_Expansion_Flags, $body: Code) where !(flags & .BY_POINTER) {
     s     := _s
     data  := s.data
     count := s.count
@@ -64,7 +64,7 @@ __for_expansion :: macro (_s: [] $T, $flags: i32, $body: Code) where (flags & 1 
 }
 
 #overload
-__for_expansion :: macro (_s: [] $T, $flags: i32, $body: Code) where (flags & 1 != 0) {
+__for_expansion :: macro (_s: [] $T, $flags: __For_Expansion_Flags, $body: Code) where (flags & .BY_POINTER) {
     s     := _s
     data  := s.data
     count := s.count
@@ -80,7 +80,7 @@ __for_expansion :: macro (_s: [] $T, $flags: i32, $body: Code) where (flags & 1 
 //
 
 #overload
-__for_expansion :: macro (_r: range, $flags: i32, $body: Code) where (body.capture_count == 1) {
+__for_expansion :: macro (_r: range, $flags: __For_Expansion_Flags, $body: Code) where (body.capture_count == 1) {
     r    := _r
     i    := r.low
     end  := r.high
@@ -97,7 +97,7 @@ __for_expansion :: macro (_r: range, $flags: i32, $body: Code) where (body.captu
 }
 
 #overload
-__for_expansion :: macro (_r: range, $flags: i32, $body: Code) where (body.capture_count == 2) {
+__for_expansion :: macro (_r: range, $flags: __For_Expansion_Flags, $body: Code) where (body.capture_count == 2) {
     r    := _r
     i    := r.low
     end  := r.high
@@ -121,7 +121,7 @@ __for_expansion :: macro (_r: range, $flags: i32, $body: Code) where (body.captu
 }
 
 #overload
-__for_expansion :: macro (_r: range64, $flags: i32, $body: Code) where (body.capture_count == 1) {
+__for_expansion :: macro (_r: range64, $flags: __For_Expansion_Flags, $body: Code) where (body.capture_count == 1) {
     r    := _r
     i    := r.low
     end  := r.high
@@ -138,7 +138,7 @@ __for_expansion :: macro (_r: range64, $flags: i32, $body: Code) where (body.cap
 }
 
 #overload
-__for_expansion :: macro (_r: range64, $flags: i32, $body: Code) where (body.capture_count == 2) {
+__for_expansion :: macro (_r: range64, $flags: __For_Expansion_Flags, $body: Code) where (body.capture_count == 2) {
     r    := _r
     i    := r.low
     end  := r.high
@@ -162,7 +162,7 @@ __for_expansion :: macro (_r: range64, $flags: i32, $body: Code) where (body.cap
 }
 
 #overload
-__for_expansion :: macro (n: i32, $flags: i32, $body: Code) {
+__for_expansion :: macro (n: i32, $flags: __For_Expansion_Flags, $body: Code) {
     i    := 0
     end  := n
     
@@ -174,7 +174,7 @@ __for_expansion :: macro (n: i32, $flags: i32, $body: Code) {
 }
 
 #overload
-__for_expansion :: macro (n: i64, $flags: i32, $body: Code) {
+__for_expansion :: macro (n: i64, $flags: __For_Expansion_Flags, $body: Code) {
     i    : i64 = 0
     end  : i64 = n
     
@@ -182,59 +182,6 @@ __for_expansion :: macro (n: i64, $flags: i32, $body: Code) {
         defer i += 1
 
         #unquote body(i) #skip_scope(2)
-    }
-}
-
-
-//
-// Move these to iter.onyx
-#overload
-__for_expansion :: macro (iterator: Iterator($T), $flags: i32, $body: Code) where 
-    (flags & 1 == 0) && (body.capture_count == 2)
-{
-    _iterator := iterator
-
-    #if flags & 2 == 0 {
-        defer if _iterator.close != null_proc {
-            _iterator.close(_iterator.data)
-        }
-    }
-
-    #if #defined(body.capture_type_2) {
-        _i: body.capture_type_2
-    } else {
-        _i: i32
-    }
-
-    while true {
-        defer _i += 1
-
-        value := _iterator.next(_iterator.data)
-        if value.tag == .None do break
-
-        _it := *cast(&T) (cast([&] u8, &value) + alignof ? T)
-        #unquote body(_it, _i) #skip_scope(2)
-    }
-}
-
-#overload
-__for_expansion :: macro (iterator: Iterator($T), $flags: i32, $body: Code) where 
-    (flags & 1 == 0) && (body.capture_count == 1)
-{
-    _iterator := iterator
-
-    #if (flags & 2 == 0) {
-        defer if _iterator.close != null_proc {
-            _iterator.close(_iterator.data)
-        }
-    }
-
-    while true {
-        value := _iterator.next(_iterator.data)
-        if value.tag == .None do break
-
-        _it := *cast(&T) (cast([&] u8, &value) + alignof ? T)
-        #unquote body(_it) #skip_scope(2)
     }
 }
 

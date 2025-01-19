@@ -10,8 +10,8 @@ ArrPair.make :: (a: [] $A, b: [] $B) -> ArrPair(A, B) {
 }
 
 #overload
-__for_expansion :: macro (x: ArrPair($A, $B), $flags: i32, $body: Code) where body.capture_count == 2 {
-    #if flags & 1 != 0 {
+__for_expansion :: macro (x: ArrPair($A, $B), $flags: __For_Expansion_Flags, $body: Code) where body.capture_count == 2 {
+    #if flags & .BY_POINTER {
         #error "Cannot iterate by pointer."
     }
 
@@ -27,7 +27,7 @@ __for_expansion :: macro (x: ArrPair($A, $B), $flags: i32, $body: Code) where bo
 MyRange :: struct { low, high: i32; step: i32 = 1 }
 
 #overload
-__for_expansion :: macro (r: MyRange, $flags: i32, $body: Code) where (body.capture_count == 1) {
+__for_expansion :: macro (r: MyRange, $flags: __For_Expansion_Flags, $body: Code) where (body.capture_count == 1) {
     _r := r
     _i := _r.low
     _high := _r.high

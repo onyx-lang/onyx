@@ -14,6 +14,57 @@ use core.intrinsics.types {type_is_struct}
 // Iterator is a builtin type known by the compiler, as Iterators
 // can be used in for-loops natively without any translation.
 
+#overload
+__for_expansion :: macro (iterator: Iterator($T), $flags: __For_Expansion_Flags, $body: Code) where 
+    !(flags & .BY_POINTER) && (body.capture_count == 2)
+{
+    _iterator := iterator
+
+    #if !(flags & .NO_CLOSE) {
+        defer if _iterator.close != null_proc {
+            _iterator.close(_iterator.data)
+        }
+    }
+
+    #if #defined(body.capture_type_2) {
+        _i: body.capture_type_2
+    } else {
+        _i: i32
+    }
+
+    while true {
+        defer _i += 1
+
+        value := _iterator.next(_iterator.data)
+        if value.tag == .None do break
+
+        _it := *cast(&T) (cast([&] u8, &value) + alignof ? T)
+        #unquote body(_it, _i) #skip_scope(2)
+    }
+}
+
+#overload
+__for_expansion :: macro (iterator: Iterator($T), $flags: __For_Expansion_Flags, $body: Code) where 
+    !(flags & .BY_POINTER) && (body.capture_count == 1)
+{
+    _iterator := iterator
+
+    #if !(flags & .NO_CLOSE) {
+        defer if _iterator.close != null_proc {
+            _iterator.close(_iterator.data)
+        }
+    }
+
+    while true {
+        value := _iterator.next(_iterator.data)
+        if value.tag == .None do break
+
+        _it := *cast(&T) (cast([&] u8, &value) + alignof ? T)
+        #unquote body(_it) #skip_scope(2)
+    }
+}
+
+
 Iterator.from :: as_iter
 Iterator.next :: next
 Iterator.close :: close

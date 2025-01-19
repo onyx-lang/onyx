@@ -277,7 +277,7 @@ Map.as_iter :: (m: &Map) =>
 
 /// Allows for looping over a map with a for-loop
 #overload
-__for_expansion :: macro (map: Map($K, $V), $flags: i32, $body: Code) where (body.capture_count == 2) {
+__for_expansion :: macro (map: Map($K, $V), $flags: __For_Expansion_Flags, $body: Code) where (body.capture_count == 2) {
     m        := map
     m_data   := m.entries.data
     m_length := m.entries.length
@@ -285,7 +285,7 @@ __for_expansion :: macro (map: Map($K, $V), $flags: i32, $body: Code) where (bod
     while i < m_length {
         defer i += 1
 
-        #if flags & 1 != 0 {
+        #if flags & .BY_POINTER {
             #unquote body(m_data[i].key, &m_data[i].value) #skip_scope(2)
         } else {
             #unquote body(m_data[i].key, m_data[i].value) #skip_scope(2)
@@ -294,13 +294,13 @@ __for_expansion :: macro (map: Map($K, $V), $flags: i32, $body: Code) where (bod
 }
 
 #overload
-__for_expansion :: macro (map: &Map($K, $V), $flags: i32, $body: Code) where (body.capture_count == 2) {
+__for_expansion :: macro (map: &Map($K, $V), $flags: __For_Expansion_Flags, $body: Code) where (body.capture_count == 2) {
     m := map
     i := 0
     while i < m.entries.length {
         defer i += 1
 
-        #if flags & 1 != 0 {
+        #if flags & .BY_POINTER {
             #unquote body(m.entries[i].key, &m.entries[i].value) #skip_scope(2)
         } else {
             #unquote body(m.entries[i].key, m.entries[i].value) #skip_scope(2)
