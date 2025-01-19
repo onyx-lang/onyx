@@ -866,9 +866,7 @@ struct AstFor           {
     // NOTE: Stores the iteration variable
     Scope *scope;
 
-    // NOTE: Local defining the iteration variable
-    AstLocal* var;
-    AstLocal* index_var;
+    bh_arr(AstLocal *) indexing_variables;
 
     // NOTE: This can be any expression, but it is checked that
     // it is of a type that we know how to iterate over.
@@ -877,16 +875,18 @@ struct AstFor           {
 
     AstBlock *stmt;
 
+    // NOTE: This is set when a for-loop isn't over a primitive type
+    // and instead is over a custom type, such as `Iterator` or `Map`.
+    // To properly invoke `__for_expansion`, we need to store the prepared
+    // call, as there could be overloads we have to wait for by yielding.
+    AstCall *intermediate_macro_expansion;
+
     // ROBUSTNESS: This should be able to be set by a compile time variable at some point.
     // But for now, this will do.
     b32 by_pointer : 1;
     b32 no_close   : 1;
-    b32 has_first  : 1;
-
-    // NOTE: This is used by the AstDirectiveFirst node for this
-    // for node to know which local variable to use.
-    u64 first_local;
 };
+
 struct AstIfWhile {
     AstNode_base;
 
@@ -907,7 +907,14 @@ struct AstIfWhile {
         };
 
         // Used by While
-        b32 bottom_test;
+        struct {
+            // NOTE: This is used by the AstDirectiveFirst node for this
+            // for node to know which local variable to use.
+            u64 first_local;
+            b32 has_first;
+
+            b32 bottom_test;
+        };
     };
 };
 typedef struct AstIfWhile AstIf;
@@ -1572,7 +1579,8 @@ struct AstDirectiveRemove {
 
 struct AstDirectiveFirst {
     AstTyped_base;
-    AstFor *for_node;
+
+    AstIfWhile *while_node;
 };
 
 struct AstDirectiveExportName {
@@ -1607,12 +1615,17 @@ struct AstCallSite {
     b32 collapsed : 1;
 };
 
+typedef struct CodeBlockBindingSymbol {
+    OnyxToken *symbol;
+    AstType   *type_node; // This can be NULL if no type was given.
+} CodeBlockBindingSymbol;
+
 // Represents a "pastable" block of code.
 struct AstCodeBlock {
     AstTyped_base;
 
     AstNode *code;
-    bh_arr(OnyxToken *) binding_symbols;
+    bh_arr(CodeBlockBindingSymbol) binding_symbols;
 
     b32 is_expression: 1;
 };
@@ -1622,6 +1635,9 @@ struct AstDirectiveInsert {
 
     AstTyped *code_expr;
     bh_arr(AstTyped *) binding_exprs;
+
+    // Set when using #skip_scope
+    AstTyped *skip_scope_index;
 };
 
 struct AstDirectiveInit {
@@ -1921,8 +1937,7 @@ typedef enum CheckerMode {
 typedef struct CheckerData {
     b32 expression_types_must_be_known;
     b32 all_checks_are_final;
-    b32 inside_for_iterator;
-    bh_arr(AstFor *) for_node_stack;
+    bh_arr(AstIfWhile *) while_node_stack;
     bh_imap __binop_impossible_cache[Binary_Op_Count];
     AstCall __op_maybe_overloaded;
     Entity *current_entity;
@@ -2109,6 +2124,9 @@ struct CompilerBuiltins {
     bh_arr(AstFunction *) init_procedures;
     AstOverloadedFunction *implicit_bool_cast;
     AstOverloadedFunction *dispose_used_local;
+
+    AstType *for_expansion_flag_type;
+    AstOverloadedFunction *for_expansion;
 };
 
 typedef struct TypeStore TypeStore;
@@ -2360,6 +2378,8 @@ b32 potentially_convert_function_to_polyproc(Context *context, AstFunction *func
 AstPolyCallType* convert_call_to_polycall(Context *context, AstCall* call);
 
 void insert_auto_dispose_call(Context *context, AstLocal *local);
+
+AstCall * create_implicit_for_expansion_call(Context *context, AstFor *fornode);
 
 typedef struct OverloadReturnTypeCheck {
     Type *expected_type;

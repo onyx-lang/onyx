@@ -275,6 +275,40 @@ Map.as_iter :: (m: &Map) =>
         });
 
 
+/// Allows for looping over a map with a for-loop
+#overload
+__for_expansion :: macro (map: Map($K, $V), $flags: __For_Expansion_Flags, $body: Code) where (body.capture_count == 2) {
+    m        := map
+    m_data   := m.entries.data
+    m_length := m.entries.length
+    i := 0
+    while i < m_length {
+        defer i += 1
+
+        #if flags & .BY_POINTER {
+            #unquote body(m_data[i].key, &m_data[i].value) #skip_scope(2)
+        } else {
+            #unquote body(m_data[i].key, m_data[i].value) #skip_scope(2)
+        }
+    }
+}
+
+#overload
+__for_expansion :: macro (map: &Map($K, $V), $flags: __For_Expansion_Flags, $body: Code) where (body.capture_count == 2) {
+    m := map
+    i := 0
+    while i < m.entries.length {
+        defer i += 1
+
+        #if flags & .BY_POINTER {
+            #unquote body(m.entries[i].key, &m.entries[i].value) #skip_scope(2)
+        } else {
+            #unquote body(m.entries[i].key, m.entries[i].value) #skip_scope(2)
+        }
+    }
+}
+
+
 //
 // Helper operator overloads for accessing values, accessing
 // values by pointer, and setting values.

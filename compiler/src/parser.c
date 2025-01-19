@@ -862,8 +862,15 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 while (!consume_token_if_next(parser, ']')) {
                     if (parser->hit_unexpected_token) return (AstTyped *) code_block;
 
-                    OnyxToken *symbol = expect_token(parser, Token_Type_Symbol);
-                    bh_arr_push(code_block->binding_symbols, symbol);
+                    CodeBlockBindingSymbol sym;
+                    sym.symbol = expect_token(parser, Token_Type_Symbol);
+                    sym.type_node = NULL;
+
+                    if (consume_token_if_next(parser, ':')) {
+                        sym.type_node = parse_type(parser);
+                    }
+
+                    bh_arr_push(code_block->binding_symbols, sym);
 
                     if (parser->curr->type != ']')
                         expect_token(parser, ',');
@@ -1064,6 +1071,10 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                         if (parser->curr->type != ')')
                             expect_token(parser, ',');
                     }
+                }
+
+                if (parse_possible_directive(parser, "skip_scope")) {
+                    insert->skip_scope_index = parse_factor(parser);
                 }
 
                 retval = (AstTyped *) insert;
@@ -1619,47 +1630,45 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
     }
 
     //
-    // For loops can take on a lot of shapes.
+    // For loops can take on a lot of shapes. Look for "sym (:|,|in)".
     //     for value in iter
     //     for value: i64 in iter
     //     for value, index in iter
     //     for value: i64, index in iter
     //     for value: i64, index: i32 in iter
     //
+    bh_arr_new(parser->context->gp_alloc, for_node->indexing_variables, 1);
+
     if (next_tokens_are(parser, 2, Token_Type_Symbol, Token_Type_Keyword_In)
         || next_tokens_are(parser, 2, Token_Type_Symbol, ':')
         || next_tokens_are(parser, 2, Token_Type_Symbol, ',')
     ) {
-        for_node->var = make_local(
-            parser->context,
-            expect_token(parser, Token_Type_Symbol),
-            NULL
-        );
+        while (!consume_token_if_next(parser, Token_Type_Keyword_In)) {
+            if (parser->hit_unexpected_token) return for_node;
 
-        if (consume_token_if_next(parser, ':')) {
-            for_node->var->type_node = parse_type(parser);
-        }
-
-        if (consume_token_if_next(parser, ',')) {
-            for_node->index_var = make_local(
+            AstLocal *var = make_local(
                 parser->context,
                 expect_token(parser, Token_Type_Symbol),
-                (AstType *) &parser->context->basic_types.type_u32
+                NULL
             );
 
             if (consume_token_if_next(parser, ':')) {
-                for_node->index_var->type_node = parse_type(parser);
+                var->type_node = parse_type(parser);
+            }
+
+            bh_arr_push(for_node->indexing_variables, var);
+
+            if (peek_token(0)->type != Token_Type_Keyword_In) {
+                expect_token(parser, ',');
             }
         }
-
-        expect_token(parser, Token_Type_Keyword_In);
     } else {
         // HACK
         static char it_name[] = "it ";
         static OnyxToken it_token = { Token_Type_Symbol, 2, it_name, { 0 } };
 
         AstLocal* var_node = make_local(parser->context, &it_token, NULL);
-        for_node->var = var_node;
+        bh_arr_push(for_node->indexing_variables, var_node);
     }
 
     for_node->iter = parse_expression(parser, 1);
@@ -2131,14 +2140,6 @@ static AstNode* parse_statement(OnyxParser* parser) {
                 binding->token = memres->token;
                 binding->node = (AstNode *) memres;
                 ENTITY_SUBMIT(binding);
-                break;
-            }
-
-            if (parse_possible_directive(parser, "remove")) {
-                // :LinearTokenDependent
-                AstDirectiveRemove *remove = make_node(AstDirectiveRemove, Ast_Kind_Directive_Remove);
-                remove->token = parser->curr - 2;
-                retval = (AstNode *) remove;
                 break;
             }
 

@@ -1,0 +1,83 @@
+use core {*}
+
+ArrPair :: struct (A: type_expr, B: type_expr) {
+    a: [] A
+    b: [] B
+}
+
+ArrPair.make :: (a: [] $A, b: [] $B) -> ArrPair(A, B) {
+    return .{ a, b }
+}
+
+#overload
+__for_expansion :: macro (x: ArrPair($A, $B), $flags: __For_Expansion_Flags, $body: Code) where body.capture_count == 2 {
+    #if flags & .BY_POINTER {
+        #error "Cannot iterate by pointer."
+    }
+
+    for _a in x.a {
+        for _b in x.b {
+            #unquote body(_a, _b) #skip_scope(3)
+        }
+    }
+}
+
+
+
+MyRange :: struct { low, high: i32; step: i32 = 1 }
+
+#overload
+__for_expansion :: macro (r: MyRange, $flags: __For_Expansion_Flags, $body: Code) where (body.capture_count == 1) {
+    _r := r
+    _i := _r.low
+    _high := _r.high
+    _step := _r.step
+    while _i < _high {
+        defer {
+            _i += _step
+        }
+
+        #unquote body(_i) #skip_scope(2)
+    }
+}
+
+range_old :: () {
+    for v in 0 .. 10 {
+        println(v)
+    }
+}
+
+range_new :: () {
+    for v in MyRange.{0, 10} {
+        println(v)
+    }
+}
+
+main :: () {
+     m := Map.literal(u32, str, .[
+         .{0, "Test"}
+         .{1, "Foo"}
+         .{2, "Cowabunga"}
+     ])
+     for k, v in m {
+         printf("{}: {}\n", k, v)
+         if k == 1 do break
+     }
+ 
+ 
+     s := Set.from(.[1, 2, 3, 4, 5])
+     for v in s {
+         println(v)
+     }
+ 
+ 
+     i := Iterator.from(s)
+     for v, c in i {
+         printf("c: {} ({})    v: {}\n", c, typeof c, *v)
+     }
+ 
+     ap := ArrPair.make(.[1, 2, 3], .["a", "b", "c"])
+     for v1, v2 in ap {
+         printf("{}, {}\n", v1, v2)
+     }
+}

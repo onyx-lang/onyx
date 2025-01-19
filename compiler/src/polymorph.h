@@ -170,6 +170,13 @@ static AstSolidifiedFunction generate_solidified_function(
             bh_arr_new(context->gp_alloc, constraint->args, 1);
             bh_arr_push(constraint->args, (AstTyped *) ast_clone(context, param->poly_sym));
 
+            //
+            // Sometimes this array is uninitialized, and that would cause a memory leak
+            // because the memory wouldn't be tracked in the gp_alloc.
+            if (!solidified_func.func->constraints.constraints) {
+                bh_arr_new(context->gp_alloc, solidified_func.func->constraints.constraints, 1);
+            }
+
             bh_arr_push(solidified_func.func->constraints.constraints, constraint);
         }
 

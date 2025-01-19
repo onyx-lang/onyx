@@ -106,7 +106,7 @@ CHECK_FUNC(statement, AstNode** pstmt);
 CHECK_FUNC(return, AstReturn* retnode);
 CHECK_FUNC(if, AstIfWhile* ifnode);
 CHECK_FUNC(while, AstIfWhile* whilenode);
-CHECK_FUNC(for, AstFor* fornode);
+CHECK_FUNC(for, AstFor** pfornode);
 CHECK_FUNC(case, AstSwitchCase *casenode);
 CHECK_FUNC(switch, AstSwitch* switchnode);
 CHECK_FUNC(call, AstCall** pcall);
@@ -336,15 +336,15 @@ CHECK_FUNC(if, AstIfWhile* ifnode) {
 
         if (static_if_resolution(context, ifnode)) {
             if (ifnode->true_stmt != NULL) {
+                ifnode->true_stmt->rules = Block_Rule_Macro & ~Block_Rule_New_Scope;
                 CHECK(statement, (AstNode **) &ifnode->true_stmt);
-                ifnode->true_stmt->rules = Block_Rule_Macro;
                 ifnode->flags |= ifnode->true_stmt->flags & Ast_Flag_Block_Returns;
             }
 
         } else {
             if (ifnode->false_stmt != NULL) {
+                ifnode->false_stmt->rules = Block_Rule_Macro & ~Block_Rule_New_Scope;
                 CHECK(statement, (AstNode **) &ifnode->false_stmt);
-                ifnode->false_stmt->rules = Block_Rule_Macro;
                 ifnode->flags |= ifnode->false_stmt->flags & Ast_Flag_Block_Returns;
             }
         }
@@ -405,7 +405,12 @@ CHECK_FUNC(while, AstIfWhile* whilenode) {
         }
     }
 
-    if (whilenode->true_stmt)  CHECK(statement, (AstNode **) &whilenode->true_stmt);
+    bh_arr_push(context->checker.while_node_stack, whilenode);
+
+    if (whilenode->true_stmt) {
+        CHECK(statement, (AstNode **) &whilenode->true_stmt);
+    }
+
     if (whilenode->false_stmt) {
         if (whilenode->bottom_test) {
             ERROR(whilenode->token->pos, "while-loops with an 'else' clause cannot be bottom tested.");
@@ -414,6 +419,8 @@ CHECK_FUNC(while, AstIfWhile* whilenode) {
         CHECK(statement, (AstNode **) &whilenode->false_stmt);
     }
 
+    bh_arr_pop(context->checker.while_node_stack);
+
     if (whilenode->initialization != NULL) {
         scope_leave(context);
     }
@@ -421,190 +428,46 @@ CHECK_FUNC(while, AstIfWhile* whilenode) {
     return Check_Success;
 }
 
-CHECK_FUNC(for, AstFor* fornode) {
-    if (!fornode->scope) {
-        fornode->scope = scope_create(context, context->checker.current_scope, fornode->token->pos);
-    }
+CHECK_FUNC(for, AstFor** pfornode) {
+    AstFor *fornode = *pfornode;
 
-    scope_enter(context, fornode->scope);
-
-    b32 old_inside_for_iterator;
-    if (fornode->flags & Ast_Flag_Has_Been_Checked) goto fornode_expr_checked;
+    // HACK
+    CHECK(expression, (AstTyped **) &context->builtins.for_expansion_flag_type);
 
     CHECK(expression, &fornode->iter);
     resolve_expression_type(context, fornode->iter);
 
-    //
-    // These locals have to be checked after the iterator value to avoid incorrect
-    // symbol resolutions.
-    //
-    // for a in x {
-    //     for a in a { // <-
-    //     }
-    // }
-    //
-    CHECK(local, &fornode->var);
-    if (fornode->index_var) {
-        fornode->index_var->flags |= Ast_Flag_Cannot_Take_Addr;
-        CHECK(local, &fornode->index_var);
-        fill_in_type(context, (AstTyped *) fornode->index_var);
-
-        if (!type_is_integer(fornode->index_var->type)) {
-            ERROR_(fornode->index_var->token->pos, "Index for a for loop must be an integer type, but it is a '%s'.", type_get_name(context, fornode->index_var->type));
+    bh_arr_each(AstLocal *, index_variable, fornode->indexing_variables) {
+        if ((*index_variable)->type_node) {
+            CHECK(type, &(*index_variable)->type_node);
         }
     }
 
-    Type* iter_type = fornode->iter->type;
-    if (iter_type == NULL) YIELD(fornode->token->pos, "Waiting for iteration expression type to be known.");
-
-    OnyxFilePos error_loc = fornode->var->token->pos;
-    if (error_loc.filename == NULL) {
-        error_loc = fornode->token->pos;
+    if (!fornode->intermediate_macro_expansion) {
+        fornode->intermediate_macro_expansion = create_implicit_for_expansion_call(context, fornode);
+        assert(fornode->intermediate_macro_expansion);
     }
-
-    // @HACK This should be built elsewhere...
-    context->builtins.range_type_type = type_build_from_ast(context, context->builtins.range_type);
-    if (context->builtins.range_type_type == NULL) YIELD(fornode->token->pos, "Waiting for 'range' structure to be built.");
-
-    Type* given_type = NULL;
-
-    fornode->loop_type = For_Loop_Invalid;
-    if (types_are_compatible(context, iter_type, context->types.basic[Basic_Kind_I32])) {
-        if (fornode->by_pointer) {
-            ERROR(error_loc, "Cannot iterate by pointer over a range.");
+ 
+    CheckStatus cs = check_call(context, (AstCall **) &fornode->intermediate_macro_expansion);
+    if (cs == Check_Yield) {
+        if (fornode->intermediate_macro_expansion->kind == Ast_Kind_Call) {
+            return Check_Yield;
         }
-
-        AstNumLit* low_0    = make_int_literal(context, 0);
-        AstRangeLiteral* rl = make_range_literal(context, (AstTyped *) low_0, fornode->iter);
-        CHECK(range_literal, &rl);
-        fornode->iter = (AstTyped *) rl;
-
-        given_type = context->builtins.range_type_type->Struct.memarr[0]->type;
-        fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
-        fornode->loop_type = For_Loop_Range;
-    }
-    else if (types_are_compatible(context, iter_type, context->types.basic[Basic_Kind_I64])) {
-        if (fornode->by_pointer) {
-            ERROR(error_loc, "Cannot iterate by pointer over a range.");
-        }
-
-        AstNumLit* low_0    = make_int_literal(context, 0);
-        low_0->type = context->types.basic[Basic_Kind_I64];
-        
-        AstRangeLiteral* rl = make_range_literal(context, (AstTyped *) low_0, fornode->iter);
-        CHECK(range_literal, &rl);
-        fornode->iter = (AstTyped *) rl;
-
-        given_type = context->builtins.range64_type_type->Struct.memarr[0]->type;
-        fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
-        fornode->loop_type = For_Loop_Range;
-    }
-    else if (types_are_compatible(context, iter_type, context->builtins.range_type_type)) {
-        if (fornode->by_pointer) {
-            ERROR(error_loc, "Cannot iterate by pointer over a range.");
-        }
-
-        // NOTE: Blindly copy the first range member's type which will
-        // be the low value.                - brendanfh 2020/09/04
-        given_type = iter_type->Struct.memarr[0]->type;
-        fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
-        fornode->loop_type = For_Loop_Range;
-    }
-    else if (types_are_compatible(context, iter_type, context->builtins.range64_type_type)) {
-        if (fornode->by_pointer) {
-            ERROR(error_loc, "Cannot iterate by pointer over a range.");
-        }
-
-        // NOTE: Blindly copy the first range member's type which will
-        // be the low value.                - brendanfh 2020/09/04
-        given_type = iter_type->Struct.memarr[0]->type;
-        fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
-        fornode->loop_type = For_Loop_Range;
-    }
-    else if (iter_type->kind == Type_Kind_Array) {
-        if (fornode->by_pointer) given_type = type_make_pointer(context, iter_type->Array.elem);
-        else                     given_type = iter_type->Array.elem;
-
-        fornode->loop_type = For_Loop_Array;
-    }
-    else if (iter_type->kind == Type_Kind_Slice) {
-        if (fornode->by_pointer) given_type = type_make_pointer(context, iter_type->Slice.elem);
-        else                     given_type = iter_type->Slice.elem;
-
-        fornode->loop_type = For_Loop_Slice;
-
-    }
-    else if (iter_type->kind == Type_Kind_VarArgs) {
-        if (fornode->by_pointer) {
-            ERROR_(error_loc, "Cannot iterate by pointer over '%s'.", type_get_name(context, iter_type));
-        }
-
-        given_type = iter_type->VarArgs.elem;
-
-        // NOTE: Slices are VarArgs are being treated the same here.
-        fornode->loop_type = For_Loop_Slice;
-    }
-    else if (iter_type->kind == Type_Kind_DynArray) {
-        if (fornode->by_pointer) given_type = type_make_pointer(context, iter_type->DynArray.elem);
-        else                     given_type = iter_type->DynArray.elem;
-
-        fornode->loop_type = For_Loop_DynArr;
-    }
-    else if (type_constructed_from_poly(iter_type, context->builtins.iterator_type)) {
-        if (fornode->by_pointer) {
-            ERROR(error_loc, "Cannot iterate by pointer over an iterator.");
-        }
-
-        // HACK: This assumes the Iterator type only has a single type argument.
-        given_type = iter_type->Struct.poly_sln[0].type;
-        fornode->loop_type = For_Loop_Iterator;
-        fornode->var->flags |= Ast_Flag_Address_Taken;
     }
 
-    if (given_type == NULL)
-        ERROR_(error_loc, "Cannot iterate over a '%s'.", type_get_name(context, iter_type));
+    if (cs == Check_Error) {
+        i32 vars = bh_arr_length(fornode->indexing_variables);
 
-    if (fornode->var->type_node) {
-        fill_in_type(context, (AstTyped *) fornode->var);
-        TYPE_CHECK((AstTyped **) &fornode->var, given_type) {
-            ERROR_(error_loc, "Mismatched type for loop variable. You specified '%s', but it should be '%s'.", type_get_name(context, fornode->var->type), type_get_name(context, given_type));
-        }
-
-    } else {
-        fornode->var->type = given_type;
+        ERROR_(fornode->token->pos, "Unable to loop over a '%s'%s with %d captured argument%s.",
+               type_get_name(context, fornode->iter->type),
+               fornode->by_pointer ? " by pointer," : "",
+               vars,
+               bh_num_plural(vars));
     }
 
-    if (fornode->by_pointer)
-        fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
+    *pfornode = (AstFor *) fornode->intermediate_macro_expansion;
+    CHECK(expression, (AstTyped **) pfornode);
 
-    if (fornode->loop_type == For_Loop_Invalid)
-        ERROR_(error_loc, "Cannot iterate over a '%s'.", type_get_name(context, iter_type));
-
-    if (fornode->no_close && fornode->loop_type != For_Loop_Iterator) {
-        ONYX_WARNING(error_loc, "Warning: #no_close here is meaningless as the iterable is not an iterator.");
-    }
-
-    fornode->flags |= Ast_Flag_Has_Been_Checked;
-
-
-fornode_expr_checked:
-    bh_arr_push(context->checker.for_node_stack, fornode);
-
-    old_inside_for_iterator = context->checker.inside_for_iterator;
-    context->checker.inside_for_iterator = 0;
-    iter_type = fornode->iter->type;
-    if (type_constructed_from_poly(iter_type, context->builtins.iterator_type)) {
-        context->checker.inside_for_iterator = 1;
-    }
-
-    do {
-        CheckStatus cs = check_block(context, fornode->stmt);
-        context->checker.inside_for_iterator = old_inside_for_iterator;
-        if (cs > Check_Errors_Start) return cs;
-    } while(0);
-
-    bh_arr_pop(context->checker.for_node_stack);
-    scope_leave(context);
     return Check_Success;
 }
 
@@ -1040,6 +903,14 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
                 YIELD(call->token->pos, "Waiting to know all options for overloaded function");
             }
 
+            //
+            // When reporting an error about a for-loop expansion overload, don't report all the overloads
+            // as there are likely very many of them and the error message won't be very useful. Instead,
+            // a better error message will be printed in check_for.
+            if ((AstOverloadedFunction *) callee == context->builtins.for_expansion) {
+                return Check_Error;
+            }
+
             report_unable_to_match_overload(context, call, ((AstOverloadedFunction *) callee)->overloads);
             return Check_Error;
         }
@@ -1250,7 +1121,9 @@ CHECK_FUNC(call, AstCall** pcall) {
         YIELD(call->token->pos, "Waiting on argument type checking.");
     }
 
-    call->flags   |= Ast_Flag_Has_Been_Checked;
+    if (tm == TYPE_MATCH_YIELD) YIELD(call->token->pos, "Waiting on argument type checking.");
+
+    call->flags |= Ast_Flag_Has_Been_Checked;
 
     if (call->kind == Ast_Kind_Call && call->callee->kind == Ast_Kind_Macro) {
         expand_macro(context, pcall, callee);
@@ -2547,7 +2420,7 @@ CHECK_FUNC(dereference, AstDereference* deref) {
     CHECK(expression, &deref->expr);
 
     if (!type_is_pointer(deref->expr->type))
-        ERROR(deref->token->pos, "Cannot dereference non-pointer value.");
+        ERROR_(deref->token->pos, "Cannot dereference non-pointer value, '%s'.", type_get_name(context, deref->expr->type));
 
     if (deref->expr->type == context->types.basic[Basic_Kind_Rawptr])
         ERROR(deref->token->pos, "Cannot dereference 'rawptr'. Cast to another pointer type first.");
@@ -2674,7 +2547,8 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
             expr->kind == Ast_Kind_Distinct_Type ||
             expr->kind == Ast_Kind_Interface ||
             expr->kind == Ast_Kind_Compiler_Extension ||
-            expr->kind == Ast_Kind_Package) {
+            expr->kind == Ast_Kind_Package ||
+            expr->kind == Ast_Kind_Code_Block) {
             goto try_resolve_from_node;
         }
     }
@@ -3231,6 +3105,11 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
         case Ast_Kind_Code_Block:
             expr->flags |= Ast_Flag_Comptime;
             fill_in_type(context, expr);
+            bh_arr_each(CodeBlockBindingSymbol, sym, ((AstCodeBlock *) expr)->binding_symbols) {
+                if (sym->type_node) {
+                    CHECK(expression, (AstTyped **) &sym->type_node);
+                }
+            }
             break;
 
         case Ast_Kind_Do_Block: {
@@ -3356,8 +3235,11 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
         CHECK(expression, pexpr);
     }
 
-    Type* code_type = type_build_from_ast(context, context->builtins.code_type);
+    if (insert->skip_scope_index) {
+        CHECK(expression, &insert->skip_scope_index);
+    }
 
+    Type* code_type = type_build_from_ast(context, context->builtins.code_type);
     TYPE_CHECK(&insert->code_expr, code_type) {
         ERROR_(insert->token->pos, "#unquote expected a value of type 'Code', got '%s'.",
             type_get_name(context, insert->code_expr->type));
@@ -3388,10 +3270,23 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
     AstNode* cloned_block = ast_clone(context, code_block->code);
     cloned_block->next = insert->next;
 
+    i32 skip_scope_index = get_expression_integer_value(context, insert->skip_scope_index, NULL);
+    Scope *scope_for_cloned_block = NULL;
+    if (skip_scope_index > 0) {
+        Scope *skip_scope = context->checker.current_scope;
+        fori (i, 0, skip_scope_index) {
+            if (!skip_scope->parent) break;
+            skip_scope = skip_scope->parent;
+        }
+
+        scope_for_cloned_block = scope_create(context, skip_scope, cloned_block->token->pos);
+    }
+
     if (bound_expr_count > 0) {
         Scope **scope = NULL;
 
         if (cloned_block->kind == Ast_Kind_Block) {
+            ((AstBlock *) cloned_block)->scope = scope_for_cloned_block;
             scope = &((AstBlock *) cloned_block)->quoted_block_capture_scope;
 
         } else if (bound_symbol_count > 0) {
@@ -3403,6 +3298,7 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
             body_block->token = cloned_block->token;
             body_block->body = (AstNode *) return_node;
             body_block->rules = Block_Rule_Code_Block;
+            ((AstBlock *) body_block)->scope = scope_for_cloned_block;
             scope = &((AstBlock *) body_block)->quoted_block_capture_scope;
 
             AstDoBlock* doblock = (AstDoBlock *) onyx_ast_node_new(context->ast_alloc, sizeof(AstDoBlock), Ast_Kind_Do_Block);
@@ -3419,7 +3315,19 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
             *scope = scope_create(context, NULL, code_block->token->pos);
 
             fori (i, 0, bound_symbol_count) {
-                symbol_introduce(context, *scope, code_block->binding_symbols[i], (AstNode *) insert->binding_exprs[i]);
+                CodeBlockBindingSymbol sym = code_block->binding_symbols[i];
+                if (sym.type_node) {
+                    Type *type = type_build_from_ast(context, sym.type_node);
+
+                    TYPE_CHECK(&insert->binding_exprs[i], type) {
+                        ERROR_(insert->token->pos, "Expected type '%s' but got type '%s' for the '%d%s' argument to the code block.", 
+                               type_get_name(context, type), type_get_name(context, insert->binding_exprs[i]->type),
+                               i + 1, bh_num_suffix(i + 1));
+                    }
+                }
+
+                AstNode *value = (void *) insert->binding_exprs[i];
+                symbol_introduce(context, *scope, sym.symbol, value);
             }
         }
     }
@@ -3501,23 +3409,15 @@ CHECK_FUNC(directive_solidify, AstDirectiveSolidify** psolid) {
     return Check_Success;
 }
 
-CHECK_FUNC(remove_directive, AstDirectiveRemove *remove) {
-    if (!context->checker.inside_for_iterator) {
-        ERROR(remove->token->pos, "#remove is only allowed in the body of a for-loop over an iterator.");
-    }
-
-    return Check_Success;
-}
-
 CHECK_FUNC(directive_first, AstDirectiveFirst *first) {
-    if (bh_arr_length(context->checker.for_node_stack) == 0) {
-        ERROR(first->token->pos, "#first is only allowed in the body of a for-loop.");
+    if (bh_arr_length(context->checker.while_node_stack) == 0) {
+        ERROR(first->token->pos, "#first is only allowed in the body of a while-loop or for-loop.");
     }
 
-    first->for_node = bh_arr_last(context->checker.for_node_stack);
-    assert(first->for_node);
+    first->while_node = bh_arr_last(context->checker.while_node_stack);
+    assert(first->while_node);
 
-    first->for_node->has_first = 1;
+    first->while_node->has_first = 1;
 
     return Check_Success;
 }
@@ -3629,13 +3529,13 @@ CHECK_FUNC(statement, AstNode** pstmt) {
         case Ast_Kind_If:          return check_if(context, (AstIfWhile *) stmt);
         case Ast_Kind_Static_If:   return check_if(context, (AstIfWhile *) stmt);
         case Ast_Kind_While:       return check_while(context, (AstIfWhile *) stmt);
-        case Ast_Kind_For:         return check_for(context, (AstFor *) stmt);
+        case Ast_Kind_For:         return check_for(context, (AstFor **) pstmt);
         case Ast_Kind_Switch:      return check_switch(context, (AstSwitch *) stmt);
         case Ast_Kind_Switch_Case: return check_case(context, (AstSwitchCase *) stmt);
         case Ast_Kind_Block:       return check_block(context, (AstBlock *) stmt);
         case Ast_Kind_Defer:       return check_statement(context, &((AstDefer *) stmt)->stmt);
         case Ast_Kind_Argument:    return check_expression(context, (AstTyped **) &((AstArgument *) stmt)->value);
-        case Ast_Kind_Directive_Remove: return check_remove_directive(context, (AstDirectiveRemove *) stmt);
+
         case Ast_Kind_Directive_Insert: return check_insert_directive(context, (AstDirectiveInsert **) pstmt, 0);
         case Ast_Kind_Procedural_Expansion: return check_proc_expansion(context, (AstProceduralExpansion **) pstmt, PMEK_Statement);
 
@@ -3678,7 +3578,7 @@ CHECK_FUNC(statement, AstNode** pstmt) {
 
                         return Check_Error;
                     } else {
-                        ERROR(stmt->token->pos, "The type of this local is not a type.");
+                        ERROR_(stmt->token->pos, "The type of this local is not a type. It is a %s.", onyx_ast_node_kind_string(typed_stmt->type_node->kind));
                     }
                 }
 
@@ -3836,8 +3736,9 @@ CHECK_FUNC(function, AstFunction* func) {
     bh_arr_push(context->checker.expected_return_type_stack, &func->type->Function.return_type);
     bh_arr_push(context->checker.named_return_values_stack, func->named_return_locals);
 
-    context->checker.inside_for_iterator = 0;
-    if (context->checker.for_node_stack) bh_arr_clear(context->checker.for_node_stack);
+    if (context->checker.while_node_stack) {
+        bh_arr_clear(context->checker.while_node_stack);
+    }
 
     assert(func->scope);
 

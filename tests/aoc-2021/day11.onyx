@@ -41,7 +41,9 @@ main :: (args) => {
     sync_step := 0;
     while true {
         step += 1;
-        for &o in octopuses do *o += 1;
+        for &o in octopuses {
+            *o += 1
+        }
 
         #persist to_flash: Set(Pos);
         for y in 10 do for x in 10 {
@@ -50,7 +52,7 @@ main :: (args) => {
             }
         }
 
-        for flash in iter.as_iter(&to_flash) {
+        for flash in &to_flash {
             for y in -1 .. 2 do for x in -1 .. 2 {
                 if y == 0 && x == 0 do continue;
 
@@ -60,7 +62,7 @@ main :: (args) => {
             }
         }
 
-        for flash in iter.as_iter(&to_flash) {
+        for flash in &to_flash {
             set_octopus(flash.x, flash.y, 0);
             if step <= 100 do flash_count += 1;
         }

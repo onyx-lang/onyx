@@ -527,6 +527,18 @@ __dispose_used_local :: #match -> void {
 }
 
 
+__For_Expansion_Flags :: enum #flags {
+    BY_POINTER  :: 1
+    NO_CLOSE    :: 2
+}
+
+/// All for-loops in Onyx are actually defined as an overload to this procedure.
+/// All overloads are macros that accept 3 arguments: the iteratable, flags, and the body
+/// of the loop. Examples of how to use this overloaded procedure can be found in `operations.onyx`
+/// next to this file.
+__for_expansion :: #match -> void {}
+
+
 /// Defines all options for changing the memory layout, imports and exports,
 /// and more of an Onyx binary.
 Link_Options :: struct {

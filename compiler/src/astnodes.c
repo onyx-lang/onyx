@@ -1948,6 +1948,61 @@ void insert_auto_dispose_call(Context *context, AstLocal *local) {
 }
 
 
+AstCall * create_implicit_for_expansion_call(Context *context, AstFor *fornode) {
+    AstCall *call = onyx_ast_node_new(context->ast_alloc, sizeof(AstCall), Ast_Kind_Call);
+    call->token = fornode->token;
+    call->callee = (AstTyped *) context->builtins.for_expansion;
+    call->next = fornode->next;
+
+    arguments_initialize(context, &call->args);
+
+    //
+    // Create the code block that will represent the body of the for-loop.
+    // This code block is given up to 2 inputs, depending on if the index variable
+    // was set in the for-loop. The implementer of a __for_expansion overload must
+    // always provide 2 values when `#unquote`-ing, as they cannot currently know if
+    // the index variable was asked for.
+    //
+    // Maybe we could pass `void` as the `index_type` if the index variable is not necessary?
+    // I would like to keep the implementations of __for_expansion simple and easy
+    // to read, but sometimes there are extra complications you cannot avoid...
+    //
+    AstCodeBlock *body_code_block = onyx_ast_node_new(context->ast_alloc, sizeof(AstCodeBlock), Ast_Kind_Code_Block);
+    body_code_block->token = fornode->token;
+    body_code_block->type_node = context->builtins.code_type;
+    body_code_block->code = (AstNode *) fornode->stmt;
+    ((AstBlock *) body_code_block->code)->rules = Block_Rule_Code_Block;
+
+    bh_arr_new(context->ast_alloc, body_code_block->binding_symbols, bh_arr_length(fornode->indexing_variables));
+    bh_arr_each(AstLocal *, indexing_variable, fornode->indexing_variables) {
+        CodeBlockBindingSymbol sym;
+        sym.symbol    = (*indexing_variable)->token;
+        sym.type_node = (*indexing_variable)->type_node;
+        bh_arr_push(body_code_block->binding_symbols, sym);
+    }
+
+    i32 flags = 0;
+    if (fornode->by_pointer) flags |= 1; // BY_POINTER
+    if (fornode->no_close)   flags |= 2; // NO_CLOSE
+    
+    AstNumLit *flag_node = make_int_literal(context, flags);
+    flag_node->type_node = context->builtins.for_expansion_flag_type;
+    // flag_node->type = type_build_from_ast(context, context->builtins.for_expansion_flag_type);
+    // assert(flag_node->type);
+
+    // Arguments are: 
+    //    Iterator
+    //    Code block with 2 inputs (value, index)
+    //    Flags
+    bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) fornode->iter));
+    bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) flag_node));
+    bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) body_code_block));
+
+    return call;
+}
+
+
+
 b32 resolve_intrinsic_interface_constraint(Context *context, AstConstraint *constraint) {
     AstInterface *interface = constraint->interface;
     Type* type = type_build_from_ast(context, (AstType *) constraint->args[0]);
