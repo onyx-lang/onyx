@@ -4,21 +4,13 @@
   lib,
 }: let
   fs = lib.fileset;
-  sourceFiles = [
-    ./bin
-    ./build.sh
-    ./compiler
-    ./core
-    ./docs
-    ./examples
-    ./interpreter
-    ./misc
-    ./runtime
-    ./scripts
-    ./settings.sh
-    ./shared
-    ./tests
-  ];
+  sourceFiles =
+    fs.difference
+    ./.
+    (fs.unions [
+      (fs.fileFilter (file: file.hasExt "nix") ./.)
+      (fs.fileFilter (file: file.hasExt "bat") ./.)
+    ]);
 in
   fs.trace sourceFiles
   stdenv.mkDerivation {
