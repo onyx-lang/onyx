@@ -59,7 +59,7 @@ __for_expansion :: macro (_s: [] $T, $flags: __For_Expansion_Flags, $body: Code)
         defer i += 1
 
         v := data[i]
-        #unquote body(v, ~~i) #skip_scope(2)
+        #unquote body(v, i) #skip_scope(2)
     }
 }
 
@@ -74,7 +74,7 @@ __for_expansion :: macro (_s: [] $T, $flags: __For_Expansion_Flags, $body: Code)
         defer i += 1
 
         v := &data[i]
-        #unquote body(v, ~~i) #skip_scope(2)
+        #unquote body(v, i) #skip_scope(2)
     }
 }
 
