@@ -17,12 +17,13 @@
     );
     packages = nixpkgs.lib.genAttrs systems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
+      version = "0.0.1"; # TODO: Where to extract version from?
       suffix =
         if pkgs.stdenv.isLinux
         then "so"
         else if pkgs.stdenv.isDarwin
         then "dylib"
-        else "dll"; # TODO: Is it even possible for Windows?
+        else "dll"; # TODO: Is it even possible for Windows? Use targetPlatform.isWindows?
       shared = pkgs.stdenv.mkDerivation {
         name = "shared";
         src = ./shared;
@@ -54,7 +55,7 @@
           then ["-g3" "-DOVM_VERBOSE=1"]
           else [];
         flags = ["-fno-stack-protector" "-fPIC"] ++ debug-flags ++ verbose-flags;
-        includes = map (i: "-I" + i) ["./include" "${pkgs.stb}/include/stb"];
+        includes = map (i: "-I${i}") ["./include" "${pkgs.stb}/include/stb"];
         # libs = "-pthread"; # TODO: Check if necessary
         FILES = builtins.concatStringsSep " " files;
         FLAGS = builtins.concatStringsSep " " flags;
@@ -107,7 +108,7 @@
           "-fvisibility=hidden"
           "-fPIC"
         ];
-        warning-flags = map (w: "-W" + w) [
+        warning-flags = map (w: "-W${w}") [
           "implicit"
           "misleading-indentation"
           "parentheses"
@@ -140,11 +141,11 @@
           then ["-DUSE_DYNCALL"]
           else [];
         flags = common-flags ++ warning-flags ++ debug-flags ++ runtime-flags ++ ovmwasm-flags ++ dyncall-flags;
-        arch-libs =
+        platform-libs =
           if pkgs.stdenv.isDarwin
           then ["-lffi" "-framework CoreFoundation" "-framework SystemConfiguration"]
           else [];
-        arch-pkgs = builtins.attrValues (
+        platform-pkgs = builtins.attrValues (
           if pkgs.stdenv.isDarwin
           then {
             inherit (pkgs) libffi;
@@ -170,8 +171,8 @@
           if (dyncall && runtime == "ovmwasm")
           then ["-ldyncall_s" "-ldyncallback_s"]
           else [];
-        libs = ["-lpthread" "-ldl" "-lm"] ++ runtime-libs ++ dyncall-libs ++ arch-libs;
-        includes = map (i: "-I" + i) ["./include" "${pkgs.stb}/include/stb"];
+        libs = ["-lpthread" "-ldl" "-lm"] ++ runtime-libs ++ dyncall-libs ++ platform-libs;
+        includes = map (i: "-I${i}") ["./include" "${pkgs.stb}/include/stb"];
         FILES = builtins.concatStringsSep " " files;
         FLAGS = builtins.concatStringsSep " " flags;
         LIBS = builtins.concatStringsSep " " libs;
@@ -180,7 +181,7 @@
         pkgs.stdenv.mkDerivation {
           name = "onyx";
           src = ./compiler;
-          buildInputs = [shared runtime-pkg dyncall-pkg] ++ arch-pkgs;
+          buildInputs = [shared runtime-pkg dyncall-pkg] ++ platform-pkgs;
           buildPhase = ''
             for file in ${FILES}; do
               $CC ${FLAGS} ${INCLUDES} -c $file -o $(basename $file).o
@@ -197,23 +198,23 @@
         };
       build-runtime = {}: let
         flags = ["-fPIC" "-O2" "-Wno-incompatible-pointer-types"];
-        arch-pkgs = builtins.attrValues (
+        platform-pkgs = builtins.attrValues (
           if pkgs.stdenv.isDarwin
           then {inherit (pkgs.darwin.apple_sdk.frameworks) Security;}
           else {}
         );
-        arch-libs =
+        platform-libs =
           if pkgs.stdenv.isDarwin
           then ["-framework Security"]
           else [];
-        libs = ["-lpthread"] ++ arch-libs;
+        libs = ["-lpthread"] ++ platform-libs;
         FLAGS = builtins.concatStringsSep " " flags;
         LIBS = builtins.concatStringsSep " " libs;
       in
         pkgs.stdenv.mkDerivation {
           name = "onyx_runtime";
           src = ./runtime;
-          buildInputs = [shared compiler-types] ++ arch-pkgs;
+          buildInputs = [shared compiler-types] ++ platform-pkgs;
           buildPhase = ''
             $CC -shared ${FLAGS} -o $name.${suffix} ./$name.c ${LIBS}
           '';
@@ -230,7 +231,7 @@
       }: let
         compiler = build-compiler {inherit debug verbose runtime dyncall;};
         runtime-lib = build-runtime {};
-        arch-pkgs = builtins.attrValues (
+        platform-pkgs = builtins.attrValues (
           if pkgs.stdenv.isDarwin
           then {inherit (pkgs.darwin) autoSignDarwinBinariesHook;} # This is used to `codesign`
           else {}
@@ -238,12 +239,12 @@
       in
         pkgs.stdenv.mkDerivation {
           name = "onyx";
-          version = "0.0.1";
+          inherit version;
           src = ./.; # TODO: Just select the needed folders
-          nativeBuildInputs = [pkgs.makeWrapper] ++ arch-pkgs;
+          nativeBuildInputs = [pkgs.makeWrapper] ++ platform-pkgs;
           buildInputs = [compiler runtime-lib shared];
           buildPhase = ''
-            # Install core libs"
+            # Install core libs
             mkdir -p $out/core
             cp -r ./core $out/
             # Install compiler
@@ -293,11 +294,11 @@
       build-compressed = {src}:
         pkgs.stdenv.mkDerivation {
           name = "compressed";
-          version = "0.0.1";
+          inherit version;
           inherit src;
           buildPhase = ''
             mkdir -p $out
-            tar -C ${src} -zcvf $out/$name.tar.gz *
+            tar -C ${src} -zcvf $out/$name-$version.tar.gz *
           '';
         };
     in rec {
