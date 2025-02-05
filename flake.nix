@@ -240,7 +240,16 @@
         pkgs.stdenv.mkDerivation {
           name = "onyx";
           inherit version;
-          src = ./.; # TODO: Just select the needed folders
+          src = pkgs.lib.fileset.toSource {
+            root = ./.;
+            fileset = pkgs.lib.fileset.unions [
+              ./core
+              ./scripts
+              ./examples
+              ./misc
+              ./LICENSE
+            ];
+          };
           nativeBuildInputs = [pkgs.makeWrapper] ++ platform-pkgs;
           buildInputs = [compiler runtime-lib shared];
           buildPhase = ''
