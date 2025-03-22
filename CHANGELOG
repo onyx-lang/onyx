@@ -315,7 +315,7 @@ Removals:
 
 Changes:
 - Complete overhaul of networking in the core library.
-    - Backwards compatiblity was not strictly maintained, but common functions did
+    - Backwards compatibility was not strictly maintained, but common functions did
       not change, like `socket_send` and `socket_recv`.
 - When debugging, `/ 0` or `% 0` will trigger an exception to debug the error.
 
@@ -575,7 +575,7 @@ Additions:
 * Macros and paste-able code blocks
 * overloaded procedures can have polymorphic and overloaded procedures as overloads.  This makes them MUCH more powerful.
 * types are not required on struct members that have default values. This is still very experimental so there are some
-    noticable bugs with it. You can always specify the type explicitly if you have issues.
+    noticeable bugs with it. You can always specify the type explicitly if you have issues.
 * structure definitions act like name spaces and can have top-level expressions defined within them, such as procedures
     or other structures.
 * structures can be "used" to bring in the aforementioned top-level expressions into the current scope.
@@ -672,7 +672,7 @@ Additions:
     processed and token processed.
 * 'abs' function in core/math.onyx.
 * 'read_word' in core.string.reader.
-* Better error reporting for invaild binary operators.
+* Better error reporting for invalid binary operators.
 
 Removals:
 * field accesses on things that are not lvals. This was a bug anyway, so it
@@ -696,7 +696,7 @@ Bug fixes:
 * Bitwise NOT on unsigned integers did not work.
 * 'use' statements now work in polymorphic procedures
 * resizing heap allocated memory at the end of memory would not grow underlying memory.
-* stack position variables introduced from for loops, ifs, whiles, or switchs would produce
+* stack position variables introduced from for loops, ifs, whiles, or switches would produce
     very bad side effects if they were not in a stack based function.
 * array.remove was broken when the semantics of `for: lo .. hi` changed.
 
@@ -711,7 +711,7 @@ Additions:
 * Arbitrarily typed varargs. They behave similar to C-style varargs.
 * vararg_get builtin procedure to retrieve a value from a ... vararg.
 * #local directive for placing a symbol at file scope.
-* a basic implentation of printf in the standard library.
+* a basic implementation of printf in the standard library.
 * use statements at the function level.
 * nested packages, i.e. 'core.array'
     - Still testing it out; could change at in the future
@@ -741,7 +741,7 @@ Bug fixes:
 * #char "\"" did not work.
 * nested function calls returning non-basic types would simply be wrong.
 * Recursive structs are no longer possible.
-* For loop array/slice/dynarray used to use signed indicies, which was wrong.
+* For loop array/slice/dynarray used to use signed indices, which was wrong.
 
 
 
