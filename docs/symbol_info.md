@@ -36,7 +36,7 @@ File contains:
 * Documentation table
     * Long list of bytes
 
-Byte respresentation of the file:
+Byte representation of the file:
     magic bytes:
         O S Y M 0x0 0x0 0x0 0x1
 
@@ -47,7 +47,7 @@ Byte respresentation of the file:
       * docs offset   docs length
 
     file section:
-        file defintions
+        file definitions
             id, name (count and data)
     
     symbol definition table:
