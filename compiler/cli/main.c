@@ -676,7 +676,7 @@ static int32_t output_file_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, const
 }
 
 static int32_t output_files_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, const char *filename) {
-    char filenameTmp[1024];
+    char filenameTmp[1024] = { 0 };
 
     if (!output_file_to_disk(cli_args, ctx, filename, ONYX_OUTPUT_TYPE_WASM)) return 0;
 
