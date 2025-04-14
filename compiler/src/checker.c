@@ -3267,19 +3267,12 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
         ERROR(code_block->token->pos, "Here is the code block being unquoted.");
     }
 
-
-    // HACK when cloning the inner part of a code block, we have to be able to handle
-    // inline functions (lambdas) that are polymorphic or have captures. With either
-    // of these things, we have to clone the functions so any closures/polyvars referenced
-    // in them can be resolved correctly. To do this tho, we have to artificially increase
-    // the clone depth to make the cloner think we are one layer deeper than we actually
-    // are to fall into the code path where we clone the body of the function.
-    context->cloner.clone_depth++;
+    context->cloner.cloning_code_block = 1;
     bh_arr(AstNode *) captured_entities = NULL;
-    bh_arr_new(context->ast_alloc, captured_entities, 2);
+    bh_arr_new(context->gp_alloc, captured_entities, 2);
     AstNode* cloned_block = ast_clone_with_captured_entities(context, code_block->code, &captured_entities);
     cloned_block->next = insert->next;
-    context->cloner.clone_depth--;
+    context->cloner.cloning_code_block = 0;
 
     bh_arr_each(AstNode *, pnode, captured_entities) {
         add_entities_for_node(
@@ -3290,6 +3283,8 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
             context->checker.current_entity->package
         );
     }
+
+    bh_arr_free(captured_entities);
 
     i32 skip_scope_index = get_expression_integer_value(context, insert->skip_scope_index, NULL);
     Scope *scope_for_cloned_block = NULL;

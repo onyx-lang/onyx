@@ -507,6 +507,16 @@ AstNode* ast_clone(Context *context, void* n) {
             AstFunction* df = (AstFunction *) nn;
             AstFunction* sf = (AstFunction *) node;
 
+            // If we cloning a code block, we do not need to clone the
+            // function body unless there are captures, we could be related
+            // to the code block bindings.
+            if (context->cloner.cloning_code_block) {
+                if (!sf->captures) {
+                    context->cloner.clone_depth--;
+                    return node;
+                }
+            }
+
             // Check if we are cloning a function inside of a function.
             if (context->cloner.clone_depth > 1) {
                 // If we are, and the inner function has a scope, this means that

@@ -1956,6 +1956,7 @@ typedef struct CheckerData {
 typedef struct ClonerData {
     u32 clone_depth;
     b32 dont_copy_structs;
+    b32 cloning_code_block; // HACK
 
     bh_arr(AstNode *) captured_entities;
 } ClonerData;
