@@ -676,9 +676,15 @@ static int32_t output_file_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, const
 }
 
 static int32_t output_files_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, const char *filename) {
+    char filenameTmp[1024];
+
     if (!output_file_to_disk(cli_args, ctx, filename, ONYX_OUTPUT_TYPE_WASM)) return 0;
-    if (!output_file_to_disk(cli_args, ctx, bh_bprintf("%s.js", filename), ONYX_OUTPUT_TYPE_JS)) return 0;
-    if (!output_file_to_disk(cli_args, ctx, bh_bprintf("%s.odoc", filename), ONYX_OUTPUT_TYPE_ODOC)) return 0;
+
+    bh_snprintf(filenameTmp, 1023, "%s.js", filename);
+    if (!output_file_to_disk(cli_args, ctx, filenameTmp, ONYX_OUTPUT_TYPE_JS)) return 0;
+
+    bh_snprintf(filenameTmp, 1023, "%s.odoc", filename);
+    if (!output_file_to_disk(cli_args, ctx, filenameTmp, ONYX_OUTPUT_TYPE_ODOC)) return 0;
 
     if (cli_args->symbol_info_file) {
         if (!output_file_to_disk(cli_args, ctx, cli_args->symbol_info_file, ONYX_OUTPUT_TYPE_OSYM)) return 0;
