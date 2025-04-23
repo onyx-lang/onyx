@@ -1,7 +1,43 @@
+//
+// HACK
+//
+// Currently, in stb_ds.h there is no way to choose the allocator
+// for arrays, and in turn hashmaps. You can provide your own
+// REALLOC and FREE macros, but the context pointer they are given
+// is always NULL. In order to allocate and free from the global
+// heap allocator, there needs to be a *global* pointer to it.
+// This is a problem for the compiler as it is meant to be a DLL,
+// so there should not be any global state in it.
+//
+// The tradeoff here is either:
+//
+//  1. The compiler is no longer thread-safe and only one compilation should
+//     be done per process at any given time.
+//
+//  2. The compiler leaks memory after every compilation. (around 400K for
+//     a hello world program).
+//
+// With those two options, I'm choosing the former. Most uses of the compiler
+// should not be multi-threaded in that way (at least I don't think so... time
+// may prove me wrong)
+//
+static void * HACK_global_heap_allocator = (void *) 0;
+
+#define STBDS_REALLOC(c, p, s) \
+    (HACK_global_heap_allocator) ? \
+        (bh_resize(*(bh_allocator *) HACK_global_heap_allocator, p, s)) : \
+        (realloc(p, s))
+
+#define STBDS_FREE(c, p) \
+    (HACK_global_heap_allocator) ? \
+        (bh_free(*(bh_allocator *) HACK_global_heap_allocator, p)) : \
+        (free(p))
+
 #define BH_DEFINE
 #define BH_NO_TABLE
 #define STB_DS_IMPLEMENTATION
 #include "bh.h"
+
 
 #include "lex.h"
 #include "errors.h"
@@ -83,6 +119,13 @@ onyx_context_t *onyx_context_create() {
     bh_managed_heap_init(&context->heap);
     context->gp_alloc = bh_managed_heap_allocator(&context->heap);
 
+    if (HACK_global_heap_allocator) {
+        printf("[WARNING] The Onyx compiler is being used by multiple threads at once. This is currently not supported and may result in catastrophic errors.\n");
+
+    } else {
+        HACK_global_heap_allocator = (void *) &context->gp_alloc;
+    }
+
     context->token_alloc = context->gp_alloc;
 
     // NOTE: Create the arena where tokens and AST nodes will exist
@@ -134,8 +177,11 @@ void onyx_context_free(onyx_context_t *ctx) {
     bh_scratch_free(&context->scratch);
     bh_managed_heap_free(&context->heap);
 
+    bh_arr_free(context->options->mapped_folders);
     free(context->options);
     free(ctx);
+
+    HACK_global_heap_allocator = NULL;
 }
 
 void onyx_options_ready(onyx_context_t *ctx) {
