@@ -177,7 +177,7 @@ void entity_heap_add_job(EntityHeap *entities, TypeMatch (*func)(Context *, void
     job->func = func;
     job->job_data = job_data;
     
-    Entity ent;
+    Entity ent = {0};
     ent.type = Entity_Type_Job;
     ent.state = Entity_State_Check_Types;
     ent.job_data = job;

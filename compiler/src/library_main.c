@@ -134,6 +134,7 @@ void onyx_context_free(onyx_context_t *ctx) {
     bh_scratch_free(&context->scratch);
     bh_managed_heap_free(&context->heap);
 
+    free(context->options);
     free(ctx);
 }
 
