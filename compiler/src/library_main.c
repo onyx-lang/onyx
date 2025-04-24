@@ -548,7 +548,7 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
                 } else if (context->cycle_almost_detected == 3) {
                     send_stalled_hooks(context);
                 } else if (context->cycle_almost_detected == 2) {
-                    compiler_event_add(context, 4);
+                    compiler_event_add(context, ONYX_EVENT_ALL_TYPES_CHECKED);
                 }
 
                 context->cycle_almost_detected += 1;

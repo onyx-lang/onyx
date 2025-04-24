@@ -263,11 +263,10 @@ b32 compiler_extension_negotiate_capabilities(Context *context, CompilerExtensio
     }
 
     {
-        CompilerEvent *e = compiler_event_add(context, 1);
-        compiler_event_add_field_str(context, e, "message",
-            bh_aprintf(context->scratch_alloc, "Extension '%s' spawned with protocol version %d.",
-                ext->name, extension_protocol_version
-            )
+        compiler_event_log(
+            context,
+            "Extension '%s' spawned with protocol version %d.",
+            ext->name, extension_protocol_version
         );
     }
     

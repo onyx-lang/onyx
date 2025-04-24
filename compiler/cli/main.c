@@ -938,9 +938,6 @@ int main(int argc, char *argv[]) {
             case ONYX_EVENT_ALL_TYPES_CHECKED:
                 break;
 
-            case ONYX_EVENT_PHASE_START:
-                break;
-
             case ONYX_EVENT_SYMBOL_DEFINED:
                 // bh_printf("DEFINED SYMBOL AT %s:%d,%d\n",
                 //     onyx_event_field_str(ctx, i, "filename"),

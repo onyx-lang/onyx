@@ -138,7 +138,7 @@ make_ipv4_address :: (out: &SocketAddress, addr: str, port: u16) {
 make_unix_address :: (out: &SocketAddress, path: str) {
     *out = .{ Unix = .{} };
 
-    out_path := cast([&] u8) out + alignof out.tag_enum;
+    out_path := cast([&] u8) out + alignof typeof *out;
     offset   := 0;
     while offset < math.min(path.count, UNIX_SOCKET_PATH_LEN - 1) {
         defer offset += 1;

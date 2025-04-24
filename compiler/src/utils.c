@@ -6,6 +6,7 @@
 #include "astnodes.h"
 #include "errors.h"
 #include "doc.h"
+#include "onyx.h"
 
 //
 // Program info and packages
@@ -1815,3 +1816,15 @@ void compiler_event_add_field_int(Context *context, CompilerEvent *event, char *
     event->first_field = new_field;
 }
 
+void compiler_event_log(Context *context, char *fmt, ...) {
+    va_list va;
+    va_start(va, fmt);
+
+    char buf[1024] = {0};
+    bh_snprintf_va(buf, 1023, (const char *) fmt, va);
+
+    CompilerEvent *e = compiler_event_add(context, ONYX_EVENT_LOG);
+    compiler_event_add_field_str(context, e, "message", buf);
+
+    va_end(va);
+}

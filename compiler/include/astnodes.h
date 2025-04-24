@@ -2429,6 +2429,7 @@ void compiler_events_clear(Context *context);
 CompilerEvent *compiler_event_add(Context *context, u32 event_type);
 void compiler_event_add_field_str(Context *context, CompilerEvent *event, char *field, char *value);
 void compiler_event_add_field_int(Context *context, CompilerEvent *event, char *field, i32 value);
+void compiler_event_log(Context *context, char *fmt, ...);
 
 
 // NOTE: Useful inlined functions
