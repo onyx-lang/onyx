@@ -1,0 +1,49 @@
+package protobuf.onyx.compiler_events
+
+use core.encoding.protobuf
+use protobuf { __ROOT_PROTOBUF_PACKAGE :: package }
+
+@protobuf.Message
+CompilerEvents :: struct {
+    @protobuf.Field.{1, 11}
+    event: [..] __ROOT_PROTOBUF_PACKAGE.onyx.compiler_events.CompilerEvent
+}
+
+@protobuf.Message
+CompilerEvent :: struct {
+    @protobuf.Field.{1, 4}
+    timestamp: ? u64
+    @protobuf.Field.{10, 11}
+    start: ? __ROOT_PROTOBUF_PACKAGE.onyx.compiler_events.EventStart
+    @protobuf.Field.{11, 11}
+    file: ? __ROOT_PROTOBUF_PACKAGE.onyx.compiler_events.EventFile
+    @protobuf.Field.{12, 11}
+    pack: ? __ROOT_PROTOBUF_PACKAGE.onyx.compiler_events.EventPackage
+}
+
+@protobuf.Message
+EventStart :: struct {
+    @protobuf.Field.{1, 9}
+    compiler_version: str
+}
+
+@protobuf.Message
+EventFile :: struct {
+    @protobuf.Field.{1, 13}
+    id: u32
+    @protobuf.Field.{2, 9}
+    path: str
+}
+
+@protobuf.Message
+EventPackage :: struct {
+    @protobuf.Field.{1, 13}
+    id: u32
+    @protobuf.Field.{2, 9}
+    package_name: str
+    @protobuf.Field.{3, 9}
+    fully_qualified_name: str
+    @protobuf.Field.{4, 13}
+    parent_package_id: u32
+}
+

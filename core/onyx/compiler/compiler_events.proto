@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package onyx.compiler_events;
+
+//
+// Data that should be available via this interface:
+//
+// - Files
+//     - File Id, file path
+// - Packages
+//     - Package name, parent package
+// - Scopes
+//     - Scope id, parent scope id, scope location, scope name?
+// - Symbol declared in scope
+//     - Symbol id, symbol text, symbol file id, symbol line, symbol column
+// - Symbol resolved
+//     - Span of source, resolved to id
+// - Binding 
+// - Types created
+
+
+
+message CompilerEvents {
+  repeated CompilerEvent events = 1;
+}
+
+message CompilerEvent {
+  optional uint64 timestamp = 1;
+  oneof data {
+    EventStart start = 10;
+    EventFile file = 11;
+    EventPackage pack = 12;
+  }
+}
+
+message EventStart {
+  string compiler_version = 1;
+}
+
+message EventFile {
+  uint32 id = 1;
+
+  // Full path to the loaded file
+  string path = 2;
+}
+
+message EventPackage {
+  uint32 id = 1;
+  string package_name = 2;
+  string fully_qualified_name = 3;
+  uint32 parent_package_id = 4;
+}
+
