@@ -13,8 +13,8 @@ use runtime {
 #load "./env"
 #load "./net"
 
-#load "core:onyx/cptr"
-#load "core:onyx/cbindgen"
+#load "core:interop/native/cptr"
+#load "core:interop/native/cbindgen"
 // #load "core:onyx/fault_handling"
 
 // Platform supports

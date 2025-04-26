@@ -9,6 +9,10 @@ use runtime {
 
 use main
 
+#load "core:interop/js/value"
+#load "core:interop/js/func"
+#load "core:interop/js/foreign"
+
 // Platform supports
 Supports_Time :: true
 Supports_Futexes :: true

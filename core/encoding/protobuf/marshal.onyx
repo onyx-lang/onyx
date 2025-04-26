@@ -1,0 +1,166 @@
+package core.encoding.protobuf
+#allow_stale_code
+
+use core {Result, tprintf}
+use core.array {Untyped_Array}
+use core.memory
+use core.misc
+
+Marshal_Error :: union {
+    Err: str
+    Unknown_Type: type_expr
+}
+
+marshal :: #match #local {}
+
+#overload
+marshal :: (input: $T) -> Result(str, Marshal_Error) {
+    v := input
+    dest := make(dyn_str)
+    encode_message(&v, T, &dest)?
+    return .{ Ok = dest }
+}
+
+#overload
+marshal :: (input: $T, dest: &dyn_str) -> Result(bool, Marshal_Error) {
+    v := input
+    return encode_message(&v, T, dest)
+}
+
+#package {
+    encode_message :: (val: rawptr, type: type_expr, dest: &dyn_str) -> Result(bool, Marshal_Error) {
+        msg_desc := lookup_protobuf_descriptor(type)
+            |> .into_result(Marshal_Error.{ Unknown_Type = type })
+            |> .forward_err()
+
+        for& field_desc in msg_desc.fields {
+            field_pointer       := memory.ptr_add(val, field_desc.field_offset)
+            field_encoding_type := get_encoding_type(field_desc)
+            field_wire_number   := build_field_number(field_desc.proto_field_number, field_encoding_type)
+
+            if field_desc.is_optional {
+                if *cast(& u8) field_pointer == 1 {
+                    encode_varint(field_wire_number, dest)
+
+                    element_pointer := memory.ptr_add(field_pointer, ~~ field_desc.optional_offset)
+                    encode_value(element_pointer, field_desc, dest)?
+                    continue
+                }
+            }
+
+            elseif field_desc.is_repeated {
+                arr := cast(&Untyped_Array) field_pointer
+
+                // TODO: Support packed encoding
+                for index in arr.count {
+                    element_pointer := memory.ptr_add(arr.data, field_desc.field_size * index)
+
+                    encode_varint(field_wire_number, dest)
+                    encode_value(element_pointer, field_desc, dest)?
+                }
+            }
+
+            else {
+                encode_varint(field_wire_number, dest)
+                encode_value(field_pointer, field_desc, dest)?
+            }
+        }
+
+        return .{ Ok = true }
+    }
+
+    encode_value :: (element_pointer: rawptr, desc: &Proto_Field_Descriptor, dest: &dyn_str) -> Result(bool, Marshal_Error) {
+        switch desc.proto_field_type {
+            case .STRING, .BYTES {
+                s := *cast(& str) element_pointer
+                encode_varint(~~ s.length, dest)
+                dest->append(s)
+            }
+
+            case .MESSAGE {
+                use tmp_buf := make(dyn_str, 16)
+                encode_message(element_pointer, desc.field_type, &tmp_buf)?
+                encode_varint(~~ tmp_buf.length, dest)
+                dest->append(tmp_buf)
+            }
+            
+            case .FIXED32, .SFIXED32, .FLOAT {
+                dest->append(.{element_pointer, 4})
+            }
+
+            case .FIXED64, .SFIXED64, .DOUBLE {
+                dest->append(.{element_pointer, 8})
+            }
+
+            case .SINT32 {
+                int_value  := *cast(& i32) element_pointer
+                uint_value := (int_value << 1) ^ (int_value >>> 31)
+                encode_varint(~~ uint_value, dest)
+            }
+
+            case .SINT64 {
+                int_value  := *cast(& i64) element_pointer
+                uint_value := (int_value << 1) ^ (int_value >>> 63)
+                encode_varint(uint_value, dest)
+            }
+
+            case .BOOL {
+                encode_varint(~~ *cast(& bool) element_pointer, dest)
+            }
+
+            case .ENUM {
+                encode_varint(~~ *cast(& u32) element_pointer, dest)
+            }
+
+            case .INT32, .UINT32 {
+                encode_varint(~~ *cast(& u32) element_pointer, dest)
+            }
+
+            case .INT64, .UINT64 {
+                encode_varint(*cast(& u64) element_pointer, dest)
+            }
+        }
+
+        return .{ Ok = true }
+    }
+
+    encode_varint :: (val: u64, dest: &dyn_str) {
+        v := val
+        while v != 0 {
+            t := v & 0x7f
+            if v >= 0x80 {
+                t |= 0x80
+            }
+
+            dest->push(~~ t)
+            v >>= 7
+        }
+    }
+
+    build_field_number :: (field_num: i32, enc: _Encoding_Type) -> u64 {
+        return (cast(u64) field_num << 3) | ~~ enc
+    }
+
+    get_encoding_type :: (field_desc: &Proto_Field_Descriptor) -> _Encoding_Type {
+        return switch field_desc.proto_field_type {
+            case .DOUBLE => .I64
+            case .FLOAT => .I32
+            case .INT64 => .Varint
+            case .UINT64 => .Varint
+            case .INT32 => .Varint
+            case .FIXED64 => .I64
+            case .FIXED32 => .I32
+            case .BOOL => .Varint
+            case .STRING => .LEN
+            case .GROUP => .Varint
+            case .MESSAGE => .LEN
+            case .BYTES => .LEN
+            case .UINT32 => .Varint
+            case .ENUM => .Varint
+            case .SFIXED32 => .I32
+            case .SFIXED64 => .I64
+            case .SINT32 => .Varint
+            case .SINT64 => .Varint
+        }
+    }
+}

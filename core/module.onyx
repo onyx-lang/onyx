@@ -70,6 +70,7 @@ use runtime
 #load "./encoding/osad"
 #load_all "./encoding/json"
 #load_all "./encoding/xml"
+#load_all "./encoding/protobuf"
 #load "./encoding/kdl/kdl"
 
 #load "./runtime/common"
@@ -143,9 +144,5 @@ use runtime
 }
 
 #if runtime.runtime == .Js {
-    #load "./js/value"
-    #load "./js/func"
-    #load "./js/foreign"
-
     #load "./runtime/platform/js/platform"
 }

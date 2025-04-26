@@ -1,0 +1,69 @@
+package core.encoding.protobuf
+#allow_stale_code
+
+use core {Result, tprintf}
+use core.memory
+use core.misc
+use runtime.info
+
+#package {
+    registered_proto_types: Map(type_expr, Proto_Message_Descriptor)
+}
+
+proto_types_preloaded :: #init () {
+    registered_proto_types->init()
+}
+
+lookup_protobuf_descriptor :: (type: type_expr) -> ? Proto_Message_Descriptor {
+    if desc := Map.get(&registered_proto_types, type); desc {
+        return desc
+    }
+
+    struct_info := info.get_type_info(type)->as_struct()
+
+    if struct_info.kind != .Struct || !Slice.some(struct_info.tags, [x](x.type == type_expr && *cast(&type_expr, x.data) == Message)) {
+        return .None
+    }
+
+    fields := make([] Proto_Field_Descriptor, struct_info.members.length)
+    for member, index in struct_info.members {
+        fields[index].field_offset = member.offset
+
+        type_info := member.type->info()
+        switch type_info.kind {
+            case .Basic {
+                fields[index].field_size = type_info.size
+                fields[index].field_type = member.type
+            }
+
+            case .Dynamic_Array {
+                fields[index].field_type = type_info->as_dynamic_array().of
+                fields[index].field_size = fields[index].field_type->info().size
+                fields[index].is_repeated = true
+            }
+
+            case .Union {
+                if type_info->as_union().constructed_from == Optional {
+                    fields[index].field_type = type_info->as_union().variants[1].type
+                    fields[index].field_size = fields[index].field_type->info().size
+                    fields[index].is_optional = true
+                    fields[index].optional_offset = ~~ type_info.alignment
+                }
+            }
+        }
+
+        member.tags
+            |> .find_opt([x](x.type == Field))
+            |> .transform(x => *misc.any_as(x, Field))
+            |> .with([fi] {
+                fields[index].proto_field_type   = ~~ fi.protobuf_type 
+                fields[index].proto_field_number = fi.number
+            })
+    }
+
+    registered_proto_types->put(type, .{ fields })
+
+    return registered_proto_types->get(type)
+}
+
+

@@ -1,0 +1,64 @@
+package core.encoding.protobuf
+#allow_stale_code
+
+//
+// Descriptor types
+//
+
+Proto_Message_Descriptor :: struct {
+    fields: [] Proto_Field_Descriptor
+}
+
+Proto_Field_Descriptor :: struct {
+    is_optional:        bool
+    is_repeated:        bool
+    optional_offset:    u16
+
+    field_offset:       i32
+    field_size:         i32
+    field_type:         type_expr
+
+    proto_field_type:   _Field_Type
+    proto_field_number: i32
+}
+
+
+//
+// Tag Types
+//
+
+Message :: #distinct void
+Field   :: struct { number: i32; protobuf_type: u32 }
+
+
+#package
+_Encoding_Type :: enum {
+    Varint :: 0
+    I64    :: 1
+    LEN    :: 2
+    SGROUP :: 3
+    EGROUP :: 4
+    I32    :: 5
+}
+
+#package
+_Field_Type :: enum {
+    DOUBLE :: 1
+    FLOAT :: 2
+    INT64 :: 3
+    UINT64 :: 4
+    INT32 :: 5
+    FIXED64 :: 6
+    FIXED32 :: 7
+    BOOL :: 8
+    STRING :: 9
+    GROUP :: 10
+    MESSAGE :: 11
+    BYTES :: 12
+    UINT32 :: 13
+    ENUM :: 14
+    SFIXED32 :: 15
+    SFIXED64 :: 16
+    SINT32 :: 17
+    SINT64 :: 18
+}

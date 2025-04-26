@@ -1,0 +1,235 @@
+package core.encoding.protobuf
+#allow_stale_code
+
+use core {Result, tprintf}
+use core.memory
+use core.misc
+
+Unmarshal_Error :: union {
+    Err: str
+    EOF: void
+    Unexpected_EOF: void
+    Unknown_Type: type_expr
+    Unknown_Field: struct {
+        name: str
+        field: i32
+    }
+}
+
+unmarshal :: (input: [] u8, $type: type_expr, allocator := context.allocator) -> Result(type, Unmarshal_Error) {
+    val: type
+
+    #context_scope {
+        ccontext.allocator = allocator
+        parse_message(input, &val, type)?
+    }
+
+    return .{ Ok = ~~ val }
+}
+
+
+#local {
+
+_Field_Header :: struct {
+    proto_number: i32
+    encoding_type: _Encoding_Type
+}
+
+_Field_Value :: union {
+    number: u64
+    bytes: [] u8
+}
+
+
+parse_message :: (input: [] u8, out: rawptr, type: type_expr) -> Result(bool, Unmarshal_Error) {
+    data := input
+    msg_desc := lookup_protobuf_descriptor(type)
+        |> .into_result(Unmarshal_Error.{ Unknown_Type = type })
+        |> .forward_err()
+
+    while data {
+        field_header := parse_field_header(&data)?
+        if field_header.encoding_type == .SGROUP || field_header.encoding_type == .EGROUP {
+            continue
+        }
+
+        field_value   := parse_field_value(&data, field_header.encoding_type)?
+        field_desc    := Slice.find_opt(msg_desc.fields, [x](x.proto_field_number == field_header.proto_number)) |> or_continue
+        field_pointer := memory.ptr_add(out, field_desc.field_offset)
+
+        if field_desc.is_optional {
+            // Set the tag to be Some
+            *cast(& u8) field_pointer = 1
+            field_pointer = memory.ptr_add(field_pointer, ~~ field_desc.optional_offset)
+        }
+
+        if field_desc.is_repeated {
+            field_pointer = Array.untyped_alloc_one(~~ field_pointer, field_desc.field_type)
+        }
+
+        store_value(field_pointer, &field_desc, field_value)?
+    }
+
+    return .{ Ok = true }
+}
+
+parse_field_header :: (data: &[] u8) -> Result(_Field_Header, Unmarshal_Error) {
+    if data.length == 0 do return .{ Err = .EOF }
+
+    b := parse_varint(data)?
+    header := _Field_Header.{ ~~(b >> 3), ~~(b & 7) }
+
+    return .{ Ok = header }
+}
+
+parse_field_value :: (data: &[] u8, enc: _Encoding_Type) -> Result(_Field_Value, Unmarshal_Error) {
+    switch enc {
+        case .Varint {
+            v := parse_varint(data)?
+            return .{ Ok = .{ number = v } }
+        }
+
+        case .I64 {
+            if data.length < 8 do return .{ Err = .Unexpected_EOF }
+
+            v: &u64 = ~~ data.data
+            str.advance(data, 8)
+
+            return .{ Ok = .{ number = *v } }
+        }
+
+        case .I32 {
+            if data.length < 4 do return .{ Err = .Unexpected_EOF }
+
+            v: &u32 = ~~ data.data
+            str.advance(data, 4)
+
+            return .{ Ok = .{ number = ~~ *v } }
+        }
+
+        case .LEN {
+            length := cast(u32) parse_varint(data)?
+            if data.length < length do return .{ Err = .Unexpected_EOF }
+
+            result := data.data[0 .. length]
+            str.advance(data, length)
+
+            return .{ Ok = .{ bytes = result } }
+        }
+    }
+}
+
+parse_varint :: (data: &[] u8) -> Result(u64, Unmarshal_Error) {
+    out, shift: u64
+    while true {
+        if data.length == 0 do return .{ Err = .Unexpected_EOF }
+
+        b := data.data[0]
+        str.advance(data)
+
+        out |= ~~(0x7f & b) << shift
+        shift += 7
+        
+        if b & 0x80 == 0 {
+            break
+        }
+    }
+
+    return .{ Ok = out }
+}
+
+store_value :: (out: rawptr, desc: &Proto_Field_Descriptor, value: _Field_Value) -> Result(bool, Unmarshal_Error) {
+    switch desc.proto_field_type {
+        // Some fun type punning here
+        case .DOUBLE, .INT64, .UINT64, .FIXED64, .SFIXED64 {
+            if value.bytes do return .{ Ok = true }
+
+            *cast(& u64) out = value.number!
+        }
+        case .FLOAT,  .INT32, .UINT32, .FIXED32, .SFIXED32 {
+            if value.bytes do return .{ Ok = true }
+
+            *cast(& u32) out = ~~ value.number!
+        }
+
+        case .SINT32 {
+            if value.bytes do return .{ Ok = true }
+
+            v := value.number!
+            *cast(& i32) out = do {
+                if v & 1 == 0 do return cast(i32) (v >> 1)
+                
+                return -cast(i32) (v >> 1) - 1
+            }
+        }
+
+        case .SINT64 {
+            if value.bytes do return .{ Ok = true }
+
+            v := value.number!
+            *cast(& i64) out = do {
+                if v & 1 == 0 do return cast(i64) (v >> 1)
+                
+                return -cast(i64) (v >> 1) - 1
+            }
+        }
+
+        case .BOOL {
+            if value.bytes do return .{ Ok = true }
+
+            *cast(& bool) out = value.number! != 0
+        }
+        case .ENUM {
+            if value.bytes do return .{ Ok = true }
+
+            *cast(& u32)  out = ~~ value.number!
+        }
+
+        case .STRING, .BYTES {
+            *cast(& str) out = str.copy(value.bytes->expect("str should be encoded in len"))
+        }
+
+        case .MESSAGE {
+            parse_message(value.bytes!, out, desc.field_type)?
+        }
+    }
+
+    return .{ Ok = true }
+}
+
+
+
+use core.array { Untyped_Array }
+
+Array.untyped_alloc_one :: (arr: &Untyped_Array, type: type_expr) -> rawptr {
+    element_size := type->info().size
+
+    if arr.count >= arr.capacity {
+        if arr.capacity == 0 {
+            arr.capacity = 4
+            arr.allocator = context.allocator
+        } else {
+            arr.capacity <<= 1
+        }
+
+        new_data := raw_resize(arr.allocator, arr.data, element_size * arr.capacity)
+        if new_data == null do return null
+        arr.data = new_data
+
+        memory.set(memory.ptr_add(arr.data, element_size * arr.count), 0, element_size * (arr.capacity - arr.count))
+    }
+
+    defer arr.count += 1
+    return memory.ptr_add(arr.data, element_size * arr.count)
+}
+
+
+or_continue :: macro (x: ? $T) -> T {
+    switch x {
+        case .Some as v do return v
+        case .None do continue
+    }
+}
+
+}
+
