@@ -2155,6 +2155,13 @@ struct CompilerStats {
     u64 microseconds_per_type[Entity_Type_Count];
 };
 
+typedef struct InjectedCodeDesc InjectedCodeDesc;
+struct InjectedCodeDesc {
+    OnyxFilePos pos;
+    char *code;
+    u32 code_length;
+};
+
 typedef struct SpecialGlobalEntities SpecialGlobalEntities;
 struct SpecialGlobalEntities {
     u32 remaining;
@@ -2218,6 +2225,7 @@ struct Context {
     bh_buffer generated_js_buffer;
     bh_buffer generated_odoc_buffer;
     bh_buffer generated_osym_buffer;
+    bh_buffer generated_injected_code_buffer;
 
     struct SymbolInfoTable *symbol_info;
     struct OnyxDocInfo     *doc_info;
@@ -2245,9 +2253,6 @@ struct Context {
     AstTyped node_that_signals_a_yield;
     AstTyped node_that_signals_failure;
 
-    // Currently, this only needs to exist so all the scope's symbol array can be freed later.
-    bh_arr(Scope *) scopes;
-
     EventSystem events;
 
     OnyxErrors errors;
@@ -2259,6 +2264,8 @@ struct Context {
     u32 next_entity_id;
 
     CompilerStats stats;
+
+    bh_arr(InjectedCodeDesc) injected_code_descriptors;
 
     // HACK
     SpecialGlobalEntities special_global_entities;

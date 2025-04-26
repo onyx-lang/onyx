@@ -109,7 +109,6 @@ void package_mark_as_used(Context *context, Package* package) {
 
 Scope* scope_create(Context *context, Scope* parent, OnyxFilePos created_at) {
     Scope* scope = bh_alloc_item(context->ast_alloc, Scope);
-    bh_arr_push(context->scopes, scope);
 
     scope->id = ++context->next_scope_id;
     scope->parent = parent;

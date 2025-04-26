@@ -65,10 +65,11 @@ typedef enum onyx_error_t {
 } onyx_error_t;
 
 typedef enum onyx_output_type_t {
-    ONYX_OUTPUT_TYPE_WASM = 0,
-    ONYX_OUTPUT_TYPE_JS   = 1,
-    ONYX_OUTPUT_TYPE_ODOC = 2,
-    ONYX_OUTPUT_TYPE_OSYM = 3,
+    ONYX_OUTPUT_TYPE_WASM          = 0,
+    ONYX_OUTPUT_TYPE_JS            = 1,
+    ONYX_OUTPUT_TYPE_ODOC          = 2,
+    ONYX_OUTPUT_TYPE_OSYM          = 3,
+    ONYX_OUTPUT_TYPE_INJECTED_CODE = 4,
 } onyx_output_type_t;
 
 typedef enum onyx_stat_t {

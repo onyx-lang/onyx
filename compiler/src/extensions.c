@@ -281,6 +281,12 @@ b32 compiler_extension_negotiate_capabilities(Context *context, CompilerExtensio
 
 
 static AstNode * parse_code(Context *context, ProceduralMacroExpansionKind kind, char *code, i32 code_length, Entity *entity, OnyxFilePos pos) {
+    bh_arr_push(context->injected_code_descriptors, ((InjectedCodeDesc) {
+        .pos = pos,
+        .code = code,
+        .code_length = code_length
+    }));
+
     bh_file_contents file_contents;
     file_contents.allocator = context->ast_alloc;
     file_contents.data = code;

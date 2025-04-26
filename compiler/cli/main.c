@@ -86,6 +86,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     "\n"
     C_LBLUE "    --doc                       " C_NORM "Generate a .odoc file, Onyx's documentation format used by " C_YELLOW "onyx-doc-gen\n"
     C_LBLUE "    --lspinfo " C_GREY "target_file       " C_NORM "Generate an LSP information file\n"
+    C_LBLUE "    --save-injected " C_GREY "target_file " C_NORM "Saves injected code to a file for debugging\n"
     "\n"
     C_LBLUE "    -V, --verbose               " C_NORM "Verbose output\n"
     C_LBLUE "    --no-colors                 " C_NORM "Disables colors in the error message\n"
@@ -143,6 +144,7 @@ typedef struct CLIArgs {
     const char* target_file;
     const char* symbol_info_file;
     const char* help_subcommand;
+    const char* injected_code_file;
 
     char *error_format;
     char *debug_socket;
@@ -455,6 +457,9 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
             onyx_set_option_int(ctx, ONYX_OPTION_GENERATE_LSP_INFO, 1);
             cli_args->symbol_info_file = argv[++i];
         }
+        else if (!strcmp(argv[i], "--save-injected")) {
+            cli_args->injected_code_file = argv[++i];
+        }
         else if (!strcmp(argv[i], "--debug")) {
             cli_args->debug_session = 1;
             onyx_set_option_int(ctx, ONYX_OPTION_GENERATE_DEBUG_INFO, 1);
@@ -688,6 +693,10 @@ static int32_t output_files_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, cons
 
     if (cli_args->symbol_info_file) {
         if (!output_file_to_disk(cli_args, ctx, cli_args->symbol_info_file, ONYX_OUTPUT_TYPE_OSYM)) return 0;
+    }
+
+    if (cli_args->injected_code_file) {
+        if (!output_file_to_disk(cli_args, ctx, cli_args->injected_code_file, ONYX_OUTPUT_TYPE_INJECTED_CODE)) return 0;
     }
 
     return 1;

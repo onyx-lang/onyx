@@ -151,7 +151,6 @@ onyx_context_t *onyx_context_create() {
     context->global_scope = scope_create(context, NULL, internal_location);
 
     sh_new_arena(context->packages);
-    bh_arr_new(context->gp_alloc, context->scopes, 128);
 
     onyx_errors_init(context, &context->loaded_files);
 
@@ -166,10 +165,6 @@ onyx_context_t *onyx_context_create() {
 void onyx_context_free(onyx_context_t *ctx) {
 	Context *context = &ctx->context;
 
-    bh_arr_each(Scope *, pscope, context->scopes) {
-        shfree((*pscope)->symbols);
-    }
-
     bh_arr_each(CompilerExtension, ext, context->extensions) {
         compiler_extension_terminate(context, ext->id);
     }
@@ -177,7 +172,6 @@ void onyx_context_free(onyx_context_t *ctx) {
     onyx_wasm_module_free(context->wasm_module);
     bh_arena_free(&context->ast_arena);
     bh_arr_free(context->loaded_files);
-    bh_arr_free(context->scopes);
     bh_scratch_free(&context->scratch);
     bh_managed_heap_free(&context->heap);
 
@@ -828,6 +822,29 @@ static void ensure_osym_has_been_generated(onyx_context_t *ctx) {
     }
 }
 
+static void ensure_injected_code_has_been_generated(onyx_context_t *ctx) {
+    if (ctx->context.generated_injected_code_buffer.data == NULL) {
+        bh_buffer *buff = &ctx->context.generated_injected_code_buffer;
+        bh_buffer_init(buff, ctx->context.gp_alloc, 16 * 1024);
+
+        bh_buffer_write_string(buff, "//\n// THIS FILE WAS AUTOMATICALLY GENERATED FROM THE ONYX COMPILER.\n// DO NOT MODIFY AS IT WILL BE REGENERATED ON NEXT COMPILATION\n//\n\n");
+
+        char tmp_buf[1024];
+        bh_arr_each(InjectedCodeDesc, desc, ctx->context.injected_code_descriptors) {
+            i32 len = bh_snprintf(tmp_buf, 1023, "// Generated from %s:%d:%d\n",
+                desc->pos.filename,
+                desc->pos.line,
+                desc->pos.column);
+            tmp_buf[len - 1] = 0;
+
+            bh_buffer_write_string(buff, tmp_buf);
+            bh_buffer_append(buff, desc->code, desc->code_length);
+
+            bh_buffer_write_string(buff, "\n\n");
+        }
+    }
+}
+
 int32_t onyx_output_length(onyx_context_t *ctx, onyx_output_type_t type) {
     switch (type) {
     case ONYX_OUTPUT_TYPE_WASM:
@@ -845,6 +862,10 @@ int32_t onyx_output_length(onyx_context_t *ctx, onyx_output_type_t type) {
     case ONYX_OUTPUT_TYPE_OSYM:
         ensure_osym_has_been_generated(ctx);
         return ctx->context.generated_osym_buffer.length;
+
+    case ONYX_OUTPUT_TYPE_INJECTED_CODE:
+        ensure_injected_code_has_been_generated(ctx);
+        return ctx->context.generated_injected_code_buffer.length;
     }
 
     return 0;
@@ -870,6 +891,11 @@ void onyx_output_write(onyx_context_t *ctx, onyx_output_type_t type, void *buffe
     case ONYX_OUTPUT_TYPE_OSYM:
         ensure_osym_has_been_generated(ctx);
         memcpy(buffer, ctx->context.generated_osym_buffer.data, ctx->context.generated_osym_buffer.length);
+        break;
+
+    case ONYX_OUTPUT_TYPE_INJECTED_CODE:
+        ensure_injected_code_has_been_generated(ctx);
+        memcpy(buffer, ctx->context.generated_injected_code_buffer.data, ctx->context.generated_injected_code_buffer.length);
         break;
     }
 }
