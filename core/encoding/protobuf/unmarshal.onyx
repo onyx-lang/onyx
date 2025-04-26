@@ -20,7 +20,7 @@ unmarshal :: (input: [] u8, $type: type_expr, allocator := context.allocator) ->
     val: type
 
     #context_scope {
-        ccontext.allocator = allocator
+        context.allocator = allocator
         parse_message(input, &val, type)?
     }
 
