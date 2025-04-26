@@ -57,11 +57,15 @@ static i32 extension_recv(CompilerExtension *ext, void *buf, i32 maxlen) {
     return bytes_read;
 }
 
+static void extension_wait(CompilerExtension *ext) {
+    int status;
+    waitpid(ext->pid, &status, 0);
+}
+
 static void extension_kill(CompilerExtension *ext) {
     ext->alive = 0;
     kill(ext->pid, SIGKILL);
-    int status;
-    waitpid(ext->pid, &status, 0);
+    extension_wait(ext);
 }
 
 static b32 extension_spawn(CompilerExtension *ext, const char *path) {
@@ -117,6 +121,9 @@ static i32 extension_recv(CompilerExtension *ext, void *buf, i32 maxlen) {
 
 static b32 extension_poll_recv(CompilerExtension *ext) {
     return 0;
+}
+
+static void extension_wait(CompilerExtension *ext) {
 }
 
 static void extension_kill(CompilerExtension *ext) {
@@ -262,13 +269,11 @@ b32 compiler_extension_negotiate_capabilities(Context *context, CompilerExtensio
         }
     }
 
-    {
-        compiler_event_log(
-            context,
-            "Extension '%s' spawned with protocol version %d.",
-            ext->name, extension_protocol_version
-        );
-    }
+    compiler_event_log(
+        context,
+        "Extension '%s' spawned with protocol version %d.",
+        ext->name, extension_protocol_version
+    );
     
     bh_arena_clear(&ext->arena);
     return 1;
@@ -491,5 +496,24 @@ TypeMatch compiler_extension_hook_stalled(Context *context, int extension_id) {
             return TYPE_MATCH_FAILED;
         }
     }
+}
+
+void compiler_extension_terminate(Context *context, int extension_id) {
+    if (extension_id <= 0 || extension_id > bh_arr_length(context->extensions)) return;
+
+    CompilerExtension *ext = &context->extensions[extension_id - 1];
+
+    if (!ext->alive) return;
+    if (ext->state != COMP_EXT_STATE_READY) return;
+
+    extension_send_int(ext, MSG_HOST_TERMINATE);
+
+    compiler_event_log(
+        context,
+        "Waiting for extension '%s' to exit...",
+        ext->name
+    );
+
+    extension_wait(ext);
 }
 

@@ -2410,6 +2410,7 @@ void track_resolution_for_symbol_info(Context *context, AstNode *original, AstNo
 
 // Compiler Extensions
 TypeMatch compiler_extension_start(Context *context, const char *name, const char *containing_filename, Entity *ent, i32 *out_extension_id);
+void compiler_extension_terminate(Context *context, int extension_id);
 TypeMatch compiler_extension_expand_macro(
     Context *context,
     int extension_id,

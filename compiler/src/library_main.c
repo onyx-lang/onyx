@@ -170,6 +170,10 @@ void onyx_context_free(onyx_context_t *ctx) {
         shfree((*pscope)->symbols);
     }
 
+    bh_arr_each(CompilerExtension, ext, context->extensions) {
+        compiler_extension_terminate(context, ext->id);
+    }
+
     onyx_wasm_module_free(context->wasm_module);
     bh_arena_free(&context->ast_arena);
     bh_arr_free(context->loaded_files);
