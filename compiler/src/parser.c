@@ -66,6 +66,7 @@ static void           parse_polymorphic_variable(OnyxParser* parser, AstType*** 
 static AstType*       parse_type(OnyxParser* parser);
 static AstTypeOf*     parse_typeof(OnyxParser* parser);
 static AstStructType* parse_struct(OnyxParser* parser);
+static AstUnionType*  parse_union(OnyxParser* parser);
 static AstInterface*  parse_interface(OnyxParser* parser);
 static AstConstraint* parse_constraint(OnyxParser* parser);
 static void           parse_constraints(OnyxParser* parser, ConstraintContext *constraints);
@@ -2491,6 +2492,14 @@ static AstType* parse_type(OnyxParser* parser) {
             case Token_Type_Keyword_Struct: {
                 AstStructType* s_node = parse_struct(parser);
                 *next_insertion = (AstType *) s_node;
+                next_insertion = NULL;
+                type_can_be_done = 1;
+                break;
+            }
+
+            case Token_Type_Keyword_Union: {
+                AstUnionType* u_node = parse_union(parser);
+                *next_insertion = (AstType *) u_node;
                 next_insertion = NULL;
                 type_can_be_done = 1;
                 break;

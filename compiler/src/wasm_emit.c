@@ -3615,7 +3615,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Code_Block: {
             // Like above, this error message should be moved to checking, but
             // this is the best place to do it right now.
-            ONYX_ERROR(expr->token->pos, Error_Critical, "'#quote' blocks are only to be used at compile-time. Using them as a runtime value is not allowed.");
+            ONYX_ERROR(expr->token->pos, Error_Critical, "Code blocks are only to be used at compile-time with '#unquote'. Using them as a runtime value is not allowed.");
             break;
         }
 

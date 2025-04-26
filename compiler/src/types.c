@@ -776,7 +776,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
 
             AstEnumType* tag_enum_node = onyx_ast_node_new(context->ast_alloc, sizeof(AstEnumType), Ast_Kind_Enum_Type);
             tag_enum_node->token = union_->token;
-            tag_enum_node->name = bh_aprintf(context->ast_alloc, "%s.tag_enum", union_->name);
+            tag_enum_node->name = bh_aprintf(context->ast_alloc, "%s.tag_enum", type_get_name(context, (Type *) u_type));
             tag_enum_node->backing_type = type_build_from_ast(context, union_->tag_backing_type);
             bh_arr_new(context->ast_alloc, tag_enum_node->values, bh_arr_length(union_->variants));
 
