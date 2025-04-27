@@ -145,11 +145,6 @@ ONYX_DEF(onyx_pump, (WASM_I64), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(onyx_options_ready, (WASM_I64), ()) {
-    onyx_options_ready((onyx_context_t *) P(0, i64));
-    return NULL;
-}
-
 ONYX_DEF(onyx_context_free, (WASM_I64), ()) {
     onyx_context_free((onyx_context_t *) P(0, i64));
     return NULL;
@@ -215,7 +210,6 @@ ONYX_LIBRARY {
     ONYX_FUNC(onyx_event_type)
     ONYX_FUNC(onyx_event_count)
     ONYX_FUNC(onyx_pump)
-    ONYX_FUNC(onyx_options_ready)
     ONYX_FUNC(onyx_context_free)
     ONYX_FUNC(onyx_context_create)
     ONYX_FUNC(onyx_version_runtime)

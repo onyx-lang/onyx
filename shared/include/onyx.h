@@ -106,9 +106,6 @@ API char   *onyx_version_runtime();
 
 API onyx_context_t *onyx_context_create();
 API void onyx_context_free(onyx_context_t *ctx);
-
-/// Call after all options have been set and before the first `onyx_pump`.
-API void onyx_options_ready(onyx_context_t *ctx);
 API onyx_pump_t onyx_pump(onyx_context_t *ctx);
 
 

@@ -1,0 +1,130 @@
+package onyx.toolchain
+
+use core { cptr, alloc, memory }
+use onyx.toolchain.native
+
+TextPosition :: struct {
+    line: u32
+    column: u32
+}
+
+TextRange :: struct {
+    start, end: TextPosition
+}
+
+CompilerError :: struct {
+    rank: native.onyx_error_t
+    message: str
+    filename: str
+    range: TextRange
+}
+
+Builder :: struct {
+    ctx: native.onyx_context_t
+}
+
+Builder.make :: () -> #Self {
+    return .{
+        ctx = native.onyx_context_create()
+    }
+}
+
+Builder.destroy :: (use self: &#Self) {
+    native.onyx_context_free(ctx)
+}
+
+Builder.map_dir :: (use self: &#Self, name: str, directory: str) {
+    native.onyx_add_mapped_dir(ctx, name, directory)
+}
+
+Builder.add_source :: (use self: &#Self, filename: str) {
+    native.onyx_include_file(ctx, filename)
+}
+
+Builder.set_platform :: (use self: &#Self, platform: native.onyx_platform_t) {
+    native.onyx_set_option_int(ctx, .PLATFORM, ~~platform)
+}
+
+Builder.enable :: (use self: &#Self, option: native.onyx_option_t) {
+    native.onyx_set_option_int(ctx, option, 1)
+}
+
+Builder.disable :: (use self: &#Self, option: native.onyx_option_t) {
+    native.onyx_set_option_int(ctx, option, 0)
+}
+
+Builder.compile :: (use self: &#Self) {
+    while native.onyx_pump(ctx) == .CONTINUE {}
+}
+
+Builder.has_errors :: (use self: &#Self) -> bool {
+    return native.onyx_error_count(ctx) > 0
+}
+
+Builder.get_errors :: (use self: &#Self, allocator := context.allocator) -> [] CompilerError {
+    return Iterator.from(0 .. native.onyx_error_count(ctx))
+        |> Iterator.map((i) use (ctx, allocator) => {
+            line := native.onyx_error_line(ctx, i)
+            column := native.onyx_error_column(ctx, i)
+            length := native.onyx_error_length(ctx, i)
+
+            return CompilerError.{
+                rank = native.onyx_error_rank(ctx, i)
+                filename = native.onyx_error_filename(ctx, i) |> cptr.copy_str(allocator)
+                message = native.onyx_error_message(ctx, i) |> cptr.copy_str(allocator)
+                range = .{
+                    start = .{ line, column }
+                    end = .{ line, column + length - 1 }
+                }
+            }
+        })
+        |> Iterator.collect()
+}
+
+Builder.generate_output :: (
+    use self: &#Self,
+    type: native.onyx_output_type_t,
+    allocator := context.allocator
+) -> ? [] u8 {
+    length := native.onyx_output_length(ctx, type)
+
+    if length <= 0 {
+        return .None
+    }
+
+    buffer := make([] u8, length)
+    native.onyx_output_write(ctx, type, buffer.data)
+    return buffer
+}
+
+
+
+
+
+run_wasm :: (wasm_bytes: [] u8, args: [] str) {
+    argv := alloc.array_from_stack(cptr(u8), args.length)
+    for v, i in args {
+        argv[i] = cptr.make(v.data)
+    }
+
+    //
+    // TODO:
+    // Consider use cases that might want to capture stdio
+    // of the "embedded" wasm process?
+
+    native.onyx_run_wasm(wasm_bytes, argv.length, argv.data)
+}
+
+run_wasm_with_debug :: (wasm_bytes: [] u8, args: [] str, debug_socket_path: [] str) {
+    argv := alloc.array_from_stack(cptr(u8), args.length)
+    for v, i in args {
+        argv[i] = cptr.make(v.data)
+    }
+
+    socket := alloc.from_stack(debug_socket_path.length + 1)
+    memory.set(socket, 0, debug_socket_path.length + 1)
+    memory.copy(socket, debug_socket_path.data, debug_socket_path.length)
+
+    native.onyx_run_wasm_with_debug(wasm_bytes, argv.length, argv.data, socket)
+}
+

@@ -182,93 +182,6 @@ void onyx_context_free(onyx_context_t *ctx) {
     HACK_global_heap_allocator = NULL;
 }
 
-void onyx_options_ready(onyx_context_t *ctx) {
-	Context *context = &ctx->context;
-
-    // NOTE: Add builtin entities to pipeline.
-    entity_heap_insert(&context->entities, ((Entity) {
-        .state = Entity_State_Parse_Builtin,
-        .type = Entity_Type_Load_File,
-        .package = NULL,
-        .include = create_load(context, "core:builtin", -1),
-    }));
-
-    entity_heap_insert(&context->entities, ((Entity) {
-        .state = Entity_State_Parse_Builtin,
-        .type = Entity_Type_Load_File,
-        .package = NULL,
-        .include = create_load(context, "core:runtime/build_opts", -1),
-    }));
-
-    if (context->options->runtime != Runtime_Custom) {
-        // HACK
-        context->special_global_entities.remaining = 5;
-
-        context->special_global_entities.runtime_info_types_entity = entity_heap_insert(&context->entities, ((Entity) {
-            .state = Entity_State_Parse,
-            .type = Entity_Type_Load_File,
-            .package = NULL,
-            .include = create_load(context, "core:runtime/info/types", -1),
-        }));
-        context->special_global_entities.runtime_info_foreign_entity = entity_heap_insert(&context->entities, ((Entity) {
-            .state = Entity_State_Parse,
-            .type = Entity_Type_Load_File,
-            .package = NULL,
-            .include = create_load(context, "core:runtime/info/foreign_blocks", -1),
-        }));
-        context->special_global_entities.runtime_info_proc_tags_entity = entity_heap_insert(&context->entities, ((Entity) {
-            .state = Entity_State_Parse,
-            .type = Entity_Type_Load_File,
-            .package = NULL,
-            .include = create_load(context, "core:runtime/info/proc_tags", -1),
-        }));
-        context->special_global_entities.runtime_info_global_tags_entity = entity_heap_insert(&context->entities, ((Entity) {
-            .state = Entity_State_Parse,
-            .type = Entity_Type_Load_File,
-            .package = NULL,
-            .include = create_load(context, "core:runtime/info/global_tags", -1),
-        }));
-        context->special_global_entities.runtime_info_stack_trace_entity = entity_heap_insert(&context->entities, ((Entity) {
-            .state = Entity_State_Parse,
-            .type = Entity_Type_Load_File,
-            .package = NULL,
-            .include = create_load(context, "core:runtime/info/stack_trace", -1),
-        }));
-    }
-
-    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.stack_top, context->global_scope, NULL);
-    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.heap_start, context->global_scope, NULL);
-    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_base, context->global_scope, NULL);
-    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_size, context->global_scope, NULL);
-    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.closure_base, context->global_scope, NULL);
-    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.stack_trace, context->global_scope, NULL);
-
-    if (!context->options->no_core) {
-        entity_heap_insert(&context->entities, ((Entity) {
-            .state = Entity_State_Parse,
-            .type = Entity_Type_Load_File,
-            .package = NULL,
-            .include = create_load(context, "core:module", -1),
-        }));
-    }
-
-    if (context->options->generate_symbol_info_file) {
-        context->symbol_info = bh_alloc_item(context->gp_alloc, SymbolInfoTable);
-        bh_imap_init(&context->symbol_info->node_to_id, context->gp_alloc, 512);
-        bh_arr_new(context->gp_alloc, context->symbol_info->symbols, 128);
-        bh_arr_new(context->gp_alloc, context->symbol_info->symbols_resolutions, 128);
-        sh_new_arena(context->symbol_info->files);
-    }
-
-    if (context->options->generate_odoc) {
-        context->doc_info = bh_alloc_item(context->gp_alloc, OnyxDocInfo);
-        memset(context->doc_info, 0, sizeof(OnyxDocInfo));
-        bh_arr_new(context->gp_alloc, context->doc_info->procedures, 128);
-        bh_arr_new(context->gp_alloc, context->doc_info->structures, 128);
-        bh_arr_new(context->gp_alloc, context->doc_info->enumerations, 128);
-    }
-}
-
 static void parse_source_file(Context *context, bh_file_contents* file_contents) {
     // :Remove passing the allocators as parameters
     OnyxTokenizer tokenizer = onyx_tokenizer_create(context, file_contents);
@@ -489,10 +402,101 @@ static void send_stalled_hooks(Context *context) {
     }
 }
 
+static void prime_pump(Context *context) {
+    // NOTE: Add builtin entities to pipeline.
+    entity_heap_insert(&context->entities, ((Entity) {
+        .state = Entity_State_Parse_Builtin,
+        .type = Entity_Type_Load_File,
+        .package = NULL,
+        .include = create_load(context, "core:builtin", -1),
+    }));
+
+    entity_heap_insert(&context->entities, ((Entity) {
+        .state = Entity_State_Parse_Builtin,
+        .type = Entity_Type_Load_File,
+        .package = NULL,
+        .include = create_load(context, "core:runtime/build_opts", -1),
+    }));
+
+    if (context->options->runtime != Runtime_Custom) {
+        // HACK
+        context->special_global_entities.remaining = 5;
+
+        context->special_global_entities.runtime_info_types_entity = entity_heap_insert(&context->entities, ((Entity) {
+            .state = Entity_State_Parse,
+            .type = Entity_Type_Load_File,
+            .package = NULL,
+            .include = create_load(context, "core:runtime/info/types", -1),
+        }));
+        context->special_global_entities.runtime_info_foreign_entity = entity_heap_insert(&context->entities, ((Entity) {
+            .state = Entity_State_Parse,
+            .type = Entity_Type_Load_File,
+            .package = NULL,
+            .include = create_load(context, "core:runtime/info/foreign_blocks", -1),
+        }));
+        context->special_global_entities.runtime_info_proc_tags_entity = entity_heap_insert(&context->entities, ((Entity) {
+            .state = Entity_State_Parse,
+            .type = Entity_Type_Load_File,
+            .package = NULL,
+            .include = create_load(context, "core:runtime/info/proc_tags", -1),
+        }));
+        context->special_global_entities.runtime_info_global_tags_entity = entity_heap_insert(&context->entities, ((Entity) {
+            .state = Entity_State_Parse,
+            .type = Entity_Type_Load_File,
+            .package = NULL,
+            .include = create_load(context, "core:runtime/info/global_tags", -1),
+        }));
+        context->special_global_entities.runtime_info_stack_trace_entity = entity_heap_insert(&context->entities, ((Entity) {
+            .state = Entity_State_Parse,
+            .type = Entity_Type_Load_File,
+            .package = NULL,
+            .include = create_load(context, "core:runtime/info/stack_trace", -1),
+        }));
+    }
+
+    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.stack_top, context->global_scope, NULL);
+    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.heap_start, context->global_scope, NULL);
+    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_base, context->global_scope, NULL);
+    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_size, context->global_scope, NULL);
+    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.closure_base, context->global_scope, NULL);
+    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.stack_trace, context->global_scope, NULL);
+
+    if (!context->options->no_core) {
+        entity_heap_insert(&context->entities, ((Entity) {
+            .state = Entity_State_Parse,
+            .type = Entity_Type_Load_File,
+            .package = NULL,
+            .include = create_load(context, "core:module", -1),
+        }));
+    }
+
+    if (context->options->generate_symbol_info_file) {
+        context->symbol_info = bh_alloc_item(context->gp_alloc, SymbolInfoTable);
+        bh_imap_init(&context->symbol_info->node_to_id, context->gp_alloc, 512);
+        bh_arr_new(context->gp_alloc, context->symbol_info->symbols, 128);
+        bh_arr_new(context->gp_alloc, context->symbol_info->symbols_resolutions, 128);
+        sh_new_arena(context->symbol_info->files);
+    }
+
+    if (context->options->generate_odoc) {
+        context->doc_info = bh_alloc_item(context->gp_alloc, OnyxDocInfo);
+        memset(context->doc_info, 0, sizeof(OnyxDocInfo));
+        bh_arr_new(context->gp_alloc, context->doc_info->procedures, 128);
+        bh_arr_new(context->gp_alloc, context->doc_info->structures, 128);
+        bh_arr_new(context->gp_alloc, context->doc_info->enumerations, 128);
+    }
+
+    context->pump_is_primed = 1;
+}
+
 onyx_pump_t onyx_pump(onyx_context_t *ctx) {
     Context *context = &ctx->context;
 
     compiler_events_clear(context);
+
+    if (!context->pump_is_primed) {
+        prime_pump(context);
+    }
 
     if (bh_arr_is_empty(context->entities.entities)) {
         // Once the module has been linked, we are all done and ready to say everything compiled successfully!
@@ -699,9 +703,7 @@ void onyx_add_defined_var(onyx_context_t *ctx, char *variable, int32_t variable_
 /// 1. `foo:file.onyx` will search in the `foo` mapped folder.
 /// 2. `file.onyx` will search in the current directory for `file.onyx`.
 void onyx_include_file(onyx_context_t *ctx, char *filename, int32_t length) {
-    if (length < 0) length = strlen(filename);
-
-    AstInclude* load_node = create_load(&ctx->context, filename, -1);
+    AstInclude* load_node = create_load(&ctx->context, filename, length);
     add_entities_for_node(&ctx->context.entities, NULL, (AstNode *) load_node, ctx->context.global_scope, NULL);
 }
 
@@ -950,11 +952,11 @@ void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, cha
 }
 #else
 void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv) {
-    printf("ERROR: Cannot run WASM code. No runtime was configured at the time Onyx was built");
+    printf("ERROR: Cannot run WASM code. No runtime was configured at the time Onyx was built\n");
 }
 
 void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path) {
-    printf("ERROR: Cannot run WASM code. No runtime was configured at the time Onyx was built");
+    printf("ERROR: Cannot run WASM code. No runtime was configured at the time Onyx was built\n");
 }
 #endif
 

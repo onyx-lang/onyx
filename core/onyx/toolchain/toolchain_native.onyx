@@ -1,4 +1,4 @@
-package onyx.compiler.native
+package onyx.toolchain.native
 #allow_stale_code
 
 //
@@ -86,7 +86,6 @@ onyx_context_t :: #distinct u64
     onyx_version_runtime :: () -> cptr(u8) ---
     onyx_context_create :: () -> onyx_context_t ---
     onyx_context_free :: (ctx: onyx_context_t) -> void ---
-    onyx_options_ready :: (ctx: onyx_context_t) -> void ---
     onyx_pump :: (ctx: onyx_context_t) -> onyx_pump_t ---
     onyx_event_count :: (ctx: onyx_context_t) -> i32 ---
     onyx_event_type :: (ctx: onyx_context_t, event_idx: i32) -> onyx_event_type_t ---

@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package onyx.compiler_events;
+package onyx.toolchain.events;
 
 //
 // Data that should be available via this interface:

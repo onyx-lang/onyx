@@ -783,7 +783,6 @@ static void onyx_watch(CLIArgs *cli_args, int arg_parse_start, int argc, char **
             return;
         }
 
-        onyx_options_ready(ctx);
         while (onyx_pump(ctx) == ONYX_PUMP_CONTINUE) {
             // doing the compilation
         }
@@ -931,7 +930,6 @@ int main(int argc, char *argv[]) {
 
     u64 start_time = bh_time_curr();
 
-    onyx_options_ready(ctx);
     while (onyx_pump(ctx) == ONYX_PUMP_CONTINUE) {
         fori (i, 0, onyx_event_count(ctx)) {
             switch (onyx_event_type(ctx, i)) {

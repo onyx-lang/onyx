@@ -1,9 +1,9 @@
-#load "core:onyx/compiler/module"
+#load "core:onyx/toolchain/module"
 
 use core {package, *}
 use cbindgen {*}
-use onyx.compiler { _ :: package }
-use onyx.compiler.native {
+use onyx.toolchain { _ :: package }
+use onyx.toolchain.native {
     onyx_context_t,
     foreign_block
 }

@@ -64,6 +64,13 @@ cptr.read_i64 :: (this: cptr(i64)) => cast(i64) __cptr_read_u64(this.data);
 // using __cptr_read_u8 would be slow compared to strlen().
 cptr.extract_str :: (this: cptr(u8), dest: [] u8) => __cptr_extract_str(this.data, dest);
 
+cptr.copy_str :: (this: cptr(u8), allocator := context.allocator) -> [] u8 {
+    length := cptr.extract_str(this, .[])
+    buffer := make([] u8, length, allocator)
+    cptr.extract_str(this, buffer)
+    return buffer
+}
+
 //
 // This procedure attempts to convert a C-pointer back into an
 // Onyx pointer, if the pointer lives with the Onyx memory space.

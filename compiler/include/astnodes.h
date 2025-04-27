@@ -2276,6 +2276,7 @@ struct Context {
     u32 cycle_almost_detected : 3;
     b32 cycle_detected : 1;
 
+    b32 pump_is_primed : 1;
     b32 builtins_initialized : 1;
     b32 wasm_module_linked : 1;
 };
