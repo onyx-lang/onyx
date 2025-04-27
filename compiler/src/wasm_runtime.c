@@ -83,6 +83,7 @@ static void *locate_symbol_in_dynamic_library_raw(char *libname, char *sym) {
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     void* handle = dlopen(libname, RTLD_LAZY);
     if (handle == NULL) {
+        printf("dlopen(): %s\n", dlerror());
         return NULL;
     }
 

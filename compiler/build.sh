@@ -49,7 +49,7 @@ case "$ONYX_ARCH" in
 
     *linux*)
         LIBRARY_BUILD_ARGS=""
-        AUTOCOMPILER_BUILD_ARGS='-Wl,-rpath,"$ORIGIN"'
+        AUTOCOMPILER_BUILD_ARGS="-Wl,-rpath,\$ORIGIN"
         ;;
 esac
 
