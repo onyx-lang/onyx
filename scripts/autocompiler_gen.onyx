@@ -1,0 +1,32 @@
+#load "core:onyx/compiler/module"
+
+use core {package, *}
+use cbindgen {*}
+use onyx.compiler { _ :: package }
+use onyx.compiler.native {
+    onyx_context_t,
+    foreign_block
+}
+
+main :: () {
+    res := generate_c_binding(.{
+        output_file = "./compiler/src/autocompiler_binding.c",
+        foreign_block = foreign_block,
+
+        preamble = .[
+"""
+#include "onyx.h"
+"""
+        ],
+
+        cast_map = .[
+            .{ onyx_context_t, "onyx_context_t *" }
+        ]
+    })
+
+    if res {
+        println("Successfully rebuilt autocompiler_binding.c")
+    } else {
+        println("Failed to rebuild autocompiler_binding.c")
+    }
+}

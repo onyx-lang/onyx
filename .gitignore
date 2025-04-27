@@ -27,6 +27,9 @@ compiler/onyx
 compiler/libonyx.so
 compiler/libonyx.dylib
 compiler/libonyx.dll
+compiler/onyx_autocompiler.so
+compiler/onyx_autocompiler.dylib
+compiler/onyx_autocompiler.dll
 runtime/onyx_runtime.so
 runtime/onyx_runtime.dylib
 runtime/onyx_runtime.dll

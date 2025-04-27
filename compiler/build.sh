@@ -43,6 +43,13 @@ fi
 case "$ONYX_ARCH" in
     *darwin*)
         LIBS="$LIBS -lffi -framework CoreFoundation -framework SystemConfiguration"
+        LIBRARY_BUILD_ARGS="-install_name @rpath/libonyx.dylib"
+        AUTOCOMPILER_BUILD_ARGS="-rpath @loader_path/"
+        ;;
+
+    *linux*)
+        LIBRARY_BUILD_ARGS=""
+        AUTOCOMPILER_BUILD_ARGS='-Wl,-rpath,"$ORIGIN"'
         ;;
 esac
 
@@ -63,13 +70,40 @@ for c_file in $(echo "$C_FILES" | sed 's/ /\n/g;s/\([a-zA-Z_0-9]*\)\n/src\/\1.c\
     $ONYX_CC $FLAGS $INCLUDES -fPIC -o $(basename $c_file).o -c $c_file
 done
 
-echo "Compiling onyx executable"
-$ONYX_CC $INCLUDES $FLAGS cli/main.c *.o -o onyx $LIBS
-
 FLAGS=""
 if [ ! -z ${ONYX_TARGET+x} ]; then
     FLAGS="$FLAGS --target=$ONYX_TARGET"
 fi
-$ONYX_CC -shared $FLAGS -o "libonyx.$suffix" *.o $LIBS
+$ONYX_CC -shared $FLAGS -o "libonyx.$suffix" *.o $LIBS $LIBRARY_BUILD_ARGS
+
+echo "Compiling onyx executable"
+$ONYX_CC $INCLUDES $FLAGS cli/main.c *.o -o onyx $LIBS
+
+# It does seem possible to allow for the CLI to directly
+# use the shared library, but it was causing some weird
+# segfaults in misc places, so I thought it best to keep
+# it how it was for how.
+#
+# $ONYX_CC $INCLUDES $FLAGS \
+#   cli/main.c \
+#   -o onyx \
+#   -L. -lonyx -rpath @loader_path/../lib
+#   $LIBS
+
+echo "Compiling onyx auto-compiler"
+$ONYX_CC -shared -fPIC $FLAGS $INCLUDES \
+    -Wno-int-conversion \
+    -o "onyx_autocompiler.$suffix" \
+    src/autocompiler_binding.c \
+    -L. -lonyx \
+    $LIBS \
+    $AUTOCOMPILER_BUILD_ARGS
+
+
+# I don't think an archive file is needed to ship right now,
+# but it would in theory be pretty easy to get that to ship
+# using the line below
+#
+# ar rcs libonyx.a *.o
 
 rm *.o

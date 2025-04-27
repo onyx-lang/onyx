@@ -44,6 +44,7 @@ package_all() {
     mkdir -p "$DIST_DIR/bin"
     cp compiler/onyx "$DIST_DIR/bin/"
     cp compiler/libonyx.$suffix "$DIST_DIR/lib/"
+    cp compiler/onyx_autocompiler.$suffix "$DIST_DIR/lib/"
     cp "shared/include/onyx.h" "$DIST_DIR/include/onyx.h"
 
     mkdir -p "$DIST_DIR/tools"
@@ -113,7 +114,12 @@ for arg in $@; do
         install) install_all ;;
         clean)
             rm -f compiler/onyx 2>/dev/null
+            rm -f compiler/libonyx.* 2>/dev/null
+            rm -f compiler/onyx_autocompiler.* 2>/dev/null
             rm -f runtime/onyx_runtime.so 2>/dev/null
+            ;;
+        build_autocompiler)
+            onyx run --generate-foreign-info scripts/autocompiler_gen.onyx
             ;;
     esac
 done

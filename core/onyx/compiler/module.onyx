@@ -1,4 +1,9 @@
 package onyx.compiler
+#allow_stale_code
+
+#load "./proto.onyx"
+#load "./compiler_native.onyx"
+#load "./compiler.onyx"
 
 
 

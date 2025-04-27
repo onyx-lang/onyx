@@ -6,7 +6,7 @@ use protobuf { __ROOT_PROTOBUF_PACKAGE :: package }
 @protobuf.Message
 CompilerEvents :: struct {
     @protobuf.Field.{1, 11}
-    event: [..] __ROOT_PROTOBUF_PACKAGE.onyx.compiler_events.CompilerEvent
+    events: [..] __ROOT_PROTOBUF_PACKAGE.onyx.compiler_events.CompilerEvent
 }
 
 @protobuf.Message
