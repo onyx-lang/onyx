@@ -4781,7 +4781,7 @@ void onyx_parse(OnyxParser *parser) {
 
     if (parse_possible_directive(parser, "allow_stale_code")
         && !parser->package->is_included_somewhere
-        && !parser->context->options->no_stale_code) {
+        && !parser->context->options.no_stale_code) {
         bh_arr_new(parser->context->gp_alloc, parser->package->buffered_entities, 32);
         bh_arr_push(parser->alternate_entity_placement_stack, &parser->package->buffered_entities);
     }

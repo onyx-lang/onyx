@@ -565,7 +565,7 @@ void initalize_special_globals(Context *context) {
         context->builtins.tagged_procedures_node = (AstTyped *) symbol_raw_resolve(context, p->scope, "tagged_procedures");
         context->builtins.tagged_globals_node = (AstTyped *) symbol_raw_resolve(context, p->scope, "tagged_globals");
 
-        if (context->options->stack_trace_enabled) {
+        if (context->options.stack_trace_enabled) {
             context->builtins.stack_trace_type = (AstType *) symbol_raw_resolve(context, p->scope, "Stack_Trace");
         }
     }
@@ -585,20 +585,20 @@ void introduce_build_options(Context *context) {
         return;
     }
 
-    AstNumLit* runtime_type = make_int_literal(context, context->options->runtime);
+    AstNumLit* runtime_type = make_int_literal(context, context->options.runtime);
     runtime_type->type_node = Runtime_Type;
     add_entities_for_node(&context->entities, NULL, (AstNode *) runtime_type, NULL, NULL);
     symbol_builtin_introduce(context, p->scope, "runtime", (AstNode *) runtime_type);
 
-    AstNumLit* multi_threaded = make_int_literal(context, context->options->use_multi_threading);
+    AstNumLit* multi_threaded = make_int_literal(context, context->options.use_multi_threading);
     multi_threaded->type_node = (AstType *) &context->basic_types.type_bool;
     symbol_builtin_introduce(context, p->scope, "Multi_Threading_Enabled", (AstNode *) multi_threaded);
 
-    AstNumLit* debug_mode = make_int_literal(context, context->options->debug_info_enabled);
+    AstNumLit* debug_mode = make_int_literal(context, context->options.debug_info_enabled);
     debug_mode->type_node = (AstType *) &context->basic_types.type_bool;
     symbol_builtin_introduce(context, p->scope, "Debug_Mode_Enabled", (AstNode *) debug_mode);
 
-    AstNumLit* stack_trace = make_int_literal(context, context->options->stack_trace_enabled);
+    AstNumLit* stack_trace = make_int_literal(context, context->options.stack_trace_enabled);
     stack_trace->type_node = (AstType *) &context->basic_types.type_bool;
     symbol_builtin_introduce(context, p->scope, "Stack_Trace_Enabled", (AstNode *) stack_trace);
 
@@ -655,7 +655,7 @@ void introduce_build_options(Context *context) {
     add_entities_for_node(&context->entities, NULL, (AstNode *) arch_type, NULL, NULL);
     symbol_builtin_introduce(context, p->scope, "arch", (AstNode *) arch_type);
 
-    if (context->options->generate_foreign_info) {
+    if (context->options.generate_foreign_info) {
         AstNumLit* foreign_info = make_int_literal(context, 1);
         foreign_info->type_node = (AstType *) &context->basic_types.type_bool;
         symbol_builtin_introduce(context, p->scope, "Generated_Foreign_Info", (AstNode *) foreign_info);

@@ -613,7 +613,7 @@ OnyxTokenizer onyx_tokenizer_create(Context *context, bh_file_contents *fc) {
         .line_start     = fc->data,
         .tokens         = NULL,
 
-        .optional_semicolons = context->options->enable_optional_semicolons,
+        .optional_semicolons = context->options.enable_optional_semicolons,
         .insert_semicolon = 0,
     };
 

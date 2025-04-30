@@ -220,7 +220,7 @@ static i32 output_globalsection(OnyxWasmModule* module, bh_buffer* buff) {
         bh_buffer_write_byte(&vec_buff, 0x01);
 
         bh_arr_each(WasmInstruction, instr, global->initial_value)
-            output_instruction(NULL, instr, module->context->options->debug_info_enabled, &vec_buff);
+            output_instruction(NULL, instr, module->context->options.debug_info_enabled, &vec_buff);
 
         // NOTE: Initial value expression terminator
         bh_buffer_write_byte(&vec_buff, (u8) WI_BLOCK_END);
@@ -602,7 +602,7 @@ static i32 output_codesection(OnyxWasmModule* module, bh_buffer* buff) {
 
     bh_arr_each(WasmFunc, func, module->funcs) {
         assert(func->code);
-        output_code(func, module->context->options->debug_info_enabled, &vec_buff);
+        output_code(func, module->context->options.debug_info_enabled, &vec_buff);
     }
 
     leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
@@ -615,7 +615,7 @@ static i32 output_codesection(OnyxWasmModule* module, bh_buffer* buff) {
 }
 
 static i32 output_datacountsection(OnyxWasmModule* module, bh_buffer* buff) {
-    if (!module->context->options->use_post_mvp_features) return 0;
+    if (!module->context->options.use_post_mvp_features) return 0;
 
     i32 prev_len = buff->length;
 
@@ -652,12 +652,12 @@ static i32 output_datasection(OnyxWasmModule* module, bh_buffer* buff) {
     bh_arr_each(WasmDatum, datum, module->data) {
         i32 memory_flags = 0x00;
         // :ProperLinking
-        if (module->context->options->use_multi_threading) memory_flags |= 0x01;
+        if (module->context->options.use_multi_threading) memory_flags |= 0x01;
 
         bh_buffer_write_byte(&vec_buff, memory_flags);
 
         // :ProperLinking
-        if (!module->context->options->use_multi_threading) {
+        if (!module->context->options.use_multi_threading) {
             bh_buffer_write_byte(&vec_buff, WI_I32_CONST);
             leb = int_to_leb128((i64) datum->offset_, &leb_len);
             bh_buffer_append(&vec_buff, leb, leb_len);
@@ -724,7 +724,7 @@ static i32 output_onyx_libraries_section(OnyxWasmModule* module, bh_buffer* buff
 
 #ifdef ENABLE_DEBUG_INFO
 static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
-    if (!module->debug_context || !module->context->options->debug_info_enabled) return 0;
+    if (!module->debug_context || !module->context->options.debug_info_enabled) return 0;
 
     DebugContext *ctx = module->debug_context;
 
@@ -1135,7 +1135,7 @@ void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer)
     bh_buffer_append(buffer, WASM_VERSION, 4);
 
 #ifdef ENABLE_DEBUG_INFO
-    if (module->context->options->debug_info_enabled) {
+    if (module->context->options.debug_info_enabled) {
         output_ovm_debug_sections(module, buffer);
     }
 #endif
@@ -1153,7 +1153,7 @@ void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer)
     output_datasection(module, buffer);
     output_onyx_libraries_section(module, buffer);
 
-    if (module->context->options->generate_name_section) {
+    if (module->context->options.generate_name_section) {
         output_name_section(module, buffer);
     }
 

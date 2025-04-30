@@ -495,7 +495,7 @@ bad_type:
 
 EMIT_FUNC_NO_ARGS(initialize_data_segments_body) {
     // :ProperLinking
-    if (!mod->context->options->use_multi_threading || !mod->context->options->use_post_mvp_features) return;
+    if (!mod->context->options.use_multi_threading || !mod->context->options.use_post_mvp_features) return;
 
     bh_arr(WasmInstruction) code = *pcode;
 

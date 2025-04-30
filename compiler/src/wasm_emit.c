@@ -306,7 +306,7 @@ static void debug_set_position(OnyxWasmModule *mod, OnyxToken *token) {
 //    - REP
 //    - SET, REP 0
 static void debug_emit_instruction(OnyxWasmModule *mod, OnyxToken *token) {
-    if (!mod->context->options->debug_info_enabled) {
+    if (!mod->context->options.debug_info_enabled) {
         return;
     }
 
@@ -2025,7 +2025,7 @@ EMIT_FUNC(call, AstCall* call) {
         reserve_size += return_size;
     }
 
-    if (mod->context->options->stack_trace_enabled) {
+    if (mod->context->options.stack_trace_enabled) {
         emit_stack_address(mod, &code, mod->stack_trace_idx, NULL);
         WIL(NULL, WI_I32_CONST, call->token->pos.line);
         emit_store_instruction(mod, &code, mod->context->types.basic[Basic_Kind_U32], 8);
@@ -2810,7 +2810,7 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
 EMIT_FUNC(wasm_copy, OnyxToken *token) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (mod->context->options->use_post_mvp_features) {
+    if (mod->context->options.use_post_mvp_features) {
         WIL(token, WI_MEMORY_COPY, 0x00);
     } else {
         emit_intrinsic_memory_copy(mod, &code);
@@ -2822,7 +2822,7 @@ EMIT_FUNC(wasm_copy, OnyxToken *token) {
 EMIT_FUNC(wasm_fill, OnyxToken *token) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (mod->context->options->use_post_mvp_features) {
+    if (mod->context->options.use_post_mvp_features) {
         WID(token, WI_MEMORY_FILL, 0x00);
     } else {
         emit_intrinsic_memory_fill(mod, &code);
@@ -4176,7 +4176,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
     debug_begin_function(mod, func_idx, fd->token, get_function_name(mod->context, fd));
 
-    if (fd == mod->context->builtins.initialize_data_segments && mod->context->options->use_post_mvp_features) {
+    if (fd == mod->context->builtins.initialize_data_segments && mod->context->options.use_post_mvp_features) {
         emit_initialize_data_segments_body(mod, &wasm_func.code);
 
         debug_emit_instruction(mod, NULL);
@@ -4745,7 +4745,7 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
     u64 alignment = type_alignment_of(effective_type);
     u64 size = type_size_of(effective_type);
 
-    if (mod->context->options->generate_type_info) {
+    if (mod->context->options.generate_type_info) {
         if (mod->context->builtins.type_table_node != NULL && (AstMemRes *) mod->context->builtins.type_table_node == memres) {
             u64 table_location = prepare_type_table(mod);
             memres->data_id = table_location;
@@ -5221,14 +5221,14 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
     module->memory_min_size = options->memory_min_size;
     module->memory_max_size = options->memory_max_size;
 
-    if (context->options->use_multi_threading || options->import_memory) {
+    if (context->options.use_multi_threading || options->import_memory) {
         module->needs_memory_section = 0;
 
         WasmImport mem_import = {
             .kind   = WASM_FOREIGN_MEMORY,
             .min    = options->memory_min_size,
             .max    = options->memory_max_size,
-            .shared = context->options->use_multi_threading && context->options->runtime != Runtime_Onyx,
+            .shared = context->options.use_multi_threading && context->options.runtime != Runtime_Onyx,
 
             .mod    = options->import_memory_module_name,
             .name   = options->import_memory_import_name,

@@ -1690,7 +1690,7 @@ static u32 symbol_info_get_file_id(SymbolInfoTable *syminfo, const char *filenam
 }
 
 void track_declaration_for_symbol_info(Context *context, OnyxFilePos pos, AstNode *node) {
-    if (!context->options->generate_symbol_info_file) return;
+    if (!context->options.generate_symbol_info_file) return;
     if (pos.filename == NULL) return;
 
     SymbolInfoTable *syminfo = context->symbol_info;
@@ -1714,8 +1714,8 @@ void track_declaration_for_symbol_info(Context *context, OnyxFilePos pos, AstNod
 }
 
 void track_documentation_for_symbol_info(Context *context, AstNode *node, AstBinding *binding) {
-    if (!context->options->generate_lsp_info_file) return;
-    if (!context->options->generate_symbol_info_file) return;
+    if (!context->options.generate_lsp_info_file) return;
+    if (!context->options.generate_symbol_info_file) return;
 
     SymbolInfoTable *syminfo = context->symbol_info;
     assert(syminfo);
@@ -1736,7 +1736,7 @@ void track_documentation_for_symbol_info(Context *context, AstNode *node, AstBin
 }
 
 void track_resolution_for_symbol_info(Context *context, AstNode *original, AstNode *resolved) {
-    if (!context->options->generate_symbol_info_file) return;
+    if (!context->options.generate_symbol_info_file) return;
     if (!resolved) return;
 
     SymbolInfoTable *syminfo = context->symbol_info;

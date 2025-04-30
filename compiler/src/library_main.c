@@ -137,12 +137,9 @@ onyx_context_t *onyx_context_create() {
     prepare_builtins(context);
     compiler_events_init(context);
 
-    // Options should be moved directly inside of the context instead of through a pointer...
-    context->options = malloc(sizeof(* context->options));
-    memset(context->options, 0, sizeof(* context->options));
-    context->options->use_post_mvp_features = 1;
-    context->options->enable_optional_semicolons = 1;
-    context->options->generate_type_info = 1;
+    context->options.use_post_mvp_features = 1;
+    context->options.enable_optional_semicolons = 1;
+    context->options.generate_type_info = 1;
 
     OnyxFilePos internal_location = { 0 };
     internal_location.filename = "<compiler internal>";
@@ -175,8 +172,7 @@ void onyx_context_free(onyx_context_t *ctx) {
     bh_scratch_free(&context->scratch);
     bh_managed_heap_free(&context->heap);
 
-    bh_arr_free(context->options->mapped_folders);
-    free(context->options);
+    bh_arr_free(context->options.mapped_folders);
     free(ctx);
 
     HACK_global_heap_allocator = NULL;
@@ -212,7 +208,7 @@ static b32 process_source_file(Context *context, char* filename) {
 
     bh_arr_push(context->loaded_files, fc);
 
-    // if (context->options->verbose_output == 2)
+    // if (context->options.verbose_output == 2)
     //     bh_printf("Processing source file:    %s (%d bytes)\n", file.filename, fc.length);
 
     parse_source_file(context, &bh_arr_last(context->loaded_files));
@@ -233,7 +229,7 @@ static b32 process_load_entity(Context *context, Entity* ent) {
             include->name,
             parent_folder,
             ".onyx",
-            context->options->mapped_folders,
+            context->options.mapped_folders,
             context->gp_alloc
         );
 
@@ -259,7 +255,7 @@ static b32 process_load_entity(Context *context, Entity* ent) {
             include->name,
             parent_folder,
             "",
-            context->options->mapped_folders,
+            context->options.mapped_folders,
             context->gp_alloc
         );
         bh_path_convert_separators(folder);
@@ -418,7 +414,7 @@ static void prime_pump(Context *context) {
         .include = create_load(context, "core:runtime/build_opts", -1),
     }));
 
-    if (context->options->runtime != Runtime_Custom) {
+    if (context->options.runtime != Runtime_Custom) {
         // HACK
         context->special_global_entities.remaining = 5;
 
@@ -461,7 +457,7 @@ static void prime_pump(Context *context) {
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.closure_base, context->global_scope, NULL);
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.stack_trace, context->global_scope, NULL);
 
-    if (!context->options->no_core) {
+    if (!context->options.no_core) {
         entity_heap_insert(&context->entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
@@ -470,7 +466,7 @@ static void prime_pump(Context *context) {
         }));
     }
 
-    if (context->options->generate_symbol_info_file) {
+    if (context->options.generate_symbol_info_file) {
         context->symbol_info = bh_alloc_item(context->gp_alloc, SymbolInfoTable);
         bh_imap_init(&context->symbol_info->node_to_id, context->gp_alloc, 512);
         bh_arr_new(context->gp_alloc, context->symbol_info->symbols, 128);
@@ -478,7 +474,7 @@ static void prime_pump(Context *context) {
         sh_new_arena(context->symbol_info->files);
     }
 
-    if (context->options->generate_odoc) {
+    if (context->options.generate_odoc) {
         context->doc_info = bh_alloc_item(context->gp_alloc, OnyxDocInfo);
         memset(context->doc_info, 0, sizeof(OnyxDocInfo));
         bh_arr_new(context->gp_alloc, context->doc_info->procedures, 128);
@@ -517,7 +513,7 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
     u64 perf_start;
     EntityType perf_entity_type;
     EntityState perf_entity_state;
-    if (context->options->running_perf) {
+    if (context->options.running_perf) {
         perf_start = bh_time_curr_micro();
         perf_entity_type = ent->type;
         perf_entity_state = ent->state;
@@ -568,7 +564,7 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
     if (ent->state != Entity_State_Finalized && ent->state != Entity_State_Failed)
         entity_heap_insert_existing(&context->entities, ent);
 
-    if (context->options->running_perf) {
+    if (context->options.running_perf) {
         u64 perf_end = bh_time_curr_micro();
 
         u64 duration = perf_end - perf_start;
@@ -660,23 +656,23 @@ int32_t onyx_set_option_bytes(onyx_context_t *ctx, onyx_option_t opt, char *valu
 
 int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t value) {
     switch (opt) {
-    case ONYX_OPTION_POST_MVP_FEATURES:      ctx->context.options->use_post_mvp_features = value; return 1;
-    case ONYX_OPTION_MULTI_THREADING:        ctx->context.options->use_multi_threading = value;  return 1;
-    case ONYX_OPTION_GENERATE_FOREIGN_INFO:  ctx->context.options->generate_foreign_info = value; return 1;
-    case ONYX_OPTION_GENERATE_TYPE_INFO:     ctx->context.options->generate_type_info = value; return 1;
-    case ONYX_OPTION_GENERATE_METHOD_INFO:   ctx->context.options->generate_method_info = value; return 1;
-    case ONYX_OPTION_GENERATE_DEBUG_INFO:    ctx->context.options->debug_info_enabled = value; return 1;
-    case ONYX_OPTION_GENERATE_STACK_TRACE:   ctx->context.options->stack_trace_enabled = value; return 1;
-    case ONYX_OPTION_GENERATE_NAME_SECTION:  ctx->context.options->generate_name_section = value; return 1;
-    case ONYX_OPTION_GENERATE_SYMBOL_INFO:   ctx->context.options->generate_symbol_info_file = value; return 1;
-    case ONYX_OPTION_GENERATE_LSP_INFO:      ctx->context.options->generate_lsp_info_file = value; return 1;
-    case ONYX_OPTION_GENERATE_DOC_INFO:      ctx->context.options->generate_odoc = value; return 1;
-    case ONYX_OPTION_DISABLE_CORE:           ctx->context.options->no_core = value; return 1;
-    case ONYX_OPTION_DISABLE_STALE_CODE:     ctx->context.options->no_stale_code = value; return 1;
-    case ONYX_OPTION_OPTIONAL_SEMICOLONS:    ctx->context.options->enable_optional_semicolons = value; return 1;
-    case ONYX_OPTION_DISABLE_FILE_CONTENTS:  ctx->context.options->no_file_contents = value; return 1;
-    case ONYX_OPTION_DISABLE_EXTENSIONS:     ctx->context.options->no_compiler_extensions = value; return 1;
-    case ONYX_OPTION_PLATFORM:               ctx->context.options->runtime = value; return 1;
+    case ONYX_OPTION_POST_MVP_FEATURES:      ctx->context.options.use_post_mvp_features = value; return 1;
+    case ONYX_OPTION_MULTI_THREADING:        ctx->context.options.use_multi_threading = value;  return 1;
+    case ONYX_OPTION_GENERATE_FOREIGN_INFO:  ctx->context.options.generate_foreign_info = value; return 1;
+    case ONYX_OPTION_GENERATE_TYPE_INFO:     ctx->context.options.generate_type_info = value; return 1;
+    case ONYX_OPTION_GENERATE_METHOD_INFO:   ctx->context.options.generate_method_info = value; return 1;
+    case ONYX_OPTION_GENERATE_DEBUG_INFO:    ctx->context.options.debug_info_enabled = value; return 1;
+    case ONYX_OPTION_GENERATE_STACK_TRACE:   ctx->context.options.stack_trace_enabled = value; return 1;
+    case ONYX_OPTION_GENERATE_NAME_SECTION:  ctx->context.options.generate_name_section = value; return 1;
+    case ONYX_OPTION_GENERATE_SYMBOL_INFO:   ctx->context.options.generate_symbol_info_file = value; return 1;
+    case ONYX_OPTION_GENERATE_LSP_INFO:      ctx->context.options.generate_lsp_info_file = value; return 1;
+    case ONYX_OPTION_GENERATE_DOC_INFO:      ctx->context.options.generate_odoc = value; return 1;
+    case ONYX_OPTION_DISABLE_CORE:           ctx->context.options.no_core = value; return 1;
+    case ONYX_OPTION_DISABLE_STALE_CODE:     ctx->context.options.no_stale_code = value; return 1;
+    case ONYX_OPTION_OPTIONAL_SEMICOLONS:    ctx->context.options.enable_optional_semicolons = value; return 1;
+    case ONYX_OPTION_DISABLE_FILE_CONTENTS:  ctx->context.options.no_file_contents = value; return 1;
+    case ONYX_OPTION_DISABLE_EXTENSIONS:     ctx->context.options.no_compiler_extensions = value; return 1;
+    case ONYX_OPTION_PLATFORM:               ctx->context.options.runtime = value; return 1;
 
     default:
         break;
@@ -711,7 +707,7 @@ void onyx_add_mapped_dir(onyx_context_t *ctx, char *mapped_name, int32_t mapped_
     if (mapped_length < 0) mapped_length = strlen(mapped_name);
     if (dir_length    < 0) dir_length    = strlen(dir);
 
-    bh_arr_push(ctx->context.options->mapped_folders, ((bh_mapped_folder) {
+    bh_arr_push(ctx->context.options.mapped_folders, ((bh_mapped_folder) {
         bh_strdup_len(ctx->context.ast_alloc, mapped_name, mapped_length),
         bh_strdup_len(ctx->context.ast_alloc, dir, dir_length)
     }));

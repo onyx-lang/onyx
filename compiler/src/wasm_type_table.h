@@ -159,7 +159,7 @@ static void write_tag_array(
 static MethodDataInfo write_method_data(struct TypeBuilderContext *ctx, Type *type) {
     bh_arr(StructMethodData) method_data=NULL;
 
-    if (!ctx->context->options->generate_method_info) {
+    if (!ctx->context->options.generate_method_info) {
         goto no_methods;
     }
 

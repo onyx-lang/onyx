@@ -1,18 +1,18 @@
 
-    if (context->options->verbose_output > 0) {
+    if (context->options.verbose_output > 0) {
         bh_printf("Mapped folders:\n");
-        bh_arr_each(bh_mapped_folder, p, context->options->mapped_folders) {
+        bh_arr_each(bh_mapped_folder, p, context->options.mapped_folders) {
             bh_printf("\t%s: %s\n", p->name, p->folder);
         }
         bh_printf("\n");
     }
 
 
-    if (context->options->verbose_output == 2)
+    if (context->options.verbose_output == 2)
         bh_printf("Processing source file:    %s (%d bytes)\n", file.filename, fc.length);
 
     static char verbose_output_buffer[512];
-    if (context->options->verbose_output == 3) {
+    if (context->options.verbose_output == 3) {
         if (ent->expr && ent->expr->token)
             snprintf(verbose_output_buffer, 511,
                     "%20s | %24s (%d, %d) | %5d | %s:%i:%i \n",
@@ -35,7 +35,7 @@
     }
 
     b32 changed = ent->state != before_state;
-    if (context->options->verbose_output == 3) {
+    if (context->options.verbose_output == 3) {
         if (changed) printf("SUCCESS to %20s | %s", entity_state_strings[ent->state], verbose_output_buffer);
         else         printf("YIELD   to %20s | %s", entity_state_strings[ent->state], verbose_output_buffer);
     }
@@ -86,11 +86,11 @@ static void output_dummy_progress_bar(Context *context) {
 #endif
 
 
-    if (context->options->fun_output)
+    if (context->options.fun_output)
         printf("\e[2J");
 
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
-        if (context->options->fun_output) {
+        if (context->options.fun_output) {
             output_dummy_progress_bar(context);
 
             if (ent->expr->token) {
@@ -120,11 +120,11 @@ static void output_dummy_progress_bar(Context *context) {
 
     u64 duration = bh_time_duration(start_time);
 
-    if (context->options->verbose_output > 0) {
+    if (context->options.verbose_output > 0) {
         printf("Type table size: %d bytes\n", context->wasm_module->type_info_size);
     }
 
-    if (context->options->running_perf) {
+    if (context->options.running_perf) {
         fori (i, 0, Entity_State_Count) {
             printf("| %27s | %10llu us |\n", entity_state_strings[i], context->stats.microseconds_per_state[i]);
         }

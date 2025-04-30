@@ -2205,7 +2205,7 @@ struct Context {
 
     Scope *global_scope;
 
-    CompileOptions* options;
+    CompileOptions options;
 
     bh_arena                  ast_arena;
     bh_allocator token_alloc, ast_alloc;

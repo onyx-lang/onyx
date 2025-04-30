@@ -45,7 +45,7 @@ void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer) {
         bh_buffer_write_u32(&sym_def_section, sym->line);
         bh_buffer_write_u32(&sym_def_section, sym->column);
 
-        if (context->options->generate_lsp_info_file) {
+        if (context->options.generate_lsp_info_file) {
             if (sym->documentation_length > 0) {
                 bh_buffer_write_u32(&sym_def_section, docs_section.length);
                 bh_buffer_write_u32(&sym_def_section, sym->documentation_length);
@@ -73,7 +73,7 @@ void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer) {
     bh_buffer_append(&header_section, "OSYM", 4);
 
     u32 header_size = 32;
-    if (context->options->generate_lsp_info_file) {
+    if (context->options.generate_lsp_info_file) {
         bh_buffer_write_u32(&header_section, 2);
         header_size = 40;
     } else {
@@ -87,7 +87,7 @@ void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer) {
     bh_buffer_write_u32(&header_section, header_size + file_section.length + sym_def_section.length);
     bh_buffer_write_u32(&header_section, bh_arr_length(syminfo->symbols_resolutions));
 
-    if (context->options->generate_lsp_info_file) {
+    if (context->options.generate_lsp_info_file) {
         bh_buffer_write_u32(&header_section, header_size + file_section.length + sym_def_section.length + sym_res_section.length);
         bh_buffer_write_u32(&header_section, docs_section.length);
     }
@@ -98,7 +98,7 @@ void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer) {
     bh_buffer_append(out_buffer, sym_def_section.data, sym_def_section.length);
     bh_buffer_append(out_buffer, sym_res_section.data, sym_res_section.length);
 
-    if (context->options->generate_lsp_info_file) {
+    if (context->options.generate_lsp_info_file) {
         bh_buffer_append(out_buffer, docs_section.data, docs_section.length);
     }
 

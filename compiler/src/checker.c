@@ -4538,7 +4538,7 @@ CHECK_FUNC(function_header, AstFunction* func) {
         CHECK(expression, &func->foreign.import_name);
     }
 
-    if (context->options->stack_trace_enabled) {
+    if (context->options.stack_trace_enabled) {
         if (!func->stack_trace_local) {
             OnyxToken *stack_trace_token = bh_alloc_item(context->ast_alloc, OnyxToken);
             stack_trace_token->type = Token_Type_Symbol;
@@ -4835,7 +4835,7 @@ CHECK_FUNC(static_if, AstIf* static_if) {
 
     b32 resolution = static_if_resolution(context, static_if);
 
-    if (context->options->print_static_if_results)
+    if (context->options.print_static_if_results)
         bh_printf("Static if statement at %s:%d:%d resulted in %s\n",
             static_if->token->pos.filename,
             static_if->token->pos.line,
@@ -5634,7 +5634,7 @@ CHECK_FUNC(file_contents, AstFileContents* fc) {
         ERROR(fc->token->pos, "Expected given expression to be a compile-time stirng literal.");
     }
 
-    if (context->options->no_file_contents) {
+    if (context->options.no_file_contents) {
         ERROR(fc->token->pos, "#file_contents is disabled for this compilation.");
     }
 
@@ -5691,7 +5691,7 @@ CHECK_FUNC(foreign_block, AstForeignBlock *fb) {
         }
     }
 
-    if (context->options->generate_foreign_info) {
+    if (context->options.generate_foreign_info) {
         // When generating foreign info, we have to pass this on to codegen
         // so it can build the static data that goes in the binary.
         return Check_Success;
@@ -5763,7 +5763,7 @@ CHECK_FUNC(import, AstImport* import) {
 }
 
 CHECK_FUNC(compiler_extension, AstCompilerExtension *ext) {
-    if (context->options->no_compiler_extensions) {
+    if (context->options.no_compiler_extensions) {
         ERROR(ext->token->pos, "Compiler extensions are disabled in this compilation.");
     }
 
