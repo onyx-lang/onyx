@@ -81,7 +81,7 @@ static AstTyped*      parse_global_declaration(OnyxParser* parser);
 static AstEnumType*   parse_enum_declaration(OnyxParser* parser);
 static AstMacro*      parse_macro(OnyxParser* parser);
 static AstIf*         parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statements);
-static AstMemRes*     parse_memory_reservation(OnyxParser* parser, OnyxToken* symbol, b32 thread_local);
+static AstMemRes*     parse_memory_reservation(OnyxParser* parser, OnyxToken* symbol, b32 is_thread_local);
 static AstTyped*      parse_top_level_expression(OnyxParser* parser);
 static AstBinding*    parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol);
 static void           parse_top_level_statement(OnyxParser* parser);
@@ -2132,10 +2132,10 @@ static AstNode* parse_statement(OnyxParser* parser) {
             }
 
             if (parse_possible_directive(parser, "persist")) {
-                b32 thread_local = parse_possible_directive(parser, "thread_local");
+                b32 is_thread_local = parse_possible_directive(parser, "thread_local");
 
                 OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
-                AstMemRes* memres = parse_memory_reservation(parser, symbol, thread_local);
+                AstMemRes* memres = parse_memory_reservation(parser, symbol, is_thread_local);
 
                 AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
                 binding->token = memres->token;
@@ -2715,10 +2715,10 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         }
 
         if (parse_possible_directive(parser, "persist")) {
-            b32 thread_local = parse_possible_directive(parser, "thread_local");
+            b32 is_thread_local = parse_possible_directive(parser, "thread_local");
 
             OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
-            AstMemRes* memres = parse_memory_reservation(parser, symbol, thread_local);
+            AstMemRes* memres = parse_memory_reservation(parser, symbol, is_thread_local);
             consume_token_if_next(parser, ';');
 
             AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
