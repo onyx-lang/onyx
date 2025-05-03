@@ -17,7 +17,7 @@ Things that need to be done in the compiler:
         I think 'namespace' better reflects the way I think about 'packages'.
         I don't want it to feel too 'C++-y' but I think the nomenclature change is worthwhile.
 
-        'package' was orginally inspired by Java, but there the folder structure must match
+        'package' was originally inspired by Java, but there the folder structure must match
         the package structure. In Onyx, that is not the case because it allows for packages
         to be extended on without needing to modify the source of the original package.
 

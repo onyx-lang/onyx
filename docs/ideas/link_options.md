@@ -57,7 +57,7 @@ That being said, I think the syntax should like so:
 
 There will only be one `#link_options` directive in the entire set
 of included files. After it, it takes an expression that is of type
-`runtime.Link_Options`, which is type infered, as seen above. All
+`runtime.Link_Options`, which is type inferred, as seen above. All
 members of this structure will have default values given by the settings
 that the program is compiling under. If no `#link_options` is provided,
 these default values are used.
@@ -77,7 +77,7 @@ package runtime.vars
 ```
 
 This would simplify a lot, as there would not have to be any other logic
-to deduplicate multiple `#link_options`. The only inconvience is that
+to deduplicate multiple `#link_options`. The only inconvenience is that
 it will have to be part of a separate package, which currently means
 a separate file. That is a separate issue that will hopefully be tackled
 later.
