@@ -305,6 +305,53 @@ Array.filter :: macro (arr: &[..] $T, body: Code) {
 }
 
 
+#overload #order 100
+__for_expansion :: macro (_s: &[..] $T, $flags: __For_Expansion_Flags, $body: Code) where
+    !(flags & .BY_POINTER)
+{
+    __s     := _s
+    __data  := __s.data
+    __count := __s.count
+
+    __i := 0
+    while __i < __count {
+        defer __i += 1
+
+        remove_code :: [] {
+            Array.delete(__s, __i)
+            __i -= 1
+            __count -= 1
+        }
+
+        v := __data[__i]
+        #unquote body(v, __i, remove_code) #skip_scope(1)
+    }
+}
+
+#overload #order 100
+__for_expansion :: macro (_s: &[..] $T, $flags: __For_Expansion_Flags, $body: Code) where
+    (flags & .BY_POINTER)
+{
+    __s     := _s
+    __data  := __s.data
+    __count := __s.count
+
+    __i := 0
+    while __i < __count {
+        defer __i += 1
+
+        remove_code :: [] {
+            Array.delete(__s, __i)
+            __i -= 1
+            __count -= 1
+        }
+
+        v := &__data[__i]
+        #unquote body(v, __i, remove_code) #skip_scope(1)
+    }
+}
+
+
 /// Useful structure when talking about dynamic arrays where you don't know of what
 /// type they store. For example, when passing a dynamic array as an 'any' argument.
 Untyped_Array :: struct {

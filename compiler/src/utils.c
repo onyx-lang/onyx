@@ -906,7 +906,7 @@ void expand_macro(Context *context, AstCall** pcall, AstFunction* template) {
             // This makes a lot of assumptions about how these nodes are being processed,
             // and I don't want to start using this with other nodes without considering
             // what the ramifications of that is.
-            assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents);
+            // assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents);
 
             Scope *scope = argument_scope;
 
@@ -919,6 +919,8 @@ void expand_macro(Context *context, AstCall** pcall, AstFunction* template) {
                     scope = scope_create(context, scope, static_if->token->pos);
                     scope_include(context, scope, template->poly_scope, static_if->token->pos);
                 }
+            } else {
+                scope = template->poly_scope;
             }
 
             add_entities_for_node(&context->entities, NULL, *node, scope, macro->entity->package);
