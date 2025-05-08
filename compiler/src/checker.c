@@ -3179,6 +3179,10 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
             CHECK(proc_expansion, (AstProceduralExpansion **) pexpr, PMEK_Expression);
             break;
 
+        case Ast_Kind_For:
+            CHECK(for, (AstFor **) pexpr);
+            break;
+
         case Ast_Kind_Switch_Case: break;
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;

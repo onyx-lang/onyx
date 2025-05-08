@@ -861,7 +861,7 @@ struct AstBlock         {
 };
 struct AstDefer         { AstNode_base; AstNode *stmt; };
 struct AstFor           {
-    AstNode_base;
+    AstTyped_base;
 
     // NOTE: Stores the iteration variable
     Scope *scope;

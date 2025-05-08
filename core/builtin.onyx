@@ -536,7 +536,7 @@ __For_Expansion_Flags :: enum #flags {
 /// All overloads are macros that accept 3 arguments: the iteratable, flags, and the body
 /// of the loop. Examples of how to use this overloaded procedure can be found in `operations.onyx`
 /// next to this file.
-__for_expansion :: #match -> void {}
+__for_expansion :: #match {}
 
 
 /// Defines all options for changing the memory layout, imports and exports,

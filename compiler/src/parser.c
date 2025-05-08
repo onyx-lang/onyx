@@ -743,6 +743,11 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        case Token_Type_Keyword_For: {
+            retval = (AstTyped *) parse_for_stmt(parser);
+            break;
+        }
+
         case Token_Type_Symbol: {
             if (parse_possible_quick_function_definition(parser, &retval)) {
                 retval->flags |= Ast_Flag_Function_Is_Lambda;
