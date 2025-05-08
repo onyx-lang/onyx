@@ -205,6 +205,32 @@ CHECK_FUNC(symbol, AstNode** symbol_node) {
     OnyxToken* token = (*symbol_node)->token;
     AstNode* res = symbol_resolve(context, context->checker.current_scope, token);
 
+    //
+    // If the symbol wasn't found, try a very crude search for "capture-able" variables in
+    // the enclosing scope of the function if that is possible.
+    if (!res) {
+        AstFunction *current_func = context->checker.current_entity->function;
+
+        if (current_func->kind == Ast_Kind_Function && current_func->captures && current_func->scope_to_lookup_captured_values) {
+            AstCaptureBlock *block = current_func->captures;
+            AstTyped *resolved = (AstTyped *) symbol_resolve(context, current_func->scope_to_lookup_captured_values, token);
+
+            if (resolved) {
+                AstCaptureLocal *capture = onyx_ast_node_new(context->ast_alloc, sizeof(AstCaptureLocal), Ast_Kind_Capture_Local);
+                capture->captured_value = resolved;
+                capture->token = token;
+
+                CHECK(expression, (AstTyped **) &capture);
+                capture->offset = block->total_size_in_bytes;
+                block->total_size_in_bytes += type_size_of(capture->type);
+
+                bh_arr_push(block->captures, capture);
+
+                res = (AstNode *) capture;
+            }
+        }
+    }
+
     if (!res) {
         if (context->cycle_detected) {
             token_toggle_end(token);
@@ -3509,15 +3535,17 @@ CHECK_FUNC(capture_block, AstCaptureBlock *block, Scope *captured_scope) {
     block->total_size_in_bytes = 8;
 
     bh_arr_each(AstCaptureLocal *, capture, block->captures) {
-        OnyxToken *token = (*capture)->token;
-        AstTyped *resolved = (AstTyped *) symbol_resolve(context, captured_scope, token);
+        if (!(*capture)->captured_value) {
+            OnyxToken *token = (*capture)->token;
+            AstTyped *resolved = (AstTyped *) symbol_resolve(context, captured_scope, token);
 
-        if (!resolved) {
-            // Should this do a yield? In there any case that that would make sense?
-            ERROR_(token->pos, "'%b' is not found in the enclosing scope.", token->text, token->length);
+            if (!resolved) {
+                // Should this do a yield? In there any case that that would make sense?
+                ERROR_(token->pos, "'%b' is not found in the enclosing scope.", token->text, token->length);
+            }
+
+            (*capture)->captured_value = resolved;
         }
-
-        (*capture)->captured_value = resolved;
 
         CHECK(expression, (AstTyped **) capture);
         if (!(*capture)->type) YIELD((*capture)->token->pos, "Waiting to resolve captures type.");
