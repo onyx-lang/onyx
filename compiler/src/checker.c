@@ -3324,9 +3324,8 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
         scope_for_cloned_block = scope_create(context, skip_scope, cloned_block->token->pos);
     }
 
-    if (bound_expr_count > 0) {
-        Scope **scope = NULL;
-
+    Scope **scope = NULL;
+    if (bound_expr_count > 0 || bh_arr_length(insert->bindings) > 0) {
         if (cloned_block->kind == Ast_Kind_Block) {
             ((AstBlock *) cloned_block)->scope = scope_for_cloned_block;
             scope = &((AstBlock *) cloned_block)->quoted_block_capture_scope;
@@ -3351,26 +3350,35 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
 
             cloned_block = (AstNode *) doblock;
         }
+    }
 
-        if (bound_symbol_count > 0) {
-            assert(scope);
-            *scope = scope_create(context, NULL, code_block->token->pos);
+    if (bound_symbol_count > 0) {
+        assert(scope);
+        *scope = scope_create(context, NULL, code_block->token->pos);
 
-            fori (i, 0, bound_symbol_count) {
-                CodeBlockBindingSymbol sym = code_block->binding_symbols[i];
-                if (sym.type_node) {
-                    Type *type = type_build_from_ast(context, sym.type_node);
+        fori (i, 0, bound_symbol_count) {
+            CodeBlockBindingSymbol sym = code_block->binding_symbols[i];
+            if (sym.type_node) {
+                Type *type = type_build_from_ast(context, sym.type_node);
 
-                    TYPE_CHECK(&insert->binding_exprs[i], type) {
-                        ERROR_(insert->token->pos, "Expected type '%s' but got type '%s' for the '%d%s' argument to the code block.", 
-                               type_get_name(context, type), type_get_name(context, insert->binding_exprs[i]->type),
-                               i + 1, bh_num_suffix(i + 1));
-                    }
+                TYPE_CHECK(&insert->binding_exprs[i], type) {
+                    ERROR_(insert->token->pos, "Expected type '%s' but got type '%s' for the '%d%s' argument to the code block.", 
+                           type_get_name(context, type), type_get_name(context, insert->binding_exprs[i]->type),
+                           i + 1, bh_num_suffix(i + 1));
                 }
-
-                AstNode *value = (void *) insert->binding_exprs[i];
-                symbol_introduce(context, *scope, sym.symbol, value);
             }
+
+            AstNode *value = (void *) insert->binding_exprs[i];
+            symbol_introduce(context, *scope, sym.symbol, value);
+        }
+    }
+
+    if (bh_arr_length(insert->bindings) > 0) {
+        assert(scope);
+        if (!*scope) *scope = scope_create(context, NULL, code_block->token->pos);
+
+        bh_arr_each(UnquoteDirectiveBinding, binding, insert->bindings) {
+            symbol_introduce(context, *scope, binding->symbol, (AstNode *) binding->value);
         }
     }
 

@@ -1078,6 +1078,28 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                     insert->skip_scope_index = parse_factor(parser);
                 }
 
+                // CLEANUP: Could this system use the same logic for AstBinding?
+                if (parse_possible_directive(parser, "inject")){
+                    expect_token(parser, '{');
+                    while (!consume_token_if_next(parser, '}')) {
+                        if (parser->hit_unexpected_token) break;
+
+                        OnyxToken *sym = expect_token(parser, Token_Type_Symbol);
+                        expect_token(parser, ':');
+                        expect_token(parser, ':');
+
+                        AstTyped *binding = parse_top_level_expression(parser);
+
+                        bh_arr_push(insert->bindings, ((UnquoteDirectiveBinding) {
+                            .symbol = sym,
+                            .value = (AstNode *) binding
+                        }));
+
+                        if (parser->curr->type != '}')
+                            consume_token_if_next(parser, ';');
+                    }
+                }
+
                 retval = (AstTyped *) insert;
                 break;
             }

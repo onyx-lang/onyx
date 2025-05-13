@@ -1630,6 +1630,12 @@ struct AstCodeBlock {
     b32 is_expression: 1;
 };
 
+typedef struct UnquoteDirectiveBinding UnquoteDirectiveBinding;
+struct UnquoteDirectiveBinding {
+    OnyxToken *symbol;
+    AstNode *value;
+};
+
 struct AstDirectiveInsert {
     AstTyped_base;
 
@@ -1638,6 +1644,8 @@ struct AstDirectiveInsert {
 
     // Set when using #skip_scope
     AstTyped *skip_scope_index;
+
+    bh_arr(UnquoteDirectiveBinding) bindings;
 };
 
 struct AstDirectiveInit {
