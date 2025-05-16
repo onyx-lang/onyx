@@ -714,7 +714,13 @@ void onyx_add_mapped_dir(onyx_context_t *ctx, char *mapped_name, int32_t mapped_
 
 /// Directly injects Onyx code as a new compilation unit
 void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length) {
-    assert(0 && "unimplemented");
+    bh_file_contents file_contents;
+    file_contents.allocator = ctx->context.ast_alloc;
+    file_contents.data = code;
+    file_contents.length = length;
+    file_contents.filename = "(injected)";
+
+    parse_source_file(&ctx->context, &file_contents);
 }
 
 //

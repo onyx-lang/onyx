@@ -41,6 +41,10 @@ Builder.add_source :: (use self: &#Self, filename: str) {
     native.onyx_include_file(ctx, filename)
 }
 
+Builder.inject_source :: (use self: &#Self, source: str) {
+    native.onyx_inject_code(ctx, source)
+}
+
 Builder.set_platform :: (use self: &#Self, platform: native.onyx_platform_t) {
     native.onyx_set_option_int(ctx, .PLATFORM, ~~platform)
 }
