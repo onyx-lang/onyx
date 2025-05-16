@@ -215,11 +215,58 @@ static b32 process_source_file(Context *context, char* filename) {
     return 1;
 }
 
+static b32 process_load_directory(Context *context, AstInclude *include, char *folder) {
+    bh_path_convert_separators(folder);
+
+    bh_arr(char *) folders_to_process = NULL;
+    bh_arr_new(context->gp_alloc, folders_to_process, 2);
+
+    bh_arr_push(folders_to_process, bh_strdup(context->scratch_alloc, folder));
+
+    while (bh_arr_length(folders_to_process) > 0) {
+        char *folder = bh_arr_pop(folders_to_process);
+        bh_dir dir = bh_dir_open(folder);
+        if (dir == NULL) {
+            ONYX_ERROR(include->token->pos, Error_Critical, "Could not find or open folder '%s'.", folder);
+            return 0;
+        }
+
+        bh_dirent entry;
+        char fullpath[512];
+        while (bh_dir_read(dir, &entry)) {
+            if (entry.type == BH_DIRENT_FILE && bh_str_ends_with(entry.name, ".onyx")) {
+                bh_snprintf(fullpath, 511, "%s/%s", folder, entry.name);
+                bh_path_convert_separators(fullpath);
+
+                char* formatted_name = bh_path_get_full_name(fullpath, context->gp_alloc);
+
+                AstInclude* new_include = onyx_ast_node_new(context->ast_alloc, sizeof(AstInclude), Ast_Kind_Load);
+                new_include->token = include->token;
+                new_include->name = formatted_name;
+                add_entities_for_node(&context->entities, NULL, (AstNode *) new_include, include->entity->scope, include->entity->package);
+            }
+
+            if (entry.type == BH_DIRENT_DIRECTORY && include->recursive) {
+                if (!strcmp(entry.name, ".") || !strcmp(entry.name, "..")) continue;
+
+                bh_snprintf(fullpath, 511, "%s/%s", folder, entry.name);
+                char* formatted_name = bh_path_get_full_name(fullpath, context->scratch_alloc); // Could this overflow the scratch allocator?
+
+                bh_arr_push(folders_to_process, formatted_name);
+            }
+        }
+
+        bh_dir_close(dir);
+    }
+
+    return 1;
+}
+
 static b32 process_load_entity(Context *context, Entity* ent) {
     assert(ent->type == Entity_Type_Load_File || ent->type == Entity_Type_Load_Path);
     AstInclude* include = ent->include;
 
-    if (include->kind == Ast_Kind_Load_File) {
+    if (include->kind == Ast_Kind_Load) {
         // :RelativeFiles
         const char* parent_file = include->token->pos.filename;
         if (parent_file == NULL) parent_file = ".";
@@ -233,78 +280,30 @@ static b32 process_load_entity(Context *context, Entity* ent) {
             context->gp_alloc
         );
 
-        if (filename == NULL) {
-            OnyxFilePos error_pos = include->token->pos;
-            if (error_pos.filename == NULL) {
-                ONYX_ERROR(error_pos, Error_Command_Line_Arg, "Failed to open file '%s'", include->name);
-            } else {
-                ONYX_ERROR(error_pos, Error_Critical, "Failed to open file '%s'", include->name);
-            }
-            return 0;
+        if (filename) {
+            return process_source_file(context, filename);
         }
 
-        return process_source_file(context, filename);
-
-    } else if (include->kind == Ast_Kind_Load_All) {
-        const char* parent_file = include->token->pos.filename;
-        if (parent_file == NULL) parent_file = ".";
-
-        char* parent_folder = bh_path_get_parent(parent_file, context->scratch_alloc);
-
-        char* folder = bh_search_for_mapped_file(
+        filename = bh_search_for_mapped_file(
             include->name,
             parent_folder,
             "",
             context->options.mapped_folders,
             context->gp_alloc
         );
-        bh_path_convert_separators(folder);
 
-        bh_arr(char *) folders_to_process = NULL;
-        bh_arr_new(context->gp_alloc, folders_to_process, 2);
-
-        bh_arr_push(folders_to_process, bh_strdup(context->scratch_alloc, folder));
-
-        while (bh_arr_length(folders_to_process) > 0) {
-            char *folder = bh_arr_pop(folders_to_process);
-            bh_dir dir = bh_dir_open(folder);
-            if (dir == NULL) {
-                ONYX_ERROR(include->token->pos, Error_Critical, "Could not find or open folder '%s'.", folder);
-                return 0;
-            }
-
-            bh_dirent entry;
-            char fullpath[512];
-            while (bh_dir_read(dir, &entry)) {
-                if (entry.type == BH_DIRENT_FILE && bh_str_ends_with(entry.name, ".onyx")) {
-                    bh_snprintf(fullpath, 511, "%s/%s", folder, entry.name);
-                    bh_path_convert_separators(fullpath);
-
-                    char* formatted_name = bh_path_get_full_name(fullpath, context->gp_alloc);
-
-                    AstInclude* new_include = onyx_ast_node_new(context->ast_alloc, sizeof(AstInclude), Ast_Kind_Load_File);
-                    new_include->token = include->token;
-                    new_include->name = formatted_name;
-                    add_entities_for_node(&context->entities, NULL, (AstNode *) new_include, include->entity->scope, include->entity->package);
-                }
-
-                if (entry.type == BH_DIRENT_DIRECTORY && include->recursive) {
-                    if (!strcmp(entry.name, ".") || !strcmp(entry.name, "..")) continue;
-
-                    bh_snprintf(fullpath, 511, "%s/%s", folder, entry.name);
-                    char* formatted_name = bh_path_get_full_name(fullpath, context->scratch_alloc); // Could this overflow the scratch allocator?
-
-                    bh_arr_push(folders_to_process, formatted_name);
-                }
-            }
-
-            bh_dir_close(dir);
+        if (filename) {
+            return process_load_directory(context, include, filename);
         }
 
-        return 1;
+        OnyxFilePos error_pos = include->token->pos;
+        if (error_pos.filename == NULL) {
+            ONYX_ERROR(error_pos, Error_Command_Line_Arg, "Failed to open file or directory '%s'", include->name);
+        } else {
+            ONYX_ERROR(error_pos, Error_Critical, "Failed to open file or directory '%s'", include->name);
+        }
 
-    } else if (include->kind == Ast_Kind_Load_Path) {
-        ONYX_WARNING(include->token->pos, "'#load_path' has been deprecated and no longer does anything.");
+        return 0;
 
     } else if (include->kind == Ast_Kind_Library_Path) {
         bh_arr_push(context->wasm_module->library_paths, include->name);
@@ -963,7 +962,7 @@ void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, cha
 static AstInclude* create_load(Context *context, char* filename, int32_t length) {
     static OnyxToken implicit_load_token = { '#', 1, 0, { 0, 0, 0, 0, 0 } };
     
-    AstInclude* include_node = onyx_ast_node_new(context->ast_alloc, sizeof(AstInclude), Ast_Kind_Load_File);
+    AstInclude* include_node = onyx_ast_node_new(context->ast_alloc, sizeof(AstInclude), Ast_Kind_Load);
     include_node->name = bh_strdup_len(context->ast_alloc, filename, length);
     include_node->token = &implicit_load_token;
 

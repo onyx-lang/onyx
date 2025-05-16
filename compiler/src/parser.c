@@ -4215,23 +4215,15 @@ static void parse_top_level_statement(OnyxParser* parser) {
             OnyxToken* dir_token = parser->curr;
 
             if (parse_possible_directive(parser, "load")) {
-                AstInclude* include = make_node(AstInclude, Ast_Kind_Load_File);
+                AstInclude* include = make_node(AstInclude, Ast_Kind_Load);
                 include->token = dir_token;
                 include->name_node = parse_expression(parser, 0);
 
                 ENTITY_SUBMIT(include);
                 return;
             }
-            else if (parse_possible_directive(parser, "load_all")) {
-                AstInclude* include = make_node(AstInclude, Ast_Kind_Load_All);
-                include->token = dir_token;
-                include->name_node = parse_expression(parser, 0);
-
-                ENTITY_SUBMIT(include);
-                return;
-            }
-            else if (parse_possible_directive(parser, "load_all_recursive")) {
-                AstInclude* include = make_node(AstInclude, Ast_Kind_Load_All);
+            else if (parse_possible_directive(parser, "load_recursive")) {
+                AstInclude* include = make_node(AstInclude, Ast_Kind_Load);
                 include->token = dir_token;
                 include->name_node = parse_expression(parser, 0);
                 include->recursive = 1;
@@ -4239,12 +4231,17 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(include);
                 return;
             }
-            else if (parse_possible_directive(parser, "load_path")) {
-                AstInclude* include = make_node(AstInclude, Ast_Kind_Load_Path);
+            else if (parse_possible_directive(parser, "load_all")) {
+                onyx_report_warning(parser->context, dir_token->pos, "'#load_all' will be removed in a future version; Use '#load' instead.");
+                AstInclude* include = make_node(AstInclude, Ast_Kind_Load);
                 include->token = dir_token;
                 include->name_node = parse_expression(parser, 0);
 
                 ENTITY_SUBMIT(include);
+                return;
+            }
+            else if (parse_possible_directive(parser, "load_all_recursive")) {
+                onyx_report_warning(parser->context, dir_token->pos, "'#load_all_recursive' no longer does anything; Use '#load_recursive' instead.");
                 return;
             }
             else if (parse_possible_directive(parser, "library_path")) {
