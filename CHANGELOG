@@ -1,3 +1,34 @@
+Release 0.1.14
+--------------
+Not released yet
+
+Changes:
+- Major compiler refactoring that allows for:
+    - The compiler being a C library
+    - The compiler being accessible from the language itself (`package core.onyx`)
+    - `for`-macros
+    - and much more in the future
+
+Additions:
+- Compiler can be used as a C library using provided `include/onyx.h` and `lib/libonyx.so`
+- for-loops are implemented as a macro (`__for_expansion` in `builtin.onyx`)
+    - This allows you to write for-loops over custom data types
+- `#unquote` now has more control over unquoted code
+    - `#skip_scope(N)` to skip N scopes
+    - `#inject` to add custom bindings visible in unquoted body
+- `Code` blocks now have generated fields to introspect information
+    - `block.capture_count` for number of captures
+    - `block.capture_type_N` where N is a 1-index psuedo-array of given types
+        - `[a: i32] {}` would have `capture_type_1` equal to `i32`
+
+Removals:
+- `#load_all` is deprecated in favor of `#load`
+
+Bugfixes:
+
+
+
+
 Release 0.1.13
 --------------
 8th November 2024
