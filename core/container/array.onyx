@@ -308,6 +308,12 @@ Array.filter :: macro (arr: &[..] $T, body: Code) {
 #overload #order 100
 __for_expansion :: macro (_s: &[..] $T, $flags: __For_Expansion_Flags, $body: Code)
 {
+    remove_element :: macro () {
+        Array.delete(__s, __i)
+        __i -= 1
+        __count -= 1
+    }
+
     __s     := _s
     __data  := __s.data
     __count := __s.count
@@ -322,13 +328,7 @@ __for_expansion :: macro (_s: &[..] $T, $flags: __For_Expansion_Flags, $body: Co
             v := __data[__i]
         }
 
-        #unquote body(v, __i) #skip_scope(1) #inject {
-            remove_element :: macro () {
-                Array.delete(__s, __i)
-                __i -= 1
-                __count -= 1
-            }
-        }
+        #unquote body(v, __i) #skip_scope(1)
     }
 }
 
