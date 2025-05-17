@@ -3128,16 +3128,22 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
             retval = check_insert_directive(context, (AstDirectiveInsert **) pexpr, 1);
             break;
 
-        case Ast_Kind_Code_Block:
-            expr->flags |= Ast_Flag_Comptime;
-            ((AstCodeBlock *) expr)->enclosing_scope = context->checker.current_scope;
+        case Ast_Kind_Code_Block: {
+            AstCodeBlock *block = (void *) expr;
+
             fill_in_type(context, expr);
-            bh_arr_each(CodeBlockBindingSymbol, sym, ((AstCodeBlock *) expr)->binding_symbols) {
+            block->flags |= Ast_Flag_Comptime;
+
+            if (!block->enclosing_scope)
+                block->enclosing_scope = context->checker.current_scope;
+
+            bh_arr_each(CodeBlockBindingSymbol, sym, block->binding_symbols) {
                 if (sym->type_node) {
                     CHECK(expression, (AstTyped **) &sym->type_node);
                 }
             }
             break;
+        }
 
         case Ast_Kind_Do_Block: {
             Scope* old_current_scope = context->checker.current_scope;

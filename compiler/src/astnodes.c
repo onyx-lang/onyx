@@ -1970,6 +1970,7 @@ AstCall * create_implicit_for_expansion_call(Context *context, AstFor *fornode) 
     body_code_block->token = fornode->token;
     body_code_block->type_node = context->builtins.code_type;
     body_code_block->code = (AstNode *) fornode->stmt;
+    body_code_block->enclosing_scope = context->checker.current_scope;
     ((AstBlock *) body_code_block->code)->rules = Block_Rule_Code_Block;
 
     bh_arr_new(context->ast_alloc, body_code_block->binding_symbols, bh_arr_length(fornode->indexing_variables));
@@ -1986,13 +1987,11 @@ AstCall * create_implicit_for_expansion_call(Context *context, AstFor *fornode) 
     
     AstNumLit *flag_node = make_int_literal(context, flags);
     flag_node->type_node = context->builtins.for_expansion_flag_type;
-    // flag_node->type = type_build_from_ast(context, context->builtins.for_expansion_flag_type);
-    // assert(flag_node->type);
 
     // Arguments are: 
     //    Iterator
-    //    Code block with 2 inputs (value, index)
     //    Flags
+    //    Code block with 2 inputs (value, index)
     bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) fornode->iter));
     bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) flag_node));
     bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) body_code_block));

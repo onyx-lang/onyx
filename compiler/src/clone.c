@@ -118,6 +118,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Union_Type: return sizeof(AstUnionType);
         case Ast_Kind_Union_Variant: return sizeof(AstUnionVariant);
         case Ast_Kind_Procedural_Expansion: return sizeof(AstProceduralExpansion);
+        case Ast_Kind_Code_Block: return sizeof(AstCodeBlock);
 
         default: break;
     }
