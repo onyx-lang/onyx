@@ -3130,6 +3130,7 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
 
         case Ast_Kind_Code_Block:
             expr->flags |= Ast_Flag_Comptime;
+            ((AstCodeBlock *) expr)->enclosing_scope = context->checker.current_scope;
             fill_in_type(context, expr);
             bh_arr_each(CodeBlockBindingSymbol, sym, ((AstCodeBlock *) expr)->binding_symbols) {
                 if (sym->type_node) {
@@ -3220,7 +3221,7 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
 
         default:
             retval = Check_Error;
-            ONYX_ERROR(expr->token->pos, Error_Critical, "UNEXPECTED INTERNAL COMPILER ERROR");
+            ONYX_ERROR(expr->token->pos, Error_Critical, "UNEXPECTED INTERNAL COMPILER ERROR (%s)", onyx_ast_node_kind_string(expr->kind));
             DEBUG_HERE;
             break;
     }
@@ -3261,8 +3262,8 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
         CHECK(expression, pexpr);
     }
 
-    if (insert->skip_scope_index) {
-        CHECK(expression, &insert->skip_scope_index);
+    if (insert->scope_expr) {
+        CHECK(expression, &insert->scope_expr);
     }
 
     Type* code_type = type_build_from_ast(context, context->builtins.code_type);
@@ -3312,16 +3313,20 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
 
     bh_arr_free(captured_entities);
 
-    i32 skip_scope_index = get_expression_integer_value(context, insert->skip_scope_index, NULL);
+    // i32 skip_scope_index = get_expression_integer_value(context, insert->skip_scope_index, NULL);
     Scope *scope_for_cloned_block = NULL;
-    if (skip_scope_index > 0) {
-        Scope *skip_scope = context->checker.current_scope;
-        fori (i, 0, skip_scope_index) {
-            if (!skip_scope->parent) break;
-            skip_scope = skip_scope->parent;
+    if (insert->scope_expr) {
+        if (insert->scope_expr->kind != Ast_Kind_Code_Block) {
+            ERROR_(insert->token->pos, "'#scope' expected a compile-code block, but got '%s' instead.",
+                type_get_name(context, insert->scope_expr->type)
+            );
         }
 
-        scope_for_cloned_block = scope_create(context, skip_scope, cloned_block->token->pos);
+        AstCodeBlock *scope_block = (AstCodeBlock *) insert->scope_expr;
+
+        assert(scope_block->enclosing_scope);
+
+        scope_for_cloned_block = scope_create(context, scope_block->enclosing_scope, cloned_block->token->pos);
     }
 
     Scope **scope = NULL;

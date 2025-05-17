@@ -59,7 +59,7 @@ __for_expansion :: macro (_s: [] $T, $flags: __For_Expansion_Flags, $body: Code)
         defer i += 1
 
         v := data[i]
-        #unquote body(v, i) #skip_scope(2)
+        #unquote body(v, i) #scope(body)
     }
 }
 
@@ -74,7 +74,7 @@ __for_expansion :: macro (_s: [] $T, $flags: __For_Expansion_Flags, $body: Code)
         defer i += 1
 
         v := &data[i]
-        #unquote body(v, i) #skip_scope(2)
+        #unquote body(v, i) #scope(body)
     }
 }
 
@@ -91,7 +91,7 @@ __for_expansion :: macro (_r: range, $flags: __For_Expansion_Flags, $body: Code)
         
         defer i += step
 
-        #unquote body(i) #skip_scope(2)
+        #unquote body(i) #scope(body)
     }
 }
 
@@ -115,7 +115,7 @@ __for_expansion :: macro (_r: range, $flags: __For_Expansion_Flags, $body: Code)
         defer i += step
         defer j += 1
 
-        #unquote body(i, j) #skip_scope(2)
+        #unquote body(i, j) #scope(body)
     }
 }
 
@@ -132,7 +132,7 @@ __for_expansion :: macro (_r: range64, $flags: __For_Expansion_Flags, $body: Cod
         
         defer i += step
 
-        #unquote body(i) #skip_scope(2)
+        #unquote body(i) #scope(body)
     }
 }
 
@@ -156,7 +156,7 @@ __for_expansion :: macro (_r: range64, $flags: __For_Expansion_Flags, $body: Cod
         defer i += step
         defer j += 1
 
-        #unquote body(i, j) #skip_scope(2)
+        #unquote body(i, j) #scope(body)
     }
 }
 
@@ -168,7 +168,7 @@ __for_expansion :: macro (n: i32, $flags: __For_Expansion_Flags, $body: Code) {
     while i < end {
         defer i += 1
 
-        #unquote body(i) #skip_scope(2)
+        #unquote body(i) #scope(body)
     }
 }
 
@@ -180,7 +180,7 @@ __for_expansion :: macro (n: i64, $flags: __For_Expansion_Flags, $body: Code) {
     while i < end {
         defer i += 1
 
-        #unquote body(i) #skip_scope(2)
+        #unquote body(i) #scope(body)
     }
 }
 

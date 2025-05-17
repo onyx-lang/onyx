@@ -881,8 +881,10 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                     code_block->code = (AstNode *) parse_block(parser, 1, NULL);
                     ((AstBlock *) code_block->code)->rules = Block_Rule_Code_Block;
                 } else {
+                    expect_token(parser, '(');
                     code_block->code = (AstNode *) parse_expression(parser, 1);
                     code_block->is_expression = 1;
+                    expect_token(parser, ')');
                 }
 
                 retval = (AstTyped *) code_block;
@@ -893,6 +895,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         }
 
         case Token_Type_Keyword_Struct:
+        case Token_Type_Keyword_Union:
         case '?': {
             AstType *type = parse_type(parser);
             retval = (AstTyped *) type;
@@ -1074,8 +1077,8 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                     }
                 }
 
-                if (parse_possible_directive(parser, "skip_scope")) {
-                    insert->skip_scope_index = parse_factor(parser);
+                if (parse_possible_directive(parser, "scope")) {
+                    insert->scope_expr = parse_factor(parser);
                 }
 
                 // CLEANUP: Could this system use the same logic for AstBinding?

@@ -19,7 +19,6 @@ static inline b32 should_clone(Context *context, AstNode* node) {
         case Ast_Kind_Package:
         case Ast_Kind_Overloaded_Function:
         case Ast_Kind_Alias:
-        case Ast_Kind_Code_Block:
         case Ast_Kind_Macro:
         case Ast_Kind_Symbol:
         case Ast_Kind_Poly_Struct_Type:
@@ -667,7 +666,7 @@ AstNode* ast_clone(Context *context, void* n) {
             C(AstIfExpression, false_expr);
             break;
 
-        case Ast_Kind_Directive_Insert:
+        case Ast_Kind_Directive_Insert: {
             C(AstDirectiveInsert, code_expr);
 
             AstDirectiveInsert* id = (AstDirectiveInsert *) nn;
@@ -679,6 +678,7 @@ AstNode* ast_clone(Context *context, void* n) {
                 bh_arr_push(id->binding_exprs, (AstTyped *) ast_clone(context, (AstNode *) *expr));
             }
             break;
+        }
 
         case Ast_Kind_Directive_Defined:
             C(AstDirectiveDefined, expr);
@@ -713,6 +713,23 @@ AstNode* ast_clone(Context *context, void* n) {
 
             bh_arr_each(AstCaptureLocal *, expr, cs->captures) {
                 bh_arr_push(cd->captures, (AstCaptureLocal *) ast_clone(context, (AstNode *) *expr));
+            }
+            break;
+        }
+
+        case Ast_Kind_Code_Block: {
+            AstCodeBlock* cd = (void *) nn;
+            AstCodeBlock* cs = (void *) node;
+
+            cd->enclosing_scope = NULL;
+            cd->binding_symbols = NULL;
+            bh_arr_new(context->gp_alloc, cd->binding_symbols, bh_arr_length(cs->binding_symbols));
+
+            bh_arr_each(CodeBlockBindingSymbol, sym, cs->binding_symbols) {
+                CodeBlockBindingSymbol new_sym;
+                new_sym.symbol = sym->symbol;
+                new_sym.type_node = (void *) ast_clone(context, (void *) sym->type_node);
+                bh_arr_push(cd->binding_symbols, new_sym);
             }
             break;
         }

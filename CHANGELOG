@@ -14,7 +14,7 @@ Additions:
 - for-loops are implemented as a macro (`__for_expansion` in `builtin.onyx`)
     - This allows you to write for-loops over custom data types
 - `#unquote` now has more control over unquoted code
-    - `#skip_scope(N)` to skip N scopes
+    - `#scope(Code)` to set parent scope
     - `#inject` to add custom bindings visible in unquoted body
 - `Code` blocks now have generated fields to introspect information
     - `block.capture_count` for number of captures

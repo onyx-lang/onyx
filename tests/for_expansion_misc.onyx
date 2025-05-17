@@ -17,7 +17,7 @@ __for_expansion :: macro (x: ArrPair($A, $B), $flags: __For_Expansion_Flags, $bo
 
     for _a in x.a {
         for _b in x.b {
-            #unquote body(_a, _b) #skip_scope(3)
+            #unquote body(_a, _b) #scope body
         }
     }
 }
@@ -37,7 +37,7 @@ __for_expansion :: macro (r: MyRange, $flags: __For_Expansion_Flags, $body: Code
             _i += _step
         }
 
-        #unquote body(_i) #skip_scope(2)
+        #unquote body(_i) #scope(body)
     }
 }
 

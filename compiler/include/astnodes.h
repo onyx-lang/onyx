@@ -1626,7 +1626,9 @@ struct AstCodeBlock {
     AstNode *code;
     bh_arr(CodeBlockBindingSymbol) binding_symbols;
 
-    b32 is_expression: 1;
+    Scope *enclosing_scope;
+
+    b32 is_expression : 1;
 };
 
 typedef struct UnquoteDirectiveBinding UnquoteDirectiveBinding;
@@ -1641,8 +1643,8 @@ struct AstDirectiveInsert {
     AstTyped *code_expr;
     bh_arr(AstTyped *) binding_exprs;
 
-    // Set when using #skip_scope
-    AstTyped *skip_scope_index;
+    // Set when using #scope
+    AstTyped *scope_expr;
 
     bh_arr(UnquoteDirectiveBinding) bindings;
 };

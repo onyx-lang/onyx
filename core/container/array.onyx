@@ -308,19 +308,13 @@ Array.filter :: macro (arr: &[..] $T, body: Code) {
 #overload #order 100
 __for_expansion :: macro (_s: &[..] $T, $flags: __For_Expansion_Flags, $body: Code)
 {
-    remove_element :: macro () {
-        Array.delete(__s, __i)
-        __i -= 1
-        __count -= 1
-    }
+    s     := _s
+    data  := s.data
+    count := s.count
 
-    __s     := _s
-    __data  := __s.data
-    __count := __s.count
-
-    __i := 0
-    while __i < __count {
-        defer __i += 1
+    i := 0
+    while i < count {
+        defer i += 1
 
         #if flags & .BY_POINTER {
             v := &__data[__i]
@@ -328,7 +322,17 @@ __for_expansion :: macro (_s: &[..] $T, $flags: __For_Expansion_Flags, $body: Co
             v := __data[__i]
         }
 
-        #unquote body(v, __i) #skip_scope(1)
+        #unquote body(v, __i) #scope(body) #inject {
+            __INDEX :: i
+            __ARRAY :: s
+            __COUNT :: count
+
+            remove_element :: macro () {
+                Array.delete(__ARRAY, __INDEX)
+                __INDEX -= 1
+                __COUNT -= 1
+            }
+        }
     }
 }
 

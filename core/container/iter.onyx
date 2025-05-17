@@ -39,7 +39,7 @@ __for_expansion :: macro (iterator: Iterator($T), $flags: __For_Expansion_Flags,
         if value.tag == .None do break
 
         _it := *cast(&T) (cast([&] u8, &value) + alignof ? T)
-        #unquote body(_it, _i) #skip_scope(2)
+        #unquote body(_it, _i) #scope(body)
     }
 }
 
@@ -60,7 +60,7 @@ __for_expansion :: macro (iterator: Iterator($T), $flags: __For_Expansion_Flags,
         if value.tag == .None do break
 
         _it := *cast(&T) (cast([&] u8, &value) + alignof ? T)
-        #unquote body(_it) #skip_scope(2)
+        #unquote body(_it) #scope(body)
     }
 }
 
