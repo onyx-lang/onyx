@@ -2,7 +2,7 @@ Rewriting Structure Assembly Code
 =================================
 
 Current in the Onyx code generator, structures r-values are represented
-in the execution stack as each of their individual primitive memebers.
+in the execution stack as each of their individual primitive members.
 This solution has proved relatively easy to implement, but takes A LOT
 of extra instructions compared to the alternative.
 
@@ -65,7 +65,7 @@ calls that return structures is done every where in Onyx programs. Just take the
         }
 
 In this example, each of the return values of those functions is an `Iterator(i32)`,
-which is obviously a structure. In the new system, passing each result as a paramter
+which is obviously a structure. In the new system, passing each result as a parameter
 to the next function would not work as shown with the array example above. A solution
 to this problem must be found before this refactor can be completed.
 

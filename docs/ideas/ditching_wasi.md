@@ -11,7 +11,7 @@ the WASI runtime, obviously, but I want to completely ditch it elsewhere.
 
 In addition to reimplementing the file, directory and clock operations that were
 available in WASI, Onyx could support a proper TCP/UDP networking protocol,
-probabily similar to the socket library in Python.
+probably similar to the socket library in Python.
 
 Good article about differences between Winsock and Berkeley sockets:
 https://handsonnetworkprogramming.com/articles/differences-windows-winsock-linux-unix-bsd-sockets-compatibility/
