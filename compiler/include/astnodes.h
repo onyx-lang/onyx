@@ -204,12 +204,10 @@ typedef enum AstKind {
     Ast_Kind_Param,
     Ast_Kind_Argument,
     Ast_Kind_Call,
-    Ast_Kind_Intrinsic_Call,
     Ast_Kind_Return,
     Ast_Kind_Address_Of,
     Ast_Kind_Dereference,
     Ast_Kind_Subscript,
-    Ast_Kind_Slice,
     Ast_Kind_Field_Access,
     Ast_Kind_Unary_Field_Access,
     Ast_Kind_Pipe,
@@ -721,7 +719,7 @@ struct AstArgument      {
 };
 struct AstSubscript   {
     AstTyped_base;
-    BinaryOp __unused_operation; // This will be set to Binary_Op_Subscript
+    BinaryOp operation; // This will be set to Binary_Op_Subscript
     AstTyped *addr;
     AstTyped *expr;
 
@@ -729,7 +727,8 @@ struct AstSubscript   {
                               // but isnt successful yet.
     AstBinaryOp *potential_substitute;
 
-    u64 elem_size;
+    u32 elem_size;
+    b32 is_slice : 1;
 };
 struct AstFieldAccess   {
     AstTyped_base;
@@ -800,10 +799,8 @@ struct AstCall {
     Arguments args;
     i32 placeholder_argument_position;
 
-    union {
-        AstTyped *callee;
-        OnyxIntrinsic intrinsic;
-    };
+    AstTyped *callee;
+    OnyxIntrinsic intrinsic;
 
     VarArgKind va_kind;
     i32 ignored_return_value_count;

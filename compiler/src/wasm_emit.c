@@ -1838,6 +1838,11 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
 // this because many times for interoperability, it is nicer to get two primitive values for the pointer and
 // count of a slice, instead of a pointer.
 EMIT_FUNC(call, AstCall* call) {
+    if (call->intrinsic) {
+        emit_intrinsic_call(mod, pcode, call);
+        return;
+    }
+
     bh_arr(WasmInstruction) code = *pcode;
 
     u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &mod->context->builtins.stack_top);
@@ -3338,7 +3343,6 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Do_Block:       emit_do_block(mod, &code, (AstDoBlock *) expr); break;
         case Ast_Kind_Call:           emit_call(mod, &code, (AstCall *) expr); break;
         case Ast_Kind_Argument:       emit_expression(mod, &code, ((AstArgument *) expr)->value); break;
-        case Ast_Kind_Intrinsic_Call: emit_intrinsic_call(mod, &code, (AstCall *) expr); break;
         case Ast_Kind_Binary_Op:      emit_binop(mod, &code, (AstBinaryOp *) expr); break;
         case Ast_Kind_Unary_Op:       emit_unaryop(mod, &code, (AstUnaryOp *) expr); break;
         case Ast_Kind_Alias:          emit_expression(mod, &code, ((AstAlias *) expr)->alias); break;
@@ -3379,6 +3383,32 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_Subscript: {
             AstSubscript* sub = (AstSubscript *) expr;
+
+            if (sub->is_slice) {
+                emit_expression(mod, &code, sub->expr);
+                emit_struct_as_separate_values(mod, &code, sub->expr->type, 0); // nocheckin This should be optimized for range literals
+
+                u64 lo_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+                u64 hi_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+
+                WI(NULL, WI_DROP);
+                WIL(NULL, WI_LOCAL_SET, hi_local);
+                WIL(NULL, WI_LOCAL_TEE, lo_local);
+                if (sub->elem_size != 1) {
+                    WID(NULL, WI_I32_CONST, sub->elem_size);
+                    WI(NULL, WI_I32_MUL);
+                }
+                emit_expression(mod, &code, sub->addr);
+                WI(NULL, WI_I32_ADD);
+                WIL(NULL, WI_LOCAL_GET, hi_local);
+                WIL(NULL, WI_LOCAL_GET, lo_local);
+                WI(NULL, WI_I32_SUB);
+
+                local_raw_free(mod->local_alloc, lo_local);
+                local_raw_free(mod->local_alloc, hi_local);
+                break;
+            }
+
             u64 offset = 0;
             emit_subscript_location(mod, &code, sub, &offset);
             emit_load_instruction(mod, &code, sub->type, offset);
@@ -3494,33 +3524,6 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 }
             }
 
-            break;
-        }
-
-        case Ast_Kind_Slice: {
-            AstSubscript* sl = (AstSubscript *) expr;
-
-            emit_expression(mod, &code, sl->expr);
-            emit_struct_as_separate_values(mod, &code, sl->expr->type, 0); // nocheckin This should be optimized for range literals
-
-            u64 lo_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-            u64 hi_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-
-            WI(NULL, WI_DROP);
-            WIL(NULL, WI_LOCAL_SET, hi_local);
-            WIL(NULL, WI_LOCAL_TEE, lo_local);
-            if (sl->elem_size != 1) {
-                WID(NULL, WI_I32_CONST, sl->elem_size);
-                WI(NULL, WI_I32_MUL);
-            }
-            emit_expression(mod, &code, sl->addr);
-            WI(NULL, WI_I32_ADD);
-            WIL(NULL, WI_LOCAL_GET, hi_local);
-            WIL(NULL, WI_LOCAL_GET, lo_local);
-            WI(NULL, WI_I32_SUB);
-
-            local_raw_free(mod->local_alloc, lo_local);
-            local_raw_free(mod->local_alloc, hi_local);
             break;
         }
 

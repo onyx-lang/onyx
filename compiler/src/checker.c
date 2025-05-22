@@ -910,7 +910,7 @@ CHECK_FUNC(argument, AstArgument** parg) {
 }
 
 CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
-    if (call->kind == Ast_Kind_Intrinsic_Call) return Check_Success;
+    if (call->intrinsic) return Check_Success;
 
     AstTyped* callee = (AstTyped *) strip_aliases((AstNode *) call->callee);
     AstTyped* original_callee = callee;
@@ -1102,13 +1102,10 @@ CHECK_FUNC(call, AstCall** pcall) {
     // NOTE: If we are calling an intrinsic function, translate the
     // call into an intrinsic call node.
     if (callee->kind == Ast_Kind_Function && callee->is_intrinsic) {
-        call->kind = Ast_Kind_Intrinsic_Call;
-        call->callee = NULL;
-
         token_toggle_end(callee->intrinsic_name);
         char* intr_name = callee->intrinsic_name->text;
 
-        OnyxIntrinsic intrinsic = 0xffffffff;
+        OnyxIntrinsic intrinsic = ONYX_INTRINSIC_UNDEFINED;
         const IntrinsicMap *im = &builtin_intrinsics[0];
         while (im->name) {
             if (!strcmp(im->name, intr_name)) {
@@ -1118,7 +1115,7 @@ CHECK_FUNC(call, AstCall** pcall) {
             im++;
         }
 
-        if (intrinsic == 0xffffffff) {
+        if (intrinsic == ONYX_INTRINSIC_UNDEFINED) {
             ONYX_ERROR(callee->token->pos, Error_Critical, "Intrinsic not supported, '%s'.", intr_name);
             token_toggle_end(callee->intrinsic_name);
             return Check_Error;
@@ -2511,9 +2508,9 @@ CHECK_FUNC(subscript, AstSubscript** psub) {
             ERROR(sub->token->pos, "Invalid type for left of slice creation.");
         }
 
-        sub->kind = Ast_Kind_Slice;
         sub->type = type_make_slice(context, of);
         sub->elem_size = type_size_of(of);
+        sub->is_slice = 1;
 
         return Check_Success;
     }
@@ -3012,7 +3009,6 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
         case Ast_Kind_Unary_Op:  retval = check_unaryop(context, (AstUnaryOp **) pexpr); break;
         case Ast_Kind_Pipe:      retval = check_pipe(context, (AstBinaryOp **) pexpr); break;
 
-        case Ast_Kind_Intrinsic_Call:
         case Ast_Kind_Call:     retval = check_call(context, (AstCall **) pexpr); break;
         case Ast_Kind_Argument: retval = check_argument(context, (AstArgument **) pexpr); break;
         case Ast_Kind_Block:    retval = check_block(context, (AstBlock *) expr); break;
@@ -3035,7 +3031,6 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
 
         case Ast_Kind_Address_Of:    retval = check_address_of(context, (AstAddressOf **) pexpr); break;
         case Ast_Kind_Dereference:   retval = check_dereference(context, (AstDereference *) expr); break;
-        case Ast_Kind_Slice:
         case Ast_Kind_Subscript:     retval = check_subscript(context, (AstSubscript **) pexpr); break;
         case Ast_Kind_Field_Access:  retval = check_field_access(context, (AstFieldAccess **) pexpr); break;
         case Ast_Kind_Method_Call:   retval = check_method_call(context, (AstBinaryOp **) pexpr); break;
@@ -3435,33 +3430,37 @@ CHECK_FUNC(directive_solidify, AstDirectiveSolidify** psolid) {
 
     CHECK(expression, (AstTyped **) &solid->poly_proc);
 
-    if (solid->poly_proc && solid->poly_proc->kind == Ast_Kind_Directive_Solidify) {
-        AstFunction* potentially_resolved_proc = (AstFunction *) ((AstDirectiveSolidify *) solid->poly_proc)->resolved_proc;
-        if (!potentially_resolved_proc) return Check_Yield;
-
-        solid->poly_proc = potentially_resolved_proc;
+    if (!solid->poly_proc) {
+        ERROR(solid->token->pos, "Internal compiler error. The given procedure did not resolve correctly.");
     }
 
-    if (!solid->poly_proc || solid->poly_proc->kind != Ast_Kind_Polymorphic_Proc) {
-        ERROR(solid->token->pos, "Expected polymorphic procedure in #solidify directive.");
+    switch (solid->poly_proc->kind) {
+        case Ast_Kind_Polymorphic_Proc:
+            bh_arr_each(AstPolySolution, sln, solid->known_polyvars) {
+                // HACK: This assumes that 'ast_type' and 'value' are at the same offset.
+                CHECK(expression, &sln->value);
+
+                if (node_is_type((AstNode *) sln->value)) {
+                    sln->type = type_build_from_ast(context, sln->ast_type);
+                    sln->kind = PSK_Type;
+                } else {
+                    sln->kind = PSK_Value;
+                }
+            }
+
+            solid->resolved_proc = polymorphic_proc_try_solidify(context, solid->poly_proc, solid->known_polyvars, solid->token);
+            break;
+
+        //case Ast_Kind_Poly_Union_Type:
+            //break;
+        
+        default:
+            ERROR(solid->token->pos, "Unable to '#solidify' this. Expected a 'polymorphic procedure'.");
     }
 
-    bh_arr_each(AstPolySolution, sln, solid->known_polyvars) {
-        // HACK: This assumes that 'ast_type' and 'value' are at the same offset.
-        CHECK(expression, &sln->value);
-
-        if (node_is_type((AstNode *) sln->value)) {
-            sln->type = type_build_from_ast(context, sln->ast_type);
-            sln->kind = PSK_Type;
-        } else {
-            sln->kind = PSK_Value;
-        }
-    }
-
-    solid->resolved_proc = polymorphic_proc_try_solidify(context, solid->poly_proc, solid->known_polyvars, solid->token);
     if (solid->resolved_proc == (AstNode *) &context->node_that_signals_a_yield) {
         solid->resolved_proc = NULL;
-        YIELD(solid->token->pos, "Waiting for partially solidified procedure.");
+        YIELD(solid->token->pos, "Waiting for solidification to finish.");
     }
 
     // NOTE: Not a DirectiveSolidify.
@@ -4842,6 +4841,12 @@ CHECK_FUNC(type, AstType** ptype) {
         case Ast_Kind_Distinct_Type: {
             AstDistinctType *distinct = (AstDistinctType *) type;
             CHECK(type, &distinct->base_type);
+            break;
+        }
+
+        case Ast_Kind_Directive_Solidify: {
+            AstDirectiveSolidify **solidify = (AstDirectiveSolidify **) ptype;
+            CHECK(directive_solidify, solidify);
             break;
         }
 

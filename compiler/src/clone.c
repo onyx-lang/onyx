@@ -76,12 +76,10 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Param: return sizeof(AstLocal);
         case Ast_Kind_Argument: return sizeof(AstArgument);
         case Ast_Kind_Call: return sizeof(AstCall);
-        case Ast_Kind_Intrinsic_Call: return sizeof(AstCall);
         case Ast_Kind_Return: return sizeof(AstReturn);
         case Ast_Kind_Address_Of: return sizeof(AstAddressOf);
         case Ast_Kind_Dereference: return sizeof(AstDereference);
         case Ast_Kind_Subscript: return sizeof(AstSubscript);
-        case Ast_Kind_Slice: return sizeof(AstSubscript);
         case Ast_Kind_Field_Access: return sizeof(AstFieldAccess);
         case Ast_Kind_Unary_Field_Access: return sizeof(AstUnaryFieldAccess);
         case Ast_Kind_Pipe: return sizeof(AstBinaryOp);
@@ -215,7 +213,6 @@ AstNode* ast_clone(Context *context, void* n) {
             C(AstDereference, expr);
             break;
 
-        case Ast_Kind_Slice:
         case Ast_Kind_Subscript:
             C(AstSubscript, addr);
             C(AstSubscript, expr);

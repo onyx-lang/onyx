@@ -1176,7 +1176,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 sub_node->token = open_bracket;
                 sub_node->addr = retval;
                 sub_node->expr = expr;
-                sub_node->__unused_operation = Binary_Op_Subscript;
+                sub_node->operation = Binary_Op_Subscript;
 
                 retval = (AstTyped *) sub_node;
                 expect_token(parser, ']');
