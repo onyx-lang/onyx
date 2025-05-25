@@ -434,27 +434,27 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
             u32 offset = 0;
             u32 alignment = 1, mem_alignment;
             u32 idx = 0;
-            bh_arr_each(AstStructMember *, member, s_node->members) {
-                if ((*member)->type == NULL)
-                    (*member)->type = type_build_from_ast_inner(context, (*member)->type_node, 1);
+            bh_arr_each(AstStructMember, member, s_node->members) {
+                if (member->type == NULL)
+                    member->type = type_build_from_ast_inner(context, member->type_node, 1);
 
-                if ((*member)->type == NULL) {
+                if (member->type == NULL) {
                     if (context->cycle_detected) {
-                        ONYX_ERROR((* member)->token->pos, Error_Critical, "Unable to figure out the type of this structure member.");
+                        ONYX_ERROR(member->token->pos, Error_Critical, "Unable to figure out the type of this structure member.");
                     }
 
                     s_node->pending_type_is_valid = 0;
                     return accept_partial_types ? s_node->pending_type : NULL;
                 }
 
-                if (!type_is_ready_to_be_used_in_construction((*member)->type)) {
+                if (!type_is_ready_to_be_used_in_construction(member->type)) {
                     s_node->pending_type_is_valid = 0;
                     return accept_partial_types ? s_node->pending_type : NULL;
                 }
 
-                mem_alignment = type_alignment_of((*member)->type);
+                mem_alignment = type_alignment_of(member->type);
                 if (mem_alignment <= 0) {
-                    ONYX_ERROR((*member)->token->pos, Error_Critical, "Invalid member type: %s. Has alignment %d", type_get_name(context, (*member)->type), mem_alignment);
+                    ONYX_ERROR(member->token->pos, Error_Critical, "Invalid member type: %s. Has alignment %d", type_get_name(context, member->type), mem_alignment);
                     return NULL;
                 }
 
@@ -464,31 +464,31 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
                     bh_align(offset, mem_alignment);
                 }
 
-                token_toggle_end((*member)->token);
-                if (shgeti(s_type->Struct.members, (*member)->token->text) != -1) {
-                    ONYX_ERROR((*member)->token->pos, Error_Critical, "Duplicate struct member, '%s'.", (*member)->token->text);
-                    token_toggle_end((*member)->token);
+                token_toggle_end(member->token);
+                if (shgeti(s_type->Struct.members, member->token->text) != -1) {
+                    ONYX_ERROR(member->token->pos, Error_Critical, "Duplicate struct member, '%s'.", member->token->text);
+                    token_toggle_end(member->token);
                     return NULL;
                 }
 
                 StructMember* smem = bh_alloc_item(context->ast_alloc, StructMember);
                 smem->offset = offset;
-                smem->type = (*member)->type;
+                smem->type = member->type;
                 smem->idx = idx;
-                smem->name = bh_strdup(context->ast_alloc, (*member)->token->text);
-                smem->token = (*member)->token;
-                smem->initial_value = &(*member)->initial_value;
-                smem->meta_tags = (*member)->meta_tags;
-                smem->member_node = *member;
+                smem->name = bh_strdup(context->ast_alloc, member->token->text);
+                smem->token = member->token;
+                smem->initial_value = &member->initial_value;
+                smem->meta_tags = member->meta_tags;
+                smem->member_node = member;
 
                 smem->included_through_use = 0;
-                smem->used = (*member)->is_used;
+                smem->used = member->is_used;
                 smem->use_through_pointer_index = -1;
-                shput(s_type->Struct.members, (*member)->token->text, smem);
+                shput(s_type->Struct.members, member->token->text, smem);
                 bh_arr_push(s_type->Struct.memarr, smem);
-                token_toggle_end((*member)->token);
+                token_toggle_end(member->token);
 
-                u32 type_size = type_size_of((*member)->type);
+                u32 type_size = type_size_of(member->type);
 
                 if (!is_union) {
                     offset += type_size;

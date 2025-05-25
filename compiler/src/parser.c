@@ -2812,13 +2812,13 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         }
 
         bh_arr_each(OnyxToken *, member_name, member_list_temp) {
-            AstStructMember* mem = make_node(AstStructMember, Ast_Kind_Struct_Member);
-            mem->token = *member_name;
-            mem->type_node = member_type;
-            mem->initial_value = initial_value;
-            mem->meta_tags = meta_tags;
+            AstStructMember mem = { 0 };
+            mem.token = *member_name;
+            mem.type_node = member_type;
+            mem.initial_value = initial_value;
+            mem.meta_tags = meta_tags;
 
-            if (member_is_used) mem->is_used = 1;
+            if (member_is_used) mem.is_used = 1;
 
             bh_arr_push(s_node->members, mem);
         }

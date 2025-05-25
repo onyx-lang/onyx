@@ -691,9 +691,7 @@ static b32 write_doc_structure(Context *context, bh_buffer *buffer, AstBinding *
         bh_buffer_init(&type_buf, context->scratch_alloc, 256);
 
         bh_buffer_write_u32(buffer, bh_arr_length(struct_node->members));
-        bh_arr_each(AstStructMember *, psmem, struct_node->members) {
-            AstStructMember *smem = *psmem;
-
+        bh_arr_each(AstStructMember, smem, struct_node->members) {
             bh_buffer_clear(&type_buf);
             write_type_node(context, &type_buf, smem->type_node);
 

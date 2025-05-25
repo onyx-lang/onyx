@@ -195,7 +195,6 @@ typedef enum AstKind {
     Ast_Kind_Distinct_Type,
     Ast_Kind_Type_End,
 
-    Ast_Kind_Struct_Member,
     Ast_Kind_Union_Variant,
     Ast_Kind_Enum_Value,
 
@@ -1022,7 +1021,7 @@ struct AstStructType {
     AstType_base;
     char *name;
 
-    bh_arr(AstStructMember *) members;
+    bh_arr(AstStructMember) members;
     bh_arr(AstTyped *) meta_tags;
 
     // u32 min_alignment, min_size;

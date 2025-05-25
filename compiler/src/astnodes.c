@@ -55,7 +55,6 @@ static const char* ast_node_names[] = {
     "DISTINCT TYPE",
     "TYPE_END (BAD)",
 
-    "STRUCT MEMBER",
     "UNION VARIANT",
     "ENUM VALUE",
 

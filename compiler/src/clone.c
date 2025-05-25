@@ -69,7 +69,6 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Type_Compound: return sizeof(AstCompoundType);
         case Ast_Kind_Typeof: return sizeof(AstTypeOf);
         case Ast_Kind_Type_End: return 0;
-        case Ast_Kind_Struct_Member: return sizeof(AstStructMember);
         case Ast_Kind_Enum_Value: return sizeof(AstEnumValue);
         case Ast_Kind_NumLit: return sizeof(AstNumLit);
         case Ast_Kind_StrLit: return sizeof(AstStrLit);
@@ -372,8 +371,18 @@ AstNode* ast_clone(Context *context, void* n) {
             ds->members = NULL;
             bh_arr_new(context->gp_alloc, ds->members, bh_arr_length(ss->members));
 
-            bh_arr_each(AstStructMember *, smem, ss->members) {
-                bh_arr_push(ds->members, (AstStructMember *) ast_clone(context, *smem));
+            bh_arr_each(AstStructMember, member, ss->members) {
+                AstStructMember new_member = *member;
+                new_member.type_node = (void *) ast_clone(context, member->type_node);
+                new_member.initial_value = (void *) ast_clone(context, member->initial_value);
+
+                new_member.meta_tags = NULL;
+                bh_arr_new(context->gp_alloc, new_member.meta_tags, bh_arr_length(member->meta_tags));
+                bh_arr_each(AstTyped *, tag, member->meta_tags) {
+                    bh_arr_push(new_member.meta_tags, (AstTyped *) ast_clone(context, *tag));
+                }
+
+                bh_arr_push(ds->members, new_member);
             }
 
             ds->meta_tags = NULL;
@@ -392,22 +401,6 @@ AstNode* ast_clone(Context *context, void* n) {
             }
 
             ds->stcache = NULL;
-            break;
-        }
-
-        case Ast_Kind_Struct_Member: {
-            C(AstStructMember, type_node);
-            C(AstStructMember, initial_value);
-
-            AstStructMember *ds = (AstStructMember *) nn;
-            AstStructMember *ss = (AstStructMember *) node;
-
-            ds->meta_tags = NULL;
-            bh_arr_new(context->gp_alloc, ds->meta_tags, bh_arr_length(ss->meta_tags));
-            bh_arr_each(AstTyped *, tag, ss->meta_tags) {
-                bh_arr_push(ds->meta_tags, (AstTyped *) ast_clone(context, *tag));
-            }
-
             break;
         }
 

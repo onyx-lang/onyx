@@ -4200,15 +4200,13 @@ CHECK_FUNC(struct, AstStructType* s_node) {
         CHECK(constraint_context, &s_node->constraints, s_node->scope, pos);
     }
 
-    bh_arr_each(AstStructMember *, smem, s_node->members) {
-        AstStructMember *member = *smem;
+    bh_arr_each(AstStructMember, member, s_node->members) {
         if (member->initial_value) {
             CHECK(expression, &member->initial_value);
         }
     }
 
-    bh_arr_each(AstStructMember *, smem, s_node->members) {
-        AstStructMember *member = *smem;
+    bh_arr_each(AstStructMember, member, s_node->members) {
         track_declaration_for_symbol_info(context, member->token->pos, (AstNode *) member);
 
         if (member->type_node) {
@@ -4576,6 +4574,14 @@ CHECK_FUNC(function_header, AstFunction* func) {
 
     func->type = type_build_function_type(context, func);
     if (func->type == NULL) {
+        AstType *return_type = (void *) strip_aliases((AstNode *) func->return_type);
+        if (return_type->kind == Ast_Kind_Poly_Struct_Type || return_type->kind == Ast_Kind_Poly_Union_Type) {
+            // TODO: Fix this error line to be the orignal return type symbol.
+            // HACK: This assumes that AstPolyStructType and AstPolyUnionType have `name` at the same offset.
+            ERROR_(func->token->pos, "'%s' cannot be used like this because it is polymorphic. Add parameters to it.",
+                ((AstPolyStructType *) return_type)->name);
+        }
+
         YIELD(func->token->pos, "Waiting for function type to be constructed");
     }
 
