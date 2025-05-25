@@ -55,7 +55,6 @@ static const char* ast_node_names[] = {
     "DISTINCT TYPE",
     "TYPE_END (BAD)",
 
-    "UNION VARIANT",
     "ENUM VALUE",
 
     "NUMERIC LITERAL",

@@ -762,9 +762,7 @@ static b32 write_doc_union_type(Context *context, bh_buffer *buffer, AstBinding 
         bh_buffer_init(&type_buf, context->scratch_alloc, 256);
 
         bh_buffer_write_u32(buffer, bh_arr_length(union_node->variants));
-        bh_arr_each(AstUnionVariant*, puv, union_node->variants) {
-            AstUnionVariant* uv = *puv;
-
+        bh_arr_each(AstUnionVariant, uv, union_node->variants) {
             bh_buffer_clear(&type_buf);
             write_type_node(context, &type_buf, uv->type_node);
 

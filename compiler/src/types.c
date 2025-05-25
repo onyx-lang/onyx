@@ -741,8 +741,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
 
             //
             // All variants need to have type know.
-            bh_arr_each(AstUnionVariant *, pvariant, union_->variants) {
-                AstUnionVariant *variant = *pvariant;
+            bh_arr_each(AstUnionVariant, variant, union_->variants) {
                 if (!variant->type) {
                     variant->type = type_build_from_ast_inner(context, variant->type_node, 1);
                 }
@@ -784,8 +783,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
 
             //
             // Create variant instances
-            bh_arr_each(AstUnionVariant *, pvariant, union_->variants) {
-                AstUnionVariant *variant = *pvariant;
+            bh_arr_each(AstUnionVariant, variant, union_->variants) {
                 assert(variant->type);
 
                 u32 var_alignment = type_alignment_of(variant->type);

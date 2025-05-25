@@ -113,7 +113,6 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Capture_Block: return sizeof(AstCaptureBlock);
         case Ast_Kind_Capture_Local: return sizeof(AstCaptureLocal);
         case Ast_Kind_Union_Type: return sizeof(AstUnionType);
-        case Ast_Kind_Union_Variant: return sizeof(AstUnionVariant);
         case Ast_Kind_Procedural_Expansion: return sizeof(AstProceduralExpansion);
         case Ast_Kind_Code_Block: return sizeof(AstCodeBlock);
 
@@ -411,8 +410,16 @@ AstNode* ast_clone(Context *context, void* n) {
             du->variants = NULL;
             bh_arr_new(context->gp_alloc, du->variants, bh_arr_length(su->variants));
 
-            bh_arr_each(AstUnionVariant *, uv, su->variants) {
-                bh_arr_push(du->variants, (AstUnionVariant *) ast_clone(context, *uv));
+            bh_arr_each(AstUnionVariant, uv, su->variants) {
+                AstUnionVariant new_variant = *uv;
+
+                new_variant.meta_tags = NULL;
+                bh_arr_new(context->gp_alloc, new_variant.meta_tags, bh_arr_length(su->meta_tags));
+                bh_arr_each(AstTyped *, tag, su->meta_tags) {
+                    bh_arr_push(new_variant.meta_tags, (AstTyped *) ast_clone(context, *tag));
+                }
+
+                bh_arr_push(du->variants, new_variant);
             }
 
             du->meta_tags = NULL;
@@ -431,21 +438,6 @@ AstNode* ast_clone(Context *context, void* n) {
             }
 
             du->utcache = NULL;
-            break;
-        }
-
-        case Ast_Kind_Union_Variant: {
-            C(AstUnionVariant, type_node);
-
-            AstUnionVariant *du = (AstUnionVariant *) nn;
-            AstUnionVariant *su = (AstUnionVariant *) node;
-
-            du->meta_tags = NULL;
-            bh_arr_new(context->gp_alloc, du->meta_tags, bh_arr_length(su->meta_tags));
-            bh_arr_each(AstTyped *, tag, su->meta_tags) {
-                bh_arr_push(du->meta_tags, (AstTyped *) ast_clone(context, *tag));
-            }
-
             break;
         }
 

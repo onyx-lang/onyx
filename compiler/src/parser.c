@@ -2927,17 +2927,17 @@ static AstUnionType* parse_union(OnyxParser* parser) {
             break;
         }
 
-        AstUnionVariant *variant = make_node(AstUnionVariant, Ast_Kind_Union_Variant);
-        variant->meta_tags = meta_tags;
-        variant->token = expect_token(parser, Token_Type_Symbol);
+        AstUnionVariant variant = { 0 };
+        variant.meta_tags = meta_tags;
+        variant.token = expect_token(parser, Token_Type_Symbol);
 
         if (consume_token_if_next(parser, Token_Type_Keyword_As)) {
-            variant->explicit_tag_value = parse_factor(parser);
+            variant.explicit_tag_value = parse_factor(parser);
         }
 
         expect_token(parser, ':');
 
-        variant->type_node = parse_type(parser);
+        variant.type_node = parse_type(parser);
 
         bh_arr_push(u_node->variants, variant);
 

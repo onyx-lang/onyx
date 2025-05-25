@@ -4357,8 +4357,7 @@ CHECK_FUNC(union, AstUnionType *u_node) {
 
     CHECK(meta_tags, u_node->meta_tags);
 
-    bh_arr_each(AstUnionVariant *, pvariant, u_node->variants) {
-        AstUnionVariant *variant = *pvariant;
+    bh_arr_each(AstUnionVariant, variant, u_node->variants) {
         track_declaration_for_symbol_info(context, variant->token->pos, (AstNode *) variant);
 
         assert(variant->type_node);

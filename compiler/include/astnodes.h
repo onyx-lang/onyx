@@ -195,7 +195,6 @@ typedef enum AstKind {
     Ast_Kind_Distinct_Type,
     Ast_Kind_Type_End,
 
-    Ast_Kind_Union_Variant,
     Ast_Kind_Enum_Value,
 
     Ast_Kind_NumLit,
@@ -1088,7 +1087,7 @@ struct AstUnionType {
     AstType_base;
     char *name;
 
-    bh_arr(AstUnionVariant *) variants;
+    bh_arr(AstUnionVariant) variants;
     bh_arr(AstTyped *) meta_tags;
 
     AstType *tag_backing_type;
