@@ -4,7 +4,7 @@
 // determined that this is the procedure you are calling (think Map
 // and hash.to_u32). This has been okay, but it leads to some grossness
 // in the language semantics and the kinds of error messages that are
-// producable.
+// producible.
 //
 // For example, it is not immediately clear that in order to make a Map
 // or a Set out of a type, you need to declare a match option for hash.to_u32
@@ -16,7 +16,7 @@
 // Ignore everything that is said below. It all sounded like a good idea
 // at one point, until I started implementing it when I realized that not
 // only is it WAY too complicated and adds too much complexity in the compiler
-// but it doesn't feel like a natural extention to Onyx.
+// but it doesn't feel like a natural extension to Onyx.
 //
 // Instead, 'interfaces' are going to be much much simpler, but to write
 // and for the compiler to deal with. Effectively, they are compile time checks
