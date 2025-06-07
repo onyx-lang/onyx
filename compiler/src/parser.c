@@ -3957,9 +3957,14 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
     OnyxToken *after_second_colon = expect_token(parser, ':');
     if (after_second_colon) after_second_colon += 1;
 
+    bh_arr_push(parser->current_symbol_stack, symbol);
+
     AstTyped* node = parse_top_level_expression(parser);
-    if (parser->hit_unexpected_token || node == NULL)
+
+    if (parser->hit_unexpected_token || node == NULL) {
+        bh_arr_pop(parser->current_symbol_stack);
         return NULL;
+    }
 
     switch (node->kind) {
         case Ast_Kind_Function:
@@ -4028,6 +4033,8 @@ default_case:
     binding->node = (AstNode *) node;
 
     if (after_second_colon) expect_no_stored_tags_pos(parser, after_second_colon->pos);
+
+    bh_arr_pop(parser->current_symbol_stack);
     return binding;
 }
 
@@ -4167,9 +4174,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
             if (next_tokens_are(parser, 2, ':', ':')) {
                 expect_token(parser, ':');
 
-                bh_arr_push(parser->current_symbol_stack, symbol);
                 binding = parse_top_level_binding(parser, symbol);
-                bh_arr_pop(parser->current_symbol_stack);
 
                 // bh_printf("%b: %d\n", symbol->text, symbol->length, private_kind);
                 if (binding != NULL) binding->flags |= private_kind;

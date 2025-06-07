@@ -1609,7 +1609,7 @@ char* generate_name_within_scope(Context *context, Scope *scope, OnyxToken* symb
         scope = scope->parent;
     }
 
-    bh_arr_each(char *, n, names) {
+    bh_arr_rev_each(char *, n, names) {
         if (*n == NULL) continue;
 
         strncat(name, *n, 511);
