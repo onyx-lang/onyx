@@ -2652,6 +2652,9 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     s_node = make_node(AstStructType, Ast_Kind_Struct_Type);
     s_node->token = s_token;
 
+    AstTyped *old_injection_point = parser->injection_point;
+    parser->injection_point = (AstTyped*) s_node;
+
     flush_stored_tags(parser, &s_node->meta_tags);
 
     type_create_scope(parser, &s_node->scope, s_node->token);
@@ -2829,6 +2832,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     }
 
     parser->current_scope = scope_to_restore_parser_to;
+    parser->injection_point = old_injection_point;
 
     bh_arr_free(member_list_temp);
 
@@ -2850,6 +2854,9 @@ static AstUnionType* parse_union(OnyxParser* parser) {
 
     u_node = make_node(AstUnionType, Ast_Kind_Union_Type);
     u_node->token = union_token;
+
+    AstTyped *old_injection_point = parser->injection_point;
+    parser->injection_point = (AstTyped*) u_node;
 
     flush_stored_tags(parser, &u_node->meta_tags);
 
@@ -2947,6 +2954,7 @@ static AstUnionType* parse_union(OnyxParser* parser) {
     }
 
     parser->current_scope = scope_to_restore_parser_to;
+    parser->injection_point = old_injection_point;
 
     if (poly_union != NULL) {
         // NOTE: Not a UnionType
