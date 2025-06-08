@@ -32,7 +32,9 @@ void submit_entity_in_scope(OnyxParser* parser, AstNode* node, Scope* scope, Pac
 
     } else {
         bh_arr(Entity *) *entity_array = bh_arr_last(parser->alternate_entity_placement_stack);
-        add_entities_for_node(&parser->context->entities, entity_array, node, scope, package);
+        if (entity_array) {
+            add_entities_for_node(&parser->context->entities, entity_array, node, scope, package);
+        }
     }
 }
 
@@ -658,7 +660,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
             retval = (AstTyped *) not_node;
             break;
-        }
+}
 
         case '*': {
             AstDereference* deref_node = make_node(AstDereference, Ast_Kind_Dereference);
@@ -1151,6 +1153,53 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 }
 
                 retval = (AstTyped *) parser->injection_point;
+                break;
+            }
+            else if (parse_possible_directive(parser, "code_as_str")) {
+                // :LinearTokenDependent
+                OnyxToken *start_token = parser->curr;
+
+                bh_arr_push(parser->alternate_entity_placement_stack, NULL);
+                if (peek_token(0)->type == '{') {
+                    parse_block(parser, 0, NULL);
+                } else {
+                    parse_expression(parser, 0);
+                }
+                bh_arr_pop(parser->alternate_entity_placement_stack);
+
+                // :LinearTokenDependent
+                OnyxToken *end_token = parser->curr - 1;
+                while (end_token->type == Token_Type_Inserted_Semicolon)
+                {
+                    end_token -= 1;
+                }
+
+                // :LinearTokenDependent
+                // :LinearTokenDependent
+                char *last_char = end_token->text + end_token->length;
+                char *first_char = start_token->text;
+
+                // :LinearTokenDependent
+                i32 length = last_char - first_char;
+
+                if (length >= 16 * 1024)
+                {
+                    ONYX_ERROR((parser->curr - 2)->pos, Error_Critical, "'#code_as_str' is too long. The maximum length currently is '16 KiB'. (This could also be a compiler bug.)");
+                }
+
+                OnyxToken *new_token = bh_alloc_item(parser->allocator, OnyxToken);
+                new_token->type = Token_Type_Literal_String;
+                new_token->text = first_char;
+                new_token->length = length;
+                new_token->pos = (parser->curr - 2)->pos; // :LinearTokenDependent
+                
+                AstStrLit* str_node = make_node(AstStrLit, Ast_Kind_StrLit);
+                str_node->token     = new_token;
+                str_node->flags    |= Ast_Flag_Comptime;
+
+                ENTITY_SUBMIT(str_node);
+
+                retval = (AstTyped *) str_node;
                 break;
             }
 
