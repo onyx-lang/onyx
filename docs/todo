@@ -18,7 +18,7 @@ Command Line Interface:
         - Run it
         - Clean up
 
-    Another throught would be an extensible command line interface, like what
+    Another thought would be an extensible command line interface, like what
     Zig has I believe. The idea is there are a couple fixed commands, such as
     'compile', 'help', etc. But in a folder such as ~/.local/share/onyx/cmd
     or /usr/share/onyx/cmd, there can be other executables that are invoked if
@@ -186,7 +186,7 @@ To-Do list for threading capability in the browser:
     [X] Change initialization process for main thread / worker threads
         - _thread_start
     [X] Write the JS glue code that will ship with the multi-threaded binary
-    [X] Write basic threading primatives like mutex and semaphore
+    [X] Write basic threading primitives like mutex and semaphore
     [X] Make heap and printf take a mutex
 
     [X] LATER: add thread-local variables
