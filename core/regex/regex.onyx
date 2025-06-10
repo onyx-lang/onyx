@@ -1,0 +1,1658 @@
+package core.regex
+
+use core {package, *}
+
+// =============================================================================
+// Core Types
+// =============================================================================
+
+/// Represents a match result with capture groups
+Match :: struct {
+    found: bool;
+    start: u32;
+    end: u32;
+    text: str;
+    groups: [..] str;
+}
+
+/// State transition
+Transition :: struct {
+    condition: Match_Condition;
+    target: u32;
+}
+
+/// Internal NFA state
+NFA_State :: struct {
+    id: u32;
+    is_final: bool;
+    transitions: [..] Transition;
+}
+
+/// Character matching conditions
+Match_Condition :: union {
+    epsilon: void;              // Empty transition
+    character: u8;              // Exact character
+    char_class: Char_Class;     // Character class
+    range: Range;               // Character range
+    negated: &Match_Condition;  // Negated condition
+    group_start: u32;           // Start of capture group
+    group_end: u32;             // End of capture group
+}
+
+/// Character classes
+Char_Class :: enum {
+    DIGIT;      // \d
+    WORD;       // \w
+    SPACE;      // \s
+    ANY;        // .
+}
+
+/// Character range
+Range :: struct {
+    start: u8;
+    end: u8;
+}
+
+/// Compiled regex pattern
+Regex :: struct {
+    pattern: str;
+    states: [..] NFA_State;
+    start_state: u32;
+}
+
+/// Internal parser state
+Parser :: struct {
+    pattern: str;
+    pos: u32;
+    state_counter: u32;
+    group_counter: u32;  // Track capture groups
+}
+
+// =============================================================================
+// Public API - Simple functional interface
+// =============================================================================
+
+/// Check if a string matches a regex pattern
+/// Returns true if match found, false otherwise
+matches :: (pattern: str, text: str) -> bool {
+    return find(pattern, text).found;
+}
+
+/// Replace first match with replacement string
+replace :: #match {
+    (pattern: str, text: str, replacement: str, allocator := context.allocator) -> str {
+        regex := compile(pattern);
+        defer destroy(&regex);
+        return replace(&regex, text, replacement, allocator);
+    },
+    (regex: &Regex, text: str, replacement: str, allocator := context.allocator) -> str {
+        match := find(regex, text);
+        if !match.found {
+            return string.copy(text, allocator);
+        }
+
+        // Build result string
+        result := string.alloc_copy("", allocator);
+
+        // Add text before match
+        if match.start > 0 {
+            before := text[0 .. match.start];
+            result = string.concat(result, string.copy(before, allocator), allocator);
+        }
+
+        // Add replacement
+        result = string.concat(result, string.copy(replacement, allocator), allocator);
+
+        // Add text after match
+        if match.end < text.count {
+            after := text[match.end .. text.count];
+            result = string.concat(result, string.copy(after, allocator), allocator);
+        }
+
+        return result;
+    },
+}
+
+// =============================================================================
+// Enhanced Replacement Functions
+// =============================================================================
+
+/// Replace with capture group substitution support
+/// Supports $1, $2, etc. for capture groups, $& for full match
+replace_with_groups :: #match {
+    (pattern: str, text: str, replacement: str, allocator := context.allocator) -> str {
+        regex := compile(pattern, allocator);
+        defer destroy(&regex);
+        return replace_with_groups(&regex, text, replacement, allocator);
+    },
+    (regex: &Regex, text: str, replacement: str, allocator := context.allocator) -> str {
+        match := find_with_groups(regex, text, allocator);
+        if !match.found {
+            return string.copy(text, allocator);
+        }
+
+        // Process replacement string with substitutions
+        processed_replacement := process_replacement(replacement, &match, allocator);
+        defer if processed_replacement != replacement do raw_free(allocator, processed_replacement.data);
+
+        // Build result string
+        result := string.alloc_copy("", allocator);
+
+        // Add text before match
+        if match.start > 0 {
+            before := text[0 .. match.start];
+            result = string.concat(result, before, allocator);
+        }
+
+        // Add processed replacement
+        result = string.concat(result, processed_replacement, allocator);
+
+        // Add text after match
+        if match.end < text.count {
+            after := text[match.end .. text.count];
+            result = string.concat(result, after, allocator);
+        }
+
+        return result;
+    },
+}
+
+/// Replace all with capture group substitution support
+replace_all_with_groups :: (regex: &Regex, text: str, replacement: str, allocator := context.allocator) -> str {
+    matches := find_all_with_groups(regex, text, allocator);
+    defer {
+        for match in matches {
+            array.free(&match.groups);
+        }
+        array.free(&matches);
+    }
+
+    if matches.count == 0 {
+        return string.copy(text, allocator);
+    }
+
+    result := string.alloc_copy("", allocator);
+    last_end := 0;
+
+    for match in matches {
+        // Add text before this match
+        if match.start > last_end {
+            before := text[last_end .. match.start];
+            result = string.concat(result, before, allocator);
+        }
+
+        // Process replacement with capture groups
+        processed_replacement := process_replacement(replacement, &match, allocator);
+        result = string.concat(result, processed_replacement, allocator);
+        
+        if processed_replacement != replacement {
+            raw_free(allocator, processed_replacement.data);
+        }
+
+        last_end = match.end;
+    }
+
+    // Add remaining text
+    if last_end < text.count {
+        after := text[last_end .. text.count];
+        result = string.concat(result, after, allocator);
+    }
+
+    return result;
+}
+
+/// Callback-based replacement function
+/// The callback receives the match and returns the replacement string
+Replacement_Callback :: #type (match: &Match) -> str;
+
+replace_with_callback :: #match {
+    (pattern: str, text: str, callback: Replacement_Callback, allocator := context.allocator) -> str {
+        regex := compile(pattern, allocator);
+        defer destroy(&regex);
+        return replace_with_callback(&regex, text, callback, allocator);
+    },
+    (regex: &Regex, text: str, callback: Replacement_Callback, allocator := context.allocator) -> str {
+        match := find_with_groups(regex, text, allocator);
+        defer array.free(&match.groups);
+        
+        if !match.found {
+            return string.copy(text, allocator);
+        }
+
+        // Get replacement from callback
+        replacement := callback(&match);
+
+        // Build result string
+        result := string.alloc_copy("", allocator);
+
+        // Add text before match
+        if match.start > 0 {
+            before := text[0 .. match.start];
+            result = string.concat(result, before, allocator);
+        }
+
+        // Add replacement
+        result = string.concat(result, replacement, allocator);
+
+        // Add text after match
+        if match.end < text.count {
+            after := text[match.end .. text.count];
+            result = string.concat(result, after, allocator);
+        }
+
+        return result;
+    },
+}
+
+/// Replace all matches with callback
+replace_all_with_callback :: (regex: &Regex, text: str, callback: Replacement_Callback, allocator := context.allocator) -> str {
+    matches := find_all_with_groups(regex, text, allocator);
+    defer {
+        for match in matches {
+            array.free(&match.groups);
+        }
+        array.free(&matches);
+    }
+
+    if matches.count == 0 {
+        return string.copy(text, allocator);
+    }
+
+    result := string.alloc_copy("", allocator);
+    last_end := 0;
+
+    for match in matches {
+        // Add text before this match
+        if match.start > last_end {
+            before := text[last_end .. match.start];
+            result = string.concat(result, before, allocator);
+        }
+
+        // Get replacement from callback
+        replacement := callback(&match);
+        result = string.concat(result, replacement, allocator);
+
+        last_end = match.end;
+    }
+
+    // Add remaining text
+    if last_end < text.count {
+        after := text[last_end .. text.count];
+        result = string.concat(result, after, allocator);
+    }
+
+    return result;
+}
+
+/// Conditional replacement - only replace if condition is met
+Replacement_Condition :: #type (match: &Match) -> bool;
+
+replace_if :: #match {
+    (pattern: str, text: str, replacement: str, condition: Replacement_Condition, allocator := context.allocator) -> str {
+        regex := compile(pattern, allocator);
+        defer destroy(&regex);
+        return replace_if(&regex, text, replacement, condition, allocator);
+    },
+    (regex: &Regex, text: str, replacement: str, condition: Replacement_Condition, allocator := context.allocator) -> str {
+        match := find_with_groups(regex, text, allocator);
+        defer array.free(&match.groups);
+        
+        if !match.found || !condition(&match) {
+            return string.copy(text, allocator);
+        }
+
+        // Process replacement string with substitutions
+        processed_replacement := process_replacement(replacement, &match, allocator);
+        defer if processed_replacement != replacement do raw_free(allocator, processed_replacement.data);
+
+        // Build result string
+        result := string.alloc_copy("", allocator);
+
+        // Add text before match
+        if match.start > 0 {
+            before := text[0 .. match.start];
+            result = string.concat(result, before, allocator);
+        }
+
+        // Add processed replacement
+        result = string.concat(result, processed_replacement, allocator);
+
+        // Add text after match
+        if match.end < text.count {
+            after := text[match.end .. text.count];
+            result = string.concat(result, after, allocator);
+        }
+
+        return result;
+    },
+}
+
+// =============================================================================
+// Advanced API - For reusable compiled patterns
+// =============================================================================
+
+/// Compile a regex pattern for reuse
+compile :: (pattern: str, allocator := context.allocator) -> Regex {
+    parser := Parser.{
+        pattern = pattern,
+        pos = 0,
+        state_counter = 0,
+        group_counter = 0
+    };
+
+    regex := Regex.{
+        pattern = string.copy(pattern, allocator),
+        states = array.make(NFA_State, allocator = allocator),
+        start_state = 0
+    };
+
+    if !build_nfa(&parser, &regex, allocator) {
+        // Return empty regex on error
+        return Regex.{
+            pattern = "",
+            states = array.make(NFA_State, allocator = allocator),
+            start_state = 0
+        };
+    }
+
+    return regex;
+}
+
+/// Execute compiled regex on text
+find :: #match {
+    (regex: &Regex, text: str) -> Match  {
+        if regex.states.count == 0 {
+            return Match.{ found = false };
+        }
+
+        // Simple NFA simulation
+        for start_pos in 0 .. text.count {
+            match := simulate_nfa(regex, text, start_pos);
+            if match.found {
+                return match;
+            }
+        }
+
+        return Match.{ found = false };
+    },
+    (pattern: str, text: str) -> Match {
+        regex := compile(pattern);
+        defer destroy(&regex);
+        return find(&regex, text);
+    },
+}
+
+/// Find all matches using compiled regex
+find_all :: (regex: &Regex, text: str, allocator := context.allocator) -> [..] Match {
+    matches := array.make(Match, allocator = allocator);
+
+    if regex.states.count == 0 {
+        return matches;
+    }
+
+    pos := 0;
+    while pos < text.count {
+        match := simulate_nfa(regex, text, pos);
+        if match.found {
+            array.push(&matches, match);
+            pos = math.max(match.end, pos + 1);
+        } else {
+            pos += 1;
+        }
+    }
+
+    return matches;
+}
+
+/// Replace all matches using compiled regex
+replace_all :: (regex: &Regex, text: str, replacement: str, allocator := context.allocator) -> str {
+    matches := find_all(regex, text, allocator);
+    defer array.free(&matches);
+
+    if matches.count == 0 {
+        return string.copy(text, allocator);
+    }
+
+    result := string.alloc_copy("", allocator);
+    last_end := 0;
+
+    for match in matches {
+        // Add text before this match
+        if match.start > last_end {
+            before := text[last_end .. match.start];
+            result = string.concat(result, before, allocator);
+        }
+
+        // Add replacement
+        result = string.concat(result, replacement, allocator);
+        last_end = match.end;
+    }
+
+    // Add remaining text
+    if last_end < text.count {
+        after := text[last_end .. text.count];
+        result = string.concat(result, after, allocator);
+    }
+
+    return result;
+}
+
+/// Clean up compiled regex
+destroy :: (regex: &Regex) {
+    for &state in regex.states {
+        array.free(&state.transitions);
+    }
+    array.free(&regex.states);
+}
+
+// =============================================================================
+// Helper Functions for Advanced Replacements
+// =============================================================================
+
+/// Find match with capture groups
+find_with_groups :: (regex: &Regex, text: str, allocator := context.allocator) -> Match {
+    if regex.states.count == 0 {
+        return Match.{ found = false };
+    }
+
+    // Try to find a match starting from each position
+    for start_pos in 0 .. text.count {
+        match := simulate_nfa_with_groups(regex, text, start_pos, allocator);
+        if match.found {
+            return match;
+        }
+    }
+
+    return Match.{ found = false };
+}
+
+/// Find all matches with capture groups
+find_all_with_groups :: (regex: &Regex, text: str, allocator := context.allocator) -> [..] Match {
+    matches := array.make(Match, allocator = allocator);
+
+    if regex.states.count == 0 {
+        return matches;
+    }
+
+    pos := 0;
+    while pos < text.count {
+        match := simulate_nfa_with_groups(regex, text, pos, allocator);
+        if match.found {
+            array.push(&matches, match);
+            pos = math.max(match.end, pos + 1);
+        } else {
+            pos += 1;
+        }
+    }
+
+    return matches;
+}
+
+/// Process replacement string with substitutions ($1, $2, $&, etc.)
+process_replacement :: (replacement: str, match: &Match, allocator := context.allocator) -> str {
+    if string.index_of(replacement, '$') == -1 {
+        // No substitutions needed
+        return replacement;
+    }
+
+    result := string.alloc_copy("", allocator);
+    i := 0;
+
+    while i < replacement.count {
+        if replacement[i] == '$' && i + 1 < replacement.count {
+            next_char := replacement[i + 1];
+            
+            if next_char == '&' {
+                // $& = full match
+                result = string.concat(result, match.text, allocator);
+                i += 2;
+            } elseif next_char >= '0' && next_char <= '9' {
+                // $1, $2, etc. = capture groups
+                group_num := cast(u32)(next_char - '0');
+                if group_num > 0 && group_num <= match.groups.count {
+                    result = string.concat(result, match.groups[group_num - 1], allocator);
+                }
+                i += 2;
+            } elseif next_char == '$' {
+                // $$ = literal $
+                result = string.concat(result, "$", allocator);
+                i += 2;
+            } else {
+                // Unknown substitution, keep as is
+                char_data := cast([&] u8) raw_alloc(allocator, 1);
+                char_data[0] = replacement[i];
+                char_str := str.{ data = char_data, count = 1 };
+                result = string.concat(result, char_str, allocator);
+                i += 1;
+            }
+        } else {
+            // Regular character
+            char_data := cast([&] u8) raw_alloc(allocator, 1);
+            char_data[0] = replacement[i];
+            char_str := str.{ data = char_data, count = 1 };
+            result = string.concat(result, char_str, allocator);
+            i += 1;
+        }
+    }
+
+    return result;
+}
+
+// =============================================================================
+// Internal Implementation
+// =============================================================================
+
+/// Build NFA from pattern
+build_nfa :: (parser: &Parser, regex: &Regex, allocator: Allocator) -> bool {
+    // Create start state
+    start := create_state(parser, allocator);
+    regex.start_state = start.id;
+    array.push(&regex.states, start);
+
+    // Parse pattern and build NFA using new structure
+    end_state := parse_sequence(parser, regex, start.id, allocator);
+    if end_state == ~0 {
+        return false;
+    }
+
+    // Mark end state as final
+    if end_state < regex.states.count {
+        regex.states[end_state].is_final = true;
+    }
+
+    return true;
+}
+
+/// Create new NFA state
+create_state :: (parser: &Parser, allocator: Allocator) -> NFA_State {
+    state := NFA_State.{
+        id = parser.state_counter,
+        is_final = false,
+        transitions = array.make(Transition, allocator = allocator)
+    };
+    parser.state_counter += 1;
+    return state;
+}
+
+/// Parse group content, handling alternation (|)
+parse_group_content :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: Allocator) -> u32 {
+    // Handle alternation within groups
+    alternatives := array.make(u32, allocator = context.temp_allocator);
+    defer array.free(&alternatives);
+    
+    // Parse first alternative
+    current_state := parse_sequence(parser, regex, start_state, allocator);
+    if current_state == ~0 {
+        return ~0;
+    }
+    array.push(&alternatives, current_state);
+    
+    // Parse additional alternatives separated by |
+    while parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '|' {
+        parser.pos += 1; // Skip |
+        
+        alt_state := parse_sequence(parser, regex, start_state, allocator);
+        if alt_state == ~0 {
+            return ~0;
+        }
+        array.push(&alternatives, alt_state);
+    }
+    
+    // If only one alternative, return it
+    if alternatives.count == 1 {
+        return alternatives[0];
+    }
+    
+    // Create a join state for all alternatives
+    join_state := create_state(parser, allocator);
+    array.push(&regex.states, join_state);
+    
+    // Connect all alternatives to the join state
+    for alt_end in alternatives {
+        epsilon_transition := Transition.{
+            condition = .{ epsilon = .{} },
+            target = join_state.id
+        };
+        array.push(&regex.states[alt_end].transitions, epsilon_transition);
+    }
+    
+    return join_state.id;
+}
+
+/// Parse a sequence of characters/elements (no alternation)
+parse_sequence :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: Allocator) -> u32 {
+    current_state := start_state;
+    
+    while parser.pos < parser.pattern.count {
+        c := parser.pattern[parser.pos];
+        
+        // Stop at group end or alternation
+        if c == ')' || c == '|' {
+            break;
+        }
+        
+        // Parse single element
+        next_state := parse_element(parser, regex, current_state, allocator);
+        if next_state == ~0 {
+            return ~0;
+        }
+        current_state = next_state;
+    }
+    
+    return current_state;
+}
+
+/// Parse a single element (character, group, etc.)
+parse_element :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: Allocator) -> u32 {
+    if parser.pos >= parser.pattern.count {
+        return start_state;
+    }
+    
+    c := parser.pattern[parser.pos];
+    
+    switch c {
+        case '(' {
+            // Capture group
+            parser.pos += 1; // Skip (
+            
+            // Increment group counter for this capture group
+            parser.group_counter += 1;
+            current_group_id := parser.group_counter;
+            
+            // Create group start state and transition
+            group_start_state := create_state(parser, allocator);
+            array.push(&regex.states, group_start_state);
+            
+            group_start_transition := Transition.{
+                condition = .{ group_start = current_group_id },
+                target = group_start_state.id
+            };
+            array.push(&regex.states[start_state].transitions, group_start_transition);
+            
+            // Parse group content without quantifiers first
+            group_content_end := parse_group_content(parser, regex, group_start_state.id, allocator);
+            if group_content_end == ~0 {
+                return ~0;
+            }
+            
+            if parser.pos >= parser.pattern.count || parser.pattern[parser.pos] != ')' {
+                return ~0; // Missing )
+            }
+            parser.pos += 1; // Skip )
+            
+            // Create group end state and transition
+            group_end_state := create_state(parser, allocator);
+            array.push(&regex.states, group_end_state);
+            
+            group_end_transition := Transition.{
+                condition = .{ group_end = current_group_id },
+                target = group_end_state.id
+            };
+            array.push(&regex.states[group_content_end].transitions, group_end_transition);
+            
+            // Now apply quantifiers to the entire group construct (including markers)
+            // This ensures quantifiers work on the complete group, not just the content
+            return apply_group_quantifier(parser, regex, start_state, group_end_state.id, current_group_id, allocator);
+        }
+        
+        case '\\' {
+            // Escape sequence
+            parser.pos += 1;
+            if parser.pos >= parser.pattern.count {
+                return ~0;
+            }
+
+            escape_char := parser.pattern[parser.pos];
+            next_state := create_state(parser, allocator);
+            array.push(&regex.states, next_state);
+
+            condition := switch escape_char {
+                case 'd' => Match_Condition.{ char_class = .DIGIT }
+                case 'w' => Match_Condition.{ char_class = .WORD }
+                case 's' => Match_Condition.{ char_class = .SPACE }
+                case _ => Match_Condition.{ character = escape_char }
+            };
+
+            transition := Transition.{
+                condition = condition,
+                target = next_state.id
+            };
+            array.push(&regex.states[start_state].transitions, transition);
+            parser.pos += 1;
+            
+            return apply_quantifier(parser, regex, start_state, next_state.id, allocator);
+        }
+        
+        case '.' {
+            // Any character
+            next_state := create_state(parser, allocator);
+            array.push(&regex.states, next_state);
+
+            transition := Transition.{
+                condition = .{ char_class = .ANY },
+                target = next_state.id
+            };
+            array.push(&regex.states[start_state].transitions, transition);
+            parser.pos += 1;
+            
+            return apply_quantifier(parser, regex, start_state, next_state.id, allocator);
+        }
+        
+        case _ {
+            // Literal character
+            next_state := create_state(parser, allocator);
+            array.push(&regex.states, next_state);
+
+            transition := Transition.{
+                condition = .{ character = c },
+                target = next_state.id
+            };
+            array.push(&regex.states[start_state].transitions, transition);
+            parser.pos += 1;
+            
+            return apply_quantifier(parser, regex, start_state, next_state.id, allocator);
+        }
+    }
+    
+    return start_state;
+}
+
+/// Apply quantifier to the element between start_state and end_state
+apply_quantifier :: (parser: &Parser, regex: &Regex, start_state: u32, end_state: u32, allocator: Allocator) -> u32 {
+    if parser.pos >= parser.pattern.count {
+        return end_state;
+    }
+    
+    c := parser.pattern[parser.pos];
+    
+    switch c {
+        case '*' {
+            // Zero or more
+            // Add epsilon transition to skip
+            epsilon_skip := Transition.{
+                condition = .{ epsilon = .{} },
+                target = end_state
+            };
+            array.push(&regex.states[start_state].transitions, epsilon_skip);
+            
+            // Add epsilon transition for repetition
+            epsilon_repeat := Transition.{
+                condition = .{ epsilon = .{} },
+                target = start_state
+            };
+            array.push(&regex.states[end_state].transitions, epsilon_repeat);
+            
+            parser.pos += 1;
+            return end_state;
+        }
+        
+        case '+' {
+            // One or more
+            epsilon_repeat := Transition.{
+                condition = .{ epsilon = .{} },
+                target = start_state
+            };
+            array.push(&regex.states[end_state].transitions, epsilon_repeat);
+            
+            parser.pos += 1;
+            return end_state;
+        }
+        
+        case '?' {
+            // Zero or one
+            epsilon_skip := Transition.{
+                condition = .{ epsilon = .{} },
+                target = end_state
+            };
+            array.push(&regex.states[start_state].transitions, epsilon_skip);
+            
+            parser.pos += 1;
+            return end_state;
+        }
+        
+        case _ {
+            return end_state;
+        }
+    }
+    
+    return end_state;
+}
+
+/// Apply quantifier specifically to capture groups
+/// This ensures group boundaries are maintained correctly with quantifiers
+apply_group_quantifier :: (parser: &Parser, regex: &Regex, start_state: u32, end_state: u32, group_id: u32, allocator: Allocator) -> u32 {
+    if parser.pos >= parser.pattern.count {
+        return end_state;
+    }
+    
+    c := parser.pattern[parser.pos];
+    
+    switch c {
+        case '*' {
+            // Zero or more groups
+            // Add epsilon transition to skip the entire group
+            epsilon_skip := Transition.{
+                condition = .{ epsilon = .{} },
+                target = end_state
+            };
+            array.push(&regex.states[start_state].transitions, epsilon_skip);
+            
+            // Add epsilon transition from group end back to group start for repetition
+            epsilon_repeat := Transition.{
+                condition = .{ epsilon = .{} },
+                target = start_state
+            };
+            array.push(&regex.states[end_state].transitions, epsilon_repeat);
+            
+            parser.pos += 1;
+            return end_state;
+        }
+        
+        case '+' {
+            // One or more groups
+            // Add epsilon transition from group end back to group start for repetition
+            epsilon_repeat := Transition.{
+                condition = .{ epsilon = .{} },
+                target = start_state
+            };
+            array.push(&regex.states[end_state].transitions, epsilon_repeat);
+            
+            parser.pos += 1;
+            return end_state;
+        }
+        
+        case '?' {
+            // Zero or one group
+            // Add epsilon transition to skip the entire group
+            epsilon_skip := Transition.{
+                condition = .{ epsilon = .{} },
+                target = end_state
+            };
+            array.push(&regex.states[start_state].transitions, epsilon_skip);
+            
+            parser.pos += 1;
+            return end_state;
+        }
+        
+        case _ {
+            // No quantifier, return as-is
+            return end_state;
+        }
+    }
+    
+    return end_state;
+}
+
+/// Structure to track capture group states during NFA simulation
+Group_State :: struct {
+    group_id: u32;
+    start_pos: u32;
+    end_pos: u32;
+    active: bool;
+}
+
+/// State tracking for NFA simulation with capture groups
+NFA_Sim_State :: struct {
+    state_id: u32;
+    groups: [..] Group_State;
+}
+
+/// Simulate NFA execution with capture group support
+simulate_nfa :: (regex: &Regex, text: str, start_pos: u32) -> Match {
+    if start_pos >= text.count || regex.states.count == 0 {
+        return Match.{ found = false };
+    }
+
+    return simulate_nfa_with_groups(regex, text, start_pos, context.temp_allocator);
+}
+
+/// Enhanced NFA simulation with capture group tracking
+simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator := context.allocator) -> Match {
+    if start_pos >= text.count || regex.states.count == 0 {
+        return Match.{ found = false };
+    }
+
+    // Current active simulation states (state + group tracking)
+    current_sim_states := array.make(NFA_Sim_State, allocator = context.temp_allocator);
+    defer {
+        for &sim_state in current_sim_states {
+            array.free(&sim_state.groups);
+        }
+        array.free(&current_sim_states);
+    }
+
+    // Add initial state
+    initial_groups := array.make(Group_State, allocator = context.temp_allocator);
+    array.push(&current_sim_states, NFA_Sim_State.{
+        state_id = regex.start_state,
+        groups = initial_groups
+    });
+
+    // Process epsilon transitions
+    add_epsilon_closure_with_groups(&current_sim_states, regex, start_pos);
+
+    // Track the longest match found so far
+    longest_match := Match.{ found = false };
+    
+    pos := start_pos;
+    while pos <= text.count && current_sim_states.count > 0 {
+        // Check if any current state is final
+        for &sim_state in current_sim_states {
+            if sim_state.state_id < regex.states.count && regex.states[sim_state.state_id].is_final {
+                // Found a match, extract capture groups
+                groups := array.make(str, allocator = allocator);
+                
+                // Find highest group number to determine array size
+                max_group_id: u32 = 0;
+                for &group in sim_state.groups {
+                    if group.active && group.group_id > max_group_id {
+                        max_group_id = group.group_id;
+                    }
+                }
+                
+                // Initialize groups array with empty strings
+                for i in 0 .. max_group_id {
+                    array.push(&groups, "");
+                }
+                
+                // Fill in captured groups
+                for &group in sim_state.groups {
+                    if group.active && group.group_id > 0 && group.group_id <= max_group_id {
+                        if group.start_pos <= group.end_pos && group.end_pos <= text.count {
+                            groups[group.group_id - 1] = text[group.start_pos .. group.end_pos];
+                        }
+                    }
+                }
+                
+                longest_match = Match.{
+                    found = true,
+                    start = start_pos,
+                    end = pos,
+                    text = text[start_pos .. pos],
+                    groups = groups
+                };
+            }
+        }
+
+        if pos >= text.count {
+            break;
+        }
+
+        // Get next character
+        c := text[pos];
+
+        // Calculate next simulation states
+        next_sim_states := array.make(NFA_Sim_State, allocator = context.temp_allocator);
+        defer {
+            for &sim_state in next_sim_states {
+                array.free(&sim_state.groups);
+            }
+            array.free(&next_sim_states);
+        }
+
+        for &sim_state in current_sim_states {
+            if sim_state.state_id >= regex.states.count do continue;
+
+            state := &regex.states[sim_state.state_id];
+            for transition in state.transitions {
+                if matches_condition(&transition.condition, c) {
+                    // Create new simulation state with copied groups
+                    new_groups := array.make(Group_State, allocator = context.temp_allocator);
+                    for group in sim_state.groups {
+                        array.push(&new_groups, group);
+                    }
+                    
+                    array.push(&next_sim_states, NFA_Sim_State.{
+                        state_id = transition.target,
+                        groups = new_groups
+                    });
+                }
+            }
+        }
+
+        // Move to next position BEFORE processing epsilon closure
+        // This ensures group end positions are set at the correct character position
+        current_sim_states = next_sim_states;
+        pos += 1;
+        
+        // Now process epsilon closure including group end transitions at the correct position
+        add_epsilon_closure_with_groups(&current_sim_states, regex, pos);
+    }
+
+    // Final check for accepting states
+    for &sim_state in current_sim_states {
+        if sim_state.state_id < regex.states.count && regex.states[sim_state.state_id].is_final {
+            // Found a match, extract capture groups
+            groups := array.make(str, allocator = allocator);
+            
+            // Find highest group number
+            max_group_id: u32 = 0;
+            for &group in sim_state.groups {
+                if group.active && group.group_id > max_group_id {
+                    max_group_id = group.group_id;
+                }
+            }
+            
+            // Initialize groups array
+            for i in 0 .. max_group_id {
+                array.push(&groups, "");
+            }
+            
+            // Fill in captured groups
+            for &group in sim_state.groups {
+                if group.active && group.group_id > 0 && group.group_id <= max_group_id {
+                    if group.start_pos <= group.end_pos && group.end_pos <= text.count {
+                        groups[group.group_id - 1] = text[group.start_pos .. group.end_pos];
+                    }
+                }
+            }
+            
+            longest_match = Match.{
+                found = true,
+                start = start_pos,
+                end = pos,
+                text = text[start_pos .. pos],
+                groups = groups
+            };
+        }
+    }
+
+    return longest_match;
+}
+
+/// Add epsilon closure to simulation state set with group tracking
+add_epsilon_closure_with_groups :: (sim_states: &[..] NFA_Sim_State, regex: &Regex, current_pos: u32) {
+    i := 0;
+    while i < sim_states.count {
+        sim_state := &(*sim_states)[i];
+        if sim_state.state_id >= regex.states.count {
+            i += 1;
+            continue;
+        }
+
+        state := &regex.states[sim_state.state_id];
+        for transition in state.transitions {
+            switch transition.condition {
+                case .epsilon {
+                    // Check if target is already in sim_states
+                    found := false;
+                    for &existing_sim_state in sim_states {
+                        if existing_sim_state.state_id == transition.target {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if !found {
+                        // Create new simulation state with copied groups
+                        new_groups := array.make(Group_State, allocator = context.temp_allocator);
+                        for group in sim_state.groups {
+                            array.push(&new_groups, group);
+                        }
+                        
+                        array.push(sim_states, NFA_Sim_State.{
+                            state_id = transition.target,
+                            groups = new_groups
+                        });
+                    }
+                }
+                case .group_start {
+                    group_id := transition.condition.group_start->unwrap();
+                    // Check if target is already in sim_states
+                    found := false;
+                    for &existing_sim_state in sim_states {
+                        if existing_sim_state.state_id == transition.target {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if !found {
+                        // Create new simulation state with group start recorded
+                        new_groups := array.make(Group_State, allocator = context.temp_allocator);
+                        for group in sim_state.groups {
+                            array.push(&new_groups, group);
+                        }
+                        
+                        // Add new group start
+                        array.push(&new_groups, Group_State.{
+                            group_id = group_id,
+                            start_pos = current_pos,
+                            end_pos = current_pos,  // Initialize with start_pos, will be updated later
+                            active = true
+                        });
+                        
+                        array.push(sim_states, NFA_Sim_State.{
+                            state_id = transition.target,
+                            groups = new_groups
+                        });
+                    }
+                }
+                case .group_end {
+                    group_id := transition.condition.group_end->unwrap();
+                    // Check if target is already in sim_states
+                    found := false;
+                    for &existing_sim_state in sim_states {
+                        if existing_sim_state.state_id == transition.target {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if !found {
+                        // Create new simulation state with group end recorded
+                        new_groups := array.make(Group_State, allocator = context.temp_allocator);
+                        for group in sim_state.groups {
+                            if group.group_id == group_id && group.active {
+                                // Update the end position for this group to current_pos
+                                // current_pos should be the position AFTER consuming the last character
+                                array.push(&new_groups, Group_State.{
+                                    group_id = group.group_id,
+                                    start_pos = group.start_pos,
+                                    end_pos = current_pos,
+                                    active = true
+                                });
+                            } else {
+                                array.push(&new_groups, group);
+                            }
+                        }
+                        
+                        array.push(sim_states, NFA_Sim_State.{
+                            state_id = transition.target,
+                            groups = new_groups
+                        });
+                    }
+                }
+                case _ {
+                    // Other transition types (character, char_class, etc.) don't affect epsilon closure
+                    continue;
+                }
+            }
+        }
+
+        i += 1;
+    }
+}
+
+/// Add epsilon closure to state set
+add_epsilon_closure :: (states: &[..] u32, regex: &Regex) {
+    i := 0;
+    while i < states.count {
+        state_id := (*states)[i];
+        if state_id >= regex.states.count {
+            i += 1;
+            continue;
+        }
+
+        state := &regex.states[state_id];
+        for transition in state.transitions {
+            switch transition.condition {
+                case .epsilon {
+                    // Check if target is already in states
+                    found := false;
+                    for existing_state in states {
+                        if existing_state == transition.target {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if !found {
+                        array.push(states, transition.target);
+                    }
+                }
+                case _ do continue
+            }
+        }
+        i += 1;
+    }
+}
+
+/// Check if character matches condition
+matches_condition :: (condition: &Match_Condition, c: u8) -> bool {
+    switch condition {
+        case .epsilon {
+            return false;
+        }
+        case .character {
+            return condition.character->unwrap() == c;
+        }
+        case .char_class {
+            char_class := condition.char_class->unwrap();
+            switch char_class {
+                case .DIGIT {
+                    return c >= '0' && c <= '9';
+                }
+                case .WORD {
+                    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+                }
+                case .SPACE {
+                    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+                }
+                case .ANY {
+                    return c != '\n';
+                }
+            }
+        }
+        case .range {
+            range := condition.range->unwrap();
+            return c >= range.start && c <= range.end;
+        }
+        case .negated {
+            return !matches_condition(condition.negated->unwrap(), c);
+        }
+        case .group_start {
+            return false; // Group markers don't match characters
+        }
+        case .group_end {
+            return false; // Group markers don't match characters
+        }
+    }
+    return false;
+}
+
+// =============================================================================
+// Convenience Functions
+// =============================================================================
+
+/// Check if string is a valid email
+is_email :: (text: str) -> bool {
+    // Simplified email pattern: word chars + @ + domain
+    return matches("\\w+@\\w+\\.\\w+", text);
+}
+
+/// Check if string is a valid phone number
+is_phone :: (text: str) -> bool {
+    // Pattern: (XXX) XXX-XXXX or XXX-XXX-XXXX
+    return matches("(\\(\\d{3}\\) |\\d{3}-)\\d{3}-\\d{4}", text);
+}
+
+/// Check if string is a valid URL
+is_url :: (text: str) -> bool {
+    // Simplified URL pattern that works with current parser: http(s)://word.word
+    return matches("https?://\\w+\\.\\w+", text);
+}
+
+/// Extract all numbers from text
+extract_numbers :: (text: str, allocator := context.allocator) -> [..] str {
+    regex := compile("\\d+", allocator);
+    matches := find_all(&regex, text, allocator);
+    defer destroy(&regex);
+    defer array.free(&matches);
+
+    numbers := array.make(str, allocator = allocator);
+    for match in matches {
+        array.push(&numbers, string.copy(match.text, allocator));
+    }
+
+    return numbers;
+}
+
+/// Extract all words from text
+extract_words :: (text: str, allocator := context.allocator) -> [..] str {
+    regex := compile("\\w+", allocator);  // Fixed: should be \w+ for words, not \d+
+    matches := find_all(&regex, text, allocator);
+    defer destroy(&regex);
+    defer array.free(&matches);
+
+    words := array.make(str, allocator = allocator);
+    for match in matches {
+        array.push(&words, string.copy(match.text, allocator));
+    }
+
+    return words;
+}
+
+// Entry point for the program
+test_suite :: () {
+    println("=== Onyx Regex Engine Test Suite ===\n");
+    
+    // Test 1: Basic literal string matching
+    println("Test 1: Basic literal string matching");
+    result := matches("hello", "hello world");
+    printf("  matches(\"hello\", \"hello world\") = {}\n", result);
+    
+    result = matches("hello", "goodbye world");
+    printf("  matches(\"hello\", \"goodbye world\") = {}\n", result);
+    println("");
+    
+    // Test 2: Digit character class
+    println("Test 2: Digit character class (\\d)");
+    result = matches("\\d+", "abc123def");
+    printf("  matches(\"\\\\d+\", \"abc123def\") = {}\n", result);
+    
+    result = matches("\\d", "no digits here");
+    printf("  matches(\"\\\\d\", \"no digits here\") = {}\n", result);
+    
+    result = matches("\\d\\d\\d", "phone: 555-1234");
+    printf("  matches(\"\\\\d\\\\d\\\\d\", \"phone: 555-1234\") = {}\n", result);
+    println("");
+    
+    // Test 3: Word character class
+    println("Test 3: Word character class (\\w)");
+    result = matches("\\w+", "hello123_world");
+    printf("  matches(\"\\\\w+\", \"hello123_world\") = {}\n", result);
+    
+    result = matches("\\w", "!@#$%");
+    printf("  matches(\"\\\\w\", \"!@#$%\") = {}\n", result);
+    println("");
+    
+    // Test 4: Space character class
+    println("Test 4: Space character class (\\s)");
+    result = matches("\\s", "hello world");
+    printf("  matches(\"\\\\s\", \"hello world\") = {}\n", result);
+    
+    result = matches("\\s+", "multiple   spaces");
+    printf("  matches(\"\\\\s+\", \"multiple   spaces\") = {}\n", result);
+    println("");
+    
+    // Test 5: Any character (.)
+    println("Test 5: Any character (.)");
+    result = matches("h.llo", "hello");
+    printf("  matches(\"h.llo\", \"hello\") = {}\n", result);
+    
+    result = matches("h.llo", "hallo");
+    printf("  matches(\"h.llo\", \"hallo\") = {}\n", result);
+    
+    result = matches("h.llo", "h\nllo");
+    printf("  matches(\"h.llo\", \"h\\\\nllo\") = {} (newline should not match)\n", result);
+    println("");
+    
+    // Test 6: Quantifiers
+    println("Test 6: Quantifiers (* + ?)");
+    result = matches("ab*", "a");
+    printf("  matches(\"ab*\", \"a\") = {} (zero or more b's)\n", result);
+    
+    result = matches("ab*", "abbb");
+    printf("  matches(\"ab*\", \"abbb\") = {} (multiple b's)\n", result);
+    
+    result = matches("ab+", "a");
+    printf("  matches(\"ab+\", \"a\") = {} (one or more b's - should fail)\n", result);
+    
+    result = matches("ab+", "ab");
+    printf("  matches(\"ab+\", \"ab\") = {} (one or more b's)\n", result);
+    println("");
+    
+    // Test 7: Real-world patterns using convenience functions
+    println("Test 7: Real-world pattern validation");
+    result = is_email("user@example.com");
+    printf("  is_email(\"user@example.com\") = {}\n", result);
+    
+    result = is_email("invalid.email");
+    printf("  is_email(\"invalid.email\") = {}\n", result);
+    
+    result = is_url("https://www.example.com");
+    printf("  is_url(\"https://www.example.com\") = {}\n", result);
+    
+    result = is_url("not a url");
+    printf("  is_url(\"not a url\") = {}\n", result);
+    println("");
+    
+    // Test 8: Find functionality with match details
+    println("Test 8: Find functionality with match details");
+    match := find("\\d+", "The answer is 42!");
+    printf("  find(\"\\\\d+\", \"The answer is 42!\"):\n");
+    printf("    found: {}\n", match.found);
+    if match.found {
+        printf("    start: {}, end: {}\n", match.start, match.end);
+        printf("    matched text: \"{}\"\n", match.text);
+    }
+    
+    // Debug: test simple digit pattern
+    match2 := find("\\d", "42");
+    printf("  find(\"\\\\d\", \"42\"):\n");
+    printf("    found: {}\n", match2.found);
+    if match2.found {
+        printf("    start: {}, end: {}\n", match2.start, match2.end);
+        printf("    matched text: \"{}\"\n", match2.text);
+    }
+    println("");
+    
+    // Test 9: Extract functions
+    println("Test 9: Extract functions");
+    numbers := extract_numbers("I have 5 apples and 10 oranges, total: 15 fruits");
+    printf("  extract_numbers result: ");
+    for i in 0..numbers.count {
+        printf("\"{}\"", numbers[i]);
+        if i < numbers.count - 1 {
+            printf(", ");
+        }
+    }
+    printf("\n");
+    
+    words := extract_words("hello_world test123 another_test");
+    printf("  extract_words result: ");
+    for i in 0..words.count {
+        printf("\"{}\"", words[i]);
+        if i < words.count - 1 {
+            printf(", ");
+        }
+    }
+    printf("\n");
+    
+    // Debug: test simple number extraction
+    simple_match := find("\\d+", "123");
+    printf("  debug find(\"\\\\d+\", \"123\"): found={}, text=\"{}\"\n", simple_match.found, simple_match.text);
+    printf("\n");
+    
+    // Test 10: Complex patterns
+    println("Test 10: Complex patterns");
+    result = matches("a.c", "abc");
+    printf("  matches(\"a.c\", \"abc\") = {}\n", result);
+    
+    result = matches("\\w+@\\w+", "test@example");
+    printf("  matches(\"\\\\w+@\\\\w+\", \"test@example\") = {}\n", result);
+    
+    result = matches("\\d{3}", "123"); // Note: This is simplified, our engine doesn't support {n} yet
+    printf("  matches(\"\\\\d\\\\d\\\\d\", \"123\") = {} (simulated \\\\d{{3}})\n", matches("\\d\\d\\d", "123"));
+    println("");
+    
+    // Test 11: Parentheses grouping support
+    println("Test 11: Parentheses grouping support");
+    result = matches("(abc)", "abc");
+    printf("  matches(\"(abc)\", \"abc\") = {}\n", result);
+    
+    result = matches("(abc)", "xyz");
+    printf("  matches(\"(abc)\", \"xyz\") = {}\n", result);
+    
+    result = matches("(ab)+", "ab");
+    printf("  matches(\"(ab)+\", \"ab\") = {}\n", result);
+    
+    result = matches("(ab)+", "abab");
+    printf("  matches(\"(ab)+\", \"abab\") = {}\n", result);
+    
+    result = matches("(ab)*", "");
+    printf("  matches(\"(ab)*\", \"\") = {} (zero matches)\n", result);
+    
+    result = matches("(ab)*", "ababab");
+    printf("  matches(\"(ab)*\", \"ababab\") = {}\n", result);
+    
+    // Test alternation within groups
+    result = matches("(hello|world)", "hello");
+    printf("  matches(\"(hello|world)\", \"hello\") = {}\n", result);
+    
+    result = matches("(hello|world)", "world");
+    printf("  matches(\"(hello|world)\", \"world\") = {}\n", result);
+    
+    result = matches("(hello|world)", "goodbye");
+    printf("  matches(\"(hello|world)\", \"goodbye\") = {}\n", result);
+    
+    // Test nested groups
+    result = matches("((ab)+c)", "abc");
+    printf("  matches(\"((ab)+c)\", \"abc\") = {}\n", result);
+    
+    result = matches("((ab)+c)", "ababc");
+    printf("  matches(\"((ab)+c)\", \"ababc\") = {}\n", result);
+    
+    println("");
+    
+    // Test 12: Enhanced replacement functions
+    println("Test 12: Enhanced replacement functions");
+    
+    // Test basic replacement
+    test_text := "Hello world, hello universe!";
+    result_str := replace("hello", test_text, "hi");
+    printf("  replace(\"hello\", \"{}\", \"hi\") = \"{}\"\n", test_text, result_str);
+    
+    // Test replace with groups (basic - no actual capture groups yet)
+    result_str = replace_with_groups("world", test_text, "[$&]");
+    printf("  replace_with_groups(\"world\", \"{}\", \"[$&]\") = \"{}\"\n", test_text, result_str);
+    
+    // Test replace_all
+    regex := compile("hello");
+    defer destroy(&regex);
+    result_str = replace_all(&regex, test_text, "hi");
+    printf("  replace_all(\"hello\", \"{}\", \"hi\") = \"{}\"\n", test_text, result_str);
+    
+    // Test callback-based replacement
+    bracketify_callback :: (match: &Match) -> str {
+        // Simple uppercase simulation by adding brackets
+        return string.concat("[", string.concat(match.text, "]"));
+    };
+    
+    result_str = replace_with_callback("world", test_text, bracketify_callback);
+    printf("  replace_with_callback(\"world\", \"{}\", bracketify_fn) = \"{}\"\n", test_text, result_str);
+    
+    // Test conditional replacement
+    length_condition :: (match: &Match) -> bool {
+        return match.text.count > 4; // Only replace words longer than 4 characters
+    };
+    
+    result_str = replace_if("world", test_text, "PLANET", length_condition);
+    printf("  replace_if(\"world\", \"{}\", \"PLANET\", length>4) = \"{}\"\n", test_text, result_str);
+    
+    result_str = replace_if("hi", test_text, "GREETING", length_condition);
+    printf("  replace_if(\"hi\", \"{}\", \"GREETING\", length>4) = \"{}\"\n", test_text, result_str);
+    
+    // Test replacement with special substitutions
+    email_text := "Contact user@example.com for help";
+    result_str = replace_with_groups("(\\w+)@(\\w+)", email_text, "[$&]"); // $& = full match
+    printf("  replace_with_groups email: \"{}\"\n", result_str);
+    
+    // Test multiple replacements
+    number_text := "I have 5 apples and 10 oranges";
+    regex2 := compile("\\d+");
+    defer destroy(&regex2);
+    result_str = replace_all(&regex2, number_text, "X");
+    printf("  replace_all numbers: \"{}\" -> \"{}\"\n", number_text, result_str);
+    
+    println("");
+    
+    // Test 13: Comprehensive replacement demonstration
+    println("Test 13: Comprehensive replacement demonstration");
+    
+    // Test replace_all_with_groups
+    regex3 := compile("\\w+");
+    defer destroy(&regex3);
+    result_str = replace_all_with_groups(&regex3, "cat dog bird", "[$&]");
+    printf("  replace_all_with_groups words: \"cat dog bird\" -> \"{}\"\n", result_str);
+    
+    // Test replace_all_with_callback for more complex transformations
+    caps_callback :: (match: &Match) -> str {
+        // Simple uppercase simulation by wrapping in brackets
+        return string.concat("[", string.concat(match.text, "]"));
+    };
+    
+    result_str = replace_all_with_callback(&regex3, "red green blue", caps_callback);
+    printf("  replace_all_with_callback caps: \"red green blue\" -> \"{}\"\n", result_str);
+    
+    // Test replace_all with compiled regex
+    regex4 := compile("\\w+");
+    defer destroy(&regex4);
+    result_str = replace_all(&regex4, "cat elephant dog hippopotamus", "***");
+    printf("  replace_all words: \"cat elephant dog hippopotamus\" -> \"{}\"\n", result_str);
+    
+    // Test special substitution patterns
+    result_str = replace_with_groups("\\w+", "testing", "Before:$& After");
+    printf("  $& substitution: \"testing\" -> \"{}\"\n", result_str);
+    
+    result_str = replace_with_groups("test", "testing", "$$LITERAL$$");
+    printf("  $$ literal: \"testing\" -> \"{}\"\n", result_str);
+    
+    println("");
+    
+    println("");
+    println("=== CAPTURE GROUP TESTS ===");
+    
+    // Test capture group functionality
+    println("Test: Capture Groups");
+    
+    // Test 1: Simple capture group
+    printf("  Simple capture group test:\n");
+    regex_cg1 := compile("(\\w+)");
+    defer destroy(&regex_cg1);
+    
+    printf("  Debug: NFA states for pattern (\\\\w+):\n");
+    for i in 0 .. regex_cg1.states.count {
+        state := &regex_cg1.states[i];
+        printf("    State {}: is_final={}, transitions={}\n", state.id, state.is_final, state.transitions.count);
+        for trans in state.transitions {
+            printf("      -> State {}: ", trans.target);
+            switch trans.condition {
+                case .epsilon {
+                    printf("epsilon\n");
+                }
+                case .character {
+                    c := trans.condition.character->unwrap();
+                    printf("char '{}' ({})\n", c, c);
+                }
+                case .char_class {
+                    class := trans.condition.char_class->unwrap();
+                    switch class {
+                        case .DIGIT do printf("class DIGIT\n");
+                        case .WORD do printf("class WORD\n");
+                        case .SPACE do printf("class SPACE\n");
+                        case .ANY do printf("class ANY\n");
+                    }
+                }
+                case .group_start {
+                    id := trans.condition.group_start->unwrap();
+                    printf("group_start {}\n", id);
+                }
+                case .group_end {
+                    id := trans.condition.group_end->unwrap();
+                    printf("group_end {}\n", id);
+                }
+                case _ {
+                    printf("other\n");
+                }
+            }
+        }
+    }
+    
+    match_cg1 := find_with_groups(&regex_cg1, "hello");
+    printf("    Pattern: (\\\\w+), Text: \"hello\"\n");
+    printf("    Found: {}, Groups count: {}\n", match_cg1.found, match_cg1.groups.count);
+    if match_cg1.groups.count > 0 {
+        printf("    Group 1: \"{}\"\n", match_cg1.groups[0]);
+    }
+    
+    // Test 2: Two capture groups
+    printf("  Two capture groups test:\n");
+    regex_cg2 := compile("(\\w+)@(\\w+)");
+    defer destroy(&regex_cg2);
+    
+    match_cg2 := find_with_groups(&regex_cg2, "user@domain");
+    printf("    Pattern: (\\\\w+)@(\\\\w+), Text: \"user@domain\"\n");
+    printf("    Found: {}, Groups count: {}\n", match_cg2.found, match_cg2.groups.count);
+    if match_cg2.groups.count > 0 {
+        printf("    Group 1: \"{}\"\n", match_cg2.groups[0]);
+    }
+    if match_cg2.groups.count > 1 {
+        printf("    Group 2: \"{}\"\n", match_cg2.groups[1]);
+    }
+    
+    // Test 3: Replacement with capture groups
+    printf("  Replacement with capture groups:\n");
+    result_cg := replace_with_groups("(\\w+)@(\\w+)", "Contact user@example for help", "[$1 at $2]");
+    printf("    Result: \"{}\"\n", result_cg);
+    
+    // Test 4: Multiple replacements
+    printf("  Multiple replacements with capture groups:\n");
+    regex_cg3 := compile("(\\w+)@(\\w+)");
+    defer destroy(&regex_cg3);
+    result_cg2 := replace_all_with_groups(&regex_cg3, "Email user@domain and admin@server", "[$1 AT $2]");
+    printf("    Result: \"{}\"\n", result_cg2);
+
+    println("=== Test Suite Complete ===");
+}
