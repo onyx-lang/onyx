@@ -99,7 +99,7 @@ replace :: #match {
         }
 
         // Build result string
-        result := str.alloc_copy("", allocator);
+        result := str.copy("", allocator);
 
         // Add text before match
         if match.start > 0 {
@@ -143,7 +143,7 @@ replace_with_groups :: #match {
         defer if processed_replacement != replacement do raw_free(allocator, processed_replacement.data);
 
         // Build result string
-        result := str.alloc_copy("", allocator);
+        result := str.copy("", allocator);
 
         // Add text before match
         if match.start > 0 {
@@ -178,7 +178,7 @@ replace_all_with_groups :: (regex: &Regex, text: str, replacement: str, allocato
         return str.copy(text, allocator);
     }
 
-    result := str.alloc_copy("", allocator);
+    result := str.copy("", allocator);
     last_end := 0;
 
     for match in matches {
@@ -230,7 +230,7 @@ replace_with_callback :: #match {
         replacement := callback(&match);
 
         // Build result string
-        result := str.alloc_copy("", allocator);
+        result := str.copy("", allocator);
 
         // Add text before match
         if match.start > 0 {
@@ -265,7 +265,7 @@ replace_all_with_callback :: (regex: &Regex, text: str, callback: Replacement_Ca
         return str.copy(text, allocator);
     }
 
-    result := str.alloc_copy("", allocator);
+    result := str.copy("", allocator);
     last_end := 0;
 
     for match in matches {
@@ -313,7 +313,7 @@ replace_if :: #match {
         defer if processed_replacement != replacement do raw_free(allocator, processed_replacement.data);
 
         // Build result string
-        result := str.alloc_copy("", allocator);
+        result := str.copy("", allocator);
 
         // Add text before match
         if match.start > 0 {
@@ -420,7 +420,7 @@ replace_all :: (regex: &Regex, text: str, replacement: str, allocator := context
         return str.copy(text, allocator);
     }
 
-    result := str.alloc_copy("", allocator);
+    result := str.copy("", allocator);
     last_end := 0;
 
     for match in matches {
@@ -502,7 +502,7 @@ process_replacement :: (replacement: str, match: &Match, allocator := context.al
         return replacement;
     }
 
-    result := str.alloc_copy("", allocator);
+    result := str.copy("", allocator);
     i := 0;
 
     while i < replacement.count {
