@@ -60,6 +60,13 @@ Regex :: struct {
     start_state: u32;
 }
 
+Regex.destroy :: (regex: &Regex) {
+    for &state in regex.states {
+        Array.free(&state.transitions);
+    }
+    Array.free(&regex.states);
+}
+
 /// Internal parser state
 Parser :: struct {
     pattern: str;
@@ -82,31 +89,31 @@ matches :: (pattern: str, text: str) -> bool {
 replace :: #match {
     (pattern: str, text: str, replacement: str, allocator := context.allocator) -> str {
         regex := compile(pattern);
-        defer destroy(&regex);
+        defer regex->destroy();
         return replace(&regex, text, replacement, allocator);
     },
     (regex: &Regex, text: str, replacement: str, allocator := context.allocator) -> str {
         match := find(regex, text);
         if !match.found {
-            return string.copy(text, allocator);
+            return str.copy(text, allocator);
         }
 
         // Build result string
-        result := string.alloc_copy("", allocator);
+        result := str.alloc_copy("", allocator);
 
         // Add text before match
         if match.start > 0 {
             before := text[0 .. match.start];
-            result = string.concat(result, string.copy(before, allocator), allocator);
+            result = str.concat(result, str.copy(before, allocator), allocator);
         }
 
         // Add replacement
-        result = string.concat(result, string.copy(replacement, allocator), allocator);
+        result = str.concat(result, str.copy(replacement, allocator), allocator);
 
         // Add text after match
         if match.end < text.count {
             after := text[match.end .. text.count];
-            result = string.concat(result, string.copy(after, allocator), allocator);
+            result = str.concat(result, str.copy(after, allocator), allocator);
         }
 
         return result;
@@ -122,13 +129,13 @@ replace :: #match {
 replace_with_groups :: #match {
     (pattern: str, text: str, replacement: str, allocator := context.allocator) -> str {
         regex := compile(pattern, allocator);
-        defer destroy(&regex);
+        defer regex->destroy();
         return replace_with_groups(&regex, text, replacement, allocator);
     },
     (regex: &Regex, text: str, replacement: str, allocator := context.allocator) -> str {
         match := find_with_groups(regex, text, allocator);
         if !match.found {
-            return string.copy(text, allocator);
+            return str.copy(text, allocator);
         }
 
         // Process replacement string with substitutions
@@ -136,21 +143,21 @@ replace_with_groups :: #match {
         defer if processed_replacement != replacement do raw_free(allocator, processed_replacement.data);
 
         // Build result string
-        result := string.alloc_copy("", allocator);
+        result := str.alloc_copy("", allocator);
 
         // Add text before match
         if match.start > 0 {
             before := text[0 .. match.start];
-            result = string.concat(result, before, allocator);
+            result = str.concat(result, before, allocator);
         }
 
         // Add processed replacement
-        result = string.concat(result, processed_replacement, allocator);
+        result = str.concat(result, processed_replacement, allocator);
 
         // Add text after match
         if match.end < text.count {
             after := text[match.end .. text.count];
-            result = string.concat(result, after, allocator);
+            result = str.concat(result, after, allocator);
         }
 
         return result;
@@ -162,28 +169,28 @@ replace_all_with_groups :: (regex: &Regex, text: str, replacement: str, allocato
     matches := find_all_with_groups(regex, text, allocator);
     defer {
         for match in matches {
-            array.free(&match.groups);
+            Array.free(&match.groups);
         }
-        array.free(&matches);
+        Array.free(&matches);
     }
 
     if matches.count == 0 {
-        return string.copy(text, allocator);
+        return str.copy(text, allocator);
     }
 
-    result := string.alloc_copy("", allocator);
+    result := str.alloc_copy("", allocator);
     last_end := 0;
 
     for match in matches {
         // Add text before this match
         if match.start > last_end {
             before := text[last_end .. match.start];
-            result = string.concat(result, before, allocator);
+            result = str.concat(result, before, allocator);
         }
 
         // Process replacement with capture groups
         processed_replacement := process_replacement(replacement, &match, allocator);
-        result = string.concat(result, processed_replacement, allocator);
+        result = str.concat(result, processed_replacement, allocator);
         
         if processed_replacement != replacement {
             raw_free(allocator, processed_replacement.data);
@@ -195,7 +202,7 @@ replace_all_with_groups :: (regex: &Regex, text: str, replacement: str, allocato
     // Add remaining text
     if last_end < text.count {
         after := text[last_end .. text.count];
-        result = string.concat(result, after, allocator);
+        result = str.concat(result, after, allocator);
     }
 
     return result;
@@ -208,36 +215,36 @@ Replacement_Callback :: #type (match: &Match) -> str;
 replace_with_callback :: #match {
     (pattern: str, text: str, callback: Replacement_Callback, allocator := context.allocator) -> str {
         regex := compile(pattern, allocator);
-        defer destroy(&regex);
+        defer regex->destroy();
         return replace_with_callback(&regex, text, callback, allocator);
     },
     (regex: &Regex, text: str, callback: Replacement_Callback, allocator := context.allocator) -> str {
         match := find_with_groups(regex, text, allocator);
-        defer array.free(&match.groups);
+        defer Array.free(&match.groups);
         
         if !match.found {
-            return string.copy(text, allocator);
+            return str.copy(text, allocator);
         }
 
         // Get replacement from callback
         replacement := callback(&match);
 
         // Build result string
-        result := string.alloc_copy("", allocator);
+        result := str.alloc_copy("", allocator);
 
         // Add text before match
         if match.start > 0 {
             before := text[0 .. match.start];
-            result = string.concat(result, before, allocator);
+            result = str.concat(result, before, allocator);
         }
 
         // Add replacement
-        result = string.concat(result, replacement, allocator);
+        result = str.concat(result, replacement, allocator);
 
         // Add text after match
         if match.end < text.count {
             after := text[match.end .. text.count];
-            result = string.concat(result, after, allocator);
+            result = str.concat(result, after, allocator);
         }
 
         return result;
@@ -249,28 +256,28 @@ replace_all_with_callback :: (regex: &Regex, text: str, callback: Replacement_Ca
     matches := find_all_with_groups(regex, text, allocator);
     defer {
         for match in matches {
-            array.free(&match.groups);
+            Array.free(&match.groups);
         }
-        array.free(&matches);
+        Array.free(&matches);
     }
 
     if matches.count == 0 {
-        return string.copy(text, allocator);
+        return str.copy(text, allocator);
     }
 
-    result := string.alloc_copy("", allocator);
+    result := str.alloc_copy("", allocator);
     last_end := 0;
 
     for match in matches {
         // Add text before this match
         if match.start > last_end {
             before := text[last_end .. match.start];
-            result = string.concat(result, before, allocator);
+            result = str.concat(result, before, allocator);
         }
 
         // Get replacement from callback
         replacement := callback(&match);
-        result = string.concat(result, replacement, allocator);
+        result = str.concat(result, replacement, allocator);
 
         last_end = match.end;
     }
@@ -278,7 +285,7 @@ replace_all_with_callback :: (regex: &Regex, text: str, callback: Replacement_Ca
     // Add remaining text
     if last_end < text.count {
         after := text[last_end .. text.count];
-        result = string.concat(result, after, allocator);
+        result = str.concat(result, after, allocator);
     }
 
     return result;
@@ -290,15 +297,15 @@ Replacement_Condition :: #type (match: &Match) -> bool;
 replace_if :: #match {
     (pattern: str, text: str, replacement: str, condition: Replacement_Condition, allocator := context.allocator) -> str {
         regex := compile(pattern, allocator);
-        defer destroy(&regex);
+        defer regex->destroy();
         return replace_if(&regex, text, replacement, condition, allocator);
     },
     (regex: &Regex, text: str, replacement: str, condition: Replacement_Condition, allocator := context.allocator) -> str {
         match := find_with_groups(regex, text, allocator);
-        defer array.free(&match.groups);
+        defer Array.free(&match.groups);
         
         if !match.found || !condition(&match) {
-            return string.copy(text, allocator);
+            return str.copy(text, allocator);
         }
 
         // Process replacement string with substitutions
@@ -306,21 +313,21 @@ replace_if :: #match {
         defer if processed_replacement != replacement do raw_free(allocator, processed_replacement.data);
 
         // Build result string
-        result := string.alloc_copy("", allocator);
+        result := str.alloc_copy("", allocator);
 
         // Add text before match
         if match.start > 0 {
             before := text[0 .. match.start];
-            result = string.concat(result, before, allocator);
+            result = str.concat(result, before, allocator);
         }
 
         // Add processed replacement
-        result = string.concat(result, processed_replacement, allocator);
+        result = str.concat(result, processed_replacement, allocator);
 
         // Add text after match
         if match.end < text.count {
             after := text[match.end .. text.count];
-            result = string.concat(result, after, allocator);
+            result = str.concat(result, after, allocator);
         }
 
         return result;
@@ -341,8 +348,8 @@ compile :: (pattern: str, allocator := context.allocator) -> Regex {
     };
 
     regex := Regex.{
-        pattern = string.copy(pattern, allocator),
-        states = array.make(NFA_State, allocator = allocator),
+        pattern = str.copy(pattern, allocator),
+        states = Array.make(NFA_State, allocator = allocator),
         start_state = 0
     };
 
@@ -350,7 +357,7 @@ compile :: (pattern: str, allocator := context.allocator) -> Regex {
         // Return empty regex on error
         return Regex.{
             pattern = "",
-            states = array.make(NFA_State, allocator = allocator),
+            states = Array.make(NFA_State, allocator = allocator),
             start_state = 0
         };
     }
@@ -377,14 +384,14 @@ find :: #match {
     },
     (pattern: str, text: str) -> Match {
         regex := compile(pattern);
-        defer destroy(&regex);
+        defer regex->destroy();
         return find(&regex, text);
     },
 }
 
 /// Find all matches using compiled regex
 find_all :: (regex: &Regex, text: str, allocator := context.allocator) -> [..] Match {
-    matches := array.make(Match, allocator = allocator);
+    matches := Array.make(Match, allocator = allocator);
 
     if regex.states.count == 0 {
         return matches;
@@ -394,7 +401,7 @@ find_all :: (regex: &Regex, text: str, allocator := context.allocator) -> [..] M
     while pos < text.count {
         match := simulate_nfa(regex, text, pos);
         if match.found {
-            array.push(&matches, match);
+            Array.push(&matches, match);
             pos = math.max(match.end, pos + 1);
         } else {
             pos += 1;
@@ -407,31 +414,31 @@ find_all :: (regex: &Regex, text: str, allocator := context.allocator) -> [..] M
 /// Replace all matches using compiled regex
 replace_all :: (regex: &Regex, text: str, replacement: str, allocator := context.allocator) -> str {
     matches := find_all(regex, text, allocator);
-    defer array.free(&matches);
+    defer Array.free(&matches);
 
     if matches.count == 0 {
-        return string.copy(text, allocator);
+        return str.copy(text, allocator);
     }
 
-    result := string.alloc_copy("", allocator);
+    result := str.alloc_copy("", allocator);
     last_end := 0;
 
     for match in matches {
         // Add text before this match
         if match.start > last_end {
             before := text[last_end .. match.start];
-            result = string.concat(result, before, allocator);
+            result = str.concat(result, before, allocator);
         }
 
         // Add replacement
-        result = string.concat(result, replacement, allocator);
+        result = str.concat(result, replacement, allocator);
         last_end = match.end;
     }
 
     // Add remaining text
     if last_end < text.count {
         after := text[last_end .. text.count];
-        result = string.concat(result, after, allocator);
+        result = str.concat(result, after, allocator);
     }
 
     return result;
@@ -440,9 +447,9 @@ replace_all :: (regex: &Regex, text: str, replacement: str, allocator := context
 /// Clean up compiled regex
 destroy :: (regex: &Regex) {
     for &state in regex.states {
-        array.free(&state.transitions);
+        Array.free(&state.transitions);
     }
-    array.free(&regex.states);
+    Array.free(&regex.states);
 }
 
 // =============================================================================
@@ -468,7 +475,7 @@ find_with_groups :: (regex: &Regex, text: str, allocator := context.allocator) -
 
 /// Find all matches with capture groups
 find_all_with_groups :: (regex: &Regex, text: str, allocator := context.allocator) -> [..] Match {
-    matches := array.make(Match, allocator = allocator);
+    matches := Array.make(Match, allocator = allocator);
 
     if regex.states.count == 0 {
         return matches;
@@ -478,7 +485,7 @@ find_all_with_groups :: (regex: &Regex, text: str, allocator := context.allocato
     while pos < text.count {
         match := simulate_nfa_with_groups(regex, text, pos, allocator);
         if match.found {
-            array.push(&matches, match);
+            Array.push(&matches, match);
             pos = math.max(match.end, pos + 1);
         } else {
             pos += 1;
@@ -490,12 +497,12 @@ find_all_with_groups :: (regex: &Regex, text: str, allocator := context.allocato
 
 /// Process replacement string with substitutions ($1, $2, $&, etc.)
 process_replacement :: (replacement: str, match: &Match, allocator := context.allocator) -> str {
-    if string.index_of(replacement, '$') == -1 {
+    if str.index_of(replacement, '$') == -1 {
         // No substitutions needed
         return replacement;
     }
 
-    result := string.alloc_copy("", allocator);
+    result := str.alloc_copy("", allocator);
     i := 0;
 
     while i < replacement.count {
@@ -504,25 +511,25 @@ process_replacement :: (replacement: str, match: &Match, allocator := context.al
             
             if next_char == '&' {
                 // $& = full match
-                result = string.concat(result, match.text, allocator);
+                result = str.concat(result, match.text, allocator);
                 i += 2;
             } elseif next_char >= '0' && next_char <= '9' {
                 // $1, $2, etc. = capture groups
                 group_num := cast(u32)(next_char - '0');
                 if group_num > 0 && group_num <= match.groups.count {
-                    result = string.concat(result, match.groups[group_num - 1], allocator);
+                    result = str.concat(result, match.groups[group_num - 1], allocator);
                 }
                 i += 2;
             } elseif next_char == '$' {
                 // $$ = literal $
-                result = string.concat(result, "$", allocator);
+                result = str.concat(result, "$", allocator);
                 i += 2;
             } else {
                 // Unknown substitution, keep as is
                 char_data := cast([&] u8) raw_alloc(allocator, 1);
                 char_data[0] = replacement[i];
                 char_str := str.{ data = char_data, count = 1 };
-                result = string.concat(result, char_str, allocator);
+                result = str.concat(result, char_str, allocator);
                 i += 1;
             }
         } else {
@@ -530,7 +537,7 @@ process_replacement :: (replacement: str, match: &Match, allocator := context.al
             char_data := cast([&] u8) raw_alloc(allocator, 1);
             char_data[0] = replacement[i];
             char_str := str.{ data = char_data, count = 1 };
-            result = string.concat(result, char_str, allocator);
+            result = str.concat(result, char_str, allocator);
             i += 1;
         }
     }
@@ -547,7 +554,7 @@ build_nfa :: (parser: &Parser, regex: &Regex, allocator: Allocator) -> bool {
     // Create start state
     start := create_state(parser, allocator);
     regex.start_state = start.id;
-    array.push(&regex.states, start);
+    Array.push(&regex.states, start);
 
     // Parse pattern and build NFA using new structure
     end_state := parse_sequence(parser, regex, start.id, allocator);
@@ -568,7 +575,7 @@ create_state :: (parser: &Parser, allocator: Allocator) -> NFA_State {
     state := NFA_State.{
         id = parser.state_counter,
         is_final = false,
-        transitions = array.make(Transition, allocator = allocator)
+        transitions = Array.make(Transition, allocator = allocator)
     };
     parser.state_counter += 1;
     return state;
@@ -577,15 +584,15 @@ create_state :: (parser: &Parser, allocator: Allocator) -> NFA_State {
 /// Parse group content, handling alternation (|)
 parse_group_content :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: Allocator) -> u32 {
     // Handle alternation within groups
-    alternatives := array.make(u32, allocator = context.temp_allocator);
-    defer array.free(&alternatives);
+    alternatives := Array.make(u32, allocator = context.temp_allocator);
+    defer Array.free(&alternatives);
     
     // Parse first alternative
     current_state := parse_sequence(parser, regex, start_state, allocator);
     if current_state == ~0 {
         return ~0;
     }
-    array.push(&alternatives, current_state);
+    Array.push(&alternatives, current_state);
     
     // Parse additional alternatives separated by |
     while parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '|' {
@@ -595,7 +602,7 @@ parse_group_content :: (parser: &Parser, regex: &Regex, start_state: u32, alloca
         if alt_state == ~0 {
             return ~0;
         }
-        array.push(&alternatives, alt_state);
+        Array.push(&alternatives, alt_state);
     }
     
     // If only one alternative, return it
@@ -605,7 +612,7 @@ parse_group_content :: (parser: &Parser, regex: &Regex, start_state: u32, alloca
     
     // Create a join state for all alternatives
     join_state := create_state(parser, allocator);
-    array.push(&regex.states, join_state);
+    Array.push(&regex.states, join_state);
     
     // Connect all alternatives to the join state
     for alt_end in alternatives {
@@ -613,7 +620,7 @@ parse_group_content :: (parser: &Parser, regex: &Regex, start_state: u32, alloca
             condition = .{ epsilon = .{} },
             target = join_state.id
         };
-        array.push(&regex.states[alt_end].transitions, epsilon_transition);
+        Array.push(&regex.states[alt_end].transitions, epsilon_transition);
     }
     
     return join_state.id;
@@ -661,13 +668,13 @@ parse_element :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: A
             
             // Create group start state and transition
             group_start_state := create_state(parser, allocator);
-            array.push(&regex.states, group_start_state);
+            Array.push(&regex.states, group_start_state);
             
             group_start_transition := Transition.{
                 condition = .{ group_start = current_group_id },
                 target = group_start_state.id
             };
-            array.push(&regex.states[start_state].transitions, group_start_transition);
+            Array.push(&regex.states[start_state].transitions, group_start_transition);
             
             // Parse group content without quantifiers first
             group_content_end := parse_group_content(parser, regex, group_start_state.id, allocator);
@@ -682,13 +689,13 @@ parse_element :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: A
             
             // Create group end state and transition
             group_end_state := create_state(parser, allocator);
-            array.push(&regex.states, group_end_state);
+            Array.push(&regex.states, group_end_state);
             
             group_end_transition := Transition.{
                 condition = .{ group_end = current_group_id },
                 target = group_end_state.id
             };
-            array.push(&regex.states[group_content_end].transitions, group_end_transition);
+            Array.push(&regex.states[group_content_end].transitions, group_end_transition);
             
             // Now apply quantifiers to the entire group construct (including markers)
             // This ensures quantifiers work on the complete group, not just the content
@@ -704,7 +711,7 @@ parse_element :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: A
 
             escape_char := parser.pattern[parser.pos];
             next_state := create_state(parser, allocator);
-            array.push(&regex.states, next_state);
+            Array.push(&regex.states, next_state);
 
             condition := switch escape_char {
                 case 'd' => Match_Condition.{ char_class = .DIGIT }
@@ -717,7 +724,7 @@ parse_element :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: A
                 condition = condition,
                 target = next_state.id
             };
-            array.push(&regex.states[start_state].transitions, transition);
+            Array.push(&regex.states[start_state].transitions, transition);
             parser.pos += 1;
             
             return apply_quantifier(parser, regex, start_state, next_state.id, allocator);
@@ -726,13 +733,13 @@ parse_element :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: A
         case '.' {
             // Any character
             next_state := create_state(parser, allocator);
-            array.push(&regex.states, next_state);
+            Array.push(&regex.states, next_state);
 
             transition := Transition.{
                 condition = .{ char_class = .ANY },
                 target = next_state.id
             };
-            array.push(&regex.states[start_state].transitions, transition);
+            Array.push(&regex.states[start_state].transitions, transition);
             parser.pos += 1;
             
             return apply_quantifier(parser, regex, start_state, next_state.id, allocator);
@@ -741,13 +748,13 @@ parse_element :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: A
         case _ {
             // Literal character
             next_state := create_state(parser, allocator);
-            array.push(&regex.states, next_state);
+            Array.push(&regex.states, next_state);
 
             transition := Transition.{
                 condition = .{ character = c },
                 target = next_state.id
             };
-            array.push(&regex.states[start_state].transitions, transition);
+            Array.push(&regex.states[start_state].transitions, transition);
             parser.pos += 1;
             
             return apply_quantifier(parser, regex, start_state, next_state.id, allocator);
@@ -773,14 +780,14 @@ apply_quantifier :: (parser: &Parser, regex: &Regex, start_state: u32, end_state
                 condition = .{ epsilon = .{} },
                 target = end_state
             };
-            array.push(&regex.states[start_state].transitions, epsilon_skip);
+            Array.push(&regex.states[start_state].transitions, epsilon_skip);
             
             // Add epsilon transition for repetition
             epsilon_repeat := Transition.{
                 condition = .{ epsilon = .{} },
                 target = start_state
             };
-            array.push(&regex.states[end_state].transitions, epsilon_repeat);
+            Array.push(&regex.states[end_state].transitions, epsilon_repeat);
             
             parser.pos += 1;
             return end_state;
@@ -792,7 +799,7 @@ apply_quantifier :: (parser: &Parser, regex: &Regex, start_state: u32, end_state
                 condition = .{ epsilon = .{} },
                 target = start_state
             };
-            array.push(&regex.states[end_state].transitions, epsilon_repeat);
+            Array.push(&regex.states[end_state].transitions, epsilon_repeat);
             
             parser.pos += 1;
             return end_state;
@@ -804,7 +811,7 @@ apply_quantifier :: (parser: &Parser, regex: &Regex, start_state: u32, end_state
                 condition = .{ epsilon = .{} },
                 target = end_state
             };
-            array.push(&regex.states[start_state].transitions, epsilon_skip);
+            Array.push(&regex.states[start_state].transitions, epsilon_skip);
             
             parser.pos += 1;
             return end_state;
@@ -835,14 +842,14 @@ apply_group_quantifier :: (parser: &Parser, regex: &Regex, start_state: u32, end
                 condition = .{ epsilon = .{} },
                 target = end_state
             };
-            array.push(&regex.states[start_state].transitions, epsilon_skip);
+            Array.push(&regex.states[start_state].transitions, epsilon_skip);
             
             // Add epsilon transition from group end back to group start for repetition
             epsilon_repeat := Transition.{
                 condition = .{ epsilon = .{} },
                 target = start_state
             };
-            array.push(&regex.states[end_state].transitions, epsilon_repeat);
+            Array.push(&regex.states[end_state].transitions, epsilon_repeat);
             
             parser.pos += 1;
             return end_state;
@@ -855,7 +862,7 @@ apply_group_quantifier :: (parser: &Parser, regex: &Regex, start_state: u32, end
                 condition = .{ epsilon = .{} },
                 target = start_state
             };
-            array.push(&regex.states[end_state].transitions, epsilon_repeat);
+            Array.push(&regex.states[end_state].transitions, epsilon_repeat);
             
             parser.pos += 1;
             return end_state;
@@ -868,7 +875,7 @@ apply_group_quantifier :: (parser: &Parser, regex: &Regex, start_state: u32, end
                 condition = .{ epsilon = .{} },
                 target = end_state
             };
-            array.push(&regex.states[start_state].transitions, epsilon_skip);
+            Array.push(&regex.states[start_state].transitions, epsilon_skip);
             
             parser.pos += 1;
             return end_state;
@@ -913,17 +920,17 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
     }
 
     // Current active simulation states (state + group tracking)
-    current_sim_states := array.make(NFA_Sim_State, allocator = context.temp_allocator);
+    current_sim_states := Array.make(NFA_Sim_State, allocator = context.temp_allocator);
     defer {
         for &sim_state in current_sim_states {
-            array.free(&sim_state.groups);
+            Array.free(&sim_state.groups);
         }
-        array.free(&current_sim_states);
+        Array.free(&current_sim_states);
     }
 
     // Add initial state
-    initial_groups := array.make(Group_State, allocator = context.temp_allocator);
-    array.push(&current_sim_states, NFA_Sim_State.{
+    initial_groups := Array.make(Group_State, allocator = context.temp_allocator);
+    Array.push(&current_sim_states, NFA_Sim_State.{
         state_id = regex.start_state,
         groups = initial_groups
     });
@@ -940,7 +947,7 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
         for &sim_state in current_sim_states {
             if sim_state.state_id < regex.states.count && regex.states[sim_state.state_id].is_final {
                 // Found a match, extract capture groups
-                groups := array.make(str, allocator = allocator);
+                groups := Array.make(str, allocator = allocator);
                 
                 // Find highest group number to determine array size
                 max_group_id: u32 = 0;
@@ -952,7 +959,7 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
                 
                 // Initialize groups array with empty strings
                 for i in 0 .. max_group_id {
-                    array.push(&groups, "");
+                    Array.push(&groups, "");
                 }
                 
                 // Fill in captured groups
@@ -982,12 +989,12 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
         c := text[pos];
 
         // Calculate next simulation states
-        next_sim_states := array.make(NFA_Sim_State, allocator = context.temp_allocator);
+        next_sim_states := Array.make(NFA_Sim_State, allocator = context.temp_allocator);
         defer {
             for &sim_state in next_sim_states {
-                array.free(&sim_state.groups);
+                Array.free(&sim_state.groups);
             }
-            array.free(&next_sim_states);
+            Array.free(&next_sim_states);
         }
 
         for &sim_state in current_sim_states {
@@ -997,12 +1004,12 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
             for transition in state.transitions {
                 if matches_condition(&transition.condition, c) {
                     // Create new simulation state with copied groups
-                    new_groups := array.make(Group_State, allocator = context.temp_allocator);
+                    new_groups := Array.make(Group_State, allocator = context.temp_allocator);
                     for group in sim_state.groups {
-                        array.push(&new_groups, group);
+                        Array.push(&new_groups, group);
                     }
                     
-                    array.push(&next_sim_states, NFA_Sim_State.{
+                    Array.push(&next_sim_states, NFA_Sim_State.{
                         state_id = transition.target,
                         groups = new_groups
                     });
@@ -1023,7 +1030,7 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
     for &sim_state in current_sim_states {
         if sim_state.state_id < regex.states.count && regex.states[sim_state.state_id].is_final {
             // Found a match, extract capture groups
-            groups := array.make(str, allocator = allocator);
+            groups := Array.make(str, allocator = allocator);
             
             // Find highest group number
             max_group_id: u32 = 0;
@@ -1035,7 +1042,7 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
             
             // Initialize groups array
             for i in 0 .. max_group_id {
-                array.push(&groups, "");
+                Array.push(&groups, "");
             }
             
             // Fill in captured groups
@@ -1085,12 +1092,12 @@ add_epsilon_closure_with_groups :: (sim_states: &[..] NFA_Sim_State, regex: &Reg
 
                     if !found {
                         // Create new simulation state with copied groups
-                        new_groups := array.make(Group_State, allocator = context.temp_allocator);
+                        new_groups := Array.make(Group_State, allocator = context.temp_allocator);
                         for group in sim_state.groups {
-                            array.push(&new_groups, group);
+                            Array.push(&new_groups, group);
                         }
                         
-                        array.push(sim_states, NFA_Sim_State.{
+                        Array.push(sim_states, NFA_Sim_State.{
                             state_id = transition.target,
                             groups = new_groups
                         });
@@ -1109,20 +1116,20 @@ add_epsilon_closure_with_groups :: (sim_states: &[..] NFA_Sim_State, regex: &Reg
 
                     if !found {
                         // Create new simulation state with group start recorded
-                        new_groups := array.make(Group_State, allocator = context.temp_allocator);
+                        new_groups := Array.make(Group_State, allocator = context.temp_allocator);
                         for group in sim_state.groups {
-                            array.push(&new_groups, group);
+                            Array.push(&new_groups, group);
                         }
                         
                         // Add new group start
-                        array.push(&new_groups, Group_State.{
+                        Array.push(&new_groups, Group_State.{
                             group_id = group_id,
                             start_pos = current_pos,
                             end_pos = current_pos,  // Initialize with start_pos, will be updated later
                             active = true
                         });
                         
-                        array.push(sim_states, NFA_Sim_State.{
+                        Array.push(sim_states, NFA_Sim_State.{
                             state_id = transition.target,
                             groups = new_groups
                         });
@@ -1141,23 +1148,23 @@ add_epsilon_closure_with_groups :: (sim_states: &[..] NFA_Sim_State, regex: &Reg
 
                     if !found {
                         // Create new simulation state with group end recorded
-                        new_groups := array.make(Group_State, allocator = context.temp_allocator);
+                        new_groups := Array.make(Group_State, allocator = context.temp_allocator);
                         for group in sim_state.groups {
                             if group.group_id == group_id && group.active {
                                 // Update the end position for this group to current_pos
                                 // current_pos should be the position AFTER consuming the last character
-                                array.push(&new_groups, Group_State.{
+                                Array.push(&new_groups, Group_State.{
                                     group_id = group.group_id,
                                     start_pos = group.start_pos,
                                     end_pos = current_pos,
                                     active = true
                                 });
                             } else {
-                                array.push(&new_groups, group);
+                                Array.push(&new_groups, group);
                             }
                         }
                         
-                        array.push(sim_states, NFA_Sim_State.{
+                        Array.push(sim_states, NFA_Sim_State.{
                             state_id = transition.target,
                             groups = new_groups
                         });
@@ -1198,7 +1205,7 @@ add_epsilon_closure :: (states: &[..] u32, regex: &Regex) {
                     }
 
                     if !found {
-                        array.push(states, transition.target);
+                        Array.push(states, transition.target);
                     }
                 }
                 case _ do continue
@@ -1277,12 +1284,12 @@ is_url :: (text: str) -> bool {
 extract_numbers :: (text: str, allocator := context.allocator) -> [..] str {
     regex := compile("\\d+", allocator);
     matches := find_all(&regex, text, allocator);
-    defer destroy(&regex);
-    defer array.free(&matches);
+    defer regex->destroy();
+    defer Array.free(&matches);
 
-    numbers := array.make(str, allocator = allocator);
+    numbers := Array.make(str, allocator = allocator);
     for match in matches {
-        array.push(&numbers, string.copy(match.text, allocator));
+        Array.push(&numbers, str.copy(match.text, allocator));
     }
 
     return numbers;
@@ -1292,12 +1299,12 @@ extract_numbers :: (text: str, allocator := context.allocator) -> [..] str {
 extract_words :: (text: str, allocator := context.allocator) -> [..] str {
     regex := compile("\\w+", allocator);  // Fixed: should be \w+ for words, not \d+
     matches := find_all(&regex, text, allocator);
-    defer destroy(&regex);
-    defer array.free(&matches);
+    defer regex->destroy();
+    defer Array.free(&matches);
 
-    words := array.make(str, allocator = allocator);
+    words := Array.make(str, allocator = allocator);
     for match in matches {
-        array.push(&words, string.copy(match.text, allocator));
+        Array.push(&words, str.copy(match.text, allocator));
     }
 
     return words;
@@ -1500,14 +1507,14 @@ test_suite :: () {
     
     // Test replace_all
     regex := compile("hello");
-    defer destroy(&regex);
+    defer regex->destroy();
     result_str = replace_all(&regex, test_text, "hi");
     printf("  replace_all(\"hello\", \"{}\", \"hi\") = \"{}\"\n", test_text, result_str);
     
     // Test callback-based replacement
     bracketify_callback :: (match: &Match) -> str {
         // Simple uppercase simulation by adding brackets
-        return string.concat("[", string.concat(match.text, "]"));
+        return str.concat("[", str.concat(match.text, "]"));
     };
     
     result_str = replace_with_callback("world", test_text, bracketify_callback);
@@ -1532,7 +1539,7 @@ test_suite :: () {
     // Test multiple replacements
     number_text := "I have 5 apples and 10 oranges";
     regex2 := compile("\\d+");
-    defer destroy(&regex2);
+    defer regex2->destroy();
     result_str = replace_all(&regex2, number_text, "X");
     printf("  replace_all numbers: \"{}\" -> \"{}\"\n", number_text, result_str);
     
@@ -1543,14 +1550,14 @@ test_suite :: () {
     
     // Test replace_all_with_groups
     regex3 := compile("\\w+");
-    defer destroy(&regex3);
+    defer regex3->destroy();
     result_str = replace_all_with_groups(&regex3, "cat dog bird", "[$&]");
     printf("  replace_all_with_groups words: \"cat dog bird\" -> \"{}\"\n", result_str);
     
     // Test replace_all_with_callback for more complex transformations
     caps_callback :: (match: &Match) -> str {
         // Simple uppercase simulation by wrapping in brackets
-        return string.concat("[", string.concat(match.text, "]"));
+        return str.concat("[", str.concat(match.text, "]"));
     };
     
     result_str = replace_all_with_callback(&regex3, "red green blue", caps_callback);
@@ -1558,7 +1565,7 @@ test_suite :: () {
     
     // Test replace_all with compiled regex
     regex4 := compile("\\w+");
-    defer destroy(&regex4);
+    defer regex4->destroy();
     result_str = replace_all(&regex4, "cat elephant dog hippopotamus", "***");
     printf("  replace_all words: \"cat elephant dog hippopotamus\" -> \"{}\"\n", result_str);
     
@@ -1580,7 +1587,7 @@ test_suite :: () {
     // Test 1: Simple capture group
     printf("  Simple capture group test:\n");
     regex_cg1 := compile("(\\w+)");
-    defer destroy(&regex_cg1);
+    defer regex_cg1->destroy();
     
     printf("  Debug: NFA states for pattern (\\\\w+):\n");
     for i in 0 .. regex_cg1.states.count {
@@ -1630,7 +1637,7 @@ test_suite :: () {
     // Test 2: Two capture groups
     printf("  Two capture groups test:\n");
     regex_cg2 := compile("(\\w+)@(\\w+)");
-    defer destroy(&regex_cg2);
+    defer regex_cg2->destroy();
     
     match_cg2 := find_with_groups(&regex_cg2, "user@domain");
     printf("    Pattern: (\\\\w+)@(\\\\w+), Text: \"user@domain\"\n");
@@ -1650,7 +1657,7 @@ test_suite :: () {
     // Test 4: Multiple replacements
     printf("  Multiple replacements with capture groups:\n");
     regex_cg3 := compile("(\\w+)@(\\w+)");
-    defer destroy(&regex_cg3);
+    defer regex_cg3->destroy();
     result_cg2 := replace_all_with_groups(&regex_cg3, "Email user@domain and admin@server", "[$1 AT $2]");
     printf("    Result: \"{}\"\n", result_cg2);
 
