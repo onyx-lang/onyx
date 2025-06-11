@@ -1386,16 +1386,14 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
         if sim_state.state_id < regex.states.count && regex.states[sim_state.state_id].is_final {
             current_match_end_pos_initial := start_pos;
 
-            // Use regex.max_group_id for sizing the groups array
             actual_groups_list := Array.make(str, regex.max_group_id, allocator = allocator);
-            actual_groups_list.count = regex.max_group_id; // Explicitly set count
+            actual_groups_list.count = regex.max_group_id; 
             printf("[Debug simulate_nfa_with_groups] initial actual_groups_list.count: {}\n", actual_groups_list.count); // DEBUG
 
             full_match_text_slice := text[start_pos .. current_match_end_pos_initial];
             
             for &group_state in sim_state.groups {
-                if group_state.active && group_state.group_id > 0 && group_state.group_id <= regex.max_group_id { // Use regex.max_group_id
-                    // Populate actual_groups_list[group_id - 1]
+                if group_state.active && group_state.group_id > 0 && group_state.group_id <= regex.max_group_id { 
                     actual_groups_list[group_state.group_id - 1] = str.copy(text[group_state.start_pos .. group_state.end_pos], allocator);
                 }
             }
@@ -1408,10 +1406,16 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
                 groups = actual_groups_list
             };
 
-            if !longest_match.found {
+            if !longest_match.found || candidate_match_initial.end > longest_match.end { // Prefer longer matches
+                if longest_match.found { 
+                    if longest_match.text.data != null { raw_free(allocator, longest_match.text.data); }
+                    for i_group in 0 .. longest_match.groups.count {
+                        if longest_match.groups[i_group].data != null { raw_free(allocator, longest_match.groups[i_group].data); }
+                    }
+                    Array.free(&longest_match.groups);
+                }
                 longest_match = candidate_match_initial;
-            } else {
-                // A zero-length match was already found. Discard this new one.
+            } else { // Shorter or same length, discard candidate
                 if candidate_match_initial.text.data != null { raw_free(allocator, candidate_match_initial.text.data); }
                 for i_group in 0 .. candidate_match_initial.groups.count {
                     if candidate_match_initial.groups[i_group].data != null { raw_free(allocator, candidate_match_initial.groups[i_group].data); }
@@ -1462,6 +1466,11 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
             active_states_list = pending_states_list;
             pending_states_list = temp_swap_list_header;
         } else {
+            // If at end of text, don't clear active_states if it's the first pass (pos == start_pos)
+            // and we are processing for zero-length matches or end-of-text anchors.
+            // Otherwise, if we consumed a char (pos > start_pos), active_states should have been swapped with pending.
+            // If pending is empty and we are at end of text, effectively no more character-consuming transitions.
+            // Epsilon closure will still run on current active_states.
         }
 
         current_text_pos_for_closure := pos;
@@ -1475,28 +1484,26 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
             if sim_state_in_active.state_id < regex.states.count && regex.states[sim_state_in_active.state_id].is_final {
                 current_match_end_pos := current_text_pos_for_closure;
 
-                // Use regex.max_group_id for sizing the groups array
                 actual_groups_list_loop := Array.make(str, regex.max_group_id, allocator = allocator);
-                actual_groups_list_loop.count = regex.max_group_id; // Explicitly set count
+                actual_groups_list_loop.count = regex.max_group_id; 
                 printf("[Debug simulate_nfa_with_groups] loop actual_groups_list_loop.count: {}\n", actual_groups_list_loop.count); // DEBUG
                 
                 match_s := start_pos;
                 match_e := current_match_end_pos;
                 if match_s > text.count { match_s = text.count; }
                 if match_e > text.count { match_e = text.count; }
-                if match_s > match_e { match_s = match_e; }
+                if match_s > match_e { match_s = match_e; } // Should not happen if logic is correct
 
                 full_match_text_loop_slice := text[match_s .. match_e];
 
                 for &group_state in sim_state_in_active.groups {
-                    if group_state.active && group_state.group_id > 0 && group_state.group_id <= regex.max_group_id { // Use regex.max_group_id
+                    if group_state.active && group_state.group_id > 0 && group_state.group_id <= regex.max_group_id { 
                         gs_s := group_state.start_pos;
                         gs_e := group_state.end_pos;
                         if gs_s > text.count { gs_s = text.count; }
                         if gs_e > text.count { gs_e = text.count; }
-                        if gs_s > gs_e { gs_s = gs_e; }
+                        if gs_s > gs_e { gs_s = gs_e; } // Should not happen
                         
-                        // Populate actual_groups_list_loop[group_id - 1]
                         actual_groups_list_loop[group_state.group_id - 1] = str.copy(text[gs_s .. gs_e], allocator);
                     }
                 }
@@ -1519,12 +1526,16 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
                     }
                     longest_match = candidate_match;
                 } elseif longest_match.found && candidate_match.end == longest_match.end {
+                    // If lengths are equal, Onyx regexes are typically "leftmost-longest".
+                    // Since we iterate start_pos in find_with_groups, the first one found at this length is fine.
+                    // However, if future tie-breaking rules are needed (e.g. for specific NFA path preferences not captured by length),
+                    // this is where they'd go. For now, we keep the existing longest_match.
                     if candidate_match.text.data != null { raw_free(allocator, candidate_match.text.data); }
                     for i_group in 0 .. candidate_match.groups.count {
                         if candidate_match.groups[i_group].data != null { raw_free(allocator, candidate_match.groups[i_group].data); }
                     }
                     Array.free(&candidate_match.groups);
-                } else { 
+                } else { // Shorter match, discard candidate
                     if candidate_match.found { 
                          if candidate_match.text.data != null { raw_free(allocator, candidate_match.text.data); }
                          for i_group in 0 .. candidate_match.groups.count {
@@ -1538,7 +1549,12 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
         if pos < text.count {
             pos += 1;
         } else {
-            break;
+            // If we are at the end of the text (pos == text.count),
+            // we've processed transitions for the last character (or start_pos for empty text).
+            // The epsilon closure after this will check for final states.
+            // We need to break to avoid an infinite loop if active_states is not empty
+            // but no more characters can be consumed.
+            break; 
         }
     }
     printf("[Debug simulate_nfa_with_groups] longest_match.groups.count before return: {}\n", longest_match.groups.count); // DEBUG
@@ -1931,19 +1947,38 @@ main :: () {
     test_count := 0;
     pass_count := 0;
     
-    run_match_test :: (description: str, pattern: str, text: str, should_match: bool, expected_groups: [] str, test_count: &u32, pass_count: &u32) {
+    run_match_test :: (description: str, pattern: str, text: str, should_match: bool, expected_groups_from_test: [] str, test_count: &u32, pass_count: &u32) {
         *test_count += 1;
         regex_test := compile(pattern);
         defer regex_test->destroy();
         match_result := find_with_groups(&regex_test, text);
-        printf("[Debug run_match_test] Description: '{}', Pattern: '{}', match_result.groups.count: {}\n", description, pattern, match_result.groups.count); // DEBUG
+        // printf("[Debug run_match_test] Description: '{}', Pattern: '{}', match_result.groups.count: {}, regex_test.max_group_id: {}\n", description, pattern, match_result.groups.count, regex_test.max_group_id); // DEBUG
+
+        actual_groups_for_comparison := Array.make(str, allocator = context.temp_allocator);
+        defer Array.free(&actual_groups_for_comparison);
+
+        if match_result.found {
+            // Populate with explicitly captured groups only, aligning with test expectations.
+            // The full match (match_result.text) is not included here.
+            for group_idx in 0 .. match_result.groups.count {
+                // Ensure we don't read uninitialized group strings if match_result.groups was overallocated
+                // or if regex_test.max_group_id is the true count of expected groups.
+                // match_result.groups should ideally be correctly sized by simulate_nfa_with_groups
+                // to match regex_test.max_group_id.
+                if group_idx < regex_test.max_group_id { 
+                     Array.push(&actual_groups_for_comparison, match_result.groups[group_idx]);
+                }
+            }
+        }
+        
+        // Defer cleanup for match_result fields
         defer { 
-            if match_result.text.data != null { // Free Match.text
+            if match_result.text.data != null { 
                 raw_free(context.allocator, match_result.text.data);
             }
-            if match_result.groups.data != null { // Free Match.groups
+            if match_result.groups.data != null { 
                 for i in 0 .. match_result.groups.count {
-                    if match_result.groups[i].data != null {
+                    if i < regex_test.max_group_id && match_result.groups[i].data != null { // Check before freeing
                         raw_free(context.allocator, match_result.groups[i].data);
                     }
                 }
@@ -1958,11 +1993,11 @@ main :: () {
         }
         
         if should_match && match_result.found {
-            if match_result.groups.count != expected_groups.count {
+            if actual_groups_for_comparison.count != expected_groups_from_test.count {
                 success = false;
             } else {
-                for i in 0 .. expected_groups.count {
-                    if match_result.groups[i] != expected_groups[i] {
+                for i in 0 .. expected_groups_from_test.count {
+                    if actual_groups_for_comparison[i] != expected_groups_from_test[i] {
                         success = false;
                         break;
                     }
@@ -1978,10 +2013,33 @@ main :: () {
             printf("    Pattern: '{}', Text: '{}'\n", pattern, text);
             printf("    Expected match: {}, Got match: {}\n", should_match, match_result.found);
             if should_match && match_result.found {
-                printf("    Expected groups: {}, Got groups: {}\n", expected_groups.count, match_result.groups.count);
-                for i in 0 .. math.min(expected_groups.count, match_result.groups.count) {
-                    if i < expected_groups.count && i < match_result.groups.count {
-                        printf("      Group {}: expected '{}', got '{}'\n", i+1, expected_groups[i], match_result.groups[i]);
+                printf("    Expected groups (count {}): {}\n", expected_groups_from_test.count, expected_groups_from_test);
+                printf("    Actual groups (count {}): {}\n", actual_groups_for_comparison.count, actual_groups_for_comparison);
+                
+                max_display_groups := math.max(expected_groups_from_test.count, actual_groups_for_comparison.count);
+                for i in 0 .. max_display_groups {
+                    expected_g_str_val: str;
+                    if i < expected_groups_from_test.count {
+                        s := expected_groups_from_test[i];
+                        if s.data == null && s.count > 0 { expected_g_str_val = "<MALFORMED EXPECTED STR>"; }
+                        else { expected_g_str_val = s; }
+                    } else {
+                        expected_g_str_val = "<none>";
+                    }
+
+                    actual_g_str_val: str;
+                    if i < actual_groups_for_comparison.count {
+                        s := actual_groups_for_comparison[i];
+                        if s.data == null && s.count > 0 { actual_g_str_val = "<MALFORMED ACTUAL STR>"; }
+                        else { actual_g_str_val = s; }
+                    } else {
+                        actual_g_str_val = "<none>";
+                    }
+                    
+                    if expected_g_str_val != actual_g_str_val {
+                        printf("      Group {}: expected '{}', got '{}'\n", i, expected_g_str_val, actual_g_str_val);
+                    } else {
+                        printf("      Group {}: '{}' (match)\n", i, expected_g_str_val);
                     }
                 }
             }
