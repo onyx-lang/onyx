@@ -331,17 +331,36 @@ find_with_groups :: (regex: &Regex, text: str, allocator := context.allocator) -
         printf("[Debug find_with_groups] anchored match_obj.groups.count: {}\n", match_obj.groups.count); // DEBUG
         return match_obj;
     } else {
-        // Try to find a match starting from each position
-        // For empty strings, we still need to try position 0
-        max_pos := math.max(1, text.count);
-        for sp_idx in 0 .. max_pos { // Renamed start_pos to sp_idx to avoid conflict
-            if sp_idx > text.count {
-                break;
+        // For lazy quantifiers, we need special handling
+        if regex.has_lazy_quantifiers {
+            // For lazy quantifiers: try to find the shortest match by trying progressively longer match lengths
+            // Try to find a match starting from each position, but at each position try shortest matches first
+            max_pos := math.max(1, text.count);
+            for sp_idx in 0 .. max_pos {
+                if sp_idx > text.count {
+                    break;
+                }
+                for end_pos in sp_idx .. text.count + 1 {
+                    match_obj := simulate_nfa_with_backtracking_to_length(regex, text, sp_idx, end_pos, allocator);
+                    printf("[Debug find_with_groups] lazy search loop ({}) match_obj.groups.count: {}\n", sp_idx, match_obj.groups.count); // DEBUG
+                    if match_obj.found {
+                        return match_obj; // Return the first (shortest) match found
+                    }
+                }
             }
-            match_obj := simulate_nfa_with_groups(regex, text, sp_idx, allocator);
-            printf("[Debug find_with_groups] non-anchored loop ({}) match_obj.groups.count: {}\n", sp_idx, match_obj.groups.count); // DEBUG
-            if match_obj.found {
-                return match_obj;
+        } else {
+            // Try to find a match starting from each position
+            // For empty strings, we still need to try position 0
+            max_pos := math.max(1, text.count);
+            for sp_idx in 0 .. max_pos { // Renamed start_pos to sp_idx to avoid conflict
+                if sp_idx > text.count {
+                    break;
+                }
+                match_obj := simulate_nfa_with_groups(regex, text, sp_idx, allocator);
+                printf("[Debug find_with_groups] non-anchored loop ({}) match_obj.groups.count: {}\n", sp_idx, match_obj.groups.count); // DEBUG
+                if match_obj.found {
+                    return match_obj;
+                }
             }
         }
     }
@@ -1416,6 +1435,12 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
         return Match.{ found = false };
     }
 
+    // Use backtracking simulation for lazy quantifiers
+    if regex.has_lazy_quantifiers {
+        return simulate_nfa_with_backtracking(regex, text, start_pos, allocator);
+    }
+
+    // Use standard NFA simulation for greedy quantifiers
     active_states_list := Array.make(NFA_Sim_State, allocator = context.temp_allocator);
     pending_states_list := Array.make(NFA_Sim_State, allocator = context.temp_allocator);
 
@@ -1461,9 +1486,7 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
                 groups = actual_groups_list
             };
 
-            if !best_match.found || 
-               (regex.has_lazy_quantifiers && candidate_match_initial.end < best_match.end) ||
-               (!regex.has_lazy_quantifiers && candidate_match_initial.end > best_match.end) { // Prefer shorter matches for lazy, longer for greedy
+            if !best_match.found || candidate_match_initial.end > best_match.end {
                 if best_match.found { 
                     if best_match.text.data != null { raw_free(allocator, best_match.text.data); }
                     for i_group in 0 .. best_match.groups.count {
@@ -1573,9 +1596,7 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
                     groups = actual_groups_list_loop
                 };
                 
-                if !best_match.found || 
-                   (regex.has_lazy_quantifiers && candidate_match.end < best_match.end) ||
-                   (!regex.has_lazy_quantifiers && candidate_match.end > best_match.end) {
+                if !best_match.found || candidate_match.end > best_match.end {
                     if best_match.found { 
                         if best_match.text.data != null { raw_free(allocator, best_match.text.data); }
                         for i_group in 0 .. best_match.groups.count {
@@ -1615,6 +1636,389 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
     }
     printf("[Debug simulate_nfa_with_groups] best_match.groups.count before return: {}\n", best_match.groups.count); // DEBUG
     return best_match;
+}
+
+/// Backtracking simulation for lazy quantifiers - try to match up to a specific length
+simulate_nfa_with_backtracking_to_length :: (regex: &Regex, text: str, start_pos: u32, target_end_pos: u32, allocator: Allocator) -> Match {
+    if start_pos > text.count || regex.states.count == 0 || target_end_pos > text.count {
+        return Match.{ found = false };
+    }
+
+    initial_groups := Array.make(Group_State, allocator = context.temp_allocator);
+    defer Array.free(&initial_groups);
+    
+    return backtrack_match_to_length(regex, text, start_pos, regex.start_state, start_pos, target_end_pos, &initial_groups, allocator);
+}
+
+/// Recursive backtracking match function that only accepts matches ending at target_end_pos
+backtrack_match_to_length :: (regex: &Regex, text: str, match_start: u32, current_state: u32, current_pos: u32, target_end_pos: u32, groups: &[..] Group_State, allocator: Allocator) -> Match {
+    if current_state >= regex.states.count {
+        return Match.{ found = false };
+    }
+
+    state := &regex.states[current_state];
+    
+    // Check if we've reached a final state at the target position
+    if state.is_final && current_pos == target_end_pos {
+        // We found a match at the exact target length
+        actual_groups_list := Array.make(str, regex.max_group_id, allocator = allocator);
+        actual_groups_list.count = regex.max_group_id;
+        
+        for &group_state in *groups {
+            if group_state.active && group_state.group_id > 0 && group_state.group_id <= regex.max_group_id {
+                gs_s := group_state.start_pos;
+                gs_e := group_state.end_pos;
+                if gs_s > text.count { gs_s = text.count; }
+                if gs_e > text.count { gs_e = text.count; }
+                if gs_s > gs_e { gs_s = gs_e; }
+                
+                actual_groups_list[group_state.group_id - 1] = str.copy(text[gs_s .. gs_e], allocator);
+            }
+        }
+        
+        match_text := text[match_start .. current_pos];
+        return Match.{
+            found = true,
+            start = match_start,
+            end = current_pos,
+            text = str.copy(match_text, allocator),
+            groups = actual_groups_list
+        };
+    }
+
+    // Don't continue if we've exceeded the target position
+    if current_pos > target_end_pos {
+        return Match.{ found = false };
+    }
+
+    // Try transitions in order (lazy quantifiers have exit transitions first)
+    for i in 0 .. state.transitions.count {
+        transition := &state.transitions[i];
+        switch transition.condition {
+            case .epsilon {
+                // Follow epsilon transition
+                result := backtrack_match_to_length(regex, text, match_start, transition.target, current_pos, target_end_pos, groups, allocator);
+                if result.found {
+                    return result;
+                }
+            }
+            case .group_start {
+                // Handle group start
+                group_id := transition.condition.group_start->unwrap();
+                
+                // Create new groups array with this group started
+                new_groups := Array.make(Group_State, capacity = groups.count + 1, allocator = context.temp_allocator);
+                defer Array.free(&new_groups);
+                
+                for existing_group in *groups {
+                    Array.push(&new_groups, existing_group);
+                }
+                
+                // Add or update the group being started
+                found_existing := false;
+                for j in 0 .. new_groups.count {
+                    if new_groups[j].group_id == group_id {
+                        new_groups[j].start_pos = current_pos;
+                        new_groups[j].end_pos = current_pos;
+                        new_groups[j].active = true;
+                        found_existing = true;
+                        break;
+                    }
+                }
+                
+                if !found_existing {
+                    Array.push(&new_groups, Group_State.{
+                        group_id = group_id,
+                        start_pos = current_pos,
+                        end_pos = current_pos,
+                        active = true
+                    });
+                }
+                
+                result := backtrack_match_to_length(regex, text, match_start, transition.target, current_pos, target_end_pos, &new_groups, allocator);
+                if result.found {
+                    return result;
+                }
+            }
+            case .group_end {
+                // Handle group end
+                group_id := transition.condition.group_end->unwrap();
+                
+                // Create new groups array with this group ended
+                new_groups := Array.make(Group_State, capacity = groups.count, allocator = context.temp_allocator);
+                defer Array.free(&new_groups);
+                
+                for existing_group in *groups {
+                    if existing_group.group_id == group_id && existing_group.active {
+                        Array.push(&new_groups, Group_State.{
+                            group_id = existing_group.group_id,
+                            start_pos = existing_group.start_pos,
+                            end_pos = current_pos,
+                            active = existing_group.active
+                        });
+                    } else {
+                        Array.push(&new_groups, existing_group);
+                    }
+                }
+                
+                result := backtrack_match_to_length(regex, text, match_start, transition.target, current_pos, target_end_pos, &new_groups, allocator);
+                if result.found {
+                    return result;
+                }
+            }
+            case .non_capture_group_start, .non_capture_group_end {
+                // Handle non-capturing groups
+                result := backtrack_match_to_length(regex, text, match_start, transition.target, current_pos, target_end_pos, groups, allocator);
+                if result.found {
+                    return result;
+                }
+            }
+            case .word_boundary {
+                // Check word boundary
+                if current_pos <= target_end_pos && is_match_at_word_boundary(text, current_pos) {
+                    result := backtrack_match_to_length(regex, text, match_start, transition.target, current_pos, target_end_pos, groups, allocator);
+                    if result.found {
+                        return result;
+                    }
+                }
+            }
+            case .anchor {
+                // Handle anchors
+                anchor_matches := false;
+                anchor_value := transition.condition.anchor->unwrap();
+                switch anchor_value {
+                    case .START {
+                        anchor_matches = current_pos == 0;
+                    }
+                    case .END {
+                        anchor_matches = current_pos >= text.count;
+                    }
+                }
+                
+                if anchor_matches {
+                    result := backtrack_match_to_length(regex, text, match_start, transition.target, current_pos, target_end_pos, groups, allocator);
+                    if result.found {
+                        return result;
+                    }
+                }
+            }
+            case .character, .char_class, .char_set, .range {
+                // Character-consuming transitions
+                if current_pos < target_end_pos && current_pos < text.count && matches_condition(&transition.condition, text[current_pos]) {
+                    result := backtrack_match_to_length(regex, text, match_start, transition.target, current_pos + 1, target_end_pos, groups, allocator);
+                    if result.found {
+                        return result;
+                    }
+                }
+            }
+            case .negated {
+                // Negated character conditions
+                if current_pos < target_end_pos && current_pos < text.count {
+                    negated_condition := transition.condition.negated->unwrap();
+                    if !matches_condition(negated_condition, text[current_pos]) {
+                        result := backtrack_match_to_length(regex, text, match_start, transition.target, current_pos + 1, target_end_pos, groups, allocator);
+                        if result.found {
+                            return result;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // No successful path found
+    return Match.{ found = false };
+}
+
+/// Backtracking simulation for lazy quantifiers
+/// This implements proper lazy quantifier semantics by finding the shortest possible match
+simulate_nfa_with_backtracking :: (regex: &Regex, text: str, start_pos: u32, allocator: Allocator) -> Match {
+    if start_pos > text.count || regex.states.count == 0 {
+        return Match.{ found = false };
+    }
+
+    // For lazy quantifiers, use backtracking that follows the NFA transitions correctly
+    // The NFA structure has been set up so that lazy quantifiers have exit transitions first
+    initial_groups := Array.make(Group_State, allocator = context.temp_allocator);
+    defer Array.free(&initial_groups);
+    
+    return backtrack_match(regex, text, start_pos, regex.start_state, start_pos, &initial_groups, allocator);
+}
+
+/// Recursive backtracking match function
+/// This tries matches in the order dictated by the NFA structure (which we've set up for lazy semantics)
+backtrack_match :: (regex: &Regex, text: str, match_start: u32, current_state: u32, current_pos: u32, groups: &[..] Group_State, allocator: Allocator) -> Match {
+    if current_state >= regex.states.count {
+        return Match.{ found = false };
+    }
+
+    state := &regex.states[current_state];
+    
+    // Check if we've reached a final state
+    if state.is_final {
+        // We found a match, construct the result
+        actual_groups_list := Array.make(str, regex.max_group_id, allocator = allocator);
+        actual_groups_list.count = regex.max_group_id;
+        
+        for &group_state in *groups {
+            if group_state.active && group_state.group_id > 0 && group_state.group_id <= regex.max_group_id {
+                gs_s := group_state.start_pos;
+                gs_e := group_state.end_pos;
+                if gs_s > text.count { gs_s = text.count; }
+                if gs_e > text.count { gs_e = text.count; }
+                if gs_s > gs_e { gs_s = gs_e; }
+                
+                actual_groups_list[group_state.group_id - 1] = str.copy(text[gs_s .. gs_e], allocator);
+            }
+        }
+        
+        match_text := text[match_start .. current_pos];
+        return Match.{
+            found = true,
+            start = match_start,
+            end = current_pos,
+            text = str.copy(match_text, allocator),
+            groups = actual_groups_list
+        };
+    }
+
+    // Try transitions in order (lazy quantifiers have exit transitions first)
+    for i in 0 .. state.transitions.count {
+        transition := &state.transitions[i];
+        switch transition.condition {
+            case .epsilon {
+                // Follow epsilon transition
+                result := backtrack_match(regex, text, match_start, transition.target, current_pos, groups, allocator);
+                if result.found {
+                    return result;
+                }
+            }
+            case .group_start {
+                // Handle group start
+                group_id := transition.condition.group_start->unwrap();
+                
+                // Create new groups array with this group started
+                new_groups := Array.make(Group_State, capacity = groups.count + 1, allocator = context.temp_allocator);
+                defer Array.free(&new_groups);
+                
+                for existing_group in *groups {
+                    Array.push(&new_groups, existing_group);
+                }
+                
+                // Add or update the group being started
+                found_existing := false;
+                for j in 0 .. new_groups.count {
+                    if new_groups[j].group_id == group_id {
+                        new_groups[j].start_pos = current_pos;
+                        new_groups[j].end_pos = current_pos;
+                        new_groups[j].active = true;
+                        found_existing = true;
+                        break;
+                    }
+                }
+                
+                if !found_existing {
+                    Array.push(&new_groups, Group_State.{
+                        group_id = group_id,
+                        start_pos = current_pos,
+                        end_pos = current_pos,
+                        active = true
+                    });
+                }
+                
+                result := backtrack_match(regex, text, match_start, transition.target, current_pos, &new_groups, allocator);
+                if result.found {
+                    return result;
+                }
+            }
+            case .group_end {
+                // Handle group end
+                group_id := transition.condition.group_end->unwrap();
+                
+                // Create new groups array with this group ended
+                new_groups := Array.make(Group_State, capacity = groups.count, allocator = context.temp_allocator);
+                defer Array.free(&new_groups);
+                
+                for existing_group in *groups {
+                    if existing_group.group_id == group_id && existing_group.active {
+                        Array.push(&new_groups, Group_State.{
+                            group_id = existing_group.group_id,
+                            start_pos = existing_group.start_pos,
+                            end_pos = current_pos,
+                            active = existing_group.active
+                        });
+                    } else {
+                        Array.push(&new_groups, existing_group);
+                    }
+                }
+                
+                result := backtrack_match(regex, text, match_start, transition.target, current_pos, &new_groups, allocator);
+                if result.found {
+                    return result;
+                }
+            }
+            case .non_capture_group_start, .non_capture_group_end {
+                // Handle non-capturing groups
+                result := backtrack_match(regex, text, match_start, transition.target, current_pos, groups, allocator);
+                if result.found {
+                    return result;
+                }
+            }
+            case .word_boundary {
+                // Check word boundary
+                if current_pos < text.count && is_match_at_word_boundary(text, current_pos) {
+                    result := backtrack_match(regex, text, match_start, transition.target, current_pos, groups, allocator);
+                    if result.found {
+                        return result;
+                    }
+                }
+            }
+            case .anchor {
+                // Handle anchors
+                anchor_matches := false;
+                anchor_value := transition.condition.anchor->unwrap();
+                switch anchor_value {
+                    case .START {
+                        anchor_matches = current_pos == 0;
+                    }
+                    case .END {
+                        anchor_matches = current_pos >= text.count;
+                    }
+                }
+                
+                if anchor_matches {
+                    result := backtrack_match(regex, text, match_start, transition.target, current_pos, groups, allocator);
+                    if result.found {
+                        return result;
+                    }
+                }
+            }
+            case .character, .char_class, .char_set, .range {
+                // Character-consuming transitions
+                if current_pos < text.count && matches_condition(&transition.condition, text[current_pos]) {
+                    result := backtrack_match(regex, text, match_start, transition.target, current_pos + 1, groups, allocator);
+                    if result.found {
+                        return result;
+                    }
+                }
+            }
+            case .negated {
+                // Negated character conditions
+                if current_pos < text.count {
+                    negated_condition := transition.condition.negated->unwrap();
+                    if !matches_condition(negated_condition, text[current_pos]) {
+                        result := backtrack_match(regex, text, match_start, transition.target, current_pos + 1, groups, allocator);
+                        if result.found {
+                            return result;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // No successful path found
+    return Match.{ found = false };
 }
 
 /// Add epsilon closure to simulation state set with group tracking
