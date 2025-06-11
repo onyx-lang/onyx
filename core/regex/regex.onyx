@@ -79,6 +79,7 @@ Regex :: struct {
     states: [..] NFA_State;
     start_state: u32;
     max_group_id: u32; // Add this line
+    has_lazy_quantifiers: bool; // Track if regex contains lazy quantifiers
 }
 
 Regex.destroy :: (regex: &Regex) {
@@ -163,7 +164,8 @@ compile :: (pattern: str, allocator := context.allocator) -> Regex {
         pattern = str.copy(pattern, allocator),
         states = Array.make(NFA_State, allocator = allocator),
         start_state = 0,
-        max_group_id = 0 // Initialize here
+        max_group_id = 0, // Initialize here
+        has_lazy_quantifiers = false // Initialize to false
     };
 
     if !build_nfa(&parser, &regex, allocator) {
@@ -768,6 +770,7 @@ parse_element :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: A
                             parser.pos += 1;
                             if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
                                 is_lazy_group = true;
+                                regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
                                 parser.pos += 1; // Consume '?' for laziness
                             }
                             
@@ -786,6 +789,7 @@ parse_element :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: A
                             parser.pos += 1;
                             if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
                                 is_lazy_group = true;
+                                regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
                                 parser.pos += 1; // Consume '?' for laziness
                             }
                             
@@ -803,6 +807,7 @@ parse_element :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: A
                             parser.pos += 1;
                             if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
                                 is_lazy_group = true;
+                                regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
                                 parser.pos += 1; // Consume '?' for laziness
                             }
                             
@@ -1022,6 +1027,7 @@ apply_quantifier :: (parser: &Parser, regex: &Regex, entry_point_state: u32, pot
             parser.pos += 1; // Consume '*'
             if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
                 is_lazy = true;
+                regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
                 parser.pos += 1; // Consume '?' for laziness
             }
 
@@ -1051,6 +1057,7 @@ apply_quantifier :: (parser: &Parser, regex: &Regex, entry_point_state: u32, pot
             parser.pos += 1; // Consume '+'
             if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
                 is_lazy = true;
+                regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
                 parser.pos += 1; // Consume '?' for laziness
             }
 
@@ -1083,6 +1090,7 @@ apply_quantifier :: (parser: &Parser, regex: &Regex, entry_point_state: u32, pot
             parser.pos += 1; // Consume '?'
             if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
                 is_lazy = true;
+                regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
                 parser.pos += 1; // Consume '?' for laziness
             }
 
@@ -1124,6 +1132,7 @@ apply_quantifier :: (parser: &Parser, regex: &Regex, entry_point_state: u32, pot
             quant_is_lazy := false;
             if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
                 quant_is_lazy = true;
+                regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
                 parser.pos += 1; // Consume '?' for laziness
             }
             return build_numeric_quantifier_nfa(regex, entry_point_state, potential_exit_state_for_one_item_id, item_condition, min_val, max_val, parser, allocator, quant_is_lazy);
@@ -1219,6 +1228,7 @@ apply_numeric_quantifier :: (parser: &Parser, regex: &Regex, entry_point_state: 
     is_lazy := false;
     if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
         is_lazy = true;
+        regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
         parser.pos += 1; // Consume '?' for laziness
     }
     
@@ -1451,7 +1461,9 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
                 groups = actual_groups_list
             };
 
-            if !best_match.found || candidate_match_initial.end > best_match.end { // Prefer longer matches
+            if !best_match.found || 
+               (regex.has_lazy_quantifiers && candidate_match_initial.end < best_match.end) ||
+               (!regex.has_lazy_quantifiers && candidate_match_initial.end > best_match.end) { // Prefer shorter matches for lazy, longer for greedy
                 if best_match.found { 
                     if best_match.text.data != null { raw_free(allocator, best_match.text.data); }
                     for i_group in 0 .. best_match.groups.count {
@@ -1561,7 +1573,9 @@ simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator
                     groups = actual_groups_list_loop
                 };
                 
-                if !best_match.found || candidate_match.end > best_match.end {
+                if !best_match.found || 
+                   (regex.has_lazy_quantifiers && candidate_match.end < best_match.end) ||
+                   (!regex.has_lazy_quantifiers && candidate_match.end > best_match.end) {
                     if best_match.found { 
                         if best_match.text.data != null { raw_free(allocator, best_match.text.data); }
                         for i_group in 0 .. best_match.groups.count {
