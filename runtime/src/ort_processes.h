@@ -183,6 +183,8 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
         STARTUPINFOA startup;
         memset(&startup, 0, sizeof startup);
         startup.cb = sizeof(startup);
+        startup.dwFlags |= STARTF_USESHOWWINDOW;
+        startup.wShowWindow = 0;
 
         SECURITY_ATTRIBUTES saAttr;
         saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);

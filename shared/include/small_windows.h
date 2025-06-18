@@ -298,6 +298,7 @@ typedef struct _PROCESS_INFORMATION {
 
 #define INFINITE 0xffffffffl
 #define INVALID_HANDLE_VALUE ((void *)(intptr_t)(-1))
+#define STARTF_USESHOWWINDOW 0x00000001
 #define STARTF_USESTDHANDLES 0x00000100
 
 typedef DWORD WINAPI THREAD_START_ROUTINE(void *parameter);
