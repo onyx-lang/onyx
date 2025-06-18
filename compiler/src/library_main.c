@@ -970,6 +970,7 @@ static AstInclude* create_load(Context *context, char* filename, int32_t length)
     
     AstInclude* include_node = onyx_ast_node_new(context->ast_alloc, sizeof(AstInclude), Ast_Kind_Load);
     include_node->name = bh_strdup_len(context->ast_alloc, filename, length);
+    bh_path_convert_separators(include_node->name);
     include_node->token = &implicit_load_token;
 
     return include_node;
