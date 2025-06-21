@@ -4,7 +4,7 @@ Onyx Standard Library Platform Layer
 Onyx has *soft* definition for what is expected from the supporting
 platform within its standard library. This should be solidified into
 a concrete set of types and functions that are expected to be implemented,
-or _explicity not_ implemented for a given platform.
+or _explicitly not_ implemented for a given platform.
 
 This is where not having header files and having a fluid definition of
 functions does hurt a little bit, because it is not possible to say

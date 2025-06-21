@@ -1,6 +1,6 @@
 List of known bugs:
 
-[ ] partially solidifying procedures messes up poly param indicies, which causes them to
+[ ] partially solidifying procedures messes up poly param indices, which causes them to
     not be solved correctly.
 
 [ ] macros cannot use 'use'.
@@ -149,7 +149,7 @@ List of known bugs:
     vararg_proc(.{ 1, 2 });
 
 
-[X] `fallthrough` in a for loop does not emit deferred statments correctly.
+[X] `fallthrough` in a for loop does not emit deferred statements correctly.
 
 List of things to change:
 [X] Currently, there is no way to use the initialized members of a structure without using a struct literal.
