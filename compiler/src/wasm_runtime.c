@@ -461,6 +461,14 @@ static void cleanup_wasm_objects() {
     if (wasm_module) wasm_module_delete(wasm_module);
     if (wasm_store)  wasm_store_delete(wasm_store);
     if (wasm_engine) wasm_engine_delete(wasm_engine);
+    wasm_extern_vec_delete(&wasm_imports);
+
+    wasm_config = NULL;
+    wasm_instance = NULL;
+    wasm_module = NULL;
+    wasm_store = NULL;
+    wasm_engine = NULL;
+    wasm_memory = NULL;
 }
 
 static wasm_trap_t *__error_on_call(void *env, const wasm_val_vec_t *args, wasm_val_vec_t *results) {
