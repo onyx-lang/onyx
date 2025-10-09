@@ -5244,13 +5244,18 @@ CHECK_FUNC(interface_constraint, AstConstraint *constraint) {
 
     // #intrinsic interfaces
     if (constraint->interface->is_intrinsic) {
-        b32 success = resolve_intrinsic_interface_constraint(context, constraint);
-        if (success) {
-            *constraint->report_status = Constraint_Check_Status_Success;
-            return Check_Complete;
-        } else {
-            *constraint->report_status = Constraint_Check_Status_Failed;
-            return Check_Failed;
+        TypeMatch result = resolve_intrinsic_interface_constraint(context, constraint);
+        switch (result) {
+            case TYPE_MATCH_SUCCESS: 
+                *constraint->report_status = Constraint_Check_Status_Success;
+                return Check_Complete;
+
+            case TYPE_MATCH_FAILED: 
+                *constraint->report_status = Constraint_Check_Status_Failed;
+                return Check_Failed;
+
+            default:
+                return Check_Yield;
         }
     }
 

@@ -1996,18 +1996,16 @@ AstCall * create_implicit_for_expansion_call(Context *context, AstFor *fornode) 
 }
 
 
-
-b32 resolve_intrinsic_interface_constraint(Context *context, AstConstraint *constraint) {
-    AstInterface *interface = constraint->interface;
-    Type* type = type_build_from_ast(context, (AstType *) constraint->args[0]);
-    if (!type) return 0;
-
+static b32 resolve_intrinsic_interface_constraint_inner(Context *context, AstInterface *interface, Type *type) {
     if (!strcmp(interface->name, "type_is_bool"))     return type_is_bool(type);
     if (!strcmp(interface->name, "type_is_int"))      return type_is_integer(type);
     if (!strcmp(interface->name, "type_is_float"))    return type->kind == Type_Kind_Basic && (type->Basic.flags & Basic_Flag_Float);
     if (!strcmp(interface->name, "type_is_number"))   return type->kind == Type_Kind_Basic && (type->Basic.flags & Basic_Flag_Numeric);
     if (!strcmp(interface->name, "type_is_simd"))     return type->kind == Type_Kind_Basic && (type->Basic.flags & Basic_Flag_SIMD);
-    if (!strcmp(interface->name, "type_is_pointer"))  return type_is_pointer(type) || type_is_rawptr(type);
+    if (!strcmp(interface->name, "type_is_pointer"))  {
+        printf("RUNNING TYPE IS POINTER ON: %s\n", type_get_name(context, type));
+        return type_is_pointer(type) || type_is_rawptr(type);
+    }
     if (!strcmp(interface->name, "type_is_enum"))     return type->kind == Type_Kind_Enum;
     if (!strcmp(interface->name, "type_is_simple"))   return type->kind == Type_Kind_Basic
                                                           || type->kind == Type_Kind_Enum
@@ -2022,3 +2020,16 @@ b32 resolve_intrinsic_interface_constraint(Context *context, AstConstraint *cons
     if (!strcmp(interface->name, "type_is_function")) return type->kind == Type_Kind_Function;
     return 0;
 }
+
+TypeMatch resolve_intrinsic_interface_constraint(Context *context, AstConstraint *constraint) {
+    AstInterface *interface = constraint->interface;
+    Type* type = type_build_from_ast(context, (AstType *) constraint->args[0]);
+    if (!type) return TYPE_MATCH_YIELD;
+
+    if (resolve_intrinsic_interface_constraint_inner(context, interface, type)) {
+        return TYPE_MATCH_SUCCESS;
+    } else {
+        return TYPE_MATCH_FAILED;
+    }
+}
+
