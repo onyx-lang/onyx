@@ -5609,6 +5609,14 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
                 return Check_Yield;
 
             case TYPE_MATCH_YIELD:
+                if (context->cycle_detected) {
+                    ONYX_ERROR(query->token->pos, Error_Critical, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
+                    if (err_msg.text != NULL) onyx_submit_error(context, err_msg);
+                    if (query->error_loc) ONYX_ERROR(query->error_loc->pos, Error_Critical, "Here is where the call is located."); // :ErrorMessage
+                }
+
+                return Check_Yield;
+                
             case TYPE_MATCH_FAILED: {
                 if (solved_something) continue;
 
