@@ -2002,10 +2002,7 @@ static b32 resolve_intrinsic_interface_constraint_inner(Context *context, AstInt
     if (!strcmp(interface->name, "type_is_float"))    return type->kind == Type_Kind_Basic && (type->Basic.flags & Basic_Flag_Float);
     if (!strcmp(interface->name, "type_is_number"))   return type->kind == Type_Kind_Basic && (type->Basic.flags & Basic_Flag_Numeric);
     if (!strcmp(interface->name, "type_is_simd"))     return type->kind == Type_Kind_Basic && (type->Basic.flags & Basic_Flag_SIMD);
-    if (!strcmp(interface->name, "type_is_pointer"))  {
-        printf("RUNNING TYPE IS POINTER ON: %s\n", type_get_name(context, type));
-        return type_is_pointer(type) || type_is_rawptr(type);
-    }
+    if (!strcmp(interface->name, "type_is_pointer"))  return type_is_pointer(type) || type_is_rawptr(type);
     if (!strcmp(interface->name, "type_is_enum"))     return type->kind == Type_Kind_Enum;
     if (!strcmp(interface->name, "type_is_simple"))   return type->kind == Type_Kind_Basic
                                                           || type->kind == Type_Kind_Enum
