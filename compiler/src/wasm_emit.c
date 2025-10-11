@@ -5341,8 +5341,10 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
         }
     }
 
-    WasmDatum *type_table_data = &module->data[module->global_type_table_data_id - 1];
-    qsort(type_table_data->data, *module->type_info_entry_count, 2 * POINTER_SIZE, cmp_type_info);
+    if (module->global_type_table_data_id >= 0) {
+        WasmDatum *type_table_data = &module->data[module->global_type_table_data_id - 1];
+        qsort(type_table_data->data, *module->type_info_entry_count, 2 * POINTER_SIZE, cmp_type_info);
+    }
 
     assert(module->stack_top_ptr && module->heap_start_ptr);
 
