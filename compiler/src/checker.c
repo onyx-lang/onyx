@@ -4414,19 +4414,6 @@ CHECK_FUNC(function_header, AstFunction* func) {
         func->scope = scope_create(context, context->checker.current_scope, func->token->pos);
     }
 
-    if (func->constraints.constraints != NULL && func->constraints.constraints_met == 0) {
-        // bh_arr_each(AstConstraint *, constraint, func->constraints.constraints) {
-        //     CHECK(constraint, *constraint);
-        // }
-
-        func->constraints.produce_errors = (func->flags & Ast_Flag_Header_Check_No_Error) == 0;
-
-        OnyxToken *tkn = func->token;
-        if (func->generated_from) tkn = func->generated_from;
-
-        CHECK(constraint_context, &func->constraints, func->scope, tkn->pos);
-    }
-
     scope_enter(context, func->scope);
 
     if (!mode_enabled(context, CM_Dont_Resolve_Symbols)) {
@@ -4553,6 +4540,15 @@ CHECK_FUNC(function_header, AstFunction* func) {
     }
 
     CHECK(type, &func->return_type);
+
+    if (func->constraints.constraints != NULL && func->constraints.constraints_met == 0) {
+        func->constraints.produce_errors = (func->flags & Ast_Flag_Header_Check_No_Error) == 0;
+
+        OnyxToken *tkn = func->token;
+        if (func->generated_from) tkn = func->generated_from;
+
+        CHECK(constraint_context, &func->constraints, func->scope, tkn->pos);
+    }
 
     if (func->deprecated_warning) {
         CHECK(expression, (AstTyped **) &func->deprecated_warning);
