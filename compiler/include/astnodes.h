@@ -2413,7 +2413,7 @@ AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* 
 Type* polymorphic_struct_lookup(Context *context, AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
 Type* polymorphic_union_lookup(Context *context, AstPolyUnionType* pu_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
 
-b32 resolve_intrinsic_interface_constraint(Context *context, AstConstraint *constraint);
+TypeMatch resolve_intrinsic_interface_constraint(Context *context, AstConstraint *constraint);
 
 void track_declaration_for_symbol_info(Context *context, OnyxFilePos, AstNode *);
 void track_documentation_for_symbol_info(Context *context, AstNode *, AstBinding *);

@@ -594,11 +594,15 @@ AstNode* ast_clone(Context *context, void* n) {
             AstConstraint* dc = (AstConstraint *) nn;
             AstConstraint* sc = (AstConstraint *) node;
 
-            dc->args = NULL;
-            bh_arr_new(context->gp_alloc, dc->args, bh_arr_length(sc->args));
+            if (sc->flags & Ast_Flag_Constraint_Is_Expression) {
+                C(AstConstraint, const_expr);
+            } else {
+                dc->args = NULL;
+                bh_arr_new(context->gp_alloc, dc->args, bh_arr_length(sc->args));
 
-            bh_arr_each(AstTyped *, arg, sc->args) {
-                bh_arr_push(dc->args, (AstTyped *) ast_clone(context, (AstNode *) *arg));
+                bh_arr_each(AstTyped *, arg, sc->args) {
+                    bh_arr_push(dc->args, (AstTyped *) ast_clone(context, (AstNode *) *arg));
+                }
             }
 
             dc->phase = Constraint_Phase_Waiting_To_Be_Queued;

@@ -522,8 +522,10 @@ __closure_block_allocate :: (size: i32) -> rawptr {
 
 
 ///
-__dispose_used_local :: #match -> void {
-    #order 10000 delete
+__dispose_used_local :: #match -> void {}
+
+#if runtime.runtime != .Custom {
+    #overload #order 10000 __dispose_used_local :: delete
 }
 
 
