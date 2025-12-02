@@ -376,18 +376,42 @@ CHECK_FUNC(if, AstIfWhile* ifnode) {
         }
 
     } else {
-        if (ifnode->initialization != NULL) {
+        if (ifnode->initialization != NULL || ifnode->optional_extract) {
             if (!ifnode->scope) {
                 ifnode->scope = scope_create(context, context->checker.current_scope, ifnode->token->pos);
             }
 
             scope_enter(context, ifnode->scope);
+        }
+
+        if (ifnode->initialization != NULL) {
             CHECK(statement_chain, &ifnode->initialization);
         }
 
         CHECK(expression, &ifnode->cond);
 
-        if (!type_is_bool(ifnode->cond->type)) {
+        if (ifnode->optional_extract) {
+            // Check:
+            //   if condition is of type ? T
+            //   declare and insert symbol for optional_extract value
+            Type *type = ifnode->cond->type;
+            assert(type);
+
+            if (type->kind != Type_Kind_Union
+                || type->Union.constructed_from != context->builtins.optional_type) {
+                ERROR_(ifnode->token->pos, "Expected expression of optional type ('? T') when using 'as'. Got '%s'", type_get_name(context, type));
+            }
+
+            if (!ifnode->optional_local) {
+                AstType *inner_type = type->Union.variants_ordered[1]->type->ast_type;
+                assert(inner_type);
+                ifnode->optional_local = make_local(context, ifnode->optional_extract_symbol, inner_type);
+                ifnode->optional_local->flags |= Ast_Flag_Address_Taken;
+                ifnode->optional_local->flags |= Ast_Flag_Decl_Followed_By_Init;
+                CHECK(local, &ifnode->optional_local);
+            }
+        }
+        else if (!type_is_bool(ifnode->cond->type)) {
             TypeMatch implicit_cast = implicit_cast_to_bool(context, &ifnode->cond);
             if (implicit_cast == TYPE_MATCH_YIELD) YIELD(ifnode->token->pos, "Waiting for implicit cast to bool to check.");
             if (implicit_cast == TYPE_MATCH_FAILED) {
@@ -403,7 +427,7 @@ CHECK_FUNC(if, AstIfWhile* ifnode) {
                 ifnode->flags |= Ast_Flag_Block_Returns;
         }
 
-        if (ifnode->initialization != NULL) {
+        if (ifnode->initialization != NULL || ifnode->optional_extract) {
             scope_leave(context);
         }
     }

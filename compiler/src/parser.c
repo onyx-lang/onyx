@@ -1609,6 +1609,11 @@ static AstIfWhile* parse_if_stmt(OnyxParser* parser) {
         initialization_or_cond = NULL;
     }
 
+    if (consume_token_if_next(parser, Token_Type_Keyword_As)) {
+        if_node->optional_extract = 1;
+        if_node->optional_extract_symbol = expect_token(parser, Token_Type_Symbol);
+    }
+
     AstBlock* true_stmt = parse_block(parser, 1, NULL);
     consume_token_if_next(parser, ';');
 
@@ -1624,6 +1629,11 @@ static AstIfWhile* parse_if_stmt(OnyxParser* parser) {
         elseif_node->token = parser->curr - 1;
 
         cond = parse_expression(parser, 1);
+        if (consume_token_if_next(parser, Token_Type_Keyword_As)) {
+            elseif_node->optional_extract = 1;
+            elseif_node->optional_extract_symbol = expect_token(parser, Token_Type_Symbol);
+        }
+
         true_stmt = parse_block(parser, 1, NULL);
 
         elseif_node->cond = cond;

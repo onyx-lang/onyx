@@ -1,0 +1,46 @@
+use core {*}
+
+Color :: union {
+    Red: i32
+    Green: str
+    Blue: struct { brightness: i32 }
+}
+
+
+Foo :: struct { x, y, z: str }
+maybe_result :: () -> ? Foo {
+    println("Computing foo...")
+    return Foo.{"a", "b", "c"}
+}
+
+main :: () {
+    // Special syntax to handle
+    //   if some_optional {
+    //      v := some_optional->unwrap()
+    //      ...
+    //   }
+    if maybe_result() as v {
+        println(v)
+    }
+
+    color := Color.{ Blue = .{ 1234 } }
+
+    // Chainable with if/elseif
+    if color.Red as c {
+        println(c)
+    }
+    elseif color.Blue as c {
+        printf("BLUE: {}\n", c)
+    }
+
+    // Negation still works due to implicit_cast_to_bool
+    if !color.Green {
+        println("Color was not green!")
+    }
+
+    // Accessing the value in the else case gives you a zero-ed value.
+    if color.Red as r {}
+    else {
+        printf("Color was not red but got default value of: {}\n", r)
+    }
+}
