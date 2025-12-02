@@ -3482,7 +3482,13 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 emit_expression(mod, &code, field->expr);
                 u64 source_base_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
                 WIL(NULL, WI_LOCAL_TEE, source_base_ptr);
-                emit_load_instruction(mod, &code, field->expr->type->Union.tag_type, 0);
+
+                if (type_is_pointer(field->expr->type)) {
+                    emit_load_instruction(mod, &code, field->expr->type->Pointer.elem->Union.tag_type, 0);
+                } else {
+                    emit_load_instruction(mod, &code, field->expr->type->Union.tag_type, 0);
+                }
+
                 WIL(NULL, WI_I32_CONST, field->idx);
                 WI(NULL, WI_I32_EQ);
                 emit_enter_structured_block(mod, &code, SBT_Basic_If, field->token);
