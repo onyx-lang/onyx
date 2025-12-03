@@ -1011,9 +1011,9 @@ prod :: (x: $I1/Iterable, y_iter: Iterator($Y)) => {
         ctx => {
             switch ctx.y_val {
                 case .Some as y {
-                    next(ctx.x_iter)->with([x] {
+                    if next(ctx.x_iter) as x {
                         return Optional.make(Pair.make(x, y))
-                    })
+                    }
                 }
 
                 case .None do return .None

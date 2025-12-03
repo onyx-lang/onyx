@@ -1103,15 +1103,15 @@ b32 potentially_convert_function_to_polyproc(Context *context, AstFunction *func
 // structures now have a delay instantiation phase and are not forced to be completed immediately.
 
 char* build_poly_struct_name(Context *context, char *name, Type* type) {
-    char name_buf[256];
-    fori (i, 0, 256) name_buf[i] = 0;
+    char name_buf[512];
+    fori (i, 0, 512) name_buf[i] = 0;
 
 
     // Special case for `? T`
     if (type->kind == Type_Kind_Union
         && type->Union.constructed_from == context->builtins.optional_type) {
-        strncat(name_buf, "? ", 255);
-        strncat(name_buf, type_get_name(context, type->Union.poly_sln[0].type), 255);
+        strncat(name_buf, "? ", 511);
+        strncat(name_buf, type_get_name(context, type->Union.poly_sln[0].type), 511);
 
         return bh_aprintf(context->gp_alloc, "%s", name_buf);
     }
@@ -1121,17 +1121,17 @@ char* build_poly_struct_name(Context *context, char *name, Type* type) {
     if (type->kind == Type_Kind_Union)  slns = type->Union.poly_sln;
 
 
-    strncat(name_buf, name, 255);
-    strncat(name_buf, "(", 255);
+    strncat(name_buf, name, 511);
+    strncat(name_buf, "(", 511);
     bh_arr_each(AstPolySolution, ptype, slns) {
         if (ptype != slns)
-            strncat(name_buf, ", ", 255);
+            strncat(name_buf, ", ", 511);
 
         // This logic will have to be other places as well.
 
         switch (ptype->kind) {
             case PSK_Undefined: assert(0); break;
-            case PSK_Type:      strncat(name_buf, type_get_name(context, ptype->type), 255); break;
+            case PSK_Type:      strncat(name_buf, type_get_name(context, ptype->type), 511); break;
             case PSK_Value: {
                 // FIX
                 AstNode* value = strip_aliases((AstNode *) ptype->value);
@@ -1155,7 +1155,7 @@ char* build_poly_struct_name(Context *context, char *name, Type* type) {
             }
         }
     }
-    strncat(name_buf, ")", 255);
+    strncat(name_buf, ")", 511);
 
     return bh_aprintf(context->gp_alloc, "%s", name_buf);
 }
