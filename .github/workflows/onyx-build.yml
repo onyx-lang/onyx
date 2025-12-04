@@ -152,7 +152,7 @@ jobs:
       - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'linux-arm64') && (matrix.runtime_library != 'none')
         run: |
-          sudo apt install --yes gcc-aarch64-linux-gnu
+          sudo apt update && sudo apt install --yes gcc-aarch64-linux-gnu
           ./build.sh compile compress
         env:
           ONYX_CC: aarch64-linux-gnu-gcc
@@ -164,7 +164,7 @@ jobs:
       - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'linux-arm64') && (matrix.runtime_library == 'none')
         run: |
-          sudo apt install --yes gcc-aarch64-linux-gnu
+          sudo apt update && apt install --yes gcc-aarch64-linux-gnu
           ./build.sh compile compress
         env:
           ONYX_CC: aarch64-linux-gnu-gcc
