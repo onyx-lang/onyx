@@ -3467,6 +3467,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
         }
     }
 
+    consume_token_if_next(parser, Token_Type_Inserted_Semicolon);
     if (parser->curr->type == Token_Type_Keyword_Where) {
         parse_constraints(parser, &func_def->constraints);
     }
