@@ -34,3 +34,5 @@ runtime/onyx_runtime.so
 runtime/onyx_runtime.dylib
 runtime/onyx_runtime.dll
 .clangd
+.direnv/
+/result
