@@ -162,22 +162,22 @@ static AstSolidifiedFunction generate_solidified_function(
     //                                             - brendanfh 2021/01/18
     u32 removed_params = 0;
     bh_arr_each(AstPolyParam, param, pp->poly_params) {
-        if (param->implicit_interface) {
-            AstConstraint *constraint = onyx_ast_node_new(context->ast_alloc, sizeof(AstConstraint), Ast_Kind_Constraint);
-            constraint->interface = (AstInterface *) param->implicit_interface;
-            constraint->token = constraint->interface->token;
+      if (param->implicit_interfaces) {
+            // Create a constraint for each interface
+            bh_arr_each(AstNode *, pinterface, param->implicit_interfaces) {
+                AstConstraint *constraint = onyx_ast_node_new(context->ast_alloc, sizeof(AstConstraint), Ast_Kind_Constraint);
+                constraint->interface = (AstInterface *) *pinterface;
+                constraint->token = constraint->interface->token;
 
-            bh_arr_new(context->gp_alloc, constraint->args, 1);
-            bh_arr_push(constraint->args, (AstTyped *) ast_clone(context, param->poly_sym));
+                bh_arr_new(context->gp_alloc, constraint->args, 1);
+                bh_arr_push(constraint->args, (AstTyped *) ast_clone(context, param->poly_sym));
 
-            //
-            // Sometimes this array is uninitialized, and that would cause a memory leak
-            // because the memory wouldn't be tracked in the gp_alloc.
-            if (!solidified_func.func->constraints.constraints) {
-                bh_arr_new(context->gp_alloc, solidified_func.func->constraints.constraints, 1);
+                if (!solidified_func.func->constraints.constraints) {
+                    bh_arr_new(context->gp_alloc, solidified_func.func->constraints.constraints, 1);
+                }
+
+                bh_arr_push(solidified_func.func->constraints.constraints, constraint);
             }
-
-            bh_arr_push(solidified_func.func->constraints.constraints, constraint);
         }
 
         if (param->kind != PPK_Baked_Value) continue;
@@ -1046,7 +1046,7 @@ b32 potentially_convert_function_to_polyproc(Context *context, AstFunction *func
         AstPolyParam pp;
         pp.idx = apv->idx;
         pp.kind = PPK_Poly_Type;
-        pp.implicit_interface = NULL;
+        pp.implicit_interfaces = NULL;
 
         AstPolyCallType* pcall = onyx_ast_node_new(context->ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
         pcall->callee = *apv->replace;

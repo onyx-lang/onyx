@@ -447,20 +447,23 @@ static void write_doc_constraints(Context *context, bh_buffer *buffer, Constrain
 
     if (poly_params) {
         bh_arr_each(AstPolyParam, poly_param, poly_params) {
-            if (!poly_param->implicit_interface) continue;
+          if (!poly_param->implicit_interfaces) continue;
 
-            bh_buffer_clear(&tmp_buffer);
-            write_type_node(context, &tmp_buffer, poly_param->implicit_interface);
-            bh_buffer_write_string(&tmp_buffer, "(");
+          // Generate constraint documentation for each interface
+          bh_arr_each(AstNode *, pinterface, poly_param->implicit_interfaces) {
+              bh_buffer_clear(&tmp_buffer);
+              write_type_node(context, &tmp_buffer, *pinterface);
+              bh_buffer_write_string(&tmp_buffer, "(");
 
-            poly_param->poly_sym->flags &= ~Ast_Flag_Symbol_Is_PolyVar;
-            write_type_node(context, &tmp_buffer, poly_param->poly_sym);
-            poly_param->poly_sym->flags |= Ast_Flag_Symbol_Is_PolyVar;
+              poly_param->poly_sym->flags &= ~Ast_Flag_Symbol_Is_PolyVar;
+              write_type_node(context, &tmp_buffer, poly_param->poly_sym);
+              poly_param->poly_sym->flags |= Ast_Flag_Symbol_Is_PolyVar;
 
-            bh_buffer_write_string(&tmp_buffer, ")");
-            write_string(buffer, tmp_buffer.length, (char *) tmp_buffer.data);
+              bh_buffer_write_string(&tmp_buffer, ")");
+              write_string(buffer, tmp_buffer.length, (char *) tmp_buffer.data);
 
-            constraint_count += 1;
+              constraint_count += 1;
+          }
         }
     }
 

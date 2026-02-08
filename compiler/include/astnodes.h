@@ -1408,7 +1408,7 @@ struct AstPolyParam {
     Type* type;
 
     // Used to store interface specified with $T/Interface.
-    AstNode *implicit_interface;
+    bh_arr(AstNode *) implicit_interfaces;
 };
 
 struct AstPolySolution {

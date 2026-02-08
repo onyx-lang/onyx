@@ -2344,9 +2344,25 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
     symbol_node->token = expect_token(parser, Token_Type_Symbol);
     symbol_node->flags |= Ast_Flag_Symbol_Is_PolyVar;
 
-    AstNode *implicit_interface = NULL;
+    bh_arr(AstNode *) implicit_interfaces = NULL;
     if (consume_token_if_next(parser, '/')) {
-        implicit_interface = (AstNode *) parse_factor(parser);
+        // Check if we have a brace-enclosed list
+        if (consume_token_if_next(parser, '{')) {
+            bh_arr_new(parser->context->gp_alloc, implicit_interfaces, 2);
+            
+            // Parse comma-separated interfaces
+            do {
+                AstNode *interface = (AstNode *) parse_factor(parser);
+                bh_arr_push(implicit_interfaces, interface);
+            } while (consume_token_if_next(parser, ','));
+            
+            expect_token(parser, '}');
+        } else {
+            // Single interface (backward compatible)
+            bh_arr_new(parser->context->gp_alloc, implicit_interfaces, 1);
+            AstNode *interface = (AstNode *) parse_factor(parser);
+            bh_arr_push(implicit_interfaces, interface);
+        }
     }
 
     **next_insertion = (AstType *) symbol_node;
@@ -2356,7 +2372,7 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
         bh_arr_push(pv, ((AstPolyParam) {
             .kind     = PPK_Poly_Type,
             .poly_sym = (AstNode *) symbol_node,
-            .implicit_interface = implicit_interface,
+            .implicit_interfaces = implicit_interfaces,  // Changed: now an array
 
             // These will be filled out by function_params()
             .type_expr = NULL,
