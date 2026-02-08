@@ -162,15 +162,28 @@ static AstSolidifiedFunction generate_solidified_function(
     //                                             - brendanfh 2021/01/18
     u32 removed_params = 0;
     bh_arr_each(AstPolyParam, param, pp->poly_params) {
-      if (param->implicit_interfaces) {
+        if (param->implicit_interface_constraints) {
             // Create a constraint for each interface
-            bh_arr_each(AstNode *, pinterface, param->implicit_interfaces) {
-                AstConstraint *constraint = onyx_ast_node_new(context->ast_alloc, sizeof(AstConstraint), Ast_Kind_Constraint);
-                constraint->interface = (AstInterface *) *pinterface;
+            bh_arr_each(ImplicitInterfaceConstraint, iic, param->implicit_interface_constraints) {
+                AstConstraint *constraint = onyx_ast_node_new(context->ast_alloc, 
+                                                              sizeof(AstConstraint), 
+                                                              Ast_Kind_Constraint);
+                constraint->interface = (AstInterface *) iic->interface;
                 constraint->token = constraint->interface->token;
 
-                bh_arr_new(context->gp_alloc, constraint->args, 1);
+                // Build args: [polyvar, extra_arg1, extra_arg2, ...]
+                bh_arr_new(context->gp_alloc, constraint->args, 
+                           1 + (iic->extra_args ? bh_arr_length(iic->extra_args) : 0));
+                
+                // First argument is always the polymorphic variable
                 bh_arr_push(constraint->args, (AstTyped *) ast_clone(context, param->poly_sym));
+                
+                // Add any extra arguments
+                if (iic->extra_args) {
+                    bh_arr_each(AstTyped *, extra_arg, iic->extra_args) {
+                        bh_arr_push(constraint->args, (AstTyped *) ast_clone(context, *extra_arg));
+                    }
+                }
 
                 if (!solidified_func.func->constraints.constraints) {
                     bh_arr_new(context->gp_alloc, solidified_func.func->constraints.constraints, 1);
@@ -1046,7 +1059,7 @@ b32 potentially_convert_function_to_polyproc(Context *context, AstFunction *func
         AstPolyParam pp;
         pp.idx = apv->idx;
         pp.kind = PPK_Poly_Type;
-        pp.implicit_interfaces = NULL;
+        pp.implicit_interface_constraints = NULL;
 
         AstPolyCallType* pcall = onyx_ast_node_new(context->ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
         pcall->callee = *apv->replace;

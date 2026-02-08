@@ -1389,6 +1389,11 @@ typedef enum PolyProcLookupMethod {
     PPLM_By_Function_Type,
 } PolyProcLookupMethod;
 
+typedef struct ImplicitInterfaceConstraint {
+    AstNode *interface;
+    bh_arr(AstTyped *) extra_args;  // Arguments after the polymorphic variable
+} ImplicitInterfaceConstraint;
+
 struct AstPolyParam {
     PolyParamKind kind;
 
@@ -1407,8 +1412,9 @@ struct AstPolyParam {
     // Used for baked values. The expected type of the parameter.
     Type* type;
 
-    // Used to store interface specified with $T/Interface.
-    bh_arr(AstNode *) implicit_interfaces;
+    // Used to store interface specified with $T/Interface
+    // Can store extra args for $T/Interface(R)
+    bh_arr(ImplicitInterfaceConstraint) implicit_interface_constraints;
 };
 
 struct AstPolySolution {
