@@ -265,12 +265,17 @@ static PolySolveResult solve_poly_type(Context *context, AstNode* target, AstTyp
         // This check does not strictly need the `type_auto_return` check,
         // but it does prevent bugs if the auto return type placeholder is
         // accidentally inserted into the real type.
-        if (elem.type_expr == (AstType *) target && elem.actual != context->types.auto_return) {
-            result.kind = elem.kind;
+        if (elem.type_expr == (AstType *) target) {
+            if (elem.actual != context->types.auto_return) {
+                result.kind = elem.kind;
 
-            assert(elem.kind != PSK_Undefined);
-            if (result.kind == PSK_Type)  result.actual = elem.actual;
-            if (result.kind == PSK_Value) result.value = elem.value;
+                assert(elem.kind != PSK_Undefined);
+                if (result.kind == PSK_Type)  result.actual = elem.actual;
+                if (result.kind == PSK_Value) result.value = elem.value;
+            } else {
+                context->polymorph.flag_to_yield = 1;
+            }
+
             break;
         }
 
