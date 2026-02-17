@@ -17,8 +17,8 @@ use core
 /// Pass a type as the first argument to force the type, otherwise
 /// the type will be inferred from the parameter type.
 Optional.make :: #match #locked {
-    ((x: $T) => (?T).{ Some = x }),
-    ($T: type_expr, x: T) => ((?T).{ Some = x })
+    (x: $T) -> ? T { return x },
+    ($T: type_expr, x: T) -> ? T { return x }
 }
 
 /// Create an empty Optional of a certain type. This procedure

@@ -447,20 +447,32 @@ static void write_doc_constraints(Context *context, bh_buffer *buffer, Constrain
 
     if (poly_params) {
         bh_arr_each(AstPolyParam, poly_param, poly_params) {
-            if (!poly_param->implicit_interface) continue;
+            if (!poly_param->implicit_interface_constraints) continue;
 
-            bh_buffer_clear(&tmp_buffer);
-            write_type_node(context, &tmp_buffer, poly_param->implicit_interface);
-            bh_buffer_write_string(&tmp_buffer, "(");
+            // Generate constraint documentation for each interface
+            bh_arr_each(ImplicitInterfaceConstraint, iic, poly_param->implicit_interface_constraints) {
+                bh_buffer_clear(&tmp_buffer);
+                write_type_node(context, &tmp_buffer, iic->interface);
+                bh_buffer_write_string(&tmp_buffer, "(");
 
-            poly_param->poly_sym->flags &= ~Ast_Flag_Symbol_Is_PolyVar;
-            write_type_node(context, &tmp_buffer, poly_param->poly_sym);
-            poly_param->poly_sym->flags |= Ast_Flag_Symbol_Is_PolyVar;
+                // First argument is the polymorphic variable
+                poly_param->poly_sym->flags &= ~Ast_Flag_Symbol_Is_PolyVar;
+                write_type_node(context, &tmp_buffer, poly_param->poly_sym);
+                poly_param->poly_sym->flags |= Ast_Flag_Symbol_Is_PolyVar;
 
-            bh_buffer_write_string(&tmp_buffer, ")");
-            write_string(buffer, tmp_buffer.length, (char *) tmp_buffer.data);
+                // Add extra arguments
+                if (iic->extra_args) {
+                    bh_arr_each(AstTyped *, extra_arg, iic->extra_args) {
+                        bh_buffer_write_string(&tmp_buffer, ", ");
+                        write_type_node(context, &tmp_buffer, *extra_arg);
+                    }
+                }
 
-            constraint_count += 1;
+                bh_buffer_write_string(&tmp_buffer, ")");
+                write_string(buffer, tmp_buffer.length, (char *) tmp_buffer.data);
+
+                constraint_count += 1;
+            }
         }
     }
 
@@ -691,9 +703,7 @@ static b32 write_doc_structure(Context *context, bh_buffer *buffer, AstBinding *
         bh_buffer_init(&type_buf, context->scratch_alloc, 256);
 
         bh_buffer_write_u32(buffer, bh_arr_length(struct_node->members));
-        bh_arr_each(AstStructMember *, psmem, struct_node->members) {
-            AstStructMember *smem = *psmem;
-
+        bh_arr_each(AstStructMember, smem, struct_node->members) {
             bh_buffer_clear(&type_buf);
             write_type_node(context, &type_buf, smem->type_node);
 
@@ -764,9 +774,7 @@ static b32 write_doc_union_type(Context *context, bh_buffer *buffer, AstBinding 
         bh_buffer_init(&type_buf, context->scratch_alloc, 256);
 
         bh_buffer_write_u32(buffer, bh_arr_length(union_node->variants));
-        bh_arr_each(AstUnionVariant*, puv, union_node->variants) {
-            AstUnionVariant* uv = *puv;
-
+        bh_arr_each(AstUnionVariant, uv, union_node->variants) {
             bh_buffer_clear(&type_buf);
             write_type_node(context, &type_buf, uv->type_node);
 

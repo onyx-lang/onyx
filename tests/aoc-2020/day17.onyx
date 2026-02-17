@@ -42,9 +42,9 @@ get_neighbor_count :: (cubes: &Map(CubePos, CubeState), pos: CubePos) -> u32 {
     for x in -1 .. 2 do for y in -1 .. 2 do for z in -1 .. 2 do for w in -1 .. 2 {
         if x == 0 && y == 0 && z == 0 && w == 0 do continue;
         key := CubePos.{ pos.x + x, pos.y + y, pos.z + z, pos.w + w };
-        map.get(cubes, key)->with([s] {
+        if map.get(cubes, key) as s {
             if s.alive do count += 1;
-        });
+        }
     }
 
     return count;

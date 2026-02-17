@@ -2228,8 +2228,8 @@ char* bh_path_convert_separators(char* path) {
     #define DIR_SEPARATOR '/'
     #define OTHER_SEPARATOR '\\'
 #elif defined(_BH_WINDOWS)
-    #define DIR_SEPARATOR '\\'
-    #define OTHER_SEPARATOR '/'
+    #define DIR_SEPARATOR '/'
+    #define OTHER_SEPARATOR '\\'
 #endif
 
     fori (i, 0, (i64) strlen(path)) {

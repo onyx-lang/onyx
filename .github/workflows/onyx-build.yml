@@ -16,7 +16,7 @@ on:
 jobs:
   setup:
     name: Set up
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     outputs:
       VERSION: ${{ steps.setup.outputs.VERSION }}
       DOING_RELEASE: ${{ steps.setup.outputs.DOING_RELEASE }}
@@ -41,53 +41,53 @@ jobs:
       matrix:
         include:
           - build: linux-amd64
-            os: ubuntu-24.04
+            os: ubuntu-22.04
             runtime_library: ovmwasm
             artifact_name: 'onyx-linux-ovm-amd64'
           - build: linux-amd64
-            os: ubuntu-24.04
+            os: ubuntu-22.04
             runtime_library: wasmer
             artifact_name: 'onyx-linux-wasmer-amd64'
           - build: linux-amd64
-            os: ubuntu-24.04
+            os: ubuntu-22.04
             runtime_library: none
             artifact_name: 'onyx-linux-none-amd64' 
           - build: linux-arm64
-            os: ubuntu-24.04
+            os: ubuntu-22.04
             runtime_library: ovmwasm
             artifact_name: 'onyx-linux-ovm-arm64'
           - build: linux-arm64
-            os: ubuntu-24.04
+            os: ubuntu-22.04
             runtime_library: wasmer
             artifact_name: 'onyx-linux-wasmer-arm64'
           - build: linux-arm64
-            os: ubuntu-24.04
+            os: ubuntu-22.04
             runtime_library: none
             artifact_name: 'onyx-linux-none-arm64' 
           - build: darwin-arm64
-            os: macos-13
+            os: macos-15
             runtime_library: none
             target: aarch64-apple-darwin
             artifact_name: 'onyx-darwin-none-arm64'
           - build: darwin-arm64
-            os: macos-13
+            os: macos-15
             runtime_library: wasmer
             target: aarch64-apple-darwin
             artifact_name: 'onyx-darwin-wasmer-arm64'
           - build: darwin-amd64
-            os: macos-13
+            os: macos-15-intel
             runtime_library: none
             artifact_name: 'onyx-darwin-none-amd64'
           - build: darwin-amd64
-            os: macos-13
+            os: macos-15-intel
             runtime_library: wasmer
             artifact_name: 'onyx-darwin-wasmer-amd64'
           - build: darwin-amd64
-            os: macos-13
+            os: macos-15-intel
             runtime_library: ovmwasm
             artifact_name: 'onyx-darwin-ovm-amd64'
           - build: darwin-arm64
-            os: macos-13
+            os: macos-15
             runtime_library: ovmwasm
             target: aarch64-apple-darwin
             artifact_name: 'onyx-darwin-ovm-arm64'
@@ -152,7 +152,7 @@ jobs:
       - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'linux-arm64') && (matrix.runtime_library != 'none')
         run: |
-          sudo apt install --yes gcc-aarch64-linux-gnu
+          sudo apt update && sudo apt install --yes gcc-aarch64-linux-gnu
           ./build.sh compile compress
         env:
           ONYX_CC: aarch64-linux-gnu-gcc
@@ -164,7 +164,7 @@ jobs:
       - name: Build Onyx for ${{ matrix.build }}-${{ matrix.runtime_library }}
         if: (matrix.build == 'linux-arm64') && (matrix.runtime_library == 'none')
         run: |
-          sudo apt install --yes gcc-aarch64-linux-gnu
+          sudo apt update && sudo apt install --yes gcc-aarch64-linux-gnu
           ./build.sh compile compress
         env:
           ONYX_CC: aarch64-linux-gnu-gcc

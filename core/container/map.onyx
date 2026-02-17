@@ -286,9 +286,9 @@ __for_expansion :: macro (map: Map($K, $V), $flags: __For_Expansion_Flags, $body
         defer i += 1
 
         #if flags & .BY_POINTER {
-            #unquote body(m_data[i].key, &m_data[i].value) #skip_scope(2)
+            #unquote body(m_data[i].key, &m_data[i].value) #scope(body)
         } else {
-            #unquote body(m_data[i].key, m_data[i].value) #skip_scope(2)
+            #unquote body(m_data[i].key, m_data[i].value) #scope(body)
         }
     }
 }
@@ -301,9 +301,9 @@ __for_expansion :: macro (map: &Map($K, $V), $flags: __For_Expansion_Flags, $bod
         defer i += 1
 
         #if flags & .BY_POINTER {
-            #unquote body(m.entries[i].key, &m.entries[i].value) #skip_scope(2)
+            #unquote body(m.entries[i].key, &m.entries[i].value) #scope(body)
         } else {
-            #unquote body(m.entries[i].key, m.entries[i].value) #skip_scope(2)
+            #unquote body(m.entries[i].key, m.entries[i].value) #scope(body)
         }
     }
 }

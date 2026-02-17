@@ -74,7 +74,7 @@ FLAGS=""
 if [ ! -z ${ONYX_TARGET+x} ]; then
     FLAGS="$FLAGS --target=$ONYX_TARGET"
 fi
-$ONYX_CC -shared $FLAGS -o "libonyx.$suffix" *.o $LIBS $LIBRARY_BUILD_ARGS
+$ONYX_CC -shared -fPIC $FLAGS -o "libonyx.$suffix" *.o $LIBS $LIBRARY_BUILD_ARGS
 
 echo "Compiling onyx executable"
 $ONYX_CC $INCLUDES $FLAGS cli/main.c *.o -o onyx $LIBS

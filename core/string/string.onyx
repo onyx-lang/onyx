@@ -444,10 +444,40 @@ str.advance :: (s: str, chars := 1) -> str {
     return out;
 }
 
+str.replace :: #match #local {}
+
+#overload
 str.replace :: (s: str, to_replace: u8, replace_with: u8) {
     for &c in s {
         if *c == to_replace do *c = replace_with;
     }
+}
+
+#overload
+str.replace :: (s: str, to_replace: str, replace_with: str) -> str {
+    if to_replace == "" {
+        // We don't need to copy here, but this retains the semantics that
+        // the returned string is a different string allocation.
+        return str.copy(s)
+    }
+
+    result: dyn_str
+
+    cursor := 0
+    while true {
+        idx := index_of(s[cursor .. s.length], to_replace)
+        if idx < 0 {
+            dyn_str.append(&result, s[cursor .. s.length])
+            break
+        }
+
+        dyn_str.append(&result, s[cursor .. cursor + idx])
+        dyn_str.append(&result, replace_with)
+
+        cursor += idx + to_replace.length
+    }
+
+    return result
 }
 
 str.read_until :: #match #local {}

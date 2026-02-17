@@ -19,7 +19,6 @@ static inline b32 should_clone(Context *context, AstNode* node) {
         case Ast_Kind_Package:
         case Ast_Kind_Overloaded_Function:
         case Ast_Kind_Alias:
-        case Ast_Kind_Code_Block:
         case Ast_Kind_Macro:
         case Ast_Kind_Symbol:
         case Ast_Kind_Poly_Struct_Type:
@@ -38,8 +37,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
     switch (node->kind) {
         case Ast_Kind_Error: return sizeof(AstNode);
         case Ast_Kind_Package: return sizeof(AstPackage);
-        case Ast_Kind_Load_File: return sizeof(AstInclude);
-        case Ast_Kind_Load_Path: return sizeof(AstInclude);
+        case Ast_Kind_Load: return sizeof(AstInclude);
         case Ast_Kind_Load_All: return sizeof(AstInclude);
         case Ast_Kind_Memres: return sizeof(AstMemRes);
         case Ast_Kind_Binding: return sizeof(AstBinding);
@@ -71,19 +69,16 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Type_Compound: return sizeof(AstCompoundType);
         case Ast_Kind_Typeof: return sizeof(AstTypeOf);
         case Ast_Kind_Type_End: return 0;
-        case Ast_Kind_Struct_Member: return sizeof(AstStructMember);
         case Ast_Kind_Enum_Value: return sizeof(AstEnumValue);
         case Ast_Kind_NumLit: return sizeof(AstNumLit);
         case Ast_Kind_StrLit: return sizeof(AstStrLit);
         case Ast_Kind_Param: return sizeof(AstLocal);
         case Ast_Kind_Argument: return sizeof(AstArgument);
         case Ast_Kind_Call: return sizeof(AstCall);
-        case Ast_Kind_Intrinsic_Call: return sizeof(AstCall);
         case Ast_Kind_Return: return sizeof(AstReturn);
         case Ast_Kind_Address_Of: return sizeof(AstAddressOf);
         case Ast_Kind_Dereference: return sizeof(AstDereference);
         case Ast_Kind_Subscript: return sizeof(AstSubscript);
-        case Ast_Kind_Slice: return sizeof(AstSubscript);
         case Ast_Kind_Field_Access: return sizeof(AstFieldAccess);
         case Ast_Kind_Unary_Field_Access: return sizeof(AstUnaryFieldAccess);
         case Ast_Kind_Pipe: return sizeof(AstBinaryOp);
@@ -118,8 +113,8 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Capture_Block: return sizeof(AstCaptureBlock);
         case Ast_Kind_Capture_Local: return sizeof(AstCaptureLocal);
         case Ast_Kind_Union_Type: return sizeof(AstUnionType);
-        case Ast_Kind_Union_Variant: return sizeof(AstUnionVariant);
         case Ast_Kind_Procedural_Expansion: return sizeof(AstProceduralExpansion);
+        case Ast_Kind_Code_Block: return sizeof(AstCodeBlock);
 
         default: break;
     }
@@ -216,7 +211,6 @@ AstNode* ast_clone(Context *context, void* n) {
             C(AstDereference, expr);
             break;
 
-        case Ast_Kind_Slice:
         case Ast_Kind_Subscript:
             C(AstSubscript, addr);
             C(AstSubscript, expr);
@@ -376,8 +370,18 @@ AstNode* ast_clone(Context *context, void* n) {
             ds->members = NULL;
             bh_arr_new(context->gp_alloc, ds->members, bh_arr_length(ss->members));
 
-            bh_arr_each(AstStructMember *, smem, ss->members) {
-                bh_arr_push(ds->members, (AstStructMember *) ast_clone(context, *smem));
+            bh_arr_each(AstStructMember, member, ss->members) {
+                AstStructMember new_member = *member;
+                new_member.type_node = (void *) ast_clone(context, member->type_node);
+                new_member.initial_value = (void *) ast_clone(context, member->initial_value);
+
+                new_member.meta_tags = NULL;
+                bh_arr_new(context->gp_alloc, new_member.meta_tags, bh_arr_length(member->meta_tags));
+                bh_arr_each(AstTyped *, tag, member->meta_tags) {
+                    bh_arr_push(new_member.meta_tags, (AstTyped *) ast_clone(context, *tag));
+                }
+
+                bh_arr_push(ds->members, new_member);
             }
 
             ds->meta_tags = NULL;
@@ -399,22 +403,6 @@ AstNode* ast_clone(Context *context, void* n) {
             break;
         }
 
-        case Ast_Kind_Struct_Member: {
-            C(AstStructMember, type_node);
-            C(AstStructMember, initial_value);
-
-            AstStructMember *ds = (AstStructMember *) nn;
-            AstStructMember *ss = (AstStructMember *) node;
-
-            ds->meta_tags = NULL;
-            bh_arr_new(context->gp_alloc, ds->meta_tags, bh_arr_length(ss->meta_tags));
-            bh_arr_each(AstTyped *, tag, ss->meta_tags) {
-                bh_arr_push(ds->meta_tags, (AstTyped *) ast_clone(context, *tag));
-            }
-
-            break;
-        }
-
         case Ast_Kind_Union_Type: {
             AstUnionType* du = (AstUnionType *) nn;
             AstUnionType* su = (AstUnionType *) node;
@@ -422,8 +410,16 @@ AstNode* ast_clone(Context *context, void* n) {
             du->variants = NULL;
             bh_arr_new(context->gp_alloc, du->variants, bh_arr_length(su->variants));
 
-            bh_arr_each(AstUnionVariant *, uv, su->variants) {
-                bh_arr_push(du->variants, (AstUnionVariant *) ast_clone(context, *uv));
+            bh_arr_each(AstUnionVariant, uv, su->variants) {
+                AstUnionVariant new_variant = *uv;
+
+                new_variant.meta_tags = NULL;
+                bh_arr_new(context->gp_alloc, new_variant.meta_tags, bh_arr_length(su->meta_tags));
+                bh_arr_each(AstTyped *, tag, su->meta_tags) {
+                    bh_arr_push(new_variant.meta_tags, (AstTyped *) ast_clone(context, *tag));
+                }
+
+                bh_arr_push(du->variants, new_variant);
             }
 
             du->meta_tags = NULL;
@@ -442,21 +438,6 @@ AstNode* ast_clone(Context *context, void* n) {
             }
 
             du->utcache = NULL;
-            break;
-        }
-
-        case Ast_Kind_Union_Variant: {
-            C(AstUnionVariant, type_node);
-
-            AstUnionVariant *du = (AstUnionVariant *) nn;
-            AstUnionVariant *su = (AstUnionVariant *) node;
-
-            du->meta_tags = NULL;
-            bh_arr_new(context->gp_alloc, du->meta_tags, bh_arr_length(su->meta_tags));
-            bh_arr_each(AstTyped *, tag, su->meta_tags) {
-                bh_arr_push(du->meta_tags, (AstTyped *) ast_clone(context, *tag));
-            }
-
             break;
         }
 
@@ -613,11 +594,15 @@ AstNode* ast_clone(Context *context, void* n) {
             AstConstraint* dc = (AstConstraint *) nn;
             AstConstraint* sc = (AstConstraint *) node;
 
-            dc->args = NULL;
-            bh_arr_new(context->gp_alloc, dc->args, bh_arr_length(sc->args));
+            if (sc->flags & Ast_Flag_Constraint_Is_Expression) {
+                C(AstConstraint, const_expr);
+            } else {
+                dc->args = NULL;
+                bh_arr_new(context->gp_alloc, dc->args, bh_arr_length(sc->args));
 
-            bh_arr_each(AstTyped *, arg, sc->args) {
-                bh_arr_push(dc->args, (AstTyped *) ast_clone(context, (AstNode *) *arg));
+                bh_arr_each(AstTyped *, arg, sc->args) {
+                    bh_arr_push(dc->args, (AstTyped *) ast_clone(context, (AstNode *) *arg));
+                }
             }
 
             dc->phase = Constraint_Phase_Waiting_To_Be_Queued;
@@ -668,7 +653,7 @@ AstNode* ast_clone(Context *context, void* n) {
             C(AstIfExpression, false_expr);
             break;
 
-        case Ast_Kind_Directive_Insert:
+        case Ast_Kind_Directive_Insert: {
             C(AstDirectiveInsert, code_expr);
 
             AstDirectiveInsert* id = (AstDirectiveInsert *) nn;
@@ -680,6 +665,7 @@ AstNode* ast_clone(Context *context, void* n) {
                 bh_arr_push(id->binding_exprs, (AstTyped *) ast_clone(context, (AstNode *) *expr));
             }
             break;
+        }
 
         case Ast_Kind_Directive_Defined:
             C(AstDirectiveDefined, expr);
@@ -714,6 +700,23 @@ AstNode* ast_clone(Context *context, void* n) {
 
             bh_arr_each(AstCaptureLocal *, expr, cs->captures) {
                 bh_arr_push(cd->captures, (AstCaptureLocal *) ast_clone(context, (AstNode *) *expr));
+            }
+            break;
+        }
+
+        case Ast_Kind_Code_Block: {
+            AstCodeBlock* cd = (void *) nn;
+            AstCodeBlock* cs = (void *) node;
+
+            cd->enclosing_scope = NULL;
+            cd->binding_symbols = NULL;
+            bh_arr_new(context->gp_alloc, cd->binding_symbols, bh_arr_length(cs->binding_symbols));
+
+            bh_arr_each(CodeBlockBindingSymbol, sym, cs->binding_symbols) {
+                CodeBlockBindingSymbol new_sym;
+                new_sym.symbol = sym->symbol;
+                new_sym.type_node = (void *) ast_clone(context, (void *) sym->type_node);
+                bh_arr_push(cd->binding_symbols, new_sym);
             }
             break;
         }

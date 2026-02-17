@@ -695,10 +695,6 @@ static int32_t output_files_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, cons
         if (!output_file_to_disk(cli_args, ctx, cli_args->symbol_info_file, ONYX_OUTPUT_TYPE_OSYM)) return 0;
     }
 
-    if (cli_args->injected_code_file) {
-        if (!output_file_to_disk(cli_args, ctx, cli_args->injected_code_file, ONYX_OUTPUT_TYPE_INJECTED_CODE)) return 0;
-    }
-
     return 1;
 }
 
@@ -962,6 +958,11 @@ int main(int argc, char *argv[]) {
     u64 duration = bh_time_duration(start_time);
 
     onyx_errors_print(ctx, cli_args.error_format, !cli_args.no_colors, cli_args.show_all_errors);
+
+    if (cli_args.injected_code_file) {
+        output_file_to_disk(&cli_args, ctx, cli_args.injected_code_file, ONYX_OUTPUT_TYPE_INJECTED_CODE);
+    }
+
     if (onyx_errors_present(ctx)) {
         return 1;
     }

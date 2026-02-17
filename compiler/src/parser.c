@@ -32,7 +32,9 @@ void submit_entity_in_scope(OnyxParser* parser, AstNode* node, Scope* scope, Pac
 
     } else {
         bh_arr(Entity *) *entity_array = bh_arr_last(parser->alternate_entity_placement_stack);
-        add_entities_for_node(&parser->context->entities, entity_array, node, scope, package);
+        if (entity_array) {
+            add_entities_for_node(&parser->context->entities, entity_array, node, scope, package);
+        }
     }
 }
 
@@ -658,7 +660,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
             retval = (AstTyped *) not_node;
             break;
-        }
+}
 
         case '*': {
             AstDereference* deref_node = make_node(AstDereference, Ast_Kind_Dereference);
@@ -886,8 +888,10 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                     code_block->code = (AstNode *) parse_block(parser, 1, NULL);
                     ((AstBlock *) code_block->code)->rules = Block_Rule_Code_Block;
                 } else {
+                    expect_token(parser, '(');
                     code_block->code = (AstNode *) parse_expression(parser, 1);
                     code_block->is_expression = 1;
+                    expect_token(parser, ')');
                 }
 
                 retval = (AstTyped *) code_block;
@@ -898,6 +902,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         }
 
         case Token_Type_Keyword_Struct:
+        case Token_Type_Keyword_Union:
         case '?': {
             AstType *type = parse_type(parser);
             retval = (AstTyped *) type;
@@ -1079,8 +1084,30 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                     }
                 }
 
-                if (parse_possible_directive(parser, "skip_scope")) {
-                    insert->skip_scope_index = parse_factor(parser);
+                if (parse_possible_directive(parser, "scope")) {
+                    insert->scope_expr = parse_factor(parser);
+                }
+
+                // CLEANUP: Could this system use the same logic for AstBinding?
+                if (parse_possible_directive(parser, "inject")){
+                    expect_token(parser, '{');
+                    while (!consume_token_if_next(parser, '}')) {
+                        if (parser->hit_unexpected_token) break;
+
+                        OnyxToken *sym = expect_token(parser, Token_Type_Symbol);
+                        expect_token(parser, ':');
+                        expect_token(parser, ':');
+
+                        AstTyped *binding = parse_top_level_expression(parser);
+
+                        bh_arr_push(insert->bindings, ((UnquoteDirectiveBinding) {
+                            .symbol = sym,
+                            .value = (AstNode *) binding
+                        }));
+
+                        if (parser->curr->type != '}')
+                            consume_token_if_next(parser, ';');
+                    }
                 }
 
                 retval = (AstTyped *) insert;
@@ -1133,6 +1160,53 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 retval = (AstTyped *) parser->injection_point;
                 break;
             }
+            else if (parse_possible_directive(parser, "code_as_str")) {
+                // :LinearTokenDependent
+                OnyxToken *start_token = parser->curr;
+
+                bh_arr_push(parser->alternate_entity_placement_stack, NULL);
+                if (peek_token(0)->type == '{') {
+                    parse_block(parser, 0, NULL);
+                } else {
+                    parse_expression(parser, 0);
+                }
+                bh_arr_pop(parser->alternate_entity_placement_stack);
+
+                // :LinearTokenDependent
+                OnyxToken *end_token = parser->curr - 1;
+                while (end_token->type == Token_Type_Inserted_Semicolon)
+                {
+                    end_token -= 1;
+                }
+
+                // :LinearTokenDependent
+                // :LinearTokenDependent
+                char *last_char = end_token->text + end_token->length;
+                char *first_char = start_token->text;
+
+                // :LinearTokenDependent
+                i32 length = last_char - first_char;
+
+                if (length >= 16 * 1024)
+                {
+                    ONYX_ERROR((parser->curr - 2)->pos, Error_Critical, "'#code_as_str' is too long. The maximum length currently is '16 KiB'. (This could also be a compiler bug.)");
+                }
+
+                OnyxToken *new_token = bh_alloc_item(parser->allocator, OnyxToken);
+                new_token->type = Token_Type_Literal_String;
+                new_token->text = first_char;
+                new_token->length = length;
+                new_token->pos = (parser->curr - 2)->pos; // :LinearTokenDependent
+                
+                AstStrLit* str_node = make_node(AstStrLit, Ast_Kind_StrLit);
+                str_node->token     = new_token;
+                str_node->flags    |= Ast_Flag_Comptime;
+
+                ENTITY_SUBMIT(str_node);
+
+                retval = (AstTyped *) str_node;
+                break;
+            }
 
             ONYX_ERROR(parser->curr->pos, Error_Critical, "Invalid directive in expression.");
             return NULL;
@@ -1156,7 +1230,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 sub_node->token = open_bracket;
                 sub_node->addr = retval;
                 sub_node->expr = expr;
-                sub_node->__unused_operation = Binary_Op_Subscript;
+                sub_node->operation = Binary_Op_Subscript;
 
                 retval = (AstTyped *) sub_node;
                 expect_token(parser, ']');
@@ -1540,6 +1614,11 @@ static AstIfWhile* parse_if_stmt(OnyxParser* parser) {
         initialization_or_cond = NULL;
     }
 
+    if (consume_token_if_next(parser, Token_Type_Keyword_As)) {
+        if_node->optional_extract = 1;
+        if_node->optional_extract_symbol = expect_token(parser, Token_Type_Symbol);
+    }
+
     AstBlock* true_stmt = parse_block(parser, 1, NULL);
     consume_token_if_next(parser, ';');
 
@@ -1555,6 +1634,11 @@ static AstIfWhile* parse_if_stmt(OnyxParser* parser) {
         elseif_node->token = parser->curr - 1;
 
         cond = parse_expression(parser, 1);
+        if (consume_token_if_next(parser, Token_Type_Keyword_As)) {
+            elseif_node->optional_extract = 1;
+            elseif_node->optional_extract_symbol = expect_token(parser, Token_Type_Symbol);
+        }
+
         true_stmt = parse_block(parser, 1, NULL);
 
         elseif_node->cond = cond;
@@ -2265,9 +2349,69 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
     symbol_node->token = expect_token(parser, Token_Type_Symbol);
     symbol_node->flags |= Ast_Flag_Symbol_Is_PolyVar;
 
-    AstNode *implicit_interface = NULL;
+    bh_arr(ImplicitInterfaceConstraint) implicit_constraints = NULL;
+    
     if (consume_token_if_next(parser, '/')) {
-        implicit_interface = (AstNode *) parse_factor(parser);
+        bh_arr_new(parser->context->gp_alloc, implicit_constraints, 2);
+        
+        // Check if we have a brace-enclosed list
+        if (consume_token_if_next(parser, '{')) {
+            // Parse comma-separated interfaces with optional arguments
+            do {
+                ImplicitInterfaceConstraint constraint;
+                constraint.extra_args = NULL;
+                
+                // Disable call parsing to get just the interface name
+                parser->parse_calls = 0;
+                constraint.interface = (AstNode *) parse_factor(parser);
+                parser->parse_calls = 1;
+                
+                // Check if there are arguments: Interface(arg1, arg2)
+                if (consume_token_if_next(parser, '(')) {
+                    bh_arr_new(parser->context->gp_alloc, constraint.extra_args, 2);
+                    
+                    while (!consume_token_if_next(parser, ')')) {
+                        if (parser->hit_unexpected_token) return;
+                        
+                        AstTyped* arg = parse_expression(parser, 0);
+                        bh_arr_push(constraint.extra_args, arg);
+                        
+                        if (parser->curr->type != ')')
+                            expect_token(parser, ',');
+                    }
+                }
+                
+                bh_arr_push(implicit_constraints, constraint);
+            } while (consume_token_if_next(parser, ','));
+            
+            expect_token(parser, '}');
+        } else {
+            // Single interface (backward compatible)
+            ImplicitInterfaceConstraint constraint;
+            constraint.extra_args = NULL;
+            
+            // Disable call parsing to get just the interface name
+            parser->parse_calls = 0;
+            constraint.interface = (AstNode *) parse_factor(parser);
+            parser->parse_calls = 1;
+            
+            // Check if there are arguments: Interface(arg)
+            if (consume_token_if_next(parser, '(')) {
+                bh_arr_new(parser->context->gp_alloc, constraint.extra_args, 2);
+                
+                while (!consume_token_if_next(parser, ')')) {
+                    if (parser->hit_unexpected_token) return;
+                    
+                    AstTyped* arg = parse_expression(parser, 0);
+                    bh_arr_push(constraint.extra_args, arg);
+                    
+                    if (parser->curr->type != ')')
+                        expect_token(parser, ',');
+                }
+            }
+            
+            bh_arr_push(implicit_constraints, constraint);
+        }
     }
 
     **next_insertion = (AstType *) symbol_node;
@@ -2277,7 +2421,7 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
         bh_arr_push(pv, ((AstPolyParam) {
             .kind     = PPK_Poly_Type,
             .poly_sym = (AstNode *) symbol_node,
-            .implicit_interface = implicit_interface,
+            .implicit_interface_constraints = implicit_constraints,
 
             // These will be filled out by function_params()
             .type_expr = NULL,
@@ -2632,6 +2776,9 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     s_node = make_node(AstStructType, Ast_Kind_Struct_Type);
     s_node->token = s_token;
 
+    AstTyped *old_injection_point = parser->injection_point;
+    parser->injection_point = (AstTyped*) s_node;
+
     flush_stored_tags(parser, &s_node->meta_tags);
 
     type_create_scope(parser, &s_node->scope, s_node->token);
@@ -2792,13 +2939,13 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         }
 
         bh_arr_each(OnyxToken *, member_name, member_list_temp) {
-            AstStructMember* mem = make_node(AstStructMember, Ast_Kind_Struct_Member);
-            mem->token = *member_name;
-            mem->type_node = member_type;
-            mem->initial_value = initial_value;
-            mem->meta_tags = meta_tags;
+            AstStructMember mem = { 0 };
+            mem.token = *member_name;
+            mem.type_node = member_type;
+            mem.initial_value = initial_value;
+            mem.meta_tags = meta_tags;
 
-            if (member_is_used) mem->is_used = 1;
+            if (member_is_used) mem.is_used = 1;
 
             bh_arr_push(s_node->members, mem);
         }
@@ -2809,6 +2956,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     }
 
     parser->current_scope = scope_to_restore_parser_to;
+    parser->injection_point = old_injection_point;
 
     bh_arr_free(member_list_temp);
 
@@ -2830,6 +2978,9 @@ static AstUnionType* parse_union(OnyxParser* parser) {
 
     u_node = make_node(AstUnionType, Ast_Kind_Union_Type);
     u_node->token = union_token;
+
+    AstTyped *old_injection_point = parser->injection_point;
+    parser->injection_point = (AstTyped*) u_node;
 
     flush_stored_tags(parser, &u_node->meta_tags);
 
@@ -2907,17 +3058,17 @@ static AstUnionType* parse_union(OnyxParser* parser) {
             break;
         }
 
-        AstUnionVariant *variant = make_node(AstUnionVariant, Ast_Kind_Union_Variant);
-        variant->meta_tags = meta_tags;
-        variant->token = expect_token(parser, Token_Type_Symbol);
+        AstUnionVariant variant = { 0 };
+        variant.meta_tags = meta_tags;
+        variant.token = expect_token(parser, Token_Type_Symbol);
 
         if (consume_token_if_next(parser, Token_Type_Keyword_As)) {
-            variant->explicit_tag_value = parse_factor(parser);
+            variant.explicit_tag_value = parse_factor(parser);
         }
 
         expect_token(parser, ':');
 
-        variant->type_node = parse_type(parser);
+        variant.type_node = parse_type(parser);
 
         bh_arr_push(u_node->variants, variant);
 
@@ -2927,6 +3078,7 @@ static AstUnionType* parse_union(OnyxParser* parser) {
     }
 
     parser->current_scope = scope_to_restore_parser_to;
+    parser->injection_point = old_injection_point;
 
     if (poly_union != NULL) {
         // NOTE: Not a UnionType
@@ -3380,6 +3532,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
         }
     }
 
+    consume_token_if_next(parser, Token_Type_Inserted_Semicolon);
     if (parser->curr->type == Token_Type_Keyword_Where) {
         parse_constraints(parser, &func_def->constraints);
     }
@@ -3937,9 +4090,14 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
     OnyxToken *after_second_colon = expect_token(parser, ':');
     if (after_second_colon) after_second_colon += 1;
 
+    bh_arr_push(parser->current_symbol_stack, symbol);
+
     AstTyped* node = parse_top_level_expression(parser);
-    if (parser->hit_unexpected_token || node == NULL)
+
+    if (parser->hit_unexpected_token || node == NULL) {
+        bh_arr_pop(parser->current_symbol_stack);
         return NULL;
+    }
 
     switch (node->kind) {
         case Ast_Kind_Function:
@@ -4008,6 +4166,8 @@ default_case:
     binding->node = (AstNode *) node;
 
     if (after_second_colon) expect_no_stored_tags_pos(parser, after_second_colon->pos);
+
+    bh_arr_pop(parser->current_symbol_stack);
     return binding;
 }
 
@@ -4147,9 +4307,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
             if (next_tokens_are(parser, 2, ':', ':')) {
                 expect_token(parser, ':');
 
-                bh_arr_push(parser->current_symbol_stack, symbol);
                 binding = parse_top_level_binding(parser, symbol);
-                bh_arr_pop(parser->current_symbol_stack);
 
                 // bh_printf("%b: %d\n", symbol->text, symbol->length, private_kind);
                 if (binding != NULL) binding->flags |= private_kind;
@@ -4198,23 +4356,15 @@ static void parse_top_level_statement(OnyxParser* parser) {
             OnyxToken* dir_token = parser->curr;
 
             if (parse_possible_directive(parser, "load")) {
-                AstInclude* include = make_node(AstInclude, Ast_Kind_Load_File);
+                AstInclude* include = make_node(AstInclude, Ast_Kind_Load);
                 include->token = dir_token;
                 include->name_node = parse_expression(parser, 0);
 
                 ENTITY_SUBMIT(include);
                 return;
             }
-            else if (parse_possible_directive(parser, "load_all")) {
-                AstInclude* include = make_node(AstInclude, Ast_Kind_Load_All);
-                include->token = dir_token;
-                include->name_node = parse_expression(parser, 0);
-
-                ENTITY_SUBMIT(include);
-                return;
-            }
-            else if (parse_possible_directive(parser, "load_all_recursive")) {
-                AstInclude* include = make_node(AstInclude, Ast_Kind_Load_All);
+            else if (parse_possible_directive(parser, "load_recursive")) {
+                AstInclude* include = make_node(AstInclude, Ast_Kind_Load);
                 include->token = dir_token;
                 include->name_node = parse_expression(parser, 0);
                 include->recursive = 1;
@@ -4222,12 +4372,17 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(include);
                 return;
             }
-            else if (parse_possible_directive(parser, "load_path")) {
-                AstInclude* include = make_node(AstInclude, Ast_Kind_Load_Path);
+            else if (parse_possible_directive(parser, "load_all")) {
+                onyx_report_warning(parser->context, dir_token->pos, "'#load_all' will be removed in a future version; Use '#load' instead.");
+                AstInclude* include = make_node(AstInclude, Ast_Kind_Load);
                 include->token = dir_token;
                 include->name_node = parse_expression(parser, 0);
 
                 ENTITY_SUBMIT(include);
+                return;
+            }
+            else if (parse_possible_directive(parser, "load_all_recursive")) {
+                onyx_report_warning(parser->context, dir_token->pos, "'#load_all_recursive' no longer does anything; Use '#load_recursive' instead.");
                 return;
             }
             else if (parse_possible_directive(parser, "library_path")) {

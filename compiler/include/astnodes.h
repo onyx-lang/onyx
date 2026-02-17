@@ -145,8 +145,7 @@ typedef struct Scope {
 typedef enum AstKind {
     Ast_Kind_Error,
     Ast_Kind_Package,
-    Ast_Kind_Load_File,
-    Ast_Kind_Load_Path,
+    Ast_Kind_Load,
     Ast_Kind_Load_All,
     Ast_Kind_Library_Path,
     Ast_Kind_Import,
@@ -196,8 +195,6 @@ typedef enum AstKind {
     Ast_Kind_Distinct_Type,
     Ast_Kind_Type_End,
 
-    Ast_Kind_Struct_Member,
-    Ast_Kind_Union_Variant,
     Ast_Kind_Enum_Value,
 
     Ast_Kind_NumLit,
@@ -205,12 +202,10 @@ typedef enum AstKind {
     Ast_Kind_Param,
     Ast_Kind_Argument,
     Ast_Kind_Call,
-    Ast_Kind_Intrinsic_Call,
     Ast_Kind_Return,
     Ast_Kind_Address_Of,
     Ast_Kind_Dereference,
     Ast_Kind_Subscript,
-    Ast_Kind_Slice,
     Ast_Kind_Field_Access,
     Ast_Kind_Unary_Field_Access,
     Ast_Kind_Pipe,
@@ -722,7 +717,7 @@ struct AstArgument      {
 };
 struct AstSubscript   {
     AstTyped_base;
-    BinaryOp __unused_operation; // This will be set to Binary_Op_Subscript
+    BinaryOp operation; // This will be set to Binary_Op_Subscript
     AstTyped *addr;
     AstTyped *expr;
 
@@ -730,7 +725,8 @@ struct AstSubscript   {
                               // but isnt successful yet.
     AstBinaryOp *potential_substitute;
 
-    u64 elem_size;
+    u32 elem_size;
+    b32 is_slice : 1;
 };
 struct AstFieldAccess   {
     AstTyped_base;
@@ -801,10 +797,8 @@ struct AstCall {
     Arguments args;
     i32 placeholder_argument_position;
 
-    union {
-        AstTyped *callee;
-        OnyxIntrinsic intrinsic;
-    };
+    AstTyped *callee;
+    OnyxIntrinsic intrinsic;
 
     VarArgKind va_kind;
     i32 ignored_return_value_count;
@@ -904,6 +898,15 @@ struct AstIfWhile {
             Scope *defined_in_scope;
             bh_arr(struct Entity *) true_entities;
             bh_arr(struct Entity *) false_entities;
+        };
+
+        // Used by If
+        struct {
+            OnyxToken *optional_extract_symbol;
+            AstLocal *optional_local;
+
+            // When this is true, `cond` should be a value that is of type `? T`
+            b32 optional_extract : 1;
         };
 
         // Used by While
@@ -1026,7 +1029,7 @@ struct AstStructType {
     AstType_base;
     char *name;
 
-    bh_arr(AstStructMember *) members;
+    bh_arr(AstStructMember) members;
     bh_arr(AstTyped *) meta_tags;
 
     // u32 min_alignment, min_size;
@@ -1093,7 +1096,7 @@ struct AstUnionType {
     AstType_base;
     char *name;
 
-    bh_arr(AstUnionVariant *) variants;
+    bh_arr(AstUnionVariant) variants;
     bh_arr(AstTyped *) meta_tags;
 
     AstType *tag_backing_type;
@@ -1386,6 +1389,11 @@ typedef enum PolyProcLookupMethod {
     PPLM_By_Function_Type,
 } PolyProcLookupMethod;
 
+typedef struct ImplicitInterfaceConstraint {
+    AstNode *interface;
+    bh_arr(AstTyped *) extra_args;  // Arguments after the polymorphic variable
+} ImplicitInterfaceConstraint;
+
 struct AstPolyParam {
     PolyParamKind kind;
 
@@ -1404,8 +1412,9 @@ struct AstPolyParam {
     // Used for baked values. The expected type of the parameter.
     Type* type;
 
-    // Used to store interface specified with $T/Interface.
-    AstNode *implicit_interface;
+    // Used to store interface specified with $T/Interface
+    // Can store extra args for $T/Interface(R)
+    bh_arr(ImplicitInterfaceConstraint) implicit_interface_constraints;
 };
 
 struct AstPolySolution {
@@ -1627,7 +1636,15 @@ struct AstCodeBlock {
     AstNode *code;
     bh_arr(CodeBlockBindingSymbol) binding_symbols;
 
-    b32 is_expression: 1;
+    Scope *enclosing_scope;
+
+    b32 is_expression : 1;
+};
+
+typedef struct UnquoteDirectiveBinding UnquoteDirectiveBinding;
+struct UnquoteDirectiveBinding {
+    OnyxToken *symbol;
+    AstNode *value;
 };
 
 struct AstDirectiveInsert {
@@ -1636,8 +1653,10 @@ struct AstDirectiveInsert {
     AstTyped *code_expr;
     bh_arr(AstTyped *) binding_exprs;
 
-    // Set when using #skip_scope
-    AstTyped *skip_scope_index;
+    // Set when using #scope
+    AstTyped *scope_expr;
+
+    bh_arr(UnquoteDirectiveBinding) bindings;
 };
 
 struct AstDirectiveInit {
@@ -2409,7 +2428,7 @@ AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* 
 Type* polymorphic_struct_lookup(Context *context, AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
 Type* polymorphic_union_lookup(Context *context, AstPolyUnionType* pu_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
 
-b32 resolve_intrinsic_interface_constraint(Context *context, AstConstraint *constraint);
+TypeMatch resolve_intrinsic_interface_constraint(Context *context, AstConstraint *constraint);
 
 void track_declaration_for_symbol_info(Context *context, OnyxFilePos, AstNode *);
 void track_documentation_for_symbol_info(Context *context, AstNode *, AstBinding *);

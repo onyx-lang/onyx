@@ -162,22 +162,35 @@ static AstSolidifiedFunction generate_solidified_function(
     //                                             - brendanfh 2021/01/18
     u32 removed_params = 0;
     bh_arr_each(AstPolyParam, param, pp->poly_params) {
-        if (param->implicit_interface) {
-            AstConstraint *constraint = onyx_ast_node_new(context->ast_alloc, sizeof(AstConstraint), Ast_Kind_Constraint);
-            constraint->interface = (AstInterface *) param->implicit_interface;
-            constraint->token = constraint->interface->token;
+        if (param->implicit_interface_constraints) {
+            // Create a constraint for each interface
+            bh_arr_each(ImplicitInterfaceConstraint, iic, param->implicit_interface_constraints) {
+                AstConstraint *constraint = onyx_ast_node_new(context->ast_alloc, 
+                                                              sizeof(AstConstraint), 
+                                                              Ast_Kind_Constraint);
+                constraint->interface = (AstInterface *) iic->interface;
+                constraint->token = constraint->interface->token;
 
-            bh_arr_new(context->gp_alloc, constraint->args, 1);
-            bh_arr_push(constraint->args, (AstTyped *) ast_clone(context, param->poly_sym));
+                // Build args: [polyvar, extra_arg1, extra_arg2, ...]
+                bh_arr_new(context->gp_alloc, constraint->args, 
+                           1 + (iic->extra_args ? bh_arr_length(iic->extra_args) : 0));
+                
+                // First argument is always the polymorphic variable
+                bh_arr_push(constraint->args, (AstTyped *) ast_clone(context, param->poly_sym));
+                
+                // Add any extra arguments
+                if (iic->extra_args) {
+                    bh_arr_each(AstTyped *, extra_arg, iic->extra_args) {
+                        bh_arr_push(constraint->args, (AstTyped *) ast_clone(context, *extra_arg));
+                    }
+                }
 
-            //
-            // Sometimes this array is uninitialized, and that would cause a memory leak
-            // because the memory wouldn't be tracked in the gp_alloc.
-            if (!solidified_func.func->constraints.constraints) {
-                bh_arr_new(context->gp_alloc, solidified_func.func->constraints.constraints, 1);
+                if (!solidified_func.func->constraints.constraints) {
+                    bh_arr_new(context->gp_alloc, solidified_func.func->constraints.constraints, 1);
+                }
+
+                bh_arr_push(solidified_func.func->constraints.constraints, constraint);
             }
-
-            bh_arr_push(solidified_func.func->constraints.constraints, constraint);
         }
 
         if (param->kind != PPK_Baked_Value) continue;
@@ -252,12 +265,17 @@ static PolySolveResult solve_poly_type(Context *context, AstNode* target, AstTyp
         // This check does not strictly need the `type_auto_return` check,
         // but it does prevent bugs if the auto return type placeholder is
         // accidentally inserted into the real type.
-        if (elem.type_expr == (AstType *) target && elem.actual != context->types.auto_return) {
-            result.kind = elem.kind;
+        if (elem.type_expr == (AstType *) target) {
+            if (elem.actual != context->types.auto_return) {
+                result.kind = elem.kind;
 
-            assert(elem.kind != PSK_Undefined);
-            if (result.kind == PSK_Type)  result.actual = elem.actual;
-            if (result.kind == PSK_Value) result.value = elem.value;
+                assert(elem.kind != PSK_Undefined);
+                if (result.kind == PSK_Type)  result.actual = elem.actual;
+                if (result.kind == PSK_Value) result.value = elem.value;
+            } else {
+                context->polymorph.flag_to_yield = 1;
+            }
+
             break;
         }
 
@@ -1046,7 +1064,7 @@ b32 potentially_convert_function_to_polyproc(Context *context, AstFunction *func
         AstPolyParam pp;
         pp.idx = apv->idx;
         pp.kind = PPK_Poly_Type;
-        pp.implicit_interface = NULL;
+        pp.implicit_interface_constraints = NULL;
 
         AstPolyCallType* pcall = onyx_ast_node_new(context->ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
         pcall->callee = *apv->replace;
@@ -1103,15 +1121,15 @@ b32 potentially_convert_function_to_polyproc(Context *context, AstFunction *func
 // structures now have a delay instantiation phase and are not forced to be completed immediately.
 
 char* build_poly_struct_name(Context *context, char *name, Type* type) {
-    char name_buf[256];
-    fori (i, 0, 256) name_buf[i] = 0;
+    char name_buf[512];
+    fori (i, 0, 512) name_buf[i] = 0;
 
 
     // Special case for `? T`
     if (type->kind == Type_Kind_Union
         && type->Union.constructed_from == context->builtins.optional_type) {
-        strncat(name_buf, "? ", 255);
-        strncat(name_buf, type_get_name(context, type->Union.poly_sln[0].type), 255);
+        strncat(name_buf, "? ", 511);
+        strncat(name_buf, type_get_name(context, type->Union.poly_sln[0].type), 511);
 
         return bh_aprintf(context->gp_alloc, "%s", name_buf);
     }
@@ -1121,17 +1139,17 @@ char* build_poly_struct_name(Context *context, char *name, Type* type) {
     if (type->kind == Type_Kind_Union)  slns = type->Union.poly_sln;
 
 
-    strncat(name_buf, name, 255);
-    strncat(name_buf, "(", 255);
+    strncat(name_buf, name, 511);
+    strncat(name_buf, "(", 511);
     bh_arr_each(AstPolySolution, ptype, slns) {
         if (ptype != slns)
-            strncat(name_buf, ", ", 255);
+            strncat(name_buf, ", ", 511);
 
         // This logic will have to be other places as well.
 
         switch (ptype->kind) {
             case PSK_Undefined: assert(0); break;
-            case PSK_Type:      strncat(name_buf, type_get_name(context, ptype->type), 255); break;
+            case PSK_Type:      strncat(name_buf, type_get_name(context, ptype->type), 511); break;
             case PSK_Value: {
                 // FIX
                 AstNode* value = strip_aliases((AstNode *) ptype->value);
@@ -1155,7 +1173,7 @@ char* build_poly_struct_name(Context *context, char *name, Type* type) {
             }
         }
     }
-    strncat(name_buf, ")", 255);
+    strncat(name_buf, ")", 511);
 
     return bh_aprintf(context->gp_alloc, "%s", name_buf);
 }

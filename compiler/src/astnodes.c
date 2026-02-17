@@ -5,9 +5,8 @@
 static const char* ast_node_names[] = {
     "ERROR",
     "PACKAGE",
-    "INCLUDE FILE",
-    "INCLUDE FOLDER",
-    "INCLUDE ALL IN FOLDER",
+    "LOAD",
+    "LOAD ALL IN FOLDER", // :Deprecated
     "INCLUDE LIBRARY PATH",
     "IMPORT",
     "MEMORY RESERVATION",
@@ -56,8 +55,6 @@ static const char* ast_node_names[] = {
     "DISTINCT TYPE",
     "TYPE_END (BAD)",
 
-    "STRUCT MEMBER",
-    "UNION VARIANT",
     "ENUM VALUE",
 
     "NUMERIC LITERAL",
@@ -65,12 +62,10 @@ static const char* ast_node_names[] = {
     "PARAM",
     "ARGUMENT",
     "CALL",
-    "INTRINSIC CALL",
     "RETURN",
     "ADDRESS OF",
     "DEREFERENCE",
     "ARRAY ACCESS",
-    "SLICE",
     "FIELD ACCESS",
     "UNARY FIELD ACCESS",
     "PIPE",
@@ -1614,7 +1609,7 @@ char* generate_name_within_scope(Context *context, Scope *scope, OnyxToken* symb
         scope = scope->parent;
     }
 
-    bh_arr_each(char *, n, names) {
+    bh_arr_rev_each(char *, n, names) {
         if (*n == NULL) continue;
 
         strncat(name, *n, 511);
@@ -1971,6 +1966,7 @@ AstCall * create_implicit_for_expansion_call(Context *context, AstFor *fornode) 
     body_code_block->token = fornode->token;
     body_code_block->type_node = context->builtins.code_type;
     body_code_block->code = (AstNode *) fornode->stmt;
+    body_code_block->enclosing_scope = context->checker.current_scope;
     ((AstBlock *) body_code_block->code)->rules = Block_Rule_Code_Block;
 
     bh_arr_new(context->ast_alloc, body_code_block->binding_symbols, bh_arr_length(fornode->indexing_variables));
@@ -1987,13 +1983,11 @@ AstCall * create_implicit_for_expansion_call(Context *context, AstFor *fornode) 
     
     AstNumLit *flag_node = make_int_literal(context, flags);
     flag_node->type_node = context->builtins.for_expansion_flag_type;
-    // flag_node->type = type_build_from_ast(context, context->builtins.for_expansion_flag_type);
-    // assert(flag_node->type);
 
     // Arguments are: 
     //    Iterator
-    //    Code block with 2 inputs (value, index)
     //    Flags
+    //    Code block with 2 inputs (value, index)
     bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) fornode->iter));
     bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) flag_node));
     bh_arr_push(call->args.values, (AstTyped *) make_argument(context, (AstTyped *) body_code_block));
@@ -2002,12 +1996,7 @@ AstCall * create_implicit_for_expansion_call(Context *context, AstFor *fornode) 
 }
 
 
-
-b32 resolve_intrinsic_interface_constraint(Context *context, AstConstraint *constraint) {
-    AstInterface *interface = constraint->interface;
-    Type* type = type_build_from_ast(context, (AstType *) constraint->args[0]);
-    if (!type) return 0;
-
+static b32 resolve_intrinsic_interface_constraint_inner(Context *context, AstInterface *interface, Type *type) {
     if (!strcmp(interface->name, "type_is_bool"))     return type_is_bool(type);
     if (!strcmp(interface->name, "type_is_int"))      return type_is_integer(type);
     if (!strcmp(interface->name, "type_is_float"))    return type->kind == Type_Kind_Basic && (type->Basic.flags & Basic_Flag_Float);
@@ -2028,3 +2017,16 @@ b32 resolve_intrinsic_interface_constraint(Context *context, AstConstraint *cons
     if (!strcmp(interface->name, "type_is_function")) return type->kind == Type_Kind_Function;
     return 0;
 }
+
+TypeMatch resolve_intrinsic_interface_constraint(Context *context, AstConstraint *constraint) {
+    AstInterface *interface = constraint->interface;
+    Type* type = type_build_from_ast(context, (AstType *) constraint->args[0]);
+    if (!type) return TYPE_MATCH_YIELD;
+
+    if (resolve_intrinsic_interface_constraint_inner(context, interface, type)) {
+        return TYPE_MATCH_SUCCESS;
+    } else {
+        return TYPE_MATCH_FAILED;
+    }
+}
+

@@ -208,16 +208,14 @@ void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *) *target_arr, A
     ent.scope   = scope;
 
     switch (node->kind) {
-        case Ast_Kind_Load_All:
-        case Ast_Kind_Load_File: {
+        case Ast_Kind_Load: {
             ent.type = Entity_Type_Load_File;
             ent.include = (AstInclude *) node;
             ENTITY_INSERT(ent);
             break;
         }
 
-        case Ast_Kind_Library_Path:
-        case Ast_Kind_Load_Path: {
+        case Ast_Kind_Library_Path: {
             ent.type = Entity_Type_Load_Path;
             ent.include = (AstInclude *) node;
             ENTITY_INSERT(ent);

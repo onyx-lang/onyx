@@ -157,9 +157,9 @@ __for_expansion :: macro (set: Set($T), $flags: __For_Expansion_Flags, $body: Co
         defer i += 1
 
         #if flags & .BY_POINTER {
-            #unquote body(&s_data[i].value) #skip_scope(2)
+            #unquote body(&s_data[i].value) #scope(body)
         } else {
-            #unquote body(s_data[i].value) #skip_scope(2)
+            #unquote body(s_data[i].value) #scope(body)
         }
     }
 }
@@ -172,9 +172,9 @@ __for_expansion :: macro (set: &Set($T), $flags: __For_Expansion_Flags, $body: C
         defer i += 1
 
         #if flags & .BY_POINTER {
-            #unquote body(&s.entries[i].value) #skip_scope(2)
+            #unquote body(&s.entries[i].value) #scope(body)
         } else {
-            #unquote body(s.entries[i].value) #skip_scope(2)
+            #unquote body(s.entries[i].value) #scope(body)
         }
     }
 }
