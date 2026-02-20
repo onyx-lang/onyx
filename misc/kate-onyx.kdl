@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE language SYSTEM "language.dtd">
+<language name="Onyx"
+          section="Sources"
+          version="1"
+          kateversion="5.0"
+          extensions="*.onyx"
+          mimetype="text/x-onyx"
+          author="Converted from tmLanguage"
+          license="MIT">
+
+<highlighting>
+
+  <!-- Keyword lists -->
+  <list name="controlflow">
+    <item>if</item>
+    <item>else</item>
+    <item>elseif</item>
+    <item>for</item>
+    <item>in</item>
+    <item>while</item>
+    <item>defer</item>
+    <item>return</item>
+    <item>do</item>
+    <item>break</item>
+    <item>continue</item>
+    <item>fallthrough</item>
+    <item>switch</item>
+    <item>case</item>
+  </list>
+
+  <list name="keywords">
+    <item>as</item>
+    <item>use</item>
+    <item>macro</item>
+    <item>package</item>
+    <item>where</item>
+    <item>cast</item>
+  </list>
+
+  <list name="types">
+    <item>union</item>
+    <item>struct</item>
+    <item>enum</item>
+    <item>interface</item>
+  </list>
+
+  <list name="builtinTypes">
+    <item>i8</item>
+    <item>i16</item>
+    <item>i32</item>
+    <item>i64</item>
+    <item>u8</item>
+    <item>u16</item>
+    <item>u32</item>
+    <item>u64</item>
+    <item>f32</item>
+    <item>f64</item>
+    <item>bool</item>
+    <item>str</item>
+    <item>cstr</item>
+    <item>dyn_str</item>
+    <item>type_expr</item>
+    <item>any</item>
+    <item>void</item>
+    <item>rawptr</item>
+    <item>i8x16</item>
+    <item>i16x8</item>
+    <item>i32x4</item>
+    <item>i64x2</item>
+    <item>f32x4</item>
+    <item>f64x2</item>
+    <item>v128</item>
+  </list>
+
+  <list name="constants">
+    <item>null</item>
+    <item>null_proc</item>
+    <item>null_str</item>
+    <item>true</item>
+    <item>false</item>
+  </list>
+
+  <list name="builtin">
+    <item>sizeof</item>
+    <item>alignof</item>
+    <item>typeof</item>
+  </list>
+
+  <list name="special">
+    <item>it</item>
+  </list>
+
+  <!-- Contexts -->
+  <contexts>
+    <context name="Normal" attribute="Normal Text" lineEndContext="#stay">
+      <IncludeRules context="FindComments" />
+      <IncludeRules context="FindStrings" />
+      <IncludeRules context="FindNumbers" />
+      <IncludeRules context="FindKeywords" />
+      <IncludeRules context="FindTypes" />
+      <IncludeRules context="FindDeclarations" />
+      <IncludeRules context="FindTags" />
+
+      <DetectChar attribute="Symbol" context="#stay" char="{"/>
+      <DetectChar attribute="Symbol" context="#stay" char="}"/>
+      <DetectChar attribute="Symbol" context="#stay" char="("/>
+      <DetectChar attribute="Symbol" context="#stay" char=")"/>
+      <DetectChar attribute="Symbol" context="#stay" char="["/>
+      <DetectChar attribute="Symbol" context="#stay" char="]"/>
+    </context>
+
+    <!-- Comments -->
+    <context name="FindComments" attribute="Normal Text" lineEndContext="#stay">
+      <Detect2Chars attribute="Comment" context="LineComment" char="/" char1="/"/>
+      <Detect2Chars attribute="Comment" context="LineComment" char="#" char1="!"/>
+      <Detect2Chars attribute="Comment" context="BlockComment" char="/" char1="*" beginRegion="BlockComment"/>
+    </context>
+
+    <context name="LineComment" attribute="Comment" lineEndContext="#pop">
+      <DetectSpaces />
+      <IncludeRules context="##Comments" />
+    </context>
+
+    <context name="BlockComment" attribute="Comment" lineEndContext="#stay">
+      <DetectSpaces />
+      <Detect2Chars attribute="Comment" context="#pop" char="*" char1="/" endRegion="BlockComment"/>
+      <Detect2Chars attribute="Comment" context="BlockComment" char="/" char1="*" beginRegion="BlockComment"/>
+      <IncludeRules context="##Comments" />
+    </context>
+
+    <!-- Strings -->
+    <context name="FindStrings" attribute="Normal Text" lineEndContext="#stay">
+      <DetectChar attribute="String" context="String" char="&quot;"/>
+      <DetectChar attribute="String" context="StringSingleQuote" char="'"/>
+    </context>
+
+    <context name="String" attribute="String" lineEndContext="#stay">
+      <LineContinue attribute="String" context="#stay"/>
+      <HlCStringChar attribute="String Char" context="#stay"/>
+      <RegExpr attribute="String Char" context="#stay" String="\\x[0-9a-fA-F]{2}"/>
+      <RegExpr attribute="String Char" context="#stay" String="\\u[0-9a-fA-F]{4}"/>
+      <RegExpr attribute="String Char" context="#stay" String="\\U[0-9a-fA-F]{8}"/>
+      <RegExpr attribute="String Char" context="#stay" String="\\[0-7]{3}"/>
+      <DetectChar attribute="String" context="#pop" char="&quot;"/>
+    </context>
+
+    <context name="StringSingleQuote" attribute="String" lineEndContext="#stay">
+      <LineContinue attribute="String" context="#stay"/>
+      <HlCStringChar attribute="String Char" context="#stay"/>
+      <RegExpr attribute="String Char" context="#stay" String="\\x[0-9a-fA-F]{2}"/>
+      <RegExpr attribute="String Char" context="#stay" String="\\u[0-9a-fA-F]{4}"/>
+      <RegExpr attribute="String Char" context="#stay" String="\\U[0-9a-fA-F]{8}"/>
+      <RegExpr attribute="String Char" context="#stay" String="\\[0-7]{3}"/>
+      <DetectChar attribute="String" context="#pop" char="'"/>
+    </context>
+
+    <!-- Numbers -->
+    <context name="FindNumbers" attribute="Normal Text" lineEndContext="#stay">
+      <!-- Hex, octal, decimal, binary numbers with optional suffix -->
+      <RegExpr attribute="Number" context="#stay" String="\b0[xXh][0-9a-fA-F_]+[ijk]?\b"/>
+      <RegExpr attribute="Number" context="#stay" String="\b0b[01_]+[ijk]?\b"/>
+      <RegExpr attribute="Number" context="#stay" String="\b0o[0-7_]+[ijk]?\b"/>
+      <RegExpr attribute="Number" context="#stay" String="\b0d[0-9_]+[ijk]?\b"/>
+      <!-- Float numbers -->
+      <RegExpr attribute="Number" context="#stay" String="\b\d[\d_]*\.[\d_]*([eE][+-]?\d+)?[ijk]?\b"/>
+      <RegExpr attribute="Number" context="#stay" String="\b\d[\d_]*([eE][+-]?\d+)[ijk]?\b"/>
+      <!-- Integer numbers -->
+      <RegExpr attribute="Number" context="#stay" String="\b\d[\d_]*[ijk]?\b"/>
+      <!-- Triple dash -->
+      <StringDetect attribute="Number" context="#stay" String="---"/>
+    </context>
+
+    <!-- Keywords -->
+    <context name="FindKeywords" attribute="Normal Text" lineEndContext="#stay">
+      <keyword attribute="Keyword" context="#stay" String="controlflow"/>
+      <keyword attribute="Keyword" context="#stay" String="keywords"/>
+      <keyword attribute="Data Type" context="#stay" String="types"/>
+      <keyword attribute="Data Type" context="#stay" String="builtinTypes"/>
+      <keyword attribute="Constant" context="#stay" String="constants"/>
+      <keyword attribute="Builtin" context="#stay" String="builtin"/>
+      <keyword attribute="Special" context="#stay" String="special"/>
+    </context>
+
+    <!-- Type references -->
+    <context name="FindTypes" attribute="Normal Text" lineEndContext="#stay">
+      <!-- Type variable reference: $TypeName -->
+      <RegExpr attribute="Data Type" context="#stay" String="\$\s*\b[a-zA-Z_][a-zA-Z0-9_]*\b"/>
+    </context>
+
+    <!-- Declarations and special patterns -->
+    <context name="FindDeclarations" attribute="Normal Text" lineEndContext="#stay">
+      <!-- Struct/union declarations: name :: struct/union -->
+      <RegExpr attribute="Type Definition" context="#stay" String="\b[a-zA-Z_][a-zA-Z0-9_]*\b\s*::\s*(struct|union)\b"/>
+      <!-- Interface declarations: name :: interface -->
+      <RegExpr attribute="Type Definition" context="#stay" String="\b[a-zA-Z_][a-zA-Z0-9_]*\b\s*::\s*interface\b"/>
+      <!-- Enum declarations: name :: enum -->
+      <RegExpr attribute="Type Definition" context="#stay" String="\b[a-zA-Z_][a-zA-Z0-9_]*\b\s*::\s*enum\b"/>
+      <!-- Type declarations: name :: #type -->
+      <RegExpr attribute="Type Definition" context="#stay" String="\b[a-zA-Z_][a-zA-Z0-9_]*\b\s*::\s*#\s*type\b"/>
+      <!-- Constant declarations: name :: (anything else) -->
+      <RegExpr attribute="Constant" context="#stay" String="\b[a-zA-Z_][a-zA-Z0-9_]*\b\s*::"/>
+      <!-- Function declarations: name :: ( -->
+      <RegExpr attribute="Function" context="#stay" String="\b[a-zA-Z_][a-zA-Z0-9_]*\b\s*::\s*"/>
+      <!-- Macro declarations: name :: macro -->
+      <RegExpr attribute="Function" context="#stay" String="\b[a-zA-Z_][a-zA-Z0-9_]*\b\s*::\s*\b"/>
+    </context>
+
+    <!-- Tags and directives -->
+    <context name="FindTags" attribute="Normal Text" lineEndContext="#stay">
+      <!-- Hash tags: #foreign, #local, #package -->
+      <RegExpr attribute="Preprocessor" context="#stay" String="#\s*(foreign|local|package)\b"/>
+      <!-- Other hash directives -->
+      <RegExpr attribute="Preprocessor" context="#stay" String="#\s*\b[a-zA-Z_][a-zA-Z0-9_]*\b"/>
+      <!-- Macro calls: name!{ -->
+      <RegExpr attribute="Preprocessor" context="#stay" String="\b[a-zA-Z_][a-zA-Z0-9_\.]*\b\s*!\{"/>
+      <!-- @ directives -->
+      <RegExpr attribute="Preprocessor" context="#stay" String="@[^\s]+"/>
+    </context>
+
+  </contexts>
+
+  <!-- Item data (color scheme mappings) -->
+  <itemDatas>
+    <itemData name="Normal Text"     defStyleNum="dsNormal" spellChecking="false"/>
+    <itemData name="Keyword"         defStyleNum="dsKeyword" spellChecking="false"/>
+    <itemData name="Data Type"       defStyleNum="dsDataType" spellChecking="false"/>
+    <itemData name="Type Definition" defStyleNum="dsDataType" spellChecking="false" bold="true"/>
+    <itemData name="Function"        defStyleNum="dsFunction" spellChecking="false"/>
+    <itemData name="Function Call"   defStyleNum="dsFunction" spellChecking="false"/>
+    <itemData name="Constant"        defStyleNum="dsConstant" spellChecking="false"/>
+    <itemData name="Builtin"         defStyleNum="dsBuiltIn" spellChecking="false"/>
+    <itemData name="Special"         defStyleNum="dsSpecialString" spellChecking="false"/>
+    <itemData name="Number"          defStyleNum="dsDecVal" spellChecking="false"/>
+    <itemData name="String"          defStyleNum="dsString"/>
+    <itemData name="String Char"     defStyleNum="dsSpecialChar" spellChecking="false"/>
+    <itemData name="Comment"         defStyleNum="dsComment"/>
+    <itemData name="Symbol"          defStyleNum="dsNormal" spellChecking="false"/>
+    <itemData name="Preprocessor"    defStyleNum="dsPreprocessor" spellChecking="false"/>
+  </itemDatas>
+
+</highlighting>
+
+<general>
+  <comments>
+    <comment name="singleLine" start="//" />
+    <comment name="multiLine" start="/*" end="*/" region="BlockComment" />
+  </comments>
+  <keywords casesensitive="1" />
+</general>
+
+</language>
