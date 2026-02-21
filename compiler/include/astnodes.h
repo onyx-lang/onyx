@@ -1512,6 +1512,7 @@ struct AstCaptureBlock {
     bh_arr(AstCaptureLocal *) captures;
 
     u32 total_size_in_bytes;
+    b32 alloc_on_stack : 1;
 };
 
 struct AstCaptureLocal {

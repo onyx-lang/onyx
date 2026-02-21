@@ -1,0 +1,27 @@
+use core {*}
+
+main :: () {
+    // Ensure that any use of closures will break the program
+    context.closure_allocate = n => {
+        panic("LAND MINE")
+        return cast(rawptr, 0)
+    }
+
+    a := Array.make(.[2, 3, 5, 7, 11])
+
+    res := Iterator.from(1 .. 20)
+        // While the Iterator itself will allocate in order to
+        // store its context, the closure will not allocate.
+        |> Iterator.filter((x) use #stack_alloc (a) => {
+            // This tests using a stack allocated closure in a macro,
+            // that is called directly (() use ...)(), which caused
+            // issues in the initial implementation.
+            return !Slice.some(a, (y) use #stack_alloc (x) => {
+                return x == y
+            })
+        })
+
+    for i in res {
+        println(i)
+    }
+}

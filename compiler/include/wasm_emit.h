@@ -683,8 +683,16 @@ typedef struct DeferredStmt {
     };
 } DeferredStmt;
 
+typedef enum AllocatedSpaceKind {
+    Allocated_Space_Kind_Local,
+    Allocated_Space_Kind_Raw
+} AllocatedSpaceKind;
+
 typedef struct AllocatedSpace {
+    AllocatedSpaceKind kind;
     u64 depth;
+    u32 size;
+    u32 alignment;
     AstTyped *expr;
 } AllocatedSpace;
 

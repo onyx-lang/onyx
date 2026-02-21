@@ -3479,8 +3479,11 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
     }
 
     if (consume_token_if_next(parser, Token_Type_Keyword_Use)) {
+        b32 stack_alloc = parse_possible_directive(parser, "stack_alloc");
+
         expect_token(parser, '(');
         func_def->captures = parse_capture_list(parser, ')');
+        if (func_def->captures) func_def->captures->alloc_on_stack = stack_alloc;
         consume_token_if_next(parser, ',');
 
         if (bh_arr_length(parser->current_function_stack) > 1) {
@@ -3683,8 +3686,11 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
         }
 
         if (consume_token_if_next(parser, Token_Type_Keyword_Use)) {
+            b32 stack_alloc = parse_possible_directive(parser, "stack_alloc");
+
             expect_token(parser, '(');
             captures = parse_capture_list(parser, ')');
+            if (captures) captures->alloc_on_stack = stack_alloc;
         }
     }
 

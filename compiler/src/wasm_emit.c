@@ -150,10 +150,7 @@ static void local_raw_free(LocalAllocator* la, WasmType wt) {
     la->freed[idx]++;
 }
 
-static u64 local_allocate_type_in_memory(LocalAllocator* la, Type *type) {
-    u32 size = type_size_of(type);
-    u32 alignment = type_alignment_of(type);
-
+static u64 local_allocate_bytes_in_memory(LocalAllocator *la, u32 size, u32 alignment) {
     bh_align(la->curr_stack, alignment);
 
     if (la->max_stack < la->curr_stack)
@@ -172,12 +169,24 @@ static u64 local_allocate_type_in_memory(LocalAllocator* la, Type *type) {
     return la->curr_stack - size;
 }
 
-static void local_free_type_in_memory(LocalAllocator* la, Type* type) {
-    u32 size = type_size_of(type);
-    u32 alignment = type_alignment_of(type);
+static void local_free_bytes_in_memory(LocalAllocator* la, u32 size, u32 alignment) {
     bh_align(size, alignment);
 
     la->curr_stack -= size;
+}
+
+static u64 local_allocate_type_in_memory(LocalAllocator* la, Type *type) {
+    u32 size = type_size_of(type);
+    u32 alignment = type_alignment_of(type);
+
+    return local_allocate_bytes_in_memory(la, size, alignment);
+}
+
+static void local_free_type_in_memory(LocalAllocator* la, Type* type) {
+    u32 size = type_size_of(type);
+    u32 alignment = type_alignment_of(type);
+
+    local_free_bytes_in_memory(la, size, alignment);
 }
 
 static u64 local_allocate(LocalAllocator* la, AstTyped* local) {
@@ -769,6 +778,19 @@ EMIT_FUNC(statement, AstNode* stmt) {
     *pcode = code;
 }
 
+EMIT_FUNC_RETURNING(u64, stack_alloc, u32 size, u32 alignment) {
+    u32 local_idx = local_allocate_bytes_in_memory(mod->local_alloc, size, alignment);
+
+    bh_arr_push(mod->local_allocations, ((AllocatedSpace) {
+        .kind = Allocated_Space_Kind_Raw,
+        .depth = bh_arr_length(mod->structured_jump_target),
+        .size = size,
+        .alignment = alignment
+    }));
+
+    return local_idx;
+}
+
 EMIT_FUNC_RETURNING(u64, local_allocation, AstTyped* stmt) {
     //
     // If the statement does not have a type, it should not
@@ -809,6 +831,7 @@ EMIT_FUNC_RETURNING(u64, local_allocation, AstTyped* stmt) {
     }
 
     bh_arr_push(mod->local_allocations, ((AllocatedSpace) {
+        .kind = Allocated_Space_Kind_Local,
         .depth = bh_arr_length(mod->structured_jump_target),
         .expr  = stmt,
     }));
@@ -821,10 +844,19 @@ EMIT_FUNC_NO_ARGS(free_local_allocations) {
 
     u64 depth = bh_arr_length(mod->structured_jump_target);
     while (bh_arr_length(mod->local_allocations) > 0 && bh_arr_last(mod->local_allocations).depth >= depth) {
-        // CHECK: Not sure this next line is okay to be here...
-        bh_imap_delete(&mod->local_map, (u64) bh_arr_last(mod->local_allocations).expr);
+        AllocatedSpace alloc = bh_arr_last(mod->local_allocations);
+        switch (alloc.kind) {
+            case Allocated_Space_Kind_Local:
+                // CHECK: Not sure this next line is okay to be here...
+                bh_imap_delete(&mod->local_map, (u64) alloc.expr);
+                local_free(mod->local_alloc, alloc.expr);
+                break;
 
-        local_free(mod->local_alloc, bh_arr_last(mod->local_allocations).expr);
+            case Allocated_Space_Kind_Raw:
+                local_free_bytes_in_memory(mod->local_alloc, alloc.size, alloc.alignment);
+                break;
+        }
+
         bh_arr_pop(mod->local_allocations);
     }
 }
@@ -2085,7 +2117,7 @@ EMIT_FUNC(call, AstCall* call) {
         WIL(NULL, WI_GLOBAL_SET, stack_trace_pass_global);
     }
 
-    if (call->callee->kind == Ast_Kind_Function) {
+    if (call->callee->kind == Ast_Kind_Function && !((AstFunction *) call->callee)->captures) {
         CodePatchInfo code_patch;
         code_patch.kind = Code_Patch_Callee;
         code_patch.func_idx = mod->current_func_idx;
@@ -3349,17 +3381,23 @@ EMIT_FUNC(expression, AstTyped* expr) {
             }
 
             // Allocate the block
-            WIL(NULL, WI_I32_CONST, func->captures->total_size_in_bytes);
+            if (func->captures->alloc_on_stack) {
+                u32 address = emit_stack_alloc(mod, &code, func->captures->total_size_in_bytes, 16);
+                emit_stack_address(mod, &code, address, NULL);
 
-            CodePatchInfo code_patch;
-            code_patch.kind = Code_Patch_Callee;
-            code_patch.func_idx = mod->current_func_idx;
-            code_patch.instr = bh_arr_length(code);
-            code_patch.node_related_to_patch = (AstNode *) mod->context->builtins.closure_block_allocate;
-            bh_arr_push(mod->code_patches, code_patch);
-            WIL(NULL, WI_CALL, 0);
+            } else {
+                WIL(NULL, WI_I32_CONST, func->captures->total_size_in_bytes);
 
-            ensure_node_has_been_submitted_for_emission(mod->context, (AstNode *) mod->context->builtins.closure_block_allocate);
+                CodePatchInfo code_patch;
+                code_patch.kind = Code_Patch_Callee;
+                code_patch.func_idx = mod->current_func_idx;
+                code_patch.instr = bh_arr_length(code);
+                code_patch.node_related_to_patch = (AstNode *) mod->context->builtins.closure_block_allocate;
+                bh_arr_push(mod->code_patches, code_patch);
+                WIL(NULL, WI_CALL, 0);
+
+                ensure_node_has_been_submitted_for_emission(mod->context, (AstNode *) mod->context->builtins.closure_block_allocate);
+            }
 
             u64 capture_block_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
             WIL(NULL, WI_LOCAL_TEE, capture_block_ptr);
