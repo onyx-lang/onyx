@@ -383,7 +383,7 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
             onyx_set_option_int(ctx, ONYX_OPTION_GENERATE_NAME_SECTION, 1);
         }
         else if (!strcmp(argv[i], "--no-type-info")) {
-            onyx_set_option_int(ctx, ONYX_OPTION_GENERATE_TYPE_INFO, 1);
+            onyx_set_option_int(ctx, ONYX_OPTION_GENERATE_TYPE_INFO, 0);
         }
         else if (!strcmp(argv[i], "--no-core")) {
             onyx_set_option_int(ctx, ONYX_OPTION_DISABLE_CORE, 1);
