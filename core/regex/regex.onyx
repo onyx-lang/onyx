@@ -1,0 +1,2480 @@
+package main
+
+use core {package, *}
+use core.set {Set}
+
+// =============================================================================
+// Core Types
+// =============================================================================
+
+/// Represents a match result with capture groups
+Match :: struct {
+    found: bool;
+    start: u32;
+    end: u32;
+    text: str;
+    groups: [..] str;
+}
+
+/// State transition
+Transition :: struct {
+    condition: Match_Condition;
+    target: u32;
+}
+
+/// Internal NFA state
+NFA_State :: struct {
+    id: u32;
+    is_final: bool;
+    transitions: [..] Transition;
+}
+
+/// Character matching conditions
+Match_Condition :: union {
+    epsilon: void;              // Empty transition
+    character: u8;              // Exact character
+    char_class: Char_Class;     // Character class
+    range: Range;               // Character range
+    char_set: Char_Set;         // Bracket expressions [abc], [^abc]
+    negated: &Match_Condition;  // Negated condition
+    group_start: u32;           // Start of capture group
+    group_end: u32;             // End of capture group
+    non_capture_group_start: void; // Start of non-capturing group
+    non_capture_group_end: void;   // End of non-capturing group
+    anchor: Anchor;             // Position anchors ^ $
+    word_boundary: void;        // Word boundary \b
+}
+
+/// Character classes
+Char_Class :: enum {
+    DIGIT;      // \d
+    WORD;       // \w
+    SPACE;      // \s
+    ANY;        // .
+}
+
+/// Character range
+Range :: struct {
+    start: u8;
+    end: u8;
+}
+
+/// Character set for bracket expressions
+Char_Set :: struct {
+    chars: [..] u8;             // Individual characters
+    ranges: [..] Range;         // Character ranges
+    negated: bool;              // True for [^...] expressions
+    has_predefined: [4] bool;   // [digit, word, space, any] flags
+}
+
+/// Position anchors
+Anchor :: enum {
+    START;      // ^ - start of string/line
+    END;        // $ - end of string/line
+    WORD_BOUNDARY; // \b - word boundary
+}
+
+/// Compiled regex pattern
+Regex :: struct {
+    pattern: str;
+    states: [..] NFA_State;
+    start_state: u32;
+    max_group_id: u32; // Add this line
+    has_lazy_quantifiers: bool; // Track if regex contains lazy quantifiers
+}
+
+Regex.destroy :: (regex: &Regex) {
+    for &state in regex.states {
+        Array.free(&state.transitions);
+    }
+    Array.free(&regex.states);
+}
+
+/// Internal parser state
+Parser :: struct {
+    pattern: str;
+    pos: u32;
+    state_counter: u32;
+    group_counter: u32;  // Track capture groups
+}
+
+// =============================================================================
+// Public API - Simple functional interface
+// =============================================================================
+
+/// Check if a string matches a regex pattern (supports all features: groups, anchors, etc.)
+/// Returns true if match found, false otherwise
+matches :: (text: str, pattern: str) -> bool {
+    return find(text, pattern).found;
+}
+
+/// Replace first match with replacement string (supports all features: groups, anchors, etc.)
+/// Supports $1, $2, etc. for capture groups, $& for full match, $$ for literal $
+replace :: #match {
+    (text: str, pattern: str, replacement: str, allocator := context.allocator) -> str {
+        regex := compile(pattern);
+        defer regex->destroy();
+        return replace(&regex, text, replacement, allocator);
+    },
+    (regex: &Regex, text: str, replacement: str, allocator := context.allocator) -> str {
+        match := find_with_groups(regex, text, allocator);
+        if !match.found {
+            return str.copy(text, allocator);
+        }
+
+        // Process replacement string with substitutions
+        processed_replacement := process_replacement(replacement, &match, allocator);
+        defer if processed_replacement != replacement do raw_free(allocator, processed_replacement.data);
+
+        // Build result string
+        result := str.copy("", allocator);
+
+        // Add text before match
+        if match.start > 0 {
+            before := text[0 .. match.start];
+            result = str.concat(result, before, allocator);
+        }
+
+        // Add processed replacement
+        result = str.concat(result, processed_replacement, allocator);
+
+        // Add text after match
+        if match.end < text.count {
+            after := text[match.end .. text.count];
+            result = str.concat(result, after, allocator);
+        }
+
+        return result;
+    },
+}
+
+// =============================================================================
+// Advanced API - For reusable compiled patterns
+// =============================================================================
+
+/// Compile a regex pattern for reuse
+compile :: (pattern: str, allocator := context.allocator) -> Regex {
+    parser := Parser.{
+        pattern = pattern,
+        pos = 0,
+        state_counter = 0,
+        group_counter = 0
+    };
+
+    regex := Regex.{
+        pattern = str.copy(pattern, allocator),
+        states = Array.make(NFA_State, allocator = allocator),
+        start_state = 0,
+        max_group_id = 0, // Initialize here
+        has_lazy_quantifiers = false // Initialize to false
+    };
+
+    if !build_nfa(&parser, &regex, allocator) {
+        // Return empty regex on error
+        return Regex.{
+            pattern = "",
+            states = Array.make(NFA_State, allocator = allocator),
+            start_state = 0,
+            max_group_id = 0
+        };
+    }
+
+    regex.max_group_id = parser.group_counter; // Store the max group ID
+
+    return regex;
+}
+
+/// Execute compiled regex on text (supports all features: groups, anchors, etc.)
+find :: #match {
+    (regex: &Regex, text: str, allocator := context.allocator) -> Match  {
+        return find_with_groups(regex, text, allocator);
+    },
+    (text: str, pattern: str, allocator := context.allocator) -> Match {
+        regex := compile(pattern);
+        defer regex->destroy();
+        return find(&regex, text, allocator);
+    },
+}
+
+/// Replace all matches using compiled regex (supports all features: groups, anchors, etc.)
+/// Supports $1, $2, etc. for capture groups, /// Find all matches using compiled regex (supports all features: groups, anchors, etc.)
+find_all :: #match {
+    (regex: &Regex, text: str, allocator := context.allocator) -> [..] Match {
+        return find_all_with_groups(regex, text, allocator);
+    },
+    (text: str, pattern: str, allocator := context.allocator) -> [..] Match {
+        regex := compile(pattern);
+        defer regex->destroy();
+        return find_all(&regex, text, allocator);
+    },
+}
+
+/// Replace all matches using compiled regex (supports all features: groups, anchors, etc.)
+/// Supports $1, $2, etc. for capture groups
+replace_all :: #match {
+    (regex: &Regex, text: str, replacement: str, allocator := context.allocator) -> str {
+        matches := find_all_with_groups(regex, text, allocator);
+        defer {
+            for match in matches {
+                Array.free(&match.groups);
+            }
+            Array.free(&matches);
+        }
+
+        if matches.count == 0 {
+            return str.copy(text, allocator);
+        }
+
+        result := str.copy("", allocator);
+        last_end := 0;
+
+        for match in matches {
+            // Add text before this match
+            if match.start > last_end {
+                before := text[last_end .. match.start];
+                result = str.concat(result, before, allocator);
+            }
+
+            // Process replacement string with substitutions
+            processed_replacement := process_replacement(replacement, &match, allocator);
+            defer if processed_replacement != replacement do raw_free(allocator, processed_replacement.data);
+
+            result = str.concat(result, processed_replacement, allocator);
+
+            last_end = match.end;
+        }
+
+        // Add remaining text
+        if last_end < text.count {
+            after := text[last_end .. text.count];
+            result = str.concat(result, after, allocator);
+        }
+
+        return result;
+    },
+    (text: str, pattern: str, replacement: str, allocator := context.allocator) -> str {
+        regex := compile(pattern);
+        defer regex->destroy();
+        return replace_all(&regex, text, replacement, allocator);
+    },
+}
+
+/// Clean up compiled regex
+destroy :: (regex: &Regex) {
+    for &state in regex.states {
+        Array.free(&state.transitions);
+    }
+    Array.free(&regex.states);
+}
+
+// =============================================================================
+// Core Implementation Functions
+// =============================================================================
+
+/// Find match with capture groups
+find_with_groups :: (regex: &Regex, text: str, allocator := context.allocator) -> Match {
+    if regex.states.count == 0 {
+        return Match.{ found = false };
+    }
+
+    // Check if this is an anchored pattern (starts with ^)
+    is_anchored := check_if_anchored(regex);
+
+    if is_anchored {
+        // For anchored patterns, only try matching from position 0
+        return simulate_nfa_with_groups(regex, text, 0, allocator);
+    }
+
+    // For non-anchored patterns, use leftmost-first matching
+    for start_pos in 0 .. text.count + 1 {
+        match_result := simulate_nfa_with_groups(regex, text, start_pos, allocator);
+        if match_result.found {
+            return match_result;
+        }
+    }
+
+    return Match.{ found = false };
+}
+
+/// Helper function to check if regex is anchored
+check_if_anchored :: (regex: &Regex) -> bool {
+    if regex.states.count == 0 {
+        return false;
+    }
+
+    start_state := &regex.states[regex.start_state];
+    
+    // Check direct transitions
+    for transition in start_state.transitions {
+        switch transition.condition {
+            case .anchor {
+                anchor := transition.condition.anchor->unwrap();
+                if anchor == .START {
+                    return true;
+                }
+            }
+            case .epsilon {
+                // Check if epsilon leads to anchor (one level deep only)
+                if transition.target < regex.states.count {
+                    target_state := &regex.states[transition.target];
+                    for target_transition in target_state.transitions {
+                        switch target_transition.condition {
+                            case .anchor {
+                                anchor := target_transition.condition.anchor->unwrap();
+                                if anchor == .START {
+                                    return true;
+                                }
+                            }
+                            case _ do continue;
+                        }
+                    }
+                }
+            }
+            case _ do continue;
+        }
+    }
+    
+    return false;
+}
+
+/// Find all matches with capture groups
+find_all_with_groups :: (regex: &Regex, text: str, allocator := context.allocator) -> [..] Match {
+    matches := Array.make(Match, allocator = allocator);
+
+    if regex.states.count == 0 {
+        return matches;
+    }
+
+    pos := 0;
+    while pos < text.count {
+        match := simulate_nfa_with_groups(regex, text, pos, allocator);
+        if match.found {
+            Array.push(&matches, match);
+            pos = math.max(match.end, pos + 1);
+        } else {
+            pos += 1;
+        }
+    }
+
+    return matches;
+}
+
+/// Process replacement string with substitutions ($1, $2, $&, etc.)
+process_replacement :: (replacement: str, match: &Match, allocator := context.allocator) -> str {
+    if str.index_of(replacement, '$') == -1 {
+        // No substitutions needed
+        return replacement;
+    }
+
+    result := str.copy("", allocator);
+    i := 0;
+
+    while i < replacement.count {
+        if replacement[i] == '$' && i + 1 < replacement.count {
+            next_char := replacement[i + 1];
+            
+            if next_char == '&' {
+                // $& = full match
+                result = str.concat(result, match.text, allocator);
+                i += 2;
+            } elseif next_char >= '0' && next_char <= '9' {
+                // $1, $2, etc. = capture groups
+                group_num := cast(u32)(next_char - '0');
+                if group_num > 0 && group_num <= match.groups.count {
+                    group_text := match.groups[group_num - 1];
+                    if group_text.count > 0 {
+                        result = str.concat(result, group_text, allocator);
+                    }
+                }
+                i += 2;
+            } elseif next_char == '$' {
+                // $$ = literal $
+                result = str.concat(result, "$", allocator);
+                i += 2;
+            } else {
+                // Unknown substitution, keep as is
+                char_data := cast([&] u8) raw_alloc(allocator, 1);
+                char_data[0] = replacement[i];
+                char_str := str.{ data = char_data, count = 1 };
+                result = str.concat(result, char_str, allocator);
+                i += 1;
+            }
+        } else {
+            // Regular character
+            char_data := cast([&] u8) raw_alloc(allocator, 1);
+            char_data[0] = replacement[i];
+            char_str := str.{ data = char_data, count = 1 };
+            result = str.concat(result, char_str, allocator);
+            i += 1;
+        }
+    }
+
+    return result;
+}
+
+// =============================================================================
+// Internal Helper Functions for Word Boundaries
+// =============================================================================
+
+is_word_char :: (c: u8) -> bool {
+    return (c >= 'a' && c <= 'z') ||
+           (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9') ||
+           c == '_';
+}
+
+is_match_at_word_boundary :: (text: str, pos: u32) -> bool {
+    if text.count == 0 {
+        return false; // No boundaries in empty text
+    }
+
+    prev_char_exists := pos > 0;
+    current_char_exists := pos < text.count;
+
+    prev_is_word := false;
+    if prev_char_exists {
+        prev_is_word = is_word_char(text[pos - 1]);
+    }
+
+    current_is_word := false;
+    if current_char_exists {
+        current_is_word = is_word_char(text[pos]);
+    }
+
+    if pos == 0 {
+        return current_is_word; // Boundary if first char is word char
+    }
+    
+    if pos == text.count {
+        return prev_is_word; // Boundary if last char was word char
+    }
+
+    return prev_is_word != current_is_word; // Boundary if one is word char and other is not
+}
+
+// =============================================================================
+// Internal Implementation
+// =============================================================================
+
+/// Build NFA from pattern
+build_nfa :: (parser: &Parser, regex: &Regex, allocator: Allocator) -> bool {
+    // Create start state
+    start := create_state(parser, allocator);
+    regex.start_state = start.id;
+    Array.push(&regex.states, start);
+
+    // Parse pattern with top-level alternation support
+    end_state := parse_top_level_alternation(parser, regex, start.id, allocator);
+    if end_state == ~0 {
+        return false;
+    }
+
+    // Mark end state as final
+    if end_state < regex.states.count {
+        regex.states[end_state].is_final = true;
+    }
+
+    return true;
+}
+
+/// Create new NFA state
+create_state :: (parser: &Parser, allocator: Allocator) -> NFA_State {
+    state := NFA_State.{
+        id = parser.state_counter,
+        is_final = false,
+        transitions = Array.make(Transition, allocator = allocator)
+    };
+    parser.state_counter += 1;
+    return state;
+}
+
+/// Parse top-level alternation in the entire pattern (like parse_group_content but for the whole pattern)
+parse_top_level_alternation :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: Allocator) -> u32 {
+    // Handle alternation at the top level of the pattern
+    alternatives := Array.make(u32, allocator = context.temp_allocator);
+    defer Array.free(&alternatives);
+    
+    // Parse first alternative
+    current_state := parse_sequence(parser, regex, start_state, allocator);
+    if current_state == ~0 {
+        return ~0;
+    }
+    Array.push(&alternatives, current_state);
+    
+    // Parse additional alternatives separated by |
+    while parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '|' {
+        parser.pos += 1; // Skip |
+        
+        alt_state := parse_sequence(parser, regex, start_state, allocator);
+        if alt_state == ~0 {
+            return ~0;
+        }
+        Array.push(&alternatives, alt_state);
+    }
+    
+    // If only one alternative, return it
+    if alternatives.count == 1 {
+        return alternatives[0];
+    }
+    
+    // Create a join state for all alternatives
+    join_state := create_state(parser, allocator);
+    Array.push(&regex.states, join_state);
+    
+    // Connect all alternatives to the join state
+    for alt_end in alternatives {
+        epsilon_transition := Transition.{
+            condition = .{ epsilon = .{} },
+            target = join_state.id
+        };
+        Array.push(&regex.states[alt_end].transitions, epsilon_transition);
+    }
+    
+    return join_state.id;
+}
+
+/// Parse group content, handling alternation (|)
+parse_group_content :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: Allocator) -> u32 {
+    // Handle alternation within groups
+    alternatives := Array.make(u32, allocator = context.temp_allocator);
+    defer Array.free(&alternatives);
+    
+    // Parse first alternative
+    current_state := parse_sequence(parser, regex, start_state, allocator);
+    if current_state == ~0 {
+        return ~0;
+    }
+    Array.push(&alternatives, current_state);
+    
+    // Parse additional alternatives separated by |
+    while parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '|' {
+        parser.pos += 1; // Skip |
+        
+        alt_state := parse_sequence(parser, regex, start_state, allocator);
+        if alt_state == ~0 {
+            return ~0;
+        }
+        Array.push(&alternatives, alt_state);
+    }
+    
+    // If only one alternative, return it
+    if alternatives.count == 1 {
+        return alternatives[0];
+    }
+    
+    // Create a join state for all alternatives
+    join_state := create_state(parser, allocator);
+    Array.push(&regex.states, join_state);
+    
+    // Connect all alternatives to the join state
+    for alt_end in alternatives {
+        epsilon_transition := Transition.{
+            condition = .{ epsilon = .{} },
+            target = join_state.id
+        };
+        Array.push(&regex.states[alt_end].transitions, epsilon_transition);
+    }
+    
+    return join_state.id;
+}
+
+/// Parse a sequence of characters/elements (no alternation)
+parse_sequence :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: Allocator) -> u32 {
+    current_state := start_state;
+    element_count := 0;
+    
+    while parser.pos < parser.pattern.count {
+        c := parser.pattern[parser.pos];
+        
+        // Stop at group end or alternation
+        if c == ')' || c == '|' {
+            break;
+        }
+        
+        // Parse single element
+        next_state := parse_element(parser, regex, current_state, allocator);
+        if next_state == ~0 {
+            return ~0;
+        }
+        current_state = next_state;
+        element_count += 1;
+    }
+    
+    // If no elements were parsed (empty sequence), create an epsilon transition
+    if element_count == 0 {
+        end_state := create_state(parser, allocator);
+        Array.push(&regex.states, end_state);
+        
+        epsilon_transition := Transition.{
+            condition = .{ epsilon = .{} },
+            target = end_state.id
+        };
+        Array.push(&regex.states[start_state].transitions, epsilon_transition);
+        
+        return end_state.id;
+    }
+    
+    return current_state;
+}
+
+/// Parse a single element (character, group, etc.)
+parse_element :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: Allocator) -> u32 {
+    if parser.pos >= parser.pattern.count {
+        return start_state;
+    }
+    
+    c := parser.pattern[parser.pos];
+    
+    switch c {
+        case '(' {
+            // Check for non-capturing group (?:...)
+            if parser.pos + 2 < parser.pattern.count && parser.pattern[parser.pos + 1] == '?' && parser.pattern[parser.pos + 2] == ':' {
+                parser.pos += 3; // Skip (?:
+                
+                // Non-capturing group: treat like a regular group for parsing sequence, but no group ID
+                nc_group_entry_state_id := start_state; 
+                
+                content_start_state_obj := create_state(parser, allocator);
+                Array.push(&regex.states, content_start_state_obj);
+                
+                entry_trans := Transition.{ condition = .{ epsilon = .{} }, target = content_start_state_obj.id };
+                Array.push(&regex.states[nc_group_entry_state_id].transitions, entry_trans);
+
+                content_end_state_id := parse_group_content(parser, regex, content_start_state_obj.id, allocator);
+                if content_end_state_id == ~0 {
+                    return ~0; // Error in group content
+                }
+                
+                if parser.pos >= parser.pattern.count || parser.pattern[parser.pos] != ')' {
+                    return ~0; // Missing )
+                }
+                parser.pos += 1; // Skip )
+                
+                nc_group_exit_state_obj := create_state(parser, allocator);
+                Array.push(&regex.states, nc_group_exit_state_obj);
+                
+                exit_trans := Transition.{ condition = .{ epsilon = .{} }, target = nc_group_exit_state_obj.id };
+                Array.push(&regex.states[content_end_state_id].transitions, exit_trans);
+
+                final_exit_state_id := nc_group_exit_state_obj.id; // This is the state if the group is matched once.
+
+                if parser.pos < parser.pattern.count {
+                    q_char := parser.pattern[parser.pos];
+                    is_lazy_group := false;
+                    switch q_char {
+                        case '*' { // Zero or more
+                            parser.pos += 1;
+                            if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
+                                is_lazy_group = true;
+                                regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
+                                parser.pos += 1; // Consume '?' for laziness
+                            }
+                            
+                            if is_lazy_group {
+                                // For lazy *: try to skip first, then repeat
+                                Array.push(&regex.states[nc_group_entry_state_id].transitions, Transition.{condition = .{epsilon = .{}}, target = final_exit_state_id});
+                                Array.push(&regex.states[nc_group_entry_state_id].transitions, Transition.{condition = .{epsilon = .{}}, target = content_start_state_obj.id});
+                            } else {
+                                // For greedy *: try to repeat first, then skip
+                                Array.push(&regex.states[nc_group_entry_state_id].transitions, Transition.{condition = .{epsilon = .{}}, target = content_start_state_obj.id});
+                                Array.push(&regex.states[nc_group_entry_state_id].transitions, Transition.{condition = .{epsilon = .{}}, target = final_exit_state_id});
+                            }
+                            Array.push(&regex.states[content_end_state_id].transitions, Transition.{condition = .{epsilon = .{}}, target = content_start_state_obj.id});
+                        }
+                        case '+' { // One or more
+                            parser.pos += 1;
+                            if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
+                                is_lazy_group = true;
+                                regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
+                                parser.pos += 1; // Consume '?' for laziness
+                            }
+                            
+                            if is_lazy_group {
+                                // For lazy +: after first match, try to exit first, then repeat
+                                Array.push(&regex.states[content_end_state_id].transitions, Transition.{condition = .{epsilon = .{}}, target = final_exit_state_id});
+                                Array.push(&regex.states[content_end_state_id].transitions, Transition.{condition = .{epsilon = .{}}, target = content_start_state_obj.id});
+                            } else {
+                                // For greedy +: after first match, try to repeat first, then exit
+                                Array.push(&regex.states[content_end_state_id].transitions, Transition.{condition = .{epsilon = .{}}, target = content_start_state_obj.id});
+                                Array.push(&regex.states[content_end_state_id].transitions, Transition.{condition = .{epsilon = .{}}, target = final_exit_state_id});
+                            }
+                        }
+                        case '?' { // Zero or one
+                            parser.pos += 1;
+                            if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
+                                is_lazy_group = true;
+                                regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
+                                parser.pos += 1; // Consume '?' for laziness
+                            }
+                            
+                            if is_lazy_group {
+                                // For lazy ?: try to skip first, then match
+                                Array.push(&regex.states[nc_group_entry_state_id].transitions, Transition.{condition = .{epsilon = .{}}, target = final_exit_state_id});
+                                Array.push(&regex.states[nc_group_entry_state_id].transitions, Transition.{condition = .{epsilon = .{}}, target = content_start_state_obj.id});
+                            } else {
+                                // For greedy ?: try to match first, then skip
+                                Array.push(&regex.states[nc_group_entry_state_id].transitions, Transition.{condition = .{epsilon = .{}}, target = content_start_state_obj.id});
+                                Array.push(&regex.states[nc_group_entry_state_id].transitions, Transition.{condition = .{epsilon = .{}}, target = final_exit_state_id});
+                            }
+                        }
+                        case '{' { // Numeric quantifiers {n}, {n,m}, {n,}
+                            temp_parser_pos := parser.pos;
+                            parser.pos += 1; // Skip opening {
+                            min_val, max_val, success := parse_quantifier_numbers(parser);
+                            if !success {
+                                parser.pos = temp_parser_pos; // Revert on failure
+                                return final_exit_state_id;
+                            }
+                            if parser.pos >= parser.pattern.count || parser.pattern[parser.pos] != '}' {
+                                parser.pos = temp_parser_pos; // Revert on failure
+                                return final_exit_state_id;
+                            }
+                            parser.pos += 1; // Skip closing }
+
+                            // Check for laziness after the closing '}'
+                            quant_is_lazy := false;
+                            if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
+                                quant_is_lazy = true;
+                                regex.has_lazy_quantifiers = true;
+                                parser.pos += 1;
+                            }
+                            
+                            // Build numeric quantifier for non-capturing group
+                            return build_numeric_quantifier_nfa_for_group(regex, nc_group_entry_state_id, content_start_state_obj.id, content_end_state_id, min_val, max_val, parser, allocator, quant_is_lazy);
+                        }
+                    }
+                }
+                return final_exit_state_id;
+
+            } else {
+                // Capturing group (existing logic)
+                parser.pos += 1; // Skip (
+                
+                parser.group_counter += 1;
+                current_group_id := parser.group_counter;
+                
+                group_start_state := create_state(parser, allocator);
+                Array.push(&regex.states, group_start_state);
+                
+                group_start_transition := Transition.{
+                    condition = .{ group_start = current_group_id },
+                    target = group_start_state.id
+                };
+                Array.push(&regex.states[start_state].transitions, group_start_transition);
+                
+                group_content_end := parse_group_content(parser, regex, group_start_state.id, allocator);
+                if group_content_end == ~0 {
+                    return ~0;
+                }
+                
+                if parser.pos >= parser.pattern.count || parser.pattern[parser.pos] != ')' {
+                    return ~0; // Missing )
+                }
+                parser.pos += 1; // Skip )
+                
+                group_end_state := create_state(parser, allocator);
+                Array.push(&regex.states, group_end_state);
+                
+                group_end_transition := Transition.{
+                    condition = .{ group_end = current_group_id },
+                    target = group_end_state.id
+                };
+                Array.push(&regex.states[group_content_end].transitions, group_end_transition);
+                
+                return apply_group_quantifier(parser, regex, start_state, group_end_state.id, current_group_id, allocator);
+            }
+        }
+        
+        case '\\' {
+            parser.pos += 1;
+            if parser.pos >= parser.pattern.count {
+                return ~0;
+            }
+
+            escape_char := parser.pattern[parser.pos];
+            
+            element_condition: Match_Condition; // Declare here
+            switch escape_char {
+                case 'd' do element_condition = .{ char_class = .DIGIT };
+                case 'w' do element_condition = .{ char_class = .WORD };
+                case 's' do element_condition = .{ char_class = .SPACE };
+                case '(' do element_condition = .{ character = '(' };
+                case ')' do element_condition = .{ character = ')' };
+                case 'b' do element_condition = .{ word_boundary = .{} };
+                case _ do element_condition = .{ character = escape_char };
+            }
+            parser.pos += 1;
+
+            potential_next_state_obj := create_state(parser, allocator);
+            Array.push(&regex.states, potential_next_state_obj);
+            return apply_quantifier(parser, regex, start_state, potential_next_state_obj.id, &element_condition, allocator);
+        }
+        
+        case '.' {
+            element_condition := Match_Condition.{ char_class = .ANY };
+            parser.pos += 1;
+
+            potential_next_state_obj := create_state(parser, allocator);
+            Array.push(&regex.states, potential_next_state_obj);
+            return apply_quantifier(parser, regex, start_state, potential_next_state_obj.id, &element_condition, allocator);
+        }
+        
+        case '[' {
+            return parse_bracket_expression(parser, regex, start_state, allocator);
+        }
+        
+        case '^' {
+            next_state_obj := create_state(parser, allocator);
+            Array.push(&regex.states, next_state_obj);
+            transition := Transition.{ condition = .{ anchor = .START }, target = next_state_obj.id };
+            Array.push(&regex.states[start_state].transitions, transition);
+            parser.pos += 1;
+            return next_state_obj.id;
+        }
+        
+        case '$' {
+            next_state_obj := create_state(parser, allocator);
+            Array.push(&regex.states, next_state_obj);
+            transition := Transition.{ condition = .{ anchor = .END }, target = next_state_obj.id };
+            Array.push(&regex.states[start_state].transitions, transition);
+            parser.pos += 1;
+            return next_state_obj.id;
+        }
+        
+        case _ {
+            element_condition := Match_Condition.{ character = c };
+            parser.pos += 1;
+
+            potential_next_state_obj := create_state(parser, allocator);
+            Array.push(&regex.states, potential_next_state_obj);
+            return apply_quantifier(parser, regex, start_state, potential_next_state_obj.id, &element_condition, allocator);
+        }
+    }
+    return start_state;
+}
+
+/// Parse bracket expressions like [abc], [^abc], [a-z], etc.
+parse_bracket_expression :: (parser: &Parser, regex: &Regex, start_state: u32, allocator: Allocator) -> u32 {
+    parser.pos += 1; // Skip opening [
+    
+    if parser.pos >= parser.pattern.count {
+        return ~0; // Incomplete bracket expression
+    }
+    
+    negated := false;
+    if parser.pattern[parser.pos] == '^' {
+        negated = true;
+        parser.pos += 1;
+    }
+    
+    chars_temp := Array.make(u8, allocator = context.temp_allocator);
+    ranges_temp := Array.make(Range, allocator = context.temp_allocator);
+    has_predefined: [4] bool = .{ false, false, false, false };
+    
+    defer Array.free(&chars_temp);
+    defer Array.free(&ranges_temp);
+    
+    while parser.pos < parser.pattern.count && parser.pattern[parser.pos] != ']' {
+        c := parser.pattern[parser.pos];
+        if c == '\\' {
+            parser.pos += 1;
+            if parser.pos >= parser.pattern.count { return ~0; }
+            escape_char := parser.pattern[parser.pos];
+            switch escape_char {
+                case 'd' { has_predefined[0] = true; }
+                case 'w' { has_predefined[1] = true; }
+                case 's' { has_predefined[2] = true; }
+                case _ { Array.push(&chars_temp, escape_char); }
+            }
+            parser.pos += 1;
+        } elseif parser.pos + 2 < parser.pattern.count && parser.pattern[parser.pos + 1] == '-' && parser.pattern[parser.pos + 2] != ']' {
+            start_char := c;
+            parser.pos += 2; 
+            end_char := parser.pattern[parser.pos];
+            Array.push(&ranges_temp, Range.{ start = start_char, end = end_char });
+            parser.pos += 1;
+        } else {
+            Array.push(&chars_temp, c);
+            parser.pos += 1;
+        }
+    }
+    
+    if parser.pos >= parser.pattern.count || parser.pattern[parser.pos] != ']' {
+        return ~0; // Missing closing ]
+    }
+    parser.pos += 1; // Skip closing ]
+    
+    final_chars_array := Array.make(u8, capacity = chars_temp.count, allocator = allocator);
+    for ch in chars_temp {
+        Array.push(&final_chars_array, ch);
+    }
+    
+    final_ranges_array := Array.make(Range, capacity = ranges_temp.count, allocator = allocator);
+    for r_item in ranges_temp {
+        Array.push(&final_ranges_array, r_item);
+    }
+    
+    element_condition := Match_Condition.{ 
+        char_set = Char_Set.{
+            chars = final_chars_array,
+            ranges = final_ranges_array,
+            negated = negated,
+            has_predefined = has_predefined
+        }
+    };
+    
+    potential_next_state_obj := create_state(parser, allocator);
+    Array.push(&regex.states, potential_next_state_obj);
+    return apply_quantifier(parser, regex, start_state, potential_next_state_obj.id, &element_condition, allocator);
+}
+
+/// Apply quantifier to the element.
+/// entry_point_state: The state before the element being quantified.
+/// potential_exit_state_for_one_item_id: The ID of a pre-created state that one instance of the element would transition to.
+/// item_condition: The condition for a single instance of the element.
+/// Returns the ID of the final state after the quantified structure.
+apply_quantifier :: (parser: &Parser, regex: &Regex, entry_point_state: u32, potential_exit_state_for_one_item_id: u32, item_condition: &Match_Condition, allocator: Allocator) -> u32 {
+    if parser.pos >= parser.pattern.count {
+        trans := Transition.{ condition = *item_condition, target = potential_exit_state_for_one_item_id };
+        Array.push(&regex.states[entry_point_state].transitions, trans);
+        return potential_exit_state_for_one_item_id;
+    }
+    
+    c := parser.pattern[parser.pos];
+    is_lazy := false; // Will be set by specific quantifiers if followed by '?'
+
+    switch c {
+        case '*' {
+            parser.pos += 1; // Consume '*'
+            if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
+                is_lazy = true;
+                regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
+                parser.pos += 1; // Consume '?' for laziness
+            }
+
+            choice_state_obj := create_state(parser, allocator); Array.push(&regex.states, choice_state_obj);
+            item_end_state_obj := create_state(parser, allocator); Array.push(&regex.states, item_end_state_obj);
+            
+            Array.push(&regex.states[entry_point_state].transitions, Transition.{condition = .{epsilon = .{}}, target = choice_state_obj.id});
+
+            trans_match_item := Transition.{condition = *item_condition, target = item_end_state_obj.id};
+            trans_exit_quant   := Transition.{condition = .{epsilon = .{}}, target = potential_exit_state_for_one_item_id};
+
+            if is_lazy {
+                // For lazy quantifiers: try to exit first (minimal matching)
+                Array.push(&regex.states[choice_state_obj.id].transitions, trans_exit_quant);
+                Array.push(&regex.states[choice_state_obj.id].transitions, trans_match_item);
+            } else {
+                // For greedy quantifiers: try to match more first (maximal matching)
+                Array.push(&regex.states[choice_state_obj.id].transitions, trans_match_item);
+                Array.push(&regex.states[choice_state_obj.id].transitions, trans_exit_quant);
+            }
+            
+            Array.push(&regex.states[item_end_state_obj.id].transitions, Transition.{condition = .{epsilon = .{}}, target = choice_state_obj.id});
+            
+            return potential_exit_state_for_one_item_id;
+        }
+        case '+' {
+            parser.pos += 1; // Consume '+'
+            if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
+                is_lazy = true;
+                regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
+                parser.pos += 1; // Consume '?' for laziness
+            }
+
+            after_first_item_state_obj := create_state(parser, allocator); Array.push(&regex.states, after_first_item_state_obj);
+            choice_state_obj := create_state(parser, allocator); Array.push(&regex.states, choice_state_obj);
+            item_end_state_obj := create_state(parser, allocator); Array.push(&regex.states, item_end_state_obj);
+
+            Array.push(&regex.states[entry_point_state].transitions, Transition.{condition = *item_condition, target = after_first_item_state_obj.id});
+            
+            Array.push(&regex.states[after_first_item_state_obj.id].transitions, Transition.{condition = .{epsilon = .{}}, target = choice_state_obj.id});
+
+            trans_match_item := Transition.{condition = *item_condition, target = item_end_state_obj.id};
+            trans_exit_quant   := Transition.{condition = .{epsilon = .{}}, target = potential_exit_state_for_one_item_id};
+
+            if is_lazy {
+                // For lazy quantifiers: try to exit first (minimal matching)
+                Array.push(&regex.states[choice_state_obj.id].transitions, trans_exit_quant);
+                Array.push(&regex.states[choice_state_obj.id].transitions, trans_match_item);
+            } else {
+                // For greedy quantifiers: try to match more first (maximal matching)
+                Array.push(&regex.states[choice_state_obj.id].transitions, trans_match_item);
+                Array.push(&regex.states[choice_state_obj.id].transitions, trans_exit_quant);
+            }
+            
+            Array.push(&regex.states[item_end_state_obj.id].transitions, Transition.{condition = .{epsilon = .{}}, target = choice_state_obj.id});
+
+            return potential_exit_state_for_one_item_id;
+        }
+        case '?' {
+            parser.pos += 1; // Consume '?'
+            if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
+                is_lazy = true;
+                regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
+                parser.pos += 1; // Consume '?' for laziness
+            }
+
+            trans_match_item := Transition.{condition = *item_condition, target = potential_exit_state_for_one_item_id};
+            trans_skip_item  := Transition.{condition = .{epsilon = .{}}, target = potential_exit_state_for_one_item_id};
+
+            if is_lazy {
+                // For lazy quantifiers: try to skip first (minimal matching)
+                Array.push(&regex.states[entry_point_state].transitions, trans_skip_item);
+                Array.push(&regex.states[entry_point_state].transitions, trans_match_item);
+            } else {
+                // For greedy quantifiers: try to match first (maximal matching)
+                Array.push(&regex.states[entry_point_state].transitions, trans_match_item);
+                Array.push(&regex.states[entry_point_state].transitions, trans_skip_item);
+            }
+            return potential_exit_state_for_one_item_id;
+        }
+        case '{' {
+            // Parse min_count and max_count first
+            temp_parser_pos_before_numbers := parser.pos;
+            parser.pos += 1; // Skip opening {
+            min_val, max_val, success_parsing_numbers := parse_quantifier_numbers(parser);
+            if !success_parsing_numbers {
+                // Failed to parse numbers, treat '{' as a literal character or error out
+                parser.pos = temp_parser_pos_before_numbers; // Revert pos
+                trans := Transition.{ condition = *item_condition, target = potential_exit_state_for_one_item_id };
+                Array.push(&regex.states[entry_point_state].transitions, trans);
+                return potential_exit_state_for_one_item_id;
+            }
+            if parser.pos >= parser.pattern.count || parser.pattern[parser.pos] != '}' {
+                parser.pos = temp_parser_pos_before_numbers; // Revert pos
+                trans := Transition.{ condition = *item_condition, target = potential_exit_state_for_one_item_id };
+                Array.push(&regex.states[entry_point_state].transitions, trans);
+                return potential_exit_state_for_one_item_id;
+            }
+            parser.pos += 1; // Skip closing }
+
+            // Check for laziness *after* the closing '}'
+            quant_is_lazy := false;
+            if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
+                quant_is_lazy = true;
+                regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
+                parser.pos += 1; // Consume '?' for laziness
+            }
+            return build_numeric_quantifier_nfa(regex, entry_point_state, potential_exit_state_for_one_item_id, item_condition, min_val, max_val, parser, allocator, quant_is_lazy);
+        }
+        case _ {
+            trans := Transition.{ condition = *item_condition, target = potential_exit_state_for_one_item_id };
+            Array.push(&regex.states[entry_point_state].transitions, trans);
+            return potential_exit_state_for_one_item_id;
+        }
+    }
+}
+
+/// Apply quantifier specifically to capture groups
+apply_group_quantifier :: (parser: &Parser, regex: &Regex, start_state: u32, end_state: u32, group_id: u32, allocator: Allocator) -> u32 {
+    if parser.pos >= parser.pattern.count {
+        return end_state;
+    }
+    
+    c := parser.pattern[parser.pos];
+    
+    switch c {
+        case '*' {
+            parser.pos += 1;
+            is_lazy := false;
+            if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
+                is_lazy = true;
+                regex.has_lazy_quantifiers = true;
+                parser.pos += 1;
+            }
+            
+            if is_lazy {
+                // For lazy *: try to skip first, then repeat
+                epsilon_skip := Transition.{
+                    condition = .{ epsilon = .{} },
+                    target = end_state
+                };
+                Array.push(&regex.states[start_state].transitions, epsilon_skip);
+                
+                epsilon_repeat := Transition.{
+                    condition = .{ epsilon = .{} },
+                    target = start_state
+                };
+                Array.push(&regex.states[end_state].transitions, epsilon_repeat);
+            } else {
+                // For greedy *: try to repeat first, then skip
+                epsilon_repeat := Transition.{
+                    condition = .{ epsilon = .{} },
+                    target = start_state
+                };
+                Array.push(&regex.states[end_state].transitions, epsilon_repeat);
+                
+                epsilon_skip := Transition.{
+                    condition = .{ epsilon = .{} },
+                    target = end_state
+                };
+                Array.push(&regex.states[start_state].transitions, epsilon_skip);
+            }
+            
+            return end_state;
+        }
+        
+        case '+' {
+            parser.pos += 1;
+            is_lazy := false;
+            if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
+                is_lazy = true;
+                regex.has_lazy_quantifiers = true;
+                parser.pos += 1;
+            }
+            
+            if is_lazy {
+                // For lazy +: after first match, try to exit first, then repeat
+                epsilon_repeat := Transition.{
+                    condition = .{ epsilon = .{} },
+                    target = start_state
+                };
+                Array.push(&regex.states[end_state].transitions, epsilon_repeat);
+            } else {
+                // For greedy +: after first match, try to repeat first, then exit
+                epsilon_repeat := Transition.{
+                    condition = .{ epsilon = .{} },
+                    target = start_state
+                };
+                Array.push(&regex.states[end_state].transitions, epsilon_repeat);
+            }
+            
+            return end_state;
+        }
+        
+        case '?' {
+            parser.pos += 1;
+            is_lazy := false;
+            if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
+                is_lazy = true;
+                regex.has_lazy_quantifiers = true;
+                parser.pos += 1;
+            }
+            
+            if is_lazy {
+                // For lazy ?: try to skip first, then match
+                epsilon_skip := Transition.{
+                    condition = .{ epsilon = .{} },
+                    target = end_state
+                };
+                Array.push(&regex.states[start_state].transitions, epsilon_skip);
+            } else {
+                // For greedy ?: try to match first, then skip
+                epsilon_skip := Transition.{
+                    condition = .{ epsilon = .{} },
+                    target = end_state
+                };
+                Array.push(&regex.states[start_state].transitions, epsilon_skip);
+            }
+            
+            return end_state;
+        }
+        
+        case _ {
+            return end_state;
+        }
+    }
+    
+    return end_state;
+}
+
+/// Parse and apply numeric quantifiers like {n}, {n,m}, {n,}
+apply_numeric_quantifier :: (parser: &Parser, regex: &Regex, entry_point_state: u32, potential_exit_state_for_one_item_id: u32, item_condition: &Match_Condition, allocator: Allocator) -> u32 {
+    if parser.pos >= parser.pattern.count || parser.pattern[parser.pos] != '{' {
+        trans := Transition.{ condition = *item_condition, target = potential_exit_state_for_one_item_id };
+        Array.push(&regex.states[entry_point_state].transitions, trans);
+        return potential_exit_state_for_one_item_id; 
+    }
+    
+    parser.pos += 1; // Skip opening {
+    
+    min_count, max_count, success := parse_quantifier_numbers(parser);
+    if !success {
+        trans := Transition.{ condition = *item_condition, target = potential_exit_state_for_one_item_id };
+        Array.push(&regex.states[entry_point_state].transitions, trans);
+        return potential_exit_state_for_one_item_id; 
+    }
+    
+    if parser.pos >= parser.pattern.count || parser.pattern[parser.pos] != '}' {
+        trans := Transition.{ condition = *item_condition, target = potential_exit_state_for_one_item_id };
+        Array.push(&regex.states[entry_point_state].transitions, trans);
+        return potential_exit_state_for_one_item_id;
+    }
+    parser.pos += 1; // Skip closing }
+
+    is_lazy := false;
+    if parser.pos < parser.pattern.count && parser.pattern[parser.pos] == '?' {
+        is_lazy = true;
+        regex.has_lazy_quantifiers = true; // Set flag when we find a lazy quantifier
+        parser.pos += 1; // Consume '?' for laziness
+    }
+    
+    return build_numeric_quantifier_nfa(regex, entry_point_state, potential_exit_state_for_one_item_id, item_condition, min_count, max_count, parser, allocator, is_lazy);
+}
+
+/// Parse numbers inside quantifier braces, returns (min, max, success)
+/// Handles: {n} -> (n, n), {n,} -> (n, ~0), {n,m} -> (n, m)
+parse_quantifier_numbers :: (parser: &Parser) -> (u32, u32, bool) {
+    start_pos := parser.pos;
+    min_count: u32 = 0;
+    max_count: u32 = 0;
+    
+    if !parse_number(parser, &min_count) {
+        return 0, 0, false;
+    }
+    
+    if parser.pos >= parser.pattern.count {
+        return 0, 0, false;
+    }
+    
+    if parser.pattern[parser.pos] == ',' {
+        parser.pos += 1; // Skip comma
+        
+        if parser.pos >= parser.pattern.count {
+            return 0, 0, false;
+        }
+        
+        if parser.pattern[parser.pos] == '}' {
+            return min_count, ~0, true;
+        } else {
+            if !parse_number(parser, &max_count) {
+                return 0, 0, false;
+            }
+            
+            if max_count < min_count {
+                return 0, 0, false;
+            }
+            
+            return min_count, max_count, true;
+        }
+    } else {
+        return min_count, min_count, true;
+    }
+}
+
+/// Parse a decimal number from current parser position
+parse_number :: (parser: &Parser, result: &u32) -> bool {
+    if parser.pos >= parser.pattern.count {
+        return false;
+    }
+    
+    start_pos := parser.pos;
+    value: u32 = 0;
+    
+    while parser.pos < parser.pattern.count {
+        c := parser.pattern[parser.pos];
+        if c >= '0' && c <= '9' {
+            digit := cast(u32)(c - '0');
+            if value > (0xFFFFFFFF - digit) / 10 {
+                return false;
+            }
+            value = value * 10 + digit;
+            parser.pos += 1;
+        } else {
+            break;
+        }
+    }
+    
+    if parser.pos == start_pos {
+        return false;
+    }
+    
+    *result = value;
+    return true;
+}
+
+/// Build NFA for numeric quantifier
+build_numeric_quantifier_nfa :: (regex: &Regex, entry_point_s: u32, potential_exit_s_for_first_item_id: u32, item_condition: &Match_Condition, min_count: u32, max_count: u32, parser: &Parser, allocator: Allocator, is_lazy: bool) -> u32 {
+    if min_count == 0 && max_count == 0 {
+        epsilon_trans := Transition.{ condition = .{epsilon = .{}}, target = potential_exit_s_for_first_item_id };
+        Array.push(&regex.states[entry_point_s].transitions, epsilon_trans);
+        return potential_exit_s_for_first_item_id;
+    }
+
+    last_mandatory_exit_s_id := entry_point_s;
+
+    if min_count > 0 {
+        current_item_target_s_id := potential_exit_s_for_first_item_id;
+        trans := Transition.{ condition = *item_condition, target = current_item_target_s_id };
+        Array.push(&regex.states[last_mandatory_exit_s_id].transitions, trans);
+        last_mandatory_exit_s_id = current_item_target_s_id;
+
+        for i in 1 .. min_count {
+            new_item_exit_obj := create_state(parser, allocator);
+            Array.push(&regex.states, new_item_exit_obj);
+            
+            trans = Transition.{ condition = *item_condition, target = new_item_exit_obj.id };
+            Array.push(&regex.states[last_mandatory_exit_s_id].transitions, trans);
+            last_mandatory_exit_s_id = new_item_exit_obj.id;
+        }
+    }
+
+    current_chain_s_id := last_mandatory_exit_s_id;
+
+    if max_count == ~0 {
+        final_exit_s_obj := create_state(parser, allocator);
+        Array.push(&regex.states, final_exit_s_obj);
+
+        item_match_state_in_loop_obj := create_state(parser, allocator);
+        Array.push(&regex.states, item_match_state_in_loop_obj);
+
+        trans_match_more := Transition.{condition = *item_condition, target = item_match_state_in_loop_obj.id};
+        trans_exit_loop  := Transition.{condition = .{epsilon = .{}}, target = final_exit_s_obj.id};
+
+        if is_lazy {
+            Array.push(&regex.states[current_chain_s_id].transitions, trans_exit_loop);
+            Array.push(&regex.states[current_chain_s_id].transitions, trans_match_more);
+        } else {
+            Array.push(&regex.states[current_chain_s_id].transitions, trans_match_more);
+            Array.push(&regex.states[current_chain_s_id].transitions, trans_exit_loop);
+        }
+        
+        Array.push(&regex.states[item_match_state_in_loop_obj.id].transitions, Transition.{condition = .{epsilon = .{}}, target = current_chain_s_id});
+        
+        return final_exit_s_obj.id;
+
+    } else {
+        num_optional_items := max_count - min_count;
+        
+        s_start_of_optional_chain_id := current_chain_s_id;
+        
+        for i in 0 .. num_optional_items {
+            s_next_choice_point_obj := create_state(parser, allocator);
+            Array.push(&regex.states, s_next_choice_point_obj);
+
+            s_after_this_optional_item_obj := create_state(parser, allocator);
+            Array.push(&regex.states, s_after_this_optional_item_obj);
+
+            trans_take_optional_item := Transition.{condition = *item_condition, target = s_after_this_optional_item_obj.id};
+            trans_skip_optional_item := Transition.{condition = .{epsilon = .{}}, target = s_next_choice_point_obj.id};
+
+            if is_lazy {
+                Array.push(&regex.states[s_start_of_optional_chain_id].transitions, trans_skip_optional_item);
+                Array.push(&regex.states[s_start_of_optional_chain_id].transitions, trans_take_optional_item);
+            } else {
+                Array.push(&regex.states[s_start_of_optional_chain_id].transitions, trans_take_optional_item);
+                Array.push(&regex.states[s_start_of_optional_chain_id].transitions, trans_skip_optional_item);
+            }
+            
+            Array.push(&regex.states[s_after_this_optional_item_obj.id].transitions, Transition.{condition = .{epsilon = .{}}, target = s_next_choice_point_obj.id});
+            
+            s_start_of_optional_chain_id = s_next_choice_point_obj.id;
+        }
+        return s_start_of_optional_chain_id;
+    }
+}
+
+/// Build NFA for numeric quantifier specifically for groups (capturing or non-capturing)
+build_numeric_quantifier_nfa_for_group :: (regex: &Regex, entry_state: u32, group_start: u32, group_end: u32, min_count: u32, max_count: u32, parser: &Parser, allocator: Allocator, is_lazy: bool) -> u32 {
+    if min_count == 0 && max_count == 0 {
+        // {0} - never match, just skip to exit
+        final_exit := create_state(parser, allocator);
+        Array.push(&regex.states, final_exit);
+        epsilon_trans := Transition.{ condition = .{epsilon = .{}}, target = final_exit.id };
+        Array.push(&regex.states[entry_state].transitions, epsilon_trans);
+        return final_exit.id;
+    }
+
+    current_chain_state := entry_state;
+
+    // Build mandatory repetitions (min_count)
+    if min_count > 0 {
+        // First mandatory match
+        Array.push(&regex.states[current_chain_state].transitions, Transition.{condition = .{epsilon = .{}}, target = group_start});
+        current_chain_state = group_end;
+
+        // Additional mandatory matches
+        for i in 1 .. min_count {
+            next_group_start := create_state(parser, allocator);
+            Array.push(&regex.states, next_group_start);
+            next_group_end := create_state(parser, allocator);  
+            Array.push(&regex.states, next_group_end);
+            
+            // Connect previous end to next start
+            Array.push(&regex.states[current_chain_state].transitions, Transition.{condition = .{epsilon = .{}}, target = next_group_start.id});
+            
+            // Copy the group structure (simplified - direct connection for non-capturing groups)
+            Array.push(&regex.states[next_group_start.id].transitions, Transition.{condition = .{epsilon = .{}}, target = group_start});
+            Array.push(&regex.states[group_end].transitions, Transition.{condition = .{epsilon = .{}}, target = next_group_end.id});
+            
+            current_chain_state = next_group_end.id;
+        }
+    }
+
+    // Handle optional repetitions (max_count - min_count)
+    if max_count == ~0 {
+        // Unlimited repetitions: add loop back and exit option
+        final_exit := create_state(parser, allocator);
+        Array.push(&regex.states, final_exit);
+
+        if is_lazy {
+            // Lazy: try to exit first, then repeat
+            Array.push(&regex.states[current_chain_state].transitions, Transition.{condition = .{epsilon = .{}}, target = final_exit.id});
+            Array.push(&regex.states[current_chain_state].transitions, Transition.{condition = .{epsilon = .{}}, target = group_start});
+        } else {
+            // Greedy: try to repeat first, then exit
+            Array.push(&regex.states[current_chain_state].transitions, Transition.{condition = .{epsilon = .{}}, target = group_start});
+            Array.push(&regex.states[current_chain_state].transitions, Transition.{condition = .{epsilon = .{}}, target = final_exit.id});
+        }
+        
+        // Loop back from group end to choice point
+        Array.push(&regex.states[group_end].transitions, Transition.{condition = .{epsilon = .{}}, target = current_chain_state});
+        
+        return final_exit.id;
+    } else {
+        // Fixed number of optional repetitions
+        num_optional := max_count - min_count;
+        
+        for i in 0 .. num_optional {
+            optional_group_start := create_state(parser, allocator);
+            Array.push(&regex.states, optional_group_start);
+            optional_group_end := create_state(parser, allocator);
+            Array.push(&regex.states, optional_group_end);
+            
+            if is_lazy {
+                // Lazy: try to skip first, then match
+                Array.push(&regex.states[current_chain_state].transitions, Transition.{condition = .{epsilon = .{}}, target = optional_group_end.id});
+                Array.push(&regex.states[current_chain_state].transitions, Transition.{condition = .{epsilon = .{}}, target = optional_group_start.id});
+            } else {
+                // Greedy: try to match first, then skip
+                Array.push(&regex.states[current_chain_state].transitions, Transition.{condition = .{epsilon = .{}}, target = optional_group_start.id});
+                Array.push(&regex.states[current_chain_state].transitions, Transition.{condition = .{epsilon = .{}}, target = optional_group_end.id});
+            }
+            
+            // Connect to group structure
+            Array.push(&regex.states[optional_group_start.id].transitions, Transition.{condition = .{epsilon = .{}}, target = group_start});
+            Array.push(&regex.states[group_end].transitions, Transition.{condition = .{epsilon = .{}}, target = optional_group_end.id});
+            
+            current_chain_state = optional_group_end.id;
+        }
+        
+        return current_chain_state;
+    }
+}
+
+/// Structure to track capture group states during NFA simulation
+Group_State :: struct {
+    group_id: u32;
+    start_pos: u32;
+    end_pos: u32;
+    active: bool;
+}
+
+/// State tracking for NFA simulation with capture groups
+NFA_Sim_State :: struct {
+    state_id: u32;
+    groups: [..] Group_State;
+}
+
+/// Simulate NFA execution with capture group support
+simulate_nfa :: (regex: &Regex, text: str, start_pos: u32) -> Match {
+    if start_pos >= text.count || regex.states.count == 0 {
+        return Match.{ found = false };
+    }
+
+    return simulate_nfa_with_groups(regex, text, start_pos, context.temp_allocator);
+}
+
+/// Enhanced NFA simulation with capture group tracking
+simulate_nfa_with_groups :: (regex: &Regex, text: str, start_pos: u32, allocator := context.allocator) -> Match {
+    if start_pos > text.count || regex.states.count == 0 {
+        return Match.{ found = false };
+    }
+
+    // Use appropriate strategy based on lazy quantifiers
+    if regex.has_lazy_quantifiers {
+        return simulate_with_lazy_semantics(regex, text, start_pos, allocator);
+    }
+
+    return simulate_with_greedy_strategy(regex, text, start_pos, allocator);
+}
+
+/// Hybrid lazy behavior to match inconsistent test expectations
+/// Standard leftmost matching with greedy quantifiers
+simulate_with_greedy_strategy :: (regex: &Regex, text: str, start_pos: u32, allocator: Allocator) -> Match {
+    active_states := Array.make(NFA_Sim_State, allocator = context.temp_allocator);
+    pending_states := Array.make(NFA_Sim_State, allocator = context.temp_allocator);
+
+    defer {
+        for &state in active_states { Array.free(&state.groups); }
+        Array.free(&active_states);
+        for &state in pending_states { Array.free(&state.groups); }
+        Array.free(&pending_states);
+    }
+
+    // Initialize with start state
+    initial_groups := Array.make(Group_State, allocator = context.temp_allocator);
+    Array.push(&active_states, NFA_Sim_State.{
+        state_id = regex.start_state,
+        groups = initial_groups
+    });
+
+    add_epsilon_closure_with_groups(&active_states, regex, text, start_pos);
+
+    // Track the longest match found so far
+    best_match := Match.{ found = false };
+
+    // Check for zero-length match
+    for &state in active_states {
+        if state.state_id < regex.states.count && regex.states[state.state_id].is_final {
+            best_match = Match.{
+                found = true,
+                start = start_pos,
+                end = start_pos,
+                text = text[start_pos .. start_pos],
+                groups = construct_groups_from_state(&state.groups, text, allocator)
+            };
+            break;
+        }
+    }
+
+    // Process each character
+    pos := start_pos;
+    while pos < text.count && active_states.count > 0 {
+        c := text[pos];
+
+        // Clear pending states
+        for &state in pending_states { Array.free(&state.groups); }
+        Array.clear(&pending_states);
+
+        // Process character transitions
+        for &current_state in active_states {
+            if current_state.state_id >= regex.states.count do continue;
+            
+            nfa_state := &regex.states[current_state.state_id];
+            for transition in nfa_state.transitions {
+                switch transition.condition {
+                    case .character, .char_class, .range, .char_set, .negated {
+                        if matches_condition(&transition.condition, c) {
+                            new_groups := Array.make(Group_State, allocator = context.temp_allocator);
+                            for g in current_state.groups {
+                                Array.push(&new_groups, g);
+                            }
+                            
+                            Array.push(&pending_states, NFA_Sim_State.{
+                                state_id = transition.target,
+                                groups = new_groups
+                            });
+                        }
+                    }
+                    case _ do continue;
+                }
+            }
+        }
+        
+        pos += 1;
+        
+        // Swap states
+        temp := active_states;
+        active_states = pending_states;
+        pending_states = temp;
+
+        add_epsilon_closure_with_groups(&active_states, regex, text, pos);
+        
+        // Check for acceptance - update best match if we find a longer one
+        for &state in active_states {
+            if state.state_id < regex.states.count && regex.states[state.state_id].is_final {
+                // Free previous groups if we're replacing the match
+                if best_match.found {
+                    Array.free(&best_match.groups);
+                }
+                
+                best_match = Match.{
+                    found = true,
+                    start = start_pos,
+                    end = pos,
+                    text = text[start_pos .. pos],
+                    groups = construct_groups_from_state(&state.groups, text, allocator)
+                };
+                break; // Take first accepting state at this position
+            }
+        }
+    }
+    
+    return best_match;
+}
+
+/// Lazy simulation: implements leftmost-minimal matching (standard lazy quantifier behavior)
+simulate_with_lazy_semantics :: (regex: &Regex, text: str, start_pos: u32, allocator: Allocator) -> Match {
+    active_states := Array.make(NFA_Sim_State, allocator = context.temp_allocator);
+    pending_states := Array.make(NFA_Sim_State, allocator = context.temp_allocator);
+
+    defer {
+        for &state in active_states { Array.free(&state.groups); }
+        Array.free(&active_states);
+        for &state in pending_states { Array.free(&state.groups); }
+        Array.free(&pending_states);
+    }
+
+    // Initialize with start state
+    initial_groups := Array.make(Group_State, allocator = context.temp_allocator);
+    Array.push(&active_states, NFA_Sim_State.{
+        state_id = regex.start_state,
+        groups = initial_groups
+    });
+
+    add_epsilon_closure_with_groups(&active_states, regex, text, start_pos);
+
+    // Check for zero-length match at the start position
+    for &state in active_states {
+        if state.state_id < regex.states.count && regex.states[state.state_id].is_final {
+            return Match.{
+                found = true,
+                start = start_pos,
+                end = start_pos,
+                text = text[start_pos .. start_pos],
+                groups = construct_groups_from_state(&state.groups, text, allocator)
+            };
+        }
+    }
+
+    // Process each character at the current starting position
+    pos := start_pos;
+    while pos < text.count && active_states.count > 0 {
+        c := text[pos];
+
+        // Clear pending states
+        for &state in pending_states { Array.free(&state.groups); }
+        Array.clear(&pending_states);
+
+        // Process character transitions
+        for &current_state in active_states {
+            if current_state.state_id >= regex.states.count do continue;
+            
+            nfa_state := &regex.states[current_state.state_id];
+            for transition in nfa_state.transitions {
+                switch transition.condition {
+                    case .character, .char_class, .range, .char_set, .negated {
+                        if matches_condition(&transition.condition, c) {
+                            new_groups := Array.make(Group_State, allocator = context.temp_allocator);
+                            for g in current_state.groups {
+                                Array.push(&new_groups, g);
+                            }
+                            
+                            Array.push(&pending_states, NFA_Sim_State.{
+                                state_id = transition.target,
+                                groups = new_groups
+                            });
+                        }
+                    }
+                    case _ do continue;
+                }
+            }
+        }
+        
+        pos += 1;
+        
+        // Swap states
+        temp := active_states;
+        active_states = pending_states;
+        pending_states = temp;
+
+        add_epsilon_closure_with_groups(&active_states, regex, text, pos);
+
+        // Check for accepting state - for lazy quantifiers, take the first match found
+        // This implements the minimal matching behavior because epsilon closures 
+        // process lazy transitions (exit before repeat) first
+        for &state in active_states {
+            if state.state_id < regex.states.count && regex.states[state.state_id].is_final {
+                return Match.{
+                    found = true,
+                    start = start_pos,
+                    end = pos,
+                    text = text[start_pos .. pos],
+                    groups = construct_groups_from_state(&state.groups, text, allocator)
+                };
+            }
+        }
+    }
+    
+        
+    return Match.{ found = false };
+}
+
+/// Add epsilon closure with lazy-ordered processing (respects transition order for lazy behavior)
+add_epsilon_closure_lazy_ordered :: (sim_states: &[..] NFA_Sim_State, regex: &Regex, text: str, current_pos: u32) {
+    i := 0;
+    while i < sim_states.count {
+        state_id := (*sim_states)[i].state_id;
+        if state_id >= regex.states.count {
+            i += 1;
+            continue;
+        }
+
+        state := &regex.states[state_id];
+        
+        // For lazy quantifiers, process transitions in the order they were added
+        // This is critical because lazy quantifiers have exit transitions first
+        for transition in state.transitions {
+            switch transition.condition {
+                case .epsilon, .group_start, .group_end, .non_capture_group_start, .non_capture_group_end, .word_boundary {
+                    // Check if this target state is already in the simulation states
+                    found := false;
+                    for existing_state in sim_states {
+                        if existing_state.state_id == transition.target {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if !found {
+                        // Copy the groups from the current state
+                        new_groups := Array.make(Group_State, allocator = context.temp_allocator);
+                        for g in (*sim_states)[i].groups {
+                            Array.push(&new_groups, g);
+                        }
+                        
+                        // Handle group transitions
+                        switch transition.condition {
+                            case .group_start {
+                                group_id := transition.condition.group_start->unwrap();
+                                Array.push(&new_groups, Group_State.{
+                                    group_id = group_id,
+                                    start_pos = current_pos,
+                                    end_pos = current_pos,
+                                    active = true
+                                });
+                            }
+                            case .group_end {
+                                group_id := transition.condition.group_end->unwrap();
+                                // Find and close the group
+                                for &g in new_groups {
+                                    if g.group_id == group_id && g.active {
+                                        g.end_pos = current_pos;
+                                        g.active = false;
+                                        break;
+                                    }
+                                }
+                            }
+                            case .word_boundary {
+                                if !is_match_at_word_boundary(text, current_pos) {
+                                    // Free the groups and don't add this state
+                                    Array.free(&new_groups);
+                                    continue;
+                                }
+                            }
+                            case _ do {}
+                        }
+                        
+                        new_state := NFA_Sim_State.{
+                            state_id = transition.target,
+                            groups = new_groups
+                        };
+                        Array.push(sim_states, new_state);
+                    }
+                }
+                case .anchor {
+                    if matches_anchor(transition.condition.anchor->unwrap(), text, current_pos) {
+                        // Check if this target state is already in the simulation states
+                        found := false;
+                        for existing_state in sim_states {
+                            if existing_state.state_id == transition.target {
+                                found = true;
+                                break;
+                            }
+                        }
+
+                        if !found {
+                            // Copy the groups from the current state
+                            new_groups := Array.make(Group_State, allocator = context.temp_allocator);
+                            for g in (*sim_states)[i].groups {
+                                Array.push(&new_groups, g);
+                            }
+                            
+                            new_state := NFA_Sim_State.{
+                                state_id = transition.target,
+                                groups = new_groups
+                            };
+                            Array.push(sim_states, new_state);
+                        }
+                    }
+                }
+                case _ do continue;
+            }
+        }
+        i += 1;
+    }
+}
+
+/// Helper function to construct groups from simulation state
+construct_groups_from_state :: (groups: &[..] Group_State, text: str, allocator: Allocator) -> [..] str {
+    result := Array.make(str, allocator = allocator);
+    
+    // Find the highest group ID to determine how many groups we need
+    max_group_id: u32 = 0;
+    for &group in groups {
+        if group.group_id > max_group_id {
+            max_group_id = group.group_id;
+        }
+    }
+    
+    // Add empty strings for each group ID
+    for i in 0 .. max_group_id {
+        Array.push(&result, "");
+    }
+    
+    // Fill in the groups that have values
+    for &group in groups {
+        if group.group_id > 0 && group.group_id <= max_group_id {
+            group_text := text[group.start_pos .. group.end_pos];
+            result[group.group_id - 1] = string.alloc_copy(group_text, allocator);
+        }
+    }
+    
+    return result;
+}
+
+
+
+/// Add epsilon closure to simulation state set with group tracking
+add_epsilon_closure_with_groups :: (sim_states: &[..] NFA_Sim_State, regex: &Regex, text: str, current_pos: u32) {
+    i := 0;
+    while i < sim_states.count {
+        // current_sim_node_idx is used to safely access sim_states as it grows.
+        current_sim_node_idx := i; 
+        
+        // Ensure the state_id is valid before accessing regex.states.
+        if (*sim_states)[current_sim_node_idx].state_id >= regex.states.count {
+            i += 1;
+            continue;
+        }
+        
+        // Get a reference to the current NFA_Sim_State's groups to avoid repeated dereferencing.
+        // This is a reference to the groups array within the sim_states[current_sim_node_idx].
+        current_sim_node_original_groups := &(*sim_states)[current_sim_node_idx].groups;
+        nfa_state_details := &regex.states[(*sim_states)[current_sim_node_idx].state_id];
+
+        for transition_idx in 0 .. nfa_state_details.transitions.count {
+            transition := &nfa_state_details.transitions[transition_idx];
+            target_nfa_state_id := transition.target;
+
+            is_transition_active := false;
+            is_group_mod_trans := false;
+            group_id_val_for_mod: u32 = 0;
+            is_start_mod := false; // True if group_start, false if group_end
+
+            switch transition.condition {
+                case .epsilon       do is_transition_active = true;
+                case .anchor        do is_transition_active = matches_anchor(transition.condition.anchor->unwrap(), text, current_pos);
+                case .word_boundary do is_transition_active = is_match_at_word_boundary(text, current_pos);
+                case .group_start   {
+                    is_transition_active = true;
+                    is_group_mod_trans = true;
+                    is_start_mod = true;
+                    group_id_val_for_mod = transition.condition.group_start->unwrap();
+                }
+                case .group_end     {
+                    is_transition_active = true;
+                    is_group_mod_trans = true;
+                    is_start_mod = false;
+                    group_id_val_for_mod = transition.condition.group_end->unwrap();
+                }
+                case .non_capture_group_start {
+                    is_transition_active = true;
+                }
+                case .non_capture_group_end {
+                    is_transition_active = true;
+                }
+                case _ {} // Character consuming transitions (.character, .char_class, .range, .char_set, .negated), not handled in epsilon closure
+            }
+
+            if is_transition_active {
+                target_nfa_id_already_in_worklist := false;
+                for k_check_idx in 0 .. sim_states.count {
+                    if (*sim_states)[k_check_idx].state_id == target_nfa_state_id {
+                        // This simple check might be insufficient if group states for the same NFA state ID differ.
+                        // For now, this prevents re-adding the same NFA state ID to the worklist in this pass.
+                        // A more robust solution would compare (state_id, group_configurations),
+                        // or allow multiple entries if group configurations differ.
+                        // However, the current problem is likely more fundamental (groups not being set at all).
+                        target_nfa_id_already_in_worklist = true;
+                        break;
+                    }
+                }
+
+                if !target_nfa_id_already_in_worklist { 
+                    current_groups_count := current_sim_node_original_groups.count;
+                    // Estimate capacity: current groups + 1 if a new group_start might add a new Group_State entry.
+                    new_groups_capacity_hint := current_groups_count;
+                    if is_group_mod_trans && is_start_mod {
+                        // Check if this group_id is already in current_sim_node_original_groups
+                        is_new_group_id := true;
+                        for g_check_idx in 0 .. current_groups_count {
+                            if (*current_sim_node_original_groups)[g_check_idx].group_id == group_id_val_for_mod {
+                                is_new_group_id = false;
+                                break;
+                            }
+                        }
+                        if is_new_group_id {
+                            new_groups_capacity_hint += 1;
+                        }
+                    }
+                    
+                    new_groups_for_target := Array.make(Group_State, capacity = new_groups_capacity_hint, allocator = context.temp_allocator);
+                    
+                    for g_state_to_copy_idx in 0 .. current_groups_count {
+                        Array.push(&new_groups_for_target, (*current_sim_node_original_groups)[g_state_to_copy_idx]);
+                    }
+
+                    if is_group_mod_trans {
+                        if is_start_mod { // .group_start
+                            found_group_to_update := false;
+                            for g_idx in 0 .. new_groups_for_target.count {
+                                if new_groups_for_target[g_idx].group_id == group_id_val_for_mod {
+                                    new_groups_for_target[g_idx].start_pos = current_pos;
+                                    new_groups_for_target[g_idx].end_pos = current_pos; 
+                                    new_groups_for_target[g_idx].active = true;
+                                    found_group_to_update = true;
+                                    break;
+                                }
+                            }
+                            if !found_group_to_update { 
+                                Array.push(&new_groups_for_target, Group_State.{
+                                    group_id = group_id_val_for_mod,
+                                    start_pos = current_pos,
+                                    end_pos = current_pos, 
+                                    active = true
+                                });
+                            }
+                        } else { // .group_end
+                            for g_idx in 0 .. new_groups_for_target.count {
+                                if new_groups_for_target[g_idx].group_id == group_id_val_for_mod && new_groups_for_target[g_idx].active {
+                                    new_groups_for_target[g_idx].end_pos = current_pos;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    Array.push(sim_states, NFA_Sim_State.{
+                        state_id = target_nfa_state_id,
+                        groups = new_groups_for_target
+                    });
+                }
+            }
+        } 
+        i += 1;
+    } 
+}
+
+
+/// Add epsilon closure to state set
+add_epsilon_closure :: (states: &[..] u32, regex: &Regex) {
+    i := 0;
+    while i < states.count {
+        state_id := (*states)[i];
+        if state_id >= regex.states.count {
+            i += 1;
+            continue;
+        }
+
+        state := &regex.states[state_id];
+        for transition in state.transitions {
+            switch transition.condition {
+                case .epsilon {
+                    found := false;
+                    for existing_state in states {
+                        if existing_state == transition.target {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if !found {
+                        Array.push(states, transition.target);
+                    }
+                }
+                case _ do continue
+            }
+        }
+        i += 1;
+    }
+}
+
+/// Check if character matches condition
+matches_condition :: (condition: &Match_Condition, c: u8) -> bool {
+    switch condition {
+        case .epsilon {
+            return false;
+        }
+        case .non_capture_group_start {
+            return false; // Does not consume characters
+        }
+        case .non_capture_group_end {
+            return false; // Does not consume characters
+        }
+        case .word_boundary {
+            return false; // Does not consume characters, handled by add_epsilon_closure_with_groups
+        }
+        case .character {
+            return condition.character->unwrap() == c;
+        }
+        case .char_class {
+            char_class := condition.char_class->unwrap();
+            switch char_class {
+                case .DIGIT {
+                    return c >= '0' && c <= '9';
+                }
+                case .WORD {
+                    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+                }
+                case .SPACE {
+                    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+                }
+                case .ANY {
+                    return c != '\n';
+                }
+            }
+        }
+        case .range {
+            range := condition.range->unwrap();
+            return c >= range.start && c <= range.end;
+        }
+        case .char_set {
+            char_set := condition.char_set->unwrap();
+            
+            for ch in char_set.chars {
+                if ch == c {
+                    return !char_set.negated;
+                }
+            }
+            
+            for range in char_set.ranges {
+                if c >= range.start && c <= range.end {
+                    return !char_set.negated;
+                }
+            }
+            
+            if char_set.has_predefined[0] && c >= '0' && c <= '9' {
+                return !char_set.negated;
+            }
+            if char_set.has_predefined[1] && ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+                return !char_set.negated;
+            }
+            if char_set.has_predefined[2] && (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+                return !char_set.negated;
+            }
+            if char_set.has_predefined[3] && c != '\n' {
+                return !char_set.negated;
+            }
+            
+            return char_set.negated;
+        }
+        case .negated {
+            return !matches_condition(condition.negated->unwrap(), c);
+        }
+        case .group_start {
+            return false;
+        }
+        case .group_end {
+            return false;
+        }
+        case .anchor {
+            return false;
+        }
+    }
+    return false;
+}
+
+/// Check if anchor condition matches at the given position
+matches_anchor :: (anchor: Anchor, text: str, pos: u32) -> bool {
+    switch anchor {
+        case .START {
+            return pos == 0;
+        }
+        case .END {
+            return pos >= text.count;
+        }
+    }
+    return false;
+}
+
+// =============================================================================
+// Debug Tests for Alternation
+// =============================================================================
+
+debug_test_alternation :: () {
+    println("=== DEBUG ALTERNATION ===");
+    
+    // Test 1: Simple alternation
+    println("Test 1: Simple alternation 'foo|bar'");
+    result1 := matches("foo", "foo|bar");
+    printf("  matches('foo', 'foo|bar') = {}\n", result1);
+    
+    result2 := matches("bar", "foo|bar");
+    printf("  matches('bar', 'foo|bar') = {}\n", result2);
+    
+    result3 := matches("baz", "foo|bar");
+    printf("  matches('baz', 'foo|bar') = {}\n", result3);
+    
+    // Test 2: Alternation in groups
+    println("Test 2: Alternation in groups '(foo|bar)'");
+    result4 := matches("foo", "(foo|bar)");
+    printf("  matches('foo', '(foo|bar)') = {}\n", result4);
+    
+    result5 := matches("bar", "(foo|bar)");
+    printf("  matches('bar', '(foo|bar)') = {}\n", result5);
+    
+    // Test 3: Specific failing pattern
+    println("Test 3: Failing pattern '(foo|bar)+?(baz|qux)?'");
+    result6 := matches("foobarfoobaz", "(foo|bar)+?(baz|qux)?");
+    printf("  matches('foobarfoobaz', '(foo|bar)+?(baz|qux)?') = {}\n", result6);
+    
+    // Test simpler parts
+    println("Test 3a: Just the first group '(foo|bar)+'");
+    result7 := matches("foobar", "(foo|bar)+");
+    printf("  matches('foobar', '(foo|bar)+') = {}\n", result7);
+    
+    println("Test 3b: Lazy version '(foo|bar)+?'");
+    result8 := matches("foo", "(foo|bar)+?");
+    printf("  matches('foo', '(foo|bar)+?') = {}\n", result8);
+}
+
+// =============================================================================
+// Debug Tests for Non-capturing Groups
+// =============================================================================
+
+debug_test_non_capturing :: () {
+    println("=== DEBUG NON-CAPTURING GROUPS ===");
+    
+    // Test 1: Simple non-capturing group
+    println("Test 1: Simple non-capturing group '(?:ab)c'");
+    result1 := matches("abc", "(?:ab)c");
+    printf("  matches('abc', '(?:ab)c') = {}\n", result1);
+    
+    // Test 2: Non-capturing group with quantifier
+    println("Test 2: Non-capturing group with quantifier '(?:ab)+'");
+    result2 := matches("ababab", "(?:ab)+");
+    printf("  matches('ababab', '(?:ab)+') = {}\n", result2);
+    
+    // Test 3: Specific failing pattern part
+    println("Test 3: Numeric pattern '[0-9]{1,3}'");
+    result3 := matches("192", "[0-9]{1,3}");
+    printf("  matches('192', '[0-9]{{1,3}}') = {}\n", result3);
+    
+    println("Test 4: Non-capturing with quantifier '(?:\\.[0-9]{1,3})'");
+    result4 := matches(".168", "(?:\\.[0-9]{1,3})");
+    printf("  matches('.168', '(?:\\\\.[0-9]{{1,3}})') = {}\n", result4);
+    
+    println("Test 5: Repeated non-capturing '(?:\\.[0-9]{1,3}){3}'");
+    result5 := matches(".168.1.100", "(?:\\.[0-9]{1,3}){3}");
+    printf("  matches('.168.1.100', '(?:\\\\.[0-9]{{1,3}}){{3}}') = {}\n", result5);
+}
+
+// Entry point for the program
+main :: () {
+    println("=== Testing capture groups with quantifiers ===");
+    
+    println("Test: Basic quantifier without capture");
+    result := matches("123", "[0-9]{3}");
+    printf("  matches(\"123\", \"[0-9]{{3}}\") = {}\n", result);
+    
+    println("\nTest: Simple capture group");
+    simple_regex := compile("([0-9])");
+    defer simple_regex->destroy();
+    simple_match := find_with_groups(&simple_regex, "1");
+    printf("  Pattern: ([0-9]), Text: \"1\"\n");
+    printf("  Found: {}, Groups: {}\n", simple_match.found, simple_match.groups.count);
+    if simple_match.groups.count > 0 {
+        printf("    Group 1: \"{}\"\n", simple_match.groups[0]);
+    }
+    
+    println("\nTest: Quantified capture group");
+    test_regex := compile("([0-9]{3})");
+    defer test_regex->destroy();
+    test_match := find_with_groups(&test_regex, "123");
+    printf("  Pattern: ([0-9]{{3}}), Text: \"123\"\n");
+    printf("  Found: {}, Groups: {}\n", test_match.found, test_match.groups.count);
+    if test_match.groups.count > 0 {
+        printf("    Group 1: \"{}\"\n", test_match.groups[0]);
+    }
+    
+    println("\nTest: {2} quantifier");
+    regex2 := compile("([0-9]{2})");
+    defer regex2->destroy();
+    match2 := find_with_groups(&regex2, "ab12cd");
+    printf("  Pattern: ([0-9]{2}), Text: \"ab12cd\"\n");
+    printf("  Found: {}, Groups: {}\n", match2.found, match2.groups.count);
+    if match2.groups.count > 0 {
+        printf("    Group 1: \"{}\"\n", match2.groups[0]);
+    }
+    
+    println("\nTest: {1} quantifier");
+    regex1 := compile("([0-9]{1})");
+    defer regex1->destroy();
+    match1 := find_with_groups(&regex1, "a1b");
+    printf("  Pattern: ([0-9]{1}), Text: \"a1b\"\n");
+    printf("  Found: {}, Groups: {}\n", match1.found, match1.groups.count);
+    if match1.groups.count > 0 {
+        printf("    Group 1: \"{}\"\n", match1.groups[0]);
+    }
+    
+    println("\nTest: {4} quantifier");
+    regex4 := compile("([0-9]{4})");
+    defer regex4->destroy();
+    match4 := find_with_groups(&regex4, "year2024end");
+    printf("  Pattern: ([0-9]{4}), Text: \"year2024end\"\n");
+    printf("  Found: {}, Groups: {}\n", match4.found, match4.groups.count);
+    if match4.groups.count > 0 {
+        printf("    Group 1: \"{}\"\n", match4.groups[0]);
+    }
+    
+    println("\n=== COMPREHENSIVE REGEX TEST SUITE ===");
+    
+    test_count := 0;
+    pass_count := 0;
+    
+    run_match_test :: (description: str, pattern: str, text: str, should_match: bool, expected_groups_from_test: [] str, test_count: &u32, pass_count: &u32) {
+        *test_count += 1;
+        regex_test := compile(pattern);
+        defer regex_test->destroy();
+        match_result := find_with_groups(&regex_test, text);
+
+        actual_groups_for_comparison := Array.make(str, allocator = context.temp_allocator);
+        defer Array.free(&actual_groups_for_comparison);
+
+        if match_result.found {
+            // Add group 0 (full match) first
+            Array.push(&actual_groups_for_comparison, match_result.text);
+            // Add capture groups 1, 2, etc.
+            for group_text in match_result.groups {
+                Array.push(&actual_groups_for_comparison, group_text);
+            }
+        }
+
+        success := match_result.found == should_match;
+        if should_match && match_result.found {
+            if expected_groups_from_test.count != actual_groups_for_comparison.count {
+                success = false;
+            } else {
+                for i in 0 .. expected_groups_from_test.count {
+                    if expected_groups_from_test[i] != actual_groups_for_comparison[i] {
+                        success = false;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if success {
+            *pass_count += 1;
+            printf("✓ PASS: {}\n", description);
+        } else {
+            printf("✗ FAIL: {}\n", description);
+            printf("    Pattern: '{}', Text: '{}'\n", pattern, text);
+            printf("    Expected match: {}, Got match: {}\n", should_match, match_result.found);
+            if should_match && match_result.found {
+                printf("    Expected groups (count {}): {}\n", expected_groups_from_test.count, expected_groups_from_test);
+                printf("    Actual groups (count {}): {}\n", actual_groups_for_comparison.count, actual_groups_for_comparison);
+                
+                max_display_groups := math.max(expected_groups_from_test.count, actual_groups_for_comparison.count);
+                for i in 0 .. max_display_groups {
+                    expected_g_str_val: str;
+                    if i < expected_groups_from_test.count {
+                        s := expected_groups_from_test[i];
+                        if s.data == null && s.count > 0 { expected_g_str_val = "<MALFORMED EXPECTED STR>"; }
+                        else { expected_g_str_val = s; }
+                    } else {
+                        expected_g_str_val = "<none>";
+                    }
+
+                    actual_g_str_val: str;
+                    if i < actual_groups_for_comparison.count {
+                        s := actual_groups_for_comparison[i];
+                        if s.data == null && s.count > 0 { actual_g_str_val = "<MALFORMED ACTUAL STR>"; }
+                        else { actual_g_str_val = s; }
+                    } else {
+                        actual_g_str_val = "<none>";
+                    }
+                    
+                    if expected_g_str_val != actual_g_str_val {
+                        printf("      Group {}: expected '{}', got '{}'\n", i, expected_g_str_val, actual_g_str_val);
+                    } else {
+                        printf("      Group {}: '{}' (match)\n", i, expected_g_str_val);
+                    }
+                }
+            }
+        }
+    };
+    
+    run_replacement_test :: (description: str, pattern: str, text: str, replacement: str, expected: str, test_count: &u32, pass_count: &u32) {
+        *test_count += 1;
+        result := replace(text, pattern, replacement);
+        defer raw_free(context.allocator, result.data);
+        
+        if result == expected {
+            *pass_count += 1;
+            printf("✓ PASS: {}\n", description);
+        } else {
+            printf("✗ FAIL: {}\n", description);
+            printf("    Pattern: '{}', Text: '{}', Replacement: '{}'\n", pattern, text, replacement);
+            printf("    Expected: '{}', Got: '{}'\n", expected, result);
+        }
+    };
+    
+    run_match_test("Basic character match", "abc", "abc", true, str.["abc"], &test_count, &pass_count);
+    run_match_test("Basic character no match", "abc", "def", false, str.[], &test_count, &pass_count);
+    
+    run_match_test("Digit class", "\\d", "5", true, str.["5"], &test_count, &pass_count);
+    run_match_test("Word class", "\\w", "a", true, str.["a"], &test_count, &pass_count);
+    run_match_test("Space class", "\\s", " ", true, str.[" "], &test_count, &pass_count);
+    run_replacement_test("Group replacement $1", "([a-z]+) ([a-z]+)", "hello world", "$2 $1", "world hello", &test_count, &pass_count);
+    run_replacement_test("Multiple group replacement", "([0-9]{2})/([0-9]{2})/([0-9]{4})", "12/25/2024", "$3-$1-$2", "2024-12-25", &test_count, &pass_count);
+    run_replacement_test("Full match replacement $&", "test", "This is a test", "[$&]", "This is a [test]", &test_count, &pass_count);
+    run_replacement_test("Quantified group replacement", "([0-9]{3})", "ID: 123", "Number: $1", "ID: Number: 123", &test_count, &pass_count);
+    
+    run_replacement_test("Bracket pattern replacement", "[0-9]{3}", "Code 456 end", "XXX", "Code XXX end", &test_count, &pass_count);
+    run_replacement_test("Bracket capture replacement", "([a-f]{2})", "hex: ab", "0x$1", "hex: 0xab", &test_count, &pass_count);
+    
+    run_match_test("URL pattern", "https?://([a-z]+)\\.([a-z]+)", "https://example.com", true, str.["https://example.com", "example", "com"], &test_count, &pass_count);
+    run_match_test("IPv4 pattern", "([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})", "192.168.1.1", true, str.["192.168.1.1", "192", "168", "1", "1"], &test_count, &pass_count);
+    run_match_test("Time pattern", "([0-9]{2}):([0-9]{2}):([0-9]{2})", "14:30:45", true, str.["14:30:45", "14", "30", "45"], &test_count, &pass_count);
+    
+    run_match_test("Wrong length", "([0-9]{3})", "12", false, str.[], &test_count, &pass_count);
+    run_match_test("Wrong characters", "([a-z]{3})", "123", false, str.[], &test_count, &pass_count);
+    run_match_test("Bracket mismatch", "[0-9]", "a", false, str.[], &test_count, &pass_count);
+
+    // Basic lazy quantifiers - leftmost match with minimal repetition (standard behavior)
+    run_match_test("Lazy a*?b matches 'aaab' in 'aaab'", "a*?b", "aaab", true, .["aaab"], &test_count, &pass_count);
+    run_match_test("Lazy a*?b matches empty in 'b'", "a*?b", "b", true, .["b"], &test_count, &pass_count);
+    run_match_test("Lazy a*?b matches 'ab' in 'ab'", "a*?b", "ab", true, .["ab"], &test_count, &pass_count);
+
+    run_match_test("Lazy a+?b matches 'aaab' in 'aaab'", "a+?b", "aaab", true, .["aaab"], &test_count, &pass_count);
+    run_match_test("Lazy a+?b matches 'ab' in 'ab'", "a+?b", "ab", true, .["ab"], &test_count, &pass_count);
+    run_match_test("Lazy a+?b no match in 'b' (needs one 'a')", "a+?b", "b", false, str.[], &test_count, &pass_count);
+
+    run_match_test("Lazy a??b matches 'ab' in 'ab'", "a??b", "ab", true, .["ab"], &test_count, &pass_count);
+    run_match_test("Lazy a??b matches 'ab' in 'aab'", "a??b", "aab", true, .["ab"], &test_count, &pass_count);
+    run_match_test("Lazy a??b matches 'b' in 'b'", "a??b", "b", true, .["b"], &test_count, &pass_count);
+
+    run_match_test("Lazy a{1,3}?b matches 'aaab' in 'aaab'", "a{1,3}?b", "aaab", true, .["aaab"], &test_count, &pass_count);
+    run_match_test("Lazy a{1,3}?b matches 'aaab' in 'aaaab'", "a{1,3}?b", "aaaab", true, .["aaab"], &test_count, &pass_count);
+    run_match_test("Lazy a{1,3}?b no match in 'b'", "a{1,3}?b", "b", false, str.[], &test_count, &pass_count);
+
+    run_match_test("Lazy a{1,}?b matches 'aaab' in 'aaab'", "a{1,}?b", "aaab", true, .["aaab"], &test_count, &pass_count);
+
+    // Lazy quantifiers with capturing groups - leftmost match with minimal repetition
+    run_match_test("Lazy (a*?)b group in 'aaab'", "(a*?)b", "aaab", true, .["aaab", "aaa"], &test_count, &pass_count);
+    run_match_test("Lazy (a*?)b empty group in 'b'", "(a*?)b", "b", true, .["b", ""], &test_count, &pass_count);
+
+    run_match_test("Lazy (a+?)b group in 'aaab'", "(a+?)b", "aaab", true, .["aaab", "aaa"], &test_count, &pass_count);
+
+    run_match_test("Lazy (a??)b group in 'ab'", "(a??)b", "ab", true, .["ab", "a"], &test_count, &pass_count);
+    run_match_test("Lazy (a??)b group in 'aab'", "(a??)b", "aab", true, .["ab", "a"], &test_count, &pass_count);
+
+    run_match_test("Lazy (a{1,3}?)b group in 'aaab'", "(a{1,3}?)b", "aaab", true, .["aaab", "aaa"], &test_count, &pass_count);
+    run_match_test("Lazy (a{1,3}?)b no match in 'aaaa_b'", "(a{1,3}?)b", "aaaa_b", false, str.[], &test_count, &pass_count);
+
+    run_match_test("Lazy (a{1,}?)b group in 'aaab'", "(a{1,}?)b", "aaab", true, .["aaab", "aaa"], &test_count, &pass_count);
+
+    // More complex interactions demonstrating leftmost match with minimal repetition
+    run_match_test("Lazy .*?o in 'hello'", ".*?o", "hello", true, .["hello"], &test_count, &pass_count);
+    run_match_test("Lazy .*?o in 'goodfood'", ".*?o", "goodfood", true, .["go"], &test_count, &pass_count);
+    run_match_test("Lazy .*?o in 'oo'", ".*?o", "oo", true, .["o"], &test_count, &pass_count);
+
+    run_match_test("Lazy a(b*?)c empty group in 'ac'", "a(b*?)c", "ac", true, .["ac", ""], &test_count, &pass_count);
+    run_match_test("Lazy a(b*?)c group 'b' in 'abc'", "a(b*?)c", "abc", true, .["abc", "b"], &test_count, &pass_count);
+    run_match_test("Lazy a(b*?)c group 'bb' in 'abbc'", "a(b*?)c", "abbc", true, .["abbc", "bb"], &test_count, &pass_count);
+
+    run_match_test("Lazy a(b+?)c group 'b' in 'abc'", "a(b+?)c", "abc", true, .["abc", "b"], &test_count, &pass_count);
+    run_match_test("Lazy a(b+?)c group 'bb' in 'abbc'", "a(b+?)c", "abbc", true, .["abbc", "bb"], &test_count, &pass_count);
+
+    run_match_test("Lazy a(b??)c empty group in 'ac'", "a(b??)c", "ac", true, .["ac", ""], &test_count, &pass_count);
+    run_match_test("Lazy a(b??)c group 'b' in 'abc'", "a(b??)c", "abc", true, .["abc", "b"], &test_count, &pass_count);
+
+    // Greedy vs Lazy comparison
+    run_match_test("Greedy a(.*)b in 'axxxbyyyb'", "a(.*)b", "axxxbyyyb", true, .["axxxbyyyb", "xxxbyyy"], &test_count, &pass_count);
+    run_match_test("Lazy a(.*?)b in 'axxxbyyyb'", "a(.*?)b", "axxxbyyyb", true, .["axxxb", "xxx"], &test_count, &pass_count);
+
+    run_match_test("Lazy '(.*?)' single quote capture", "'(.*?)'", "'test' 'this'", true, .["'test'", "test"], &test_count, &pass_count);
+    run_match_test("Greedy '(.*)' single quote capture", "'(.*)'", "'test' 'this'", true, .["'test' 'this'", "test' 'this"], &test_count, &pass_count);
+
+    // Numeric lazy vs greedy
+    run_match_test("Greedy x(a{1,3})y 'aa' in 'xaay'", "x(a{1,3})y", "xaay", true, .["xaay", "aa"], &test_count, &pass_count);
+    run_match_test("Greedy x(a{1,3})y 'aaa' in 'xaaay'", "x(a{1,3})y", "xaaay", true, .["xaaay", "aaa"], &test_count, &pass_count);
+    run_match_test("Lazy x(a{1,3}?)y 'aa' in 'xaay'", "x(a{1,3}?)y", "xaay", true, .["xaay", "aa"], &test_count, &pass_count);
+    run_match_test("Lazy x(a{1,3}?)y 'aaa' in 'xaaay'", "x(a{1,3}?)y", "xaaay", true, .["xaaay", "aaa"], &test_count, &pass_count);
+    run_match_test("Lazy x(a{1,3}?)y no match in 'xaaaay'", "x(a{1,3}?)y", "xaaaay", false, str.[], &test_count, &pass_count);
+
+    run_match_test("Greedy x(a{1,})y 'aaa' in 'xaaay'", "x(a{1,})y", "xaaay", true, .["xaaay", "aaa"], &test_count, &pass_count);
+    run_match_test("Lazy x(a{1,}?)y 'aaa' in 'xaaay'", "x(a{1,}?)y", "xaaay", true, .["xaaay", "aaa"], &test_count, &pass_count);
+
+    // Test case from a common regex tutorial for lazy vs greedy
+    run_match_test("Greedy <p>.*</p> across paragraphs", "<p>.*</p>", "<p>Para 1.</p><p>Para 2.</p>", true, .["<p>Para 1.</p><p>Para 2.</p>"], &test_count, &pass_count);
+    run_match_test("Lazy <p>.*?</p> single paragraph", "<p>.*?</p>", "<p>Para 1.</p><p>Para 2.</p>", true, .["<p>Para 1.</p>"], &test_count, &pass_count);
+
+    // Test lazy quantifiers at the end of a pattern (matching an empty string if possible at the current position)
+    run_match_test("Lazy a*? at end matches empty", "a*?", "aaa", true, .[""], &test_count, &pass_count);
+    run_match_test("Lazy a+? at end matches 'a'", "a+?", "aaa", true, .["a"], &test_count, &pass_count);
+    run_match_test("Lazy a?? at end matches empty", "a??", "aaa", true, .[""], &test_count, &pass_count);
+
+    // Test lazy quantifiers with non-capturing groups and alternatives
+    run_match_test("Lazy (?:a|b)*?c", "(?:a|b)*?c", "abacaba", true, .["abac"], &test_count, &pass_count);
+    run_match_test("Lazy (?:a|b)+?c", "(?:a|b)+?c", "abacaba", true, .["abac"], &test_count, &pass_count);
+    run_match_test("Lazy (?:a|b)??c with 'a'", "(?:a|b)??c", "ac", true, .["ac"], &test_count, &pass_count);
+    run_match_test("Lazy (?:a|b)??c with 'b'", "(?:a|b)??c", "bc", true, .["bc"], &test_count, &pass_count);
+    run_match_test("Lazy (?:a|b)??c with empty option", "(?:a|b)??c", "c", true, .["c"], &test_count, &pass_count);
+
+    // === COMPLEX STRESS TESTS - JavaScript-verified expectations ===
+    
+    // 1. Nested lazy quantifiers with multiple capture groups (VERIFIED ✓)
+    run_match_test("Complex: Nested lazy quantifiers", "([a-z]+?)(\\d+?)([a-z]+?)", "abc123def456ghi", true, .["abc123d", "abc", "123", "d"], &test_count, &pass_count);
+    
+    // 2. Complex alternation with lazy quantifiers (VERIFIED ✓ - alternation will fail in Onyx)
+    run_match_test("Complex: Alternation with lazy quantifiers", "(foo|bar)+?(baz|qux)?", "foobarfoobaz", true, .["foo", "foo"], &test_count, &pass_count);
+    
+    // 3. Deeply nested groups with mixed quantifiers (VERIFIED ✓ - corrected expectations)
+    run_match_test("Complex: Deeply nested groups", "((a+?)(b{2,4}?))+?(c*)", "aaabbbaabbc", true, .["aaabb", "aaabb", "aaa", "bb", ""], &test_count, &pass_count);
+    
+    // 4. Character classes with lazy quantifiers and whitespace (VERIFIED ✓ - corrected expectations)
+    run_match_test("Complex: Character classes with lazy quantifiers", "([A-Z]+?)\\s+?([a-z]{2,5}?)\\s+?(\\d+?)", "HELLO world 123", true, .["HELLO world 1", "HELLO", "world", "1"], &test_count, &pass_count);
+    
+    // 5. Mixed greedy and lazy quantifiers in sequence (VERIFIED ✓)
+    run_match_test("Complex: Mixed greedy and lazy quantifiers", "([a-z]{2,}).*?([0-9]+?)([a-z]+)", "hello123world456end", true, .["hello123world", "hello", "123", "world"], &test_count, &pass_count);
+    
+    // 6. Negated character classes with lazy quantifiers (VERIFIED ✓ - negation will fail in Onyx)
+    run_match_test("Complex: Negated character classes", "([^0-9]+?)([0-9]{2,3}?)([^0-9]+?)", "abc123def", true, .["abc123d", "abc", "123", "d"], &test_count, &pass_count);
+    
+    // 7. Word boundaries with lazy quantifiers (VERIFIED ✓)
+    run_match_test("Complex: Word boundaries with lazy quantifiers", "\\b([a-z]+?)([0-9]+?)\\b", "word123 test456", true, .["word123", "word", "123"], &test_count, &pass_count);
+    
+    // 8. Complex numeric quantifiers with ranges (VERIFIED ✓)
+    run_match_test("Complex: Numeric quantifiers with ranges", "([a-z]{2,4}?)([A-Z]{1,3})([0-9]{2,5}?)", "abcDEF12345", true, .["abcDEF12", "abc", "DEF", "12"], &test_count, &pass_count);
+    
+    // 9. Alternation inside capture groups (VERIFIED ✓ - alternation will fail in Onyx)
+    run_match_test("Complex: Alternation inside capture groups", "(cat|dog|bird)+?\\s+(run|fly|swim)+?", "catdog run", true, .["catdog run", "dog", "run"], &test_count, &pass_count);
+    
+    // 10. Ultra-complex server:IP:port pattern with anchors (VERIFIED ✓)
+    run_match_test("Complex: Server:IP:port pattern", "^([a-z]+?)://([0-9]{1,3}(?:\\.[0-9]{1,3}){3}):([0-9]{2,5}?)$", "http://192.168.1.100:8080", true, .["http://192.168.1.100:8080", "http", "192.168.1.100", "8080"], &test_count, &pass_count);
+
+    // Debug test for lazy quantifiers
+    printf("\n=== DEBUG LAZY QUANTIFIER ===\n");
+    {
+        pattern := "a+?b";
+        text := "aaab";
+        regex := compile(pattern);
+        defer regex->destroy();
+        
+        printf("Testing pattern '{}' on text '{}'\n", pattern, text);
+        match_result := find(&regex, text);
+        if match_result.found {
+            printf("Match found: '{}' (start: {}, end: {})\n", match_result.text, match_result.start, match_result.end);
+        } else {
+            printf("No match found\n");
+        }
+    }
+
+    debug_test_alternation();
+    debug_test_non_capturing();
+
+    println("\n=== TEST RESULTS ===");
+    printf("Tests run: {}\n", test_count);
+    printf("Passed: {}\n", pass_count);
+    printf("Failed: {}\n", test_count - pass_count);
+    if pass_count == test_count {
+        println("🎉 ALL TESTS PASSED! Regex engine is working correctly.");
+    } else {
+        printf("❌ {} tests failed. Regex engine needs fixes.\n", test_count - pass_count);
+    }
+}
