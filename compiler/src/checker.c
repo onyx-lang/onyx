@@ -4906,7 +4906,7 @@ CHECK_FUNC(type, AstType** ptype) {
                 pc_node->callee = (AstType*) macro_expr;
                 if (cs > Check_Errors_Start) return cs;
 
-                // Expansion complete — verify the macro returned type_expr.
+                // Expansion complete; verify the macro returned type_expr.
                 AstTyped* result = (AstTyped*) pc_node->callee;
                 if (result->type != context->types.basic[Basic_Kind_Type_Index]) {
                     ONYX_ERROR(pc_node->token->pos, Error_Critical,
