@@ -1847,6 +1847,15 @@ CHECK_FUNC(struct_literal, AstStructLiteral* sl) {
         }
 
         CHECK(expression, &sl->stnode);
+        if (!node_is_type((AstNode *) sl->stnode)
+                && sl->stnode->type == context->types.basic[Basic_Kind_Type_Index]) {
+            // May be a type_expr alias (e.g., a macro-generated type); attempt to resolve as a type.
+            AstType* as_type = (AstType*) sl->stnode;
+            CheckStatus cs_type = check_type(context, &as_type);
+            if (cs_type > Check_Errors_Start) return cs_type;
+            sl->stnode = (AstTyped*) as_type;
+            sl->type_node = as_type;
+        }
         if (!node_is_type((AstNode *) sl->stnode)) {
             ERROR(sl->token->pos, "Type used for struct literal is not a type.");
         }
@@ -4798,7 +4807,33 @@ CHECK_FUNC(type, AstType** ptype) {
             type = *ptype;
             original_type = type;
 
+
             if (!node_is_type((AstNode *) type)) {
+                // If a macro call appears in type position, expand it and retry.
+                if (type->kind == Ast_Kind_Call) {
+                    AstCall *call = (AstCall *) type;
+
+                    // First, check the call normally; macro expansion happens through call checking.
+                    CheckStatus cs = check_expression(context, (AstTyped **) &call);
+                    if (cs != Check_Success) return cs;
+
+                    // `type` may have been rewritten during check_expression.
+                    type = (AstType *) call;
+                    if (type->kind == Ast_Kind_Call) {
+                        // If it is still a call and not rewritten into a type node,
+                        // this macro/call did not yield a valid type expression.
+                        ONYX_ERROR(type->token->pos, Error_Critical,
+                            "Expression in type position did not resolve to a type.");
+                        return Check_Error;
+                    }
+
+                    // Continue into the existing node_is_type check below.
+                }
+
+                // A macro is not yet a type; allow it through so the enclosing
+                // Poly_Call_Type handler can build the synthetic call and expand it.
+                if (type->kind == Ast_Kind_Macro) break;
+
                 ERROR_(original_type->token->pos, "This field access did not resolve to be a type. It resolved to be a '%s'.", onyx_ast_node_kind_string(type->kind));
             }
             break;
@@ -4835,8 +4870,76 @@ CHECK_FUNC(type, AstType** ptype) {
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pc_node = (AstPolyCallType *) type;
 
-            CHECK(type, &pc_node->callee);
+            // Detect whether macro expansion is already in progress.
+            // The callee is replaced with either a synthetic AstCall (before expansion)
+            // or an AstDoBlock (after expansion). The parser never produces either of
+            // those as a Poly_Call_Type callee, so matching on them is precise and safe.
+            AstNode* current_callee = strip_aliases((AstNode*) pc_node->callee);
+            b32 macro_expansion_in_progress = current_callee->kind == Ast_Kind_Call
+                || current_callee->kind == Ast_Kind_Do_Block;
 
+            if (!macro_expansion_in_progress) {
+                CHECK(type, &pc_node->callee);
+
+                current_callee = strip_aliases((AstNode*) pc_node->callee);
+                if (current_callee->kind == Ast_Kind_Macro) {
+                    // Build a synthetic AstCall to run the macro through check_expression,
+                    // which is the only path that triggers macro expansion.
+                    AstCall* macro_call = onyx_ast_node_new(context->ast_alloc, sizeof(AstCall), Ast_Kind_Call);
+                    macro_call->token = pc_node->token;
+                    macro_call->callee = (AstTyped*) current_callee;
+                    macro_call->va_kind = VA_Kind_Not_VA;
+                    bh_arr_new(context->ast_alloc, macro_call->args.values, bh_arr_length(pc_node->params));
+                    bh_arr_new(context->ast_alloc, macro_call->args.named_values, 1);
+                    macro_call->args.used_argument_count = -1;
+                    bh_arr_each(AstNode *, param, pc_node->params) {
+                        bh_arr_push(macro_call->args.values, (AstTyped*) make_argument(context, (AstTyped*) *param));
+                    }
+                    pc_node->callee = (AstType*) macro_call;
+                    macro_expansion_in_progress = 1;
+                }
+            }
+
+            if (macro_expansion_in_progress) {
+                AstTyped* macro_expr = (AstTyped*) pc_node->callee;
+                CheckStatus cs = check_expression(context, &macro_expr);
+                pc_node->callee = (AstType*) macro_expr;
+                if (cs > Check_Errors_Start) return cs;
+
+                // Expansion complete; verify the macro returned type_expr.
+                AstTyped* result = (AstTyped*) pc_node->callee;
+                if (result->type != context->types.basic[Basic_Kind_Type_Index]) {
+                    ONYX_ERROR(pc_node->token->pos, Error_Critical,
+                        "Macro in type position must return a 'type_expr'.");
+                    return Check_Error;
+                }
+
+                // Extract the returned type node from the do_block body.
+                AstType* type_result = NULL;
+                if (result->kind == Ast_Kind_Do_Block) {
+                    AstNode* stmt = ((AstDoBlock*) result)->block->body;
+                    while (stmt) {
+                        if (stmt->kind == Ast_Kind_Return) {
+                            AstTyped* ret_expr = ((AstReturn*) stmt)->expr;
+                            if (ret_expr && node_is_type((AstNode*) ret_expr)) {
+                                type_result = (AstType*) ret_expr;
+                            }
+                        }
+                        stmt = stmt->next;
+                    }
+                }
+
+                if (type_result == NULL) {
+                    ONYX_ERROR(pc_node->token->pos, Error_Critical,
+                        "Unable to extract type from macro expansion in type position.");
+                    return Check_Error;
+                }
+
+                *ptype = type_result;
+                return Check_Success;
+            }
+
+            // Normal poly-call-type processing (non-macro callee).
             bh_arr_each(AstNode *, param, pc_node->params) {
                 if (node_is_type(*param)) {
                     CHECK(type, (AstType **) param);
@@ -4859,6 +4962,28 @@ CHECK_FUNC(type, AstType** ptype) {
         case Ast_Kind_Alias: {
             AstAlias* alias = (AstAlias *) type;
             CHECK_INVISIBLE(type, alias, (AstType **) &alias->alias);
+
+            // Unwrap type_expr macro expansion: if the alias holds a do_block
+            // whose body returns a type node, extract that type as the resolved alias.
+            AstTyped* inner = alias->alias;
+            if (!node_is_type((AstNode*) inner)
+                    && inner->type == context->types.basic[Basic_Kind_Type_Index]
+                    && inner->kind == Ast_Kind_Do_Block) {
+                AstNode* stmt = ((AstDoBlock*) inner)->block->body;
+                while (stmt) {
+                    if (stmt->kind == Ast_Kind_Return) {
+                        AstTyped* ret_expr = ((AstReturn*) stmt)->expr;
+                        if (ret_expr && node_is_type((AstNode*) ret_expr)) {
+                            alias->alias = ret_expr;
+                            *ptype = (AstType*) ret_expr;
+                            return Check_Success;
+                        }
+                    }
+                    stmt = stmt->next;
+                }
+                // Do_block body not yet type-checked; yield and retry after entity processes.
+                YIELD(type->token->pos, "Waiting for macro type expression to resolve.");
+            }
 
             break;
         }
