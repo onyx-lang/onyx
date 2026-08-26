@@ -2,23 +2,20 @@ package core.encoding.csv
 #allow_stale_code
 
 //
-// A simple CSV parsing and encoding library.
-// 
-// This library is used to ingest and output a CSV file. It uses
-// a polymorphic structure to represent a CSV over a particular
-// set of data. This helps with type safety, as well as making
-// it ergonomic to work with.
+// A CSV parsing and encoding library (RFC 4180 quoting).
+//
+// Typed rows via a polymorphic `CSV(T)` and `@CSV_Column` tags.
+// Quoted fields may contain commas, quotes (`""`), and newlines.
 //
 
 use core
 use core.string
 use core.array
-use core.iter
 use core.conv
 use core.io
 use core.test
-use runtime
 
+use core { Result }
 use core.misc {any_as}
 use runtime.info {
     get_type_info,
@@ -28,6 +25,12 @@ use runtime.info {
 /// Represents data from a CSV file of a particular type.
 CSV :: struct (Output_Type: type_expr) {
     entries: [..] Output_Type;
+}
+
+Error :: enum {
+    Unclosed_Quote
+    Unexpected_Character
+    Type_Mismatch
 }
 
 /// Tag-type used to tell the ingress and egress methods what
@@ -42,118 +45,330 @@ CSV_Column :: struct {
 }
 
 /// Create and initialize a CSV with no elements.
-CSV.make :: ($T: type_expr) => {
-    r := CSV(T).{};
-    r.entries = make(typeof r.entries);
-
-    return r;
+CSV.make :: ($T: type_expr, allocator := context.allocator) -> CSV(T) {
+    return .{
+        entries = make([..] T, 4, allocator)
+    }
 }
 
-/// Frees all data in a CSV.
+#overload
+__make_overload :: (_: &CSV($T), allocator := context.allocator) -> CSV(T) {
+    return CSV.make(T, allocator)
+}
+
+/// Frees all data in a CSV, including copied `str` fields.
 CSV.delete :: (csv: &CSV) {
-    delete(&csv.entries);
+    info: &Type_Info_Struct = ~~ get_type_info(csv.Output_Type)
+    for &entry in csv.entries {
+        free_entry(entry, info)
+    }
+    delete(&csv.entries)
 }
+
+#overload builtin.delete :: CSV.delete
+__dispose_used_local :: CSV.delete
 
 /// Ingests data from a string representing CSV data.
 /// Uses the type of the CSV to know what columns should be expected.
-/// If `headers_presents` is true, the first line will be treated as
+/// If `headers_present` is true, the first line will be treated as
 /// headers, and cross checked with the CSV_Column tag information.
 /// Use this when the columns from your CSV have a different order
 /// from the order of fields in the structure.
-CSV.ingress_string :: (csv: &CSV, contents: str, headers_present := true) -> bool {
-    reader, stream := io.reader_from_string(contents);
-    defer cfree(stream);
-
-    return csv->ingress(&reader, headers_present);
+CSV.ingress_string :: (csv: &CSV, contents: str, headers_present := true) -> Result(void, Error) {
+    return csv->ingress_bytes(contents, headers_present)
 }
 
 /// Ingests data from a Reader containing CSV data.
-/// Uses the type of the CSV to know what columns should be expectd.
-CSV.ingress :: (csv: &CSV, reader: &io.Reader, headers_present := true) -> bool {
+/// Uses the type of the CSV to know what columns should be expected.
+CSV.ingress :: (csv: &CSV, reader: &io.Reader, headers_present := true) -> Result(void, Error) {
+    contents := reader->read_all()
+    defer if contents.data != null do str.free(contents)
+    return csv->ingress_bytes(contents, headers_present)
+}
+
+CSV.ingress_bytes :: (csv: &CSV, contents: str, headers_present := true) -> Result(void, Error) {
     Header :: struct {
         type: type_expr;
         offset: i32;
     }
 
-    any_headers := make([..] Header);
-    defer delete(&any_headers);
+    any_headers := make([..] Header, 4)
+    defer delete(&any_headers)
 
-    output_type_info: &Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
+    buf := make(dyn_str, 32)
+    defer delete(&buf)
+
+    output_type_info: &Type_Info_Struct = ~~ get_type_info(csv.Output_Type)
+
+    p := Parser.{ contents, 0 }
+    p->skip_bom()
+    p->skip_newlines()
+
+    start := csv.entries.count
 
     if headers_present {
-        header_line := reader->read_line(allocator=context.temp_allocator)
-                    |> string.strip_trailing_whitespace();
+        if p->eof() do return .{ Ok = .{} }
 
-        for header in string.split_iter(header_line, ',') {
+        while true {
+            switch p->parse_field(&buf) {
+                case .Err as e {
+                    rollback_entries(csv, start, output_type_info)
+                    return .{ Err = e }
+                }
+                case .Ok ---
+            }
+
+            header := buf
             member := array.first(output_type_info.members, [](do {
                 if tag := array.first(it.tags, [t](t.type == CSV_Column)); tag {
                     return any_as(*tag, CSV_Column).name == header;
                 }
 
-                return false;
+                return it.name == header;
             }));
 
             any_headers << ((.{member.type, member.offset}) if member else .{void, -1});
-        }
 
+            c := p->peek()
+            if c == ',' {
+                p->bump()
+                continue
+            }
+            if c != 0 && c != '\n' && c != '\r' {
+                rollback_entries(csv, start, output_type_info)
+                return .{ Err = .Unexpected_Character }
+            }
+            break
+        }
+        p->consume_record_end()
+        p->skip_newlines()
     } else {
         for &member in output_type_info.members {
-            any_headers << .{ member.type, member.offset };
+            any_headers << .{ member.type, member.offset }
         }
     }
 
-    for line in reader->lines(allocator = context.temp_allocator) {
-        out: csv.Output_Type;
+    while !p->eof() {
+        out: csv.Output_Type
+        col := 0
+        row_err := false
+        row_err_kind := Error.Unexpected_Character
 
-        for entry in string.split_iter(string.strip_trailing_whitespace(line), ',')
-                |> iter.enumerate()
-        {
-            header := &any_headers[entry.index];
-            if header.offset == -1 do continue;
-
-            target := cast([&] u8) &out + header.offset;
-
-            if header.type == str {
-                *cast(&str) target = string.copy(entry.value);
-            } else {
-                conv.parse_any(target, header.type, entry.value);
+        while true {
+            switch p->parse_field(&buf) {
+                case .Err as e {
+                    free_entry(&out, output_type_info)
+                    rollback_entries(csv, start, output_type_info)
+                    return .{ Err = e }
+                }
+                case .Ok ---
             }
+
+            if col < any_headers.count {
+                header := &any_headers[col]
+                if header.offset != -1 {
+                    target := cast([&] u8) &out + header.offset
+
+                    if header.type == str {
+                        *cast(&str) target = string.copy(buf)
+                    } else {
+                        if !conv.parse_any(target, header.type, buf) {
+                            row_err = true
+                            row_err_kind = .Type_Mismatch
+                        }
+                    }
+                }
+            }
+            col += 1
+
+            if row_err {
+                free_entry(&out, output_type_info)
+                rollback_entries(csv, start, output_type_info)
+                return .{ Err = row_err_kind }
+            }
+
+            c := p->peek()
+            if c == ',' {
+                p->bump()
+                continue
+            }
+            if c != 0 && c != '\n' && c != '\r' {
+                free_entry(&out, output_type_info)
+                rollback_entries(csv, start, output_type_info)
+                return .{ Err = .Unexpected_Character }
+            }
+            break
         }
 
-        csv.entries << out;
+        csv.entries << out
+        p->consume_record_end()
+        p->skip_newlines()
     }
 
-    return true;
+    return .{ Ok = .{} }
 }
 
 /// Outputs data from a CSV into a Writer.
 /// When `include_headers` is true, the first line outputted will be
 /// the headers of the CSV, according to the CSV_Column tag information.
+/// Fields that contain a comma, quote, CR, or LF are quoted.
 CSV.egress :: (csv: &CSV, writer: &io.Writer, include_headers := true) {
-    output_type_info: &Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
+    output_type_info: &Type_Info_Struct = ~~ get_type_info(csv.Output_Type)
+
+    field := make(dyn_str, 32)
+    defer delete(&field)
 
     if include_headers {
         for &member in output_type_info.members {
-            if !#first do io.write(writer, ",");
+            if !#first do io.write(writer, ",")
 
             if tag := array.first(member.tags, [t](t.type == CSV_Column)); tag {
-                io.write(writer, any_as(*tag, CSV_Column).name);
+                write_field(writer, any_as(*tag, CSV_Column).name)
             } else {
-                io.write(writer, member.name);
+                write_field(writer, member.name)
             }
         }
 
-        io.write(writer, "\n");
+        io.write(writer, "\n")
     }
 
     for &it in csv.entries {
         for &member in output_type_info.members {
-            if !#first do io.write(writer, ",");
+            if !#first do io.write(writer, ",")
 
-            io.write_format_va(writer, "{}", .[ .{cast([&] u8) it + member.offset, member.type} ]);
+            field.count = 0
+            conv.format_va(&field, "{}", .[ .{cast([&] u8) it + member.offset, member.type} ])
+            write_field(writer, field)
         }
 
-        io.write(writer, "\n");
+        io.write(writer, "\n")
+    }
+}
+
+CSV.egress_string :: (csv: &CSV, include_headers := true, allocator := context.allocator) -> str {
+    stream := io.buffer_stream_make(256)
+    writer := io.writer_make(&stream, 0)
+    defer io.buffer_stream_free(&stream)
+
+    csv->egress(&writer, include_headers)
+    return string.copy(io.buffer_stream_to_str(&stream), allocator)
+}
+
+
+#local
+Parser :: struct {
+    data: str
+    i: u32
+}
+
+#local
+Parser.eof :: (p: &Parser) -> bool {
+    return p.i >= p.data.count
+}
+
+#local
+Parser.peek :: (p: &Parser) -> u8 {
+    if p->eof() do return 0
+    return p.data[p.i]
+}
+
+#local
+Parser.bump :: (p: &Parser) {
+    if !p->eof() do p.i += 1
+}
+
+#local
+Parser.skip_bom :: (p: &Parser) {
+    if p.data.count >= 3 && p.data[0] == 0xEF && p.data[1] == 0xBB && p.data[2] == 0xBF {
+        p.i = 3
+    }
+}
+
+#local
+Parser.skip_newlines :: (p: &Parser) {
+    while !p->eof() {
+        c := p->peek()
+        if c == '\n' || c == '\r' {
+            p->bump()
+        } else {
+            break
+        }
+    }
+}
+
+#local
+Parser.consume_record_end :: (p: &Parser) {
+    if p->peek() == '\r' do p->bump()
+    if p->peek() == '\n' do p->bump()
+}
+
+#local
+Parser.parse_field :: (p: &Parser, buf: &dyn_str) -> Result(void, Error) {
+    buf.count = 0
+
+    if p->peek() == '"' {
+        p->bump()
+        while !p->eof() {
+            c := p->peek()
+            p->bump()
+            if c == '"' {
+                if p->peek() == '"' {
+                    p->bump()
+                    *buf << cast(u8) '"'
+                } else {
+                    return .{ Ok = .{} }
+                }
+            } else {
+                *buf << c
+            }
+        }
+        return .{ Err = .Unclosed_Quote }
+    }
+
+    while !p->eof() {
+        c := p->peek()
+        if c == ',' || c == '\n' || c == '\r' do break
+        *buf << c
+        p->bump()
+    }
+
+    return .{ Ok = .{} }
+}
+
+#local
+field_needs_quotes :: (s: str) -> bool {
+    for c in s {
+        if c == ',' || c == '"' || c == '\n' || c == '\r' do return true
+    }
+    return false
+}
+
+#local
+write_field :: (w: &io.Writer, s: str) {
+    quote := field_needs_quotes(s)
+    if quote do io.write(w, "\"")
+    for c in s {
+        if c == '"' do io.write_byte(w, '"')
+        io.write_byte(w, c)
+    }
+    if quote do io.write(w, "\"")
+}
+
+#local
+rollback_entries :: (csv: &CSV, start: u32, info: &Type_Info_Struct) {
+    while csv.entries.count > start {
+        csv.entries.count -= 1
+        free_entry(&csv.entries[csv.entries.count], info)
+    }
+}
+
+#local
+free_entry :: (row: rawptr, info: &Type_Info_Struct) {
+    for &member in info.members {
+        if member.type == str {
+            s := *cast(&str) (cast([&] u8) row + member.offset)
+            if s.data != null do str.free(s)
+        }
     }
 }
 
@@ -180,10 +395,10 @@ CSV.egress :: (csv: &CSV, writer: &io.Writer, include_headers := true) {
         third: f32;
     }
 
-    csv: CSV(Data);
-    csv->ingress_string(data);
+    csv := CSV.make(Data);
+    t->assert(csv->ingress_string(data)->is_ok(), "ingress succeeds");
 
     t->assert(csv.entries[0].first == 1,   "First entry matches");
     t->assert(csv.entries[2].third == 3.6, "Last entry matches");
+    csv->delete();
 }
-

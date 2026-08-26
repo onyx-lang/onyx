@@ -1,0 +1,74 @@
+package main
+
+use core {*}
+use core.encoding.csv
+
+// @leak-check
+
+Data :: struct {
+    @csv.CSV_Column.{"first"}
+    first: i32
+
+    @csv.CSV_Column.{"second"}
+    second: str
+
+    @csv.CSV_Column.{"third"}
+    third: f32
+}
+
+Row :: struct {
+    a: str
+    b: str
+    c: str
+}
+
+Note :: struct {
+    @csv.CSV_Column.{"last, first"}
+    name: str
+    note: str
+}
+
+main :: () {
+    use table := csv.CSV.make(Data)
+    table->ingress_string("first,second,third\n1,test 1,1.2\n2,test 2,2.4\n3,test 3,3.6")!
+    println(table.entries.count)
+    println(table.entries[0].first)
+    println(table.entries[0].second)
+    println(table.entries[2].first)
+    println(table.entries[2].third == 3.6)
+
+    use quoted := csv.CSV.make(Row)
+    quoted->ingress_string("x,\"y,z\",w", headers_present=false)!
+    println(quoted.entries[0].a)
+    println(quoted.entries[0].b)
+    println(quoted.entries[0].c)
+
+    use escaped := csv.CSV.make(Row)
+    escaped->ingress_string("\"a\"\"b\",c,d", headers_present=false)!
+    println(escaped.entries[0].a)
+
+    use multi := csv.CSV.make(Row)
+    multi->ingress_string("\"a\nb\",c,d", headers_present=false)!
+    println(multi.entries[0].a.count)
+    println(multi.entries[0].a[0] == 'a' && multi.entries[0].a[1] == '\n' && multi.entries[0].a[2] == 'b')
+
+    use bad_quote := csv.CSV.make(Row)
+    println(bad_quote->ingress_string("\"abc", headers_present=false).Err!)
+    use bad_char := csv.CSV.make(Row)
+    println(bad_char->ingress_string("\"x\"y", headers_present=false).Err!)
+
+    use notes := csv.CSV.make(Note)
+    notes->ingress_string("\"last, first\",note\nAda,\"hello, world\"")!
+    println(notes.entries[0].name)
+    println(notes.entries[0].note)
+
+    out := notes->egress_string()
+    defer str.free(out)
+    println(out->contains("\"last, first\""))
+    println(out->contains("\"hello, world\""))
+
+    use round := csv.CSV.make(Note)
+    round->ingress_string(out)!
+    println(round.entries[0].name)
+    println(round.entries[0].note)
+}
