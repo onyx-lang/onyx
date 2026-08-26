@@ -1170,6 +1170,23 @@ CHECK_FUNC(call, AstCall** pcall) {
 
     if (tm == TYPE_MATCH_YIELD) YIELD(call->token->pos, "Waiting on argument type checking.");
 
+    if (call->kind == Ast_Kind_Call && call->callee->kind == Ast_Kind_Macro) {
+        bh_arr_each(AstParam, param, callee->params) {
+            if (param->is_used && param->local->type && type_is_struct(param->local->type)) {
+                Type *st;
+                if (param->local->type->kind == Type_Kind_Struct) {
+                    st = param->local->type;
+                } else {
+                    st = param->local->type->Pointer.elem;
+                }
+
+                if (st->Struct.status != SPS_Uses_Done) {
+                    YIELD(call->token->pos, "Waiting for used parameter members.");
+                }
+            }
+        }
+    }
+
     call->flags |= Ast_Flag_Has_Been_Checked;
 
     if (call->kind == Ast_Kind_Call && call->callee->kind == Ast_Kind_Macro) {
@@ -1288,6 +1305,8 @@ static CheckStatus assign_type_or_check(Context *context, AstTyped **node, Type 
     if (stat != Check_Success) return stat; \
     } while (0);
 
+static b32 binary_op_is_allowed(BinaryOp operation, Type* type);
+
 CHECK_FUNC(binaryop_assignment, AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
     if (context->checker.current_checking_level == EXPRESSION_LEVEL)
@@ -1374,27 +1393,42 @@ CHECK_FUNC(binaryop_assignment, AstBinaryOp** pbinop) {
 
     } else {
         // NOTE: +=, -=, ...
-        // NOTE: At this point, it is assumed that operator overloads for +=, -=, etc have been tested.
+        // Keep the compound-assign opcode so emit can evaluate the
+        // l-value address once. Do not rewrite to `lhs = lhs + rhs`.
+        BinaryOp operation = binary_op_from_compound_assign(binop->operation);
 
-        BinaryOp operation = -1;
-        if      (binop->operation == Binary_Op_Assign_Add)      operation = Binary_Op_Add;
-        else if (binop->operation == Binary_Op_Assign_Minus)    operation = Binary_Op_Minus;
-        else if (binop->operation == Binary_Op_Assign_Multiply) operation = Binary_Op_Multiply;
-        else if (binop->operation == Binary_Op_Assign_Divide)   operation = Binary_Op_Divide;
-        else if (binop->operation == Binary_Op_Assign_Modulus)  operation = Binary_Op_Modulus;
-        else if (binop->operation == Binary_Op_Assign_And)      operation = Binary_Op_And;
-        else if (binop->operation == Binary_Op_Assign_Or)       operation = Binary_Op_Or;
-        else if (binop->operation == Binary_Op_Assign_Xor)      operation = Binary_Op_Xor;
-        else if (binop->operation == Binary_Op_Assign_Shl)      operation = Binary_Op_Shl;
-        else if (binop->operation == Binary_Op_Assign_Shr)      operation = Binary_Op_Shr;
-        else if (binop->operation == Binary_Op_Assign_Sar)      operation = Binary_Op_Sar;
+        if (binop->left->type && type_is_multi_pointer(binop->left->type)) {
+            if (operation != Binary_Op_Add && operation != Binary_Op_Minus) {
+                report_bad_binaryop(context, binop);
+                return Check_Error;
+            }
 
-        AstBinaryOp* new_right = make_binary_op(context, operation, binop->left, binop->right);
-        binop->right = (AstTyped *) new_right;
-        new_right->token = binop->token;
-        binop->operation = Binary_Op_Assign;
+            resolve_expression_type(context, binop->right);
+            if (!type_is_integer(binop->right->type)) {
+                report_bad_binaryop(context, binop);
+                return Check_Error;
+            }
 
-        CHECK(binaryop, (AstBinaryOp **) &binop->right);
+            AstNumLit* numlit = make_int_literal(context, type_size_of(binop->left->type->MultiPointer.elem));
+            numlit->token = binop->right->token;
+            numlit->type = binop->right->type;
+
+            AstBinaryOp* scale = make_binary_op(context, Binary_Op_Multiply, binop->right, (AstTyped *) numlit);
+            scale->token = binop->token;
+            CHECK(binaryop, &scale);
+            binop->right = (AstTyped *) scale;
+            binop->right->type = binop->left->type;
+
+        } else if (binop->left->type && !binary_op_is_allowed(operation, binop->left->type)) {
+            // Not a builtin op= (e.g. a struct). Rewrite to `lhs = lhs + rhs`
+            // so `#operator+` still applies to `+=`. Primitive op= stays
+            // intact so emit can evaluate the l-value once.
+            AstBinaryOp* rhs_op = make_binary_op(context, operation, binop->left, binop->right);
+            rhs_op->token = binop->token;
+            CHECK(binaryop, &rhs_op);
+            binop->right = (AstTyped *) rhs_op;
+            binop->operation = Binary_Op_Assign;
+        }
     }
 
     if (binop->right->type == NULL) {

@@ -1,0 +1,58 @@
+use core {*}
+
+calls := 0
+slot := 10
+
+get_slot :: () -> &i32 {
+    calls += 1
+    return &slot
+}
+
+idx_calls := 0
+arr := i32.[ 1, 2, 3 ]
+
+get_idx :: () -> i32 {
+    idx_calls += 1
+    return 1
+}
+
+Point :: struct { x, y: i32 }
+pt := Point.{ 4, 5 }
+pt_calls := 0
+
+get_pt :: () -> &Point {
+    pt_calls += 1
+    return &pt
+}
+
+main :: () {
+    x := 1
+    x += 1
+    println(x)
+
+    x *= 3
+    println(x)
+
+    x -= 1
+    println(x)
+
+    *get_slot() += 5
+    printf("slot={}\n", slot)
+    printf("calls={}\n", calls)
+
+    arr[get_idx()] += 7
+    printf("arr1={}\n", arr[1])
+    printf("idx_calls={}\n", idx_calls)
+
+    get_pt().x += 10
+    printf("pt.x={}\n", pt.x)
+    printf("pt_calls={}\n", pt_calls)
+
+    flags := 15
+    flags &= 10
+    println(flags)
+
+    mp: [&] i32 = &arr[0]
+    mp += 1
+    printf("mp0={}\n", mp[0])
+}

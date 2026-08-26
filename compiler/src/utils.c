@@ -895,6 +895,28 @@ void expand_macro(Context *context, AstCall** pcall, AstFunction* template) {
         }
 
         symbol_introduce(context, argument_scope, template->params[i].local->token, value);
+
+        if (template->params[i].is_used) {
+            if (type_is_struct(param_type)) {
+                Type *st;
+                if (param_type->kind == Type_Kind_Struct) {
+                    st = param_type;
+                } else {
+                    st = param_type->Pointer.elem;
+                }
+
+                if (st->Struct.status == SPS_Uses_Done) {
+                    fori (j, 0, shlen(st->Struct.members)) {
+                        StructMember* member = st->Struct.members[j].value;
+                        AstFieldAccess* fa = make_field_access(context, (AstTyped *) value, member->name);
+                        symbol_raw_introduce(context, argument_scope, member->name, template->params[i].local->token->pos, (AstNode *) fa);
+                    }
+                }
+
+            } else if (param_type != NULL) {
+                ONYX_ERROR(template->params[i].local->token->pos, Error_Critical, "Can only 'use' structures or pointers to structures.");
+            }
+        }
     }
 
     if (template->poly_scope != NULL)

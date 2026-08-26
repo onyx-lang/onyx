@@ -507,6 +507,7 @@ EMIT_FUNC(data_relocation_for_node,        AstNode *node);
 EMIT_FUNC(assignment,                      AstBinaryOp* assign);
 EMIT_FUNC(assignment_of_array,             AstTyped* left, AstTyped* right);
 EMIT_FUNC(compound_assignment,             AstBinaryOp* assign);
+EMIT_FUNC(inplace_assignment,              AstBinaryOp* assign);
 EMIT_FUNC(store_instruction,               Type* type, u32 offset);
 EMIT_FUNC(flip_and_store_instruction,      AstTyped *lval, OnyxToken *token);
 EMIT_FUNC(generic_store_instruction,       AstTyped *lval, OnyxToken *token);
@@ -1701,11 +1702,88 @@ static const WasmInstructionType binop_map[][4] = {
     /* BOR  */ { WI_I32_OR,    WI_I64_OR,    WI_NOP,     WI_NOP },
 };
 
+EMIT_FUNC(inplace_assignment, AstBinaryOp* assign) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    BinaryOp base_op = binary_op_from_compound_assign(assign->operation);
+    assert(base_op < Binary_Op_Bool_And);
+
+    AstTyped *lval = assign->left;
+
+    Type *op_type = lval->type;
+    while (op_type && op_type->kind == Type_Kind_Distinct) op_type = op_type->Distinct.base_type;
+    if (op_type && op_type->kind == Type_Kind_Enum) op_type = op_type->Enum.backing;
+
+    WasmType operator_type = onyx_type_to_wasm_type(lval->type);
+    i32 optype = 0;
+    if      (operator_type == WASM_TYPE_INT32)   optype = 0;
+    else if (operator_type == WASM_TYPE_INT64)   optype = 1;
+    else if (operator_type == WASM_TYPE_FLOAT32) optype = 2;
+    else if (operator_type == WASM_TYPE_FLOAT64) optype = 3;
+
+    WasmInstructionType binop_instr = binop_map[(i32) base_op][optype];
+    assert(binop_instr != WI_NOP);
+
+    if ((base_op == Binary_Op_Divide || base_op == Binary_Op_Modulus)
+        && op_type && op_type->kind == Type_Kind_Basic
+        && (op_type->Basic.flags & Basic_Flag_Unsigned)) {
+        binop_instr = (WasmInstructionType) ((i32) binop_instr + 1);
+    }
+
+    if ((lval->kind == Ast_Kind_Local || lval->kind == Ast_Kind_Param)
+        && (bh_imap_get(&mod->local_map, (u64) lval) & LOCAL_IS_WASM)) {
+        u64 localidx = bh_imap_get(&mod->local_map, (u64) lval);
+        WIL(assign->token, WI_LOCAL_GET, localidx);
+        emit_expression(mod, &code, assign->right);
+        WI(assign->token, binop_instr);
+        WIL(assign->token, WI_LOCAL_SET, localidx);
+        *pcode = code;
+        return;
+    }
+
+    if (lval->kind == Ast_Kind_Global) {
+        i32 globalidx = (i32) bh_imap_get(&mod->index_map, (u64) lval);
+        WID(assign->token, WI_GLOBAL_GET, globalidx);
+        emit_expression(mod, &code, assign->right);
+        WI(assign->token, binop_instr);
+        WID(assign->token, WI_GLOBAL_SET, globalidx);
+        *pcode = code;
+        return;
+    }
+
+    u64 offset = 0;
+    emit_location_return_offset(mod, &code, lval, &offset);
+
+    u64 addr_tmp = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+    WIL(assign->token, WI_LOCAL_TEE, addr_tmp);
+    emit_load_instruction(mod, &code, lval->type, (u32) offset);
+
+    emit_expression(mod, &code, assign->right);
+    WI(assign->token, binop_instr);
+
+    WasmType wt = onyx_type_to_wasm_type(lval->type);
+    u64 val_tmp = local_raw_allocate(mod->local_alloc, wt);
+    WIL(assign->token, WI_LOCAL_SET, val_tmp);
+    WIL(assign->token, WI_LOCAL_GET, addr_tmp);
+    WIL(assign->token, WI_LOCAL_GET, val_tmp);
+    emit_store_instruction(mod, &code, lval->type, (u32) offset);
+
+    local_raw_free(mod->local_alloc, wt);
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+
+    *pcode = code;
+    return;
+}
+
 EMIT_FUNC(binop, AstBinaryOp* binop) {
     bh_arr(WasmInstruction) code = *pcode;
 
     if (binop_is_assignment(binop->operation)) {
-        emit_assignment(mod, &code, binop);
+        if (binop->operation != Binary_Op_Assign) {
+            emit_inplace_assignment(mod, &code, binop);
+        } else {
+            emit_assignment(mod, &code, binop);
+        }
         *pcode = code;
         return;
     }

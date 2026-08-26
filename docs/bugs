@@ -3,7 +3,7 @@ List of known bugs:
 [ ] partially solidifying procedures messes up poly param indicies, which causes them to
     not be solved correctly.
 
-[ ] macros cannot use 'use'.
+[X] macros cannot use 'use'.
 
     Vec2 :: struct { x, y : f32; }
 
@@ -17,7 +17,7 @@ List of known bugs:
         return conv.str_format_va(buffer, format, args);
     }
 
-[ ] Compound assignment operators such as += evaluate the location of their left-value twice.
+[X] Compound assignment operators such as += evaluate the location of their left-value twice.
     Not only is this bad for efficiency, if the value requires calling a function, that
     function will be called twice instead of once. This is a simple code generation fix,
     but will require not destroying this information in the checking phase of the compiler.

@@ -2489,6 +2489,23 @@ static inline b32 binop_is_assignment(BinaryOp binop) {
     return (binop >= Binary_Op_Assign_Start && binop <= Binary_Op_Assign_End);
 }
 
+static inline BinaryOp binary_op_from_compound_assign(BinaryOp op) {
+    switch (op) {
+        case Binary_Op_Assign_Add:      return Binary_Op_Add;
+        case Binary_Op_Assign_Minus:    return Binary_Op_Minus;
+        case Binary_Op_Assign_Multiply: return Binary_Op_Multiply;
+        case Binary_Op_Assign_Divide:   return Binary_Op_Divide;
+        case Binary_Op_Assign_Modulus:  return Binary_Op_Modulus;
+        case Binary_Op_Assign_And:      return Binary_Op_And;
+        case Binary_Op_Assign_Or:       return Binary_Op_Or;
+        case Binary_Op_Assign_Xor:      return Binary_Op_Xor;
+        case Binary_Op_Assign_Shl:      return Binary_Op_Shl;
+        case Binary_Op_Assign_Shr:      return Binary_Op_Shr;
+        case Binary_Op_Assign_Sar:      return Binary_Op_Sar;
+        default:                        return Binary_Op_Count;
+    }
+}
+
 static inline b32 binop_is_compare(BinaryOp binop) {
     return (binop >= Binary_Op_Equal && binop <= Binary_Op_Greater_Equal);
 }
