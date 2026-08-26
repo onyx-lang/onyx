@@ -94,6 +94,8 @@ static void           parse_import_statement(OnyxParser* parser, OnyxToken *toke
 static void consume_token(OnyxParser* parser) {
     if (parser->hit_unexpected_token) return;
 
+    if (parser->curr->type == Token_Type_End_Stream) return;
+
     parser->prev = parser->curr;
     // :LinearTokenDependent
     parser->curr++;
@@ -134,10 +136,6 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type) {
     if (parser->hit_unexpected_token) return NULL;
 
     OnyxToken* token = parser->curr;
-    if (token_type == ';' && token->type == Token_Type_End_Stream) {
-        return token;
-    }
-
     consume_token(parser);
 
     if (token->type == Token_Type_Inserted_Semicolon) {
@@ -549,6 +547,7 @@ static void parse_arguments(OnyxParser* parser, TokenType end_token, Arguments* 
 }
 
 static b32 value_is_placeholder(AstTyped *arg) {
+    if (arg == NULL || arg->token == NULL) return 0;
     if (arg->kind != Ast_Kind_Symbol) return 0;
     if (arg->token->length > 1) return 0;
     if (arg->token->text[0] != '_') return 0;
@@ -853,7 +852,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             // HACK CLEANUP
             // :LinearTokenDependent
             OnyxToken *matching = find_matching_paren(parser->curr);
-            if (matching->type == ']' &&
+            if (matching && matching->type == ']' &&
                 ((matching + 1)->type == '{' || (matching + 1)->type == '(')) {
                 AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
                 code_block->token = expect_token(parser, '[');
@@ -1210,6 +1209,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         default:
         no_match:
             ONYX_ERROR(parser->curr->pos, Error_Critical, "Unexpected token '%s'.", token_name(parser->curr));
+            parser->hit_unexpected_token = 1;
             return NULL;
     }
 
@@ -1516,6 +1516,12 @@ static AstTyped* parse_expression(OnyxParser* parser, b32 assignment_allowed) {
         if (parser->hit_unexpected_token) return root;
 
         if (parser->curr->type == Token_Type_Keyword_If) {
+            if (root == NULL) {
+                ONYX_ERROR(parser->curr->pos, Error_Critical, "Unexpected 'if' in expression.");
+                parser->hit_unexpected_token = 1;
+                return NULL;
+            }
+
             AstIfExpression *ifexpr = make_node(AstIfExpression, Ast_Kind_If_Expression);
             ifexpr->token = expect_token(parser, Token_Type_Keyword_If);
 
@@ -2132,6 +2138,10 @@ static AstNode* parse_statement(OnyxParser* parser) {
             AstDefer* defer = make_node(AstDefer, Ast_Kind_Defer);
             defer->token = expect_token(parser, Token_Type_Keyword_Defer);
             defer->stmt  = parse_statement(parser);
+            if (defer->stmt == NULL) {
+                ONYX_ERROR(defer->token->pos, Error_Critical, "Expected a statement after 'defer'.");
+                parser->hit_unexpected_token = 1;
+            }
 
             retval = (AstNode *) defer;
             break;
@@ -2265,6 +2275,12 @@ static AstNode *parse_statements_until(OnyxParser *parser, TokenType end_token) 
     AstNode **next = NULL;
     AstNode *root = NULL;
     while (!consume_token_if_next(parser, end_token)) {
+        if (parser->curr->type == Token_Type_End_Stream) {
+            ONYX_ERROR(parser->curr->pos, Error_Critical, "Unexpected end of file.");
+            parser->hit_unexpected_token = 1;
+            break;
+        }
+
         AstNode *stmt = parse_statement(parser);
         if (parser->hit_unexpected_token) {
             break;
@@ -2727,11 +2743,12 @@ static AstType* parse_type(OnyxParser* parser) {
     }
 
     if (!type_can_be_done) {
-        if (root) {
+        if (root && root->token) {
             ONYX_ERROR(root->token->pos, Error_Critical, "Incomplete type when parsing.");
         } else {
             ONYX_ERROR(parser->curr->pos, Error_Critical, "Expected a type here.");
         }
+        parser->hit_unexpected_token = 1;
     }
 
     return root;
@@ -3120,6 +3137,11 @@ static AstInterface* parse_interface(OnyxParser* parser) {
     expect_token(parser, '{');
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) return interface;
+        if (parser->curr->type == Token_Type_End_Stream) {
+            ONYX_ERROR(parser->curr->pos, Error_Critical, "Unexpected end of file. Expected '}'.");
+            parser->hit_unexpected_token = 1;
+            return interface;
+        }
 
         if (next_tokens_are(parser, 3, Token_Type_Symbol, ':', ':')) {
             OnyxToken* binding_name = expect_token(parser, Token_Type_Symbol);
@@ -3185,7 +3207,7 @@ static AstConstraint* parse_constraint(OnyxParser* parser) {
     b32 parse_interface = 0;
     while (1) {
         OnyxToken* next = peek_token(i);
-        if (!next || next->type == '{') break;
+        if (!next || next->type == '{' || next->type == Token_Type_End_Stream) break;
 
         if (next->type == Token_Type_Symbol) {
             next = peek_token(i + 1);
@@ -3329,6 +3351,12 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
                 i32 old_len = bh_arr_length(*parser->polymorph_context.poly_params);
                 type_node = parse_type(parser);
                 i32 new_len = bh_arr_length(*parser->polymorph_context.poly_params);
+
+                if (type_node == NULL) {
+                    ONYX_ERROR(parser->curr->pos, Error_Critical, "Expected a type after '..'.");
+                    parser->hit_unexpected_token = 1;
+                    return;
+                }
 
                 if (vararg_kind == VA_Kind_Typed) {
                     AstVarArgType* va_type = make_node(AstVarArgType, Ast_Kind_VarArg_Type);
@@ -3524,7 +3552,10 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
         } else {
             func_def->return_type = parse_return_type(parser, &func_def->named_return_locals);
 
-            if (value_is_placeholder((AstTyped *) func_def->return_type)) {
+            if (func_def->return_type == NULL) {
+                func_def->return_type = (AstType *) &parser->context->basic_types.type_void;
+                parser->hit_unexpected_token = 1;
+            } else if (value_is_placeholder((AstTyped *) func_def->return_type)) {
                 func_def->return_type = (AstType *) &parser->context->basic_types.type_auto_return;
             }
         }
@@ -3852,6 +3883,11 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
 
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) return enum_node;
+        if (parser->curr->type == Token_Type_End_Stream) {
+            ONYX_ERROR(parser->curr->pos, Error_Critical, "Unexpected end of file. Expected '}'.");
+            parser->hit_unexpected_token = 1;
+            return enum_node;
+        }
         if (parser->curr->type == Token_Type_Doc_Comment) {
             consume_token(parser);
             continue;
@@ -4488,6 +4524,11 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 }
 
                 add_overload->overload = parse_expression(parser, 0);
+                if (add_overload->overload == NULL) {
+                    ONYX_ERROR(dir_token->pos, Error_Critical, "Expected an overload after '#overload' / '#match'.");
+                    parser->hit_unexpected_token = 1;
+                    return;
+                }
                 add_overload->overload->flags &= ~Ast_Flag_Function_Is_Lambda;
 
                 ENTITY_SUBMIT(add_overload);
@@ -4496,6 +4537,11 @@ static void parse_top_level_statement(OnyxParser* parser) {
             else if (parse_possible_directive(parser, "inject")) {
                 AstAlias *injection_point = make_node(AstAlias, Ast_Kind_Alias);
                 injection_point->alias = parse_expression(parser, 0);
+                if (injection_point->alias == NULL) {
+                    ONYX_ERROR(dir_token->pos, Error_Critical, "Expected a target after '#inject'.");
+                    parser->hit_unexpected_token = 1;
+                    return;
+                }
                 injection_point->token = injection_point->alias->token;
 
                 consume_token_if_next(parser, Token_Type_Inserted_Semicolon);
@@ -4706,7 +4752,7 @@ static b32 parse_package_name(OnyxParser *parser, AstPackage *package) {
     }
 
     package->package_name = package_name;
-    return 1;
+    return bh_arr_length(package->path) > 0;
 }
 
 static AstPackage* parse_package_expression(OnyxParser* parser) {
@@ -4793,6 +4839,10 @@ static Package* parse_file_package(OnyxParser* parser) {
     }
 
     AstPackage* package_node = parse_package_expression(parser);
+    if (package_node == NULL || package_node->path == NULL || bh_arr_length(package_node->path) == 0) {
+        ONYX_ERROR(parser->curr->pos, Error_Critical, "Expected a package name after 'package'.");
+        return package_lookup_or_create(parser->context, "main", parser->context->global_scope, parser->curr->pos);
+    }
 
     char aggregate_name[2048];
     aggregate_name[0] = '\0';
@@ -4930,7 +4980,10 @@ void onyx_parse(OnyxParser *parser) {
     }
 
     parser->package = parse_file_package(parser);
-    assert(parser->package);
+    if (parser->package == NULL) {
+        ONYX_ERROR(parser->curr->pos, Error_Critical, "Unable to determine the package for this file.");
+        return;
+    }
 
     {
         const char *doc_string = NULL;

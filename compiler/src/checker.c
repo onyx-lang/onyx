@@ -3617,6 +3617,8 @@ CHECK_FUNC(capture_block, AstCaptureBlock *block, Scope *captured_scope) {
 }
 
 CHECK_FUNC(statement, AstNode** pstmt) {
+    if (pstmt == NULL || *pstmt == NULL) return Check_Error;
+
     AstNode* stmt = *pstmt;
 
     context->checker.current_checking_level = STATEMENT_LEVEL;
