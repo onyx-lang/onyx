@@ -136,6 +136,7 @@ onyx_context_t *onyx_context_create() {
     types_init(context);
     prepare_builtins(context);
     compiler_events_init(context);
+    compilation_log_init(context);
 
     context->options.use_post_mvp_features = 1;
     context->options.enable_optional_semicolons = 1;
@@ -207,6 +208,7 @@ static b32 process_source_file(Context *context, char* filename) {
     bh_file_close(&file);
 
     bh_arr_push(context->loaded_files, fc);
+    compilation_log_emit_file(context, bh_arr_last(context->loaded_files).filename);
 
     // if (context->options.verbose_output == 2)
     //     bh_printf("Processing source file:    %s (%d bytes)\n", file.filename, fc.length);
@@ -484,6 +486,11 @@ static void prime_pump(Context *context) {
     context->pump_is_primed = 1;
 }
 
+static onyx_pump_t pump_return(Context *context, onyx_pump_t result) {
+    compiler_extensions_flush_compilation_data(context);
+    return result;
+}
+
 onyx_pump_t onyx_pump(onyx_context_t *ctx) {
     Context *context = &ctx->context;
 
@@ -495,11 +502,11 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
 
     if (bh_arr_is_empty(context->entities.entities)) {
         // Once the module has been linked, we are all done and ready to say everything compiled successfully!
-        if (context->wasm_module_linked) return ONYX_PUMP_DONE;
+        if (context->wasm_module_linked) return pump_return(context, ONYX_PUMP_DONE);
 
         link_wasm_module(context);
         context->wasm_module_linked = 1;
-        return ONYX_PUMP_DONE;
+        return pump_return(context, ONYX_PUMP_DONE);
     }
 
     Entity* ent = entity_heap_top(&context->entities);
@@ -557,7 +564,7 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
     }
 
     if (onyx_has_errors(context)) {
-        return ONYX_PUMP_ERRORED;
+        return pump_return(context, ONYX_PUMP_ERRORED);
     }
 
     if (ent->state != Entity_State_Finalized && ent->state != Entity_State_Failed)
@@ -571,7 +578,7 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
         context->stats.microseconds_per_state[perf_entity_state] += duration;
     }
 
-    return ONYX_PUMP_CONTINUE;
+    return pump_return(context, ONYX_PUMP_CONTINUE);
 }
 
 //
@@ -720,7 +727,9 @@ void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length) {
     file_contents.length = length;
     file_contents.filename = "(injected)";
 
+    compilation_log_emit_file(&ctx->context, file_contents.filename);
     parse_source_file(&ctx->context, &file_contents);
+    compiler_extensions_flush_compilation_data(&ctx->context);
 }
 
 //
@@ -901,6 +910,24 @@ void onyx_output_write(onyx_context_t *ctx, onyx_output_type_t type, void *buffe
         memcpy(buffer, ctx->context.generated_injected_code_buffer.data, ctx->context.generated_injected_code_buffer.length);
         break;
     }
+}
+
+
+int32_t onyx_compilation_data_length(onyx_context_t *ctx) {
+    compilation_log_ensure_c_abi_encoded(&ctx->context);
+    return ctx->context.compilation_log.encoded.length;
+}
+
+void onyx_compilation_data_write(onyx_context_t *ctx, void *buffer) {
+    CompilationLog *log = &ctx->context.compilation_log;
+    compilation_log_ensure_c_abi_encoded(&ctx->context);
+
+    if (log->encoded.length > 0 && buffer) {
+        memcpy(buffer, log->encoded.data, log->encoded.length);
+    }
+
+    log->c_abi_cursor = log->encoded_to;
+    log->encoded_valid = 0;
 }
 
 

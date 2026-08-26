@@ -1,0 +1,143 @@
+#load "core:onyx/toolchain/module"
+
+use core {*}
+use onyx.toolchain {*}
+use protobuf.onyx.toolchain.events
+
+main :: () {
+    b := Builder.make();
+    defer b->destroy();
+
+    core_root := os.env("ONYX_PATH") ?? "";
+    defer str.free(core_root);
+    b->map_dir("core", tprintf("{}/core", core_root));
+
+    b->enable(.DISABLE_EXTENSIONS);
+
+    b->inject_source("package foo.bar\nx :: 1\n");
+    b->compile();
+
+    first := b->compilation_data();
+
+    has_start := false;
+    has_foo := false;
+    has_foo_bar := false;
+    foo_id: u32;
+    foo_bar_parent: u32;
+    file_count := 0;
+    has_scope := false;
+    has_nested_scope := false;
+    has_symbol_x := false;
+    x_scope_id: u32;
+
+    for e in first.events {
+        switch e.start {
+            case .Some do has_start = true;
+            case .None {}
+        }
+
+        switch e.file {
+            case .Some do file_count += 1;
+            case .None {}
+        }
+
+        switch e.pack {
+            case .Some as p {
+                if p.fully_qualified_name == "foo" {
+                    has_foo = true;
+                    foo_id = p.id;
+                }
+                if p.fully_qualified_name == "foo.bar" {
+                    has_foo_bar = true;
+                    foo_bar_parent = p.parent_package_id;
+                }
+            }
+            case .None {}
+        }
+
+        switch e.scope {
+            case .Some as s {
+                has_scope = true;
+                if s.parent_scope_id != 0 do has_nested_scope = true;
+            }
+            case .None {}
+        }
+
+        switch e.symbol {
+            case .Some as sym {
+                if sym.name == "x" {
+                    has_symbol_x = true;
+                    x_scope_id = sym.scope_id;
+                }
+            }
+            case .None {}
+        }
+    }
+
+    println("has_start");
+    println(has_start);
+    println("has_foo");
+    println(has_foo);
+    println("has_foo_bar");
+    println(has_foo_bar);
+    println("parent_ok");
+    println(has_foo && has_foo_bar && foo_bar_parent == foo_id);
+    println("has_file");
+    println(file_count > 0);
+    println("has_scope");
+    println(has_scope);
+    println("has_nested_scope");
+    println(has_nested_scope);
+    println("has_symbol_x");
+    println(has_symbol_x);
+    println("symbol_x_scope_ok");
+    println(has_symbol_x && x_scope_id != 0);
+
+    b->inject_source("package extra\ny :: 1\n");
+    b->compile();
+    second := b->compilation_data();
+
+    delta_has_start := false;
+    delta_has_extra := false;
+    delta_has_foo := false;
+    delta_has_scope := false;
+    delta_has_symbol_x := false;
+
+    for e in second.events {
+        switch e.start {
+            case .Some do delta_has_start = true;
+            case .None {}
+        }
+
+        switch e.pack {
+            case .Some as p {
+                if p.fully_qualified_name == "extra" do delta_has_extra = true;
+                if p.fully_qualified_name == "foo" do delta_has_foo = true;
+            }
+            case .None {}
+        }
+
+        switch e.scope {
+            case .Some do delta_has_scope = true;
+            case .None {}
+        }
+
+        switch e.symbol {
+            case .Some as sym {
+                if sym.name == "x" do delta_has_symbol_x = true;
+            }
+            case .None {}
+        }
+    }
+
+    println("delta_has_start");
+    println(delta_has_start);
+    println("delta_has_extra");
+    println(delta_has_extra);
+    println("delta_has_foo");
+    println(delta_has_foo);
+    println("delta_has_scope");
+    println(delta_has_scope);
+    println("delta_has_symbol_x");
+    println(delta_has_symbol_x);
+}

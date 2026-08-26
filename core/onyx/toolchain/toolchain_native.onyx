@@ -108,6 +108,8 @@ onyx_context_t :: #distinct u64
     onyx_error_rank :: (ctx: onyx_context_t, error_idx: i32) -> onyx_error_t ---
     onyx_output_length :: (ctx: onyx_context_t, type: onyx_output_type_t) -> i32 ---
     onyx_output_write :: (ctx: onyx_context_t, type: onyx_output_type_t, buffer: [&] u8) -> void ---
+    onyx_compilation_data_length :: (ctx: onyx_context_t) -> i32 ---
+    onyx_compilation_data_write :: (ctx: onyx_context_t, buffer: [&] u8) -> void ---
     onyx_stat :: (ctx: onyx_context_t, stat: onyx_stat_t) -> i32 ---
     onyx_stat_filepath :: (ctx: onyx_context_t, file_index: i32) -> cptr(u8) ---
     onyx_run_wasm :: (buffer: [] u8, argc: i32, argv: [&] cptr(u8)) -> void ---

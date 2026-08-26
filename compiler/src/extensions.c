@@ -3,10 +3,11 @@
 #include "parser.h"
 #include "utils.h"
 
-#define MSG_HOST_INIT          0
-#define MSG_HOST_TERMINATE     1
-#define MSG_HOST_EXPAND_MACRO  2
-#define MSG_HOST_HOOK          3
+#define MSG_HOST_INIT              0
+#define MSG_HOST_TERMINATE         1
+#define MSG_HOST_EXPAND_MACRO      2
+#define MSG_HOST_HOOK              3
+#define MSG_HOST_COMPILATION_DATA  4
 
 #define MSG_EXT_INIT             0
 #define MSG_EXT_ERROR_REPORT     1
@@ -14,7 +15,8 @@
 #define MSG_EXT_INJECT_CODE      3
 #define MSG_EXT_ACKNOWLEDGE_HOOK 4
 
-#define HOOK_STALLED 1
+#define HOOK_STALLED            1
+#define HOOK_COMPILATION_DATA   2
 
 
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
@@ -191,6 +193,30 @@ static char *extension_recv_str(CompilerExtension *ext, i32 *out_len) {
     return buf;
 }
 
+static void compiler_extension_send_compilation_data(Context *context, CompilerExtension *ext) {
+    if (!ext->alive || !ext->supports_compilation_data) return;
+    if (ext->state != COMP_EXT_STATE_READY) return;
+
+    u32 from = ext->compilation_data_cursor;
+    u32 to = (u32)bh_arr_length(context->compilation_log.events);
+    if (from >= to) return;
+
+    bh_buffer buf;
+    bh_buffer_init(&buf, context->gp_alloc, 256);
+    compilation_log_encode_range(context, from, to, &buf);
+
+    extension_send_int(ext, MSG_HOST_COMPILATION_DATA);
+    extension_send_bytes(ext, buf.data, buf.length);
+    bh_buffer_free(&buf);
+
+    ext->compilation_data_cursor = to;
+}
+
+void compiler_extensions_flush_compilation_data(Context *context) {
+    bh_arr_each(CompilerExtension, ext, context->extensions) {
+        compiler_extension_send_compilation_data(context, ext);
+    }
+}
 
 
 TypeMatch compiler_extension_start(Context *context, const char *name, const char *containing_filename, Entity *ent, i32 *out_extension_id) {
@@ -207,6 +233,7 @@ TypeMatch compiler_extension_start(Context *context, const char *name, const cha
         }
 
         CompilerExtension ext;
+        memset(&ext, 0, sizeof(ext));
         ext.state = COMP_EXT_STATE_SPAWNING;
         bh_arena_init(&ext.arena, context->gp_alloc, 1 * 1024 * 1024); // 1MB
         ext.entity = ent;
@@ -226,7 +253,7 @@ TypeMatch compiler_extension_start(Context *context, const char *name, const cha
         init_msg[1] = VERSION_MAJOR;
         init_msg[2] = VERSION_MINOR;
         init_msg[3] = VERSION_PATCH;
-        init_msg[4] = 1;
+        init_msg[4] = 3;
 
         extension_send(&ext, init_msg, sizeof(init_msg));
 
@@ -244,6 +271,7 @@ TypeMatch compiler_extension_start(Context *context, const char *name, const cha
         }
 
         ext->state = COMP_EXT_STATE_READY;
+        compiler_extensions_flush_compilation_data(context);
         return TYPE_MATCH_SUCCESS;
     }
 }
@@ -265,7 +293,8 @@ b32 compiler_extension_negotiate_capabilities(Context *context, CompilerExtensio
         fori (i, 0, hook_count) {
             int hook = extension_recv_int(ext);
 
-            if (hook == 1) ext->supports_stalled_hook = 1;
+            if (hook == HOOK_STALLED) ext->supports_stalled_hook = 1;
+            if (hook == HOOK_COMPILATION_DATA) ext->supports_compilation_data = 1;
         }
     }
 
@@ -450,6 +479,7 @@ TypeMatch compiler_extension_expand_macro(
 
             ext->state = COMP_EXT_STATE_READY;
             ext->current_expansion_id = 0;
+            compiler_extensions_flush_compilation_data(context);
             return TYPE_MATCH_SUCCESS;
         }
 
@@ -495,6 +525,7 @@ TypeMatch compiler_extension_hook_stalled(Context *context, int extension_id) {
             }
 
             ext->state = COMP_EXT_STATE_READY;
+            compiler_extensions_flush_compilation_data(context);
             return TYPE_MATCH_SUCCESS;
         }
 
@@ -510,6 +541,9 @@ void compiler_extension_terminate(Context *context, int extension_id) {
     CompilerExtension *ext = &context->extensions[extension_id - 1];
 
     if (!ext->alive) return;
+
+    compiler_extension_send_compilation_data(context, ext);
+
     if (ext->state != COMP_EXT_STATE_READY) return;
 
     extension_send_int(ext, MSG_HOST_TERMINATE);

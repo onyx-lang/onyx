@@ -19,6 +19,10 @@ CompilerEvent :: struct {
     file: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventFile
     @protobuf.Field.{12, 11}
     pack: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventPackage
+    @protobuf.Field.{13, 11}
+    scope: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventScope
+    @protobuf.Field.{14, 11}
+    symbol: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventSymbol
 }
 
 @protobuf.Message
@@ -45,5 +49,39 @@ EventPackage :: struct {
     fully_qualified_name: str
     @protobuf.Field.{4, 13}
     parent_package_id: u32
+}
+
+@protobuf.Message
+EventScope :: struct {
+    @protobuf.Field.{1, 13}
+    id: u32
+    @protobuf.Field.{2, 13}
+    parent_scope_id: u32
+    @protobuf.Field.{3, 13}
+    file_id: u32
+    @protobuf.Field.{4, 13}
+    line: u32
+    @protobuf.Field.{5, 13}
+    column: u32
+    @protobuf.Field.{6, 9}
+    name: str
+}
+
+@protobuf.Message
+EventSymbol :: struct {
+    @protobuf.Field.{1, 13}
+    id: u32
+    @protobuf.Field.{2, 13}
+    scope_id: u32
+    @protobuf.Field.{3, 9}
+    name: str
+    @protobuf.Field.{4, 13}
+    file_id: u32
+    @protobuf.Field.{5, 13}
+    line: u32
+    @protobuf.Field.{6, 13}
+    column: u32
+    @protobuf.Field.{7, 13}
+    kind: u32
 }
 

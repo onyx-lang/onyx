@@ -162,6 +162,16 @@ API int32_t onyx_output_length(onyx_context_t *ctx, onyx_output_type_t type);
 API void    onyx_output_write(onyx_context_t *ctx, onyx_output_type_t type, void *buffer);
 
 //
+// Compilation data (protobuf CompilerEvents)
+//
+// First write is the full log so far. Later writes are only events since the last
+// write. length does not advance the cursor; write does.
+//
+
+API int32_t onyx_compilation_data_length(onyx_context_t *ctx);
+API void    onyx_compilation_data_write(onyx_context_t *ctx, void *buffer);
+
+//
 // Compilation Info
 //
 

@@ -1,13 +1,17 @@
 package onyx.compiler_extension
 #allow_stale_code
 
+#load "../toolchain/compiler_events.proto.onyx"
+
 use core {
     stdio
     Result
 }
 use core.alloc {package, arena}
 use core.encoding.osad
+use core.encoding.protobuf
 use core.io
+use protobuf.onyx.toolchain.events { CompilerEvents }
 
 // PROTOCOL VERSION 1
 // 
@@ -79,6 +83,10 @@ IncomingMessage :: union {
         id: u32
         info: HookInfo
     }
+
+    CompilationData as 4: struct {
+        events: [] u8
+    }
 }
 
 OutgoingMessage :: union {
@@ -139,6 +147,8 @@ HookInfo :: union {
 
     Stalled: struct {}
 
+    CompilationData: struct {}
+
     Count: void
 }
 
@@ -156,13 +166,16 @@ ExtensionContext :: struct {
     reader: io.Reader
 
     running: bool
+    wants_compilation_data: bool
+    compiler_events: CompilerEvents
 }
 
 ExtensionContext.make :: (name: str) -> (res: ExtensionContext) {
     res.name = name
-    res.protocol_version = 2
+    res.protocol_version = 3
 
     res.proc_macros = make(typeof res.proc_macros)
+    res.compiler_events.events = make(typeof res.compiler_events.events)
     res.arena = arena.make(context.allocator, 32 * 1024)
     res.reader = io.Reader.make(&stdio.stream)
     return
@@ -184,6 +197,14 @@ ExtensionContext.start :: (self: &#Self, callback: (&#Self, msg: IncomingMessage
                     if h != null_proc {
                         hooks->push(i)
                     }
+                }
+
+                if self.wants_compilation_data {
+                    found := false
+                    for h in hooks {
+                        if h == 2 do found = true
+                    }
+                    if !found do hooks->push(2)
                 }
 
                 self->send(.{
@@ -209,6 +230,20 @@ ExtensionContext.start :: (self: &#Self, callback: (&#Self, msg: IncomingMessage
                         id = hk.id
                     }
                 })
+            }
+
+            case .CompilationData as &cd {
+                switch protobuf.unmarshal(cd.events, CompilerEvents) {
+                    case .Ok as decoded {
+                        for e in decoded.events {
+                            self.compiler_events.events->push(e)
+                        }
+                        delete(&decoded.events)
+                    }
+                    case .Err {}
+                }
+
+                callback(self, msg)
             }
 
             case .ExpandMacro as em {
@@ -248,6 +283,11 @@ ExtensionContext.handle_macro :: (self: &#Self, name: str, func: (&ExtensionCont
 
 ExtensionContext.handle_hook :: (self: &#Self, hook: HookInfo.tag_enum, func: (&ExtensionContext, HookInfo) -> void) {
     self.hook_handlers[~~hook] = func
+}
+
+ExtensionContext.enable_compilation_data :: (self: &#Self) {
+    if self.protocol_version < 3 do self.protocol_version = 3
+    self.wants_compilation_data = true
 }
 
 

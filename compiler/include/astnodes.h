@@ -2041,6 +2041,9 @@ typedef struct CompilerExtension {
     b32 alive : 1;
 
     b32 supports_stalled_hook : 1;
+    b32 supports_compilation_data : 1;
+
+    u32 compilation_data_cursor;
 } CompilerExtension;
 
 typedef struct CompileOptions CompileOptions;
@@ -2224,6 +2227,71 @@ typedef struct EventSystem {
     CompilerEvent *last;
 } EventSystem;
 
+typedef enum CompilationEventKind {
+    COMPILATION_EVENT_START = 0,
+    COMPILATION_EVENT_FILE = 1,
+    COMPILATION_EVENT_PACKAGE = 2,
+    COMPILATION_EVENT_SCOPE = 3,
+    COMPILATION_EVENT_SYMBOL = 4,
+} CompilationEventKind;
+
+typedef struct CompilationEvent {
+    CompilationEventKind kind;
+    u64 timestamp;
+
+    union {
+        struct {
+            char *compiler_version;
+        } start;
+
+        struct {
+            u32 id;
+            char *path;
+        } file;
+
+        struct {
+            u32 id;
+            char *package_name;
+            char *fully_qualified_name;
+            u32 parent_package_id;
+        } pack;
+
+        struct {
+            u32 id;
+            u32 parent_scope_id;
+            u32 file_id;
+            u32 line;
+            u32 column;
+            char *name;
+        } scope;
+
+        struct {
+            u32 id;
+            u32 scope_id;
+            char *name;
+            u32 file_id;
+            u32 line;
+            u32 column;
+            u32 kind;
+        } symbol;
+    };
+} CompilationEvent;
+
+typedef struct CompilationLog {
+    bh_arr(CompilationEvent) events;
+
+    bh_buffer encoded;
+    u32 encoded_from;
+    u32 encoded_to;
+    b32 encoded_valid;
+
+    u32 c_abi_cursor;
+    u32 next_file_id;
+    u32 next_symbol_id;
+
+    Table(u32) file_ids;
+} CompilationLog;
+
 struct Context {
     Table(Package *)      packages;
     EntityHeap            entities;
@@ -2279,6 +2347,7 @@ struct Context {
     AstTyped node_that_signals_failure;
 
     EventSystem events;
+    CompilationLog compilation_log;
 
     OnyxErrors errors;
     b32 errors_enabled;
@@ -2455,6 +2524,7 @@ TypeMatch compiler_extension_expand_macro(
     u32 *out_expansion_id,
     b32 wait_for_response);
 TypeMatch compiler_extension_hook_stalled(Context *context, int extension_id);
+void compiler_extensions_flush_compilation_data(Context *context);
 
 
 // Compiler Events
@@ -2464,6 +2534,15 @@ CompilerEvent *compiler_event_add(Context *context, u32 event_type);
 void compiler_event_add_field_str(Context *context, CompilerEvent *event, char *field, char *value);
 void compiler_event_add_field_int(Context *context, CompilerEvent *event, char *field, i32 value);
 void compiler_event_log(Context *context, char *fmt, ...);
+
+void compilation_log_init(Context *context);
+void compilation_log_emit_start(Context *context);
+void compilation_log_emit_file(Context *context, const char *path);
+void compilation_log_emit_package(Context *context, Package *package);
+void compilation_log_emit_scope(Context *context, Scope *scope);
+void compilation_log_emit_symbol(Context *context, Scope *scope, char *name, OnyxFilePos pos, AstNode *node);
+void compilation_log_encode_range(Context *context, u32 from, u32 to, bh_buffer *out);
+void compilation_log_ensure_c_abi_encoded(Context *context);
 
 
 // NOTE: Useful inlined functions

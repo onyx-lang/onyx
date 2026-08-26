@@ -1,7 +1,9 @@
 package onyx.toolchain
 
 use core { cptr, alloc, memory }
+use core.encoding.protobuf
 use onyx.toolchain.native
+use protobuf.onyx.toolchain.events { CompilerEvents }
 
 TextPosition :: struct {
     line: u32
@@ -57,6 +59,10 @@ Builder.disable :: (use self: &#Self, option: native.onyx_option_t) {
     native.onyx_set_option_int(ctx, option, 0)
 }
 
+Builder.pump :: (use self: &#Self) -> bool {
+    return native.onyx_pump(ctx) == .CONTINUE
+}
+
 Builder.compile :: (use self: &#Self) {
     while native.onyx_pump(ctx) == .CONTINUE {}
 }
@@ -99,6 +105,22 @@ Builder.generate_output :: (
     buffer := make([] u8, length)
     native.onyx_output_write(ctx, type, buffer.data)
     return buffer
+}
+
+/// Unread compilation events since the last call, decoded as `CompilerEvents`.
+/// The first call returns the full log so far; later calls return only new events.
+/// Append successive results to reconstruct the complete log.
+Builder.compilation_data :: (use self: &#Self, allocator := context.allocator) -> CompilerEvents {
+    length := native.onyx_compilation_data_length(ctx)
+    if length <= 0 {
+        return .{}
+    }
+
+    buffer := make([] u8, length)
+    defer delete(&buffer)
+
+    native.onyx_compilation_data_write(ctx, buffer.data)
+    return protobuf.unmarshal(buffer, CompilerEvents, allocator)!
 }
 
 

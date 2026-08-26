@@ -38,6 +38,15 @@ Package* package_lookup_or_create(Context *context, char* package_name, Scope* p
         package->use_package_entities = NULL;
         package->id = ++context->next_package_id;
         package->parent_id = -1;
+
+        char *dot = strrchr(pac_name, '.');
+        if (dot != NULL) {
+            *dot = '\0';
+            Package *parent = package_lookup(context, pac_name);
+            *dot = '.';
+            if (parent) package->parent_id = parent->id;
+        }
+
         bh_arr_new(context->gp_alloc, package->sub_packages, 4);
 
         if (!strcmp(pac_name, "builtin")) {
@@ -61,6 +70,8 @@ Package* package_lookup_or_create(Context *context, char* package_name, Scope* p
 
             symbol_raw_introduce(context, context->global_scope, pac_name, pos, (AstNode *) package_node);
         }
+
+        compilation_log_emit_package(context, package);
 
         return package;
     }
@@ -118,6 +129,8 @@ Scope* scope_create(Context *context, Scope* parent, OnyxFilePos created_at) {
     // This will be set on the first symbol insertion.
     scope->symbols = NULL;
 
+    compilation_log_emit_scope(context, scope);
+
     return scope;
 }
 
@@ -160,6 +173,7 @@ b32 symbol_raw_introduce(Context *context, Scope* scope, char* name, OnyxFilePos
 
     shput(scope->symbols, name, symbol);
     track_declaration_for_symbol_info(context, pos, symbol);
+    compilation_log_emit_symbol(context, scope, name, pos, symbol);
     return 1;
 }
 

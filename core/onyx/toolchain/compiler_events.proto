@@ -15,9 +15,9 @@ package onyx.toolchain.events;
 //     - Symbol id, symbol text, symbol file id, symbol line, symbol column
 // - Symbol resolved
 //     - Span of source, resolved to id
-// - Binding 
+// - Binding
 // - Types created
-
+//
 
 
 message CompilerEvents {
@@ -30,6 +30,8 @@ message CompilerEvent {
     EventStart start = 10;
     EventFile file = 11;
     EventPackage pack = 12;
+    EventScope scope = 13;
+    EventSymbol symbol = 14;
   }
 }
 
@@ -51,3 +53,21 @@ message EventPackage {
   uint32 parent_package_id = 4;
 }
 
+message EventScope {
+  uint32 id = 1;
+  uint32 parent_scope_id = 2;
+  uint32 file_id = 3;
+  uint32 line = 4;
+  uint32 column = 5;
+  string name = 6;
+}
+
+message EventSymbol {
+  uint32 id = 1;
+  uint32 scope_id = 2;
+  string name = 3;
+  uint32 file_id = 4;
+  uint32 line = 5;
+  uint32 column = 6;
+  uint32 kind = 7;
+}
