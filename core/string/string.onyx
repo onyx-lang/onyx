@@ -189,6 +189,7 @@ str.contains :: (s: str, substr: str) -> bool {
 }
 
 
+/// Joins `strs` with `sep` between them. The result is an owned `str`; free it with `str.free`.
 str.join :: (strs: [] str, sep: str, allocator := context.allocator) -> str {
     if strs.count == 0 do return "";
 
@@ -279,36 +280,58 @@ str.index_of :: #match #local {}
 
 #overload
 str.index_of :: (s: str, c: u8) -> i32 {
-    for s.count {
-        if s[it] == c do return it;
-    }
-    return -1;
+    return str.find(s, c) ?? -1;
 }
 
 #overload
 str.index_of :: (s: str, substr: str) -> i32 {
-    while i := 0; i < s.count {
+    return str.find(s, substr) ?? -1;
+}
+
+/// Index of the first `c`, or `.None` if it is not present.
+str.find :: #match #local {}
+
+#overload
+str.find :: (s: str, c: u8) -> ? i32 {
+    for s.count {
+        if s[it] == c do return it;
+    }
+    return .None;
+}
+
+#overload
+str.find :: (s: str, substr: str) -> ? i32 {
+    if substr.count == 0 do return 0;
+    if substr.count > s.count do return .None;
+
+    last := s.count - substr.count;
+    while i := 0; i <= last {
         defer i += 1;
 
-        while j := 0; j < substr.count {
+        matched := true;
+        for j in substr.count {
             if s[i + j] != substr[j] {
-                continue continue;
+                matched = false;
+                break;
             }
-
-            j += 1;
         }
 
-        return i;
+        if matched do return i;
     }
 
-    return -1;
+    return .None;
 }
 
 str.last_index_of :: (s: str, c: u8) -> i32 {
+    return str.find_last(s, c) ?? -1;
+}
+
+/// Index of the last `c`, or `.None` if it is not present.
+str.find_last :: (s: str, c: u8) -> ? i32 {
     for range.{s.count-1, 0, -1} {
         if s[it] == c do return it;
     }
-    return -1;
+    return .None;
 }
 
 
@@ -736,6 +759,27 @@ str.to_dyn_str :: (x: str, allocator := context.allocator) -> dyn_str {
     return array.make(x, allocator);
 }
 
+/// Joins `parts` with `sep` between them into an owned string.
+///
+///     path := dyn_str.join(.[ dir, name ], "/");
+///     defer delete(&path);
+dyn_str.join :: (parts: [] str, sep: str, allocator := context.allocator) -> dyn_str {
+    out := Array.make(u8, allocator = allocator);
+    for parts {
+        if !#first do Array.concat(&out, sep);
+        Array.concat(&out, it);
+    }
+    return out;
+}
+
+/// Appends formatted text to the string.
+///
+///     s->append_format("x={}", 3);
+dyn_str.append_format :: (s: &dyn_str, format: str, va: ..any) {
+    use core.conv
+    conv.format_va(s, format, ~~va);
+}
+
 dyn_str.append :: #match {
     macro (x: &dyn_str, other: str) {
         use core.array
@@ -774,6 +818,8 @@ ends_with :: str.ends_with
 empty :: str.empty
 index_of :: str.index_of
 last_index_of :: str.last_index_of
+find :: str.find
+find_last :: str.find_last
 strip_whitespace :: str.strip_whitespace
 strip_leading_whitespace :: str.strip_leading_whitespace
 strip_trailing_whitespace :: str.strip_trailing_whitespace
@@ -794,6 +840,7 @@ bisect :: str.bisect
 to_dyn_str :: str.to_dyn_str
 delete :: dyn_str.delete
 append :: dyn_str.append
+append_format :: dyn_str.append_format
 clear  :: dyn_str.clear
 retreat :: dyn_str.retreat
 insert :: dyn_str.insert

@@ -1,0 +1,225 @@
+package core.bytes
+
+use core
+
+/// Appends a single byte.
+append :: (buf: &[..] u8, b: u8) {
+    Array.push(buf, b);
+}
+
+/// Appends the bytes of a string or slice.
+append_str :: (buf: &[..] u8, s: [] u8) {
+    Array.concat(buf, s);
+}
+
+append_u8 :: append
+
+/// Writes `v` into the start of `dest`. Returns `false` if `dest` is too short.
+put_u16_le :: (dest: [] u8, v: u16) -> bool {
+    if dest.count < 2 do return false;
+    encode_le(dest[0 .. 2], v);
+    return true;
+}
+
+put_u16_be :: (dest: [] u8, v: u16) -> bool {
+    if dest.count < 2 do return false;
+    encode_be(dest[0 .. 2], v);
+    return true;
+}
+
+put_u32_le :: (dest: [] u8, v: u32) -> bool {
+    if dest.count < 4 do return false;
+    encode_le(dest[0 .. 4], v);
+    return true;
+}
+
+put_u32_be :: (dest: [] u8, v: u32) -> bool {
+    if dest.count < 4 do return false;
+    encode_be(dest[0 .. 4], v);
+    return true;
+}
+
+put_u64_le :: (dest: [] u8, v: u64) -> bool {
+    if dest.count < 8 do return false;
+    encode_le(dest[0 .. 8], v);
+    return true;
+}
+
+put_u64_be :: (dest: [] u8, v: u64) -> bool {
+    if dest.count < 8 do return false;
+    encode_be(dest[0 .. 8], v);
+    return true;
+}
+
+/// Appends `v` in little-endian order.
+append_u16_le :: (buf: &[..] u8, v: u16) {
+    tmp: [2] u8;
+    encode_le(~~tmp, v);
+    Array.concat(buf, ~~tmp);
+}
+
+/// Appends `v` in big-endian order.
+append_u16_be :: (buf: &[..] u8, v: u16) {
+    tmp: [2] u8;
+    encode_be(~~tmp, v);
+    Array.concat(buf, ~~tmp);
+}
+
+append_u32_le :: (buf: &[..] u8, v: u32) {
+    tmp: [4] u8;
+    encode_le(~~tmp, v);
+    Array.concat(buf, ~~tmp);
+}
+
+append_u32_be :: (buf: &[..] u8, v: u32) {
+    tmp: [4] u8;
+    encode_be(~~tmp, v);
+    Array.concat(buf, ~~tmp);
+}
+
+append_u64_le :: (buf: &[..] u8, v: u64) {
+    tmp: [8] u8;
+    encode_le(~~tmp, v);
+    Array.concat(buf, ~~tmp);
+}
+
+append_u64_be :: (buf: &[..] u8, v: u64) {
+    tmp: [8] u8;
+    encode_be(~~tmp, v);
+    Array.concat(buf, ~~tmp);
+}
+
+append_i16_le :: (buf: &[..] u8, v: i16) do append_u16_le(buf, ~~v);
+append_i16_be :: (buf: &[..] u8, v: i16) do append_u16_be(buf, ~~v);
+append_i32_le :: (buf: &[..] u8, v: i32) do append_u32_le(buf, ~~v);
+append_i32_be :: (buf: &[..] u8, v: i32) do append_u32_be(buf, ~~v);
+append_i64_le :: (buf: &[..] u8, v: i64) do append_u64_le(buf, ~~v);
+append_i64_be :: (buf: &[..] u8, v: i64) do append_u64_be(buf, ~~v);
+
+/// Reads a little-endian integer from `data` at `offset`.
+/// Returns `.None` if there are not enough bytes.
+read_u16_le :: (data: [] u8, offset := 0) -> ? u16 {
+    if !has(data, offset, 2) do return .None;
+    return decode_le(u16, data[offset .. offset + 2]);
+}
+
+read_u16_be :: (data: [] u8, offset := 0) -> ? u16 {
+    if !has(data, offset, 2) do return .None;
+    return decode_be(u16, data[offset .. offset + 2]);
+}
+
+read_u32_le :: (data: [] u8, offset := 0) -> ? u32 {
+    if !has(data, offset, 4) do return .None;
+    return decode_le(u32, data[offset .. offset + 4]);
+}
+
+read_u32_be :: (data: [] u8, offset := 0) -> ? u32 {
+    if !has(data, offset, 4) do return .None;
+    return decode_be(u32, data[offset .. offset + 4]);
+}
+
+read_u64_le :: (data: [] u8, offset := 0) -> ? u64 {
+    if !has(data, offset, 8) do return .None;
+    return decode_le(u64, data[offset .. offset + 8]);
+}
+
+read_u64_be :: (data: [] u8, offset := 0) -> ? u64 {
+    if !has(data, offset, 8) do return .None;
+    return decode_be(u64, data[offset .. offset + 8]);
+}
+
+read_i16_le :: (data: [] u8, offset := 0) -> ? i16 {
+    if read_u16_le(data, offset) as v {
+        return cast(i16) v;
+    }
+    return .None;
+}
+
+read_i16_be :: (data: [] u8, offset := 0) -> ? i16 {
+    if read_u16_be(data, offset) as v {
+        return cast(i16) v;
+    }
+    return .None;
+}
+
+read_i32_le :: (data: [] u8, offset := 0) -> ? i32 {
+    if read_u32_le(data, offset) as v {
+        return cast(i32) v;
+    }
+    return .None;
+}
+
+read_i32_be :: (data: [] u8, offset := 0) -> ? i32 {
+    if read_u32_be(data, offset) as v {
+        return cast(i32) v;
+    }
+    return .None;
+}
+
+read_i64_le :: (data: [] u8, offset := 0) -> ? i64 {
+    if read_u64_le(data, offset) as v {
+        return cast(i64) v;
+    }
+    return .None;
+}
+
+read_i64_be :: (data: [] u8, offset := 0) -> ? i64 {
+    if read_u64_be(data, offset) as v {
+        return cast(i64) v;
+    }
+    return .None;
+}
+
+/// True if `data` begins with `prefix`.
+starts_with :: (data: [] u8, prefix: [] u8) -> bool {
+    return str.starts_with(data, prefix);
+}
+
+/// True if `data` ends with `suffix`.
+ends_with :: (data: [] u8, suffix: [] u8) -> bool {
+    return str.ends_with(data, suffix);
+}
+
+/// Index of the first occurrence of `needle`, or `.None`.
+find :: (data: [] u8, needle: [] u8) -> ? i32 {
+    return str.find(data, needle);
+}
+
+
+#local {
+    has :: (data: [] u8, offset: i32, n: i32) -> bool {
+        return offset >= 0 && offset + n <= data.count;
+    }
+
+    encode_le :: (dest: [] u8, v: $T) {
+        x := cast(u64) v;
+        for i in dest.count {
+            dest[i] = cast(u8) (x >> cast(u64) (i * 8));
+        }
+    }
+
+    encode_be :: (dest: [] u8, v: $T) {
+        x := cast(u64) v;
+        n := dest.count;
+        for i in n {
+            dest[i] = cast(u8) (x >> cast(u64) ((n - 1 - i) * 8));
+        }
+    }
+
+    decode_le :: ($T: type_expr, src: [] u8) -> T {
+        v: u64 = 0;
+        for i in src.count {
+            v |= (cast(u64) src[i]) << cast(u64) (i * 8);
+        }
+        return cast(T) v;
+    }
+
+    decode_be :: ($T: type_expr, src: [] u8) -> T {
+        v: u64 = 0;
+        n := src.count;
+        for i in n {
+            v |= (cast(u64) src[i]) << cast(u64) ((n - 1 - i) * 8);
+        }
+        return cast(T) v;
+    }
+}

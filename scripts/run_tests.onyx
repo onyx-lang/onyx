@@ -41,6 +41,42 @@ print_color :: (color: Color, format: str, args: ..any) {
 Test_Case :: struct {
     source_file   : str;
     expected_file : str;
+    leak_check    := false;
+}
+
+// Tests that opt into leak checking contain this marker in the source.
+LEAK_CHECK_MARKER :: "@leak-check";
+LEAK_LINE_PREFIX  :: "[LEAK]";
+
+strip_leak_reports :: (output: str) -> (clean: str, leak_count: i32) {
+    if !string.contains(output, LEAK_LINE_PREFIX) {
+        clean = output;
+        leak_count = 0;
+        return;
+    }
+
+    result := make(dyn_str);
+    start := 0;
+    i := 0;
+    while i <= output.count {
+        end_of_line := i == output.count || output[i] == '\n';
+        if end_of_line {
+            line := output[start .. i];
+            if string.starts_with(line, LEAK_LINE_PREFIX) {
+                leak_count += 1;
+            } else {
+                dyn_str.append(&result, line);
+                if i < output.count {
+                    dyn_str.append(&result, "\n");
+                }
+            }
+            start = i + 1;
+        }
+        i += 1;
+    }
+
+    clean = result;
+    return;
 }
 
 find_onyx_files :: (root: str, cases: &[..] Test_Case) {
@@ -55,7 +91,9 @@ find_onyx_files :: (root: str, cases: &[..] Test_Case) {
                 continue;
             }
 
-            array.push(cases, .{ test_case, expected_file });
+            contents := os.get_contents(test_case);
+            leak_check := string.contains(contents, LEAK_CHECK_MARKER);
+            array.push(cases, .{ test_case, expected_file, leak_check });
         }
 
         if it.type == .Directory {
@@ -83,6 +121,9 @@ Settings :: struct {
 
     #tag "--compile-only"
     compile_only := false;
+
+    #tag "--leak-check"
+    leak_check := false;
 }
 
 main :: (args) => {
@@ -94,15 +135,20 @@ main :: (args) => {
         onyx_cmd: str;
         at_least_one_test_failed := false;
         compile_only := false;   // @Bug // why is this necessary? why is settings.compile_only false when in the thread code?
+        leak_check := false;
 
         failed_tests: &[..] str;
+        leaked_tests: &[..] str;
         failed_tests_mutex: sync.Mutex;
     }
     exec_context := Execution_Context.{};
     exec_context.compile_only = settings.compile_only;
+    exec_context.leak_check = settings.leak_check;
 
     failed_tests := make([..] str);
+    leaked_tests := make([..] str);
     exec_context.failed_tests = &failed_tests;
+    exec_context.leaked_tests = &leaked_tests;
     sync.mutex_init(&exec_context.failed_tests_mutex);
 
     switch runtime.compiler_os {
@@ -120,16 +166,26 @@ main :: (args) => {
         // Weird macros mean I have to forward external names
         use core {*}
         print_color :: print_color;
+        strip_leak_reports :: strip_leak_reports;
 
         cmd := os.command()
             ->path(thread_data.onyx_cmd);
+
+        check_leaks := thread_data.leak_check || it.leak_check;
 
         if thread_data.compile_only {
             printf("[{}]  Compiling test {}...\n", context.thread_id, it.source_file);
             cmd->args(.["build", it.source_file]);
         } else {
             printf("[{}]  Running test {}...\n", context.thread_id, it.source_file);
-            cmd->args(.["run", "--generate-method-info", it.source_file]);
+            args: [..] str
+            args << "run"
+            args << "--generate-method-info"
+            if check_leaks {
+                args << "-DLEAKCHECK"
+            }
+            args << it.source_file
+            cmd->args(args);
         }
 
         output := cmd->output();
@@ -152,12 +208,29 @@ main :: (args) => {
         if thread_data.compile_only do continue;
 
         program_output := output.Ok->unwrap();
+        clean_output, leak_count := strip_leak_reports(program_output);
 
         use expected_file := os.open(it.expected_file)->unwrap();
         use expected_reader := io.reader_make(&expected_file);
         expected_output := io.read_all(&expected_reader);
 
-        if program_output != expected_output {
+        if it.leak_check && leak_count > 0 {
+            print_color(.Red, "[{}]  Leaked memory in {}.\n{}", context.thread_id, it.source_file, program_output);
+            thread_data.at_least_one_test_failed = true;
+
+            sync.critical_section(&thread_data.failed_tests_mutex) {
+                array.push(thread_data.failed_tests, it.source_file);
+            }
+
+        } elseif leak_count > 0 {
+            print_color(.Yellow, "[{}]  {} leaked (ignored).\n", context.thread_id, it.source_file);
+
+            sync.critical_section(&thread_data.failed_tests_mutex) {
+                array.push(thread_data.leaked_tests, it.source_file);
+            }
+        }
+
+        if clean_output != expected_output {
             print_color(.Red, "[{}]  Output did not match for {}.\n", context.thread_id, it.source_file);
             printf("Expected:\n{}\n", expected_output);
             printf("Got:\n{}\n", program_output);
@@ -166,6 +239,13 @@ main :: (args) => {
             sync.critical_section(&thread_data.failed_tests_mutex) {
                 array.push(thread_data.failed_tests, it.source_file);
             }
+        }
+    }
+
+    if leaked_tests.count > 0 {
+        print_color(.Yellow, "{} tests leaked (ignored under --leak-check)\n", leaked_tests.count);
+        for leaked_tests {
+            printf("  {}\n", it);
         }
     }
 

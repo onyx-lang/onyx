@@ -1,0 +1,37 @@
+use core {*}
+
+// @leak-check
+
+main :: () {
+    bs := io.buffer_stream_make();
+    defer delete(&bs);
+
+    bw := io.binary_writer_make(&bs);
+    bw->write_u16_le(0xabcd);
+    bw->write_u16_be(0xabcd);
+    bw->write_u32_le(0x01020304);
+    bw->write_i16_le(-2);
+    bw->write_bytes("xy");
+
+    nums := i32.[10, 20];
+    bw->write_slice(nums);
+
+    io.stream_seek(&bs, 0, .Start);
+
+    br := io.binary_reader_make(&bs);
+    println(br->read_u16_le()!);
+    println(br->read_u16_be()!);
+    println(br->read_u32_le()!);
+    println(br->read_i16_le()!);
+
+    text: [2] u8;
+    n := br->read_bytes(~~text)!;
+    println(n);
+    println(text[0]);
+    println(text[1]);
+
+    sl := br->read_slice(i32, 2);
+    println(sl[0]);
+    println(sl[1]);
+    delete(&sl);
+}

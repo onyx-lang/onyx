@@ -1,6 +1,8 @@
 package core.io
 
 use core.memory
+use core.bytes
+use core { Result }
 
 
 BinaryWriter :: struct {
@@ -21,20 +23,76 @@ binary_write :: (use bw: &BinaryWriter, $T: type_expr, v: &T) {
     stream_write(stream, .{ ~~ v, sizeof T });
 }
 
+/// Writes the raw bytes of `sl`. If `output_size` is true, writes `sl.count` first as a host-endian `i32`.
 binary_write_slice :: (use bw: &BinaryWriter, sl: [] $T, output_size := false) {
-    panic("binary_write_slice is not working at the moment");
-    if output_size do binary_write(bw, i32, sl.count);
+    if output_size {
+        count := sl.count;
+        binary_write(bw, i32, &count);
+    }
 
-    bytes := ([] u8).{
-        data = cast(&u8) &sl.data[0],
+    raw: [] u8 = .{
+        data  = cast(&u8) sl.data,
         count = sizeof T * sl.count,
     };
 
-    stream_write(stream, bytes);
+    stream_write(stream, raw);
 }
 
+BinaryWriter.write_byte :: binary_write_byte
+BinaryWriter.write :: binary_write
+BinaryWriter.write_slice :: binary_write_slice
+BinaryWriter.write_bytes :: (use bw: &BinaryWriter, buf: [] u8) {
+    stream_write(stream, buf);
+}
 
+BinaryWriter.write_u16_le :: (use bw: &BinaryWriter, v: u16) {
+    tmp: [2] u8;
+    bytes.put_u16_le(~~tmp, v);
+    stream_write(stream, ~~tmp);
+}
 
+BinaryWriter.write_u16_be :: (use bw: &BinaryWriter, v: u16) {
+    tmp: [2] u8;
+    bytes.put_u16_be(~~tmp, v);
+    stream_write(stream, ~~tmp);
+}
+
+BinaryWriter.write_u32_le :: (use bw: &BinaryWriter, v: u32) {
+    tmp: [4] u8;
+    bytes.put_u32_le(~~tmp, v);
+    stream_write(stream, ~~tmp);
+}
+
+BinaryWriter.write_u32_be :: (use bw: &BinaryWriter, v: u32) {
+    tmp: [4] u8;
+    bytes.put_u32_be(~~tmp, v);
+    stream_write(stream, ~~tmp);
+}
+
+BinaryWriter.write_u64_le :: (use bw: &BinaryWriter, v: u64) {
+    tmp: [8] u8;
+    bytes.put_u64_le(~~tmp, v);
+    stream_write(stream, ~~tmp);
+}
+
+BinaryWriter.write_u64_be :: (use bw: &BinaryWriter, v: u64) {
+    tmp: [8] u8;
+    bytes.put_u64_be(~~tmp, v);
+    stream_write(stream, ~~tmp);
+}
+
+BinaryWriter.write_i16_le :: (use bw: &BinaryWriter, v: i16) do bw->write_u16_le(~~v);
+BinaryWriter.write_i16_be :: (use bw: &BinaryWriter, v: i16) do bw->write_u16_be(~~v);
+BinaryWriter.write_i32_le :: (use bw: &BinaryWriter, v: i32) do bw->write_u32_le(~~v);
+BinaryWriter.write_i32_be :: (use bw: &BinaryWriter, v: i32) do bw->write_u32_be(~~v);
+BinaryWriter.write_i64_le :: (use bw: &BinaryWriter, v: i64) do bw->write_u64_le(~~v);
+BinaryWriter.write_i64_be :: (use bw: &BinaryWriter, v: i64) do bw->write_u64_be(~~v);
+
+/// Writes `sl.count` as a little-endian `u32`, then the raw bytes of `sl`.
+BinaryWriter.write_slice_u32_le :: (use bw: &BinaryWriter, sl: [] $T) {
+    bw->write_u32_le(sl.count);
+    bw->write_bytes(.{ cast(&u8) sl.data, sl.count * sizeof T });
+}
 
 
 BinaryReader :: struct {
@@ -59,19 +117,115 @@ binary_read :: (use br: &BinaryReader, $T: type_expr) -> T {
     return *(cast(&T) buf);
 }
 
+/// Reads `size` elements of `T`. If `size` is 0 and `read_size` is true, reads a host-endian `i32` count first.
 binary_read_slice :: (use br: &BinaryReader,
     $T: type_expr,
     size := 0, read_size := false,
     allocator := context.allocator) -> [] T {
 
-    panic("binary_write_slice is not working at the moment");
-    
     if size == 0 && read_size {
         size = binary_read(br, i32);
     }
 
+    if size <= 0 do return .{};
+
     sl := memory.make_slice(u8, size * sizeof T, allocator = allocator);
     bytes_read := stream_read(stream, sl).Ok ?? 0;
+    count := bytes_read / sizeof T;
 
-    return .{ data = cast(&T) sl.data, count = size };
+    return .{ data = cast(&T) sl.data, count = count };
+}
+
+BinaryReader.read_byte :: binary_read_byte
+BinaryReader.read :: binary_read
+BinaryReader.read_slice :: binary_read_slice
+
+BinaryReader.read_bytes :: (use br: &BinaryReader, buf: [] u8) -> Result(i32, Error) {
+    switch stream_read(stream, buf) {
+        case .Ok as n do return .{ Ok = n };
+        case .Err as err do return .{ Err = err };
+    }
+}
+
+#local
+read_exact :: (use br: &BinaryReader, buf: [] u8) -> Error {
+    switch stream_read(stream, buf) {
+        case .Err as err do return err;
+        case .Ok as n {
+            if n < buf.count do return .EOF;
+            return .None;
+        }
+    }
+}
+
+BinaryReader.read_u16_le :: (use br: &BinaryReader) -> Result(u16, Error) {
+    buf: [2] u8;
+    if err := read_exact(br, ~~buf); err != .None do return .{ Err = err };
+    return .{ Ok = bytes.read_u16_le(~~buf) ?? 0 };
+}
+
+BinaryReader.read_u16_be :: (use br: &BinaryReader) -> Result(u16, Error) {
+    buf: [2] u8;
+    if err := read_exact(br, ~~buf); err != .None do return .{ Err = err };
+    return .{ Ok = bytes.read_u16_be(~~buf) ?? 0 };
+}
+
+BinaryReader.read_u32_le :: (use br: &BinaryReader) -> Result(u32, Error) {
+    buf: [4] u8;
+    if err := read_exact(br, ~~buf); err != .None do return .{ Err = err };
+    return .{ Ok = bytes.read_u32_le(~~buf) ?? 0 };
+}
+
+BinaryReader.read_u32_be :: (use br: &BinaryReader) -> Result(u32, Error) {
+    buf: [4] u8;
+    if err := read_exact(br, ~~buf); err != .None do return .{ Err = err };
+    return .{ Ok = bytes.read_u32_be(~~buf) ?? 0 };
+}
+
+BinaryReader.read_u64_le :: (use br: &BinaryReader) -> Result(u64, Error) {
+    buf: [8] u8;
+    if err := read_exact(br, ~~buf); err != .None do return .{ Err = err };
+    return .{ Ok = bytes.read_u64_le(~~buf) ?? 0 };
+}
+
+BinaryReader.read_u64_be :: (use br: &BinaryReader) -> Result(u64, Error) {
+    buf: [8] u8;
+    if err := read_exact(br, ~~buf); err != .None do return .{ Err = err };
+    return .{ Ok = bytes.read_u64_be(~~buf) ?? 0 };
+}
+
+BinaryReader.read_i16_le :: (use br: &BinaryReader) -> Result(i16, Error) {
+    buf: [2] u8;
+    if err := read_exact(br, ~~buf); err != .None do return .{ Err = err };
+    return .{ Ok = bytes.read_i16_le(~~buf) ?? 0 };
+}
+
+BinaryReader.read_i16_be :: (use br: &BinaryReader) -> Result(i16, Error) {
+    buf: [2] u8;
+    if err := read_exact(br, ~~buf); err != .None do return .{ Err = err };
+    return .{ Ok = bytes.read_i16_be(~~buf) ?? 0 };
+}
+
+BinaryReader.read_i32_le :: (use br: &BinaryReader) -> Result(i32, Error) {
+    buf: [4] u8;
+    if err := read_exact(br, ~~buf); err != .None do return .{ Err = err };
+    return .{ Ok = bytes.read_i32_le(~~buf) ?? 0 };
+}
+
+BinaryReader.read_i32_be :: (use br: &BinaryReader) -> Result(i32, Error) {
+    buf: [4] u8;
+    if err := read_exact(br, ~~buf); err != .None do return .{ Err = err };
+    return .{ Ok = bytes.read_i32_be(~~buf) ?? 0 };
+}
+
+BinaryReader.read_i64_le :: (use br: &BinaryReader) -> Result(i64, Error) {
+    buf: [8] u8;
+    if err := read_exact(br, ~~buf); err != .None do return .{ Err = err };
+    return .{ Ok = bytes.read_i64_le(~~buf) ?? 0 };
+}
+
+BinaryReader.read_i64_be :: (use br: &BinaryReader) -> Result(i64, Error) {
+    buf: [8] u8;
+    if err := read_exact(br, ~~buf); err != .None do return .{ Err = err };
+    return .{ Ok = bytes.read_i64_be(~~buf) ?? 0 };
 }

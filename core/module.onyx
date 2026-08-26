@@ -39,6 +39,7 @@ use runtime
 #load "./string/buffer"
 #load "./string/char_utils"
 #load "./string/string_pool"
+#load "./bytes/bytes"
 
 #load "./intrinsics/onyx"
 #load "./intrinsics/wasm"
