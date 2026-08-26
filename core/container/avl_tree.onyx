@@ -9,6 +9,71 @@ AVL_Tree :: struct (T: type_expr) {
     height: i32;
 }
 
+#local get_height :: (tree: &AVL_Tree) -> i32 {
+    if tree == null do return -1;
+    return tree.height;
+}
+
+#local rotate_left :: (tree: & &AVL_Tree) {
+    A := *tree;
+    B := A.right;
+    A.right = B.left;
+    B.left = A;
+    *tree = B;
+
+    A.height = math.max(get_height(A.left), get_height(A.right)) + 1;
+    B.height = math.max(get_height(B.left), get_height(B.right)) + 1;
+}
+
+#local rotate_right :: (tree: & &AVL_Tree) {
+    A := *tree;
+    B := A.left;
+    A.left = B.right;
+    B.right = A;
+    *tree = B;
+
+    A.height = math.max(get_height(A.left), get_height(A.right)) + 1;
+    B.height = math.max(get_height(B.left), get_height(B.right)) + 1;
+}
+
+#local rebalance :: (ptree: & &AVL_Tree) {
+    tree := *ptree;
+    if tree == null do return;
+
+    tree.height = math.max(get_height(tree.left), get_height(tree.right)) + 1;
+
+    bf := get_height(tree.left) - get_height(tree.right);
+    if bf < -1 {
+        child_bf := get_height(tree.right.left) - get_height(tree.right.right);
+        if child_bf > 0 {
+            rotate_right(&tree.right);
+            rotate_left(ptree);
+        } else {
+            rotate_left(ptree);
+        }
+    } elseif bf > 1 {
+        child_bf := get_height(tree.left.left) - get_height(tree.left.right);
+        if child_bf < 0 {
+            rotate_left(&tree.left);
+            rotate_right(ptree);
+        } else {
+            rotate_right(ptree);
+        }
+    }
+}
+
+#local detach_min :: (ptree: & &AVL_Tree($T)) -> &AVL_Tree(T) {
+    tree := *ptree;
+    if tree.left == null {
+        *ptree = tree.right;
+        return tree;
+    }
+
+    m := detach_min(&tree.left);
+    rebalance(ptree);
+    return m;
+}
+
 AVL_Tree.insert :: (ptree: & &AVL_Tree($T), data: T) {
     tree := *ptree;
     if tree == null {
@@ -27,36 +92,54 @@ AVL_Tree.insert :: (ptree: & &AVL_Tree($T), data: T) {
         AVL_Tree.insert(&tree.right, data);
     }
 
-    tree.height = math.max(get_height(tree.left), get_height(tree.right)) + 1;
+    rebalance(ptree);
+}
 
-    bf := get_height(tree.left) - get_height(tree.right);
-    if bf < -1 {
-        child_bf := get_height(tree.right.left) - get_height(tree.right.right);
-        if child_bf < 0 {
-            rotate_left(ptree);
-        } else {
-            rotate_right(&tree.right);
-            rotate_left(ptree);
+/// Removes the first node whose value equals `data`. No-op if it is not in the tree.
+AVL_Tree.remove :: (ptree: & &AVL_Tree($T), data: T) {
+    tree := *ptree;
+    if tree == null do return;
+
+    if data == tree.data {
+        if tree.left == null {
+            *ptree = tree.right;
+            cfree(tree);
+            return;
         }
 
-    } elseif bf > 1 {
-        child_bf := get_height(tree.left.left) - get_height(tree.left.right);
-        if child_bf < 0 {
-            rotate_right(ptree);
-        } else {
-            rotate_left(&tree.left);
-            rotate_right(ptree);
+        if tree.right == null {
+            *ptree = tree.left;
+            cfree(tree);
+            return;
         }
+
+        succ := detach_min(&tree.right);
+        tree.data = succ.data;
+        cfree(succ);
+    } elseif data < tree.data {
+        AVL_Tree.remove(&tree.left, data);
+    } else {
+        AVL_Tree.remove(&tree.right, data);
     }
+
+    rebalance(ptree);
 }
 
-AVL_Tree.remove :: (tree: &AVL_Tree, data: tree.T) {
+/// Frees every node. Prefer `delete(&tree)` when `tree` is `&AVL_Tree`.
+AVL_Tree.free :: (ptree: & &AVL_Tree) {
+    tree := *ptree;
+    if tree == null do return;
 
+    AVL_Tree.free(&tree.left);
+    AVL_Tree.free(&tree.right);
+    cfree(tree);
+    *ptree = null;
 }
 
-delete :: AVL_Tree.remove
-AVL_Tree.delete :: AVL_Tree.remove
+AVL_Tree.delete :: AVL_Tree.free
 
+#overload
+builtin.delete :: AVL_Tree.free
 
 AVL_Tree.contains :: (tree: &AVL_Tree, data: tree.T) -> bool {
     if tree == null do return false;
@@ -87,35 +170,12 @@ AVL_Tree.print :: (tree: &AVL_Tree) {
     }
 }
 
-#local get_height :: (tree: &AVL_Tree) -> i32 {
-    if tree == null do return -1;
-    return tree.height;
-}
-
-#local rotate_left :: (tree: & &AVL_Tree) {
-    A := *tree;
-    B := A.right;
-    A.right = B.left;
-    B.left = A;
-    *tree = B;
-
-    A.height = math.max(get_height(A.left), get_height(A.right)) + 1;
-    B.height = math.max(get_height(B.left), get_height(B.right)) + 1;
-}
-
-#local rotate_right :: (tree: & &AVL_Tree) {
-    A := *tree;
-    B := A.left;
-    A.left = B.right;
-    B.right = A;
-    *tree = B;
-
-    A.height = math.max(get_height(A.left), get_height(A.right)) + 1;
-    B.height = math.max(get_height(B.left), get_height(B.right)) + 1;
-}
 
 // Compatibility: package names.
 insert :: AVL_Tree.insert
 remove :: AVL_Tree.remove
+// Element-removal alias; the destructor is `AVL_Tree.delete` / `delete(&tree)`.
+delete :: AVL_Tree.remove
 contains :: AVL_Tree.contains
 print :: AVL_Tree.print
+free :: AVL_Tree.free

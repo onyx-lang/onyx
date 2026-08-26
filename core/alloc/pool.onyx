@@ -64,7 +64,13 @@ pool_free :: (pool: &PoolAllocator($Elem), elem: &Elem) {
 // I think I'm going to veto that idea because when the buffer is a slice of Elem
 // its guaranteed that the size allocated for the buffer is a multiple of the size
 // of Elem.
-make :: (buffer: [] $Elem) -> PoolAllocator(Elem) {
+PoolAllocator.make :: (buffer: [] $Elem) -> PoolAllocator(Elem) {
+    pool: PoolAllocator(Elem);
+    PoolAllocator.init(&pool, buffer);
+    return pool;
+}
+
+PoolAllocator.init :: (pool: &PoolAllocator($Elem), buffer: [] Elem) {
     assert(sizeof Elem >= sizeof rawptr, "Cannot have a pool allocator of a type less than a rawptr in size.");
 
     for i in 0 .. buffer.count - 1 {
@@ -73,16 +79,34 @@ make :: (buffer: [] $Elem) -> PoolAllocator(Elem) {
 
     *(cast(&rawptr) &buffer[buffer.count - 1]) = null;
 
-    return .{
-        buffer     = buffer,
-        first_free = &buffer[0],
-    };
+    pool.buffer     = buffer;
+    pool.first_free = &buffer[0];
 }
 
-#match core.alloc.as_allocator make_allocator
-make_allocator :: (pool: &PoolAllocator($Elem)) -> Allocator {
+/// Rebuilds the free list. Does not free `buffer`; the caller owns it.
+PoolAllocator.clear :: (pool: &PoolAllocator) {
+    PoolAllocator.init(pool, pool.buffer);
+}
+
+/// Drops the view of `buffer`. Does not free it; the caller owns it.
+PoolAllocator.delete :: (pool: &PoolAllocator) {
+    pool.buffer = .{};
+    pool.first_free = null;
+}
+
+#match core.alloc.as_allocator PoolAllocator.as_allocator
+PoolAllocator.as_allocator :: (pool: &PoolAllocator($Elem)) -> Allocator {
     return Allocator.{
         func = #solidify pool_allocator_proc { Elem = Elem },
         data = pool,
     };
 }
+
+#overload
+builtin.delete :: PoolAllocator.delete
+
+// Compatibility: package names.
+make :: PoolAllocator.make
+init :: PoolAllocator.init
+make_allocator :: PoolAllocator.as_allocator
+clear :: PoolAllocator.clear

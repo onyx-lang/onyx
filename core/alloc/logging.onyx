@@ -14,6 +14,32 @@ Allocation_Action_Strings := str.[
     "resize",
 ];
 
+LoggingAllocator :: struct {
+    wrapped: Allocator;
+}
+
+LoggingAllocator.make :: (a: Allocator) -> LoggingAllocator {
+    l: LoggingAllocator;
+    LoggingAllocator.init(&l, a);
+    return l;
+}
+
+LoggingAllocator.init :: (l: &LoggingAllocator, a: Allocator) {
+    l.wrapped = a;
+}
+
+LoggingAllocator.delete :: (l: &LoggingAllocator) {
+    l.wrapped = .{};
+}
+
+#match core.alloc.as_allocator LoggingAllocator.as_allocator
+LoggingAllocator.as_allocator :: (l: &LoggingAllocator) -> Allocator {
+    return logging_allocator(&l.wrapped);
+}
+
+#overload
+builtin.delete :: LoggingAllocator.delete
+
 #local
 logging_allocator_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     allocator := cast(&Allocator) data;
@@ -40,3 +66,8 @@ logging_allocator :: (alloc: &Allocator) -> Allocator {
         data = alloc,
     };
 }
+
+// Compatibility: package names.
+make :: LoggingAllocator.make
+init :: LoggingAllocator.init
+make_allocator :: LoggingAllocator.as_allocator

@@ -94,7 +94,7 @@ arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, 
 ///
 /// `arena_size` specifies the size of each individual arena page, which must be at least 4 bytes
 /// in size (but should be quite a bit large).
-make :: (backing: Allocator, arena_size: u32) -> Arena {
+Arena.make :: (backing: Allocator, arena_size: u32) -> Arena {
     assert(arena_size >= 4, "Arena size was expected to be at least 4 bytes.");
     
     initial_arena := cast(&ArenaBlock) raw_alloc(backing, arena_size);
@@ -110,16 +110,21 @@ make :: (backing: Allocator, arena_size: u32) -> Arena {
     };
 }
 
-#match core.alloc.as_allocator make_allocator
-make_allocator :: (rs: &Arena) -> Allocator {
+/// Prepares an existing arena. The previous pages are not freed.
+Arena.init :: (arena: &Arena, backing: Allocator, arena_size: u32) {
+    *arena = Arena.make(backing, arena_size);
+}
+
+#match core.alloc.as_allocator Arena.as_allocator
+Arena.as_allocator :: (rs: &Arena) -> Allocator {
     return Allocator.{
         func = arena_alloc_proc,
         data = rs,
     };
 }
 
-/// Frees all pages in an arena.
-free :: (arena: &Arena) {
+/// Frees all pages in an arena. Prefer `delete(&arena)`.
+Arena.delete :: (arena: &Arena) {
     walker := arena.first_arena;
     trailer := walker;
     while walker != null {
@@ -133,8 +138,10 @@ free :: (arena: &Arena) {
     arena.size          = 0;
 }
 
+Arena.free :: Arena.delete
+
 /// Clears and frees every page, except for first page.
-clear :: (arena: &Arena) {
+Arena.clear :: (arena: &Arena) {
     walker := arena.first_arena.next;
 
     while walker != null {
@@ -148,7 +155,7 @@ clear :: (arena: &Arena) {
 }
 
 /// Returns the number of pages in the arena.
-get_allocated_arenas :: (arena: &Arena) -> u32 {
+Arena.get_allocated_arenas :: (arena: &Arena) -> u32 {
     arenas := 0;
     walker := arena.first_arena;
     while walker != null {
@@ -160,9 +167,21 @@ get_allocated_arenas :: (arena: &Arena) -> u32 {
 }
 
 /// Returns the number of bytes used by the arena.
-get_allocated_bytes :: (arena: &Arena) -> u32 {
-    return get_allocated_arenas(arena) * (arena.arena_size - 1) + arena.size;
+Arena.get_allocated_bytes :: (arena: &Arena) -> u32 {
+    return Arena.get_allocated_arenas(arena) * (arena.arena_size - 1) + arena.size;
 }
+
+#overload
+builtin.delete :: Arena.delete
+
+// Compatibility: package names.
+make :: Arena.make
+init :: Arena.init
+make_allocator :: Arena.as_allocator
+free :: Arena.delete
+clear :: Arena.clear
+get_allocated_arenas :: Arena.get_allocated_arenas
+get_allocated_bytes :: Arena.get_allocated_bytes
 
 /// Creates an arena allocator and automatically applies it to the context's allocator
 /// in the current scope.
@@ -180,11 +199,11 @@ auto :: #match {
     macro (size := 32 * 1024, $dest: Code = [](context.allocator)) {
         use core.alloc {arena, heap_allocator}
 
-        a := arena.make(heap_allocator, size);
+        a := arena.Arena.make(heap_allocator, size);
         old_allocator := #unquote dest;
-        (#unquote dest) = arena.make_allocator(&a);
+        (#unquote dest) = arena.Arena.as_allocator(&a);
         defer {
-            arena.free(&a);
+            arena.Arena.delete(&a);
             (#unquote dest) = old_allocator;
         }
     },
@@ -214,13 +233,13 @@ auto :: #match {
 ///     }
 auto_temp :: macro (body: Code) -> i32 {
     use core.alloc {arena, heap_allocator}
-    a := arena.make(heap_allocator, 32 * 1024);
+    a := arena.Arena.make(heap_allocator, 32 * 1024);
 
     old_allocator := context.temp_allocator;
-    context.temp_allocator = arena.make_allocator(&a);
+    context.temp_allocator = arena.Arena.as_allocator(&a);
 
     #unquote body;
 
-    arena.free(&a);
+    arena.Arena.delete(&a);
     context.temp_allocator = old_allocator;
 }

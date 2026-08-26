@@ -52,21 +52,27 @@ MemWatchStackNode :: struct {
 }
 
 
-make :: (a: Allocator, listen_addr: &net.SocketAddress) -> MemWatchState {
-    return .{
-        a,
-        *listen_addr,
-        .None,
-        .None
-    };
+MemWatchState.make :: (a: Allocator, listen_addr: &net.SocketAddress) -> MemWatchState {
+    m: MemWatchState;
+    MemWatchState.init(&m, a, listen_addr);
+    return m;
 }
 
-free :: (m: &MemWatchState) {
+MemWatchState.init :: (m: &MemWatchState, a: Allocator, listen_addr: &net.SocketAddress) {
+    m.wrapped_allocator = a;
+    m.listen_addr = *listen_addr;
+    m.socket = .None;
+    m.writer = .None;
+}
+
+MemWatchState.delete :: (m: &MemWatchState) {
     io.writer_free(m.writer->unwrap_ptr());
     m.socket->unwrap_ptr()->close();
 }
 
-wait_for_connection :: (m: &MemWatchState) -> Result(void, io.Error) {
+MemWatchState.free :: MemWatchState.delete
+
+MemWatchState.wait_for_connection :: (m: &MemWatchState) -> Result(void, io.Error) {
     listen_socket := net.socket_create(.Inet, .Stream, .ANY)?;
     listen_socket->option(.ReuseAddress, true);
     listen_socket->bind(&m.listen_addr);
@@ -81,6 +87,15 @@ wait_for_connection :: (m: &MemWatchState) -> Result(void, io.Error) {
     return .{ Ok = .{} };
 }
 
+#overload
+builtin.delete :: MemWatchState.delete
+
+// Compatibility: package names.
+make :: MemWatchState.make
+init :: MemWatchState.init
+free :: MemWatchState.delete
+wait_for_connection :: MemWatchState.wait_for_connection
+
 enable_in_scope :: macro (a: Allocator, port := DEFAULT_PORT) {
     use core.alloc.memwatch
 
@@ -88,17 +103,18 @@ enable_in_scope :: macro (a: Allocator, port := DEFAULT_PORT) {
     net.make_ipv4_address(&addr, "0.0.0.0", ~~port);
 
     old_allocator := a;
-    dbg := memwatch.make(old_allocator, &addr);
+    dbg := memwatch.MemWatchState.make(old_allocator, &addr);
     a = alloc.as_allocator(&dbg);
 
-    memwatch.wait_for_connection(&dbg);
+    memwatch.MemWatchState.wait_for_connection(&dbg);
 
-    defer memwatch.free(&dbg);
+    defer memwatch.MemWatchState.delete(&dbg);
 }
 
 
 #overload
-alloc.as_allocator :: (memwatch: &MemWatchState) => Allocator.{ memwatch, memwatch_proc }
+alloc.as_allocator :: MemWatchState.as_allocator
+MemWatchState.as_allocator :: (memwatch: &MemWatchState) => Allocator.{ memwatch, memwatch_proc }
 
 #local
 memwatch_proc :: (m: &MemWatchState, action: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {

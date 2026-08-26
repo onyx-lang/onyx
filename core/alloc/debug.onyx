@@ -1,5 +1,4 @@
 package core.alloc.debug
-#allow_stale_code
 
 use core.alloc
 use core.memory
@@ -33,16 +32,25 @@ Debug_State :: struct {
     first: &Debug_Header
 }
 
-make :: (backing_allocator: Allocator) -> Debug_State {
-    return .{ backing_allocator, null }
+Debug_State.make :: (backing_allocator: Allocator) -> Debug_State {
+    s: Debug_State;
+    Debug_State.init(&s, backing_allocator);
+    return s;
+}
+
+Debug_State.init :: (s: &Debug_State, backing_allocator: Allocator) {
+    s.backing = backing_allocator;
+    s.first = null;
 }
 
 #overload
-alloc.as_allocator :: (s: &Debug_State) -> Allocator {
+alloc.as_allocator :: Debug_State.as_allocator
+Debug_State.as_allocator :: (s: &Debug_State) -> Allocator {
     return .{ s, debug_alloc }
 }
 
-Debug_State.destroy :: (s: &Debug_State) {
+/// Reports remaining allocations and frees them. Prefer `delete(&s)`.
+Debug_State.delete :: (s: &Debug_State) {
     walker := s.first
     while walker {
         n := walker.next
@@ -62,6 +70,15 @@ Debug_State.destroy :: (s: &Debug_State) {
 
     s.first = null
 }
+
+Debug_State.destroy :: Debug_State.delete
+
+#overload
+builtin.delete :: Debug_State.delete
+
+// Compatibility: package names.
+make :: Debug_State.make
+init :: Debug_State.init
 
 
 #local

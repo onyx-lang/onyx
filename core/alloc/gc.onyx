@@ -28,13 +28,19 @@ GCLink :: struct {
     magic_number: u32;
 }
 
-make :: (backing := context.allocator) -> GCState {
+GCState.make :: (backing := context.allocator) -> GCState {
     hs: GCState;
-    hs.backing_allocator = backing;
+    GCState.init(&hs, backing);
     return hs;
 }
 
-clear :: (hs: &GCState) {
+GCState.init :: (hs: &GCState, backing := context.allocator) {
+    hs.backing_allocator = backing;
+    hs.first = null;
+}
+
+/// Frees every tracked allocation. The GCState can be used again.
+GCState.clear :: (hs: &GCState) {
     Debug_Printing :: #defined(runtime.vars.Enable_GC_Debug)
 
     count := 0;
@@ -64,23 +70,34 @@ clear :: (hs: &GCState) {
     hs.first = null;
 }
 
-#match core.alloc.as_allocator make_allocator
-make_allocator :: (hs: &GCState) -> Allocator {
+GCState.delete :: GCState.clear
+
+#match core.alloc.as_allocator GCState.as_allocator
+GCState.as_allocator :: (hs: &GCState) -> Allocator {
     return Allocator.{
         func = gc_alloc_proc,
         data = hs
     };
 }
 
+#overload
+builtin.delete :: GCState.delete
+
+// Compatibility: package names.
+make :: GCState.make
+init :: GCState.init
+clear :: GCState.clear
+make_allocator :: GCState.as_allocator
+
 auto :: #match {
     macro () {
         use core.alloc {package, gc}
         
-        gcs := gc.make();
+        gcs := gc.GCState.make();
         old_allocator := context.allocator;
         context.allocator = alloc.as_allocator(&gcs);
         defer {
-            gc.clear(&gcs);
+            gc.GCState.clear(&gcs);
             context.allocator = old_allocator;
         }
     },

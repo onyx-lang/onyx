@@ -20,20 +20,34 @@ AtomicAllocator :: struct {
 }
 
 /// Creates a new AtomicAllocator over an existing allocator.
-make :: (a: Allocator) -> AtomicAllocator {
-    atomic: AtomicAllocator = .{ a = a };
-
-    sync.mutex_init(&atomic.m);
-
+AtomicAllocator.make :: (a: Allocator) -> AtomicAllocator {
+    atomic: AtomicAllocator;
+    AtomicAllocator.init(&atomic, a);
     return atomic;
 }
 
+AtomicAllocator.init :: (atomic: &AtomicAllocator, a: Allocator) {
+    atomic.a = a;
+    sync.mutex_init(&atomic.m);
+}
+
+AtomicAllocator.delete :: (atomic: &AtomicAllocator) {
+    sync.mutex_destroy(&atomic.m);
+}
+
 /// Makes an allocator out of the atomic allocator state.
-make_allocator :: (atomic: &AtomicAllocator) =>
+#overload
+alloc.as_allocator :: AtomicAllocator.as_allocator
+AtomicAllocator.as_allocator :: (atomic: &AtomicAllocator) =>
     Allocator.{ atomic, atomic_alloc };
 
 #overload
-alloc.as_allocator :: make_allocator
+builtin.delete :: AtomicAllocator.delete
+
+// Compatibility: package names.
+make :: AtomicAllocator.make
+init :: AtomicAllocator.init
+make_allocator :: AtomicAllocator.as_allocator
 
 
 #local

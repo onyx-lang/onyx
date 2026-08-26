@@ -98,13 +98,13 @@ temp_allocator : Allocator;
 ///
 /// You do not need to call this. It is called automatically on thread initialization.
 init_temp_allocator :: () {
-    temp_state = arena.make(heap_allocator, TEMPORARY_ALLOCATOR_SIZE);
+    temp_state = arena.Arena.make(heap_allocator, TEMPORARY_ALLOCATOR_SIZE);
     temp_allocator = as_allocator(&temp_state);
 }
 
 /// Resets the temporary allocator, effectively freeing all allocations made in the temporary allocator.
 clear_temp_allocator :: () {
-    arena.clear(&temp_state);
+    arena.Arena.clear(&temp_state);
 }
 
 

@@ -38,19 +38,44 @@ ring_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, o
     return null;
 }
 
-make :: (buffer: [] u8) -> RingState {
-    return .{
-        base_ptr = buffer.data,
-        size     = buffer.count,
-        curr     = 0,
-    };
+RingState.make :: (buffer: [] u8) -> RingState {
+    rs: RingState;
+    RingState.init(&rs, buffer);
+    return rs;
 }
 
-#match core.alloc.as_allocator make_allocator
-make_allocator :: (rs: &RingState) -> Allocator {
+RingState.init :: (rs: &RingState, buffer: [] u8) {
+    rs.base_ptr = buffer.data;
+    rs.size     = buffer.count;
+    rs.curr     = 0;
+}
+
+#match core.alloc.as_allocator RingState.as_allocator
+RingState.as_allocator :: (rs: &RingState) -> Allocator {
     return .{
         func = ring_alloc_proc,
         data = rs,
     };
 }
+
+/// Rewinds to the start of the buffer. Does not free it.
+RingState.clear :: (rs: &RingState) {
+    rs.curr = 0;
+}
+
+/// Drops the view of `buffer`. Does not free it; the caller owns it.
+RingState.delete :: (rs: &RingState) {
+    rs.base_ptr = null;
+    rs.size = 0;
+    rs.curr = 0;
+}
+
+#overload
+builtin.delete :: RingState.delete
+
+// Compatibility: package names.
+make :: RingState.make
+init :: RingState.init
+make_allocator :: RingState.as_allocator
+clear :: RingState.clear
 

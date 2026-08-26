@@ -31,14 +31,38 @@ fixed_allocator_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u
     return fa_data.buffer.data + aligned_end;
 }
 
-make :: (buffer: [] u8) => FixedAllocator.{ buffer, 0 }
+FixedAllocator.make :: (buffer: [] u8) => FixedAllocator.{ buffer, 0 }
 
-#match core.alloc.as_allocator make_allocator
-make_allocator :: (fa_data: &FixedAllocator) => Allocator.{
+FixedAllocator.init :: (data: &FixedAllocator, buffer: [] u8) {
+    data.buffer = buffer;
+    data.end = 0;
+}
+
+#match core.alloc.as_allocator FixedAllocator.as_allocator
+FixedAllocator.as_allocator :: (fa_data: &FixedAllocator) => Allocator.{
     func = fixed_allocator_proc,
     data = fa_data,
 }
 
-reset :: (data: &FixedAllocator) {
+/// Rewinds to the start of the buffer. Does not free it.
+FixedAllocator.clear :: (data: &FixedAllocator) {
     data.end = 0;
 }
+
+/// Drops the view of `buffer`. Does not free it; the caller owns it.
+FixedAllocator.delete :: (data: &FixedAllocator) {
+    data.buffer = .{};
+    data.end = 0;
+}
+
+FixedAllocator.reset :: FixedAllocator.clear
+
+#overload
+builtin.delete :: FixedAllocator.delete
+
+// Compatibility: package names.
+make :: FixedAllocator.make
+init :: FixedAllocator.init
+make_allocator :: FixedAllocator.as_allocator
+reset :: FixedAllocator.clear
+clear :: FixedAllocator.clear
