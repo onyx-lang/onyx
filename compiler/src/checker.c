@@ -1843,6 +1843,17 @@ CHECK_FUNC(struct_literal, AstStructLiteral* sl) {
         if (sl->stnode == NULL) {
             CHECK(arguments, &sl->args);
 
+            // Untyped literals (`.{ 1, 0 }`) are still comptime if every
+            // given value is. This must be set on the first pass so a
+            // top-level `Type.[ .{ ... } ]` is accepted as a global.
+            sl->flags |= Ast_Flag_Comptime;
+            bh_arr_each(AstTyped *, value, sl->args.values) {
+                sl->flags &= ((*value)->flags & Ast_Flag_Comptime) | (sl->flags &~ Ast_Flag_Comptime);
+            }
+            bh_arr_each(AstNamedValue *, named, sl->args.named_values) {
+                sl->flags &= ((*named)->value->flags & Ast_Flag_Comptime) | (sl->flags &~ Ast_Flag_Comptime);
+            }
+
             return Check_Success;
         }
 
@@ -1946,6 +1957,7 @@ CHECK_FUNC(struct_literal, AstStructLiteral* sl) {
             bh_arr_push(sl->values_to_initialize, ((ValueWithOffset) { (AstTyped *) zv, 0 }));
 
             sl->flags |= Ast_Flag_Has_Been_Checked;
+            sl->flags |= Ast_Flag_Comptime;
             return Check_Success;
         }
 
@@ -1990,6 +2002,7 @@ CHECK_FUNC(struct_literal, AstStructLiteral* sl) {
             bh_arr_push(sl->values_to_initialize, ((ValueWithOffset) { (AstTyped *) zv, 0 }));
 
             sl->flags |= Ast_Flag_Has_Been_Checked;
+            sl->flags |= Ast_Flag_Comptime;
             return Check_Success;
         }
 
@@ -3761,6 +3774,13 @@ CHECK_FUNC(block, AstBlock* block) {
         CheckStatus cs = check_statement(context, start);
         switch (cs) {
             case Check_Success:
+                // Block macros expand to a nested block. If that expansion
+                // always returns, the caller procedure returns too — even
+                // when more statements follow the macro call.
+                if ((*start)->flags & Ast_Flag_Block_Returns) {
+                    block->flags |= Ast_Flag_Block_Returns;
+                }
+
                 last = *start;
                 start = &(*start)->next;
                 block->statement_idx++;

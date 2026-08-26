@@ -22,7 +22,7 @@ List of known bugs:
     function will be called twice instead of once. This is a simple code generation fix,
     but will require not destroying this information in the checking phase of the compiler.
 
-[ ] Top level implicit typed arrays/struct literals are not correctly being marked as compile-time.
+[X] Top level implicit typed arrays/struct literals are not correctly being marked as compile-time.
 
     Vec2 :: struct { x, y: i32; }
     

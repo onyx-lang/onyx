@@ -682,8 +682,8 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         }
 
         case '.': {
-            if (parse_possible_struct_literal(parser, NULL, &retval)) return retval;
-            if (parse_possible_array_literal(parser, NULL, &retval))  return retval;
+            if (parse_possible_struct_literal(parser, NULL, &retval)) break;
+            if (parse_possible_array_literal(parser, NULL, &retval))  break;
             if (parse_possible_unary_field_access(parser, &retval))   break;
             goto no_match;
         }
@@ -1233,8 +1233,8 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             }
 
             case '.': {
-                if (parse_possible_struct_literal(parser, retval, &retval)) return retval;
-                if (parse_possible_array_literal(parser, retval, &retval))  return retval;
+                if (parse_possible_struct_literal(parser, retval, &retval)) break;
+                if (parse_possible_array_literal(parser, retval, &retval))  break;
 
                 consume_token(parser);
                 if (parser->curr->type == '*') {

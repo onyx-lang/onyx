@@ -1,0 +1,9 @@
+use core {*}
+
+Point :: struct { x, y: i32 }
+
+main :: () {
+    printf("{}\n", typeof Point.{}.x)
+    printf("{}\n", typeof Point.{ 3, 4 }.y)
+    printf("{}\n", Point.{ 8, 9 }.x)
+}
