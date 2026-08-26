@@ -830,6 +830,44 @@ void ensure_overload_returns_correct_type(Context *context, AstTyped *overload, 
 //
 //
 // TODO: Write this documentation
+
+static AstTyped *macro_wrap_value_as_any(Context *context, AstTyped *value, AstBlock *expansion, OnyxToken *token) {
+    resolve_expression_type(context, value);
+
+    static i32 tmp_id = 0;
+    OnyxToken *tmp_token = bh_alloc_item(context->ast_alloc, OnyxToken);
+    tmp_token->type = Token_Type_Symbol;
+    tmp_token->text = bh_aprintf(context->ast_alloc, "__macro_any_%d", tmp_id++);
+    tmp_token->length = strlen(tmp_token->text);
+    tmp_token->pos = token ? token->pos : (OnyxFilePos) { 0 };
+
+    AstLocal *tmp = make_local_with_type(context, tmp_token, value->type);
+    tmp->token = tmp_token;
+
+    AstBinaryOp *assign = make_binary_op(context, Binary_Op_Assign, (AstTyped *) tmp, value);
+    assign->token = token;
+
+    tmp->next = (AstNode *) assign;
+    assign->next = expansion->body;
+    expansion->body = (AstNode *) tmp;
+
+    AstAddressOf *addr = make_address_of(context, (AstTyped *) tmp);
+    addr->token = token;
+
+    AstTypeOf *tof = onyx_ast_node_new(context->ast_alloc, sizeof(AstTypeOf), Ast_Kind_Typeof);
+    tof->token = token;
+    tof->expr = (AstTyped *) tmp;
+
+    AstStructLiteral *sl = onyx_ast_node_new(context->ast_alloc, sizeof(AstStructLiteral), Ast_Kind_Struct_Literal);
+    sl->token = token;
+    sl->stnode = (AstTyped *) context->builtins.any_type;
+    arguments_initialize(context, &sl->args);
+    bh_arr_push(sl->args.values, (AstTyped *) addr);
+    bh_arr_push(sl->args.values, (AstTyped *) tof);
+
+    return (AstTyped *) sl;
+}
+
 void expand_macro(Context *context, AstCall** pcall, AstFunction* template) {
     AstCall* call = *pcall;
     AstMacro* macro = (AstMacro *) call->callee;
@@ -884,17 +922,45 @@ void expand_macro(Context *context, AstCall** pcall, AstFunction* template) {
     // HACK HACK HACK This is probably very wrong. I don't know what guarentees that
     // the paramters and arguments are going to be in the same order exactly.
     Type *any_type = type_build_from_ast(context, context->builtins.any_type);
-    fori (i, 0, bh_arr_length(call->args.values)) {
-        AstNode *value = (AstNode *) ((AstArgument *) call->args.values[i])->value;
+    i32 arg_i = 0;
+    i32 arg_count = bh_arr_length(call->args.values);
+    fori (i, 0, bh_arr_length(template->params)) {
         assert(template->params[i].local->type);
 
         Type *param_type = template->params[i].local->type;
-        if (param_type == any_type
-            || (param_type->kind == Type_Kind_VarArgs && param_type->VarArgs.elem == any_type)) {
-            ONYX_ERROR(macro->token->pos, Error_Critical, "Currently, macros do not support arguments of type 'any' or '..any'.");
+        AstTyped *value = NULL;
+
+        if (param_type == any_type) {
+            assert(arg_i < arg_count);
+            AstTyped *raw = ((AstArgument *) call->args.values[arg_i++])->value;
+            if (raw->type == any_type) {
+                value = raw;
+            } else {
+                value = macro_wrap_value_as_any(context, raw, expansion, call->token);
+            }
+
+        } else if (param_type->kind == Type_Kind_VarArgs && param_type->VarArgs.elem == any_type) {
+            AstArrayLiteral *al = onyx_ast_node_new(context->ast_alloc, sizeof(AstArrayLiteral), Ast_Kind_Array_Literal);
+            al->token = call->token;
+            al->atnode = (AstTyped *) context->builtins.any_type;
+            bh_arr_new(context->ast_alloc, al->values, bh_max(arg_count - arg_i, 0));
+
+            while (arg_i < arg_count) {
+                AstTyped *raw = ((AstArgument *) call->args.values[arg_i++])->value;
+                if (raw->type != any_type) {
+                    raw = macro_wrap_value_as_any(context, raw, expansion, call->token);
+                }
+                bh_arr_push(al->values, raw);
+            }
+
+            value = (AstTyped *) al;
+
+        } else {
+            assert(arg_i < arg_count);
+            value = ((AstArgument *) call->args.values[arg_i++])->value;
         }
 
-        symbol_introduce(context, argument_scope, template->params[i].local->token, value);
+        symbol_introduce(context, argument_scope, template->params[i].local->token, (AstNode *) value);
 
         if (template->params[i].is_used) {
             if (type_is_struct(param_type)) {
@@ -908,7 +974,7 @@ void expand_macro(Context *context, AstCall** pcall, AstFunction* template) {
                 if (st->Struct.status == SPS_Uses_Done) {
                     fori (j, 0, shlen(st->Struct.members)) {
                         StructMember* member = st->Struct.members[j].value;
-                        AstFieldAccess* fa = make_field_access(context, (AstTyped *) value, member->name);
+                        AstFieldAccess* fa = make_field_access(context, value, member->name);
                         symbol_raw_introduce(context, argument_scope, member->name, template->params[i].local->token->pos, (AstNode *) fa);
                     }
                 }

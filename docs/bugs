@@ -1,6 +1,6 @@
 List of known bugs:
 
-[ ] partially solidifying procedures messes up poly param indicies, which causes them to
+[X] partially solidifying procedures messes up poly param indicies, which causes them to
     not be solved correctly.
 
 [X] macros cannot use 'use'.
@@ -11,7 +11,7 @@ List of known bugs:
         println(x); // Doesn't work
     }
 
-[ ] macros don't work with any:
+[X] macros don't work with any:
     format :: macro (format: str, args: ..any) -> str {
         buffer: [1024] u8;
         return conv.str_format_va(buffer, format, args);
@@ -169,7 +169,7 @@ List of things to change:
     // x.x = 1
     // x.y = <uninitialized>
 
-[ ] Add functionality to #solidify that resolves to a procedure given a set of types. For example:
+[X] Add functionality to #solidify that resolves to a procedure given a set of types. For example:
     overloaded :: proc {
         (x: str) { println("String function!"); },
         (x: i32) { println("Int function!"); },

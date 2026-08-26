@@ -1,0 +1,19 @@
+use core {*}
+
+overloaded :: #match {
+    (x: str) { println("String function!") },
+    (x: i32) { println("Int function!") },
+    (x: f32) { println("Float function!") },
+    (x: $T)  { println("Other function!") },
+    (z: $T)  { println("Other function ZZZ!") },
+}
+
+int_function   :: #solidify overloaded(i32)
+other_function :: #solidify overloaded(range)
+will_work      :: #solidify overloaded(z = range)
+
+main :: () {
+    int_function(1)
+    other_function(1 .. 2)
+    will_work(1 .. 2)
+}

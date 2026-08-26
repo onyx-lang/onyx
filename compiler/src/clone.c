@@ -615,6 +615,8 @@ AstNode* ast_clone(Context *context, void* n) {
 
             dd->poly_proc = (AstFunction *) ast_clone(context, (AstNode *) sd->poly_proc);
             dd->resolved_proc = NULL;
+            dd->from_arguments = sd->from_arguments;
+            arguments_deep_clone(context, &dd->args, &sd->args);
 
             dd->known_polyvars = NULL;
             bh_arr_new(context->gp_alloc, dd->known_polyvars, bh_arr_length(sd->known_polyvars));

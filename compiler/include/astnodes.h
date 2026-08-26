@@ -831,6 +831,10 @@ struct AstDirectiveSolidify {
     AstFunction* poly_proc;
     bh_arr(AstPolySolution) known_polyvars;
 
+    // Set when using `#solidify overloaded(i32)` / `#solidify foo(z = range)`.
+    Arguments args;
+    b32 from_arguments : 1;
+
     AstNode* resolved_proc;
 };
 

@@ -1006,30 +1006,47 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 // :LinearTokenDependent
                 solid->token = parser->curr - 1;
 
+                parser->parse_calls = 0;
                 solid->poly_proc = (AstFunction *) parse_factor(parser);
+                parser->parse_calls = 1;
 
                 solid->known_polyvars = NULL;
                 bh_arr_new(parser->context->gp_alloc, solid->known_polyvars, 2);
+                arguments_initialize(parser->context, &solid->args);
 
-                expect_token(parser, '{');
-                while (!consume_token_if_next(parser, '}')) {
-                    if (parser->hit_unexpected_token) break;
+                if (consume_token_if_next(parser, '(')) {
+                    solid->from_arguments = 1;
+                    parse_arguments(parser, ')', &solid->args);
 
-                    AstNode* poly_var = (void *) make_node(AstTyped, Ast_Kind_Symbol);
-                    poly_var->token = expect_token(parser, Token_Type_Symbol);
+                    bh_arr_each(AstTyped *, arg, solid->args.values) {
+                        if (*arg) *arg = (AstTyped *) make_argument(parser->context, *arg);
+                    }
+                    bh_arr_each(AstNamedValue *, named_value, solid->args.named_values) {
+                        if ((*named_value)->value) {
+                            (*named_value)->value = (AstTyped *) make_argument(parser->context, (*named_value)->value);
+                        }
+                    }
+                } else {
+                    expect_token(parser, '{');
+                    while (!consume_token_if_next(parser, '}')) {
+                        if (parser->hit_unexpected_token) break;
 
-                    expect_token(parser, '=');
-                    AstType* poly_type = (AstType *) parse_expression(parser, 0);
+                        AstNode* poly_var = (void *) make_node(AstTyped, Ast_Kind_Symbol);
+                        poly_var->token = expect_token(parser, Token_Type_Symbol);
 
-                    bh_arr_push(solid->known_polyvars, ((AstPolySolution) {
-                        .kind     = PSK_Undefined,
-                        .poly_sym = poly_var,
-                        .ast_type = poly_type,
-                        .type     = NULL
-                    }));
+                        expect_token(parser, '=');
+                        AstType* poly_type = (AstType *) parse_expression(parser, 0);
 
-                    if (parser->curr->type != '}')
-                        expect_token(parser, ',');
+                        bh_arr_push(solid->known_polyvars, ((AstPolySolution) {
+                            .kind     = PSK_Undefined,
+                            .poly_sym = poly_var,
+                            .ast_type = poly_type,
+                            .type     = NULL
+                        }));
+
+                        if (parser->curr->type != '}')
+                            expect_token(parser, ',');
+                    }
                 }
 
                 retval = (AstTyped *) solid;

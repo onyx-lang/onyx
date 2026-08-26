@@ -1,0 +1,25 @@
+use core {*}
+
+foo :: (x: $A, y: $B) {
+    printf("{} {}\n", x, y)
+}
+
+foo_i32 :: #solidify foo { A = i32 }
+
+bar :: ($T: type_expr, x: T, y: $U) {
+    printf("{} {}\n", x, y)
+}
+
+bar_i32 :: #solidify bar { T = i32 }
+
+baz :: ($T: type_expr, $U: type_expr, x: T, y: U) {
+    printf("{} {}\n", x, y)
+}
+
+baz_i32 :: #solidify baz { T = i32 }
+
+main :: () {
+    foo_i32(10, "hi")
+    bar_i32(10, "hi")
+    baz_i32(str, 10, "hi")
+}

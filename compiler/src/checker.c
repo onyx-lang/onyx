@@ -3512,28 +3512,96 @@ CHECK_FUNC(directive_solidify, AstDirectiveSolidify** psolid) {
         ERROR(solid->token->pos, "Internal compiler error. The given procedure did not resolve correctly.");
     }
 
-    switch (solid->poly_proc->kind) {
-        case Ast_Kind_Polymorphic_Proc:
-            bh_arr_each(AstPolySolution, sln, solid->known_polyvars) {
-                // HACK: This assumes that 'ast_type' and 'value' are at the same offset.
-                CHECK(expression, &sln->value);
+    AstTyped *target = (AstTyped *) strip_aliases((AstNode *) solid->poly_proc);
 
-                if (node_is_type((AstNode *) sln->value)) {
-                    sln->type = type_build_from_ast(context, sln->ast_type);
-                    sln->kind = PSK_Type;
-                } else {
-                    sln->kind = PSK_Value;
-                }
+    if (solid->from_arguments) {
+        CHECK(arguments, &solid->args);
+
+        bh_arr_each(AstTyped *, parg, solid->args.values) {
+            AstArgument *arg = (AstArgument *) *parg;
+            if (node_is_type((AstNode *) arg->value)) {
+                Type *t = type_build_from_ast(context, (AstType *) arg->value);
+                if (t == NULL) YIELD(solid->token->pos, "Waiting to construct type for #solidify argument.");
+                arg->value = (AstTyped *) make_zero_value(context, solid->token, t);
+                arg->type = t;
+            }
+        }
+
+        bh_arr_each(AstNamedValue *, pnv, solid->args.named_values) {
+            AstTyped *nv_value = (*pnv)->value;
+            if (nv_value && nv_value->kind == Ast_Kind_Argument) {
+                nv_value = ((AstArgument *) nv_value)->value;
             }
 
-            solid->resolved_proc = polymorphic_proc_try_solidify(context, solid->poly_proc, solid->known_polyvars, solid->token);
-            break;
+            if (nv_value && node_is_type((AstNode *) nv_value)) {
+                Type *t = type_build_from_ast(context, (AstType *) nv_value);
+                if (t == NULL) YIELD(solid->token->pos, "Waiting to construct type for #solidify argument.");
+                AstTyped *zero = (AstTyped *) make_zero_value(context, solid->token, t);
+                if ((*pnv)->value->kind == Ast_Kind_Argument) {
+                    ((AstArgument *) (*pnv)->value)->value = zero;
+                    ((AstArgument *) (*pnv)->value)->type = t;
+                } else {
+                    (*pnv)->value = zero;
+                }
+            }
+        }
 
-        //case Ast_Kind_Poly_Union_Type:
-            //break;
-        
-        default:
-            ERROR(solid->token->pos, "Unable to '#solidify' this. Expected a 'polymorphic procedure'.");
+        if (target->kind == Ast_Kind_Overloaded_Function) {
+            AstTyped *matched = find_matching_overload_by_arguments(
+                context,
+                ((AstOverloadedFunction *) target)->overloads,
+                &solid->args);
+
+            if (matched == NULL) {
+                if (context->cycle_almost_detected < 2) {
+                    YIELD(solid->token->pos, "Waiting to know all options for overloaded function.");
+                }
+
+                ERROR(solid->token->pos, "Unable to '#solidify' this overloaded procedure with the given arguments.");
+            }
+
+            if (matched == (AstTyped *) &context->node_that_signals_a_yield) {
+                YIELD(solid->token->pos, "Waiting for overloaded function option to pass type-checking.");
+            }
+
+            target = (AstTyped *) strip_aliases((AstNode *) matched);
+        }
+
+        if (target->kind == Ast_Kind_Polymorphic_Proc) {
+            AstFunction *resolved = polymorphic_proc_lookup(context, (AstFunction *) target, PPLM_By_Arguments, &solid->args, solid->token);
+            if (resolved == NULL) {
+                ERROR(solid->token->pos, "Unable to '#solidify' this polymorphic procedure with the given arguments.");
+            }
+            solid->resolved_proc = (AstNode *) resolved;
+
+        } else if (target->kind == Ast_Kind_Function || target->kind == Ast_Kind_Macro) {
+            solid->resolved_proc = (AstNode *) target;
+
+        } else {
+            ERROR(solid->token->pos, "Unable to '#solidify' this. Expected a procedure, overloaded procedure, or polymorphic procedure.");
+        }
+
+    } else {
+        switch (target->kind) {
+            case Ast_Kind_Polymorphic_Proc:
+                bh_arr_each(AstPolySolution, sln, solid->known_polyvars) {
+                    // HACK: This assumes that 'ast_type' and 'value' are at the same offset.
+                    CHECK(expression, &sln->value);
+
+                    if (node_is_type((AstNode *) sln->value)) {
+                        sln->type = type_build_from_ast(context, sln->ast_type);
+                        sln->kind = PSK_Type;
+                    } else {
+                        sln->kind = PSK_Value;
+                    }
+                }
+
+                solid->resolved_proc = polymorphic_proc_try_solidify(context, (AstFunction *) target, solid->known_polyvars, solid->token);
+                break;
+
+            default:
+                ERROR(solid->token->pos, "Unable to '#solidify' this. Expected a 'polymorphic procedure'.");
+        }
     }
 
     if (solid->resolved_proc == (AstNode *) &context->node_that_signals_a_yield) {

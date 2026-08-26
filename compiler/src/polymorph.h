@@ -926,6 +926,7 @@ AstNode* polymorphic_proc_try_solidify(Context *context, AstFunction* pp, bh_arr
         AstFunction* new_pp = onyx_ast_node_new(context->ast_alloc, sizeof(AstFunction), Ast_Kind_Polymorphic_Proc);
         memcpy(new_pp, pp, sizeof(AstFunction));
         new_pp->token = tkn;
+        new_pp->params = bh_arr_copy(context->ast_alloc, pp->params);
         new_pp->poly_params = bh_arr_copy(context->ast_alloc, pp->poly_params);
 
         ensure_polyproc_cache_is_created(context, pp);
@@ -936,6 +937,36 @@ AstNode* polymorphic_proc_try_solidify(Context *context, AstFunction* pp, bh_arr
 
         bh_arr_each(AstPolySolution, sln, pp->known_slns) bh_arr_push(new_pp->known_slns, *sln);
         bh_arr_each(AstPolySolution, sln, slns)           bh_arr_push(new_pp->known_slns, *sln);
+
+        // Drop solved poly-params and shift remaining indices so later
+        // lookups see the arguments that are still passed at the call site.
+        // Baked `$T: type_expr` params are removed from the calling convention.
+        bh_arr(AstPolyParam) remaining = NULL;
+        bh_arr_new(context->ast_alloc, remaining, bh_arr_length(new_pp->poly_params));
+
+        u32 removed = 0;
+        bh_arr_each(AstPolyParam, param, new_pp->poly_params) {
+            b32 solved = 0;
+            bh_arr_each(AstPolySolution, sln, new_pp->known_slns) {
+                if (token_equals(sln->poly_sym->token, param->poly_sym->token)) {
+                    solved = 1;
+                    break;
+                }
+            }
+
+            if (solved) {
+                if (param->kind == PPK_Baked_Value) {
+                    bh_arr_deleten(new_pp->params, param->idx - removed, 1);
+                    removed++;
+                }
+            } else {
+                AstPolyParam keep = *param;
+                keep.idx -= removed;
+                bh_arr_push(remaining, keep);
+            }
+        }
+
+        new_pp->poly_params = remaining;
 
         return (AstNode *) new_pp;
     }
