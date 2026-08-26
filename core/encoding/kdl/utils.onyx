@@ -12,7 +12,14 @@ Value.as_int :: (v: Value) -> ? i64 {
 }
 
 Value.as_float :: (v: Value) -> ? f64 {
-    return v.data.Number?.Float;
+    switch v.data {
+        case .Number as n do switch n {
+            case .Float as f do return f;
+            case .Integer as i do return cast(f64) i;
+            case _ do return .None;
+        }
+        case _ do return .None;
+    }
 }
 
 Value.as_bool :: (v: Value) -> ? bool {
@@ -24,9 +31,9 @@ Document.create_node :: (d: &Document, name: str) -> &Node {
     return d.allocator->move(Node.{
         node = name,
         type_annotation = .None,
-        values = make([..] Value, d.allocator),
+        values = make([..] Value, 4, d.allocator),
         props = make(Map(str, Value), d.allocator),
-        children = make([..] &Node, d.allocator)
+        children = make([..] &Node, 4, d.allocator)
     });
 }
 

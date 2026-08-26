@@ -8,6 +8,10 @@ main :: () {
     encoded := encoding.hex.encode(s);
     println(encoded);
     
-    decoded := encoding.hex.decode(encoded);
+    decoded := encoding.hex.decode(encoded).Ok!;
     println(decoded);
+
+    println(encoding.hex.decode("abc").Err!);
+    println(encoding.hex.decode("zz").Err!);
+    println(encoding.hex.decode("").Ok!.count);
 }

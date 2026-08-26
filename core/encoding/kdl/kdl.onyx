@@ -89,13 +89,21 @@ parse :: (r: &io.Reader, allocator := context.allocator) -> Result(Document, Par
     }
 }
 
+#overload #order 100
+builtin.delete :: Document.destroy
+
 #overload
-builtin.delete :: free
+__dispose_used_local :: Document.destroy
+
+Document.destroy :: (d: &Document) {
+    for d.nodes do free_node(d.allocator, it);
+    delete(&d.nodes);
+}
 
 /// Releases all resources allocated for the document.
 free :: (d: Document) {
-    for d.nodes do free_node(d.allocator, it);
-    delete(&d.nodes);
+    local := d;
+    Document.destroy(&local);
 }
 
 #local
@@ -104,7 +112,7 @@ free_node :: (al: Allocator, n: &Node) {
     n.type_annotation->with([t] { string.free(t, al); });
 
     for& v in n.values do free_value(al, v);
-    delete(&n.values); // This should use the allocator inside of the array
+    delete(&n.values);
 
     for n.props->as_iter() {
         string.free(it.key, al);
@@ -113,6 +121,8 @@ free_node :: (al: Allocator, n: &Node) {
     delete(&n.props);
 
     for n.children do free_node(al, it);
+    delete(&n.children);
+    raw_free(al, n);
 }
 
 #local

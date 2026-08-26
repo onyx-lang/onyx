@@ -3,8 +3,7 @@ package core.encoding.kdl
 
 KDL_TAB_SIZE :: 4
 
-use core {io}
-use core.string {contains}
+use core {io, string}
 
 write :: (d: &Document, w: &io.Writer) {
     for d.nodes {
@@ -13,6 +12,19 @@ write :: (d: &Document, w: &io.Writer) {
     }
 }
 
+Document.write :: write
+
+write_string :: (d: &Document, allocator := context.allocator) -> str {
+    stream := io.buffer_stream_make(256);
+    writer := io.writer_make(&stream, 0);
+    defer io.buffer_stream_free(&stream);
+
+    write(d, &writer);
+    return string.copy(io.buffer_stream_to_str(&stream), allocator);
+}
+
+Document.write_string :: write_string
+
 write_node :: (n: &Node, w: &io.Writer, indentation := 0) {
     for indentation * KDL_TAB_SIZE do io.write(w, " ");
 
@@ -20,7 +32,7 @@ write_node :: (n: &Node, w: &io.Writer, indentation := 0) {
         io.write_format(w, "({}) ", ta);
     });
 
-    if contains(n.node, "/") do io.write_format(w, "{\"}", n.node);
+    if string.contains(n.node, "/") do io.write_format(w, "{\"}", n.node);
     else do io.write(w, n.node);
     io.write(w, " ");
 

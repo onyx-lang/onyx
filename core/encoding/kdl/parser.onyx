@@ -3,13 +3,9 @@ package core.encoding.kdl
 
 
 // TODO
-//  - Parse integers
-//  - Parse decimals
 //  - Types in the correct places
-//  - Escaped strings
-//  - Slashdash on children block
 
-use core {tprintf, Result, printf}
+use core {tprintf, Result, printf, conv}
 use core.io
 use core.memory
 use core.slice
@@ -60,23 +56,20 @@ Tokenizer.destroy :: (self: &#Self) {
 Tokenizer.peek_char :: (self: &#Self) -> ? u32 {
     if self.cursor >= self.doc.length do return .None;
 
-    codepoint_length := utf8.rune_length_from_first_byte(self.doc[self.cursor]);
-    if self.cursor + codepoint_length > self.doc.length do return .None;
-    
-    value := utf8.decode_rune(string.advance(self.doc, self.cursor));
-    return value;
+    rest := string.advance(self.doc, self.cursor);
+    r, len := utf8.decode_rune(rest);
+    if len <= 0 do return .None;
+    return cast(u32) r;
 }
 
 Tokenizer.eat_char :: (self: &#Self) -> ? u32 {
     if self.cursor >= self.doc.length do return .None;
 
-    codepoint_length := utf8.rune_length_from_first_byte(self.doc[self.cursor]);
-    if self.cursor + codepoint_length > self.doc.length do return .None;
-    
-    value := utf8.decode_rune(string.advance(self.doc, self.cursor));
-    self.cursor += codepoint_length;
-
-    return value;
+    rest := string.advance(self.doc, self.cursor);
+    r, len := utf8.decode_rune(rest);
+    if len <= 0 do return .None;
+    self.cursor += ~~len;
+    return cast(u32) r;
 }
 
 Tokenizer.peek_token :: (use self: &#Self) -> Token {
@@ -331,13 +324,13 @@ Parser.parse_node :: (self: &#Self) -> Result(&Node, Parse_Error) {
         node = name->unwrap(),
         type_annotation = type_annotation,
         props     = make(Map(str, Value), self.result_allocator),
-        values    = make([..] Value, 0, self.result_allocator),
-        children  = make([..] &Node, 0, self.result_allocator),
+        values    = make([..] Value, 4, self.result_allocator),
+        children  = make([..] &Node, 4, self.result_allocator),
     });
 
     while true {
         switch tkn := self.tokenizer->peek_token(); tkn {
-            case .Newline, .Semicolon {
+            case .Newline, .Semicolon, .EOF {
                 self.tokenizer->next_token();
                 _apply_slashdash(node_to_return);
                 return .{ Ok = node_to_return };
@@ -378,6 +371,11 @@ Parser.parse_node :: (self: &#Self) -> Result(&Node, Parse_Error) {
 
                 value.type_annotation = type;
                 node_to_return.values << value;
+            }
+
+            case .Slashdash {
+                self.tokenizer->next_token();
+                self->skip_slashdashed_item()?;
             }
 
             case .Start_Children {
@@ -426,9 +424,8 @@ Parser.parse_value :: (self: &#Self, token: Token) -> ? Value {
         }
 
         case .String as s {
-            // TODO: Handle escaped strings here
             return Value.{
-                data = .{ String = string.copy(s, self.result_allocator) }
+                data = .{ String = unescape_kdl_string(s, self.result_allocator) }
             };
         }
         
@@ -451,7 +448,14 @@ Parser.parse_value :: (self: &#Self, token: Token) -> ? Value {
                 };
             }
 
-            // TODO: parse numbers
+            switch parse_kdl_number(w) {
+                case .Some as num {
+                    return Value.{
+                        data = .{ Number = num }
+                    };
+                }
+                case .None ---
+            }
 
             return Value.{
                 data = .{ String = string.copy(w, self.result_allocator) }
@@ -524,7 +528,283 @@ Parser.expect_token :: macro (self: &#Self, type: Token.tag_enum) -> Token {
 }
 
 Parser.parse_into_string :: (self: &#Self, tkn: Token) -> ? str {
-    return self->parse_value(tkn)->and_then(x => x.data.String);
+    switch tkn {
+        case .Word as w do return string.copy(w, self.result_allocator);
+        case .Raw_String as s do return string.copy(s, self.result_allocator);
+        case .String as s do return unescape_kdl_string(s, self.result_allocator);
+        case _ do return .None;
+    }
+}
+
+Parser.skip_slashdashed_item :: (self: &#Self) -> Result(i32, Parse_Error) {
+    switch tkn := self.tokenizer->peek_token(); tkn {
+        case .Start_Children {
+            return self->skip_children_block();
+        }
+
+        case .Newline, .Semicolon, .EOF, .End_Children {
+            return .{ Ok = 0 };
+        }
+
+        case .Start_Type {
+            type := self->parse_type_if_present()?;
+            value := self->parse_value(self.tokenizer->next_token()) ?? [] {
+                return return .{ Err = .{ Parser_Error = "Error parsing ignored value" } };
+            };
+            value.type_annotation = type;
+            free_skipped_value(self.result_allocator, value);
+            return .{ Ok = 0 };
+        }
+
+        case .Word, .Raw_String, .String {
+            self.tokenizer->next_token();
+            if_next_token_is(self, .Equals, [] {
+                prop_name := self->parse_into_string(tkn) ?? "";
+                type := self->parse_type_if_present()?;
+                value := self->parse_value(self.tokenizer->next_token()) ?? [] {
+                    return return .{ Err = .{ Parser_Error = "Error parsing ignored property" } };
+                };
+                value.type_annotation = type;
+                string.free(prop_name, self.result_allocator);
+                free_skipped_value(self.result_allocator, value);
+                return .{ Ok = 0 };
+            });
+
+            value := self->parse_value(tkn) ?? [] {
+                return return .{ Err = .{ Parser_Error = "Error parsing ignored value" } };
+            };
+            free_skipped_value(self.result_allocator, value);
+            return .{ Ok = 0 };
+        }
+
+        case .Slashdash {
+            self.tokenizer->next_token();
+            return self->skip_slashdashed_item();
+        }
+
+        case _ {
+            return .{ Err = .{ Parser_Error = tprintf("Unexpected token after /-, got {}", tkn) } };
+        }
+    }
+}
+
+Parser.skip_children_block :: (self: &#Self) -> Result(i32, Parse_Error) {
+    self->expect_token(.Start_Children);
+    depth := 1;
+    while depth > 0 {
+        tkn := self.tokenizer->next_token();
+        switch tkn {
+            case .Start_Children do depth += 1;
+            case .End_Children do depth -= 1;
+            case .EOF do return .{ Err = .{ Parser_Error = "Unterminated children block after /-" } };
+            case .Error do return .{ Err = .{ Parser_Error = "Bad token in ignored children block" } };
+            case _ ---
+        }
+    }
+    return .{ Ok = 0 };
+}
+
+#local
+free_skipped_value :: (al: Allocator, v: Value) {
+    v.type_annotation->with([t] { string.free(t, al); });
+    switch v.data {
+        case .String as s do string.free(s, al);
+        case .Number as num do switch num {
+            case .String as s do string.free(s, al);
+            case _ ---
+        }
+        case _ ---
+    }
+}
+
+#local
+looks_like_number :: (w: str) -> bool {
+    if w.count == 0 do return false;
+    i := 0;
+    if w[0] == '+' || w[0] == '-' {
+        if w.count == 1 do return false;
+        i = 1;
+    }
+    return w[i] >= '0' && w[i] <= '9';
+}
+
+#local
+parse_kdl_number :: (w: str) -> ? KDL_Number {
+    if !looks_like_number(w) do return .None;
+
+    s := w;
+    if string.contains(w, "_") {
+        buf: [128] u8;
+        n := 0;
+        for c in w {
+            if c == '_' do continue;
+            if n >= buf.count do return .None;
+            buf[n] = c;
+            n += 1;
+        }
+        s = buf[0 .. n];
+    }
+    if s.count == 0 do return .None;
+
+    sign: i64 = 1;
+    rest := s;
+    if rest[0] == '-' {
+        sign = -1;
+        rest = rest[1 .. rest.count];
+    } elseif rest[0] == '+' {
+        rest = rest[1 .. rest.count];
+    }
+    if rest.count == 0 do return .None;
+
+    if rest.count >= 2 && rest[0] == '0' {
+        switch rest[1] {
+            case 'x', 'X' {
+                if rest.count < 3 do return .None;
+                return KDL_Number.{ Integer = sign * parse_i64_base(rest[2 .. rest.count], 16) };
+            }
+            case 'o', 'O' {
+                if rest.count < 3 do return .None;
+                return KDL_Number.{ Integer = sign * parse_i64_base(rest[2 .. rest.count], 8) };
+            }
+            case 'b', 'B' {
+                if rest.count < 3 do return .None;
+                return KDL_Number.{ Integer = sign * parse_i64_base(rest[2 .. rest.count], 2) };
+            }
+            case _ ---
+        }
+    }
+
+    is_float := false;
+    for c in rest {
+        if c == '.' || c == 'e' || c == 'E' {
+            is_float = true;
+            break;
+        }
+    }
+
+    if is_float {
+        return KDL_Number.{ Float = conv.str_to_f64(s) };
+    }
+    return KDL_Number.{ Integer = parse_i64_base(s, 10) };
+}
+
+#local
+parse_i64_base :: (s: str, base: i64) -> i64 {
+    v: i64 = 0;
+    sign: i64 = 1;
+    i := 0;
+    if s.count > 0 && s[0] == '-' {
+        sign = -1;
+        i = 1;
+    } elseif s.count > 0 && s[0] == '+' {
+        i = 1;
+    }
+
+    while i < s.count {
+        c := s[i];
+        d: i64 = -1;
+        if c >= '0' && c <= '9' do d = cast(i64) (c - '0');
+        elseif c >= 'a' && c <= 'z' do d = cast(i64) (c - 'a' + 10);
+        elseif c >= 'A' && c <= 'Z' do d = cast(i64) (c - 'A' + 10);
+        if d < 0 || d >= base do break;
+        v = v * base + d;
+        i += 1;
+    }
+    return v * sign;
+}
+
+#local
+unescape_kdl_string :: (s: str, allocator: Allocator) -> str {
+    has_escape := false;
+    for c in s {
+        if c == '\\' {
+            has_escape = true;
+            break;
+        }
+    }
+    if !has_escape do return string.copy(s, allocator);
+
+    out := make(dyn_str, s.count, allocator);
+    i := 0;
+    while i < s.count {
+        if s[i] != '\\' {
+            dyn_str.append(&out, s[i]);
+            i += 1;
+            continue;
+        }
+
+        i += 1;
+        if i >= s.count do break;
+
+        switch s[i] {
+            case '\\', '"' {
+                dyn_str.append(&out, s[i]);
+                i += 1;
+            }
+            case '/' {
+                dyn_str.append(&out, '/');
+                i += 1;
+            }
+            case 'n' {
+                dyn_str.append(&out, '\n');
+                i += 1;
+            }
+            case 't' {
+                dyn_str.append(&out, '\t');
+                i += 1;
+            }
+            case 'r' {
+                dyn_str.append(&out, '\r');
+                i += 1;
+            }
+            case 'b' {
+                dyn_str.append(&out, '\b');
+                i += 1;
+            }
+            case 'f' {
+                dyn_str.append(&out, '\f');
+                i += 1;
+            }
+            case 's' {
+                dyn_str.append(&out, ' ');
+                i += 1;
+            }
+            case '\n' {
+                i += 1;
+                while i < s.count && (s[i] == ' ' || s[i] == '\t' || s[i] == '\r') {
+                    i += 1;
+                }
+            }
+            case '\r' {
+                i += 1;
+                if i < s.count && s[i] == '\n' do i += 1;
+                while i < s.count && (s[i] == ' ' || s[i] == '\t') {
+                    i += 1;
+                }
+            }
+            case 'u' {
+                i += 1;
+                if i >= s.count || s[i] != '{' {
+                    dyn_str.append(&out, 'u');
+                    continue;
+                }
+                i += 1;
+                hex_start := i;
+                while i < s.count && s[i] != '}' {
+                    i += 1;
+                }
+                if i >= s.count do break;
+                cp := conv.str_to_i64(s[hex_start .. i], 16);
+                utf8.append_rune(&out, ~~cp);
+                i += 1;
+            }
+            case _ {
+                dyn_str.append(&out, s[i]);
+                i += 1;
+            }
+        }
+    }
+    return out;
 }
 
 #package {

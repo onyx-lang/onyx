@@ -115,12 +115,14 @@ JWT.parse :: (token: str, signing_key: str, allocator := context.allocator) -> R
     if !signature_enc do return .{ Err = .Bad_Format }
 
     use header := base64.decode_url(header_enc, context.temp_allocator)
+        |> Result.transform_err(x => JWT_Parse_Error.Invalid_Header)?
         |> json.decode_with_result(context.temp_allocator)
         |> Result.transform(x => x.root)
         |> Result.transform_err(x => JWT_Parse_Error.Invalid_Header)?
         |> json.Value.as_map(allocator)
 
     body_raw := base64.decode_url(body_enc, allocator)
+        |> Result.transform_err(x => JWT_Parse_Error.Invalid_Body)?
     body := body_raw
         |> json.decode_with_result(allocator)
         |> Result.transform(x => x.root)
@@ -141,6 +143,7 @@ JWT.parse :: (token: str, signing_key: str, allocator := context.allocator) -> R
     token._body = Array.raw_from_slice(body_raw, allocator)
 
     use signature := base64.decode_url(signature_enc)
+        |> Result.transform_err(x => JWT_Parse_Error.Invalid_Signature)?
     valid := verify_string(
         tprintf("{}.{}", header_enc, body_enc)
         token.method

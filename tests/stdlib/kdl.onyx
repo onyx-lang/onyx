@@ -1,0 +1,51 @@
+package main
+
+use core {*}
+use core.encoding.kdl
+
+// @leak-check
+
+main :: () {
+    use doc := kdl.parse("node 123 0xFF 0o10 0b1010 1_000 1.5 true null \"a\\nb\"")!
+
+    n := doc.nodes[0]
+    println(n.node)
+    println(n.values[0]->as_int() ?? -1)
+    println(n.values[1]->as_int() ?? -1)
+    println(n.values[2]->as_int() ?? -1)
+    println(n.values[3]->as_int() ?? -1)
+    println(n.values[4]->as_int() ?? -1)
+    printf("{}\n", n.values[5]->as_float() ?? -1.0)
+    println(n.values[6]->as_bool() ?? false)
+    println(n.values[7].data.tag)
+    esc := n.values[8]->as_str() ?? ""
+    println(esc.count)
+    println(esc[0] == 'a' && esc[1] == '\n' && esc[2] == 'b')
+
+    use props := kdl.parse("item foo=42")!
+    println(props.nodes[0].props["foo"]->unwrap()->as_int() ?? -1)
+
+    use sd := kdl.parse("n 1 /- 2 3")!
+    println(sd.nodes[0].values.count)
+    println(sd.nodes[0].values[0]->as_int() ?? -1)
+    println(sd.nodes[0].values[1]->as_int() ?? -1)
+
+    use ch := kdl.parse("n /- { x 1 }\nm 9")!
+    println(ch.nodes.count)
+    println(ch.nodes[0].children.count)
+    println(ch.nodes[1].values[0]->as_int() ?? -1)
+
+    use uni := kdl.parse("e \"\\u{41}\"")!
+    println(uni.nodes[0].values[0]->as_str() ?? "")
+
+    q := doc->query("node")
+    switch q {
+        case .None do println(false)
+        case .Some do println(true)
+    }
+
+    s := doc->write_string()
+    defer str.free(s)
+    println(string.contains(s, "node"))
+    println(string.contains(s, "123"))
+}

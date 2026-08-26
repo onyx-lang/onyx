@@ -8,7 +8,13 @@
 package core.encoding.base64
 #allow_stale_code
 
+use core { Result }
 use core.array
+
+Error :: enum {
+    Invalid_Length
+    Invalid_Digit
+}
 
 
 /// Encodes the given data in base64 into a new buffer, allocated
@@ -49,8 +55,12 @@ encode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
 
 /// Decodes the given base64 data into a new buffer, allocated
 /// from the allocator provided.
-decode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
-    if data.count % 4 != 0 do return null_str;
+decode :: (data: [] u8, allocator := context.allocator) -> Result([] u8, Error) {
+    if data.count % 4 != 0 do return .{ Err = .Invalid_Length }
+    switch validate_std(data) {
+        case .Some as e do return .{ Err = e }
+        case .None ---
+    }
 
     out := array.make(u8, allocator=allocator);
 
@@ -74,7 +84,7 @@ decode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
         if c4 != '=' do out << o3;
     }
 
-    return out;
+    return .{ Ok = out }
 }
 
 
@@ -110,7 +120,12 @@ encode_url :: (data: [] u8, allocator := context.allocator) -> [] u8 {
 
 /// Decodes the given base64 data into a new buffer, allocated
 /// from the allocator provided.
-decode_url :: (data: [] u8, allocator := context.allocator) -> [] u8 {
+decode_url :: (data: [] u8, allocator := context.allocator) -> Result([] u8, Error) {
+    if data.count % 4 == 1 do return .{ Err = .Invalid_Length }
+    for c in data {
+        if !is_url_digit(c) do return .{ Err = .Invalid_Digit }
+    }
+
     out := Array.make(u8, allocator=allocator)
 
     for i in range.{0, data.count - 3, 4} {
@@ -163,7 +178,52 @@ decode_url :: (data: [] u8, allocator := context.allocator) -> [] u8 {
         out << o1
     }
 
-    return out
+    return .{ Ok = out }
+}
+
+#local
+is_std_digit :: (c: u8) -> bool {
+    switch c {
+        case 'A' ..= 'Z' do return true
+        case 'a' ..= 'z' do return true
+        case '0' ..= '9' do return true
+        case '+', '/' do return true
+        case _ do return false
+    }
+}
+
+#local
+is_url_digit :: (c: u8) -> bool {
+    switch c {
+        case 'A' ..= 'Z' do return true
+        case 'a' ..= 'z' do return true
+        case '0' ..= '9' do return true
+        case '-', '_' do return true
+        case _ do return false
+    }
+}
+
+#local
+validate_std :: (data: [] u8) -> ? Error {
+    for i in range.{0, data.count, 4} {
+        last := i + 4 == data.count
+        c1 := data[i + 0]
+        c2 := data[i + 1]
+        c3 := data[i + 2]
+        c4 := data[i + 3]
+
+        if !is_std_digit(c1) || !is_std_digit(c2) do return .{ Some = .Invalid_Digit }
+
+        if c3 == '=' {
+            if !last || c4 != '=' do return .{ Some = .Invalid_Digit }
+        } elseif c4 == '=' {
+            if !last || !is_std_digit(c3) do return .{ Some = .Invalid_Digit }
+        } elseif !is_std_digit(c3) || !is_std_digit(c4) {
+            return .{ Some = .Invalid_Digit }
+        }
+    }
+
+    return .None
 }
 
 

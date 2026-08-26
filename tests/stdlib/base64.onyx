@@ -17,7 +17,7 @@ decode_test :: () {
         "bGlnaHQgd29yayBhbmQgbGVz",
         "bGlnaHQgd29yayBhbmQgbGVzcw==",
     ] {
-        core.println(base64.decode(it));
+        core.println(base64.decode(it).Ok!);
     }
 }
 
@@ -58,7 +58,7 @@ decode_url_test :: () {
         "bGlnaHQgd29yayBhbmQgbGVz",
         "bGlnaHQgd29yayBhbmQgbGVzcw",
     ] {
-        core.println(base64.decode_url(it))
+        core.println(base64.decode_url(it).Ok!)
     }
 }
 
@@ -91,5 +91,10 @@ main :: () {
     decode_url_test()
     core.println("\n")
     encode_url_test()
+
+    core.println(base64.decode("abc").Err!)
+    core.println(base64.decode("!!!!").Err!)
+    core.println(base64.decode_url("A").Err!)
+    core.println(base64.decode_url("!!!!").Err!)
 }
 
