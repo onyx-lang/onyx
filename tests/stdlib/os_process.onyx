@@ -1,0 +1,32 @@
+use core {*}
+
+main :: () {
+    p := os.Process.spawn("/bin/echo", .["hello"]);
+    r := io.reader_make(&p);
+    out := io.read_all(&r);
+    defer str.free(out);
+    io.reader_free(&r);
+
+    res := p->wait();
+    p->destroy();
+    println(res == .Success);
+    println(p.exit_code == 0);
+    println(out->starts_with("hello"));
+
+    f := os.Process.spawn("/bin/sh", .["-c", "exit 1"]);
+    fres := f->wait();
+    code := f.exit_code;
+    f->destroy();
+    println(fres == .Error);
+    println(code == 1);
+
+    e := os.Process.spawn("/bin/sh", .["-c", "echo err >&2"]);
+    err_r := io.reader_make(&e.stderr);
+    err_out := io.read_all(&err_r);
+    defer str.free(err_out);
+    io.reader_free(&err_r);
+    eres := e->wait();
+    e->destroy();
+    println(eres == .Success);
+    println(err_out->starts_with("err"));
+}

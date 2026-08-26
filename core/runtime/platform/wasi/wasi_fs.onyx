@@ -24,8 +24,20 @@ FileData :: struct {
     flags  : FDFlags  = ~~ 0;
 }
 
-__file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError) {
-    // Requesting all of the rights because why not.
+#local
+wasi_file_error :: (err: Errno) -> os.FileError {
+    switch err {
+        case .Success do return .None;
+        case .NoEntry do return .NotFound;
+        case .Exist do return .Exists;
+        case .Permission, .Access, .NotCapable, .ReadonlyFS do return .Permission;
+        case .Invalid, .NotSupported, .IsDirectory do return .BadMode;
+        case .BadFile do return .BadFile;
+        case _ do return .BadFile;
+    }
+}
+
+__file_open :: (path: str, mode := os.OpenMode.Read, flags := os.OpenFlags.{}) -> (FileData, os.FileError) {
     rights     := wasi.Rights.{}
     open_flags := cast(OFlags) 0
     fd_flags   := cast(FDFlags) 0
@@ -38,6 +50,20 @@ __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError)
         case .Write {
             open_flags |= OFlags.Creat | OFlags.Trunc;
         }
+
+        case .ReadWrite {
+            if flags & os.OpenFlags.Create {
+                open_flags |= OFlags.Creat;
+            }
+        }
+    }
+
+    if flags & os.OpenFlags.Create {
+        open_flags |= OFlags.Creat;
+    }
+
+    if (flags & os.OpenFlags.Exclusive) && (open_flags & OFlags.Creat) {
+        open_flags |= OFlags.FailIfExists;
     }
 
     switch mode {
@@ -48,6 +74,13 @@ __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError)
 
         case .Write {
             rights |= Rights.Write | Rights.Seek | Rights.Tell;
+            rights |= Rights.DataSync | Rights.FdStatSetFlags;
+            rights |= Rights.Sync | Rights.Allocate | Rights.Advise;
+            rights |= Rights.FilestatSetSize | Rights.FilestatSetTimes;
+        }
+
+        case .ReadWrite {
+            rights |= Rights.Read | Rights.Write | Rights.Seek | Rights.Tell | Rights.FilestatGet;
             rights |= Rights.DataSync | Rights.FdStatSetFlags;
             rights |= Rights.Sync | Rights.Allocate | Rights.Advise;
             rights |= Rights.FilestatSetSize | Rights.FilestatSetTimes;
@@ -70,10 +103,7 @@ __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError)
         return file, .None;
     }
 
-    return .{}, switch err {
-        // TODO: Return better error statuses.
-        case _ => .NotFound
-    }
+    return .{}, wasi_file_error(err);
 }
 
 __file_close :: (file: FileData) -> os.FileError {
@@ -85,29 +115,63 @@ __file_close :: (file: FileData) -> os.FileError {
 }
 
 __file_stat :: (path: str, out: &os.FileStat) -> bool {
+    return wasi_stat(path, out, follow=true);
+}
+
+__file_lstat :: (path: str, out: &os.FileStat) -> bool {
+    return wasi_stat(path, out, follow=false);
+}
+
+#local
+wasi_stat :: (path: str, out: &os.FileStat, follow: bool) -> bool {
     fs: wasi.FileStat;
 
-    exists := false;
+    lookup := LookupFlags.{};
+    if follow do lookup = .SymLinkFollow;
 
     fd, resolved_path := resolve_fd_and_path(path)
 
-    err := wasi.path_filestat_get(fd, .SymLinkFollow, resolved_path, &fs);
-    if err == .Success {
-        exists = true;
-        out.size = ~~ fs.size;
-        out.change_time = fs.ctim / 1000000;
-        out.accessed_time = fs.atim / 1000000;
-        out.modified_time = fs.mtim / 1000000;
+    err := wasi.path_filestat_get(fd, lookup, resolved_path, &fs);
+    if err != .Success do return false;
 
-        switch fs.filetype {
-            case .RegularFile do out.type = .RegularFile;
-            case .Directory do out.type = .Directory;
-            case .SymLink do out.type = .SymLink;
-            case _ do out.type = .Unknown;
-        }
+    out.size = ~~ fs.size;
+    out.change_time = fs.ctim / 1000000;
+    out.accessed_time = fs.atim / 1000000;
+    out.modified_time = fs.mtim / 1000000;
+
+    switch fs.filetype {
+        case .RegularFile do out.type = .RegularFile;
+        case .Directory do out.type = .Directory;
+        case .SymLink do out.type = .SymLink;
+        case _ do out.type = .Unknown;
     }
 
-    return exists;
+    return true;
+}
+
+__file_symlink :: (target: str, link_path: str) -> bool {
+    fd, resolved_path := resolve_fd_and_path(link_path)
+    err := wasi.path_symlink(target.data, ~~target.count, fd, resolved_path);
+    return err == .Success;
+}
+
+__file_link :: (target: str, link_path: str) -> bool {
+    old_fd, old_path := resolve_fd_and_path(target)
+    new_fd, new_path := resolve_fd_and_path(link_path)
+    err := wasi.path_link(old_fd, .{}, old_path, new_fd, new_path);
+    return err == .Success;
+}
+
+__file_readlink :: (path: str, buf: [] u8) -> i32 {
+    used: Size;
+    fd, resolved_path := resolve_fd_and_path(path)
+    err := wasi.path_readlink(fd, resolved_path, buf.data, ~~buf.count, &used);
+    if err != .Success do return -1;
+    return ~~used;
+}
+
+__file_truncate :: (file: FileData, size: i64) -> bool {
+    return wasi.fd_filestat_set_size(file.fd, ~~size) == .Success;
 }
 
 __file_exists :: (path: str) -> bool {

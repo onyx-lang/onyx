@@ -51,6 +51,10 @@ Supports_Env_Vars :: true
     Supports_TTY :: false
 }
 
+__stdin: os.File;
+__stdout: os.File;
+__stderr: os.File;
+
 __output_string :: (s: str) -> u32 {
     STDOUT_FILENO :: 1
 
@@ -234,6 +238,19 @@ __args :: (allocator: Allocator) -> [] cstr {
 
 // Sets up everything needed for execution.
 __start :: () {
+    __stdin = .{
+        .{ &__file_stream_vtable, .Block_On_Read },
+        .{ fd = 0, mode = .Read },
+    };
+    __stdout = .{
+        .{ &__file_stream_vtable },
+        .{ fd = 1, mode = .Write },
+    };
+    __stderr = .{
+        .{ &__file_stream_vtable },
+        .{ fd = 2, mode = .Write },
+    };
+
     __runtime_initialize();
     context.thread_id = 0;
 

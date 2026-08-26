@@ -42,5 +42,42 @@ main :: () {
     defer str.free(copied);
     println(copied);
 
+    println(os.stdout.vtable != null);
+    println(os.stderr.vtable != null);
+
+    switch os.File.open(path, .Write, .Exclusive) {
+        case .Err as e do println(e == .Exists);
+        case .Ok do println(false);
+    }
+    switch os.File.open(os.Path.join(nested, "nope.txt"), .Read) {
+        case .Err as e do println(e == .NotFound);
+        case .Ok do println(false);
+    }
+
+    {
+        use rw := os.File.open(path, .ReadWrite)!;
+        println(os.File.truncate(&rw, 2));
+    }
+    trunc := os.get_contents(path);
+    defer str.free(trunc);
+    println(trunc);
+
+    link := os.Path.join(nested, "hello.link");
+    println(os.File.symlink("hello.txt", link));
+    switch os.File.readlink(link) {
+        case .None do println("");
+        case .Some as target {
+            defer str.free(target);
+            println(target);
+        }
+    }
+
+    lst: os.FileStat;
+    println(os.File.lstat(link, &lst));
+    println(lst.type == .SymLink);
+    st: os.FileStat;
+    println(os.file_stat(link, &st));
+    println(st.type == .RegularFile);
+
     println(os.remove_directory(root));
 }

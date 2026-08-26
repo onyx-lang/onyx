@@ -1,0 +1,98 @@
+package core.time
+
+/// One-shot deadline. `wait` sleeps until it fires (or returns immediately if
+/// it already has). No thread and no channel: pair this with `sleep` / `Instant`.
+Timer :: struct {
+    deadline: Instant;
+    stopped: bool;
+}
+
+Timer.make :: (d: Duration) -> Timer {
+    return .{
+        deadline = Instant.now() + d,
+        stopped = false,
+    };
+}
+
+Timer.stop :: (t: &Timer) {
+    t.stopped = true;
+}
+
+Timer.reset :: (t: &Timer, d: Duration) {
+    t.stopped = false;
+    t.deadline = Instant.now() + d;
+}
+
+Timer.expired :: (t: Timer) -> bool {
+    if t.stopped do return false;
+    return Instant.now() >= t.deadline;
+}
+
+Timer.remaining :: (t: Timer) -> Duration {
+    if t.stopped do return Duration.from_ns(0);
+    d := t.deadline - Instant.now();
+    if cast(i64) d < 0 do return Duration.from_ns(0);
+    return d;
+}
+
+/// Sleep until the deadline. Returns false if the timer was stopped.
+Timer.wait :: (t: &Timer) -> bool {
+    if t.stopped do return false;
+    d := t.deadline - Instant.now();
+    if cast(i64) d > 0 do sleep(d);
+    return !t.stopped;
+}
+
+/// Repeating timer. `wait` sleeps until the next tick, then advances.
+/// Slow consumers skip missed ticks rather than bursting.
+Ticker :: struct {
+    period: Duration;
+    next: Instant;
+    stopped: bool;
+}
+
+Ticker.make :: (d: Duration) -> Ticker {
+    return .{
+        period = d,
+        next = Instant.now() + d,
+        stopped = false,
+    };
+}
+
+Ticker.stop :: (t: &Ticker) {
+    t.stopped = true;
+}
+
+Ticker.reset :: (t: &Ticker, d: Duration) {
+    t.stopped = false;
+    t.period = d;
+    t.next = Instant.now() + d;
+}
+
+/// Sleep until the next tick. Returns false if the ticker was stopped or the period is not positive.
+Ticker.wait :: (t: &Ticker) -> bool {
+    if t.stopped do return false;
+    if cast(i64) t.period <= 0 do return false;
+
+    now := Instant.now();
+    if now < t.next {
+        sleep(t.next - now);
+        now = Instant.now();
+    }
+
+    while t.next <= now {
+        t.next = t.next + t.period;
+    }
+
+    return !t.stopped;
+}
+
+/// Sleep for `d`, then return the wall clock.
+after :: (d: Duration) -> Instant {
+    sleep(d);
+    return Instant.now();
+}
+
+until :: Instant.until
+since :: Instant.since
+sleep_until :: Instant.sleep_until

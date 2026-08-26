@@ -20,11 +20,20 @@ FileError :: enum {
     BadMode    :: 0x05;
 }
 
+/// Shorthand open modes. `.Write` creates and truncates; `.Append` creates.
+/// `.ReadWrite` opens an existing file for both (add `OpenFlags.Create` to create it).
 OpenMode :: enum {
-    Invalid :: 0x00;
-    Read    :: 0x01;
-    Write   :: 0x02;
-    Append  :: 0x03;
+    Invalid   :: 0x00;
+    Read      :: 0x01;
+    Write     :: 0x02;
+    Append    :: 0x03;
+    ReadWrite :: 0x04;
+}
+
+/// Extra bits for `File.open`. `Exclusive` is `O_EXCL` / WASI `FailIfExists` (only with create).
+OpenFlags :: enum #flags (u32) {
+    Exclusive :: 0x01;
+    Create    :: 0x02;
 }
 
 FileData :: fs.FileData;
@@ -59,6 +68,7 @@ FileStat :: struct {
 
 file_exists :: fs.__file_exists
 file_stat   :: fs.__file_stat
+file_lstat  :: fs.__file_lstat
 remove_file :: fs.__file_remove
 rename_file :: fs.__file_rename
 
@@ -84,18 +94,46 @@ File.from_fd :: (fd: FileData) -> File {
     return file;
 }
 
-File.open :: (path: str, mode := OpenMode.Read) -> Result(File, os.FileError) {
+File.open :: (path: str, mode := OpenMode.Read, flags := OpenFlags.{}) -> Result(File, os.FileError) {
     file := File.{
         stream = .{ vtable = null },
         data   = .{},
     };
 
-    file_data, error := fs.__file_open(path, mode);
+    file_data, error := fs.__file_open(path, mode, flags);
     if error != .None do return .{ Err = error };
 
     file.data = file_data;
     file.vtable = &fs.__file_stream_vtable;
     return .{ Ok = file };
+}
+
+/// Replace the file's size. Extending may leave a hole; shrinking discards the tail.
+File.truncate :: (file: &File, size: i64) -> bool {
+    return fs.__file_truncate(file.data, size);
+}
+
+/// Create a symbolic link at `link_path` pointing at `target`.
+File.symlink :: (target: str, link_path: str) -> bool {
+    return fs.__file_symlink(target, link_path);
+}
+
+/// Create a hard link at `link_path` for the file at `target`.
+File.link :: (target: str, link_path: str) -> bool {
+    return fs.__file_link(target, link_path);
+}
+
+/// Read the target of a symbolic link. The caller owns the string.
+File.readlink :: (path: str, allocator := context.allocator) -> ? str {
+    buf: [4096] u8;
+    n := fs.__file_readlink(path, buf);
+    if n < 0 do return .None;
+    return str.copy(buf[0 .. n], allocator);
+}
+
+/// Like `file_stat`, but does not follow a final symlink.
+File.lstat :: (path: str, stat: &FileStat) -> bool {
+    return fs.__file_lstat(path, stat);
 }
 
 File.close :: (file: &File) {
@@ -207,9 +245,17 @@ File.stat   :: file_stat
 File.remove :: remove_file
 File.rename :: rename_file
 
+stdin  := &fs.__stdin
+stdout := &fs.__stdout
+stderr := &fs.__stderr
+
 // Compatibility: package names.
 open :: File.open
 close :: File.close
 from_fd :: File.from_fd
 get_contents_from_file :: File.get_contents
 write_contents :: File.write_contents
+symlink :: File.symlink
+link :: File.link
+readlink :: File.readlink
+lstat :: File.lstat

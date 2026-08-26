@@ -14,13 +14,22 @@ use runtime.platform {
     __process_destroy,
     __process_kill,
     __process_read,
+    __process_read_stderr,
     __process_write,
     __process_wait,
     ProcessData
 }
 
-/// Represents a spawned OS process.
+/// Represents a spawned OS process. `use stream` is stdout; `stderr` is a separate stream.
 Process :: struct {
+    use stream: io.Stream;
+    stderr: ProcessStderr;
+    process_handle: ProcessData;
+    exit_code: i32;
+}
+
+/// Stderr side of a captured process. `io.Stream.read(&p.stderr)` works because the stream is at offset 0.
+ProcessStderr :: struct {
     use stream: io.Stream;
     process_handle: ProcessData;
 }
@@ -70,7 +79,9 @@ Process.spawn :: (path: str, args: [] str, opts: &ProcessSpawnOpts) -> Process {
 
     return .{
         .{ &process_stream_vtable },
+        .{ .{ &process_stderr_vtable }, handle },
         handle,
+        0,
     };
 }
 
@@ -79,9 +90,19 @@ Process.kill :: (use p: &Process) -> bool {
     return __process_kill(process_handle);
 }
 
-/// Waits for a process to exit.
-Process.wait :: (use p: &Process) => {
-    return __process_wait(process_handle);
+/// Waits for a process to exit. Stores the numeric code on `p.exit_code`.
+Process.wait :: (use p: &Process) -> ProcessResult {
+    code := __process_wait(process_handle);
+    if code == -1 {
+        p.exit_code = -1;
+        return .FailedToRun;
+    }
+    if code == -2 {
+        p.exit_code = -1;
+        return .InternalErr;
+    }
+    p.exit_code = code;
+    return .Success if code == 0 else .Error;
 }
 
 /// Frees internal resources used by a process. Should be called after process_kill or process_wait.
@@ -126,9 +147,23 @@ Process.destroy :: (use p: &Process) => {
     }
 }
 
-/// Represents exit states of a process.
-///
-/// This is not the best format for this data, as it is impossible to get the exit status.
+#local process_stderr_vtable := io.Stream_Vtable.{
+    read = (use s: &ProcessStderr, buffer: [] u8) -> Result(u32, io.Error) {
+        if cast(i64) process_handle == 0 do return .{ Err = .BadFile };
+
+        bytes_read := __process_read_stderr(process_handle, buffer);
+        if bytes_read < 0 {
+            switch cast(Process_Read_Error) -bytes_read {
+                case .None do return .{ Ok = 0 };
+                case .Process_Dead do return .{ Err = .EOF };
+                case .Unknown do return .{ Err = .BadFile };
+            }
+        }
+        return .{ Ok = bytes_read };
+    }
+}
+
+/// Represents exit states of a process. The numeric code is on `Process.exit_code` after `wait`.
 ProcessResult :: enum {
     Success     :: 0x00;
     FailedToRun :: 0x01;
@@ -156,6 +191,7 @@ Command :: struct {
 
     _process: ? Process;
     _opts: ProcessSpawnOpts;
+    exit_code: i32;
 }
 
 /// Produces a new `Command` for the process builder.
@@ -241,6 +277,7 @@ Command.wait :: (cmd: &Command) -> ProcessResult {
     if !cmd._process do return .Error;
 
     res := process_wait(cmd._process->unwrap_ptr());
+    cmd.exit_code = cmd._process->unwrap_ptr().exit_code;
     process_destroy(cmd._process->unwrap_ptr());
 
     cmd->destroy();

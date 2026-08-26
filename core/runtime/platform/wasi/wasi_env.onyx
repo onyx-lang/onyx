@@ -1,10 +1,21 @@
 package runtime.platform
 
 use wasi { environ_get, environ_sizes_get, Size }
-use core {Pair, string, slice}
+use core {Pair, string, slice, Optional}
 
 #local {
     all_env: [] Pair(str, str);
+    overlay: Map(str, str);
+    deleted: Set(str);
+    overlay_ready := false;
+}
+
+#local
+ensure_overlay :: () {
+    if overlay_ready do return;
+    overlay = make(Map(str, str));
+    deleted = make(Set(str));
+    overlay_ready = true;
 }
 
 #local
@@ -42,10 +53,40 @@ __lookup_all_envs :: () {
 __get_all_env :: () -> [] Pair(str, str) {
     __lookup_all_envs();
 
-    return all_env;
+    if !overlay_ready do return all_env;
+
+    result := make([..] Pair(str, str), 8);
+    for p in all_env {
+        if deleted->has(p.first) do continue;
+        if overlay->has(p.first) {
+            result << .{ p.first, overlay->get(p.first)! };
+        } else {
+            result << p;
+        }
+    }
+
+    for key, value in overlay {
+        found := false;
+        for p in all_env {
+            if p.first == key {
+                found = true;
+                break;
+            }
+        }
+        if !found && !deleted->has(key) {
+            result << .{ key, value };
+        }
+    }
+
+    return result;
 }
 
 __get_env :: (key: str) -> ? str {
+    if overlay_ready {
+        if deleted->has(key) do return .None;
+        if overlay->has(key) do return overlay->get(key);
+    }
+
     __lookup_all_envs();
 
     return slice.first(all_env, [v](v.first == key))
@@ -53,5 +94,16 @@ __get_env :: (key: str) -> ? str {
         |> Optional.transform(x => x.second);
 }
 
+__set_env :: (key: str, value: str) -> bool {
+    ensure_overlay();
+    deleted->remove(key);
+    overlay->put(str.copy(key), str.copy(value));
+    return true;
+}
 
-
+__unset_env :: (key: str) -> bool {
+    ensure_overlay();
+    overlay->remove(key);
+    deleted->insert(str.copy(key));
+    return true;
+}

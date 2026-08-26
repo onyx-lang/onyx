@@ -188,6 +188,20 @@ Instant.since :: (start: Instant) -> Duration {
     return Instant.now() - start;
 }
 
+/// Time remaining until `deadline`. Negative if the deadline is already past.
+Instant.until :: (deadline: Instant) -> Duration {
+    return deadline - Instant.now();
+}
+
+Instant.expired :: (deadline: Instant) -> bool {
+    return Instant.now() >= deadline;
+}
+
+Instant.sleep_until :: (deadline: Instant) {
+    d := deadline - Instant.now();
+    if cast(i64) d > 0 do sleep(d);
+}
+
 /// RFC 3339 / ISO 8601. Default `offset` is UTC (`…Z`). Pass a `Fixed_Offset` to emit `+HH:MM`.
 /// Fractional seconds are omitted when they are zero.
 Instant.format_rfc3339 :: (i: Instant, allocator := context.allocator, offset := UTC) -> str {

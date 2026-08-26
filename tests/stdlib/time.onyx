@@ -1,5 +1,5 @@
 use core {*}
-use core.time { Duration, Instant, Mono, Timestamp, Date, Fixed_Offset, Offset_Time, UTC, SECOND, MILLISECOND, NANOSECOND, gmtime, strftime }
+use core.time { Duration, Instant, Mono, Timestamp, Date, Fixed_Offset, Offset_Time, UTC, SECOND, MILLISECOND, NANOSECOND, HOUR, Timer, Ticker, after, gmtime, strftime }
 
 // @leak-check
 
@@ -97,5 +97,32 @@ main :: () {
     println(m1 >= m0);
 
     println(Instant.now() > epoch);
+
+    start := Instant.now();
+    tm := Timer.make(20 * MILLISECOND);
+    println(tm->wait());
+    println(Instant.since(start) >= 10 * MILLISECOND);
+    println(tm->remaining() == Duration.from_ns(0) || tm->expired());
+
+    t2 := Timer.make(1 * HOUR);
+    t2->stop();
+    println(!t2->wait());
+    println(!t2->expired());
+
+    dl := Instant.now() + 20 * MILLISECOND;
+    println(cast(i64) Instant.until(dl) > 0);
+    Instant.sleep_until(dl);
+    println(Instant.expired(dl) || cast(i64) Instant.until(dl) <= 5 * 1000000);
+
+    tk := Ticker.make(15 * MILLISECOND);
+    println(tk->wait());
+    println(tk->wait());
+    tk->stop();
+    println(!tk->wait());
+
+    a0 := Instant.now();
+    a1 := after(15 * MILLISECOND);
+    println(a1 >= a0);
+
     println("ok");
 }

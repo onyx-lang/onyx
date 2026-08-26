@@ -106,31 +106,153 @@ ONYX_DEF(__poll, (WASM_I32, WASM_I32, WASM_I32), ()) {
 
 
 ONYX_DEF(__lookup_env, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    char key[512] = {0};
+    int key_len = params->data[1].of.i32;
+    if (key_len > 511) key_len = 511;
+    memcpy(key, ONYX_PTR(params->data[0].of.i32), key_len);
+    key[key_len] = 0;
 
-    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
-    char *key_ptr = ONYX_PTR(params->data[0].of.i32);
-    int   key_len = params->data[1].of.i32;
     char *out_ptr = ONYX_PTR(params->data[2].of.i32);
     int   out_len = params->data[3].of.i32;
 
-    char key[512] = {0};
-    key_len = bh_min(key_len, 511);
-    strncpy(key, key_ptr, key_len);
-    key[key_len] = 0;
-
-    char * value = getenv(key);
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    char *value = getenv(key);
     if (!value) {
         results->data[0] = WASM_I32_VAL(0);
-    } else {
-        out_len = bh_min(out_len, strlen(value));
-        memcpy(out_ptr, value, out_len);
-        results->data[0] = WASM_I32_VAL(out_len);
+        return NULL;
     }
-    #endif
+    int n = (int) strlen(value);
+    if (n > out_len) n = out_len;
+    memcpy(out_ptr, value, n);
+    results->data[0] = WASM_I32_VAL(n);
+    return NULL;
+#endif
 
-    #ifdef _BH_WINDOWS
-    results->data[0] = WASM_I32_VAL(0);
-    #endif
+#ifdef _BH_WINDOWS
+    DWORD n = GetEnvironmentVariableA(key, out_ptr, out_len);
+    if (n == 0) {
+        results->data[0] = WASM_I32_VAL(0);
+        return NULL;
+    }
+    if (n >= (DWORD) out_len) {
+        results->data[0] = WASM_I32_VAL(out_len);
+        return NULL;
+    }
+    results->data[0] = WASM_I32_VAL((i32) n);
+    return NULL;
+#endif
+}
+
+ONYX_DEF(__set_env, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    char key[512] = {0};
+    char val[4096] = {0};
+    int key_len = params->data[1].of.i32;
+    int val_len = params->data[3].of.i32;
+    if (key_len > 511) key_len = 511;
+    if (val_len > 4095) val_len = 4095;
+    memcpy(key, ONYX_PTR(params->data[0].of.i32), key_len);
+    memcpy(val, ONYX_PTR(params->data[2].of.i32), val_len);
+    key[key_len] = 0;
+    val[val_len] = 0;
+
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    results->data[0] = WASM_I32_VAL(setenv(key, val, 1) == 0);
+    return NULL;
+#endif
+
+#ifdef _BH_WINDOWS
+    results->data[0] = WASM_I32_VAL(SetEnvironmentVariableA(key, val) != 0);
+    return NULL;
+#endif
+}
+
+ONYX_DEF(__unset_env, (WASM_I32, WASM_I32), (WASM_I32)) {
+    char key[512] = {0};
+    int key_len = params->data[1].of.i32;
+    if (key_len > 511) key_len = 511;
+    memcpy(key, ONYX_PTR(params->data[0].of.i32), key_len);
+    key[key_len] = 0;
+
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    results->data[0] = WASM_I32_VAL(unsetenv(key) == 0);
+    return NULL;
+#endif
+
+#ifdef _BH_WINDOWS
+    results->data[0] = WASM_I32_VAL(SetEnvironmentVariableA(key, NULL) != 0);
+    return NULL;
+#endif
+}
+
+ONYX_DEF(__environ_sizes_get, (WASM_I32, WASM_I32), ()) {
+    i32 count = 0;
+    i32 buf_size = 0;
+
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    extern char **environ;
+    char **e = environ;
+    if (e) {
+        for (; *e; e++) {
+            count += 1;
+            buf_size += (i32) strlen(*e) + 1;
+        }
+    }
+#endif
+
+#ifdef _BH_WINDOWS
+    LPCH env = GetEnvironmentStringsA();
+    if (env) {
+        char *p = env;
+        while (*p) {
+            count += 1;
+            i32 n = (i32) strlen(p) + 1;
+            buf_size += n;
+            p += n;
+        }
+        FreeEnvironmentStringsA(env);
+    }
+#endif
+
+    *(i32 *) ONYX_PTR(params->data[0].of.i32) = count;
+    *(i32 *) ONYX_PTR(params->data[1].of.i32) = buf_size;
+    return NULL;
+}
+
+ONYX_DEF(__environ_get, (WASM_I32, WASM_I32), ()) {
+    i32 ptrs_base = params->data[0].of.i32;
+    i32 buf_base  = params->data[1].of.i32;
+    i32 buf_off   = buf_base;
+    i32 i = 0;
+
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    extern char **environ;
+    char **e = environ;
+    if (e) {
+        for (; *e; e++, i++) {
+            i32 n = (i32) strlen(*e) + 1;
+            memcpy(ONYX_PTR(buf_off), *e, n);
+            *(i32 *) ONYX_PTR(ptrs_base + i * 4) = buf_off;
+            buf_off += n;
+        }
+    }
+#endif
+
+#ifdef _BH_WINDOWS
+    LPCH env = GetEnvironmentStringsA();
+    if (env) {
+        char *p = env;
+        while (*p) {
+            i32 n = (i32) strlen(p) + 1;
+            memcpy(ONYX_PTR(buf_off), p, n);
+            *(i32 *) ONYX_PTR(ptrs_base + i * 4) = buf_off;
+            buf_off += n;
+            p += n;
+            i += 1;
+        }
+        FreeEnvironmentStringsA(env);
+    }
+#endif
+
     return NULL;
 }
 

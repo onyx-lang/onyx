@@ -33,11 +33,9 @@ Supports_TTY :: true
 
 #library "onyx_runtime"
 
-#local {
-    __stdout: os.File;
-    __stderr: os.File;
-    __stdin:  os.File;
-}
+__stdout: os.File;
+__stderr: os.File;
+__stdin:  os.File;
 
 __output_string :: (s: str) -> u32 {
     wrote := io.stream_write(&__stdout, s).Ok ?? 0;
@@ -98,9 +96,10 @@ ProcessData :: #distinct u64
     // Processes
     __process_spawn   :: (path: str, args: [] str, env: [&] cptr(u8), opts: &os.ProcessSpawnOpts) -> ProcessData ---
     __process_read    :: (handle: ProcessData, buffer: [] u8) -> i32 ---
+    __process_read_stderr :: (handle: ProcessData, buffer: [] u8) -> i32 ---
     __process_write   :: (handle: ProcessData, buffer: [] u8) -> i32 ---
     __process_kill    :: (handle: ProcessData) -> bool ---
-    __process_wait    :: (handle: ProcessData) -> os.ProcessResult ---
+    __process_wait    :: (handle: ProcessData) -> i32 ---
     __process_destroy :: (handle: ProcessData) -> void ---
 
     // Misc
