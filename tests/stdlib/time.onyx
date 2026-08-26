@@ -1,5 +1,5 @@
 use core {*}
-use core.time { Duration, Instant, Mono, Timestamp, Date, SECOND, MILLISECOND, NANOSECOND, gmtime, strftime }
+use core.time { Duration, Instant, Mono, Timestamp, Date, Fixed_Offset, Offset_Time, UTC, SECOND, MILLISECOND, NANOSECOND, gmtime, strftime }
 
 // @leak-check
 
@@ -19,6 +19,32 @@ main :: () {
     println(parsed == epoch);
     println(Instant.parse_rfc3339("1970-01-01T01:00:00+01:00") ?? Instant.from_unix(-1) == epoch);
     println(Instant.parse_rfc3339("1969-12-31T23:00:00-01:00") ?? Instant.from_unix(-1) == epoch);
+
+    plus1 := Fixed_Offset.from_hours(1);
+    s1 := epoch->format_rfc3339(offset=plus1);
+    defer str.free(s1);
+    println(s1);
+
+    ot := Offset_Time.parse_rfc3339("1970-01-01T01:00:00+01:00") ?? Offset_Time.utc(Instant.from_unix(-1));
+    println(ot.instant == epoch);
+    println(ot.offset == plus1);
+    s2 := ot->format_rfc3339();
+    defer str.free(s2);
+    println(s2);
+
+    est := Fixed_Offset.from_hours(-5);
+    s3 := epoch->in_offset(est)->format_rfc3339();
+    defer str.free(s3);
+    println(s3);
+
+    println(Fixed_Offset.parse("Z") ?? Fixed_Offset.from_hours(1) == UTC);
+    println((Fixed_Offset.parse("+05:30") ?? UTC)->as_seconds());
+    println((Fixed_Offset.parse("-0330") ?? UTC)->as_seconds());
+    println(Fixed_Offset.parse("+25:00") == .None);
+
+    wall := epoch->to_timestamp(plus1);
+    println(wall.hour);
+    println(Instant.from_timestamp(wall, plus1) == epoch);
 
     frac := Instant.parse_rfc3339("1970-01-01T00:00:00.5Z") ?? Instant.from_unix(-1);
     println(frac->to_unix_ns());

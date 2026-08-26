@@ -26,12 +26,139 @@ Instant.now :: () -> Instant {
     }
 }
 
-Instant.from_timestamp :: (t: Timestamp) -> Instant {
-    return Instant.from_unix(t->to_epoch());
+/// Seconds east of UTC. No DST and no IANA names; use this for RFC 3339 `Z` / `+HH:MM`.
+Fixed_Offset :: #distinct i32
+
+UTC :: cast(Fixed_Offset) 0
+
+Fixed_Offset.from_seconds :: (s: i32) -> Fixed_Offset {
+    return cast(Fixed_Offset) s;
 }
 
-Instant.to_timestamp :: (i: Instant) -> Timestamp {
-    return gmtime(i->to_unix());
+/// `minutes` is a magnitude 0–59; its sign follows `hours` (so `-3, 30` is `-03:30`).
+Fixed_Offset.from_hours_minutes :: (hours: i32, minutes: i32) -> Fixed_Offset {
+    if hours < 0 {
+        return Fixed_Offset.from_seconds(hours * 3600 - minutes * 60);
+    }
+    return Fixed_Offset.from_seconds(hours * 3600 + minutes * 60);
+}
+
+Fixed_Offset.from_hours :: (hours: i32) -> Fixed_Offset {
+    return Fixed_Offset.from_hours_minutes(hours, 0);
+}
+
+Fixed_Offset.as_seconds :: (o: Fixed_Offset) -> i32 {
+    return cast(i32) o;
+}
+
+Fixed_Offset.as_duration :: (o: Fixed_Offset) -> Duration {
+    return Duration.from_s(cast(i64) o->as_seconds());
+}
+
+/// `Z`, `+HH:MM`, `-HH:MM`, `+HHMM`, `-HHMM`.
+Fixed_Offset.parse :: (s: str) -> ? Fixed_Offset {
+    if s.count == 0 do return .None;
+    if s.count == 1 && (s[0] == 'Z' || s[0] == 'z') do return UTC;
+
+    sign := 1;
+    rest := s;
+    if rest[0] == '+' {
+        sign = 1;
+    } elseif rest[0] == '-' {
+        sign = -1;
+    } else {
+        return .None;
+    }
+    string.advance(&rest, 1);
+
+    oh, om: i32;
+    if rest.count < 2 do return .None;
+    if !parse_n(&rest, 2, &oh) do return .None;
+    if rest.count > 0 && rest[0] == ':' do string.advance(&rest, 1);
+    if !parse_n(&rest, 2, &om) do return .None;
+    if rest.count != 0 do return .None;
+    if oh > 23 || om > 59 do return .None;
+
+    return Fixed_Offset.from_seconds(sign * (oh * 3600 + om * 60));
+
+    parse_n :: (buf: &str, n: i32, out: &i32) -> bool {
+        if buf.count < n do return false;
+        v := 0;
+        for n {
+            c := buf.data[it];
+            if c < '0' || c > '9' do return false;
+            v = v * 10 + cast(i32) (c - '0');
+        }
+        string.advance(buf, n);
+        *out = v;
+        return true;
+    }
+}
+
+/// `Z` when the offset is zero, otherwise `+HH:MM` / `-HH:MM`.
+Fixed_Offset.format :: (o: Fixed_Offset, allocator := context.allocator) -> str {
+    buf: [8] u8;
+    n := 0;
+    write_offset(buf, &n, o);
+    return string.copy(buf[0 .. n], allocator);
+}
+
+#local
+write_offset :: (b: [] u8, p: &i32, o: Fixed_Offset) {
+    s := o->as_seconds();
+    if s == 0 {
+        b[*p] = 'Z';
+        *p += 1;
+        return;
+    }
+
+    b[*p] = '+' if s > 0 else '-';
+    *p += 1;
+    if s < 0 do s = -s;
+    h := s / 3600;
+    m := (s % 3600) / 60;
+    b[*p] = cast(u8) ('0' + h / 10);
+    b[*p + 1] = cast(u8) ('0' + h % 10);
+    *p += 2;
+    b[*p] = ':';
+    *p += 1;
+    b[*p] = cast(u8) ('0' + m / 10);
+    b[*p + 1] = cast(u8) ('0' + m % 10);
+    *p += 2;
+}
+
+#operator == (a, b: Fixed_Offset) => cast(i32) a == cast(i32) b
+#operator != (a, b: Fixed_Offset) => cast(i32) a != cast(i32) b
+
+/// An `Instant` plus the offset used to display it. The instant is still UTC.
+Offset_Time :: struct {
+    instant: Instant;
+    offset: Fixed_Offset;
+}
+
+Offset_Time.utc :: (i: Instant) -> Offset_Time {
+    return .{ i, UTC };
+}
+
+Offset_Time.now :: (offset := UTC) -> Offset_Time {
+    return .{ Instant.now(), offset };
+}
+
+Offset_Time.to_timestamp :: (t: Offset_Time) -> Timestamp {
+    return t.instant->to_timestamp(t.offset);
+}
+
+Instant.in_offset :: (i: Instant, offset: Fixed_Offset) -> Offset_Time {
+    return .{ i, offset };
+}
+
+/// Civil fields are UTC when `offset` is `UTC`. Same offset is required to convert back.
+Instant.from_timestamp :: (t: Timestamp, offset := UTC) -> Instant {
+    return Instant.from_unix(t->to_epoch() - cast(i64) offset->as_seconds());
+}
+
+Instant.to_timestamp :: (i: Instant, offset := UTC) -> Timestamp {
+    return gmtime(i->to_unix() + cast(i64) offset->as_seconds());
 }
 
 Timestamp.add :: (t: Timestamp, d: Duration) -> Timestamp {
@@ -61,10 +188,10 @@ Instant.since :: (start: Instant) -> Duration {
     return Instant.now() - start;
 }
 
-/// RFC 3339 / ISO 8601 UTC, e.g. `2023-11-14T22:13:20Z`.
+/// RFC 3339 / ISO 8601. Default `offset` is UTC (`…Z`). Pass a `Fixed_Offset` to emit `+HH:MM`.
 /// Fractional seconds are omitted when they are zero.
-Instant.format_rfc3339 :: (i: Instant, allocator := context.allocator) -> str {
-    t := i->to_timestamp();
+Instant.format_rfc3339 :: (i: Instant, allocator := context.allocator, offset := UTC) -> str {
+    t := i->to_timestamp(offset);
     frac := i->to_unix_ns() - i->to_unix() * 1000000000;
     if frac < 0 do frac += 1000000000;
 
@@ -114,12 +241,24 @@ Instant.format_rfc3339 :: (i: Instant, allocator := context.allocator) -> str {
         }
     }
 
-    buf[n] = 'Z'; n += 1;
+    write_offset(buf, &n, offset);
     return string.copy(buf[0 .. n], allocator);
 }
 
+Offset_Time.format_rfc3339 :: (t: Offset_Time, allocator := context.allocator) -> str {
+    return t.instant->format_rfc3339(allocator, t.offset);
+}
+
 /// Parses RFC 3339 / ISO 8601. Accepts `Z`, `+HH:MM`, `-HH:MM`, and a space instead of `T`.
+/// The offset is applied so the result is UTC; use `Offset_Time.parse_rfc3339` to keep the offset.
 Instant.parse_rfc3339 :: (s: str) -> ? Instant {
+    switch Offset_Time.parse_rfc3339(s) {
+        case .None do return .None;
+        case .Some as t do return t.instant;
+    }
+}
+
+Offset_Time.parse_rfc3339 :: (s: str) -> ? Offset_Time {
     buf := s;
     year, month, day, hour, min, sec: i32;
     frac_ns: i64 = 0;
@@ -173,6 +312,7 @@ Instant.parse_rfc3339 :: (s: str) -> ? Instant {
 
     if buf.count == 0 do return .None;
 
+    offset := UTC;
     if buf[0] == 'Z' || buf[0] == 'z' {
         string.advance(&buf, 1);
     } else {
@@ -192,12 +332,17 @@ Instant.parse_rfc3339 :: (s: str) -> ? Instant {
         if !parse_n(&buf, 2, &om) do return .None;
         if oh > 23 || om > 59 do return .None;
 
-        unix -= cast(i64) sign * (cast(i64) oh * 3600 + cast(i64) om * 60);
+        off_sec := sign * (oh * 3600 + om * 60);
+        offset = Fixed_Offset.from_seconds(off_sec);
+        unix -= cast(i64) off_sec;
     }
 
     if buf.count != 0 do return .None;
 
-    return Instant.from_unix_ns(unix * 1000000000 + frac_ns);
+    return Offset_Time.{
+        Instant.from_unix_ns(unix * 1000000000 + frac_ns)
+        offset
+    };
 
     parse_n :: (buf: &str, n: i32, out: &i32) -> bool {
         if buf.count < n do return false;
@@ -230,6 +375,9 @@ Instant.parse_rfc3339 :: (s: str) -> ? Instant {
 #operator >  (a, b: Instant) => cast(i64) a >  cast(i64) b
 #operator >= (a, b: Instant) => cast(i64) a >= cast(i64) b
 
+#operator == (a, b: Offset_Time) => a.instant == b.instant && a.offset == b.offset
+#operator != (a, b: Offset_Time) => !(a == b)
+
 @conv.Custom_Format_Proc.{ Instant }
 (output: &conv.Format_Output, _: &conv.Format, i: &Instant) {
     s := Instant.format_rfc3339(*i, context.temp_allocator);
@@ -242,6 +390,30 @@ Instant.parse_rfc3339 :: (s: str) -> ? Instant {
     if v == .None do return false;
     *i = v!;
     return true;
+}
+
+@conv.Custom_Format_Proc.{ Offset_Time }
+(output: &conv.Format_Output, _: &conv.Format, t: &Offset_Time) {
+    s := Offset_Time.format_rfc3339(*t, context.temp_allocator);
+    output->write(s);
+}
+
+@conv.Custom_Parse_Proc.{ Offset_Time }
+(t: &Offset_Time, data: str, _: Allocator) -> bool {
+    switch Offset_Time.parse_rfc3339(data) {
+        case .None do return false;
+        case .Some as v {
+            *t = v;
+            return true;
+        }
+    }
+    return false;
+}
+
+@conv.Custom_Format_Proc.{ Fixed_Offset }
+(output: &conv.Format_Output, _: &conv.Format, o: &Fixed_Offset) {
+    s := Fixed_Offset.format(*o, context.temp_allocator);
+    output->write(s);
 }
 
 

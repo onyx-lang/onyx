@@ -38,6 +38,7 @@ Timestamp.as_date :: (t: Timestamp) -> Date {
 Timestamp.to_epoch  :: to_epoch
 Timestamp.parse     :: strptime
 /// UTC civil time. There is no timezone database; this is the same as `gmtime`.
+/// Use `Instant.to_timestamp(offset)` / `Offset_Time` for a fixed offset.
 Timestamp.localtime :: localtime
 Timestamp.gmtime    :: gmtime
 
@@ -77,7 +78,7 @@ now :: Timestamp.now
 to_epoch :: tm_to_time
 
 /// Converts UNIX epoch seconds to a timestamp. Always UTC; there is no timezone database.
-/// `localtime` is kept as a name and is identical to `gmtime`.
+/// `localtime` is identical to `gmtime`. For a chosen offset, use `Instant.to_timestamp(offset)`.
 localtime :: #match #local {}
 
 #overload
