@@ -35,10 +35,15 @@ Error :: struct {
         Illegal_Character;
         String_Unterminated;
         Unexpected_Token;
+        Type_Mismatch;
+        Unsupported_Type;
     }
 
     kind := Kind.None;
     use pos := Position.{ 0, 1, 1 };
+    expected: str = "";
+    actual: str = "";
+    path: str = "";
 }
 
 Value :: #distinct ^_Value
@@ -345,4 +350,27 @@ free_value :: (v: Value, allocator: Allocator) {
 
 static_string :: (s: str) -> _Value_String {
     return .{ str_ = s, dont_free = true };
+}
+
+@conv.Custom_Format_Proc.{ Error }
+(output: &conv.Format_Output, _: &conv.Format, e: &Error) {
+    switch e.kind {
+        case .Type_Mismatch {
+            if e.path {
+                conv.format(output, "type mismatch at {}: expected {}, got {}", e.path, e.expected, e.actual);
+            } else {
+                conv.format(output, "type mismatch: expected {}, got {}", e.expected, e.actual);
+            }
+        }
+        case .Unsupported_Type {
+            if e.path {
+                conv.format(output, "unsupported type at {}", e.path);
+            } else {
+                conv.format(output, "unsupported type");
+            }
+        }
+        case _ {
+            conv.format(output, "{} at {}:{}", e.kind, e.line, e.column);
+        }
+    }
 }

@@ -1,0 +1,86 @@
+use core {*}
+use core.encoding.json
+
+// @leak-check
+
+Person :: struct {
+    name: str;
+    age: i32;
+}
+
+Color :: enum {
+    Red;
+    Blue;
+}
+
+main :: () {
+    j := json.decode("{\"a\": 1}")!;
+    defer delete(j);
+    println(j.root["a"]->as_int());
+
+    p := json.decode_as("{\"name\": \"Ada\", \"age\": 36}", Person)!;
+    defer str.free(p.name);
+    println(p.name);
+    println(p.age);
+
+    p2 := json.decode_as(j.root, struct { a: i32 })!;
+    println(p2.a);
+
+    s := json.encode_string(p)!;
+    defer str.free(s);
+    println(s);
+
+    pretty := json.encode_string(.{ x = 1, y = 2 }, indent=2)!;
+    defer str.free(pretty);
+    println(pretty);
+
+    err := json.decode_as("\"nope\"", i32).Err ?? .{};
+    println(err.kind);
+    println(err.expected);
+    println(err.actual);
+
+    err2 := json.decode("{").Err ?? .{};
+    println(err2.kind != .None);
+    println(json.valid("{\"a\":1}"));
+    println(json.valid("{"));
+
+    Opt :: struct { n: ? i32 };
+    o := json.decode_as("{\"n\": null}", Opt)!;
+    println(o.n == .None);
+
+    nested := json.decode_as("{\"p\": {\"name\": 1}}", struct { p: Person }).Err ?? .{};
+    println(nested.kind);
+    println(nested.path);
+
+    c := json.decode_as("\"Blue\"", Color)!;
+    println(c == Color.Blue);
+
+    println(json.valid(""));
+    println(json.valid("1 2"));
+    println(json.valid("  1  "));
+
+    m := json.decode_as("{\"a\": 1, \"b\": 2}", Map(str, i32))!;
+    defer {
+        for e in m.entries {
+            str.free(e.key);
+        }
+        delete(&m);
+    }
+    println(m->get("a") ?? -1);
+    println(m->get("b") ?? -1);
+
+    mt := json.from_any(&m);
+    defer json.free(mt, context.allocator);
+    println(mt["a"]->as_int());
+
+    lines := json.decode_jsonl("1\n2\n\n3\n", i32)!;
+    defer delete(&lines);
+    println(lines.count);
+    println(lines[0]);
+    println(lines[2]);
+
+    v := json.from_any(.{ name = "x", age = 1 });
+    defer json.free(v, context.allocator);
+    json.encode(&stdio.print_writer, v);
+    println("");
+}

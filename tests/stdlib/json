@@ -1,0 +1,29 @@
+1
+Ada
+36
+1
+{"name":"Ada","age":36}
+{
+  "x": 1,
+  "y": 2
+}
+Type_Mismatch
+number
+string
+true
+true
+false
+true
+Type_Mismatch
+.p.name
+true
+false
+false
+true
+1
+2
+1
+3
+1
+3
+{"name":"x","age":1}

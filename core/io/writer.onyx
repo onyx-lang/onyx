@@ -221,8 +221,17 @@ Writer.write_escaped_str :: (use writer: &Writer, s: str) {
             case '\\' { write_byte(writer, '\\'); write_byte(writer, '\\'); }
 
             case _ {
-                // @Speed
-                write_byte(writer, ch);
+                if ch < 0x20 {
+                    write_byte(writer, '\\');
+                    write_byte(writer, 'u');
+                    write_byte(writer, '0');
+                    write_byte(writer, '0');
+                    hex := "0123456789abcdef";
+                    write_byte(writer, hex[ch >> 4]);
+                    write_byte(writer, hex[ch & 0xf]);
+                } else {
+                    write_byte(writer, ch);
+                }
             }
         } 
     }

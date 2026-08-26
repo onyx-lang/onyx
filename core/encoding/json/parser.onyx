@@ -230,6 +230,99 @@ parse_object :: (use parser: ^Parser) -> (Value, Error) {
 }
 
 
+/// Walk `data` as JSON without allocating a tree. Trailing non-whitespace is an error.
+#package
+validate :: (data: [] u8) -> Error {
+    parser: Parser;
+    parser.tokenizer = Tokenizer.{ data = data };
+
+    _, err := consume_token(&parser);
+    if err.kind != .None && err.kind != .EOF {
+        return err;
+    }
+
+    err = validate_value(&parser);
+    if err.kind != .None do return err;
+
+    if parser.current_token.kind != .Invalid {
+        return .{ .Unexpected_Token, parser.current_token.position };
+    }
+
+    return .{};
+}
+
+#local
+validate_consume :: (use parser: ^Parser) -> Error {
+    _, err := consume_token(parser);
+    if err.kind != .None && err.kind != .EOF do return err;
+    return .{};
+}
+
+#local
+validate_value :: (use parser: ^Parser) -> Error {
+    current := current_token;
+    switch current.kind {
+        case .Null, .False, .True, .Integer, .Float, .String {
+            return validate_consume(parser);
+        }
+
+        case .Open_Bracket {
+            return validate_array(parser);
+        }
+
+        case .Open_Brace {
+            return validate_object(parser);
+        }
+
+        case _ {
+            return .{ .Unexpected_Token, current.position };
+        }
+    }
+}
+
+#local
+validate_array :: (use parser: ^Parser) -> Error {
+    _, err := expect_token(parser, .Open_Bracket);
+    if err.kind != .None do return err;
+
+    while current_token.kind != .Close_Bracket && current_token.kind != .Invalid {
+        err = validate_value(parser);
+        if err.kind != .None do return err;
+
+        if !consume_token_if_next(parser, .Comma) {
+            break;
+        }
+    }
+
+    _, err = expect_token(parser, .Close_Bracket);
+    return err;
+}
+
+#local
+validate_object :: (use parser: ^Parser) -> Error {
+    _, err := expect_token(parser, .Open_Brace);
+    if err.kind != .None do return err;
+
+    while current_token.kind != .Close_Brace && current_token.kind != .Invalid {
+        _, err = expect_token(parser, .String);
+        if err.kind != .None do return err;
+
+        _, err = expect_token(parser, .Colon);
+        if err.kind != .None do return err;
+
+        err = validate_value(parser);
+        if err.kind != .None do return err;
+
+        if !consume_token_if_next(parser, .Comma) {
+            break;
+        }
+    }
+
+    _, err = expect_token(parser, .Close_Brace);
+    return err;
+}
+
+
 #local
 unescape_string :: (token: Token, allocator: Allocator) -> str {
     if token.kind != .String do return "";

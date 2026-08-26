@@ -1,0 +1,290 @@
+package core.encoding.json
+#allow_stale_code
+
+use core {package, *}
+use runtime.info {*}
+
+#local
+json_kind_name :: (v: Value) -> str {
+    t := v->type();
+    if t == .Null    do return "null";
+    if t == .Bool    do return "boolean";
+    if t == .Integer do return "integer";
+    if t == .Float   do return "number";
+    if t == .String  do return "string";
+    if t == .Array   do return "array";
+    if t == .Object  do return "object";
+    return "value";
+}
+
+#local
+copy_path :: (path: &dyn_str) -> str {
+    if path.count == 0 do return "";
+    return str.copy(.{ path.data, path.count }, context.temp_allocator);
+}
+
+#local
+mismatch :: (expected: str, value: Value, path: &dyn_str) -> Error {
+    return .{
+        kind = .Type_Mismatch,
+        expected = expected,
+        actual = json_kind_name(value),
+        path = copy_path(path)
+    };
+}
+
+#local
+unsupported :: (path: &dyn_str) -> Error {
+    return .{ kind = .Unsupported_Type, path = copy_path(path) };
+}
+
+#local
+path_push_key :: (path: &dyn_str, key: str) -> i32 {
+    n := path.count;
+    dyn_str.append(path, '.');
+    dyn_str.append(path, key);
+    return n;
+}
+
+#local
+path_push_index :: (path: &dyn_str, i: i32) -> i32 {
+    n := path.count;
+    conv.format(path, "[{}]", i);
+    return n;
+}
+
+#local
+path_pop :: (path: &dyn_str, n: i32) {
+    path.count = n;
+}
+
+#local
+is_number :: (v: Value) -> bool {
+    t := v->type();
+    return t == .Integer || t == .Float;
+}
+
+/// Runtime dispatch plus a compile-time Map(str, V) path so `Map.put` is typed.
+unmarshal_into :: #match {}
+
+#overload #order 100
+unmarshal_into :: (value: Value, map: &Map(str, $V), path: &dyn_str) -> Error {
+    return unmarshal_str_map(value, map, path);
+}
+
+#overload #order 10000
+unmarshal_into :: (value: Value, out: &$T, path: &dyn_str) -> Error {
+    return unmarshal(value, T, out, path);
+}
+
+unmarshal_str_map :: (value: Value, map: &Map(str, $V), path: &dyn_str) -> Error {
+    if value->is_null() {
+        if map.hashes.data == null {
+            Map.init(map);
+        }
+        return .{};
+    }
+
+    if value->type() != .Object do return mismatch("object", value, path);
+
+    if map.hashes.data == null {
+        Map.init(map);
+    }
+
+    for entry in value->as_entry_array() {
+        v: V;
+        mark := path_push_key(path, entry.key);
+        err := unmarshal_into(entry.value, &v, path);
+        path_pop(path, mark);
+        if err.kind != .None do return err;
+
+        Map.put(map, str.copy(entry.key), v);
+    }
+
+    return .{};
+}
+
+/// Fill `out` from a JSON value. Type mismatches return `Error`; missing
+/// object fields and JSON `null` leave the destination zeroed (except `? T`).
+unmarshal :: (value: Value, type: type_expr, out: rawptr, path: &dyn_str) -> Error {
+    t_info := get_type_info(type);
+
+    if type == Value {
+        *cast(^Value) out = value;
+        return .{};
+    }
+
+    if t_info.kind == .Distinct {
+        d_info := cast(^Type_Info_Distinct) t_info;
+        return unmarshal(value, d_info.base_type, out, path);
+    }
+
+    if t_info.kind == .Union {
+        if !union_constructed_from(type, Optional) {
+            return unsupported(path);
+        }
+
+        u_info := t_info->as_union();
+        if value->is_null() {
+            *cast(&? void) out = .{};
+            return .{};
+        }
+
+        *cast(&Optional(void).tag_enum) out = .Some;
+        return unmarshal(value, u_info.variants[1].type, memory.ptr_add(out, u_info.alignment), path);
+    }
+
+    if value->is_null() {
+        return .{};
+    }
+
+    switch t_info.kind {
+        case .Basic do switch type {
+            case bool {
+                if value->type() != .Bool do return mismatch("boolean", value, path);
+                *cast(^bool) out = value->as_bool();
+            }
+            case i32, u32 {
+                if !is_number(value) do return mismatch("number", value, path);
+                *cast(^i32) out = ~~value->as_int();
+            }
+            case i64, u64 {
+                if !is_number(value) do return mismatch("number", value, path);
+                *cast(^i64) out = value->as_int();
+            }
+            case i8, u8 {
+                if !is_number(value) do return mismatch("number", value, path);
+                *cast(^u8) out = ~~value->as_int();
+            }
+            case i16, u16 {
+                if !is_number(value) do return mismatch("number", value, path);
+                *cast(^u16) out = ~~value->as_int();
+            }
+            case f32 {
+                if !is_number(value) do return mismatch("number", value, path);
+                *cast(^f32) out = ~~value->as_float();
+            }
+            case f64 {
+                if !is_number(value) do return mismatch("number", value, path);
+                *cast(^f64) out = value->as_float();
+            }
+        }
+
+        case .Enum {
+            etype := cast(^Type_Info_Enum) t_info;
+            found: u64;
+            ok := false;
+
+            if value->type() == .String {
+                name := value->as_str();
+                for^ m in etype.members {
+                    if m.name == name {
+                        found = m.value;
+                        ok = true;
+                    }
+                }
+            } elseif value->type() == .Integer {
+                found = ~~value->as_int();
+                ok = true;
+            }
+
+            if !ok do return mismatch("enum", value, path);
+
+            if t_info.size == 1 do *cast(^u8)  out = ~~found;
+            elseif t_info.size == 2 do *cast(^u16) out = ~~found;
+            elseif t_info.size == 4 do *cast(^u32) out = ~~found;
+            elseif t_info.size == 8 do *cast(^u64) out = found;
+        }
+
+        case .Array {
+            if value->type() != .Array do return mismatch("array", value, path);
+
+            a_info := cast(^Type_Info_Array) t_info;
+            arr := value->as_array();
+            n := a_info.count;
+            if arr.count < n do n = ~~arr.count;
+
+            for i in n {
+                mark := path_push_index(path, ~~i);
+                err := unmarshal(arr[~~i], a_info.of, memory.ptr_add(out, size_of(a_info.of) * i), path);
+                path_pop(path, mark);
+                if err.kind != .None do return err;
+            }
+        }
+
+        case .Dynamic_Array {
+            s := cast(^core.array.Untyped_Array) out;
+            if s.count == 0 {
+                to_copy := value->as_array();
+                s.allocator = context.allocator;
+                s.capacity = to_copy.count;
+            }
+
+            fallthrough;
+        }
+
+        case .Slice {
+            if type == str {
+                if value->type() != .String do return mismatch("string", value, path);
+                *cast(^str) out = string.copy(value->as_str());
+                return .{};
+            }
+
+            if value->type() != .Array do return mismatch("array", value, path);
+
+            s_info := cast(^Type_Info_Slice) t_info;
+            s := cast(^core.array.Untyped_Array) out;
+            to_copy := value->as_array();
+
+            if s.count == 0 {
+                if s.data != null {
+                    return .{};
+                }
+
+                size := size_of(s_info.of) * to_copy.count;
+                s.data = raw_alloc(context.allocator, size);
+                memory.set(s.data, 0, size);
+                s.count = to_copy.count;
+            }
+
+            n := s.count;
+            if to_copy.count < n do n = to_copy.count;
+
+            for i in n {
+                mark := path_push_index(path, i);
+                err := unmarshal(to_copy[i], s_info.of, memory.ptr_add(s.data, size_of(s_info.of) * i), path);
+                path_pop(path, mark);
+                if err.kind != .None do return err;
+            }
+        }
+
+        case .Struct {
+            if value->type() != .Object do return mismatch("object", value, path);
+
+            s_info := cast(^Type_Info_Struct) t_info;
+            for^ member in s_info.members {
+                key := member.name;
+                if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
+                    key = (cast(^Custom_Key) tag.data).key;
+                }
+
+                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
+                    if *cast(^type_expr, tag.data) == Ignore {
+                        continue;
+                    }
+                }
+
+                mark := path_push_key(path, key);
+                err := unmarshal(value[key], member.type, memory.ptr_add(out, member.offset), path);
+                path_pop(path, mark);
+                if err.kind != .None do return err;
+            }
+        }
+
+        case _ {
+            return unsupported(path);
+        }
+    }
+
+    return .{};
+}

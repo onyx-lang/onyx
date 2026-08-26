@@ -3,30 +3,19 @@ package core.encoding.json
 
 use core {*}
 
-/// Unsafely decodes a strings into a json object, returning an invalid
-/// Json value if it failed to parse.
-///
-/// This procedure is not very useful and should be considered deprecated.
-decode :: (data: str, allocator := context.allocator, print_errors := true) -> Json {
-    json: Json;
-    json.allocator = allocator;
-    json.root = cast(Value) null;
-
+/// Decode JSON text into a `Json` tree. Prefer this over `decode_with_error`.
+decode :: (data: str, allocator := context.allocator) -> Result(Json, Error) {
     root, err := parse(data, allocator);
-    if err.kind != .None && print_errors {
-        switch err.kind {
-            case .EOF do printf("Reached EOF\n");
-            case .Illegal_Character do printf("Illegal Character: {}\n", err.pos);
-            case .String_Unterminated do printf("Unterminated String: {}\n", err.pos);
-            case .Unexpected_Token do printf("Unexpected Token: {}\n", err.pos);
-        }
-
-        return json;
+    if err.kind != .None {
+        return .{ Err = err };
     }
 
-    json.root = root;
-    return json;
+    return .{
+        Ok = .{ allocator, root }
+    };
 }
+
+decode_with_result :: decode
 
 #local
 _Decode_Error :: struct {
@@ -40,55 +29,129 @@ Decode_Error.has_error :: (this: Decode_Error) => cast(^_Decode_Error) this != n
 Decode_Error.message   :: (this: Decode_Error) => (cast(^_Decode_Error) this).errmsg;
 Decode_Error.position  :: (this: Decode_Error) => (cast(^_Decode_Error) this).pos;
 
-/// Decodes a string into a Json object, and returns the Json object and
-/// and a `Decode_Error` that is non-null if an error occured.
-///
-/// This procedure should be considered deprecated in favor of `decode_with_result`.
+/// Deprecated: use `decode`. Pair-style error for older callers.
 decode_with_error :: (data: str, allocator := context.allocator) -> (Json, Decode_Error) {
     json: Json;
     json.allocator = allocator;
     json.root = null_value();
 
-    root, err := parse(data, allocator);
-
-    if err.kind != .None {
-        decode_error := new_temp(_Decode_Error);
-        decode_error.pos = err.pos;
-        switch err.kind {
-            case .EOF                  do decode_error.errmsg = "Reached EOF";
-            case .Illegal_Character    do decode_error.errmsg = "Illegal Character";
-            case .String_Unterminated  do decode_error.errmsg = "Unterminated String";
-            case .Unexpected_Token     do decode_error.errmsg = "Unexpected Token";
+    switch decode(data, allocator) {
+        case .Ok as obj {
+            return obj, Decode_Error.{null};
         }
+        case .Err as err {
+            decode_error := new_temp(_Decode_Error);
+            decode_error.pos = err.pos;
+            switch err.kind {
+                case .EOF                  do decode_error.errmsg = "Reached EOF";
+                case .Illegal_Character    do decode_error.errmsg = "Illegal Character";
+                case .String_Unterminated  do decode_error.errmsg = "Unterminated String";
+                case .Unexpected_Token     do decode_error.errmsg = "Unexpected Token";
+                case .Type_Mismatch        do decode_error.errmsg = "Type mismatch";
+                case .Unsupported_Type     do decode_error.errmsg = "Unsupported type";
+                case .None                 do decode_error.errmsg = "Error";
+            }
 
-        return json, Decode_Error.{decode_error};
+            return json, Decode_Error.{decode_error};
+        }
     }
-
-    json.root = root;
-    return json, Decode_Error.{null};
 }
 
-/// Decodes a string into a possible Json object. If parsing fails, an error is returned instead.
-decode_with_result :: (data: str, allocator := context.allocator) -> Result(Json, Error) {
-    root, err := parse(data, allocator);
+/// True if `data` is a complete JSON value. Tokenizes only; does not allocate a tree.
+valid :: (data: str) -> bool {
+    err := validate(data);
+    return err.kind == .None;
+}
+
+/// Decode JSON text, a `Value` tree, or a `Json` document into an Onyx type.
+///
+///     p := json.decode_as("{\"n\": 1}", Person)!
+///     p := json.decode_as(j.root, Person)!
+decode_as :: #match #local {}
+
+#overload
+decode_as :: (data: str, $T: type_expr, allocator := context.allocator) -> Result(T, Error) {
+    obj := decode(data, allocator)->catch([err] {
+        return return .{ Err = err };
+    });
+    defer delete(obj);
+
+    return from_value(obj.root, T);
+}
+
+/// Tree → T. Also `j.root->decode_as(Person)` / `j->decode_as(Person)`.
+from_value :: (value: Value, $T: type_expr) -> Result(T, Error) {
+    x: T;
+    path := make(dyn_str, allocator=context.temp_allocator);
+    defer delete(&path);
+
+    err := unmarshal_into(value, &x, &path);
     if err.kind != .None {
         return .{ Err = err };
     }
-
-    return .{
-        Ok = .{ allocator, root }
-    };
+    return .{ Ok = x };
 }
 
-/// Decodes a string into any Onyx type.
-///
-/// Internally uses `decode_with_result` and `as_any`.
+#overload
+decode_as :: from_value
+
+#overload
+decode_as :: (j: Json, $T: type_expr) -> Result(T, Error) {
+    return from_value(j.root, T);
+}
+
+Json.decode_as :: (use j: Json, $T: type_expr) -> Result(T, Error) {
+    return from_value(root, T);
+}
+
+Value.decode_as :: from_value
+
+/// Decode JSON text into an existing value. Returns a parse or type error.
 decode_into :: (data: str, out: &$T) -> Error {
-    obj := decode_with_result(data)->catch([err] {
+    obj := decode(data)->catch([err] {
         return return err;
     });
     defer delete(obj);
 
-    as_any(obj.root, out);
-    return .{ .None };
+    path := make(dyn_str, allocator=context.temp_allocator);
+    defer delete(&path);
+    return unmarshal_into(obj.root, out, &path);
+}
+
+/// Decode one JSON value per line (JSONL). Blank lines are skipped.
+decode_jsonl :: (data: str, $T: type_expr, allocator := context.allocator) -> Result([..] T, Error) {
+    out := make([..] T, allocator=allocator);
+
+    start := 0;
+    i := 0;
+    while i <= data.count {
+        at_end := i == data.count;
+        if at_end || data[i] == '\n' {
+            line := data[start .. i];
+            if line.count > 0 && line[line.count - 1] == '\r' {
+                line.count -= 1;
+            }
+
+            empty := true;
+            for c in line {
+                if c != ' ' && c != '\t' {
+                    empty = false;
+                    break;
+                }
+            }
+
+            if !empty {
+                v := decode_as(line, T, allocator)->catch([err] {
+                    delete(&out);
+                    return return .{ Err = err };
+                });
+                Array.push(&out, v);
+            }
+
+            start = i + 1;
+        }
+        i += 1;
+    }
+
+    return .{ Ok = out };
 }

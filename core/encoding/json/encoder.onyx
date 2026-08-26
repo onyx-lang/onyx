@@ -11,27 +11,94 @@ Encoding_Error :: enum {
     Unsupported_Type;
 }
 
-encode_string :: (v: $T, allocator := context.allocator) -> (str, Encoding_Error) {
+#thread_local
+_enc: struct {
+    indent: i32;
+    depth: i32;
+}
+
+#local
+write_newline_indent :: (w: &io.Writer) {
+    if _enc.indent <= 0 do return;
+    io.write_byte(w, '\n');
+    n := _enc.indent * _enc.depth;
+    while n > 0 {
+        io.write_byte(w, ' ');
+        n -= 1;
+    }
+}
+
+#local
+pretty_open :: (w: &io.Writer, open: u8, empty: bool) {
+    io.write_byte(w, open);
+    if empty do return;
+    _enc.depth += 1;
+    write_newline_indent(w);
+}
+
+#local
+pretty_close :: (w: &io.Writer, close: u8, empty: bool) {
+    if !empty {
+        _enc.depth -= 1;
+        write_newline_indent(w);
+    }
+    io.write_byte(w, close);
+}
+
+#local
+pretty_sep :: (w: &io.Writer, first: bool) {
+    if first do return;
+    io.write_byte(w, ',');
+    write_newline_indent(w);
+}
+
+#local
+pretty_colon :: (w: &io.Writer) {
+    io.write_byte(w, ':');
+    if _enc.indent > 0 do io.write_byte(w, ' ');
+}
+
+encode_string :: (v: $T, allocator := context.allocator, indent := 0) -> Result(str, Encoding_Error) {
+    old_indent := _enc.indent;
+    old_depth := _enc.depth;
+    _enc.indent = indent;
+    _enc.depth = 0;
+    defer {
+        _enc.indent = old_indent;
+        _enc.depth = old_depth;
+    }
+
     stream := io.buffer_stream_make(256);
     writer := io.writer_make(^stream, 0);
     defer io.buffer_stream_free(^stream);
 
     err := encode(^writer, v);
     if err != .None {
-        return "", err;
+        return .{ Err = err };
     }
 
     s := string.copy(io.buffer_stream_to_str(^stream), allocator);
-    return s, .None;
+    return .{ Ok = s };
 }
 
 encode_string_opt :: (v: $T, allocator := context.allocator) -> ? str {
-    s, err := encode_string(v, allocator);
-    if err != .None {
-        return .None;
+    switch encode_string(v, allocator) {
+        case .Ok as s do return s;
+        case .Err do return .None;
+    }
+}
+
+encode_pretty :: (w: &io.Writer, v: $T, indent := 2) -> Encoding_Error {
+    old_indent := _enc.indent;
+    old_depth := _enc.depth;
+    _enc.indent = indent;
+    _enc.depth = 0;
+    defer {
+        _enc.indent = old_indent;
+        _enc.depth = old_depth;
     }
 
-    return s;
+    return encode(w, v);
 }
 
 //
@@ -66,48 +133,51 @@ encode :: #match {
     },
 
     (w: ^io.Writer, v: [] $T) -> Encoding_Error {
-        io.write_byte(w, '[');
+        empty := v.count == 0;
+        pretty_open(w, '[', empty);
 
         for i in v.count {
-            if i > 0 do io.write_byte(w, ',');
+            pretty_sep(w, i == 0);
 
             err := encode(w, v[i]);
             if err != .None do return err;
         }
 
-        io.write_byte(w, ']');
+        pretty_close(w, ']', empty);
         return .None;
     },
 
     (w: ^io.Writer, v: [..] $T) -> Encoding_Error {
-        io.write_byte(w, '[');
+        empty := v.count == 0;
+        pretty_open(w, '[', empty);
 
         for i in v.count {
-            if i > 0 do io.write_byte(w, ',');
+            pretty_sep(w, i == 0);
 
             err := encode(w, v[i]);
             if err != .None do return err;
         }
 
-        io.write_byte(w, ']');
+        pretty_close(w, ']', empty);
         return .None;
     },
 
     (w: ^io.Writer, v: Map(str, $T)) -> Encoding_Error {
-        io.write_byte(w, '{');
+        empty := v.entries.count == 0;
+        pretty_open(w, '{', empty);
 
         for i in v.entries.count {
-            if i > 0 do io.write_byte(w, ',');
+            pretty_sep(w, i == 0);
             entry := ^v.entries[i];
 
             io.write_escaped_str(w, entry.key);
-            io.write_byte(w, ':');
+            pretty_colon(w);
 
             err := encode(w, entry.value);
             if err != .None do return err;
         }
 
-        io.write_byte(w, '}');
+        pretty_close(w, '}', empty);
         return .None;
     },
 
@@ -121,20 +191,21 @@ encode :: #match {
             case .Array   do   encode(w, v->as_array());
 
             case .Object {
-                io.write_byte(w, '{');
                 obj := cast(^_Value_Object) cast(^_Value) v;
+                empty := obj.object_.count == 0;
+                pretty_open(w, '{', empty);
 
                 for i in obj.object_.count {
-                    if i > 0 do io.write_byte(w, ',');
+                    pretty_sep(w, i == 0);
 
                     io.write_escaped_str(w, obj.object_[i].key);
-                    io.write_byte(w, ':');
+                    pretty_colon(w);
 
                     err := encode(w, obj.object_[i].value);
                     if err != .None do return err;
                 }
 
-                io.write_byte(w, '}');
+                pretty_close(w, '}', empty);
             }
 
             case _ {
@@ -167,18 +238,16 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
         }
 
         case .Array {
-            io.write(w, "[");
-
             a := cast(^Type_Info_Array) info;
-            arr := data.data;
+            empty := a.count == 0;
+            pretty_open(w, '[', empty);
 
             for i in a.count {
-                if i != 0 do io.write(w, ",");
-
+                pretty_sep(w, i == 0);
                 encode(w, misc.any_subscript(data, i));
             }
 
-            io.write(w, "]");
+            pretty_close(w, ']', empty);
         }
 
         case .Slice, .Dynamic_Array {
@@ -187,19 +256,17 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
                 break;
             }
 
-            io.write(w, "[");
-
             a := cast(^Type_Info_Dynamic_Array) info;
             arr := cast(^core.array.Untyped_Array) data.data;
-            count := arr.count;
+            empty := arr.count == 0;
+            pretty_open(w, '[', empty);
 
-            for i in count {
-                if i != 0 do io.write(w, ",");
-
+            for i in arr.count {
+                pretty_sep(w, i == 0);
                 encode(w, misc.any_subscript(data, i));
             }
 
-            io.write(w, "]");
+            pretty_close(w, ']', empty);
         }
 
         case .Distinct {
@@ -215,7 +282,17 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
         case .Struct {
             s := cast(^runtime.info.Type_Info_Struct) info;
 
-            io.write(w, "{");
+            visible := 0;
+            for ^member in s.members {
+                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
+                    if *cast(^type_expr, tag.data) == Ignore do continue;
+                }
+                visible += 1;
+            }
+
+            empty := visible == 0;
+            pretty_open(w, '{', empty);
+            first := true;
 
             for ^member in s.members {
                 key := member.name;
@@ -229,13 +306,13 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
                     }
                 }
 
-                if !#first do io.write(w, ",");
+                pretty_sep(w, first);
+                first = false;
                 encode(w, key);
-
-                io.write(w, ":");
+                pretty_colon(w);
                 encode(w, misc.any_member(data, member));
             }
-            io.write(w, "}");
+            pretty_close(w, '}', empty);
         }
 
         case .Union {
@@ -286,17 +363,37 @@ Ignore :: #distinct void
 
 from_any :: #match #local {}
 
-#overload
+#overload #order 100
+from_any :: (m: &Map(str, $V), allocator := context.allocator) -> Value {
+    return from_str_map(m, allocator);
+}
+
+#overload #order 100
+from_any :: (m: Map(str, $V), allocator := context.allocator) -> Value {
+    x := m;
+    return from_str_map(&x, allocator);
+}
+
+#overload #order 10000
 from_any :: macro (v: ^$T, allocator := context.allocator) -> Value {
     from_any :: from_any
     return from_any(T, v, allocator);
 }
 
-#overload
+#overload #order 10000
 from_any :: macro (v: $T, allocator := context.allocator) -> Value {
     from_any :: from_any
     x := v
     return from_any(T, &x, allocator)
+}
+
+from_str_map :: (m: &Map(str, $V), allocator := context.allocator) -> Value {
+    obj := empty_object(allocator);
+    for i in m.entries.count {
+        e := &m.entries[i];
+        json.set(obj, e.key, from_any(e.value, allocator));
+    }
+    return obj;
 }
 
 #overload
