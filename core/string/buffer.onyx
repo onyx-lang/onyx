@@ -14,7 +14,7 @@ String_Buffer :: struct {
     capacity : u32;
 }
 
-buffer_make :: (buffer_memory: [] u8, initial_str := null_str) -> String_Buffer {
+String_Buffer.make :: (buffer_memory: [] u8, initial_str := null_str) -> String_Buffer {
     buffer : String_Buffer;
     buffer.data = buffer_memory.data;
     buffer.capacity = buffer_memory.count;
@@ -32,7 +32,7 @@ buffer_make :: (buffer_memory: [] u8, initial_str := null_str) -> String_Buffer 
     return buffer;
 }
 
-buffer_insert :: (use buffer: &String_Buffer, position: i32, ch: u8) -> bool {
+String_Buffer.insert :: (use buffer: &String_Buffer, position: i32, ch: u8) -> bool {
     if position >= capacity do return false;
     if count >= capacity do return false;
 
@@ -47,7 +47,7 @@ buffer_insert :: (use buffer: &String_Buffer, position: i32, ch: u8) -> bool {
     return true;
 }
 
-buffer_append :: (use buffer: &String_Buffer, end: str) -> bool {
+String_Buffer.append :: (use buffer: &String_Buffer, end: str) -> bool {
     if count + end.count > capacity do return false;
 
     for i in end.count {
@@ -58,7 +58,7 @@ buffer_append :: (use buffer: &String_Buffer, end: str) -> bool {
     return true;
 }
 
-buffer_delete :: (use buffer: &String_Buffer, position: i32) -> bool {
+String_Buffer.remove :: (use buffer: &String_Buffer, position: i32) -> bool {
     if position > capacity do return false;
     if position > count do return false;
     if count == 0 do return false;
@@ -74,8 +74,16 @@ buffer_delete :: (use buffer: &String_Buffer, position: i32) -> bool {
     return true;
 }
 
-buffer_clear :: (use buffer: &String_Buffer) {
+String_Buffer.clear :: (use buffer: &String_Buffer) {
     count = 0;
 }
 
-buffer_to_str :: (use buffer: &String_Buffer) -> str do return .{data, count};
+String_Buffer.as_str :: (use buffer: &String_Buffer) -> str do return .{data, count};
+
+// Compatibility: package names.
+buffer_make :: String_Buffer.make
+buffer_insert :: String_Buffer.insert
+buffer_append :: String_Buffer.append
+buffer_delete :: String_Buffer.remove
+buffer_clear :: String_Buffer.clear
+buffer_to_str :: String_Buffer.as_str

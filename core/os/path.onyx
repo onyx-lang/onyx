@@ -12,6 +12,11 @@ use core.conv
     PATH_SEP :: '/'
 }
 
+/// A filesystem path. `Path` is `str` at runtime; methods also accept `str`.
+Path :: #distinct str
+
+Path.SEP :: PATH_SEP
+
 /// Removes:
 /// - Stray '.' in the path
 /// - Stray '..'
@@ -19,7 +24,7 @@ use core.conv
 /// - Trailing '/'
 ///
 /// Modifies the string in place, as the length will never be longer.
-path_clean :: (path: str, allocator := Path_Allocator) -> str {
+Path.clean :: (path: str, allocator := Path_Allocator) -> str {
     if path == "" do return string.copy(".", Path_Allocator);
 
     rooted := path[0] == PATH_SEP;
@@ -74,30 +79,30 @@ path_clean :: (path: str, allocator := Path_Allocator) -> str {
 /// Concatenates path elements, and returns cleaned output.
 ///
 /// This uses the temporary allocator, so a copy may be needed.
-path_join :: (path: ..str) -> str {
+Path.join :: (path: ..str) -> str {
     out := make(dyn_str, allocator=context.temp_allocator);
     
     for p in path {
         conv.format(&out, "{}{}", p, PATH_SEP);
     }
 
-    return path_clean(out);
+    return Path.clean(out);
 }
 
 /// Returns everything but the last element in the path.
 ///
 /// This is then cleaned and copied into the temporary allocator.
-path_directory :: (path: str) -> str {
-    dir, _ := path_split(path);
-    return path_clean(dir);
+Path.directory :: (path: str) -> str {
+    dir, _ := Path.split(path);
+    return Path.clean(dir);
 }
 
 /// Returns the extension of the file on the end of the path, if present.
 ///
-///     path_extension("foo.txt") -> "txt"
-///     path_extension("foo/bar") -> ""
-///     path_extension("foo/bar.txt") -> "txt"
-path_extension :: (path: str) -> str {
+///     Path.extension("foo.txt") -> "txt"
+///     Path.extension("foo/bar") -> ""
+///     Path.extension("foo/bar.txt") -> "txt"
+Path.extension :: (path: str) -> str {
     for i in range.{ path.length - 1, 0, -1 } {
         if path[i] == PATH_SEP do break;
         if path[i] == '.' do return path[i .. path.length];
@@ -107,9 +112,9 @@ path_extension :: (path: str) -> str {
 
 /// Returns the last element of the path, sans its extension.
 ///
-///     path_basename("foo.txt") -> "foo"
-///     path_basename("test/bar.txt") -> "bar"
-path_basename :: (path: str) -> str {
+///     Path.basename("foo.txt") -> "foo"
+///     Path.basename("test/bar.txt") -> "bar"
+Path.basename :: (path: str) -> str {
     if path == "" do return ".";
 
     start := string.last_index_of(path, PATH_SEP);
@@ -118,8 +123,16 @@ path_basename :: (path: str) -> str {
 }
 
 /// Splits the last path element off.
-path_split :: (path: str) -> (str, str) {
+Path.split :: (path: str) -> (str, str) {
     index := string.last_index_of(path, PATH_SEP);
     return path[0 .. index], path[index+1 .. path.length];
 }
+
+path_clean     :: Path.clean
+path_join      :: Path.join
+path_directory :: Path.directory
+path_extension :: Path.extension
+path_basename  :: Path.basename
+path_split     :: Path.split
+
 

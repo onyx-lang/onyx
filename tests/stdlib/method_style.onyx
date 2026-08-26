@@ -1,0 +1,33 @@
+use core {*}
+
+// @leak-check
+
+main :: () {
+    arr := make([..] i32);
+    Array.push(&arr, 1);
+    arr->push(2);
+    println(arr.count);
+    delete(&arr);
+
+    l := List.from_array(i32.[3, 4]);
+    println(l->count());
+    println(l->empty());
+    println(l->pop_end_opt() ?? -1);
+    delete(&l);
+
+    b := make([..] u8);
+    b->append_u16_le(0x1234);
+    println(Slice.read_u16_le(b, 0) ?? 0);
+    println(Slice.starts_with(b, u8.[0x34]));
+    delete(&b);
+
+    use bs := io.BufferStream.make(32);
+    io.Stream.write_byte(&bs, 'A');
+    println(io.BufferStream.to_str(&bs));
+
+    println(os.Path.clean("a/./b"));
+    println(os.Path.join("a", "b"));
+    _ := time.Timestamp.now();
+
+    println("ok");
+}

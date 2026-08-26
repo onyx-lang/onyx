@@ -37,10 +37,10 @@ ProcessSpawnOpts :: struct {
 /// Spawns a new OS process. This operation is always assumed to succeed.
 /// To determine if the operation failed, use `process_wait` and look for the
 /// `FailedToRun` state.
-process_spawn :: #match #local -> Process {}
+Process.spawn :: #match #local -> Process {}
 
 #overload
-process_spawn :: (path: str, args: [] str, non_blocking_io := false, starting_directory := "") -> Process {
+Process.spawn :: (path: str, args: [] str, non_blocking_io := false, starting_directory := "") -> Process {
     opts := ProcessSpawnOpts.{
         capture_io = true,
         non_blocking_io = non_blocking_io,
@@ -53,7 +53,7 @@ process_spawn :: (path: str, args: [] str, non_blocking_io := false, starting_di
 }
 
 #overload
-process_spawn :: (path: str, args: [] str, opts: &ProcessSpawnOpts) -> Process {
+Process.spawn :: (path: str, args: [] str, opts: &ProcessSpawnOpts) -> Process {
     env_data := null;
     if opts.environment {
         env: [..] cptr(u8);
@@ -75,19 +75,20 @@ process_spawn :: (path: str, args: [] str, opts: &ProcessSpawnOpts) -> Process {
 }
 
 /// Force kills a subprocess.
-process_kill :: (use p: &Process) -> bool {
+Process.kill :: (use p: &Process) -> bool {
     return __process_kill(process_handle);
 }
 
 /// Waits for a process to exit.
-process_wait :: (use p: &Process) => {
+Process.wait :: (use p: &Process) => {
     return __process_wait(process_handle);
 }
 
 /// Frees internal resources used by a process. Should be called after process_kill or process_wait.
-process_destroy :: (use p: &Process) => {
+Process.destroy :: (use p: &Process) => {
     __process_destroy(process_handle);
 }
+
 
 #local Process_Read_Error :: enum {
     None         :: 0x00;
@@ -253,3 +254,9 @@ Command.destroy :: (cmd: &Command) {
     cfree(cmd);
 }
 
+
+// Compatibility: package names.
+process_spawn :: Process.spawn
+process_kill :: Process.kill
+process_wait :: Process.wait
+process_destroy :: Process.destroy

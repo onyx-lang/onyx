@@ -20,42 +20,7 @@ Writer :: struct {
     buffer_filled: u32;
 }
 
-Writer.make :: writer_make
-Writer.free :: writer_free
-Writer.flush :: writer_flush
-Writer.consume_error :: writer_consume_error
-Writer.remaining_capacity :: writer_remaining_capacity
-
-Writer.write :: write
-Writer.write_byte :: write_byte
-Writer.write_str :: write_str
-Writer.write_cstr :: write_cstr
-Writer.write_i32 :: write_i32
-Writer.write_i64 :: write_i64
-Writer.write_f32 :: write_f32
-Writer.write_f64 :: write_f64
-Writer.write_bool :: write_bool
-Writer.write_ptr :: write_ptr
-Writer.write_range :: write_range
-Writer.write_format :: write_format
-Writer.write_format_va :: write_format_va
-Writer.write_escaped_str :: write_escaped_str
-Writer.write_bytes :: write_str
-Writer.write_u16_le :: write_u16_le
-Writer.write_u16_be :: write_u16_be
-Writer.write_u32_le :: write_u32_le
-Writer.write_u32_be :: write_u32_be
-Writer.write_u64_le :: write_u64_le
-Writer.write_u64_be :: write_u64_be
-Writer.write_i16_le :: write_i16_le
-Writer.write_i16_be :: write_i16_be
-Writer.write_i32_le :: write_i32_le
-Writer.write_i32_be :: write_i32_be
-Writer.write_i64_le :: write_i64_le
-Writer.write_i64_be :: write_i64_be
-
-
-writer_make :: (s: &Stream, buffer_size := 4096) -> Writer {
+Writer.make :: (s: &Stream, buffer_size := 4096) -> Writer {
     assert(s.vtable != null, "Stream vtable was not setup correctly.");
 
     w := Writer.{s};
@@ -67,13 +32,13 @@ writer_make :: (s: &Stream, buffer_size := 4096) -> Writer {
     return w;
 }
 
-#overload delete :: writer_free
-writer_free :: (w: &Writer) {
+#overload delete :: Writer.free
+Writer.free :: (w: &Writer) {
     writer_flush(w);
     delete(&w.buffer);
 }
 
-writer_flush :: (w: &Writer) {
+Writer.flush :: (w: &Writer) {
     if w.buffer_filled == 0 do return;
 
     err := stream_write(w.stream, w.buffer[0 .. w.buffer_filled]).Err ?? Error.None;
@@ -84,66 +49,66 @@ writer_flush :: (w: &Writer) {
     w.buffer_filled = 0;
 }
 
-writer_consume_error :: (w: &Writer) -> Error {
+Writer.consume_error :: (w: &Writer) -> Error {
     defer w.error = .None;
     return w.error;
 }
 
-writer_remaining_capacity :: (w: &Writer) -> u32 {
+Writer.remaining_capacity :: (w: &Writer) -> u32 {
     return w.buffer.count - w.buffer_filled;
 }
 
-string_builder :: (allocator := context.allocator) -> (Writer, &BufferStream) {
+Writer.string_builder :: (allocator := context.allocator) -> (Writer, &BufferStream) {
     new_stream := new(BufferStream, allocator=allocator);
     *new_stream = buffer_stream_make();
 
     return writer_make(new_stream, 0), new_stream;
 }
 
-write_u16_le :: (use writer: &Writer, v: u16) {
+Writer.write_u16_le :: (use writer: &Writer, v: u16) {
     tmp: [2] u8;
     bytes.put_u16_le(~~tmp, v);
     write_str(writer, ~~tmp);
 }
 
-write_u16_be :: (use writer: &Writer, v: u16) {
+Writer.write_u16_be :: (use writer: &Writer, v: u16) {
     tmp: [2] u8;
     bytes.put_u16_be(~~tmp, v);
     write_str(writer, ~~tmp);
 }
 
-write_u32_le :: (use writer: &Writer, v: u32) {
+Writer.write_u32_le :: (use writer: &Writer, v: u32) {
     tmp: [4] u8;
     bytes.put_u32_le(~~tmp, v);
     write_str(writer, ~~tmp);
 }
 
-write_u32_be :: (use writer: &Writer, v: u32) {
+Writer.write_u32_be :: (use writer: &Writer, v: u32) {
     tmp: [4] u8;
     bytes.put_u32_be(~~tmp, v);
     write_str(writer, ~~tmp);
 }
 
-write_u64_le :: (use writer: &Writer, v: u64) {
+Writer.write_u64_le :: (use writer: &Writer, v: u64) {
     tmp: [8] u8;
     bytes.put_u64_le(~~tmp, v);
     write_str(writer, ~~tmp);
 }
 
-write_u64_be :: (use writer: &Writer, v: u64) {
+Writer.write_u64_be :: (use writer: &Writer, v: u64) {
     tmp: [8] u8;
     bytes.put_u64_be(~~tmp, v);
     write_str(writer, ~~tmp);
 }
 
-write_i16_le :: (use writer: &Writer, v: i16) do write_u16_le(writer, ~~v);
-write_i16_be :: (use writer: &Writer, v: i16) do write_u16_be(writer, ~~v);
-write_i32_le :: (use writer: &Writer, v: i32) do write_u32_le(writer, ~~v);
-write_i32_be :: (use writer: &Writer, v: i32) do write_u32_be(writer, ~~v);
-write_i64_le :: (use writer: &Writer, v: i64) do write_u64_le(writer, ~~v);
-write_i64_be :: (use writer: &Writer, v: i64) do write_u64_be(writer, ~~v);
+Writer.write_i16_le :: (use writer: &Writer, v: i16) do write_u16_le(writer, ~~v);
+Writer.write_i16_be :: (use writer: &Writer, v: i16) do write_u16_be(writer, ~~v);
+Writer.write_i32_le :: (use writer: &Writer, v: i32) do write_u32_le(writer, ~~v);
+Writer.write_i32_be :: (use writer: &Writer, v: i32) do write_u32_be(writer, ~~v);
+Writer.write_i64_le :: (use writer: &Writer, v: i64) do write_u64_le(writer, ~~v);
+Writer.write_i64_be :: (use writer: &Writer, v: i64) do write_u64_be(writer, ~~v);
 
-write_byte :: (use writer: &Writer, byte: u8) {
+Writer.write_byte :: (use writer: &Writer, byte: u8) {
     if buffer.count == 0 {
         if err := stream_write_byte(stream, byte); err != .None {
             writer.error = err;
@@ -159,7 +124,7 @@ write_byte :: (use writer: &Writer, byte: u8) {
     }
 }
 
-write_str :: (use writer: &Writer, s: str) {
+Writer.write_str :: (use writer: &Writer, s: str) {
     if buffer.count == 0 {
         if err := stream_write(stream, s).Err ?? Error.None; err != .None {
             writer.error = err;
@@ -177,56 +142,56 @@ write_str :: (use writer: &Writer, s: str) {
     }
 }
 
-write_cstr :: (use writer: &Writer, cs: cstr) {
+Writer.write_cstr :: (use writer: &Writer, cs: cstr) {
     s := string.from_cstr(cs);
     write_str(writer, s);
 }
 
-write_i32 :: (use writer: &Writer, n: i32, base: u32 = 10) {
+Writer.write_i32 :: (use writer: &Writer, n: i32, base: u32 = 10) {
     buf : [256] u8;
     s := conv.i64_to_str(cast(i64) n, cast(u64) base, ~~buf);
     write_str(writer, s);
 }
 
-write_i64 :: (use writer: &Writer, n: i64, base: u64 = 10) {
+Writer.write_i64 :: (use writer: &Writer, n: i64, base: u64 = 10) {
     buf : [256] u8;
     s := conv.i64_to_str(n, base, ~~buf);
     write_str(writer, s);
 }
 
-write_f32 :: (use writer: &Writer, f: f32) {
+Writer.write_f32 :: (use writer: &Writer, f: f32) {
     buf : [256] u8;
     s := conv.f64_to_str(cast(f64) f, ~~buf);
     write_str(writer, s);
 }
 
-write_f64 :: (use writer: &Writer, f: f64) {
+Writer.write_f64 :: (use writer: &Writer, f: f64) {
     buf : [256] u8;
     s := conv.f64_to_str(f, ~~buf);
     write_str(writer, s);
 }
 
-write_bool :: (use writer: &Writer, b: bool) {
+Writer.write_bool :: (use writer: &Writer, b: bool) {
     if b do write_str(writer, "true");
     else do write_str(writer, "false");
 }
 
-write_ptr :: (use writer: &Writer, p: &void) {
+Writer.write_ptr :: (use writer: &Writer, p: &void) {
     write_i64(writer, cast(i64) p, 16);
 }
 
-write_range :: (use writer: &Writer, r: range, sep := " ") {
+Writer.write_range :: (use writer: &Writer, r: range, sep := " ") {
     for i in r {
         write_i32(writer, i);
         if i + r.step < r.high do write_str(writer, sep);
     }
 }
 
-write_format :: (use writer: &Writer, format: str, va: ..any) {
+Writer.write_format :: (use writer: &Writer, format: str, va: ..any) {
     write_format_va(writer, format, ~~ va);
 }
 
-write_format_va :: (use writer: &Writer, format: str, va: [] any) {
+Writer.write_format_va :: (use writer: &Writer, format: str, va: [] any) {
     flush :: (writer, to_output) => {
         write_str(writer, to_output);
         return true;
@@ -236,7 +201,7 @@ write_format_va :: (use writer: &Writer, format: str, va: [] any) {
     write_str(writer, conv.format_va(buffer, format, va, .{writer, flush}));
 }
 
-write_escaped_str :: (use writer: &Writer, s: str) {
+Writer.write_escaped_str :: (use writer: &Writer, s: str) {
     write_byte(writer, '"');
 
     while i := 0; i < s.count {
@@ -265,7 +230,7 @@ write_escaped_str :: (use writer: &Writer, s: str) {
     write_byte(writer, '"');
 }
 
-write :: #match {
+Writer.write :: #match {
     write_str, write_cstr, 
     write_i32, write_f32,
     write_i64, write_f64,
@@ -281,3 +246,39 @@ write :: #match {
         write_format(w, "{}", a);
     }
 }
+
+Writer.write_bytes :: Writer.write_str
+
+// Compatibility: package names.
+writer_make :: Writer.make
+writer_free :: Writer.free
+writer_flush :: Writer.flush
+writer_consume_error :: Writer.consume_error
+writer_remaining_capacity :: Writer.remaining_capacity
+string_builder :: Writer.string_builder
+write_u16_le :: Writer.write_u16_le
+write_u16_be :: Writer.write_u16_be
+write_u32_le :: Writer.write_u32_le
+write_u32_be :: Writer.write_u32_be
+write_u64_le :: Writer.write_u64_le
+write_u64_be :: Writer.write_u64_be
+write_i16_le :: Writer.write_i16_le
+write_i16_be :: Writer.write_i16_be
+write_i32_le :: Writer.write_i32_le
+write_i32_be :: Writer.write_i32_be
+write_i64_le :: Writer.write_i64_le
+write_i64_be :: Writer.write_i64_be
+write_byte :: Writer.write_byte
+write_str :: Writer.write_str
+write_cstr :: Writer.write_cstr
+write_i32 :: Writer.write_i32
+write_i64 :: Writer.write_i64
+write_f32 :: Writer.write_f32
+write_f64 :: Writer.write_f64
+write_bool :: Writer.write_bool
+write_ptr :: Writer.write_ptr
+write_range :: Writer.write_range
+write_format :: Writer.write_format
+write_format_va :: Writer.write_format_va
+write_escaped_str :: Writer.write_escaped_str
+write :: Writer.write

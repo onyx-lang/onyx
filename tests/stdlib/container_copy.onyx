@@ -47,4 +47,25 @@ main :: () {
     println(m2[1] ?? -1);
     delete(&m2);
     delete(&m);
+
+    buf := make(Buf(i32), 3);
+    buf[0] = 8;
+    buf[1] = 9;
+    buf2 := buf->copy();
+    println(buf2[1]);
+    delete(&buf2);
+    buf->clear();
+    println(buf[0]);
+    delete(&buf);
+
+    ba := make(Bucket_Array(i32), 4);
+    for i in 6 do ba << i;
+    println(ba[5]);
+    ba2 := ba->copy();
+    println(ba2.count);
+    println(ba2->pop() ?? -1);
+    delete(&ba2);
+    ba->clear();
+    println(ba.count);
+    delete(&ba);
 }

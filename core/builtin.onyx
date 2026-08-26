@@ -522,7 +522,8 @@ __closure_block_allocate :: (size: i32) -> rawptr {
 }
 
 
-///
+/// Called as `defer __dispose_used_local(&x)` for `use x := ...`.
+/// The default overload is `delete`, so `use x := make(...)` frees owned containers.
 __dispose_used_local :: #match -> void {}
 
 #if runtime.runtime != .Custom {

@@ -29,7 +29,7 @@ main :: () {
 
         .{"abc/def/..", "abc"}
     ] {
-        cleaned := os.path_clean(t.first);
+        cleaned := os.Path.clean(t.first);
         printf("{}: {}=={}\n", cleaned == t.second, cleaned, t.second);
     }
 }

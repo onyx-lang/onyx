@@ -18,6 +18,7 @@ use runtime
 #load "./container/optional"
 #load "./container/result"
 #load "./container/slice"
+#load "./container/buf"
 
 #load "./conv/conv"
 #load "./conv/format"

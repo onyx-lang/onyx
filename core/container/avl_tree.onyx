@@ -1,7 +1,6 @@
 package core.avl_tree
 #allow_stale_code
 
-use core
 use core.math
 
 AVL_Tree :: struct (T: type_expr) {
@@ -10,7 +9,7 @@ AVL_Tree :: struct (T: type_expr) {
     height: i32;
 }
 
-insert :: (ptree: & &AVL_Tree($T), data: T) {
+AVL_Tree.insert :: (ptree: & &AVL_Tree($T), data: T) {
     tree := *ptree;
     if tree == null {
         node := new(typeof *tree);
@@ -23,9 +22,9 @@ insert :: (ptree: & &AVL_Tree($T), data: T) {
     }
 
     if data < tree.data {
-        insert(&tree.left, data);
+        AVL_Tree.insert(&tree.left, data);
     } else {
-        insert(&tree.right, data);
+        AVL_Tree.insert(&tree.right, data);
     }
 
     tree.height = math.max(get_height(tree.left), get_height(tree.right)) + 1;
@@ -51,22 +50,24 @@ insert :: (ptree: & &AVL_Tree($T), data: T) {
     }
 }
 
-remove :: (tree: &AVL_Tree, data: tree.T) {
+AVL_Tree.remove :: (tree: &AVL_Tree, data: tree.T) {
 
 }
 
-delete :: remove
+delete :: AVL_Tree.remove
+AVL_Tree.delete :: AVL_Tree.remove
 
-contains :: (tree: &AVL_Tree, data: tree.T) -> bool {
+
+AVL_Tree.contains :: (tree: &AVL_Tree, data: tree.T) -> bool {
     if tree == null do return false;
 
     if tree.data == data do return true;
 
-    if data < tree.data do return contains(tree.left, data);
-    else                do return contains(tree.right, data);
+    if data < tree.data do return AVL_Tree.contains(tree.left, data);
+    else                do return AVL_Tree.contains(tree.right, data);
 }
 
-print :: (tree: &AVL_Tree) {
+AVL_Tree.print :: (tree: &AVL_Tree) {
     use core {
         std_print :: print,
         printf
@@ -80,8 +81,8 @@ print :: (tree: &AVL_Tree) {
     printf("{}[{}] ", tree.data, tree.height);
     if tree.left != null || tree.right != null {
         std_print("( ");
-        print(tree.left);
-        print(tree.right);
+        AVL_Tree.print(tree.left);
+        AVL_Tree.print(tree.right);
         std_print(") ");
     }
 }
@@ -112,3 +113,9 @@ print :: (tree: &AVL_Tree) {
     A.height = math.max(get_height(A.left), get_height(A.right)) + 1;
     B.height = math.max(get_height(B.left), get_height(B.right)) + 1;
 }
+
+// Compatibility: package names.
+insert :: AVL_Tree.insert
+remove :: AVL_Tree.remove
+contains :: AVL_Tree.contains
+print :: AVL_Tree.print

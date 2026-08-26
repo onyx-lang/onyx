@@ -27,29 +27,30 @@ DirectoryEntry.name :: (use dir: &DirectoryEntry) => str.{ ~~name_data, name_len
 DirectoryEntry.name_copy :: (use dir: DirectoryEntry, allocator := context.allocator) =>
     str.copy(.{ ~~name_data, name_length }, allocator)
 
-dir_open :: (path: str) -> (Directory, bool) {
+Directory.open :: (path: str) -> (Directory, bool) {
     dir: Directory;
     success := fs.__dir_open(path, &dir);
     return dir, success;
 }
 
-dir_close :: (dir: Directory) {
+Directory.close :: (dir: Directory) {
     fs.__dir_close(dir);
 }
 
-dir_read :: (dir: Directory, out_entry: &DirectoryEntry) -> bool {
+Directory.read :: (dir: Directory, out_entry: &DirectoryEntry) -> bool {
     return fs.__dir_read(dir, out_entry);
 }
 
-dir_create :: fs.__dir_create
-dir_exists :: fs.__file_exists
-dir_remove :: fs.__dir_remove
-dir_rename :: fs.__file_rename
+
+Directory.create :: fs.__dir_create
+Directory.exists :: fs.__file_exists
+Directory.remove :: fs.__dir_remove
+Directory.rename :: fs.__file_rename
 
 chdir  :: fs.__chdir
 getcwd :: fs.__getcwd
 
-list_directory :: (path: str) -> Iterator(DirectoryEntry) {
+Directory.list :: (path: str) -> Iterator(DirectoryEntry) {
     Context :: struct {
         dir: Directory;
         opened := false;
@@ -100,3 +101,13 @@ remove_directory :: (path: str) -> bool {
 
     return dir_remove(path);    
 }
+
+// Compatibility: package names.
+dir_open :: Directory.open
+dir_close :: Directory.close
+dir_read :: Directory.read
+dir_create :: Directory.create
+dir_exists :: Directory.exists
+dir_remove :: Directory.remove
+dir_rename :: Directory.rename
+list_directory :: Directory.list

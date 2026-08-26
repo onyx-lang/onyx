@@ -59,5 +59,36 @@ main :: () {
         scoped << 9;
     }
 
+    {
+        use m3 := make(Map(i32, i32));
+        m3[1] = 2;
+    }
+
+    {
+        use s2 := make(Set(i32));
+        s2->insert(1);
+    }
+
+    {
+        use l3 := make(List(i32));
+        l3->push_end(1);
+    }
+
+    {
+        use h3 := Heap.make(i32, (a, b) => a - b);
+        h3 << 1;
+    }
+
+    {
+        use buf := make(Buf(i32), 2);
+        buf[0] = 1;
+    }
+
+    {
+        use ba := make(Bucket_Array(i32), 4);
+        ba << 1;
+        ba << 2;
+    }
+
     println("ok");
 }

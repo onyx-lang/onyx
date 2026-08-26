@@ -185,6 +185,42 @@ find :: (data: [] u8, needle: [] u8) -> ? i32 {
     return str.find(data, needle);
 }
 
+Array.append_u8      :: append
+Array.append_str     :: append_str
+Array.append_u16_le  :: append_u16_le
+Array.append_u16_be  :: append_u16_be
+Array.append_u32_le  :: append_u32_le
+Array.append_u32_be  :: append_u32_be
+Array.append_u64_le  :: append_u64_le
+Array.append_u64_be  :: append_u64_be
+Array.append_i16_le  :: append_i16_le
+Array.append_i16_be  :: append_i16_be
+Array.append_i32_le  :: append_i32_le
+Array.append_i32_be  :: append_i32_be
+Array.append_i64_le  :: append_i64_le
+Array.append_i64_be  :: append_i64_be
+
+Slice.put_u16_le :: put_u16_le
+Slice.put_u16_be :: put_u16_be
+Slice.put_u32_le :: put_u32_le
+Slice.put_u32_be :: put_u32_be
+Slice.put_u64_le :: put_u64_le
+Slice.put_u64_be :: put_u64_be
+Slice.read_u16_le :: read_u16_le
+Slice.read_u16_be :: read_u16_be
+Slice.read_u32_le :: read_u32_le
+Slice.read_u32_be :: read_u32_be
+Slice.read_u64_le :: read_u64_le
+Slice.read_u64_be :: read_u64_be
+Slice.read_i16_le :: read_i16_le
+Slice.read_i16_be :: read_i16_be
+Slice.read_i32_le :: read_i32_le
+Slice.read_i32_be :: read_i32_be
+Slice.read_i64_le :: read_i64_le
+Slice.read_i64_be :: read_i64_be
+Slice.starts_with :: starts_with
+Slice.ends_with   :: ends_with
+
 
 #local {
     has :: (data: [] u8, offset: i32, n: i32) -> bool {

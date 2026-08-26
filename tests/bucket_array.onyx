@@ -1,8 +1,8 @@
-
-
 use core {*}
 
-main :: (args: [] cstr) {
+// @leak-check
+
+main :: () {
     ba := bucket_array.make(i32, 4);
     for i in 24 do ba << i;
 
@@ -19,4 +19,5 @@ main :: (args: [] cstr) {
     }
 
     printf("Sum is {}\n", sum);
+    delete(&ba);
 }

@@ -33,58 +33,7 @@ List.init :: (list: &List($T), allocator := context.allocator) {
     list.last = null;
 }
 
-/// Frees the list. Prefer `delete(&list)`.
-List.delete :: (list: &List) {
-    free(list);
-}
-
-/// Removes every element so the list can be filled again.
-List.clear :: (list: &List) {
-    free(list);
-}
-
-/// Allocates a new list with the same elements.
-List.copy :: (list: &List($T), allocator := context.allocator) -> List(T) {
-    out := List.make(T, allocator);
-    elem := list.first;
-    while elem != null {
-        push_end(&out, elem.data);
-        elem = elem.next;
-    }
-    return out;
-}
-
-List.free         :: free
-List.push_end     :: push_end
-List.push_begin   :: push_begin
-List.pop_end      :: pop_end
-List.pop_begin    :: pop_begin
-List.count        :: count
-List.at           :: at
-List.contains     :: contains
-List.fold         :: fold
-List.map          :: map
-List.as_iter      :: as_iter
-
-make :: List.make
-
-#overload
-__make_overload :: (_: &List($T), allocator := context.allocator) -> List(T) {
-    return List.make(T, allocator);
-}
-
-#overload
-builtin.delete :: List.delete
-
-from_array :: (arr: [] $T, allocator := context.allocator) -> List(T) {
-    l := make(T, allocator);
-    for& arr {
-        push_end(&l, *it);
-    }
-    return l;
-}
-
-free :: (list: &List) {
+List.free :: (list: &List) {
     elem := list.first;
     while elem != null {
         to_delete := elem;
@@ -96,7 +45,44 @@ free :: (list: &List) {
     list.last = null;
 }
 
-push_end :: (list: &List, x: list.Elem_Type) {
+/// Frees the list. Prefer `delete(&list)`.
+List.delete :: (list: &List) {
+    List.free(list);
+}
+
+/// Removes every element so the list can be filled again.
+List.clear :: (list: &List) {
+    List.free(list);
+}
+
+/// Allocates a new list with the same elements.
+List.copy :: (list: &List($T), allocator := context.allocator) -> List(T) {
+    out := List.make(T, allocator);
+    elem := list.first;
+    while elem != null {
+        List.push_end(&out, elem.data);
+        elem = elem.next;
+    }
+    return out;
+}
+
+List.from_array :: (arr: [] $T, allocator := context.allocator) -> List(T) {
+    l := List.make(T, allocator);
+    for& arr {
+        List.push_end(&l, *it);
+    }
+    return l;
+}
+
+#overload
+__make_overload :: (_: &List($T), allocator := context.allocator) -> List(T) {
+    return List.make(T, allocator);
+}
+
+#overload
+builtin.delete :: List.delete
+
+List.push_end :: (list: &List, x: list.Elem_Type) {
     new_elem := allocate_elem(list);
     new_elem.data = x;
 
@@ -107,7 +93,7 @@ push_end :: (list: &List, x: list.Elem_Type) {
     if !list.first do list.first = new_elem;
 }
 
-push_begin :: (list: &List, x: list.Elem_Type) {
+List.push_begin :: (list: &List, x: list.Elem_Type) {
     new_elem := allocate_elem(list);
     new_elem.data = x;
 
@@ -118,7 +104,7 @@ push_begin :: (list: &List, x: list.Elem_Type) {
     if !list.last do list.last = new_elem;
 }
 
-pop_end :: (list: &List($T), default: T = .{}) -> T {
+List.pop_end :: (list: &List($T), default: T = .{}) -> T {
     if list.last == null do return default;
 
     end := list.last;
@@ -133,7 +119,7 @@ pop_end :: (list: &List($T), default: T = .{}) -> T {
     return end.data;
 }
 
-pop_begin :: (list: &List($T), default: T = .{}) -> T {
+List.pop_begin :: (list: &List($T), default: T = .{}) -> T {
     if list.last == null do return default;
 
     begin := list.first;
@@ -148,7 +134,7 @@ pop_begin :: (list: &List($T), default: T = .{}) -> T {
     return begin.data;
 }
 
-pop_end_opt :: (list: &List($T)) -> ? T {
+List.pop_end_opt :: (list: &List($T)) -> ? T {
     if list.last == null do return .None;
 
     end := list.last;
@@ -163,7 +149,7 @@ pop_end_opt :: (list: &List($T)) -> ? T {
     return end.data;
 }
 
-pop_begin_opt :: (list: &List($T)) -> ? T {
+List.pop_begin_opt :: (list: &List($T)) -> ? T {
     if list.last == null do return .None;
 
     begin := list.first;
@@ -178,11 +164,11 @@ pop_begin_opt :: (list: &List($T)) -> ? T {
     return begin.data;
 }
 
-empty :: (list: &List) -> bool {
+List.empty :: (list: &List) -> bool {
     return list.first == null;
 }
 
-count :: (list: &List) -> i32 {
+List.count :: (list: &List) -> i32 {
     c := 0;
     elem := list.first;
     while elem != null {
@@ -193,7 +179,7 @@ count :: (list: &List) -> i32 {
     return c;
 }
 
-at :: (list: &List($T), index: i32) -> &T {
+List.at :: (list: &List($T), index: i32) -> &T {
     elem := list.first;
     while elem != null {
         if index == 0 do return &elem.data;
@@ -204,7 +190,7 @@ at :: (list: &List($T), index: i32) -> &T {
     return null;
 }
 
-contains :: (list: &List, x: list.Elem_Type) -> bool {
+List.contains :: (list: &List, x: list.Elem_Type) -> bool {
     elem := list.first;
     while elem != null {
         if elem.data == x do return true;
@@ -214,7 +200,7 @@ contains :: (list: &List, x: list.Elem_Type) -> bool {
     return false;
 }
 
-fold :: (list: &List($T), init: $R, f: (T, R) -> R) -> R {
+List.fold :: (list: &List($T), init: $R, f: (T, R) -> R) -> R {
     val := init;
 
     link := list.first;
@@ -226,18 +212,18 @@ fold :: (list: &List($T), init: $R, f: (T, R) -> R) -> R {
     return val;
 }
 
-map :: (list: &List($T), f: (T) -> $R) -> List(R) {
-    new_list := make(R, allocator=list.allocator);
+List.map :: (list: &List($T), f: (T) -> $R) -> List(R) {
+    new_list := List.make(R, allocator=list.allocator);
     elem := list.first;
     while elem != null {
-        push_end(&new_list, f(elem.data));
+        List.push_end(&new_list, f(elem.data));
         elem = elem.next;
     }
 
     return new_list;
 }
 
-as_iter :: (list: &List) =>
+List.as_iter :: (list: &List) =>
     core.iter.generator(&.{current = list.first}, (ctx) => {
         if ctx.current != null {
             defer ctx.current = ctx.current.next;
@@ -248,6 +234,24 @@ as_iter :: (list: &List) =>
     });
 
 #overload
-core.iter.as_iter :: as_iter
+core.iter.as_iter :: List.as_iter
 
 #local allocate_elem :: macro (list: &List($T)) => new(ListElem(T), allocator=list.allocator);
+
+// Compatibility: package names.
+make           :: List.make
+from_array     :: List.from_array
+free           :: List.free
+push_end       :: List.push_end
+push_begin     :: List.push_begin
+pop_end        :: List.pop_end
+pop_begin      :: List.pop_begin
+pop_end_opt    :: List.pop_end_opt
+pop_begin_opt  :: List.pop_begin_opt
+empty          :: List.empty
+count          :: List.count
+at             :: List.at
+contains       :: List.contains
+fold           :: List.fold
+map            :: List.map
+as_iter        :: List.as_iter

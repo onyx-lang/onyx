@@ -49,42 +49,42 @@ SeekFrom :: enum {
     End     :: 0x02;    
 }
 
-stream_seek :: (use s: &Stream, to: i32, whence: SeekFrom) -> Error {
+Stream.seek :: (use s: &Stream, to: i32, whence: SeekFrom) -> Error {
     if vtable == null do return .NoVtable;
     if vtable.seek == null_proc do return .NotImplemented;
 
     return vtable.seek(s, to, whence);
 }
 
-stream_tell :: (use s: &Stream) -> Result(u32, Error) {
+Stream.tell :: (use s: &Stream) -> Result(u32, Error) {
     if vtable == null do return .{ Err = .NoVtable };
     if vtable.tell == null_proc do return .{ Err = .NotImplemented };
     
     return vtable.tell(s);
 }
 
-stream_read :: (use s: &Stream, buffer: [] u8) -> Result(u32, Error) {
+Stream.read :: (use s: &Stream, buffer: [] u8) -> Result(u32, Error) {
     if vtable == null do return .{ Err = .NoVtable };
     if vtable.read == null_proc do return .{ Err = .NotImplemented };
     
     return vtable.read(s, buffer);
 }
 
-stream_read_at :: (use s: &Stream, at: u32, buffer: [] u8) -> Result(u32, Error) {
+Stream.read_at :: (use s: &Stream, at: u32, buffer: [] u8) -> Result(u32, Error) {
     if vtable == null do return .{ Err = .NoVtable };
     if vtable.read_at == null_proc do return .{ Err = .NotImplemented };
     
     return vtable.read_at(s, at, buffer);
 }
 
-stream_read_byte :: (use s: &Stream) -> Result(u8, Error) {
+Stream.read_byte :: (use s: &Stream) -> Result(u8, Error) {
     if vtable == null do return .{ Err = .NoVtable };
     if vtable.read_byte == null_proc do return .{ Err = .NotImplemented };
     
     return vtable.read_byte(s);
 }
 
-stream_read_until_full :: (use s: &Stream, buffer: [] u8) -> Result(u32, Error) {
+Stream.read_until_full :: (use s: &Stream, buffer: [] u8) -> Result(u32, Error) {
     if vtable == null do return .{ Err = .NoVtable };
     if vtable.read == null_proc do return .{ Err = .NotImplemented };
 
@@ -105,42 +105,42 @@ stream_read_until_full :: (use s: &Stream, buffer: [] u8) -> Result(u32, Error) 
     return .{ Ok = bytes_read };
 }
 
-stream_write :: (use s: &Stream, buffer: [] u8) -> Result(u32, Error) {
+Stream.write :: (use s: &Stream, buffer: [] u8) -> Result(u32, Error) {
     if vtable == null do return .{ Err = .NoVtable };
     if vtable.write == null_proc do return .{ Err = .NotImplemented };
     
     return vtable.write(s, buffer);
 }
 
-stream_write_at :: (use s: &Stream, at: u32, buffer: [] u8) -> Result(u32, Error) {
+Stream.write_at :: (use s: &Stream, at: u32, buffer: [] u8) -> Result(u32, Error) {
     if vtable == null do return .{ Err = .NoVtable };
     if vtable.write_at == null_proc do return .{ Err = .NotImplemented };
     
     return vtable.write_at(s, at, buffer);
 }
 
-stream_write_byte :: (use s: &Stream, byte: u8) -> Error {
+Stream.write_byte :: (use s: &Stream, byte: u8) -> Error {
     if vtable == null do return .NoVtable;
     if vtable.write_byte == null_proc do return .NotImplemented;
     
     return vtable.write_byte(s, byte);
 }
 
-stream_close :: (use s: &Stream) -> Error {
+Stream.close :: (use s: &Stream) -> Error {
     if vtable == null do return .NoVtable;
     if vtable.close == null_proc do return .NotImplemented;
 
     return vtable.close(s);
 }
 
-stream_flush :: (use s: &Stream) -> Error {
+Stream.flush :: (use s: &Stream) -> Error {
     if vtable == null do return .NoVtable;
     if vtable.flush == null_proc do return .NotImplemented;
 
     return vtable.flush(s);
 }
 
-stream_size :: (use s: &Stream) -> i32 {
+Stream.size :: (use s: &Stream) -> i32 {
     if vtable == null do return 0;
     if vtable.size == null_proc do return 0;
 
@@ -154,7 +154,7 @@ stream_size :: (use s: &Stream) -> i32 {
 /// If `timeout` = 0, then there is no timeout, and this function returns immediately.
 ///
 /// If `timeout` > 0, then there is a `timeout` millisecond delay before returning false.
-stream_poll :: (use s: &Stream, ev: PollEvent, timeout: i32) -> Result(bool, Error) {
+Stream.poll :: (use s: &Stream, ev: PollEvent, timeout: i32) -> Result(bool, Error) {
     if vtable == null do return .{ Err = .NoVtable };
     if vtable.poll == null_proc do return .{ Err = .NotImplemented };
 
@@ -216,7 +216,7 @@ BufferStream :: struct {
     fixed         := false;
 }
 
-buffer_stream_make :: #match #locked {
+BufferStream.make :: #match #locked {
     (initial_data: [] u8, allocator := context.allocator, fixed := false, write_enabled := true) -> BufferStream {
         if !write_enabled {
             return .{
@@ -250,15 +250,15 @@ buffer_stream_make :: #match #locked {
     }
 }
 
-#overload builtin.delete :: buffer_stream_free
-buffer_stream_free :: (use bs: &BufferStream) {
+#overload builtin.delete :: BufferStream.free
+BufferStream.free :: (use bs: &BufferStream) {
     if write_enabled && !fixed {
         delete(&data);
     }
 }
 
-#overload str.as_str buffer_stream_to_str
-buffer_stream_to_str :: (use bs: &BufferStream) -> str {
+#overload str.as_str BufferStream.to_str
+BufferStream.to_str :: (use bs: &BufferStream) -> str {
     if !write_enabled do return null_str;
 
     return data[0 .. curr_pos];
@@ -382,3 +382,21 @@ buffer_stream_vtable := Stream_Vtable.{
     }
 }
 
+
+// Compatibility: package names.
+stream_seek :: Stream.seek
+stream_tell :: Stream.tell
+stream_read :: Stream.read
+stream_read_at :: Stream.read_at
+stream_read_byte :: Stream.read_byte
+stream_read_until_full :: Stream.read_until_full
+stream_write :: Stream.write
+stream_write_at :: Stream.write_at
+stream_write_byte :: Stream.write_byte
+stream_close :: Stream.close
+stream_flush :: Stream.flush
+stream_size :: Stream.size
+stream_poll :: Stream.poll
+buffer_stream_make :: BufferStream.make
+buffer_stream_free :: BufferStream.free
+buffer_stream_to_str :: BufferStream.to_str

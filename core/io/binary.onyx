@@ -9,7 +9,7 @@ BinaryWriter :: struct {
     stream: &Stream;
 }
 
-binary_writer_make :: (s: &Stream) -> BinaryWriter {
+BinaryWriter.make :: (s: &Stream) -> BinaryWriter {
     assert(s.vtable != null, "Stream vtable was not setup correctly.");
 
     return BinaryWriter.{ s };
@@ -99,7 +99,7 @@ BinaryReader :: struct {
     stream: &Stream;
 }
 
-binary_reader_make :: (s: &Stream) -> BinaryReader {
+BinaryReader.make :: (s: &Stream) -> BinaryReader {
     assert(s.vtable != null, "Stream vtable was not setup correctly.");
 
     return BinaryReader.{ s };
@@ -229,3 +229,8 @@ BinaryReader.read_i64_be :: (use br: &BinaryReader) -> Result(i64, Error) {
     if err := read_exact(br, ~~buf); err != .None do return .{ Err = err };
     return .{ Ok = bytes.read_i64_be(~~buf) ?? 0 };
 }
+
+// Compatibility: package names.
+binary_writer_make :: BinaryWriter.make
+binary_reader_make :: BinaryReader.make
+

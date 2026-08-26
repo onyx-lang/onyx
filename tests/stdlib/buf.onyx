@@ -1,0 +1,33 @@
+use core {*}
+
+// @leak-check
+
+main :: () {
+    b := make(Buf(i32), 4);
+    b[0] = 10;
+    b[1] = 20;
+    println(b[0]);
+    println(b->count());
+    println(b->as_slice()[1]);
+
+    c := b->copy();
+    println(c[1]);
+    delete(&c);
+
+    b->clear();
+    println(b[0]);
+    delete(&b);
+
+    {
+        use scoped := make(Buf(u8), 8);
+        scoped[0] = 65;
+    }
+
+    b2 := Buf.make(i32, 2);
+    b2[0] = 7;
+    println(b2[0]);
+    println(b2->empty());
+    delete(&b2);
+
+    println("ok");
+}

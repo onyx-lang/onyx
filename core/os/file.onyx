@@ -62,7 +62,7 @@ file_stat   :: fs.__file_stat
 remove_file :: fs.__file_remove
 rename_file :: fs.__file_rename
 
-get_contents_from_file :: (file: &File) -> str {
+File.get_contents :: (file: &File) -> str {
     size := cast(u32) io.stream_size(file);
 
     data := cast([&] u8) raw_alloc(context.allocator, size);
@@ -77,14 +77,14 @@ get_contents_from_file :: (file: &File) -> str {
     return data[0 .. size];
 }
 
-from_fd :: (fd: FileData) -> File {
+File.from_fd :: (fd: FileData) -> File {
     file: File;
     file.data = fd;
     file.vtable = &fs.__file_stream_vtable;
     return file;
 }
 
-open :: (path: str, mode := OpenMode.Read) -> Result(File, os.FileError) {
+File.open :: (path: str, mode := OpenMode.Read) -> Result(File, os.FileError) {
     file := File.{
         stream = .{ vtable = null },
         data   = .{},
@@ -98,10 +98,11 @@ open :: (path: str, mode := OpenMode.Read) -> Result(File, os.FileError) {
     return .{ Ok = file };
 }
 
-close :: (file: &File) {
+File.close :: (file: &File) {
     fs.__file_close(file.data);
     file.stream.vtable = null;
 }
+
 
 #overload
 __dispose_used_local :: macro (file: &File) {
@@ -109,7 +110,7 @@ __dispose_used_local :: macro (file: &File) {
 }
 
 get_contents :: #match {
-    get_contents_from_file,
+    File.get_contents,
 
     (path: str) -> str {
         file := open(path, .Read)->or_return(null_str);
@@ -188,3 +189,14 @@ file_logger_proc :: (logger: &File_Logger, level: Log_Level, msg: str, module: s
         io.write_format(&writer, "[{}] {}\n", level, msg);
     }
 }
+
+File.exists :: file_exists
+File.stat   :: file_stat
+File.remove :: remove_file
+File.rename :: rename_file
+
+// Compatibility: package names.
+open :: File.open
+close :: File.close
+from_fd :: File.from_fd
+get_contents_from_file :: File.get_contents

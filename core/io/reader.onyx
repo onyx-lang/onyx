@@ -36,47 +36,7 @@ NewLineFormat :: enum {
     CRLF;
 }
 
-Reader.make :: reader_make;
-Reader.reset :: reader_reset;
-Reader.free :: reader_free;
-Reader.from_string :: reader_from_string;
-Reader.get_buffered :: reader_get_buffered;
-Reader.ensure_buffered :: reader_ensure_buffered
-Reader.is_empty :: reader_empty;
-Reader.empty    :: reader_empty;
-Reader.read_all :: read_all;
-Reader.read_byte :: read_byte;
-Reader.unread_byte :: unread_byte;
-Reader.read_bytes :: read_bytes;
-Reader.read_fill_buffer :: read_fill_buffer;
-Reader.read_string :: read_string;
-Reader.read_i32 :: read_i32;
-Reader.read_i64 :: read_i64;
-Reader.read_u32 :: read_u32;
-Reader.read_u64 :: read_u64;
-Reader.read_line :: read_line;
-Reader.read_word :: read_word;
-Reader.read_until :: read_until;
-Reader.peek_byte :: peek_byte;
-Reader.peek_bytes :: peek_bytes
-Reader.advance_line :: advance_line;
-Reader.skip_whitespace :: skip_whitespace;
-Reader.skip_bytes :: skip_bytes;
-Reader.lines :: lines;
-Reader.read_u16_le :: read_u16_le;
-Reader.read_u16_be :: read_u16_be;
-Reader.read_u32_le :: read_u32_le;
-Reader.read_u32_be :: read_u32_be;
-Reader.read_u64_le :: read_u64_le;
-Reader.read_u64_be :: read_u64_be;
-Reader.read_i16_le :: read_i16_le;
-Reader.read_i16_be :: read_i16_be;
-Reader.read_i32_le :: read_i32_le;
-Reader.read_i32_be :: read_i32_be;
-Reader.read_i64_le :: read_i64_le;
-Reader.read_i64_be :: read_i64_be;
-
-reader_make :: (
+Reader.make :: (
     s: &Stream,
     buffer_size := 4096,
     allocator := context.allocator,
@@ -97,36 +57,36 @@ reader_make :: (
     return reader;
 }
 
-reader_reset :: (use reader: &Reader) {
+Reader.reset :: (use reader: &Reader) {
     start, end = 0, 0;
     last_byte = '\0';
     done = false;
 }
 
-#overload delete :: reader_free
-reader_free :: (use reader: &Reader) {
+#overload delete :: Reader.free
+Reader.free :: (use reader: &Reader) {
     memory.free_slice(&buffer, buffer_allocator);
 }
 
 // You need to free the StringStream from the context.allocator when you use this. For example,
 //      reader, stream := reader_from_string(s);
 //      defer cfree(stream);
-reader_from_string :: (s: str) -> (Reader, &BufferStream) {
+Reader.from_string :: (s: str) -> (Reader, &BufferStream) {
     stream_ptr := new(BufferStream);
     *stream_ptr = buffer_stream_make(s, fixed=true, write_enabled=false);
 
     return reader_make(stream_ptr), stream_ptr;
 }
 
-reader_get_buffered :: (use reader: &Reader) -> i32 {
+Reader.get_buffered :: (use reader: &Reader) -> i32 {
     return end - start;
 }
 
-reader_empty :: (use reader: &Reader) -> bool {
+Reader.empty :: (use reader: &Reader) -> bool {
     return done && reader_get_buffered(reader) == 0;
 }
 
-reader_ensure_buffered :: (use reader: &Reader, bytes: u32) -> Error {
+Reader.ensure_buffered :: (use reader: &Reader, bytes: u32) -> Error {
     if bytes > buffer.length do return .OutOfBounds
 
     if start == end && end == 0 {
@@ -144,7 +104,7 @@ reader_ensure_buffered :: (use reader: &Reader, bytes: u32) -> Error {
     return .None
 }
 
-read_all :: (use reader: &Reader, allocator := context.allocator) -> [] u8 {
+Reader.read_all :: (use reader: &Reader, allocator := context.allocator) -> [] u8 {
     output := array.make(u8, 128, allocator=allocator);
 
     while !reader_empty(reader) {
@@ -169,7 +129,7 @@ read_all :: (use reader: &Reader, allocator := context.allocator) -> [] u8 {
     return output;
 }
 
-read_byte :: (use reader: &Reader) -> u8 {
+Reader.read_byte :: (use reader: &Reader) -> u8 {
     while start == end {
         if reader_empty(reader) do return 0;
 
@@ -189,7 +149,7 @@ read_byte :: (use reader: &Reader) -> u8 {
     return byte;
 }
 
-unread_byte :: (use reader: &Reader) -> Error {
+Reader.unread_byte :: (use reader: &Reader) -> Error {
     if last_byte < 0 || (start == 0 && end > 0) {
         return .InvalidUnread;
     }
@@ -211,7 +171,7 @@ unread_byte :: (use reader: &Reader) -> Error {
 // returns ReadPending, this function may only fill part / none
 // of the buffer. If the function exits with a .None error, the
 // buffer is filled completely.
-read_bytes :: (use reader: &Reader, bytes: [] u8) -> (i32, Error) {
+Reader.read_bytes :: (use reader: &Reader, bytes: [] u8) -> (i32, Error) {
     n := bytes.count;
     if n == 0 {
         if reader_get_buffered(reader) > 0 do return 0, .None;
@@ -241,13 +201,13 @@ read_bytes :: (use reader: &Reader, bytes: [] u8) -> (i32, Error) {
     return write_index, .None;
 }
 
-read_string :: (use reader: &Reader, bytes := 1, allocator := context.allocator) -> str {
+Reader.read_string :: (use reader: &Reader, bytes := 1, allocator := context.allocator) -> str {
     buf := memory.make_slice(u8, bytes, allocator);
     bytes_read, err := read_bytes(reader, buf);
     return buf[0 .. bytes_read];
 }
 
-read_fill_buffer :: (use reader: &Reader, bytes: [] u8) -> Error {
+Reader.read_fill_buffer :: (use reader: &Reader, bytes: [] u8) -> Error {
     n := bytes.count;
     if n == 0 {
         if reader_get_buffered(reader) > 0 do return .None;
@@ -276,79 +236,79 @@ read_fill_buffer :: (use reader: &Reader, bytes: [] u8) -> Error {
     return .None;
 }
 
-read_u16_le :: (use reader: &Reader) -> Result(u16, Error) {
+Reader.read_u16_le :: (use reader: &Reader) -> Result(u16, Error) {
     buf: [2] u8;
     if err := read_fill_buffer(reader, ~~buf); err != .None do return .{ Err = err };
     return .{ Ok = bytes.read_u16_le(~~buf) ?? 0 };
 }
 
-read_u16_be :: (use reader: &Reader) -> Result(u16, Error) {
+Reader.read_u16_be :: (use reader: &Reader) -> Result(u16, Error) {
     buf: [2] u8;
     if err := read_fill_buffer(reader, ~~buf); err != .None do return .{ Err = err };
     return .{ Ok = bytes.read_u16_be(~~buf) ?? 0 };
 }
 
-read_u32_le :: (use reader: &Reader) -> Result(u32, Error) {
+Reader.read_u32_le :: (use reader: &Reader) -> Result(u32, Error) {
     buf: [4] u8;
     if err := read_fill_buffer(reader, ~~buf); err != .None do return .{ Err = err };
     return .{ Ok = bytes.read_u32_le(~~buf) ?? 0 };
 }
 
-read_u32_be :: (use reader: &Reader) -> Result(u32, Error) {
+Reader.read_u32_be :: (use reader: &Reader) -> Result(u32, Error) {
     buf: [4] u8;
     if err := read_fill_buffer(reader, ~~buf); err != .None do return .{ Err = err };
     return .{ Ok = bytes.read_u32_be(~~buf) ?? 0 };
 }
 
-read_u64_le :: (use reader: &Reader) -> Result(u64, Error) {
+Reader.read_u64_le :: (use reader: &Reader) -> Result(u64, Error) {
     buf: [8] u8;
     if err := read_fill_buffer(reader, ~~buf); err != .None do return .{ Err = err };
     return .{ Ok = bytes.read_u64_le(~~buf) ?? 0 };
 }
 
-read_u64_be :: (use reader: &Reader) -> Result(u64, Error) {
+Reader.read_u64_be :: (use reader: &Reader) -> Result(u64, Error) {
     buf: [8] u8;
     if err := read_fill_buffer(reader, ~~buf); err != .None do return .{ Err = err };
     return .{ Ok = bytes.read_u64_be(~~buf) ?? 0 };
 }
 
-read_i16_le :: (use reader: &Reader) -> Result(i16, Error) {
+Reader.read_i16_le :: (use reader: &Reader) -> Result(i16, Error) {
     buf: [2] u8;
     if err := read_fill_buffer(reader, ~~buf); err != .None do return .{ Err = err };
     return .{ Ok = bytes.read_i16_le(~~buf) ?? 0 };
 }
 
-read_i16_be :: (use reader: &Reader) -> Result(i16, Error) {
+Reader.read_i16_be :: (use reader: &Reader) -> Result(i16, Error) {
     buf: [2] u8;
     if err := read_fill_buffer(reader, ~~buf); err != .None do return .{ Err = err };
     return .{ Ok = bytes.read_i16_be(~~buf) ?? 0 };
 }
 
-read_i32_le :: (use reader: &Reader) -> Result(i32, Error) {
+Reader.read_i32_le :: (use reader: &Reader) -> Result(i32, Error) {
     buf: [4] u8;
     if err := read_fill_buffer(reader, ~~buf); err != .None do return .{ Err = err };
     return .{ Ok = bytes.read_i32_le(~~buf) ?? 0 };
 }
 
-read_i32_be :: (use reader: &Reader) -> Result(i32, Error) {
+Reader.read_i32_be :: (use reader: &Reader) -> Result(i32, Error) {
     buf: [4] u8;
     if err := read_fill_buffer(reader, ~~buf); err != .None do return .{ Err = err };
     return .{ Ok = bytes.read_i32_be(~~buf) ?? 0 };
 }
 
-read_i64_le :: (use reader: &Reader) -> Result(i64, Error) {
+Reader.read_i64_le :: (use reader: &Reader) -> Result(i64, Error) {
     buf: [8] u8;
     if err := read_fill_buffer(reader, ~~buf); err != .None do return .{ Err = err };
     return .{ Ok = bytes.read_i64_le(~~buf) ?? 0 };
 }
 
-read_i64_be :: (use reader: &Reader) -> Result(i64, Error) {
+Reader.read_i64_be :: (use reader: &Reader) -> Result(i64, Error) {
     buf: [8] u8;
     if err := read_fill_buffer(reader, ~~buf); err != .None do return .{ Err = err };
     return .{ Ok = bytes.read_i64_be(~~buf) ?? 0 };
 }
 
-read_i32 :: (use reader: &Reader) -> i32 {
+Reader.read_i32 :: (use reader: &Reader) -> i32 {
     n: i32 = 0;
 
     skip_whitespace(reader);
@@ -374,7 +334,7 @@ read_i32 :: (use reader: &Reader) -> i32 {
     return n;
 }
 
-read_i64 :: (use reader: &Reader) -> i64 {
+Reader.read_i64 :: (use reader: &Reader) -> i64 {
     n: i64 = 0;
 
     skip_whitespace(reader);
@@ -400,7 +360,7 @@ read_i64 :: (use reader: &Reader) -> i64 {
     return n;
 }
 
-read_u32 :: (use reader: &Reader) -> u32 {
+Reader.read_u32 :: (use reader: &Reader) -> u32 {
     n: u32 = 0;
 
     skip_whitespace(reader);
@@ -418,7 +378,7 @@ read_u32 :: (use reader: &Reader) -> u32 {
     return n;
 }
 
-read_u64 :: (use reader: &Reader) -> u64 {
+Reader.read_u64 :: (use reader: &Reader) -> u64 {
     n: u64 = 0;
 
     skip_whitespace(reader);
@@ -436,7 +396,7 @@ read_u64 :: (use reader: &Reader) -> u64 {
     return n;
 }
 
-read_line :: (use reader: &Reader, consume_newline := true, allocator := context.allocator, inplace := false) -> str {
+Reader.read_line :: (use reader: &Reader, consume_newline := true, allocator := context.allocator, inplace := false) -> str {
     //
     // Reading in place is special. It does not make a special allocation for the data,
     // instead just return a pointer to the internal data.
@@ -508,7 +468,7 @@ read_line :: (use reader: &Reader, consume_newline := true, allocator := context
     return out;
 }
 
-read_word :: (use reader: &Reader, numeric_allowed := false, allocator := context.allocator, inplace := false) -> str {
+Reader.read_word :: (use reader: &Reader, numeric_allowed := false, allocator := context.allocator, inplace := false) -> str {
     skip_whitespace(reader);
     while reader_read_next_chunk(reader) == .ReadPending {
         skip_whitespace(reader);
@@ -578,7 +538,7 @@ read_word :: (use reader: &Reader, numeric_allowed := false, allocator := contex
     return out;
 }
 
-read_until :: (use reader: &Reader, until: u8, skip: u32 = 0, allocator := context.allocator, consume_end := false, inplace := false) -> str {
+Reader.read_until :: (use reader: &Reader, until: u8, skip: u32 = 0, allocator := context.allocator, consume_end := false, inplace := false) -> str {
     //
     // Reading in place is special. It does not make a special allocation for the data,
     // instead just return a pointer to the internal data.
@@ -645,7 +605,7 @@ read_until :: (use reader: &Reader, until: u8, skip: u32 = 0, allocator := conte
     return out;
 }
 
-peek_byte :: (use reader: &Reader, advance := 0) -> (u8, Error) {
+Reader.peek_byte :: (use reader: &Reader, advance := 0) -> (u8, Error) {
     if reader_empty(reader) do return 0, .EOF;
 
     if start == end {
@@ -661,7 +621,7 @@ peek_byte :: (use reader: &Reader, advance := 0) -> (u8, Error) {
     return buffer[start + advance], .None;
 }
 
-peek_bytes :: (use reader: &Reader, advance: u32, length: u32) -> (str, Error) {
+Reader.peek_bytes :: (use reader: &Reader, advance: u32, length: u32) -> (str, Error) {
     if reader_empty(reader) do return "", .EOF
 
     if start == end {
@@ -677,7 +637,7 @@ peek_bytes :: (use reader: &Reader, advance: u32, length: u32) -> (str, Error) {
     return buffer[start + advance .. start + advance + length], .None
 }
 
-advance_line :: (use reader: &Reader) {
+Reader.advance_line :: (use reader: &Reader) {
     if reader_empty(reader) do return;
 
     while true {
@@ -694,7 +654,7 @@ advance_line :: (use reader: &Reader) {
     }
 }
 
-skip_whitespace :: (use reader: &Reader) {
+Reader.skip_whitespace :: (use reader: &Reader) {
     if reader_empty(reader) do return;
 
     while start <= end {
@@ -714,7 +674,7 @@ skip_whitespace :: (use reader: &Reader) {
     }
 }
 
-skip_bytes :: (use reader: &Reader, bytes: u32) -> (i32, Error) {
+Reader.skip_bytes :: (use reader: &Reader, bytes: u32) -> (i32, Error) {
     if bytes == 0 do return 0, .None;
     if reader_empty(reader) do return 0, .EOF;
 
@@ -743,7 +703,7 @@ skip_bytes :: (use reader: &Reader, bytes: u32) -> (i32, Error) {
     return 0, .None;
 }
 
-lines :: (r: &Reader, inplace := false, allocator := context.allocator) =>
+Reader.lines :: (r: &Reader, inplace := false, allocator := context.allocator) =>
     iter.generator(&.{
         r = r,
         inplace = inplace,
@@ -828,3 +788,45 @@ lines :: (r: &Reader, inplace := false, allocator := context.allocator) =>
     error = .NoProgress;
     return .None;
 }
+
+Reader.is_empty :: Reader.empty
+
+// Compatibility: package names.
+reader_make :: Reader.make
+reader_reset :: Reader.reset
+reader_free :: Reader.free
+reader_from_string :: Reader.from_string
+reader_get_buffered :: Reader.get_buffered
+reader_ensure_buffered :: Reader.ensure_buffered
+reader_empty :: Reader.empty
+read_all :: Reader.read_all
+read_byte :: Reader.read_byte
+unread_byte :: Reader.unread_byte
+read_bytes :: Reader.read_bytes
+read_string :: Reader.read_string
+read_fill_buffer :: Reader.read_fill_buffer
+read_u16_le :: Reader.read_u16_le
+read_u16_be :: Reader.read_u16_be
+read_u32_le :: Reader.read_u32_le
+read_u32_be :: Reader.read_u32_be
+read_u64_le :: Reader.read_u64_le
+read_u64_be :: Reader.read_u64_be
+read_i16_le :: Reader.read_i16_le
+read_i16_be :: Reader.read_i16_be
+read_i32_le :: Reader.read_i32_le
+read_i32_be :: Reader.read_i32_be
+read_i64_le :: Reader.read_i64_le
+read_i64_be :: Reader.read_i64_be
+read_i32 :: Reader.read_i32
+read_i64 :: Reader.read_i64
+read_u32 :: Reader.read_u32
+read_u64 :: Reader.read_u64
+read_line :: Reader.read_line
+read_word :: Reader.read_word
+read_until :: Reader.read_until
+peek_byte :: Reader.peek_byte
+peek_bytes :: Reader.peek_bytes
+advance_line :: Reader.advance_line
+skip_whitespace :: Reader.skip_whitespace
+skip_bytes :: Reader.skip_bytes
+lines :: Reader.lines

@@ -35,7 +35,10 @@ Timestamp.as_date :: (t: Timestamp) -> Date {
     return Date.make(t.year + 1900, t.mon + 1, t.mday);
 }
 
-Timestamp.to_epoch :: to_epoch
+Timestamp.to_epoch  :: to_epoch
+Timestamp.parse     :: strptime
+Timestamp.localtime :: localtime
+Timestamp.gmtime    :: gmtime
 
 /// Formats a timestamp into a string.
 Timestamp.format :: (t: Timestamp, format := "%Y-%m-%d %H:%M:%S") -> str {
@@ -57,7 +60,7 @@ Timestamp.format :: (t: Timestamp, format := "%Y-%m-%d %H:%M:%S") -> str {
 }
 
 /// Returns the current system time at UTC-0.
-now :: () -> Timestamp {
+Timestamp.now :: () -> Timestamp {
     current_time: i64;
     #if runtime.platform.Supports_Time {
         current_time = runtime.platform.__time();
@@ -70,6 +73,8 @@ now :: () -> Timestamp {
     // returns milliseconds.
     return gmtime(current_time / 1000);
 }
+
+now :: Timestamp.now
 
 to_epoch :: tm_to_time
 
