@@ -1,0 +1,14 @@
+use core {*}
+
+Nested :: (f: (i32) -> (i32) -> i32, x: i32, y: i32) -> i32 {
+    return f(x)(y)
+}
+
+add :: (a: i32) -> (i32) -> i32 {
+    return (b: i32) use (a) => a + b
+}
+
+main :: () {
+    println(Nested(add, 10, 20))
+    println(add(3)(4))
+}

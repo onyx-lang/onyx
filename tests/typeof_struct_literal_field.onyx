@@ -6,4 +6,6 @@ main :: () {
     printf("{}\n", typeof Point.{}.x)
     printf("{}\n", typeof Point.{ 3, 4 }.y)
     printf("{}\n", Point.{ 8, 9 }.x)
+    printf("{}\n", (.[ 10, 20, 30 ])[1])
+    printf("{}\n", .[ 10, 20, 30 ][0])
 }

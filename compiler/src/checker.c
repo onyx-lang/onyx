@@ -2495,6 +2495,13 @@ CHECK_FUNC(subscript, AstSubscript** psub) {
     CHECK(expression, &sub->addr);
     CHECK(expression, &sub->expr);
 
+    if (sub->addr->type == NULL) {
+        // Untyped `.[ 10, 20, 30 ]` has no destination type. Infer
+        // `[N] T` from the elements so `(.[ 10, 20, 30 ])[1]` works
+        // without locking the literal to i32 in other contexts
+        // (`return .[4, 7]` as `[2] f32` still type-checks).
+        resolve_expression_type(context, sub->addr);
+    }
     if (sub->addr->type == NULL) YIELD(sub->token->pos, "Waiting to know type of left-hand side of subscript.");
 
     // NOTE: Try operator overloading before checking everything else.

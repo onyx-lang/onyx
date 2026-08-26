@@ -2447,6 +2447,23 @@ static AstType* parse_return_type(OnyxParser* parser, bh_arr(AstLocal *) *pimpli
     b32 values_are_named = 0;
     OnyxToken *last_named_value = NULL;
 
+    // `(i32) -> i32` is a function type, not a parenthesized return.
+    // Right-associative: (A) -> (B) -> C  means  (A) -> ((B) -> C).
+    if (parser->curr->type == '(') {
+        OnyxToken *matching = find_matching_paren(parser->curr);
+        if (matching) {
+            OnyxToken *after = matching + 1;
+            while (after->type == Token_Type_Comment
+                || after->type == Token_Type_Doc_Comment
+                || after->type == Token_Type_Inserted_Semicolon) {
+                after++;
+            }
+            if (after->type == Token_Type_Right_Arrow) {
+                return parse_type(parser);
+            }
+        }
+    }
+
     if (!consume_token_if_next(parser, '(')) {
         return parse_type(parser);
     }
