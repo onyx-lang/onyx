@@ -941,6 +941,7 @@ BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc);
 u64 bh_time_curr();
 u64 bh_time_curr_micro();
 u64 bh_time_duration(u64 old);
+u64 bh_time_monotonic_ns();
 
 
 
@@ -3356,6 +3357,32 @@ u64 bh_time_curr() {
 u64 bh_time_duration(u64 old) {
     u64 curr = bh_time_curr();
     return curr - old;
+}
+
+u64 bh_time_monotonic_ns() {
+#if defined(_BH_WINDOWS)
+    static LARGE_INTEGER freq;
+    static int inited = 0;
+    if (!inited) {
+        QueryPerformanceFrequency(&freq);
+        inited = 1;
+    }
+
+    LARGE_INTEGER counter;
+    QueryPerformanceCounter(&counter);
+    u64 q = (u64) counter.QuadPart;
+    u64 f = (u64) freq.QuadPart;
+    if (f == 0) return 0;
+    return (q / f) * 1000000000ULL + ((q % f) * 1000000000ULL) / f;
+
+#elif defined(_BH_LINUX) || defined(_BH_DARWIN)
+    struct timespec spec;
+    clock_gettime(CLOCK_MONOTONIC, &spec);
+    return (u64) spec.tv_sec * 1000000000ULL + (u64) spec.tv_nsec;
+
+#else
+    return bh_time_curr() * 1000000ULL;
+#endif
 }
 
 #endif // ifdef BH_DEFINE

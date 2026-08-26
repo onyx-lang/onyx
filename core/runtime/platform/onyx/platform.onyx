@@ -93,6 +93,7 @@ ProcessData :: #distinct u64
 
     // Time and sleep
     __time :: () -> u64 ---
+    __monotonic :: () -> i64 ---
 
     // Processes
     __process_spawn   :: (path: str, args: [] str, env: [&] cptr(u8), opts: &os.ProcessSpawnOpts) -> ProcessData ---

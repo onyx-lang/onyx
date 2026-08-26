@@ -146,6 +146,14 @@ __time :: () -> i64 {
     return time / 1000000;
 }
 
+__monotonic :: () -> i64 {
+    time: Timestamp;
+    if clock_time_get(.Monotonic, 1, &time) != .Success {
+        return 0;
+    }
+    return ~~time;
+}
+
 __random_get :: (buf: [] u8) {
     random_get(buf.data, buf.length);
 }

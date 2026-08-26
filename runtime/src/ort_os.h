@@ -53,6 +53,11 @@ ONYX_DEF(__time, (), (WASM_I64)) {
     return NULL;
 }
 
+ONYX_DEF(__monotonic, (), (WASM_I64)) {
+    results->data[0] = WASM_I64_VAL((i64) bh_time_monotonic_ns());
+    return NULL;
+}
+
 // ([] PollDescription, timeout: i32) -> void
 // PollDescription :: struct { fd: i64; in_event: PollEvent; out_event: PollEvent; }
 ONYX_DEF(__poll, (WASM_I32, WASM_I32, WASM_I32), ()) {

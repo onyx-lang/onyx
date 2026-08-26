@@ -1,0 +1,267 @@
+package core.time
+
+use core
+use core.string
+use core.conv
+use runtime
+
+/// A UTC instant, stored as nanoseconds since 1970-01-01T00:00:00Z.
+/// Sub-millisecond digits from `now` are zero: the platform clock is milliseconds.
+Instant :: #distinct i64
+
+Instant.from_unix    :: (seconds: i64) -> Instant { return ~~(seconds * 1000000000); }
+Instant.from_unix_ms :: (ms: i64) -> Instant { return ~~(ms * 1000000); }
+Instant.from_unix_ns :: (ns: i64) -> Instant { return ~~ns; }
+
+Instant.to_unix    :: (i: Instant) -> i64 { return cast(i64) i / 1000000000; }
+Instant.to_unix_ms :: (i: Instant) -> i64 { return cast(i64) i / 1000000; }
+Instant.to_unix_ns :: (i: Instant) -> i64 { return cast(i64) i; }
+
+/// Current UTC wall time.
+Instant.now :: () -> Instant {
+    #if runtime.platform.Supports_Time {
+        return Instant.from_unix_ms(cast(i64) runtime.platform.__time());
+    } else {
+        return Instant.from_unix_ns(0);
+    }
+}
+
+Instant.from_timestamp :: (t: Timestamp) -> Instant {
+    return Instant.from_unix(t->to_epoch());
+}
+
+Instant.to_timestamp :: (i: Instant) -> Timestamp {
+    return gmtime(i->to_unix());
+}
+
+Timestamp.add :: (t: Timestamp, d: Duration) -> Timestamp {
+    return Instant.from_timestamp(t)->add(d)->to_timestamp();
+}
+
+#operator + (t: Timestamp, d: Duration) -> Timestamp { return t->add(d); }
+#operator - (t: Timestamp, d: Duration) -> Timestamp {
+    return t->add(~~(-cast(i64) d));
+}
+
+#operator == (a, b: Timestamp) =>
+    a.year == b.year && a.mon == b.mon && a.mday == b.mday &&
+    a.hour == b.hour && a.min == b.min && a.sec == b.sec
+
+#operator != (a, b: Timestamp) => !(a == b)
+
+Instant.add :: (i: Instant, d: Duration) -> Instant {
+    return ~~(cast(i64) i + cast(i64) d);
+}
+
+Instant.sub :: (i: Instant, d: Duration) -> Instant {
+    return ~~(cast(i64) i - cast(i64) d);
+}
+
+Instant.since :: (start: Instant) -> Duration {
+    return Instant.now() - start;
+}
+
+/// RFC 3339 / ISO 8601 UTC, e.g. `2023-11-14T22:13:20Z`.
+/// Fractional seconds are omitted when they are zero.
+Instant.format_rfc3339 :: (i: Instant, allocator := context.allocator) -> str {
+    t := i->to_timestamp();
+    frac := i->to_unix_ns() - i->to_unix() * 1000000000;
+    if frac < 0 do frac += 1000000000;
+
+    buf: [48] u8;
+    n := 0;
+
+    append_w2 :: (b: [] u8, p: &i32, v: i32) {
+        b[*p] = cast(u8) ('0' + v / 10);
+        b[*p + 1] = cast(u8) ('0' + v % 10);
+        *p += 2;
+    }
+
+    append_w4 :: (b: [] u8, p: &i32, v: i32) {
+        b[*p]     = cast(u8) ('0' + (v / 1000) % 10);
+        b[*p + 1] = cast(u8) ('0' + (v / 100) % 10);
+        b[*p + 2] = cast(u8) ('0' + (v / 10) % 10);
+        b[*p + 3] = cast(u8) ('0' + v % 10);
+        *p += 4;
+    }
+
+    year := t.year + 1900;
+    if year < 0 || year > 9999 {
+        return string.copy("", allocator);
+    }
+
+    append_w4(buf, &n, year);
+    buf[n] = '-'; n += 1;
+    append_w2(buf, &n, t.mon + 1);
+    buf[n] = '-'; n += 1;
+    append_w2(buf, &n, t.mday);
+    buf[n] = 'T'; n += 1;
+    append_w2(buf, &n, t.hour);
+    buf[n] = ':'; n += 1;
+    append_w2(buf, &n, t.min);
+    buf[n] = ':'; n += 1;
+    append_w2(buf, &n, t.sec);
+
+    if frac != 0 {
+        buf[n] = '.'; n += 1;
+        scale: i64 = 100000000;
+        while scale > 0 && frac != 0 {
+            digit := frac / scale;
+            buf[n] = cast(u8) ('0' + cast(i32) digit);
+            n += 1;
+            frac -= digit * scale;
+            scale /= 10;
+        }
+    }
+
+    buf[n] = 'Z'; n += 1;
+    return string.copy(buf[0 .. n], allocator);
+}
+
+/// Parses RFC 3339 / ISO 8601. Accepts `Z`, `+HH:MM`, `-HH:MM`, and a space instead of `T`.
+Instant.parse_rfc3339 :: (s: str) -> ? Instant {
+    buf := s;
+    year, month, day, hour, min, sec: i32;
+    frac_ns: i64 = 0;
+
+    if !parse_n(&buf, 4, &year) do return .None;
+    if !expect(&buf, '-') do return .None;
+    if !parse_n(&buf, 2, &month) do return .None;
+    if !expect(&buf, '-') do return .None;
+    if !parse_n(&buf, 2, &day) do return .None;
+
+    if buf.count == 0 do return .None;
+    sep := buf[0];
+    if sep != 'T' && sep != 't' && sep != ' ' do return .None;
+    string.advance(&buf, 1);
+
+    if !parse_n(&buf, 2, &hour) do return .None;
+    if !expect(&buf, ':') do return .None;
+    if !parse_n(&buf, 2, &min) do return .None;
+    if !expect(&buf, ':') do return .None;
+    if !parse_n(&buf, 2, &sec) do return .None;
+
+    if buf.count > 0 && buf[0] == '.' {
+        string.advance(&buf, 1);
+        digits := 0;
+        while buf.count > 0 && buf[0] >= '0' && buf[0] <= '9' && digits < 9 {
+            frac_ns = frac_ns * 10 + cast(i64) (buf[0] - '0');
+            digits += 1;
+            string.advance(&buf, 1);
+        }
+        while digits < 9 {
+            frac_ns *= 10;
+            digits += 1;
+        }
+        while buf.count > 0 && buf[0] >= '0' && buf[0] <= '9' {
+            string.advance(&buf, 1);
+        }
+    }
+
+    if month < 1 || month > 12 do return .None;
+    if day < 1 || day > 31 do return .None;
+    if hour > 23 || min > 59 || sec > 60 do return .None;
+
+    t: Timestamp;
+    t.year = year - 1900;
+    t.mon  = month - 1;
+    t.mday = day;
+    t.hour = hour;
+    t.min  = min;
+    t.sec  = sec;
+    unix := t->to_epoch();
+
+    if buf.count == 0 do return .None;
+
+    if buf[0] == 'Z' || buf[0] == 'z' {
+        string.advance(&buf, 1);
+    } else {
+        sign := 1;
+        if buf[0] == '+' {
+            sign = 1;
+        } elseif buf[0] == '-' {
+            sign = -1;
+        } else {
+            return .None;
+        }
+        string.advance(&buf, 1);
+
+        oh, om: i32;
+        if !parse_n(&buf, 2, &oh) do return .None;
+        if buf.count > 0 && buf[0] == ':' do string.advance(&buf, 1);
+        if !parse_n(&buf, 2, &om) do return .None;
+        if oh > 23 || om > 59 do return .None;
+
+        unix -= cast(i64) sign * (cast(i64) oh * 3600 + cast(i64) om * 60);
+    }
+
+    if buf.count != 0 do return .None;
+
+    return Instant.from_unix_ns(unix * 1000000000 + frac_ns);
+
+    parse_n :: (buf: &str, n: i32, out: &i32) -> bool {
+        if buf.count < n do return false;
+        v := 0;
+        for n {
+            c := buf.data[it];
+            if c < '0' || c > '9' do return false;
+            v = v * 10 + cast(i32) (c - '0');
+        }
+        string.advance(buf, n);
+        *out = v;
+        return true;
+    }
+
+    expect :: (buf: &str, c: u8) -> bool {
+        if buf.count == 0 || (*buf)[0] != c do return false;
+        string.advance(buf, 1);
+        return true;
+    }
+}
+
+#operator + (i: Instant, d: Duration) -> Instant { return Instant.add(i, d); }
+#operator - (i: Instant, d: Duration) -> Instant { return Instant.sub(i, d); }
+#operator - (a, b: Instant) -> Duration { return ~~(cast(i64) a - cast(i64) b); }
+
+#operator == (a, b: Instant) => cast(i64) a == cast(i64) b
+#operator != (a, b: Instant) => cast(i64) a != cast(i64) b
+#operator <  (a, b: Instant) => cast(i64) a <  cast(i64) b
+#operator <= (a, b: Instant) => cast(i64) a <= cast(i64) b
+#operator >  (a, b: Instant) => cast(i64) a >  cast(i64) b
+#operator >= (a, b: Instant) => cast(i64) a >= cast(i64) b
+
+@conv.Custom_Format_Proc.{ Instant }
+(output: &conv.Format_Output, _: &conv.Format, i: &Instant) {
+    s := Instant.format_rfc3339(*i, context.temp_allocator);
+    output->write(s);
+}
+
+@conv.Custom_Parse_Proc.{ Instant }
+(i: &Instant, data: str, _: Allocator) -> bool {
+    v := Instant.parse_rfc3339(data);
+    if v == .None do return false;
+    *i = v!;
+    return true;
+}
+
+
+/// A monotonic clock reading, nanoseconds. Only differences are meaningful.
+/// Not comparable to `Instant`. On JS this currently follows the wall clock.
+Mono :: #distinct i64
+
+Mono.now :: () -> Mono {
+    return ~~runtime.platform.__monotonic();
+}
+
+Mono.since :: (start: Mono) -> Duration {
+    return Mono.now() - start;
+}
+
+#operator - (a, b: Mono) -> Duration { return ~~(cast(i64) a - cast(i64) b); }
+
+#operator == (a, b: Mono) => cast(i64) a == cast(i64) b
+#operator != (a, b: Mono) => cast(i64) a != cast(i64) b
+#operator <  (a, b: Mono) => cast(i64) a <  cast(i64) b
+#operator <= (a, b: Mono) => cast(i64) a <= cast(i64) b
+#operator >  (a, b: Mono) => cast(i64) a >  cast(i64) b
+#operator >= (a, b: Mono) => cast(i64) a >= cast(i64) b

@@ -1,0 +1,75 @@
+use core {*}
+use core.time { Duration, Instant, Mono, Timestamp, Date, SECOND, MILLISECOND, NANOSECOND, gmtime, strftime }
+
+// @leak-check
+
+main :: () {
+    d := 2 * SECOND + 500 * MILLISECOND;
+    println(d->as_ms());
+    println((d - SECOND)->as_ms());
+    println((d / MILLISECOND));
+    println((d->abs())->as_ms());
+
+    epoch := Instant.from_unix(0);
+    s := epoch->format_rfc3339();
+    defer str.free(s);
+    println(s);
+
+    parsed := Instant.parse_rfc3339("1970-01-01T00:00:00Z") ?? Instant.from_unix(-1);
+    println(parsed == epoch);
+    println(Instant.parse_rfc3339("1970-01-01T01:00:00+01:00") ?? Instant.from_unix(-1) == epoch);
+    println(Instant.parse_rfc3339("1969-12-31T23:00:00-01:00") ?? Instant.from_unix(-1) == epoch);
+
+    frac := Instant.parse_rfc3339("1970-01-01T00:00:00.5Z") ?? Instant.from_unix(-1);
+    println(frac->to_unix_ns());
+
+    t0 := gmtime(0);
+    println(t0.year);
+    println(t0.mon);
+    println(t0.mday);
+    println(t0.hour);
+    println(t0.wday);
+    println(t0->to_epoch());
+
+    tneg := gmtime(-86400);
+    println(tneg.year);
+    println(tneg.mon);
+    println(tneg.mday);
+    println(tneg->to_epoch());
+
+    t: Timestamp = .{
+        year = 70, mon = 0, mday = 1,
+        hour = 15, min = 37, sec = 40, wday = 2,
+    };
+    tbuf: [16] u8;
+    println(strftime(tbuf, "%T", &t));
+    println(strftime(tbuf, "%R", &t));
+
+    tp := Timestamp.parse("15:37:40", "%T") ?? .{};
+    println(tp.hour);
+    println(tp.min);
+    println(tp.sec);
+
+    jan31 := Date.make(2023, 1, 31);
+    feb := jan31->add_months(1);
+    println(feb);
+    leap := Date.make(2024, 1, 31)->add_months(1);
+    println(leap);
+    println(Date.days_between(Date.make(1970, 1, 1), Date.make(1970, 1, 2)));
+    println(Date.make(1970, 1, 2) - Date.make(1970, 1, 1));
+    println(conv.parse(Date, "2024-02-31") == .None);
+    println(conv.parse(Date, "2024-02-29") == .None);
+    println(Date.is_leap_year(2024));
+    println(Date.is_leap_year(2023));
+
+    later := epoch + 2 * SECOND;
+    println((later - epoch)->as_s());
+    println(later > epoch);
+
+    m0 := Mono.now();
+    m1 := Mono.now();
+    println(m1 >= m0);
+
+    println(Instant.now() > epoch);
+    println("ok");
+}

@@ -60,8 +60,10 @@ use runtime
 
 #load "./test/testing"
 
+#load "./time/duration"
 #load "./time/time"
 #load "./time/date"
+#load "./time/instant"
 
 #load "./misc/arg_parse"
 #load "./misc/method_ops"

@@ -12,14 +12,15 @@ Date :: struct {
 #local
 _month_durations := u32.[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
+Date.is_leap_year :: (year: i32) -> bool {
+    return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+}
+
 Date.month_duration_in_days :: (year: i32, month: i32) => {
     d := _month_durations[month];
 
-    // February leap year case
-    if month == 1 {
-        if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) {
-            d += 1;
-        }
+    if month == 1 && Date.is_leap_year(year) {
+        d += 1;
     }
 
     return d;
@@ -47,6 +48,9 @@ Date.add_months :: (d: Date, months: i32) -> Date {
         nd.month += 12;
         nd.year -= 1;
     }
+
+    max_day := Date.month_duration_in_days(nd.year, nd.month);
+    if nd.day > max_day do nd.day = max_day;
 
     return nd;
 }
@@ -128,6 +132,12 @@ Date.end_of_month :: (d: Date) -> Date {
     };
 }
 
+Date.days_between :: (from, to: Date) -> i32 {
+    a: Timestamp = .{ year = from.year - 1900, mon = from.month, mday = from.day };
+    b: Timestamp = .{ year = to.year - 1900, mon = to.month, mday = to.day };
+    return ~~((b->to_epoch() - a->to_epoch()) / 86400);
+}
+
 Date.is_before :: (d1, d2: Date) -> bool {
     if d1.year  != d2.year  do return d1.year  < d2.year;
     if d1.month != d2.month do return d1.month < d2.month;
@@ -151,10 +161,18 @@ Date.is_after :: (d1, d2: Date) -> bool {
     month, t~ := string.bisect(t,    '-');
     day,   t~ := string.bisect(t,    '-');
 
-    d.year  = ~~  conv.str_to_i64(year);
-    d.month = ~~ (conv.str_to_i64(month) - 1);
-    d.day   = ~~  conv.str_to_i64(day);
+    if year.count == 0 || month.count == 0 || day.count == 0 do return false;
 
+    y  := conv.str_to_i64(year);
+    m  := conv.str_to_i64(month);
+    dd := conv.str_to_i64(day);
+
+    if m < 1 || m > 12 do return false;
+    if dd < 1 || dd > cast(i64) Date.month_duration_in_days(~~y, ~~(m - 1)) do return false;
+
+    d.year  = ~~y;
+    d.month = ~~(m - 1);
+    d.day   = ~~dd;
     return true;
 }
 
@@ -166,4 +184,8 @@ Date.is_after :: (d1, d2: Date) -> bool {
     d1.year == d2.year &&
     d1.month == d2.month &&
     d1.day == d2.day;
+
+#operator != (d1, d2: Date) => !(d1 == d2);
+
+#operator - (a, b: Date) -> i32 { return Date.days_between(b, a); }
 

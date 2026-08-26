@@ -1,0 +1,73 @@
+package core.time
+
+use core
+use core.conv
+use runtime
+
+/// A span of time, stored as nanoseconds. Can be negative.
+Duration :: #distinct i64
+
+Duration.from_ns :: (n: i64) -> Duration { return ~~n; }
+Duration.from_us :: (n: i64) -> Duration { return ~~(n * 1000); }
+Duration.from_ms :: (n: i64) -> Duration { return ~~(n * 1000000); }
+Duration.from_s  :: (n: i64) -> Duration { return ~~(n * 1000000000); }
+Duration.from_min :: (n: i64) -> Duration { return ~~(n * 60000000000); }
+Duration.from_hour :: (n: i64) -> Duration { return ~~(n * 3600000000000); }
+
+Duration.as_ns  :: (d: Duration) -> i64 { return cast(i64) d; }
+Duration.as_us  :: (d: Duration) -> i64 { return cast(i64) d / 1000; }
+Duration.as_ms  :: (d: Duration) -> i64 { return cast(i64) d / 1000000; }
+Duration.as_s   :: (d: Duration) -> i64 { return cast(i64) d / 1000000000; }
+Duration.as_s_f :: (d: Duration) -> f64 { return cast(f64, cast(i64) d) / 1000000000.0; }
+
+Duration.abs :: (d: Duration) -> Duration {
+    n := cast(i64) d;
+    if n < 0 do n = -n;
+    return ~~n;
+}
+
+/// Sleeps for `d`. Truncates to milliseconds. No-op if the platform has no sleep.
+Duration.sleep :: (d: Duration) {
+    sleep(d);
+}
+
+NANOSECOND  :: Duration.from_ns(1)
+MICROSECOND :: Duration.from_us(1)
+MILLISECOND :: Duration.from_ms(1)
+SECOND      :: Duration.from_s(1)
+MINUTE      :: Duration.from_min(1)
+HOUR        :: Duration.from_hour(1)
+
+#operator + (a, b: Duration) -> Duration { return ~~(cast(i64) a + cast(i64) b); }
+#operator - (a, b: Duration) -> Duration { return ~~(cast(i64) a - cast(i64) b); }
+#operator * (d: Duration, n: i64) -> Duration { return ~~(cast(i64) d * n); }
+#operator * (n: i64, d: Duration) -> Duration { return ~~(n * cast(i64) d); }
+#operator / (d: Duration, n: i64) -> Duration { return ~~(cast(i64) d / n); }
+#operator / (a, b: Duration) -> i64 { return cast(i64) a / cast(i64) b; }
+
+#operator == (a, b: Duration) => cast(i64) a == cast(i64) b
+#operator != (a, b: Duration) => cast(i64) a != cast(i64) b
+#operator <  (a, b: Duration) => cast(i64) a <  cast(i64) b
+#operator <= (a, b: Duration) => cast(i64) a <= cast(i64) b
+#operator >  (a, b: Duration) => cast(i64) a >  cast(i64) b
+#operator >= (a, b: Duration) => cast(i64) a >= cast(i64) b
+
+@conv.Custom_Format_Proc.{ Duration }
+(output: &conv.Format_Output, _: &conv.Format, d: &Duration) {
+    n := cast(i64) *d;
+    if n % 1000000 == 0 {
+        conv.format(output, "{}ms", n / 1000000);
+    } else {
+        conv.format(output, "{}ns", n);
+    }
+}
+
+/// Sleeps for `d`. Uses `os.sleep` when the platform provides it.
+sleep :: (d: Duration) {
+    #if #defined(runtime.platform.__sleep) {
+        ms := d->as_ms();
+        if ms < 0 do ms = 0;
+        if ms > 0x7fffffff do ms = 0x7fffffff;
+        runtime.platform.__sleep(cast(i32) ms);
+    }
+}
