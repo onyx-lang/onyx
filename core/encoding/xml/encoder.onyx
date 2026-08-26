@@ -1,0 +1,459 @@
+package core.encoding.xml
+#allow_stale_code
+
+use core {io, string, tprintf, misc, memory, Result}
+use core.array {Untyped_Array}
+use runtime.info {*}
+
+write :: (doc: &Document, w: &io.Writer, indent := 0) {
+    if doc.doctype.name.count > 0 {
+        write_doctype(doc, w);
+        if indent > 0 do io.write_byte(w, '\n');
+    }
+    if doc.elements.count == 0 do return;
+    write_element(doc, w, 0, indent, 0);
+}
+
+Document.write :: write
+
+write_string :: (doc: &Document, allocator := context.allocator, indent := 0) -> str {
+    stream := io.buffer_stream_make(256);
+    writer := io.writer_make(&stream, 0);
+    defer io.buffer_stream_free(&stream);
+
+    write(doc, &writer, indent);
+    return string.copy(io.buffer_stream_to_str(&stream), allocator);
+}
+
+Document.write_string :: write_string
+
+#local
+write_doctype :: (doc: &Document, w: &io.Writer) {
+    io.write(w, "<!DOCTYPE ");
+    io.write(w, doc.doctype.name);
+    if doc.doctype.public_id.count > 0 {
+        io.write(w, " PUBLIC \"");
+        write_escaped(w, doc.doctype.public_id, true);
+        io.write(w, "\" \"");
+        write_escaped(w, doc.doctype.system_id, true);
+        io.write(w, "\"");
+    } elseif doc.doctype.system_id.count > 0 {
+        io.write(w, " SYSTEM \"");
+        write_escaped(w, doc.doctype.system_id, true);
+        io.write(w, "\"");
+    }
+    if doc.doctype.internal_subset.count > 0 {
+        io.write(w, " [");
+        io.write(w, doc.doctype.internal_subset);
+        io.write(w, "]");
+    }
+    io.write(w, ">");
+}
+
+#local
+write_nl_indent :: (w: &io.Writer, indent: i32, depth: i32) {
+    if indent <= 0 do return;
+    io.write_byte(w, '\n');
+    n := indent * depth;
+    while n > 0 {
+        io.write_byte(w, ' ');
+        n -= 1;
+    }
+}
+
+#local
+has_element_child :: (el: &Element) -> bool {
+    for c in el.children {
+        if c.Element do return true;
+    }
+    return false;
+}
+
+#local
+write_escaped :: (w: &io.Writer, s: str, attr: bool) {
+    for c in s {
+        switch c {
+            case '&'  do io.write(w, "&amp;");
+            case '<'  do io.write(w, "&lt;");
+            case '>'  do io.write(w, "&gt;");
+            case '"' {
+                if attr do io.write(w, "&quot;");
+                else     do io.write_byte(w, c);
+            }
+            case '\'' {
+                if attr do io.write(w, "&apos;");
+                else     do io.write_byte(w, c);
+            }
+            case _ do io.write_byte(w, c);
+        }
+    }
+}
+
+#local
+write_element :: (doc: &Document, w: &io.Writer, idx: Element.Index, indent: i32, depth: i32) {
+    el := &doc.elements[idx];
+
+    io.write_byte(w, '<');
+    io.write(w, el.name);
+    for attr in el.attributes {
+        io.write_byte(w, ' ');
+        io.write(w, attr.key);
+        io.write(w, "=\"");
+        write_escaped(w, attr.value, true);
+        io.write_byte(w, '"');
+    }
+
+    if el.children.count == 0 {
+        io.write(w, "/>");
+        return;
+    }
+
+    io.write_byte(w, '>');
+
+    pretty := indent > 0 && has_element_child(el);
+    for c in el.children {
+        if pretty do write_nl_indent(w, indent, depth + 1);
+        switch c {
+            case .Text as t do write_escaped(w, t, false);
+            case .Element as e do write_element(doc, w, e, indent, depth + 1);
+        }
+    }
+
+    if pretty do write_nl_indent(w, indent, depth);
+    io.write(w, "</");
+    io.write(w, el.name);
+    io.write_byte(w, '>');
+}
+
+encode :: #match #local {}
+
+#overload #order 100
+encode :: (w: &io.Writer, doc: &Document, indent := 0) -> Error {
+    write(doc, w, indent)
+    return .{}
+}
+
+#overload
+encode :: (w: &io.Writer, v: $T, indent := 0) -> Error {
+    local := v
+    return encode_any(w, any.{&local, T}, indent, 0)
+}
+
+encode_string :: #match #local {}
+
+#overload #order 100
+encode_string :: (doc: &Document, allocator := context.allocator, indent := 0) -> Result(str, Error) {
+    return .{ Ok = write_string(doc, allocator, indent) }
+}
+
+#overload
+encode_string :: (v: $T, allocator := context.allocator, indent := 0) -> Result(str, Error) {
+    stream := io.buffer_stream_make(256)
+    writer := io.writer_make(&stream, 0)
+    defer io.buffer_stream_free(&stream)
+
+    err := encode(&writer, v, indent)
+    if err.kind != .None do return .{ Err = err }
+
+    return .{ Ok = string.copy(io.buffer_stream_to_str(&stream), allocator) }
+}
+
+#local
+Enc_Field_Mode :: enum {
+    Child
+    Attr
+    Text
+    Ignore
+}
+
+#local
+Enc_Field_Spec :: struct {
+    mode: Enc_Field_Mode
+    name: str
+    space: str
+}
+
+#local
+enc_spec :: (member: &Type_Info_Struct.Member) -> Enc_Field_Spec {
+    spec := Enc_Field_Spec.{ mode = .Child, name = member.name, space = "" }
+
+    for tag in member.tags {
+        if tag.type == Name {
+            n := *cast(^Name) tag.data
+            if n.name.count > 0 do spec.name = n.name
+            spec.space = n.space
+        } elseif tag.type == Attr {
+            spec.mode = .Attr
+            a := *cast(^Attr) tag.data
+            if a.name.count > 0 do spec.name = a.name
+        } elseif tag.type == type_expr {
+            t := *cast(^type_expr) tag.data
+            if t == Text   do spec.mode = .Text
+            if t == Ignore do spec.mode = .Ignore
+        }
+    }
+
+    return spec
+}
+
+#local
+struct_xml_name :: (info: &Type_Info_Struct) -> Name {
+    for tag in info.tags {
+        if tag.type == Name {
+            n := *cast(^Name) tag.data
+            if n.name.count > 0 do return n
+            return .{ name = info.name, space = n.space }
+        }
+    }
+    return .{ name = info.name }
+}
+
+#local
+optional_parts :: (data: any) -> (value: any, is_opt: bool, some: bool) {
+    if !union_constructed_from(data.type, Optional) {
+        return data, false, true
+    }
+
+    u := get_type_info(data.type)->as_union()
+    tag := *cast(&Optional(void).tag_enum) data.data
+    val := misc.any_member(data, u.variants[1].type, u.alignment)
+    return val, true, tag == .Some
+}
+
+#local
+encode_any :: (w: &io.Writer, data: any, indent: i32, depth: i32) -> Error {
+    info := get_type_info(data.type)
+
+    if info.kind == .Pointer {
+        return encode_any(w, misc.any_dereference(data), indent, depth)
+    }
+
+    if info.kind == .Distinct {
+        d := cast(^Type_Info_Distinct) info
+        return encode_any(w, any.{ data.data, d.base_type }, indent, depth)
+    }
+
+    if info.kind != .Struct {
+        return .{ kind = .Unsupported_Type, msg = tprintf("xml.encode requires a struct, got {}", data.type) }
+    }
+
+    s := cast(^Type_Info_Struct) info
+    n := struct_xml_name(s)
+    return write_struct_element(w, data, n.name, n.space, indent, depth)
+}
+
+#local
+write_struct_element :: (w: &io.Writer, data: any, name: str, space: str, indent: i32, depth: i32) -> Error {
+    s := cast(^Type_Info_Struct) get_type_info(data.type)
+
+    io.write_byte(w, '<')
+    io.write(w, name)
+    if space.count > 0 {
+        io.write(w, " xmlns=\"")
+        write_escaped(w, space, true)
+        io.write_byte(w, '"')
+    }
+
+    for^ member in s.members {
+        spec := enc_spec(member)
+        if spec.mode != .Attr do continue
+
+        field := misc.any_member(data, member)
+        aval, aopt, asome := optional_parts(field)
+        if !asome do continue
+
+        io.write_byte(w, ' ')
+        io.write(w, spec.name)
+        io.write(w, "=\"")
+        if err := write_scalar(w, aval, true); err.kind != .None do return err
+        io.write_byte(w, '"')
+    }
+
+    if !struct_has_body(data) {
+        io.write(w, "/>")
+        return .{}
+    }
+
+    io.write_byte(w, '>')
+
+    pretty := indent > 0 && struct_has_element_child(data)
+    for^ member in s.members {
+        spec := enc_spec(member)
+        if spec.mode == .Ignore || spec.mode == .Attr do continue
+
+        field := misc.any_member(data, member)
+        cval, copt, csome := optional_parts(field)
+        if !csome do continue
+
+        if spec.mode == .Text {
+            if err := write_scalar(w, cval, false); err.kind != .None do return err
+            continue
+        }
+
+        if err := write_child_field(w, cval, spec, indent, depth, pretty); err.kind != .None do return err
+    }
+
+    if pretty do write_nl_indent(w, indent, depth)
+    io.write(w, "</")
+    io.write(w, name)
+    io.write_byte(w, '>')
+    return .{}
+}
+
+#local
+struct_has_body :: (data: any) -> bool {
+    s := cast(^Type_Info_Struct) get_type_info(data.type)
+    for^ member in s.members {
+        spec := enc_spec(member)
+        if spec.mode == .Ignore || spec.mode == .Attr do continue
+
+        field := misc.any_member(data, member)
+        _body, _bopt, bsome := optional_parts(field)
+        if bsome do return true
+    }
+    return false
+}
+
+#local
+struct_has_element_child :: (data: any) -> bool {
+    s := cast(^Type_Info_Struct) get_type_info(data.type)
+    for^ member in s.members {
+        spec := enc_spec(member)
+        if spec.mode != .Child do continue
+
+        field := misc.any_member(data, member)
+        child, _copt, csome := optional_parts(field)
+        if !csome do continue
+
+        info := get_type_info(child.type)
+        if child.type != str && (info.kind == .Dynamic_Array || info.kind == .Slice || info.kind == .Array) {
+            _base, _of, count := enc_as_array(child)
+            if count > 0 do return true
+            continue
+        }
+        return true
+    }
+    return false
+}
+
+#local
+write_child_field :: (w: &io.Writer, data: any, spec: Enc_Field_Spec, indent: i32, depth: i32, pretty: bool) -> Error {
+    info := get_type_info(data.type)
+
+    if data.type != str && (info.kind == .Dynamic_Array || info.kind == .Slice || info.kind == .Array) {
+        base, of, count := enc_as_array(data)
+        i := 0
+        while i < count {
+            elem := any.{ memory.ptr_add(base, size_of(of) * i), of }
+            if pretty do write_nl_indent(w, indent, depth + 1)
+            if err := write_named_value(w, elem, spec.name, spec.space, indent, depth + 1); err.kind != .None do return err
+            i += 1
+        }
+        return .{}
+    }
+
+    if pretty do write_nl_indent(w, indent, depth + 1)
+    return write_named_value(w, data, spec.name, spec.space, indent, depth + 1)
+}
+
+#local
+enc_as_array :: (arr: any) -> (rawptr, type_expr, u32) {
+    info := get_type_info(arr.type)
+
+    switch info.kind {
+        case .Array {
+            a := cast(^Type_Info_Array) info
+            return arr.data, a.of, a.count
+        }
+
+        case .Slice, .Dynamic_Array {
+            a := cast(^Untyped_Array) arr.data
+            return a.data, (cast(^Type_Info_Dynamic_Array) info).of, a.count
+        }
+
+        case _ {
+            return null, void, 0
+        }
+    }
+}
+
+#local
+write_named_value :: (w: &io.Writer, data: any, name: str, space: str, indent: i32, depth: i32) -> Error {
+    info := get_type_info(data.type)
+
+    if info.kind == .Pointer {
+        return write_named_value(w, misc.any_dereference(data), name, space, indent, depth)
+    }
+
+    if info.kind == .Distinct {
+        d := cast(^Type_Info_Distinct) info
+        return write_named_value(w, any.{ data.data, d.base_type }, name, space, indent, depth)
+    }
+
+    if info.kind == .Struct {
+        return write_struct_element(w, data, name, space, indent, depth)
+    }
+
+    io.write_byte(w, '<')
+    io.write(w, name)
+    if space.count > 0 {
+        io.write(w, " xmlns=\"")
+        write_escaped(w, space, true)
+        io.write_byte(w, '"')
+    }
+    io.write_byte(w, '>')
+    if err := write_scalar(w, data, false); err.kind != .None do return err
+    io.write(w, "</")
+    io.write(w, name)
+    io.write_byte(w, '>')
+    return .{}
+}
+
+#local
+write_scalar :: (w: &io.Writer, data: any, attr: bool) -> Error {
+    type := data.type
+    info := get_type_info(type)
+
+    if info.kind == .Distinct {
+        d := cast(^Type_Info_Distinct) info
+        return write_scalar(w, any.{ data.data, d.base_type }, attr)
+    }
+
+    if info.kind == .Enum {
+        einfo := cast(^Type_Info_Enum) info
+        val: u64 = 0
+        if info.size == 1 do val = ~~(*cast(^u8) data.data)
+        elseif info.size == 2 do val = ~~(*cast(^u16) data.data)
+        elseif info.size == 4 do val = ~~(*cast(^u32) data.data)
+        elseif info.size == 8 do val = *cast(^u64) data.data
+        io.write(w, tprintf("{}", val))
+        return .{}
+    }
+
+    switch type {
+        case str {
+            write_escaped(w, *cast(^str) data.data, attr)
+            return .{}
+        }
+        case bool {
+            if *cast(^bool) data.data do io.write(w, "true")
+            else do io.write(w, "false")
+            return .{}
+        }
+        case i8  do io.write(w, tprintf("{}", *cast(^i8)  data.data))
+        case u8  do io.write(w, tprintf("{}", *cast(^u8)  data.data))
+        case i16 do io.write(w, tprintf("{}", *cast(^i16) data.data))
+        case u16 do io.write(w, tprintf("{}", *cast(^u16) data.data))
+        case i32 do io.write(w, tprintf("{}", *cast(^i32) data.data))
+        case u32 do io.write(w, tprintf("{}", *cast(^u32) data.data))
+        case i64 do io.write(w, tprintf("{}", *cast(^i64) data.data))
+        case u64 do io.write(w, tprintf("{}", *cast(^u64) data.data))
+        case f32 do io.write(w, tprintf("{}", *cast(^f32) data.data))
+        case f64 do io.write(w, tprintf("{}", *cast(^f64) data.data))
+        case _ {
+            return .{ kind = .Unsupported_Type, msg = tprintf("cannot encode {} as XML text", type) }
+        }
+    }
+
+    return .{}
+}

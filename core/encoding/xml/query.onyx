@@ -1,0 +1,293 @@
+package core.encoding.xml
+#allow_stale_code
+
+use core {iter}
+
+query :: (doc: &Document, path: str) -> ? Element.Index {
+    it := query_all(doc, path)
+    defer iter.close(it)
+    return iter.next(it)
+}
+
+query_all :: (doc: &Document, path: str) -> Iterator(Element.Index) {
+    matches := make([..] Element.Index)
+    eval_path(doc, path, &matches)
+    return iter.generator(
+        &.{ matches = matches, i = 0 },
+        (c: $C) -> ? Element.Index {
+            if c.i >= c.matches.count do return .None
+            defer c.i += 1
+            return c.matches[c.i]
+        },
+        c => { delete(&c.matches) }
+    )
+}
+
+query_attr :: (doc: &Document, path: str) -> ? str {
+    attr_name: str
+    el_path := strip_attr(path, &attr_name)
+    if attr_name.count == 0 do return .None
+
+    if el_path.count == 0 {
+        if doc.elements.count == 0 do return .None
+        return doc->attr(0, attr_name)
+    }
+
+    el := query(doc, el_path)
+    switch el {
+        case .None do return .None
+        case .Some as idx do return doc->attr(idx, attr_name)
+    }
+}
+
+query_text :: (doc: &Document, path: str) -> ? str {
+    el := query(doc, path)
+    switch el {
+        case .None do return .None
+        case .Some as idx {
+            t := doc->text(idx)
+            if t.count == 0 do return .None
+            return t
+        }
+    }
+}
+
+Document.query      :: query
+Document.query_all  :: query_all
+Document.query_attr :: query_attr
+Document.query_text :: query_text
+
+#local
+Step :: struct {
+    descendant: bool
+    name: str
+    pred_index: i32
+    pred_attr: str
+    pred_value: str
+    pred_eq: bool
+}
+
+#local
+strip_attr :: (path: str, out_name: &str) -> str {
+    *out_name = ""
+    last_slash := -1
+    i := 0
+    while i < path.count {
+        if path[i] == '/' do last_slash = i
+        i += 1
+    }
+
+    if last_slash >= 0 {
+        rest := path[last_slash + 1 .. path.count]
+        if rest.count > 0 && rest[0] == '@' {
+            *out_name = rest[1 .. rest.count]
+            return path[0 .. last_slash]
+        }
+        return path
+    }
+
+    if path.count > 0 && path[0] == '@' {
+        *out_name = path[1 .. path.count]
+        return ""
+    }
+    return path
+}
+
+#local
+eval_path :: (doc: &Document, path: str, out: &[..] Element.Index) {
+    if doc.elements.count == 0 do return
+
+    steps := make([..] Step)
+    defer delete(&steps)
+    if !parse_steps(path, &steps) do return
+    if steps.count == 0 do return
+
+    cur := make([..] Element.Index)
+    defer delete(&cur)
+    nxt := make([..] Element.Index)
+    defer delete(&nxt)
+
+    first := steps[0]
+    if first.descendant {
+        collect_descendants(doc, -1, first.name, &cur)
+    } else {
+        if element_matches(&doc.elements[0], first.name) {
+            cur << 0
+        }
+    }
+    apply_pred(doc, first, &cur)
+
+    i := 1
+    while i < steps.count {
+        step := steps[i]
+        nxt.count = 0
+        for el in cur {
+            if step.descendant {
+                collect_descendants(doc, ~~el, step.name, &nxt)
+            } else {
+                for ch in doc->children(el) {
+                    if element_matches(&doc.elements[ch], step.name) {
+                        nxt << ch
+                    }
+                }
+            }
+        }
+        apply_pred(doc, step, &nxt)
+        tmp := cur
+        cur = nxt
+        nxt = tmp
+        i += 1
+    }
+
+    for el in cur {
+        out->push(el)
+    }
+}
+
+#local
+collect_descendants :: (doc: &Document, from: i32, name: str, out: &[..] Element.Index) {
+    if from < 0 {
+        if element_matches(&doc.elements[0], name) {
+            out->push(0)
+        }
+        walk_desc(doc, 0, name, out)
+        return
+    }
+    walk_desc(doc, ~~from, name, out)
+}
+
+#local
+walk_desc :: (doc: &Document, parent: Element.Index, name: str, out: &[..] Element.Index) {
+    for ch in doc->children(parent) {
+        if element_matches(&doc.elements[ch], name) {
+            out->push(ch)
+        }
+        walk_desc(doc, ch, name, out)
+    }
+}
+
+#local
+apply_pred :: (doc: &Document, step: Step, nodes: &[..] Element.Index) {
+    if step.pred_index > 0 {
+        idx := step.pred_index - 1
+        if idx >= nodes.count {
+            nodes.count = 0
+            return
+        }
+        v := nodes.data[idx]
+        nodes.count = 1
+        nodes.data[0] = v
+        return
+    }
+
+    if step.pred_attr.count == 0 do return
+
+    n := 0
+    for el in *nodes {
+        val := doc->attr(el, step.pred_attr)
+        ok := false
+        switch val {
+            case .None ---
+            case .Some as s {
+                ok = true
+                if step.pred_eq do ok = s == step.pred_value
+            }
+        }
+        if ok {
+            nodes.data[n] = el
+            n += 1
+        }
+    }
+    nodes.count = n
+}
+
+#local
+parse_steps :: (path: str, out: &[..] Step) -> bool {
+    if path.count == 0 do return false
+    pos := 0
+
+    while pos < path.count {
+        step: Step
+
+        if pos + 1 < path.count && path[pos] == '/' && path[pos + 1] == '/' {
+            step.descendant = true
+            pos += 2
+        } elseif pos < path.count && path[pos] == '/' {
+            pos += 1
+        }
+
+        if pos >= path.count do break
+        if path[pos] == '@' do break
+
+        name_start := pos
+        while pos < path.count {
+            c := path[pos]
+            if c == '/' || c == '[' do break
+            pos += 1
+        }
+
+        name := path[name_start .. pos]
+        if name == "*" {
+            step.name = ""
+        } else {
+            step.name = name
+        }
+
+        if pos < path.count && path[pos] == '[' {
+            pos += 1
+            if !parse_pred(path, &pos, &step) do return false
+        }
+
+        if step.name.count == 0 && !step.descendant && name != "*" {
+            continue
+        }
+
+        out->push(step)
+    }
+
+    return out.count > 0
+}
+
+#local
+parse_pred :: (path: str, pos: &i32, step: &Step) -> bool {
+    if *pos >= path.count do return false
+
+    if path[*pos] >= '0' && path[*pos] <= '9' {
+        n := 0
+        while *pos < path.count && path[*pos] >= '0' && path[*pos] <= '9' {
+            n = n * 10 + cast(i32) (path[*pos] - '0')
+            *pos += 1
+        }
+        step.pred_index = n
+    } elseif path[*pos] == '@' {
+        *pos += 1
+        attr_start := *pos
+        while *pos < path.count {
+            c := path[*pos]
+            if c == '=' || c == ']' do break
+            *pos += 1
+        }
+        step.pred_attr = path[attr_start .. *pos]
+        if *pos < path.count && path[*pos] == '=' {
+            step.pred_eq = true
+            *pos += 1
+            if *pos >= path.count do return false
+            q := path[*pos]
+            if q != '\'' && q != '"' do return false
+            *pos += 1
+            val_start := *pos
+            while *pos < path.count && path[*pos] != q {
+                *pos += 1
+            }
+            step.pred_value = path[val_start .. *pos]
+            if *pos >= path.count do return false
+            *pos += 1
+        }
+    } else {
+        return false
+    }
+
+    if *pos >= path.count || path[*pos] != ']' do return false
+    *pos += 1
+    return true
+}

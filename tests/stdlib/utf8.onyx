@@ -1,0 +1,78 @@
+use core {*}
+use core.encoding.utf8
+
+// @leak-check
+
+print_decode :: (s: str) {
+    r, n := utf8.decode_rune(s);
+    printf("{} {}\n", r, n);
+}
+
+main :: () {
+    println(utf8.valid(""));
+    println(utf8.valid("hello"));
+    println(utf8.valid("café"));
+    println(utf8.valid(u8.[0xC2, 0x80]));
+    println(utf8.valid(u8.[0xEF, 0xBF, 0xBD]));
+    println(utf8.valid(u8.[0xF4, 0x8F, 0xBF, 0xBF]));
+
+    println(utf8.valid(u8.[0x80]));
+    println(utf8.valid(u8.[0xC0, 0x80]));
+    println(utf8.valid(u8.[0xED, 0xA0, 0x80]));
+    println(utf8.valid(u8.[0xF0, 0x80, 0x80, 0x80]));
+    println(utf8.valid(u8.[0xF4, 0x90, 0x80, 0x80]));
+    println(utf8.valid(u8.['a', 0x80]));
+
+    println(utf8.valid_rune('A'));
+    println(utf8.valid_rune(0x10FFFF));
+    println(utf8.valid_rune(0xD800));
+    println(utf8.valid_rune(0x110000));
+    println(utf8.valid_rune(-1));
+
+    println(utf8.rune_is_start('A'));
+    println(utf8.rune_is_start(0xC2));
+    println(utf8.rune_is_start(0x80));
+    println(utf8.rune_is_start(0xFF));
+
+    print_decode("A");
+    print_decode("");
+    print_decode(u8.[0x80]);
+    print_decode(u8.[0xC3, 0xA9]);
+    print_decode(u8.[0xEF, 0xBF, 0xBD]);
+    print_decode(u8.[0xC0, 0x80]);
+    print_decode(u8.[0xE0, 0xA0]);
+
+    r, n := utf8.decode_last_rune("abé");
+    printf("{} {}\n", r, n);
+    r, n = utf8.decode_last_rune(u8.[65, 0x80]);
+    printf("{} {}\n", r, n);
+
+    println(utf8.rune_count("hi"));
+    println(utf8.rune_count("café"));
+    println(utf8.rune_count(u8.[0x80, 0x80, 0x80]));
+    println(utf8.rune_length(0xD800));
+    println(utf8.rune_length(0x1F600));
+
+    println(utf8.full_rune("A"));
+    println(utf8.full_rune(""));
+    println(utf8.full_rune(u8.[0xC3]));
+    println(utf8.full_rune(u8.[0xC3, 0xA9]));
+    println(utf8.full_rune(u8.[0x80]));
+
+    buf: [4] u8;
+    e := utf8.encode_rune(buf, -1);
+    printf("{} {} {} {}\n", e.count, cast(i32) e[0], cast(i32) e[1], cast(i32) e[2]);
+    e = utf8.encode_rune(buf, 0xE9);
+    print_decode(e);
+
+    switch utf8.next("Hi") {
+        case .Some as v {
+            printf("{} {}\n", v.rune, v.rest);
+        }
+        case .None do println("none");
+    }
+    switch utf8.next("") {
+        case .None do println(true);
+        case .Some do println(false);
+    }
+}

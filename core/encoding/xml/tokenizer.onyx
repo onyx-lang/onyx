@@ -28,6 +28,7 @@ Tokenizer.Error :: enum {
     Unterminated_Comment
     Unterminated_CDATA
     Invalid_Double_Dash_In_Comment
+    Invalid_Entity
 }
 
 Token :: struct {
@@ -99,15 +100,32 @@ Tokenizer.advance :: (self: &#Self) {
         return
     }
 
-    b := self.r->peek_byte()
-    rlen := utf8.rune_length_from_first_byte(b)
-    assert(rlen > 0, "Bad UTF8 Encoding")
+    b, peek_err := self.r->peek_byte()
+    if peek_err != .None {
+        self.current = -1
+        return
+    }
+
+    want := utf8.rune_length_from_first_byte(b)
+    if want < 1 {
+        one: [1] u8
+        self.r->read_fill_buffer(one)
+        self.offset += 1
+        self.current = utf8.Rune_Error
+        return
+    }
 
     rbuf: [4] u8
-    self.r->read_fill_buffer(rbuf[0 .. rlen])
-    self.offset += rlen
+    fill_err := self.r->read_fill_buffer(rbuf[0 .. want])
+    if fill_err != .None {
+        self.current = utf8.Rune_Error
+        self.offset += 1
+        return
+    }
 
-    self.current = utf8.decode_rune(rbuf[0 .. rlen])
+    self.offset += want
+    r, _ := utf8.decode_rune(rbuf[0 .. want])
+    self.current = r
     if self.current == 0 {
         self.current = -1
     }
@@ -127,7 +145,7 @@ Tokenizer.scan_ident :: (self: &#Self) -> Token.Kind {
 
     ident := make(dyn_str, 32, as_allocator(&self.arena))
 
-    while is_ident_rune(self.current) {
+    while xml_name_char(self.current) {
         utf8.append_rune(&ident, self.current)
 
         self->advance()
@@ -138,16 +156,6 @@ Tokenizer.scan_ident :: (self: &#Self) -> Token.Kind {
     }
 
     return .{ Identifier = ident }
-
-    is_ident_rune :: macro (x: utf8.rune) -> bool {
-        // TODO: Add support for letters and numbers in other languages
-        switch x {
-            case '_', '-', ':' do return true
-            case 'A'..='Z', 'a'..='z' do return true
-            case '0'..='9' do return true
-            case _ do return false
-        }
-    }
 }
 
 Tokenizer.skip_cdata :: (self: &#Self) -> bool {
@@ -212,6 +220,13 @@ Tokenizer.scan_string :: (self: &#Self, end: utf8.rune = '<', multiline := true)
     while true {
         if self.current == -1 do err(.Early_EOF)
 
+        if self.current == '&' {
+            ent, ok := self->scan_entity()
+            if !ok do return "", false
+            utf8.append_rune(&out, ent)
+            continue
+        }
+
         switch self.current {
             case '<' {
                 if b := self.r->peek_byte(); b == '!' {
@@ -257,6 +272,78 @@ Tokenizer.scan_string :: (self: &#Self, end: utf8.rune = '<', multiline := true)
     }
 }
 
+Tokenizer.scan_entity :: (self: &#Self) -> (utf8.rune, bool) {
+    self->advance()
+
+    if self.current == '#' {
+        self->advance()
+        hex := false
+        if self.current == 'x' || self.current == 'X' {
+            hex = true
+            self->advance()
+        }
+
+        v: i32 = 0
+        digits := 0
+        while self.current != ';' && self.current != -1 {
+            d := entity_digit(self.current, hex)
+            if d < 0 {
+                self.error = .Invalid_Entity
+                return 0, false
+            }
+            if hex do v = (v << 4) + d
+            else   do v = v * 10 + d
+            if v > utf8.Max_Rune {
+                self.error = .Invalid_Entity
+                return 0, false
+            }
+            digits += 1
+            self->advance()
+        }
+
+        if self.current != ';' || digits == 0 {
+            self.error = .Invalid_Entity
+            return 0, false
+        }
+        self->advance()
+
+        if !utf8.valid_rune(v) do return utf8.Rune_Error, true
+        return v, true
+    }
+
+    name := make(dyn_str, 8, as_allocator(&self.arena))
+    while self.current != ';' && self.current != -1 {
+        if !is_letter(self.current) && !(self.current >= '0' && self.current <= '9') {
+            break
+        }
+        utf8.append_rune(&name, self.current)
+        self->advance()
+    }
+
+    if self.current != ';' {
+        self.error = .Invalid_Entity
+        return 0, false
+    }
+    self->advance()
+
+    if name == "amp"  do return '&', true
+    if name == "lt"   do return '<', true
+    if name == "gt"   do return '>', true
+    if name == "quot" do return '"', true
+    if name == "apos" do return '\'', true
+
+    self.error = .Invalid_Entity
+    return 0, false
+}
+
+#local
+entity_digit :: (c: utf8.rune, hex: bool) -> i32 {
+    if c >= '0' && c <= '9' do return c - '0'
+    if hex && c >= 'a' && c <= 'f' do return c - 'a' + 10
+    if hex && c >= 'A' && c <= 'F' do return c - 'A' + 10
+    return -1
+}
+
 
 Tokenizer.scan :: (self: &#Self) -> Token {
     if self.peeked_token {
@@ -269,7 +356,7 @@ Tokenizer.scan :: (self: &#Self) -> Token {
 
     pos := pos_from_offset(self, self.offset)
 
-    if is_letter(self.current) {
+    if xml_name_start(self.current) {
         return Token.{
             kind = self->scan_ident()
             pos = pos
@@ -294,6 +381,9 @@ Tokenizer.scan :: (self: &#Self) -> Token {
         case '/' do kind = .Slash
         case '-' do kind = .Dash
         case ':' do kind = .Colon
+
+        case '[' do kind = .Open_Bracket
+        case ']' do kind = .Close_Bracket
 
         case '"', '\'' {
             kind = .Invalid
@@ -330,6 +420,37 @@ is_letter :: (c: utf8.rune) -> bool {
         case '_', 'A'..='Z', 'a'..='z' do return true
         case _ do return false
     }
+}
+
+/// XML 1.0 NameStartChar (plus ':' for QNames).
+xml_name_start :: (c: utf8.rune) -> bool {
+    if c == ':' || c == '_' do return true
+    if c >= 'A' && c <= 'Z' do return true
+    if c >= 'a' && c <= 'z' do return true
+    if c >= 0xC0 && c <= 0xD6 do return true
+    if c >= 0xD8 && c <= 0xF6 do return true
+    if c >= 0xF8 && c <= 0x2FF do return true
+    if c >= 0x370 && c <= 0x37D do return true
+    if c >= 0x37F && c <= 0x1FFF do return true
+    if c >= 0x200C && c <= 0x200D do return true
+    if c >= 0x2070 && c <= 0x218F do return true
+    if c >= 0x2C00 && c <= 0x2FEF do return true
+    if c >= 0x3001 && c <= 0xD7FF do return true
+    if c >= 0xF900 && c <= 0xFDCF do return true
+    if c >= 0xFDF0 && c <= 0xFFFD do return true
+    if c >= 0x10000 && c <= 0xEFFFF do return true
+    return false
+}
+
+/// XML 1.0 NameChar.
+xml_name_char :: (c: utf8.rune) -> bool {
+    if xml_name_start(c) do return true
+    if c == '-' || c == '.' do return true
+    if c >= '0' && c <= '9' do return true
+    if c == 0xB7 do return true
+    if c >= 0x0300 && c <= 0x036F do return true
+    if c >= 0x203F && c <= 0x2040 do return true
+    return false
 }
 
 #local

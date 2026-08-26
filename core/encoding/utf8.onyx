@@ -2,12 +2,22 @@ package core.encoding.utf8
 #allow_stale_code
 
 use core.string
-use core.array
 use core.iter
 
 rune :: i32
 
 Max_Chars :: 4
+
+/// U+FFFD. `decode_rune` returns this for invalid or incomplete input.
+Rune_Error :: 0xFFFD
+
+Max_Rune :: 0x10FFFF
+
+#local
+Surrogate_Min :: 0xD800
+
+#local
+Surrogate_Max :: 0xDFFF
 
 append_rune :: (s: &dyn_str, r: rune) -> str {
     buffer: [Max_Chars] u8;
@@ -21,47 +31,104 @@ advance_rune :: #match #local {}
 advance_rune :: (s: str, n := 1) -> str {
     t := s;
     for n {
-        t = string.advance(t, rune_length_from_first_byte(t[0]));
+        if t.count == 0 do break;
+        _, len := decode_rune(t);
+        if len <= 0 do break;
+        t = string.advance(t, len);
     }
     return t;
 }
 
 #overload
 advance_rune :: (s: &str, n := 1) {
-    for n {
-        string.advance(s, rune_length_from_first_byte(s.data[0]));
-    }
+    *s = advance_rune(*s, n);
 }
 
 next_rune :: (s: str) -> str {
-    return s.data[0 .. rune_length_from_first_byte(s[0])];
+    if s.count == 0 do return "";
+    _, n := decode_rune(s);
+    if n <= 0 do return "";
+    return s[0 .. n];
 }
 
+/// First rune and the unconsumed suffix. `.None` if `s` is empty.
+/// Invalid UTF-8 yields `Rune_Error` and skips one byte.
+Next :: struct {
+    rune: rune;
+    rest: str;
+}
+
+next :: (s: str) -> ? Next {
+    if s.count == 0 do return .None;
+    r, n := decode_rune(s);
+    if n < 0 do n = 0;
+    return .{ Some = .{ r, s[n .. s.count] } };
+}
+
+/// Unpack the first encoding in `s`. Empty input is `(Rune_Error, 0)`.
+/// Invalid or incomplete UTF-8 is `(Rune_Error, 1)` — one consumed byte.
+/// A well-formed U+FFFD is `(Rune_Error, 3)`.
 decode_rune :: (s: str) -> (rune, i32) {
-    len := rune_length_from_first_byte(s[0]);
-    if len == 1 do return (cast(rune) s[0]), 1;
+    n := s.count;
+    if n < 1 do return Rune_Error, 0;
 
-    mask := 0xFF >> (1 + len);
-    r: rune = ((cast(rune) s[0]) & mask);
-
-    for len - 1 {
-        r = r << 6;
-        r = r | ~~(s[it + 1] & 0x3F);
+    c0 := s[0];
+    if (c0 & 0x80) == 0 {
+        return ~~c0, 1;
     }
+
+    len := rune_length_from_first_byte(c0);
+    if len < 2 || n < len {
+        return Rune_Error, 1;
+    }
+
+    for i in 1 .. len {
+        if (s[i] & 0xC0) != 0x80 {
+            return Rune_Error, 1;
+        }
+    }
+
+    r := (cast(rune) c0) & (0xFF >> (1 + len));
+    for i in 1 .. len {
+        r = (r << 6) | (cast(rune) s[i] & 0x3F);
+    }
+
+    if !valid_rune(r) do return Rune_Error, 1;
+    if rune_length(r) != len do return Rune_Error, 1;
 
     return r, len;
 }
 
 decode_last_rune :: (s: str) -> (rune, i32) {
-    i := s.length - 1;
-    while i >= 0 && (s[i] & 0xC0 == 0x80) {
-        i -= 1;
+    end := s.count;
+    if end == 0 do return Rune_Error, 0;
+
+    start := end - 1;
+    if (s[start] & 0x80) == 0 {
+        return ~~s[start], 1;
     }
 
-    return decode_rune(s[i..s.length]);
+    lim := end - Max_Chars;
+    if lim < 0 do lim = 0;
+
+    start -= 1;
+    while start >= lim {
+        if rune_is_start(s[start]) do break;
+        start -= 1;
+    }
+
+    if start < 0 do start = 0;
+
+    r, size := decode_rune(s[start .. end]);
+    if start + size != end do return Rune_Error, 1;
+    return r, size;
 }
 
 encode_rune :: (buffer: [] u8, r: rune) -> str {
+    if !valid_rune(r) {
+        r = Rune_Error;
+    }
+
     if r <= 0x7F {
         buffer[0] = ~~ r;
         return buffer[0 .. 1];
@@ -73,10 +140,6 @@ encode_rune :: (buffer: [] u8, r: rune) -> str {
         return buffer[0 .. 2];
     }
 
-    if r >= 0xD800 && r <= 0xDFFF {
-        return buffer[0 .. 0];
-    }
-
     if r <= 0xFFFF {
         buffer[0] = ~~(0xE0 | ((r >> 12) & 0x0F));
         buffer[1] = ~~(0x80 | ((r >> 6) & 0x3F));
@@ -84,32 +147,35 @@ encode_rune :: (buffer: [] u8, r: rune) -> str {
         return buffer[0 .. 3];
     }
 
-    if r <= 0x10FFFF {
-        buffer[0] = ~~(0xF0 | ((r >> 18) & 0x07));
-        buffer[1] = ~~(0x80 | ((r >> 12) & 0x3F));
-        buffer[2] = ~~(0x80 | ((r >> 6) & 0x3F));
-        buffer[3] = ~~(0x80 | (r & 0x3F));
-        return buffer[0 .. 4];
-    }
-
-    return buffer[0 .. 0];
+    buffer[0] = ~~(0xF0 | ((r >> 18) & 0x07));
+    buffer[1] = ~~(0x80 | ((r >> 12) & 0x3F));
+    buffer[2] = ~~(0x80 | ((r >> 6) & 0x3F));
+    buffer[3] = ~~(0x80 | (r & 0x3F));
+    return buffer[0 .. 4];
 }
 
-full_rune :: (buffer: [] u8) -> bool {
-    len := rune_length_from_first_byte(buffer[0]);
+/// True if `p` begins with a complete encoding (including a 1-byte error rune).
+full_rune :: (p: str) -> bool {
+    if p.count == 0 do return false;
 
-    // If there are not enough bytes, then this cannot
-    // be a valid rune.
-    if buffer.length < len do return false;
+    want := rune_length_from_first_byte(p[0]);
+    if want <= 1 do return true;
+    if p.count >= want do return true;
 
-    return array.every(buffer[1 .. buffer.length], [c](c & 0xC0 == 0x80));
+    for i in 1 .. p.count {
+        if (p[i] & 0xC0) != 0x80 do return true;
+    }
+
+    return false;
 }
 
 rune_count :: (s: str) -> i32 {
     w := s;
     count := 0;
-    while !string.empty(w) {
-        advance_rune(&w);
+    while w.count > 0 {
+        _, len := decode_rune(w);
+        if len <= 0 do break;
+        w = string.advance(w, len);
         count += 1;
     }
 
@@ -117,24 +183,48 @@ rune_count :: (s: str) -> i32 {
 }
 
 rune_length :: (r: rune) -> i32 {
-    if r <= 0x7f     do return 1;
-    if r <= 0x7ff    do return 2;
-    if r <= 0xffff   do return 3;
-    if r <= 0x10ffff do return 4;
-
-    return -1;
+    if !valid_rune(r) do return -1;
+    if r <= 0x7F     do return 1;
+    if r <= 0x7FF    do return 2;
+    if r <= 0xFFFF   do return 3;
+    return 4;
 }
 
 rune_length_from_first_byte :: (b: u8) -> i32 {
-    if b & 0x80 == 0x00 do return 1;
-    if b & 0xE0 == 0xC0 do return 2;
-    if b & 0xF0 == 0xE0 do return 3;
-    if b & 0xF8 == 0xF0 do return 4;
+    if (b & 0x80) == 0x00 do return 1;
+    if (b & 0xE0) == 0xC0 do return 2;
+    if (b & 0xF0) == 0xE0 do return 3;
+    if (b & 0xF8) == 0xF0 do return 4;
     return -1;
 }
 
+/// True if `b` can start a rune. Continuation bytes (`10xxxxxx`) are false.
+/// ASCII is true.
 rune_is_start :: (b: u8) -> bool {
-    return rune_length_from_first_byte(b) > 1;
+    return (b & 0xC0) != 0x80;
+}
+
+valid :: (s: str) -> bool {
+    i := 0;
+    while i < s.count {
+        if (s[i] & 0x80) == 0 {
+            i += 1;
+            continue;
+        }
+
+        _, n := decode_rune(s[i .. s.count]);
+        if n <= 1 do return false;
+        i += n;
+    }
+
+    return true;
+}
+
+valid_rune :: (r: rune) -> bool {
+    if r < 0 do return false;
+    if r > Max_Rune do return false;
+    if r >= Surrogate_Min && r <= Surrogate_Max do return false;
+    return true;
 }
 
 
@@ -150,10 +240,11 @@ runes :: (s: str) -> Iterator(RuneIterValue) {
             if string.empty(ctx.s) do return .None;
 
             r, len := decode_rune(ctx.s);
+            if len <= 0 do return .None;
             defer string.advance(&ctx.s, len);
 
-            return RuneIterValue.{ r, ctx.s[0..len] };
-        }            
+            return RuneIterValue.{ r, ctx.s[0 .. len] };
+        }
     );
 }
 
@@ -163,8 +254,12 @@ slice :: (s: str, low, high: i32) -> str {
     tmp := advanced;
 
     bytes := 0;
-    for high - low {
+    n := high - low;
+    if n < 0 do n = 0;
+    for n {
+        if tmp.count == 0 do break;
         _, b := decode_rune(tmp);
+        if b <= 0 do break;
         bytes += b;
         string.advance(&tmp, b);
     }

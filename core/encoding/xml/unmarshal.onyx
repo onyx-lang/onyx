@@ -1,0 +1,380 @@
+package core.encoding.xml
+#allow_stale_code
+
+use core {package, *}
+use core.array {Untyped_Array}
+use runtime.info {*}
+
+decode_as :: #match #local {}
+
+/// String → T. Parses a document, then unmarshals the root element.
+#overload
+decode_as :: (data: str, $T: type_expr, allocator := context.allocator) -> Result(T, Error) {
+    doc := parse(data, allocator)->catch([err] {
+        return return .{ Err = parse_error_as_error(err) }
+    })
+    defer delete(&doc)
+    return decode_as(&doc, T)
+}
+
+/// Document tree → T. Also `doc->decode_as(Person)`.
+#overload
+decode_as :: (doc: &Document, $T: type_expr) -> Result(T, Error) {
+    return from_document(doc, T)
+}
+
+Document.decode_as :: (doc: &Document, $T: type_expr) -> Result(T, Error) {
+    return from_document(doc, T)
+}
+
+from_element :: (doc: &Document, el: Element.Index, $T: type_expr) -> Result(T, Error) {
+    x: T
+    path := make(dyn_str, allocator=context.temp_allocator)
+    defer delete(&path)
+    err := unmarshal(doc, el, T, &x, &path)
+    if err.kind != .None do return .{ Err = err }
+    return .{ Ok = x }
+}
+
+#local
+from_document :: (doc: &Document, $T: type_expr) -> Result(T, Error) {
+    if doc.elements.count == 0 {
+        return .{ Err = .{ kind = .Parse, msg = "empty document" } }
+    }
+
+    t_info := get_type_info(T)
+    if t_info.kind == .Struct {
+        s_info := cast(^Type_Info_Struct) t_info
+        if tag := array.first(s_info.tags, [t](t.type == Name)); tag != null {
+            n := *cast(^Name) tag.data
+            if n.name.count > 0 && !element_matches(&doc.elements[0], n.name, n.space) {
+                return .{
+                    Err = .{
+                        kind = .Type_Mismatch
+                        msg = tprintf("root element '{}' does not match '{}'", doc.elements[0].name, n.name)
+                    }
+                }
+            }
+        }
+    }
+
+    return from_element(doc, 0, T)
+}
+
+#local
+parse_error_as_error :: (e: ParseError) -> Error {
+    return .{ kind = .Parse, msg = tprintf("{}", e) }
+}
+
+#local
+copy_path :: (path: &dyn_str) -> str {
+    if path.count == 0 do return ""
+    return str.copy(.{ path.data, path.count }, context.temp_allocator)
+}
+
+#local
+mismatch :: (msg: str, path: &dyn_str) -> Error {
+    return .{ kind = .Type_Mismatch, msg = msg, path = copy_path(path) }
+}
+
+#local
+unsupported :: (path: &dyn_str) -> Error {
+    return .{ kind = .Unsupported_Type, path = copy_path(path) }
+}
+
+#local
+path_push_key :: (path: &dyn_str, key: str) -> i32 {
+    n := path.count
+    dyn_str.append(path, '.')
+    dyn_str.append(path, key)
+    return n
+}
+
+#local
+path_push_index :: (path: &dyn_str, i: i32) -> i32 {
+    n := path.count
+    conv.format(path, "[{}]", i)
+    return n
+}
+
+#local
+path_pop :: (path: &dyn_str, n: i32) {
+    path.count = n
+}
+
+#local
+Field_Mode :: enum {
+    Child
+    Attr
+    Text
+    Ignore
+}
+
+#local
+Field_Spec :: struct {
+    mode: Field_Mode
+    name: str
+    space: str
+}
+
+#local
+spec_from_member :: (member: &Type_Info_Struct.Member) -> Field_Spec {
+    spec := Field_Spec.{ mode = .Child, name = member.name, space = "" }
+
+    for tag in member.tags {
+        if tag.type == Name {
+            n := *cast(^Name) tag.data
+            if n.name.count > 0 do spec.name = n.name
+            spec.space = n.space
+        } elseif tag.type == Attr {
+            spec.mode = .Attr
+            a := *cast(^Attr) tag.data
+            if a.name.count > 0 do spec.name = a.name
+        } elseif tag.type == type_expr {
+            t := *cast(^type_expr) tag.data
+            if t == Text   do spec.mode = .Text
+            if t == Ignore do spec.mode = .Ignore
+        }
+    }
+
+    return spec
+}
+
+#local
+find_child :: (doc: &Document, parent: Element.Index, name: str, space: str) -> ? Element.Index {
+    if doc.elements.count <= parent do return .None
+
+    for v in doc.elements[parent].children {
+        v.Element->with([e] {
+            if element_matches(&doc.elements[e], name, space) {
+                return e
+            }
+        })
+    }
+
+    return .None
+}
+
+#local
+collect_children :: (doc: &Document, parent: Element.Index, name: str, space: str, out: &[..] Element.Index) {
+    if doc.elements.count <= parent do return
+
+    for v in doc.elements[parent].children {
+        v.Element->with([e] {
+            if element_matches(&doc.elements[e], name, space) {
+                out->push(e)
+            }
+        })
+    }
+}
+
+#local
+unwrap_optional :: (type: type_expr, out: rawptr) -> (inner: type_expr, ptr: rawptr, is_opt: bool) {
+    if !union_constructed_from(type, Optional) {
+        return type, out, false
+    }
+    u_info := get_type_info(type)->as_union()
+    return u_info.variants[1].type, memory.ptr_add(out, u_info.alignment), true
+}
+
+#local
+set_optional_some :: (out: rawptr) {
+    *cast(&Optional(void).tag_enum) out = .Some
+}
+
+#local
+set_optional_none :: (out: rawptr) {
+    *cast(&? void) out = .{}
+}
+
+unmarshal :: (doc: &Document, el: Element.Index, type: type_expr, out: rawptr, path: &dyn_str) -> Error {
+    t_info := get_type_info(type)
+
+    if t_info.kind == .Distinct {
+        d_info := cast(^Type_Info_Distinct) t_info
+        return unmarshal(doc, el, d_info.base_type, out, path)
+    }
+
+    if t_info.kind == .Union {
+        if !union_constructed_from(type, Optional) {
+            return unsupported(path)
+        }
+        set_optional_some(out)
+        u_info := t_info->as_union()
+        return unmarshal(doc, el, u_info.variants[1].type, memory.ptr_add(out, u_info.alignment), path)
+    }
+
+    switch t_info.kind {
+        case .Basic, .Enum {
+            return unmarshal_text(doc, el, type, out, path)
+        }
+
+        case .Slice {
+            if type == str {
+                *cast(^str) out = string.copy(doc->text(el))
+                return .{}
+            }
+            return unsupported(path)
+        }
+
+        case .Array, .Dynamic_Array {
+            return unsupported(path)
+        }
+
+        case .Struct {
+            return unmarshal_struct(doc, el, type, out, path)
+        }
+
+        case _ {
+            return unsupported(path)
+        }
+    }
+
+    return .{}
+}
+
+#local
+unmarshal_text :: (doc: &Document, el: Element.Index, type: type_expr, out: rawptr, path: &dyn_str) -> Error {
+    if type == str {
+        *cast(^str) out = string.copy(doc->text(el))
+        return .{}
+    }
+
+    t := doc->text(el)
+    if !conv.parse_any(out, type, t) {
+        return mismatch(tprintf("cannot parse '{}' as {}", t, type), path)
+    }
+    return .{}
+}
+
+#local
+unmarshal_struct :: (doc: &Document, el: Element.Index, type: type_expr, out: rawptr, path: &dyn_str) -> Error {
+    s_info := cast(^Type_Info_Struct) get_type_info(type)
+
+    for^ member in s_info.members {
+        spec := spec_from_member(member)
+        dest := memory.ptr_add(out, member.offset)
+        mark := path_push_key(path, spec.name)
+        err := unmarshal_field(doc, el, member.type, dest, spec, path)
+        path_pop(path, mark)
+        if err.kind != .None do return err
+    }
+
+    return .{}
+}
+
+#local
+unmarshal_field :: (doc: &Document, el: Element.Index, type: type_expr, out: rawptr, spec: Field_Spec, path: &dyn_str) -> Error {
+    if spec.mode == .Ignore do return .{}
+
+    inner, dest, is_opt := unwrap_optional(type, out)
+    t_info := get_type_info(inner)
+
+    if spec.mode == .Attr {
+        val := doc->attr(el, spec.name)
+        switch val {
+            case .None {
+                if is_opt do set_optional_none(out)
+                return .{}
+            }
+            case .Some as s {
+                if is_opt do set_optional_some(out)
+                if inner == str {
+                    *cast(^str) dest = string.copy(s)
+                    return .{}
+                }
+                if !conv.parse_any(dest, inner, s) {
+                    return mismatch(tprintf("cannot parse attribute '{}' as {}", s, inner), path)
+                }
+                return .{}
+            }
+        }
+    }
+
+    if spec.mode == .Text {
+        if is_opt do set_optional_some(out)
+        return unmarshal_text(doc, el, inner, dest, path)
+    }
+
+    // Repeated children: [..] T or [] T (not str).
+    if t_info.kind == .Dynamic_Array || (t_info.kind == .Slice && inner != str) || t_info.kind == .Array {
+        if is_opt do set_optional_some(out)
+        return unmarshal_repeated(doc, el, inner, dest, spec, path)
+    }
+
+    child := find_child(doc, el, spec.name, spec.space)
+    switch child {
+        case .None {
+            if is_opt do set_optional_none(out)
+            return .{}
+        }
+        case .Some as idx {
+            if is_opt do set_optional_some(out)
+            return unmarshal(doc, idx, inner, dest, path)
+        }
+    }
+
+    return .{}
+}
+
+#local
+unmarshal_repeated :: (doc: &Document, parent: Element.Index, type: type_expr, out: rawptr, spec: Field_Spec, path: &dyn_str) -> Error {
+    t_info := get_type_info(type)
+
+    idxs := make([..] Element.Index, allocator=context.temp_allocator)
+    defer delete(&idxs)
+    collect_children(doc, parent, spec.name, spec.space, &idxs)
+
+    of: type_expr
+    dest: rawptr
+    n: i32
+
+    switch t_info.kind {
+        case .Array {
+            a_info := cast(^Type_Info_Array) t_info
+            of = a_info.of
+            dest = out
+            n = ~~a_info.count
+            if idxs.count < n do n = ~~idxs.count
+        }
+
+        case .Dynamic_Array {
+            s_info := cast(^Type_Info_Dynamic_Array) t_info
+            of = s_info.of
+            s := cast(^Untyped_Array) out
+            s.allocator = context.allocator
+            s.capacity = idxs.count
+            size := size_of(of) * idxs.count
+            s.data = raw_alloc(context.allocator, size)
+            memory.set(s.data, 0, size)
+            s.count = idxs.count
+            dest = s.data
+            n = ~~idxs.count
+        }
+
+        case .Slice {
+            s_info := cast(^Type_Info_Slice) t_info
+            of = s_info.of
+            s := cast(^Untyped_Array) out
+            size := size_of(of) * idxs.count
+            s.data = raw_alloc(context.allocator, size)
+            memory.set(s.data, 0, size)
+            s.count = idxs.count
+            dest = s.data
+            n = ~~idxs.count
+        }
+
+        case _ {
+            return unsupported(path)
+        }
+    }
+
+    for i in n {
+        mark := path_push_index(path, ~~i)
+        err := unmarshal(doc, idxs[i], of, memory.ptr_add(dest, size_of(of) * i), path)
+        path_pop(path, mark)
+        if err.kind != .None do return err
+    }
+
+    return .{}
+}

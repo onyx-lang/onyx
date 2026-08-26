@@ -13,11 +13,53 @@ Document.child_with_name :: (doc: &Document, parent: Element.Index, name: str) -
 
     for v in doc.elements[parent].children {
         v.Element->with([e] {
-            if doc.elements[e].name == name {
+            if element_matches(&doc.elements[e], name) {
                 return e
             }
         })
     }
 
     return .None
+}
+
+Document.attr :: (doc: &Document, el: Element.Index, key: str) -> ? str {
+    if doc.elements.count <= el do return .None
+
+    for a in doc.elements[el].attributes {
+        if attr_matches(&a, key) do return a.value
+    }
+
+    return .None
+}
+
+/// Direct text children of `el`, concatenated. A single text child is
+/// returned as the interned slice (no allocation).
+Document.text :: (doc: &Document, el: Element.Index, allocator := context.allocator) -> str {
+    if doc.elements.count <= el do return ""
+
+    first: str = ""
+    n := 0
+    for c in doc.elements[el].children {
+        c.Text->with([t] {
+            if n == 0 do first = t
+            n += 1
+        })
+    }
+
+    if n == 0 do return ""
+    if n == 1 do return first
+
+    out := make(dyn_str, allocator=allocator)
+    for c in doc.elements[el].children {
+        c.Text->with([t] {
+            dyn_str.append(&out, t)
+        })
+    }
+    return out
+}
+
+Document.children_with_name :: (doc: &Document, parent: Element.Index, name: str) -> Iterator(Element.Index) {
+    ctx: struct { doc: &Document; name: str } = .{ doc, name }
+    return doc->children(parent)
+        |> Iterator.filter(ctx, (idx, c) => element_matches(&c.doc.elements[idx], c.name))
 }
