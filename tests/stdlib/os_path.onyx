@@ -32,4 +32,34 @@ main :: () {
         cleaned := os.Path.clean(t.first);
         printf("{}: {}=={}\n", cleaned == t.second, cleaned, t.second);
     }
+
+    println(os.Path.basename("foo.txt"));
+    println(os.Path.basename("test/bar.txt"));
+    println(os.Path.basename("a.b/c"));
+    println(os.Path.basename("foo"));
+    println(os.Path.basename(""));
+    println(os.Path.basename("/"));
+    println(os.Path.basename("foo/"));
+    println(os.Path.stem("foo.txt"));
+    println(os.Path.stem("a.b/c"));
+    println(os.Path.stem(".bashrc"));
+    println(os.Path.extension("foo.txt"));
+    println(os.Path.extension("foo/bar"));
+    println(os.Path.extension("foo/bar.txt"));
+    println(os.Path.extension("a.b/c"));
+    println(os.Path.extension(".bashrc"));
+    println(os.Path.extension("foo.tar.gz"));
+    println(os.Path.is_absolute("/foo"));
+    println(os.Path.is_absolute("foo"));
+    println(os.Path.is_absolute(""));
+    println(os.Path.is_relative("foo"));
+    println(os.Path.directory("foo"));
+    dir, base := os.Path.split("a/b");
+    println(dir);
+    println(base);
+
+    abs_rel := os.Path.abs("foo");
+    abs_expect := os.Path.clean(os.Path.join(os.getcwd(), "foo"));
+    println(abs_rel == abs_expect);
+    println(os.Path.abs("/foo") == os.Path.clean("/foo"));
 }

@@ -17,20 +17,42 @@ Path :: #distinct str
 
 Path.SEP :: PATH_SEP
 
+/// Last path element, trailing separators stripped.
+/// `""` → `"."`; `"/"`, `"//"` → `"/"`.
+#local
+path_last_element :: (path: str) -> str {
+    if path == "" do return ".";
+
+    end := path.length;
+    while end > 0 && path[end - 1] == PATH_SEP {
+        end -= 1;
+    }
+    if end == 0 do return path[0 .. 1];
+
+    start := 0;
+    for i in range.{end - 1, 0, -1} {
+        if path[i] == PATH_SEP {
+            start = i + 1;
+            break;
+        }
+    }
+    return path[start .. end];
+}
+
 /// Removes:
 /// - Stray '.' in the path
 /// - Stray '..'
 /// - Repeated '/'
 /// - Trailing '/'
 ///
-/// Modifies the string in place, as the length will never be longer.
+/// The result is allocated with `allocator` (temp by default).
 Path.clean :: (path: str, allocator := Path_Allocator) -> str {
-    if path == "" do return string.copy(".", Path_Allocator);
+    if path == "" do return string.copy(".", allocator);
 
     rooted := path[0] == PATH_SEP;
     n := path.length;
 
-    out := make(dyn_str, path.length, allocator=context.temp_allocator);
+    out := make(dyn_str, path.length, allocator=allocator);
     r, dotdot := 0, 0;
 
     if rooted {
@@ -97,35 +119,82 @@ Path.directory :: (path: str) -> str {
     return Path.clean(dir);
 }
 
-/// Returns the extension of the file on the end of the path, if present.
+/// Returns the suffix beginning at the final `.` in the last element.
+/// A leading dot in the last element is not an extension (`.bashrc` → `""`).
 ///
-///     Path.extension("foo.txt") -> "txt"
+///     Path.extension("foo.txt") -> ".txt"
 ///     Path.extension("foo/bar") -> ""
-///     Path.extension("foo/bar.txt") -> "txt"
+///     Path.extension("foo/bar.txt") -> ".txt"
 Path.extension :: (path: str) -> str {
-    for i in range.{ path.length - 1, 0, -1 } {
-        if path[i] == PATH_SEP do break;
-        if path[i] == '.' do return path[i .. path.length];
-    }
-    return "";
+    name := path_last_element(path);
+    if name == "." || name == ".." do return "";
+
+    dot := string.last_index_of(name, '.');
+    if dot <= 0 do return "";
+    return name[dot .. name.length];
 }
 
-/// Returns the last element of the path, sans its extension.
+/// Returns the last element of the path, including any extension.
 ///
-///     Path.basename("foo.txt") -> "foo"
-///     Path.basename("test/bar.txt") -> "bar"
+///     Path.basename("foo.txt") -> "foo.txt"
+///     Path.basename("test/bar.txt") -> "bar.txt"
+///     Path.basename("a.b/c") -> "c"
 Path.basename :: (path: str) -> str {
-    if path == "" do return ".";
+    return path_last_element(path);
+}
 
-    start := string.last_index_of(path, PATH_SEP);
-    end   := string.last_index_of(path, '.');
-    return path[start + 1 .. end];
+/// Last path element without its extension.
+///
+///     Path.stem("foo.txt") -> "foo"
+///     Path.stem("a.b/c") -> "c"
+Path.stem :: (path: str) -> str {
+    name := path_last_element(path);
+    ext := Path.extension(name);
+    if ext == "" do return name;
+    return name[0 .. name.length - ext.length];
 }
 
 /// Splits the last path element off.
 Path.split :: (path: str) -> (str, str) {
     index := string.last_index_of(path, PATH_SEP);
-    return path[0 .. index], path[index+1 .. path.length];
+    if index < 0 do return "", path;
+    return path[0 .. index], path[index + 1 .. path.length];
+}
+
+/// True if `path` is absolute on this OS (`/` on Unix; drive or UNC on Windows).
+Path.is_absolute :: (path: str) -> bool {
+    #if runtime.compiler_os == .Windows {
+        if path.length >= 1 && (path[0] == '\\' || path[0] == '/') do return true;
+        if path.length >= 3 {
+            c := path[0];
+            drive := (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+            if drive && path[1] == ':' && (path[2] == '\\' || path[2] == '/') {
+                return true;
+            }
+        }
+        return false;
+    } else {
+        return path.length > 0 && path[0] == PATH_SEP;
+    }
+}
+
+Path.is_relative :: (path: str) -> bool {
+    return !Path.is_absolute(path);
+}
+
+/// Absolute path: `getcwd` joined with `path`, then cleaned.
+/// Does not resolve symlinks. Uses the temp allocator by default.
+Path.abs :: (path: str, allocator := Path_Allocator) -> str {
+    if Path.is_absolute(path) {
+        return Path.clean(path, allocator);
+    }
+
+    cwd := getcwd();
+    if cwd == "" {
+        return Path.clean(path, allocator);
+    }
+
+    return Path.clean(Path.join(cwd, path), allocator);
 }
 
 path_clean     :: Path.clean
@@ -133,6 +202,8 @@ path_join      :: Path.join
 path_directory :: Path.directory
 path_extension :: Path.extension
 path_basename  :: Path.basename
+path_stem      :: Path.stem
 path_split     :: Path.split
-
-
+path_is_absolute :: Path.is_absolute
+path_is_relative :: Path.is_relative
+path_abs       :: Path.abs

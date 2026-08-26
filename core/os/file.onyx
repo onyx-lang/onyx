@@ -120,6 +120,18 @@ get_contents :: #match {
     }
 }
 
+/// Create or truncate `path` and write `contents`. Returns false if the file
+/// cannot be opened or the write is short.
+File.write_contents :: (path: str, contents: [] u8) -> bool {
+    file := File.open(path, .Write)->or_return(false);
+    defer File.close(&file);
+
+    switch io.Stream.write(&file, contents) {
+        case .Ok as n do return n == contents.count;
+        case .Err do return false;
+    }
+}
+
 is_file :: (path: str) -> bool {
     s: FileStat;
     if !file_stat(path, &s) do return false;
@@ -200,3 +212,4 @@ open :: File.open
 close :: File.close
 from_fd :: File.from_fd
 get_contents_from_file :: File.get_contents
+write_contents :: File.write_contents

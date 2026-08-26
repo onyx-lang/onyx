@@ -47,6 +47,32 @@ Directory.exists :: fs.__file_exists
 Directory.remove :: fs.__dir_remove
 Directory.rename :: fs.__file_rename
 
+/// Create `path` and any missing parents. Returns true if the directory
+/// exists when this returns. Fails if a prefix exists and is not a directory.
+Directory.create_all :: (path: str) -> bool {
+    cleaned := Path.clean(path);
+    if cleaned == "." || cleaned == "/" do return true;
+
+    i := 0;
+    if cleaned[0] == PATH_SEP do i = 1;
+
+    while i <= cleaned.length {
+        if i == cleaned.length || cleaned[i] == PATH_SEP {
+            prefix := cleaned[0 .. i];
+            if prefix.length > 0 {
+                if Directory.exists(prefix) {
+                    if !is_directory(prefix) do return false;
+                } else {
+                    if !Directory.create(prefix) do return false;
+                }
+            }
+        }
+        i += 1;
+    }
+
+    return true;
+}
+
 chdir  :: fs.__chdir
 getcwd :: fs.__getcwd
 
@@ -107,6 +133,7 @@ dir_open :: Directory.open
 dir_close :: Directory.close
 dir_read :: Directory.read
 dir_create :: Directory.create
+dir_create_all :: Directory.create_all
 dir_exists :: Directory.exists
 dir_remove :: Directory.remove
 dir_rename :: Directory.rename

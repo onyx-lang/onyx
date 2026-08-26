@@ -1,0 +1,46 @@
+use core {*}
+
+// @leak-check
+
+main :: () {
+    src := io.BufferStream.make("hello", write_enabled=false);
+    dst := io.BufferStream.make(16);
+    n := io.Stream.copy(&dst, &src).Ok ?? 0;
+    println(n);
+    println(io.BufferStream.to_str(&dst));
+    delete(&dst);
+
+    name_buf: [64] u8;
+    name := conv.format(name_buf, "onyx_os_{}", os.time());
+    root := os.Path.join("/tmp", name);
+    nested := os.Path.join(root, "a/b/c");
+
+    println(os.Directory.create_all(nested));
+    println(os.is_directory(nested));
+
+    path := os.Path.join(nested, "hello.txt");
+    println(os.File.write_contents(path, "hello"));
+    data := os.get_contents(path);
+    defer str.free(data);
+    println(data);
+
+    out_path := os.Path.join(nested, "out.txt");
+    {
+        use f := os.File.open(out_path, .Write)!;
+        wr := io.Stream.write(&f, "ok");
+        println(wr->is_ok());
+        println(wr.Ok ?? 0);
+    }
+
+    srcf := os.File.open(path, .Read)!;
+    defer srcf->close();
+    dstf := os.File.open(os.Path.join(nested, "copy.txt"), .Write)!;
+    defer dstf->close();
+    cn := io.Stream.copy(&dstf, &srcf).Ok ?? 0;
+    println(cn);
+    copied := os.get_contents(os.Path.join(nested, "copy.txt"));
+    defer str.free(copied);
+    println(copied);
+
+    println(os.remove_directory(root));
+}

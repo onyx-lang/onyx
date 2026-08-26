@@ -126,6 +126,38 @@ Stream.write_byte :: (use s: &Stream, byte: u8) -> Error {
     return vtable.write_byte(s, byte);
 }
 
+/// Copy `src` to `dst` until EOF. Partial writes are retried.
+Stream.copy :: (dst: &Stream, src: &Stream) -> Result(u64, Error) {
+    buf: [4096] u8;
+    total: u64 = 0;
+
+    while true {
+        switch src->read(buf) {
+            case .Err as e {
+                if e == .EOF do return .{ Ok = total };
+                return .{ Err = e };
+            }
+            case .Ok as n {
+                if n == 0 do return .{ Ok = total };
+
+                written: u32 = 0;
+                while written < n {
+                    switch dst->write(buf[written .. n]) {
+                        case .Err as e do return .{ Err = e };
+                        case .Ok as w {
+                            if w == 0 do return .{ Err = .NoProgress };
+                            written += w;
+                            total += cast(u64) w;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return .{ Ok = total };
+}
+
 Stream.close :: (use s: &Stream) -> Error {
     if vtable == null do return .NoVtable;
     if vtable.close == null_proc do return .NotImplemented;
@@ -393,6 +425,8 @@ stream_read_until_full :: Stream.read_until_full
 stream_write :: Stream.write
 stream_write_at :: Stream.write_at
 stream_write_byte :: Stream.write_byte
+stream_copy :: Stream.copy
+copy :: Stream.copy
 stream_close :: Stream.close
 stream_flush :: Stream.flush
 stream_size :: Stream.size
