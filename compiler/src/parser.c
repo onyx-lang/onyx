@@ -3866,7 +3866,12 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
             evalue->value = parse_expression(parser, 0);
         }
 
-        expect_token(parser, ';');
+        // Semicolon is required between members, but optional before `}`
+        // so one-liners can omit the trailing separator:
+        //   enum { Red; Green; Blue }
+        if (!consume_token_if_next(parser, ';') && parser->curr->type != '}') {
+            expect_token(parser, ';');
+        }
 
         bh_arr_push(enum_node->values, evalue);
     }

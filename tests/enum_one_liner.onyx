@@ -1,0 +1,31 @@
+use core {*}
+
+ColorA :: enum { Red; Green; Blue }
+ColorB :: enum { Red; Green; Blue; }
+ColorC :: enum (u8) { Red; Green; Blue }
+
+ColorD :: enum {
+    Red
+    Green
+    Blue
+}
+
+ColorE :: enum {
+    Red :: 10
+    Green
+    Blue :: Red + Green
+}
+
+Settings :: enum #flags { Vsync; Fullscreen; Borderless }
+
+main :: () {
+    printf("{} {} {}\n", ColorA.Red, ColorA.Green, ColorA.Blue)
+    printf("{} {} {}\n", ColorB.Red, ColorB.Green, ColorB.Blue)
+    printf("{} {} {}\n", ColorC.Red, ColorC.Green, ColorC.Blue)
+    printf("{} {} {}\n", ColorD.Red, ColorD.Green, ColorD.Blue)
+    printf("{d} {d} {d}\n", ColorE.Red, ColorE.Green, ColorE.Blue)
+    printf("{d} {d} {d}\n", Settings.Vsync, Settings.Fullscreen, Settings.Borderless)
+
+    col := ColorA.Green
+    if col == .Green do println("green")
+}
