@@ -392,6 +392,7 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
     ///
     __make_overload :: #match {}
 
+    /// Frees an owned container. For a pointer from `new`, use `cfree`.
     delete :: #match {}
 
     #local

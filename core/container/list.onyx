@@ -43,6 +43,17 @@ List.clear :: (list: &List) {
     free(list);
 }
 
+/// Allocates a new list with the same elements.
+List.copy :: (list: &List($T), allocator := context.allocator) -> List(T) {
+    out := List.make(T, allocator);
+    elem := list.first;
+    while elem != null {
+        push_end(&out, elem.data);
+        elem = elem.next;
+    }
+    return out;
+}
+
 List.free         :: free
 List.push_end     :: push_end
 List.push_begin   :: push_begin

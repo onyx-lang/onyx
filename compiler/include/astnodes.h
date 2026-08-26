@@ -2152,6 +2152,7 @@ struct CompilerBuiltins {
 
     AstType *for_expansion_flag_type;
     AstOverloadedFunction *for_expansion;
+    AstOverloadedFunction *delete_match;
 };
 
 typedef struct TypeStore TypeStore;

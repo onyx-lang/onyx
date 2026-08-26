@@ -97,6 +97,7 @@ Iterator.every :: every;
 Iterator.sum   :: sum;
 Iterator.collect :: to_array;
 Iterator.collect_map :: to_map;
+Iterator.collect_set :: to_set;
 
 Iterator.generator :: generator
 Iterator.generator_no_copy :: generator_no_copy
@@ -971,11 +972,20 @@ to_map :: (it: Iterator(Pair($K, $V)), allocator := context.allocator) -> Map(K,
     return m;
 }
 
-/// Collects elements into an array, or a map, depending on if the
-/// iterator produces a Pair(K, V) or not.
+/// Places all yielded values into a Set.
+to_set :: (it: Iterator($T), allocator := context.allocator) -> Set(T) {
+    s := builtin.make(Set(T), allocator=allocator);
+    for v in it do s->insert(v);
+    return s;
+}
+
+/// Collects yielded values into a dynamic array.
 collect :: #match {
     to_array
 }
+
+collect_map :: to_map
+collect_set :: to_set
 
 
 /// Produces an iterator that first yields all values from the

@@ -1,0 +1,50 @@
+use core {*}
+
+// @leak-check
+
+main :: () {
+    l := List.make(i32);
+    l->push_end(1);
+    l->push_end(2);
+    c := l->copy();
+    println(c->count());
+    delete(&c);
+    l->clear();
+    println(l->count());
+    delete(&l);
+
+    s := make(Set(i32));
+    s->insert(3);
+    s->insert(4);
+    s2 := s->copy();
+    println(s2->has(3));
+    delete(&s2);
+    s->clear();
+    println(s->empty());
+    delete(&s);
+
+    h := Heap.make(i32, (a, b) => a - b);
+    h << 2;
+    h << 1;
+    h2 := h->copy();
+    println(h2->pop() ?? -1);
+    delete(&h2);
+    h->clear();
+    println(h->empty());
+    delete(&h);
+
+    arr := iter.as_iter(0 .. 4) |> iter.collect();
+    println(arr.count);
+    delete(&arr);
+
+    set := iter.as_iter(i32.[1, 2, 2, 3]) |> iter.collect_set();
+    println(set->has(2));
+    delete(&set);
+
+    m := make(Map(i32, i32));
+    m[1] = 10;
+    m2 := m->copy();
+    println(m2[1] ?? -1);
+    delete(&m2);
+    delete(&m);
+}

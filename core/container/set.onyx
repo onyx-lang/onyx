@@ -48,7 +48,7 @@ Set.from :: (arr: [] $T, allocator := context.allocator) -> Set(T) {
 }
 
 #overload
-builtin.__make_overload :: macro (x: &Set, allocator: Allocator) =>
+builtin.__make_overload :: macro (x: &Set, allocator := context.allocator) =>
     #this_package.Set.make(x.Elem_Type, allocator = allocator);
 
 Set.init :: (set: &Set($T), allocator := context.allocator) {
@@ -60,13 +60,25 @@ Set.init :: (set: &Set($T), allocator := context.allocator) {
     Array.init(&set.entries, 4, allocator=allocator); 
 }
 
-Set.free :: (use set: &Set) {
+/// Frees the set. Prefer `delete(&set)`.
+Set.delete :: (use set: &Set) {
     memory.free_slice(&hashes, allocator=allocator);
     Array.free(&entries);
 }
 
+Set.free :: Set.delete
+
 #overload
-builtin.delete :: #this_package.Set.free
+builtin.delete :: Set.delete
+
+/// Allocates a new set with the same elements.
+Set.copy :: (old: &Set, allocator := context.allocator) -> Set(old.Elem_Type) {
+    out: Set(old.Elem_Type);
+    out.allocator = allocator;
+    out.hashes = Array.copy(old.hashes, allocator);
+    out.entries = Array.copy(&old.entries, allocator);
+    return out;
+}
 
 Set.insert :: (use set: &Set, value: set.Elem_Type) {
     if hashes.data == null do Set.init(set);
@@ -245,6 +257,8 @@ __for_expansion :: macro (set: &Set($T), $flags: __For_Expansion_Flags, $body: C
 make     :: Set.make
 init     :: Set.init
 free     :: Set.free
+delete   :: Set.delete
+copy     :: Set.copy
 has      :: Set.has
 get      :: Set.get
 get_ptr  :: Set.get_ptr

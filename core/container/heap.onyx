@@ -16,6 +16,19 @@ Heap.delete :: (h: &Heap) {
     Array.free(&h.data);
 }
 
+/// Drops every element and keeps the backing array.
+Heap.clear :: (use h: &Heap) {
+    Array.clear(&data);
+}
+
+/// Allocates a new heap with the same elements and comparison.
+Heap.copy :: (h: &Heap, allocator := context.allocator) -> Heap(h.T) {
+    out: Heap(h.T);
+    out.compare = h.compare;
+    out.data = Array.copy(&h.data, allocator);
+    return out;
+}
+
 #overload
 builtin.delete :: Heap.delete
 
@@ -83,6 +96,8 @@ remove_top :: Heap.remove_top
 pop :: Heap.pop
 remove :: Heap.remove
 delete :: Heap.delete
+clear :: Heap.clear
+copy :: Heap.copy
 
 
 #local {

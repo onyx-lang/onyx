@@ -961,6 +961,27 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
                 return Check_Error;
             }
 
+            // `delete` is defined inside a runtime `#if` in builtin.onyx, so it is
+            // not visible during initialize_builtins. Resolve it the first time a
+            // #match fails.
+            if (!context->builtins.delete_match) {
+                Package *builtin_pkg = package_lookup(context, "builtin");
+                if (builtin_pkg) {
+                    AstNode *n = symbol_raw_resolve(context, builtin_pkg->scope, "delete");
+                    if (n && n->kind == Ast_Kind_Overloaded_Function) {
+                        context->builtins.delete_match = (AstOverloadedFunction *) n;
+                    }
+                }
+            }
+
+            if (context->builtins.delete_match
+                && (AstOverloadedFunction *) callee == context->builtins.delete_match)
+            {
+                ONYX_ERROR(call->token->pos, Error_Critical,
+                    "`delete` is for containers. Use `cfree` for values from `new`.");
+                return Check_Error;
+            }
+
             report_unable_to_match_overload(context, call, ((AstOverloadedFunction *) callee)->overloads);
             return Check_Error;
         }
