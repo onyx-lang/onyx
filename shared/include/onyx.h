@@ -42,6 +42,8 @@ typedef enum onyx_option_t {
     ONYX_OPTION_COLLECT_PERF,
 
     ONYX_OPTION_PLATFORM,
+
+    ONYX_OPTION_COMPILATION_DATA_DETAILED,
 } onyx_option_t;
 
 typedef enum onyx_pump_t {
@@ -166,6 +168,11 @@ API void    onyx_output_write(onyx_context_t *ctx, onyx_output_type_t type, void
 //
 // First write is the full log so far. Later writes are only events since the last
 // write. length does not advance the cursor; write does.
+//
+// Resolutions, bindings, and types are always recorded. They are included in the
+// payload only when ONYX_OPTION_COMPILATION_DATA_DETAILED is set. If that option
+// is turned on after some writes, the next write backfills those detailed events
+// from the start of the log, then any unread events.
 //
 
 API int32_t onyx_compilation_data_length(onyx_context_t *ctx);

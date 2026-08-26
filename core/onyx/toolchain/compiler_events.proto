@@ -32,6 +32,13 @@ message CompilerEvent {
     EventPackage pack = 12;
     EventScope scope = 13;
     EventSymbol symbol = 14;
+    // Detailed events below are always recorded. Delivery is gated:
+    // C ABI: ONYX_OPTION_COMPILATION_DATA_DETAILED
+    // Extensions: hook CompilationDataDetailed (3)
+    EventSymbolResolved resolved = 15;
+    EventBinding binding = 16;
+    EventType type = 17;
+    EventTypeBody type_body = 18;
   }
 }
 
@@ -70,4 +77,102 @@ message EventSymbol {
   uint32 line = 5;
   uint32 column = 6;
   uint32 kind = 7;
+}
+
+message EventSymbolResolved {
+  uint32 symbol_id = 1;
+  uint32 file_id = 2;
+  uint32 line = 3;
+  uint32 column = 4;
+  uint32 length = 5;
+}
+
+message EventBinding {
+  uint32 symbol_id = 1;
+  string documentation = 2;
+  uint32 type_id = 3;
+}
+
+message EventType {
+  uint32 id = 1;
+  uint32 kind = 2;
+  string name = 3;
+
+  // Known at type creation. Struct/union member lists come later.
+  oneof body {
+    TypeBasic basic = 10;
+    TypeElem elem = 11;           // pointer, multi-pointer, slice, dynarray, varargs
+    TypeArray array = 12;
+    TypeFunction function = 13;
+    TypeCompound compound = 14;
+    TypeDistinct distinct = 15;
+    TypeEnum enumeration = 16;
+  }
+}
+
+message TypeBasic {
+  uint32 basic_kind = 1;
+  uint32 size = 2;
+  uint32 alignment = 3;
+}
+
+message TypeElem {
+  uint32 elem_id = 1;
+}
+
+message TypeArray {
+  uint32 elem_id = 1;
+  uint32 count = 2;
+}
+
+message TypeFunction {
+  uint32 return_id = 1;
+  repeated uint32 param_ids = 2;
+}
+
+message TypeCompound {
+  repeated uint32 type_ids = 1;
+}
+
+message TypeDistinct {
+  uint32 base_id = 1;
+}
+
+message TypeEnum {
+  uint32 backing_id = 1;
+  bool is_flags = 2;
+}
+
+message EventTypeBody {
+  uint32 type_id = 1;
+  uint32 size = 2;
+  uint32 alignment = 3;
+  uint32 scope_id = 4;
+
+  oneof details {
+    TypeStructBody struct_body = 10;
+    TypeUnionBody union_body = 11;
+  }
+}
+
+message TypeStructMember {
+  string name = 1;
+  uint32 type_id = 2;
+  uint32 offset = 3;
+  uint32 idx = 4;
+}
+
+message TypeStructBody {
+  repeated TypeStructMember members = 1;
+}
+
+message TypeUnionVariant {
+  string name = 1;
+  uint32 type_id = 2;
+  uint32 tag = 3;
+}
+
+message TypeUnionBody {
+  uint32 tag_type_id = 1;
+  repeated TypeUnionVariant variants = 2;
 }

@@ -23,6 +23,14 @@ CompilerEvent :: struct {
     scope: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventScope
     @protobuf.Field.{14, 11}
     symbol: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventSymbol
+    @protobuf.Field.{15, 11}
+    resolved: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventSymbolResolved
+    @protobuf.Field.{16, 11}
+    binding: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventBinding
+    @protobuf.Field.{17, 11}
+    type: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventType
+    @protobuf.Field.{18, 11}
+    type_body: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventTypeBody
 }
 
 @protobuf.Message
@@ -83,5 +91,157 @@ EventSymbol :: struct {
     column: u32
     @protobuf.Field.{7, 13}
     kind: u32
+}
+
+@protobuf.Message
+EventSymbolResolved :: struct {
+    @protobuf.Field.{1, 13}
+    symbol_id: u32
+    @protobuf.Field.{2, 13}
+    file_id: u32
+    @protobuf.Field.{3, 13}
+    line: u32
+    @protobuf.Field.{4, 13}
+    column: u32
+    @protobuf.Field.{5, 13}
+    length: u32
+}
+
+@protobuf.Message
+EventBinding :: struct {
+    @protobuf.Field.{1, 13}
+    symbol_id: u32
+    @protobuf.Field.{2, 9}
+    documentation: str
+    @protobuf.Field.{3, 13}
+    type_id: u32
+}
+
+@protobuf.Message
+EventType :: struct {
+    @protobuf.Field.{1, 13}
+    id: u32
+    @protobuf.Field.{2, 13}
+    kind: u32
+    @protobuf.Field.{3, 9}
+    name: str
+    @protobuf.Field.{10, 11}
+    basic: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeBasic
+    @protobuf.Field.{11, 11}
+    elem: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeElem
+    @protobuf.Field.{12, 11}
+    array: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeArray
+    @protobuf.Field.{13, 11}
+    function: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeFunction
+    @protobuf.Field.{14, 11}
+    compound: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeCompound
+    @protobuf.Field.{15, 11}
+    distinct: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeDistinct
+    @protobuf.Field.{16, 11}
+    enumeration: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeEnum
+}
+
+@protobuf.Message
+TypeBasic :: struct {
+    @protobuf.Field.{1, 13}
+    basic_kind: u32
+    @protobuf.Field.{2, 13}
+    size: u32
+    @protobuf.Field.{3, 13}
+    alignment: u32
+}
+
+@protobuf.Message
+TypeElem :: struct {
+    @protobuf.Field.{1, 13}
+    elem_id: u32
+}
+
+@protobuf.Message
+TypeArray :: struct {
+    @protobuf.Field.{1, 13}
+    elem_id: u32
+    @protobuf.Field.{2, 13}
+    count: u32
+}
+
+@protobuf.Message
+TypeFunction :: struct {
+    @protobuf.Field.{1, 13}
+    return_id: u32
+    @protobuf.Field.{2, 13}
+    param_ids: [..] u32
+}
+
+@protobuf.Message
+TypeCompound :: struct {
+    @protobuf.Field.{1, 13}
+    type_ids: [..] u32
+}
+
+@protobuf.Message
+TypeDistinct :: struct {
+    @protobuf.Field.{1, 13}
+    base_id: u32
+}
+
+@protobuf.Message
+TypeEnum :: struct {
+    @protobuf.Field.{1, 13}
+    backing_id: u32
+    @protobuf.Field.{2, 8}
+    is_flags: bool
+}
+
+@protobuf.Message
+EventTypeBody :: struct {
+    @protobuf.Field.{1, 13}
+    type_id: u32
+    @protobuf.Field.{2, 13}
+    size: u32
+    @protobuf.Field.{3, 13}
+    alignment: u32
+    @protobuf.Field.{4, 13}
+    scope_id: u32
+    @protobuf.Field.{10, 11}
+    struct_body: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeStructBody
+    @protobuf.Field.{11, 11}
+    union_body: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeUnionBody
+}
+
+@protobuf.Message
+TypeStructMember :: struct {
+    @protobuf.Field.{1, 9}
+    name: str
+    @protobuf.Field.{2, 13}
+    type_id: u32
+    @protobuf.Field.{3, 13}
+    offset: u32
+    @protobuf.Field.{4, 13}
+    idx: u32
+}
+
+@protobuf.Message
+TypeStructBody :: struct {
+    @protobuf.Field.{1, 11}
+    members: [..] __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeStructMember
+}
+
+@protobuf.Message
+TypeUnionVariant :: struct {
+    @protobuf.Field.{1, 9}
+    name: str
+    @protobuf.Field.{2, 13}
+    type_id: u32
+    @protobuf.Field.{3, 13}
+    tag: u32
+}
+
+@protobuf.Message
+TypeUnionBody :: struct {
+    @protobuf.Field.{1, 13}
+    tag_type_id: u32
+    @protobuf.Field.{2, 11}
+    variants: [..] __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeUnionVariant
 }
 

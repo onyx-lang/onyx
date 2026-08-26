@@ -1818,6 +1818,8 @@ void track_declaration_for_symbol_info(Context *context, OnyxFilePos pos, AstNod
 }
 
 void track_documentation_for_symbol_info(Context *context, AstNode *node, AstBinding *binding) {
+    compilation_log_emit_binding(context, node, binding);
+
     if (!context->options.generate_lsp_info_file) return;
     if (!context->options.generate_symbol_info_file) return;
 
@@ -1840,6 +1842,8 @@ void track_documentation_for_symbol_info(Context *context, AstNode *node, AstBin
 }
 
 void track_resolution_for_symbol_info(Context *context, AstNode *original, AstNode *resolved) {
+    compilation_log_emit_symbol_resolved(context, original, resolved);
+
     if (!context->options.generate_symbol_info_file) return;
     if (!resolved) return;
 

@@ -2042,6 +2042,7 @@ typedef struct CompilerExtension {
 
     b32 supports_stalled_hook : 1;
     b32 supports_compilation_data : 1;
+    b32 supports_compilation_data_detailed : 1;
 
     u32 compilation_data_cursor;
 } CompilerExtension;
@@ -2069,6 +2070,7 @@ struct CompileOptions {
 
     b32 generate_symbol_info_file : 1;
     b32 generate_lsp_info_file    : 1;
+    b32 compilation_data_detailed : 1;
 
     b32 running_perf : 1;
 
@@ -2233,7 +2235,24 @@ typedef enum CompilationEventKind {
     COMPILATION_EVENT_PACKAGE = 2,
     COMPILATION_EVENT_SCOPE = 3,
     COMPILATION_EVENT_SYMBOL = 4,
+    COMPILATION_EVENT_SYMBOL_RESOLVED = 5,
+    COMPILATION_EVENT_BINDING = 6,
+    COMPILATION_EVENT_TYPE = 7,
+    COMPILATION_EVENT_TYPE_BODY = 8,
 } CompilationEventKind;
+
+typedef struct CompilationTypeMember {
+    char *name;
+    u32 type_id;
+    u32 offset;
+    u32 idx;
+} CompilationTypeMember;
+
+typedef struct CompilationTypeVariant {
+    char *name;
+    u32 type_id;
+    u32 tag;
+} CompilationTypeVariant;
 
 typedef struct CompilationEvent {
     CompilationEventKind kind;
@@ -2274,6 +2293,76 @@ typedef struct CompilationEvent {
             u32 column;
             u32 kind;
         } symbol;
+
+        struct {
+            u32 symbol_id;
+            u32 file_id;
+            u32 line;
+            u32 column;
+            u32 length;
+        } resolved;
+
+        struct {
+            u32 symbol_id;
+            char *documentation;
+            u32 type_id;
+        } binding;
+
+        struct {
+            u32 id;
+            u32 kind;
+            char *name;
+
+            union {
+                struct {
+                    u32 basic_kind;
+                    u32 size;
+                    u32 alignment;
+                } basic;
+
+                struct {
+                    u32 elem_id;
+                } elem;
+
+                struct {
+                    u32 elem_id;
+                    u32 count;
+                } array;
+
+                struct {
+                    u32 return_id;
+                    u32 param_count;
+                    u32 *param_ids;
+                } function;
+
+                struct {
+                    u32 count;
+                    u32 *type_ids;
+                } compound;
+
+                struct {
+                    u32 base_id;
+                } distinct;
+
+                struct {
+                    u32 backing_id;
+                    b32 is_flags;
+                } enumeration;
+            } body;
+        } type;
+
+        struct {
+            u32 type_id;
+            u32 size;
+            u32 alignment;
+            u32 scope_id;
+            b32 is_union;
+            u32 tag_type_id;
+            u32 member_count;
+            CompilationTypeMember *members;
+            u32 variant_count;
+            CompilationTypeVariant *variants;
+        } type_body;
     };
 } CompilationEvent;
 
@@ -2284,12 +2373,18 @@ typedef struct CompilationLog {
     u32 encoded_from;
     u32 encoded_to;
     b32 encoded_valid;
+    b32 encoded_include_detailed;
+    b32 encoded_backfill;
 
     u32 c_abi_cursor;
+    b32 c_abi_detailed_sent;
     u32 next_file_id;
     u32 next_symbol_id;
 
     Table(u32) file_ids;
+    bh_imap node_to_symbol_id;
+    bh_imap node_to_binding;
+    bh_imap symbol_binding_type_id;
 } CompilationLog;
 
 struct Context {
@@ -2541,7 +2636,12 @@ void compilation_log_emit_file(Context *context, const char *path);
 void compilation_log_emit_package(Context *context, Package *package);
 void compilation_log_emit_scope(Context *context, Scope *scope);
 void compilation_log_emit_symbol(Context *context, Scope *scope, char *name, OnyxFilePos pos, AstNode *node);
-void compilation_log_encode_range(Context *context, u32 from, u32 to, bh_buffer *out);
+void compilation_log_emit_symbol_resolved(Context *context, AstNode *original, AstNode *resolved);
+void compilation_log_emit_binding(Context *context, AstNode *node, AstBinding *binding);
+void compilation_log_notify_node_typed(Context *context, AstNode *node);
+void compilation_log_emit_type(Context *context, Type *type);
+void compilation_log_emit_type_body(Context *context, Type *type);
+void compilation_log_encode_range(Context *context, u32 from, u32 to, bh_buffer *out, b32 include_detailed);
 void compilation_log_ensure_c_abi_encoded(Context *context);
 
 

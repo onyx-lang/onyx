@@ -133,10 +133,10 @@ onyx_context_t *onyx_context_create() {
     bh_arena_init(&context->ast_arena, context->gp_alloc, 16 * 1024 * 1024); // 16MB
     context->ast_alloc = bh_arena_allocator(&context->ast_arena);
 
+    compilation_log_init(context);
     types_init(context);
     prepare_builtins(context);
     compiler_events_init(context);
-    compilation_log_init(context);
 
     context->options.use_post_mvp_features = 1;
     context->options.enable_optional_semicolons = 1;
@@ -679,6 +679,7 @@ int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t valu
     case ONYX_OPTION_DISABLE_FILE_CONTENTS:  ctx->context.options.no_file_contents = value; return 1;
     case ONYX_OPTION_DISABLE_EXTENSIONS:     ctx->context.options.no_compiler_extensions = value; return 1;
     case ONYX_OPTION_PLATFORM:               ctx->context.options.runtime = value; return 1;
+    case ONYX_OPTION_COMPILATION_DATA_DETAILED: ctx->context.options.compilation_data_detailed = value; return 1;
 
     default:
         break;
@@ -927,6 +928,7 @@ void onyx_compilation_data_write(onyx_context_t *ctx, void *buffer) {
     }
 
     log->c_abi_cursor = log->encoded_to;
+    if (log->encoded_include_detailed) log->c_abi_detailed_sent = 1;
     log->encoded_valid = 0;
 }
 

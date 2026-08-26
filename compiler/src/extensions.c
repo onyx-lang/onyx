@@ -15,8 +15,9 @@
 #define MSG_EXT_INJECT_CODE      3
 #define MSG_EXT_ACKNOWLEDGE_HOOK 4
 
-#define HOOK_STALLED            1
-#define HOOK_COMPILATION_DATA   2
+#define HOOK_STALLED                      1
+#define HOOK_COMPILATION_DATA             2
+#define HOOK_COMPILATION_DATA_DETAILED    3
 
 
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
@@ -203,7 +204,7 @@ static void compiler_extension_send_compilation_data(Context *context, CompilerE
 
     bh_buffer buf;
     bh_buffer_init(&buf, context->gp_alloc, 256);
-    compilation_log_encode_range(context, from, to, &buf);
+    compilation_log_encode_range(context, from, to, &buf, ext->supports_compilation_data_detailed);
 
     extension_send_int(ext, MSG_HOST_COMPILATION_DATA);
     extension_send_bytes(ext, buf.data, buf.length);
@@ -295,6 +296,10 @@ b32 compiler_extension_negotiate_capabilities(Context *context, CompilerExtensio
 
             if (hook == HOOK_STALLED) ext->supports_stalled_hook = 1;
             if (hook == HOOK_COMPILATION_DATA) ext->supports_compilation_data = 1;
+            if (hook == HOOK_COMPILATION_DATA_DETAILED) {
+                ext->supports_compilation_data = 1;
+                ext->supports_compilation_data_detailed = 1;
+            }
         }
     }
 

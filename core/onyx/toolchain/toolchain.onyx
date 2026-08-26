@@ -110,6 +110,10 @@ Builder.generate_output :: (
 /// Unread compilation events since the last call, decoded as `CompilerEvents`.
 /// The first call returns the full log so far; later calls return only new events.
 /// Append successive results to reconstruct the complete log.
+///
+/// Resolutions, bindings, and types are omitted unless
+/// `.COMPILATION_DATA_DETAILED` is enabled. Enabling it after a prior read
+/// backfills those events on the next call.
 Builder.compilation_data :: (use self: &#Self, allocator := context.allocator) -> CompilerEvents {
     length := native.onyx_compilation_data_length(ctx)
     if length <= 0 {

@@ -61,6 +61,18 @@ use protobuf.onyx.toolchain.events { CompilerEvents }
 //
 // INCOMING HOOK (3)
 //     Added
+//
+// PROTOCOL VERSION 3 CHANGES
+//
+// INCOMING COMPILATIONDATA (4)
+//     Added
+//
+// OUTGOING INIT hooks
+//     2 = CompilationData (basic events)
+//     3 = CompilationDataDetailed (also resolutions, bindings, types)
+//     Hook 3 implies hook 2. Detailed events are always recorded; hook 3
+//     only gates whether they are sent. First dump after INIT includes
+//     the full history so far.
 
 
 // Types
@@ -149,6 +161,8 @@ HookInfo :: union {
 
     CompilationData: struct {}
 
+    CompilationDataDetailed: struct {}
+
     Count: void
 }
 
@@ -167,6 +181,7 @@ ExtensionContext :: struct {
 
     running: bool
     wants_compilation_data: bool
+    wants_compilation_data_detailed: bool
     compiler_events: CompilerEvents
 }
 
@@ -199,7 +214,28 @@ ExtensionContext.start :: (self: &#Self, callback: (&#Self, msg: IncomingMessage
                     }
                 }
 
-                if self.wants_compilation_data {
+                if self.wants_compilation_data || self.wants_compilation_data_detailed {
+                    found := false
+                    for h in hooks {
+                        if h == 2 do found = true
+                    }
+                    if !found do hooks->push(2)
+                }
+
+                if self.wants_compilation_data_detailed {
+                    found := false
+                    for h in hooks {
+                        if h == 3 do found = true
+                    }
+                    if !found do hooks->push(3)
+                }
+
+                // A detailed hook implies compilation-data messages.
+                has_detailed_hook := false
+                for h in hooks {
+                    if h == 3 do has_detailed_hook = true
+                }
+                if has_detailed_hook {
                     found := false
                     for h in hooks {
                         if h == 2 do found = true
@@ -288,6 +324,12 @@ ExtensionContext.handle_hook :: (self: &#Self, hook: HookInfo.tag_enum, func: (&
 ExtensionContext.enable_compilation_data :: (self: &#Self) {
     if self.protocol_version < 3 do self.protocol_version = 3
     self.wants_compilation_data = true
+}
+
+ExtensionContext.enable_compilation_data_detailed :: (self: &#Self) {
+    if self.protocol_version < 3 do self.protocol_version = 3
+    self.wants_compilation_data = true
+    self.wants_compilation_data_detailed = true
 }
 
 

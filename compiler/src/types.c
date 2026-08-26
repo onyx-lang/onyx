@@ -19,6 +19,8 @@ static void type_register(Context *context, Type* type) {
     if (type->ast_type) type->ast_type->type_id = type->id;
 
     bh_imap_put(&context->types.type_map, type->id, (u64) type);
+    compilation_log_emit_type(context, type);
+    if (type->ast_type) compilation_log_notify_node_typed(context, (AstNode *) type->ast_type);
 }
 
 void types_init(Context *context) {
@@ -840,7 +842,10 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
             u_type->Union.alignment = alignment;
             u_type->Union.size = size + alignment; // Add the size of the tag
             u_type->Union.tag_type = type_build_from_ast(context, (AstType *) tag_enum_node);
-            u_type->Union.status = SPS_Uses_Done;
+            if (u_type->Union.status != SPS_Uses_Done) {
+                u_type->Union.status = SPS_Uses_Done;
+                compilation_log_emit_type_body(context, u_type);
+            }
 
             return u_type;
         }
@@ -1016,7 +1021,10 @@ Type* type_build_implicit_type_of_struct_literal(Context *context, AstStructLite
     type->Struct.alignment = alignment;
     type->Struct.size = size;
 
-    type->Struct.status = SPS_Uses_Done;
+    if (type->Struct.status != SPS_Uses_Done) {
+        type->Struct.status = SPS_Uses_Done;
+        compilation_log_emit_type_body(context, type);
+    }
     lit->generated_inferred_type = type;
     return type;
 }
@@ -1104,11 +1112,11 @@ Type* type_make_slice(Context *context, Type* of) {
 
     } else {
         Type* slice_type = type_create(context, Type_Kind_Slice, 0);
+        slice_type->Slice.elem = of;
         type_register(context, slice_type);
         bh_imap_put(&context->types.slice_map, of->id, slice_type->id);
 
         type_make_multi_pointer(context, of);
-        slice_type->Slice.elem = of;
 
         AstPolyStructType* pslice_type = (AstPolyStructType *) context->builtins.slice_type;
         OnyxFilePos pos = { 0 };
@@ -1130,11 +1138,11 @@ Type* type_make_dynarray(Context *context, Type* of) {
 
     } else {
         Type* dynarr = type_create(context, Type_Kind_DynArray, 0);
+        dynarr->DynArray.elem = of;
         type_register(context, dynarr);
         bh_imap_put(&context->types.dynarr_map, of->id, dynarr->id);
 
         type_make_multi_pointer(context, of);
-        dynarr->DynArray.elem = of;
 
         AstPolyStructType* dynarr_type = (AstPolyStructType *) context->builtins.array_type;
         OnyxFilePos pos = { 0 };
@@ -1156,11 +1164,11 @@ Type* type_make_varargs(Context *context, Type* of) {
 
     } else {
         Type* va_type = type_create(context, Type_Kind_VarArgs, 0);
+        va_type->VarArgs.elem = of;
         type_register(context, va_type);
         bh_imap_put(&context->types.vararg_map, of->id, va_type->id);
 
         type_make_multi_pointer(context, of);
-        va_type->VarArgs.elem = of;
 
         return va_type;
     }

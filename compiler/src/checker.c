@@ -4426,7 +4426,10 @@ CHECK_FUNC(struct, AstStructType* s_node) {
     }
 
     s_node->stcache = s_node->pending_type;
-    s_node->stcache->Struct.status = SPS_Uses_Done;
+    if (s_node->stcache->Struct.status != SPS_Uses_Done) {
+        s_node->stcache->Struct.status = SPS_Uses_Done;
+        compilation_log_emit_type_body(context, s_node->stcache);
+    }
 
     scope_leave(context);
     return Check_Success;
@@ -6094,6 +6097,34 @@ CHECK_FUNC(proc_expansion, AstProceduralExpansion **pexp, ProceduralMacroExpansi
     return Check_Success;
 }
 
+static AstNode *entity_typed_node(Entity *ent) {
+    if (!ent) return NULL;
+
+    switch (ent->type) {
+        case Entity_Type_Binding:                return ent->binding ? ent->binding->node : NULL;
+        case Entity_Type_Foreign_Function_Header:
+        case Entity_Type_Temp_Function_Header:
+        case Entity_Type_Function_Header:
+        case Entity_Type_Function:
+        case Entity_Type_Polymorphic_Proc:       return (AstNode *) ent->function;
+        case Entity_Type_Overloaded_Function:    return (AstNode *) ent->overloaded_function;
+        case Entity_Type_Global_Header:
+        case Entity_Type_Global:                 return (AstNode *) ent->global;
+        case Entity_Type_String_Literal:         return (AstNode *) ent->strlit;
+        case Entity_Type_Expression:
+        case Entity_Type_Process_Directive:      return (AstNode *) ent->expr;
+        case Entity_Type_Type_Alias:
+        case Entity_Type_Struct_Member_Default:  return (AstNode *) ent->type_alias;
+        case Entity_Type_Enum:                   return (AstNode *) ent->enum_type;
+        case Entity_Type_Enum_Value:             return (AstNode *) ent->enum_value;
+        case Entity_Type_Memory_Reservation_Type:
+        case Entity_Type_Memory_Reservation:     return (AstNode *) ent->mem_res;
+        case Entity_Type_Macro:                  return (AstNode *) ent->macro;
+        case Entity_Type_Interface:              return (AstNode *) ent->interface;
+        default:                                 return NULL;
+    }
+}
+
 void check_entity(Context *context, Entity* ent) {
     CheckStatus cs = Check_Success;
 
@@ -6179,6 +6210,9 @@ void check_entity(Context *context, Entity* ent) {
     clear_attempts:
         ent->macro_attempts = 0;
         ent->micro_attempts = 0;
+        if (cs == Check_Success || cs == Check_Complete) {
+            compilation_log_notify_node_typed(context, entity_typed_node(ent));
+        }
 
         default: break;
     }

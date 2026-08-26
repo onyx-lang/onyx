@@ -14,6 +14,10 @@ void pb_write_tag(bh_buffer *buf, u32 field, u32 wire) {
 
 void pb_write_uint32(bh_buffer *buf, u32 field, u32 v) {
     if (v == 0) return;
+    pb_write_uint32_always(buf, field, v);
+}
+
+void pb_write_uint32_always(bh_buffer *buf, u32 field, u32 v) {
     pb_write_tag(buf, field, PB_WIRE_VARINT);
     pb_write_varint(buf, v);
 }
