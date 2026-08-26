@@ -166,8 +166,10 @@ Map.get_opt :: (use map: &Map, key: map.Key_Type) -> ?map.Value_Type {
     return .{};
 }
 
-/// Removes an entry from the map.
-Map.delete :: (use map: &Map, key: map.Key_Type) {
+/// Removes `key` and its value, if present.
+///
+///     m->remove("Ada");
+Map.remove :: (use map: &Map, key: map.Key_Type) {
     lr := lookup(map, key);
     if lr.entry_index < 0 do return;
 
@@ -179,12 +181,14 @@ Map.delete :: (use map: &Map, key: map.Key_Type) {
         return;
     }
 
-    Array.fast_delete(&entries, lr.entry_index);
+    Array.unordered_remove(&entries, lr.entry_index);
     last := lookup(map, entries[lr.entry_index].key);
 
     if last.entry_prev >= 0    do entries[last.entry_prev].next = lr.entry_index;
     else                       do hashes[last.hash_index] = lr.entry_index;
 }
+
+Map.delete :: Map.remove
 
 /// Helper macro that finds a value by the key, and if it exists,
 /// runs the code, providing an `it` variable that is a pointer
@@ -388,6 +392,7 @@ get_ptr :: Map.get_ptr
 get_opt :: Map.get_opt
 get_ptr_or_create :: Map.get_ptr_or_create
 put :: Map.put
+remove :: Map.remove
 delete :: Map.delete
 update :: Map.update
 clear :: Map.clear

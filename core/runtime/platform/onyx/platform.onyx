@@ -155,6 +155,33 @@ __start :: () {
         memwatch.enable_in_scope(context.allocator);
     }
 
+    #if #defined(runtime.vars.LEAKCHECK) {
+        use core.alloc.gc
+        gcs := gc.make();
+        old_allocator := context.allocator;
+        context.allocator = alloc.as_allocator(&gcs);
+        defer {
+            leaked_bytes := 0;
+            leaked_allocs := 0;
+
+            while l := gcs.first; l != null {
+                n := l.next;
+                size := *cast(&u32) (cast([&] u8) l - 8);
+                printf("[LEAK] {} bytes\n", size);
+                leaked_bytes += size;
+                leaked_allocs += 1;
+
+                l = n;
+            }
+
+            if leaked_allocs > 0 {
+                printf("[LEAK] total: {} bytes in {} allocations\n", leaked_bytes, leaked_allocs);
+            }
+
+            __flush_stdio();
+        }
+    }
+
     #if (typeof MAIN_FUNCTION) == #type () -> void { // An error on this line means no 'main.main' was found in your program.
         MAIN_FUNCTION();
 

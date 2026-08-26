@@ -693,7 +693,7 @@ generic_dynamic_array_as_iter :: (x: &[..] $T, $access: Code, $return_type: type
         //
         // This is current - 1 because current will have already
         // been incremented by the time this element calls #remove.
-        array.delete(arr, current - 1);
+        Array.remove_at(arr, current - 1);
         current -= 1;
     }
 

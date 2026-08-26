@@ -1,0 +1,63 @@
+use core {*}
+
+// @leak-check — this test frees every container it allocates.
+
+main :: () {
+    a := make([..] i32);
+    a << 10;
+    a << 20;
+    a << 30;
+    println(a->remove_at(1));
+    println(a->unordered_remove(0));
+    a->remove(30);
+    println(a.count);
+    delete(&a);
+
+    b := make([..] i32);
+    b << 1;
+    b << 2;
+    b << 3;
+    println(b->delete(1));
+    delete(&b);
+
+    m := make(Map(str, i32));
+    m["a"] = 1;
+    m["b"] = 2;
+    m->remove("a");
+    println(m["a"] ?? -1);
+    println(m["b"] ?? -1);
+    delete(&m);
+
+    l := List.make(i32);
+    l->push_end(1);
+    l->push_end(2);
+    println(l->count());
+    delete(&l);
+
+    l2 := make(List(i32));
+    l2->push_end(9);
+    delete(&l2);
+
+    h := Heap.make(i32, (x, y) => x - y);
+    h << 3;
+    h << 1;
+    h << 2;
+    println(h->pop() ?? -1);
+    delete(&h);
+
+    h2 := make(Heap(i32));
+    delete(&h2);
+
+    s := make(Set(i32));
+    s->insert(5);
+    s->remove(5);
+    println(s->empty());
+    delete(&s);
+
+    {
+        use scoped := make([..] i32);
+        scoped << 9;
+    }
+
+    println("ok");
+}

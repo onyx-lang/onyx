@@ -118,7 +118,7 @@ Set.remove :: (use set: &Set, value: set.Elem_Type) {
         return;
     }
 
-    Array.fast_delete(&entries, lr.entry_index);
+    Array.unordered_remove(&entries, lr.entry_index);
     last := lookup(set, entries[lr.entry_index].value);
     if last.entry_prev >= 0    do entries[last.entry_prev].next = lr.entry_index;
     else                       do hashes[last.hash_index] = lr.entry_index;

@@ -54,30 +54,30 @@ range_new :: () {
 }
 
 main :: () {
-     m := Map.literal(u32, str, .[
-         .{0, "Test"}
-         .{1, "Foo"}
-         .{2, "Cowabunga"}
-     ])
-     for k, v in m {
-         printf("{}: {}\n", k, v)
-         if k == 1 do break
-     }
+    m := Map.literal(u32, str, .[
+        .{0, "Test"}
+        .{1, "Foo"}
+        .{2, "Cowabunga"}
+    ])
+    for k, v in m {
+        printf("{}: {}\n", k, v)
+        if k == 1 do break
+    }
+
+ 
+    s := Set.from(.[1, 2, 3, 4, 5])
+    for v in s {
+        println(v)
+    }
  
  
-     s := Set.from(.[1, 2, 3, 4, 5])
-     for v in s {
-         println(v)
-     }
+    i := Iterator.from(s)
+    for v, c in i {
+        printf("c: {} ({})    v: {}\n", c, typeof c, *v)
+    }
  
- 
-     i := Iterator.from(s)
-     for v, c in i {
-         printf("c: {} ({})    v: {}\n", c, typeof c, *v)
-     }
- 
-     ap := ArrPair.make(.[1, 2, 3], .["a", "b", "c"])
-     for v1, v2 in ap {
-         printf("{}, {}\n", v1, v2)
-     }
+    ap := ArrPair.make(.[1, 2, 3], .["a", "b", "c"])
+    for v1, v2 in ap {
+        printf("{}, {}\n", v1, v2)
+    }
 }

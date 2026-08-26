@@ -49,7 +49,7 @@ Channel.recv :: (chan: &Channel) -> ? chan.T {
     }
 
     res := chan._buf[0];
-    array.delete(&chan._buf, 0);
+    Array.remove_at(&chan._buf, 0);
 
     return res;
 }

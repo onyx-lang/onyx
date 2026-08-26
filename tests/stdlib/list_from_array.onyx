@@ -1,10 +1,13 @@
 use core {println}
 use core.list
 
+// @leak-check
+
 main :: () {
     arr := i32.[1];
     l := list.from_array(arr);
     for elem in l->as_iter() {
         println(elem);
     }
+    delete(&l);
 }

@@ -225,10 +225,14 @@ Array.remove :: (arr: &[..] $T, elem: T) {
     arr.count -= move;
 }
 
-/// Removes the element at index `idx` from the array and returns it.
+/// Removes the element at `idx` and returns it, keeping the rest in order.
 ///
-/// Maintains order of the array.
-Array.delete :: (arr: &[..] $T, idx: u32) -> T {
+///     arr := array.make(.[ 2, 3, 5, 7 ]);
+///     x := arr->remove_at(1);  // 3
+///     // arr is 2, 5, 7
+///
+/// If `idx` is out of range, returns a zeroed value.
+Array.remove_at :: (arr: &[..] $T, idx: u32) -> T {
     if idx >= arr.count do return .{};
 
     to_return := arr.data[idx];
@@ -240,10 +244,10 @@ Array.delete :: (arr: &[..] $T, idx: u32) -> T {
     return to_return;
 }
 
-/// Removes the element at index `idx` from the array and returns it.
+/// Removes the element at `idx` and returns it, filling the gap with the last element.
 ///
-/// Order is not guaranteed to be preserved.
-Array.fast_delete :: (arr: &[..] $T, idx: u32) -> T {
+/// Faster than `remove_at` when you do not need to keep order.
+Array.unordered_remove :: (arr: &[..] $T, idx: u32) -> T {
     if idx >= arr.count do return .{};
 
     to_return := arr.data[idx];
@@ -252,6 +256,9 @@ Array.fast_delete :: (arr: &[..] $T, idx: u32) -> T {
 
     return to_return;
 }
+
+Array.delete :: Array.remove_at
+Array.fast_delete :: Array.unordered_remove
 
 /// Removes `n` elements from the end of the array.
 Array.pop :: (arr: &[..] $T, n := 1) -> T {
@@ -309,7 +316,7 @@ Array.filter :: macro (arr: &[..] $T, body: Code) {
 __for_expansion :: macro (_s: &[..] $T, $flags: __For_Expansion_Flags, $body: Code)
 {
     remove_element :: macro () {
-        Array.delete(__s, __i)
+        Array.remove_at(__s, __i)
         __i -= 1
         __count -= 1
     }
@@ -362,6 +369,8 @@ push :: Array.push
 insert :: Array.insert
 insert_empty :: Array.insert_empty
 remove :: Array.remove
+remove_at :: Array.remove_at
+unordered_remove :: Array.unordered_remove
 delete :: Array.delete
 fast_delete :: Array.fast_delete
 pop :: Array.pop

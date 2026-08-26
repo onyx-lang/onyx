@@ -51,9 +51,11 @@ insert :: (ptree: & &AVL_Tree($T), data: T) {
     }
 }
 
-delete :: (tree: &AVL_Tree, data: tree.T) {
+remove :: (tree: &AVL_Tree, data: tree.T) {
 
 }
+
+delete :: remove
 
 contains :: (tree: &AVL_Tree, data: tree.T) -> bool {
     if tree == null do return false;

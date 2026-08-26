@@ -3,6 +3,8 @@ use core.list
 
 use core {println}
 
+// @leak-check
+
 main :: () {
     l := list.make(i32);
 
@@ -23,4 +25,7 @@ main :: () {
     for float_list->as_iter() {
         println(it);
     }
+
+    delete(&float_list);
+    delete(&l);
 }

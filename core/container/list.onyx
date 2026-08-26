@@ -1,5 +1,4 @@
 package core.list
-#allow_stale_code
 
 use core
 
@@ -16,6 +15,34 @@ List :: struct (Elem_Type: type_expr) {
     last:  &ListElem(Elem_Type) = null;
 }
 
+builtin.List :: List
+
+/// Creates an empty list.
+///
+///     l := make(List(i32));
+///     l->push_end(1);
+///     delete(&l);
+List.make :: ($T: type_expr, allocator := context.allocator) -> List(T) {
+    return .{ allocator = allocator };
+}
+
+/// Prepares an existing list to use `allocator`. The list starts empty.
+List.init :: (list: &List($T), allocator := context.allocator) {
+    list.allocator = allocator;
+    list.first = null;
+    list.last = null;
+}
+
+/// Frees the list. Prefer `delete(&list)`.
+List.delete :: (list: &List) {
+    free(list);
+}
+
+/// Removes every element so the list can be filled again.
+List.clear :: (list: &List) {
+    free(list);
+}
+
 List.free         :: free
 List.push_end     :: push_end
 List.push_begin   :: push_begin
@@ -28,14 +55,15 @@ List.fold         :: fold
 List.map          :: map
 List.as_iter      :: as_iter
 
-make :: ($T: type_expr, allocator := context.allocator) -> List(T) {
-    return .{ allocator = allocator };
-}
+make :: List.make
 
 #overload
 __make_overload :: (_: &List($T), allocator := context.allocator) -> List(T) {
-    return #this_package.make(T, allocator);
+    return List.make(T, allocator);
 }
+
+#overload
+builtin.delete :: List.delete
 
 from_array :: (arr: [] $T, allocator := context.allocator) -> List(T) {
     l := make(T, allocator);
@@ -52,6 +80,9 @@ free :: (list: &List) {
         elem = elem.next;
         raw_free(list.allocator, to_delete);
     }
+
+    list.first = null;
+    list.last = null;
 }
 
 push_end :: (list: &List, x: list.Elem_Type) {

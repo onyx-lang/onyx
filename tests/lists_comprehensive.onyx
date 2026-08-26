@@ -1,5 +1,7 @@
 use core {*}
 
+// @leak-check
+
 main :: () {
     l := make(list.List(i32));
 
@@ -33,4 +35,5 @@ main :: () {
 
     println(list.count(&l));
     println(list.empty(&l));
+    delete(&l);
 }

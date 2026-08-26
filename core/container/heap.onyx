@@ -5,24 +5,28 @@ Heap :: struct (T: type_expr) {
     compare: (T, T) -> i32 = null_proc;
 }
 
+builtin.Heap :: Heap
+
 #overload
-__make_overload :: macro (_: &Heap($T), allocator: Allocator) -> Heap(T) {
-    return #this_package.Heap.make(T);
+__make_overload :: macro (_: &Heap($T), allocator := context.allocator) -> Heap(T) {
+    return Heap.make(T, allocator = allocator);
+}
+
+Heap.delete :: (h: &Heap) {
+    Array.free(&h.data);
 }
 
 #overload
-delete :: (h: &Heap) {
-    delete(&h.data);
-}
+builtin.delete :: Heap.delete
 
-Heap.make :: ($T: type_expr, cmp: (T, T) -> i32 = null_proc) -> Heap(T) {
+Heap.make :: ($T: type_expr, cmp: (T, T) -> i32 = null_proc, allocator := context.allocator) -> Heap(T) {
     h: Heap(T);
-    Heap.init(&h, cmp);
+    Heap.init(&h, cmp, allocator);
     return h;
 }
 
-Heap.init :: (use heap: &Heap, cmp: (heap.T, heap.T) -> i32 = null_proc) {
-    Array.init(&data);
+Heap.init :: (use heap: &Heap, cmp: (heap.T, heap.T) -> i32 = null_proc, allocator := context.allocator) {
+    Array.init(&data, allocator = allocator);
     compare = cmp;
 }
 
@@ -46,17 +50,19 @@ Heap.remove_top :: (use heap: &Heap) -> ? heap.T {
     if data.count == 0 do return .None;
 
     x := data[0];
-    data->fast_delete(0);
+    data->unordered_remove(0);
     shift_down(heap, 0);
     return x;
 }
+
+Heap.pop :: Heap.remove_top
 
 Heap.remove :: macro (heap: &Heap, cond: Code) -> ? heap.T {
     shift_down :: shift_down
 
     for e, i in heap.data {
         if #unquote cond(e) {
-            x := heap.data->fast_delete(i);
+            x := heap.data->unordered_remove(i);
             shift_down(heap, i);
             return x;
         }
@@ -74,7 +80,9 @@ insert :: Heap.insert
 empty :: Heap.empty
 peek_top :: Heap.peek_top
 remove_top :: Heap.remove_top
+pop :: Heap.pop
 remove :: Heap.remove
+delete :: Heap.delete
 
 
 #local {
