@@ -4,6 +4,9 @@ package core.encoding.json
 use core {*}
 
 /// Decode JSON text into a `Json` tree. Prefer this over `decode_with_error`.
+decode :: #match #local {}
+
+#overload
 decode :: (data: str, allocator := context.allocator) -> Result(Json, Error) {
     root, err := parse(data, allocator);
     if err.kind != .None {
@@ -13,6 +16,13 @@ decode :: (data: str, allocator := context.allocator) -> Result(Json, Error) {
     return .{
         Ok = .{ allocator, root }
     };
+}
+
+#overload
+decode :: (r: &io.Reader, allocator := context.allocator) -> Result(Json, Error) {
+    d := Decoder.make(r, allocator);
+    defer d->delete();
+    return d->decode();
 }
 
 decode_with_result :: decode
@@ -77,6 +87,13 @@ decode_as :: (data: str, $T: type_expr, allocator := context.allocator) -> Resul
     defer delete(obj);
 
     return from_value(obj.root, T);
+}
+
+#overload
+decode_as :: (r: &io.Reader, $T: type_expr, allocator := context.allocator) -> Result(T, Error) {
+    d := Decoder.make(r, allocator);
+    defer d->delete();
+    return d->decode_as(T);
 }
 
 /// Tree → T. Also `j.root->decode_as(Person)` / `j->decode_as(Person)`.
@@ -154,4 +171,52 @@ decode_jsonl :: (data: str, $T: type_expr, allocator := context.allocator) -> Re
     }
 
     return .{ Ok = out };
+}
+
+/// Streaming decoder over a `Reader`. Each `decode` / `decode_as` reads the next JSON value
+/// and keeps leftover bytes for the next call, so JSONL and concatenated values both work.
+Decoder :: struct {
+    parser: Parser
+    allocator: Allocator
+}
+
+Decoder.make :: (r: &io.Reader, allocator := context.allocator) -> Decoder {
+    return .{
+        parser = make_parser_reader(r, allocator)
+        allocator = allocator
+    }
+}
+
+Decoder.delete :: (d: &Decoder) {
+    parser_free(&d.parser)
+}
+
+#overload builtin.delete :: Decoder.delete
+__dispose_used_local :: Decoder.delete
+
+/// True if another JSON value appears to be in the stream.
+Decoder.more :: (d: &Decoder) -> bool {
+    return d.parser.current_token.kind != .Invalid
+}
+
+Decoder.decode :: (d: &Decoder) -> Result(Json, Error) {
+    if !d->more() {
+        return .{ Err = .{ .EOF, d.parser.tokenizer.position } }
+    }
+
+    root, err := parse_value(&d.parser)
+    if err.kind != .None {
+        return .{ Err = err }
+    }
+
+    parser_compact(&d.parser)
+    return .{ Ok = .{ d.allocator, root } }
+}
+
+Decoder.decode_as :: (d: &Decoder, $T: type_expr) -> Result(T, Error) {
+    obj := d->decode()->catch([err] {
+        return return .{ Err = err }
+    })
+    defer delete(obj)
+    return from_value(obj.root, T)
 }

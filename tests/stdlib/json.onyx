@@ -83,4 +83,42 @@ main :: () {
     defer json.free(v, context.allocator);
     json.encode(&stdio.print_writer, v);
     println("");
+
+    reader, rstream := io.reader_from_string("[1,2,3]");
+    defer {
+        delete(&reader);
+        cfree(rstream);
+    }
+    use dec := json.Decoder.make(&reader);
+    arr := dec->decode()!;
+    defer delete(arr);
+    println(arr.root[0]->as_int());
+    println(arr.root[2]->as_int());
+    println(dec->more());
+
+    reader2, rstream2 := io.reader_from_string("1\n2\n\n3");
+    defer {
+        delete(&reader2);
+        cfree(rstream2);
+    }
+    use dec2 := json.Decoder.make(&reader2);
+    n := 0;
+    sum := 0;
+    while dec2->more() {
+        x := dec2->decode_as(i32)!;
+        n += 1;
+        sum += x;
+    }
+    println(n);
+    println(sum);
+
+    estream := io.buffer_stream_make(64);
+    ewriter := io.writer_make(&estream, 0);
+    defer io.buffer_stream_free(&estream);
+    enc := json.Encoder.make(&ewriter, newline=true);
+    enc->encode(1);
+    enc->encode(2);
+    io.writer_flush(&ewriter);
+    println(io.buffer_stream_to_str(&estream));
+    delete(&ewriter);
 }

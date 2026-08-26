@@ -6,9 +6,18 @@
 package core.encoding.json
 #allow_stale_code
 
+use core.array
+use core.io
+use core.memory
+
+#local
+TOKENIZER_CHUNK :: 256
+
 #package
 Tokenizer :: struct {
     data: [] u8;
+    reader: &io.Reader;
+    buf: dyn_str;
     use position := Position.{ 0, 1, 1 };
 }
 
@@ -46,6 +55,42 @@ Position :: struct {
     line, column : u32;  // Line and column number
 }
 
+#local
+ensure :: (use tkn: ^Tokenizer, n: u32) -> bool {
+    if reader == null {
+        return offset + n <= data.count;
+    }
+
+    while true {
+        if offset > data.count do return false;
+        remaining := data.count - offset;
+        if remaining >= n do return true;
+        if !fill(tkn) do return false;
+    }
+
+    return false;
+}
+
+#local
+fill :: (use tkn: ^Tokenizer) -> bool {
+    if reader == null do return false;
+
+    Array.ensure_capacity(&buf, buf.count + TOKENIZER_CHUNK);
+    space := buf.capacity - buf.count;
+    if space == 0 do return false;
+
+    dest: [] u8;
+    dest.data = buf.data + buf.count;
+    dest.count = space;
+
+    nread, _ := reader->read_bytes(dest);
+    if nread <= 0 do return false;
+
+    buf.count += cast(u32) nread;
+    data = buf;
+    return true;
+}
+
 #package
 token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
     err := Error.{};
@@ -54,8 +99,7 @@ token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
     token := Token.{};
     token.position = tkn.position;
 
-    curr_char := data[offset];
-    next_char, has_next := next_character(tkn);
+    curr_char, has_next := next_character(tkn);
     if !has_next do return .{}, .{ .EOF, token.position };
 
     switch curr_char {
@@ -77,31 +121,31 @@ token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
         }
 
         case '-' {
-            switch data[offset] {
-                case '0' ..= '9' ---
-                case _ {
-                    err.kind = .Illegal_Character;
-                    err.pos  = token.position;
-                    break break;
-                }
+            ch, ok := peek_char(tkn);
+            if !ok || ch < '0' || ch > '9' {
+                err.kind = .Illegal_Character;
+                err.pos  = token.position;
+            } else {
+                fallthrough;
             }
-
-            fallthrough;
         }
 
         case '0' ..= '9' {
             token.kind = .Integer;
             skip_numeric(tkn);
 
-            if data[offset] == '.' {
+            ch, ok := peek_char(tkn);
+            if ok && ch == '.' {
                 token.kind = .Float;
                 next_character(tkn);
                 skip_numeric(tkn);
+                ch, ok = peek_char(tkn);
             }
 
-            if data[offset] == 'e' || data[offset] == 'E' {
+            if ok && (ch == 'e' || ch == 'E') {
                 next_character(tkn);
-                if data[offset] == '-' || data[offset] == '+' {
+                sign, sok := peek_char(tkn);
+                if sok && (sign == '-' || sign == '+') {
                     next_character(tkn);
                 }
                 skip_numeric(tkn);
@@ -110,23 +154,36 @@ token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
 
         case '"' {
             token.kind = .String;
+            closed := false;
 
-            while offset < data.count {
-                ch := data[offset];
+            while true {
+                ch, ok := peek_char(tkn);
+                if !ok {
+                    err.kind = .String_Unterminated;
+                    err.pos  = token.position;
+                    break;
+                }
+
                 if ch == '\n' {
                     err.kind = .String_Unterminated;
                     err.pos  = token.position;
-                    break break;
+                    break;
                 }
 
                 next_character(tkn);
                 if ch == '"' {
+                    closed = true;
                     break;
                 }
 
                 if ch == '\\' {
                     skip_escape(tkn);
                 }
+            }
+
+            if !closed && err.kind == .None {
+                err.kind = .String_Unterminated;
+                err.pos  = token.position;
             }
         }
     }
@@ -139,8 +196,14 @@ token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
 }
 
 #local
+peek_char :: (use tkn: ^Tokenizer) -> (u8, bool) {
+    if !ensure(tkn, 1) do return 0, false;
+    return data[offset], true;
+}
+
+#local
 next_character :: (use tkn: ^Tokenizer) -> (u8, bool) {
-    if offset >= data.count do return 0, false;
+    if !ensure(tkn, 1) do return 0, false;
 
     retval := data[offset];
     offset += 1;
@@ -151,8 +214,11 @@ next_character :: (use tkn: ^Tokenizer) -> (u8, bool) {
 
 #local
 skip_whitespace :: (use tkn: ^Tokenizer) {
-    while offset < data.count {
-        switch data[offset] {
+    while true {
+        ch, ok := peek_char(tkn);
+        if !ok do return;
+
+        switch ch {
             case '\t', ' ', '\r', '\v' {
                 next_character(tkn);
             }
@@ -164,7 +230,7 @@ skip_whitespace :: (use tkn: ^Tokenizer) {
             }
 
             case _ {
-                break break;
+                return;
             }
         }
     }
@@ -172,45 +238,48 @@ skip_whitespace :: (use tkn: ^Tokenizer) {
 
 #local
 skip_alpha_numeric :: (use tkn: ^Tokenizer) {
-    while offset < data.count {
-        switch data[offset] {
+    while true {
+        ch, ok := peek_char(tkn);
+        if !ok do return;
+
+        switch ch {
             case 'A' ..= 'Z', 'a' ..= 'z', '0' ..= '9', '_' {
                 next_character(tkn);
                 continue;
             }
         }
 
-        break;
+        return;
     }
 }
 
 #local
 skip_numeric :: (use tkn: ^Tokenizer) {
-    while offset < data.count {
-        switch data[offset] {
+    while true {
+        ch, ok := peek_char(tkn);
+        if !ok do return;
+
+        switch ch {
             case '0' ..= '9' {
                 next_character(tkn);
                 continue;
             }
         }
 
-        break;
+        return;
     }
 }
 
 #local
 skip_escape :: (use tkn: ^Tokenizer) {
-    switch data[offset] {
+    ch, ok := peek_char(tkn);
+    if !ok do return;
+
+    switch ch {
         case 'u' {
             for i in 4 {
-                ch, _ := next_character(tkn);
-                switch ch {
-                    case '0' ..= '9',
-                         'A' ..= 'F',
-                         'a' ..= 'f' ---
-
-                    case _ do return;
-                }
+                _, more := next_character(tkn);
+                if !more do return;
             }
         }
 

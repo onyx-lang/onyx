@@ -101,6 +101,33 @@ encode_pretty :: (w: &io.Writer, v: $T, indent := 2) -> Encoding_Error {
     return encode(w, v);
 }
 
+/// Streaming encoder over a `Writer`. `newline=true` writes a `\n` after each value (JSONL).
+Encoder :: struct {
+    writer: &io.Writer
+    indent: i32
+    newline: bool
+}
+
+Encoder.make :: (w: &io.Writer, indent := 0, newline := false) -> Encoder {
+    return .{ w, indent, newline }
+}
+
+Encoder.encode :: (e: &Encoder, v: $T) -> Encoding_Error {
+    old_indent := _enc.indent
+    old_depth := _enc.depth
+    _enc.indent = e.indent
+    _enc.depth = 0
+    defer {
+        _enc.indent = old_indent
+        _enc.depth = old_depth
+    }
+
+    err := encode(e.writer, v)
+    if err != .None do return err
+    if e.newline do io.write_byte(e.writer, '\n')
+    return .None
+}
+
 //
 // This could be changed to use the "any" type now, which would allow for any type to be
 // represented as a json value. However, this eliminates the control that you get from

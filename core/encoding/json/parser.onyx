@@ -22,6 +22,57 @@ make_parser :: (data: [] u8, allocator := context.allocator) -> Parser {
 }
 
 #package
+make_parser_reader :: (r: &io.Reader, allocator := context.allocator) -> Parser {
+    parser: Parser;
+    parser.allocator = allocator;
+    parser.tokenizer.reader = r;
+    parser.tokenizer.buf = make(dyn_str, 256, allocator);
+    parser.tokenizer.data = parser.tokenizer.buf;
+    consume_token(^parser);
+    return parser;
+}
+
+#package
+parser_free :: (p: &Parser) {
+    if p.tokenizer.buf.data != null {
+        delete(&p.tokenizer.buf);
+    }
+}
+
+#package
+parser_compact :: (use parser: ^Parser) {
+    t := &tokenizer;
+    if t.reader == null do return;
+
+    if current_token.kind == .Invalid {
+        t.buf.count = 0;
+        t.offset = 0;
+        t.data = t.buf;
+        current_token = .{};
+        previous_token = .{};
+        return;
+    }
+
+    start := current_token.offset;
+    if start == 0 do return;
+    if start > t.buf.count do start = t.buf.count;
+
+    left := t.buf.count - start;
+    if left > 0 {
+        memory.copy(t.buf.data, t.buf.data + start, left);
+    }
+    t.buf.count = left;
+    t.offset -= start;
+    t.data = t.buf;
+
+    current_token.offset -= start;
+    if current_token.text.count > 0 {
+        current_token.text.data = t.buf.data;
+    }
+    previous_token = .{};
+}
+
+#package
 parse :: (data: [] u8, allocator := context.allocator) -> (Value, Error) {
     parser := make_parser(data, allocator);
     return parse_value(^parser);
