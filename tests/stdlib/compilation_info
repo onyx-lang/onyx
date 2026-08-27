@@ -12,6 +12,12 @@ point_members
 true
 point_type_of
 true
+point_symbols_with_type
+true
+point_binding_of
+true
+point_binding_location
+true
 lookup_member_x
 true
 color_enum

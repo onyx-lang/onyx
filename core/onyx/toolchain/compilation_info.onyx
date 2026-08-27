@@ -36,6 +36,7 @@ CompilationInfo :: struct {
     types_by_name:    Map(str, [..] u32)
 
     symbols_by_file: [..] [..] u32
+    symbols_by_type: [..] [..] u32
 
     resolutions: [..] EventSymbolResolved
 }
@@ -74,6 +75,7 @@ CompilationInfo.make :: (allocator := context.allocator) -> (res: CompilationInf
     res.types_by_name    = make(typeof res.types_by_name,    allocator=allocator)
 
     res.symbols_by_file = make(typeof res.symbols_by_file, allocator=allocator)
+    res.symbols_by_type = make(typeof res.symbols_by_type, allocator=allocator)
     res.resolutions     = make(typeof res.resolutions,     allocator=allocator)
     return
 }
@@ -170,7 +172,13 @@ CompilationInfo.ingest_event :: (self: &#Self, event: &CompilerEvent) {
         case .Binding as b {
             slot := ensure_id(&self.symbols, b.symbol_id)
             if b.documentation.count > 0 do slot.documentation = b.documentation
-            if b.type_id != 0 do slot.type_id = b.type_id
+            if b.type_id != 0 {
+                prev := slot.type_id
+                slot.type_id = b.type_id
+                if prev != b.type_id {
+                    ensure_id_list(&self.symbols_by_type, b.type_id)->push(b.symbol_id)
+                }
+            }
         }
 
         case .Type as t {
@@ -241,6 +249,37 @@ CompilationInfo.symbols_in_file :: (self: &#Self, file_id: u32) -> [] u32 {
     i := cast(i32) file_id
     if file_id == 0 || i >= self.symbols_by_file.count do return .{}
     return self.symbols_by_file[i]
+}
+
+/// Symbols whose binding has this `type_id` (aliases and uses included).
+CompilationInfo.symbols_with_type :: (self: &#Self, type_id: u32) -> [] u32 {
+    i := cast(i32) type_id
+    if type_id == 0 || i >= self.symbols_by_type.count do return .{}
+    return self.symbols_by_type[i]
+}
+
+/// Declaring binding for a type: prefers a symbol whose kind matches the
+/// type (Struct/Union/Enum/Distinct). Falls back to the first bound symbol,
+/// which covers anonymous `foo: struct { ... }` bindings.
+CompilationInfo.binding_of :: (self: &#Self, type_id: u32) -> ? &SymbolInfo {
+    preferred: SymbolKind = .Unknown
+    switch self->get_type(type_id) {
+        case .Some as t do preferred = declaring_symbol_kind(t.kind)
+        case .None {}
+    }
+
+    fallback: &SymbolInfo = null
+    for sid in self->symbols_with_type(type_id) {
+        switch self->get_symbol(sid) {
+            case .Some as sym {
+                if fallback == null do fallback = sym
+                if preferred != .Unknown && sym.kind == preferred do return sym
+            }
+            case .None {}
+        }
+    }
+    if fallback != null do return fallback
+    return .None
 }
 
 CompilationInfo.symbols_in_scope :: (self: &#Self, scope_id: u32) -> [] u32 {
@@ -386,6 +425,9 @@ CompilationInfo.destroy :: (use self: &#Self) {
     for i in 0 .. symbols_by_file.count {
         delete(&symbols_by_file[i])
     }
+    for i in 0 .. symbols_by_type.count {
+        delete(&symbols_by_type[i])
+    }
 
     delete(&files)
     delete(&packages)
@@ -397,6 +439,7 @@ CompilationInfo.destroy :: (use self: &#Self) {
     delete(&symbols_by_name)
     delete(&types_by_name)
     delete(&symbols_by_file)
+    delete(&symbols_by_type)
     delete(&resolutions)
 }
 
@@ -438,6 +481,16 @@ index_unique :: (map: &Map(str, u32), name: str, id: u32) {
 index_list :: (map: &Map(str, [..] u32), name: str, id: u32) {
     if name.count == 0 do return
     map->get_ptr_or_create(name)->push(id)
+}
+
+declaring_symbol_kind :: (kind: TypeKind) -> SymbolKind {
+    switch kind {
+        case .Struct, .Poly_Struct do return .Struct
+        case .Union, .Poly_Union   do return .Union
+        case .Enum                 do return .Enum
+        case .Distinct             do return .Distinct
+        case _                     do return .Unknown
+    }
 }
 
 }

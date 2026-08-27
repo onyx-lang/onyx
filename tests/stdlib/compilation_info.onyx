@@ -138,6 +138,33 @@ main :: () {
     }
     ok("point_type_of", point_type_of);
 
+    point_symbols_with_type := false;
+    if point_type != null && point_sym != null {
+        for id in info->symbols_with_type(point_type.id) {
+            if id == point_sym.id do point_symbols_with_type = true;
+        }
+    }
+    ok("point_symbols_with_type", point_symbols_with_type);
+
+    point_binding := false;
+    point_binding_loc := false;
+    if point_type != null {
+        switch info->binding_of(point_type.id) {
+            case .Some as sym {
+                point_binding = point_sym != null && sym.id == point_sym.id;
+                if sym.file_id != 0 && sym.line != 0 {
+                    switch info->get_file(sym.file_id) {
+                        case .Some do point_binding_loc = true;
+                        case .None {}
+                    }
+                }
+            }
+            case .None {}
+        }
+    }
+    ok("point_binding_of", point_binding);
+    ok("point_binding_location", point_binding_loc);
+
     x_in_scope := false;
     if point_type != null {
         switch info->lookup_member(point_type.id, "x") {
