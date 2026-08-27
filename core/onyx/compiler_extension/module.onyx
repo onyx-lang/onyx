@@ -13,7 +13,7 @@ use core.alloc {package, arena}
 use core.encoding.osad
 use core.encoding.protobuf
 use core.io
-use protobuf.onyx.toolchain.events { CompilerEvents }
+use protobuf.onyx.toolchain.events {*}
 use onyx.toolchain { CompilationInfo }
 
 // PROTOCOL VERSION 1
@@ -197,7 +197,7 @@ ExtensionContext.make :: (name: str) -> (res: ExtensionContext) {
     res.compiler_events.events = make(typeof res.compiler_events.events)
     res.compilation_info = CompilationInfo.make()
     res.arena = arena.make(context.allocator, 32 * 1024)
-    res.reader = io.Reader.make(&stdio.stream)
+    res.reader = io.Reader.make(&stdio.stream, 64 * 1024)
     return
 }
 
@@ -274,14 +274,8 @@ ExtensionContext.start :: (self: &#Self, callback: (&#Self, msg: IncomingMessage
             }
 
             case .CompilationData as &cd {
-                switch protobuf.unmarshal(cd.events, CompilerEvents) {
-                    case .Ok as decoded {
-                        self.compilation_info->update(decoded.events)
-                        for e in decoded.events {
-                            self.compiler_events.events->push(e)
-                        }
-                        delete(&decoded.events)
-                    }
+                switch self.compilation_info->ingest_protobuf(cd.events) {
+                    case .Ok {}
                     case .Err as err {
                         eprintf("Failed to unmarshal CompilationData: {p}\n", err)
                     }

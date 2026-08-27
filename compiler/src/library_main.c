@@ -479,7 +479,11 @@ static void prime_pump(Context *context) {
 }
 
 static onyx_pump_t pump_return(Context *context, onyx_pump_t result) {
-    compiler_extensions_flush_compilation_data(context);
+    if (result == ONYX_PUMP_CONTINUE) {
+        compiler_extensions_flush_compilation_data(context);
+    } else {
+        compiler_extensions_flush_compilation_data_now(context);
+    }
     return result;
 }
 
@@ -722,7 +726,7 @@ void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length) {
 
     compilation_log_emit_file(&ctx->context, file_contents.filename);
     parse_source_file(&ctx->context, &file_contents);
-    compiler_extensions_flush_compilation_data(&ctx->context);
+    compiler_extensions_flush_compilation_data_now(&ctx->context);
 }
 
 //

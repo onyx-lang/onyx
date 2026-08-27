@@ -170,89 +170,140 @@ static b32 compilation_event_is_detailed(CompilationEventKind kind) {
         || kind == COMPILATION_EVENT_TYPE_BODY;
 }
 
+static char *compilation_log_intern(Context *context, const char *name) {
+    if (!name || !*name) return (char *) "";
+
+    CompilationLog *log = &context->compilation_log;
+    if (!log->interned_names) sh_new_arena(log->interned_names);
+
+    i32 idx = shgeti(log->interned_names, (char *) name);
+    if (idx >= 0) return log->interned_names[idx].key;
+
+    idx = shputi(log->interned_names, (char *) name, 1);
+    return log->interned_names[idx].key;
+}
+
+static char *compilation_log_intern_len(Context *context, const char *s, i32 len) {
+    if (!s || len <= 0) return (char *) "";
+
+    char stack[256];
+    if (len < (i32) sizeof(stack)) {
+        memcpy(stack, s, len);
+        stack[len] = 0;
+        return compilation_log_intern(context, stack);
+    }
+
+    char *tmp = bh_alloc_array(context->gp_alloc, char, len + 1);
+    memcpy(tmp, s, len);
+    tmp[len] = 0;
+    return compilation_log_intern(context, tmp);
+}
+
+static char *compilation_log_type_name(Context *context, Type *type) {
+    if (!type) return (char *) "";
+
+    const char *stable = NULL;
+    switch (type->kind) {
+        case Type_Kind_Basic:      stable = type->Basic.name; break;
+        case Type_Kind_PolyStruct: stable = type->PolyStruct.name; break;
+        case Type_Kind_PolyUnion:  stable = type->PolyUnion.name; break;
+        case Type_Kind_Struct:     stable = type->Struct.name ? type->Struct.name : "<anonymous struct>"; break;
+        case Type_Kind_Enum:       stable = type->Enum.name ? type->Enum.name : "<anonymous enum>"; break;
+        case Type_Kind_Union:      stable = type->Union.name ? type->Union.name : "<anonymous union>"; break;
+        case Type_Kind_Distinct:   stable = type->Distinct.name; break;
+        default: break;
+    }
+
+    if (stable) return (char *) stable;
+
+    const char *name = type_get_name(context, type);
+    return compilation_log_intern(context, name ? name : "");
+}
+
 static void compilation_log_push(Context *context, CompilationEvent event) {
-    event.timestamp = bh_time_curr();
     bh_arr_push(context->compilation_log.events, event);
     context->compilation_log.encoded_valid = 0;
 }
 
-static void encode_event(CompilationEvent *ev, bh_buffer *out) {
-    pb_write_optional_uint64(out, PB_COMPILER_EVENT_TIMESTAMP, ev->timestamp);
+static void encode_event(CompilationLog *log, CompilationEvent *ev) {
+    bh_buffer *out = &log->pb_event;
+    bh_buffer *inner = &log->pb_field;
+    bh_buffer *sub = &log->pb_sub;
+    bh_buffer *item = &log->pb_item;
 
-    bh_buffer inner;
-    bh_buffer_init(&inner, out->allocator, 64);
+    bh_buffer_clear(out);
+    bh_buffer_clear(inner);
 
     switch (ev->kind) {
         case COMPILATION_EVENT_START:
-            pb_write_string(&inner, PB_EVENT_START_COMPILER_VERSION, ev->start.compiler_version);
-            pb_write_bytes(out, PB_COMPILER_EVENT_START, inner.data, inner.length);
+            pb_write_string(inner, PB_EVENT_START_COMPILER_VERSION, ev->start.compiler_version);
+            pb_write_bytes(out, PB_COMPILER_EVENT_START, inner->data, inner->length);
             break;
 
         case COMPILATION_EVENT_FILE:
-            pb_write_uint32(&inner, PB_EVENT_FILE_ID, ev->file.id);
-            pb_write_string(&inner, PB_EVENT_FILE_PATH, ev->file.path);
-            pb_write_bytes(out, PB_COMPILER_EVENT_FILE, inner.data, inner.length);
+            pb_write_uint32(inner, PB_EVENT_FILE_ID, ev->file.id);
+            pb_write_string(inner, PB_EVENT_FILE_PATH, ev->file.path);
+            pb_write_bytes(out, PB_COMPILER_EVENT_FILE, inner->data, inner->length);
             break;
 
         case COMPILATION_EVENT_PACKAGE:
-            pb_write_uint32(&inner, PB_EVENT_PACKAGE_ID, ev->pack.id);
-            pb_write_string(&inner, PB_EVENT_PACKAGE_NAME, ev->pack.package_name);
-            pb_write_string(&inner, PB_EVENT_PACKAGE_FULLY_QUALIFIED_NAME, ev->pack.fully_qualified_name);
-            pb_write_uint32(&inner, PB_EVENT_PACKAGE_PARENT_ID, ev->pack.parent_package_id);
-            pb_write_bytes(out, PB_COMPILER_EVENT_PACK, inner.data, inner.length);
+            pb_write_uint32(inner, PB_EVENT_PACKAGE_ID, ev->pack.id);
+            pb_write_string(inner, PB_EVENT_PACKAGE_NAME, ev->pack.package_name);
+            pb_write_string(inner, PB_EVENT_PACKAGE_FULLY_QUALIFIED_NAME, ev->pack.fully_qualified_name);
+            pb_write_uint32(inner, PB_EVENT_PACKAGE_PARENT_ID, ev->pack.parent_package_id);
+            pb_write_bytes(out, PB_COMPILER_EVENT_PACK, inner->data, inner->length);
             break;
 
         case COMPILATION_EVENT_SCOPE:
-            pb_write_uint32(&inner, PB_EVENT_SCOPE_ID, ev->scope.id);
-            pb_write_uint32(&inner, PB_EVENT_SCOPE_PARENT_SCOPE_ID, ev->scope.parent_scope_id);
-            pb_write_uint32(&inner, PB_EVENT_SCOPE_FILE_ID, ev->scope.file_id);
-            pb_write_uint32(&inner, PB_EVENT_SCOPE_LINE, ev->scope.line);
-            pb_write_uint32(&inner, PB_EVENT_SCOPE_COLUMN, ev->scope.column);
-            pb_write_string(&inner, PB_EVENT_SCOPE_NAME, ev->scope.name);
-            pb_write_bytes(out, PB_COMPILER_EVENT_SCOPE, inner.data, inner.length);
+            pb_write_uint32(inner, PB_EVENT_SCOPE_ID, ev->scope.id);
+            pb_write_uint32(inner, PB_EVENT_SCOPE_PARENT_SCOPE_ID, ev->scope.parent_scope_id);
+            pb_write_uint32(inner, PB_EVENT_SCOPE_FILE_ID, ev->scope.file_id);
+            pb_write_uint32(inner, PB_EVENT_SCOPE_LINE, ev->scope.line);
+            pb_write_uint32(inner, PB_EVENT_SCOPE_COLUMN, ev->scope.column);
+            pb_write_string(inner, PB_EVENT_SCOPE_NAME, ev->scope.name);
+            pb_write_bytes(out, PB_COMPILER_EVENT_SCOPE, inner->data, inner->length);
             break;
 
         case COMPILATION_EVENT_SYMBOL:
-            pb_write_uint32(&inner, PB_EVENT_SYMBOL_ID, ev->symbol.id);
-            pb_write_uint32(&inner, PB_EVENT_SYMBOL_SCOPE_ID, ev->symbol.scope_id);
-            pb_write_string(&inner, PB_EVENT_SYMBOL_NAME, ev->symbol.name);
-            pb_write_uint32(&inner, PB_EVENT_SYMBOL_FILE_ID, ev->symbol.file_id);
-            pb_write_uint32(&inner, PB_EVENT_SYMBOL_LINE, ev->symbol.line);
-            pb_write_uint32(&inner, PB_EVENT_SYMBOL_COLUMN, ev->symbol.column);
-            pb_write_uint32(&inner, PB_EVENT_SYMBOL_KIND, ev->symbol.kind);
-            pb_write_bytes(out, PB_COMPILER_EVENT_SYMBOL, inner.data, inner.length);
+            pb_write_uint32(inner, PB_EVENT_SYMBOL_ID, ev->symbol.id);
+            pb_write_uint32(inner, PB_EVENT_SYMBOL_SCOPE_ID, ev->symbol.scope_id);
+            pb_write_string(inner, PB_EVENT_SYMBOL_NAME, ev->symbol.name);
+            pb_write_uint32(inner, PB_EVENT_SYMBOL_FILE_ID, ev->symbol.file_id);
+            pb_write_uint32(inner, PB_EVENT_SYMBOL_LINE, ev->symbol.line);
+            pb_write_uint32(inner, PB_EVENT_SYMBOL_COLUMN, ev->symbol.column);
+            pb_write_uint32(inner, PB_EVENT_SYMBOL_KIND, ev->symbol.kind);
+            pb_write_bytes(out, PB_COMPILER_EVENT_SYMBOL, inner->data, inner->length);
             break;
 
         case COMPILATION_EVENT_SYMBOL_RESOLVED:
-            pb_write_uint32(&inner, PB_EVENT_RESOLVED_SYMBOL_ID, ev->resolved.symbol_id);
-            pb_write_uint32(&inner, PB_EVENT_RESOLVED_FILE_ID, ev->resolved.file_id);
-            pb_write_uint32(&inner, PB_EVENT_RESOLVED_LINE, ev->resolved.line);
-            pb_write_uint32(&inner, PB_EVENT_RESOLVED_COLUMN, ev->resolved.column);
-            pb_write_uint32(&inner, PB_EVENT_RESOLVED_LENGTH, ev->resolved.length);
-            pb_write_bytes(out, PB_COMPILER_EVENT_RESOLVED, inner.data, inner.length);
+            pb_write_uint32(inner, PB_EVENT_RESOLVED_SYMBOL_ID, ev->resolved.symbol_id);
+            pb_write_uint32(inner, PB_EVENT_RESOLVED_FILE_ID, ev->resolved.file_id);
+            pb_write_uint32(inner, PB_EVENT_RESOLVED_LINE, ev->resolved.line);
+            pb_write_uint32(inner, PB_EVENT_RESOLVED_COLUMN, ev->resolved.column);
+            pb_write_uint32(inner, PB_EVENT_RESOLVED_LENGTH, ev->resolved.length);
+            pb_write_bytes(out, PB_COMPILER_EVENT_RESOLVED, inner->data, inner->length);
             break;
 
         case COMPILATION_EVENT_BINDING:
-            pb_write_uint32(&inner, PB_EVENT_BINDING_SYMBOL_ID, ev->binding.symbol_id);
-            pb_write_string(&inner, PB_EVENT_BINDING_DOCUMENTATION, ev->binding.documentation);
-            pb_write_uint32(&inner, PB_EVENT_BINDING_TYPE_ID, ev->binding.type_id);
-            pb_write_bytes(out, PB_COMPILER_EVENT_BINDING, inner.data, inner.length);
+            pb_write_uint32(inner, PB_EVENT_BINDING_SYMBOL_ID, ev->binding.symbol_id);
+            pb_write_string(inner, PB_EVENT_BINDING_DOCUMENTATION, ev->binding.documentation);
+            pb_write_uint32(inner, PB_EVENT_BINDING_TYPE_ID, ev->binding.type_id);
+            pb_write_bytes(out, PB_COMPILER_EVENT_BINDING, inner->data, inner->length);
             break;
 
         case COMPILATION_EVENT_TYPE: {
-            pb_write_uint32(&inner, PB_EVENT_TYPE_ID, ev->type.id);
-            pb_write_uint32(&inner, PB_EVENT_TYPE_KIND, ev->type.kind);
-            pb_write_string(&inner, PB_EVENT_TYPE_NAME, ev->type.name);
+            pb_write_uint32(inner, PB_EVENT_TYPE_ID, ev->type.id);
+            pb_write_uint32(inner, PB_EVENT_TYPE_KIND, ev->type.kind);
+            pb_write_string(inner, PB_EVENT_TYPE_NAME, ev->type.name);
 
-            bh_buffer body;
-            bh_buffer_init(&body, out->allocator, 32);
+            bh_buffer_clear(sub);
 
             switch (ev->type.kind) {
                 case PROTO_TYPE_KIND_BASIC:
-                    pb_write_uint32(&body, PB_TYPE_BASIC_KIND, ev->type.body.basic.basic_kind);
-                    pb_write_uint32(&body, PB_TYPE_BASIC_SIZE, ev->type.body.basic.size);
-                    pb_write_uint32(&body, PB_TYPE_BASIC_ALIGNMENT, ev->type.body.basic.alignment);
-                    pb_write_bytes(&inner, PB_EVENT_TYPE_BASIC, body.data, body.length);
+                    pb_write_uint32(sub, PB_TYPE_BASIC_KIND, ev->type.body.basic.basic_kind);
+                    pb_write_uint32(sub, PB_TYPE_BASIC_SIZE, ev->type.body.basic.size);
+                    pb_write_uint32(sub, PB_TYPE_BASIC_ALIGNMENT, ev->type.body.basic.alignment);
+                    pb_write_bytes(inner, PB_EVENT_TYPE_BASIC, sub->data, sub->length);
                     break;
 
                 case PROTO_TYPE_KIND_POINTER:
@@ -260,117 +311,103 @@ static void encode_event(CompilationEvent *ev, bh_buffer *out) {
                 case PROTO_TYPE_KIND_SLICE:
                 case PROTO_TYPE_KIND_DYN_ARRAY:
                 case PROTO_TYPE_KIND_VAR_ARGS:
-                    pb_write_uint32(&body, PB_TYPE_ELEM_ELEM_ID, ev->type.body.elem.elem_id);
-                    pb_write_bytes(&inner, PB_EVENT_TYPE_ELEM, body.data, body.length);
+                    pb_write_uint32(sub, PB_TYPE_ELEM_ELEM_ID, ev->type.body.elem.elem_id);
+                    pb_write_bytes(inner, PB_EVENT_TYPE_ELEM, sub->data, sub->length);
                     break;
 
                 case PROTO_TYPE_KIND_ARRAY:
-                    pb_write_uint32(&body, PB_TYPE_ARRAY_ELEM_ID, ev->type.body.array.elem_id);
-                    pb_write_uint32(&body, PB_TYPE_ARRAY_COUNT, ev->type.body.array.count);
-                    pb_write_bytes(&inner, PB_EVENT_TYPE_ARRAY, body.data, body.length);
+                    pb_write_uint32(sub, PB_TYPE_ARRAY_ELEM_ID, ev->type.body.array.elem_id);
+                    pb_write_uint32(sub, PB_TYPE_ARRAY_COUNT, ev->type.body.array.count);
+                    pb_write_bytes(inner, PB_EVENT_TYPE_ARRAY, sub->data, sub->length);
                     break;
 
                 case PROTO_TYPE_KIND_FUNCTION:
-                    pb_write_uint32(&body, PB_TYPE_FUNCTION_RETURN_ID, ev->type.body.function.return_id);
+                    pb_write_uint32(sub, PB_TYPE_FUNCTION_RETURN_ID, ev->type.body.function.return_id);
                     for (u32 i = 0; i < ev->type.body.function.param_count; i++) {
-                        pb_write_uint32_always(&body, PB_TYPE_FUNCTION_PARAM_IDS, ev->type.body.function.param_ids[i]);
+                        pb_write_uint32_always(sub, PB_TYPE_FUNCTION_PARAM_IDS, ev->type.body.function.param_ids[i]);
                     }
-                    pb_write_bytes(&inner, PB_EVENT_TYPE_FUNCTION, body.data, body.length);
+                    pb_write_bytes(inner, PB_EVENT_TYPE_FUNCTION, sub->data, sub->length);
                     break;
 
                 case PROTO_TYPE_KIND_COMPOUND:
                     for (u32 i = 0; i < ev->type.body.compound.count; i++) {
-                        pb_write_uint32_always(&body, PB_TYPE_COMPOUND_TYPE_IDS, ev->type.body.compound.type_ids[i]);
+                        pb_write_uint32_always(sub, PB_TYPE_COMPOUND_TYPE_IDS, ev->type.body.compound.type_ids[i]);
                     }
-                    pb_write_bytes(&inner, PB_EVENT_TYPE_COMPOUND, body.data, body.length);
+                    pb_write_bytes(inner, PB_EVENT_TYPE_COMPOUND, sub->data, sub->length);
                     break;
 
                 case PROTO_TYPE_KIND_DISTINCT:
-                    pb_write_uint32(&body, PB_TYPE_DISTINCT_BASE_ID, ev->type.body.distinct.base_id);
-                    pb_write_bytes(&inner, PB_EVENT_TYPE_DISTINCT, body.data, body.length);
+                    pb_write_uint32(sub, PB_TYPE_DISTINCT_BASE_ID, ev->type.body.distinct.base_id);
+                    pb_write_bytes(inner, PB_EVENT_TYPE_DISTINCT, sub->data, sub->length);
                     break;
 
                 case PROTO_TYPE_KIND_ENUM:
-                    pb_write_uint32(&body, PB_TYPE_ENUM_BACKING_ID, ev->type.body.enumeration.backing_id);
+                    pb_write_uint32(sub, PB_TYPE_ENUM_BACKING_ID, ev->type.body.enumeration.backing_id);
                     if (ev->type.body.enumeration.is_flags) {
-                        pb_write_uint32_always(&body, PB_TYPE_ENUM_IS_FLAGS, 1);
+                        pb_write_uint32_always(sub, PB_TYPE_ENUM_IS_FLAGS, 1);
                     }
                     for (u32 i = 0; i < ev->type.body.enumeration.value_count; i++) {
                         CompilationTypeEnumValue *v = &ev->type.body.enumeration.values[i];
-                        bh_buffer val;
-                        bh_buffer_init(&val, out->allocator, 32);
-                        pb_write_string(&val, PB_TYPE_ENUM_VALUE_NAME, v->name);
-                        pb_write_int64_always(&val, PB_TYPE_ENUM_VALUE_VALUE, v->value);
-                        pb_write_uint32(&val, PB_TYPE_ENUM_VALUE_SYMBOL_ID, v->symbol_id);
-                        pb_write_bytes(&body, PB_TYPE_ENUM_VALUES, val.data, val.length);
-                        bh_buffer_free(&val);
+                        bh_buffer_clear(item);
+                        pb_write_string(item, PB_TYPE_ENUM_VALUE_NAME, v->name);
+                        pb_write_int64_always(item, PB_TYPE_ENUM_VALUE_VALUE, v->value);
+                        pb_write_uint32(item, PB_TYPE_ENUM_VALUE_SYMBOL_ID, v->symbol_id);
+                        pb_write_bytes(sub, PB_TYPE_ENUM_VALUES, item->data, item->length);
                     }
-                    pb_write_bytes(&inner, PB_EVENT_TYPE_ENUMERATION, body.data, body.length);
+                    pb_write_bytes(inner, PB_EVENT_TYPE_ENUMERATION, sub->data, sub->length);
                     break;
 
                 default:
                     break;
             }
 
-            bh_buffer_free(&body);
-            pb_write_bytes(out, PB_COMPILER_EVENT_TYPE, inner.data, inner.length);
+            pb_write_bytes(out, PB_COMPILER_EVENT_TYPE, inner->data, inner->length);
             break;
         }
 
         case COMPILATION_EVENT_TYPE_BODY: {
-            pb_write_uint32(&inner, PB_EVENT_TYPE_BODY_TYPE_ID, ev->type_body.type_id);
-            pb_write_uint32(&inner, PB_EVENT_TYPE_BODY_SIZE, ev->type_body.size);
-            pb_write_uint32(&inner, PB_EVENT_TYPE_BODY_ALIGNMENT, ev->type_body.alignment);
-            pb_write_uint32(&inner, PB_EVENT_TYPE_BODY_SCOPE_ID, ev->type_body.scope_id);
+            pb_write_uint32(inner, PB_EVENT_TYPE_BODY_TYPE_ID, ev->type_body.type_id);
+            pb_write_uint32(inner, PB_EVENT_TYPE_BODY_SIZE, ev->type_body.size);
+            pb_write_uint32(inner, PB_EVENT_TYPE_BODY_ALIGNMENT, ev->type_body.alignment);
+            pb_write_uint32(inner, PB_EVENT_TYPE_BODY_SCOPE_ID, ev->type_body.scope_id);
 
-            bh_buffer details;
-            bh_buffer_init(&details, out->allocator, 64);
+            bh_buffer_clear(sub);
 
             if (ev->type_body.is_union) {
-                pb_write_uint32(&details, PB_TYPE_UNION_BODY_TAG_TYPE_ID, ev->type_body.tag_type_id);
+                pb_write_uint32(sub, PB_TYPE_UNION_BODY_TAG_TYPE_ID, ev->type_body.tag_type_id);
                 for (u32 i = 0; i < ev->type_body.variant_count; i++) {
                     CompilationTypeVariant *v = &ev->type_body.variants[i];
-                    bh_buffer var;
-                    bh_buffer_init(&var, out->allocator, 32);
-                    pb_write_string(&var, PB_TYPE_UNION_VARIANT_NAME, v->name);
-                    pb_write_uint32(&var, PB_TYPE_UNION_VARIANT_TYPE_ID, v->type_id);
-                    pb_write_uint32_always(&var, PB_TYPE_UNION_VARIANT_TAG, v->tag);
-                    pb_write_uint32(&var, PB_TYPE_UNION_VARIANT_SYMBOL_ID, v->symbol_id);
-                    pb_write_bytes(&details, PB_TYPE_UNION_BODY_VARIANTS, var.data, var.length);
-                    bh_buffer_free(&var);
+                    bh_buffer_clear(item);
+                    pb_write_string(item, PB_TYPE_UNION_VARIANT_NAME, v->name);
+                    pb_write_uint32(item, PB_TYPE_UNION_VARIANT_TYPE_ID, v->type_id);
+                    pb_write_uint32_always(item, PB_TYPE_UNION_VARIANT_TAG, v->tag);
+                    pb_write_uint32(item, PB_TYPE_UNION_VARIANT_SYMBOL_ID, v->symbol_id);
+                    pb_write_bytes(sub, PB_TYPE_UNION_BODY_VARIANTS, item->data, item->length);
                 }
-                pb_write_bytes(&inner, PB_EVENT_TYPE_BODY_UNION, details.data, details.length);
+                pb_write_bytes(inner, PB_EVENT_TYPE_BODY_UNION, sub->data, sub->length);
             } else {
                 for (u32 i = 0; i < ev->type_body.member_count; i++) {
                     CompilationTypeMember *m = &ev->type_body.members[i];
-                    bh_buffer mem;
-                    bh_buffer_init(&mem, out->allocator, 32);
-                    pb_write_string(&mem, PB_TYPE_STRUCT_MEMBER_NAME, m->name);
-                    pb_write_uint32(&mem, PB_TYPE_STRUCT_MEMBER_TYPE_ID, m->type_id);
-                    pb_write_uint32_always(&mem, PB_TYPE_STRUCT_MEMBER_OFFSET, m->offset);
-                    pb_write_uint32_always(&mem, PB_TYPE_STRUCT_MEMBER_IDX, m->idx);
-                    pb_write_uint32(&mem, PB_TYPE_STRUCT_MEMBER_SYMBOL_ID, m->symbol_id);
-                    pb_write_bytes(&details, PB_TYPE_STRUCT_BODY_MEMBERS, mem.data, mem.length);
-                    bh_buffer_free(&mem);
+                    bh_buffer_clear(item);
+                    pb_write_string(item, PB_TYPE_STRUCT_MEMBER_NAME, m->name);
+                    pb_write_uint32(item, PB_TYPE_STRUCT_MEMBER_TYPE_ID, m->type_id);
+                    pb_write_uint32_always(item, PB_TYPE_STRUCT_MEMBER_OFFSET, m->offset);
+                    pb_write_uint32_always(item, PB_TYPE_STRUCT_MEMBER_IDX, m->idx);
+                    pb_write_uint32(item, PB_TYPE_STRUCT_MEMBER_SYMBOL_ID, m->symbol_id);
+                    pb_write_bytes(sub, PB_TYPE_STRUCT_BODY_MEMBERS, item->data, item->length);
                 }
-                pb_write_bytes(&inner, PB_EVENT_TYPE_BODY_STRUCT, details.data, details.length);
+                pb_write_bytes(inner, PB_EVENT_TYPE_BODY_STRUCT, sub->data, sub->length);
             }
 
-            bh_buffer_free(&details);
-            pb_write_bytes(out, PB_COMPILER_EVENT_TYPE_BODY, inner.data, inner.length);
+            pb_write_bytes(out, PB_COMPILER_EVENT_TYPE_BODY, inner->data, inner->length);
             break;
         }
     }
-
-    bh_buffer_free(&inner);
 }
 
-static void encode_event_into(CompilationEvent *ev, bh_buffer *out) {
-    bh_buffer inner;
-    bh_buffer_init(&inner, out->allocator, 64);
-    encode_event(ev, &inner);
-    pb_write_bytes(out, PB_COMPILER_EVENTS_EVENTS, inner.data, inner.length);
-    bh_buffer_free(&inner);
+static void encode_event_into(CompilationLog *log, CompilationEvent *ev, bh_buffer *out) {
+    encode_event(log, ev);
+    pb_write_bytes(out, PB_COMPILER_EVENTS_EVENTS, log->pb_event.data, log->pb_event.length);
 }
 
 void compilation_log_encode_range(Context *context, u32 from, u32 to, bh_buffer *out, b32 include_detailed) {
@@ -381,7 +418,7 @@ void compilation_log_encode_range(Context *context, u32 from, u32 to, bh_buffer 
     for (u32 i = from; i < to; i++) {
         CompilationEvent *ev = &context->compilation_log.events[i];
         if (!include_detailed && compilation_event_is_detailed(ev->kind)) continue;
-        encode_event_into(ev, out);
+        encode_event_into(&context->compilation_log, ev, out);
     }
 }
 
@@ -392,7 +429,7 @@ static void compilation_log_encode_detailed_backfill(Context *context, u32 until
     for (u32 i = 0; i < until; i++) {
         CompilationEvent *ev = &context->compilation_log.events[i];
         if (!compilation_event_is_detailed(ev->kind)) continue;
-        encode_event_into(ev, out);
+        encode_event_into(&context->compilation_log, ev, out);
     }
 }
 
@@ -444,11 +481,14 @@ static u32 compilation_log_file_id_for(Context *context, const char *filename) {
     if (!filename || !*filename) return 0;
 
     CompilationLog *log = &context->compilation_log;
+    if (log->cached_file_name == filename) return log->cached_file_id;
     if (!log->file_ids) return 0;
 
     i32 index = shgeti(log->file_ids, (char *)filename);
-    if (index == -1) return 0;
-    return log->file_ids[index].value;
+    u32 id = index == -1 ? 0 : log->file_ids[index].value;
+    log->cached_file_name = filename;
+    log->cached_file_id = id;
+    return id;
 }
 
 void compilation_log_emit_file(Context *context, const char *path) {
@@ -584,7 +624,7 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
     ev.kind = COMPILATION_EVENT_SYMBOL;
     ev.symbol.id = ++log->next_symbol_id;
     ev.symbol.scope_id = (u32)scope->id;
-    ev.symbol.name = bh_strdup(context->gp_alloc, name);
+    ev.symbol.name = compilation_log_intern(context, name);
     ev.symbol.file_id = compilation_log_file_id_for(context, pos.filename);
     ev.symbol.line = pos.line;
     ev.symbol.column = pos.column;
@@ -738,13 +778,13 @@ void compilation_log_emit_binding(Context *context, AstNode *node, AstBinding *b
     char *docs = "";
     if (binding) {
         if (binding->documentation_token_old && binding->documentation_token_old->text) {
-            docs = bh_strdup_len(
-                context->gp_alloc,
+            docs = compilation_log_intern_len(
+                context,
                 binding->documentation_token_old->text,
                 binding->documentation_token_old->length
             );
         } else if (binding->documentation_string) {
-            docs = bh_strdup(context->gp_alloc, (char *) binding->documentation_string);
+            docs = compilation_log_intern(context, (char *) binding->documentation_string);
         }
     }
 
@@ -765,14 +805,12 @@ void compilation_log_emit_type(Context *context, Type *type) {
     if (!type) return;
     if (!context->compilation_log.events) return;
 
-    const char *name = type_get_name(context, type);
-
     CompilationEvent ev;
     memset(&ev, 0, sizeof(ev));
     ev.kind = COMPILATION_EVENT_TYPE;
     ev.type.id = type->id;
     ev.type.kind = compilation_log_type_kind(type->kind);
-    ev.type.name = bh_strdup(context->gp_alloc, (char *)(name ? name : ""));
+    ev.type.name = compilation_log_type_name(context, type);
 
     switch (type->kind) {
         case Type_Kind_Basic:
@@ -855,7 +893,7 @@ void compilation_log_emit_type(Context *context, Type *type) {
 
                         CompilationTypeEnumValue *out = &ev.type.body.enumeration.values[i++];
                         out->name = value->token
-                            ? bh_strdup_len(context->gp_alloc, value->token->text, value->token->length)
+                            ? compilation_log_intern_len(context, value->token->text, value->token->length)
                             : "";
                         out->value = value->value ? get_expression_integer_value(context, value->value, NULL) : 0;
                         out->symbol_id = 0;
@@ -895,7 +933,7 @@ void compilation_log_emit_type_body(Context *context, Type *type) {
             ev.type_body.variants = bh_alloc(context->gp_alloc, sizeof(CompilationTypeVariant) * n);
             for (u32 i = 0; i < n; i++) {
                 UnionVariant *uv = type->Union.variants_ordered[i];
-                ev.type_body.variants[i].name = bh_strdup(context->gp_alloc, uv && uv->name ? uv->name : "");
+                ev.type_body.variants[i].name = compilation_log_intern(context, uv && uv->name ? uv->name : "");
                 ev.type_body.variants[i].type_id = uv && uv->type ? uv->type->id : 0;
                 ev.type_body.variants[i].tag = uv ? uv->tag_value : 0;
                 ev.type_body.variants[i].symbol_id = 0;
@@ -922,7 +960,7 @@ void compilation_log_emit_type_body(Context *context, Type *type) {
             ev.type_body.members = bh_alloc(context->gp_alloc, sizeof(CompilationTypeMember) * n);
             for (u32 i = 0; i < n; i++) {
                 StructMember *smem = type->Struct.memarr[i];
-                ev.type_body.members[i].name = bh_strdup(context->gp_alloc, smem && smem->name ? smem->name : "");
+                ev.type_body.members[i].name = compilation_log_intern(context, smem && smem->name ? smem->name : "");
                 ev.type_body.members[i].type_id = smem && smem->type ? smem->type->id : 0;
                 ev.type_body.members[i].offset = smem ? smem->offset : 0;
                 ev.type_body.members[i].idx = smem ? smem->idx : 0;
@@ -946,8 +984,15 @@ void compilation_log_emit_type_body(Context *context, Type *type) {
 
 void compilation_log_init(Context *context) {
     CompilationLog *log = &context->compilation_log;
-    bh_arr_new(context->gp_alloc, log->events, 32);
+    bh_arr_new(context->gp_alloc, log->events, 8192);
     sh_new_arena(log->file_ids);
+    sh_new_arena(log->interned_names);
+    bh_buffer_init(&log->encoded, context->gp_alloc, 64 * 1024);
+    bh_buffer_init(&log->pb_event, context->gp_alloc, 256);
+    bh_buffer_init(&log->pb_field, context->gp_alloc, 256);
+    bh_buffer_init(&log->pb_sub, context->gp_alloc, 256);
+    bh_buffer_init(&log->pb_item, context->gp_alloc, 128);
+    bh_buffer_init(&log->pb_flush, context->gp_alloc, 64 * 1024);
     bh_imap_init(&log->node_to_symbol_id, context->gp_alloc, 255);
     bh_imap_init(&log->node_to_binding, context->gp_alloc, 255);
     bh_imap_init(&log->symbol_binding_type_id, context->gp_alloc, 255);

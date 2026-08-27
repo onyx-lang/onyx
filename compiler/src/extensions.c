@@ -202,18 +202,28 @@ static void compiler_extension_send_compilation_data(Context *context, CompilerE
     u32 to = (u32)bh_arr_length(context->compilation_log.events);
     if (from >= to) return;
 
-    bh_buffer buf;
-    bh_buffer_init(&buf, context->gp_alloc, 256);
-    compilation_log_encode_range(context, from, to, &buf, ext->supports_compilation_data_detailed);
+    CompilationLog *log = &context->compilation_log;
+    bh_buffer_clear(&log->pb_flush);
+    compilation_log_encode_range(context, from, to, &log->pb_flush, ext->supports_compilation_data_detailed);
 
     extension_send_int(ext, MSG_HOST_COMPILATION_DATA);
-    extension_send_bytes(ext, buf.data, buf.length);
-    bh_buffer_free(&buf);
+    extension_send_bytes(ext, log->pb_flush.data, log->pb_flush.length);
 
     ext->compilation_data_cursor = to;
 }
 
+#define COMPILATION_DATA_FLUSH_BATCH 8192
+
 void compiler_extensions_flush_compilation_data(Context *context) {
+    bh_arr_each(CompilerExtension, ext, context->extensions) {
+        u32 pending = (u32)bh_arr_length(context->compilation_log.events);
+        if (pending <= ext->compilation_data_cursor) continue;
+        if (pending - ext->compilation_data_cursor < COMPILATION_DATA_FLUSH_BATCH) continue;
+        compiler_extension_send_compilation_data(context, ext);
+    }
+}
+
+void compiler_extensions_flush_compilation_data_now(Context *context) {
     bh_arr_each(CompilerExtension, ext, context->extensions) {
         compiler_extension_send_compilation_data(context, ext);
     }
@@ -272,7 +282,7 @@ TypeMatch compiler_extension_start(Context *context, const char *name, const cha
         }
 
         ext->state = COMP_EXT_STATE_READY;
-        compiler_extensions_flush_compilation_data(context);
+        compiler_extensions_flush_compilation_data_now(context);
         return TYPE_MATCH_SUCCESS;
     }
 }
@@ -484,7 +494,7 @@ TypeMatch compiler_extension_expand_macro(
 
             ext->state = COMP_EXT_STATE_READY;
             ext->current_expansion_id = 0;
-            compiler_extensions_flush_compilation_data(context);
+            compiler_extensions_flush_compilation_data_now(context);
             return TYPE_MATCH_SUCCESS;
         }
 
@@ -530,7 +540,7 @@ TypeMatch compiler_extension_hook_stalled(Context *context, int extension_id) {
             }
 
             ext->state = COMP_EXT_STATE_READY;
-            compiler_extensions_flush_compilation_data(context);
+            compiler_extensions_flush_compilation_data_now(context);
             return TYPE_MATCH_SUCCESS;
         }
 

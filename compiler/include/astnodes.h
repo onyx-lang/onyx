@@ -2264,7 +2264,6 @@ typedef struct CompilationTypeEnumValue {
 
 typedef struct CompilationEvent {
     CompilationEventKind kind;
-    u64 timestamp;
 
     union {
         struct {
@@ -2392,6 +2391,16 @@ typedef struct CompilationLog {
     u32 next_symbol_id;
 
     Table(u32) file_ids;
+    Table(i32) interned_names;
+    const char *cached_file_name;
+    u32 cached_file_id;
+
+    bh_buffer pb_event;
+    bh_buffer pb_field;
+    bh_buffer pb_sub;
+    bh_buffer pb_item;
+    bh_buffer pb_flush;
+
     bh_imap node_to_symbol_id;
     bh_imap node_to_binding;
     bh_imap symbol_binding_type_id;
@@ -2628,6 +2637,7 @@ TypeMatch compiler_extension_expand_macro(
     b32 wait_for_response);
 TypeMatch compiler_extension_hook_stalled(Context *context, int extension_id);
 void compiler_extensions_flush_compilation_data(Context *context);
+void compiler_extensions_flush_compilation_data_now(Context *context);
 
 
 // Compiler Events

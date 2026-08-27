@@ -4,6 +4,7 @@ package onyx.toolchain
 #load "./compiler_events.proto.onyx"
 
 use core {*}
+use core.encoding.protobuf
 use protobuf.onyx.toolchain.events {*}
 
 /// Indexed view of a compilation-event stream.
@@ -80,7 +81,7 @@ CompilationInfo.from :: (data: CompilerEvents, allocator := context.allocator) -
 /// unread dump, or one extension CompilationData payload). Replaying an
 /// already-applied batch will duplicate resolutions and name index entries.
 CompilationInfo.update :: (self: &#Self, events: [] CompilerEvent) -> u32 {
-    for e in events {
+    for& e in events {
         self->ingest_event(e)
         self.events_applied += 1
     }
@@ -89,7 +90,16 @@ CompilationInfo.update :: (self: &#Self, events: [] CompilerEvent) -> u32 {
 
 CompilationInfo.ingest :: CompilationInfo.update
 
-CompilationInfo.ingest_event :: (self: &#Self, event: CompilerEvent) {
+/// Decode a CompilerEvents protobuf blob without allocating the outer event array.
+CompilationInfo.ingest_protobuf :: (self: &#Self, bytes: [] u8) -> Result(void, protobuf.Unmarshal_Error) {
+    protobuf.unmarshal_each(bytes, 1, CompilerEvent, [ev] {
+        self->ingest_event(ev)
+        self.events_applied += 1
+    })
+    return .{ Ok = .{} }
+}
+
+CompilationInfo.ingest_event :: (self: &#Self, event: &CompilerEvent) {
     switch event.start {
         case .Some as s do self.compiler_version = s.compiler_version
         case .None {}

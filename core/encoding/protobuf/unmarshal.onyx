@@ -27,6 +27,45 @@ unmarshal :: (input: [] u8, $type: type_expr, allocator := context.allocator) ->
     return .{ Ok = ~~ val }
 }
 
+/// Decode the next length-delimited message on `field_number`.
+/// Returns `true` if `out` was filled, `false` if the stream is exhausted.
+unmarshal_next_message :: (data: &[] u8, field_number: i32, out: rawptr, type: type_expr) -> Result(bool, Unmarshal_Error) {
+    while data.length > 0 {
+        field_header := parse_field_header(data)?
+        if field_header.encoding_type == .SGROUP || field_header.encoding_type == .EGROUP {
+            continue
+        }
+
+        field_value := parse_field_value(data, field_header.encoding_type)?
+        if field_header.proto_number != field_number do continue
+
+        parse_message(field_value.bytes!, out, type)?
+        return .{ Ok = true }
+    }
+
+    return .{ Ok = false }
+}
+
+/// Decode a stream of length-delimited messages on `field_number` without
+/// allocating the outer repeated array. The body is inlined at the call site.
+/// Pass a Code block with one capture (`[ev] { ... }`); that capture is `&type`.
+/// Anything the body needs to keep must be copied out of the capture.
+unmarshal_each :: macro (
+    input: [] u8,
+    field_number: i32,
+    $type: type_expr,
+    $body: Code
+) {
+    data := input
+
+    while data {
+        item: type
+        found := #this_package.unmarshal_next_message(&data, field_number, &item, type)?
+        if !found do break
+        #unquote body(&item) #scope(body)
+    }
+}
+
 
 #local {
 
@@ -206,7 +245,13 @@ Array.untyped_alloc_one :: (arr: &Untyped_Array, type: type_expr) -> rawptr {
 
     if arr.count >= arr.capacity {
         if arr.capacity == 0 {
-            arr.capacity = 4
+            // Large messages (CompilerEvent is hundreds of bytes) grow in
+            // big chunks so a 70k-event dump does not realloc from 4.
+            if element_size >= 256 {
+                arr.capacity = 4096
+            } else {
+                arr.capacity = 4
+            }
             arr.allocator = context.allocator
         } else {
             arr.capacity <<= 1
