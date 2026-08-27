@@ -101,6 +101,7 @@
 #define PB_EVENT_SYMBOL_LINE      5
 #define PB_EVENT_SYMBOL_COLUMN    6
 #define PB_EVENT_SYMBOL_KIND      7
+#define PB_EVENT_SYMBOL_PACKAGE_ID 8
 
 #define PB_EVENT_RESOLVED_SYMBOL_ID 1
 #define PB_EVENT_RESOLVED_FILE_ID   2
@@ -280,6 +281,7 @@ static void encode_event(CompilationLog *log, CompilationEvent *ev) {
             pb_write_uint32(inner, PB_EVENT_SYMBOL_LINE, ev->symbol.line);
             pb_write_uint32(inner, PB_EVENT_SYMBOL_COLUMN, ev->symbol.column);
             pb_write_uint32(inner, PB_EVENT_SYMBOL_KIND, ev->symbol.kind);
+            pb_write_uint32(inner, PB_EVENT_SYMBOL_PACKAGE_ID, ev->symbol.package_id);
             pb_write_bytes(out, PB_COMPILER_EVENT_SYMBOL, inner->data, inner->length);
             break;
 
@@ -655,16 +657,31 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
     ev.symbol.kind = kind;
 
     if (node) {
-        if (!bh_imap_has(&log->node_to_symbol_id, (u64) node)) {
+        // Locals can be introduced again in a child scope (named returns are
+        // added to the function scope, then spliced into the body). Keep the
+        // mapping on the newest symbol so type notifications follow lookup.
+        if (node->kind == Ast_Kind_Local || !bh_imap_has(&log->node_to_symbol_id, (u64) node)) {
             bh_imap_put(&log->node_to_symbol_id, (u64) node, ev.symbol.id);
         }
         AstNode *inner = strip_aliases(node);
         if (inner && inner != node && !bh_imap_has(&log->node_to_symbol_id, (u64) inner)) {
             bh_imap_put(&log->node_to_symbol_id, (u64) inner, ev.symbol.id);
         }
+        if (inner && inner->kind == Ast_Kind_Package) {
+            AstPackage *package = (AstPackage *) inner;
+            if (package->package) ev.symbol.package_id = package->package->id;
+        }
     }
 
     compilation_log_push(context, ev);
+
+    if (node && node->kind == Ast_Kind_Local) {
+        AstTyped *typed = (AstTyped *) node;
+        if (typed->type && typed->type->id) {
+            compilation_log_emit_binding(context, node, NULL);
+        }
+    }
+
     return ev.symbol.id;
 }
 

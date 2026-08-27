@@ -788,8 +788,13 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(Context *context, AstFuncti
 
         if (query->entity->state == Entity_State_Finalized) return query->slns;
         if (query->entity->state == Entity_State_Failed)    return NULL;
+        if (context->cycle_detected) return NULL;
 
         context->polymorph.flag_to_yield = 1;
+        return NULL;
+    }
+
+    if (context->cycle_detected) {
         return NULL;
     }
 
@@ -1011,8 +1016,13 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstF
     if (solidified_func.func_header_entity) {
         if (solidified_func.func_header_entity->state == Entity_State_Finalized) return solidified_func.func;
         if (solidified_func.func_header_entity->state == Entity_State_Failed)    return NULL;
+        if (context->cycle_detected) return NULL;
 
         return (AstFunction *) &context->node_that_signals_a_yield;
+    }
+
+    if (context->cycle_detected) {
+        return NULL;
     }
 
     BH_MASK_SET(solidified_func.func->flags, !error_if_failed, Ast_Flag_Header_Check_No_Error);

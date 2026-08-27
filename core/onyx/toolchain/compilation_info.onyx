@@ -363,6 +363,180 @@ CompilationInfo.lookup :: (self: &#Self, scope_id: u32, name: str) -> ? &SymbolI
     return .None
 }
 
+/// Name in this scope only; does not walk parents.
+CompilationInfo.lookup_in_scope :: (self: &#Self, scope_id: u32, name: str) -> ? &SymbolInfo {
+    switch self->get_scope(scope_id) {
+        case .Some as sc {
+            for sid in sc.symbol_ids {
+                if self->get_symbol(sid) as sym {
+                    if sym.name == name do return sym
+                }
+            }
+        }
+        case .None {}
+    }
+    return .None
+}
+
+CompilationInfo.package_of :: (self: &#Self, sym: &SymbolInfo) -> ? &EventPackage {
+    if sym.package_id == 0 do return .None
+    return self->get_package(sym.package_id)
+}
+
+CompilationInfo.child_package_named :: (self: &#Self, parent_id: u32, name: str) -> ? &EventPackage {
+    if parent_id == 0 || name.count == 0 do return .None
+    i := 0
+    while i < self.packages.count {
+        p := &self.packages[i]
+        i += 1
+        if p.id == 0 do continue
+        if p.parent_package_id != parent_id do continue
+        if p.package_name == name do return p
+    }
+    return .None
+}
+
+/// Peel pointers and distinct wrappers for member lookup.
+CompilationInfo.unwrap_access_type :: (self: &#Self, t: &TypeInfo) -> &TypeInfo {
+    cur := t
+    n := 0
+    while n < 8 {
+        n += 1
+        peeled := false
+        switch cur.kind {
+            case .Pointer, .Multi_Pointer, .Distinct {
+                if self->elem(cur.id) as nxt {
+                    cur = nxt
+                    peeled = true
+                }
+            }
+            case _ {}
+        }
+        if !peeled do break
+    }
+    return cur
+}
+
+/// Receiver after walking a dotted identifier chain (`alloc.arena`, `p.x`).
+/// `Type` is a type name (methods and enum values). `Value` is a value (fields and methods).
+ResolvedPath :: union {
+    None: void
+    Pkg: &EventPackage
+    Type: &TypeInfo
+    Value: &TypeInfo
+}
+
+path_is_none :: (p: ResolvedPath) -> bool {
+    switch p {
+        case .None do return true
+        case .Pkg do return false
+        case .Type do return false
+        case .Value do return false
+    }
+}
+
+CompilationInfo.is_type_name :: (self: &#Self, sym: &SymbolInfo) -> bool {
+    switch sym.kind {
+        case .Struct, .Union, .Enum, .Distinct, .Interface do return true
+        case _ {}
+    }
+    if self->type_of(sym.id) as t {
+        if self->binding_of(t.id) as b {
+            if b.id == sym.id do return true
+        }
+    }
+    return false
+}
+
+CompilationInfo.peel_path_symbol :: (self: &#Self, sym: &SymbolInfo) -> ResolvedPath {
+    if self->package_of(sym) as pkg do return .{ Pkg = pkg }
+    if sym.kind == .Package do return .None
+    if self->type_of(sym.id) as t {
+        if self->is_type_name(sym) do return .{ Type = t }
+        return .{ Value = t }
+    }
+    return .None
+}
+
+/// Walk `parts` starting at `scope_id`. The first name uses parent walk;
+/// later names stay inside the current package or type.
+CompilationInfo.resolve_path :: (self: &#Self, scope_id: u32, parts: [] str) -> ResolvedPath {
+    if parts.count == 0 do return .None
+
+    switch self->lookup(scope_id, parts[0]) {
+        case .None do return .None
+        case .Some as first {
+            receiver := self->peel_path_symbol(first)
+
+            n := 1
+            while n < parts.count {
+                part := parts[n]
+                n += 1
+
+                next: ResolvedPath = .None
+                switch receiver {
+                    case .Pkg as pkg {
+                        if self->lookup_in_scope(pkg.scope_id, part) as sym {
+                            next = self->peel_path_symbol(sym)
+                        }
+                        if path_is_none(next) {
+                            if self->child_package_named(pkg.id, part) as child {
+                                next = .{ Pkg = child }
+                            }
+                        }
+                    }
+                    case .Type as t {
+                        u := self->unwrap_access_type(t)
+                        if u.scope_id != 0 {
+                            if self->lookup_in_scope(u.scope_id, part) as sym {
+                                next = self->peel_path_symbol(sym)
+                            }
+                        }
+                    }
+                    case .Value as t {
+                        u := self->unwrap_access_type(t)
+
+                        if self->member(u.id, part) as m {
+                            if m.type_id != 0 {
+                                if self->get_type(m.type_id) as mt {
+                                    next = .{ Value = mt }
+                                }
+                            }
+                            if path_is_none(next) && m.symbol_id != 0 {
+                                if self->type_of(m.symbol_id) as mt {
+                                    next = .{ Value = mt }
+                                }
+                            }
+                        }
+
+                        if path_is_none(next) && u.scope_id != 0 {
+                            if self->lookup_in_scope(u.scope_id, part) as sym {
+                                next = self->peel_path_symbol(sym)
+                            }
+                        }
+
+                        if path_is_none(next) {
+                            if self->variant(u.id, part) as v {
+                                if v.type_id != 0 {
+                                    if self->get_type(v.type_id) as vt {
+                                        next = .{ Value = vt }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    case .None do return .None
+                }
+
+                if path_is_none(next) do return .None
+                receiver = next
+            }
+
+            return receiver
+        }
+    }
+}
+
 CompilationInfo.type_of :: (self: &#Self, symbol_id: u32) -> ? &TypeInfo {
     switch self->get_symbol(symbol_id) {
         case .Some as sym do return self->get_type(sym.type_id)

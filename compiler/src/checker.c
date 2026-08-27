@@ -412,6 +412,10 @@ CHECK_FUNC(if, AstIfWhile* ifnode) {
                 ifnode->optional_local->flags |= Ast_Flag_Address_Taken;
                 ifnode->optional_local->flags |= Ast_Flag_Decl_Followed_By_Init;
                 CHECK(local, &ifnode->optional_local);
+                if (!ifnode->optional_local->type && type->Union.variants_ordered[1]->type) {
+                    ifnode->optional_local->type = type->Union.variants_ordered[1]->type;
+                }
+                compilation_log_notify_node_typed(context, (AstNode *) ifnode->optional_local);
             }
         }
         else if (!type_is_bool(ifnode->cond->type)) {
@@ -775,6 +779,7 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
                     } else {
                         sc->capture->type = union_variant->type;
                     }
+                    compilation_log_notify_node_typed(context, (AstNode *) sc->capture);
                 }
 
             } else {
@@ -1409,6 +1414,7 @@ CHECK_FUNC(binaryop_assignment, AstBinaryOp** pbinop) {
                         }
 
                         TRY_ASSIGN_TYPE_OR_FAIL(context, &lhs->exprs[i], right_type->Compound.types[i], binop->token);
+                        compilation_log_notify_node_typed(context, (AstNode *) lhs->exprs[i]);
                     }
 
                     lhs->type = type_build_compound_type(context, lhs);
@@ -4083,6 +4089,11 @@ CHECK_FUNC(function, AstFunction* func) {
     if (func->named_return_locals) {
         bh_arr_each(AstLocal *, named_return, func->named_return_locals) {
             CHECK(local, named_return);
+            fill_in_type(context, (AstTyped *) *named_return);
+            if ((*named_return)->type == NULL) {
+                YIELD((*named_return)->token->pos, "Waiting for named return type to be known.");
+            }
+            compilation_log_notify_node_typed(context, (AstNode *) *named_return);
         }
 
         if (!func->named_return_locals_added) {
@@ -5839,6 +5850,11 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
                 goto poly_var_solved;
 
             case TYPE_MATCH_SPECIAL:
+                if (context->cycle_detected) {
+                    ONYX_ERROR(query->token->pos, Error_Critical, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
+                    if (query->error_loc) ONYX_ERROR(query->error_loc->pos, Error_Critical, "Here is where the call is located.");
+                    return Check_Error;
+                }
                 return Check_Yield;
 
             case TYPE_MATCH_YIELD:
@@ -5846,6 +5862,7 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
                     ONYX_ERROR(query->token->pos, Error_Critical, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
                     if (err_msg.text != NULL) onyx_submit_error(context, err_msg);
                     if (query->error_loc) ONYX_ERROR(query->error_loc->pos, Error_Critical, "Here is where the call is located."); // :ErrorMessage
+                    return Check_Error;
                 }
 
                 return Check_Yield;
@@ -5875,6 +5892,11 @@ poly_query_done:
     scope_leave(context);
 
     if (solved_count != bh_arr_length(query->proc->poly_params)) {
+        if (context->cycle_detected) {
+            ONYX_ERROR(query->token->pos, Error_Critical, "Unable to solve all polymorphic variables.");
+            if (query->error_loc) ONYX_ERROR(query->error_loc->pos, Error_Critical, "Here is where the call is located.");
+            return Check_Error;
+        }
         if (solved_something) {
             return Check_Yield;
         } else {

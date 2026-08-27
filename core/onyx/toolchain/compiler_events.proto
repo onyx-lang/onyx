@@ -98,6 +98,7 @@ message EventSymbol {
   uint32 line = 5;
   uint32 column = 6;
   SymbolKind kind = 7;
+  uint32 package_id = 8;
 }
 
 message EventSymbolResolved {

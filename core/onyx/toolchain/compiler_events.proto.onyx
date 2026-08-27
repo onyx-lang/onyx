@@ -117,6 +117,8 @@ EventSymbol :: struct {
     column: u32
     @protobuf.Field.{7, 14}
     kind: SymbolKind
+    @protobuf.Field.{8, 13}
+    package_id: u32
 }
 
 @protobuf.Message

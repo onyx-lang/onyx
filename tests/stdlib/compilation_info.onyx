@@ -415,6 +415,201 @@ main :: () {
     ok("circular_alias_has_errors", circb->has_errors());
     ok("circular_alias_finished", circinfo.events_applied > 0);
 
+    missb := Builder.make();
+    defer missb->destroy();
+    missb->map_dir("core", tprintf("{}/core", core_root));
+    missb->enable(.DISABLE_EXTENSIONS);
+    missb->enable(.MULTI_THREADING);
+    missb->enable(.COMPILATION_DATA_DETAILED);
+    missb->set_platform(.ONYX);
+    missb->inject_source("""
+package main
+
+use core {*}
+use core.iter {as_iter}
+
+main :: () {
+    xs := i32.[1, 2, 3]
+    _ := as_iter(xs)
+        |> .map(x => Missing.foo(x))
+        |> .collect()
+}
+""");
+    missb->compile();
+
+    missinfo := missb->compilation_info();
+    defer delete(&missinfo);
+
+    ok("unresolved_in_poly_has_errors", missb->has_errors());
+    ok("unresolved_in_poly_finished", missinfo.events_applied > 0);
+
+    pathb := Builder.make();
+    defer pathb->destroy();
+    pathb->map_dir("core", tprintf("{}/core", core_root));
+    pathb->enable(.DISABLE_EXTENSIONS);
+    pathb->enable(.MULTI_THREADING);
+    pathb->enable(.COMPILATION_DATA_DETAILED);
+    pathb->set_platform(.ONYX);
+    pathb->inject_source("""
+package foo.bar
+
+Point :: struct {
+    x: i32
+    y: i32
+}
+""");
+    pathb->inject_source("""
+package main
+
+use foo {package}
+use core {*}
+
+main :: () {
+    p := foo.bar.Point.{ x = 1, y = 2 }
+    _ := p.x
+    opt := Optional.empty(foo.bar.Point)
+    if opt as s {
+        _ := s.x
+    }
+    a, b := p, p
+    _ := a.x
+    _ := b.x
+}
+
+named_out :: () -> (out: foo.bar.Point) {
+    out.x = 1
+    return
+}
+""");
+    pathb->compile();
+
+    ok("nested_path_compile_ok", !pathb->has_errors());
+
+    pathinfo := pathb->compilation_info();
+    defer delete(&pathinfo);
+
+    start_scope: u32 = 0;
+    for id in pathinfo->symbols_named("p") {
+        if pathinfo->get_symbol(id) as psym {
+            if pathinfo->lookup(psym.scope_id, "foo") {
+                start_scope = psym.scope_id;
+            }
+        }
+    }
+
+    foo_bar_path := false;
+    point_in_bar := false;
+    lookup_no_parent := false;
+    if start_scope != 0 {
+        switch pathinfo->resolve_path(start_scope, str.["foo", "bar"]) {
+            case .Pkg as pkg {
+                foo_bar_path = pkg.fully_qualified_name == "foo.bar";
+                if pathinfo->lookup_in_scope(pkg.scope_id, "Point") as ps {
+                    if ps.kind == .Struct do point_in_bar = true;
+                }
+                lookup_no_parent = true;
+                if pathinfo->lookup_in_scope(pkg.scope_id, "foo") do lookup_no_parent = false;
+            }
+            case _ {}
+        }
+    }
+    ok("foo_bar_path", foo_bar_path);
+    ok("point_in_nested_package", point_in_bar);
+    ok("lookup_in_scope_no_parent", lookup_no_parent);
+
+    alloc_pkg_id := false;
+    alloc_arena_path := false;
+    if start_scope != 0 {
+        if pathinfo->lookup(start_scope, "alloc") as alloc_sym {
+            if pathinfo->package_of(alloc_sym) as ap {
+                if pathinfo->package_named("core.alloc") as expected {
+                    alloc_pkg_id = ap.id == expected.id;
+                }
+            }
+        }
+        switch pathinfo->resolve_path(start_scope, str.["alloc", "arena"]) {
+            case .Pkg as pkg {
+                alloc_arena_path = pkg.fully_qualified_name == "core.alloc.arena";
+            }
+            case _ {}
+        }
+    }
+    ok("alloc_package_id", alloc_pkg_id);
+    ok("alloc_arena_path", alloc_arena_path);
+
+    value_chain := false;
+    p_is_value := false;
+    point_is_type := false;
+    if start_scope != 0 {
+        switch pathinfo->resolve_path(start_scope, str.["p", "x"]) {
+            case .Value as t {
+                if t.kind == .Basic do value_chain = true;
+            }
+            case _ {}
+        }
+        switch pathinfo->resolve_path(start_scope, str.["p"]) {
+            case .Value do p_is_value = true;
+            case _ {}
+        }
+        switch pathinfo->resolve_path(start_scope, str.["foo", "bar", "Point"]) {
+            case .Type do point_is_type = true;
+            case _ {}
+        }
+    }
+    ok("value_member_path", value_chain);
+    ok("p_is_value", p_is_value);
+    ok("point_is_type_name", point_is_type);
+
+    as_binding_typed := false;
+    for id in pathinfo->symbols_named("s") {
+        if pathinfo->get_symbol(id) as ssym {
+            if pathinfo->type_of(ssym.id) as t {
+                if pathinfo->member(t.id, "x") do as_binding_typed = true;
+            }
+        }
+    }
+    ok("as_binding_typed", as_binding_typed);
+
+    compound_a_typed := false;
+    compound_b_typed := false;
+    for id in pathinfo->symbols_named("a") {
+        if pathinfo->get_symbol(id) as asym {
+            if pathinfo->type_of(asym.id) as t {
+                if pathinfo->member(t.id, "x") do compound_a_typed = true;
+            }
+        }
+    }
+    for id in pathinfo->symbols_named("b") {
+        if pathinfo->get_symbol(id) as bsym {
+            if pathinfo->type_of(bsym.id) as t {
+                if pathinfo->member(t.id, "x") do compound_b_typed = true;
+            }
+        }
+    }
+    ok("compound_a_typed", compound_a_typed);
+    ok("compound_b_typed", compound_b_typed);
+
+    named_out_typed := false;
+    named_out_in_body := false;
+    for id in pathinfo->symbols_named("out") {
+        if pathinfo->get_symbol(id) as osym {
+            if pathinfo->type_of(osym.id) as t {
+                if pathinfo->member(t.id, "x") do named_out_typed = true;
+            }
+            for r in pathinfo->references(osym.id) {
+                if r.line == osym.line && r.column == osym.column do continue;
+                sid := pathinfo->scope_at(r.file_id, r.line, r.column);
+                if pathinfo->lookup(sid, "out") as found {
+                    if pathinfo->type_of(found.id) as t {
+                        if pathinfo->member(t.id, "x") do named_out_in_body = true;
+                    }
+                }
+            }
+        }
+    }
+    ok("named_out_typed", named_out_typed);
+    ok("named_out_in_body", named_out_in_body);
+
     ifb := Builder.make();
     defer ifb->destroy();
     ifb->map_dir("core", tprintf("{}/core", core_root));

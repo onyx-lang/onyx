@@ -2311,6 +2311,7 @@ typedef struct CompilationEvent {
             u32 line;
             u32 column;
             u32 kind;
+            u32 package_id;
         } symbol;
 
         struct {
