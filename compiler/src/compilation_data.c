@@ -591,9 +591,11 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
     ev.symbol.kind = kind;
 
     if (node) {
-        bh_imap_put(&log->node_to_symbol_id, (u64) node, ev.symbol.id);
+        if (!bh_imap_has(&log->node_to_symbol_id, (u64) node)) {
+            bh_imap_put(&log->node_to_symbol_id, (u64) node, ev.symbol.id);
+        }
         AstNode *inner = strip_aliases(node);
-        if (inner && inner != node) {
+        if (inner && inner != node && !bh_imap_has(&log->node_to_symbol_id, (u64) inner)) {
             bh_imap_put(&log->node_to_symbol_id, (u64) inner, ev.symbol.id);
         }
     }

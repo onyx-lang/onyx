@@ -2425,7 +2425,6 @@ struct Context {
     bh_buffer generated_osym_buffer;
     bh_buffer generated_injected_code_buffer;
 
-    struct SymbolInfoTable *symbol_info;
     struct OnyxDocInfo     *doc_info;
 
     bh_arr(CompilerExtension) extensions;
@@ -2610,7 +2609,6 @@ Type* polymorphic_union_lookup(Context *context, AstPolyUnionType* pu_type, bh_a
 
 TypeMatch resolve_intrinsic_interface_constraint(Context *context, AstConstraint *constraint);
 
-void track_declaration_for_symbol_info(Context *context, OnyxFilePos, AstNode *);
 void track_documentation_for_symbol_info(Context *context, AstNode *, AstBinding *);
 void track_resolution_for_symbol_info(Context *context, AstNode *original, AstNode *resolved);
 

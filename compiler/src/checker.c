@@ -4390,8 +4390,6 @@ CHECK_FUNC(struct, AstStructType* s_node) {
     }
 
     bh_arr_each(AstStructMember, member, s_node->members) {
-        track_declaration_for_symbol_info(context, member->token->pos, (AstNode *) member);
-
         if (member->type_node) {
             CHECK(type, &member->type_node);
         }
@@ -4544,8 +4542,6 @@ CHECK_FUNC(union, AstUnionType *u_node) {
     CHECK(meta_tags, u_node->meta_tags);
 
     bh_arr_each(AstUnionVariant, variant, u_node->variants) {
-        track_declaration_for_symbol_info(context, variant->token->pos, (AstNode *) variant);
-
         assert(variant->type_node);
 
         CHECK(type, &variant->type_node);

@@ -467,14 +467,6 @@ static void prime_pump(Context *context) {
         }));
     }
 
-    if (context->options.generate_symbol_info_file) {
-        context->symbol_info = bh_alloc_item(context->gp_alloc, SymbolInfoTable);
-        bh_imap_init(&context->symbol_info->node_to_id, context->gp_alloc, 512);
-        bh_arr_new(context->gp_alloc, context->symbol_info->symbols, 128);
-        bh_arr_new(context->gp_alloc, context->symbol_info->symbols_resolutions, 128);
-        sh_new_arena(context->symbol_info->files);
-    }
-
     if (context->options.generate_odoc) {
         context->doc_info = bh_alloc_item(context->gp_alloc, OnyxDocInfo);
         memset(context->doc_info, 0, sizeof(OnyxDocInfo));

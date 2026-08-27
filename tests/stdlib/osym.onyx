@@ -1,0 +1,154 @@
+#load "core:onyx/toolchain/module"
+
+use core {*}
+use onyx.toolchain {*}
+use protobuf.onyx.toolchain.events
+
+read_u32 :: (buf: [] u8, off: i32) -> u32 {
+    return ~~ ((~~buf[off]) | ((~~buf[off + 1]) << 8) | ((~~buf[off + 2]) << 16) | ((~~buf[off + 3]) << 24))
+}
+
+main :: () {
+    b := Builder.make();
+    defer b->destroy();
+
+    core_root := os.env("ONYX_PATH") ?? "";
+    defer str.free(core_root);
+    b->map_dir("core", tprintf("{}/core", core_root));
+
+    b->enable(.DISABLE_EXTENSIONS);
+    b->enable(.MULTI_THREADING);
+    b->enable(.GENERATE_LSP_INFO);
+    b->set_platform(.ONYX);
+
+    b->inject_source("""
+package foo.bar
+
+/// Hello Point
+Point :: struct {
+    x: i32
+    y: i32
+}
+
+x :: 1
+
+get_x :: (p: Point) -> i32 {
+    return p.x
+}
+""");
+
+    b->inject_source("""
+package main
+
+use foo.bar { Point, get_x, x }
+
+main :: () {
+    p := Point.{ x = x, y = 0 }
+    _ := get_x(p)
+}
+""");
+    b->compile();
+
+    println("compile_ok");
+    println(!b->has_errors());
+
+    events := b->compilation_data();
+    point_id: u32;
+    for e in events.events {
+        switch e.symbol {
+            case .Some as sym {
+                if point_id == 0 && sym.name == "Point" && sym.kind == .Struct {
+                    point_id = sym.id;
+                }
+            }
+            case .None {}
+        }
+    }
+
+    println("point_symbol_id");
+    println(point_id != 0);
+
+    osym := b->generate_output(.OSYM);
+    has_osym := false;
+    magic_ok := false;
+    version_2 := false;
+    file_count_ok := false;
+    symbol_count_ok := false;
+    resolution_count_ok := false;
+    point_def_ok := false;
+    point_resolved_ok := false;
+    point_docs_ok := false;
+
+    switch osym {
+        case .Some as buf {
+            has_osym = buf.count >= 40;
+            if has_osym {
+                magic_ok = buf[0] == 'O' && buf[1] == 'S' && buf[2] == 'Y' && buf[3] == 'M';
+                version := read_u32(buf, 4);
+                header_size := read_u32(buf, 8);
+                file_count := read_u32(buf, 12);
+                symbols_off := read_u32(buf, 16);
+                symbol_count := read_u32(buf, 20);
+                resolutions_off := read_u32(buf, 24);
+                resolution_count := read_u32(buf, 28);
+                docs_off := read_u32(buf, 32);
+                docs_len := read_u32(buf, 36);
+
+                version_2 = version == 2 && header_size == 40;
+                file_count_ok = file_count > 0;
+                symbol_count_ok = symbol_count > 0;
+                resolution_count_ok = resolution_count > 0;
+
+                i: i32 = ~~symbols_off;
+                n := 0;
+                while n < symbol_count {
+                    id := read_u32(buf, i);
+                    doc_off := read_u32(buf, i + 16);
+                    doc_len := read_u32(buf, i + 20);
+                    if id == point_id {
+                        point_def_ok = true;
+                        if doc_len > 0 {
+                            start := ~~docs_off + ~~doc_off;
+                            docs := buf[start .. start + ~~doc_len];
+                            if string.contains(docs, "Hello Point") do point_docs_ok = true;
+                        }
+                    }
+                    i += 24;
+                    n += 1;
+                }
+
+                i = ~~resolutions_off;
+                n = 0;
+                while n < resolution_count {
+                    symbol_id := read_u32(buf, i + 16);
+                    if symbol_id == point_id do point_resolved_ok = true;
+                    i += 20;
+                    n += 1;
+                }
+
+                // Silence unused if the header was short.
+                _ := docs_len;
+            }
+        }
+        case .None {}
+    }
+
+    println("has_osym");
+    println(has_osym);
+    println("magic_ok");
+    println(magic_ok);
+    println("version_2");
+    println(version_2);
+    println("file_count_ok");
+    println(file_count_ok);
+    println("symbol_count_ok");
+    println(symbol_count_ok);
+    println("resolution_count_ok");
+    println(resolution_count_ok);
+    println("point_def_ok");
+    println(point_def_ok);
+    println("point_resolved_ok");
+    println(point_resolved_ok);
+    println("point_docs_ok");
+    println(point_docs_ok);
+}

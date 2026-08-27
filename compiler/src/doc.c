@@ -15,21 +15,75 @@ static i32 sort_symbol_resolutions(const SymbolResolution *a, const SymbolResolu
 }
 
 void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer) {
-    SymbolInfoTable *syminfo = context->symbol_info;
-    if (!syminfo) return;
+    CompilationLog *log = &context->compilation_log;
+    if (!log->events) return;
 
-    qsort(syminfo->symbols_resolutions,
-            bh_arr_length(syminfo->symbols_resolutions),
+    bh_arr(SymbolInfo) symbols = NULL;
+    bh_arr(SymbolResolution) resolutions = NULL;
+    bh_arr(CompilationEvent *) files = NULL;
+    bh_imap id_to_index;
+    bh_imap_init(&id_to_index, context->gp_alloc, 255);
+    bh_arr_new(context->gp_alloc, symbols, 128);
+    bh_arr_new(context->gp_alloc, resolutions, 128);
+    bh_arr_new(context->gp_alloc, files, 16);
+
+    bh_arr_each(CompilationEvent, ev, log->events) {
+        switch (ev->kind) {
+            case COMPILATION_EVENT_FILE:
+                bh_arr_push(files, ev);
+                break;
+
+            case COMPILATION_EVENT_SYMBOL: {
+                SymbolInfo symbol;
+                symbol.id = ev->symbol.id;
+                symbol.file_id = ev->symbol.file_id;
+                symbol.line = ev->symbol.line;
+                symbol.column = ev->symbol.column;
+                symbol.documentation = NULL;
+                symbol.documentation_length = 0;
+                bh_imap_put(&id_to_index, (u64) symbol.id, (u64) bh_arr_length(symbols));
+                bh_arr_push(symbols, symbol);
+                break;
+            }
+
+            case COMPILATION_EVENT_BINDING:
+                if (bh_imap_has(&id_to_index, (u64) ev->binding.symbol_id)) {
+                    u32 idx = (u32) bh_imap_get(&id_to_index, (u64) ev->binding.symbol_id);
+                    symbols[idx].documentation = ev->binding.documentation ? ev->binding.documentation : "";
+                    symbols[idx].documentation_length = symbols[idx].documentation
+                        ? (u32) strlen(symbols[idx].documentation)
+                        : 0;
+                }
+                break;
+
+            case COMPILATION_EVENT_SYMBOL_RESOLVED: {
+                SymbolResolution res;
+                res.symbol_id = ev->resolved.symbol_id;
+                res.file_id = ev->resolved.file_id;
+                res.line = ev->resolved.line;
+                res.column = ev->resolved.column;
+                res.length = ev->resolved.length;
+                bh_arr_push(resolutions, res);
+                break;
+            }
+
+            default:
+                break;
+        }
+    }
+
+    qsort(resolutions,
+            bh_arr_length(resolutions),
             sizeof(SymbolResolution),
             (int (*)(const void *, const void*)) sort_symbol_resolutions);
 
     bh_buffer file_section;
     bh_buffer_init(&file_section, context->gp_alloc, 2048);
-    fori (i, 0, shlen(syminfo->files)) {
-        char *filename = syminfo->files[i].key;
-        u32   file_id  = syminfo->files[i].value;
-        bh_buffer_write_u32(&file_section, file_id);
-        bh_buffer_write_u32(&file_section, strlen(filename));
+    bh_arr_each(CompilationEvent *, pfile, files) {
+        CompilationEvent *fev = *pfile;
+        char *filename = fev->file.path ? fev->file.path : "";
+        bh_buffer_write_u32(&file_section, fev->file.id);
+        bh_buffer_write_u32(&file_section, (u32) strlen(filename));
         bh_buffer_write_string(&file_section, filename);
     }
 
@@ -39,7 +93,7 @@ void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer) {
     bh_buffer docs_section;
     bh_buffer_init(&docs_section, context->gp_alloc, 4096);
 
-    bh_arr_each(SymbolInfo, sym, syminfo->symbols) {
+    bh_arr_each(SymbolInfo, sym, symbols) {
         bh_buffer_write_u32(&sym_def_section, sym->id);
         bh_buffer_write_u32(&sym_def_section, sym->file_id);
         bh_buffer_write_u32(&sym_def_section, sym->line);
@@ -60,7 +114,7 @@ void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer) {
 
     bh_buffer sym_res_section;
     bh_buffer_init(&sym_res_section, context->gp_alloc, 2048);
-    bh_arr_each(SymbolResolution, sym, syminfo->symbols_resolutions) {
+    bh_arr_each(SymbolResolution, sym, resolutions) {
         bh_buffer_write_u32(&sym_res_section, sym->file_id);
         bh_buffer_write_u32(&sym_res_section, sym->line);
         bh_buffer_write_u32(&sym_res_section, sym->column);
@@ -81,11 +135,11 @@ void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer) {
     }
 
     bh_buffer_write_u32(&header_section, header_size);
-    bh_buffer_write_u32(&header_section, shlenu(syminfo->files));
+    bh_buffer_write_u32(&header_section, (u32) bh_arr_length(files));
     bh_buffer_write_u32(&header_section, header_size + file_section.length);
-    bh_buffer_write_u32(&header_section, bh_arr_length(syminfo->symbols));
+    bh_buffer_write_u32(&header_section, (u32) bh_arr_length(symbols));
     bh_buffer_write_u32(&header_section, header_size + file_section.length + sym_def_section.length);
-    bh_buffer_write_u32(&header_section, bh_arr_length(syminfo->symbols_resolutions));
+    bh_buffer_write_u32(&header_section, (u32) bh_arr_length(resolutions));
 
     if (context->options.generate_lsp_info_file) {
         bh_buffer_write_u32(&header_section, header_size + file_section.length + sym_def_section.length + sym_res_section.length);
@@ -106,11 +160,10 @@ void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer) {
     bh_buffer_free(&file_section);
     bh_buffer_free(&sym_def_section);
     bh_buffer_free(&sym_res_section);
-
-    bh_arr_free(syminfo->symbols);
-    bh_arr_free(syminfo->symbols_resolutions);
-    shfree(syminfo->files);
-    bh_imap_free(&syminfo->node_to_id);
+    bh_arr_free(symbols);
+    bh_arr_free(resolutions);
+    bh_arr_free(files);
+    bh_imap_free(&id_to_index);
 }
 
 

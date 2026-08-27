@@ -5,7 +5,6 @@
 #include "parser.h"
 #include "astnodes.h"
 #include "errors.h"
-#include "doc.h"
 #include "onyx.h"
 
 //
@@ -172,7 +171,6 @@ b32 symbol_raw_introduce(Context *context, Scope* scope, char* name, OnyxFilePos
     }
 
     shput(scope->symbols, name, symbol);
-    track_declaration_for_symbol_info(context, pos, symbol);
     compilation_log_emit_symbol(context, scope, name, pos, symbol);
     return 1;
 }
@@ -1780,90 +1778,12 @@ char *find_closest_symbol_in_node(Context *context, AstNode* node, char *sym) {
 
 
 
-static u32 symbol_info_get_file_id(SymbolInfoTable *syminfo, const char *filename) {
-    u32 file_id;
-    if (shgeti(syminfo->files, filename) == -1) {
-        file_id = syminfo->next_file_id++;
-        shput(syminfo->files, filename, file_id);
-
-    } else {
-        file_id = shget(syminfo->files, filename);
-    }
-
-    return file_id;
-}
-
-void track_declaration_for_symbol_info(Context *context, OnyxFilePos pos, AstNode *node) {
-    if (!context->options.generate_symbol_info_file) return;
-    if (pos.filename == NULL) return;
-
-    SymbolInfoTable *syminfo = context->symbol_info;
-    assert(syminfo);
-
-    if (bh_imap_has(&syminfo->node_to_id, (u64) node)) return;
-
-    u32 symbol_id = syminfo->next_symbol_id++;
-    u32 file_id = symbol_info_get_file_id(syminfo, pos.filename);
-
-    SymbolInfo symbol;
-    symbol.id = symbol_id;
-    symbol.file_id = file_id;
-    symbol.line = pos.line;
-    symbol.column = pos.column;
-    symbol.documentation = NULL;
-    symbol.documentation_length = 0;
-    bh_arr_push(syminfo->symbols, symbol);
-
-    bh_imap_put(&syminfo->node_to_id, (u64) node, (u64) symbol_id);
-}
-
 void track_documentation_for_symbol_info(Context *context, AstNode *node, AstBinding *binding) {
     compilation_log_emit_binding(context, node, binding);
-
-    if (!context->options.generate_lsp_info_file) return;
-    if (!context->options.generate_symbol_info_file) return;
-
-    SymbolInfoTable *syminfo = context->symbol_info;
-    assert(syminfo);
-
-    if (!bh_imap_has(&syminfo->node_to_id, (u64) node)) return;
-
-    u64 symbol_id = bh_imap_get(&syminfo->node_to_id, (u64) node);
-    if (binding->documentation_token_old) {
-        syminfo->symbols[symbol_id].documentation        = binding->documentation_token_old->text;
-        syminfo->symbols[symbol_id].documentation_length = binding->documentation_token_old->length;
-    } else if (binding->documentation_string) {
-        syminfo->symbols[symbol_id].documentation = binding->documentation_string;
-        syminfo->symbols[symbol_id].documentation_length = strlen(binding->documentation_string);
-    } else {
-        syminfo->symbols[symbol_id].documentation = "";
-        syminfo->symbols[symbol_id].documentation_length = 0;
-    }
 }
 
 void track_resolution_for_symbol_info(Context *context, AstNode *original, AstNode *resolved) {
     compilation_log_emit_symbol_resolved(context, original, resolved);
-
-    if (!context->options.generate_symbol_info_file) return;
-    if (!resolved) return;
-
-    SymbolInfoTable *syminfo = context->symbol_info;
-    assert(syminfo);
-
-    if (!bh_imap_has(&syminfo->node_to_id, (u64) resolved)) return;
-
-    u32 symbol_id = (u32) bh_imap_get(&syminfo->node_to_id, (u64) resolved);
-
-    u32 file_id = symbol_info_get_file_id(syminfo, original->token->pos.filename);
-
-    SymbolResolution res;
-    res.symbol_id = symbol_id;
-    res.file_id = file_id;
-    res.line = original->token->pos.line;
-    res.column = original->token->pos.column;
-    res.length = original->token->length;
-
-    bh_arr_push(syminfo->symbols_resolutions, res);
 }
 
 
