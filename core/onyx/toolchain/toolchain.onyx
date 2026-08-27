@@ -127,6 +127,21 @@ Builder.compilation_data :: (use self: &#Self, allocator := context.allocator) -
     return protobuf.unmarshal(buffer, CompilerEvents, allocator)!
 }
 
+/// Snapshot of unread compilation events as a new index.
+/// The first call is the log so far; later calls are only the delta.
+/// For a running index, `make` once and `update_compilation_info`.
+Builder.compilation_info :: (use self: &#Self, allocator := context.allocator) -> CompilationInfo {
+    return CompilationInfo.from(self->compilation_data(allocator), allocator)
+}
+
+/// Fold unread compilation events into an existing index.
+Builder.update_compilation_info :: (use self: &#Self, info: &CompilationInfo, allocator := context.allocator) -> u32 {
+    data := self->compilation_data(allocator)
+    applied := info->update(data.events)
+    delete(&data.events)
+    return applied
+}
+
 
 
 

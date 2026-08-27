@@ -1,0 +1,447 @@
+package onyx.toolchain
+#allow_stale_code
+
+#load "./compiler_events.proto.onyx"
+
+use core {*}
+use protobuf.onyx.toolchain.events {*}
+
+/// Indexed view of a compilation-event stream.
+///
+/// Event payloads are copied by value; `str` fields still point at the
+/// original unmarshal allocations, so the ingested events' string data
+/// must remain alive for as long as this structure is used.
+///
+/// Fold later deltas with `update` (or `Builder.update_compilation_info`)
+/// instead of building a new index. Each `Builder.compilation_data` read
+/// and each extension CompilationData message is already a delta.
+CompilationInfo :: struct {
+    compiler_version: str
+    events_applied:   u32
+
+    files:    [..] EventFile
+    packages: [..] EventPackage
+    scopes:   [..] ScopeInfo
+    symbols:  [..] SymbolInfo
+    types:    [..] TypeInfo
+
+    files_by_path:    Map(str, u32)
+    packages_by_name: Map(str, u32)
+    symbols_by_name:  Map(str, [..] u32)
+    types_by_name:    Map(str, [..] u32)
+
+    symbols_by_file: [..] [..] u32
+
+    resolutions: [..] EventSymbolResolved
+}
+
+ScopeInfo :: struct {
+    use ev: EventScope
+    symbol_ids: [..] u32
+}
+
+SymbolInfo :: struct {
+    use decl: EventSymbol
+    documentation: str
+    type_id: u32
+    use_sites: [..] EventSymbolResolved
+}
+
+TypeInfo :: struct {
+    use decl: EventType
+    use body: EventTypeBody
+    has_body: bool
+}
+
+CompilationInfo.make :: (allocator := context.allocator) -> (res: CompilationInfo) {
+    res.files    = make(typeof res.files,    allocator=allocator)
+    res.packages = make(typeof res.packages, allocator=allocator)
+    res.scopes   = make(typeof res.scopes,   allocator=allocator)
+    res.symbols  = make(typeof res.symbols,  allocator=allocator)
+    res.types    = make(typeof res.types,    allocator=allocator)
+
+    res.files_by_path    = make(typeof res.files_by_path,    allocator=allocator)
+    res.packages_by_name = make(typeof res.packages_by_name, allocator=allocator)
+    res.symbols_by_name  = make(typeof res.symbols_by_name,  allocator=allocator)
+    res.types_by_name    = make(typeof res.types_by_name,    allocator=allocator)
+
+    res.symbols_by_file = make(typeof res.symbols_by_file, allocator=allocator)
+    res.resolutions     = make(typeof res.resolutions,     allocator=allocator)
+    return
+}
+
+CompilationInfo.from :: (data: CompilerEvents, allocator := context.allocator) -> CompilationInfo {
+    info := CompilationInfo.make(allocator)
+    info->update(data.events)
+    return info
+}
+
+/// Apply a batch of events in place. Pass only *new* events (a Builder
+/// unread dump, or one extension CompilationData payload). Replaying an
+/// already-applied batch will duplicate resolutions and name index entries.
+CompilationInfo.update :: (self: &#Self, events: [] CompilerEvent) -> u32 {
+    for e in events {
+        self->ingest_event(e)
+        self.events_applied += 1
+    }
+    return cast(u32) events.count
+}
+
+CompilationInfo.ingest :: CompilationInfo.update
+
+CompilationInfo.ingest_event :: (self: &#Self, event: CompilerEvent) {
+    switch event.start {
+        case .Some as s do self.compiler_version = s.compiler_version
+        case .None {}
+    }
+
+    switch event.file {
+        case .Some as f {
+            slot := ensure_id(&self.files, f.id)
+            if slot.id == 0 {
+                *slot = f
+                index_unique(&self.files_by_path, f.path, f.id)
+            }
+        }
+        case .None {}
+    }
+
+    switch event.pack {
+        case .Some as p {
+            slot := ensure_id(&self.packages, p.id)
+            if slot.id == 0 {
+                *slot = p
+                index_unique(&self.packages_by_name, p.fully_qualified_name, p.id)
+            }
+        }
+        case .None {}
+    }
+
+    switch event.scope {
+        case .Some as s {
+            slot := ensure_id(&self.scopes, s.id)
+            if slot.id == 0 {
+                slot.ev = s
+            }
+        }
+        case .None {}
+    }
+
+    switch event.symbol {
+        case .Some as sym {
+            slot := ensure_id(&self.symbols, sym.id)
+            if slot.id == 0 {
+                slot.decl = sym
+                index_list(&self.symbols_by_name, sym.name, sym.id)
+
+                if sym.scope_id != 0 {
+                    sc := ensure_id(&self.scopes, sym.scope_id)
+                    sc.symbol_ids->push(sym.id)
+                }
+
+                if sym.file_id != 0 {
+                    ensure_id_list(&self.symbols_by_file, sym.file_id)->push(sym.id)
+                }
+            }
+        }
+        case .None {}
+    }
+
+    switch event.resolved {
+        case .Some as r {
+            self.resolutions->push(r)
+            ensure_id(&self.symbols, r.symbol_id).use_sites->push(r)
+        }
+        case .None {}
+    }
+
+    switch event.binding {
+        case .Some as b {
+            slot := ensure_id(&self.symbols, b.symbol_id)
+            if b.documentation.count > 0 do slot.documentation = b.documentation
+            if b.type_id != 0 do slot.type_id = b.type_id
+        }
+        case .None {}
+    }
+
+    switch event.type {
+        case .Some as t {
+            slot := ensure_id(&self.types, t.id)
+            first := slot.id == 0
+            slot.decl = t
+            if first do index_list(&self.types_by_name, t.name, t.id)
+        }
+        case .None {}
+    }
+
+    switch event.type_body {
+        case .Some as tb {
+            slot := ensure_id(&self.types, tb.type_id)
+            if slot.id == 0 do slot.id = tb.type_id
+            slot.body = tb
+            slot.has_body = true
+        }
+        case .None {}
+    }
+}
+
+CompilationInfo.get_file :: (self: &#Self, id: u32) -> ? &EventFile {
+    return by_id(&self.files, id)
+}
+
+CompilationInfo.get_package :: (self: &#Self, id: u32) -> ? &EventPackage {
+    return by_id(&self.packages, id)
+}
+
+CompilationInfo.get_scope :: (self: &#Self, id: u32) -> ? &ScopeInfo {
+    return by_id(&self.scopes, id)
+}
+
+CompilationInfo.get_symbol :: (self: &#Self, id: u32) -> ? &SymbolInfo {
+    return by_id(&self.symbols, id)
+}
+
+CompilationInfo.get_type :: (self: &#Self, id: u32) -> ? &TypeInfo {
+    return by_id(&self.types, id)
+}
+
+CompilationInfo.file_with_path :: (self: &#Self, path: str) -> ? &EventFile {
+    switch self.files_by_path->get(path) {
+        case .Some as id do return self->get_file(id)
+        case .None do return .None
+    }
+}
+
+CompilationInfo.package_named :: (self: &#Self, fully_qualified_name: str) -> ? &EventPackage {
+    switch self.packages_by_name->get(fully_qualified_name) {
+        case .Some as id do return self->get_package(id)
+        case .None do return .None
+    }
+}
+
+CompilationInfo.symbols_named :: (self: &#Self, name: str) -> [] u32 {
+    ptr := self.symbols_by_name->get_ptr(name)
+    if ptr == null do return .{}
+    return *ptr
+}
+
+CompilationInfo.types_named :: (self: &#Self, name: str) -> [] u32 {
+    ptr := self.types_by_name->get_ptr(name)
+    if ptr == null do return .{}
+    return *ptr
+}
+
+CompilationInfo.symbols_in_file :: (self: &#Self, file_id: u32) -> [] u32 {
+    i := cast(i32) file_id
+    if file_id == 0 || i >= self.symbols_by_file.count do return .{}
+    return self.symbols_by_file[i]
+}
+
+CompilationInfo.symbols_in_scope :: (self: &#Self, scope_id: u32) -> [] u32 {
+    switch self->get_scope(scope_id) {
+        case .Some as sc do return sc.symbol_ids
+        case .None do return .{}
+    }
+}
+
+/// Walk `scope_id` and its parents looking for a declared name.
+CompilationInfo.lookup :: (self: &#Self, scope_id: u32, name: str) -> ? &SymbolInfo {
+    id := scope_id
+    while id != 0 {
+        switch self->get_scope(id) {
+            case .Some as sc {
+                for sid in sc.symbol_ids {
+                    switch self->get_symbol(sid) {
+                        case .Some as sym {
+                            if sym.name == name do return sym
+                        }
+                        case .None {}
+                    }
+                }
+                id = sc.parent_scope_id
+            }
+            case .None do return .None
+        }
+    }
+    return .None
+}
+
+CompilationInfo.type_of :: (self: &#Self, symbol_id: u32) -> ? &TypeInfo {
+    switch self->get_symbol(symbol_id) {
+        case .Some as sym do return self->get_type(sym.type_id)
+        case .None do return .None
+    }
+}
+
+CompilationInfo.member :: (self: &#Self, type_id: u32, name: str) -> ? &TypeStructMember {
+    switch self->get_type(type_id) {
+        case .Some as t {
+            switch t.struct_body {
+                case .Some as &sb {
+                    for& m in sb.members {
+                        if m.name == name do return m
+                    }
+                }
+                case .None {}
+            }
+        }
+        case .None {}
+    }
+    return .None
+}
+
+CompilationInfo.lookup_member :: (self: &#Self, type_id: u32, name: str) -> ? &SymbolInfo {
+    switch self->member(type_id, name) {
+        case .Some as m do return self->get_symbol(m.symbol_id)
+        case .None do return .None
+    }
+}
+
+CompilationInfo.variant :: (self: &#Self, type_id: u32, name: str) -> ? &TypeUnionVariant {
+    switch self->get_type(type_id) {
+        case .Some as t {
+            switch t.union_body {
+                case .Some as &ub {
+                    for& v in ub.variants {
+                        if v.name == name do return v
+                    }
+                }
+                case .None {}
+            }
+        }
+        case .None {}
+    }
+    return .None
+}
+
+/// Element type of a pointer, multi-pointer, slice, dyn-array, varargs, or array;
+/// base type of a distinct type.
+CompilationInfo.elem :: (self: &#Self, type_id: u32) -> ? &TypeInfo {
+    switch self->get_type(type_id) {
+        case .Some as t {
+            switch t.kind {
+                case .Pointer, .Multi_Pointer, .Slice, .Dyn_Array, .Var_Args {
+                    switch t.elem {
+                        case .Some as e do return self->get_type(e.elem_id)
+                        case .None do return .None
+                    }
+                }
+                case .Array {
+                    switch t.array {
+                        case .Some as a do return self->get_type(a.elem_id)
+                        case .None do return .None
+                    }
+                }
+                case .Distinct {
+                    switch t.distinct {
+                        case .Some as d do return self->get_type(d.base_id)
+                        case .None do return .None
+                    }
+                }
+                case _ do return .None
+            }
+        }
+        case .None do return .None
+    }
+}
+
+/// Symbol referenced at this source position. If several spans overlap,
+/// the shortest one is returned.
+CompilationInfo.resolve_at :: (self: &#Self, file_id: u32, line: u32, column: u32) -> ? &EventSymbolResolved {
+    best: &EventSymbolResolved = null
+    best_len: u32 = 0xffffffff
+
+    for& r in self.resolutions {
+        if r.file_id != file_id do continue
+        if r.line != line do continue
+        if column < r.column do continue
+        if r.length != 0 && column >= r.column + r.length do continue
+        if r.length == 0 && column != r.column do continue
+        if r.length < best_len {
+            best_len = r.length
+            best = r
+        }
+    }
+
+    if best == null do return .None
+    return best
+}
+
+CompilationInfo.references :: (self: &#Self, symbol_id: u32) -> [] EventSymbolResolved {
+    switch self->get_symbol(symbol_id) {
+        case .Some as sym do return sym.use_sites
+        case .None do return .{}
+    }
+}
+
+CompilationInfo.destroy :: (use self: &#Self) {
+    for i in 0 .. symbols_by_name.entries.count {
+        delete(&symbols_by_name.entries[i].value)
+    }
+    for i in 0 .. types_by_name.entries.count {
+        delete(&types_by_name.entries[i].value)
+    }
+    for i in 0 .. scopes.count {
+        delete(&scopes[i].symbol_ids)
+    }
+    for i in 0 .. symbols.count {
+        delete(&symbols[i].use_sites)
+    }
+    for i in 0 .. symbols_by_file.count {
+        delete(&symbols_by_file[i])
+    }
+
+    delete(&files)
+    delete(&packages)
+    delete(&scopes)
+    delete(&symbols)
+    delete(&types)
+    delete(&files_by_path)
+    delete(&packages_by_name)
+    delete(&symbols_by_name)
+    delete(&types_by_name)
+    delete(&symbols_by_file)
+    delete(&resolutions)
+}
+
+#overload
+builtin.delete :: CompilationInfo.destroy
+
+
+#local {
+
+by_id :: (arr: &[..] $T, id: u32) -> ? &T {
+    if id == 0 do return .None
+    i := cast(i32) id
+    if i >= arr.count do return .None
+    slot := &arr.data[i]
+    if slot.id == 0 do return .None
+    return slot
+}
+
+ensure_id :: (arr: &[..] $T, id: u32) -> &T {
+    i := cast(i32) id
+    needed := i + 1
+    if arr.count < needed {
+        Array.ensure_capacity(arr, cast(u32) needed)
+        arr.count = needed
+    }
+    return &arr.data[i]
+}
+
+ensure_id_list :: (arr: &[..] [..] u32, id: u32) -> &[..] u32 {
+    return ensure_id(arr, id)
+}
+
+index_unique :: (map: &Map(str, u32), name: str, id: u32) {
+    if name.count == 0 do return
+    if map->has(name) do return
+    map->put(name, id)
+}
+
+index_list :: (map: &Map(str, [..] u32), name: str, id: u32) {
+    if name.count == 0 do return
+    map->get_ptr_or_create(name)->push(id)
+}
+
+}

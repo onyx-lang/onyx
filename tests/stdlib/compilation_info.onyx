@@ -1,0 +1,247 @@
+#load "core:onyx/toolchain/module"
+
+use core {*}
+use onyx.toolchain {*}
+use protobuf.onyx.toolchain.events
+
+ok :: (label: str, value: bool) {
+    println(label)
+    println(value)
+}
+
+main :: () {
+    b := Builder.make();
+    defer b->destroy();
+
+    core_root := os.env("ONYX_PATH") ?? "";
+    defer str.free(core_root);
+    b->map_dir("core", tprintf("{}/core", core_root));
+
+    b->enable(.DISABLE_EXTENSIONS);
+    b->enable(.MULTI_THREADING);
+    b->enable(.COMPILATION_DATA_DETAILED);
+    b->set_platform(.ONYX);
+
+    b->inject_source("""
+package foo.bar
+
+Point :: struct {
+    x: i32
+    y: i32
+}
+
+Shape :: union {
+    Point: Point
+    Empty: void
+}
+
+x :: 1
+y :: x
+
+Color :: enum {
+    Red
+    Green :: 10
+    Blue
+}
+
+origin :: Point.{ x = x, y = 0 }
+
+get_x :: (p: Point) -> i32 {
+    return p.x
+}
+
+Ptr :: &Point
+Arr :: [2] i32
+""");
+
+    b->inject_source("""
+package main
+
+use foo.bar { Point, get_x, x, Shape }
+
+main :: () {
+    p := Point.{ x = x, y = 0 }
+    _ := get_x(p)
+    s := Shape.{ Point = p }
+    _ := s.Point
+}
+""");
+    b->compile();
+
+    ok("compile_ok", !b->has_errors());
+
+    info := b->compilation_info();
+    defer delete(&info);
+
+    ok("has_version", info.compiler_version.count > 0);
+
+    foo := info->package_named("foo");
+    foo_bar := info->package_named("foo.bar");
+    parent_ok := false;
+    switch foo {
+        case .Some as f {
+            switch foo_bar {
+                case .Some as fb do parent_ok = fb.parent_package_id == f.id;
+                case .None {}
+            }
+        }
+        case .None {}
+    }
+    ok("package_parent", parent_ok);
+
+    point_sym: &SymbolInfo = null;
+    for id in info->symbols_named("Point") {
+        switch info->get_symbol(id) {
+            case .Some as sym {
+                if point_sym == null && sym.kind == .Struct do point_sym = sym;
+            }
+            case .None {}
+        }
+    }
+    ok("point_symbol", point_sym != null);
+
+    point_type: &TypeInfo = null;
+    for id in info->types_named("Point") {
+        switch info->get_type(id) {
+            case .Some as t {
+                if t.kind == .Struct do point_type = t;
+            }
+            case .None {}
+        }
+    }
+    ok("point_type", point_type != null);
+
+    has_x := false;
+    has_y := false;
+    member_x_sym: u32;
+    if point_type != null {
+        switch info->member(point_type.id, "x") {
+            case .Some as m {
+                has_x = true;
+                member_x_sym = m.symbol_id;
+            }
+            case .None {}
+        }
+        switch info->member(point_type.id, "y") {
+            case .Some do has_y = true;
+            case .None {}
+        }
+    }
+    ok("point_members", has_x && has_y);
+
+    point_type_of := false;
+    if point_sym != null {
+        switch info->type_of(point_sym.id) {
+            case .Some as t do point_type_of = point_type != null && t.id == point_type.id;
+            case .None {}
+        }
+    }
+    ok("point_type_of", point_type_of);
+
+    x_in_scope := false;
+    if point_type != null {
+        switch info->lookup_member(point_type.id, "x") {
+            case .Some as sym do x_in_scope = sym.kind == .Member;
+            case .None {}
+        }
+    }
+    ok("lookup_member_x", x_in_scope);
+
+    color_ok := false;
+    for id in info->types_named("Color") {
+        switch info->get_type(id) {
+            case .Some as t {
+                if t.kind != .Enum do continue;
+                switch t.enumeration {
+                    case .Some as en {
+                        has_red := false;
+                        has_green := false;
+                        has_blue := false;
+                        for v in en.values {
+                            if v.name == "Red" && v.value == 0 do has_red = true;
+                            if v.name == "Green" && v.value == 10 do has_green = true;
+                            if v.name == "Blue" && v.value == 11 do has_blue = true;
+                        }
+                        color_ok = has_red && has_green && has_blue;
+                    }
+                    case .None {}
+                }
+            }
+            case .None {}
+        }
+    }
+    ok("color_enum", color_ok);
+
+    shape_ok := false;
+    for id in info->types_named("Shape") {
+        switch info->get_type(id) {
+            case .Some as t {
+                switch info->variant(t.id, "Point") {
+                    case .Some do shape_ok = true;
+                    case .None {}
+                }
+            }
+            case .None {}
+        }
+    }
+    ok("shape_variant", shape_ok);
+
+    ptr_elem_ok := false;
+    for id in info->types_named("&i32") {
+        switch info->elem(id) {
+            case .Some as e {
+                if e.name == "i32" && e.kind == .Basic do ptr_elem_ok = true;
+            }
+            case .None {}
+        }
+    }
+    ok("ptr_elem", ptr_elem_ok);
+
+    resolved_member := false;
+    if member_x_sym != 0 {
+        for r in info->references(member_x_sym) {
+            if r.length != 0 do resolved_member = true;
+        }
+    }
+    ok("resolved_member_x", resolved_member);
+
+    get_x_ok := false;
+    for id in info->symbols_named("get_x") {
+        switch info->get_symbol(id) {
+            case .Some as sym {
+                if sym.kind == .Function do get_x_ok = true;
+            }
+            case .None {}
+        }
+    }
+    ok("get_x_function", get_x_ok);
+
+    first_applied := info.events_applied;
+
+    b->inject_source("package extra\nextra_y :: 1\n");
+    b->compile();
+    added := b->update_compilation_info(&info);
+
+    still_foo := false;
+    switch info->package_named("foo.bar") {
+        case .Some do still_foo = true;
+        case .None {}
+    }
+
+    got_extra := false;
+    switch info->package_named("extra") {
+        case .Some do got_extra = true;
+        case .None {}
+    }
+
+    extra_sym := false;
+    for id in info->symbols_named("extra_y") {
+        extra_sym = true;
+    }
+
+    ok("stream_added_events", added > 0);
+    ok("stream_kept_foo", still_foo);
+    ok("stream_got_extra", got_extra);
+    ok("stream_got_extra_y", extra_sym);
+    ok("stream_applied_grew", info.events_applied > first_applied);
+}
