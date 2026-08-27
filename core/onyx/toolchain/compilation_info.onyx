@@ -273,19 +273,13 @@ CompilationInfo.symbols_with_type :: (self: &#Self, type_id: u32) -> [] u32 {
 /// which covers anonymous `foo: struct { ... }` bindings.
 CompilationInfo.binding_of :: (self: &#Self, type_id: u32) -> ? &SymbolInfo {
     preferred: SymbolKind = .Unknown
-    switch self->get_type(type_id) {
-        case .Some as t do preferred = declaring_symbol_kind(t.kind)
-        case .None {}
-    }
+    if self->get_type(type_id) as t do preferred = declaring_symbol_kind(t.kind);
 
     fallback: &SymbolInfo = null
     for sid in self->symbols_with_type(type_id) {
-        switch self->get_symbol(sid) {
-            case .Some as sym {
-                if fallback == null do fallback = sym
-                if preferred != .Unknown && sym.kind == preferred do return sym
-            }
-            case .None {}
+        if self->get_symbol(sid) as sym {
+            if fallback == null do fallback = sym
+            if preferred != .Unknown && sym.kind == preferred do return sym
         }
     }
     if fallback != null do return fallback
@@ -306,11 +300,8 @@ CompilationInfo.lookup :: (self: &#Self, scope_id: u32, name: str) -> ? &SymbolI
         switch self->get_scope(id) {
             case .Some as sc {
                 for sid in sc.symbol_ids {
-                    switch self->get_symbol(sid) {
-                        case .Some as sym {
-                            if sym.name == name do return sym
-                        }
-                        case .None {}
+                    if self->get_symbol(sid) as sym {
+                        if sym.name == name do return sym
                     }
                 }
                 id = sc.parent_scope_id
@@ -329,18 +320,15 @@ CompilationInfo.type_of :: (self: &#Self, symbol_id: u32) -> ? &TypeInfo {
 }
 
 CompilationInfo.member :: (self: &#Self, type_id: u32, name: str) -> ? &TypeStructMember {
-    switch self->get_type(type_id) {
-        case .Some as t {
-            switch t.details {
-                case .Struct as &sb {
-                    for& m in sb.members {
-                        if m.name == name do return m
-                    }
+    if self->get_type(type_id) as t {
+        switch t.details {
+            case .Struct as &sb {
+                for& m in sb.members {
+                    if m.name == name do return m
                 }
-                case _ {}
             }
+            case _ {}
         }
-        case .None {}
     }
     return .None
 }
@@ -353,18 +341,15 @@ CompilationInfo.lookup_member :: (self: &#Self, type_id: u32, name: str) -> ? &S
 }
 
 CompilationInfo.variant :: (self: &#Self, type_id: u32, name: str) -> ? &TypeUnionVariant {
-    switch self->get_type(type_id) {
-        case .Some as t {
-            switch t.details {
-                case .Union as &ub {
-                    for& v in ub.variants {
-                        if v.name == name do return v
-                    }
+    if self->get_type(type_id) as t {
+        switch t.details {
+            case .Union as &ub {
+                for& v in ub.variants {
+                    if v.name == name do return v
                 }
-                case _ {}
             }
+            case _ {}
         }
-        case .None {}
     }
     return .None
 }

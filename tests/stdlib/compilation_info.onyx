@@ -87,46 +87,31 @@ main :: () {
     foo := info->package_named("foo");
     foo_bar := info->package_named("foo.bar");
     parent_ok := false;
-    switch foo {
-        case .Some as f {
-            switch foo_bar {
-                case .Some as fb do parent_ok = fb.parent_package_id == f.id;
-                case .None {}
-            }
-        }
-        case .None {}
+    if foo as f {
+        if foo_bar as fb do parent_ok = fb.parent_package_id == f.id;
     }
     ok("package_parent", parent_ok);
 
     point_sym: &SymbolInfo = null;
     for id in info->symbols_named("Point") {
-        switch info->get_symbol(id) {
-            case .Some as sym {
-                if point_sym == null && sym.kind == .Struct do point_sym = sym;
-            }
-            case .None {}
+        if info->get_symbol(id) as sym {
+            if point_sym == null && sym.kind == .Struct do point_sym = sym;
         }
     }
     ok("point_symbol", point_sym != null);
 
     pkg_scope_ok := false;
-    switch foo_bar {
-        case .Some as fb {
-            if point_sym != null && fb.scope_id != 0 {
-                pkg_scope_ok = point_sym.scope_id == fb.scope_id;
-            }
+    if foo_bar as fb {
+        if point_sym != null && fb.scope_id != 0 {
+            pkg_scope_ok = point_sym.scope_id == fb.scope_id;
         }
-        case .None {}
     }
     ok("point_in_package_scope", pkg_scope_ok);
 
     point_type: &TypeInfo = null;
     for id in info->types_named("Point") {
-        switch info->get_type(id) {
-            case .Some as t {
-                if t.kind == .Struct do point_type = t;
-            }
-            case .None {}
+        if info->get_type(id) as t {
+            if t.kind == .Struct do point_type = t;
         }
     }
     ok("point_type", point_type != null);
@@ -135,26 +120,17 @@ main :: () {
     has_y := false;
     member_x_sym: u32;
     if point_type != null {
-        switch info->member(point_type.id, "x") {
-            case .Some as m {
-                has_x = true;
-                member_x_sym = m.symbol_id;
-            }
-            case .None {}
+        if info->member(point_type.id, "x") as m {
+            has_x = true;
+            member_x_sym = m.symbol_id;
         }
-        switch info->member(point_type.id, "y") {
-            case .Some do has_y = true;
-            case .None {}
-        }
+        if info->member(point_type.id, "y") do has_y = true;
     }
     ok("point_members", has_x && has_y);
 
     point_type_of := false;
     if point_sym != null {
-        switch info->type_of(point_sym.id) {
-            case .Some as t do point_type_of = point_type != null && t.id == point_type.id;
-            case .None {}
-        }
+        if info->type_of(point_sym.id) as t do point_type_of = point_type != null && t.id == point_type.id;
     }
     ok("point_type_of", point_type_of);
 
@@ -169,17 +145,11 @@ main :: () {
     point_binding := false;
     point_binding_loc := false;
     if point_type != null {
-        switch info->binding_of(point_type.id) {
-            case .Some as sym {
-                point_binding = point_sym != null && sym.id == point_sym.id;
-                if sym.file_id != 0 && sym.line != 0 {
-                    switch info->get_file(sym.file_id) {
-                        case .Some do point_binding_loc = true;
-                        case .None {}
-                    }
-                }
+        if info->binding_of(point_type.id) as sym {
+            point_binding = point_sym != null && sym.id == point_sym.id;
+            if sym.file_id != 0 && sym.line != 0 {
+                if info->get_file(sym.file_id) do point_binding_loc = true;
             }
-            case .None {}
         }
     }
     ok("point_binding_of", point_binding);
@@ -187,59 +157,44 @@ main :: () {
 
     x_in_scope := false;
     if point_type != null {
-        switch info->lookup_member(point_type.id, "x") {
-            case .Some as sym do x_in_scope = sym.kind == .Member;
-            case .None {}
-        }
+        if info->lookup_member(point_type.id, "x") as sym do x_in_scope = sym.kind == .Member;
     }
     ok("lookup_member_x", x_in_scope);
 
     color_ok := false;
     for id in info->types_named("Color") {
-        switch info->get_type(id) {
-            case .Some as t {
-                if t.kind != .Enum do continue;
-                switch t.body {
-                    case .Enumeration as en {
-                        has_red := false
-                        has_green := false
-                        has_blue := false
-                        for v in en.values {
-                            if v.name == "Red" && v.value == 0 do has_red = true
-                            if v.name == "Green" && v.value == 10 do has_green = true
-                            if v.name == "Blue" && v.value == 11 do has_blue = true
-                        }
-                        color_ok = has_red && has_green && has_blue
+        if info->get_type(id) as t {
+            if t.kind != .Enum do continue;
+            switch t.body {
+                case .Enumeration as en {
+                    has_red := false
+                    has_green := false
+                    has_blue := false
+                    for v in en.values {
+                        if v.name == "Red" && v.value == 0 do has_red = true
+                        if v.name == "Green" && v.value == 10 do has_green = true
+                        if v.name == "Blue" && v.value == 11 do has_blue = true
                     }
-                    case _ {}
+                    color_ok = has_red && has_green && has_blue
                 }
+                case _ {}
             }
-            case .None {}
         }
     }
     ok("color_enum", color_ok);
 
     shape_ok := false;
     for id in info->types_named("Shape") {
-        switch info->get_type(id) {
-            case .Some as t {
-                switch info->variant(t.id, "Point") {
-                    case .Some do shape_ok = true;
-                    case .None {}
-                }
-            }
-            case .None {}
+        if info->get_type(id) as t {
+            if info->variant(t.id, "Point") do shape_ok = true;
         }
     }
     ok("shape_variant", shape_ok);
 
     ptr_elem_ok := false;
     for id in info->types_named("&i32") {
-        switch info->elem(id) {
-            case .Some as e {
-                if e.name == "i32" && e.kind == .Basic do ptr_elem_ok = true;
-            }
-            case .None {}
+        if info->elem(id) as e {
+            if e.name == "i32" && e.kind == .Basic do ptr_elem_ok = true;
         }
     }
     ok("ptr_elem", ptr_elem_ok);
@@ -254,22 +209,16 @@ main :: () {
 
     get_x_ok := false;
     for id in info->symbols_named("get_x") {
-        switch info->get_symbol(id) {
-            case .Some as sym {
-                if sym.kind == .Function do get_x_ok = true;
-            }
-            case .None {}
+        if info->get_symbol(id) as sym {
+            if sym.kind == .Function do get_x_ok = true;
         }
     }
     ok("get_x_function", get_x_ok);
 
     get_x_sym: &SymbolInfo = null;
     for id in info->symbols_named("get_x") {
-        switch info->get_symbol(id) {
-            case .Some as sym {
-                if get_x_sym == null && sym.kind == .Function do get_x_sym = sym;
-            }
-            case .None {}
+        if info->get_symbol(id) as sym {
+            if get_x_sym == null && sym.kind == .Function do get_x_sym = sym;
         }
     }
 
@@ -278,32 +227,23 @@ main :: () {
     param_p_use_ok := false;
     get_x_param_ids_ok := false;
     if get_x_sym != null && get_x_sym.param_symbol_ids.count == 1 {
-        switch info->get_symbol(get_x_sym.param_symbol_ids[0]) {
-            case .Some as p {
-                param_p_ok = p.name == "p" && p.kind == .Parameter;
-                if point_type != null {
-                    switch info->type_of(p.id) {
-                        case .Some as t do param_p_type_ok = t.id == point_type.id;
-                        case .None {}
-                    }
-                }
-                for r in info->references(p.id) {
-                    if r.length != 0 do param_p_use_ok = true;
-                }
+        if info->get_symbol(get_x_sym.param_symbol_ids[0]) as p {
+            param_p_ok = p.name == "p" && p.kind == .Parameter;
+            if point_type != null {
+                if info->type_of(p.id) as t do param_p_type_ok = t.id == point_type.id;
             }
-            case .None {}
+            for r in info->references(p.id) {
+                if r.length != 0 do param_p_use_ok = true;
+            }
         }
 
-        switch info->type_of(get_x_sym.id) {
-            case .Some as t {
-                switch t.body {
-                    case .Function as f {
-                        get_x_param_ids_ok = f.param_ids.count == 1 && point_type != null && f.param_ids[0] == point_type.id;
-                    }
-                    case _ {}
+        if info->type_of(get_x_sym.id) as t {
+            switch t.body {
+                case .Function as f {
+                    get_x_param_ids_ok = f.param_ids.count == 1 && point_type != null && f.param_ids[0] == point_type.id;
                 }
+                case _ {}
             }
-            case .None {}
         }
     }
     ok("param_p_symbol", param_p_ok);
@@ -314,16 +254,13 @@ main :: () {
     point_method_ok := false;
     if point_type != null && point_type.scope_id != 0 {
         for sid in info->symbols_in_scope(point_type.scope_id) {
-            switch info->get_symbol(sid) {
-                case .Some as sym {
-                    if sym.name == "mag" {
-                        switch sym.kind {
-                            case .Function, .Overloaded_Function, .Polymorphic_Proc do point_method_ok = true;
-                            case _ {}
-                        }
+            if info->get_symbol(sid) as sym {
+                if sym.name == "mag" {
+                    switch sym.kind {
+                        case .Function, .Overloaded_Function, .Polymorphic_Proc do point_method_ok = true;
+                        case _ {}
                     }
                 }
-                case .None {}
             }
         }
     }
@@ -333,27 +270,18 @@ main :: () {
     names_method_ok := false;
     slice_scope_ok := false;
     for id in info->symbols_named("Names") {
-        switch info->get_symbol(id) {
-            case .Some as sym {
-                switch info->type_of(sym.id) {
-                    case .Some as t {
-                        names_type_ok = t.kind == .Slice;
-                        slice_scope_ok = t.scope_id != 0;
-                        if t.scope_id != 0 {
-                            for sid in info->symbols_in_scope(t.scope_id) {
-                                switch info->get_symbol(sid) {
-                                    case .Some as m {
-                                        if m.name == "has_a" do names_method_ok = true;
-                                    }
-                                    case .None {}
-                                }
-                            }
+        if info->get_symbol(id) as sym {
+            if info->type_of(sym.id) as t {
+                names_type_ok = t.kind == .Slice;
+                slice_scope_ok = t.scope_id != 0;
+                if t.scope_id != 0 {
+                    for sid in info->symbols_in_scope(t.scope_id) {
+                        if info->get_symbol(sid) as m {
+                            if m.name == "has_a" do names_method_ok = true;
                         }
                     }
-                    case .None {}
                 }
             }
-            case .None {}
         }
     }
     ok("names_alias_is_slice", names_type_ok);
@@ -367,16 +295,10 @@ main :: () {
     added := b->update_compilation_info(&info);
 
     still_foo := false;
-    switch info->package_named("foo.bar") {
-        case .Some do still_foo = true;
-        case .None {}
-    }
+    if info->package_named("foo.bar") do still_foo = true;
 
     got_extra := false;
-    switch info->package_named("extra") {
-        case .Some do got_extra = true;
-        case .None {}
-    }
+    if info->package_named("extra") do got_extra = true;
 
     extra_sym := false;
     for id in info->symbols_named("extra_y") {
@@ -416,16 +338,10 @@ later :: () -> i32 {
 
     later_ok := false;
     for id in errinfo->symbols_named("later") {
-        switch errinfo->get_symbol(id) {
-            case .Some as sym {
-                if sym.kind == .Function {
-                    switch errinfo->type_of(sym.id) {
-                        case .Some do later_ok = true;
-                        case .None {}
-                    }
-                }
+        if errinfo->get_symbol(id) as sym {
+            if sym.kind == .Function {
+                if errinfo->type_of(sym.id) do later_ok = true;
             }
-            case .None {}
         }
     }
 
