@@ -131,15 +131,22 @@ Builder.compilation_data :: (use self: &#Self, allocator := context.allocator) -
 /// The first call is the log so far; later calls are only the delta.
 /// For a running index, `make` once and `update_compilation_info`.
 Builder.compilation_info :: (use self: &#Self, allocator := context.allocator) -> CompilationInfo {
-    return CompilationInfo.from(self->compilation_data(allocator), allocator)
+    info := CompilationInfo.make(allocator)
+    self->update_compilation_info(&info, allocator)
+    return info
 }
 
 /// Fold unread compilation events into an existing index.
 Builder.update_compilation_info :: (use self: &#Self, info: &CompilationInfo, allocator := context.allocator) -> u32 {
-    data := self->compilation_data(allocator)
-    applied := info->update(data.events)
-    delete(&data.events)
-    return applied
+    length := native.onyx_compilation_data_length(ctx)
+    if length <= 0 do return 0
+
+    buffer := make([] u8, length, allocator=allocator)
+    native.onyx_compilation_data_write(ctx, buffer.data)
+
+    before := info.events_applied
+    info->ingest_protobuf(buffer, copy_payload=false)!
+    return info.events_applied - before
 }
 
 

@@ -21,7 +21,7 @@ unmarshal :: (input: [] u8, $type: type_expr, allocator := context.allocator) ->
 
     #context_scope {
         context.allocator = allocator
-        parse_message(input, &val, type)?
+        parse_message(input, &val, type, true)?
     }
 
     return .{ Ok = ~~ val }
@@ -29,7 +29,9 @@ unmarshal :: (input: [] u8, $type: type_expr, allocator := context.allocator) ->
 
 /// Decode the next length-delimited message on `field_number`.
 /// Returns `true` if `out` was filled, `false` if the stream is exhausted.
-unmarshal_next_message :: (data: &[] u8, field_number: i32, out: rawptr, type: type_expr) -> Result(bool, Unmarshal_Error) {
+/// If `copy_strings` is false, `str`/`[] u8` fields alias `data`; the caller
+/// must keep those bytes alive.
+unmarshal_next_message :: (data: &[] u8, field_number: i32, out: rawptr, type: type_expr, copy_strings := false) -> Result(bool, Unmarshal_Error) {
     while data.length > 0 {
         field_header := parse_field_header(data)?
         if field_header.encoding_type == .SGROUP || field_header.encoding_type == .EGROUP {
@@ -39,7 +41,7 @@ unmarshal_next_message :: (data: &[] u8, field_number: i32, out: rawptr, type: t
         field_value := parse_field_value(data, field_header.encoding_type)?
         if field_header.proto_number != field_number do continue
 
-        parse_message(field_value.bytes!, out, type)?
+        parse_message(field_value.bytes!, out, type, copy_strings)?
         return .{ Ok = true }
     }
 
@@ -49,7 +51,9 @@ unmarshal_next_message :: (data: &[] u8, field_number: i32, out: rawptr, type: t
 /// Decode a stream of length-delimited messages on `field_number` without
 /// allocating the outer repeated array. The body is inlined at the call site.
 /// Pass a Code block with one capture (`[ev] { ... }`); that capture is `&type`.
-/// Anything the body needs to keep must be copied out of the capture.
+///
+/// String fields alias `input`. Keep `input` alive for as long as those
+/// strings are used.
 unmarshal_each :: macro (
     input: [] u8,
     field_number: i32,
@@ -60,7 +64,7 @@ unmarshal_each :: macro (
 
     while data {
         item: type
-        found := #this_package.unmarshal_next_message(&data, field_number, &item, type)?
+        found := #this_package.unmarshal_next_message(&data, field_number, &item, type, false)?
         if !found do break
         #unquote body(&item) #scope(body)
     }
@@ -80,7 +84,7 @@ _Field_Value :: union {
 }
 
 
-parse_message :: (input: [] u8, out: rawptr, type: type_expr) -> Result(bool, Unmarshal_Error) {
+parse_message :: (input: [] u8, out: rawptr, type: type_expr, copy_strings: bool) -> Result(bool, Unmarshal_Error) {
     data := input
     msg_desc := lookup_protobuf_descriptor(type)
         |> .into_result(Unmarshal_Error.{ Unknown_Type = type })
@@ -106,7 +110,7 @@ parse_message :: (input: [] u8, out: rawptr, type: type_expr) -> Result(bool, Un
             field_pointer = Array.untyped_alloc_one(~~ field_pointer, field_desc.field_type)
         }
 
-        store_value(field_pointer, &field_desc, field_value)?
+        store_value(field_pointer, &field_desc, field_value, copy_strings)?
     }
 
     return .{ Ok = true }
@@ -177,7 +181,7 @@ parse_varint :: (data: &[] u8) -> Result(u64, Unmarshal_Error) {
     return .{ Ok = out }
 }
 
-store_value :: (out: rawptr, desc: &Proto_Field_Descriptor, value: _Field_Value) -> Result(bool, Unmarshal_Error) {
+store_value :: (out: rawptr, desc: &Proto_Field_Descriptor, value: _Field_Value, copy_strings: bool) -> Result(bool, Unmarshal_Error) {
     switch desc.proto_field_type {
         // Some fun type punning here
         case .DOUBLE, .INT64, .UINT64, .FIXED64, .SFIXED64 {
@@ -225,11 +229,16 @@ store_value :: (out: rawptr, desc: &Proto_Field_Descriptor, value: _Field_Value)
         }
 
         case .STRING, .BYTES {
-            *cast(& str) out = str.copy(value.bytes->expect("str should be encoded in len"))
+            raw := value.bytes->expect("str should be encoded in len")
+            if copy_strings {
+                *cast(& str) out = str.copy(raw)
+            } else {
+                *cast(& str) out = raw
+            }
         }
 
         case .MESSAGE {
-            parse_message(value.bytes!, out, desc.field_type)?
+            parse_message(value.bytes!, out, desc.field_type, copy_strings)?
         }
     }
 
