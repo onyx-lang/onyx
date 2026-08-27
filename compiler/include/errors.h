@@ -29,6 +29,7 @@ typedef struct OnyxErrors {
     bh_arr(bh_file_contents)* file_contents;
 
     bh_arr(OnyxError) errors;
+    b32 errors_sorted;
 } OnyxErrors;
 
 struct Context;
@@ -41,6 +42,7 @@ void onyx_submit_error(struct Context *context, OnyxError error);
 void onyx_report_error(struct Context *context, OnyxFilePos pos, OnyxErrorRank rank, char * format, ...);
 void onyx_report_warning(struct Context *context, OnyxFilePos pos, char* format, ...);
 void onyx_errors_print(struct Context *context);
+void onyx_errors_ensure_sorted(struct Context *context);
 b32  onyx_has_errors(struct Context *context);
 void onyx_clear_errors(struct Context *context);
 

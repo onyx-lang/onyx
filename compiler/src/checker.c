@@ -233,9 +233,12 @@ CHECK_FUNC(symbol, AstNode** symbol_node) {
 
     if (!res) {
         if (context->cycle_detected) {
-            token_toggle_end(token);
-            char *closest = find_closest_symbol_in_scope_and_parents(context, context->checker.current_scope, token->text);
-            token_toggle_end(token);
+            char *closest = NULL;
+            if (bh_arr_length(context->errors.errors) < 64) {
+                token_toggle_end(token);
+                closest = find_closest_symbol_in_scope_and_parents(context, context->checker.current_scope, token->text);
+                token_toggle_end(token);
+            }
 
             if (closest) ERROR_(token->pos, "Unable to resolve symbol '%b'. Did you mean '%s'?", token->text, token->length, closest);
             else         ERROR_(token->pos, "Unable to resolve symbol '%b'.", token->text, token->length);
@@ -1888,8 +1891,7 @@ CHECK_FUNC(struct_literal, AstStructLiteral* sl) {
     }
 
     sl->type_node = (AstType *) sl->stnode;
-    while (sl->type_node && sl->type_node->kind == Ast_Kind_Type_Alias)
-        sl->type_node = ((AstTypeAlias *) sl->type_node)->to;
+    sl->type_node = strip_type_aliases(sl->type_node);
 
     if (sl->extension_value) {
         CHECK(expression, &sl->extension_value);
@@ -2187,8 +2189,7 @@ CHECK_FUNC(array_literal, AstArrayLiteral* al) {
     }
 
     al->type_node = (AstType *) al->atnode;
-    while (al->type_node && al->type_node->kind == Ast_Kind_Type_Alias)
-        al->type_node = ((AstTypeAlias *) al->type_node)->to;
+    al->type_node = strip_type_aliases(al->type_node);
 
     bh_arr_each(AstTyped *, expr, al->values) {
         CHECK(expression, expr);
@@ -2664,9 +2665,7 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
     AstTyped *expr;
     {
         expr = (AstTyped *) strip_aliases((AstNode *) field->expr);
-        while (expr->kind == Ast_Kind_Type_Alias) {
-            expr = (AstTyped *)((AstTypeAlias *) expr)->to;
-        }
+        expr = (AstTyped *) strip_type_aliases((AstType *) expr);
 
         if (expr->kind == Ast_Kind_Struct_Type ||
             expr->kind == Ast_Kind_Poly_Struct_Type ||
@@ -2823,6 +2822,16 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
   resolved:
     if (n) {
         track_resolution_for_symbol_info(context, (AstNode *) *pfield, n);
+
+        if (n == (AstNode *) field) {
+            YIELD_ERROR(field->token->pos, "Circular alias.");
+        }
+        if (n->kind == Ast_Kind_Alias) {
+            AstNode *inner = strip_aliases(n);
+            if (!inner || inner == n || inner == (AstNode *) field) {
+                YIELD_ERROR(field->token->pos, "Circular alias.");
+            }
+        }
 
         *pfield = (AstFieldAccess *) n;
         CHECK(expression, (AstTyped **) pfield);
@@ -3211,6 +3220,13 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
 
         case Ast_Kind_Alias: {
             AstAlias *alias = (AstAlias *) expr;
+
+            if (!alias->alias || (AstNode *) alias->alias == (AstNode *) alias) {
+                YIELD_ERROR(expr->token->pos, "Circular alias.");
+            }
+            if (strip_aliases((AstNode *) alias) == (AstNode *) alias) {
+                YIELD_ERROR(expr->token->pos, "Circular alias.");
+            }
 
             //
             // If an alias has an entity, do not force checking on it here.
@@ -3902,6 +3918,9 @@ CHECK_FUNC(block, AstBlock* block) {
 
     if (!block->body) {
         if (block->rules & Block_Rule_New_Scope) {
+            if (block->scope && block->closing) {
+                compilation_log_emit_scope_end(context, block->scope, block->closing->pos);
+            }
             scope_leave(context);
         }
 
@@ -3955,8 +3974,12 @@ CHECK_FUNC(block, AstBlock* block) {
         block->flags |= Ast_Flag_Block_Returns;
     }
 
-    if (block->rules & Block_Rule_New_Scope)
+    if (block->rules & Block_Rule_New_Scope) {
+        if (block->scope && block->closing) {
+            compilation_log_emit_scope_end(context, block->scope, block->closing->pos);
+        }
         scope_leave(context);
+    }
 
     return Check_Success;
 }
@@ -4112,6 +4135,10 @@ CHECK_FUNC(function, AstFunction* func) {
     }
 
     func->flags |= Ast_Flag_Has_Been_Checked;
+
+    if (func->closing_brace) {
+        compilation_log_emit_scope_end(context, func->scope, func->closing_brace->pos);
+    }
 
     scope_leave(context);
 
@@ -4876,8 +4903,7 @@ CHECK_FUNC(type, AstType** ptype) {
 
     AstType* type = *ptype;
     AstType* original_type = type;
-    while (type->kind == Ast_Kind_Type_Alias)
-        type = ((AstTypeAlias *) type)->to;
+    type = strip_type_aliases(type);
     
     if (type->kind == Ast_Kind_Symbol) {
         CHECK(symbol, (AstNode **) ptype);
@@ -5026,6 +5052,9 @@ CHECK_FUNC(type, AstType** ptype) {
 
         case Ast_Kind_Type_Alias: {
             AstTypeAlias *type_alias = (AstTypeAlias *) type;
+            if (!type_alias->to || strip_type_aliases((AstType *) type_alias) == (AstType *) type_alias) {
+                YIELD_ERROR(type->token->pos, "Circular type alias.");
+            }
             CHECK(type, &type_alias->to);
             if (type_build_from_ast(context, (AstType *) type_alias)) {
                 compilation_log_notify_node_typed(context, (AstNode *) type_alias);
@@ -5059,9 +5088,16 @@ CHECK_FUNC(type, AstType** ptype) {
 
     // CLEANUP: Should Type_Alias nodes just be made comptime at creation? Since they will always be set to comptime here?
     type->flags |= Ast_Flag_Comptime;
-    while (type->kind == Ast_Kind_Type_Alias) {
-        type->flags |= Ast_Flag_Comptime;
-        type = ((AstTypeAlias *) type)->to;
+    {
+        AstType *walk = type;
+        AstType *seen = type;
+        i32 depth = 0;
+        while (walk && walk->kind == Ast_Kind_Type_Alias && depth++ < 64) {
+            walk->flags |= Ast_Flag_Comptime;
+            AstType *next = ((AstTypeAlias *) walk)->to;
+            if (next == NULL || next == walk || next == seen) break;
+            walk = next;
+        }
     }
 
     type->flags |= Ast_Flag_Has_Been_Checked;

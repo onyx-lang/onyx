@@ -352,4 +352,116 @@ later :: () -> i32 {
 
     ok("error_keeps_later", later_ok);
     ok("error_keeps_broken_name", broken_named);
+
+    // Method field + #match option + alias of the field, like os.File.get_contents.
+    matchb := Builder.make();
+    defer matchb->destroy();
+    matchb->map_dir("core", tprintf("{}/core", core_root));
+    matchb->enable(.DISABLE_EXTENSIONS);
+    matchb->enable(.MULTI_THREADING);
+    matchb->enable(.COMPILATION_DATA_DETAILED);
+    matchb->set_platform(.ONYX);
+    matchb->inject_source("""
+package main
+
+Holder :: struct {}
+Holder.get :: (h: &Holder) -> i32 { return 1 }
+
+get :: #match {
+    Holder.get,
+    (x: i32) -> i32 { return x }
+}
+
+get_from_holder :: Holder.get
+
+main :: () {
+    _ := get_from_holder
+}
+""");
+    matchb->compile();
+
+    ok("method_match_alias_ok", !matchb->has_errors());
+
+    matchinfo := matchb->compilation_info();
+    defer delete(&matchinfo);
+
+    get_from_named := false;
+    for id in matchinfo->symbols_named("get_from_holder") {
+        get_from_named = true;
+    }
+    ok("method_match_alias_indexed", get_from_named);
+
+    circb := Builder.make();
+    defer circb->destroy();
+    circb->map_dir("core", tprintf("{}/core", core_root));
+    circb->enable(.DISABLE_EXTENSIONS);
+    circb->enable(.MULTI_THREADING);
+    circb->enable(.COMPILATION_DATA_DETAILED);
+    circb->set_platform(.ONYX);
+    circb->inject_source("""
+package main
+
+a :: b
+b :: a
+
+main :: () {
+}
+""");
+    circb->compile();
+
+    circinfo := circb->compilation_info();
+    defer delete(&circinfo);
+
+    ok("circular_alias_has_errors", circb->has_errors());
+    ok("circular_alias_finished", circinfo.events_applied > 0);
+
+    ifb := Builder.make();
+    defer ifb->destroy();
+    ifb->map_dir("core", tprintf("{}/core", core_root));
+    ifb->enable(.DISABLE_EXTENSIONS);
+    ifb->enable(.MULTI_THREADING);
+    ifb->enable(.COMPILATION_DATA_DETAILED);
+    ifb->set_platform(.ONYX);
+    ifb->inject_source("""
+package main
+
+main :: () {
+    app := .{ test = 10 }
+    #if false {
+        skip := (c) => {
+            return c
+        }
+        _ := skip
+    }
+    _ := app.test
+}
+""");
+    ifb->compile();
+
+    ok("static_if_compile_ok", !ifb->has_errors());
+
+    ifinfo := ifb->compilation_info();
+    defer delete(&ifinfo);
+
+    app_sym: &SymbolInfo = null;
+    for id in ifinfo->symbols_named("app") {
+        if ifinfo->get_symbol(id) as sym {
+            if app_sym == null && sym.kind == .Expression do app_sym = sym;
+        }
+    }
+
+    after_if_lookup := false;
+    after_if_member := false;
+    if app_sym != null {
+        for r in ifinfo->references(app_sym.id) {
+            if r.line == app_sym.line && r.column == app_sym.column do continue;
+            sid := ifinfo->scope_at(r.file_id, r.line, r.column);
+            if ifinfo->lookup(sid, "app") as found {
+                if found.id == app_sym.id do after_if_lookup = true;
+                if ifinfo->member(found.type_id, "test") do after_if_member = true;
+            }
+        }
+    }
+    ok("static_if_keeps_outer_local", after_if_lookup);
+    ok("static_if_completes_member", after_if_member);
 }

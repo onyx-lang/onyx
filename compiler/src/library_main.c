@@ -850,6 +850,7 @@ void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length) {
 
 int32_t onyx_error_count(onyx_context_t *ctx) {
     stbds_bind(ctx);
+    onyx_errors_ensure_sorted(&ctx->context);
     return bh_arr_length(ctx->context.errors.errors);
 }
 

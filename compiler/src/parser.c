@@ -831,6 +831,9 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
                 parser->current_scope = tmp_block->binding_scope;
                 tmp_block->body = parse_statement(parser);
+                // :LinearTokenDependent
+                tmp_block->closing = parser->curr - 1;
+                compilation_log_emit_scope_end(parser->context, tmp_block->binding_scope, tmp_block->closing->pos);
                 parser->current_scope = parser->current_scope->parent;
 
                 do_block->block = tmp_block;
@@ -2319,6 +2322,15 @@ static AstNode *parse_statements_until(OnyxParser *parser, TokenType end_token) 
     return root;
 }
 
+static void close_block_binding_scope(OnyxParser *parser, AstBlock *block, OnyxToken *closing) {
+    if (closing) block->closing = closing;
+    if (!block->binding_scope) return;
+    if (closing) {
+        compilation_log_emit_scope_end(parser->context, block->binding_scope, closing->pos);
+    }
+    parser->current_scope = parser->current_scope->parent;
+}
+
 static AstBlock* parse_block(OnyxParser* parser, b32 make_a_new_scope, char* block_name) {
     AstBlock* block = make_node(AstBlock, Ast_Kind_Block);
     block->rules = Block_Rule_Normal;
@@ -2338,7 +2350,8 @@ static AstBlock* parse_block(OnyxParser* parser, b32 make_a_new_scope, char* blo
     if (parser->curr->type == Token_Type_Keyword_Do) {
         block->token = expect_token(parser, Token_Type_Keyword_Do);
         block->body = parse_statement(parser);
-        if (make_a_new_scope) parser->current_scope = parser->current_scope->parent;
+        // :LinearTokenDependent
+        close_block_binding_scope(parser, block, parser->curr - 1);
         return block;
     }
 
@@ -2348,7 +2361,7 @@ static AstBlock* parse_block(OnyxParser* parser, b32 make_a_new_scope, char* blo
     AstNode* stmt = NULL;
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) {
-            if (make_a_new_scope) parser->current_scope = parser->current_scope->parent;
+            close_block_binding_scope(parser, block, parser->curr);
             return block;
         }
 
@@ -2362,7 +2375,8 @@ static AstBlock* parse_block(OnyxParser* parser, b32 make_a_new_scope, char* blo
         }
     }
 
-    if (make_a_new_scope) parser->current_scope = parser->current_scope->parent;
+    // :LinearTokenDependent
+    close_block_binding_scope(parser, block, parser->curr - 1);
     return block;
 }
 

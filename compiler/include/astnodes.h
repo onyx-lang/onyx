@@ -137,6 +137,7 @@ typedef struct Scope {
     u64 id;
     struct Scope *parent;
     OnyxFilePos created_at;
+    OnyxFilePos closed_at;
     char* name;
     Table(AstNode *) symbols;
 } Scope;
@@ -855,6 +856,7 @@ struct AstBlock         {
 
     u32 statement_idx;
 
+    OnyxToken *closing;
     OnyxToken *macro_generated_from;
 };
 struct AstDefer         { AstNode_base; AstNode *stmt; };
@@ -2296,6 +2298,8 @@ typedef struct CompilationEvent {
             u32 file_id;
             u32 line;
             u32 column;
+            u32 end_line;
+            u32 end_column;
             char *name;
         } scope;
 
@@ -2559,6 +2563,7 @@ char* generate_name_within_scope(Context *context, Scope *scope, OnyxToken* symb
 TypeMatch implicit_cast_to_bool(Context *context, AstTyped **pnode);
 
 AstNode* strip_aliases(AstNode* node);
+AstType* strip_type_aliases(AstType* type);
 
 AstNumLit*        make_bool_literal(Context *context, b32 b);
 AstNumLit*        make_int_literal(Context *context, i64 value);
@@ -2665,6 +2670,7 @@ void compilation_log_emit_start(Context *context);
 void compilation_log_emit_file(Context *context, const char *path);
 void compilation_log_emit_package(Context *context, Package *package);
 void compilation_log_emit_scope(Context *context, Scope *scope);
+void compilation_log_emit_scope_end(Context *context, Scope *scope, OnyxFilePos pos);
 void compilation_log_emit_symbol(Context *context, Scope *scope, char *name, OnyxFilePos pos, AstNode *node);
 void compilation_log_emit_symbol_resolved(Context *context, AstNode *original, AstNode *resolved);
 void compilation_log_emit_binding(Context *context, AstNode *node, AstBinding *binding);

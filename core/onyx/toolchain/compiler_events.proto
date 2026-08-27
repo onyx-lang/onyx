@@ -68,6 +68,8 @@ message EventScope {
   uint32 line = 4;
   uint32 column = 5;
   string name = 6;
+  uint32 end_line = 7;
+  uint32 end_column = 8;
 }
 
 // Coarse kind of a declared symbol. Compiler AST details are not part of the protocol.

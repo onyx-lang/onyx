@@ -91,6 +91,8 @@
 #define PB_EVENT_SCOPE_LINE             4
 #define PB_EVENT_SCOPE_COLUMN           5
 #define PB_EVENT_SCOPE_NAME             6
+#define PB_EVENT_SCOPE_END_LINE         7
+#define PB_EVENT_SCOPE_END_COLUMN       8
 
 #define PB_EVENT_SYMBOL_ID        1
 #define PB_EVENT_SYMBOL_SCOPE_ID  2
@@ -265,6 +267,8 @@ static void encode_event(CompilationLog *log, CompilationEvent *ev) {
             pb_write_uint32(inner, PB_EVENT_SCOPE_LINE, ev->scope.line);
             pb_write_uint32(inner, PB_EVENT_SCOPE_COLUMN, ev->scope.column);
             pb_write_string(inner, PB_EVENT_SCOPE_NAME, ev->scope.name);
+            pb_write_uint32(inner, PB_EVENT_SCOPE_END_LINE, ev->scope.end_line);
+            pb_write_uint32(inner, PB_EVENT_SCOPE_END_COLUMN, ev->scope.end_column);
             pb_write_bytes(out, PB_COMPILER_EVENT_SCOPE, inner->data, inner->length);
             break;
 
@@ -540,8 +544,19 @@ void compilation_log_emit_scope(Context *context, Scope *scope) {
     ev.scope.file_id = compilation_log_file_id_for(context, scope->created_at.filename);
     ev.scope.line = scope->created_at.line;
     ev.scope.column = scope->created_at.column;
+    ev.scope.end_line = scope->closed_at.line;
+    ev.scope.end_column = scope->closed_at.column;
     ev.scope.name = scope->name ? scope->name : "";
     compilation_log_push(context, ev);
+}
+
+void compilation_log_emit_scope_end(Context *context, Scope *scope, OnyxFilePos pos) {
+    if (!scope) return;
+    if (scope->closed_at.line != 0) return;
+    if (pos.line == 0) return;
+
+    scope->closed_at = pos;
+    compilation_log_emit_scope(context, scope);
 }
 
 static u32 compilation_log_symbol_kind(AstNode *node) {

@@ -64,3 +64,17 @@ error_keeps_later
 true
 error_keeps_broken_name
 true
+method_match_alias_ok
+true
+method_match_alias_indexed
+true
+circular_alias_has_errors
+true
+circular_alias_finished
+true
+static_if_compile_ok
+true
+static_if_keeps_outer_local
+true
+static_if_completes_member
+true

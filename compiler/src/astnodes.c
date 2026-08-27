@@ -926,6 +926,9 @@ TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b
 
     if (node->kind == Ast_Kind_Alias) {
         AstAlias* alias = (AstAlias *) node;
+        if (!alias->alias || strip_aliases((AstNode *) alias) == (AstNode *) alias) {
+            return TYPE_MATCH_FAILED;
+        }
         return unify_node_and_type_(context, &alias->alias, type, permanent);
     }
 
@@ -1023,6 +1026,9 @@ Type* query_expression_type(Context *context, AstTyped *node) {
 
     if (node->kind == Ast_Kind_Alias) {
         AstAlias* alias = (AstAlias *) node;
+        if (!alias->alias || strip_aliases((AstNode *) alias) == (AstNode *) alias) {
+            return NULL;
+        }
         return query_expression_type(context, alias->alias);
     }
 
@@ -1124,6 +1130,9 @@ Type* resolve_expression_type(Context *context, AstTyped* node) {
 
     if (node->kind == Ast_Kind_Alias) {
         AstAlias* alias = (AstAlias *) node;
+        if (!alias->alias || strip_aliases((AstNode *) alias) == (AstNode *) alias) {
+            return NULL;
+        }
         alias->type = resolve_expression_type(context, alias->alias);
     }
 
@@ -1620,12 +1629,61 @@ char* generate_name_within_scope(Context *context, Scope *scope, OnyxToken* symb
     return bh_aprintf(context->gp_alloc, "%s%b", name, symbol->text, symbol->length);
 }
 
+// Follow AstAlias / Type_Alias chains. On a cycle, return the node we started
+// from (still an alias) so callers can detect it without spinning or crashing
+// on NULL. Floyd's algorithm catches cycles that do not include the start node.
 AstNode* strip_aliases(AstNode* n) {
     if (n == NULL) return n;
 
-    while (n->kind == Ast_Kind_Alias) n = (AstNode *) ((AstAlias *) n)->alias;
+    AstNode *start = n;
+    AstNode *slow = n;
+    AstNode *fast = n;
+    i32 depth = 0;
 
-    return n;
+    while (slow->kind == Ast_Kind_Alias) {
+        AstNode *next = (AstNode *) ((AstAlias *) slow)->alias;
+        if (next == NULL || next == slow || next == start) return start;
+        slow = next;
+        if (slow->kind != Ast_Kind_Alias) return slow;
+
+        if (fast && fast->kind == Ast_Kind_Alias) {
+            fast = (AstNode *) ((AstAlias *) fast)->alias;
+            if (fast && fast->kind == Ast_Kind_Alias) {
+                fast = (AstNode *) ((AstAlias *) fast)->alias;
+            }
+        }
+        if (fast && slow == fast) return start;
+        if (++depth > 64) return start;
+    }
+
+    return slow;
+}
+
+AstType* strip_type_aliases(AstType* type) {
+    if (type == NULL) return type;
+
+    AstType *start = type;
+    AstType *slow = type;
+    AstType *fast = type;
+    i32 depth = 0;
+
+    while (slow->kind == Ast_Kind_Type_Alias) {
+        AstType *next = ((AstTypeAlias *) slow)->to;
+        if (next == NULL || next == slow || next == start) return start;
+        slow = next;
+        if (slow->kind != Ast_Kind_Type_Alias) return slow;
+
+        if (fast && fast->kind == Ast_Kind_Type_Alias) {
+            fast = ((AstTypeAlias *) fast)->to;
+            if (fast && fast->kind == Ast_Kind_Type_Alias) {
+                fast = ((AstTypeAlias *) fast)->to;
+            }
+        }
+        if (fast && slow == fast) return start;
+        if (++depth > 64) return start;
+    }
+
+    return slow;
 }
 
 AstNumLit* make_bool_literal(Context *context, b32 b) {

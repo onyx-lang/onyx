@@ -78,6 +78,10 @@ EventScope :: struct {
     column: u32
     @protobuf.Field.{6, 9}
     name: str
+    @protobuf.Field.{7, 13}
+    end_line: u32
+    @protobuf.Field.{8, 13}
+    end_column: u32
 }
 
 SymbolKind :: enum {

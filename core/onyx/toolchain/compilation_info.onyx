@@ -148,6 +148,20 @@ CompilationInfo.ingest_event :: (self: &#Self, event: &CompilerEvent) {
             slot := ensure_id(&self.scopes, s.id)
             if slot.id == 0 {
                 slot.ev = s
+            } else {
+                if s.end_line != 0 {
+                    slot.ev.end_line = s.end_line
+                    slot.ev.end_column = s.end_column
+                }
+                if s.line != 0 && slot.ev.line == 0 {
+                    slot.ev.line = s.line
+                    slot.ev.column = s.column
+                    slot.ev.file_id = s.file_id
+                    slot.ev.parent_scope_id = s.parent_scope_id
+                }
+                if s.name.count > 0 && slot.ev.name.count == 0 {
+                    slot.ev.name = s.name
+                }
             }
         }
 
@@ -293,10 +307,46 @@ CompilationInfo.symbols_in_scope :: (self: &#Self, scope_id: u32) -> [] u32 {
     }
 }
 
+scope_contains_pos :: (sc: &EventScope, line: u32, column: u32) -> bool {
+    if sc.line > line do return false
+    if sc.line == line && sc.column > column do return false
+    if sc.end_line != 0 {
+        if line > sc.end_line do return false
+        if line == sc.end_line && column > sc.end_column do return false
+    }
+    return true
+}
+
+/// Innermost scope that still contains this file position.
+/// Scopes with `end_line` set are treated as closed after that point, so a
+/// nested `#if` / lambda body does not steal lookup after it has ended.
+CompilationInfo.scope_at :: (self: &#Self, file_id: u32, line: u32, column: u32) -> u32 {
+    best_id: u32 = 0
+    best_line: u32 = 0
+    best_col: u32 = 0
+
+    i := 0
+    while i < self.scopes.count {
+        sc := &self.scopes[i]
+        i += 1
+        if sc.id == 0 do continue
+        if sc.file_id != file_id do continue
+        if !scope_contains_pos(sc, line, column) do continue
+        if sc.line > best_line || (sc.line == best_line && sc.column >= best_col) {
+            best_line = sc.line
+            best_col = sc.column
+            best_id = sc.id
+        }
+    }
+    return best_id
+}
+
 /// Walk `scope_id` and its parents looking for a declared name.
 CompilationInfo.lookup :: (self: &#Self, scope_id: u32, name: str) -> ? &SymbolInfo {
     id := scope_id
-    while id != 0 {
+    hops := 0
+    while id != 0 && hops < 256 {
+        hops += 1
         switch self->get_scope(id) {
             case .Some as sc {
                 for sid in sc.symbol_ids {
@@ -304,6 +354,7 @@ CompilationInfo.lookup :: (self: &#Self, scope_id: u32, name: str) -> ? &SymbolI
                         if sym.name == name do return sym
                     }
                 }
+                if sc.parent_scope_id == id do return .None
                 id = sc.parent_scope_id
             }
             case .None do return .None

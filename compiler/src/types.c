@@ -558,7 +558,9 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
         }
 
         case Ast_Kind_Type_Alias: {
-            Type* type = type_build_from_ast_inner(context, ((AstTypeAlias *) type_node)->to, accept_partial_types);
+            AstType *inner = strip_type_aliases(((AstTypeAlias *) type_node)->to);
+            if (!inner || inner == type_node || inner->kind == Ast_Kind_Type_Alias) return NULL;
+            Type* type = type_build_from_ast_inner(context, inner, accept_partial_types);
             if (type) {
                 type_node->type_id = type->id;
                 compilation_log_notify_node_typed(context, (AstNode *) type_node);
@@ -685,8 +687,9 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
         }
 
         case Ast_Kind_Alias: {
-            AstAlias* alias = (AstAlias *) type_node;
-            return type_build_from_ast_inner(context, (AstType *) alias->alias, accept_partial_types);
+            AstNode *inner = strip_aliases((AstNode *) type_node);
+            if (!inner || inner == (AstNode *) type_node || inner->kind == Ast_Kind_Alias) return NULL;
+            return type_build_from_ast_inner(context, (AstType *) inner, accept_partial_types);
         }
 
         case Ast_Kind_Typeof: {
