@@ -857,7 +857,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
                 code_block->token = expect_token(parser, '[');
 
-                assert(parser->context->builtins.code_type != NULL);
+                // PARSE_ONLY + DISABLE_CORE never loads builtins; do not abort.
                 code_block->type_node = parser->context->builtins.code_type;
 
                 bh_arr_new(parser->context->gp_alloc, code_block->binding_symbols, 4);
@@ -933,7 +933,10 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 AstFileContents* fc = make_node(AstFileContents, Ast_Kind_File_Contents);
                 fc->token = parser->prev - 1;
                 fc->filename_expr = parse_expression(parser, 0);
-                fc->type = type_make_slice(parser->context, parser->context->types.basic[Basic_Kind_U8]);
+                // PARSE_ONLY + DISABLE_CORE never loads Slice; skip type construction.
+                if (parser->context->builtins.slice_type != NULL) {
+                    fc->type = type_make_slice(parser->context, parser->context->types.basic[Basic_Kind_U8]);
+                }
 
                 if (parser->current_function_stack && bh_arr_length(parser->current_function_stack) > 0) {
                     bh_arr_push(bh_arr_last(parser->current_function_stack)->nodes_that_need_entities_after_clone, (AstNode *) fc);
@@ -2729,8 +2732,6 @@ static AstType* parse_type(OnyxParser* parser) {
             }
 
             case '?': {
-                assert(parser->context->builtins.optional_type);
-
                 bh_arr(AstNode *) params = NULL;
                 bh_arr_new(parser->context->gp_alloc, params, 1);
                 bh_arr_set_length(params, 1);

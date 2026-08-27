@@ -37,4 +37,22 @@ main :: () {
     pumped->parse();
     println("parse_pump_ok");
     println(!pumped->has_errors());
+
+    code := Builder.make();
+    defer code->destroy();
+    code->enable(.PARSE_ONLY);
+    code->enable(.DISABLE_CORE);
+    code->enable(.DISABLE_EXTENSIONS);
+    code->inject_source_as("code.onyx", "package main\nmain :: () {\n    x := [] { }\n}\n");
+    println("code_block_no_abort");
+    println(true);
+
+    contents := Builder.make();
+    defer contents->destroy();
+    contents->enable(.PARSE_ONLY);
+    contents->enable(.DISABLE_CORE);
+    contents->enable(.DISABLE_EXTENSIONS);
+    contents->inject_source_as("contents.onyx", "package main\nmain :: () {\n    x := #file_contents \"foo.txt\"\n}\n");
+    println("file_contents_no_abort");
+    println(true);
 }

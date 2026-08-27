@@ -1119,9 +1119,11 @@ Type* type_make_slice(Context *context, Type* of) {
 
         type_make_multi_pointer(context, of);
 
-        AstPolyStructType* pslice_type = (AstPolyStructType *) context->builtins.slice_type;
-        OnyxFilePos pos = { 0 };
-        slice_type->Slice.scope = scope_create(context, pslice_type->scope, pos);
+        if (context->builtins.slice_type != NULL) {
+            AstPolyStructType* pslice_type = (AstPolyStructType *) context->builtins.slice_type;
+            OnyxFilePos pos = { 0 };
+            slice_type->Slice.scope = scope_create(context, pslice_type->scope, pos);
+        }
 
         return slice_type;
     }
@@ -1145,9 +1147,11 @@ Type* type_make_dynarray(Context *context, Type* of) {
 
         type_make_multi_pointer(context, of);
 
-        AstPolyStructType* dynarr_type = (AstPolyStructType *) context->builtins.array_type;
-        OnyxFilePos pos = { 0 };
-        dynarr->DynArray.scope = scope_create(context, dynarr_type->scope, pos);
+        if (context->builtins.array_type != NULL) {
+            AstPolyStructType* dynarr_type = (AstPolyStructType *) context->builtins.array_type;
+            OnyxFilePos pos = { 0 };
+            dynarr->DynArray.scope = scope_create(context, dynarr_type->scope, pos);
+        }
 
         return dynarr;
     }
