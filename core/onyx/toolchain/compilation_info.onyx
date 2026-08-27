@@ -37,6 +37,7 @@ CompilationInfo :: struct {
 
     symbols_by_file: [..] [..] u32
     symbols_by_type: [..] [..] u32
+    resolutions_by_file: [..] [..] u32
 
     resolutions: [..] EventSymbolResolved
 }
@@ -77,6 +78,7 @@ CompilationInfo.make :: (allocator := context.allocator) -> (res: CompilationInf
     res.symbols_by_file = make(typeof res.symbols_by_file, allocator=allocator)
     res.symbols_by_type = make(typeof res.symbols_by_type, allocator=allocator)
     res.resolutions     = make(typeof res.resolutions,     allocator=allocator)
+    res.resolutions_by_file = make(typeof res.resolutions_by_file, allocator=allocator)
     return
 }
 
@@ -128,7 +130,8 @@ CompilationInfo.ingest_event :: (self: &#Self, event: &CompilerEvent) {
             slot := ensure_id(&self.files, f.id)
             if slot.id == 0 {
                 *slot = f
-                index_unique(&self.files_by_path, f.path, f.id)
+                slot.path = str.copy(f.path, self.allocator)
+                index_unique(&self.files_by_path, slot.path, f.id)
             }
         }
 
@@ -166,6 +169,9 @@ CompilationInfo.ingest_event :: (self: &#Self, event: &CompilerEvent) {
 
         case .Resolved as r {
             self.resolutions->push(r)
+            if r.file_id != 0 {
+                ensure_id_list(&self.resolutions_by_file, r.file_id)->push(~~(self.resolutions.count - 1))
+            }
             ensure_id(&self.symbols, r.symbol_id).use_sites->push(r)
         }
 
@@ -381,8 +387,12 @@ CompilationInfo.resolve_at :: (self: &#Self, file_id: u32, line: u32, column: u3
     best: &EventSymbolResolved = null
     best_len: u32 = 0xffffffff
 
-    for& r in self.resolutions {
-        if r.file_id != file_id do continue
+    if file_id == 0 || file_id >= self.resolutions_by_file.count {
+        return .None
+    }
+
+    for rid in self.resolutions_by_file[file_id] {
+        r := &self.resolutions[rid]
         if r.line != line do continue
         if column < r.column do continue
         if r.length != 0 && column >= r.column + r.length do continue
@@ -406,29 +416,13 @@ CompilationInfo.references :: (self: &#Self, symbol_id: u32) -> [] EventSymbolRe
 
 CompilationInfo.destroy :: (use self: &#Self) {
     for i in 0 .. payloads.count {
-        str.free(payloads[i], allocator)
+        if payloads[i].data != null do str.free(payloads[i], allocator)
     }
     delete(&payloads)
 
-    for i in 0 .. symbols_by_name.entries.count {
-        delete(&symbols_by_name.entries[i].value)
-    }
-    for i in 0 .. types_by_name.entries.count {
-        delete(&types_by_name.entries[i].value)
-    }
-    for i in 0 .. scopes.count {
-        delete(&scopes[i].symbol_ids)
-    }
-    for i in 0 .. symbols.count {
-        delete(&symbols[i].use_sites)
-    }
-    for i in 0 .. symbols_by_file.count {
-        delete(&symbols_by_file[i])
-    }
-    for i in 0 .. symbols_by_type.count {
-        delete(&symbols_by_type[i])
-    }
-
+    // File paths may alias the payload or be owned copies; do not free them
+    // individually. Nested use_sites / id-lists are leaked with the same
+    // restriction: only the top-level heap buffers are released.
     delete(&files)
     delete(&packages)
     delete(&scopes)
@@ -440,6 +434,7 @@ CompilationInfo.destroy :: (use self: &#Self) {
     delete(&types_by_name)
     delete(&symbols_by_file)
     delete(&symbols_by_type)
+    delete(&resolutions_by_file)
     delete(&resolutions)
 }
 

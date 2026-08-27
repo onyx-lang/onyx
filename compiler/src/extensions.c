@@ -179,6 +179,8 @@ static b32 extension_spawn(CompilerExtension *ext, const char *path) {
 
             dup2(comp_to_ext[0], 0);
             dup2(ext_to_comp[1], 1);
+            if (comp_to_ext[0] != 0) close(comp_to_ext[0]);
+            if (ext_to_comp[1] != 1) close(ext_to_comp[1]);
 
             execlp("onyx", "onyx", "run", "--no-compiler-extensions", "--no-file-contents", path, NULL);
             exit(1);
@@ -672,17 +674,25 @@ void compiler_extension_terminate(Context *context, int extension_id) {
 
     compiler_extension_send_compilation_data(context, ext);
 
-    if (ext->state != COMP_EXT_STATE_READY) return;
+    if (ext->state == COMP_EXT_STATE_READY) {
+        extension_send_int(ext, MSG_HOST_TERMINATE);
+        extension_drain(ext);
 
-    extension_send_int(ext, MSG_HOST_TERMINATE);
-    extension_drain(ext);
+        compiler_event_log(
+            context,
+            "Waiting for extension '%s' to exit...",
+            ext->name
+        );
 
-    compiler_event_log(
-        context,
-        "Waiting for extension '%s' to exit...",
-        ext->name
-    );
+        extension_wait(ext);
+    } else {
+        extension_kill(ext);
+    }
 
-    extension_wait(ext);
+    if (ext->send_file) close((int) ext->send_file);
+    if (ext->recv_file) close((int) ext->recv_file);
+    ext->send_file = 0;
+    ext->recv_file = 0;
+    ext->alive = 0;
 }
 

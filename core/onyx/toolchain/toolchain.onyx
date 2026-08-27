@@ -145,7 +145,12 @@ Builder.update_compilation_info :: (use self: &#Self, info: &CompilationInfo, al
     native.onyx_compilation_data_write(ctx, buffer.data)
 
     before := info.events_applied
-    info->ingest_protobuf(buffer, copy_payload=false)!
+    switch info->ingest_protobuf(buffer, copy_payload=false) {
+        case .Ok {}
+        case .Err {
+            return 0
+        }
+    }
     return info.events_applied - before
 }
 

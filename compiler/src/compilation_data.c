@@ -193,7 +193,7 @@ static char *compilation_log_intern_len(Context *context, const char *s, i32 len
         return compilation_log_intern(context, stack);
     }
 
-    char *tmp = bh_alloc_array(context->gp_alloc, char, len + 1);
+    char *tmp = bh_alloc_array(context->scratch_alloc, char, len + 1);
     memcpy(tmp, s, len);
     tmp[len] = 0;
     return compilation_log_intern(context, tmp);

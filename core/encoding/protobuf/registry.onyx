@@ -7,10 +7,10 @@ use core.misc
 use runtime.info
 
 #package {
-    registered_proto_types: Map(type_expr, Proto_Message_Descriptor)
-
-    last_desc_type: type_expr
-    last_desc: &Proto_Message_Descriptor
+    /// Heap-allocated descriptors, never stored by value in the map.
+    /// Nested lookups insert new types and may rehash the map; pointers
+    /// into map slots would dangle, so the map only holds stable pointers.
+    registered_proto_types: Map(type_expr, &Proto_Message_Descriptor)
 }
 
 proto_types_preloaded :: #init () {
@@ -18,14 +18,8 @@ proto_types_preloaded :: #init () {
 }
 
 lookup_protobuf_descriptor :: (type: type_expr) -> &Proto_Message_Descriptor {
-    if last_desc != null && type == last_desc_type {
-        return last_desc
-    }
-
-    if ptr := Map.get_ptr(&registered_proto_types, type); ptr {
-        last_desc_type = type
-        last_desc = ptr
-        return ptr
+    if slot := registered_proto_types->get_ptr(type); slot {
+        return *slot
     }
 
     struct_info := info.get_type_info(type)->as_struct()
@@ -104,14 +98,11 @@ lookup_protobuf_descriptor :: (type: type_expr) -> &Proto_Message_Descriptor {
         if n >= 0 && n <= max_n do by_number[n] = i + 1
     }
 
-    registered_proto_types->put(type, .{
-        fields = .{ fields.data, fields.count },
-        by_number = by_number,
-    })
-    ptr := Map.get_ptr(&registered_proto_types, type)
-    last_desc_type = type
-    last_desc = ptr
-    return ptr
+    desc := new(Proto_Message_Descriptor)
+    desc.fields = .{ fields.data, fields.count }
+    desc.by_number = by_number
+    registered_proto_types->put(type, desc)
+    return desc
 }
 
 apply_field_tag :: (tags: [] any, dest: &Proto_Field_Descriptor) {
