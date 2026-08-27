@@ -537,9 +537,80 @@ CompilationInfo.resolve_path :: (self: &#Self, scope_id: u32, parts: [] str) -> 
     }
 }
 
+/// First parameter type of a procedure, from its function type or param symbols.
+CompilationInfo.first_param_type :: (self: &#Self, symbol_id: u32) -> ? &TypeInfo {
+    if self->type_of(symbol_id) as t {
+        switch t.body {
+            case .Function as f {
+                if f.param_ids.count > 0 do return self->get_type(f.param_ids[0])
+            }
+            case _ {}
+        }
+    }
+    if self->get_symbol(symbol_id) as sym {
+        if sym.param_symbol_ids.count > 0 {
+            return self->type_of(sym.param_symbol_ids[0])
+        }
+    }
+    return .None
+}
+
+/// True when `symbol_id` is a struct/union-bound method of `type_id`:
+/// first parameter is `T` or `&T`. `#match` groups with no visible
+/// first parameter stay methods; other untyped symbols do not.
+CompilationInfo.is_method_of :: (self: &#Self, symbol_id: u32, type_id: u32) -> bool {
+    if type_id == 0 do return false
+
+    switch self->first_param_type(symbol_id) {
+        case .Some as p {
+            if p.id == type_id do return true
+            if p.kind == .Pointer {
+                switch p.body {
+                    case .Elem as e do return e.elem_id == type_id
+                    case _ {}
+                }
+            }
+            return false
+        }
+        case .None {
+            if self->get_symbol(symbol_id) as sym {
+                if sym.kind == .Overloaded_Function {
+                    for id in self->symbols_named(sym.name) {
+                        if id == symbol_id do continue
+                        if self->get_symbol(id) as other {
+                            switch other.kind {
+                                case .Function, .Polymorphic_Proc, .Macro {
+                                    if self->is_method_of(other.id, type_id) do return true
+                                }
+                                case _ {}
+                            }
+                        }
+                    }
+                    return true
+                }
+            }
+            return false
+        }
+    }
+}
+
 CompilationInfo.type_of :: (self: &#Self, symbol_id: u32) -> ? &TypeInfo {
     switch self->get_symbol(symbol_id) {
-        case .Some as sym do return self->get_type(sym.type_id)
+        case .Some as sym {
+            if self->get_type(sym.type_id) as t do return t
+
+            // `use pkg { * }` copies a name into the using scope. The
+            // declaring symbol still has the type binding.
+            for id in self->symbols_named(sym.name) {
+                if id == symbol_id do continue
+                if self->get_symbol(id) as other {
+                    if other.kind == sym.kind && other.type_id != 0 {
+                        return self->get_type(other.type_id)
+                    }
+                }
+            }
+            return .None
+        }
         case .None do return .None
     }
 }

@@ -2390,6 +2390,11 @@ typedef struct CompilationEvent {
     };
 } CompilationEvent;
 
+typedef struct CompilationLogAliasSymbol {
+    AstNode *node;
+    u32 symbol_id;
+} CompilationLogAliasSymbol;
+
 typedef struct CompilationLog {
     bh_arr(CompilationEvent) events;
 
@@ -2419,6 +2424,8 @@ typedef struct CompilationLog {
     bh_imap node_to_symbol_id;
     bh_imap node_to_binding;
     bh_imap symbol_binding_type_id;
+    // Additional EventSymbols for the same AST node (`use pkg { * }` copies).
+    bh_arr(CompilationLogAliasSymbol) alias_symbols;
 } CompilationLog;
 
 struct Context {

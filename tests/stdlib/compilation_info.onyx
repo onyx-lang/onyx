@@ -54,6 +54,14 @@ Point.mag :: (p: Point) -> i32 {
     return p.x
 }
 
+Point.zero :: () -> Point {
+    return .{ x = 0, y = 0 }
+}
+
+Point.shift :: (self: &Point, dx: i32) {
+    self.x += dx
+}
+
 Names :: #type [] u8
 Names.has_a :: (s: Names) -> bool {
     return true
@@ -266,6 +274,22 @@ main :: () {
     }
     ok("point_method_mag", point_method_ok);
 
+    mag_is_method := false;
+    zero_is_function := false;
+    shift_is_method := false;
+    if point_type != null && point_type.scope_id != 0 {
+        for sid in info->symbols_in_scope(point_type.scope_id) {
+            if info->get_symbol(sid) as sym {
+                if sym.name == "mag" do mag_is_method = info->is_method_of(sym.id, point_type.id);
+                if sym.name == "zero" do zero_is_function = !info->is_method_of(sym.id, point_type.id);
+                if sym.name == "shift" do shift_is_method = info->is_method_of(sym.id, point_type.id);
+            }
+        }
+    }
+    ok("point_mag_is_method", mag_is_method);
+    ok("point_zero_is_function", zero_is_function);
+    ok("point_shift_is_method", shift_is_method);
+
     names_type_ok := false;
     names_method_ok := false;
     slice_scope_ok := false;
@@ -474,11 +498,22 @@ main :: () {
     a, b := p, p
     _ := a.x
     _ := b.x
+    _ := Outer.Inner.{ x = 1 }->mag()
 }
 
 named_out :: () -> (out: foo.bar.Point) {
     out.x = 1
     return
+}
+
+Outer :: struct {
+    Inner :: struct {
+        x: i32
+    }
+}
+
+Outer.Inner.mag :: (self: Outer.Inner) -> i32 {
+    return self.x
 }
 """);
     pathb->compile();
@@ -609,6 +644,62 @@ named_out :: () -> (out: foo.bar.Point) {
     }
     ok("named_out_typed", named_out_typed);
     ok("named_out_in_body", named_out_in_body);
+
+    optional_is_type := false;
+    optional_has_empty := false;
+    if start_scope != 0 {
+        switch pathinfo->resolve_path(start_scope, str.["Optional"]) {
+            case .Type as t {
+                optional_is_type = true;
+                if t.scope_id != 0 {
+                    if pathinfo->lookup_in_scope(t.scope_id, "empty") as esym {
+                        switch esym.kind {
+                            case .Function, .Overloaded_Function, .Polymorphic_Proc, .Macro {
+                                optional_has_empty = true;
+                            }
+                            case _ {}
+                        }
+                    }
+                }
+            }
+            case _ {}
+        }
+    }
+    ok("imported_optional_is_type", optional_is_type);
+    ok("imported_optional_has_empty", optional_has_empty);
+
+    outer_is_type := false;
+    inner_is_nested_type := false;
+    inner_has_mag := false;
+    if start_scope != 0 {
+        switch pathinfo->resolve_path(start_scope, str.["Outer"]) {
+            case .Type as t {
+                outer_is_type = true;
+                if pathinfo->lookup_in_scope(t.scope_id, "Inner") as isym {
+                    if isym.kind == .Struct do inner_is_nested_type = true;
+                }
+            }
+            case _ {}
+        }
+        switch pathinfo->resolve_path(start_scope, str.["Outer", "Inner"]) {
+            case .Type as t {
+                if t.scope_id != 0 {
+                    if pathinfo->lookup_in_scope(t.scope_id, "mag") as msym {
+                        switch msym.kind {
+                            case .Function, .Overloaded_Function, .Polymorphic_Proc, .Macro {
+                                inner_has_mag = true;
+                            }
+                            case _ {}
+                        }
+                    }
+                }
+            }
+            case _ {}
+        }
+    }
+    ok("outer_is_type", outer_is_type);
+    ok("inner_is_nested_type", inner_is_nested_type);
+    ok("inner_has_mag", inner_has_mag);
 
     ifb := Builder.make();
     defer ifb->destroy();
