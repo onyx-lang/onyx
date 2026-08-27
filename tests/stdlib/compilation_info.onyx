@@ -152,19 +152,19 @@ main :: () {
         switch info->get_type(id) {
             case .Some as t {
                 if t.kind != .Enum do continue;
-                switch t.enumeration {
-                    case .Some as en {
-                        has_red := false;
-                        has_green := false;
-                        has_blue := false;
+                switch t.body {
+                    case .Enumeration as en {
+                        has_red := false
+                        has_green := false
+                        has_blue := false
                         for v in en.values {
-                            if v.name == "Red" && v.value == 0 do has_red = true;
-                            if v.name == "Green" && v.value == 10 do has_green = true;
-                            if v.name == "Blue" && v.value == 11 do has_blue = true;
+                            if v.name == "Red" && v.value == 0 do has_red = true
+                            if v.name == "Green" && v.value == 10 do has_green = true
+                            if v.name == "Blue" && v.value == 11 do has_blue = true
                         }
-                        color_ok = has_red && has_green && has_blue;
+                        color_ok = has_red && has_green && has_blue
                     }
-                    case .None {}
+                    case _ {}
                 }
             }
             case .None {}

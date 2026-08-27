@@ -98,18 +98,12 @@ main :: () {
     defer delete(&x_ids);
 
     for e in first.events {
-        switch e.start {
-            case .Some do has_start = true;
-            case .None {}
-        }
+        switch e.data {
+            case .Start do has_start = true;
 
-        switch e.file {
-            case .Some do file_count += 1;
-            case .None {}
-        }
+            case .File do file_count += 1;
 
-        switch e.pack {
-            case .Some as p {
+            case .Pack as p {
                 if p.fully_qualified_name == "foo" {
                     has_foo = true;
                     foo_id = p.id;
@@ -119,19 +113,13 @@ main :: () {
                     foo_bar_parent = p.parent_package_id;
                 }
             }
-            case .None {}
-        }
 
-        switch e.scope {
-            case .Some as s {
+            case .Scope as s {
                 has_scope = true;
                 if s.parent_scope_id != 0 do has_nested_scope = true;
             }
-            case .None {}
-        }
 
-        switch e.symbol {
-            case .Some as sym {
+            case .Symbol as sym {
                 if sym.name == "Point" {
                     if point_symbol_id == 0 {
                         point_symbol_id = sym.id;
@@ -147,13 +135,14 @@ main :: () {
                     if sym.kind == .Function do get_x_kind_ok = true;
                 }
             }
-            case .None {}
+
+            case _ {}
         }
     }
 
     for e in first.events {
-        switch e.symbol {
-            case .Some as sym {
+        switch e.data {
+            case .Symbol as sym {
                 if sym.name == "x" && contains_u32(point_scopes, sym.scope_id) {
                     has_symbol_x = true;
                     if sym.scope_id == point_scope_id {
@@ -163,7 +152,7 @@ main :: () {
                     array.push(&x_ids, sym.id);
                 }
             }
-            case .None {}
+            case _ {}
         }
     }
 
@@ -197,21 +186,12 @@ main :: () {
     first_has_binding := false;
     first_has_type_body := false;
     for e in first.events {
-        switch e.type {
-            case .Some do first_has_type = true;
-            case .None {}
-        }
-        switch e.resolved {
-            case .Some do first_has_resolved = true;
-            case .None {}
-        }
-        switch e.binding {
-            case .Some do first_has_binding = true;
-            case .None {}
-        }
-        switch e.type_body {
-            case .Some do first_has_type_body = true;
-            case .None {}
+        switch e.data {
+            case .Type do first_has_type = true;
+            case .Resolved do first_has_resolved = true;
+            case .Binding do first_has_binding = true;
+            case .Type_Body do first_has_type_body = true;
+            case _ {}
         }
     }
 
@@ -262,33 +242,21 @@ main :: () {
     color_values_ok := false;
 
     for e in second.events {
-        switch e.start {
-            case .Some do delta_has_start = true;
-            case .None {}
-        }
+        switch e.data {
+            case .Start do delta_has_start = true;
 
-        switch e.pack {
-            case .Some as p {
+            case .Pack as p {
                 if p.fully_qualified_name == "extra" do delta_has_extra = true;
                 if p.fully_qualified_name == "foo" do delta_has_foo = true;
             }
-            case .None {}
-        }
 
-        switch e.scope {
-            case .Some do delta_has_scope = true;
-            case .None {}
-        }
+            case .Scope do delta_has_scope = true;
 
-        switch e.symbol {
-            case .Some as sym {
+            case .Symbol as sym {
                 if sym.name == "x" do delta_has_symbol_x = true;
             }
-            case .None {}
-        }
 
-        switch e.binding {
-            case .Some as bind {
+            case .Binding as bind {
                 if bind.type_id != 0 {
                     if contains_u32(point_ids, bind.symbol_id) {
                         point_binding_type_id = bind.type_id;
@@ -298,24 +266,21 @@ main :: () {
                     }
                 }
             }
-            case .None {}
-        }
 
-        switch e.type {
-            case .Some as t {
+            case .Type as t {
                 if t.name == "void" {
                     delta_has_type_void = true;
-                    switch t.basic {
-                        case .Some do delta_void_has_basic = true;
-                        case .None {}
+                    switch t.body {
+                        case .Basic do delta_void_has_basic = true;
+                        case _ {}
                     }
                 }
                 if t.name == "i32" {
-                    switch t.basic {
-                        case .Some as basic {
+                    switch t.body {
+                        case .Basic as basic {
                             if basic.basic_kind == .I32 do delta_i32_has_basic = true;
                         }
-                        case .None {}
+                        case _ {}
                     }
                 }
                 if t.name == "Point" {
@@ -328,8 +293,8 @@ main :: () {
                 }
                 if t.name == "Color" {
                     if t.kind == .Enum do color_kind_ok = true;
-                    switch t.enumeration {
-                        case .Some as en {
+                    switch t.body {
+                        case .Enumeration as en {
                             has_red := false;
                             has_green := false;
                             has_blue := false;
@@ -340,36 +305,33 @@ main :: () {
                             }
                             if has_red && has_green && has_blue do color_values_ok = true;
                         }
-                        case .None {}
+                        case _ {}
                     }
                 }
 
                 is_elem_kind := t.kind == .Pointer || t.kind == .Multi_Pointer || t.kind == .Slice || t.kind == .Dyn_Array || t.kind == .Var_Args;
                 if is_elem_kind {
-                    switch t.elem {
-                        case .Some as el {
+                    switch t.body {
+                        case .Elem as el {
                             if el.elem_id == 0 do delta_elem_ids_ok = false;
                         }
-                        case .None do delta_elem_ids_ok = false;
+                        case _ do delta_elem_ids_ok = false;
                     }
                 }
 
                 if t.kind == .Array {
-                    switch t.array {
-                        case .Some as a {
+                    switch t.body {
+                        case .Array as a {
                             if a.elem_id == 0 do delta_array_ids_ok = false;
                         }
-                        case .None do delta_array_ids_ok = false;
+                        case _ do delta_array_ids_ok = false;
                     }
                 }
             }
-            case .None {}
-        }
 
-        switch e.type_body {
-            case .Some as tb {
-                switch tb.struct_body {
-                    case .Some as sb {
+            case .Type_Body as tb {
+                switch tb.details {
+                    case .Struct as sb {
                         for m in sb.members {
                             if m.name.count == 0 || m.type_id == 0 do delta_bodies_ok = false;
                         }
@@ -386,10 +348,7 @@ main :: () {
                             if has_px && has_py do delta_has_point_body = true;
                         }
                     }
-                    case .None {}
-                }
-                switch tb.union_body {
-                    case .Some as ub {
+                    case .Union as ub {
                         for v in ub.variants {
                             if v.name.count == 0 || v.type_id == 0 do delta_bodies_ok = false;
                         }
@@ -406,16 +365,17 @@ main :: () {
                             if has_point && has_empty do delta_has_shape_body = true;
                         }
                     }
-                    case .None {}
+                    case _ {}
                 }
             }
-            case .None {}
+
+            case _ {}
         }
     }
 
     for e in second.events {
-        switch e.resolved {
-            case .Some as r {
+        switch e.data {
+            case .Resolved as r {
                 if r.length != 0 {
                     if contains_u32(point_ids, r.symbol_id) do delta_resolved_point = true;
                     if contains_u32(x_ids, r.symbol_id) do delta_resolved_x = true;
@@ -423,7 +383,7 @@ main :: () {
                     if shape_variant_point_id != 0 && r.symbol_id == shape_variant_point_id do delta_resolved_shape_point = true;
                 }
             }
-            case .None {}
+            case _ {}
         }
     }
 
@@ -465,8 +425,8 @@ main :: () {
     member_x_kind_ok := false;
     shape_point_kind_ok := false;
     for e in first.events {
-        switch e.symbol {
-            case .Some as sym {
+        switch e.data {
+            case .Symbol as sym {
                 if point_member_x_id != 0 && sym.id == point_member_x_id && sym.kind == .Member {
                     member_x_kind_ok = true;
                 }
@@ -474,7 +434,7 @@ main :: () {
                     shape_point_kind_ok = true;
                 }
             }
-            case .None {}
+            case _ {}
         }
     }
 

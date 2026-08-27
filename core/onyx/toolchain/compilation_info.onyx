@@ -54,7 +54,7 @@ SymbolInfo :: struct {
 
 TypeInfo :: struct {
     use decl: EventType
-    use body: EventTypeBody
+    use type_body: EventTypeBody
     has_body: bool
 }
 
@@ -119,45 +119,33 @@ CompilationInfo.ingest_protobuf :: (self: &#Self, bytes: [] u8, copy_payload := 
 }
 
 CompilationInfo.ingest_event :: (self: &#Self, event: &CompilerEvent) {
-    switch event.start {
-        case .Some as s do self.compiler_version = s.compiler_version
-        case .None {}
-    }
+    switch event.data {
+        case .Start as s do self.compiler_version = s.compiler_version
 
-    switch event.file {
-        case .Some as f {
+        case .File as f {
             slot := ensure_id(&self.files, f.id)
             if slot.id == 0 {
                 *slot = f
                 index_unique(&self.files_by_path, f.path, f.id)
             }
         }
-        case .None {}
-    }
 
-    switch event.pack {
-        case .Some as p {
+        case .Pack as p {
             slot := ensure_id(&self.packages, p.id)
             if slot.id == 0 {
                 *slot = p
                 index_unique(&self.packages_by_name, p.fully_qualified_name, p.id)
             }
         }
-        case .None {}
-    }
 
-    switch event.scope {
-        case .Some as s {
+        case .Scope as s {
             slot := ensure_id(&self.scopes, s.id)
             if slot.id == 0 {
                 slot.ev = s
             }
         }
-        case .None {}
-    }
 
-    switch event.symbol {
-        case .Some as sym {
+        case .Symbol as sym {
             slot := ensure_id(&self.symbols, sym.id)
             if slot.id == 0 {
                 slot.decl = sym
@@ -173,43 +161,32 @@ CompilationInfo.ingest_event :: (self: &#Self, event: &CompilerEvent) {
                 }
             }
         }
-        case .None {}
-    }
 
-    switch event.resolved {
-        case .Some as r {
+        case .Resolved as r {
             self.resolutions->push(r)
             ensure_id(&self.symbols, r.symbol_id).use_sites->push(r)
         }
-        case .None {}
-    }
 
-    switch event.binding {
-        case .Some as b {
+        case .Binding as b {
             slot := ensure_id(&self.symbols, b.symbol_id)
             if b.documentation.count > 0 do slot.documentation = b.documentation
             if b.type_id != 0 do slot.type_id = b.type_id
         }
-        case .None {}
-    }
 
-    switch event.type {
-        case .Some as t {
+        case .Type as t {
             slot := ensure_id(&self.types, t.id)
             first := slot.id == 0
             slot.decl = t
             if first do index_list(&self.types_by_name, t.name, t.id)
         }
-        case .None {}
-    }
 
-    switch event.type_body {
-        case .Some as tb {
+        case .Type_Body as tb {
             slot := ensure_id(&self.types, tb.type_id)
             if slot.id == 0 do slot.id = tb.type_id
-            slot.body = tb
+            slot.type_body = tb
             slot.has_body = true
         }
+
         case .None {}
     }
 }
@@ -305,13 +282,13 @@ CompilationInfo.type_of :: (self: &#Self, symbol_id: u32) -> ? &TypeInfo {
 CompilationInfo.member :: (self: &#Self, type_id: u32, name: str) -> ? &TypeStructMember {
     switch self->get_type(type_id) {
         case .Some as t {
-            switch t.struct_body {
-                case .Some as &sb {
+            switch t.details {
+                case .Struct as &sb {
                     for& m in sb.members {
                         if m.name == name do return m
                     }
                 }
-                case .None {}
+                case _ {}
             }
         }
         case .None {}
@@ -329,13 +306,13 @@ CompilationInfo.lookup_member :: (self: &#Self, type_id: u32, name: str) -> ? &S
 CompilationInfo.variant :: (self: &#Self, type_id: u32, name: str) -> ? &TypeUnionVariant {
     switch self->get_type(type_id) {
         case .Some as t {
-            switch t.union_body {
-                case .Some as &ub {
+            switch t.details {
+                case .Union as &ub {
                     for& v in ub.variants {
                         if v.name == name do return v
                     }
                 }
-                case .None {}
+                case _ {}
             }
         }
         case .None {}
@@ -348,25 +325,10 @@ CompilationInfo.variant :: (self: &#Self, type_id: u32, name: str) -> ? &TypeUni
 CompilationInfo.elem :: (self: &#Self, type_id: u32) -> ? &TypeInfo {
     switch self->get_type(type_id) {
         case .Some as t {
-            switch t.kind {
-                case .Pointer, .Multi_Pointer, .Slice, .Dyn_Array, .Var_Args {
-                    switch t.elem {
-                        case .Some as e do return self->get_type(e.elem_id)
-                        case .None do return .None
-                    }
-                }
-                case .Array {
-                    switch t.array {
-                        case .Some as a do return self->get_type(a.elem_id)
-                        case .None do return .None
-                    }
-                }
-                case .Distinct {
-                    switch t.distinct {
-                        case .Some as d do return self->get_type(d.base_id)
-                        case .None do return .None
-                    }
-                }
+            switch t.body {
+                case .Elem as e do return self->get_type(e.elem_id)
+                case .Array as a do return self->get_type(a.elem_id)
+                case .Distinct as d do return self->get_type(d.base_id)
                 case _ do return .None
             }
         }

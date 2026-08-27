@@ -25,45 +25,78 @@ lookup_protobuf_descriptor :: (type: type_expr) -> ? Proto_Message_Descriptor {
         return .None
     }
 
-    fields := make([] Proto_Field_Descriptor, struct_info.members.length)
-    for member, index in struct_info.members {
-        fields[index].field_offset = member.offset
+    fields := make([..] Proto_Field_Descriptor)
 
+    for member in struct_info.members {
         type_info := member.type->info()
         switch type_info.kind {
-            case .Basic, .Enum {
-                fields[index].field_size = type_info.size
-                fields[index].field_type = member.type
+            case .Union {
+                u_info := type_info->as_union()
+                if u_info.constructed_from == Optional {
+                    desc: Proto_Field_Descriptor
+                    desc.field_offset = member.offset
+                    desc.field_type = u_info.variants[1].type
+                    desc.field_size = desc.field_type->info().size
+                    desc.is_optional = true
+                    desc.optional_offset = ~~ type_info.alignment
+                    apply_field_tag(member.tags, &desc)
+                    fields->push(desc)
+                } else {
+                    tag_size: u16 = ~~ u_info.tag_enum->info().size
+                    for variant in u_info.variants {
+                        if variant.type == void do continue
+
+                        desc: Proto_Field_Descriptor
+                        desc.field_offset = member.offset
+                        desc.field_type = variant.type
+                        desc.field_size = ~~ variant.type->info().size
+                        desc.is_oneof = true
+                        desc.oneof_tag = variant.tag_value
+                        desc.oneof_tag_size = tag_size
+                        desc.optional_offset = ~~ type_info.alignment
+                        desc.proto_field_number = ~~ variant.tag_value
+                        if variant.type->info().kind == .Struct {
+                            desc.proto_field_type = .MESSAGE
+                        }
+                        apply_field_tag(variant.tags, &desc)
+                        fields->push(desc)
+                    }
+                }
             }
 
             case .Dynamic_Array {
-                fields[index].field_type = type_info->as_dynamic_array().of
-                fields[index].field_size = fields[index].field_type->info().size
-                fields[index].is_repeated = true
+                desc: Proto_Field_Descriptor
+                desc.field_offset = member.offset
+                desc.field_type = type_info->as_dynamic_array().of
+                desc.field_size = desc.field_type->info().size
+                desc.is_repeated = true
+                apply_field_tag(member.tags, &desc)
+                fields->push(desc)
             }
 
-            case .Union {
-                if type_info->as_union().constructed_from == Optional {
-                    fields[index].field_type = type_info->as_union().variants[1].type
-                    fields[index].field_size = fields[index].field_type->info().size
-                    fields[index].is_optional = true
-                    fields[index].optional_offset = ~~ type_info.alignment
-                }
+            case _ {
+                desc: Proto_Field_Descriptor
+                desc.field_offset = member.offset
+                desc.field_size = type_info.size
+                desc.field_type = member.type
+                apply_field_tag(member.tags, &desc)
+                fields->push(desc)
             }
         }
-
-        member.tags
-            |> .find_opt([x](x.type == Field))
-            |> .transform(x => *misc.any_as(x, Field))
-            |> .with([fi] {
-                fields[index].proto_field_type   = ~~ fi.protobuf_type 
-                fields[index].proto_field_number = fi.number
-            })
     }
 
-    registered_proto_types->put(type, .{ fields })
-
+    registered_proto_types->put(type, .{ fields = .{ fields.data, fields.count } })
     return registered_proto_types->get(type)
+}
+
+apply_field_tag :: (tags: [] any, dest: &Proto_Field_Descriptor) {
+    tags
+        |> .find_opt([x](x.type == Field))
+        |> .transform(x => *misc.any_as(x, Field))
+        |> .with([fi] {
+            dest.proto_field_type   = ~~ fi.protobuf_type
+            dest.proto_field_number = fi.number
+        })
 }
 
 

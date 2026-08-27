@@ -55,13 +55,13 @@ main :: () {
     events := b->compilation_data();
     point_id: u32;
     for e in events.events {
-        switch e.symbol {
-            case .Some as sym {
+        switch e.data {
+            case .Symbol as sym {
                 if point_id == 0 && sym.name == "Point" && sym.kind == .Struct {
                     point_id = sym.id;
                 }
             }
-            case .None {}
+            case _ {}
         }
     }
 

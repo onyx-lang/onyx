@@ -13,24 +13,27 @@ CompilerEvents :: struct {
 CompilerEvent :: struct {
     @protobuf.Field.{1, 4}
     timestamp: ? u64
-    @protobuf.Field.{10, 11}
-    start: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventStart
-    @protobuf.Field.{11, 11}
-    file: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventFile
-    @protobuf.Field.{12, 11}
-    pack: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventPackage
-    @protobuf.Field.{13, 11}
-    scope: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventScope
-    @protobuf.Field.{14, 11}
-    symbol: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventSymbol
-    @protobuf.Field.{15, 11}
-    resolved: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventSymbolResolved
-    @protobuf.Field.{16, 11}
-    binding: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventBinding
-    @protobuf.Field.{17, 11}
-    type: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventType
-    @protobuf.Field.{18, 11}
-    type_body: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventTypeBody
+    data: union {
+        None: void
+        @protobuf.Field.{10, 11}
+        Start as 10: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventStart
+        @protobuf.Field.{11, 11}
+        File as 11: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventFile
+        @protobuf.Field.{12, 11}
+        Pack as 12: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventPackage
+        @protobuf.Field.{13, 11}
+        Scope as 13: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventScope
+        @protobuf.Field.{14, 11}
+        Symbol as 14: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventSymbol
+        @protobuf.Field.{15, 11}
+        Resolved as 15: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventSymbolResolved
+        @protobuf.Field.{16, 11}
+        Binding as 16: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventBinding
+        @protobuf.Field.{17, 11}
+        Type as 17: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventType
+        @protobuf.Field.{18, 11}
+        Type_Body as 18: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventTypeBody
+    }
 }
 
 @protobuf.Message
@@ -160,20 +163,23 @@ EventType :: struct {
     kind: TypeKind
     @protobuf.Field.{3, 9}
     name: str
-    @protobuf.Field.{10, 11}
-    basic: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeBasic
-    @protobuf.Field.{11, 11}
-    elem: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeElem
-    @protobuf.Field.{12, 11}
-    array: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeArray
-    @protobuf.Field.{13, 11}
-    function: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeFunction
-    @protobuf.Field.{14, 11}
-    compound: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeCompound
-    @protobuf.Field.{15, 11}
-    distinct: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeDistinct
-    @protobuf.Field.{16, 11}
-    enumeration: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeEnum
+    body: union {
+        None: void
+        @protobuf.Field.{10, 11}
+        Basic as 10: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeBasic
+        @protobuf.Field.{11, 11}
+        Elem as 11: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeElem
+        @protobuf.Field.{12, 11}
+        Array as 12: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeArray
+        @protobuf.Field.{13, 11}
+        Function as 13: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeFunction
+        @protobuf.Field.{14, 11}
+        Compound as 14: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeCompound
+        @protobuf.Field.{15, 11}
+        Distinct as 15: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeDistinct
+        @protobuf.Field.{16, 11}
+        Enumeration as 16: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeEnum
+    }
 }
 
 BasicKind :: enum {
@@ -277,10 +283,13 @@ EventTypeBody :: struct {
     alignment: u32
     @protobuf.Field.{4, 13}
     scope_id: u32
-    @protobuf.Field.{10, 11}
-    struct_body: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeStructBody
-    @protobuf.Field.{11, 11}
-    union_body: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeUnionBody
+    details: union {
+        None: void
+        @protobuf.Field.{10, 11}
+        Struct as 10: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeStructBody
+        @protobuf.Field.{11, 11}
+        Union as 11: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeUnionBody
+    }
 }
 
 @protobuf.Message

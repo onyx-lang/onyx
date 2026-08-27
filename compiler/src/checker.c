@@ -751,13 +751,21 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
                         (*value)->token->text, (*value)->token->length, type_get_name(context, union_expr_type));
                 }
 
-                // We subtract one here because variant numbering starts at 1, instead of 0.
-                // This is so a zeroed out block of memory does not have a valid variant.
-                // This is going to change now...
-                i32 variant_number = get_expression_integer_value(context, *value, NULL);
-                switchnode->union_variants_handled[variant_number] = 1;
+                // Tag values can be sparse (`Foo as 10`). Index `variants_ordered`
+                // and the handled-flags by declaration order, not by tag.
+                i32 variant_tag = (i32) get_expression_integer_value(context, *value, NULL);
+                i32 variant_index = type_lookup_union_variant_idx_by_tag(union_expr_type, (u32) variant_tag);
+                if (variant_index < 0) {
+                    OnyxToken* tkn = sc->block->token;
+                    if ((*value)->token) tkn = (*value)->token;
+                    ERROR_(tkn->pos, "'%b' is not a variant of '%s'.",
+                        (*value)->token->text, (*value)->token->length, type_get_name(context, union_expr_type));
+                    return Check_Error;
+                }
 
-                UnionVariant *union_variant = union_expr_type->Union.variants_ordered[variant_number];
+                switchnode->union_variants_handled[variant_index] = 1;
+
+                UnionVariant *union_variant = union_expr_type->Union.variants_ordered[variant_index];
                 if (sc->capture) {
                     if (sc->capture_is_by_pointer) {
                         sc->capture->type = type_make_pointer(context, union_variant->type);

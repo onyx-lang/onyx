@@ -48,6 +48,16 @@ marshal :: (input: $T, dest: &dyn_str) -> Result(bool, Marshal_Error) {
                 }
             }
 
+            elseif field_desc.is_oneof {
+                if read_union_tag(field_pointer, field_desc.oneof_tag_size) == field_desc.oneof_tag {
+                    encode_varint(field_wire_number, dest)
+
+                    element_pointer := memory.ptr_add(field_pointer, ~~ field_desc.optional_offset)
+                    encode_value(element_pointer, field_desc, dest)?
+                }
+                continue
+            }
+
             elseif field_desc.is_repeated {
                 arr := cast(&Untyped_Array) field_pointer
 
@@ -126,14 +136,15 @@ marshal :: (input: $T, dest: &dyn_str) -> Result(bool, Marshal_Error) {
 
     encode_varint :: (val: u64, dest: &dyn_str) {
         v := val
-        while v != 0 {
+        while true {
             t := v & 0x7f
-            if v >= 0x80 {
+            v >>= 7
+            if v != 0 {
                 t |= 0x80
             }
 
             dest->push(~~ t)
-            v >>= 7
+            if v == 0 do break
         }
     }
 

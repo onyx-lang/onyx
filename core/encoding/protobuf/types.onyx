@@ -12,7 +12,10 @@ Proto_Message_Descriptor :: struct {
 Proto_Field_Descriptor :: struct {
     is_optional:        bool
     is_repeated:        bool
+    is_oneof:           bool
     optional_offset:    u16
+    oneof_tag:          u32
+    oneof_tag_size:     u16
 
     field_offset:       i32
     field_size:         i32
@@ -61,4 +64,24 @@ _Field_Type :: enum {
     SFIXED64 :: 16
     SINT32 :: 17
     SINT64 :: 18
+}
+
+write_union_tag :: (base: rawptr, tag: u32, size: u16) {
+    switch size {
+        case 1 do *cast(&u8)  base = ~~ tag
+        case 2 do *cast(&u16) base = ~~ tag
+        case 4 do *cast(&u32) base = tag
+        case 8 do *cast(&u64) base = ~~ tag
+        case _ {}
+    }
+}
+
+read_union_tag :: (base: rawptr, size: u16) -> u32 {
+    switch size {
+        case 1 do return ~~ *cast(&u8)  base
+        case 2 do return ~~ *cast(&u16) base
+        case 4 do return *cast(&u32) base
+        case 8 do return ~~ *cast(&u64) base
+        case _ do return 0
+    }
 }

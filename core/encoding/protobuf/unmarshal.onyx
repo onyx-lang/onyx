@@ -104,6 +104,10 @@ parse_message :: (input: [] u8, out: rawptr, type: type_expr, copy_strings: bool
             // Set the tag to be Some
             *cast(& u8) field_pointer = 1
             field_pointer = memory.ptr_add(field_pointer, ~~ field_desc.optional_offset)
+        } elseif field_desc.is_oneof {
+            write_union_tag(field_pointer, field_desc.oneof_tag, field_desc.oneof_tag_size)
+            field_pointer = memory.ptr_add(field_pointer, ~~ field_desc.optional_offset)
+            memory.set(field_pointer, 0, field_desc.field_size)
         }
 
         if field_desc.is_repeated {
