@@ -2043,8 +2043,14 @@ typedef struct CompilerExtension {
     b32 supports_stalled_hook : 1;
     b32 supports_compilation_data : 1;
     b32 supports_compilation_data_detailed : 1;
+    b32 supports_all_code_checked_hook : 1;
 
     u32 compilation_data_cursor;
+
+    // Host-side send queue. Compilation data is appended here and flushed
+    // without blocking the compiler pump. Drained before any recv/terminate.
+    bh_buffer outgoing;
+    i32 outgoing_off;
 } CompilerExtension;
 
 typedef struct CompileOptions CompileOptions;
@@ -2486,6 +2492,7 @@ struct Context {
     b32 pump_is_primed : 1;
     b32 builtins_initialized : 1;
     b32 wasm_module_linked : 1;
+    b32 all_code_checked_hook_done : 1;
 };
 
 typedef struct BuiltinSymbol {
@@ -2636,6 +2643,7 @@ TypeMatch compiler_extension_expand_macro(
     u32 *out_expansion_id,
     b32 wait_for_response);
 TypeMatch compiler_extension_hook_stalled(Context *context, int extension_id);
+TypeMatch compiler_extension_hook_all_code_checked(Context *context, int extension_id);
 void compiler_extensions_flush_compilation_data(Context *context);
 void compiler_extensions_flush_compilation_data_now(Context *context);
 

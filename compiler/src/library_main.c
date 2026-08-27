@@ -295,7 +295,11 @@ static b32 process_load_entity(Context *context, Entity* ent) {
         );
 
         if (filename) {
-            return process_load_directory(context, include, filename);
+            bh_file_stats stats;
+            if (bh_file_stat(filename, &stats) && stats.file_type == BH_FILE_TYPE_DIRECTORY) {
+                return process_load_directory(context, include, filename);
+            }
+            return process_source_file(context, filename);
         }
 
         OnyxFilePos error_pos = include->token->pos;
@@ -399,6 +403,48 @@ static void send_stalled_hooks(Context *context) {
     }
 }
 
+static b32 heap_has_pre_codegen_work(Context *context) {
+    i32 *sc = context->entities.state_count;
+    return sc[Entity_State_Parse_Builtin]
+         + sc[Entity_State_Introduce_Symbols]
+         + sc[Entity_State_Parse]
+         + sc[Entity_State_Resolve_Symbols]
+         + sc[Entity_State_Check_Types] > 0;
+}
+
+static void send_all_code_checked_hooks(Context *context) {
+    bh_arr_each(CompilerExtension, ext, context->extensions) {
+        compiler_extension_hook_all_code_checked(context, ext->id);
+    }
+}
+
+// Barrier before code generation. Compilation-data delivery stays async;
+// this is the rendezvous where extensions can inject more source.
+// Returns 1 if inject added compile work that must run first.
+static b32 maybe_all_code_checked_barrier(Context *context) {
+    if (context->all_code_checked_hook_done) return 0;
+    if (heap_has_pre_codegen_work(context)) return 0;
+
+    b32 any = 0;
+    bh_arr_each(CompilerExtension, ext, context->extensions) {
+        if (ext->alive && ext->supports_all_code_checked_hook) {
+            any = 1;
+            break;
+        }
+    }
+    if (!any) {
+        context->all_code_checked_hook_done = 1;
+        return 0;
+    }
+
+    send_all_code_checked_hooks(context);
+
+    if (heap_has_pre_codegen_work(context)) return 1;
+
+    context->all_code_checked_hook_done = 1;
+    return 0;
+}
+
 static void prime_pump(Context *context) {
     // NOTE: Add builtin entities to pipeline.
     entity_heap_insert(&context->entities, ((Entity) {
@@ -497,6 +543,10 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
     }
 
     if (bh_arr_is_empty(context->entities.entities)) {
+        if (maybe_all_code_checked_barrier(context)) {
+            return pump_return(context, ONYX_PUMP_CONTINUE);
+        }
+
         // Once the module has been linked, we are all done and ready to say everything compiled successfully!
         if (context->wasm_module_linked) return pump_return(context, ONYX_PUMP_DONE);
 
@@ -506,6 +556,12 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
     }
 
     Entity* ent = entity_heap_top(&context->entities);
+
+    if (ent->state >= Entity_State_Code_Gen) {
+        if (maybe_all_code_checked_barrier(context)) {
+            return pump_return(context, ONYX_PUMP_CONTINUE);
+        }
+    }
 
     // Mostly a preventative thing to ensure that even if somehow
     // errors were left disabled, they are re-enabled in this cycle.

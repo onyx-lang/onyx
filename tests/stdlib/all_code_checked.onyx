@@ -1,0 +1,39 @@
+#load "core:onyx/toolchain/module"
+
+use core {*}
+use onyx.toolchain {*}
+
+ok :: (label: str, value: bool) {
+    println(label)
+    println(value)
+}
+
+main :: () {
+    b := Builder.make();
+    defer b->destroy();
+
+    core_root := os.env("ONYX_PATH") ?? "";
+    defer str.free(core_root);
+    b->map_dir("core", tprintf("{}/core", core_root));
+
+    b->enable(.MULTI_THREADING);
+    b->enable(.COMPILATION_DATA_DETAILED);
+    b->set_platform(.ONYX);
+
+    b->add_source("tests/stdlib/all_code_checked_program.onyx.ignore");
+    b->compile();
+
+    if b->has_errors() {
+        for e in b->get_errors() {
+            eprintf("{}:{}: {}\n", e.filename, e.range.start.line, e.message)
+        }
+    }
+
+    ok("compile_ok", !b->has_errors());
+
+    info := b->compilation_info();
+    defer delete(&info);
+
+    ok("has_anchor", info->symbols_named("all_code_checked_anchor").count > 0);
+    ok("has_injected", info->symbols_named("injected_from_barrier").count > 0);
+}

@@ -87,8 +87,7 @@ _Field_Value :: union {
 parse_message :: (input: [] u8, out: rawptr, type: type_expr, copy_strings: bool) -> Result(bool, Unmarshal_Error) {
     data := input
     msg_desc := lookup_protobuf_descriptor(type)
-        |> .into_result(Unmarshal_Error.{ Unknown_Type = type })
-        |> .forward_err()
+    if msg_desc == null do return .{ Err = .{ Unknown_Type = type } }
 
     while data {
         field_header := parse_field_header(&data)?
@@ -96,25 +95,28 @@ parse_message :: (input: [] u8, out: rawptr, type: type_expr, copy_strings: bool
             continue
         }
 
-        field_value   := parse_field_value(&data, field_header.encoding_type)?
-        field_desc    := Slice.find_opt(msg_desc.fields, [x](x.proto_field_number == field_header.proto_number)) |> or_continue
+        field_value := parse_field_value(&data, field_header.encoding_type)?
+
+        n := field_header.proto_number
+        if n < 0 || n >= msg_desc.by_number.count do continue
+        slot := msg_desc.by_number[n]
+        if slot == 0 do continue
+        field_desc := &msg_desc.fields[slot - 1]
         field_pointer := memory.ptr_add(out, field_desc.field_offset)
 
         if field_desc.is_optional {
-            // Set the tag to be Some
             *cast(& u8) field_pointer = 1
             field_pointer = memory.ptr_add(field_pointer, ~~ field_desc.optional_offset)
         } elseif field_desc.is_oneof {
             write_union_tag(field_pointer, field_desc.oneof_tag, field_desc.oneof_tag_size)
             field_pointer = memory.ptr_add(field_pointer, ~~ field_desc.optional_offset)
-            memory.set(field_pointer, 0, field_desc.field_size)
         }
 
         if field_desc.is_repeated {
             field_pointer = Array.untyped_alloc_one(~~ field_pointer, field_desc.field_type)
         }
 
-        store_value(field_pointer, &field_desc, field_value, copy_strings)?
+        store_value(field_pointer, field_desc, field_value, copy_strings)?
     }
 
     return .{ Ok = true }

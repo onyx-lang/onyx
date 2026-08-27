@@ -30,8 +30,7 @@ marshal :: (input: $T, dest: &dyn_str) -> Result(bool, Marshal_Error) {
 #package {
     encode_message :: (val: rawptr, type: type_expr, dest: &dyn_str) -> Result(bool, Marshal_Error) {
         msg_desc := lookup_protobuf_descriptor(type)
-            |> .into_result(Marshal_Error.{ Unknown_Type = type })
-            |> .forward_err()
+        if msg_desc == null do return .{ Err = .{ Unknown_Type = type } }
 
         for& field_desc in msg_desc.fields {
             field_pointer       := memory.ptr_add(val, field_desc.field_offset)

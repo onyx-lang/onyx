@@ -1,0 +1,21 @@
+#load "core:onyx/compiler_extension/module"
+
+use onyx.compiler_extension {*}
+
+injected := false
+
+main :: () {
+    ext := ExtensionContext.make("AllCodeChecked")
+    ext->enable_compilation_data_detailed()
+    ext->on_all_code_checked((ext, _) => {
+        if injected do return
+        injected = true
+
+        ext->send(.{
+            InjectCode = .{
+                code = "package main\ninjected_from_barrier :: 42\n"
+            }
+        })
+    })
+    ext->start((_, _) => {})
+}

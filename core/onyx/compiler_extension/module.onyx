@@ -11,7 +11,6 @@ use core {
 }
 use core.alloc {package, arena}
 use core.encoding.osad
-use core.encoding.protobuf
 use core.io
 use protobuf.onyx.toolchain.events {*}
 use onyx.toolchain { CompilationInfo }
@@ -76,6 +75,15 @@ use onyx.toolchain { CompilationInfo }
 //     Hook 3 implies hook 2. Detailed events are always recorded; hook 3
 //     only gates whether they are sent. First dump after INIT includes
 //     the full history so far.
+//
+// PROTOCOL VERSION 4 CHANGES
+//
+// INCOMING HOOK (3)
+//     4 = All_Code_Checked
+//     Synchronous barrier after all parse/check work and before code
+//     generation. Remaining CompilationData is flushed first so
+//     CompilationInfo is complete. InjectCode is applied and compiled
+//     before generation; the hook may fire again if inject added work.
 
 
 // Types
@@ -166,6 +174,8 @@ HookInfo :: union {
 
     CompilationDataDetailed: struct {}
 
+    All_Code_Checked: struct {}
+
     Count: void
 }
 
@@ -197,7 +207,7 @@ ExtensionContext.make :: (name: str) -> (res: ExtensionContext) {
     res.compiler_events.events = make(typeof res.compiler_events.events)
     res.compilation_info = CompilationInfo.make()
     res.arena = arena.make(context.allocator, 32 * 1024)
-    res.reader = io.Reader.make(&stdio.stream, 64 * 1024)
+    res.reader = io.Reader.make(&stdio.stream, 256 * 1024)
     return
 }
 
@@ -321,6 +331,13 @@ ExtensionContext.handle_macro :: (self: &#Self, name: str, func: (&ExtensionCont
 
 ExtensionContext.handle_hook :: (self: &#Self, hook: HookInfo.tag_enum, func: (&ExtensionContext, HookInfo) -> void) {
     self.hook_handlers[~~hook] = func
+    if hook == .All_Code_Checked {
+        if self.protocol_version < 4 do self.protocol_version = 4
+    }
+}
+
+ExtensionContext.on_all_code_checked :: (self: &#Self, func: (&ExtensionContext, HookInfo) -> void) {
+    self->handle_hook(.All_Code_Checked, func)
 }
 
 ExtensionContext.enable_compilation_data :: (self: &#Self) {

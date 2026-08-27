@@ -8,21 +8,30 @@ use runtime.info
 
 #package {
     registered_proto_types: Map(type_expr, Proto_Message_Descriptor)
+
+    last_desc_type: type_expr
+    last_desc: &Proto_Message_Descriptor
 }
 
 proto_types_preloaded :: #init () {
     registered_proto_types->init()
 }
 
-lookup_protobuf_descriptor :: (type: type_expr) -> ? Proto_Message_Descriptor {
-    if desc := Map.get(&registered_proto_types, type); desc {
-        return desc
+lookup_protobuf_descriptor :: (type: type_expr) -> &Proto_Message_Descriptor {
+    if last_desc != null && type == last_desc_type {
+        return last_desc
+    }
+
+    if ptr := Map.get_ptr(&registered_proto_types, type); ptr {
+        last_desc_type = type
+        last_desc = ptr
+        return ptr
     }
 
     struct_info := info.get_type_info(type)->as_struct()
 
     if struct_info.kind != .Struct || !Slice.some(struct_info.tags, [x](x.type == type_expr && *cast(&type_expr, x.data) == Message)) {
-        return .None
+        return null
     }
 
     fields := make([..] Proto_Field_Descriptor)
@@ -85,8 +94,24 @@ lookup_protobuf_descriptor :: (type: type_expr) -> ? Proto_Message_Descriptor {
         }
     }
 
-    registered_proto_types->put(type, .{ fields = .{ fields.data, fields.count } })
-    return registered_proto_types->get(type)
+    max_n := 0
+    for f in fields {
+        if f.proto_field_number > max_n do max_n = f.proto_field_number
+    }
+    by_number := make([] i32, max_n + 1)
+    for i in 0 .. fields.count {
+        n := fields[i].proto_field_number
+        if n >= 0 && n <= max_n do by_number[n] = i + 1
+    }
+
+    registered_proto_types->put(type, .{
+        fields = .{ fields.data, fields.count },
+        by_number = by_number,
+    })
+    ptr := Map.get_ptr(&registered_proto_types, type)
+    last_desc_type = type
+    last_desc = ptr
+    return ptr
 }
 
 apply_field_tag :: (tags: [] any, dest: &Proto_Field_Descriptor) {
