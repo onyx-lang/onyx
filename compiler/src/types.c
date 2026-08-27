@@ -559,7 +559,10 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
 
         case Ast_Kind_Type_Alias: {
             Type* type = type_build_from_ast_inner(context, ((AstTypeAlias *) type_node)->to, accept_partial_types);
-            if (type && type->ast_type) type_node->type_id = type->id;
+            if (type) {
+                type_node->type_id = type->id;
+                compilation_log_notify_node_typed(context, (AstNode *) type_node);
+            }
             return type;
         }
 
@@ -1109,21 +1112,28 @@ Type* type_make_slice(Context *context, Type* of) {
     u64 slice_id = bh_imap_get(&context->types.slice_map, of->id);
     if (slice_id > 0) {
         Type* slice_type = (Type *) bh_imap_get(&context->types.type_map, slice_id);
+        if (slice_type && !slice_type->Slice.scope && context->builtins.slice_type != NULL) {
+            AstPolyStructType* pslice_type = (AstPolyStructType *) context->builtins.slice_type;
+            OnyxFilePos pos = { 0 };
+            slice_type->Slice.scope = scope_create(context, pslice_type->scope, pos);
+            compilation_log_emit_type_body(context, slice_type);
+        }
         return slice_type;
 
     } else {
         Type* slice_type = type_create(context, Type_Kind_Slice, 0);
         slice_type->Slice.elem = of;
-        type_register(context, slice_type);
-        bh_imap_put(&context->types.slice_map, of->id, slice_type->id);
-
-        type_make_multi_pointer(context, of);
 
         if (context->builtins.slice_type != NULL) {
             AstPolyStructType* pslice_type = (AstPolyStructType *) context->builtins.slice_type;
             OnyxFilePos pos = { 0 };
             slice_type->Slice.scope = scope_create(context, pslice_type->scope, pos);
         }
+
+        type_register(context, slice_type);
+        bh_imap_put(&context->types.slice_map, of->id, slice_type->id);
+
+        type_make_multi_pointer(context, of);
 
         return slice_type;
     }
@@ -1137,21 +1147,28 @@ Type* type_make_dynarray(Context *context, Type* of) {
     u64 dynarr_id = bh_imap_get(&context->types.dynarr_map, of->id);
     if (dynarr_id > 0) {
         Type* dynarr = (Type *) bh_imap_get(&context->types.type_map, dynarr_id);
+        if (dynarr && !dynarr->DynArray.scope && context->builtins.array_type != NULL) {
+            AstPolyStructType* dynarr_type = (AstPolyStructType *) context->builtins.array_type;
+            OnyxFilePos pos = { 0 };
+            dynarr->DynArray.scope = scope_create(context, dynarr_type->scope, pos);
+            compilation_log_emit_type_body(context, dynarr);
+        }
         return dynarr;
 
     } else {
         Type* dynarr = type_create(context, Type_Kind_DynArray, 0);
         dynarr->DynArray.elem = of;
-        type_register(context, dynarr);
-        bh_imap_put(&context->types.dynarr_map, of->id, dynarr->id);
-
-        type_make_multi_pointer(context, of);
 
         if (context->builtins.array_type != NULL) {
             AstPolyStructType* dynarr_type = (AstPolyStructType *) context->builtins.array_type;
             OnyxFilePos pos = { 0 };
             dynarr->DynArray.scope = scope_create(context, dynarr_type->scope, pos);
         }
+
+        type_register(context, dynarr);
+        bh_imap_put(&context->types.dynarr_map, of->id, dynarr->id);
+
+        type_make_multi_pointer(context, of);
 
         return dynarr;
     }

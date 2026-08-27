@@ -2321,6 +2321,8 @@ typedef struct CompilationEvent {
             u32 symbol_id;
             char *documentation;
             u32 type_id;
+            u32 param_count;
+            u32 *param_symbol_ids;
         } binding;
 
         struct {

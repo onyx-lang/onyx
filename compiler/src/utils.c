@@ -1693,6 +1693,11 @@ Scope *get_scope_from_node_or_create(Context *context, AstNode *node) {
         if (node->token) pos = node->token->pos;
 
         *pscope = scope_create(context, NULL, pos);
+
+        if (node_is_type(node)) {
+            Type *t = type_build_from_ast(context, (AstType *) node);
+            if (t) compilation_log_emit_type_body(context, t);
+        }
     }
 
     return *pscope;

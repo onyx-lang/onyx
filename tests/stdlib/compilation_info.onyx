@@ -50,6 +50,15 @@ get_x :: (p: Point) -> i32 {
     return p.x
 }
 
+Point.mag :: (p: Point) -> i32 {
+    return p.x
+}
+
+Names :: #type [] u8
+Names.has_a :: (s: Names) -> bool {
+    return true
+}
+
 Ptr :: &Point
 Arr :: [2] i32
 """);
@@ -254,6 +263,103 @@ main :: () {
     }
     ok("get_x_function", get_x_ok);
 
+    get_x_sym: &SymbolInfo = null;
+    for id in info->symbols_named("get_x") {
+        switch info->get_symbol(id) {
+            case .Some as sym {
+                if get_x_sym == null && sym.kind == .Function do get_x_sym = sym;
+            }
+            case .None {}
+        }
+    }
+
+    param_p_ok := false;
+    param_p_type_ok := false;
+    param_p_use_ok := false;
+    get_x_param_ids_ok := false;
+    if get_x_sym != null && get_x_sym.param_symbol_ids.count == 1 {
+        switch info->get_symbol(get_x_sym.param_symbol_ids[0]) {
+            case .Some as p {
+                param_p_ok = p.name == "p" && p.kind == .Parameter;
+                if point_type != null {
+                    switch info->type_of(p.id) {
+                        case .Some as t do param_p_type_ok = t.id == point_type.id;
+                        case .None {}
+                    }
+                }
+                for r in info->references(p.id) {
+                    if r.length != 0 do param_p_use_ok = true;
+                }
+            }
+            case .None {}
+        }
+
+        switch info->type_of(get_x_sym.id) {
+            case .Some as t {
+                switch t.body {
+                    case .Function as f {
+                        get_x_param_ids_ok = f.param_ids.count == 1 && point_type != null && f.param_ids[0] == point_type.id;
+                    }
+                    case _ {}
+                }
+            }
+            case .None {}
+        }
+    }
+    ok("param_p_symbol", param_p_ok);
+    ok("param_p_type", param_p_type_ok);
+    ok("param_p_use", param_p_use_ok);
+    ok("get_x_param_type_ids", get_x_param_ids_ok);
+
+    point_method_ok := false;
+    if point_type != null && point_type.scope_id != 0 {
+        for sid in info->symbols_in_scope(point_type.scope_id) {
+            switch info->get_symbol(sid) {
+                case .Some as sym {
+                    if sym.name == "mag" {
+                        switch sym.kind {
+                            case .Function, .Overloaded_Function, .Polymorphic_Proc do point_method_ok = true;
+                            case _ {}
+                        }
+                    }
+                }
+                case .None {}
+            }
+        }
+    }
+    ok("point_method_mag", point_method_ok);
+
+    names_type_ok := false;
+    names_method_ok := false;
+    slice_scope_ok := false;
+    for id in info->symbols_named("Names") {
+        switch info->get_symbol(id) {
+            case .Some as sym {
+                switch info->type_of(sym.id) {
+                    case .Some as t {
+                        names_type_ok = t.kind == .Slice;
+                        slice_scope_ok = t.scope_id != 0;
+                        if t.scope_id != 0 {
+                            for sid in info->symbols_in_scope(t.scope_id) {
+                                switch info->get_symbol(sid) {
+                                    case .Some as m {
+                                        if m.name == "has_a" do names_method_ok = true;
+                                    }
+                                    case .None {}
+                                }
+                            }
+                        }
+                    }
+                    case .None {}
+                }
+            }
+            case .None {}
+        }
+    }
+    ok("names_alias_is_slice", names_type_ok);
+    ok("names_slice_has_scope", slice_scope_ok);
+    ok("names_method_has_a", names_method_ok);
+
     first_applied := info.events_applied;
 
     b->inject_source("package extra\nextra_y :: 1\n");
@@ -282,4 +388,52 @@ main :: () {
     ok("stream_got_extra", got_extra);
     ok("stream_got_extra_y", extra_sym);
     ok("stream_applied_grew", info.events_applied > first_applied);
+
+    errb := Builder.make();
+    defer errb->destroy();
+    errb->map_dir("core", tprintf("{}/core", core_root));
+    errb->enable(.DISABLE_EXTENSIONS);
+    errb->enable(.MULTI_THREADING);
+    errb->enable(.COMPILATION_DATA_DETAILED);
+    errb->set_platform(.ONYX);
+    errb->inject_source("""
+package erridx
+
+broken :: () {
+    x: i32 = "nope"
+}
+
+later :: () -> i32 {
+    return 1
+}
+""");
+    errb->compile();
+
+    ok("error_compile_has_errors", errb->has_errors());
+
+    errinfo := errb->compilation_info();
+    defer delete(&errinfo);
+
+    later_ok := false;
+    for id in errinfo->symbols_named("later") {
+        switch errinfo->get_symbol(id) {
+            case .Some as sym {
+                if sym.kind == .Function {
+                    switch errinfo->type_of(sym.id) {
+                        case .Some do later_ok = true;
+                        case .None {}
+                    }
+                }
+            }
+            case .None {}
+        }
+    }
+
+    broken_named := false;
+    for id in errinfo->symbols_named("broken") {
+        broken_named = true;
+    }
+
+    ok("error_keeps_later", later_ok);
+    ok("error_keeps_broken_name", broken_named);
 }

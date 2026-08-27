@@ -94,6 +94,7 @@ SymbolKind :: enum {
     Interface;
     Expression;
     Member;
+    Parameter;
 }
 
 @protobuf.Message
@@ -136,6 +137,8 @@ EventBinding :: struct {
     documentation: str
     @protobuf.Field.{3, 13}
     type_id: u32
+    @protobuf.Field.{4, 13}
+    param_symbol_ids: [..] u32
 }
 
 TypeKind :: enum {

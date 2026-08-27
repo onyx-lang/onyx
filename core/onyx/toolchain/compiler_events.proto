@@ -85,6 +85,7 @@ enum SymbolKind {
   SYMBOL_KIND_INTERFACE = 10;
   SYMBOL_KIND_EXPRESSION = 11;
   SYMBOL_KIND_MEMBER = 12;
+  SYMBOL_KIND_PARAMETER = 13;
 }
 
 message EventSymbol {
@@ -109,6 +110,7 @@ message EventBinding {
   uint32 symbol_id = 1;
   string documentation = 2;
   uint32 type_id = 3;
+  repeated uint32 param_symbol_ids = 4;
 }
 
 // Coarse kind of a type. Compiler TypeKind numbers are not part of the protocol.

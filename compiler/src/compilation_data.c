@@ -16,6 +16,7 @@
 #define SYMBOL_KIND_INTERFACE           10
 #define SYMBOL_KIND_EXPRESSION          11
 #define SYMBOL_KIND_MEMBER              12
+#define SYMBOL_KIND_PARAMETER           13
 
 #define PROTO_TYPE_KIND_UNKNOWN         0
 #define PROTO_TYPE_KIND_BASIC           1
@@ -105,9 +106,10 @@
 #define PB_EVENT_RESOLVED_COLUMN    4
 #define PB_EVENT_RESOLVED_LENGTH    5
 
-#define PB_EVENT_BINDING_SYMBOL_ID     1
-#define PB_EVENT_BINDING_DOCUMENTATION 2
-#define PB_EVENT_BINDING_TYPE_ID       3
+#define PB_EVENT_BINDING_SYMBOL_ID        1
+#define PB_EVENT_BINDING_DOCUMENTATION    2
+#define PB_EVENT_BINDING_TYPE_ID          3
+#define PB_EVENT_BINDING_PARAM_SYMBOL_IDS 4
 
 #define PB_EVENT_TYPE_ID           1
 #define PB_EVENT_TYPE_KIND         2
@@ -290,6 +292,9 @@ static void encode_event(CompilationLog *log, CompilationEvent *ev) {
             pb_write_uint32(inner, PB_EVENT_BINDING_SYMBOL_ID, ev->binding.symbol_id);
             pb_write_string(inner, PB_EVENT_BINDING_DOCUMENTATION, ev->binding.documentation);
             pb_write_uint32(inner, PB_EVENT_BINDING_TYPE_ID, ev->binding.type_id);
+            for (u32 i = 0; i < ev->binding.param_count; i++) {
+                pb_write_uint32_always(inner, PB_EVENT_BINDING_PARAM_SYMBOL_IDS, ev->binding.param_symbol_ids[i]);
+            }
             pb_write_bytes(out, PB_COMPILER_EVENT_BINDING, inner->data, inner->length);
             break;
 
@@ -559,6 +564,7 @@ static u32 compilation_log_symbol_kind(AstNode *node) {
         case Ast_Kind_Enum_Type:           return SYMBOL_KIND_ENUM;
         case Ast_Kind_Distinct_Type:       return SYMBOL_KIND_DISTINCT;
         case Ast_Kind_Interface:           return SYMBOL_KIND_INTERFACE;
+        case Ast_Kind_Param:               return SYMBOL_KIND_PARAMETER;
         default:                           return SYMBOL_KIND_EXPRESSION;
     }
 }
@@ -655,17 +661,19 @@ static u32 compilation_log_emit_member_symbol(Context *context, Scope *scope, ch
     return compilation_log_emit_symbol_with_kind(context, scope, name, pos, node, SYMBOL_KIND_MEMBER, 1);
 }
 
+static b32 compilation_log_lookup_symbol_id(CompilationLog *log, AstNode *node, u32 *out);
+
 void compilation_log_emit_symbol_resolved(Context *context, AstNode *original, AstNode *resolved) {
     if (!original || !resolved || !original->token) return;
 
     CompilationLog *log = &context->compilation_log;
-    if (!log->node_to_symbol_id.hashes) return;
-    if (!bh_imap_has(&log->node_to_symbol_id, (u64) resolved)) return;
+    u32 symbol_id;
+    if (!compilation_log_lookup_symbol_id(log, resolved, &symbol_id)) return;
 
     CompilationEvent ev;
     memset(&ev, 0, sizeof(ev));
     ev.kind = COMPILATION_EVENT_SYMBOL_RESOLVED;
-    ev.resolved.symbol_id = (u32) bh_imap_get(&log->node_to_symbol_id, (u64) resolved);
+    ev.resolved.symbol_id = symbol_id;
     ev.resolved.file_id = compilation_log_file_id_for(context, original->token->pos.filename);
     ev.resolved.line = original->token->pos.line;
     ev.resolved.column = original->token->pos.column;
@@ -681,8 +689,6 @@ static u32 compilation_log_type_id_of_node(AstNode *node) {
 
     if (node_is_type(inner)) {
         AstType *t = (AstType *) inner;
-        if (t->type && t->type->id) return t->type->id;
-        if (t->type_id) return (u32) t->type_id;
 
         if (inner->kind == Ast_Kind_Struct_Type) {
             AstStructType *s = (AstStructType *) inner;
@@ -698,6 +704,14 @@ static u32 compilation_log_type_id_of_node(AstNode *node) {
         } else if (inner->kind == Ast_Kind_Distinct_Type) {
             AstDistinctType *d = (AstDistinctType *) inner;
             if (d->dtcache) return d->dtcache->id;
+        }
+
+        if (t->type_id) return (u32) t->type_id;
+
+        if (t->type && t->type->id) {
+            b32 is_type_expr = t->type->kind == Type_Kind_Basic
+                && t->type->Basic.kind == Basic_Kind_Type_Index;
+            if (!is_type_expr) return t->type->id;
         }
 
         return 0;
@@ -778,6 +792,24 @@ void compilation_log_emit_binding(Context *context, AstNode *node, AstBinding *b
     }
     bh_imap_put(&log->symbol_binding_type_id, (u64) symbol_id, (u64) type_id);
 
+    u32 param_count = 0;
+    u32 *param_symbol_ids = NULL;
+    AstNode *inner = strip_aliases(node);
+    if (inner && (inner->kind == Ast_Kind_Function || inner->kind == Ast_Kind_Polymorphic_Proc)) {
+        AstFunction *func = (AstFunction *) inner;
+        u32 n = (u32) bh_arr_length(func->params);
+        if (n > 0) {
+            param_symbol_ids = bh_alloc(context->gp_alloc, sizeof(u32) * n);
+            bh_arr_each(AstParam, param, func->params) {
+                u32 sid = 0;
+                if (param->local) {
+                    compilation_log_lookup_symbol_id(log, (AstNode *) param->local, &sid);
+                }
+                param_symbol_ids[param_count++] = sid;
+            }
+        }
+    }
+
     char *docs = "";
     if (binding) {
         if (binding->documentation_token_old && binding->documentation_token_old->text) {
@@ -797,6 +829,8 @@ void compilation_log_emit_binding(Context *context, AstNode *node, AstBinding *b
     ev.binding.symbol_id = symbol_id;
     ev.binding.documentation = docs;
     ev.binding.type_id = type_id;
+    ev.binding.param_count = param_count;
+    ev.binding.param_symbol_ids = param_symbol_ids;
     compilation_log_push(context, ev);
 }
 
@@ -911,12 +945,41 @@ void compilation_log_emit_type(Context *context, Type *type) {
     }
 
     compilation_log_push(context, ev);
+
+    if (type->kind != Type_Kind_Struct && type->kind != Type_Kind_Union) {
+        compilation_log_emit_type_body(context, type);
+    }
+}
+
+static Scope *compilation_log_type_method_scope(Type *type) {
+    if (!type) return NULL;
+
+    switch (type->kind) {
+        case Type_Kind_Struct:     return type->Struct.scope;
+        case Type_Kind_Union:      return type->Union.scope;
+        case Type_Kind_PolyStruct: return type->PolyStruct.scope;
+        case Type_Kind_PolyUnion:  return type->PolyUnion.scope;
+        case Type_Kind_Slice:      return type->Slice.scope;
+        case Type_Kind_DynArray:   return type->DynArray.scope;
+        case Type_Kind_Distinct:   return type->Distinct.scope;
+        case Type_Kind_Enum:
+            if (type->ast_type && type->ast_type->kind == Ast_Kind_Enum_Type) {
+                return ((AstEnumType *) type->ast_type)->scope;
+            }
+            return NULL;
+        case Type_Kind_Basic:
+            if (type->ast_type && type->ast_type->kind == Ast_Kind_Basic_Type) {
+                return ((AstBasicType *) type->ast_type)->scope;
+            }
+            return NULL;
+        default:
+            return NULL;
+    }
 }
 
 void compilation_log_emit_type_body(Context *context, Type *type) {
     if (!type) return;
     if (!context->compilation_log.events) return;
-    if (type->kind != Type_Kind_Struct && type->kind != Type_Kind_Union) return;
 
     CompilationEvent ev;
     memset(&ev, 0, sizeof(ev));
@@ -952,7 +1015,7 @@ void compilation_log_emit_type_body(Context *context, Type *type) {
                 }
             }
         }
-    } else {
+    } else if (type->kind == Type_Kind_Struct) {
         ev.type_body.size = type->Struct.size;
         ev.type_body.alignment = type->Struct.alignment;
         ev.type_body.scope_id = type->Struct.scope ? (u32) type->Struct.scope->id : 0;
@@ -980,6 +1043,13 @@ void compilation_log_emit_type_body(Context *context, Type *type) {
                 }
             }
         }
+    } else {
+        Scope *scope = compilation_log_type_method_scope(type);
+        if (!scope) return;
+
+        ev.type_body.size = type_size_of(type);
+        ev.type_body.alignment = type_alignment_of(type);
+        ev.type_body.scope_id = (u32) scope->id;
     }
 
     compilation_log_push(context, ev);

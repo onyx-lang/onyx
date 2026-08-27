@@ -51,6 +51,7 @@ SymbolInfo :: struct {
     use decl: EventSymbol
     documentation: str
     type_id: u32
+    param_symbol_ids: [..] u32
     use_sites: [..] EventSymbolResolved
 }
 
@@ -184,6 +185,9 @@ CompilationInfo.ingest_event :: (self: &#Self, event: &CompilerEvent) {
                 if prev != b.type_id {
                     ensure_id_list(&self.symbols_by_type, b.type_id)->push(b.symbol_id)
                 }
+            }
+            if b.param_symbol_ids.count > 0 {
+                slot.param_symbol_ids = b.param_symbol_ids
             }
         }
 

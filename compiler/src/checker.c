@@ -4717,6 +4717,8 @@ CHECK_FUNC(function_header, AstFunction* func) {
             return Check_Failed;
         }
 
+        compilation_log_notify_node_typed(context, (AstNode *) local);
+
         if (local->type->kind == Type_Kind_Compound) {
             ERROR(param->local->token->pos, "Compound types are not allowed as parameter types. Try splitting this into multiple parameters.");
         }
@@ -5025,6 +5027,9 @@ CHECK_FUNC(type, AstType** ptype) {
         case Ast_Kind_Type_Alias: {
             AstTypeAlias *type_alias = (AstTypeAlias *) type;
             CHECK(type, &type_alias->to);
+            if (type_build_from_ast(context, (AstType *) type_alias)) {
+                compilation_log_notify_node_typed(context, (AstNode *) type_alias);
+            }
             break;
         }
 
@@ -6222,7 +6227,8 @@ void check_entity(Context *context, Entity* ent) {
         case Check_Success:          ent->state = Entity_State_Code_Gen;        goto clear_attempts;
         case Check_Complete:         ent->state = Entity_State_Finalized;       goto clear_attempts;
         case Check_Goto_Parse:       ent->state = Entity_State_Parse;           goto clear_attempts;
-        case Check_Failed:           ent->state = Entity_State_Failed;          goto clear_attempts;
+        case Check_Failed:
+        case Check_Error:            ent->state = Entity_State_Failed;          goto clear_attempts;
 
     clear_attempts:
         ent->macro_attempts = 0;

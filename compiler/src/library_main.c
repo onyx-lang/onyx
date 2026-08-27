@@ -368,7 +368,7 @@ static b32 process_entity(Context *context, Entity* ent) {
 
                 ent->state = Entity_State_Finalized;
             } else {
-                ent->macro_attempts++;
+                ent->state = Entity_State_Failed;
             }
             break;
 
@@ -555,6 +555,12 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
             return pump_return(context, ONYX_PUMP_DONE);
         }
 
+        // Keep compilation events even when checking failed: remaining
+        // entities were already processed. Skip linking and report error.
+        if (onyx_has_errors(context)) {
+            return pump_return(context, ONYX_PUMP_ERRORED);
+        }
+
         if (maybe_all_code_checked_barrier(context)) {
             return pump_return(context, ONYX_PUMP_CONTINUE);
         }
@@ -568,6 +574,12 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
     }
 
     Entity* ent = entity_heap_top(&context->entities);
+
+    if (onyx_has_errors(context) && ent->state >= Entity_State_Code_Gen) {
+        entity_heap_remove_top(&context->entities);
+        ent->state = Entity_State_Finalized;
+        return pump_return(context, ONYX_PUMP_CONTINUE);
+    }
 
     if (!context->options.parse_only && ent->state >= Entity_State_Code_Gen) {
         if (maybe_all_code_checked_barrier(context)) {
@@ -627,8 +639,8 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
         context->cycle_almost_detected = 0;
     }
 
-    if (onyx_has_errors(context)) {
-        return pump_return(context, ONYX_PUMP_ERRORED);
+    if (ent->state == Entity_State_Error) {
+        ent->state = Entity_State_Failed;
     }
 
     if (ent->state != Entity_State_Finalized && ent->state != Entity_State_Failed)
