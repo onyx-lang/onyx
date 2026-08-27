@@ -176,10 +176,37 @@ EventType :: struct {
     enumeration: ? __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeEnum
 }
 
+BasicKind :: enum {
+    Unknown;
+    Void;
+    Bool;
+    Int_Unsized;
+    I8;
+    U8;
+    I16;
+    U16;
+    I32;
+    U32;
+    I64;
+    U64;
+    Float_Unsized;
+    F32;
+    F64;
+    Rawptr;
+    I8x16;
+    I16x8;
+    I32x4;
+    I64x2;
+    F32x4;
+    F64x2;
+    V128;
+    Type_Expr;
+}
+
 @protobuf.Message
 TypeBasic :: struct {
-    @protobuf.Field.{1, 13}
-    basic_kind: u32
+    @protobuf.Field.{1, 14}
+    basic_kind: BasicKind
     @protobuf.Field.{2, 13}
     size: u32
     @protobuf.Field.{3, 13}

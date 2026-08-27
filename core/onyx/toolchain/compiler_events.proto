@@ -149,9 +149,37 @@ message EventType {
 }
 
 message TypeBasic {
-  uint32 basic_kind = 1;
+  BasicKind basic_kind = 1;
   uint32 size = 2;
   uint32 alignment = 3;
+}
+
+// Coarse kind of a basic type. Compiler BasicKind numbers are not part of the protocol.
+enum BasicKind {
+  BASIC_KIND_UNKNOWN = 0;
+  BASIC_KIND_VOID = 1;
+  BASIC_KIND_BOOL = 2;
+  BASIC_KIND_INT_UNSIZED = 3;
+  BASIC_KIND_I8 = 4;
+  BASIC_KIND_U8 = 5;
+  BASIC_KIND_I16 = 6;
+  BASIC_KIND_U16 = 7;
+  BASIC_KIND_I32 = 8;
+  BASIC_KIND_U32 = 9;
+  BASIC_KIND_I64 = 10;
+  BASIC_KIND_U64 = 11;
+  BASIC_KIND_FLOAT_UNSIZED = 12;
+  BASIC_KIND_F32 = 13;
+  BASIC_KIND_F64 = 14;
+  BASIC_KIND_RAWPTR = 15;
+  BASIC_KIND_I8X16 = 16;
+  BASIC_KIND_I16X8 = 17;
+  BASIC_KIND_I32X4 = 18;
+  BASIC_KIND_I64X2 = 19;
+  BASIC_KIND_F32X4 = 20;
+  BASIC_KIND_F64X2 = 21;
+  BASIC_KIND_V128 = 22;
+  BASIC_KIND_TYPE_EXPR = 23;
 }
 
 message TypeElem {

@@ -261,8 +261,6 @@ main :: () {
     color_kind_ok := false;
     color_values_ok := false;
 
-    BASIC_KIND_I32 :: 7;
-
     for e in second.events {
         switch e.start {
             case .Some do delta_has_start = true;
@@ -315,7 +313,7 @@ main :: () {
                 if t.name == "i32" {
                     switch t.basic {
                         case .Some as basic {
-                            if basic.basic_kind == BASIC_KIND_I32 do delta_i32_has_basic = true;
+                            if basic.basic_kind == .I32 do delta_i32_has_basic = true;
                         }
                         case .None {}
                     }

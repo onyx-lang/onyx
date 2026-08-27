@@ -34,6 +34,31 @@
 #define PROTO_TYPE_KIND_UNION           14
 #define PROTO_TYPE_KIND_POLY_UNION      15
 
+#define PROTO_BASIC_KIND_UNKNOWN        0
+#define PROTO_BASIC_KIND_VOID           1
+#define PROTO_BASIC_KIND_BOOL           2
+#define PROTO_BASIC_KIND_INT_UNSIZED    3
+#define PROTO_BASIC_KIND_I8             4
+#define PROTO_BASIC_KIND_U8             5
+#define PROTO_BASIC_KIND_I16            6
+#define PROTO_BASIC_KIND_U16            7
+#define PROTO_BASIC_KIND_I32            8
+#define PROTO_BASIC_KIND_U32            9
+#define PROTO_BASIC_KIND_I64            10
+#define PROTO_BASIC_KIND_U64            11
+#define PROTO_BASIC_KIND_FLOAT_UNSIZED  12
+#define PROTO_BASIC_KIND_F32            13
+#define PROTO_BASIC_KIND_F64            14
+#define PROTO_BASIC_KIND_RAWPTR         15
+#define PROTO_BASIC_KIND_I8X16          16
+#define PROTO_BASIC_KIND_I16X8          17
+#define PROTO_BASIC_KIND_I32X4          18
+#define PROTO_BASIC_KIND_I64X2          19
+#define PROTO_BASIC_KIND_F32X4          20
+#define PROTO_BASIC_KIND_F64X2          21
+#define PROTO_BASIC_KIND_V128           22
+#define PROTO_BASIC_KIND_TYPE_EXPR      23
+
 // Field numbers from core/onyx/toolchain/compiler_events.proto
 #define PB_COMPILER_EVENTS_EVENTS 1
 
@@ -516,6 +541,35 @@ static u32 compilation_log_type_kind(TypeKind kind) {
     }
 }
 
+static u32 compilation_log_basic_kind(enum BasicKind kind) {
+    switch (kind) {
+        case Basic_Kind_Void:          return PROTO_BASIC_KIND_VOID;
+        case Basic_Kind_Bool:          return PROTO_BASIC_KIND_BOOL;
+        case Basic_Kind_Int_Unsized:   return PROTO_BASIC_KIND_INT_UNSIZED;
+        case Basic_Kind_I8:            return PROTO_BASIC_KIND_I8;
+        case Basic_Kind_U8:            return PROTO_BASIC_KIND_U8;
+        case Basic_Kind_I16:           return PROTO_BASIC_KIND_I16;
+        case Basic_Kind_U16:           return PROTO_BASIC_KIND_U16;
+        case Basic_Kind_I32:           return PROTO_BASIC_KIND_I32;
+        case Basic_Kind_U32:           return PROTO_BASIC_KIND_U32;
+        case Basic_Kind_I64:           return PROTO_BASIC_KIND_I64;
+        case Basic_Kind_U64:           return PROTO_BASIC_KIND_U64;
+        case Basic_Kind_Float_Unsized: return PROTO_BASIC_KIND_FLOAT_UNSIZED;
+        case Basic_Kind_F32:           return PROTO_BASIC_KIND_F32;
+        case Basic_Kind_F64:           return PROTO_BASIC_KIND_F64;
+        case Basic_Kind_Rawptr:        return PROTO_BASIC_KIND_RAWPTR;
+        case Basic_Kind_I8X16:         return PROTO_BASIC_KIND_I8X16;
+        case Basic_Kind_I16X8:         return PROTO_BASIC_KIND_I16X8;
+        case Basic_Kind_I32X4:         return PROTO_BASIC_KIND_I32X4;
+        case Basic_Kind_I64X2:         return PROTO_BASIC_KIND_I64X2;
+        case Basic_Kind_F32X4:         return PROTO_BASIC_KIND_F32X4;
+        case Basic_Kind_F64X2:         return PROTO_BASIC_KIND_F64X2;
+        case Basic_Kind_V128:          return PROTO_BASIC_KIND_V128;
+        case Basic_Kind_Type_Index:    return PROTO_BASIC_KIND_TYPE_EXPR;
+        default:                       return PROTO_BASIC_KIND_UNKNOWN;
+    }
+}
+
 static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope, char *name, OnyxFilePos pos, AstNode *node, u32 kind, b32 dedup) {
     if (!scope || !name || !*name) return 0;
     if (!strcmp(name, "_")) return 0;
@@ -720,7 +774,7 @@ void compilation_log_emit_type(Context *context, Type *type) {
 
     switch (type->kind) {
         case Type_Kind_Basic:
-            ev.type.body.basic.basic_kind = (u32) type->Basic.kind;
+            ev.type.body.basic.basic_kind = compilation_log_basic_kind(type->Basic.kind);
             ev.type.body.basic.size = type->Basic.size;
             ev.type.body.basic.alignment = type->Basic.alignment;
             break;
