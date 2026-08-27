@@ -2246,13 +2246,21 @@ typedef struct CompilationTypeMember {
     u32 type_id;
     u32 offset;
     u32 idx;
+    u32 symbol_id;
 } CompilationTypeMember;
 
 typedef struct CompilationTypeVariant {
     char *name;
     u32 type_id;
     u32 tag;
+    u32 symbol_id;
 } CompilationTypeVariant;
+
+typedef struct CompilationTypeEnumValue {
+    char *name;
+    i64 value;
+    u32 symbol_id;
+} CompilationTypeEnumValue;
 
 typedef struct CompilationEvent {
     CompilationEventKind kind;
@@ -2347,6 +2355,8 @@ typedef struct CompilationEvent {
                 struct {
                     u32 backing_id;
                     b32 is_flags;
+                    u32 value_count;
+                    CompilationTypeEnumValue *values;
                 } enumeration;
             } body;
         } type;

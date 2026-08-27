@@ -3,6 +3,37 @@
 
 #include <string.h>
 
+#define SYMBOL_KIND_UNKNOWN             0
+#define SYMBOL_KIND_PACKAGE             1
+#define SYMBOL_KIND_FUNCTION            2
+#define SYMBOL_KIND_OVERLOADED_FUNCTION 3
+#define SYMBOL_KIND_POLYMORPHIC_PROC    4
+#define SYMBOL_KIND_MACRO               5
+#define SYMBOL_KIND_STRUCT              6
+#define SYMBOL_KIND_UNION               7
+#define SYMBOL_KIND_ENUM                8
+#define SYMBOL_KIND_DISTINCT            9
+#define SYMBOL_KIND_INTERFACE           10
+#define SYMBOL_KIND_EXPRESSION          11
+#define SYMBOL_KIND_MEMBER              12
+
+#define PROTO_TYPE_KIND_UNKNOWN         0
+#define PROTO_TYPE_KIND_BASIC           1
+#define PROTO_TYPE_KIND_POINTER         2
+#define PROTO_TYPE_KIND_MULTI_POINTER   3
+#define PROTO_TYPE_KIND_FUNCTION        4
+#define PROTO_TYPE_KIND_STRUCT          5
+#define PROTO_TYPE_KIND_POLY_STRUCT     6
+#define PROTO_TYPE_KIND_COMPOUND        7
+#define PROTO_TYPE_KIND_ARRAY           8
+#define PROTO_TYPE_KIND_SLICE           9
+#define PROTO_TYPE_KIND_DYN_ARRAY       10
+#define PROTO_TYPE_KIND_VAR_ARGS        11
+#define PROTO_TYPE_KIND_ENUM            12
+#define PROTO_TYPE_KIND_DISTINCT        13
+#define PROTO_TYPE_KIND_UNION           14
+#define PROTO_TYPE_KIND_POLY_UNION      15
+
 // Field numbers from core/onyx/toolchain/compiler_events.proto
 #define PB_COMPILER_EVENTS_EVENTS 1
 
@@ -81,6 +112,10 @@
 
 #define PB_TYPE_ENUM_BACKING_ID 1
 #define PB_TYPE_ENUM_IS_FLAGS   2
+#define PB_TYPE_ENUM_VALUES     3
+#define PB_TYPE_ENUM_VALUE_NAME      1
+#define PB_TYPE_ENUM_VALUE_VALUE     2
+#define PB_TYPE_ENUM_VALUE_SYMBOL_ID 3
 
 #define PB_EVENT_TYPE_BODY_TYPE_ID    1
 #define PB_EVENT_TYPE_BODY_SIZE       2
@@ -90,16 +125,18 @@
 #define PB_EVENT_TYPE_BODY_UNION      11
 
 #define PB_TYPE_STRUCT_BODY_MEMBERS 1
-#define PB_TYPE_STRUCT_MEMBER_NAME    1
-#define PB_TYPE_STRUCT_MEMBER_TYPE_ID 2
-#define PB_TYPE_STRUCT_MEMBER_OFFSET  3
-#define PB_TYPE_STRUCT_MEMBER_IDX     4
+#define PB_TYPE_STRUCT_MEMBER_NAME      1
+#define PB_TYPE_STRUCT_MEMBER_TYPE_ID   2
+#define PB_TYPE_STRUCT_MEMBER_OFFSET    3
+#define PB_TYPE_STRUCT_MEMBER_IDX       4
+#define PB_TYPE_STRUCT_MEMBER_SYMBOL_ID 5
 
 #define PB_TYPE_UNION_BODY_TAG_TYPE_ID 1
 #define PB_TYPE_UNION_BODY_VARIANTS    2
-#define PB_TYPE_UNION_VARIANT_NAME     1
-#define PB_TYPE_UNION_VARIANT_TYPE_ID  2
-#define PB_TYPE_UNION_VARIANT_TAG      3
+#define PB_TYPE_UNION_VARIANT_NAME      1
+#define PB_TYPE_UNION_VARIANT_TYPE_ID   2
+#define PB_TYPE_UNION_VARIANT_TAG       3
+#define PB_TYPE_UNION_VARIANT_SYMBOL_ID 4
 
 static b32 compilation_event_is_detailed(CompilationEventKind kind) {
     return kind == COMPILATION_EVENT_SYMBOL_RESOLVED
@@ -185,30 +222,30 @@ static void encode_event(CompilationEvent *ev, bh_buffer *out) {
             bh_buffer body;
             bh_buffer_init(&body, out->allocator, 32);
 
-            switch ((TypeKind) ev->type.kind) {
-                case Type_Kind_Basic:
+            switch (ev->type.kind) {
+                case PROTO_TYPE_KIND_BASIC:
                     pb_write_uint32(&body, PB_TYPE_BASIC_KIND, ev->type.body.basic.basic_kind);
                     pb_write_uint32(&body, PB_TYPE_BASIC_SIZE, ev->type.body.basic.size);
                     pb_write_uint32(&body, PB_TYPE_BASIC_ALIGNMENT, ev->type.body.basic.alignment);
                     pb_write_bytes(&inner, PB_EVENT_TYPE_BASIC, body.data, body.length);
                     break;
 
-                case Type_Kind_Pointer:
-                case Type_Kind_MultiPointer:
-                case Type_Kind_Slice:
-                case Type_Kind_DynArray:
-                case Type_Kind_VarArgs:
+                case PROTO_TYPE_KIND_POINTER:
+                case PROTO_TYPE_KIND_MULTI_POINTER:
+                case PROTO_TYPE_KIND_SLICE:
+                case PROTO_TYPE_KIND_DYN_ARRAY:
+                case PROTO_TYPE_KIND_VAR_ARGS:
                     pb_write_uint32(&body, PB_TYPE_ELEM_ELEM_ID, ev->type.body.elem.elem_id);
                     pb_write_bytes(&inner, PB_EVENT_TYPE_ELEM, body.data, body.length);
                     break;
 
-                case Type_Kind_Array:
+                case PROTO_TYPE_KIND_ARRAY:
                     pb_write_uint32(&body, PB_TYPE_ARRAY_ELEM_ID, ev->type.body.array.elem_id);
                     pb_write_uint32(&body, PB_TYPE_ARRAY_COUNT, ev->type.body.array.count);
                     pb_write_bytes(&inner, PB_EVENT_TYPE_ARRAY, body.data, body.length);
                     break;
 
-                case Type_Kind_Function:
+                case PROTO_TYPE_KIND_FUNCTION:
                     pb_write_uint32(&body, PB_TYPE_FUNCTION_RETURN_ID, ev->type.body.function.return_id);
                     for (u32 i = 0; i < ev->type.body.function.param_count; i++) {
                         pb_write_uint32_always(&body, PB_TYPE_FUNCTION_PARAM_IDS, ev->type.body.function.param_ids[i]);
@@ -216,22 +253,32 @@ static void encode_event(CompilationEvent *ev, bh_buffer *out) {
                     pb_write_bytes(&inner, PB_EVENT_TYPE_FUNCTION, body.data, body.length);
                     break;
 
-                case Type_Kind_Compound:
+                case PROTO_TYPE_KIND_COMPOUND:
                     for (u32 i = 0; i < ev->type.body.compound.count; i++) {
                         pb_write_uint32_always(&body, PB_TYPE_COMPOUND_TYPE_IDS, ev->type.body.compound.type_ids[i]);
                     }
                     pb_write_bytes(&inner, PB_EVENT_TYPE_COMPOUND, body.data, body.length);
                     break;
 
-                case Type_Kind_Distinct:
+                case PROTO_TYPE_KIND_DISTINCT:
                     pb_write_uint32(&body, PB_TYPE_DISTINCT_BASE_ID, ev->type.body.distinct.base_id);
                     pb_write_bytes(&inner, PB_EVENT_TYPE_DISTINCT, body.data, body.length);
                     break;
 
-                case Type_Kind_Enum:
+                case PROTO_TYPE_KIND_ENUM:
                     pb_write_uint32(&body, PB_TYPE_ENUM_BACKING_ID, ev->type.body.enumeration.backing_id);
                     if (ev->type.body.enumeration.is_flags) {
                         pb_write_uint32_always(&body, PB_TYPE_ENUM_IS_FLAGS, 1);
+                    }
+                    for (u32 i = 0; i < ev->type.body.enumeration.value_count; i++) {
+                        CompilationTypeEnumValue *v = &ev->type.body.enumeration.values[i];
+                        bh_buffer val;
+                        bh_buffer_init(&val, out->allocator, 32);
+                        pb_write_string(&val, PB_TYPE_ENUM_VALUE_NAME, v->name);
+                        pb_write_int64_always(&val, PB_TYPE_ENUM_VALUE_VALUE, v->value);
+                        pb_write_uint32(&val, PB_TYPE_ENUM_VALUE_SYMBOL_ID, v->symbol_id);
+                        pb_write_bytes(&body, PB_TYPE_ENUM_VALUES, val.data, val.length);
+                        bh_buffer_free(&val);
                     }
                     pb_write_bytes(&inner, PB_EVENT_TYPE_ENUMERATION, body.data, body.length);
                     break;
@@ -263,6 +310,7 @@ static void encode_event(CompilationEvent *ev, bh_buffer *out) {
                     pb_write_string(&var, PB_TYPE_UNION_VARIANT_NAME, v->name);
                     pb_write_uint32(&var, PB_TYPE_UNION_VARIANT_TYPE_ID, v->type_id);
                     pb_write_uint32_always(&var, PB_TYPE_UNION_VARIANT_TAG, v->tag);
+                    pb_write_uint32(&var, PB_TYPE_UNION_VARIANT_SYMBOL_ID, v->symbol_id);
                     pb_write_bytes(&details, PB_TYPE_UNION_BODY_VARIANTS, var.data, var.length);
                     bh_buffer_free(&var);
                 }
@@ -276,6 +324,7 @@ static void encode_event(CompilationEvent *ev, bh_buffer *out) {
                     pb_write_uint32(&mem, PB_TYPE_STRUCT_MEMBER_TYPE_ID, m->type_id);
                     pb_write_uint32_always(&mem, PB_TYPE_STRUCT_MEMBER_OFFSET, m->offset);
                     pb_write_uint32_always(&mem, PB_TYPE_STRUCT_MEMBER_IDX, m->idx);
+                    pb_write_uint32(&mem, PB_TYPE_STRUCT_MEMBER_SYMBOL_ID, m->symbol_id);
                     pb_write_bytes(&details, PB_TYPE_STRUCT_BODY_MEMBERS, mem.data, mem.length);
                     bh_buffer_free(&mem);
                 }
@@ -422,23 +471,72 @@ void compilation_log_emit_scope(Context *context, Scope *scope) {
     compilation_log_push(context, ev);
 }
 
-void compilation_log_emit_symbol(Context *context, Scope *scope, char *name, OnyxFilePos pos, AstNode *node) {
-    if (!scope || !name || !*name) return;
-    if (!strcmp(name, "_")) return;
+static u32 compilation_log_symbol_kind(AstNode *node) {
+    if (!node) return SYMBOL_KIND_UNKNOWN;
+
+    node = strip_aliases(node);
+    if (!node) return SYMBOL_KIND_UNKNOWN;
+
+    switch (node->kind) {
+        case Ast_Kind_Package:             return SYMBOL_KIND_PACKAGE;
+        case Ast_Kind_Function:            return SYMBOL_KIND_FUNCTION;
+        case Ast_Kind_Overloaded_Function: return SYMBOL_KIND_OVERLOADED_FUNCTION;
+        case Ast_Kind_Polymorphic_Proc:    return SYMBOL_KIND_POLYMORPHIC_PROC;
+        case Ast_Kind_Macro:
+        case Ast_Kind_Procedural_Macro:    return SYMBOL_KIND_MACRO;
+        case Ast_Kind_Struct_Type:
+        case Ast_Kind_Poly_Struct_Type:    return SYMBOL_KIND_STRUCT;
+        case Ast_Kind_Union_Type:
+        case Ast_Kind_Poly_Union_Type:     return SYMBOL_KIND_UNION;
+        case Ast_Kind_Enum_Type:           return SYMBOL_KIND_ENUM;
+        case Ast_Kind_Distinct_Type:       return SYMBOL_KIND_DISTINCT;
+        case Ast_Kind_Interface:           return SYMBOL_KIND_INTERFACE;
+        default:                           return SYMBOL_KIND_EXPRESSION;
+    }
+}
+
+static u32 compilation_log_type_kind(TypeKind kind) {
+    switch (kind) {
+        case Type_Kind_Basic:        return PROTO_TYPE_KIND_BASIC;
+        case Type_Kind_Pointer:      return PROTO_TYPE_KIND_POINTER;
+        case Type_Kind_MultiPointer: return PROTO_TYPE_KIND_MULTI_POINTER;
+        case Type_Kind_Function:     return PROTO_TYPE_KIND_FUNCTION;
+        case Type_Kind_Struct:       return PROTO_TYPE_KIND_STRUCT;
+        case Type_Kind_PolyStruct:   return PROTO_TYPE_KIND_POLY_STRUCT;
+        case Type_Kind_Compound:     return PROTO_TYPE_KIND_COMPOUND;
+        case Type_Kind_Array:        return PROTO_TYPE_KIND_ARRAY;
+        case Type_Kind_Slice:        return PROTO_TYPE_KIND_SLICE;
+        case Type_Kind_DynArray:     return PROTO_TYPE_KIND_DYN_ARRAY;
+        case Type_Kind_VarArgs:      return PROTO_TYPE_KIND_VAR_ARGS;
+        case Type_Kind_Enum:         return PROTO_TYPE_KIND_ENUM;
+        case Type_Kind_Distinct:     return PROTO_TYPE_KIND_DISTINCT;
+        case Type_Kind_Union:        return PROTO_TYPE_KIND_UNION;
+        case Type_Kind_PolyUnion:    return PROTO_TYPE_KIND_POLY_UNION;
+        default:                     return PROTO_TYPE_KIND_UNKNOWN;
+    }
+}
+
+static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope, char *name, OnyxFilePos pos, AstNode *node, u32 kind, b32 dedup) {
+    if (!scope || !name || !*name) return 0;
+    if (!strcmp(name, "_")) return 0;
+
+    CompilationLog *log = &context->compilation_log;
+    if (dedup && node && log->node_to_symbol_id.hashes && bh_imap_has(&log->node_to_symbol_id, (u64) node)) {
+        return (u32) bh_imap_get(&log->node_to_symbol_id, (u64) node);
+    }
 
     CompilationEvent ev;
     memset(&ev, 0, sizeof(ev));
     ev.kind = COMPILATION_EVENT_SYMBOL;
-    ev.symbol.id = ++context->compilation_log.next_symbol_id;
+    ev.symbol.id = ++log->next_symbol_id;
     ev.symbol.scope_id = (u32)scope->id;
     ev.symbol.name = bh_strdup(context->gp_alloc, name);
     ev.symbol.file_id = compilation_log_file_id_for(context, pos.filename);
     ev.symbol.line = pos.line;
     ev.symbol.column = pos.column;
-    ev.symbol.kind = node ? (u32)node->kind : 0;
+    ev.symbol.kind = kind;
 
     if (node) {
-        CompilationLog *log = &context->compilation_log;
         bh_imap_put(&log->node_to_symbol_id, (u64) node, ev.symbol.id);
         AstNode *inner = strip_aliases(node);
         if (inner && inner != node) {
@@ -447,6 +545,15 @@ void compilation_log_emit_symbol(Context *context, Scope *scope, char *name, Ony
     }
 
     compilation_log_push(context, ev);
+    return ev.symbol.id;
+}
+
+void compilation_log_emit_symbol(Context *context, Scope *scope, char *name, OnyxFilePos pos, AstNode *node) {
+    compilation_log_emit_symbol_with_kind(context, scope, name, pos, node, compilation_log_symbol_kind(node), 0);
+}
+
+static u32 compilation_log_emit_member_symbol(Context *context, Scope *scope, char *name, OnyxFilePos pos, AstNode *node) {
+    return compilation_log_emit_symbol_with_kind(context, scope, name, pos, node, SYMBOL_KIND_MEMBER, 1);
 }
 
 void compilation_log_emit_symbol_resolved(Context *context, AstNode *original, AstNode *resolved) {
@@ -608,7 +715,7 @@ void compilation_log_emit_type(Context *context, Type *type) {
     memset(&ev, 0, sizeof(ev));
     ev.kind = COMPILATION_EVENT_TYPE;
     ev.type.id = type->id;
-    ev.type.kind = (u32) type->kind;
+    ev.type.kind = compilation_log_type_kind(type->kind);
     ev.type.name = bh_strdup(context->gp_alloc, (char *)(name ? name : ""));
 
     switch (type->kind) {
@@ -675,6 +782,31 @@ void compilation_log_emit_type(Context *context, Type *type) {
         case Type_Kind_Enum:
             ev.type.body.enumeration.backing_id = type->Enum.backing ? type->Enum.backing->id : 0;
             ev.type.body.enumeration.is_flags = type->Enum.is_flags;
+            if (type->ast_type && type->ast_type->kind == Ast_Kind_Enum_Type) {
+                AstEnumType *en = (AstEnumType *) type->ast_type;
+                u32 n = 0;
+                bh_arr_each(AstEnumValue *, pvalue, en->values) {
+                    if ((*pvalue)->flags & Ast_Flag_Has_Been_Checked) n++;
+                }
+
+                ev.type.body.enumeration.value_count = n;
+                if (n > 0) {
+                    ev.type.body.enumeration.values = bh_alloc(context->gp_alloc, sizeof(CompilationTypeEnumValue) * n);
+                    u32 i = 0;
+                    bh_arr_each(AstEnumValue *, pvalue, en->values) {
+                        AstEnumValue *value = *pvalue;
+                        if (!(value->flags & Ast_Flag_Has_Been_Checked)) continue;
+
+                        CompilationTypeEnumValue *out = &ev.type.body.enumeration.values[i++];
+                        out->name = value->token
+                            ? bh_strdup_len(context->gp_alloc, value->token->text, value->token->length)
+                            : "";
+                        out->value = value->value ? get_expression_integer_value(context, value->value, NULL) : 0;
+                        out->symbol_id = 0;
+                        compilation_log_lookup_symbol_id(&context->compilation_log, (AstNode *) value, &out->symbol_id);
+                    }
+                }
+            }
             break;
 
         default:
@@ -710,6 +842,17 @@ void compilation_log_emit_type_body(Context *context, Type *type) {
                 ev.type_body.variants[i].name = bh_strdup(context->gp_alloc, uv && uv->name ? uv->name : "");
                 ev.type_body.variants[i].type_id = uv && uv->type ? uv->type->id : 0;
                 ev.type_body.variants[i].tag = uv ? uv->tag_value : 0;
+                ev.type_body.variants[i].symbol_id = 0;
+                if (uv && uv->variant_node && type->Union.scope) {
+                    OnyxFilePos pos = uv->token ? uv->token->pos : (OnyxFilePos){0};
+                    ev.type_body.variants[i].symbol_id = compilation_log_emit_member_symbol(
+                        context,
+                        type->Union.scope,
+                        uv->name,
+                        pos,
+                        (AstNode *) uv->variant_node
+                    );
+                }
             }
         }
     } else {
@@ -727,6 +870,17 @@ void compilation_log_emit_type_body(Context *context, Type *type) {
                 ev.type_body.members[i].type_id = smem && smem->type ? smem->type->id : 0;
                 ev.type_body.members[i].offset = smem ? smem->offset : 0;
                 ev.type_body.members[i].idx = smem ? smem->idx : 0;
+                ev.type_body.members[i].symbol_id = 0;
+                if (smem && smem->member_node && type->Struct.scope) {
+                    OnyxFilePos pos = smem->token ? smem->token->pos : (OnyxFilePos){0};
+                    ev.type_body.members[i].symbol_id = compilation_log_emit_member_symbol(
+                        context,
+                        type->Struct.scope,
+                        smem->name,
+                        pos,
+                        (AstNode *) smem->member_node
+                    );
+                }
             }
         }
     }

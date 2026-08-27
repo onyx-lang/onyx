@@ -75,6 +75,22 @@ EventScope :: struct {
     name: str
 }
 
+SymbolKind :: enum {
+    Unknown;
+    Package;
+    Function;
+    Overloaded_Function;
+    Polymorphic_Proc;
+    Macro;
+    Struct;
+    Union;
+    Enum;
+    Distinct;
+    Interface;
+    Expression;
+    Member;
+}
+
 @protobuf.Message
 EventSymbol :: struct {
     @protobuf.Field.{1, 13}
@@ -89,8 +105,8 @@ EventSymbol :: struct {
     line: u32
     @protobuf.Field.{6, 13}
     column: u32
-    @protobuf.Field.{7, 13}
-    kind: u32
+    @protobuf.Field.{7, 14}
+    kind: SymbolKind
 }
 
 @protobuf.Message
@@ -117,12 +133,31 @@ EventBinding :: struct {
     type_id: u32
 }
 
+TypeKind :: enum {
+    Unknown;
+    Basic;
+    Pointer;
+    Multi_Pointer;
+    Function;
+    Struct;
+    Poly_Struct;
+    Compound;
+    Array;
+    Slice;
+    Dyn_Array;
+    Var_Args;
+    Enum;
+    Distinct;
+    Union;
+    Poly_Union;
+}
+
 @protobuf.Message
 EventType :: struct {
     @protobuf.Field.{1, 13}
     id: u32
-    @protobuf.Field.{2, 13}
-    kind: u32
+    @protobuf.Field.{2, 14}
+    kind: TypeKind
     @protobuf.Field.{3, 9}
     name: str
     @protobuf.Field.{10, 11}
@@ -186,11 +221,23 @@ TypeDistinct :: struct {
 }
 
 @protobuf.Message
+TypeEnumValue :: struct {
+    @protobuf.Field.{1, 9}
+    name: str
+    @protobuf.Field.{2, 3}
+    value: i64
+    @protobuf.Field.{3, 13}
+    symbol_id: u32
+}
+
+@protobuf.Message
 TypeEnum :: struct {
     @protobuf.Field.{1, 13}
     backing_id: u32
     @protobuf.Field.{2, 8}
     is_flags: bool
+    @protobuf.Field.{3, 11}
+    values: [..] __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeEnumValue
 }
 
 @protobuf.Message
@@ -219,6 +266,8 @@ TypeStructMember :: struct {
     offset: u32
     @protobuf.Field.{4, 13}
     idx: u32
+    @protobuf.Field.{5, 13}
+    symbol_id: u32
 }
 
 @protobuf.Message
@@ -235,6 +284,8 @@ TypeUnionVariant :: struct {
     type_id: u32
     @protobuf.Field.{3, 13}
     tag: u32
+    @protobuf.Field.{4, 13}
+    symbol_id: u32
 }
 
 @protobuf.Message

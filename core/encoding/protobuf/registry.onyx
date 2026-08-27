@@ -31,7 +31,7 @@ lookup_protobuf_descriptor :: (type: type_expr) -> ? Proto_Message_Descriptor {
 
         type_info := member.type->info()
         switch type_info.kind {
-            case .Basic {
+            case .Basic, .Enum {
                 fields[index].field_size = type_info.size
                 fields[index].field_type = member.type
             }

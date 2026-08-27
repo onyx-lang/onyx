@@ -109,6 +109,7 @@ typedef struct UnionVariant {
     u32 tag_value;
     bh_arr(struct AstTyped *) meta_tags;
     struct OnyxToken *token;
+    struct AstUnionVariant *variant_node;
 } UnionVariant;
 
 #define TYPE_KINDS \

@@ -2744,6 +2744,9 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
                 if (!field->type) YIELD(field->token->pos, "Waiting for field access type to be constructed.");
 
                 field->flags |= Ast_Flag_Has_Been_Checked;
+                if (uv->variant_node) {
+                    track_resolution_for_symbol_info(context, (AstNode *) field, (AstNode *) uv->variant_node);
+                }
                 return Check_Success;
             }
         }
@@ -4304,6 +4307,10 @@ CHECK_FUNC(enum, AstEnumType* enum_node) {
     // However, during the symbol resolution of the values in an enum, they need to be able to see the
     // enclosing scope.
     enum_node->scope->parent = NULL;
+
+    if (enum_node->etcache) {
+        compilation_log_emit_type(context, enum_node->etcache);
+    }
 
     return Check_Success;
 }

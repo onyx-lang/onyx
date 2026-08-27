@@ -811,6 +811,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
                 uv->token = variant->token;
                 uv->meta_tags = variant->meta_tags;
                 uv->type = variant->type;
+                uv->variant_node = variant;
 
                 if (variant->explicit_tag_value) {
                     b32 success;

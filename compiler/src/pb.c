@@ -22,6 +22,11 @@ void pb_write_uint32_always(bh_buffer *buf, u32 field, u32 v) {
     pb_write_varint(buf, v);
 }
 
+void pb_write_int64_always(bh_buffer *buf, u32 field, i64 v) {
+    pb_write_tag(buf, field, PB_WIRE_VARINT);
+    pb_write_varint(buf, (u64) v);
+}
+
 void pb_write_uint64(bh_buffer *buf, u32 field, u64 v) {
     if (v == 0) return;
     pb_write_tag(buf, field, PB_WIRE_VARINT);

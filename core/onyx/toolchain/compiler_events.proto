@@ -69,6 +69,23 @@ message EventScope {
   string name = 6;
 }
 
+// Coarse kind of a declared symbol. Compiler AST details are not part of the protocol.
+enum SymbolKind {
+  SYMBOL_KIND_UNKNOWN = 0;
+  SYMBOL_KIND_PACKAGE = 1;
+  SYMBOL_KIND_FUNCTION = 2;
+  SYMBOL_KIND_OVERLOADED_FUNCTION = 3;
+  SYMBOL_KIND_POLYMORPHIC_PROC = 4;
+  SYMBOL_KIND_MACRO = 5;
+  SYMBOL_KIND_STRUCT = 6;
+  SYMBOL_KIND_UNION = 7;
+  SYMBOL_KIND_ENUM = 8;
+  SYMBOL_KIND_DISTINCT = 9;
+  SYMBOL_KIND_INTERFACE = 10;
+  SYMBOL_KIND_EXPRESSION = 11;
+  SYMBOL_KIND_MEMBER = 12;
+}
+
 message EventSymbol {
   uint32 id = 1;
   uint32 scope_id = 2;
@@ -76,7 +93,7 @@ message EventSymbol {
   uint32 file_id = 4;
   uint32 line = 5;
   uint32 column = 6;
-  uint32 kind = 7;
+  SymbolKind kind = 7;
 }
 
 message EventSymbolResolved {
@@ -93,12 +110,33 @@ message EventBinding {
   uint32 type_id = 3;
 }
 
+// Coarse kind of a type. Compiler TypeKind numbers are not part of the protocol.
+enum TypeKind {
+  TYPE_KIND_UNKNOWN = 0;
+  TYPE_KIND_BASIC = 1;
+  TYPE_KIND_POINTER = 2;
+  TYPE_KIND_MULTI_POINTER = 3;
+  TYPE_KIND_FUNCTION = 4;
+  TYPE_KIND_STRUCT = 5;
+  TYPE_KIND_POLY_STRUCT = 6;
+  TYPE_KIND_COMPOUND = 7;
+  TYPE_KIND_ARRAY = 8;
+  TYPE_KIND_SLICE = 9;
+  TYPE_KIND_DYN_ARRAY = 10;
+  TYPE_KIND_VAR_ARGS = 11;
+  TYPE_KIND_ENUM = 12;
+  TYPE_KIND_DISTINCT = 13;
+  TYPE_KIND_UNION = 14;
+  TYPE_KIND_POLY_UNION = 15;
+}
+
 message EventType {
   uint32 id = 1;
-  uint32 kind = 2;
+  TypeKind kind = 2;
   string name = 3;
 
   // Known at type creation. Struct/union member lists come later.
+  // Enum values are filled in a later EventType for the same id once the enum is checked.
   oneof body {
     TypeBasic basic = 10;
     TypeElem elem = 11;           // pointer, multi-pointer, slice, dynarray, varargs
@@ -138,9 +176,16 @@ message TypeDistinct {
   uint32 base_id = 1;
 }
 
+message TypeEnumValue {
+  string name = 1;
+  int64 value = 2;
+  uint32 symbol_id = 3;
+}
+
 message TypeEnum {
   uint32 backing_id = 1;
   bool is_flags = 2;
+  repeated TypeEnumValue values = 3;
 }
 
 message EventTypeBody {
@@ -160,6 +205,7 @@ message TypeStructMember {
   uint32 type_id = 2;
   uint32 offset = 3;
   uint32 idx = 4;
+  uint32 symbol_id = 5;
 }
 
 message TypeStructBody {
@@ -170,6 +216,7 @@ message TypeUnionVariant {
   string name = 1;
   uint32 type_id = 2;
   uint32 tag = 3;
+  uint32 symbol_id = 4;
 }
 
 message TypeUnionBody {
