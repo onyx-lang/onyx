@@ -77,10 +77,12 @@ package_all() {
 compress_all() {
     package_all
 
-    # Sign the binaries on MacOS
+    # Sign the binaries on MacOS. Linker-signed dylibs get SIGKILL'd on
+    # load (AMFI) unless they are ad-hoc signed like the onyx executable.
     [ "$(uname)" = 'Darwin' ] && \
         codesign -s - "$DIST_DIR/bin/onyx" && \
         codesign -s - "$DIST_DIR/lib/libonyx.dylib" && \
+        codesign -s - "$DIST_DIR/lib/onyx_autocompiler.dylib" && \
         [ -f "$DIST_DIR/lib/onyx_runtime.dylib" ] && \
             codesign -s - "$DIST_DIR/lib/onyx_runtime.dylib"
 
@@ -98,9 +100,13 @@ install_all() {
     mkdir -p "$ONYX_INSTALL_DIR"
     cp -r "$DIST_DIR/." "$ONYX_INSTALL_DIR"
 
-    # Sign the binaries on MacOS
+    # Sign the binaries on MacOS. install copies unsigned/linker-signed
+    # dylibs from package_all; without this, dlopen of libonyx /
+    # onyx_autocompiler is SIGKILL'd by AMFI (onyx lsp, Builder, etc.).
     [ "$(uname)" = 'Darwin' ] && \
         codesign -s - "$ONYX_INSTALL_DIR/bin/onyx" && \
+        codesign -s - "$ONYX_INSTALL_DIR/lib/libonyx.dylib" && \
+        codesign -s - "$ONYX_INSTALL_DIR/lib/onyx_autocompiler.dylib" && \
         [ -f "$ONYX_INSTALL_DIR/lib/onyx_runtime.dylib" ] && \
             codesign -s - "$ONYX_INSTALL_DIR/lib/onyx_runtime.dylib"
 }

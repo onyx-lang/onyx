@@ -8,6 +8,7 @@ void onyx_errors_init(Context *context, bh_arr(bh_file_contents)* files) {
     context->errors.msg_alloc = bh_arena_allocator(&context->errors.msg_arena);
 
     bh_arr_new(context->gp_alloc, context->errors.errors, 4);
+    context->errors_enabled = 1;
 }
 
 static i32 errors_sort(const void* v1, const void* v2) {

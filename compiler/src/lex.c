@@ -3,6 +3,12 @@
 #include "utils.h"
 #include "errors.h"
 
+#if defined(_MSC_VER)
+    #define ONYX_THREAD_LOCAL __declspec(thread)
+#else
+    #define ONYX_THREAD_LOCAL __thread
+#endif
+
 static const char* token_type_names[] = {
     "UNKNOWN",
     "the end of file",
@@ -129,7 +135,7 @@ static inline b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, 
 }
 
 const char *token_type_name(TokenType tkn_type) {
-    static char hack_tmp_buffer[32];
+    static ONYX_THREAD_LOCAL char hack_tmp_buffer[32];
     if (tkn_type < Token_Type_Ascii_End) {
         bh_snprintf(hack_tmp_buffer, 31, "%c", (char) tkn_type);
         return hack_tmp_buffer;
@@ -142,7 +148,7 @@ const char* token_name(OnyxToken * tkn) {
     TokenType tkn_type = tkn->type;
 
     if (tkn_type == Token_Type_Symbol) {
-        static char hack_tmp_buffer[512];
+        static ONYX_THREAD_LOCAL char hack_tmp_buffer[512];
         bh_snprintf(hack_tmp_buffer, 511, "%b", tkn->text, tkn->length);
         return hack_tmp_buffer;
     }
@@ -151,7 +157,7 @@ const char* token_name(OnyxToken * tkn) {
 }
 
 void token_toggle_end(OnyxToken* tkn) {
-    static char backup = 0;
+    static ONYX_THREAD_LOCAL char backup = 0;
     char tmp = tkn->text[tkn->length];
     assert(backup == '\0' || tmp == '\0'); // Sanity check
     tkn->text[tkn->length] = backup;

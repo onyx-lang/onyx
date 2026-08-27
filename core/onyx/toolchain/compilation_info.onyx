@@ -454,10 +454,30 @@ by_id :: (arr: &[..] $T, id: u32) -> ? &T {
 }
 
 ensure_id :: (arr: &[..] $T, id: u32) -> &T {
+    // Dense id tables; a corrupt/huge id would try to allocate gigabytes
+    // and crash the WASM runtime (signed memory.fill past 2GiB).
+    if id == 0 || id > 2_000_000 {
+        if arr.count == 0 {
+            Array.ensure_capacity(arr, 1)
+            memory.set(arr.data, 0, sizeof T)
+            arr.count = 1
+        }
+        return &arr.data[0]
+    }
     i := cast(i32) id
     needed := i + 1
     if arr.count < needed {
+        old := arr.count
         Array.ensure_capacity(arr, cast(u32) needed)
+        // make() / spare capacity is uninitialized. Growing zeros the new
+        // backing tail, but bumping count into existing spare does not.
+        // Nested array headers (symbol_ids, symbols_by_file) must be zero
+        // or the next push uses a garbage data pointer and traps.
+        memory.set(
+            memory.ptr_add(arr.data, sizeof T * old),
+            0,
+            sizeof T * (needed - old)
+        )
         arr.count = needed
     }
     return &arr.data[i]
@@ -468,13 +488,13 @@ ensure_id_list :: (arr: &[..] [..] u32, id: u32) -> &[..] u32 {
 }
 
 index_unique :: (map: &Map(str, u32), name: str, id: u32) {
-    if name.count == 0 do return
+    if name.count == 0 || name.count > 1 << 16 do return
     if map->has(name) do return
     map->put(name, id)
 }
 
 index_list :: (map: &Map(str, [..] u32), name: str, id: u32) {
-    if name.count == 0 do return
+    if name.count == 0 || name.count > 1 << 16 do return
     map->get_ptr_or_create(name)->push(id)
 }
 

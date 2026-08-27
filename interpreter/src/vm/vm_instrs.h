@@ -267,17 +267,32 @@ OVMI_INSTR_EXEC(copy) {
 
     if (!dest || !src) OVMI_EXCEPTION_HOOK;
 
+    if ((u64) dest + count > (u64) state->engine->memory_size
+        || (u64) src + count > (u64) state->engine->memory_size) {
+        OVMI_EXCEPTION_HOOK;
+        ovm_value_t bad_val;
+        bad_val.type = OVM_TYPE_ERR;
+        return bad_val;
+    }
+
     memmove(&memory[dest], &memory[src], count);
 
     NEXT_OP;
 }
 
 OVMI_INSTR_EXEC(fill) {
-    i32 dest  = VAL(instr->r).i32;
+    u32 dest  = VAL(instr->r).u32;
     u8  byte  = VAL(instr->a).u8;
-    i32 count = VAL(instr->b).i32;
+    u32 count = VAL(instr->b).u32;
 
     if (!dest) OVMI_EXCEPTION_HOOK;
+
+    if ((u64) dest + count > (u64) state->engine->memory_size) {
+        OVMI_EXCEPTION_HOOK;
+        ovm_value_t bad_val;
+        bad_val.type = OVM_TYPE_ERR;
+        return bad_val;
+    }
 
     memset(&memory[dest], byte, count);
 
@@ -527,9 +542,11 @@ OVMI_INSTR_EXEC(mem_grow) {
     VAL(instr->r).type = OVM_TYPE_I32;
     VAL(instr->r).u32 = (u32) (state->engine->memory_size / 65536);
 
-    if (!ovm_engine_memory_ensure_capacity(state->engine,
-            state->engine->memory_size + VAL(instr->a).u32 * 65536)) {
+    i64 new_size = state->engine->memory_size + (i64) VAL(instr->a).u32 * 65536;
+    if (!ovm_engine_memory_ensure_capacity(state->engine, new_size)) {
         VAL(instr->r).i32 = -1;
+    } else {
+        state->engine->memory_size = new_size;
     }
 
     memory = state->engine->memory;

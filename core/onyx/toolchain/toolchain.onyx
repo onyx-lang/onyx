@@ -47,6 +47,10 @@ Builder.inject_source :: (use self: &#Self, source: str) {
     native.onyx_inject_code(ctx, source)
 }
 
+Builder.inject_source_as :: (use self: &#Self, filename: str, source: str) {
+    native.onyx_inject_code_as(ctx, filename, source)
+}
+
 Builder.set_platform :: (use self: &#Self, platform: native.onyx_platform_t) {
     native.onyx_set_option_int(ctx, .PLATFORM, ~~platform)
 }
@@ -64,6 +68,12 @@ Builder.pump :: (use self: &#Self) -> bool {
 }
 
 Builder.compile :: (use self: &#Self) {
+    while native.onyx_pump(ctx) == .CONTINUE {}
+}
+
+/// Pump until parse of included/injected sources finishes. Does not typecheck.
+Builder.parse :: (use self: &#Self) {
+    native.onyx_set_option_int(ctx, .PARSE_ONLY, 1)
     while native.onyx_pump(ctx) == .CONTINUE {}
 }
 

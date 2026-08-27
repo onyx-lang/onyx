@@ -44,6 +44,13 @@ typedef enum onyx_option_t {
     ONYX_OPTION_PLATFORM,
 
     ONYX_OPTION_COMPILATION_DATA_DETAILED,
+
+    /// Lex and parse only: skip type checking, code generation, and
+    /// loading compiler builtins/core. `onyx_inject_code` already
+    /// parses immediately; this option is for `onyx_pump` after
+    /// `onyx_include_file` / inject, so `#load` is parsed without a
+    /// full compile.
+    ONYX_OPTION_PARSE_ONLY,
 } onyx_option_t;
 
 typedef enum onyx_pump_t {
@@ -139,8 +146,11 @@ API void onyx_add_defined_var(onyx_context_t *ctx, char *variable, int32_t varia
 API void onyx_include_file(onyx_context_t *ctx, char *filename, int32_t length);
 API void onyx_add_mapped_dir(onyx_context_t *ctx, char *mapped_name, int32_t mapped_length, char *dir, int32_t dir_length);
 
-/// Directly injects Onyx code as a new compilation unit
+/// Directly injects Onyx code as a new compilation unit.
+/// The buffer is copied; `filename` is used in diagnostics.
+/// Pass NULL / 0 for filename to use "(injected)".
 API void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length);
+API void onyx_inject_code_as(onyx_context_t *ctx, char *filename, int32_t filename_length, uint8_t *code, int32_t length);
 
 //
 // Errors 
