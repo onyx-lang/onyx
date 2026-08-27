@@ -547,9 +547,7 @@ __for_expansion :: #match -> void {}
 /// and more of an Onyx binary.
 Link_Options :: struct {
     // The size, in bytes of the stack.
-    // JSON-RPC + compilation-event ingest needs more than 1 MiB; 1 MiB
-    // overflowed, wrapped to a high linear-memory address, and crashed.
-    stack_size      := 64 * 65536;  // 64 pages * 65536 bytes per page = 4 MiB stack
+    stack_size      := 16 * 65536;  // 16 pages * 65536 bytes per page = 1 MiB stack
 
     // The alignment of the start addres of the stack.
     stack_alignment := 16;
