@@ -1418,6 +1418,8 @@ CHECK_FUNC(binaryop_assignment, AstBinaryOp** pbinop) {
 
                 binop->left->type = right_type;
             }
+
+            compilation_log_notify_node_typed(context, (AstNode *) binop->left);
         }
 
     } else {
@@ -3847,6 +3849,10 @@ CHECK_FUNC(statement, AstNode** pstmt) {
             //
             if (typed_stmt->type == (Type *) &context->node_that_signals_failure) {
                 ERROR(stmt->token->pos, "Invalid type for this local variable.");
+            }
+
+            if (typed_stmt->type != NULL) {
+                compilation_log_notify_node_typed(context, (AstNode *) typed_stmt);
             }
 
             return Check_Success;

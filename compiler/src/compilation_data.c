@@ -82,6 +82,7 @@
 #define PB_EVENT_PACKAGE_NAME                  2
 #define PB_EVENT_PACKAGE_FULLY_QUALIFIED_NAME  3
 #define PB_EVENT_PACKAGE_PARENT_ID             4
+#define PB_EVENT_PACKAGE_SCOPE_ID              5
 
 #define PB_EVENT_SCOPE_ID               1
 #define PB_EVENT_SCOPE_PARENT_SCOPE_ID  2
@@ -251,6 +252,7 @@ static void encode_event(CompilationLog *log, CompilationEvent *ev) {
             pb_write_string(inner, PB_EVENT_PACKAGE_NAME, ev->pack.package_name);
             pb_write_string(inner, PB_EVENT_PACKAGE_FULLY_QUALIFIED_NAME, ev->pack.fully_qualified_name);
             pb_write_uint32(inner, PB_EVENT_PACKAGE_PARENT_ID, ev->pack.parent_package_id);
+            pb_write_uint32(inner, PB_EVENT_PACKAGE_SCOPE_ID, ev->pack.scope_id);
             pb_write_bytes(out, PB_COMPILER_EVENT_PACK, inner->data, inner->length);
             break;
 
@@ -518,6 +520,7 @@ void compilation_log_emit_package(Context *context, Package *package) {
     ev.pack.package_name = package->unqualified_name ? package->unqualified_name : "";
     ev.pack.fully_qualified_name = package->name ? package->name : "";
     ev.pack.parent_package_id = package->parent_id >= 0 ? (u32)package->parent_id : 0;
+    ev.pack.scope_id = package->scope ? (u32)package->scope->id : 0;
     compilation_log_push(context, ev);
 }
 

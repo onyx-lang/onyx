@@ -100,6 +100,17 @@ main :: () {
     }
     ok("point_symbol", point_sym != null);
 
+    pkg_scope_ok := false;
+    switch foo_bar {
+        case .Some as fb {
+            if point_sym != null && fb.scope_id != 0 {
+                pkg_scope_ok = point_sym.scope_id == fb.scope_id;
+            }
+        }
+        case .None {}
+    }
+    ok("point_in_package_scope", pkg_scope_ok);
+
     point_type: &TypeInfo = null;
     for id in info->types_named("Point") {
         switch info->get_type(id) {

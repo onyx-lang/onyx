@@ -58,6 +58,7 @@ message EventPackage {
   string package_name = 2;
   string fully_qualified_name = 3;
   uint32 parent_package_id = 4;
+  uint32 scope_id = 5;
 }
 
 message EventScope {

@@ -60,6 +60,8 @@ EventPackage :: struct {
     fully_qualified_name: str
     @protobuf.Field.{4, 13}
     parent_package_id: u32
+    @protobuf.Field.{5, 13}
+    scope_id: u32
 }
 
 @protobuf.Message

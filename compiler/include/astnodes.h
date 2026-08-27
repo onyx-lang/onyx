@@ -2287,6 +2287,7 @@ typedef struct CompilationEvent {
             char *package_name;
             char *fully_qualified_name;
             u32 parent_package_id;
+            u32 scope_id;
         } pack;
 
         struct {

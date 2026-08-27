@@ -6,6 +6,8 @@ package_parent
 true
 point_symbol
 true
+point_in_package_scope
+true
 point_type
 true
 point_members
