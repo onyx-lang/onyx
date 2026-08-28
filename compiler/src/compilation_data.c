@@ -1,5 +1,6 @@
 #include "astnodes.h"
 #include "pb.h"
+#include "utils.h"
 
 #include <string.h>
 
@@ -73,6 +74,7 @@
 #define PB_COMPILER_EVENT_BINDING   16
 #define PB_COMPILER_EVENT_TYPE      17
 #define PB_COMPILER_EVENT_TYPE_BODY 18
+#define PB_COMPILER_EVENT_OVERLOAD  19
 
 #define PB_EVENT_START_COMPILER_VERSION 1
 
@@ -103,11 +105,15 @@
 #define PB_EVENT_SYMBOL_KIND      7
 #define PB_EVENT_SYMBOL_PACKAGE_ID 8
 
-#define PB_EVENT_RESOLVED_SYMBOL_ID 1
-#define PB_EVENT_RESOLVED_FILE_ID   2
-#define PB_EVENT_RESOLVED_LINE      3
-#define PB_EVENT_RESOLVED_COLUMN    4
-#define PB_EVENT_RESOLVED_LENGTH    5
+#define PB_EVENT_RESOLVED_SYMBOL_ID        1
+#define PB_EVENT_RESOLVED_FILE_ID          2
+#define PB_EVENT_RESOLVED_LINE             3
+#define PB_EVENT_RESOLVED_COLUMN           4
+#define PB_EVENT_RESOLVED_LENGTH           5
+#define PB_EVENT_RESOLVED_CHOSEN_SYMBOL_ID 6
+
+#define PB_EVENT_OVERLOAD_GROUP_SYMBOL_ID   1
+#define PB_EVENT_OVERLOAD_OPTION_SYMBOL_IDS 2
 
 #define PB_EVENT_BINDING_SYMBOL_ID        1
 #define PB_EVENT_BINDING_DOCUMENTATION    2
@@ -173,7 +179,8 @@ static b32 compilation_event_is_detailed(CompilationEventKind kind) {
     return kind == COMPILATION_EVENT_SYMBOL_RESOLVED
         || kind == COMPILATION_EVENT_BINDING
         || kind == COMPILATION_EVENT_TYPE
-        || kind == COMPILATION_EVENT_TYPE_BODY;
+        || kind == COMPILATION_EVENT_TYPE_BODY
+        || kind == COMPILATION_EVENT_OVERLOAD;
 }
 
 static char *compilation_log_intern(Context *context, const char *name) {
@@ -291,7 +298,16 @@ static void encode_event(CompilationLog *log, CompilationEvent *ev) {
             pb_write_uint32(inner, PB_EVENT_RESOLVED_LINE, ev->resolved.line);
             pb_write_uint32(inner, PB_EVENT_RESOLVED_COLUMN, ev->resolved.column);
             pb_write_uint32(inner, PB_EVENT_RESOLVED_LENGTH, ev->resolved.length);
+            pb_write_uint32(inner, PB_EVENT_RESOLVED_CHOSEN_SYMBOL_ID, ev->resolved.chosen_symbol_id);
             pb_write_bytes(out, PB_COMPILER_EVENT_RESOLVED, inner->data, inner->length);
+            break;
+
+        case COMPILATION_EVENT_OVERLOAD:
+            pb_write_uint32(inner, PB_EVENT_OVERLOAD_GROUP_SYMBOL_ID, ev->overload.group_symbol_id);
+            for (u32 i = 0; i < ev->overload.option_count; i++) {
+                pb_write_uint32_always(inner, PB_EVENT_OVERLOAD_OPTION_SYMBOL_IDS, ev->overload.option_symbol_ids[i]);
+            }
+            pb_write_bytes(out, PB_COMPILER_EVENT_OVERLOAD, inner->data, inner->length);
             break;
 
         case COMPILATION_EVENT_BINDING:
@@ -641,7 +657,7 @@ static void compilation_log_remember_alias_symbol(Context *context, AstNode *nod
 static void compilation_log_copy_binding_to_symbol(Context *context, u32 dest_id, u32 src_id);
 
 static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope, char *name, OnyxFilePos pos, AstNode *node, u32 kind, b32 dedup) {
-    if (!scope || !name || !*name) return 0;
+    if (!name || !*name) return 0;
     if (!strcmp(name, "_")) return 0;
 
     CompilationLog *log = &context->compilation_log;
@@ -653,7 +669,7 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
     memset(&ev, 0, sizeof(ev));
     ev.kind = COMPILATION_EVENT_SYMBOL;
     ev.symbol.id = ++log->next_symbol_id;
-    ev.symbol.scope_id = (u32)scope->id;
+    ev.symbol.scope_id = scope ? (u32)scope->id : 0;
     ev.symbol.name = compilation_log_intern(context, name);
     ev.symbol.file_id = compilation_log_file_id_for(context, pos.filename);
     ev.symbol.line = pos.line;
@@ -681,6 +697,7 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
     }
 
     compilation_log_push(context, ev);
+    bh_imap_put(&log->symbol_names, ev.symbol.id, (u64) ev.symbol.name);
 
     if (is_alias) {
         compilation_log_remember_alias_symbol(context, node, ev.symbol.id);
@@ -708,22 +725,102 @@ static u32 compilation_log_emit_member_symbol(Context *context, Scope *scope, ch
 
 static b32 compilation_log_lookup_symbol_id(CompilationLog *log, AstNode *node, u32 *out);
 
-void compilation_log_emit_symbol_resolved(Context *context, AstNode *original, AstNode *resolved) {
-    if (!original || !resolved || !original->token) return;
-
-    CompilationLog *log = &context->compilation_log;
-    u32 symbol_id;
-    if (!compilation_log_lookup_symbol_id(log, resolved, &symbol_id)) return;
+static void compilation_log_emit_resolved_at(Context *context, OnyxToken *token, u32 symbol_id, u32 chosen_symbol_id) {
+    if (!token || !symbol_id) return;
 
     CompilationEvent ev;
     memset(&ev, 0, sizeof(ev));
     ev.kind = COMPILATION_EVENT_SYMBOL_RESOLVED;
     ev.resolved.symbol_id = symbol_id;
-    ev.resolved.file_id = compilation_log_file_id_for(context, original->token->pos.filename);
-    ev.resolved.line = original->token->pos.line;
-    ev.resolved.column = original->token->pos.column;
-    ev.resolved.length = original->token->length;
+    ev.resolved.file_id = compilation_log_file_id_for(context, token->pos.filename);
+    ev.resolved.line = token->pos.line;
+    ev.resolved.column = token->pos.column;
+    ev.resolved.length = token->length;
+    ev.resolved.chosen_symbol_id = chosen_symbol_id;
     compilation_log_push(context, ev);
+}
+
+void compilation_log_emit_symbol_resolved(Context *context, AstNode *original, AstNode *resolved) {
+    if (!original || !resolved || !original->token) return;
+
+    u32 symbol_id;
+    if (!compilation_log_lookup_symbol_id(&context->compilation_log, resolved, &symbol_id)) return;
+    compilation_log_emit_resolved_at(context, original->token, symbol_id, 0);
+}
+
+void compilation_log_emit_overloads(Context *context, AstOverloadedFunction *ofunc) {
+    if (!ofunc) return;
+
+    CompilationLog *log = &context->compilation_log;
+    u32 group_id = 0;
+    if (!compilation_log_lookup_symbol_id(log, (AstNode *) ofunc, &group_id)) return;
+
+    char *group_name = "overload";
+    if (bh_imap_has(&log->symbol_names, (u64) group_id)) {
+        group_name = (char *) bh_imap_get(&log->symbol_names, (u64) group_id);
+    }
+
+    bh_imap all_overloads;
+    bh_imap_init(&all_overloads, context->gp_alloc, 8);
+    build_all_overload_options(ofunc->overloads, &all_overloads);
+
+    u32 max = (u32) bh_arr_length(all_overloads.entries);
+    u32 *ids = NULL;
+    if (max > 0) ids = bh_alloc(context->gp_alloc, sizeof(u32) * max);
+    u32 count = 0;
+
+    bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
+        AstTyped *node = (AstTyped *) strip_aliases((AstNode *) entry->key);
+        if (!node) continue;
+        if (node->kind == Ast_Kind_Overloaded_Function) continue;
+        if (node->kind != Ast_Kind_Function
+            && node->kind != Ast_Kind_Polymorphic_Proc
+            && node->kind != Ast_Kind_Macro) {
+            continue;
+        }
+
+        u32 sid = 0;
+        if (!compilation_log_lookup_symbol_id(log, (AstNode *) node, &sid)) {
+            OnyxFilePos pos = ofunc->token ? ofunc->token->pos : (OnyxFilePos){0};
+            if (node->token) pos = node->token->pos;
+            sid = compilation_log_emit_symbol_with_kind(
+                context, NULL, group_name, pos, (AstNode *) node,
+                compilation_log_symbol_kind((AstNode *) node), 1
+            );
+        }
+
+        if (!sid) continue;
+        compilation_log_emit_binding(context, (AstNode *) node, NULL);
+
+        b32 seen = 0;
+        for (u32 i = 0; i < count; i++) {
+            if (ids[i] == sid) { seen = 1; break; }
+        }
+        if (!seen) ids[count++] = sid;
+    }
+
+    bh_imap_free(&all_overloads);
+
+    CompilationEvent ev;
+    memset(&ev, 0, sizeof(ev));
+    ev.kind = COMPILATION_EVENT_OVERLOAD;
+    ev.overload.group_symbol_id = group_id;
+    ev.overload.option_count = count;
+    ev.overload.option_symbol_ids = ids;
+    compilation_log_push(context, ev);
+}
+
+void compilation_log_emit_overload_choice(Context *context, OnyxToken *site, AstNode *group, AstNode *chosen) {
+    if (!site || !group || !chosen) return;
+
+    CompilationLog *log = &context->compilation_log;
+    u32 group_id = 0;
+    u32 chosen_id = 0;
+    if (!compilation_log_lookup_symbol_id(log, group, &group_id)) return;
+    if (!compilation_log_lookup_symbol_id(log, chosen, &chosen_id)) return;
+    if (!chosen_id || chosen_id == group_id) return;
+
+    compilation_log_emit_resolved_at(context, site, group_id, chosen_id);
 }
 
 static u32 compilation_log_type_id_of_node(AstNode *node) {
@@ -1162,6 +1259,7 @@ void compilation_log_init(Context *context) {
     bh_imap_init(&log->node_to_symbol_id, context->gp_alloc, 255);
     bh_imap_init(&log->node_to_binding, context->gp_alloc, 255);
     bh_imap_init(&log->symbol_binding_type_id, context->gp_alloc, 255);
+    bh_imap_init(&log->symbol_names, context->gp_alloc, 255);
     bh_arr_new(context->gp_alloc, log->alias_symbols, 64);
     compilation_log_emit_start(context);
 }

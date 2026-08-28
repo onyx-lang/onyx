@@ -39,6 +39,7 @@ message CompilerEvent {
     EventBinding binding = 16;
     EventType type = 17;
     EventTypeBody type_body = 18;
+    EventOverload overload = 19;
   }
 }
 
@@ -107,6 +108,16 @@ message EventSymbolResolved {
   uint32 line = 3;
   uint32 column = 4;
   uint32 length = 5;
+  // Specific #match option at this use, when the compiler picked one.
+  // 0 means this span still refers to symbol_id (the group or other name).
+  uint32 chosen_symbol_id = 6;
+}
+
+// Complete set of options for a #match / #overload group.
+// Re-emitted when #overload adds more options.
+message EventOverload {
+  uint32 group_symbol_id = 1;
+  repeated uint32 option_symbol_ids = 2;
 }
 
 message EventBinding {

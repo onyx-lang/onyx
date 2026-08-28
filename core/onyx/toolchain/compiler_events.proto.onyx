@@ -33,6 +33,8 @@ CompilerEvent :: struct {
         Type as 17: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventType
         @protobuf.Field.{18, 11}
         Type_Body as 18: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventTypeBody
+        @protobuf.Field.{19, 11}
+        Overload as 19: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventOverload
     }
 }
 
@@ -133,6 +135,16 @@ EventSymbolResolved :: struct {
     column: u32
     @protobuf.Field.{5, 13}
     length: u32
+    @protobuf.Field.{6, 13}
+    chosen_symbol_id: u32
+}
+
+@protobuf.Message
+EventOverload :: struct {
+    @protobuf.Field.{1, 13}
+    group_symbol_id: u32
+    @protobuf.Field.{2, 13}
+    option_symbol_ids: [..] u32
 }
 
 @protobuf.Message

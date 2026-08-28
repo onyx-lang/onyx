@@ -750,4 +750,96 @@ main :: () {
     }
     ok("static_if_keeps_outer_local", after_if_lookup);
     ok("static_if_completes_member", after_if_member);
+
+    ovb := Builder.make();
+    defer ovb->destroy();
+    ovb->map_dir("core", tprintf("{}/core", core_root));
+    ovb->enable(.DISABLE_EXTENSIONS);
+    ovb->enable(.MULTI_THREADING);
+    ovb->enable(.COMPILATION_DATA_DETAILED);
+    ovb->set_platform(.ONYX);
+    ovb->inject_source("""
+package main
+
+area :: #match {
+    (n: i32) -> i32 { return n },
+    (s: str) -> i32 { return 0 }
+}
+
+#overload
+area :: (b: bool) -> i32 { return 2 }
+
+main :: () {
+    _ := area(3)
+    _ := area("hi")
+    _ := area(true)
+}
+""");
+    ovb->compile();
+
+    ok("overload_compile_ok", !ovb->has_errors());
+
+    ovinfo := ovb->compilation_info();
+    defer delete(&ovinfo);
+
+    area_group: &SymbolInfo = null;
+    for id in ovinfo->symbols_named("area") {
+        if ovinfo->get_symbol(id) as sym {
+            if area_group == null && sym.kind == .Overloaded_Function do area_group = sym;
+        }
+    }
+
+    overload_count := 0;
+    i32_opt: u32 = 0;
+    str_opt: u32 = 0;
+    bool_opt: u32 = 0;
+    if area_group != null {
+        for id in ovinfo->overloads_of(area_group.id) {
+            overload_count += 1;
+            if ovinfo->get_symbol(id) as opt {
+                if opt.param_symbol_ids.count > 0 {
+                    if ovinfo->get_symbol(opt.param_symbol_ids[0]) as p {
+                        if p.name == "n" do i32_opt = id;
+                        if p.name == "s" do str_opt = id;
+                        if p.name == "b" do bool_opt = id;
+                    }
+                }
+            }
+        }
+    }
+
+    ok("overload_group_found", area_group != null);
+    ok("overload_option_count", overload_count == 3);
+    ok("overload_has_i32", i32_opt != 0);
+    ok("overload_has_str", str_opt != 0);
+    ok("overload_has_bool", bool_opt != 0);
+
+    chose_i32 := false;
+    chose_str := false;
+    chose_bool := false;
+    if area_group != null {
+        for r in ovinfo.resolutions {
+            if r.symbol_id != area_group.id do continue;
+            if r.chosen_symbol_id == i32_opt do chose_i32 = true;
+            if r.chosen_symbol_id == str_opt do chose_str = true;
+            if r.chosen_symbol_id == bool_opt do chose_bool = true;
+        }
+    }
+
+    ok("overload_chose_i32", chose_i32);
+    ok("overload_chose_str", chose_str);
+    ok("overload_chose_bool", chose_bool);
+
+    resolve_prefers_chosen := false;
+    if area_group != null {
+        for r in ovinfo.resolutions {
+            if r.chosen_symbol_id != i32_opt do continue;
+            if ovinfo->resolve_at(r.file_id, r.line, r.column) as hit {
+                if ovinfo->symbol_at_resolution(hit) as chosen {
+                    if chosen.id == i32_opt do resolve_prefers_chosen = true;
+                }
+            }
+        }
+    }
+    ok("overload_resolve_at_chosen", resolve_prefers_chosen);
 }

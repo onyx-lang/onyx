@@ -799,6 +799,7 @@ struct AstCall {
     i32 placeholder_argument_position;
 
     AstTyped *callee;
+    OnyxToken *callee_name_token;
     OnyxIntrinsic intrinsic;
 
     VarArgKind va_kind;
@@ -2248,6 +2249,7 @@ typedef enum CompilationEventKind {
     COMPILATION_EVENT_BINDING = 6,
     COMPILATION_EVENT_TYPE = 7,
     COMPILATION_EVENT_TYPE_BODY = 8,
+    COMPILATION_EVENT_OVERLOAD = 9,
 } CompilationEventKind;
 
 typedef struct CompilationTypeMember {
@@ -2320,7 +2322,14 @@ typedef struct CompilationEvent {
             u32 line;
             u32 column;
             u32 length;
+            u32 chosen_symbol_id;
         } resolved;
+
+        struct {
+            u32 group_symbol_id;
+            u32 option_count;
+            u32 *option_symbol_ids;
+        } overload;
 
         struct {
             u32 symbol_id;
@@ -2424,6 +2433,7 @@ typedef struct CompilationLog {
     bh_imap node_to_symbol_id;
     bh_imap node_to_binding;
     bh_imap symbol_binding_type_id;
+    bh_imap symbol_names;
     // Additional EventSymbols for the same AST node (`use pkg { * }` copies).
     bh_arr(CompilationLogAliasSymbol) alias_symbols;
 } CompilationLog;
@@ -2681,6 +2691,8 @@ void compilation_log_emit_scope(Context *context, Scope *scope);
 void compilation_log_emit_scope_end(Context *context, Scope *scope, OnyxFilePos pos);
 void compilation_log_emit_symbol(Context *context, Scope *scope, char *name, OnyxFilePos pos, AstNode *node);
 void compilation_log_emit_symbol_resolved(Context *context, AstNode *original, AstNode *resolved);
+void compilation_log_emit_overloads(Context *context, AstOverloadedFunction *ofunc);
+void compilation_log_emit_overload_choice(Context *context, OnyxToken *site, AstNode *group, AstNode *chosen);
 void compilation_log_emit_binding(Context *context, AstNode *node, AstBinding *binding);
 void compilation_log_notify_node_typed(Context *context, AstNode *node);
 void compilation_log_emit_type(Context *context, Type *type);

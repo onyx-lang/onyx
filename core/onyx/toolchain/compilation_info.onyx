@@ -53,6 +53,10 @@ SymbolInfo :: struct {
     type_id: u32
     param_symbol_ids: [..] u32
     use_sites: [..] EventSymbolResolved
+    /// Options of this `#match` group, in search order.
+    overload_ids: [..] u32
+    /// Group this option belongs to, when it was listed by EventOverload.
+    overload_group_id: u32
 }
 
 TypeInfo :: struct {
@@ -188,6 +192,19 @@ CompilationInfo.ingest_event :: (self: &#Self, event: &CompilerEvent) {
                 ensure_id_list(&self.resolutions_by_file, r.file_id)->push(~~(self.resolutions.count - 1))
             }
             ensure_id(&self.symbols, r.symbol_id).use_sites->push(r)
+            if r.chosen_symbol_id != 0 && r.chosen_symbol_id != r.symbol_id {
+                ensure_id(&self.symbols, r.chosen_symbol_id).use_sites->push(r)
+            }
+        }
+
+        case .Overload as o {
+            slot := ensure_id(&self.symbols, o.group_symbol_id)
+            slot.overload_ids = o.option_symbol_ids
+            for id in o.option_symbol_ids {
+                if id == 0 do continue
+                opt := ensure_id(&self.symbols, id)
+                opt.overload_group_id = o.group_symbol_id
+            }
         }
 
         case .Binding as b {
@@ -575,16 +592,9 @@ CompilationInfo.is_method_of :: (self: &#Self, symbol_id: u32, type_id: u32) -> 
         case .None {
             if self->get_symbol(symbol_id) as sym {
                 if sym.kind == .Overloaded_Function {
-                    for id in self->symbols_named(sym.name) {
+                    for id in self->overloads_of(symbol_id) {
                         if id == symbol_id do continue
-                        if self->get_symbol(id) as other {
-                            switch other.kind {
-                                case .Function, .Polymorphic_Proc, .Macro {
-                                    if self->is_method_of(other.id, type_id) do return true
-                                }
-                                case _ {}
-                            }
-                        }
+                        if self->is_method_of(id, type_id) do return true
                     }
                     return true
                 }
@@ -685,11 +695,38 @@ CompilationInfo.resolve_at :: (self: &#Self, file_id: u32, line: u32, column: u3
         if r.length < best_len {
             best_len = r.length
             best = r
+        } elseif r.length == best_len {
+            if r.chosen_symbol_id != 0 do best = r
         }
     }
 
     if best == null do return .None
     return best
+}
+
+/// Options of a `#match` group. If `symbol_id` is itself an option,
+/// returns the sibling list from its group.
+CompilationInfo.overloads_of :: (self: &#Self, symbol_id: u32) -> [] u32 {
+    switch self->get_symbol(symbol_id) {
+        case .Some as sym {
+            if sym.overload_ids.count > 0 do return sym.overload_ids
+            if sym.overload_group_id != 0 {
+                if self->get_symbol(sym.overload_group_id) as group {
+                    if group.overload_ids.count > 0 do return group.overload_ids
+                }
+            }
+            return .{}
+        }
+        case .None do return .{}
+    }
+}
+
+/// Name binding at this span, preferring the overload the compiler chose.
+CompilationInfo.symbol_at_resolution :: (self: &#Self, r: &EventSymbolResolved) -> ? &SymbolInfo {
+    if r.chosen_symbol_id != 0 {
+        if self->get_symbol(r.chosen_symbol_id) as chosen do return chosen
+    }
+    return self->get_symbol(r.symbol_id)
 }
 
 CompilationInfo.references :: (self: &#Self, symbol_id: u32) -> [] EventSymbolResolved {

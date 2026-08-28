@@ -1008,6 +1008,9 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
 
         need_to_check_overload_return_type = 1;
 
+        compilation_log_emit_overloads(context, (AstOverloadedFunction *) original_callee);
+        compilation_log_emit_overload_choice(context, call->callee_name_token, (AstNode *) original_callee, (AstNode *) new_callee);
+
         callee = new_callee;
     }
 
@@ -1076,6 +1079,15 @@ CHECK_FUNC(call, AstCall** pcall) {
     }
 
     if (call->kind == Ast_Kind_Call) {
+        if (!call->callee_name_token && call->callee) {
+            AstNode *name_node = strip_aliases((AstNode *) call->callee);
+            if (name_node && (name_node->kind == Ast_Kind_Symbol || name_node->kind == Ast_Kind_Field_Access)) {
+                call->callee_name_token = name_node->token;
+            } else if (call->callee->token) {
+                call->callee_name_token = call->callee->token;
+            }
+        }
+
         u32 current_checking_level_store = context->checker.current_checking_level;
         CHECK(expression, &call->callee);
         context->checker.current_checking_level = current_checking_level_store;
@@ -4225,6 +4237,7 @@ CHECK_FUNC(overloaded_function, AstOverloadedFunction* ofunc) {
 
                 // Return early here because the following code does not work with a
                 // polymorphic expected return type.
+                compilation_log_emit_overloads(context, ofunc);
                 bh_imap_free(&all_overloads);
                 return Check_Success;
             }
@@ -4254,6 +4267,8 @@ CHECK_FUNC(overloaded_function, AstOverloadedFunction* ofunc) {
         }
     }
 
+
+    compilation_log_emit_overloads(context, ofunc);
 
     bh_imap_free(&all_overloads);
     return Check_Success;
@@ -5196,6 +5211,7 @@ CHECK_FUNC(process_directive, AstNode* directive) {
         add_overload->overload->flags &= ~Ast_Flag_Function_Is_Lambda;
 
         add_overload_option(&ofunc->overloads, add_overload->order, add_overload->overload);
+        compilation_log_emit_overloads(context, ofunc);
         return Check_Success;
     }
 
