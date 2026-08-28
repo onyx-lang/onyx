@@ -1054,6 +1054,47 @@ void compilation_log_emit_poly_choice(Context *context, OnyxToken *site, AstNode
     compilation_log_emit_resolved_at(context, site, template_id, chosen_id);
 }
 
+// These kinds are AstNode_base only. Casting them to AstTyped and reading
+// `type` walks off the allocation (the next arena object's `kind` then looks
+// like a Type*).
+static b32 compilation_log_kind_has_type_pointer(AstKind kind) {
+    switch (kind) {
+        case Ast_Kind_Error:
+        case Ast_Kind_Load:
+        case Ast_Kind_Load_All:
+        case Ast_Kind_Library_Path:
+        case Ast_Kind_Import:
+        case Ast_Kind_Symbol:
+        case Ast_Kind_Return:
+        case Ast_Kind_Jump:
+        case Ast_Kind_Block:
+        case Ast_Kind_Defer:
+        case Ast_Kind_If:
+        case Ast_Kind_For:
+        case Ast_Kind_While:
+        case Ast_Kind_Static_If:
+        case Ast_Kind_Switch:
+        case Ast_Kind_Switch_Case:
+        case Ast_Kind_Constraint:
+        case Ast_Kind_Capture_Block:
+        case Ast_Kind_Polymorph_Query:
+        case Ast_Kind_Directive_Error:
+        case Ast_Kind_Directive_Add_Overload:
+        case Ast_Kind_Directive_Operator:
+        case Ast_Kind_Directive_Export:
+        case Ast_Kind_Directive_Remove:
+        case Ast_Kind_Directive_Init:
+        case Ast_Kind_Directive_Library:
+        case Ast_Kind_Directive_Wasm_Section:
+        case Ast_Kind_Js_Code:
+        case Ast_Kind_Compiler_Extension:
+        case Ast_Kind_Procedural_Macro:
+            return 0;
+        default:
+            return 1;
+    }
+}
+
 static u32 compilation_log_type_id_of_node(AstNode *node) {
     if (!node) return 0;
 
@@ -1089,6 +1130,8 @@ static u32 compilation_log_type_id_of_node(AstNode *node) {
 
         return 0;
     }
+
+    if (!compilation_log_kind_has_type_pointer(inner->kind)) return 0;
 
     AstTyped *typed = (AstTyped *) inner;
     if (typed->type) return typed->type->id;
