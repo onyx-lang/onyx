@@ -171,8 +171,8 @@ b32 symbol_raw_introduce(Context *context, Scope* scope, char* name, OnyxFilePos
         }
     }
 
-    shput(scope->symbols, name, symbol);
-    compilation_log_emit_symbol(context, scope, name, pos, symbol);
+    i32 index = shputi(scope->symbols, name, symbol);
+    compilation_log_emit_symbol(context, scope, scope->symbols[index].key, pos, symbol);
     return 1;
 }
 

@@ -2253,27 +2253,6 @@ typedef enum CompilationEventKind {
     COMPILATION_EVENT_POLY_PROC = 10,
 } CompilationEventKind;
 
-typedef struct CompilationTypeMember {
-    char *name;
-    u32 type_id;
-    u32 offset;
-    u32 idx;
-    u32 symbol_id;
-} CompilationTypeMember;
-
-typedef struct CompilationTypeVariant {
-    char *name;
-    u32 type_id;
-    u32 tag;
-    u32 symbol_id;
-} CompilationTypeVariant;
-
-typedef struct CompilationTypeEnumValue {
-    char *name;
-    i64 value;
-    u32 symbol_id;
-} CompilationTypeEnumValue;
-
 typedef struct CompilationEvent {
     CompilationEventKind kind;
 
@@ -2344,66 +2323,15 @@ typedef struct CompilationEvent {
             u32 symbol_id;
             char *documentation;
             u32 type_id;
-            u32 param_count;
-            u32 *param_symbol_ids;
+            AstNode *node;
         } binding;
 
         struct {
-            u32 id;
-            u32 kind;
-            char *name;
-
-            union {
-                struct {
-                    u32 basic_kind;
-                    u32 size;
-                    u32 alignment;
-                } basic;
-
-                struct {
-                    u32 elem_id;
-                } elem;
-
-                struct {
-                    u32 elem_id;
-                    u32 count;
-                } array;
-
-                struct {
-                    u32 return_id;
-                    u32 param_count;
-                    u32 *param_ids;
-                } function;
-
-                struct {
-                    u32 count;
-                    u32 *type_ids;
-                } compound;
-
-                struct {
-                    u32 base_id;
-                } distinct;
-
-                struct {
-                    u32 backing_id;
-                    b32 is_flags;
-                    u32 value_count;
-                    CompilationTypeEnumValue *values;
-                } enumeration;
-            } body;
+            Type *type;
         } type;
 
         struct {
-            u32 type_id;
-            u32 size;
-            u32 alignment;
-            u32 scope_id;
-            b32 is_union;
-            u32 tag_type_id;
-            u32 member_count;
-            CompilationTypeMember *members;
-            u32 variant_count;
-            CompilationTypeVariant *variants;
+            Type *type;
         } type_body;
     };
 } CompilationEvent;
@@ -2415,8 +2343,8 @@ typedef struct CompilationFileOverlay {
 } CompilationFileOverlay;
 
 typedef struct CompilationLogAliasSymbol {
-    AstNode *node;
     u32 symbol_id;
+    u32 next;
 } CompilationLogAliasSymbol;
 
 typedef struct CompilationLog {
@@ -2449,7 +2377,9 @@ typedef struct CompilationLog {
     bh_imap node_to_binding;
     bh_imap symbol_binding_type_id;
     bh_imap symbol_names;
+    bh_imap node_to_first_alias;
     // Additional EventSymbols for the same AST node (`use pkg { * }` copies).
+    // 1-based indices; `next` chains aliases for one node.
     bh_arr(CompilationLogAliasSymbol) alias_symbols;
 } CompilationLog;
 
