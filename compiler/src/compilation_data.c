@@ -216,6 +216,23 @@ static char *compilation_log_intern_len(Context *context, const char *s, i32 len
     return compilation_log_intern(context, tmp);
 }
 
+static char *compilation_log_get_symbol_name(CompilationLog *log, u32 id) {
+    if (!id || id >= (u32) bh_arr_length(log->symbol_names)) return NULL;
+    return log->symbol_names[id];
+}
+
+static b32 compilation_log_binding_type_get(CompilationLog *log, u32 id, u32 *out) {
+    if (!id || id >= (u32) bh_arr_length(log->symbol_binding_type_id)) return 0;
+    u32 stored = log->symbol_binding_type_id[id];
+    if (!stored) return 0;
+    if (out) *out = stored - 1;
+    return 1;
+}
+
+static void compilation_log_binding_type_put(Context *context, CompilationLog *log, u32 id, u32 type_id) {
+    bh_arr_set_at(log->symbol_binding_type_id, id, type_id + 1);
+}
+
 static char *compilation_log_type_name(Context *context, Type *type) {
     if (!type) return (char *) "";
 
@@ -794,14 +811,14 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
         // Locals can be introduced again in a child scope (named returns are
         // added to the function scope, then spliced into the body). Keep the
         // mapping on the newest symbol so type notifications follow lookup.
-        if (node->kind == Ast_Kind_Local || !bh_imap_try_get(&log->node_to_symbol_id, (u64) node, NULL)) {
+        if (node->kind == Ast_Kind_Local) {
             bh_imap_put(&log->node_to_symbol_id, (u64) node, symbol_id);
-        } else {
+        } else if (!bh_imap_put_if_absent(&log->node_to_symbol_id, (u64) node, symbol_id)) {
             is_alias = 1;
         }
         AstNode *inner = strip_aliases(node);
-        if (inner && inner != node && !bh_imap_try_get(&log->node_to_symbol_id, (u64) inner, NULL)) {
-            bh_imap_put(&log->node_to_symbol_id, (u64) inner, symbol_id);
+        if (inner && inner != node) {
+            bh_imap_put_if_absent(&log->node_to_symbol_id, (u64) inner, symbol_id);
         }
         if (inner && inner->kind == Ast_Kind_Package) {
             AstPackage *package = (AstPackage *) inner;
@@ -809,14 +826,13 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
         }
     }
 
-    bh_imap_put(&log->symbol_names, symbol_id, (u64) ev->symbol.name);
+    bh_arr_set_at(log->symbol_names, symbol_id, ev->symbol.name);
 
     if (is_alias) {
         compilation_log_remember_alias_symbol(context, node, symbol_id);
         u64 primary = 0;
         if (bh_imap_try_get(&log->node_to_symbol_id, (u64) node, &primary) && primary) {
-            u64 ignored = 0;
-            if (bh_imap_try_get(&log->symbol_binding_type_id, primary, &ignored)) {
+            if (compilation_log_binding_type_get(log, (u32) primary, NULL)) {
                 compilation_log_copy_binding_to_symbol(context, symbol_id, (u32) primary);
             }
         }
@@ -866,10 +882,8 @@ void compilation_log_emit_overloads(Context *context, AstOverloadedFunction *ofu
     if (!compilation_log_lookup_symbol_id(log, (AstNode *) ofunc, &group_id)) return;
 
     char *group_name = "overload";
-    u64 named = 0;
-    if (bh_imap_try_get(&log->symbol_names, (u64) group_id, &named)) {
-        group_name = (char *) named;
-    }
+    char *named = compilation_log_get_symbol_name(log, group_id);
+    if (named) group_name = named;
 
     bh_imap all_overloads;
     bh_imap_init(&all_overloads, context->gp_alloc, 8);
@@ -1129,17 +1143,15 @@ static void compilation_log_copy_binding_to_symbol(Context *context, u32 dest_id
     if (!dest_id || !src_id || dest_id == src_id) return;
 
     CompilationLog *log = &context->compilation_log;
-    u64 type_id64 = 0;
-    if (!bh_imap_try_get(&log->symbol_binding_type_id, (u64) src_id, &type_id64)) return;
-
-    u32 type_id = (u32) type_id64;
+    u32 type_id = 0;
+    if (!compilation_log_binding_type_get(log, src_id, &type_id)) return;
     if (!type_id) return;
 
-    u64 prev = 0;
-    if (bh_imap_try_get(&log->symbol_binding_type_id, (u64) dest_id, &prev)) {
-        if ((u32) prev == type_id) return;
+    u32 prev = 0;
+    if (compilation_log_binding_type_get(log, dest_id, &prev)) {
+        if (prev == type_id) return;
     }
-    bh_imap_put(&log->symbol_binding_type_id, (u64) dest_id, (u64) type_id);
+    compilation_log_binding_type_put(context, log, dest_id, type_id);
 
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_BINDING);
     ev->binding.symbol_id = dest_id;
@@ -1193,15 +1205,15 @@ static void compilation_log_emit_binding_for_id(Context *context, u32 symbol_id,
 
     if (type_id == 0 && !binding && !any_param) return;
 
-    u64 prev = 0;
-    if (bh_imap_try_get(&log->symbol_binding_type_id, (u64) symbol_id, &prev)) {
-        if ((u32) prev == type_id) {
+    u32 prev = 0;
+    if (compilation_log_binding_type_get(log, symbol_id, &prev)) {
+        if (prev == type_id) {
             if (type_id != 0) return;
             if (!any_param) return;
         }
-        if (type_id == 0 && (u32) prev != 0) return;
+        if (type_id == 0 && prev != 0) return;
     }
-    bh_imap_put(&log->symbol_binding_type_id, (u64) symbol_id, (u64) type_id);
+    compilation_log_binding_type_put(context, log, symbol_id, type_id);
 
     char *docs = "";
     if (binding) {
@@ -1341,8 +1353,8 @@ void compilation_log_init(Context *context) {
     bh_buffer_init(&log->pb_flush, context->gp_alloc, 64 * 1024);
     bh_imap_init(&log->node_to_symbol_id, context->gp_alloc, 4096);
     bh_imap_init(&log->node_to_binding, context->gp_alloc, 4096);
-    bh_imap_init(&log->symbol_binding_type_id, context->gp_alloc, 4096);
-    bh_imap_init(&log->symbol_names, context->gp_alloc, 4096);
+    bh_arr_new(context->gp_alloc, log->symbol_binding_type_id, 4096);
+    bh_arr_new(context->gp_alloc, log->symbol_names, 4096);
     bh_imap_init(&log->node_to_first_alias, context->gp_alloc, 1024);
     bh_arr_new(context->gp_alloc, log->alias_symbols, 64);
     compilation_log_emit_start(context);

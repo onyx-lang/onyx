@@ -2377,8 +2377,8 @@ typedef struct CompilationLog {
 
     bh_imap node_to_symbol_id;
     bh_imap node_to_binding;
-    bh_imap symbol_binding_type_id;
-    bh_imap symbol_names;
+    bh_arr(u32) symbol_binding_type_id;
+    bh_arr(char *) symbol_names;
     bh_imap node_to_first_alias;
     // Additional EventSymbols for the same AST node (`use pkg { * }` copies).
     // 1-based indices; `next` chains aliases for one node.
