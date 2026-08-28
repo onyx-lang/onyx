@@ -175,6 +175,7 @@ AstNode* ast_clone(Context *context, void* n) {
     memmove(nn, node, node_size);
 
     nn->flags &= ~(Ast_Flag_Has_Been_Checked | Ast_Flag_Has_Been_Symres);
+    nn->compilation_symbol_id = 0;
 
     switch ((u16) node->kind) {
         case Ast_Kind_Binary_Op:
@@ -745,6 +746,7 @@ AstFunction* clone_function_header(Context *context, AstFunction* func) {
 
     AstFunction* new_func = onyx_ast_node_new(context->ast_alloc, sizeof(AstFunction), func->kind);
     memmove(new_func, func, sizeof(AstFunction));
+    new_func->compilation_symbol_id = 0;
     assert(new_func->scope == NULL);
 
     convert_polyproc_to_function(new_func);

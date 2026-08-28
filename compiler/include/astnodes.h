@@ -638,7 +638,8 @@ typedef struct ValueWithOffset {
     u32 flags;                \
     OnyxToken *token;         \
     struct Entity* entity;    \
-    AstNode *next
+    AstNode *next;            \
+    u32 compilation_symbol_id
 struct AstNode { AstNode_base; };
 
 // NOTE: 'type_node' is filled out by the parser.
@@ -1011,6 +1012,7 @@ struct AstSwitch {
     OnyxToken* token;      \
     struct Entity* entity; \
     void* next;            \
+    u32 compilation_symbol_id; \
     u64 type_id;           \
     Type* type
 struct AstType { AstType_base; };
@@ -2375,7 +2377,6 @@ typedef struct CompilationLog {
     bh_buffer pb_item;
     bh_buffer pb_flush;
 
-    bh_imap node_to_symbol_id;
     bh_imap node_to_binding;
     bh_arr(u32) symbol_binding_type_id;
     bh_arr(char *) symbol_names;

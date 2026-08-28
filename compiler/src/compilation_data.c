@@ -2,7 +2,14 @@
 #include "pb.h"
 #include "utils.h"
 
+#include <stddef.h>
 #include <string.h>
+
+enum {
+    _compilation_symbol_id_same_offset = sizeof(char[
+        (offsetof(AstNode, compilation_symbol_id) == offsetof(AstType, compilation_symbol_id)) ? 1 : -1
+    ])
+};
 
 #define SYMBOL_KIND_UNKNOWN             0
 #define SYMBOL_KIND_PACKAGE             1
@@ -790,9 +797,8 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
     if (!strcmp(name, "_")) return 0;
 
     CompilationLog *log = &context->compilation_log;
-    u64 existing = 0;
-    if (dedup && node && bh_imap_try_get(&log->node_to_symbol_id, (u64) node, &existing)) {
-        return (u32) existing;
+    if (dedup && node && node->compilation_symbol_id) {
+        return node->compilation_symbol_id;
     }
 
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_SYMBOL);
@@ -812,13 +818,15 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
         // added to the function scope, then spliced into the body). Keep the
         // mapping on the newest symbol so type notifications follow lookup.
         if (node->kind == Ast_Kind_Local) {
-            bh_imap_put(&log->node_to_symbol_id, (u64) node, symbol_id);
-        } else if (!bh_imap_put_if_absent(&log->node_to_symbol_id, (u64) node, symbol_id)) {
+            node->compilation_symbol_id = symbol_id;
+        } else if (node->compilation_symbol_id) {
             is_alias = 1;
+        } else {
+            node->compilation_symbol_id = symbol_id;
         }
         AstNode *inner = strip_aliases(node);
-        if (inner && inner != node) {
-            bh_imap_put_if_absent(&log->node_to_symbol_id, (u64) inner, symbol_id);
+        if (inner && inner != node && !inner->compilation_symbol_id) {
+            inner->compilation_symbol_id = symbol_id;
         }
         if (inner && inner->kind == Ast_Kind_Package) {
             AstPackage *package = (AstPackage *) inner;
@@ -830,11 +838,9 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
 
     if (is_alias) {
         compilation_log_remember_alias_symbol(context, node, symbol_id);
-        u64 primary = 0;
-        if (bh_imap_try_get(&log->node_to_symbol_id, (u64) node, &primary) && primary) {
-            if (compilation_log_binding_type_get(log, (u32) primary, NULL)) {
-                compilation_log_copy_binding_to_symbol(context, symbol_id, (u32) primary);
-            }
+        u32 primary = node->compilation_symbol_id;
+        if (primary && compilation_log_binding_type_get(log, primary, NULL)) {
+            compilation_log_copy_binding_to_symbol(context, symbol_id, primary);
         }
     } else if (node && node->kind == Ast_Kind_Local) {
         AstTyped *typed = (AstTyped *) node;
@@ -1096,17 +1102,17 @@ static u32 compilation_log_type_id_of_node(AstNode *node) {
 }
 
 static b32 compilation_log_lookup_symbol_id(CompilationLog *log, AstNode *node, u32 *out) {
+    (void) log;
     if (!node) return 0;
 
-    u64 id = 0;
-    if (bh_imap_try_get(&log->node_to_symbol_id, (u64) node, &id)) {
-        *out = (u32) id;
+    if (node->compilation_symbol_id) {
+        *out = node->compilation_symbol_id;
         return 1;
     }
 
     AstNode *inner = strip_aliases(node);
-    if (inner && inner != node && bh_imap_try_get(&log->node_to_symbol_id, (u64) inner, &id)) {
-        *out = (u32) id;
+    if (inner && inner != node && inner->compilation_symbol_id) {
+        *out = inner->compilation_symbol_id;
         return 1;
     }
 
@@ -1351,7 +1357,6 @@ void compilation_log_init(Context *context) {
     bh_buffer_init(&log->pb_sub, context->gp_alloc, 256);
     bh_buffer_init(&log->pb_item, context->gp_alloc, 128);
     bh_buffer_init(&log->pb_flush, context->gp_alloc, 64 * 1024);
-    bh_imap_init(&log->node_to_symbol_id, context->gp_alloc, 4096);
     bh_imap_init(&log->node_to_binding, context->gp_alloc, 4096);
     bh_arr_new(context->gp_alloc, log->symbol_binding_type_id, 4096);
     bh_arr_new(context->gp_alloc, log->symbol_names, 4096);

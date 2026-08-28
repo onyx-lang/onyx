@@ -939,6 +939,7 @@ AstNode* polymorphic_proc_try_solidify(Context *context, AstFunction* pp, bh_arr
         //                                                    - brendanfh 2020/12/25
         AstFunction* new_pp = onyx_ast_node_new(context->ast_alloc, sizeof(AstFunction), Ast_Kind_Polymorphic_Proc);
         memcpy(new_pp, pp, sizeof(AstFunction));
+        new_pp->compilation_symbol_id = 0;
         new_pp->token = tkn;
         new_pp->params = bh_arr_copy(context->ast_alloc, pp->params);
         new_pp->poly_params = bh_arr_copy(context->ast_alloc, pp->poly_params);

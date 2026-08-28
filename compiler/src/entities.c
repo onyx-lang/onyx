@@ -2,29 +2,32 @@
 #include "astnodes.h"
 #include "utils.h"
 
-static inline i32 entity_phase(Entity* e1) {
-    if (e1->state <= Entity_State_Parse && e1->macro_attempts == 0) return 1;
-    if (e1->state <  Entity_State_Code_Gen) return 2;
-    return 3;
+// Packed to match the old lexicographic order:
+//   phase, macro_attempts, state, type, micro_attempts, then id.
+// phase: 1 if state <= Parse && macro_attempts == 0, else 2 if state < Code_Gen, else 3.
+static inline u64 entity_sort_key(Entity* e) {
+    u32 s = (u32) e->state;
+    u32 mac = e->macro_attempts;
+    u32 phase = 3u - (u32)(s < (u32) Entity_State_Code_Gen)
+                    - (u32)(s <= (u32) Entity_State_Parse && mac == 0);
+
+    if (mac > 0x3fffffffu) mac = 0x3fffffffu;
+    u32 micro = e->micro_attempts;
+    if (micro > 0x3fffffu) micro = 0x3fffffu;
+
+    return ((u64) phase << 62)
+         | ((u64) mac   << 32)
+         | ((u64) s     << 28)
+         | ((u64) e->type << 22)
+         | (u64) micro;
 }
 
 // NOTE: Returns >0 if e1 should be processed after e2.
-static i32 entity_compare(Entity* e1, Entity* e2) {
-    i32 phase1 = entity_phase(e1);
-    i32 phase2 = entity_phase(e2);
-
-    if (phase1 != phase2)
-        return phase1 - phase2;
-    else if (e1->macro_attempts != e2->macro_attempts)
-        return (i32) e1->macro_attempts - (i32) e2->macro_attempts;
-    else if (e1->state != e2->state)
-        return (i32) e1->state - (i32) e2->state;
-    else if (e1->type != e2->type)
-        return (i32) e1->type - (i32) e2->type;
-    else if (e1->micro_attempts != e2->micro_attempts)
-        return (i32) (e1->micro_attempts - e2->micro_attempts);
-    else
-        return (i32) (e1->id - e2->id);
+static inline i32 entity_compare(Entity* e1, Entity* e2) {
+    u64 k1 = entity_sort_key(e1);
+    u64 k2 = entity_sort_key(e2);
+    if (k1 != k2) return k1 < k2 ? -1 : 1;
+    return (e1->id > e2->id) - (e1->id < e2->id);
 }
 
 #define eh_parent(index) (((index) - 1) / 2)
