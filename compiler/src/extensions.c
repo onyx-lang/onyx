@@ -304,6 +304,7 @@ static void compiler_extension_send_compilation_data(Context *context, CompilerE
     extension_send_bytes(ext, log->pb_flush.data, log->pb_flush.length);
 
     ext->compilation_data_cursor = to;
+    if (to > log->delivered_until) log->delivered_until = to;
 }
 
 #define COMPILATION_DATA_FLUSH_BATCH 8192

@@ -3220,7 +3220,8 @@ void bh_imap_init(bh_imap* imap, bh_allocator alloc, i32 hash_count) {
     bh_arr_new(alloc, imap->hashes, hash_count);
     bh_arr_new(alloc, imap->entries, 4);
 
-    fori(count, 0, hash_count) bh_arr_push(imap->hashes, -1);
+    bh_arr_set_length(imap->hashes, hash_count);
+    memset(imap->hashes, 0xFF, (size_t) hash_count * sizeof(i64));
 }
 
 void bh_imap_free(bh_imap* imap) {

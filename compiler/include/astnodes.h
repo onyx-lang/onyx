@@ -140,6 +140,7 @@ typedef struct Scope {
     OnyxFilePos closed_at;
     char* name;
     Table(AstNode *) symbols;
+    u32 log_event_index;
 } Scope;
 
 
@@ -2359,6 +2360,7 @@ typedef struct CompilationLog {
 
     u32 c_abi_cursor;
     b32 c_abi_detailed_sent;
+    u32 delivered_until;
     u32 next_file_id;
     u32 next_symbol_id;
 

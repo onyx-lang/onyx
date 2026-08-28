@@ -240,9 +240,11 @@ static char *compilation_log_type_name(Context *context, Type *type) {
 static CompilationEvent *compilation_log_new_event(Context *context, CompilationEventKind kind) {
     CompilationLog *log = &context->compilation_log;
     i32 i = bh_arr_length(log->events);
-    bh_arr_push(log->events, (CompilationEvent){ .kind = kind });
+    bh_arr_insert_end(log->events, 1);
+    CompilationEvent *ev = &log->events[i];
+    ev->kind = kind;
     log->encoded_valid = 0;
-    return &log->events[i];
+    return ev;
 }
 
 static u32 compilation_log_type_kind(TypeKind kind);
@@ -652,6 +654,7 @@ void compilation_log_emit_package(Context *context, Package *package) {
 void compilation_log_emit_scope(Context *context, Scope *scope) {
     if (!scope) return;
 
+    CompilationLog *log = &context->compilation_log;
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_SCOPE);
     ev->scope.id = (u32)scope->id;
     ev->scope.parent_scope_id = scope->parent ? (u32)scope->parent->id : 0;
@@ -661,6 +664,7 @@ void compilation_log_emit_scope(Context *context, Scope *scope) {
     ev->scope.end_line = scope->closed_at.line;
     ev->scope.end_column = scope->closed_at.column;
     ev->scope.name = scope->name ? scope->name : "";
+    scope->log_event_index = (u32)(bh_arr_length(log->events) - 1);
 }
 
 void compilation_log_emit_scope_end(Context *context, Scope *scope, OnyxFilePos pos) {
@@ -669,6 +673,19 @@ void compilation_log_emit_scope_end(Context *context, Scope *scope, OnyxFilePos 
     if (pos.line == 0) return;
 
     scope->closed_at = pos;
+
+    CompilationLog *log = &context->compilation_log;
+    u32 idx = scope->log_event_index;
+    if (idx != 0 && idx >= log->delivered_until && idx < (u32)bh_arr_length(log->events)) {
+        CompilationEvent *ev = &log->events[idx];
+        if (ev->kind == COMPILATION_EVENT_SCOPE && ev->scope.id == (u32)scope->id) {
+            ev->scope.end_line = pos.line;
+            ev->scope.end_column = pos.column;
+            log->encoded_valid = 0;
+            return;
+        }
+    }
+
     compilation_log_emit_scope(context, scope);
 }
 
@@ -769,6 +786,7 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
     ev->symbol.line = pos.line;
     ev->symbol.column = pos.column;
     ev->symbol.kind = kind;
+    ev->symbol.package_id = 0;
 
     u32 symbol_id = ev->symbol.id;
     b32 is_alias = 0;

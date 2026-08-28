@@ -125,6 +125,7 @@ Scope* scope_create(Context *context, Scope* parent, OnyxFilePos created_at) {
     scope->created_at = created_at;
     scope->closed_at = (OnyxFilePos) { 0 };
     scope->name = NULL;
+    scope->log_event_index = 0;
 
     // This will be set on the first symbol insertion.
     scope->symbols = NULL;

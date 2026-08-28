@@ -1155,6 +1155,7 @@ void onyx_compilation_data_write(onyx_context_t *ctx, void *buffer) {
     }
 
     log->c_abi_cursor = log->encoded_to;
+    if (log->c_abi_cursor > log->delivered_until) log->delivered_until = log->c_abi_cursor;
     if (log->encoded_include_detailed) log->c_abi_detailed_sent = 1;
     log->encoded_valid = 0;
 }
