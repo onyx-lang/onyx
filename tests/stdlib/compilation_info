@@ -40,6 +40,8 @@ param_p_use
 true
 get_x_param_type_ids
 true
+get_x_alias_params
+true
 point_method_mag
 true
 point_mag_is_method
@@ -147,6 +149,8 @@ true
 poly_template_found
 true
 poly_template_param
+true
+poly_param_untyped
 true
 poly_instance_count
 true

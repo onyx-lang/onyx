@@ -278,6 +278,18 @@ main :: () {
     ok("param_p_use", param_p_use_ok);
     ok("get_x_param_type_ids", get_x_param_ids_ok);
 
+    get_x_alias_params := true;
+    get_x_typed_count := 0;
+    for id in info->symbols_named("get_x") {
+        if info->get_symbol(id) as sym {
+            if sym.kind != .Function do continue;
+            if sym.type_id == 0 do continue;
+            get_x_typed_count += 1;
+            if info->param_symbols_of(sym.id).count == 0 do get_x_alias_params = false;
+        }
+    }
+    ok("get_x_alias_params", get_x_typed_count >= 2 && get_x_alias_params);
+
     point_method_ok := false;
     if point_type != null && point_type.scope_id != 0 {
         for sid in info->symbols_in_scope(point_type.scope_id) {
@@ -879,6 +891,17 @@ main :: () {
         }
     }
     ok("poly_template_param", poly_has_param);
+
+    poly_param_untyped := false;
+    if id_sym != null && id_sym.param_symbol_ids.count > 0 {
+        if polyinfo->get_symbol(id_sym.param_symbol_ids[0]) as p {
+            switch polyinfo->type_of(p.id) {
+                case .None do poly_param_untyped = p.type_id == 0;
+                case .Some {}
+            }
+        }
+    }
+    ok("poly_param_untyped", poly_param_untyped);
 
     instance_count := 0;
     distinct_param_types := 0;

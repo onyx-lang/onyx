@@ -626,13 +626,38 @@ CompilationInfo.is_method_of :: (self: &#Self, symbol_id: u32, type_id: u32) -> 
     }
 }
 
+/// Parameter symbols of a procedure. `use pkg { * }` copies a name into
+/// the using scope with the type binding but not the param list; fall
+/// back to another same-name, same-kind symbol that has params.
+CompilationInfo.param_symbols_of :: (self: &#Self, symbol_id: u32) -> [] u32 {
+    switch self->get_symbol(symbol_id) {
+        case .Some as sym {
+            if sym.param_symbol_ids.count > 0 do return sym.param_symbol_ids
+            for id in self->symbols_named(sym.name) {
+                if id == symbol_id do continue
+                if self->get_symbol(id) as other {
+                    if other.kind == sym.kind && other.param_symbol_ids.count > 0 {
+                        return other.param_symbol_ids
+                    }
+                }
+            }
+            return .{}
+        }
+        case .None do return .{}
+    }
+}
+
 CompilationInfo.type_of :: (self: &#Self, symbol_id: u32) -> ? &TypeInfo {
     switch self->get_symbol(symbol_id) {
         case .Some as sym {
             if self->get_type(sym.type_id) as t do return t
 
             // `use pkg { * }` copies a name into the using scope. The
-            // declaring symbol still has the type binding.
+            // declaring symbol still has the type binding. Parameters
+            // share short names (`r`, `x`, `value`) across the program;
+            // do not steal another parameter's type.
+            if sym.kind == .Parameter do return .None
+
             for id in self->symbols_named(sym.name) {
                 if id == symbol_id do continue
                 if self->get_symbol(id) as other {
