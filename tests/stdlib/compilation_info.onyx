@@ -9,6 +9,25 @@ ok :: (label: str, value: bool) {
     println(value)
 }
 
+CompilationInfo.keeps_outer :: (self: &#Self, name: str) -> (lookup: bool, member: bool) {
+    lookup = false;
+    member = false;
+    for id in self->symbols_named(name) {
+        if self->get_symbol(id) as sym {
+            if sym.kind != .Expression do continue;
+            for r in self->references(sym.id) {
+                if r.line == sym.line && r.column == sym.column do continue;
+                sid := self->scope_at(r.file_id, r.line, r.column);
+                if self->lookup(sid, name) as found {
+                    if found.id == sym.id do lookup = true;
+                    if self->member(found.type_id, "test") do member = true;
+                }
+            }
+        }
+    }
+    return
+}
+
 main :: () {
     b := Builder.make();
     defer b->destroy();
@@ -750,6 +769,191 @@ main :: () {
     }
     ok("static_if_keeps_outer_local", after_if_lookup);
     ok("static_if_completes_member", after_if_member);
+
+    nestb := Builder.make();
+    defer nestb->destroy();
+    nestb->map_dir("core", tprintf("{}/core", core_root));
+    nestb->enable(.DISABLE_EXTENSIONS);
+    nestb->enable(.MULTI_THREADING);
+    nestb->enable(.COMPILATION_DATA_DETAILED);
+    nestb->set_platform(.ONYX);
+    nestb->inject_source("""
+package main
+
+main :: () {
+    app := .{ test = 10 }
+    f := (c: i32) -> i32 {
+        return c
+    }
+    _ := f(1)
+    if x := 1; x > 0 {
+        _ := x
+    }
+    _ := app.test
+}
+""");
+    nestb->compile();
+
+    ok("nested_scope_compile_ok", !nestb->has_errors());
+
+    nestinfo := nestb->compilation_info();
+    defer delete(&nestinfo);
+
+    nest_lookup, nest_member := nestinfo->keeps_outer("app");
+    ok("lambda_keeps_outer_local", nest_lookup);
+    ok("lambda_completes_member", nest_member);
+    ok("if_init_keeps_outer_local", nest_lookup);
+    ok("if_init_completes_member", nest_member);
+
+    forb := Builder.make();
+    defer forb->destroy();
+    forb->map_dir("core", tprintf("{}/core", core_root));
+    forb->enable(.DISABLE_EXTENSIONS);
+    forb->enable(.MULTI_THREADING);
+    forb->enable(.COMPILATION_DATA_DETAILED);
+    forb->set_platform(.ONYX);
+    forb->inject_source("""
+package main
+
+main :: () {
+    app := .{ test = 10 }
+    xs := i32.[1, 2]
+    for x in xs {
+        _ := x
+    }
+    _ := app.test
+}
+""");
+    forb->compile();
+
+    ok("for_scope_compile_ok", !forb->has_errors());
+
+    forinfo := forb->compilation_info();
+    defer delete(&forinfo);
+
+    for_lookup, for_member := forinfo->keeps_outer("app");
+    ok("for_keeps_outer_local", for_lookup);
+    ok("for_completes_member", for_member);
+
+    polyb := Builder.make();
+    defer polyb->destroy();
+    polyb->map_dir("core", tprintf("{}/core", core_root));
+    polyb->enable(.DISABLE_EXTENSIONS);
+    polyb->enable(.MULTI_THREADING);
+    polyb->enable(.COMPILATION_DATA_DETAILED);
+    polyb->set_platform(.ONYX);
+    polyb->inject_source("""
+package main
+
+id :: (x: $T) -> T {
+    return x
+}
+
+id32 := #solidify id { T = i32 }
+
+main :: () {
+    _ := id(1)
+    _ := id("hi")
+    _ := id32(3)
+}
+""");
+    polyb->compile();
+
+    ok("poly_compile_ok", !polyb->has_errors());
+
+    polyinfo := polyb->compilation_info();
+    defer delete(&polyinfo);
+
+    id_sym: &SymbolInfo = null;
+    for sid in polyinfo->symbols_named("id") {
+        if polyinfo->get_symbol(sid) as s {
+            if s.kind == .Polymorphic_Proc do id_sym = s;
+        }
+    }
+    ok("poly_template_found", id_sym != null);
+
+    poly_has_param := false;
+    if id_sym != null && id_sym.param_symbol_ids.count > 0 {
+        if polyinfo->get_symbol(id_sym.param_symbol_ids[0]) as p {
+            if p.name == "x" do poly_has_param = true;
+        }
+    }
+    ok("poly_template_param", poly_has_param);
+
+    instance_count := 0;
+    distinct_param_types := 0;
+    solutions_named_t := 0;
+    solutions_have_types := 0;
+    instances_point_at_template := 0;
+    if id_sym != null {
+        instance_count = polyinfo->poly_instances_of(id_sym.id).count;
+        seen_a: u32 = 0;
+        seen_b: u32 = 0;
+        for iid in polyinfo->poly_instances_of(id_sym.id) {
+            if polyinfo->get_symbol(iid) as inst {
+                if inst.poly_template_id == id_sym.id {
+                    instances_point_at_template += 1;
+                }
+                if inst.poly_solution_names.count > 0 && inst.poly_solution_names[0] == "T" {
+                    solutions_named_t += 1;
+                }
+                if inst.poly_solution_type_ids.count > 0 && inst.poly_solution_type_ids[0] != 0 {
+                    solutions_have_types += 1;
+                }
+                if polyinfo->type_of(inst.id) as t {
+                    if t.kind == .Function do switch t.body {
+                        case .Function as f {
+                            pid := f.param_ids[0];
+                            if pid == 0 do continue;
+                            if seen_a == 0 {
+                                seen_a = pid;
+                                distinct_param_types += 1;
+                            } elseif pid != seen_a && seen_b == 0 {
+                                seen_b = pid;
+                                distinct_param_types += 1;
+                            }
+                        }
+                        case _ {}
+                    }
+                }
+            }
+        }
+    }
+    ok("poly_instance_count", instance_count == 2);
+    ok("poly_two_instance_types", distinct_param_types == 2);
+    ok("poly_solutions_named_t", solutions_named_t == 2);
+    ok("poly_solutions_have_types", solutions_have_types == 2);
+    ok("poly_instances_link_template", instances_point_at_template == 2);
+
+    poly_chose_two := false;
+    chosen_count := 0;
+    if id_sym != null {
+        chosen_a: u32 = 0;
+        for r in polyinfo.resolutions {
+            if r.symbol_id != id_sym.id do continue;
+            if r.chosen_symbol_id == 0 do continue;
+            chosen_count += 1;
+            if polyinfo->get_symbol(r.chosen_symbol_id) as chosen {
+                if polyinfo->type_of(chosen.id) as t {
+                    if t.kind == .Function do switch t.body {
+                        case .Function as f {
+                            pid := f.param_ids[0];
+                            if pid == 0 do continue;
+                            if chosen_a == 0 {
+                                chosen_a = pid;
+                            } elseif pid != chosen_a {
+                                poly_chose_two = true;
+                            }
+                        }
+                        case _ {}
+                    }
+                }
+            }
+        }
+    }
+    ok("poly_chose_two_sites", poly_chose_two);
+    // id(1), id("hi"), and #solidify id { T = i32 }
+    ok("poly_solidify_chose", chosen_count >= 3);
 
     ovb := Builder.make();
     defer ovb->destroy();

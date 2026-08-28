@@ -57,6 +57,12 @@ SymbolInfo :: struct {
     overload_ids: [..] u32
     /// Group this option belongs to, when it was listed by EventOverload.
     overload_group_id: u32
+    /// Solidified instances of this polymorphic procedure.
+    poly_instance_ids: [..] u32
+    /// Template this instance was generated from.
+    poly_template_id: u32
+    poly_solution_names: [..] str
+    poly_solution_type_ids: [..] u32
 }
 
 TypeInfo :: struct {
@@ -205,6 +211,22 @@ CompilationInfo.ingest_event :: (self: &#Self, event: &CompilerEvent) {
                 opt := ensure_id(&self.symbols, id)
                 opt.overload_group_id = o.group_symbol_id
             }
+        }
+
+        case .Poly_Proc as p {
+            tmpl := ensure_id(&self.symbols, p.template_symbol_id)
+            inst := ensure_id(&self.symbols, p.instance_symbol_id)
+            inst.poly_template_id = p.template_symbol_id
+            inst.poly_solution_names = p.solution_names
+            inst.poly_solution_type_ids = p.solution_type_ids
+            seen := false
+            for id in tmpl.poly_instance_ids {
+                if id == p.instance_symbol_id {
+                    seen = true
+                    break
+                }
+            }
+            if !seen do tmpl.poly_instance_ids->push(p.instance_symbol_id)
         }
 
         case .Binding as b {
@@ -713,6 +735,23 @@ CompilationInfo.overloads_of :: (self: &#Self, symbol_id: u32) -> [] u32 {
             if sym.overload_group_id != 0 {
                 if self->get_symbol(sym.overload_group_id) as group {
                     if group.overload_ids.count > 0 do return group.overload_ids
+                }
+            }
+            return .{}
+        }
+        case .None do return .{}
+    }
+}
+
+/// Solidified instances of a polymorphic procedure. If `symbol_id` is
+/// itself an instance, returns the sibling list from its template.
+CompilationInfo.poly_instances_of :: (self: &#Self, symbol_id: u32) -> [] u32 {
+    switch self->get_symbol(symbol_id) {
+        case .Some as sym {
+            if sym.poly_instance_ids.count > 0 do return sym.poly_instance_ids
+            if sym.poly_template_id != 0 {
+                if self->get_symbol(sym.poly_template_id) as tmpl {
+                    if tmpl.poly_instance_ids.count > 0 do return tmpl.poly_instance_ids
                 }
             }
             return .{}

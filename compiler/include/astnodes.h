@@ -2250,6 +2250,7 @@ typedef enum CompilationEventKind {
     COMPILATION_EVENT_TYPE = 7,
     COMPILATION_EVENT_TYPE_BODY = 8,
     COMPILATION_EVENT_OVERLOAD = 9,
+    COMPILATION_EVENT_POLY_PROC = 10,
 } CompilationEventKind;
 
 typedef struct CompilationTypeMember {
@@ -2330,6 +2331,14 @@ typedef struct CompilationEvent {
             u32 option_count;
             u32 *option_symbol_ids;
         } overload;
+
+        struct {
+            u32 template_symbol_id;
+            u32 instance_symbol_id;
+            u32 solution_count;
+            char **solution_names;
+            u32 *solution_type_ids;
+        } poly_proc;
 
         struct {
             u32 symbol_id;
@@ -2702,6 +2711,9 @@ void compilation_log_emit_symbol(Context *context, Scope *scope, char *name, Ony
 void compilation_log_emit_symbol_resolved(Context *context, AstNode *original, AstNode *resolved);
 void compilation_log_emit_overloads(Context *context, AstOverloadedFunction *ofunc);
 void compilation_log_emit_overload_choice(Context *context, OnyxToken *site, AstNode *group, AstNode *chosen);
+void compilation_log_emit_poly_proc(Context *context, AstFunction *pp, AstFunction *instance, bh_arr(AstPolySolution) slns);
+void compilation_log_emit_poly_choice(Context *context, OnyxToken *site, AstNode *template, AstNode *chosen);
+void compilation_log_ensure_poly_template_params(Context *context, AstFunction *pp);
 void compilation_log_emit_binding(Context *context, AstNode *node, AstBinding *binding);
 void compilation_log_notify_node_typed(Context *context, AstNode *node);
 void compilation_log_emit_type(Context *context, Type *type);

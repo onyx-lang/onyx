@@ -35,6 +35,8 @@ CompilerEvent :: struct {
         Type_Body as 18: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventTypeBody
         @protobuf.Field.{19, 11}
         Overload as 19: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventOverload
+        @protobuf.Field.{20, 11}
+        Poly_Proc as 20: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventPolyProc
     }
 }
 
@@ -145,6 +147,18 @@ EventOverload :: struct {
     group_symbol_id: u32
     @protobuf.Field.{2, 13}
     option_symbol_ids: [..] u32
+}
+
+@protobuf.Message
+EventPolyProc :: struct {
+    @protobuf.Field.{1, 13}
+    template_symbol_id: u32
+    @protobuf.Field.{2, 13}
+    instance_symbol_id: u32
+    @protobuf.Field.{3, 9}
+    solution_names: [..] str
+    @protobuf.Field.{4, 13}
+    solution_type_ids: [..] u32
 }
 
 @protobuf.Message

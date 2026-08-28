@@ -150,7 +150,9 @@ static AstSolidifiedFunction generate_solidified_function(
 
     assert(pp->parent_scope_of_poly_proc);
     solidified_func.func->poly_scope = scope_create(context, pp->parent_scope_of_poly_proc, poly_scope_pos);
+    compilation_log_emit_scope_end(context, solidified_func.func->poly_scope, poly_scope_pos);
     insert_poly_slns_into_scope(context, solidified_func.func->poly_scope, slns);
+    compilation_log_emit_poly_proc(context, pp, solidified_func.func, slns);
 
     solidified_func.func->flags |= Ast_Flag_From_Polymorphism;
     solidified_func.func->generated_from = tkn;

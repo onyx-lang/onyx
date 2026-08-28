@@ -40,6 +40,7 @@ message CompilerEvent {
     EventType type = 17;
     EventTypeBody type_body = 18;
     EventOverload overload = 19;
+    EventPolyProc poly_proc = 20;
   }
 }
 
@@ -118,6 +119,17 @@ message EventSymbolResolved {
 message EventOverload {
   uint32 group_symbol_id = 1;
   repeated uint32 option_symbol_ids = 2;
+}
+
+// One solidified instance of a polymorphic procedure.
+// Re-emitted is not required; each instance is reported once.
+// solution_names[i] is the polymorphic variable ($T); solution_type_ids[i]
+// is the solved type (0 if that slot was a baked value).
+message EventPolyProc {
+  uint32 template_symbol_id = 1;
+  uint32 instance_symbol_id = 2;
+  repeated string solution_names = 3;
+  repeated uint32 solution_type_ids = 4;
 }
 
 message EventBinding {

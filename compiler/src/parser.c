@@ -3878,6 +3878,9 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
 
     *ret = (AstTyped *) poly_proc;
 
+    // :LinearTokenDependent
+    poly_proc->closing_brace = parser->curr - 1;
+
     bh_arr_pop(parser->current_function_stack);
     bh_arr_free(params);
     bh_arr_free(poly_params);

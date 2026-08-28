@@ -75,6 +75,7 @@
 #define PB_COMPILER_EVENT_TYPE      17
 #define PB_COMPILER_EVENT_TYPE_BODY 18
 #define PB_COMPILER_EVENT_OVERLOAD  19
+#define PB_COMPILER_EVENT_POLY_PROC 20
 
 #define PB_EVENT_START_COMPILER_VERSION 1
 
@@ -114,6 +115,11 @@
 
 #define PB_EVENT_OVERLOAD_GROUP_SYMBOL_ID   1
 #define PB_EVENT_OVERLOAD_OPTION_SYMBOL_IDS 2
+
+#define PB_EVENT_POLY_PROC_TEMPLATE_SYMBOL_ID 1
+#define PB_EVENT_POLY_PROC_INSTANCE_SYMBOL_ID 2
+#define PB_EVENT_POLY_PROC_SOLUTION_NAMES     3
+#define PB_EVENT_POLY_PROC_SOLUTION_TYPE_IDS  4
 
 #define PB_EVENT_BINDING_SYMBOL_ID        1
 #define PB_EVENT_BINDING_DOCUMENTATION    2
@@ -180,7 +186,8 @@ static b32 compilation_event_is_detailed(CompilationEventKind kind) {
         || kind == COMPILATION_EVENT_BINDING
         || kind == COMPILATION_EVENT_TYPE
         || kind == COMPILATION_EVENT_TYPE_BODY
-        || kind == COMPILATION_EVENT_OVERLOAD;
+        || kind == COMPILATION_EVENT_OVERLOAD
+        || kind == COMPILATION_EVENT_POLY_PROC;
 }
 
 static char *compilation_log_intern(Context *context, const char *name) {
@@ -308,6 +315,18 @@ static void encode_event(CompilationLog *log, CompilationEvent *ev) {
                 pb_write_uint32_always(inner, PB_EVENT_OVERLOAD_OPTION_SYMBOL_IDS, ev->overload.option_symbol_ids[i]);
             }
             pb_write_bytes(out, PB_COMPILER_EVENT_OVERLOAD, inner->data, inner->length);
+            break;
+
+        case COMPILATION_EVENT_POLY_PROC:
+            pb_write_uint32(inner, PB_EVENT_POLY_PROC_TEMPLATE_SYMBOL_ID, ev->poly_proc.template_symbol_id);
+            pb_write_uint32(inner, PB_EVENT_POLY_PROC_INSTANCE_SYMBOL_ID, ev->poly_proc.instance_symbol_id);
+            for (u32 i = 0; i < ev->poly_proc.solution_count; i++) {
+                pb_write_string(inner, PB_EVENT_POLY_PROC_SOLUTION_NAMES, ev->poly_proc.solution_names[i]);
+            }
+            for (u32 i = 0; i < ev->poly_proc.solution_count; i++) {
+                pb_write_uint32_always(inner, PB_EVENT_POLY_PROC_SOLUTION_TYPE_IDS, ev->poly_proc.solution_type_ids[i]);
+            }
+            pb_write_bytes(out, PB_COMPILER_EVENT_POLY_PROC, inner->data, inner->length);
             break;
 
         case COMPILATION_EVENT_BINDING:
@@ -823,6 +842,114 @@ void compilation_log_emit_overload_choice(Context *context, OnyxToken *site, Ast
     compilation_log_emit_resolved_at(context, site, group_id, chosen_id);
 }
 
+static char *compilation_log_function_display_name(Context *context, AstFunction *func) {
+    if (!func) return compilation_log_intern(context, "proc");
+    if (func->name && func->name[0]) return compilation_log_intern(context, func->name);
+    if (func->token && func->token->text && func->token->length > 0) {
+        return compilation_log_intern_len(context, func->token->text, func->token->length);
+    }
+    return compilation_log_intern(context, "proc");
+}
+
+void compilation_log_ensure_poly_template_params(Context *context, AstFunction *pp) {
+    if (!pp) return;
+
+    bh_arr_each(AstParam, param, pp->params) {
+        if (!param->local || !param->local->token) continue;
+        char *name = compilation_log_intern_len(
+            context, param->local->token->text, param->local->token->length
+        );
+        compilation_log_emit_symbol_with_kind(
+            context, NULL, name, param->local->token->pos,
+            (AstNode *) param->local, SYMBOL_KIND_PARAMETER, 1
+        );
+    }
+
+    compilation_log_emit_binding(context, (AstNode *) pp, NULL);
+}
+
+void compilation_log_emit_poly_proc(Context *context, AstFunction *pp, AstFunction *instance, bh_arr(AstPolySolution) slns) {
+    if (!pp || !instance) return;
+
+    CompilationLog *log = &context->compilation_log;
+    u32 template_id = 0;
+    if (!compilation_log_lookup_symbol_id(log, (AstNode *) pp, &template_id)) {
+        char *name = compilation_log_function_display_name(context, pp);
+        OnyxFilePos pos = pp->token ? pp->token->pos : (OnyxFilePos){0};
+        template_id = compilation_log_emit_symbol_with_kind(
+            context, NULL, name, pos, (AstNode *) pp, SYMBOL_KIND_POLYMORPHIC_PROC, 1
+        );
+    }
+    if (!template_id) return;
+
+    compilation_log_ensure_poly_template_params(context, pp);
+
+    u32 instance_id = 0;
+    if (!compilation_log_lookup_symbol_id(log, (AstNode *) instance, &instance_id)) {
+        char *name = compilation_log_function_display_name(context, pp);
+        OnyxFilePos pos = pp->token ? pp->token->pos : (OnyxFilePos){0};
+        if (instance->token) pos = instance->token->pos;
+        instance_id = compilation_log_emit_symbol_with_kind(
+            context, NULL, name, pos, (AstNode *) instance, SYMBOL_KIND_FUNCTION, 1
+        );
+    }
+    if (!instance_id) return;
+
+    compilation_log_emit_binding(context, (AstNode *) instance, NULL);
+
+    u32 n = (u32) bh_arr_length(slns);
+    char **names = NULL;
+    u32 *type_ids = NULL;
+    if (n > 0) {
+        names = bh_alloc(context->gp_alloc, sizeof(char *) * n);
+        type_ids = bh_alloc(context->gp_alloc, sizeof(u32) * n);
+        u32 i = 0;
+        bh_arr_each(AstPolySolution, sln, slns) {
+            char *sname = compilation_log_intern(context, "?");
+            if (sln->poly_sym && sln->poly_sym->token && sln->poly_sym->token->length > 0) {
+                sname = compilation_log_intern_len(
+                    context, sln->poly_sym->token->text, sln->poly_sym->token->length
+                );
+            }
+            names[i] = sname;
+
+            u32 tid = 0;
+            if (sln->kind == PSK_Type && sln->type) {
+                compilation_log_emit_type(context, sln->type);
+                tid = sln->type->id;
+            } else if (sln->kind == PSK_Value && sln->value && sln->value->type) {
+                compilation_log_emit_type(context, sln->value->type);
+                tid = sln->value->type->id;
+            }
+            type_ids[i] = tid;
+            i++;
+        }
+    }
+
+    CompilationEvent ev;
+    memset(&ev, 0, sizeof(ev));
+    ev.kind = COMPILATION_EVENT_POLY_PROC;
+    ev.poly_proc.template_symbol_id = template_id;
+    ev.poly_proc.instance_symbol_id = instance_id;
+    ev.poly_proc.solution_count = n;
+    ev.poly_proc.solution_names = names;
+    ev.poly_proc.solution_type_ids = type_ids;
+    compilation_log_push(context, ev);
+}
+
+void compilation_log_emit_poly_choice(Context *context, OnyxToken *site, AstNode *template, AstNode *chosen) {
+    if (!site || !template || !chosen) return;
+
+    CompilationLog *log = &context->compilation_log;
+    u32 template_id = 0;
+    u32 chosen_id = 0;
+    if (!compilation_log_lookup_symbol_id(log, template, &template_id)) return;
+    if (!compilation_log_lookup_symbol_id(log, chosen, &chosen_id)) return;
+    if (!chosen_id || chosen_id == template_id) return;
+
+    compilation_log_emit_resolved_at(context, site, template_id, chosen_id);
+}
+
 static u32 compilation_log_type_id_of_node(AstNode *node) {
     if (!node) return 0;
 
@@ -957,14 +1084,6 @@ static void compilation_log_emit_binding_for_id(Context *context, u32 symbol_id,
     }
 
     u32 type_id = compilation_log_type_id_of_node(node);
-    if (type_id == 0 && !binding) return;
-
-    if (bh_imap_has(&log->symbol_binding_type_id, (u64) symbol_id)) {
-        u32 prev = (u32) bh_imap_get(&log->symbol_binding_type_id, (u64) symbol_id);
-        if (prev == type_id) return;
-        if (type_id == 0) return;
-    }
-    bh_imap_put(&log->symbol_binding_type_id, (u64) symbol_id, (u64) type_id);
 
     u32 param_count = 0;
     u32 *param_symbol_ids = NULL;
@@ -983,6 +1102,23 @@ static void compilation_log_emit_binding_for_id(Context *context, u32 symbol_id,
             }
         }
     }
+
+    b32 any_param = 0;
+    for (u32 i = 0; i < param_count; i++) {
+        if (param_symbol_ids[i]) { any_param = 1; break; }
+    }
+
+    if (type_id == 0 && !binding && !any_param) return;
+
+    if (bh_imap_has(&log->symbol_binding_type_id, (u64) symbol_id)) {
+        u32 prev = (u32) bh_imap_get(&log->symbol_binding_type_id, (u64) symbol_id);
+        if (prev == type_id) {
+            if (type_id != 0) return;
+            if (!any_param) return;
+        }
+        if (type_id == 0 && prev != 0) return;
+    }
+    bh_imap_put(&log->symbol_binding_type_id, (u64) symbol_id, (u64) type_id);
 
     char *docs = "";
     if (binding) {

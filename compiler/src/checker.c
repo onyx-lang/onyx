@@ -162,6 +162,30 @@ static void scope_leave(Context *context) {
     context->checker.current_scope = bh_arr_last(context->checker.scope_stack);
 }
 
+static OnyxFilePos ast_block_end_pos(AstBlock *block) {
+    if (!block) return (OnyxFilePos) { 0 };
+    if (block->closing) return block->closing->pos;
+    if (block->token) return block->token->pos;
+    return (OnyxFilePos) { 0 };
+}
+
+static void compilation_log_close_scope(Context *context, Scope *scope, OnyxFilePos pos) {
+    if (!scope) return;
+    compilation_log_emit_scope_end(context, scope, pos);
+}
+
+static void compilation_log_close_function_scopes(Context *context, AstFunction *func) {
+    OnyxFilePos func_end = { 0 };
+    if (func->closing_brace) func_end = func->closing_brace->pos;
+    else if (func->body) func_end = ast_block_end_pos(func->body);
+    else if (func->token) func_end = func->token->pos;
+    compilation_log_close_scope(context, func->scope, func_end);
+
+    if (func->poly_scope) {
+        compilation_log_close_scope(context, func->poly_scope, func->poly_scope->created_at);
+    }
+}
+
 static void clear_modes(Context *context) {
     context->checker.mode = 0;
 }
@@ -435,6 +459,10 @@ CHECK_FUNC(if, AstIfWhile* ifnode) {
         }
 
         if (ifnode->initialization != NULL || ifnode->optional_extract) {
+            OnyxFilePos end = ast_block_end_pos(ifnode->false_stmt);
+            if (end.line == 0) end = ast_block_end_pos(ifnode->true_stmt);
+            if (end.line == 0 && ifnode->token) end = ifnode->token->pos;
+            compilation_log_close_scope(context, ifnode->scope, end);
             scope_leave(context);
         }
     }
@@ -479,6 +507,10 @@ CHECK_FUNC(while, AstIfWhile* whilenode) {
     bh_arr_pop(context->checker.while_node_stack);
 
     if (whilenode->initialization != NULL) {
+        OnyxFilePos end = ast_block_end_pos(whilenode->false_stmt);
+        if (end.line == 0) end = ast_block_end_pos(whilenode->true_stmt);
+        if (end.line == 0 && whilenode->token) end = whilenode->token->pos;
+        compilation_log_close_scope(context, whilenode->scope, end);
         scope_leave(context);
     }
 
@@ -618,6 +650,14 @@ CHECK_FUNC(case, AstSwitchCase *casenode) {
     }
 
     if (casenode->capture) {
+        OnyxFilePos end = { 0 };
+        if (casenode->body_is_expr) {
+            if (casenode->expr && casenode->expr->token) end = casenode->expr->token->pos;
+        } else {
+            end = ast_block_end_pos(casenode->block);
+        }
+        if (end.line == 0 && casenode->token) end = casenode->token->pos;
+        compilation_log_close_scope(context, casenode->scope, end);
         scope_leave(context);
     }
 
@@ -926,6 +966,9 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
     }
 
     if (switchnode->initialization) {
+        OnyxFilePos end = ast_block_end_pos(switchnode->case_block);
+        if (end.line == 0 && switchnode->token) end = switchnode->token->pos;
+        compilation_log_close_scope(context, switchnode->scope, end);
         scope_leave(context);
     }
 
@@ -954,6 +997,7 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
 
     AstTyped* callee = (AstTyped *) strip_aliases((AstNode *) call->callee);
     AstTyped* original_callee = callee;
+    AstTyped* poly_template = NULL;
 
     b32 calling_a_macro = 0;
     b32 need_to_check_overload_return_type = 0;
@@ -1028,6 +1072,7 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
         callee = new_callee;
 
     } else while (callee->kind == Ast_Kind_Polymorphic_Proc) {
+        if (!poly_template) poly_template = callee;
         AstTyped* new_callee = (AstTyped *) polymorphic_proc_lookup(context, (AstFunction *) callee, PPLM_By_Arguments, &call->args, call->token);
         if (new_callee == NULL) return Check_Error;
         if (new_callee == (AstTyped *) &context->node_that_signals_a_yield) {
@@ -1036,6 +1081,15 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
 
         arguments_remove_baked(&call->args);
         callee = new_callee;
+    }
+
+    if (poly_template && callee && callee != poly_template) {
+        compilation_log_emit_poly_choice(
+            context,
+            call->callee_name_token ? call->callee_name_token : call->token,
+            (AstNode *) poly_template,
+            (AstNode *) callee
+        );
     }
 
     // NOTE: Build callee's type
@@ -3506,7 +3560,9 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
 
     if (bound_symbol_count > 0) {
         assert(scope);
-        *scope = scope_create(context, NULL, code_block->token->pos);
+        Scope *parent = code_block->enclosing_scope;
+        if (!parent) parent = context->checker.current_scope;
+        *scope = scope_create(context, parent, code_block->token->pos);
 
         fori (i, 0, bound_symbol_count) {
             CodeBlockBindingSymbol sym = code_block->binding_symbols[i];
@@ -3527,7 +3583,11 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
 
     if (bh_arr_length(insert->bindings) > 0) {
         assert(scope);
-        if (!*scope) *scope = scope_create(context, NULL, code_block->token->pos);
+        if (!*scope) {
+            Scope *parent = code_block->enclosing_scope;
+            if (!parent) parent = context->checker.current_scope;
+            *scope = scope_create(context, parent, code_block->token->pos);
+        }
 
         bh_arr_each(UnquoteDirectiveBinding, binding, insert->bindings) {
             symbol_introduce(context, *scope, binding->symbol, (AstNode *) binding->value);
@@ -3675,6 +3735,17 @@ CHECK_FUNC(directive_solidify, AstDirectiveSolidify** psolid) {
     if (solid->resolved_proc == (AstNode *) &context->node_that_signals_a_yield) {
         solid->resolved_proc = NULL;
         YIELD(solid->token->pos, "Waiting for solidification to finish.");
+    }
+
+    if (solid->resolved_proc && target &&
+        (AstNode *) target != solid->resolved_proc) {
+        OnyxToken *site = solid->token;
+        if (solid->poly_proc && solid->poly_proc->token) {
+            site = solid->poly_proc->token;
+        }
+        compilation_log_emit_poly_choice(
+            context, site, (AstNode *) target, solid->resolved_proc
+        );
     }
 
     // NOTE: Not a DirectiveSolidify.
@@ -3917,10 +3988,17 @@ CHECK_FUNC(statement_chain, AstNode** walker) {
     return Check_Success;
 }
 
-static void compilation_log_close_macro_binding_scope(Context *context, AstBlock *block) {
-    if (!block->binding_scope) return;
-    if (!block->macro_generated_from) return;
-    compilation_log_emit_scope_end(context, block->binding_scope, block->macro_generated_from->pos);
+static void compilation_log_close_block_extra_scopes(Context *context, AstBlock *block) {
+    if (block->binding_scope && block->macro_generated_from) {
+        compilation_log_emit_scope_end(context, block->binding_scope, block->macro_generated_from->pos);
+    }
+
+    if (block->quoted_block_capture_scope) {
+        OnyxFilePos end = ast_block_end_pos(block);
+        if (end.line == 0 && block->macro_generated_from) end = block->macro_generated_from->pos;
+        if (end.line == 0 && block->token) end = block->token->pos;
+        compilation_log_close_scope(context, block->quoted_block_capture_scope, end);
+    }
 }
 
 CHECK_FUNC(block, AstBlock* block) {
@@ -3941,11 +4019,9 @@ CHECK_FUNC(block, AstBlock* block) {
         scope_include(context, context->checker.current_scope, block->quoted_block_capture_scope, block->token->pos);
 
     if (!block->body) {
-        compilation_log_close_macro_binding_scope(context, block);
+        compilation_log_close_block_extra_scopes(context, block);
         if (block->rules & Block_Rule_New_Scope) {
-            if (block->scope && block->closing) {
-                compilation_log_emit_scope_end(context, block->scope, block->closing->pos);
-            }
+            compilation_log_close_scope(context, block->scope, ast_block_end_pos(block));
             scope_leave(context);
         }
 
@@ -3999,12 +4075,10 @@ CHECK_FUNC(block, AstBlock* block) {
         block->flags |= Ast_Flag_Block_Returns;
     }
 
-    compilation_log_close_macro_binding_scope(context, block);
+    compilation_log_close_block_extra_scopes(context, block);
 
     if (block->rules & Block_Rule_New_Scope) {
-        if (block->scope && block->closing) {
-            compilation_log_emit_scope_end(context, block->scope, block->closing->pos);
-        }
+        compilation_log_close_scope(context, block->scope, ast_block_end_pos(block));
         scope_leave(context);
     }
 
@@ -4023,6 +4097,8 @@ CHECK_FUNC(polyproc, AstFunction* pp) {
             CHECK(expression, &param->default_value);
         }
     }
+
+    compilation_log_ensure_poly_template_params(context, pp);
 
     return Check_Complete;
 }
@@ -4168,9 +4244,7 @@ CHECK_FUNC(function, AstFunction* func) {
 
     func->flags |= Ast_Flag_Has_Been_Checked;
 
-    if (func->closing_brace) {
-        compilation_log_emit_scope_end(context, func->scope, func->closing_brace->pos);
-    }
+    compilation_log_close_function_scopes(context, func);
 
     scope_leave(context);
 
@@ -4672,6 +4746,10 @@ CHECK_FUNC(function_header, AstFunction* func) {
         func->scope = scope_create(context, context->checker.current_scope, func->token->pos);
     }
 
+    // The end position is known from parse. Close now so a later yield/error
+    // does not leave this scope open for the rest of the file.
+    compilation_log_close_function_scopes(context, func);
+
     scope_enter(context, func->scope);
 
     if (!mode_enabled(context, CM_Dont_Resolve_Symbols)) {
@@ -4860,6 +4938,8 @@ CHECK_FUNC(function_header, AstFunction* func) {
 
         CHECK(local, &func->stack_trace_local);
     }
+
+    compilation_log_close_function_scopes(context, func);
 
     scope_leave(context);
 
