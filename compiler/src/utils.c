@@ -933,7 +933,7 @@ void expand_macro(Context *context, AstCall** pcall, AstFunction* template) {
         subst = (AstNode *) doblock;
     }
 
-    Scope* argument_scope = scope_create(context, NULL, call->token->pos);
+    Scope* argument_scope = scope_create(context, context->checker.current_scope, call->token->pos);
     if (expansion->binding_scope != NULL)
         scope_include(context, argument_scope, expansion->binding_scope, call->token->pos);
     expansion->binding_scope = argument_scope;

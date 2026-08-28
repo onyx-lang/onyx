@@ -3917,6 +3917,12 @@ CHECK_FUNC(statement_chain, AstNode** walker) {
     return Check_Success;
 }
 
+static void compilation_log_close_macro_binding_scope(Context *context, AstBlock *block) {
+    if (!block->binding_scope) return;
+    if (!block->macro_generated_from) return;
+    compilation_log_emit_scope_end(context, block->binding_scope, block->macro_generated_from->pos);
+}
+
 CHECK_FUNC(block, AstBlock* block) {
     // This used to use statement_chain, but since block optimize which statements need to be rechecked,
     // it has to be its own thing.
@@ -3935,6 +3941,7 @@ CHECK_FUNC(block, AstBlock* block) {
         scope_include(context, context->checker.current_scope, block->quoted_block_capture_scope, block->token->pos);
 
     if (!block->body) {
+        compilation_log_close_macro_binding_scope(context, block);
         if (block->rules & Block_Rule_New_Scope) {
             if (block->scope && block->closing) {
                 compilation_log_emit_scope_end(context, block->scope, block->closing->pos);
@@ -3991,6 +3998,8 @@ CHECK_FUNC(block, AstBlock* block) {
     if (last && last->flags & Ast_Flag_Block_Returns) {
         block->flags |= Ast_Flag_Block_Returns;
     }
+
+    compilation_log_close_macro_binding_scope(context, block);
 
     if (block->rules & Block_Rule_New_Scope) {
         if (block->scope && block->closing) {
