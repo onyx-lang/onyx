@@ -105,6 +105,11 @@ ONYX_DEF(onyx_inject_code_as, (WASM_I64, WASM_I32,WASM_I32, WASM_I32,WASM_I32), 
     return NULL;
 }
 
+ONYX_DEF(onyx_overlay_file, (WASM_I64, WASM_I32,WASM_I32, WASM_I32,WASM_I32), ()) {
+    onyx_overlay_file((onyx_context_t *) P(0, i64), ONYX_PTR(P(1, i32)), P(2, i32), ONYX_PTR(P(3, i32)), P(4, i32));
+    return NULL;
+}
+
 ONYX_DEF(onyx_add_mapped_dir, (WASM_I64, WASM_I32,WASM_I32, WASM_I32,WASM_I32), ()) {
     onyx_add_mapped_dir((onyx_context_t *) P(0, i64), ONYX_PTR(P(1, i32)), P(2, i32), ONYX_PTR(P(3, i32)), P(4, i32));
     return NULL;
@@ -217,6 +222,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(onyx_error_count)
     ONYX_FUNC(onyx_inject_code)
     ONYX_FUNC(onyx_inject_code_as)
+    ONYX_FUNC(onyx_overlay_file)
     ONYX_FUNC(onyx_add_mapped_dir)
     ONYX_FUNC(onyx_include_file)
     ONYX_FUNC(onyx_add_defined_var)

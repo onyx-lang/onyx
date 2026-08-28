@@ -160,6 +160,7 @@ void onyx_context_free(onyx_context_t *ctx) {
     onyx_wasm_module_free(context->wasm_module);
     bh_arena_free(&context->ast_arena);
     bh_arr_free(context->loaded_files);
+    bh_arr_free(context->file_overlays);
     bh_scratch_free(&context->scratch);
     bh_managed_heap_free(&context->heap);
 
@@ -184,11 +185,75 @@ static void parse_source_file(Context *context, bh_file_contents* file_contents)
     onyx_parser_free(&parser);
 }
 
+static b32 overlay_path_match(const char *a, const char *b) {
+    if (!a || !b) return 0;
+    if (!strcmp(a, b)) return 1;
+
+    i32 i = (i32) strlen(a);
+    i32 j = (i32) strlen(b);
+    while (i > 0 && j > 0) {
+        i -= 1;
+        j -= 1;
+        char ca = a[i] == '\\' ? '/' : a[i];
+        char cb = b[j] == '\\' ? '/' : b[j];
+        if (ca != cb) return 0;
+    }
+
+    if (i == 0 && j == 0) return 1;
+    if (i == 0 && j > 0 && (b[j - 1] == '/' || b[j - 1] == '\\')) return 1;
+    if (j == 0 && i > 0 && (a[i - 1] == '/' || a[i - 1] == '\\')) return 1;
+    return 0;
+}
+
+static char *overlay_canon_name(Context *context, char *filename) {
+    if (!filename) return filename;
+    if (!bh_file_exists(filename)) return filename;
+    char *full = bh_path_get_full_name(filename, context->gp_alloc);
+    if (full) return full;
+    return filename;
+}
+
+static CompilationFileOverlay *find_file_overlay(Context *context, const char *filename) {
+    if (!filename || !context->file_overlays) return NULL;
+
+    const char *lookup = filename;
+    if (bh_file_exists((char *) filename)) {
+        char *full = bh_path_get_full_name((char *) filename, context->scratch_alloc);
+        if (full) lookup = full;
+    }
+
+    bh_arr_each(CompilationFileOverlay, o, context->file_overlays) {
+        if (overlay_path_match(o->filename, lookup)) return o;
+        if (lookup != filename && overlay_path_match(o->filename, filename)) return o;
+    }
+    return NULL;
+}
+
+static bh_file_contents file_contents_from_overlay(Context *context, const char *filename, CompilationFileOverlay *ov) {
+    bh_file_contents fc;
+    memset(&fc, 0, sizeof fc);
+    fc.allocator = context->token_alloc;
+    fc.length = ov->length > 0 ? ov->length : 0;
+    fc.data = bh_alloc(context->token_alloc, fc.length + 1);
+    if (fc.length > 0 && ov->data) memcpy(fc.data, ov->data, fc.length);
+    ((char *) fc.data)[fc.length] = '\0';
+    fc.filename = bh_strdup(context->token_alloc, (char *) filename);
+    return fc;
+}
+
 static b32 process_source_file(Context *context, char* filename) {
     bh_arr_each(bh_file_contents, fc, context->loaded_files) {
         // Duplicates are detected here and since these filenames will be the full path,
         // string comparing them should be all that is necessary.
         if (!strcmp(fc->filename, filename)) return 1;
+    }
+
+    CompilationFileOverlay *ov = find_file_overlay(context, filename);
+    if (ov) {
+        bh_arr_push(context->loaded_files, file_contents_from_overlay(context, filename, ov));
+        compilation_log_emit_file(context, bh_arr_last(context->loaded_files).filename);
+        parse_source_file(context, &bh_arr_last(context->loaded_files));
+        return 1;
     }
 
     bh_file file;
@@ -293,6 +358,13 @@ static b32 process_load_entity(Context *context, Entity* ent) {
                 return process_load_directory(context, include, filename);
             }
             return process_source_file(context, filename);
+        }
+
+        {
+            CompilationFileOverlay *ov = find_file_overlay(context, include->name);
+            if (ov) {
+                return process_source_file(context, ov->filename);
+            }
         }
 
         OnyxFilePos error_pos = include->token->pos;
@@ -842,6 +914,37 @@ void onyx_inject_code_as(onyx_context_t *ctx, char *filename, int32_t filename_l
 
 void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length) {
     onyx_inject_code_as(ctx, "(injected)", -1, code, length);
+}
+
+void onyx_overlay_file(onyx_context_t *ctx, char *filename, int32_t filename_length, uint8_t *code, int32_t length) {
+    stbds_bind(ctx);
+    if (!filename) return;
+    if (filename_length < 0) filename_length = (int32_t) strlen(filename);
+    if (length < 0) length = code ? (int32_t) strlen((char *) code) : 0;
+
+    char *name = overlay_canon_name(&ctx->context, bh_strdup_len(ctx->context.gp_alloc, filename, filename_length));
+    uint8_t *data = bh_alloc(ctx->context.gp_alloc, length + 1);
+    if (length > 0 && code) memcpy(data, code, length);
+    data[length] = 0;
+
+    if (!ctx->context.file_overlays) {
+        bh_arr_new(ctx->context.gp_alloc, ctx->context.file_overlays, 4);
+    }
+
+    bh_arr_each(CompilationFileOverlay, o, ctx->context.file_overlays) {
+        if (overlay_path_match(o->filename, name)) {
+            o->filename = name;
+            o->data = data;
+            o->length = length;
+            return;
+        }
+    }
+
+    CompilationFileOverlay ov;
+    ov.filename = name;
+    ov.data = data;
+    ov.length = length;
+    bh_arr_push(ctx->context.file_overlays, ov);
 }
 
 //

@@ -51,6 +51,11 @@ Builder.inject_source_as :: (use self: &#Self, filename: str, source: str) {
     native.onyx_inject_code_as(ctx, filename, source)
 }
 
+/// Use `source` instead of the on-disk file when this path is `#load`ed.
+Builder.overlay_file :: (use self: &#Self, filename: str, source: str) {
+    native.onyx_overlay_file(ctx, filename, source)
+}
+
 Builder.set_platform :: (use self: &#Self, platform: native.onyx_platform_t) {
     native.onyx_set_option_int(ctx, .PLATFORM, ~~platform)
 }

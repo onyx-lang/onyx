@@ -842,4 +842,34 @@ main :: () {
         }
     }
     ok("overload_resolve_at_chosen", resolve_prefers_chosen);
+
+    disk := tprintf("/tmp/onyx_overlay_{}.onyx", os.time());
+    wrote := os.File.write_contents(disk, "package main\ndisk_val :: 1\nmain :: () {\n}\n");
+    ok("overlay_wrote_disk", wrote);
+
+    overlay_b := Builder.make();
+    defer overlay_b->destroy();
+    overlay_b->map_dir("core", tprintf("{}/core", core_root));
+    overlay_b->enable(.DISABLE_EXTENSIONS);
+    overlay_b->enable(.MULTI_THREADING);
+    overlay_b->enable(.COMPILATION_DATA_DETAILED);
+    overlay_b->set_platform(.ONYX);
+    overlay_b->overlay_file(disk, """
+package main
+overlay_val :: 1
+main :: () {
+}
+""");
+    overlay_b->add_source(disk);
+    overlay_b->compile();
+
+    ok("overlay_compile_ok", !overlay_b->has_errors());
+
+    overlay_info := overlay_b->compilation_info();
+    defer delete(&overlay_info);
+
+    has_overlay := overlay_info->symbols_named("overlay_val").count > 0;
+    has_disk := overlay_info->symbols_named("disk_val").count > 0;
+    ok("overlay_uses_buffer", has_overlay);
+    ok("overlay_hides_disk", !has_disk);
 }

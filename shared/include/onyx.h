@@ -152,6 +152,10 @@ API void onyx_add_mapped_dir(onyx_context_t *ctx, char *mapped_name, int32_t map
 API void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length);
 API void onyx_inject_code_as(onyx_context_t *ctx, char *filename, int32_t filename_length, uint8_t *code, int32_t length);
 
+/// Prefer this buffer when `#load` / `onyx_include_file` opens `filename`.
+/// The path is matched on the full resolved name or a suffix. Copied.
+API void onyx_overlay_file(onyx_context_t *ctx, char *filename, int32_t filename_length, uint8_t *code, int32_t length);
+
 //
 // Errors 
 //

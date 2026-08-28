@@ -2399,6 +2399,12 @@ typedef struct CompilationEvent {
     };
 } CompilationEvent;
 
+typedef struct CompilationFileOverlay {
+    char *filename;
+    uint8_t *data;
+    i32 length;
+} CompilationFileOverlay;
+
 typedef struct CompilationLogAliasSymbol {
     AstNode *node;
     u32 symbol_id;
@@ -2457,6 +2463,9 @@ struct Context {
 
     bh_arr(bh_file_contents) loaded_files;
     bh_arr(DefinedVariable) defined_variables;
+
+    // Unsaved editor buffers. process_source_file prefers these over disk.
+    bh_arr(CompilationFileOverlay) file_overlays;
 
     // NOTE: This is defined in wasm_emit.h
     struct OnyxWasmModule* wasm_module;

@@ -146,3 +146,11 @@ overload_chose_bool
 true
 overload_resolve_at_chosen
 true
+overlay_wrote_disk
+true
+overlay_compile_ok
+true
+overlay_uses_buffer
+true
+overlay_hides_disk
+true
