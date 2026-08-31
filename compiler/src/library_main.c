@@ -173,6 +173,7 @@ void onyx_context_free(onyx_context_t *ctx) {
     onyx_wasm_module_free(context->wasm_module);
     bh_arena_free(&context->ast_arena);
     bh_arr_free(context->loaded_files);
+    bh_arr_free(context->file_overlays);
     bh_scratch_free(&context->scratch);
     bh_managed_heap_free(&context->heap);
 
@@ -392,6 +393,15 @@ static b32 process_load_entity(Context *context, Entity* ent) {
 
 static b32 process_entity(Context *context, Entity* ent) {
     EntityState before_state = ent->state;
+
+     if (context->options.parse_only
+         && before_state != Entity_State_Parse
+         && before_state != Entity_State_Parse_Builtin
+         && before_state != Entity_State_Error) {
+         ent->state = Entity_State_Finalized;
+         return 1;
+     }
+
     switch (before_state) {
         case Entity_State_Error:
             if (ent->type != Entity_Type_Error) {
@@ -476,6 +486,11 @@ static void send_stalled_hooks(Context *context) {
 }
 
 static void prime_pump(Context *context) {
+    if (context->options.parse_only) {
+        context->pump_is_primed = 1;
+        return;
+    }
+
     // NOTE: Add builtin entities to pipeline.
     entity_heap_insert(&context->entities, ((Entity) {
         .state = Entity_State_Parse_Builtin,
@@ -573,6 +588,14 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
     }
 
     if (bh_arr_is_empty(context->entities.entities)) {
+        if (context->options.parse_only) {
+            return ONYX_PUMP_DONE;
+        }
+
+        if (onyx_has_errors(context)) {
+            return ONYX_PUMP_ERRORED;
+        }
+
         // Once the module has been linked, we are all done and ready to say everything compiled successfully!
         if (context->wasm_module_linked) return ONYX_PUMP_DONE;
 
@@ -758,6 +781,7 @@ int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t valu
     case ONYX_OPTION_DISABLE_FILE_CONTENTS:  ctx->context.options.no_file_contents = value; return 1;
     case ONYX_OPTION_DISABLE_EXTENSIONS:     ctx->context.options.no_compiler_extensions = value; return 1;
     case ONYX_OPTION_PLATFORM:               ctx->context.options.runtime = value; return 1;
+    case ONYX_OPTION_PARSE_ONLY:             ctx->context.options.parse_only = value; return 1;
 
     default:
         break;
@@ -801,16 +825,70 @@ void onyx_add_mapped_dir(onyx_context_t *ctx, char *mapped_name, int32_t mapped_
     }));
 }
 
-/// Directly injects Onyx code as a new compilation unit
-void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length) {
+/// Directly injects Onyx code as a new compilation unit.
+/// The source is copied onto the context heap so tokens remain valid
+/// after the caller reuses its buffer.
+void onyx_inject_code_as(onyx_context_t *ctx, char *filename, int32_t filename_length, uint8_t *code, int32_t length) {
     __library_code_entry(ctx);
-    bh_file_contents file_contents;
-    file_contents.allocator = ctx->context.ast_alloc;
-    file_contents.data = code;
-    file_contents.length = length;
-    file_contents.filename = "(injected)";
 
-    parse_source_file(&ctx->context, &file_contents);
+    if (length < 0) {
+        length = code ? (int32_t) strlen((char *) code) : 0;
+    }
+
+    bh_file_contents file_contents;
+    memset(&file_contents, 0, sizeof file_contents);
+    file_contents.allocator = ctx->context.token_alloc;
+    file_contents.data = bh_alloc(ctx->context.token_alloc, length + 1);
+    if (length > 0 && code) {
+        memcpy(file_contents.data, code, length);
+    }
+    ((char *) file_contents.data)[length] = '\0';
+    file_contents.length = length;
+
+    if (filename && filename_length != 0) {
+        if (filename_length < 0) filename_length = (int32_t) strlen(filename);
+        file_contents.filename = bh_strdup_len(ctx->context.token_alloc, filename, filename_length);
+    } else {
+        file_contents.filename = "(injected)";
+    }
+
+    bh_arr_push(ctx->context.loaded_files, file_contents);
+    parse_source_file(&ctx->context, &bh_arr_last(ctx->context.loaded_files));
+}
+
+void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length) {
+    onyx_inject_code_as(ctx, "(injected)", -1, code, length);
+}
+
+void onyx_overlay_file(onyx_context_t *ctx, char *filename, int32_t filename_length, uint8_t *code, int32_t length) {
+    __library_code_entry(ctx);
+    if (!filename) return;
+    if (filename_length < 0) filename_length = (int32_t) strlen(filename);
+    if (length < 0) length = code ? (int32_t) strlen((char *) code) : 0;
+
+    char *name = overlay_canon_name(&ctx->context, bh_strdup_len(ctx->context.gp_alloc, filename, filename_length));
+    uint8_t *data = bh_alloc(ctx->context.gp_alloc, length + 1);
+    if (length > 0 && code) memcpy(data, code, length);
+    data[length] = 0;
+
+    if (!ctx->context.file_overlays) {
+        bh_arr_new(ctx->context.gp_alloc, ctx->context.file_overlays, 4);
+    }
+
+    bh_arr_each(CompilationFileOverlay, o, ctx->context.file_overlays) {
+        if (overlay_path_match(o->filename, name)) {
+            o->filename = name;
+            o->data = data;
+            o->length = length;
+            return;
+        }
+    }
+
+    CompilationFileOverlay ov;
+    ov.filename = name;
+    ov.data = data;
+    ov.length = length;
+    bh_arr_push(ctx->context.file_overlays, ov);
 }
 
 //

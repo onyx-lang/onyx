@@ -2069,6 +2069,7 @@ struct CompileOptions {
 
     b32 generate_symbol_info_file : 1;
     b32 generate_lsp_info_file    : 1;
+    b32 parse_only : 1;
 
     b32 running_perf : 1;
 

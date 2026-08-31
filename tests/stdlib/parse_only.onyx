@@ -1,0 +1,58 @@
+#load "core:onyx/toolchain/module"
+
+use core {*}
+use onyx.toolchain {*}
+
+main :: () {
+    broken := Builder.make();
+    defer broken->destroy();
+
+    broken->enable(.PARSE_ONLY);
+    broken->enable(.DISABLE_CORE);
+    broken->enable(.DISABLE_EXTENSIONS);
+    broken->inject_source_as("broken.onyx", "package main\nmain :: () {\n");
+
+    errors := broken->get_errors();
+    println("has_syntax_error");
+    println(errors.count > 0);
+    println("filename_ok");
+    println(errors.count > 0 && errors[0].filename == "broken.onyx");
+
+    typed := Builder.make();
+    defer typed->destroy();
+
+    typed->enable(.PARSE_ONLY);
+    typed->enable(.DISABLE_CORE);
+    typed->enable(.DISABLE_EXTENSIONS);
+    typed->inject_source_as("types.onyx", "package main\nmain :: () {\n    x: NoSuchType = 1\n}\n");
+
+    println("type_error_skipped");
+    println(!typed->has_errors());
+
+    pumped := Builder.make();
+    defer pumped->destroy();
+    pumped->enable(.DISABLE_CORE);
+    pumped->enable(.DISABLE_EXTENSIONS);
+    pumped->inject_source_as("ok.onyx", "package main\nmain :: () {\n}\n");
+    pumped->parse();
+    println("parse_pump_ok");
+    println(!pumped->has_errors());
+
+    code := Builder.make();
+    defer code->destroy();
+    code->enable(.PARSE_ONLY);
+    code->enable(.DISABLE_CORE);
+    code->enable(.DISABLE_EXTENSIONS);
+    code->inject_source_as("code.onyx", "package main\nmain :: () {\n    x := [] { }\n}\n");
+    println("code_block_no_abort");
+    println(true);
+
+    contents := Builder.make();
+    defer contents->destroy();
+    contents->enable(.PARSE_ONLY);
+    contents->enable(.DISABLE_CORE);
+    contents->enable(.DISABLE_EXTENSIONS);
+    contents->inject_source_as("contents.onyx", "package main\nmain :: () {\n    x := #file_contents \"foo.txt\"\n}\n");
+    println("file_contents_no_abort");
+    println(true);
+}

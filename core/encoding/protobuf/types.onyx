@@ -7,6 +7,8 @@ package core.encoding.protobuf
 
 Proto_Message_Descriptor :: struct {
     fields: [] Proto_Field_Descriptor
+    // proto_field_number -> fields index+1; 0 means missing
+    by_number: [] i32
 }
 
 Proto_Field_Descriptor :: struct {

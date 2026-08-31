@@ -31,6 +31,7 @@ onyx_option_t :: enum {
     DISABLE_EXTENSIONS :: 17
     COLLECT_PERF :: 18
     PLATFORM :: 19
+    PARSE_ONLY :: 20
 }
 
 onyx_pump_t :: enum {
@@ -98,6 +99,8 @@ onyx_context_t :: #distinct u64
     onyx_include_file :: (ctx: onyx_context_t, filename: str) -> void ---
     onyx_add_mapped_dir :: (ctx: onyx_context_t, mapped_name: str, dir: str) -> void ---
     onyx_inject_code :: (ctx: onyx_context_t, code: str) -> void ---
+    onyx_inject_code_as :: (ctx: onyx_context_t, filename: str, code: str) -> void ---
+    onyx_overlay_file :: (ctx: onyx_context_t, filename: str, code: str) -> void ---
     onyx_error_count :: (ctx: onyx_context_t) -> i32 ---
     onyx_error_message :: (ctx: onyx_context_t, error_idx: i32) -> cptr(u8) ---
     onyx_error_filename :: (ctx: onyx_context_t, error_idx: i32) -> cptr(u8) ---

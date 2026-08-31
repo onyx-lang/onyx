@@ -1,0 +1,12 @@
+has_syntax_error
+true
+filename_ok
+true
+type_error_skipped
+true
+parse_pump_ok
+true
+code_block_no_abort
+true
+file_contents_no_abort
+true

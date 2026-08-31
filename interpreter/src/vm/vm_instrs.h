@@ -542,11 +542,6 @@ OVMI_INSTR_EXEC(mem_grow) {
     VAL(instr->r).type = OVM_TYPE_I32;
     VAL(instr->r).u32 = (u32) (state->engine->memory_size / 65536);
 
-    if (!ovm_engine_memory_ensure_capacity(state->engine,
-            state->engine->memory_size + VAL(instr->a).u32 * 65536)) {
-        VAL(instr->r).i32 = -1;
-    }
-
     i64 new_size = state->engine->memory_size + (i64) VAL(instr->a).u32 * 65536;
     if (!ovm_engine_memory_ensure_capacity(state->engine, new_size)) {
         VAL(instr->r).i32 = -1;

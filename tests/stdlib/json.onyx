@@ -121,4 +121,13 @@ main :: () {
     io.writer_flush(&ewriter);
     println(io.buffer_stream_to_str(&estream));
     delete(&ewriter);
+
+    buf := make([] u8, 1);
+    buf[0] = 0;
+    nul := json.encode_string(cast(str) buf)!;
+    defer str.free(nul);
+    println(nul);
+    vt := json.encode_string("\v")!;
+    defer str.free(vt);
+    println(vt);
 }
