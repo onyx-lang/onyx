@@ -122,7 +122,7 @@ main :: () {
     println(io.buffer_stream_to_str(&estream));
     delete(&ewriter);
 
-    buf := make([] u8, 1);
+    use buf := make([] u8, 1);
     buf[0] = 0;
     nul := json.encode_string(cast(str) buf)!;
     defer str.free(nul);
