@@ -2341,7 +2341,7 @@ typedef struct CompilationEvent {
 
 typedef struct CompilationFileOverlay {
     char *filename;
-    uint8_t *data;
+    u8 *data;
     i32 length;
 } CompilationFileOverlay;
 
@@ -2403,10 +2403,12 @@ struct Context {
     bh_managed_heap heap;
     bh_allocator gp_alloc; // General purpose allocator 
 
+    bh_allocator *stbds_alloc;
+
     bh_arr(bh_file_contents) loaded_files;
     bh_arr(DefinedVariable) defined_variables;
 
-    // Unsaved editor buffers. process_source_file prefers these over disk.
+    // Unsaved editor buffers. process_source_file preferes these over disk.
     bh_arr(CompilationFileOverlay) file_overlays;
 
     // NOTE: This is defined in wasm_emit.h
@@ -2532,7 +2534,7 @@ char* generate_name_within_scope(Context *context, Scope *scope, OnyxToken* symb
 TypeMatch implicit_cast_to_bool(Context *context, AstTyped **pnode);
 
 AstNode* strip_aliases(AstNode* node);
-AstType* strip_type_aliases(AstType* type);
+AstType* strip_type_aliases(AstType* node);
 
 AstNumLit*        make_bool_literal(Context *context, b32 b);
 AstNumLit*        make_int_literal(Context *context, i64 value);

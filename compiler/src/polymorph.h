@@ -782,6 +782,10 @@ TypeMatch find_polymorphic_sln(Context *context, AstPolySolution *out, AstPolyPa
 // solving for the polymorphic variables, in order to return an array of the solutions for all
 // of the polymorphic variables.
 static bh_arr(AstPolySolution) find_polymorphic_slns(Context *context, AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken *tkn, b32 necessary) {
+    if (context->cycle_detected) {
+        return NULL;
+    }
+
     ensure_polyproc_cache_is_created(context, pp);
     if (bh_imap_has(&pp->active_queries, (u64) actual)) {
         AstPolyQuery *query = (AstPolyQuery *) bh_imap_get(&pp->active_queries, (u64) actual);
@@ -1002,6 +1006,10 @@ AstFunction* polymorphic_proc_build_only_header(Context *context, AstFunction* p
 }
 
 AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstFunction* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed) {
+    if (context->cycle_detected) {
+        return NULL;
+    }
+
     AstSolidifiedFunction solidified_func;
 
     char* unique_key = build_poly_slns_unique_key(context, slns);

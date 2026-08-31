@@ -2361,7 +2361,8 @@ static AstBlock* parse_block(OnyxParser* parser, b32 make_a_new_scope, char* blo
     AstNode* stmt = NULL;
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) {
-            close_block_binding_scope(parser, block, parser->curr);
+            // :LinearTokenDependent
+            close_block_binding_scope(parser, block, parser->curr - 1);
             return block;
         }
 

@@ -3483,3 +3483,4 @@ u64 bh_time_monotonic_ns() {
 #endif // ifdef BH_DEFINE
 
 #endif // ifndef BH_H
+

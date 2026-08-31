@@ -92,8 +92,8 @@ serialize :: (v: any, w: &io.Writer) -> bool {
 
             output_u32(w, count);
             if elem_info.kind == .Basic && elem_info.size == 1 {
+                // Fast path for writing `[] u8`
                 io.write_str(w, str.{ base, count });
-                break;
             }
 
             elem_size := type_info.size_of(s_info.of);

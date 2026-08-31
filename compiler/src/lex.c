@@ -4,10 +4,10 @@
 #include "errors.h"
 
 #if defined(_MSC_VER)
-    #define ONYX_THREAD_LOCAL __declspec(thread)
-#else
-    #define ONYX_THREAD_LOCAL __thread
-#endif
+     #define ONYX_THREAD_LOCAL __declspec(thread)
+ #else
+     #define ONYX_THREAD_LOCAL __thread
+ #endif
 
 static const char* token_type_names[] = {
     "UNKNOWN",

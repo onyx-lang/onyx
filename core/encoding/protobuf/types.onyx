@@ -16,8 +16,8 @@ Proto_Field_Descriptor :: struct {
     is_repeated:        bool
     is_oneof:           bool
     optional_offset:    u16
-    oneof_tag:          u32
     oneof_tag_size:     u16
+    oneof_tag:          u32
 
     field_offset:       i32
     field_size:         i32

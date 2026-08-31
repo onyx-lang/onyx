@@ -2833,8 +2833,8 @@ EMIT_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
     } else if (source_expr->kind == Ast_Kind_Memres && !is_pointer) {
         emit_memory_reservation_location(mod, &code, (AstMemRes *) source_expr);
 
-    } else if (source_expr->kind == Ast_Kind_Dereference && !is_pointer) {
-        // Location of `*p` is `p`. Emitting the dereference as a value is
+    } else if (source_expr->kind == Ast_Kind_Dereference) {
+        // Location of `*p` is `p`. Emitting the deference as a value is
         // wrong for compound types (slices, varargs): that pushes data+count
         // and the following field load treats `count` as a pointer.
         emit_expression(mod, &code, ((AstDereference *) source_expr)->expr);

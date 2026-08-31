@@ -1137,7 +1137,7 @@ CHECK_FUNC(call, AstCall** pcall) {
             AstNode *name_node = strip_aliases((AstNode *) call->callee);
             if (name_node && (name_node->kind == Ast_Kind_Symbol || name_node->kind == Ast_Kind_Field_Access)) {
                 call->callee_name_token = name_node->token;
-            } else if (call->callee->token) {
+            } else {
                 call->callee_name_token = call->callee->token;
             }
         }
@@ -3583,7 +3583,7 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
 
     if (bh_arr_length(insert->bindings) > 0) {
         assert(scope);
-        if (!*scope) {
+        if (!*scope)  {
             Scope *parent = code_block->enclosing_scope;
             if (!parent) parent = context->checker.current_scope;
             *scope = scope_create(context, parent, code_block->token->pos);
@@ -5168,8 +5168,8 @@ CHECK_FUNC(type, AstType** ptype) {
         case Ast_Kind_Type_Alias: {
             AstTypeAlias *type_alias = (AstTypeAlias *) type;
             if (!type_alias->to || strip_type_aliases((AstType *) type_alias) == (AstType *) type_alias) {
-                YIELD_ERROR(type->token->pos, "Circular type alias.");
-            }
+                 YIELD_ERROR(type->token->pos, "Circular type alias.");
+             }
             CHECK(type, &type_alias->to);
             if (type_build_from_ast(context, (AstType *) type_alias)) {
                 compilation_log_notify_node_typed(context, (AstNode *) type_alias);
@@ -5979,6 +5979,7 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
                     ONYX_ERROR(query->token->pos, Error_Critical, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
                     if (err_msg.text != NULL) onyx_submit_error(context, err_msg);
                     if (query->error_loc) ONYX_ERROR(query->error_loc->pos, Error_Critical, "Here is where the call is located."); // :ErrorMessage
+                    return Check_Error;
                 }
 
                 return Check_Failed;
@@ -6002,6 +6003,7 @@ poly_query_done:
             if (query->error_loc) ONYX_ERROR(query->error_loc->pos, Error_Critical, "Here is where the call is located.");
             return Check_Error;
         }
+
         if (solved_something) {
             return Check_Yield;
         } else {

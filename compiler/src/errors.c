@@ -19,10 +19,10 @@ static i32 errors_sort(const void* v1, const void* v2) {
 }
 
 void onyx_errors_ensure_sorted(Context *context) {
-    if (context->errors.errors_sorted) return;
-    qsort(context->errors.errors, bh_arr_length(context->errors.errors), sizeof(OnyxError), errors_sort);
-    context->errors.errors_sorted = 1;
-}
+     if (context->errors.errors_sorted) return;
+     qsort(context->errors.errors, bh_arr_length(context->errors.errors), sizeof(OnyxError), errors_sort);
+     context->errors.errors_sorted = 1;
+ }
 
 void onyx_errors_enable(Context *context) {
     context->errors_enabled = 1;
