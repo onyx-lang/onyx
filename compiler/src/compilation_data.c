@@ -727,7 +727,7 @@ static u32 compilation_log_file_id_for(Context *context, const char *filename) {
     return id;
 }
 
-void compilation_log_emit_file(Context *context, const char *path) {
+u32 compilation_log_emit_file(Context *context, const char *path) {
     CompilationLog *log = &context->compilation_log;
 
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_FILE);
@@ -741,6 +741,12 @@ void compilation_log_emit_file(Context *context, const char *path) {
         log->cached_file_id = ev->a;
         compilation_log_file_id_cache_put(log, path, ev->a);
     }
+    return ev->a;
+}
+
+static u32 compilation_log_pos_file_id(Context *context, OnyxFilePos pos) {
+    if (pos.file_id) return pos.file_id;
+    return compilation_log_file_id_for(context, pos.filename);
 }
 
 void compilation_log_emit_package(Context *context, Package *package) {
@@ -755,7 +761,7 @@ void compilation_log_emit_scope(Context *context, Scope *scope) {
 
     CompilationLog *log = &context->compilation_log;
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_SCOPE);
-    ev->a = compilation_log_file_id_for(context, scope->created_at.filename);
+    ev->a = compilation_log_pos_file_id(context, scope->created_at);
     ev->b = 0;
     ev->c = 0;
     ev->ptr = scope;
@@ -879,7 +885,7 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_SYMBOL);
     ev->a = ++log->next_symbol_id;
     ev->b = scope ? (u32)scope->id : 0;
-    ev->c = compilation_log_file_id_for(context, pos.filename);
+    ev->c = compilation_log_pos_file_id(context, pos);
     ev->d = pos.line;
     ev->extra16 = (u16) pos.column;
     ev->extra = (u8) kind;
@@ -939,7 +945,7 @@ static void compilation_log_emit_resolved_at(Context *context, OnyxToken *token,
 
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_SYMBOL_RESOLVED);
     ev->a = symbol_id;
-    ev->b = compilation_log_file_id_for(context, token->pos.filename);
+    ev->b = compilation_log_pos_file_id(context, token->pos);
     ev->c = token->pos.line;
     ev->d = token->length;
     ev->extra16 = (u16) token->pos.column;

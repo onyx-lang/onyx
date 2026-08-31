@@ -184,9 +184,10 @@ void onyx_context_free(onyx_context_t *ctx) {
     stbds_heap_allocator = (void *) 0;
 }
 
-static void parse_source_file(Context *context, bh_file_contents* file_contents) {
+static void parse_source_file(Context *context, bh_file_contents* file_contents, u32 file_id) {
     // :Remove passing the allocators as parameters
     OnyxTokenizer tokenizer = onyx_tokenizer_create(context, file_contents);
+    tokenizer.file_id = file_id;
     onyx_lex_tokens(&tokenizer);
 
     file_contents->line_count = tokenizer.line_number;
@@ -262,8 +263,8 @@ static b32 process_source_file(Context *context, char* filename) {
     CompilationFileOverlay *ov = find_file_overlay(context, filename);
     if (ov) {
         bh_arr_push(context->loaded_files, file_contents_from_overlay(context, filename, ov));
-        compilation_log_emit_file(context, bh_arr_last(context->loaded_files).filename);
-        parse_source_file(context, &bh_arr_last(context->loaded_files));
+        u32 file_id = compilation_log_emit_file(context, bh_arr_last(context->loaded_files).filename);
+        parse_source_file(context, &bh_arr_last(context->loaded_files), file_id);
         return 1;
     }
 
@@ -277,12 +278,12 @@ static b32 process_source_file(Context *context, char* filename) {
     bh_file_close(&file);
 
     bh_arr_push(context->loaded_files, fc);
-    compilation_log_emit_file(context, bh_arr_last(context->loaded_files).filename);
+    u32 file_id = compilation_log_emit_file(context, bh_arr_last(context->loaded_files).filename);
 
     // if (context->options.verbose_output == 2)
     //     bh_printf("Processing source file:    %s (%d bytes)\n", file.filename, fc.length);
 
-    parse_source_file(context, &bh_arr_last(context->loaded_files));
+    parse_source_file(context, &bh_arr_last(context->loaded_files), file_id);
     return 1;
 }
 
@@ -918,8 +919,8 @@ void onyx_inject_code_as(onyx_context_t *ctx, char *filename, int32_t filename_l
     }
 
     bh_arr_push(ctx->context.loaded_files, file_contents);
-    compilation_log_emit_file(&ctx->context, bh_arr_last(ctx->context.loaded_files).filename);
-    parse_source_file(&ctx->context, &bh_arr_last(ctx->context.loaded_files));
+    u32 file_id = compilation_log_emit_file(&ctx->context, bh_arr_last(ctx->context.loaded_files).filename);
+    parse_source_file(&ctx->context, &bh_arr_last(ctx->context.loaded_files), file_id);
     compiler_extensions_flush_compilation_data_now(&ctx->context);
 }
 

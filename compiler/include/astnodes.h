@@ -2594,7 +2594,7 @@ void compiler_event_log(Context *context, char *fmt, ...);
 
 void compilation_log_init(Context *context);
 void compilation_log_emit_start(Context *context);
-void compilation_log_emit_file(Context *context, const char *path);
+u32 compilation_log_emit_file(Context *context, const char *path);
 void compilation_log_emit_package(Context *context, Package *package);
 void compilation_log_emit_scope(Context *context, Scope *scope);
 void compilation_log_emit_scope_end(Context *context, Scope *scope, OnyxFilePos pos);

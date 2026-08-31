@@ -100,6 +100,8 @@ typedef struct OnyxFilePos {
 
     // NOTE: This assumes that no line is no longer than 2^16 chars
     u16 column, length;
+
+    u32 file_id;
 } OnyxFilePos;
 
 typedef struct OnyxToken {
@@ -115,6 +117,7 @@ typedef struct OnyxTokenizer {
     char *start, *curr, *end;
 
     const char* filename;
+    u32 file_id;
 
     char* line_start;
     u64 line_number;

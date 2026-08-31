@@ -43,50 +43,60 @@ static void insert_poly_slns_into_scope(Context *context, Scope* scope, bh_arr(A
     }
 }
 
-// NOTE: This might return a volatile string. Do not store it without copying it.
-static char* build_poly_solution_key(Context *context, AstPolySolution* sln) {
-    if (sln->kind == PSK_Type) {
-        return bh_aprintf(context->ast_alloc, "@%d", sln->type->id);
+static void poly_key_append(char **p, char *end, const char *s, i32 len) {
+    if (!s || len <= 0) return;
+    i32 room = (i32)(end - *p);
+    if (room <= 0) return;
+    if (len > room) len = room;
+    memcpy(*p, s, len);
+    *p += len;
+}
 
-    } else if (sln->kind == PSK_Value) {
-        static char buffer[256];
+static void poly_key_printf(char **p, char *end, const char *fmt, ...) {
+    i32 room = (i32)(end - *p) + 1;
+    if (room <= 1) return;
 
-        fori (i, 0, 256) buffer[i] = 0;
+    va_list va;
+    va_start(va, fmt);
+    isize n = bh_snprintf_va(*p, room, fmt, va);
+    va_end(va);
 
-        if (sln->value->kind == Ast_Kind_NumLit) {
-            strncat(buffer, "NUMLIT:", 127);
-            strncat(buffer, bh_bprintf("%l", ((AstNumLit *) sln->value)->value.l), 127);
-
-        } else {
-            // HACK: For now, the value pointer is just used. This means that
-            // sometimes, even through the solution is the same, it won't be
-            // stored the same.
-            bh_snprintf(buffer, 128, "%p", sln->value);
-        }
-
-        return buffer;
+    if (n > 0) {
+        *p += n - 1;
+        if (*p > end) *p = end;
     }
-
-    return NULL;
 }
 
 // NOTE: This returns a volatile string. Do not store it without copying it.
 static char* build_poly_slns_unique_key(Context *context, bh_arr(AstPolySolution) slns) {
     static char key_buf[1024];
-    fori (i, 0, 1024) key_buf[i] = 0;
+    char *p = key_buf;
+    char *end = key_buf + sizeof(key_buf) - 1;
+    b32 first = 1;
 
     bh_arr_each(AstPolySolution, sln, slns) {
-        if (sln != slns) strncat(key_buf, "$", 1023);
+        if (!first) poly_key_append(&p, end, "$", 1);
+        first = 0;
 
-        token_toggle_end(sln->poly_sym->token);
+        OnyxToken *tkn = sln->poly_sym->token;
+        poly_key_append(&p, end, tkn->text, tkn->length);
+        poly_key_append(&p, end, "=", 1);
 
-        strncat(key_buf, sln->poly_sym->token->text, 1023);
-        strncat(key_buf, "=", 1023);
-        strncat(key_buf, build_poly_solution_key(context, sln), 1023);
-
-        token_toggle_end(sln->poly_sym->token);
+        if (sln->kind == PSK_Type) {
+            poly_key_printf(&p, end, "@%d", sln->type->id);
+        } else if (sln->kind == PSK_Value) {
+            if (sln->value->kind == Ast_Kind_NumLit) {
+                poly_key_printf(&p, end, "NUMLIT:%l", ((AstNumLit *) sln->value)->value.l);
+            } else {
+                // HACK: For now, the value pointer is just used. This means that
+                // sometimes, even through the solution is the same, it won't be
+                // stored the same.
+                poly_key_printf(&p, end, "%p", sln->value);
+            }
+        }
     }
 
+    *p = 0;
     return key_buf;
 }
 

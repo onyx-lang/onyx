@@ -182,6 +182,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
                     semicolon_token.pos.filename = tokenizer->filename;
                     semicolon_token.pos.line = tokenizer->line_number;
                     semicolon_token.pos.column = (u16)(tokenizer->curr - tokenizer->line_start) + 1;
+                    semicolon_token.pos.file_id = tokenizer->file_id;
                     bh_arr_push(tokenizer->tokens, semicolon_token);
                     tokenizer->insert_semicolon = 0;
                 }
@@ -204,6 +205,7 @@ whitespace_skipped:
     tk.pos.filename = tokenizer->filename;
     tk.pos.line = tokenizer->line_number;
     tk.pos.column = (u16)(tokenizer->curr - tokenizer->line_start) + 1;
+    tk.pos.file_id = tokenizer->file_id;
 
     if (tokenizer->curr == tokenizer->end) {
         tk.type = Token_Type_End_Stream;
@@ -614,6 +616,7 @@ OnyxTokenizer onyx_tokenizer_create(Context *context, bh_file_contents *fc) {
         .end            = bh_pointer_add(fc->data, fc->length),
 
         .filename       = fc->filename,
+        .file_id        = 0,
 
         .line_number    = 1,
         .line_start     = fc->data,
