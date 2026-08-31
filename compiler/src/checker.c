@@ -1052,7 +1052,6 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
 
         need_to_check_overload_return_type = 1;
 
-        compilation_log_emit_overloads(context, (AstOverloadedFunction *) original_callee);
         compilation_log_emit_overload_choice(context, call->callee_name_token, (AstNode *) original_callee, (AstNode *) new_callee);
 
         callee = new_callee;

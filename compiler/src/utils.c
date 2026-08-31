@@ -123,7 +123,6 @@ Scope* scope_create(Context *context, Scope* parent, OnyxFilePos created_at) {
     scope->id = ++context->next_scope_id;
     scope->parent = parent;
     scope->created_at = created_at;
-    scope->closed_at = (OnyxFilePos) { 0 };
     scope->name = NULL;
     scope->log_event_index = 0;
 

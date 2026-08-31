@@ -35,10 +35,10 @@ void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer) {
 
             case COMPILATION_EVENT_SYMBOL: {
                 SymbolInfo symbol;
-                symbol.id = ev->symbol.id;
-                symbol.file_id = ev->symbol.file_id;
-                symbol.line = ev->symbol.line;
-                symbol.column = ev->symbol.column;
+                symbol.id = ev->a;
+                symbol.file_id = ev->c;
+                symbol.line = ev->d;
+                symbol.column = ev->extra16;
                 symbol.documentation = NULL;
                 symbol.documentation_length = 0;
                 bh_imap_put(&id_to_index, (u64) symbol.id, (u64) bh_arr_length(symbols));
@@ -47,22 +47,33 @@ void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer) {
             }
 
             case COMPILATION_EVENT_BINDING:
-                if (bh_imap_has(&id_to_index, (u64) ev->binding.symbol_id)) {
-                    u32 idx = (u32) bh_imap_get(&id_to_index, (u64) ev->binding.symbol_id);
-                    symbols[idx].documentation = ev->binding.documentation ? ev->binding.documentation : "";
-                    symbols[idx].documentation_length = symbols[idx].documentation
-                        ? (u32) strlen(symbols[idx].documentation)
-                        : 0;
+                if (bh_imap_has(&id_to_index, (u64) ev->a)) {
+                    u32 idx = (u32) bh_imap_get(&id_to_index, (u64) ev->a);
+                    char *docs = "";
+                    u64 binding = 0;
+                    if (ev->ptr && bh_imap_try_get(&log->node_to_binding, (u64) ev->ptr, &binding) && binding) {
+                        AstBinding *b = (AstBinding *) binding;
+                        if (b->documentation_string) {
+                            docs = (char *) b->documentation_string;
+                        } else if (b->documentation_token_old && b->documentation_token_old->text) {
+                            docs = b->documentation_token_old->text;
+                            symbols[idx].documentation = docs;
+                            symbols[idx].documentation_length = b->documentation_token_old->length;
+                            break;
+                        }
+                    }
+                    symbols[idx].documentation = docs;
+                    symbols[idx].documentation_length = docs ? (u32) strlen(docs) : 0;
                 }
                 break;
 
             case COMPILATION_EVENT_SYMBOL_RESOLVED: {
                 SymbolResolution res;
-                res.symbol_id = ev->resolved.symbol_id;
-                res.file_id = ev->resolved.file_id;
-                res.line = ev->resolved.line;
-                res.column = ev->resolved.column;
-                res.length = ev->resolved.length;
+                res.symbol_id = ev->a;
+                res.file_id = ev->b;
+                res.line = ev->c;
+                res.column = ev->extra16;
+                res.length = ev->d;
                 bh_arr_push(resolutions, res);
                 break;
             }
@@ -81,8 +92,8 @@ void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer) {
     bh_buffer_init(&file_section, context->gp_alloc, 2048);
     bh_arr_each(CompilationEvent *, pfile, files) {
         CompilationEvent *fev = *pfile;
-        char *filename = fev->file.path ? fev->file.path : "";
-        bh_buffer_write_u32(&file_section, fev->file.id);
+        char *filename = fev->ptr ? (char *) fev->ptr : "";
+        bh_buffer_write_u32(&file_section, fev->a);
         bh_buffer_write_u32(&file_section, (u32) strlen(filename));
         bh_buffer_write_string(&file_section, filename);
     }

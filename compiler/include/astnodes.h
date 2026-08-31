@@ -137,7 +137,6 @@ typedef struct Scope {
     u64 id;
     struct Scope *parent;
     OnyxFilePos created_at;
-    OnyxFilePos closed_at;
     char* name;
     Table(AstNode *) symbols;
     u32 log_event_index;
@@ -2256,88 +2255,42 @@ typedef enum CompilationEventKind {
     COMPILATION_EVENT_POLY_PROC = 10,
 } CompilationEventKind;
 
+// Compact 32-byte event. Named overlays used to be a fat union (~48B);
+// high-volume resolved/symbol/type events do not need that.
+//
+//   START:     ptr = version string
+//   FILE:      a = id, ptr = path
+//   PACKAGE:   ptr = Package *
+//   SCOPE:     a = file_id, b = end_line, c = end_column, ptr = Scope *
+//   SYMBOL:    a = id, b = scope_id, c = file_id, d = line,
+//              extra = kind, extra16 = column, e = package_id
+//              (name lives in CompilationLog.symbol_names)
+//   RESOLVED:  a = symbol_id, b = file_id, c = line, d = length,
+//              extra16 = column, e = chosen_symbol_id
+//   BINDING:   a = symbol_id, b = type_id, ptr = AstNode *
+//   TYPE:      ptr = Type *
+//   TYPE_BODY: ptr = Type *
+//   OVERLOAD:  a = group_id, b = count, ptr = u32 *ids
+//   POLY_PROC: a = template_id, b = instance_id, c = count, ptr = CompilationLogPoly *
 typedef struct CompilationEvent {
-    CompilationEventKind kind;
-
+    u8 kind;
+    u8 extra;
+    u16 extra16;
+    u32 a, b, c, d;
     union {
-        struct {
-            char *compiler_version;
-        } start;
-
-        struct {
-            u32 id;
-            char *path;
-        } file;
-
-        struct {
-            u32 id;
-            char *package_name;
-            char *fully_qualified_name;
-            u32 parent_package_id;
-            u32 scope_id;
-        } pack;
-
-        struct {
-            u32 id;
-            u32 parent_scope_id;
-            u32 file_id;
-            u32 line;
-            u32 column;
-            u32 end_line;
-            u32 end_column;
-            char *name;
-        } scope;
-
-        struct {
-            u32 id;
-            u32 scope_id;
-            char *name;
-            u32 file_id;
-            u32 line;
-            u32 column;
-            u32 kind;
-            u32 package_id;
-        } symbol;
-
-        struct {
-            u32 symbol_id;
-            u32 file_id;
-            u32 line;
-            u32 column;
-            u32 length;
-            u32 chosen_symbol_id;
-        } resolved;
-
-        struct {
-            u32 group_symbol_id;
-            u32 option_count;
-            u32 *option_symbol_ids;
-        } overload;
-
-        struct {
-            u32 template_symbol_id;
-            u32 instance_symbol_id;
-            u32 solution_count;
-            char **solution_names;
-            u32 *solution_type_ids;
-        } poly_proc;
-
-        struct {
-            u32 symbol_id;
-            char *documentation;
-            u32 type_id;
-            AstNode *node;
-        } binding;
-
-        struct {
-            Type *type;
-        } type;
-
-        struct {
-            Type *type;
-        } type_body;
+        void *ptr;
+        struct { u32 e, f; };
     };
 } CompilationEvent;
+
+enum {
+    _compilation_event_size = sizeof(char[(sizeof(CompilationEvent) <= 32) ? 1 : -1])
+};
+
+typedef struct CompilationLogPoly {
+    char **names;
+    u32 *type_ids;
+} CompilationLogPoly;
 
 typedef struct CompilationFileOverlay {
     char *filename;

@@ -236,8 +236,34 @@ static b32 compilation_log_binding_type_get(CompilationLog *log, u32 id, u32 *ou
     return 1;
 }
 
+static void compilation_log_u32s_set(Context *context, bh_arr(u32) *arr, u32 index, u32 value) {
+    i32 n = (i32) index;
+    if (n + 1 > bh_arr_capacity(*arr)) {
+        bh_arr_grow(*arr, n + 1);
+    }
+    i32 len = bh_arr_length(*arr);
+    if (n + 1 > len) {
+        memset(*arr + len, 0, (n + 1 - len) * sizeof(u32));
+        bh_arr_set_length(*arr, n + 1);
+    }
+    (*arr)[n] = value;
+}
+
+static void compilation_log_names_set(Context *context, bh_arr(char *) *arr, u32 index, char *value) {
+    i32 n = (i32) index;
+    if (n + 1 > bh_arr_capacity(*arr)) {
+        bh_arr_grow(*arr, n + 1);
+    }
+    i32 len = bh_arr_length(*arr);
+    if (n + 1 > len) {
+        memset(*arr + len, 0, (n + 1 - len) * sizeof(char *));
+        bh_arr_set_length(*arr, n + 1);
+    }
+    (*arr)[n] = value;
+}
+
 static void compilation_log_binding_type_put(Context *context, CompilationLog *log, u32 id, u32 type_id) {
-    bh_arr_set_at(log->symbol_binding_type_id, id, type_id + 1);
+    compilation_log_u32s_set(context, &log->symbol_binding_type_id, id, type_id + 1);
 }
 
 static char *compilation_log_type_name(Context *context, Type *type) {
@@ -264,7 +290,10 @@ static char *compilation_log_type_name(Context *context, Type *type) {
 static CompilationEvent *compilation_log_new_event(Context *context, CompilationEventKind kind) {
     CompilationLog *log = &context->compilation_log;
     i32 i = bh_arr_length(log->events);
-    bh_arr_insert_end(log->events, 1);
+    if (i >= bh_arr_capacity(log->events)) {
+        bh_arr_grow(log->events, i + 1);
+    }
+    bh_arr_set_length(log->events, i + 1);
     CompilationEvent *ev = &log->events[i];
     ev->kind = kind;
     log->encoded_valid = 0;
@@ -274,6 +303,7 @@ static CompilationEvent *compilation_log_new_event(Context *context, Compilation
 static u32 compilation_log_type_kind(TypeKind kind);
 static u32 compilation_log_basic_kind(enum BasicKind kind);
 static b32 compilation_log_lookup_symbol_id(CompilationLog *log, AstNode *node, u32 *out);
+static char *compilation_log_binding_docs(Context *context, CompilationLog *log, AstNode *node);
 
 static void encode_type_payload(Context *context, Type *type) {
     CompilationLog *log = &context->compilation_log;
@@ -459,85 +489,95 @@ static void encode_event(Context *context, CompilationEvent *ev) {
 
     switch (ev->kind) {
         case COMPILATION_EVENT_START:
-            pb_write_string(inner, PB_EVENT_START_COMPILER_VERSION, ev->start.compiler_version);
+            pb_write_string(inner, PB_EVENT_START_COMPILER_VERSION, ev->ptr ? (char *) ev->ptr : "");
             pb_write_bytes(out, PB_COMPILER_EVENT_START, inner->data, inner->length);
             break;
 
         case COMPILATION_EVENT_FILE:
-            pb_write_uint32(inner, PB_EVENT_FILE_ID, ev->file.id);
-            pb_write_string(inner, PB_EVENT_FILE_PATH, ev->file.path);
+            pb_write_uint32(inner, PB_EVENT_FILE_ID, ev->a);
+            pb_write_string(inner, PB_EVENT_FILE_PATH, ev->ptr ? (char *) ev->ptr : "");
             pb_write_bytes(out, PB_COMPILER_EVENT_FILE, inner->data, inner->length);
             break;
 
-        case COMPILATION_EVENT_PACKAGE:
-            pb_write_uint32(inner, PB_EVENT_PACKAGE_ID, ev->pack.id);
-            pb_write_string(inner, PB_EVENT_PACKAGE_NAME, ev->pack.package_name);
-            pb_write_string(inner, PB_EVENT_PACKAGE_FULLY_QUALIFIED_NAME, ev->pack.fully_qualified_name);
-            pb_write_uint32(inner, PB_EVENT_PACKAGE_PARENT_ID, ev->pack.parent_package_id);
-            pb_write_uint32(inner, PB_EVENT_PACKAGE_SCOPE_ID, ev->pack.scope_id);
+        case COMPILATION_EVENT_PACKAGE: {
+            Package *package = (Package *) ev->ptr;
+            pb_write_uint32(inner, PB_EVENT_PACKAGE_ID, package ? package->id : 0);
+            pb_write_string(inner, PB_EVENT_PACKAGE_NAME, package && package->unqualified_name ? package->unqualified_name : "");
+            pb_write_string(inner, PB_EVENT_PACKAGE_FULLY_QUALIFIED_NAME, package && package->name ? package->name : "");
+            pb_write_uint32(inner, PB_EVENT_PACKAGE_PARENT_ID, package && package->parent_id >= 0 ? (u32) package->parent_id : 0);
+            pb_write_uint32(inner, PB_EVENT_PACKAGE_SCOPE_ID, package && package->scope ? (u32) package->scope->id : 0);
             pb_write_bytes(out, PB_COMPILER_EVENT_PACK, inner->data, inner->length);
             break;
+        }
 
-        case COMPILATION_EVENT_SCOPE:
-            pb_write_uint32(inner, PB_EVENT_SCOPE_ID, ev->scope.id);
-            pb_write_uint32(inner, PB_EVENT_SCOPE_PARENT_SCOPE_ID, ev->scope.parent_scope_id);
-            pb_write_uint32(inner, PB_EVENT_SCOPE_FILE_ID, ev->scope.file_id);
-            pb_write_uint32(inner, PB_EVENT_SCOPE_LINE, ev->scope.line);
-            pb_write_uint32(inner, PB_EVENT_SCOPE_COLUMN, ev->scope.column);
-            pb_write_string(inner, PB_EVENT_SCOPE_NAME, ev->scope.name);
-            pb_write_uint32(inner, PB_EVENT_SCOPE_END_LINE, ev->scope.end_line);
-            pb_write_uint32(inner, PB_EVENT_SCOPE_END_COLUMN, ev->scope.end_column);
+        case COMPILATION_EVENT_SCOPE: {
+            Scope *scope = (Scope *) ev->ptr;
+            pb_write_uint32(inner, PB_EVENT_SCOPE_ID, scope ? (u32) scope->id : 0);
+            pb_write_uint32(inner, PB_EVENT_SCOPE_PARENT_SCOPE_ID, scope && scope->parent ? (u32) scope->parent->id : 0);
+            pb_write_uint32(inner, PB_EVENT_SCOPE_FILE_ID, ev->a);
+            pb_write_uint32(inner, PB_EVENT_SCOPE_LINE, scope ? scope->created_at.line : 0);
+            pb_write_uint32(inner, PB_EVENT_SCOPE_COLUMN, scope ? scope->created_at.column : 0);
+            pb_write_string(inner, PB_EVENT_SCOPE_NAME, scope && scope->name ? scope->name : "");
+            pb_write_uint32(inner, PB_EVENT_SCOPE_END_LINE, ev->b);
+            pb_write_uint32(inner, PB_EVENT_SCOPE_END_COLUMN, ev->c);
             pb_write_bytes(out, PB_COMPILER_EVENT_SCOPE, inner->data, inner->length);
             break;
+        }
 
-        case COMPILATION_EVENT_SYMBOL:
-            pb_write_uint32(inner, PB_EVENT_SYMBOL_ID, ev->symbol.id);
-            pb_write_uint32(inner, PB_EVENT_SYMBOL_SCOPE_ID, ev->symbol.scope_id);
-            pb_write_string(inner, PB_EVENT_SYMBOL_NAME, ev->symbol.name);
-            pb_write_uint32(inner, PB_EVENT_SYMBOL_FILE_ID, ev->symbol.file_id);
-            pb_write_uint32(inner, PB_EVENT_SYMBOL_LINE, ev->symbol.line);
-            pb_write_uint32(inner, PB_EVENT_SYMBOL_COLUMN, ev->symbol.column);
-            pb_write_uint32(inner, PB_EVENT_SYMBOL_KIND, ev->symbol.kind);
-            pb_write_uint32(inner, PB_EVENT_SYMBOL_PACKAGE_ID, ev->symbol.package_id);
+        case COMPILATION_EVENT_SYMBOL: {
+            char *sym_name = compilation_log_get_symbol_name(log, ev->a);
+            pb_write_uint32(inner, PB_EVENT_SYMBOL_ID, ev->a);
+            pb_write_uint32(inner, PB_EVENT_SYMBOL_SCOPE_ID, ev->b);
+            pb_write_string(inner, PB_EVENT_SYMBOL_NAME, sym_name ? sym_name : "");
+            pb_write_uint32(inner, PB_EVENT_SYMBOL_FILE_ID, ev->c);
+            pb_write_uint32(inner, PB_EVENT_SYMBOL_LINE, ev->d);
+            pb_write_uint32(inner, PB_EVENT_SYMBOL_COLUMN, ev->extra16);
+            pb_write_uint32(inner, PB_EVENT_SYMBOL_KIND, ev->extra);
+            pb_write_uint32(inner, PB_EVENT_SYMBOL_PACKAGE_ID, ev->e);
             pb_write_bytes(out, PB_COMPILER_EVENT_SYMBOL, inner->data, inner->length);
             break;
+        }
 
         case COMPILATION_EVENT_SYMBOL_RESOLVED:
-            pb_write_uint32(inner, PB_EVENT_RESOLVED_SYMBOL_ID, ev->resolved.symbol_id);
-            pb_write_uint32(inner, PB_EVENT_RESOLVED_FILE_ID, ev->resolved.file_id);
-            pb_write_uint32(inner, PB_EVENT_RESOLVED_LINE, ev->resolved.line);
-            pb_write_uint32(inner, PB_EVENT_RESOLVED_COLUMN, ev->resolved.column);
-            pb_write_uint32(inner, PB_EVENT_RESOLVED_LENGTH, ev->resolved.length);
-            pb_write_uint32(inner, PB_EVENT_RESOLVED_CHOSEN_SYMBOL_ID, ev->resolved.chosen_symbol_id);
+            pb_write_uint32(inner, PB_EVENT_RESOLVED_SYMBOL_ID, ev->a);
+            pb_write_uint32(inner, PB_EVENT_RESOLVED_FILE_ID, ev->b);
+            pb_write_uint32(inner, PB_EVENT_RESOLVED_LINE, ev->c);
+            pb_write_uint32(inner, PB_EVENT_RESOLVED_COLUMN, ev->extra16);
+            pb_write_uint32(inner, PB_EVENT_RESOLVED_LENGTH, ev->d);
+            pb_write_uint32(inner, PB_EVENT_RESOLVED_CHOSEN_SYMBOL_ID, ev->e);
             pb_write_bytes(out, PB_COMPILER_EVENT_RESOLVED, inner->data, inner->length);
             break;
 
-        case COMPILATION_EVENT_OVERLOAD:
-            pb_write_uint32(inner, PB_EVENT_OVERLOAD_GROUP_SYMBOL_ID, ev->overload.group_symbol_id);
-            for (u32 i = 0; i < ev->overload.option_count; i++) {
-                pb_write_uint32_always(inner, PB_EVENT_OVERLOAD_OPTION_SYMBOL_IDS, ev->overload.option_symbol_ids[i]);
+        case COMPILATION_EVENT_OVERLOAD: {
+            u32 *ids = (u32 *) ev->ptr;
+            pb_write_uint32(inner, PB_EVENT_OVERLOAD_GROUP_SYMBOL_ID, ev->a);
+            for (u32 i = 0; i < ev->b; i++) {
+                pb_write_uint32_always(inner, PB_EVENT_OVERLOAD_OPTION_SYMBOL_IDS, ids ? ids[i] : 0);
             }
             pb_write_bytes(out, PB_COMPILER_EVENT_OVERLOAD, inner->data, inner->length);
             break;
+        }
 
-        case COMPILATION_EVENT_POLY_PROC:
-            pb_write_uint32(inner, PB_EVENT_POLY_PROC_TEMPLATE_SYMBOL_ID, ev->poly_proc.template_symbol_id);
-            pb_write_uint32(inner, PB_EVENT_POLY_PROC_INSTANCE_SYMBOL_ID, ev->poly_proc.instance_symbol_id);
-            for (u32 i = 0; i < ev->poly_proc.solution_count; i++) {
-                pb_write_string(inner, PB_EVENT_POLY_PROC_SOLUTION_NAMES, ev->poly_proc.solution_names[i]);
+        case COMPILATION_EVENT_POLY_PROC: {
+            CompilationLogPoly *poly = (CompilationLogPoly *) ev->ptr;
+            pb_write_uint32(inner, PB_EVENT_POLY_PROC_TEMPLATE_SYMBOL_ID, ev->a);
+            pb_write_uint32(inner, PB_EVENT_POLY_PROC_INSTANCE_SYMBOL_ID, ev->b);
+            for (u32 i = 0; i < ev->c; i++) {
+                pb_write_string(inner, PB_EVENT_POLY_PROC_SOLUTION_NAMES, poly && poly->names ? poly->names[i] : "");
             }
-            for (u32 i = 0; i < ev->poly_proc.solution_count; i++) {
-                pb_write_uint32_always(inner, PB_EVENT_POLY_PROC_SOLUTION_TYPE_IDS, ev->poly_proc.solution_type_ids[i]);
+            for (u32 i = 0; i < ev->c; i++) {
+                pb_write_uint32_always(inner, PB_EVENT_POLY_PROC_SOLUTION_TYPE_IDS, poly && poly->type_ids ? poly->type_ids[i] : 0);
             }
             pb_write_bytes(out, PB_COMPILER_EVENT_POLY_PROC, inner->data, inner->length);
             break;
+        }
 
         case COMPILATION_EVENT_BINDING: {
-            pb_write_uint32(inner, PB_EVENT_BINDING_SYMBOL_ID, ev->binding.symbol_id);
-            pb_write_string(inner, PB_EVENT_BINDING_DOCUMENTATION, ev->binding.documentation);
-            pb_write_uint32(inner, PB_EVENT_BINDING_TYPE_ID, ev->binding.type_id);
+            pb_write_uint32(inner, PB_EVENT_BINDING_SYMBOL_ID, ev->a);
+            pb_write_string(inner, PB_EVENT_BINDING_DOCUMENTATION, compilation_log_binding_docs(context, log, (AstNode *) ev->ptr));
+            pb_write_uint32(inner, PB_EVENT_BINDING_TYPE_ID, ev->b);
 
-            AstNode *node = ev->binding.node;
+            AstNode *node = (AstNode *) ev->ptr;
             if (node) {
                 AstNode *inner_node = strip_aliases(node);
                 if (inner_node && (inner_node->kind == Ast_Kind_Function || inner_node->kind == Ast_Kind_Polymorphic_Proc)) {
@@ -557,12 +597,12 @@ static void encode_event(Context *context, CompilationEvent *ev) {
         }
 
         case COMPILATION_EVENT_TYPE:
-            if (ev->type.type) encode_type_payload(context, ev->type.type);
+            if (ev->ptr) encode_type_payload(context, (Type *) ev->ptr);
             pb_write_bytes(out, PB_COMPILER_EVENT_TYPE, inner->data, inner->length);
             break;
 
         case COMPILATION_EVENT_TYPE_BODY:
-            if (ev->type_body.type) encode_type_body_payload(context, ev->type_body.type);
+            if (ev->ptr) encode_type_body_payload(context, (Type *) ev->ptr);
             pb_write_bytes(out, PB_COMPILER_EVENT_TYPE_BODY, inner->data, inner->length);
             break;
     }
@@ -630,7 +670,7 @@ void compilation_log_ensure_c_abi_encoded(Context *context) {
 
 void compilation_log_emit_start(Context *context) {
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_START);
-    ev->start.compiler_version = bh_aprintf(
+    ev->ptr = bh_aprintf(
         context->gp_alloc,
         "%d.%d.%d%s",
         VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, VERSION_SUFFIX
@@ -655,12 +695,12 @@ void compilation_log_emit_file(Context *context, const char *path) {
     CompilationLog *log = &context->compilation_log;
 
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_FILE);
-    ev->file.id = ++log->next_file_id;
-    ev->file.path = path ? (char *)path : "";
+    ev->a = ++log->next_file_id;
+    ev->ptr = path ? (char *)path : "";
 
     if (path && *path) {
         if (!log->file_ids) sh_new_arena(log->file_ids);
-        shput(log->file_ids, (char *)path, ev->file.id);
+        shput(log->file_ids, (char *)path, ev->a);
     }
 }
 
@@ -668,11 +708,7 @@ void compilation_log_emit_package(Context *context, Package *package) {
     if (!package) return;
 
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_PACKAGE);
-    ev->pack.id = package->id;
-    ev->pack.package_name = package->unqualified_name ? package->unqualified_name : "";
-    ev->pack.fully_qualified_name = package->name ? package->name : "";
-    ev->pack.parent_package_id = package->parent_id >= 0 ? (u32)package->parent_id : 0;
-    ev->pack.scope_id = package->scope ? (u32)package->scope->id : 0;
+    ev->ptr = package;
 }
 
 void compilation_log_emit_scope(Context *context, Scope *scope) {
@@ -680,44 +716,45 @@ void compilation_log_emit_scope(Context *context, Scope *scope) {
 
     CompilationLog *log = &context->compilation_log;
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_SCOPE);
-    ev->scope.id = (u32)scope->id;
-    ev->scope.parent_scope_id = scope->parent ? (u32)scope->parent->id : 0;
-    ev->scope.file_id = compilation_log_file_id_for(context, scope->created_at.filename);
-    ev->scope.line = scope->created_at.line;
-    ev->scope.column = scope->created_at.column;
-    ev->scope.end_line = scope->closed_at.line;
-    ev->scope.end_column = scope->closed_at.column;
-    ev->scope.name = scope->name ? scope->name : "";
+    ev->a = compilation_log_file_id_for(context, scope->created_at.filename);
+    ev->b = 0;
+    ev->c = 0;
+    ev->ptr = scope;
     scope->log_event_index = (u32)(bh_arr_length(log->events) - 1);
 }
 
 void compilation_log_emit_scope_end(Context *context, Scope *scope, OnyxFilePos pos) {
     if (!scope) return;
-    if (scope->closed_at.line != 0) return;
     if (pos.line == 0) return;
-
-    scope->closed_at = pos;
 
     CompilationLog *log = &context->compilation_log;
     u32 idx = scope->log_event_index;
-    if (idx != 0 && idx >= log->delivered_until && idx < (u32)bh_arr_length(log->events)) {
+    if (idx != 0 && idx < (u32)bh_arr_length(log->events)) {
         CompilationEvent *ev = &log->events[idx];
-        if (ev->kind == COMPILATION_EVENT_SCOPE && ev->scope.id == (u32)scope->id) {
-            ev->scope.end_line = pos.line;
-            ev->scope.end_column = pos.column;
-            log->encoded_valid = 0;
-            return;
+        if (ev->kind == COMPILATION_EVENT_SCOPE && ev->ptr == scope) {
+            if (ev->b != 0) return;
+            if (idx >= log->delivered_until) {
+                ev->b = pos.line;
+                ev->c = pos.column;
+                log->encoded_valid = 0;
+                return;
+            }
         }
     }
 
     compilation_log_emit_scope(context, scope);
+    CompilationEvent *ev = &log->events[bh_arr_length(log->events) - 1];
+    ev->b = pos.line;
+    ev->c = pos.column;
 }
 
 static u32 compilation_log_symbol_kind(AstNode *node) {
     if (!node) return SYMBOL_KIND_UNKNOWN;
 
-    node = strip_aliases(node);
-    if (!node) return SYMBOL_KIND_UNKNOWN;
+    if (node->kind == Ast_Kind_Alias) {
+        node = strip_aliases(node);
+        if (!node) return SYMBOL_KIND_UNKNOWN;
+    }
 
     switch (node->kind) {
         case Ast_Kind_Package:             return SYMBOL_KIND_PACKAGE;
@@ -788,13 +825,12 @@ static u32 compilation_log_basic_kind(enum BasicKind kind) {
     }
 }
 
-static void compilation_log_emit_binding_for_id(Context *context, u32 symbol_id, AstNode *node, AstBinding *binding);
+static b32 compilation_log_emit_binding_for_id(Context *context, u32 symbol_id, AstNode *node, AstBinding *binding);
 static void compilation_log_remember_alias_symbol(Context *context, AstNode *node, u32 symbol_id);
 static void compilation_log_copy_binding_to_symbol(Context *context, u32 dest_id, u32 src_id);
 
 static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope, char *name, OnyxFilePos pos, AstNode *node, u32 kind, b32 dedup) {
-    if (!name || !*name) return 0;
-    if (!strcmp(name, "_")) return 0;
+    if (!name || !*name || (name[0] == '_' && name[1] == '\0')) return 0;
 
     CompilationLog *log = &context->compilation_log;
     if (dedup && node && node->compilation_symbol_id) {
@@ -802,16 +838,15 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
     }
 
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_SYMBOL);
-    ev->symbol.id = ++log->next_symbol_id;
-    ev->symbol.scope_id = scope ? (u32)scope->id : 0;
-    ev->symbol.name = name;
-    ev->symbol.file_id = compilation_log_file_id_for(context, pos.filename);
-    ev->symbol.line = pos.line;
-    ev->symbol.column = pos.column;
-    ev->symbol.kind = kind;
-    ev->symbol.package_id = 0;
+    ev->a = ++log->next_symbol_id;
+    ev->b = scope ? (u32)scope->id : 0;
+    ev->c = compilation_log_file_id_for(context, pos.filename);
+    ev->d = pos.line;
+    ev->extra16 = (u16) pos.column;
+    ev->extra = (u8) kind;
+    ev->e = 0;
 
-    u32 symbol_id = ev->symbol.id;
+    u32 symbol_id = ev->a;
     b32 is_alias = 0;
     if (node) {
         // Locals can be introduced again in a child scope (named returns are
@@ -824,17 +859,17 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
         } else {
             node->compilation_symbol_id = symbol_id;
         }
-        AstNode *inner = strip_aliases(node);
+        AstNode *inner = (node->kind == Ast_Kind_Alias) ? strip_aliases(node) : node;
         if (inner && inner != node && !inner->compilation_symbol_id) {
             inner->compilation_symbol_id = symbol_id;
         }
         if (inner && inner->kind == Ast_Kind_Package) {
             AstPackage *package = (AstPackage *) inner;
-            if (package->package) ev->symbol.package_id = package->package->id;
+            if (package->package) ev->e = package->package->id;
         }
     }
 
-    bh_arr_set_at(log->symbol_names, symbol_id, ev->symbol.name);
+    compilation_log_names_set(context, &log->symbol_names, symbol_id, name);
 
     if (is_alias) {
         compilation_log_remember_alias_symbol(context, node, symbol_id);
@@ -864,12 +899,12 @@ static void compilation_log_emit_resolved_at(Context *context, OnyxToken *token,
     if (!token || !symbol_id) return;
 
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_SYMBOL_RESOLVED);
-    ev->resolved.symbol_id = symbol_id;
-    ev->resolved.file_id = compilation_log_file_id_for(context, token->pos.filename);
-    ev->resolved.line = token->pos.line;
-    ev->resolved.column = token->pos.column;
-    ev->resolved.length = token->length;
-    ev->resolved.chosen_symbol_id = chosen_symbol_id;
+    ev->a = symbol_id;
+    ev->b = compilation_log_file_id_for(context, token->pos.filename);
+    ev->c = token->pos.line;
+    ev->d = token->length;
+    ev->extra16 = (u16) token->pos.column;
+    ev->e = chosen_symbol_id;
 }
 
 void compilation_log_emit_symbol_resolved(Context *context, AstNode *original, AstNode *resolved) {
@@ -933,9 +968,9 @@ void compilation_log_emit_overloads(Context *context, AstOverloadedFunction *ofu
     bh_imap_free(&all_overloads);
 
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_OVERLOAD);
-    ev->overload.group_symbol_id = group_id;
-    ev->overload.option_count = count;
-    ev->overload.option_symbol_ids = ids;
+    ev->a = group_id;
+    ev->b = count;
+    ev->ptr = ids;
 }
 
 void compilation_log_emit_overload_choice(Context *context, OnyxToken *site, AstNode *group, AstNode *chosen) {
@@ -965,6 +1000,7 @@ void compilation_log_ensure_poly_template_params(Context *context, AstFunction *
 
     bh_arr_each(AstParam, param, pp->params) {
         if (!param->local || !param->local->token) continue;
+        if (param->local->compilation_symbol_id) continue;
         char *name = compilation_log_intern_len(
             context, param->local->token->text, param->local->token->length
         );
@@ -1033,12 +1069,18 @@ void compilation_log_emit_poly_proc(Context *context, AstFunction *pp, AstFuncti
         }
     }
 
+    CompilationLogPoly *poly = NULL;
+    if (n > 0) {
+        poly = bh_alloc_item(context->gp_alloc, CompilationLogPoly);
+        poly->names = names;
+        poly->type_ids = type_ids;
+    }
+
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_POLY_PROC);
-    ev->poly_proc.template_symbol_id = template_id;
-    ev->poly_proc.instance_symbol_id = instance_id;
-    ev->poly_proc.solution_count = n;
-    ev->poly_proc.solution_names = names;
-    ev->poly_proc.solution_type_ids = type_ids;
+    ev->a = template_id;
+    ev->b = instance_id;
+    ev->c = n;
+    ev->ptr = poly;
 }
 
 void compilation_log_emit_poly_choice(Context *context, OnyxToken *site, AstNode *template, AstNode *chosen) {
@@ -1153,6 +1195,8 @@ static b32 compilation_log_lookup_symbol_id(CompilationLog *log, AstNode *node, 
         return 1;
     }
 
+    if (node->kind != Ast_Kind_Alias) return 0;
+
     AstNode *inner = strip_aliases(node);
     if (inner && inner != node && inner->compilation_symbol_id) {
         *out = inner->compilation_symbol_id;
@@ -1166,6 +1210,8 @@ static void compilation_log_map_node_binding(CompilationLog *log, AstNode *node,
     if (!node || !binding) return;
 
     bh_imap_put(&log->node_to_binding, (u64) node, (u64) binding);
+    if (node->kind != Ast_Kind_Alias) return;
+
     AstNode *inner = strip_aliases(node);
     if (inner && inner != node) {
         bh_imap_put(&log->node_to_binding, (u64) inner, (u64) binding);
@@ -1180,12 +1226,29 @@ static AstBinding *compilation_log_lookup_binding(CompilationLog *log, AstNode *
         return (AstBinding *) binding;
     }
 
+    if (node->kind != Ast_Kind_Alias) return NULL;
+
     AstNode *inner = strip_aliases(node);
     if (inner && inner != node && bh_imap_try_get(&log->node_to_binding, (u64) inner, &binding)) {
         return (AstBinding *) binding;
     }
 
     return NULL;
+}
+
+static char *compilation_log_binding_docs(Context *context, CompilationLog *log, AstNode *node) {
+    AstBinding *binding = compilation_log_lookup_binding(log, node);
+    if (!binding) return (char *) "";
+
+    if (binding->documentation_token_old && binding->documentation_token_old->text) {
+        return compilation_log_intern_len(
+            context,
+            binding->documentation_token_old->text,
+            binding->documentation_token_old->length
+        );
+    }
+    if (binding->documentation_string) return (char *) binding->documentation_string;
+    return (char *) "";
 }
 
 static void compilation_log_copy_binding_to_symbol(Context *context, u32 dest_id, u32 src_id) {
@@ -1203,10 +1266,9 @@ static void compilation_log_copy_binding_to_symbol(Context *context, u32 dest_id
     compilation_log_binding_type_put(context, log, dest_id, type_id);
 
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_BINDING);
-    ev->binding.symbol_id = dest_id;
-    ev->binding.documentation = "";
-    ev->binding.type_id = type_id;
-    ev->binding.node = NULL;
+    ev->a = dest_id;
+    ev->b = type_id;
+    ev->ptr = NULL;
 }
 
 static void compilation_log_remember_alias_symbol(Context *context, AstNode *node, u32 symbol_id) {
@@ -1239,10 +1301,31 @@ static b32 compilation_log_function_has_param_symbols(CompilationLog *log, AstNo
     return 0;
 }
 
-static void compilation_log_emit_binding_for_id(Context *context, u32 symbol_id, AstNode *node, AstBinding *binding) {
-    if (!symbol_id || !node) return;
+static u32 compilation_log_fast_type_id(AstNode *node) {
+    if (!node) return 0;
+
+    AstKind kind = node->kind;
+    if (kind == Ast_Kind_Alias || (kind > Ast_Kind_Type_Start && kind < Ast_Kind_Type_End)) {
+        return compilation_log_type_id_of_node(node);
+    }
+    if (!compilation_log_kind_has_type_pointer(kind)) return 0;
+
+    Type *type = ((AstTyped *) node)->type;
+    return (type && type->id) ? type->id : 0;
+}
+
+static b32 compilation_log_emit_binding_for_id(Context *context, u32 symbol_id, AstNode *node, AstBinding *binding) {
+    if (!symbol_id || !node) return 0;
 
     CompilationLog *log = &context->compilation_log;
+
+    if (!binding) {
+        u32 prev = 0;
+        if (compilation_log_binding_type_get(log, symbol_id, &prev) && prev != 0) {
+            if (compilation_log_fast_type_id(node) == prev) return 0;
+        }
+    }
+
     if (binding) {
         compilation_log_map_node_binding(log, node, binding);
     } else {
@@ -1252,36 +1335,23 @@ static void compilation_log_emit_binding_for_id(Context *context, u32 symbol_id,
     u32 type_id = compilation_log_type_id_of_node(node);
     b32 any_param = compilation_log_function_has_param_symbols(log, node);
 
-    if (type_id == 0 && !binding && !any_param) return;
+    if (type_id == 0 && !binding && !any_param) return 0;
 
     u32 prev = 0;
     if (compilation_log_binding_type_get(log, symbol_id, &prev)) {
         if (prev == type_id) {
-            if (type_id != 0) return;
-            if (!any_param) return;
+            if (type_id != 0) return 0;
+            if (!any_param) return 0;
         }
-        if (type_id == 0 && prev != 0) return;
+        if (type_id == 0 && prev != 0) return 0;
     }
     compilation_log_binding_type_put(context, log, symbol_id, type_id);
 
-    char *docs = "";
-    if (binding) {
-        if (binding->documentation_token_old && binding->documentation_token_old->text) {
-            docs = compilation_log_intern_len(
-                context,
-                binding->documentation_token_old->text,
-                binding->documentation_token_old->length
-            );
-        } else if (binding->documentation_string) {
-            docs = (char *) binding->documentation_string;
-        }
-    }
-
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_BINDING);
-    ev->binding.symbol_id = symbol_id;
-    ev->binding.documentation = docs;
-    ev->binding.type_id = type_id;
-    ev->binding.node = node;
+    ev->a = symbol_id;
+    ev->b = type_id;
+    ev->ptr = node;
+    return 1;
 }
 
 void compilation_log_emit_binding(Context *context, AstNode *node, AstBinding *binding) {
@@ -1291,7 +1361,7 @@ void compilation_log_emit_binding(Context *context, AstNode *node, AstBinding *b
     u32 symbol_id;
     if (!compilation_log_lookup_symbol_id(log, node, &symbol_id)) return;
 
-    compilation_log_emit_binding_for_id(context, symbol_id, node, binding);
+    if (!compilation_log_emit_binding_for_id(context, symbol_id, node, binding)) return;
 
     u64 idx = 0;
     if (bh_imap_try_get(&log->node_to_first_alias, (u64) node, &idx)) {
@@ -1304,6 +1374,8 @@ void compilation_log_emit_binding(Context *context, AstNode *node, AstBinding *b
 }
 
 void compilation_log_notify_node_typed(Context *context, AstNode *node) {
+    if (!node) return;
+    if (!node->compilation_symbol_id && node->kind != Ast_Kind_Alias) return;
     compilation_log_emit_binding(context, node, NULL);
 }
 
@@ -1312,7 +1384,7 @@ void compilation_log_emit_type(Context *context, Type *type) {
     if (!context->compilation_log.events) return;
 
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_TYPE);
-    ev->type.type = type;
+    ev->ptr = type;
 
     if (type->kind != Type_Kind_Struct && type->kind != Type_Kind_Union) {
         if (compilation_log_type_method_scope(type)) {
@@ -1386,7 +1458,7 @@ void compilation_log_emit_type_body(Context *context, Type *type) {
     }
 
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_TYPE_BODY);
-    ev->type_body.type = type;
+    ev->ptr = type;
 }
 
 void compilation_log_init(Context *context) {
