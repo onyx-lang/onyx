@@ -43,14 +43,14 @@ typedef enum onyx_option_t {
 
     ONYX_OPTION_PLATFORM,
 
-    ONYX_OPTION_COMPILATION_DATA_DETAILED,
-
     /// Lex and parse only: skip type checking, code generation, and
     /// loading compiler builtins/core. `onyx_inject_code` already
     /// parses immediately; this option is for `onyx_pump` after
     /// `onyx_include_file` / inject, so `#load` is parsed without a
     /// full compile.
     ONYX_OPTION_PARSE_ONLY,
+
+    ONYX_OPTION_COMPILATION_DATA_DETAILED,
 } onyx_option_t;
 
 typedef enum onyx_pump_t {

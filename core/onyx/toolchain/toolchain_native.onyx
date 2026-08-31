@@ -31,8 +31,8 @@ onyx_option_t :: enum {
     DISABLE_EXTENSIONS :: 17
     COLLECT_PERF :: 18
     PLATFORM :: 19
-    COMPILATION_DATA_DETAILED :: 20
-    PARSE_ONLY :: 21
+    PARSE_ONLY :: 20
+    COMPILATION_DATA_DETAILED :: 21
 }
 
 onyx_pump_t :: enum {

@@ -397,13 +397,13 @@ static b32 process_load_entity(Context *context, Entity* ent) {
 static b32 process_entity(Context *context, Entity* ent) {
     EntityState before_state = ent->state;
 
-    if (context->options.parse_only
-        && before_state != Entity_State_Parse
-        && before_state != Entity_State_Parse_Builtin
-        && before_state != Entity_State_Error) {
-        ent->state = Entity_State_Finalized;
-        return 1;
-    }
+     if (context->options.parse_only
+         && before_state != Entity_State_Parse
+         && before_state != Entity_State_Parse_Builtin
+         && before_state != Entity_State_Error) {
+         ent->state = Entity_State_Finalized;
+         return 1;
+     }
 
     switch (before_state) {
         case Entity_State_Error:
@@ -845,8 +845,8 @@ int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t valu
     case ONYX_OPTION_DISABLE_FILE_CONTENTS:  ctx->context.options.no_file_contents = value; return 1;
     case ONYX_OPTION_DISABLE_EXTENSIONS:     ctx->context.options.no_compiler_extensions = value; return 1;
     case ONYX_OPTION_PLATFORM:               ctx->context.options.runtime = value; return 1;
-    case ONYX_OPTION_COMPILATION_DATA_DETAILED: ctx->context.options.compilation_data_detailed = value; return 1;
     case ONYX_OPTION_PARSE_ONLY:             ctx->context.options.parse_only = value; return 1;
+    case ONYX_OPTION_COMPILATION_DATA_DETAILED: ctx->context.options.compilation_data_detailed = value; return 1;
 
     default:
         break;
