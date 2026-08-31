@@ -831,6 +831,8 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
                 parser->current_scope = tmp_block->binding_scope;
                 tmp_block->body = parse_statement(parser);
+                // :LinearTokenDependent
+                tmp_block->closing = parser->curr - 1;
                 parser->current_scope = parser->current_scope->parent;
 
                 do_block->block = tmp_block;
@@ -857,7 +859,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
                 code_block->token = expect_token(parser, '[');
 
-                assert(parser->context->builtins.code_type != NULL);
+                // PARSE_ONLY + DISABLE_CORE never loads builtins; do not abort.
                 code_block->type_node = parser->context->builtins.code_type;
 
                 bh_arr_new(parser->context->gp_alloc, code_block->binding_symbols, 4);
@@ -933,7 +935,10 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 AstFileContents* fc = make_node(AstFileContents, Ast_Kind_File_Contents);
                 fc->token = parser->prev - 1;
                 fc->filename_expr = parse_expression(parser, 0);
-                fc->type = type_make_slice(parser->context, parser->context->types.basic[Basic_Kind_U8]);
+                // PARSE_ONLY + DISABLE_CORE never loads Slice; skip type construction.
+                if (parser->context->builtins.slice_type != NULL) {
+                    fc->type = type_make_slice(parser->context, parser->context->types.basic[Basic_Kind_U8]);
+                }
 
                 if (parser->current_function_stack && bh_arr_length(parser->current_function_stack) > 0) {
                     bh_arr_push(bh_arr_last(parser->current_function_stack)->nodes_that_need_entities_after_clone, (AstNode *) fc);
@@ -2316,6 +2321,12 @@ static AstNode *parse_statements_until(OnyxParser *parser, TokenType end_token) 
     return root;
 }
 
+static void close_block_binding_scope(OnyxParser *parser, AstBlock *block, OnyxToken *closing) {
+    if (closing) block->closing = closing;
+    if (!block->binding_scope) return;
+    parser->current_scope = parser->current_scope->parent;
+}
+
 static AstBlock* parse_block(OnyxParser* parser, b32 make_a_new_scope, char* block_name) {
     AstBlock* block = make_node(AstBlock, Ast_Kind_Block);
     block->rules = Block_Rule_Normal;
@@ -2335,7 +2346,8 @@ static AstBlock* parse_block(OnyxParser* parser, b32 make_a_new_scope, char* blo
     if (parser->curr->type == Token_Type_Keyword_Do) {
         block->token = expect_token(parser, Token_Type_Keyword_Do);
         block->body = parse_statement(parser);
-        if (make_a_new_scope) parser->current_scope = parser->current_scope->parent;
+        // :LinearTokenDependent
+        close_block_binding_scope(parser, block, parser->curr - 1);
         return block;
     }
 
@@ -2345,7 +2357,8 @@ static AstBlock* parse_block(OnyxParser* parser, b32 make_a_new_scope, char* blo
     AstNode* stmt = NULL;
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) {
-            if (make_a_new_scope) parser->current_scope = parser->current_scope->parent;
+            // :LinearTokenDependent
+            close_block_binding_scope(parser, block, parser->curr - 1);
             return block;
         }
 
@@ -2359,7 +2372,8 @@ static AstBlock* parse_block(OnyxParser* parser, b32 make_a_new_scope, char* blo
         }
     }
 
-    if (make_a_new_scope) parser->current_scope = parser->current_scope->parent;
+    // :LinearTokenDependent
+    close_block_binding_scope(parser, block, parser->curr - 1);
     return block;
 }
 
@@ -2729,8 +2743,6 @@ static AstType* parse_type(OnyxParser* parser) {
             }
 
             case '?': {
-                assert(parser->context->builtins.optional_type);
-
                 bh_arr(AstNode *) params = NULL;
                 bh_arr_new(parser->context->gp_alloc, params, 1);
                 bh_arr_set_length(params, 1);
@@ -3862,6 +3874,9 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
     }
 
     *ret = (AstTyped *) poly_proc;
+
+    // :LinearTokenDependent
+    poly_proc->closing_brace = parser->curr - 1;
 
     bh_arr_pop(parser->current_function_stack);
     bh_arr_free(params);

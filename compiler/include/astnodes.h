@@ -137,6 +137,7 @@ typedef struct Scope {
     u64 id;
     struct Scope *parent;
     OnyxFilePos created_at;
+    OnyxFilePos closed_at;
     char* name;
     Table(AstNode *) symbols;
 } Scope;
@@ -798,6 +799,7 @@ struct AstCall {
     i32 placeholder_argument_position;
 
     AstTyped *callee;
+    OnyxToken *callee_name_token;
     OnyxIntrinsic intrinsic;
 
     VarArgKind va_kind;
@@ -855,6 +857,7 @@ struct AstBlock         {
 
     u32 statement_idx;
 
+    OnyxToken *closing;
     OnyxToken *macro_generated_from;
 };
 struct AstDefer         { AstNode_base; AstNode *stmt; };
@@ -2224,6 +2227,12 @@ typedef struct EventSystem {
     CompilerEvent *last;
 } EventSystem;
 
+typedef struct CompilationFileOverlay {
+    char *filename;
+    u8 *data;
+    i32 length;
+} CompilationFileOverlay;
+
 struct Context {
     Table(Package *)      packages;
     EntityHeap            entities;
@@ -2241,8 +2250,13 @@ struct Context {
     bh_managed_heap heap;
     bh_allocator gp_alloc; // General purpose allocator 
 
+    bh_allocator *stbds_alloc;
+
     bh_arr(bh_file_contents) loaded_files;
     bh_arr(DefinedVariable) defined_variables;
+
+    // Unsaved editor buffers. process_source_file preferes these over disk.
+    bh_arr(CompilationFileOverlay) file_overlays;
 
     // NOTE: This is defined in wasm_emit.h
     struct OnyxWasmModule* wasm_module;
@@ -2366,6 +2380,7 @@ char* generate_name_within_scope(Context *context, Scope *scope, OnyxToken* symb
 TypeMatch implicit_cast_to_bool(Context *context, AstTyped **pnode);
 
 AstNode* strip_aliases(AstNode* node);
+AstType* strip_type_aliases(AstType* node);
 
 AstNumLit*        make_bool_literal(Context *context, b32 b);
 AstNumLit*        make_int_literal(Context *context, i64 value);

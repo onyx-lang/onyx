@@ -1922,3 +1922,20 @@ UnionVariant* type_lookup_union_variant_by_name(Type* type, char *name) {
     return type->Union.variants[index].value;
 }
 
+
+i32 type_lookup_union_variant_idx_by_tag(Type* type, u32 tag) {
+    if (!type) return -1;
+    if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
+    if (type->kind != Type_Kind_Union) return -1;
+    fori (i, 0, bh_arr_length(type->Union.variants_ordered)) {
+       if (type->Union.variants_ordered[i]->tag_value == tag) {
+           return i;
+       }
+    }
+    return -1;
+}
+UnionVariant* type_lookup_union_variant_by_tag(Type* type, u32 tag) {
+    i32 idx = type_lookup_union_variant_idx_by_tag(type, tag);
+    if (idx < 0) return NULL;
+    return type->Union.variants_ordered[idx];
+}

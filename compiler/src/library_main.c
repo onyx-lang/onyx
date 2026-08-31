@@ -21,16 +21,23 @@
 // should not be multi-threaded in that way (at least I don't think so... time
 // may prove me wrong)
 //
-static void * HACK_global_heap_allocator = (void *) 0;
+
+#if defined(_MSC_VER)
+    #define ONYX_THREAD_LOCAL __declspec(thread)
+#else
+    #define ONYX_THREAD_LOCAL __thread
+#endif
+
+static ONYX_THREAD_LOCAL void * stbds_heap_allocator = (void *) 0;
 
 #define STBDS_REALLOC(c, p, s) \
-    (HACK_global_heap_allocator) ? \
-        (bh_resize(*(bh_allocator *) HACK_global_heap_allocator, p, s)) : \
+    (stbds_heap_allocator) ? \
+        (bh_resize(*(bh_allocator *) stbds_heap_allocator, p, s)) : \
         (realloc(p, s))
 
 #define STBDS_FREE(c, p) \
-    (HACK_global_heap_allocator) ? \
-        (bh_free(*(bh_allocator *) HACK_global_heap_allocator, p)) : \
+    (stbds_heap_allocator) ? \
+        (bh_free(*(bh_allocator *) stbds_heap_allocator, p)) : \
         (free(p))
 
 #define BH_DEFINE
@@ -100,6 +107,7 @@ static AstInclude* create_load(Context *context, char* filename, int32_t length)
 static void introduce_defined_variables(Context *context);
 static void create_and_add_defined_variable(Context *context, DefinedVariable *var);
 static void link_wasm_module(Context *context);
+static void __library_code_entry(onyx_context_t *ctx);
 
 
 //
@@ -118,15 +126,10 @@ onyx_context_t *onyx_context_create() {
 
     bh_managed_heap_init(&context->heap);
     context->gp_alloc = bh_managed_heap_allocator(&context->heap);
-
-    if (HACK_global_heap_allocator) {
-        printf("[WARNING] The Onyx compiler is being used by multiple threads at once. This is currently not supported and may result in catastrophic errors.\n");
-
-    } else {
-        HACK_global_heap_allocator = (void *) &context->gp_alloc;
-    }
-
+    context->stbds_alloc = &context->gp_alloc;
     context->token_alloc = context->gp_alloc;
+
+    __library_code_entry(ctx);
 
     // NOTE: Create the arena where tokens and AST nodes will exist
     // Prevents nodes from being scattered across memory due to fragmentation
@@ -160,6 +163,7 @@ onyx_context_t *onyx_context_create() {
 }
 
 void onyx_context_free(onyx_context_t *ctx) {
+    __library_code_entry(ctx);
 	Context *context = &ctx->context;
 
     bh_arr_each(CompilerExtension, ext, context->extensions) {
@@ -175,7 +179,7 @@ void onyx_context_free(onyx_context_t *ctx) {
     bh_arr_free(context->options.mapped_folders);
     free(ctx);
 
-    HACK_global_heap_allocator = NULL;
+    stbds_heap_allocator = (void *) 0;
 }
 
 static void parse_source_file(Context *context, bh_file_contents* file_contents) {
@@ -190,11 +194,74 @@ static void parse_source_file(Context *context, bh_file_contents* file_contents)
     onyx_parser_free(&parser);
 }
 
+static b32 overlay_path_match(const char *a, const char *b) {
+    if (!a || !b) return 0;
+    if (!strcmp(a, b)) return 1;
+
+    i32 i = (i32) strlen(a);
+    i32 j = (i32) strlen(b);
+    while (i > 0 && j > 0) {
+        i -= 1;
+        j -= 1;
+        char ca = a[i] == '\\' ? '/' : a[i];
+        char cb = b[j] == '\\' ? '/' : b[j];
+        if (ca != cb) return 0;
+    }
+
+    if (i == 0 && j == 0) return 1;
+    if (i == 0 && j > 0 && (b[j - 1] == '/' || b[j - 1] == '\\')) return 1;
+    if (j == 0 && i > 0 && (a[i - 1] == '/' || a[i - 1] == '\\')) return 1;
+    return 0;
+}
+
+static char *overlay_canon_name(Context *context, char *filename) {
+    if (!filename) return filename;
+    if (!bh_file_exists(filename)) return filename;
+    char *full = bh_path_get_full_name(filename, context->gp_alloc);
+    if (full) return full;
+    return filename;
+}
+
+static CompilationFileOverlay *find_file_overlay(Context *context, const char *filename) {
+    if (!filename || !context->file_overlays) return NULL;
+
+    const char *lookup = filename;
+    if (bh_file_exists((char *) filename)) {
+        char *full = bh_path_get_full_name((char *) filename, context->scratch_alloc);
+        if (full) lookup = full;
+    }
+
+    bh_arr_each(CompilationFileOverlay, o, context->file_overlays) {
+        if (overlay_path_match(o->filename, lookup)) return o;
+        if (lookup != filename && overlay_path_match(o->filename, filename)) return o;
+    }
+    return NULL;
+}
+
+static bh_file_contents file_contents_from_overlay(Context *context, const char *filename, CompilationFileOverlay *ov) {
+    bh_file_contents fc;
+    memset(&fc, 0, sizeof fc);
+    fc.allocator = context->token_alloc;
+    fc.length = ov->length > 0 ? ov->length : 0;
+    fc.data = bh_alloc(context->token_alloc, fc.length + 1);
+    if (fc.length > 0 && ov->data) memcpy(fc.data, ov->data, fc.length);
+    ((char *) fc.data)[fc.length] = '\0';
+    fc.filename = bh_strdup(context->token_alloc, (char *) filename);
+    return fc;
+}
+
 static b32 process_source_file(Context *context, char* filename) {
     bh_arr_each(bh_file_contents, fc, context->loaded_files) {
         // Duplicates are detected here and since these filenames will be the full path,
         // string comparing them should be all that is necessary.
         if (!strcmp(fc->filename, filename)) return 1;
+    }
+
+    CompilationFileOverlay *ov = find_file_overlay(context, filename);
+    if (ov) {
+        bh_arr_push(context->loaded_files, file_contents_from_overlay(context, filename, ov));
+        parse_source_file(context, &bh_arr_last(context->loaded_files));
+        return 1;
     }
 
     bh_file file;
@@ -293,7 +360,18 @@ static b32 process_load_entity(Context *context, Entity* ent) {
         );
 
         if (filename) {
-            return process_load_directory(context, include, filename);
+            bh_file_stats stats;
+            if (bh_file_stat(filename, &stats) && stats.file_type == BH_FILE_TYPE_DIRECTORY) {
+                return process_load_directory(context, include, filename);
+            }
+            return process_source_file(context, filename);
+        }
+ 
+        {
+            CompilationFileOverlay *ov = find_file_overlay(context, include->name);
+            if (ov) {
+                return process_source_file(context, ov->filename);
+            }
         }
 
         OnyxFilePos error_pos = include->token->pos;
@@ -485,6 +563,7 @@ static void prime_pump(Context *context) {
 }
 
 onyx_pump_t onyx_pump(onyx_context_t *ctx) {
+    __library_code_entry(ctx);
     Context *context = &ctx->context;
 
     compiler_events_clear(context);
@@ -579,10 +658,12 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
 //
 
 int32_t onyx_event_count(onyx_context_t *ctx) {
+    __library_code_entry(ctx);
     return ctx->context.events.event_count;
 }
 
 onyx_event_type_t onyx_event_type(onyx_context_t *ctx, int event_idx) {
+    __library_code_entry(ctx);
     if (event_idx >= ctx->context.events.event_count) return ONYX_EVENT_UNKNOWN;
 
     CompilerEvent *ev = ctx->context.events.first;
@@ -596,6 +677,7 @@ onyx_event_type_t onyx_event_type(onyx_context_t *ctx, int event_idx) {
 }
 
 int32_t onyx_event_field_int(onyx_context_t *ctx, int event_idx, char *field) {
+    __library_code_entry(ctx);
     if (event_idx >= ctx->context.events.event_count) return 0;
 
     CompilerEvent *ev = ctx->context.events.first;
@@ -617,6 +699,7 @@ int32_t onyx_event_field_int(onyx_context_t *ctx, int event_idx, char *field) {
 }
 
 const char *onyx_event_field_str(onyx_context_t *ctx, int event_idx, char *field) {
+    __library_code_entry(ctx);
     if (event_idx >= ctx->context.events.event_count) return "";
 
     CompilerEvent *ev = ctx->context.events.first;
@@ -645,15 +728,18 @@ const char *onyx_event_field_str(onyx_context_t *ctx, int event_idx, char *field
 // Options
 //
 int32_t onyx_set_option_cstr(onyx_context_t *ctx, onyx_option_t opt, char *value) {
+    __library_code_entry(ctx);
     return onyx_set_option_bytes(ctx, opt, value, strlen(value));
 }
 
 int32_t onyx_set_option_bytes(onyx_context_t *ctx, onyx_option_t opt, char *value, int32_t length) {
+    __library_code_entry(ctx);
     if (length < 0) length = strlen(value);
     return 0;
 }
 
 int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t value) {
+    __library_code_entry(ctx);
     switch (opt) {
     case ONYX_OPTION_POST_MVP_FEATURES:      ctx->context.options.use_post_mvp_features = value; return 1;
     case ONYX_OPTION_MULTI_THREADING:        ctx->context.options.use_multi_threading = value;  return 1;
@@ -681,6 +767,7 @@ int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t valu
 }
 
 void onyx_add_defined_var(onyx_context_t *ctx, char *variable, int32_t variable_length, char *value, int32_t value_length) {
+    __library_code_entry(ctx);
     if (variable_length < 0) variable_length = strlen(variable);
     if (value_length    < 0) value_length    = strlen(value);
 
@@ -698,11 +785,13 @@ void onyx_add_defined_var(onyx_context_t *ctx, char *variable, int32_t variable_
 /// 1. `foo:file.onyx` will search in the `foo` mapped folder.
 /// 2. `file.onyx` will search in the current directory for `file.onyx`.
 void onyx_include_file(onyx_context_t *ctx, char *filename, int32_t length) {
+    __library_code_entry(ctx);
     AstInclude* load_node = create_load(&ctx->context, filename, length);
     add_entities_for_node(&ctx->context.entities, NULL, (AstNode *) load_node, ctx->context.global_scope, NULL);
 }
 
 void onyx_add_mapped_dir(onyx_context_t *ctx, char *mapped_name, int32_t mapped_length, char *dir, int32_t dir_length) {
+    __library_code_entry(ctx);
     if (mapped_length < 0) mapped_length = strlen(mapped_name);
     if (dir_length    < 0) dir_length    = strlen(dir);
 
@@ -714,6 +803,7 @@ void onyx_add_mapped_dir(onyx_context_t *ctx, char *mapped_name, int32_t mapped_
 
 /// Directly injects Onyx code as a new compilation unit
 void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length) {
+    __library_code_entry(ctx);
     bh_file_contents file_contents;
     file_contents.allocator = ctx->context.ast_alloc;
     file_contents.data = code;
@@ -728,10 +818,14 @@ void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length) {
 //
 
 int32_t onyx_error_count(onyx_context_t *ctx) {
+    __library_code_entry(ctx);
+
     return bh_arr_length(ctx->context.errors.errors);
 }
 
 const char *onyx_error_message(onyx_context_t *ctx, int32_t error_idx) {
+    __library_code_entry(ctx);
+
     int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return NULL;
 
@@ -739,6 +833,8 @@ const char *onyx_error_message(onyx_context_t *ctx, int32_t error_idx) {
 }
 
 const char *onyx_error_filename(onyx_context_t *ctx, int32_t error_idx) {
+    __library_code_entry(ctx);
+
     int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return NULL;
 
@@ -746,6 +842,8 @@ const char *onyx_error_filename(onyx_context_t *ctx, int32_t error_idx) {
 }
 
 int32_t onyx_error_line(onyx_context_t *ctx, int32_t error_idx) {
+    __library_code_entry(ctx);
+
     int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return 0;
 
@@ -753,6 +851,8 @@ int32_t onyx_error_line(onyx_context_t *ctx, int32_t error_idx) {
 }
 
 int32_t onyx_error_column(onyx_context_t *ctx, int32_t error_idx) {
+    __library_code_entry(ctx);
+
     int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return 0;
 
@@ -760,6 +860,8 @@ int32_t onyx_error_column(onyx_context_t *ctx, int32_t error_idx) {
 }
 
 int32_t onyx_error_length(onyx_context_t *ctx, int32_t error_idx) {
+    __library_code_entry(ctx);
+
     int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return 0;
 
@@ -767,6 +869,8 @@ int32_t onyx_error_length(onyx_context_t *ctx, int32_t error_idx) {
 }
 
 int32_t onyx_error_line_text(onyx_context_t *ctx, int32_t error_idx, char *line_buffer, int max_length) {
+    __library_code_entry(ctx);
+
     int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return 0;
 
@@ -786,6 +890,8 @@ int32_t onyx_error_line_text(onyx_context_t *ctx, int32_t error_idx, char *line_
 }
 
 onyx_error_t onyx_error_rank(onyx_context_t *ctx, int32_t error_idx) {
+    __library_code_entry(ctx);
+
     int32_t error_count = onyx_error_count(ctx);
     if (error_idx < 0 || error_idx >= error_count) return 0;
 
@@ -849,6 +955,8 @@ static void ensure_injected_code_has_been_generated(onyx_context_t *ctx) {
 }
 
 int32_t onyx_output_length(onyx_context_t *ctx, onyx_output_type_t type) {
+    __library_code_entry(ctx);
+
     switch (type) {
     case ONYX_OUTPUT_TYPE_WASM:
         ensure_wasm_has_been_generated(ctx);
@@ -875,6 +983,8 @@ int32_t onyx_output_length(onyx_context_t *ctx, onyx_output_type_t type) {
 }
 
 void onyx_output_write(onyx_context_t *ctx, onyx_output_type_t type, void *buffer) {
+    __library_code_entry(ctx);
+
     switch (type) {
     case ONYX_OUTPUT_TYPE_WASM:
         ensure_wasm_has_been_generated(ctx);
@@ -909,6 +1019,8 @@ void onyx_output_write(onyx_context_t *ctx, onyx_output_type_t type, void *buffe
 //
 
 int64_t onyx_stat(onyx_context_t *ctx, onyx_stat_t stat) {
+    __library_code_entry(ctx);
+
     switch (stat) {
         case ONYX_STAT_FILE_COUNT:  return bh_arr_length(ctx->context.loaded_files);
         case ONYX_STAT_LINE_COUNT:  return ctx->context.stats.lexer_lines_processed;
@@ -918,6 +1030,8 @@ int64_t onyx_stat(onyx_context_t *ctx, onyx_stat_t stat) {
 }
 
 const char *onyx_stat_filepath(onyx_context_t *ctx, int32_t file_index) {
+    __library_code_entry(ctx);
+
     if (file_index < 0 || file_index >= bh_arr_length(ctx->context.loaded_files)) {
         return NULL;
     }
@@ -1019,4 +1133,8 @@ static void link_wasm_module(Context *context) {
     assert(onyx_wasm_build_link_options_from_node(context, &link_opts, link_options_node));
 
     onyx_wasm_module_link(context, context->wasm_module, &link_opts);
+}
+
+static void __library_code_entry(onyx_context_t *ctx) {
+    stbds_heap_allocator = ctx ? (void *) ctx->context.stbds_alloc : (void *) 0;
 }

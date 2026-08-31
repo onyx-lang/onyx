@@ -780,6 +780,10 @@ TypeMatch find_polymorphic_sln(Context *context, AstPolySolution *out, AstPolyPa
 // solving for the polymorphic variables, in order to return an array of the solutions for all
 // of the polymorphic variables.
 static bh_arr(AstPolySolution) find_polymorphic_slns(Context *context, AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken *tkn, b32 necessary) {
+    if (context->cycle_detected) {
+        return NULL;
+    }
+
     ensure_polyproc_cache_is_created(context, pp);
     if (bh_imap_has(&pp->active_queries, (u64) actual)) {
         AstPolyQuery *query = (AstPolyQuery *) bh_imap_get(&pp->active_queries, (u64) actual);
@@ -866,6 +870,13 @@ AstFunction* polymorphic_proc_solidify(Context *context, AstFunction* pp, bh_arr
             solidified_func.func->generated_from = tkn;
 
         return solidified_func.func;
+    }
+
+    // Cycle dumps must not spawn more polymorphic variants. Unresolved names inside
+    // a poly lambda (e.g. File.get_contents when File is not in scope) otherwise keep
+    // inserting entities and never finish.
+    if (context->cycle_detected) {
+        return NULL;
     }
 
     AstSolidifiedFunction solidified_func = generate_solidified_function(context, pp, slns, tkn, 0);
@@ -987,6 +998,10 @@ AstFunction* polymorphic_proc_build_only_header(Context *context, AstFunction* p
 }
 
 AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstFunction* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed) {
+    if (context->cycle_detected) {
+        return NULL;
+    }
+
     AstSolidifiedFunction solidified_func;
 
     char* unique_key = build_poly_slns_unique_key(context, slns);
@@ -1046,7 +1061,9 @@ b32 potentially_convert_function_to_polyproc(Context *context, AstFunction *func
         AstType *param_type = param->local->type_node;
 
         b32 done = 0;
+        i32 peel_depth = 0;
         while (!done && param_type) {
+            if (++peel_depth > 64) break;
             switch (param_type->kind) {
                 case Ast_Kind_Pointer_Type:       to_replace = &((AstPointerType *)      *to_replace)->elem;  param_type = ((AstPointerType *) param_type)->elem;  break;
                 case Ast_Kind_Multi_Pointer_Type: to_replace = &((AstMultiPointerType *) *to_replace)->elem;  param_type = ((AstMultiPointerType *) param_type)->elem;  break;

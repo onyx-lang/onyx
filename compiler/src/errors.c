@@ -8,6 +8,8 @@ void onyx_errors_init(Context *context, bh_arr(bh_file_contents)* files) {
     context->errors.msg_alloc = bh_arena_allocator(&context->errors.msg_arena);
 
     bh_arr_new(context->gp_alloc, context->errors.errors, 4);
+    context->errors.errors_sorted = 1;
+    context->errors_enabled = 1;
 }
 
 static i32 errors_sort(const void* v1, const void* v2) {
@@ -15,6 +17,12 @@ static i32 errors_sort(const void* v1, const void* v2) {
     OnyxError* e2 = (OnyxError *) v2;
     return e2->rank - e1->rank;
 }
+
+void onyx_errors_ensure_sorted(Context *context) {
+     if (context->errors.errors_sorted) return;
+     qsort(context->errors.errors, bh_arr_length(context->errors.errors), sizeof(OnyxError), errors_sort);
+     context->errors.errors_sorted = 1;
+ }
 
 void onyx_errors_enable(Context *context) {
     context->errors_enabled = 1;
@@ -45,13 +53,14 @@ void onyx_clear_errors(Context *context) {
     if (context->cycle_detected) return;
 
     bh_arr_set_length(context->errors.errors, 0);
+    context->errors.errors_sorted = 1;
 }
 
 void onyx_submit_error(Context *context, OnyxError error) {
     if (!context->errors_enabled) return;
 
     bh_arr_push(context->errors.errors, error);
-    qsort(context->errors.errors, bh_arr_length(context->errors.errors), sizeof(OnyxError), errors_sort);
+    context->errors.errors_sorted = 0;
 }
 
 void onyx_report_error(Context *context, OnyxFilePos pos, OnyxErrorRank rank, char * format, ...) {
@@ -69,7 +78,7 @@ void onyx_report_error(Context *context, OnyxFilePos pos, OnyxErrorRank rank, ch
     };
 
     bh_arr_push(context->errors.errors, err);
-    qsort(context->errors.errors, bh_arr_length(context->errors.errors), sizeof(OnyxError), errors_sort);
+    context->errors.errors_sorted = 0;
 }
 
 void onyx_report_warning(Context *context, OnyxFilePos pos, char* format, ...) {
@@ -87,5 +96,5 @@ void onyx_report_warning(Context *context, OnyxFilePos pos, char* format, ...) {
     };
 
     bh_arr_push(context->errors.errors, err);
-    qsort(context->errors.errors, bh_arr_length(context->errors.errors), sizeof(OnyxError), errors_sort);
+    context->errors.errors_sorted = 0;
 }

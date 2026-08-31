@@ -38,6 +38,15 @@ Package* package_lookup_or_create(Context *context, char* package_name, Scope* p
         package->use_package_entities = NULL;
         package->id = ++context->next_package_id;
         package->parent_id = -1;
+
+        char *dot = strrchr(pac_name, '.');
+        if (dot != NULL) {
+            *dot = '\0';
+            Package *parent = package_lookup(context, pac_name);
+            *dot = '.';
+            if (parent) package->parent_id = parent->id;
+        }
+
         bh_arr_new(context->gp_alloc, package->sub_packages, 4);
 
         if (!strcmp(pac_name, "builtin")) {
@@ -113,6 +122,7 @@ Scope* scope_create(Context *context, Scope* parent, OnyxFilePos created_at) {
     scope->id = ++context->next_scope_id;
     scope->parent = parent;
     scope->created_at = created_at;
+    scope->closed_at = (OnyxFilePos) { 0 };
     scope->name = NULL;
 
     // This will be set on the first symbol insertion.
@@ -223,8 +233,9 @@ AstNode* symbol_raw_resolve_limited(Context *context, Scope* start_scope, char* 
 AstNode* symbol_raw_resolve(Context *context, Scope* start_scope, char* sym) {
     Scope* scope = start_scope;
     AstNode *res = NULL;
+    i32 depth = 0;
 
-    while (scope != NULL) {
+    while (scope != NULL && depth++ < 256) {
         res = symbol_raw_resolve_no_ascend(context, scope, sym);
         if (res) {
             return res;
@@ -250,9 +261,11 @@ AstNode* try_symbol_raw_resolve_from_node(Context *context, AstNode* node, char*
     // of this code could be rewritten in terms of get_scope_from_node.
 
     b32 used_pointer = 0;
+    i32 peel_depth = 0;
 
     while (1) {
         if (!node) return NULL;
+        if (++peel_depth > 64) return NULL;
 
         switch (node->kind) {
             case Ast_Kind_Type_Raw_Alias: node = (AstNode *) ((AstTypeRawAlias *) node)->to->ast_type; break;
@@ -432,9 +445,11 @@ static AstNode* try_symbol_raw_resolve_from_poly_sln(Context *context, bh_arr(As
 }
 
 AstNode* try_symbol_raw_resolve_from_type(Context *context, Type *type, char* symbol) {
-    while (type->kind == Type_Kind_Pointer) {
+    i32 ptr_depth = 0;
+    while (type && type->kind == Type_Kind_Pointer && ptr_depth++ < 64) {
         type = type->Pointer.elem; 
     }
+    if (!type) return NULL;
 
     switch (type->kind) {
         case Type_Kind_Basic: {
@@ -593,8 +608,9 @@ void build_all_overload_options(bh_arr(OverloadOption) overloads, bh_imap* all_o
 
         bh_imap_put(all_overloads, (u64) overload->option, 1);
 
-        if (overload->option->kind == Ast_Kind_Overloaded_Function) {
-            AstOverloadedFunction* sub_overload = (AstOverloadedFunction *) overload->option;
+        AstNode *option = strip_aliases((AstNode *) overload->option);
+        if (option && option->kind == Ast_Kind_Overloaded_Function) {
+            AstOverloadedFunction* sub_overload = (AstOverloadedFunction *) option;
             build_all_overload_options(sub_overload->overloads, all_overloads);
         }
     }
@@ -1556,9 +1572,11 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
 
 static Scope **get_scope_from_node_helper(Context *context, AstNode *node) {
     b32 used_pointer = 0;
+    i32 peel_depth = 0;
 
     while (1) {
         if (!node) return NULL;
+        if (++peel_depth > 64) return NULL;
 
         switch (node->kind) {
             case Ast_Kind_Type_Raw_Alias: node = (AstNode *) ((AstTypeRawAlias *) node)->to->ast_type; break;

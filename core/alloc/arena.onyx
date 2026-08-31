@@ -151,6 +151,7 @@ Arena.clear :: (arena: &Arena) {
     }
 
     arena.first_arena.next = null;
+    arena.current_arena = arena.first_arena;
     arena.size = sizeof rawptr;
 }
 

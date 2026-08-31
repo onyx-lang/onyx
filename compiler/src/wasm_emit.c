@@ -1161,6 +1161,11 @@ EMIT_FUNC(flip_and_store_instruction, AstTyped *lval, OnyxToken *token) {
 EMIT_FUNC(generic_store_instruction, AstTyped *lval, OnyxToken *token) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    if (type_results_in_void(lval->type)) {
+        *pcode = code;
+        return;
+    }
+
     // If this is a WASM local, simply set the local and continue.
     if (bh_imap_get(&mod->local_map, (u64) lval) & LOCAL_IS_WASM) {
         u64 localidx = bh_imap_get(&mod->local_map, (u64) lval);
@@ -2828,6 +2833,12 @@ EMIT_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
     } else if (source_expr->kind == Ast_Kind_Memres && !is_pointer) {
         emit_memory_reservation_location(mod, &code, (AstMemRes *) source_expr);
 
+    } else if (source_expr->kind == Ast_Kind_Dereference) {
+        // Location of `*p` is `p`. Emitting the deference as a value is
+        // wrong for compound types (slices, varargs): that pushes data+count
+        // and the following field load treats `count` as a pointer.
+        emit_expression(mod, &code, ((AstDereference *) source_expr)->expr);
+
     } else {
         emit_expression(mod, &code, source_expr);
     }
@@ -3202,25 +3213,38 @@ EMIT_FUNC(if_expression, AstIfExpression* if_expr) {
 EMIT_FUNC(do_block, AstDoBlock* doblock) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    u64 result_local    = local_allocate(mod->local_alloc, (AstTyped *) doblock);
-    b32 result_is_local = (b32) ((result_local & LOCAL_IS_WASM) != 0);
+    // Void do-blocks (`=> void_call()`, including `Result(void).unwrap` via `!`)
+    // must not allocate a dummy i32 result: return would `local.set` with an
+    // empty stack, then `local.get` would leave a leftover value.
+    b32 is_void = type_results_in_void(doblock->type);
 
-    bh_imap_put(&mod->local_map, (u64) doblock, result_local);
+    u64 result_local    = 0;
+    b32 result_is_local = 0;
+
+    if (!is_void) {
+        result_local    = local_allocate(mod->local_alloc, (AstTyped *) doblock);
+        result_is_local = (b32) ((result_local & LOCAL_IS_WASM) != 0);
+        bh_imap_put(&mod->local_map, (u64) doblock, result_local);
+    }
+
     bh_arr_push(mod->return_location_stack, (AstLocal *) doblock);
 
     emit_block(mod, &code, doblock->block, 1);
 
-    u64 offset = 0;
-    if (!result_is_local) {
-        emit_local_location(mod, &code, (AstLocal *) doblock, &offset);
-        emit_load_instruction(mod, &code, doblock->type, offset);
+    if (!is_void) {
+        u64 offset = 0;
+        if (!result_is_local) {
+            emit_local_location(mod, &code, (AstLocal *) doblock, &offset);
+            emit_load_instruction(mod, &code, doblock->type, offset);
 
-    } else {
-        WIL(doblock->block->token, WI_LOCAL_GET, result_local);
+        } else {
+            WIL(doblock->block->token, WI_LOCAL_GET, result_local);
+        }
+
+        local_free(mod->local_alloc, (AstTyped *) doblock);
     }
 
     bh_arr_pop(mod->return_location_stack);
-    local_free(mod->local_alloc, (AstTyped *) doblock);
 
     *pcode = code;
 }
@@ -4010,7 +4034,9 @@ EMIT_FUNC(return, AstReturn* ret) {
     if (ret->expr) {
         if (result_destination) {
             emit_expression(mod, &code, ret->expr);
-            emit_generic_store_instruction(mod, &code, (AstTyped *) result_destination, NULL);
+            if (!type_results_in_void(ret->expr->type)) {
+                emit_generic_store_instruction(mod, &code, (AstTyped *) result_destination, NULL);
+            }
 
         } else if (mod->curr_cc == CC_Return_Stack) {
             assert(mod->stack_return_location_idx);

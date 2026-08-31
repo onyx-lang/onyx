@@ -119,9 +119,21 @@ Array.clear :: (arr: &[..] $T) {
 /// If this procedure returns `true`, `arr.capacity` will be greater than or equal to `capacity`.
 Array.ensure_capacity :: (arr: &[..] $T, capacity: u32) -> bool {
     if arr.capacity >= capacity do return true;
-    if arr.data == null do Array.init(arr, capacity);
+    if arr.data == null || arr.capacity == 0 do Array.init(arr, capacity);
 
-    while capacity > arr.capacity do arr.capacity <<= 1;
+    // `<< 1` of 0 stays 0 and would loop forever; overflow to 0 would too.
+    new_cap := arr.capacity;
+    if new_cap == 0 do new_cap = 4;
+    while capacity > new_cap {
+        next := new_cap << 1;
+        if next <= new_cap {
+            new_cap = capacity;
+            break;
+        }
+        new_cap = next;
+    }
+    arr.capacity = new_cap;
+
     new_data := raw_resize(arr.allocator, arr.data, sizeof T * arr.capacity);
     if new_data == null do return false;
     arr.data = new_data;

@@ -112,7 +112,11 @@ struct ovm_engine_t {
 
     pthread_mutex_t atomic_mutex;
 
-    i64   memory_size; // This is probably going to always be 4GiB.
+    // mmap reservation (typically 4GiB so grow never relocates).
+    i64   memory_capacity;
+    // WASM-visible linear memory size. Must not use capacity: reporting
+    // 4GiB as memory.size overflows Onyx heap remaining_space (pages<<16).
+    i64   memory_size;
     void *memory;
 
     debug_state_t *debug;

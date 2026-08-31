@@ -213,10 +213,8 @@ Writer.write_escaped_str :: (use writer: &Writer, s: str) {
             case '\n' { write_byte(writer, '\\'); write_byte(writer, 'n');  }
             case '\r' { write_byte(writer, '\\'); write_byte(writer, 'r');  }
             case '\t' { write_byte(writer, '\\'); write_byte(writer, 't');  }
-            case '\v' { write_byte(writer, '\\'); write_byte(writer, 'v');  }
             case '\b' { write_byte(writer, '\\'); write_byte(writer, 'b');  }
             case '\f' { write_byte(writer, '\\'); write_byte(writer, 'f');  }
-            case '\0' { write_byte(writer, '\\'); write_byte(writer, '0');  }
             case '"'  { write_byte(writer, '\\'); write_byte(writer, '"'); }
             case '\\' { write_byte(writer, '\\'); write_byte(writer, '\\'); }
 

@@ -233,9 +233,12 @@ CHECK_FUNC(symbol, AstNode** symbol_node) {
 
     if (!res) {
         if (context->cycle_detected) {
-            token_toggle_end(token);
-            char *closest = find_closest_symbol_in_scope_and_parents(context, context->checker.current_scope, token->text);
-            token_toggle_end(token);
+            char *closest = NULL;
+            if (bh_arr_length(context->errors.errors) < 64) {
+                token_toggle_end(token);
+                closest = find_closest_symbol_in_scope_and_parents(context, context->checker.current_scope, token->text);
+                token_toggle_end(token);
+            }
 
             if (closest) ERROR_(token->pos, "Unable to resolve symbol '%b'. Did you mean '%s'?", token->text, token->length, closest);
             else         ERROR_(token->pos, "Unable to resolve symbol '%b'.", token->text, token->length);
@@ -751,13 +754,21 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
                         (*value)->token->text, (*value)->token->length, type_get_name(context, union_expr_type));
                 }
 
-                // We subtract one here because variant numbering starts at 1, instead of 0.
-                // This is so a zeroed out block of memory does not have a valid variant.
-                // This is going to change now...
-                i32 variant_number = get_expression_integer_value(context, *value, NULL);
-                switchnode->union_variants_handled[variant_number] = 1;
+                // Tag values can be sparse (`Foo as 10`). Index `variants_ordered`
+                // and the handled-flags by declaration order, not by tag.
+                i32 variant_tag = (i32) get_expression_integer_value(context, *value, NULL);
+                i32 variant_index = type_lookup_union_variant_idx_by_tag(union_expr_type, (u32) variant_tag);
+                if (variant_index < 0) {
+                    OnyxToken* tkn = sc->block->token;
+                    if ((*value)->token) tkn = (*value)->token;
+                    ERROR_(tkn->pos, "'%b' is not a variant of '%s'.",
+                        (*value)->token->text, (*value)->token->length, type_get_name(context, union_expr_type));
+                    return Check_Error;
+                }
 
-                UnionVariant *union_variant = union_expr_type->Union.variants_ordered[variant_number];
+                switchnode->union_variants_handled[variant_index] = 1;
+
+                UnionVariant *union_variant = union_expr_type->Union.variants_ordered[variant_index];
                 if (sc->capture) {
                     if (sc->capture_is_by_pointer) {
                         sc->capture->type = type_make_pointer(context, union_variant->type);
@@ -1060,6 +1071,15 @@ CHECK_FUNC(call, AstCall** pcall) {
     }
 
     if (call->kind == Ast_Kind_Call) {
+        if (!call->callee_name_token && call->callee) {
+            AstNode *name_node = strip_aliases((AstNode *) call->callee);
+            if (name_node && (name_node->kind == Ast_Kind_Symbol || name_node->kind == Ast_Kind_Field_Access)) {
+                call->callee_name_token = name_node->token;
+            } else {
+                call->callee_name_token = call->callee->token;
+            }
+        }
+
         u32 current_checking_level_store = context->checker.current_checking_level;
         CHECK(expression, &call->callee);
         context->checker.current_checking_level = current_checking_level_store;
@@ -1878,8 +1898,7 @@ CHECK_FUNC(struct_literal, AstStructLiteral* sl) {
     }
 
     sl->type_node = (AstType *) sl->stnode;
-    while (sl->type_node && sl->type_node->kind == Ast_Kind_Type_Alias)
-        sl->type_node = ((AstTypeAlias *) sl->type_node)->to;
+    sl->type_node = strip_type_aliases(sl->type_node);
 
     if (sl->extension_value) {
         CHECK(expression, &sl->extension_value);
@@ -2177,8 +2196,7 @@ CHECK_FUNC(array_literal, AstArrayLiteral* al) {
     }
 
     al->type_node = (AstType *) al->atnode;
-    while (al->type_node && al->type_node->kind == Ast_Kind_Type_Alias)
-        al->type_node = ((AstTypeAlias *) al->type_node)->to;
+    al->type_node = strip_type_aliases(al->type_node);
 
     bh_arr_each(AstTyped *, expr, al->values) {
         CHECK(expression, expr);
@@ -2654,9 +2672,7 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
     AstTyped *expr;
     {
         expr = (AstTyped *) strip_aliases((AstNode *) field->expr);
-        while (expr->kind == Ast_Kind_Type_Alias) {
-            expr = (AstTyped *)((AstTypeAlias *) expr)->to;
-        }
+        expr = (AstTyped *) strip_type_aliases((AstType *) expr);
 
         if (expr->kind == Ast_Kind_Struct_Type ||
             expr->kind == Ast_Kind_Poly_Struct_Type ||
@@ -2744,6 +2760,9 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
                 if (!field->type) YIELD(field->token->pos, "Waiting for field access type to be constructed.");
 
                 field->flags |= Ast_Flag_Has_Been_Checked;
+                if (uv->variant_node) {
+                    track_resolution_for_symbol_info(context, (AstNode *) field, (AstNode *) uv->variant_node);
+                }
                 return Check_Success;
             }
         }
@@ -2810,6 +2829,16 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
   resolved:
     if (n) {
         track_resolution_for_symbol_info(context, (AstNode *) *pfield, n);
+
+        if (n == (AstNode *) field) {
+            YIELD_ERROR(field->token->pos, "Circular alias.");
+        }
+        if (n->kind == Ast_Kind_Alias) {
+            AstNode *inner = strip_aliases(n);
+            if (!inner || inner == n || inner == (AstNode *) field) {
+                YIELD_ERROR(field->token->pos, "Circular alias.");
+            }
+        }
 
         *pfield = (AstFieldAccess *) n;
         CHECK(expression, (AstTyped **) pfield);
@@ -3199,6 +3228,13 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
         case Ast_Kind_Alias: {
             AstAlias *alias = (AstAlias *) expr;
 
+            if (!alias->alias || (AstNode *) alias->alias == (AstNode *) alias) {
+                YIELD_ERROR(expr->token->pos, "Circular alias.");
+            }
+            if (strip_aliases((AstNode *) alias) == (AstNode *) alias) {
+                YIELD_ERROR(expr->token->pos, "Circular alias.");
+            }
+
             //
             // If an alias has an entity, do not force checking on it here.
             // Wait for the alias to pass type-checking in the normal way.
@@ -3459,7 +3495,9 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
 
     if (bound_symbol_count > 0) {
         assert(scope);
-        *scope = scope_create(context, NULL, code_block->token->pos);
+        Scope *parent = code_block->enclosing_scope;
+        if (!parent) parent = context->checker.current_scope;
+        *scope = scope_create(context, parent, code_block->token->pos);
 
         fori (i, 0, bound_symbol_count) {
             CodeBlockBindingSymbol sym = code_block->binding_symbols[i];
@@ -3480,7 +3518,11 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
 
     if (bh_arr_length(insert->bindings) > 0) {
         assert(scope);
-        if (!*scope) *scope = scope_create(context, NULL, code_block->token->pos);
+        if (!*scope)  {
+            Scope *parent = code_block->enclosing_scope;
+            if (!parent) parent = context->checker.current_scope;
+            *scope = scope_create(context, parent, code_block->token->pos);
+        }
 
         bh_arr_each(UnquoteDirectiveBinding, binding, insert->bindings) {
             symbol_introduce(context, *scope, binding->symbol, (AstNode *) binding->value);
@@ -4043,6 +4085,10 @@ CHECK_FUNC(function, AstFunction* func) {
     if (func->named_return_locals) {
         bh_arr_each(AstLocal *, named_return, func->named_return_locals) {
             CHECK(local, named_return);
+            fill_in_type(context, (AstTyped *) *named_return);
+            if ((*named_return)->type == NULL) {
+                YIELD((*named_return)->token->pos, "Waiting for named return type to be known.");
+            }
         }
 
         if (!func->named_return_locals_added) {
@@ -4854,8 +4900,7 @@ CHECK_FUNC(type, AstType** ptype) {
 
     AstType* type = *ptype;
     AstType* original_type = type;
-    while (type->kind == Ast_Kind_Type_Alias)
-        type = ((AstTypeAlias *) type)->to;
+    type = strip_type_aliases(type);
     
     if (type->kind == Ast_Kind_Symbol) {
         CHECK(symbol, (AstNode **) ptype);
@@ -5004,6 +5049,9 @@ CHECK_FUNC(type, AstType** ptype) {
 
         case Ast_Kind_Type_Alias: {
             AstTypeAlias *type_alias = (AstTypeAlias *) type;
+            if (!type_alias->to || strip_type_aliases((AstType *) type_alias) == (AstType *) type_alias) {
+                 YIELD_ERROR(type->token->pos, "Circular type alias.");
+             }
             CHECK(type, &type_alias->to);
             break;
         }
@@ -5034,9 +5082,16 @@ CHECK_FUNC(type, AstType** ptype) {
 
     // CLEANUP: Should Type_Alias nodes just be made comptime at creation? Since they will always be set to comptime here?
     type->flags |= Ast_Flag_Comptime;
-    while (type->kind == Ast_Kind_Type_Alias) {
-        type->flags |= Ast_Flag_Comptime;
-        type = ((AstTypeAlias *) type)->to;
+    {
+        AstType *walk = type;
+        AstType *seen = type;
+        i32 depth = 0;
+        while (walk && walk->kind == Ast_Kind_Type_Alias && depth++ < 64) {
+            walk->flags |= Ast_Flag_Comptime;
+            AstType *next = ((AstTypeAlias *) walk)->to;
+            if (next == NULL || next == walk || next == seen) break;
+            walk = next;
+        }
     }
 
     type->flags |= Ast_Flag_Has_Been_Checked;
@@ -5778,6 +5833,11 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
                 goto poly_var_solved;
 
             case TYPE_MATCH_SPECIAL:
+                if (context->cycle_detected) {
+                    ONYX_ERROR(query->token->pos, Error_Critical, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
+                    if (query->error_loc) ONYX_ERROR(query->error_loc->pos, Error_Critical, "Here is where the call is located.");
+                    return Check_Error;
+                }
                 return Check_Yield;
 
             case TYPE_MATCH_YIELD:
@@ -5785,6 +5845,7 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
                     ONYX_ERROR(query->token->pos, Error_Critical, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
                     if (err_msg.text != NULL) onyx_submit_error(context, err_msg);
                     if (query->error_loc) ONYX_ERROR(query->error_loc->pos, Error_Critical, "Here is where the call is located."); // :ErrorMessage
+                    return Check_Error;
                 }
 
                 return Check_Yield;
@@ -5796,6 +5857,7 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
                     ONYX_ERROR(query->token->pos, Error_Critical, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
                     if (err_msg.text != NULL) onyx_submit_error(context, err_msg);
                     if (query->error_loc) ONYX_ERROR(query->error_loc->pos, Error_Critical, "Here is where the call is located."); // :ErrorMessage
+                    return Check_Error;
                 }
 
                 return Check_Failed;
@@ -5814,6 +5876,12 @@ poly_query_done:
     scope_leave(context);
 
     if (solved_count != bh_arr_length(query->proc->poly_params)) {
+        if (context->cycle_detected) {
+            ONYX_ERROR(query->token->pos, Error_Critical, "Unable to solve all polymorphic variables.");
+            if (query->error_loc) ONYX_ERROR(query->error_loc->pos, Error_Critical, "Here is where the call is located.");
+            return Check_Error;
+        }
+
         if (solved_something) {
             return Check_Yield;
         } else {

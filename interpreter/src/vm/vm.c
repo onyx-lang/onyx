@@ -162,6 +162,7 @@ ovm_engine_t *ovm_engine_new(ovm_store_t *store) {
 
     engine->store = store;
     engine->memory_size = 0;
+    engine->memory_capacity = 0;
     engine->memory = NULL;
     engine->debug = NULL;
     pthread_mutex_init(&engine->atomic_mutex, NULL);
@@ -177,6 +178,9 @@ ovm_engine_t *ovm_engine_new(ovm_store_t *store) {
         attempt_to_allocate /= 2;
     }
 
+    // Capacity is the mmap; WASM memory.size starts at the module minimum.
+    engine->memory_size = 0;
+
     return engine;
 }
 
@@ -184,7 +188,7 @@ void ovm_engine_delete(ovm_engine_t *engine) {
     ovm_store_t *store = engine->store;
 
     if (engine->memory) {
-        munmap(engine->memory, engine->memory_size);
+        munmap(engine->memory, engine->memory_capacity);
     }
 
     bh_free(store->heap_allocator, engine);
@@ -214,7 +218,7 @@ void ovm_engine_enable_debug(ovm_engine_t *engine, debug_state_t *debug) {
 }
 
 bool ovm_engine_memory_ensure_capacity(ovm_engine_t *engine, i64 minimum_size) {
-    if (engine->memory_size >= minimum_size) return true;
+    if (engine->memory_capacity >= minimum_size) return true;
 
     void *new_addr;
 
@@ -225,10 +229,10 @@ bool ovm_engine_memory_ensure_capacity(ovm_engine_t *engine, i64 minimum_size) {
             new_addr = mmap(engine->memory, minimum_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
             if (new_addr == MAP_FAILED) return false;
 
-            memcpy(new_addr, engine->memory, engine->memory_size);
-            munmap(engine->memory, engine->memory_size);
+            memcpy(new_addr, engine->memory, engine->memory_capacity);
+            munmap(engine->memory, engine->memory_capacity);
         #elif defined(_BH_LINUX)
-            new_addr = mremap(engine->memory, engine->memory_size, minimum_size, MREMAP_MAYMOVE);
+            new_addr = mremap(engine->memory, engine->memory_capacity, minimum_size, MREMAP_MAYMOVE);
         #else
             #error "Unhandled platform."
         #endif
@@ -241,7 +245,7 @@ bool ovm_engine_memory_ensure_capacity(ovm_engine_t *engine, i64 minimum_size) {
         return false;
     }
 
-    engine->memory_size = minimum_size;
+    engine->memory_capacity = minimum_size;
     engine->memory = new_addr;
 
     return true;
@@ -251,7 +255,7 @@ void ovm_engine_memory_copy(ovm_engine_t *engine, i64 target, void *data, i64 si
     ovm_assert(engine);
     ovm_assert(engine->memory);
     ovm_assert(data);
-    ovm_assert(size + target < engine->memory_size);
+    ovm_assert(size + target < engine->memory_capacity);
     memcpy(((u8 *) engine->memory) + target, data, size);
 }
 

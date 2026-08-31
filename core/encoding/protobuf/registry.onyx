@@ -7,63 +7,113 @@ use core.misc
 use runtime.info
 
 #package {
-    registered_proto_types: Map(type_expr, Proto_Message_Descriptor)
+    /// Heap-allocated descriptors, never stored by value in the map.
+    /// Nested lookups insert new types and may rehash the map; pointers
+    /// into map slots would dangle, so the map only holds stable pointers.
+    registered_proto_types: Map(type_expr, &Proto_Message_Descriptor)
 }
 
 proto_types_preloaded :: #init () {
     registered_proto_types->init()
 }
 
-lookup_protobuf_descriptor :: (type: type_expr) -> ? Proto_Message_Descriptor {
-    if desc := Map.get(&registered_proto_types, type); desc {
-        return desc
+lookup_protobuf_descriptor :: (type: type_expr) -> &Proto_Message_Descriptor {
+    if slot := registered_proto_types->get_ptr(type); slot {
+        return *slot
     }
 
     struct_info := info.get_type_info(type)->as_struct()
 
     if struct_info.kind != .Struct || !Slice.some(struct_info.tags, [x](x.type == type_expr && *cast(&type_expr, x.data) == Message)) {
-        return .None
+        return null
     }
 
-    fields := make([] Proto_Field_Descriptor, struct_info.members.length)
-    for member, index in struct_info.members {
-        fields[index].field_offset = member.offset
+    fields := make([..] Proto_Field_Descriptor)
 
+    for member in struct_info.members {
         type_info := member.type->info()
         switch type_info.kind {
-            case .Basic {
-                fields[index].field_size = type_info.size
-                fields[index].field_type = member.type
+            case .Union {
+                u_info := type_info->as_union()
+                if u_info.constructed_from == Optional {
+                    desc: Proto_Field_Descriptor
+                    desc.field_offset = member.offset
+                    desc.field_type = u_info.variants[1].type
+                    desc.field_size = desc.field_type->info().size
+                    desc.is_optional = true
+                    desc.optional_offset = ~~ type_info.alignment
+                    apply_field_tag(member.tags, &desc)
+                    fields->push(desc)
+                } else {
+                    tag_size: u16 = ~~ u_info.tag_enum->info().size
+                    for variant in u_info.variants {
+                        if variant.type == void do continue
+
+                        desc: Proto_Field_Descriptor
+                        desc.field_offset = member.offset
+                        desc.field_type = variant.type
+                        desc.field_size = ~~ variant.type->info().size
+                        desc.is_oneof = true
+                        desc.oneof_tag = variant.tag_value
+                        desc.oneof_tag_size = tag_size
+                        desc.optional_offset = ~~ type_info.alignment
+                        desc.proto_field_number = ~~ variant.tag_value
+                        if variant.type->info().kind == .Struct {
+                            desc.proto_field_type = .MESSAGE
+                        }
+                        apply_field_tag(variant.tags, &desc)
+                        fields->push(desc)
+                    }
+                }
             }
 
             case .Dynamic_Array {
-                fields[index].field_type = type_info->as_dynamic_array().of
-                fields[index].field_size = fields[index].field_type->info().size
-                fields[index].is_repeated = true
+                desc: Proto_Field_Descriptor
+                desc.field_offset = member.offset
+                desc.field_type = type_info->as_dynamic_array().of
+                desc.field_size = desc.field_type->info().size
+                desc.is_repeated = true
+                apply_field_tag(member.tags, &desc)
+                fields->push(desc)
             }
 
-            case .Union {
-                if type_info->as_union().constructed_from == Optional {
-                    fields[index].field_type = type_info->as_union().variants[1].type
-                    fields[index].field_size = fields[index].field_type->info().size
-                    fields[index].is_optional = true
-                    fields[index].optional_offset = ~~ type_info.alignment
-                }
+            case _ {
+                desc: Proto_Field_Descriptor
+                desc.field_offset = member.offset
+                desc.field_size = type_info.size
+                desc.field_type = member.type
+                apply_field_tag(member.tags, &desc)
+                fields->push(desc)
             }
         }
-
-        member.tags
-            |> .find_opt([x](x.type == Field))
-            |> .transform(x => *misc.any_as(x, Field))
-            |> .with([fi] {
-                fields[index].proto_field_type   = ~~ fi.protobuf_type 
-                fields[index].proto_field_number = fi.number
-            })
     }
 
-    registered_proto_types->put(type, .{ fields })
+    max_n := 0
+    for f in fields {
+        if f.proto_field_number > max_n do max_n = f.proto_field_number
+    }
+    by_number := make([] i32, max_n + 1)
+    for i in 0 .. fields.count {
+        n := fields[i].proto_field_number
+        if n >= 0 && n <= max_n do by_number[n] = i + 1
+    }
 
-    return registered_proto_types->get(type)
+    desc := new(Proto_Message_Descriptor)
+    desc.fields = .{ fields.data, fields.count }
+    desc.by_number = by_number
+    registered_proto_types->put(type, desc)
+    return desc
 }
+
+apply_field_tag :: (tags: [] any, dest: &Proto_Field_Descriptor) {
+    tags
+        |> .find_opt([x](x.type == Field))
+        |> .transform(x => *misc.any_as(x, Field))
+        |> .with([fi] {
+            dest.proto_field_type   = ~~ fi.protobuf_type
+            dest.proto_field_number = fi.number
+        })
+}
+
 
 

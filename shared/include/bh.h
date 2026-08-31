@@ -841,19 +841,17 @@ typedef u64 bh_imap_entry_t;
 
 typedef struct bh__imap_lookup_result {
     i64 hash_index;
-    i64 entry_prev;
     i64 entry_index;
 } bh__imap_lookup_result;
 
 typedef struct bh__imap_entry {
     bh_imap_entry_t key, value;
-    i64 next;
 } bh__imap_entry;
 
 typedef struct bh_imap {
     bh_allocator allocator;
 
-    bh_arr(i64)            hashes;
+    bh_arr(i32)            hashes;
     bh_arr(bh__imap_entry) entries;
 } bh_imap;
 
@@ -861,8 +859,10 @@ typedef struct bh_imap {
 void bh_imap_init(bh_imap* imap, bh_allocator alloc, i32 hash_count);
 void bh_imap_free(bh_imap* imap);
 void bh_imap_put(bh_imap* imap, bh_imap_entry_t key, bh_imap_entry_t value);
+b32 bh_imap_put_if_absent(bh_imap* imap, bh_imap_entry_t key, bh_imap_entry_t value);
 b32 bh_imap_has(bh_imap* imap, bh_imap_entry_t key);
 bh_imap_entry_t bh_imap_get(bh_imap* imap, bh_imap_entry_t key);
+b32 bh_imap_try_get(bh_imap* imap, bh_imap_entry_t key, bh_imap_entry_t *out);
 void bh_imap_delete(bh_imap* imap, bh_imap_entry_t key);
 void bh_imap_clear(bh_imap* imap);
 
@@ -3197,16 +3197,44 @@ step_to_next:
 // IMAP IMPLEMENTATION
 //-------------------------------------------------------------------------------------
 #ifndef BH_NO_IMAP
+#define BH_IMAP_EMPTY     ((i32)-1)
+#define BH_IMAP_TOMBSTONE ((i32)-2)
+
+static i32 bh__imap_pow2(i32 n) {
+    if (n < 8) n = 8;
+    n--;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    return n + 1;
+}
+
+static u64 bh__imap_mix(u64 key) {
+    key += 0x9e3779b97f4a7c15ull;
+    key = (key ^ (key >> 30)) * 0xbf58476d1ce4e5b9ull;
+    key = (key ^ (key >> 27)) * 0x94d049bb133111ebull;
+    return key ^ (key >> 31);
+}
+
+static void bh__imap_fill_empty(i32 *hashes, i32 count) {
+    memset(hashes, 0xFF, (size_t) count * sizeof(i32));
+}
+
 void bh_imap_init(bh_imap* imap, bh_allocator alloc, i32 hash_count) {
     imap->allocator = alloc;
 
     imap->hashes  = NULL;
     imap->entries = NULL;
 
+    hash_count = bh__imap_pow2(hash_count);
+
     bh_arr_new(alloc, imap->hashes, hash_count);
     bh_arr_new(alloc, imap->entries, 4);
 
-    fori(count, 0, hash_count) bh_arr_push(imap->hashes, -1);
+    bh_arr_set_length(imap->hashes, hash_count);
+    bh__imap_fill_empty(imap->hashes, hash_count);
 }
 
 void bh_imap_free(bh_imap* imap) {
@@ -3217,24 +3245,81 @@ void bh_imap_free(bh_imap* imap) {
     imap->entries = NULL;
 }
 
+static void bh__imap_place(bh_imap* imap, i32 entry_index) {
+    u64 n = (u64) bh_arr_length(imap->hashes);
+    u64 mask = n - 1;
+    u64 h = bh__imap_mix(imap->entries[entry_index].key) & mask;
+    for (;;) {
+        if (imap->hashes[h] < 0) {
+            imap->hashes[h] = entry_index;
+            return;
+        }
+        h = (h + 1) & mask;
+    }
+}
+
+static void bh__imap_rehash(bh_imap* imap, i32 new_count) {
+    bh_arr(i32) new_hashes = NULL;
+    bh_arr_new(imap->allocator, new_hashes, new_count);
+    bh_arr_set_length(new_hashes, new_count);
+    bh__imap_fill_empty(new_hashes, new_count);
+
+    bh_arr_free(imap->hashes);
+    imap->hashes = new_hashes;
+
+    i32 nent = bh_arr_length(imap->entries);
+    fori (i, 0, nent) {
+        bh__imap_place(imap, (i32) i);
+    }
+}
+
+static b32 bh__imap_needs_grow(bh_imap* imap) {
+    return bh_arr_length(imap->entries) * 4 > bh_arr_length(imap->hashes) * 3;
+}
+
 bh__imap_lookup_result bh__imap_lookup(bh_imap* imap, bh_imap_entry_t key) {
-    bh__imap_lookup_result lr = { -1, -1, -1 };
+    bh__imap_lookup_result lr = { -1, -1 };
 
-    u64 hash = 0xcbf29ce484222325ull ^ key;
-    u64 n = bh_arr_capacity(imap->hashes);
+    u64 n = (u64) bh_arr_length(imap->hashes);
+    if (n == 0) return lr;
 
-    lr.hash_index  = hash % n;
-    lr.entry_index = imap->hashes[lr.hash_index];
-    while (lr.entry_index >= 0) {
-        if (imap->entries[lr.entry_index].key == key) {
+    u64 mask = n - 1;
+    u64 h = bh__imap_mix(key) & mask;
+    i64 first_tombstone = -1;
+
+    for (u64 i = 0; i < n; i++) {
+        i32 slot = imap->hashes[h];
+        if (slot == BH_IMAP_EMPTY) {
+            lr.hash_index = first_tombstone >= 0 ? first_tombstone : (i64) h;
             return lr;
         }
-
-        lr.entry_prev  = lr.entry_index;
-        lr.entry_index = imap->entries[lr.entry_index].next;
+        if (slot == BH_IMAP_TOMBSTONE) {
+            if (first_tombstone < 0) first_tombstone = (i64) h;
+        } else if (imap->entries[slot].key == key) {
+            lr.hash_index = (i64) h;
+            lr.entry_index = slot;
+            return lr;
+        }
+        h = (h + 1) & mask;
     }
 
+    lr.hash_index = first_tombstone;
     return lr;
+}
+
+static void bh__imap_insert_new(bh_imap* imap, bh_imap_entry_t key, bh_imap_entry_t value, i64 hash_index) {
+    if (!imap->hashes || bh__imap_needs_grow(imap) || hash_index < 0) {
+        i32 cap = bh_arr_length(imap->hashes);
+        bh__imap_rehash(imap, cap ? cap * 2 : 8);
+        bh__imap_lookup_result lr = bh__imap_lookup(imap, key);
+        hash_index = lr.hash_index;
+    }
+
+    bh__imap_entry entry;
+    entry.key = key;
+    entry.value = value;
+    bh_arr_push(imap->entries, entry);
+    imap->hashes[hash_index] = bh_arr_length(imap->entries) - 1;
 }
 
 void bh_imap_put(bh_imap* imap, bh_imap_entry_t key, bh_imap_entry_t value) {
@@ -3245,57 +3330,67 @@ void bh_imap_put(bh_imap* imap, bh_imap_entry_t key, bh_imap_entry_t value) {
         return;
     }
 
-    bh__imap_entry entry;
-    entry.key = key;
-    entry.value = value;
-    entry.next = imap->hashes[lr.hash_index];
-    bh_arr_push(imap->entries, entry);
+    bh__imap_insert_new(imap, key, value, lr.hash_index);
+}
 
-    imap->hashes[lr.hash_index] = bh_arr_length(imap->entries) - 1;
+b32 bh_imap_put_if_absent(bh_imap* imap, bh_imap_entry_t key, bh_imap_entry_t value) {
+    bh__imap_lookup_result lr = bh__imap_lookup(imap, key);
+    if (lr.entry_index >= 0) return 0;
+
+    bh__imap_insert_new(imap, key, value, lr.hash_index);
+    return 1;
 }
 
 b32 bh_imap_has(bh_imap* imap, bh_imap_entry_t key) {
+    if (!imap->hashes) return 0;
     bh__imap_lookup_result lr = bh__imap_lookup(imap, key);
     return lr.entry_index >= 0;
 }
 
 bh_imap_entry_t bh_imap_get(bh_imap* imap, bh_imap_entry_t key) {
+    bh_imap_entry_t value = 0;
+    bh_imap_try_get(imap, key, &value);
+    return value;
+}
+
+b32 bh_imap_try_get(bh_imap* imap, bh_imap_entry_t key, bh_imap_entry_t *out) {
+    if (!imap->hashes) return 0;
     bh__imap_lookup_result lr = bh__imap_lookup(imap, key);
-    if (lr.entry_index >= 0) {
-        return imap->entries[lr.entry_index].value;
-    } else {
-        return 0;
-    }
+    if (lr.entry_index < 0) return 0;
+    if (out) *out = imap->entries[lr.entry_index].value;
+    return 1;
 }
 
 void bh_imap_delete(bh_imap* imap, bh_imap_entry_t key) {
     bh__imap_lookup_result lr = bh__imap_lookup(imap, key);
     if (lr.entry_index < 0) return;
 
-    if (lr.entry_prev < 0) {
-        imap->hashes[lr.hash_index] = imap->entries[lr.entry_index].next;
-    } else {
-        imap->entries[lr.entry_prev].next = imap->entries[lr.entry_index].next;
-    }
+    i32 last = bh_arr_length(imap->entries) - 1;
+    imap->hashes[lr.hash_index] = BH_IMAP_TOMBSTONE;
 
-    // If it's that last thing in the array, just pop off the end
-    if (lr.entry_index == bh_arr_length(imap->entries) - 1) {
+    if (lr.entry_index == last) {
         bh_arr_pop(imap->entries);
         return;
     }
 
-    bh_arr_fastdelete(imap->entries, lr.entry_index);
-    bh__imap_lookup_result last = bh__imap_lookup(imap, imap->entries[lr.entry_index].key);
-    if (last.entry_prev >= 0) {
-        imap->entries[last.entry_prev].next = lr.entry_index;
-    } else {
-        imap->hashes[last.hash_index] = lr.entry_index;
+    bh_imap_entry_t moved_key = imap->entries[last].key;
+    i32 old_index = last;
+    bh_arr_fastdelete(imap->entries, (i32) lr.entry_index);
+
+    u64 n = (u64) bh_arr_length(imap->hashes);
+    u64 mask = n - 1;
+    u64 h = bh__imap_mix(moved_key) & mask;
+    for (u64 i = 0; i < n; i++) {
+        if (imap->hashes[h] == old_index) {
+            imap->hashes[h] = (i32) lr.entry_index;
+            return;
+        }
+        h = (h + 1) & mask;
     }
 }
 
 void bh_imap_clear(bh_imap* imap) {
-    // NOTE: Does not clear out an of the data that was in the map
-    bh_arr_each(i64, hash, imap->hashes) *hash = -1;
+    if (imap->hashes) bh__imap_fill_empty(imap->hashes, bh_arr_length(imap->hashes));
     bh_arr_set_length(imap->entries, 0);
 }
 
@@ -3388,3 +3483,4 @@ u64 bh_time_monotonic_ns() {
 #endif // ifdef BH_DEFINE
 
 #endif // ifndef BH_H
+

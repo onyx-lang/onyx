@@ -42,7 +42,7 @@ fi
 
 case "$ONYX_ARCH" in
     *darwin*)
-        LIBS="$LIBS -lffi -framework CoreFoundation -framework SystemConfiguration"
+        LIBS="$LIBS -lffi -framework CoreFoundation -framework SystemConfiguration -framework Security"
         LIBRARY_BUILD_ARGS="-install_name @rpath/libonyx.dylib"
         AUTOCOMPILER_BUILD_ARGS="-rpath @loader_path/"
         ;;
