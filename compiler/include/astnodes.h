@@ -2323,6 +2323,9 @@ typedef struct CompilationLog {
     Table(i32) interned_names;
     const char *cached_file_name;
     u32 cached_file_id;
+    const char *file_id_cache_name[16];
+    u32 file_id_cache_id[16];
+    u32 file_id_cache_used;
 
     bh_buffer pb_event;
     bh_buffer pb_field;

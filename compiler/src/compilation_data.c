@@ -8,6 +8,15 @@
 enum {
     _compilation_symbol_id_same_offset = sizeof(char[
         (offsetof(AstNode, compilation_symbol_id) == offsetof(AstType, compilation_symbol_id)) ? 1 : -1
+    ]),
+    // parse_top_level_binding writes name through AstStructType * for several kinds.
+    _named_type_name_offset = sizeof(char[
+        (offsetof(AstInterface, name) == offsetof(AstStructType, name)
+         && offsetof(AstEnumType, name) == offsetof(AstStructType, name)
+         && offsetof(AstDistinctType, name) == offsetof(AstStructType, name)
+         && offsetof(AstUnionType, name) == offsetof(AstStructType, name)
+         && offsetof(AstPolyStructType, name) == offsetof(AstStructType, name)
+         && offsetof(AstPolyUnionType, name) == offsetof(AstStructType, name)) ? 1 : -1
     ])
 };
 
@@ -677,17 +686,44 @@ void compilation_log_emit_start(Context *context) {
     );
 }
 
+static void compilation_log_file_id_cache_put(CompilationLog *log, const char *filename, u32 id) {
+    u32 n = log->file_id_cache_used;
+    if (n < 16) {
+        log->file_id_cache_name[n] = filename;
+        log->file_id_cache_id[n] = id;
+        log->file_id_cache_used = n + 1;
+        return;
+    }
+
+    n = 15;
+    memmove(log->file_id_cache_name, log->file_id_cache_name + 1, n * sizeof(const char *));
+    memmove(log->file_id_cache_id, log->file_id_cache_id + 1, n * sizeof(u32));
+    log->file_id_cache_name[n] = filename;
+    log->file_id_cache_id[n] = id;
+}
+
 static u32 compilation_log_file_id_for(Context *context, const char *filename) {
     if (!filename || !*filename) return 0;
 
     CompilationLog *log = &context->compilation_log;
     if (log->cached_file_name == filename) return log->cached_file_id;
+
+    u32 used = log->file_id_cache_used;
+    for (u32 i = 0; i < used; i++) {
+        if (log->file_id_cache_name[i] == filename) {
+            log->cached_file_name = filename;
+            log->cached_file_id = log->file_id_cache_id[i];
+            return log->cached_file_id;
+        }
+    }
+
     if (!log->file_ids) return 0;
 
     i32 index = shgeti(log->file_ids, (char *)filename);
     u32 id = index == -1 ? 0 : log->file_ids[index].value;
     log->cached_file_name = filename;
     log->cached_file_id = id;
+    compilation_log_file_id_cache_put(log, filename, id);
     return id;
 }
 
@@ -701,6 +737,9 @@ void compilation_log_emit_file(Context *context, const char *path) {
     if (path && *path) {
         if (!log->file_ids) sh_new_arena(log->file_ids);
         shput(log->file_ids, (char *)path, ev->a);
+        log->cached_file_name = path;
+        log->cached_file_id = ev->a;
+        compilation_log_file_id_cache_put(log, path, ev->a);
     }
 }
 
@@ -1286,7 +1325,12 @@ static void compilation_log_remember_alias_symbol(Context *context, AstNode *nod
 }
 
 static b32 compilation_log_function_has_param_symbols(CompilationLog *log, AstNode *node) {
-    AstNode *inner = strip_aliases(node);
+    AstKind kind = node->kind;
+    if (kind != Ast_Kind_Function && kind != Ast_Kind_Polymorphic_Proc && kind != Ast_Kind_Alias) {
+        return 0;
+    }
+
+    AstNode *inner = (kind == Ast_Kind_Alias) ? strip_aliases(node) : node;
     if (!inner || (inner->kind != Ast_Kind_Function && inner->kind != Ast_Kind_Polymorphic_Proc)) {
         return 0;
     }
@@ -1319,23 +1363,23 @@ static b32 compilation_log_emit_binding_for_id(Context *context, u32 symbol_id, 
 
     CompilationLog *log = &context->compilation_log;
 
-    if (!binding) {
+    if (binding) {
+        compilation_log_map_node_binding(log, node, binding);
+    } else {
         u32 prev = 0;
         if (compilation_log_binding_type_get(log, symbol_id, &prev) && prev != 0) {
             if (compilation_log_fast_type_id(node) == prev) return 0;
         }
     }
 
-    if (binding) {
-        compilation_log_map_node_binding(log, node, binding);
-    } else {
-        binding = compilation_log_lookup_binding(log, node);
-    }
-
     u32 type_id = compilation_log_type_id_of_node(node);
-    b32 any_param = compilation_log_function_has_param_symbols(log, node);
-
-    if (type_id == 0 && !binding && !any_param) return 0;
+    b32 any_param = 0;
+    if (type_id == 0) {
+        any_param = compilation_log_function_has_param_symbols(log, node);
+        if (!binding && !any_param) {
+            if (!compilation_log_lookup_binding(log, node)) return 0;
+        }
+    }
 
     u32 prev = 0;
     if (compilation_log_binding_type_get(log, symbol_id, &prev)) {
