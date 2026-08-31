@@ -144,9 +144,6 @@ API void onyx_add_defined_var(onyx_context_t *ctx, char *variable, int32_t varia
 API void onyx_include_file(onyx_context_t *ctx, char *filename, int32_t length);
 API void onyx_add_mapped_dir(onyx_context_t *ctx, char *mapped_name, int32_t mapped_length, char *dir, int32_t dir_length);
 
-/// Directly injects Onyx code as a new compilation unit
-API void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length);
-
 /// Directly injects Onyx code as a new compilation unit.
 /// The buffer is copied; `filename` is used in diagnostics.
 /// Pass NULL / 0 for filename to use "(injected)".
