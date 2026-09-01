@@ -604,7 +604,8 @@ static void x64_emit_round(ovm_emit_buf_t *b, int dbl, u8 mode, i32 r, i32 a) {
     x64_u8(b, 0x3A);
     x64_u8(b, dbl ? 0x0B : 0x0A);
     x64_modrm(b, 3, 0, 0);
-    x64_u8(b, (u8) (mode | 4));
+    /* bits 1:0 = mode; bit 2 = 1 would ignore those and use MXCSR.RC */
+    x64_u8(b, (u8) (mode | 8));
     x64_movd_gpr_from_xmm(b, RAX, 0, dbl);
     x64_slot_st(b, r, RAX, dbl);
 }
