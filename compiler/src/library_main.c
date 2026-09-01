@@ -476,7 +476,7 @@ static void dump_cycles(Context *context) {
         if (ent->state < Entity_State_Code_Gen) process_entity(context, ent);
         else break;
 
-        if (bh_arr_length(context->entities.entities) == 0) {
+        if (entity_heap_empty(&context->entities)) {
             break;
         }
     }
@@ -634,7 +634,7 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
         prime_pump(context);
     }
 
-    if (bh_arr_is_empty(context->entities.entities)) {
+    if (entity_heap_empty(&context->entities)) {
         if (context->options.parse_only) {
             return pump_return(context, ONYX_PUMP_DONE);
         }

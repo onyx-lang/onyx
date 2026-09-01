@@ -2,71 +2,126 @@
 #include "astnodes.h"
 #include "utils.h"
 
-static inline i32 entity_phase(Entity* e1) {
-    if (e1->state <= Entity_State_Parse && e1->macro_attempts == 0) return 1;
-    if (e1->state <  Entity_State_Code_Gen) return 2;
-    return 3;
+static inline b32 entity_uses_ready_queue(Entity* e) {
+    return e->macro_attempts == 0 && e->state < Entity_State_Code_Gen;
 }
 
-// NOTE: Returns >0 if e1 should be processed after e2.
-static i32 entity_compare(Entity* e1, Entity* e2) {
-    i32 phase1 = entity_phase(e1);
-    i32 phase2 = entity_phase(e2);
+static void grid_push(bh_allocator a, EntityQueueGrid* g, Entity* e) {
+    i32 s = (i32) e->state;
+    i32 t = (i32) e->type;
+    if (!g->items[s][t]) {
+        bh_arr_new(a, g->items[s][t], 16);
+    }
+    bh_arr_push(g->items[s][t], e);
+    g->count++;
 
-    if (phase1 != phase2)
-        return phase1 - phase2;
-    else if (e1->macro_attempts != e2->macro_attempts)
-        return (i32) e1->macro_attempts - (i32) e2->macro_attempts;
-    else if (e1->state != e2->state)
-        return (i32) e1->state - (i32) e2->state;
-    else if (e1->type != e2->type)
-        return (i32) e1->type - (i32) e2->type;
-    else if (e1->micro_attempts != e2->micro_attempts)
-        return (i32) (e1->micro_attempts - e2->micro_attempts);
-    else
-        return (i32) (e1->id - e2->id);
+    if (s < g->hint_state || (s == g->hint_state && t < g->hint_type)) {
+        g->hint_state = s;
+        g->hint_type = t;
+    }
 }
 
-#define eh_parent(index) (((index) - 1) / 2)
-#define eh_lchild(index) (((index) * 2) + 1)
-#define eh_rchild(index) (((index) * 2) + 2)
+static Entity* grid_peek(EntityQueueGrid* g) {
+    if (g->count == 0) return NULL;
+
+    for (i32 s = g->hint_state; s < Entity_State_Count; s++) {
+        i32 t0 = (s == g->hint_state) ? g->hint_type : 0;
+        for (i32 t = t0; t < Entity_Type_Count; t++) {
+            i32 head = g->head[s][t];
+            if (head < bh_arr_length(g->items[s][t])) {
+                g->hint_state = s;
+                g->hint_type = t;
+                return g->items[s][t][head];
+            }
+        }
+    }
+
+    return NULL;
+}
+
+static Entity* grid_pop(EntityQueueGrid* g) {
+    Entity* e = grid_peek(g);
+    if (!e) return NULL;
+
+    i32 s = g->hint_state;
+    i32 t = g->hint_type;
+    i32 head = ++g->head[s][t];
+    g->count--;
+
+    bh_arr(Entity *) q = g->items[s][t];
+    i32 len = bh_arr_length(q);
+    if (head >= 32 && head * 2 >= len) {
+        i32 remain = len - head;
+        if (remain > 0) memmove(q, q + head, remain * sizeof(Entity *));
+        bh_arr_set_length(q, remain);
+        g->head[s][t] = 0;
+        head = 0;
+    }
+
+    if (head >= bh_arr_length(g->items[s][t])) {
+        if (t + 1 < Entity_Type_Count) {
+            g->hint_type = t + 1;
+        } else {
+            g->hint_state = s + 1;
+            g->hint_type = 0;
+        }
+    }
+
+    return e;
+}
+
+// Same order as the old multi-field compare: phase, attempts, state, type,
+// micro_attempts, then id. Packed so a sift is a couple of integer compares.
+static inline u64 entity_sort_key(Entity* e) {
+    u64 phase = (e->state <= Entity_State_Parse && e->macro_attempts == 0) ? 1
+              : (e->state <  Entity_State_Code_Gen) ? 2 : 3;
+    return (phase << 56)
+         | ((u64) e->macro_attempts << 32)
+         | ((u64) e->state << 24)
+         | ((u64) e->type << 16)
+         | (u64) (e->micro_attempts & 0xffff);
+}
+
+static inline i32 entity_compare(Entity* e1, Entity* e2) {
+    u64 k1 = entity_sort_key(e1);
+    u64 k2 = entity_sort_key(e2);
+    if (k1 < k2) return -1;
+    if (k1 > k2) return 1;
+    return (i32) e1->id - (i32) e2->id;
+}
 
 static void eh_shift_up(EntityHeap* entities, i32 index) {
-    while (index > 0 && entity_compare(entities->entities[eh_parent(index)], entities->entities[index]) > 0) {
-        Entity* tmp = entities->entities[eh_parent(index)];
-        entities->entities[eh_parent(index)] = entities->entities[index];
-        entities->entities[index] = tmp;
-
-        index = eh_parent(index);
+    Entity **h = entities->entities;
+    while (index > 0) {
+        i32 parent = (index - 1) / 4;
+        if (entity_compare(h[parent], h[index]) <= 0) break;
+        Entity* tmp = h[parent];
+        h[parent] = h[index];
+        h[index] = tmp;
+        index = parent;
     }
 }
 
 static void eh_shift_down(EntityHeap* entities, i32 index) {
+    Entity **h = entities->entities;
+    i32 n = bh_arr_length(h);
     while (1) {
+        i32 first = index * 4 + 1;
+        if (first >= n) break;
+
         i32 min_index = index;
-
-        i32 l = eh_lchild(index);
-        if (l < bh_arr_length(entities->entities)
-            && entity_compare(entities->entities[l], entities->entities[min_index]) < 0) {
-            min_index = l;
+        i32 last = first + 4;
+        if (last > n) last = n;
+        for (i32 c = first; c < last; c++) {
+            if (entity_compare(h[c], h[min_index]) < 0) min_index = c;
         }
 
-        i32 r = eh_rchild(index);
-        if (r < bh_arr_length(entities->entities)
-            && entity_compare(entities->entities[r], entities->entities[min_index]) < 0) {
-            min_index = r;
-        }
+        if (min_index == index) break;
 
-        if (index != min_index) {
-            Entity* tmp = entities->entities[min_index];
-            entities->entities[min_index] = entities->entities[index];
-            entities->entities[index] = tmp;
-
-            index = min_index;
-            continue;
-        }
-
-        break;
+        Entity* tmp = h[min_index];
+        h[min_index] = h[index];
+        h[index] = tmp;
+        index = min_index;
     }
 }
 
@@ -76,7 +131,10 @@ void entity_heap_init(bh_allocator a, EntityHeap* entities) {
 
     bh_arena_init(&entities->entity_arena, a, 32 * 1024);
     bh_arr_new(a, entities->entities, 128);
-    bh_arr_new(a, entities->quick_unsorted_entities, 128);
+}
+
+b32 entity_heap_empty(EntityHeap* entities) {
+    return entities->ready.count == 0 && bh_arr_length(entities->entities) == 0;
 }
 
 // Allocates the entity in the entity heap. Don't quite feel this is necessary...
@@ -95,8 +153,8 @@ Entity* entity_heap_register(EntityHeap* entities, Entity e) {
 void entity_heap_insert_existing(EntityHeap* entities, Entity* e) {
     if (e->entered_in_queue) return;
 
-    if (e->state <= Entity_State_Introduce_Symbols) {
-        bh_arr_push(entities->quick_unsorted_entities, e);
+    if (entity_uses_ready_queue(e)) {
+        grid_push(entities->allocator, &entities->ready, e);
     } else {
         bh_arr_push(entities->entities, e);
         eh_shift_up(entities, bh_arr_length(entities->entities) - 1);
@@ -116,10 +174,8 @@ Entity* entity_heap_insert(EntityHeap* entities, Entity e) {
 }
 
 Entity* entity_heap_top(EntityHeap* entities) {
-    if (bh_arr_length(entities->quick_unsorted_entities) > 0) {
-        return entities->quick_unsorted_entities[0];
-    }
-
+    Entity* e = grid_peek(&entities->ready);
+    if (e) return e;
     return entities->entities[0];
 }
 
@@ -140,24 +196,21 @@ void entity_heap_change_top(EntityHeap* entities, Entity* new_top) {
 void entity_heap_remove_top(EntityHeap* entities) {
     Entity *e;
 
-    if (bh_arr_length(entities->quick_unsorted_entities) > 0) {
-        e = entities->quick_unsorted_entities[0];
+    if (entities->ready.count > 0) {
+        e = grid_pop(&entities->ready);
     } else {
         e = entities->entities[0];
+        entities->entities[0] = entities->entities[bh_arr_length(entities->entities) - 1];
+        bh_arr_pop(entities->entities);
+        if (bh_arr_length(entities->entities) > 0) {
+            eh_shift_down(entities, 0);
+        }
     }
 
     entities->state_count[e->state]--;
     entities->type_count[e->type]--;
     entities->all_count[e->state][e->type]--;
     e->entered_in_queue = 0;
-
-    if (bh_arr_length(entities->quick_unsorted_entities) > 0) {
-        bh_arr_fastdelete(entities->quick_unsorted_entities, 0);
-    } else {
-        entities->entities[0] = entities->entities[bh_arr_length(entities->entities) - 1];
-        bh_arr_pop(entities->entities);
-        eh_shift_down(entities, 0);
-    }
 }
 
 void entity_change_type(EntityHeap* entities, Entity *ent, EntityType new_type) {

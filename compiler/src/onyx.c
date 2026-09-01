@@ -46,7 +46,7 @@
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
 static void output_dummy_progress_bar(Context *context) {
     EntityHeap* eh = &context->entities;
-    if (bh_arr_length(eh->entities) == 0) return;
+    if (entity_heap_empty(eh)) return;
 
     static const char* state_colors[] = {
         "\e[91m", "\e[93m", "\e[94m", "\e[93m",
@@ -64,7 +64,7 @@ static void output_dummy_progress_bar(Context *context) {
 
     for (i32 i = 0; i < Entity_Type_Count; i++) {
         if      (eh->type_count[i] == 0)           printf("\e[90m");
-        else if ((i32) eh->entities[0]->type == i) printf("\e[92m");
+        else if ((i32) entity_heap_top(eh)->type == i) printf("\e[92m");
         else                                       printf("\e[97m");
 
         printf("%25s (%4d) | ", entity_type_strings[i], eh->type_count[i]);
@@ -109,7 +109,7 @@ static void output_dummy_progress_bar(Context *context) {
         u64 nano_time = spec.tv_nsec + 1000000000 * (spec.tv_sec % 100);
         printf("%lu %d %d %d %d %d %d %d\n",
                 nano_time,
-                bh_arr_length(context->entities.entities),
+                context->entities.ready.count + bh_arr_length(context->entities.entities),
                 context->entities.state_count[Entity_State_Introduce_Symbols],
                 context->entities.state_count[Entity_State_Parse],
                 context->entities.state_count[Entity_State_Resolve_Symbols],

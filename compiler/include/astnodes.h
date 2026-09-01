@@ -1860,12 +1860,25 @@ typedef struct Entity {
     };
 } Entity;
 
+// FIFO per (state, type). Scanned in state-then-type order, which matches
+// the old heap compare for a single attempt/phase layer.
+typedef struct EntityQueueGrid {
+    bh_arr(Entity *) items[Entity_State_Count][Entity_Type_Count];
+    i32 head[Entity_State_Count][Entity_Type_Count];
+    i32 count;
+    i32 hint_state;
+    i32 hint_type;
+} EntityQueueGrid;
+
 typedef struct EntityHeap {
     bh_arena entity_arena;
     bh_allocator allocator;
 
+    // 4-ary heap for retries (macro_attempts > 0) and codegen.
+    // First-try pre-codegen work uses `ready` instead of sifting.
     bh_arr(Entity *) entities;
-    bh_arr(Entity *) quick_unsorted_entities;
+    EntityQueueGrid ready;
+
     i32 next_id;
 
     i32 state_count[Entity_State_Count];
@@ -1880,6 +1893,7 @@ Entity* entity_heap_insert(EntityHeap* entities, Entity e);
 Entity* entity_heap_top(EntityHeap* entities);
 void entity_heap_change_top(EntityHeap* entities, Entity* new_top);
 void entity_heap_remove_top(EntityHeap* entities);
+b32 entity_heap_empty(EntityHeap* entities);
 void entity_change_type(EntityHeap* entities, Entity *ent, EntityType new_type);
 void entity_change_state(EntityHeap* entities, Entity *ent, EntityState new_state);
 void entity_heap_add_job(EntityHeap *entities, enum TypeMatch (*func)(Context *, void *), void *job_data);
