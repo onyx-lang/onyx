@@ -95,10 +95,10 @@ copy_required() {
 sign_tree() {
     root="$1"
     [ "$(uname)" = 'Darwin' ] || return 0
-    [ -f "$root/bin/onyx" ] && codesign -s - "$root/bin/onyx"
-    [ -f "$root/lib/libonyx.dylib" ] && codesign -s - "$root/lib/libonyx.dylib"
-    [ -f "$root/lib/onyx_autocompiler.dylib" ] && codesign -s - "$root/lib/onyx_autocompiler.dylib"
-    [ -f "$root/lib/onyx_runtime.dylib" ] && codesign -s - "$root/lib/onyx_runtime.dylib"
+    [ -f "$root/bin/onyx" ] && codesign -s - -f "$root/bin/onyx"
+    [ -f "$root/lib/libonyx.dylib" ] && codesign -s - -f "$root/lib/libonyx.dylib"
+    [ -f "$root/lib/onyx_autocompiler.dylib" ] && codesign -s - -f "$root/lib/onyx_autocompiler.dylib"
+    [ -f "$root/lib/onyx_runtime.dylib" ] && codesign -s - -f "$root/lib/onyx_runtime.dylib"
 }
 
 package_all() {

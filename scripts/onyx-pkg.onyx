@@ -221,8 +221,8 @@ run_add_command :: (args: [] str) {
         version = Git.get_latest_version(dep_repo)
     }
 
-    if config.dependencies->has(dep_name) {
-        error_print("Dependency '{}' already specified at version '{}'.\n", dep_name, config.dependencies[dep_name]?.target)
+    if config.dependencies[dep_name] as dep {
+        error_print("Dependency '{}' already specified at version '{}'.\n", dep_name, dep.name)
 
     } elseif version->is_zero() {
         error_print("Unable to find latest version of '{}'\n", args[0])
@@ -250,8 +250,8 @@ run_remove_command :: (args: [] str) {
 
     dep := args[0]
 
-    if config.dependencies->has(dep) {
-        version := config.dependencies->get(dep)->unwrap().target.version
+    if config.dependencies[dep] as d {
+        version := d.target.version
         config.dependencies->delete(dep)
         info_print("Removed", "'{}' version {}\n", dep, version)
         return
@@ -269,7 +269,7 @@ run_show_command :: (args: [] str) {
     printf("Package version     : {}\n", config.package_version)
     print("\n")
 
-    max_width := array.fold(config.dependencies.entries, 0, (d, w) => {
+    max_width := Array.fold(config.dependencies.entries, 0, (d, w) => {
         return math.max(d.key.count, w)
     })
     format_str := tprintf("    {{w{}}} | {{}}\n", max_width)
@@ -418,8 +418,8 @@ run_rebuild_command :: (args: [] str)  {
     }
 
     dep := args[0]
-    if config.dependencies->has(dep) {
-        dep = config.dependencies->get(dep)->unwrap().source.Git->unwrap()
+    if config.dependencies[dep] as d {
+        dep = d.source.Git->unwrap()
     }
 
     info_print("Rebuild", "{}\n", dep)
@@ -436,14 +436,14 @@ run_rebuild_command :: (args: [] str)  {
 run_publish_command :: (args: [] str) {
     // @TODO // Better error handling and reporting, as this is a delicate process.
 
-    if !os.dir_exists(".git") {
+    if !os.Directory.exists(".git") {
         error_print("Not in Git repository.\n")
         printf("It does not look like you are in a Git repository. In order to publish packages\n")
         printf("with onyx-pkg, you have to initialize a Git repository in the current directory.\n\n")
         return
     }
 
-    r := io.reader_make(&stdio.stream)
+    r := io.Reader.make(&stdio.stream)
 
     while true {
         printf("Is this a m[a]jor, m[i]nor, or [p]atch release? or [c]ancel? (a/i/p/c) ")
