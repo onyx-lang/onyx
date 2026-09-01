@@ -27,6 +27,7 @@ typedef struct ovm_emit_buf_t {
     i32 func_start_ovmi;
     i32 has_indirect_br;
     i32 jumptable_off;
+    i32 nested_off;
 } ovm_emit_buf_t;
 
 void ovm_emit_init(ovm_emit_buf_t *buf);

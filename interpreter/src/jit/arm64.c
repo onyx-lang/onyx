@@ -604,6 +604,19 @@ static void a64_emit_cvt_int(ovm_emit_buf_t *b, u32 op, u32 ty, i32 r, i32 a) {
     }
 }
 
+static void a64_emit_call_fast(ovm_emit_buf_t *b, u64 helper, u64 a, i32 result_vn) {
+    a64_u32(b, 0xAA1503E0u); // mov x0, x21
+    a64_mov64(b, X1, a);
+    a64_mov64(b, X2, (u64)(i64) result_vn);
+    a64_blr_abs(b, helper);
+    a64_u32(b, 0xF100001Fu); // cmp x0, #0
+    i32 z = a64_bcond_here(b, COND_EQ);
+    a64_reload_pins(b);
+    a64_u32(b, 0xD63F0000u); // blr x0
+    a64_patch_bcond(b, z);
+    a64_reload_pins(b);
+}
+
 static void a64_emit_one(ovm_emit_buf_t *b, ovm_program_t *program, i32 idx, ovm_instr_t *ins) {
     u32 op = OVM_INSTR_INSTR(*ins);
     u32 ty = OVM_INSTR_TYPE(*ins);
@@ -792,22 +805,15 @@ static void a64_emit_one(ovm_emit_buf_t *b, ovm_program_t *program, i32 idx, ovm
             a64_slot_ld64(b, X1, ins->a);
             a64_u32(b, 0xAA1503E0u); // mov x0, x21
             a64_blr_abs(b, (u64)(uintptr_t) ovm_jit_return);
-            a64_epilogue(b);
+            a64_u32(b, 0xF84107FEu); // ldr x30, [sp], #16
+            a64_u32(b, 0xD65F03C0u);
             break;
 
         case OVMI_CALL:
-            a64_u32(b, 0xAA1503E0u);
-            a64_mov64(b, X1, (u64)(i64) ins->a);
-            a64_mov64(b, X2, (u64)(i64) ins->r);
-            a64_blr_abs(b, (u64)(uintptr_t) ovm_jit_call);
-            a64_reload_pins(b);
+            a64_emit_call_fast(b, (u64)(uintptr_t) ovm_jit_call_fast, (u64)(i64) ins->a, ins->r);
             break;
         case OVMI_CALLI:
-            a64_u32(b, 0xAA1503E0u);
-            a64_mov64(b, X1, (u64)(i64) ins->a);
-            a64_mov64(b, X2, (u64)(i64) ins->r);
-            a64_blr_abs(b, (u64)(uintptr_t) ovm_jit_calli);
-            a64_reload_pins(b);
+            a64_emit_call_fast(b, (u64)(uintptr_t) ovm_jit_calli_fast, (u64)(i64) ins->a, ins->r);
             break;
 
         case OVMI_CLZ:
@@ -880,13 +886,24 @@ static void a64_emit_one(ovm_emit_buf_t *b, ovm_program_t *program, i32 idx, ovm
 }
 
 void ovm_jit_emit_arm64(ovm_emit_buf_t *buf, ovm_program_t *program, i32 start, i32 end) {
+    i32 func_start = buf->len;
     a64_prologue(buf);
+    i32 bl_at = buf->len;
+    a64_u32(buf, 0x94000000u);
+    a64_epilogue(buf);
+    buf->nested_off = buf->len - func_start;
+    i32 words = (buf->len - bl_at) / 4;
+    u32 bl = 0x94000000u | ((u32) words & 0x03ffffffu);
+    memcpy(buf->data + bl_at, &bl, 4);
+    /* Helpers use blr and clobber x30; keep the incoming return address. */
+    a64_u32(buf, 0xF81F0FFEu); // str x30, [sp, #-16]!
     for (i32 i = start; i < end; i++) {
         buf->ovmi_off[i - start] = buf->len;
         a64_emit_one(buf, program, i, &program->code[i]);
     }
     a64_mov64(buf, X0, 0);
-    a64_epilogue(buf);
+    a64_u32(buf, 0xF84107FEu); // ldr x30, [sp], #16
+    a64_u32(buf, 0xD65F03C0u);
 }
 
 void ovm_jit_patch_arm64(ovm_emit_buf_t *buf) {

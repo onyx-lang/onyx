@@ -144,6 +144,13 @@ static void x64_cmp_rr(ovm_emit_buf_t *b, int a, int rb, int wide) {
     x64_alu_rr(b, 0x39, a, rb, wide);
 }
 
+static void x64_cmovz(ovm_emit_buf_t *b, int dst, int src, int wide) {
+    x64_rex(b, wide, rex_bit(dst), 0, rex_bit(src));
+    x64_u8(b, 0x0F);
+    x64_u8(b, 0x44);
+    x64_modrm(b, 3, dst, src);
+}
+
 static void x64_setcc(ovm_emit_buf_t *b, int dst, int cc) {
     if (dst >= 4) x64_rex(b, 0, 0, 0, rex_bit(dst));
     x64_u8(b, 0x0F);
@@ -596,6 +603,19 @@ static void x64_emit_copysign(ovm_emit_buf_t *b, int dbl, i32 r, i32 a, i32 ba) 
     x64_slot_st(b, r, RAX, dbl);
 }
 
+static void x64_emit_call_fast(ovm_emit_buf_t *b, u64 helper, u32 a, i32 result_vn) {
+    x64_mov_rr(b, RDI, R13);
+    x64_mov_imm32(b, RSI, a);
+    x64_mov_imm64(b, RDX, (u64)(i64) result_vn);
+    x64_call_abs(b, helper);
+    x64_alu_rr(b, 0x85, RAX, RAX, 1);
+    i32 z = x64_jcc8(b, CC_E);
+    x64_reload_pins(b);
+    x64_call_rax(b);
+    x64_patch_rel8(b, z);
+    x64_reload_pins(b);
+}
+
 static void x64_emit_round(ovm_emit_buf_t *b, int dbl, u8 mode, i32 r, i32 a) {
     x64_slot_ld(b, RAX, a, dbl);
     x64_movd_xmm_from_gpr(b, 0, RAX, dbl);
@@ -869,40 +889,36 @@ static void x64_emit_one(ovm_emit_buf_t *b, ovm_program_t *program, i32 idx, ovm
             x64_slot_ld(b, RSI, ins->a, 1);
             x64_mov_rr(b, RDI, R13);
             x64_call_abs(b, (u64)(uintptr_t) ovm_jit_return);
-            x64_epilogue(b);
+            x64_u8(b, 0xC3);
             break;
 
         case OVMI_CALL:
-            x64_mov_rr(b, RDI, R13);
-            x64_mov_imm32(b, RSI, (u32) ins->a);
-            x64_mov_imm64(b, RDX, (u64)(i64) ins->r);
-            x64_call_abs(b, (u64)(uintptr_t) ovm_jit_call);
-            x64_reload_pins(b);
+            x64_emit_call_fast(b, (u64)(uintptr_t) ovm_jit_call_fast, (u32) ins->a, ins->r);
             break;
         case OVMI_CALLI:
-            x64_mov_rr(b, RDI, R13);
-            x64_mov_imm32(b, RSI, (u32) ins->a);
-            x64_mov_imm64(b, RDX, (u64)(i64) ins->r);
-            x64_call_abs(b, (u64)(uintptr_t) ovm_jit_calli);
-            x64_reload_pins(b);
+            x64_emit_call_fast(b, (u64)(uintptr_t) ovm_jit_calli_fast, (u32) ins->a, ins->r);
             break;
 
         case OVMI_CLZ:
             x64_slot_ld(b, RAX, ins->a, wide);
+            x64_mov_imm32(b, RCX, wide ? 64 : 32);
             x64_rex(b, wide, 0, 0, 0);
             x64_u8(b, 0x0F);
             x64_u8(b, 0xBD);
-            x64_modrm(b, 3, RAX, RAX); // bsr
-            x64_mov_imm32(b, RCX, wide ? 63 : 31);
-            x64_alu_rr(b, 0x29, RCX, RAX, wide); // ecx - eax
-            x64_slot_st(b, ins->r, RCX, wide);
+            x64_modrm(b, 3, RAX, RAX); // bsr; ZF=1 if src was 0
+            x64_mov_imm32(b, RDX, wide ? 63 : 31);
+            x64_alu_rr(b, 0x29, RDX, RAX, wide);
+            x64_cmovz(b, RDX, RCX, wide);
+            x64_slot_st(b, ins->r, RDX, wide);
             break;
         case OVMI_CTZ:
             x64_slot_ld(b, RAX, ins->a, wide);
+            x64_mov_imm32(b, RCX, wide ? 64 : 32);
             x64_rex(b, wide, 0, 0, 0);
             x64_u8(b, 0x0F);
             x64_u8(b, 0xBC);
             x64_modrm(b, 3, RAX, RAX); // bsf
+            x64_cmovz(b, RAX, RCX, wide);
             x64_slot_st(b, ins->r, RAX, wide);
             break;
         case OVMI_POPCNT:
@@ -976,13 +992,21 @@ static void x64_emit_one(ovm_emit_buf_t *b, ovm_program_t *program, i32 idx, ovm
 }
 
 void ovm_jit_emit_x64(ovm_emit_buf_t *buf, ovm_program_t *program, i32 start, i32 end) {
+    i32 func_start = buf->len;
     x64_prologue(buf);
+    i32 call_at = buf->len;
+    x64_u8(buf, 0xE8);
+    x64_u32(buf, 0);
+    x64_epilogue(buf);
+    buf->nested_off = buf->len - func_start;
+    i32 rel = buf->len - (call_at + 5);
+    memcpy(buf->data + call_at + 1, &rel, 4);
     for (i32 i = start; i < end; i++) {
         buf->ovmi_off[i - start] = buf->len;
         x64_emit_one(buf, program, i, &program->code[i]);
     }
     x64_mov_imm64(buf, RAX, 0);
-    x64_epilogue(buf);
+    x64_u8(buf, 0xC3);
 }
 
 void ovm_jit_patch_x64(ovm_emit_buf_t *buf) {

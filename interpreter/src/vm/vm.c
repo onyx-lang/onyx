@@ -127,6 +127,7 @@ int ovm_program_register_func(ovm_program_t *program, char *name, i32 instr, i32
     func.param_count = param_count;
     func.value_number_count = value_number_count;
     func.native_entry = NULL;
+    func.native_body = NULL;
 
     bh_arr_push(program->funcs, func);
     return func.id;
@@ -141,6 +142,7 @@ int ovm_program_register_external_func(ovm_program_t *program, char *name, i32 p
     func.external_func_idx = external_func_idx;
     func.value_number_count = param_count;
     func.native_entry = NULL;
+    func.native_body = NULL;
 
     bh_arr_push(program->funcs, func);
     return func.id;
@@ -154,6 +156,7 @@ void ovm_program_begin_func(ovm_program_t *program, char *name, i32 param_count,
     func.param_count = param_count;
     func.value_number_count = value_number_count;
     func.native_entry = NULL;
+    func.native_body = NULL;
 
     bh_arr_push(program->funcs, func);
 }

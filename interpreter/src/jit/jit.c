@@ -37,26 +37,24 @@ u64 ovm_jit_return(ovm_state_t *state, u64 val) {
     return val;
 }
 
-void ovm_jit_call(ovm_state_t *state, i32 func_idx, i32 result_vn) {
+static ovm_func_t *ovm_jit_setup_call(ovm_state_t *state, i32 func_idx, i32 result_vn, i32 *extra_out) {
     ovm_func_t *func = &state->program->funcs[func_idx];
     i32 extra_params = (i32) state->param_count - func->param_count;
     if (extra_params < 0) extra_params = 0;
 
     ovm__func_setup_stack_frame(state, func, result_vn);
     state->param_count -= (u32) func->param_count;
+    *extra_out = extra_params;
+    return func;
+}
 
+static void ovm_jit_finish_uncompiled(ovm_state_t *state, ovm_func_t *func, i32 extra_params, i32 result_vn) {
     if (func->kind == OVM_FUNC_INTERNAL) {
         for (i32 pi = 0; pi < func->param_count; pi++) {
             state->__frame_values[pi].u64 = state->param_buf[extra_params + pi].u64;
         }
-
-        if (func->native_entry && !state->debug) {
-            bh_arr_last(state->stack_frames).compiled = 1;
-            func->native_entry(state->engine, state, state->program);
-        } else {
-            state->pc = func->start_instr;
-            ovm_run_code(state->engine, state, state->program);
-        }
+        state->pc = func->start_instr;
+        ovm_run_code(state->engine, state, state->program);
     } else {
         ovm_external_func_t external_func = state->external_funcs[func->external_func_idx];
         external_func.native_func(external_func.userdata, &state->param_buf[extra_params], &state->__tmp_value);
@@ -67,9 +65,44 @@ void ovm_jit_call(ovm_state_t *state, i32 func_idx, i32 result_vn) {
     }
 }
 
+void ovm_jit_call(ovm_state_t *state, i32 func_idx, i32 result_vn) {
+    i32 extra = 0;
+    ovm_func_t *func = ovm_jit_setup_call(state, func_idx, result_vn, &extra);
+
+    if (func->kind == OVM_FUNC_INTERNAL && func->native_entry && !state->debug) {
+        for (i32 pi = 0; pi < func->param_count; pi++) {
+            state->__frame_values[pi].u64 = state->param_buf[extra + pi].u64;
+        }
+        bh_arr_last(state->stack_frames).compiled = 1;
+        func->native_entry(state->engine, state, state->program);
+        return;
+    }
+
+    ovm_jit_finish_uncompiled(state, func, extra, result_vn);
+}
+
 void ovm_jit_calli(ovm_state_t *state, i32 func_slot, i32 result_vn) {
-    i32 fidx = state->__frame_values[func_slot].i32;
-    ovm_jit_call(state, fidx, result_vn);
+    ovm_jit_call(state, state->__frame_values[func_slot].i32, result_vn);
+}
+
+ovm_jit_fn_t ovm_jit_call_fast(ovm_state_t *state, i32 func_idx, i32 result_vn) {
+    i32 extra = 0;
+    ovm_func_t *func = ovm_jit_setup_call(state, func_idx, result_vn, &extra);
+
+    if (func->kind == OVM_FUNC_INTERNAL && func->native_body && !state->debug) {
+        for (i32 pi = 0; pi < func->param_count; pi++) {
+            state->__frame_values[pi].u64 = state->param_buf[extra + pi].u64;
+        }
+        bh_arr_last(state->stack_frames).compiled = 1;
+        return func->native_body;
+    }
+
+    ovm_jit_finish_uncompiled(state, func, extra, result_vn);
+    return NULL;
+}
+
+ovm_jit_fn_t ovm_jit_calli_fast(ovm_state_t *state, i32 func_slot, i32 result_vn) {
+    return ovm_jit_call_fast(state, state->__frame_values[func_slot].i32, result_vn);
 }
 
 static inline double jit_abs(double f) { return f >= 0 ? f : -f; }
@@ -353,9 +386,11 @@ void ovm_jit_compile_program(ovm_engine_t *engine, ovm_program_t *program) {
     ovm_emit_init(&buf);
 
     i32 *func_off = calloc((size_t) nfuncs, sizeof(i32));
+    i32 *body_off = calloc((size_t) nfuncs, sizeof(i32));
     u8 *compiled = calloc((size_t) nfuncs, 1);
-    if (!func_off || !compiled) {
+    if (!func_off || !body_off || !compiled) {
         free(func_off);
+        free(body_off);
         free(compiled);
         ovm_emit_free(&buf);
         return;
@@ -383,10 +418,12 @@ void ovm_jit_compile_program(ovm_engine_t *engine, ovm_program_t *program) {
         ovm_jit_emit_x64(&buf, program, start, end);
         ovm_jit_patch_x64(&buf);
 #endif
+        body_off[fi] = buf.nested_off;
     }
 
     if (buf.len <= 0) {
         free(func_off);
+        free(body_off);
         free(compiled);
         ovm_emit_free(&buf);
         return;
@@ -397,6 +434,7 @@ void ovm_jit_compile_program(ovm_engine_t *engine, ovm_program_t *program) {
                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (mem == MAP_FAILED) {
         free(func_off);
+        free(body_off);
         free(compiled);
         ovm_emit_free(&buf);
         return;
@@ -414,6 +452,7 @@ void ovm_jit_compile_program(ovm_engine_t *engine, ovm_program_t *program) {
     if (mprotect(mem, (size_t) map_size, PROT_READ | PROT_EXEC) != 0) {
         munmap(mem, (size_t) map_size);
         free(func_off);
+        free(body_off);
         free(compiled);
         ovm_emit_free(&buf);
         return;
@@ -424,12 +463,13 @@ void ovm_jit_compile_program(ovm_engine_t *engine, ovm_program_t *program) {
 
     for (i32 fi = 0; fi < nfuncs; fi++) {
         if (!compiled[fi] || func_off[fi] < 0) continue;
-        program->funcs[fi].native_entry =
-            (u64 (*)(ovm_engine_t *, ovm_state_t *, ovm_program_t *))
-            ((u8 *) mem + func_off[fi]);
+        u8 *base = (u8 *) mem + func_off[fi];
+        program->funcs[fi].native_entry = (ovm_jit_fn_t) base;
+        program->funcs[fi].native_body = (ovm_jit_fn_t) (base + body_off[fi]);
     }
 
     free(func_off);
+    free(body_off);
     free(compiled);
     ovm_emit_free(&buf);
 }

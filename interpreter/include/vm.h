@@ -238,6 +238,8 @@ struct ovm_func_t {
     };
 
     u64 (*native_entry)(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program);
+    /* Same ABI, but pins are already live; RETURN does not restore them. */
+    u64 (*native_body)(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program);
 };
 
 struct ovm_external_func_t {
