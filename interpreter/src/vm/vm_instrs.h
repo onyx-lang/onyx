@@ -35,107 +35,107 @@ static ovm_value_t OVM_RUN_NAME(ovm_engine_t *engine, ovm_state_t *state, ovm_pr
 #define IROW_FLOAT(name)   IL, IL, IL, IL, IL, D(name##_f32), D(name##_f64), IL,
 #define IROW_SAME(name)    D(name),D(name),D(name),D(name),D(name),D(name),D(name),IL,
 
-    static const void *OVMI_DISPATCH_NAME[] = {
-        IROW_UNTYPED(nop) // 0x00
-        IROW_PARTIAL(add)
-        IROW_PARTIAL(sub)
-        IROW_PARTIAL(mul)
-        IROW_PARTIAL(div)
-        IROW_PARTIAL(div_s)
-        IROW_INT(rem)
-        IROW_INT(rem_s)
-        IROW_INT(and)
-        IROW_INT(or)
-        IROW_INT(xor)
-        IROW_INT(shl)
-        IROW_INT(shr)
-        IROW_INT(sar)
-        IROW_SAME(illegal)
-        IROW_SAME(illegal)
-        IROW_PARTIAL(imm) // 0x10
-        IROW_UNTYPED(mov)
-        IROW_TYPED(load)
-        IROW_TYPED(store)
-        IROW_UNTYPED(copy)
-        IROW_UNTYPED(fill)
-        IROW_UNTYPED(reg_get)
-        IROW_UNTYPED(reg_set)
-        IROW_UNTYPED(idx_arr)
-        IROW_PARTIAL(lt)
-        IROW_PARTIAL(lt_s)
-        IROW_PARTIAL(le)
-        IROW_PARTIAL(le_s)
-        IROW_PARTIAL(eq)
-        IROW_PARTIAL(ge)
-        IROW_PARTIAL(ge_s)
-        IROW_PARTIAL(gt)  // 0x20
-        IROW_PARTIAL(gt_s)
-        IROW_PARTIAL(ne)
-        IROW_UNTYPED(param)
-        IROW_UNTYPED(return)
-        IROW_UNTYPED(call)
-        IROW_UNTYPED(calli)
-        IROW_UNTYPED(br)
-        IROW_UNTYPED(br_z)
-        IROW_UNTYPED(br_nz)
-        IROW_UNTYPED(bri)
-        IROW_UNTYPED(bri_z)
-        IROW_UNTYPED(bri_nz)
-        IROW_INT(clz)
-        IROW_INT(ctz)
-        IROW_INT(popcount)
-        IROW_INT(rotl)  // 0x30
-        IROW_INT(rotr)
-        IROW_FLOAT(abs)
-        IROW_FLOAT(neg)
-        IROW_FLOAT(ceil)
-        IROW_FLOAT(floor)
-        IROW_FLOAT(trunc)
-        IROW_FLOAT(nearest)
-        IROW_FLOAT(sqrt)
-        IROW_FLOAT(min)
-        IROW_FLOAT(max)
-        IROW_FLOAT(copysign)
-        IL, IL, D(cvt_i8_i16), D(cvt_i8_i32), D(cvt_i8_i64), IL, IL, IL,
-        IL, IL, D(cvt_i8_s_i16), D(cvt_i8_s_i32), D(cvt_i8_s_i64), IL, IL, IL,
-        IL, D(cvt_i16_i8),   IL, D(cvt_i16_i32), D(cvt_i16_i64), IL, IL, IL,
-        IL, D(cvt_i16_s_i8), IL, D(cvt_i16_s_i32), D(cvt_i16_s_i64), IL, IL, IL,
-        IL, D(cvt_i32_i8),   D(cvt_i32_i16),   IL, D(cvt_i32_i64), D(cvt_i32_f32), D(cvt_i32_f64), IL,  // 0x40
-        IL, D(cvt_i32_s_i8), D(cvt_i32_s_i16), IL, D(cvt_i32_s_i64), D(cvt_i32_s_f32), D(cvt_i32_s_f64), IL,
-        IL, D(cvt_i64_i8),   D(cvt_i64_i16),   D(cvt_i64_i32),   IL, D(cvt_i64_f32), D(cvt_i64_f64), IL,
-        IL, D(cvt_i64_s_i8), D(cvt_i64_s_i16), D(cvt_i64_s_i32), IL, D(cvt_i64_s_f32), D(cvt_i64_s_f64), IL,
-        IL, IL, IL, D(cvt_f32_i32), D(cvt_f32_i64), IL, D(cvt_f32_f64), IL,
-        IL, IL, IL, D(cvt_f32_s_i32), D(cvt_f32_s_i64), IL, D(cvt_f32_s_f64), IL,
-        IL, IL, IL, D(cvt_f64_i32), D(cvt_f64_i64), D(cvt_f64_f32), IL, IL,
-        IL, IL, IL, D(cvt_f64_s_i32), D(cvt_f64_s_i64), D(cvt_f64_s_f32), IL, IL,
-        IL, IL, IL, D(transmute_i32_f32), IL, IL, IL, IL,
-        IL, IL, IL, IL, D(transmute_i64_f64), IL, IL, IL,
-        IL, IL, IL, IL, IL, D(transmute_f32_i32), IL, IL,
-        IL, IL, IL, IL, IL, IL, D(transmute_f64_i64), IL,
-        IROW_INT(cmpxchg)
-        IROW_SAME(illegal)
-        IROW_UNTYPED(mem_size)
-        IROW_UNTYPED(mem_grow)
-        IROW_INT(add_imm) // 0x50
-        IROW_INT(sub_imm)
-        IROW_INT(mul_imm)
-        IROW_INT(and_imm)
-        IROW_INT(or_imm)
-        IROW_INT(xor_imm)
-        IROW_INT(shl_imm)
-        IROW_INT(shr_imm)
-        IROW_INT(sar_imm)
-        IROW_PARTIAL(br_eq)
-        IROW_PARTIAL(br_ne)
-        IROW_PARTIAL(br_lt)
-        IROW_PARTIAL(br_lt_s)
-        IROW_PARTIAL(br_le)
-        IROW_PARTIAL(br_le_s)
-        IROW_PARTIAL(br_gt)
-        IROW_PARTIAL(br_gt_s)
-        IROW_PARTIAL(br_ge)
-        IROW_PARTIAL(br_ge_s)
-    };
+static const void *OVMI_DISPATCH_NAME[] = {
+    IROW_UNTYPED(nop) // 0x00
+    IROW_PARTIAL(add)
+    IROW_PARTIAL(sub)
+    IROW_PARTIAL(mul)
+    IROW_PARTIAL(div)
+    IROW_PARTIAL(div_s)
+    IROW_INT(rem)
+    IROW_INT(rem_s)
+    IROW_INT(and)
+    IROW_INT(or)
+    IROW_INT(xor)
+    IROW_INT(shl)
+    IROW_INT(shr)
+    IROW_INT(sar)
+    IROW_SAME(illegal)
+    IROW_SAME(illegal)
+    IROW_PARTIAL(imm) // 0x10
+    IROW_UNTYPED(mov)
+    IROW_TYPED(load)
+    IROW_TYPED(store)
+    IROW_UNTYPED(copy)
+    IROW_UNTYPED(fill)
+    IROW_UNTYPED(reg_get)
+    IROW_UNTYPED(reg_set)
+    IROW_UNTYPED(idx_arr)
+    IROW_PARTIAL(lt)
+    IROW_PARTIAL(lt_s)
+    IROW_PARTIAL(le)
+    IROW_PARTIAL(le_s)
+    IROW_PARTIAL(eq)
+    IROW_PARTIAL(ge)
+    IROW_PARTIAL(ge_s)
+    IROW_PARTIAL(gt)  // 0x20
+    IROW_PARTIAL(gt_s)
+    IROW_PARTIAL(ne)
+    IROW_UNTYPED(param)
+    IROW_UNTYPED(return)
+    IROW_UNTYPED(call)
+    IROW_UNTYPED(calli)
+    IROW_UNTYPED(br)
+    IROW_UNTYPED(br_z)
+    IROW_UNTYPED(br_nz)
+    IROW_UNTYPED(bri)
+    IROW_UNTYPED(bri_z)
+    IROW_UNTYPED(bri_nz)
+    IROW_INT(clz)
+    IROW_INT(ctz)
+    IROW_INT(popcount)
+    IROW_INT(rotl)  // 0x30
+    IROW_INT(rotr)
+    IROW_FLOAT(abs)
+    IROW_FLOAT(neg)
+    IROW_FLOAT(ceil)
+    IROW_FLOAT(floor)
+    IROW_FLOAT(trunc)
+    IROW_FLOAT(nearest)
+    IROW_FLOAT(sqrt)
+    IROW_FLOAT(min)
+    IROW_FLOAT(max)
+    IROW_FLOAT(copysign)
+    IL, IL, D(cvt_i8_i16), D(cvt_i8_i32), D(cvt_i8_i64), IL, IL, IL,
+    IL, IL, D(cvt_i8_s_i16), D(cvt_i8_s_i32), D(cvt_i8_s_i64), IL, IL, IL,
+    IL, D(cvt_i16_i8),   IL, D(cvt_i16_i32), D(cvt_i16_i64), IL, IL, IL,
+    IL, D(cvt_i16_s_i8), IL, D(cvt_i16_s_i32), D(cvt_i16_s_i64), IL, IL, IL,
+    IL, D(cvt_i32_i8),   D(cvt_i32_i16),   IL, D(cvt_i32_i64), D(cvt_i32_f32), D(cvt_i32_f64), IL,  // 0x40
+    IL, D(cvt_i32_s_i8), D(cvt_i32_s_i16), IL, D(cvt_i32_s_i64), D(cvt_i32_s_f32), D(cvt_i32_s_f64), IL,
+    IL, D(cvt_i64_i8),   D(cvt_i64_i16),   D(cvt_i64_i32),   IL, D(cvt_i64_f32), D(cvt_i64_f64), IL,
+    IL, D(cvt_i64_s_i8), D(cvt_i64_s_i16), D(cvt_i64_s_i32), IL, D(cvt_i64_s_f32), D(cvt_i64_s_f64), IL,
+    IL, IL, IL, D(cvt_f32_i32), D(cvt_f32_i64), IL, D(cvt_f32_f64), IL,
+    IL, IL, IL, D(cvt_f32_s_i32), D(cvt_f32_s_i64), IL, D(cvt_f32_s_f64), IL,
+    IL, IL, IL, D(cvt_f64_i32), D(cvt_f64_i64), D(cvt_f64_f32), IL, IL,
+    IL, IL, IL, D(cvt_f64_s_i32), D(cvt_f64_s_i64), D(cvt_f64_s_f32), IL, IL,
+    IL, IL, IL, D(transmute_i32_f32), IL, IL, IL, IL,
+    IL, IL, IL, IL, D(transmute_i64_f64), IL, IL, IL,
+    IL, IL, IL, IL, IL, D(transmute_f32_i32), IL, IL,
+    IL, IL, IL, IL, IL, IL, D(transmute_f64_i64), IL,
+    IROW_INT(cmpxchg)
+    IROW_SAME(illegal)
+    IROW_UNTYPED(mem_size)
+    IROW_UNTYPED(mem_grow)
+    IROW_INT(add_imm) // 0x50
+    IROW_INT(sub_imm)
+    IROW_INT(mul_imm)
+    IROW_INT(and_imm)
+    IROW_INT(or_imm)
+    IROW_INT(xor_imm)
+    IROW_INT(shl_imm)
+    IROW_INT(shr_imm)
+    IROW_INT(sar_imm)
+    IROW_PARTIAL(br_eq)
+    IROW_PARTIAL(br_ne)
+    IROW_PARTIAL(br_lt)
+    IROW_PARTIAL(br_lt_s)
+    IROW_PARTIAL(br_le)
+    IROW_PARTIAL(br_le_s)
+    IROW_PARTIAL(br_gt)
+    IROW_PARTIAL(br_gt_s)
+    IROW_PARTIAL(br_ge)
+    IROW_PARTIAL(br_ge_s)
+};
 
 #undef D
 #undef IL
