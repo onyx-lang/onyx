@@ -849,9 +849,7 @@ int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t valu
     case ONYX_OPTION_PLATFORM:               ctx->context.options.runtime = value; return 1;
     case ONYX_OPTION_PARSE_ONLY:             ctx->context.options.parse_only = value; return 1;
     case ONYX_OPTION_COMPILATION_DATA_DETAILED: ctx->context.options.compilation_data_detailed = value; return 1;
-    case ONYX_OPTION_JIT:
-        ctx->context.options.enable_jit = value;
-        return 1;
+    case ONYX_OPTION_JIT:                    ctx->context.options.enable_jit = value; return 1;
 
     default:
         break;

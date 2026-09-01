@@ -89,7 +89,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     C_LBLUE "    --doc                       " C_NORM "Generate a .odoc file, Onyx's documentation format used by " C_YELLOW "onyx-doc-gen\n"
     C_LBLUE "    --lspinfo " C_GREY "target_file       " C_NORM "Generate an LSP information file\n"
     C_LBLUE "    --save-injected " C_GREY "target_file " C_NORM "Saves injected code to a file for debugging\n"
-    C_LBLUE "    --generate-events " C_GREY "target_file  " C_NORM "Write compilation events as protobuf\n"
+    C_LBLUE "    --generate-events " C_GREY "file      " C_NORM "Write compilation events as protobuf\n"
     "\n"
     C_LBLUE "    -V, --verbose               " C_NORM "Verbose output\n"
     C_LBLUE "    --no-colors                 " C_NORM "Disables colors in the error message\n"
