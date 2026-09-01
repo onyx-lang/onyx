@@ -133,6 +133,13 @@ static void x64_shift_cl(ovm_emit_buf_t *b, int dst, int ext, int wide) {
     x64_modrm(b, 3, ext, dst);
 }
 
+static void x64_shl_imm(ovm_emit_buf_t *b, int dst, int amount, int wide) {
+    x64_rex(b, wide, 0, 0, rex_bit(dst));
+    x64_u8(b, 0xC1);
+    x64_modrm(b, 3, 4, dst);
+    x64_u8(b, (u8) amount);
+}
+
 static void x64_cmp_rr(ovm_emit_buf_t *b, int a, int rb, int wide) {
     x64_alu_rr(b, 0x39, a, rb, wide);
 }
@@ -467,12 +474,12 @@ static void x64_emit_one(ovm_emit_buf_t *b, ovm_program_t *program, i32 idx, ovm
             break;
 
         case OVMI_PARAM:
+            // param_buf[count] is 16-byte ovm_value_t; SIB cannot scale by 16.
             x64_load_disp(b, RAX, R13, OFF_PCNT, 0);
             x64_load_disp(b, RCX, R13, OFF_PBUF, 1);
-            x64_rex(b, 1, 0, 0, 0);
-            x64_u8(b, 0x8D);
-            x64_modrm(b, 0, RCX, 4);
-            x64_sib(b, 4, RAX, RCX); // lea rcx, [rcx + rax*16]
+            x64_mov_rr(b, RDX, RAX);
+            x64_shl_imm(b, RDX, 4, 1);
+            x64_alu_rr(b, 0x01, RCX, RDX, 1);
             x64_slot_ld(b, RDX, ins->a, 1);
             x64_store_disp(b, RCX, 0, RDX, 1);
             x64_alu_imm32(b, RAX, 1, 0, 0);
@@ -521,8 +528,8 @@ static void x64_emit_one(ovm_emit_buf_t *b, ovm_program_t *program, i32 idx, ovm
             break;
         case OVMI_POPCNT:
             x64_slot_ld(b, RAX, ins->a, wide);
-            x64_rex(b, wide, 0, 0, 0);
             x64_u8(b, 0xF3);
+            if (wide) x64_u8(b, 0x48);
             x64_u8(b, 0x0F);
             x64_u8(b, 0xB8);
             x64_modrm(b, 3, RAX, RAX);
