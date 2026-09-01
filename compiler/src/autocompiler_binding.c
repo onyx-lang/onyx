@@ -15,13 +15,13 @@ ONYX_DEF(onyx_version_major, (), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(onyx_run_wasm_with_debug, (WASM_I32,WASM_I32, WASM_I32, WASM_I32, WASM_I32), ()) {
-    onyx_run_wasm_with_debug(ONYX_PTR(P(0, i32)), P(1, i32), P(2, i32), ONYX_PTR(P(3, i32)), ONYX_PTR(P(4, i32)));
+ONYX_DEF(onyx_run_wasm_with_debug, (WASM_I32,WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), ()) {
+    onyx_run_wasm_with_debug(ONYX_PTR(P(0, i32)), P(1, i32), P(2, i32), ONYX_PTR(P(3, i32)), ONYX_PTR(P(4, i32)), P(5, i32));
     return NULL;
 }
 
-ONYX_DEF(onyx_run_wasm, (WASM_I32,WASM_I32, WASM_I32, WASM_I32), ()) {
-    onyx_run_wasm(ONYX_PTR(P(0, i32)), P(1, i32), P(2, i32), ONYX_PTR(P(3, i32)));
+ONYX_DEF(onyx_run_wasm, (WASM_I32,WASM_I32, WASM_I32, WASM_I32, WASM_I32), ()) {
+    onyx_run_wasm(ONYX_PTR(P(0, i32)), P(1, i32), P(2, i32), ONYX_PTR(P(3, i32)), P(4, i32));
     return NULL;
 }
 

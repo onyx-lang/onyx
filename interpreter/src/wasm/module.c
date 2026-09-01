@@ -1,6 +1,7 @@
 
 
 #include "ovm_wasm.h"
+#include "ovm_jit.h"
 #include "vm_codebuilder.h"
 #include "stb_ds.h"
 
@@ -32,6 +33,8 @@ static bool module_build(wasm_module_t *module, const wasm_byte_vec_t *binary) {
     #if 0
         printf("Program instruction count: %d\n", bh_arr_length(module->program->code));
     #endif
+
+    ovm_jit_compile_program(engine->engine, module->program);
 
     return true;
 }

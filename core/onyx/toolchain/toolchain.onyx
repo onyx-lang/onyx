@@ -173,7 +173,7 @@ Builder.update_compilation_info :: (use self: &#Self, info: &CompilationInfo, al
 
 
 
-run_wasm :: (wasm_bytes: [] u8, args: [] str) {
+run_wasm :: (wasm_bytes: [] u8, args: [] str, jit_enabled := 0) {
     argv := alloc.array_from_stack(cptr(u8), args.length)
     for v, i in args {
         argv[i] = cptr.make(v.data)
@@ -184,10 +184,10 @@ run_wasm :: (wasm_bytes: [] u8, args: [] str) {
     // Consider use cases that might want to capture stdio
     // of the "embedded" wasm process?
 
-    native.onyx_run_wasm(wasm_bytes, argv.length, argv.data)
+    native.onyx_run_wasm(wasm_bytes, argv.length, argv.data, jit_enabled)
 }
 
-run_wasm_with_debug :: (wasm_bytes: [] u8, args: [] str, debug_socket_path: [] str) {
+run_wasm_with_debug :: (wasm_bytes: [] u8, args: [] str, debug_socket_path: [] str, jit_enabled := 0) {
     argv := alloc.array_from_stack(cptr(u8), args.length)
     for v, i in args {
         argv[i] = cptr.make(v.data)
@@ -197,6 +197,6 @@ run_wasm_with_debug :: (wasm_bytes: [] u8, args: [] str, debug_socket_path: [] s
     memory.set(socket, 0, debug_socket_path.length + 1)
     memory.copy(socket, debug_socket_path.data, debug_socket_path.length)
 
-    native.onyx_run_wasm_with_debug(wasm_bytes, argv.length, argv.data, socket)
+    native.onyx_run_wasm_with_debug(wasm_bytes, argv.length, argv.data, socket, jit_enabled)
 }
 

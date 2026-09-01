@@ -51,6 +51,8 @@ typedef enum onyx_option_t {
     ONYX_OPTION_PARSE_ONLY,
 
     ONYX_OPTION_COMPILATION_DATA_DETAILED,
+
+    ONYX_OPTION_JIT,
 } onyx_option_t;
 
 typedef enum onyx_pump_t {
@@ -204,8 +206,8 @@ API const char *onyx_stat_filepath(onyx_context_t *ctx, int32_t file_index);
 // Running WASM
 //
 
-API void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv);
-API void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path);
+API void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv, int32_t jit_enabled);
+API void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path, int32_t jit_enabled);
 
 #endif
 

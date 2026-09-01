@@ -108,6 +108,9 @@ struct ovm_program_t {
 
     i32 register_count;
     ovm_store_t *store;
+
+    void *jit_exec;
+    i64   jit_exec_size;
 };
 
 ovm_program_t *ovm_program_new(ovm_store_t *store);
@@ -138,6 +141,7 @@ struct ovm_engine_t {
     void *memory;
 
     debug_state_t *debug;
+    b32 jit_enabled;
 };
 
 ovm_engine_t *ovm_engine_new(ovm_store_t *store);
@@ -206,6 +210,7 @@ struct ovm_stack_frame_t {
 
     i32 return_address;
     i32 return_number_value;
+    b32 compiled;
 };
 
 
@@ -231,6 +236,8 @@ struct ovm_func_t {
         i32 start_instr;
         i32 external_func_idx;
     };
+
+    u64 (*native_entry)(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program);
 };
 
 struct ovm_external_func_t {
@@ -247,6 +254,9 @@ struct ovm_linkable_func_t {
 ovm_func_t  *ovm_func_new();
 ovm_instr_t *ovm_func_add_instruction(ovm_func_t *func, ovm_instr_kind_t instr, ovm_valtype_t type);
 void         ovm_func_delete(ovm_func_t *func);
+
+void ovm__func_setup_stack_frame(ovm_state_t *state, ovm_func_t *func, i32 result_number);
+ovm_stack_frame_t ovm__func_teardown_stack_frame(ovm_state_t *state);
 
 ovm_value_t ovm_func_call(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program, i32 func_idx,
         i32 param_count, ovm_value_t *params);

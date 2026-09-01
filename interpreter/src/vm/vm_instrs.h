@@ -445,6 +445,12 @@ OVMI_INSTR_EXEC(return) {
         VAL(frame.return_number_value) = val;
     }
 
+    if (bh_arr_last(state->stack_frames).compiled) {
+        ovm_value_t out = {0};
+        out.u64 = val.u64;
+        return out;
+    }
+
 #ifdef OVM_VERBOSE
     printf("Returning from %s to %s: ", frame.func->name, bh_arr_last(state->stack_frames).func->name);
     ovm_print_val((ovm_value_t) { .u64 = val.u64 });
@@ -469,8 +475,15 @@ OVMI_INSTR_EXEC(return) {
         for (i32 pi = 0; pi < func->param_count; pi++) { \
             VAL(pi).u64 = state->param_buf[extra_params + pi].u64; \
         } \
-        instr = &code[func->start_instr]; \
-        DISPATCH; \
+        if (func->native_entry) { \
+            bh_arr_last(state->stack_frames).compiled = 1; \
+            func->native_entry(state->engine, state, state->program); \
+            values = state->__frame_values; \
+            memory = state->engine->memory; \
+        } else { \
+            instr = &code[func->start_instr]; \
+            DISPATCH; \
+        } \
     } else { \
         ovm_external_func_t external_func = state->external_funcs[func->external_func_idx]; \
         external_func.native_func(external_func.userdata, &state->param_buf[extra_params], &state->__tmp_value); \

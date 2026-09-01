@@ -5,8 +5,8 @@
 FLAGS="-O3 -fno-stack-protector"
 LIBS="-pthread"
 TARGET="../shared/lib/$ONYX_ARCH/lib/libovmwasm.a"
-C_FILES="src/ovmwasm.c src/vm/*.c src/wasm/*.c src/debug/*.c"
-INCLUDES="-I../shared/include -Iinclude"
+C_FILES="src/ovmwasm.c src/vm/*.c src/wasm/*.c src/debug/*.c src/jit/*.c"
+INCLUDES="-I../shared/include -Iinclude -Isrc/jit"
 
 if [ ! -z ${ONYX_TARGET+x} ]; then
     FLAGS="$FLAGS --target=$ONYX_TARGET"

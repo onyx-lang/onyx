@@ -72,6 +72,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     C_LBLUE "    --map-dir " C_GREY "name:folder       " C_NORM "Adds a mapped directory\n"
     "\n"
     C_LBLUE "    --debug                     " C_NORM "Output a debugable build\n"
+    C_LBLUE "    --jit                       " C_NORM "Use the OVM native backend when running\n"
     C_LBLUE "    --feature " C_GREY "feature           " C_NORM "Enable an experimental language feature\n"
     C_LBLUE "    --multi-threaded            " C_NORM "Enables multi-threading for this compilation\n"
     C_LBLUE "    --stack-trace               " C_NORM "Enable dynamic stack trace\n"
@@ -136,6 +137,7 @@ typedef struct CLIArgs {
     b32 print_function_mappings : 1;
     b32 print_static_if_results : 1;
     b32 debug_session           : 1;
+    b32 enable_jit              : 1;
     b32 no_colors               : 1;
     b32 show_all_errors         : 1;
 
@@ -171,6 +173,11 @@ static int32_t cli_args_init(CLIArgs *cli_args) {
     if (getenv("ONYX_ERROR_FORMAT")) {
         cli_args->error_format = getenv("ONYX_ERROR_FORMAT");
     }
+
+    {
+        char *jit_env = getenv("ONYX_JIT");
+        if (jit_env && jit_env[0] == '1') cli_args->enable_jit = 1;
+    }
     #endif
 
     #ifdef _BH_WINDOWS
@@ -185,6 +192,13 @@ static int32_t cli_args_init(CLIArgs *cli_args) {
     }
     if (GetEnvironmentVariableA("ONYX_ERROR_FORMAT", tmp_error_format, 512) > 0) {
         cli_args->error_format = tmp_error_format;
+    }
+
+    {
+        char tmp_jit[8] = {0};
+        if (GetEnvironmentVariableA("ONYX_JIT", tmp_jit, 8) > 0 && tmp_jit[0] == '1') {
+            cli_args->enable_jit = 1;
+        }
     }
     #endif
 
@@ -469,6 +483,10 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
             }
             onyx_set_option_int(ctx, ONYX_OPTION_COMPILATION_DATA_DETAILED, 1);
             cli_args->events_file = argv[++i];
+        }
+        else if (!strcmp(argv[i], "--jit")) {
+            cli_args->enable_jit = 1;
+            onyx_set_option_int(ctx, ONYX_OPTION_JIT, 1);
         }
         else if (!strcmp(argv[i], "--debug")) {
             cli_args->debug_session = 1;
@@ -956,9 +974,9 @@ int main(int argc, char *argv[]) {
         }
 
         if (cli_args.debug_session) {
-            onyx_run_wasm_with_debug(wasm_content.data, wasm_content.length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data, cli_args.debug_socket);
+            onyx_run_wasm_with_debug(wasm_content.data, wasm_content.length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data, cli_args.debug_socket, cli_args.enable_jit);
         } else {
-            onyx_run_wasm(wasm_content.data, wasm_content.length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data);
+            onyx_run_wasm(wasm_content.data, wasm_content.length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data, cli_args.enable_jit);
         }
 
         return 0;
@@ -1032,9 +1050,9 @@ int main(int argc, char *argv[]) {
             onyx_context_free(ctx);
 
             if (cli_args.debug_session) {
-                onyx_run_wasm_with_debug(output, output_length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data, cli_args.debug_socket);
+                onyx_run_wasm_with_debug(output, output_length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data, cli_args.debug_socket, cli_args.enable_jit);
             } else {
-                onyx_run_wasm(output, output_length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data);
+                onyx_run_wasm(output, output_length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data, cli_args.enable_jit);
             }
 
             free(output);

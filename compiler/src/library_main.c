@@ -849,6 +849,9 @@ int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t valu
     case ONYX_OPTION_PLATFORM:               ctx->context.options.runtime = value; return 1;
     case ONYX_OPTION_PARSE_ONLY:             ctx->context.options.parse_only = value; return 1;
     case ONYX_OPTION_COMPILATION_DATA_DETAILED: ctx->context.options.compilation_data_detailed = value; return 1;
+    case ONYX_OPTION_JIT:
+        ctx->context.options.enable_jit = value;
+        return 1;
 
     default:
         break;
@@ -1215,8 +1218,8 @@ const char *onyx_stat_filepath(onyx_context_t *ctx, int32_t file_index) {
 //
 
 #ifdef ONYX_RUNTIME_LIBRARY
-void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv) {
-    onyx_run_initialize(0, NULL);
+void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv, int32_t jit_enabled) {
+    onyx_run_initialize(0, NULL, jit_enabled);
 
     bh_buffer wasm_bytes;
     wasm_bytes.data = buffer;
@@ -1225,8 +1228,8 @@ void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv) {
     onyx_run_wasm_code(wasm_bytes, argc, argv);
 }
 
-void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path) {
-    onyx_run_initialize(1, socket_path);
+void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path, int32_t jit_enabled) {
+    onyx_run_initialize(1, socket_path, jit_enabled);
 
     bh_buffer wasm_bytes;
     wasm_bytes.data = buffer;
@@ -1235,11 +1238,13 @@ void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, cha
     onyx_run_wasm_code(wasm_bytes, argc, argv);
 }
 #else
-void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv) {
+void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv, int32_t jit_enabled) {
+    (void) jit_enabled;
     printf("ERROR: Cannot run WASM code. No runtime was configured at the time Onyx was built\n");
 }
 
-void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path) {
+void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path, int32_t jit_enabled) {
+    (void) jit_enabled;
     printf("ERROR: Cannot run WASM code. No runtime was configured at the time Onyx was built\n");
 }
 #endif

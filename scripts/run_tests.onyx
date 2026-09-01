@@ -124,6 +124,9 @@ Settings :: struct {
 
     #tag "--leak-check"
     leak_check := false;
+
+    #tag "--jit"
+    jit := false;
 }
 
 main :: (args) => {
@@ -136,6 +139,7 @@ main :: (args) => {
         at_least_one_test_failed := false;
         compile_only := false;   // @Bug // why is this necessary? why is settings.compile_only false when in the thread code?
         leak_check := false;
+        jit := false;
 
         failed_tests: &[..] str;
         leaked_tests: &[..] str;
@@ -144,6 +148,7 @@ main :: (args) => {
     exec_context := Execution_Context.{};
     exec_context.compile_only = settings.compile_only;
     exec_context.leak_check = settings.leak_check;
+    exec_context.jit = settings.jit;
 
     failed_tests := make([..] str);
     leaked_tests := make([..] str);
@@ -183,6 +188,9 @@ main :: (args) => {
             args << "--generate-method-info"
             if check_leaks {
                 args << "-DLEAKCHECK"
+            }
+            if thread_data.jit {
+                args << "--jit"
             }
             args << it.source_file
             cmd->args(args);

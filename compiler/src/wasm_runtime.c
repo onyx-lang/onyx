@@ -589,7 +589,7 @@ static b32 link_wasm_imports(
     return 1;
 }
 
-void onyx_run_initialize(b32 debug_enabled, const char *debug_socket) {
+void onyx_run_initialize(b32 debug_enabled, const char *debug_socket, b32 jit_enabled) {
     wasm_config = wasm_config_new();
     if (!wasm_config) {
         cleanup_wasm_objects();
@@ -599,6 +599,11 @@ void onyx_run_initialize(b32 debug_enabled, const char *debug_socket) {
 #ifdef USE_OVM_DEBUGGER
     void wasm_config_enable_debug(wasm_config_t *config, int value);
     wasm_config_enable_debug(wasm_config, debug_enabled);
+
+    if (jit_enabled) {
+        void wasm_config_enable_jit(wasm_config_t *config, int value);
+        wasm_config_enable_jit(wasm_config, 1);
+    }
 
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         i32 getpid();
@@ -619,6 +624,7 @@ void onyx_run_initialize(b32 debug_enabled, const char *debug_socket) {
 #endif
 
 #ifndef USE_OVM_DEBUGGER
+    (void) jit_enabled;
     if (debug_enabled) {
         printf("Warning: --debug does nothing if libovmwasm.so is not being used!\n");
     }
