@@ -128,9 +128,10 @@ static b32 extension_poll_recv(CompilerExtension *ext) {
     struct pollfd fd;
     fd.events = POLL_IN;
     fd.fd = ext->recv_file;
+    fd.revents = 0;
 
-    poll(&fd, 1, 0);
-
+    if (poll(&fd, 1, 0) < 0) return 0;
+    if (fd.revents & (POLLERR | POLLHUP | POLLNVAL)) return 1;
     return (fd.revents & POLL_IN) != 0;
 }
 
@@ -327,6 +328,33 @@ void compiler_extensions_flush_compilation_data_now(Context *context) {
     }
 }
 
+static i32 extension_queued_entity_count(Context *context) {
+    EntityHeap *h = &context->entities;
+    i32 n = h->ready.count + h->retry_count;
+    i32 heap_n = bh_arr_length(h->entities);
+    if (h->detached_top) heap_n -= 1;
+    if (heap_n > 0) n += heap_n;
+    return n;
+}
+
+// Yield only when something else can run. If the leftover queue is just
+// other extensions also waiting on their children, block instead of spinning.
+static b32 extension_startup_has_other_work(Context *context) {
+    i32 queued = extension_queued_entity_count(context);
+    if (queued <= 0) return 0;
+
+    i32 waiting_in_queue = 0;
+    bh_arr_each(CompilerExtension, ext, context->extensions) {
+        if (!ext->alive) continue;
+        if (ext->state != COMP_EXT_STATE_SPAWNING && ext->state != COMP_EXT_STATE_INITIATING) continue;
+        if (context->checker.current_entity && ext->entity == context->checker.current_entity) continue;
+        waiting_in_queue++;
+    }
+
+    return queued > waiting_in_queue;
+}
+
+b32 compiler_extension_negotiate_capabilities(Context *context, CompilerExtension *ext);
 
 TypeMatch compiler_extension_start(Context *context, const char *name, const char *containing_filename, Entity *ent, i32 *out_extension_id) {
     if (*out_extension_id == 0) {
@@ -372,13 +400,20 @@ TypeMatch compiler_extension_start(Context *context, const char *name, const cha
 
     } else {
         CompilerExtension *ext = &context->extensions[*out_extension_id - 1];
+        if (!ext->alive) return TYPE_MATCH_FAILED;
+
+        extension_try_flush(ext);
+
+        if (!extension_poll_recv(ext)) {
+            if (extension_startup_has_other_work(context)) {
+                return TYPE_MATCH_YIELD;
+            }
+        }
 
         ext->state = COMP_EXT_STATE_INITIATING;
         extension_drain(ext);
 
-        b32 compiler_extension_negotiate_capabilities(Context *context, CompilerExtension *ext);
-        b32 negotiated = compiler_extension_negotiate_capabilities(context, ext);
-        if (!negotiated) {
+        if (!compiler_extension_negotiate_capabilities(context, ext)) {
             return TYPE_MATCH_FAILED;
         }
 
@@ -469,7 +504,8 @@ static b32 handle_common_messages(Context *context, CompilerExtension *ext, int 
             u32 line = extension_recv_int(ext);
             u32 column = extension_recv_int(ext);
             u32 length = extension_recv_int(ext);
-            char *msg =  extension_recv_str(ext, NULL);
+            char *msg = extension_recv_str(ext, NULL);
+            if (!msg) msg = "";
 
             OnyxFilePos pos;
             pos.column = column + (line == tkn->pos.line ? 2 : 0);
@@ -534,8 +570,13 @@ TypeMatch compiler_extension_expand_macro(
 
     if (!ext->alive) return TYPE_MATCH_FAILED;
 
-    if (ext->state != COMP_EXT_STATE_READY && ext->current_expansion_id != (i32) *expansion_id) {
-        return TYPE_MATCH_YIELD;
+    // Not ready yet (still spawning / negotiating), or busy with a
+    // different expansion / hook. Do not read from the pipe or we can
+    // steal the child's INIT message.
+    if (ext->state != COMP_EXT_STATE_READY) {
+        if (ext->state != COMP_EXT_STATE_EXPANDING || ext->current_expansion_id != (i32) *expansion_id) {
+            return TYPE_MATCH_YIELD;
+        }
     }
 
     bh_arena_clear(&ext->arena);
