@@ -1779,7 +1779,7 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
     } else {
         // HACK
         static char it_name[] = "it ";
-        static OnyxToken it_token = { Token_Type_Symbol, 2, it_name, { 0 } };
+        static OnyxToken it_token = { Token_Type_Symbol, 2, it_name, 0, { 0 } };
 
         AstLocal* var_node = make_local(parser->context, &it_token, NULL);
         bh_arr_push(for_node->indexing_variables, var_node);

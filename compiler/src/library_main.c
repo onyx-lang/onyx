@@ -137,6 +137,7 @@ onyx_context_t *onyx_context_create() {
     context->ast_alloc = bh_arena_allocator(&context->ast_arena);
 
     compilation_log_init(context);
+    atom_table_init(context);
     types_init(context);
     prepare_builtins(context);
     compiler_events_init(context);

@@ -10,6 +10,11 @@ void package_track_use_package(Context *context, Package* package, Entity* entit
 void package_reinsert_use_packages(Context *context, Package* package);
 void package_mark_as_used(Context *context, Package* package);
 
+void atom_table_init(Context *context);
+u32 atom_intern(Context *context, const char *name);
+const char *atom_name(Context *context, u32 atom);
+u32 token_atom(Context *context, OnyxToken *tkn);
+
 Scope* scope_create(Context *context, Scope* parent, OnyxFilePos created_at);
 void scope_include(Context *context, Scope* target, Scope* source, OnyxFilePos pos);
 b32 symbol_introduce(Context *context, Scope* scope, OnyxToken* tkn, AstNode* symbol);

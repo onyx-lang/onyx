@@ -108,6 +108,7 @@ typedef struct OnyxToken {
     TokenType type;
     i32 length;
     char* text;
+    u32 atom;
     OnyxFilePos pos;
 } OnyxToken;
 

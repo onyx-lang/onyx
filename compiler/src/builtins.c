@@ -18,14 +18,14 @@ static OnyxToken basic_type_f64_token       = { Token_Type_Symbol, 3, "f64 " };
 static OnyxToken basic_type_rawptr_token    = { Token_Type_Symbol, 6, "rawptr " };
 static OnyxToken basic_type_type_expr_token = { Token_Type_Symbol, 9, "type_expr " };
 
-static OnyxToken builtin_heap_start_token  = { Token_Type_Symbol, 12, "__heap_start ", { 0 } };
-static OnyxToken builtin_stack_top_token   = { Token_Type_Symbol, 11, "__stack_top ",  { 0 } };
-static OnyxToken builtin_tls_base_token    = { Token_Type_Symbol, 10, "__tls_base ",  { 0 } };
-static OnyxToken builtin_tls_size_token    = { Token_Type_Symbol, 10, "__tls_size ",  { 0 } };
-static OnyxToken builtin_closure_base_token = { Token_Type_Symbol, 14, "__closure_base ",  { 0 } };
-static OnyxToken builtin_stack_trace_token = { Token_Type_Symbol, 0, " ", { 0 } };
+static OnyxToken builtin_heap_start_token  = { Token_Type_Symbol, 12, "__heap_start ", 0, { 0 } };
+static OnyxToken builtin_stack_top_token   = { Token_Type_Symbol, 11, "__stack_top ",  0, { 0 } };
+static OnyxToken builtin_tls_base_token    = { Token_Type_Symbol, 10, "__tls_base ",  0, { 0 } };
+static OnyxToken builtin_tls_size_token    = { Token_Type_Symbol, 10, "__tls_size ",  0, { 0 } };
+static OnyxToken builtin_closure_base_token = { Token_Type_Symbol, 14, "__closure_base ",  0, { 0 } };
+static OnyxToken builtin_stack_trace_token = { Token_Type_Symbol, 0, " ", 0, { 0 } };
 
-static OnyxToken simd_token = { Token_Type_Symbol, 0, "", { 0 } };
+static OnyxToken simd_token = { Token_Type_Symbol, 0, "", 0, { 0 } };
 
 
 const BuiltinSymbol builtin_symbols[] = {

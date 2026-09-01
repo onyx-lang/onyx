@@ -554,8 +554,9 @@ static void write_doc_methods(Context *context, bh_buffer *buffer, Scope *method
     }
 
     u32 method_count = 0;
-    fori (i, 0, shlen(method_scope->symbols)) {
-        AstFunction* node = (AstFunction *) strip_aliases(method_scope->symbols[i].value);
+    i32 method_n = scope_symbol_count(method_scope);
+    fori (i, 0, method_n) {
+        AstFunction* node = (AstFunction *) strip_aliases(scope_symbol_at(method_scope, i));
         if (node->kind != Ast_Kind_Function
             && node->kind != Ast_Kind_Polymorphic_Proc
             && node->kind != Ast_Kind_Overloaded_Function
@@ -576,8 +577,9 @@ static void write_doc_methods(Context *context, bh_buffer *buffer, Scope *method
 
         OnyxToken tmp_name_token;
         tmp_name_token.pos = binding->token->pos;
-        tmp_name_token.text = method_scope->symbols[i].key;
+        tmp_name_token.text = (char *) atom_name(context, scope_symbol_atom_at(method_scope, i));
         tmp_name_token.length = strlen(tmp_name_token.text);
+        tmp_name_token.atom = scope_symbol_atom_at(method_scope, i);
 
         OnyxToken *old_token = binding->token;
         binding->token = &tmp_name_token;

@@ -167,14 +167,15 @@ static MethodDataInfo write_method_data(struct TypeBuilderContext *ctx, Type *ty
     Scope *scope = get_scope_from_node(ctx->context, (AstNode *) ast_type);
     if (!scope) goto no_methods;
 
-    fori (i, 0, shlen(scope->symbols)) {
-        AstFunction* node = (AstFunction *) strip_aliases(scope->symbols[i].value);
+    i32 scope_n = scope_symbol_count(scope);
+    fori (i, 0, scope_n) {
+        AstFunction* node = (AstFunction *) strip_aliases(scope_symbol_at(scope, i));
         if (node->kind != Ast_Kind_Function) continue;
         assert(node->entity);
         assert(node->entity->function == node);
 
         // Name
-        char *name = scope->symbols[i].key;
+        char *name = (char *) atom_name(ctx->context, scope_symbol_atom_at(scope, i));
         u32 name_loc = ctx->buffer.length;
         u32 name_len = strlen(name);
         bh_buffer_append(&ctx->buffer, name, name_len);
@@ -878,14 +879,15 @@ static u64 build_foreign_blocks(OnyxWasmModule* module) {
 
         u32 funcs_length = 0;
 
-        u32 *name_offsets = bh_alloc_array(module->context->scratch_alloc, u32, shlen(fb->scope->symbols));
-        u32 *name_lengths = bh_alloc_array(module->context->scratch_alloc, u32, shlen(fb->scope->symbols));
-        u32 *func_types   = bh_alloc_array(module->context->scratch_alloc, u32, shlen(fb->scope->symbols));
-        u32 *tag_offsets  = bh_alloc_array(module->context->scratch_alloc, u32, shlen(fb->scope->symbols));
-        u32 *tag_lengths  = bh_alloc_array(module->context->scratch_alloc, u32, shlen(fb->scope->symbols));
+        i32 fb_n = scope_symbol_count(fb->scope);
+        u32 *name_offsets = bh_alloc_array(module->context->scratch_alloc, u32, fb_n);
+        u32 *name_lengths = bh_alloc_array(module->context->scratch_alloc, u32, fb_n);
+        u32 *func_types   = bh_alloc_array(module->context->scratch_alloc, u32, fb_n);
+        u32 *tag_offsets  = bh_alloc_array(module->context->scratch_alloc, u32, fb_n);
+        u32 *tag_lengths  = bh_alloc_array(module->context->scratch_alloc, u32, fb_n);
 
-        fori (i, 0, shlen(fb->scope->symbols)) {
-            AstFunction *func = (AstFunction *) fb->scope->symbols[i].value;
+        fori (i, 0, fb_n) {
+            AstFunction *func = (AstFunction *) scope_symbol_at(fb->scope, i);
             if (func->kind != Ast_Kind_Function) continue;
 
             OnyxToken *import_name = func->foreign.import_name->token;

@@ -138,9 +138,23 @@ typedef struct Scope {
     struct Scope *parent;
     OnyxFilePos created_at;
     char* name;
-    Table(AstNode *) symbols;
+    // atom id -> AstNode*. Intern once, then parent walks are integer probes.
+    bh_imap symbols;
     u32 log_event_index;
 } Scope;
+
+static inline i32 scope_symbol_count(Scope *scope) {
+    if (!scope || !scope->symbols.entries) return 0;
+    return bh_arr_length(scope->symbols.entries);
+}
+
+static inline AstNode *scope_symbol_at(Scope *scope, i32 i) {
+    return (AstNode *) scope->symbols.entries[i].value;
+}
+
+static inline u32 scope_symbol_atom_at(Scope *scope, i32 i) {
+    return (u32) scope->symbols.entries[i].key;
+}
 
 
 typedef enum AstKind {
@@ -2391,6 +2405,13 @@ struct Context {
     bh_allocator gp_alloc; // General purpose allocator 
 
     bh_allocator *stbds_alloc;
+
+    // Unique ids for identifier text. Scope tables are keyed by these.
+    Table(u32) atom_by_name;
+    bh_arr(char *) atom_names;
+    u32 atom_underscore;
+    const char *atom_cache_ptr;
+    u32 atom_cache_id;
 
     bh_arr(bh_file_contents) loaded_files;
     bh_arr(DefinedVariable) defined_variables;

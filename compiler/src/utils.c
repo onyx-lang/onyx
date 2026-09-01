@@ -114,52 +114,98 @@ void package_mark_as_used(Context *context, Package* package) {
 
 
 //
+// Atom table
+//
+
+void atom_table_init(Context *context) {
+    sh_new_arena(context->atom_by_name);
+    bh_arr_new(context->gp_alloc, context->atom_names, 256);
+    bh_arr_push(context->atom_names, (char *) "");
+    context->atom_underscore = atom_intern(context, "_");
+}
+
+u32 atom_intern(Context *context, const char *name) {
+    if (!name || !name[0]) return 0;
+    if (context->atom_cache_ptr == name) return context->atom_cache_id;
+
+    i32 idx = shgeti(context->atom_by_name, (char *) name);
+    if (idx >= 0) {
+        context->atom_cache_ptr = name;
+        context->atom_cache_id = context->atom_by_name[idx].value;
+        return context->atom_cache_id;
+    }
+
+    u32 id = (u32) bh_arr_length(context->atom_names);
+    shput(context->atom_by_name, (char *) name, id);
+    idx = shgeti(context->atom_by_name, (char *) name);
+    bh_arr_push(context->atom_names, context->atom_by_name[idx].key);
+    context->atom_cache_ptr = name;
+    context->atom_cache_id = id;
+    return id;
+}
+
+const char *atom_name(Context *context, u32 atom) {
+    if (atom >= (u32) bh_arr_length(context->atom_names)) return "";
+    char *name = context->atom_names[atom];
+    return name ? name : "";
+}
+
+u32 token_atom(Context *context, OnyxToken *tkn) {
+    if (!tkn) return 0;
+    if (tkn->atom) return tkn->atom;
+
+    token_toggle_end(tkn);
+    tkn->atom = atom_intern(context, tkn->text);
+    token_toggle_end(tkn);
+    return tkn->atom;
+}
+
+//
 // Scoping
 //
 
-Scope* scope_create(Context *context, Scope* parent, OnyxFilePos created_at) {
-    Scope* scope = bh_alloc_item(context->ast_alloc, Scope);
-
-    scope->id = ++context->next_scope_id;
-    scope->parent = parent;
-    scope->created_at = created_at;
-    scope->name = NULL;
-    scope->log_event_index = 0;
-
-    // This will be set on the first symbol insertion.
-    scope->symbols = NULL;
-
-    compilation_log_emit_scope(context, scope);
-
-    return scope;
+static void scope_symbols_init(Context *context, Scope *scope) {
+    if (scope->symbols.hashes) return;
+    bh_imap_init(&scope->symbols, context->gp_alloc, 16);
 }
 
-void scope_include(Context *context, Scope* target, Scope* source, OnyxFilePos pos) {
-    fori (i, 0, shlen(source->symbols)) {
-        symbol_raw_introduce(context, target, source->symbols[i].key, pos, source->symbols[i].value);
+static AstNode *symbol_resolve_atom_no_ascend(Scope *scope, u32 atom) {
+    if (!scope || !atom || !scope->symbols.hashes) return NULL;
+
+    bh_imap_entry_t value = 0;
+    if (!bh_imap_try_get(&scope->symbols, (bh_imap_entry_t) atom, &value)) return NULL;
+
+    AstNode *res = (AstNode *) value;
+    if (res && (res->flags & Ast_Flag_Symbol_Invisible) == 0) {
+        return res;
     }
+    return NULL;
 }
 
-b32 symbol_introduce(Context *context, Scope* scope, OnyxToken* tkn, AstNode* symbol) {
-    token_toggle_end(tkn);
+static AstNode *symbol_resolve_atom(Scope *start_scope, u32 atom, i32 limit) {
+    if (!atom) return NULL;
 
-    b32 ret = symbol_raw_introduce(context, scope, tkn->text, tkn->pos, symbol);
-
-    token_toggle_end(tkn);
-    return ret;
-}
-
-b32 symbol_raw_introduce(Context *context, Scope* scope, char* name, OnyxFilePos pos, AstNode* symbol) {
-    if (!scope->symbols) {
-        sh_new_arena(scope->symbols);
+    Scope *scope = start_scope;
+    i32 depth = 0;
+    while (scope != NULL && depth++ < limit) {
+        AstNode *res = symbol_resolve_atom_no_ascend(scope, atom);
+        if (res) return res;
+        scope = scope->parent;
     }
+    return NULL;
+}
 
-    if (strcmp(name, "_")) {
-        i32 index = shgeti(scope->symbols, name);
-        if (index != -1) {
-            AstNode *node = scope->symbols[index].value;
+static b32 symbol_introduce_atom(Context *context, Scope *scope, u32 atom, OnyxFilePos pos, AstNode *symbol) {
+    if (!atom) return 1;
+
+    scope_symbols_init(context, scope);
+
+    if (atom != context->atom_underscore) {
+        bh_imap_entry_t existing = 0;
+        if (bh_imap_try_get(&scope->symbols, (bh_imap_entry_t) atom, &existing)) {
+            AstNode *node = (AstNode *) existing;
             if (node != symbol) {
-                ONYX_ERROR(pos, Error_Critical, "Redeclaration of symbol '%s'.", name);
+                ONYX_ERROR(pos, Error_Critical, "Redeclaration of symbol '%s'.", atom_name(context, atom));
 
                 if (node->token) {
                     ONYX_ERROR(node->token->pos, Error_Critical, "Previous declaration was here.");
@@ -171,30 +217,63 @@ b32 symbol_raw_introduce(Context *context, Scope* scope, char* name, OnyxFilePos
         }
     }
 
-    i32 index = shputi(scope->symbols, name, symbol);
-    compilation_log_emit_symbol(context, scope, scope->symbols[index].key, pos, symbol);
+    bh_imap_put(&scope->symbols, (bh_imap_entry_t) atom, (bh_imap_entry_t) symbol);
+    compilation_log_emit_symbol(context, scope, (char *) atom_name(context, atom), pos, symbol);
     return 1;
 }
 
-void symbol_builtin_introduce(Context *context, Scope* scope, char* sym, AstNode *node) {
-    if (!scope->symbols) sh_new_arena(scope->symbols);
+Scope* scope_create(Context *context, Scope* parent, OnyxFilePos created_at) {
+    Scope* scope = bh_alloc_item(context->ast_alloc, Scope);
+    memset(scope, 0, sizeof(*scope));
 
-    shput(scope->symbols, sym, node);
+    scope->id = ++context->next_scope_id;
+    scope->parent = parent;
+    scope->created_at = created_at;
+
+    compilation_log_emit_scope(context, scope);
+
+    return scope;
+}
+
+void scope_include(Context *context, Scope* target, Scope* source, OnyxFilePos pos) {
+    i32 n = scope_symbol_count(source);
+    fori (i, 0, n) {
+        symbol_introduce_atom(context, target, scope_symbol_atom_at(source, i), pos, scope_symbol_at(source, i));
+    }
+}
+
+b32 symbol_introduce(Context *context, Scope* scope, OnyxToken* tkn, AstNode* symbol) {
+    return symbol_introduce_atom(context, scope, token_atom(context, tkn), tkn->pos, symbol);
+}
+
+b32 symbol_raw_introduce(Context *context, Scope* scope, char* name, OnyxFilePos pos, AstNode* symbol) {
+    return symbol_introduce_atom(context, scope, atom_intern(context, name), pos, symbol);
+}
+
+void symbol_builtin_introduce(Context *context, Scope* scope, char* sym, AstNode *node) {
+    u32 atom = atom_intern(context, sym);
+    if (!atom) return;
+
+    scope_symbols_init(context, scope);
+    bh_imap_put(&scope->symbols, (bh_imap_entry_t) atom, (bh_imap_entry_t) node);
 }
 
 void symbol_subpackage_introduce(Context *context, Package* parent, char* sym, AstPackage* subpackage) {
     Scope *scope = parent->scope;
-    if (!scope->symbols) sh_new_arena(scope->symbols);
+    u32 atom = atom_intern(context, sym);
+    if (!atom) return;
 
-    i32 index = shgeti(scope->symbols, sym);
-    if (index != -1) {
-        AstNode* maybe_package = scope->symbols[index].value;
-        
+    scope_symbols_init(context, scope);
+
+    bh_imap_entry_t existing = 0;
+    if (bh_imap_try_get(&scope->symbols, (bh_imap_entry_t) atom, &existing)) {
+        AstNode* maybe_package = (AstNode *) existing;
+
         // CLEANUP: Make this assertion an actual error message.
         assert(maybe_package->kind == Ast_Kind_Package);
 
     } else {
-        shput(scope->symbols, sym, (AstNode *) subpackage);
+        bh_imap_put(&scope->symbols, (bh_imap_entry_t) atom, (bh_imap_entry_t) subpackage);
 
         // Parent: parent->id
         // Child:  subpackage->package->id
@@ -203,59 +282,19 @@ void symbol_subpackage_introduce(Context *context, Package* parent, char* sym, A
 }
 
 AstNode* symbol_raw_resolve_no_ascend(Context *context, Scope* scope, char* sym) {
-    if (!scope || !scope->symbols) return NULL;
-
-    i32 index = shgeti(scope->symbols, sym);
-    if (index != -1) {
-        AstNode* res = scope->symbols[index].value;
-
-        if ((res->flags & Ast_Flag_Symbol_Invisible) == 0) {
-            return res;
-        }
-    }
-
-    return NULL;
+    return symbol_resolve_atom_no_ascend(scope, atom_intern(context, sym));
 }
 
 AstNode* symbol_raw_resolve_limited(Context *context, Scope* start_scope, char* sym, i32 limit) {
-    Scope* scope = start_scope;
-    AstNode *res = NULL;
-
-    while (scope != NULL && limit-- > 0) {
-        res = symbol_raw_resolve_no_ascend(context, scope, sym);
-        if (res) {
-            return res;
-        }
-
-        scope = scope->parent;
-    }
-
-    return NULL;
+    return symbol_resolve_atom(start_scope, atom_intern(context, sym), limit);
 }
 
 AstNode* symbol_raw_resolve(Context *context, Scope* start_scope, char* sym) {
-    Scope* scope = start_scope;
-    AstNode *res = NULL;
-    i32 depth = 0;
-
-    while (scope != NULL && depth++ < 256) {
-        res = symbol_raw_resolve_no_ascend(context, scope, sym);
-        if (res) {
-            return res;
-        }
-
-        scope = scope->parent;
-    }
-
-    return NULL;
+    return symbol_resolve_atom(start_scope, atom_intern(context, sym), 256);
 }
 
 AstNode* symbol_resolve(Context *context, Scope* start_scope, OnyxToken* tkn) {
-    token_toggle_end(tkn);
-    AstNode* res = symbol_raw_resolve(context, start_scope, tkn->text);
-    token_toggle_end(tkn);
-
-    return res;
+    return symbol_resolve_atom(start_scope, token_atom(context, tkn), 256);
 }
 
 AstNode* try_symbol_raw_resolve_from_node(Context *context, AstNode* node, char* symbol) {
@@ -263,6 +302,7 @@ AstNode* try_symbol_raw_resolve_from_node(Context *context, AstNode* node, char*
     // There are some additional cases handled here, but I think the majority
     // of this code could be rewritten in terms of get_scope_from_node.
 
+    u32 atom = atom_intern(context, symbol);
     b32 used_pointer = 0;
     i32 peel_depth = 0;
 
@@ -302,7 +342,7 @@ all_types_peeled_off:
                 return NULL;
             }
 
-            return symbol_raw_resolve_no_ascend(context, package->package->scope, symbol);
+            return symbol_resolve_atom_no_ascend(package->package->scope, atom);
         } 
 
         case Ast_Kind_Foreign_Block:
@@ -312,7 +352,7 @@ all_types_peeled_off:
         case Ast_Kind_Distinct_Type:
         case Ast_Kind_Interface: {
             Scope* scope = get_scope_from_node(context, node);
-            return symbol_raw_resolve_no_ascend(context, scope, symbol);
+            return symbol_resolve_atom_no_ascend(scope, atom);
         }
 
         case Ast_Kind_Slice_Type:
@@ -322,7 +362,7 @@ all_types_peeled_off:
             if (!scope)
                 return NULL;
 
-            return symbol_raw_resolve(context, scope, symbol);
+            return symbol_resolve_atom(scope, atom, 256);
         }
 
         case Ast_Kind_Struct_Type: {
@@ -338,7 +378,7 @@ all_types_peeled_off:
             }
 
             if (result == NULL && stype->scope) {
-                result = symbol_raw_resolve_no_ascend(context, stype->scope, symbol);
+                result = symbol_resolve_atom_no_ascend(stype->scope, atom);
             }
 
             return result;
@@ -353,7 +393,7 @@ all_types_peeled_off:
             }
 
             if (result == NULL && utype->scope) {
-                result = symbol_raw_resolve_no_ascend(context, utype->scope, symbol);
+                result = symbol_resolve_atom_no_ascend(utype->scope, atom);
             }
 
             return result;
@@ -368,10 +408,10 @@ all_types_peeled_off:
                 // forcing the use the Slice functions, but then it can
                 // get confusing about where every function lives, ya know.
                 // Is "get" in Array or Slice.
-                return symbol_raw_resolve_limited(context, stype->scope, symbol, 2);
+                return symbol_resolve_atom(stype->scope, atom, 2);
 
             } else {
-                return symbol_raw_resolve_no_ascend(context, stype->scope, symbol);
+                return symbol_resolve_atom_no_ascend(stype->scope, atom);
             }
         }
 
@@ -420,11 +460,8 @@ all_types_peeled_off:
 }
 
 AstNode* try_symbol_resolve_from_node(Context *context, AstNode* node, OnyxToken* token) {
-    token_toggle_end(token);
-    AstNode* result = try_symbol_raw_resolve_from_node(context, node, token->text);
-    token_toggle_end(token);
-
-    return result;
+    u32 atom = token_atom(context, token);
+    return try_symbol_raw_resolve_from_node(context, node, (char *) atom_name(context, atom));
 }
 
 static AstNode* try_symbol_raw_resolve_from_poly_sln(Context *context, bh_arr(AstPolySolution) slns, char *symbol) {
@@ -448,6 +485,7 @@ static AstNode* try_symbol_raw_resolve_from_poly_sln(Context *context, bh_arr(As
 }
 
 AstNode* try_symbol_raw_resolve_from_type(Context *context, Type *type, char* symbol) {
+    u32 atom = atom_intern(context, symbol);
     i32 ptr_depth = 0;
     while (type && type->kind == Type_Kind_Pointer && ptr_depth++ < 64) {
         type = type->Pointer.elem; 
@@ -456,19 +494,19 @@ AstNode* try_symbol_raw_resolve_from_type(Context *context, Type *type, char* sy
 
     switch (type->kind) {
         case Type_Kind_Basic: {
-            return symbol_raw_resolve_no_ascend(context, ((AstBasicType *) type->ast_type)->scope, symbol);
+            return symbol_resolve_atom_no_ascend(((AstBasicType *) type->ast_type)->scope, atom);
         }
 
         case Type_Kind_Enum: {
-            return symbol_raw_resolve_no_ascend(context, ((AstEnumType *) type->ast_type)->scope, symbol);
+            return symbol_resolve_atom_no_ascend(((AstEnumType *) type->ast_type)->scope, atom);
         }
 
         case Type_Kind_Slice: {
-            return symbol_raw_resolve(context, type->Slice.scope, symbol);
+            return symbol_resolve_atom(type->Slice.scope, atom, 256);
         }
 
         case Type_Kind_DynArray: {
-            return symbol_raw_resolve(context, type->DynArray.scope, symbol);
+            return symbol_resolve_atom(type->DynArray.scope, atom, 256);
         }
 
         case Type_Kind_Struct: {
@@ -481,7 +519,7 @@ AstNode* try_symbol_raw_resolve_from_type(Context *context, Type *type, char* sy
                 limit = 3;
             }
 
-            return symbol_raw_resolve_limited(context, type->Struct.scope, symbol, limit);
+            return symbol_resolve_atom(type->Struct.scope, atom, limit);
         }
 
         case Type_Kind_Union: {
@@ -498,19 +536,19 @@ AstNode* try_symbol_raw_resolve_from_type(Context *context, Type *type, char* sy
                 limit = 3;
             }
 
-            return symbol_raw_resolve_limited(context, type->Union.scope, symbol, limit);
+            return symbol_resolve_atom(type->Union.scope, atom, limit);
         }
 
         case Type_Kind_PolyStruct: {
-            return symbol_raw_resolve_no_ascend(context, type->PolyStruct.scope, symbol);
+            return symbol_resolve_atom_no_ascend(type->PolyStruct.scope, atom);
         }
 
         case Type_Kind_PolyUnion: {
-            return symbol_raw_resolve_no_ascend(context, type->PolyUnion.scope, symbol);
+            return symbol_resolve_atom_no_ascend(type->PolyUnion.scope, atom);
         }
 
         case Type_Kind_Distinct: {
-            return symbol_raw_resolve(context, type->Distinct.scope, symbol);
+            return symbol_resolve_atom(type->Distinct.scope, atom, 256);
         }
 
         default: return NULL;
@@ -520,15 +558,12 @@ AstNode* try_symbol_raw_resolve_from_type(Context *context, Type *type, char* sy
 }
 
 AstNode* try_symbol_resolve_from_type(Context *context, Type *type, OnyxToken *token) {
-    token_toggle_end(token);
-    AstNode* result = try_symbol_raw_resolve_from_type(context, type, token->text);
-    token_toggle_end(token);
-
-    return result;
+    u32 atom = token_atom(context, token);
+    return try_symbol_raw_resolve_from_type(context, type, (char *) atom_name(context, atom));
 }
 
 void scope_clear(Scope* scope) {
-    sh_new_arena(scope->symbols);
+    if (scope->symbols.hashes) bh_imap_clear(&scope->symbols);
 }
 
 // Polymorphic procedures are in their own file to clean up this file.
@@ -1775,10 +1810,12 @@ char *find_closest_symbol_in_scope(Context *context, Scope *scope, char *sym, u3
     if (scope == NULL) return NULL;
 
     char* closest = NULL;
-    fori (i, 0, shlen(scope->symbols)) {
-        if (scope->symbols[i].value && scope->symbols[i].value->flags & Ast_Flag_Symbol_Invisible) continue;
+    i32 n = scope_symbol_count(scope);
+    fori (i, 0, n) {
+        AstNode *node = scope_symbol_at(scope, i);
+        if (node && node->flags & Ast_Flag_Symbol_Invisible) continue;
 
-        char *key = scope->symbols[i].key;
+        char *key = (char *) atom_name(context, scope_symbol_atom_at(scope, i));
         u32 d = levenshtein_distance(context, key, sym); 
         if (d < *out_distance) {
             *out_distance = d;
