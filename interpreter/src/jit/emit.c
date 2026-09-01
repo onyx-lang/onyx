@@ -115,6 +115,13 @@ static b32 instr_is_emit_worthy(u32 op) {
         case OVMI_BR_GT: case OVMI_BR_GT_S:
         case OVMI_BR_GE: case OVMI_BR_GE_S:
             return 1;
+#if defined(__x86_64__)
+        case OVMI_DIV: case OVMI_DIV_S:
+        case OVMI_NEG: case OVMI_ABS: case OVMI_SQRT:
+        case OVMI_CVT_F32: case OVMI_CVT_F32_S:
+        case OVMI_CVT_F64: case OVMI_CVT_F64_S:
+            return 1;
+#endif
         default:
             return 0;
     }
@@ -126,14 +133,7 @@ b32 ovm_jit_should_compile(ovm_program_t *program, i32 start, i32 end) {
         u32 op = OVM_INSTR_INSTR(program->code[i]);
         u32 ty = OVM_INSTR_TYPE(program->code[i]);
         if (instr_is_indirect_br(op)) return 0;
-#if defined(__x86_64__)
-        if (op >= OVMI_BR_EQ && op <= OVMI_BR_GE_S &&
-            (ty == OVM_TYPE_F32 || ty == OVM_TYPE_F64)) {
-            return 0;
-        }
-#else
         (void) ty;
-#endif
         if (instr_is_emit_worthy(op)) any_native = 1;
     }
     return any_native;

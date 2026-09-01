@@ -108,6 +108,56 @@ void ovm_jit_slow(ovm_state_t *state, ovm_instr_t *instr) {
 #define BIN(ctype, expr) do { V(instr->r).ctype = (expr); } while (0)
 
     switch (op) {
+        case OVMI_ADD:
+            if (ty == OVM_TYPE_I32) BIN(i32, V(instr->a).i32 + V(instr->b).i32);
+            else if (ty == OVM_TYPE_I64) BIN(i64, V(instr->a).i64 + V(instr->b).i64);
+            else if (ty == OVM_TYPE_F32) BIN(f32, V(instr->a).f32 + V(instr->b).f32);
+            else if (ty == OVM_TYPE_F64) BIN(f64, V(instr->a).f64 + V(instr->b).f64);
+            break;
+        case OVMI_SUB:
+            if (ty == OVM_TYPE_I32) BIN(i32, V(instr->a).i32 - V(instr->b).i32);
+            else if (ty == OVM_TYPE_I64) BIN(i64, V(instr->a).i64 - V(instr->b).i64);
+            else if (ty == OVM_TYPE_F32) BIN(f32, V(instr->a).f32 - V(instr->b).f32);
+            else if (ty == OVM_TYPE_F64) BIN(f64, V(instr->a).f64 - V(instr->b).f64);
+            break;
+        case OVMI_MUL:
+            if (ty == OVM_TYPE_I32) BIN(i32, V(instr->a).i32 * V(instr->b).i32);
+            else if (ty == OVM_TYPE_I64) BIN(i64, V(instr->a).i64 * V(instr->b).i64);
+            else if (ty == OVM_TYPE_F32) BIN(f32, V(instr->a).f32 * V(instr->b).f32);
+            else if (ty == OVM_TYPE_F64) BIN(f64, V(instr->a).f64 * V(instr->b).f64);
+            break;
+
+        case OVMI_EQ: case OVMI_NE:
+        case OVMI_LT: case OVMI_LT_S: case OVMI_LE: case OVMI_LE_S:
+        case OVMI_GT: case OVMI_GT_S: case OVMI_GE: case OVMI_GE_S: {
+            i32 res = 0;
+            if (ty == OVM_TYPE_I32 || ty == OVM_TYPE_F32) {
+                if (op == OVMI_EQ) res = (ty == OVM_TYPE_F32) ? (V(instr->a).f32 == V(instr->b).f32) : (V(instr->a).i32 == V(instr->b).i32);
+                else if (op == OVMI_NE) res = (ty == OVM_TYPE_F32) ? (V(instr->a).f32 != V(instr->b).f32) : (V(instr->a).i32 != V(instr->b).i32);
+                else if (op == OVMI_LT) res = (ty == OVM_TYPE_F32) ? (V(instr->a).f32 < V(instr->b).f32) : (V(instr->a).u32 < V(instr->b).u32);
+                else if (op == OVMI_LT_S) res = V(instr->a).i32 < V(instr->b).i32;
+                else if (op == OVMI_LE) res = (ty == OVM_TYPE_F32) ? (V(instr->a).f32 <= V(instr->b).f32) : (V(instr->a).u32 <= V(instr->b).u32);
+                else if (op == OVMI_LE_S) res = V(instr->a).i32 <= V(instr->b).i32;
+                else if (op == OVMI_GT) res = (ty == OVM_TYPE_F32) ? (V(instr->a).f32 > V(instr->b).f32) : (V(instr->a).u32 > V(instr->b).u32);
+                else if (op == OVMI_GT_S) res = V(instr->a).i32 > V(instr->b).i32;
+                else if (op == OVMI_GE) res = (ty == OVM_TYPE_F32) ? (V(instr->a).f32 >= V(instr->b).f32) : (V(instr->a).u32 >= V(instr->b).u32);
+                else if (op == OVMI_GE_S) res = V(instr->a).i32 >= V(instr->b).i32;
+            } else if (ty == OVM_TYPE_I64 || ty == OVM_TYPE_F64) {
+                if (op == OVMI_EQ) res = (ty == OVM_TYPE_F64) ? (V(instr->a).f64 == V(instr->b).f64) : (V(instr->a).i64 == V(instr->b).i64);
+                else if (op == OVMI_NE) res = (ty == OVM_TYPE_F64) ? (V(instr->a).f64 != V(instr->b).f64) : (V(instr->a).i64 != V(instr->b).i64);
+                else if (op == OVMI_LT) res = (ty == OVM_TYPE_F64) ? (V(instr->a).f64 < V(instr->b).f64) : (V(instr->a).u64 < V(instr->b).u64);
+                else if (op == OVMI_LT_S) res = V(instr->a).i64 < V(instr->b).i64;
+                else if (op == OVMI_LE) res = (ty == OVM_TYPE_F64) ? (V(instr->a).f64 <= V(instr->b).f64) : (V(instr->a).u64 <= V(instr->b).u64);
+                else if (op == OVMI_LE_S) res = V(instr->a).i64 <= V(instr->b).i64;
+                else if (op == OVMI_GT) res = (ty == OVM_TYPE_F64) ? (V(instr->a).f64 > V(instr->b).f64) : (V(instr->a).u64 > V(instr->b).u64);
+                else if (op == OVMI_GT_S) res = V(instr->a).i64 > V(instr->b).i64;
+                else if (op == OVMI_GE) res = (ty == OVM_TYPE_F64) ? (V(instr->a).f64 >= V(instr->b).f64) : (V(instr->a).u64 >= V(instr->b).u64);
+                else if (op == OVMI_GE_S) res = V(instr->a).i64 >= V(instr->b).i64;
+            }
+            V(instr->r).i32 = res ? 1 : 0;
+            break;
+        }
+
         case OVMI_DIV:
             if (ty == OVM_TYPE_I32) BIN(u32, V(instr->a).u32 / V(instr->b).u32);
             else if (ty == OVM_TYPE_I64) BIN(u64, V(instr->a).u64 / V(instr->b).u64);
