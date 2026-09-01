@@ -152,9 +152,18 @@ const char *atom_name(Context *context, u32 atom) {
 
 u32 token_atom(Context *context, OnyxToken *tkn) {
     if (!tkn) return 0;
-    if (tkn->atom) return tkn->atom;
 
     token_toggle_end(tkn);
+    // Tokens can outlive a Context (static builtin / `it` tokens). The
+    // cached id is only valid if this table still has that name.
+    if (tkn->atom) {
+        const char *n = atom_name(context, tkn->atom);
+        if (n[0] && !strcmp(n, tkn->text)) {
+            token_toggle_end(tkn);
+            return tkn->atom;
+        }
+    }
+
     tkn->atom = atom_intern(context, tkn->text);
     token_toggle_end(tkn);
     return tkn->atom;
