@@ -34,7 +34,9 @@ static bool module_build(wasm_module_t *module, const wasm_byte_vec_t *binary) {
         printf("Program instruction count: %d\n", bh_arr_length(module->program->code));
     #endif
 
-    ovm_jit_compile_program(engine->engine, module->program);
+    ovm_aot_image_t *aot = ovm_jit_get_aot_image();
+    if (aot) ovm_jit_bind_aot(module->program, aot);
+    else ovm_jit_compile_program(engine->engine, module->program);
 
     return true;
 }

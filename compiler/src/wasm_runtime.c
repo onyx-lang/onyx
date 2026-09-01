@@ -81,6 +81,13 @@ typedef struct LinkLibraryContext {
 
 static void *locate_symbol_in_dynamic_library_raw(char *libname, char *sym) {
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    /* Native exes statically link onyx_runtime; resolve it without a dylib. */
+    void *self = dlopen(NULL, RTLD_LAZY);
+    if (self) {
+        void *from_exe = dlsym(self, sym);
+        if (from_exe) return from_exe;
+    }
+
     void* handle = dlopen(libname, RTLD_LAZY);
     if (handle == NULL) {
         printf("dlopen(): %s\n", dlerror());

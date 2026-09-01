@@ -16,6 +16,9 @@ mkdir -p "build_tmp"
 
 echo "Compiling ovmwasm to $TARGET"
 for c_file in $C_FILES; do
+    case "$c_file" in
+        *native_main.c) continue ;;
+    esac
     $ONYX_CC $FLAGS $INCLUDES -fPIC -o build_tmp/$(basename $c_file).o -c $c_file $LIBS
 done
 

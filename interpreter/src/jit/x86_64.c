@@ -207,10 +207,29 @@ static void x64_call_abs(ovm_emit_buf_t *b, u64 addr) {
     x64_call_rax(b);
 }
 
+static void x64_call_helper(ovm_emit_buf_t *b, int helper, u64 jit_addr) {
+    if (!b->aot) {
+        x64_call_abs(b, jit_addr);
+        return;
+    }
+    x64_u8(b, 0x48);
+    x64_u8(b, 0x8B);
+    x64_u8(b, 0x05);
+    i32 at = b->len;
+    x64_u32(b, 0);
+    ovm_emit_helper_reloc(b, at, helper, OVM_HRELOC_X64_RIP);
+    x64_call_rax(b);
+}
+
 static void x64_call_slow(ovm_emit_buf_t *b, ovm_program_t *program, i32 idx) {
     x64_mov_rr(b, RDI, R13);
-    x64_mov_imm64(b, RSI, (u64)(uintptr_t) &program->code[idx]);
-    x64_call_abs(b, (u64)(uintptr_t) ovm_jit_slow);
+    if (b->aot) {
+        x64_mov_imm32(b, RSI, (u32) idx);
+        x64_call_helper(b, OVM_JIT_H_SLOW, 0);
+    } else {
+        x64_mov_imm64(b, RSI, (u64)(uintptr_t) &program->code[idx]);
+        x64_call_abs(b, (u64)(uintptr_t) ovm_jit_slow);
+    }
     x64_reload_pins(b);
 }
 
@@ -583,7 +602,7 @@ static void x64_emit_copy(ovm_emit_buf_t *b, i32 dest, i32 src, i32 count) {
     i32 z2 = x64_jcc8(b, CC_E);
     x64_alu_rr(b, 0x01, RDI, R12, 1);
     x64_alu_rr(b, 0x01, RSI, R12, 1);
-    x64_call_abs(b, (u64)(uintptr_t) memmove);
+    x64_call_helper(b, OVM_JIT_H_MEMMOVE, (u64)(uintptr_t) memmove);
     x64_reload_pins(b);
     x64_patch_rel8(b, z1);
     x64_patch_rel8(b, z2);
@@ -596,7 +615,7 @@ static void x64_emit_fill(ovm_emit_buf_t *b, i32 dest, i32 byte, i32 count) {
     x64_alu_rr(b, 0x85, RDI, RDI, 0);
     i32 z = x64_jcc8(b, CC_E);
     x64_alu_rr(b, 0x01, RDI, R12, 1);
-    x64_call_abs(b, (u64)(uintptr_t) memset);
+    x64_call_helper(b, OVM_JIT_H_MEMSET, (u64)(uintptr_t) memset);
     x64_reload_pins(b);
     x64_patch_rel8(b, z);
 }
@@ -618,11 +637,11 @@ static void x64_emit_copysign(ovm_emit_buf_t *b, int dbl, i32 r, i32 a, i32 ba) 
     x64_slot_st(b, r, RAX, dbl);
 }
 
-static void x64_emit_call_fast(ovm_emit_buf_t *b, u64 helper, u32 a, i32 result_vn) {
+static void x64_emit_call_fast(ovm_emit_buf_t *b, int helper, u64 jit_addr, u32 a, i32 result_vn) {
     x64_mov_rr(b, RDI, R13);
     x64_mov_imm32(b, RSI, a);
     x64_mov_imm64(b, RDX, (u64)(i64) result_vn);
-    x64_call_abs(b, helper);
+    x64_call_helper(b, helper, jit_addr);
     x64_alu_rr(b, 0x85, RAX, RAX, 1);
     i32 z = x64_jcc8(b, CC_E);
     x64_reload_pins(b);
@@ -903,16 +922,16 @@ static void x64_emit_one(ovm_emit_buf_t *b, ovm_program_t *program, i32 idx, ovm
         case OVMI_RETURN:
             x64_slot_ld(b, RSI, ins->a, 1);
             x64_mov_rr(b, RDI, R13);
-            x64_call_abs(b, (u64)(uintptr_t) ovm_jit_return);
+            x64_call_helper(b, OVM_JIT_H_RETURN, (u64)(uintptr_t) ovm_jit_return);
             x64_unalign_body(b);
             x64_u8(b, 0xC3);
             break;
 
         case OVMI_CALL:
-            x64_emit_call_fast(b, (u64)(uintptr_t) ovm_jit_call_fast, (u32) ins->a, ins->r);
+            x64_emit_call_fast(b, OVM_JIT_H_CALL_FAST, (u64)(uintptr_t) ovm_jit_call_fast, (u32) ins->a, ins->r);
             break;
         case OVMI_CALLI:
-            x64_emit_call_fast(b, (u64)(uintptr_t) ovm_jit_calli_fast, (u32) ins->a, ins->r);
+            x64_emit_call_fast(b, OVM_JIT_H_CALLI_FAST, (u64)(uintptr_t) ovm_jit_calli_fast, (u32) ins->a, ins->r);
             break;
 
         case OVMI_CLZ:

@@ -138,10 +138,29 @@ static void a64_blr_abs(ovm_emit_buf_t *b, u64 addr) {
     a64_u32(b, 0xD63F0000u | (X8 << 5));
 }
 
+static void a64_blr_helper(ovm_emit_buf_t *b, int helper, u64 jit_addr) {
+    if (!b->aot) {
+        a64_blr_abs(b, jit_addr);
+        return;
+    }
+    i32 adrp_at = b->len;
+    a64_u32(b, 0x90000000u | (u32) X8); // adrp x8, #0
+    ovm_emit_helper_reloc(b, adrp_at, helper, OVM_HRELOC_A64_ADRP);
+    i32 ldr_at = b->len;
+    a64_u32(b, 0xF9400000u | (X8 << 5) | (u32) X8); // ldr x8, [x8]
+    ovm_emit_helper_reloc(b, ldr_at, helper, OVM_HRELOC_A64_LDR);
+    a64_u32(b, 0xD63F0000u | (X8 << 5));
+}
+
 static void a64_call_slow(ovm_emit_buf_t *b, ovm_program_t *program, i32 idx) {
     a64_u32(b, 0xAA1503E0u); // mov x0, x21
-    a64_mov64(b, X1, (u64)(uintptr_t) &program->code[idx]);
-    a64_blr_abs(b, (u64)(uintptr_t) ovm_jit_slow);
+    if (b->aot) {
+        a64_mov64(b, X1, (u64)(u32) idx);
+        a64_blr_helper(b, OVM_JIT_H_SLOW, 0);
+    } else {
+        a64_mov64(b, X1, (u64)(uintptr_t) &program->code[idx]);
+        a64_blr_abs(b, (u64)(uintptr_t) ovm_jit_slow);
+    }
     a64_reload_pins(b);
 }
 
@@ -368,7 +387,7 @@ static void a64_emit_copy(ovm_emit_buf_t *b, i32 dest, i32 src, i32 count) {
     i32 z2 = a64_bcond_here(b, COND_EQ);
     a64_u32(b, 0x8B000280u); // add x0, x20, x0
     a64_u32(b, 0x8B010281u); // add x1, x20, x1
-    a64_blr_abs(b, (u64)(uintptr_t) memmove);
+    a64_blr_helper(b, OVM_JIT_H_MEMMOVE, (u64)(uintptr_t) memmove);
     a64_reload_pins(b);
     a64_patch_bcond(b, z1);
     a64_patch_bcond(b, z2);
@@ -381,7 +400,7 @@ static void a64_emit_fill(ovm_emit_buf_t *b, i32 dest, i32 byte, i32 count) {
     a64_u32(b, 0x7100001Fu);
     i32 z = a64_bcond_here(b, COND_EQ);
     a64_u32(b, 0x8B000280u);
-    a64_blr_abs(b, (u64)(uintptr_t) memset);
+    a64_blr_helper(b, OVM_JIT_H_MEMSET, (u64)(uintptr_t) memset);
     a64_reload_pins(b);
     a64_patch_bcond(b, z);
 }
@@ -604,11 +623,11 @@ static void a64_emit_cvt_int(ovm_emit_buf_t *b, u32 op, u32 ty, i32 r, i32 a) {
     }
 }
 
-static void a64_emit_call_fast(ovm_emit_buf_t *b, u64 helper, u64 a, i32 result_vn) {
+static void a64_emit_call_fast(ovm_emit_buf_t *b, int helper, u64 jit_addr, u64 a, i32 result_vn) {
     a64_u32(b, 0xAA1503E0u); // mov x0, x21
     a64_mov64(b, X1, a);
     a64_mov64(b, X2, (u64)(i64) result_vn);
-    a64_blr_abs(b, helper);
+    a64_blr_helper(b, helper, jit_addr);
     a64_u32(b, 0xF100001Fu); // cmp x0, #0
     i32 z = a64_bcond_here(b, COND_EQ);
     a64_reload_pins(b);
@@ -804,16 +823,16 @@ static void a64_emit_one(ovm_emit_buf_t *b, ovm_program_t *program, i32 idx, ovm
         case OVMI_RETURN:
             a64_slot_ld64(b, X1, ins->a);
             a64_u32(b, 0xAA1503E0u); // mov x0, x21
-            a64_blr_abs(b, (u64)(uintptr_t) ovm_jit_return);
+            a64_blr_helper(b, OVM_JIT_H_RETURN, (u64)(uintptr_t) ovm_jit_return);
             a64_u32(b, 0xF84107FEu); // ldr x30, [sp], #16
             a64_u32(b, 0xD65F03C0u);
             break;
 
         case OVMI_CALL:
-            a64_emit_call_fast(b, (u64)(uintptr_t) ovm_jit_call_fast, (u64)(i64) ins->a, ins->r);
+            a64_emit_call_fast(b, OVM_JIT_H_CALL_FAST, (u64)(uintptr_t) ovm_jit_call_fast, (u64)(i64) ins->a, ins->r);
             break;
         case OVMI_CALLI:
-            a64_emit_call_fast(b, (u64)(uintptr_t) ovm_jit_calli_fast, (u64)(i64) ins->a, ins->r);
+            a64_emit_call_fast(b, OVM_JIT_H_CALLI_FAST, (u64)(uintptr_t) ovm_jit_calli_fast, (u64)(i64) ins->a, ins->r);
             break;
 
         case OVMI_CLZ:

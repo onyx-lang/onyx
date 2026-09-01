@@ -1,5 +1,7 @@
 
+#ifndef ONYX_RUNTIME_NO_BH
 #define BH_DEFINE
+#endif
 #include "bh.h"
 
 #define ONYX_LIBRARY_NAME onyx_runtime

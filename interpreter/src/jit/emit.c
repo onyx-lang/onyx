@@ -6,6 +6,7 @@ void ovm_emit_init(ovm_emit_buf_t *buf) {
     memset(buf, 0, sizeof(*buf));
     buf->jumptable_off = -1;
     bh_arr_new(bh_heap_allocator(), buf->relocs, 32);
+    bh_arr_new(bh_heap_allocator(), buf->helper_relocs, 32);
 }
 
 void ovm_emit_reloc(ovm_emit_buf_t *buf, i32 at, i32 target_ovmi, i32 kind, i32 cond) {
@@ -15,6 +16,14 @@ void ovm_emit_reloc(ovm_emit_buf_t *buf, i32 at, i32 target_ovmi, i32 kind, i32 
     r.kind = kind;
     r.cond = cond;
     bh_arr_push(buf->relocs, r);
+}
+
+void ovm_emit_helper_reloc(ovm_emit_buf_t *buf, i32 at, i32 helper, i32 kind) {
+    ovm_helper_reloc_t r;
+    r.at = at;
+    r.helper = helper;
+    r.kind = kind;
+    bh_arr_push(buf->helper_relocs, r);
 }
 
 void ovm_emit_reset_func(ovm_emit_buf_t *buf, i32 start, i32 end) {
@@ -31,6 +40,7 @@ void ovm_emit_free(ovm_emit_buf_t *buf) {
     free(buf->data);
     free(buf->ovmi_off);
     bh_arr_free(buf->relocs);
+    bh_arr_free(buf->helper_relocs);
     memset(buf, 0, sizeof(*buf));
 }
 
@@ -137,4 +147,38 @@ b32 ovm_jit_should_compile(ovm_program_t *program, i32 start, i32 end) {
         if (instr_is_emit_worthy(op)) any_native = 1;
     }
     return any_native;
+}
+
+b32 ovm_jit_emit_functions(ovm_program_t *program, ovm_emit_buf_t *buf, i32 *func_off, i32 *body_off) {
+    i32 nfuncs = bh_arr_length(program->funcs);
+    if (nfuncs <= 0) return 0;
+
+    for (i32 fi = 0; fi < nfuncs; fi++) {
+        func_off[fi] = -1;
+        body_off[fi] = -1;
+        ovm_func_t *f = &program->funcs[fi];
+        if (f->kind != OVM_FUNC_INTERNAL) continue;
+
+        i32 start = f->start_instr;
+        i32 end = ovm_func_code_end(program, fi);
+        if (start < 0 || end <= start) continue;
+        if (!ovm_jit_should_compile(program, start, end)) continue;
+
+        ovm_emit_align(buf, 16);
+        ovm_emit_reset_func(buf, start, end);
+        func_off[fi] = buf->len;
+
+#if defined(__aarch64__) || defined(__arm64__)
+        ovm_jit_emit_arm64(buf, program, start, end);
+        ovm_jit_patch_arm64(buf);
+#elif defined(__x86_64__)
+        ovm_jit_emit_x64(buf, program, start, end);
+        ovm_jit_patch_x64(buf);
+#else
+        return 0;
+#endif
+        body_off[fi] = buf->nested_off;
+    }
+
+    return buf->len > 0;
 }

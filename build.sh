@@ -20,6 +20,56 @@ compile_all() {
         ./build.sh $1
         cd ..
     fi
+
+    if [ "$ONYX_RUNTIME_LIBRARY" = "ovmwasm" ]; then
+        build_native_archive
+    fi
+}
+
+build_native_archive() {
+    DEST="shared/lib/$ONYX_ARCH/lib/libonyx_native.a"
+    TMP="./build_native_tmp"
+    rm -rf "$TMP"
+    mkdir -p "$TMP" "$(dirname "$DEST")"
+
+    echo "Compiling libonyx_native.a"
+
+    OVMWASM="shared/lib/$ONYX_ARCH/lib/libovmwasm.a"
+    (cd "$TMP" && ar x "../$OVMWASM")
+
+    NATIVE_FLAGS="-O2 -fPIC -w"
+    if [ ! -z ${ONYX_TARGET+x} ]; then
+        NATIVE_FLAGS="$NATIVE_FLAGS --target=$ONYX_TARGET"
+    fi
+
+    $ONYX_CC $NATIVE_FLAGS -c interpreter/src/jit/native_main.c \
+        -Iinterpreter/include -Ishared/include \
+        -o "$TMP/native_main.o"
+
+    WASM_RT_FLAGS="-DONYX_RUNTIME_LIBRARY=ovmwasm -DUSE_OVM_DEBUGGER -DENABLE_DEBUG_INFO"
+    if [ "$ONYX_USE_DYNCALL" = "1" ]; then
+        WASM_RT_FLAGS="$WASM_RT_FLAGS -DUSE_DYNCALL"
+    fi
+
+    $ONYX_CC $NATIVE_FLAGS -c compiler/src/wasm_runtime.c \
+        -Icompiler/include -Ishared/include -Ishared/include/dyncall \
+        $WASM_RT_FLAGS \
+        -o "$TMP/wasm_runtime.o"
+
+    if [ -f runtime/libonyx_runtime.a ]; then
+        (cd "$TMP" && ar x "../runtime/libonyx_runtime.a")
+    fi
+
+    if [ "$ONYX_USE_DYNCALL" = "1" ]; then
+        DYN="shared/lib/$ONYX_ARCH/lib/libdyncall_s.a"
+        DYNB="shared/lib/$ONYX_ARCH/lib/libdyncallback_s.a"
+        [ -f "$DYN" ] && (cd "$TMP" && ar x "../$DYN")
+        [ -f "$DYNB" ] && (cd "$TMP" && ar x "../$DYNB")
+    fi
+
+    rm -f "$DEST"
+    ar crs "$DEST" "$TMP"/*.o
+    rm -rf "$TMP"
 }
 
 package_all() {
@@ -57,6 +107,7 @@ package_all() {
         echo "Installing runtime library"
 
         [ -f runtime/onyx_runtime.$suffix ] && cp runtime/onyx_runtime.$suffix "$DIST_DIR/lib/"
+        [ -f "shared/lib/$ONYX_ARCH/lib/libonyx_native.a" ] && cp "shared/lib/$ONYX_ARCH/lib/libonyx_native.a" "$DIST_DIR/lib/"
         cp "shared/include/onyx_library.h" "$DIST_DIR/include/onyx_library.h"
         cp "shared/include/wasm.h" "$DIST_DIR/include/wasm.h"
     fi

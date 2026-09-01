@@ -67,12 +67,13 @@ static const char *build_docstring = DOCSTRING_HEADER
     C_BOLD "Usage: " C_BLUE "onyx" C_LBLUE " %s " C_NORM C_YELLOW "[..flags] " C_GREEN "files " C_NORM "%s" "\n"
     "\n"
     C_BOLD "Flags:\n" C_NORM
-    C_LBLUE "    -o, --output " C_GREY "target_file    " C_NORM "Specify the target file " C_GREY "(default: out.wasm)\n"
+    C_LBLUE "    -o, --output " C_GREY "target_file    " C_NORM "Specify the target file " C_GREY "(default: out.wasm, or out with --native)\n"
     C_LBLUE "    -r, --runtime " C_GREY "runtime       " C_NORM "Specifies the runtime " C_GREY "(onyx, wasi, js, custom)\n"
     C_LBLUE "    --map-dir " C_GREY "name:folder       " C_NORM "Adds a mapped directory\n"
     "\n"
     C_LBLUE "    --debug                     " C_NORM "Output a debugable build\n"
     C_LBLUE "    --jit                       " C_NORM "Use the OVM native backend when running\n"
+    C_LBLUE "    --native                    " C_NORM "AOT-compile to a host executable (onyx build)\n"
     C_LBLUE "    --feature " C_GREY "feature           " C_NORM "Enable an experimental language feature\n"
     C_LBLUE "    --multi-threaded            " C_NORM "Enables multi-threading for this compilation\n"
     C_LBLUE "    --stack-trace               " C_NORM "Enable dynamic stack trace\n"
@@ -138,6 +139,8 @@ typedef struct CLIArgs {
     b32 print_static_if_results : 1;
     b32 debug_session           : 1;
     b32 enable_jit              : 1;
+    b32 enable_native           : 1;
+    b32 output_explicit         : 1;
     b32 no_colors               : 1;
     b32 show_all_errors         : 1;
 
@@ -353,6 +356,7 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
         }
 
         if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
+            cli_args->output_explicit = 1;
             cli_args->target_file = argv[++i]; // :InCli
         }
         else if (!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-V")) {
@@ -487,6 +491,10 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
         else if (!strcmp(argv[i], "--jit")) {
             cli_args->enable_jit = 1;
             onyx_set_option_int(ctx, ONYX_OPTION_JIT, 1);
+        }
+        else if (!strcmp(argv[i], "--native")) {
+            cli_args->enable_native = 1;
+            if (!cli_args->output_explicit) cli_args->target_file = "out";
         }
         else if (!strcmp(argv[i], "--debug")) {
             cli_args->debug_session = 1;
@@ -736,6 +744,64 @@ static int32_t output_compilation_events_to_disk(CLIArgs *cli_args, onyx_context
     free(output);
     return 1;
 }
+
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+int ovm_native_compile_wasm(const void *wasm, unsigned int wasm_len, const char *obj_path);
+
+static int32_t link_native_executable(CLIArgs *cli_args, onyx_context_t *ctx) {
+#if !defined(__aarch64__) && !defined(__arm64__) && !defined(__x86_64__)
+    bh_printf(C_RED "error" C_NORM ": --native requires x86_64 or arm64.\n");
+    return 0;
+#else
+    int64_t wasm_len = onyx_output_length(ctx, ONYX_OUTPUT_TYPE_WASM);
+    if (wasm_len <= 0) {
+        bh_printf(C_RED "error" C_NORM ": no wasm output to compile natively.\n");
+        return 0;
+    }
+
+    void *wasm = malloc((size_t) wasm_len);
+    if (!wasm) return 0;
+    onyx_output_write(ctx, ONYX_OUTPUT_TYPE_WASM, wasm);
+
+    char obj_path[1024] = {0};
+    snprintf(obj_path, sizeof obj_path, "%s.o", cli_args->target_file);
+
+    int ok = ovm_native_compile_wasm(wasm, (unsigned int) wasm_len, obj_path);
+    free(wasm);
+    if (!ok) {
+        bh_printf(C_RED "error" C_NORM ": failed to emit native object '%s'\n", obj_path);
+        return 0;
+    }
+
+    char lib[1024] = {0};
+    snprintf(lib, sizeof lib, "%s/lib/libonyx_native.a", cli_args->core_installation);
+    if (!bh_file_exists(lib)) {
+        bh_printf(C_RED "error" C_NORM ": missing '%s'. Rebuild Onyx with ONYX_RUNTIME_LIBRARY=ovmwasm.\n", lib);
+        return 0;
+    }
+
+    char cmd[4096] = {0};
+#if defined(_BH_DARWIN)
+    snprintf(cmd, sizeof cmd,
+        "cc -o \"%s\" \"%s\" \"%s\" -lpthread -ldl -lm -lffi -framework Security -framework CoreFoundation -framework SystemConfiguration",
+        cli_args->target_file, obj_path, lib);
+#else
+    snprintf(cmd, sizeof cmd,
+        "cc -rdynamic -o \"%s\" \"%s\" \"%s\" -lpthread -ldl -lm",
+        cli_args->target_file, obj_path, lib);
+#endif
+
+    int rc = system(cmd);
+    if (rc != 0) {
+        bh_printf(C_RED "error" C_NORM ": native link failed (cc exited %d)\n", rc);
+        return 0;
+    }
+
+    remove(obj_path);
+    return 1;
+#endif
+}
+#endif
 
 static int32_t output_files_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, const char *filename) {
     char filenameTmp[1024] = { 0 };
@@ -1069,6 +1135,14 @@ int main(int argc, char *argv[]) {
         }
 
         case ONYX_COMPILE_ACTION_COMPILE: {
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+            if (cli_args.enable_native) {
+                if (!link_native_executable(&cli_args, ctx)) {
+                    return 1;
+                }
+                break;
+            }
+#endif
             if (!output_files_to_disk(&cli_args, ctx, cli_args.target_file)) {
                 return 1;
             }

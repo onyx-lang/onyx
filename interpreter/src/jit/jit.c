@@ -18,6 +18,30 @@ void ovm_engine_set_jit_enabled(ovm_engine_t *engine, b32 enabled) {
     if (engine) engine->jit_enabled = enabled;
 }
 
+static ovm_aot_image_t *g_aot_image;
+
+void ovm_jit_set_aot_image(ovm_aot_image_t *img) {
+    g_aot_image = img;
+}
+
+ovm_aot_image_t *ovm_jit_get_aot_image(void) {
+    return g_aot_image;
+}
+
+void ovm_jit_bind_aot(ovm_program_t *program, ovm_aot_image_t *img) {
+    if (!program || !img || !img->text) return;
+    i32 n = bh_arr_length(program->funcs);
+    if (img->nfuncs < n) n = img->nfuncs;
+    for (i32 fi = 0; fi < n; fi++) {
+        if (!img->entry_off || img->entry_off[fi] < 0) continue;
+        u8 *base = img->text + img->entry_off[fi];
+        program->funcs[fi].native_entry = (ovm_jit_fn_t) base;
+        if (img->body_off && img->body_off[fi] >= 0) {
+            program->funcs[fi].native_body = (ovm_jit_fn_t) (img->text + img->body_off[fi]);
+        }
+    }
+}
+
 u64 ovm_jit_return(ovm_state_t *state, u64 val) {
     ovm_stack_frame_t frame = ovm__func_teardown_stack_frame(state);
 
@@ -129,6 +153,12 @@ static inline double jit_nearest(double f) {
 static inline double jit_copysign(double a, double b) {
     if ((a > 0 && b > 0) || (a < 0 && b < 0)) return a;
     return -a;
+}
+
+void ovm_jit_slow_idx(ovm_state_t *state, i32 idx) {
+    if (!state || !state->program) return;
+    if (idx < 0 || idx >= bh_arr_length(state->program->code)) return;
+    ovm_jit_slow(state, &state->program->code[idx]);
 }
 
 void ovm_jit_slow(ovm_state_t *state, ovm_instr_t *instr) {
@@ -387,44 +417,16 @@ void ovm_jit_compile_program(ovm_engine_t *engine, ovm_program_t *program) {
 
     i32 *func_off = calloc((size_t) nfuncs, sizeof(i32));
     i32 *body_off = calloc((size_t) nfuncs, sizeof(i32));
-    u8 *compiled = calloc((size_t) nfuncs, 1);
-    if (!func_off || !body_off || !compiled) {
+    if (!func_off || !body_off) {
         free(func_off);
         free(body_off);
-        free(compiled);
         ovm_emit_free(&buf);
         return;
     }
 
-    for (i32 fi = 0; fi < nfuncs; fi++) {
-        func_off[fi] = -1;
-        ovm_func_t *f = &program->funcs[fi];
-        if (f->kind != OVM_FUNC_INTERNAL) continue;
-
-        i32 start = f->start_instr;
-        i32 end = ovm_func_code_end(program, fi);
-        if (start < 0 || end <= start) continue;
-        if (!ovm_jit_should_compile(program, start, end)) continue;
-
-        ovm_emit_align(&buf, 16);
-        ovm_emit_reset_func(&buf, start, end);
-        func_off[fi] = buf.len;
-        compiled[fi] = 1;
-
-#if defined(__aarch64__) || defined(__arm64__)
-        ovm_jit_emit_arm64(&buf, program, start, end);
-        ovm_jit_patch_arm64(&buf);
-#elif defined(__x86_64__)
-        ovm_jit_emit_x64(&buf, program, start, end);
-        ovm_jit_patch_x64(&buf);
-#endif
-        body_off[fi] = buf.nested_off;
-    }
-
-    if (buf.len <= 0) {
+    if (!ovm_jit_emit_functions(program, &buf, func_off, body_off)) {
         free(func_off);
         free(body_off);
-        free(compiled);
         ovm_emit_free(&buf);
         return;
     }
@@ -435,7 +437,6 @@ void ovm_jit_compile_program(ovm_engine_t *engine, ovm_program_t *program) {
     if (mem == MAP_FAILED) {
         free(func_off);
         free(body_off);
-        free(compiled);
         ovm_emit_free(&buf);
         return;
     }
@@ -453,7 +454,6 @@ void ovm_jit_compile_program(ovm_engine_t *engine, ovm_program_t *program) {
         munmap(mem, (size_t) map_size);
         free(func_off);
         free(body_off);
-        free(compiled);
         ovm_emit_free(&buf);
         return;
     }
@@ -462,7 +462,7 @@ void ovm_jit_compile_program(ovm_engine_t *engine, ovm_program_t *program) {
     program->jit_exec_size = map_size;
 
     for (i32 fi = 0; fi < nfuncs; fi++) {
-        if (!compiled[fi] || func_off[fi] < 0) continue;
+        if (func_off[fi] < 0) continue;
         u8 *base = (u8 *) mem + func_off[fi];
         program->funcs[fi].native_entry = (ovm_jit_fn_t) base;
         program->funcs[fi].native_body = (ovm_jit_fn_t) (base + body_off[fi]);
@@ -470,6 +470,5 @@ void ovm_jit_compile_program(ovm_engine_t *engine, ovm_program_t *program) {
 
     free(func_off);
     free(body_off);
-    free(compiled);
     ovm_emit_free(&buf);
 }
