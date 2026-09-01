@@ -57,6 +57,21 @@ static void x64_pop(ovm_emit_buf_t *b, int r) {
     x64_u8(b, (u8) (0x58 + reg7(r)));
 }
 
+/* call leaves rsp % 16 == 8; SysV needs 0 before the next call. */
+static void x64_align_body(ovm_emit_buf_t *b) {
+    x64_u8(b, 0x48);
+    x64_u8(b, 0x83);
+    x64_u8(b, 0xEC);
+    x64_u8(b, 0x08); // sub rsp, 8
+}
+
+static void x64_unalign_body(ovm_emit_buf_t *b) {
+    x64_u8(b, 0x48);
+    x64_u8(b, 0x83);
+    x64_u8(b, 0xC4);
+    x64_u8(b, 0x08); // add rsp, 8
+}
+
 static void x64_mov_rr(ovm_emit_buf_t *b, int dst, int src) {
     x64_rex(b, 1, rex_bit(src), 0, rex_bit(dst));
     x64_u8(b, 0x89);
@@ -889,6 +904,7 @@ static void x64_emit_one(ovm_emit_buf_t *b, ovm_program_t *program, i32 idx, ovm
             x64_slot_ld(b, RSI, ins->a, 1);
             x64_mov_rr(b, RDI, R13);
             x64_call_abs(b, (u64)(uintptr_t) ovm_jit_return);
+            x64_unalign_body(b);
             x64_u8(b, 0xC3);
             break;
 
@@ -1001,11 +1017,13 @@ void ovm_jit_emit_x64(ovm_emit_buf_t *buf, ovm_program_t *program, i32 start, i3
     buf->nested_off = buf->len - func_start;
     i32 rel = buf->len - (call_at + 5);
     memcpy(buf->data + call_at + 1, &rel, 4);
+    x64_align_body(buf);
     for (i32 i = start; i < end; i++) {
         buf->ovmi_off[i - start] = buf->len;
         x64_emit_one(buf, program, i, &program->code[i]);
     }
     x64_mov_imm64(buf, RAX, 0);
+    x64_unalign_body(buf);
     x64_u8(buf, 0xC3);
 }
 
