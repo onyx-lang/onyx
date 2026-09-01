@@ -6,6 +6,13 @@ static inline b32 entity_uses_ready_queue(Entity* e) {
     return e->macro_attempts == 0 && e->state < Entity_State_Code_Gen;
 }
 
+static inline b32 entity_uses_retry_wave(Entity* e) {
+    return e->macro_attempts > 0 && e->state < Entity_State_Code_Gen;
+}
+
+static inline void entity_refresh_key(Entity* e);
+static inline i32 entity_compare(Entity* e1, Entity* e2);
+
 static void grid_push(bh_allocator a, EntityQueueGrid* g, Entity* e) {
     i32 s = (i32) e->state;
     i32 t = (i32) e->type;
@@ -65,6 +72,127 @@ static Entity* grid_pop(EntityQueueGrid* g) {
             g->hint_state = s + 1;
             g->hint_type = 0;
         }
+    }
+
+    return e;
+}
+
+static int entity_ptr_cmp(const void *a, const void *b) {
+    Entity *e1 = *(Entity * const *) a;
+    Entity *e2 = *(Entity * const *) b;
+    return entity_compare(e1, e2);
+}
+
+static void retry_pause_active(EntityHeap* entities) {
+    if (entities->retry_active_attempt == 0) return;
+
+    bh_arr(Entity *) w = entities->retry_waves[entities->retry_active_attempt];
+    i32 remain = bh_arr_length(w) - entities->retry_index;
+    if (entities->retry_index > 0 && remain > 0) {
+        memmove(w, w + entities->retry_index, remain * sizeof(Entity *));
+    }
+    bh_arr_set_length(w, remain);
+    entities->retry_active_attempt = 0;
+    entities->retry_index = 0;
+}
+
+static void retry_insert_sorted_remaining(EntityHeap* entities, Entity* e) {
+    u32 a = entities->retry_active_attempt;
+    i32 lo = entities->retry_index;
+    i32 hi = bh_arr_length(entities->retry_waves[a]);
+    while (lo < hi) {
+        i32 mid = (lo + hi) / 2;
+        if (entity_compare(entities->retry_waves[a][mid], e) <= 0) lo = mid + 1;
+        else hi = mid;
+    }
+    bh_arr_insertn(entities->retry_waves[a], lo, 1);
+    entities->retry_waves[a][lo] = e;
+}
+
+static void retry_push(EntityHeap* entities, Entity* e) {
+    u32 a = e->macro_attempts;
+    if (a == 0) a = 1;
+
+    while (bh_arr_length(entities->retry_waves) <= (i32) a) {
+        bh_arr_push(entities->retry_waves, NULL);
+    }
+    if (!entities->retry_waves[a]) {
+        bh_arr_new(entities->allocator, entities->retry_waves[a], 16);
+    }
+
+    if (entities->retry_active_attempt != 0 && a < entities->retry_active_attempt) {
+        retry_pause_active(entities);
+    }
+
+    if (entities->retry_active_attempt != 0 && a == entities->retry_active_attempt) {
+        retry_insert_sorted_remaining(entities, e);
+    } else {
+        bh_arr_push(entities->retry_waves[a], e);
+    }
+
+    entities->retry_count++;
+    if (a < entities->retry_min_attempt) {
+        entities->retry_min_attempt = a;
+    }
+}
+
+static void retry_activate(EntityHeap* entities) {
+    if (entities->retry_active_attempt != 0) {
+        bh_arr(Entity *) w = entities->retry_waves[entities->retry_active_attempt];
+        if (entities->retry_index < bh_arr_length(w)) return;
+
+        bh_arr_set_length(w, 0);
+        entities->retry_min_attempt = entities->retry_active_attempt + 1;
+        entities->retry_active_attempt = 0;
+        entities->retry_index = 0;
+    }
+
+    if (entities->retry_count == 0) {
+        entities->retry_min_attempt = 0xffffffffu;
+        return;
+    }
+
+    u32 n = (u32) bh_arr_length(entities->retry_waves);
+    for (u32 a = entities->retry_min_attempt; a < n; a++) {
+        bh_arr(Entity *) w = entities->retry_waves[a];
+        i32 len = bh_arr_length(w);
+        if (len == 0) continue;
+
+        for (i32 i = 0; i < len; i++) {
+            entity_refresh_key(w[i]);
+        }
+        if (len > 1) {
+            qsort(w, (size_t) len, sizeof(Entity *), entity_ptr_cmp);
+        }
+
+        entities->retry_active_attempt = a;
+        entities->retry_min_attempt = a;
+        entities->retry_index = 0;
+        return;
+    }
+
+    entities->retry_min_attempt = 0xffffffffu;
+}
+
+static Entity* retry_peek(EntityHeap* entities) {
+    if (entities->retry_count == 0) return NULL;
+    retry_activate(entities);
+    if (entities->retry_active_attempt == 0) return NULL;
+    return entities->retry_waves[entities->retry_active_attempt][entities->retry_index];
+}
+
+static Entity* retry_pop(EntityHeap* entities) {
+    Entity* e = retry_peek(entities);
+    if (!e) return NULL;
+
+    entities->retry_index++;
+    entities->retry_count--;
+
+    if (entities->retry_index >= bh_arr_length(entities->retry_waves[entities->retry_active_attempt])) {
+        bh_arr_set_length(entities->retry_waves[entities->retry_active_attempt], 0);
+        entities->retry_min_attempt = entities->retry_active_attempt + 1;
+        entities->retry_active_attempt = 0;
+        entities->retry_index = 0;
     }
 
     return e;
@@ -144,15 +272,17 @@ static void eh_commit_detach(EntityHeap* entities) {
 void entity_heap_init(bh_allocator a, EntityHeap* entities) {
     memset(entities, 0, sizeof(*entities));
     entities->allocator = a;
+    entities->retry_min_attempt = 0xffffffffu;
 
     bh_arena_init(&entities->entity_arena, a, 32 * 1024);
     bh_arr_new(a, entities->entities, 128);
+    bh_arr_new(a, entities->retry_waves, 8);
 }
 
 b32 entity_heap_empty(EntityHeap* entities) {
     i32 heap_n = bh_arr_length(entities->entities);
     if (entities->detached_top) heap_n -= 1;
-    return entities->ready.count == 0 && heap_n <= 0;
+    return entities->ready.count == 0 && entities->retry_count == 0 && heap_n <= 0;
 }
 
 // Allocates the entity in the entity heap. Don't quite feel this is necessary...
@@ -181,6 +311,9 @@ void entity_heap_insert_existing(EntityHeap* entities, Entity* e) {
         if (entity_uses_ready_queue(e)) {
             eh_commit_detach(entities);
             grid_push(entities->allocator, &entities->ready, e);
+        } else if (entity_uses_retry_wave(e)) {
+            eh_commit_detach(entities);
+            retry_push(entities, e);
         } else {
             entities->detached_top = NULL;
             eh_shift_down(entities, 0);
@@ -190,6 +323,9 @@ void entity_heap_insert_existing(EntityHeap* entities, Entity* e) {
 
     if (entity_uses_ready_queue(e)) {
         grid_push(entities->allocator, &entities->ready, e);
+    } else if (entity_uses_retry_wave(e)) {
+        entity_refresh_key(e);
+        retry_push(entities, e);
     } else {
         if (entities->detached_top) eh_commit_detach(entities);
         entity_refresh_key(e);
@@ -212,6 +348,8 @@ Entity* entity_heap_insert(EntityHeap* entities, Entity e) {
 
 Entity* entity_heap_top(EntityHeap* entities) {
     Entity* e = grid_peek(&entities->ready);
+    if (e) return e;
+    e = retry_peek(entities);
     if (e) return e;
     if (entities->detached_top) eh_commit_detach(entities);
     return entities->entities[0];
@@ -239,6 +377,8 @@ void entity_heap_remove_top(EntityHeap* entities) {
 
     if (entities->ready.count > 0) {
         e = grid_pop(&entities->ready);
+    } else if (entities->retry_count > 0) {
+        e = retry_pop(entities);
     } else {
         if (entities->detached_top) eh_commit_detach(entities);
         e = entities->entities[0];

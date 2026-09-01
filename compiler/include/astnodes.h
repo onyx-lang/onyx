@@ -1878,13 +1878,22 @@ typedef struct EntityHeap {
     bh_arena entity_arena;
     bh_allocator allocator;
 
-    // 4-ary heap for retries (macro_attempts > 0) and codegen.
-    // First-try pre-codegen work uses `ready` instead of sifting.
-    bh_arr(Entity *) entities;
+    // First-try pre-codegen work. FIFO per (state, type).
     EntityQueueGrid ready;
 
-    // Heap top that was taken for processing but not sifted out yet.
-    // Reinserting the same entity is one sift-down instead of remove+insert.
+    // Yielded pre-codegen work, one bag per macro_attempts.
+    // The current wave is sorted by (queue_key, id) then scanned.
+    // A yield appends to a later wave instead of sifting the heap.
+    bh_arr(bh_arr(Entity *)) retry_waves;
+    i32 retry_count;
+    u32 retry_min_attempt;
+    u32 retry_active_attempt;
+    i32 retry_index;
+
+    // 4-ary heap for codegen (state >= Code_Gen).
+    bh_arr(Entity *) entities;
+
+    // Codegen heap top taken for processing but not sifted out yet.
     Entity *detached_top;
 
     i32 next_id;
