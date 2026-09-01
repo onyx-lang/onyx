@@ -87,6 +87,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     C_LBLUE "    --doc                       " C_NORM "Generate a .odoc file, Onyx's documentation format used by " C_YELLOW "onyx-doc-gen\n"
     C_LBLUE "    --lspinfo " C_GREY "target_file       " C_NORM "Generate an LSP information file\n"
     C_LBLUE "    --save-injected " C_GREY "target_file " C_NORM "Saves injected code to a file for debugging\n"
+    C_LBLUE "    --generate-events " C_GREY "target_file  " C_NORM "Write compilation events as protobuf\n"
     "\n"
     C_LBLUE "    -V, --verbose               " C_NORM "Verbose output\n"
     C_LBLUE "    --no-colors                 " C_NORM "Disables colors in the error message\n"
@@ -145,6 +146,7 @@ typedef struct CLIArgs {
     const char* symbol_info_file;
     const char* help_subcommand;
     const char* injected_code_file;
+    const char* events_file;
 
     char *error_format;
     char *debug_socket;
@@ -460,6 +462,14 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
         else if (!strcmp(argv[i], "--save-injected")) {
             cli_args->injected_code_file = argv[++i];
         }
+        else if (!strcmp(argv[i], "--generate-events")) {
+            if (i + 1 >= argc || is_flag(argv[i + 1])) {
+                bh_printf(C_RED "error" C_NORM ": --generate-events requires a target file.\n");
+                return 0;
+            }
+            onyx_set_option_int(ctx, ONYX_OPTION_COMPILATION_DATA_DETAILED, 1);
+            cli_args->events_file = argv[++i];
+        }
         else if (!strcmp(argv[i], "--debug")) {
             cli_args->debug_session = 1;
             onyx_set_option_int(ctx, ONYX_OPTION_GENERATE_DEBUG_INFO, 1);
@@ -680,6 +690,35 @@ static int32_t output_file_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, const
     return 1;
 }
 
+static int32_t output_compilation_events_to_disk(CLIArgs *cli_args, onyx_context_t *ctx) {
+    if (!cli_args->events_file) return 1;
+
+    int32_t output_length = onyx_compilation_data_length(ctx);
+    void *output = NULL;
+    if (output_length > 0) {
+        output = malloc(output_length);
+        if (!output) {
+            bh_printf(C_RED "error" C_NORM ": Failed to allocate compilation events buffer\n");
+            return 0;
+        }
+        onyx_compilation_data_write(ctx, output);
+    }
+
+    bh_file out_file;
+    if (bh_file_create(&out_file, cli_args->events_file) != BH_FILE_ERROR_NONE) {
+        bh_printf(C_RED "error" C_NORM ": Failed to open file for writing '%s'\n", cli_args->events_file);
+        free(output);
+        return 0;
+    }
+
+    if (output_length > 0) {
+        bh_file_write(&out_file, output, output_length);
+    }
+    bh_file_close(&out_file);
+    free(output);
+    return 1;
+}
+
 static int32_t output_files_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, const char *filename) {
     char filenameTmp[1024] = { 0 };
 
@@ -784,6 +823,7 @@ static void onyx_watch(CLIArgs *cli_args, int arg_parse_start, int argc, char **
         }
 
         i32 error_count = onyx_error_count(ctx);
+        output_compilation_events_to_disk(cli_args, ctx);
         if (error_count == 0) {
             output_files_to_disk(cli_args, ctx, cli_args->target_file);
 
@@ -962,6 +1002,8 @@ int main(int argc, char *argv[]) {
     if (cli_args.injected_code_file) {
         output_file_to_disk(&cli_args, ctx, cli_args.injected_code_file, ONYX_OUTPUT_TYPE_INJECTED_CODE);
     }
+
+    output_compilation_events_to_disk(&cli_args, ctx);
 
     if (onyx_errors_present(ctx)) {
         return 1;
