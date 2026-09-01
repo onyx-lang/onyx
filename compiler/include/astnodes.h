@@ -1821,6 +1821,7 @@ typedef struct Entity {
     // TODO: Document this!
     u32 macro_attempts;
     u32 micro_attempts;
+    u64 queue_key;
 
     b32 entered_in_queue : 1;
 
@@ -1878,6 +1879,10 @@ typedef struct EntityHeap {
     // First-try pre-codegen work uses `ready` instead of sifting.
     bh_arr(Entity *) entities;
     EntityQueueGrid ready;
+
+    // Heap top that was taken for processing but not sifted out yet.
+    // Reinserting the same entity is one sift-down instead of remove+insert.
+    Entity *detached_top;
 
     i32 next_id;
 

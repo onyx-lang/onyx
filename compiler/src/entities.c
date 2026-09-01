@@ -71,7 +71,7 @@ static Entity* grid_pop(EntityQueueGrid* g) {
 }
 
 // Same order as the old multi-field compare: phase, attempts, state, type,
-// micro_attempts, then id. Packed so a sift is a couple of integer compares.
+// micro_attempts, then id. Cached on the entity so a sift is two u64 loads.
 static inline u64 entity_sort_key(Entity* e) {
     u64 phase = (e->state <= Entity_State_Parse && e->macro_attempts == 0) ? 1
               : (e->state <  Entity_State_Code_Gen) ? 2 : 3;
@@ -82,11 +82,13 @@ static inline u64 entity_sort_key(Entity* e) {
          | (u64) (e->micro_attempts & 0xffff);
 }
 
+static inline void entity_refresh_key(Entity* e) {
+    e->queue_key = entity_sort_key(e);
+}
+
 static inline i32 entity_compare(Entity* e1, Entity* e2) {
-    u64 k1 = entity_sort_key(e1);
-    u64 k2 = entity_sort_key(e2);
-    if (k1 < k2) return -1;
-    if (k1 > k2) return 1;
+    if (e1->queue_key < e2->queue_key) return -1;
+    if (e1->queue_key > e2->queue_key) return 1;
     return (i32) e1->id - (i32) e2->id;
 }
 
@@ -125,6 +127,20 @@ static void eh_shift_down(EntityHeap* entities, i32 index) {
     }
 }
 
+static void eh_commit_detach(EntityHeap* entities) {
+    if (!entities->detached_top) return;
+    entities->detached_top = NULL;
+
+    i32 n = bh_arr_length(entities->entities);
+    if (n == 0) return;
+
+    entities->entities[0] = entities->entities[n - 1];
+    bh_arr_pop(entities->entities);
+    if (bh_arr_length(entities->entities) > 0) {
+        eh_shift_down(entities, 0);
+    }
+}
+
 void entity_heap_init(bh_allocator a, EntityHeap* entities) {
     memset(entities, 0, sizeof(*entities));
     entities->allocator = a;
@@ -134,7 +150,9 @@ void entity_heap_init(bh_allocator a, EntityHeap* entities) {
 }
 
 b32 entity_heap_empty(EntityHeap* entities) {
-    return entities->ready.count == 0 && bh_arr_length(entities->entities) == 0;
+    i32 heap_n = bh_arr_length(entities->entities);
+    if (entities->detached_top) heap_n -= 1;
+    return entities->ready.count == 0 && heap_n <= 0;
 }
 
 // Allocates the entity in the entity heap. Don't quite feel this is necessary...
@@ -153,9 +171,29 @@ Entity* entity_heap_register(EntityHeap* entities, Entity e) {
 void entity_heap_insert_existing(EntityHeap* entities, Entity* e) {
     if (e->entered_in_queue) return;
 
+    if (entities->detached_top == e) {
+        entities->state_count[e->state]++;
+        entities->type_count[e->type]++;
+        entities->all_count[e->state][e->type]++;
+        e->entered_in_queue = 1;
+        entity_refresh_key(e);
+
+        if (entity_uses_ready_queue(e)) {
+            eh_commit_detach(entities);
+            grid_push(entities->allocator, &entities->ready, e);
+        } else {
+            entities->detached_top = NULL;
+            eh_shift_down(entities, 0);
+        }
+        return;
+    }
+
+    if (entities->detached_top) eh_commit_detach(entities);
+
     if (entity_uses_ready_queue(e)) {
         grid_push(entities->allocator, &entities->ready, e);
     } else {
+        entity_refresh_key(e);
         bh_arr_push(entities->entities, e);
         eh_shift_up(entities, bh_arr_length(entities->entities) - 1);
     }
@@ -176,10 +214,13 @@ Entity* entity_heap_insert(EntityHeap* entities, Entity e) {
 Entity* entity_heap_top(EntityHeap* entities) {
     Entity* e = grid_peek(&entities->ready);
     if (e) return e;
+    if (entities->detached_top) eh_commit_detach(entities);
     return entities->entities[0];
 }
 
 void entity_heap_change_top(EntityHeap* entities, Entity* new_top) {
+    if (entities->detached_top) eh_commit_detach(entities);
+
     entities->state_count[entities->entities[0]->state]--;
     entities->state_count[new_top->state]++;
 
@@ -189,6 +230,7 @@ void entity_heap_change_top(EntityHeap* entities, Entity* new_top) {
     entities->all_count[entities->entities[0]->state][entities->entities[0]->type]--;
     entities->all_count[new_top->state][new_top->type]++;
 
+    entity_refresh_key(new_top);
     entities->entities[0] = new_top;
     eh_shift_down(entities, 0);
 }
@@ -199,12 +241,9 @@ void entity_heap_remove_top(EntityHeap* entities) {
     if (entities->ready.count > 0) {
         e = grid_pop(&entities->ready);
     } else {
+        if (entities->detached_top) eh_commit_detach(entities);
         e = entities->entities[0];
-        entities->entities[0] = entities->entities[bh_arr_length(entities->entities) - 1];
-        bh_arr_pop(entities->entities);
-        if (bh_arr_length(entities->entities) > 0) {
-            eh_shift_down(entities, 0);
-        }
+        entities->detached_top = e;
     }
 
     entities->state_count[e->state]--;
@@ -217,12 +256,14 @@ void entity_change_type(EntityHeap* entities, Entity *ent, EntityType new_type) 
     entities->type_count[ent->type]--;
     entities->type_count[new_type]++;
     ent->type = new_type;
+    entity_refresh_key(ent);
 }
 
 void entity_change_state(EntityHeap* entities, Entity *ent, EntityState new_state) {
     entities->state_count[ent->state]--;
     entities->state_count[new_state]++;
     ent->state = new_state;
+    entity_refresh_key(ent);
 }
 
 void entity_heap_add_job(EntityHeap *entities, TypeMatch (*func)(Context *, void *), void *job_data) {
