@@ -27,8 +27,8 @@ Protocols :: str.[
 //
 // NOTE: This returns a string that ends with the path separator.
 Template_Directory :: () -> str {
-    return os.path_directory(#file)
-        |> os.path_join("pkg_templates")
+    return os.Path.directory(#file)
+        |> os.Path.join("pkg_templates")
         |> str.copy()
 }
 
@@ -58,8 +58,7 @@ main :: () {
     loaded_config_file := false
     defer if loaded_config_file do store_config_file()
 
-    command_procedures := runtime.info.get_procedures_with_tag(Command)
-    defer delete(&command_procedures)
+    use command_procedures := runtime.info.get_procedures_with_tag(Command)
 
     command_tag := Array.first(command_procedures, [p](p.tag.command == command))
     if !command_tag {
@@ -108,13 +107,12 @@ run_help_command :: (args: [] str) {
     printf("\n")
     printf("Commands:\n")
 
-    command_procedures := runtime.info.get_procedures_with_tag(Command)
-    defer delete(&command_procedures)
+    use command_procedures := runtime.info.get_procedures_with_tag(Command)
 
     max_command_width :=
-        iter.as_iter(command_procedures)
-        |> iter.map(x => x.tag.command.length)
-        |> iter.fold(0, (x, y) => math.max(x, y))
+        Iterator.from(command_procedures)
+        |> Iterator.map(x => x.tag.command.length)
+        |> Iterator.fold(0, (x, y) => math.max(x, y))
 
     command_fmt := tprintf("{{w{}}}", max_command_width + 2)
 
@@ -151,7 +149,7 @@ show_help_for_command :: (cmd: &Command) {
 
 @Command.{ "init", "Initialize a new project in the current directory", "", require_config_file=false }
 run_init_command :: (args: [] str) {
-    if os.file_exists(global_arguments.config_file) {
+    if os.File.exists(global_arguments.config_file) {
         error_print("Config file present; project already initialized.\n")
         return
     }
@@ -182,7 +180,7 @@ run_init_command :: (args: [] str) {
     config.dependency_source_path = "./lib"
 
     // @TODO // Validation for these fields.
-    r := io.reader_make(&stdio.stream)
+    r := io.Reader.make(&stdio.stream)
     read_field("Package name: ", &config.package_name, "")
     read_field("Package description: ", &config.package_description, "")
     read_field("Package url: ", &config.package_url, "")
@@ -252,7 +250,7 @@ run_remove_command :: (args: [] str) {
 
     if config.dependencies[dep] as d {
         version := d.target.version
-        config.dependencies->delete(dep)
+        config.dependencies->remove(dep)
         info_print("Removed", "'{}' version {}\n", dep, version)
         return
     }
@@ -329,7 +327,7 @@ run_sync_command :: (args: [] str) {
 
     if options.clean {
         info_print("Cleaning", "Removing {} directory\n", config.dependency_source_path)
-        os.remove_directory(config.dependency_source_path)
+        os.Directory.remove(config.dependency_source_path)
     }
 
     To_Install :: struct {
@@ -348,7 +346,7 @@ run_sync_command :: (args: [] str) {
 
     while dependencies_to_install.count > 0 {
         alloc.clear_temp_allocator()
-        to_install := array.delete(&dependencies_to_install, 0)
+        to_install := Array.remove_at(&dependencies_to_install, 0)
 
         repo := to_install.source.Git ?? [] { continue; }
 
@@ -384,7 +382,7 @@ run_sync_command :: (args: [] str) {
                 // TODO : Check if this is right? Could this accidentally forcefully upgrade a package?
                 if version->is_newer(dep!.version!) {
                     uninstall_package(.{it.value.source, it.value.target})
-                    dependencies_installed->delete(key)
+                    dependencies_installed->remove(key)
                     dependencies_to_install << .{ .{it.value.source, it.value.target}, false }
 
                 } elseif !(version->is_compatible(dep!.version!)) {
@@ -495,11 +493,10 @@ run_list_versions :: (args: [] str) {
 
     pack := args[0]
 
-    pack      = Git.get_full_repo_uri(pack)
-    versions := Git.get_available_versions(pack)
-    defer delete(&versions)
+    pack          = Git.get_full_repo_uri(pack)
+    use versions := Git.get_available_versions(pack)
 
-    array.sort(versions, SemVer.compare)
+    Array.sort(versions, SemVer.compare)
 
     for versions {
         printf("{}\n", it)
@@ -532,7 +529,7 @@ run_new_command :: (args: [] str) {
             for os.list_directory(Template_Directory()) {
                 if !str.ends_with(it->name(), ".json") do continue
 
-                printf("    {}\n", os.path_basename(it->name()))
+                printf("    {}\n", os.Path.basename(it->name()))
             }
             return
         }
@@ -552,7 +549,7 @@ run_new_command :: (args: [] str) {
             for folder in Iterator.from(&to_process) {
                 for entry in os.list_directory(folder) {
                     name := entry->name()
-                    fullpath := os.path_join(folder, name)
+                    fullpath := os.Path.join(folder, name)
 
                     if entry.type == .Directory {
                         if name == ".git" || name == "lib" || name == "bin" {
@@ -602,7 +599,7 @@ run_new_command :: (args: [] str) {
     }
 
     template_dir := Template_Directory()
-    template_file := os.path_join(template_dir, tprintf("{}.json", template_name))
+    template_file := os.Path.join(template_dir, tprintf("{}.json", template_name))
     if !os.file_exists(template_file) {
         error_print("Template '{}' not found in {}\n", template_name, template_dir)
         return
@@ -631,8 +628,8 @@ run_new_command :: (args: [] str) {
         vars->put(it.key, line)
     }
 
-    if !os.dir_exists(directory) {
-        os.dir_create(directory)
+    if !os.Directory.exists(directory) {
+        os.Directory.create(directory)
     }
 
     populate_directory(directory, template.root["files"], &vars)
@@ -655,7 +652,7 @@ run_new_command :: (args: [] str) {
 
     populate_directory :: (dir: str, files: json.Value, vars: &Map(str, str)) {
         for files->as_map_iter() {
-            destination := os.path_join(dir, it.first)
+            destination := os.Path.join(dir, it.first)
             switch it.second->type() {
                 case .String {
                     info_print("Creating", tprintf("{}\n", destination))
@@ -665,9 +662,9 @@ run_new_command :: (args: [] str) {
                         folders = folders[0 .. folders.count - 1]
                         target := dir
                         for folder in folders {
-                            target = os.path_join(target, folder)
-                            if !os.dir_exists(target) {
-                                os.dir_create(target)
+                            target = os.Path.join(target, folder)
+                            if !os.Directory.exists(target) {
+                                os.Directory.create(target)
                             }
                         }
                     }
@@ -678,7 +675,7 @@ run_new_command :: (args: [] str) {
                 }
 
                 case .Object {
-                    os.dir_create(destination)
+                    os.Directory.create(destination)
                     populate_directory(destination, it.second, vars)
                 }
             }
@@ -881,12 +878,12 @@ install_package :: (pack: Package, downgrade_if_necessary := false, skip_native_
 uninstall_package :: (pack: Package) -> bool {
     repo := pack.source.Git?
     folder_name := strip_protocol_and_www_from_repo(repo)
-    package_folder := os.path_join(config.dependency_source_path, folder_name)
+    package_folder := os.Path.join(config.dependency_source_path, folder_name)
 
     if os.file_exists(package_folder) {
         // Should this check if the version to be deleted is the one that is actually installed?
         attempt_remove_native_library(package_folder)
-        os.remove_directory(package_folder)
+        os.Directory.remove(package_folder)
 
         // This should maybe cleanup the parent directory if it is now empty.
         return true
@@ -900,7 +897,7 @@ attempt_remove_native_library :: (package_folder: str) -> bool {
 
     if !inner_config.native_library do return false
 
-    target := os.path_join(config.dependency_binary_path, tprintf("{}{}", inner_config.native_library->unwrap(), native_library_suffix))
+    target := os.Path.join(config.dependency_binary_path, tprintf("{}{}", inner_config.native_library->unwrap(), native_library_suffix))
     os.remove_file(target)
     return true
 }
@@ -948,7 +945,7 @@ strip_protocol_and_www_from_repo :: (repo: str) -> str {
 }
 
 get_install_path_of_repo :: (repo: str) -> str {
-    return os.path_join(config.dependency_source_path, strip_protocol_and_www_from_repo(repo))
+    return os.Path.join(config.dependency_source_path, strip_protocol_and_www_from_repo(repo))
 }
 
 run_native_library_installation :: (folder: str) -> (bool, str) {
@@ -979,8 +976,8 @@ run_native_library_installation :: (folder: str) -> (bool, str) {
         }
     }
 
-    if !os.dir_exists(config.dependency_binary_path) {
-        if !os.dir_create(config.dependency_binary_path) {
+    if !os.Directory.exists(config.dependency_binary_path) {
+        if !os.Directory.create(config.dependency_binary_path) {
             error_print("Failed to create native library directory, {}.\n", config.dependency_binary_path)
             return false, ""
         }
@@ -1003,7 +1000,7 @@ native_library_is_up_to_date :: (folder: str) -> bool {
     // If no native library, no worries.
     if !inner_config.native_library do return true
 
-    target := os.path_join(config.dependency_binary_path, tprintf("{}{}", inner_config.native_library->unwrap(), native_library_suffix))
+    target := os.Path.join(config.dependency_binary_path, tprintf("{}{}", inner_config.native_library->unwrap(), native_library_suffix))
     inner_package_file := tprintf("{}/onyx-pkg.kdl", folder)
 
     target_stat, package_stat: os.FileStat
@@ -1021,26 +1018,25 @@ run_tool_installation :: (folder: str) -> bool {
 
     if inner_config.tools->empty() do return true
 
-    if !os.dir_exists(".onyx") {
-        if !os.dir_create(".onyx") {
+    if !os.Directory.exists(".onyx") {
+        if !os.Directory.create(".onyx") {
             error_print("Failed to create tool directory, '.onyx'.\n")
             return false
         }
     }
 
-    for Iterator.from(inner_config.tools) {
-        bc := it.value
+    for key, bc in inner_config.tools {
         bc = .{
             CompileOnyx = .{
                 ..bc.CompileOnyx!,
-                target = tprintf(".onyx/{}.wasm", it.key),
+                target = tprintf(".onyx/{}.wasm", key),
                 working_dir = folder,
                 args = Array.make(.["--no-compiler-extensions"])
             }
         }
 
         if !run_build_configuration(bc) {
-            error_print("Failed to install tool '{}' from '{}'.\n", it.key, inner_config.package_name)
+            error_print("Failed to install tool '{}' from '{}'.\n", key, inner_config.package_name)
             return false
         }
     }
@@ -1065,18 +1061,18 @@ run_command_and_forward_output :: (cmd: str) => {
 }
 
 build_package_file_to_load :: () {
-    if !os.dir_exists(config.dependency_source_path) {
-        os.dir_create(config.dependency_source_path)
+    if !os.Directory.exists(config.dependency_source_path) {
+        os.Directory.create(config.dependency_source_path)
     }
 
-    filepath := os.path_join(config.dependency_source_path, "packages.onyx")
+    filepath := os.Path.join(config.dependency_source_path, "packages.onyx")
 
-    if os.file_exists(filepath) {
+    if os.File.exists(filepath) {
         os.remove_file(filepath)
     }
 
     use file := os.open(filepath, .Write).Ok?
-    use w := io.writer_make(&file)
+    use w := io.Writer.make(&file)
 
     io.write(&w, """
 //
@@ -1087,8 +1083,8 @@ build_package_file_to_load :: () {
 // PACKAGE LOADING
 """)
 
-    for config.dependencies->as_iter() {
-        dependency_repo := it.value.source.Git ?? [] { continue; }
+    for _, value in config.dependencies {
+        dependency_repo := value.source.Git ?? [] { continue; }
         dependency_folder := strip_protocol_and_www_from_repo(dependency_repo)
 
         io.write_format(&w,
@@ -1182,8 +1178,8 @@ Git :: struct {
         for Known_Repositories {
             for proto in Protocols {
                 r := tprintf("{}{}", proto, tprintf(it, package_search))
-                git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", r])
-                if os.process_wait(&git_proc) == .Success {
+                git_proc := os.Process.spawn(git_path, .["ls-remote", "--tags", r])
+                if os.Process.wait(&git_proc) == .Success {
                     return r |> str.copy()
                 }
             }
@@ -1216,25 +1212,23 @@ Git :: struct {
     }
 
     get_latest_version :: (repo: str) -> SemVer {
-        versions := get_available_versions(repo)
+        use versions := get_available_versions(repo)
         if versions.count == 0 {
             return .{0, 0, 0}
         }
-        defer delete(&versions)
 
-        array.sort(versions, SemVer.compare)
+        Array.sort(versions, SemVer.compare)
         latest := versions[0]
         return latest
     }
 
     get_latest_compatible_version :: (repo: str, current_version: SemVer) -> SemVer {
-        versions := get_available_versions(repo)
+        use versions := get_available_versions(repo)
         if versions.count == 0 {
             return .{0, 0, 0}
         }
-        defer delete(&versions)
 
-        array.sort(versions, SemVer.compare)
+        Array.sort(versions, SemVer.compare)
         for versions {
             if current_version->is_compatible(it) do return it
         }
@@ -1245,16 +1239,16 @@ Git :: struct {
         info_print("Fetch", "{}  {}\n", repo, version)
 
         version_str := tprintf("v{}", version)
-        temporary_dest := os.path_join(config.dependency_source_path, ".cloned")
+        temporary_dest := os.Path.join(config.dependency_source_path, ".cloned")
 
-        os.remove_directory(temporary_dest)
+        os.Directory.remove(temporary_dest)
 
         successfully_cloned := do -> bool {
             for proto in Protocols {
                 // Use 'git clone' to clone the bare minimum amount to get the released version.
                 proto_repo  := tprintf("{}{}", proto, repo)
-                git_proc    := os.process_spawn(git_path, .["clone", "--single-branch", "--depth", "1", "-b", version_str, proto_repo, temporary_dest])
-                result      := os.process_wait(&git_proc)
+                git_proc    := os.Process.spawn(git_path, .["clone", "--single-branch", "--depth", "1", "-b", version_str, proto_repo, temporary_dest])
+                result      := os.Process.wait(&git_proc)
 
                 if result == .Success do return true
             }
@@ -1272,15 +1266,15 @@ Git :: struct {
     clone_branch :: (repo: str, branch: str) -> bool {
         info_print("Fetch", "{}  {}\n", repo, branch)
 
-        temporary_dest := os.path_join(config.dependency_source_path, ".cloned")
-        os.remove_directory(temporary_dest)
+        temporary_dest := os.Path.join(config.dependency_source_path, ".cloned")
+        os.Directory.remove(temporary_dest)
 
         successfully_cloned := do -> bool {
             for proto in Protocols {
                 // Use 'git clone' to clone the bare minimum amount to get the released version.
                 proto_repo  := tprintf("{}{}", proto, repo)
-                git_proc    := os.process_spawn(git_path, .["clone", "--single-branch", "--depth", "1", "-b", branch, proto_repo, temporary_dest])
-                result      := os.process_wait(&git_proc)
+                git_proc    := os.Process.spawn(git_path, .["clone", "--single-branch", "--depth", "1", "-b", branch, proto_repo, temporary_dest])
+                result      := os.Process.wait(&git_proc)
 
                 if result == .Success do return true
             }
@@ -1300,14 +1294,14 @@ Git :: struct {
         install_dest := strip_protocol_and_www_from_repo(repo)
 
         // Move the cloned repository to its permanent location.
-        actual_dest := os.path_join(config.dependency_source_path, install_dest)
-        if os.dir_exists(actual_dest) {
+        actual_dest := os.Path.join(config.dependency_source_path, install_dest)
+        if os.Directory.exists(actual_dest) {
             if overwrite {
-                os.remove_directory(actual_dest)
+                os.Directory.remove(actual_dest)
 
             } else {
                 error_print("Expected {} to not exist when fetching '{}'.\n", actual_dest, repo)
-                os.remove_directory(temporary_dest)
+                os.Directory.remove(temporary_dest)
                 return false
             }
         }
@@ -1318,20 +1312,20 @@ Git :: struct {
             dyn_str.append(&rolling_parent, it)
             dyn_str.append(&rolling_parent, os.PATH_SEP)
 
-            if !os.dir_exists(rolling_parent) {
-                os.dir_create(rolling_parent)
+            if !os.Directory.exists(rolling_parent) {
+                os.Directory.create(rolling_parent)
             }
         }
 
-        if !os.dir_rename(temporary_dest, actual_dest) {
+        if !os.Directory.rename(temporary_dest, actual_dest) {
             error_print("Failed to move temporary package to final destination when fetching '{}'.\n", repo)
-            os.remove_directory(temporary_dest)
+            os.Directory.remove(temporary_dest)
             return false
         }
 
         // Remove the .git folder, as it is unneeded.
-        unnecessary_git_dir := os.path_join(actual_dest, ".git")
-        if !os.remove_directory(unnecessary_git_dir) {
+        unnecessary_git_dir := os.Path.join(actual_dest, ".git")
+        if !os.Directory.remove(unnecessary_git_dir) {
             error_print("Failed to delete .git folder of '{}'.\n", repo)
             return false
         }
@@ -1341,8 +1335,8 @@ Git :: struct {
 
     publish_version :: () -> bool {
         run_command :: macro (cmd: str, args: [] str) {
-            p := os.process_spawn(cmd, args)
-            if os.process_wait(&p) != .Success {
+            p := os.Process.spawn(cmd, args)
+            if os.Process.wait(&p) != .Success {
                 return false
             }
         }
@@ -1427,10 +1421,9 @@ store_config_file :: () -> bool {
 }
 
 load_config :: (path: str) -> ? Config {
-    contents := os.get_contents(path)
+    use contents := os.get_contents(path)
     if !contents do return .{}
 
-    defer delete(&contents)
     doc := kdl.parse(contents).Ok?
 
     c: Config
@@ -1493,23 +1486,23 @@ load_config :: (path: str) -> ? Config {
                 load_string(it, "target", &target)
 
                 for it->query_all("include") {
-                    array.concat(&include,
-                        iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
+                    Array.concat(&include,
+                        Iterator.from(it.values)->flatten(x => (*x)->as_str()))
                 }
 
                 for it->query_all("define") {
-                    array.concat(&defines,
-                        iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
+                    Array.concat(&defines,
+                        Iterator.from(it.values)->flatten(x => (*x)->as_str()))
                 }
 
                 for it->query_all("args") {
-                    array.concat(&args,
-                        iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
+                    Array.concat(&args,
+                        Iterator.from(it.values)->flatten(x => (*x)->as_str()))
                 }
 
                 for it->query_all("source") {
-                    array.concat(&sources,
-                        iter.as_iter(it.values)->flatten(x => (*x)->as_str()))
+                    Array.concat(&sources,
+                        Iterator.from(it.values)->flatten(x => (*x)->as_str()))
                 }
 
                 c.build_configs[it.node] = .{
@@ -1672,18 +1665,14 @@ store_config :: (path: str) -> bool {
 
     config._source_doc->with([source] {
         for source->query_all("top() > []") {
-            if !array.contains(str.["package", "config", "native", "dependencies"], it.node) {
+            if !Array.contains(str.["package", "config", "native", "dependencies"], it.node) {
                 doc.nodes << it
             }
         }
     })
 
-    file := os.open(path, .Write)->or_return(false)
-    defer os.close(&file)
-
-    w := io.writer_make(&file)
-    defer io.writer_free(&w)
-
+    use file := os.open(path, .Write)->or_return(false)
+    use w := io.Writer.make(&file)
     kdl.write(&doc, &w)
 
     return true
@@ -1844,7 +1833,7 @@ load_old_config_file :: () -> bool {
 
 store_old_config_file :: () -> bool {
     use file := os.open(global_arguments.config_file, .Write)->or_return(false)
-    use writer := io.writer_make(&file)
+    use writer := io.Writer.make(&file)
 
     return encoding.ini.write_ini_file(&writer, config)
 }
