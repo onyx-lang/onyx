@@ -260,8 +260,14 @@ static void a64_fsub(ovm_emit_buf_t *b, int dbl, int rd, int rn, int rm) {
 static void a64_fmul(ovm_emit_buf_t *b, int dbl, int rd, int rn, int rm) {
     a64_u32(b, (dbl ? 0x1E600800u : 0x1E200800u) | ((u32) rm << 16) | ((u32) rn << 5) | (u32) rd);
 }
+static void a64_fdiv(ovm_emit_buf_t *b, int dbl, int rd, int rn, int rm) {
+    a64_u32(b, (dbl ? 0x1E601800u : 0x1E201800u) | ((u32) rm << 16) | ((u32) rn << 5) | (u32) rd);
+}
 static void a64_fcmp(ovm_emit_buf_t *b, int dbl, int rn, int rm) {
     a64_u32(b, (dbl ? 0x1E602000u : 0x1E202000u) | ((u32) rm << 16) | ((u32) rn << 5));
+}
+static void a64_fp_1src(ovm_emit_buf_t *b, u32 base_s, u32 base_d, int dbl, int rd, int rn) {
+    a64_u32(b, (dbl ? base_d : base_s) | ((u32) rn << 5) | (u32) rd);
 }
 
 static void a64_slot_ld_fp(ovm_emit_buf_t *b, int dbl, int vt, i32 vn) {
@@ -308,8 +314,148 @@ static void a64_emit_fp_bin(ovm_emit_buf_t *b, u32 op, int dbl, i32 r, i32 a, i3
     a64_slot_ld_fp(b, dbl, 1, ba);
     if (op == OVMI_ADD) a64_fadd(b, dbl, 0, 0, 1);
     else if (op == OVMI_SUB) a64_fsub(b, dbl, 0, 0, 1);
+    else if (op == OVMI_DIV || op == OVMI_DIV_S) a64_fdiv(b, dbl, 0, 0, 1);
     else a64_fmul(b, dbl, 0, 0, 1);
     a64_slot_st_fp(b, dbl, 0, r);
+}
+
+static void a64_emit_fp_unop(ovm_emit_buf_t *b, u32 base_s, u32 base_d, int dbl, i32 r, i32 a) {
+    a64_slot_ld_fp(b, dbl, 0, a);
+    a64_fp_1src(b, base_s, base_d, dbl, 0, 0);
+    a64_slot_st_fp(b, dbl, 0, r);
+}
+
+static i32 a64_bcond_here(ovm_emit_buf_t *b, int cond) {
+    i32 at = b->len;
+    a64_u32(b, 0x54000000u | (u32) cond);
+    return at;
+}
+
+static void a64_patch_bcond(ovm_emit_buf_t *b, i32 at) {
+    i32 words = (b->len - at) / 4;
+    u32 old = 0;
+    memcpy(&old, b->data + at, 4);
+    u32 insn = 0x54000000u | (((u32) words & 0x7ffff) << 5) | (old & 0xfu);
+    memcpy(b->data + at, &insn, 4);
+}
+
+static void a64_emit_divmod(ovm_emit_buf_t *b, int wide, int is_signed, int want_rem, i32 r, i32 a, i32 ba) {
+    if (wide) {
+        a64_slot_ld64(b, X8, a);
+        a64_slot_ld64(b, X9, ba);
+    } else {
+        a64_slot_ld32(b, X8, a);
+        a64_slot_ld32(b, X9, ba);
+    }
+    u32 div = (is_signed ? 0x1AC00C00u : 0x1AC00800u) | ((u32) wide << 31) | (X9 << 16) | (X8 << 5) | X10;
+    a64_u32(b, div);
+    if (want_rem) {
+        a64_u32(b, 0x1B008000u | ((u32) wide << 31) | (X9 << 16) | (X8 << 10) | (X10 << 5) | X8);
+    } else {
+        a64_u32(b, 0xAA0A03E8u); // mov x8, x10
+    }
+    if (wide) a64_slot_st64(b, X8, r);
+    else a64_slot_st32(b, X8, r);
+}
+
+static void a64_emit_copy(ovm_emit_buf_t *b, i32 dest, i32 src, i32 count) {
+    a64_slot_ld32(b, X0, dest);
+    a64_slot_ld32(b, X1, src);
+    a64_slot_ld32(b, X2, count);
+    a64_u32(b, 0x7100001Fu); // cmp w0, #0
+    i32 z1 = a64_bcond_here(b, COND_EQ);
+    a64_u32(b, 0x7100003Fu); // cmp w1, #0
+    i32 z2 = a64_bcond_here(b, COND_EQ);
+    a64_u32(b, 0x8B000280u); // add x0, x20, x0
+    a64_u32(b, 0x8B010281u); // add x1, x20, x1
+    a64_blr_abs(b, (u64)(uintptr_t) memmove);
+    a64_reload_pins(b);
+    a64_patch_bcond(b, z1);
+    a64_patch_bcond(b, z2);
+}
+
+static void a64_emit_fill(ovm_emit_buf_t *b, i32 dest, i32 byte, i32 count) {
+    a64_slot_ld32(b, X0, dest);
+    a64_slot_ld32(b, X1, byte);
+    a64_slot_ld32(b, X2, count);
+    a64_u32(b, 0x7100001Fu);
+    i32 z = a64_bcond_here(b, COND_EQ);
+    a64_u32(b, 0x8B000280u);
+    a64_blr_abs(b, (u64)(uintptr_t) memset);
+    a64_reload_pins(b);
+    a64_patch_bcond(b, z);
+}
+
+static void a64_emit_copysign(ovm_emit_buf_t *b, int dbl, i32 r, i32 a, i32 ba) {
+    if (dbl) {
+        a64_slot_ld64(b, X8, a);
+        a64_slot_ld64(b, X9, ba);
+        a64_mov64(b, X10, 0x8000000000000000ull);
+        a64_alu_reg(b, 0x0A000000u, 1, X9, X9, X10);
+        a64_mov64(b, X10, 0x7FFFFFFFFFFFFFFFull);
+        a64_alu_reg(b, 0x0A000000u, 1, X8, X8, X10);
+        a64_alu_reg(b, 0x2A000000u, 1, X8, X8, X9);
+        a64_slot_st64(b, X8, r);
+    } else {
+        a64_slot_ld32(b, X8, a);
+        a64_slot_ld32(b, X9, ba);
+        a64_mov64(b, X10, 0x80000000ull);
+        a64_alu_reg(b, 0x0A000000u, 0, X9, X9, X10);
+        a64_mov64(b, X10, 0x7FFFFFFFull);
+        a64_alu_reg(b, 0x0A000000u, 0, X8, X8, X10);
+        a64_alu_reg(b, 0x2A000000u, 0, X8, X8, X9);
+        a64_slot_st32(b, X8, r);
+    }
+}
+
+static void a64_emit_fp_cvt(ovm_emit_buf_t *b, ovm_program_t *program, i32 idx, u32 op, u32 ty, i32 r, i32 a) {
+    int to_f32 = (ty == OVM_TYPE_F32);
+    int to_f64 = (ty == OVM_TYPE_F64);
+    int to_i32 = (ty == OVM_TYPE_I32);
+    int to_i64 = (ty == OVM_TYPE_I64);
+
+    if ((op == OVMI_CVT_I32 || op == OVMI_CVT_I32_S || op == OVMI_CVT_I64 || op == OVMI_CVT_I64_S) &&
+        (to_f32 || to_f64)) {
+        int src64 = (op == OVMI_CVT_I64 || op == OVMI_CVT_I64_S);
+        int uns = (op == OVMI_CVT_I32 || op == OVMI_CVT_I64);
+        if (src64) a64_slot_ld64(b, X8, a);
+        else a64_slot_ld32(b, X8, a);
+        u32 base = uns ? (to_f64 ? 0x1E630000u : 0x1E230000u)
+                       : (to_f64 ? 0x1E620000u : 0x1E220000u);
+        if (src64) base |= 0x80000000u;
+        a64_u32(b, base | (X8 << 5));
+        a64_slot_st_fp(b, to_f64, 0, r);
+        return;
+    }
+
+    if ((op == OVMI_CVT_F32 || op == OVMI_CVT_F32_S || op == OVMI_CVT_F64 || op == OVMI_CVT_F64_S) &&
+        (to_i32 || to_i64)) {
+        int src64 = (op == OVMI_CVT_F64 || op == OVMI_CVT_F64_S);
+        int uns = (op == OVMI_CVT_F32 || op == OVMI_CVT_F64);
+        a64_slot_ld_fp(b, src64, 0, a);
+        u32 base = uns ? 0x1E390000u : 0x1E380000u;
+        if (src64) base |= 0x00400000u;
+        if (to_i64) base |= 0x80000000u;
+        a64_u32(b, base | X8);
+        if (to_i64) a64_slot_st64(b, X8, r);
+        else a64_slot_st32(b, X8, r);
+        return;
+    }
+
+    if (op == OVMI_CVT_F32 && to_f64) {
+        a64_slot_ld_fp(b, 0, 0, a);
+        a64_u32(b, 0x1E22C000u);
+        a64_slot_st_fp(b, 1, 0, r);
+        return;
+    }
+    if (op == OVMI_CVT_F64 && to_f32) {
+        a64_slot_ld_fp(b, 1, 0, a);
+        a64_u32(b, 0x1E624000u);
+        a64_slot_st_fp(b, 0, 0, r);
+        return;
+    }
+
+    a64_call_slow(b, program, idx);
 }
 
 static void a64_mem_addr(ovm_emit_buf_t *b, i32 base_vn, i32 off) {
@@ -505,6 +651,43 @@ static void a64_emit_one(ovm_emit_buf_t *b, ovm_program_t *program, i32 idx, ovm
                 if (wide) a64_slot_st64(b, X8, ins->r); else a64_slot_st32(b, X8, ins->r);
             }
             break;
+        case OVMI_DIV: case OVMI_DIV_S:
+            if (ty == OVM_TYPE_F32 || ty == OVM_TYPE_F64) a64_emit_fp_bin(b, op, dbl, ins->r, ins->a, ins->b);
+            else a64_emit_divmod(b, wide, op == OVMI_DIV_S, 0, ins->r, ins->a, ins->b);
+            break;
+        case OVMI_REM: case OVMI_REM_S:
+            a64_emit_divmod(b, wide, op == OVMI_REM_S, 1, ins->r, ins->a, ins->b);
+            break;
+        case OVMI_COPY:
+            a64_emit_copy(b, ins->r, ins->a, ins->b);
+            break;
+        case OVMI_FILL:
+            a64_emit_fill(b, ins->r, ins->a, ins->b);
+            break;
+        case OVMI_NEG:
+            a64_emit_fp_unop(b, 0x1E214000u, 0x1E614000u, dbl, ins->r, ins->a);
+            break;
+        case OVMI_ABS:
+            a64_emit_fp_unop(b, 0x1E20C000u, 0x1E60C000u, dbl, ins->r, ins->a);
+            break;
+        case OVMI_SQRT:
+            a64_emit_fp_unop(b, 0x1E21C000u, 0x1E61C000u, dbl, ins->r, ins->a);
+            break;
+        case OVMI_COPYSIGN:
+            a64_emit_copysign(b, dbl, ins->r, ins->a, ins->b);
+            break;
+        case OVMI_NEAREST:
+            a64_emit_fp_unop(b, 0x1E244000u, 0x1E644000u, dbl, ins->r, ins->a);
+            break;
+        case OVMI_FLOOR:
+            a64_emit_fp_unop(b, 0x1E254000u, 0x1E654000u, dbl, ins->r, ins->a);
+            break;
+        case OVMI_CEIL:
+            a64_emit_fp_unop(b, 0x1E24C000u, 0x1E64C000u, dbl, ins->r, ins->a);
+            break;
+        case OVMI_TRUNC:
+            a64_emit_fp_unop(b, 0x1E25C000u, 0x1E65C000u, dbl, ins->r, ins->a);
+            break;
         case OVMI_AND: a64_emit_alu(b, 0x0A000000u, wide, ins->r, ins->a, ins->b); break;
         case OVMI_OR:  a64_emit_alu(b, 0x2A000000u, wide, ins->r, ins->a, ins->b); break;
         case OVMI_XOR: a64_emit_alu(b, 0x4A000000u, wide, ins->r, ins->a, ins->b); break;
@@ -672,10 +855,14 @@ static void a64_emit_one(ovm_emit_buf_t *b, ovm_program_t *program, i32 idx, ovm
         case OVMI_CVT_I32: case OVMI_CVT_I32_S:
         case OVMI_CVT_I64: case OVMI_CVT_I64_S:
             if (ty == OVM_TYPE_F32 || ty == OVM_TYPE_F64) {
-                a64_call_slow(b, program, idx);
+                a64_emit_fp_cvt(b, program, idx, op, ty, ins->r, ins->a);
             } else {
                 a64_emit_cvt_int(b, op, ty, ins->r, ins->a);
             }
+            break;
+        case OVMI_CVT_F32: case OVMI_CVT_F32_S:
+        case OVMI_CVT_F64: case OVMI_CVT_F64_S:
+            a64_emit_fp_cvt(b, program, idx, op, ty, ins->r, ins->a);
             break;
 
         case OVMI_TRANSMUTE_I32:

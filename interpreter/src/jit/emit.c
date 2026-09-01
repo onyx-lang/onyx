@@ -114,14 +114,14 @@ static b32 instr_is_emit_worthy(u32 op) {
         case OVMI_BR_LE: case OVMI_BR_LE_S:
         case OVMI_BR_GT: case OVMI_BR_GT_S:
         case OVMI_BR_GE: case OVMI_BR_GE_S:
-            return 1;
-#if defined(__x86_64__)
         case OVMI_DIV: case OVMI_DIV_S:
-        case OVMI_NEG: case OVMI_ABS: case OVMI_SQRT:
+        case OVMI_REM: case OVMI_REM_S:
+        case OVMI_COPY: case OVMI_FILL:
+        case OVMI_NEG: case OVMI_ABS: case OVMI_SQRT: case OVMI_COPYSIGN:
+        case OVMI_CEIL: case OVMI_FLOOR: case OVMI_TRUNC: case OVMI_NEAREST:
         case OVMI_CVT_F32: case OVMI_CVT_F32_S:
         case OVMI_CVT_F64: case OVMI_CVT_F64_S:
             return 1;
-#endif
         default:
             return 0;
     }
