@@ -12,6 +12,7 @@ struct wasm_ovm_binding {
     ovm_engine_t  *engine;
     ovm_state_t   *state;
     ovm_program_t *program;
+    const wasm_functype_t *type;
 
     wasm_instance_t *instance;
 };
@@ -118,6 +119,16 @@ static wasm_trap_t *wasm_to_ovm_func_call_binding(void *vbinding, const wasm_val
 
     if (!res || res->size == 0) return NULL;
 
+    if (ovm_res.type == OVM_TYPE_NONE && binding->type && binding->type->type.func.results.size > 0) {
+        switch (binding->type->type.func.results.data[0]->kind) {
+            case WASM_I32: ovm_res.type = OVM_TYPE_I32; break;
+            case WASM_I64: ovm_res.type = OVM_TYPE_I64; break;
+            case WASM_F32: ovm_res.type = OVM_TYPE_F32; break;
+            case WASM_F64: ovm_res.type = OVM_TYPE_F64; break;
+            default: break;
+        }
+    }
+
     OVM_TO_WASM(ovm_res, res->data[0]);
 
     return NULL;
@@ -126,7 +137,14 @@ static wasm_trap_t *wasm_to_ovm_func_call_binding(void *vbinding, const wasm_val
 static void ovm_to_wasm_func_call_binding(void *env, ovm_value_t* params, ovm_value_t *res) {
     ovm_wasm_binding *binding = (ovm_wasm_binding *) env;
 
+    const wasm_valtype_vec_t *param_types = wasm_functype_params(wasm_func_type(binding->func));
     fori (i, 0, binding->param_count) {
+        wasm_valkind_t kind = param_types->data[i]->kind;
+        params[i].type =
+            kind == WASM_I32 ? OVM_TYPE_I32 :
+            kind == WASM_I64 ? OVM_TYPE_I64 :
+            kind == WASM_F32 ? OVM_TYPE_F32 :
+            kind == WASM_F64 ? OVM_TYPE_F64 : OVM_TYPE_NONE;
         OVM_TO_WASM(params[i], binding->param_buffer.data[i]);
     }
 
@@ -146,11 +164,6 @@ static void ovm_to_wasm_func_call_binding(void *env, ovm_value_t* params, ovm_va
 
 static void wasm_memory_init(void *env, ovm_value_t* params, ovm_value_t *res) {
     wasm_instance_t *instr = (wasm_instance_t *) env;
-
-    assert(params[0].type == OVM_TYPE_I32);
-    assert(params[1].type == OVM_TYPE_I32);
-    assert(params[2].type == OVM_TYPE_I32);
-    assert(params[3].type == OVM_TYPE_I32);
 
     ovm_engine_memory_copy(instr->store->engine->engine, params[0].i32, instr->module->data_entries[params[3].i32].data, params[2].i32);
 }
@@ -236,6 +249,7 @@ static void prepare_instance(wasm_instance_t *instance, const wasm_extern_vec_t 
         binding->func_idx = bh_arr_length(instance->funcs);
         binding->program  = ovm_program;
         binding->state    = ovm_state;
+        binding->type     = instance->module->functypes.data[i];
         binding->instance = instance;
 
         wasm_func_t *func = wasm_func_new_with_env(instance->store, instance->module->functypes.data[i],

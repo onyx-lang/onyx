@@ -58,8 +58,24 @@ struct ovm_static_integer_array_t {
 #define OVM_TYPE_V128   0x07
 #define OVM_TYPE_ERR    0xff
 
+// Untagged 8-byte payload used by the interpreter value stack.
+typedef union ovm_slot_t {
+    i8  i8;
+    i16 i16;
+    i32 i32;
+    i64 i64;
+    u8  u8;
+    u16 u16;
+    u32 u32;
+    u64 u64;
+    f32 f32;
+    f64 f64;
+} ovm_slot_t;
+
+// Tagged value for the WASM C-API boundary (registers, host calls, traps).
 struct ovm_value_t {
     union {
+        ovm_slot_t slot;
         i8  i8;
         i16 i16;
         i32 i32;
@@ -73,6 +89,8 @@ struct ovm_value_t {
     };
     ovm_valtype_t type;
 };
+
+_Static_assert(sizeof(ovm_slot_t) == 8, "ovm_slot_t must be 8 bytes");
 
 
 //
@@ -145,7 +163,7 @@ struct ovm_state_t {
     i32 pc;
     i32 value_number_offset;
 
-    bh_arr(ovm_value_t) numbered_values;
+    bh_arr(ovm_slot_t) numbered_values;
     bh_arr(ovm_stack_frame_t) stack_frames;
     bh_arr(ovm_value_t) registers;
 
@@ -166,7 +184,7 @@ struct ovm_state_t {
 
     //
     // TODO Doc
-    ovm_value_t *__frame_values;
+    ovm_slot_t *__frame_values;
 
     debug_thread_state_t *debug;
     i32                   call_depth;
@@ -362,6 +380,28 @@ struct ovm_instr_t {
 
 #define OVMI_MEM_SIZE          0x4e   // %r = <size in bytes of memory>
 #define OVMI_MEM_GROW          0x4f   // %r = <grow memory, return new size in bytes>
+
+// Superinstructions. Imm forms store a sign-extended i32 in `.b`.
+// Compare-and-branch stores the relative delta in `.r`.
+#define OVMI_ADD_IMM           0x50   // %r = %a + i
+#define OVMI_SUB_IMM           0x51   // %r = %a - i
+#define OVMI_MUL_IMM           0x52   // %r = %a * i
+#define OVMI_AND_IMM           0x53   // %r = %a & i
+#define OVMI_OR_IMM            0x54   // %r = %a | i
+#define OVMI_XOR_IMM           0x55   // %r = %a ^ i
+#define OVMI_SHL_IMM           0x56   // %r = %a << i
+#define OVMI_SHR_IMM           0x57   // %r = %a >> i
+#define OVMI_SAR_IMM           0x58   // %r = %a >>> i
+#define OVMI_BR_EQ             0x59   // br pc + r if %a == %b
+#define OVMI_BR_NE             0x5a
+#define OVMI_BR_LT             0x5b
+#define OVMI_BR_LT_S           0x5c
+#define OVMI_BR_LE             0x5d
+#define OVMI_BR_LE_S           0x5e
+#define OVMI_BR_GT             0x5f
+#define OVMI_BR_GT_S           0x60
+#define OVMI_BR_GE             0x61
+#define OVMI_BR_GE_S           0x62
 
 //
 // OVM_TYPED_INSTR(OVMI_ADD, OVM_TYPE_I32) == instruction for adding i32s
