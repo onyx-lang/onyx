@@ -4615,6 +4615,15 @@ static void emit_export_directive(OnyxWasmModule* mod, AstDirectiveExport* expor
 }
 
 static void emit_global(OnyxWasmModule* mod, AstGlobal* global) {
+    if (global == &mod->context->builtins.stack_top && mod->stack_top_ptr) return;
+    if (global == &mod->context->builtins.heap_start && mod->heap_start_ptr) return;
+    if (global == &mod->context->builtins.tls_size && mod->tls_size_ptr) return;
+
+    if (!global->type && global->type_node) {
+        global->type = type_build_from_ast(mod->context, global->type_node);
+    }
+    if (!global->type) return;
+
     WasmType global_type = onyx_type_to_wasm_type(global->type);
 
     WasmGlobal glob = {
@@ -4646,6 +4655,32 @@ static void emit_global(OnyxWasmModule* mod, AstGlobal* global) {
 
     if (global == &mod->context->builtins.tls_size)
         mod->tls_size_ptr = &mod->globals[global_idx].initial_value[0].data.i1;
+}
+
+// Register and emit the compiler-created runtime globals. These used to
+// exist only if their Code_Gen entities ran; a nested library compile
+// (or dump_cycles) can drop those, then link asserts on NULL pointers.
+static void emit_runtime_builtins(OnyxWasmModule *mod) {
+    AstGlobal *builtins[] = {
+        &mod->context->builtins.stack_top,
+        &mod->context->builtins.heap_start,
+        &mod->context->builtins.tls_base,
+        &mod->context->builtins.tls_size,
+        &mod->context->builtins.closure_base,
+        &mod->context->builtins.stack_trace,
+    };
+
+    for (i32 i = 0; i < (i32) (sizeof(builtins) / sizeof(builtins[0])); i++) {
+        AstGlobal *g = builtins[i];
+        if (!g->type && g->type_node) {
+            g->type = type_build_from_ast(mod->context, g->type_node);
+        }
+        if (!g->type) continue;
+        if (!bh_imap_has(&mod->index_map, (u64) g)) {
+            bh_imap_put(&mod->index_map, (u64) g, (u64) mod->next_global_idx++);
+        }
+        emit_global(mod, g);
+    }
 }
 
 static void emit_raw_string(OnyxWasmModule* mod, char *data, i32 len, u64 *out_data_id, u64 *out_len) {
@@ -5218,6 +5253,8 @@ void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module) {
 
     bh_buffer_init(&module->debug_context->op_buffer, context->gp_alloc, 1024);
 #endif
+
+    emit_runtime_builtins(module);
 }
 
 void emit_entity(Context *context, Entity* ent) {
@@ -5246,7 +5283,9 @@ void emit_entity(Context *context, Entity* ent) {
             break;
 
         case Entity_Type_Global_Header:
-            bh_imap_put(&mod->index_map, (u64) ent->global, mod->next_global_idx++);
+            if (!bh_imap_has(&mod->index_map, (u64) ent->global)) {
+                bh_imap_put(&mod->index_map, (u64) ent->global, mod->next_global_idx++);
+            }
             break;
 
         case Entity_Type_String_Literal: {
@@ -5539,6 +5578,7 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
         qsort(type_table_data->data, *module->type_info_entry_count, 2 * POINTER_SIZE, cmp_type_info);
     }
 
+    emit_runtime_builtins(module);
     assert(module->stack_top_ptr && module->heap_start_ptr);
 
     *module->stack_top_ptr = options->null_reserve_size + options->stack_size;

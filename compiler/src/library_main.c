@@ -471,14 +471,14 @@ static void dump_cycles(Context *context) {
     context->cycle_detected = 1;
     Entity* ent;
 
-    while (1) {
+    while (!entity_heap_empty(&context->entities)) {
         ent = entity_heap_top(&context->entities);
-        entity_heap_remove_top(&context->entities);
-        if (ent->state < Entity_State_Code_Gen) process_entity(context, ent);
-        else break;
+        if (ent->state >= Entity_State_Code_Gen) break;
 
-        if (entity_heap_empty(&context->entities)) {
-            break;
+        entity_heap_remove_top(&context->entities);
+        process_entity(context, ent);
+        if (ent->state != Entity_State_Finalized && ent->state != Entity_State_Failed) {
+            entity_heap_insert_existing(&context->entities, ent);
         }
     }
 }
