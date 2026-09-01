@@ -1,6 +1,5 @@
 #include "bh.h"
 #include "ovm_jit.h"
-#include "onyx_library.h"
 
 extern u8  onyx_jit_text[];
 extern i32 onyx_func_count;
@@ -11,11 +10,11 @@ extern u8  onyx_wasm[];
 
 void onyx_run_initialize(b32 debug_enabled, const char *debug_socket, b32 jit_enabled);
 b32  onyx_run_wasm_code(bh_buffer code_buffer, int argc, char *argv[]);
-WasmFuncDefinition **onyx_library_onyx_runtime(OnyxRuntime *in_runtime);
+void *onyx_library_onyx_runtime(void *in_runtime);
 
 int main(int argc, char *argv[]) {
     /* Strong ref so the linker pulls static onyx_runtime out of the archive. */
-    if ((void *) onyx_library_onyx_runtime == NULL) return 1;
+    if (onyx_library_onyx_runtime == NULL) return 1;
 
     static ovm_aot_image_t img;
     img.text = onyx_jit_text;

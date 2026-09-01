@@ -46,7 +46,11 @@ typedef struct OnyxRuntime {
     wasm_store_t *wasm_store;
 } OnyxRuntime;
 
+#ifdef ONYX_LIBRARY_RUNTIME_EXTERN
+extern OnyxRuntime* runtime;
+#else
 OnyxRuntime* runtime;
+#endif
 
 typedef struct WasmValkindBuffer {
     unsigned int count;
