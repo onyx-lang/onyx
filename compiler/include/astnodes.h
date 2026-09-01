@@ -1248,15 +1248,18 @@ struct OverloadOption {
     AstTyped* option;
 };
 
+typedef struct OverloadCache {
+    bh_imap map;
+    u32 epoch;
+} OverloadCache;
+
 struct AstOverloadedFunction {
     AstTyped_base;
 
     bh_arr(OverloadOption) overloads;
 
-    // CLEANUP: This is unused right now, but should be used to cache
-    // the complete set of overloads that can be used by an overloaded
-    // function.
-    bh_imap            all_overloads;
+    // Flattened reachable options. Rebuilt when Context.overload_cache_epoch changes.
+    OverloadCache      all_overloads;
 
     AstType *expected_return_node;
     Type    *expected_return_type;
@@ -2412,6 +2415,9 @@ struct Context {
     // TODO: Move these
     bh_arr(OverloadOption) operator_overloads[Binary_Op_Count];
     bh_arr(OverloadOption) unary_operator_overloads[Unary_Op_Count];
+    u32 overload_cache_epoch;
+    OverloadCache operator_overload_cache[Binary_Op_Count];
+    OverloadCache unary_operator_overload_cache[Unary_Op_Count];
 
     // The name is pretty self-descriptive, but this is a node that is returned from things
     // like polymorphic_proc_lookup when it is determined that everything works so far, but
@@ -2565,9 +2571,10 @@ typedef struct OverloadReturnTypeCheck {
     OnyxToken *group;
 } OverloadReturnTypeCheck;
 
-void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 order, AstTyped* overload);
-AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadOption) overloads, Arguments* args);
-AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption) overloads, Type* type);
+void add_overload_option(Context *context, bh_arr(OverloadOption)* poverloads, u64 order, AstTyped* overload);
+bh_imap *overload_cache_get(Context *context, bh_arr(OverloadOption) overloads, OverloadCache *cache);
+AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadOption) overloads, Arguments* args, OverloadCache *cache);
+AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption) overloads, Type* type, OverloadCache *cache);
 void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(OverloadOption) overloads);
 void report_incorrect_overload_expected_type(Context *context, Type *given, Type *expected, OnyxToken *overload, OnyxToken *group);
 void ensure_overload_returns_correct_type(Context *context, AstTyped *overload, AstOverloadedFunction *group);

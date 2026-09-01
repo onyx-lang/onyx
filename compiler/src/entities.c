@@ -188,11 +188,10 @@ void entity_heap_insert_existing(EntityHeap* entities, Entity* e) {
         return;
     }
 
-    if (entities->detached_top) eh_commit_detach(entities);
-
     if (entity_uses_ready_queue(e)) {
         grid_push(entities->allocator, &entities->ready, e);
     } else {
+        if (entities->detached_top) eh_commit_detach(entities);
         entity_refresh_key(e);
         bh_arr_push(entities->entities, e);
         eh_shift_up(entities, bh_arr_length(entities->entities) - 1);

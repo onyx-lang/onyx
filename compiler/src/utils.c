@@ -561,7 +561,9 @@ void scope_clear(Scope* scope) {
 //  * Resolving an overload from a TypeFunction (so an overloaded procedure can be passed as a parameter)
 //
 
-void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 order, AstTyped* overload) {
+void add_overload_option(Context *context, bh_arr(OverloadOption)* poverloads, u64 order, AstTyped* overload) {
+    context->overload_cache_epoch++;
+
     bh_arr(OverloadOption) overloads = *poverloads;
 
     i32 index = -1;
@@ -607,9 +609,7 @@ void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 order, AstTyped
 // collect all the overloads into the map, and also use the map to provide a base case.
 void build_all_overload_options(bh_arr(OverloadOption) overloads, bh_imap* all_overloads) {
     bh_arr_each(OverloadOption, overload, overloads) {
-        if (bh_imap_has(all_overloads, (u64) overload->option)) continue;
-
-        bh_imap_put(all_overloads, (u64) overload->option, 1);
+        if (!bh_imap_put_if_absent(all_overloads, (u64) overload->option, 1)) continue;
 
         AstNode *option = strip_aliases((AstNode *) overload->option);
         if (option && option->kind == Ast_Kind_Overloaded_Function) {
@@ -619,20 +619,45 @@ void build_all_overload_options(bh_arr(OverloadOption) overloads, bh_imap* all_o
     }
 }
 
-AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadOption) overloads, Arguments* param_args) {
+bh_imap *overload_cache_get(Context *context, bh_arr(OverloadOption) overloads, OverloadCache *cache) {
+    if (cache && cache->map.hashes && cache->epoch == context->overload_cache_epoch) {
+        return &cache->map;
+    }
+
+    if (cache) {
+        if (cache->map.hashes) {
+            bh_imap_clear(&cache->map);
+        } else {
+            i32 n = bh_arr_length(overloads) * 2;
+            if (n < 4) n = 4;
+            bh_imap_init(&cache->map, context->gp_alloc, n);
+        }
+        build_all_overload_options(overloads, &cache->map);
+        cache->epoch = context->overload_cache_epoch;
+        return &cache->map;
+    }
+
+    return NULL;
+}
+
+AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadOption) overloads, Arguments* param_args, OverloadCache *cache) {
     Arguments args;
     arguments_clone(context, &args, param_args);
     arguments_ensure_length(context, &args, bh_arr_length(args.values) + bh_arr_length(args.named_values));
 
-    // CLEANUP SPEED: This currently rebuilds the complete set of overloads every time one is looked up.
-    // This should be cached in the AstOverloadedFunction or somewhere like that.
-    bh_imap all_overloads;
-    bh_imap_init(&all_overloads, context->gp_alloc, bh_arr_length(overloads) * 2);
-    build_all_overload_options(overloads, &all_overloads);
+    bh_imap local_overloads;
+    bh_imap *all_overloads = overload_cache_get(context, overloads, cache);
+    b32 local = 0;
+    if (!all_overloads) {
+        bh_imap_init(&local_overloads, context->gp_alloc, bh_arr_length(overloads) * 2);
+        build_all_overload_options(overloads, &local_overloads);
+        all_overloads = &local_overloads;
+        local = 1;
+    }
 
     AstTyped *matched_overload = NULL;
 
-    bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
+    bh_arr_each(bh__imap_entry, entry, all_overloads->entries) {
         AstTyped* node = (AstTyped *) strip_aliases((AstNode *) entry->key);
         arguments_copy(context, &args, param_args);
 
@@ -656,7 +681,7 @@ AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadO
 
             // return and not continue because if the overload that didn't have a type will
             // work in the future, then it has to take precedence over the other options available.
-            bh_imap_free(&all_overloads);
+            if (local) bh_imap_free(all_overloads);
             bh_arr_free(args.values);
             return (AstTyped *) &context->node_that_signals_a_yield;
         }
@@ -676,27 +701,33 @@ AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadO
         }
 
         if (tm == TYPE_MATCH_YIELD) {
-            bh_imap_free(&all_overloads);
+            if (local) bh_imap_free(all_overloads);
             bh_arr_free(args.values);
             return (AstTyped *) &context->node_that_signals_a_yield;
         }
     }
 
-    bh_imap_free(&all_overloads);
+    if (local) bh_imap_free(all_overloads);
     bh_arr_free(args.values);
     return matched_overload;
 }
 
-AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption) overloads, Type* type) {
+AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption) overloads, Type* type, OverloadCache *cache) {
     if (type->kind != Type_Kind_Function) return NULL;
 
-    bh_imap all_overloads;
-    bh_imap_init(&all_overloads, context->gp_alloc, bh_arr_length(overloads) * 2);
-    build_all_overload_options(overloads, &all_overloads);
+    bh_imap local_overloads;
+    bh_imap *all_overloads = overload_cache_get(context, overloads, cache);
+    b32 local = 0;
+    if (!all_overloads) {
+        bh_imap_init(&local_overloads, context->gp_alloc, bh_arr_length(overloads) * 2);
+        build_all_overload_options(overloads, &local_overloads);
+        all_overloads = &local_overloads;
+        local = 1;
+    }
 
     AstTyped *matched_overload = NULL;
 
-    bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
+    bh_arr_each(bh__imap_entry, entry, all_overloads->entries) {
         AstTyped* node = (AstTyped *) entry->key;
         if (node->kind == Ast_Kind_Overloaded_Function) continue;
 
@@ -707,11 +738,12 @@ AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption
         }
 
         if (tm == TYPE_MATCH_YIELD) {
+            if (local) bh_imap_free(all_overloads);
             return (AstTyped *) &context->node_that_signals_a_yield;
         }
     }
-    
-    bh_imap_free(&all_overloads);
+
+    if (local) bh_imap_free(all_overloads);
     return matched_overload;
 }
 

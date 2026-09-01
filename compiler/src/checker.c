@@ -1006,7 +1006,8 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
         AstTyped* new_callee = find_matching_overload_by_arguments(
             context,
             ((AstOverloadedFunction *) callee)->overloads,
-            &call->args);
+            &call->args,
+            &((AstOverloadedFunction *) callee)->all_overloads);
 
         if (new_callee == NULL) {
             if (context->cycle_almost_detected < 2) {
@@ -1346,7 +1347,7 @@ static AstCall* binaryop_try_operator_overload(Context *context, AstBinaryOp* bi
         if (third_argument != NULL) binop->overload_args->values[2] = (AstTyped *) make_argument(context, third_argument);
     }
 
-    AstTyped* overload = find_matching_overload_by_arguments(context, context->operator_overloads[binop->operation], binop->overload_args);
+    AstTyped* overload = find_matching_overload_by_arguments(context, context->operator_overloads[binop->operation], binop->overload_args, &context->operator_overload_cache[binop->operation]);
     if (overload == NULL || overload == (AstTyped *) &context->node_that_signals_a_yield) return (AstCall *) overload;
 
     AstCall* implicit_call = onyx_ast_node_new(context->ast_alloc, sizeof(AstCall), Ast_Kind_Call);
@@ -1371,7 +1372,7 @@ static AstCall* unaryop_try_operator_overload(Context *context, AstUnaryOp* unop
         unop->overload_args->values[0] = (AstTyped *) make_argument(context, unop->expr);
     }
 
-    AstTyped* overload = find_matching_overload_by_arguments(context, context->unary_operator_overloads[unop->operation], unop->overload_args);
+    AstTyped* overload = find_matching_overload_by_arguments(context, context->unary_operator_overloads[unop->operation], unop->overload_args, &context->unary_operator_overload_cache[unop->operation]);
     if (overload == NULL || overload == (AstTyped *) &context->node_that_signals_a_yield) return (AstCall *) overload;
 
     AstCall* implicit_call = onyx_ast_node_new(context->ast_alloc, sizeof(AstCall), Ast_Kind_Call);
@@ -3677,7 +3678,8 @@ CHECK_FUNC(directive_solidify, AstDirectiveSolidify** psolid) {
             AstTyped *matched = find_matching_overload_by_arguments(
                 context,
                 ((AstOverloadedFunction *) target)->overloads,
-                &solid->args);
+                &solid->args,
+                &((AstOverloadedFunction *) target)->all_overloads);
 
             if (matched == NULL) {
                 if (context->cycle_almost_detected < 2) {
@@ -4266,11 +4268,9 @@ CHECK_FUNC(overloaded_function, AstOverloadedFunction* ofunc) {
 
     b32 done = 1;
 
-    bh_imap all_overloads;
-    bh_imap_init(&all_overloads, context->gp_alloc, 4);
-    build_all_overload_options(ofunc->overloads, &all_overloads);
+    bh_imap *all_overloads = overload_cache_get(context, ofunc->overloads, &ofunc->all_overloads);
 
-    bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
+    bh_arr_each(bh__imap_entry, entry, all_overloads->entries) {
         AstTyped* node = (AstTyped *) strip_aliases((AstNode *) entry->key);
         if (node->kind == Ast_Kind_Overloaded_Function) continue;
 
@@ -4280,7 +4280,6 @@ CHECK_FUNC(overloaded_function, AstOverloadedFunction* ofunc) {
             ONYX_ERROR(node->token->pos, Error_Critical, "Overload option not procedure or macro. Got '%s'",
                 onyx_ast_node_kind_string(node->kind));
 
-            bh_imap_free(&all_overloads);
             return Check_Error;
         }
 
@@ -4296,7 +4295,6 @@ CHECK_FUNC(overloaded_function, AstOverloadedFunction* ofunc) {
     }
 
     if (!done) {
-        bh_imap_free(&all_overloads);
         YIELD(ofunc->token->pos, "Waiting for all options to pass type-checking.");
     }
 
@@ -4320,7 +4318,6 @@ CHECK_FUNC(overloaded_function, AstOverloadedFunction* ofunc) {
                 // Return early here because the following code does not work with a
                 // polymorphic expected return type.
                 compilation_log_emit_overloads(context, ofunc);
-                bh_imap_free(&all_overloads);
                 return Check_Success;
             }
         }
@@ -4328,7 +4325,7 @@ CHECK_FUNC(overloaded_function, AstOverloadedFunction* ofunc) {
         ofunc->expected_return_type = type_build_from_ast(context, expected_return_node);
         if (!ofunc->expected_return_type) YIELD(ofunc->token->pos, "Waiting to construct expected return type.");
 
-        bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
+        bh_arr_each(bh__imap_entry, entry, all_overloads->entries) {
             AstTyped* node = (AstTyped *) entry->key;
 
             if (node->kind == Ast_Kind_Function) {
@@ -4342,7 +4339,6 @@ CHECK_FUNC(overloaded_function, AstOverloadedFunction* ofunc) {
 
                 if (!types_are_compatible(context, return_type, ofunc->expected_return_type)) {
                     report_incorrect_overload_expected_type(context, return_type, ofunc->expected_return_type, func->token, ofunc->token);
-                    bh_imap_free(&all_overloads);
                     return Check_Error;
                 }
             }
@@ -4352,7 +4348,6 @@ CHECK_FUNC(overloaded_function, AstOverloadedFunction* ofunc) {
 
     compilation_log_emit_overloads(context, ofunc);
 
-    bh_imap_free(&all_overloads);
     return Check_Success;
 }
 
@@ -5298,7 +5293,7 @@ CHECK_FUNC(process_directive, AstNode* directive) {
 
         add_overload->overload->flags &= ~Ast_Flag_Function_Is_Lambda;
 
-        add_overload_option(&ofunc->overloads, add_overload->order, add_overload->overload);
+        add_overload_option(context, &ofunc->overloads, add_overload->order, add_overload->overload);
         compilation_log_emit_overloads(context, ofunc);
         return Check_Success;
     }
@@ -5337,7 +5332,7 @@ CHECK_FUNC(process_directive, AstNode* directive) {
                 ERROR(operator->token->pos, "Unknown operator.");
             }
 
-            add_overload_option(&context->unary_operator_overloads[unop], operator->order, operator->overload);
+            add_overload_option(context, &context->unary_operator_overloads[unop], operator->order, operator->overload);
             return Check_Success;
         }
 
@@ -5345,7 +5340,7 @@ CHECK_FUNC(process_directive, AstNode* directive) {
             ERROR(operator->token->pos, "Expected exactly 2 arguments for binary operator overload.");
         }
 
-        add_overload_option(&context->operator_overloads[operator->operator], operator->order, operator->overload);
+        add_overload_option(context, &context->operator_overloads[operator->operator], operator->order, operator->overload);
         return Check_Success;
     }
 

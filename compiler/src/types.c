@@ -77,8 +77,9 @@ void types_dump_type_info(Context *context) {
 }
 
 Type* type_lookup_by_id(Context *context, u32 id) {
-    if (bh_imap_has(&context->types.type_map, id)) {
-        return (Type *) bh_imap_get(&context->types.type_map, id);
+    u64 type_p;
+    if (bh_imap_try_get(&context->types.type_map, id, &type_p)) {
+        return (Type *) type_p;
     }
 
     return NULL;

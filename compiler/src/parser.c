@@ -3513,7 +3513,7 @@ static AstOverloadedFunction* parse_overloaded_function(OnyxParser* parser, Onyx
 
         AstTyped* option = parse_expression(parser, 0);
         option->flags &= ~Ast_Flag_Function_Is_Lambda;
-        add_overload_option(&ofunc->overloads, order++, option);
+        add_overload_option(parser->context, &ofunc->overloads, order++, option);
 
         if (parser->curr->type != '}')
             expect_token(parser, ',');

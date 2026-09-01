@@ -718,7 +718,7 @@ TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b
     }
 
     if (node->kind == Ast_Kind_Overloaded_Function) {
-        AstTyped* func = find_matching_overload_by_type(context, ((AstOverloadedFunction *) node)->overloads, type);
+        AstTyped* func = find_matching_overload_by_type(context, ((AstOverloadedFunction *) node)->overloads, type, &((AstOverloadedFunction *) node)->all_overloads);
         if (func == NULL) return TYPE_MATCH_FAILED;
         if (func == (AstTyped *) &context->node_that_signals_a_yield) return TYPE_MATCH_YIELD;
 
@@ -1538,7 +1538,7 @@ TypeMatch implicit_cast_to_bool(Context *context, AstTyped **pnode) {
     }
 
     Arguments *args = (Arguments *) bh_imap_get(&context->caches.implicit_cast_to_bool_cache, (u64) node);
-    AstFunction *overload = (AstFunction *) find_matching_overload_by_arguments(context, context->builtins.implicit_bool_cast->overloads, args);
+    AstFunction *overload = (AstFunction *) find_matching_overload_by_arguments(context, context->builtins.implicit_bool_cast->overloads, args, &context->builtins.implicit_bool_cast->all_overloads);
 
     if (overload == NULL)                                       return TYPE_MATCH_FAILED;
     if (overload == (AstFunction *) &context->node_that_signals_a_yield) return TYPE_MATCH_YIELD;

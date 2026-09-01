@@ -797,8 +797,9 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(Context *context, AstFuncti
     }
 
     ensure_polyproc_cache_is_created(context, pp);
-    if (bh_imap_has(&pp->active_queries, (u64) actual)) {
-        AstPolyQuery *query = (AstPolyQuery *) bh_imap_get(&pp->active_queries, (u64) actual);
+    u64 query_p;
+    if (bh_imap_try_get(&pp->active_queries, (u64) actual, &query_p)) {
+        AstPolyQuery *query = (AstPolyQuery *) query_p;
         assert(query->kind == Ast_Kind_Polymorph_Query);
         assert(query->entity);
 
