@@ -72,7 +72,38 @@ build_native_archive() {
     rm -rf "$TMP"
 }
 
+host_lib_suffix() {
+    case "$(uname)" in
+        Linux)  echo 'so' ;;
+        *BSD)   echo 'so' ;;
+        Darwin) echo 'dylib' ;;
+        *)      echo 'dll' ;;
+    esac
+}
+
+copy_required() {
+    src="$1"
+    dest="$2"
+    if [ ! -f "$src" ]; then
+        echo "error: missing '$src' (run './build.sh compile' first)"
+        exit 1
+    fi
+    cp "$src" "$dest"
+}
+
+# Ad-hoc sign so dlopen is not SIGKILL'd by AFMI on macOS.
+sign_tree() {
+    root="$1"
+    [ "$(uname)" = 'Darwin' ] || return 0
+    [ -f "$root/bin/onyx" ] && codesign -s - "$root/bin/onyx"
+    [ -f "$root/lib/libonyx.dylib" ] && codesign -s - "$root/lib/libonyx.dylib"
+    [ -f "$root/lib/onyx_autocompiler.dylib" ] && codesign -s - "$root/lib/onyx_autocompiler.dylib"
+    [ -f "$root/lib/onyx_runtime.dylib" ] && codesign -s - "$root/lib/onyx_runtime.dylib"
+}
+
 package_all() {
+    : "${ONYX_ARCH:=$(uname | tr '[:upper:]' '[:lower:]')_$(uname -m)}"
+
     rm -rf "$DIST_DIR"
     mkdir -p "$DIST_DIR"
     mkdir -p "$DIST_DIR/lib"
@@ -83,31 +114,41 @@ package_all() {
     [ -d "$DIST_DIR/core" ] && rm -r "$DIST_DIR/core"
     cp -r ./core "$DIST_DIR/core"
 
-    case "$(uname)" in
-        Linux)  suffix='so' ;;
-        *BSD)   suffix='so' ;;
-        Darwin) suffix='dylib' ;;
-        *)      suffix='dll' ;;
-    esac
+    suffix="$(host_lib_suffix)"
 
     echo "Installing core tools"
     mkdir -p "$DIST_DIR/bin"
-    cp compiler/onyx "$DIST_DIR/bin/"
-    cp compiler/libonyx.$suffix "$DIST_DIR/lib/"
-    cp compiler/onyx_autocompiler.$suffix "$DIST_DIR/lib/"
-    cp "shared/include/onyx.h" "$DIST_DIR/include/onyx.h"
+    copy_required compiler/onyx "$DIST_DIR/bin/"
+    copy_required compiler/libonyx.$suffix "$DIST_DIR/lib/"
+    copy_required compiler/onyx_autocompiler.$suffix "$DIST_DIR/lib/"
+    copy_required "shared/include/onyx.h" "$DIST_DIR/include/onyx.h"
 
     mkdir -p "$DIST_DIR/tools"
     mkdir -p "$DIST_DIR/tools/pkg_templates"
-    cp ./scripts/onyx-pkg.onyx "$DIST_DIR/tools"
-    cp ./scripts/default.json "$DIST_DIR/tools/pkg_templates"
-    cp ./scripts/lsp.wasm "$DIST_DIR/tools"
+    copy_required ./scripts/onyx-pkg.onyx "$DIST_DIR/tools"
+    copy_required ./scripts/default.json "$DIST_DIR/tools/pkg_templates"
+    copy_required ./scripts/lsp.wasm "$DIST_DIR/tools"
 
-    if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
-        echo "Installing runtime library"
+    echo "Installing runtime library"
+    if [ -f "runtime/onyx_runtime.$suffix" ]; then
+        cp "runtime/onyx_runtime.$suffix" "$DIST_DIR/lib/"
+    elif [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
+        echo "error: missing 'runtime/onyx_runtime.$suffix' (run './build.sh compile' first)"
+        exit 1
+    fi
 
-        [ -f runtime/onyx_runtime.$suffix ] && cp runtime/onyx_runtime.$suffix "$DIST_DIR/lib/"
-        [ -f "shared/lib/$ONYX_ARCH/lib/libonyx_native.a" ] && cp "shared/lib/$ONYX_ARCH/lib/libonyx_native.a" "$DIST_DIR/lib/"
+    NATIVE_LIB="shared/lib/$ONYX_ARCH/lib/libonyx_native.a"
+    if [ ! -f "$NATIVE_LIB" ] && [ "$ONYX_RUNTIME_LIBRARY" = "ovmwasm" ]; then
+        build_native_archive
+    fi
+    if [ -f "$NATIVE_LIB" ]; then
+        cp "$NATIVE_LIB" "$DIST_DIR/lib/"
+    elif [ "$ONYX_RUNTIME_LIBRARY" = "ovmwasm" ]; then
+        echo "error: missing '$NATIVE_LIB' (run './build.sh compile' first)"
+        exit 1
+    fi
+
+    if [ -f "shared/include/onyx_library.h" ]; then
         cp "shared/include/onyx_library.h" "$DIST_DIR/include/onyx_library.h"
         cp "shared/include/wasm.h" "$DIST_DIR/include/wasm.h"
     fi
@@ -123,19 +164,12 @@ package_all() {
     cp misc/vscode/onyxlang-0.1.9.vsix "$DIST_DIR/misc"
 
     cp LICENSE "$DIST_DIR/LICENSE"
+
+    sign_tree "$DIST_DIR"
 }
 
 compress_all() {
     package_all
-
-    # Sign the binaries on MacOS, Linked-signed dylibs get SIGKILL'd on
-    # load (AFMI) unless they are ad-hoc signed like the onyx executable.
-    [ "$(uname)" = 'Darwin' ] && \
-        codesign -s - "$DIST_DIR/bin/onyx" && \
-        codesign -s - "$DIST_DIR/lib/libonyx.dylib" && \
-        codesign -s - "$DIST_DIR/lib/onyx_autocompiler.dylib" && \
-        [ -f "$DIST_DIR/lib/onyx_runtime.dylib" ] && \
-            codesign -s - "$DIST_DIR/lib/onyx_runtime.dylib"
 
     tar -C "$DIST_DIR" -zcvf onyx.tar.gz bin core examples include lib misc tools LICENSE
 
@@ -151,15 +185,8 @@ install_all() {
     mkdir -p "$ONYX_INSTALL_DIR"
     cp -r "$DIST_DIR/." "$ONYX_INSTALL_DIR"
 
-    # Sign the binaries on MacOS, install copies unsigned/linked-signed
-    # dylibs from package_all; without, dlopen of libonyx /
-    # onyx_autocompiler is SIGKILL'd by AFMI (onyx lps, Builder, etc.).
-    [ "$(uname)" = 'Darwin' ] && \
-        codesign -s - "$ONYX_INSTALL_DIR/bin/onyx" && \
-        codesign -s - "$ONYX_INSTALL_DIR/lib/libonyx.dylib" && \
-        codesign -s - "$ONYX_INSTALL_DIR/lib/onyx_autocompiler.dylib" && \
-        [ -f "$ONYX_INSTALL_DIR/lib/onyx_runtime.dylib" ] && \
-            codesign -s - "$ONYX_INSTALL_DIR/lib/onyx_runtime.dylib"
+    # Re-sign after copy; some Darwin copies drop the ad-hoc signature.
+    sign_tree "$ONYX_INSTALL_DIR"
 }
 
 for arg in $@; do
