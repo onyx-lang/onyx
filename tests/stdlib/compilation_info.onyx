@@ -88,6 +88,16 @@ Names.has_a :: (s: Names) -> bool {
 
 Ptr :: &Point
 Arr :: [2] i32
+
+Holder :: struct {
+    m: Map(str, u32)
+    o: Optional(i32)
+}
+
+Used :: struct {
+    use p: Point
+    extra: i32
+}
 """);
 
     b->inject_source("""
@@ -342,6 +352,70 @@ main :: () {
     ok("names_alias_is_slice", names_type_ok);
     ok("names_slice_has_scope", slice_scope_ok);
     ok("names_method_has_a", names_method_ok);
+
+    map_poly_id: u32;
+    for id in info->types_named("Map") {
+        if info->get_type(id) as t {
+            if t.kind == .Poly_Struct do map_poly_id = t.id;
+        }
+    }
+    ok("map_poly_template", map_poly_id != 0);
+
+    map_inst: &TypeInfo = null;
+    if point_type != null {
+        // Holder.m is Map(str, u32)
+        for id in info->types_named("Holder") {
+            if info->get_type(id) as ht {
+                if info->member(ht.id, "m") as m {
+                    if info->get_type(m.type_id) as mt do map_inst = mt;
+                }
+            }
+        }
+    }
+    map_from_ok := false;
+    map_key_ok := false;
+    map_val_ok := false;
+    if map_inst != null {
+        if info->constructed_from(map_inst.id) as from {
+            map_from_ok = from.id == map_poly_id;
+        }
+        if info->poly_arg(map_inst.id, "Key_Type") as k {
+            map_key_ok = k.name == "str" || k.name == "[] u8";
+        }
+        if info->poly_arg(map_inst.id, "Value_Type") as v {
+            map_val_ok = v.name == "u32";
+        }
+    }
+    ok("map_constructed_from", map_from_ok);
+    ok("map_poly_arg_key", map_key_ok);
+    ok("map_poly_arg_value", map_val_ok);
+
+    opt_from_ok := false;
+    for id in info->types_named("Holder") {
+        if info->get_type(id) as ht {
+            if info->member(ht.id, "o") as m {
+                if info->constructed_from(m.type_id) as from {
+                    opt_from_ok = from.name == "Optional" || from.kind == .Poly_Union;
+                }
+            }
+        }
+    }
+    ok("optional_constructed_from", opt_from_ok);
+
+    use_member_ok := false;
+    included_ok := false;
+    for id in info->types_named("Used") {
+        if info->get_type(id) as ut {
+            if info->member(ut.id, "p") as m {
+                use_member_ok = m.is_used && !m.included_through_use;
+            }
+            if info->member(ut.id, "x") as m {
+                included_ok = m.included_through_use && !m.is_used;
+            }
+        }
+    }
+    ok("use_member_is_used", use_member_ok);
+    ok("use_member_flattened", included_ok);
 
     first_applied := info.events_applied;
 

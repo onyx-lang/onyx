@@ -200,6 +200,12 @@ EventType :: struct {
     kind: TypeKind
     @protobuf.Field.{3, 9}
     name: str
+    @protobuf.Field.{4, 13}
+    constructed_from_id: u32
+    @protobuf.Field.{5, 9}
+    poly_arg_names: [..] str
+    @protobuf.Field.{6, 13}
+    poly_arg_type_ids: [..] u32
     body: union {
         None: void
         @protobuf.Field.{10, 11}
@@ -341,6 +347,10 @@ TypeStructMember :: struct {
     idx: u32
     @protobuf.Field.{5, 13}
     symbol_id: u32
+    @protobuf.Field.{6, 8}
+    included_through_use: bool
+    @protobuf.Field.{7, 8}
+    is_used: bool
 }
 
 @protobuf.Message

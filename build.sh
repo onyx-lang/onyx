@@ -162,6 +162,7 @@ package_all() {
     cp misc/onyx.sublime-syntax "$DIST_DIR/misc"
     cp misc/onyx.tmPreferences "$DIST_DIR/misc"
     cp misc/vscode/onyxlang-0.1.9.vsix "$DIST_DIR/misc"
+    cp core/onyx/toolchain/compiler_events.proto "$DIST_DIR/misc"
 
     cp LICENSE "$DIST_DIR/LICENSE"
 

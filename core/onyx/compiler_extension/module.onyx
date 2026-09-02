@@ -51,6 +51,7 @@ use onyx.toolchain { CompilationInfo }
 //     position (Position)
 //     macro_name (str)
 //     body (str)
+//     scope_id (u32)     PROTOCOL 5: expansion-site scope for nearby lookup
 //
 
 // PROTOCOL VERSION 2 CHANGES
@@ -63,6 +64,9 @@ use onyx.toolchain { CompilationInfo }
 //
 // INCOMING HOOK (3)
 //     Added
+//     1 = Stalled — no entity made progress. Remaining CompilationData
+//         is flushed first so the extension can inject code that
+//         defines missing names, then checking resumes.
 //
 // PROTOCOL VERSION 3 CHANGES
 //
@@ -84,6 +88,13 @@ use onyx.toolchain { CompilationInfo }
 //     generation. Remaining CompilationData is flushed first so
 //     CompilationInfo is complete. InjectCode is applied and compiled
 //     before generation; the hook may fire again if inject added work.
+//
+// PROTOCOL VERSION 5 CHANGES
+//
+// INCOMING EXPANDMACRO (2)
+//     added `scope_id (u32)` after `body`
+//     Scope of the expansion entity, so the extension can look up
+//     nearby symbols (CompilationInfo.lookup) once types are ready.
 
 
 // Types
@@ -145,6 +156,7 @@ ExpansionInfo :: struct {
     position: Position
     macro_name: str
     body: str
+    scope_id: u32
 }
 
 ExpansionLocation :: enum {
@@ -334,10 +346,6 @@ ExtensionContext.handle_hook :: (self: &#Self, hook: HookInfo.tag_enum, func: (&
     if hook == .All_Code_Checked {
         if self.protocol_version < 4 do self.protocol_version = 4
     }
-}
-
-ExtensionContext.on_all_code_checked :: (self: &#Self, func: (&ExtensionContext, HookInfo) -> void) {
-    self->handle_hook(.All_Code_Checked, func)
 }
 
 ExtensionContext.enable_compilation_data :: (self: &#Self) {

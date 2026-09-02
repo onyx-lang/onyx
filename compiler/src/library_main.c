@@ -467,6 +467,21 @@ static b32 process_entity(Context *context, Entity* ent) {
     return changed;
 }
 
+static b32 extensions_still_starting(Context *context) {
+    EntityHeap *eh = &context->entities;
+    for (i32 s = 0; s < Entity_State_Count; s++) {
+        if (s >= Entity_State_Code_Gen) continue;
+        if (eh->all_count[s][Entity_Type_Compiler_Extension] > 0) return 1;
+    }
+    bh_arr_each(CompilerExtension, ext, context->extensions) {
+        if (!ext->alive) continue;
+        if (ext->state == COMP_EXT_STATE_SPAWNING || ext->state == COMP_EXT_STATE_INITIATING) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static void dump_cycles(Context *context) {
     context->cycle_detected = 1;
     Entity* ent;
@@ -485,6 +500,11 @@ static void dump_cycles(Context *context) {
 
 // TODO: relocate this function
 static void send_stalled_hooks(Context *context) {
+    // Compilation-data delivery is batched. A stall is the last chance
+    // for an extension to see every type/symbol recorded so far and
+    // inject code that resolves the missing names.
+    compiler_extensions_flush_compilation_data_now(context);
+
     bh_arr_each(CompilerExtension, ext, context->extensions) {
         compiler_extension_hook_stalled(context, ext->id);
     }
@@ -506,7 +526,8 @@ static void send_all_code_checked_hooks(Context *context) {
 }
 
 // Barrier before code generation. Compilation-data delivery stays async;
-// this is the rendezvous where extensions can inject more source.
+// this is the rendezvous where extensions can inject more source
+// (`#init`, tagged procedures, …) after everything has type-checked.
 // Returns 1 if inject added compile work that must run first.
 static b32 maybe_all_code_checked_barrier(Context *context) {
     if (context->all_code_checked_hook_done) return 0;
@@ -707,6 +728,16 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
         else if (context->watermarked_node == ent) {
             if (ent->macro_attempts > context->highest_watermark) {
                 entity_heap_insert_existing(&context->entities, ent);
+
+                // The child is still negotiating. A stall now would see
+                // no registered hooks, and dump_cycles would turn every
+                // yield into a hard error before inject can run.
+                if (extensions_still_starting(context)) {
+                    context->watermarked_node = NULL;
+                    context->highest_watermark = 0;
+                    context->cycle_almost_detected = 0;
+                    return pump_return(context, ONYX_PUMP_CONTINUE);
+                }
 
                 if (context->cycle_almost_detected == 4) {
                     dump_cycles(context);

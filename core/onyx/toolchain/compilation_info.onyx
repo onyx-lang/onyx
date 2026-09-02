@@ -247,8 +247,15 @@ CompilationInfo.ingest_event :: (self: &#Self, event: &CompilerEvent) {
         case .Type as t {
             slot := ensure_id(&self.types, t.id)
             first := slot.id == 0
+            old_name := slot.name
             slot.decl = t
-            if first do index_list(&self.types_by_name, t.name, t.id)
+            if first {
+                index_list(&self.types_by_name, t.name, t.id)
+            } elseif t.name.count > 0 && t.name != old_name {
+                // A later EventType can fill in Map(str, u32) after the
+                // first emit, which often has an empty / anonymous name.
+                index_list(&self.types_by_name, t.name, t.id)
+            }
         }
 
         case .Type_Body as tb {
@@ -705,6 +712,32 @@ CompilationInfo.variant :: (self: &#Self, type_id: u32, name: str) -> ? &TypeUni
         }
     }
     return .None
+}
+
+/// Template this instance was built from (`Map` for `Map(str, u32)`).
+CompilationInfo.constructed_from :: (self: &#Self, type_id: u32) -> ? &TypeInfo {
+    switch self->get_type(type_id) {
+        case .Some as t {
+            if t.constructed_from_id == 0 do return .None
+            return self->get_type(t.constructed_from_id)
+        }
+        case .None do return .None
+    }
+}
+
+/// Solved poly argument of this instance (`"Value_Type"` → `u32` on `Map(str, u32)`).
+CompilationInfo.poly_arg :: (self: &#Self, type_id: u32, name: str) -> ? &TypeInfo {
+    switch self->get_type(type_id) {
+        case .Some as t {
+            for n, i in t.poly_arg_names {
+                if n != name do continue
+                if i >= t.poly_arg_type_ids.count do return .None
+                return self->get_type(t.poly_arg_type_ids[i])
+            }
+            return .None
+        }
+        case .None do return .None
+    }
 }
 
 /// Element type of a pointer, multi-pointer, slice, dyn-array, varargs, or array;
