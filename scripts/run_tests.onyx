@@ -49,7 +49,7 @@ LEAK_CHECK_MARKER :: "@leak-check";
 LEAK_LINE_PREFIX  :: "[LEAK]";
 
 strip_leak_reports :: (output: str) -> (clean: str, leak_count: i32) {
-    if !string.contains(output, LEAK_LINE_PREFIX) {
+    if !str.contains(output, LEAK_LINE_PREFIX) {
         clean = output;
         leak_count = 0;
         return;
@@ -62,7 +62,7 @@ strip_leak_reports :: (output: str) -> (clean: str, leak_count: i32) {
         end_of_line := i == output.count || output[i] == '\n';
         if end_of_line {
             line := output[start .. i];
-            if string.starts_with(line, LEAK_LINE_PREFIX) {
+            if str.starts_with(line, LEAK_LINE_PREFIX) {
                 leak_count += 1;
             } else {
                 dyn_str.append(&result, line);
@@ -81,23 +81,22 @@ strip_leak_reports :: (output: str) -> (clean: str, leak_count: i32) {
 
 find_onyx_files :: (root: str, cases: &[..] Test_Case) {
     for os.list_directory(root) {
-        path_buffer: [512] u8;
+        use path := os.Path.join(root, it->name());
         if string.ends_with(it->name(), ".onyx") {
-            test_case := string.concat(path_buffer, root, "/", it->name()) |> string.copy();
-            expected_file := test_case[0 .. (test_case.count - 5)];
+            expected_file := path[0 .. (path.count - 5)];
 
-            if !os.file_exists(expected_file) {
-                print_color(.Yellow, "Skipping test case {} because an expected output file was not found.\n", test_case);
+            if !os.File.exists(expected_file) {
+                print_color(.Yellow, "Skipping test case {} because an expected output file was not found.\n", path);
                 continue;
             }
 
-            contents := os.get_contents(test_case);
-            leak_check := string.contains(contents, LEAK_CHECK_MARKER);
-            array.push(cases, .{ test_case, expected_file, leak_check });
+            contents := os.get_contents(path);
+            leak_check := str.contains(contents, LEAK_CHECK_MARKER);
+            Array.push(cases, .{ path, expected_file, leak_check });
         }
 
         if it.type == .Directory {
-            find_onyx_files(string.concat(path_buffer, root, "/", it->name()), cases);
+            find_onyx_files(path, cases);
         }
     }
 
@@ -124,6 +123,9 @@ Settings :: struct {
 
     #tag "--leak-check"
     leak_check := false;
+
+    #tag "--jit"
+    jit := false;
 }
 
 main :: (args) => {
@@ -136,6 +138,7 @@ main :: (args) => {
         at_least_one_test_failed := false;
         compile_only := false;   // @Bug // why is this necessary? why is settings.compile_only false when in the thread code?
         leak_check := false;
+        jit := false;
 
         failed_tests: &[..] str;
         leaked_tests: &[..] str;
@@ -144,6 +147,7 @@ main :: (args) => {
     exec_context := Execution_Context.{};
     exec_context.compile_only = settings.compile_only;
     exec_context.leak_check = settings.leak_check;
+    exec_context.jit = settings.jit;
 
     failed_tests := make([..] str);
     leaked_tests := make([..] str);
@@ -184,6 +188,9 @@ main :: (args) => {
             if check_leaks {
                 args << "-DLEAKCHECK"
             }
+            if thread_data.jit {
+                args << "--jit"
+            }
             args << it.source_file
             cmd->args(args);
         }
@@ -196,7 +203,7 @@ main :: (args) => {
                 thread_data.at_least_one_test_failed = true;
 
                 sync.critical_section(&thread_data.failed_tests_mutex) {
-                    array.push(thread_data.failed_tests, it.source_file);
+                    Array.push(thread_data.failed_tests, it.source_file);
                 }
 
                 continue;
@@ -219,14 +226,14 @@ main :: (args) => {
             thread_data.at_least_one_test_failed = true;
 
             sync.critical_section(&thread_data.failed_tests_mutex) {
-                array.push(thread_data.failed_tests, it.source_file);
+                Array.push(thread_data.failed_tests, it.source_file);
             }
 
         } elseif leak_count > 0 {
             print_color(.Yellow, "[{}]  {} leaked (ignored).\n", context.thread_id, it.source_file);
 
             sync.critical_section(&thread_data.failed_tests_mutex) {
-                array.push(thread_data.leaked_tests, it.source_file);
+                Array.push(thread_data.leaked_tests, it.source_file);
             }
         }
 
@@ -237,7 +244,7 @@ main :: (args) => {
             thread_data.at_least_one_test_failed = true;
 
             sync.critical_section(&thread_data.failed_tests_mutex) {
-                array.push(thread_data.failed_tests, it.source_file);
+                Array.push(thread_data.failed_tests, it.source_file);
             }
         }
     }

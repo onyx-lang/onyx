@@ -4389,10 +4389,12 @@ static void parse_top_level_statement(OnyxParser* parser) {
         }
 
         case Token_Type_Symbol: {
-            // Handle implicit injections as 'Foo.bar ::' or 'Foo(T).bar ::'
+            // Handle implicit injections as 'Foo.bar ::' or 'Foo(T).bar ::',
+            // and top-level procedural macro expansions as 'the_macro!{ ... }'.
             if (   peek_token(1)->type == '.'
                 || peek_token(1)->type == '('
-                || peek_token(1)->type == Token_Type_Left_Arrow) {
+                || peek_token(1)->type == Token_Type_Left_Arrow
+                || peek_token(1)->type == Token_Type_Proc_Macro_Body) {
                 parse_implicit_injection(parser);
                 return;
             }

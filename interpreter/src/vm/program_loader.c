@@ -1,4 +1,5 @@
 #include "vm.h"
+#include "ovm_jit.h"
 
 //
 // I'm very lazy and silly, so this code make the drastic assumption that the
@@ -100,6 +101,8 @@ bool ovm_program_load_from_file(ovm_program_t *program, ovm_engine_t *engine, ch
         // For now, these are just ignored...
     }
     program->register_count = entry_count;
+
+    ovm_jit_compile_program(engine, program);
 
     return true;
 }

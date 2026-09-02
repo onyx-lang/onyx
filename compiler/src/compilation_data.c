@@ -142,9 +142,12 @@ enum {
 #define PB_EVENT_BINDING_TYPE_ID          3
 #define PB_EVENT_BINDING_PARAM_SYMBOL_IDS 4
 
-#define PB_EVENT_TYPE_ID           1
-#define PB_EVENT_TYPE_KIND         2
-#define PB_EVENT_TYPE_NAME         3
+#define PB_EVENT_TYPE_ID                    1
+#define PB_EVENT_TYPE_KIND                  2
+#define PB_EVENT_TYPE_NAME                  3
+#define PB_EVENT_TYPE_CONSTRUCTED_FROM_ID   4
+#define PB_EVENT_TYPE_POLY_ARG_NAMES        5
+#define PB_EVENT_TYPE_POLY_ARG_TYPE_IDS     6
 #define PB_EVENT_TYPE_BASIC        10
 #define PB_EVENT_TYPE_ELEM         11
 #define PB_EVENT_TYPE_ARRAY        12
@@ -184,11 +187,13 @@ enum {
 #define PB_EVENT_TYPE_BODY_UNION      11
 
 #define PB_TYPE_STRUCT_BODY_MEMBERS 1
-#define PB_TYPE_STRUCT_MEMBER_NAME      1
-#define PB_TYPE_STRUCT_MEMBER_TYPE_ID   2
-#define PB_TYPE_STRUCT_MEMBER_OFFSET    3
-#define PB_TYPE_STRUCT_MEMBER_IDX       4
-#define PB_TYPE_STRUCT_MEMBER_SYMBOL_ID 5
+#define PB_TYPE_STRUCT_MEMBER_NAME                  1
+#define PB_TYPE_STRUCT_MEMBER_TYPE_ID               2
+#define PB_TYPE_STRUCT_MEMBER_OFFSET                3
+#define PB_TYPE_STRUCT_MEMBER_IDX                   4
+#define PB_TYPE_STRUCT_MEMBER_SYMBOL_ID             5
+#define PB_TYPE_STRUCT_MEMBER_INCLUDED_THROUGH_USE  6
+#define PB_TYPE_STRUCT_MEMBER_IS_USED               7
 
 #define PB_TYPE_UNION_BODY_TAG_TYPE_ID 1
 #define PB_TYPE_UNION_BODY_VARIANTS    2
@@ -314,6 +319,43 @@ static u32 compilation_log_basic_kind(enum BasicKind kind);
 static b32 compilation_log_lookup_symbol_id(CompilationLog *log, AstNode *node, u32 *out);
 static char *compilation_log_binding_docs(Context *context, CompilationLog *log, AstNode *node);
 
+static void encode_type_poly_construction(Context *context, Type *type, bh_buffer *inner) {
+    AstType *from = NULL;
+    bh_arr(AstPolySolution) slns = NULL;
+
+    if (type->kind == Type_Kind_Struct) {
+        from = type->Struct.constructed_from;
+        slns = type->Struct.poly_sln;
+    } else if (type->kind == Type_Kind_Union) {
+        from = type->Union.constructed_from;
+        slns = type->Union.poly_sln;
+    }
+
+    if (from && from->type_id) {
+        pb_write_uint32(inner, PB_EVENT_TYPE_CONSTRUCTED_FROM_ID, from->type_id);
+    }
+
+    u32 n = (u32) bh_arr_length(slns);
+    for (u32 i = 0; i < n; i++) {
+        AstPolySolution *sln = &slns[i];
+        char *sname = (char *) "";
+        if (sln->poly_sym && sln->poly_sym->token && sln->poly_sym->token->length > 0) {
+            sname = compilation_log_intern_len(
+                context, sln->poly_sym->token->text, sln->poly_sym->token->length
+            );
+        }
+        pb_write_string(inner, PB_EVENT_TYPE_POLY_ARG_NAMES, sname);
+
+        u32 tid = 0;
+        if (sln->kind == PSK_Type && sln->type) {
+            tid = sln->type->id;
+        } else if (sln->kind == PSK_Value && sln->value && sln->value->type) {
+            tid = sln->value->type->id;
+        }
+        pb_write_uint32_always(inner, PB_EVENT_TYPE_POLY_ARG_TYPE_IDS, tid);
+    }
+}
+
 static void encode_type_payload(Context *context, Type *type) {
     CompilationLog *log = &context->compilation_log;
     bh_buffer *inner = &log->pb_field;
@@ -323,6 +365,7 @@ static void encode_type_payload(Context *context, Type *type) {
     pb_write_uint32(inner, PB_EVENT_TYPE_ID, type->id);
     pb_write_uint32(inner, PB_EVENT_TYPE_KIND, compilation_log_type_kind(type->kind));
     pb_write_string(inner, PB_EVENT_TYPE_NAME, compilation_log_type_name(context, type));
+    encode_type_poly_construction(context, type, inner);
 
     bh_buffer_clear(sub);
 
@@ -474,8 +517,39 @@ static void encode_type_body_payload(Context *context, Type *type) {
             pb_write_uint32_always(item, PB_TYPE_STRUCT_MEMBER_OFFSET, smem ? smem->offset : 0);
             pb_write_uint32_always(item, PB_TYPE_STRUCT_MEMBER_IDX, smem ? smem->idx : 0);
             pb_write_uint32(item, PB_TYPE_STRUCT_MEMBER_SYMBOL_ID, sid);
+            if (smem && smem->included_through_use) {
+                pb_write_uint32_always(item, PB_TYPE_STRUCT_MEMBER_INCLUDED_THROUGH_USE, 1);
+            }
+            if (smem && smem->used) {
+                pb_write_uint32_always(item, PB_TYPE_STRUCT_MEMBER_IS_USED, 1);
+            }
             pb_write_bytes(sub, PB_TYPE_STRUCT_BODY_MEMBERS, item->data, item->length);
         }
+
+        // Members flattened in by `use` live only in the lookup table, not in
+        // memarr, because they are not part of the struct's own layout. Report
+        // them so an extension can see the same names field access resolves.
+        fori (i, 0, shlen(type->Struct.members)) {
+            StructMember *smem = type->Struct.members[i].value;
+            if (!smem || !smem->included_through_use) continue;
+
+            u32 sid = 0;
+            if (smem->member_node) {
+                compilation_log_lookup_symbol_id(log, (AstNode *) smem->member_node, &sid);
+            }
+            bh_buffer_clear(item);
+            pb_write_string(item, PB_TYPE_STRUCT_MEMBER_NAME, smem->name ? smem->name : "");
+            pb_write_uint32(item, PB_TYPE_STRUCT_MEMBER_TYPE_ID, smem->type ? smem->type->id : 0);
+            pb_write_uint32_always(item, PB_TYPE_STRUCT_MEMBER_OFFSET, smem->offset);
+            pb_write_uint32_always(item, PB_TYPE_STRUCT_MEMBER_IDX, smem->idx);
+            pb_write_uint32(item, PB_TYPE_STRUCT_MEMBER_SYMBOL_ID, sid);
+            pb_write_uint32_always(item, PB_TYPE_STRUCT_MEMBER_INCLUDED_THROUGH_USE, 1);
+            if (smem->used) {
+                pb_write_uint32_always(item, PB_TYPE_STRUCT_MEMBER_IS_USED, 1);
+            }
+            pb_write_bytes(sub, PB_TYPE_STRUCT_BODY_MEMBERS, item->data, item->length);
+        }
+
         pb_write_bytes(inner, PB_EVENT_TYPE_BODY_STRUCT, sub->data, sub->length);
         return;
     }

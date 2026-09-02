@@ -2130,6 +2130,7 @@ struct CompileOptions {
     b32 compilation_data_detailed : 1;
 
     b32 running_perf : 1;
+    b32 enable_jit   : 1;
 
     Runtime runtime;
 

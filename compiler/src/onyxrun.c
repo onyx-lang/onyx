@@ -23,7 +23,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    onyx_run_initialize(debug);
+    b32 jit = 0;
+    {
+        char *jit_env = getenv("ONYX_JIT");
+        if (jit_env && jit_env[0] == '1') jit = 1;
+    }
+    onyx_run_initialize(debug, NULL, jit);
 
     bh_file wasm_file;
     bh_file_error err = bh_file_open(&wasm_file, argv[wasm_file_idx]);

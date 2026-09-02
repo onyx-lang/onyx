@@ -164,6 +164,15 @@ message EventType {
   TypeKind kind = 2;
   string name = 3;
 
+  // Poly-struct / poly-union instance: the template this was built from.
+  // 0 if this type is not a polymorphic instantiation.
+  uint32 constructed_from_id = 4;
+  // Parallel arrays. poly_arg_names[i] is the template parameter
+  // (Key_Type, Value_Type, …). poly_arg_type_ids[i] is the solved type,
+  // or 0 when that slot was a baked value.
+  repeated string poly_arg_names = 5;
+  repeated uint32 poly_arg_type_ids = 6;
+
   // Known at type creation. Struct/union member lists come later.
   // Enum values are filled in a later EventType for the same id once the enum is checked.
   oneof body {
@@ -263,6 +272,10 @@ message TypeStructMember {
   uint32 offset = 3;
   uint32 idx = 4;
   uint32 symbol_id = 5;
+  // True when this field was flattened in from a `use` member.
+  bool included_through_use = 6;
+  // True when this field is itself a `use other: Other` member.
+  bool is_used = 7;
 }
 
 message TypeStructBody {

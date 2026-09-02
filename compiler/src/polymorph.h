@@ -1292,10 +1292,12 @@ Type* polymorphic_struct_lookup(Context *context, AstPolyStructType* ps_type, bh
         Type* cs_type = type_build_from_ast(context, (AstType *) concrete_struct);
         if (!cs_type) return NULL;
 
+        b32 first_construction = cs_type->Struct.constructed_from == NULL;
         cs_type->Struct.constructed_from = (AstType *) ps_type;
         
         if (cs_type->Struct.poly_sln == NULL) cs_type->Struct.poly_sln = bh_arr_copy(context->gp_alloc, slns);
         if (cs_type->Struct.name == NULL)     cs_type->Struct.name = build_poly_struct_name(context, ps_type->name, cs_type);
+        if (first_construction) compilation_log_emit_type(context, cs_type);
 
         return cs_type;
     }
@@ -1365,10 +1367,12 @@ Type* polymorphic_union_lookup(Context *context, AstPolyUnionType* pu_type, bh_a
         Type* cu_type = type_build_from_ast(context, (AstType *) concrete_union);
         if (!cu_type) return NULL;
 
+        b32 first_construction = cu_type->Union.constructed_from == NULL;
         cu_type->Union.constructed_from = (AstType *) pu_type;
         
         if (cu_type->Union.poly_sln == NULL) cu_type->Union.poly_sln = bh_arr_copy(context->gp_alloc, slns);
         cu_type->Union.name = build_poly_struct_name(context, pu_type->name, cu_type);
+        if (first_construction) compilation_log_emit_type(context, cu_type);
 
         return cu_type;
     }

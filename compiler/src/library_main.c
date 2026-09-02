@@ -467,6 +467,21 @@ static b32 process_entity(Context *context, Entity* ent) {
     return changed;
 }
 
+static b32 extensions_still_starting(Context *context) {
+    EntityHeap *eh = &context->entities;
+    for (i32 s = 0; s < Entity_State_Count; s++) {
+        if (s >= Entity_State_Code_Gen) continue;
+        if (eh->all_count[s][Entity_Type_Compiler_Extension] > 0) return 1;
+    }
+    bh_arr_each(CompilerExtension, ext, context->extensions) {
+        if (!ext->alive) continue;
+        if (ext->state == COMP_EXT_STATE_SPAWNING || ext->state == COMP_EXT_STATE_INITIATING) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static void dump_cycles(Context *context) {
     context->cycle_detected = 1;
     Entity* ent;
@@ -485,6 +500,11 @@ static void dump_cycles(Context *context) {
 
 // TODO: relocate this function
 static void send_stalled_hooks(Context *context) {
+    // Compilation-data delivery is batched. A stall is the last chance
+    // for an extension to see every type/symbol recorded so far and
+    // inject code that resolves the missing names.
+    compiler_extensions_flush_compilation_data_now(context);
+
     bh_arr_each(CompilerExtension, ext, context->extensions) {
         compiler_extension_hook_stalled(context, ext->id);
     }
@@ -506,7 +526,8 @@ static void send_all_code_checked_hooks(Context *context) {
 }
 
 // Barrier before code generation. Compilation-data delivery stays async;
-// this is the rendezvous where extensions can inject more source.
+// this is the rendezvous where extensions can inject more source
+// (`#init`, tagged procedures, …) after everything has type-checked.
 // Returns 1 if inject added compile work that must run first.
 static b32 maybe_all_code_checked_barrier(Context *context) {
     if (context->all_code_checked_hook_done) return 0;
@@ -708,6 +729,16 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
             if (ent->macro_attempts > context->highest_watermark) {
                 entity_heap_insert_existing(&context->entities, ent);
 
+                // The child is still negotiating. A stall now would see
+                // no registered hooks, and dump_cycles would turn every
+                // yield into a hard error before inject can run.
+                if (extensions_still_starting(context)) {
+                    context->watermarked_node = NULL;
+                    context->highest_watermark = 0;
+                    context->cycle_almost_detected = 0;
+                    return pump_return(context, ONYX_PUMP_CONTINUE);
+                }
+
                 if (context->cycle_almost_detected == 4) {
                     dump_cycles(context);
                 } else if (context->cycle_almost_detected == 3) {
@@ -849,6 +880,7 @@ int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t valu
     case ONYX_OPTION_PLATFORM:               ctx->context.options.runtime = value; return 1;
     case ONYX_OPTION_PARSE_ONLY:             ctx->context.options.parse_only = value; return 1;
     case ONYX_OPTION_COMPILATION_DATA_DETAILED: ctx->context.options.compilation_data_detailed = value; return 1;
+    case ONYX_OPTION_JIT:                    ctx->context.options.enable_jit = value; return 1;
 
     default:
         break;
@@ -1215,8 +1247,8 @@ const char *onyx_stat_filepath(onyx_context_t *ctx, int32_t file_index) {
 //
 
 #ifdef ONYX_RUNTIME_LIBRARY
-void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv) {
-    onyx_run_initialize(0, NULL);
+void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv, int32_t jit_enabled) {
+    onyx_run_initialize(0, NULL, jit_enabled);
 
     bh_buffer wasm_bytes;
     wasm_bytes.data = buffer;
@@ -1225,8 +1257,8 @@ void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv) {
     onyx_run_wasm_code(wasm_bytes, argc, argv);
 }
 
-void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path) {
-    onyx_run_initialize(1, socket_path);
+void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path, int32_t jit_enabled) {
+    onyx_run_initialize(1, socket_path, jit_enabled);
 
     bh_buffer wasm_bytes;
     wasm_bytes.data = buffer;
@@ -1235,11 +1267,13 @@ void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, cha
     onyx_run_wasm_code(wasm_bytes, argc, argv);
 }
 #else
-void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv) {
+void onyx_run_wasm(void *buffer, int32_t buffer_length, int argc, char **argv, int32_t jit_enabled) {
+    (void) jit_enabled;
     printf("ERROR: Cannot run WASM code. No runtime was configured at the time Onyx was built\n");
 }
 
-void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path) {
+void onyx_run_wasm_with_debug(void *buffer, int32_t buffer_length, int argc, char **argv, char *socket_path, int32_t jit_enabled) {
+    (void) jit_enabled;
     printf("ERROR: Cannot run WASM code. No runtime was configured at the time Onyx was built\n");
 }
 #endif

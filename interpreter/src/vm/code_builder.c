@@ -105,6 +105,10 @@ void ovm_code_builder_pop_label_target(ovm_code_builder_t *builder) {
                 builder->program->code[patch.branch_instr].a = br_delta;
                 break;
 
+            case branch_patch_instr_r:
+                builder->program->code[patch.branch_instr].r = br_delta;
+                break;
+
             case branch_patch_static_idx:
                 ovm_program_modify_static_int(builder->program, patch.static_arr, patch.static_idx, br_delta);
                 break;
@@ -129,9 +133,12 @@ void ovm_code_builder_patch_else(ovm_code_builder_t *builder, label_target_t if_
         if (!patch.targets_else) continue;
 
         int br_delta = bh_arr_length(builder->program->code) - patch.branch_instr - 1;
-        assert(patch.kind == branch_patch_instr_a);
-
-        builder->program->code[patch.branch_instr].a = br_delta;
+        if (patch.kind == branch_patch_instr_r) {
+            builder->program->code[patch.branch_instr].r = br_delta;
+        } else {
+            assert(patch.kind == branch_patch_instr_a);
+            builder->program->code[patch.branch_instr].a = br_delta;
+        }
 
         bh_arr_fastdelete(builder->branch_patches, i);
         return;
@@ -165,9 +172,82 @@ void ovm_code_builder_add_break(ovm_code_builder_t *builder) {
     ovm_program_add_instructions(builder->program, 1, &break_);
 }
 
+static b32 value_still_on_stack(ovm_code_builder_t *builder, i32 val) {
+    bh_arr_each(i32, reg, builder->execution_stack) {
+        if (*reg == val) return 1;
+    }
+    return 0;
+}
+
+static i32 imm_binop_opcode(u32 op) {
+    switch (op) {
+        case OVMI_ADD: return OVMI_ADD_IMM;
+        case OVMI_SUB: return OVMI_SUB_IMM;
+        case OVMI_MUL: return OVMI_MUL_IMM;
+        case OVMI_AND: return OVMI_AND_IMM;
+        case OVMI_OR:  return OVMI_OR_IMM;
+        case OVMI_XOR: return OVMI_XOR_IMM;
+        case OVMI_SHL: return OVMI_SHL_IMM;
+        case OVMI_SHR: return OVMI_SHR_IMM;
+        case OVMI_SAR: return OVMI_SAR_IMM;
+        default: return -1;
+    }
+}
+
+static b32 imm_binop_commutative(u32 op) {
+    return op == OVMI_ADD || op == OVMI_MUL || op == OVMI_AND || op == OVMI_OR || op == OVMI_XOR;
+}
+
+static b32 try_fold_imm_binop(ovm_code_builder_t *builder, u32 instr, i32 left, i32 right) {
+    if (bh_arr_length(builder->program->code) == 0) return 0;
+
+    ovm_instr_t *last = &bh_arr_last(builder->program->code);
+    if (OVM_INSTR_INSTR(*last) != OVMI_IMM) return 0;
+
+    u32 type = OVM_INSTR_TYPE(*last);
+    if (type != (instr & 0x7)) return 0;
+    if (type != OVM_TYPE_I32 && type != OVM_TYPE_I64) return 0;
+
+    u32 op = (instr >> 3) & 0xff;
+    i32 fused = imm_binop_opcode(op);
+    if (fused < 0) return 0;
+
+    i32 imm_reg = last->r;
+    i32 src;
+    if (imm_reg == right) {
+        src = left;
+    } else if (imm_reg == left && imm_binop_commutative(op)) {
+        src = right;
+    } else {
+        return 0;
+    }
+
+    if (!IS_TEMPORARY_VALUE(builder, imm_reg)) return 0;
+    if (value_still_on_stack(builder, imm_reg)) return 0;
+
+    i32 imm_bits;
+    if (type == OVM_TYPE_I32) {
+        imm_bits = last->i;
+    } else {
+        if ((i64)(i32) last->l != last->l) return 0;
+        imm_bits = (i32) last->l;
+    }
+
+    i32 result = NEXT_VALUE(builder);
+    last->full_instr = OVM_TYPED_INSTR((u32) fused, type);
+    last->r = result;
+    last->a = src;
+    last->b = imm_bits;
+    PUSH_VALUE(builder, result);
+    return 1;
+}
+
 void ovm_code_builder_add_binop(ovm_code_builder_t *builder, u32 instr) {
     i32 right  = POP_VALUE(builder);
     i32 left   = POP_VALUE(builder);
+
+    if (try_fold_imm_binop(builder, instr, left, right)) return;
+
     i32 result = NEXT_VALUE(builder);
 
     ovm_instr_t binop;
@@ -231,7 +311,61 @@ void ovm_code_builder_add_branch(ovm_code_builder_t *builder, i32 label_idx) {
     ovm_program_add_instructions(builder->program, 1, &branch_instr);
 }
 
+static i32 cmp_to_br_opcode(u32 cmp, bool branch_if_true) {
+    if (branch_if_true) {
+        switch (cmp) {
+            case OVMI_EQ:   return OVMI_BR_EQ;
+            case OVMI_NE:   return OVMI_BR_NE;
+            case OVMI_LT:   return OVMI_BR_LT;
+            case OVMI_LT_S: return OVMI_BR_LT_S;
+            case OVMI_LE:   return OVMI_BR_LE;
+            case OVMI_LE_S: return OVMI_BR_LE_S;
+            case OVMI_GT:   return OVMI_BR_GT;
+            case OVMI_GT_S: return OVMI_BR_GT_S;
+            case OVMI_GE:   return OVMI_BR_GE;
+            case OVMI_GE_S: return OVMI_BR_GE_S;
+            default: return -1;
+        }
+    }
+
+    switch (cmp) {
+        case OVMI_EQ:   return OVMI_BR_NE;
+        case OVMI_NE:   return OVMI_BR_EQ;
+        case OVMI_LT:   return OVMI_BR_GE;
+        case OVMI_LT_S: return OVMI_BR_GE_S;
+        case OVMI_LE:   return OVMI_BR_GT;
+        case OVMI_LE_S: return OVMI_BR_GT_S;
+        case OVMI_GT:   return OVMI_BR_LE;
+        case OVMI_GT_S: return OVMI_BR_LE_S;
+        case OVMI_GE:   return OVMI_BR_LT;
+        case OVMI_GE_S: return OVMI_BR_LT_S;
+        default: return -1;
+    }
+}
+
 void ovm_code_builder_add_cond_branch(ovm_code_builder_t *builder, i32 label_idx, bool branch_if_true, bool targets_else) {
+    i32 cond = POP_VALUE(builder);
+
+    if (bh_arr_length(builder->program->code) > 0) {
+        ovm_instr_t *last = &bh_arr_last(builder->program->code);
+        i32 fused = cmp_to_br_opcode(OVM_INSTR_INSTR(*last), branch_if_true);
+        if (fused >= 0
+            && last->r == cond
+            && IS_TEMPORARY_VALUE(builder, cond)
+            && !value_still_on_stack(builder, cond)) {
+            last->full_instr = OVM_TYPED_INSTR((u32) fused, OVM_INSTR_TYPE(*last));
+            last->r = -1;
+
+            branch_patch_t patch;
+            patch.kind = branch_patch_instr_r;
+            patch.branch_instr = bh_arr_length(builder->program->code) - 1;
+            patch.label_idx = label_idx;
+            patch.targets_else = targets_else;
+            bh_arr_push(builder->branch_patches, patch);
+            return;
+        }
+    }
+
     ovm_instr_t branch_instr = {0};
     if (branch_if_true) {
         branch_instr.full_instr = OVM_TYPED_INSTR(OVMI_BR_NZ, OVM_TYPE_NONE);
@@ -240,7 +374,7 @@ void ovm_code_builder_add_cond_branch(ovm_code_builder_t *builder, i32 label_idx
     }
 
     branch_instr.a = -1;
-    branch_instr.b = POP_VALUE(builder);
+    branch_instr.b = cond;
 
     branch_patch_t patch;
     patch.kind = branch_patch_instr_a;

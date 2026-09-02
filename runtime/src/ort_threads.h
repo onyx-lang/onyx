@@ -93,14 +93,24 @@ ONYX_DEF(__spawn_thread, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM
     thread->instance = runtime->wasm_instance_new(runtime->wasm_store, runtime->wasm_module, &runtime->wasm_imports, &traps);
     assert(thread->instance);
 
+    // Interpreter call frames live on the heap; JIT frames live on the OS stack
+    // (prologue plus a C helper per CALL). macOS secondary threads default to
+    // 512KiB, which overflows depending on which worker draws a deep call path.
+    #define ONYX_THREAD_STACK_SIZE (8u * 1024u * 1024u)
+
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
-        pthread_create(&thread->thread, NULL, onyx_run_thread, thread);
+        pthread_attr_t attr;
+        pthread_attr_init(&attr);
+        pthread_attr_setstacksize(&attr, ONYX_THREAD_STACK_SIZE);
+        pthread_create(&thread->thread, &attr, onyx_run_thread, thread);
+        pthread_attr_destroy(&attr);
     #endif
 
     #ifdef _BH_WINDOWS
-        // thread->thread_handle = CreateThread(NULL, 0, onyx_run_thread, thread, 0, &thread->thread_id);
-        thread->thread_handle = (HANDLE) _beginthreadex(NULL, 0, onyx_run_thread, thread, 0, &thread->thread_id);
+        thread->thread_handle = (HANDLE) _beginthreadex(NULL, ONYX_THREAD_STACK_SIZE, onyx_run_thread, thread, 0, &thread->thread_id);
     #endif
+
+    #undef ONYX_THREAD_STACK_SIZE
 
     results->data[0] = WASM_I32_VAL(1);
     return NULL;

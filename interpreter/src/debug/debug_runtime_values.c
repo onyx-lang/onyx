@@ -26,7 +26,8 @@ static bool lookup_register_in_frame(ovm_state_t *state, ovm_stack_frame_t *fram
         val_num_base = frame->value_number_base;
     }
 
-    *out = state->numbered_values[val_num_base + reg];
+    out->u64 = state->numbered_values[val_num_base + reg].u64;
+    out->type = 0;
     return true;
 }
 

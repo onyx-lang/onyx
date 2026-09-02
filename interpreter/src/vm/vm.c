@@ -72,6 +72,8 @@ ovm_program_t *ovm_program_new(ovm_store_t *store) {
     program->code  = NULL;
     program->static_integers = NULL;
     program->static_data  = NULL;
+    program->jit_exec = NULL;
+    program->jit_exec_size = 0;
     bh_arr_new(store->heap_allocator, program->funcs, 16);
     bh_arr_new(store->heap_allocator, program->code, 1024);
     bh_arr_new(store->heap_allocator, program->static_integers, 128);
@@ -81,6 +83,11 @@ ovm_program_t *ovm_program_new(ovm_store_t *store) {
 }
 
 void ovm_program_delete(ovm_program_t *program) {
+    if (program->jit_exec && program->jit_exec_size > 0) {
+        munmap(program->jit_exec, (size_t) program->jit_exec_size);
+        program->jit_exec = NULL;
+    }
+
     bh_arr_free(program->funcs);
     bh_arr_free(program->code);
     bh_arr_free(program->static_integers);
@@ -119,6 +126,8 @@ int ovm_program_register_func(ovm_program_t *program, char *name, i32 instr, i32
     func.start_instr = instr;
     func.param_count = param_count;
     func.value_number_count = value_number_count;
+    func.native_entry = NULL;
+    func.native_body = NULL;
 
     bh_arr_push(program->funcs, func);
     return func.id;
@@ -132,6 +141,8 @@ int ovm_program_register_external_func(ovm_program_t *program, char *name, i32 p
     func.param_count = param_count;
     func.external_func_idx = external_func_idx;
     func.value_number_count = param_count;
+    func.native_entry = NULL;
+    func.native_body = NULL;
 
     bh_arr_push(program->funcs, func);
     return func.id;
@@ -144,6 +155,8 @@ void ovm_program_begin_func(ovm_program_t *program, char *name, i32 param_count,
     func.start_instr = bh_arr_length(program->code);
     func.param_count = param_count;
     func.value_number_count = value_number_count;
+    func.native_entry = NULL;
+    func.native_body = NULL;
 
     bh_arr_push(program->funcs, func);
 }
@@ -165,6 +178,7 @@ ovm_engine_t *ovm_engine_new(ovm_store_t *store) {
     engine->memory_capacity = 0;
     engine->memory = NULL;
     engine->debug = NULL;
+    engine->jit_enabled = 0;
     pthread_mutex_init(&engine->atomic_mutex, NULL);
 
     //
@@ -279,8 +293,8 @@ ovm_state_t *ovm_state_new(ovm_engine_t *engine, ovm_program_t *program) {
     state->numbered_values = NULL;
     state->stack_frames = NULL;
     state->registers = NULL;
-    bh_arr_new(store->heap_allocator, state->numbered_values, 128);
-    bh_arr_new(store->heap_allocator, state->stack_frames, 32);
+    bh_arr_new(store->heap_allocator, state->numbered_values, 4096);
+    bh_arr_new(store->heap_allocator, state->stack_frames, 256);
     bh_arr_new(store->heap_allocator, state->registers, program->register_count);
     bh_arr_insert_end(state->registers, program->register_count);
 
@@ -330,35 +344,32 @@ void ovm_state_register_set(ovm_state_t *state, i32 idx, ovm_value_t val) {
 //
 // Function calling
 
-static void ovm__func_setup_stack_frame(ovm_state_t *state, ovm_func_t *func, i32 result_number) {
-    //
-    // Push a stack frame
+void ovm__func_setup_stack_frame(ovm_state_t *state, ovm_func_t *func, i32 result_number) {
     ovm_stack_frame_t frame;
     frame.func = func;
     frame.value_number_count = func->value_number_count;
     frame.value_number_base  = bh_arr_length(state->numbered_values);
     frame.return_address = state->pc;
     frame.return_number_value = result_number;
+    frame.compiled = 0;
     bh_arr_push(state->stack_frames, frame);
 
-    //
-    // Move the base pointer to the value numbers.
     state->value_number_offset = frame.value_number_base;
 
-    //
-    // Setup value numbers
-    bh_arr_insert_end(state->numbered_values, func->value_number_count);
+    i32 need = frame.value_number_base + func->value_number_count;
+    if (need > bh_arr_capacity(state->numbered_values)) {
+        bh_arr_grow(state->numbered_values, need);
+    }
+    bh__arrhead(state->numbered_values)->length = need;
 
     state->__frame_values = &state->numbered_values[state->value_number_offset];
 
-    //
-    // Modify debug state so step over works
     if (state->debug) {
         state->debug->extra_frames_since_last_pause++;
     }
 }
 
-static ovm_stack_frame_t ovm__func_teardown_stack_frame(ovm_state_t *state) {
+ovm_stack_frame_t ovm__func_teardown_stack_frame(ovm_state_t *state) {
     ovm_stack_frame_t frame = bh_arr_pop(state->stack_frames);
     bh_arr_fastdeleten(state->numbered_values, frame.value_number_count);
 
@@ -391,7 +402,15 @@ ovm_value_t ovm_func_call(ovm_engine_t *engine, ovm_state_t *state, ovm_program_
             ovm__func_setup_stack_frame(state, func, 0);
 
             fori (i, 0, param_count) {
-                state->numbered_values[i + state->value_number_offset] = params[i];
+                state->numbered_values[i + state->value_number_offset].u64 = params[i].u64;
+            }
+
+            if (func->native_entry && !state->debug) {
+                bh_arr_last(state->stack_frames).compiled = 1;
+                ovm_value_t result = {0};
+                result.u64 = func->native_entry(engine, state, program);
+                state->call_depth -= 1;
+                return result;
             }
 
             state->pc = func->start_instr;
@@ -458,6 +477,30 @@ static inline double __ovm_nearest(double f) {
 static inline double __ovm_copysign(double a, double b) {
     if ((a > 0 && b > 0) || (a < 0 && b < 0)) return a;
     return -a;
+}
+
+static inline u32 rotl32(u32 value, u32 count) {
+    const unsigned int mask = 0xFF;
+    count &= mask;
+    return (value << count) | (value >> (-count & mask));
+}
+
+static inline u64 rotl64(u64 value, u32 count) {
+    const unsigned int mask = 0xFF;
+    count &= mask;
+    return (value << count) | (value >> (-count & mask));
+}
+
+static inline u32 rotr32(u32 value, u32 count) {
+    const unsigned int mask = 0xFF;
+    count &= mask;
+    return (value >> count) | (value << (-count & mask));
+}
+
+static inline u64 rotr64(u64 value, u32 count) {
+    const unsigned int mask = 0xFF;
+    count &= mask;
+    return (value >> count) | (value << (-count & mask));
 }
 
 static void __ovm_trigger_exception(ovm_state_t *state) {
@@ -528,16 +571,18 @@ static void __ovm_debug_hook(ovm_engine_t *engine, ovm_state_t *state) {
     if (state->debug->run_count > 0) state->debug->run_count--;
 }
 
-#define OVMI_FUNC_NAME(n) ovmi_exec_##n
+#define OVMI_FUNC_NAME(n) ovmi_##n
 #define OVMI_DISPATCH_NAME ovmi_dispatch
+#define OVM_RUN_NAME ovm_run_fast
 #define OVMI_DEBUG_HOOK ((void)0)
 #define OVMI_EXCEPTION_HOOK ((void)0)
 #define OVMI_DIVIDE_CHECK_HOOK(_) ((void)0)
 #include "./vm_instrs.h"
 
-#define OVMI_FUNC_NAME(n) ovmi_exec_debug_##n
+#define OVMI_FUNC_NAME(n) ovmi_dbg_##n
 #define OVMI_DISPATCH_NAME ovmi_debug_dispatch
-#define OVMI_DEBUG_HOOK __ovm_debug_hook(state->engine, state)
+#define OVM_RUN_NAME ovm_run_debug
+#define OVMI_DEBUG_HOOK do { state->pc = (i32)(instr - code) + 1; __ovm_debug_hook(state->engine, state); } while (0)
 #define OVMI_EXCEPTION_HOOK __ovm_trigger_exception(state)
 #define OVMI_DIVIDE_CHECK_HOOK(ctype) if (VAL(instr->b).ctype == 0) __ovm_trigger_exception(state)
 #include "./vm_instrs.h"
@@ -547,17 +592,10 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
     ovm_assert(state);
     ovm_assert(program);
 
-    ovmi_instr_exec_t *exec_table = ovmi_dispatch;
     if (state->debug) {
-        exec_table = ovmi_debug_dispatch;
+        return ovm_run_debug(engine, state, program);
     }
-
-    ovm_instr_t *code = program->code;
-    u8 *memory = engine->memory;
-    ovm_value_t *values = state->__frame_values;
-    ovm_instr_t *instr = &code[state->pc];
-
-    return exec_table[instr->full_instr & 0x7ff](instr, state, values, memory, code);
+    return ovm_run_fast(engine, state, program);
 }
 
 

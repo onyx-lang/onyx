@@ -489,6 +489,16 @@ static AstNode * parse_code(Context *context, ProceduralMacroExpansionKind kind,
     }
 
     onyx_parser_free(&parser);
+
+    // Code from an extension is new work, so any earlier conclusion that the
+    // compiler had stalled no longer holds. Leaving cycle_detected set would
+    // turn the first yield from this code (instantiating a polymorphic type,
+    // for instance) into a hard error instead of a retry.
+    context->watermarked_node = NULL;
+    context->highest_watermark = 0;
+    context->cycle_almost_detected = 0;
+    context->cycle_detected = 0;
+
     return result;
 }
 
@@ -597,6 +607,7 @@ TypeMatch compiler_extension_expand_macro(
         extension_send_int(ext, 0);
         extension_send_str(ext, macro_name);
         extension_send_bytes(ext, body->text, body->length);
+        extension_send_int(ext, entity && entity->scope ? (int) entity->scope->id : 0);
     }
 
     while (1) {
@@ -653,8 +664,9 @@ static TypeMatch compiler_extension_send_hook(Context *context, CompilerExtensio
     if (!ext->alive) return TYPE_MATCH_FAILED;
     if (ext->state != COMP_EXT_STATE_READY) return TYPE_MATCH_FAILED;
 
-    // Deliver remaining compilation events before the barrier so the
-    // extension's CompilationInfo is complete when the hook runs.
+    // Deliver remaining compilation events before the hook so the
+    // extension's CompilationInfo is complete (needed on stall to
+    // generate code for types that were only just recorded).
     compiler_extension_send_compilation_data(context, ext);
 
     bh_arena_clear(&ext->arena);

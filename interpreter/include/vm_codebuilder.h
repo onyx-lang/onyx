@@ -47,6 +47,7 @@ struct label_target_t {
 
 enum branch_patch_kind_t {
     branch_patch_instr_a,    // For patching the '.a' register of a branch instruction.
+    branch_patch_instr_r,    // For patching the '.r' delta of a fused compare-branch.
     branch_patch_static_idx, // For patching an integer in the static integers section.
 };
 

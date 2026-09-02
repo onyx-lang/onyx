@@ -7,7 +7,7 @@ injected := false
 main :: () {
     ext := ExtensionContext.make("AllCodeChecked")
     ext->enable_compilation_data_detailed()
-    ext->on_all_code_checked((ext, _) => {
+    ext->handle_hook(.All_Code_Checked, (ext, _) => {
         if injected do return
         injected = true
 
