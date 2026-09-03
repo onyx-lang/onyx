@@ -31,6 +31,12 @@
     #define _BH_DARWIN 1
 #endif
 
+#if defined(_MSC_VER)
+    #define BH_THREAD_LOCAL __declspec(thread)
+#else
+    #define BH_THREAD_LOCAL __thread
+#endif
+
 #include <sys/stat.h>
 #include <time.h>
 
@@ -1426,7 +1432,7 @@ BH_ALLOCATOR_PROC(bh_scratch_allocator_proc) {
 // CONVERSION FUNCTIONS IMPLEMENTATION
 //-------------------------------------------------------------------------------------
 u8* uint_to_uleb128(u64 n, i32* output_length) {
-    static u8 buffer[16];
+    static BH_THREAD_LOCAL u8 buffer[16];
 
     *output_length = 0;
     u8* output = buffer;
@@ -1445,7 +1451,7 @@ u8* uint_to_uleb128(u64 n, i32* output_length) {
 
 // Converts a signed integer to the signed LEB128 format
 u8* int_to_leb128(i64 n, i32* output_length) {
-    static u8 buffer[16];
+    static BH_THREAD_LOCAL u8 buffer[16];
 
     *output_length = 0;
     u8* output = buffer;
@@ -1471,7 +1477,7 @@ u8* int_to_leb128(i64 n, i32* output_length) {
 // NOTE: This assumes the underlying implementation of float on the host
 // system is already IEEE-754. This is safe to assume in most cases.
 u8* float_to_ieee754(f32 f, b32 reverse) {
-    static u8 buffer[4];
+    static BH_THREAD_LOCAL u8 buffer[4];
 
     u8* fmem = (u8*) &f;
     if (reverse) {
@@ -1490,7 +1496,7 @@ u8* float_to_ieee754(f32 f, b32 reverse) {
 }
 
 u8* double_to_ieee754(f64 f, b32 reverse) {
-    static u8 buffer[8];
+    static BH_THREAD_LOCAL u8 buffer[8];
 
     u8* fmem = (u8*) &f;
     if (reverse) {
@@ -2027,9 +2033,9 @@ char* bh_path_get_full_name(char const* filename, bh_allocator a) {
 #elif defined(_BH_LINUX) || defined (_BH_DARWIN)
     char* p = realpath(filename, NULL);
 
-    // Check if the file did not exists.
-    // :Cleanup should this return NULL?
-    if (p == NULL) return (char *) filename;
+    // File may not exist yet; still return an owned copy so the
+    // caller never holds a pointer to a lookup scratch buffer.
+    if (p == NULL) return bh_strdup(a, (char *) filename);
 
     i32 len = strlen(p);
     char* result = bh_alloc_array(a, char, len + 1);
@@ -2068,10 +2074,10 @@ char* bh_lookup_file(
 ) {
     assert(relative_to != NULL);
 
-    static char path[512];
+    char path[512];
     fori (i, 0, 512) path[i] = 0;
 
-    static char fn[256];
+    char fn[256];
     fori (i, 0, 256) fn[i] = 0;
 
     if (suffix && !bh_str_ends_with(filename, suffix)) {
@@ -2095,7 +2101,7 @@ char* bh_lookup_file(
 
         if (bh_file_exists(path)) return bh_path_get_full_name(path, allocator);
 
-        return path;
+        return bh_strdup(allocator, path);
     }
 
     if (contains_colon && mapped_folders) {
@@ -2144,10 +2150,10 @@ char* bh_lookup_file(
 char* bh_search_for_mapped_file(char* filename, char* relative_to, char *suffix, bh_mapped_folder* mapped_folders, bh_allocator allocator) {
     assert(relative_to != NULL);
 
-    static char path[512];
+    char path[512];
     fori (i, 0, 512) path[i] = 0;
 
-    static char fn[256];
+    char fn[256];
     fori (i, 0, 256) fn[i] = 0;
 
     if (suffix && !bh_str_ends_with(filename, suffix)) {
@@ -2489,7 +2495,7 @@ isize bh_fprintf(bh_file* f, char const *fmt, ...) {
 }
 
 isize bh_fprintf_va(bh_file* f, char const *fmt, va_list va) {
-    static char buffer[4096];
+    static BH_THREAD_LOCAL char buffer[4096];
     isize len = bh_snprintf_va(buffer, sizeof(buffer), fmt, va);
     bh_file_write(f, buffer, len - 1);
     return len;
@@ -2505,7 +2511,7 @@ char* bh_bprintf(char const *fmt, ...) {
 }
 
 char* bh_bprintf_va(char const *fmt, va_list va) {
-    static char buffer[4096];
+    static BH_THREAD_LOCAL char buffer[4096];
     isize len = bh_snprintf_va(buffer, sizeof(buffer), fmt, va);
     buffer[len - 1] = 0;
     return buffer;
@@ -2521,7 +2527,7 @@ char* bh_aprintf(bh_allocator alloc, const char* fmt, ...) {
 }
 
 char* bh_aprintf_va(bh_allocator alloc, const char* fmt, va_list va) {
-    static char buffer[4096];
+    static BH_THREAD_LOCAL char buffer[4096];
     isize len = bh_snprintf_va(buffer, sizeof(buffer), fmt, va);
     char* res = bh_alloc(alloc, len);
     memcpy(res, buffer, len);

@@ -297,13 +297,15 @@ static void prepare_instance(wasm_instance_t *instance, const wasm_extern_vec_t 
     }
 
 
-    //
-    // Initialize all non-passive data segments
-    fori (i, 0, (int) instance->module->data_count) {
-        struct wasm_data_t *datum = &instance->module->data_entries[i];
-        if (datum->passive) continue;
+    // Initialize active data segments once. Later instances share the
+    // engine memory; recopying would reset live statics under other threads.
+    if (ovm_engine->memory_size == 0) {
+        fori (i, 0, (int) instance->module->data_count) {
+            struct wasm_data_t *datum = &instance->module->data_entries[i];
+            if (datum->passive) continue;
 
-        ovm_engine_memory_copy(ovm_engine, datum->offset, datum->data, datum->length);
+            ovm_engine_memory_copy(ovm_engine, datum->offset, datum->data, datum->length);
+        }
     }
 
     wasm_extern_vec_new_uninitialized(&instance->exports, instance->module->exports.size);

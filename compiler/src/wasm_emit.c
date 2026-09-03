@@ -4198,7 +4198,7 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_nod
 static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     if (ft->kind != Type_Kind_Function) return -1;
 
-    static char type_repr_buf[128];
+    char type_repr_buf[128];
     char* t = type_repr_buf;
 
     Type** param_type = ft->Function.params;

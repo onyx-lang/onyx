@@ -154,8 +154,9 @@ u32 token_atom(Context *context, OnyxToken *tkn) {
     if (!tkn) return 0;
 
     token_toggle_end(tkn);
-    // Tokens can outlive a Context (static builtin / `it` tokens). The
-    // cached id is only valid if this table still has that name.
+    // A token may carry an atom id from another table (or a stale
+    // cache). Only reuse it if this context still maps that id to
+    // the same name.
     if (tkn->atom) {
         const char *n = atom_name(context, tkn->atom);
         if (n[0] && !strcmp(n, tkn->text)) {
@@ -929,7 +930,7 @@ void ensure_overload_returns_correct_type(Context *context, AstTyped *overload, 
 static AstTyped *macro_wrap_value_as_any(Context *context, AstTyped *value, AstBlock *expansion, OnyxToken *token) {
     resolve_expression_type(context, value);
 
-    static i32 tmp_id = 0;
+    static BH_THREAD_LOCAL i32 tmp_id = 0;
     OnyxToken *tmp_token = bh_alloc_item(context->ast_alloc, OnyxToken);
     tmp_token->type = Token_Type_Symbol;
     tmp_token->text = bh_aprintf(context->ast_alloc, "__macro_any_%d", tmp_id++);

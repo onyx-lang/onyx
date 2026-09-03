@@ -1777,11 +1777,12 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
             }
         }
     } else {
-        // HACK
-        static char it_name[] = "it ";
-        static OnyxToken it_token = { Token_Type_Symbol, 2, it_name, 0, { 0 } };
+        OnyxToken *it_token = bh_alloc_item(parser->context->ast_alloc, OnyxToken);
+        char *it_text = bh_alloc(parser->context->ast_alloc, 4);
+        memcpy(it_text, "it ", 4);
+        *it_token = (OnyxToken) { Token_Type_Symbol, 2, it_text, 0, { 0 } };
 
-        AstLocal* var_node = make_local(parser->context, &it_token, NULL);
+        AstLocal* var_node = make_local(parser->context, it_token, NULL);
         bh_arr_push(for_node->indexing_variables, var_node);
     }
 

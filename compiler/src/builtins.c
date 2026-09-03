@@ -3,29 +3,23 @@
 #include "errors.h"
 #include "utils.h"
 
-static OnyxToken basic_type_void_token      = { Token_Type_Symbol, 4, "void " };
-static OnyxToken basic_type_bool_token      = { Token_Type_Symbol, 4, "bool " };
-static OnyxToken basic_type_i8_token        = { Token_Type_Symbol, 2, "i8 " };
-static OnyxToken basic_type_u8_token        = { Token_Type_Symbol, 2, "u8 " };
-static OnyxToken basic_type_i16_token       = { Token_Type_Symbol, 3, "i16 " };
-static OnyxToken basic_type_u16_token       = { Token_Type_Symbol, 3, "u16 " };
-static OnyxToken basic_type_i32_token       = { Token_Type_Symbol, 3, "i32 " };
-static OnyxToken basic_type_u32_token       = { Token_Type_Symbol, 3, "u32 " };
-static OnyxToken basic_type_i64_token       = { Token_Type_Symbol, 3, "i64 " };
-static OnyxToken basic_type_u64_token       = { Token_Type_Symbol, 3, "u64 " };
-static OnyxToken basic_type_f32_token       = { Token_Type_Symbol, 3, "f32 " };
-static OnyxToken basic_type_f64_token       = { Token_Type_Symbol, 3, "f64 " };
-static OnyxToken basic_type_rawptr_token    = { Token_Type_Symbol, 6, "rawptr " };
-static OnyxToken basic_type_type_expr_token = { Token_Type_Symbol, 9, "type_expr " };
+// token_toggle_end writes text[length] (the trailing space). These must
+// be per-context writable copies: string literals live in read-only
+// __TEXT in libonyx, and a cached atom id is only valid for one table.
+static OnyxToken *make_symbol_token(Context *context, const char *name) {
+    i32 len = (i32) strlen(name);
+    char *text = bh_alloc(context->ast_alloc, len + 2);
+    memcpy(text, name, (size_t) len);
+    text[len] = ' ';
+    text[len + 1] = '\0';
 
-static OnyxToken builtin_heap_start_token  = { Token_Type_Symbol, 12, "__heap_start ", 0, { 0 } };
-static OnyxToken builtin_stack_top_token   = { Token_Type_Symbol, 11, "__stack_top ",  0, { 0 } };
-static OnyxToken builtin_tls_base_token    = { Token_Type_Symbol, 10, "__tls_base ",  0, { 0 } };
-static OnyxToken builtin_tls_size_token    = { Token_Type_Symbol, 10, "__tls_size ",  0, { 0 } };
-static OnyxToken builtin_closure_base_token = { Token_Type_Symbol, 14, "__closure_base ",  0, { 0 } };
-static OnyxToken builtin_stack_trace_token = { Token_Type_Symbol, 0, " ", 0, { 0 } };
-
-static OnyxToken simd_token = { Token_Type_Symbol, 0, "", 0, { 0 } };
+    OnyxToken *tkn = bh_alloc_item(context->ast_alloc, OnyxToken);
+    memset(tkn, 0, sizeof *tkn);
+    tkn->type = Token_Type_Symbol;
+    tkn->length = len;
+    tkn->text = text;
+    return tkn;
+}
 
 
 const BuiltinSymbol builtin_symbols[] = {
@@ -338,45 +332,46 @@ void prepare_builtins(Context *context) {
     // `types_init()` needs to be called first so the pointers in context->types.basic are valid
     assert(context->types.basic[Basic_Kind_Void]);
 
-    context->basic_types.type_void      = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_void_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_Void]  });
-    context->basic_types.type_bool      = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_bool_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_Bool]  });
-    context->basic_types.type_i8        = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i8_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I8]    });
-    context->basic_types.type_u8        = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u8_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_U8]    });
-    context->basic_types.type_i16       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i16_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I16]   });
-    context->basic_types.type_u16       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u16_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_U16]   });
-    context->basic_types.type_i32       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i32_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I32]   });
-    context->basic_types.type_u32       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u32_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_U32]   });
-    context->basic_types.type_i64       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_i64_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I64]   });
-    context->basic_types.type_u64       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_u64_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_U64]   });
-    context->basic_types.type_f32       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_f32_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_F32]   });
-    context->basic_types.type_f64       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_f64_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_F64]   });
-    context->basic_types.type_rawptr    = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_rawptr_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_Rawptr] });
-    context->basic_types.type_type_expr = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &basic_type_type_expr_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_Type_Index] });
+    context->basic_types.type_void      = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, make_symbol_token(context, "void"), NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_Void]  });
+    context->basic_types.type_bool      = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, make_symbol_token(context, "bool"), NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_Bool]  });
+    context->basic_types.type_i8        = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, make_symbol_token(context, "i8"), NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I8]    });
+    context->basic_types.type_u8        = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, make_symbol_token(context, "u8"), NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_U8]    });
+    context->basic_types.type_i16       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, make_symbol_token(context, "i16"), NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I16]   });
+    context->basic_types.type_u16       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, make_symbol_token(context, "u16"), NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_U16]   });
+    context->basic_types.type_i32       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, make_symbol_token(context, "i32"), NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I32]   });
+    context->basic_types.type_u32       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, make_symbol_token(context, "u32"), NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_U32]   });
+    context->basic_types.type_i64       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, make_symbol_token(context, "i64"), NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I64]   });
+    context->basic_types.type_u64       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, make_symbol_token(context, "u64"), NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_U64]   });
+    context->basic_types.type_f32       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, make_symbol_token(context, "f32"), NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_F32]   });
+    context->basic_types.type_f64       = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, make_symbol_token(context, "f64"), NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_F64]   });
+    context->basic_types.type_rawptr    = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, make_symbol_token(context, "rawptr"), NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_Rawptr] });
+    context->basic_types.type_type_expr = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, make_symbol_token(context, "type_expr"), NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_Type_Index] });
 
     // NOTE: Types used for numeric literals
     context->basic_types.type_int_unsized   = ((AstBasicType) { Ast_Kind_Basic_Type, 0, NULL, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_Int_Unsized] });
     context->basic_types.type_float_unsized = ((AstBasicType) { Ast_Kind_Basic_Type, 0, NULL, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_Float_Unsized] });
 
-    context->basic_types.type_i8x16 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I8X16] });
-    context->basic_types.type_i16x8 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I16X8] });
-    context->basic_types.type_i32x4 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I32X4] });
-    context->basic_types.type_i64x2 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I64X2] });
-    context->basic_types.type_f32x4 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_F32X4] });
-    context->basic_types.type_f64x2 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_F64X2] });
-    context->basic_types.type_v128  = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, &simd_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_V128]  });
+    OnyxToken *simd_token = make_symbol_token(context, "");
+    context->basic_types.type_i8x16 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, simd_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I8X16] });
+    context->basic_types.type_i16x8 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, simd_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I16X8] });
+    context->basic_types.type_i32x4 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, simd_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I32X4] });
+    context->basic_types.type_i64x2 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, simd_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_I64X2] });
+    context->basic_types.type_f32x4 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, simd_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_F32X4] });
+    context->basic_types.type_f64x2 = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, simd_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_F64X2] });
+    context->basic_types.type_v128  = ((AstBasicType) { Ast_Kind_Basic_Type, Ast_Flag_Comptime, simd_token, NULL, NULL, 0, 0, NULL, context->types.basic[Basic_Kind_V128]  });
 
     // HACK
     // :AutoReturnType
     context->types.auto_return = bh_alloc_item(context->ast_alloc, Type);
-    context->basic_types.type_auto_return = ((AstBasicType) { Ast_Kind_Basic_Type, 0, &simd_token, NULL, NULL, 0, 0, NULL, context->types.auto_return });
+    context->basic_types.type_auto_return = ((AstBasicType) { Ast_Kind_Basic_Type, 0, simd_token, NULL, NULL, 0, 0, NULL, context->types.auto_return });
 
     // Builtins
-    context->builtins.heap_start   = ((AstGlobal) { Ast_Kind_Global, Ast_Flag_Const, &builtin_heap_start_token, NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
-    context->builtins.stack_top    = ((AstGlobal) { Ast_Kind_Global, 0, &builtin_stack_top_token, NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
-    context->builtins.tls_base     = ((AstGlobal) { Ast_Kind_Global, 0, &builtin_tls_base_token, NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
-    context->builtins.tls_size     = ((AstGlobal) { Ast_Kind_Global, 0, &builtin_tls_size_token, NULL, NULL, 0, (AstType *) &context->basic_types.type_u32, NULL });
-    context->builtins.closure_base = ((AstGlobal) { Ast_Kind_Global, 0, &builtin_closure_base_token, NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
-    context->builtins.stack_trace  = ((AstGlobal) { Ast_Kind_Global, 0, &builtin_stack_trace_token, NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
+    context->builtins.heap_start   = ((AstGlobal) { Ast_Kind_Global, Ast_Flag_Const, make_symbol_token(context, "__heap_start"), NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
+    context->builtins.stack_top    = ((AstGlobal) { Ast_Kind_Global, 0, make_symbol_token(context, "__stack_top"), NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
+    context->builtins.tls_base     = ((AstGlobal) { Ast_Kind_Global, 0, make_symbol_token(context, "__tls_base"), NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
+    context->builtins.tls_size     = ((AstGlobal) { Ast_Kind_Global, 0, make_symbol_token(context, "__tls_size"), NULL, NULL, 0, (AstType *) &context->basic_types.type_u32, NULL });
+    context->builtins.closure_base = ((AstGlobal) { Ast_Kind_Global, 0, make_symbol_token(context, "__closure_base"), NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
+    context->builtins.stack_trace  = ((AstGlobal) { Ast_Kind_Global, 0, make_symbol_token(context, ""), NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
 
     context->node_that_signals_a_yield.kind = Ast_Kind_Function;
 }

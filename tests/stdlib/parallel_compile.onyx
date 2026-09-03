@@ -11,11 +11,15 @@ compile_job :: (out: &Compile_Out) {
     b := Builder.make();
     defer b->destroy();
 
-    b->enable(.PARSE_ONLY);
-    b->enable(.DISABLE_CORE);
+    core_root := os.env("ONYX_PATH") ?? "";
+    defer str.free(core_root);
+    b->map_dir("core", tprintf("{}/core", core_root));
+
     b->enable(.DISABLE_EXTENSIONS);
+    b->enable(.MULTI_THREADING);
+    b->set_platform(.ONYX);
     b->inject_source_as("t.onyx", "package main\nmain :: () {}\n");
-    b->parse();
+    b->compile();
     out.ok = !b->has_errors();
 }
 

@@ -1,26 +1,10 @@
 //
-// HACK
+// stb_ds arrays/hashmaps always pass a NULL context to REALLOC/FREE.
+// Each compilation context has its own heap; we point this thread-local
+// at it on every public API entry so two compilations can run on two
+// threads. A single onyx_context_t is still not safe to use concurrently.
 //
-// Currently, in stb_ds.h there is no way to choose the allocator
-// for arrays, and in turn hashmaps. You can provide your own
-// REALLOC and FREE macros, but the context pointer they are given
-// is always NULL. In order to allocate and free from the global
-// heap allocator, there needs to be a *global* pointer to it.
-// This is a problem for the compiler as it is meant to be a DLL,
-// so there should not be any global state in it.
-//
-// The tradeoff here is either:
-//
-//  1. The compiler is no longer thread-safe and only one compilation should
-//     be done per process at any given time.
-//
-//  2. The compiler leaks memory after every compilation. (around 400K for
-//     a hello world program).
-//
-// With those two options, I'm choosing the former. Most uses of the compiler
-// should not be multi-threaded in that way (at least I don't think so... time
-// may prove me wrong)
-//
+
 
 #if defined(_MSC_VER)
     #define ONYX_THREAD_LOCAL __declspec(thread)

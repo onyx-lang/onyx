@@ -67,9 +67,10 @@ static void poly_key_printf(char **p, char *end, const char *fmt, ...) {
     }
 }
 
-// NOTE: This returns a volatile string. Do not store it without copying it.
+// Owned string on the context heap. Callers keep the pointer across
+// nested solidify/lookup (and two threads must not share a scratch key).
 static char* build_poly_slns_unique_key(Context *context, bh_arr(AstPolySolution) slns) {
-    static char key_buf[1024];
+    char key_buf[1024];
     char *p = key_buf;
     char *end = key_buf + sizeof(key_buf) - 1;
     b32 first = 1;
@@ -97,7 +98,7 @@ static char* build_poly_slns_unique_key(Context *context, bh_arr(AstPolySolution
     }
 
     *p = 0;
-    return key_buf;
+    return bh_strdup(context->gp_alloc, key_buf);
 }
 
 // NOTE: This function adds a solidified function to the entity heap for it to be processed
