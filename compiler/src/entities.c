@@ -1,3 +1,129 @@
+// Entity queue
+//
+// Compilation is a worklist over Entity records. An entity is one unit of work
+// wrapping an AST node (or an arbitrary job): a file to load, a binding to
+// introduce, a function header to type-check, a body to emit, and so on.
+//
+// Each entity has a pipeline state and a kind:
+//
+//   state  Parse_Builtin -> Introduce_Symbols -> Parse-> Resolve_Symbols -> Check_Types -> Code_Gen -> Finalized
+//          (Error / Failed are terminal-ish sides)
+//   type   Load_File, Binding, Function_Header, Function, Type_Alias, …
+//
+// The checker may yield (Check_Yield) when something is not ready yet. A yield
+// increments macro_attempts and leaves the entity in the same state so it can
+// be tried again after other work has made progress. Progress (a state change)
+// clears both attempt counters.
+//
+//
+// Expected usage
+//
+//   entity_heap_init(alloc, &entities);
+//
+//   // Birth: allocate in the entity arena and enqueue.
+//   entity_heap_insert(&entities, e);            // register + insert
+//   add_entities_for_node(&entities, NULL, …);   // map an AST node to 1+ entities
+//
+//   // If target_arr is non-NULL, add_entities_for_node only registers. The
+//   // caller (static-if, #foreign block, parser alternate placement) holds
+//   // the entities and later calls entity_heap_insert_existing.
+//
+//   while (!entity_heap_empty(&entities)) {
+//       Entity *e = entity_heap_top(&entities);
+//       entity_heap_remove_top(&entities);       // e is no longer queued
+//
+//       process_entity(context, e);              // may change state / type / attempts
+//
+//       if (e->state != Finalized && e->state != Failed)
+//           entity_heap_insert_existing(&entities, e);
+//   }
+//
+// insert_existing is a no-op if entered_in_queue is already set. After
+// remove_top, mutate the entity freely, then re-insert so it is routed to
+// the right structure for its new state and attempt count.
+//
+// entity_change_state / entity_change_type update the bookkeeping counters
+// and the cached sort key. They do not move the entity between structures.
+// Call them only while the entity is not queued (after remove_top, or before
+// the first insert).
+//
+//
+// Storage
+//
+// Entities themselves live in entity_arena. Membership is exactly one of:
+// not queued, ready, a retry wave, or the codegen heap.
+//
+//   ready (EntityQueueGrid)
+//     First-try pre-codegen work: macro_attempts == 0 && state < Code_Gen.
+//     A 2D grid of FIFO arrays, items[state][type], scanned in state-then-type
+//     order. That order matches the old heap compare for a single attempt /
+//     phase layer, so no sift is needed. hint_state / hint_type skip empty
+//     buckets; heads compact in place when they have walked far enough.
+//
+//   retry_waves
+//     Yielded pre-codegen work: macro_attempts > 0 && state < Code_Gen.
+//     One bag per macro_attempts value. A yield appends to a later wave
+//     instead of sifting a heap. When a wave becomes active its keys are
+//     refreshed and it is sorted by (queue_key, id), then scanned. Inserting
+//     into a lower-attempt wave pauses the active wave (remaining items are
+//     compacted) so that lower-attempt work is always taken first.
+//
+//   entities (4-ary min-heap)
+//     Codegen and later: state >= Code_Gen. Ordered by queue_key, then id.
+//     detached_top is a lazy pop: remove_top marks the heap root without
+//     sifting. If that same entity is re-inserted immediately it can be
+//     rerouted to ready/retry or left on the heap; otherwise the next heap
+//     mutation commits the detach (swap-last + shift-down).
+//
+// state_count, type_count, and all_count[state][type] track only queued
+// entities. The pump uses them for "any pre-codegen work left?" checks.
+//
+//
+// Priority
+//
+// queue_key packs the old multi-field compare so a sift is two u64 loads:
+//
+//   phase << 56 | macro_attempts << 32 | state << 24 | type << 16
+//               | (micro_attempts & 0xffff)
+//   then id as the tiebreaker
+//
+//   phase 1  first-try parse-or-earlier  (state <= Parse && attempts == 0)
+//   phase 2  all other pre-codegen       (state < Code_Gen)
+//   phase 3  codegen and later
+//
+// So: parse new files first, then type-check (retries after first-tries of
+// the same state/type), then emit. entity_heap_top always prefers ready,
+// then the current retry wave, then the heap.
+//
+//
+// How an entity moves
+//
+//   register
+//     Arena-allocate, assign id, zero attempts, entered_in_queue = 0.
+//
+//   insert
+//     Route by the predicates above into ready, a retry wave, or the heap.
+//     Mark entered_in_queue and bump the counts.
+//
+//   top / remove_top
+//     Take from ready, else retry, else the heap. Decrement counts and
+//     clear entered_in_queue. The entity is now "out" for processing.
+//
+//   after process_entity
+//     Finalized / Failed     stay out (done)
+//     Check_Yield            macro_attempts++, same state → later retry wave
+//     advanced, still < CG   attempts cleared → ready
+//     advanced to Code_Gen   attempts cleared → heap
+//     entity_change_* then insert_existing
+//                            used when some other path (e.g. wasm emit
+//                            kicking a function into Code_Gen) wants to
+//                            requeue an already-allocated entity
+//
+// Some AST nodes spawn more than one entity (function header + body, global
+// header + global, struct defaults + type, memres type + reservation).
+// Parsing and #load produce more entities as they run, which is why the
+// worklist is a pump rather than a single pass.
+
 #include "bh.h"
 #include "astnodes.h"
 #include "utils.h"
