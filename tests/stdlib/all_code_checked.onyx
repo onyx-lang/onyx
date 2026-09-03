@@ -17,7 +17,6 @@ main :: () {
     b->map_dir("core", tprintf("{}/core", core_root));
 
     b->enable(.MULTI_THREADING);
-    b->enable(.COMPILATION_DATA_DETAILED);
     b->set_platform(.ONYX);
 
     b->add_source("tests/stdlib/all_code_checked_program.onyx.ignore");

@@ -32,9 +32,6 @@ message CompilerEvent {
     EventPackage pack = 12;
     EventScope scope = 13;
     EventSymbol symbol = 14;
-    // Detailed events below are always recorded. Delivery is gated:
-    // C ABI: ONYX_OPTION_COMPILATION_DATA_DETAILED
-    // Extensions: hook CompilationDataDetailed (3)
     EventSymbolResolved resolved = 15;
     EventBinding binding = 16;
     EventType type = 17;

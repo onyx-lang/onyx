@@ -73,7 +73,7 @@ main :: () {
     println("first_compile_ok");
     println(!b->has_errors());
 
-    first := b->compilation_data();
+    first := b->compilation_events();
 
     has_start := false;
     has_foo := false;
@@ -204,58 +204,31 @@ main :: () {
     println("first_has_type_body");
     println(first_has_type_body);
 
-    b->enable(.COMPILATION_DATA_DETAILED);
-
-    b->inject_source("package extra\nextra_y :: 1\n");
-    b->compile();
-    second := b->compilation_data();
-
-    println("delta_compile_ok");
-    println(!b->has_errors());
-
-    delta_has_start := false;
-    delta_has_extra := false;
-    delta_has_foo := false;
-    delta_has_scope := false;
-    delta_has_symbol_x := false;
-    delta_has_type_void := false;
-    delta_void_has_basic := false;
-    delta_i32_has_basic := false;
-    delta_elem_ids_ok := true;
-    delta_array_ids_ok := true;
-    delta_bodies_ok := true;
-    delta_has_point_body := false;
-    delta_has_shape_body := false;
+    has_type_void := false;
+    void_has_basic := false;
+    i32_has_basic := false;
+    elem_ids_ok := true;
+    array_ids_ok := true;
+    bodies_ok := true;
+    has_point_body := false;
+    has_shape_body := false;
     point_type_id: u32;
     shape_type_id: u32;
     found_point_type := false;
     found_shape_type := false;
     point_binding_type_id: u32;
     x_binding_has_type := false;
-    delta_resolved_x := false;
-    delta_resolved_point := false;
-    delta_resolved_member_x := false;
-    delta_resolved_shape_point := false;
+    resolved_x := false;
+    resolved_point := false;
+    resolved_member_x := false;
+    resolved_shape_point := false;
     point_member_x_id: u32;
     shape_variant_point_id: u32;
     color_kind_ok := false;
     color_values_ok := false;
 
-    for e in second.events {
+    for e in first.events {
         switch e.data {
-            case .Start do delta_has_start = true;
-
-            case .Pack as p {
-                if p.fully_qualified_name == "extra" do delta_has_extra = true;
-                if p.fully_qualified_name == "foo" do delta_has_foo = true;
-            }
-
-            case .Scope do delta_has_scope = true;
-
-            case .Symbol as sym {
-                if sym.name == "x" do delta_has_symbol_x = true;
-            }
-
             case .Binding as bind {
                 if bind.type_id != 0 {
                     if contains_u32(point_ids, bind.symbol_id) {
@@ -269,16 +242,16 @@ main :: () {
 
             case .Type as t {
                 if t.name == "void" {
-                    delta_has_type_void = true;
+                    has_type_void = true;
                     switch t.body {
-                        case .Basic do delta_void_has_basic = true;
+                        case .Basic do void_has_basic = true;
                         case _ {}
                     }
                 }
                 if t.name == "i32" {
                     switch t.body {
                         case .Basic as basic {
-                            if basic.basic_kind == .I32 do delta_i32_has_basic = true;
+                            if basic.basic_kind == .I32 do i32_has_basic = true;
                         }
                         case _ {}
                     }
@@ -313,18 +286,18 @@ main :: () {
                 if is_elem_kind {
                     switch t.body {
                         case .Elem as el {
-                            if el.elem_id == 0 do delta_elem_ids_ok = false;
+                            if el.elem_id == 0 do elem_ids_ok = false;
                         }
-                        case _ do delta_elem_ids_ok = false;
+                        case _ do elem_ids_ok = false;
                     }
                 }
 
                 if t.kind == .Array {
                     switch t.body {
                         case .Array as a {
-                            if a.elem_id == 0 do delta_array_ids_ok = false;
+                            if a.elem_id == 0 do array_ids_ok = false;
                         }
-                        case _ do delta_array_ids_ok = false;
+                        case _ do array_ids_ok = false;
                     }
                 }
             }
@@ -333,7 +306,7 @@ main :: () {
                 switch tb.details {
                     case .Struct as sb {
                         for m in sb.members {
-                            if m.name.count == 0 || m.type_id == 0 do delta_bodies_ok = false;
+                            if m.name.count == 0 || m.type_id == 0 do bodies_ok = false;
                         }
                         if found_point_type && tb.type_id == point_type_id {
                             has_px := false;
@@ -345,12 +318,12 @@ main :: () {
                                 }
                                 if m.name == "y" do has_py = true;
                             }
-                            if has_px && has_py do delta_has_point_body = true;
+                            if has_px && has_py do has_point_body = true;
                         }
                     }
                     case .Union as ub {
                         for v in ub.variants {
-                            if v.name.count == 0 || v.type_id == 0 do delta_bodies_ok = false;
+                            if v.name.count == 0 || v.type_id == 0 do bodies_ok = false;
                         }
                         if found_shape_type && tb.type_id == shape_type_id {
                             has_point := false;
@@ -362,7 +335,7 @@ main :: () {
                                 }
                                 if v.name == "Empty" do has_empty = true;
                             }
-                            if has_point && has_empty do delta_has_shape_body = true;
+                            if has_point && has_empty do has_shape_body = true;
                         }
                     }
                     case _ {}
@@ -373,54 +346,44 @@ main :: () {
         }
     }
 
-    for e in second.events {
+    for e in first.events {
         switch e.data {
             case .Resolved as r {
                 if r.length != 0 {
-                    if contains_u32(point_ids, r.symbol_id) do delta_resolved_point = true;
-                    if contains_u32(x_ids, r.symbol_id) do delta_resolved_x = true;
-                    if point_member_x_id != 0 && r.symbol_id == point_member_x_id do delta_resolved_member_x = true;
-                    if shape_variant_point_id != 0 && r.symbol_id == shape_variant_point_id do delta_resolved_shape_point = true;
+                    if contains_u32(point_ids, r.symbol_id) do resolved_point = true;
+                    if contains_u32(x_ids, r.symbol_id) do resolved_x = true;
+                    if point_member_x_id != 0 && r.symbol_id == point_member_x_id do resolved_member_x = true;
+                    if shape_variant_point_id != 0 && r.symbol_id == shape_variant_point_id do resolved_shape_point = true;
                 }
             }
             case _ {}
         }
     }
 
-    println("delta_has_start");
-    println(delta_has_start);
-    println("delta_has_extra");
-    println(delta_has_extra);
-    println("delta_has_foo");
-    println(delta_has_foo);
-    println("delta_has_scope");
-    println(delta_has_scope);
-    println("delta_has_symbol_x");
-    println(delta_has_symbol_x);
-    println("delta_has_type_void");
-    println(delta_has_type_void);
-    println("delta_void_has_basic");
-    println(delta_void_has_basic);
-    println("delta_i32_has_basic");
-    println(delta_i32_has_basic);
-    println("delta_elem_ids_ok");
-    println(delta_elem_ids_ok);
-    println("delta_array_ids_ok");
-    println(delta_array_ids_ok);
-    println("delta_bodies_ok");
-    println(delta_bodies_ok);
-    println("delta_has_point_body");
-    println(delta_has_point_body);
-    println("delta_has_shape_body");
-    println(delta_has_shape_body);
-    println("delta_point_binding_type_ok");
+    println("has_type_void");
+    println(has_type_void);
+    println("void_has_basic");
+    println(void_has_basic);
+    println("i32_has_basic");
+    println(i32_has_basic);
+    println("elem_ids_ok");
+    println(elem_ids_ok);
+    println("array_ids_ok");
+    println(array_ids_ok);
+    println("bodies_ok");
+    println(bodies_ok);
+    println("has_point_body");
+    println(has_point_body);
+    println("has_shape_body");
+    println(has_shape_body);
+    println("point_binding_type_ok");
     println(found_point_type && point_binding_type_id == point_type_id);
-    println("delta_x_binding_has_type");
+    println("x_binding_has_type");
     println(x_binding_has_type);
-    println("delta_resolved_x");
-    println(delta_resolved_x);
-    println("delta_resolved_point");
-    println(delta_resolved_point);
+    println("resolved_x");
+    println(resolved_x);
+    println("resolved_point");
+    println(resolved_point);
 
     member_x_kind_ok := false;
     shape_point_kind_ok := false;
@@ -446,8 +409,51 @@ main :: () {
     println(member_x_kind_ok);
     println("shape_point_kind_ok");
     println(shape_point_kind_ok);
-    println("delta_resolved_member_x");
-    println(delta_resolved_member_x);
-    println("delta_resolved_shape_point");
-    println(delta_resolved_shape_point);
+    println("resolved_member_x");
+    println(resolved_member_x);
+    println("resolved_shape_point");
+    println(resolved_shape_point);
+
+    b->inject_source("package extra\nextra_y :: 1\n");
+    b->compile();
+    second := b->compilation_events();
+
+    println("delta_compile_ok");
+    println(!b->has_errors());
+
+    delta_has_start := false;
+    delta_has_extra := false;
+    delta_has_foo := false;
+    delta_has_scope := false;
+    delta_has_symbol_x := false;
+
+    for e in second.events {
+        switch e.data {
+            case .Start do delta_has_start = true;
+
+            case .Pack as p {
+                if p.fully_qualified_name == "extra" do delta_has_extra = true;
+                if p.fully_qualified_name == "foo" do delta_has_foo = true;
+            }
+
+            case .Scope do delta_has_scope = true;
+
+            case .Symbol as sym {
+                if sym.name == "x" do delta_has_symbol_x = true;
+            }
+
+            case _ {}
+        }
+    }
+
+    println("delta_has_start");
+    println(delta_has_start);
+    println("delta_has_extra");
+    println(delta_has_extra);
+    println("delta_has_foo");
+    println(delta_has_foo);
+    println("delta_has_scope");
+    println(delta_has_scope);
+    println("delta_has_symbol_x");
+    println(delta_has_symbol_x);
 }

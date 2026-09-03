@@ -64,28 +64,26 @@ use onyx.toolchain { CompilationInfo }
 //
 // INCOMING HOOK (3)
 //     Added
-//     1 = Stalled — no entity made progress. Remaining CompilationData
-//         is flushed first so the extension can inject code that
+//     1 = Stalled — no entity made progress. Remaining CompilationEvents
+//         are flushed first so the extension can inject code that
 //         defines missing names, then checking resumes.
 //
 // PROTOCOL VERSION 3 CHANGES
 //
-// INCOMING COMPILATIONDATA (4)
+// INCOMING COMPILATIONEVENTS (4)
 //     Added
 //
 // OUTGOING INIT hooks
-//     2 = CompilationData (basic events)
-//     3 = CompilationDataDetailed (also resolutions, bindings, types)
-//     Hook 3 implies hook 2. Detailed events are always recorded; hook 3
-//     only gates whether they are sent. First dump after INIT includes
-//     the full history so far.
+//     2 = CompilationEvents (full event stream)
+//     3 = reserved (formerly CompilationDataDetailed; treated as 2)
+//     First dump after INIT includes the full history so far.
 //
 // PROTOCOL VERSION 4 CHANGES
 //
 // INCOMING HOOK (3)
 //     4 = All_Code_Checked
 //     Synchronous barrier after all parse/check work and before code
-//     generation. Remaining CompilationData is flushed first so
+//     generation. Remaining CompilationEvents are flushed first so
 //     CompilationInfo is complete. InjectCode is applied and compiled
 //     before generation; the hook may fire again if inject added work.
 //
@@ -118,7 +116,7 @@ IncomingMessage :: union {
         info: HookInfo
     }
 
-    CompilationData as 4: struct {
+    CompilationEvents as 4: struct {
         events: [] u8
     }
 }
@@ -178,17 +176,15 @@ Position :: struct {
 }
 
 HookInfo :: union {
-    None: void
+    None as 0: struct {}
 
-    Stalled: struct {}
+    Stalled as 1: struct {}
 
-    CompilationData: struct {}
+    CompilationEvents as 2: struct {}
 
-    CompilationDataDetailed: struct {}
+    All_Code_Checked as 4: struct {}
 
-    All_Code_Checked: struct {}
-
-    Count: void
+    Count as 5: struct {}
 }
 
 
@@ -205,8 +201,7 @@ ExtensionContext :: struct {
     reader: io.Reader
 
     running: bool
-    wants_compilation_data: bool
-    wants_compilation_data_detailed: bool
+    wants_compilation_events: bool
     compiler_events: CompilerEvents
     compilation_info: CompilationInfo
 }
@@ -241,28 +236,7 @@ ExtensionContext.start :: (self: &#Self, callback: (&#Self, msg: IncomingMessage
                     }
                 }
 
-                if self.wants_compilation_data || self.wants_compilation_data_detailed {
-                    found := false
-                    for h in hooks {
-                        if h == 2 do found = true
-                    }
-                    if !found do hooks->push(2)
-                }
-
-                if self.wants_compilation_data_detailed {
-                    found := false
-                    for h in hooks {
-                        if h == 3 do found = true
-                    }
-                    if !found do hooks->push(3)
-                }
-
-                // A detailed hook implies compilation-data messages.
-                has_detailed_hook := false
-                for h in hooks {
-                    if h == 3 do has_detailed_hook = true
-                }
-                if has_detailed_hook {
+                if self.wants_compilation_events {
                     found := false
                     for h in hooks {
                         if h == 2 do found = true
@@ -295,11 +269,11 @@ ExtensionContext.start :: (self: &#Self, callback: (&#Self, msg: IncomingMessage
                 })
             }
 
-            case .CompilationData as &cd {
-                switch self.compilation_info->ingest_protobuf(cd.events) {
+            case .CompilationEvents as &ce {
+                switch self.compilation_info->ingest_protobuf(ce.events) {
                     case .Ok {}
                     case .Err as err {
-                        eprintf("Failed to unmarshal CompilationData: {p}\n", err)
+                        eprintf("Failed to unmarshal CompilationEvents: {p}\n", err)
                     }
                 }
 
@@ -348,15 +322,9 @@ ExtensionContext.handle_hook :: (self: &#Self, hook: HookInfo.tag_enum, func: (&
     }
 }
 
-ExtensionContext.enable_compilation_data :: (self: &#Self) {
+ExtensionContext.enable_compilation_events :: (self: &#Self) {
     if self.protocol_version < 3 do self.protocol_version = 3
-    self.wants_compilation_data = true
-}
-
-ExtensionContext.enable_compilation_data_detailed :: (self: &#Self) {
-    if self.protocol_version < 3 do self.protocol_version = 3
-    self.wants_compilation_data = true
-    self.wants_compilation_data_detailed = true
+    self.wants_compilation_events = true
 }
 
 

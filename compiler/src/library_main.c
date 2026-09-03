@@ -500,10 +500,10 @@ static void dump_cycles(Context *context) {
 
 // TODO: relocate this function
 static void send_stalled_hooks(Context *context) {
-    // Compilation-data delivery is batched. A stall is the last chance
+    // Compilation-event delivery is batched. A stall is the last chance
     // for an extension to see every type/symbol recorded so far and
     // inject code that resolves the missing names.
-    compiler_extensions_flush_compilation_data_now(context);
+    compiler_extensions_flush_compilation_events_now(context);
 
     bh_arr_each(CompilerExtension, ext, context->extensions) {
         compiler_extension_hook_stalled(context, ext->id);
@@ -525,7 +525,7 @@ static void send_all_code_checked_hooks(Context *context) {
     }
 }
 
-// Barrier before code generation. Compilation-data delivery stays async;
+// Barrier before code generation. Compilation-event delivery stays async;
 // this is the rendezvous where extensions can inject more source
 // (`#init`, tagged procedures, …) after everything has type-checked.
 // Returns 1 if inject added compile work that must run first.
@@ -639,9 +639,9 @@ static void prime_pump(Context *context) {
 
 static onyx_pump_t pump_return(Context *context, onyx_pump_t result) {
     if (result == ONYX_PUMP_CONTINUE) {
-        compiler_extensions_flush_compilation_data(context);
+        compiler_extensions_flush_compilation_events(context);
     } else {
-        compiler_extensions_flush_compilation_data_now(context);
+        compiler_extensions_flush_compilation_events_now(context);
     }
     return result;
 }
@@ -879,7 +879,6 @@ int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t valu
     case ONYX_OPTION_DISABLE_EXTENSIONS:     ctx->context.options.no_compiler_extensions = value; return 1;
     case ONYX_OPTION_PLATFORM:               ctx->context.options.runtime = value; return 1;
     case ONYX_OPTION_PARSE_ONLY:             ctx->context.options.parse_only = value; return 1;
-    case ONYX_OPTION_COMPILATION_DATA_DETAILED: ctx->context.options.compilation_data_detailed = value; return 1;
     case ONYX_OPTION_JIT:                    ctx->context.options.enable_jit = value; return 1;
 
     default:
@@ -954,7 +953,7 @@ void onyx_inject_code_as(onyx_context_t *ctx, char *filename, int32_t filename_l
     bh_arr_push(ctx->context.loaded_files, file_contents);
     u32 file_id = compilation_log_emit_file(&ctx->context, bh_arr_last(ctx->context.loaded_files).filename);
     parse_source_file(&ctx->context, &bh_arr_last(ctx->context.loaded_files), file_id);
-    compiler_extensions_flush_compilation_data_now(&ctx->context);
+    compiler_extensions_flush_compilation_events_now(&ctx->context);
 }
 
 void onyx_inject_code(onyx_context_t *ctx, uint8_t *code, int32_t length) {
@@ -1193,13 +1192,13 @@ void onyx_output_write(onyx_context_t *ctx, onyx_output_type_t type, void *buffe
 }
 
 
-int32_t onyx_compilation_data_length(onyx_context_t *ctx) {
+int32_t onyx_compilation_events_length(onyx_context_t *ctx) {
     __library_code_entry(ctx);
     compilation_log_ensure_c_abi_encoded(&ctx->context);
     return ctx->context.compilation_log.encoded.length;
 }
 
-void onyx_compilation_data_write(onyx_context_t *ctx, void *buffer) {
+void onyx_compilation_events_write(onyx_context_t *ctx, void *buffer) {
     __library_code_entry(ctx);
     CompilationLog *log = &ctx->context.compilation_log;
     compilation_log_ensure_c_abi_encoded(&ctx->context);
@@ -1210,7 +1209,6 @@ void onyx_compilation_data_write(onyx_context_t *ctx, void *buffer) {
 
     log->c_abi_cursor = log->encoded_to;
     if (log->c_abi_cursor > log->delivered_until) log->delivered_until = log->c_abi_cursor;
-    if (log->encoded_include_detailed) log->c_abi_detailed_sent = 1;
     log->encoded_valid = 0;
 }
 

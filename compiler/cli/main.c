@@ -485,7 +485,6 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
                 bh_printf(C_RED "error" C_NORM ": --generate-events requires a target file.\n");
                 return 0;
             }
-            onyx_set_option_int(ctx, ONYX_OPTION_COMPILATION_DATA_DETAILED, 1);
             cli_args->events_file = argv[++i];
         }
         else if (!strcmp(argv[i], "--jit")) {
@@ -719,7 +718,7 @@ static int32_t output_file_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, const
 static int32_t output_compilation_events_to_disk(CLIArgs *cli_args, onyx_context_t *ctx) {
     if (!cli_args->events_file) return 1;
 
-    int32_t output_length = onyx_compilation_data_length(ctx);
+    int32_t output_length = onyx_compilation_events_length(ctx);
     void *output = NULL;
     if (output_length > 0) {
         output = malloc(output_length);
@@ -727,7 +726,7 @@ static int32_t output_compilation_events_to_disk(CLIArgs *cli_args, onyx_context
             bh_printf(C_RED "error" C_NORM ": Failed to allocate compilation events buffer\n");
             return 0;
         }
-        onyx_compilation_data_write(ctx, output);
+        onyx_compilation_events_write(ctx, output);
     }
 
     bh_file out_file;

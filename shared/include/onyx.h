@@ -50,8 +50,6 @@ typedef enum onyx_option_t {
     /// full compile.
     ONYX_OPTION_PARSE_ONLY,
 
-    ONYX_OPTION_COMPILATION_DATA_DETAILED,
-
     ONYX_OPTION_JIT,
 } onyx_option_t;
 
@@ -180,19 +178,14 @@ API int32_t onyx_output_length(onyx_context_t *ctx, onyx_output_type_t type);
 API void    onyx_output_write(onyx_context_t *ctx, onyx_output_type_t type, void *buffer);
 
 //
-// Compilation data (protobuf CompilerEvents)
+// Compilation events (protobuf CompilerEvents)
 //
 // First write is the full log so far. Later writes are only events since the last
 // write. length does not advance the cursor; write does.
 //
-// Resolutions, bindings, and types are always recorded. They are included in the
-// payload only when ONYX_OPTION_COMPILATION_DATA_DETAILED is set. If that option
-// is turned on after some writes, the next write backfills those detailed events
-// from the start of the log, then any unread events.
-//
 
-API int32_t onyx_compilation_data_length(onyx_context_t *ctx);
-API void    onyx_compilation_data_write(onyx_context_t *ctx, void *buffer);
+API int32_t onyx_compilation_events_length(onyx_context_t *ctx);
+API void    onyx_compilation_events_write(onyx_context_t *ctx, void *buffer);
 
 //
 // Compilation Info

@@ -45,13 +45,13 @@ ONYX_DEF(onyx_output_length, (WASM_I64, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(onyx_compilation_data_length, (WASM_I64), (WASM_I32)) {
-    results->data[0] = WASM_I32_VAL(onyx_compilation_data_length((onyx_context_t *) P(0, i64)));
+ONYX_DEF(onyx_compilation_events_length, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(onyx_compilation_events_length((onyx_context_t *) P(0, i64)));
     return NULL;
 }
 
-ONYX_DEF(onyx_compilation_data_write, (WASM_I64, WASM_I32), ()) {
-    onyx_compilation_data_write((onyx_context_t *) P(0, i64), ONYX_PTR(P(1, i32)));
+ONYX_DEF(onyx_compilation_events_write, (WASM_I64, WASM_I32), ()) {
+    onyx_compilation_events_write((onyx_context_t *) P(0, i64), ONYX_PTR(P(1, i32)));
     return NULL;
 }
 
@@ -210,8 +210,8 @@ ONYX_LIBRARY {
     ONYX_FUNC(onyx_stat)
     ONYX_FUNC(onyx_output_write)
     ONYX_FUNC(onyx_output_length)
-    ONYX_FUNC(onyx_compilation_data_length)
-    ONYX_FUNC(onyx_compilation_data_write)
+    ONYX_FUNC(onyx_compilation_events_length)
+    ONYX_FUNC(onyx_compilation_events_write)
     ONYX_FUNC(onyx_error_rank)
     ONYX_FUNC(onyx_error_line_text)
     ONYX_FUNC(onyx_error_length)

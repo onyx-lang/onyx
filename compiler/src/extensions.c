@@ -10,7 +10,7 @@
 #define MSG_HOST_TERMINATE         1
 #define MSG_HOST_EXPAND_MACRO      2
 #define MSG_HOST_HOOK              3
-#define MSG_HOST_COMPILATION_DATA  4
+#define MSG_HOST_COMPILATION_EVENTS 4
 
 #define MSG_EXT_INIT             0
 #define MSG_EXT_ERROR_REPORT     1
@@ -19,9 +19,9 @@
 #define MSG_EXT_ACKNOWLEDGE_HOOK 4
 
 #define HOOK_STALLED                      1
-#define HOOK_COMPILATION_DATA             2
-#define HOOK_COMPILATION_DATA_DETAILED    3
-#define HOOK_ALL_CODE_CHECKED            4
+#define HOOK_COMPILATION_EVENTS           2
+#define HOOK_COMPILATION_EVENTS_LEGACY    3
+#define HOOK_ALL_CODE_CHECKED             4
 
 
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
@@ -289,41 +289,41 @@ static char *extension_recv_str(CompilerExtension *ext, i32 *out_len) {
     return buf;
 }
 
-static void compiler_extension_send_compilation_data(Context *context, CompilerExtension *ext) {
-    if (!ext->alive || !ext->supports_compilation_data) return;
+static void compiler_extension_send_compilation_events(Context *context, CompilerExtension *ext) {
+    if (!ext->alive || !ext->supports_compilation_events) return;
     if (ext->state != COMP_EXT_STATE_READY) return;
 
-    u32 from = ext->compilation_data_cursor;
+    u32 from = ext->compilation_events_cursor;
     u32 to = (u32)bh_arr_length(context->compilation_log.events);
     if (from >= to) return;
 
     CompilationLog *log = &context->compilation_log;
     bh_buffer_clear(&log->pb_flush);
-    compilation_log_encode_range(context, from, to, &log->pb_flush, ext->supports_compilation_data_detailed);
+    compilation_log_encode_range(context, from, to, &log->pb_flush);
 
-    extension_send_int(ext, MSG_HOST_COMPILATION_DATA);
+    extension_send_int(ext, MSG_HOST_COMPILATION_EVENTS);
     extension_send_bytes(ext, log->pb_flush.data, log->pb_flush.length);
 
-    ext->compilation_data_cursor = to;
+    ext->compilation_events_cursor = to;
     if (to > log->delivered_until) log->delivered_until = to;
 }
 
-#define COMPILATION_DATA_FLUSH_BATCH 8192
+#define COMPILATION_EVENTS_FLUSH_BATCH 8192
 
-void compiler_extensions_flush_compilation_data(Context *context) {
+void compiler_extensions_flush_compilation_events(Context *context) {
     bh_arr_each(CompilerExtension, ext, context->extensions) {
         u32 pending = (u32)bh_arr_length(context->compilation_log.events);
-        if (pending > ext->compilation_data_cursor &&
-            pending - ext->compilation_data_cursor >= COMPILATION_DATA_FLUSH_BATCH) {
-            compiler_extension_send_compilation_data(context, ext);
+        if (pending > ext->compilation_events_cursor &&
+            pending - ext->compilation_events_cursor >= COMPILATION_EVENTS_FLUSH_BATCH) {
+            compiler_extension_send_compilation_events(context, ext);
         }
         extension_try_flush(ext);
     }
 }
 
-void compiler_extensions_flush_compilation_data_now(Context *context) {
+void compiler_extensions_flush_compilation_events_now(Context *context) {
     bh_arr_each(CompilerExtension, ext, context->extensions) {
-        compiler_extension_send_compilation_data(context, ext);
+        compiler_extension_send_compilation_events(context, ext);
         extension_try_flush(ext);
     }
 }
@@ -418,7 +418,7 @@ TypeMatch compiler_extension_start(Context *context, const char *name, const cha
         }
 
         ext->state = COMP_EXT_STATE_READY;
-        compiler_extensions_flush_compilation_data_now(context);
+        compiler_extensions_flush_compilation_events_now(context);
         return TYPE_MATCH_SUCCESS;
     }
 }
@@ -441,11 +441,8 @@ b32 compiler_extension_negotiate_capabilities(Context *context, CompilerExtensio
             int hook = extension_recv_int(ext);
 
             if (hook == HOOK_STALLED) ext->supports_stalled_hook = 1;
-            if (hook == HOOK_COMPILATION_DATA) ext->supports_compilation_data = 1;
-            if (hook == HOOK_COMPILATION_DATA_DETAILED) {
-                ext->supports_compilation_data = 1;
-                ext->supports_compilation_data_detailed = 1;
-            }
+            if (hook == HOOK_COMPILATION_EVENTS || hook == HOOK_COMPILATION_EVENTS_LEGACY)
+                ext->supports_compilation_events = 1;
             if (hook == HOOK_ALL_CODE_CHECKED) ext->supports_all_code_checked_hook = 1;
         }
     }
@@ -649,7 +646,7 @@ TypeMatch compiler_extension_expand_macro(
 
             ext->state = COMP_EXT_STATE_READY;
             ext->current_expansion_id = 0;
-            compiler_extensions_flush_compilation_data_now(context);
+            compiler_extensions_flush_compilation_events_now(context);
             return TYPE_MATCH_SUCCESS;
         }
 
@@ -667,7 +664,7 @@ static TypeMatch compiler_extension_send_hook(Context *context, CompilerExtensio
     // Deliver remaining compilation events before the hook so the
     // extension's CompilationInfo is complete (needed on stall to
     // generate code for types that were only just recorded).
-    compiler_extension_send_compilation_data(context, ext);
+    compiler_extension_send_compilation_events(context, ext);
 
     bh_arena_clear(&ext->arena);
     ext->state = COMP_EXT_STATE_HANDLING_HOOK;
@@ -691,7 +688,7 @@ static TypeMatch compiler_extension_send_hook(Context *context, CompilerExtensio
             }
 
             ext->state = COMP_EXT_STATE_READY;
-            compiler_extensions_flush_compilation_data_now(context);
+            compiler_extensions_flush_compilation_events_now(context);
             return TYPE_MATCH_SUCCESS;
         }
 
@@ -726,7 +723,7 @@ void compiler_extension_terminate(Context *context, int extension_id) {
 
     if (!ext->alive) return;
 
-    compiler_extension_send_compilation_data(context, ext);
+    compiler_extension_send_compilation_events(context, ext);
 
     if (ext->state == COMP_EXT_STATE_READY) {
         extension_send_int(ext, MSG_HOST_TERMINATE);

@@ -2091,13 +2091,12 @@ typedef struct CompilerExtension {
     b32 alive : 1;
 
     b32 supports_stalled_hook : 1;
-    b32 supports_compilation_data : 1;
-    b32 supports_compilation_data_detailed : 1;
+    b32 supports_compilation_events : 1;
     b32 supports_all_code_checked_hook : 1;
 
-    u32 compilation_data_cursor;
+    u32 compilation_events_cursor;
 
-    // Host-side send queue. Compilation data is appended here and flushed
+    // Host-side send queue. Compilation events are appended here and flushed
     // without blocking the compiler pump. Drained before any recv/terminate.
     bh_buffer outgoing;
     i32 outgoing_off;
@@ -2127,7 +2126,6 @@ struct CompileOptions {
     b32 generate_symbol_info_file : 1;
     b32 generate_lsp_info_file    : 1;
     b32 parse_only                : 1;
-    b32 compilation_data_detailed : 1;
 
     b32 running_perf : 1;
     b32 enable_jit   : 1;
@@ -2356,11 +2354,8 @@ typedef struct CompilationLog {
     u32 encoded_from;
     u32 encoded_to;
     b32 encoded_valid;
-    b32 encoded_include_detailed;
-    b32 encoded_backfill;
 
     u32 c_abi_cursor;
-    b32 c_abi_detailed_sent;
     u32 delivered_until;
     u32 next_file_id;
     u32 next_symbol_id;
@@ -2637,8 +2632,8 @@ TypeMatch compiler_extension_expand_macro(
     b32 wait_for_response);
 TypeMatch compiler_extension_hook_stalled(Context *context, int extension_id);
 TypeMatch compiler_extension_hook_all_code_checked(Context *context, int extension_id);
-void compiler_extensions_flush_compilation_data(Context *context);
-void compiler_extensions_flush_compilation_data_now(Context *context);
+void compiler_extensions_flush_compilation_events(Context *context);
+void compiler_extensions_flush_compilation_events_now(Context *context);
 
 
 // Compiler Events
@@ -2666,7 +2661,7 @@ void compilation_log_emit_binding(Context *context, AstNode *node, AstBinding *b
 void compilation_log_notify_node_typed(Context *context, AstNode *node);
 void compilation_log_emit_type(Context *context, Type *type);
 void compilation_log_emit_type_body(Context *context, Type *type);
-void compilation_log_encode_range(Context *context, u32 from, u32 to, bh_buffer *out, b32 include_detailed);
+void compilation_log_encode_range(Context *context, u32 from, u32 to, bh_buffer *out);
 void compilation_log_ensure_c_abi_encoded(Context *context);
 
 

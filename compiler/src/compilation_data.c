@@ -202,15 +202,6 @@ enum {
 #define PB_TYPE_UNION_VARIANT_TAG       3
 #define PB_TYPE_UNION_VARIANT_SYMBOL_ID 4
 
-static b32 compilation_event_is_detailed(CompilationEventKind kind) {
-    return kind == COMPILATION_EVENT_SYMBOL_RESOLVED
-        || kind == COMPILATION_EVENT_BINDING
-        || kind == COMPILATION_EVENT_TYPE
-        || kind == COMPILATION_EVENT_TYPE_BODY
-        || kind == COMPILATION_EVENT_OVERLOAD
-        || kind == COMPILATION_EVENT_POLY_PROC;
-}
-
 static char *compilation_log_intern(Context *context, const char *name) {
     if (!name || !*name) return (char *) "";
 
@@ -696,26 +687,13 @@ static void encode_event_into(Context *context, CompilationEvent *ev, bh_buffer 
     pb_write_bytes(out, PB_COMPILER_EVENTS_EVENTS, context->compilation_log.pb_event.data, context->compilation_log.pb_event.length);
 }
 
-void compilation_log_encode_range(Context *context, u32 from, u32 to, bh_buffer *out, b32 include_detailed) {
+void compilation_log_encode_range(Context *context, u32 from, u32 to, bh_buffer *out) {
     u32 count = (u32)bh_arr_length(context->compilation_log.events);
     if (from > count) from = count;
     if (to > count) to = count;
 
     for (u32 i = from; i < to; i++) {
-        CompilationEvent *ev = &context->compilation_log.events[i];
-        if (!include_detailed && compilation_event_is_detailed(ev->kind)) continue;
-        encode_event_into(context, ev, out);
-    }
-}
-
-static void compilation_log_encode_detailed_backfill(Context *context, u32 until, bh_buffer *out) {
-    u32 count = (u32)bh_arr_length(context->compilation_log.events);
-    if (until > count) until = count;
-
-    for (u32 i = 0; i < until; i++) {
-        CompilationEvent *ev = &context->compilation_log.events[i];
-        if (!compilation_event_is_detailed(ev->kind)) continue;
-        encode_event_into(context, ev, out);
+        encode_event_into(context, &context->compilation_log.events[i], out);
     }
 }
 
@@ -723,14 +701,8 @@ void compilation_log_ensure_c_abi_encoded(Context *context) {
     CompilationLog *log = &context->compilation_log;
     u32 from = log->c_abi_cursor;
     u32 to = (u32)bh_arr_length(log->events);
-    b32 want_detailed = context->options.compilation_data_detailed;
-    b32 backfill = want_detailed && !log->c_abi_detailed_sent && from > 0;
 
-    if (log->encoded_valid
-        && log->encoded_from == from
-        && log->encoded_to == to
-        && log->encoded_include_detailed == want_detailed
-        && log->encoded_backfill == backfill) {
+    if (log->encoded_valid && log->encoded_from == from && log->encoded_to == to) {
         return;
     }
 
@@ -740,14 +712,9 @@ void compilation_log_ensure_c_abi_encoded(Context *context) {
         bh_buffer_clear(&log->encoded);
     }
 
-    if (backfill) {
-        compilation_log_encode_detailed_backfill(context, from, &log->encoded);
-    }
-    compilation_log_encode_range(context, from, to, &log->encoded, want_detailed);
+    compilation_log_encode_range(context, from, to, &log->encoded);
     log->encoded_from = from;
     log->encoded_to = to;
-    log->encoded_include_detailed = want_detailed;
-    log->encoded_backfill = backfill;
     log->encoded_valid = 1;
 }
 

@@ -125,12 +125,8 @@ Builder.generate_output :: (
 /// Unread compilation events since the last call, decoded as `CompilerEvents`.
 /// The first call returns the full log so far; later calls return only new events.
 /// Append successive results to reconstruct the complete log.
-///
-/// Resolutions, bindings, and types are omitted unless
-/// `.COMPILATION_DATA_DETAILED` is enabled. Enabling it after a prior read
-/// backfills those events on the next call.
-Builder.compilation_data :: (use self: &#Self, allocator := context.allocator) -> CompilerEvents {
-    length := native.onyx_compilation_data_length(ctx)
+Builder.compilation_events :: (use self: &#Self, allocator := context.allocator) -> CompilerEvents {
+    length := native.onyx_compilation_events_length(ctx)
     if length <= 0 {
         return .{}
     }
@@ -138,7 +134,7 @@ Builder.compilation_data :: (use self: &#Self, allocator := context.allocator) -
     buffer := make([] u8, length)
     defer delete(&buffer)
 
-    native.onyx_compilation_data_write(ctx, buffer.data)
+    native.onyx_compilation_events_write(ctx, buffer.data)
     return protobuf.unmarshal(buffer, CompilerEvents, allocator)!
 }
 
@@ -153,11 +149,11 @@ Builder.compilation_info :: (use self: &#Self, allocator := context.allocator) -
 
 /// Fold unread compilation events into an existing index.
 Builder.update_compilation_info :: (use self: &#Self, info: &CompilationInfo, allocator := context.allocator) -> u32 {
-    length := native.onyx_compilation_data_length(ctx)
+    length := native.onyx_compilation_events_length(ctx)
     if length <= 0 do return 0
 
     buffer := make([] u8, length, allocator=allocator)
-    native.onyx_compilation_data_write(ctx, buffer.data)
+    native.onyx_compilation_events_write(ctx, buffer.data)
 
     before := info.events_applied
     switch info->ingest_protobuf(buffer, copy_payload=false) {

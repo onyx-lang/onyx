@@ -14,8 +14,8 @@ use protobuf.onyx.toolchain.events {*}
 /// events still points at whatever allocated those events' strings.
 ///
 /// Fold later deltas with `update` (or `Builder.update_compilation_info`)
-/// instead of building a new index. Each `Builder.compilation_data` read
-/// and each extension CompilationData message is already a delta.
+/// instead of building a new index. Each `Builder.compilation_events` read
+/// and each extension CompilationEvents message is already a delta.
 CompilationInfo :: struct {
     allocator: Allocator
     compiler_version: str
@@ -100,7 +100,7 @@ CompilationInfo.from :: (data: CompilerEvents, allocator := context.allocator) -
 }
 
 /// Apply a batch of events in place. Pass only *new* events (a Builder
-/// unread dump, or one extension CompilationData payload). Replaying an
+/// unread dump, or one extension CompilationEvents payload). Replaying an
 /// already-applied batch will duplicate resolutions and name index entries.
 CompilationInfo.update :: (self: &#Self, events: [] CompilerEvent) -> u32 {
     for& e in events {

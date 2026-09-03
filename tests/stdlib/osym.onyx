@@ -52,7 +52,7 @@ main :: () {
     println("compile_ok");
     println(!b->has_errors());
 
-    events := b->compilation_data();
+    events := b->compilation_events();
     point_id: u32;
     for e in events.events {
         switch e.data {
