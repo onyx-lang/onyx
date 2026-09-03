@@ -91,6 +91,7 @@ ONYX_LIBRARY {
 
     ONYX_FUNC(__spawn_thread)
     ONYX_FUNC(__kill_thread)
+    ONYX_FUNC(__join_thread)
 
     ONYX_FUNC(__process_spawn)
     ONYX_FUNC(__process_read)

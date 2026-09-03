@@ -24,6 +24,20 @@ typedef struct OnyxThread {
 static bh_arr(OnyxThread) threads = NULL;
 
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+static pthread_mutex_t threads_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
+#ifdef _BH_WINDOWS
+static CRITICAL_SECTION threads_lock;
+static b32 threads_lock_inited = 0;
+static void threads_lock_ensure(void) {
+    if (!threads_lock_inited) {
+        InitializeCriticalSection(&threads_lock);
+        threads_lock_inited = 1;
+    }
+}
+#endif
+
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
 static void *onyx_run_thread(void *data) {
 #endif
 #ifdef _BH_WINDOWS
@@ -78,6 +92,14 @@ static i32 onyx_run_thread(void *data) {
 }
 
 ONYX_DEF(__spawn_thread, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+        pthread_mutex_lock(&threads_lock);
+    #endif
+    #ifdef _BH_WINDOWS
+        threads_lock_ensure();
+        EnterCriticalSection(&threads_lock);
+    #endif
+
     if (threads == NULL) bh_arr_new(bh_heap_allocator(), threads, 128);
     bh_arr_insert_end(threads, 1);
     OnyxThread *thread = &bh_arr_last(threads);
@@ -112,12 +134,100 @@ ONYX_DEF(__spawn_thread, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM
 
     #undef ONYX_THREAD_STACK_SIZE
 
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+        pthread_mutex_unlock(&threads_lock);
+    #endif
+    #ifdef _BH_WINDOWS
+        LeaveCriticalSection(&threads_lock);
+    #endif
+
     results->data[0] = WASM_I32_VAL(1);
+    return NULL;
+}
+
+ONYX_DEF(__join_thread, (WASM_I32), (WASM_I32)) {
+    i32 thread_id = params->data[0].of.i32;
+
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+        pthread_mutex_lock(&threads_lock);
+        i32 i = 0;
+        pthread_t handle = 0;
+        b32 found = 0;
+        bh_arr_each(OnyxThread, thread, threads) {
+            if (thread->id == thread_id) {
+                handle = thread->thread;
+                found = 1;
+                break;
+            }
+            i++;
+        }
+        pthread_mutex_unlock(&threads_lock);
+
+        if (found) {
+            pthread_join(handle, NULL);
+            pthread_mutex_lock(&threads_lock);
+            i = 0;
+            bh_arr_each(OnyxThread, thread, threads) {
+                if (thread->id == thread_id) {
+                    bh_arr_deleten(threads, i, 1);
+                    break;
+                }
+                i++;
+            }
+            pthread_mutex_unlock(&threads_lock);
+            results->data[0] = WASM_I32_VAL(1);
+            return NULL;
+        }
+    #endif
+
+    #ifdef _BH_WINDOWS
+        threads_lock_ensure();
+        EnterCriticalSection(&threads_lock);
+        i32 i = 0;
+        HANDLE handle = NULL;
+        b32 found = 0;
+        bh_arr_each(OnyxThread, thread, threads) {
+            if (thread->id == thread_id) {
+                handle = thread->thread_handle;
+                found = 1;
+                break;
+            }
+            i++;
+        }
+        LeaveCriticalSection(&threads_lock);
+
+        if (found && handle) {
+            WaitForSingleObject(handle, INFINITE);
+            CloseHandle(handle);
+            EnterCriticalSection(&threads_lock);
+            i = 0;
+            bh_arr_each(OnyxThread, thread, threads) {
+                if (thread->id == thread_id) {
+                    bh_arr_deleten(threads, i, 1);
+                    break;
+                }
+                i++;
+            }
+            LeaveCriticalSection(&threads_lock);
+            results->data[0] = WASM_I32_VAL(1);
+            return NULL;
+        }
+    #endif
+
+    results->data[0] = WASM_I32_VAL(0);
     return NULL;
 }
 
 ONYX_DEF(__kill_thread, (WASM_I32), (WASM_I32)) {
     i32 thread_id = params->data[0].of.i32;
+
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+        pthread_mutex_lock(&threads_lock);
+    #endif
+    #ifdef _BH_WINDOWS
+        threads_lock_ensure();
+        EnterCriticalSection(&threads_lock);
+    #endif
 
     i32 i = 0;
     bh_arr_each(OnyxThread, thread, threads) {
@@ -135,12 +245,25 @@ ONYX_DEF(__kill_thread, (WASM_I32), (WASM_I32)) {
             #endif
 
             bh_arr_deleten(threads, i, 1);
+            #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+                pthread_mutex_unlock(&threads_lock);
+            #endif
+            #ifdef _BH_WINDOWS
+                LeaveCriticalSection(&threads_lock);
+            #endif
             results->data[0] = WASM_I32_VAL(1);
             return NULL;
         }
 
         i++;
     }
+
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+        pthread_mutex_unlock(&threads_lock);
+    #endif
+    #ifdef _BH_WINDOWS
+        LeaveCriticalSection(&threads_lock);
+    #endif
 
     results->data[0] = WASM_I32_VAL(0);
     return NULL;

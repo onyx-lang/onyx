@@ -18,6 +18,8 @@ Thread_ID :: #type i32
 /// of the thread and whether or not it is alive.
 Thread :: struct {
     id    : Thread_ID;
+    /// 1 while the worker is running, 0 after `__exited`. Futex wait word.
+    join_word : i32;
     alive : bool;
 
     stack_base : rawptr
@@ -34,6 +36,7 @@ spawn :: (t: &Thread, data: &$T, func: (&T) -> void) {
 
     t.id    = next_thread_id;
     t.alive = true;
+    __atomic_store(&t.join_word, 1);
     next_thread_id += 1;
 
     thread_map->put(t.id, t);
@@ -51,13 +54,25 @@ spawn :: (t: &Thread, data: &$T, func: (&T) -> void) {
 /// If the thread was not alive in the first place,
 /// immediately return.
 join :: (t: &Thread) {
-    while t.alive {
+    // Wait on `join_word`, not `id`. `id` never changes, so a futex
+    // wait after the wake already fired would sleep forever.
+    while __atomic_load(&t.join_word) != 0 {
         #if runtime.platform.Supports_Futexes {
-            runtime.platform.__futex_wait(&t.id, t.id, -1);
+            runtime.platform.__futex_wait(&t.join_word, 1, -1);
         } else {
-            // To not completely kill the CPU.
             runtime.platform.__sleep(1);
         }
+    }
+
+    // The worker still uses its WASM stack/TLS until the OS thread
+    // returns from `_thread_exit`. Join that before freeing.
+    runtime.platform.__join_thread(t.id);
+
+    if t.stack_base != null {
+        raw_free(alloc.heap_allocator, t.stack_base)
+        raw_free(alloc.heap_allocator, t.tls_base)
+        t.stack_base = null
+        t.tls_base = null
     }
 }
 
@@ -85,13 +100,13 @@ __exited :: (id: i32) {
 
     thread := thread_map->get(id) ?? null
     if thread != null {
-        raw_free(alloc.heap_allocator, thread.stack_base)
-        raw_free(alloc.heap_allocator, thread.tls_base)
-
+        // Do not free stack/TLS here: this thread is still running on
+        // them, and `scoped_mutex` still has to unlock with `context`.
         thread.alive = false
+        __atomic_store(&thread.join_word, 0)
 
         #if runtime.platform.Supports_Futexes {
-            runtime.platform.__futex_wake(&thread.id, 1)
+            runtime.platform.__futex_wake(&thread.join_word, 1)
         }
 
         thread_map->delete(id)

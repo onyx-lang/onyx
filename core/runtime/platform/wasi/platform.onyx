@@ -288,6 +288,7 @@ __start :: () {
 
     // Currently, WASI does not provide a way to kill a thread preemptively.
     __kill_thread :: (id: i32) => 0
+    __join_thread :: (id: i32) => 1
 
     #export "wasi_thread_start"
     (wasi_tid: u32, use td: &ThreadData) {
