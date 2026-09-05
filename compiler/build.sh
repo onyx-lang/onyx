@@ -70,14 +70,14 @@ for c_file in $(echo "$C_FILES" | sed 's/ /\n/g;s/\([a-zA-Z_0-9]*\)\n/src\/\1.c\
     $ONYX_CC $FLAGS $INCLUDES -fPIC -o $(basename $c_file).o -c $c_file
 done
 
+echo "Compiling onyx executable"
+$ONYX_CC $INCLUDES $FLAGS *.o cli/main.c -o onyx $LIBS
+
 FLAGS=""
 if [ ! -z ${ONYX_TARGET+x} ]; then
     FLAGS="$FLAGS --target=$ONYX_TARGET"
 fi
 $ONYX_CC -shared -fPIC $FLAGS -o "libonyx.$suffix" *.o $LIBS $LIBRARY_BUILD_ARGS
-
-echo "Compiling onyx executable"
-$ONYX_CC $INCLUDES $FLAGS cli/main.c *.o -o onyx $LIBS
 
 # It does seem possible to allow for the CLI to directly
 # use the shared library, but it was causing some weird
