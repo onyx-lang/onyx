@@ -38,7 +38,8 @@ static const char* top_level_docstring = DOCSTRING_HEADER
     C_LBLUE "    help             " C_NORM "Shows this help message\n"
     C_LBLUE "    version          " C_NORM "Prints version information\n"
     "\n"
-    C_LBLUE "    build " C_GREY "files      " C_NORM "Compiles an Onyx program into an executable " C_GREY "(onyx b)" C_NORM "\n"
+    C_LBLUE "    build " C_GREY "files      " C_NORM "Compiles an Onyx program into a WASM module " C_GREY "(onyx b)" C_NORM "\n"
+    C_LBLUE "    build-exe " C_GREY "files  " C_NORM "Compiles an Onyx program into a native executable\n"
     C_LBLUE "    check " C_GREY "files      " C_NORM "Checks syntax and types of a program\n"
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     C_LBLUE "    watch            " C_NORM "Continuously rebuilds a program on file changes\n"
@@ -67,13 +68,12 @@ static const char *build_docstring = DOCSTRING_HEADER
     C_BOLD "Usage: " C_BLUE "onyx" C_LBLUE " %s " C_NORM C_YELLOW "[..flags] " C_GREEN "files " C_NORM "%s" "\n"
     "\n"
     C_BOLD "Flags:\n" C_NORM
-    C_LBLUE "    -o, --output " C_GREY "target_file    " C_NORM "Specify the target file " C_GREY "(default: out.wasm, or out with --native)\n"
+    C_LBLUE "    -o, --output " C_GREY "target_file    " C_NORM "Specify the target file " C_GREY "(default: %s)\n"
     C_LBLUE "    -r, --runtime " C_GREY "runtime       " C_NORM "Specifies the runtime " C_GREY "(onyx, wasi, js, custom)\n"
     C_LBLUE "    --map-dir " C_GREY "name:folder       " C_NORM "Adds a mapped directory\n"
     "\n"
     C_LBLUE "    --debug                     " C_NORM "Output a debugable build\n"
     C_LBLUE "    --jit                       " C_NORM "Use the OVM native backend when running\n"
-    C_LBLUE "    --native                    " C_NORM "AOT-compile to a host executable (onyx build)\n"
     C_LBLUE "    --feature " C_GREY "feature           " C_NORM "Enable an experimental language feature\n"
     C_LBLUE "    --multi-threaded            " C_NORM "Enables multi-threading for this compilation\n"
     C_LBLUE "    --stack-trace               " C_NORM "Enable dynamic stack trace\n"
@@ -237,6 +237,14 @@ static int32_t cli_determine_action(CLIArgs *cli_args, int *first_sub_arg, int a
 
     if (!strcmp(argv[1], "compile") || !strcmp(argv[1], "build") || !strcmp(argv[1], "b")) {
         cli_args->action = ONYX_COMPILE_ACTION_COMPILE;
+        *first_sub_arg = 2;
+        return 1;
+    }
+
+    if (!strcmp(argv[1], "build-exe")) {
+        cli_args->action = ONYX_COMPILE_ACTION_COMPILE;
+        cli_args->enable_native = 1;
+        cli_args->target_file = "out";
         *first_sub_arg = 2;
         return 1;
     }
@@ -492,8 +500,9 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
             onyx_set_option_int(ctx, ONYX_OPTION_JIT, 1);
         }
         else if (!strcmp(argv[i], "--native")) {
-            cli_args->enable_native = 1;
-            if (!cli_args->output_explicit) cli_args->target_file = "out";
+            bh_printf(C_RED "error" C_NORM ": Unknown flag '--native'.\n");
+            bh_printf(C_GREY " hint: Use 'onyx build-exe' to AOT-compile a host executable.\n" C_NORM);
+            return 0;
         }
         else if (!strcmp(argv[i], "--debug")) {
             cli_args->debug_session = 1;
@@ -583,13 +592,18 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
 static void print_subcommand_help(const char *subcommand) {
     if (!strcmp(subcommand, "build") || !strcmp(subcommand, "b")
         || !strcmp(subcommand, "check") || !strcmp(subcommand, "watch")) {
-        bh_printf(build_docstring, subcommand, "");
+        bh_printf(build_docstring, subcommand, "", "out.wasm");
+        return;
+    }
+
+    if (!strcmp(subcommand, "build-exe")) {
+        bh_printf(build_docstring, subcommand, "", "out");
         return;
     }
 
     if (!strcmp(subcommand, "run") || !strcmp(subcommand, "r")
         || !strcmp(subcommand, "run-watch") || !strcmp(subcommand, "rw")) {
-        bh_printf(build_docstring, subcommand, "[-- program args]");
+        bh_printf(build_docstring, subcommand, "[-- program args]", "out.wasm");
         bh_printf(
             C_LBLUE "    --debug-socket " C_GREY "addr         " C_NORM "Specifies the address or port used for the debug server.\n"
         );
@@ -744,12 +758,12 @@ static int32_t output_compilation_events_to_disk(CLIArgs *cli_args, onyx_context
     return 1;
 }
 
-#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+#if defined(USE_OVM_DEBUGGER) && (defined(_BH_LINUX) || defined(_BH_DARWIN))
 int ovm_native_compile_wasm(const void *wasm, unsigned int wasm_len, const char *obj_path);
 
 static int32_t link_native_executable(CLIArgs *cli_args, onyx_context_t *ctx) {
 #if !defined(__aarch64__) && !defined(__arm64__) && !defined(__x86_64__)
-    bh_printf(C_RED "error" C_NORM ": --native requires x86_64 or arm64.\n");
+    bh_printf(C_RED "error" C_NORM ": build-exe requires x86_64 or arm64.\n");
     return 0;
 #else
     int64_t wasm_len = onyx_output_length(ctx, ONYX_OUTPUT_TYPE_WASM);
@@ -1134,14 +1148,17 @@ int main(int argc, char *argv[]) {
         }
 
         case ONYX_COMPILE_ACTION_COMPILE: {
-#if defined(_BH_LINUX) || defined(_BH_DARWIN)
             if (cli_args.enable_native) {
+#if defined(USE_OVM_DEBUGGER) && (defined(_BH_LINUX) || defined(_BH_DARWIN))
                 if (!link_native_executable(&cli_args, ctx)) {
                     return 1;
                 }
                 break;
-            }
+#else
+                bh_printf(C_RED "error" C_NORM ": build-exe requires the ovmwasm runtime.\n");
+                return 1;
 #endif
+            }
             if (!output_files_to_disk(&cli_args, ctx, cli_args.target_file)) {
                 return 1;
             }
