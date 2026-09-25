@@ -23,6 +23,41 @@ main :: () {
         println(v)
     }
 
+    // `as &name` / `as ^name` binds a pointer into the optional, like `case .Some as &value`.
+    // The else branch sees null.
+    result := maybe_result()
+    if result as &f {
+        println(*f)
+        f.x = "mutated"
+    }
+    if result as v {
+        println(v.x)
+    }
+
+    empty: ? Foo = .{}
+    if empty as &p {
+        println("should not run")
+    } else {
+        println(p == null)
+    }
+
+    if result as ^g {
+        println(g.x)
+    }
+
+    n: ? i32 = 7
+    if false {}
+    elseif n as &np {
+        println(*np)
+    }
+
+    missing: ? i32 = .{}
+    if missing as &m {
+        println("no")
+    } elseif true {
+        println(m == null)
+    }
+
     color := Color.{ Blue = .{ 1234 } }
 
     // Chainable with if/elseif

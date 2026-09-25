@@ -1295,12 +1295,14 @@ EMIT_FUNC(if, AstIfWhile* if_node) {
     emit_expression(mod, &code, if_node->cond);
 
     u64 optional_ptr_local = 0;
+    u64 optional_extract_local = 0;
     if (if_node->optional_extract) {
         // Top of stack will be a pointer to the optional
-        // Need to test if 0'th byte at that pointer is non-zero
-        // Copy data in rest of pointer to local allocation
+        // Need to test if 0'th byte at that pointer is non-zero.
+        // Value capture copies the payload into a stack local.
+        // Pointer capture stores (optional_ptr + alignment) in a WASM local.
 
-        emit_local_allocation(mod, &code, (AstTyped *) if_node->optional_local);
+        optional_extract_local = emit_local_allocation(mod, &code, (AstTyped *) if_node->optional_local);
 
         optional_ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
         WIL(NULL, WI_LOCAL_TEE, optional_ptr_local);
@@ -1311,18 +1313,27 @@ EMIT_FUNC(if, AstIfWhile* if_node) {
 
     if (if_node->true_stmt) {
         if (if_node->optional_extract) {
-            u64 offset = 0;
-            emit_local_location(mod, &code, if_node->optional_local, &offset);
-            WIL(NULL, WI_PTR_CONST, offset);
-            WI(NULL, WI_PTR_ADD);
+            if (if_node->optional_extract_by_pointer) {
+                WIL(NULL, WI_LOCAL_GET, optional_ptr_local);
+                WIL(NULL, WI_PTR_CONST, type_alignment_of(if_node->cond->type));
+                WI(NULL, WI_PTR_ADD);
+                WIL(NULL, WI_LOCAL_SET, optional_extract_local);
 
-            WIL(NULL, WI_LOCAL_GET, optional_ptr_local);
-            WIL(NULL, WI_PTR_CONST, type_alignment_of(if_node->cond->type));
-            WI(NULL, WI_PTR_ADD);
+            } else {
+                u64 offset = 0;
+                emit_local_location(mod, &code, if_node->optional_local, &offset);
+                WIL(NULL, WI_PTR_CONST, offset);
+                WI(NULL, WI_PTR_ADD);
 
-            WIL(NULL, WI_I32_CONST, type_size_of(if_node->cond->type->Union.variants_ordered[1]->type));
+                WIL(NULL, WI_LOCAL_GET, optional_ptr_local);
+                WIL(NULL, WI_PTR_CONST, type_alignment_of(if_node->cond->type));
+                WI(NULL, WI_PTR_ADD);
 
-            emit_wasm_copy(mod, &code, NULL);
+                WIL(NULL, WI_I32_CONST, type_size_of(if_node->cond->type->Union.variants_ordered[1]->type));
+
+                emit_wasm_copy(mod, &code, NULL);
+            }
+
             local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
         }
 
@@ -1333,16 +1344,22 @@ EMIT_FUNC(if, AstIfWhile* if_node) {
         WI(if_node->false_stmt->token, WI_ELSE);
 
         if (if_node->optional_extract) {
-            u64 offset = 0;
-            emit_local_location(mod, &code, if_node->optional_local, &offset);
-            WIL(NULL, WI_PTR_CONST, offset);
-            WI(NULL, WI_PTR_ADD);
+            if (if_node->optional_extract_by_pointer) {
+                WIL(NULL, WI_PTR_CONST, 0);
+                WIL(NULL, WI_LOCAL_SET, optional_extract_local);
 
-            WIL(NULL, WI_I32_CONST, 0);
+            } else {
+                u64 offset = 0;
+                emit_local_location(mod, &code, if_node->optional_local, &offset);
+                WIL(NULL, WI_PTR_CONST, offset);
+                WI(NULL, WI_PTR_ADD);
 
-            WIL(NULL, WI_I32_CONST, type_size_of(if_node->cond->type->Union.variants_ordered[1]->type));
+                WIL(NULL, WI_I32_CONST, 0);
 
-            emit_wasm_fill(mod, &code, NULL);
+                WIL(NULL, WI_I32_CONST, type_size_of(if_node->cond->type->Union.variants_ordered[1]->type));
+
+                emit_wasm_fill(mod, &code, NULL);
+            }
         }
 
         if (if_node->false_stmt->kind == Ast_Kind_If) {

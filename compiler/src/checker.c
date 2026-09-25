@@ -430,14 +430,22 @@ CHECK_FUNC(if, AstIfWhile* ifnode) {
             }
 
             if (!ifnode->optional_local) {
-                AstType *inner_type = type->Union.variants_ordered[1]->type->ast_type;
-                assert(inner_type);
-                ifnode->optional_local = make_local(context, ifnode->optional_extract_symbol, inner_type);
-                ifnode->optional_local->flags |= Ast_Flag_Address_Taken;
-                ifnode->optional_local->flags |= Ast_Flag_Decl_Followed_By_Init;
-                CHECK(local, &ifnode->optional_local);
-                if (!ifnode->optional_local->type && type->Union.variants_ordered[1]->type) {
-                    ifnode->optional_local->type = type->Union.variants_ordered[1]->type;
+                Type *inner = type->Union.variants_ordered[1]->type;
+
+                if (ifnode->optional_extract_by_pointer) {
+                    ifnode->optional_local = make_local_with_type(context, ifnode->optional_extract_symbol, type_make_pointer(context, inner));
+                    ifnode->optional_local->flags |= Ast_Flag_Decl_Followed_By_Init;
+                    CHECK(local, &ifnode->optional_local);
+                } else {
+                    AstType *inner_type = inner->ast_type;
+                    assert(inner_type);
+                    ifnode->optional_local = make_local(context, ifnode->optional_extract_symbol, inner_type);
+                    ifnode->optional_local->flags |= Ast_Flag_Address_Taken;
+                    ifnode->optional_local->flags |= Ast_Flag_Decl_Followed_By_Init;
+                    CHECK(local, &ifnode->optional_local);
+                    if (!ifnode->optional_local->type && inner) {
+                        ifnode->optional_local->type = inner;
+                    }
                 }
                 compilation_log_notify_node_typed(context, (AstNode *) ifnode->optional_local);
             }

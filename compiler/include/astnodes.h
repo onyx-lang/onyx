@@ -929,6 +929,7 @@ struct AstIfWhile {
 
             // When this is true, `cond` should be a value that is of type `? T`
             b32 optional_extract : 1;
+            b32 optional_extract_by_pointer : 1;
         };
 
         // Used by While
