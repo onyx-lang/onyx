@@ -71,7 +71,6 @@ message EventScope {
   uint32 end_column = 8;
 }
 
-// Coarse kind of a declared symbol. Compiler AST details are not part of the protocol.
 enum SymbolKind {
   SYMBOL_KIND_UNKNOWN = 0;
   SYMBOL_KIND_PACKAGE = 1;
@@ -111,17 +110,11 @@ message EventSymbolResolved {
   uint32 chosen_symbol_id = 6;
 }
 
-// Complete set of options for a #match / #overload group.
-// Re-emitted when #overload adds more options.
 message EventOverload {
   uint32 group_symbol_id = 1;
   repeated uint32 option_symbol_ids = 2;
 }
 
-// One solidified instance of a polymorphic procedure.
-// Re-emitted is not required; each instance is reported once.
-// solution_names[i] is the polymorphic variable ($T); solution_type_ids[i]
-// is the solved type (0 if that slot was a baked value).
 message EventPolyProc {
   uint32 template_symbol_id = 1;
   uint32 instance_symbol_id = 2;
@@ -136,7 +129,6 @@ message EventBinding {
   repeated uint32 param_symbol_ids = 4;
 }
 
-// Coarse kind of a type. Compiler TypeKind numbers are not part of the protocol.
 enum TypeKind {
   TYPE_KIND_UNKNOWN = 0;
   TYPE_KIND_BASIC = 1;
@@ -174,7 +166,8 @@ message EventType {
   // Enum values are filled in a later EventType for the same id once the enum is checked.
   oneof body {
     TypeBasic basic = 10;
-    TypeElem elem = 11;           // pointer, multi-pointer, slice, dynarray, varargs
+    // pointer, multi-pointer, slice, dynarray, varargs
+    TypeElem elem = 11;
     TypeArray array = 12;
     TypeFunction function = 13;
     TypeCompound compound = 14;
@@ -189,7 +182,6 @@ message TypeBasic {
   uint32 alignment = 3;
 }
 
-// Coarse kind of a basic type. Compiler BasicKind numbers are not part of the protocol.
 enum BasicKind {
   BASIC_KIND_UNKNOWN = 0;
   BASIC_KIND_VOID = 1;
