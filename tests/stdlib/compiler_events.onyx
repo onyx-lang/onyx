@@ -4,13 +4,6 @@ use core {*}
 use onyx.toolchain {*}
 use protobuf.onyx.toolchain.events
 
-contains_u32 :: (ids: [] u32, id: u32) -> bool {
-    for it in ids {
-        if it == id do return true
-    }
-    return false
-}
-
 main :: () {
     b := Builder.make();
     defer b->destroy();
@@ -126,9 +119,9 @@ main :: () {
                         point_scope_id = sym.scope_id;
                         if sym.kind == .Struct do point_kind_ok = true;
                     }
-                    array.push(&point_ids, sym.id);
-                    if !contains_u32(point_scopes, sym.scope_id) {
-                        array.push(&point_scopes, sym.scope_id);
+                    Array.push(&point_ids, sym.id);
+                    if !Slice.contains(point_scopes, sym.scope_id) {
+                        Array.push(&point_scopes, sym.scope_id);
                     }
                 }
                 if sym.name == "get_x" && !get_x_kind_ok {
@@ -143,13 +136,13 @@ main :: () {
     for e in first.events {
         switch e.data {
             case .Symbol as sym {
-                if sym.name == "x" && contains_u32(point_scopes, sym.scope_id) {
+                if sym.name == "x" && Slice.contains(point_scopes, sym.scope_id) {
                     has_symbol_x = true;
                     if sym.scope_id == point_scope_id {
                         x_scope_id = sym.scope_id;
                         if sym.kind == .Expression do x_kind_ok = true;
                     }
-                    array.push(&x_ids, sym.id);
+                    Array.push(&x_ids, sym.id);
                 }
             }
             case _ {}
@@ -231,10 +224,10 @@ main :: () {
         switch e.data {
             case .Binding as bind {
                 if bind.type_id != 0 {
-                    if contains_u32(point_ids, bind.symbol_id) {
+                    if Slice.contains(point_ids, bind.symbol_id) {
                         point_binding_type_id = bind.type_id;
                     }
-                    if contains_u32(x_ids, bind.symbol_id) {
+                    if Slice.contains(x_ids, bind.symbol_id) {
                         x_binding_has_type = true;
                     }
                 }
@@ -350,8 +343,8 @@ main :: () {
         switch e.data {
             case .Resolved as r {
                 if r.length != 0 {
-                    if contains_u32(point_ids, r.symbol_id) do resolved_point = true;
-                    if contains_u32(x_ids, r.symbol_id) do resolved_x = true;
+                    if Slice.contains(point_ids, r.symbol_id) do resolved_point = true;
+                    if Slice.contains(x_ids, r.symbol_id) do resolved_x = true;
                     if point_member_x_id != 0 && r.symbol_id == point_member_x_id do resolved_member_x = true;
                     if shape_variant_point_id != 0 && r.symbol_id == shape_variant_point_id do resolved_shape_point = true;
                 }
