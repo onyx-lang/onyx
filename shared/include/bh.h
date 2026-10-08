@@ -1159,6 +1159,7 @@ BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc) {
         }
     }
 
+    if (!newptr) return NULL;
     return newptr + 1;
 }
 

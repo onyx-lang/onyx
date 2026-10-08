@@ -62,6 +62,9 @@ typedef struct OnyxParser {
     b32 parse_calls : 1;
     b32 parse_quick_functions : 1;
 
+    // Caps recursive descent on partial editor buffers.
+    i32 parse_depth;
+
     // Currently, package expressions are only allowed in certain places.
     b32 allow_package_expressions : 1;
 } OnyxParser;

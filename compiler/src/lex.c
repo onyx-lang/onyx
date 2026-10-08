@@ -136,12 +136,18 @@ static inline b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, 
 
 const char *token_type_name(TokenType tkn_type) {
     static ONYX_THREAD_LOCAL char hack_tmp_buffer[32];
-    if (tkn_type < Token_Type_Ascii_End) {
+    // Compare as unsigned so a signed-char token (byte >= 128) cannot
+    // index token_type_names off the end.
+    if ((u32) tkn_type < (u32) Token_Type_Ascii_End) {
         bh_snprintf(hack_tmp_buffer, 31, "%c", (char) tkn_type);
         return hack_tmp_buffer;
-    } else {
-        return token_type_names[tkn_type - Token_Type_Ascii_End];
     }
+
+    u32 index = (u32) tkn_type - (u32) Token_Type_Ascii_End;
+    if (index >= (u32) (Token_Type_Count - Token_Type_Ascii_End)) {
+        return "unknown token";
+    }
+    return token_type_names[index];
 }
 
 const char* token_name(OnyxToken * tkn) {
@@ -158,8 +164,13 @@ const char* token_name(OnyxToken * tkn) {
 
 void token_toggle_end(OnyxToken* tkn) {
     static ONYX_THREAD_LOCAL char backup = 0;
+    if (!tkn || !tkn->text || tkn->length < 0) return;
+
     char tmp = tkn->text[tkn->length];
-    assert(backup == '\0' || tmp == '\0'); // Sanity check
+    // Unpaired toggles used to abort. Skip the write so a bad token
+    // from partial input cannot take down the process.
+    if (backup != '\0' && tmp != '\0') return;
+
     tkn->text[tkn->length] = backup;
     backup = tmp;
 }
@@ -220,7 +231,12 @@ whitespace_skipped:
             tk.type = Token_Type_Comment;
 
             tokenizer->curr += 2;
-            while (*tokenizer->curr++ != '\n' && tokenizer->curr != tokenizer->end);
+            while (tokenizer->curr < tokenizer->end && *tokenizer->curr != '\n') {
+                tokenizer->curr++;
+            }
+            if (tokenizer->curr < tokenizer->end && *tokenizer->curr == '\n') {
+                tokenizer->curr++;
+            }
 
             tk.length = tokenizer->curr - tk.text;
             goto token_parsed;
@@ -570,7 +586,7 @@ whitespace_skipped:
     }
 
 
-    tk.type = (TokenType) *tokenizer->curr;
+    tk.type = (TokenType) (unsigned char) *tokenizer->curr;
     INCREMENT_CURR_TOKEN(tokenizer);
 
 token_parsed:
