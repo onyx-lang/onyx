@@ -1018,7 +1018,11 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
             &((AstOverloadedFunction *) callee)->all_overloads);
 
         if (new_callee == NULL) {
-            if (context->cycle_almost_detected < 2) {
+            // A prior error means this overload is still waiting, not that
+            // matching failed. cycle_detected is the no-prior-error dump,
+            // which must still report the real mismatch.
+            if (!context->cycle_detected
+                && (context->cycle_almost_detected < 2 || onyx_has_errors(context))) {
                 YIELD(call->token->pos, "Waiting to know all options for overloaded function");
             }
 
@@ -2929,6 +2933,13 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
         return Check_Yield;
     }
 
+    // A prior error already explains why this field is unresolved.
+    // Reporting it here returns Check_Error, which resets the stall
+    // ladder before the pump can stop.
+    if (!context->cycle_detected && onyx_has_errors(context)) {
+        return Check_Yield;
+    }
+
     if (expr->kind == Ast_Kind_Package) {
         if (context->cycle_detected) {
             char *closest = find_closest_symbol_in_node(context, (AstNode *) expr, field->field);
@@ -3690,7 +3701,8 @@ CHECK_FUNC(directive_solidify, AstDirectiveSolidify** psolid) {
                 &((AstOverloadedFunction *) target)->all_overloads);
 
             if (matched == NULL) {
-                if (context->cycle_almost_detected < 2) {
+                if (!context->cycle_detected
+                    && (context->cycle_almost_detected < 2 || onyx_has_errors(context))) {
                     YIELD(solid->token->pos, "Waiting to know all options for overloaded function.");
                 }
 

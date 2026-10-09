@@ -5122,7 +5122,6 @@ static Package* parse_file_package(OnyxParser* parser) {
 static void parse_top_level_statements_until(OnyxParser* parser, TokenType tt) {
     while (parser->curr->type != tt) {
         if (parser->hit_unexpected_token) break;
-        if (onyx_has_errors(parser->context)) break;
         parse_top_level_statement(parser);
         consume_token_if_next(parser, ';');
     }

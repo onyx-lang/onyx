@@ -724,6 +724,14 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
                 }
 
                 if (context->cycle_almost_detected == 4) {
+                    // The all-types-checked event and the stalled-extension
+                    // hook already ran on earlier rungs. If a real error is
+                    // already recorded, the remaining yields are unfinished
+                    // work, not new errors. dump_cycles would promote every
+                    // one of them.
+                    if (onyx_has_errors(context)) {
+                        return pump_return(context, ONYX_PUMP_ERRORED);
+                    }
                     dump_cycles(context);
                 } else if (context->cycle_almost_detected == 3) {
                     send_stalled_hooks(context);
