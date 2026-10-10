@@ -176,13 +176,14 @@ run_init_command :: (args: [] str) {
                 break
             }
 
-            if T == ?PlatformDefinition {
+            if T == PlatformDefinition {
                 platform_strs := cast([]str)(line->split(',')->map(x => x |> str.strip_whitespace()))
                 platforms: [..]str = Array.make(str)
                 for platform in platform_strs {
                     platforms << platform
                 }
                 *cast(&[]str)dest = cast([]str)platforms
+                break
             }
         }
     }
@@ -197,7 +198,14 @@ run_init_command :: (args: [] str) {
     read_field("Package url: ", &config.package_url, "")
     read_field("Package author: ", &config.package_author, "")
     read_field("Package version (0.0.1): ", &config.package_version, .{0, 0, 1})
-    read_field("Package platform (onyx, js, wasi, custom) (comma seperated): ", &config.package_platform, .{})
+    platform_def: PlatformDefinition
+    platform_def->init()
+    read_field("Package platform (onyx, js, wasi, custom) (comma seperated): ", &platform_def, platform_def)
+    if platform_def.count == 0 {
+        config.package_platform = .{}
+    } else {
+        config.package_platform = platform_def
+    }
 
     store_config_file()
 }
@@ -1624,6 +1632,19 @@ store_config :: (path: str) -> bool {
         array.concat(&package_node.children, .[
             name_node, author_node, url_node, description_node, version_node
         ])
+
+        printf("Len of children: {}\n", package_node.children.count)
+
+        switch config.package_platform {
+            case .Some as platforms {
+                platform_node := doc->create_node("platform")
+                for platform in platforms {
+                    platform_node->add_value(.{ String = platform })
+                }
+                package_node.children << platform_node
+            }
+            case .None {}
+        }
     }
 
     config_node := doc->create_node("config")
@@ -1741,7 +1762,7 @@ read_old_config :: (path: str) -> ? Config {
     return c
 }
 
-PlatformDefinition :: Array(str)
+PlatformDefinition :: [..]str
 
 IniConfig :: struct {
     Metadata :: struct {
