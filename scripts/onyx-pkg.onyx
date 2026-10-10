@@ -1366,6 +1366,7 @@ Config :: struct {
     package_author: str
     package_version: SemVer
     package_license: str
+    package_platform: PlatformDefinition
 
     dependency_source_path: str
     dependency_binary_path: str
@@ -1391,6 +1392,7 @@ Dependency :: struct {
     target: Target
     locked: bool
     source: DependencySource
+    platform: PlatformDefinition
 }
 
 DependencySource :: union {
@@ -1729,6 +1731,8 @@ read_old_config :: (path: str) -> ? Config {
     return c
 }
 
+PlatformDefinition :: ?[..]str
+
 IniConfig :: struct {
     Metadata :: struct {
         name:        str
@@ -1736,6 +1740,7 @@ IniConfig :: struct {
         url:         str
         author:      str
         version:     SemVer
+        platform:    PlatformDefinition
     }
     metadata: Metadata
 
