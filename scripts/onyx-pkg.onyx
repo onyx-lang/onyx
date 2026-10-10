@@ -175,6 +175,15 @@ run_init_command :: (args: [] str) {
                 *cast(&str) dest = str.copy(line)
                 break
             }
+
+            if T == ?PlatformDefinition {
+                platform_strs := cast([]str)(line->split(',')->map(x => x |> str.strip_whitespace()))
+                platforms: [..]str = Array.make(str)
+                for platform in platform_strs {
+                    platforms << platform
+                }
+                *cast(&[]str)dest = cast([]str)platforms
+            }
         }
     }
 
@@ -188,6 +197,7 @@ run_init_command :: (args: [] str) {
     read_field("Package url: ", &config.package_url, "")
     read_field("Package author: ", &config.package_author, "")
     read_field("Package version (0.0.1): ", &config.package_version, .{0, 0, 1})
+    read_field("Package platform (onyx, js, wasi, custom) (comma seperated): ", &config.package_platform, .{})
 
     store_config_file()
 }
@@ -1366,7 +1376,7 @@ Config :: struct {
     package_author: str
     package_version: SemVer
     package_license: str
-    package_platform: PlatformDefinition
+    package_platform: ?PlatformDefinition
 
     dependency_source_path: str
     dependency_binary_path: str
@@ -1392,7 +1402,7 @@ Dependency :: struct {
     target: Target
     locked: bool
     source: DependencySource
-    platform: PlatformDefinition
+    platform: ?PlatformDefinition
 }
 
 DependencySource :: union {
@@ -1731,7 +1741,7 @@ read_old_config :: (path: str) -> ? Config {
     return c
 }
 
-PlatformDefinition :: ?[..]str
+PlatformDefinition :: Array(str)
 
 IniConfig :: struct {
     Metadata :: struct {
@@ -1740,7 +1750,7 @@ IniConfig :: struct {
         url:         str
         author:      str
         version:     SemVer
-        platform:    PlatformDefinition
+        platform:    ?PlatformDefinition
     }
     metadata: Metadata
 
