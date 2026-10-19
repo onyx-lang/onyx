@@ -8,6 +8,12 @@ Runtime :: enum {
     Custom :: 4;
 }
 
+// target_type: Target_Type    This is set by the compiler.
+Target_Type :: enum {
+    Executable :: 0;
+    Object     :: 1;
+}
+
 // compiler_os        This is set by the compiler. It is not called 'os' because that conflicts with the 'core.os' package.
 OS :: enum {
     Linux       :: 1;

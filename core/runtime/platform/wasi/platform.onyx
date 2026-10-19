@@ -290,10 +290,12 @@ __start :: () {
     __kill_thread :: (id: i32) => 0
     __join_thread :: (id: i32) => 1
 
-    #export "wasi_thread_start"
-    (wasi_tid: u32, use td: &ThreadData) {
-        runtime._thread_start(id, tls_base, stack_base, func, data);
-        runtime._thread_exit(id);
+    #if runtime.target_type == .Executable {
+        #export "wasi_thread_start"
+        (wasi_tid: u32, use td: &ThreadData) {
+            runtime._thread_start(id, tls_base, stack_base, func, data);
+            runtime._thread_exit(id);
+        }
     }
 }
 

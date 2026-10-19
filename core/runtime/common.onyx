@@ -7,15 +7,18 @@ use runtime.platform { __output_string }
 //
 // Export the __start function from the platform layer.
 // Every platform should define this, even if is it just '() {}'.
-#export "_start" platform.__start
+// An object file leaves the entry point to the linker.
+#if target_type == .Executable {
+    #export "_start" platform.__start
 
-#if runtime != .Wasi {
-    //
-    // Export a common initialization procedure that should
-    // always be invoked before using anything in Onyx.
-    #export "_initialize" () {
-        __runtime_initialize();
-        context.thread_id = 0;    
+    #if runtime != .Wasi {
+        //
+        // Export a common initialization procedure that should
+        // always be invoked before using anything in Onyx.
+        #export "_initialize" () {
+            __runtime_initialize();
+            context.thread_id = 0;
+        }
     }
 }
 

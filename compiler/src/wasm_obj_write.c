@@ -2,8 +2,8 @@
 // wasm-ld can link it with Clang objects. Executable layout is skipped:
 // no stack reservation, no _start, no data-segment initializer.
 //
-// Only functions reachable from a #export outside core/ are included.
-// Core's _start export would otherwise pull the whole runtime in.
+// Only functions reachable from a #export, plus #init procedures, are included.
+// Executable entry exports are compiled out when runtime.target_type is Object.
 
 #include "wasm_emit.h"
 #include "errors.h"
@@ -136,14 +136,6 @@ static OnyxFilePos fn_pos(AstFunction *fn) {
     OnyxFilePos pos;
     memset(&pos, 0, sizeof pos);
     return pos;
-}
-
-static b32 path_is_core(const char *f) {
-    if (!f) return 0;
-    if (strstr(f, "/core/")) return 1;
-    if (strncmp(f, "core/", 5) == 0) return 1;
-    if (strstr(f, "core:")) return 1;
-    return 0;
 }
 
 static char *copy_text(bh_allocator a, const char *text, i32 length) {
@@ -496,8 +488,6 @@ static void collect_image(ObjImage *img) {
     b32 any_export = 0;
     bh_arr_each(CodePatchInfo, patch, module->code_patches) {
         if (patch->kind != Code_Patch_Export) continue;
-        if (path_is_core(patch->token_related_to_patch ? patch->token_related_to_patch->pos.filename : NULL))
-            continue;
 
         any_export = 1;
         AstNode *node = patch->node_related_to_patch;
@@ -538,8 +528,7 @@ static void collect_image(ObjImage *img) {
     if (module->context->builtins.init_procedures) {
         bh_arr_each(AstFunction *, pinit, module->context->builtins.init_procedures) {
             AstFunction *fn = *pinit;
-            if (!fn || !fn->token || path_is_core(fn->token->pos.filename)) continue;
-            if (fn->is_foreign || fn->is_object_link) continue;
+            if (!fn || fn->is_foreign || fn->is_object_link) continue;
             if (!bh_imap_has(&module->index_map, (u64) fn)) continue;
             visit_function(img, (i32) bh_imap_get(&module->index_map, (u64) fn), queue, &qt);
         }
