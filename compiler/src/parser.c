@@ -147,6 +147,7 @@ static AstIf*         parse_static_if_stmt(OnyxParser* parser, b32 parse_block_a
 static AstMemRes*     parse_memory_reservation(OnyxParser* parser, OnyxToken* symbol, b32 is_thread_local);
 static AstTyped*      parse_top_level_expression(OnyxParser* parser);
 static AstBinding*    parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol);
+static void           submit_binding(OnyxParser* parser, AstBinding* binding);
 static void           parse_top_level_statement(OnyxParser* parser);
 static AstPackage*    parse_package_expression(OnyxParser* parser);
 static void           parse_top_level_statements_until(OnyxParser* parser, TokenType tt);
@@ -4291,28 +4292,86 @@ static AstForeignBlock* parse_foreign_block(OnyxParser* parser, OnyxToken *token
     return fb;
 }
 
+static void submit_binding(OnyxParser *parser, AstBinding *binding) {
+    if (!binding) return;
+
+    flush_doc_tokens(parser, &binding->documentation_string, &binding->documentation_token_old);
+
+    //
+    // If this binding is inside an #inject block,
+    // swap the binding node for an injection node
+    // onto the injection point. This is the easiest
+    // way I could think of doing this.
+    if (parser->injection_point) {
+        AstInjection *injection = make_node(AstInjection, Ast_Kind_Injection);
+        injection->token = parser->injection_point->token;
+        injection->dest = parser->injection_point;
+        injection->symbol = binding->token;
+        injection->binding = binding;
+
+        ENTITY_SUBMIT(injection);
+        return;
+    }
+
+    Scope* target_scope = parser->package->scope;
+
+    if (binding->flags & Ast_Flag_Private_Package)
+        target_scope = parser->package->private_scope;
+    if (binding->flags & Ast_Flag_Private_File)
+        target_scope = parser->file_scope;
+
+    binding->flags |= Ast_Flag_Binding_Isnt_Captured;
+
+    ENTITY_SUBMIT_IN_SCOPE(binding, target_scope);
+}
+
 static void parse_object_provides(OnyxParser *parser, AstObjectBlock *ob) {
     if (ob->provides == NULL)
         bh_arr_new(parser->context->gp_alloc, ob->provides, 4);
 
-    while (1) {
-        if (parser->hit_unexpected_token) return;
+    expect_token(parser, '{');
+    if (parser->hit_unexpected_token) return;
+
+    // Provide procedures are ordinary bindings, not object imports.
+    // Pop the object block's capture while they are parsed.
+    bh_arr(Entity *) *captured = bh_arr_pop(parser->alternate_entity_placement_stack);
+
+    while (parser->curr->type != '}') {
+        if (parser->hit_unexpected_token) break;
+        if (consume_token_if_next(parser, ';')) continue;
+
+        if (parser->curr->type != Token_Type_Symbol) {
+            ONYX_ERROR(parser->curr->pos, Error_Critical, "Expected a binding in #provide.");
+            parser->hit_unexpected_token = 1;
+            break;
+        }
+
+        OnyxToken *symbol = expect_token(parser, Token_Type_Symbol);
+        if (!next_tokens_are(parser, 2, ':', ':')) {
+            ONYX_ERROR(symbol->pos, Error_Critical, "Expected '::' after '%b' in #provide.", symbol->text, symbol->length);
+            parser->hit_unexpected_token = 1;
+            break;
+        }
+        expect_token(parser, ':');
+
+        AstBinding *binding = parse_top_level_binding(parser, symbol);
+        if (binding == NULL) break;
+
+        if (bh_arr_length(parser->scope_flags) > 0)
+            binding->flags |= bh_arr_last(parser->scope_flags);
+        submit_binding(parser, binding);
 
         ObjectProvide prov;
         memset(&prov, 0, sizeof(prov));
-
-        if (parser->curr->type == Token_Type_Literal_String) {
-            prov.symbol = expect_token(parser, Token_Type_Literal_String);
-            prov.expr = parse_expression(parser, 0);
-        } else {
-            prov.symbol = expect_token(parser, Token_Type_Symbol);
-        }
-
+        prov.symbol = symbol;
+        prov.expr = (AstTyped *) binding->node;
         bh_arr_push(ob->provides, prov);
-
-        if (!consume_token_if_next(parser, ',')) break;
-        if (parser->curr->type == '}' || parser->curr->type == ';') break;
     }
+
+    if (!parser->hit_unexpected_token)
+        expect_token(parser, '}');
+
+    bh_arr_push(parser->alternate_entity_placement_stack, captured);
 }
 
 static AstObjectBlock* parse_object_block(OnyxParser* parser, OnyxToken *token) {
@@ -4988,38 +5047,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
     return;
 
 submit_binding_to_entities:
-    {
-        if (!binding) return;
-
-        flush_doc_tokens(parser, &binding->documentation_string, &binding->documentation_token_old);
-
-        //
-        // If this binding is inside an #inject block,
-        // swap the binding node for an injection node
-        // onto the injection point. This is the easiest
-        // way I could think of doing this.
-        if (parser->injection_point) {
-            AstInjection *injection = make_node(AstInjection, Ast_Kind_Injection);
-            injection->token = parser->injection_point->token;
-            injection->dest = parser->injection_point;
-            injection->symbol = binding->token;
-            injection->binding = binding;
-
-            ENTITY_SUBMIT(injection);
-            return;
-        }
-
-        Scope* target_scope = parser->package->scope;
-
-        if (binding->flags & Ast_Flag_Private_Package)
-            target_scope = parser->package->private_scope;
-        if (binding->flags & Ast_Flag_Private_File)
-            target_scope = parser->file_scope;
-
-        binding->flags |= Ast_Flag_Binding_Isnt_Captured;
-
-        ENTITY_SUBMIT_IN_SCOPE(binding, target_scope);
-    }
+    submit_binding(parser, binding);
 }
 
 static b32 parse_package_name(OnyxParser *parser, AstPackage *package) {

@@ -598,6 +598,8 @@ static void prime_pump(Context *context) {
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.heap_start, context->global_scope, NULL);
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_base, context->global_scope, NULL);
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_size, context->global_scope, NULL);
+    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_align, context->global_scope, NULL);
+    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_image, context->global_scope, NULL);
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.closure_base, context->global_scope, NULL);
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.stack_trace, context->global_scope, NULL);
 

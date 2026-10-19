@@ -1,6 +1,9 @@
 // Links Clang/LLVM WASM object files (tool-conventions linking section v2)
 // into an Onyx module. Object code stays as raw function bodies; relocations
 // are patched in place. __stack_pointer is Onyx's existing stack global.
+// Thread-local symbols are appended to Onyx's TLS block. Their relocations
+// store offsets from __tls_base, and a static image restores initializers
+// on every thread.
 
 #include "wasm_emit.h"
 #include "errors.h"
@@ -25,6 +28,8 @@
 #define SYM_TLS           0x100
 #define SYM_ABSOLUTE      0x200
 
+#define SEG_TLS 2
+
 #define RELOC_FUNCTION_INDEX_LEB 0
 #define RELOC_TABLE_INDEX_SLEB   1
 #define RELOC_TABLE_INDEX_I32    2
@@ -34,6 +39,7 @@
 #define RELOC_TYPE_INDEX_LEB     6
 #define RELOC_GLOBAL_INDEX_LEB   7
 #define RELOC_TABLE_NUMBER_LEB   20
+#define RELOC_MEMORY_ADDR_TLS_SLEB 21
 
 #define SEC_CUSTOM   0
 #define SEC_TYPE     1
@@ -87,7 +93,10 @@ typedef struct ObjSegment {
     u32 len;
     u32 payload_off;
     u32 align;
+    u32 flags;
+    u32 tls_offset;
     b32 live;
+    b32 tls_placed;
     u8 *copy;
     u32 data_id;
 } ObjSegment;
@@ -111,6 +120,7 @@ struct ObjSymbol {
     i32 out_global;
     i32 out_table;
     u32 data_id;
+    u32 tls_offset;
 };
 
 typedef struct ObjReloc {
@@ -132,6 +142,11 @@ typedef struct ObjSection {
     u32 len;
 } ObjSection;
 
+typedef struct ObjProvide {
+    char *name;
+    AstFunction *func;
+} ObjProvide;
+
 struct ObjFile {
     char *path;
     OnyxFilePos pos;
@@ -149,20 +164,15 @@ struct ObjFile {
     bh_arr(ObjReloc) relocs;
     bh_arr(ObjInit) inits;
     bh_arr(ObjSection) sections;
+    bh_arr(ObjProvide) provides;
 
     b32 failed;
 };
-
-typedef struct ObjProvide {
-    char *name;
-    AstFunction *func;
-} ObjProvide;
 
 typedef struct Linker {
     OnyxWasmModule *module;
     bh_arr(ObjFile *) files;
     bh_arr(ObjSymbol *) work;
-    bh_arr(ObjProvide) provides;
     b32 failed;
 } Linker;
 
@@ -283,7 +293,8 @@ static u32 reloc_width(u32 type) {
 static b32 reloc_has_addend(u32 type) {
     return type == RELOC_MEMORY_ADDR_LEB
         || type == RELOC_MEMORY_ADDR_SLEB
-        || type == RELOC_MEMORY_ADDR_I32;
+        || type == RELOC_MEMORY_ADDR_I32
+        || type == RELOC_MEMORY_ADDR_TLS_SLEB;
 }
 
 static void write_uleb5(u8 *p, u32 value) {
@@ -452,9 +463,9 @@ static b32 parse_segment_info(ObjFile *file, ByteCursor *c) {
         u32 align_log = 0;
         u32 flags = 0;
         if (!read_uleb(c, &align_log) || !read_uleb(c, &flags)) return 0;
-        (void) flags;
         if (align_log >= 31) return 0;
         file->segments[i].align = 1u << align_log;
+        file->segments[i].flags = flags;
     }
     return 1;
 }
@@ -524,11 +535,6 @@ static b32 parse_symbols(ObjFile *file, ByteCursor *c, bh_allocator alloc, Linke
             return 0;
         }
 
-        if (sym.flags & SYM_TLS) {
-            obj_error(L, file, "Thread-local symbol '%s' is not supported.", sym.name ? sym.name : "");
-            return 0;
-        }
-
         bh_arr_push(file->symbols, sym);
     }
     return 1;
@@ -573,7 +579,9 @@ static b32 parse_reloc(ObjFile *file, u8 *payload, u32 len, bh_arr(ObjSection) s
         ObjReloc rel = { 0 };
         rel.section_id = section_id;
         if (!read_uleb(&c, &rel.type) || !read_uleb(&c, &rel.offset) || !read_uleb(&c, &rel.index)) return 0;
-        if (rel.type > RELOC_GLOBAL_INDEX_LEB && rel.type != RELOC_TABLE_NUMBER_LEB) return 0;
+        if (rel.type > RELOC_GLOBAL_INDEX_LEB
+            && rel.type != RELOC_TABLE_NUMBER_LEB
+            && rel.type != RELOC_MEMORY_ADDR_TLS_SLEB) return 0;
         if (reloc_has_addend(rel.type)) {
             if (!read_sleb(&c, &rel.addend)) return 0;
         }
@@ -593,6 +601,7 @@ static b32 feature_allowed(const char *name) {
         "reference-types",
         "call-indirect-overlong",
         "extended-const",
+        "atomics",
         NULL,
     };
     for (int i = 0; allowed[i]; i++) {
@@ -658,6 +667,7 @@ static ObjFile *parse_object_file(Linker *L, const char *path, OnyxFilePos pos) 
     bh_arr_new(alloc, file->relocs, 4);
     bh_arr_new(alloc, file->inits, 4);
     bh_arr_new(alloc, file->sections, 8);
+    bh_arr_new(alloc, file->provides, 4);
 
     if (!file->bytes || file->length < 8) {
         obj_error(L, file, "Could not read object file '%s'.", path);
@@ -725,6 +735,13 @@ static b32 is_stack_pointer(ObjSymbol *sym) {
         && strcmp(sym->name, "__stack_pointer") == 0;
 }
 
+static b32 is_tls_base(ObjSymbol *sym) {
+    return sym->kind == SYM_GLOBAL
+        && (sym->flags & SYM_UNDEFINED)
+        && sym->name
+        && strcmp(sym->name, "__tls_base") == 0;
+}
+
 static b32 is_function_table(ObjSymbol *sym) {
     return sym->kind == SYM_TABLE
         && (sym->flags & SYM_UNDEFINED)
@@ -736,6 +753,12 @@ static i32 onyx_stack_global(OnyxWasmModule *mod) {
     AstGlobal *stack = &mod->context->builtins.stack_top;
     if (!bh_imap_has(&mod->index_map, (u64) stack)) return -1;
     return (i32) bh_imap_get(&mod->index_map, (u64) stack);
+}
+
+static i32 onyx_tls_global(OnyxWasmModule *mod) {
+    AstGlobal *tls = &mod->context->builtins.tls_base;
+    if (!bh_imap_has(&mod->index_map, (u64) tls)) return -1;
+    return (i32) bh_imap_get(&mod->index_map, (u64) tls);
 }
 
 static ObjSymbol *find_definition(Linker *L, ObjSymbol *undef) {
@@ -772,7 +795,7 @@ static b32 bind_provided_function(Linker *L, ObjSymbol *sym) {
     if (sym->out_func >= 0) return 1;
 
     ObjProvide *prov = NULL;
-    bh_arr_each(ObjProvide, candidate, L->provides) {
+    bh_arr_each(ObjProvide, candidate, sym->file->provides) {
         if (candidate->name && strcmp(candidate->name, sym->name) == 0) {
             prov = candidate;
             break;
@@ -820,6 +843,14 @@ static void mark_symbol(Linker *L, ObjSymbol *sym) {
         return;
     }
 
+    if (is_tls_base(sym)) {
+        sym->live = 1;
+        sym->out_global = onyx_tls_global(L->module);
+        if (sym->out_global < 0)
+            obj_error(L, sym->file, "Internal error: __tls_base has no global index.");
+        return;
+    }
+
     if (is_function_table(sym)) {
         sym->live = 1;
         return;
@@ -832,8 +863,10 @@ static void mark_symbol(Linker *L, ObjSymbol *sym) {
         }
         if (sym->reported) return;
         if (sym->kind == SYM_FUNCTION && sym->out_func >= 0) return;
+        // A #provide on this object resolves its own references, even when
+        // another object defines the same symbol.
+        if (bind_provided_function(L, sym)) return;
         ObjSymbol *def = find_definition(L, sym);
-        if (!def && bind_provided_function(L, sym)) return;
         if (!def) {
             sym->reported = 1;
             sym->live = 1;
@@ -1085,6 +1118,46 @@ static b32 decode_global_init(OnyxWasmModule *mod, ObjGlobal *global, bh_arr(Was
     return 0;
 }
 
+static u32 align_tls(u32 value, u32 align) {
+    if (align <= 1) return value;
+    u32 mask = align - 1;
+    return (value + mask) & ~mask;
+}
+
+static void note_tls(OnyxWasmModule *mod, u32 at, u32 align) {
+    if (!mod->tls_span || at < mod->tls_image_begin) mod->tls_image_begin = at;
+    mod->tls_span = 1;
+    if (align > mod->tls_align) mod->tls_align = align;
+}
+
+static void place_tls_segment(OnyxWasmModule *mod, ObjSegment *seg) {
+    if (seg->tls_placed) return;
+    u32 align = seg->align ? seg->align : 1;
+    u32 at = align_tls(mod->next_tls_offset, align);
+    seg->tls_offset = at;
+    seg->tls_placed = 1;
+    note_tls(mod, at, align);
+    mod->next_tls_offset = at + seg->len;
+
+    u32 len = seg->len ? seg->len : 1;
+    u8 *copy = bh_alloc_array(mod->allocator, u8, len);
+    memset(copy, 0, len);
+    if (seg->len && seg->data) memcpy(copy, seg->data, seg->len);
+    seg->copy = copy;
+}
+
+static b32 segment_is_tls(ObjFile *file, u32 seg_index) {
+    if (seg_index >= (u32) bh_arr_length(file->segments)) return 0;
+    if (file->segments[seg_index].flags & SEG_TLS) return 1;
+    bh_arr_each(ObjSymbol, sym, file->symbols) {
+        if (!(sym->flags & SYM_TLS) || sym->kind != SYM_DATA) continue;
+        if (sym->flags & SYM_UNDEFINED) continue;
+        if ((sym->flags & SYM_BINDING_MASK) == 0x3) continue;
+        if (sym->index == seg_index) return 1;
+    }
+    return 0;
+}
+
 static u32 place_bytes(OnyxWasmModule *mod, u8 *bytes, u32 len, u32 align) {
     if (align == 0) align = 1;
     WasmDatum datum = { 0 };
@@ -1098,6 +1171,14 @@ static u32 place_bytes(OnyxWasmModule *mod, u8 *bytes, u32 len, u32 align) {
 
 static void assign_outputs(Linker *L) {
     OnyxWasmModule *mod = L->module;
+    bh_arr_each(ObjFile *, pfile, L->files) {
+        ObjFile *file = *pfile;
+        for (u32 i = 0; i < (u32) bh_arr_length(file->segments); i++) {
+            ObjSegment *seg = &file->segments[i];
+            if (!seg->live || !segment_is_tls(file, i)) continue;
+            place_tls_segment(mod, seg);
+        }
+    }
     bh_arr_each(ObjFile *, pfile, L->files) {
         ObjFile *file = *pfile;
         bh_arr_each(ObjSymbol, sym, file->symbols) {
@@ -1158,24 +1239,36 @@ static void assign_outputs(Linker *L) {
                 sym->out_global = gidx;
             } else if (sym->kind == SYM_DATA) {
                 if (sym->flags & SYM_ABSOLUTE) continue;
+                b32 tls = (sym->flags & SYM_TLS) != 0;
                 if ((sym->flags & SYM_BINDING_MASK) == 0x3) {
                     u32 align = sym->align < 31 ? (1u << sym->align) : 1;
-                    u32 len = sym->size ? sym->size : 1;
-                    u8 *zeros = bh_alloc_array(mod->allocator, u8, len);
-                    memset(zeros, 0, len);
-                    sym->data_id = place_bytes(mod, zeros, sym->size, align);
+                    if (tls) {
+                        u32 at = align_tls(mod->next_tls_offset, align);
+                        sym->tls_offset = at;
+                        note_tls(mod, at, align);
+                        mod->next_tls_offset = at + sym->size;
+                    } else {
+                        u32 len = sym->size ? sym->size : 1;
+                        u8 *zeros = bh_alloc_array(mod->allocator, u8, len);
+                        memset(zeros, 0, len);
+                        sym->data_id = place_bytes(mod, zeros, sym->size, align);
+                    }
                 } else if (sym->index < (u32) bh_arr_length(file->segments)) {
                     ObjSegment *seg = &file->segments[sym->index];
-                    if (!seg->live) seg->live = 1;
-                    if (seg->data_id == 0) {
-                        u32 len = seg->len ? seg->len : 1;
-                        u8 *copy = bh_alloc_array(mod->allocator, u8, len);
-                        memset(copy, 0, len);
-                        if (seg->len && seg->data) memcpy(copy, seg->data, seg->len);
-                        seg->copy = copy;
-                        seg->data_id = place_bytes(mod, copy, seg->len, seg->align);
+                    if (seg->tls_placed) {
+                        sym->tls_offset = seg->tls_offset + sym->offset;
+                    } else {
+                        if (!seg->live) seg->live = 1;
+                        if (seg->data_id == 0) {
+                            u32 len = seg->len ? seg->len : 1;
+                            u8 *copy = bh_alloc_array(mod->allocator, u8, len);
+                            memset(copy, 0, len);
+                            if (seg->len && seg->data) memcpy(copy, seg->data, seg->len);
+                            seg->copy = copy;
+                            seg->data_id = place_bytes(mod, copy, seg->len, seg->align);
+                        }
+                        sym->data_id = seg->data_id;
                     }
-                    sym->data_id = seg->data_id;
                 }
             }
         }
@@ -1317,11 +1410,22 @@ static void apply_relocs(Linker *L) {
                 patch.at = site.at;
                 patch.addend = rel->addend;
                 if (rel->type == RELOC_MEMORY_ADDR_LEB) patch.kind = ONYX_OBJ_PATCH_ULEB5;
-                else if (rel->type == RELOC_MEMORY_ADDR_SLEB) patch.kind = ONYX_OBJ_PATCH_SLEB5;
+                else if (rel->type == RELOC_MEMORY_ADDR_SLEB || rel->type == RELOC_MEMORY_ADDR_TLS_SLEB) patch.kind = ONYX_OBJ_PATCH_SLEB5;
                 else patch.kind = ONYX_OBJ_PATCH_I32;
+                b32 in_tls = (sym->flags & SYM_TLS) != 0;
+                if (!in_tls && sym->kind == SYM_DATA && sym->file
+                    && (sym->flags & SYM_BINDING_MASK) != 0x3
+                    && sym->index < (u32) bh_arr_length(sym->file->segments)
+                    && sym->file->segments[sym->index].tls_placed) {
+                    in_tls = 1;
+                }
                 if (sym->flags & SYM_ABSOLUTE) {
                     patch.data_id = 0;
                     patch.extra = sym->offset;
+                } else if (in_tls) {
+                    // Clang addresses TLS as global.get __tls_base; i32.const offset; i32.add.
+                    patch.data_id = 0;
+                    patch.extra = sym->tls_offset;
                 } else {
                     if (sym->data_id == 0) {
                         obj_error(L, file, "Memory relocation against '%s' has no address.", sym->name ? sym->name : "");
@@ -1410,6 +1514,85 @@ static ObjFile *file_for_path(Linker *L, const char *path, OnyxFilePos pos) {
     return file;
 }
 
+static void finish_tls_image(Linker *L) {
+    OnyxWasmModule *mod = L->module;
+    if (!mod->tls_span || L->failed) return;
+    if (mod->next_tls_offset < mod->tls_image_begin) return;
+    u32 size = mod->next_tls_offset - mod->tls_image_begin;
+    if (size == 0) return;
+
+    u32 begin = mod->tls_image_begin;
+    u32 blob_len = size + 8;
+    u8 *blob = bh_alloc_array(mod->allocator, u8, blob_len);
+    memset(blob, 0, blob_len);
+    blob[0] = (u8) begin;
+    blob[1] = (u8) (begin >> 8);
+    blob[2] = (u8) (begin >> 16);
+    blob[3] = (u8) (begin >> 24);
+    blob[4] = (u8) size;
+    blob[5] = (u8) (size >> 8);
+    blob[6] = (u8) (size >> 16);
+    blob[7] = (u8) (size >> 24);
+
+    bh_arr_each(ObjFile *, pfile, L->files) {
+        bh_arr_each(ObjSegment, seg, (*pfile)->segments) {
+            if (!seg->tls_placed || !seg->len || !seg->copy) continue;
+            u32 dest = 8 + (seg->tls_offset - begin);
+            if (dest + seg->len > blob_len) continue;
+            memcpy(blob + dest, seg->copy, seg->len);
+        }
+    }
+
+    b32 patched = 0;
+    bh_arr_each(OnyxObjectMemPatch, patch, mod->object_mem_patches) {
+        b32 found = 0;
+        bh_arr_each(ObjFile *, pfile, L->files) {
+            bh_arr_each(ObjSegment, seg, (*pfile)->segments) {
+                if (!seg->tls_placed || patch->bytes != seg->copy) continue;
+                patch->bytes = blob;
+                patch->at = 8 + (seg->tls_offset - begin) + patch->at;
+                patched = 1;
+                found = 1;
+                break;
+            }
+            if (found) break;
+        }
+    }
+
+    b32 nonzero = 0;
+    for (u32 i = 0; i < size; i++) {
+        if (blob[8 + i]) {
+            nonzero = 1;
+            break;
+        }
+    }
+    if (!nonzero && !patched) return;
+    mod->tls_image_data_id = place_bytes(mod, blob, blob_len, 4);
+}
+
+static void add_file_provides(Linker *L, ObjFile *file, AstObjectBlock *block) {
+    bh_arr_each(ObjectProvide, prov, block->provides) {
+        if (!prov->name || !prov->func) continue;
+        b32 seen = 0;
+        bh_arr_each(ObjProvide, existing, file->provides) {
+            if (strcmp(existing->name, prov->name) != 0) continue;
+            if (existing->func != prov->func) {
+                onyx_report_error(L->module->context, prov->symbol->pos, Error_Critical,
+                    "Symbol '%s' is provided by two different procedures for '%s'.",
+                    prov->name, file->path);
+                L->failed = 1;
+            }
+            seen = 1;
+            break;
+        }
+        if (seen) continue;
+        ObjProvide entry;
+        entry.name = prov->name;
+        entry.func = prov->func;
+        bh_arr_push(file->provides, entry);
+    }
+}
+
 void onyx_wasm_link_object_files(OnyxWasmModule *module) {
     if (bh_arr_length(module->object_functions) == 0) return;
 
@@ -1417,36 +1600,14 @@ void onyx_wasm_link_object_files(OnyxWasmModule *module) {
     linker.module = module;
     bh_arr_new(module->allocator, linker.files, 4);
     bh_arr_new(module->allocator, linker.work, 8);
-    bh_arr_new(module->allocator, linker.provides, 4);
-
-    bh_arr_each(AstObjectBlock *, pblock, module->object_blocks) {
-        bh_arr_each(ObjectProvide, prov, (*pblock)->provides) {
-            if (!prov->name || !prov->func) continue;
-            b32 seen = 0;
-            bh_arr_each(ObjProvide, existing, linker.provides) {
-                if (strcmp(existing->name, prov->name) != 0) continue;
-                if (existing->func != prov->func) {
-                    onyx_report_error(module->context, prov->symbol->pos, Error_Critical,
-                        "Symbol '%s' is provided by two different procedures.", prov->name);
-                    linker.failed = 1;
-                }
-                seen = 1;
-                break;
-            }
-            if (seen) continue;
-            ObjProvide entry;
-            entry.name = prov->name;
-            entry.func = prov->func;
-            bh_arr_push(linker.provides, entry);
-        }
-    }
-    if (linker.failed) return;
 
     bh_arr_each(AstObjectBlock *, pblock, module->object_blocks) {
         AstObjectBlock *block = *pblock;
         if (!block->filename) continue;
-        file_for_path(&linker, block->filename, block->token->pos);
+        ObjFile *file = file_for_path(&linker, block->filename, block->token->pos);
+        if (file) add_file_provides(&linker, file, block);
     }
+    if (linker.failed) return;
     bh_arr_each(AstFunction *, pfunc, module->object_functions) {
         AstFunction *fn = *pfunc;
         if (!fn->object_filename) continue;
@@ -1526,6 +1687,8 @@ void onyx_wasm_link_object_files(OnyxWasmModule *module) {
     }
 
     apply_relocs(&linker);
+    if (linker.failed) return;
+    finish_tls_image(&linker);
     if (linker.failed) return;
     emit_constructors(&linker);
 }

@@ -53,6 +53,8 @@ const BuiltinSymbol builtin_symbols[] = {
     { "builtin", "__stack_top",  OFFSET(stack_top) },
     { "builtin", "__tls_base",   OFFSET(tls_base) },
     { "builtin", "__tls_size",   OFFSET(tls_size) },
+    { "builtin", "__tls_align",  OFFSET(tls_align) },
+    { "builtin", "__tls_image",  OFFSET(tls_image) },
     { "builtin", "__closure_base",   OFFSET(closure_base) },
     #undef OFFSET
 
@@ -370,6 +372,8 @@ void prepare_builtins(Context *context) {
     context->builtins.stack_top    = ((AstGlobal) { Ast_Kind_Global, 0, make_symbol_token(context, "__stack_top"), NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
     context->builtins.tls_base     = ((AstGlobal) { Ast_Kind_Global, 0, make_symbol_token(context, "__tls_base"), NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
     context->builtins.tls_size     = ((AstGlobal) { Ast_Kind_Global, 0, make_symbol_token(context, "__tls_size"), NULL, NULL, 0, (AstType *) &context->basic_types.type_u32, NULL });
+    context->builtins.tls_align    = ((AstGlobal) { Ast_Kind_Global, Ast_Flag_Const, make_symbol_token(context, "__tls_align"), NULL, NULL, 0, (AstType *) &context->basic_types.type_u32, NULL });
+    context->builtins.tls_image    = ((AstGlobal) { Ast_Kind_Global, Ast_Flag_Const, make_symbol_token(context, "__tls_image"), NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
     context->builtins.closure_base = ((AstGlobal) { Ast_Kind_Global, 0, make_symbol_token(context, "__closure_base"), NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
     context->builtins.stack_trace  = ((AstGlobal) { Ast_Kind_Global, 0, make_symbol_token(context, ""), NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
 

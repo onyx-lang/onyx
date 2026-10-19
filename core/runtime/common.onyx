@@ -85,14 +85,34 @@ __runtime_initialize :: () {
 
 // Use this procedure to initialize everything needed in the
 // standard library when you are dropped directly into a function.
+// Linked C thread-locals live after Onyx's own. __tls_image, when present,
+// is a u32 offset, a u32 size, and then the initial bytes for that range.
+__tls_copy_image :: () {
+    if __tls_image == null do return;
+
+    header := cast([&] u32) __tls_image;
+    offset := cast(i32) header[0];
+    size := header[1];
+    if size == 0 do return;
+
+    memory.copy(
+        memory.ptr_add(__tls_base, offset),
+        memory.ptr_add(__tls_image, 8),
+        cast(i32) size);
+}
+
 __thread_initialize :: () {
     use core.intrinsics.onyx { __initialize }
 
     // This should only be true for the main thread.
     if __tls_base == null {
-        __tls_base = raw_alloc(alloc.heap_allocator, __tls_size);
+        __tls_base = raw_alloc(alloc.heap_allocator, __tls_size, __tls_align);
         memory.set(__tls_base, 0, __tls_size);
     }
+
+    // Workers already have a zeroed block and a base, so the copy runs
+    // on both paths.
+    __tls_copy_image();
 
     alloc.init_temp_allocator();
 

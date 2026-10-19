@@ -724,8 +724,9 @@ typedef struct JsPartial {
 } JsPartial;
 
 // A memory-address relocation in a linked object function or data segment.
-// Applied after datum offsets are assigned. data_id 0 means `extra` is an
-// absolute address; otherwise the address is datum.offset_ + extra.
+// Applied after datum offsets are assigned. data_id 0 means `extra` is the
+// value to write (an absolute address, or an offset from __tls_base).
+// Otherwise the value is datum.offset_ + extra.
 typedef struct OnyxObjectMemPatch {
     u8 *bytes;
     u32 at;
@@ -812,9 +813,17 @@ typedef struct OnyxWasmModule {
     u32 next_foreign_func_idx;
     u32 next_global_idx;
     u32 next_tls_offset;
+    // C TLS from linked objects is appended after Onyx's own thread-locals.
+    // tls_image is a static blob: u32 offset, u32 size, then the initial bytes.
+    u32 tls_align;
+    u32 tls_image_data_id;
+    u32 tls_image_begin;
+    b32 tls_span;
 
     i32 *stack_top_ptr;
     i32 *tls_size_ptr;
+    i32 *tls_align_ptr;
+    i32 *tls_image_ptr;
     i32 *heap_start_ptr;
     u64 stack_base_idx;
     u64 stack_restore_idx;

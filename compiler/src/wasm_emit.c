@@ -4635,6 +4635,8 @@ static void emit_global(OnyxWasmModule* mod, AstGlobal* global) {
     if (global == &mod->context->builtins.stack_top && mod->stack_top_ptr) return;
     if (global == &mod->context->builtins.heap_start && mod->heap_start_ptr) return;
     if (global == &mod->context->builtins.tls_size && mod->tls_size_ptr) return;
+    if (global == &mod->context->builtins.tls_align && mod->tls_align_ptr) return;
+    if (global == &mod->context->builtins.tls_image && mod->tls_image_ptr) return;
 
     if (!global->type && global->type_node) {
         global->type = type_build_from_ast(mod->context, global->type_node);
@@ -4672,6 +4674,14 @@ static void emit_global(OnyxWasmModule* mod, AstGlobal* global) {
 
     if (global == &mod->context->builtins.tls_size)
         mod->tls_size_ptr = &mod->globals[global_idx].initial_value[0].data.i1;
+
+    if (global == &mod->context->builtins.tls_align) {
+        mod->globals[global_idx].initial_value[0].data.i1 = 16;
+        mod->tls_align_ptr = &mod->globals[global_idx].initial_value[0].data.i1;
+    }
+
+    if (global == &mod->context->builtins.tls_image)
+        mod->tls_image_ptr = &mod->globals[global_idx].initial_value[0].data.i1;
 }
 
 // Register and emit the compiler-created runtime globals. These used to
@@ -4683,6 +4693,8 @@ static void emit_runtime_builtins(OnyxWasmModule *mod) {
         &mod->context->builtins.heap_start,
         &mod->context->builtins.tls_base,
         &mod->context->builtins.tls_size,
+        &mod->context->builtins.tls_align,
+        &mod->context->builtins.tls_image,
         &mod->context->builtins.closure_base,
         &mod->context->builtins.stack_trace,
     };
@@ -5173,7 +5185,13 @@ void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module) {
         .code_patches = NULL,
 
         .next_tls_offset = 0,
+        .tls_align = 0,
+        .tls_image_data_id = 0,
+        .tls_image_begin = 0,
+        .tls_span = 0,
         .tls_size_ptr = NULL,
+        .tls_align_ptr = NULL,
+        .tls_image_ptr = NULL,
 
         .elems = NULL,
 
@@ -5634,8 +5652,14 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
     bh_align(*module->heap_start_ptr, 16);
 
     if (module->tls_size_ptr) {
+        u32 tls_align = module->tls_align < 16 ? 16 : module->tls_align;
         *module->tls_size_ptr = module->next_tls_offset;
-        bh_align(*module->tls_size_ptr, 16);
+        bh_align(*module->tls_size_ptr, tls_align);
+        if (module->tls_align_ptr) *module->tls_align_ptr = (i32) tls_align;
+        if (module->tls_image_ptr && module->tls_image_data_id) {
+            WasmDatum *image = &module->data[module->tls_image_data_id - 1];
+            *module->tls_image_ptr = image->offset_;
+        }
     }
 
 

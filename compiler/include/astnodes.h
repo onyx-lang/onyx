@@ -1730,9 +1730,9 @@ struct AstForeignBlock {
     b32 uses_dyncall : 1;
 };
 
-// An undefined symbol in an object file, satisfied by an Onyx procedure.
-// `symbol` is the C name. `expr` is set when the directive names a different
-// procedure (`#provide "malloc" libc.malloc`); otherwise the C name is looked up.
+// An undefined symbol in one object file, satisfied by an Onyx procedure.
+// `symbol` is both the binding name and the C symbol. `expr` is the
+// right-hand side of `name ::` inside a `#provide` block.
 struct ObjectProvide {
     OnyxToken *symbol;
     char *name;
@@ -1743,7 +1743,8 @@ typedef struct ObjectProvide ObjectProvide;
 
 // Links procedures from a WASM object file (Clang/LLVM linking section v2).
 // Empty-bodied declarations are symbols defined by the object. `#provide`
-// names symbols the object imports, and binds them to Onyx procedures.
+// binds symbols that this object imports to Onyx procedures. A provide in
+// one object does not satisfy the same symbol in another object.
 struct AstObjectBlock {
     AstTyped_base;
 
@@ -2213,6 +2214,8 @@ struct CompilerBuiltins {
     AstGlobal stack_top;
     AstGlobal tls_base;
     AstGlobal tls_size;
+    AstGlobal tls_align;
+    AstGlobal tls_image;
     AstGlobal closure_base;
     AstGlobal stack_trace;
     AstType  *string_type;
