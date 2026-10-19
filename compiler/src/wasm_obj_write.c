@@ -4,6 +4,8 @@
 //
 // Only functions reachable from a #export, plus #init procedures, are included.
 // Executable entry exports are compiled out when runtime.target_type is Object.
+// Indirect calls import env.__indirect_function_table and relocate type,
+// table number, and function-pointer immediates the way Clang does.
 
 #include "wasm_emit.h"
 #include "errors.h"
@@ -24,15 +26,23 @@
 #define SYM_DATA     1
 #define SYM_GLOBAL   2
 
+#define SYM_TABLE         5
+
 #define SYM_BINDING_LOCAL 0x2
 #define SYM_UNDEFINED     0x10
 #define SYM_EXPORTED      0x20
+#define SYM_NO_STRIP      0x80
 #define SYM_TLS           0x100
 
 #define RELOC_FUNCTION_INDEX_LEB  0
+#define RELOC_TABLE_INDEX_SLEB    1
+#define RELOC_TABLE_INDEX_I32     2
+#define RELOC_MEMORY_ADDR_LEB     3
 #define RELOC_MEMORY_ADDR_SLEB    4
 #define RELOC_MEMORY_ADDR_I32     5
+#define RELOC_TYPE_INDEX_LEB      6
 #define RELOC_GLOBAL_INDEX_LEB    7
+#define RELOC_TABLE_NUMBER_LEB    20
 #define RELOC_MEMORY_ADDR_TLS_SLEB 21
 
 typedef struct OutSym {
@@ -86,6 +96,8 @@ typedef struct ObjImage {
     b32 need_memory;
     b32 need_stack;
     b32 need_tls;
+    b32 need_table;
+    i32 table_sym;
     b32 need_tls_data;
     b32 have_stack;
     b32 have_tls;
@@ -378,6 +390,47 @@ static void visit_function(ObjImage *img, i32 func_idx, i32 *queue, i32 *qt) {
     queue[(*qt)++] = func_idx;
 }
 
+static b32 reloc_has_addend(u32 type) {
+    return type == RELOC_MEMORY_ADDR_LEB
+        || type == RELOC_MEMORY_ADDR_SLEB
+        || type == RELOC_MEMORY_ADDR_I32
+        || type == RELOC_MEMORY_ADDR_TLS_SLEB;
+}
+
+static void ensure_table_function(ObjImage *img, AstFunction *fn, OnyxFilePos pos, i32 *queue, i32 *qt) {
+    img->need_table = 1;
+    if (!fn) {
+        werr(img, pos, "A function pointer has no function to place in the table.");
+        return;
+    }
+    if (fn->is_object_link) {
+        werr(img, fn_pos(fn),
+            "Function '%s' is linked from a wasm object. Object output does not re-link #object files.",
+            get_function_name(img->module->context, fn));
+        return;
+    }
+    if (fn->is_foreign_dyncall) {
+        werr(img, fn_pos(fn),
+            "Function '%s' is a dyncall import. Wasm object output emits C symbols.",
+            get_function_name(img->module->context, fn));
+        return;
+    }
+    if (fn->is_foreign) {
+        add_foreign(img, fn);
+        return;
+    }
+    if (!bh_imap_has(&img->module->index_map, (u64) fn)) {
+        werr(img, pos, "Function '%s' was not generated.", get_function_name(img->module->context, fn));
+        return;
+    }
+    i32 idx = (i32) bh_imap_get(&img->module->index_map, (u64) fn);
+    if (idx < 0 || idx >= img->nfuncs) {
+        werr(img, pos, "Function '%s' was not generated.", get_function_name(img->module->context, fn));
+        return;
+    }
+    visit_function(img, idx, queue, qt);
+}
+
 static void scan_function(ObjImage *img, i32 func_idx, i32 *queue, i32 *qt) {
     OnyxWasmModule *module = img->module;
     WasmFunc *func = &module->funcs[func_idx];
@@ -386,10 +439,16 @@ static void scan_function(ObjImage *img, i32 func_idx, i32 *queue, i32 *qt) {
 
     for (i32 i = 0; i < bh_arr_length(func->code); i++) {
         WasmInstruction *instr = &func->code[i];
-        if (instr->type == WI_CALL_INDIRECT) {
-            werr(img, pos, "Function '%s' uses an indirect call. Wasm object output does not write table relocations yet.", fname);
-            return;
+        if (instr->type == WI_CALL_INDIRECT) img->need_table = 1;
+
+        if (instr->type == WI_I32_CONST) {
+            CodePatchInfo *table = find_code_patch(module, (u32) func_idx, (u32) i, Code_Patch_Table_Index);
+            if (table) {
+                ensure_table_function(img, (AstFunction *) table->node_related_to_patch, pos, queue, qt);
+                if (img->failed) return;
+            }
         }
+
         if (instr_uses_memory(instr->type)) img->need_memory = 1;
 
         if (instr->type == WI_GLOBAL_GET || instr->type == WI_GLOBAL_SET) {
@@ -543,23 +602,42 @@ static void collect_image(ObjImage *img) {
     }
     free(queue);
 
-    b32 grew = 1;
-    while (grew && !img->failed && img->live_data) {
-        grew = 0;
-        bh_arr_each(DatumPatchInfo, patch, module->data_patches) {
-            if (patch->kind != Datum_Patch_Data && patch->kind != Datum_Patch_Relative) continue;
-            if (patch->index == 0 || (i32) patch->index > img->ndata) continue;
-            if (!img->live_data[patch->index]) continue;
-            resolve_data_id(patch);
-            if (patch->data_id == 0 || (i32) patch->data_id > img->ndata) {
-                werr(img, fallback_pos(module), "A data relocation points at a missing symbol.");
-                break;
-            }
-            if (!img->live_data[patch->data_id]) {
-                img->live_data[patch->data_id] = 1;
-                grew = 1;
+    while (!img->failed) {
+        b32 grew = 1;
+        while (grew && !img->failed && img->live_data) {
+            grew = 0;
+            bh_arr_each(DatumPatchInfo, patch, module->data_patches) {
+                if (patch->kind != Datum_Patch_Data && patch->kind != Datum_Patch_Relative) continue;
+                if (patch->index == 0 || (i32) patch->index > img->ndata) continue;
+                if (!img->live_data[patch->index]) continue;
+                resolve_data_id(patch);
+                if (patch->data_id == 0 || (i32) patch->data_id > img->ndata) {
+                    werr(img, fallback_pos(module), "A data relocation points at a missing symbol.");
+                    break;
+                }
+                if (!img->live_data[patch->data_id]) {
+                    img->live_data[patch->data_id] = 1;
+                    grew = 1;
+                }
             }
         }
+        if (img->failed || !img->live_data) break;
+
+        i32 *more = img->nfuncs ? malloc((size_t) img->nfuncs * sizeof(i32)) : NULL;
+        i32 mt = 0;
+        bh_arr_each(DatumPatchInfo, patch, module->data_patches) {
+            if (patch->kind != Datum_Patch_Table_Index) continue;
+            if (patch->index == 0 || (i32) patch->index > img->ndata) continue;
+            if (!img->live_data[patch->index]) continue;
+            ensure_table_function(img, (AstFunction *) patch->node_to_use_if_data_id_is_null, fallback_pos(module), more, &mt);
+            if (img->failed) break;
+        }
+        if (img->failed || mt == 0) {
+            free(more);
+            break;
+        }
+        for (i32 qh = 0; qh < mt && !img->failed; qh++) scan_function(img, more[qh], more, &mt);
+        free(more);
     }
 
     if (img->need_tls_data) img->need_tls = 1;
@@ -625,6 +703,15 @@ static void build_symbols(ObjImage *img) {
         sym.index = (u32) i;
         sym.name = NULL;
         img->foreigns[i].sym = bh_arr_length(img->syms);
+        push_sym(img, sym);
+    }
+
+    if (img->need_table) {
+        OutSym sym = { 0 };
+        sym.kind = SYM_TABLE;
+        sym.flags = SYM_UNDEFINED | SYM_NO_STRIP;
+        sym.index = 0;
+        img->table_sym = bh_arr_length(img->syms);
         push_sym(img, sym);
     }
 
@@ -839,6 +926,15 @@ static void record_reloc(ObjImage *img, bh_arr(OutRel) *rels, u32 type, u32 offs
     bh__arrhead(*rels)->length = n + 1;
 }
 
+static i32 symbol_for_function(ObjImage *img, AstFunction *fn) {
+    if (!fn) return -1;
+    if (fn->is_foreign) return foreign_sym_for(img, fn);
+    if (!bh_imap_has(&img->module->index_map, (u64) fn)) return -1;
+    i32 idx = (i32) bh_imap_get(&img->module->index_map, (u64) fn);
+    if (idx < 0 || idx >= img->nfuncs) return -1;
+    return img->sym_of_func[idx];
+}
+
 static i32 symbol_for_global(ObjImage *img, u64 g) {
     if (img->have_stack && g == img->stack_g) return img->stack_sym;
     if (img->have_tls && g == img->tls_g) return img->tls_sym;
@@ -889,7 +985,30 @@ static void write_instr(ObjImage *img, WasmFunc *func, i32 func_idx, WasmInstruc
         return;
     }
 
+    if (instr->type == WI_CALL_INDIRECT) {
+        u32 type_at = (u32) body->length;
+        buf_uleb5(body, 0);
+        record_reloc(img, body_relocs, RELOC_TYPE_INDEX_LEB, type_at, (u32) instr->data.i1, 0);
+        u32 table_at = (u32) body->length;
+        buf_uleb5(body, 0);
+        record_reloc(img, body_relocs, RELOC_TABLE_NUMBER_LEB, table_at, (u32) img->table_sym, 0);
+        return;
+    }
+
     if (instr->type == WI_I32_CONST) {
+        CodePatchInfo *table = find_code_patch(img->module, (u32) func_idx, (u32) instr_index, Code_Patch_Table_Index);
+        if (table) {
+            i32 sym = symbol_for_function(img, (AstFunction *) table->node_related_to_patch);
+            if (sym < 0) {
+                werr(img, func->location ? func->location->pos : fallback_pos(img->module),
+                    "A function pointer has no symbol to relocate.");
+                return;
+            }
+            u32 at = (u32) body->length;
+            buf_sleb5(body, 0);
+            record_reloc(img, body_relocs, RELOC_TABLE_INDEX_SLEB, at, (u32) sym, 0);
+            return;
+        }
         CodePatchInfo *tls = find_code_patch(img->module, (u32) func_idx, (u32) instr_index, Code_Patch_Tls_Offset);
         if (tls) {
             AstMemRes *memres = (AstMemRes *) tls->node_related_to_patch;
@@ -971,9 +1090,9 @@ static void encode_object(ObjImage *img, bh_buffer *out) {
         }
     }
 
-    b32 has_import = img->need_memory || img->nforeign || img->need_stack || img->need_tls;
+    b32 has_import = img->need_memory || img->nforeign || img->need_table || img->need_stack || img->need_tls;
     if (has_import) {
-        i32 count = (img->need_memory ? 1 : 0) + img->nforeign + (img->need_stack ? 1 : 0) + (img->need_tls ? 1 : 0);
+        i32 count = (img->need_memory ? 1 : 0) + img->nforeign + (img->need_table ? 1 : 0) + (img->need_stack ? 1 : 0) + (img->need_tls ? 1 : 0);
         buf_uleb(&imports, (u64) count);
         if (img->need_memory) {
             write_wasm_name(&imports, "env");
@@ -987,6 +1106,14 @@ static void encode_object(ObjImage *img, bh_buffer *out) {
             write_wasm_name(&imports, img->foreigns[i].name);
             bh_buffer_write_byte(&imports, 0x00);
             buf_uleb(&imports, (u64) img->foreigns[i].type_idx);
+        }
+        if (img->need_table) {
+            write_wasm_name(&imports, "env");
+            write_wasm_name(&imports, "__indirect_function_table");
+            bh_buffer_write_byte(&imports, 0x01);
+            bh_buffer_write_byte(&imports, 0x70);
+            bh_buffer_write_byte(&imports, 0x00);
+            buf_uleb(&imports, 1);
         }
         if (img->need_stack) {
             write_wasm_name(&imports, "env");
@@ -1078,6 +1205,18 @@ static void encode_object(ObjImage *img, bh_buffer *out) {
                 if (bytes) memset(bytes + patch->location, 0, 4);
                 record_reloc(img, &img->data_relocs, RELOC_MEMORY_ADDR_I32, bytes_at + patch->location, (u32) img->sym_of_datum[patch->data_id], addend);
             }
+            bh_arr_each(DatumPatchInfo, patch, module->data_patches) {
+                if (patch->kind != Datum_Patch_Table_Index) continue;
+                if (patch->index != (u32) id) continue;
+                if (patch->location + 4 > datum->length) continue;
+                i32 sym = symbol_for_function(img, (AstFunction *) patch->node_to_use_if_data_id_is_null);
+                if (sym < 0) {
+                    werr(img, fallback_pos(module), "A function pointer in data has no symbol to relocate.");
+                    continue;
+                }
+                if (bytes) memset(bytes + patch->location, 0, 4);
+                record_reloc(img, &img->data_relocs, RELOC_TABLE_INDEX_I32, bytes_at + patch->location, (u32) sym, 0);
+            }
             if (datum->length) bh_buffer_append(&data, bytes, (i32) datum->length);
             free(bytes);
         }
@@ -1125,7 +1264,7 @@ static void encode_object(ObjImage *img, bh_buffer *out) {
         bh_arr_each(OutSym, sym, img->syms) {
             bh_buffer_write_byte(&sub, sym->kind);
             buf_uleb(&sub, sym->flags);
-            if (sym->kind == SYM_FUNCTION || sym->kind == SYM_GLOBAL) {
+            if (sym->kind == SYM_FUNCTION || sym->kind == SYM_GLOBAL || sym->kind == SYM_TABLE) {
                 buf_uleb(&sub, sym->index);
                 if ((sym->flags & SYM_UNDEFINED) == 0) write_wasm_name(&sub, sym->name ? sym->name : "");
             } else if (sym->kind == SYM_DATA) {
@@ -1199,9 +1338,7 @@ static void encode_object(ObjImage *img, bh_buffer *out) {
             buf_uleb(&rel, r->type);
             buf_uleb(&rel, r->offset);
             buf_uleb(&rel, r->index);
-            if (r->type == RELOC_MEMORY_ADDR_SLEB || r->type == RELOC_MEMORY_ADDR_I32 || r->type == RELOC_MEMORY_ADDR_TLS_SLEB
-                || r->type == 3)
-                buf_sleb(&rel, r->addend);
+            if (reloc_has_addend(r->type)) buf_sleb(&rel, r->addend);
         }
         append_custom(out, "reloc.CODE", &rel);
         bh_buffer_free(&rel);
@@ -1215,7 +1352,7 @@ static void encode_object(ObjImage *img, bh_buffer *out) {
             buf_uleb(&rel, r->type);
             buf_uleb(&rel, r->offset);
             buf_uleb(&rel, r->index);
-            buf_sleb(&rel, r->addend);
+            if (reloc_has_addend(r->type)) buf_sleb(&rel, r->addend);
         }
         append_custom(out, "reloc.DATA", &rel);
         bh_buffer_free(&rel);

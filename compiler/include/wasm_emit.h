@@ -599,6 +599,7 @@ typedef enum DatumPatchInfoKind {
     Datum_Patch_Instruction,
     Datum_Patch_Data,
     Datum_Patch_Relative,
+    Datum_Patch_Table_Index,
 } DatumPatchInfoKind;
 
 typedef enum CodePatchInfoKind {
@@ -608,6 +609,7 @@ typedef enum CodePatchInfoKind {
     Code_Patch_Tls_Offset,
     Code_Patch_String_Length,
     Code_Patch_String_Length_In_Data,
+    Code_Patch_Table_Index,
 } CodePatchInfoKind;
 
 //

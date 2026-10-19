@@ -94,6 +94,8 @@ static b32 onyx_type_is_multiple_wasm_values(Type *type) {
 
 static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft);
 static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func);
+static void note_table_index(OnyxWasmModule *mod, bh_arr(WasmInstruction) code, AstFunction *func);
+static AstFunction *function_at_element(OnyxWasmModule *mod, i32 elemidx);
 
 #define LOCAL_I32  0x000000000
 #define LOCAL_I64  0x100000000
@@ -1689,6 +1691,7 @@ EMIT_FUNC(remove_directive, AstDirectiveRemove* remove) {
     ForRemoveInfo remove_info = bh_arr_last(mod->for_remove_info);
 
     WIL(remove->token, WI_LOCAL_GET, remove_info.iterator_remove_func);
+    note_table_index(mod, code, function_at_element(mod, mod->null_proc_func_idx));
     WIL(remove->token, WI_I32_CONST, mod->null_proc_func_idx);
     WI(remove->token, WI_I32_NE);
     WID(remove->token, WI_IF_START, 0x40);
@@ -3513,8 +3516,9 @@ EMIT_FUNC(expression, AstTyped* expr) {
             AstFunction *func = (AstFunction *) expr;
             i32 elemidx = get_element_idx(mod, func);
 
-            // This is not patched because it refers to the element index, which
-            // requires the function be submitted and part of the binary already.
+            // The immediate is the element slot. Object output relocates it
+            // against the function symbol so the linker assigns the table index.
+            note_table_index(mod, code, func);
             WID(NULL, WI_I32_CONST, elemidx);
             if (!func->captures) {
                 WIL(NULL, WI_PTR_CONST, 0);
@@ -4213,6 +4217,7 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_nod
         emit_location(mod, &code, alloc_node);
 
     } else if (type->kind == Type_Kind_Function) {
+        note_table_index(mod, code, function_at_element(mod, mod->null_proc_func_idx));
         WID(NULL, WI_I32_CONST, mod->null_proc_func_idx);
         WIL(NULL, WI_I32_CONST, 0);
 
@@ -4299,6 +4304,24 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
 
     shput(mod->type_map, type_repr_buf, mod->next_type_idx);
     return mod->next_type_idx++;
+}
+
+static void note_table_index(OnyxWasmModule *mod, bh_arr(WasmInstruction) code, AstFunction *func) {
+    CodePatchInfo patch = { 0 };
+    patch.kind = Code_Patch_Table_Index;
+    patch.func_idx = mod->current_func_idx;
+    patch.instr = (u32) bh_arr_length(code);
+    patch.node_related_to_patch = (AstNode *) func;
+    bh_arr_push(mod->code_patches, patch);
+}
+
+static AstFunction *function_at_element(OnyxWasmModule *mod, i32 elemidx) {
+    if (elemidx < 0) return NULL;
+    bh_arr_each(CodePatchInfo, patch, mod->code_patches) {
+        if (patch->kind == Code_Patch_Element && (i32) patch->instr == elemidx)
+            return (AstFunction *) patch->node_related_to_patch;
+    }
+    return NULL;
 }
 
 static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func) {
@@ -4878,6 +4901,13 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
         AstFunction* func = (AstFunction *) node;
         CE(u32, 0) = get_element_idx(ctx->module, func);
         CE(u32, 4) = 0;
+
+        DatumPatchInfo table_patch = { 0 };
+        table_patch.kind = Datum_Patch_Table_Index;
+        table_patch.index = ctx->data_id;
+        table_patch.location = offset;
+        table_patch.node_to_use_if_data_id_is_null = (AstNode *) func;
+        bh_arr_push_unsafe(ctx->module->data_patches, table_patch);
         break;
     }
 
@@ -5610,6 +5640,8 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
 #endif
 
     bh_arr_each(DatumPatchInfo, patch, module->data_patches) {
+        if (patch->kind == Datum_Patch_Table_Index) continue;
+
         if (patch->data_id == 0) {
             assert(patch->node_to_use_if_data_id_is_null || ("Unexpected empty data_id in linking!" && 0));
             switch (patch->node_to_use_if_data_id_is_null->kind) {
