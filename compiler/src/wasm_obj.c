@@ -994,6 +994,17 @@ static b32 c_wasm_type(Type *type, u8 *out) {
     return 0;
 }
 
+static b32 lower_c_param(Type *type, u8 *out) {
+    if (type_get_param_pass(type) == Param_Pass_By_Implicit_Pointer) {
+        *out = 0x7f;
+        return 1;
+    }
+    if (type_get_param_pass(type) == Param_Pass_By_Multiple_Values) return 0;
+    Type *one = type_struct_is_just_one_basic_value(unwrap_type(type));
+    if (one) type = one;
+    return c_wasm_type(type, out);
+}
+
 static b32 signature_matches(OnyxWasmModule *mod, AstFunction *fn, ObjType *ty, const char *name) {
     Type *ft = fn->type;
     if (!ft || ft->kind != Type_Kind_Function) {
@@ -1001,21 +1012,34 @@ static b32 signature_matches(OnyxWasmModule *mod, AstFunction *fn, ObjType *ty, 
             "Object function '%s' was not typechecked.", name);
         return 0;
     }
-    if ((u32) ft->Function.param_count != ty->nparams) {
+
+    b32 sret = type_function_get_cc(ft) == CC_Return_Stack;
+    u32 base = 0;
+    if (sret) {
+        if (ty->nparams < 1 || ty->params[0] != 0x7f) {
+            onyx_report_error(mod->context, fn->token->pos, Error_Critical,
+                "'%s' returns an aggregate, but the object file has no leading return pointer.",
+                name);
+            return 0;
+        }
+        base = 1;
+    }
+
+    if (ty->nparams != base + (u32) ft->Function.param_count) {
         onyx_report_error(mod->context, fn->token->pos, Error_Critical,
             "Declaration of '%s' has %d parameter(s); the object file has %d.",
-            name, ft->Function.param_count, ty->nparams);
+            name, ft->Function.param_count, ty->nparams - base);
         return 0;
     }
-    for (u32 i = 0; i < ty->nparams; i++) {
+    for (u32 i = 0; i < (u32) ft->Function.param_count; i++) {
         u8 expect = 0;
-        if (!c_wasm_type(ft->Function.params[i], &expect)) {
+        if (!lower_c_param(ft->Function.params[i], &expect)) {
             onyx_report_error(mod->context, fn->token->pos, Error_Critical,
-                "Parameter %d of '%s' is not a C-compatible type. Pass aggregates as rawptr.",
+                "Parameter %d of '%s' is not a C-compatible type.",
                 i + 1, name);
             return 0;
         }
-        if (expect != ty->params[i]) {
+        if (expect != ty->params[base + i]) {
             onyx_report_error(mod->context, fn->token->pos, Error_Critical,
                 "Parameter %d of '%s' does not match the object file.",
                 i + 1, name);
@@ -1025,11 +1049,14 @@ static b32 signature_matches(OnyxWasmModule *mod, AstFunction *fn, ObjType *ty, 
 
     Type *ret = unwrap_type(ft->Function.return_type);
     b32 is_void = ret && ret->kind == Type_Kind_Basic && ret->Basic.kind == Basic_Kind_Void;
-    if (type_function_get_cc(ft) == CC_Return_Stack) {
-        onyx_report_error(mod->context, fn->token->pos, Error_Critical,
-            "'%s' returns an aggregate. Object functions must return a primitive or rawptr.",
-            name);
-        return 0;
+    if (sret) {
+        if (ty->nresults != 0) {
+            onyx_report_error(mod->context, fn->token->pos, Error_Critical,
+                "'%s' returns an aggregate, but the object file also returns a wasm value.",
+                name);
+            return 0;
+        }
+        return 1;
     }
     if (is_void) {
         if (ty->nresults != 0) {

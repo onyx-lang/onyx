@@ -170,9 +170,13 @@ static u64 local_allocate_bytes_in_memory(LocalAllocator *la, u32 size, u32 alig
 }
 
 static void local_free_bytes_in_memory(LocalAllocator* la, u32 size, u32 alignment) {
-    bh_align(size, alignment);
+    (void) la;
+    (void) size;
+    (void) alignment;
 
-    la->curr_stack -= size;
+    // A block can end while a slice still points at one of its arrays.
+    // Reusing that stack slot lets a later aggregate return clobber the
+    // bytes before they are read. Slots stay reserved until the function ends.
 }
 
 static u64 local_allocate_type_in_memory(LocalAllocator* la, Type *type) {
@@ -2007,7 +2011,10 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
 //
 // Linear memory stack:
 //
-//     ... | struct-like arguments (z) | variadic arguments (va) | return space | ...
+//     ... | return space | struct-like arguments (z) | variadic arguments (va) | ...
+//
+// The return pointer is the first wasm parameter, and the function has no
+// wasm result. Callers read the value back from the return slot.
 //
 // The interesting part from above is the fact that 'y' gets passed on the WASM stack, not the linear memory
 // stack, even though a 'str' in Onyx is 2-component structure. This is because so-called "simple" structures,
@@ -2043,6 +2050,35 @@ EMIT_FUNC(call, AstCall* call) {
     u32 reserve_size  = 0;
     u32 vararg_count  = 0;
     i32 vararg_offset = -1;
+
+    CallingConvention cc = type_function_get_cc(call->callee->type);
+    assert(cc != CC_Undefined);
+
+    Type* return_type = call->callee->type->Function.return_type;
+    u32 return_size = type_size_of(return_type);
+    assert(return_size % type_alignment_of(return_type) == 0);
+
+    // The return pointer is wasm parameter 0. An in-memory result lives in
+    // this function's frame, above the stack used by the call. A multi-value
+    // result is loaded immediately, so its slot can sit in the reservation.
+    u32 return_location = 0;
+    b32 stable_memory_return = 0;
+    u64 stable_return_offset = 0;
+    if (cc == CC_Return_Stack) {
+        if (onyx_type_is_stored_in_memory(return_type)) {
+            stable_memory_return = 1;
+            stable_return_offset = local_allocate_type_in_memory(mod->local_alloc, return_type);
+            emit_stack_address(mod, &code, (u32) stable_return_offset, call_token);
+        } else {
+            return_location = reserve_size;
+            WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+            if (return_location > 0) {
+                WID(call_token, WI_PTR_CONST, return_location);
+                WI(call_token, WI_PTR_ADD);
+            }
+            reserve_size += return_size;
+        }
+    }
 
     u32* vararg_any_offsets=NULL;
     u32* vararg_any_types=NULL;
@@ -2189,24 +2225,6 @@ EMIT_FUNC(call, AstCall* call) {
             break;
     }
 
-    CallingConvention cc = type_function_get_cc(call->callee->type);
-    assert(cc != CC_Undefined);
-
-    Type* return_type = call->callee->type->Function.return_type;
-    u32 return_size = type_size_of(return_type);
-    assert(return_size % type_alignment_of(return_type) == 0);
-
-    u32 return_location = 0;
-    if (cc == CC_Return_Stack) {
-        return_location = reserve_size;
-
-        WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
-        WID(call_token, WI_PTR_CONST, return_location);
-        WI(call_token, WI_PTR_ADD);
-
-        reserve_size += return_size;
-    }
-
     if (mod->context->options.stack_trace_enabled) {
         emit_stack_address(mod, &code, mod->stack_trace_idx, NULL);
         WIL(NULL, WI_I32_CONST, call->token->pos.line);
@@ -2251,8 +2269,12 @@ EMIT_FUNC(call, AstCall* call) {
     }
 
     if (cc == CC_Return_Stack) {
-        WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
-        emit_load_with_ignored_instruction(mod, &code, return_type, return_location, call->ignored_return_value_count);
+        if (stable_memory_return) {
+            emit_stack_address(mod, &code, (u32) stable_return_offset, call_token);
+        } else {
+            WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+            emit_load_with_ignored_instruction(mod, &code, return_type, return_location, call->ignored_return_value_count);
+        }
     }
 
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
@@ -4221,6 +4243,12 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     Type** param_type = ft->Function.params;
     i32 param_count = ft->Function.param_count;
     i32 params_left = param_count;
+    b32 return_on_stack = type_function_get_cc(ft) == CC_Return_Stack;
+
+    if (return_on_stack) {
+        *(t++) = (char) WASM_TYPE_PTR;
+        param_count += 1;
+    }
 
     while (params_left-- > 0) {
         switch (type_get_param_pass(*param_type)) {
@@ -4246,14 +4274,9 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
         param_type++;
     }
 
-    if (type_function_get_cc(ft) == CC_Return_Stack) {
-        *(t++) = onyx_type_to_wasm_type(mod->context->types.basic[Basic_Kind_Rawptr]);
-        param_count += 1;
-    }
-
     *(t++) = ':';
 
-    WasmType return_type = onyx_type_to_wasm_type(ft->Function.return_type);
+    WasmType return_type = return_on_stack ? WASM_TYPE_VOID : onyx_type_to_wasm_type(ft->Function.return_type);
     *(t++) = (char) return_type;
 
     *t = '\0';
@@ -4418,8 +4441,15 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     if (fd->body != NULL) {
         mod->local_alloc = &wasm_func.locals;
 
-        // NOTE: Generate the local map
+        // NOTE: Generate the local map. A stack return pointer is parameter 0.
         u64 localidx = 0;
+        mod->curr_cc = type_function_get_cc(fd->type);
+        assert(mod->curr_cc != CC_Undefined);
+        if (mod->curr_cc == CC_Return_Stack) {
+            mod->stack_return_location_idx = localidx | LOCAL_IS_WASM;
+            localidx += 1;
+        }
+
         bh_arr_each(AstParam, param, fd->params) {
             switch (type_get_param_pass(param->local->type)) {
                 case Param_Pass_By_Multiple_Values:
@@ -4436,19 +4466,6 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
                 default: assert(0);
             }
-        }
-
-        mod->curr_cc = type_function_get_cc(fd->type);
-        assert(mod->curr_cc != CC_Undefined);
-
-        if (mod->curr_cc == CC_Return_Stack) {
-            // When returning on the stack, the location to write
-            // the result to is passed as the last parameter.
-            mod->stack_return_location_idx = localidx | LOCAL_IS_WASM;
-            localidx += 1;
-            
-            // TODO: Make this next line work.
-            // debug_introduce_symbol_by_name(mod, "$return", DSL_REGISTER, mod->stack_return_location_idx, mod->context->types.basic[Basic_Kind_Rawptr]);
         }
 
         mod->local_alloc->param_count = localidx;

@@ -2776,10 +2776,21 @@ static inline Type* get_expression_type(Context *context, AstTyped* expr) {
     }
 }
 
+static inline b32 type_return_uses_memory(Type* type) {
+    while (type && type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
+    if (!type) return 0;
+    if (type_is_compound(type)) return 1;
+    if (type_struct_is_just_one_basic_value(type)) return 0;
+    return type->kind == Type_Kind_Struct
+        || type->kind == Type_Kind_Array
+        || type->kind == Type_Kind_DynArray
+        || type->kind == Type_Kind_Union;
+}
+
 static inline CallingConvention type_function_get_cc(Type* type) {
     if (type == NULL) return CC_Undefined;
     if (type->kind != Type_Kind_Function) return CC_Undefined;
-    if (type_is_compound(type->Function.return_type)) return CC_Return_Stack;
+    if (type_return_uses_memory(type->Function.return_type)) return CC_Return_Stack;
     return CC_Return_Wasm;
 }
 
