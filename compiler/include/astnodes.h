@@ -2166,6 +2166,7 @@ struct CompileOptions {
 
     b32 running_perf : 1;
     b32 enable_jit   : 1;
+    b32 emit_wasm_object : 1;
 
     Runtime runtime;
 

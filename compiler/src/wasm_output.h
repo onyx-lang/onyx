@@ -1137,6 +1137,11 @@ i32 output_custom_section(OnyxWasmModule *module, bh_buffer *buff, WasmCustomSec
 }
 
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer) {
+    if (module->context->options.emit_wasm_object) {
+        onyx_wasm_module_write_object(module, buffer);
+        return;
+    }
+
     bh_buffer_init(buffer, module->context->gp_alloc, 128);
     bh_buffer_append(buffer, WASM_MAGIC_STRING, 4);
     bh_buffer_append(buffer, WASM_VERSION, 4);

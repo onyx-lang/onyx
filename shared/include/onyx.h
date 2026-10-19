@@ -51,6 +51,8 @@ typedef enum onyx_option_t {
     ONYX_OPTION_PARSE_ONLY,
 
     ONYX_OPTION_JIT,
+
+    ONYX_OPTION_EMIT_WASM_OBJECT,
 } onyx_option_t;
 
 typedef enum onyx_pump_t {

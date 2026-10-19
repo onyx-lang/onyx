@@ -872,6 +872,8 @@ b32 onyx_wasm_build_link_options_from_node(Context *context, OnyxWasmLinkOptions
 
 void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module);
 void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLinkOptions *options);
+b32 onyx_wasm_prepare_object(OnyxWasmModule *module);
+void onyx_wasm_module_write_object(OnyxWasmModule *module, bh_buffer *buffer);
 void onyx_wasm_link_object_files(OnyxWasmModule *module);
 void onyx_wasm_apply_object_memory_patches(OnyxWasmModule *module);
 void onyx_wasm_module_free(OnyxWasmModule* module);

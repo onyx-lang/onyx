@@ -80,6 +80,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     C_LBLUE "    --wasm-mvp                  " C_NORM "Use only WebAssembly MVP features\n"
     "\n"
     C_LBLUE "    --no-core                   " C_NORM "Disable automatically including \"core/module\"\n"
+    C_LBLUE "    --emit-wasm-object          " C_NORM "Write a relocatable wasm object instead of an executable\n"
     C_LBLUE "    --no-type-info              " C_NORM "Disables generating type information\n"
     C_LBLUE "    --generate-method-info      " C_NORM "Populate method information in type information structures\n"
     C_LBLUE "    --generate-foreign-info     " C_NORM "Generate information for foreign blocks\n"
@@ -415,6 +416,9 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
         }
         else if (!strcmp(argv[i], "--no-core")) {
             onyx_set_option_int(ctx, ONYX_OPTION_DISABLE_CORE, 1);
+        }
+        else if (!strcmp(argv[i], "--emit-wasm-object")) {
+            onyx_set_option_int(ctx, ONYX_OPTION_EMIT_WASM_OBJECT, 1);
         }
         else if (!strcmp(argv[i], "--no-stale-code")) {
             onyx_set_option_int(ctx, ONYX_OPTION_DISABLE_STALE_CODE, 1);
