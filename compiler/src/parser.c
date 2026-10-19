@@ -4291,6 +4291,58 @@ static AstForeignBlock* parse_foreign_block(OnyxParser* parser, OnyxToken *token
     return fb;
 }
 
+static void parse_object_provides(OnyxParser *parser, AstObjectBlock *ob) {
+    if (ob->provides == NULL)
+        bh_arr_new(parser->context->gp_alloc, ob->provides, 4);
+
+    while (1) {
+        if (parser->hit_unexpected_token) return;
+
+        ObjectProvide prov;
+        memset(&prov, 0, sizeof(prov));
+
+        if (parser->curr->type == Token_Type_Literal_String) {
+            prov.symbol = expect_token(parser, Token_Type_Literal_String);
+            prov.expr = parse_expression(parser, 0);
+        } else {
+            prov.symbol = expect_token(parser, Token_Type_Symbol);
+        }
+
+        bh_arr_push(ob->provides, prov);
+
+        if (!consume_token_if_next(parser, ',')) break;
+        if (parser->curr->type == '}' || parser->curr->type == ';') break;
+    }
+}
+
+static AstObjectBlock* parse_object_block(OnyxParser* parser, OnyxToken *token) {
+    AstObjectBlock *ob = make_node(AstObjectBlock, Ast_Kind_Object_Block);
+    ob->token = token;
+    ob->filename_expr = parse_expression(parser, 0);
+
+    bh_arr_new(parser->context->gp_alloc, ob->captured_entities, 4);
+    bh_arr_push(parser->alternate_entity_placement_stack, &ob->captured_entities);
+
+    expect_token(parser, '{');
+    while (parser->curr->type != '}') {
+        if (parser->hit_unexpected_token) break;
+
+        if (parse_possible_directive(parser, "provide")) {
+            parse_object_provides(parser, ob);
+        } else {
+            parse_top_level_statement(parser);
+        }
+
+        consume_token_if_next(parser, ';');
+    }
+    expect_token(parser, '}');
+
+    bh_arr_pop(parser->alternate_entity_placement_stack);
+    ENTITY_SUBMIT(ob);
+
+    return ob;
+}
+
 static AstCompilerExtension* parse_compiler_extension(OnyxParser* parser, OnyxToken *token) {
     AstCompilerExtension *ext = make_node(AstCompilerExtension, Ast_Kind_Compiler_Extension);
     ext->token = token;
@@ -4356,6 +4408,11 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
         if (parse_possible_directive(parser, "foreign")) {
             AstForeignBlock *foreign = parse_foreign_block(parser, peek_token(-2));
             return (AstTyped *) foreign;
+        }
+
+        if (parse_possible_directive(parser, "object")) {
+            AstObjectBlock *object = parse_object_block(parser, peek_token(-2));
+            return (AstTyped *) object;
         }
 
         if (parse_possible_directive(parser, "compiler_extension") || parse_possible_directive(parser, "extension")) {
@@ -4685,6 +4742,10 @@ static void parse_top_level_statement(OnyxParser* parser) {
             }
             else if (parse_possible_directive(parser, "foreign")) {
                 parse_foreign_block(parser, peek_token(-2));
+                return;
+            }
+            else if (parse_possible_directive(parser, "object")) {
+                parse_object_block(parser, peek_token(-2));
                 return;
             }
             else if (parse_possible_directive(parser, "operator")) {

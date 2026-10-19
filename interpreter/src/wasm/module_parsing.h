@@ -630,7 +630,10 @@ static void parse_instruction(build_context *ctx) {
             break;
         }
 
-        case 0x1B: assert(0);
+        case 0x1B: {
+            ovm_code_builder_add_select(&ctx->builder);
+            break;
+        }
 
         case 0x20: {
             int local_idx = uleb128_to_uint((u8 *)ctx->binary.data, (i32 *)&ctx->offset);

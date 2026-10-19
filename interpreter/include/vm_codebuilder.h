@@ -78,6 +78,7 @@ void               ovm_code_builder_add_return(ovm_code_builder_t *builder);
 void               ovm_code_builder_add_call(ovm_code_builder_t *builder, i32 func_idx, i32 param_count, bool has_return_value);
 void               ovm_code_builder_add_indirect_call(ovm_code_builder_t *builder, i32 param_count, bool has_return_value);
 void               ovm_code_builder_drop_value(ovm_code_builder_t *builder);
+void               ovm_code_builder_add_select(ovm_code_builder_t *builder);
 void               ovm_code_builder_add_local_get(ovm_code_builder_t *builder, i32 local_idx);
 void               ovm_code_builder_add_local_set(ovm_code_builder_t *builder, i32 local_idx);
 void               ovm_code_builder_add_local_tee(ovm_code_builder_t *builder, i32 local_idx);

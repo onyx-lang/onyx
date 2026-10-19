@@ -578,7 +578,7 @@ static void ensure_node_has_been_submitted_for_emission(Context *context, AstNod
     if (node->kind == Ast_Kind_Function) {
         // Need to add header and body for functions
         AstFunction *func = (AstFunction *) node;
-        if (func->is_foreign) goto submit_normal_node;
+        if (func->is_foreign || func->is_object_link) goto submit_normal_node;
 
         func->entity_header->macro_attempts = 0;
         func->entity_body->macro_attempts = 0;
@@ -5245,6 +5245,9 @@ void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module) {
     bh_arr_new(context->gp_alloc, module->local_allocations, 4);
     bh_arr_new(context->gp_alloc, module->stack_leave_patches, 4);
     bh_arr_new(context->gp_alloc, module->foreign_blocks, 4);
+    bh_arr_new(context->gp_alloc, module->object_blocks, 4);
+    bh_arr_new(context->gp_alloc, module->object_functions, 4);
+    bh_arr_new(context->gp_alloc, module->object_mem_patches, 4);
     bh_arr_new(context->gp_alloc, module->procedures_with_tags, 4);
     bh_arr_new(context->gp_alloc, module->globals_with_tags, 4);
     bh_arr_new(context->gp_alloc, module->all_procedures, 4);
@@ -5290,6 +5293,10 @@ void emit_entity(Context *context, Entity* ent) {
             break;
 
         case Entity_Type_Function_Header:
+            if (ent->function->is_object_link) {
+                bh_arr_push(mod->object_functions, ent->function);
+            }
+
             if (ent->function->flags & Ast_Flag_Proc_Is_Null) {
                 if (mod->null_proc_func_idx == -1) mod->null_proc_func_idx = get_element_idx(mod, ent->function);
             }
@@ -5359,6 +5366,15 @@ void emit_entity(Context *context, Entity* ent) {
             break;
         }
 
+        case Entity_Type_Object_Block: {
+            bh_arr_each(ObjectProvide, prov, ent->object_block->provides) {
+                if (prov->func)
+                    ensure_node_has_been_submitted_for_emission(context, (AstNode *) prov->func);
+            }
+            bh_arr_push(mod->object_blocks, ent->object_block);
+            break;
+        }
+
         case Entity_Type_Function: emit_function(mod, ent->function); break;
         case Entity_Type_Global:   emit_global(mod,   ent->global); break;
 
@@ -5388,6 +5404,10 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
     assert(POINTER_SIZE == 4);
 
     module->doing_linking = 1;
+
+    // Object functions must be in the index map before call sites are patched.
+    onyx_wasm_link_object_files(module);
+    if (onyx_has_errors(context)) return;
 
     bh_arr_each(CodePatchInfo, patch, module->code_patches) {
         AstFunction *func = (AstFunction *) patch->node_related_to_patch;
@@ -5520,9 +5540,16 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
         module->export_count++;
     }
 
-    i32 datum_offset = options->null_reserve_size;
+    // Clang may write 128 bytes below __stack_pointer without moving it.
+    // That red zone sits under the usable stack, inside the reservation,
+    // so a full stack still cannot touch the null page.
+    #define ONYX_STACK_RED_ZONE 128
 
-    datum_offset += options->stack_size;
+    u32 stack_align = options->stack_alignment;
+    if (stack_align < 16) stack_align = 16;
+
+    i32 stack_base = options->null_reserve_size + ONYX_STACK_RED_ZONE;
+    i32 datum_offset = stack_base + options->stack_size;
 
     bh_arr_each(WasmDatum, datum, module->data) {
         assert(datum->id > 0);
@@ -5532,6 +5559,8 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
 
         datum_offset += datum->length;
     }
+
+    onyx_wasm_apply_object_memory_patches(module);
 
     // Now that we know where the data elements will go (and to avoid a lot of patches),
     // we can emit the __initialize_data_segments function.
@@ -5598,10 +5627,10 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
     emit_runtime_builtins(module);
     assert(module->stack_top_ptr && module->heap_start_ptr);
 
-    *module->stack_top_ptr = options->null_reserve_size + options->stack_size;
+    *module->stack_top_ptr = stack_base + options->stack_size;
     *module->heap_start_ptr = datum_offset;
 
-    bh_align(*module->stack_top_ptr, options->stack_alignment);
+    bh_align(*module->stack_top_ptr, stack_align);
     bh_align(*module->heap_start_ptr, 16);
 
     if (module->tls_size_ptr) {

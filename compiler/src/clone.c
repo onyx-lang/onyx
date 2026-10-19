@@ -115,6 +115,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Union_Type: return sizeof(AstUnionType);
         case Ast_Kind_Procedural_Expansion: return sizeof(AstProceduralExpansion);
         case Ast_Kind_Code_Block: return sizeof(AstCodeBlock);
+        case Ast_Kind_Object_Block: return sizeof(AstObjectBlock);
 
         default: break;
     }
@@ -518,7 +519,7 @@ AstNode* ast_clone(Context *context, void* n) {
                 convert_polyproc_to_function(df);
             }
 
-            if (sf->is_foreign) return node;
+            if (sf->is_foreign || sf->is_object_link) return node;
             assert(df->scope == NULL);
 
             df->nodes_that_need_entities_after_clone = NULL;

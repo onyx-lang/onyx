@@ -1,0 +1,84 @@
+package core.libc
+
+use core
+use core.memory
+use core.math
+
+/// C `malloc`. Memory comes from `context.allocator`.
+/// A zero size still returns a unique freeable pointer.
+malloc :: (size: i32) -> rawptr {
+    if size < 0 do return null;
+
+    bytes := cast(u32) size;
+    if bytes == 0 do bytes = 1;
+    return raw_alloc(context.allocator, bytes);
+}
+
+/// C `free`. `null` is ignored.
+free :: (ptr: rawptr) {
+    if ptr == null do return;
+    raw_free(context.allocator, ptr);
+}
+
+/// C `realloc`. `null` allocates, and a non-positive size frees.
+realloc :: (ptr: rawptr, size: i32) -> rawptr {
+    if size <= 0 {
+        free(ptr);
+        return null;
+    }
+    if ptr == null do return malloc(size);
+    return raw_resize(context.allocator, ptr, cast(u32) size);
+}
+
+/// C `memcpy`. The ranges must not overlap.
+memcpy :: (dest, src: rawptr, count: i32) -> rawptr {
+    if count > 0 do memory.copy(dest, src, count);
+    return dest;
+}
+
+/// C `memmove`. Overlapping ranges are safe.
+memmove :: (dest, src: rawptr, count: i32) -> rawptr {
+    if count > 0 do memory.copy(dest, src, count);
+    return dest;
+}
+
+/// C `memset`. `value` is truncated to a byte, matching C.
+memset :: (dest: rawptr, value: i32, count: i32) -> rawptr {
+    if count > 0 do memory.set(dest, cast(u8) value, count);
+    return dest;
+}
+
+/// C `memcmp`. Bytes are compared as unsigned values.
+memcmp :: (left, right: rawptr, count: i32) -> i32 {
+    a := cast([&] u8) left;
+    b := cast([&] u8) right;
+    for i in 0 .. count {
+        if a[i] != b[i] do return cast(i32) a[i] - cast(i32) b[i];
+    }
+    return 0;
+}
+
+/// C `strlen`.
+strlen :: (text: rawptr) -> i32 {
+    bytes := cast([&] u8) text;
+    n := 0;
+    while bytes[n] != 0 do n += 1;
+    return n;
+}
+
+/// C `strcmp`.
+strcmp :: (left, right: rawptr) -> i32 {
+    a := cast([&] u8) left;
+    b := cast([&] u8) right;
+    i := 0;
+    while a[i] != 0 || b[i] != 0 {
+        if a[i] != b[i] do return cast(i32) a[i] - cast(i32) b[i];
+        i += 1;
+    }
+    return 0;
+}
+
+/// C `pow` for `double`.
+pow :: (base, exponent: f64) -> f64 {
+    return math.pow(base, exponent);
+}

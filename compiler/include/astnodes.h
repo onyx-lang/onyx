@@ -115,6 +115,7 @@
     NODE(CaptureLocal)         \
                                \
     NODE(ForeignBlock)         \
+    NODE(ObjectBlock)          \
                                \
     NODE(Package)              \
     NODE(Import)               \
@@ -274,6 +275,8 @@ typedef enum AstKind {
     Ast_Kind_Compiler_Extension,
     Ast_Kind_Procedural_Macro,
     Ast_Kind_Procedural_Expansion,
+
+    Ast_Kind_Object_Block,
 
     Ast_Kind_Count
 } AstKind;
@@ -1524,9 +1527,15 @@ struct AstFunction {
     // NOTE: Only set on when --stack-trace is passed.
     AstLocal *stack_trace_local;
 
+    // Set for procedures declared in an #object block. object_filename is the
+    // resolved path of the WASM object, and object_symbol is the C symbol name.
+    char *object_filename;
+    char *object_symbol;
+
     b32 is_exported        : 1;
     b32 is_foreign         : 1;
     b32 is_foreign_dyncall : 1;
+    b32 is_object_link     : 1;
     b32 is_intrinsic       : 1;
 
     b32 named_return_locals_added : 1;
@@ -1721,6 +1730,30 @@ struct AstForeignBlock {
     b32 uses_dyncall : 1;
 };
 
+// An undefined symbol in an object file, satisfied by an Onyx procedure.
+// `symbol` is the C name. `expr` is set when the directive names a different
+// procedure (`#provide "malloc" libc.malloc`); otherwise the C name is looked up.
+struct ObjectProvide {
+    OnyxToken *symbol;
+    char *name;
+    AstTyped *expr;
+    AstFunction *func;
+};
+typedef struct ObjectProvide ObjectProvide;
+
+// Links procedures from a WASM object file (Clang/LLVM linking section v2).
+// Empty-bodied declarations are symbols defined by the object. `#provide`
+// names symbols the object imports, and binds them to Onyx procedures.
+struct AstObjectBlock {
+    AstTyped_base;
+
+    Scope *scope;
+    AstTyped *filename_expr;
+    char *filename;
+    bh_arr(struct Entity *) captured_entities;
+    bh_arr(struct ObjectProvide) provides;
+};
+
 struct AstJsNode {
     AstNode_base;
 
@@ -1824,6 +1857,7 @@ typedef enum EntityType {
     Entity_Type_Overloaded_Function,
     Entity_Type_Function,
     Entity_Type_JS,
+    Entity_Type_Object_Block,
 
     Entity_Type_Count,
 } EntityType;
@@ -1876,6 +1910,7 @@ typedef struct Entity {
         AstJsNode             *js;
         AstCompilerExtension  *compiler_extension;
         AstProceduralExpansion *proc_expansion;
+        AstObjectBlock        *object_block;
     };
 } Entity;
 

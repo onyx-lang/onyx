@@ -24,20 +24,28 @@ as_allocator :: #match {
 }
 
 /// Allocates memory from the stack. This is similar to `alloca` in C.
+/// The adjustment is rounded up so `__stack_top` stays 16-byte aligned.
 ///
 /// **DO NOT USE THIS IN A LOOP! You cannot free memory allocated off the stack.**
 from_stack :: macro (size: u32) -> rawptr {
-    // This should do something about the alignment...
-    // Everything so far has assume that the stack is aligned to 16 bytes.
-    __stack_top = cast([&]u8, __stack_top) - size;
+    aligned := size;
+    rem := aligned & 15;
+    if rem != 0 do aligned += 16 - rem;
+
+    __stack_top = cast([&]u8, __stack_top) - aligned;
     return __stack_top;
 }
 
 /// Allocates memory from the stack to form a slice of `T` with length `size`.
+/// The adjustment is rounded up so `__stack_top` stays 16-byte aligned.
 ///
 /// **DO NOT USE THIS IN A LOOP! You cannot free memory allocated off the stack.**
 array_from_stack :: macro ($T: type_expr, size: u32) -> [] T {
-    __stack_top = cast([&]u8, __stack_top) - size * sizeof T;
+    bytes := size * cast(u32) sizeof T;
+    rem := bytes & 15;
+    if rem != 0 do bytes += 16 - rem;
+
+    __stack_top = cast([&]u8, __stack_top) - bytes;
     return (cast([&]T) __stack_top)[0 .. size];
 }
 

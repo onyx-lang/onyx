@@ -545,6 +545,11 @@ typedef struct WasmFunc {
     bh_arr(WasmInstruction) code;
     OnyxToken *location;
     char *name;
+
+    // Linked from a WASM object file. The bytes are the function body
+    // (locals and expression) with relocations already patched in place.
+    u8 *raw_body;
+    u32 raw_body_len;
 } WasmFunc;
 
 typedef struct WasmGlobal {
@@ -718,6 +723,22 @@ typedef struct JsPartial {
     char *code;
 } JsPartial;
 
+// A memory-address relocation in a linked object function or data segment.
+// Applied after datum offsets are assigned. data_id 0 means `extra` is an
+// absolute address; otherwise the address is datum.offset_ + extra.
+typedef struct OnyxObjectMemPatch {
+    u8 *bytes;
+    u32 at;
+    u8 kind;
+    i32 addend;
+    u32 data_id;
+    u32 extra;
+} OnyxObjectMemPatch;
+
+#define ONYX_OBJ_PATCH_ULEB5 1
+#define ONYX_OBJ_PATCH_SLEB5 2
+#define ONYX_OBJ_PATCH_I32   3
+
 typedef struct OnyxWasmModule {
     Context *context;
     bh_allocator allocator;
@@ -747,6 +768,9 @@ typedef struct OnyxWasmModule {
     bh_arr(ForRemoveInfo) for_remove_info;
 
     bh_arr(AstForeignBlock *) foreign_blocks;
+    bh_arr(AstObjectBlock *) object_blocks;
+    bh_arr(AstFunction *) object_functions;
+    bh_arr(OnyxObjectMemPatch) object_mem_patches;
     u32 next_foreign_block_idx;
 
     bh_arr(AstFunction *) procedures_with_tags;
@@ -839,6 +863,8 @@ b32 onyx_wasm_build_link_options_from_node(Context *context, OnyxWasmLinkOptions
 
 void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module);
 void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLinkOptions *options);
+void onyx_wasm_link_object_files(OnyxWasmModule *module);
+void onyx_wasm_apply_object_memory_patches(OnyxWasmModule *module);
 void onyx_wasm_module_free(OnyxWasmModule* module);
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer);
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);

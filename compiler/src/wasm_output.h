@@ -140,7 +140,7 @@ static i32 output_funcsection(OnyxWasmModule* module, bh_buffer* buff) {
     bh_buffer_append(&vec_buff, leb, leb_len);
 
     bh_arr_each(WasmFunc, func, module->funcs) {
-        assert(func->code);
+        assert(func->code || func->raw_body);
 
         leb = uint_to_uleb128((u64) (func->type_idx), &leb_len);
         bh_buffer_append(&vec_buff, leb, leb_len);
@@ -566,6 +566,13 @@ static void output_instruction(WasmFunc* func, WasmInstruction* instr, b32 debug
 }
 
 static i32 output_code(WasmFunc* func, b32 debug_enabled, bh_buffer* buff) {
+    if (func->raw_body) {
+        i32 leb_len;
+        u8* leb = uint_to_uleb128((u64) func->raw_body_len, &leb_len);
+        bh_buffer_append(buff, leb, leb_len);
+        bh_buffer_append(buff, func->raw_body, func->raw_body_len);
+        return 0;
+    }
 
     bh_buffer code_buff;
     bh_buffer_init(&code_buff, buff->allocator, 128);
@@ -601,7 +608,7 @@ static i32 output_codesection(OnyxWasmModule* module, bh_buffer* buff) {
     bh_buffer_append(&vec_buff, leb, leb_len);
 
     bh_arr_each(WasmFunc, func, module->funcs) {
-        assert(func->code);
+        assert(func->code || func->raw_body);
         output_code(func, module->context->options.debug_info_enabled, &vec_buff);
     }
 

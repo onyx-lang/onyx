@@ -531,6 +531,41 @@ void ovm_code_builder_drop_value(ovm_code_builder_t *builder) {
     POP_VALUE(builder);
 }
 
+void ovm_code_builder_add_select(ovm_code_builder_t *builder) {
+    // WASM select: result = cond != 0 ? val1 : val2. The condition is i32.
+    i32 cond = POP_VALUE(builder);
+    i32 val2 = POP_VALUE(builder);
+    i32 val1 = POP_VALUE(builder);
+
+    i32 result = NEXT_VALUE(builder);
+    if (result == cond || result == val2) {
+        result = builder->highest_value_number;
+        if (result == cond || result == val2) result++;
+        builder->highest_value_number = result + 1;
+    }
+
+    ovm_instr_t instrs[3] = {0};
+    instrs[0].full_instr = OVM_TYPED_INSTR(OVMI_MOV, OVM_TYPE_NONE);
+    instrs[0].r = result;
+    instrs[0].a = val1;
+
+    // Skip the fallback move when the condition is true. The VM and JIT both
+    // land on instruction (index + a + 1).
+    instrs[1].full_instr = OVM_TYPED_INSTR(OVMI_BR_NZ, OVM_TYPE_NONE);
+    instrs[1].a = 1;
+    instrs[1].b = cond;
+
+    instrs[2].full_instr = OVM_TYPED_INSTR(OVMI_MOV, OVM_TYPE_NONE);
+    instrs[2].r = result;
+    instrs[2].a = val2;
+
+    debug_info_builder_emit_location(builder->debug_builder);
+    debug_info_builder_emit_location(builder->debug_builder);
+    debug_info_builder_emit_location(builder->debug_builder);
+    ovm_program_add_instructions(builder->program, 3, instrs);
+    PUSH_VALUE(builder, result);
+}
+
 void ovm_code_builder_add_local_get(ovm_code_builder_t *builder, i32 local_idx) {
     PUSH_VALUE(builder, local_idx);
 }

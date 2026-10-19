@@ -1,6 +1,6 @@
 #!/bin/sh
 
-C_FILES="library_main astnodes builtins checker clone doc entities errors lex parser types utils wasm_emit extensions pb compilation_data "
+C_FILES="library_main astnodes builtins checker clone doc entities errors lex parser types utils wasm_emit wasm_obj extensions pb compilation_data "
 LIBS="-lpthread -ldl -lm"
 INCLUDES="-I./include -I../shared/include -I../shared/include/dyncall"
 
