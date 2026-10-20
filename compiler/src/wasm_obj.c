@@ -116,6 +116,8 @@ struct ObjSymbol {
     i32 out_table;
     u32 data_id;
     u32 tls_offset;
+    // Non-TLS data is copied per symbol. NULL for TLS, which stays in the segment image.
+    u8 *copy;
 };
 
 typedef struct ObjReloc {
@@ -957,6 +959,29 @@ static b32 offset_in_range(u32 off, u32 start, u32 len) {
     return off >= start && off < start + len;
 }
 
+// Byte range of a segment-backed data symbol, in data-section payload offsets.
+// Relocations outside this range belong to some other symbol in the same segment.
+static b32 data_symbol_span(ObjSymbol *sym, u32 *start, u32 *len) {
+    if (!sym || sym->kind != SYM_DATA) return 0;
+    if (sym->flags & (SYM_UNDEFINED | SYM_ABSOLUTE)) return 0;
+    if ((sym->flags & SYM_BINDING_MASK) == 0x3) return 0;
+    if (!sym->file || sym->index >= (u32) bh_arr_length(sym->file->segments)) return 0;
+    ObjSegment *seg = &sym->file->segments[sym->index];
+    if (sym->offset > seg->len || sym->size > seg->len - sym->offset) return 0;
+    *start = seg->payload_off + sym->offset;
+    *len = sym->size;
+    return 1;
+}
+
+static u32 data_symbol_align(ObjSegment *seg, ObjSymbol *sym) {
+    u32 align = seg->align ? seg->align : 1;
+    if (sym->offset) {
+        u32 low = sym->offset & ~(sym->offset - 1);
+        if (low && low < align) align = low;
+    }
+    return align;
+}
+
 static void scan_symbol(Linker *L, ObjSymbol *sym) {
     ObjFile *file = sym->file;
     if (sym->kind == SYM_FUNCTION) {
@@ -981,11 +1006,14 @@ static void scan_symbol(Linker *L, ObjSymbol *sym) {
             obj_error(L, file, "Data symbol '%s' has an invalid segment.", sym->name ? sym->name : "");
             return;
         }
-        ObjSegment *seg = &file->segments[sym->index];
-        seg->live = 1;
+        u32 span_at = 0, span_len = 0;
+        if (!data_symbol_span(sym, &span_at, &span_len)) {
+            obj_error(L, file, "Data symbol '%s' does not fit in its segment.", sym->name ? sym->name : "");
+            return;
+        }
         bh_arr_each(ObjReloc, rel, file->relocs) {
             if (rel->section_id != SEC_DATA) continue;
-            if (!offset_in_range(rel->offset, seg->payload_off, seg->len)) continue;
+            if (!offset_in_range(rel->offset, span_at, span_len)) continue;
             if (rel->type == RELOC_TYPE_INDEX_LEB) continue;
             if (rel->index >= (u32) bh_arr_length(file->symbols)) {
                 obj_error(L, file, "Relocation has an invalid symbol index.");
@@ -1263,6 +1291,19 @@ static u32 place_bytes(OnyxWasmModule *mod, u8 *bytes, u32 len, u32 align) {
 
 static void assign_outputs(Linker *L) {
     OnyxWasmModule *mod = L->module;
+    // TLS offsets are relative to the whole segment, so a used TLS symbol keeps
+    // that segment. Ordinary data is placed per symbol below.
+    bh_arr_each(ObjFile *, pfile, L->files) {
+        ObjFile *file = *pfile;
+        bh_arr_each(ObjSymbol, sym, file->symbols) {
+            if (!sym->live || (sym->flags & SYM_UNDEFINED) || sym->kind != SYM_DATA) continue;
+            if (sym->flags & SYM_ABSOLUTE) continue;
+            if ((sym->flags & SYM_BINDING_MASK) == 0x3) continue;
+            if (sym->index >= (u32) bh_arr_length(file->segments)) continue;
+            if (segment_is_tls(file, sym->index))
+                file->segments[sym->index].live = 1;
+        }
+    }
     bh_arr_each(ObjFile *, pfile, L->files) {
         ObjFile *file = *pfile;
         for (u32 i = 0; i < (u32) bh_arr_length(file->segments); i++) {
@@ -1346,16 +1387,18 @@ static void assign_outputs(Linker *L) {
                     ObjSegment *seg = &file->segments[sym->index];
                     if (seg->tls_placed) {
                         sym->tls_offset = seg->tls_offset + sym->offset;
+                    } else if (sym->offset > seg->len || sym->size > seg->len - sym->offset) {
+                        obj_error(L, file, "Data symbol '%s' does not fit in its segment.", sym->name ? sym->name : "");
+                        return;
                     } else {
-                        if (!seg->live) seg->live = 1;
-                        if (seg->data_id == 0) {
-                            u32 len = seg->len ? seg->len : 1;
-                            u8 *copy = bh_alloc_array(mod->allocator, u8, len);
-                            if (seg->len && seg->data) bh_memcpy(copy, seg->data, seg->len);
-                            seg->copy = copy;
-                            seg->data_id = place_bytes(mod, copy, seg->len, seg->align);
-                        }
-                        sym->data_id = seg->data_id;
+                        // The datum is exactly this symbol, so its address is the
+                        // datum base. sym->offset stays the segment-relative offset
+                        // used to find relocations; memory patches add 0.
+                        u32 copy_len = sym->size ? sym->size : 1;
+                        u8 *copy = bh_alloc_array(mod->allocator, u8, copy_len);
+                        if (sym->size && seg->data) bh_memcpy(copy, seg->data + sym->offset, sym->size);
+                        sym->copy = copy;
+                        sym->data_id = place_bytes(mod, copy, sym->size, data_symbol_align(seg, sym));
                     }
                 }
             }
@@ -1383,18 +1426,37 @@ static PatchSite locate_reloc(ObjFile *file, ObjReloc *rel) {
             site.len = fn->body_len;
             return site;
         }
-    } else if (rel->section_id == SEC_DATA) {
-        bh_arr_each(ObjSegment, seg, file->segments) {
-            if (!offset_in_range(rel->offset, seg->payload_off, seg->len)) continue;
-            site.found = 1;
-            site.live = seg->live;
+    }
+    return site;
+}
+
+// A data relocation is applied only where it falls inside a live symbol.
+// TLS keeps one segment image, so the patch still addresses that image.
+// Overlapping non-TLS symbols each get their own copy.
+static i32 live_data_sites(ObjFile *file, ObjReloc *rel, PatchSite *out, i32 cap) {
+    i32 n = 0;
+    bh_arr_each(ObjSymbol, sym, file->symbols) {
+        if (!sym->live) continue;
+        u32 start = 0, span = 0;
+        if (!data_symbol_span(sym, &start, &span)) continue;
+        if (!offset_in_range(rel->offset, start, span)) continue;
+        if (n >= cap) return -1;
+        ObjSegment *seg = &file->segments[sym->index];
+        PatchSite site = { 0 };
+        site.found = 1;
+        site.live = 1;
+        if (seg->tls_placed) {
             site.bytes = seg->copy;
             site.at = rel->offset - seg->payload_off;
             site.len = seg->len;
-            return site;
+        } else {
+            site.bytes = sym->copy;
+            site.at = rel->offset - start;
+            site.len = sym->size;
         }
+        out[n++] = site;
     }
-    return site;
+    return n;
 }
 
 static void patch_immediate(Linker *L, ObjFile *file, u8 *bytes, u32 at, u32 len, u32 kind, i32 value) {
@@ -1412,8 +1474,17 @@ static void apply_relocs(Linker *L) {
     OnyxWasmModule *mod = L->module;
     b32 need_table = 0;
     bh_arr_each(ObjFile *, pfile, L->files) {
-        bh_arr_each(ObjReloc, rel, (*pfile)->relocs) {
-            if (rel->type == RELOC_TABLE_INDEX_SLEB || rel->type == RELOC_TABLE_INDEX_I32) need_table = 1;
+        ObjFile *file = *pfile;
+        if (!file_is_included(file)) continue;
+        bh_arr_each(ObjReloc, rel, file->relocs) {
+            if (rel->type != RELOC_TABLE_INDEX_SLEB && rel->type != RELOC_TABLE_INDEX_I32) continue;
+            if (rel->section_id == SEC_CODE) {
+                PatchSite site = locate_reloc(file, rel);
+                if (site.found && site.live) need_table = 1;
+            } else if (rel->section_id == SEC_DATA) {
+                PatchSite sites[1];
+                if (live_data_sites(file, rel, sites, 1) > 0) need_table = 1;
+            }
         }
     }
     if (need_table && bh_arr_length(mod->elems) == 0) {
@@ -1436,8 +1507,20 @@ static void apply_relocs(Linker *L) {
         ObjFile *file = *pfile;
         if (!file_is_included(file)) continue;
         bh_arr_each(ObjReloc, rel, file->relocs) {
-            PatchSite site = locate_reloc(file, rel);
-            if (!site.found || !site.live) continue;
+            PatchSite sites[8];
+            i32 nsites = 0;
+            if (rel->section_id == SEC_DATA) {
+                nsites = live_data_sites(file, rel, sites, 8);
+                if (nsites < 0) {
+                    obj_error(L, file, "Too many overlapping data symbols at one relocation.");
+                    return;
+                }
+            } else {
+                sites[0] = locate_reloc(file, rel);
+                nsites = (sites[0].found && sites[0].live) ? 1 : 0;
+            }
+            for (i32 si = 0; si < nsites; si++) {
+            PatchSite site = sites[si];
 
             if (rel->type == RELOC_TABLE_NUMBER_LEB) {
                 // Onyx has a single function table. Its table number is 0.
@@ -1519,7 +1602,9 @@ static void apply_relocs(Linker *L) {
                         return;
                     }
                     patch.data_id = sym->data_id;
-                    patch.extra = (sym->flags & SYM_BINDING_MASK) == 0x3 ? 0 : sym->offset;
+                    // A symbol-owned datum starts at the symbol. TLS and absolute
+                    // addresses use the branches above. Binding 0x3 has no offset.
+                    patch.extra = sym->copy ? 0 : ((sym->flags & SYM_BINDING_MASK) == 0x3 ? 0 : sym->offset);
                 }
                 if (patch.at + reloc_width(rel->type) > site.len) {
                     obj_error(L, file, "Relocation does not fit in its section.");
@@ -1529,6 +1614,7 @@ static void apply_relocs(Linker *L) {
             } else {
                 obj_error(L, file, "Unsupported relocation type %d.", rel->type);
                 return;
+            }
             }
         }
     }
