@@ -4354,12 +4354,19 @@ static void parse_object_provides(OnyxParser *parser, AstObjectBlock *ob) {
         }
         expect_token(parser, ':');
 
+        parser->provide_alias = 1;
         AstBinding *binding = parse_top_level_binding(parser, symbol);
+        parser->provide_alias = 0;
         if (binding == NULL) break;
 
         if (bh_arr_length(parser->scope_flags) > 0)
             binding->flags |= bh_arr_last(parser->scope_flags);
-        submit_binding(parser, binding);
+
+        // `errno :: errno` becomes an alias of the existing global. The
+        // left-hand name is the C symbol, not a new Onyx binding. A procedure
+        // body is a new definition and is submitted.
+        if (binding->node->kind != Ast_Kind_Alias)
+            submit_binding(parser, binding);
 
         ObjectProvide prov;
         memset(&prov, 0, sizeof(prov));
@@ -4553,7 +4560,7 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
             }
 
 default_case:
-            ENTITY_SUBMIT(node);
+            if (!parser->provide_alias) ENTITY_SUBMIT(node);
         }
     }
 
@@ -5245,6 +5252,7 @@ OnyxParser onyx_parser_create(Context *context, OnyxTokenizer *tokenizer) {
     parser.stored_tags = NULL;
     parser.parse_calls = 1;
     parser.parse_quick_functions = 1;
+    parser.provide_alias = 0;
     parser.tag_depth = 0;
     parser.overload_count = 0;
     parser.injection_point = NULL;

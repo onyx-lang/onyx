@@ -140,6 +140,7 @@ typedef struct ObjSection {
 typedef struct ObjProvide {
     char *name;
     AstFunction *func;
+    AstMemRes *memres;
 } ObjProvide;
 
 struct ObjFile {
@@ -830,6 +831,58 @@ static b32 bind_provided_function(Linker *L, ObjSymbol *sym) {
     return 1;
 }
 
+// An undefined data symbol is a memory reservation in the object. Point it at
+// the Onyx global from #provide so load/store relocations use that address.
+static b32 bind_provided_data(Linker *L, ObjSymbol *sym) {
+    if (sym->kind != SYM_DATA || !sym->name) return 0;
+    if (sym->data_id != 0) return 1;
+
+    ObjProvide *prov = NULL;
+    bh_arr_each(ObjProvide, candidate, sym->file->provides) {
+        if (candidate->name && strcmp(candidate->name, sym->name) == 0) {
+            prov = candidate;
+            break;
+        }
+    }
+    if (!prov || !prov->memres) return 0;
+
+    AstMemRes *memres = prov->memres;
+    b32 sym_tls = (sym->flags & SYM_TLS) != 0;
+    if (sym_tls != (memres->threadlocal != 0)) {
+        obj_error(L, sym->file, sym_tls
+            ? "Symbol '%s' is thread-local, but the provided global is not."
+            : "Symbol '%s' is not thread-local, but the provided global is.",
+            sym->name);
+        sym->reported = 1;
+        return 1;
+    }
+
+    if (!memres->type) {
+        obj_error(L, sym->file, "Provided global for '%s' has no type.", sym->name);
+        sym->reported = 1;
+        return 1;
+    }
+    u32 have = (u32) type_size_of(memres->type);
+    if (sym->size && have < sym->size) {
+        obj_error(L, sym->file, "Provided global for '%s' is %d bytes; the object symbol is %d bytes.",
+            sym->name, have, sym->size);
+        sym->reported = 1;
+        return 1;
+    }
+
+    if (memres->threadlocal) {
+        sym->tls_offset = memres->tls_offset;
+    } else if (memres->data_id == 0) {
+        obj_error(L, sym->file, "Provided global for '%s' was not placed in memory.", sym->name);
+        sym->reported = 1;
+        return 1;
+    } else {
+        sym->data_id = memres->data_id;
+    }
+    sym->live = 1;
+    return 1;
+}
+
 static void queue_symbol(Linker *L, ObjSymbol *sym) {
     if (!sym || sym->live) return;
     sym->live = 1;
@@ -878,6 +931,7 @@ static void mark_symbol(Linker *L, ObjSymbol *sym) {
                 return;
             }
         }
+        if (sym->kind == SYM_DATA && bind_provided_data(L, sym)) return;
         if (bind_provided_function(L, sym)) return;
         ObjSymbol *def = find_definition(L, sym);
         if (!def) {
@@ -1778,13 +1832,13 @@ static void finish_tls_image(Linker *L) {
 
 static void add_file_provides(Linker *L, ObjFile *file, AstObjectBlock *block) {
     bh_arr_each(ObjectProvide, prov, block->provides) {
-        if (!prov->name || !prov->func) continue;
+        if (!prov->name || (!prov->func && !prov->memres)) continue;
         b32 seen = 0;
         bh_arr_each(ObjProvide, existing, file->provides) {
             if (bh_strcmp(existing->name, prov->name) != 0) continue;
-            if (existing->func != prov->func) {
+            if (existing->func != prov->func || existing->memres != prov->memres) {
                 onyx_report_error(L->module->context, prov->symbol->pos, Error_Critical,
-                    "Symbol '%s' is provided by two different procedures for '%s'.",
+                    "Symbol '%s' is provided by two different definitions for '%s'.",
                     prov->name, file->path);
                 L->failed = 1;
             }
@@ -1795,6 +1849,7 @@ static void add_file_provides(Linker *L, ObjFile *file, AstObjectBlock *block) {
         ObjProvide entry;
         entry.name = prov->name;
         entry.func = prov->func;
+        entry.memres = prov->memres;
         bh_arr_push(file->provides, entry);
     }
 }
