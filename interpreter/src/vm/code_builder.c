@@ -845,18 +845,13 @@ void ovm_code_builder_drop_value(ovm_code_builder_t *builder) {
 
 void ovm_code_builder_add_select(ovm_code_builder_t *builder) {
     // WASM select: result = cond != 0 ? val1 : val2. The condition is i32.
+    i32 result = NEXT_VALUE(builder);
+
     i32 cond = POP_VALUE(builder);
     i32 val2 = POP_VALUE(builder);
     i32 val1 = POP_VALUE(builder);
 
-    i32 result = NEXT_VALUE(builder);
-    if (result == cond || result == val2) {
-        result = builder->highest_value_number;
-        if (result == cond || result == val2) result++;
-        builder->highest_value_number = result + 1;
-    }
-
-    ovm_instr_t instrs[3] = {0};
+    ovm_instr_t instrs[4] = {0};
     instrs[0].full_instr = OVM_TYPED_INSTR(OVMI_MOV, OVM_TYPE_NONE);
     instrs[0].r = result;
     instrs[0].a = val1;
@@ -871,11 +866,21 @@ void ovm_code_builder_add_select(ovm_code_builder_t *builder) {
     instrs[2].r = result;
     instrs[2].a = val2;
 
-    debug_info_builder_emit_location(builder->debug_builder);
-    debug_info_builder_emit_location(builder->debug_builder);
-    debug_info_builder_emit_location(builder->debug_builder);
-    ovm_program_add_instructions(builder->program, 3, instrs);
+    // Doing an extra copy here in order to preserve the semantics that a temporary
+    // register is only ever written to once.
     PUSH_VALUE(builder, result);
+    i32 result_copy = NEXT_VALUE(builder);
+    instrs[3].full_instr = OVM_TYPED_INSTR(OVMI_MOV, OVM_TYPE_NONE);
+    instrs[3].r = result_copy;
+    instrs[3].a = result;
+    POP_VALUE(builder);
+    PUSH_VALUE(builder, result_copy);
+
+    debug_info_builder_emit_location(builder->debug_builder);
+    debug_info_builder_emit_location(builder->debug_builder);
+    debug_info_builder_emit_location(builder->debug_builder);
+    debug_info_builder_emit_location(builder->debug_builder);
+    ovm_program_add_instructions(builder->program, 4, instrs);
 }
 
 void ovm_code_builder_add_local_get(ovm_code_builder_t *builder, i32 local_idx) {
