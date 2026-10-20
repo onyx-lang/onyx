@@ -635,6 +635,8 @@ static b32 parse_custom(ObjFile *file, u8 *payload, u32 len, bh_allocator alloc,
         return parse_linking(file, c.p, (u32) (c.end - c.p), alloc, L);
     }
     if (name_len >= 6 && bh_memcmp(name_bytes, "reloc.", 6) == 0) {
+        if (bh_memcmp(name_bytes, "reloc..debug_", 13) == 0) return 1;
+
         return parse_reloc(file, c.p, (u32) (c.end - c.p), file->sections);
     }
     if (name_len == 15 && bh_memcmp(name_bytes, "target_features", 15) == 0) {
