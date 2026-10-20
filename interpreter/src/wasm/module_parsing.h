@@ -512,6 +512,32 @@ static void parse_fe_instruction(build_context *ctx) {
     }
 }
 
+// blocktype is 0x40 (empty), a value type (one result), or an s33 type index.
+static void parse_blocktype(build_context *ctx, int *param_count, int *result_count) {
+    unsigned char first = PEEK_BYTE(ctx);
+    if (first == 0x40) {
+        CONSUME_BYTE(ctx);
+        *param_count = 0;
+        *result_count = 0;
+        return;
+    }
+
+    if (first == 0x7f || first == 0x7e || first == 0x7d || first == 0x7c
+        || first == 0x7b || first == 0x70 || first == 0x6f) {
+        CONSUME_BYTE(ctx);
+        assert(first != 0x7b && "SIMD values are not currently supported");
+        *param_count = 0;
+        *result_count = 1;
+        return;
+    }
+
+    i64 idx = leb128_to_int((u8 *) ctx->binary.data, (i32 *) &ctx->offset);
+    assert(idx >= 0 && (size_t) idx < ctx->module->type_section.size);
+    wasm_functype_t *ft = ctx->module->type_section.data[idx];
+    *param_count = (int) ft->type.func.params.size;
+    *result_count = (int) ft->type.func.results.size;
+}
+
 static void parse_instruction(build_context *ctx) {
     debug_info_builder_step(&ctx->debug_builder);
 
@@ -526,23 +552,26 @@ static void parse_instruction(build_context *ctx) {
             break;
 
         case 0x02: {
-            // Currently, only "void" block types are valid.
-            assert(CONSUME_BYTE(ctx) == 0x40);
+            int param_count, result_count;
+            parse_blocktype(ctx, &param_count, &result_count);
             ovm_code_builder_push_label_target(&ctx->builder, label_kind_block);
+            ovm_code_builder_bind_block(&ctx->builder, param_count, result_count);
             break;
         }
 
         case 0x03: {
-            // Currently, only "void" block types are valid.
-            assert(CONSUME_BYTE(ctx) == 0x40);
+            int param_count, result_count;
+            parse_blocktype(ctx, &param_count, &result_count);
             ovm_code_builder_push_label_target(&ctx->builder, label_kind_loop);
+            ovm_code_builder_bind_block(&ctx->builder, param_count, result_count);
             break;
         }
 
         case 0x04: {
-            // Currently, only "void" block types are valid.
-            assert(CONSUME_BYTE(ctx) == 0x40);
+            int param_count, result_count;
+            parse_blocktype(ctx, &param_count, &result_count);
             int if_target = ovm_code_builder_push_label_target(&ctx->builder, label_kind_if);
+            ovm_code_builder_bind_if(&ctx->builder, param_count, result_count);
 
             //
             // This uses the pattern of "branch if zero" to skip a section of
@@ -552,9 +581,7 @@ static void parse_instruction(build_context *ctx) {
         }
 
         case 0x05: {
-            label_target_t if_target = ovm_code_builder_wasm_target_idx(&ctx->builder, 0);
-            ovm_code_builder_add_branch(&ctx->builder, if_target.idx);
-            ovm_code_builder_patch_else(&ctx->builder, if_target);
+            ovm_code_builder_else(&ctx->builder);
             break;
         }
 

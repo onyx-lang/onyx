@@ -361,6 +361,10 @@ void ovm__func_setup_stack_frame(ovm_state_t *state, ovm_func_t *func, i32 resul
         bh_arr_grow(state->numbered_values, need);
     }
     bh__arrhead(state->numbered_values)->length = need;
+    // WASM locals are zero. Slots are reused across calls, so a fresh frame
+    // must not observe whatever the previous call left behind.
+    memset(&state->numbered_values[frame.value_number_base], 0,
+        (size_t) func->value_number_count * sizeof(state->numbered_values[0]));
 
     state->__frame_values = &state->numbered_values[state->value_number_offset];
 
