@@ -170,10 +170,25 @@ struct ObjFile {
     b32 failed;
 };
 
+// One defined global symbol. Chains are in archive order so the first strong
+// definition and the first weak definition match a linear scan.
+typedef struct ObjDef {
+    ObjSymbol *sym;
+    struct ObjDef *next;
+} ObjDef;
+
+typedef struct DefMap {
+    u32 cap;
+    u32 used;
+    u32 *hash;
+    ObjDef **slot;
+} DefMap;
+
 typedef struct Linker {
     OnyxWasmModule *module;
     bh_arr(ObjFile *) files;
     bh_arr(ObjSymbol *) work;
+    DefMap defs;
     b32 failed;
 } Linker;
 
@@ -762,29 +777,124 @@ static i32 onyx_tls_global(OnyxWasmModule *mod) {
     return (i32) bh_imap_get(&mod->index_map, (u64) tls);
 }
 
-static ObjSymbol *find_definition_in(Linker *L, ObjSymbol *undef, const char *only_archive) {
-    ObjSymbol *strong = NULL;
-    ObjSymbol *weak = NULL;
+static u32 def_hash(u8 kind, const char *name) {
+    u32 hash = 2166136261u;
+    hash = (hash ^ kind) * 16777619u;
+    while (*name) hash = (hash ^ (u8) *name++) * 16777619u;
+    return hash ? hash : 1;
+}
+
+static void defmap_grow(Linker *L, DefMap *map) {
+    u32 cap = map->cap ? map->cap * 2 : 16384;
+    u32 *hash = bh_alloc_array(L->module->allocator, u32, cap);
+    ObjDef **slot = bh_alloc_array(L->module->allocator, ObjDef *, cap);
+    memset(hash, 0, (size_t) cap * sizeof(u32));
+    memset(slot, 0, (size_t) cap * sizeof(ObjDef *));
+    u32 mask = cap - 1;
+    for (u32 i = 0; i < map->cap; i++) {
+        if (!map->slot[i]) continue;
+        u32 h = map->hash[i];
+        u32 j = h & mask;
+        while (slot[j]) j = (j + 1) & mask;
+        hash[j] = h;
+        slot[j] = map->slot[i];
+    }
+    map->cap = cap;
+    map->hash = hash;
+    map->slot = slot;
+}
+
+static ObjDef *defmap_find(DefMap *map, u8 kind, const char *name, u32 hash) {
+    if (!map->cap) return NULL;
+    u32 mask = map->cap - 1;
+    u32 i = hash & mask;
+    while (map->slot[i]) {
+        if (map->hash[i] == hash && map->slot[i]->sym->kind == kind
+            && bh_strcmp(map->slot[i]->sym->name, name) == 0) {
+            return map->slot[i];
+        }
+        i = (i + 1) & mask;
+    }
+    return NULL;
+}
+
+static void defmap_add(Linker *L, DefMap *map, ObjDef *node) {
+    if (map->used * 10 >= map->cap * 7) defmap_grow(L, map);
+    u32 hash = def_hash(node->sym->kind, node->sym->name);
+    u32 mask = map->cap - 1;
+    u32 i = hash & mask;
+    while (map->slot[i]) {
+        if (map->hash[i] == hash && map->slot[i]->sym->kind == node->sym->kind
+            && bh_strcmp(map->slot[i]->sym->name, node->sym->name) == 0) {
+            ObjDef *tail = map->slot[i];
+            while (tail->next) tail = tail->next;
+            tail->next = node;
+            return;
+        }
+        i = (i + 1) & mask;
+    }
+    map->hash[i] = hash;
+    map->slot[i] = node;
+    map->used++;
+}
+
+static void index_definitions(Linker *L) {
     bh_arr_each(ObjFile *, pfile, L->files) {
         ObjFile *file = *pfile;
-        if (only_archive && (!file->archive || bh_strcmp(file->archive, only_archive) != 0)) continue;
         bh_arr_each(ObjSymbol, sym, file->symbols) {
             if (sym->flags & SYM_UNDEFINED) continue;
             if ((sym->flags & SYM_BINDING_MASK) == SYM_BINDING_LOCAL) continue;
-            if (sym->kind != undef->kind) continue;
-            if (!sym->name || !undef->name || bh_strcmp(sym->name, undef->name) != 0) continue;
-            if ((sym->flags & SYM_BINDING_MASK) == SYM_BINDING_WEAK) {
-                if (!weak) weak = sym;
-            } else if (strong) {
-                obj_error(L, undef->file, "Duplicate symbol '%s'.", undef->name);
-                return NULL;
-            } else {
-                strong = sym;
-            }
+            if (!sym->name || !sym->name[0]) continue;
+            ObjDef *node = bh_alloc_item(L->module->allocator, ObjDef);
+            node->sym = sym;
+            node->next = NULL;
+            defmap_add(L, &L->defs, node);
+        }
+    }
+}
+
+static ObjSymbol *find_definition_in(Linker *L, ObjSymbol *undef, const char *only_archive) {
+    if (!undef->name || !undef->name[0]) return NULL;
+    u32 hash = def_hash(undef->kind, undef->name);
+    ObjDef *head = defmap_find(&L->defs, undef->kind, undef->name, hash);
+    if (!head) return NULL;
+    ObjSymbol *strong = NULL;
+    ObjSymbol *weak = NULL;
+    for (ObjDef *node = head; node; node = node->next) {
+        ObjSymbol *sym = node->sym;
+        if (only_archive && (!sym->file->archive || bh_strcmp(sym->file->archive, only_archive) != 0)) continue;
+        if ((sym->flags & SYM_BINDING_MASK) == SYM_BINDING_WEAK) {
+            if (!weak) weak = sym;
+        } else if (strong) {
+            obj_error(L, undef->file, "Duplicate symbol '%s'.", undef->name);
+            return NULL;
+        } else {
+            strong = sym;
         }
     }
     if (strong) return strong;
     return weak;
+}
+
+static void report_duplicate_live(Linker *L) {
+    DefMap seen = { 0 };
+    bh_arr_each(ObjFile *, pfile, L->files) {
+        bh_arr_each(ObjSymbol, sym, (*pfile)->symbols) {
+            if (!sym->live || (sym->flags & SYM_UNDEFINED)) continue;
+            if ((sym->flags & SYM_BINDING_MASK) == SYM_BINDING_LOCAL) continue;
+            if ((sym->flags & SYM_BINDING_MASK) == SYM_BINDING_WEAK) continue;
+            if (!sym->name || !sym->name[0]) continue;
+            u32 hash = def_hash(sym->kind, sym->name);
+            if (defmap_find(&seen, sym->kind, sym->name, hash)) {
+                obj_error(L, sym->file, "Duplicate symbol '%s'.", sym->name);
+                return;
+            }
+            ObjDef *node = bh_alloc_item(L->module->allocator, ObjDef);
+            node->sym = sym;
+            node->next = NULL;
+            defmap_add(L, &seen, node);
+        }
+    }
 }
 
 static ObjSymbol *find_definition(Linker *L, ObjSymbol *undef) {
@@ -936,6 +1046,7 @@ static void mark_symbol(Linker *L, ObjSymbol *sym) {
         if (sym->kind == SYM_DATA && bind_provided_data(L, sym)) return;
         if (bind_provided_function(L, sym)) return;
         ObjSymbol *def = find_definition(L, sym);
+        if (L->failed) return;
         if (!def) {
             sym->reported = 1;
             sym->live = 1;
@@ -1965,6 +2076,7 @@ void onyx_wasm_link_object_files(OnyxWasmModule *module) {
         load_source(&linker, fn->object_filename, fn->token->pos);
     }
     if (linker.failed) return;
+    index_definitions(&linker);
 
     bh_arr_each(AstFunction *, pfunc, module->object_functions) {
         AstFunction *fn = *pfunc;
@@ -2013,24 +2125,8 @@ void onyx_wasm_link_object_files(OnyxWasmModule *module) {
     mark_constructors(&linker);
     if (linker.failed) return;
 
-    bh_arr_each(ObjFile *, pfile, linker.files) {
-        bh_arr_each(ObjSymbol, sym, (*pfile)->symbols) {
-            if (!sym->live || (sym->flags & SYM_UNDEFINED)) continue;
-            if ((sym->flags & SYM_BINDING_MASK) == SYM_BINDING_LOCAL) continue;
-            if ((sym->flags & SYM_BINDING_MASK) == SYM_BINDING_WEAK) continue;
-            bh_arr_each(ObjFile *, other_file, linker.files) {
-                bh_arr_each(ObjSymbol, other, (*other_file)->symbols) {
-                    if (other == sym || !other->live || (other->flags & SYM_UNDEFINED)) continue;
-                    if ((other->flags & SYM_BINDING_MASK) == SYM_BINDING_LOCAL) continue;
-                    if ((other->flags & SYM_BINDING_MASK) == SYM_BINDING_WEAK) continue;
-                    if (other->kind == sym->kind && other->name && sym->name && bh_strcmp(other->name, sym->name) == 0) {
-                        obj_error(&linker, sym->file, "Duplicate symbol '%s'.", sym->name);
-                        return;
-                    }
-                }
-            }
-        }
-    }
+    report_duplicate_live(&linker);
+    if (linker.failed) return;
 
     assign_outputs(&linker);
     if (linker.failed) return;

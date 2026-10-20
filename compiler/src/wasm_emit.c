@@ -5430,6 +5430,12 @@ void emit_entity(Context *context, Entity* ent) {
             bh_arr_each(ObjectProvide, prov, ent->object_block->provides) {
                 if (prov->func)
                     ensure_node_has_been_submitted_for_emission(context, (AstNode *) prov->func);
+                // A provided global is only placed if something asks for its
+                // address. The object file is that use, even when Onyx code
+                // never reads the global. The scheduled flag keeps this from
+                // allocating the datum twice.
+                if (prov->memres)
+                    ensure_node_has_been_submitted_for_emission(context, (AstNode *) prov->memres);
             }
             bh_arr_push(mod->object_blocks, ent->object_block);
             break;
