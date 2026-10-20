@@ -172,13 +172,8 @@ static u64 local_allocate_bytes_in_memory(LocalAllocator *la, u32 size, u32 alig
 }
 
 static void local_free_bytes_in_memory(LocalAllocator* la, u32 size, u32 alignment) {
-    (void) la;
-    (void) size;
-    (void) alignment;
-
-    // A block can end while a slice still points at one of its arrays.
-    // Reusing that stack slot lets a later aggregate return clobber the
-    // bytes before they are read. Slots stay reserved until the function ends.
+    bh_align(size, alignment);
+    la->curr_stack -= size;
 }
 
 static u64 local_allocate_type_in_memory(LocalAllocator* la, Type *type) {
@@ -1984,7 +1979,7 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
         case Unary_Op_Cast: emit_cast(mod, &code, unop); break;
 
         case Unary_Op_Try: // Should be handled in operator overload
-        case Unary_Op_Unwrap: 
+        case Unary_Op_Unwrap:
         case Unary_Op_Count:
             break;
     }
@@ -4636,7 +4631,7 @@ static void emit_export_directive(OnyxWasmModule* mod, AstDirectiveExport* expor
     if (shgeti(mod->exports, export->export_name->text) != -1) {
         ONYX_ERROR(export->token->pos, Error_Critical, "Duplicate export name, '%s'.", export->export_name->text);
         token_toggle_end(export->export_name);
-        return;        
+        return;
     }
 
 
@@ -5487,7 +5482,7 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
                 if (!func->is_foreign) {
                     func_idx += module->next_foreign_func_idx;
                 }
-                
+
                 module->funcs[patch->func_idx].code[patch->instr].data.l = func_idx;
                 break;
             }
@@ -5498,7 +5493,7 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
                 if (!func->is_foreign) {
                     func_idx += module->next_foreign_func_idx;
                 }
-                
+
                 module->elems[patch->instr] = func_idx;
                 break;
             }

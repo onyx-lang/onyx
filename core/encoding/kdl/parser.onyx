@@ -404,7 +404,7 @@ Parser.parse_node :: (self: &#Self) -> Result(&Node, Parse_Error) {
             }
         }
     }
-    
+
     _apply_slashdash(node_to_return);
     return .{ Ok = node_to_return };
 
@@ -428,7 +428,7 @@ Parser.parse_value :: (self: &#Self, token: Token) -> ? Value {
                 data = .{ String = unescape_kdl_string(s, self.result_allocator) }
             };
         }
-        
+
         case .Word as w {
             if w == "null" {
                 return Value.{
@@ -633,8 +633,10 @@ parse_kdl_number :: (w: str) -> ? KDL_Number {
     if !looks_like_number(w) do return .None;
 
     s := w;
+
+    // Keep the buffer alive past this if statement
+    buf: [128] u8;
     if string.contains(w, "_") {
-        buf: [128] u8;
         n := 0;
         for c in w {
             if c == '_' do continue;
@@ -863,4 +865,3 @@ unescape_kdl_string :: (s: str, allocator: Allocator) -> str {
         }
     }
 }
-
