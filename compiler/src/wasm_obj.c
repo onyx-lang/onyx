@@ -8,11 +8,6 @@
 #include "wasm_emit.h"
 #include "errors.h"
 
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #define SYM_FUNCTION 0
 #define SYM_DATA     1
 #define SYM_GLOBAL   2
@@ -226,10 +221,7 @@ static char *read_name(ByteCursor *c, bh_allocator alloc) {
     if (!read_uleb(c, &len)) return NULL;
     u8 *bytes = NULL;
     if (!read_bytes(c, len, &bytes)) return NULL;
-    char *s = bh_alloc_array(alloc, char, len + 1);
-    memcpy(s, bytes, len);
-    s[len] = 0;
-    return s;
+    return bh_strdup_len(alloc, (char *) bytes, (i32) len);
 }
 
 static b32 skip_init_expr(ByteCursor *c) {
@@ -277,15 +269,17 @@ static void obj_error(Linker *L, ObjFile *file, const char *fmt, ...) {
     L->failed = 1;
     if (file) file->failed = 1;
 
-    char buf[512];
-    va_list args;
-    va_start(args, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, args);
-    va_end(args);
-
     OnyxFilePos pos = { 0 };
     if (file) pos = file->pos;
-    onyx_report_error(L->module->context, pos, Error_Critical, "%s", buf);
+    if (!onyx_errors_are_enabled(L->module->context)) return;
+
+    va_list args;
+    va_start(args, fmt);
+    char *msg = bh_aprintf_va(L->module->context->errors.msg_alloc, fmt, args);
+    va_end(args);
+
+    OnyxError err = { .pos = pos, .rank = Error_Critical, .text = msg };
+    onyx_submit_error(L->module->context, err);
 }
 
 static u32 reloc_width(u32 type) {
@@ -608,7 +602,7 @@ static b32 feature_allowed(const char *name) {
         NULL,
     };
     for (int i = 0; allowed[i]; i++) {
-        if (strcmp(name, allowed[i]) == 0) return 1;
+        if (bh_strcmp(name, allowed[i]) == 0) return 1;
     }
     return 0;
 }
@@ -637,13 +631,13 @@ static b32 parse_custom(ObjFile *file, u8 *payload, u32 len, bh_allocator alloc,
     u8 *name_bytes = NULL;
     if (!read_bytes(&c, name_len, &name_bytes)) return 0;
 
-    if (name_len == 7 && memcmp(name_bytes, "linking", 7) == 0) {
+    if (name_len == 7 && bh_memcmp(name_bytes, "linking", 7) == 0) {
         return parse_linking(file, c.p, (u32) (c.end - c.p), alloc, L);
     }
-    if (name_len >= 6 && memcmp(name_bytes, "reloc.", 6) == 0) {
+    if (name_len >= 6 && bh_memcmp(name_bytes, "reloc.", 6) == 0) {
         return parse_reloc(file, c.p, (u32) (c.end - c.p), file->sections);
     }
-    if (name_len == 15 && memcmp(name_bytes, "target_features", 15) == 0) {
+    if (name_len == 15 && bh_memcmp(name_bytes, "target_features", 15) == 0) {
         return parse_features(file, c.p, (u32) (c.end - c.p), alloc, L);
     }
     return 1;
@@ -652,7 +646,6 @@ static b32 parse_custom(ObjFile *file, u8 *payload, u32 len, bh_allocator alloc,
 static ObjFile *parse_object_bytes(Linker *L, const char *display, const char *archive, OnyxFilePos pos, u8 *bytes, u32 length) {
     bh_allocator alloc = L->module->allocator;
     ObjFile *file = bh_alloc_item(alloc, ObjFile);
-    memset(file, 0, sizeof(*file));
     file->path = bh_strdup(alloc, (char *) display);
     file->archive = archive ? bh_strdup(alloc, (char *) archive) : NULL;
     file->pos = pos;
@@ -676,7 +669,7 @@ static ObjFile *parse_object_bytes(Linker *L, const char *display, const char *a
         obj_error(L, file, "Could not read object file '%s'.", display);
         return file;
     }
-    if (memcmp(file->bytes, "\0asm", 4) != 0 || file->bytes[4] != 1) {
+    if (bh_memcmp(file->bytes, "\0asm", 4) != 0 || file->bytes[4] != 1) {
         obj_error(L, file, "'%s' is not a WASM object file.", display);
         return file;
     }
@@ -705,7 +698,7 @@ static ObjFile *parse_object_bytes(Linker *L, const char *display, const char *a
         else if (id == SEC_CODE) ok = parse_code(file, payload, size);
         else if (id == SEC_DATA) ok = parse_data(file, payload, size, L);
         else if (id == SEC_CUSTOM) {
-            if (size >= 8 && payload[0] == 7 && memcmp(payload + 1, "linking", 7) == 0) saw_linking = 1;
+            if (size >= 8 && payload[0] == 7 && bh_memcmp(payload + 1, "linking", 7) == 0) saw_linking = 1;
             ok = parse_custom(file, payload, size, alloc, L);
         }
         if (!ok) {
@@ -725,7 +718,7 @@ static ObjSymbol *find_named(ObjFile *file, const char *name, u8 kind) {
     bh_arr_each(ObjSymbol, sym, file->symbols) {
         if (sym->kind != kind) continue;
         if (sym->flags & SYM_UNDEFINED) continue;
-        if (!sym->name || strcmp(sym->name, name) != 0) continue;
+        if (!sym->name || bh_strcmp(sym->name, name) != 0) continue;
         return sym;
     }
     return NULL;
@@ -735,21 +728,21 @@ static b32 is_stack_pointer(ObjSymbol *sym) {
     return sym->kind == SYM_GLOBAL
         && (sym->flags & SYM_UNDEFINED)
         && sym->name
-        && strcmp(sym->name, "__stack_pointer") == 0;
+        && bh_strcmp(sym->name, "__stack_pointer") == 0;
 }
 
 static b32 is_tls_base(ObjSymbol *sym) {
     return sym->kind == SYM_GLOBAL
         && (sym->flags & SYM_UNDEFINED)
         && sym->name
-        && strcmp(sym->name, "__tls_base") == 0;
+        && bh_strcmp(sym->name, "__tls_base") == 0;
 }
 
 static b32 is_function_table(ObjSymbol *sym) {
     return sym->kind == SYM_TABLE
         && (sym->flags & SYM_UNDEFINED)
         && sym->name
-        && strcmp(sym->name, "__indirect_function_table") == 0;
+        && bh_strcmp(sym->name, "__indirect_function_table") == 0;
 }
 
 static i32 onyx_stack_global(OnyxWasmModule *mod) {
@@ -769,12 +762,12 @@ static ObjSymbol *find_definition_in(Linker *L, ObjSymbol *undef, const char *on
     ObjSymbol *weak = NULL;
     bh_arr_each(ObjFile *, pfile, L->files) {
         ObjFile *file = *pfile;
-        if (only_archive && (!file->archive || strcmp(file->archive, only_archive) != 0)) continue;
+        if (only_archive && (!file->archive || bh_strcmp(file->archive, only_archive) != 0)) continue;
         bh_arr_each(ObjSymbol, sym, file->symbols) {
             if (sym->flags & SYM_UNDEFINED) continue;
             if ((sym->flags & SYM_BINDING_MASK) == SYM_BINDING_LOCAL) continue;
             if (sym->kind != undef->kind) continue;
-            if (!sym->name || !undef->name || strcmp(sym->name, undef->name) != 0) continue;
+            if (!sym->name || !undef->name || bh_strcmp(sym->name, undef->name) != 0) continue;
             if ((sym->flags & SYM_BINDING_MASK) == SYM_BINDING_WEAK) {
                 if (!weak) weak = sym;
             } else if (strong) {
@@ -804,7 +797,7 @@ static b32 bind_provided_function(Linker *L, ObjSymbol *sym) {
 
     ObjProvide *prov = NULL;
     bh_arr_each(ObjProvide, candidate, sym->file->provides) {
-        if (candidate->name && strcmp(candidate->name, sym->name) == 0) {
+        if (candidate->name && bh_strcmp(candidate->name, sym->name) == 0) {
             prov = candidate;
             break;
         }
@@ -1138,8 +1131,7 @@ static b32 decode_global_init(OnyxWasmModule *mod, ObjGlobal *global, bh_arr(Was
     while (c.p < c.end) {
         u8 op = *c.p++;
         if (op == 0x0b) return 1;
-        WasmInstruction in;
-        memset(&in, 0, sizeof(in));
+        WasmInstruction in = { 0 };
         if (op == 0x41 || op == 0x42) {
             i32 v = 0;
             if (!read_sleb(&c, &v)) return 0;
@@ -1152,8 +1144,8 @@ static b32 decode_global_init(OnyxWasmModule *mod, ObjGlobal *global, bh_arr(Was
             u32 n = op == 0x43 ? 4 : 8;
             if (c.p + n > c.end) return 0;
             in.type = op == 0x43 ? WI_F32_CONST : WI_F64_CONST;
-            if (op == 0x43) memcpy(&in.data.f, c.p, 4);
-            else            memcpy(&in.data.d, c.p, 8);
+            if (op == 0x43) bh_memcpy(&in.data.f, c.p, 4);
+            else            bh_memcpy(&in.data.d, c.p, 8);
             c.p += n;
             bh_arr_push(*out, in);
             continue;
@@ -1186,8 +1178,7 @@ static void place_tls_segment(OnyxWasmModule *mod, ObjSegment *seg) {
 
     u32 len = seg->len ? seg->len : 1;
     u8 *copy = bh_alloc_array(mod->allocator, u8, len);
-    memset(copy, 0, len);
-    if (seg->len && seg->data) memcpy(copy, seg->data, seg->len);
+    if (seg->len && seg->data) bh_memcpy(copy, seg->data, seg->len);
     seg->copy = copy;
 }
 
@@ -1246,9 +1237,8 @@ static void assign_outputs(Linker *L) {
                     return;
                 }
                 u8 *copy = bh_alloc_array(mod->allocator, u8, fn->body_len ? fn->body_len : 1);
-                if (fn->body_len) memcpy(copy, fn->body, fn->body_len);
-                WasmFunc wasm_func;
-                memset(&wasm_func, 0, sizeof(wasm_func));
+                if (fn->body_len) bh_memcpy(copy, fn->body, fn->body_len);
+                WasmFunc wasm_func = { 0 };
                 wasm_func.type_idx = type_idx;
                 wasm_func.raw_body = copy;
                 wasm_func.raw_body_len = fn->body_len;
@@ -1273,8 +1263,7 @@ static void assign_outputs(Linker *L) {
                     obj_error(L, file, "Global '%s' has an initializer this linker cannot copy.", sym->name);
                     return;
                 }
-                WasmGlobal wg;
-                memset(&wg, 0, sizeof(wg));
+                WasmGlobal wg = { 0 };
                 wg.type = global->valtype;
                 wg.mutable = global->mut ? 1 : 0;
                 wg.initial_value = init;
@@ -1295,7 +1284,6 @@ static void assign_outputs(Linker *L) {
                     } else {
                         u32 len = sym->size ? sym->size : 1;
                         u8 *zeros = bh_alloc_array(mod->allocator, u8, len);
-                        memset(zeros, 0, len);
                         sym->data_id = place_bytes(mod, zeros, sym->size, align);
                     }
                 } else if (sym->index < (u32) bh_arr_length(file->segments)) {
@@ -1307,8 +1295,7 @@ static void assign_outputs(Linker *L) {
                         if (seg->data_id == 0) {
                             u32 len = seg->len ? seg->len : 1;
                             u8 *copy = bh_alloc_array(mod->allocator, u8, len);
-                            memset(copy, 0, len);
-                            if (seg->len && seg->data) memcpy(copy, seg->data, seg->len);
+                            if (seg->len && seg->data) bh_memcpy(copy, seg->data, seg->len);
                             seg->copy = copy;
                             seg->data_id = place_bytes(mod, copy, seg->len, seg->align);
                         }
@@ -1380,8 +1367,7 @@ static void apply_relocs(Linker *L) {
         body[0] = 0x00;
         body[1] = 0x00;
         body[2] = 0x0b;
-        WasmFunc trap;
-        memset(&trap, 0, sizeof(trap));
+        WasmFunc trap = { 0 };
         trap.type_idx = type_idx;
         trap.raw_body = body;
         trap.raw_body_len = 3;
@@ -1497,14 +1483,6 @@ typedef struct LinkedCtor {
     ObjSymbol *sym;
 } LinkedCtor;
 
-static int ctor_order(const void *a, const void *b) {
-    const LinkedCtor *x = a;
-    const LinkedCtor *y = b;
-    if (x->priority < y->priority) return -1;
-    if (x->priority > y->priority) return 1;
-    return 0;
-}
-
 static void emit_constructors(Linker *L) {
     bh_arr(LinkedCtor) ctors = NULL;
     bh_arr_new(L->module->allocator, ctors, 4);
@@ -1521,7 +1499,16 @@ static void emit_constructors(Linker *L) {
     }
     if (bh_arr_length(ctors) == 0) return;
 
-    qsort(ctors, (size_t) bh_arr_length(ctors), sizeof(LinkedCtor), ctor_order);
+    i32 ctor_count = bh_arr_length(ctors);
+    for (i32 i = 1; i < ctor_count; i++) {
+        LinkedCtor key = ctors[i];
+        i32 j = i - 1;
+        while (j >= 0 && ctors[j].priority > key.priority) {
+            ctors[j + 1] = ctors[j];
+            j--;
+        }
+        ctors[j + 1] = key;
+    }
 
     AstFunction *runner = L->module->context->builtins.run_init_procedures;
     if (!runner || !bh_imap_has(&L->module->index_map, (u64) runner)) {
@@ -1541,8 +1528,7 @@ static void emit_constructors(Linker *L) {
             obj_error(L, L->files[0], "Object constructor was not linked.");
             return;
         }
-        WasmInstruction call;
-        memset(&call, 0, sizeof(call));
+        WasmInstruction call = { 0 };
         call.type = WI_CALL;
         call.data.l = ctor->sym->out_func + (i32) L->module->next_foreign_func_idx;
         bh_arr_push(wf->code, call);
@@ -1552,18 +1538,19 @@ static void emit_constructors(Linker *L) {
 
 static void source_error(Linker *L, OnyxFilePos pos, const char *fmt, ...) {
     L->failed = 1;
-    char buf[512];
+    if (!onyx_errors_are_enabled(L->module->context)) return;
     va_list args;
     va_start(args, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, args);
+    char *msg = bh_aprintf_va(L->module->context->errors.msg_alloc, fmt, args);
     va_end(args);
-    onyx_report_error(L->module->context, pos, Error_Critical, "%s", buf);
+    OnyxError err = { .pos = pos, .rank = Error_Critical, .text = msg };
+    onyx_submit_error(L->module->context, err);
 }
 
 static b32 file_is_source(ObjFile *file, const char *source) {
     if (!file || !source) return 0;
-    if (file->archive) return strcmp(file->archive, source) == 0;
-    return file->path && strcmp(file->path, source) == 0;
+    if (file->archive) return bh_strcmp(file->archive, source) == 0;
+    return file->path && bh_strcmp(file->path, source) == 0;
 }
 
 static b32 source_is_loaded(Linker *L, const char *path) {
@@ -1590,20 +1577,17 @@ static i32 ar_field_int(const char *s, int n) {
 
 static char *ar_copy_name(bh_allocator alloc, const u8 *s, u32 n) {
     while (n > 0 && (s[n - 1] == 0 || s[n - 1] == '\n' || s[n - 1] == '/')) n--;
-    char *out = bh_alloc(alloc, n + 1);
-    if (n) memcpy(out, s, n);
-    out[n] = 0;
-    return out;
+    return bh_strdup_len(alloc, (char *) s, (i32) n);
 }
 
 static b32 ar_is_symbol_index(const char *name) {
     return name
-        && (strcmp(name, "/") == 0
-            || strcmp(name, "/SYM64") == 0
-            || strcmp(name, "__.SYMDEF") == 0
-            || strcmp(name, "__.SYMDEF SORTED") == 0
-            || strcmp(name, "__.SYMDEF_64") == 0
-            || strcmp(name, "__.SYMDEF SORTED_64") == 0);
+        && (bh_strcmp(name, "/") == 0
+            || bh_strcmp(name, "/SYM64") == 0
+            || bh_strcmp(name, "__.SYMDEF") == 0
+            || bh_strcmp(name, "__.SYMDEF SORTED") == 0
+            || bh_strcmp(name, "__.SYMDEF_64") == 0
+            || bh_strcmp(name, "__.SYMDEF SORTED_64") == 0);
 }
 
 static char *ar_strtab_name(bh_allocator alloc, const u8 *tab, u32 tab_len, i32 offset) {
@@ -1616,11 +1600,11 @@ static char *ar_strtab_name(bh_allocator alloc, const u8 *tab, u32 tab_len, i32 
 
 static void load_archive(Linker *L, const char *path, OnyxFilePos pos, u8 *bytes, u32 length) {
     bh_allocator alloc = L->module->allocator;
-    if (length >= 8 && memcmp(bytes, "!<thin>\n", 8) == 0) {
+    if (length >= 8 && bh_memcmp(bytes, "!<thin>\n", 8) == 0) {
         source_error(L, pos, "Thin archive '%s' is not supported. Create a normal archive.", path);
         return;
     }
-    if (length < 8 || memcmp(bytes, "!<arch>\n", 8) != 0) {
+    if (length < 8 || bh_memcmp(bytes, "!<arch>\n", 8) != 0) {
         source_error(L, pos, "'%s' is not a WASM object or an archive.", path);
         return;
     }
@@ -1653,7 +1637,7 @@ static void load_archive(Linker *L, const char *path, OnyxFilePos pos, u8 *bytes
         }
 
         char raw[17];
-        memcpy(raw, hdr, 16);
+        bh_memcpy(raw, hdr, 16);
         int namelen = 16;
         while (namelen > 0 && raw[namelen - 1] == ' ') namelen--;
         raw[namelen] = 0;
@@ -1662,7 +1646,7 @@ static void load_archive(Linker *L, const char *path, OnyxFilePos pos, u8 *bytes
         u8 *body = payload;
         u32 body_len = payload_len;
         if (ar_is_symbol_index(raw)) continue;
-        if (strcmp(raw, "//") == 0) {
+        if (bh_strcmp(raw, "//") == 0) {
             strtab = payload;
             strtab_len = payload_len;
             continue;
@@ -1673,7 +1657,7 @@ static void load_archive(Linker *L, const char *path, OnyxFilePos pos, u8 *bytes
                 source_error(L, pos, "Archive '%s' has a member name the string table does not contain.", path);
                 return;
             }
-        } else if (namelen >= 3 && memcmp(raw, "#1/", 3) == 0) {
+        } else if (namelen >= 3 && bh_memcmp(raw, "#1/", 3) == 0) {
             i32 n = ar_field_int(raw + 3, namelen - 3);
             if (n < 0 || (u32) n > payload_len) {
                 source_error(L, pos, "Malformed archive '%s'.", path);
@@ -1691,7 +1675,7 @@ static void load_archive(Linker *L, const char *path, OnyxFilePos pos, u8 *bytes
         // The name is often longer than 15 bytes, so it arrives through #1/.
         if (ar_is_symbol_index(member)) continue;
 
-        if (body_len < 4 || memcmp(body, "\0asm", 4) != 0) {
+        if (body_len < 4 || bh_memcmp(body, "\0asm", 4) != 0) {
             source_error(L, pos, "Archive member '%s' in '%s' is not a WASM object.", member ? member : "", path);
             return;
         }
@@ -1713,7 +1697,7 @@ static void load_source(Linker *L, const char *path, OnyxFilePos pos) {
     bh_file_contents contents = bh_file_read_contents(alloc, path);
     u8 *bytes = (u8 *) contents.data;
     u32 length = (u32) contents.length;
-    if (bytes && length >= 8 && (memcmp(bytes, "!<arch>\n", 8) == 0 || memcmp(bytes, "!<thin>\n", 8) == 0)) {
+    if (bytes && length >= 8 && (bh_memcmp(bytes, "!<arch>\n", 8) == 0 || bh_memcmp(bytes, "!<thin>\n", 8) == 0)) {
         load_archive(L, path, pos, bytes, length);
         return;
     }
@@ -1745,7 +1729,6 @@ static void finish_tls_image(Linker *L) {
     u32 begin = mod->tls_image_begin;
     u32 blob_len = size + 8;
     u8 *blob = bh_alloc_array(mod->allocator, u8, blob_len);
-    memset(blob, 0, blob_len);
     blob[0] = (u8) begin;
     blob[1] = (u8) (begin >> 8);
     blob[2] = (u8) (begin >> 16);
@@ -1760,7 +1743,7 @@ static void finish_tls_image(Linker *L) {
             if (!seg->tls_placed || !seg->len || !seg->copy) continue;
             u32 dest = 8 + (seg->tls_offset - begin);
             if (dest + seg->len > blob_len) continue;
-            memcpy(blob + dest, seg->copy, seg->len);
+            bh_memcpy(blob + dest, seg->copy, seg->len);
         }
     }
 
@@ -1796,7 +1779,7 @@ static void add_file_provides(Linker *L, ObjFile *file, AstObjectBlock *block) {
         if (!prov->name || !prov->func) continue;
         b32 seen = 0;
         bh_arr_each(ObjProvide, existing, file->provides) {
-            if (strcmp(existing->name, prov->name) != 0) continue;
+            if (bh_strcmp(existing->name, prov->name) != 0) continue;
             if (existing->func != prov->func) {
                 onyx_report_error(L->module->context, prov->symbol->pos, Error_Critical,
                     "Symbol '%s' is provided by two different procedures for '%s'.",
@@ -1897,7 +1880,7 @@ void onyx_wasm_link_object_files(OnyxWasmModule *module) {
                     if (other == sym || !other->live || (other->flags & SYM_UNDEFINED)) continue;
                     if ((other->flags & SYM_BINDING_MASK) == SYM_BINDING_LOCAL) continue;
                     if ((other->flags & SYM_BINDING_MASK) == SYM_BINDING_WEAK) continue;
-                    if (other->kind == sym->kind && other->name && sym->name && strcmp(other->name, sym->name) == 0) {
+                    if (other->kind == sym->kind && other->name && sym->name && bh_strcmp(other->name, sym->name) == 0) {
                         obj_error(&linker, sym->file, "Duplicate symbol '%s'.", sym->name);
                         return;
                     }

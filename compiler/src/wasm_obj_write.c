@@ -10,11 +10,6 @@
 #include "wasm_emit.h"
 #include "errors.h"
 
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #define WASM_TYPE_INT32   0x7F
 #define WASM_TYPE_INT64   0x7E
 #define WASM_TYPE_FLOAT32 0x7D
@@ -80,8 +75,7 @@ typedef struct ObjImage {
     char **export_name;
     i32 *sym_of_func;
 
-    ForeignSym *foreigns;
-    i32 nforeign;
+    bh_arr(ForeignSym) foreigns;
 
     u8 *global_needed;
     i32 *sym_of_global;
@@ -123,8 +117,7 @@ static OnyxFilePos fallback_pos(OnyxWasmModule *module) {
             return fn->token->pos;
     }
     static char line[] = "\n";
-    OnyxFilePos pos;
-    memset(&pos, 0, sizeof pos);
+    OnyxFilePos pos = { 0 };
     pos.filename = "wasm-object";
     pos.line_start = line;
     pos.line = 1;
@@ -133,39 +126,31 @@ static OnyxFilePos fallback_pos(OnyxWasmModule *module) {
 
 static void werr(ObjImage *img, OnyxFilePos pos, const char *fmt, ...) {
     img->failed = 1;
-    char buf[768];
+    if (!onyx_errors_are_enabled(img->module->context)) return;
     va_list ap;
     va_start(ap, fmt);
-    vsnprintf(buf, sizeof buf, fmt, ap);
+    char *msg = bh_aprintf_va(img->module->context->errors.msg_alloc, fmt, ap);
     va_end(ap);
     if (!pos.filename || !pos.line_start) pos = fallback_pos(img->module);
-    onyx_report_error(img->module->context, pos, Error_Critical, "%s", buf);
+    OnyxError err = { .pos = pos, .rank = Error_Critical, .text = msg };
+    onyx_submit_error(img->module->context, err);
 }
 
 static OnyxFilePos fn_pos(AstFunction *fn) {
     if (fn && fn->token && fn->token->pos.filename && fn->token->pos.line_start)
         return fn->token->pos;
-    OnyxFilePos pos;
-    memset(&pos, 0, sizeof pos);
+    OnyxFilePos pos = { 0 };
     return pos;
 }
 
 static char *copy_text(bh_allocator a, const char *text, i32 length) {
-    if (length < 0) length = 0;
-    char *s = bh_alloc(a, (u32) length + 1);
-    if (length && text) memcpy(s, text, (u32) length);
-    s[length] = 0;
-    return s;
+    if (!text || length <= 0) return bh_strdup_len(a, "", 0);
+    return bh_strdup_len(a, (char *) text, length);
 }
 
 static char *copy_token(bh_allocator a, OnyxToken *t) {
     if (!t) return copy_text(a, "", 0);
     return copy_text(a, t->text, t->length);
-}
-
-static char *copy_cstr(bh_allocator a, const char *s) {
-    if (!s) s = "";
-    return copy_text(a, s, (i32) strlen(s));
 }
 
 static void buf_uleb(bh_buffer *b, u64 v) {
@@ -201,7 +186,7 @@ static void buf_sleb5(bh_buffer *b, i32 value) {
 }
 
 static void write_wasm_name(bh_buffer *b, const char *s) {
-    u32 len = s ? (u32) strlen(s) : 0;
+    u32 len = s ? (u32) bh_strlen(s) : 0;
     buf_uleb(b, len);
     if (len) bh_buffer_append(b, s, (i32) len);
 }
@@ -214,7 +199,7 @@ static void append_section(bh_buffer *out, u8 id, bh_buffer *payload) {
 
 static void append_custom(bh_buffer *out, const char *name, bh_buffer *body) {
     bh_buffer payload;
-    bh_buffer_init(&payload, out->allocator, body->length + (i32) strlen(name) + 8);
+    bh_buffer_init(&payload, out->allocator, body->length + (i32) bh_strlen(name) + 8);
     write_wasm_name(&payload, name);
     if (body->length) bh_buffer_append(&payload, body->data, body->length);
     append_section(out, 0, &payload);
@@ -305,14 +290,14 @@ static DatumPatchInfo *find_instr_datum_patch(OnyxWasmModule *module, u32 func, 
 }
 
 static i32 foreign_sym_for(ObjImage *img, AstFunction *fn) {
-    for (i32 i = 0; i < img->nforeign; i++) {
+    for (i32 i = 0; i < bh_arr_length(img->foreigns); i++) {
         if (img->foreigns[i].fn == fn) return img->foreigns[i].sym;
     }
     OnyxToken *tok = fn->foreign.import_name ? fn->foreign.import_name->token : NULL;
     if (!tok) return -1;
-    for (i32 i = 0; i < img->nforeign; i++) {
-        if (img->foreigns[i].name && tok->length == (i32) strlen(img->foreigns[i].name)
-            && memcmp(tok->text, img->foreigns[i].name, (u32) tok->length) == 0)
+    for (i32 i = 0; i < bh_arr_length(img->foreigns); i++) {
+        if (img->foreigns[i].name && tok->length == (i32) bh_strlen(img->foreigns[i].name)
+            && bh_memcmp(tok->text, img->foreigns[i].name, (u32) tok->length) == 0)
             return img->foreigns[i].sym;
     }
     return -1;
@@ -320,7 +305,7 @@ static i32 foreign_sym_for(ObjImage *img, AstFunction *fn) {
 
 static i32 lookup_foreign_type(OnyxWasmModule *module, const char *name) {
     bh_arr_each(WasmImport, im, module->imports) {
-        if (im->kind == WASM_FOREIGN_FUNCTION && im->name && strcmp(im->name, name) == 0)
+        if (im->kind == WASM_FOREIGN_FUNCTION && im->name && bh_strcmp(im->name, name) == 0)
             return im->idx;
     }
     return -1;
@@ -331,8 +316,8 @@ static void add_foreign(ObjImage *img, AstFunction *fn) {
 
     OnyxToken *tok = fn->foreign.import_name ? fn->foreign.import_name->token : NULL;
     char *name = copy_token(img->module->context->gp_alloc, tok);
-    for (i32 i = 0; i < img->nforeign; i++) {
-        if (strcmp(img->foreigns[i].name, name) == 0) return;
+    for (i32 i = 0; i < bh_arr_length(img->foreigns); i++) {
+        if (bh_strcmp(img->foreigns[i].name, name) == 0) return;
     }
 
     i32 type_idx = lookup_foreign_type(img->module, name);
@@ -348,12 +333,13 @@ static void add_foreign(ObjImage *img, AstFunction *fn) {
         return;
     }
 
-    img->foreigns = realloc(img->foreigns, (size_t) (img->nforeign + 1) * sizeof(ForeignSym));
-    img->foreigns[img->nforeign].fn = fn;
-    img->foreigns[img->nforeign].name = name;
-    img->foreigns[img->nforeign].type_idx = type_idx;
-    img->foreigns[img->nforeign].sym = -1;
-    img->nforeign++;
+    if (!img->foreigns) bh_arr_new(img->module->context->gp_alloc, img->foreigns, 4);
+    ForeignSym fs = { 0 };
+    fs.fn = fn;
+    fs.name = name;
+    fs.type_idx = type_idx;
+    fs.sym = -1;
+    bh_arr_push(img->foreigns, fs);
 }
 
 static b32 mark_data(ObjImage *img, u32 id, OnyxFilePos pos) {
@@ -523,25 +509,25 @@ static void collect_image(ObjImage *img) {
     img->tls_data_sym = -1;
 
     if (img->nfuncs > 0) {
-        img->live = calloc((size_t) img->nfuncs, 1);
-        img->export_name = calloc((size_t) img->nfuncs, sizeof(char *));
-        img->sym_of_func = malloc((size_t) img->nfuncs * sizeof(i32));
+        img->live = bh_alloc_array(alloc, u8, img->nfuncs);
+        img->export_name = bh_alloc_array(alloc, char *, img->nfuncs);
+        img->sym_of_func = bh_alloc_array(alloc, i32, img->nfuncs);
         for (i32 i = 0; i < img->nfuncs; i++) img->sym_of_func[i] = -1;
     }
     if (img->nglobals > 0) {
-        img->global_needed = calloc((size_t) img->nglobals, 1);
-        img->sym_of_global = malloc((size_t) img->nglobals * sizeof(i32));
-        img->defined_globals = malloc((size_t) img->nglobals * sizeof(i32));
+        img->global_needed = bh_alloc_array(alloc, u8, img->nglobals);
+        img->sym_of_global = bh_alloc_array(alloc, i32, img->nglobals);
+        img->defined_globals = bh_alloc_array(alloc, i32, img->nglobals);
         for (i32 i = 0; i < img->nglobals; i++) img->sym_of_global[i] = -1;
     }
     if (img->ndata > 0) {
-        img->live_data = calloc((size_t) img->ndata + 1, 1);
-        img->sym_of_datum = malloc(((size_t) img->ndata + 1) * sizeof(i32));
-        img->data_ids = malloc((size_t) img->ndata * sizeof(i32));
+        img->live_data = bh_alloc_array(alloc, u8, img->ndata + 1);
+        img->sym_of_datum = bh_alloc_array(alloc, i32, img->ndata + 1);
+        img->data_ids = bh_alloc_array(alloc, i32, img->ndata);
         for (i32 i = 0; i <= img->ndata; i++) img->sym_of_datum[i] = -1;
     }
 
-    i32 *queue = img->nfuncs ? malloc((size_t) img->nfuncs * sizeof(i32)) : NULL;
+    i32 *queue = img->nfuncs ? bh_alloc_array(alloc, i32, img->nfuncs) : NULL;
     i32 qt = 0;
 
     b32 any_export = 0;
@@ -576,7 +562,7 @@ static void collect_image(ObjImage *img) {
             continue;
         }
         char *name = copy_token(alloc, patch->token_related_to_patch);
-        if (img->export_name[idx] && strcmp(img->export_name[idx], name) != 0) {
+        if (img->export_name[idx] && bh_strcmp(img->export_name[idx], name) != 0) {
             werr(img, pos, "Function '%s' is exported under two names.", get_function_name(module->context, fn));
             continue;
         }
@@ -600,7 +586,7 @@ static void collect_image(ObjImage *img) {
     for (i32 qh = 0; qh < qt && !img->failed; qh++) {
         scan_function(img, queue[qh], queue, &qt);
     }
-    free(queue);
+    bh_free(alloc, queue);
 
     while (!img->failed) {
         b32 grew = 1;
@@ -623,7 +609,7 @@ static void collect_image(ObjImage *img) {
         }
         if (img->failed || !img->live_data) break;
 
-        i32 *more = img->nfuncs ? malloc((size_t) img->nfuncs * sizeof(i32)) : NULL;
+        i32 *more = img->nfuncs ? bh_alloc_array(alloc, i32, img->nfuncs) : NULL;
         i32 mt = 0;
         bh_arr_each(DatumPatchInfo, patch, module->data_patches) {
             if (patch->kind != Datum_Patch_Table_Index) continue;
@@ -633,11 +619,11 @@ static void collect_image(ObjImage *img) {
             if (img->failed) break;
         }
         if (img->failed || mt == 0) {
-            free(more);
+            bh_free(alloc, more);
             break;
         }
         for (i32 qh = 0; qh < mt && !img->failed; qh++) scan_function(img, more[qh], more, &mt);
-        free(more);
+        bh_free(alloc, more);
     }
 
     if (img->need_tls_data) img->need_tls = 1;
@@ -678,25 +664,19 @@ static void build_symbols(ObjImage *img) {
         OutSym sym = { 0 };
         sym.kind = SYM_FUNCTION;
         sym.flags = img->export_name[i] ? SYM_EXPORTED : SYM_BINDING_LOCAL;
-        sym.index = (u32) (img->nforeign + pos);
+        sym.index = (u32) (bh_arr_length(img->foreigns) + pos);
         if (img->export_name[i]) {
             sym.name = img->export_name[i];
         } else {
-            char buf[128];
-            snprintf(buf, sizeof buf, ".Lfunc.%d", i);
-            sym.name = copy_cstr(alloc, func->name && func->name[0] ? func->name : buf);
-            if (!img->export_name[i]) {
-                char unique[160];
-                snprintf(unique, sizeof unique, "%s@%d", sym.name, i);
-                sym.name = copy_cstr(alloc, unique);
-            }
+            char *base = func->name && func->name[0] ? func->name : bh_aprintf(alloc, ".Lfunc.%d", i);
+            sym.name = bh_aprintf(alloc, "%s@%d", base, i);
         }
         img->sym_of_func[i] = bh_arr_length(img->syms);
         push_sym(img, sym);
         pos++;
     }
 
-    for (i32 i = 0; i < img->nforeign; i++) {
+    for (i32 i = 0; i < bh_arr_length(img->foreigns); i++) {
         OutSym sym = { 0 };
         sym.kind = SYM_FUNCTION;
         sym.flags = SYM_UNDEFINED;
@@ -739,9 +719,7 @@ static void build_symbols(ObjImage *img) {
         sym.kind = SYM_GLOBAL;
         sym.flags = SYM_BINDING_LOCAL;
         sym.index = imported_globals++;
-        char buf[64];
-        snprintf(buf, sizeof buf, ".global.%d", g);
-        sym.name = copy_cstr(alloc, buf);
+        sym.name = bh_aprintf(alloc, ".global.%d", g);
         img->sym_of_global[g] = bh_arr_length(img->syms);
         push_sym(img, sym);
     }
@@ -757,9 +735,7 @@ static void build_symbols(ObjImage *img) {
             sym.index = seg;
             sym.offset = 0;
             sym.size = datum->length;
-            char buf[64];
-            snprintf(buf, sizeof buf, ".data.%d", id);
-            sym.name = copy_cstr(alloc, buf);
+            sym.name = bh_aprintf(alloc, ".data.%d", id);
             img->sym_of_datum[id] = bh_arr_length(img->syms);
             img->data_ids[img->ndata_segs++] = id;
             push_sym(img, sym);
@@ -775,13 +751,14 @@ static void build_symbols(ObjImage *img) {
         sym.index = seg;
         sym.offset = 0;
         sym.size = img->tls_size;
-        sym.name = copy_cstr(alloc, ".tdata");
+        sym.name = bh_strdup(alloc, ".tdata");
         img->tls_data_sym = bh_arr_length(img->syms);
         push_sym(img, sym);
     }
 
     if (module->context->builtins.init_procedures && img->sym_of_func) {
-        img->init_syms = malloc((size_t) bh_arr_length(module->context->builtins.init_procedures) * sizeof(i32));
+        i32 nprocs = bh_arr_length(module->context->builtins.init_procedures);
+        if (nprocs > 0) img->init_syms = bh_alloc_array(alloc, i32, nprocs);
         bh_arr_each(AstFunction *, pinit, module->context->builtins.init_procedures) {
             AstFunction *fn = *pinit;
             if (!fn || !bh_imap_has(&module->index_map, (u64) fn)) continue;
@@ -1090,9 +1067,9 @@ static void encode_object(ObjImage *img, bh_buffer *out) {
         }
     }
 
-    b32 has_import = img->need_memory || img->nforeign || img->need_table || img->need_stack || img->need_tls;
+    b32 has_import = img->need_memory || bh_arr_length(img->foreigns) || img->need_table || img->need_stack || img->need_tls;
     if (has_import) {
-        i32 count = (img->need_memory ? 1 : 0) + img->nforeign + (img->need_table ? 1 : 0) + (img->need_stack ? 1 : 0) + (img->need_tls ? 1 : 0);
+        i32 count = (img->need_memory ? 1 : 0) + bh_arr_length(img->foreigns) + (img->need_table ? 1 : 0) + (img->need_stack ? 1 : 0) + (img->need_tls ? 1 : 0);
         buf_uleb(&imports, (u64) count);
         if (img->need_memory) {
             write_wasm_name(&imports, "env");
@@ -1101,7 +1078,7 @@ static void encode_object(ObjImage *img, bh_buffer *out) {
             bh_buffer_write_byte(&imports, 0x00);
             buf_uleb(&imports, 0);
         }
-        for (i32 i = 0; i < img->nforeign; i++) {
+        for (i32 i = 0; i < bh_arr_length(img->foreigns); i++) {
             write_wasm_name(&imports, "env");
             write_wasm_name(&imports, img->foreigns[i].name);
             bh_buffer_write_byte(&imports, 0x00);
@@ -1190,8 +1167,8 @@ static void encode_object(ObjImage *img, bh_buffer *out) {
 
             u8 *bytes = NULL;
             if (datum->length) {
-                bytes = calloc(1, datum->length);
-                if (datum->data) memcpy(bytes, datum->data, datum->length);
+                bytes = bh_alloc_array(alloc, u8, datum->length);
+                if (datum->data) bh_memcpy(bytes, datum->data, datum->length);
             }
             u32 bytes_at = (u32) data.length;
             bh_arr_each(DatumPatchInfo, patch, module->data_patches) {
@@ -1199,10 +1176,10 @@ static void encode_object(ObjImage *img, bh_buffer *out) {
                 if (patch->index != (u32) id) continue;
                 if (patch->location + 4 > datum->length) continue;
                 i32 existing = 0;
-                if (bytes) memcpy(&existing, bytes + patch->location, 4);
+                if (bytes) bh_memcpy(&existing, bytes + patch->location, 4);
                 if (patch->kind == Datum_Patch_Relative && existing == 0 && patch->offset == 0) continue;
                 i32 addend = patch->kind == Datum_Patch_Relative ? existing + (i32) patch->offset : (i32) patch->offset;
-                if (bytes) memset(bytes + patch->location, 0, 4);
+                if (bytes) bh_memset(bytes + patch->location, 0, 4);
                 record_reloc(img, &img->data_relocs, RELOC_MEMORY_ADDR_I32, bytes_at + patch->location, (u32) img->sym_of_datum[patch->data_id], addend);
             }
             bh_arr_each(DatumPatchInfo, patch, module->data_patches) {
@@ -1214,11 +1191,11 @@ static void encode_object(ObjImage *img, bh_buffer *out) {
                     werr(img, fallback_pos(module), "A function pointer in data has no symbol to relocate.");
                     continue;
                 }
-                if (bytes) memset(bytes + patch->location, 0, 4);
+                if (bytes) bh_memset(bytes + patch->location, 0, 4);
                 record_reloc(img, &img->data_relocs, RELOC_TABLE_INDEX_I32, bytes_at + patch->location, (u32) sym, 0);
             }
             if (datum->length) bh_buffer_append(&data, bytes, (i32) datum->length);
-            free(bytes);
+            bh_free(alloc, bytes);
         }
         if (img->need_tls_data) {
             bh_buffer_write_byte(&data, 0x00);
@@ -1227,9 +1204,9 @@ static void encode_object(ObjImage *img, bh_buffer *out) {
             bh_buffer_write_byte(&data, 0x0b);
             buf_uleb(&data, img->tls_size);
             if (img->tls_size) {
-                u8 *zeros = calloc(1, img->tls_size);
+                u8 *zeros = bh_alloc_array(alloc, u8, img->tls_size);
                 bh_buffer_append(&data, zeros, (i32) img->tls_size);
-                free(zeros);
+                bh_free(alloc, zeros);
             }
         }
     }
@@ -1370,25 +1347,25 @@ static void encode_object(ObjImage *img, bh_buffer *out) {
 }
 
 static void free_image(ObjImage *img) {
-    free(img->live);
-    free(img->export_name);
-    free(img->sym_of_func);
-    free(img->foreigns);
-    free(img->global_needed);
-    free(img->sym_of_global);
-    free(img->defined_globals);
-    free(img->live_data);
-    free(img->data_ids);
-    free(img->sym_of_datum);
-    free(img->init_syms);
+    bh_allocator alloc = img->module->context->gp_alloc;
+    bh_free(alloc, img->live);
+    bh_free(alloc, img->export_name);
+    bh_free(alloc, img->sym_of_func);
+    bh_arr_free(img->foreigns);
+    bh_free(alloc, img->global_needed);
+    bh_free(alloc, img->sym_of_global);
+    bh_free(alloc, img->defined_globals);
+    bh_free(alloc, img->live_data);
+    bh_free(alloc, img->data_ids);
+    bh_free(alloc, img->sym_of_datum);
+    bh_free(alloc, img->init_syms);
     bh_arr_free(img->syms);
     bh_arr_free(img->code_relocs);
     bh_arr_free(img->data_relocs);
 }
 
 static b32 emit_object(OnyxWasmModule *module, bh_buffer *out) {
-    ObjImage img;
-    memset(&img, 0, sizeof img);
+    ObjImage img = { 0 };
     img.module = module;
     img.stack_sym = -1;
     img.tls_sym = -1;

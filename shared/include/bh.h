@@ -375,6 +375,12 @@ u32 bh_str_last_index_of(char *str, char needle);
 char* bh_strdup(bh_allocator a, char* str);
 char* bh_strdup_len(bh_allocator a, char* str, i32 len);
 
+isize bh_strlen(const char *str);
+i32 bh_strcmp(const char *a, const char *b);
+i32 bh_memcmp(const void *a, const void *b, isize n);
+void bh_memcpy(void *dst, const void *src, isize n);
+void bh_memset(void *dst, u8 value, isize n);
+
 
 
 
@@ -1633,6 +1639,46 @@ char* bh_strdup_len(bh_allocator a, char* str, i32 len) {
 
     *t = '\0';
     return buf;
+}
+
+isize bh_strlen(const char *str) {
+    isize n = 0;
+    if (!str) return 0;
+    while (str[n]) n++;
+    return n;
+}
+
+i32 bh_strcmp(const char *a, const char *b) {
+    if (a == b) return 0;
+    if (!a) return -1;
+    if (!b) return 1;
+    while (*a && *a == *b) {
+        a++;
+        b++;
+    }
+    return (i32) (u8) *a - (i32) (u8) *b;
+}
+
+i32 bh_memcmp(const void *a, const void *b, isize n) {
+    const u8 *x = (const u8 *) a;
+    const u8 *y = (const u8 *) b;
+    for (isize i = 0; i < n; i++) {
+        if (x[i] != y[i]) return (i32) x[i] - (i32) y[i];
+    }
+    return 0;
+}
+
+void bh_memcpy(void *dst, const void *src, isize n) {
+    if (n <= 0 || !dst || !src) return;
+    u8 *d = (u8 *) dst;
+    const u8 *s = (const u8 *) src;
+    for (isize i = 0; i < n; i++) d[i] = s[i];
+}
+
+void bh_memset(void *dst, u8 value, isize n) {
+    if (n <= 0 || !dst) return;
+    u8 *d = (u8 *) dst;
+    for (isize i = 0; i < n; i++) d[i] = value;
 }
 
 
