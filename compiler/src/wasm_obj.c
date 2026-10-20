@@ -1596,6 +1596,16 @@ static char *ar_copy_name(bh_allocator alloc, const u8 *s, u32 n) {
     return out;
 }
 
+static b32 ar_is_symbol_index(const char *name) {
+    return name
+        && (strcmp(name, "/") == 0
+            || strcmp(name, "/SYM64") == 0
+            || strcmp(name, "__.SYMDEF") == 0
+            || strcmp(name, "__.SYMDEF SORTED") == 0
+            || strcmp(name, "__.SYMDEF_64") == 0
+            || strcmp(name, "__.SYMDEF SORTED_64") == 0);
+}
+
 static char *ar_strtab_name(bh_allocator alloc, const u8 *tab, u32 tab_len, i32 offset) {
     if (!tab || offset < 0 || (u32) offset >= tab_len) return NULL;
     u32 i = (u32) offset;
@@ -1651,7 +1661,7 @@ static void load_archive(Linker *L, const char *path, OnyxFilePos pos, u8 *bytes
         char *member = NULL;
         u8 *body = payload;
         u32 body_len = payload_len;
-        if (strcmp(raw, "/") == 0 || strcmp(raw, "/SYM64") == 0) continue;
+        if (ar_is_symbol_index(raw)) continue;
         if (strcmp(raw, "//") == 0) {
             strtab = payload;
             strtab_len = payload_len;
@@ -1676,6 +1686,10 @@ static void load_archive(Linker *L, const char *path, OnyxFilePos pos, u8 *bytes
             if (namelen > 0 && raw[namelen - 1] == '/') raw[--namelen] = 0;
             member = ar_copy_name(alloc, (const u8 *) raw, (u32) namelen);
         }
+
+        // macOS ar names its symbol index __.SYMDEF or __.SYMDEF SORTED.
+        // The name is often longer than 15 bytes, so it arrives through #1/.
+        if (ar_is_symbol_index(member)) continue;
 
         if (body_len < 4 || memcmp(body, "\0asm", 4) != 0) {
             source_error(L, pos, "Archive member '%s' in '%s' is not a WASM object.", member ? member : "", path);
