@@ -149,6 +149,9 @@ typedef struct ObjProvide {
 
 struct ObjFile {
     char *path;
+    // Set when this file was a member of an ar archive. path is then
+    // "archive.a(member.o)" and archive is the path named by #object.
+    char *archive;
     OnyxFilePos pos;
     u8 *bytes;
     u32 length;
@@ -646,15 +649,15 @@ static b32 parse_custom(ObjFile *file, u8 *payload, u32 len, bh_allocator alloc,
     return 1;
 }
 
-static ObjFile *parse_object_file(Linker *L, const char *path, OnyxFilePos pos) {
+static ObjFile *parse_object_bytes(Linker *L, const char *display, const char *archive, OnyxFilePos pos, u8 *bytes, u32 length) {
     bh_allocator alloc = L->module->allocator;
-    bh_file_contents contents = bh_file_read_contents(alloc, path);
     ObjFile *file = bh_alloc_item(alloc, ObjFile);
     memset(file, 0, sizeof(*file));
-    file->path = bh_strdup(alloc, (char *) path);
+    file->path = bh_strdup(alloc, (char *) display);
+    file->archive = archive ? bh_strdup(alloc, (char *) archive) : NULL;
     file->pos = pos;
-    file->bytes = (u8 *) contents.data;
-    file->length = (u32) contents.length;
+    file->bytes = bytes;
+    file->length = length;
 
     bh_arr_new(alloc, file->types, 4);
     bh_arr_new(alloc, file->func_imports, 4);
@@ -670,11 +673,11 @@ static ObjFile *parse_object_file(Linker *L, const char *path, OnyxFilePos pos) 
     bh_arr_new(alloc, file->provides, 4);
 
     if (!file->bytes || file->length < 8) {
-        obj_error(L, file, "Could not read object file '%s'.", path);
+        obj_error(L, file, "Could not read object file '%s'.", display);
         return file;
     }
     if (memcmp(file->bytes, "\0asm", 4) != 0 || file->bytes[4] != 1) {
-        obj_error(L, file, "'%s' is not a WASM object file.", path);
+        obj_error(L, file, "'%s' is not a WASM object file.", display);
         return file;
     }
 
@@ -685,7 +688,7 @@ static ObjFile *parse_object_file(Linker *L, const char *path, OnyxFilePos pos) 
         u8 id = *c.p++;
         u32 size = 0;
         if (!read_uleb(&c, &size) || c.p + size > c.end) {
-            obj_error(L, file, "Malformed WASM object '%s'.", path);
+            obj_error(L, file, "Malformed WASM object '%s'.", display);
             return file;
         }
         u8 *payload = c.p;
@@ -707,13 +710,13 @@ static ObjFile *parse_object_file(Linker *L, const char *path, OnyxFilePos pos) 
         }
         if (!ok) {
             if (!file->failed)
-                obj_error(L, file, "Malformed WASM object '%s'.", path);
+                obj_error(L, file, "Malformed WASM object '%s'.", display);
             return file;
         }
     }
 
     if (!saw_linking) {
-        obj_error(L, file, "'%s' has no WASM linking section.", path);
+        obj_error(L, file, "'%s' has no WASM linking section.", display);
     }
     return file;
 }
@@ -761,11 +764,12 @@ static i32 onyx_tls_global(OnyxWasmModule *mod) {
     return (i32) bh_imap_get(&mod->index_map, (u64) tls);
 }
 
-static ObjSymbol *find_definition(Linker *L, ObjSymbol *undef) {
+static ObjSymbol *find_definition_in(Linker *L, ObjSymbol *undef, const char *only_archive) {
     ObjSymbol *strong = NULL;
     ObjSymbol *weak = NULL;
     bh_arr_each(ObjFile *, pfile, L->files) {
         ObjFile *file = *pfile;
+        if (only_archive && (!file->archive || strcmp(file->archive, only_archive) != 0)) continue;
         bh_arr_each(ObjSymbol, sym, file->symbols) {
             if (sym->flags & SYM_UNDEFINED) continue;
             if ((sym->flags & SYM_BINDING_MASK) == SYM_BINDING_LOCAL) continue;
@@ -783,6 +787,10 @@ static ObjSymbol *find_definition(Linker *L, ObjSymbol *undef) {
     }
     if (strong) return strong;
     return weak;
+}
+
+static ObjSymbol *find_definition(Linker *L, ObjSymbol *undef) {
+    return find_definition_in(L, undef, NULL);
 }
 
 static void mark_symbol(Linker *L, ObjSymbol *sym);
@@ -863,8 +871,18 @@ static void mark_symbol(Linker *L, ObjSymbol *sym) {
         }
         if (sym->reported) return;
         if (sym->kind == SYM_FUNCTION && sym->out_func >= 0) return;
-        // A #provide on this object resolves its own references, even when
-        // another object defines the same symbol.
+        // Members of one archive share a namespace: a definition in any
+        // member wins over this block's #provide. A plain object still lets
+        // its own #provide win over a definition in a different object.
+        if (sym->file->archive) {
+            ObjSymbol *local = find_definition_in(L, sym, sym->file->archive);
+            if (L->failed) return;
+            if (local) {
+                sym->resolved = local;
+                mark_symbol(L, local);
+                return;
+            }
+        }
         if (bind_provided_function(L, sym)) return;
         ObjSymbol *def = find_definition(L, sym);
         if (!def) {
@@ -1532,13 +1550,175 @@ static void emit_constructors(Linker *L) {
     bh_arr_push(wf->code, end);
 }
 
-static ObjFile *file_for_path(Linker *L, const char *path, OnyxFilePos pos) {
+static void source_error(Linker *L, OnyxFilePos pos, const char *fmt, ...) {
+    L->failed = 1;
+    char buf[512];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    onyx_report_error(L->module->context, pos, Error_Critical, "%s", buf);
+}
+
+static b32 file_is_source(ObjFile *file, const char *source) {
+    if (!file || !source) return 0;
+    if (file->archive) return strcmp(file->archive, source) == 0;
+    return file->path && strcmp(file->path, source) == 0;
+}
+
+static b32 source_is_loaded(Linker *L, const char *path) {
     bh_arr_each(ObjFile *, pfile, L->files) {
-        if (strcmp((*pfile)->path, path) == 0) return *pfile;
+        if (file_is_source(*pfile, path)) return 1;
     }
-    ObjFile *file = parse_object_file(L, path, pos);
+    return 0;
+}
+
+static i32 ar_field_int(const char *s, int n) {
+    i32 value = 0;
+    b32 saw = 0;
+    for (int i = 0; i < n; i++) {
+        if (s[i] == ' ') {
+            if (saw) break;
+            continue;
+        }
+        if (s[i] < '0' || s[i] > '9') return -1;
+        saw = 1;
+        value = value * 10 + (s[i] - '0');
+    }
+    return saw ? value : -1;
+}
+
+static char *ar_copy_name(bh_allocator alloc, const u8 *s, u32 n) {
+    while (n > 0 && (s[n - 1] == 0 || s[n - 1] == '\n' || s[n - 1] == '/')) n--;
+    char *out = bh_alloc(alloc, n + 1);
+    if (n) memcpy(out, s, n);
+    out[n] = 0;
+    return out;
+}
+
+static char *ar_strtab_name(bh_allocator alloc, const u8 *tab, u32 tab_len, i32 offset) {
+    if (!tab || offset < 0 || (u32) offset >= tab_len) return NULL;
+    u32 i = (u32) offset;
+    u32 start = i;
+    while (i < tab_len && tab[i] != 0 && tab[i] != '\n' && tab[i] != '/') i++;
+    return ar_copy_name(alloc, tab + start, i - start);
+}
+
+static void load_archive(Linker *L, const char *path, OnyxFilePos pos, u8 *bytes, u32 length) {
+    bh_allocator alloc = L->module->allocator;
+    if (length >= 8 && memcmp(bytes, "!<thin>\n", 8) == 0) {
+        source_error(L, pos, "Thin archive '%s' is not supported. Create a normal archive.", path);
+        return;
+    }
+    if (length < 8 || memcmp(bytes, "!<arch>\n", 8) != 0) {
+        source_error(L, pos, "'%s' is not a WASM object or an archive.", path);
+        return;
+    }
+
+    const u8 *strtab = NULL;
+    u32 strtab_len = 0;
+    i32 wasm_members = 0;
+    u32 cursor = 8;
+    while (cursor < length && !L->failed) {
+        if (length - cursor < 60) {
+            if (length - cursor <= 1) break;
+            source_error(L, pos, "Malformed archive '%s'.", path);
+            return;
+        }
+        const u8 *hdr = bytes + cursor;
+        if (hdr[58] != '`' || hdr[59] != '\n') {
+            source_error(L, pos, "Malformed archive '%s'.", path);
+            return;
+        }
+        i32 member_size = ar_field_int((const char *) hdr + 48, 10);
+        if (member_size < 0 || cursor + 60 + (u32) member_size > length) {
+            source_error(L, pos, "Malformed archive '%s'.", path);
+            return;
+        }
+        u8 *payload = bytes + cursor + 60;
+        u32 payload_len = (u32) member_size;
+        cursor += 60 + (u32) member_size;
+        if (member_size & 1) {
+            if (cursor < length) cursor++;
+        }
+
+        char raw[17];
+        memcpy(raw, hdr, 16);
+        int namelen = 16;
+        while (namelen > 0 && raw[namelen - 1] == ' ') namelen--;
+        raw[namelen] = 0;
+
+        char *member = NULL;
+        u8 *body = payload;
+        u32 body_len = payload_len;
+        if (strcmp(raw, "/") == 0 || strcmp(raw, "/SYM64") == 0) continue;
+        if (strcmp(raw, "//") == 0) {
+            strtab = payload;
+            strtab_len = payload_len;
+            continue;
+        }
+        if (raw[0] == '/' && raw[1] >= '0' && raw[1] <= '9') {
+            member = ar_strtab_name(alloc, strtab, strtab_len, ar_field_int(raw + 1, namelen - 1));
+            if (!member) {
+                source_error(L, pos, "Archive '%s' has a member name the string table does not contain.", path);
+                return;
+            }
+        } else if (namelen >= 3 && memcmp(raw, "#1/", 3) == 0) {
+            i32 n = ar_field_int(raw + 3, namelen - 3);
+            if (n < 0 || (u32) n > payload_len) {
+                source_error(L, pos, "Malformed archive '%s'.", path);
+                return;
+            }
+            member = ar_copy_name(alloc, payload, (u32) n);
+            body = payload + n;
+            body_len = payload_len - (u32) n;
+        } else {
+            if (namelen > 0 && raw[namelen - 1] == '/') raw[--namelen] = 0;
+            member = ar_copy_name(alloc, (const u8 *) raw, (u32) namelen);
+        }
+
+        if (body_len < 4 || memcmp(body, "\0asm", 4) != 0) {
+            source_error(L, pos, "Archive member '%s' in '%s' is not a WASM object.", member ? member : "", path);
+            return;
+        }
+        char *display = bh_aprintf(alloc, "%s(%s)", path, member ? member : "");
+        ObjFile *file = parse_object_bytes(L, display, path, pos, body, body_len);
+        bh_arr_push(L->files, file);
+        wasm_members++;
+        if (file->failed) return;
+    }
+
+    if (!L->failed && wasm_members == 0)
+        source_error(L, pos, "Archive '%s' contains no WASM objects.", path);
+}
+
+static void load_source(Linker *L, const char *path, OnyxFilePos pos) {
+    if (source_is_loaded(L, path) || L->failed) return;
+
+    bh_allocator alloc = L->module->allocator;
+    bh_file_contents contents = bh_file_read_contents(alloc, path);
+    u8 *bytes = (u8 *) contents.data;
+    u32 length = (u32) contents.length;
+    if (bytes && length >= 8 && (memcmp(bytes, "!<arch>\n", 8) == 0 || memcmp(bytes, "!<thin>\n", 8) == 0)) {
+        load_archive(L, path, pos, bytes, length);
+        return;
+    }
+
+    ObjFile *file = parse_object_bytes(L, path, NULL, pos, bytes, length);
     bh_arr_push(L->files, file);
-    return file;
+}
+
+static i32 collect_source_function(Linker *L, const char *source, const char *name, ObjSymbol **out) {
+    i32 count = 0;
+    *out = NULL;
+    bh_arr_each(ObjFile *, pfile, L->files) {
+        if (!file_is_source(*pfile, source)) continue;
+        ObjSymbol *sym = find_named(*pfile, name, SYM_FUNCTION);
+        if (!sym) continue;
+        count++;
+        *out = sym;
+    }
+    return count;
 }
 
 static void finish_tls_image(Linker *L) {
@@ -1631,35 +1811,47 @@ void onyx_wasm_link_object_files(OnyxWasmModule *module) {
     bh_arr_each(AstObjectBlock *, pblock, module->object_blocks) {
         AstObjectBlock *block = *pblock;
         if (!block->filename) continue;
-        ObjFile *file = file_for_path(&linker, block->filename, block->token->pos);
-        if (file) add_file_provides(&linker, file, block);
+        load_source(&linker, block->filename, block->token->pos);
+        if (linker.failed) return;
+        bh_arr_each(ObjFile *, pfile, linker.files) {
+            if (file_is_source(*pfile, block->filename))
+                add_file_provides(&linker, *pfile, block);
+        }
     }
     if (linker.failed) return;
     bh_arr_each(AstFunction *, pfunc, module->object_functions) {
         AstFunction *fn = *pfunc;
         if (!fn->object_filename) continue;
-        file_for_path(&linker, fn->object_filename, fn->token->pos);
+        load_source(&linker, fn->object_filename, fn->token->pos);
     }
     if (linker.failed) return;
 
     bh_arr_each(AstFunction *, pfunc, module->object_functions) {
         AstFunction *fn = *pfunc;
-        ObjFile *file = NULL;
-        bh_arr_each(ObjFile *, pfile, linker.files) {
-            if (strcmp((*pfile)->path, fn->object_filename) == 0) file = *pfile;
-        }
-        if (!file) {
+        ObjSymbol *sym = NULL;
+        i32 matches = collect_source_function(&linker, fn->object_filename, fn->object_symbol, &sym);
+        if (matches > 1) {
             onyx_report_error(module->context, fn->token->pos, Error_Critical,
-                "Object file '%s' was not loaded.", fn->object_filename);
-            return;
+                "Symbol '%s' is defined more than once in '%s'.", fn->object_symbol, fn->object_filename);
+            linker.failed = 1;
+            continue;
         }
-        ObjSymbol *sym = find_named(file, fn->object_symbol, SYM_FUNCTION);
         if (!sym) {
+            b32 loaded = 0;
+            bh_arr_each(ObjFile *, pfile, linker.files) {
+                if (file_is_source(*pfile, fn->object_filename)) loaded = 1;
+            }
+            if (!loaded) {
+                onyx_report_error(module->context, fn->token->pos, Error_Critical,
+                    "Object file '%s' was not loaded.", fn->object_filename);
+                return;
+            }
             onyx_report_error(module->context, fn->token->pos, Error_Critical,
                 "Symbol '%s' was not found in '%s'.", fn->object_symbol, fn->object_filename);
             linker.failed = 1;
             continue;
         }
+        ObjFile *file = sym->file;
         u32 imports = (u32) bh_arr_length(file->func_imports);
         if (sym->index < imports || sym->index - imports >= (u32) bh_arr_length(file->funcs)) {
             onyx_report_error(module->context, fn->token->pos, Error_Critical,
@@ -1705,12 +1897,10 @@ void onyx_wasm_link_object_files(OnyxWasmModule *module) {
 
     bh_arr_each(AstFunction *, pfunc, module->object_functions) {
         AstFunction *fn = *pfunc;
-        bh_arr_each(ObjFile *, pfile, linker.files) {
-            if (strcmp((*pfile)->path, fn->object_filename) != 0) continue;
-            ObjSymbol *sym = find_named(*pfile, fn->object_symbol, SYM_FUNCTION);
-            if (sym && sym->out_func >= 0)
-                bh_imap_put(&module->index_map, (u64) fn, (u64) sym->out_func);
-        }
+        ObjSymbol *sym = NULL;
+        i32 matches = collect_source_function(&linker, fn->object_filename, fn->object_symbol, &sym);
+        if (matches == 1 && sym && sym->out_func >= 0)
+            bh_imap_put(&module->index_map, (u64) fn, (u64) sym->out_func);
     }
 
     apply_relocs(&linker);
