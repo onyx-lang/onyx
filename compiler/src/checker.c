@@ -6127,7 +6127,7 @@ CHECK_FUNC(object_block, AstObjectBlock *ob) {
             prov->name = bh_strdup(context->gp_alloc, temp);
         }
 
-        if (prov->func != NULL) continue;
+        if (prov->func != NULL || prov->memres != NULL) continue;
 
         AstNode *resolved = NULL;
         if (prov->expr != NULL) {
@@ -6140,8 +6140,26 @@ CHECK_FUNC(object_block, AstObjectBlock *ob) {
             resolved = strip_aliases(resolved);
         }
 
-        if (resolved == NULL || resolved->kind != Ast_Kind_Function) {
-            ERROR_(prov->symbol->pos, "'%s' must provide a procedure.", prov->name);
+        if (resolved == NULL || (resolved->kind != Ast_Kind_Function && resolved->kind != Ast_Kind_Memres)) {
+            ERROR_(prov->symbol->pos, "'%s' must provide a procedure or a global.", prov->name);
+        }
+
+        bh_arr_each(ObjectProvide, earlier, ob->provides) {
+            if (earlier == prov) break;
+            if (earlier->name && strcmp(earlier->name, prov->name) == 0) {
+                ERROR_(prov->symbol->pos, "Symbol '%s' is provided more than once.", prov->name);
+            }
+        }
+
+        if (resolved->kind == Ast_Kind_Memres) {
+            AstMemRes *memres = (AstMemRes *) resolved;
+            // Memory reservations do not set Has_Been_Checked. The type is
+            // enough here; its address is assigned later, before linking.
+            if (memres->type == NULL) {
+                YIELD_(prov->symbol->pos, "Waiting for '%s' to be type-checked.", prov->name);
+            }
+            prov->memres = memres;
+            continue;
         }
 
         AstFunction *func = (AstFunction *) resolved;
@@ -6156,13 +6174,6 @@ CHECK_FUNC(object_block, AstObjectBlock *ob) {
         }
         if (func->body == NULL) {
             ERROR_(prov->symbol->pos, "'%s' must provide a procedure with a body.", prov->name);
-        }
-
-        bh_arr_each(ObjectProvide, earlier, ob->provides) {
-            if (earlier == prov) break;
-            if (earlier->name && strcmp(earlier->name, prov->name) == 0) {
-                ERROR_(prov->symbol->pos, "Symbol '%s' is provided more than once.", prov->name);
-            }
         }
 
         prov->func = func;

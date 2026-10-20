@@ -1738,12 +1738,16 @@ struct ObjectProvide {
     char *name;
     AstTyped *expr;
     AstFunction *func;
+    // A memory reservation, such as `errno: i32`, provided in place of a
+    // data symbol. The object's loads and stores of that symbol use its address.
+    struct AstMemRes *memres;
 };
 typedef struct ObjectProvide ObjectProvide;
 
 // Links procedures from a WASM object file (Clang/LLVM linking section v2).
 // Empty-bodied declarations are symbols defined by the object. `#provide`
-// binds symbols that this object imports to Onyx procedures. A provide in
+// binds symbols that this object imports to Onyx procedures or memory
+// reservations. A provide in
 // one object does not satisfy the same symbol in another object.
 struct AstObjectBlock {
     AstTyped_base;
