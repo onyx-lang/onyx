@@ -61,8 +61,6 @@ typedef struct OnyxParser {
     b32 hit_unexpected_token : 1;
     b32 parse_calls : 1;
     b32 parse_quick_functions : 1;
-    // A #provide alias names an existing value. Do not introduce it as a binding.
-    b32 provide_alias : 1;
 
     // Caps recursive descent on partial editor buffers.
     i32 parse_depth;

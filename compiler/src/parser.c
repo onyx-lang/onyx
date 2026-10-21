@@ -1309,7 +1309,7 @@ static AstTyped* parse_factor_impl(OnyxParser* parser) {
                 new_token->text = first_char;
                 new_token->length = length;
                 new_token->pos = (peek_token(-2))->pos; // :LinearTokenDependent
-                
+
                 AstStrLit* str_node = make_node(AstStrLit, Ast_Kind_StrLit);
                 str_node->token     = new_token;
                 str_node->flags    |= Ast_Flag_Comptime;
@@ -2517,66 +2517,66 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
     symbol_node->flags |= Ast_Flag_Symbol_Is_PolyVar;
 
     bh_arr(ImplicitInterfaceConstraint) implicit_constraints = NULL;
-    
+
     if (consume_token_if_next(parser, '/')) {
         bh_arr_new(parser->context->gp_alloc, implicit_constraints, 2);
-        
+
         // Check if we have a brace-enclosed list
         if (consume_token_if_next(parser, '{')) {
             // Parse comma-separated interfaces with optional arguments
             do {
                 ImplicitInterfaceConstraint constraint;
                 constraint.extra_args = NULL;
-                
+
                 // Disable call parsing to get just the interface name
                 parser->parse_calls = 0;
                 constraint.interface = (AstNode *) parse_factor(parser);
                 parser->parse_calls = 1;
-                
+
                 // Check if there are arguments: Interface(arg1, arg2)
                 if (consume_token_if_next(parser, '(')) {
                     bh_arr_new(parser->context->gp_alloc, constraint.extra_args, 2);
-                    
+
                     while (!consume_token_if_next(parser, ')')) {
                         if (parser->hit_unexpected_token) return;
-                        
+
                         AstTyped* arg = parse_expression(parser, 0);
                         bh_arr_push(constraint.extra_args, arg);
-                        
+
                         if (parser->curr->type != ')')
                             expect_token(parser, ',');
                     }
                 }
-                
+
                 bh_arr_push(implicit_constraints, constraint);
             } while (consume_token_if_next(parser, ','));
-            
+
             expect_token(parser, '}');
         } else {
             // Single interface (backward compatible)
             ImplicitInterfaceConstraint constraint;
             constraint.extra_args = NULL;
-            
+
             // Disable call parsing to get just the interface name
             parser->parse_calls = 0;
             constraint.interface = (AstNode *) parse_factor(parser);
             parser->parse_calls = 1;
-            
+
             // Check if there are arguments: Interface(arg)
             if (consume_token_if_next(parser, '(')) {
                 bh_arr_new(parser->context->gp_alloc, constraint.extra_args, 2);
-                
+
                 while (!consume_token_if_next(parser, ')')) {
                     if (parser->hit_unexpected_token) return;
-                    
+
                     AstTyped* arg = parse_expression(parser, 0);
                     bh_arr_push(constraint.extra_args, arg);
-                    
+
                     if (parser->curr->type != ')')
                         expect_token(parser, ',');
                 }
             }
-            
+
             bh_arr_push(implicit_constraints, constraint);
         }
     }
@@ -4375,9 +4375,7 @@ static void parse_object_provides(OnyxParser *parser, AstObjectBlock *ob) {
         // does not collide with the same C symbol provided by another block.
         Scope *saved_scope = parser->current_scope;
         parser->current_scope = ob->scope;
-        parser->provide_alias = 1;
         AstBinding *binding = parse_top_level_binding(parser, symbol);
-        parser->provide_alias = 0;
         parser->current_scope = saved_scope;
         if (binding == NULL) break;
 
@@ -4588,7 +4586,7 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
             }
 
 default_case:
-            if (!parser->provide_alias) ENTITY_SUBMIT(node);
+            ENTITY_SUBMIT(node);
         }
     }
 
@@ -5280,7 +5278,6 @@ OnyxParser onyx_parser_create(Context *context, OnyxTokenizer *tokenizer) {
     parser.stored_tags = NULL;
     parser.parse_calls = 1;
     parser.parse_quick_functions = 1;
-    parser.provide_alias = 0;
     parser.tag_depth = 0;
     parser.overload_count = 0;
     parser.injection_point = NULL;
