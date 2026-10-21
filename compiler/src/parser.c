@@ -4371,9 +4371,14 @@ static void parse_object_provides(OnyxParser *parser, AstObjectBlock *ob) {
         }
         expect_token(parser, ':');
 
+        // Name the procedure inside the object scope so its assembly name
+        // does not collide with the same C symbol provided by another block.
+        Scope *saved_scope = parser->current_scope;
+        parser->current_scope = ob->scope;
         parser->provide_alias = 1;
         AstBinding *binding = parse_top_level_binding(parser, symbol);
         parser->provide_alias = 0;
+        parser->current_scope = saved_scope;
         if (binding == NULL) break;
 
         if (bh_arr_length(parser->scope_flags) > 0)
@@ -4381,9 +4386,13 @@ static void parse_object_provides(OnyxParser *parser, AstObjectBlock *ob) {
 
         // `errno :: errno` becomes an alias of the existing global. The
         // left-hand name is the C symbol, not a new Onyx binding. A procedure
-        // body is a new definition and is submitted.
-        if (binding->node->kind != Ast_Kind_Alias)
-            submit_binding(parser, binding);
+        // body is a new definition, but only inside this object block. Two
+        // blocks may provide the same C name without sharing a binding.
+        if (binding->node->kind != Ast_Kind_Alias) {
+            flush_doc_tokens(parser, &binding->documentation_string, &binding->documentation_token_old);
+            binding->flags |= Ast_Flag_Binding_Isnt_Captured;
+            ENTITY_SUBMIT_IN_SCOPE(binding, ob->scope);
+        }
 
         ObjectProvide prov;
         memset(&prov, 0, sizeof(prov));
@@ -4402,6 +4411,8 @@ static AstObjectBlock* parse_object_block(OnyxParser* parser, OnyxToken *token) 
     AstObjectBlock *ob = make_node(AstObjectBlock, Ast_Kind_Object_Block);
     ob->token = token;
     ob->filename_expr = parse_expression(parser, 0);
+    ob->scope = scope_create(parser->context, parser->current_scope, token->pos);
+    ob->scope->name = bh_aprintf(parser->context->gp_alloc, "object_%d", (int) ob->scope->id);
 
     bh_arr_new(parser->context->gp_alloc, ob->captured_entities, 4);
     bh_arr_push(parser->alternate_entity_placement_stack, &ob->captured_entities);
