@@ -12,259 +12,259 @@ use runtime
 /// C `malloc`. Memory comes from `context.allocator`.
 /// A zero size still returns a unique freeable pointer.
 malloc :: (size: i32) -> rawptr {
-    if size < 0 do return null;
+    if size < 0 do return null
 
-    bytes := cast(u32) size;
-    if bytes == 0 do bytes = 1;
-    return raw_alloc(context.allocator, bytes);
+    bytes := cast(u32) size
+    if bytes == 0 do bytes = 1
+    return raw_alloc(context.allocator, bytes)
 }
 
 /// C `free`. `null` is ignored.
 free :: (ptr: rawptr) {
-    if ptr == null do return;
-    raw_free(context.allocator, ptr);
+    if ptr == null do return
+    raw_free(context.allocator, ptr)
 }
 
 /// C `realloc`. `null` allocates, and a non-positive size frees.
 realloc :: (ptr: rawptr, size: i32) -> rawptr {
     if size <= 0 {
-        free(ptr);
-        return null;
+        free(ptr)
+        return null
     }
-    if ptr == null do return malloc(size);
-    return raw_resize(context.allocator, ptr, cast(u32) size);
+    if ptr == null do return malloc(size)
+    return raw_resize(context.allocator, ptr, cast(u32) size)
 }
 
 /// C `memcpy`. The ranges must not overlap.
 memcpy :: (dest, src: rawptr, count: i32) -> rawptr {
-    if count > 0 do memory.copy(dest, src, count);
-    return dest;
+    if count > 0 do memory.copy(dest, src, count)
+    return dest
 }
 
 /// C `memmove`. Overlapping ranges are safe.
 memmove :: (dest, src: rawptr, count: i32) -> rawptr {
-    if count > 0 do memory.copy(dest, src, count);
-    return dest;
+    if count > 0 do memory.copy(dest, src, count)
+    return dest
 }
 
 /// C `memset`. `value` is truncated to a byte, matching C.
 memset :: (dest: rawptr, value: i32, count: i32) -> rawptr {
-    if count > 0 do memory.set(dest, cast(u8) value, count);
-    return dest;
+    if count > 0 do memory.set(dest, cast(u8) value, count)
+    return dest
 }
 
 /// C `memcmp`. Bytes are compared as unsigned values.
 memcmp :: (left, right: rawptr, count: i32) -> i32 {
-    a := cast([&] u8) left;
-    b := cast([&] u8) right;
+    a := cast([&] u8) left
+    b := cast([&] u8) right
     for i in 0 .. count {
-        if a[i] != b[i] do return cast(i32) a[i] - cast(i32) b[i];
+        if a[i] != b[i] do return cast(i32) a[i] - cast(i32) b[i]
     }
-    return 0;
+    return 0
 }
 
 /// C `strlen`.
 strlen :: (text: rawptr) -> i32 {
-    bytes := cast([&] u8) text;
-    n := 0;
-    while bytes[n] != 0 do n += 1;
-    return n;
+    bytes := cast([&] u8) text
+    n := 0
+    while bytes[n] != 0 do n += 1
+    return n
 }
 
 /// C `strcmp`.
 strcmp :: (left, right: rawptr) -> i32 {
-    a := cast([&] u8) left;
-    b := cast([&] u8) right;
-    i := 0;
+    a := cast([&] u8) left
+    b := cast([&] u8) right
+    i := 0
     while a[i] != 0 || b[i] != 0 {
-        if a[i] != b[i] do return cast(i32) a[i] - cast(i32) b[i];
-        i += 1;
+        if a[i] != b[i] do return cast(i32) a[i] - cast(i32) b[i]
+        i += 1
     }
-    return 0;
+    return 0
 }
 
 /// C `pow` for `double`.
 pow :: (base, exponent: f64) -> f64 {
-    return math.pow(base, exponent);
+    return math.pow(base, exponent)
 }
 
 // Errno numbers from the wasm32-wasi-musl libc that typical freestanding
 // Clang objects are built against. They are not the Linux values.
-EINVAL  :: 28;
-ENOMEM  :: 48;
-ERANGE  :: 68;
-ENOENT  :: 44;
-EBADF   :: 8;
-EIO     :: 29;
-EMFILE  :: 33;
-ENOTDIR :: 54;
-EACCES  :: 2;
-EEXIST  :: 20;
+EINVAL  :: 28
+ENOMEM  :: 48
+ERANGE  :: 68
+ENOENT  :: 44
+EBADF   :: 8
+EIO     :: 29
+EMFILE  :: 33
+ENOTDIR :: 54
+EACCES  :: 2
+EEXIST  :: 20
 
 /// C `errno`. One reservation shared by every `#provide` that binds it.
-errno: i32;
+errno: i32
 
 /// wasm32 `CLOCK_REALTIME`. C code loads this data symbol; the value is 0.
-_CLOCK_REALTIME: i32 = 0;
+_CLOCK_REALTIME: i32 = 0
 
 #local
 is_space :: (c: u8) -> bool {
-    return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f';
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f'
 }
 
 #local
 digit_value :: (c: u8) -> i32 {
-    if c >= '0' && c <= '9' do return cast(i32) c - cast(i32) '0';
-    if c >= 'a' && c <= 'z' do return cast(i32) c - cast(i32) 'a' + 10;
-    if c >= 'A' && c <= 'Z' do return cast(i32) c - cast(i32) 'A' + 10;
-    return -1;
+    if c >= '0' && c <= '9' do return cast(i32) c - cast(i32) '0'
+    if c >= 'a' && c <= 'z' do return cast(i32) c - cast(i32) 'a' + 10
+    if c >= 'A' && c <= 'Z' do return cast(i32) c - cast(i32) 'A' + 10
+    return -1
 }
 
 /// C `strncmp`. Comparison stops after `count` bytes or at a null.
 strncmp :: (left, right: rawptr, count: i32) -> i32 {
-    a := cast([&] u8) left;
-    b := cast([&] u8) right;
+    a := cast([&] u8) left
+    b := cast([&] u8) right
     for i in 0 .. count {
-        if a[i] != b[i] || a[i] == 0 do return cast(i32) a[i] - cast(i32) b[i];
+        if a[i] != b[i] || a[i] == 0 do return cast(i32) a[i] - cast(i32) b[i]
     }
-    return 0;
+    return 0
 }
 
 /// C `strchr`. `ch` is truncated to a byte. A search for 0 returns the terminator.
 strchr :: (text: rawptr, ch: i32) -> rawptr {
-    if text == null do return null;
-    c := cast(u8) ch;
-    p := cast([&] u8) text;
+    if text == null do return null
+    c := cast(u8) ch
+    p := cast([&] u8) text
     while true {
-        if p[0] == c do return p;
-        if p[0] == 0 do return null;
-        p = p + 1;
+        if p[0] == c do return p
+        if p[0] == 0 do return null
+        p = p + 1
     }
-    return null;
+    return null
 }
 
 /// C `strrchr`. Returns the last matching byte, including a search for 0.
 strrchr :: (text: rawptr, ch: i32) -> rawptr {
-    if text == null do return null;
-    c := cast(u8) ch;
-    last: rawptr = null;
-    p := cast([&] u8) text;
+    if text == null do return null
+    c := cast(u8) ch
+    last: rawptr = null
+    p := cast([&] u8) text
     while true {
-        if p[0] == c do last = p;
-        if p[0] == 0 do return last;
-        p = p + 1;
+        if p[0] == c do last = p
+        if p[0] == 0 do return last
+        p = p + 1
     }
-    return null;
+    return null
 }
 
 /// C `strstr`. An empty needle returns `haystack`.
 strstr :: (haystack, needle: rawptr) -> rawptr {
-    if haystack == null || needle == null do return null;
-    h := cast([&] u8) haystack;
-    n := cast([&] u8) needle;
-    if n[0] == 0 do return h;
-    len := strlen(n);
+    if haystack == null || needle == null do return null
+    h := cast([&] u8) haystack
+    n := cast([&] u8) needle
+    if n[0] == 0 do return h
+    len := strlen(n)
     while h[0] != 0 {
-        if strncmp(h, n, len) == 0 do return h;
-        h = h + 1;
+        if strncmp(h, n, len) == 0 do return h
+        h = h + 1
     }
-    return null;
+    return null
 }
 
 /// C `strspn`. Counts the leading bytes that appear in `accept`.
 strspn :: (text, accept: rawptr) -> i32 {
-    s := cast([&] u8) text;
-    n := 0;
+    s := cast([&] u8) text
+    n := 0
     while s[n] != 0 {
-        if strchr(accept, cast(i32) s[n]) == null do return n;
-        n += 1;
+        if strchr(accept, cast(i32) s[n]) == null do return n
+        n += 1
     }
-    return n;
+    return n
 }
 
 /// C `strcspn`. Counts the leading bytes that do not appear in `reject`.
 strcspn :: (text, reject: rawptr) -> i32 {
-    s := cast([&] u8) text;
-    n := 0;
+    s := cast([&] u8) text
+    n := 0
     while s[n] != 0 {
-        if strchr(reject, cast(i32) s[n]) != null do return n;
-        n += 1;
+        if strchr(reject, cast(i32) s[n]) != null do return n
+        n += 1
     }
-    return n;
+    return n
 }
 
 /// C `strpbrk`. Returns the first byte of `text` that appears in `accept`.
 strpbrk :: (text, accept: rawptr) -> rawptr {
-    p := cast([&] u8) text;
+    p := cast([&] u8) text
     while p[0] != 0 {
-        if strchr(accept, cast(i32) p[0]) != null do return p;
-        p = p + 1;
+        if strchr(accept, cast(i32) p[0]) != null do return p
+        p = p + 1
     }
-    return null;
+    return null
 }
 
 /// C `strcpy`. `dest` must have room for `src` and its terminator.
 strcpy :: (dest, src: rawptr) -> rawptr {
-    d := cast([&] u8) dest;
-    s := cast([&] u8) src;
-    i := 0;
+    d := cast([&] u8) dest
+    s := cast([&] u8) src
+    i := 0
     while s[i] != 0 {
-        d[i] = s[i];
-        i += 1;
+        d[i] = s[i]
+        i += 1
     }
-    d[i] = 0;
-    return dest;
+    d[i] = 0
+    return dest
 }
 
 /// C `strncpy`. Copies at most `count` bytes and zero-fills the remainder.
 /// The result is not terminated when `src` is longer than `count`.
 strncpy :: (dest, src: rawptr, count: i32) -> rawptr {
-    d := cast([&] u8) dest;
-    s := cast([&] u8) src;
-    i := 0;
+    d := cast([&] u8) dest
+    s := cast([&] u8) src
+    i := 0
     while i < count && s[i] != 0 {
-        d[i] = s[i];
-        i += 1;
+        d[i] = s[i]
+        i += 1
     }
     while i < count {
-        d[i] = 0;
-        i += 1;
+        d[i] = 0
+        i += 1
     }
-    return dest;
+    return dest
 }
 
 /// C `strdup`. The result is allocated with `malloc`.
 strdup :: (text: rawptr) -> rawptr {
-    if text == null do return null;
-    n := strlen(text);
-    p := cast([&] u8) malloc(n + 1);
-    if p == null do return null;
-    memory.copy(p, text, n);
-    p[n] = 0;
-    return p;
+    if text == null do return null
+    n := strlen(text)
+    p := cast([&] u8) malloc(n + 1)
+    if p == null do return null
+    memory.copy(p, text, n)
+    p[n] = 0
+    return p
 }
 
 /// C `memchr`.
 memchr :: (mem: rawptr, ch: i32, count: i32) -> rawptr {
-    if mem == null || count <= 0 do return null;
-    b := cast([&] u8) mem;
-    c := cast(u8) ch;
+    if mem == null || count <= 0 do return null
+    b := cast([&] u8) mem
+    c := cast(u8) ch
     for i in 0 .. count {
-        if b[i] == c do return b + i;
+        if b[i] == c do return b + i
     }
-    return null;
+    return null
 }
 
 /// C `tolower` for a byte. Values outside `A`-`Z` are unchanged.
 tolower :: (ch: i32) -> i32 {
-    if ch >= 'A' && ch <= 'Z' do return ch + 32;
-    return ch;
+    if ch >= 'A' && ch <= 'Z' do return ch + 32
+    return ch
 }
 
 /// C `strerror`. The pointer is to a single reused buffer.
 strerror :: (err: i32) -> rawptr {
-    #persist buf: [64] u8;
-    msg: str = "Unknown error";
+    #persist buf: [64] u8
+    msg: str = "Unknown error"
     switch err {
         case 0       { msg = "Success"; }
         case EACCES  { msg = "Permission denied"; }
@@ -280,26 +280,26 @@ strerror :: (err: i32) -> rawptr {
         case _       {}
     }
 
-    n := msg.count;
-    if n > 63 do n = 63;
-    memory.copy(~~buf, msg.data, n);
-    buf[n] = 0;
-    return ~~buf;
+    n := msg.count
+    if n > 63 do n = 63
+    memory.copy(~~buf, msg.data, n)
+    buf[n] = 0
+    return ~~buf
 }
 
 /// C `getenv`. The returned string is a `malloc` copy; missing names return null.
 #if runtime.platform.Supports_Env_Vars {
     getenv :: (name: rawptr) -> rawptr {
-        if name == null do return null;
-        found := runtime.platform.__get_env(string.from_cstr(cast(cstr) name));
+        if name == null do return null
+        found := runtime.platform.__get_env(string.from_cstr(cast(cstr) name))
         if found as value {
-            p := cast([&] u8) malloc(value.count + 1);
-            if p == null do return null;
-            if value.count > 0 do memory.copy(p, value.data, value.count);
-            p[value.count] = 0;
-            return p;
+            p := cast([&] u8) malloc(value.count + 1)
+            if p == null do return null
+            if value.count > 0 do memory.copy(p, value.data, value.count)
+            p[value.count] = 0
+            return p
         }
-        return null;
+        return null
     }
 }
 
@@ -307,989 +307,988 @@ strerror :: (err: i32) -> rawptr {
 #local
 strto :: (text: rawptr, end: rawptr, base: i32, want_signed: bool) -> i32 {
     if text == null {
-        errno = EINVAL;
-        return 0;
+        errno = EINVAL
+        return 0
     }
 
-    p := cast([&] u8) text;
-    while is_space(p[0]) do p = p + 1;
+    p := cast([&] u8) text
+    while is_space(p[0]) do p = p + 1
 
-    neg := false;
+    neg := false
     if p[0] == '-' || p[0] == '+' {
-        neg = p[0] == '-';
-        p = p + 1;
+        neg = p[0] == '-'
+        p = p + 1
     }
 
     if base != 0 && (base < 2 || base > 36) {
-        errno = EINVAL;
-        if end != null do *cast(&rawptr) end = text;
-        return 0;
+        errno = EINVAL
+        if end != null do *cast(&rawptr) end = text
+        return 0
     }
 
-    b := base;
+    b := base
     if b == 0 {
-        b = 10;
+        b = 10
         if p[0] == '0' {
             if p[1] == 'x' || p[1] == 'X' {
-                b = 16;
-                p = p + 2;
-            } else do b = 8;
+                b = 16
+                p = p + 2
+            } else do b = 8
         }
     } else {
         if b == 16 && p[0] == '0' && (p[1] == 'x' || p[1] == 'X') {
-            p = p + 2;
+            p = p + 2
         }
     }
 
-    limit: u64 = (cast(u64) 1 << 32) - 1;
+    limit: u64 = (cast(u64) 1 << 32) - 1
     if want_signed {
-        limit = 2147483647;
-        if neg do limit = cast(u64) 1 << 31;
+        limit = 2147483647
+        if neg do limit = cast(u64) 1 << 31
     }
 
-    any := false;
-    overflow := false;
-    acc: u64 = 0;
+    any := false
+    overflow := false
+    acc: u64 = 0
     while true {
-        d := digit_value(p[0]);
-        if d < 0 || d >= b do break;
-        any = true;
+        d := digit_value(p[0])
+        if d < 0 || d >= b do break
+        any = true
         if !overflow {
-            bb := cast(u64) b;
-            dd := cast(u64) d;
+            bb := cast(u64) b
+            dd := cast(u64) d
             if acc > (limit - dd) / bb {
-                overflow = true;
+                overflow = true
             } else {
-                acc = acc * bb + dd;
+                acc = acc * bb + dd
             }
         }
-        p = p + 1;
+        p = p + 1
     }
 
     if !any {
-        if end != null do *cast(&rawptr) end = text;
-        return 0;
+        if end != null do *cast(&rawptr) end = text
+        return 0
     }
-    if end != null do *cast(&rawptr) end = p;
+    if end != null do *cast(&rawptr) end = p
 
     if overflow {
-        errno = ERANGE;
-        if !want_signed do return cast(i32) (~cast(u32) 0);
-        if neg do return cast(i32) (cast(u32) 1 << 31);
-        return 2147483647;
+        errno = ERANGE
+        if !want_signed do return cast(i32) (~cast(u32) 0)
+        if neg do return cast(i32) (cast(u32) 1 << 31)
+        return 2147483647
     }
 
     if want_signed {
         if neg {
-            if acc == (cast(u64) 1 << 31) do return cast(i32) (cast(u32) 1 << 31);
-            return 0 - cast(i32) acc;
+            if acc == (cast(u64) 1 << 31) do return cast(i32) (cast(u32) 1 << 31)
+            return 0 - cast(i32) acc
         }
-        return cast(i32) acc;
+        return cast(i32) acc
     }
 
-    bits := cast(u32) acc;
-    if neg do bits = 0 - bits;
-    return cast(i32) bits;
+    bits := cast(u32) acc
+    if neg do bits = 0 - bits
+    return cast(i32) bits
 }
 
 /// C `strtol`. The result is a wasm32 `long`.
 strtol :: (text: rawptr, end: rawptr, base: i32) -> i32 {
-    return strto(text, end, base, true);
+    return strto(text, end, base, true)
 }
 
 /// C `strtoul`. The result is a wasm32 `unsigned long` stored in an `i32`.
 strtoul :: (text: rawptr, end: rawptr, base: i32) -> i32 {
-    return strto(text, end, base, false);
+    return strto(text, end, base, false)
 }
 
 /// C `atoi`.
 atoi :: (text: rawptr) -> i32 {
-    return strto(text, null, 10, true);
+    return strto(text, null, 10, true)
 }
 
 /// C `calloc`. The product is checked for overflow. A zero product still allocates.
 calloc :: (count, size: i32) -> rawptr {
     if count < 0 || size < 0 {
-        errno = ENOMEM;
-        return null;
+        errno = ENOMEM
+        return null
     }
     if count != 0 && size != 0 && count > 2147483647 / size {
-        errno = ENOMEM;
-        return null;
+        errno = ENOMEM
+        return null
     }
-    bytes := count * size;
-    p := malloc(bytes);
-    if p != null && bytes > 0 do memset(p, 0, bytes);
-    return p;
+    bytes := count * size
+    p := malloc(bytes)
+    if p != null && bytes > 0 do memset(p, 0, bytes)
+    return p
 }
 
 /// C `posix_memalign`. `alignment` must be a power of two and at least 4.
 /// Returns 0 or an errno value, and also stores that errno.
 posix_memalign :: (out: &rawptr, alignment: i32, size: i32) -> i32 {
     if out == null || alignment < 4 || (alignment & (alignment - 1)) != 0 {
-        errno = EINVAL;
-        return EINVAL;
+        errno = EINVAL
+        return EINVAL
     }
     if size < 0 {
-        errno = ENOMEM;
-        return ENOMEM;
+        errno = ENOMEM
+        return ENOMEM
     }
 
-    bytes := size;
-    if bytes == 0 do bytes = 1;
-    p := raw_alloc(context.allocator, cast(u32) bytes, cast(u32) alignment);
+    bytes := size
+    if bytes == 0 do bytes = 1
+    p := raw_alloc(context.allocator, cast(u32) bytes, cast(u32) alignment)
     if p == null {
-        errno = ENOMEM;
-        return ENOMEM;
+        errno = ENOMEM
+        return ENOMEM
     }
-    *out = p;
-    return 0;
+    *out = p
+    return 0
 }
 
 #local
-Compare :: #type (a: rawptr, b: rawptr) -> i32;
+Compare :: #type (a: rawptr, b: rawptr) -> i32
 
 #local
 sort_swap :: (bytes: [&] u8, tmp: [&] u8, size: i32, i: i32, j: i32) {
-    if i == j do return;
-    memory.copy(tmp, bytes + i * size, size);
-    memory.copy(bytes + i * size, bytes + j * size, size);
-    memory.copy(bytes + j * size, tmp, size);
+    if i == j do return
+    memory.copy(tmp, bytes + i * size, size)
+    memory.copy(bytes + i * size, bytes + j * size, size)
+    memory.copy(bytes + j * size, tmp, size)
 }
 
 #local
 sort_sift :: (bytes: [&] u8, tmp: [&] u8, size: i32, cmp: Compare, root: i32, end: i32) {
     while true {
-        child := root * 2 + 1;
-        if child >= end do return;
+        child := root * 2 + 1
+        if child >= end do return
         if child + 1 < end && cmp(bytes + child * size, bytes + (child + 1) * size) < 0 {
-            child += 1;
+            child += 1
         }
-        if cmp(bytes + root * size, bytes + child * size) >= 0 do return;
-        sort_swap(bytes, tmp, size, root, child);
-        root = child;
+        if cmp(bytes + root * size, bytes + child * size) >= 0 do return
+        sort_swap(bytes, tmp, size, root, child)
+        root = child
     }
 }
 
 /// C `qsort`. `compare` is a wasm function-table index, the form Clang passes
 /// for an `int (*)(const void *, const void *)`.
 qsort :: (base: rawptr, count: i32, size: i32, compare: i32) {
-    if base == null || count <= 1 || size <= 0 do return;
+    if base == null || count <= 1 || size <= 0 do return
 
-    cmp := Compare.{ compare, null };
-    bytes := cast([&] u8) base;
-    tmp := cast([&] u8) malloc(size);
-    if tmp == null do return;
-    defer free(tmp);
+    cmp := Compare.{ compare, null }
+    bytes := cast([&] u8) base
+    tmp := core.alloc.array_from_stack(u8, size)
+    if !tmp do return
 
-    start := count / 2;
+    start := count / 2
     while start > 0 {
-        start -= 1;
-        sort_sift(bytes, tmp, size, cmp, start, count);
+        start -= 1
+        sort_sift(bytes, tmp.data, size, cmp, start, count)
     }
 
-    end := count;
+    end := count
     while end > 1 {
-        end -= 1;
-        sort_swap(bytes, tmp, size, 0, end);
-        sort_sift(bytes, tmp, size, cmp, 0, end);
+        end -= 1
+        sort_swap(bytes, tmp.data, size, 0, end)
+        sort_sift(bytes, tmp.data, size, cmp, 0, end)
     }
 }
 
 #local
 Out :: struct {
-    dst: [&] u8;
-    cap: i32;
-    len: i32;
+    dst: [&] u8
+    cap: i32
+    len: i32
 }
 
 #local
 Va :: struct {
-    p: [&] u8;
+    p: [&] u8
 }
 
 #local
 out_byte :: (o: &Out, c: u8) {
-    if o.cap > 0 && o.len < o.cap - 1 do o.dst[o.len] = c;
-    o.len += 1;
+    if o.cap > 0 && o.len < o.cap - 1 do o.dst[o.len] = c
+    o.len += 1
 }
 
 #local
 out_repeat :: (o: &Out, c: u8, n: i32) {
-    if n <= 0 do return;
-    room := 0;
-    if o.cap > 0 && o.len < o.cap - 1 do room = o.cap - 1 - o.len;
-    take := n;
-    if take > room do take = room;
+    if n <= 0 do return
+    room := 0
+    if o.cap > 0 && o.len < o.cap - 1 do room = o.cap - 1 - o.len
+    take := n
+    if take > room do take = room
     for i in 0 .. take {
-        o.dst[o.len + i] = c;
+        o.dst[o.len + i] = c
     }
-    o.len += n;
+    o.len += n
 }
 
 #local
 out_finish :: (o: &Out) {
-    if o.cap <= 0 do return;
-    at := o.len;
-    if at >= o.cap do at = o.cap - 1;
-    o.dst[at] = 0;
+    if o.cap <= 0 do return
+    at := o.len
+    if at >= o.cap do at = o.cap - 1
+    o.dst[at] = 0
 }
 
 #local
 pad_text :: (o: &Out, text: [&] u8, n: i32, width: i32, left: bool, zero: bool) {
-    pad := 0;
-    if width > n do pad = width - n;
-    if !left && !zero do out_repeat(o, ' ', pad);
-    if !left && zero do out_repeat(o, '0', pad);
+    pad := 0
+    if width > n do pad = width - n
+    if !left && !zero do out_repeat(o, ' ', pad)
+    if !left && zero do out_repeat(o, '0', pad)
     for i in 0 .. n {
-        out_byte(o, text[i]);
+        out_byte(o, text[i])
     }
-    if left do out_repeat(o, ' ', pad);
+    if left do out_repeat(o, ' ', pad)
 }
 
 #local
 format_uint :: (o: &Out, value: u64, base: i32, upper: bool, prec: i32, width: i32, left: bool, zero: bool, alt: bool, sign_ch: u8) {
-    raw: [80] u8;
-    nd := 0;
-    vv := value;
-    show_zero := prec != 0;
+    raw: [80] u8
+    nd := 0
+    vv := value
+    show_zero := prec != 0
     if vv == 0 {
         if show_zero {
-            raw[0] = '0';
-            nd = 1;
+            raw[0] = '0'
+            nd = 1
         }
     } else {
         while vv > 0 && nd < 80 {
-            d := cast(i32) (vv % cast(u64) base);
-            ch: u8 = cast(u8) ('0' + d);
+            d := cast(i32) (vv % cast(u64) base)
+            ch: u8 = cast(u8) ('0' + d)
             if d >= 10 {
-                ch = cast(u8) ('a' + d - 10);
-                if upper do ch = cast(u8) ('A' + d - 10);
+                ch = cast(u8) ('a' + d - 10)
+                if upper do ch = cast(u8) ('A' + d - 10)
             }
-            raw[nd] = ch;
-            nd += 1;
-            vv = vv / cast(u64) base;
+            raw[nd] = ch
+            nd += 1
+            vv = vv / cast(u64) base
         }
     }
 
-    zeros := 0;
-    if prec > nd do zeros = prec - nd;
+    zeros := 0
+    if prec > nd do zeros = prec - nd
     if alt && base == 8 && value != 0 && zeros == 0 && (nd == 0 || raw[nd - 1] != '0') {
-        zeros = 1;
+        zeros = 1
     }
 
-    hex := alt && base == 16 && value != 0;
-    prefix := 0;
-    if sign_ch != 0 do prefix += 1;
-    if hex do prefix += 2;
+    hex := alt && base == 16 && value != 0
+    prefix := 0
+    if sign_ch != 0 do prefix += 1
+    if hex do prefix += 2
 
-    body := zeros + nd;
-    pad := 0;
-    if width > prefix + body do pad = width - prefix - body;
-    use_zero := zero && !left && prec < 0;
+    body := zeros + nd
+    pad := 0
+    if width > prefix + body do pad = width - prefix - body
+    use_zero := zero && !left && prec < 0
 
-    if !left && !use_zero do out_repeat(o, ' ', pad);
-    if sign_ch != 0 do out_byte(o, sign_ch);
+    if !left && !use_zero do out_repeat(o, ' ', pad)
+    if sign_ch != 0 do out_byte(o, sign_ch)
     if hex {
-        out_byte(o, '0');
-        if upper do out_byte(o, 'X');
-        else do out_byte(o, 'x');
+        out_byte(o, '0')
+        if upper do out_byte(o, 'X')
+        else do out_byte(o, 'x')
     }
-    if !left && use_zero do out_repeat(o, '0', pad);
-    out_repeat(o, '0', zeros);
+    if !left && use_zero do out_repeat(o, '0', pad)
+    out_repeat(o, '0', zeros)
     while nd > 0 {
-        nd -= 1;
-        out_byte(o, raw[nd]);
+        nd -= 1
+        out_byte(o, raw[nd])
     }
-    if left do out_repeat(o, ' ', pad);
+    if left do out_repeat(o, ' ', pad)
 }
 
 #local
 format_float :: (o: &Out, value: f64, prec: i32, width: i32, left: bool, zero: bool, plus: bool, space: bool) {
     if value != value {
-        pad_text(o, "nan", 3, width, left, false);
-        return;
+        pad_text(o, "nan", 3, width, left, false)
+        return
     }
 
-    neg := value < 0.0;
-    mag := value;
-    if neg do mag = -value;
+    neg := value < 0.0
+    mag := value
+    if neg do mag = -value
     if mag > 1.0e18 {
         if neg {
-            pad_text(o, "-inf", 4, width, left, false);
+            pad_text(o, "-inf", 4, width, left, false)
         } else {
             if plus {
-                pad_text(o, "+inf", 4, width, left, false);
+                pad_text(o, "+inf", 4, width, left, false)
             } else {
-                if space do pad_text(o, " inf", 4, width, left, false);
-                else do pad_text(o, "inf", 3, width, left, false);
+                if space do pad_text(o, " inf", 4, width, left, false)
+                else do pad_text(o, "inf", 3, width, left, false)
             }
         }
-        return;
+        return
     }
 
-    if prec < 0 do prec = 6;
-    if prec > 18 do prec = 18;
+    if prec < 0 do prec = 6
+    if prec > 18 do prec = 18
 
-    scale := 1.0;
-    for i in 0 .. prec do scale *= 10.0;
+    scale := 1.0
+    for i in 0 .. prec do scale *= 10.0
 
-    ip := cast(i64) mag;
-    frac := mag - cast(f64) ip;
-    fi := cast(i64) (frac * scale + 0.5);
+    ip := cast(i64) mag
+    frac := mag - cast(f64) ip
+    fi := cast(i64) (frac * scale + 0.5)
     if prec > 0 && fi >= cast(i64) scale {
-        ip += 1;
-        fi = 0;
+        ip += 1
+        fi = 0
     }
 
-    sign_ch: u8 = 0;
-    if neg do sign_ch = '-';
+    sign_ch: u8 = 0
+    if neg do sign_ch = '-'
     else {
-        if plus do sign_ch = '+';
+        if plus do sign_ch = '+'
         else {
-            if space do sign_ch = ' ';
+            if space do sign_ch = ' '
         }
     }
 
-    format_uint(o, cast(u64) ip, 10, false, 1, 0, false, false, false, sign_ch);
-    if prec <= 0 do return;
-    out_byte(o, '.');
-    format_uint(o, cast(u64) fi, 10, false, prec, 0, false, false, false, 0);
+    format_uint(o, cast(u64) ip, 10, false, 1, 0, false, false, false, sign_ch)
+    if prec <= 0 do return
+    out_byte(o, '.')
+    format_uint(o, cast(u64) fi, 10, false, prec, 0, false, false, false, 0)
     if width > 0 {}
     if left || zero {}
 }
 
 #local
 va_align :: (v: &Va, n: i32) {
-    addr := cast(u32) v.p;
-    mask := cast(u32) (n - 1);
-    off := cast(i32) (addr & mask);
-    if off != 0 do v.p = v.p + (n - off);
+    addr := cast(u32) v.p
+    mask := cast(u32) (n - 1)
+    off := cast(i32) (addr & mask)
+    if off != 0 do v.p = v.p + (n - off)
 }
 
 #local
 va_i32 :: (v: &Va) -> i32 {
-    x := *cast(&i32) v.p;
-    v.p = v.p + 4;
-    return x;
+    x := *cast(&i32) v.p
+    v.p = v.p + 4
+    return x
 }
 
 #local
 va_i64 :: (v: &Va) -> i64 {
-    va_align(v, 8);
-    x := *cast(&i64) v.p;
-    v.p = v.p + 8;
-    return x;
+    va_align(v, 8)
+    x := *cast(&i64) v.p
+    v.p = v.p + 8
+    return x
 }
 
 #local
 va_f64 :: (v: &Va) -> f64 {
-    va_align(v, 8);
-    x := *cast(&f64) v.p;
-    v.p = v.p + 8;
-    return x;
+    va_align(v, 8)
+    x := *cast(&f64) v.p
+    v.p = v.p + 8
+    return x
 }
 
 /// C `vsnprintf`. `args` points at the wasm32 vararg area: `i32` values are
 /// packed, and `i64` / `double` values are aligned to 8. Returns the length
 /// that would have been written, not counting the terminator.
 vsnprintf :: (dest: rawptr, size: i32, format: rawptr, args: rawptr) -> i32 {
-    o: Out;
-    o.dst = cast([&] u8) dest;
-    o.cap = size;
-    if dest == null || size < 0 do o.cap = 0;
-    o.len = 0;
+    o: Out
+    o.dst = cast([&] u8) dest
+    o.cap = size
+    if dest == null || size < 0 do o.cap = 0
+    o.len = 0
 
     if format == null {
-        out_finish(&o);
-        errno = EINVAL;
-        return -1;
+        out_finish(&o)
+        errno = EINVAL
+        return -1
     }
 
-    v: Va;
-    v.p = cast([&] u8) args;
-    f := cast([&] u8) format;
+    v: Va
+    v.p = cast([&] u8) args
+    f := cast([&] u8) format
 
     while f[0] != 0 {
         if f[0] != '%' {
-            out_byte(&o, f[0]);
-            f = f + 1;
-            continue;
+            out_byte(&o, f[0])
+            f = f + 1
+            continue
         }
-        f = f + 1;
+        f = f + 1
         if f[0] == '%' {
-            out_byte(&o, '%');
-            f = f + 1;
-            continue;
+            out_byte(&o, '%')
+            f = f + 1
+            continue
         }
 
-        left := false;
-        plus := false;
-        space := false;
-        alt := false;
-        zero := false;
+        left := false
+        plus := false
+        space := false
+        alt := false
+        zero := false
         while true {
-            c := f[0];
-            if c == '-' do left = true;
+            c := f[0]
+            if c == '-' do left = true
             else {
-                if c == '+' do plus = true;
+                if c == '+' do plus = true
                 else {
-                    if c == ' ' do space = true;
+                    if c == ' ' do space = true
                     else {
-                        if c == '#' do alt = true;
+                        if c == '#' do alt = true
                         else {
-                            if c == '0' do zero = true;
-                            else do break;
+                            if c == '0' do zero = true
+                            else do break
                         }
                     }
                 }
             }
-            f = f + 1;
+            f = f + 1
         }
 
-        width := -1;
+        width := -1
         if f[0] == '*' {
-            width = va_i32(&v);
-            f = f + 1;
+            width = va_i32(&v)
+            f = f + 1
             if width < 0 {
-                left = true;
-                width = -width;
+                left = true
+                width = -width
             }
         } else {
             if f[0] >= '0' && f[0] <= '9' {
-                width = 0;
+                width = 0
                 while f[0] >= '0' && f[0] <= '9' {
-                    width = width * 10 + (cast(i32) f[0] - cast(i32) '0');
-                    f = f + 1;
+                    width = width * 10 + (cast(i32) f[0] - cast(i32) '0')
+                    f = f + 1
                 }
             }
         }
 
-        prec := -1;
+        prec := -1
         if f[0] == '.' {
-            f = f + 1;
+            f = f + 1
             if f[0] == '*' {
-                prec = va_i32(&v);
-                f = f + 1;
-                if prec < 0 do prec = -1;
+                prec = va_i32(&v)
+                f = f + 1
+                if prec < 0 do prec = -1
             } else {
-                prec = 0;
+                prec = 0
                 while f[0] >= '0' && f[0] <= '9' {
-                    prec = prec * 10 + (cast(i32) f[0] - cast(i32) '0');
-                    f = f + 1;
+                    prec = prec * 10 + (cast(i32) f[0] - cast(i32) '0')
+                    f = f + 1
                 }
             }
         }
 
-        length := 0;
+        length := 0
         if f[0] == 'h' {
-            f = f + 1;
-            length = 1;
+            f = f + 1
+            length = 1
             if f[0] == 'h' {
-                f = f + 1;
-                length = 2;
+                f = f + 1
+                length = 2
             }
         } else {
             if f[0] == 'l' {
-                f = f + 1;
-                length = 3;
+                f = f + 1
+                length = 3
                 if f[0] == 'l' {
-                    f = f + 1;
-                    length = 4;
+                    f = f + 1
+                    length = 4
                 }
             } else {
                 if f[0] == 'z' || f[0] == 't' || f[0] == 'L' {
-                    f = f + 1;
-                    length = 3;
+                    f = f + 1
+                    length = 3
                 }
             }
         }
 
-        spec := f[0];
-        if spec == 0 do break;
-        f = f + 1;
+        spec := f[0]
+        if spec == 0 do break
+        f = f + 1
 
         switch spec {
             case 'c' {
-                ch := cast(u8) va_i32(&v);
-                tmp: [1] u8;
-                tmp[0] = ch;
-                pad_text(&o, ~~tmp, 1, width, left, false);
+                ch := cast(u8) va_i32(&v)
+                tmp: [1] u8
+                tmp[0] = ch
+                pad_text(&o, ~~tmp, 1, width, left, false)
             }
             case 's' {
-                sp := cast([&] u8) va_i32(&v);
+                sp := cast([&] u8) va_i32(&v)
                 if sp == null {
-                    pad_text(&o, "(null)", 6, width, left, false);
+                    pad_text(&o, "(null)", 6, width, left, false)
                 } else {
-                    sl := strlen(sp);
-                    if prec >= 0 && prec < sl do sl = prec;
-                    pad_text(&o, sp, sl, width, left, false);
+                    sl := strlen(sp)
+                    if prec >= 0 && prec < sl do sl = prec
+                    pad_text(&o, sp, sl, width, left, false)
                 }
             }
             case 'd', 'i' {
-                val: i64 = 0;
-                if length == 4 do val = va_i64(&v);
-                else do val = cast(i64) va_i32(&v);
-                if length == 2 do val = cast(i64) cast(i8) cast(i32) val;
-                if length == 1 do val = cast(i64) cast(i16) cast(i32) val;
+                val: i64 = 0
+                if length == 4 do val = va_i64(&v)
+                else do val = cast(i64) va_i32(&v)
+                if length == 2 do val = cast(i64) cast(i8) cast(i32) val
+                if length == 1 do val = cast(i64) cast(i16) cast(i32) val
 
-                neg := val < 0;
-                mag := val;
-                if neg do mag = -val;
-                sign_ch: u8 = 0;
-                if neg do sign_ch = '-';
+                neg := val < 0
+                mag := val
+                if neg do mag = -val
+                sign_ch: u8 = 0
+                if neg do sign_ch = '-'
                 else {
-                    if plus do sign_ch = '+';
+                    if plus do sign_ch = '+'
                     else {
-                        if space do sign_ch = ' ';
+                        if space do sign_ch = ' '
                     }
                 }
-                format_uint(&o, cast(u64) mag, 10, false, prec, width, left, zero, false, sign_ch);
+                format_uint(&o, cast(u64) mag, 10, false, prec, width, left, zero, false, sign_ch)
             }
             case 'u', 'x', 'X', 'o', 'p' {
-                base := 10;
-                upper := spec == 'X';
-                if spec == 'x' || spec == 'X' || spec == 'p' do base = 16;
-                if spec == 'o' do base = 8;
-                if spec == 'p' do alt = true;
+                base := 10
+                upper := spec == 'X'
+                if spec == 'x' || spec == 'X' || spec == 'p' do base = 16
+                if spec == 'o' do base = 8
+                if spec == 'p' do alt = true
 
-                bits: u64 = 0;
+                bits: u64 = 0
                 if length == 4 && spec != 'p' {
-                    bits = cast(u64) va_i64(&v);
+                    bits = cast(u64) va_i64(&v)
                 } else {
-                    bits = cast(u64) cast(u32) va_i32(&v);
+                    bits = cast(u64) cast(u32) va_i32(&v)
                 }
-                if length == 2 do bits = bits & 0xff;
-                if length == 1 do bits = bits & 0xffff;
-                format_uint(&o, bits, base, upper, prec, width, left, zero, alt, 0);
+                if length == 2 do bits = bits & 0xff
+                if length == 1 do bits = bits & 0xffff
+                format_uint(&o, bits, base, upper, prec, width, left, zero, alt, 0)
             }
             case 'f', 'F', 'e', 'E', 'g', 'G' {
-                format_float(&o, va_f64(&v), prec, width, left, zero, plus, space);
+                format_float(&o, va_f64(&v), prec, width, left, zero, plus, space)
             }
             case 'n' {
-                destp := va_i32(&v);
-                if destp != 0 do *cast(&i32) destp = o.len;
+                destp := va_i32(&v)
+                if destp != 0 do *cast(&i32) destp = o.len
             }
             case _ {
-                out_byte(&o, spec);
+                out_byte(&o, spec)
             }
         }
     }
 
-    out_finish(&o);
-    return o.len;
+    out_finish(&o)
+    return o.len
 }
 
 #local
 scan_skip :: (p: [&] u8) -> [&] u8 {
-    while is_space(p[0]) do p = p + 1;
-    return p;
+    while is_space(p[0]) do p = p + 1
+    return p
 }
 
 #local
 scan_int :: (p: [&] u8, spec: u8, length: i32, dest: rawptr) -> [&] u8 {
-    p = scan_skip(p);
-    start := p;
-    neg := false;
+    p = scan_skip(p)
+    start := p
+    neg := false
     if p[0] == '-' || p[0] == '+' {
-        neg = p[0] == '-';
-        p = p + 1;
+        neg = p[0] == '-'
+        p = p + 1
     }
 
-    base := 10;
-    if spec == 'x' || spec == 'X' do base = 16;
-    if spec == 'o' do base = 8;
+    base := 10
+    if spec == 'x' || spec == 'X' do base = 16
+    if spec == 'o' do base = 8
     if spec == 'i' {
-        base = 10;
+        base = 10
         if p[0] == '0' {
             if p[1] == 'x' || p[1] == 'X' {
-                base = 16;
-                p = p + 2;
-            } else do base = 8;
+                base = 16
+                p = p + 2
+            } else do base = 8
         }
     } else {
         if base == 16 && p[0] == '0' && (p[1] == 'x' || p[1] == 'X') {
-            p = p + 2;
+            p = p + 2
         }
     }
 
-    any := false;
-    acc: u64 = 0;
+    any := false
+    acc: u64 = 0
     while true {
-        d := digit_value(p[0]);
-        if d < 0 || d >= base do break;
-        any = true;
-        acc = acc * cast(u64) base + cast(u64) d;
-        p = p + 1;
+        d := digit_value(p[0])
+        if d < 0 || d >= base do break
+        any = true
+        acc = acc * cast(u64) base + cast(u64) d
+        p = p + 1
     }
-    if !any do return null;
-    if p == start do return null;
+    if !any do return null
+    if p == start do return null
 
     if dest != null {
         switch length {
             case 4 {
-                v := cast(i64) acc;
-                if neg do v = -v;
-                *cast(&i64) dest = v;
+                v := cast(i64) acc
+                if neg do v = -v
+                *cast(&i64) dest = v
             }
             case 2 {
-                v := cast(i32) acc;
-                if neg do v = -v;
-                *cast(&i8) dest = cast(i8) v;
+                v := cast(i32) acc
+                if neg do v = -v
+                *cast(&i8) dest = cast(i8) v
             }
             case 1 {
-                v := cast(i32) acc;
-                if neg do v = -v;
-                *cast(&i16) dest = cast(i16) v;
+                v := cast(i32) acc
+                if neg do v = -v
+                *cast(&i16) dest = cast(i16) v
             }
             case _ {
-                v := cast(i32) acc;
-                if neg do v = -v;
-                *cast(&i32) dest = v;
+                v := cast(i32) acc
+                if neg do v = -v
+                *cast(&i32) dest = v
             }
         }
     }
-    return p;
+    return p
 }
 
 /// C `sscanf`. `args` is the same wasm32 vararg area as `vsnprintf`.
 /// Returns the number of assigned values.
 sscanf :: (text: rawptr, format: rawptr, args: rawptr) -> i32 {
     if text == null || format == null {
-        errno = EINVAL;
-        return -1;
+        errno = EINVAL
+        return -1
     }
 
-    v: Va;
-    v.p = cast([&] u8) args;
-    s := cast([&] u8) text;
-    f := cast([&] u8) format;
-    assigned := 0;
-    consumed := 0;
+    v: Va
+    v.p = cast([&] u8) args
+    s := cast([&] u8) text
+    f := cast([&] u8) format
+    assigned := 0
+    consumed := 0
 
     while f[0] != 0 {
         if is_space(f[0]) {
-            f = f + 1;
-            while is_space(f[0]) do f = f + 1;
-            before := s;
-            s = scan_skip(s);
-            consumed += cast(i32) (cast(u32) s - cast(u32) before);
-            continue;
+            f = f + 1
+            while is_space(f[0]) do f = f + 1
+            before := s
+            s = scan_skip(s)
+            consumed += cast(i32) (cast(u32) s - cast(u32) before)
+            continue
         }
         if f[0] != '%' {
-            if s[0] != f[0] do return assigned;
-            s = s + 1;
-            f = f + 1;
-            consumed += 1;
-            continue;
+            if s[0] != f[0] do return assigned
+            s = s + 1
+            f = f + 1
+            consumed += 1
+            continue
         }
 
-        f = f + 1;
+        f = f + 1
         if f[0] == '%' {
-            if s[0] != '%' do return assigned;
-            s = s + 1;
-            f = f + 1;
-            consumed += 1;
-            continue;
+            if s[0] != '%' do return assigned
+            s = s + 1
+            f = f + 1
+            consumed += 1
+            continue
         }
 
-        suppress := false;
+        suppress := false
         if f[0] == '*' {
-            suppress = true;
-            f = f + 1;
+            suppress = true
+            f = f + 1
         }
 
-        width := -1;
+        width := -1
         if f[0] >= '0' && f[0] <= '9' {
-            width = 0;
+            width = 0
             while f[0] >= '0' && f[0] <= '9' {
-                width = width * 10 + (cast(i32) f[0] - cast(i32) '0');
-                f = f + 1;
+                width = width * 10 + (cast(i32) f[0] - cast(i32) '0')
+                f = f + 1
             }
         }
 
-        length := 0;
+        length := 0
         if f[0] == 'h' {
-            f = f + 1;
-            length = 1;
+            f = f + 1
+            length = 1
             if f[0] == 'h' {
-                f = f + 1;
-                length = 2;
+                f = f + 1
+                length = 2
             }
         } else {
             if f[0] == 'l' {
-                f = f + 1;
-                length = 3;
+                f = f + 1
+                length = 3
                 if f[0] == 'l' {
-                    f = f + 1;
-                    length = 4;
+                    f = f + 1
+                    length = 4
                 }
             } else {
                 if f[0] == 'z' {
-                    f = f + 1;
-                    length = 3;
+                    f = f + 1
+                    length = 3
                 }
             }
         }
 
-        spec := f[0];
-        if spec == 0 do return assigned;
-        f = f + 1;
+        spec := f[0]
+        if spec == 0 do return assigned
+        f = f + 1
 
-        dest: rawptr = null;
-        if !suppress && spec != 'n' do dest = cast(rawptr) va_i32(&v);
+        dest: rawptr = null
+        if !suppress && spec != 'n' do dest = cast(rawptr) va_i32(&v)
 
         if spec == 'n' {
-            np := dest;
-            if !suppress do np = cast(rawptr) va_i32(&v);
-            if np != null do *cast(&i32) np = consumed;
-            continue;
+            np := dest
+            if !suppress do np = cast(rawptr) va_i32(&v)
+            if np != null do *cast(&i32) np = consumed
+            continue
         }
 
         if spec == 'c' {
-            count := width;
-            if count < 0 do count = 1;
-            if strlen(s) < count do return assigned;
+            count := width
+            if count < 0 do count = 1
+            if strlen(s) < count do return assigned
             if dest != null {
-                memory.copy(dest, s, count);
-                assigned += 1;
+                memory.copy(dest, s, count)
+                assigned += 1
             }
-            s = s + count;
-            consumed += count;
-            continue;
+            s = s + count
+            consumed += count
+            continue
         }
 
         if spec == 's' {
-            before := s;
-            s = scan_skip(s);
-            consumed += cast(i32) (cast(u32) s - cast(u32) before);
-            if s[0] == 0 do return assigned;
-            n := 0;
+            before := s
+            s = scan_skip(s)
+            consumed += cast(i32) (cast(u32) s - cast(u32) before)
+            if s[0] == 0 do return assigned
+            n := 0
             while s[n] != 0 && !is_space(s[n]) {
-                if width >= 0 && n >= width do break;
-                n += 1;
+                if width >= 0 && n >= width do break
+                n += 1
             }
-            if n == 0 do return assigned;
+            if n == 0 do return assigned
             if dest != null {
-                memory.copy(dest, s, n);
-                (cast([&] u8) dest)[n] = 0;
-                assigned += 1;
+                memory.copy(dest, s, n)
+                (cast([&] u8) dest)[n] = 0
+                assigned += 1
             }
-            s = s + n;
-            consumed += n;
-            continue;
+            s = s + n
+            consumed += n
+            continue
         }
 
         if spec == 'd' || spec == 'i' || spec == 'u' || spec == 'x' || spec == 'X' || spec == 'o' {
-            before := s;
-            next := scan_int(s, spec, length, dest);
-            if next == null do return assigned;
-            consumed += cast(i32) (cast(u32) next - cast(u32) before);
-            s = next;
-            if dest != null do assigned += 1;
-            continue;
+            before := s
+            next := scan_int(s, spec, length, dest)
+            if next == null do return assigned
+            consumed += cast(i32) (cast(u32) next - cast(u32) before)
+            s = next
+            if dest != null do assigned += 1
+            continue
         }
 
-        return assigned;
+        return assigned
     }
 
-    return assigned;
+    return assigned
 }
 
 /// C `getpid`. This runtime has one process, so the id is 1.
 getpid :: () -> i32 {
-    return 1;
+    return 1
 }
 
 /// C `abort`. Does not return.
 abort :: () {
-    core.intrinsics.wasm.unreachable();
+    core.intrinsics.wasm.unreachable()
 }
 
 __dso_handle: rawptr
 #init () { __dso_handle = &__dso_handle }
 
 AtExit :: struct {
-    func: i32;
-    arg: rawptr;
+    func: i32
+    arg: rawptr
 }
 
-atexit_fns: [64] AtExit;
-atexit_count: i32;
+atexit_fns: [64] AtExit
+atexit_count: i32
 
 __cxa_atexit :: (func: i32, arg: rawptr, dso: rawptr) -> i32 {
     if dso == cast(rawptr) 1 {}
-    if atexit_count >= 64 do return -1;
-    atexit_fns[atexit_count].func = func;
-    atexit_fns[atexit_count].arg = arg;
-    atexit_count += 1;
-    return 0;
+    if atexit_count >= 64 do return -1
+    atexit_fns[atexit_count].func = func
+    atexit_fns[atexit_count].arg = arg
+    atexit_count += 1
+    return 0
 }
 
 i128 :: struct {lo, hi: i64}
 
 __ashlti3 :: (ret: &i128, lo: i64, hi: i64, sh: i32) {
-    a := cast(u64) lo;
-    b := cast(u64) hi;
+    a := cast(u64) lo
+    b := cast(u64) hi
     if sh <= 0 {
-        ret.lo = a;
-        ret.hi = b;
-        return;
+        ret.lo = a
+        ret.hi = b
+        return
     }
     if sh >= 128 {
-        ret.lo = 0;
-        ret.hi = 0;
-        return;
+        ret.lo = 0
+        ret.hi = 0
+        return
     }
     if sh >= 64 {
-        ret.lo = 0;
-        ret.hi = a << cast(u64) (sh - 64);
-        return;
+        ret.lo = 0
+        ret.hi = a << cast(u64) (sh - 64)
+        return
     }
-    n := cast(u64) sh;
-    ret.lo = a << n;
-    ret.hi = (b << n) | (a >> (cast(u64) 64 - n));
+    n := cast(u64) sh
+    ret.lo = a << n
+    ret.hi = (b << n) | (a >> (cast(u64) 64 - n))
 }
 
 __i128_mul_wide :: (x: u64, y: u64) -> i128 {
-    x0 := x & 0xffffffff;
-    x1 := x >> 32;
-    y0 := y & 0xffffffff;
-    y1 := y >> 32;
-    p0 := x0 * y0;
-    p1 := x0 * y1;
-    p2 := x1 * y0;
-    p3 := x1 * y1;
-    mid := (p0 >> 32) + (p1 & 0xffffffff) + (p2 & 0xffffffff);
+    x0 := x & 0xffffffff
+    x1 := x >> 32
+    y0 := y & 0xffffffff
+    y1 := y >> 32
+    p0 := x0 * y0
+    p1 := x0 * y1
+    p2 := x1 * y0
+    p3 := x1 * y1
+    mid := (p0 >> 32) + (p1 & 0xffffffff) + (p2 & 0xffffffff)
     return .{
         lo = (p0 & 0xffffffff) | ((mid & 0xffffffff) << 32),
         hi = p3 + (p1 >> 32) + (p2 >> 32) + (mid >> 32),
-    };
+    }
 }
 
 __multi3 :: (ret: &i128, a_lo: i64, a_hi: i64, b_lo: i64, b_hi: i64) {
-    alo := cast(u64) a_lo;
-    ahi := cast(u64) a_hi;
-    blo := cast(u64) b_lo;
-    bhi := cast(u64) b_hi;
-    low := __i128_mul_wide(alo, blo);
-    cross_a := __i128_mul_wide(ahi, blo);
-    cross_b := __i128_mul_wide(alo, bhi);
-    ret.lo = low.lo;
-    ret.hi = low.hi + cross_a.lo + cross_b.lo;
+    alo := cast(u64) a_lo
+    ahi := cast(u64) a_hi
+    blo := cast(u64) b_lo
+    bhi := cast(u64) b_hi
+    low := __i128_mul_wide(alo, blo)
+    cross_a := __i128_mul_wide(ahi, blo)
+    cross_b := __i128_mul_wide(alo, bhi)
+    ret.lo = low.lo
+    ret.hi = low.hi + cross_a.lo + cross_b.lo
 }
 
 #if #defined(runtime.platform.__random_get) {
     /// C `getentropy`. Fills `buf` from the platform random source.
     getentropy :: (buf: rawptr, len: i32) -> i32 {
         if buf == null || len < 0 {
-            errno = EINVAL;
-            return -1;
+            errno = EINVAL
+            return -1
         }
-        if len == 0 do return 0;
-        runtime.platform.__random_get(.{ cast([&] u8) buf, len });
-        return 0;
+        if len == 0 do return 0
+        runtime.platform.__random_get(.{ cast([&] u8) buf, len })
+        return 0
     }
 
     /// BSD `arc4random_buf`.
     arc4random_buf :: (buf: rawptr, len: i32) {
-        if buf == null || len <= 0 do return;
-        runtime.platform.__random_get(.{ cast([&] u8) buf, len });
+        if buf == null || len <= 0 do return
+        runtime.platform.__random_get(.{ cast([&] u8) buf, len })
     }
 }
 
 // wasm32-wasi `struct timespec`. `pad` keeps the following `stat` field aligned.
 Timespec :: struct {
-    sec: i64;
-    nsec: i32;
-    pad: i32;
+    sec: i64
+    nsec: i32
+    pad: i32
 }
 
 /// wasm32-wasi `struct timeval`.
 Timeval :: struct {
-    sec: i64;
-    usec: i64;
+    sec: i64
+    usec: i64
 }
 
 /// C `clock_gettime`. Clock 1 is monotonic. Every other id, including
 /// `_CLOCK_REALTIME`, is wall time. Seconds come from `os.time` milliseconds.
 clock_gettime :: (clock_id: i32, out: &Timespec) -> i32 {
     if out == null {
-        errno = EINVAL;
-        return -1;
+        errno = EINVAL
+        return -1
     }
     if clock_id == 1 {
-        ns := runtime.platform.__monotonic();
-        out.sec = ns / 1000000000;
-        out.nsec = cast(i32) (ns % 1000000000);
-        out.pad = 0;
-        return 0;
+        ns := runtime.platform.__monotonic()
+        out.sec = ns / 1000000000
+        out.nsec = cast(i32) (ns % 1000000000)
+        out.pad = 0
+        return 0
     }
-    ms := cast(i64) runtime.platform.__time();
-    out.sec = ms / 1000;
-    out.nsec = cast(i32) ((ms % 1000) * 1000000);
-    out.pad = 0;
-    return 0;
+    ms := cast(i64) runtime.platform.__time()
+    out.sec = ms / 1000
+    out.nsec = cast(i32) ((ms % 1000) * 1000000)
+    out.pad = 0
+    return 0
 }
 
 /// C `gettimeofday`. `tz` is ignored.
 gettimeofday :: (out: &Timeval, tz: rawptr) -> i32 {
     if tz == cast(rawptr) 1 {}
-    if out == null do return 0;
-    ms := cast(i64) runtime.platform.__time();
-    out.sec = ms / 1000;
-    out.usec = (ms % 1000) * 1000;
-    return 0;
+    if out == null do return 0
+    ms := cast(i64) runtime.platform.__time()
+    out.sec = ms / 1000
+    out.usec = (ms % 1000) * 1000
+    return 0
 }
 
 /// C `time`. Returns seconds since the Unix epoch. `out` may be null.
 time :: (out: rawptr) -> i64 {
-    sec := cast(i64) runtime.platform.__time() / 1000;
-    if out != null do *cast(&i64) out = sec;
-    return sec;
+    sec := cast(i64) runtime.platform.__time() / 1000
+    if out != null do *cast(&i64) out = sec
+    return sec
 }
 
 #if runtime.platform.Supports_Files {
     // wasm32-wasi-musl `struct stat`. `st_mode` is at byte 24.
     Stat :: struct {
-        dev: u64;
-        ino: u64;
-        nlink: u64;
-        mode: u32;
-        uid: u32;
-        gid: u32;
-        pad0: u32;
-        rdev: u64;
-        size: i64;
-        blksize: i32;
-        pad1: i32;
-        blocks: i64;
-        atim: Timespec;
-        mtim: Timespec;
-        ctim: Timespec;
-        reserved0: i64;
-        reserved1: i64;
-        reserved2: i64;
+        dev: u64
+        ino: u64
+        nlink: u64
+        mode: u32
+        uid: u32
+        gid: u32
+        pad0: u32
+        rdev: u64
+        size: i64
+        blksize: i32
+        pad1: i32
+        blocks: i64
+        atim: Timespec
+        mtim: Timespec
+        ctim: Timespec
+        reserved0: i64
+        reserved1: i64
+        reserved2: i64
     }
 
-    O_APPEND :: 0x0001;
-    O_CREAT  :: 0x1000;
-    O_EXCL   :: 0x4000;
-    O_RDONLY :: 0x04000000;
-    O_WRONLY :: 0x10000000;
+    O_APPEND :: 0x0001
+    O_CREAT  :: 0x1000
+    O_EXCL   :: 0x4000
+    O_RDONLY :: 0x04000000
+    O_WRONLY :: 0x10000000
 
     #local
-    MAX_FD :: 32;
+    MAX_FD :: 32
 
     #local
     FdSlot :: struct {
-        open: bool;
-        file: core.os.File;
-        path: cstr;
+        open: bool
+        file: core.os.File
+        path: cstr
     }
 
     #local
-    fd_table: [MAX_FD] FdSlot;
+    fd_table: [MAX_FD] FdSlot
 
     #local
     file_errno :: (err: core.os.FileError) {
@@ -1305,53 +1304,53 @@ time :: (out: rawptr) -> i64 {
 
     #local
     mode_bits :: (kind: core.os.FileType) -> u32 {
-        if kind == .Directory do return 0x4000 | 493;
-        if kind == .Char do return 0x2000 | 438;
-        if kind == .Block do return 0x6000 | 438;
-        if kind == .SymLink do return 0xA000 | 511;
-        if kind == .RegularFile do return 0x8000 | 420;
-        return 420;
+        if kind == .Directory do return 0x4000 | 493
+        if kind == .Char do return 0x2000 | 438
+        if kind == .Block do return 0x6000 | 438
+        if kind == .SymLink do return 0xA000 | 511
+        if kind == .RegularFile do return 0x8000 | 420
+        return 420
     }
 
     #local
     path_ino :: (s: str) -> u64 {
-        h: u64 = 1469598103934665603;
+        h: u64 = 1469598103934665603
         for i in 0 .. s.count {
-            h = (h ^ cast(u64) s[i]) * 1099511628211;
+            h = (h ^ cast(u64) s[i]) * 1099511628211
         }
-        if h == 0 do h = 1;
-        return h;
+        if h == 0 do h = 1
+        return h
     }
 
     #local
     set_timespec :: (ts: &Timespec, ms: u64) {
-        ts.sec = cast(i64) (ms / 1000);
-        ts.nsec = cast(i32) ((ms % 1000) * 1000000);
-        ts.pad = 0;
+        ts.sec = cast(i64) (ms / 1000)
+        ts.nsec = cast(i32) ((ms % 1000) * 1000000)
+        ts.pad = 0
     }
 
     #local
     fill_stat :: (path: str, out: &Stat) -> bool {
-        st: core.os.FileStat;
-        if !core.os.file_stat(path, &st) do return false;
+        st: core.os.FileStat
+        if !core.os.file_stat(path, &st) do return false
 
-        memory.set(out, 0, sizeof Stat);
-        out.dev = 1;
-        out.ino = path_ino(path);
-        out.nlink = 1;
-        out.mode = mode_bits(st.type);
-        out.size = st.size;
-        out.blksize = 4096;
-        if st.size > 0 do out.blocks = (st.size + 511) / 512;
-        set_timespec(&out.atim, st.accessed_time);
-        set_timespec(&out.mtim, st.modified_time);
-        set_timespec(&out.ctim, st.change_time);
-        return true;
+        memory.set(out, 0, sizeof Stat)
+        out.dev = 1
+        out.ino = path_ino(path)
+        out.nlink = 1
+        out.mode = mode_bits(st.type)
+        out.size = st.size
+        out.blksize = 4096
+        if st.size > 0 do out.blocks = (st.size + 511) / 512
+        set_timespec(&out.atim, st.accessed_time)
+        set_timespec(&out.mtim, st.modified_time)
+        set_timespec(&out.ctim, st.change_time)
+        return true
     }
 
     #local
     fd_ok :: (fd: i32) -> bool {
-        return fd >= 0 && fd < MAX_FD && fd_table[fd].open;
+        return fd >= 0 && fd < MAX_FD && fd_table[fd].open
     }
 
     /// C `open`. `mode` is accepted and ignored. Descriptors start at 3.
@@ -1359,55 +1358,55 @@ time :: (out: rawptr) -> i64 {
     open :: (path: rawptr, flags: i32, mode: i32) -> i32 {
         if mode == 0 {}
         if path == null {
-            errno = EINVAL;
-            return -1;
+            errno = EINVAL
+            return -1
         }
 
-        slot := -1;
+        slot := -1
         for i in 3 .. MAX_FD {
             if !fd_table[i].open {
-                slot = i;
-                break;
+                slot = i
+                break
             }
         }
         if slot < 0 {
-            errno = EMFILE;
-            return -1;
+            errno = EMFILE
+            return -1
         }
 
-        om := core.os.OpenMode.Read;
-        reading := (flags & O_RDONLY) != 0;
-        writing := (flags & O_WRONLY) != 0;
+        om := core.os.OpenMode.Read
+        reading := (flags & O_RDONLY) != 0
+        writing := (flags & O_WRONLY) != 0
         if (flags & O_APPEND) != 0 {
-            om = .Append;
+            om = .Append
         } else {
             if reading && writing {
-                om = .ReadWrite;
+                om = .ReadWrite
             } else {
-                if writing do om = .Write;
+                if writing do om = .Write
             }
         }
 
-        of := core.os.OpenFlags.{};
-        if (flags & O_CREAT) != 0 do of = of | .Create;
-        if (flags & O_EXCL) != 0 do of = of | .Exclusive;
+        of := core.os.OpenFlags.{}
+        if (flags & O_CREAT) != 0 do of = of | .Create
+        if (flags & O_EXCL) != 0 do of = of | .Exclusive
 
         switch core.os.File.open(string.from_cstr(cast(cstr) path), om, of) {
             case .Err as err {
-                file_errno(err);
-                return -1;
+                file_errno(err)
+                return -1
             }
             case .Ok as file {
-                owned := cast(cstr) strdup(path);
+                owned := cast(cstr) strdup(path)
                 if owned == null {
-                    core.os.File.close(&file);
-                    errno = ENOMEM;
-                    return -1;
+                    core.os.File.close(&file)
+                    errno = ENOMEM
+                    return -1
                 }
-                fd_table[slot].file = file;
-                fd_table[slot].path = owned;
-                fd_table[slot].open = true;
-                return slot;
+                fd_table[slot].file = file
+                fd_table[slot].path = owned
+                fd_table[slot].open = true
+                return slot
             }
         }
     }
@@ -1415,34 +1414,34 @@ time :: (out: rawptr) -> i64 {
     /// C `close`.
     close :: (fd: i32) -> i32 {
         if !fd_ok(fd) {
-            errno = EBADF;
-            return -1;
+            errno = EBADF
+            return -1
         }
-        core.os.File.close(&fd_table[fd].file);
-        free(fd_table[fd].path);
-        fd_table[fd].path = null;
-        fd_table[fd].open = false;
-        return 0;
+        core.os.File.close(&fd_table[fd].file)
+        free(fd_table[fd].path)
+        fd_table[fd].path = null
+        fd_table[fd].open = false
+        return 0
     }
 
     /// C `read`. A short read is returned as its byte count. End of file is 0.
     read :: (fd: i32, buf: rawptr, count: i32) -> i32 {
         if !fd_ok(fd) {
-            errno = EBADF;
-            return -1;
+            errno = EBADF
+            return -1
         }
         if count < 0 {
-            errno = EINVAL;
-            return -1;
+            errno = EINVAL
+            return -1
         }
-        if count == 0 do return 0;
+        if count == 0 do return 0
 
         switch core.io.stream_read(&fd_table[fd].file, .{ cast([&] u8) buf, count }) {
-            case .Ok as got do return cast(i32) got;
+            case .Ok as got do return cast(i32) got
             case .Err as err {
-                if err == .EOF do return 0;
-                errno = EIO;
-                return -1;
+                if err == .EOF do return 0
+                errno = EIO
+                return -1
             }
         }
     }
@@ -1450,120 +1449,120 @@ time :: (out: rawptr) -> i64 {
     /// C `stat`. `out` is a wasm32-wasi-musl `struct stat`.
     stat :: (path: rawptr, out: &Stat) -> i32 {
         if path == null || out == null {
-            errno = EINVAL;
-            return -1;
+            errno = EINVAL
+            return -1
         }
         if !fill_stat(string.from_cstr(cast(cstr) path), out) {
-            errno = ENOENT;
-            return -1;
+            errno = ENOENT
+            return -1
         }
-        return 0;
+        return 0
     }
 
     /// C `fstat`.
     fstat :: (fd: i32, out: &Stat) -> i32 {
         if out == null || !fd_ok(fd) {
-            errno = EBADF;
-            return -1;
+            errno = EBADF
+            return -1
         }
         if !fill_stat(string.from_cstr(fd_table[fd].path), out) {
-            errno = ENOENT;
-            return -1;
+            errno = ENOENT
+            return -1
         }
-        return 0;
+        return 0
     }
 
     #if runtime.platform.Supports_Directories {
         // `d_name` is at byte 9: ino (8) then d_type (1).
         Dirent :: struct #pack {
-            ino: u64;
-            typ: u8;
-            name: [256] u8;
+            ino: u64
+            typ: u8
+            name: [256] u8
         }
 
         #local
         DirHandle :: struct {
-            dir: core.os.Directory;
-            ent: Dirent;
+            dir: core.os.Directory
+            ent: Dirent
         }
 
         #local
         dtype :: (kind: core.os.FileType) -> u8 {
-            if kind == .Directory do return 4;
-            if kind == .Char do return 2;
-            if kind == .Block do return 6;
-            if kind == .RegularFile do return 8;
-            if kind == .SymLink do return 10;
-            return 0;
+            if kind == .Directory do return 4
+            if kind == .Char do return 2
+            if kind == .Block do return 6
+            if kind == .RegularFile do return 8
+            if kind == .SymLink do return 10
+            return 0
         }
 
         /// C `opendir`.
         opendir :: (path: rawptr) -> rawptr {
             if path == null {
-                errno = EINVAL;
-                return null;
+                errno = EINVAL
+                return null
             }
-            text := string.from_cstr(cast(cstr) path);
-            st: core.os.FileStat;
+            text := string.from_cstr(cast(cstr) path)
+            st: core.os.FileStat
             if !core.os.file_stat(text, &st) {
-                errno = ENOENT;
-                return null;
+                errno = ENOENT
+                return null
             }
             if st.type != .Directory {
-                errno = ENOTDIR;
-                return null;
+                errno = ENOTDIR
+                return null
             }
 
-            dir, ok := core.os.Directory.open(text);
+            dir, ok := core.os.Directory.open(text)
             if !ok {
-                errno = ENOENT;
-                return null;
+                errno = ENOENT
+                return null
             }
 
-            h := cast(&DirHandle) malloc(sizeof DirHandle);
+            h := cast(&DirHandle) malloc(sizeof DirHandle)
             if h == null {
-                core.os.Directory.close(dir);
-                errno = ENOMEM;
-                return null;
+                core.os.Directory.close(dir)
+                errno = ENOMEM
+                return null
             }
-            memory.set(h, 0, sizeof DirHandle);
-            h.dir = dir;
-            return h;
+            memory.set(h, 0, sizeof DirHandle)
+            h.dir = dir
+            return h
         }
 
         /// C `closedir`.
         closedir :: (dirp: rawptr) -> i32 {
             if dirp == null {
-                errno = EBADF;
-                return -1;
+                errno = EBADF
+                return -1
             }
-            h := cast(&DirHandle) dirp;
-            core.os.Directory.close(h.dir);
-            free(h);
-            return 0;
+            h := cast(&DirHandle) dirp
+            core.os.Directory.close(h.dir)
+            free(h)
+            return 0
         }
 
         /// C `readdir`. The returned `Dirent` is reused by the next call.
         readdir :: (dirp: rawptr) -> rawptr {
             if dirp == null {
-                errno = EBADF;
-                return null;
+                errno = EBADF
+                return null
             }
-            h := cast(&DirHandle) dirp;
-            entry: core.os.DirectoryEntry;
+            h := cast(&DirHandle) dirp
+            entry: core.os.DirectoryEntry
             if !core.os.Directory.read(h.dir, &entry) {
-                errno = 0;
-                return null;
+                errno = 0
+                return null
             }
 
-            n := cast(i32) entry.name_length;
-            if n > 255 do n = 255;
-            if n < 0 do n = 0;
-            if n > 0 do memory.copy(&h.ent.name[0], &entry.name_data[0], n);
-            h.ent.name[n] = 0;
-            h.ent.ino = cast(u64) entry.identifier;
-            h.ent.typ = dtype(entry.type);
-            return &h.ent;
+            n := cast(i32) entry.name_length
+            if n > 255 do n = 255
+            if n < 0 do n = 0
+            if n > 0 do memory.copy(&h.ent.name[0], &entry.name_data[0], n)
+            h.ent.name[n] = 0
+            h.ent.ino = cast(u64) entry.identifier
+            h.ent.typ = dtype(entry.type)
+            return &h.ent
         }
     }
 }
