@@ -689,6 +689,8 @@ va_f64 :: (v: &Va) -> f64 {
     return x
 }
 
+snprintf :: vsnprintf
+
 /// C `vsnprintf`. `args` points at the wasm32 vararg area: `i32` values are
 /// packed, and `i64` / `double` values are aligned to 8. Returns the length
 /// that would have been written, not counting the terminator.
@@ -1470,6 +1472,13 @@ time :: (out: rawptr) -> i64 {
             return -1
         }
         return 0
+    }
+
+    /// C `access`.
+    access :: (path: rawptr, _mode: i32) -> i32 {
+        if path == null do return -1;
+        if core.os.file_exists(string.from_cstr(path)) do return 0;
+        return -1;
     }
 
     #if runtime.platform.Supports_Directories {
