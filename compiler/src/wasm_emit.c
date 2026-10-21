@@ -5503,6 +5503,76 @@ static i32 cmp_type_info(const void *a, const void *b) {
 #undef BH_INTERNAL_ALLOCATOR
 #define BH_INTERNAL_ALLOCATOR (context->gp_alloc)
 
+// Padding between two initialized segments that is still worth storing as
+// zeros. Alignment holes are a few bytes. A large uninitialized reservation
+// stays a hole so it is not copied into the binary.
+#define ONYX_DATA_MERGE_GAP 128
+
+static void merge_adjacent_data_segments(OnyxWasmModule *module) {
+    Context *context = module->context;
+    i32 count = bh_arr_length(module->data);
+    if (count <= 1) return;
+
+    WasmDatum *items = module->data;
+
+    bh_arr(WasmDatum) merged = NULL;
+    bh_arr_new(module->context->gp_alloc, merged, 8);
+
+    if (count > 0) {
+        i32 i = 0;
+        while (!items[i].data && i < count) i++;
+
+        while (i < count) {
+            // This is a slight hack for if we don't know what it should be initialized with, don't include it in a data segment
+            // otherwise it could be zeroed out after it has been initialized.
+            if (!items[i].data) {
+                i++;
+                continue;
+            }
+
+            u32 start = items[i].offset_;
+            u32 end = start + items[i].length;
+            u32 alignment = items[i].alignment ? items[i].alignment : 1;
+            i32 j = i + 1;
+            while (j < count) {
+                if (!items[j].data) break;
+
+                u32 next_at = items[j].offset_;
+                u32 next_end = next_at + items[j].length;
+                if (next_at < end) {
+                    if (next_end > end) end = next_end;
+                    j++;
+                    continue;
+                }
+                if (next_at - end > ONYX_DATA_MERGE_GAP) break;
+                end = next_end;
+                j++;
+            }
+
+            u32 length = end - start;
+            u8 *bytes = bh_alloc_array(module->allocator, u8, length ? length : 1);
+            if (length) memset(bytes, 0, length);
+            for (i32 k = i; k < j; k++) {
+                if (!items[k].data) continue;
+                u32 at = items[k].offset_ - start;
+                if (at > length || items[k].length > length - at) continue;
+                memcpy(bytes + at, items[k].data, items[k].length);
+            }
+
+            WasmDatum out = { 0 };
+            out.id = (u32) bh_arr_length(merged) + 1;
+            out.offset_ = start;
+            out.alignment = alignment;
+            out.length = length;
+            out.data = bytes;
+            bh_arr_push(merged, out);
+            i = j;
+        }
+    }
+
+    module->data = merged;
+}
+
 void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLinkOptions *options) {
     // If the pointer size is going to change,
     // the code will probably need to be altered.
@@ -5667,10 +5737,6 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
 
     onyx_wasm_apply_object_memory_patches(module);
 
-    // Now that we know where the data elements will go (and to avoid a lot of patches),
-    // we can emit the __initialize_data_segments function.
-    emit_function(module, context->builtins.initialize_data_segments);
-
 #ifdef ENABLE_DEBUG_INFO
     if (module->debug_context) {
         bh_arr_each(DebugFuncContext, func, module->debug_context->funcs) {
@@ -5751,6 +5817,10 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
         }
     }
 
+    // Addresses are already assigned. Collapse nearby segments so
+    // __initialize_data_segments emits one memory.init per run, not per symbol.
+    merge_adjacent_data_segments(module);
+    emit_function(module, context->builtins.initialize_data_segments);
 
     if (0) {
         bh_arr_each(AstFunction *, pfunc, module->all_procedures) {
