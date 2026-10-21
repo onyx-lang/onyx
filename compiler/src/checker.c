@@ -6088,6 +6088,66 @@ CHECK_FUNC(file_contents, AstFileContents* fc) {
     return Check_Complete;
 }
 
+static b32 node_is_symbol_scope(AstNode *node) {
+    if (!node) return 0;
+    switch (node->kind) {
+        case Ast_Kind_Package:
+        case Ast_Kind_Foreign_Block:
+        case Ast_Kind_Object_Block:
+        case Ast_Kind_Basic_Type:
+        case Ast_Kind_Enum_Type:
+        case Ast_Kind_Poly_Union_Type:
+        case Ast_Kind_Distinct_Type:
+        case Ast_Kind_Interface:
+        case Ast_Kind_Slice_Type:
+        case Ast_Kind_DynArr_Type:
+        case Ast_Kind_Struct_Type:
+        case Ast_Kind_Union_Type:
+        case Ast_Kind_Poly_Struct_Type:
+        case Ast_Kind_Poly_Call_Type:
+        case Ast_Kind_Compiler_Extension:
+        case Ast_Kind_Code_Block:
+            return 1;
+        default: return 0;
+    }
+}
+
+// Bind one provided symbol. Yields until a procedure body or global type is ready.
+static CheckStatus bind_object_provide(Context *context, ObjectProvide *prov, AstNode *resolved) {
+    resolved = strip_aliases(resolved);
+    if (resolved == NULL || (resolved->kind != Ast_Kind_Function && resolved->kind != Ast_Kind_Memres)) {
+        ERROR_(prov->symbol->pos, "'%s' must provide a procedure or a global.", prov->name);
+    }
+
+    if (resolved->kind == Ast_Kind_Memres) {
+        AstMemRes *memres = (AstMemRes *) resolved;
+        // Memory reservations do not set Has_Been_Checked. The type is
+        // enough here; its address is assigned later, before linking.
+        if (memres->type == NULL) {
+            YIELD_(prov->symbol->pos, "Waiting for '%s' to be type-checked.", prov->name);
+        }
+        prov->memres = memres;
+        return Check_Success;
+    }
+
+    AstFunction *func = (AstFunction *) resolved;
+    if (func->kind == Ast_Kind_Polymorphic_Proc || func->poly_params != NULL) {
+        ERROR_(prov->symbol->pos, "'%s' must provide a concrete procedure.", prov->name);
+    }
+    if (func->is_foreign || func->is_intrinsic || func->is_object_link) {
+        ERROR_(prov->symbol->pos, "'%s' must provide an Onyx procedure with a body.", prov->name);
+    }
+    if (func->type == NULL || (func->flags & Ast_Flag_Has_Been_Checked) == 0) {
+        YIELD_(prov->symbol->pos, "Waiting for '%s' to be type-checked.", prov->name);
+    }
+    if (func->body == NULL) {
+        ERROR_(prov->symbol->pos, "'%s' must provide a procedure with a body.", prov->name);
+    }
+
+    prov->func = func;
+    return Check_Success;
+}
+
 CHECK_FUNC(object_block, AstObjectBlock *ob) {
     if (ob->scope == NULL)
         ob->scope = scope_create(context, context->checker.current_scope, ob->token->pos);
@@ -6140,10 +6200,6 @@ CHECK_FUNC(object_block, AstObjectBlock *ob) {
             resolved = strip_aliases(resolved);
         }
 
-        if (resolved == NULL || (resolved->kind != Ast_Kind_Function && resolved->kind != Ast_Kind_Memres)) {
-            ERROR_(prov->symbol->pos, "'%s' must provide a procedure or a global.", prov->name);
-        }
-
         bh_arr_each(ObjectProvide, earlier, ob->provides) {
             if (earlier == prov) break;
             if (earlier->name && strcmp(earlier->name, prov->name) == 0) {
@@ -6151,32 +6207,21 @@ CHECK_FUNC(object_block, AstObjectBlock *ob) {
             }
         }
 
-        if (resolved->kind == Ast_Kind_Memres) {
-            AstMemRes *memres = (AstMemRes *) resolved;
-            // Memory reservations do not set Has_Been_Checked. The type is
-            // enough here; its address is assigned later, before linking.
-            if (memres->type == NULL) {
-                YIELD_(prov->symbol->pos, "Waiting for '%s' to be type-checked.", prov->name);
-            }
-            prov->memres = memres;
-            continue;
-        }
+        CheckStatus bound = bind_object_provide(context, prov, resolved);
+        if (bound != Check_Success) return bound;
+    }
 
-        AstFunction *func = (AstFunction *) resolved;
-        if (func->kind == Ast_Kind_Polymorphic_Proc || func->poly_params != NULL) {
-            ERROR_(prov->symbol->pos, "'%s' must provide a concrete procedure.", prov->name);
+    // The namespace expression is checked here. Which imports it satisfies
+    // is decided while linking, when the object is parsed for real.
+    bh_arr_each(ObjectNamespace, ns, ob->namespaces) {
+        CHECK(expression, &ns->expr);
+        AstNode *node = strip_aliases((AstNode *) ns->expr);
+        if (node && node->kind == Ast_Kind_Poly_Call_Type && ((AstPolyCallType *) node)->resolved_type == NULL) {
+            YIELD(ns->token->pos, "Waiting for namespace type to be known.");
         }
-        if (func->is_foreign || func->is_intrinsic || func->is_object_link) {
-            ERROR_(prov->symbol->pos, "'%s' must provide an Onyx procedure with a body.", prov->name);
+        if (!node_is_symbol_scope(node)) {
+            ERROR(ns->token->pos, "A #namespace must name a package, struct, or other symbol scope.");
         }
-        if (func->type == NULL || (func->flags & Ast_Flag_Has_Been_Checked) == 0) {
-            YIELD_(prov->symbol->pos, "Waiting for '%s' to be type-checked.", prov->name);
-        }
-        if (func->body == NULL) {
-            ERROR_(prov->symbol->pos, "'%s' must provide a procedure with a body.", prov->name);
-        }
-
-        prov->func = func;
     }
 
     bh_arr_each(Entity *, pent, ob->captured_entities) {

@@ -1,5 +1,8 @@
 package core.libc
 
+// Don't compile everything in here if the module is never referenced
+#allow_stale_code
+
 use core
 use core {string}
 use core.memory
@@ -1101,6 +1104,79 @@ getpid :: () -> i32 {
 /// C `abort`. Does not return.
 abort :: () {
     core.intrinsics.wasm.unreachable();
+}
+
+__dso_handle: rawptr
+#init () { __dso_handle = &__dso_handle }
+
+AtExit :: struct {
+    func: i32;
+    arg: rawptr;
+}
+
+atexit_fns: [64] AtExit;
+atexit_count: i32;
+
+__cxa_atexit :: (func: i32, arg: rawptr, dso: rawptr) -> i32 {
+    if dso == cast(rawptr) 1 {}
+    if atexit_count >= 64 do return -1;
+    atexit_fns[atexit_count].func = func;
+    atexit_fns[atexit_count].arg = arg;
+    atexit_count += 1;
+    return 0;
+}
+
+i128 :: struct {lo, hi: i64}
+
+__ashlti3 :: (ret: &i128, lo: i64, hi: i64, sh: i32) {
+    a := cast(u64) lo;
+    b := cast(u64) hi;
+    if sh <= 0 {
+        ret.lo = a;
+        ret.hi = b;
+        return;
+    }
+    if sh >= 128 {
+        ret.lo = 0;
+        ret.hi = 0;
+        return;
+    }
+    if sh >= 64 {
+        ret.lo = 0;
+        ret.hi = a << cast(u64) (sh - 64);
+        return;
+    }
+    n := cast(u64) sh;
+    ret.lo = a << n;
+    ret.hi = (b << n) | (a >> (cast(u64) 64 - n));
+}
+
+__i128_mul_wide :: (x: u64, y: u64) -> i128 {
+    x0 := x & 0xffffffff;
+    x1 := x >> 32;
+    y0 := y & 0xffffffff;
+    y1 := y >> 32;
+    p0 := x0 * y0;
+    p1 := x0 * y1;
+    p2 := x1 * y0;
+    p3 := x1 * y1;
+    mid := (p0 >> 32) + (p1 & 0xffffffff) + (p2 & 0xffffffff);
+    return .{
+        lo = (p0 & 0xffffffff) | ((mid & 0xffffffff) << 32),
+        hi = p3 + (p1 >> 32) + (p2 >> 32) + (mid >> 32),
+    };
+}
+
+__multi3 :: (ret: &i128, a_lo: i64, a_hi: i64, b_lo: i64, b_hi: i64) {
+    alo := cast(u64) a_lo;
+    ahi := cast(u64) a_hi;
+    blo := cast(u64) b_lo;
+    bhi := cast(u64) b_hi;
+    low := __i128_mul_wide(alo, blo);
+    cross_a := __i128_mul_wide(ahi, blo);
+    cross_b := __i128_mul_wide(alo, bhi);
+    ret.lo = low.lo;
+    ret.hi = low.hi + cross_a.lo + cross_b.lo;
 }
 
 #if #defined(runtime.platform.__random_get) {

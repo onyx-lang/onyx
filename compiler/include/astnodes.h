@@ -1731,8 +1731,9 @@ struct AstForeignBlock {
 };
 
 // An undefined symbol in one object file, satisfied by an Onyx procedure.
-// `symbol` is both the binding name and the C symbol. `expr` is the
-// right-hand side of `name ::` inside a `#provide` block.
+// `symbol` is the binding name for an explicit `name ::` provide. A provide
+// created from `#namespace` uses that directive's token here, and `name` is
+// the C symbol. `expr` is the right-hand side of an explicit provide.
 struct ObjectProvide {
     OnyxToken *symbol;
     char *name;
@@ -1743,6 +1744,14 @@ struct ObjectProvide {
     struct AstMemRes *memres;
 };
 typedef struct ObjectProvide ObjectProvide;
+
+// `#namespace Package` inside `#provide`. The linker looks undefined symbols
+// up in this node with try_symbol_raw_resolve_from_node.
+struct ObjectNamespace {
+    OnyxToken *token;
+    AstTyped *expr;
+};
+typedef struct ObjectNamespace ObjectNamespace;
 
 // Links procedures from a WASM object file (Clang/LLVM linking section v2).
 // Empty-bodied declarations are symbols defined by the object. `#provide`
@@ -1757,6 +1766,7 @@ struct AstObjectBlock {
     char *filename;
     bh_arr(struct Entity *) captured_entities;
     bh_arr(struct ObjectProvide) provides;
+    bh_arr(struct ObjectNamespace) namespaces;
 };
 
 struct AstJsNode {

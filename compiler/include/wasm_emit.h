@@ -767,6 +767,9 @@ typedef struct OnyxWasmModule {
     bh_arr(PatchInfo) stack_leave_patches;
     bh_arr(DatumPatchInfo) data_patches;
     bh_arr(CodePatchInfo)  code_patches;
+    // Nodes discovered while linking. Drained immediately so their callees
+    // are emitted before code patches run. The entity heap is already empty.
+    bh_arr(AstNode *) link_emit_queue;
 
     bh_arr(ForRemoveInfo) for_remove_info;
 
@@ -842,6 +845,7 @@ typedef struct OnyxWasmModule {
 
     b32 has_stack_locals : 1;
     b32 doing_linking : 1;
+    b32 link_emit_draining : 1;
 
 #ifdef ENABLE_DEBUG_INFO
     struct DebugContext *debug_context;
@@ -877,6 +881,8 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
 b32 onyx_wasm_prepare_object(OnyxWasmModule *module);
 void onyx_wasm_module_write_object(OnyxWasmModule *module, bh_buffer *buffer);
 void onyx_wasm_link_object_files(OnyxWasmModule *module);
+// Emit a procedure or global reached while linking, including anything it uses.
+void onyx_wasm_ensure_emitted(OnyxWasmModule *module, AstNode *node);
 void onyx_wasm_apply_object_memory_patches(OnyxWasmModule *module);
 void onyx_wasm_module_free(OnyxWasmModule* module);
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer);

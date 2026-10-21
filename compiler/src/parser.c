@@ -4340,6 +4340,23 @@ static void parse_object_provides(OnyxParser *parser, AstObjectBlock *ob) {
         if (parser->hit_unexpected_token) break;
         if (consume_token_if_next(parser, ';')) continue;
 
+        if (parse_possible_directive(parser, "namespace")) {
+            OnyxToken *token = peek_token(-2);
+            AstTyped *expr = parse_expression(parser, 0);
+            if (expr == NULL) {
+                ONYX_ERROR(token->pos, Error_Critical, "Expected a package or type after #namespace.");
+                parser->hit_unexpected_token = 1;
+                break;
+            }
+            if (ob->namespaces == NULL)
+                bh_arr_new(parser->context->gp_alloc, ob->namespaces, 2);
+            ObjectNamespace ns;
+            ns.token = token;
+            ns.expr = expr;
+            bh_arr_push(ob->namespaces, ns);
+            continue;
+        }
+
         if (parser->curr->type != Token_Type_Symbol) {
             ONYX_ERROR(parser->curr->pos, Error_Critical, "Expected a binding in #provide.");
             parser->hit_unexpected_token = 1;

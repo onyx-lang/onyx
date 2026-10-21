@@ -566,11 +566,22 @@ static i32 emit_initialized_global_value(OnyxWasmModule *mod, Type *type, AstTyp
 static void emit_constexpr(ConstExprContext *ctx, AstTyped *node, u32 offset);
 static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset);
 
+static void queue_for_link_emit(OnyxWasmModule *mod, AstNode *node) {
+    bh_arr_push(mod->link_emit_queue, node);
+}
+
 static void ensure_node_has_been_submitted_for_emission(Context *context, AstNode *node) {
     assert(node->entity);
 
     if (node->flags & Ast_Flag_Has_Been_Scheduled_For_Emit) return;
     node->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
+
+    // Linking runs after the entity heap is empty. Remember the node and emit
+    // it from onyx_wasm_ensure_emitted, which is not inside another function body.
+    if (context->wasm_module && context->wasm_module->doing_linking) {
+        queue_for_link_emit(context->wasm_module, node);
+        return;
+    }
 
     // Node should be finalized at this point.
     // Actually no, it could have been entered by something else.
@@ -4404,6 +4415,7 @@ static i32 assign_function_index(OnyxWasmModule *mod, AstFunction *fd) {
 }
 
 static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
+    fd->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
     i32 func_idx = assign_function_index(mod, fd);
 
     if (fd == mod->context->builtins.initialize_data_segments && !mod->doing_linking) {
@@ -5041,6 +5053,7 @@ static i32 emit_initialized_global_value(OnyxWasmModule *mod, Type *type, AstTyp
 }
 
 static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
+    memres->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
     // :ProperLinking
     Type* effective_type = memres->type;
 
@@ -5225,6 +5238,7 @@ void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module) {
         .data = NULL,
         .data_patches = NULL,
         .code_patches = NULL,
+        .link_emit_queue = NULL,
 
         .next_tls_offset = 0,
         .tls_align = 0,
@@ -5313,6 +5327,7 @@ void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module) {
     bh_arr_new(context->gp_alloc, module->all_procedures, 4);
     bh_arr_new(context->gp_alloc, module->data_patches, 4);
     bh_arr_new(context->gp_alloc, module->code_patches, 4);
+    bh_arr_new(context->gp_alloc, module->link_emit_queue, 8);
 
     bh_arr_new(context->gp_alloc, module->types_enqueued_for_info, 32);
 
@@ -5453,6 +5468,30 @@ void emit_entity(Context *context, Entity* ent) {
 
     // HACK
     flush_enqueued_types_for_info(mod);
+}
+
+static void emit_link_node(OnyxWasmModule *mod, AstNode *node) {
+    if (node->kind == Ast_Kind_Function) {
+        AstFunction *func = (AstFunction *) node;
+        if (!func->is_foreign && !func->is_object_link) {
+            if (func->entity_header) emit_entity(mod->context, func->entity_header);
+            if (func->entity_body) emit_entity(mod->context, func->entity_body);
+            return;
+        }
+    }
+    if (node->entity) emit_entity(mod->context, node->entity);
+}
+
+void onyx_wasm_ensure_emitted(OnyxWasmModule *mod, AstNode *node) {
+    ensure_node_has_been_submitted_for_emission(mod->context, node);
+    if (!mod->doing_linking || mod->link_emit_draining) return;
+
+    mod->link_emit_draining = 1;
+    for (i32 i = 0; i < bh_arr_length(mod->link_emit_queue); i++) {
+        emit_link_node(mod, mod->link_emit_queue[i]);
+    }
+    bh_arr_clear(mod->link_emit_queue);
+    mod->link_emit_draining = 0;
 }
 
 

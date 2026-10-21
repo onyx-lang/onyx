@@ -7,6 +7,7 @@
 
 #include "wasm_emit.h"
 #include "errors.h"
+#include "utils.h"
 
 #define SYM_FUNCTION 0
 #define SYM_DATA     1
@@ -145,6 +146,11 @@ typedef struct ObjProvide {
     AstMemRes *memres;
 } ObjProvide;
 
+typedef struct ObjNamespace {
+    OnyxToken *token;
+    AstNode *node;
+} ObjNamespace;
+
 struct ObjFile {
     char *path;
     // Set when this file was a member of an ar archive. path is then
@@ -166,6 +172,7 @@ struct ObjFile {
     bh_arr(ObjInit) inits;
     bh_arr(ObjSection) sections;
     bh_arr(ObjProvide) provides;
+    bh_arr(ObjNamespace) namespaces;
 
     b32 failed;
 };
@@ -684,6 +691,7 @@ static ObjFile *parse_object_bytes(Linker *L, const char *display, const char *a
     bh_arr_new(alloc, file->inits, 4);
     bh_arr_new(alloc, file->sections, 8);
     bh_arr_new(alloc, file->provides, 4);
+    bh_arr_new(alloc, file->namespaces, 2);
 
     if (!file->bytes || file->length < 8) {
         obj_error(L, file, "Could not read object file '%s'.", display);
@@ -903,6 +911,7 @@ static ObjSymbol *find_definition(Linker *L, ObjSymbol *undef) {
 
 static void mark_symbol(Linker *L, ObjSymbol *sym);
 static b32 signature_matches(OnyxWasmModule *mod, AstFunction *fn, ObjType *ty, const char *name);
+static void source_error(Linker *L, OnyxFilePos pos, const char *fmt, ...);
 
 // Returns 1 when a #provide binding exists for this symbol. The binding may
 // still fail the signature check; callers should not also report it as undefined.
@@ -995,6 +1004,80 @@ static b32 bind_provided_data(Linker *L, ObjSymbol *sym) {
     return 1;
 }
 
+static b32 name_is_explicitly_provided(ObjFile *file, const char *name) {
+    bh_arr_each(ObjProvide, candidate, file->provides) {
+        if (candidate->name && bh_strcmp(candidate->name, name) == 0) return 1;
+    }
+    return 0;
+}
+
+// An earlier #namespace wins. A hit that is not a concrete procedure or global
+// is an error. A miss leaves the symbol for another object file.
+static b32 bind_from_namespace(Linker *L, ObjSymbol *sym) {
+    if (!sym->name || !sym->name[0]) return 0;
+    if ((sym->flags & SYM_BINDING_MASK) == SYM_BINDING_LOCAL) return 0;
+    if (sym->kind != SYM_FUNCTION && sym->kind != SYM_DATA) return 0;
+    if (name_is_explicitly_provided(sym->file, sym->name)) return 0;
+
+    bh_arr_each(ObjNamespace, ns, sym->file->namespaces) {
+        AstNode *hit = try_symbol_raw_resolve_from_node(L->module->context, ns->node, sym->name);
+        if (!hit) continue;
+        hit = strip_aliases(hit);
+        OnyxFilePos pos = ns->token ? ns->token->pos : sym->file->pos;
+
+        if (sym->kind == SYM_DATA) {
+            if (!hit || hit->kind != Ast_Kind_Memres) {
+                source_error(L, pos, "'%s' must provide a procedure or a global.", sym->name);
+                sym->reported = 1;
+                return 1;
+            }
+            AstMemRes *memres = (AstMemRes *) hit;
+            if (memres->type == NULL) {
+                source_error(L, pos, "'%s' was not type-checked.", sym->name);
+                sym->reported = 1;
+                return 1;
+            }
+            onyx_wasm_ensure_emitted(L->module, (AstNode *) memres);
+            ObjProvide entry;
+            entry.name = sym->name;
+            entry.func = NULL;
+            entry.memres = memres;
+            bh_arr_push(sym->file->provides, entry);
+            return bind_provided_data(L, sym);
+        }
+
+        if (!hit || hit->kind != Ast_Kind_Function) {
+            source_error(L, pos, "'%s' must provide a procedure or a global.", sym->name);
+            sym->reported = 1;
+            return 1;
+        }
+        AstFunction *func = (AstFunction *) hit;
+        if (func->kind == Ast_Kind_Polymorphic_Proc || func->poly_params != NULL) {
+            source_error(L, pos, "'%s' must provide a concrete procedure.", sym->name);
+            sym->reported = 1;
+            return 1;
+        }
+        if (func->is_foreign || func->is_intrinsic || func->is_object_link || func->body == NULL) {
+            source_error(L, pos, "'%s' must provide an Onyx procedure with a body.", sym->name);
+            sym->reported = 1;
+            return 1;
+        }
+        if (func->type == NULL || (func->flags & Ast_Flag_Has_Been_Checked) == 0) {
+            source_error(L, pos, "'%s' was not type-checked.", sym->name);
+            sym->reported = 1;
+            return 1;
+        }
+        onyx_wasm_ensure_emitted(L->module, (AstNode *) func);
+        ObjProvide entry;
+        entry.name = sym->name;
+        entry.func = func;
+        entry.memres = NULL;
+        bh_arr_push(sym->file->provides, entry);
+        return bind_provided_function(L, sym);
+    }
+    return 0;
+}
+
 static void queue_symbol(Linker *L, ObjSymbol *sym) {
     if (!sym || sym->live) return;
     sym->live = 1;
@@ -1045,6 +1128,7 @@ static void mark_symbol(Linker *L, ObjSymbol *sym) {
         }
         if (sym->kind == SYM_DATA && bind_provided_data(L, sym)) return;
         if (bind_provided_function(L, sym)) return;
+        if (bind_from_namespace(L, sym)) return;
         ObjSymbol *def = find_definition(L, sym);
         if (L->failed) return;
         if (!def) {
@@ -2048,6 +2132,13 @@ static void add_file_provides(Linker *L, ObjFile *file, AstObjectBlock *block) {
         entry.func = prov->func;
         entry.memres = prov->memres;
         bh_arr_push(file->provides, entry);
+    }
+
+    bh_arr_each(ObjectNamespace, ns, block->namespaces) {
+        ObjNamespace entry;
+        entry.token = ns->token;
+        entry.node = strip_aliases((AstNode *) ns->expr);
+        bh_arr_push(file->namespaces, entry);
     }
 }
 
