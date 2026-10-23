@@ -88,6 +88,11 @@ pow :: (base, exponent: f64) -> f64 {
     return math.pow(base, exponent)
 }
 
+/// C `ldexp`
+ldexp :: (a: f64, b: i32) -> f64 {
+    return a * ~~math.pow(2, b)
+}
+
 // Errno numbers from the wasm32-wasi-musl libc that typical freestanding
 // Clang objects are built against. They are not the Linux values.
 EINVAL  :: 28
