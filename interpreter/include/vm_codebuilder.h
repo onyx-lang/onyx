@@ -27,6 +27,11 @@ struct ovm_code_builder_t {
     i32 func_table_arr_idx;
     i32 highest_value_number;
 
+    // False after an unconditional branch, return, or unreachable, until the
+    // next join point (else or end). The abstract stack is not meaningful then.
+    b32 reachable;
+    i32 unreachable_sink;
+
     debug_info_builder_t *debug_builder;
 };
 
@@ -42,7 +47,20 @@ struct label_target_t {
     label_kind_t kind;
     i32 instr;
 
-    i32 values_on_stack_before_block;
+    // Stack height underneath this block's parameters. Result values replace
+    // the parameters, so exits rebuild the stack from here.
+    i32 stack_height;
+    i32 param_count;
+    i32 result_count;
+    // Stable registers. Loop back-edges write param_regs; block/if exits
+    // write result_regs. Both are pinned so later instructions cannot reuse them.
+    i32 *param_regs;
+    i32 *result_regs;
+
+    b32 entry_reachable;
+    // A branch to this label was emitted on a reachable path. Loop back-edges
+    // set this too; only block and if joins treat it as reaching the end.
+    b32 targeted;
 };
 
 enum branch_patch_kind_t {
@@ -63,7 +81,13 @@ struct branch_patch_t {
 ovm_code_builder_t ovm_code_builder_new(ovm_program_t *program, debug_info_builder_t *debug, i32 param_count, i32 result_count, i32 local_count);
 label_target_t     ovm_code_builder_wasm_target_idx(ovm_code_builder_t *builder, i32 idx);
 i32                ovm_code_builder_push_label_target(ovm_code_builder_t *builder, label_kind_t kind);
+// Parameters are the top of the stack. Copies them into stable registers and
+// reserves result registers. For a loop, the back-edge target is after the copies.
+void               ovm_code_builder_bind_block(ovm_code_builder_t *builder, i32 param_count, i32 result_count);
+// Same as bind_block, but the condition is sitting above the parameters.
+void               ovm_code_builder_bind_if(ovm_code_builder_t *builder, i32 param_count, i32 result_count);
 void               ovm_code_builder_pop_label_target(ovm_code_builder_t *builder);
+void               ovm_code_builder_else(ovm_code_builder_t *builder);
 void               ovm_code_builder_patch_else(ovm_code_builder_t *builder, label_target_t if_target);
 void               ovm_code_builder_free(ovm_code_builder_t *builder);
 void               ovm_code_builder_add_nop(ovm_code_builder_t *builder);
@@ -78,6 +102,7 @@ void               ovm_code_builder_add_return(ovm_code_builder_t *builder);
 void               ovm_code_builder_add_call(ovm_code_builder_t *builder, i32 func_idx, i32 param_count, bool has_return_value);
 void               ovm_code_builder_add_indirect_call(ovm_code_builder_t *builder, i32 param_count, bool has_return_value);
 void               ovm_code_builder_drop_value(ovm_code_builder_t *builder);
+void               ovm_code_builder_add_select(ovm_code_builder_t *builder);
 void               ovm_code_builder_add_local_get(ovm_code_builder_t *builder, i32 local_idx);
 void               ovm_code_builder_add_local_set(ovm_code_builder_t *builder, i32 local_idx);
 void               ovm_code_builder_add_local_tee(ovm_code_builder_t *builder, i32 local_idx);

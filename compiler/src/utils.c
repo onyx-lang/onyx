@@ -356,6 +356,7 @@ all_types_peeled_off:
         } 
 
         case Ast_Kind_Foreign_Block:
+        case Ast_Kind_Object_Block:
         case Ast_Kind_Basic_Type:
         case Ast_Kind_Enum_Type:
         case Ast_Kind_Poly_Union_Type:
@@ -1688,6 +1689,11 @@ all_types_peeled_off:
         case Ast_Kind_Foreign_Block: {
             AstForeignBlock* fb = (AstForeignBlock *) node;
             return &fb->scope;
+        }
+
+        case Ast_Kind_Object_Block: {
+            AstObjectBlock* ob = (AstObjectBlock *) node;
+            return &ob->scope;
         }
 
         case Ast_Kind_Basic_Type: {

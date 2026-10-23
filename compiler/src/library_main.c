@@ -598,6 +598,8 @@ static void prime_pump(Context *context) {
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.heap_start, context->global_scope, NULL);
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_base, context->global_scope, NULL);
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_size, context->global_scope, NULL);
+    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_align, context->global_scope, NULL);
+    add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.tls_image, context->global_scope, NULL);
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.closure_base, context->global_scope, NULL);
     add_entities_for_node(&context->entities, NULL, (AstNode *) &context->builtins.stack_trace, context->global_scope, NULL);
 
@@ -657,6 +659,14 @@ onyx_pump_t onyx_pump(onyx_context_t *ctx) {
 
         // Once the module has been linked, we are all done and ready to say everything compiled successfully!
         if (context->wasm_module_linked) return pump_return(context, ONYX_PUMP_DONE);
+
+        if (context->options.emit_wasm_object) {
+            if (!context->wasm_module || !onyx_wasm_prepare_object(context->wasm_module)) {
+                return pump_return(context, ONYX_PUMP_ERRORED);
+            }
+            context->wasm_module_linked = 1;
+            return pump_return(context, ONYX_PUMP_DONE);
+        }
 
         link_wasm_module(context);
         context->wasm_module_linked = 1;
@@ -872,6 +882,7 @@ int32_t onyx_set_option_int(onyx_context_t *ctx, onyx_option_t opt, int32_t valu
     case ONYX_OPTION_PLATFORM:               ctx->context.options.runtime = value; return 1;
     case ONYX_OPTION_PARSE_ONLY:             ctx->context.options.parse_only = value; return 1;
     case ONYX_OPTION_JIT:                    ctx->context.options.enable_jit = value; return 1;
+    case ONYX_OPTION_EMIT_WASM_OBJECT:       ctx->context.options.emit_wasm_object = value; return 1;
 
     default:
         break;

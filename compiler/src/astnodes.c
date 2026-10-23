@@ -118,6 +118,7 @@ static const char* ast_node_names[] = {
     "COMPILER EXTENSION",
     "PROCEDURAL MACRO",
     "PROCEDURAL EXPANSION",
+    "OBJECT BLOCK",
 
     "AST_NODE_KIND_COUNT",
 };
@@ -193,6 +194,7 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Overloaded_Function",
     "Function",
     "JS",
+    "Object Block",
 };
 
 AstNumLit* ast_reduce_type_compare(Context *context, AstBinaryOp* node) {

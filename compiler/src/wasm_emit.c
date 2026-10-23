@@ -94,6 +94,8 @@ static b32 onyx_type_is_multiple_wasm_values(Type *type) {
 
 static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft);
 static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func);
+static void note_table_index(OnyxWasmModule *mod, bh_arr(WasmInstruction) code, AstFunction *func);
+static AstFunction *function_at_element(OnyxWasmModule *mod, i32 elemidx);
 
 #define LOCAL_I32  0x000000000
 #define LOCAL_I64  0x100000000
@@ -171,7 +173,6 @@ static u64 local_allocate_bytes_in_memory(LocalAllocator *la, u32 size, u32 alig
 
 static void local_free_bytes_in_memory(LocalAllocator* la, u32 size, u32 alignment) {
     bh_align(size, alignment);
-
     la->curr_stack -= size;
 }
 
@@ -565,11 +566,22 @@ static i32 emit_initialized_global_value(OnyxWasmModule *mod, Type *type, AstTyp
 static void emit_constexpr(ConstExprContext *ctx, AstTyped *node, u32 offset);
 static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset);
 
+static void queue_for_link_emit(OnyxWasmModule *mod, AstNode *node) {
+    bh_arr_push(mod->link_emit_queue, node);
+}
+
 static void ensure_node_has_been_submitted_for_emission(Context *context, AstNode *node) {
     assert(node->entity);
 
     if (node->flags & Ast_Flag_Has_Been_Scheduled_For_Emit) return;
     node->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
+
+    // Linking runs after the entity heap is empty. Remember the node and emit
+    // it from onyx_wasm_ensure_emitted, which is not inside another function body.
+    if (context->wasm_module && context->wasm_module->doing_linking) {
+        queue_for_link_emit(context->wasm_module, node);
+        return;
+    }
 
     // Node should be finalized at this point.
     // Actually no, it could have been entered by something else.
@@ -578,7 +590,7 @@ static void ensure_node_has_been_submitted_for_emission(Context *context, AstNod
     if (node->kind == Ast_Kind_Function) {
         // Need to add header and body for functions
         AstFunction *func = (AstFunction *) node;
-        if (func->is_foreign) goto submit_normal_node;
+        if (func->is_foreign || func->is_object_link) goto submit_normal_node;
 
         func->entity_header->macro_attempts = 0;
         func->entity_body->macro_attempts = 0;
@@ -1685,6 +1697,7 @@ EMIT_FUNC(remove_directive, AstDirectiveRemove* remove) {
     ForRemoveInfo remove_info = bh_arr_last(mod->for_remove_info);
 
     WIL(remove->token, WI_LOCAL_GET, remove_info.iterator_remove_func);
+    note_table_index(mod, code, function_at_element(mod, mod->null_proc_func_idx));
     WIL(remove->token, WI_I32_CONST, mod->null_proc_func_idx);
     WI(remove->token, WI_I32_NE);
     WID(remove->token, WI_IF_START, 0x40);
@@ -1977,7 +1990,7 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
         case Unary_Op_Cast: emit_cast(mod, &code, unop); break;
 
         case Unary_Op_Try: // Should be handled in operator overload
-        case Unary_Op_Unwrap: 
+        case Unary_Op_Unwrap:
         case Unary_Op_Count:
             break;
     }
@@ -2007,7 +2020,10 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
 //
 // Linear memory stack:
 //
-//     ... | struct-like arguments (z) | variadic arguments (va) | return space | ...
+//     ... | return space | struct-like arguments (z) | variadic arguments (va) | ...
+//
+// The return pointer is the first wasm parameter, and the function has no
+// wasm result. Callers read the value back from the return slot.
 //
 // The interesting part from above is the fact that 'y' gets passed on the WASM stack, not the linear memory
 // stack, even though a 'str' in Onyx is 2-component structure. This is because so-called "simple" structures,
@@ -2043,6 +2059,35 @@ EMIT_FUNC(call, AstCall* call) {
     u32 reserve_size  = 0;
     u32 vararg_count  = 0;
     i32 vararg_offset = -1;
+
+    CallingConvention cc = type_function_get_cc(call->callee->type);
+    assert(cc != CC_Undefined);
+
+    Type* return_type = call->callee->type->Function.return_type;
+    u32 return_size = type_size_of(return_type);
+    assert(return_size % type_alignment_of(return_type) == 0);
+
+    // The return pointer is wasm parameter 0. An in-memory result lives in
+    // this function's frame, above the stack used by the call. A multi-value
+    // result is loaded immediately, so its slot can sit in the reservation.
+    u32 return_location = 0;
+    b32 stable_memory_return = 0;
+    u64 stable_return_offset = 0;
+    if (cc == CC_Return_Stack) {
+        if (onyx_type_is_stored_in_memory(return_type)) {
+            stable_memory_return = 1;
+            stable_return_offset = local_allocate_type_in_memory(mod->local_alloc, return_type);
+            emit_stack_address(mod, &code, (u32) stable_return_offset, call_token);
+        } else {
+            return_location = reserve_size;
+            WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+            if (return_location > 0) {
+                WID(call_token, WI_PTR_CONST, return_location);
+                WI(call_token, WI_PTR_ADD);
+            }
+            reserve_size += return_size;
+        }
+    }
 
     u32* vararg_any_offsets=NULL;
     u32* vararg_any_types=NULL;
@@ -2189,24 +2234,6 @@ EMIT_FUNC(call, AstCall* call) {
             break;
     }
 
-    CallingConvention cc = type_function_get_cc(call->callee->type);
-    assert(cc != CC_Undefined);
-
-    Type* return_type = call->callee->type->Function.return_type;
-    u32 return_size = type_size_of(return_type);
-    assert(return_size % type_alignment_of(return_type) == 0);
-
-    u32 return_location = 0;
-    if (cc == CC_Return_Stack) {
-        return_location = reserve_size;
-
-        WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
-        WID(call_token, WI_PTR_CONST, return_location);
-        WI(call_token, WI_PTR_ADD);
-
-        reserve_size += return_size;
-    }
-
     if (mod->context->options.stack_trace_enabled) {
         emit_stack_address(mod, &code, mod->stack_trace_idx, NULL);
         WIL(NULL, WI_I32_CONST, call->token->pos.line);
@@ -2251,8 +2278,12 @@ EMIT_FUNC(call, AstCall* call) {
     }
 
     if (cc == CC_Return_Stack) {
-        WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
-        emit_load_with_ignored_instruction(mod, &code, return_type, return_location, call->ignored_return_value_count);
+        if (stable_memory_return) {
+            emit_stack_address(mod, &code, (u32) stable_return_offset, call_token);
+        } else {
+            WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+            emit_load_with_ignored_instruction(mod, &code, return_type, return_location, call->ignored_return_value_count);
+        }
     }
 
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
@@ -3491,8 +3522,9 @@ EMIT_FUNC(expression, AstTyped* expr) {
             AstFunction *func = (AstFunction *) expr;
             i32 elemidx = get_element_idx(mod, func);
 
-            // This is not patched because it refers to the element index, which
-            // requires the function be submitted and part of the binary already.
+            // The immediate is the element slot. Object output relocates it
+            // against the function symbol so the linker assigns the table index.
+            note_table_index(mod, code, func);
             WID(NULL, WI_I32_CONST, elemidx);
             if (!func->captures) {
                 WIL(NULL, WI_PTR_CONST, 0);
@@ -4191,6 +4223,7 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_nod
         emit_location(mod, &code, alloc_node);
 
     } else if (type->kind == Type_Kind_Function) {
+        note_table_index(mod, code, function_at_element(mod, mod->null_proc_func_idx));
         WID(NULL, WI_I32_CONST, mod->null_proc_func_idx);
         WIL(NULL, WI_I32_CONST, 0);
 
@@ -4221,6 +4254,12 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     Type** param_type = ft->Function.params;
     i32 param_count = ft->Function.param_count;
     i32 params_left = param_count;
+    b32 return_on_stack = type_function_get_cc(ft) == CC_Return_Stack;
+
+    if (return_on_stack) {
+        *(t++) = (char) WASM_TYPE_PTR;
+        param_count += 1;
+    }
 
     while (params_left-- > 0) {
         switch (type_get_param_pass(*param_type)) {
@@ -4246,14 +4285,9 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
         param_type++;
     }
 
-    if (type_function_get_cc(ft) == CC_Return_Stack) {
-        *(t++) = onyx_type_to_wasm_type(mod->context->types.basic[Basic_Kind_Rawptr]);
-        param_count += 1;
-    }
-
     *(t++) = ':';
 
-    WasmType return_type = onyx_type_to_wasm_type(ft->Function.return_type);
+    WasmType return_type = return_on_stack ? WASM_TYPE_VOID : onyx_type_to_wasm_type(ft->Function.return_type);
     *(t++) = (char) return_type;
 
     *t = '\0';
@@ -4276,6 +4310,24 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
 
     shput(mod->type_map, type_repr_buf, mod->next_type_idx);
     return mod->next_type_idx++;
+}
+
+static void note_table_index(OnyxWasmModule *mod, bh_arr(WasmInstruction) code, AstFunction *func) {
+    CodePatchInfo patch = { 0 };
+    patch.kind = Code_Patch_Table_Index;
+    patch.func_idx = mod->current_func_idx;
+    patch.instr = (u32) bh_arr_length(code);
+    patch.node_related_to_patch = (AstNode *) func;
+    bh_arr_push(mod->code_patches, patch);
+}
+
+static AstFunction *function_at_element(OnyxWasmModule *mod, i32 elemidx) {
+    if (elemidx < 0) return NULL;
+    bh_arr_each(CodePatchInfo, patch, mod->code_patches) {
+        if (patch->kind == Code_Patch_Element && (i32) patch->instr == elemidx)
+            return (AstFunction *) patch->node_related_to_patch;
+    }
+    return NULL;
 }
 
 static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func) {
@@ -4363,6 +4415,7 @@ static i32 assign_function_index(OnyxWasmModule *mod, AstFunction *fd) {
 }
 
 static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
+    fd->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
     i32 func_idx = assign_function_index(mod, fd);
 
     if (fd == mod->context->builtins.initialize_data_segments && !mod->doing_linking) {
@@ -4418,8 +4471,15 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     if (fd->body != NULL) {
         mod->local_alloc = &wasm_func.locals;
 
-        // NOTE: Generate the local map
+        // NOTE: Generate the local map. A stack return pointer is parameter 0.
         u64 localidx = 0;
+        mod->curr_cc = type_function_get_cc(fd->type);
+        assert(mod->curr_cc != CC_Undefined);
+        if (mod->curr_cc == CC_Return_Stack) {
+            mod->stack_return_location_idx = localidx | LOCAL_IS_WASM;
+            localidx += 1;
+        }
+
         bh_arr_each(AstParam, param, fd->params) {
             switch (type_get_param_pass(param->local->type)) {
                 case Param_Pass_By_Multiple_Values:
@@ -4436,19 +4496,6 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
                 default: assert(0);
             }
-        }
-
-        mod->curr_cc = type_function_get_cc(fd->type);
-        assert(mod->curr_cc != CC_Undefined);
-
-        if (mod->curr_cc == CC_Return_Stack) {
-            // When returning on the stack, the location to write
-            // the result to is passed as the last parameter.
-            mod->stack_return_location_idx = localidx | LOCAL_IS_WASM;
-            localidx += 1;
-            
-            // TODO: Make this next line work.
-            // debug_introduce_symbol_by_name(mod, "$return", DSL_REGISTER, mod->stack_return_location_idx, mod->context->types.basic[Basic_Kind_Rawptr]);
         }
 
         mod->local_alloc->param_count = localidx;
@@ -4596,7 +4643,7 @@ static void emit_export_directive(OnyxWasmModule* mod, AstDirectiveExport* expor
     if (shgeti(mod->exports, export->export_name->text) != -1) {
         ONYX_ERROR(export->token->pos, Error_Critical, "Duplicate export name, '%s'.", export->export_name->text);
         token_toggle_end(export->export_name);
-        return;        
+        return;
     }
 
 
@@ -4635,6 +4682,8 @@ static void emit_global(OnyxWasmModule* mod, AstGlobal* global) {
     if (global == &mod->context->builtins.stack_top && mod->stack_top_ptr) return;
     if (global == &mod->context->builtins.heap_start && mod->heap_start_ptr) return;
     if (global == &mod->context->builtins.tls_size && mod->tls_size_ptr) return;
+    if (global == &mod->context->builtins.tls_align && mod->tls_align_ptr) return;
+    if (global == &mod->context->builtins.tls_image && mod->tls_image_ptr) return;
 
     if (!global->type && global->type_node) {
         global->type = type_build_from_ast(mod->context, global->type_node);
@@ -4672,6 +4721,14 @@ static void emit_global(OnyxWasmModule* mod, AstGlobal* global) {
 
     if (global == &mod->context->builtins.tls_size)
         mod->tls_size_ptr = &mod->globals[global_idx].initial_value[0].data.i1;
+
+    if (global == &mod->context->builtins.tls_align) {
+        mod->globals[global_idx].initial_value[0].data.i1 = 16;
+        mod->tls_align_ptr = &mod->globals[global_idx].initial_value[0].data.i1;
+    }
+
+    if (global == &mod->context->builtins.tls_image)
+        mod->tls_image_ptr = &mod->globals[global_idx].initial_value[0].data.i1;
 }
 
 // Register and emit the compiler-created runtime globals. These used to
@@ -4683,6 +4740,8 @@ static void emit_runtime_builtins(OnyxWasmModule *mod) {
         &mod->context->builtins.heap_start,
         &mod->context->builtins.tls_base,
         &mod->context->builtins.tls_size,
+        &mod->context->builtins.tls_align,
+        &mod->context->builtins.tls_image,
         &mod->context->builtins.closure_base,
         &mod->context->builtins.stack_trace,
     };
@@ -4849,6 +4908,13 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
         AstFunction* func = (AstFunction *) node;
         CE(u32, 0) = get_element_idx(ctx->module, func);
         CE(u32, 4) = 0;
+
+        DatumPatchInfo table_patch = { 0 };
+        table_patch.kind = Datum_Patch_Table_Index;
+        table_patch.index = ctx->data_id;
+        table_patch.location = offset;
+        table_patch.node_to_use_if_data_id_is_null = (AstNode *) func;
+        bh_arr_push_unsafe(ctx->module->data_patches, table_patch);
         break;
     }
 
@@ -4987,6 +5053,7 @@ static i32 emit_initialized_global_value(OnyxWasmModule *mod, Type *type, AstTyp
 }
 
 static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
+    memres->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
     // :ProperLinking
     Type* effective_type = memres->type;
 
@@ -5171,9 +5238,16 @@ void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module) {
         .data = NULL,
         .data_patches = NULL,
         .code_patches = NULL,
+        .link_emit_queue = NULL,
 
         .next_tls_offset = 0,
+        .tls_align = 0,
+        .tls_image_data_id = 0,
+        .tls_image_begin = 0,
+        .tls_span = 0,
         .tls_size_ptr = NULL,
+        .tls_align_ptr = NULL,
+        .tls_image_ptr = NULL,
 
         .elems = NULL,
 
@@ -5245,11 +5319,15 @@ void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module) {
     bh_arr_new(context->gp_alloc, module->local_allocations, 4);
     bh_arr_new(context->gp_alloc, module->stack_leave_patches, 4);
     bh_arr_new(context->gp_alloc, module->foreign_blocks, 4);
+    bh_arr_new(context->gp_alloc, module->object_blocks, 4);
+    bh_arr_new(context->gp_alloc, module->object_functions, 4);
+    bh_arr_new(context->gp_alloc, module->object_mem_patches, 4);
     bh_arr_new(context->gp_alloc, module->procedures_with_tags, 4);
     bh_arr_new(context->gp_alloc, module->globals_with_tags, 4);
     bh_arr_new(context->gp_alloc, module->all_procedures, 4);
     bh_arr_new(context->gp_alloc, module->data_patches, 4);
     bh_arr_new(context->gp_alloc, module->code_patches, 4);
+    bh_arr_new(context->gp_alloc, module->link_emit_queue, 8);
 
     bh_arr_new(context->gp_alloc, module->types_enqueued_for_info, 32);
 
@@ -5290,6 +5368,10 @@ void emit_entity(Context *context, Entity* ent) {
             break;
 
         case Entity_Type_Function_Header:
+            if (ent->function->is_object_link) {
+                bh_arr_push(mod->object_functions, ent->function);
+            }
+
             if (ent->function->flags & Ast_Flag_Proc_Is_Null) {
                 if (mod->null_proc_func_idx == -1) mod->null_proc_func_idx = get_element_idx(mod, ent->function);
             }
@@ -5359,6 +5441,21 @@ void emit_entity(Context *context, Entity* ent) {
             break;
         }
 
+        case Entity_Type_Object_Block: {
+            bh_arr_each(ObjectProvide, prov, ent->object_block->provides) {
+                if (prov->func)
+                    ensure_node_has_been_submitted_for_emission(context, (AstNode *) prov->func);
+                // A provided global is only placed if something asks for its
+                // address. The object file is that use, even when Onyx code
+                // never reads the global. The scheduled flag keeps this from
+                // allocating the datum twice.
+                if (prov->memres)
+                    ensure_node_has_been_submitted_for_emission(context, (AstNode *) prov->memres);
+            }
+            bh_arr_push(mod->object_blocks, ent->object_block);
+            break;
+        }
+
         case Entity_Type_Function: emit_function(mod, ent->function); break;
         case Entity_Type_Global:   emit_global(mod,   ent->global); break;
 
@@ -5373,6 +5470,30 @@ void emit_entity(Context *context, Entity* ent) {
     flush_enqueued_types_for_info(mod);
 }
 
+static void emit_link_node(OnyxWasmModule *mod, AstNode *node) {
+    if (node->kind == Ast_Kind_Function) {
+        AstFunction *func = (AstFunction *) node;
+        if (!func->is_foreign && !func->is_object_link) {
+            if (func->entity_header) emit_entity(mod->context, func->entity_header);
+            if (func->entity_body) emit_entity(mod->context, func->entity_body);
+            return;
+        }
+    }
+    if (node->entity) emit_entity(mod->context, node->entity);
+}
+
+void onyx_wasm_ensure_emitted(OnyxWasmModule *mod, AstNode *node) {
+    ensure_node_has_been_submitted_for_emission(mod->context, node);
+    if (!mod->doing_linking || mod->link_emit_draining) return;
+
+    mod->link_emit_draining = 1;
+    for (i32 i = 0; i < bh_arr_length(mod->link_emit_queue); i++) {
+        emit_link_node(mod, mod->link_emit_queue[i]);
+    }
+    bh_arr_clear(mod->link_emit_queue);
+    mod->link_emit_draining = 0;
+}
+
 
 static i32 cmp_type_info(const void *a, const void *b) {
     return *(i32 *) a - *(i32 *) b;
@@ -5382,12 +5503,86 @@ static i32 cmp_type_info(const void *a, const void *b) {
 #undef BH_INTERNAL_ALLOCATOR
 #define BH_INTERNAL_ALLOCATOR (context->gp_alloc)
 
+// Padding between two initialized segments that is still worth storing as
+// zeros. Alignment holes are a few bytes. A large uninitialized reservation
+// stays a hole so it is not copied into the binary.
+#define ONYX_DATA_MERGE_GAP 128
+
+static void merge_adjacent_data_segments(OnyxWasmModule *module) {
+    Context *context = module->context;
+    i32 count = bh_arr_length(module->data);
+    if (count <= 1) return;
+
+    WasmDatum *items = module->data;
+
+    bh_arr(WasmDatum) merged = NULL;
+    bh_arr_new(module->context->gp_alloc, merged, 8);
+
+    if (count > 0) {
+        i32 i = 0;
+        while (!items[i].data && i < count) i++;
+
+        while (i < count) {
+            // This is a slight hack for if we don't know what it should be initialized with, don't include it in a data segment
+            // otherwise it could be zeroed out after it has been initialized.
+            if (!items[i].data) {
+                i++;
+                continue;
+            }
+
+            u32 start = items[i].offset_;
+            u32 end = start + items[i].length;
+            u32 alignment = items[i].alignment ? items[i].alignment : 1;
+            i32 j = i + 1;
+            while (j < count) {
+                if (!items[j].data) break;
+
+                u32 next_at = items[j].offset_;
+                u32 next_end = next_at + items[j].length;
+                if (next_at < end) {
+                    if (next_end > end) end = next_end;
+                    j++;
+                    continue;
+                }
+                if (next_at - end > ONYX_DATA_MERGE_GAP) break;
+                end = next_end;
+                j++;
+            }
+
+            u32 length = end - start;
+            u8 *bytes = bh_alloc_array(module->allocator, u8, length ? length : 1);
+            if (length) memset(bytes, 0, length);
+            for (i32 k = i; k < j; k++) {
+                if (!items[k].data) continue;
+                u32 at = items[k].offset_ - start;
+                if (at > length || items[k].length > length - at) continue;
+                memcpy(bytes + at, items[k].data, items[k].length);
+            }
+
+            WasmDatum out = { 0 };
+            out.id = (u32) bh_arr_length(merged) + 1;
+            out.offset_ = start;
+            out.alignment = alignment;
+            out.length = length;
+            out.data = bytes;
+            bh_arr_push(merged, out);
+            i = j;
+        }
+    }
+
+    module->data = merged;
+}
+
 void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLinkOptions *options) {
     // If the pointer size is going to change,
     // the code will probably need to be altered.
     assert(POINTER_SIZE == 4);
 
     module->doing_linking = 1;
+
+    // Object functions must be in the index map before call sites are patched.
+    onyx_wasm_link_object_files(module);
+    if (onyx_has_errors(context)) return;
 
     bh_arr_each(CodePatchInfo, patch, module->code_patches) {
         AstFunction *func = (AstFunction *) patch->node_related_to_patch;
@@ -5402,7 +5597,7 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
                 if (!func->is_foreign) {
                     func_idx += module->next_foreign_func_idx;
                 }
-                
+
                 module->funcs[patch->func_idx].code[patch->instr].data.l = func_idx;
                 break;
             }
@@ -5413,7 +5608,7 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
                 if (!func->is_foreign) {
                     func_idx += module->next_foreign_func_idx;
                 }
-                
+
                 module->elems[patch->instr] = func_idx;
                 break;
             }
@@ -5520,9 +5715,16 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
         module->export_count++;
     }
 
-    i32 datum_offset = options->null_reserve_size;
+    // Clang may write 128 bytes below __stack_pointer without moving it.
+    // That red zone sits under the usable stack, inside the reservation,
+    // so a full stack still cannot touch the null page.
+    #define ONYX_STACK_RED_ZONE 128
 
-    datum_offset += options->stack_size;
+    u32 stack_align = options->stack_alignment;
+    if (stack_align < 16) stack_align = 16;
+
+    i32 stack_base = options->null_reserve_size + ONYX_STACK_RED_ZONE;
+    i32 datum_offset = stack_base + options->stack_size;
 
     bh_arr_each(WasmDatum, datum, module->data) {
         assert(datum->id > 0);
@@ -5533,9 +5735,7 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
         datum_offset += datum->length;
     }
 
-    // Now that we know where the data elements will go (and to avoid a lot of patches),
-    // we can emit the __initialize_data_segments function.
-    emit_function(module, context->builtins.initialize_data_segments);
+    onyx_wasm_apply_object_memory_patches(module);
 
 #ifdef ENABLE_DEBUG_INFO
     if (module->debug_context) {
@@ -5546,6 +5746,8 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
 #endif
 
     bh_arr_each(DatumPatchInfo, patch, module->data_patches) {
+        if (patch->kind == Datum_Patch_Table_Index) continue;
+
         if (patch->data_id == 0) {
             assert(patch->node_to_use_if_data_id_is_null || ("Unexpected empty data_id in linking!" && 0));
             switch (patch->node_to_use_if_data_id_is_null->kind) {
@@ -5598,17 +5800,27 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
     emit_runtime_builtins(module);
     assert(module->stack_top_ptr && module->heap_start_ptr);
 
-    *module->stack_top_ptr = options->null_reserve_size + options->stack_size;
+    *module->stack_top_ptr = stack_base + options->stack_size;
     *module->heap_start_ptr = datum_offset;
 
-    bh_align(*module->stack_top_ptr, options->stack_alignment);
+    bh_align(*module->stack_top_ptr, stack_align);
     bh_align(*module->heap_start_ptr, 16);
 
     if (module->tls_size_ptr) {
+        u32 tls_align = module->tls_align < 16 ? 16 : module->tls_align;
         *module->tls_size_ptr = module->next_tls_offset;
-        bh_align(*module->tls_size_ptr, 16);
+        bh_align(*module->tls_size_ptr, tls_align);
+        if (module->tls_align_ptr) *module->tls_align_ptr = (i32) tls_align;
+        if (module->tls_image_ptr && module->tls_image_data_id) {
+            WasmDatum *image = &module->data[module->tls_image_data_id - 1];
+            *module->tls_image_ptr = image->offset_;
+        }
     }
 
+    // Addresses are already assigned. Collapse nearby segments so
+    // __initialize_data_segments emits one memory.init per run, not per symbol.
+    merge_adjacent_data_segments(module);
+    emit_function(module, context->builtins.initialize_data_segments);
 
     if (0) {
         bh_arr_each(AstFunction *, pfunc, module->all_procedures) {

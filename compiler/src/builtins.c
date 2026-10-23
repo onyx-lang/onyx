@@ -53,6 +53,8 @@ const BuiltinSymbol builtin_symbols[] = {
     { "builtin", "__stack_top",  OFFSET(stack_top) },
     { "builtin", "__tls_base",   OFFSET(tls_base) },
     { "builtin", "__tls_size",   OFFSET(tls_size) },
+    { "builtin", "__tls_align",  OFFSET(tls_align) },
+    { "builtin", "__tls_image",  OFFSET(tls_image) },
     { "builtin", "__closure_base",   OFFSET(closure_base) },
     #undef OFFSET
 
@@ -370,6 +372,8 @@ void prepare_builtins(Context *context) {
     context->builtins.stack_top    = ((AstGlobal) { Ast_Kind_Global, 0, make_symbol_token(context, "__stack_top"), NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
     context->builtins.tls_base     = ((AstGlobal) { Ast_Kind_Global, 0, make_symbol_token(context, "__tls_base"), NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
     context->builtins.tls_size     = ((AstGlobal) { Ast_Kind_Global, 0, make_symbol_token(context, "__tls_size"), NULL, NULL, 0, (AstType *) &context->basic_types.type_u32, NULL });
+    context->builtins.tls_align    = ((AstGlobal) { Ast_Kind_Global, Ast_Flag_Const, make_symbol_token(context, "__tls_align"), NULL, NULL, 0, (AstType *) &context->basic_types.type_u32, NULL });
+    context->builtins.tls_image    = ((AstGlobal) { Ast_Kind_Global, Ast_Flag_Const, make_symbol_token(context, "__tls_image"), NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
     context->builtins.closure_base = ((AstGlobal) { Ast_Kind_Global, 0, make_symbol_token(context, "__closure_base"), NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
     context->builtins.stack_trace  = ((AstGlobal) { Ast_Kind_Global, 0, make_symbol_token(context, ""), NULL, NULL, 0, (AstType *) &context->basic_types.type_rawptr, NULL });
 
@@ -584,6 +588,17 @@ void introduce_build_options(Context *context) {
     runtime_type->type_node = Runtime_Type;
     add_entities_for_node(&context->entities, NULL, (AstNode *) runtime_type, NULL, NULL);
     symbol_builtin_introduce(context, p->scope, "runtime", (AstNode *) runtime_type);
+
+    AstType* Target_Type = (AstType *) symbol_raw_resolve(context, p->scope, "Target_Type");
+    if (Target_Type == NULL) {
+        ONYX_ERROR((OnyxFilePos) {0}, Error_Critical, "'Target_Type' type not found in package runtime.");
+        return;
+    }
+
+    AstNumLit* target_type = make_int_literal(context, context->options.emit_wasm_object ? 1 : 0);
+    target_type->type_node = Target_Type;
+    add_entities_for_node(&context->entities, NULL, (AstNode *) target_type, NULL, NULL);
+    symbol_builtin_introduce(context, p->scope, "target_type", (AstNode *) target_type);
 
     AstNumLit* multi_threaded = make_int_literal(context, context->options.use_multi_threading);
     multi_threaded->type_node = (AstType *) &context->basic_types.type_bool;

@@ -147,6 +147,7 @@ static AstIf*         parse_static_if_stmt(OnyxParser* parser, b32 parse_block_a
 static AstMemRes*     parse_memory_reservation(OnyxParser* parser, OnyxToken* symbol, b32 is_thread_local);
 static AstTyped*      parse_top_level_expression(OnyxParser* parser);
 static AstBinding*    parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol);
+static void           submit_binding(OnyxParser* parser, AstBinding* binding);
 static void           parse_top_level_statement(OnyxParser* parser);
 static AstPackage*    parse_package_expression(OnyxParser* parser);
 static void           parse_top_level_statements_until(OnyxParser* parser, TokenType tt);
@@ -1308,7 +1309,7 @@ static AstTyped* parse_factor_impl(OnyxParser* parser) {
                 new_token->text = first_char;
                 new_token->length = length;
                 new_token->pos = (peek_token(-2))->pos; // :LinearTokenDependent
-                
+
                 AstStrLit* str_node = make_node(AstStrLit, Ast_Kind_StrLit);
                 str_node->token     = new_token;
                 str_node->flags    |= Ast_Flag_Comptime;
@@ -2516,66 +2517,66 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
     symbol_node->flags |= Ast_Flag_Symbol_Is_PolyVar;
 
     bh_arr(ImplicitInterfaceConstraint) implicit_constraints = NULL;
-    
+
     if (consume_token_if_next(parser, '/')) {
         bh_arr_new(parser->context->gp_alloc, implicit_constraints, 2);
-        
+
         // Check if we have a brace-enclosed list
         if (consume_token_if_next(parser, '{')) {
             // Parse comma-separated interfaces with optional arguments
             do {
                 ImplicitInterfaceConstraint constraint;
                 constraint.extra_args = NULL;
-                
+
                 // Disable call parsing to get just the interface name
                 parser->parse_calls = 0;
                 constraint.interface = (AstNode *) parse_factor(parser);
                 parser->parse_calls = 1;
-                
+
                 // Check if there are arguments: Interface(arg1, arg2)
                 if (consume_token_if_next(parser, '(')) {
                     bh_arr_new(parser->context->gp_alloc, constraint.extra_args, 2);
-                    
+
                     while (!consume_token_if_next(parser, ')')) {
                         if (parser->hit_unexpected_token) return;
-                        
+
                         AstTyped* arg = parse_expression(parser, 0);
                         bh_arr_push(constraint.extra_args, arg);
-                        
+
                         if (parser->curr->type != ')')
                             expect_token(parser, ',');
                     }
                 }
-                
+
                 bh_arr_push(implicit_constraints, constraint);
             } while (consume_token_if_next(parser, ','));
-            
+
             expect_token(parser, '}');
         } else {
             // Single interface (backward compatible)
             ImplicitInterfaceConstraint constraint;
             constraint.extra_args = NULL;
-            
+
             // Disable call parsing to get just the interface name
             parser->parse_calls = 0;
             constraint.interface = (AstNode *) parse_factor(parser);
             parser->parse_calls = 1;
-            
+
             // Check if there are arguments: Interface(arg)
             if (consume_token_if_next(parser, '(')) {
                 bh_arr_new(parser->context->gp_alloc, constraint.extra_args, 2);
-                
+
                 while (!consume_token_if_next(parser, ')')) {
                     if (parser->hit_unexpected_token) return;
-                    
+
                     AstTyped* arg = parse_expression(parser, 0);
                     bh_arr_push(constraint.extra_args, arg);
-                    
+
                     if (parser->curr->type != ')')
                         expect_token(parser, ',');
                 }
             }
-            
+
             bh_arr_push(implicit_constraints, constraint);
         }
     }
@@ -4291,6 +4292,149 @@ static AstForeignBlock* parse_foreign_block(OnyxParser* parser, OnyxToken *token
     return fb;
 }
 
+static void submit_binding(OnyxParser *parser, AstBinding *binding) {
+    if (!binding) return;
+
+    flush_doc_tokens(parser, &binding->documentation_string, &binding->documentation_token_old);
+
+    //
+    // If this binding is inside an #inject block,
+    // swap the binding node for an injection node
+    // onto the injection point. This is the easiest
+    // way I could think of doing this.
+    if (parser->injection_point) {
+        AstInjection *injection = make_node(AstInjection, Ast_Kind_Injection);
+        injection->token = parser->injection_point->token;
+        injection->dest = parser->injection_point;
+        injection->symbol = binding->token;
+        injection->binding = binding;
+
+        ENTITY_SUBMIT(injection);
+        return;
+    }
+
+    Scope* target_scope = parser->package->scope;
+
+    if (binding->flags & Ast_Flag_Private_Package)
+        target_scope = parser->package->private_scope;
+    if (binding->flags & Ast_Flag_Private_File)
+        target_scope = parser->file_scope;
+
+    binding->flags |= Ast_Flag_Binding_Isnt_Captured;
+
+    ENTITY_SUBMIT_IN_SCOPE(binding, target_scope);
+}
+
+static void parse_object_provides(OnyxParser *parser, AstObjectBlock *ob) {
+    if (ob->provides == NULL)
+        bh_arr_new(parser->context->gp_alloc, ob->provides, 4);
+
+    expect_token(parser, '{');
+    if (parser->hit_unexpected_token) return;
+
+    // Provide procedures are ordinary bindings, not object imports.
+    // Pop the object block's capture while they are parsed.
+    bh_arr(Entity *) *captured = bh_arr_pop(parser->alternate_entity_placement_stack);
+
+    while (parser->curr->type != '}') {
+        if (parser->hit_unexpected_token) break;
+        if (consume_token_if_next(parser, ';')) continue;
+
+        if (parse_possible_directive(parser, "namespace")) {
+            OnyxToken *token = peek_token(-2);
+            AstTyped *expr = parse_expression(parser, 0);
+            if (expr == NULL) {
+                ONYX_ERROR(token->pos, Error_Critical, "Expected a package or type after #namespace.");
+                parser->hit_unexpected_token = 1;
+                break;
+            }
+            if (ob->namespaces == NULL)
+                bh_arr_new(parser->context->gp_alloc, ob->namespaces, 2);
+            ObjectNamespace ns;
+            ns.token = token;
+            ns.expr = expr;
+            bh_arr_push(ob->namespaces, ns);
+            continue;
+        }
+
+        if (parser->curr->type != Token_Type_Symbol) {
+            ONYX_ERROR(parser->curr->pos, Error_Critical, "Expected a binding in #provide.");
+            parser->hit_unexpected_token = 1;
+            break;
+        }
+
+        OnyxToken *symbol = expect_token(parser, Token_Type_Symbol);
+        if (!next_tokens_are(parser, 2, ':', ':')) {
+            ONYX_ERROR(symbol->pos, Error_Critical, "Expected '::' after '%b' in #provide.", symbol->text, symbol->length);
+            parser->hit_unexpected_token = 1;
+            break;
+        }
+        expect_token(parser, ':');
+
+        // Name the procedure inside the object scope so its assembly name
+        // does not collide with the same C symbol provided by another block.
+        Scope *saved_scope = parser->current_scope;
+        parser->current_scope = ob->scope;
+        AstBinding *binding = parse_top_level_binding(parser, symbol);
+        parser->current_scope = saved_scope;
+        if (binding == NULL) break;
+
+        if (bh_arr_length(parser->scope_flags) > 0)
+            binding->flags |= bh_arr_last(parser->scope_flags);
+
+        // `errno :: errno` becomes an alias of the existing global. The
+        // left-hand name is the C symbol, not a new Onyx binding. A procedure
+        // body is a new definition, but only inside this object block. Two
+        // blocks may provide the same C name without sharing a binding.
+        if (binding->node->kind != Ast_Kind_Alias) {
+            flush_doc_tokens(parser, &binding->documentation_string, &binding->documentation_token_old);
+            binding->flags |= Ast_Flag_Binding_Isnt_Captured;
+            ENTITY_SUBMIT_IN_SCOPE(binding, ob->scope);
+        }
+
+        ObjectProvide prov;
+        memset(&prov, 0, sizeof(prov));
+        prov.symbol = symbol;
+        prov.expr = (AstTyped *) binding->node;
+        bh_arr_push(ob->provides, prov);
+    }
+
+    if (!parser->hit_unexpected_token)
+        expect_token(parser, '}');
+
+    bh_arr_push(parser->alternate_entity_placement_stack, captured);
+}
+
+static AstObjectBlock* parse_object_block(OnyxParser* parser, OnyxToken *token) {
+    AstObjectBlock *ob = make_node(AstObjectBlock, Ast_Kind_Object_Block);
+    ob->token = token;
+    ob->filename_expr = parse_expression(parser, 0);
+    ob->scope = scope_create(parser->context, parser->current_scope, token->pos);
+    ob->scope->name = bh_aprintf(parser->context->gp_alloc, "object_%d", (int) ob->scope->id);
+
+    bh_arr_new(parser->context->gp_alloc, ob->captured_entities, 4);
+    bh_arr_push(parser->alternate_entity_placement_stack, &ob->captured_entities);
+
+    expect_token(parser, '{');
+    while (parser->curr->type != '}') {
+        if (parser->hit_unexpected_token) break;
+
+        if (parse_possible_directive(parser, "provide")) {
+            parse_object_provides(parser, ob);
+        } else {
+            parse_top_level_statement(parser);
+        }
+
+        consume_token_if_next(parser, ';');
+    }
+    expect_token(parser, '}');
+
+    bh_arr_pop(parser->alternate_entity_placement_stack);
+    ENTITY_SUBMIT(ob);
+
+    return ob;
+}
+
 static AstCompilerExtension* parse_compiler_extension(OnyxParser* parser, OnyxToken *token) {
     AstCompilerExtension *ext = make_node(AstCompilerExtension, Ast_Kind_Compiler_Extension);
     ext->token = token;
@@ -4356,6 +4500,11 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
         if (parse_possible_directive(parser, "foreign")) {
             AstForeignBlock *foreign = parse_foreign_block(parser, peek_token(-2));
             return (AstTyped *) foreign;
+        }
+
+        if (parse_possible_directive(parser, "object")) {
+            AstObjectBlock *object = parse_object_block(parser, peek_token(-2));
+            return (AstTyped *) object;
         }
 
         if (parse_possible_directive(parser, "compiler_extension") || parse_possible_directive(parser, "extension")) {
@@ -4687,6 +4836,10 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 parse_foreign_block(parser, peek_token(-2));
                 return;
             }
+            else if (parse_possible_directive(parser, "object")) {
+                parse_object_block(parser, peek_token(-2));
+                return;
+            }
             else if (parse_possible_directive(parser, "operator")) {
                 AstDirectiveOperator *operator = make_node(AstDirectiveOperator, Ast_Kind_Directive_Operator);
                 operator->token = dir_token;
@@ -4927,38 +5080,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
     return;
 
 submit_binding_to_entities:
-    {
-        if (!binding) return;
-
-        flush_doc_tokens(parser, &binding->documentation_string, &binding->documentation_token_old);
-
-        //
-        // If this binding is inside an #inject block,
-        // swap the binding node for an injection node
-        // onto the injection point. This is the easiest
-        // way I could think of doing this.
-        if (parser->injection_point) {
-            AstInjection *injection = make_node(AstInjection, Ast_Kind_Injection);
-            injection->token = parser->injection_point->token;
-            injection->dest = parser->injection_point;
-            injection->symbol = binding->token;
-            injection->binding = binding;
-
-            ENTITY_SUBMIT(injection);
-            return;
-        }
-
-        Scope* target_scope = parser->package->scope;
-
-        if (binding->flags & Ast_Flag_Private_Package)
-            target_scope = parser->package->private_scope;
-        if (binding->flags & Ast_Flag_Private_File)
-            target_scope = parser->file_scope;
-
-        binding->flags |= Ast_Flag_Binding_Isnt_Captured;
-
-        ENTITY_SUBMIT_IN_SCOPE(binding, target_scope);
-    }
+    submit_binding(parser, binding);
 }
 
 static b32 parse_package_name(OnyxParser *parser, AstPackage *package) {

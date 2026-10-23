@@ -115,6 +115,7 @@
     NODE(CaptureLocal)         \
                                \
     NODE(ForeignBlock)         \
+    NODE(ObjectBlock)          \
                                \
     NODE(Package)              \
     NODE(Import)               \
@@ -274,6 +275,8 @@ typedef enum AstKind {
     Ast_Kind_Compiler_Extension,
     Ast_Kind_Procedural_Macro,
     Ast_Kind_Procedural_Expansion,
+
+    Ast_Kind_Object_Block,
 
     Ast_Kind_Count
 } AstKind;
@@ -1524,9 +1527,15 @@ struct AstFunction {
     // NOTE: Only set on when --stack-trace is passed.
     AstLocal *stack_trace_local;
 
+    // Set for procedures declared in an #object block. object_filename is the
+    // resolved path of the WASM object, and object_symbol is the C symbol name.
+    char *object_filename;
+    char *object_symbol;
+
     b32 is_exported        : 1;
     b32 is_foreign         : 1;
     b32 is_foreign_dyncall : 1;
+    b32 is_object_link     : 1;
     b32 is_intrinsic       : 1;
 
     b32 named_return_locals_added : 1;
@@ -1721,6 +1730,45 @@ struct AstForeignBlock {
     b32 uses_dyncall : 1;
 };
 
+// An undefined symbol in one object file, satisfied by an Onyx procedure.
+// `symbol` is the binding name for an explicit `name ::` provide. A provide
+// created from `#namespace` uses that directive's token here, and `name` is
+// the C symbol. `expr` is the right-hand side of an explicit provide.
+struct ObjectProvide {
+    OnyxToken *symbol;
+    char *name;
+    AstTyped *expr;
+    AstFunction *func;
+    // A memory reservation, such as `errno: i32`, provided in place of a
+    // data symbol. The object's loads and stores of that symbol use its address.
+    struct AstMemRes *memres;
+};
+typedef struct ObjectProvide ObjectProvide;
+
+// `#namespace Package` inside `#provide`. The linker looks undefined symbols
+// up in this node with try_symbol_raw_resolve_from_node.
+struct ObjectNamespace {
+    OnyxToken *token;
+    AstTyped *expr;
+};
+typedef struct ObjectNamespace ObjectNamespace;
+
+// Links procedures from a WASM object file (Clang/LLVM linking section v2).
+// Empty-bodied declarations are symbols defined by the object. `#provide`
+// binds symbols that this object imports to Onyx procedures or memory
+// reservations. A provide in
+// one object does not satisfy the same symbol in another object.
+struct AstObjectBlock {
+    AstTyped_base;
+
+    Scope *scope;
+    AstTyped *filename_expr;
+    char *filename;
+    bh_arr(struct Entity *) captured_entities;
+    bh_arr(struct ObjectProvide) provides;
+    bh_arr(struct ObjectNamespace) namespaces;
+};
+
 struct AstJsNode {
     AstNode_base;
 
@@ -1824,6 +1872,7 @@ typedef enum EntityType {
     Entity_Type_Overloaded_Function,
     Entity_Type_Function,
     Entity_Type_JS,
+    Entity_Type_Object_Block,
 
     Entity_Type_Count,
 } EntityType;
@@ -1876,6 +1925,7 @@ typedef struct Entity {
         AstJsNode             *js;
         AstCompilerExtension  *compiler_extension;
         AstProceduralExpansion *proc_expansion;
+        AstObjectBlock        *object_block;
     };
 } Entity;
 
@@ -2130,6 +2180,7 @@ struct CompileOptions {
 
     b32 running_perf : 1;
     b32 enable_jit   : 1;
+    b32 emit_wasm_object : 1;
 
     Runtime runtime;
 
@@ -2178,6 +2229,8 @@ struct CompilerBuiltins {
     AstGlobal stack_top;
     AstGlobal tls_base;
     AstGlobal tls_size;
+    AstGlobal tls_align;
+    AstGlobal tls_image;
     AstGlobal closure_base;
     AstGlobal stack_trace;
     AstType  *string_type;
@@ -2738,10 +2791,21 @@ static inline Type* get_expression_type(Context *context, AstTyped* expr) {
     }
 }
 
+static inline b32 type_return_uses_memory(Type* type) {
+    while (type && type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
+    if (!type) return 0;
+    if (type_is_compound(type)) return 1;
+    if (type_struct_is_just_one_basic_value(type)) return 0;
+    return type->kind == Type_Kind_Struct
+        || type->kind == Type_Kind_Array
+        || type->kind == Type_Kind_DynArray
+        || type->kind == Type_Kind_Union;
+}
+
 static inline CallingConvention type_function_get_cc(Type* type) {
     if (type == NULL) return CC_Undefined;
     if (type->kind != Type_Kind_Function) return CC_Undefined;
-    if (type_is_compound(type->Function.return_type)) return CC_Return_Stack;
+    if (type_return_uses_memory(type->Function.return_type)) return CC_Return_Stack;
     return CC_Return_Wasm;
 }
 

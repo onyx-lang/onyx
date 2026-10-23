@@ -595,6 +595,12 @@ void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *) *target_arr, A
                 ent.function = (AstFunction *) node;
                 ENTITY_INSERT(ent);
 
+            } else if (((AstFunction *) node)->is_object_link) {
+                ent.type     = Entity_Type_Function_Header;
+                ent.function = (AstFunction *) node;
+                ENTITY_INSERT(ent);
+                ((AstFunction *) node)->entity_header = entity;
+
             } else {
                 ent.type     = Entity_Type_Function_Header;
                 ent.function = (AstFunction *) node;
@@ -764,6 +770,13 @@ void add_entities_for_node(EntityHeap *entities, bh_arr(Entity *) *target_arr, A
         case Ast_Kind_Foreign_Block: {
             ent.type = Entity_Type_Foreign_Block;
             ent.foreign_block = (AstForeignBlock *) node;
+            ENTITY_INSERT(ent);
+            break;
+        }
+
+        case Ast_Kind_Object_Block: {
+            ent.type = Entity_Type_Object_Block;
+            ent.object_block = (AstObjectBlock *) node;
             ENTITY_INSERT(ent);
             break;
         }

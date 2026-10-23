@@ -26,6 +26,7 @@ use runtime
 
 #load "./math/math"
 #load "./math/consts"
+#load "./libc/libc"
 #load "./random/random"
 
 #load "./hash/hash"

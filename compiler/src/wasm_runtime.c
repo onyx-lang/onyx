@@ -230,11 +230,23 @@ typedef struct DynCallContext {
     char types[64];
 } DynCallContext;
 
+static int dyncall_wasm_arg_count(const char *types) {
+    int count = 0;
+    for (int i = 1; types[i]; i++) {
+        count += types[i] == 's' ? 2 : 1;
+    }
+    return count;
+}
+
 static wasm_trap_t *__wasm_dyncall(void *env, const wasm_val_vec_t *args, wasm_val_vec_t *res) {
     DynCallContext *ctx = env;
     dcReset(dcCallVM);
 
+    // An aggregate return is a leading wasm pointer that the type string
+    // does not list. Skip it so the remaining arguments stay aligned.
     int arg_idx = 0;
+    if ((int) args->size == dyncall_wasm_arg_count(ctx->types) + 1) arg_idx = 1;
+
     for (int i = 1; i < 64; i++) {
         switch (ctx->types[i]) {
             case '\0': goto arguments_placed;

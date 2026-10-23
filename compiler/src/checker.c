@@ -3434,6 +3434,7 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
         case Ast_Kind_Error: break;
         case Ast_Kind_Unary_Field_Access: break;
         case Ast_Kind_Foreign_Block: break;
+        case Ast_Kind_Object_Block: break;
         case Ast_Kind_Zero_Value: break;
         case Ast_Kind_Interface: break;
         case Ast_Kind_Compiler_Extension: break;
@@ -6087,6 +6088,198 @@ CHECK_FUNC(file_contents, AstFileContents* fc) {
     return Check_Complete;
 }
 
+static b32 node_is_symbol_scope(AstNode *node) {
+    if (!node) return 0;
+    switch (node->kind) {
+        case Ast_Kind_Package:
+        case Ast_Kind_Foreign_Block:
+        case Ast_Kind_Object_Block:
+        case Ast_Kind_Basic_Type:
+        case Ast_Kind_Enum_Type:
+        case Ast_Kind_Poly_Union_Type:
+        case Ast_Kind_Distinct_Type:
+        case Ast_Kind_Interface:
+        case Ast_Kind_Slice_Type:
+        case Ast_Kind_DynArr_Type:
+        case Ast_Kind_Struct_Type:
+        case Ast_Kind_Union_Type:
+        case Ast_Kind_Poly_Struct_Type:
+        case Ast_Kind_Poly_Call_Type:
+        case Ast_Kind_Compiler_Extension:
+        case Ast_Kind_Code_Block:
+            return 1;
+        default: return 0;
+    }
+}
+
+// Bind one provided symbol. Yields until a procedure body or global type is ready.
+static CheckStatus bind_object_provide(Context *context, ObjectProvide *prov, AstNode *resolved) {
+    resolved = strip_aliases(resolved);
+    if (resolved == NULL || (resolved->kind != Ast_Kind_Function && resolved->kind != Ast_Kind_Memres)) {
+        ERROR_(prov->symbol->pos, "'%s' must provide a procedure or a global.", prov->name);
+    }
+
+    if (resolved->kind == Ast_Kind_Memres) {
+        AstMemRes *memres = (AstMemRes *) resolved;
+        // Memory reservations do not set Has_Been_Checked. The type is
+        // enough here; its address is assigned later, before linking.
+        if (memres->type == NULL) {
+            YIELD_(prov->symbol->pos, "Waiting for '%s' to be type-checked.", prov->name);
+        }
+        prov->memres = memres;
+        return Check_Success;
+    }
+
+    AstFunction *func = (AstFunction *) resolved;
+    if (func->kind == Ast_Kind_Polymorphic_Proc || func->poly_params != NULL) {
+        ERROR_(prov->symbol->pos, "'%s' must provide a concrete procedure.", prov->name);
+    }
+    if (func->is_foreign || func->is_intrinsic || func->is_object_link) {
+        ERROR_(prov->symbol->pos, "'%s' must provide an Onyx procedure with a body.", prov->name);
+    }
+    if (func->type == NULL || (func->flags & Ast_Flag_Has_Been_Checked) == 0) {
+        YIELD_(prov->symbol->pos, "Waiting for '%s' to be type-checked.", prov->name);
+    }
+    if (func->body == NULL) {
+        ERROR_(prov->symbol->pos, "'%s' must provide a procedure with a body.", prov->name);
+    }
+
+    prov->func = func;
+    return Check_Success;
+}
+
+CHECK_FUNC(object_block, AstObjectBlock *ob) {
+    if (ob->scope == NULL)
+        ob->scope = scope_create(context, context->checker.current_scope, ob->token->pos);
+
+    CHECK(expression, &ob->filename_expr);
+
+    if (ob->filename_expr->kind != Ast_Kind_StrLit) {
+        ERROR(ob->token->pos, "Expected object file name to be a compile-time string literal.");
+    }
+
+    OnyxToken *str_token = ob->filename_expr->token;
+    char *temp_str = bh_alloc_array(context->scratch_alloc, char, str_token->length + 1);
+    string_process_escape_seqs(temp_str, str_token->text, str_token->length);
+
+    const char *containing_filename = ob->token->pos.filename;
+    char *parent_folder = bh_path_get_parent(containing_filename, context->scratch_alloc);
+    if (parent_folder == NULL || parent_folder[0] == '\0') parent_folder = "./";
+
+    char *rel = temp_str;
+    if (rel[0] == '.' && (rel[1] == '/' || rel[1] == '\\')) rel += 2;
+
+    char *path;
+    if (rel[0] == '/') path = bh_strdup(context->gp_alloc, rel);
+    else               path = bh_aprintf(context->gp_alloc, "%s%s", parent_folder, rel);
+
+    if (!bh_file_exists(path)) {
+        ERROR_(ob->token->pos, "Failed to open object file '%s'.", path);
+    }
+
+    ob->filename = path;
+
+    bh_arr_each(ObjectProvide, prov, ob->provides) {
+        if (prov->name == NULL) {
+            char *temp = bh_alloc_array(context->scratch_alloc, char, prov->symbol->length + 1);
+            i32 len = string_process_escape_seqs(temp, prov->symbol->text, prov->symbol->length);
+            temp[len] = '\0';
+            prov->name = bh_strdup(context->gp_alloc, temp);
+        }
+
+        if (prov->func != NULL || prov->memres != NULL) continue;
+
+        AstNode *resolved = NULL;
+        if (prov->expr != NULL) {
+            CHECK(expression, &prov->expr);
+            resolved = strip_aliases((AstNode *) prov->expr);
+        } else {
+            resolved = symbol_resolve(context, ob->scope, prov->symbol);
+            if (resolved == NULL)
+                YIELD_(prov->symbol->pos, "Waiting to resolve provided symbol '%s'.", prov->name);
+            resolved = strip_aliases(resolved);
+        }
+
+        bh_arr_each(ObjectProvide, earlier, ob->provides) {
+            if (earlier == prov) break;
+            if (earlier->name && strcmp(earlier->name, prov->name) == 0) {
+                ERROR_(prov->symbol->pos, "Symbol '%s' is provided more than once.", prov->name);
+            }
+        }
+
+        CheckStatus bound = bind_object_provide(context, prov, resolved);
+        if (bound != Check_Success) return bound;
+    }
+
+    // The namespace expression is checked here. Which imports it satisfies
+    // is decided while linking, when the object is parsed for real.
+    bh_arr_each(ObjectNamespace, ns, ob->namespaces) {
+        CHECK(expression, &ns->expr);
+        AstNode *node = strip_aliases((AstNode *) ns->expr);
+        if (node && node->kind == Ast_Kind_Poly_Call_Type && ((AstPolyCallType *) node)->resolved_type == NULL) {
+            YIELD(ns->token->pos, "Waiting for namespace type to be known.");
+        }
+        if (!node_is_symbol_scope(node)) {
+            ERROR(ns->token->pos, "A #namespace must name a package, struct, or other symbol scope.");
+        }
+    }
+
+    bh_arr_each(Entity *, pent, ob->captured_entities) {
+        Entity *ent = *pent;
+        if (ent->type == Entity_Type_Function_Header) {
+            AstFunction *func = ent->function;
+
+            if (func->body == NULL || func->body->body != NULL) {
+                ERROR(func->token->pos, "Procedures declared in an #object block must have an empty body (---).");
+            }
+
+            if (func->intrinsic_name == NULL) {
+                ERROR(func->token->pos, "Object-linked procedures must be named.");
+            }
+
+            bh_arr_each(AstParam, param, func->params) {
+                if (param->vararg_kind != VA_Kind_Not_VA) {
+                    ERROR(func->token->pos, "Object-linked procedures cannot be variadic.");
+                }
+            }
+
+            func->is_object_link = 1;
+            func->object_filename = ob->filename;
+            func->object_symbol = bh_alloc_array(context->gp_alloc, char, func->intrinsic_name->length + 1);
+            memcpy(func->object_symbol, func->intrinsic_name->text, func->intrinsic_name->length);
+            func->object_symbol[func->intrinsic_name->length] = '\0';
+            func->entity = NULL;
+            func->entity_header = NULL;
+            func->entity_body = NULL;
+
+            add_entities_for_node(&context->entities, NULL, (AstNode *) func, ent->scope, ent->package);
+            continue;
+        }
+
+        if (ent->type == Entity_Type_Binding) {
+            AstBinding* new_binding = onyx_ast_node_new(context->ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
+            new_binding->token = ent->binding->token;
+            new_binding->node = ent->binding->node;
+
+            Entity e;
+            memset(&e, 0, sizeof(e));
+            e.type = Entity_Type_Binding;
+            e.state = Entity_State_Introduce_Symbols;
+            e.binding = new_binding;
+            e.scope = ob->scope;
+            e.package = ent->package;
+
+            entity_heap_insert(&context->entities, e);
+        }
+
+        if (ent->type != Entity_Type_Function) {
+            entity_heap_insert_existing(&context->entities, ent);
+        }
+    }
+
+    return Check_Success;
+}
+
 CHECK_FUNC(foreign_block, AstForeignBlock *fb) {
     if (fb->scope == NULL)
         fb->scope = scope_create(context, context->checker.current_scope, fb->token->pos);
@@ -6393,6 +6586,7 @@ void check_entity(Context *context, Entity* ent) {
         case Entity_Type_Job:           cs = check_arbitrary_job(context, ent->job_data); break;
         case Entity_Type_JS:            cs = check_js_node(context, ent->js); break;
         case Entity_Type_Foreign_Block: cs = check_foreign_block(context, ent->foreign_block); break;
+        case Entity_Type_Object_Block:  cs = check_object_block(context, ent->object_block); break;
         case Entity_Type_Import:        cs = check_import(context, ent->import); break;
             
         case Entity_Type_Compiler_Extension:   cs = check_compiler_extension(context, ent->compiler_extension); break;

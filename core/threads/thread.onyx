@@ -41,7 +41,7 @@ spawn :: (t: &Thread, data: &$T, func: (&T) -> void) {
 
     thread_map->put(t.id, t);
 
-    t.tls_base = raw_alloc(alloc.heap_allocator, __tls_size);
+    t.tls_base = raw_alloc(alloc.heap_allocator, __tls_size, __tls_align);
     memory.set(t.tls_base, 0, __tls_size);
 
     t.stack_base = raw_alloc(alloc.heap_allocator, 1 << 20);
