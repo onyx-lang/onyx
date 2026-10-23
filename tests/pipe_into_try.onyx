@@ -19,7 +19,6 @@ main :: () {
     })
     x := misc.as_any(v)
 
-    printf("{}\n", &x)
     printf("{}\n", x.type)
     printf("{a}\n", x)
 
@@ -55,5 +54,3 @@ temp_any :: macro (x: $T) => any.{
     new_temp(x)
     T
 }
-
-
