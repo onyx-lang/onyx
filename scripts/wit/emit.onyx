@@ -9,16 +9,23 @@ param_taken: [..] str
 param_names: [..] str
 has_exports: bool
 export_package: str = "wit_user";
+indent := 0
+
+idt :: (delta: i32) {
+    indent += delta * 4
+}
 
 e :: (s: str) {
+    if outb[outb.count - 1] == '\n' {
+        for indent do outb << ' ';
+    }
     for i in 0 .. s.count do outb << s[i];
 }
 
-e_dyn :: (b: dyn_str) {
-    for i in 0 .. b.count do outb << b[i];
-}
-
 el :: (s: str) {
+    if outb[outb.count - 1] == '\n' {
+        for indent do outb << ' ';
+    }
     e(s);
     outb << '\n';
 }
@@ -392,58 +399,80 @@ emit_lower_flat :: (expr: str, t: Type_Ref, slot: i32, expect: [] Core_Ty) -> i3
         if d.kind == .Option_ {
             bind := arm_name();
             el(tprintf("switch {} {{", expr));
+            idt(1)
             el("case .None {");
+            idt(1)
             el(tprintf("s{} = {};", slot, as_core("0", .I32, expect_at(expect, 0))));
+            idt(-1)
             el("}");
             el(tprintf("case .Some as {} {{", bind));
+            idt(1)
             el(tprintf("s{} = {};", slot, as_core("1", .I32, expect_at(expect, 0))));
             if expect.count > 1 {
                 emit_lower_flat(bind, d.inner, slot + 1, expect[1 .. expect.count]);
             }
+            idt(-1)
             el("}");
+            idt(-1)
             el("}");
         } elseif d.kind == .Result_ {
             el(tprintf("switch {} {{", expr));
+            idt(1)
             if d.has_ok {
                 bind := arm_name();
                 el(tprintf("case .Ok as {} {{", bind));
+                idt(1)
                 el(tprintf("s{} = {};", slot, as_core("0", .I32, expect_at(expect, 0))));
                 if expect.count > 1 do emit_lower_flat(bind, d.ok, slot + 1, expect[1 .. expect.count]);
+                idt(-1)
                 el("}");
             } else {
                 el("case .Ok {");
+                idt(1)
                 el(tprintf("s{} = {};", slot, as_core("0", .I32, expect_at(expect, 0))));
+                idt(-1)
                 el("}");
             }
             if d.has_err {
                 bind := arm_name();
                 el(tprintf("case .Err as {} {{", bind));
+                idt(1)
                 el(tprintf("s{} = {};", slot, as_core("1", .I32, expect_at(expect, 0))));
                 if expect.count > 1 do emit_lower_flat(bind, d.err, slot + 1, expect[1 .. expect.count]);
+                idt(-1)
                 el("}");
             } else {
                 el("case .Err {");
+                idt(1)
                 el(tprintf("s{} = {};", slot, as_core("1", .I32, expect_at(expect, 0))));
+                idt(-1)
                 el("}");
             }
+            idt(-1)
             el("}");
         } else {
             el(tprintf("switch {} {{", expr));
+            idt(1)
             for ci in 0 .. d.cases.count {
                 cs := d.cases[ci];
                 cname := pascal(cs.name);
                 if cs.has_payload {
                     bind := arm_name();
                     el(tprintf("case .{} as {} {{", cname, bind));
+                    idt(1)
                     el(tprintf("s{} = {};", slot, as_core(tprintf("{}", ci), .I32, expect_at(expect, 0))));
                     if expect.count > 1 do emit_lower_flat(bind, cs.payload, slot + 1, expect[1 .. expect.count]);
+                    idt(-1)
                     el("}");
                 } else {
                     el(tprintf("case .{} {{", cname));
+                    idt(1)
                     el(tprintf("s{} = {};", slot, as_core(tprintf("{}", ci), .I32, expect_at(expect, 0))));
+                    idt(-1)
                     el("}");
                 }
             }
+            idt(-1)
             el("}");
         }
         return slot + expect.count;
@@ -462,9 +491,12 @@ emit_lower_list :: (expr: str, elem: Type_Ref, slot: i32, expect: [] Core_Ty) ->
     child := abi_get(elem);
     el(tprintf("{} := ({}).count;", n, expr));
     el(tprintf("if {} <= 0 {{", n));
+    idt(1)
     el(tprintf("s{} = {};", slot, core_zero(expect[0])));
     el(tprintf("s{} = {};", slot + 1, core_zero(expect[1])));
+    idt(-1)
     el("} else {");
+    idt(1)
     if layout_matches(elem) {
         el(tprintf("s{} = {};", slot, as_core(tprintf("cast(i32) abi.ptr_u32(({}).data)", expr), .I32, expect[0])));
         el(tprintf("s{} = {};", slot + 1, as_core(n, .I32, expect[1])));
@@ -474,11 +506,14 @@ emit_lower_list :: (expr: str, elem: Type_Ref, slot: i32, expect: [] Core_Ty) ->
         el(tprintf("{} := abi.alloc_bytes({}, cast(u32) {} * {});", buf, child.align, n, child.size));
         el(tprintf("abi.note_alloc({}, false);", buf));
         el(tprintf("for _i in 0 .. {} {{", n));
+        idt(1)
         el(tprintf("__wit_store_{}({} + (cast(u32) _i) * {}, ({})[_i], false);", concrete.index, buf, child.size, expr));
+        idt(-1)
         el("}");
         el(tprintf("s{} = {};", slot, as_core(tprintf("cast(i32) {}", buf), .I32, expect[0])));
         el(tprintf("s{} = {};", slot + 1, as_core(n, .I32, expect[1])));
     }
+    idt(-1)
     el("}");
     return slot + 2;
 }
@@ -541,19 +576,26 @@ emit_lift_flat :: (dest: str, t: Type_Ref, slot: i32, expect: [] Core_Ty) -> i32
     }
     if d.kind == .Option_ {
         el(tprintf("if a{} == 0 {{", slot));
+        idt(1)
         el(tprintf("{} = .None;", dest));
+        idt(-1)
         el(tprintf("}} elseif a{} == 1 {{", slot));
+        idt(1)
         tmp := fresh(spell(d.inner));
         if expect.count > 1 do emit_lift_flat(tmp, d.inner, slot + 1, expect[1 .. expect.count]);
         el(tprintf("{} = .{{ Some = {} }};", dest, tmp));
+        idt(-1)
         el("} else {");
+        idt(1)
         el("abi.trap();");
         el(tprintf("{} = .None;", dest));
+        idt(-1)
         el("}");
         return slot + expect.count;
     }
     if d.kind == .Result_ {
         el(tprintf("if a{} == 0 {{", slot));
+        idt(1)
         if d.has_ok {
             tmp := fresh(spell(d.ok));
             if expect.count > 1 do emit_lift_flat(tmp, d.ok, slot + 1, expect[1 .. expect.count]);
@@ -561,7 +603,9 @@ emit_lift_flat :: (dest: str, t: Type_Ref, slot: i32, expect: [] Core_Ty) -> i32
         } else {
             el(tprintf("{} = .{{ Ok = .{{}} }};", dest));
         }
+        idt(-1)
         el(tprintf("}} elseif a{} == 1 {{", slot));
+        idt(1)
         if d.has_err {
             tmp := fresh(spell(d.err));
             if expect.count > 1 do emit_lift_flat(tmp, d.err, slot + 1, expect[1 .. expect.count]);
@@ -569,9 +613,12 @@ emit_lift_flat :: (dest: str, t: Type_Ref, slot: i32, expect: [] Core_Ty) -> i32
         } else {
             el(tprintf("{} = .{{ Err = .{{}} }};", dest));
         }
+        idt(-1)
         el("} else {");
+        idt(1)
         el("abi.trap();");
         el(tprintf("{} = .{{}};", dest));
+        idt(-1)
         el("}");
         return slot + expect.count;
     }
@@ -581,6 +628,7 @@ emit_lift_flat :: (dest: str, t: Type_Ref, slot: i32, expect: [] Core_Ty) -> i32
             cname := pascal(cs.name);
             if ci == 0 do el(tprintf("if a{} == {} {{", slot, ci));
             else do el(tprintf("}} elseif a{} == {} {{", slot, ci));
+            idt(1)
             if cs.has_payload {
                 tmp := fresh(spell(cs.payload));
                 if expect.count > 1 do emit_lift_flat(tmp, cs.payload, slot + 1, expect[1 .. expect.count]);
@@ -588,10 +636,13 @@ emit_lift_flat :: (dest: str, t: Type_Ref, slot: i32, expect: [] Core_Ty) -> i32
             } else {
                 el(tprintf("{} = .{{ {} = .{{}} }};", dest, cname));
             }
+            idt(-1)
         }
         el("} else {");
+        idt(1)
         el("abi.trap();");
         el(tprintf("{} = .{{}};", dest));
+        idt(-1)
         el("}");
         return slot + expect.count;
     }
@@ -665,15 +716,19 @@ emit_load_list :: (elem: Type_Ref) {
     el("data := abi.load_u32(ptr);");
     el("n := abi.load_u32(ptr + 4);");
     el("if n == 0 {");
+    idt(1)
     el("abi.free_bytes(data);");
     el("return .{};");
+    idt(-1)
     el("}");
     el(tprintf("out := make([] {}, cast(i32) n);", spell(elem)));
     if plain_scalar(elem) {
         el(tprintf("memory.copy(cast(rawptr) out.data, abi.u32_ptr(data), cast(i32) n * {});", child.size));
     } else {
         el("for _i in 0 .. cast(i32) n {");
+        idt(1)
         el(tprintf("out[_i] = {};", load_expr(elem, tprintf("data + (cast(u32) _i) * {}", child.size))));
+        idt(-1)
         el("}");
     }
     el("abi.free_bytes(data);");
@@ -683,15 +738,19 @@ emit_load_list :: (elem: Type_Ref) {
 emit_store_list :: (elem: Type_Ref) {
     child := abi_get(elem);
     el("if v.count <= 0 {");
+    idt(1)
     el("abi.store_u32(ptr, 0);");
     el("abi.store_u32(ptr + 4, 0);");
     el("return;");
+    idt(-1)
     el("}");
     if layout_matches(elem) {
         el("if !owned {");
+        idt(1)
         el("abi.store_u32(ptr, abi.ptr_u32(v.data));");
         el("abi.store_u32(ptr + 4, cast(u32) v.count);");
         el("return;");
+        idt(-1)
         el("}");
     }
     el(tprintf("buf := abi.alloc_bytes({}, cast(u32) v.count * {});", child.align, child.size));
@@ -700,7 +759,9 @@ emit_store_list :: (elem: Type_Ref) {
         el(tprintf("memory.copy(abi.u32_ptr(buf), cast(rawptr) v.data, v.count * {});", child.size));
     } else {
         el("for _i in 0 .. v.count {");
+        idt(1)
         emit_store_word(tprintf("buf + (cast(u32) _i) * {}", child.size), "v[_i]", elem, "owned");
+        idt(-1)
         el("}");
     }
     el("abi.store_u32(ptr, buf);");
@@ -716,6 +777,7 @@ emit_load_store_funcs :: () {
         a := abi_get(t);
 
         el(tprintf("__wit_load_{} :: (ptr: u32) -> {} {{", i, sp));
+        idt(1)
         if d.kind == .Record || d.kind == .Tuple {
             el(tprintf("v: {};", sp));
             off: u32 = 0;
@@ -736,19 +798,25 @@ emit_load_store_funcs :: () {
             el(tprintf("disc := {};", disc_load_expr("ptr", a.disc_size)));
             el("if disc == 0 do return .None;");
             el("if disc == 1 {");
+            idt(1)
             el(tprintf("return .{{ Some = {} }};", load_expr(d.inner, tprintf("ptr + {}", a.payload_off))));
+            idt(-1)
             el("}");
             el("abi.trap();");
             el("return .None;");
         } elseif d.kind == .Result_ {
             el(tprintf("disc := {};", disc_load_expr("ptr", a.disc_size)));
             el("if disc == 0 {");
+            idt(1)
             if d.has_ok do el(tprintf("return .{{ Ok = {} }};", load_expr(d.ok, tprintf("ptr + {}", a.payload_off))));
             else do el("return .{ Ok = .{} };");
+            idt(-1)
             el("}");
             el("if disc == 1 {");
+            idt(1)
             if d.has_err do el(tprintf("return .{{ Err = {} }};", load_expr(d.err, tprintf("ptr + {}", a.payload_off))));
             else do el("return .{ Err = .{} };");
+            idt(-1)
             el("}");
             el("abi.trap();");
             el("return .{};");
@@ -757,20 +825,24 @@ emit_load_store_funcs :: () {
             for ci in 0 .. d.cases.count {
                 cs := d.cases[ci];
                 el(tprintf("if disc == {} {{", ci));
+                idt(1)
                 if cs.has_payload {
                     el(tprintf("return .{{ {} = {} }};", pascal(cs.name), load_expr(cs.payload, tprintf("ptr + {}", a.payload_off))));
                 } else {
                     el(tprintf("return .{{ {} = .{{}} }};", pascal(cs.name)));
                 }
+                idt(-1)
                 el("}");
             }
             el("abi.trap();");
             el("return .{};");
         }
+        idt(-1)
         el("}");
         el("");
 
         el(tprintf("__wit_store_{} :: (ptr: u32, v: {}, owned: bool) {{", i, sp));
+        idt(1)
         el("_ := owned;");
         if d.kind == .Record || d.kind == .Tuple || d.kind == .Variant || d.kind == .Option_ || d.kind == .Result_ {
             el(tprintf("memory.set(abi.u32_ptr(ptr), 0, cast(i32) {});", a.size));
@@ -791,54 +863,77 @@ emit_load_store_funcs :: () {
             emit_store_list(d.inner);
         } elseif d.kind == .Option_ {
             el("switch v {");
+            idt(1)
             el("case .None {");
+            idt(1)
             disc_store("ptr", "0", a.disc_size);
+            idt(-1)
             el("}");
             el("case .Some as inner {");
+            idt(1)
             disc_store("ptr", "1", a.disc_size);
             emit_store_word(tprintf("ptr + {}", a.payload_off), "inner", d.inner, "owned");
+            idt(-1)
             el("}");
+            idt(-1)
             el("}");
         } elseif d.kind == .Result_ {
             el("switch v {");
+            idt(1)
             if d.has_ok {
                 el("case .Ok as inner {");
+                idt(1)
                 disc_store("ptr", "0", a.disc_size);
                 emit_store_word(tprintf("ptr + {}", a.payload_off), "inner", d.ok, "owned");
+                idt(-1)
                 el("}");
             } else {
                 el("case .Ok {");
+                idt(1)
                 disc_store("ptr", "0", a.disc_size);
+                idt(-1)
                 el("}");
             }
             if d.has_err {
                 el("case .Err as inner {");
+                idt(1)
                 disc_store("ptr", "1", a.disc_size);
                 emit_store_word(tprintf("ptr + {}", a.payload_off), "inner", d.err, "owned");
+                idt(-1)
                 el("}");
             } else {
                 el("case .Err {");
+                idt(1)
                 disc_store("ptr", "1", a.disc_size);
+                idt(-1)
                 el("}");
             }
+            idt(-1)
             el("}");
         } elseif d.kind == .Variant {
             el("switch v {");
+            idt(1)
             for ci in 0 .. d.cases.count {
                 cs := d.cases[ci];
                 if cs.has_payload {
                     el(tprintf("case .{} as inner {{", pascal(cs.name)));
+                    idt(1)
                     disc_store("ptr", tprintf("{}", ci), a.disc_size);
                     emit_store_word(tprintf("ptr + {}", a.payload_off), "inner", cs.payload, "owned");
+                    idt(-1)
                     el("}");
                 } else {
                     el(tprintf("case .{} {{", pascal(cs.name)));
+                    idt(1)
                     disc_store("ptr", tprintf("{}", ci), a.disc_size);
+                    idt(-1)
                     el("}");
                 }
             }
+            idt(-1)
             el("}");
         }
+        idt(-1)
         el("}");
         el("");
     }
@@ -1075,7 +1170,9 @@ borrow_name_of :: (resource_id: i32) -> str {
 
 emit_rep_method :: (type_name: str, rep_raw: str) {
     el(tprintf("{}.rep :: (self: {}) -> rawptr {{", type_name, type_name));
+    idt(1)
     el(tprintf("return abi.u32_ptr(cast(u32) {}(cast(i32) self.handle));", rep_raw));
+    idt(-1)
     el("}");
     el("");
 }
@@ -1109,7 +1206,9 @@ emit_guest_resource :: (iface_id: i32) {
 
         public := type_public[i];
         el(tprintf("{}.from_rep :: (rep: rawptr) -> {} {{", public, public));
+        idt(1)
         el(tprintf("return .{{ handle = cast(u32) {}(cast(i32) abi.ptr_u32(rep)) }};", new_raw));
+        idt(-1)
         el("}");
         el("");
         emit_rep_method(public, rep_raw);
@@ -1117,7 +1216,9 @@ emit_guest_resource :: (iface_id: i32) {
         if borrowed.count > 0 do emit_rep_method(borrowed, rep_raw);
 
         el(tprintf("{}.drop :: (resource: {}) {{", public, public));
+        idt(1)
         el(tprintf("{}(cast(i32) resource.handle);", drop_raw));
+        idt(-1)
         el("}");
         el(tprintf("#overload delete :: {}.drop", public));
         el("");
@@ -1135,7 +1236,9 @@ emit_guest_resource :: (iface_id: i32) {
 emit_dtor_trampoline :: (rec: Guest_Res) {
     cname := tprintf("__wit_exp_{}", rec.dtor_hook);
     el(tprintf("{} :: (a0: i32) {{", cname));
+    idt(1)
     el(tprintf("{}.{}(abi.u32_ptr(cast(u32) a0));", export_package, rec.dtor_hook));
+    idt(-1)
     el("}");
     el(tprintf("#export {} {}", quote_onyx(rec.dtor_export), cname));
     el("");
@@ -1239,6 +1342,7 @@ emit_import :: (f: Func, iface_name: str, ns: str) {
     e(")");
     if f.has_result do e(tprintf(" -> {}", spell(f.result)));
     el(" {");
+    idt(1)
     el("abi.temp_push();");
 
     flats := flatten_params(f);
@@ -1266,7 +1370,6 @@ emit_import :: (f: Func, iface_name: str, ns: str) {
     if sig.indirect_result {
         ra := abi_get(f.result);
         el(tprintf("_retb: [{}] u64;", stack_slots(ra.size)));
-        el(tprintf("memory.set(cast(rawptr) &_retb, 0, cast(i32) {});", ra.size));
         el("_retp := abi.ptr_u32(cast(rawptr) &_retb);");
     }
 
@@ -1282,7 +1385,7 @@ emit_import :: (f: Func, iface_name: str, ns: str) {
     }
     e(raw);
     e("(");
-    e_dyn(args);
+    e(args);
     el(");");
 
     if f.has_result {
@@ -1297,6 +1400,7 @@ emit_import :: (f: Func, iface_name: str, ns: str) {
     }
     el("abi.temp_free();");
     if f.has_result do el("return _ret;");
+    idt(-1)
     el("}");
     el("");
 }
@@ -1315,7 +1419,9 @@ emit_drops :: (iface_name: str, iface_id: i32) {
         emit_foreign(raw, sig, sym.module, sym.name);
         ty := type_public[i];
         el(tprintf("{}.drop :: (resource: {}) {{", ty, ty));
+        idt(1)
         el(tprintf("{}(cast(i32) resource.handle);", raw));
+        idt(-1)
         el("}");
         el(tprintf("#overload delete :: {}.drop", ty));
         el("");
@@ -1333,6 +1439,7 @@ emit_export :: (f: Func, iface_name: str, hook: str) {
     e(tprintf("{} :: ", cname));
     write_core_params(sig);
     el(" {");
+    idt(1)
     if post_ok do el("abi.post_push();");
 
     flats := flatten_params(f);
@@ -1369,7 +1476,7 @@ emit_export :: (f: Func, iface_name: str, hook: str) {
     }
     e(tprintf("{}.{}", export_package, hook));
     e("(");
-    e_dyn(args);
+    e(args);
     el(");");
 
     if guest_ctor {
@@ -1388,6 +1495,7 @@ emit_export :: (f: Func, iface_name: str, hook: str) {
         emit_lower_flat("_user", f.result, 0, rf);
         el("return s0;");
     }
+    idt(-1)
     el("}");
     el(tprintf("#export {} {}", quote_onyx(sym.name), cname));
     el("");
@@ -1397,7 +1505,9 @@ emit_export :: (f: Func, iface_name: str, hook: str) {
         e(tprintf("{} :: ", pname));
         write_core_params(post.sig);
         el(" {");
+        idt(1)
         el("abi.post_free();");
+        idt(-1)
         el("}");
         el(tprintf("#export {} {}", quote_onyx(post.name), pname));
         el("");

@@ -3,12 +3,14 @@ package runtime.platform
 #load "./bindings"
 #load "./env"
 #load "./fs"
+#load "./wit_user"
 
 use core {*}
 use runtime
 use runtime.component.abi
 use main { MAIN_PKG :: package }
 use wasi.cli.v0_2_12 {*}
+use wit_user
 
 // Preview 2 command components. Threads and sockets are in the generated
 // bindings, but this world has no thread spawn and the os/net layer is the
@@ -202,7 +204,7 @@ __start :: () {
 
 // wasmtime calls cm32p2_initialize before the command export. Calling it
 // again is safe and covers a host that invokes run directly.
-run_run :: () -> Result(void, void) {
+wit_user.run_run :: () -> Result(void, void) {
     abi.initialize();
     __start();
     return .{ Ok = .{} };
