@@ -66,6 +66,7 @@ typedef enum onyx_platform_t {
     ONYX_PLATFORM_WASI   = 2,
     ONYX_PLATFORM_JS     = 3,
     ONYX_PLATFORM_CUSTOM = 4,
+    ONYX_PLATFORM_WASIP2 = 5,
 } onyx_platform_t;
 
 typedef enum onyx_error_t {

@@ -1,0 +1,209 @@
+package runtime.platform
+
+#load "./bindings"
+#load "./env"
+#load "./fs"
+
+use core {*}
+use runtime
+use runtime.component.abi
+use main { MAIN_PKG :: package }
+use wasi.cli.v0_2_12 {*}
+
+// Preview 2 command components. Threads and sockets are in the generated
+// bindings, but this world has no thread spawn and the os/net layer is the
+// wasix API, which preview 2 does not speak.
+
+Supports_Files :: true
+Supports_Directories :: true
+Supports_Os :: true
+Supports_Processes :: false
+Supports_Time :: true
+Supports_Type_Info :: true
+Supports_Threads :: false
+Supports_Env_Vars :: true
+Supports_Networking :: false
+Supports_Futexes :: false
+Supports_TTY :: false
+
+__stdin: os.File;
+__stdout: os.File;
+__stderr: os.File;
+
+stdout_ready := false
+stderr_ready := false
+stdin_ready := false
+stdout_stream: OutputStream
+stderr_stream: OutputStream
+stdin_stream: InputStream
+
+stdout_get :: () -> OutputStream {
+    if !stdout_ready {
+        stdout_stream = Stdout.get_stdout();
+        stdout_ready = true;
+    }
+    return stdout_stream;
+}
+
+stderr_get :: () -> OutputStream {
+    if !stderr_ready {
+        stderr_stream = Stderr.get_stderr();
+        stderr_ready = true;
+    }
+    return stderr_stream;
+}
+
+stdin_get :: () -> InputStream {
+    if !stdin_ready {
+        stdin_stream = Stdin.get_stdin();
+        stdin_ready = true;
+    }
+    return stdin_stream;
+}
+
+write_stream :: (stream: OutputStream, s: str) -> u32 {
+    if s.count <= 0 do return 0;
+
+    switch OutputStream.blocking_write_and_flush(stream, s) {
+        case .Ok do return cast(u32) s.count;
+        case .Err as err {
+            switch err {
+                case .LastOperationFailed as e do Error.drop(e);
+                case .Closed {}
+            }
+            return 0;
+        }
+    }
+}
+
+__output_string :: (s: str) -> u32 {
+    return write_stream(stdout_get(), s);
+}
+
+__output_error :: (s: str) -> u32 {
+    return write_stream(stderr_get(), s);
+}
+
+__exit :: (status: i32) {
+    code := cast(u8) status;
+    if status < 0 do code = 1;
+    Exit.exit_with_code(code);
+}
+
+__read_from_input :: (buffer: [] u8) -> i32 {
+    if buffer.count <= 0 do return 0;
+
+    switch InputStream.blocking_read(stdin_get(), cast(u64) buffer.count) {
+        case .Err as err {
+            switch err {
+                case .LastOperationFailed as e do Error.drop(e);
+                case .Closed {}
+            }
+            return -1;
+        }
+        case .Ok as bytes {
+            n := bytes.count;
+            if n > buffer.count do n = buffer.count;
+            if n > 0 do memory.copy(buffer.data, bytes.data, n);
+            if bytes.data do cfree(bytes.data);
+            return n;
+        }
+    }
+}
+
+__wait_for_input :: (timeout: i32) -> bool {
+    ready_poll := InputStream.subscribe(stdin_get());
+
+    if timeout <= 0 {
+        Pollable.block(ready_poll);
+        Pollable.drop(ready_poll);
+        return true;
+    }
+
+    timer := MonotonicClock.subscribe_duration(cast(u64) timeout * 1000000);
+    polls: [2] Pollable_Borrow;
+    polls[0] = .{ handle = ready_poll.handle };
+    polls[1] = .{ handle = timer.handle };
+    ready := Poll.poll(polls[0 .. 2]);
+
+    stdin_ready_now := false;
+    for index in ready {
+        if index == 0 do stdin_ready_now = true;
+    }
+    if ready.data do cfree(ready.data);
+    Pollable.drop(ready_poll);
+    Pollable.drop(timer);
+    return stdin_ready_now;
+}
+
+__sleep :: (milliseconds: u32) {
+    waiter := MonotonicClock.subscribe_duration(cast(u64) milliseconds * 1000000);
+    Pollable.block(waiter);
+    Pollable.drop(waiter);
+}
+
+__time :: () -> i64 {
+    now := WallClock.now();
+    ms := now.seconds * 1000 + cast(u64) now.nanoseconds / 1000000;
+    return cast(i64) ms;
+}
+
+__monotonic :: () -> i64 {
+    return cast(i64) MonotonicClock.now();
+}
+
+__random_get :: (buf: [] u8) {
+    if buf.count <= 0 do return;
+
+    bytes := Random.get_random_bytes(cast(u64) buf.count);
+    n := bytes.count;
+    if n > buf.count do n = buf.count;
+    if n > 0 do memory.copy(buf.data, bytes.data, n);
+    if bytes.data do cfree(bytes.data);
+}
+
+__args :: (allocator: Allocator) -> [] cstr {
+    args := Environment.get_arguments();
+    out := make([] cstr, args.count, allocator);
+    for arg, i in args {
+        buf := cast([&] u8) allocator->alloc(cast(u32) arg.count + 1);
+        if arg.count > 0 do memory.copy(buf, arg.data, arg.count);
+        buf[arg.count] = 0;
+        out[i] = buf;
+        if arg.data do cfree(arg.data);
+    }
+    if args.data do cfree(args.data);
+    return out;
+}
+
+__start :: () {
+    __stdin = .{
+        .{ &__file_stream_vtable, .Block_On_Read },
+        .{ stdio = 1, open = true, mode = .Read },
+    };
+    __stdout = .{
+        .{ &__file_stream_vtable },
+        .{ stdio = 2, open = true, mode = .Write },
+    };
+    __stderr = .{
+        .{ &__file_stream_vtable },
+        .{ stdio = 3, open = true, mode = .Write },
+    };
+
+    #if (typeof MAIN_PKG.main) == (#type () -> void) {
+        MAIN_PKG.main();
+    } else {
+        args := __args(context.allocator);
+        MAIN_PKG.main(args);
+    }
+
+    __flush_stdio();
+}
+
+// wasmtime calls cm32p2_initialize before the command export. Calling it
+// again is safe and covers a host that invokes run directly.
+run_run :: () -> Result(void, void) {
+    abi.initialize();
+    __start();
+    return .{ Ok = .{} };
+}

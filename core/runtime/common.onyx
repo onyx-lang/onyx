@@ -8,7 +8,9 @@ use runtime.platform { __output_string }
 // Export the __start function from the platform layer.
 // Every platform should define this, even if is it just '() {}'.
 // An object file leaves the entry point to the linker.
-#if target_type == .Executable {
+// Component builds export cm32p2_initialize instead. _start and
+// _initialize are not part of the standard32 component ABI.
+#if target_type == .Executable && !#defined(vars.Component_Build) && runtime != .Wasip2 {
     #export "_start" platform.__start
 
     #if runtime != .Wasi {
@@ -130,7 +132,11 @@ __thread_initialize :: () {
     // manually.
     default_log_level(.Info);
 
-    __stdio_init();
+    // A bare custom runtime has no stdio. Component guests load it and
+    // discard output through the platform stubs.
+    #if runtime != .Custom || #defined(vars.Component_Build) {
+        __stdio_init();
+    }
 }
 
 #if Multi_Threading_Enabled {

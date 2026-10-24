@@ -14,7 +14,7 @@ use runtime
 // not possible to print anything if the runtime is not known. This check
 // could be replaced with something like !#defined(runtime.__output_string),
 // but that can happen when custom runtimes are more needed.
-#if runtime.runtime == .Custom {
+#if runtime.runtime == .Custom && !#defined(runtime.vars.Component_Build) {
     #error "'stdio' cannot be used in a custom runtime."
 }
 

@@ -1,0 +1,134 @@
+package main
+
+#wasm_section "onyx-command-description" "Generate Onyx guest bindings from a WIT world"
+
+#load "wit/model.onyx"
+#load "wit/decode.onyx"
+#load "wit/abi.onyx"
+#load "wit/wat.onyx"
+#load "wit/emit.onyx"
+
+use core {*}
+use core.encoding.json
+use witgen
+
+tools_path: str
+
+bytes_as_str :: (b: [] u8) -> str {
+    return .{ b.data, b.count };
+}
+
+run_capture :: (args: [] str) -> ([] u8, [] u8, i32) {
+    p := os.Process.spawn(tools_path, args);
+    out_r := io.reader_make(&p);
+    err_r := io.reader_make(&p.stderr);
+    out := io.read_all(&out_r);
+    err := io.read_all(&err_r);
+    p->wait();
+    code := p.exit_code;
+    p->destroy();
+    io.reader_free(&out_r);
+    io.reader_free(&err_r);
+    return out, err, code;
+}
+
+run_ok :: (args: [] str) -> [] u8 {
+    out, err, code := run_capture(args);
+    if code != 0 {
+        println(tprintf("wasm-tools failed ({})", code));
+        println(bytes_as_str(err));
+        os.exit(1);
+    }
+    return out;
+}
+
+find_tools :: (override: str) -> str {
+    if override.count > 0 do return override;
+    return "wasm-tools";
+}
+
+usage :: () {
+    println("onyx wit-bindgen <wit-dir> --world <name> --out <dir> [--export-package <pkg>] [--wasm-tools <path>]");
+    os.exit(1);
+}
+
+main :: () {
+    args := os.args();
+    wit_dir := "";
+    world := "";
+    out_dir := "";
+    override := "";
+    export_package := "";
+
+    i := 0;
+    while i < args.count {
+        a := args[i];
+        if a == "--world" {
+            i += 1;
+            if i >= args.count do usage();
+            world = args[i];
+        } elseif a == "--out" {
+            i += 1;
+            if i >= args.count do usage();
+            out_dir = args[i];
+        } elseif a == "--export-package" {
+            i += 1;
+            if i >= args.count do usage();
+            export_package = args[i];
+        } elseif a == "--wasm-tools" {
+            i += 1;
+            if i >= args.count do usage();
+            override = args[i];
+        } elseif str.starts_with(a, "--") {
+            usage();
+        } elseif wit_dir.count == 0 {
+            wit_dir = a;
+        } else do usage();
+        i += 1;
+    }
+    if wit_dir.count == 0 || world.count == 0 || out_dir.count == 0 do usage();
+
+    tools_path = find_tools(override);
+    ver := run_ok(.["--version"]);
+    if !str.contains(bytes_as_str(ver), witgen.EXPECTED_WASM_TOOLS) {
+        println(tprintf("wasm-tools {} is required", witgen.EXPECTED_WASM_TOOLS));
+        println(bytes_as_str(ver));
+        os.exit(1);
+    }
+
+    js := run_ok(.["component", "wit", "--json", wit_dir]);
+    parsed := json.decode(bytes_as_str(js));
+    switch parsed {
+        case .Err {
+            witgen.die("WIT JSON did not parse");
+        }
+        case .Ok as doc {
+            witgen.decode_resolve(doc.root);
+            delete(doc);
+        }
+    }
+
+    if !os.Directory.create_all(out_dir) {
+        witgen.die(tprintf("could not create {}", out_dir));
+    }
+
+    dummy := tprintf("{}/.wit-bindgen-dummy.wasm", out_dir);
+    run_ok(.[
+        "component", "embed",
+        "--dummy-names", "standard32",
+        "-t", wit_dir,
+        "--world", world,
+        "-o", dummy,
+    ]);
+    wat := run_ok(.["print", dummy]);
+    witgen.parse_dummy_wat(bytes_as_str(wat));
+    os.File.remove(dummy);
+
+    if export_package.count > 0 do witgen.export_package = export_package;
+    src := witgen.generate(world);
+    out_file := tprintf("{}/bindings.onyx", out_dir);
+    if !os.File.write_contents(out_file, src) {
+        witgen.die(tprintf("could not write {}", out_file));
+    }
+    println(out_file);
+}

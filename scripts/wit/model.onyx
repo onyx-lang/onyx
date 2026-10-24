@@ -1,0 +1,240 @@
+package witgen
+
+use core {*}
+
+// Model of a wasm-tools 1.262.0 `component wit --json` document,
+// plus the core signatures from `component embed --dummy-names standard32`.
+
+EXPECTED_WASM_TOOLS :: "1.262.0"
+MAX_FLAT_PARAMS :: 16
+MAX_FLAT_RESULTS :: 1
+
+Core_Ty :: enum {
+    I32;
+    I64;
+    F32;
+    F64;
+}
+
+Type_Tag :: enum {
+    None;
+    Prim;
+    Index;
+}
+
+Type_Ref :: struct {
+    tag: Type_Tag;
+    prim: str;
+    index: i32;
+}
+
+Field :: struct {
+    name: str;
+    typ: Type_Ref;
+}
+
+Case :: struct {
+    name: str;
+    has_payload: bool;
+    payload: Type_Ref;
+}
+
+Type_Kind :: enum {
+    Record;
+    Variant;
+    Enum_;
+    Flags;
+    Resource;
+    Alias;
+    Handle_Own;
+    Handle_Borrow;
+    Result_;
+    List;
+    Option_;
+    Tuple;
+    Unsupported;
+}
+
+Type_Def :: struct {
+    name: str;
+    kind: Type_Kind;
+    fields: [..] Field;
+    cases: [..] Case;
+    inner: Type_Ref;
+    ok: Type_Ref;
+    err: Type_Ref;
+    has_ok: bool;
+    has_err: bool;
+    handle_of: i32;
+    owner_iface: i32;
+}
+
+Func_Kind :: enum {
+    Freestanding;
+    Method;
+    Static_;
+    Constructor;
+    Unsupported;
+}
+
+Param :: struct {
+    name: str;
+    typ: Type_Ref;
+}
+
+Func :: struct {
+    name: str;
+    kind: Func_Kind;
+    resource: i32;
+    params: [..] Param;
+    has_result: bool;
+    result: Type_Ref;
+}
+
+Item_Kind :: enum {
+    Interface;
+    Function;
+}
+
+World_Item :: struct {
+    key: str;
+    kind: Item_Kind;
+    interface_id: i32;
+    func: Func;
+}
+
+Interface :: struct {
+    name: str;
+    pkg: i32;
+    type_names: [..] str;
+    type_ids: [..] i32;
+    functions: [..] Func;
+}
+
+World :: struct {
+    name: str;
+    pkg: i32;
+    imports: [..] World_Item;
+    exports: [..] World_Item;
+}
+
+Package_Info :: struct {
+    name: str;
+}
+
+Resolve :: struct {
+    worlds: [..] World;
+    interfaces: [..] Interface;
+    types: [..] Type_Def;
+    packages: [..] Package_Info;
+}
+
+Sig :: struct {
+    params: [..] Core_Ty;
+    results: [..] Core_Ty;
+    indirect_params: bool;
+    indirect_result: bool;
+}
+
+Abi :: struct {
+    size: u32;
+    align: u32;
+    flat: [..] Core_Ty;
+    disc_size: u32;
+    payload_off: u32;
+    payload_size: u32;
+}
+
+Wat_Sym :: struct {
+    module: str;
+    name: str;
+    sig: Sig;
+}
+
+resolved: Resolve
+abi_keys: [..] str
+abi_vals: [..] Abi
+abi_stack: [..] str
+
+wat_imports: [..] Wat_Sym
+wat_exports: [..] Wat_Sym
+
+type_public: [..] str
+iface_public: [..] str
+used_names: [..] str
+
+die :: (msg: str) {
+    println(msg);
+    os.exit(1);
+}
+
+none_ref :: () -> Type_Ref {
+    r: Type_Ref;
+    r.tag = .None;
+    r.index = -1;
+    return r;
+}
+
+prim_ref :: (name: str) -> Type_Ref {
+    r: Type_Ref;
+    r.tag = .Prim;
+    r.prim = str.copy(name);
+    r.index = -1;
+    return r;
+}
+
+index_ref :: (index: i32) -> Type_Ref {
+    r: Type_Ref;
+    r.tag = .Index;
+    r.index = index;
+    return r;
+}
+
+ref_key :: (t: Type_Ref) -> str {
+    if t.tag == .Prim do return tprintf("p:{}", t.prim);
+    if t.tag == .Index do return tprintf("i:{}", t.index);
+    return "none";
+}
+
+core_onyx :: (t: Core_Ty) -> str {
+    if t == .I64 do return "i64";
+    if t == .F32 do return "f32";
+    if t == .F64 do return "f64";
+    return "i32";
+}
+
+core_word :: (t: Core_Ty) -> str {
+    if t == .I64 do return "i64";
+    if t == .F32 do return "f32";
+    if t == .F64 do return "f64";
+    return "i32";
+}
+
+sig_text :: (s: Sig) -> str {
+    buf: dyn_str;
+    for i in 0 .. s.params.count {
+        if i > 0 do buf << ',';
+        w := core_word(s.params[i]);
+        for j in 0 .. w.count do buf << w[j];
+    }
+    arrow := "->";
+    for j in 0 .. arrow.count do buf << arrow[j];
+    for i in 0 .. s.results.count {
+        if i > 0 do buf << ',';
+        w := core_word(s.results[i]);
+        for j in 0 .. w.count do buf << w[j];
+    }
+    return buf;
+}
+
+sigs_equal :: (a: Sig, b: Sig) -> bool {
+    if a.params.count != b.params.count do return false;
+    if a.results.count != b.results.count do return false;
+    for i in 0 .. a.params.count {
+        if a.params[i] != b.params[i] do return false;
+    }
+    for i in 0 .. a.results.count {
+        if a.results[i] != b.results[i] do return false;
+    }
+    return true;
+}
