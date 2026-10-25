@@ -129,6 +129,13 @@ package_all() {
     copy_required ./scripts/default.json "$DIST_DIR/tools/pkg_templates"
     copy_required ./scripts/lsp.wasm "$DIST_DIR/tools"
 
+    echo "Compiling wit-bindgen"
+    ONYX_PATH="$(pwd)" ./compiler/onyx build -r onyx -o "$DIST_DIR/tools/wit-bindgen.wasm" scripts/wit-bindgen.onyx
+    if [ ! -f "$DIST_DIR/tools/wit-bindgen.wasm" ]; then
+        echo "error: failed to build tools/wit-bindgen.wasm"
+        exit 1
+    fi
+
     echo "Installing runtime library"
     if [ -f "runtime/onyx_runtime.$suffix" ]; then
         cp "runtime/onyx_runtime.$suffix" "$DIST_DIR/lib/"

@@ -69,7 +69,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     "\n"
     C_BOLD "Flags:\n" C_NORM
     C_LBLUE "    -o, --output " C_GREY "target_file    " C_NORM "Specify the target file " C_GREY "(default: %s)\n"
-    C_LBLUE "    -r, --runtime " C_GREY "runtime       " C_NORM "Specifies the runtime " C_GREY "(onyx, wasi, js, custom)\n"
+    C_LBLUE "    -r, --runtime " C_GREY "runtime       " C_NORM "Specifies the runtime " C_GREY "(onyx, wasi, wasip2, js, custom)\n"
     C_LBLUE "    --map-dir " C_GREY "name:folder       " C_NORM "Adds a mapped directory\n"
     "\n"
     C_LBLUE "    --debug                     " C_NORM "Output a debugable build\n"
@@ -347,6 +347,7 @@ static int32_t cli_determine_action(CLIArgs *cli_args, int *first_sub_arg, int a
 
         cli_args->passthrough_argument_count = argc - 2;
         cli_args->passthrough_argument_data  = &argv[2];
+        *first_sub_arg = argc;
         return 1;
     }
 
@@ -470,6 +471,7 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
             i += 1;
             if (!strcmp(argv[i], "onyx")) using_onyx_runtime = 1;
             else if (!strcmp(argv[i], "wasi"))   onyx_set_option_int(ctx, ONYX_OPTION_PLATFORM, ONYX_PLATFORM_WASI);
+            else if (!strcmp(argv[i], "wasip2")) onyx_set_option_int(ctx, ONYX_OPTION_PLATFORM, ONYX_PLATFORM_WASIP2);
             else if (!strcmp(argv[i], "js"))     onyx_set_option_int(ctx, ONYX_OPTION_PLATFORM, ONYX_PLATFORM_JS);
             else if (!strcmp(argv[i], "custom")) onyx_set_option_int(ctx, ONYX_OPTION_PLATFORM, ONYX_PLATFORM_CUSTOM);
             else {
@@ -1043,7 +1045,8 @@ int main(int argc, char *argv[]) {
         onyx_set_option_int(ctx, ONYX_OPTION_MULTI_THREADING, 1);
         onyx_include_file(ctx, bh_aprintf(bh_heap_allocator(), "%s/tools/onyx-pkg.onyx", cli_args.core_installation), -1);
 
-    } else {
+    } else if (cli_args.action != ONYX_COMPILE_ACTION_RUN_WASM) {
+        // Installed tools are already RUN_WASM. Their flags belong to the tool.
         if (!cli_parse_compilation_options(&cli_args, ctx, arg_parse_start, argc, argv)) {
             return 1;
         }

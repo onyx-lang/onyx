@@ -2039,6 +2039,7 @@ enum Runtime {
     Runtime_Wasi    = 2,
     Runtime_Js      = 3,
     Runtime_Custom  = 4,
+    Runtime_Wasip2  = 5,
 };
 
 

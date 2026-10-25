@@ -6,6 +6,7 @@ Runtime :: enum {
     Wasi   :: 2;
     Js     :: 3;
     Custom :: 4;
+    Wasip2 :: 5;
 }
 
 // target_type: Target_Type    This is set by the compiler.

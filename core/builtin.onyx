@@ -293,7 +293,7 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 //
 // This cannot be used in a custom runtime, as the other core
 // packages are not included.
-#if runtime.runtime != .Custom {
+#if runtime.runtime != .Custom || #defined(runtime.vars.Component_Build) {
     use core
     use core.memory
 
@@ -526,7 +526,7 @@ __closure_block_allocate :: (size: i32) -> rawptr {
 /// The default overload is `delete`, so `use x := make(...)` frees owned containers.
 __dispose_used_local :: #match -> void {}
 
-#if runtime.runtime != .Custom {
+#if runtime.runtime != .Custom || #defined(runtime.vars.Component_Build) {
     #overload #order 10000 __dispose_used_local :: delete
 }
 

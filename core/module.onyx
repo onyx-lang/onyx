@@ -149,6 +149,14 @@ use runtime
     #load "./runtime/platform/wasi/platform"
 }
 
+#if runtime.runtime == .Wasip2 {
+    #load "./runtime/platform/wasip2/platform"
+}
+
 #if runtime.runtime == .Js {
     #load "./runtime/platform/js/platform"
+}
+
+#if runtime.runtime == .Custom && #defined(runtime.vars.Component_Build) {
+    #load "./runtime/platform/component/platform"
 }

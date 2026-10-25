@@ -1,0 +1,308 @@
+package witgen
+
+use core {*}
+
+align_to :: (value: u32, alignment: u32) -> u32 {
+    if alignment <= 1 do return value;
+    m := value % alignment;
+    if m == 0 do return value;
+    return value + (alignment - m);
+}
+
+disc_size_of :: (n: i32) -> u32 {
+    if n <= 0 do die("WIT variant or enum has no cases");
+    if n <= 256 do return 1;
+    if n <= 65536 do return 2;
+    return 4;
+}
+
+join_core :: (a: Core_Ty, b: Core_Ty) -> Core_Ty {
+    if a == b do return a;
+    if (a == .I32 && b == .F32) || (a == .F32 && b == .I32) do return .I32;
+    return .I64;
+}
+
+prim_unsupported :: (name: str) {
+    if name == "error-context" do die("WIT error-context is not supported");
+}
+
+def_at :: (index: i32) -> Type_Def {
+    if index < 0 || index >= resolved.types.count do die(tprintf("type index {} is out of range", index));
+    return resolved.types[index];
+}
+
+abi_of :: (t: Type_Ref) -> i32 {
+    if t.tag == .None do die("ABI requested for an empty type");
+    if t.tag == .Prim do prim_unsupported(t.prim);
+    key := str.copy(ref_key(t));
+
+    for i in 0 .. abi_keys.count {
+        if abi_keys[i] == key do return i;
+    }
+    for s in abi_stack {
+        if s == key do die(tprintf("recursive WIT type {}", key));
+    }
+    abi_stack << key;
+
+    if t.tag == .Index {
+        d := def_at(t.index);
+        if d.kind == .Alias {
+            abi_stack.count -= 1;
+            return abi_of(d.inner);
+        }
+        if d.kind == .Unsupported do die("unsupported WIT type in ABI");
+    }
+
+    built := build_abi(t);
+    abi_keys << key;
+    abi_vals << built;
+    abi_stack.count -= 1;
+    return abi_keys.count - 1;
+}
+
+abi_get :: (t: Type_Ref) -> Abi {
+    return abi_vals[abi_of(t)];
+}
+
+build_prim :: (name: str) -> Abi {
+    a: Abi;
+    if name == "bool" || name == "u8" || name == "s8" {
+        a.size = 1; a.align = 1; a.flat << Core_Ty.I32;
+    } elseif name == "u16" || name == "s16" {
+        a.size = 2; a.align = 2; a.flat << Core_Ty.I32;
+    } elseif name == "u32" || name == "s32" || name == "char" {
+        a.size = 4; a.align = 4; a.flat << Core_Ty.I32;
+    } elseif name == "u64" || name == "s64" {
+        a.size = 8; a.align = 8; a.flat << Core_Ty.I64;
+    } elseif name == "f32" {
+        a.size = 4; a.align = 4; a.flat << Core_Ty.F32;
+    } elseif name == "f64" {
+        a.size = 8; a.align = 8; a.flat << Core_Ty.F64;
+    } elseif name == "string" {
+        a.size = 8; a.align = 4; a.flat << Core_Ty.I32; a.flat << Core_Ty.I32;
+    } else do die(tprintf("unknown WIT primitive '{}'", name));
+    return a;
+}
+
+build_record :: (fields: [..] Field) -> Abi {
+    if fields.count == 0 do die("empty WIT records are not representable");
+    a: Abi;
+    a.align = 1;
+    offset: u32 = 0;
+    for f in fields {
+        child := abi_get(f.typ);
+        offset = align_to(offset, child.align);
+        offset += child.size;
+        if child.align > a.align do a.align = child.align;
+        for c in child.flat do a.flat << c;
+    }
+    a.size = align_to(offset, a.align);
+    return a;
+}
+
+build_variant_cases :: (cases: [..] Case) -> Abi {
+    if cases.count == 0 do die("WIT variant has no cases");
+    a: Abi;
+    a.disc_size = disc_size_of(cases.count);
+    max_align: u32 = a.disc_size;
+    max_payload: u32 = 0;
+    for c in cases {
+        if !c.has_payload do continue;
+        child := abi_get(c.payload);
+        if child.align > max_align do max_align = child.align;
+        if child.size > max_payload do max_payload = child.size;
+        for i in 0 .. child.flat.count {
+            ft := child.flat[i];
+            if i < a.flat.count {
+                a.flat[i] = join_core(a.flat[i], ft);
+            } else {
+                a.flat << ft;
+            }
+        }
+    }
+    // Discriminant flattens to i32 and comes first.
+    with_disc: [..] Core_Ty;
+    with_disc << Core_Ty.I32;
+    for c in a.flat do with_disc << c;
+    a.flat = with_disc;
+
+    a.payload_off = align_to(a.disc_size, max_align);
+    // max_align so far included the discriminant size, which is also its alignment.
+    // Case alignment is what the payload aligns to. Recompute payload alignment
+    // without treating the discriminant size as a payload alignment when it is larger
+    // only because of the disc. The spec uses max(disc align, max case align).
+    a.align = max_align;
+    a.payload_size = max_payload;
+    a.size = align_to(a.payload_off + max_payload, a.align);
+    if a.size == 0 do a.size = a.disc_size;
+    return a;
+}
+
+build_enum :: (n: i32) -> Abi {
+    a: Abi;
+    a.disc_size = disc_size_of(n);
+    a.size = a.disc_size;
+    a.align = a.disc_size;
+    a.flat << Core_Ty.I32;
+    return a;
+}
+
+build_flags :: (n: i32) -> Abi {
+    if n <= 0 do die("WIT flags have no labels");
+    if n > 32 do die("WIT flags wider than 32 bits are not supported");
+    a: Abi;
+    if n <= 8 do a.size = 1;
+    elseif n <= 16 do a.size = 2;
+    else do a.size = 4;
+    a.align = a.size;
+    a.disc_size = a.size;
+    a.flat << Core_Ty.I32;
+    return a;
+}
+
+build_handle :: () -> Abi {
+    a: Abi;
+    a.size = 4;
+    a.align = 4;
+    a.flat << Core_Ty.I32;
+    return a;
+}
+
+build_list :: (elem: Type_Ref) -> Abi {
+    _ := abi_of(elem);
+    a: Abi;
+    a.size = 8;
+    a.align = 4;
+    a.flat << Core_Ty.I32;
+    a.flat << Core_Ty.I32;
+    return a;
+}
+
+build_option :: (inner: Type_Ref) -> Abi {
+    cases: [..] Case;
+    none: Case;
+    none.name = "none";
+    cases << none;
+    some: Case;
+    some.name = "some";
+    some.has_payload = true;
+    some.payload = inner;
+    cases << some;
+    return build_variant_cases(cases);
+}
+
+build_result :: (d: Type_Def) -> Abi {
+    cases: [..] Case;
+    ok: Case;
+    ok.name = "ok";
+    ok.has_payload = d.has_ok;
+    ok.payload = d.ok;
+    cases << ok;
+    err: Case;
+    err.name = "err";
+    err.has_payload = d.has_err;
+    err.payload = d.err;
+    cases << err;
+    return build_variant_cases(cases);
+}
+
+build_abi :: (t: Type_Ref) -> Abi {
+    if t.tag == .Prim do return build_prim(t.prim);
+    d := def_at(t.index);
+    if d.kind == .Record || d.kind == .Tuple do return build_record(d.fields);
+    if d.kind == .Variant do return build_variant_cases(d.cases);
+    if d.kind == .Enum_ do return build_enum(d.cases.count);
+    if d.kind == .Flags do return build_flags(d.cases.count);
+    if d.kind == .Handle_Own || d.kind == .Handle_Borrow do return build_handle();
+    if d.kind == .List do return build_list(d.inner);
+    if d.kind == .Option_ do return build_option(d.inner);
+    if d.kind == .Result_ do return build_result(d);
+    if d.kind == .Resource do die("resource types are not passed by value");
+    die("cannot compute the ABI of this WIT type");
+    a: Abi;
+    return a;
+}
+
+flatten_params :: (f: Func) -> [..] Core_Ty {
+    out: [..] Core_Ty;
+    for p in f.params {
+        a := abi_get(p.typ);
+        for c in a.flat do out << c;
+    }
+    return out;
+}
+
+flatten_result :: (f: Func) -> [..] Core_Ty {
+    out: [..] Core_Ty;
+    if !f.has_result do return out;
+    a := abi_get(f.result);
+    for c in a.flat do out << c;
+    return out;
+}
+
+sig_for :: (f: Func, is_import: bool) -> Sig {
+    ps := flatten_params(f);
+    rs := flatten_result(f);
+    s: Sig;
+    if ps.count > MAX_FLAT_PARAMS {
+        s.indirect_params = true;
+        s.params << Core_Ty.I32;
+    } else {
+        for c in ps do s.params << c;
+    }
+    if rs.count > MAX_FLAT_RESULTS {
+        s.indirect_result = true;
+        if is_import {
+            s.params << Core_Ty.I32;
+        } else {
+            s.results << Core_Ty.I32;
+        }
+    } else {
+        for c in rs do s.results << c;
+    }
+    return s;
+}
+
+contains_heap :: (t: Type_Ref) -> bool {
+    if t.tag == .None do return false;
+    if t.tag == .Prim do return t.prim == "string";
+    d := def_at(t.index);
+    if d.kind == .Alias do return contains_heap(d.inner);
+    if d.kind == .List do return true;
+    if d.kind == .Option_ do return contains_heap(d.inner);
+    if d.kind == .Result_ {
+        ok := d.has_ok && contains_heap(d.ok);
+        err := d.has_err && contains_heap(d.err);
+        return ok || err;
+    }
+    if d.kind == .Variant {
+        for c in d.cases {
+            if c.has_payload && contains_heap(c.payload) do return true;
+        }
+        return false;
+    }
+    if d.kind == .Record || d.kind == .Tuple {
+        for f in d.fields {
+            if contains_heap(f.typ) do return true;
+        }
+        return false;
+    }
+    return false;
+}
+
+layout_matches :: (t: Type_Ref) -> bool {
+    if t.tag == .None do return true;
+    if t.tag == .Prim do return true;
+    d := def_at(t.index);
+    if d.kind == .Alias do return layout_matches(d.inner);
+    if d.kind == .Variant || d.kind == .Option_ || d.kind == .Result_ do return false;
+    if d.kind == .List do return layout_matches(d.inner);
+    if d.kind == .Record || d.kind == .Tuple {
+        for f in d.fields {
+            if !layout_matches(f.typ) do return false;
+        }
+        return true;
+    }
+    if d.kind == .Enum_ || d.kind == .Flags || d.kind == .Handle_Own || d.kind == .Handle_Borrow do return true;
+    return false;
+}
