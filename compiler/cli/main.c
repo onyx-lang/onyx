@@ -14,7 +14,7 @@
     #define C_GREEN   "\e[33m"
     #define C_BLUE    "\e[34m"
     #define C_LBLUE   "\e[94m"
-#else 
+#else
     #define C_NORM
     #define C_BOLD
     #define C_RED
@@ -50,7 +50,7 @@ static const char* top_level_docstring = DOCSTRING_HEADER
 #endif
     "\n";
 
-static const char *run_commands_docstring = 
+static const char *run_commands_docstring =
     C_LBLUE "    run " C_GREY "files        " C_NORM "Compiles and runs an Onyx program " C_GREY "(onyx r)" C_NORM "\n"
 #if (defined(_BH_LINUX) || defined(_BH_DARWIN))
     C_LBLUE "    run-watch        " C_NORM "Continuously rebuilds and runs a program on file changes " C_GREY "(onyx rw)" C_NORM "\n"
@@ -210,7 +210,7 @@ static int32_t cli_args_init(CLIArgs *cli_args) {
         bh_printf(C_RED "error" C_NORM ": ONYX_PATH environment variable is not set. Please set this to the location of your Onyx installation.\n");
         return 0;
     }
-    
+
     return 1;
 }
 
@@ -548,7 +548,7 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
     }
 
     int32_t at_least_one_file = 0;
-    
+
     fori (i, arg_parse_start, argc) {
         if (is_flag(argv[i])) {
             if (!strcmp(argv[i], "--")) {
@@ -938,7 +938,7 @@ static void onyx_watch(CLIArgs *cli_args, int arg_parse_start, int argc, char **
         char time_buf[128] = {0};
         time_t now = time(NULL);
         strftime(time_buf, 128, "%X", localtime(&now));
-        bh_printf("\e[1;1H\e[30;105m Onyx %d.%d.%d%s \e[30;104m Built %s \e[0m", 
+        bh_printf("\e[1;1H\e[30;105m Onyx %d.%d.%d%s \e[30;104m Built %s \e[0m",
             onyx_version_major(),
             onyx_version_minor(),
             onyx_version_patch(),
@@ -1004,7 +1004,7 @@ int main(int argc, char *argv[]) {
         return !action_was_determined;
     }
 
-    if (cli_args.action == ONYX_COMPILE_ACTION_PRINT_VERSION) { 
+    if (cli_args.action == ONYX_COMPILE_ACTION_PRINT_VERSION) {
         bh_printf("Onyx tool-chain version %d.%d.%d%s\n",
             onyx_version_major(),
             onyx_version_minor(),
@@ -1082,19 +1082,7 @@ int main(int argc, char *argv[]) {
                 }
                 break;
 
-            case ONYX_EVENT_ALL_TYPES_CHECKED:
-                break;
-
-            case ONYX_EVENT_SYMBOL_DEFINED:
-                // bh_printf("DEFINED SYMBOL AT %s:%d,%d\n",
-                //     onyx_event_field_str(ctx, i, "filename"),
-                //     onyx_event_field_int(ctx, i, "line"),
-                //     onyx_event_field_int(ctx, i, "column")
-                // );
-                break;
-
-            case ONYX_EVENT_UNKNOWN:
-                break;
+            default: break;
             }
         }
     }
@@ -1126,7 +1114,7 @@ int main(int argc, char *argv[]) {
         printf("    Processed %d tokens (%f tokens/second).\n", tokens, tokens_per_sec);
         printf("\n");
     }
-  
+
     switch (cli_args.action) {
         case ONYX_COMPILE_ACTION_RUN:
         case ONYX_COMPILE_ACTION_PACKAGE: {
@@ -1176,7 +1164,7 @@ int main(int argc, char *argv[]) {
         default:
             break;
     }
-  
+
     onyx_context_free(ctx);
     return 0;
 }

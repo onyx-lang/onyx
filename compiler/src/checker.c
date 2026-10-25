@@ -544,7 +544,7 @@ CHECK_FUNC(for, AstFor** pfornode) {
         fornode->intermediate_macro_expansion = create_implicit_for_expansion_call(context, fornode);
         assert(fornode->intermediate_macro_expansion);
     }
- 
+
     CheckStatus cs = check_call(context, (AstCall **) &fornode->intermediate_macro_expansion);
     if (cs == Check_Yield) {
         if (fornode->intermediate_macro_expansion->kind == Ast_Kind_Call) {
@@ -680,7 +680,7 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
     // the checking, because case-bodies cannot be checked before they know the type of their
     // captured variables (if there are any), but the case values must be checked before the
     // switch node can do proper type checking.
-    // 
+    //
 
     if (switchnode->initialization) {
         if (switchnode->scope == NULL) {
@@ -2026,7 +2026,7 @@ CHECK_FUNC(struct_literal, AstStructLiteral* sl) {
     // Union literal are internally structure literals with a single named member.
     if (sl->type->kind == Type_Kind_Union) {
         if ((sl->flags & Ast_Flag_Has_Been_Checked) != 0) return Check_Success;
-        
+
         if (sl->extension_value) {
             ERROR_(sl->token->pos, "Cannot use field-update syntax on '%s' because it is a 'union'.", type_get_name(context, sl->type));
         }
@@ -2739,7 +2739,7 @@ CHECK_FUNC(field_access, AstFieldAccess** pfield) {
     // Here we "pre-check" the expression to resolve any symbols, but maybe
     // leave unknown types hanging around. This does not matter for any of
     // the cases that exist below. If we are not looking at one of the cases
-    // below, we will "properly" check the expression type again. Not the 
+    // below, we will "properly" check the expression type again. Not the
     // fastest way of going about this, but I am aiming for correctness
     // at the moment.
     //
@@ -3172,7 +3172,7 @@ CHECK_FUNC(expression, AstTyped** pexpr) {
     if (expr->kind == Ast_Kind_Polymorphic_Proc) {
         // polymorphic procedures do not need to be checked. Their concrete instantiations
         // will be checked when they are created.
-        
+
         if (((AstFunction *) expr)->captures) {
             ((AstFunction *) expr)->scope_to_lookup_captured_values = context->checker.current_scope;
         }
@@ -3590,7 +3590,7 @@ CHECK_FUNC(insert_directive, AstDirectiveInsert** pinsert, b32 expected_expressi
                 Type *type = type_build_from_ast(context, sym.type_node);
 
                 TYPE_CHECK(&insert->binding_exprs[i], type) {
-                    ERROR_(insert->token->pos, "Expected type '%s' but got type '%s' for the '%d%s' argument to the code block.", 
+                    ERROR_(insert->token->pos, "Expected type '%s' but got type '%s' for the '%d%s' argument to the code block.",
                            type_get_name(context, type), type_get_name(context, insert->binding_exprs[i]->type),
                            i + 1, bh_num_suffix(i + 1));
                 }
@@ -3965,7 +3965,7 @@ CHECK_FUNC(statement, AstNode** pstmt) {
                     typed_stmt->flags |= Ast_Flag_Decl_Followed_By_Init;
                 }
             }
-            
+
             if (typed_stmt->type != NULL && typed_stmt->type == context->types.basic[Basic_Kind_Void]) {
                 ERROR(stmt->token->pos, "This local variable has a type of 'void', which is not allowed.");
             }
@@ -4112,7 +4112,7 @@ CHECK_FUNC(polyproc, AstFunction* pp) {
     pp->parent_scope_of_poly_proc = context->checker.current_scope;
 
     bh_arr_each(AstPolyParam, p, pp->poly_params) {
-        if (p->kind != PSK_Value) continue;
+        if (p->kind != PPK_Baked_Value) continue;
 
         AstParam *param = &pp->params[p->idx];
         if (param->default_value != NULL) {
@@ -4217,7 +4217,7 @@ CHECK_FUNC(function, AstFunction* func) {
 
         if (!func->named_return_locals_added) {
             func->named_return_locals_added = 1;
-            
+
             AstNode **prev = &func->body->body;
             bh_arr_each(AstLocal *, named_return, func->named_return_locals) {
                 (*named_return)->next = *prev;
@@ -5034,7 +5034,7 @@ CHECK_FUNC(type, AstType** ptype) {
     AstType* type = *ptype;
     AstType* original_type = type;
     type = strip_type_aliases(type);
-    
+
     if (type->kind == Ast_Kind_Symbol) {
         CHECK(symbol, (AstNode **) ptype);
         type = *ptype;
@@ -5079,7 +5079,7 @@ CHECK_FUNC(type, AstType** ptype) {
             CHECK(type, &((AstVarArgType *) type)->elem);
             break;
 
-        case Ast_Kind_Multi_Pointer_Type: 
+        case Ast_Kind_Multi_Pointer_Type:
             ((AstMultiPointerType *) type)->elem->flags |= type->flags & Ast_Flag_Header_Check_No_Error;
             CHECK(type, &((AstMultiPointerType *) type)->elem);
             break;
@@ -5332,7 +5332,7 @@ CHECK_FUNC(process_directive, AstNode* directive) {
         }
 
         overload->flags &= ~Ast_Flag_Function_Is_Lambda;
-        
+
         // First try unary operator overloading
         // CLEANUP This is not written well at all...
         if (operator->operator == Binary_Op_Count) {
@@ -5434,7 +5434,7 @@ CHECK_FUNC(process_directive, AstNode* directive) {
                 enable_mode(context, CM_Allow_Init_Expressions);
                 CHECK(expression, (AstTyped **) dependency);
                 disable_mode(context, CM_Allow_Init_Expressions);
-                
+
                 AstTyped *d = (AstTyped *) strip_aliases((AstNode *) *dependency);
                 if (d->kind != Ast_Kind_Directive_Init) {
                     ERROR_(init->token->pos, "All dependencies of an #init must be another #init. The %d%s dependency was not.", i + 1, bh_num_suffix(i + 1));
@@ -5610,11 +5610,11 @@ CHECK_FUNC(interface_constraint, AstConstraint *constraint) {
     if (constraint->interface->is_intrinsic) {
         TypeMatch result = resolve_intrinsic_interface_constraint(context, constraint);
         switch (result) {
-            case TYPE_MATCH_SUCCESS: 
+            case TYPE_MATCH_SUCCESS:
                 *constraint->report_status = Constraint_Check_Status_Success;
                 return Check_Complete;
 
-            case TYPE_MATCH_FAILED: 
+            case TYPE_MATCH_FAILED:
                 *constraint->report_status = Constraint_Check_Status_Failed;
                 return Check_Failed;
 
@@ -5937,7 +5937,7 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
             check_type(context, &param->local->type_node);
             param->local->flags &= ~Ast_Flag_Symbol_Invisible;
             onyx_errors_enable(context);
-            
+
             if (context->checker.resolved_a_symbol) {
                 solved_something = 1;
             }
@@ -5986,7 +5986,7 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
                 }
 
                 return Check_Yield;
-                
+
             case TYPE_MATCH_FAILED: {
                 if (solved_something) continue;
 
@@ -6588,7 +6588,7 @@ void check_entity(Context *context, Entity* ent) {
         case Entity_Type_Foreign_Block: cs = check_foreign_block(context, ent->foreign_block); break;
         case Entity_Type_Object_Block:  cs = check_object_block(context, ent->object_block); break;
         case Entity_Type_Import:        cs = check_import(context, ent->import); break;
-            
+
         case Entity_Type_Compiler_Extension:   cs = check_compiler_extension(context, ent->compiler_extension); break;
         case Entity_Type_Procedural_Expansion: cs = check_proc_expansion(context, &ent->proc_expansion, PMEK_Top_Level); break;
 

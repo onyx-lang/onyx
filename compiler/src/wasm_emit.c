@@ -5662,6 +5662,8 @@ void onyx_wasm_module_link(Context *context, OnyxWasmModule *module, OnyxWasmLin
                 *(i32 *) bh_pointer_add(datum->data, patch->instr) = (i32) length;
                 break;
             }
+
+            case Code_Patch_Table_Index: break;
         }
     }
 

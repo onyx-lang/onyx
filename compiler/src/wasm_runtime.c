@@ -422,7 +422,7 @@ static char *lookup_func_name_in_name_section(u32 funcidx, i32 name_section, i32
 
             if (idx == funcidx) {
                 *out_len = len;
-                return &wasm_raw_bytes.data[cursor];
+                return (char *) &wasm_raw_bytes.data[cursor];
             }
 
             cursor += len;
