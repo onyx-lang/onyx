@@ -327,7 +327,7 @@ run_sync_command :: (args: [] str) {
 
     if options.clean {
         info_print("Cleaning", "Removing {} directory\n", config.dependency_source_path)
-        os.Directory.remove(config.dependency_source_path)
+        os.Directory.remove_recursive(config.dependency_source_path)
     }
 
     To_Install :: struct {
@@ -883,7 +883,7 @@ uninstall_package :: (pack: Package) -> bool {
     if os.file_exists(package_folder) {
         // Should this check if the version to be deleted is the one that is actually installed?
         attempt_remove_native_library(package_folder)
-        os.Directory.remove(package_folder)
+        os.Directory.remove_recursive(package_folder)
 
         // This should maybe cleanup the parent directory if it is now empty.
         return true
@@ -1241,7 +1241,7 @@ Git :: struct {
         version_str := tprintf("v{}", version)
         temporary_dest := os.Path.join(config.dependency_source_path, ".cloned")
 
-        os.Directory.remove(temporary_dest)
+        os.Directory.remove_recursive(temporary_dest)
 
         successfully_cloned := do -> bool {
             for proto in Protocols {
@@ -1267,7 +1267,7 @@ Git :: struct {
         info_print("Fetch", "{}  {}\n", repo, branch)
 
         temporary_dest := os.Path.join(config.dependency_source_path, ".cloned")
-        os.Directory.remove(temporary_dest)
+        os.Directory.remove_recursive(temporary_dest)
 
         successfully_cloned := do -> bool {
             for proto in Protocols {
@@ -1297,11 +1297,11 @@ Git :: struct {
         actual_dest := os.Path.join(config.dependency_source_path, install_dest)
         if os.Directory.exists(actual_dest) {
             if overwrite {
-                os.Directory.remove(actual_dest)
+                os.Directory.remove_recursive(actual_dest)
 
             } else {
                 error_print("Expected {} to not exist when fetching '{}'.\n", actual_dest, repo)
-                os.Directory.remove(temporary_dest)
+                os.Directory.remove_recursive(temporary_dest)
                 return false
             }
         }
@@ -1319,13 +1319,13 @@ Git :: struct {
 
         if !os.Directory.rename(temporary_dest, actual_dest) {
             error_print("Failed to move temporary package to final destination when fetching '{}'.\n", repo)
-            os.Directory.remove(temporary_dest)
+            os.Directory.remove_recursive(temporary_dest)
             return false
         }
 
         // Remove the .git folder, as it is unneeded.
         unnecessary_git_dir := os.Path.join(actual_dest, ".git")
-        if !os.Directory.remove(unnecessary_git_dir) {
+        if !os.Directory.remove_recursive(unnecessary_git_dir) {
             error_print("Failed to delete .git folder of '{}'.\n", repo)
             return false
         }
