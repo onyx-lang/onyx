@@ -412,34 +412,6 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 
 
 
-/// Represents a generic "iterator" or "generator" of a specific
-/// type. Can be used in a for-loop natively.
-///
-/// `data` is used for contextual information and is passed to
-/// the `next`, `close`, and `remove` procedures.
-///
-/// `next` is used to extract the next value out of the iterator.
-/// It returns the next value, and a continuation flag. If the
-/// flag is false, the value should be ignored and iteration should
-/// stop.
-///
-/// `close` should called when the iterator has ended. This is
-/// done automatically in for-loops, and in the `core.iter` library.
-/// In for-loops, `close` is called no matter which way the for-loop
-/// exits (`break`, `return`, etc). Using this rule, iterator can
-/// be used to create "resources" that automatically close when you
-/// are done with them.
-///
-/// `remove` is used to tell the iterator to remove the last value
-/// returned from some underlying data store. Invoked automatically
-/// using the `#remove` directive in a for-loop.
-Iterator :: struct (Iter_Type: type_expr) {
-    data:   rawptr;
-    next:   (data: rawptr) -> Optional(Iter_Type);
-    close:  (data: rawptr) -> void = null_proc;
-    remove: (data: rawptr) -> void = null_proc;
-}
-
 
 /// Optional represents the possibility of a value being empty, without
 /// resorting to pointers and null-pointers. Most of the functionality

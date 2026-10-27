@@ -9,13 +9,38 @@ use runtime
 use core {Pair}
 use core.intrinsics.types {type_is_struct}
 
+/// Represents a generic "iterator" or "generator" of a specific
+/// type. Can be used in a for-loop natively.
+///
+/// `data` is used for contextual information and is passed to
+/// the `next`, `close`, and `remove` procedures.
+///
+/// `next` is used to extract the next value out of the iterator.
+/// It returns the next value, and a continuation flag. If the
+/// flag is false, the value should be ignored and iteration should
+/// stop.
+///
+/// `close` should called when the iterator has ended. This is
+/// done automatically in for-loops, and in the `core.iter` library.
+/// In for-loops, `close` is called no matter which way the for-loop
+/// exits (`break`, `return`, etc). Using this rule, iterator can
+/// be used to create "resources" that automatically close when you
+/// are done with them.
+///
+/// `remove` is used to tell the iterator to remove the last value
+/// returned from some underlying data store. Invoked automatically
+/// using the `#remove` directive in a for-loop.
+Iterator :: struct (Iter_Type: type_expr) {
+    data:   rawptr;
+    next:   (data: rawptr) -> Optional(Iter_Type);
+    close:  (data: rawptr) -> void = null_proc;
+    remove: (data: rawptr) -> void = null_proc;
+}
 
-//
-// Iterator is a builtin type known by the compiler, as Iterators
-// can be used in for-loops natively without any translation.
+builtin.Iterator :: Iterator
 
 #overload
-__for_expansion :: macro (iterator: Iterator($T), $flags: __For_Expansion_Flags, $body: Code) where 
+__for_expansion :: macro (iterator: Iterator($T), $flags: __For_Expansion_Flags, $body: Code) where
     !(flags & .BY_POINTER) && (body.capture_count == 2)
 {
     _iterator := iterator
@@ -44,7 +69,7 @@ __for_expansion :: macro (iterator: Iterator($T), $flags: __For_Expansion_Flags,
 }
 
 #overload
-__for_expansion :: macro (iterator: Iterator($T), $flags: __For_Expansion_Flags, $body: Code) where 
+__for_expansion :: macro (iterator: Iterator($T), $flags: __For_Expansion_Flags, $body: Code) where
     !(flags & .BY_POINTER) && (body.capture_count == 1)
 {
     _iterator := iterator
@@ -364,7 +389,7 @@ take :: (it: Iterator($T), count: u32) -> Iterator(T) {
                 ti.remaining -= 1;
                 return next(ti.iterator);
             }
-            
+
             return .None;
         },
 
@@ -540,7 +565,7 @@ concat :: (iters: ..Iterator($T)) -> Iterator(T) {
 
             return .None;
         },
-        
+
         c => {
             for& c.iters {
                 close(*it);
@@ -1039,7 +1064,7 @@ prod :: (x: $I1/Iterable, y_iter: Iterator($Y)) => {
                     ctx.x_iter = as_iter(ctx.x)
                     x_val := next(ctx.x_iter)
                     if !x_val do return .None
-                    
+
                     return Optional.make(Pair.make(x_val!, ctx.y_val!))
                 }
             }
@@ -1050,7 +1075,7 @@ prod :: (x: $I1/Iterable, y_iter: Iterator($Y)) => {
 
 /// Simple iterator comprehensions, in the same vein
 /// as Pythons comprehension syntax.
-/// 
+///
 /// Python:
 ///     results = [it * 2 for it in [1, 2, 3, 4, 5]]
 /// Onyx:
@@ -1086,7 +1111,7 @@ comp :: macro (i: $I/Iterable, value: Code) =>
 /// Using the polymorph solving system, you can write type
 /// free versions of arbitrary iterators. This is used
 /// heavily by many of the functions defined above.
-/// 
+///
 /// Maybe at some point an alternate allocator would be good
 /// for this? For now, I think the temporary allocator is sufficient.
 generator :: #match #local {}
@@ -1127,7 +1152,7 @@ generator_no_copy :: (ctx: &$Ctx, gen: (&Ctx) -> ? $T, close: (&Ctx) -> void) =>
 
 /// Groups like elements together using the provided comparison function.
 /// `cmp` should return `true` if the two elements are equal.
-/// The items should be sorted in such a way that the equal items appear next to each other. 
+/// The items should be sorted in such a way that the equal items appear next to each other.
 group_by :: (it: Iterator($T), cmp: (T, T) -> bool) -> Iterator(Pair(T, Iterator(T))) {
     return generator(
         &.{ outer_iter = it, cmp = cmp, key_item = next(it), yielded_key = false }
@@ -1217,7 +1242,7 @@ group_by :: (it: Iterator($T), cmp: (T, T) -> bool) -> Iterator(Pair(T, Iterator
 
     /// Allows you to easily write a parallelized for-loop over an iterator.
     /// For example,
-    /// 
+    ///
     ///     iter.parallel_for(1 .. 100, 4, &.{}) {
     ///         printf("Thread {} has {}!\n", context.thread_id, it);
     ///     }

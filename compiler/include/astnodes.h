@@ -1772,7 +1772,7 @@ struct AstObjectBlock {
 struct AstJsNode {
     AstNode_base;
 
-    u32 order; 
+    u32 order;
     AstTyped *order_expr;
 
     AstTyped *code;
@@ -2244,7 +2244,6 @@ struct CompilerBuiltins {
     Type     *vararg_type_type;
     AstTyped *context_variable;
     AstType  *allocator_type;
-    AstType  *iterator_type;
     AstType  *optional_type;
     AstType  *callsite_type;
     AstType  *any_type;
@@ -2453,7 +2452,7 @@ struct Context {
     bh_allocator scratch_alloc;
 
     bh_managed_heap heap;
-    bh_allocator gp_alloc; // General purpose allocator 
+    bh_allocator gp_alloc; // General purpose allocator
 
     bh_allocator *stbds_alloc;
 

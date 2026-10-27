@@ -444,12 +444,6 @@ void initialize_builtins(Context *context) {
         return;
     }
 
-    context->builtins.iterator_type = (AstType *) symbol_raw_resolve(context, p->scope, "Iterator");
-    if (context->builtins.iterator_type == NULL) {
-        ONYX_ERROR((OnyxFilePos) { 0 }, Error_Critical, "'Iterator' struct not found in builtin package.");
-        return;
-    }
-
     context->builtins.optional_type = (AstType *) symbol_raw_resolve(context, p->scope, "Optional");
     if (context->builtins.optional_type == NULL) {
         ONYX_ERROR((OnyxFilePos) { 0 }, Error_Critical, "'Optional' struct not found in builtin package.");
@@ -671,4 +665,3 @@ void introduce_build_options(Context *context) {
         symbol_builtin_introduce(context, p->scope, "Generated_Foreign_Info", (AstNode *) foreign_info);
     }
 }
-
