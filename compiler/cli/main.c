@@ -164,6 +164,21 @@ typedef struct CLIArgs {
 
 static void print_subcommand_help(const char *subcommand);
 
+static void build_version_string(char *buf, i32 len) {
+    i32 major = onyx_version_major();
+    i32 minor = onyx_version_minor();
+    i32 patch = onyx_version_patch();
+    char *suffix = onyx_version_suffix();
+
+    if (minor > 0 && patch > 0) {
+        bh_snprintf(buf, len, "%d.%d.%d%s", major, minor, patch, suffix);
+    } else if (minor > 0) {
+        bh_snprintf(buf, len, "%d.%d%s", major, minor, suffix);
+    } else {
+        bh_snprintf(buf, len, "%d%s", major, suffix);
+    }
+}
+
 static int32_t cli_args_init(CLIArgs *cli_args) {
     memset(cli_args, 0, sizeof(* cli_args));
 
@@ -935,16 +950,13 @@ static void onyx_watch(CLIArgs *cli_args, int arg_parse_start, int argc, char **
             onyx_errors_print(ctx, cli_args->error_format, !cli_args->no_colors, cli_args->show_all_errors);
         }
 
+        char version_buf[128] = {0};
+        build_version_string(version_buf, 127);
+
         char time_buf[128] = {0};
         time_t now = time(NULL);
         strftime(time_buf, 128, "%X", localtime(&now));
-        bh_printf("\e[1;1H\e[30;105m Onyx %d.%d.%d%s \e[30;104m Built %s \e[0m",
-            onyx_version_major(),
-            onyx_version_minor(),
-            onyx_version_patch(),
-            onyx_version_suffix(),
-            time_buf
-        );
+        bh_printf("\e[1;1H\e[30;105m Onyx %s \e[30;104m Built %s \e[0m", version_buf, time_buf);
 
         if (error_count == 0) {
             bh_printf("\e[30;102m Errors 0 \e[0m");
@@ -1005,12 +1017,10 @@ int main(int argc, char *argv[]) {
     }
 
     if (cli_args.action == ONYX_COMPILE_ACTION_PRINT_VERSION) {
-        bh_printf("Onyx tool-chain version %d.%d.%d%s\n",
-            onyx_version_major(),
-            onyx_version_minor(),
-            onyx_version_patch(),
-            onyx_version_suffix()
-        );
+        char version_buf[128] = {0};
+        build_version_string(version_buf, 127);
+
+        bh_printf("Onyx tool-chain version %s\n", version_buf);
         bh_printf("Runtime: %s\n", onyx_version_runtime());
         bh_printf("Built:   %s\n", onyx_version_build_time());
 

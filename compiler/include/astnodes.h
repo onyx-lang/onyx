@@ -1,9 +1,9 @@
 #ifndef ONYXASTNODES_H
 #define ONYXASTNODES_H
 
-#define VERSION_MAJOR 0
-#define VERSION_MINOR 1
-#define VERSION_PATCH 14
+#define VERSION_MAJOR 2611
+#define VERSION_MINOR 0
+#define VERSION_PATCH 0
 #define VERSION_SUFFIX "-preview"
 
 #include "stb_ds.h"
