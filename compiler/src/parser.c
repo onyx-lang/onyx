@@ -709,12 +709,12 @@ static AstTyped* parse_factor_impl(OnyxParser* parser) {
         case '(': {
             if (parse_possible_function_definition(parser, &retval)) {
                 retval->flags |= Ast_Flag_Function_Is_Lambda;
-                ENTITY_SUBMIT(retval);
+                if (!parser->hit_unexpected_token) ENTITY_SUBMIT(retval);
                 break;
             }
             if (parse_possible_quick_function_definition(parser, &retval)) {
                 retval->flags |= Ast_Flag_Function_Is_Lambda;
-                ENTITY_SUBMIT(retval);
+                if (!parser->hit_unexpected_token) ENTITY_SUBMIT(retval);
                 break;
             }
 
@@ -4609,6 +4609,10 @@ static void parse_implicit_injection(OnyxParser* parser) {
     }
 
     AstFieldAccess *injection_expression = (AstFieldAccess *) parse_type(parser);
+    if (injection_expression == NULL || parser->hit_unexpected_token) {
+        parser->hit_unexpected_token = 1;
+        return;
+    }
 
     if (peek_token(0)->type == Token_Type_Proc_Macro_Body) {
         AstProceduralExpansion *proc_expand = make_node(AstProceduralExpansion, Ast_Kind_Procedural_Expansion);
@@ -4668,10 +4672,13 @@ static void parse_implicit_injection(OnyxParser* parser) {
         inject->binding->node = (AstNode *) memres;
     }
 
-    ENTITY_SUBMIT(inject);
-
     parser->injection_point = NULL;
-    return;
+
+    // A failed binding is a parse error. Do not hand the checker an injection
+    // with a null binding; that used to segfault in check_process_directive.
+    if (inject->binding == NULL || parser->hit_unexpected_token) return;
+
+    ENTITY_SUBMIT(inject);
 }
 
 
@@ -4963,10 +4970,9 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 inject->token = dir_token;
                 inject->full_loc = (AstTyped *) injection_point;
                 inject->binding = parse_top_level_binding(parser, injection_point->token);
-                if (inject->binding) {
-                    flush_doc_tokens(parser, &inject->binding->documentation_string, &inject->binding->documentation_token_old);
-                }
+                if (inject->binding == NULL || parser->hit_unexpected_token) return;
 
+                flush_doc_tokens(parser, &inject->binding->documentation_string, &inject->binding->documentation_token_old);
                 ENTITY_SUBMIT(inject);
                 return;
             }

@@ -5501,6 +5501,10 @@ CHECK_FUNC(process_directive, AstNode* directive) {
             YIELD_ERROR(inject->token->pos, "Cannot #inject here.");
         }
 
+        if (inject->binding == NULL) {
+            ERROR(inject->token->pos, "This injection has no binding. This is a compiler bug.");
+        }
+
         inject->binding->token = inject->symbol;
 
         if (inject->binding->kind == Ast_Kind_Function || inject->binding->kind == Ast_Kind_Polymorphic_Proc) {
