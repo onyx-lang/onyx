@@ -5097,23 +5097,46 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
 }
 
 static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
-    // INVESTIGATE: I think that filename should always be NULL when this function starts because
-    // a file contents entity is only processed once and therefore should only go through this step
-    // once. But somehow filename isn't NULL occasionally so I have to check for that...
-    //                                                                      - brendanfh  2021/05/23
+    // A file-contents entity is normally processed once, but filename is
+    // occasionally already set. Keep that resolved path when it is.
     if (fc->filename == NULL) {
         const char* parent_file = fc->token->pos.filename;
-        if (parent_file == NULL) parent_file = ".";
+        if (parent_file == NULL || parent_file[0] == '\0') parent_file = ".";
 
+        // Same lookup as #load: relative paths (with or without "./") are
+        // next to the file that contains this directive. Absolute paths and
+        // mapped folders ("name:path") are unchanged.
         char* parent_folder = bh_path_get_parent(parent_file, mod->context->scratch_alloc);
+        if (parent_folder == NULL || parent_folder[0] == '\0') parent_folder = "./";
 
         OnyxToken *filename_token = fc->filename_expr->token;
 
         token_toggle_end(filename_token);
-        char* temp_fn     = bh_alloc_array(mod->context->scratch_alloc, char, filename_token->length);
-        i32   temp_fn_len = string_process_escape_seqs(temp_fn, filename_token->text, filename_token->length);
-        char* filename    = bh_lookup_file(temp_fn, parent_folder, NULL, NULL, NULL, mod->context->scratch_alloc);
-        fc->filename      = bh_strdup(mod->context->gp_alloc, filename);
+        char* temp_fn = bh_alloc_array(mod->context->scratch_alloc, char, filename_token->length + 1);
+        string_process_escape_seqs(temp_fn, filename_token->text, filename_token->length);
+
+        char* filename = bh_search_for_mapped_file(
+            temp_fn,
+            parent_folder,
+            NULL,
+            mod->context->options.mapped_folders,
+            mod->context->scratch_alloc
+        );
+
+        if (filename == NULL) {
+            b32 mapped_or_absolute = temp_fn[0] == '/' || temp_fn[0] == '\\' || strchr(temp_fn, ':') != NULL;
+            if (!mapped_or_absolute) {
+                char sep = parent_folder[strlen(parent_folder) - 1];
+                if (sep == '/' || sep == '\\')
+                    filename = bh_aprintf(mod->context->scratch_alloc, "%s%s", parent_folder, temp_fn);
+                else
+                    filename = bh_aprintf(mod->context->scratch_alloc, "%s/%s", parent_folder, temp_fn);
+            } else {
+                filename = temp_fn;
+            }
+        }
+
+        fc->filename = bh_strdup(mod->context->gp_alloc, filename);
         token_toggle_end(filename_token);
     }
 
@@ -5132,10 +5155,6 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
         return;
     }
 
-    // :RelativeFiles This should be relative to the current directory by default; However,
-    // if the filename is prefixed with a './' or '.\\' then it should be relative to the
-    // file in which is was inclded. The loaded file info above should probably use the full
-    // file path in order to avoid duplicates.
     bh_file_contents contents = bh_file_read_contents(mod->context->gp_alloc, fc->filename);
     u8* actual_data = bh_alloc(mod->context->gp_alloc, contents.length + 1);
     u32 length = contents.length + 1;
