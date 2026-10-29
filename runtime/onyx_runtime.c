@@ -121,6 +121,10 @@ ONYX_LIBRARY {
     ONYX_FUNC(__tty_enter_raw)
     ONYX_FUNC(__tty_leave_raw)
     ONYX_FUNC(__tty_raise_tstp)
+    ONYX_FUNC(__tty_winch_install)
+    ONYX_FUNC(__tty_winch_remove)
+    ONYX_FUNC(__tty_wake)
+    ONYX_FUNC(__tty_wait)
     ONYX_FUNC(__register_cleanup)
 
     ONYX_FUNC(__net_create_socket)
