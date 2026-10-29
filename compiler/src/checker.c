@@ -4645,8 +4645,9 @@ CHECK_FUNC(union, AstUnionType *u_node) {
     u_node->flags |= Ast_Flag_Comptime;
 
     if (!u_node->tag_backing_type) {
-        int n = (31 - bh_clz(bh_arr_length(u_node->variants) - 1)) >> 3;
-        if      (n == 0) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u8;
+        int n = (31 - bh_clz(bh_arr_length(u_node->variants) - 1));
+        if (n > 0) n = n >> 3;
+        if      (n <= 0) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u8;
         else if (n == 1) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u16;
         else if (n <= 3) u_node->tag_backing_type = (AstType *) &context->basic_types.type_u32;
         else {

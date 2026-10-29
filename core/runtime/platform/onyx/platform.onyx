@@ -88,6 +88,8 @@ ProcessData :: #distinct u64
     // TTY
     __tty_get :: (state: &os.TTY_State) -> void ---
     __tty_set :: (state: &os.TTY_State) -> bool ---
+    __tty_enter_raw :: () -> bool ---
+    __tty_leave_raw :: () -> bool ---
 
     // Time and sleep
     __time :: () -> u64 ---

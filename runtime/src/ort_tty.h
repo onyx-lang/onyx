@@ -69,4 +69,121 @@ ONYX_DEF(__tty_set, (WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+#include <stdlib.h>
+#include <string.h>
+#include <signal.h>
+
+static struct termios onyx_tty_saved;
+static int onyx_tty_raw = 0;
+static int onyx_tty_atexit_installed = 0;
+
+static int onyx_tty_caught[] = {
+    SIGINT, SIGTERM, SIGQUIT, SIGHUP, SIGABRT, SIGPIPE
+};
+#define ONYX_TTY_CAUGHT_COUNT ((int)(sizeof(onyx_tty_caught) / sizeof(onyx_tty_caught[0])))
+static struct sigaction onyx_tty_old_actions[6];
+
+static void onyx_tty_restore_termios(void) {
+    if (!onyx_tty_raw) return;
+    tcsetattr(STDIN_FILENO, TCSANOW, &onyx_tty_saved);
+    onyx_tty_raw = 0;
+}
+
+static void onyx_tty_atexit_handler(void) {
+    onyx_tty_restore_termios();
+}
+
+static void onyx_tty_on_signal(int signo) {
+    struct sigaction old;
+    int found = 0;
+    int i;
+
+    onyx_tty_restore_termios();
+    for (i = 0; i < ONYX_TTY_CAUGHT_COUNT; i++) {
+        if (onyx_tty_caught[i] == signo) {
+            old = onyx_tty_old_actions[i];
+            found = 1;
+            break;
+        }
+    }
+    if (found) sigaction(signo, &old, NULL);
+    else signal(signo, SIG_DFL);
+    raise(signo);
+}
+
+static void onyx_tty_make_raw(struct termios *t) {
+    t->c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
+    t->c_oflag &= ~OPOST;
+    t->c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
+    t->c_cflag &= ~(CSIZE | PARENB);
+    t->c_cflag |= CS8;
+    t->c_cc[VMIN] = 0;
+    t->c_cc[VTIME] = 0;
+}
+#endif
+
+ONYX_DEF(__tty_enter_raw, (), (WASM_I32)) {
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    struct termios raw;
+    int i;
+
+    if (onyx_tty_raw) {
+        results->data[0] = WASM_I32_VAL(1);
+        return NULL;
+    }
+
+    if (tcgetattr(STDIN_FILENO, &onyx_tty_saved) != 0) {
+        results->data[0] = WASM_I32_VAL(0);
+        return NULL;
+    }
+
+    raw = onyx_tty_saved;
+    onyx_tty_make_raw(&raw);
+    if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) != 0) {
+        results->data[0] = WASM_I32_VAL(0);
+        return NULL;
+    }
+
+    onyx_tty_raw = 1;
+    if (!onyx_tty_atexit_installed) {
+        atexit(onyx_tty_atexit_handler);
+        onyx_tty_atexit_installed = 1;
+    }
+
+    for (i = 0; i < ONYX_TTY_CAUGHT_COUNT; i++) {
+        struct sigaction sa;
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = onyx_tty_on_signal;
+        sigemptyset(&sa.sa_mask);
+        sigaction(onyx_tty_caught[i], &sa, &onyx_tty_old_actions[i]);
+    }
+
+    results->data[0] = WASM_I32_VAL(1);
+    return NULL;
+#else
+    results->data[0] = WASM_I32_VAL(0);
+    return NULL;
+#endif
+}
+
+ONYX_DEF(__tty_leave_raw, (), (WASM_I32)) {
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    int i;
+
+    if (onyx_tty_raw) {
+        for (i = 0; i < ONYX_TTY_CAUGHT_COUNT; i++) {
+            sigaction(onyx_tty_caught[i], &onyx_tty_old_actions[i], NULL);
+        }
+        onyx_tty_restore_termios();
+    }
+
+    results->data[0] = WASM_I32_VAL(1);
+    return NULL;
+#else
+    results->data[0] = WASM_I32_VAL(0);
+    return NULL;
+#endif
+}
+
 

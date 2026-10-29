@@ -118,6 +118,8 @@ ONYX_LIBRARY {
     ONYX_FUNC(__futex_wake)
     ONYX_FUNC(__tty_get)
     ONYX_FUNC(__tty_set)
+    ONYX_FUNC(__tty_enter_raw)
+    ONYX_FUNC(__tty_leave_raw)
     ONYX_FUNC(__register_cleanup)
 
     ONYX_FUNC(__net_create_socket)
