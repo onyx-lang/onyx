@@ -921,7 +921,7 @@ read_config_from_installed_dependency :: (dependency_folder: str) -> ? Config {
 }
 
 strip_protocol_and_www_from_repo :: (repo: str) -> str {
-    to_return := repo
+    to_return := str.temp_copy(repo)
 
     if str.contains(to_return, "://") {
         _, to_return~ := str.bisect(to_return, "://")
@@ -940,6 +940,9 @@ strip_protocol_and_www_from_repo :: (repo: str) -> str {
 
         str.replace(to_return, '/', '\\')
     }
+
+    // Handle colons in the the url name
+    str.replace(to_return, ':', '-')
 
     return to_return
 }
