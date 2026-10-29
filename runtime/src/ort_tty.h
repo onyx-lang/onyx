@@ -73,6 +73,7 @@ ONYX_DEF(__tty_set, (WASM_I32), (WASM_I32)) {
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <pthread.h>
 
 static struct termios onyx_tty_saved;
 static int onyx_tty_raw = 0;
@@ -160,6 +161,34 @@ ONYX_DEF(__tty_enter_raw, (), (WASM_I32)) {
     }
 
     results->data[0] = WASM_I32_VAL(1);
+    return NULL;
+#else
+    results->data[0] = WASM_I32_VAL(0);
+    return NULL;
+#endif
+}
+
+// Stops this process group with SIGTSTP. Returns after the process continues.
+ONYX_DEF(__tty_raise_tstp, (), (WASM_I32)) {
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    struct sigaction sa, old;
+    sigset_t unblock, previous;
+
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = SIG_DFL;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGTSTP, &sa, &old);
+
+    sigemptyset(&unblock);
+    sigaddset(&unblock, SIGTSTP);
+    pthread_sigmask(SIG_UNBLOCK, &unblock, &previous);
+
+    // Delivered before raise returns. The process is stopped until SIGCONT.
+    int rc = raise(SIGTSTP);
+
+    pthread_sigmask(SIG_SETMASK, &previous, NULL);
+    sigaction(SIGTSTP, &old, NULL);
+    results->data[0] = WASM_I32_VAL(rc == 0);
     return NULL;
 #else
     results->data[0] = WASM_I32_VAL(0);
