@@ -1154,6 +1154,14 @@ Type* query_expression_type(Context *context, AstTyped *node) {
 Type* resolve_expression_type(Context *context, AstTyped* node) {
     if (node == NULL) return NULL;
 
+    // No expected type is coming from a parent. A deferred overload or
+    // polymorphic call has to become one concrete procedure, or report why
+    // its return type cannot be known. Argument and alias nodes resolve their
+    // inner expression below, which performs this itself.
+    if (node->kind != Ast_Kind_Argument && node->kind != Ast_Kind_Alias) {
+        concretize_deferred_call(context, node);
+    }
+
     if (node->kind == Ast_Kind_Compound) {
         bh_arr_each(AstTyped *, expr, ((AstCompound *) node)->exprs) {
             resolve_expression_type(context, *expr);
@@ -1169,6 +1177,12 @@ Type* resolve_expression_type(Context *context, AstTyped* node) {
 
     if (node->kind == Ast_Kind_If_Expression) {
         AstIfExpression* if_expr = (AstIfExpression *) node;
+
+        // A deferred branch is waiting for the if-expression's expected type.
+        // Forcing it here would reject the call before that type arrives.
+        if (deferred_call_of(if_expr->true_expr) || deferred_call_of(if_expr->false_expr)) {
+            return node->type;
+        }
 
         Type* ltype = resolve_expression_type(context, if_expr->true_expr);
         unify_node_and_type(context, &if_expr->false_expr, ltype);

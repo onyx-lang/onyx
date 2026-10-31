@@ -634,18 +634,25 @@ static void solve_for_polymorphic_param_type(Context *context, PolySolveResult* 
             if (all_types)
                 typed_param = try_lookup_based_on_partial_function_type(context, (AstFunction *) potential, ft);
 
-          skip_nested_polymorph_case:
-
-            actual_type = query_expression_type(context, typed_param);
+          skip_nested_polymorph_case: {
+            i32 error_mark = bh_arr_length(context->errors.errors);
+            actual_type = resolve_expression_type(context, typed_param);
             if (actual_type == NULL) {
-                if (typed_param) err_msg->pos = typed_param->token->pos;
+                if (bh_arr_length(context->errors.errors) > error_mark) return;
 
-                const char *reason = unresolved_deferred_call_reason(typed_param);
-                err_msg->text = reason ? (char *) reason : "Unable to resolve type of this expression, needed to solve for polymorphic variable.";
+                if (deferred_call_of(typed_param)) {
+                    context->polymorph.flag_to_yield = 1;
+                    return;
+                }
+
+                if (typed_param && err_msg) err_msg->pos = typed_param->token->pos;
+                if (err_msg) err_msg->text = "Unable to resolve type of this expression, needed to solve for polymorphic variable.";
                 return;
             }
 
             break;
+            }
+
         }
 
         case PPLM_By_Function_Type: {

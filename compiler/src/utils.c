@@ -1035,6 +1035,75 @@ done:
     return result;
 }
 
+// Options that match the arguments and do not need an expected type. A single
+// shared return type can be committed. Several return types cannot.
+b32 deferred_call_has_concrete_return(Context *context, AstCall *call) {
+    AstTyped *callee = (AstTyped *) strip_aliases((AstNode *) call->callee);
+    if (!callee || callee->kind != Ast_Kind_Overloaded_Function) return 1;
+
+    AstOverloadedFunction *group = (AstOverloadedFunction *) callee;
+    bh_imap local_overloads;
+    bh_imap *all_overloads = overload_cache_get(context, group->overloads, &group->all_overloads);
+    b32 local = 0;
+    if (!all_overloads) {
+        bh_imap_init(&local_overloads, context->gp_alloc, bh_arr_length(group->overloads) * 2);
+        build_all_overload_options(group->overloads, &local_overloads);
+        all_overloads = &local_overloads;
+        local = 1;
+    }
+
+    i32 concrete = 0;
+    b32 needs_return = 0;
+    b32 conflict = 0;
+    b32 waiting = 0;
+    Type *known = NULL;
+
+    bh_arr_each(bh__imap_entry, entry, all_overloads->entries) {
+        AstTyped *node = (AstTyped *) strip_aliases((AstNode *) entry->key);
+        if (!node) continue;
+
+        AstFunction *func = NULL;
+        OptionMatchKind kind = match_overload_option(context, node, &call->args, &func);
+        if (kind == OPTION_MATCH_YIELD) {
+            waiting = 1;
+            continue;
+        }
+        if (kind == OPTION_MATCH_NEEDS_RETURN) {
+            needs_return = 1;
+            continue;
+        }
+        if (kind != OPTION_MATCH_SOLVED || !func || !func->type) continue;
+
+        Type *ret = func->type->Function.return_type;
+        if (!ret || ret == context->types.auto_return) {
+            waiting = 1;
+            continue;
+        }
+
+        if (known && !types_are_compatible(context, known, ret)) conflict = 1;
+        else if (!known) known = ret;
+        concrete++;
+    }
+
+    if (local) bh_imap_free(all_overloads);
+
+    if (waiting && !conflict) return 0;
+
+    if (conflict) {
+        ONYX_ERROR(call->token->pos, Error_Critical,
+            "Multiple overloads match the arguments provided, but the return type is not known.");
+        return 0;
+    }
+
+    if (concrete == 0 && needs_return) {
+        ONYX_ERROR(call->token->pos, Error_Critical,
+            "Cannot solve the polymorphic return type of this call without an expected type.");
+        return 0;
+    }
+
+    return 1;
+}
+
 TypeMatch probe_call_against_expected_return(Context *context, AstTyped *callee, Arguments *args, Type *expected) {
     callee = (AstTyped *) strip_aliases((AstNode *) callee);
     if (!callee || !expected) return TYPE_MATCH_FAILED;
@@ -1688,34 +1757,6 @@ b32 fill_in_arguments(Context *context, Arguments* args, AstNode* provider, char
 // Argument checking
 //
 
-// A call left open because several options match, or because a return-only
-// variable is unsolved, has no type for an argument to read.
-const char *unresolved_deferred_call_reason(AstTyped *expr) {
-    while (expr && (expr->kind == Ast_Kind_Alias || expr->kind == Ast_Kind_Argument)) {
-        if (expr->kind == Ast_Kind_Alias) expr = ((AstAlias *) expr)->alias;
-        else expr = ((AstArgument *) expr)->value;
-    }
-    if (!expr) return NULL;
-
-    AstCall *call = NULL;
-    if (expr->kind == Ast_Kind_Call && ((AstCall *) expr)->deferred_for_expected_type) {
-        call = (AstCall *) expr;
-    } else if (expr->kind == Ast_Kind_Method_Call) {
-        AstTyped *right = ((AstBinaryOp *) expr)->right;
-        if (right && right->kind == Ast_Kind_Call && ((AstCall *) right)->deferred_for_expected_type) {
-            call = (AstCall *) right;
-        }
-    }
-    if (!call) return NULL;
-
-    AstTyped *callee = (AstTyped *) strip_aliases((AstNode *) call->callee);
-    if (callee && (callee->kind == Ast_Kind_Polymorphic_Proc || callee->kind == Ast_Kind_Macro)) {
-        return "Cannot solve the polymorphic return type of this call without an expected type.";
-    }
-
-    return "Multiple overloads match the arguments provided, but the return type is not known.";
-}
-
 
 
 typedef enum ArgState {
@@ -1817,12 +1858,12 @@ TypeMatch check_arguments_against_type(Context *context, Arguments* args, TypeFu
                 if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
 
                 if (variadic_type->id == any_type_id) {
+                    i32 error_mark = bh_arr_length(context->errors.errors);
                     resolve_expression_type(context, arg_arr[arg_pos]->value);
                     if (arg_arr[arg_pos]->value->type == NULL) {
-                        if (error != NULL) {
+                        if (error != NULL && bh_arr_length(context->errors.errors) == error_mark) {
                             error->pos = arg_arr[arg_pos]->token->pos;
-                            const char *reason = unresolved_deferred_call_reason(arg_arr[arg_pos]->value);
-                            error->text = reason ? (char *) reason : "Unable to resolve type of argument.";
+                            error->text = "Unable to resolve type of argument.";
                         }
                         return TYPE_MATCH_FAILED;
                     }
@@ -1858,12 +1899,12 @@ TypeMatch check_arguments_against_type(Context *context, Arguments* args, TypeFu
                 if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
 
                 assert(arg_arr[arg_pos]->kind == Ast_Kind_Argument);
+                i32 error_mark = bh_arr_length(context->errors.errors);
                 resolve_expression_type(context, arg_arr[arg_pos]->value);
                 if (arg_arr[arg_pos]->value->type == NULL) {
-                    if (error != NULL) {
+                    if (error != NULL && bh_arr_length(context->errors.errors) == error_mark) {
                         error->pos = arg_arr[arg_pos]->token->pos;
-                        const char *reason = unresolved_deferred_call_reason(arg_arr[arg_pos]->value);
-                        error->text = reason ? (char *) reason : "Unable to resolve type for argument.";
+                        error->text = "Unable to resolve type for argument.";
                     }
                     return TYPE_MATCH_FAILED;
                 }

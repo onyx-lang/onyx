@@ -147,7 +147,7 @@ CHECK_FUNC(proc_expansion, AstProceduralExpansion **pexp, ProceduralMacroExpansi
 CHECK_FUNC(package, AstPackage* package);
 
 static b32 expr_is_deferred_call(AstTyped *expr);
-static AstCall *deferred_call_of(AstTyped *expr);
+AstCall *deferred_call_of(AstTyped *expr);
 static CheckStatus commit_deferred_call(Context *context, AstTyped **pexpr);
 
 static b32 type_is_unsized_literal(Type *type) {
@@ -703,13 +703,12 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
     }
 
     CHECK(expression, &switchnode->expr);
+    i32 switch_expr_error_mark = bh_arr_length(context->errors.errors);
     Type* resolved_expr_type = resolve_expression_type(context, switchnode->expr);
 
     if (!(switchnode->flags & Ast_Flag_Has_Been_Checked)) {
         if (resolved_expr_type == NULL) {
-            const char *reason = unresolved_deferred_call_reason(switchnode->expr);
-            OnyxFilePos pos = switchnode->expr->token ? switchnode->expr->token->pos : switchnode->token->pos;
-            if (reason) YIELD(pos, (char *) reason);
+            if (bh_arr_length(context->errors.errors) > switch_expr_error_mark) return Check_Error;
             YIELD(switchnode->token->pos, "Waiting for expression type to be known.");
         }
 
@@ -1459,11 +1458,13 @@ CHECK_FUNC(call, AstCall** pcall) {
         YIELD(call->token->pos, "Waiting for auto-return type to be solved.");
     }
 
-    OnyxError error;
+    OnyxError error = { 0 };
     TypeMatch tm = check_arguments_against_type(context, &call->args, &callee->type->Function, &call->va_kind,
                                                 call->token, get_function_name(context, callee), &error);
     if (tm == TYPE_MATCH_FAILED) {
-        onyx_submit_error(context, error);
+        // A deferred call reports its own error from resolve_expression_type
+        // and leaves this struct empty. Submitting it prints leftover stack bytes.
+        if (error.text != NULL) onyx_submit_error(context, error);
         return Check_Error;
     }
 
@@ -1616,7 +1617,7 @@ static b32 expr_is_deferred_call(AstTyped *expr) {
     return deferred_call_of(expr) != NULL;
 }
 
-static AstCall *deferred_call_of(AstTyped *expr) {
+AstCall *deferred_call_of(AstTyped *expr) {
     while (expr && (expr->kind == Ast_Kind_Alias || expr->kind == Ast_Kind_Argument)) {
         if (expr->kind == Ast_Kind_Alias) expr = ((AstAlias *) expr)->alias;
         else expr = ((AstArgument *) expr)->value;
@@ -1643,6 +1644,26 @@ static CheckStatus commit_deferred_call(Context *context, AstTyped **pexpr) {
     deferred->commit_without_expected_type = 1;
     deferred->deferred_for_expected_type = 0;
     return check_expression(context, pexpr);
+}
+
+// resolve_expression_type asks for a type and supplies no expected type.
+// Commit when every argument-matching option agrees on one return type.
+// Otherwise the error is reported by deferred_call_has_concrete_return.
+void concretize_deferred_call(Context *context, AstTyped *node) {
+    AstCall *call = deferred_call_of(node);
+    if (!call || (call->flags & Ast_Flag_Has_Been_Checked)) return;
+    if (!deferred_call_has_concrete_return(context, call)) return;
+
+    call->commit_without_expected_type = 1;
+    call->deferred_for_expected_type = 0;
+
+    AstTyped *expr = node;
+    CheckStatus status = check_expression(context, &expr);
+    if ((status == Check_Yield || status == Check_Failed)
+        && (call->flags & Ast_Flag_Has_Been_Checked) == 0) {
+        call->deferred_for_expected_type = 1;
+        call->commit_without_expected_type = 0;
+    }
 }
 
 CHECK_FUNC(binaryop_assignment, AstBinaryOp** pbinop) {
@@ -2144,7 +2165,9 @@ CHECK_FUNC(unaryop, AstUnaryOp** punop) {
         if (cs > Check_Errors_Start) return cs;
     }
 
-    if (unaryop->operation != Unary_Op_Negate) {
+    // A cast applies its destination type after this. Resolving a deferred
+    // operand first would reject it before that type is known.
+    if (unaryop->operation != Unary_Op_Negate && !expr_is_deferred_call(unaryop->expr)) {
         resolve_expression_type(context, unaryop->expr);
     }
 
@@ -6261,6 +6284,7 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
             goto poly_query_done;
         }
 
+        i32 poly_error_mark = bh_arr_length(context->errors.errors);
         TypeMatch result = find_polymorphic_sln(context, &sln, param, query->function_header, query->pp_lookup, query->given, &err_msg);
 
         switch (result) {
@@ -6287,6 +6311,9 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
 
             case TYPE_MATCH_FAILED: {
                 if (solved_something) continue;
+
+                // resolve_expression_type already reported why the argument has no type.
+                if (bh_arr_length(context->errors.errors) > poly_error_mark) return Check_Error;
 
                 if (query->error_on_fail || context->cycle_detected) {
                     ONYX_ERROR(query->token->pos, Error_Critical, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
