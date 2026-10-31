@@ -514,6 +514,25 @@ static AstTyped* lookup_param_in_arguments(AstFunction* func, AstPolyParam* para
 }
 
 static AstTyped* try_lookup_based_on_partial_function_type(Context *context, AstFunction *pp, AstFunctionType *ft) {
+    // The partial type blanks the return. A polymorphic return has to be
+    // solved from the real return type, so use the full function type.
+    if (poly_proc_needs_expected_return(pp)) {
+        Type *full = type_build_from_ast(context, (AstType *) ft);
+        if (!full) {
+            context->polymorph.doing_nested_polymorph_lookup = 1;
+            return NULL;
+        }
+
+        AstTyped *result = (AstTyped *) polymorphic_proc_lookup(context, pp, PPLM_By_Function_Type, full, pp->token);
+        if (!result || result == (AstTyped *) &context->node_that_signals_a_yield || result->type == NULL
+            || (result->type->kind == Type_Kind_Function && result->type->Function.return_type == context->types.auto_return))
+        {
+            context->polymorph.doing_nested_polymorph_lookup = 1;
+            return NULL;
+        }
+        return result;
+    }
+
     if (ft->partial_function_type == NULL) {
         AstType *old_return_type = ft->return_type;
         ft->return_type = (AstType *) &context->basic_types.type_void;
@@ -657,6 +676,17 @@ static void solve_for_polymorphic_param_type(Context *context, PolySolveResult* 
 
         case PPLM_By_Function_Type: {
             Type* ft = (Type *) actual;
+            if (poly_param_from_return(param)) {
+                actual_type = ft->Function.return_type;
+                if (!actual_type) {
+                    if (err_msg && err_msg->text == NULL) {
+                        err_msg->text = "Cannot solve a polymorphic return variable without an expected type.";
+                    }
+                    return;
+                }
+                break;
+            }
+
             if (param->idx >= ft->Function.param_count) {
                 if (err_msg) {
                     err_msg->text = "Incompatible polymorphic argument to function parameter.";
