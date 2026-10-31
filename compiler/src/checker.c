@@ -146,6 +146,16 @@ CHECK_FUNC(directive_export_name, AstDirectiveExportName *ename);
 CHECK_FUNC(proc_expansion, AstProceduralExpansion **pexp, ProceduralMacroExpansionKind kind);
 CHECK_FUNC(package, AstPackage* package);
 
+static b32 expr_is_deferred_call(AstTyped *expr);
+static AstCall *deferred_call_of(AstTyped *expr);
+static CheckStatus commit_deferred_call(Context *context, AstTyped **pexpr);
+
+static b32 type_is_unsized_literal(Type *type) {
+    return type
+        && type->kind == Type_Kind_Basic
+        && (type->Basic.kind == Basic_Kind_Int_Unsized
+            || type->Basic.kind == Basic_Kind_Float_Unsized);
+}
 
 #define STATEMENT_LEVEL 1
 #define EXPRESSION_LEVEL 2
@@ -898,19 +908,36 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
 
     CHECK(block, switchnode->case_block);
 
+    b32 any_deferred_case = 0;
+    if (switchnode->is_expr) {
+        bh_arr_each(AstSwitchCase *, pdeferred, switchnode->cases) {
+            if ((*pdeferred)->body_is_expr && expr_is_deferred_call((*pdeferred)->expr)) any_deferred_case = 1;
+        }
+        if (switchnode->default_case && expr_is_deferred_call((AstTyped *) switchnode->default_case)) {
+            any_deferred_case = 1;
+        }
+    }
+
     b32 all_cases_return = 1;
     bh_arr_each(AstSwitchCase *, pcase, switchnode->cases) {
         AstSwitchCase *sc = *pcase;
 
         if (sc->body_is_expr) {
-            if (switchnode->type == NULL) {
-                switchnode->type = resolve_expression_type(context, sc->expr);
+            // Deferred cases are unified below, after a concrete case supplies the type.
+            if (!expr_is_deferred_call(sc->expr)) {
+                if (switchnode->type == NULL) {
+                    Type *resolved = resolve_expression_type(context, sc->expr);
+                    // An unsized literal is not a type yet when another case is still deferred.
+                    if (!(any_deferred_case && type_is_unsized_literal(resolved))) {
+                        switchnode->type = resolved;
+                    }
 
-            } else {
-                TYPE_CHECK(&sc->expr, switchnode->type) {
-                    ERROR_(sc->token->pos, "Expected case expression to be of type '%s', got '%s'.",
-                        type_get_name(context, switchnode->type),
-                        type_get_name(context, sc->expr->type));
+                } else {
+                    TYPE_CHECK(&sc->expr, switchnode->type) {
+                        ERROR_(sc->token->pos, "Expected case expression to be of type '%s', got '%s'.",
+                            type_get_name(context, switchnode->type),
+                            type_get_name(context, sc->expr->type));
+                    }
                 }
             }
 
@@ -924,7 +951,7 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
             AstTyped **default_case = (AstTyped **) &switchnode->default_case;
             CHECK(expression, default_case);
 
-            if (switchnode->type) {
+            if (switchnode->type && !expr_is_deferred_call((AstTyped *) switchnode->default_case)) {
                 TYPE_CHECK(default_case, switchnode->type) {
                     ERROR_((*default_case)->token->pos, "Expected case expression to be of type '%s', got '%s'.",
                         type_get_name(context, switchnode->type),
@@ -969,6 +996,35 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
         }
     }
 
+    if (switchnode->is_expr && switchnode->type == NULL && switchnode->default_case
+        && !expr_is_deferred_call((AstTyped *) switchnode->default_case)) {
+        Type *resolved = resolve_expression_type(context, (AstTyped *) switchnode->default_case);
+        if (!(any_deferred_case && type_is_unsized_literal(resolved))) {
+            switchnode->type = resolved;
+        }
+    }
+
+    if (switchnode->is_expr && switchnode->type) {
+        bh_arr_each(AstSwitchCase *, pcase2, switchnode->cases) {
+            AstSwitchCase *sc2 = *pcase2;
+            if (!sc2->body_is_expr || !expr_is_deferred_call(sc2->expr)) continue;
+            TYPE_CHECK(&sc2->expr, switchnode->type) {
+                ERROR_(sc2->token->pos, "Expected case expression to be of type '%s', got '%s'.",
+                    type_get_name(context, switchnode->type),
+                    type_get_name(context, sc2->expr->type));
+            }
+        }
+
+        if (switchnode->default_case && expr_is_deferred_call((AstTyped *) switchnode->default_case)) {
+            AstTyped **default_case = (AstTyped **) &switchnode->default_case;
+            TYPE_CHECK(default_case, switchnode->type) {
+                ERROR_((*default_case)->token->pos, "Expected case expression to be of type '%s', got '%s'.",
+                    type_get_name(context, switchnode->type),
+                    type_get_name(context, (*default_case)->type));
+            }
+        }
+    }
+
     if (all_cases_return) {
         switchnode->flags |= Ast_Flag_Block_Returns;
     }
@@ -1000,7 +1056,7 @@ CHECK_FUNC(argument, AstArgument** parg) {
     return Check_Success;
 }
 
-CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
+CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee, Type *expected_return) {
     if (call->intrinsic) return Check_Success;
 
     AstTyped* callee = (AstTyped *) strip_aliases((AstNode *) call->callee);
@@ -1011,11 +1067,21 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
     b32 need_to_check_overload_return_type = 0;
 
     if (callee->kind == Ast_Kind_Overloaded_Function) {
-        AstTyped* new_callee = find_matching_overload_by_arguments(
-            context,
-            ((AstOverloadedFunction *) callee)->overloads,
-            &call->args,
-            &((AstOverloadedFunction *) callee)->all_overloads);
+        AstTyped* new_callee;
+        if (expected_return) {
+            new_callee = find_matching_overload_for_expected_return(
+                context,
+                ((AstOverloadedFunction *) callee)->overloads,
+                &call->args,
+                &((AstOverloadedFunction *) callee)->all_overloads,
+                expected_return);
+        } else {
+            new_callee = find_matching_overload_by_arguments(
+                context,
+                ((AstOverloadedFunction *) callee)->overloads,
+                &call->args,
+                &((AstOverloadedFunction *) callee)->all_overloads);
+        }
 
         if (new_callee == NULL) {
             // A prior error means this overload is still waiting, not that
@@ -1055,7 +1121,7 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
                 return Check_Error;
             }
 
-            report_unable_to_match_overload(context, call, ((AstOverloadedFunction *) callee)->overloads);
+            report_unable_to_match_overload(context, call, ((AstOverloadedFunction *) callee)->overloads, expected_return);
             return Check_Error;
         }
 
@@ -1074,7 +1140,7 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
         calling_a_macro = 1;
         call->callee = callee;
 
-        AstTyped* new_callee = (AstTyped *) macro_resolve_header(context, (AstMacro *) callee, &call->args, call->token, 1);
+        AstTyped* new_callee = (AstTyped *) macro_resolve_header(context, (AstMacro *) callee, &call->args, call->token, 1, expected_return);
         if (new_callee == NULL) return Check_Error;
         if (new_callee == (AstTyped *) &context->node_that_signals_a_yield) {
             YIELD(call->token->pos, "Waiting for macro header to pass type-checking.");
@@ -1085,7 +1151,22 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
 
     } else while (callee->kind == Ast_Kind_Polymorphic_Proc) {
         if (!poly_template) poly_template = callee;
-        AstTyped* new_callee = (AstTyped *) polymorphic_proc_lookup(context, (AstFunction *) callee, PPLM_By_Arguments, &call->args, call->token);
+        AstTyped* new_callee;
+        if (poly_proc_needs_expected_return((AstFunction *) callee)) {
+            if (!expected_return) {
+                ONYX_ERROR(call->token->pos, Error_Critical,
+                    "Cannot solve the polymorphic return type of this call without an expected type.");
+                return Check_Error;
+            }
+
+            PolyArgumentLookup lookup;
+            lookup.args = &call->args;
+            lookup.expected_return = expected_return;
+            new_callee = (AstTyped *) polymorphic_proc_lookup(
+                context, (AstFunction *) callee, PPLM_By_Arguments_And_Return, &lookup, call->token);
+        } else {
+            new_callee = (AstTyped *) polymorphic_proc_lookup(context, (AstFunction *) callee, PPLM_By_Arguments, &call->args, call->token);
+        }
         if (new_callee == NULL) return Check_Error;
         if (new_callee == (AstTyped *) &context->node_that_signals_a_yield) {
             YIELD(call->token->pos, "Waiting for polymorphic procedure header to pass type-checking.");
@@ -1124,6 +1205,47 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee) {
 
     *effective_callee = callee;
     return Check_Success;
+}
+
+TypeMatch resolve_deferred_call(Context *context, AstTyped **pnode, Type *expected, b32 permanent) {
+    if (!pnode || !*pnode || (*pnode)->kind != Ast_Kind_Call) return TYPE_MATCH_FAILED;
+
+    AstCall *call = (AstCall *) *pnode;
+    if (!call->deferred_for_expected_type) {
+        if (call->type && expected && types_are_compatible(context, call->type, expected)) return TYPE_MATCH_SUCCESS;
+        if (call->type && expected && call->type->kind == Type_Kind_Compound) return TYPE_MATCH_SUCCESS;
+        return call->type ? TYPE_MATCH_SUCCESS : TYPE_MATCH_FAILED;
+    }
+
+    if (!permanent) {
+        AstTyped *callee = (AstTyped *) strip_aliases((AstNode *) call->callee);
+        return probe_call_against_expected_return(context, callee, &call->args, expected);
+    }
+
+    call->deferred_for_expected_type = 0;
+    call->pending_expected_return = expected;
+
+    CheckStatus status = check_call(context, (AstCall **) pnode);
+
+    if (!*pnode || (*pnode)->kind != Ast_Kind_Call) {
+        if (status == Check_Yield || status == Check_Failed) return TYPE_MATCH_YIELD;
+        if (status == Check_Error) return TYPE_MATCH_FAILED;
+        if (!*pnode || (*pnode)->type == NULL) return TYPE_MATCH_YIELD;
+        return TYPE_MATCH_SUCCESS;
+    }
+
+    call = (AstCall *) *pnode;
+    call->pending_expected_return = NULL;
+
+    if (status == Check_Yield || status == Check_Failed) {
+        if ((call->flags & Ast_Flag_Has_Been_Checked) == 0) {
+            call->deferred_for_expected_type = 1;
+        }
+        return TYPE_MATCH_YIELD;
+    }
+    if (status == Check_Error) return TYPE_MATCH_FAILED;
+    if (call->type == NULL) return TYPE_MATCH_YIELD;
+    return TYPE_MATCH_SUCCESS;
 }
 
 CHECK_FUNC(call, AstCall** pcall) {
@@ -1169,12 +1291,33 @@ CHECK_FUNC(call, AstCall** pcall) {
 
     if (call->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
+    b32 force_commit = call->commit_without_expected_type
+        || context->checker.current_checking_level == STATEMENT_LEVEL;
+    if (call->deferred_for_expected_type && !call->pending_expected_return && !force_commit) {
+        return Check_Success;
+    }
+
     u32 current_checking_level_store = context->checker.current_checking_level;
     CHECK(arguments, &call->args);
     context->checker.current_checking_level = current_checking_level_store;
 
+    if (!call->pending_expected_return && !force_commit) {
+        AstTyped *callee_expr = (AstTyped *) strip_aliases((AstNode *) call->callee);
+        if (callee_expr && (callee_expr->kind == Ast_Kind_Overloaded_Function
+                || callee_expr->kind == Ast_Kind_Polymorphic_Proc)) {
+            CallDeferral deferral = call_should_wait_for_expected_type(context, callee_expr, &call->args);
+            if (deferral == CALL_DEFER_YIELD) {
+                YIELD(call->token->pos, "Waiting to decide if this call needs an expected type.");
+            }
+            if (deferral == CALL_DEFER_WAIT) {
+                call->deferred_for_expected_type = 1;
+                return Check_Success;
+            }
+        }
+    }
+
     AstFunction* callee=NULL;
-    CHECK(resolve_callee, call, (AstTyped **) &callee);
+    CHECK(resolve_callee, call, (AstTyped **) &callee, call->pending_expected_return);
 
     if (callee->kind == Ast_Kind_Function) {
         if (callee->constraints.constraints != NULL && callee->constraints.constraints_met == 0) {
@@ -1366,6 +1509,7 @@ static AstCall* binaryop_try_operator_overload(Context *context, AstBinaryOp* bi
     implicit_call->token = binop->token;
     implicit_call->callee = overload;
     implicit_call->va_kind = VA_Kind_Not_VA;
+    implicit_call->commit_without_expected_type = 1;
 
     arguments_clone(context, &implicit_call->args, binop->overload_args);
     return implicit_call;
@@ -1391,6 +1535,7 @@ static AstCall* unaryop_try_operator_overload(Context *context, AstUnaryOp* unop
     implicit_call->token = unop->token;
     implicit_call->callee = overload;
     implicit_call->va_kind = VA_Kind_Not_VA;
+    implicit_call->commit_without_expected_type = 1;
 
     arguments_clone(context, &implicit_call->args, unop->overload_args);
     return implicit_call;
@@ -1422,6 +1567,39 @@ static CheckStatus assign_type_or_check(Context *context, AstTyped **node, Type 
 
 static b32 binary_op_is_allowed(BinaryOp operation, Type* type);
 
+static b32 expr_is_deferred_call(AstTyped *expr) {
+    return deferred_call_of(expr) != NULL;
+}
+
+static AstCall *deferred_call_of(AstTyped *expr) {
+    while (expr && (expr->kind == Ast_Kind_Alias || expr->kind == Ast_Kind_Argument)) {
+        if (expr->kind == Ast_Kind_Alias) expr = ((AstAlias *) expr)->alias;
+        else expr = ((AstArgument *) expr)->value;
+    }
+    if (!expr) return NULL;
+    if (expr->kind == Ast_Kind_Call && ((AstCall *) expr)->deferred_for_expected_type) {
+        return (AstCall *) expr;
+    }
+    if (expr->kind == Ast_Kind_Method_Call) {
+        AstTyped *right = ((AstBinaryOp *) expr)->right;
+        if (right && right->kind == Ast_Kind_Call && ((AstCall *) right)->deferred_for_expected_type) {
+            return (AstCall *) right;
+        }
+    }
+    return NULL;
+}
+
+// Finish a call that has nowhere to get an expected type. A return-only
+// variable still open is an error, reported by check_call.
+static CheckStatus commit_deferred_call(Context *context, AstTyped **pexpr) {
+    AstCall *deferred = deferred_call_of(*pexpr);
+    if (!deferred) return Check_Success;
+
+    deferred->commit_without_expected_type = 1;
+    deferred->deferred_for_expected_type = 0;
+    return check_expression(context, pexpr);
+}
+
 CHECK_FUNC(binaryop_assignment, AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
     if (context->checker.current_checking_level == EXPRESSION_LEVEL)
@@ -1452,6 +1630,9 @@ CHECK_FUNC(binaryop_assignment, AstBinaryOp** pbinop) {
             // as in some cases (especially with macros and polyprocs), the result is not "correct". The result
             // makes them appears as though they are runtime-known values, which they are not. Using the following
             // pattern does prevent this issue.
+            CheckStatus inferred = commit_deferred_call(context, &binop->right);
+            if (inferred > Check_Errors_Start) return inferred;
+
             resolve_expression_type(context, binop->right);
 
             Type* right_type = get_expression_type(context, binop->right);
@@ -1755,6 +1936,15 @@ CHECK_FUNC(binaryop, AstBinaryOp** pbinop) {
     CHECK(expression, &binop->right);
     context->checker.current_checking_level = current_checking_level_store;
 
+    // Neither operand is an expected type for the other. Commit now so a
+    // return-only call is not solved against an unsized literal.
+    if (!binop_is_assignment(binop->operation)) {
+        CheckStatus left_cs = commit_deferred_call(context, &binop->left);
+        if (left_cs > Check_Errors_Start) return left_cs;
+        CheckStatus right_cs = commit_deferred_call(context, &binop->right);
+        if (right_cs > Check_Errors_Start) return right_cs;
+    }
+
     // :UnaryFieldAccessIsGross
     if (binop->left->kind == Ast_Kind_Unary_Field_Access || binop->right->kind == Ast_Kind_Unary_Field_Access) {
         TYPE_CHECK(&binop->left, binop->right->type) {
@@ -1901,6 +2091,14 @@ CHECK_FUNC(unaryop, AstUnaryOp** punop) {
 
     CHECK(expression, &unaryop->expr);
 
+    // A cast's destination type is the expected type of the operand, so a
+    // deferred call stays open until that type is known. Other unary
+    // operators do not supply an expected type.
+    if (unaryop->operation != Unary_Op_Cast) {
+        CheckStatus cs = commit_deferred_call(context, &unaryop->expr);
+        if (cs > Check_Errors_Start) return cs;
+    }
+
     if (unaryop->operation != Unary_Op_Negate) {
         resolve_expression_type(context, unaryop->expr);
     }
@@ -1911,6 +2109,14 @@ CHECK_FUNC(unaryop, AstUnaryOp** punop) {
         char* err;
         if (unaryop->type == NULL)
             YIELD(unaryop->token->pos, "Trying to resolve destination type for cast.");
+
+        if (expr_is_deferred_call(unaryop->expr)) {
+            TypeMatch tm = unify_node_and_type(context, &unaryop->expr, unaryop->type);
+            if (tm == TYPE_MATCH_YIELD || tm == TYPE_MATCH_SPECIAL) {
+                YIELD(unaryop->token->pos, "Waiting to solve the cast operand.");
+            }
+            if (tm != TYPE_MATCH_SUCCESS) return Check_Error;
+        }
 
         if (!cast_is_legal(context, unaryop->expr->type, unaryop->type, &err)) {
             ERROR_(unaryop->token->pos, "Cast Error: %s", err);
@@ -2426,6 +2632,32 @@ CHECK_FUNC(if_expression, AstIfExpression* if_expr) {
     }
 
     resolve_expression_type(context, (AstTyped *) if_expr);
+
+    if (expr_is_deferred_call(if_expr->true_expr) || expr_is_deferred_call(if_expr->false_expr)) {
+        Type *known = NULL;
+        if (!expr_is_deferred_call(if_expr->true_expr) && if_expr->true_expr->type) known = if_expr->true_expr->type;
+        if (!expr_is_deferred_call(if_expr->false_expr) && if_expr->false_expr->type) known = if_expr->false_expr->type;
+
+        // An unsized literal is not a type yet. Leave the if-expression
+        // untyped so the caller can push i32/f32 into both branches.
+        if (type_is_unsized_literal(known)) known = NULL;
+
+        if (known) {
+            TYPE_CHECK(&if_expr->true_expr, known) {
+                ERROR_(if_expr->token->pos, "Mismatched types for if-expression, left side is '%s', and right side is '%s'.",
+                    node_get_type_name(context, if_expr->true_expr),
+                    type_get_name(context, known));
+            }
+            TYPE_CHECK(&if_expr->false_expr, known) {
+                ERROR_(if_expr->token->pos, "Mismatched types for if-expression, left side is '%s', and right side is '%s'.",
+                    type_get_name(context, known),
+                    node_get_type_name(context, if_expr->false_expr));
+            }
+            if_expr->type = known;
+        }
+
+        return Check_Success;
+    }
 
     if (!types_are_compatible(context, if_expr->true_expr->type, if_expr->false_expr->type)) {
         ERROR_(if_expr->token->pos, "Mismatched types for if-expression, left side is '%s', and right side is '%s'.",
@@ -3995,6 +4227,16 @@ CHECK_FUNC(statement, AstNode** pstmt) {
         default:
             CHECK(expression, (AstTyped **) pstmt);
             (*pstmt)->flags |= Ast_Flag_Expr_Ignored;
+
+            // Expression statements are checked at expression level, so an
+            // overload or return-only call can stay deferred. A statement has
+            // no expected type: commit the first argument match, or error if
+            // a return-only variable is still open.
+            {
+                CheckStatus cs = commit_deferred_call(context, (AstTyped **) pstmt);
+                if (cs > Check_Errors_Start) return cs;
+                (*pstmt)->flags |= Ast_Flag_Expr_Ignored;
+            }
             return Check_Success;
     }
 
@@ -5966,6 +6208,12 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
                 sln = *known_sln;
                 goto poly_var_solved;
             }
+        }
+
+        // Argument matching runs before a caller has a type for the result.
+        // Return-only variables are solved later, from that expected type.
+        if (query->pp_lookup == PPLM_By_Arguments_Partial && poly_param_from_return(param)) {
+            goto poly_query_done;
         }
 
         TypeMatch result = find_polymorphic_sln(context, &sln, param, query->function_header, query->pp_lookup, query->given, &err_msg);

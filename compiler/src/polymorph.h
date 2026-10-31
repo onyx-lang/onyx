@@ -167,6 +167,7 @@ static AstSolidifiedFunction generate_solidified_function(
 
     solidified_func.func->flags |= Ast_Flag_From_Polymorphism;
     solidified_func.func->generated_from = tkn;
+    solidified_func.func->argument_return_lookups = NULL;
 
     // HACK: Remove the baked parameters from the function defintion so they can be
     // resolved in the poly scope above the function. This does feel kinda of gross
@@ -549,6 +550,51 @@ static AstTyped* try_lookup_based_on_partial_function_type(Context *context, Ast
 // either the arguments provided, or a function type to compare against to pattern match for
 // the type that the parameter but be.
 static void solve_for_polymorphic_param_type(Context *context, PolySolveResult* resolved, AstFunction* func, AstPolyParam* param, PolyProcLookupMethod pp_lookup, ptr actual, OnyxError* err_msg) {
+    if (pp_lookup == PPLM_By_Arguments_And_Return) {
+        PolyArgumentLookup *lookup = (PolyArgumentLookup *) actual;
+
+        if (poly_param_from_return(param)) {
+            if (!lookup->expected_return || !param->type_expr) {
+                if (err_msg && err_msg->text == NULL) {
+                    err_msg->text = "Cannot solve a polymorphic return variable without an expected type.";
+                }
+                return;
+            }
+
+            PolySolveResult res = solve_poly_type(context, param->poly_sym, param->type_expr, lookup->expected_return);
+            if (res.kind == PSK_Undefined && err_msg && err_msg->text == NULL) {
+                err_msg->pos = param->poly_sym->token->pos;
+                err_msg->text = bh_aprintf(context->scratch_alloc,
+                    "Unable to solve for polymorphic variable '%b' from the expected return type '%s'.",
+                    param->poly_sym->token->text,
+                    param->poly_sym->token->length,
+                    type_get_name(context, lookup->expected_return));
+            }
+
+            *resolved = res;
+            return;
+        }
+
+        actual = lookup->args;
+        pp_lookup = PPLM_By_Arguments;
+    }
+
+    if (poly_param_from_return(param) && (pp_lookup == PPLM_By_Arguments || pp_lookup == PPLM_By_Arguments_Partial)) {
+        if (err_msg && err_msg->text == NULL) {
+            err_msg->pos = param->poly_sym->token->pos;
+            err_msg->text = bh_aprintf(context->scratch_alloc,
+                "Cannot solve polymorphic variable '%b' without an expected type. It appears only in the return type.",
+                param->poly_sym->token->text,
+                param->poly_sym->token->length);
+        }
+        return;
+    }
+
+    // A partial query only exists to match arguments. Return variables were
+    // skipped by the caller; everything else solves the same way as a normal
+    // argument query.
+    if (pp_lookup == PPLM_By_Arguments_Partial) pp_lookup = PPLM_By_Arguments;
+
     Type* actual_type = NULL;
     b32 can_strip_pointer = 0;
 
@@ -792,14 +838,43 @@ TypeMatch find_polymorphic_sln(Context *context, AstPolySolution *out, AstPolyPa
 // NOTE: The job of this function is to take a polymorphic procedure, as well as a method of
 // solving for the polymorphic variables, in order to return an array of the solutions for all
 // of the polymorphic variables.
+static PolyArgumentLookup *intern_poly_argument_lookup(Context *context, AstFunction *pp, PolyArgumentLookup *incoming) {
+    if (pp->argument_return_lookups == NULL) {
+        bh_arr_new(context->gp_alloc, pp->argument_return_lookups, 4);
+    }
+
+    bh_arr_each(PolyArgumentLookup *, slot, pp->argument_return_lookups) {
+        PolyArgumentLookup *existing = *slot;
+        if (existing->args == incoming->args && existing->expected_return == incoming->expected_return) {
+            return existing;
+        }
+    }
+
+    PolyArgumentLookup *stable = bh_alloc_item(context->ast_alloc, PolyArgumentLookup);
+    *stable = *incoming;
+    bh_arr_push(pp->argument_return_lookups, stable);
+    return stable;
+}
+
 static bh_arr(AstPolySolution) find_polymorphic_slns(Context *context, AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken *tkn, b32 necessary) {
     if (context->cycle_detected) {
         return NULL;
     }
 
     ensure_polyproc_cache_is_created(context, pp);
+
+    ptr given = actual;
+    u64 key = (u64) actual;
+    if (pp_lookup == PPLM_By_Arguments_And_Return) {
+        given = intern_poly_argument_lookup(context, pp, (PolyArgumentLookup *) actual);
+        key = (u64) given;
+    } else if (pp_lookup == PPLM_By_Arguments_Partial) {
+        // Distinct from a full argument query of the same Arguments pointer.
+        key = ((u64) actual) ^ 0x9E3779B97F4A7C15ull;
+    }
+
     u64 query_p;
-    if (bh_imap_try_get(&pp->active_queries, (u64) actual, &query_p)) {
+    if (bh_imap_try_get(&pp->active_queries, key, &query_p)) {
         AstPolyQuery *query = (AstPolyQuery *) query_p;
         assert(query->kind == Ast_Kind_Polymorph_Query);
         assert(query->entity);
@@ -828,7 +903,7 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(Context *context, AstFuncti
     query->token = pp->token;
     query->proc = pp;
     query->pp_lookup = pp_lookup;
-    query->given = actual;
+    query->given = given;
     query->error_loc = tkn;
     query->slns = slns;
     query->function_header = clone_function_header(context, pp);
@@ -836,7 +911,7 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(Context *context, AstFuncti
     query->function_header->scope = NULL;
     query->error_on_fail = necessary;
 
-    bh_imap_put(&pp->active_queries, (u64) actual, (u64) query);
+    bh_imap_put(&pp->active_queries, key, (u64) query);
     add_entities_for_node(&context->entities, NULL, (AstNode *) query, NULL, NULL);
 
     context->polymorph.flag_to_yield = 1;
@@ -1014,10 +1089,10 @@ AstFunction* polymorphic_proc_build_only_header(Context *context, AstFunction* p
 
     ensure_polyproc_cache_is_created(context, pp);
 
-    return polymorphic_proc_build_only_header_with_slns(context, pp, slns, 0);
+    return polymorphic_proc_build_only_header_with_slns(context, pp, slns, 0, 0);
 }
 
-AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstFunction* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed) {
+AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstFunction* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed, b32 void_return) {
     if (context->cycle_detected) {
         return NULL;
     }
@@ -1034,6 +1109,11 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstF
         // Nothing should happen to this function's body or else the original will be corrupted.
         //                                                      - brendanfh 2021/01/10
         solidified_func = generate_solidified_function(context, pp, slns, NULL, 1);
+        if (void_return) {
+            // Argument matching only needs parameter types. The real return
+            // type still contains unsolved variables, so blank it on this probe.
+            solidified_func.func->return_type = (AstType *) &context->basic_types.type_void;
+        }
     }
 
     if (solidified_func.func_header_entity) {
@@ -1065,6 +1145,18 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstF
     shput(pp->concrete_funcs, unique_key, solidified_func);
 
     return (AstFunction *) &context->node_that_signals_a_yield;
+}
+
+AstFunction* polymorphic_proc_prepare_argument_probe(Context *context, AstFunction *pp, Arguments *args) {
+    ensure_polyproc_cache_is_created(context, pp);
+    bh_arr(AstPolySolution) slns = find_polymorphic_slns(context, pp, PPLM_By_Arguments_Partial, args, NULL, 0);
+    if (context->polymorph.flag_to_yield) {
+        context->polymorph.flag_to_yield = 0;
+        return (AstFunction *) &context->node_that_signals_a_yield;
+    }
+    if (slns == NULL) return NULL;
+
+    return polymorphic_proc_build_only_header_with_slns(context, pp, slns, 0, 1);
 }
 
 typedef struct AutoPolymorphVariable {

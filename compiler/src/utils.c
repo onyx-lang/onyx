@@ -709,8 +709,14 @@ AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadO
 
         AstFunction* overload = NULL;
         switch (node->kind) {
-            case Ast_Kind_Macro:            overload = macro_resolve_header(context, (AstMacro *) node, param_args, NULL, 0); break;
-            case Ast_Kind_Polymorphic_Proc: overload = polymorphic_proc_build_only_header(context, (AstFunction *) node, PPLM_By_Arguments, param_args); break;
+            case Ast_Kind_Macro:            overload = macro_resolve_header(context, (AstMacro *) node, param_args, NULL, 0, NULL); break;
+            case Ast_Kind_Polymorphic_Proc:
+                if (poly_proc_needs_expected_return((AstFunction *) node)) {
+                    overload = polymorphic_proc_prepare_argument_probe(context, (AstFunction *) node, param_args);
+                } else {
+                    overload = polymorphic_proc_build_only_header(context, (AstFunction *) node, PPLM_By_Arguments, param_args);
+                }
+                break;
             case Ast_Kind_Function:
                 overload = (AstFunction *) node;
                 arguments_clear_baked_flags(&args);
@@ -758,6 +764,319 @@ AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadO
     return matched_overload;
 }
 
+typedef enum OptionMatchKind {
+    OPTION_MATCH_NONE = 0,
+    OPTION_MATCH_YIELD,
+    OPTION_MATCH_SOLVED,
+    OPTION_MATCH_NEEDS_RETURN,
+} OptionMatchKind;
+
+static b32 function_return_matches(Context *context, Type *ret, Type *expected) {
+    if (!ret || !expected) return 0;
+    if (ret == context->types.auto_return) return 0;
+    if (types_are_compatible(context, ret, expected)) return 1;
+    if (ret->kind != Type_Kind_Compound) return 0;
+
+    if (expected->kind != Type_Kind_Compound) {
+        if (ret->Compound.count == 0) return 0;
+        return types_are_compatible(context, ret->Compound.types[0], expected);
+    }
+
+    if (expected->Compound.count > ret->Compound.count) return 0;
+    fori (i, 0, expected->Compound.count) {
+        if (!types_are_compatible(context, ret->Compound.types[i], expected->Compound.types[i])) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static OptionMatchKind match_overload_option_raw(Context *context, AstTyped *node, Arguments *param_args, AstFunction **out_func) {
+    node = (AstTyped *) strip_aliases((AstNode *) node);
+    if (!node) return OPTION_MATCH_NONE;
+
+    AstFunction *overload = NULL;
+    b32 needs_return = 0;
+
+    switch (node->kind) {
+        case Ast_Kind_Macro:
+            if (macro_needs_expected_return((AstMacro *) node)) return OPTION_MATCH_NONE;
+            overload = macro_resolve_header(context, (AstMacro *) node, param_args, NULL, 0, NULL);
+            break;
+
+        case Ast_Kind_Polymorphic_Proc:
+            if (poly_proc_needs_expected_return((AstFunction *) node)) {
+                needs_return = 1;
+                overload = polymorphic_proc_prepare_argument_probe(context, (AstFunction *) node, param_args);
+            } else {
+                overload = polymorphic_proc_build_only_header(context, (AstFunction *) node, PPLM_By_Arguments, param_args);
+            }
+            break;
+
+        case Ast_Kind_Function:
+            overload = (AstFunction *) node;
+            break;
+
+        default: return OPTION_MATCH_NONE;
+    }
+
+    if (overload == NULL) return OPTION_MATCH_NONE;
+    if (overload == (AstFunction *) &context->node_that_signals_a_yield || overload->type == NULL) {
+        return OPTION_MATCH_YIELD;
+    }
+    if (overload->kind != Ast_Kind_Function) return OPTION_MATCH_NONE;
+
+    Arguments args;
+    arguments_clone(context, &args, param_args);
+
+    // Clearing baked flags mutates the call's argument nodes. Put them back
+    // so a later option, and the real resolution, still see the original call.
+    i32 baked_count = bh_arr_length(args.values);
+    b32 *saved_baked = NULL;
+    if (baked_count > 0) {
+        saved_baked = bh_alloc_array(context->gp_alloc, b32, baked_count);
+        fori (i, 0, baked_count) {
+            AstTyped *arg = args.values[i];
+            saved_baked[i] = arg && arg->kind == Ast_Kind_Argument && ((AstArgument *) arg)->is_baked;
+        }
+    }
+
+    if (node->kind == Ast_Kind_Function) arguments_clear_baked_flags(&args);
+    arguments_remove_baked(&args);
+    arguments_ensure_length(context, &args, get_argument_buffer_size(context, &overload->type->Function, &args));
+
+    OptionMatchKind matched = OPTION_MATCH_NONE;
+    if (!fill_in_arguments(context, &args, (AstNode *) overload, NULL, 0)) {
+        goto option_match_done;
+    }
+
+    VarArgKind va_kind;
+    TypeMatch tm = check_arguments_against_type(context, &args, &overload->type->Function, &va_kind, NULL, NULL, NULL);
+
+    if (tm == TYPE_MATCH_YIELD || tm == TYPE_MATCH_SPECIAL) matched = OPTION_MATCH_YIELD;
+    else if (tm == TYPE_MATCH_SUCCESS) {
+        if (out_func) *out_func = overload;
+        matched = needs_return ? OPTION_MATCH_NEEDS_RETURN : OPTION_MATCH_SOLVED;
+    }
+
+option_match_done:
+    if (saved_baked) {
+        fori (i, 0, baked_count) {
+            AstTyped *arg = param_args->values[i];
+            if (arg && arg->kind == Ast_Kind_Argument) ((AstArgument *) arg)->is_baked = saved_baked[i];
+        }
+        bh_free(context->gp_alloc, saved_baked);
+    }
+    bh_arr_free(args.values);
+    return matched;
+}
+
+// Trying an overload must not report errors. A later option's where-clause
+// can fail while an earlier option is a perfectly good match.
+static OptionMatchKind match_overload_option(Context *context, AstTyped *node, Arguments *param_args, AstFunction **out_func) {
+    i32 error_mark = bh_arr_length(context->errors.errors);
+    OptionMatchKind kind = match_overload_option_raw(context, node, param_args, out_func);
+    if (!context->cycle_detected && bh_arr_length(context->errors.errors) > error_mark) {
+        bh_arr_set_length(context->errors.errors, error_mark);
+    }
+    return kind;
+}
+
+static AstFunction *header_for_expected_return(Context *context, AstFunction *pp, Arguments *args, Type *expected) {
+    PolyArgumentLookup lookup;
+    lookup.args = args;
+    lookup.expected_return = expected;
+
+    bh_arr(AstPolySolution) slns = find_polymorphic_slns(context, pp, PPLM_By_Arguments_And_Return, &lookup, NULL, 0);
+    if (context->polymorph.flag_to_yield) {
+        context->polymorph.flag_to_yield = 0;
+        return (AstFunction *) &context->node_that_signals_a_yield;
+    }
+    if (slns == NULL) return NULL;
+
+    return polymorphic_proc_build_only_header_with_slns(context, pp, slns, 0, 0);
+}
+
+static AstTyped *first_option_matching_expected_return(Context *context, bh_arr(OverloadOption) overloads, Arguments *args, OverloadCache *cache, Type *expected) {
+    bh_imap local_overloads;
+    bh_imap *all_overloads = overload_cache_get(context, overloads, cache);
+    b32 local = 0;
+    if (!all_overloads) {
+        bh_imap_init(&local_overloads, context->gp_alloc, bh_arr_length(overloads) * 2);
+        build_all_overload_options(overloads, &local_overloads);
+        all_overloads = &local_overloads;
+        local = 1;
+    }
+
+    AstTyped *matched = NULL;
+    bh_arr_each(bh__imap_entry, entry, all_overloads->entries) {
+        AstTyped *node = (AstTyped *) strip_aliases((AstNode *) entry->key);
+        AstFunction *func = NULL;
+
+        // A macro whose return type is polymorphic is solved with the expected
+        // type, then its where clause runs. Argument-only matching cannot see $R.
+        if (node->kind == Ast_Kind_Macro && macro_needs_expected_return((AstMacro *) node)) {
+            func = macro_resolve_header(context, (AstMacro *) node, args, NULL, 0, expected);
+            if (func == (AstFunction *) &context->node_that_signals_a_yield) {
+                if (local) bh_imap_free(all_overloads);
+                return (AstTyped *) &context->node_that_signals_a_yield;
+            }
+            if (func == NULL) continue;
+            goto have_header;
+        }
+
+        OptionMatchKind kind = match_overload_option(context, node, args, &func);
+
+        if (kind == OPTION_MATCH_YIELD) {
+            if (local) bh_imap_free(all_overloads);
+            return (AstTyped *) &context->node_that_signals_a_yield;
+        }
+        if (kind == OPTION_MATCH_NONE) continue;
+
+        if (kind == OPTION_MATCH_NEEDS_RETURN) {
+            func = header_for_expected_return(context, (AstFunction *) node, args, expected);
+            if (func == (AstFunction *) &context->node_that_signals_a_yield) {
+                if (local) bh_imap_free(all_overloads);
+                return (AstTyped *) &context->node_that_signals_a_yield;
+            }
+            if (func == NULL) continue;
+        }
+
+      have_header:
+        if (!func || !func->type || !func->type->Function.return_type) {
+            if (local) bh_imap_free(all_overloads);
+            return (AstTyped *) &context->node_that_signals_a_yield;
+        }
+        if (func->type->Function.return_type == context->types.auto_return) {
+            if (local) bh_imap_free(all_overloads);
+            return (AstTyped *) &context->node_that_signals_a_yield;
+        }
+
+        if (function_return_matches(context, func->type->Function.return_type, expected)) {
+            matched = node;
+            break;
+        }
+    }
+
+    if (local) bh_imap_free(all_overloads);
+    return matched;
+}
+
+AstTyped* find_matching_overload_for_expected_return(Context *context, bh_arr(OverloadOption) overloads, Arguments* args, OverloadCache *cache, Type *expected_return) {
+    return first_option_matching_expected_return(context, overloads, args, cache, expected_return);
+}
+
+CallDeferral call_should_wait_for_expected_type(Context *context, AstTyped *callee, Arguments *args) {
+    callee = (AstTyped *) strip_aliases((AstNode *) callee);
+    if (!callee) return CALL_DEFER_READY;
+
+    if (callee->kind == Ast_Kind_Polymorphic_Proc) {
+        if (poly_proc_needs_expected_return((AstFunction *) callee)) return CALL_DEFER_WAIT;
+        return CALL_DEFER_READY;
+    }
+
+    if (callee->kind == Ast_Kind_Macro) {
+        if (macro_needs_expected_return((AstMacro *) callee)) return CALL_DEFER_WAIT;
+        return CALL_DEFER_READY;
+    }
+
+    if (callee->kind != Ast_Kind_Overloaded_Function) return CALL_DEFER_READY;
+
+    // Do not solidify a macro or a return-only procedure just to decide to wait.
+    // Where clauses run when the expected type is known and the option is chosen.
+    AstOverloadedFunction *group = (AstOverloadedFunction *) callee;
+    bh_imap local_overloads;
+    bh_imap *all_overloads = overload_cache_get(context, group->overloads, &group->all_overloads);
+    b32 local = 0;
+    if (!all_overloads) {
+        bh_imap_init(&local_overloads, context->gp_alloc, bh_arr_length(group->overloads) * 2);
+        build_all_overload_options(group->overloads, &local_overloads);
+        all_overloads = &local_overloads;
+        local = 1;
+    }
+
+    i32 matches = 0;
+    CallDeferral result = CALL_DEFER_READY;
+
+    bh_arr_each(bh__imap_entry, entry, all_overloads->entries) {
+        AstTyped *node = (AstTyped *) strip_aliases((AstNode *) entry->key);
+        if (!node) continue;
+
+        if (node->kind == Ast_Kind_Polymorphic_Proc
+            && poly_proc_needs_expected_return((AstFunction *) node)) {
+            result = CALL_DEFER_WAIT;
+            goto done;
+        }
+
+        if (node->kind == Ast_Kind_Macro && macro_needs_expected_return((AstMacro *) node)) {
+            result = CALL_DEFER_WAIT;
+            goto done;
+        }
+
+        if (node->kind != Ast_Kind_Function) continue;
+
+        OptionMatchKind kind = match_overload_option(context, node, args, NULL);
+        if (kind == OPTION_MATCH_YIELD) {
+            // A later option that is not ready must not block an earlier match.
+            result = matches == 0 ? CALL_DEFER_YIELD : CALL_DEFER_READY;
+            goto done;
+        }
+        if (kind != OPTION_MATCH_SOLVED && kind != OPTION_MATCH_NEEDS_RETURN) continue;
+
+        matches++;
+        if (matches >= 2) {
+            result = CALL_DEFER_WAIT;
+            goto done;
+        }
+    }
+
+done:
+    if (local) bh_imap_free(all_overloads);
+    return result;
+}
+
+TypeMatch probe_call_against_expected_return(Context *context, AstTyped *callee, Arguments *args, Type *expected) {
+    callee = (AstTyped *) strip_aliases((AstNode *) callee);
+    if (!callee || !expected) return TYPE_MATCH_FAILED;
+
+    if (callee->kind == Ast_Kind_Overloaded_Function) {
+        AstOverloadedFunction *group = (AstOverloadedFunction *) callee;
+        AstTyped *found = first_option_matching_expected_return(context, group->overloads, args, &group->all_overloads, expected);
+        if (found == (AstTyped *) &context->node_that_signals_a_yield) return TYPE_MATCH_YIELD;
+        if (found == NULL) return TYPE_MATCH_FAILED;
+        return TYPE_MATCH_SUCCESS;
+    }
+
+    if (callee->kind == Ast_Kind_Macro && macro_needs_expected_return((AstMacro *) callee)) {
+        AstFunction *header = macro_resolve_header(context, (AstMacro *) callee, args, NULL, 0, expected);
+        if (header == (AstFunction *) &context->node_that_signals_a_yield) return TYPE_MATCH_YIELD;
+        if (header == NULL || !header->type || !header->type->Function.return_type) return TYPE_MATCH_FAILED;
+        if (!function_return_matches(context, header->type->Function.return_type, expected)) return TYPE_MATCH_FAILED;
+        return TYPE_MATCH_SUCCESS;
+    }
+
+    if (callee->kind == Ast_Kind_Polymorphic_Proc && poly_proc_needs_expected_return((AstFunction *) callee)) {
+        AstFunction *header = header_for_expected_return(context, (AstFunction *) callee, args, expected);
+        if (header == (AstFunction *) &context->node_that_signals_a_yield) return TYPE_MATCH_YIELD;
+        if (header == NULL) return TYPE_MATCH_FAILED;
+
+        AstFunction *checked = NULL;
+        OptionMatchKind kind = match_overload_option(context, callee, args, &checked);
+        if (kind == OPTION_MATCH_YIELD) return TYPE_MATCH_YIELD;
+        if (kind == OPTION_MATCH_NONE) return TYPE_MATCH_FAILED;
+        if (!header->type || !header->type->Function.return_type) return TYPE_MATCH_YIELD;
+        if (!function_return_matches(context, header->type->Function.return_type, expected)) return TYPE_MATCH_FAILED;
+        return TYPE_MATCH_SUCCESS;
+    }
+
+    AstFunction *func = NULL;
+    OptionMatchKind kind = match_overload_option(context, callee, args, &func);
+    if (kind == OPTION_MATCH_YIELD) return TYPE_MATCH_YIELD;
+    if (kind != OPTION_MATCH_SOLVED || !func || !func->type) return TYPE_MATCH_FAILED;
+    if (!function_return_matches(context, func->type->Function.return_type, expected)) return TYPE_MATCH_FAILED;
+    return TYPE_MATCH_SUCCESS;
+}
+
 AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption) overloads, Type* type, OverloadCache *cache) {
     if (type->kind != Type_Kind_Function) return NULL;
 
@@ -793,7 +1112,7 @@ AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption
     return matched_overload;
 }
 
-void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(OverloadOption) overloads) {
+void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(OverloadOption) overloads, Type *expected_return) {
     char* arg_str = bh_alloc(context->scratch_alloc, 1024);
     arg_str[0] = '\0';
 
@@ -822,7 +1141,13 @@ void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(Ove
         }
     }
 
-    ONYX_ERROR(call->token->pos, Error_Critical, "Unable to match overloaded function with provided argument types: (%s)", arg_str);
+    if (expected_return) {
+        ONYX_ERROR(call->token->pos, Error_Critical,
+            "Unable to match overloaded function with provided argument types: (%s), expected return type '%s'.",
+            arg_str, type_get_name(context, expected_return));
+    } else {
+        ONYX_ERROR(call->token->pos, Error_Critical, "Unable to match overloaded function with provided argument types: (%s)", arg_str);
+    }
 
     bh_free(context->scratch_alloc, arg_str);
 
@@ -1118,7 +1443,7 @@ void expand_macro(Context *context, AstCall** pcall, AstFunction* template) {
     return;
 }
 
-AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed) {
+AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed, Type *expected_return) {
     switch (macro->body->kind) {
         case Ast_Kind_Function: return (AstFunction *) macro->body;
 
@@ -1126,7 +1451,17 @@ AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* 
             AstFunction* pp = (AstFunction *) macro->body;
             ensure_polyproc_cache_is_created(context, pp);
 
-            bh_arr(AstPolySolution) slns = find_polymorphic_slns(context, pp, PPLM_By_Arguments, args, callsite, error_if_failed);
+            bh_arr(AstPolySolution) slns;
+            if (poly_proc_needs_expected_return(pp)) {
+                if (!expected_return) return NULL;
+
+                PolyArgumentLookup lookup;
+                lookup.args = args;
+                lookup.expected_return = expected_return;
+                slns = find_polymorphic_slns(context, pp, PPLM_By_Arguments_And_Return, &lookup, callsite, error_if_failed);
+            } else {
+                slns = find_polymorphic_slns(context, pp, PPLM_By_Arguments, args, callsite, error_if_failed);
+            }
 
             if (slns == NULL) {
                 if (context->polymorph.flag_to_yield) {
@@ -1137,7 +1472,7 @@ AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* 
                 return NULL;
             }
 
-            return polymorphic_proc_build_only_header_with_slns(context, pp, slns, error_if_failed);
+            return polymorphic_proc_build_only_header_with_slns(context, pp, slns, error_if_failed, 0);
         }
 
         default: assert("Bad macro body type." && 0);

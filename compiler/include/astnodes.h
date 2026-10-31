@@ -822,6 +822,17 @@ struct AstCall {
 
     VarArgKind va_kind;
     i32 ignored_return_value_count;
+
+    // Set when overload resolution or a return-only polymorphic variable
+    // needs the caller's expected type. unify_node_and_type finishes the call.
+    b32 deferred_for_expected_type;
+
+    // Statement position, := inference, and operator overloads commit with
+    // the first argument match and never wait for an expected type.
+    b32 commit_without_expected_type;
+
+    // Expected type supplied by unify_node_and_type for this resolution.
+    Type *pending_expected_return;
 };
 struct AstCompound {
     AstTyped_base;
@@ -1417,7 +1428,29 @@ typedef enum PolySolutionKind {
 typedef enum PolyProcLookupMethod {
     PPLM_By_Arguments,
     PPLM_By_Function_Type,
+
+    // Arguments plus the expected type of the call, used to solve
+    // polymorphic variables that appear only in the return type.
+    PPLM_By_Arguments_And_Return,
+
+    // Solve argument variables only. Return-only variables are skipped
+    // so argument matching can run before an expected type exists.
+    PPLM_By_Arguments_Partial,
 } PolyProcLookupMethod;
+
+// `given` pointer for PPLM_By_Arguments_And_Return. Interned on the
+// polymorphic procedure so a yield retries the same query, and so two
+// probes of one call against different expected types stay distinct.
+typedef struct PolyArgumentLookup {
+    Arguments *args;
+    Type *expected_return;
+} PolyArgumentLookup;
+
+typedef enum CallDeferral {
+    CALL_DEFER_READY = 0,
+    CALL_DEFER_YIELD,
+    CALL_DEFER_WAIT,
+} CallDeferral;
 
 typedef struct ImplicitInterfaceConstraint {
     AstNode *interface;
@@ -1446,6 +1479,15 @@ struct AstPolyParam {
     // Can store extra args for $T/Interface(R)
     bh_arr(ImplicitInterfaceConstraint) implicit_interface_constraints;
 };
+
+// idx stays (u32)-1 when $T is introduced in the return type rather than
+// in a parameter. lookup_param_in_arguments already ignores that index.
+static inline b32 poly_param_from_return(AstPolyParam *param) {
+    return param
+        && param->kind == PPK_Poly_Type
+        && param->idx == (u32) -1
+        && param->type_expr != NULL;
+}
 
 struct AstPolySolution {
     PolySolutionKind kind;
@@ -1516,6 +1558,9 @@ struct AstFunction {
 
     Table(AstSolidifiedFunction) concrete_funcs;
     bh_imap active_queries;
+
+    // Interned PolyArgumentLookup values for return-type queries.
+    bh_arr(PolyArgumentLookup *) argument_return_lookups;
 
     bh_arr(AstNode *) nodes_that_need_entities_after_clone;
 
@@ -2637,7 +2682,8 @@ AstFunction* polymorphic_proc_lookup(Context *context, AstFunction* pp, PolyProc
 AstFunction* polymorphic_proc_solidify(Context *context, AstFunction* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
 AstNode* polymorphic_proc_try_solidify(Context *context, AstFunction* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
 AstFunction* polymorphic_proc_build_only_header(Context *context, AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual);
-AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstFunction* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed);
+AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstFunction* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed, b32 void_return);
+AstFunction* polymorphic_proc_prepare_argument_probe(Context *context, AstFunction *pp, Arguments *args);
 b32 potentially_convert_function_to_polyproc(Context *context, AstFunction *func);
 AstPolyCallType* convert_call_to_polycall(Context *context, AstCall* call);
 
@@ -2654,13 +2700,17 @@ typedef struct OverloadReturnTypeCheck {
 void add_overload_option(Context *context, bh_arr(OverloadOption)* poverloads, u64 order, AstTyped* overload);
 bh_imap *overload_cache_get(Context *context, bh_arr(OverloadOption) overloads, OverloadCache *cache);
 AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadOption) overloads, Arguments* args, OverloadCache *cache);
+AstTyped* find_matching_overload_for_expected_return(Context *context, bh_arr(OverloadOption) overloads, Arguments* args, OverloadCache *cache, Type *expected_return);
 AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption) overloads, Type* type, OverloadCache *cache);
-void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(OverloadOption) overloads);
+CallDeferral call_should_wait_for_expected_type(Context *context, AstTyped *callee, Arguments *args);
+TypeMatch probe_call_against_expected_return(Context *context, AstTyped *callee, Arguments *args, Type *expected);
+TypeMatch resolve_deferred_call(Context *context, AstTyped **pnode, Type *expected, b32 permanent);
+void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(OverloadOption) overloads, Type *expected_return);
 void report_incorrect_overload_expected_type(Context *context, Type *given, Type *expected, OnyxToken *overload, OnyxToken *group);
 void ensure_overload_returns_correct_type(Context *context, AstTyped *overload, AstOverloadedFunction *group);
 
 void expand_macro(Context *context, AstCall** pcall, AstFunction* template);
-AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed);
+AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed, Type *expected_return);
 
 Type* polymorphic_struct_lookup(Context *context, AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
 Type* polymorphic_union_lookup(Context *context, AstPolyUnionType* pu_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
@@ -2830,6 +2880,47 @@ static inline AstCall *get_call_expr_from_node(AstNode *node) {
     return NULL;
 }
 
+// True when some polymorphic variable is introduced only in the return
+// type and is not already fixed by an argument variable of the same name
+// or by a #solidify solution.
+static inline b32 poly_proc_needs_expected_return(AstFunction *fn) {
+    if (!fn || fn->kind != Ast_Kind_Polymorphic_Proc || !fn->poly_params) return 0;
+
+    bh_arr_each(AstPolyParam, param, fn->poly_params) {
+        if (!poly_param_from_return(param)) continue;
+
+        b32 known = 0;
+        if (fn->known_slns) {
+            bh_arr_each(AstPolySolution, sln, fn->known_slns) {
+                if (sln->poly_sym && param->poly_sym
+                    && token_equals(sln->poly_sym->token, param->poly_sym->token)) {
+                    known = 1;
+                    break;
+                }
+            }
+        }
+        if (known) continue;
+
+        b32 named_earlier = 0;
+        bh_arr_each(AstPolyParam, earlier, fn->poly_params) {
+            if (earlier == param) break;
+            if (earlier->poly_sym && param->poly_sym
+                && token_equals(earlier->poly_sym->token, param->poly_sym->token)) {
+                named_earlier = 1;
+                break;
+            }
+        }
+        if (!named_earlier) return 1;
+    }
+
+    return 0;
+}
+
+static inline b32 macro_needs_expected_return(AstMacro *macro) {
+    if (!macro || macro->kind != Ast_Kind_Macro || !macro->body) return 0;
+    return poly_proc_needs_expected_return((AstFunction *) macro->body);
+}
+
 static inline void convert_polyproc_to_function(AstFunction *func) {
     if (func->kind != Ast_Kind_Polymorphic_Proc) return;
 
@@ -2840,6 +2931,7 @@ static inline void convert_polyproc_to_function(AstFunction *func) {
     func->concrete_funcs = NULL;
     func->active_queries.hashes = NULL;
     func->active_queries.entries = NULL;
+    func->argument_return_lookups = NULL;
     func->poly_scope = NULL;
     func->entity = NULL;
     func->type = NULL;

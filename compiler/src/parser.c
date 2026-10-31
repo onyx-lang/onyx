@@ -3695,6 +3695,29 @@ static AstOverloadedFunction* parse_overloaded_function(OnyxParser* parser, Onyx
     return ofunc;
 }
 
+static void bind_return_poly_params(bh_arr(AstPolyParam) polymorphic_vars, AstType *return_type) {
+    if (!polymorphic_vars || !return_type) return;
+
+    bh_arr_each(AstPolyParam, param, polymorphic_vars) {
+        // Parameter $T is given an index while its type is parsed. A $T that
+        // is still unindexed was introduced by the return type.
+        if (param->kind == PPK_Poly_Type && param->idx == (u32) -1 && param->type_expr == NULL) {
+            param->type_expr = return_type;
+        }
+    }
+}
+
+static void finish_function_poly_params(OnyxParser *parser, AstFunction *func_def, bh_arr(AstPolyParam) polymorphic_vars, void *prev_poly_params) {
+    parser->polymorph_context.poly_params = prev_poly_params;
+
+    if (bh_arr_length(polymorphic_vars) > 0) {
+        func_def->kind = Ast_Kind_Polymorphic_Proc;
+        func_def->poly_params = polymorphic_vars;
+    } else {
+        bh_arr_free(polymorphic_vars);
+    }
+}
+
 static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* token) {
     AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
     func_def->token = token;
@@ -3710,15 +3733,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
     void *prev_poly_params = parser->polymorph_context.poly_params;
     parser->polymorph_context.poly_params = &polymorphic_vars;
     parse_function_params(parser, func_def);
-    parser->polymorph_context.poly_params = prev_poly_params;
-
-    if (bh_arr_length(polymorphic_vars) > 0) {
-        func_def->kind = Ast_Kind_Polymorphic_Proc;
-        func_def->poly_params = polymorphic_vars;
-
-    } else {
-        bh_arr_free(polymorphic_vars);
-    }
+    // Poly context stays active through the return type so `$T` there is recorded.
 
     func_def->return_type = (AstType *) &parser->context->basic_types.type_void;
 
@@ -3746,6 +3761,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
 
     if (consume_token_if_next(parser, Token_Type_Fat_Right_Arrow)) {
         func_def->return_type = (AstType *) &parser->context->basic_types.type_auto_return;
+        finish_function_poly_params(parser, func_def, polymorphic_vars, prev_poly_params);
 
         if (parser->curr->type == '{') {
             func_def->body = parse_block(parser, 1, name);
@@ -3779,9 +3795,13 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
                 parser->hit_unexpected_token = 1;
             } else if (value_is_placeholder((AstTyped *) func_def->return_type)) {
                 func_def->return_type = (AstType *) &parser->context->basic_types.type_auto_return;
+            } else {
+                bind_return_poly_params(polymorphic_vars, func_def->return_type);
             }
         }
     }
+
+    finish_function_poly_params(parser, func_def, polymorphic_vars, prev_poly_params);
 
     consume_token_if_next(parser, Token_Type_Inserted_Semicolon);
     if (parser->curr->type == Token_Type_Keyword_Where) {
