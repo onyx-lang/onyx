@@ -1121,6 +1121,39 @@ CHECK_FUNC(resolve_callee, AstCall* call, AstTyped** effective_callee, Type *exp
                 return Check_Error;
             }
 
+            // `From.from` lives on the interface, so it is not a package-level symbol.
+            if (!context->builtins.from_match) {
+                Package *builtin_pkg = package_lookup(context, "builtin");
+                if (builtin_pkg) {
+                    AstNode *iface = symbol_raw_resolve(context, builtin_pkg->scope, "From");
+                    AstNode *n = iface ? try_symbol_raw_resolve_from_node(context, iface, "from") : NULL;
+                    if (n && n->kind == Ast_Kind_Overloaded_Function) {
+                        context->builtins.from_match = (AstOverloadedFunction *) n;
+                    }
+                }
+            }
+
+            if (context->builtins.from_match
+                && (AstOverloadedFunction *) callee == context->builtins.from_match
+                && bh_arr_length(call->args.values) + bh_arr_length(call->args.named_values) == 1)
+            {
+                const char *src = bh_arr_length(call->args.values) == 1
+                    ? node_get_type_name(context, call->args.values[0])
+                    : node_get_type_name(context, call->args.named_values[0]->value);
+
+                if (expected_return) {
+                    call->type = expected_return;
+                    ONYX_ERROR(call->token->pos, Error_Critical,
+                        "No implementation of `From(%s, %s)`.",
+                        src, type_get_name(context, expected_return));
+                } else {
+                    ONYX_ERROR(call->token->pos, Error_Critical,
+                        "`From.from` needs a destination type to convert from `%s`.",
+                        src);
+                }
+                return Check_Error;
+            }
+
             report_unable_to_match_overload(context, call, ((AstOverloadedFunction *) callee)->overloads, expected_return);
             return Check_Error;
         }
@@ -1243,7 +1276,14 @@ TypeMatch resolve_deferred_call(Context *context, AstTyped **pnode, Type *expect
         }
         return TYPE_MATCH_YIELD;
     }
-    if (status == Check_Error) return TYPE_MATCH_FAILED;
+    if (status == Check_Error) {
+        // The call already reported why it failed and adopted the expected
+        // type, so the parent assignment does not also complain about `unknown`.
+        if (call->type && expected && types_are_compatible(context, call->type, expected)) {
+            return TYPE_MATCH_SUCCESS;
+        }
+        return TYPE_MATCH_FAILED;
+    }
     if (call->type == NULL) return TYPE_MATCH_YIELD;
     return TYPE_MATCH_SUCCESS;
 }

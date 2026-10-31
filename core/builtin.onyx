@@ -410,6 +410,34 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
     }
 }
 
+/// `From(T, R)` is satisfied when `R.from` builds an `R` from a `T`.
+/// The first argument is the source type and the second is the destination.
+/// `From.from(x)` calls that method, or returns `x` unchanged when the
+/// types are already the same. A conversion that is not `R.from` is
+/// another overload of `From.from`. Those are tried first: the `R.from`
+/// and identity cases use `#order` 999 and 1000.
+///
+///     i: i32 = From.from(v);
+///
+/// A missing conversion is a compile error naming `T` and `R`.
+From :: interface (T: type_expr, R: type_expr) {
+    t as T;
+
+    { R.from(t) } -> R;
+}
+
+From.from :: #match {}
+
+#overload #order 999
+From.from :: macro (x: $T) -> $R where From(T, R) {
+    return R.from(x);
+}
+
+#overload #order 1000
+From.from :: macro (x: $T) -> $R where T == R {
+    return x;
+}
+
 
 
 
