@@ -1120,7 +1120,11 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstF
         if (void_return) {
             // Argument matching only needs parameter types. The real return
             // type still contains unsolved variables, so blank it on this probe.
+            // Where clauses may name those variables, so they run on the header
+            // built once the expected return type has supplied them.
             solidified_func.func->return_type = (AstType *) &context->basic_types.type_void;
+            memset(&solidified_func.func->constraints, 0, sizeof(solidified_func.func->constraints));
+            solidified_func.func->constraints.constraints_met = 1;
         }
     }
 

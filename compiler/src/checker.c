@@ -6219,9 +6219,18 @@ CHECK_FUNC(polyquery, AstPolyQuery *query) {
     if (query->function_header->scope == NULL)
         query->function_header->scope = scope_create(context, query->proc->parent_scope_of_poly_proc, query->token->pos);
 
+    // Where clauses are checked on the solidified function, after every
+    // solution — including ones taken from the expected return type — has
+    // been inserted into its scope. Checking them here rejects the option
+    // before a return-only variable exists.
+    ConstraintContext saved_constraints = query->function_header->constraints;
+    memset(&query->function_header->constraints, 0, sizeof(query->function_header->constraints));
+
     enable_mode(context, CM_Dont_Resolve_Symbols);
     check_temp_function_header(context, query->function_header);
     disable_mode(context, CM_Dont_Resolve_Symbols);
+
+    query->function_header->constraints = saved_constraints;
 
     scope_enter(context, query->function_header->scope);
 
