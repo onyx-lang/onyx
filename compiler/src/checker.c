@@ -1635,7 +1635,8 @@ AstCall *deferred_call_of(AstTyped *expr) {
     return NULL;
 }
 
-// Finish a call that has nowhere to get an expected type. A return-only
+// Finish a call that has nowhere to get an expected type. The first argument
+// match is used, even when later options return a different type. A return-only
 // variable still open is an error, reported by check_call.
 static CheckStatus commit_deferred_call(Context *context, AstTyped **pexpr) {
     AstCall *deferred = deferred_call_of(*pexpr);
@@ -1643,27 +1644,25 @@ static CheckStatus commit_deferred_call(Context *context, AstTyped **pexpr) {
 
     deferred->commit_without_expected_type = 1;
     deferred->deferred_for_expected_type = 0;
-    return check_expression(context, pexpr);
+    CheckStatus status = check_expression(context, pexpr);
+    if ((status == Check_Yield || status == Check_Failed)
+        && (deferred->flags & Ast_Flag_Has_Been_Checked) == 0) {
+        deferred->deferred_for_expected_type = 1;
+        deferred->commit_without_expected_type = 0;
+    }
+    return status;
 }
 
-// resolve_expression_type asks for a type and supplies no expected type.
-// Commit when every argument-matching option agrees on one return type.
-// Otherwise the error is reported by deferred_call_has_concrete_return.
+// resolve_expression_type asks for one type and supplies no expected type.
+// Ambiguous overloads are reported by deferred_call_has_concrete_return.
+// A single agreed return type commits through the same path as a statement.
 void concretize_deferred_call(Context *context, AstTyped *node) {
     AstCall *call = deferred_call_of(node);
     if (!call || (call->flags & Ast_Flag_Has_Been_Checked)) return;
     if (!deferred_call_has_concrete_return(context, call)) return;
 
-    call->commit_without_expected_type = 1;
-    call->deferred_for_expected_type = 0;
-
     AstTyped *expr = node;
-    CheckStatus status = check_expression(context, &expr);
-    if ((status == Check_Yield || status == Check_Failed)
-        && (call->flags & Ast_Flag_Has_Been_Checked) == 0) {
-        call->deferred_for_expected_type = 1;
-        call->commit_without_expected_type = 0;
-    }
+    commit_deferred_call(context, &expr);
 }
 
 CHECK_FUNC(binaryop_assignment, AstBinaryOp** pbinop) {
@@ -2157,16 +2156,14 @@ CHECK_FUNC(unaryop, AstUnaryOp** punop) {
 
     CHECK(expression, &unaryop->expr);
 
-    // A cast's destination type is the expected type of the operand, so a
-    // deferred call stays open until that type is known. Other unary
-    // operators do not supply an expected type.
+    // A cast's destination type selects the operand. Other unary operators
+    // have no expected type, so they take the first argument match.
     if (unaryop->operation != Unary_Op_Cast) {
         CheckStatus cs = commit_deferred_call(context, &unaryop->expr);
         if (cs > Check_Errors_Start) return cs;
     }
 
-    // A cast applies its destination type after this. Resolving a deferred
-    // operand first would reject it before that type is known.
+    // A deferred cast operand is unified with the cast type below.
     if (unaryop->operation != Unary_Op_Negate && !expr_is_deferred_call(unaryop->expr)) {
         resolve_expression_type(context, unaryop->expr);
     }
