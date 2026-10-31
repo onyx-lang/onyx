@@ -2706,6 +2706,7 @@ AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption
 CallDeferral call_should_wait_for_expected_type(Context *context, AstTyped *callee, Arguments *args);
 TypeMatch probe_call_against_expected_return(Context *context, AstTyped *callee, Arguments *args, Type *expected);
 TypeMatch resolve_deferred_call(Context *context, AstTyped **pnode, Type *expected, b32 permanent);
+const char *unresolved_deferred_call_reason(AstTyped *expr);
 void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(OverloadOption) overloads, Type *expected_return);
 void report_incorrect_overload_expected_type(Context *context, Type *given, Type *expected, OnyxToken *overload, OnyxToken *group);
 void ensure_overload_returns_correct_type(Context *context, AstTyped *overload, AstOverloadedFunction *group);

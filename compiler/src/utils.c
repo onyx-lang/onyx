@@ -1688,6 +1688,36 @@ b32 fill_in_arguments(Context *context, Arguments* args, AstNode* provider, char
 // Argument checking
 //
 
+// A call left open because several options match, or because a return-only
+// variable is unsolved, has no type for an argument to read.
+const char *unresolved_deferred_call_reason(AstTyped *expr) {
+    while (expr && (expr->kind == Ast_Kind_Alias || expr->kind == Ast_Kind_Argument)) {
+        if (expr->kind == Ast_Kind_Alias) expr = ((AstAlias *) expr)->alias;
+        else expr = ((AstArgument *) expr)->value;
+    }
+    if (!expr) return NULL;
+
+    AstCall *call = NULL;
+    if (expr->kind == Ast_Kind_Call && ((AstCall *) expr)->deferred_for_expected_type) {
+        call = (AstCall *) expr;
+    } else if (expr->kind == Ast_Kind_Method_Call) {
+        AstTyped *right = ((AstBinaryOp *) expr)->right;
+        if (right && right->kind == Ast_Kind_Call && ((AstCall *) right)->deferred_for_expected_type) {
+            call = (AstCall *) right;
+        }
+    }
+    if (!call) return NULL;
+
+    AstTyped *callee = (AstTyped *) strip_aliases((AstNode *) call->callee);
+    if (callee && (callee->kind == Ast_Kind_Polymorphic_Proc || callee->kind == Ast_Kind_Macro)) {
+        return "Cannot solve the polymorphic return type of this call without an expected type.";
+    }
+
+    return "Multiple overloads match the arguments provided, but the return type is not known.";
+}
+
+
+
 typedef enum ArgState {
     AS_Expecting_Exact,
     AS_Expecting_Typed_VA,
@@ -1791,7 +1821,8 @@ TypeMatch check_arguments_against_type(Context *context, Arguments* args, TypeFu
                     if (arg_arr[arg_pos]->value->type == NULL) {
                         if (error != NULL) {
                             error->pos = arg_arr[arg_pos]->token->pos;
-                            error->text = "Unable to resolve type of argument.";
+                            const char *reason = unresolved_deferred_call_reason(arg_arr[arg_pos]->value);
+                            error->text = reason ? (char *) reason : "Unable to resolve type of argument.";
                         }
                         return TYPE_MATCH_FAILED;
                     }
@@ -1831,7 +1862,8 @@ TypeMatch check_arguments_against_type(Context *context, Arguments* args, TypeFu
                 if (arg_arr[arg_pos]->value->type == NULL) {
                     if (error != NULL) {
                         error->pos = arg_arr[arg_pos]->token->pos;
-                        error->text = "Unable to resolve type for argument.";
+                        const char *reason = unresolved_deferred_call_reason(arg_arr[arg_pos]->value);
+                        error->text = reason ? (char *) reason : "Unable to resolve type for argument.";
                     }
                     return TYPE_MATCH_FAILED;
                 }

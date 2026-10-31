@@ -706,7 +706,12 @@ CHECK_FUNC(switch, AstSwitch* switchnode) {
     Type* resolved_expr_type = resolve_expression_type(context, switchnode->expr);
 
     if (!(switchnode->flags & Ast_Flag_Has_Been_Checked)) {
-        if (resolved_expr_type == NULL) YIELD(switchnode->token->pos, "Waiting for expression type to be known.");
+        if (resolved_expr_type == NULL) {
+            const char *reason = unresolved_deferred_call_reason(switchnode->expr);
+            OnyxFilePos pos = switchnode->expr->token ? switchnode->expr->token->pos : switchnode->token->pos;
+            if (reason) YIELD(pos, (char *) reason);
+            YIELD(switchnode->token->pos, "Waiting for expression type to be known.");
+        }
 
         switchnode->switch_kind = Switch_Kind_Integer;
         if (!type_is_integer(switchnode->expr->type) && switchnode->expr->type->kind != Type_Kind_Enum) {

@@ -640,7 +640,8 @@ static void solve_for_polymorphic_param_type(Context *context, PolySolveResult* 
             if (actual_type == NULL) {
                 if (typed_param) err_msg->pos = typed_param->token->pos;
 
-                err_msg->text = "Unable to resolve type of this expression, needed to solve for polymorphic variable.";
+                const char *reason = unresolved_deferred_call_reason(typed_param);
+                err_msg->text = reason ? (char *) reason : "Unable to resolve type of this expression, needed to solve for polymorphic variable.";
                 return;
             }
 
