@@ -2148,10 +2148,16 @@ all_types_peeled_off:
 
         case Ast_Kind_Poly_Call_Type: {
             Type *t = type_build_from_ast(context, (AstType *) node);
-            if (t) {
-                return &t->Struct.scope;
+            if (!t || t == (Type *) &context->node_that_signals_failure) return NULL;
+
+            // A poly call is a struct or a union. Struct.scope is not at the
+            // same offset as Union.scope: on a finished union that slot is
+            // the processing status, and SPS_Uses_Done is 2.
+            switch (t->kind) {
+                case Type_Kind_Struct: return &t->Struct.scope;
+                case Type_Kind_Union:  return &t->Union.scope;
+                default: return NULL;
             }
-            return NULL;
         }
 
         case Ast_Kind_Distinct_Type: {
