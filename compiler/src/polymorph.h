@@ -873,9 +873,6 @@ TypeMatch find_polymorphic_sln(Context *context, AstPolySolution *out, AstPolyPa
     }
 }
 
-// NOTE: The job of this function is to take a polymorphic procedure, as well as a method of
-// solving for the polymorphic variables, in order to return an array of the solutions for all
-// of the polymorphic variables.
 static PolyArgumentLookup *intern_poly_argument_lookup(Context *context, AstFunction *pp, PolyArgumentLookup *incoming) {
     if (pp->argument_return_lookups == NULL) {
         bh_arr_new(context->gp_alloc, pp->argument_return_lookups, 4);
@@ -894,6 +891,9 @@ static PolyArgumentLookup *intern_poly_argument_lookup(Context *context, AstFunc
     return stable;
 }
 
+// NOTE: The job of this function is to take a polymorphic procedure, as well as a method of
+// solving for the polymorphic variables, in order to return an array of the solutions for all
+// of the polymorphic variables.
 static bh_arr(AstPolySolution) find_polymorphic_slns(Context *context, AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken *tkn, b32 necessary) {
     if (context->cycle_detected) {
         return NULL;
