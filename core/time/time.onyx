@@ -108,11 +108,6 @@ gmtime :: (seconds: i64) -> Timestamp {
     return t;
 }
 
-#overload
-gmtime :: (seconds: u64) -> Timestamp {
-    return gmtime(cast(i64) seconds);
-}
-
 strftime :: #match #local {}
 
 /// Formats a timestamp into a string, using the format specified.
