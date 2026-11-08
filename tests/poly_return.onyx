@@ -1,0 +1,106 @@
+package main
+
+use core {*}
+
+// Return-only polymorphic variables are solved from the expected type.
+// These are errors, checked separately from this program:
+//     give();
+//     n := give();
+//     m: i64 = id(1);
+
+Wrapper :: struct (T: type_expr) {
+    value: T
+}
+
+give :: () -> $T {
+    return 0
+}
+
+wrap :: (s: str) -> Wrapper($T) {
+    return .{ value = 0 }
+}
+
+label :: (x: $T) -> $U {
+    return 7
+}
+
+id :: (x: $T) -> T {
+    return x
+}
+
+hits: i32
+
+pick :: #match {
+    () -> i32 {
+        hits = hits + 1
+        return 1
+    },
+    () -> str {
+        hits = hits + 10
+        return "hi"
+    },
+}
+
+take_i32 :: (x: i32) -> i32 {
+    return x + 1
+}
+
+take_str :: (s: str) -> str {
+    return s
+}
+
+sink :: #match {
+    (x: i32) -> i32 { return x + 2 },
+    (x: Wrapper(i32)) -> i32 { return x.value + 3 },
+}
+
+main :: () {
+    x: i32 = give()
+    assert(x == 0, "give")
+
+    w: Wrapper(i32) = wrap("a")
+    assert(w.value == 0, "wrap")
+
+    v: i32 = label("ok")
+    assert(v == 7, "label")
+
+    n := id(1)
+    assert(n == 1, "id")
+
+    hits = 0
+    s: str = pick()
+    assert(s == "hi", "pick str")
+    assert(hits == 10, "pick str hits")
+
+    hits = 0
+    inferred := pick()
+    assert(inferred == 1, "pick first")
+    assert(hits == 1, "pick first hits")
+
+    hits = 0
+    pick()
+    assert(hits == 1, "pick statement")
+
+    y := take_i32(give())
+    assert(y == 1, "nested give")
+
+    chosen := take_str(pick())
+    assert(chosen == "hi", "arg select")
+
+    casted := cast(str) pick()
+    assert(casted == "hi", "cast select")
+
+    z := sink(wrap("b"))
+    assert(z == 3, "sink wrap")
+
+    b: i32 = give() if true else 4
+    assert(b == 0, "if give")
+
+    c: i32 = switch true {
+        case true => give();
+        case false => 9;
+    }
+    assert(c == 0, "switch give")
+
+    println("poly_return ok")
+}

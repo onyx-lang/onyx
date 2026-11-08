@@ -585,6 +585,31 @@ b32 convert_numlit_to_type(Context *context, AstNumLit* num, Type* to_type, b32 
     return 0;
 }
 
+// A deferred call or method call is solved against `type` here.
+// Returns 1 when the node was deferred. `*out` is the result.
+static b32 unify_deferred_expr(Context *context, AstTyped **pnode, Type *type, b32 permanent, TypeMatch *out) {
+    AstTyped *node = *pnode;
+
+    if (node->kind == Ast_Kind_Method_Call) {
+        AstBinaryOp *mcall = (AstBinaryOp *) node;
+        if (!(mcall->right && mcall->right->kind == Ast_Kind_Call
+              && ((AstCall *) mcall->right)->deferred_for_expected_type)) {
+            return 0;
+        }
+
+        *out = resolve_deferred_call(context, &mcall->right, type, permanent);
+        if (*out == TYPE_MATCH_SUCCESS && permanent) mcall->type = mcall->right->type;
+        return 1;
+    }
+
+    if (node->kind == Ast_Kind_Call && ((AstCall *) node)->deferred_for_expected_type) {
+        *out = resolve_deferred_call(context, pnode, type, permanent);
+        return 1;
+    }
+
+    return 0;
+}
+
 TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b32 permanent) {
     AstTyped* node = *pnode;
     if (type == NULL) return TYPE_MATCH_FAILED;
@@ -741,6 +766,17 @@ TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b
         node = *pnode;
     }
 
+    // Solve a deferred call against the expected type. An optional destination
+    // is handled below: the inner type is tried first, then the optional itself.
+    b32 optional_dest = context->builtins.optional_type
+        && type_constructed_from_poly(type, context->builtins.optional_type);
+    TypeMatch deferred_match;
+    if (!optional_dest && unify_deferred_expr(context, pnode, type, permanent, &deferred_match)) {
+        if (deferred_match != TYPE_MATCH_SUCCESS) return deferred_match;
+        if (!permanent) return TYPE_MATCH_SUCCESS;
+        node = *pnode;
+    }
+
     // HACK: NullProcHack
     // The null_proc matches any procedure, and because of that, will cause a runtime error if you
     // try to call it.
@@ -749,6 +785,21 @@ TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b
     // The normal case where everything works perfectly.
     Type* node_type = get_expression_type(context, node);
     if (types_are_compatible(context, node_type, type)) return TYPE_MATCH_SUCCESS;
+
+    // Method calls insert a removable address-of around the receiver. Peel it
+    // before optional wrapping, which would otherwise strip it while matching
+    // the inner type and then reject a receiver that already has the optional type.
+    if (node->kind == Ast_Kind_Address_Of) {
+        AstAddressOf *address_of = (AstAddressOf *) node;
+        if (address_of->can_be_removed) {
+            if (!permanent) {
+                return unify_node_and_type_(context, &address_of->expr, type, permanent);
+            }
+
+            *pnode = (AstTyped *) address_of->expr;
+            return unify_node_and_type_(context, pnode, type, permanent);
+        }
+    }
 
 
     // 'any' matches any type. This is commented out because it was causing
@@ -867,7 +918,7 @@ TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b
         TypeMatch match = unify_node_and_type_(context, pnode, type->Union.poly_sln[0].type, permanent);
         if (match == TYPE_MATCH_SUCCESS) {
             if (permanent) {
-                AstStructLiteral *opt_lit = make_optional_literal_some(context, node, type);
+                AstStructLiteral *opt_lit = make_optional_literal_some(context, *pnode, type);
 
                 *(AstStructLiteral **) pnode = opt_lit;
             }
@@ -876,6 +927,14 @@ TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b
         }
 
         if (match == TYPE_MATCH_YIELD) return TYPE_MATCH_YIELD;
+
+        // The call itself may return the optional, rather than the inner type.
+        node = *pnode;
+        if (unify_deferred_expr(context, pnode, type, permanent, &deferred_match)) {
+            if (deferred_match != TYPE_MATCH_SUCCESS) return deferred_match;
+            if (!permanent) return TYPE_MATCH_SUCCESS;
+            node = *pnode;
+        }
     }
 
 
@@ -932,19 +991,6 @@ TypeMatch unify_node_and_type_(Context *context, AstTyped** pnode, Type* type, b
             return TYPE_MATCH_FAILED;
         }
         return unify_node_and_type_(context, &alias->alias, type, permanent);
-    }
-
-    if (node->kind == Ast_Kind_Address_Of) {
-        AstAddressOf *address_of = (AstAddressOf *) node;
-        if (address_of->can_be_removed) {
-            if (!permanent) {
-                return unify_node_and_type_(context, &address_of->expr, type, permanent);
-
-            } else {
-                *pnode = (AstTyped *) address_of->expr;
-                return unify_node_and_type_(context, pnode, type, permanent);
-            }
-        }
     }
 
     //
@@ -1108,6 +1154,14 @@ Type* query_expression_type(Context *context, AstTyped *node) {
 Type* resolve_expression_type(Context *context, AstTyped* node) {
     if (node == NULL) return NULL;
 
+    // No expected type is coming from a parent. A deferred overload or
+    // polymorphic call has to become one concrete procedure, or report why
+    // its return type cannot be known. Argument and alias nodes resolve their
+    // inner expression below, which performs this itself.
+    if (node->kind != Ast_Kind_Argument && node->kind != Ast_Kind_Alias) {
+        concretize_deferred_call(context, node);
+    }
+
     if (node->kind == Ast_Kind_Compound) {
         bh_arr_each(AstTyped *, expr, ((AstCompound *) node)->exprs) {
             resolve_expression_type(context, *expr);
@@ -1123,6 +1177,12 @@ Type* resolve_expression_type(Context *context, AstTyped* node) {
 
     if (node->kind == Ast_Kind_If_Expression) {
         AstIfExpression* if_expr = (AstIfExpression *) node;
+
+        // A deferred branch is waiting for the if-expression's expected type.
+        // Forcing it here would reject the call before that type arrives.
+        if (deferred_call_of(if_expr->true_expr) || deferred_call_of(if_expr->false_expr)) {
+            return node->type;
+        }
 
         Type* ltype = resolve_expression_type(context, if_expr->true_expr);
         unify_node_and_type(context, &if_expr->false_expr, ltype);
