@@ -29,7 +29,20 @@ if [ ! -z ${ONYX_RUNTIME_LIBRARY+x} ]; then
             ;;
 
         wasmer)
-            wasmer_lib="$(wasmer config --libdir || echo $WASMER_LIB_PATH)"
+            # `wasmer config --libdir` only works when the CLI can run. Cross
+            # builds and older runners set WASMER_LIB_PATH to a downloaded archive.
+            wasmer_lib=""
+            if command -v wasmer >/dev/null 2>&1; then
+                wasmer_lib="$(wasmer config --libdir 2>/dev/null || true)"
+            fi
+            if [ -z "$wasmer_lib" ]; then
+                wasmer_lib="${WASMER_LIB_PATH:-}"
+            fi
+            if [ -z "$wasmer_lib" ] || [ ! -f "$wasmer_lib/libwasmer.a" ]; then
+                echo "error: libwasmer.a not found (looked in '${wasmer_lib:-<unset>}')"
+                echo "Install Wasmer or set WASMER_LIB_PATH to the directory containing libwasmer.a."
+                exit 1
+            fi
             LIBS="$wasmer_lib/libwasmer.a $LIBS"
             ;;
 

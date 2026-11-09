@@ -91,6 +91,51 @@ copy_required() {
     cp "$src" "$dest"
 }
 
+# True when compiler/onyx is an ELF for a machine other than the host.
+# Linux aarch64 CI cross-compiles on x86_64, then has to run that compiler
+# to produce tools/wit-bindgen.wasm.
+compiler_needs_emulator() {
+    command -v file >/dev/null 2>&1 || return 1
+    desc="$(file -b ./compiler/onyx 2>/dev/null || true)"
+    case "$(uname -m)" in
+        x86_64|amd64)
+            case "$desc" in
+                *aarch64*|*arm64*) return 0 ;;
+            esac
+            ;;
+        aarch64|arm64)
+            case "$desc" in
+                *x86-64*|*x86_64*) return 0 ;;
+            esac
+            ;;
+    esac
+    return 1
+}
+
+invoke_built_onyx() {
+    emulator="${ONYX_EMULATOR:-}"
+    if [ -z "$emulator" ] && compiler_needs_emulator; then
+        if command -v qemu-aarch64-static >/dev/null 2>&1; then
+            emulator="qemu-aarch64-static -L /usr/aarch64-linux-gnu"
+        elif command -v qemu-aarch64 >/dev/null 2>&1; then
+            emulator="qemu-aarch64 -L /usr/aarch64-linux-gnu"
+        else
+            echo "error: compiler/onyx is built for a different architecture and cannot run here."
+            echo "Install qemu-user-static, or set ONYX_EMULATOR (for example: qemu-aarch64-static -L /usr/aarch64-linux-gnu)."
+            exit 1
+        fi
+        echo "Running cross-compiled compiler with $emulator"
+    fi
+
+    if [ -n "$emulator" ]; then
+        # Intentional split so ONYX_EMULATOR can be "qemu-aarch64-static -L <sysroot>".
+        # shellcheck disable=SC2086
+        $emulator ./compiler/onyx "$@"
+    else
+        ./compiler/onyx "$@"
+    fi
+}
+
 # Ad-hoc sign so dlopen is not SIGKILL'd by AFMI on macOS.
 sign_tree() {
     root="$1"
@@ -130,7 +175,7 @@ package_all() {
     copy_required ./scripts/lsp.wasm "$DIST_DIR/tools"
 
     echo "Compiling wit-bindgen"
-    ONYX_PATH="$(pwd)" ./compiler/onyx build -r onyx -o "$DIST_DIR/tools/wit-bindgen.wasm" scripts/wit-bindgen.onyx
+    ONYX_PATH="$(pwd)" invoke_built_onyx build -r onyx -o "$DIST_DIR/tools/wit-bindgen.wasm" scripts/wit-bindgen.onyx
     if [ ! -f "$DIST_DIR/tools/wit-bindgen.wasm" ]; then
         echo "error: failed to build tools/wit-bindgen.wasm"
         exit 1
