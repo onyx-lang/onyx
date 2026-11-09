@@ -17,7 +17,7 @@ typedef struct OnyxThread {
 
     #ifdef _BH_WINDOWS
         HANDLE thread_handle;
-        i32    thread_id;
+        unsigned thread_id;
     #endif
 } OnyxThread;
 
@@ -87,7 +87,7 @@ static void threads_remove_id(i32 thread_id) {
 static void *onyx_run_thread(void *data) {
 #endif
 #ifdef _BH_WINDOWS
-static i32 onyx_run_thread(void *data) {
+static unsigned __stdcall onyx_run_thread(void *data) {
 #endif
     OnyxThread *thread = (OnyxThread *) data;
 
