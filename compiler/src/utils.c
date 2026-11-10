@@ -1996,6 +1996,11 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
     i32 total_len = 0;
     for (i32 i = 0; i < len; i++) {
         if (src[i] == '\\') {
+            if (i + 1 >= len) {
+                *dest++ = '\\';
+                total_len++;
+                break;
+            }
             i++;
             switch (src[i]) {
             case '0':  *dest++ = '\0'; total_len++; break;
@@ -2011,6 +2016,7 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
             case '\'': *dest++ = '\''; total_len++; break;
             case '\\': *dest++ = '\\'; total_len++; break;
             case 'x': {
+                if (i + 2 >= len) break;
                 u8 ch1 = src[i + 1];
                 u8 ch2 = src[i + 2];
                 *dest++ = (i8) (char_to_base16_value(ch1) << 4 | char_to_base16_value(ch2));

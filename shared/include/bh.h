@@ -1424,8 +1424,9 @@ BH_ALLOCATOR_PROC(bh_scratch_allocator_proc) {
             retval = scratch->curr;
         }
 
-        // HACK!!!!!: Using size instead of some kind of "old size"
-        memcpy(retval, prev_memory, size);
+        // The new block is placed immediately after the old one, and `size`
+        // is the new size, so the ranges overlap. memmove is defined for that.
+        memmove(retval, prev_memory, size);
     } break;
     }
 

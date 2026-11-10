@@ -1014,9 +1014,13 @@ static AstTyped* parse_factor_impl(OnyxParser* parser) {
             char_lit->token = expect_token(parser, Token_Type_Literal_Char);
             char_lit->was_char_literal = 1;
 
-            char dest[2];
-            i32 length = string_process_escape_seqs((char *) &dest, char_lit->token->text, 1);
-            char_lit->value.i = (u32) dest[0];
+            char dest[16];
+            i32 n = 0;
+            if (char_lit->token && char_lit->token->text && char_lit->token->length > 0)
+                n = char_lit->token->length;
+            if (n > 8) n = 8;
+            i32 length = string_process_escape_seqs(dest, char_lit->token->text, n);
+            char_lit->value.i = (u32) (unsigned char) dest[0];
 
             if (length != 1) {
                 ONYX_ERROR(char_lit->token->pos, Error_Critical, "Expected only a single character in character literal.");
@@ -1084,9 +1088,13 @@ static AstTyped* parse_factor_impl(OnyxParser* parser) {
                 char_lit->token = expect_token(parser, Token_Type_Literal_String);
                 char_lit->was_char_literal = 1;
 
-                char dest[2];
-                i32 length = string_process_escape_seqs((char *) &dest, char_lit->token->text, 1);
-                char_lit->value.i = (u32) dest[0];
+                char dest[16];
+                i32 n = 0;
+                if (char_lit->token && char_lit->token->text && char_lit->token->length > 0)
+                    n = char_lit->token->length;
+                if (n > 8) n = 8;
+                i32 length = string_process_escape_seqs(dest, char_lit->token->text, n);
+                char_lit->value.i = (u32) (unsigned char) dest[0];
 
                 if (length != 1) {
                     ONYX_ERROR(char_lit->token->pos, Error_Critical, "Expected only a single character in character literal.");
@@ -3442,6 +3450,10 @@ static AstConstraint* parse_constraint(OnyxParser* parser) {
         parser->parse_calls = 0;
         constraint->interface = (AstInterface *) parse_factor(parser);
         parser->parse_calls = 1;
+        if (!constraint->interface) {
+            parser->hit_unexpected_token = 1;
+            return constraint;
+        }
 
         constraint->token = constraint->interface->token;
 
@@ -3980,24 +3992,31 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
     bh_arr(AstNode *) poly_params=NULL;
     bh_arr_new(parser->context->gp_alloc, poly_params, bh_arr_length(params));
     bh_arr_each(QuickParam, param, params) {
-        char text[512];
-        memset(text, 0, 512);
-        strncat(text, "__type_", 511);
+        i32 sym_len = param->token && param->token->length > 0 ? param->token->length : 0;
 
         token_toggle_end(param->token);
-        if (!strcmp(param->token->text, "_")) {
-            int index = param - params;
-            int len = strnlen(text, 511);
-            snprintf(text + len, 511 - len, "%d", index);
+        char *text = NULL;
+        i32 text_len = 0;
+        if (param->token && param->token->text && !strcmp(param->token->text, "_")) {
+            int index = (int) (param - params);
+            text = bh_alloc(parser->allocator, 32);
+            int wrote = snprintf(text, 32, "__type_%d", index);
+            text_len = wrote > 0 ? wrote : 0;
         } else {
-            strncat(text, param->token->text, 511);
+            text_len = 7 + sym_len;
+            text = bh_alloc(parser->allocator, text_len + 1);
+            memcpy(text, "__type_", 7);
+            if (sym_len > 0 && param->token && param->token->text) {
+                memcpy(text + 7, param->token->text, (size_t) sym_len);
+            }
+            text[text_len] = '\0';
         }
         token_toggle_end(param->token);
 
         OnyxToken* new_token = bh_alloc(parser->allocator, sizeof(OnyxToken));
         new_token->type = Token_Type_Symbol;
-        new_token->length = 7 + param->token->length;
-        new_token->text = bh_strdup(parser->allocator, text);
+        new_token->length = text_len;
+        new_token->text = text;
         new_token->pos = param->token->pos;
 
         AstNode* type_node = make_symbol(parser->context, new_token);
@@ -5232,7 +5251,11 @@ static Package* parse_file_package(OnyxParser* parser) {
         return package_lookup_or_create(parser->context, "main", parser->context->global_scope, parser->curr->pos);
     }
 
-    char aggregate_name[2048];
+    // Grown as components are appended. A fixed buffer overflows on long
+    // package paths, which the editor can produce from a partial paste.
+    i32 name_cap = 64;
+    i32 name_used = 0;
+    char *aggregate_name = bh_alloc(parser->context->ast_alloc, name_cap);
     aggregate_name[0] = '\0';
 
     Package* prevpackage = NULL;
@@ -5240,7 +5263,28 @@ static Package* parse_file_package(OnyxParser* parser) {
     bh_arr_each(OnyxToken *, symbol, package_node->path) {
         token_toggle_end(*symbol);
 
-        strncat(aggregate_name, (*symbol)->text, 2047);
+        i32 sym_len = (*symbol)->length > 0 ? (*symbol)->length : 0;
+        i32 name_need = name_used + sym_len + 2;
+        if (name_need > name_cap) {
+            i32 ncap = name_cap;
+            while (ncap < name_need) {
+                if (ncap > 0x3fffffff / 2) {
+                    ncap = name_need;
+                    break;
+                }
+                ncap *= 2;
+            }
+            char *grown = bh_alloc(parser->context->ast_alloc, ncap);
+            memcpy(grown, aggregate_name, (size_t) name_used);
+            aggregate_name = grown;
+            name_cap = ncap;
+        }
+        if (sym_len > 0 && (*symbol)->text) {
+            memcpy(aggregate_name + name_used, (*symbol)->text, (size_t) sym_len);
+            name_used += sym_len;
+        }
+        aggregate_name[name_used] = '\0';
+
         Package* newpackage = package_lookup_or_create(parser->context, aggregate_name, parser->context->global_scope, package_node->token->pos);
         newpackage->parent_id = prevpackage ? prevpackage->id : 0xffffffff;
 
@@ -5257,7 +5301,10 @@ static Package* parse_file_package(OnyxParser* parser) {
         }
 
         token_toggle_end(*symbol);
-        strncat(aggregate_name, ".", 2047);
+        if (name_used + 2 <= name_cap) {
+            aggregate_name[name_used++] = '.';
+            aggregate_name[name_used] = '\0';
+        }
 
         prevpackage = newpackage;
     }
