@@ -472,15 +472,6 @@ ResolvedPath :: union {
     Value: &TypeInfo
 }
 
-path_is_none :: (p: ResolvedPath) -> bool {
-    switch p {
-        case .None do return true
-        case .Pkg do return false
-        case .Type do return false
-        case .Value do return false
-    }
-}
-
 CompilationInfo.is_type_name :: (self: &#Self, sym: &SymbolInfo) -> bool {
     switch sym.kind {
         case .Struct, .Union, .Enum, .Distinct, .Interface do return true
@@ -525,7 +516,7 @@ CompilationInfo.resolve_path :: (self: &#Self, scope_id: u32, parts: [] str) -> 
                         if self->lookup_in_scope(pkg.scope_id, part) as sym {
                             next = self->peel_path_symbol(sym)
                         }
-                        if path_is_none(next) {
+                        if next.None {
                             if self->child_package_named(pkg.id, part) as child {
                                 next = .{ Pkg = child }
                             }
@@ -548,20 +539,20 @@ CompilationInfo.resolve_path :: (self: &#Self, scope_id: u32, parts: [] str) -> 
                                     next = .{ Value = mt }
                                 }
                             }
-                            if path_is_none(next) && m.symbol_id != 0 {
+                            if next.None && m.symbol_id != 0 {
                                 if self->type_of(m.symbol_id) as mt {
                                     next = .{ Value = mt }
                                 }
                             }
                         }
 
-                        if path_is_none(next) && u.scope_id != 0 {
+                        if next.None && u.scope_id != 0 {
                             if self->lookup_in_scope(u.scope_id, part) as sym {
                                 next = self->peel_path_symbol(sym)
                             }
                         }
 
-                        if path_is_none(next) {
+                        if next.None {
                             if self->variant(u.id, part) as v {
                                 if v.type_id != 0 {
                                     if self->get_type(v.type_id) as vt {
@@ -574,7 +565,7 @@ CompilationInfo.resolve_path :: (self: &#Self, scope_id: u32, parts: [] str) -> 
                     case .None do return .None
                 }
 
-                if path_is_none(next) do return .None
+                if next.None do return .None
                 receiver = next
             }
 
