@@ -144,6 +144,38 @@ main :: () {
     }
     ok("point_in_package_scope", pkg_scope_ok);
 
+    point_pkg := false;
+    if foo_bar as fb {
+        if point_sym != null && point_sym.scope_id == fb.scope_id {
+            point_pkg = point_sym.package_id == fb.id;
+        }
+    }
+    ok("point_symbol_package", point_pkg);
+
+    get_x_pkg := false;
+    if foo_bar as fb {
+        for id in info->symbols_named("get_x") {
+            if info->get_symbol(id) as sym {
+                if sym.kind == .Function && sym.package_id == fb.id {
+                    get_x_pkg = true;
+                }
+            }
+        }
+    }
+    ok("get_x_package", get_x_pkg);
+
+    main_func_pkg := false;
+    if info->package_named("main") as mp {
+        for id in info->symbols_named("main") {
+            if info->get_symbol(id) as sym {
+                if sym.kind == .Function && sym.package_id == mp.id {
+                    main_func_pkg = true;
+                }
+            }
+        }
+    }
+    ok("main_func_package", main_func_pkg);
+
     point_type: &TypeInfo = null;
     for id in info->types_named("Point") {
         if info->get_type(id) as t {
@@ -163,6 +195,16 @@ main :: () {
         if info->member(point_type.id, "y") do has_y = true;
     }
     ok("point_members", has_x && has_y);
+
+    member_pkg := false;
+    if has_x {
+        if foo_bar as fb {
+            if info->get_symbol(member_x_sym) as msym {
+                member_pkg = msym.kind == .Member && msym.package_id == fb.id;
+            }
+        }
+    }
+    ok("point_member_package", member_pkg);
 
     point_type_of := false;
     if point_sym != null {

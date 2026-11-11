@@ -424,6 +424,8 @@ CompilationInfo.lookup_in_scope :: (self: &#Self, scope_id: u32, name: str) -> ?
     return .None
 }
 
+/// Package recorded on this symbol. A package symbol names that package.
+/// Any other symbol records the package that owns the scope it was introduced into.
 CompilationInfo.package_of :: (self: &#Self, sym: &SymbolInfo) -> ? &EventPackage {
     if sym.package_id == 0 do return .None
     return self->get_package(sym.package_id)
@@ -486,8 +488,12 @@ CompilationInfo.is_type_name :: (self: &#Self, sym: &SymbolInfo) -> bool {
 }
 
 CompilationInfo.peel_path_symbol :: (self: &#Self, sym: &SymbolInfo) -> ResolvedPath {
-    if self->package_of(sym) as pkg do return .{ Pkg = pkg }
-    if sym.kind == .Package do return .None
+    // package_id is set on every symbol that lives in a package. Only a
+    // package symbol is a step in a package path.
+    if sym.kind == .Package {
+        if self->package_of(sym) as pkg do return .{ Pkg = pkg }
+        return .None
+    }
     if self->type_of(sym.id) as t {
         if self->is_type_name(sym) do return .{ Type = t }
         return .{ Value = t }

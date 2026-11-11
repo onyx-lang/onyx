@@ -915,6 +915,15 @@ static b32 compilation_log_emit_binding_for_id(Context *context, u32 symbol_id, 
 static void compilation_log_remember_alias_symbol(Context *context, AstNode *node, u32 symbol_id);
 static void compilation_log_copy_binding_to_symbol(Context *context, u32 dest_id, u32 src_id);
 
+// Package scopes store the package directly. Nested scopes (files, procedures,
+// structs) walk to the nearest ancestor that does.
+static u32 compilation_log_scope_package_id(Scope *scope) {
+    for (Scope *s = scope; s; s = s->parent) {
+        if (s->package) return s->package->id;
+    }
+    return 0;
+}
+
 static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope, char *name, OnyxFilePos pos, AstNode *node, u32 kind, b32 dedup) {
     if (!name || !*name || (name[0] == '_' && name[1] == '\0')) return 0;
 
@@ -930,7 +939,7 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
     ev->d = pos.line;
     ev->extra16 = (u16) pos.column;
     ev->extra = (u8) kind;
-    ev->e = 0;
+    ev->e = compilation_log_scope_package_id(scope);
 
     u32 symbol_id = ev->a;
     b32 is_alias = 0;
@@ -949,6 +958,11 @@ static u32 compilation_log_emit_symbol_with_kind(Context *context, Scope *scope,
         if (inner && inner != node && !inner->compilation_symbol_id) {
             inner->compilation_symbol_id = symbol_id;
         }
+
+        // A package symbol names a package, which may be different from the
+        // scope it was introduced into (`use core.alloc`). Every other symbol
+        // keeps the package that owns its scope, so `main` the procedure can
+        // be told apart from `main` the package.
         if (inner && inner->kind == Ast_Kind_Package) {
             AstPackage *package = (AstPackage *) inner;
             if (package->package) ev->e = package->package->id;

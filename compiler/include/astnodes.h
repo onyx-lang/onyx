@@ -142,6 +142,10 @@ typedef struct Scope {
     // atom id -> AstNode*. Intern once, then parent walks are integer probes.
     bh_imap symbols;
     u32 log_event_index;
+
+    // Set on a package's public and private scopes. Other scopes leave this
+    // null; the owning package is the nearest ancestor that has it.
+    Package *package;
 } Scope;
 
 static inline i32 scope_symbol_count(Scope *scope) {
@@ -2408,6 +2412,8 @@ typedef enum CompilationEventKind {
 //   SCOPE:     a = file_id, b = end_line, c = end_column, ptr = Scope *
 //   SYMBOL:    a = id, b = scope_id, c = file_id, d = line,
 //              extra = kind, extra16 = column, e = package_id
+//              package_id is the package that owns the symbol's scope.
+//              A package symbol stores the package it names instead.
 //              (name lives in CompilationLog.symbol_names)
 //   RESOLVED:  a = symbol_id, b = file_id, c = line, d = length,
 //              extra16 = column, e = chosen_symbol_id

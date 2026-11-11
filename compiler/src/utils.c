@@ -56,6 +56,11 @@ Package* package_lookup_or_create(Context *context, char* package_name, Scope* p
             package->private_scope = scope_create(context, package->scope, pos);
         }
 
+        // Public scope's parent is often the global scope, which belongs to
+        // builtin. Stamp both package scopes so symbol lookup stops here.
+        if (package->scope) package->scope->package = package;
+        if (package->private_scope) package->private_scope->package = package;
+
         shput(context->packages, pac_name, package);
 
         // The builtin package is special. The 'builtin' symbol will be
