@@ -637,7 +637,19 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
             }
 
             Type* concrete = NULL;
-            if (pc_type->callee->kind == Ast_Kind_Poly_Struct_Type) {
+            // Slice(T) is [] T, and Array(T) is [..] T. The struct definitions stay
+            // as the method scopes; construction uses the compiler slice/dynarray types.
+            if (pc_type->callee == context->builtins.slice_type
+                && bh_arr_length(slns) == 1
+                && slns[0].kind == PSK_Type) {
+                concrete = type_make_slice(context, slns[0].type);
+            }
+            else if (pc_type->callee == context->builtins.array_type
+                && bh_arr_length(slns) == 1
+                && slns[0].kind == PSK_Type) {
+                concrete = type_make_dynarray(context, slns[0].type);
+            }
+            else if (pc_type->callee->kind == Ast_Kind_Poly_Struct_Type) {
                 AstPolyStructType* ps_type = (AstPolyStructType *) pc_type->callee;
                 type_build_from_ast_inner(context, (AstType *) ps_type, 0);
                 concrete = polymorphic_struct_lookup(context, ps_type, slns, pc_type->token->pos, (pc_type->flags & Ast_Flag_Header_Check_No_Error) == 0);

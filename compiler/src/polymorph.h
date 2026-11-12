@@ -412,6 +412,47 @@ static PolySolveResult solve_poly_type(Context *context, AstNode* target, AstTyp
             }
 
             case Ast_Kind_Poly_Call_Type: {
+                // Slice(T) is [] T and Array(T) is [..] T, so a polymorphic
+                // parameter written either way has to solve against the other.
+                // The callee is often still a symbol here: poly-query checking
+                // runs before the template's type node is fully resolved.
+                AstPolyCallType* pt_builtin = (AstPolyCallType *) elem.type_expr;
+                AstNode* callee_node = pt_builtin->callee
+                    ? strip_aliases((AstNode *) pt_builtin->callee)
+                    : NULL;
+                if (callee_node && callee_node->kind == Ast_Kind_Symbol && context->checker.current_scope) {
+                    AstNode* resolved = symbol_resolve(context, context->checker.current_scope, callee_node->token);
+                    if (resolved) callee_node = strip_aliases(resolved);
+                }
+                AstType* builtin_callee = (AstType *) callee_node;
+
+                if (bh_arr_length(pt_builtin->params) == 1) {
+                    Type* builtin_elem = NULL;
+
+                    if (builtin_callee == context->builtins.array_type
+                        && elem.actual->kind == Type_Kind_DynArray) {
+                        builtin_elem = elem.actual->DynArray.elem;
+                    }
+
+                    if (builtin_callee == context->builtins.slice_type
+                        && (elem.actual->kind == Type_Kind_Slice
+                            || elem.actual->kind == Type_Kind_DynArray
+                            || elem.actual->kind == Type_Kind_VarArgs
+                            || elem.actual->kind == Type_Kind_Array)) {
+                        // Same element-field layout as the [] $T case above.
+                        builtin_elem = elem.actual->Slice.elem;
+                    }
+
+                    if (builtin_elem != NULL) {
+                        bh_arr_push(elem_queue, ((PolySolveElem) {
+                            .kind = PSK_Type,
+                            .type_expr = (AstType *) pt_builtin->params[0],
+                            .actual = builtin_elem,
+                        }));
+                        break;
+                    }
+                }
+
                 if (elem.actual->kind != Type_Kind_Struct && elem.actual->kind != Type_Kind_Union) break;
 
                 bh_arr(AstPolySolution) slns;

@@ -454,9 +454,8 @@ Optional :: union (Value_Type: type_expr) {
 
 
 /// This structure represents the slice types, `[] T`.
-/// While slices are a special type in Onyx, and therefore need extra
-/// compiler support, this structure exists to allow for placing
-/// methods onto slices. See `core/container/slice.onyx` for examples.
+/// `Slice(i32)` is exactly `[] i32`. The definition stays here so
+/// methods can be placed on slices. See `core/container/slice.onyx`.
 Slice :: struct (T: type_expr) {
     data: [&] T;
     count: i32;
@@ -464,8 +463,8 @@ Slice :: struct (T: type_expr) {
 
 
 /// This structure represents the dynamic array types, `[..] T`.
-/// This structure exists to allow for placing methods onto dynamic arrays.
-/// See `core/container/array.onyx` for examples.
+/// `Array(i32)` is exactly `[..] i32`. The definition stays here so
+/// methods can be placed on dynamic arrays. See `core/container/array.onyx`.
 Array :: struct (T: type_expr) {
     data: [&] T;
     count: i32;

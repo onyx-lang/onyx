@@ -1,0 +1,46 @@
+use core {*}
+
+first_arr :: (x: Array($T)) -> T {
+    return x[0];
+}
+
+first_darr :: (x: [..] $T) -> T {
+    return x[0];
+}
+
+first_slice :: (x: Slice($T)) -> T {
+    return x[0];
+}
+
+first_sl :: (x: [] $T) -> T {
+    return x[0];
+}
+
+main :: () {
+    t: [] i32 = .[1, 2, 3];
+    s: Slice(i32) = t;
+    t = s;
+    println(Slice.empty(s));
+    println(s.count);
+
+    b: [..] i32;
+    a: Array(i32) = b;
+    Array.push(&a, 4);
+    b = a;
+    println(a.count);
+    println(b.count);
+
+    darr: [..] i32;
+    Array.push(&darr, 7);
+    println(first_arr(darr));
+
+    named: Array(i32);
+    Array.push(&named, 8);
+    println(first_darr(named));
+
+    sl: [] i32 = .[9];
+    println(first_slice(sl));
+
+    named_sl: Slice(i32) = .[10];
+    println(first_sl(named_sl));
+}
