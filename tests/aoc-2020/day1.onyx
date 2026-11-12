@@ -7,16 +7,16 @@ use core {printf}
 
 main :: (args: [] cstr) {
     contents := #file_contents "./input/day1.txt";
-    reader, stream := io.reader_from_string(contents);
+    reader, stream := io.Reader.from_string(contents);
     defer cfree(stream);
 
-    nums := array.make(u32, 128);
-    defer array.free(&nums);
+    nums := Array.make(u32, 128);
+    defer Array.free(&nums);
 
     while num := 1; num > 0 {
         // This sets num to be 0 if there is no number
-        num = io.read_u32(&reader);
-        if num != 0 do array.push(&nums, num);
+        num = io.Reader.read_u32(&reader);
+        if num != 0 do Array.push(&nums, num);
     }
 
     for i in nums do for j in nums do for k in nums {

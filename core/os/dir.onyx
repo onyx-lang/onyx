@@ -86,7 +86,7 @@ Directory.list :: (path: str) -> Iterator(DirectoryEntry) {
         if !opened do return .None;
 
         entry: DirectoryEntry;
-        if !dir_read(dir, &entry) {
+        if !Directory.read(dir, &entry) {
             return .None;
         }
 
@@ -95,14 +95,14 @@ Directory.list :: (path: str) -> Iterator(DirectoryEntry) {
 
     close :: (use c: &Context) {
         if opened {
-            dir_close(dir);
+            Directory.close(dir);
         }
 
         cfree(c);
     }
 
     c := new(Context);
-    if dir, success := dir_open(path); success {
+    if dir, success := Directory.open(path); success {
         c.dir = dir;
         c.opened = true;
     }
@@ -115,27 +115,15 @@ Directory.remove_recursive :: (path: str) -> bool {
     // if the directory being deleted has a lot of descendents.
     full_path_buffer: [512] u8;
 
-    for list_directory(path) {
+    for Directory.list(path) {
         full_path := conv.format(full_path_buffer, "{}{}{}", path, PATH_SEP, it->name());
 
         if it.type == .Directory {
-            if !remove_directory(full_path) do return false;
+            if !Directory.remove_recursive(full_path) do return false;
         } else {
             remove_file(full_path);
         }
     }
 
-    return dir_remove(path);    
+    return Directory.remove(path);    
 }
-
-// Compatibility: package names.
-dir_open :: Directory.open
-dir_close :: Directory.close
-dir_read :: Directory.read
-dir_create :: Directory.create
-dir_create_all :: Directory.create_all
-dir_exists :: Directory.exists
-dir_remove :: Directory.remove
-dir_rename :: Directory.rename
-list_directory :: Directory.list
-remove_directory :: Directory.remove_recursive

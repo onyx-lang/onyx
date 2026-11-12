@@ -119,8 +119,8 @@ CSV.ingress_bytes :: (csv: &CSV, contents: str, headers_present := true) -> Resu
             }
 
             header := buf
-            member := array.first(output_type_info.members, [](do {
-                if tag := array.first(it.tags, [t](t.type == CSV_Column)); tag {
+            member := Slice.first(output_type_info.members, [](do {
+                if tag := Slice.first(it.tags, [t](t.type == CSV_Column)); tag {
                     return any_as(*tag, CSV_Column).name == header;
                 }
 
@@ -170,7 +170,7 @@ CSV.ingress_bytes :: (csv: &CSV, contents: str, headers_present := true) -> Resu
                     target := cast([&] u8) &out + header.offset
 
                     if header.type == str {
-                        *cast(&str) target = string.copy(buf)
+                        *cast(&str) target = str.copy(buf)
                     } else {
                         if !conv.parse_any(target, header.type, buf) {
                             row_err = true
@@ -220,38 +220,38 @@ CSV.egress :: (csv: &CSV, writer: &io.Writer, include_headers := true) {
 
     if include_headers {
         for &member in output_type_info.members {
-            if !#first do io.write(writer, ",")
+            if !#first do io.Writer.write(writer, ",")
 
-            if tag := array.first(member.tags, [t](t.type == CSV_Column)); tag {
+            if tag := Slice.first(member.tags, [t](t.type == CSV_Column)); tag {
                 write_field(writer, any_as(*tag, CSV_Column).name)
             } else {
                 write_field(writer, member.name)
             }
         }
 
-        io.write(writer, "\n")
+        io.Writer.write(writer, "\n")
     }
 
     for &it in csv.entries {
         for &member in output_type_info.members {
-            if !#first do io.write(writer, ",")
+            if !#first do io.Writer.write(writer, ",")
 
             field.count = 0
             conv.format_va(&field, "{}", .[ .{cast([&] u8) it + member.offset, member.type} ])
             write_field(writer, field)
         }
 
-        io.write(writer, "\n")
+        io.Writer.write(writer, "\n")
     }
 }
 
 CSV.egress_string :: (csv: &CSV, include_headers := true, allocator := context.allocator) -> str {
-    stream := io.buffer_stream_make(256)
-    writer := io.writer_make(&stream, 0)
-    defer io.buffer_stream_free(&stream)
+    stream := io.BufferStream.make(256)
+    writer := io.Writer.make(&stream, 0)
+    defer io.BufferStream.free(&stream)
 
     csv->egress(&writer, include_headers)
-    return string.copy(io.buffer_stream_to_str(&stream), allocator)
+    return str.copy(io.BufferStream.to_str(&stream), allocator)
 }
 
 
@@ -346,12 +346,12 @@ field_needs_quotes :: (s: str) -> bool {
 #local
 write_field :: (w: &io.Writer, s: str) {
     quote := field_needs_quotes(s)
-    if quote do io.write(w, "\"")
+    if quote do io.Writer.write(w, "\"")
     for c in s {
-        if c == '"' do io.write_byte(w, '"')
-        io.write_byte(w, c)
+        if c == '"' do io.Writer.write_byte(w, '"')
+        io.Writer.write_byte(w, c)
     }
-    if quote do io.write(w, "\"")
+    if quote do io.Writer.write(w, "\"")
 }
 
 #local

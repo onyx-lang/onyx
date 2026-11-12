@@ -83,11 +83,6 @@ GCState.as_allocator :: (hs: &GCState) -> Allocator {
 #overload
 builtin.delete :: GCState.delete
 
-// Compatibility: package names.
-make :: GCState.make
-init :: GCState.init
-clear :: GCState.clear
-make_allocator :: GCState.as_allocator
 
 auto :: #match {
     macro () {
@@ -184,4 +179,3 @@ untrack :: (ptr: rawptr) -> bool {
     link.magic_number = GC_Manually_Free_Magic_Number;
     return true;
 }
-

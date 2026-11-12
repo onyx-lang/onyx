@@ -16,7 +16,7 @@ use core.memory
 ///
 ///     use core {slice, println}
 ///
-///     sl := slice.make(i32, 10);
+///     sl := Slice.make(i32, 10);
 ///     println(sl);
 ///     // 0 0 0 0 0 0 0 0 0 0
 Slice.make :: ($T: type_expr, length: u32, allocator := context.allocator) -> [] T {
@@ -30,7 +30,7 @@ Slice.make :: ($T: type_expr, length: u32, allocator := context.allocator) -> []
 ///     use core {slice, println}
 ///
 ///     sl: [] i32;
-///     slice.init(&sl, 10);
+///     Slice.init(&sl, 10);
 ///     println(sl);
 ///     // 0 0 0 0 0 0 0 0 0 0
 Slice.init :: (sl: &[] $T, length: u32, allocator := context.allocator) {
@@ -121,7 +121,7 @@ Slice.map_inplace :: macro (sl: [] $T, transform: Code, allocator := context.all
 ///     arr := i32.[1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 ///
 ///     // Move element at index 4 to index 8
-///     slice.transplant(arr, 4, 8);
+///     Slice.transplant(arr, 4, 8);
 ///
 ///     println(arr);
 ///     // 1 2 3 4 6 7 8 9 5 10
@@ -206,7 +206,7 @@ Slice.contains :: #match #locked {
 /// Normally this is unneeded, as arrays have a 'truthiness'
 /// that depends on their count. For example, instead of saying:
 ///
-///     if slice.empty(arr) { ... }
+///     if Slice.empty(arr) { ... }
 ///
 /// You can simply say:
 ///
@@ -384,11 +384,11 @@ Slice.unique :: (arr: &[] $T) {
 ///
 ///     arr := i32.[1, 2, 3, 4, 5];
 ///
-///     slice.fold(arr, 0, (it, acc) => it + acc) |> println();
+///     Slice.fold(arr, 0, (it, acc) => it + acc) |> println();
 ///     
 ///     // OR
 ///     
-///     slice.fold(arr, 0, [it, acc](it + acc)) |> println();
+///     Slice.fold(arr, 0, [it, acc](it + acc)) |> println();
 Slice.fold :: #match #local {}
 
 #overload
@@ -531,10 +531,10 @@ Slice.fill_range :: (arr: [] $T, r: range, value: T) {
 
 /// Converts a slice to a linked list.
 Slice.to_list :: (arr: [] $T, allocator := context.allocator) -> List(T) {
-    new_list := list.make(T, allocator);
+    new_list := list.List.make(T, allocator);
 
     for &it in arr {
-        list.push_end(&new_list, *it);
+        list.List.push_end(&new_list, *it);
     }
 
     return new_list;
@@ -759,43 +759,3 @@ Slice.least :: macro (arr: [] $T) -> (i32, T) {
     fold_idx_elem :: fold_idx_elem
     return fold_idx_elem(arr, [](*A < *B));
 }
-
-
-//
-// Everything below here only exists for backwards compatibility.
-//
-
-transplant  :: Slice.transplant
-get         :: Slice.get
-get_ptr     :: Slice.get_ptr
-set         :: Slice.set
-contains    :: Slice.contains
-empty       :: Slice.empty
-sum         :: Slice.sum
-product     :: Slice.product
-average     :: Slice.average
-reverse     :: Slice.reverse
-sort        :: Slice.sort
-quicksort   :: Slice.quicksort
-unique      :: Slice.unique
-fold        :: Slice.fold
-every       :: Slice.every
-some        :: Slice.some
-group_by    :: Slice.group_by
-fill        :: Slice.fill
-fill_range  :: Slice.fill_range
-to_list     :: Slice.to_list
-find        :: Slice.find
-find_ptr    :: Slice.find_ptr
-find_opt    :: Slice.find_opt
-first       :: Slice.first
-count_where :: Slice.count_where
-windows     :: Slice.windows
-chunks      :: Slice.chunks
-greatest    :: Slice.greatest
-least       :: Slice.least
-free        :: Slice.free
-copy        :: Slice.copy
-make        :: Slice.make
-init        :: Slice.init
-

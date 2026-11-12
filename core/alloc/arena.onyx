@@ -172,14 +172,6 @@ Arena.get_allocated_bytes :: (arena: &Arena) -> u32 {
 #overload
 builtin.delete :: Arena.delete
 
-// Compatibility: package names.
-make :: Arena.make
-init :: Arena.init
-make_allocator :: Arena.as_allocator
-free :: Arena.delete
-clear :: Arena.clear
-get_allocated_arenas :: Arena.get_allocated_arenas
-get_allocated_bytes :: Arena.get_allocated_bytes
 
 /// Creates an arena allocator and automatically applies it to the context's allocator
 /// in the current scope.
@@ -190,7 +182,7 @@ get_allocated_bytes :: Arena.get_allocated_bytes
 ///         // Lazily allocate everything, knowing that it will
 ///         // be freed when this function returns.
 ///         for 100 {
-///             s := string.copy("Make a copy of me!");
+///             s := str.copy("Make a copy of me!");
 ///         }
 ///     }
 auto :: #match {

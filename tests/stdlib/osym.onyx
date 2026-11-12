@@ -110,7 +110,7 @@ main :: () {
                         if doc_len > 0 {
                             start := ~~docs_off + ~~doc_off;
                             docs := buf[start .. start + ~~doc_len];
-                            if string.contains(docs, "Hello Point") do point_docs_ok = true;
+                            if str.contains(docs, "Hello Point") do point_docs_ok = true;
                         }
                     }
                     i += 24;

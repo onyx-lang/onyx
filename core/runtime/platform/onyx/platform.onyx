@@ -38,17 +38,17 @@ __stderr: os.File;
 __stdin:  os.File;
 
 __output_string :: (s: str) -> u32 {
-    wrote := io.stream_write(&__stdout, s).Ok ?? 0;
+    wrote := io.Stream.write(&__stdout, s).Ok ?? 0;
     return wrote;
 }
 
 __output_error :: (s: str) -> u32 {
-    wrote := io.stream_write(&__stderr, s).Ok ?? 0;
+    wrote := io.Stream.write(&__stderr, s).Ok ?? 0;
     return wrote;
 }
 
 __read_from_input :: (buffer: [] u8) -> i32 {
-    switch io.stream_read(&__stdin, buffer) {
+    switch io.Stream.read(&__stdin, buffer) {
         case .Err as err {
             if err == .ReadPending do return 0;
             return -1;
@@ -61,7 +61,7 @@ __read_from_input :: (buffer: [] u8) -> i32 {
 }
 
 __wait_for_input :: (timeout: i32) -> bool {
-    switch io.stream_poll(&__stdin, .Read, timeout) {
+    switch io.Stream.poll(&__stdin, .Read, timeout) {
         case .Err as err {
             return false;
         }
@@ -159,7 +159,7 @@ __start :: () {
 
     #if #defined(runtime.vars.LEAKCHECK) {
         use core.alloc.gc
-        gcs := gc.make();
+        gcs := gc.GCState.make();
         old_allocator := context.allocator;
         context.allocator = alloc.as_allocator(&gcs);
         defer {

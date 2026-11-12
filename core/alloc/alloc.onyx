@@ -119,7 +119,7 @@ clear_temp_allocator :: () {
 report_leaks_in_scope :: macro () {
     use core.alloc
 
-    use __ha := alloc.debug.make(context.allocator)
+    use __ha := alloc.debug.Debug_State.make(context.allocator)
 
     __old_allocator := context.allocator
     context.allocator = alloc.as_allocator(&__ha)

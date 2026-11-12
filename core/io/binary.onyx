@@ -16,11 +16,11 @@ BinaryWriter.make :: (s: &Stream) -> BinaryWriter {
 }
 
 binary_write_byte :: (use bw: &BinaryWriter, byte: u8) {
-    stream_write_byte(stream, byte);
+    Stream.write_byte(stream, byte);
 }
 
 binary_write :: (use bw: &BinaryWriter, $T: type_expr, v: &T) {
-    stream_write(stream, .{ ~~ v, sizeof T });
+    Stream.write(stream, .{ ~~ v, sizeof T });
 }
 
 /// Writes the raw bytes of `sl`. If `output_size` is true, writes `sl.count` first as a host-endian `i32`.
@@ -35,50 +35,50 @@ binary_write_slice :: (use bw: &BinaryWriter, sl: [] $T, output_size := false) {
         count = sizeof T * sl.count,
     };
 
-    stream_write(stream, raw);
+    Stream.write(stream, raw);
 }
 
 BinaryWriter.write_byte :: binary_write_byte
 BinaryWriter.write :: binary_write
 BinaryWriter.write_slice :: binary_write_slice
 BinaryWriter.write_bytes :: (use bw: &BinaryWriter, buf: [] u8) {
-    stream_write(stream, buf);
+    Stream.write(stream, buf);
 }
 
 BinaryWriter.write_u16_le :: (use bw: &BinaryWriter, v: u16) {
     tmp: [2] u8;
     bytes.put_u16_le(~~tmp, v);
-    stream_write(stream, ~~tmp);
+    Stream.write(stream, ~~tmp);
 }
 
 BinaryWriter.write_u16_be :: (use bw: &BinaryWriter, v: u16) {
     tmp: [2] u8;
     bytes.put_u16_be(~~tmp, v);
-    stream_write(stream, ~~tmp);
+    Stream.write(stream, ~~tmp);
 }
 
 BinaryWriter.write_u32_le :: (use bw: &BinaryWriter, v: u32) {
     tmp: [4] u8;
     bytes.put_u32_le(~~tmp, v);
-    stream_write(stream, ~~tmp);
+    Stream.write(stream, ~~tmp);
 }
 
 BinaryWriter.write_u32_be :: (use bw: &BinaryWriter, v: u32) {
     tmp: [4] u8;
     bytes.put_u32_be(~~tmp, v);
-    stream_write(stream, ~~tmp);
+    Stream.write(stream, ~~tmp);
 }
 
 BinaryWriter.write_u64_le :: (use bw: &BinaryWriter, v: u64) {
     tmp: [8] u8;
     bytes.put_u64_le(~~tmp, v);
-    stream_write(stream, ~~tmp);
+    Stream.write(stream, ~~tmp);
 }
 
 BinaryWriter.write_u64_be :: (use bw: &BinaryWriter, v: u64) {
     tmp: [8] u8;
     bytes.put_u64_be(~~tmp, v);
-    stream_write(stream, ~~tmp);
+    Stream.write(stream, ~~tmp);
 }
 
 BinaryWriter.write_i16_le :: (use bw: &BinaryWriter, v: i16) do bw->write_u16_le(~~v);
@@ -106,13 +106,13 @@ BinaryReader.make :: (s: &Stream) -> BinaryReader {
 }
 
 binary_read_byte :: (use br: &BinaryReader) -> u8 {
-    byte := stream_read_byte(stream).Ok ?? 0;
+    byte := Stream.read_byte(stream).Ok ?? 0;
     return byte;
 }
 
 binary_read :: (use br: &BinaryReader, $T: type_expr) -> T {
     buf: [sizeof T] u8;
-    bytes_read := stream_read(stream, ~~ buf).Ok ?? 0;
+    bytes_read := Stream.read(stream, ~~ buf).Ok ?? 0;
 
     return *(cast(&T) buf);
 }
@@ -130,7 +130,7 @@ binary_read_slice :: (use br: &BinaryReader,
     if size <= 0 do return .{};
 
     sl := memory.make_slice(u8, size * sizeof T, allocator = allocator);
-    bytes_read := stream_read(stream, sl).Ok ?? 0;
+    bytes_read := Stream.read(stream, sl).Ok ?? 0;
     count := bytes_read / sizeof T;
 
     return .{ data = cast(&T) sl.data, count = count };
@@ -141,7 +141,7 @@ BinaryReader.read :: binary_read
 BinaryReader.read_slice :: binary_read_slice
 
 BinaryReader.read_bytes :: (use br: &BinaryReader, buf: [] u8) -> Result(i32, Error) {
-    switch stream_read(stream, buf) {
+    switch Stream.read(stream, buf) {
         case .Ok as n do return .{ Ok = n };
         case .Err as err do return .{ Err = err };
     }
@@ -149,7 +149,7 @@ BinaryReader.read_bytes :: (use br: &BinaryReader, buf: [] u8) -> Result(i32, Er
 
 #local
 read_exact :: (use br: &BinaryReader, buf: [] u8) -> Error {
-    switch stream_read(stream, buf) {
+    switch Stream.read(stream, buf) {
         case .Err as err do return err;
         case .Ok as n {
             if n < buf.count do return .EOF;
@@ -229,8 +229,3 @@ BinaryReader.read_i64_be :: (use br: &BinaryReader) -> Result(i64, Error) {
     if err := read_exact(br, ~~buf); err != .None do return .{ Err = err };
     return .{ Ok = bytes.read_i64_be(~~buf) ?? 0 };
 }
-
-// Compatibility: package names.
-binary_writer_make :: BinaryWriter.make
-binary_reader_make :: BinaryReader.make
-

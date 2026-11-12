@@ -12,30 +12,30 @@ State :: struct {
 }
 
 // Nicer way of printing a Map.
-#match io.write (w: &io.Writer, x: &Map($K, $V)) {
-    io.write(w, "{\n");
+#match io.Writer.write (w: &io.Writer, x: &Map($K, $V)) {
+    io.Writer.write(w, "{\n");
     for e in x.entries {
-        io.write(w, "    {} => {}\n", e.key, e.value);
+        io.Writer.write(w, "    {} => {}\n", e.key, e.value);
     }
-    io.write(w, "}");
+    io.Writer.write(w, "}");
 }
 
 main :: (args) => {
-    use file := os.open("./tests/aoc-2021/input/day14.txt")->unwrap();
-    use reader := io.reader_make(&file);
+    use file := os.File.open("./tests/aoc-2021/input/day14.txt")->unwrap();
+    use reader := io.Reader.make(&file);
 
-    start_polymer := io.read_line(&reader, consume_newline=false);
-    io.skip_whitespace(&reader);
+    start_polymer := io.Reader.read_line(&reader, consume_newline=false);
+    io.Reader.skip_whitespace(&reader);
 
     rules: [..] Rule;
-    while !io.reader_empty(&reader) {
+    while !io.Reader.empty(&reader) {
         r: Rule;
-        io.read_bytes(&reader, .{cast([&] u8) &r.pair, 2});
-        io.skip_bytes(&reader, 4);
-        r.insert = io.read_byte(&reader);
+        io.Reader.read_bytes(&reader, .{cast([&] u8) &r.pair, 2});
+        io.Reader.skip_bytes(&reader, 4);
+        r.insert = io.Reader.read_byte(&reader);
 
         rules << r;
-        io.skip_whitespace(&reader);
+        io.Reader.skip_whitespace(&reader);
     }
 
     polymer_state: Map(Pair(u8, u8), State);
@@ -81,8 +81,8 @@ main :: (args) => {
         mode[it.key.second] = (mode[it.key.second] ?? .{}) + it.value.now;
     }
 
-    maximum := array.fold(mode.entries, cast(u64) 0, (x, y) => math.max(x.value, y));
-    minimum := array.fold(mode.entries, maximum, (x, y) => math.min(x.value, y));
+    maximum := Slice.fold(mode.entries, cast(u64) 0, (x, y) => math.max(x.value, y));
+    minimum := Slice.fold(mode.entries, maximum, (x, y) => math.min(x.value, y));
 
     println(&mode);
     printf("Part 2: {}\n", maximum - minimum - 1);

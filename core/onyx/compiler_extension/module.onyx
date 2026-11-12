@@ -213,7 +213,7 @@ ExtensionContext.make :: (name: str) -> (res: ExtensionContext) {
     res.proc_macros = make(typeof res.proc_macros)
     res.compiler_events.events = make(typeof res.compiler_events.events)
     res.compilation_info = CompilationInfo.make()
-    res.arena = arena.make(context.allocator, 32 * 1024)
+    res.arena = arena.Arena.make(context.allocator, 32 * 1024)
     res.reader = io.Reader.make(&stdio.stream, 256 * 1024)
     return
 }
@@ -301,7 +301,7 @@ ExtensionContext.start :: (self: &#Self, callback: (&#Self, msg: IncomingMessage
             }
         }
 
-        alloc.arena.clear(&self.arena)
+        alloc.arena.Arena.clear(&self.arena)
     }
 }
 

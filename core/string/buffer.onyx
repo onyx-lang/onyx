@@ -79,11 +79,3 @@ String_Buffer.clear :: (use buffer: &String_Buffer) {
 }
 
 String_Buffer.as_str :: (use buffer: &String_Buffer) -> str do return .{data, count};
-
-// Compatibility: package names.
-buffer_make :: String_Buffer.make
-buffer_insert :: String_Buffer.insert
-buffer_append :: String_Buffer.append
-buffer_delete :: String_Buffer.remove
-buffer_clear :: String_Buffer.clear
-buffer_to_str :: String_Buffer.as_str

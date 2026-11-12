@@ -7,13 +7,13 @@ Pos :: struct {x, y:i32;}
 #operator == (p1, p2: Pos) => p1.x == p2.x && p1.y == p2.y;
 
 main :: (args) => {
-    use file := os.open("./tests/aoc-2021/input/day11.txt")->unwrap();
-    use reader := io.reader_make(&file);
+    use file := os.File.open("./tests/aoc-2021/input/day11.txt")->unwrap();
+    use reader := io.Reader.make(&file);
 
     octopuses: [..] u32;
-    while !io.reader_empty(&reader) {
-        line := io.read_line(&reader, consume_newline=false, inplace=true);
-        io.skip_whitespace(&reader);
+    while !io.Reader.empty(&reader) {
+        line := io.Reader.read_line(&reader, consume_newline=false, inplace=true);
+        io.Reader.skip_whitespace(&reader);
 
         for ch in line do octopuses << ~~(ch - '0');
     }

@@ -20,17 +20,17 @@ _enc: struct {
 #local
 write_newline_indent :: (w: &io.Writer) {
     if _enc.indent <= 0 do return;
-    io.write_byte(w, '\n');
+    io.Writer.write_byte(w, '\n');
     n := _enc.indent * _enc.depth;
     while n > 0 {
-        io.write_byte(w, ' ');
+        io.Writer.write_byte(w, ' ');
         n -= 1;
     }
 }
 
 #local
 pretty_open :: (w: &io.Writer, open: u8, empty: bool) {
-    io.write_byte(w, open);
+    io.Writer.write_byte(w, open);
     if empty do return;
     _enc.depth += 1;
     write_newline_indent(w);
@@ -42,20 +42,20 @@ pretty_close :: (w: &io.Writer, close: u8, empty: bool) {
         _enc.depth -= 1;
         write_newline_indent(w);
     }
-    io.write_byte(w, close);
+    io.Writer.write_byte(w, close);
 }
 
 #local
 pretty_sep :: (w: &io.Writer, first: bool) {
     if first do return;
-    io.write_byte(w, ',');
+    io.Writer.write_byte(w, ',');
     write_newline_indent(w);
 }
 
 #local
 pretty_colon :: (w: &io.Writer) {
-    io.write_byte(w, ':');
-    if _enc.indent > 0 do io.write_byte(w, ' ');
+    io.Writer.write_byte(w, ':');
+    if _enc.indent > 0 do io.Writer.write_byte(w, ' ');
 }
 
 encode_string :: (v: $T, allocator := context.allocator, indent := 0) -> Result(str, Encoding_Error) {
@@ -68,16 +68,16 @@ encode_string :: (v: $T, allocator := context.allocator, indent := 0) -> Result(
         _enc.depth = old_depth;
     }
 
-    stream := io.buffer_stream_make(256);
-    writer := io.writer_make(&stream, 0);
-    defer io.buffer_stream_free(&stream);
+    stream := io.BufferStream.make(256);
+    writer := io.Writer.make(&stream, 0);
+    defer io.BufferStream.free(&stream);
 
     err := encode(&writer, v);
     if err != .None {
         return .{ Err = err };
     }
 
-    s := string.copy(io.buffer_stream_to_str(&stream), allocator);
+    s := str.copy(io.BufferStream.to_str(&stream), allocator);
     return .{ Ok = s };
 }
 
@@ -124,7 +124,7 @@ Encoder.encode :: (e: &Encoder, v: $T) -> Encoding_Error {
 
     err := encode(e.writer, v)
     if err != .None do return err
-    if e.newline do io.write_byte(e.writer, '\n')
+    if e.newline do io.Writer.write_byte(e.writer, '\n')
     return .None
 }
 
@@ -135,27 +135,27 @@ Encoder.encode :: (e: &Encoder, v: $T) -> Encoding_Error {
 //
 encode :: #match {
     (w: &io.Writer, v: i32) -> Encoding_Error {
-        io.write_i32(w, ~~v);
+        io.Writer.write_i32(w, ~~v);
         return .None;
     },
 
     (w: &io.Writer, v: i64) -> Encoding_Error {
-        io.write_i64(w, ~~v);
+        io.Writer.write_i64(w, ~~v);
         return .None;
     },
 
     (w: &io.Writer, v: f32) -> Encoding_Error {
-        io.write_f32(w, ~~v);
+        io.Writer.write_f32(w, ~~v);
         return .None;
     },
 
     (w: &io.Writer, v: f64) -> Encoding_Error {
-        io.write_f64(w, ~~v);
+        io.Writer.write_f64(w, ~~v);
         return .None;
     },
 
     (w: &io.Writer, v: str) -> Encoding_Error {
-        io.write_escaped_str(w, v);
+        io.Writer.write_escaped_str(w, v);
         return .None;
     },
 
@@ -197,7 +197,7 @@ encode :: #match {
             pretty_sep(w, i == 0);
             entry := &v.entries[i];
 
-            io.write_escaped_str(w, entry.key);
+            io.Writer.write_escaped_str(w, entry.key);
             pretty_colon(w);
 
             err := encode(w, entry.value);
@@ -210,10 +210,10 @@ encode :: #match {
 
     (w: &io.Writer, v: Value) -> Encoding_Error {
         switch (cast(&_Value) v).type {
-            case .Null    do io.write_str(w, "null");
-            case .Bool    do io.write(w, v->as_bool());
-            case .Integer do io.write(w, v->as_int());
-            case .Float   do io.write(w, v->as_float());
+            case .Null    do io.Writer.write_str(w, "null");
+            case .Bool    do io.Writer.write(w, v->as_bool());
+            case .Integer do io.Writer.write(w, v->as_int());
+            case .Float   do io.Writer.write(w, v->as_float());
             case .String  do   encode(w, v->as_str());
             case .Array   do   encode(w, v->as_array());
 
@@ -225,7 +225,7 @@ encode :: #match {
                 for i in obj.object_.count {
                     pretty_sep(w, i == 0);
 
-                    io.write_escaped_str(w, obj.object_[i].key);
+                    io.Writer.write_escaped_str(w, obj.object_[i].key);
                     pretty_colon(w);
 
                     err := encode(w, obj.object_[i].value);
@@ -261,7 +261,7 @@ encode :: (w: &io.Writer, data: any) -> Encoding_Error {
 
     switch info.kind {
         case .Basic {
-            io.write_format_va(w, "{}", .[data]);
+            io.Writer.write_format_va(w, "{}", .[data]);
         }
 
         case .Array {
@@ -279,7 +279,7 @@ encode :: (w: &io.Writer, data: any) -> Encoding_Error {
 
         case .Slice, .Dynamic_Array {
             if data.type == str {
-                io.write_escaped_str(w, *misc.any_as(data, str));
+                io.Writer.write_escaped_str(w, *misc.any_as(data, str));
                 break;
             }
 
@@ -311,7 +311,7 @@ encode :: (w: &io.Writer, data: any) -> Encoding_Error {
 
             visible := 0;
             for &member in s.members {
-                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
+                if tag := Slice.first(member.tags, [t](t.type == type_expr)); tag != null {
                     if *cast(&type_expr, tag.data) == Ignore do continue;
                 }
                 visible += 1;
@@ -323,11 +323,11 @@ encode :: (w: &io.Writer, data: any) -> Encoding_Error {
 
             for &member in s.members {
                 key := member.name;
-                if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
+                if tag := Slice.first(member.tags, [t](t.type == Custom_Key)); tag != null {
                     key = (cast(&Custom_Key) tag.data).key;
                 }
 
-                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
+                if tag := Slice.first(member.tags, [t](t.type == type_expr)); tag != null {
                     if *cast(&type_expr, tag.data) == Ignore {
                         continue;
                     }
@@ -350,7 +350,7 @@ encode :: (w: &io.Writer, data: any) -> Encoding_Error {
             u := info->as_union();
             tag := *cast(&Optional(void).tag_enum) data.data;
             if tag != .Some {
-                io.write(w, "null");
+                io.Writer.write(w, "null");
             } else {
                 encode(w, misc.any_member(data, u.variants[1].type, u.alignment));
             }
@@ -443,7 +443,7 @@ from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> 
             a_info := cast(&Type_Info_Array) t_info;
 
             v := new(_Value_Array, allocator);
-            array.init(&v.array_, a_info.count, allocator);
+            Array.init(&v.array_, a_info.count, allocator);
 
             for i in a_info.count {
                 v.array_ << from_any(a_info.of, memory.ptr_add(input, size_of(a_info.of) * i));
@@ -456,7 +456,7 @@ from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> 
             // Strings are handled differently
             if type == str {
                 v := new(_Value_String, allocator);
-                v.str_ = string.copy(*cast(&str) input, allocator);
+                v.str_ = str.copy(*cast(&str) input, allocator);
                 return Value.{v};
             }
 
@@ -464,7 +464,7 @@ from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> 
             s := cast(&core.array.Untyped_Array) input;
 
             v := new(_Value_Array, allocator);
-            array.init(&v.array_, s.count, allocator);
+            Array.init(&v.array_, s.count, allocator);
 
             for i in s.count {
                 v.array_ << from_any(s_info.of, memory.ptr_add(s.data, size_of(s_info.of) * i));
@@ -477,15 +477,15 @@ from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> 
             s_info := cast(&Type_Info_Struct) t_info;
 
             v := new(_Value_Object, allocator);
-            array.init(&v.object_, s_info.members.count, allocator);
+            Array.init(&v.object_, s_info.members.count, allocator);
 
             for& member in s_info.members {
                 key := member.name;
-                if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
+                if tag := Slice.first(member.tags, [t](t.type == Custom_Key)); tag != null {
                     key = (cast(&Custom_Key) tag.data).key;
                 }
 
-                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
+                if tag := Slice.first(member.tags, [t](t.type == type_expr)); tag != null {
                     if *cast(&type_expr, tag.data) == Ignore {
                         continue;
                     }
@@ -581,7 +581,7 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
         case .Slice {
             // Strings are handled differently
             if type == str {
-                *cast(&str) out = string.copy(value->as_str());
+                *cast(&str) out = str.copy(value->as_str());
                 return;
             }
 
@@ -612,11 +612,11 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
 
             for& member in s_info.members {
                 key := member.name;
-                if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
+                if tag := Slice.first(member.tags, [t](t.type == Custom_Key)); tag != null {
                     key = (cast(&Custom_Key) tag.data).key;
                 }
 
-                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
+                if tag := Slice.first(member.tags, [t](t.type == type_expr)); tag != null {
                     if *cast(&type_expr, tag.data) == Ignore {
                         continue;
                     }

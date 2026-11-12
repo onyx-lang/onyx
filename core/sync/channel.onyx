@@ -28,7 +28,7 @@ Channel.send :: (chan: &Channel, msg: chan.T) {
     if !chan._is_open do return;
 
     critical_section(&chan._mutex) {
-        array.push(&chan._buf, msg);
+        Array.push(&chan._buf, msg);
         condition_broadcast(&chan._condvar);
     }
 }

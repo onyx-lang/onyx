@@ -66,7 +66,7 @@ MemWatchState.init :: (m: &MemWatchState, a: Allocator, listen_addr: &net.Socket
 }
 
 MemWatchState.delete :: (m: &MemWatchState) {
-    io.writer_free(m.writer->unwrap_ptr());
+    io.Writer.free(m.writer->unwrap_ptr());
     m.socket->unwrap_ptr()->close();
 }
 
@@ -80,7 +80,7 @@ MemWatchState.wait_for_connection :: (m: &MemWatchState) -> Result(void, io.Erro
     result := listen_socket->accept()?;
 
     m.socket = .{ Some = result.socket };
-    m.writer = .{ Some = io.writer_make(m.socket->unwrap_ptr(), 0) };
+    m.writer = .{ Some = io.Writer.make(m.socket->unwrap_ptr(), 0) };
 
     memwatch_send_message(m, .{ Start = .{ version = VERSION, heap_base_address = cast(u32) __heap_start } });
 
@@ -90,11 +90,6 @@ MemWatchState.wait_for_connection :: (m: &MemWatchState) -> Result(void, io.Erro
 #overload
 builtin.delete :: MemWatchState.delete
 
-// Compatibility: package names.
-make :: MemWatchState.make
-init :: MemWatchState.init
-free :: MemWatchState.delete
-wait_for_connection :: MemWatchState.wait_for_connection
 
 enable_in_scope :: macro (a: Allocator, port := DEFAULT_PORT) {
     use core.alloc.memwatch
@@ -124,7 +119,7 @@ memwatch_proc :: (m: &MemWatchState, action: AllocationAction, size: u32, align:
     trace: [] MemWatchStackNode = .[];
     stack_trace := runtime.info.get_stack_trace();
     if stack_trace {
-        slice.init(&trace, stack_trace.count, context.temp_allocator);
+        Slice.init(&trace, stack_trace.count, context.temp_allocator);
         for i in stack_trace.count {
             info := stack_trace[i].info;
             trace[i] = .{

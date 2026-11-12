@@ -21,7 +21,7 @@ Surrogate_Max :: 0xDFFF
 
 append_rune :: (s: &dyn_str, r: rune) -> str {
     buffer: [Max_Chars] u8;
-    string.append(s, encode_rune(buffer, r));
+    dyn_str.append(s, encode_rune(buffer, r));
     return *s;
 }
 
@@ -34,7 +34,7 @@ advance_rune :: (s: str, n := 1) -> str {
         if t.count == 0 do break;
         _, len := decode_rune(t);
         if len <= 0 do break;
-        t = string.advance(t, len);
+        t = str.advance(t, len);
     }
     return t;
 }
@@ -175,7 +175,7 @@ rune_count :: (s: str) -> i32 {
     while w.count > 0 {
         _, len := decode_rune(w);
         if len <= 0 do break;
-        w = string.advance(w, len);
+        w = str.advance(w, len);
         count += 1;
     }
 
@@ -237,11 +237,11 @@ runes :: (s: str) -> Iterator(RuneIterValue) {
     return iter.generator(
         &.{ s = s },
         (ctx: $C) -> ? RuneIterValue {
-            if string.empty(ctx.s) do return .None;
+            if str.empty(ctx.s) do return .None;
 
             r, len := decode_rune(ctx.s);
             if len <= 0 do return .None;
-            defer string.advance(&ctx.s, len);
+            defer str.advance(&ctx.s, len);
 
             return RuneIterValue.{ r, ctx.s[0 .. len] };
         }
@@ -261,7 +261,7 @@ slice :: (s: str, low, high: i32) -> str {
         _, b := decode_rune(tmp);
         if b <= 0 do break;
         bytes += b;
-        string.advance(&tmp, b);
+        str.advance(&tmp, b);
     }
 
     return advanced.data[0 .. bytes];

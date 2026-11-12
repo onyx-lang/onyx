@@ -15,7 +15,7 @@ package cbindgen
 //
 // main :: () {
 //     path := module_path(#file);
-//     c_file_path := string.concat(path, "temporary.c");
+//     c_file_path := str.concat(path, "temporary.c");
 //     success := cbindgen.generate_c_binding(.{
 //         output_file            = c_file_path,
 //         foreign_block          = your_module.foreign_block,
@@ -32,7 +32,7 @@ package cbindgen
 //
 //     if !success do os.exit(1);
 //
-//     success = cbindgen.compile_c_file(c_file_path, string.concat(path, "library"));
+//     success = cbindgen.compile_c_file(c_file_path, str.concat(path, "library"));
 //     if !success do os.exit(1);
 //
 //     os.remove_file(c_file_path);
@@ -88,8 +88,8 @@ Binding_Config :: struct {
 }
 
 generate_c_binding :: (use binding_config: Binding_Config) -> bool {
-    use file := os.open(output_file, .Write)->or_return(false);
-    use writer := io.writer_make(&file);
+    use file := os.File.open(output_file, .Write)->or_return(false);
+    use writer := io.Writer.make(&file);
 
     fb := runtime.info.get_foreign_block(foreign_block);
 
@@ -98,8 +98,8 @@ generate_c_binding :: (use binding_config: Binding_Config) -> bool {
     for fb.funcs {
         for impl in custom_implementations {
             if impl.name == it.name {
-                io.write(&writer, impl.impl);
-                io.write(&writer, "\n");
+                io.Writer.write(&writer, impl.impl);
+                io.Writer.write(&writer, "\n");
                 continue continue;
             }
         }
@@ -155,7 +155,7 @@ compile_c_file :: (
         }
 
         if flags != "" {
-            for string.split(flags, ' ') do args << it;
+            for str.split(flags, ' ') do args << it;
         }
 
         args << "-o";
@@ -169,14 +169,14 @@ compile_c_file :: (
             args << aprintf("-l{}", it);
         }
 
-        proc := os.process_spawn(Compiler, args);
-        defer os.process_destroy(&proc);
+        proc := os.Process.spawn(Compiler, args);
+        defer os.Process.destroy(&proc);
 
-        proc_reader := io.reader_make(&proc);
-        output := io.read_all(&proc_reader);
+        proc_reader := io.Reader.make(&proc);
+        output := io.Reader.read_all(&proc_reader);
         defer memory.free_slice(&output);
 
-        exit := os.process_wait(&proc);
+        exit := os.Process.wait(&proc);
         if exit != .Success {
             eprintf("Failed to compile {}\n", path);
             eprintf("{}\n", output);
@@ -194,15 +194,15 @@ compile_c_file :: (
 
 #local {
     write_file_introduction :: (writer: &io.Writer, preamble: [] str, name: str) {
-        io.write_format(writer, "//\n");
-        io.write_format(writer, "// THIS FILE WAS AUTOMATICALLY GENERATED.\n");
-        io.write_format(writer, "//\n");
+        io.Writer.write_format(writer, "//\n");
+        io.Writer.write_format(writer, "// THIS FILE WAS AUTOMATICALLY GENERATED.\n");
+        io.Writer.write_format(writer, "//\n");
 
         for text in preamble {
-            io.write_format(writer, "{}\n", text);
+            io.Writer.write_format(writer, "{}\n", text);
         }
 
-        io.write_format(writer, """
+        io.Writer.write_format(writer, """
 #define ONYX_LIBRARY_NAME {}
 #include "onyx_library.h"
 
@@ -218,37 +218,37 @@ compile_c_file :: (
         method_info := cast (&Type_Info_Function) get_type_info(method_type);
         assert(method_info.kind == .Function, "Expected function type.");
 
-        io.write_format(writer, "ONYX_DEF({}, (", ff.name);
+        io.Writer.write_format(writer, "ONYX_DEF({}, (", ff.name);
 
         for method_info.parameter_types {
-            if !#first do io.write(writer, ", ");
+            if !#first do io.Writer.write(writer, ", ");
 
-            io.write(writer, type_encoding(it));
+            io.Writer.write(writer, type_encoding(it));
         }
 
-        io.write(writer, "), (");
-        io.write(writer, type_encoding(method_info.return_type));
-        io.write(writer, ")) {\n");
+        io.Writer.write(writer, "), (");
+        io.Writer.write(writer, type_encoding(method_info.return_type));
+        io.Writer.write(writer, ")) {\n");
 
-        method_name := slice.find_opt(ff.tags, [it](it.type == link_name))
+        method_name := Slice.find_opt(ff.tags, [it](it.type == link_name))
                        ->transform(x => misc.any_as(x, link_name).symbol_name) ?? ff.name;
 
         if name_map != null_proc {
             method_name = name_map(method_name);
         }
 
-        switch slice.find_opt(ff.tags, [it](it.type == func_body))
+        switch Slice.find_opt(ff.tags, [it](it.type == func_body))
                    ->transform(x => misc.any_as(x, func_body).body)
         {
             case .Some as body {
-                io.write(writer, body);
-                io.write(writer, "    return NULL;");
+                io.Writer.write(writer, body);
+                io.Writer.write(writer, "    return NULL;");
             }
 
             case .None {
                 print_body(
                     writer, method_name, method_info, cast_map,
-                    slice.some(ff.tags, [it](
+                    Slice.some(ff.tags, [it](
                         misc.any_as(*it, type_expr)
                         |> Optional.from_ptr()
                         |> Optional.transform(x => x == last_arg_is_return_value)
@@ -258,23 +258,23 @@ compile_c_file :: (
             }
         }
 
-        io.write(writer, "}\n\n");
+        io.Writer.write(writer, "}\n\n");
     }
 
     write_library_block :: (writer, funcs) => {
-        io.write(writer, "\n\n");
-        io.write(writer, "ONYX_LIBRARY {\n");
+        io.Writer.write(writer, "\n\n");
+        io.Writer.write(writer, "ONYX_LIBRARY {\n");
         for funcs {
-            io.write_format(writer, "    ONYX_FUNC({})\n", it.name);
+            io.Writer.write_format(writer, "    ONYX_FUNC({})\n", it.name);
         }
-        io.write(writer, "    NULL\n");
-        io.write(writer, "};");
+        io.Writer.write(writer, "    NULL\n");
+        io.Writer.write(writer, "};");
     }
 
     print_body :: (writer, method_name, method_info, cast_map, last_arg_is_return_value) => {
         use runtime.info {*};
-        callw, call := io.string_builder();
-        defer io.buffer_stream_free(call);
+        callw, call := io.Writer.string_builder();
+        defer io.BufferStream.free(call);
         defer cfree(call);
 
         params := method_info.parameter_types;
@@ -287,11 +287,11 @@ compile_c_file :: (
             it_info := it->info();
 
             if it_info.kind == .Slice {
-                io.write_format(&callw, "ONYX_PTR(P({}, i32)), P({}, i32)", param_num, param_num + 1);
+                io.Writer.write_format(&callw, "ONYX_PTR(P({}, i32)), P({}, i32)", param_num, param_num + 1);
                 param_num += 1;
 
             } elseif is_pointer(it) {
-                io.write_format(&callw, "ONYX_PTR(P({}, i32))", param_num);
+                io.Writer.write_format(&callw, "ONYX_PTR(P({}, i32))", param_num);
             
             } elseif it_info.kind == .Function {
                 call_signature := make(dyn_str);
@@ -302,10 +302,10 @@ compile_c_file :: (
                     map_to_dyncall(p, &call_signature);
                 }
 
-                string.append(&call_signature, ")");
+                dyn_str.append(&call_signature, ")");
                 map_to_dyncall(func_info.return_type, &call_signature);
 
-                io.write_format(&callw, "(void *) runtime->wasm_func_from_idx(runtime->wasm_func_table, P({}, i32), \"{}\")", param_num, cast(str) call_signature);
+                io.Writer.write_format(&callw, "(void *) runtime->wasm_func_from_idx(runtime->wasm_func_table, P({}, i32), \"{}\")", param_num, cast(str) call_signature);
 
                 map_to_dyncall :: (t: type_expr, call_signature: &dyn_str) {
                     p := t;
@@ -316,21 +316,21 @@ compile_c_file :: (
                     }
 
                     switch p {
-                        case void do string.append(call_signature, "v");
-                        case bool do string.append(call_signature, "B");
-                        case i8   do string.append(call_signature, "c");
-                        case u8   do string.append(call_signature, "C");
-                        case i16  do string.append(call_signature, "s");
-                        case u16  do string.append(call_signature, "S");
-                        case i32  do string.append(call_signature, "i");
-                        case u32  do string.append(call_signature, "I");
-                        case i64  do string.append(call_signature, "l");
-                        case u64  do string.append(call_signature, "L");
-                        case f32  do string.append(call_signature, "f");
-                        case f64  do string.append(call_signature, "d");
+                        case void do dyn_str.append(call_signature, "v");
+                        case bool do dyn_str.append(call_signature, "B");
+                        case i8   do dyn_str.append(call_signature, "c");
+                        case u8   do dyn_str.append(call_signature, "C");
+                        case i16  do dyn_str.append(call_signature, "s");
+                        case u16  do dyn_str.append(call_signature, "S");
+                        case i32  do dyn_str.append(call_signature, "i");
+                        case u32  do dyn_str.append(call_signature, "I");
+                        case i64  do dyn_str.append(call_signature, "l");
+                        case u64  do dyn_str.append(call_signature, "L");
+                        case f32  do dyn_str.append(call_signature, "f");
+                        case f64  do dyn_str.append(call_signature, "d");
                         case _ {
                             if is_pointer(p) {
-                                string.append(call_signature, "p");
+                                dyn_str.append(call_signature, "p");
                             } else {
                                 panic(tprintf("Unsupported type in function pointer: {}", p));
                             }
@@ -340,63 +340,63 @@ compile_c_file :: (
 
             } elseif it_info.kind == .Struct && it_info->as_struct().constructed_from != cptr {
                 param_type := it;
-                name := slice.find_opt(cast_map, [x](x.type == param_type))
+                name := Slice.find_opt(cast_map, [x](x.type == param_type))
                     ->transform(x => x.name)
                     ->expect(tprintf("Structures used as parameter arguments MUST have a definition in the 'cast_map' in '{}'.", method_name));
 
-                io.write_format(&callw, "*({} *) ONYX_PTR(P({}, i32))", name, param_num); // This is dependent on the pointer size
+                io.Writer.write_format(&callw, "*({} *) ONYX_PTR(P({}, i32))", name, param_num); // This is dependent on the pointer size
 
             } else {
                 matched := false;
                 for& m in cast_map {
                     if m.type == it {
-                        io.write_format(&callw, "({}) P({}, {})", m.name, param_num, type_to_wasm_type(it));
+                        io.Writer.write_format(&callw, "({}) P({}, {})", m.name, param_num, type_to_wasm_type(it));
                         matched = true;
                         break;
                     }
                 }
                 
                 if !matched {
-                    io.write_format(&callw, "P({}, {})", param_num, type_to_wasm_type(it));
+                    io.Writer.write_format(&callw, "P({}, {})", param_num, type_to_wasm_type(it));
                 }
             }
 
-            io.write_format(&callw, ", ");
+            io.Writer.write_format(&callw, ", ");
             param_num += 1;
         }
 
-        call_str := io.buffer_stream_to_str(call);
+        call_str := io.BufferStream.to_str(call);
         call_str  = call_str[0 .. call_str.count - 2];
         if last_arg_is_return_value {
-            return_type := slice.get(method_info.parameter_types, -1);
+            return_type := Slice.get(method_info.parameter_types, -1);
             if return_type->info().kind != .Pointer {
                 panic(tprintf("last_arg_is_return_value requires last parameter to be a pointer. ({} in {})", method_info.parameter_types, method_name));
             }
 
             return_type = return_type->info()->as_pointer().to;
-            type_name := slice.find_opt(cast_map, [x](x.type == return_type))
+            type_name := Slice.find_opt(cast_map, [x](x.type == return_type))
                 ->transform(x => x.name)
                 ->expect(tprintf("Types used as last argument return values MUST have a definition in the 'cast_map' in '{}'.", method_name));
 
-            io.write_format(writer, "    *({} *) ONYX_PTR(P({}, i32)) = {}({});\n", type_name, param_num, method_name, call_str);
+            io.Writer.write_format(writer, "    *({} *) ONYX_PTR(P({}, i32)) = {}({});\n", type_name, param_num, method_name, call_str);
             
         } else {
             wasm_return_type := type_to_wasm_type(method_info.return_type, for_return=true);
             switch wasm_return_type {
-                case ""    do io.write_format(writer,  "    {}({});\n", method_name, call_str);
-                case "i32" do io.write_format(writer,  "    results->data[0] = WASM_I32_VAL({}({}));\n", method_name, call_str);
-                case "i64" do io.write_format(writer,  "    results->data[0] = WASM_I64_VAL({}({}));\n", method_name, call_str);
-                case "f32" do io.write_format(writer,  "    results->data[0] = WASM_F32_VAL({}({}));\n", method_name, call_str);
-                case "f64" do io.write_format(writer,  "    results->data[0] = WASM_F64_VAL({}({}));\n", method_name, call_str);
-                case "cptr" do io.write_format(writer, "    results->data[0] = WASM_I64_VAL((int64_t) {}({}));\n", method_name, call_str);
+                case ""    do io.Writer.write_format(writer,  "    {}({});\n", method_name, call_str);
+                case "i32" do io.Writer.write_format(writer,  "    results->data[0] = WASM_I32_VAL({}({}));\n", method_name, call_str);
+                case "i64" do io.Writer.write_format(writer,  "    results->data[0] = WASM_I64_VAL({}({}));\n", method_name, call_str);
+                case "f32" do io.Writer.write_format(writer,  "    results->data[0] = WASM_F32_VAL({}({}));\n", method_name, call_str);
+                case "f64" do io.Writer.write_format(writer,  "    results->data[0] = WASM_F64_VAL({}({}));\n", method_name, call_str);
+                case "cptr" do io.Writer.write_format(writer, "    results->data[0] = WASM_I64_VAL((int64_t) {}({}));\n", method_name, call_str);
                 case "ptr" {
                     printf("Returning a pointer-like object from C to Onyx in '{}'.\nWhile this is not an error, be careful with what you are doing, as this pointer MUST be allocated in Onyx's memory space, not in external memory. Use cptr(...) if the memory lives elsewhere.\n\n", method_name);
-                    io.write_format(writer,  "    int out = ONYX_UNPTR({}({}));\n    results->data[0] = WASM_I32_VAL(out);\n", method_name, call_str);
+                    io.Writer.write_format(writer,  "    int out = ONYX_UNPTR({}({}));\n    results->data[0] = WASM_I32_VAL(out);\n", method_name, call_str);
                 }
             }
         }
 
-        io.write_format(writer, "    return NULL;\n");
+        io.Writer.write_format(writer, "    return NULL;\n");
     }
 
     type_to_wasm_type :: (t: type_expr, for_return := false) -> str {

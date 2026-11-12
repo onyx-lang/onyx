@@ -86,7 +86,7 @@ TCP_Connection.iter_close :: (use conn: &TCP_Connection) {
         raw_free(event_allocator, it.data)
     }
 
-    array.clear(&events)
+    Array.clear(&events)
 }
 
 
@@ -167,7 +167,7 @@ tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> &TCP_S
 
     server.client_count = 0
     server.clients = make([] ? TCP_Server.Client, max_clients, allocator=allocator)
-    array.fill(server.clients, .None)
+    Slice.fill(server.clients, .None)
 
     return server
 }

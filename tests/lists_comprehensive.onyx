@@ -6,7 +6,7 @@ main :: () {
     l := make(list.List(i32));
 
     for 10 {
-        list.push_end(&l, it);
+        list.List.push_end(&l, it);
     }
 
     for iter.as_iter(&l) {
@@ -15,7 +15,7 @@ main :: () {
 
     println("=================");
     for 5 {
-        list.pop_begin_opt(&l) |> println();
+        list.List.pop_begin_opt(&l) |> println();
     }
 
     println("=================");
@@ -25,15 +25,15 @@ main :: () {
 
     println("=================");
     for 5 {
-        list.pop_end_opt(&l) |> println();
+        list.List.pop_end_opt(&l) |> println();
     }
 
     println("=================");
     for 5 {
-        list.pop_begin_opt(&l) |> println();
+        list.List.pop_begin_opt(&l) |> println();
     }
 
-    println(list.count(&l));
-    println(list.empty(&l));
+    println(list.List.count(&l));
+    println(list.List.empty(&l));
     delete(&l);
 }

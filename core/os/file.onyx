@@ -73,16 +73,16 @@ remove_file :: fs.__file_remove
 rename_file :: fs.__file_rename
 
 File.get_contents :: (file: &File) -> str {
-    size := cast(u32) io.stream_size(file);
+    size := cast(u32) io.Stream.size(file);
 
     data := cast([&] u8) raw_alloc(context.allocator, size);
 
-    prev_loc := io.stream_tell(file).Ok ?? 0;
-    io.stream_seek(file, 0, .Start);
+    prev_loc := io.Stream.tell(file).Ok ?? 0;
+    io.Stream.seek(file, 0, .Start);
 
-    io.stream_read(file, .{ data, size });
+    io.Stream.read(file, .{ data, size });
 
-    io.stream_seek(file, prev_loc, .Start);
+    io.Stream.seek(file, prev_loc, .Start);
 
     return data[0 .. size];
 }
@@ -144,15 +144,15 @@ File.close :: (file: &File) {
 
 #overload
 __dispose_used_local :: macro (file: &File) {
-    #this_package.close(file);
+    #this_package.File.close(file);
 }
 
 get_contents :: #match {
     File.get_contents,
 
     (path: str) -> str {
-        file := open(path, .Read)->or_return(null_str);
-        defer close(&file);
+        file := File.open(path, .Read)->or_return(null_str);
+        defer File.close(&file);
 
         return get_contents(&file);
     }
@@ -203,7 +203,7 @@ file_logger_open :: (filename: str, allocator := context.allocator) -> Result(&F
 
     file_logger.file = new(File, allocator);
 
-    *file_logger.file = open(filename, mode=.Append)->catch([] {
+    *file_logger.file = File.open(filename, mode=.Append)->catch([] {
         raw_free(allocator, file_logger.file);
         raw_free(allocator, file_logger);
 
@@ -223,7 +223,7 @@ file_logger_close :: (logger: &File_Logger) {
         context.logger = logger.old_logger;
     }
 
-    close(logger.file);
+    File.close(logger.file);
 
     raw_free(logger.allocator, logger.file);
     raw_free(logger.allocator, logger);
@@ -231,12 +231,12 @@ file_logger_close :: (logger: &File_Logger) {
 
 #local
 file_logger_proc :: (logger: &File_Logger, level: Log_Level, msg: str, module: str) {
-    writer := io.writer_make(logger.file, 0);
+    writer := io.Writer.make(logger.file, 0);
 
     if module {
-        io.write_format(&writer, "[{}][{}] {}\n", level, module, msg);
+        io.Writer.write_format(&writer, "[{}][{}] {}\n", level, module, msg);
     } else {
-        io.write_format(&writer, "[{}] {}\n", level, msg);
+        io.Writer.write_format(&writer, "[{}] {}\n", level, msg);
     }
 }
 
@@ -248,14 +248,3 @@ File.rename :: rename_file
 stdin  := &fs.__stdin
 stdout := &fs.__stdout
 stderr := &fs.__stderr
-
-// Compatibility: package names.
-open :: File.open
-close :: File.close
-from_fd :: File.from_fd
-get_contents_from_file :: File.get_contents
-write_contents :: File.write_contents
-symlink :: File.symlink
-link :: File.link
-readlink :: File.readlink
-lstat :: File.lstat

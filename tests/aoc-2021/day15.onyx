@@ -10,14 +10,14 @@ pos :: struct { x, y: i32; }
 #operator == (p1, p2: pos) => p1.x == p2.x && p1.y == p2.y;
 
 main :: (args) => {
-    use file := os.open("./tests/aoc-2021/input/day15.txt")->unwrap();
-    use reader := io.reader_make(&file);
+    use file := os.File.open("./tests/aoc-2021/input/day15.txt")->unwrap();
+    use reader := io.Reader.make(&file);
 
     cells: [..] u8;
     height := 0;
-    while !io.reader_empty(&reader) {
-        line := io.read_line(&reader, consume_newline=false, inplace=true);
-        io.skip_whitespace(&reader);
+    while !io.Reader.empty(&reader) {
+        line := io.Reader.read_line(&reader, consume_newline=false, inplace=true);
+        io.Reader.skip_whitespace(&reader);
 
         for line do cells << it;
         height += 1;
@@ -25,14 +25,14 @@ main :: (args) => {
 
     width := cells.count / height;
 
-    to_try := heap.make(queued, (x, y) => x.cost - y.cost);
-    tried := set.make(pos);
+    to_try := heap.Heap.make(queued, (x, y) => x.cost - y.cost);
+    tried := set.Set.make(pos);
 
     to_try << .{ 0, 0, -cast(i32) (cells[0] - '0') };
 
     minimum := 0;
-    while !heap.empty(&to_try) {
-        try := heap.remove_top(&to_try)->unwrap();
+    while !heap.Heap.empty(&to_try) {
+        try := heap.Heap.remove_top(&to_try)->unwrap();
         tried << .{try.x, try.y};
 
         cell_value := cast(u32) (cells[(try.y % height) * width + (try.x % width)] - '0');
@@ -47,7 +47,7 @@ main :: (args) => {
         attempt_add :: macro (cond: Code, dx, dy: i32) {
             if #unquote cond {
                 if !(tried->has(.{try.x + dx, try.y + dy})) {
-                    if found := array.find_ptr(to_try.data, .{try.x + dx, try.y + dy, 0}); found != null {
+                    if found := Slice.find_ptr(to_try.data, .{try.x + dx, try.y + dy, 0}); found != null {
                         found.cost = math.min(cell_value, found.cost);
                     } else {
                         to_try << .{try.x + dx, try.y + dy, cell_value };
@@ -65,7 +65,7 @@ main :: (args) => {
     printf("Part 2: {}\n", minimum);
 
 /*      NAIVE SOLUTION
-        min_paths := array.make(u32, capacity=cells.count*25);
+        min_paths := Array.make(u32, capacity=cells.count*25);
         min_paths.count = cells.count * 25;
         memory.set(min_paths.data, 0, sizeof u32 * min_paths.count * 25);
 

@@ -16,8 +16,8 @@ use runtime
 /// It looks for all custom formatting and parsing definitions and
 /// registers them to be used in format_any and parse_any.
 custom_formatters_initialized :: #init () {
-    map.init(&custom_formatters);
-    map.init(&custom_parsers);
+    map.Map.init(&custom_formatters);
+    map.Map.init(&custom_parsers);
 
     #if Enable_Custom_Formatters {
         use runtime.info {*};
@@ -175,7 +175,7 @@ Format :: struct {
 
 #local
 flush_to_dyn_str :: (dynstr: &dyn_str, to_write: str) => {
-    array.concat(dynstr, to_write);
+    Array.concat(dynstr, to_write);
     return true;
 }
 
@@ -218,7 +218,7 @@ format :: (buffer: &dyn_str, format: str, va: ..any) -> str {
     };
 
     final := format_va(&output, format, ~~va);
-    string.concat(buffer, final);
+    str.concat(buffer, final);
     return *buffer;
 }
 
@@ -246,7 +246,7 @@ format_va :: (buffer: &dyn_str, format: str, va: [] any) -> str {
     };
 
     final := format_va(&output, format, va);
-    string.concat(buffer, final);
+    str.concat(buffer, final);
     return *buffer;
 }
 
@@ -525,12 +525,12 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
             // This is a little gross but the only way to output the type name for a type_expr
             // is through a io.Writer. That should maybe be changed in the future? Also, I think
             // 256 bytes is enough for the name of a type but I'm not entirely sure...
-            stream := io.buffer_stream_make(~~buf, fixed=true);
-            writer := io.writer_make(&stream, 0);
+            stream := io.BufferStream.make(~~buf, fixed=true);
+            writer := io.Writer.make(&stream, 0);
             write_type_name(&writer, value);
-            io.writer_flush(&writer);
+            io.Writer.flush(&writer);
 
-            output->write(io.buffer_stream_to_str(&stream));
+            output->write(io.BufferStream.to_str(&stream));
         }
 
         case any {
@@ -732,7 +732,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                     case _ do panic("Bad union backing type");
                 }
 
-                variant := array.first(u.variants, [x](x.tag_value == ~~tag_value));
+                variant := Slice.first(u.variants, [x](x.tag_value == ~~tag_value));
 
                 if !variant {
                     output->write("unknown_variant");

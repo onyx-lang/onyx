@@ -8,7 +8,7 @@ use runtime.info {*}
 write :: (doc: &Document, w: &io.Writer, indent := 0) {
     if doc.doctype.name.count > 0 {
         write_doctype(doc, w);
-        if indent > 0 do io.write_byte(w, '\n');
+        if indent > 0 do io.Writer.write_byte(w, '\n');
     }
     if doc.elements.count == 0 do return;
     write_element(doc, w, 0, indent, 0);
@@ -17,46 +17,46 @@ write :: (doc: &Document, w: &io.Writer, indent := 0) {
 Document.write :: write
 
 write_string :: (doc: &Document, allocator := context.allocator, indent := 0) -> str {
-    stream := io.buffer_stream_make(256);
-    writer := io.writer_make(&stream, 0);
-    defer io.buffer_stream_free(&stream);
+    stream := io.BufferStream.make(256);
+    writer := io.Writer.make(&stream, 0);
+    defer io.BufferStream.free(&stream);
 
     write(doc, &writer, indent);
-    return string.copy(io.buffer_stream_to_str(&stream), allocator);
+    return str.copy(io.BufferStream.to_str(&stream), allocator);
 }
 
 Document.write_string :: write_string
 
 #local
 write_doctype :: (doc: &Document, w: &io.Writer) {
-    io.write(w, "<!DOCTYPE ");
-    io.write(w, doc.doctype.name);
+    io.Writer.write(w, "<!DOCTYPE ");
+    io.Writer.write(w, doc.doctype.name);
     if doc.doctype.public_id.count > 0 {
-        io.write(w, " PUBLIC \"");
+        io.Writer.write(w, " PUBLIC \"");
         write_escaped(w, doc.doctype.public_id, true);
-        io.write(w, "\" \"");
+        io.Writer.write(w, "\" \"");
         write_escaped(w, doc.doctype.system_id, true);
-        io.write(w, "\"");
+        io.Writer.write(w, "\"");
     } elseif doc.doctype.system_id.count > 0 {
-        io.write(w, " SYSTEM \"");
+        io.Writer.write(w, " SYSTEM \"");
         write_escaped(w, doc.doctype.system_id, true);
-        io.write(w, "\"");
+        io.Writer.write(w, "\"");
     }
     if doc.doctype.internal_subset.count > 0 {
-        io.write(w, " [");
-        io.write(w, doc.doctype.internal_subset);
-        io.write(w, "]");
+        io.Writer.write(w, " [");
+        io.Writer.write(w, doc.doctype.internal_subset);
+        io.Writer.write(w, "]");
     }
-    io.write(w, ">");
+    io.Writer.write(w, ">");
 }
 
 #local
 write_nl_indent :: (w: &io.Writer, indent: i32, depth: i32) {
     if indent <= 0 do return;
-    io.write_byte(w, '\n');
+    io.Writer.write_byte(w, '\n');
     n := indent * depth;
     while n > 0 {
-        io.write_byte(w, ' ');
+        io.Writer.write_byte(w, ' ');
         n -= 1;
     }
 }
@@ -73,18 +73,18 @@ has_element_child :: (el: &Element) -> bool {
 write_escaped :: (w: &io.Writer, s: str, attr: bool) {
     for c in s {
         switch c {
-            case '&'  do io.write(w, "&amp;");
-            case '<'  do io.write(w, "&lt;");
-            case '>'  do io.write(w, "&gt;");
+            case '&'  do io.Writer.write(w, "&amp;");
+            case '<'  do io.Writer.write(w, "&lt;");
+            case '>'  do io.Writer.write(w, "&gt;");
             case '"' {
-                if attr do io.write(w, "&quot;");
-                else     do io.write_byte(w, c);
+                if attr do io.Writer.write(w, "&quot;");
+                else     do io.Writer.write_byte(w, c);
             }
             case '\'' {
-                if attr do io.write(w, "&apos;");
-                else     do io.write_byte(w, c);
+                if attr do io.Writer.write(w, "&apos;");
+                else     do io.Writer.write_byte(w, c);
             }
-            case _ do io.write_byte(w, c);
+            case _ do io.Writer.write_byte(w, c);
         }
     }
 }
@@ -93,22 +93,22 @@ write_escaped :: (w: &io.Writer, s: str, attr: bool) {
 write_element :: (doc: &Document, w: &io.Writer, idx: Element.Index, indent: i32, depth: i32) {
     el := &doc.elements[idx];
 
-    io.write_byte(w, '<');
-    io.write(w, el.name);
+    io.Writer.write_byte(w, '<');
+    io.Writer.write(w, el.name);
     for attr in el.attributes {
-        io.write_byte(w, ' ');
-        io.write(w, attr.key);
-        io.write(w, "=\"");
+        io.Writer.write_byte(w, ' ');
+        io.Writer.write(w, attr.key);
+        io.Writer.write(w, "=\"");
         write_escaped(w, attr.value, true);
-        io.write_byte(w, '"');
+        io.Writer.write_byte(w, '"');
     }
 
     if el.children.count == 0 {
-        io.write(w, "/>");
+        io.Writer.write(w, "/>");
         return;
     }
 
-    io.write_byte(w, '>');
+    io.Writer.write_byte(w, '>');
 
     pretty := indent > 0 && has_element_child(el);
     for c in el.children {
@@ -120,9 +120,9 @@ write_element :: (doc: &Document, w: &io.Writer, idx: Element.Index, indent: i32
     }
 
     if pretty do write_nl_indent(w, indent, depth);
-    io.write(w, "</");
-    io.write(w, el.name);
-    io.write_byte(w, '>');
+    io.Writer.write(w, "</");
+    io.Writer.write(w, el.name);
+    io.Writer.write_byte(w, '>');
 }
 
 encode :: #match #local {}
@@ -148,14 +148,14 @@ encode_string :: (doc: &Document, allocator := context.allocator, indent := 0) -
 
 #overload
 encode_string :: (v: $T, allocator := context.allocator, indent := 0) -> Result(str, Error) {
-    stream := io.buffer_stream_make(256)
-    writer := io.writer_make(&stream, 0)
-    defer io.buffer_stream_free(&stream)
+    stream := io.BufferStream.make(256)
+    writer := io.Writer.make(&stream, 0)
+    defer io.BufferStream.free(&stream)
 
     err := encode(&writer, v, indent)
     if err.kind != .None do return .{ Err = err }
 
-    return .{ Ok = string.copy(io.buffer_stream_to_str(&stream), allocator) }
+    return .{ Ok = str.copy(io.BufferStream.to_str(&stream), allocator) }
 }
 
 #local
@@ -246,12 +246,12 @@ encode_any :: (w: &io.Writer, data: any, indent: i32, depth: i32) -> Error {
 write_struct_element :: (w: &io.Writer, data: any, name: str, space: str, indent: i32, depth: i32) -> Error {
     s := cast(&Type_Info_Struct) get_type_info(data.type)
 
-    io.write_byte(w, '<')
-    io.write(w, name)
+    io.Writer.write_byte(w, '<')
+    io.Writer.write(w, name)
     if space.count > 0 {
-        io.write(w, " xmlns=\"")
+        io.Writer.write(w, " xmlns=\"")
         write_escaped(w, space, true)
-        io.write_byte(w, '"')
+        io.Writer.write_byte(w, '"')
     }
 
     for& member in s.members {
@@ -262,19 +262,19 @@ write_struct_element :: (w: &io.Writer, data: any, name: str, space: str, indent
         aval, aopt, asome := optional_parts(field)
         if !asome do continue
 
-        io.write_byte(w, ' ')
-        io.write(w, spec.name)
-        io.write(w, "=\"")
+        io.Writer.write_byte(w, ' ')
+        io.Writer.write(w, spec.name)
+        io.Writer.write(w, "=\"")
         if err := write_scalar(w, aval, true); err.kind != .None do return err
-        io.write_byte(w, '"')
+        io.Writer.write_byte(w, '"')
     }
 
     if !struct_has_body(data) {
-        io.write(w, "/>")
+        io.Writer.write(w, "/>")
         return .{}
     }
 
-    io.write_byte(w, '>')
+    io.Writer.write_byte(w, '>')
 
     pretty := indent > 0 && struct_has_element_child(data)
     for& member in s.members {
@@ -294,9 +294,9 @@ write_struct_element :: (w: &io.Writer, data: any, name: str, space: str, indent
     }
 
     if pretty do write_nl_indent(w, indent, depth)
-    io.write(w, "</")
-    io.write(w, name)
-    io.write_byte(w, '>')
+    io.Writer.write(w, "</")
+    io.Writer.write(w, name)
+    io.Writer.write_byte(w, '>')
     return .{}
 }
 
@@ -394,18 +394,18 @@ write_named_value :: (w: &io.Writer, data: any, name: str, space: str, indent: i
         return write_struct_element(w, data, name, space, indent, depth)
     }
 
-    io.write_byte(w, '<')
-    io.write(w, name)
+    io.Writer.write_byte(w, '<')
+    io.Writer.write(w, name)
     if space.count > 0 {
-        io.write(w, " xmlns=\"")
+        io.Writer.write(w, " xmlns=\"")
         write_escaped(w, space, true)
-        io.write_byte(w, '"')
+        io.Writer.write_byte(w, '"')
     }
-    io.write_byte(w, '>')
+    io.Writer.write_byte(w, '>')
     if err := write_scalar(w, data, false); err.kind != .None do return err
-    io.write(w, "</")
-    io.write(w, name)
-    io.write_byte(w, '>')
+    io.Writer.write(w, "</")
+    io.Writer.write(w, name)
+    io.Writer.write_byte(w, '>')
     return .{}
 }
 
@@ -426,7 +426,7 @@ write_scalar :: (w: &io.Writer, data: any, attr: bool) -> Error {
         elseif info.size == 2 do val = ~~(*cast(&u16) data.data)
         elseif info.size == 4 do val = ~~(*cast(&u32) data.data)
         elseif info.size == 8 do val = *cast(&u64) data.data
-        io.write(w, tprintf("{}", val))
+        io.Writer.write(w, tprintf("{}", val))
         return .{}
     }
 
@@ -436,20 +436,20 @@ write_scalar :: (w: &io.Writer, data: any, attr: bool) -> Error {
             return .{}
         }
         case bool {
-            if *cast(&bool) data.data do io.write(w, "true")
-            else do io.write(w, "false")
+            if *cast(&bool) data.data do io.Writer.write(w, "true")
+            else do io.Writer.write(w, "false")
             return .{}
         }
-        case i8  do io.write(w, tprintf("{}", *cast(&i8)  data.data))
-        case u8  do io.write(w, tprintf("{}", *cast(&u8)  data.data))
-        case i16 do io.write(w, tprintf("{}", *cast(&i16) data.data))
-        case u16 do io.write(w, tprintf("{}", *cast(&u16) data.data))
-        case i32 do io.write(w, tprintf("{}", *cast(&i32) data.data))
-        case u32 do io.write(w, tprintf("{}", *cast(&u32) data.data))
-        case i64 do io.write(w, tprintf("{}", *cast(&i64) data.data))
-        case u64 do io.write(w, tprintf("{}", *cast(&u64) data.data))
-        case f32 do io.write(w, tprintf("{}", *cast(&f32) data.data))
-        case f64 do io.write(w, tprintf("{}", *cast(&f64) data.data))
+        case i8  do io.Writer.write(w, tprintf("{}", *cast(&i8)  data.data))
+        case u8  do io.Writer.write(w, tprintf("{}", *cast(&u8)  data.data))
+        case i16 do io.Writer.write(w, tprintf("{}", *cast(&i16) data.data))
+        case u16 do io.Writer.write(w, tprintf("{}", *cast(&u16) data.data))
+        case i32 do io.Writer.write(w, tprintf("{}", *cast(&i32) data.data))
+        case u32 do io.Writer.write(w, tprintf("{}", *cast(&u32) data.data))
+        case i64 do io.Writer.write(w, tprintf("{}", *cast(&i64) data.data))
+        case u64 do io.Writer.write(w, tprintf("{}", *cast(&u64) data.data))
+        case f32 do io.Writer.write(w, tprintf("{}", *cast(&f32) data.data))
+        case f64 do io.Writer.write(w, tprintf("{}", *cast(&f64) data.data))
         case _ {
             return .{ kind = .Unsupported_Type, msg = tprintf("cannot encode {} as XML text", type) }
         }

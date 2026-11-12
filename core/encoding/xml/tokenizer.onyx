@@ -69,7 +69,7 @@ Token.Kind :: union {
 
 
 Tokenizer.make :: (a: Allocator, s: &io.Stream) -> (tkn: Tokenizer) {
-    tkn.arena = arena.make(a, 16384)
+    tkn.arena = arena.Arena.make(a, 16384)
     tkn.s = s
     tkn.r = io.Reader.make(s)
     tkn.offset = 0
@@ -85,7 +85,7 @@ Tokenizer.make :: (a: Allocator, s: &io.Stream) -> (tkn: Tokenizer) {
 }
 
 Tokenizer.destroy :: (self: &#Self) {
-    arena.free(&self.arena)
+    arena.Arena.delete(&self.arena)
     self.r->free()
 }
 

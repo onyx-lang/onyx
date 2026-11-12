@@ -27,7 +27,7 @@ StringPool.free  :: pool_free;
 /// Creates a StringPool.
 pool_make :: (maximum_string_length := 16384, allocator := context.allocator) =>
     StringPool.{
-        arena.make(allocator, maximum_string_length)
+        arena.Arena.make(allocator, maximum_string_length)
     }
 
 ///
@@ -43,13 +43,13 @@ pool_add :: (sp: &StringPool, s: str) -> str {
 ///
 /// Clears all entries in the pool.
 pool_flush :: (sp: &StringPool) {
-    arena.clear(&sp.arena);
+    arena.Arena.clear(&sp.arena);
 }
 
 ///
 /// Completely frees all memory in the pool.
 pool_free :: (sp: &StringPool) {
-    arena.free(&sp.arena);
+    arena.Arena.delete(&sp.arena);
 }
 
 #overload

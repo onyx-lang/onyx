@@ -45,7 +45,7 @@ from_document :: (doc: &Document, $T: type_expr) -> Result(T, Error) {
     t_info := get_type_info(T)
     if t_info.kind == .Struct {
         s_info := cast(&Type_Info_Struct) t_info
-        if tag := array.first(s_info.tags, [t](t.type == Name)); tag != null {
+        if tag := Slice.first(s_info.tags, [t](t.type == Name)); tag != null {
             n := *cast(&Name) tag.data
             if n.name.count > 0 && !element_matches(&doc.elements[0], n.name, n.space) {
                 return .{
@@ -211,7 +211,7 @@ unmarshal :: (doc: &Document, el: Element.Index, type: type_expr, out: rawptr, p
 
         case .Slice {
             if type == str {
-                *cast(&str) out = string.copy(doc->text(el))
+                *cast(&str) out = str.copy(doc->text(el))
                 return .{}
             }
             return unsupported(path)
@@ -236,7 +236,7 @@ unmarshal :: (doc: &Document, el: Element.Index, type: type_expr, out: rawptr, p
 #local
 unmarshal_text :: (doc: &Document, el: Element.Index, type: type_expr, out: rawptr, path: &dyn_str) -> Error {
     if type == str {
-        *cast(&str) out = string.copy(doc->text(el))
+        *cast(&str) out = str.copy(doc->text(el))
         return .{}
     }
 
@@ -280,7 +280,7 @@ unmarshal_field :: (doc: &Document, el: Element.Index, type: type_expr, out: raw
             case .Some as s {
                 if is_opt do set_optional_some(out)
                 if inner == str {
-                    *cast(&str) dest = string.copy(s)
+                    *cast(&str) dest = str.copy(s)
                     return .{}
                 }
                 if !conv.parse_any(dest, inner, s) {

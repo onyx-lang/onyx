@@ -965,8 +965,8 @@ sum :: (it: Iterator($T)) -> T {
 /// Places all yielded values into a dynamically allocated array,
 /// using the allocator provided (context.allocator by default).
 to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
-    arr := array.make(T, allocator=allocator);
-    for v in it do array.push(&arr, v);
+    arr := Array.make(T, allocator=allocator);
+    for v in it do Array.push(&arr, v);
 
     return arr;
 }

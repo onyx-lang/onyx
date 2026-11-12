@@ -226,7 +226,7 @@ unmarshal :: (value: Value, type: type_expr, out: rawptr, path: &dyn_str) -> Err
         case .Slice {
             if type == str {
                 if value->type() != .String do return mismatch("string", value, path);
-                *cast(&str) out = string.copy(value->as_str());
+                *cast(&str) out = str.copy(value->as_str());
                 return .{};
             }
 
@@ -264,11 +264,11 @@ unmarshal :: (value: Value, type: type_expr, out: rawptr, path: &dyn_str) -> Err
             s_info := cast(&Type_Info_Struct) t_info;
             for& member in s_info.members {
                 key := member.name;
-                if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
+                if tag := Slice.first(member.tags, [t](t.type == Custom_Key)); tag != null {
                     key = (cast(&Custom_Key) tag.data).key;
                 }
 
-                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
+                if tag := Slice.first(member.tags, [t](t.type == type_expr)); tag != null {
                     if *cast(&type_expr, tag.data) == Ignore {
                         continue;
                     }

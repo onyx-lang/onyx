@@ -1443,7 +1443,7 @@ time :: (out: rawptr) -> i64 {
         }
         if count == 0 do return 0
 
-        switch core.io.stream_read(&fd_table[fd].file, .{ cast([&] u8) buf, count }) {
+        switch core.io.Stream.read(&fd_table[fd].file, .{ cast([&] u8) buf, count }) {
             case .Ok as got do return cast(i32) got
             case .Err as err {
                 if err == .EOF do return 0

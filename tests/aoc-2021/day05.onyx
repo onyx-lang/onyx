@@ -43,21 +43,21 @@ Point :: struct {x, y: u32;}
 #operator == (p1, p2: Point) => p1.x == p2.x && p1.y == p2.y;
 
 main :: (args) => {
-    use file := os.open("./tests/aoc-2021/input/day05.txt")->unwrap();
-    use reader := io.reader_make(&file);
+    use file := os.File.open("./tests/aoc-2021/input/day05.txt")->unwrap();
+    use reader := io.Reader.make(&file);
 
     lines: [..] Line;
 
-    while !io.reader_empty(&reader) {
-        x1 := io.read_u32(&reader);
-        io.skip_bytes(&reader, 1);
-        y1 := io.read_u32(&reader);
-        io.skip_bytes(&reader, 4);
+    while !io.Reader.empty(&reader) {
+        x1 := io.Reader.read_u32(&reader);
+        io.Reader.skip_bytes(&reader, 1);
+        y1 := io.Reader.read_u32(&reader);
+        io.Reader.skip_bytes(&reader, 4);
 
-        x2 := io.read_u32(&reader);
-        io.skip_bytes(&reader, 1);
-        y2 := io.read_u32(&reader);
-        io.skip_whitespace(&reader);
+        x2 := io.Reader.read_u32(&reader);
+        io.Reader.skip_bytes(&reader, 1);
+        y2 := io.Reader.read_u32(&reader);
+        io.Reader.skip_whitespace(&reader);
 
         lines << .{x1, y1, x2, y2};
     }
