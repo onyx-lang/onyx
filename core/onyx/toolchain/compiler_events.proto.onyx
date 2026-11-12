@@ -37,6 +37,8 @@ CompilerEvent :: struct {
         Overload as 19: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventOverload
         @protobuf.Field.{20, 11}
         Poly_Proc as 20: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventPolyProc
+        @protobuf.Field.{21, 11}
+        Tag as 21: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.EventTag
     }
 }
 
@@ -377,5 +379,50 @@ TypeUnionBody :: struct {
     tag_type_id: u32
     @protobuf.Field.{2, 11}
     variants: [..] __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TypeUnionVariant
+}
+
+@protobuf.Message
+EventTag :: struct {
+    target: union {
+        None: void
+        @protobuf.Field.{1, 13}
+        Symbol as 1: u32
+        @protobuf.Field.{2, 13}
+        Type as 2: u32
+    }
+    @protobuf.Field.{3, 11}
+    value: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TagValue
+}
+
+@protobuf.Message
+TagValue :: struct {
+    data: union {
+        None: void
+        @protobuf.Field.{1, 11}
+        Number as 1: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TagNumber
+        @protobuf.Field.{2, 9}
+        String as 2: str
+        @protobuf.Field.{3, 11}
+        Raw_Value as 3: __ROOT_PROTOBUF_PACKAGE.onyx.toolchain.events.TagRawValue
+    }
+}
+
+@protobuf.Message
+TagNumber :: struct {
+    data: union {
+        None: void
+        @protobuf.Field.{1, 3}
+        Int as 1: i64
+        @protobuf.Field.{2, 1}
+        Float as 2: f64
+    }
+}
+
+@protobuf.Message
+TagRawValue :: struct {
+    @protobuf.Field.{1, 13}
+    type_id: u32
+    @protobuf.Field.{2, 12}
+    bytes: [] u8
 }
 

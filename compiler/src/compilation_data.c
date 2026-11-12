@@ -137,6 +137,18 @@ enum {
 #define PB_EVENT_POLY_PROC_SOLUTION_NAMES     3
 #define PB_EVENT_POLY_PROC_SOLUTION_TYPE_IDS  4
 
+#define PB_COMPILER_EVENT_TAG 21
+#define PB_EVENT_TAG_SYMBOL 1
+#define PB_EVENT_TAG_TYPE 2
+#define PB_EVENT_TAG_VALUE 3
+#define PB_TAG_VALUE_NUMBER 1
+#define PB_TAG_VALUE_STRING 2
+#define PB_TAG_VALUE_RAW 3
+#define PB_TAG_NUMBER_INT 1
+#define PB_TAG_NUMBER_FLOAT 2
+#define PB_TAG_RAW_TYPE_ID 1
+#define PB_TAG_RAW_BYTES 2
+
 #define PB_EVENT_BINDING_SYMBOL_ID        1
 #define PB_EVENT_BINDING_DOCUMENTATION    2
 #define PB_EVENT_BINDING_TYPE_ID          3
@@ -553,6 +565,468 @@ static void encode_type_body_payload(Context *context, Type *type) {
     pb_write_bytes(inner, PB_EVENT_TYPE_BODY_STRUCT, sub->data, sub->length);
 }
 
+static AstTyped *tag_unwrap(AstTyped *expr) {
+    while (expr && expr->kind == Ast_Kind_Alias) expr = ((AstAlias *) expr)->alias;
+    while (expr && expr->kind == Ast_Kind_Argument) expr = (AstTyped *) ((AstArgument *) expr)->value;
+    return expr;
+}
+
+static b32 tag_type_is_str(Context *context, Type *type) {
+    if (!context->builtins.string_type) return 0;
+    Type *str_type = type_build_from_ast(context, context->builtins.string_type);
+    return str_type && type == str_type;
+}
+
+static Type *tag_slice_elem(Type *type) {
+    if (type->kind == Type_Kind_DynArray) return type->DynArray.elem;
+    if (type->kind == Type_Kind_VarArgs) return type->VarArgs.elem;
+    return type->Slice.elem;
+}
+
+static void tag_unwrap_numeric(Type **type) {
+    for (;;) {
+        if ((*type)->kind == Type_Kind_Distinct) { *type = (*type)->Distinct.base_type; continue; }
+        if ((*type)->kind == Type_Kind_Enum) { *type = (*type)->Enum.backing; continue; }
+        break;
+    }
+}
+
+static b32 tag_copy_strlit(Context *context, AstStrLit *sl, char **out, u32 *out_len) {
+    if (!sl->token || sl->token->length <= 0) {
+        *out = bh_alloc_array(context->gp_alloc, char, 1);
+        (*out)[0] = '\0';
+        *out_len = 0;
+        return 1;
+    }
+
+    char *raw = bh_alloc_array(context->scratch_alloc, char, sl->token->length + 1);
+    i32 len = string_process_escape_seqs(raw, sl->token->text, sl->token->length);
+    if (len < 0) {
+        bh_free(context->scratch_alloc, raw);
+        return 0;
+    }
+
+    char *stored = bh_alloc_array(context->gp_alloc, char, (u32) len + 1);
+    if (len > 0) memcpy(stored, raw, (u32) len);
+    stored[len] = '\0';
+    bh_free(context->scratch_alloc, raw);
+    *out = stored;
+    *out_len = (u32) len;
+    return 1;
+}
+
+static b32 tag_high_bit(i64 bits) {
+    return ((u64) bits) > 0x7fffffffffffffffULL;
+}
+
+static b32 tag_read_i64(Context *context, AstTyped *expr, Type *type, i64 *out) {
+    expr = tag_unwrap(expr);
+    if (!expr || !type) return 0;
+    tag_unwrap_numeric(&type);
+
+    if (expr->kind == Ast_Kind_Enum_Value) {
+        return tag_read_i64(context, ((AstEnumValue *) expr)->value, type, out);
+    }
+    if (expr->kind == Ast_Kind_Unary_Op && ((AstUnaryOp *) expr)->operation == Unary_Op_Cast) {
+        return tag_read_i64(context, ((AstUnaryOp *) expr)->expr, type, out);
+    }
+    if (expr->kind == Ast_Kind_Size_Of) {
+        *out = (i64) ((AstSizeOf *) expr)->size;
+        return 1;
+    }
+    if (expr->kind == Ast_Kind_Align_Of) {
+        *out = (i64) ((AstAlignOf *) expr)->alignment;
+        return 1;
+    }
+    if (node_is_type((AstNode *) expr)) {
+        Type *built = type_build_from_ast(context, (AstType *) expr);
+        if (!built) return 0;
+        *out = (i64) built->id;
+        return 1;
+    }
+    if (expr->kind == Ast_Kind_Zero_Value) {
+        *out = 0;
+        return 1;
+    }
+    if (expr->kind != Ast_Kind_NumLit || type->kind != Type_Kind_Basic) return 0;
+
+    AstNumLit *nl = (AstNumLit *) expr;
+    switch (type->Basic.kind) {
+        case Basic_Kind_Bool:
+        case Basic_Kind_I8:
+        case Basic_Kind_I16:
+        case Basic_Kind_I32:
+            *out = (i64) nl->value.i;
+            return 1;
+        case Basic_Kind_I64:
+            *out = nl->value.l;
+            return 1;
+        case Basic_Kind_U8:
+        case Basic_Kind_U16:
+        case Basic_Kind_U32:
+            *out = (i64) (u64) nl->value.l;
+            return 1;
+        case Basic_Kind_U64:
+        case Basic_Kind_Type_Index:
+            if (tag_high_bit(nl->value.l)) return 0;
+            *out = nl->value.l;
+            return 1;
+        case Basic_Kind_Int_Unsized:
+            if (nl->was_char_literal) {
+                *out = (i64) (u8) nl->value.i;
+                return 1;
+            }
+            if (nl->was_hex_literal && tag_high_bit(nl->value.l)) return 0;
+            *out = nl->value.l;
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static b32 tag_read_f64(AstTyped *expr, Type *type, double *out) {
+    expr = tag_unwrap(expr);
+    if (!expr || !type) return 0;
+    while (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
+
+    if (expr->kind == Ast_Kind_Unary_Op && ((AstUnaryOp *) expr)->operation == Unary_Op_Cast) {
+        return tag_read_f64(((AstUnaryOp *) expr)->expr, type, out);
+    }
+    if (expr->kind == Ast_Kind_Zero_Value) {
+        *out = 0;
+        return 1;
+    }
+    if (expr->kind != Ast_Kind_NumLit || type->kind != Type_Kind_Basic) return 0;
+
+    AstNumLit *nl = (AstNumLit *) expr;
+    switch (type->Basic.kind) {
+        case Basic_Kind_F32:
+            *out = (double) nl->value.f;
+            return 1;
+        case Basic_Kind_F64:
+        case Basic_Kind_Float_Unsized:
+            *out = nl->value.d;
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static b32 tag_type_is_int(Type *type) {
+    if (!type) return 0;
+    if (type->kind == Type_Kind_Enum) return 1;
+    if (type->kind != Type_Kind_Basic) return 0;
+    switch (type->Basic.kind) {
+        case Basic_Kind_Bool:
+        case Basic_Kind_Int_Unsized:
+        case Basic_Kind_I8:
+        case Basic_Kind_U8:
+        case Basic_Kind_I16:
+        case Basic_Kind_U16:
+        case Basic_Kind_I32:
+        case Basic_Kind_U32:
+        case Basic_Kind_I64:
+        case Basic_Kind_U64:
+        case Basic_Kind_Type_Index:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static b32 tag_type_is_float(Type *type) {
+    if (!type || type->kind != Type_Kind_Basic) return 0;
+    switch (type->Basic.kind) {
+        case Basic_Kind_Float_Unsized:
+        case Basic_Kind_F32:
+        case Basic_Kind_F64:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static b32 osad_write_bytes(bh_buffer *out, void *data, u32 len) {
+    if (len == 0) return 1;
+    bh_buffer_append(out, data, (i32) len);
+    return 1;
+}
+
+static b32 osad_append_strlit(Context *context, AstStrLit *sl, bh_buffer *out) {
+    if (!sl->token || sl->token->length <= 0) {
+        bh_buffer_write_u32(out, 0);
+        return 1;
+    }
+
+    char *raw = bh_alloc_array(context->scratch_alloc, char, sl->token->length + 1);
+    i32 len = string_process_escape_seqs(raw, sl->token->text, sl->token->length);
+    if (len < 0) {
+        bh_free(context->scratch_alloc, raw);
+        return 0;
+    }
+
+    bh_buffer_write_u32(out, (u32) len);
+    if (len > 0) bh_buffer_append(out, raw, len);
+    bh_free(context->scratch_alloc, raw);
+    return 1;
+}
+
+static b32 osad_encode(Context *context, AstTyped *expr, Type *type, bh_buffer *out);
+
+static b32 osad_encode_zero(Context *context, Type *type, bh_buffer *out) {
+    if (!type) return 0;
+    while (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
+
+    switch (type->kind) {
+        case Type_Kind_Basic: {
+            if (type->Basic.flags & Basic_Flag_SIMD) return 0;
+            if (type->Basic.kind == Basic_Kind_Rawptr) return 0;
+            u32 size = type->Basic.size;
+            if (type->Basic.kind == Basic_Kind_Void) return 1;
+            if (type->Basic.kind == Basic_Kind_Int_Unsized || type->Basic.kind == Basic_Kind_Float_Unsized) size = 8;
+            for (u32 i = 0; i < size; i++) bh_buffer_write_byte(out, 0);
+            return 1;
+        }
+        case Type_Kind_Enum:
+            return osad_encode_zero(context, type->Enum.backing, out);
+        case Type_Kind_Pointer:
+        case Type_Kind_MultiPointer:
+        case Type_Kind_Function:
+            return 0;
+        case Type_Kind_Array:
+            for (u32 i = 0; i < type->Array.count; i++) {
+                if (!osad_encode_zero(context, type->Array.elem, out)) return 0;
+            }
+            return 1;
+        case Type_Kind_Slice:
+        case Type_Kind_DynArray:
+        case Type_Kind_VarArgs:
+            bh_buffer_write_u32(out, 0);
+            return 1;
+        case Type_Kind_Struct: {
+            u32 count = type->Struct.mem_count;
+            for (u32 i = 0; i < count; i++) {
+                StructMember *smem = type->Struct.memarr ? type->Struct.memarr[i] : NULL;
+                if (!smem || !osad_encode_zero(context, smem->type, out)) return 0;
+            }
+            return 1;
+        }
+        case Type_Kind_Union: {
+            UnionVariant *variant = type_lookup_union_variant_by_tag(type, 0);
+            if (!variant) {
+                bh_buffer_write_u32(out, 0xffffffffu);
+                return 1;
+            }
+            bh_buffer_write_u32(out, 0);
+            return osad_encode_zero(context, variant->type, out);
+        }
+        default:
+            return 0;
+    }
+}
+
+static b32 osad_encode_basic(Context *context, AstTyped *expr, Type *type, bh_buffer *out) {
+    expr = tag_unwrap(expr);
+    if (!expr) return osad_encode_zero(context, type, out);
+
+    if (expr->kind == Ast_Kind_Unary_Op && ((AstUnaryOp *) expr)->operation == Unary_Op_Cast) {
+        return osad_encode_basic(context, ((AstUnaryOp *) expr)->expr, type, out);
+    }
+    if (expr->kind == Ast_Kind_Struct_Literal) {
+        AstStructLiteral *sl = (AstStructLiteral *) expr;
+        AstTyped *inner = NULL;
+        if (bh_arr_length(sl->values_to_initialize) >= 1) inner = sl->values_to_initialize[0].value;
+        else if (bh_arr_length(sl->args.values) == 1) inner = sl->args.values[0];
+        if (!inner) return 0;
+        return osad_encode_basic(context, inner, type, out);
+    }
+    if (expr->kind == Ast_Kind_Zero_Value) return osad_encode_zero(context, type, out);
+    if (expr->kind == Ast_Kind_Enum_Value) return osad_encode_basic(context, ((AstEnumValue *) expr)->value, type, out);
+    if (expr->kind != Ast_Kind_NumLit) return 0;
+
+    AstNumLit *nl = (AstNumLit *) expr;
+    switch (type->Basic.kind) {
+        case Basic_Kind_Bool:
+        case Basic_Kind_I8:
+        case Basic_Kind_U8: {
+            u8 b = (u8) (type->Basic.flags & Basic_Flag_Unsigned ? nl->value.l : nl->value.i);
+            return osad_write_bytes(out, &b, 1);
+        }
+        case Basic_Kind_I16:
+        case Basic_Kind_U16: {
+            u16 v = (u16) (type->Basic.flags & Basic_Flag_Unsigned ? nl->value.l : nl->value.i);
+            return osad_write_bytes(out, &v, 2);
+        }
+        case Basic_Kind_I32: {
+            i32 v = nl->value.i;
+            return osad_write_bytes(out, &v, 4);
+        }
+        case Basic_Kind_U32:
+        case Basic_Kind_Type_Index: {
+            u32 v = (u32) nl->value.l;
+            return osad_write_bytes(out, &v, 4);
+        }
+        case Basic_Kind_I64:
+        case Basic_Kind_U64:
+        case Basic_Kind_Int_Unsized: {
+            u64 v = nl->was_char_literal ? (u64) (u8) nl->value.i : (u64) nl->value.l;
+            return osad_write_bytes(out, &v, 8);
+        }
+        case Basic_Kind_F32: {
+            float v = nl->value.f;
+            return osad_write_bytes(out, &v, 4);
+        }
+        case Basic_Kind_F64:
+        case Basic_Kind_Float_Unsized:
+            return osad_write_bytes(out, &nl->value.d, 8);
+        case Basic_Kind_Void:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static bh_arr(AstTyped *) tag_literal_values(AstTyped *expr) {
+    if (expr->kind == Ast_Kind_Array_Literal) return ((AstArrayLiteral *) expr)->values;
+    return ((AstStructLiteral *) expr)->args.values;
+}
+
+static b32 osad_encode(Context *context, AstTyped *expr, Type *type, bh_buffer *out) {
+    expr = tag_unwrap(expr);
+    if (!type) return 0;
+    while (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
+
+    switch (type->kind) {
+        case Type_Kind_Basic:
+            if (type->Basic.flags & Basic_Flag_SIMD) return 0;
+            if (type->Basic.kind == Basic_Kind_Rawptr) return 0;
+            return osad_encode_basic(context, expr, type, out);
+        case Type_Kind_Enum:
+            return osad_encode(context, expr, type->Enum.backing, out);
+        case Type_Kind_Pointer:
+        case Type_Kind_MultiPointer:
+        case Type_Kind_Function:
+            return 0;
+        case Type_Kind_Array: {
+            if (!expr || expr->kind == Ast_Kind_Zero_Value) return osad_encode_zero(context, type, out);
+            if (expr->kind != Ast_Kind_Struct_Literal && expr->kind != Ast_Kind_Array_Literal) return 0;
+            bh_arr(AstTyped *) values = tag_literal_values(expr);
+            if (bh_arr_length(values) == 0) return osad_encode_zero(context, type, out);
+            if ((u32) bh_arr_length(values) != type->Array.count) return 0;
+            for (u32 i = 0; i < type->Array.count; i++) {
+                if (!osad_encode(context, values[i], type->Array.elem, out)) return 0;
+            }
+            return 1;
+        }
+        case Type_Kind_Slice:
+        case Type_Kind_DynArray:
+        case Type_Kind_VarArgs: {
+            if (!expr || expr->kind == Ast_Kind_Zero_Value) {
+                bh_buffer_write_u32(out, 0);
+                return 1;
+            }
+            if (expr->kind == Ast_Kind_StrLit && tag_type_is_str(context, type)) {
+                return osad_append_strlit(context, (AstStrLit *) expr, out);
+            }
+            if (expr->kind != Ast_Kind_Struct_Literal && expr->kind != Ast_Kind_Array_Literal) return 0;
+            bh_arr(AstTyped *) values = tag_literal_values(expr);
+            bh_buffer_write_u32(out, (u32) bh_arr_length(values));
+            Type *elem = tag_slice_elem(type);
+            for (i32 i = 0; i < bh_arr_length(values); i++) {
+                if (!osad_encode(context, values[i], elem, out)) return 0;
+            }
+            return 1;
+        }
+        case Type_Kind_Struct: {
+            if (!expr || expr->kind == Ast_Kind_Zero_Value) return osad_encode_zero(context, type, out);
+            if (expr->kind != Ast_Kind_Struct_Literal) return 0;
+            AstStructLiteral *sl = (AstStructLiteral *) expr;
+            if (sl->extension_value) return 0;
+            u32 count = type->Struct.mem_count;
+            if ((u32) bh_arr_length(sl->args.values) < count) return 0;
+            for (u32 i = 0; i < count; i++) {
+                StructMember *smem = type->Struct.memarr ? type->Struct.memarr[i] : NULL;
+                if (!smem || !osad_encode(context, sl->args.values[i], smem->type, out)) return 0;
+            }
+            return 1;
+        }
+        case Type_Kind_Union: {
+            if (!expr || expr->kind == Ast_Kind_Zero_Value) return osad_encode_zero(context, type, out);
+            if (expr->kind != Ast_Kind_Struct_Literal) return 0;
+            AstStructLiteral *sl = (AstStructLiteral *) expr;
+            if (bh_arr_length(sl->values_to_initialize) < 2) return 0;
+            i64 tag_value = 0;
+            if (!tag_read_i64(context, sl->values_to_initialize[0].value, type->Union.tag_type, &tag_value)) return 0;
+            if (tag_value < 0) return 0;
+            UnionVariant *variant = type_lookup_union_variant_by_tag(type, (u32) tag_value);
+            if (!variant) {
+                bh_buffer_write_u32(out, 0xffffffffu);
+                return 1;
+            }
+            bh_buffer_write_u32(out, (u32) tag_value);
+            return osad_encode(context, sl->values_to_initialize[1].value, variant->type, out);
+        }
+        default:
+            return 0;
+    }
+}
+
+static void tag_fill_raw(Context *context, CompilationLogTag *tag, AstTyped *expr, Type *type) {
+    tag->value_kind = COMPILATION_TAG_RAW;
+    tag->raw_type_id = type ? type->id : 0;
+
+    bh_buffer buf;
+    bh_buffer_init(&buf, context->gp_alloc, 32);
+    if (type && osad_encode(context, expr, type, &buf) && buf.length > 0) {
+        tag->raw_bytes = buf.data;
+        tag->raw_len = (u32) buf.length;
+        return;
+    }
+    bh_buffer_free(&buf);
+}
+
+static void tag_fill_value(Context *context, CompilationLogTag *tag, AstTyped *expr) {
+    expr = tag_unwrap(expr);
+    Type *type = expr ? expr->type : NULL;
+    if (!expr || !type) {
+        tag->value_kind = COMPILATION_TAG_RAW;
+        return;
+    }
+
+    if (tag_type_is_str(context, type) && expr->kind == Ast_Kind_StrLit) {
+        char *bytes = NULL;
+        u32 len = 0;
+        if (tag_copy_strlit(context, (AstStrLit *) expr, &bytes, &len)) {
+            tag->value_kind = COMPILATION_TAG_STRING;
+            tag->str_bytes = bytes;
+            tag->str_len = len;
+            return;
+        }
+        tag_fill_raw(context, tag, expr, type);
+        return;
+    }
+
+    if (tag_type_is_int(type)) {
+        i64 value = 0;
+        if (tag_read_i64(context, expr, type, &value)) {
+            tag->value_kind = COMPILATION_TAG_INT;
+            tag->i = value;
+            return;
+        }
+    }
+
+    if (tag_type_is_float(type)) {
+        double value = 0;
+        if (tag_read_f64(expr, type, &value)) {
+            tag->value_kind = COMPILATION_TAG_FLOAT;
+            tag->f = value;
+            return;
+        }
+    }
+
+    tag_fill_raw(context, tag, expr, type);
+}
+
 static void encode_event(Context *context, CompilationEvent *ev) {
     CompilationLog *log = &context->compilation_log;
     bh_buffer *out = &log->pb_event;
@@ -679,6 +1153,42 @@ static void encode_event(Context *context, CompilationEvent *ev) {
             if (ev->ptr) encode_type_body_payload(context, (Type *) ev->ptr);
             pb_write_bytes(out, PB_COMPILER_EVENT_TYPE_BODY, inner->data, inner->length);
             break;
+
+        case COMPILATION_EVENT_TAG: {
+            CompilationLogTag *tag = (CompilationLogTag *) ev->ptr;
+            bh_buffer *value = &log->pb_sub;
+            bh_buffer *nested = &log->pb_item;
+            bh_buffer_clear(value);
+            bh_buffer_clear(nested);
+
+            if (tag) {
+                if (tag->target_is_type) pb_write_uint32_always(inner, PB_EVENT_TAG_TYPE, tag->target_id);
+                else                     pb_write_uint32_always(inner, PB_EVENT_TAG_SYMBOL, tag->target_id);
+
+                switch (tag->value_kind) {
+                    case COMPILATION_TAG_INT:
+                        pb_write_int64_always(nested, PB_TAG_NUMBER_INT, tag->i);
+                        pb_write_bytes(value, PB_TAG_VALUE_NUMBER, nested->data, nested->length);
+                        break;
+                    case COMPILATION_TAG_FLOAT:
+                        pb_write_double(nested, PB_TAG_NUMBER_FLOAT, tag->f);
+                        pb_write_bytes(value, PB_TAG_VALUE_NUMBER, nested->data, nested->length);
+                        break;
+                    case COMPILATION_TAG_STRING:
+                        pb_write_bytes(value, PB_TAG_VALUE_STRING, tag->str_bytes, (i32) tag->str_len);
+                        break;
+                    case COMPILATION_TAG_RAW:
+                    default:
+                        pb_write_uint32_always(nested, PB_TAG_RAW_TYPE_ID, tag->raw_type_id);
+                        pb_write_bytes(nested, PB_TAG_RAW_BYTES, tag->raw_bytes, (i32) tag->raw_len);
+                        pb_write_bytes(value, PB_TAG_VALUE_RAW, nested->data, nested->length);
+                        break;
+                }
+                pb_write_bytes(inner, PB_EVENT_TAG_VALUE, value->data, value->length);
+            }
+            pb_write_bytes(out, PB_COMPILER_EVENT_TAG, inner->data, inner->length);
+            break;
+        }
     }
 }
 
@@ -1555,6 +2065,23 @@ void compilation_log_emit_type_body(Context *context, Type *type) {
 
     CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_TYPE_BODY);
     ev->ptr = type;
+}
+
+void compilation_log_emit_tags(Context *context, u32 target_id, b32 target_is_type, bh_arr(AstTyped *) tags) {
+    if (!context || target_id == 0) return;
+    if (!context->compilation_log.events) return;
+    if (bh_arr_length(tags) <= 0) return;
+
+    bh_arr_each(AstTyped *, ptag, tags) {
+        CompilationLogTag *tag = bh_alloc_item(context->gp_alloc, CompilationLogTag);
+        memset(tag, 0, sizeof(*tag));
+        tag->target_id = target_id;
+        tag->target_is_type = target_is_type ? 1 : 0;
+        tag_fill_value(context, tag, *ptag);
+
+        CompilationEvent *ev = compilation_log_new_event(context, COMPILATION_EVENT_TAG);
+        ev->ptr = tag;
+    }
 }
 
 void compilation_log_init(Context *context) {

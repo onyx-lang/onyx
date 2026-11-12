@@ -1100,6 +1100,12 @@ struct AstStructType {
     b32 is_union              : 1;
     b32 is_packed             : 1;
     b32 ready_to_build_type   : 1;
+
+    // Set on the template's base struct when its polymorphic type is built.
+    // Concrete instances point poly_owner at the polymorphic type node.
+    struct Type *poly_type;
+    struct AstPolyStructType *poly_owner;
+    b32 compilation_tags_emitted;
 };
 struct AstStructMember {
     AstTyped_base;
@@ -1161,6 +1167,10 @@ struct AstUnionType {
 
     b32 pending_type_is_valid : 1;
     // b32 ready_to_build_type   : 1;
+
+    struct Type *poly_type;
+    struct AstPolyUnionType *poly_owner;
+    b32 compilation_tags_emitted;
 };
 struct AstUnionVariant {
     AstTyped_base;
@@ -1239,6 +1249,7 @@ struct AstMemRes        {
     struct Entity *type_entity;
 
     bh_arr(AstTyped *) tags;
+    b32 compilation_tags_emitted;
 
     b32 threadlocal : 1;
 
@@ -1583,6 +1594,7 @@ struct AstFunction {
 
     b32 named_return_locals_added : 1;
     b32 ready_for_body_to_be_checked : 1;
+    b32 compilation_tags_emitted;
 };
 
 struct AstCaptureBlock {
@@ -2391,6 +2403,7 @@ typedef enum CompilationEventKind {
     COMPILATION_EVENT_TYPE_BODY = 8,
     COMPILATION_EVENT_OVERLOAD = 9,
     COMPILATION_EVENT_POLY_PROC = 10,
+    COMPILATION_EVENT_TAG = 11,
 } CompilationEventKind;
 
 // Compact 32-byte event. Named overlays used to be a fat union (~48B);
@@ -2412,6 +2425,7 @@ typedef enum CompilationEventKind {
 //   TYPE_BODY: ptr = Type *
 //   OVERLOAD:  a = group_id, b = count, ptr = u32 *ids
 //   POLY_PROC: a = template_id, b = instance_id, c = count, ptr = CompilationLogPoly *
+//   TAG:       ptr = CompilationLogTag *
 typedef struct CompilationEvent {
     u8 kind;
     u8 extra;
@@ -2431,6 +2445,26 @@ typedef struct CompilationLogPoly {
     char **names;
     u32 *type_ids;
 } CompilationLogPoly;
+
+typedef enum CompilationLogTagValueKind {
+    COMPILATION_TAG_INT = 0,
+    COMPILATION_TAG_FLOAT = 1,
+    COMPILATION_TAG_STRING = 2,
+    COMPILATION_TAG_RAW = 3,
+} CompilationLogTagValueKind;
+
+typedef struct CompilationLogTag {
+    u32 target_id;
+    u8 target_is_type;
+    u8 value_kind;
+    i64 i;
+    double f;
+    char *str_bytes;
+    u32 str_len;
+    u32 raw_type_id;
+    u8 *raw_bytes;
+    u32 raw_len;
+} CompilationLogTag;
 
 typedef struct CompilationFileOverlay {
     char *filename;
@@ -2767,6 +2801,7 @@ void compilation_log_emit_binding(Context *context, AstNode *node, AstBinding *b
 void compilation_log_notify_node_typed(Context *context, AstNode *node);
 void compilation_log_emit_type(Context *context, Type *type);
 void compilation_log_emit_type_body(Context *context, Type *type);
+void compilation_log_emit_tags(Context *context, u32 target_id, b32 target_is_type, bh_arr(AstTyped *) tags);
 void compilation_log_encode_range(Context *context, u32 from, u32 to, bh_buffer *out);
 void compilation_log_ensure_c_abi_encoded(Context *context);
 

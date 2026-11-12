@@ -1968,6 +1968,10 @@ i32 bh_file_write(bh_file* file, void* buffer, isize buff_size) {
 
 void bh_file_flush(bh_file* file) {
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    // macOS exports fdatasync but does not declare it in unistd.h.
+    #if defined(_BH_DARWIN)
+    extern int fdatasync(int);
+    #endif
     fdatasync(file->fd);
     #endif
 }

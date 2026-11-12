@@ -580,6 +580,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
             p_type->PolyStruct.name = ((AstPolyStructType *) type_node)->name;
             p_type->PolyStruct.meta_tags = ((AstPolyStructType *) type_node)->base_struct->meta_tags;
             p_type->PolyStruct.scope = ((AstPolyStructType *) type_node)->scope;
+            ((AstPolyStructType *) type_node)->base_struct->poly_type = p_type;
 
             type_register(context, p_type);
             return NULL;
@@ -593,6 +594,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
             p_type->PolyUnion.name = ((AstPolyUnionType *) type_node)->name;
             p_type->PolyUnion.meta_tags = ((AstPolyUnionType *) type_node)->base_union->meta_tags;
             p_type->PolyUnion.scope = ((AstPolyUnionType *) type_node)->scope;
+            ((AstPolyUnionType *) type_node)->base_union->poly_type = p_type;
 
             type_register(context, p_type);
             return NULL;

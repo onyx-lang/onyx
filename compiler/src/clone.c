@@ -400,6 +400,9 @@ AstNode* ast_clone(Context *context, void* n) {
             }
 
             ds->stcache = NULL;
+            ds->poly_type = NULL;
+            ds->poly_owner = NULL;
+            ds->compilation_tags_emitted = 0;
             break;
         }
 
@@ -438,6 +441,9 @@ AstNode* ast_clone(Context *context, void* n) {
             }
 
             du->utcache = NULL;
+            du->poly_type = NULL;
+            du->poly_owner = NULL;
+            du->compilation_tags_emitted = 0;
             break;
         }
 
@@ -567,6 +573,8 @@ AstNode* ast_clone(Context *context, void* n) {
                     bh_arr_push(df->constraints.constraints, (AstConstraint *) ast_clone(context, (AstNode *) *constraint));
                 }
             }
+
+            df->compilation_tags_emitted = 0;
 
             if (sf->tags) {
                 bh_arr_new(context->ast_alloc, df->tags, bh_arr_length(sf->tags));
@@ -746,6 +754,7 @@ AstFunction* clone_function_header(Context *context, AstFunction* func) {
     AstFunction* new_func = onyx_ast_node_new(context->ast_alloc, sizeof(AstFunction), func->kind);
     memmove(new_func, func, sizeof(AstFunction));
     new_func->compilation_symbol_id = 0;
+    new_func->compilation_tags_emitted = 0;
     assert(new_func->scope == NULL);
 
     convert_polyproc_to_function(new_func);

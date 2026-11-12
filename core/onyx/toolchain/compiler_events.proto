@@ -17,6 +17,7 @@ package onyx.toolchain.events;
 //     - Span of source, resolved to id
 // - Binding
 // - Types created
+// - Tags on procedures, globals, and struct/union types
 //
 
 
@@ -38,6 +39,7 @@ message CompilerEvent {
     EventTypeBody type_body = 18;
     EventOverload overload = 19;
     EventPolyProc poly_proc = 20;
+    EventTag tag = 21;
   }
 }
 
@@ -281,4 +283,40 @@ message TypeUnionVariant {
 message TypeUnionBody {
   uint32 tag_type_id = 1;
   repeated TypeUnionVariant variants = 2;
+}
+
+// One #tag. `symbol` is a procedure or global. `type` is a struct or union,
+// including a polymorphic template and each concrete instance.
+// Member and variant tags are not emitted.
+message EventTag {
+  oneof target {
+    uint32 symbol = 1;
+    uint32 type = 2;
+  }
+  TagValue value = 3;
+}
+
+message TagValue {
+  oneof data {
+    TagNumber number = 1;
+    // Only `str`.
+    string str = 2;
+    TagRawValue raw_value = 3;
+  }
+}
+
+message TagNumber {
+  oneof data {
+    // Integers of every width, bools, char literals, and enum values.
+    // Unsigned values above int64 max are RawValue instead.
+    int64 int_value = 1;
+    // f32 widened to f64, f64, and unsized floats.
+    double float_value = 2;
+  }
+}
+
+message TagRawValue {
+  uint32 type_id = 1;
+  // OSAD bytes. Empty when the value cannot be encoded.
+  bytes bytes = 2;
 }

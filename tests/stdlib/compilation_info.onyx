@@ -1,8 +1,13 @@
 #load "core:onyx/toolchain/module"
 
 use core {*}
+use core.encoding.osad
 use onyx.toolchain {*}
 use protobuf.onyx.toolchain.events
+
+Tag_Meta :: struct {
+    n: i32
+}
 
 ok :: (label: str, value: bool) {
     println(label)
@@ -1203,4 +1208,200 @@ main :: () {
     has_disk := overlay_info->symbols_named("disk_val").count > 0;
     ok("overlay_uses_buffer", has_overlay);
     ok("overlay_hides_disk", !has_disk);
+
+    tb := Builder.make();
+    defer tb->destroy();
+    tb->map_dir("core", tprintf("{}/core", core_root));
+    tb->enable(.DISABLE_EXTENSIONS);
+    tb->enable(.MULTI_THREADING);
+    tb->set_platform(.ONYX);
+    tb->inject_source("""
+package main
+
+#tag "hidden"
+#tag 3
+hidden :: () {}
+
+#tag 1.5
+g: f64
+
+Meta :: struct {
+    n: i32
+}
+
+#tag Meta.{ n = 1 }
+Osad :: struct {}
+
+noop :: () {}
+Call :: struct {
+    f: () -> void
+}
+
+#tag Call.{ f = noop }
+Bad :: struct {}
+
+Marked :: struct {
+    #tag "member-only"
+    n: i32
+}
+
+#tag "boxed"
+Box :: struct (T: type_expr) {
+    value: T
+}
+
+use_box: Box(i32)
+
+main :: () {}
+""");
+    tb->compile();
+
+    ok("tag_compile_ok", !tb->has_errors());
+
+    tinfo := tb->compilation_info();
+    defer delete(&tinfo);
+
+    hidden: &SymbolInfo = null;
+    for id in tinfo->symbols_named("hidden") {
+        if tinfo->get_symbol(id) as sym {
+            if sym.kind == .Function do hidden = sym;
+        }
+    }
+
+    hidden_str := false;
+    hidden_int := false;
+    if hidden != null && hidden.tags.count == 2 {
+        switch hidden.tags[0].data {
+            case .String as s {
+                hidden_str = s == "hidden";
+            }
+            case _ {}
+        }
+        switch hidden.tags[1].data {
+            case .Number as n {
+                switch n.data {
+                    case .Int as i {
+                        hidden_int = i == 3;
+                    }
+                    case _ {}
+                }
+            }
+            case _ {}
+        }
+    }
+    ok("tag_proc_string", hidden_str);
+    ok("tag_proc_int", hidden_int);
+
+    gsym: &SymbolInfo = null;
+    for id in tinfo->symbols_named("g") {
+        if tinfo->get_symbol(id) as sym {
+            if sym.kind == .Expression do gsym = sym;
+        }
+    }
+
+    global_float := false;
+    if gsym != null && gsym.tags.count == 1 {
+        switch gsym.tags[0].data {
+            case .Number as n {
+                switch n.data {
+                    case .Float as value {
+                        global_float = value == 1.5;
+                    }
+                    case _ {}
+                }
+            }
+            case _ {}
+        }
+    }
+    ok("tag_global_float", global_float);
+
+    osad_type: &TypeInfo = null;
+    for id in tinfo->types_named("Osad") {
+        if tinfo->get_type(id) as ty {
+            if ty.kind == .Struct do osad_type = ty;
+        }
+    }
+
+    osad_ok := false;
+    if osad_type != null && osad_type.tags.count == 1 {
+        switch osad_type.tags[0].data {
+            case .Raw_Value as raw {
+                if osad.deserialize(Tag_Meta, raw.bytes) as meta {
+                    if meta.n == 1 do osad_ok = true;
+                }
+            }
+            case _ {}
+        }
+    }
+    ok("tag_osad_struct", osad_ok);
+
+    call_id: u32 = 0;
+    for id in tinfo->types_named("Call") {
+        if tinfo->get_type(id) as ty {
+            if ty.kind == .Struct do call_id = ty.id;
+        }
+    }
+
+    bad_type: &TypeInfo = null;
+    for id in tinfo->types_named("Bad") {
+        if tinfo->get_type(id) as ty {
+            if ty.kind == .Struct do bad_type = ty;
+        }
+    }
+
+    bad_empty := false;
+    if bad_type != null && bad_type.tags.count == 1 && call_id != 0 {
+        switch bad_type.tags[0].data {
+            case .Raw_Value as raw {
+                if raw.type_id == call_id && raw.bytes.count == 0 do bad_empty = true;
+            }
+            case _ {}
+        }
+    }
+    ok("tag_raw_empty", bad_empty);
+
+    box_poly := false;
+    for id in tinfo->types_named("Box") {
+        if tinfo->get_type(id) as ty {
+            if ty.kind != .Poly_Struct do continue;
+            if ty.tags.count != 1 do continue;
+            switch ty.tags[0].data {
+                case .String as s {
+                    if s == "boxed" do box_poly = true;
+                }
+                case _ {}
+            }
+        }
+    }
+    ok("tag_poly_template", box_poly);
+
+    use_box: &SymbolInfo = null;
+    for id in tinfo->symbols_named("use_box") {
+        if tinfo->get_symbol(id) as sym {
+            if sym.kind == .Expression do use_box = sym;
+        }
+    }
+
+    box_inst := false;
+    if use_box != null {
+        if tinfo->get_type(use_box.type_id) as ty {
+            if ty.tags.count == 1 {
+                switch ty.tags[0].data {
+                    case .String as s {
+                        if s == "boxed" do box_inst = true;
+                    }
+                    case _ {}
+                }
+            }
+        }
+    }
+    ok("tag_poly_instance", box_inst);
+
+    marked_clean := false;
+    for id in tinfo->types_named("Marked") {
+        if tinfo->get_type(id) as ty {
+            if ty.kind == .Struct && ty.tags.count == 0 do marked_clean = true;
+        }
+    }
+    ok("tag_ignores_member", marked_clean);
 }
