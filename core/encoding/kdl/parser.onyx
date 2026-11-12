@@ -685,7 +685,7 @@ parse_kdl_number :: (w: str) -> ? KDL_Number {
     }
 
     if is_float {
-        return KDL_Number.{ Float = conv.str_to_f64(s) };
+        return KDL_Number.{ Float = conv.parse_float(s) };
     }
     return KDL_Number.{ Integer = parse_i64_base(s, 10) };
 }
@@ -796,7 +796,7 @@ unescape_kdl_string :: (s: str, allocator: Allocator) -> str {
                     i += 1;
                 }
                 if i >= s.count do break;
-                cp := conv.str_to_i64(s[hex_start .. i], 16);
+                cp := conv.parse_int(s[hex_start .. i], 16);
                 utf8.append_rune(&out, ~~cp);
                 i += 1;
             }

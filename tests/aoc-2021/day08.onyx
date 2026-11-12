@@ -149,7 +149,7 @@ decode_line :: (left, right: str) -> u32 {
     io.write(w, "}");
 }
 
-#match hash.to_u32 (x: u8) => cast(u32) x;
+#match hash.hash (x: u8) => cast(u32) x;
 
 #operator == (a, b: [] $T) -> bool {
     if a.count != b.count do return false;

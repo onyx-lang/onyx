@@ -789,8 +789,6 @@ Reader.lines :: (r: &Reader, inplace := false, allocator := context.allocator) =
     return .None;
 }
 
-Reader.is_empty :: Reader.empty
-
 // Compatibility: package names.
 reader_make :: Reader.make
 reader_reset :: Reader.reset

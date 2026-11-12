@@ -2,7 +2,7 @@
 
 use core {*}
 
-key_arena : alloc.arena.ArenaState;
+key_arena : alloc.arena.Arena;
 key_alloc : Allocator;
 
 score_player :: (p: &[..] u32) -> u32 {

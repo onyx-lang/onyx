@@ -11,12 +11,12 @@ use core {println, printf}
 Hashable :: interface (T: type_expr) {
     t as T;
 
-    { hash.to_u32(t) } -> u32;
+    { hash.hash(t) } -> u32;
 }
 
 try_hash :: #match {
     macro (x: $T) where Hashable(T) {
-        println(hash.to_u32(x));
+        println(hash.hash(x));
     },
     (x: any) {
         printf("{} is not hashable!\n", x.type);

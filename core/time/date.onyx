@@ -163,9 +163,9 @@ Date.is_after :: (d1, d2: Date) -> bool {
 
     if year.count == 0 || month.count == 0 || day.count == 0 do return false;
 
-    y  := conv.str_to_i64(year);
-    m  := conv.str_to_i64(month);
-    dd := conv.str_to_i64(day);
+    y  := conv.parse_int(year);
+    m  := conv.parse_int(month);
+    dd := conv.parse_int(day);
 
     if m < 1 || m > 12 do return false;
     if dd < 1 || dd > cast(i64) Date.month_duration_in_days(~~y, ~~(m - 1)) do return false;

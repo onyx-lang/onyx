@@ -272,10 +272,6 @@ str.ends_with :: (s: str, suffix: str) -> bool {
 
 str.empty    :: (s: str) => s.count == 0 || s.data == null;
 
-is_empty :: (s: str) -> bool #deprecated "Use 'string.empty' instead." {
-    return s.count == 0 || s.data == null;
-}
-
 str.index_of :: #match #local {}
 
 #overload
@@ -838,13 +834,10 @@ split_iter :: str.split_iter
 bisect :: str.bisect
 
 to_dyn_str :: str.to_dyn_str
-delete :: dyn_str.delete
+delete :: dyn_str.remove_at
 append :: dyn_str.append
 append_format :: dyn_str.append_format
 clear  :: dyn_str.clear
 retreat :: dyn_str.retreat
 insert :: dyn_str.insert
-
-// DEPRECATED: Use `string.copy` instead
-alloc_copy :: str.copy
 

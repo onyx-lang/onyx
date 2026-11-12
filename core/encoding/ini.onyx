@@ -97,7 +97,7 @@ parse_ini_file_inner :: (r: &io.Reader, output_ptr: any) -> (IniParseResult, Ini
     active_item_type := void;
 
     r->skip_whitespace();
-    while !(r->is_empty()) {
+    while !(r->empty()) {
         defer r->skip_whitespace();
 
         if b, e := r->peek_byte(); b == '[' {

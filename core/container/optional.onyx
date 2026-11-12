@@ -10,7 +10,7 @@ use core
 
 // Because Optional is a newer addition to the standard library of Onyx,
 // much of the standard library does not use it. Currently it is only
-// used by Map and Set in their `get_opt` function. In theory, it should
+// used by Map.get and Set.get_opt. In theory, it should
 // be used in many more places, instead of returning `.{}`.
 
 /// Helper procedure for creating an Optional with a value.

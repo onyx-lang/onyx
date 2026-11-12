@@ -128,7 +128,7 @@ parse_value :: (use parser: &Parser) -> (Value, Error) {
 
         case .Integer {
             value := new(_Value_Integer, allocator);
-            value.int_ = conv.str_to_i64(current.text);
+            value.int_ = conv.parse_int(current.text);
 
             consume_token(parser);
             return_value = value;
@@ -136,7 +136,7 @@ parse_value :: (use parser: &Parser) -> (Value, Error) {
 
         case .Float {
             value := new(_Value_Float, allocator);
-            value.float_ = conv.str_to_f64(current.text);
+            value.float_ = conv.parse_float(current.text);
 
             consume_token(parser);
             return_value = value;

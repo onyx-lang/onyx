@@ -5,7 +5,7 @@ use core {*}
 Point :: struct {
     x, y: i32;
 }
-#match hash.to_u32 (use p: Point) => x * 1337 + y * 7331;
+#match hash.hash (use p: Point) => x * 1337 + y * 7331;
 #operator == (p1, p2: Point) => p1.x == p2.x && p1.y == p2.y;
 cmp_point :: (p1, p2: Point) => {
     if p1.x != p2.x do return p1.x - p2.x;
@@ -50,7 +50,7 @@ main :: (args) => {
 
         axis_name := string.read_until(&line, '=');
         string.advance(&line, 1);
-        axis_value := cast(i32) conv.str_to_i64(line);
+        axis_value := cast(i32) conv.parse_int(line);
 
         apply_fold(~~ &dots, axis_name, axis_value);
         if part_1_answer < 0 {

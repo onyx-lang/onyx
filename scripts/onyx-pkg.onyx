@@ -606,7 +606,7 @@ run_new_command :: (args: [] str) {
     }
 
     use core.encoding {json}
-    template_res := json.decode_with_result(os.get_contents(template_file))
+    template_res := json.decode(os.get_contents(template_file))
     if template_res.Err {
         error_print("Failed to parse template file.\n")
         print(template_res.Err!)
@@ -1114,11 +1114,11 @@ SemVer :: struct {
     parse :: (semver: &SemVer, to_parse_: str, _: Allocator) -> bool {
         to_parse := to_parse_
 
-        major := str.read_until(&to_parse, '.') |> conv.str_to_i64()
+        major := str.read_until(&to_parse, '.') |> conv.parse_int()
         str.advance(&to_parse)
-        minor := str.read_until(&to_parse, '.') |> conv.str_to_i64()
+        minor := str.read_until(&to_parse, '.') |> conv.parse_int()
         str.advance(&to_parse)
-        patch := str.read_until(&to_parse, '.') |> conv.str_to_i64()
+        patch := str.read_until(&to_parse, '.') |> conv.parse_int()
 
         if major == 0 && minor == 0 && patch == 0 do return false
 
@@ -1767,7 +1767,7 @@ IniConfig :: struct {
 #local parse_dependencies :: (dependencies: &IniConfig.Dependencies, r: &io.Reader) -> bool {
     while true {
         r->skip_whitespace()
-        if r->is_empty() do return true
+        if r->empty() do return true
         if p, _ := r->peek_byte(); p == '[' do return true
 
         dep := r->read_until('=') |> str.strip_trailing_whitespace()
@@ -1794,7 +1794,7 @@ IniConfig :: struct {
 #local parse_dependency_folders :: (dependencies: &IniConfig.Dependency_Folders, r: &io.Reader) -> bool {
     while true {
         r->skip_whitespace()
-        if r->is_empty() do return true
+        if r->empty() do return true
         if p, _ := r->peek_byte(); p == '[' do return true
 
         dep := r->read_until('=') |> str.strip_trailing_whitespace()

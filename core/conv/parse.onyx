@@ -38,7 +38,7 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
         integer_case :: macro (T: type_expr) {
             case T {
                 dest := cast(&T) target;
-                *dest = cast(T) str_to_i64(to_parse);
+                *dest = cast(T) parse_int(to_parse);
                 return true;
             }
         }
@@ -54,13 +54,13 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
 
         case f32 {
             dest := cast(&f32) target;
-            *dest = ~~ str_to_f64(to_parse);
+            *dest = ~~ parse_float(to_parse);
             return true;
         }
 
         case f64 {
             dest := cast(&f64) target;
-            *dest = str_to_f64(to_parse);
+            *dest = parse_float(to_parse);
             return true;
         }
 
@@ -86,7 +86,7 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
 
         case _ {
             if info.kind == .Enum {
-                val := str_to_i64(to_parse);
+                val := parse_int(to_parse);
                 
                 einfo := info->as_enum();
                 switch einfo.backing_type {

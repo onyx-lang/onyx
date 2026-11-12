@@ -2,14 +2,14 @@ use core
 use core.encoding.json
 
 main :: () {
-    j, err := json.decode_with_error("""[
+    j := json.decode("""[
         {
             "x": 1
         },
         {
             "x": 2
         }
-    ]""");
+    ]""")!;
     defer delete(j);
 
     arr: [] struct {
@@ -42,7 +42,7 @@ main :: () {
     json.set(o, "foo", json.from_any(&.{data=5}));
     json.encode(&core.stdio.print_writer, o);
 
-    v := json.decode_with_error("{ \"key1\": \"\\uD83C\\uDCA1\", \"key2\": \"\\u264C\" }");
+    v := json.decode("{ \"key1\": \"\\uD83C\\uDCA1\", \"key2\": \"\\u264C\" }")!;
     core.print("\n");
     core.println(v.root["key1"]->as_str());
 
@@ -52,7 +52,7 @@ main :: () {
         v2: ? i32;
     }
 
-    ut_json := json.decode_with_error("""{ "v1": null, "v2": 123 }""");
+    ut_json := json.decode("""{ "v1": null, "v2": 123 }""")!;
     ut: Union_Test;
     json.as_any(ut_json.root, &ut);
     core.println(ut);

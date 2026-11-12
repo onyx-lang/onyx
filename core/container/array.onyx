@@ -269,9 +269,6 @@ Array.unordered_remove :: (arr: &[..] $T, idx: u32) -> T {
     return to_return;
 }
 
-Array.delete :: Array.remove_at
-Array.fast_delete :: Array.unordered_remove
-
 /// Removes `n` elements from the end of the array.
 Array.pop :: (arr: &[..] $T, n := 1) -> T {
     if arr.count == 0 do return .{};
@@ -377,8 +374,8 @@ insert_empty :: Array.insert_empty
 remove :: Array.remove
 remove_at :: Array.remove_at
 unordered_remove :: Array.unordered_remove
-delete :: Array.delete
-fast_delete :: Array.fast_delete
+delete :: Array.remove_at
+fast_delete :: Array.unordered_remove
 pop :: Array.pop
 concat :: Array.concat
 filter :: Array.filter

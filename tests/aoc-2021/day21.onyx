@@ -47,8 +47,8 @@ main :: () {
         string.strip_whitespace(&s1);
         string.strip_whitespace(&s2);
 
-        p1.square = ~~ (conv.str_to_i64(s1) - 1);
-        p2.square = ~~ (conv.str_to_i64(s2) - 1);
+        p1.square = ~~ (conv.parse_int(s1) - 1);
+        p2.square = ~~ (conv.parse_int(s2) - 1);
     }
 
     die := Die.make();
@@ -87,8 +87,8 @@ Player :: struct {
 
 Player.hash :: (p: Player) -> u32 {
     h := 7;
-    h += h << 5 + hash.to_u32(p.square);
-    h += h << 5 + hash.to_u32(p.score);
+    h += h << 5 + hash.hash(p.square);
+    h += h << 5 + hash.hash(p.score);
     return h;
 }
 
@@ -200,8 +200,8 @@ main :: () {
         string.strip_whitespace(&s1);
         string.strip_whitespace(&s2);
 
-        p1.square = cast(i32) (conv.str_to_i64(s1) - 1);
-        p2.square = cast(i32) (conv.str_to_i64(s2) - 1);
+        p1.square = cast(i32) (conv.parse_int(s1) - 1);
+        p2.square = cast(i32) (conv.parse_int(s2) - 1);
     }
 
     w1, w2 := calc_wins(p1, p2);

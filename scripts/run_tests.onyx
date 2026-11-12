@@ -16,7 +16,7 @@ Color :: enum {
 
 print_color :: (color: Color, format: str, args: ..any) {
     buffer: [2048] u8;
-    output := conv.str_format_va(buffer, format, args);
+    output := conv.format_va(buffer, format, args);
 
     if (runtime.compiler_os == .Linux || runtime.compiler_os == .MacOS) && !settings.no_color {
         color_code: str;

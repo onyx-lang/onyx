@@ -16,10 +16,10 @@ CubePos :: struct {
 
 CubePos.hash :: (c: CubePos) => {
     hash: u32 = 7;
-    hash += hash << 5 + core.hash.to_u32(c.x);
-    hash += hash << 5 + core.hash.to_u32(c.y);
-    hash += hash << 5 + core.hash.to_u32(c.z);
-    hash += hash << 5 + core.hash.to_u32(c.w);
+    hash += hash << 5 + core.hash.hash(c.x);
+    hash += hash << 5 + core.hash.hash(c.y);
+    hash += hash << 5 + core.hash.hash(c.z);
+    hash += hash << 5 + core.hash.hash(c.w);
     return hash;
 }
 

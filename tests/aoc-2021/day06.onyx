@@ -11,7 +11,7 @@ main :: (args) => {
 
     fish: [9] i64;
     for start_list {
-        value := cast(i32) conv.str_to_i64(it);
+        value := cast(i32) conv.parse_int(it);
         fish[value] += 1;
     }
 

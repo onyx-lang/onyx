@@ -14,9 +14,6 @@ package core.alloc.arena
 
 use core
 
-// Deprecated struct 'ArenaState'. Use 'Arena' instead.
-ArenaState :: Arena
-
 /// Stores internal details used during arena allocations.
 Arena :: struct {
     backing_allocator : Allocator;

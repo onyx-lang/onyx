@@ -181,13 +181,6 @@ flush_to_dyn_str :: (dynstr: &dyn_str, to_write: str) => {
 
 
 
-//
-// Old aliases to not break old programs. Use format and format_va instead.
-str_format :: format
-str_format_va :: format_va
-
-
-
 builtin.logf :: (level: builtin.Log_Level, format: str, va: ..any) {
     use core {conv}
 
@@ -447,7 +440,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
 
             } else {
                 ibuf : [128] u8;
-                istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true);
+                istr := format_int(~~value, 16, ~~ibuf, prefix=true);
                 output->write(istr);
             }
         }
@@ -457,7 +450,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 value := *(cast(&T) v.data);
 
                 ibuf : [128] u8;
-                istr := i64_to_str(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width);
+                istr := format_int(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width);
                 output->write(istr);
             }
         }
@@ -467,7 +460,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 value := *(cast(&T) v.data);
 
                 ibuf : [128] u8;
-                istr := u64_to_str(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width);
+                istr := format_uint(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width);
                 output->write(istr);
             }
         }
@@ -484,7 +477,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
             value := *(cast(&f32) v.data);
 
             fbuf : [128] u8;
-            fstr := f64_to_str(~~value, ~~fbuf, formatting.digits_after_decimal);
+            fstr := format_float(~~value, ~~fbuf, formatting.digits_after_decimal);
             output->write(fstr);
         }
 
@@ -492,7 +485,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
             value := *(cast(&f64) v.data);
 
             fbuf : [128] u8;
-            fstr := f64_to_str(~~value, ~~fbuf, formatting.digits_after_decimal);
+            fstr := format_float(~~value, ~~fbuf, formatting.digits_after_decimal);
             output->write(fstr);
         }
 
@@ -519,7 +512,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 output->write("(null)");
             } else {
                 ibuf : [128] u8;
-                istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true);
+                istr := format_int(~~value, 16, ~~ibuf, prefix=true);
                 output->write(istr);
             }
         }
@@ -600,7 +593,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 value := *(cast(&i32) v.data);
 
                 ibuf : [128] u8;
-                istr := i64_to_str(~~value, 10, ~~ibuf);
+                istr := format_int(~~value, 10, ~~ibuf);
                 output->write(istr);
 
                 output->write("]");
@@ -610,7 +603,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 value := *(cast(&rawptr) v.data);
 
                 ibuf : [128] u8;
-                istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true);
+                istr := format_int(~~value, 16, ~~ibuf, prefix=true);
                 output->write(istr);
             }
 

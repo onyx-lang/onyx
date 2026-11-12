@@ -116,7 +116,7 @@ JWT.parse :: (token: str, signing_key: str, allocator := context.allocator) -> R
 
     use header := base64.decode_url(header_enc, context.temp_allocator)
         |> Result.transform_err(x => JWT_Parse_Error.Invalid_Header)?
-        |> json.decode_with_result(context.temp_allocator)
+        |> json.decode(context.temp_allocator)
         |> Result.transform(x => x.root)
         |> Result.transform_err(x => JWT_Parse_Error.Invalid_Header)?
         |> json.Value.as_map(allocator)
@@ -124,7 +124,7 @@ JWT.parse :: (token: str, signing_key: str, allocator := context.allocator) -> R
     body_raw := base64.decode_url(body_enc, allocator)
         |> Result.transform_err(x => JWT_Parse_Error.Invalid_Body)?
     body := body_raw
-        |> json.decode_with_result(allocator)
+        |> json.decode(allocator)
         |> Result.transform(x => x.root)
         |> Result.transform_err(x => JWT_Parse_Error.Invalid_Body)?
         |> free_after_use(
