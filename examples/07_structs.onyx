@@ -130,11 +130,11 @@ main :: (args: [] cstr) {
     // pointer conversion between two structs, A and B, if A is the first member of B, and is used.
     // For example, we can pass `thing` to this procedure, even though it is not a ComponentOne.
     // The first member is a ComponentOne and is used, so a implicit pointer conversion is always safe.
-    do_something_with_component_one :: (c: ^ComponentOne) {
+    do_something_with_component_one :: (c: &ComponentOne) {
         printf("ComponentOne's name is {}.\n", c.name);
     }
 
-    do_something_with_component_one(^thing);
+    do_something_with_component_one(&thing);
 
 
 

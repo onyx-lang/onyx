@@ -110,12 +110,12 @@ unmarshal :: (value: Value, type: type_expr, out: rawptr, path: &dyn_str) -> Err
     t_info := get_type_info(type);
 
     if type == Value {
-        *cast(^Value) out = value;
+        *cast(&Value) out = value;
         return .{};
     }
 
     if t_info.kind == .Distinct {
-        d_info := cast(^Type_Info_Distinct) t_info;
+        d_info := cast(&Type_Info_Distinct) t_info;
         return unmarshal(value, d_info.base_type, out, path);
     }
 
@@ -142,42 +142,42 @@ unmarshal :: (value: Value, type: type_expr, out: rawptr, path: &dyn_str) -> Err
         case .Basic do switch type {
             case bool {
                 if value->type() != .Bool do return mismatch("boolean", value, path);
-                *cast(^bool) out = value->as_bool();
+                *cast(&bool) out = value->as_bool();
             }
             case i32, u32 {
                 if !is_number(value) do return mismatch("number", value, path);
-                *cast(^i32) out = ~~value->as_int();
+                *cast(&i32) out = ~~value->as_int();
             }
             case i64, u64 {
                 if !is_number(value) do return mismatch("number", value, path);
-                *cast(^i64) out = value->as_int();
+                *cast(&i64) out = value->as_int();
             }
             case i8, u8 {
                 if !is_number(value) do return mismatch("number", value, path);
-                *cast(^u8) out = ~~value->as_int();
+                *cast(&u8) out = ~~value->as_int();
             }
             case i16, u16 {
                 if !is_number(value) do return mismatch("number", value, path);
-                *cast(^u16) out = ~~value->as_int();
+                *cast(&u16) out = ~~value->as_int();
             }
             case f32 {
                 if !is_number(value) do return mismatch("number", value, path);
-                *cast(^f32) out = ~~value->as_float();
+                *cast(&f32) out = ~~value->as_float();
             }
             case f64 {
                 if !is_number(value) do return mismatch("number", value, path);
-                *cast(^f64) out = value->as_float();
+                *cast(&f64) out = value->as_float();
             }
         }
 
         case .Enum {
-            etype := cast(^Type_Info_Enum) t_info;
+            etype := cast(&Type_Info_Enum) t_info;
             found: u64;
             ok := false;
 
             if value->type() == .String {
                 name := value->as_str();
-                for^ m in etype.members {
+                for& m in etype.members {
                     if m.name == name {
                         found = m.value;
                         ok = true;
@@ -190,16 +190,16 @@ unmarshal :: (value: Value, type: type_expr, out: rawptr, path: &dyn_str) -> Err
 
             if !ok do return mismatch("enum", value, path);
 
-            if t_info.size == 1 do *cast(^u8)  out = ~~found;
-            elseif t_info.size == 2 do *cast(^u16) out = ~~found;
-            elseif t_info.size == 4 do *cast(^u32) out = ~~found;
-            elseif t_info.size == 8 do *cast(^u64) out = found;
+            if t_info.size == 1 do *cast(&u8)  out = ~~found;
+            elseif t_info.size == 2 do *cast(&u16) out = ~~found;
+            elseif t_info.size == 4 do *cast(&u32) out = ~~found;
+            elseif t_info.size == 8 do *cast(&u64) out = found;
         }
 
         case .Array {
             if value->type() != .Array do return mismatch("array", value, path);
 
-            a_info := cast(^Type_Info_Array) t_info;
+            a_info := cast(&Type_Info_Array) t_info;
             arr := value->as_array();
             n := a_info.count;
             if arr.count < n do n = ~~arr.count;
@@ -213,7 +213,7 @@ unmarshal :: (value: Value, type: type_expr, out: rawptr, path: &dyn_str) -> Err
         }
 
         case .Dynamic_Array {
-            s := cast(^core.array.Untyped_Array) out;
+            s := cast(&core.array.Untyped_Array) out;
             if s.count == 0 {
                 to_copy := value->as_array();
                 s.allocator = context.allocator;
@@ -226,14 +226,14 @@ unmarshal :: (value: Value, type: type_expr, out: rawptr, path: &dyn_str) -> Err
         case .Slice {
             if type == str {
                 if value->type() != .String do return mismatch("string", value, path);
-                *cast(^str) out = string.copy(value->as_str());
+                *cast(&str) out = string.copy(value->as_str());
                 return .{};
             }
 
             if value->type() != .Array do return mismatch("array", value, path);
 
-            s_info := cast(^Type_Info_Slice) t_info;
-            s := cast(^core.array.Untyped_Array) out;
+            s_info := cast(&Type_Info_Slice) t_info;
+            s := cast(&core.array.Untyped_Array) out;
             to_copy := value->as_array();
 
             if s.count == 0 {
@@ -261,15 +261,15 @@ unmarshal :: (value: Value, type: type_expr, out: rawptr, path: &dyn_str) -> Err
         case .Struct {
             if value->type() != .Object do return mismatch("object", value, path);
 
-            s_info := cast(^Type_Info_Struct) t_info;
-            for^ member in s_info.members {
+            s_info := cast(&Type_Info_Struct) t_info;
+            for& member in s_info.members {
                 key := member.name;
                 if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
-                    key = (cast(^Custom_Key) tag.data).key;
+                    key = (cast(&Custom_Key) tag.data).key;
                 }
 
                 if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
-                    if *cast(^type_expr, tag.data) == Ignore {
+                    if *cast(&type_expr, tag.data) == Ignore {
                         continue;
                     }
                 }

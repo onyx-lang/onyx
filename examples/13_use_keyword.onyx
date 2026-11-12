@@ -52,12 +52,12 @@ main :: (args: [] cstr) {
         // a procedure with two used parameters implies that it is a 'cross-cutting'
         // procedure between two areas of concern.
 
-        basically_a_method :: (use dummy: ^Dummy) {
+        basically_a_method :: (use dummy: &Dummy) {
             printf("Dummy with name '{}', and age '{}'.\n", name, age);
         }
 
         dummy := Dummy.{ "Phil", 15 };
-        basically_a_method(^dummy);
+        basically_a_method(&dummy);
 
         Dummy :: struct {
             name : str;

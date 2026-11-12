@@ -83,7 +83,7 @@ consume :: macro (x: $T/iter.Iterable) => {
     // In order to be able tell what the iterator produces, you
     // have to pattern match it in a procedure parameter. This means
     // that you have to declare an internal macro that pattern
-    // matches the variable out. Also, you need to use #auto as the
+    // matches the variable out. Also, you need to use _ as the
     // return type otherwise you can't say the correct type.
     // I can't think of a better way of doing this without making
     // everything WAY more complicated.

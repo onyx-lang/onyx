@@ -179,15 +179,15 @@ enc_spec :: (member: &Type_Info_Struct.Member) -> Enc_Field_Spec {
 
     for tag in member.tags {
         if tag.type == Name {
-            n := *cast(^Name) tag.data
+            n := *cast(&Name) tag.data
             if n.name.count > 0 do spec.name = n.name
             spec.space = n.space
         } elseif tag.type == Attr {
             spec.mode = .Attr
-            a := *cast(^Attr) tag.data
+            a := *cast(&Attr) tag.data
             if a.name.count > 0 do spec.name = a.name
         } elseif tag.type == type_expr {
-            t := *cast(^type_expr) tag.data
+            t := *cast(&type_expr) tag.data
             if t == Text   do spec.mode = .Text
             if t == Ignore do spec.mode = .Ignore
         }
@@ -200,7 +200,7 @@ enc_spec :: (member: &Type_Info_Struct.Member) -> Enc_Field_Spec {
 struct_xml_name :: (info: &Type_Info_Struct) -> Name {
     for tag in info.tags {
         if tag.type == Name {
-            n := *cast(^Name) tag.data
+            n := *cast(&Name) tag.data
             if n.name.count > 0 do return n
             return .{ name = info.name, space = n.space }
         }
@@ -229,7 +229,7 @@ encode_any :: (w: &io.Writer, data: any, indent: i32, depth: i32) -> Error {
     }
 
     if info.kind == .Distinct {
-        d := cast(^Type_Info_Distinct) info
+        d := cast(&Type_Info_Distinct) info
         return encode_any(w, any.{ data.data, d.base_type }, indent, depth)
     }
 
@@ -237,14 +237,14 @@ encode_any :: (w: &io.Writer, data: any, indent: i32, depth: i32) -> Error {
         return .{ kind = .Unsupported_Type, msg = tprintf("xml.encode requires a struct, got {}", data.type) }
     }
 
-    s := cast(^Type_Info_Struct) info
+    s := cast(&Type_Info_Struct) info
     n := struct_xml_name(s)
     return write_struct_element(w, data, n.name, n.space, indent, depth)
 }
 
 #local
 write_struct_element :: (w: &io.Writer, data: any, name: str, space: str, indent: i32, depth: i32) -> Error {
-    s := cast(^Type_Info_Struct) get_type_info(data.type)
+    s := cast(&Type_Info_Struct) get_type_info(data.type)
 
     io.write_byte(w, '<')
     io.write(w, name)
@@ -254,7 +254,7 @@ write_struct_element :: (w: &io.Writer, data: any, name: str, space: str, indent
         io.write_byte(w, '"')
     }
 
-    for^ member in s.members {
+    for& member in s.members {
         spec := enc_spec(member)
         if spec.mode != .Attr do continue
 
@@ -277,7 +277,7 @@ write_struct_element :: (w: &io.Writer, data: any, name: str, space: str, indent
     io.write_byte(w, '>')
 
     pretty := indent > 0 && struct_has_element_child(data)
-    for^ member in s.members {
+    for& member in s.members {
         spec := enc_spec(member)
         if spec.mode == .Ignore || spec.mode == .Attr do continue
 
@@ -302,8 +302,8 @@ write_struct_element :: (w: &io.Writer, data: any, name: str, space: str, indent
 
 #local
 struct_has_body :: (data: any) -> bool {
-    s := cast(^Type_Info_Struct) get_type_info(data.type)
-    for^ member in s.members {
+    s := cast(&Type_Info_Struct) get_type_info(data.type)
+    for& member in s.members {
         spec := enc_spec(member)
         if spec.mode == .Ignore || spec.mode == .Attr do continue
 
@@ -316,8 +316,8 @@ struct_has_body :: (data: any) -> bool {
 
 #local
 struct_has_element_child :: (data: any) -> bool {
-    s := cast(^Type_Info_Struct) get_type_info(data.type)
-    for^ member in s.members {
+    s := cast(&Type_Info_Struct) get_type_info(data.type)
+    for& member in s.members {
         spec := enc_spec(member)
         if spec.mode != .Child do continue
 
@@ -362,13 +362,13 @@ enc_as_array :: (arr: any) -> (rawptr, type_expr, u32) {
 
     switch info.kind {
         case .Array {
-            a := cast(^Type_Info_Array) info
+            a := cast(&Type_Info_Array) info
             return arr.data, a.of, a.count
         }
 
         case .Slice, .Dynamic_Array {
-            a := cast(^Untyped_Array) arr.data
-            return a.data, (cast(^Type_Info_Dynamic_Array) info).of, a.count
+            a := cast(&Untyped_Array) arr.data
+            return a.data, (cast(&Type_Info_Dynamic_Array) info).of, a.count
         }
 
         case _ {
@@ -386,7 +386,7 @@ write_named_value :: (w: &io.Writer, data: any, name: str, space: str, indent: i
     }
 
     if info.kind == .Distinct {
-        d := cast(^Type_Info_Distinct) info
+        d := cast(&Type_Info_Distinct) info
         return write_named_value(w, any.{ data.data, d.base_type }, name, space, indent, depth)
     }
 
@@ -415,41 +415,41 @@ write_scalar :: (w: &io.Writer, data: any, attr: bool) -> Error {
     info := get_type_info(type)
 
     if info.kind == .Distinct {
-        d := cast(^Type_Info_Distinct) info
+        d := cast(&Type_Info_Distinct) info
         return write_scalar(w, any.{ data.data, d.base_type }, attr)
     }
 
     if info.kind == .Enum {
-        einfo := cast(^Type_Info_Enum) info
+        einfo := cast(&Type_Info_Enum) info
         val: u64 = 0
-        if info.size == 1 do val = ~~(*cast(^u8) data.data)
-        elseif info.size == 2 do val = ~~(*cast(^u16) data.data)
-        elseif info.size == 4 do val = ~~(*cast(^u32) data.data)
-        elseif info.size == 8 do val = *cast(^u64) data.data
+        if info.size == 1 do val = ~~(*cast(&u8) data.data)
+        elseif info.size == 2 do val = ~~(*cast(&u16) data.data)
+        elseif info.size == 4 do val = ~~(*cast(&u32) data.data)
+        elseif info.size == 8 do val = *cast(&u64) data.data
         io.write(w, tprintf("{}", val))
         return .{}
     }
 
     switch type {
         case str {
-            write_escaped(w, *cast(^str) data.data, attr)
+            write_escaped(w, *cast(&str) data.data, attr)
             return .{}
         }
         case bool {
-            if *cast(^bool) data.data do io.write(w, "true")
+            if *cast(&bool) data.data do io.write(w, "true")
             else do io.write(w, "false")
             return .{}
         }
-        case i8  do io.write(w, tprintf("{}", *cast(^i8)  data.data))
-        case u8  do io.write(w, tprintf("{}", *cast(^u8)  data.data))
-        case i16 do io.write(w, tprintf("{}", *cast(^i16) data.data))
-        case u16 do io.write(w, tprintf("{}", *cast(^u16) data.data))
-        case i32 do io.write(w, tprintf("{}", *cast(^i32) data.data))
-        case u32 do io.write(w, tprintf("{}", *cast(^u32) data.data))
-        case i64 do io.write(w, tprintf("{}", *cast(^i64) data.data))
-        case u64 do io.write(w, tprintf("{}", *cast(^u64) data.data))
-        case f32 do io.write(w, tprintf("{}", *cast(^f32) data.data))
-        case f64 do io.write(w, tprintf("{}", *cast(^f64) data.data))
+        case i8  do io.write(w, tprintf("{}", *cast(&i8)  data.data))
+        case u8  do io.write(w, tprintf("{}", *cast(&u8)  data.data))
+        case i16 do io.write(w, tprintf("{}", *cast(&i16) data.data))
+        case u16 do io.write(w, tprintf("{}", *cast(&u16) data.data))
+        case i32 do io.write(w, tprintf("{}", *cast(&i32) data.data))
+        case u32 do io.write(w, tprintf("{}", *cast(&u32) data.data))
+        case i64 do io.write(w, tprintf("{}", *cast(&i64) data.data))
+        case u64 do io.write(w, tprintf("{}", *cast(&u64) data.data))
+        case f32 do io.write(w, tprintf("{}", *cast(&f32) data.data))
+        case f64 do io.write(w, tprintf("{}", *cast(&f64) data.data))
         case _ {
             return .{ kind = .Unsupported_Type, msg = tprintf("cannot encode {} as XML text", type) }
         }

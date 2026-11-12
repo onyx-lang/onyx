@@ -537,6 +537,11 @@ typedef struct LocalAllocator {
 
     i32 max_stack;
     i32 curr_stack;
+
+    // Compound literals inside an expression macro pin this so a later rewind
+    // cannot reuse their slots. The macro frees those slots when it returns,
+    // which is too early when the returned value still points at them.
+    i32 stack_floor;
 } LocalAllocator;
 
 typedef struct WasmFunc {
@@ -712,14 +717,6 @@ typedef struct PatchInfo {
     u32 instruction_index;
 } PatchInfo;
 
-typedef struct ForRemoveInfo {
-    // These are WASM locals
-    u64 iterator_remove_func;
-    u64 iterator_data_ptr;
-
-    i32 remove_func_type_idx;
-} ForRemoveInfo;
-
 typedef struct JsPartial {
     u32 order;
     char *code;
@@ -770,8 +767,6 @@ typedef struct OnyxWasmModule {
     // Nodes discovered while linking. Drained immediately so their callees
     // are emitted before code patches run. The entity heap is already empty.
     bh_arr(AstNode *) link_emit_queue;
-
-    bh_arr(ForRemoveInfo) for_remove_info;
 
     bh_arr(AstForeignBlock *) foreign_blocks;
     bh_arr(AstObjectBlock *) object_blocks;

@@ -22,10 +22,10 @@ use core {*}
 main :: (args: [] cstr) {
     // The following declares a fixed-size array of 10 i32s on the stack. Currently,
     // it is not guaranteed that `arr` will be zero initialized, so we will do that
-    // with a for loop. Note, the `^` after the for keyword means we are iterating by
+    // with a for loop. Note, the `&` after the for keyword means we are iterating by
     // pointer.
     arr : [10] i32;
-    for ^elem in arr do *elem = 0;
+    for &elem in arr do *elem = 0;
 
     // To access certain elements of the array, simply use the array access operator,
     // [...], as so. This sets the fourth element of the array to be 1234.
@@ -74,7 +74,7 @@ main :: (args: [] cstr) {
     //      buffer2 = tmp;
     //
     // In this circumstance, I would recommend just using pointers. So [128] i32 in
-    // the previous example would just become ^i32.
+    // the previous example would just become &i32.
 
 
 

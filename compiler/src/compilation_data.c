@@ -1203,7 +1203,6 @@ static b32 compilation_log_kind_has_type_pointer(AstKind kind) {
     switch (kind) {
         case Ast_Kind_Error:
         case Ast_Kind_Load:
-        case Ast_Kind_Load_All:
         case Ast_Kind_Library_Path:
         case Ast_Kind_Import:
         case Ast_Kind_Symbol:
@@ -1224,7 +1223,6 @@ static b32 compilation_log_kind_has_type_pointer(AstKind kind) {
         case Ast_Kind_Directive_Add_Overload:
         case Ast_Kind_Directive_Operator:
         case Ast_Kind_Directive_Export:
-        case Ast_Kind_Directive_Remove:
         case Ast_Kind_Directive_Init:
         case Ast_Kind_Directive_Library:
         case Ast_Kind_Directive_Wasm_Section:
@@ -1340,13 +1338,6 @@ static char *compilation_log_binding_docs(Context *context, CompilationLog *log,
     AstBinding *binding = compilation_log_lookup_binding(log, node);
     if (!binding) return (char *) "";
 
-    if (binding->documentation_token_old && binding->documentation_token_old->text) {
-        return compilation_log_intern_len(
-            context,
-            binding->documentation_token_old->text,
-            binding->documentation_token_old->length
-        );
-    }
     if (binding->documentation_string) return (char *) binding->documentation_string;
     return (char *) "";
 }

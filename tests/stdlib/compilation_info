@@ -8,9 +8,17 @@ point_symbol
 true
 point_in_package_scope
 true
+point_symbol_package
+true
+get_x_package
+true
+main_func_package
+true
 point_type
 true
 point_members
+true
+point_member_package
 true
 point_type_of
 true

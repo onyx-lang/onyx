@@ -46,7 +46,6 @@
     NODE(DirectiveDefined)     \
     NODE(DirectiveInit)        \
     NODE(DirectiveLibrary)     \
-    NODE(DirectiveRemove)      \
     NODE(DirectiveFirst)       \
     NODE(DirectiveExportName)  \
     NODE(DirectiveWasmSection) \
@@ -166,7 +165,6 @@ typedef enum AstKind {
     Ast_Kind_Error,
     Ast_Kind_Package,
     Ast_Kind_Load,
-    Ast_Kind_Load_All,
     Ast_Kind_Library_Path,
     Ast_Kind_Import,
     Ast_Kind_Memres,
@@ -255,7 +253,6 @@ typedef enum AstKind {
     Ast_Kind_Directive_Defined,
     Ast_Kind_Directive_Init,
     Ast_Kind_Directive_Library,
-    Ast_Kind_Directive_Remove,
     Ast_Kind_Directive_First,
     Ast_Kind_Directive_Export_Name,
     Ast_Kind_Directive_This_Package,
@@ -1225,10 +1222,7 @@ struct AstBinding       {
     AstTyped_base;
     AstNode* node;
 
-    // Used for the old '#doc' scheme
-    OnyxToken *documentation_token_old;
-
-    // Used for the new `///` scheme
+    // Captured from `///` doc comments.
     const char *documentation_string;
 };
 struct AstInjection     {
@@ -1666,10 +1660,6 @@ struct AstDirectiveDefined {
     AstTyped *expr;
 
     b32 is_defined: 1;
-};
-
-struct AstDirectiveRemove {
-    AstNode_base;
 };
 
 struct AstDirectiveFirst {

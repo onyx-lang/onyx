@@ -6,7 +6,6 @@ static const char* ast_node_names[] = {
     "ERROR",
     "PACKAGE",
     "LOAD",
-    "LOAD ALL IN FOLDER", // :Deprecated
     "INCLUDE LIBRARY PATH",
     "IMPORT",
     "MEMORY RESERVATION",
@@ -95,7 +94,6 @@ static const char* ast_node_names[] = {
     "DEFINED",
     "INIT",
     "LIBRARY",
-    "REMOVE",
     "FIRST",
     "EXPORT NAME",
     "THIS PACKAGE",
@@ -140,7 +138,7 @@ const char *binaryop_string[Binary_Op_Count] = {
 
     "|>", "..", "..=", "->",
 
-    "[]", "[]=", "^[]",
+    "[]", "[]=", "&[]",
 
     "??"
 };

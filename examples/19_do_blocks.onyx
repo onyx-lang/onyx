@@ -40,7 +40,7 @@ main :: (args: [] cstr) {
 #if false {
     left, right := do {
         parts := string.split(line, '|');
-        defer memory.free_slice(^parts);
+        defer memory.free_slice(&parts);
         return parts[0], parts[1];
     };
 }
@@ -54,7 +54,7 @@ main :: (args: [] cstr) {
     {
         parts := string.split(line, '|');
         left, right = parts[0], parts[1];
-        memory.free_slice(^parts);
+        memory.free_slice(&parts);
     }
 }
 

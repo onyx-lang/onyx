@@ -23,7 +23,7 @@ main :: () {
         println(v)
     }
 
-    // `as &name` / `as ^name` binds a pointer into the optional, like `case .Some as &value`.
+    // `as &name` binds a pointer into the optional, like `case .Some as &value`.
     // The else branch sees null.
     result := maybe_result()
     if result as &f {
@@ -41,7 +41,7 @@ main :: () {
         println(p == null)
     }
 
-    if result as ^g {
+    if result as &g {
         println(g.x)
     }
 

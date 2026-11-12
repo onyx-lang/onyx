@@ -32,7 +32,7 @@ max :: (a: $Type, b: Type) -> Type {
 
 // As another example, take 'array.push':
 
-push :: (arr: ^[..] $T, value: T) {
+push :: (arr: &[..] $T, value: T) {
     // ...
 }
 
@@ -40,7 +40,7 @@ push :: (arr: ^[..] $T, value: T) {
 // then the value is expected to be the same type. If the dollar sign would have been on
 // the second T like so,
 
-push :: (arr: ^[..] T, value: $T) {
+push :: (arr: &[..] T, value: $T) {
     // ...
 }
 

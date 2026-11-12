@@ -5,7 +5,7 @@
 
 main :: (args: [] cstr) {
     // If you don't want to explicitly write the return type
-    // of a function, you can use #auto:
+    // of a function, you can use _:
     f :: (x: i32) -> _ {
         return x * 2;
     }
@@ -16,7 +16,7 @@ main :: (args: [] cstr) {
     // That's really all you need to know... It is just a
     // convinent shorthand. However, like I said, there are
     // some cases where it is impossible to actually write
-    // the type so #auto is the only solution. Take this
+    // the type so _ is the only solution. Take this
     // example. It takes something that is iterable, and
     // returns an array of whatever that iterable iterates
     // over. Because the only way to pattern match the V

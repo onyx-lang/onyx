@@ -56,7 +56,7 @@ main :: (args: [] cstr) {
     person_set << .{ "Joe", 38 };
 
     // "Joe" will only be printed once.
-    for person in set.as_iter(^person_set) {
+    for person in set.as_iter(&person_set) {
         println(person);
     }
 }

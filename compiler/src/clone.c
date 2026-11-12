@@ -38,7 +38,6 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Error: return sizeof(AstNode);
         case Ast_Kind_Package: return sizeof(AstPackage);
         case Ast_Kind_Load: return sizeof(AstInclude);
-        case Ast_Kind_Load_All: return sizeof(AstInclude);
         case Ast_Kind_Memres: return sizeof(AstMemRes);
         case Ast_Kind_Binding: return sizeof(AstBinding);
         case Ast_Kind_Function: return sizeof(AstFunction);
@@ -106,7 +105,6 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Directive_Defined: return sizeof(AstDirectiveDefined);
         case Ast_Kind_Do_Block: return sizeof(AstDoBlock);
         case Ast_Kind_Constraint: return sizeof(AstConstraint);
-        case Ast_Kind_Directive_Remove: return sizeof(AstDirectiveRemove);
         case Ast_Kind_Directive_First: return sizeof(AstDirectiveFirst);
         case Ast_Kind_Directive_Export_Name: return sizeof(AstDirectiveExportName);
         case Ast_Kind_Import: return sizeof(AstImport);
