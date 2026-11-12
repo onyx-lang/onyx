@@ -208,19 +208,19 @@ Optional.hash :: (o: ?$T/core.hash.Hashable) => switch o {
 }
 
 #operator?? :: macro (opt: ?$T, catch: Code) -> T {
-    switch value := opt; value {
-        case .Some as v do return v;
-        case _ ---
+    if opt as v {
+        return v
     }
 
     #unquote catch;
 }
 
 #operator? :: macro (opt: ?$T) -> T {
-    switch value := opt; value {
-        case .Some as v do return v;
-        case _ do return #from_proc .{};
+    if opt as v {
+        return v
     }
+
+    return #from_proc .{}
 }
 
 #operator! :: macro (o: ? $T) => o->unwrap()
