@@ -145,11 +145,11 @@ find_child :: (doc: &Document, parent: Element.Index, name: str, space: str) -> 
     if doc.elements.count <= parent do return .None
 
     for v in doc.elements[parent].children {
-        v.Element->with([e] {
+        if v.Element as e {
             if element_matches(&doc.elements[e], name, space) {
                 return e
             }
-        })
+        }
     }
 
     return .None
@@ -160,11 +160,11 @@ collect_children :: (doc: &Document, parent: Element.Index, name: str, space: st
     if doc.elements.count <= parent do return
 
     for v in doc.elements[parent].children {
-        v.Element->with([e] {
+        if v.Element as e {
             if element_matches(&doc.elements[e], name, space) {
                 out->push(e)
             }
-        })
+        }
     }
 }
 

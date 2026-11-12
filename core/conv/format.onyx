@@ -419,10 +419,10 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
     //
     // Use a custom formatter, if one is registered for the type.
     if formatting.custom_format {
-        custom_formatters->get(v.type)->with([formatter] {
+        if custom_formatters->get(v.type) as formatter {
             formatter(output, formatting, v.data);
             return;
-        });
+        }
     }
 
     switch v.type {

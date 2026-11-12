@@ -199,33 +199,32 @@ tcp_server_pulse :: (use server: &TCP_Server) -> bool {
     //
     // Check for new connection
     if client_count < clients.count {
-        socket->accept().Ok->with([client_data] {
+        if socket->accept().Ok as client_data {
             client := Slice.first(clients, [cl](cl.None))
             if !client {
                 client_data.socket->close()
-                break
+            } else {
+                *client = TCP_Server.Client.{}
+                cl := client->unwrap_ptr()
+                cl.server = server
+                cl.state = .Alive
+                cl.socket = client_data.socket
+                cl.address = client_data.addr
+
+                server.client_count += 1
+
+                conn_event := new(TCP_Event.Connection, allocator=server.event_allocator)
+                conn_event.address = &cl.address
+                conn_event.client = cl
+
+                server.events << .{ .Connection, conn_event }
             }
-
-            *client = TCP_Server.Client.{}
-            cl := client->unwrap_ptr()
-            cl.server = server
-            cl.state = .Alive
-            cl.socket = client_data.socket
-            cl.address = client_data.addr
-
-            server.client_count += 1
-
-            conn_event := new(TCP_Event.Connection, allocator=server.event_allocator)
-            conn_event.address = &cl.address
-            conn_event.client = cl
-
-            server.events << .{ .Connection, conn_event }
-        })
+        }
     }
 
     // 
     // Process dead clients
-    for& maybe_client in clients do maybe_client.*->with([client] {
+    for& maybe_client in clients do if maybe_client.* as client {
         switch client.state {
             case .Being_Killed {
                 // Before, there was not a "being killed" state and the code made
@@ -247,7 +246,7 @@ tcp_server_pulse :: (use server: &TCP_Server) -> bool {
                 server.client_count -= 1
             }
         }
-    })
+    }
 
     if client_count == 0 {
         // Wait for a client to connect.

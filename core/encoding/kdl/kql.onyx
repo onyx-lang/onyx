@@ -209,15 +209,15 @@ query_matcher_matches :: (s: &Matcher, node: &Node) =>
             );
         }
 
-        d.accessor.Prop->with([prop] {
+        if d.accessor.Prop as prop {
             if !d.value {
                 return node.props->has(prop);
             }
 
             return operate_on_values(node.props->get(prop)?, d.value?, d.op);
-        });
+        }
 
-        d.accessor.Arg->with([index] {
+        if d.accessor.Arg as index {
             if !d.value {
                 return index < node.values.length;
             }
@@ -225,7 +225,7 @@ query_matcher_matches :: (s: &Matcher, node: &Node) =>
             if index >= node.values.length do return false;
 
             return operate_on_values(node.values[index], d.value?, d.op);
-        });
+        }
 
         return false;
     })

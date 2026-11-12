@@ -1434,7 +1434,7 @@ load_config :: (path: str) -> ? Config {
     c.dependency_source_path = "./lib"
     c.dependency_binary_path = "./bin"
 
-    doc->query("top() > package")->with([p] {
+    if doc->query("top() > package") as p {
         pack := p
 
         load_string(pack, "name", &c.package_name)
@@ -1447,17 +1447,17 @@ load_config :: (path: str) -> ? Config {
         load_string(pack, "version", &version)
 
         conv.parse_any(&c.package_version, version)
-    })
+    }
 
-    doc->query("top() > config")->with([p] {
+    if doc->query("top() > config") as p {
         load_string(p, "dependency_source_path", &c.dependency_source_path)
         load_string(p, "dependency_binary_path", &c.dependency_binary_path)
-    })
+    }
 
-    doc->query("top() > native")->with([p] {
+    if doc->query("top() > native") as p {
         load_string(p, "library", &c.native_library)
         load_string(p, "build", &c.native_library_build)
-    })
+    }
 
     for doc->query_all("top() > tools > []") {
         sources: [..] str
@@ -1548,9 +1548,9 @@ load_config :: (path: str) -> ? Config {
         d.name = it.node
 
         if it.values.length == 0 {
-            it.props->get("branch")->with([branch] {
+            if it.props->get("branch") as branch {
                 d.target = .{ branch = branch->as_str() ?? "" }
-            })
+            }
 
         } else {
             version_str := it->value_or_null()->as_str() ?? ""
@@ -1559,13 +1559,13 @@ load_config :: (path: str) -> ? Config {
             d.target = .{ version = version }
         }
 
-        it.props->get("git")->with([src] {
+        if it.props->get("git") as src {
             d.source = .{ Git = src->as_str() ?? "" }
-        })
+        }
 
-        it.props->get("locked")->with([locked] {
+        if it.props->get("locked") as locked {
             d.locked = locked->as_bool() ?? false
-        })
+        }
 
         c.dependencies[d.name] = d
     }
@@ -1573,11 +1573,11 @@ load_config :: (path: str) -> ? Config {
     return c
 
     load_string :: (p: &kdl.Node, field: str, target: &$T) {
-        p->query(field)->with([n] {
-            n->value_or_null()->as_str()->with([s] {
+        if p->query(field) as n {
+            if n->value_or_null()->as_str() as s {
                 *target = s
-            })
-        })
+            }
+        }
     }
 }
 
@@ -1666,13 +1666,13 @@ store_config :: (path: str) -> bool {
         }
     }
 
-    config._source_doc->with([source] {
+    if config._source_doc as source {
         for source->query_all("top() > []") {
             if !Array.contains(str.["package", "config", "native", "dependencies"], it.node) {
                 doc.nodes << it
             }
         }
-    })
+    }
 
     use file := os.File.open(path, .Write)->or_return(false)
     use w := io.Writer.make(&file)

@@ -28,9 +28,9 @@ Document.write_string :: write_string
 write_node :: (n: &Node, w: &io.Writer, indentation := 0) {
     for indentation * KDL_TAB_SIZE do io.Writer.write(w, " ");
 
-    n.type_annotation->with([ta] {
+    if n.type_annotation as ta {
         io.Writer.write_format(w, "({}) ", ta);
-    });
+    }
 
     if str.contains(n.node, "/") do io.Writer.write_format(w, "{\"}", n.node);
     else do io.Writer.write(w, n.node);
@@ -62,9 +62,9 @@ write_node :: (n: &Node, w: &io.Writer, indentation := 0) {
 }
 
 write_value :: (v: Value, w: &io.Writer) {
-    v.type_annotation->with([ta] {
+    if v.type_annotation as ta {
         io.Writer.write_format(w, "({}) ", ta);
-    });
+    }
 
     switch v.data {
         case .String as s {

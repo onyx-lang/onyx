@@ -6,9 +6,9 @@ main :: () {
     x := 5;
 
     val := Slice.find_opt(arr, [n](n > x));
-    val->with([captured_name] {
+    if val as captured_name {
         println(captured_name);
-    });
+    }
 
     m := Map.literal(str, i32, .[
         .{ "foo", 123 },

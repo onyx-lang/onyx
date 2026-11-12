@@ -606,7 +606,7 @@ Parser.skip_children_block :: (self: &#Self) -> Result(i32, Parse_Error) {
 
 #local
 free_skipped_value :: (al: Allocator, v: Value) {
-    v.type_annotation->with([t] { str.free(t, al); });
+    if v.type_annotation as t do str.free(t, al);
     switch v.data {
         case .String as s do str.free(s, al);
         case .Number as num do switch num {

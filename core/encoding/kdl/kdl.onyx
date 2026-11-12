@@ -109,7 +109,7 @@ free :: (d: Document) {
 #local
 free_node :: (al: Allocator, n: &Node) {
     str.free(n.node, al);
-    n.type_annotation->with([t] { str.free(t, al); });
+    if n.type_annotation as t do str.free(t, al);
 
     for& v in n.values do free_value(al, v);
     delete(&n.values);
@@ -127,7 +127,7 @@ free_node :: (al: Allocator, n: &Node) {
 
 #local
 free_value :: (al: Allocator, v: &Value) {
-    v.type_annotation->with([t] { str.free(t, al); });
+    if v.type_annotation as t do str.free(t, al);
 
     switch v.data {
         case .String as s {

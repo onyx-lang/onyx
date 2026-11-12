@@ -186,15 +186,6 @@ Optional.catch :: macro (o: ?$T, body: Code) -> T {
     }
 }
 
-Optional.with :: macro (o: ?$T, body: Code) {
-    switch o {
-        case .None ---;
-        case .Some as it {
-            #unquote body(it);
-        }
-    }
-}
-
 Optional.hash :: (o: ?$T/core.hash.Hashable) => switch o {
     case .Some as v => core.hash.hash(v);
     case _          => 0;
