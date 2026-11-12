@@ -1322,10 +1322,19 @@ main :: () {}
         }
     }
 
+    meta_tag_type: &TypeInfo = null;
+    for id in tinfo->types_named("Meta") {
+        if tinfo->get_type(id) as ty {
+            if ty.kind == .Struct do meta_tag_type = ty;
+        }
+    }
+
     osad_ok := false;
     if osad_type != null && osad_type.tags.count == 1 {
         switch osad_type.tags[0].data {
             case .Raw_Value as raw {
+                if raw.type_id != meta_tag_type.id do break
+
                 if osad.deserialize(Tag_Meta, raw.bytes) as meta {
                     if meta.n == 1 do osad_ok = true;
                 }
