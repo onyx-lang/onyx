@@ -32,7 +32,7 @@ Date.make :: (year, month, day: i32) -> Date {
 }
 
 Date.today :: () -> Date {
-    return now()->as_date();
+    return Timestamp.now()->as_date();
 }
 
 Date.add_months :: (d: Date, months: i32) -> Date {

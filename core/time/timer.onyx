@@ -92,7 +92,3 @@ after :: (d: Duration) -> Instant {
     sleep(d);
     return Instant.now();
 }
-
-until :: Instant.until
-since :: Instant.since
-sleep_until :: Instant.sleep_until

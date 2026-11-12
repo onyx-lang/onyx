@@ -171,55 +171,49 @@ read_i64_be :: (data: [] u8, offset := 0) -> ? i64 {
 }
 
 /// True if `data` begins with `prefix`.
-starts_with :: (data: [] u8, prefix: [] u8) -> bool {
-    return str.starts_with(data, prefix);
-}
+starts_with :: str.starts_with
 
 /// True if `data` ends with `suffix`.
-ends_with :: (data: [] u8, suffix: [] u8) -> bool {
-    return str.ends_with(data, suffix);
-}
+ends_with :: str.ends_with
 
 /// Index of the first occurrence of `needle`, or `.None`.
 find :: (data: [] u8, needle: [] u8) -> ? i32 {
     return str.find(data, needle);
 }
 
-Array.append_u8      :: append
-Array.append_str     :: append_str
-Array.append_u16_le  :: append_u16_le
-Array.append_u16_be  :: append_u16_be
-Array.append_u32_le  :: append_u32_le
-Array.append_u32_be  :: append_u32_be
-Array.append_u64_le  :: append_u64_le
-Array.append_u64_be  :: append_u64_be
-Array.append_i16_le  :: append_i16_le
-Array.append_i16_be  :: append_i16_be
-Array.append_i32_le  :: append_i32_le
-Array.append_i32_be  :: append_i32_be
-Array.append_i64_le  :: append_i64_le
-Array.append_i64_be  :: append_i64_be
+dyn_str.append_u8      :: append
+dyn_str.append_str     :: append_str
+dyn_str.append_u16_le  :: append_u16_le
+dyn_str.append_u16_be  :: append_u16_be
+dyn_str.append_u32_le  :: append_u32_le
+dyn_str.append_u32_be  :: append_u32_be
+dyn_str.append_u64_le  :: append_u64_le
+dyn_str.append_u64_be  :: append_u64_be
+dyn_str.append_i16_le  :: append_i16_le
+dyn_str.append_i16_be  :: append_i16_be
+dyn_str.append_i32_le  :: append_i32_le
+dyn_str.append_i32_be  :: append_i32_be
+dyn_str.append_i64_le  :: append_i64_le
+dyn_str.append_i64_be  :: append_i64_be
 
-Slice.put_u16_le :: put_u16_le
-Slice.put_u16_be :: put_u16_be
-Slice.put_u32_le :: put_u32_le
-Slice.put_u32_be :: put_u32_be
-Slice.put_u64_le :: put_u64_le
-Slice.put_u64_be :: put_u64_be
-Slice.read_u16_le :: read_u16_le
-Slice.read_u16_be :: read_u16_be
-Slice.read_u32_le :: read_u32_le
-Slice.read_u32_be :: read_u32_be
-Slice.read_u64_le :: read_u64_le
-Slice.read_u64_be :: read_u64_be
-Slice.read_i16_le :: read_i16_le
-Slice.read_i16_be :: read_i16_be
-Slice.read_i32_le :: read_i32_le
-Slice.read_i32_be :: read_i32_be
-Slice.read_i64_le :: read_i64_le
-Slice.read_i64_be :: read_i64_be
-Slice.starts_with :: starts_with
-Slice.ends_with   :: ends_with
+str.put_u16_le :: put_u16_le
+str.put_u16_be :: put_u16_be
+str.put_u32_le :: put_u32_le
+str.put_u32_be :: put_u32_be
+str.put_u64_le :: put_u64_le
+str.put_u64_be :: put_u64_be
+str.read_u16_le :: read_u16_le
+str.read_u16_be :: read_u16_be
+str.read_u32_le :: read_u32_le
+str.read_u32_be :: read_u32_be
+str.read_u64_le :: read_u64_le
+str.read_u64_be :: read_u64_be
+str.read_i16_le :: read_i16_le
+str.read_i16_be :: read_i16_be
+str.read_i32_le :: read_i32_le
+str.read_i32_be :: read_i32_be
+str.read_i64_le :: read_i64_le
+str.read_i64_be :: read_i64_be
 
 
 #local {

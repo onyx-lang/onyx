@@ -778,17 +778,14 @@ dyn_str.append_format :: (s: &dyn_str, format: str, va: ..any) {
 
 dyn_str.append :: #match {
     macro (x: &dyn_str, other: str) {
-        use core.array
         Array.concat(x, other);
     }, 
 
     macro (x: &dyn_str, other: u8) {
-        use core.array
         Array.push(x, other);
     }, 
 }
 
 dyn_str.retreat :: macro (x: &dyn_str, chars := 1) {
-    use core.array
     Array.pop(x, chars);
 }

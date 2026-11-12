@@ -5,11 +5,9 @@ package core.net
 }
 
 use core.thread
-use core.array
 use core.memory
 use core.alloc
 use core.os
-use core.iter
 use runtime
 
 // Should TCP_Connection be an abstraction of both the client and the server?

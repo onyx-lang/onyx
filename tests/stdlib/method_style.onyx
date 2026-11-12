@@ -17,8 +17,8 @@ main :: () {
 
     b := make([..] u8);
     b->append_u16_le(0x1234);
-    println(Slice.read_u16_le(b, 0) ?? 0);
-    println(Slice.starts_with(b, u8.[0x34]));
+    println(str.read_u16_le(b, 0) ?? 0);
+    println(str.starts_with(b, u8.[0x34]));
     delete(&b);
 
     use bs := io.BufferStream.make(32);

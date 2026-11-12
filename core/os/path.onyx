@@ -196,14 +196,3 @@ Path.abs :: (path: str, allocator := Path_Allocator) -> str {
 
     return Path.clean(Path.join(cwd, path), allocator);
 }
-
-path_clean     :: Path.clean
-path_join      :: Path.join
-path_directory :: Path.directory
-path_extension :: Path.extension
-path_basename  :: Path.basename
-path_stem      :: Path.stem
-path_split     :: Path.split
-path_is_absolute :: Path.is_absolute
-path_is_relative :: Path.is_relative
-path_abs       :: Path.abs

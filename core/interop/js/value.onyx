@@ -1,9 +1,7 @@
 
 package core.js
 
-use core.iter
 use core.math
-use core.array
 use core.alloc
 
 /// Used to represent a JavaScript value.

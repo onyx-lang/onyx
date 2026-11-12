@@ -73,6 +73,7 @@ Timestamp.now :: () -> Timestamp {
     return gmtime(current_time / 1000);
 }
 
+/// Current UTC time. Same as `Timestamp.now`.
 now :: Timestamp.now
 
 to_epoch :: tm_to_time

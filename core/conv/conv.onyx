@@ -4,7 +4,6 @@ package core.conv
     Enable_Custom_Formatters :: true
 }
 
-use core.string
 use core.math
 
 /// Converts a string into an integer. Works with positive and

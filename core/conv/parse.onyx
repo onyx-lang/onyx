@@ -1,9 +1,5 @@
 package core.conv
 
-use core.map
-use core.string
-use core.array
-use core.math
 use core.memory
 use runtime
 

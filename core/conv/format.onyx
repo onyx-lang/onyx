@@ -1,8 +1,6 @@
 package core.conv
 
-use core.map
-use core.string
-use core.array
+use core.array {Untyped_Array}
 use core.math
 use core.io
 use runtime
@@ -16,8 +14,8 @@ use runtime
 /// It looks for all custom formatting and parsing definitions and
 /// registers them to be used in format_any and parse_any.
 custom_formatters_initialized :: #init () {
-    map.Map.init(&custom_formatters);
-    map.Map.init(&custom_parsers);
+    Map.init(&custom_formatters);
+    Map.init(&custom_parsers);
 
     #if Enable_Custom_Formatters {
         use runtime.info {*};
@@ -616,7 +614,7 @@ format_any :: (output: &Format_Output, formatting: &Format, v: any) {
                 }
 
                 a := cast(&Type_Info_Dynamic_Array) info;
-                arr := cast(&array.Untyped_Array) v.data;
+                arr := cast(&Untyped_Array) v.data;
                 data  := arr.data;
                 count := arr.count;
 
