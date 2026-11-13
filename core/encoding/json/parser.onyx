@@ -379,7 +379,7 @@ unescape_string :: (token: Token, allocator: Allocator) -> str {
     if token.kind != .String do return "";
 
     s := token.text;
-    if s.count <= 2 do return "";
+    if s.count < 2 do return "";
 
     s = s.data[1 .. s.count - 1];
 
