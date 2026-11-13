@@ -41,6 +41,7 @@ CompilationInfo :: struct {
     resolutions_by_file: [..] [..] u32
 
     resolutions: [..] EventSymbolResolved
+    tags: [..] TagInfo
 }
 
 ScopeInfo :: struct {
@@ -76,6 +77,10 @@ TypeInfo :: struct {
     tags: [..] TagValue
 }
 
+TagInfo :: struct {
+    target: typeof EventTag.{}.target
+}
+
 CompilationInfo.make :: (allocator := context.allocator) -> (res: CompilationInfo) {
     res.allocator = allocator
     res.payloads = make(typeof res.payloads, allocator=allocator)
@@ -95,6 +100,7 @@ CompilationInfo.make :: (allocator := context.allocator) -> (res: CompilationInf
     res.symbols_by_type = make(typeof res.symbols_by_type, allocator=allocator)
     res.resolutions     = make(typeof res.resolutions,     allocator=allocator)
     res.resolutions_by_file = make(typeof res.resolutions_by_file, allocator=allocator)
+    res.tags = make(typeof res.tags, allocator=allocator)
     return
 }
 
@@ -271,6 +277,8 @@ CompilationInfo.ingest_event :: (self: &#Self, event: &CompilerEvent) {
         }
 
         case .Tag as tag {
+            self.tags->push(.{tag.target})
+
             switch tag.target {
                 case .Symbol as sid {
                     if sid != 0 {
