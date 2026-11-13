@@ -2,9 +2,8 @@ package core.encoding.osad
 #allow_stale_code
 
 use core.io
-use core.string
-use core.array
 use core.memory
+use core.array {Untyped_Array}
 use runtime
 
 use runtime {
@@ -75,7 +74,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
 
         case .Slice, .Dynamic_Array {
             if v.type == str {
-                untyped_slice := cast(&array.Untyped_Array, v.data);
+                untyped_slice := cast(&Untyped_Array, v.data);
                 base: [&] u8 = untyped_slice.data;
                 count:       = untyped_slice.count;
                 output_u32(w, count);
@@ -85,7 +84,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
 
             s_info := cast(&type_info.Type_Info_Slice, info);
 
-            untyped_slice := cast(&array.Untyped_Array, v.data);
+            untyped_slice := cast(&Untyped_Array, v.data);
             base: [&] u8 = untyped_slice.data;
             count:       = untyped_slice.count;
             elem_info := type_info.get_type_info(s_info.of);
@@ -228,7 +227,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := con
 
             count := read_u32(r);
 
-            untyped_slice := cast(&array.Untyped_Array, target);
+            untyped_slice := cast(&Untyped_Array, target);
             untyped_slice.count = count;
             untyped_slice.data = raw_alloc(allocator, elem_size * count);
 

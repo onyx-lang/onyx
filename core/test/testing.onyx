@@ -2,8 +2,6 @@ package core.test
 #allow_stale_code
 
 use core
-use core.array
-use core.string
 use runtime
 
 use core {printf}

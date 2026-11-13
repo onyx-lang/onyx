@@ -2,7 +2,6 @@
 
 use core
 use core.io
-use core.array
 use core {printf}
 
 main :: (args: [] cstr) {

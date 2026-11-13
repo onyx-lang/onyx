@@ -35,7 +35,6 @@ package core.encoding.ini
 
 use core.alloc
 use core.conv
-use core.string
 use core.io
 
 use core { aprintf }

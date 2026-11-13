@@ -1,8 +1,6 @@
 
 package runtime.info
 
-use core.array
-
 tagged_procedures: [] &Tagged_Procedure
 
 Tagged_Procedure :: struct {

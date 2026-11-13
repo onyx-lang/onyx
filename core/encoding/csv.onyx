@@ -9,8 +9,6 @@ package core.encoding.csv
 //
 
 use core
-use core.string
-use core.array
 use core.conv
 use core.io
 use core.test

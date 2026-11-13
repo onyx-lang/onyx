@@ -751,7 +751,6 @@ str.tokenize :: (s: str, charset: [] u8) => {
 //
 
 str.to_dyn_str :: (x: str, allocator := context.allocator) -> dyn_str {
-    use core.array
     return Array.make(x, allocator);
 }
 

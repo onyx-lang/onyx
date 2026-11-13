@@ -32,8 +32,6 @@ main :: (args: [] cstr) {
     }
 
     {
-        use core.string
-
         s := "   Some string ...";
         t := str.strip_leading_whitespace(s);
         println(t);

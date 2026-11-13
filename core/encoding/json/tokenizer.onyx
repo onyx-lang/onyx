@@ -6,7 +6,6 @@
 package core.encoding.json
 #allow_stale_code
 
-use core.array
 use core.io
 use core.memory
 

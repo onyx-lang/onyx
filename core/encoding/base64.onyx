@@ -9,7 +9,6 @@ package core.encoding.base64
 #allow_stale_code
 
 use core { Result }
-use core.array
 
 Error :: enum {
     Invalid_Length

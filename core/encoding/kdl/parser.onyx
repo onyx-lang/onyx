@@ -10,7 +10,6 @@ use core.io
 use core.memory
 use core.slice
 use core.encoding.utf8
-use core.string
 
 #package
 Tokenizer :: struct {

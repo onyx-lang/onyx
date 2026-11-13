@@ -1,7 +1,6 @@
 package core.io
 
 use core.conv
-use core.string
 use core.memory
 use core.bytes
 
@@ -143,7 +142,7 @@ Writer.write_str :: (use writer: &Writer, s: str) {
 }
 
 Writer.write_cstr :: (use writer: &Writer, cs: cstr) {
-    s := string.from_cstr(cs);
+    s := str.as_str(cs);
     Writer.write_str(writer, s);
 }
 

@@ -1,8 +1,5 @@
 package core.sync
 
-use core.iter
-use core.array
-
 Channel :: struct (T: type_expr) {
     _buf: [..] T;
     _mutex: Mutex;
@@ -55,7 +52,7 @@ Channel.recv :: (chan: &Channel) -> ? chan.T {
 }
 
 Channel.as_iter :: (chan: &Channel) -> Iterator(chan.T) {
-    return iter.generator(
+    return Iterator.generator(
         &.{chan = chan},
         ctx => {
             return ctx.chan->recv();

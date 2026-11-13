@@ -3,7 +3,6 @@ package core.iter
 use core
 use core.memory
 use core.alloc
-use core.array
 use runtime
 
 use core {Pair}

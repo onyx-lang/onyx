@@ -3,7 +3,6 @@
 use core
 use core.hash
 use core.conv
-use core.array
 use core.iter
 
 use core {println, printf}

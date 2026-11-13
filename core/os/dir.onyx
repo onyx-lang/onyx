@@ -4,7 +4,6 @@ package core.os
     #error "Cannot include this file. Platform not supported.";
 }
 
-use core.string
 use core.conv
 use runtime
 

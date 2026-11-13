@@ -1,7 +1,6 @@
 package core.os
 
 use runtime
-use core.string
 use core.conv
 
 #local Path_Allocator :: context.temp_allocator

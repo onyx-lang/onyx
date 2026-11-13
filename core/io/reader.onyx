@@ -10,8 +10,6 @@ package core.io
 
 use core.memory
 use core.math
-use core.array
-use core.iter
 use core.bytes
 use core { Result }
 
@@ -704,7 +702,7 @@ Reader.skip_bytes :: (use reader: &Reader, bytes: u32) -> (i32, Error) {
 }
 
 Reader.lines :: (r: &Reader, inplace := false, allocator := context.allocator) =>
-    iter.generator(&.{
+    Iterator.generator(&.{
         r = r,
         inplace = inplace,
         allocator = allocator,
