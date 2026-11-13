@@ -85,19 +85,7 @@ Heap.remove :: macro (heap: &Heap, cond: Code) -> ? heap.T {
 }
 
 
-// These definitions only exist for backwards compatibility
 
-make :: Heap.make
-init :: Heap.init
-insert :: Heap.insert
-empty :: Heap.empty
-peek_top :: Heap.peek_top
-remove_top :: Heap.remove_top
-pop :: Heap.pop
-remove :: Heap.remove
-delete :: Heap.delete
-clear :: Heap.clear
-copy :: Heap.copy
 
 
 #local {
@@ -147,4 +135,3 @@ copy :: Heap.copy
         }
     }
 }
-

@@ -66,8 +66,3 @@ logging_allocator :: (alloc: &Allocator) -> Allocator {
         data = alloc,
     };
 }
-
-// Compatibility: package names.
-make :: LoggingAllocator.make
-init :: LoggingAllocator.init
-make_allocator :: LoggingAllocator.as_allocator

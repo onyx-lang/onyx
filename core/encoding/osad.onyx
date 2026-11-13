@@ -25,7 +25,7 @@ serialize :: #match #local {}
 
 #overload
 serialize :: (v: any) -> ? [] u8 {
-    writer, stream := io.string_builder();
+    writer, stream := io.Writer.string_builder();
     defer cfree(stream);
 
     if !serialize(any.{v.data, v.type}, &writer) {
@@ -54,7 +54,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
             }
 
             // Output the raw bytes of the primitive type.
-            io.write_str(w, str.{ v.data, info.size });
+            io.Writer.write_str(w, str.{ v.data, info.size });
         }
 
         case .Function {
@@ -79,7 +79,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
                 base: [&] u8 = untyped_slice.data;
                 count:       = untyped_slice.count;
                 output_u32(w, count);
-                io.write_str(w, str.{ base, count });
+                io.Writer.write_str(w, str.{ base, count });
                 break;
             }
 
@@ -93,7 +93,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
             output_u32(w, count);
             if elem_info.kind == .Basic && elem_info.size == 1 {
                 // Fast path for writing `[] u8`
-                io.write_str(w, str.{ base, count });
+                io.Writer.write_str(w, str.{ base, count });
             }
 
             elem_size := type_info.size_of(s_info.of);
@@ -136,7 +136,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
                 case _ do panic("Bad union backing type");
             }
 
-            variant := array.first(u_info.variants, [x](x.tag_value == ~~tag_value));
+            variant := Slice.first(u_info.variants, [x](x.tag_value == ~~tag_value));
 
             if !variant {
                 output_u32(w, 0xffffffff);
@@ -154,7 +154,7 @@ serialize :: (v: any, w: &io.Writer) -> bool {
 
     output_u32 :: macro (w: &io.Writer, i: u32) {
         v: u32 = i;
-        io.write_str(w, str.{ ~~&v, 4 });
+        io.Writer.write_str(w, str.{ ~~&v, 4 });
     }
 }
 
@@ -167,7 +167,7 @@ deserialize :: #match #local {}
 
 #overload
 deserialize :: ($T: type_expr, s: str, allocator := context.allocator) -> ?T {
-    reader, stream := io.reader_from_string(s);
+    reader, stream := io.Reader.from_string(s);
     defer cfree(stream);
 
     target: T;
@@ -195,7 +195,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := con
         }
 
         case .Basic {
-            err := io.read_fill_buffer(r, .{ target, info.size });
+            err := io.Reader.read_fill_buffer(r, .{ target, info.size });
             // if err != .None do logf(.Warning, "Deserialize hit end of file.");
             return err == .None;
         }
@@ -240,7 +240,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := con
             if count == 0 do break;
 
             if elem_info.kind == .Basic && elem_info.size == 1 {
-                err := io.read_fill_buffer(r, .{ untyped_slice.data, count });
+                err := io.Reader.read_fill_buffer(r, .{ untyped_slice.data, count });
                 if err != .None do return false;
                 break;
             }
@@ -268,7 +268,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := con
 
             base: [&] u8 = target;
             variant_value := read_u32(r);
-            variant := array.first(u_info.variants, [x](x.tag_value == ~~variant_value));
+            variant := Slice.first(u_info.variants, [x](x.tag_value == ~~variant_value));
             if !variant {
                 memory.set(target, 0, u_info.size);
                 break;
@@ -290,7 +290,7 @@ deserialize :: (target: rawptr, type: type_expr, r: &io.Reader, allocator := con
 
     read_u32 :: macro (r: &io.Reader) -> u32 {
         dest: u32;
-        io.read_fill_buffer(r, str.{~~&dest, 4});
+        io.Reader.read_fill_buffer(r, str.{~~&dest, 4});
         return dest;
     }
 }

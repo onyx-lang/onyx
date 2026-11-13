@@ -1,10 +1,8 @@
 package core.misc
 
 use runtime
-use core.iter
-use core.array
-use core.string
 use core.memory
+use core.array {Untyped_Array}
 
 use runtime.info {
     get_type_info,
@@ -85,7 +83,7 @@ any_nested_selector :: (v: any, member_name: str) -> any {
     t := get_type_info(v.type);
     if t.kind != .Struct do return .{};
 
-    part_name, next_name := string.bisect(member_name, '.');
+    part_name, next_name := str.bisect(member_name, '.');
 
     member := get_struct_member(v.type, part_name);
     if member {
@@ -155,7 +153,7 @@ any_iter :: (arr: any) -> Iterator(any) {
         return .{ null, (_: rawptr) => Optional.empty(any) };
     }
 
-    return iter.generator(
+    return Iterator.generator(
         &.{
             base_ptr  = base_ptr,
             elem_type = elem_type,
@@ -208,7 +206,7 @@ any_as_array :: (arr: any) -> (rawptr, type_expr, u32) {
         }
 
         case .Slice, .Dynamic_Array, .Variadic_Argument {
-            a := cast(&array.Untyped_Array) arr.data;
+            a := cast(&Untyped_Array) arr.data;
             return a.data, (cast(&Type_Info_Dynamic_Array) info).of, a.count;
         }
 

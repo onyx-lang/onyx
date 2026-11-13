@@ -12,11 +12,11 @@ Document.child_with_name :: (doc: &Document, parent: Element.Index, name: str) -
     if doc.elements.count <= parent do return .None
 
     for v in doc.elements[parent].children {
-        v.Element->with([e] {
+        if v.Element as e {
             if element_matches(&doc.elements[e], name) {
                 return e
             }
-        })
+        }
     }
 
     return .None
@@ -40,10 +40,10 @@ Document.text :: (doc: &Document, el: Element.Index, allocator := context.alloca
     first: str = ""
     n := 0
     for c in doc.elements[el].children {
-        c.Text->with([t] {
+        if c.Text as t {
             if n == 0 do first = t
             n += 1
-        })
+        }
     }
 
     if n == 0 do return ""
@@ -51,9 +51,9 @@ Document.text :: (doc: &Document, el: Element.Index, allocator := context.alloca
 
     out := make(dyn_str, allocator=allocator)
     for c in doc.elements[el].children {
-        c.Text->with([t] {
+        if c.Text as t {
             dyn_str.append(&out, t)
-        })
+        }
     }
     return out
 }

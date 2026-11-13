@@ -237,21 +237,3 @@ List.as_iter :: (list: &List) =>
 core.iter.as_iter :: List.as_iter
 
 #local allocate_elem :: macro (list: &List($T)) => new(ListElem(T), allocator=list.allocator);
-
-// Compatibility: package names.
-make           :: List.make
-from_array     :: List.from_array
-free           :: List.free
-push_end       :: List.push_end
-push_begin     :: List.push_begin
-pop_end        :: List.pop_end
-pop_begin      :: List.pop_begin
-pop_end_opt    :: List.pop_end_opt
-pop_begin_opt  :: List.pop_begin_opt
-empty          :: List.empty
-count          :: List.count
-at             :: List.at
-contains       :: List.contains
-fold           :: List.fold
-map            :: List.map
-as_iter        :: List.as_iter

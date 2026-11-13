@@ -97,7 +97,7 @@ heap_allocator : Allocator;
 
 // The global temp allocator, set up upon program intialization.
 #local #thread_local
-temp_state     : arena.ArenaState;
+temp_state     : arena.Arena;
 
 #thread_local
 temp_allocator : Allocator;
@@ -119,7 +119,7 @@ clear_temp_allocator :: () {
 report_leaks_in_scope :: macro () {
     use core.alloc
 
-    use __ha := alloc.debug.make(context.allocator)
+    use __ha := alloc.debug.Debug_State.make(context.allocator)
 
     __old_allocator := context.allocator
     context.allocator = alloc.as_allocator(&__ha)

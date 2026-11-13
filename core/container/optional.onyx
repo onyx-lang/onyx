@@ -10,7 +10,7 @@ use core
 
 // Because Optional is a newer addition to the standard library of Onyx,
 // much of the standard library does not use it. Currently it is only
-// used by Map and Set in their `get_opt` function. In theory, it should
+// used by Map.get and Set.get_opt. In theory, it should
 // be used in many more places, instead of returning `.{}`.
 
 /// Helper procedure for creating an Optional with a value.
@@ -186,15 +186,6 @@ Optional.catch :: macro (o: ?$T, body: Code) -> T {
     }
 }
 
-Optional.with :: macro (o: ?$T, body: Code) {
-    switch o {
-        case .None ---;
-        case .Some as it {
-            #unquote body(it);
-        }
-    }
-}
-
 Optional.hash :: (o: ?$T/core.hash.Hashable) => switch o {
     case .Some as v => core.hash.hash(v);
     case _          => 0;
@@ -217,19 +208,19 @@ Optional.hash :: (o: ?$T/core.hash.Hashable) => switch o {
 }
 
 #operator?? :: macro (opt: ?$T, catch: Code) -> T {
-    switch value := opt; value {
-        case .Some as v do return v;
-        case _ ---
+    if opt as v {
+        return v
     }
 
     #unquote catch;
 }
 
 #operator? :: macro (opt: ?$T) -> T {
-    switch value := opt; value {
-        case .Some as v do return v;
-        case _ do return #from_proc .{};
+    if opt as v {
+        return v
     }
+
+    return #from_proc .{}
 }
 
 #operator! :: macro (o: ? $T) => o->unwrap()

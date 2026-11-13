@@ -72,10 +72,3 @@ RingState.delete :: (rs: &RingState) {
 
 #overload
 builtin.delete :: RingState.delete
-
-// Compatibility: package names.
-make :: RingState.make
-init :: RingState.init
-make_allocator :: RingState.as_allocator
-clear :: RingState.clear
-

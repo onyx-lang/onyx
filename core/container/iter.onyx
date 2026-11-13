@@ -13,7 +13,7 @@ use core.intrinsics.types {type_is_struct}
 /// type. Can be used in a for-loop natively.
 ///
 /// `data` is used for contextual information and is passed to
-/// the `next`, `close`, and `remove` procedures.
+/// the `next` and `close` procedures.
 ///
 /// `next` is used to extract the next value out of the iterator.
 /// It returns the next value, and a continuation flag. If the
@@ -26,15 +26,10 @@ use core.intrinsics.types {type_is_struct}
 /// exits (`break`, `return`, etc). Using this rule, iterator can
 /// be used to create "resources" that automatically close when you
 /// are done with them.
-///
-/// `remove` is used to tell the iterator to remove the last value
-/// returned from some underlying data store. Invoked automatically
-/// using the `#remove` directive in a for-loop.
 Iterator :: struct (Iter_Type: type_expr) {
     data:   rawptr;
     next:   (data: rawptr) -> Optional(Iter_Type);
     close:  (data: rawptr) -> void = null_proc;
-    remove: (data: rawptr) -> void = null_proc;
 }
 
 builtin.Iterator :: Iterator
@@ -693,8 +688,6 @@ from_array :: (arr: [] $T) => generator(
 );
 
 
-/// Iterators created from pointers to dynamic arrays are
-/// special, because they support the #remove directive.
 #local
 generic_dynamic_array_as_iter :: (x: &[..] $T, $access: Code, $return_type: type_expr) => {
     Context :: struct (T: type_expr) {
@@ -715,18 +708,9 @@ generic_dynamic_array_as_iter :: (x: &[..] $T, $access: Code, $return_type: type
         }
     }
 
-    remove :: (use _: &Context($T)) {
-        //
-        // This is current - 1 because current will have already
-        // been incremented by the time this element calls #remove.
-        Array.remove_at(arr, current - 1);
-        current -= 1;
-    }
-
     return return_type.{
         data  = c,
         next  = #solidify next { T = T, access = access },
-        remove = #solidify remove { T = T },
     };
 }
 
@@ -981,8 +965,8 @@ sum :: (it: Iterator($T)) -> T {
 /// Places all yielded values into a dynamically allocated array,
 /// using the allocator provided (context.allocator by default).
 to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
-    arr := array.make(T, allocator=allocator);
-    for v in it do array.push(&arr, v);
+    arr := Array.make(T, allocator=allocator);
+    for v in it do Array.push(&arr, v);
 
     return arr;
 }

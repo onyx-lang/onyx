@@ -4,7 +4,6 @@ package core.libc
 #allow_stale_code
 
 use core
-use core {string}
 use core.memory
 use core.math
 use runtime
@@ -296,7 +295,7 @@ strerror :: (err: i32) -> rawptr {
 #if runtime.platform.Supports_Env_Vars {
     getenv :: (name: rawptr) -> rawptr {
         if name == null do return null
-        found := runtime.platform.__get_env(string.from_cstr(cast(cstr) name))
+        found := runtime.platform.__get_env(str.as_str(cast(cstr) name))
         if found as value {
             p := cast([&] u8) malloc(value.count + 1)
             if p == null do return null
@@ -1398,7 +1397,7 @@ time :: (out: rawptr) -> i64 {
         if (flags & O_CREAT) != 0 do of = of | .Create
         if (flags & O_EXCL) != 0 do of = of | .Exclusive
 
-        switch core.os.File.open(string.from_cstr(cast(cstr) path), om, of) {
+        switch core.os.File.open(str.as_str(cast(cstr) path), om, of) {
             case .Err as err {
                 file_errno(err)
                 return -1
@@ -1443,7 +1442,7 @@ time :: (out: rawptr) -> i64 {
         }
         if count == 0 do return 0
 
-        switch core.io.stream_read(&fd_table[fd].file, .{ cast([&] u8) buf, count }) {
+        switch core.io.Stream.read(&fd_table[fd].file, .{ cast([&] u8) buf, count }) {
             case .Ok as got do return cast(i32) got
             case .Err as err {
                 if err == .EOF do return 0
@@ -1459,7 +1458,7 @@ time :: (out: rawptr) -> i64 {
             errno = EINVAL
             return -1
         }
-        if !fill_stat(string.from_cstr(cast(cstr) path), out) {
+        if !fill_stat(str.as_str(cast(cstr) path), out) {
             errno = ENOENT
             return -1
         }
@@ -1472,7 +1471,7 @@ time :: (out: rawptr) -> i64 {
             errno = EBADF
             return -1
         }
-        if !fill_stat(string.from_cstr(fd_table[fd].path), out) {
+        if !fill_stat(str.as_str(fd_table[fd].path), out) {
             errno = ENOENT
             return -1
         }
@@ -1482,7 +1481,7 @@ time :: (out: rawptr) -> i64 {
     /// C `access`.
     access :: (path: rawptr, _mode: i32) -> i32 {
         if path == null do return -1;
-        if core.os.file_exists(string.from_cstr(path)) do return 0;
+        if core.os.file_exists(str.as_str(path)) do return 0;
         return -1;
     }
 
@@ -1516,7 +1515,7 @@ time :: (out: rawptr) -> i64 {
                 errno = EINVAL
                 return null
             }
-            text := string.from_cstr(cast(cstr) path)
+            text := str.as_str(cast(cstr) path)
             st: core.os.FileStat
             if !core.os.file_stat(text, &st) {
                 errno = ENOENT

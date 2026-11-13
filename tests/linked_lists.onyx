@@ -6,7 +6,7 @@ use core {println}
 // @leak-check
 
 main :: () {
-    l := list.make(i32);
+    l := list.List.make(i32);
 
     l->push_end(1);
     l->push_end(2);

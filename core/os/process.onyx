@@ -58,7 +58,7 @@ Process.spawn :: (path: str, args: [] str, non_blocking_io := false, starting_di
         environment = .{},
     };
 
-    return process_spawn(path, args, &opts);
+    return Process.spawn(path, args, &opts);
 }
 
 #overload
@@ -142,7 +142,7 @@ Process.destroy :: (use p: &Process) => {
     },
 
     close = (use p: &Process) -> io.Error {
-        process_kill(p);
+        Process.kill(p);
         return .None;
     }
 }
@@ -212,7 +212,7 @@ Command.path :: (cmd: &Command, path: str) -> &Command {
 
 /// Appends arguments to the argument array of the command.
 Command.args :: (cmd: &Command, args: [] str) -> &Command {
-    array.concat(&cmd._args, args);
+    Array.concat(&cmd._args, args);
     return cmd;
 }
 
@@ -239,9 +239,9 @@ Command.output :: (cmd: &Command) -> Result(str, ProcessResultOutput) {
         if !cmd._process do return .{ Err = .{ .Error, "Failed to spawn process" } };
     }
 
-    r := io.reader_make(cmd._process->unwrap_ptr());
-    output := io.read_all(&r);
-    io.reader_free(&r);
+    r := io.Reader.make(cmd._process->unwrap_ptr());
+    output := io.Reader.read_all(&r);
+    io.Reader.free(&r);
 
     res := cmd->wait();
     if res != .Success {
@@ -268,7 +268,7 @@ Command.start :: (cmd: &Command) -> &Command {
     cmd._opts.environment = cmd._env;
     cmd._opts.dir = cmd._dir;
 
-    cmd._process = process_spawn(cmd._path, cmd._args, &cmd._opts);
+    cmd._process = Process.spawn(cmd._path, cmd._args, &cmd._opts);
     return cmd;
 }
 
@@ -276,9 +276,9 @@ Command.start :: (cmd: &Command) -> &Command {
 Command.wait :: (cmd: &Command) -> ProcessResult {
     if !cmd._process do return .Error;
 
-    res := process_wait(cmd._process->unwrap_ptr());
+    res := Process.wait(cmd._process->unwrap_ptr());
     cmd.exit_code = cmd._process->unwrap_ptr().exit_code;
-    process_destroy(cmd._process->unwrap_ptr());
+    Process.destroy(cmd._process->unwrap_ptr());
 
     cmd->destroy();
     return res;
@@ -290,10 +290,3 @@ Command.destroy :: (cmd: &Command) {
     delete(&cmd._env);
     cfree(cmd);
 }
-
-
-// Compatibility: package names.
-process_spawn :: Process.spawn
-process_kill :: Process.kill
-process_wait :: Process.wait
-process_destroy :: Process.destroy

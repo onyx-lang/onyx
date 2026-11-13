@@ -59,10 +59,3 @@ FixedAllocator.reset :: FixedAllocator.clear
 
 #overload
 builtin.delete :: FixedAllocator.delete
-
-// Compatibility: package names.
-make :: FixedAllocator.make
-init :: FixedAllocator.init
-make_allocator :: FixedAllocator.as_allocator
-reset :: FixedAllocator.clear
-clear :: FixedAllocator.clear

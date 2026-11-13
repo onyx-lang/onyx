@@ -109,7 +109,7 @@ __exited :: (id: i32) {
             runtime.platform.__futex_wake(&thread.join_word, 1)
         }
 
-        thread_map->delete(id)
+        thread_map->remove(id)
     }
 }
 

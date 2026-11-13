@@ -11,12 +11,12 @@ use core {println, printf}
 Hashable :: interface (T: type_expr) {
     t as T;
 
-    { hash.to_u32(t) } -> u32;
+    { hash.hash(t) } -> u32;
 }
 
 try_hash :: #match {
     macro (x: $T) where Hashable(T) {
-        println(hash.to_u32(x));
+        println(hash.hash(x));
     },
     (x: any) {
         printf("{} is not hashable!\n", x.type);
@@ -83,20 +83,20 @@ consume :: macro (x: $T/iter.Iterable) => {
     // In order to be able tell what the iterator produces, you
     // have to pattern match it in a procedure parameter. This means
     // that you have to declare an internal macro that pattern
-    // matches the variable out. Also, you need to use #auto as the
+    // matches the variable out. Also, you need to use _ as the
     // return type otherwise you can't say the correct type.
     // I can't think of a better way of doing this without making
     // everything WAY more complicated.
     consume_inner :: #match {
         // Iterator over pointers get dereferenced
         macro (iter: Iterator(&$T)) -> [..] T {
-            arr := array.make(T);
+            arr := Array.make(T);
             for iter do arr << *it;
             return arr;
         },
 
         macro (iter: Iterator($T)) -> [..] T {
-            arr := array.make(T);
+            arr := Array.make(T);
             for iter do arr << it;
             return arr;
         },
@@ -137,7 +137,7 @@ main :: (args: [] cstr) {
     // println(bit_math(3.0, 4.0));
 
     a := consume(f32.[4,2,4,7,4]);
-    defer array.free(&a);
+    defer Array.free(&a);
     println(a);
 
     consume(1 .. 10) |> println();

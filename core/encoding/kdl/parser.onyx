@@ -56,7 +56,7 @@ Tokenizer.destroy :: (self: &#Self) {
 Tokenizer.peek_char :: (self: &#Self) -> ? u32 {
     if self.cursor >= self.doc.length do return .None;
 
-    rest := string.advance(self.doc, self.cursor);
+    rest := str.advance(self.doc, self.cursor);
     r, len := utf8.decode_rune(rest);
     if len <= 0 do return .None;
     return cast(u32) r;
@@ -65,7 +65,7 @@ Tokenizer.peek_char :: (self: &#Self) -> ? u32 {
 Tokenizer.eat_char :: (self: &#Self) -> ? u32 {
     if self.cursor >= self.doc.length do return .None;
 
-    rest := string.advance(self.doc, self.cursor);
+    rest := str.advance(self.doc, self.cursor);
     r, len := utf8.decode_rune(rest);
     if len <= 0 do return .None;
     self.cursor += ~~len;
@@ -419,7 +419,7 @@ Parser.parse_value :: (self: &#Self, token: Token) -> ? Value {
     switch token {
         case .Raw_String as s {
             return Value.{
-                data = .{ String = string.copy(s, self.result_allocator) }
+                data = .{ String = str.copy(s, self.result_allocator) }
             };
         }
 
@@ -458,7 +458,7 @@ Parser.parse_value :: (self: &#Self, token: Token) -> ? Value {
             }
 
             return Value.{
-                data = .{ String = string.copy(w, self.result_allocator) }
+                data = .{ String = str.copy(w, self.result_allocator) }
             };
         }
 
@@ -529,8 +529,8 @@ Parser.expect_token :: macro (self: &#Self, type: Token.tag_enum) -> Token {
 
 Parser.parse_into_string :: (self: &#Self, tkn: Token) -> ? str {
     switch tkn {
-        case .Word as w do return string.copy(w, self.result_allocator);
-        case .Raw_String as s do return string.copy(s, self.result_allocator);
+        case .Word as w do return str.copy(w, self.result_allocator);
+        case .Raw_String as s do return str.copy(s, self.result_allocator);
         case .String as s do return unescape_kdl_string(s, self.result_allocator);
         case _ do return .None;
     }
@@ -565,7 +565,7 @@ Parser.skip_slashdashed_item :: (self: &#Self) -> Result(i32, Parse_Error) {
                     return return .{ Err = .{ Parser_Error = "Error parsing ignored property" } };
                 };
                 value.type_annotation = type;
-                string.free(prop_name, self.result_allocator);
+                str.free(prop_name, self.result_allocator);
                 free_skipped_value(self.result_allocator, value);
                 return .{ Ok = 0 };
             });
@@ -606,11 +606,11 @@ Parser.skip_children_block :: (self: &#Self) -> Result(i32, Parse_Error) {
 
 #local
 free_skipped_value :: (al: Allocator, v: Value) {
-    v.type_annotation->with([t] { string.free(t, al); });
+    if v.type_annotation as t do str.free(t, al);
     switch v.data {
-        case .String as s do string.free(s, al);
+        case .String as s do str.free(s, al);
         case .Number as num do switch num {
-            case .String as s do string.free(s, al);
+            case .String as s do str.free(s, al);
             case _ ---
         }
         case _ ---
@@ -636,7 +636,7 @@ parse_kdl_number :: (w: str) -> ? KDL_Number {
 
     // Keep the buffer alive past this if statement
     buf: [128] u8;
-    if string.contains(w, "_") {
+    if str.contains(w, "_") {
         n := 0;
         for c in w {
             if c == '_' do continue;
@@ -685,7 +685,7 @@ parse_kdl_number :: (w: str) -> ? KDL_Number {
     }
 
     if is_float {
-        return KDL_Number.{ Float = conv.str_to_f64(s) };
+        return KDL_Number.{ Float = conv.parse_float(s) };
     }
     return KDL_Number.{ Integer = parse_i64_base(s, 10) };
 }
@@ -724,7 +724,7 @@ unescape_kdl_string :: (s: str, allocator: Allocator) -> str {
             break;
         }
     }
-    if !has_escape do return string.copy(s, allocator);
+    if !has_escape do return str.copy(s, allocator);
 
     out := make(dyn_str, s.count, allocator);
     i := 0;
@@ -796,7 +796,7 @@ unescape_kdl_string :: (s: str, allocator: Allocator) -> str {
                     i += 1;
                 }
                 if i >= s.count do break;
-                cp := conv.str_to_i64(s[hex_start .. i], 16);
+                cp := conv.parse_int(s[hex_start .. i], 16);
                 utf8.append_rune(&out, ~~cp);
                 i += 1;
             }
@@ -822,14 +822,14 @@ unescape_kdl_string :: (s: str, allocator: Allocator) -> str {
             0x202F, 0x205F,
             0x3000
         ];
-        return slice.contains(chars, [it](it == c));
+        return Slice.contains(chars, [it](it == c));
     }
 
     is_newline :: (c: u32) -> bool {
         #persist chars := u32.[
             0xd, 0xa, 0x85, 0xc, 0x2028, 0x2029
         ];
-        return slice.contains(chars, [it](it == c));
+        return Slice.contains(chars, [it](it == c));
     }
 
     is_id :: (c: u32) -> bool {
@@ -840,7 +840,7 @@ unescape_kdl_string :: (s: str, allocator: Allocator) -> str {
             '\\', '/', '(', ')', '{', '}', '<', '>', ';', '[', ']', '=', ',', '"'
         ];
 
-        return !slice.contains(chars, [it](it == c));
+        return !Slice.contains(chars, [it](it == c));
     }
 
     is_id_start :: (c: u32) -> bool {
@@ -852,7 +852,7 @@ unescape_kdl_string :: (s: str, allocator: Allocator) -> str {
         if is_newline(c) do return true;
 
         #persist chars := u32.[ ';', ')', '}', '/', '\\', '=' ];
-        return slice.contains(chars, [it](it == c));
+        return Slice.contains(chars, [it](it == c));
     }
 
     if_next_token_is :: macro (p: &Parser, $type: Token.tag_enum, body: Code) {

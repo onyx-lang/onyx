@@ -104,9 +104,3 @@ PoolAllocator.as_allocator :: (pool: &PoolAllocator($Elem)) -> Allocator {
 
 #overload
 builtin.delete :: PoolAllocator.delete
-
-// Compatibility: package names.
-make :: PoolAllocator.make
-init :: PoolAllocator.init
-make_allocator :: PoolAllocator.as_allocator
-clear :: PoolAllocator.clear

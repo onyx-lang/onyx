@@ -4,38 +4,37 @@ package core.conv
     Enable_Custom_Formatters :: true
 }
 
-use core.string
 use core.math
 
 /// Converts a string into an integer. Works with positive and
 /// negative integers. If given a pointer to a string, will
 /// modify the string to extract the integer part.
-str_to_i64 :: #match #local {}
+parse_int :: #match #local {}
 
 #overload
-str_to_i64 :: macro (s: str, base: u32 = 10) -> i64 {
-    str_to_i64 :: str_to_i64;
+parse_int :: macro (s: str, base: u32 = 10) -> i64 {
+    parse_int :: parse_int;
     s_ := s;
-    return str_to_i64(&s_, base);
+    return parse_int(&s_, base);
 }
 
 #overload
-str_to_i64 :: (s: &str, base: u32 = 10) -> i64 {
-    string.strip_leading_whitespace(s);
+parse_int :: (s: &str, base: u32 = 10) -> i64 {
+    str.strip_leading_whitespace(s);
 
     value: i64 = 0;
     mul := 1;
 
     if s.data[0] == '-' {
         mul = -1;
-        string.advance(s, 1);
+        str.advance(s, 1);
     }
 
     if s.data[0] == '+' {
-         string.advance(s, 1);
+         str.advance(s, 1);
     }
 
-    while !string.empty(*s) {
+    while !str.empty(*s) {
         switch c := s.data[0]; c {
             case '0' ..= '9' {
                 value *= ~~base;
@@ -59,7 +58,7 @@ str_to_i64 :: (s: &str, base: u32 = 10) -> i64 {
             case _ do break break;
         }
 
-        string.advance(s);
+        str.advance(s);
     }
 
     return value * ~~mul;
@@ -67,24 +66,24 @@ str_to_i64 :: (s: &str, base: u32 = 10) -> i64 {
 
 
 /// Converts a string to a floating point number.
-str_to_f64 :: #match #local {}
+parse_float :: #match #local {}
 
 #overload
-str_to_f64 :: macro (s: str) -> f64 {
-    str_to_f64 :: str_to_f64;
+parse_float :: macro (s: str) -> f64 {
+    parse_float :: parse_float;
     s_ := s;
-    return str_to_f64(&s_);
+    return parse_float(&s_);
 }
 
 #overload
-str_to_f64 :: (s: &str) -> f64 {
-    string.strip_leading_whitespace(s);
+parse_float :: (s: &str) -> f64 {
+    str.strip_leading_whitespace(s);
 
     sign := parse_sign(s);
     value, _ := parse_digits(s);    
 
     if s.data[0] == '.' {
-        string.advance(s, 1);
+        str.advance(s, 1);
         fraction, fraction_digits := parse_digits(s);
         while fraction_digits > 0 {
             fraction_digits -= 1;
@@ -96,7 +95,7 @@ str_to_f64 :: (s: &str) -> f64 {
     value *= sign;
 
     if s.data[0] != 'e' && s.data[0] != 'E' do return value;
-    string.advance(s, 1);
+    str.advance(s, 1);
 
     exponent_sign := parse_sign(s);
     exponent, _   := parse_digits(s);
@@ -117,8 +116,8 @@ str_to_f64 :: (s: &str) -> f64 {
 
     parse_sign :: (s: &str) -> f64 {
         switch s.data[0] {
-            case '-' { string.advance(s, 1); return -1; }
-            case '+' { string.advance(s, 1); return  1; }
+            case '-' { str.advance(s, 1); return -1; }
+            case '+' { str.advance(s, 1); return  1; }
             case _  { return 1; }
         }
     }
@@ -129,7 +128,7 @@ str_to_f64 :: (s: &str) -> f64 {
         while s.count > 0 do switch s.data[0] {
             case '0' ..= '9' {
                 value = value * 10 + ~~cast(i32)(s.data[0] - '0');
-                string.advance(s, 1);
+                str.advance(s, 1);
                 count += 1;
             }
 
@@ -144,7 +143,7 @@ str_to_f64 :: (s: &str) -> f64 {
 /// Supports upto base 64. If prefix is true, binary numbers are
 /// prefixed with '0b' and hexadecimal numbers are prefixed with
 /// '0x'.
-i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
+format_int :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
     is_neg := false;
     if n < 0 {
         is_neg = true;
@@ -210,8 +209,8 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
 
 
 /// Converts an unsigned number into a string using the buffer provided.
-/// Behaves like i64_to_str.
-u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
+/// Behaves like format_int.
+format_uint :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
     c: [&] u8 = &buf[buf.count - 1];
     len := 0;
 
@@ -268,7 +267,7 @@ u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
 ///
 /// This is better than what used to be, but still relies on converting the integer
 /// part of the float to an integer, which could overflow.
-f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
+format_float :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
     if math.is_nan(f) {
         return format(buf, "NaN");
     }
@@ -290,7 +289,7 @@ f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
     int_part := f - dec_part;
     dec_part  = math.abs(dec_part);
 
-    s1 := i64_to_str(~~int_part, 10, buf);
+    s1 := format_int(~~int_part, 10, buf);
     for i in 0 .. s1.count do buf.data[i + len] = s1.data[i];
     len += s1.count;
 
@@ -312,16 +311,3 @@ f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
 
     return str.{ buf.data, len };
 }
-
-
-// I like the way that parse_int reads better than 'str_to_i64'.
-// For a soft transistion, I am allowing the programmer to use either.
-// At some point, it might be worth deprecating 'str_to_i64', but no harm
-// in leaving it here for now. Same thing applied to all other functions
-// below.
-parse_int :: str_to_i64
-parse_float :: str_to_f64
-
-format_int :: i64_to_str
-format_uint :: u64_to_str
-format_float :: f64_to_str

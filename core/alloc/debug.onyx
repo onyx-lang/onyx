@@ -76,9 +76,6 @@ Debug_State.destroy :: Debug_State.delete
 #overload
 builtin.delete :: Debug_State.delete
 
-// Compatibility: package names.
-make :: Debug_State.make
-init :: Debug_State.init
 
 
 #local

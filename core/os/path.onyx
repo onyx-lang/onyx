@@ -47,7 +47,7 @@ path_last_element :: (path: str) -> str {
 ///
 /// The result is allocated with `allocator` (temp by default).
 Path.clean :: (path: str, allocator := Path_Allocator) -> str {
-    if path == "" do return string.copy(".", allocator);
+    if path == "" do return str.copy(".", allocator);
 
     rooted := path[0] == PATH_SEP;
     n := path.length;
@@ -56,7 +56,7 @@ Path.clean :: (path: str, allocator := Path_Allocator) -> str {
     r, dotdot := 0, 0;
 
     if rooted {
-        string.append(&out, PATH_SEP);
+        dyn_str.append(&out, PATH_SEP);
         r, dotdot = 1, 1;
     }
 
@@ -73,26 +73,26 @@ Path.clean :: (path: str, allocator := Path_Allocator) -> str {
             }
             elseif !rooted {
                 if out.length > 0 {
-                    string.append(&out, PATH_SEP);
+                    dyn_str.append(&out, PATH_SEP);
                 }
-                string.append(&out, "..");
+                dyn_str.append(&out, "..");
                 dotdot = out.length;
             }
         }
         else {
             if (rooted && out.length != 1) || (!rooted && out.length != 0) {
-                string.append(&out, PATH_SEP);
+                dyn_str.append(&out, PATH_SEP);
             }
 
             while r < n && path[r] != PATH_SEP {
-                string.append(&out, path[r]);
+                dyn_str.append(&out, path[r]);
                 r += 1;
             }
         }
     }
 
     if out.length == 0 {
-        string.append(&out, ".");
+        dyn_str.append(&out, ".");
     }
 
     return out;
@@ -129,7 +129,7 @@ Path.extension :: (path: str) -> str {
     name := path_last_element(path);
     if name == "." || name == ".." do return "";
 
-    dot := string.last_index_of(name, '.');
+    dot := str.last_index_of(name, '.');
     if dot <= 0 do return "";
     return name[dot .. name.length];
 }
@@ -156,7 +156,7 @@ Path.stem :: (path: str) -> str {
 
 /// Splits the last path element off.
 Path.split :: (path: str) -> (str, str) {
-    index := string.last_index_of(path, PATH_SEP);
+    index := str.last_index_of(path, PATH_SEP);
     if index < 0 do return "", path;
     return path[0 .. index], path[index + 1 .. path.length];
 }
@@ -196,14 +196,3 @@ Path.abs :: (path: str, allocator := Path_Allocator) -> str {
 
     return Path.clean(Path.join(cwd, path), allocator);
 }
-
-path_clean     :: Path.clean
-path_join      :: Path.join
-path_directory :: Path.directory
-path_extension :: Path.extension
-path_basename  :: Path.basename
-path_stem      :: Path.stem
-path_split     :: Path.split
-path_is_absolute :: Path.is_absolute
-path_is_relative :: Path.is_relative
-path_abs       :: Path.abs

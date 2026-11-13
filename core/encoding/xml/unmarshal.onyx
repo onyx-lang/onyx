@@ -44,9 +44,9 @@ from_document :: (doc: &Document, $T: type_expr) -> Result(T, Error) {
 
     t_info := get_type_info(T)
     if t_info.kind == .Struct {
-        s_info := cast(^Type_Info_Struct) t_info
-        if tag := array.first(s_info.tags, [t](t.type == Name)); tag != null {
-            n := *cast(^Name) tag.data
+        s_info := cast(&Type_Info_Struct) t_info
+        if tag := Slice.first(s_info.tags, [t](t.type == Name)); tag != null {
+            n := *cast(&Name) tag.data
             if n.name.count > 0 && !element_matches(&doc.elements[0], n.name, n.space) {
                 return .{
                     Err = .{
@@ -123,15 +123,15 @@ spec_from_member :: (member: &Type_Info_Struct.Member) -> Field_Spec {
 
     for tag in member.tags {
         if tag.type == Name {
-            n := *cast(^Name) tag.data
+            n := *cast(&Name) tag.data
             if n.name.count > 0 do spec.name = n.name
             spec.space = n.space
         } elseif tag.type == Attr {
             spec.mode = .Attr
-            a := *cast(^Attr) tag.data
+            a := *cast(&Attr) tag.data
             if a.name.count > 0 do spec.name = a.name
         } elseif tag.type == type_expr {
-            t := *cast(^type_expr) tag.data
+            t := *cast(&type_expr) tag.data
             if t == Text   do spec.mode = .Text
             if t == Ignore do spec.mode = .Ignore
         }
@@ -145,11 +145,11 @@ find_child :: (doc: &Document, parent: Element.Index, name: str, space: str) -> 
     if doc.elements.count <= parent do return .None
 
     for v in doc.elements[parent].children {
-        v.Element->with([e] {
+        if v.Element as e {
             if element_matches(&doc.elements[e], name, space) {
                 return e
             }
-        })
+        }
     }
 
     return .None
@@ -160,11 +160,11 @@ collect_children :: (doc: &Document, parent: Element.Index, name: str, space: st
     if doc.elements.count <= parent do return
 
     for v in doc.elements[parent].children {
-        v.Element->with([e] {
+        if v.Element as e {
             if element_matches(&doc.elements[e], name, space) {
                 out->push(e)
             }
-        })
+        }
     }
 }
 
@@ -191,7 +191,7 @@ unmarshal :: (doc: &Document, el: Element.Index, type: type_expr, out: rawptr, p
     t_info := get_type_info(type)
 
     if t_info.kind == .Distinct {
-        d_info := cast(^Type_Info_Distinct) t_info
+        d_info := cast(&Type_Info_Distinct) t_info
         return unmarshal(doc, el, d_info.base_type, out, path)
     }
 
@@ -211,7 +211,7 @@ unmarshal :: (doc: &Document, el: Element.Index, type: type_expr, out: rawptr, p
 
         case .Slice {
             if type == str {
-                *cast(^str) out = string.copy(doc->text(el))
+                *cast(&str) out = str.copy(doc->text(el))
                 return .{}
             }
             return unsupported(path)
@@ -236,7 +236,7 @@ unmarshal :: (doc: &Document, el: Element.Index, type: type_expr, out: rawptr, p
 #local
 unmarshal_text :: (doc: &Document, el: Element.Index, type: type_expr, out: rawptr, path: &dyn_str) -> Error {
     if type == str {
-        *cast(^str) out = string.copy(doc->text(el))
+        *cast(&str) out = str.copy(doc->text(el))
         return .{}
     }
 
@@ -249,9 +249,9 @@ unmarshal_text :: (doc: &Document, el: Element.Index, type: type_expr, out: rawp
 
 #local
 unmarshal_struct :: (doc: &Document, el: Element.Index, type: type_expr, out: rawptr, path: &dyn_str) -> Error {
-    s_info := cast(^Type_Info_Struct) get_type_info(type)
+    s_info := cast(&Type_Info_Struct) get_type_info(type)
 
-    for^ member in s_info.members {
+    for& member in s_info.members {
         spec := spec_from_member(member)
         dest := memory.ptr_add(out, member.offset)
         mark := path_push_key(path, spec.name)
@@ -280,7 +280,7 @@ unmarshal_field :: (doc: &Document, el: Element.Index, type: type_expr, out: raw
             case .Some as s {
                 if is_opt do set_optional_some(out)
                 if inner == str {
-                    *cast(^str) dest = string.copy(s)
+                    *cast(&str) dest = str.copy(s)
                     return .{}
                 }
                 if !conv.parse_any(dest, inner, s) {
@@ -331,7 +331,7 @@ unmarshal_repeated :: (doc: &Document, parent: Element.Index, type: type_expr, o
 
     switch t_info.kind {
         case .Array {
-            a_info := cast(^Type_Info_Array) t_info
+            a_info := cast(&Type_Info_Array) t_info
             of = a_info.of
             dest = out
             n = ~~a_info.count
@@ -339,9 +339,9 @@ unmarshal_repeated :: (doc: &Document, parent: Element.Index, type: type_expr, o
         }
 
         case .Dynamic_Array {
-            s_info := cast(^Type_Info_Dynamic_Array) t_info
+            s_info := cast(&Type_Info_Dynamic_Array) t_info
             of = s_info.of
-            s := cast(^Untyped_Array) out
+            s := cast(&Untyped_Array) out
             s.allocator = context.allocator
             s.capacity = idxs.count
             size := size_of(of) * idxs.count
@@ -353,9 +353,9 @@ unmarshal_repeated :: (doc: &Document, parent: Element.Index, type: type_expr, o
         }
 
         case .Slice {
-            s_info := cast(^Type_Info_Slice) t_info
+            s_info := cast(&Type_Info_Slice) t_info
             of = s_info.of
-            s := cast(^Untyped_Array) out
+            s := cast(&Untyped_Array) out
             size := size_of(of) * idxs.count
             s.data = raw_alloc(context.allocator, size)
             memory.set(s.data, 0, size)

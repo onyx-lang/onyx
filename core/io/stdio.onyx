@@ -38,8 +38,8 @@ use runtime
 // `stdio` object. This should not be called more than once per thread,
 // so you will likely never need to call it.
 __stdio_init :: () {
-    stdio.print_stream = io.buffer_stream_make(2048, context.allocator);
-    stdio.print_writer = io.writer_make(&stdio.print_stream, 0);
+    stdio.print_stream = io.BufferStream.make(2048, context.allocator);
+    stdio.print_writer = io.Writer.make(&stdio.print_stream, 0);
 
     stdio.stream = .{ vtable = &stdio_vtable, flags = .Block_On_Read };
 
@@ -49,31 +49,31 @@ __stdio_init :: () {
 
 //
 // Internal procedure to flush data from the print_stream to standard
-// output. Can be used directly, or through io.stream_flush(&stdio.stream);
+// output. Can be used directly, or through io.Stream.flush(&stdio.stream);
 __flush_stdio :: () {
     if stdio.print_stream.data.count == 0 do return;
 
     &stdio.print_stream
-        |> io.buffer_stream_to_str()
+        |> io.BufferStream.to_str()
         |> runtime.platform.__output_string();
 
-    &stdio.print_stream |> io.stream_flush();
+    &stdio.print_stream |> io.Stream.flush();
 }
 
 //
 // Generic procedure to print something. This is normally not used
 // directly, but does support passing a different number of arguments
-// that are sent directly to io.write.
+// that are sent directly to io.Writer.write.
 print :: #match #locked {
     (x: str) {
         if !x do return;
 
-        io.write(&stdio.print_writer, x);
+        io.Writer.write(&stdio.print_writer, x);
         if x[x.count - 1] == '\n' && stdio.auto_flush do __flush_stdio();
     },
 
-    (x)    => { io.write(&stdio.print_writer, x); },
-    (x, y) => { io.write(&stdio.print_writer, x, y); },
+    (x)    => { io.Writer.write(&stdio.print_writer, x); },
+    (x, y) => { io.Writer.write(&stdio.print_writer, x, y); },
 }
 
 //
@@ -90,7 +90,7 @@ printf :: (format: str, va: ..any) {
     buffer: [1024] u8;
     print(conv.format_va(buffer, format, va, .{ null,
         (_: rawptr, to_output: str) -> bool {
-            io.write(&stdio.print_writer, to_output);
+            io.Writer.write(&stdio.print_writer, to_output);
             __flush_stdio();
             return true;
         }
@@ -120,7 +120,7 @@ printf :: (format: str, va: ..any) {
 aprintf :: (format: str, va: ..any) -> str {
     buffer: [8196] u8;
     out := conv.format_va(buffer, format, va);
-    return string.copy(out);
+    return str.copy(out);
 }
 
 //
@@ -129,7 +129,7 @@ aprintf :: (format: str, va: ..any) -> str {
 tprintf :: (format: str, va: ..any) -> str {
     buffer: [8196] u8;
     out := conv.format_va(buffer, format, va);
-    return string.copy(out, allocator=context.temp_allocator);
+    return str.copy(out, allocator=context.temp_allocator);
 }
 
 
@@ -204,11 +204,11 @@ __byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
     },
 
     write = (_: &io.Stream, buffer: [] u8) -> Result(u32, io.Error) {
-        return io.stream_write(&stdio.print_stream, buffer);
+        return io.Stream.write(&stdio.print_stream, buffer);
     },
 
     write_byte = (_: &io.Stream, byte: u8) -> io.Error {
-        return io.stream_write_byte(&stdio.print_stream, byte);
+        return io.Stream.write_byte(&stdio.print_stream, byte);
     },
 
     flush = (_: &io.Stream) -> io.Error {

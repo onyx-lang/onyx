@@ -55,11 +55,6 @@ void onyx_docs_emit_symbol_info(Context *context, bh_buffer *out_buffer) {
                         AstBinding *b = (AstBinding *) binding;
                         if (b->documentation_string) {
                             docs = (char *) b->documentation_string;
-                        } else if (b->documentation_token_old && b->documentation_token_old->text) {
-                            docs = b->documentation_token_old->text;
-                            symbols[idx].documentation = docs;
-                            symbols[idx].documentation_length = b->documentation_token_old->length;
-                            break;
                         }
                     }
                     symbols[idx].documentation = docs;
@@ -293,7 +288,7 @@ static void write_type_node(Context *context, bh_buffer *buffer, void *vnode) {
     switch (node->kind) {
         case Ast_Kind_Basic_Type:
             if (((AstBasicType *) node)->basic_type == context->types.auto_return) {
-                bh_buffer_write_string(buffer, "#auto");
+                bh_buffer_write_string(buffer, "_");
             } else {
                 bh_buffer_write_string(buffer, (char *) ((AstBasicType *) node)->basic_type->Basic.name);
             }
@@ -436,11 +431,6 @@ static void write_type_node(Context *context, bh_buffer *buffer, void *vnode) {
 
 static void write_doc_notes(bh_buffer *buffer, AstBinding *binding) {
     if (binding) {
-        if (binding->documentation_token_old) {
-            write_string(buffer, binding->documentation_token_old->length, binding->documentation_token_old->text);
-            return;
-        }
-
         if (binding->documentation_string) {
             write_string(buffer, strlen(binding->documentation_string), (char *) binding->documentation_string);
             return;

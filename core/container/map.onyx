@@ -147,23 +147,11 @@ Map.get_ptr :: (use map: &Map, key: map.Key_Type) -> &map.Value_Type {
 Map.get_ptr_or_create :: (use map: &Map, key: map.Key_Type) -> &map.Value_Type {
     lr := lookup(map, key);
     if lr.entry_index < 0 {
-        put(map, key, .{});
+        Map.put(map, key, .{});
         lr = lookup(map, key);
     }
 
     return &entries[lr.entry_index].value;
-}
-
-/// **DEPRECATED** - Use `map.get` instead.
-///
-/// Returns an Optional of the value at the specified key. The Optional
-/// has a value if the key is present, otherwise the optional does not
-/// have a value.
-Map.get_opt :: (use map: &Map, key: map.Key_Type) -> ?map.Value_Type {
-    lr := lookup(map, key);
-    if lr.entry_index >= 0 do return Optional.make(entries[lr.entry_index].value);
-
-    return .{};
 }
 
 /// Removes `key` and its value, if present.
@@ -188,8 +176,6 @@ Map.remove :: (use map: &Map, key: map.Key_Type) {
     else                       do hashes[last.hash_index] = lr.entry_index;
 }
 
-Map.delete :: Map.remove
-
 /// Helper macro that finds a value by the key, and if it exists,
 /// runs the code, providing an `it` variable that is a pointer
 /// to the value.
@@ -200,7 +186,7 @@ Map.delete :: Map.remove
 ///     }
 /// or:
 ///     m->update("test", [v](*v += 10));
-Map.update :: macro (map: ^Map, key: map.Key_Type, body: Code) {
+Map.update :: macro (map: &Map, key: map.Key_Type, body: Code) {
     lookup_ :: lookup
     lr := lookup_(map, key);
 
@@ -249,7 +235,7 @@ Map.format_map :: (output: &conv.Format_Output, format: &conv.Format, x: &Map($K
 ///         .{ "foo",  456 },
 ///     ]);
 Map.literal :: ($Key: type_expr, $Value: type_expr, values: [] MapLiteralValue(Key, Value)) => {
-    m := core.map.make(Key, Value);
+    m := Map.make(Key, Value);
     for & values {
         m->put(it.key, it.value);
     }
@@ -337,7 +323,7 @@ __for_expansion :: macro (map: &Map($K, $V), $flags: __For_Expansion_Flags, $bod
     }
 
     lookup :: (use map: &Map, key: map.Key_Type) -> MapLookupResult {
-        if hashes.data == null do init(map);
+        if hashes.data == null do Map.init(map);
         lr := MapLookupResult.{};
 
         hash_value: u32 = hash.hash(key);
@@ -377,26 +363,3 @@ __for_expansion :: macro (map: &Map($K, $V), $flags: __For_Expansion_Flags, $bod
         }
     }
 }
-
-//
-// Everything below here only exists for backwards compatibility.
-//
-
-make :: Map.make
-init :: Map.init
-free :: Map.free
-copy :: Map.copy
-has :: Map.has
-get :: Map.get
-get_ptr :: Map.get_ptr
-get_opt :: Map.get_opt
-get_ptr_or_create :: Map.get_ptr_or_create
-put :: Map.put
-remove :: Map.remove
-delete :: Map.delete
-update :: Map.update
-clear :: Map.clear
-empty :: Map.empty
-literal :: Map.literal
-as_iter :: Map.as_iter
-

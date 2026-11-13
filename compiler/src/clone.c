@@ -38,7 +38,6 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Error: return sizeof(AstNode);
         case Ast_Kind_Package: return sizeof(AstPackage);
         case Ast_Kind_Load: return sizeof(AstInclude);
-        case Ast_Kind_Load_All: return sizeof(AstInclude);
         case Ast_Kind_Memres: return sizeof(AstMemRes);
         case Ast_Kind_Binding: return sizeof(AstBinding);
         case Ast_Kind_Function: return sizeof(AstFunction);
@@ -106,7 +105,6 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Directive_Defined: return sizeof(AstDirectiveDefined);
         case Ast_Kind_Do_Block: return sizeof(AstDoBlock);
         case Ast_Kind_Constraint: return sizeof(AstConstraint);
-        case Ast_Kind_Directive_Remove: return sizeof(AstDirectiveRemove);
         case Ast_Kind_Directive_First: return sizeof(AstDirectiveFirst);
         case Ast_Kind_Directive_Export_Name: return sizeof(AstDirectiveExportName);
         case Ast_Kind_Import: return sizeof(AstImport);
@@ -402,6 +400,9 @@ AstNode* ast_clone(Context *context, void* n) {
             }
 
             ds->stcache = NULL;
+            ds->poly_type = NULL;
+            ds->poly_owner = NULL;
+            ds->compilation_tags_emitted = 0;
             break;
         }
 
@@ -440,6 +441,9 @@ AstNode* ast_clone(Context *context, void* n) {
             }
 
             du->utcache = NULL;
+            du->poly_type = NULL;
+            du->poly_owner = NULL;
+            du->compilation_tags_emitted = 0;
             break;
         }
 
@@ -569,6 +573,8 @@ AstNode* ast_clone(Context *context, void* n) {
                     bh_arr_push(df->constraints.constraints, (AstConstraint *) ast_clone(context, (AstNode *) *constraint));
                 }
             }
+
+            df->compilation_tags_emitted = 0;
 
             if (sf->tags) {
                 bh_arr_new(context->ast_alloc, df->tags, bh_arr_length(sf->tags));
@@ -748,6 +754,7 @@ AstFunction* clone_function_header(Context *context, AstFunction* func) {
     AstFunction* new_func = onyx_ast_node_new(context->ast_alloc, sizeof(AstFunction), func->kind);
     memmove(new_func, func, sizeof(AstFunction));
     new_func->compilation_symbol_id = 0;
+    new_func->compilation_tags_emitted = 0;
     assert(new_func->scope == NULL);
 
     convert_polyproc_to_function(new_func);

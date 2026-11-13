@@ -169,13 +169,3 @@ AVL_Tree.print :: (tree: &AVL_Tree) {
         std_print(") ");
     }
 }
-
-
-// Compatibility: package names.
-insert :: AVL_Tree.insert
-remove :: AVL_Tree.remove
-// Element-removal alias; the destructor is `AVL_Tree.delete` / `delete(&tree)`.
-delete :: AVL_Tree.remove
-contains :: AVL_Tree.contains
-print :: AVL_Tree.print
-free :: AVL_Tree.free

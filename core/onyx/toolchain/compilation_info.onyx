@@ -10,8 +10,9 @@ use protobuf.onyx.toolchain.events {*}
 /// Indexed view of a compilation-event stream.
 ///
 /// Event payloads are copied by value. `str` fields from `ingest_protobuf`
-/// alias retained protobuf blobs (`payloads`). `update` of already-decoded
-/// events still points at whatever allocated those events' strings.
+/// alias retained protobuf blobs (`payloads`), including tag strings and
+/// raw tag bytes. `update` of already-decoded events still points at
+/// whatever allocated those events' strings.
 ///
 /// Fold later deltas with `update` (or `Builder.update_compilation_info`)
 /// instead of building a new index. Each `Builder.compilation_events` read
@@ -40,6 +41,7 @@ CompilationInfo :: struct {
     resolutions_by_file: [..] [..] u32
 
     resolutions: [..] EventSymbolResolved
+    tags: [..] TagInfo
 }
 
 ScopeInfo :: struct {
@@ -63,12 +65,20 @@ SymbolInfo :: struct {
     poly_template_id: u32
     poly_solution_names: [..] str
     poly_solution_type_ids: [..] u32
+    /// `#tag` values, in source order.
+    tags: [..] TagValue
 }
 
 TypeInfo :: struct {
     use decl: EventType
     use type_body: EventTypeBody
     has_body: bool
+    /// `#tag` values, in source order.
+    tags: [..] TagValue
+}
+
+TagInfo :: struct {
+    target: typeof EventTag.{}.target
 }
 
 CompilationInfo.make :: (allocator := context.allocator) -> (res: CompilationInfo) {
@@ -90,6 +100,7 @@ CompilationInfo.make :: (allocator := context.allocator) -> (res: CompilationInf
     res.symbols_by_type = make(typeof res.symbols_by_type, allocator=allocator)
     res.resolutions     = make(typeof res.resolutions,     allocator=allocator)
     res.resolutions_by_file = make(typeof res.resolutions_by_file, allocator=allocator)
+    res.tags = make(typeof res.tags, allocator=allocator)
     return
 }
 
@@ -263,6 +274,24 @@ CompilationInfo.ingest_event :: (self: &#Self, event: &CompilerEvent) {
             if slot.id == 0 do slot.id = tb.type_id
             slot.type_body = tb
             slot.has_body = true
+        }
+
+        case .Tag as tag {
+            self.tags->push(.{tag.target})
+
+            switch tag.target {
+                case .Symbol as sid {
+                    if sid != 0 {
+                        ensure_id(&self.symbols, sid).tags->push(tag.value)
+                    }
+                }
+                case .Type as tid {
+                    if tid != 0 {
+                        ensure_id(&self.types, tid).tags->push(tag.value)
+                    }
+                }
+                case .None {}
+            }
         }
 
         case .None {}

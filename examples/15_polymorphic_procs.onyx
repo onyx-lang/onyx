@@ -30,9 +30,9 @@ max :: (a: $Type, b: Type) -> Type {
 // will be given to be the same type as 'a', and then 'b' and the return type should be
 // of the same type.
 
-// As another example, take 'array.push':
+// As another example, take 'Array.push':
 
-push :: (arr: ^[..] $T, value: T) {
+push :: (arr: &[..] $T, value: T) {
     // ...
 }
 
@@ -40,7 +40,7 @@ push :: (arr: ^[..] $T, value: T) {
 // then the value is expected to be the same type. If the dollar sign would have been on
 // the second T like so,
 
-push :: (arr: ^[..] T, value: $T) {
+push :: (arr: &[..] T, value: $T) {
     // ...
 }
 

@@ -46,6 +46,6 @@ main :: () {
 
     s := doc->write_string()
     defer str.free(s)
-    println(string.contains(s, "node"))
-    println(string.contains(s, "123"))
+    println(str.contains(s, "node"))
+    println(str.contains(s, "123"))
 }

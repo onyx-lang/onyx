@@ -597,13 +597,8 @@ Link_Options :: struct {
 
 
 /// Special type used to represent a package at runtime.
-/// For example,
-///
-///     x: package_id = package main
-///
-/// Currently, there is not much you can do with this; it is
-/// only used by the runtime.info library if you want to filter
-/// tags based on which package they are coming from.
+/// `any_package` matches every package. runtime.info uses this
+/// to filter tags by the package they come from.
 package_id :: #distinct u32
 
 ///

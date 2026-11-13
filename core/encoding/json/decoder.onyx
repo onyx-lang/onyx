@@ -3,7 +3,7 @@ package core.encoding.json
 
 use core {*}
 
-/// Decode JSON text into a `Json` tree. Prefer this over `decode_with_error`.
+/// Decode JSON text into a `Json` tree.
 decode :: #match #local {}
 
 #overload
@@ -23,48 +23,6 @@ decode :: (r: &io.Reader, allocator := context.allocator) -> Result(Json, Error)
     d := Decoder.make(r, allocator);
     defer d->delete();
     return d->decode();
-}
-
-decode_with_result :: decode
-
-#local
-_Decode_Error :: struct {
-    errmsg: str;
-    pos:    Position;
-}
-
-Decode_Error :: #distinct ^_Decode_Error;
-
-Decode_Error.has_error :: (this: Decode_Error) => cast(^_Decode_Error) this != null;
-Decode_Error.message   :: (this: Decode_Error) => (cast(^_Decode_Error) this).errmsg;
-Decode_Error.position  :: (this: Decode_Error) => (cast(^_Decode_Error) this).pos;
-
-/// Deprecated: use `decode`. Pair-style error for older callers.
-decode_with_error :: (data: str, allocator := context.allocator) -> (Json, Decode_Error) {
-    json: Json;
-    json.allocator = allocator;
-    json.root = null_value();
-
-    switch decode(data, allocator) {
-        case .Ok as obj {
-            return obj, Decode_Error.{null};
-        }
-        case .Err as err {
-            decode_error := new_temp(_Decode_Error);
-            decode_error.pos = err.pos;
-            switch err.kind {
-                case .EOF                  do decode_error.errmsg = "Reached EOF";
-                case .Illegal_Character    do decode_error.errmsg = "Illegal Character";
-                case .String_Unterminated  do decode_error.errmsg = "Unterminated String";
-                case .Unexpected_Token     do decode_error.errmsg = "Unexpected Token";
-                case .Type_Mismatch        do decode_error.errmsg = "Type mismatch";
-                case .Unsupported_Type     do decode_error.errmsg = "Unsupported type";
-                case .None                 do decode_error.errmsg = "Error";
-            }
-
-            return json, Decode_Error.{decode_error};
-        }
-    }
 }
 
 /// True if `data` is a complete JSON value. Tokenizes only; does not allocate a tree.

@@ -95,8 +95,8 @@ Array.copy :: #match #locked {
 
 /// Copies a sub-array of a dynamic-array.
 ///
-///     arr := array.make(.[ 2, 3, 5, 7, 11 ]);
-///     sub := array.copy_range(&arr, 2 .. 5);
+///     arr := Array.make(.[ 2, 3, 5, 7, 11 ]);
+///     sub := Array.copy_range(&arr, 2 .. 5);
 ///     println(sub); // 5, 7, 11
 Array.copy_range :: (arr: &[..] $T, r: range, allocator := context.allocator) -> [..] T {
     new_arr : [..] T;
@@ -239,7 +239,7 @@ Array.remove :: (arr: &[..] $T, elem: T) {
 
 /// Removes the element at `idx` and returns it, keeping the rest in order.
 ///
-///     arr := array.make(.[ 2, 3, 5, 7 ]);
+///     arr := Array.make(.[ 2, 3, 5, 7 ]);
 ///     x := arr->remove_at(1);  // 3
 ///     // arr is 2, 5, 7
 ///
@@ -268,9 +268,6 @@ Array.unordered_remove :: (arr: &[..] $T, idx: u32) -> T {
 
     return to_return;
 }
-
-Array.delete :: Array.remove_at
-Array.fast_delete :: Array.unordered_remove
 
 /// Removes `n` elements from the end of the array.
 Array.pop :: (arr: &[..] $T, n := 1) -> T {
@@ -302,8 +299,8 @@ Array.concat :: (arr: &[..] $T, other: Iterator(T)) {
 
 /// Removes all elements for which the given predicate does not hold.
 ///
-///     arr := array.make(.[ 1, 2, 3, 4, 5 ]);
-///     array.filter(&arr, [v](v % 2 == 0));
+///     arr := Array.make(.[ 1, 2, 3, 4, 5 ]);
+///     Array.filter(&arr, [v](v % 2 == 0));
 ///     println(arr); // 2, 4
 Array.filter :: macro (arr: &[..] $T, body: Code) {
     move := 0;
@@ -327,12 +324,6 @@ Array.filter :: macro (arr: &[..] $T, body: Code) {
 #overload #order 100
 __for_expansion :: macro (_s: &[..] $T, $flags: __For_Expansion_Flags, $body: Code)
 {
-    remove_element :: macro () {
-        Array.remove_at(__s, __i)
-        __i -= 1
-        __count -= 1
-    }
-
     __s     := _s
     __data  := __s.data
     __count := __s.count
@@ -360,64 +351,3 @@ Untyped_Array :: struct {
     capacity: u32;
     allocator: Allocator;
 }
-
-
-
-
-
-//
-// Everything below here only exists for backwards compatibility.
-//
-
-make :: Array.make
-init :: Array.init
-free :: Array.free
-copy :: Array.copy
-copy_range :: Array.copy_range
-clear :: Array.clear
-ensure_capacity :: Array.ensure_capacity
-alloc_one :: Array.alloc_one
-push :: Array.push
-insert :: Array.insert
-insert_empty :: Array.insert_empty
-remove :: Array.remove
-remove_at :: Array.remove_at
-unordered_remove :: Array.unordered_remove
-delete :: Array.delete
-fast_delete :: Array.fast_delete
-pop :: Array.pop
-concat :: Array.concat
-filter :: Array.filter
-
-
-
-// Things that work with slices and arrays
-
-transplant  :: Slice.transplant
-get         :: Slice.get
-get_ptr     :: Slice.get_ptr
-set         :: Slice.set
-contains    :: Slice.contains
-empty       :: Slice.empty
-sum         :: Slice.sum
-product     :: Slice.product
-average     :: Slice.average
-reverse     :: Slice.reverse
-sort        :: Slice.sort
-quicksort   :: Slice.quicksort
-unique      :: Slice.unique
-fold        :: Slice.fold
-every       :: Slice.every
-some        :: Slice.some
-fill        :: Slice.fill
-fill_range  :: Slice.fill_range
-to_list     :: Slice.to_list
-find        :: Slice.find
-find_ptr    :: Slice.find_ptr
-find_opt    :: Slice.find_opt
-first       :: Slice.first
-count_where :: Slice.count_where
-windows     :: Slice.windows
-chunks      :: Slice.chunks
-greatest    :: Slice.greatest
-least       :: Slice.least

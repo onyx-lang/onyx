@@ -106,13 +106,13 @@ lookup_protobuf_descriptor :: (type: type_expr) -> &Proto_Message_Descriptor {
 }
 
 apply_field_tag :: (tags: [] any, dest: &Proto_Field_Descriptor) {
-    tags
+    field := tags
         |> .find_opt([x](x.type == Field))
         |> .transform(x => *misc.any_as(x, Field))
-        |> .with([fi] {
-            dest.proto_field_type   = ~~ fi.protobuf_type
-            dest.proto_field_number = fi.number
-        })
+    if field as fi {
+        dest.proto_field_type   = ~~ fi.protobuf_type
+        dest.proto_field_number = fi.number
+    }
 }
 
 

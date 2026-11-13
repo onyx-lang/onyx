@@ -41,7 +41,7 @@ __lookup_all_envs :: () {
     result := make([..] Pair(str, str), env_count, allocator);
     for env in env_var {
         s := string.from_cstr(env);
-        var, val := string.bisect(s, '=');
+        var, val := str.bisect(s, '=');
         result << .{var, val};
     }
 
@@ -89,7 +89,7 @@ __get_env :: (key: str) -> ? str {
 
     __lookup_all_envs();
 
-    return slice.first(all_env, [v](v.first == key))
+    return Slice.first(all_env, [v](v.first == key))
         |> Optional.from_ptr()
         |> Optional.transform(x => x.second);
 }

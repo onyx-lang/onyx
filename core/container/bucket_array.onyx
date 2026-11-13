@@ -198,14 +198,3 @@ alloc_bucket :: (b: &Bucket_Array($T)) -> Bucket_Array.Bucket(T) {
 
 Bucket_Array.for_each :: for_each
 Bucket_Array.as_iter  :: as_iter
-
-make     :: Bucket_Array.make
-init     :: Bucket_Array.init
-delete   :: Bucket_Array.delete
-clear    :: Bucket_Array.clear
-copy     :: Bucket_Array.copy
-empty    :: Bucket_Array.empty
-get      :: Bucket_Array.get
-get_ptr  :: Bucket_Array.get_ptr
-push     :: Bucket_Array.push
-pop      :: Bucket_Array.pop

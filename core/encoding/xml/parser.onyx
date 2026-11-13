@@ -18,7 +18,7 @@ parse :: #match #local {}
 
 #overload
 parse :: (s: str, allocator := context.allocator) -> Result(Document, ParseError) {
-    use stream := io.buffer_stream_make(s)
+    use stream := io.BufferStream.make(s)
     return parse(&stream, allocator)
 }
 
@@ -190,7 +190,7 @@ apply_xmlns :: (doc: &Document, ns: &[..] Ns_Bind, attrs: &[..] Attribute) {
     for a in *attrs {
         if a.key == "xmlns" {
             ns->push(.{ prefix = "", uri = doc.strings->add(a.value) })
-        } elseif string.starts_with(a.key, "xmlns:") {
+        } elseif str.starts_with(a.key, "xmlns:") {
             _, local := split_qname(a.key)
             ns->push(.{ prefix = doc.strings->add(local), uri = doc.strings->add(a.value) })
         }

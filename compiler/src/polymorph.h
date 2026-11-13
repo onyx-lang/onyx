@@ -1482,6 +1482,7 @@ Type* polymorphic_struct_lookup(Context *context, AstPolyStructType* ps_type, bh
     insert_poly_slns_into_scope(context, sln_scope, slns);
 
     AstStructType* concrete_struct = (AstStructType *) ast_clone(context, ps_type->base_struct);
+    concrete_struct->poly_owner = ps_type;
     concrete_struct->scope = scope_create(context, sln_scope, ps_type->token->pos);
     concrete_struct->polymorphic_error_loc = pos;
     BH_MASK_SET(concrete_struct->flags, !error_if_failed, Ast_Flag_Header_Check_No_Error);
@@ -1557,6 +1558,7 @@ Type* polymorphic_union_lookup(Context *context, AstPolyUnionType* pu_type, bh_a
     insert_poly_slns_into_scope(context, sln_scope, slns);
 
     AstUnionType* concrete_union = (AstUnionType *) ast_clone(context, pu_type->base_union);
+    concrete_union->poly_owner = pu_type;
     concrete_union->scope = scope_create(context, sln_scope, pu_type->token->pos);
     concrete_union->polymorphic_error_loc = pos;
     BH_MASK_SET(concrete_union->flags, !error_if_failed, Ast_Flag_Header_Check_No_Error);

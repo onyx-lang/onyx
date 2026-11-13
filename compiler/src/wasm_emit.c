@@ -174,6 +174,9 @@ static u64 local_allocate_bytes_in_memory(LocalAllocator *la, u32 size, u32 alig
 static void local_free_bytes_in_memory(LocalAllocator* la, u32 size, u32 alignment) {
     bh_align(size, alignment);
     la->curr_stack -= size;
+
+    if (la->curr_stack < la->stack_floor)
+        la->curr_stack = la->stack_floor;
 }
 
 static u64 local_allocate_type_in_memory(LocalAllocator* la, Type *type) {
@@ -520,7 +523,6 @@ EMIT_FUNC(switch,                          AstSwitch* switch_node);
 EMIT_FUNC(defer,                           AstDefer* defer);
 EMIT_FUNC(deferred_stmt,                   DeferredStmt deferred_stmt);
 EMIT_FUNC_NO_ARGS(deferred_stmts);
-EMIT_FUNC(remove_directive,                AstDirectiveRemove* remove);
 EMIT_FUNC(binop,                           AstBinaryOp* binop);
 EMIT_FUNC(unaryop,                         AstUnaryOp* unop);
 EMIT_FUNC(call,                            AstCall* call);
@@ -782,7 +784,6 @@ EMIT_FUNC(statement, AstNode* stmt) {
         case Ast_Kind_Defer:      emit_defer(mod, &code, (AstDefer *) stmt); break;
         case Ast_Kind_Local:      emit_local_allocation(mod, &code, (AstTyped *) stmt); break;
 
-        case Ast_Kind_Directive_Remove: emit_remove_directive(mod, &code, (AstDirectiveRemove *) stmt); break;
         case Ast_Kind_Directive_Insert: break;
 
         default:                  emit_expression(mod, &code, (AstTyped *) stmt); break;
@@ -808,7 +809,7 @@ EMIT_FUNC_RETURNING(u64, local_allocation, AstTyped* stmt) {
     //
     // If the statement does not have a type, it should not
     // be emitted. The only case this should be used by is
-    // when a local is declared with "#auto" type and is
+    // when a local is declared with "_" type and is
     // never used, therefore never declaring its type.
     if (stmt->type == NULL) {
         assert(stmt->kind == Ast_Kind_Local);
@@ -1687,26 +1688,6 @@ EMIT_FUNC_NO_ARGS(deferred_stmts) {
         DeferredStmt stmt = bh_arr_pop(mod->deferred_stmts);
         emit_deferred_stmt(mod, pcode, stmt);
     }
-}
-
-EMIT_FUNC(remove_directive, AstDirectiveRemove* remove) {
-    assert(bh_arr_length(mod->for_remove_info) > 0);
-
-    bh_arr(WasmInstruction) code = *pcode;
-
-    ForRemoveInfo remove_info = bh_arr_last(mod->for_remove_info);
-
-    WIL(remove->token, WI_LOCAL_GET, remove_info.iterator_remove_func);
-    note_table_index(mod, code, function_at_element(mod, mod->null_proc_func_idx));
-    WIL(remove->token, WI_I32_CONST, mod->null_proc_func_idx);
-    WI(remove->token, WI_I32_NE);
-    WID(remove->token, WI_IF_START, 0x40);
-    WIL(remove->token, WI_LOCAL_GET, remove_info.iterator_data_ptr);
-    WIL(remove->token, WI_LOCAL_GET, remove_info.iterator_remove_func);
-    WIL(remove->token, WI_CALL_INDIRECT, remove_info.remove_func_type_idx);
-    WI(remove->token, WI_IF_END);
-
-    *pcode = code;
 }
 
 // NOTE: These need to be in the same order as
@@ -3091,6 +3072,26 @@ EMIT_FUNC(values_into_contiguous_memory, u64 base_ptr_local, u32 offset, u32 val
     *pcode = code;
 }
 
+// An expression macro is emitted as a do-block, and that block frees every
+// slot it allocated when the macro returns. A compound literal in the macro
+// can still be pointed at by the returned value, as with an iterator over a
+// temporary array. Pinning the stack floor keeps those bytes for the rest of
+// the function instead of letting a later allocation reuse them.
+static void pin_temporary_past_expr_macro(OnyxWasmModule *mod) {
+    i32 depth = bh_arr_length(mod->structured_jump_target);
+    b32 inside_expr_macro = 0;
+    fori (i, 0, depth) {
+        if (mod->structured_jump_target[i] == SBT_Return_Block) {
+            inside_expr_macro = 1;
+            break;
+        }
+    }
+    if (!inside_expr_macro) return;
+
+    if (mod->local_alloc->curr_stack > mod->local_alloc->stack_floor)
+        mod->local_alloc->stack_floor = mod->local_alloc->curr_stack;
+}
+
 EMIT_FUNC(struct_literal_into_contiguous_memory, AstStructLiteral* sl, u64 base_ptr_local, u32 offset) {
     emit_values_into_contiguous_memory(mod, pcode, base_ptr_local, offset, bh_arr_length(sl->values_to_initialize), sl->values_to_initialize);
 }
@@ -3109,6 +3110,7 @@ EMIT_FUNC(struct_literal, AstStructLiteral* sl) {
 
     u64 local_offset = emit_local_allocation(mod, &code, (AstTyped *) sl);
     assert((local_offset & LOCAL_IS_WASM) == 0);
+    pin_temporary_past_expr_macro(mod);
 
     emit_struct_literal_into_contiguous_memory(mod, &code, sl, mod->stack_base_idx, local_offset);
     emit_stack_address(mod, &code, local_offset, sl->token);
@@ -3175,6 +3177,7 @@ EMIT_FUNC(array_literal, AstArrayLiteral* al) {
 
     u64 local_offset = emit_local_allocation(mod, &code, (AstTyped *) al);
     assert((local_offset & LOCAL_IS_WASM) == 0);
+    pin_temporary_past_expr_macro(mod);
 
     assert(al->type->kind == Type_Kind_Array);
 
@@ -3195,6 +3198,7 @@ EMIT_FUNC(range_literal, AstRangeLiteral* range) {
 
     u64 local_offset = emit_local_allocation(mod, &code, (AstTyped *) range);
     assert((local_offset & LOCAL_IS_WASM) == 0);
+    pin_temporary_past_expr_macro(mod);
 
     i32 elem_size = range->type->Struct.alignment;
 
@@ -5318,8 +5322,6 @@ void onyx_wasm_module_initialize(Context *context, OnyxWasmModule *module) {
     bh_arr_new(context->gp_alloc, module->libraries, 4);
     bh_arr_new(context->gp_alloc, module->library_paths, 4);
     bh_arr_new(context->gp_alloc, module->js_partials, 4);
-    bh_arr_new(context->gp_alloc, module->for_remove_info, 4);
-
     bh_arr_new(context->gp_alloc, module->return_location_stack, 4);
     bh_arr_new(context->gp_alloc, module->structured_jump_target, 16);
     bh_arr_set_length(module->structured_jump_target, 0);

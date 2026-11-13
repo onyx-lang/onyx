@@ -20,15 +20,15 @@ bytes_as_str :: (b: [] u8) -> str {
 
 run_capture :: (args: [] str) -> ([] u8, [] u8, i32) {
     p := os.Process.spawn(tools_path, args);
-    out_r := io.reader_make(&p);
-    err_r := io.reader_make(&p.stderr);
-    out := io.read_all(&out_r);
-    err := io.read_all(&err_r);
+    out_r := io.Reader.make(&p);
+    err_r := io.Reader.make(&p.stderr);
+    out := io.Reader.read_all(&out_r);
+    err := io.Reader.read_all(&err_r);
     p->wait();
     code := p.exit_code;
     p->destroy();
-    io.reader_free(&out_r);
-    io.reader_free(&err_r);
+    io.Reader.free(&out_r);
+    io.Reader.free(&err_r);
     return out, err, code;
 }
 

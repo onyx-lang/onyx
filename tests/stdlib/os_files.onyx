@@ -79,5 +79,5 @@ main :: () {
     println(os.file_stat(link, &st));
     println(st.type == .RegularFile);
 
-    println(os.remove_directory(root));
+    println(os.Directory.remove_recursive(root));
 }

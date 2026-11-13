@@ -129,6 +129,8 @@ CHECK_FUNC(global, AstGlobal* global);
 CHECK_FUNC(function, AstFunction* func);
 CHECK_FUNC(overloaded_function, AstOverloadedFunction* func);
 CHECK_FUNC(struct, AstStructType* s_node);
+CHECK_FUNC(struct_tags, AstStructType* s_node);
+CHECK_FUNC(union_tags, AstUnionType* u_node);
 CHECK_FUNC(temp_function_header, AstFunction* func);
 CHECK_FUNC(function_header, AstFunction* func);
 CHECK_FUNC(memres_type, AstMemRes* memres);
@@ -4414,6 +4416,17 @@ CHECK_FUNC(block, AstBlock* block) {
     return Check_Success;
 }
 
+static void emit_tags_once(Context *context, b32 *emitted, u32 target_id, b32 target_is_type, bh_arr(AstTyped *) tags) {
+    if (!emitted || *emitted) return;
+    if (bh_arr_length(tags) <= 0) {
+        *emitted = 1;
+        return;
+    }
+    if (target_id == 0) return;
+    compilation_log_emit_tags(context, target_id, target_is_type, tags);
+    *emitted = 1;
+}
+
 CHECK_FUNC(polyproc, AstFunction* pp) {
     pp->flags |= Ast_Flag_Comptime;
     pp->parent_scope_of_poly_proc = context->checker.current_scope;
@@ -4429,6 +4442,17 @@ CHECK_FUNC(polyproc, AstFunction* pp) {
 
     compilation_log_ensure_poly_template_params(context, pp);
 
+    if (pp->scope) scope_enter(context, pp->scope);
+    bh_arr_each(AstTyped *, pexpr, pp->tags) {
+        CHECK(expression, pexpr);
+        if (((*pexpr)->flags & Ast_Flag_Comptime) == 0) {
+            ERROR((*pexpr)->token->pos, "#tag expressions should be compile time known.");
+        }
+    }
+    if (pp->scope) scope_leave(context);
+
+    emit_tags_once(context, &pp->compilation_tags_emitted, pp->compilation_symbol_id, 0, pp->tags);
+
     return Check_Complete;
 }
 
@@ -4440,6 +4464,8 @@ CHECK_FUNC(function, AstFunction* func) {
     if (!func->ready_for_body_to_be_checked || !func->type) {
         YIELD(func->token->pos, "Waiting for procedure header to pass type-checking");
     }
+
+    emit_tags_once(context, &func->compilation_tags_emitted, func->compilation_symbol_id, 0, func->tags);
 
     bh_arr_clear(context->checker.expected_return_type_stack);
     bh_arr_clear(context->checker.named_return_values_stack);
@@ -4941,8 +4967,83 @@ CHECK_FUNC(struct_defaults, AstStructType* s_node) {
         CHECK(meta_tags, (*smem)->meta_tags);
     }
 
+    CHECK(struct_tags, s_node);
+
     if (s_node->scope) {
         scope_leave(context);
+    }
+
+    return Check_Success;
+}
+
+// Type-check a copy of a polymorphic template's tags. The originals stay
+// untouched: #solidify inside a tag replaces the node it is stored in, and
+// the code generator still needs the template form so each instance can
+// solidify its own copy.
+static CheckStatus emit_cloned_template_tags(Context *context, u32 type_id, bh_arr(AstTyped *) tags) {
+    if (type_id == 0 || bh_arr_length(tags) <= 0) return Check_Success;
+
+    bh_arr(AstTyped *) clones = NULL;
+    bh_arr_new(context->gp_alloc, clones, bh_arr_length(tags));
+    bh_arr_each(AstTyped *, tag, tags) {
+        AstTyped *cloned = (AstTyped *) ast_clone(context, (AstNode *) *tag);
+        if (cloned) bh_arr_push(clones, cloned);
+    }
+
+    b32 errors_were_enabled = context->errors_enabled;
+    onyx_errors_disable(context);
+    CheckStatus cs = check_meta_tags(context, clones);
+    context->errors_enabled = errors_were_enabled;
+
+    if (cs == Check_Success) {
+        compilation_log_emit_tags(context, type_id, 1, clones);
+    }
+    return cs;
+}
+
+CHECK_FUNC(struct_tags, AstStructType* s_node) {
+    if (s_node->poly_owner) {
+        AstStructType *base = s_node->poly_owner->base_struct;
+        if (base && !base->compilation_tags_emitted) {
+            if (bh_arr_length(base->meta_tags) > 0 && base->poly_type && base->poly_type->id) {
+                CheckStatus cs = emit_cloned_template_tags(context, base->poly_type->id, base->meta_tags);
+                if (cs == Check_Yield || cs == Check_Goto_Parse) return cs;
+            }
+            base->compilation_tags_emitted = 1;
+        }
+    }
+
+    if (!s_node->compilation_tags_emitted) {
+        if (bh_arr_length(s_node->meta_tags) <= 0) {
+            s_node->compilation_tags_emitted = 1;
+        } else if (s_node->stcache && s_node->stcache->id) {
+            compilation_log_emit_tags(context, s_node->stcache->id, 1, s_node->meta_tags);
+            s_node->compilation_tags_emitted = 1;
+        }
+    }
+
+    return Check_Success;
+}
+
+CHECK_FUNC(union_tags, AstUnionType* u_node) {
+    if (u_node->poly_owner) {
+        AstUnionType *base = u_node->poly_owner->base_union;
+        if (base && !base->compilation_tags_emitted) {
+            if (bh_arr_length(base->meta_tags) > 0 && base->poly_type && base->poly_type->id) {
+                CheckStatus cs = emit_cloned_template_tags(context, base->poly_type->id, base->meta_tags);
+                if (cs == Check_Yield || cs == Check_Goto_Parse) return cs;
+            }
+            base->compilation_tags_emitted = 1;
+        }
+    }
+
+    if (!u_node->compilation_tags_emitted) {
+        if (bh_arr_length(u_node->meta_tags) <= 0) {
+            u_node->compilation_tags_emitted = 1;
+        } else if (u_node->utcache && u_node->utcache->id) {
+            compilation_log_emit_tags(context, u_node->utcache->id, 1, u_node->meta_tags);
+            u_node->compilation_tags_emitted = 1;
+        }
     }
 
     return Check_Success;
@@ -5031,6 +5132,7 @@ CHECK_FUNC(union, AstUnionType *u_node) {
 
     scope_leave(context);
     u_node->utcache = u_node->pending_type;
+    CHECK(union_tags, u_node);
     return Check_Success;
 }
 
@@ -5266,6 +5368,8 @@ CHECK_FUNC(function_header, AstFunction* func) {
 
     scope_leave(context);
 
+    emit_tags_once(context, &func->compilation_tags_emitted, func->compilation_symbol_id, 0, func->tags);
+
     if (bh_arr_length(func->tags) > 0 || (func->flags & Ast_Flag_Proc_Is_Null) != 0) {
         func->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;
         return Check_Success;
@@ -5327,6 +5431,8 @@ CHECK_FUNC(memres, AstMemRes* memres) {
     bh_arr_each(AstTyped *, ptag, memres->tags) {
         CHECK(expression, ptag);
     }
+
+    emit_tags_once(context, &memres->compilation_tags_emitted, memres->compilation_symbol_id, 0, memres->tags);
 
     if (bh_arr_length(memres->tags) > 0) {
         memres->flags |= Ast_Flag_Has_Been_Scheduled_For_Emit;

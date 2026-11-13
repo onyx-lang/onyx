@@ -56,7 +56,7 @@ Position :: struct {
 }
 
 #local
-ensure :: (use tkn: ^Tokenizer, n: u32) -> bool {
+ensure :: (use tkn: &Tokenizer, n: u32) -> bool {
     if reader == null {
         return offset + n <= data.count;
     }
@@ -72,7 +72,7 @@ ensure :: (use tkn: ^Tokenizer, n: u32) -> bool {
 }
 
 #local
-fill :: (use tkn: ^Tokenizer) -> bool {
+fill :: (use tkn: &Tokenizer) -> bool {
     if reader == null do return false;
 
     Array.ensure_capacity(&buf, buf.count + TOKENIZER_CHUNK);
@@ -92,7 +92,7 @@ fill :: (use tkn: ^Tokenizer) -> bool {
 }
 
 #package
-token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
+token_get :: (use tkn: &Tokenizer) -> (Token, Error) {
     err := Error.{};
 
     skip_whitespace(tkn);
@@ -196,13 +196,13 @@ token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
 }
 
 #local
-peek_char :: (use tkn: ^Tokenizer) -> (u8, bool) {
+peek_char :: (use tkn: &Tokenizer) -> (u8, bool) {
     if !ensure(tkn, 1) do return 0, false;
     return data[offset], true;
 }
 
 #local
-next_character :: (use tkn: ^Tokenizer) -> (u8, bool) {
+next_character :: (use tkn: &Tokenizer) -> (u8, bool) {
     if !ensure(tkn, 1) do return 0, false;
 
     retval := data[offset];
@@ -213,7 +213,7 @@ next_character :: (use tkn: ^Tokenizer) -> (u8, bool) {
 }
 
 #local
-skip_whitespace :: (use tkn: ^Tokenizer) {
+skip_whitespace :: (use tkn: &Tokenizer) {
     while true {
         ch, ok := peek_char(tkn);
         if !ok do return;
@@ -237,7 +237,7 @@ skip_whitespace :: (use tkn: ^Tokenizer) {
 }
 
 #local
-skip_alpha_numeric :: (use tkn: ^Tokenizer) {
+skip_alpha_numeric :: (use tkn: &Tokenizer) {
     while true {
         ch, ok := peek_char(tkn);
         if !ok do return;
@@ -254,7 +254,7 @@ skip_alpha_numeric :: (use tkn: ^Tokenizer) {
 }
 
 #local
-skip_numeric :: (use tkn: ^Tokenizer) {
+skip_numeric :: (use tkn: &Tokenizer) {
     while true {
         ch, ok := peek_char(tkn);
         if !ok do return;
@@ -271,7 +271,7 @@ skip_numeric :: (use tkn: ^Tokenizer) {
 }
 
 #local
-skip_escape :: (use tkn: ^Tokenizer) {
+skip_escape :: (use tkn: &Tokenizer) {
     ch, ok := peek_char(tkn);
     if !ok do return;
 

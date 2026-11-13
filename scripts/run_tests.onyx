@@ -16,7 +16,7 @@ Color :: enum {
 
 print_color :: (color: Color, format: str, args: ..any) {
     buffer: [2048] u8;
-    output := conv.str_format_va(buffer, format, args);
+    output := conv.format_va(buffer, format, args);
 
     if (runtime.compiler_os == .Linux || runtime.compiler_os == .MacOS) && !settings.no_color {
         color_code: str;
@@ -80,9 +80,9 @@ strip_leak_reports :: (output: str) -> (clean: str, leak_count: i32) {
 }
 
 find_onyx_files :: (root: str, cases: &[..] Test_Case) {
-    for os.list_directory(root) {
+    for os.Directory.list(root) {
         use path := os.Path.join(root, it->name());
-        if string.ends_with(it->name(), ".onyx") {
+        if str.ends_with(it->name(), ".onyx") {
             expected_file := path[0 .. (path.count - 5)];
 
             if !os.File.exists(expected_file) {
@@ -163,7 +163,7 @@ main :: (args) => {
         case .Windows do exec_context.onyx_cmd = "onyx.exe";
     }
 
-    cases := array.make(Test_Case, capacity=256);
+    cases := Array.make(Test_Case, capacity=256);
     find_onyx_files(settings.test_folder, &cases);
 
     iter.parallel_for(cases, settings.threads, &exec_context) {
@@ -217,9 +217,9 @@ main :: (args) => {
         program_output := output.Ok->unwrap();
         clean_output, leak_count := strip_leak_reports(program_output);
 
-        use expected_file := os.open(it.expected_file)->unwrap();
-        use expected_reader := io.reader_make(&expected_file);
-        expected_output := io.read_all(&expected_reader);
+        use expected_file := os.File.open(it.expected_file)->unwrap();
+        use expected_reader := io.Reader.make(&expected_file);
+        expected_output := io.Reader.read_all(&expected_reader);
 
         if it.leak_check && leak_count > 0 {
             print_color(.Red, "[{}]  Leaked memory in {}.\n{}", context.thread_id, it.source_file, program_output);

@@ -44,10 +44,6 @@ AtomicAllocator.as_allocator :: (atomic: &AtomicAllocator) =>
 #overload
 builtin.delete :: AtomicAllocator.delete
 
-// Compatibility: package names.
-make :: AtomicAllocator.make
-init :: AtomicAllocator.init
-make_allocator :: AtomicAllocator.as_allocator
 
 
 #local
