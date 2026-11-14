@@ -1801,11 +1801,26 @@ CHECK_FUNC(binaryop_assignment, AstBinaryOp** pbinop) {
             // Not a builtin op= (e.g. a struct). Rewrite to `lhs = lhs + rhs`
             // so `#operator+` still applies to `+=`. Primitive op= stays
             // intact so emit can evaluate the l-value once.
-            AstBinaryOp* rhs_op = make_binary_op(context, operation, binop->left, binop->right);
-            rhs_op->token = binop->token;
-            CHECK(binaryop, &rhs_op);
-            binop->right = (AstTyped *) rhs_op;
+            //
+            // Keep the rewritten expression across a yield. Operator methods
+            // are polymorphic macros, and overload resolution keys its query
+            // on the argument node. A fresh `lhs + rhs` on every retry is a
+            // new query. Those queries finish, so the stall detector resets
+            // and compilation never ends.
+            if (binop->potential_substitute == NULL) {
+                AstBinaryOp* rhs_op = make_binary_op(context, operation, binop->left, binop->right);
+                rhs_op->token = binop->token;
+                binop->potential_substitute = rhs_op;
+            }
+
+            AstTyped *rhs = (AstTyped *) binop->potential_substitute;
+            CheckStatus cs = check_expression(context, &rhs);
+            binop->potential_substitute = (AstBinaryOp *) rhs;
+            if (cs > Check_Errors_Start) return cs;
+
+            binop->right = rhs;
             binop->operation = Binary_Op_Assign;
+            binop->potential_substitute = NULL;
         }
     }
 
