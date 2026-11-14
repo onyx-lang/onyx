@@ -4460,6 +4460,8 @@ CHECK_FUNC(polyproc, AstFunction* pp) {
         if (((*pexpr)->flags & Ast_Flag_Comptime) == 0) {
             ERROR((*pexpr)->token->pos, "#tag expressions should be compile time known.");
         }
+
+        resolve_expression_type(context, *pexpr);
     }
     if (pp->scope) scope_leave(context);
 
@@ -5338,6 +5340,8 @@ CHECK_FUNC(function_header, AstFunction* func) {
         if (((*pexpr)->flags & Ast_Flag_Comptime) == 0) {
             ERROR((*pexpr)->token->pos, "#tag expressions should be compile time known.");
         }
+
+        resolve_expression_type(context, *pexpr);
     }
 
     func->ready_for_body_to_be_checked = 1;
@@ -5442,6 +5446,7 @@ CHECK_FUNC(memres, AstMemRes* memres) {
 
     bh_arr_each(AstTyped *, ptag, memres->tags) {
         CHECK(expression, ptag);
+        resolve_expression_type(context, *ptag);
     }
 
     emit_tags_once(context, &memres->compilation_tags_emitted, memres->compilation_symbol_id, 0, memres->tags);
