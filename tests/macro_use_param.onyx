@@ -1,0 +1,27 @@
+use core {*}
+
+Vec2 :: struct { x, y: i32 }
+
+print_x :: macro (use v: Vec2) {
+    printf("{}\n", x)
+}
+
+print_ptr_x :: macro (use v: &Vec2) {
+    printf("{}\n", x)
+}
+
+sum_xy :: macro (use v: Vec2) -> i32 {
+    return x + y
+}
+
+print_v :: macro (use v: Vec2) {
+    printf("{} {}\n", v.x, y)
+}
+
+main :: () {
+    v := Vec2.{ 3, 4 }
+    print_x(v)
+    print_ptr_x(&v)
+    println(sum_xy(v))
+    print_v(v)
+}

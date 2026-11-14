@@ -1,0 +1,452 @@
+#load "core:onyx/toolchain/module"
+
+use core {*}
+use onyx.toolchain {*}
+use protobuf.onyx.toolchain.events
+
+main :: () {
+    b := Builder.make();
+    defer b->destroy();
+
+    core_root := os.env("ONYX_PATH") ?? "";
+    defer str.free(core_root);
+    b->map_dir("core", tprintf("{}/core", core_root));
+
+    b->enable(.DISABLE_EXTENSIONS);
+    b->enable(.MULTI_THREADING);
+    b->set_platform(.ONYX);
+
+    b->inject_source("""
+package foo.bar
+
+Point :: struct {
+    x: i32
+    y: i32
+}
+
+Shape :: union {
+    Point: Point
+    Empty: void
+}
+
+x :: 1
+y :: x
+
+Color :: enum {
+    Red
+    Green :: 10
+    Blue
+}
+
+origin :: Point.{ x = x, y = 0 }
+
+get_x :: (p: Point) -> i32 {
+    return p.x
+}
+
+Ptr :: &Point
+Arr :: [2] i32
+Slc :: [] i32
+""");
+
+    b->inject_source("""
+package main
+
+use foo.bar { Point, get_x, x, Shape }
+
+main :: () {
+    p := Point.{ x = x, y = 0 }
+    _ := get_x(p)
+    s := Shape.{ Point = p }
+    _ := s.Point
+}
+""");
+    b->compile();
+
+    println("first_compile_ok");
+    println(!b->has_errors());
+
+    first := b->compilation_events();
+
+    has_start := false;
+    has_foo := false;
+    has_foo_bar := false;
+    foo_id: u32;
+    foo_bar_parent: u32;
+    file_count := 0;
+    has_scope := false;
+    has_nested_scope := false;
+    has_symbol_x := false;
+    x_scope_id: u32;
+    point_symbol_id: u32;
+    point_kind_ok := false;
+    x_kind_ok := false;
+    get_x_kind_ok := false;
+    point_scope_id: u32;
+    point_ids := make([..] u32);
+    point_scopes := make([..] u32);
+    x_ids := make([..] u32);
+    defer delete(&point_ids);
+    defer delete(&point_scopes);
+    defer delete(&x_ids);
+
+    for e in first.events {
+        switch e.data {
+            case .Start do has_start = true;
+
+            case .File do file_count += 1;
+
+            case .Pack as p {
+                if p.fully_qualified_name == "foo" {
+                    has_foo = true;
+                    foo_id = p.id;
+                }
+                if p.fully_qualified_name == "foo.bar" {
+                    has_foo_bar = true;
+                    foo_bar_parent = p.parent_package_id;
+                }
+            }
+
+            case .Scope as s {
+                has_scope = true;
+                if s.parent_scope_id != 0 do has_nested_scope = true;
+            }
+
+            case .Symbol as sym {
+                if sym.name == "Point" {
+                    if point_symbol_id == 0 {
+                        point_symbol_id = sym.id;
+                        point_scope_id = sym.scope_id;
+                        if sym.kind == .Struct do point_kind_ok = true;
+                    }
+                    Array.push(&point_ids, sym.id);
+                    if !Slice.contains(point_scopes, sym.scope_id) {
+                        Array.push(&point_scopes, sym.scope_id);
+                    }
+                }
+                if sym.name == "get_x" && !get_x_kind_ok {
+                    if sym.kind == .Function do get_x_kind_ok = true;
+                }
+            }
+
+            case _ {}
+        }
+    }
+
+    for e in first.events {
+        switch e.data {
+            case .Symbol as sym {
+                if sym.name == "x" && Slice.contains(point_scopes, sym.scope_id) {
+                    has_symbol_x = true;
+                    if sym.scope_id == point_scope_id {
+                        x_scope_id = sym.scope_id;
+                        if sym.kind == .Expression do x_kind_ok = true;
+                    }
+                    Array.push(&x_ids, sym.id);
+                }
+            }
+            case _ {}
+        }
+    }
+
+    println("has_start");
+    println(has_start);
+    println("has_foo");
+    println(has_foo);
+    println("has_foo_bar");
+    println(has_foo_bar);
+    println("parent_ok");
+    println(has_foo && has_foo_bar && foo_bar_parent == foo_id);
+    println("has_file");
+    println(file_count > 0);
+    println("has_scope");
+    println(has_scope);
+    println("has_nested_scope");
+    println(has_nested_scope);
+    println("has_symbol_x");
+    println(has_symbol_x);
+    println("symbol_x_scope_ok");
+    println(has_symbol_x && x_scope_id != 0 && x_scope_id == point_scope_id);
+    println("point_kind_ok");
+    println(point_kind_ok);
+    println("x_kind_ok");
+    println(x_kind_ok);
+    println("get_x_kind_ok");
+    println(get_x_kind_ok);
+
+    first_has_type := false;
+    first_has_resolved := false;
+    first_has_binding := false;
+    first_has_type_body := false;
+    for e in first.events {
+        switch e.data {
+            case .Type do first_has_type = true;
+            case .Resolved do first_has_resolved = true;
+            case .Binding do first_has_binding = true;
+            case .Type_Body do first_has_type_body = true;
+            case _ {}
+        }
+    }
+
+    println("first_has_type");
+    println(first_has_type);
+    println("first_has_resolved");
+    println(first_has_resolved);
+    println("first_has_binding");
+    println(first_has_binding);
+    println("first_has_type_body");
+    println(first_has_type_body);
+
+    has_type_void := false;
+    void_has_basic := false;
+    i32_has_basic := false;
+    elem_ids_ok := true;
+    array_ids_ok := true;
+    bodies_ok := true;
+    has_point_body := false;
+    has_shape_body := false;
+    point_type_id: u32;
+    shape_type_id: u32;
+    found_point_type := false;
+    found_shape_type := false;
+    point_binding_type_id: u32;
+    x_binding_has_type := false;
+    resolved_x := false;
+    resolved_point := false;
+    resolved_member_x := false;
+    resolved_shape_point := false;
+    point_member_x_id: u32;
+    shape_variant_point_id: u32;
+    color_kind_ok := false;
+    color_values_ok := false;
+
+    for e in first.events {
+        switch e.data {
+            case .Binding as bind {
+                if bind.type_id != 0 {
+                    if Slice.contains(point_ids, bind.symbol_id) {
+                        point_binding_type_id = bind.type_id;
+                    }
+                    if Slice.contains(x_ids, bind.symbol_id) {
+                        x_binding_has_type = true;
+                    }
+                }
+            }
+
+            case .Type as t {
+                if t.name == "void" {
+                    has_type_void = true;
+                    switch t.body {
+                        case .Basic do void_has_basic = true;
+                        case _ {}
+                    }
+                }
+                if t.name == "i32" {
+                    switch t.body {
+                        case .Basic as basic {
+                            if basic.basic_kind == .I32 do i32_has_basic = true;
+                        }
+                        case _ {}
+                    }
+                }
+                if t.name == "Point" {
+                    point_type_id = t.id;
+                    found_point_type = true;
+                }
+                if t.name == "Shape" {
+                    shape_type_id = t.id;
+                    found_shape_type = true;
+                }
+                if t.name == "Color" {
+                    if t.kind == .Enum do color_kind_ok = true;
+                    switch t.body {
+                        case .Enumeration as en {
+                            has_red := false;
+                            has_green := false;
+                            has_blue := false;
+                            for v in en.values {
+                                if v.name == "Red" && v.value == 0 && v.symbol_id != 0 do has_red = true;
+                                if v.name == "Green" && v.value == 10 && v.symbol_id != 0 do has_green = true;
+                                if v.name == "Blue" && v.value == 11 && v.symbol_id != 0 do has_blue = true;
+                            }
+                            if has_red && has_green && has_blue do color_values_ok = true;
+                        }
+                        case _ {}
+                    }
+                }
+
+                is_elem_kind := t.kind == .Pointer || t.kind == .Multi_Pointer || t.kind == .Slice || t.kind == .Dyn_Array || t.kind == .Var_Args;
+                if is_elem_kind {
+                    switch t.body {
+                        case .Elem as el {
+                            if el.elem_id == 0 do elem_ids_ok = false;
+                        }
+                        case _ do elem_ids_ok = false;
+                    }
+                }
+
+                if t.kind == .Array {
+                    switch t.body {
+                        case .Array as a {
+                            if a.elem_id == 0 do array_ids_ok = false;
+                        }
+                        case _ do array_ids_ok = false;
+                    }
+                }
+            }
+
+            case .Type_Body as tb {
+                switch tb.details {
+                    case .Struct as sb {
+                        for m in sb.members {
+                            if m.name.count == 0 || m.type_id == 0 do bodies_ok = false;
+                        }
+                        if found_point_type && tb.type_id == point_type_id {
+                            has_px := false;
+                            has_py := false;
+                            for m in sb.members {
+                                if m.name == "x" {
+                                    has_px = true;
+                                    point_member_x_id = m.symbol_id;
+                                }
+                                if m.name == "y" do has_py = true;
+                            }
+                            if has_px && has_py do has_point_body = true;
+                        }
+                    }
+                    case .Union as ub {
+                        for v in ub.variants {
+                            if v.name.count == 0 || v.type_id == 0 do bodies_ok = false;
+                        }
+                        if found_shape_type && tb.type_id == shape_type_id {
+                            has_point := false;
+                            has_empty := false;
+                            for v in ub.variants {
+                                if v.name == "Point" {
+                                    has_point = true;
+                                    shape_variant_point_id = v.symbol_id;
+                                }
+                                if v.name == "Empty" do has_empty = true;
+                            }
+                            if has_point && has_empty do has_shape_body = true;
+                        }
+                    }
+                    case _ {}
+                }
+            }
+
+            case _ {}
+        }
+    }
+
+    for e in first.events {
+        switch e.data {
+            case .Resolved as r {
+                if r.length != 0 {
+                    if Slice.contains(point_ids, r.symbol_id) do resolved_point = true;
+                    if Slice.contains(x_ids, r.symbol_id) do resolved_x = true;
+                    if point_member_x_id != 0 && r.symbol_id == point_member_x_id do resolved_member_x = true;
+                    if shape_variant_point_id != 0 && r.symbol_id == shape_variant_point_id do resolved_shape_point = true;
+                }
+            }
+            case _ {}
+        }
+    }
+
+    println("has_type_void");
+    println(has_type_void);
+    println("void_has_basic");
+    println(void_has_basic);
+    println("i32_has_basic");
+    println(i32_has_basic);
+    println("elem_ids_ok");
+    println(elem_ids_ok);
+    println("array_ids_ok");
+    println(array_ids_ok);
+    println("bodies_ok");
+    println(bodies_ok);
+    println("has_point_body");
+    println(has_point_body);
+    println("has_shape_body");
+    println(has_shape_body);
+    println("point_binding_type_ok");
+    println(found_point_type && point_binding_type_id == point_type_id);
+    println("x_binding_has_type");
+    println(x_binding_has_type);
+    println("resolved_x");
+    println(resolved_x);
+    println("resolved_point");
+    println(resolved_point);
+
+    member_x_kind_ok := false;
+    shape_point_kind_ok := false;
+    for e in first.events {
+        switch e.data {
+            case .Symbol as sym {
+                if point_member_x_id != 0 && sym.id == point_member_x_id && sym.kind == .Member {
+                    member_x_kind_ok = true;
+                }
+                if shape_variant_point_id != 0 && sym.id == shape_variant_point_id && sym.kind == .Member {
+                    shape_point_kind_ok = true;
+                }
+            }
+            case _ {}
+        }
+    }
+
+    println("color_kind_ok");
+    println(color_kind_ok);
+    println("color_values_ok");
+    println(color_values_ok);
+    println("member_x_kind_ok");
+    println(member_x_kind_ok);
+    println("shape_point_kind_ok");
+    println(shape_point_kind_ok);
+    println("resolved_member_x");
+    println(resolved_member_x);
+    println("resolved_shape_point");
+    println(resolved_shape_point);
+
+    b->inject_source("package extra\nextra_y :: 1\n");
+    b->compile();
+    second := b->compilation_events();
+
+    println("delta_compile_ok");
+    println(!b->has_errors());
+
+    delta_has_start := false;
+    delta_has_extra := false;
+    delta_has_foo := false;
+    delta_has_scope := false;
+    delta_has_symbol_x := false;
+
+    for e in second.events {
+        switch e.data {
+            case .Start do delta_has_start = true;
+
+            case .Pack as p {
+                if p.fully_qualified_name == "extra" do delta_has_extra = true;
+                if p.fully_qualified_name == "foo" do delta_has_foo = true;
+            }
+
+            case .Scope do delta_has_scope = true;
+
+            case .Symbol as sym {
+                if sym.name == "x" do delta_has_symbol_x = true;
+            }
+
+            case _ {}
+        }
+    }
+
+    println("delta_has_start");
+    println(delta_has_start);
+    println("delta_has_extra");
+    println(delta_has_extra);
+    println("delta_has_foo");
+    println(delta_has_foo);
+    println("delta_has_scope");
+    println(delta_has_scope);
+    println("delta_has_symbol_x");
+    println(delta_has_symbol_x);
+}

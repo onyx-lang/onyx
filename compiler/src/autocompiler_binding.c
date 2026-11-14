@@ -15,13 +15,13 @@ ONYX_DEF(onyx_version_major, (), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(onyx_run_wasm_with_debug, (WASM_I32,WASM_I32, WASM_I32, WASM_I32, WASM_I32), ()) {
-    onyx_run_wasm_with_debug(ONYX_PTR(P(0, i32)), P(1, i32), P(2, i32), ONYX_PTR(P(3, i32)), ONYX_PTR(P(4, i32)));
+ONYX_DEF(onyx_run_wasm_with_debug, (WASM_I32,WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), ()) {
+    onyx_run_wasm_with_debug(ONYX_PTR(P(0, i32)), P(1, i32), P(2, i32), ONYX_PTR(P(3, i32)), ONYX_PTR(P(4, i32)), P(5, i32));
     return NULL;
 }
 
-ONYX_DEF(onyx_run_wasm, (WASM_I32,WASM_I32, WASM_I32, WASM_I32), ()) {
-    onyx_run_wasm(ONYX_PTR(P(0, i32)), P(1, i32), P(2, i32), ONYX_PTR(P(3, i32)));
+ONYX_DEF(onyx_run_wasm, (WASM_I32,WASM_I32, WASM_I32, WASM_I32, WASM_I32), ()) {
+    onyx_run_wasm(ONYX_PTR(P(0, i32)), P(1, i32), P(2, i32), ONYX_PTR(P(3, i32)), P(4, i32));
     return NULL;
 }
 
@@ -42,6 +42,16 @@ ONYX_DEF(onyx_output_write, (WASM_I64, WASM_I32, WASM_I32), ()) {
 
 ONYX_DEF(onyx_output_length, (WASM_I64, WASM_I32), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(onyx_output_length((onyx_context_t *) P(0, i64), P(1, i32)));
+    return NULL;
+}
+
+ONYX_DEF(onyx_compilation_events_length, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(onyx_compilation_events_length((onyx_context_t *) P(0, i64)));
+    return NULL;
+}
+
+ONYX_DEF(onyx_compilation_events_write, (WASM_I64, WASM_I32), ()) {
+    onyx_compilation_events_write((onyx_context_t *) P(0, i64), ONYX_PTR(P(1, i32)));
     return NULL;
 }
 
@@ -87,6 +97,16 @@ ONYX_DEF(onyx_error_count, (WASM_I64), (WASM_I32)) {
 
 ONYX_DEF(onyx_inject_code, (WASM_I64, WASM_I32,WASM_I32), ()) {
     onyx_inject_code((onyx_context_t *) P(0, i64), ONYX_PTR(P(1, i32)), P(2, i32));
+    return NULL;
+}
+
+ONYX_DEF(onyx_inject_code_as, (WASM_I64, WASM_I32,WASM_I32, WASM_I32,WASM_I32), ()) {
+    onyx_inject_code_as((onyx_context_t *) P(0, i64), ONYX_PTR(P(1, i32)), P(2, i32), ONYX_PTR(P(3, i32)), P(4, i32));
+    return NULL;
+}
+
+ONYX_DEF(onyx_overlay_file, (WASM_I64, WASM_I32,WASM_I32, WASM_I32,WASM_I32), ()) {
+    onyx_overlay_file((onyx_context_t *) P(0, i64), ONYX_PTR(P(1, i32)), P(2, i32), ONYX_PTR(P(3, i32)), P(4, i32));
     return NULL;
 }
 
@@ -190,6 +210,8 @@ ONYX_LIBRARY {
     ONYX_FUNC(onyx_stat)
     ONYX_FUNC(onyx_output_write)
     ONYX_FUNC(onyx_output_length)
+    ONYX_FUNC(onyx_compilation_events_length)
+    ONYX_FUNC(onyx_compilation_events_write)
     ONYX_FUNC(onyx_error_rank)
     ONYX_FUNC(onyx_error_line_text)
     ONYX_FUNC(onyx_error_length)
@@ -199,6 +221,8 @@ ONYX_LIBRARY {
     ONYX_FUNC(onyx_error_message)
     ONYX_FUNC(onyx_error_count)
     ONYX_FUNC(onyx_inject_code)
+    ONYX_FUNC(onyx_inject_code_as)
+    ONYX_FUNC(onyx_overlay_file)
     ONYX_FUNC(onyx_add_mapped_dir)
     ONYX_FUNC(onyx_include_file)
     ONYX_FUNC(onyx_add_defined_var)

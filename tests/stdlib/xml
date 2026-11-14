@@ -1,66 +1,54 @@
-Child: Element { 
-    name = "Datapoint", 
-    parent = 0, 
-    attributes = [
-    ], 
-    children = [
-        Element(2), 
-        Element(3)
-    ]
-}
+Child: Datapoint
 Name (value): 'Name 1' (123.45)
-Child: Element { 
-    name = "Datapoint", 
-    parent = 0, 
-    attributes = [
-    ], 
-    children = [
-        Element(5), 
-        Element(6)
-    ]
-}
+Child: Datapoint
 Name (value): 'Name 2' (123.45)
-Child: Element { 
-    name = "Datapoint", 
-    parent = 0, 
-    attributes = [
-    ], 
-    children = [
-        Element(8), 
-        Element(9)
-    ]
-}
+Child: Datapoint
 Name (value): 'Name 3' (123.45)
-Child: Element { 
-    name = "Datapoint", 
-    parent = 0, 
-    attributes = [
-    ], 
-    children = [
-        Element(11), 
-        Element(12)
-    ]
-}
+Child: Datapoint
 Name (value): 'Name 4' (123.45)
-Child: Element { 
-    name = "Datapoint", 
-    parent = 0, 
-    attributes = [
-    ], 
-    children = [
-        Element(14), 
-        Element(15)
-    ]
-}
+Child: Datapoint
 Name (value): 'Name 5' (123.45)
-Child: Element { 
-    name = "Datapoint", 
-    parent = 0, 
-    attributes = [
-    ], 
-    children = [
-        Element(17), 
-        Element(18)
-    ]
-}
+Child: Datapoint
 Name (value): 'Name 6' (123.45)
+madeitup
+true
+6
+Name 1
+1
+hi & bye
+
+<root a="1"><x>hi &amp; bye</x><empty/></root>
+<root a="1">
+  <x>hi &amp; bye</x>
+  <empty/>
+</root>
+"q"
+a<b c
+<e k="&quot;q&quot;">a&lt;b c</e>
+65533 3
+6
+Name 2
+madeitup
+true
+2
+3
+3
+3
+a
+http://example.com
+h
+td
+http://www.w3.org/TR/html4/
+http://example.com
+x
+note
+note.dtd
+<!ELEMENT note (#PCDATA)>
+<!DOCTYPE note SYSTEM "note.dtd" [<!ELEMENT note (#PCDATA)>]><note>hi</note>
+café
+oui
+7 Ada 2 36
+0
+<person id="7"><full-name>Ada</full-name><aliases>A</aliases><aliases>B</aliases><age>36</age></person>
+x
+<item xmlns="http://example.com"><n>x</n></item>

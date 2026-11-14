@@ -1,5 +1,9 @@
 
+#ifndef ONYX_RUNTIME_NO_BH
 #define BH_DEFINE
+#else
+#define ONYX_LIBRARY_RUNTIME_EXTERN
+#endif
 #include "bh.h"
 
 #define ONYX_LIBRARY_NAME onyx_runtime
@@ -11,6 +15,9 @@
     #include <signal.h>
     #include <sys/wait.h>
     #include <sys/types.h>
+    #include <sys/stat.h>
+    #include <fcntl.h>
+    #include <errno.h>
     #include <dlfcn.h>
     #include <dirent.h>
     #include <arpa/inet.h>
@@ -58,6 +65,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(__file_close)
     ONYX_FUNC(__file_exists)
     ONYX_FUNC(__file_stat)
+    ONYX_FUNC(__file_lstat)
     ONYX_FUNC(__file_remove)
     ONYX_FUNC(__file_seek)
     ONYX_FUNC(__file_tell)
@@ -67,6 +75,10 @@ ONYX_LIBRARY {
     ONYX_FUNC(__file_size)
     ONYX_FUNC(__file_get_standard)
     ONYX_FUNC(__file_rename)
+    ONYX_FUNC(__file_symlink)
+    ONYX_FUNC(__file_link)
+    ONYX_FUNC(__file_readlink)
+    ONYX_FUNC(__file_truncate)
     ONYX_FUNC(__poll)
 
     ONYX_FUNC(__dir_open)
@@ -79,9 +91,11 @@ ONYX_LIBRARY {
 
     ONYX_FUNC(__spawn_thread)
     ONYX_FUNC(__kill_thread)
+    ONYX_FUNC(__join_thread)
 
     ONYX_FUNC(__process_spawn)
     ONYX_FUNC(__process_read)
+    ONYX_FUNC(__process_read_stderr)
     ONYX_FUNC(__process_write)
     ONYX_FUNC(__process_kill)
     ONYX_FUNC(__process_wait)
@@ -89,16 +103,28 @@ ONYX_LIBRARY {
 
     ONYX_FUNC(__args_get)
     ONYX_FUNC(__args_sizes_get)
+    ONYX_FUNC(__environ_get)
+    ONYX_FUNC(__environ_sizes_get)
+    ONYX_FUNC(__set_env)
+    ONYX_FUNC(__unset_env)
 
     ONYX_FUNC(__exit)
     ONYX_FUNC(__sleep)
     ONYX_FUNC(__time)
+    ONYX_FUNC(__monotonic)
     ONYX_FUNC(__lookup_env)
     ONYX_FUNC(__random_get)
     ONYX_FUNC(__futex_wait)
     ONYX_FUNC(__futex_wake)
     ONYX_FUNC(__tty_get)
     ONYX_FUNC(__tty_set)
+    ONYX_FUNC(__tty_enter_raw)
+    ONYX_FUNC(__tty_leave_raw)
+    ONYX_FUNC(__tty_raise_tstp)
+    ONYX_FUNC(__tty_winch_install)
+    ONYX_FUNC(__tty_winch_remove)
+    ONYX_FUNC(__tty_wake)
+    ONYX_FUNC(__tty_wait)
     ONYX_FUNC(__register_cleanup)
 
     ONYX_FUNC(__net_create_socket)

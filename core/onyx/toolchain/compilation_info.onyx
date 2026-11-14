@@ -1,0 +1,956 @@
+package onyx.toolchain
+#allow_stale_code
+
+#load "./compiler_events.proto.onyx"
+
+use core {*}
+use core.encoding.protobuf
+use protobuf.onyx.toolchain.events {*}
+
+/// Indexed view of a compilation-event stream.
+///
+/// Event payloads are copied by value. `str` fields from `ingest_protobuf`
+/// alias retained protobuf blobs (`payloads`), including tag strings and
+/// raw tag bytes. `update` of already-decoded events still points at
+/// whatever allocated those events' strings.
+///
+/// Fold later deltas with `update` (or `Builder.update_compilation_info`)
+/// instead of building a new index. Each `Builder.compilation_events` read
+/// and each extension CompilationEvents message is already a delta.
+CompilationInfo :: struct {
+    allocator: Allocator
+    compiler_version: str
+    events_applied:   u32
+
+    /// Owned protobuf blobs that `str` fields may alias.
+    payloads: [..] [] u8
+
+    files:    [..] EventFile
+    packages: [..] EventPackage
+    scopes:   [..] ScopeInfo
+    symbols:  [..] SymbolInfo
+    types:    [..] TypeInfo
+
+    files_by_path:    Map(str, u32)
+    packages_by_name: Map(str, u32)
+    symbols_by_name:  Map(str, [..] u32)
+    types_by_name:    Map(str, [..] u32)
+
+    symbols_by_file: [..] [..] u32
+    symbols_by_type: [..] [..] u32
+    resolutions_by_file: [..] [..] u32
+
+    resolutions: [..] EventSymbolResolved
+    tags: [..] TagInfo
+}
+
+ScopeInfo :: struct {
+    use ev: EventScope
+    symbol_ids: [..] u32
+}
+
+SymbolInfo :: struct {
+    use decl: EventSymbol
+    documentation: str
+    type_id: u32
+    param_symbol_ids: [..] u32
+    use_sites: [..] EventSymbolResolved
+    /// Options of this `#match` group, in search order.
+    overload_ids: [..] u32
+    /// Group this option belongs to, when it was listed by EventOverload.
+    overload_group_id: u32
+    /// Solidified instances of this polymorphic procedure.
+    poly_instance_ids: [..] u32
+    /// Template this instance was generated from.
+    poly_template_id: u32
+    poly_solution_names: [..] str
+    poly_solution_type_ids: [..] u32
+    /// `#tag` values, in source order.
+    tags: [..] TagValue
+}
+
+TypeInfo :: struct {
+    use decl: EventType
+    use type_body: EventTypeBody
+    has_body: bool
+    /// `#tag` values, in source order.
+    tags: [..] TagValue
+}
+
+TagInfo :: struct {
+    target: typeof EventTag.{}.target
+}
+
+CompilationInfo.make :: (allocator := context.allocator) -> (res: CompilationInfo) {
+    res.allocator = allocator
+    res.payloads = make(typeof res.payloads, allocator=allocator)
+
+    res.files    = make(typeof res.files,    allocator=allocator)
+    res.packages = make(typeof res.packages, allocator=allocator)
+    res.scopes   = make(typeof res.scopes,   allocator=allocator)
+    res.symbols  = make(typeof res.symbols,  allocator=allocator)
+    res.types    = make(typeof res.types,    allocator=allocator)
+
+    res.files_by_path    = make(typeof res.files_by_path,    allocator=allocator)
+    res.packages_by_name = make(typeof res.packages_by_name, allocator=allocator)
+    res.symbols_by_name  = make(typeof res.symbols_by_name,  allocator=allocator)
+    res.types_by_name    = make(typeof res.types_by_name,    allocator=allocator)
+
+    res.symbols_by_file = make(typeof res.symbols_by_file, allocator=allocator)
+    res.symbols_by_type = make(typeof res.symbols_by_type, allocator=allocator)
+    res.resolutions     = make(typeof res.resolutions,     allocator=allocator)
+    res.resolutions_by_file = make(typeof res.resolutions_by_file, allocator=allocator)
+    res.tags = make(typeof res.tags, allocator=allocator)
+    return
+}
+
+CompilationInfo.from :: (data: CompilerEvents, allocator := context.allocator) -> CompilationInfo {
+    info := CompilationInfo.make(allocator)
+    info->update(data.events)
+    return info
+}
+
+/// Apply a batch of events in place. Pass only *new* events (a Builder
+/// unread dump, or one extension CompilationEvents payload). Replaying an
+/// already-applied batch will duplicate resolutions and name index entries.
+CompilationInfo.update :: (self: &#Self, events: [] CompilerEvent) -> u32 {
+    for& e in events {
+        self->ingest_event(e)
+        self.events_applied += 1
+    }
+    return cast(u32) events.count
+}
+
+CompilationInfo.ingest :: CompilationInfo.update
+
+/// Decode a CompilerEvents protobuf blob without allocating the outer event array.
+/// String fields alias a retained copy of `bytes` (or `bytes` itself when
+/// `copy_payload` is false; then this index owns `bytes`).
+CompilationInfo.ingest_protobuf :: (self: &#Self, bytes: [] u8, copy_payload := true) -> Result(void, protobuf.Unmarshal_Error) {
+    if bytes.count == 0 {
+        return .{ Ok = .{} }
+    }
+
+    payload := bytes
+    if copy_payload {
+        payload = str.copy(bytes, self.allocator)
+    }
+    self.payloads->push(payload)
+
+    protobuf.unmarshal_each(payload, 1, CompilerEvent, [ev] {
+        self->ingest_event(ev)
+        self.events_applied += 1
+    })
+    return .{ Ok = .{} }
+}
+
+CompilationInfo.ingest_event :: (self: &#Self, event: &CompilerEvent) {
+    switch event.data {
+        case .Start as s do self.compiler_version = s.compiler_version
+
+        case .File as f {
+            slot := ensure_id(&self.files, f.id)
+            if slot.id == 0 {
+                *slot = f
+                slot.path = str.copy(f.path, self.allocator)
+                index_unique(&self.files_by_path, slot.path, f.id)
+            }
+        }
+
+        case .Pack as p {
+            slot := ensure_id(&self.packages, p.id)
+            if slot.id == 0 {
+                *slot = p
+                index_unique(&self.packages_by_name, p.fully_qualified_name, p.id)
+            }
+        }
+
+        case .Scope as s {
+            slot := ensure_id(&self.scopes, s.id)
+            if slot.id == 0 {
+                slot.ev = s
+            } else {
+                if s.end_line != 0 {
+                    slot.ev.end_line = s.end_line
+                    slot.ev.end_column = s.end_column
+                }
+                if s.line != 0 && slot.ev.line == 0 {
+                    slot.ev.line = s.line
+                    slot.ev.column = s.column
+                    slot.ev.file_id = s.file_id
+                    slot.ev.parent_scope_id = s.parent_scope_id
+                }
+                if s.name.count > 0 && slot.ev.name.count == 0 {
+                    slot.ev.name = s.name
+                }
+            }
+        }
+
+        case .Symbol as sym {
+            slot := ensure_id(&self.symbols, sym.id)
+            if slot.id == 0 {
+                slot.decl = sym
+                index_list(&self.symbols_by_name, sym.name, sym.id)
+
+                if sym.scope_id != 0 {
+                    sc := ensure_id(&self.scopes, sym.scope_id)
+                    sc.symbol_ids->push(sym.id)
+                }
+
+                if sym.file_id != 0 {
+                    ensure_id_list(&self.symbols_by_file, sym.file_id)->push(sym.id)
+                }
+            }
+        }
+
+        case .Resolved as r {
+            self.resolutions->push(r)
+            if r.file_id != 0 {
+                ensure_id_list(&self.resolutions_by_file, r.file_id)->push(~~(self.resolutions.count - 1))
+            }
+            ensure_id(&self.symbols, r.symbol_id).use_sites->push(r)
+            if r.chosen_symbol_id != 0 && r.chosen_symbol_id != r.symbol_id {
+                ensure_id(&self.symbols, r.chosen_symbol_id).use_sites->push(r)
+            }
+        }
+
+        case .Overload as o {
+            slot := ensure_id(&self.symbols, o.group_symbol_id)
+            slot.overload_ids = o.option_symbol_ids
+            for id in o.option_symbol_ids {
+                if id == 0 do continue
+                opt := ensure_id(&self.symbols, id)
+                opt.overload_group_id = o.group_symbol_id
+            }
+        }
+
+        case .Poly_Proc as p {
+            tmpl := ensure_id(&self.symbols, p.template_symbol_id)
+            inst := ensure_id(&self.symbols, p.instance_symbol_id)
+            inst.poly_template_id = p.template_symbol_id
+            inst.poly_solution_names = p.solution_names
+            inst.poly_solution_type_ids = p.solution_type_ids
+            seen := false
+            for id in tmpl.poly_instance_ids {
+                if id == p.instance_symbol_id {
+                    seen = true
+                    break
+                }
+            }
+            if !seen do tmpl.poly_instance_ids->push(p.instance_symbol_id)
+        }
+
+        case .Binding as b {
+            slot := ensure_id(&self.symbols, b.symbol_id)
+            if b.documentation.count > 0 do slot.documentation = b.documentation
+            if b.type_id != 0 {
+                prev := slot.type_id
+                slot.type_id = b.type_id
+                if prev != b.type_id {
+                    ensure_id_list(&self.symbols_by_type, b.type_id)->push(b.symbol_id)
+                }
+            }
+            if b.param_symbol_ids.count > 0 {
+                slot.param_symbol_ids = b.param_symbol_ids
+            }
+        }
+
+        case .Type as t {
+            slot := ensure_id(&self.types, t.id)
+            first := slot.id == 0
+            old_name := slot.name
+            slot.decl = t
+            if first {
+                index_list(&self.types_by_name, t.name, t.id)
+            } elseif t.name.count > 0 && t.name != old_name {
+                // A later EventType can fill in Map(str, u32) after the
+                // first emit, which often has an empty / anonymous name.
+                index_list(&self.types_by_name, t.name, t.id)
+            }
+        }
+
+        case .Type_Body as tb {
+            slot := ensure_id(&self.types, tb.type_id)
+            if slot.id == 0 do slot.id = tb.type_id
+            slot.type_body = tb
+            slot.has_body = true
+        }
+
+        case .Tag as tag {
+            self.tags->push(.{tag.target})
+
+            switch tag.target {
+                case .Symbol as sid {
+                    if sid != 0 {
+                        ensure_id(&self.symbols, sid).tags->push(tag.value)
+                    }
+                }
+                case .Type as tid {
+                    if tid != 0 {
+                        ensure_id(&self.types, tid).tags->push(tag.value)
+                    }
+                }
+                case .None {}
+            }
+        }
+
+        case .None {}
+    }
+}
+
+CompilationInfo.get_file :: (self: &#Self, id: u32) -> ? &EventFile {
+    return by_id(&self.files, id)
+}
+
+CompilationInfo.get_package :: (self: &#Self, id: u32) -> ? &EventPackage {
+    return by_id(&self.packages, id)
+}
+
+CompilationInfo.get_scope :: (self: &#Self, id: u32) -> ? &ScopeInfo {
+    return by_id(&self.scopes, id)
+}
+
+CompilationInfo.get_symbol :: (self: &#Self, id: u32) -> ? &SymbolInfo {
+    return by_id(&self.symbols, id)
+}
+
+CompilationInfo.get_type :: (self: &#Self, id: u32) -> ? &TypeInfo {
+    return by_id(&self.types, id)
+}
+
+CompilationInfo.file_with_path :: (self: &#Self, path: str) -> ? &EventFile {
+    switch self.files_by_path->get(path) {
+        case .Some as id do return self->get_file(id)
+        case .None do return .None
+    }
+}
+
+CompilationInfo.package_named :: (self: &#Self, fully_qualified_name: str) -> ? &EventPackage {
+    switch self.packages_by_name->get(fully_qualified_name) {
+        case .Some as id do return self->get_package(id)
+        case .None do return .None
+    }
+}
+
+CompilationInfo.symbols_named :: (self: &#Self, name: str) -> [] u32 {
+    ptr := self.symbols_by_name->get_ptr(name)
+    if ptr == null do return .{}
+    return *ptr
+}
+
+CompilationInfo.types_named :: (self: &#Self, name: str) -> [] u32 {
+    ptr := self.types_by_name->get_ptr(name)
+    if ptr == null do return .{}
+    return *ptr
+}
+
+CompilationInfo.symbols_in_file :: (self: &#Self, file_id: u32) -> [] u32 {
+    i := cast(i32) file_id
+    if file_id == 0 || i >= self.symbols_by_file.count do return .{}
+    return self.symbols_by_file[i]
+}
+
+/// Symbols whose binding has this `type_id` (aliases and uses included).
+CompilationInfo.symbols_with_type :: (self: &#Self, type_id: u32) -> [] u32 {
+    i := cast(i32) type_id
+    if type_id == 0 || i >= self.symbols_by_type.count do return .{}
+    return self.symbols_by_type[i]
+}
+
+/// Declaring binding for a type: prefers a symbol whose kind matches the
+/// type (Struct/Union/Enum/Distinct). Falls back to the first bound symbol,
+/// which covers anonymous `foo: struct { ... }` bindings.
+CompilationInfo.binding_of :: (self: &#Self, type_id: u32) -> ? &SymbolInfo {
+    preferred: SymbolKind = .Unknown
+    if self->get_type(type_id) as t do preferred = declaring_symbol_kind(t.kind);
+
+    fallback: &SymbolInfo = null
+    for sid in self->symbols_with_type(type_id) {
+        if self->get_symbol(sid) as sym {
+            if fallback == null do fallback = sym
+            if preferred != .Unknown && sym.kind == preferred do return sym
+        }
+    }
+    if fallback != null do return fallback
+    return .None
+}
+
+CompilationInfo.symbols_in_scope :: (self: &#Self, scope_id: u32) -> [] u32 {
+    switch self->get_scope(scope_id) {
+        case .Some as sc do return sc.symbol_ids
+        case .None do return .{}
+    }
+}
+
+scope_contains_pos :: (sc: &EventScope, line: u32, column: u32) -> bool {
+    if sc.line > line do return false
+    if sc.line == line && sc.column > column do return false
+    if sc.end_line != 0 {
+        if line > sc.end_line do return false
+        if line == sc.end_line && column > sc.end_column do return false
+    }
+    return true
+}
+
+/// Innermost scope that still contains this file position.
+/// Scopes with `end_line` set are treated as closed after that point, so a
+/// nested `#if` / lambda body does not steal lookup after it has ended.
+CompilationInfo.scope_at :: (self: &#Self, file_id: u32, line: u32, column: u32) -> u32 {
+    best_id: u32 = 0
+    best_line: u32 = 0
+    best_col: u32 = 0
+
+    i := 0
+    while i < self.scopes.count {
+        sc := &self.scopes[i]
+        i += 1
+        if sc.id == 0 do continue
+        if sc.file_id != file_id do continue
+        if !scope_contains_pos(sc, line, column) do continue
+        if sc.line > best_line || (sc.line == best_line && sc.column >= best_col) {
+            best_line = sc.line
+            best_col = sc.column
+            best_id = sc.id
+        }
+    }
+    return best_id
+}
+
+/// Walk `scope_id` and its parents looking for a declared name.
+CompilationInfo.lookup :: (self: &#Self, scope_id: u32, name: str) -> ? &SymbolInfo {
+    id := scope_id
+    hops := 0
+    while id != 0 && hops < 256 {
+        hops += 1
+        switch self->get_scope(id) {
+            case .Some as sc {
+                for sid in sc.symbol_ids {
+                    if self->get_symbol(sid) as sym {
+                        if sym.name == name do return sym
+                    }
+                }
+                if sc.parent_scope_id == id do return .None
+                id = sc.parent_scope_id
+            }
+            case .None do return .None
+        }
+    }
+    return .None
+}
+
+/// Name in this scope only; does not walk parents.
+CompilationInfo.lookup_in_scope :: (self: &#Self, scope_id: u32, name: str) -> ? &SymbolInfo {
+    switch self->get_scope(scope_id) {
+        case .Some as sc {
+            for sid in sc.symbol_ids {
+                if self->get_symbol(sid) as sym {
+                    if sym.name == name do return sym
+                }
+            }
+        }
+        case .None {}
+    }
+    return .None
+}
+
+/// Package recorded on this symbol. A package symbol names that package.
+/// Any other symbol records the package that owns the scope it was introduced into.
+CompilationInfo.package_of :: (self: &#Self, sym: &SymbolInfo) -> ? &EventPackage {
+    if sym.package_id == 0 do return .None
+    return self->get_package(sym.package_id)
+}
+
+CompilationInfo.child_package_named :: (self: &#Self, parent_id: u32, name: str) -> ? &EventPackage {
+    if parent_id == 0 || name.count == 0 do return .None
+    i := 0
+    while i < self.packages.count {
+        p := &self.packages[i]
+        i += 1
+        if p.id == 0 do continue
+        if p.parent_package_id != parent_id do continue
+        if p.package_name == name do return p
+    }
+    return .None
+}
+
+/// Peel pointers and distinct wrappers for member lookup.
+CompilationInfo.unwrap_access_type :: (self: &#Self, t: &TypeInfo) -> &TypeInfo {
+    cur := t
+    n := 0
+    while n < 8 {
+        n += 1
+        peeled := false
+        switch cur.kind {
+            case .Pointer, .Multi_Pointer, .Distinct {
+                if self->elem(cur.id) as nxt {
+                    cur = nxt
+                    peeled = true
+                }
+            }
+            case _ {}
+        }
+        if !peeled do break
+    }
+    return cur
+}
+
+/// Receiver after walking a dotted identifier chain (`alloc.arena`, `p.x`).
+/// `Type` is a type name (methods and enum values). `Value` is a value (fields and methods).
+ResolvedPath :: union {
+    None: void
+    Pkg: &EventPackage
+    Type: &TypeInfo
+    Value: &TypeInfo
+}
+
+CompilationInfo.is_type_name :: (self: &#Self, sym: &SymbolInfo) -> bool {
+    switch sym.kind {
+        case .Struct, .Union, .Enum, .Distinct, .Interface do return true
+        case _ {}
+    }
+    if self->type_of(sym.id) as t {
+        if self->binding_of(t.id) as b {
+            if b.id == sym.id do return true
+        }
+    }
+    return false
+}
+
+CompilationInfo.peel_path_symbol :: (self: &#Self, sym: &SymbolInfo) -> ResolvedPath {
+    // package_id is set on every symbol that lives in a package. Only a
+    // package symbol is a step in a package path.
+    if sym.kind == .Package {
+        if self->package_of(sym) as pkg do return .{ Pkg = pkg }
+        return .None
+    }
+    if self->type_of(sym.id) as t {
+        if self->is_type_name(sym) do return .{ Type = t }
+        return .{ Value = t }
+    }
+    return .None
+}
+
+/// Walk `parts` starting at `scope_id`. The first name uses parent walk;
+/// later names stay inside the current package or type.
+CompilationInfo.resolve_path :: (self: &#Self, scope_id: u32, parts: [] str) -> ResolvedPath {
+    if parts.count == 0 do return .None
+
+    switch self->lookup(scope_id, parts[0]) {
+        case .None do return .None
+        case .Some as first {
+            receiver := self->peel_path_symbol(first)
+
+            n := 1
+            while n < parts.count {
+                part := parts[n]
+                n += 1
+
+                next: ResolvedPath = .None
+                switch receiver {
+                    case .Pkg as pkg {
+                        if self->lookup_in_scope(pkg.scope_id, part) as sym {
+                            next = self->peel_path_symbol(sym)
+                        }
+                        if next.None {
+                            if self->child_package_named(pkg.id, part) as child {
+                                next = .{ Pkg = child }
+                            }
+                        }
+                    }
+                    case .Type as t {
+                        u := self->unwrap_access_type(t)
+                        if u.scope_id != 0 {
+                            if self->lookup_in_scope(u.scope_id, part) as sym {
+                                next = self->peel_path_symbol(sym)
+                            }
+                        }
+                    }
+                    case .Value as t {
+                        u := self->unwrap_access_type(t)
+
+                        if self->member(u.id, part) as m {
+                            if m.type_id != 0 {
+                                if self->get_type(m.type_id) as mt {
+                                    next = .{ Value = mt }
+                                }
+                            }
+                            if next.None && m.symbol_id != 0 {
+                                if self->type_of(m.symbol_id) as mt {
+                                    next = .{ Value = mt }
+                                }
+                            }
+                        }
+
+                        if next.None && u.scope_id != 0 {
+                            if self->lookup_in_scope(u.scope_id, part) as sym {
+                                next = self->peel_path_symbol(sym)
+                            }
+                        }
+
+                        if next.None {
+                            if self->variant(u.id, part) as v {
+                                if v.type_id != 0 {
+                                    if self->get_type(v.type_id) as vt {
+                                        next = .{ Value = vt }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    case .None do return .None
+                }
+
+                if next.None do return .None
+                receiver = next
+            }
+
+            return receiver
+        }
+    }
+}
+
+/// First parameter type of a procedure, from its function type or param symbols.
+CompilationInfo.first_param_type :: (self: &#Self, symbol_id: u32) -> ? &TypeInfo {
+    if self->type_of(symbol_id) as t {
+        switch t.body {
+            case .Function as f {
+                if f.param_ids.count > 0 do return self->get_type(f.param_ids[0])
+            }
+            case _ {}
+        }
+    }
+    if self->get_symbol(symbol_id) as sym {
+        if sym.param_symbol_ids.count > 0 {
+            return self->type_of(sym.param_symbol_ids[0])
+        }
+    }
+    return .None
+}
+
+/// True when `symbol_id` is a struct/union-bound method of `type_id`:
+/// first parameter is `T` or `&T`. `#match` groups with no visible
+/// first parameter stay methods; other untyped symbols do not.
+CompilationInfo.is_method_of :: (self: &#Self, symbol_id: u32, type_id: u32) -> bool {
+    if type_id == 0 do return false
+
+    switch self->first_param_type(symbol_id) {
+        case .Some as p {
+            if p.id == type_id do return true
+            if p.kind == .Pointer {
+                switch p.body {
+                    case .Elem as e do return e.elem_id == type_id
+                    case _ {}
+                }
+            }
+            return false
+        }
+        case .None {
+            if self->get_symbol(symbol_id) as sym {
+                if sym.kind == .Overloaded_Function {
+                    for id in self->overloads_of(symbol_id) {
+                        if id == symbol_id do continue
+                        if self->is_method_of(id, type_id) do return true
+                    }
+                    return true
+                }
+            }
+            return false
+        }
+    }
+}
+
+/// Parameter symbols of a procedure. `use pkg { * }` copies a name into
+/// the using scope with the type binding but not the param list; fall
+/// back to another same-name, same-kind symbol that has params.
+CompilationInfo.param_symbols_of :: (self: &#Self, symbol_id: u32) -> [] u32 {
+    switch self->get_symbol(symbol_id) {
+        case .Some as sym {
+            if sym.param_symbol_ids.count > 0 do return sym.param_symbol_ids
+            for id in self->symbols_named(sym.name) {
+                if id == symbol_id do continue
+                if self->get_symbol(id) as other {
+                    if other.kind == sym.kind && other.param_symbol_ids.count > 0 {
+                        return other.param_symbol_ids
+                    }
+                }
+            }
+            return .{}
+        }
+        case .None do return .{}
+    }
+}
+
+CompilationInfo.type_of :: (self: &#Self, symbol_id: u32) -> ? &TypeInfo {
+    switch self->get_symbol(symbol_id) {
+        case .Some as sym {
+            if self->get_type(sym.type_id) as t do return t
+
+            // `use pkg { * }` copies a name into the using scope. The
+            // declaring symbol still has the type binding. Parameters
+            // share short names (`r`, `x`, `value`) across the program;
+            // do not steal another parameter's type.
+            if sym.kind == .Parameter do return .None
+
+            for id in self->symbols_named(sym.name) {
+                if id == symbol_id do continue
+                if self->get_symbol(id) as other {
+                    if other.kind == sym.kind && other.type_id != 0 {
+                        return self->get_type(other.type_id)
+                    }
+                }
+            }
+            return .None
+        }
+        case .None do return .None
+    }
+}
+
+CompilationInfo.member :: (self: &#Self, type_id: u32, name: str) -> ? &TypeStructMember {
+    if self->get_type(type_id) as t {
+        switch t.details {
+            case .Struct as &sb {
+                for& m in sb.members {
+                    if m.name == name do return m
+                }
+            }
+            case _ {}
+        }
+    }
+    return .None
+}
+
+CompilationInfo.lookup_member :: (self: &#Self, type_id: u32, name: str) -> ? &SymbolInfo {
+    switch self->member(type_id, name) {
+        case .Some as m do return self->get_symbol(m.symbol_id)
+        case .None do return .None
+    }
+}
+
+CompilationInfo.variant :: (self: &#Self, type_id: u32, name: str) -> ? &TypeUnionVariant {
+    if self->get_type(type_id) as t {
+        switch t.details {
+            case .Union as &ub {
+                for& v in ub.variants {
+                    if v.name == name do return v
+                }
+            }
+            case _ {}
+        }
+    }
+    return .None
+}
+
+/// Template this instance was built from (`Map` for `Map(str, u32)`).
+CompilationInfo.constructed_from :: (self: &#Self, type_id: u32) -> ? &TypeInfo {
+    switch self->get_type(type_id) {
+        case .Some as t {
+            if t.constructed_from_id == 0 do return .None
+            return self->get_type(t.constructed_from_id)
+        }
+        case .None do return .None
+    }
+}
+
+/// Solved poly argument of this instance (`"Value_Type"` → `u32` on `Map(str, u32)`).
+CompilationInfo.poly_arg :: (self: &#Self, type_id: u32, name: str) -> ? &TypeInfo {
+    switch self->get_type(type_id) {
+        case .Some as t {
+            for n, i in t.poly_arg_names {
+                if n != name do continue
+                if i >= t.poly_arg_type_ids.count do return .None
+                return self->get_type(t.poly_arg_type_ids[i])
+            }
+            return .None
+        }
+        case .None do return .None
+    }
+}
+
+/// Element type of a pointer, multi-pointer, slice, dyn-array, varargs, or array;
+/// base type of a distinct type.
+CompilationInfo.elem :: (self: &#Self, type_id: u32) -> ? &TypeInfo {
+    switch self->get_type(type_id) {
+        case .Some as t {
+            switch t.body {
+                case .Elem as e do return self->get_type(e.elem_id)
+                case .Array as a do return self->get_type(a.elem_id)
+                case .Distinct as d do return self->get_type(d.base_id)
+                case _ do return .None
+            }
+        }
+        case .None do return .None
+    }
+}
+
+/// Symbol referenced at this source position. If several spans overlap,
+/// the shortest one is returned.
+CompilationInfo.resolve_at :: (self: &#Self, file_id: u32, line: u32, column: u32) -> ? &EventSymbolResolved {
+    best: &EventSymbolResolved = null
+    best_len: u32 = 0xffffffff
+
+    if file_id == 0 || file_id >= self.resolutions_by_file.count {
+        return .None
+    }
+
+    for rid in self.resolutions_by_file[file_id] {
+        r := &self.resolutions[rid]
+        if r.line != line do continue
+        if column < r.column do continue
+        if r.length != 0 && column >= r.column + r.length do continue
+        if r.length == 0 && column != r.column do continue
+        if r.length < best_len {
+            best_len = r.length
+            best = r
+        } elseif r.length == best_len {
+            if r.chosen_symbol_id != 0 do best = r
+        }
+    }
+
+    if best == null do return .None
+    return best
+}
+
+/// Options of a `#match` group. If `symbol_id` is itself an option,
+/// returns the sibling list from its group.
+CompilationInfo.overloads_of :: (self: &#Self, symbol_id: u32) -> [] u32 {
+    switch self->get_symbol(symbol_id) {
+        case .Some as sym {
+            if sym.overload_ids.count > 0 do return sym.overload_ids
+            if sym.overload_group_id != 0 {
+                if self->get_symbol(sym.overload_group_id) as group {
+                    if group.overload_ids.count > 0 do return group.overload_ids
+                }
+            }
+            return .{}
+        }
+        case .None do return .{}
+    }
+}
+
+/// Solidified instances of a polymorphic procedure. If `symbol_id` is
+/// itself an instance, returns the sibling list from its template.
+CompilationInfo.poly_instances_of :: (self: &#Self, symbol_id: u32) -> [] u32 {
+    switch self->get_symbol(symbol_id) {
+        case .Some as sym {
+            if sym.poly_instance_ids.count > 0 do return sym.poly_instance_ids
+            if sym.poly_template_id != 0 {
+                if self->get_symbol(sym.poly_template_id) as tmpl {
+                    if tmpl.poly_instance_ids.count > 0 do return tmpl.poly_instance_ids
+                }
+            }
+            return .{}
+        }
+        case .None do return .{}
+    }
+}
+
+/// Name binding at this span, preferring the overload the compiler chose.
+CompilationInfo.symbol_at_resolution :: (self: &#Self, r: &EventSymbolResolved) -> ? &SymbolInfo {
+    if r.chosen_symbol_id != 0 {
+        if self->get_symbol(r.chosen_symbol_id) as chosen do return chosen
+    }
+    return self->get_symbol(r.symbol_id)
+}
+
+CompilationInfo.references :: (self: &#Self, symbol_id: u32) -> [] EventSymbolResolved {
+    switch self->get_symbol(symbol_id) {
+        case .Some as sym do return sym.use_sites
+        case .None do return .{}
+    }
+}
+
+CompilationInfo.destroy :: (use self: &#Self) {
+    for i in 0 .. payloads.count {
+        if payloads[i].data != null do str.free(payloads[i], allocator)
+    }
+    delete(&payloads)
+
+    // File paths may alias the payload or be owned copies; do not free them
+    // individually. Nested use_sites / id-lists are leaked with the same
+    // restriction: only the top-level heap buffers are released.
+    delete(&files)
+    delete(&packages)
+    delete(&scopes)
+    delete(&symbols)
+    delete(&types)
+    delete(&files_by_path)
+    delete(&packages_by_name)
+    delete(&symbols_by_name)
+    delete(&types_by_name)
+    delete(&symbols_by_file)
+    delete(&symbols_by_type)
+    delete(&resolutions_by_file)
+    delete(&resolutions)
+}
+
+#overload
+builtin.delete :: CompilationInfo.destroy
+
+
+#local {
+
+by_id :: (arr: &[..] $T, id: u32) -> ? &T {
+    if id == 0 do return .None
+    i := cast(i32) id
+    if i >= arr.count do return .None
+    slot := &arr.data[i]
+    if slot.id == 0 do return .None
+    return slot
+}
+
+ensure_id :: (arr: &[..] $T, id: u32) -> &T {
+    // Dense id tables; a corrupt/huge id would try to allocate gigabytes
+    // and crash the WASM runtime (signed memory.fill past 2GiB).
+    if id == 0 || id > 2_000_000 {
+        if arr.count == 0 {
+            Array.ensure_capacity(arr, 1)
+            memory.set(arr.data, 0, sizeof T)
+            arr.count = 1
+        }
+        return &arr.data[0]
+    }
+    i := cast(i32) id
+    needed := i + 1
+    if arr.count < needed {
+        old := arr.count
+        Array.ensure_capacity(arr, cast(u32) needed)
+        // make() / spare capacity is uninitialized. Growing zeros the new
+        // backing tail, but bumping count into existing spare does not.
+        // Nested array headers (symbol_ids, symbols_by_file) must be zero
+        // or the next push uses a garbage data pointer and traps.
+        memory.set(
+            memory.ptr_add(arr.data, sizeof T * old),
+            0,
+            sizeof T * (needed - old)
+        )
+        arr.count = needed
+    }
+    return &arr.data[i]
+}
+
+ensure_id_list :: (arr: &[..] [..] u32, id: u32) -> &[..] u32 {
+    return ensure_id(arr, id)
+}
+
+index_unique :: (map: &Map(str, u32), name: str, id: u32) {
+    if name.count == 0 || name.count > 1 << 16 do return
+    if map->has(name) do return
+    map->put(name, id)
+}
+
+index_list :: (map: &Map(str, [..] u32), name: str, id: u32) {
+    if name.count == 0 || name.count > 1 << 16 do return
+    map->get_ptr_or_create(name)->push(id)
+}
+
+declaring_symbol_kind :: (kind: TypeKind) -> SymbolKind {
+    switch kind {
+        case .Struct, .Poly_Struct do return .Struct
+        case .Union, .Poly_Union   do return .Union
+        case .Enum                 do return .Enum
+        case .Distinct             do return .Distinct
+        case _                     do return .Unknown
+    }
+}
+
+}

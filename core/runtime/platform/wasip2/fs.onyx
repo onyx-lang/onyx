@@ -1,0 +1,545 @@
+package runtime.platform
+
+use core {*}
+use wasi.cli.v0_2_12 {*}
+
+FileData :: struct {
+    desc: Descriptor;
+    mode: os.OpenMode = .Invalid;
+    offset: u64;
+    open: bool;
+    // 0 is a filesystem descriptor. 1, 2 and 3 are stdin, stdout and stderr.
+    stdio: u8;
+}
+
+#local
+file_error :: (err: ErrorCode) -> os.FileError {
+    switch err {
+        case .NoEntry, .NotDirectory do return .NotFound;
+        case .Exist do return .Exists;
+        case .Access, .NotPermitted, .ReadOnly do return .Permission;
+        case .IsDirectory, .Invalid, .Unsupported do return .BadMode;
+        case .BadDescriptor do return .BadFile;
+        case _ do return .BadFile;
+    }
+}
+
+#local
+ms_of :: (when: ? Datetime) -> u64 {
+    switch when {
+        case .None do return 0;
+        case .Some as t {
+            return t.seconds * 1000 + cast(u64) t.nanoseconds / 1000000;
+        }
+    }
+}
+
+#local
+fill_stat :: (st: DescriptorStat, out: &os.FileStat) {
+    out.size = cast(i64) st.size;
+    out.change_time = ms_of(st.status_change_timestamp);
+    out.accessed_time = ms_of(st.data_access_timestamp);
+    out.modified_time = ms_of(st.data_modification_timestamp);
+    out.type = switch st.type {
+        case .RegularFile => .RegularFile;
+        case .Directory => .Directory;
+        case .SymbolicLink => .SymLink;
+        case .BlockDevice => .Block;
+        case .CharacterDevice => .Char;
+        case _ => .Unknown;
+    };
+}
+
+#local {
+    Preopen :: struct {
+        desc: Descriptor;
+        path: str;
+    }
+
+    preopens: [..] Preopen;
+    preopens_ready := false;
+
+    path_matches :: (path: str, root: str) -> bool {
+        if root == "/" {
+            return path.count == 0 || path[0] == '/';
+        }
+        if !str.starts_with(path, root) do return false;
+        if path.count == root.count do return true;
+        return path[root.count] == '/';
+    }
+
+    ensure_preopens :: () {
+        if preopens_ready do return;
+        preopens_ready = true;
+        dirs := Preopens.get_directories();
+        found := make([..] Preopen);
+        for item in dirs {
+            found << .{ item.f0, item.f1 };
+        }
+        if dirs.data do cfree(dirs.data);
+        preopens = found;
+    }
+
+    resolve :: (path: str) -> (Descriptor, str) {
+        ensure_preopens();
+
+        best: Descriptor;
+        best_path: str;
+        // count is unsigned, so a sentinel of -1 would wrap and reject every match.
+        best_len := 0;
+        found := false;
+        for pre in preopens {
+            if !path_matches(path, pre.path) do continue;
+            if found && pre.path.count <= best_len do continue;
+            best = pre.desc;
+            best_path = pre.path;
+            best_len = pre.path.count;
+            found = true;
+        }
+
+        if !found {
+            // Relative paths use the first preopen as the working directory.
+            // An absolute path that matches nothing has no descriptor.
+            if path.count > 0 && path[0] != '/' && preopens.count > 0 {
+                return preopens[0].desc, path;
+            }
+            return .{}, path;
+        }
+
+        len := best_path.count;
+        if path.count == best_path.count do return best, ".";
+        if best_path != "/" do len += 1;
+        out := str.advance(path, len);
+        if out.count == 0 do out = ".";
+        return best, out;
+    }
+}
+
+__file_open :: (path: str, mode := os.OpenMode.Read, flags := os.OpenFlags.{}) -> (FileData, os.FileError) {
+    if mode == .Invalid do return .{}, .BadMode;
+
+    open_flags := cast(OpenFlags) 0;
+    desc_flags := cast(DescriptorFlags) 0;
+    creating := false;
+
+    switch mode {
+        case .Read {
+            desc_flags = .Read;
+        }
+        case .Write {
+            open_flags = OpenFlags.Create | OpenFlags.Truncate;
+            desc_flags = .Write;
+            creating = true;
+        }
+        case .Append {
+            open_flags = .Create;
+            desc_flags = .Write;
+            creating = true;
+        }
+        case .ReadWrite {
+            desc_flags = DescriptorFlags.Read | DescriptorFlags.Write;
+            if flags & os.OpenFlags.Create {
+                open_flags |= .Create;
+                creating = true;
+            }
+        }
+        case .Invalid {}
+    }
+
+    if flags & os.OpenFlags.Create {
+        open_flags |= .Create;
+        creating = true;
+    }
+    if creating && (flags & os.OpenFlags.Exclusive) {
+        open_flags |= .Exclusive;
+    }
+
+    parent, relative := resolve(path);
+    if parent.handle == 0 do return .{}, .NotFound;
+    opened := Descriptor.open_at(parent, .SymlinkFollow, relative, open_flags, desc_flags);
+    switch opened {
+        case .Err as err do return .{}, file_error(err);
+        case .Ok as desc {
+            file := FileData.{
+                desc = desc,
+                mode = mode,
+                open = true,
+            };
+            if mode == .Append {
+                switch Descriptor.stat(desc) {
+                    case .Ok as st do file.offset = st.size;
+                    case .Err {}
+                }
+            }
+            return file, .None;
+        }
+    }
+}
+
+__file_close :: (file: FileData) -> os.FileError {
+    if !file.open || file.stdio != 0 do return .None;
+    Descriptor.drop(file.desc);
+    return .None;
+}
+
+#local
+stat_at :: (path: str, out: &os.FileStat, follow: bool) -> bool {
+    parent, relative := resolve(path);
+    if parent.handle == 0 do return false;
+    flags := cast(PathFlags) 0;
+    if follow do flags = .SymlinkFollow;
+    switch Descriptor.stat_at(parent, flags, relative) {
+        case .Err do return false;
+        case .Ok as st {
+            fill_stat(st, out);
+            return true;
+        }
+    }
+}
+
+__file_stat :: (path: str, out: &os.FileStat) -> bool {
+    return stat_at(path, out, true);
+}
+
+__file_lstat :: (path: str, out: &os.FileStat) -> bool {
+    return stat_at(path, out, false);
+}
+
+__file_symlink :: (target: str, link_path: str) -> bool {
+    parent, relative := resolve(link_path);
+    if parent.handle == 0 do return false;
+    switch Descriptor.symlink_at(parent, target, relative) {
+        case .Ok do return true;
+        case .Err do return false;
+    }
+}
+
+__file_link :: (target: str, link_path: str) -> bool {
+    old_dir, old_path := resolve(target);
+    new_dir, new_path := resolve(link_path);
+    if old_dir.handle == 0 || new_dir.handle == 0 do return false;
+    borrow := Descriptor_Borrow.{ handle = new_dir.handle };
+    switch Descriptor.link_at(old_dir, .{}, old_path, borrow, new_path) {
+        case .Ok do return true;
+        case .Err do return false;
+    }
+}
+
+__file_readlink :: (path: str, buf: [] u8) -> i32 {
+    parent, relative := resolve(path);
+    if parent.handle == 0 do return -1;
+    switch Descriptor.readlink_at(parent, relative) {
+        case .Err do return -1;
+        case .Ok as text {
+            n := text.count;
+            if n > buf.count do n = buf.count;
+            if n > 0 do memory.copy(buf.data, text.data, n);
+            if text.data do cfree(text.data);
+            return n;
+        }
+    }
+}
+
+__file_truncate :: (file: FileData, size: i64) -> bool {
+    if !file.open || file.stdio != 0 do return false;
+    switch Descriptor.set_size(file.desc, cast(u64) size) {
+        case .Ok do return true;
+        case .Err do return false;
+    }
+}
+
+__file_exists :: (path: str) -> bool {
+    st: os.FileStat;
+    return stat_at(path, &st, true);
+}
+
+__file_remove :: (path: str) -> bool {
+    parent, relative := resolve(path);
+    if parent.handle == 0 do return false;
+    switch Descriptor.unlink_file_at(parent, relative) {
+        case .Ok do return true;
+        case .Err do return false;
+    }
+}
+
+__file_rename :: (old_path: str, new_path: str) -> bool {
+    old_dir, old_rel := resolve(old_path);
+    new_dir, new_rel := resolve(new_path);
+    if old_dir.handle == 0 || new_dir.handle == 0 do return false;
+    borrow := Descriptor_Borrow.{ handle = new_dir.handle };
+    switch Descriptor.rename_at(old_dir, old_rel, borrow, new_rel) {
+        case .Ok do return true;
+        case .Err do return false;
+    }
+}
+
+#local
+stdio_stream :: (kind: u8) -> OutputStream {
+    if kind == 3 do return stderr_get();
+    return stdout_get();
+}
+
+#local
+read_at_desc :: (desc: Descriptor, at: u64, buffer: [] u8) -> Result(u32, io.Error) {
+    if buffer.count <= 0 do return .{ Ok = 0 };
+    switch Descriptor.read(desc, cast(u64) buffer.count, at) {
+        case .Err do return .{ Err = .BadFile };
+        case .Ok as got {
+            n := got.f0.count;
+            if n > buffer.count do n = buffer.count;
+            if n > 0 do memory.copy(buffer.data, got.f0.data, n);
+            if got.f0.data do cfree(got.f0.data);
+            return .{ Ok = cast(u32) n };
+        }
+    }
+}
+
+#local
+write_at_desc :: (desc: Descriptor, at: u64, buffer: [] u8) -> Result(u32, io.Error) {
+    if buffer.count <= 0 do return .{ Ok = 0 };
+    switch Descriptor.write(desc, buffer, at) {
+        case .Err do return .{ Err = .BadFile };
+        case .Ok as n do return .{ Ok = cast(u32) n };
+    }
+}
+
+__file_stream_vtable := io.Stream_Vtable.{
+    seek = (use fs: &os.File, to: i32, whence: io.SeekFrom) -> io.Error {
+        if data.stdio != 0 do return .NotImplemented;
+
+        base: i64 = 0;
+        switch whence {
+            case .Start do base = 0;
+            case .Current do base = cast(i64) data.offset;
+            case .End {
+                switch Descriptor.stat(data.desc) {
+                    case .Err do return .BadFile;
+                    case .Ok as st do base = cast(i64) st.size;
+                }
+            }
+        }
+
+        next := base + cast(i64) to;
+        if next < 0 do return .OutOfBounds;
+        data.offset = cast(u64) next;
+        return .None;
+    },
+
+    tell = (use fs: &os.File) -> Result(u32, io.Error) {
+        if data.stdio != 0 do return .{ Err = .NotImplemented };
+        return .{ Ok = cast(u32) data.offset };
+    },
+
+    read = (use fs: &os.File, buffer: [] u8) -> Result(u32, io.Error) {
+        if data.stdio == 1 {
+            n := __read_from_input(buffer);
+            if n < 0 do return .{ Err = .BadFile };
+            if n == 0 do return .{ Err = .EOF };
+            return .{ Ok = cast(u32) n };
+        }
+        if data.stdio != 0 do return .{ Err = .BadFile };
+
+        got := read_at_desc(data.desc, data.offset, buffer);
+        switch got {
+            case .Err as err do return .{ Err = err };
+            case .Ok as n {
+                data.offset += cast(u64) n;
+                if n == 0 do return .{ Err = .EOF };
+                return .{ Ok = n };
+            }
+        }
+    },
+
+    read_at = (use fs: &os.File, at: u32, buffer: [] u8) -> Result(u32, io.Error) {
+        if data.stdio != 0 do return .{ Err = .NotImplemented };
+        return read_at_desc(data.desc, cast(u64) at, buffer);
+    },
+
+    read_byte = (use fs: &os.File) -> Result(u8, io.Error) {
+        tmp: [1] u8;
+        switch __file_stream_vtable.read(fs, tmp) {
+            case .Err as err do return .{ Err = err };
+            case .Ok do return .{ Ok = tmp[0] };
+        }
+    },
+
+    write = (use fs: &os.File, buffer: [] u8) -> Result(u32, io.Error) {
+        if data.stdio == 2 || data.stdio == 3 {
+            n := write_stream(stdio_stream(data.stdio), buffer);
+            if n == 0 && buffer.count > 0 do return .{ Err = .BadFile };
+            return .{ Ok = n };
+        }
+
+        at := data.offset;
+        if data.mode == .Append {
+            switch Descriptor.stat(data.desc) {
+                case .Err do return .{ Err = .BadFile };
+                case .Ok as st do at = st.size;
+            }
+        }
+
+        got := write_at_desc(data.desc, at, buffer);
+        switch got {
+            case .Err as err do return .{ Err = err };
+            case .Ok as n {
+                data.offset = at + cast(u64) n;
+                return .{ Ok = n };
+            }
+        }
+    },
+
+    write_at = (use fs: &os.File, at: u32, buffer: [] u8) -> Result(u32, io.Error) {
+        if data.stdio != 0 do return .{ Err = .NotImplemented };
+        return write_at_desc(data.desc, cast(u64) at, buffer);
+    },
+
+    write_byte = (use fs: &os.File, byte: u8) -> io.Error {
+        tmp: [1] u8;
+        tmp[0] = byte;
+        switch __file_stream_vtable.write(fs, tmp) {
+            case .Err as err do return err;
+            case .Ok do return .None;
+        }
+    },
+
+    close = (use fs: &os.File) -> io.Error {
+        __file_close(data);
+        data.open = false;
+        return .None;
+    },
+
+    flush = (use fs: &os.File) -> io.Error {
+        if data.stdio != 0 do return .None;
+        switch Descriptor.sync_data(data.desc) {
+            case .Ok do return .None;
+            case .Err do return .BadFile;
+        }
+    },
+
+    size = (use fs: &os.File) -> i32 {
+        if data.stdio != 0 do return 0;
+        switch Descriptor.stat(data.desc) {
+            case .Err do return 0;
+            case .Ok as st do return cast(i32) st.size;
+        }
+    },
+
+    // Regular files do not block. Stream pollables are used for stdin.
+    poll = (use fs: &os.File, ev: io.PollEvent, timeout: i32) -> Result(bool, io.Error) {
+        _ := timeout;
+        if data.stdio == 1 && ev == .Read {
+            return .{ Ok = __wait_for_input(0) };
+        }
+        return .{ Ok = true };
+    },
+}
+
+WasiDirectory :: struct {
+    desc: Descriptor;
+    stream: DirectoryEntryStream;
+}
+
+DirectoryData :: &WasiDirectory;
+
+__dir_open :: (path: str, dir: &DirectoryData) -> bool {
+    parent, relative := resolve(path);
+    if parent.handle == 0 do return false;
+    switch Descriptor.open_at(parent, .SymlinkFollow, relative, .Directory, .Read) {
+        case .Err do return false;
+        case .Ok as desc {
+            switch Descriptor.read_directory(desc) {
+                case .Err {
+                    Descriptor.drop(desc);
+                    return false;
+                }
+                case .Ok as stream {
+                    opened := new(WasiDirectory);
+                    opened.desc = desc;
+                    opened.stream = stream;
+                    *dir = opened;
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+__dir_close :: (dir: DirectoryData) {
+    if !dir do return;
+    DirectoryEntryStream.drop(dir.stream);
+    Descriptor.drop(dir.desc);
+    cfree(dir);
+}
+
+__dir_read :: (dir: DirectoryData, out_entry: &os.DirectoryEntry) -> bool {
+    while true {
+        switch DirectoryEntryStream.read_directory_entry(dir.stream) {
+            case .Err do return false;
+            case .Ok as entry {
+                switch entry {
+                    case .None do return false;
+                    case .Some as item {
+                        if item.name == "." || item.name == ".." {
+                            if item.name.data do cfree(item.name.data);
+                        } else {
+                            out_entry.type = switch item.type {
+                                case .RegularFile => .RegularFile;
+                                case .Directory => .Directory;
+                                case .SymbolicLink => .SymLink;
+                                case .BlockDevice => .Block;
+                                case .CharacterDevice => .Char;
+                                case _ => .Unknown;
+                            };
+                            out_entry.identifier = 0;
+                            n := item.name.count;
+                            if n > 256 do n = 256;
+                            out_entry.name_length = cast(u32) n;
+                            memory.set(~~&out_entry.name_data, 0, 256);
+                            if n > 0 {
+                                memory.copy(~~&out_entry.name_data, item.name.data, n);
+                            }
+                            if item.name.data do cfree(item.name.data);
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+__dir_create :: (path: str) -> bool {
+    parent, relative := resolve(path);
+    if parent.handle == 0 do return false;
+    switch Descriptor.create_directory_at(parent, relative) {
+        case .Ok do return true;
+        case .Err do return false;
+    }
+}
+
+__dir_remove :: (path: str) -> bool {
+    parent, relative := resolve(path);
+    if parent.handle == 0 do return false;
+    switch Descriptor.remove_directory_at(parent, relative) {
+        case .Ok do return true;
+        case .Err do return false;
+    }
+}
+
+__chdir :: (path: str) -> bool {
+    _ := path;
+    return false;
+}
+
+__getcwd :: () -> str {
+    switch Environment.initial_cwd() {
+        case .Some as path do return path;
+        case .None {}
+    }
+
+    ensure_preopens();
+    if preopens.count > 0 do return str.copy(preopens[0].path);
+    return ".";
+}

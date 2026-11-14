@@ -51,6 +51,10 @@ Supports_Env_Vars :: true
     Supports_TTY :: false
 }
 
+__stdin: os.File;
+__stdout: os.File;
+__stderr: os.File;
+
 __output_string :: (s: str) -> u32 {
     STDOUT_FILENO :: 1
 
@@ -146,6 +150,14 @@ __time :: () -> i64 {
     return time / 1000000;
 }
 
+__monotonic :: () -> i64 {
+    time: Timestamp;
+    if clock_time_get(.Monotonic, 1, &time) != .Success {
+        return 0;
+    }
+    return ~~time;
+}
+
 __random_get :: (buf: [] u8) {
     random_get(buf.data, buf.length);
 }
@@ -226,6 +238,19 @@ __args :: (allocator: Allocator) -> [] cstr {
 
 // Sets up everything needed for execution.
 __start :: () {
+    __stdin = .{
+        .{ &__file_stream_vtable, .Block_On_Read },
+        .{ fd = 0, mode = .Read },
+    };
+    __stdout = .{
+        .{ &__file_stream_vtable },
+        .{ fd = 1, mode = .Write },
+    };
+    __stderr = .{
+        .{ &__file_stream_vtable },
+        .{ fd = 2, mode = .Write },
+    };
+
     __runtime_initialize();
     context.thread_id = 0;
 
@@ -263,11 +288,14 @@ __start :: () {
 
     // Currently, WASI does not provide a way to kill a thread preemptively.
     __kill_thread :: (id: i32) => 0
+    __join_thread :: (id: i32) => 1
 
-    #export "wasi_thread_start"
-    (wasi_tid: u32, use td: &ThreadData) {
-        runtime._thread_start(id, tls_base, stack_base, func, data);
-        runtime._thread_exit(id);
+    #if runtime.target_type == .Executable {
+        #export "wasi_thread_start"
+        (wasi_tid: u32, use td: &ThreadData) {
+            runtime._thread_start(id, tls_base, stack_base, func, data);
+            runtime._thread_exit(id);
+        }
     }
 }
 

@@ -19,6 +19,8 @@ static void type_register(Context *context, Type* type) {
     if (type->ast_type) type->ast_type->type_id = type->id;
 
     bh_imap_put(&context->types.type_map, type->id, (u64) type);
+    compilation_log_emit_type(context, type);
+    if (type->ast_type) compilation_log_notify_node_typed(context, (AstNode *) type->ast_type);
 }
 
 void types_init(Context *context) {
@@ -75,8 +77,9 @@ void types_dump_type_info(Context *context) {
 }
 
 Type* type_lookup_by_id(Context *context, u32 id) {
-    if (bh_imap_has(&context->types.type_map, id)) {
-        return (Type *) bh_imap_get(&context->types.type_map, id);
+    u64 type_p;
+    if (bh_imap_try_get(&context->types.type_map, id, &type_p)) {
+        return (Type *) type_p;
     }
 
     return NULL;
@@ -556,8 +559,13 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
         }
 
         case Ast_Kind_Type_Alias: {
-            Type* type = type_build_from_ast_inner(context, ((AstTypeAlias *) type_node)->to, accept_partial_types);
-            if (type && type->ast_type) type_node->type_id = type->id;
+            AstType *inner = strip_type_aliases(((AstTypeAlias *) type_node)->to);
+            if (!inner || inner == type_node || inner->kind == Ast_Kind_Type_Alias) return NULL;
+            Type* type = type_build_from_ast_inner(context, inner, accept_partial_types);
+            if (type) {
+                type_node->type_id = type->id;
+                compilation_log_notify_node_typed(context, (AstNode *) type_node);
+            }
             return type;
         }
 
@@ -572,6 +580,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
             p_type->PolyStruct.name = ((AstPolyStructType *) type_node)->name;
             p_type->PolyStruct.meta_tags = ((AstPolyStructType *) type_node)->base_struct->meta_tags;
             p_type->PolyStruct.scope = ((AstPolyStructType *) type_node)->scope;
+            ((AstPolyStructType *) type_node)->base_struct->poly_type = p_type;
 
             type_register(context, p_type);
             return NULL;
@@ -585,6 +594,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
             p_type->PolyUnion.name = ((AstPolyUnionType *) type_node)->name;
             p_type->PolyUnion.meta_tags = ((AstPolyUnionType *) type_node)->base_union->meta_tags;
             p_type->PolyUnion.scope = ((AstPolyUnionType *) type_node)->scope;
+            ((AstPolyUnionType *) type_node)->base_union->poly_type = p_type;
 
             type_register(context, p_type);
             return NULL;
@@ -629,7 +639,19 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
             }
 
             Type* concrete = NULL;
-            if (pc_type->callee->kind == Ast_Kind_Poly_Struct_Type) {
+            // Slice(T) is [] T, and Array(T) is [..] T. The struct definitions stay
+            // as the method scopes; construction uses the compiler slice/dynarray types.
+            if (pc_type->callee == context->builtins.slice_type
+                && bh_arr_length(slns) == 1
+                && slns[0].kind == PSK_Type) {
+                concrete = type_make_slice(context, slns[0].type);
+            }
+            else if (pc_type->callee == context->builtins.array_type
+                && bh_arr_length(slns) == 1
+                && slns[0].kind == PSK_Type) {
+                concrete = type_make_dynarray(context, slns[0].type);
+            }
+            else if (pc_type->callee->kind == Ast_Kind_Poly_Struct_Type) {
                 AstPolyStructType* ps_type = (AstPolyStructType *) pc_type->callee;
                 type_build_from_ast_inner(context, (AstType *) ps_type, 0);
                 concrete = polymorphic_struct_lookup(context, ps_type, slns, pc_type->token->pos, (pc_type->flags & Ast_Flag_Header_Check_No_Error) == 0);
@@ -680,8 +702,9 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
         }
 
         case Ast_Kind_Alias: {
-            AstAlias* alias = (AstAlias *) type_node;
-            return type_build_from_ast_inner(context, (AstType *) alias->alias, accept_partial_types);
+            AstNode *inner = strip_aliases((AstNode *) type_node);
+            if (!inner || inner == (AstNode *) type_node || inner->kind == Ast_Kind_Alias) return NULL;
+            return type_build_from_ast_inner(context, (AstType *) inner, accept_partial_types);
         }
 
         case Ast_Kind_Typeof: {
@@ -809,6 +832,7 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
                 uv->token = variant->token;
                 uv->meta_tags = variant->meta_tags;
                 uv->type = variant->type;
+                uv->variant_node = variant;
 
                 if (variant->explicit_tag_value) {
                     b32 success;
@@ -840,7 +864,10 @@ static Type* type_build_from_ast_inner(Context *context, AstType* type_node, b32
             u_type->Union.alignment = alignment;
             u_type->Union.size = size + alignment; // Add the size of the tag
             u_type->Union.tag_type = type_build_from_ast(context, (AstType *) tag_enum_node);
-            u_type->Union.status = SPS_Uses_Done;
+            if (u_type->Union.status != SPS_Uses_Done) {
+                u_type->Union.status = SPS_Uses_Done;
+                compilation_log_emit_type_body(context, u_type);
+            }
 
             return u_type;
         }
@@ -1016,7 +1043,10 @@ Type* type_build_implicit_type_of_struct_literal(Context *context, AstStructLite
     type->Struct.alignment = alignment;
     type->Struct.size = size;
 
-    type->Struct.status = SPS_Uses_Done;
+    if (type->Struct.status != SPS_Uses_Done) {
+        type->Struct.status = SPS_Uses_Done;
+        compilation_log_emit_type_body(context, type);
+    }
     lit->generated_inferred_type = type;
     return type;
 }
@@ -1100,19 +1130,28 @@ Type* type_make_slice(Context *context, Type* of) {
     u64 slice_id = bh_imap_get(&context->types.slice_map, of->id);
     if (slice_id > 0) {
         Type* slice_type = (Type *) bh_imap_get(&context->types.type_map, slice_id);
+        if (slice_type && !slice_type->Slice.scope && context->builtins.slice_type != NULL) {
+            AstPolyStructType* pslice_type = (AstPolyStructType *) context->builtins.slice_type;
+            OnyxFilePos pos = { 0 };
+            slice_type->Slice.scope = scope_create(context, pslice_type->scope, pos);
+            compilation_log_emit_type_body(context, slice_type);
+        }
         return slice_type;
 
     } else {
         Type* slice_type = type_create(context, Type_Kind_Slice, 0);
+        slice_type->Slice.elem = of;
+
+        if (context->builtins.slice_type != NULL) {
+            AstPolyStructType* pslice_type = (AstPolyStructType *) context->builtins.slice_type;
+            OnyxFilePos pos = { 0 };
+            slice_type->Slice.scope = scope_create(context, pslice_type->scope, pos);
+        }
+
         type_register(context, slice_type);
         bh_imap_put(&context->types.slice_map, of->id, slice_type->id);
 
         type_make_multi_pointer(context, of);
-        slice_type->Slice.elem = of;
-
-        AstPolyStructType* pslice_type = (AstPolyStructType *) context->builtins.slice_type;
-        OnyxFilePos pos = { 0 };
-        slice_type->Slice.scope = scope_create(context, pslice_type->scope, pos);
 
         return slice_type;
     }
@@ -1126,19 +1165,28 @@ Type* type_make_dynarray(Context *context, Type* of) {
     u64 dynarr_id = bh_imap_get(&context->types.dynarr_map, of->id);
     if (dynarr_id > 0) {
         Type* dynarr = (Type *) bh_imap_get(&context->types.type_map, dynarr_id);
+        if (dynarr && !dynarr->DynArray.scope && context->builtins.array_type != NULL) {
+            AstPolyStructType* dynarr_type = (AstPolyStructType *) context->builtins.array_type;
+            OnyxFilePos pos = { 0 };
+            dynarr->DynArray.scope = scope_create(context, dynarr_type->scope, pos);
+            compilation_log_emit_type_body(context, dynarr);
+        }
         return dynarr;
 
     } else {
         Type* dynarr = type_create(context, Type_Kind_DynArray, 0);
+        dynarr->DynArray.elem = of;
+
+        if (context->builtins.array_type != NULL) {
+            AstPolyStructType* dynarr_type = (AstPolyStructType *) context->builtins.array_type;
+            OnyxFilePos pos = { 0 };
+            dynarr->DynArray.scope = scope_create(context, dynarr_type->scope, pos);
+        }
+
         type_register(context, dynarr);
         bh_imap_put(&context->types.dynarr_map, of->id, dynarr->id);
 
         type_make_multi_pointer(context, of);
-        dynarr->DynArray.elem = of;
-
-        AstPolyStructType* dynarr_type = (AstPolyStructType *) context->builtins.array_type;
-        OnyxFilePos pos = { 0 };
-        dynarr->DynArray.scope = scope_create(context, dynarr_type->scope, pos);
 
         return dynarr;
     }
@@ -1156,11 +1204,11 @@ Type* type_make_varargs(Context *context, Type* of) {
 
     } else {
         Type* va_type = type_create(context, Type_Kind_VarArgs, 0);
+        va_type->VarArgs.elem = of;
         type_register(context, va_type);
         bh_imap_put(&context->types.vararg_map, of->id, va_type->id);
 
         type_make_multi_pointer(context, of);
-        va_type->VarArgs.elem = of;
 
         return va_type;
     }
@@ -1922,3 +1970,20 @@ UnionVariant* type_lookup_union_variant_by_name(Type* type, char *name) {
     return type->Union.variants[index].value;
 }
 
+
+i32 type_lookup_union_variant_idx_by_tag(Type* type, u32 tag) {
+    if (!type) return -1;
+    if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
+    if (type->kind != Type_Kind_Union) return -1;
+    fori (i, 0, bh_arr_length(type->Union.variants_ordered)) {
+       if (type->Union.variants_ordered[i]->tag_value == tag) {
+           return i;
+       }
+    }
+    return -1;
+}
+UnionVariant* type_lookup_union_variant_by_tag(Type* type, u32 tag) {
+    i32 idx = type_lookup_union_variant_idx_by_tag(type, tag);
+    if (idx < 0) return NULL;
+    return type->Union.variants_ordered[idx];
+}

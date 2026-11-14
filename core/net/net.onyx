@@ -296,11 +296,11 @@ socket_send :: (s: &Socket, data: [] u8) -> i32 {
     if !s->is_alive() do return -1;
 
     res := runtime.platform.__net_sock_send(s.handle, data);
-    res.Err->with([err] {
+    if res.Err as err {
         if err == .EOF {
             socket_close(s);
         }
-    });
+    }
 
     return res.Ok ?? -1;
 }
@@ -309,11 +309,11 @@ socket_sendto :: (s: &Socket, data: [] u8, addr: &SocketAddress) -> i32 {
     if !s->is_alive() do return -1;
 
     res := runtime.platform.__net_sock_send_to(s.handle, data, addr);
-    res.Err->with([err] {
+    if res.Err as err {
         if err == .EOF {
             socket_close(s);
         }
-    });
+    }
 
     return res.Ok ?? -1;
 }
@@ -335,28 +335,28 @@ socket_recv :: (s: &Socket, maxlen := 1024, allocator := context.allocator) -> ?
 
     buffer := alloc.array_from_stack(u8, maxlen);
     res := runtime.platform.__net_sock_recv(s.handle, buffer);
-    res.Err->with([err] {
+    if res.Err as err {
         if err == .EOF {
             socket_close(s);
         }
-    });
+    }
 
     if res.Err {
         return .{};
     }
 
-    return slice.copy(buffer[0 .. res.Ok->unwrap()], allocator);
+    return Slice.copy(buffer[0 .. res.Ok->unwrap()], allocator);
 }
 
 socket_recv_into :: (s: &Socket, buffer: [] u8) -> i32 {
     if !s->is_alive() do return 0;
 
     res := runtime.platform.__net_sock_recv(s.handle, buffer);
-    res.Err->with([err] {
+    if res.Err as err {
         if err == .EOF {
             socket_close(s);
         }
-    });
+    }
 
     if res.Err {
         return 0;
@@ -375,11 +375,11 @@ socket_recvfrom :: (s: &Socket, buffer: [] u8) -> ? SocketRecvFromResult {
 
     sender_addr: SocketAddress;
     res := runtime.platform.__net_sock_recv_from(s.handle, buffer, &sender_addr);
-    res.Err->with([err] {
+    if res.Err as err {
         if err == .EOF {
             socket_close(s);
         }
-    });
+    }
 
     if res.Err do return .{};
 
@@ -393,20 +393,20 @@ socket_recvfrom :: (s: &Socket, buffer: [] u8) -> ? SocketRecvFromResult {
         if !s->is_alive() do return .{ Err = .EOF };
         
         res := runtime.platform.__net_sock_recv(handle, buffer);
-        res.Ok->with([bytes_read] {
+        if res.Ok as bytes_read {
             if bytes_read == 0 do return .{ Err = .EOF };
 
             return .{ Ok = bytes_read };
-        });
+        }
 
-        res.Err->with([err] {
+        if res.Err as err {
             if err == .NoData do return .{ Err = .ReadLater };
             if err == .EOF {
                 socket_close(s);
             }
 
             return .{ Err = err };
-        });
+        }
 
         return .{ Ok = 0 }
     },
@@ -416,13 +416,13 @@ socket_recvfrom :: (s: &Socket, buffer: [] u8) -> ? SocketRecvFromResult {
         if !s->is_alive() do return .EOF;
 
         res := runtime.platform.__net_sock_send(handle, .[ byte ]);
-        res->err()->with([err] {
+        if res->err() as err {
             if err == .EOF {
                 socket_close(s);
             }
 
             return err;
-        });
+        }
 
         if res->ok()->unwrap() > 0 do return .None;
         return .BufferFull;
@@ -433,13 +433,13 @@ socket_recvfrom :: (s: &Socket, buffer: [] u8) -> ? SocketRecvFromResult {
         if !s->is_alive() do return .{ Err = .EOF };
         
         res := runtime.platform.__net_sock_send(handle, buffer);
-        res->err()->with([err] {
+        if res->err() as err {
             if err == .EOF {
                 socket_close(s);
             }
 
             return .{ Err = err };
-        });
+        }
 
         return .{ Ok = res->ok()->unwrap() };
     },
@@ -473,10 +473,10 @@ str_to_ipv4 :: (ip: str) -> u32 {
     res: u32;
     shift := 0;
     for 4 {
-        octet := string.read_until(&ip_, '.');
-        string.advance(&ip_, 1);
+        octet := str.read_until(&ip_, '.');
+        str.advance(&ip_, 1);
 
-        res |= cast(u32) (conv.str_to_i64(octet) & cast(i64) 0xFF) << shift;
+        res |= cast(u32) (conv.parse_int(octet) & cast(i64) 0xFF) << shift;
         shift += 8;
     }
 
@@ -499,7 +499,7 @@ ipv6_to_str :: (addr: [16] u8) -> str {
     return iter.as_iter(addr)
         ->map(x => tprintf("{w2b16}", cast(u32) x))
         ->collect()
-        |> string.join(" ");
+        |> str.join(" ");
 }
 
 

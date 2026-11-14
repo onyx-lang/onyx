@@ -15,9 +15,10 @@ package onyx.toolchain.events;
 //     - Symbol id, symbol text, symbol file id, symbol line, symbol column
 // - Symbol resolved
 //     - Span of source, resolved to id
-// - Binding 
+// - Binding
 // - Types created
-
+// - Tags on procedures, globals, and struct/union types
+//
 
 
 message CompilerEvents {
@@ -30,6 +31,15 @@ message CompilerEvent {
     EventStart start = 10;
     EventFile file = 11;
     EventPackage pack = 12;
+    EventScope scope = 13;
+    EventSymbol symbol = 14;
+    EventSymbolResolved resolved = 15;
+    EventBinding binding = 16;
+    EventType type = 17;
+    EventTypeBody type_body = 18;
+    EventOverload overload = 19;
+    EventPolyProc poly_proc = 20;
+    EventTag tag = 21;
   }
 }
 
@@ -49,5 +59,264 @@ message EventPackage {
   string package_name = 2;
   string fully_qualified_name = 3;
   uint32 parent_package_id = 4;
+  uint32 scope_id = 5;
 }
 
+message EventScope {
+  uint32 id = 1;
+  uint32 parent_scope_id = 2;
+  uint32 file_id = 3;
+  uint32 line = 4;
+  uint32 column = 5;
+  string name = 6;
+  uint32 end_line = 7;
+  uint32 end_column = 8;
+}
+
+enum SymbolKind {
+  SYMBOL_KIND_UNKNOWN = 0;
+  SYMBOL_KIND_PACKAGE = 1;
+  SYMBOL_KIND_FUNCTION = 2;
+  SYMBOL_KIND_OVERLOADED_FUNCTION = 3;
+  SYMBOL_KIND_POLYMORPHIC_PROC = 4;
+  SYMBOL_KIND_MACRO = 5;
+  SYMBOL_KIND_STRUCT = 6;
+  SYMBOL_KIND_UNION = 7;
+  SYMBOL_KIND_ENUM = 8;
+  SYMBOL_KIND_DISTINCT = 9;
+  SYMBOL_KIND_INTERFACE = 10;
+  SYMBOL_KIND_EXPRESSION = 11;
+  SYMBOL_KIND_MEMBER = 12;
+  SYMBOL_KIND_PARAMETER = 13;
+}
+
+message EventSymbol {
+  uint32 id = 1;
+  uint32 scope_id = 2;
+  string name = 3;
+  uint32 file_id = 4;
+  uint32 line = 5;
+  uint32 column = 6;
+  SymbolKind kind = 7;
+  uint32 package_id = 8;
+}
+
+message EventSymbolResolved {
+  uint32 symbol_id = 1;
+  uint32 file_id = 2;
+  uint32 line = 3;
+  uint32 column = 4;
+  uint32 length = 5;
+  // Specific #match option at this use, when the compiler picked one.
+  // 0 means this span still refers to symbol_id (the group or other name).
+  uint32 chosen_symbol_id = 6;
+}
+
+message EventOverload {
+  uint32 group_symbol_id = 1;
+  repeated uint32 option_symbol_ids = 2;
+}
+
+message EventPolyProc {
+  uint32 template_symbol_id = 1;
+  uint32 instance_symbol_id = 2;
+  repeated string solution_names = 3;
+  repeated uint32 solution_type_ids = 4;
+}
+
+message EventBinding {
+  uint32 symbol_id = 1;
+  string documentation = 2;
+  uint32 type_id = 3;
+  repeated uint32 param_symbol_ids = 4;
+}
+
+enum TypeKind {
+  TYPE_KIND_UNKNOWN = 0;
+  TYPE_KIND_BASIC = 1;
+  TYPE_KIND_POINTER = 2;
+  TYPE_KIND_MULTI_POINTER = 3;
+  TYPE_KIND_FUNCTION = 4;
+  TYPE_KIND_STRUCT = 5;
+  TYPE_KIND_POLY_STRUCT = 6;
+  TYPE_KIND_COMPOUND = 7;
+  TYPE_KIND_ARRAY = 8;
+  TYPE_KIND_SLICE = 9;
+  TYPE_KIND_DYN_ARRAY = 10;
+  TYPE_KIND_VAR_ARGS = 11;
+  TYPE_KIND_ENUM = 12;
+  TYPE_KIND_DISTINCT = 13;
+  TYPE_KIND_UNION = 14;
+  TYPE_KIND_POLY_UNION = 15;
+}
+
+message EventType {
+  uint32 id = 1;
+  TypeKind kind = 2;
+  string name = 3;
+
+  // Poly-struct / poly-union instance: the template this was built from.
+  // 0 if this type is not a polymorphic instantiation.
+  uint32 constructed_from_id = 4;
+  // Parallel arrays. poly_arg_names[i] is the template parameter
+  // (Key_Type, Value_Type, …). poly_arg_type_ids[i] is the solved type,
+  // or 0 when that slot was a baked value.
+  repeated string poly_arg_names = 5;
+  repeated uint32 poly_arg_type_ids = 6;
+
+  // Known at type creation. Struct/union member lists come later.
+  // Enum values are filled in a later EventType for the same id once the enum is checked.
+  oneof body {
+    TypeBasic basic = 10;
+    // pointer, multi-pointer, slice, dynarray, varargs
+    TypeElem elem = 11;
+    TypeArray array = 12;
+    TypeFunction function = 13;
+    TypeCompound compound = 14;
+    TypeDistinct distinct = 15;
+    TypeEnum enumeration = 16;
+  }
+}
+
+message TypeBasic {
+  BasicKind basic_kind = 1;
+  uint32 size = 2;
+  uint32 alignment = 3;
+}
+
+enum BasicKind {
+  BASIC_KIND_UNKNOWN = 0;
+  BASIC_KIND_VOID = 1;
+  BASIC_KIND_BOOL = 2;
+  BASIC_KIND_INT_UNSIZED = 3;
+  BASIC_KIND_I8 = 4;
+  BASIC_KIND_U8 = 5;
+  BASIC_KIND_I16 = 6;
+  BASIC_KIND_U16 = 7;
+  BASIC_KIND_I32 = 8;
+  BASIC_KIND_U32 = 9;
+  BASIC_KIND_I64 = 10;
+  BASIC_KIND_U64 = 11;
+  BASIC_KIND_FLOAT_UNSIZED = 12;
+  BASIC_KIND_F32 = 13;
+  BASIC_KIND_F64 = 14;
+  BASIC_KIND_RAWPTR = 15;
+  BASIC_KIND_I8X16 = 16;
+  BASIC_KIND_I16X8 = 17;
+  BASIC_KIND_I32X4 = 18;
+  BASIC_KIND_I64X2 = 19;
+  BASIC_KIND_F32X4 = 20;
+  BASIC_KIND_F64X2 = 21;
+  BASIC_KIND_V128 = 22;
+  BASIC_KIND_TYPE_EXPR = 23;
+}
+
+message TypeElem {
+  uint32 elem_id = 1;
+}
+
+message TypeArray {
+  uint32 elem_id = 1;
+  uint32 count = 2;
+}
+
+message TypeFunction {
+  uint32 return_id = 1;
+  repeated uint32 param_ids = 2;
+}
+
+message TypeCompound {
+  repeated uint32 type_ids = 1;
+}
+
+message TypeDistinct {
+  uint32 base_id = 1;
+}
+
+message TypeEnumValue {
+  string name = 1;
+  int64 value = 2;
+  uint32 symbol_id = 3;
+}
+
+message TypeEnum {
+  uint32 backing_id = 1;
+  bool is_flags = 2;
+  repeated TypeEnumValue values = 3;
+}
+
+message EventTypeBody {
+  uint32 type_id = 1;
+  uint32 size = 2;
+  uint32 alignment = 3;
+  uint32 scope_id = 4;
+
+  oneof details {
+    TypeStructBody struct_body = 10;
+    TypeUnionBody union_body = 11;
+  }
+}
+
+message TypeStructMember {
+  string name = 1;
+  uint32 type_id = 2;
+  uint32 offset = 3;
+  uint32 idx = 4;
+  uint32 symbol_id = 5;
+  // True when this field was flattened in from a `use` member.
+  bool included_through_use = 6;
+  // True when this field is itself a `use other: Other` member.
+  bool is_used = 7;
+}
+
+message TypeStructBody {
+  repeated TypeStructMember members = 1;
+}
+
+message TypeUnionVariant {
+  string name = 1;
+  uint32 type_id = 2;
+  uint32 tag = 3;
+  uint32 symbol_id = 4;
+}
+
+message TypeUnionBody {
+  uint32 tag_type_id = 1;
+  repeated TypeUnionVariant variants = 2;
+}
+
+// One #tag. `symbol` is a procedure or global. `type` is a struct or union,
+// including a polymorphic template and each concrete instance.
+// Member and variant tags are not emitted.
+message EventTag {
+  oneof target {
+    uint32 symbol = 1;
+    uint32 type = 2;
+  }
+  TagValue value = 3;
+}
+
+message TagValue {
+  oneof data {
+    TagNumber number = 1;
+    // Only `str`.
+    string str = 2;
+    TagRawValue raw_value = 3;
+  }
+}
+
+message TagNumber {
+  oneof data {
+    // Integers of every width, bools, char literals, and enum values.
+    // Unsigned values above int64 max are RawValue instead.
+    int64 int_value = 1;
+    // f32 widened to f64, f64, and unsized floats.
+    double float_value = 2;
+  }
+}
+
+message TagRawValue {
+  uint32 type_id = 1;
+  // OSAD bytes. Empty when the value cannot be encoded.
+  bytes bytes = 2;
+}

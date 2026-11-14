@@ -1,0 +1,1656 @@
+package witgen
+
+use core {*}
+
+outb: dyn_str
+tmp_seq: i32
+imp_seq: i32
+param_taken: [..] str
+param_names: [..] str
+has_exports: bool
+export_package: str = "wit_user";
+indent := 0
+
+idt :: (delta: i32) {
+    indent += delta * 4
+}
+
+e :: (s: str) {
+    if outb[outb.count - 1] == '\n' {
+        for indent do outb << ' ';
+    }
+    for i in 0 .. s.count do outb << s[i];
+}
+
+el :: (s: str) {
+    if outb[outb.count - 1] == '\n' {
+        for indent do outb << ' ';
+    }
+    e(s);
+    outb << '\n';
+}
+
+buf_add :: (buf: &dyn_str, s: str) {
+    for i in 0 .. s.count do buf->append(s[i]);
+}
+
+buf_arg :: (buf: &dyn_str, s: str) {
+    if buf.count > 0 do buf_add(buf, ", ");
+    buf_add(buf, s);
+}
+
+quote_onyx :: (s: str) -> str {
+    buf: dyn_str;
+    buf << '"';
+    for i in 0 .. s.count {
+        c := s[i];
+        if c == '\\' || c == '"' do buf << '\\';
+        buf << c;
+    }
+    buf << '"';
+    return buf;
+}
+
+is_ident_char :: (c: u8) -> bool {
+    if c >= 'a' && c <= 'z' do return true;
+    if c >= 'A' && c <= 'Z' do return true;
+    if c >= '0' && c <= '9' do return true;
+    return c == '_';
+}
+
+is_keyword :: (s: str) -> bool {
+    words := str.["package", "struct", "union", "enum", "use", "if", "else", "elseif", "return", "global", "cast", "while", "for", "break", "continue", "sizeof", "alignof", "typeof", "defer", "do", "case", "switch", "fallthrough", "macro", "interface", "where", "as", "in", "true", "false", "null", "void", "bool", "str", "rawptr", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64"];
+    for w in words {
+        if s == w do return true;
+    }
+    return false;
+}
+
+snake :: (s: str) -> str {
+    buf: dyn_str;
+    prev_us := false;
+    for i in 0 .. s.count {
+        c := s[i];
+        if c == '%' do continue;
+        if c == '-' || c == '.' || c == '/' {
+            if !prev_us && buf.count > 0 {
+                buf << '_';
+                prev_us = true;
+            }
+            continue;
+        }
+        if c >= 'A' && c <= 'Z' do c = c + 32;
+        if !is_ident_char(c) do continue;
+        buf << c;
+        prev_us = c == '_';
+    }
+    if buf.count == 0 do return str.copy("name");
+    if buf[0] >= '0' && buf[0] <= '9' {
+        pref: dyn_str;
+        pref << 'n';
+        buf_add(&pref, buf);
+        buf = pref;
+    }
+    if is_keyword(buf) {
+        pref: dyn_str;
+        buf_add(&pref, "w_");
+        buf_add(&pref, buf);
+        buf = pref;
+    }
+    return str.copy(buf);
+}
+
+pascal :: (s: str) -> str {
+    buf: dyn_str;
+    cap := true;
+    for i in 0 .. s.count {
+        c := s[i];
+        if c == '%' do continue;
+        if c == '-' || c == '_' || c == '.' || c == '/' || c == ' ' {
+            cap = true;
+            continue;
+        }
+        if !is_ident_char(c) do continue;
+        if cap && c >= 'a' && c <= 'z' do c = c - 32;
+        if !cap && c >= 'A' && c <= 'Z' do c = c + 32;
+        buf << c;
+        cap = false;
+    }
+    if buf.count == 0 do return str.copy("Name");
+    if buf[0] >= '0' && buf[0] <= '9' {
+        pref: dyn_str;
+        pref << 'N';
+        buf_add(&pref, buf);
+        buf = pref;
+    }
+    return str.copy(buf);
+}
+
+name_used :: (s: str) -> bool {
+    for n in used_names {
+        if n == s do return true;
+    }
+    return false;
+}
+
+claim :: (s: str) -> str {
+    n := str.copy(s);
+    while name_used(n) {
+        n = str.copy(tprintf("{}_", n));
+    }
+    used_names << str.copy(n);
+    return n;
+}
+
+onyx_package_of :: (pkg: str) -> str {
+    rest := pkg;
+    at := str.index_of(pkg, "@");
+    ver := "";
+    if at >= 0 {
+        rest = pkg[0 .. at];
+        ver = pkg[at + 1 .. pkg.count];
+    }
+    colon := str.index_of(rest, ":");
+    ns := rest;
+    name := "";
+    if colon >= 0 {
+        ns = rest[0 .. colon];
+        name = rest[colon + 1 .. rest.count];
+    }
+    buf: dyn_str;
+    buf_add(&buf, snake(ns));
+    if name.count > 0 {
+        buf << '.';
+        buf_add(&buf, snake(name));
+    }
+    if ver.count > 0 {
+        buf << '.';
+        buf << 'v';
+        for i in 0 .. ver.count {
+            c := ver[i];
+            if c == '.' do c = '_';
+            if is_ident_char(c) do buf << c;
+        }
+    }
+    return str.copy(buf);
+}
+
+follow :: (t: Type_Ref) -> Type_Ref {
+    cur := t;
+    while cur.tag == .Index {
+        d := def_at(cur.index);
+        if d.kind != .Alias do return cur;
+        cur = d.inner;
+    }
+    return cur;
+}
+
+spell :: (t: Type_Ref) -> str {
+    if t.tag == .None do return "void";
+    if t.tag == .Prim {
+        if t.prim == "bool" do return "bool";
+        if t.prim == "s8" do return "i8";
+        if t.prim == "s16" do return "i16";
+        if t.prim == "s32" do return "i32";
+        if t.prim == "s64" do return "i64";
+        if t.prim == "u8" do return "u8";
+        if t.prim == "u16" do return "u16";
+        if t.prim == "u32" do return "u32";
+        if t.prim == "u64" do return "u64";
+        if t.prim == "f32" do return "f32";
+        if t.prim == "f64" do return "f64";
+        if t.prim == "char" do return "u32";
+        if t.prim == "string" do return "str";
+        die(tprintf("cannot spell primitive '{}'", t.prim));
+    }
+    d := def_at(t.index);
+    if d.kind == .Alias do return spell(d.inner);
+    if d.kind == .Option_ do return tprintf("? {}", spell(d.inner));
+    if d.kind == .Result_ {
+        ok := "void";
+        err := "void";
+        if d.has_ok do ok = spell(d.ok);
+        if d.has_err do err = spell(d.err);
+        return tprintf("Result({}, {})", ok, err);
+    }
+    if d.kind == .List do return tprintf("[] {}", spell(d.inner));
+    if t.index >= 0 && t.index < type_public.count && type_public[t.index].count > 0 {
+        return type_public[t.index];
+    }
+    die(tprintf("WIT type {} has no Onyx name", t.index));
+    return "void";
+}
+
+// `use` aliases are their own type indexes. Handles often point at the alias.
+resolve_resource :: (idx: i32) -> i32 {
+    guard := 0;
+    while guard < 16 {
+        d := resolved.types[idx];
+        if d.kind != .Alias || d.inner.tag != .Index do return idx;
+        idx = d.inner.index;
+        guard += 1;
+    }
+    return idx;
+}
+
+fill_names :: () {
+    used_names.count = 0;
+    type_public.count = 0;
+    iface_public.count = 0;
+    for _ in resolved.types {
+        type_public << "";
+    }
+    for i in 0 .. resolved.types.count {
+        d := resolved.types[i];
+        if d.name.count == 0 do continue;
+        if d.kind == .Resource || d.kind == .Record || d.kind == .Variant || d.kind == .Enum_ || d.kind == .Flags {
+            type_public[i] = claim(pascal(d.name));
+        }
+    }
+    for i in 0 .. resolved.types.count {
+        d := resolved.types[i];
+        if d.kind == .Handle_Own || d.kind == .Handle_Borrow {
+            base := type_public[resolve_resource(d.handle_of)];
+            if base.count == 0 do die("handle does not point at a named resource");
+            if d.kind == .Handle_Own {
+                type_public[i] = base;
+            } else {
+                type_public[i] = claim(tprintf("{}_Borrow", base));
+            }
+        } elseif d.kind == .Tuple {
+            type_public[i] = claim(tprintf("Tup_{}", i));
+        }
+    }
+    for i in 0 .. resolved.interfaces.count {
+        iface_public << claim(pascal(resolved.interfaces[i].name));
+    }
+}
+
+core_zero :: (t: Core_Ty) -> str {
+    if t == .F32 || t == .F64 do return "0.0";
+    if t == .I64 do return "cast(i64) 0";
+    return "0";
+}
+
+as_core :: (bits: str, src: Core_Ty, dst: Core_Ty) -> str {
+    if src == dst do return bits;
+    if src == .F32 && dst == .I32 do return tprintf("abi.f32_as_i32({})", bits);
+    if src == .I32 && dst == .F32 do return tprintf("abi.i32_as_f32({})", bits);
+    if src == .F64 && dst == .I64 do return tprintf("abi.f64_as_i64({})", bits);
+    if src == .I64 && dst == .F64 do return tprintf("abi.i64_as_f64({})", bits);
+    if src == .I32 && dst == .I64 do return tprintf("abi.zext_i32({})", bits);
+    if src == .F32 && dst == .I64 do return tprintf("abi.zext_i32(abi.f32_as_i32({}))", bits);
+    if src == .I64 && dst == .I32 do return tprintf("cast(i32) ({})", bits);
+    if src == .I64 && dst == .F32 do return tprintf("abi.i32_as_f32(cast(i32) ({}))", bits);
+    die(tprintf("cannot reinterpret {} as {}", src, dst));
+    return bits;
+}
+
+expect_at :: (expect: [] Core_Ty, i: i32) -> Core_Ty {
+    if i < 0 || i >= expect.count do die("internal error: flat slot out of range");
+    return expect[i];
+}
+
+arm_name :: () -> str {
+    n := tmp_seq;
+    tmp_seq += 1;
+    return tprintf("_a{}", n);
+}
+
+fresh :: (ty: str) -> str {
+    n := tmp_seq;
+    tmp_seq += 1;
+    name := tprintf("_t{}", n);
+    el(tprintf("{}: {};", name, ty));
+    return name;
+}
+
+plain_scalar :: (t: Type_Ref) -> bool {
+    c := follow(t);
+    if c.tag != .Prim do return false;
+    if c.prim == "string" || c.prim == "bool" || c.prim == "char" do return false;
+    return true;
+}
+
+take_param :: (raw: str) -> str {
+    n := snake(raw);
+    if n == "owned" || n == "ptr" || n == "v" || n == "inner" || n == "disc" || n == "rv" {
+        n = str.copy(tprintf("in_{}", n));
+    }
+    base := n;
+    k := 2;
+    while true {
+        hit := false;
+        for t in param_taken {
+            if t == n do hit = true;
+        }
+        if !hit do break;
+        n = str.copy(tprintf("{}_{}", base, k));
+        k += 1;
+    }
+    param_taken << str.copy(n);
+    return n;
+}
+
+// Lower `expr` into flat slots s{slot} .. using `expect` as the joined slot types.
+emit_lower_flat :: (expr: str, t: Type_Ref, slot: i32, expect: [] Core_Ty) -> i32 {
+    if t.tag == .None do die("cannot lower an empty WIT type");
+    c := follow(t);
+
+    if c.tag == .Prim {
+        if c.prim == "string" {
+            if expect.count < 2 do die("string flatten is not two core values");
+            el(tprintf("s{} = {};", slot, as_core(tprintf("abi.str_ptr({})", expr), .I32, expect_at(expect, 0))));
+            el(tprintf("s{} = {};", slot + 1, as_core(tprintf("({}).count", expr), .I32, expect_at(expect, 1))));
+            return slot + 2;
+        }
+        natural := abi_get(c).flat[0];
+        bits := expr;
+        if c.prim == "bool" {
+            bits = tprintf("(1 if ({}) else 0)", expr);
+            natural = .I32;
+        } elseif c.prim == "char" {
+            el(tprintf("abi.check_char({});", expr));
+            bits = tprintf("cast(i32) ({})", expr);
+            natural = .I32;
+        } elseif c.prim == "f32" {
+            natural = .F32;
+        } elseif c.prim == "f64" {
+            natural = .F64;
+        } elseif c.prim == "u64" || c.prim == "s64" {
+            bits = tprintf("cast(i64) ({})", expr);
+            natural = .I64;
+        } else {
+            bits = tprintf("cast(i32) ({})", expr);
+            natural = .I32;
+        }
+        el(tprintf("s{} = {};", slot, as_core(bits, natural, expect_at(expect, 0))));
+        return slot + 1;
+    }
+
+    d := def_at(c.index);
+    if d.kind == .Enum_ || d.kind == .Flags {
+        el(tprintf("s{} = {};", slot, as_core(tprintf("cast(i32) ({})", expr), .I32, expect_at(expect, 0))));
+        return slot + 1;
+    }
+    if d.kind == .Handle_Own || d.kind == .Handle_Borrow {
+        el(tprintf("s{} = {};", slot, as_core(tprintf("cast(i32) (({}).handle)", expr), .I32, expect_at(expect, 0))));
+        return slot + 1;
+    }
+    if d.kind == .List do return emit_lower_list(expr, d.inner, slot, expect);
+
+    if d.kind == .Record || d.kind == .Tuple {
+        cursor := 0;
+        at := slot;
+        for f in d.fields {
+            child := abi_get(f.typ);
+            n := child.flat.count;
+            if cursor + n > expect.count do die("record flatten does not match its fields");
+            at = emit_lower_flat(tprintf("({}).{}", expr, snake(f.name)), f.typ, at, expect[cursor .. cursor + n]);
+            cursor += n;
+        }
+        return at;
+    }
+
+    if d.kind == .Option_ || d.kind == .Result_ || d.kind == .Variant {
+        for i in 0 .. expect.count {
+            el(tprintf("s{} = {};", slot + i, core_zero(expect[i])));
+        }
+        if d.kind == .Option_ {
+            bind := arm_name();
+            el(tprintf("switch {} {{", expr));
+            idt(1)
+            el("case .None {");
+            idt(1)
+            el(tprintf("s{} = {};", slot, as_core("0", .I32, expect_at(expect, 0))));
+            idt(-1)
+            el("}");
+            el(tprintf("case .Some as {} {{", bind));
+            idt(1)
+            el(tprintf("s{} = {};", slot, as_core("1", .I32, expect_at(expect, 0))));
+            if expect.count > 1 {
+                emit_lower_flat(bind, d.inner, slot + 1, expect[1 .. expect.count]);
+            }
+            idt(-1)
+            el("}");
+            idt(-1)
+            el("}");
+        } elseif d.kind == .Result_ {
+            el(tprintf("switch {} {{", expr));
+            idt(1)
+            if d.has_ok {
+                bind := arm_name();
+                el(tprintf("case .Ok as {} {{", bind));
+                idt(1)
+                el(tprintf("s{} = {};", slot, as_core("0", .I32, expect_at(expect, 0))));
+                if expect.count > 1 do emit_lower_flat(bind, d.ok, slot + 1, expect[1 .. expect.count]);
+                idt(-1)
+                el("}");
+            } else {
+                el("case .Ok {");
+                idt(1)
+                el(tprintf("s{} = {};", slot, as_core("0", .I32, expect_at(expect, 0))));
+                idt(-1)
+                el("}");
+            }
+            if d.has_err {
+                bind := arm_name();
+                el(tprintf("case .Err as {} {{", bind));
+                idt(1)
+                el(tprintf("s{} = {};", slot, as_core("1", .I32, expect_at(expect, 0))));
+                if expect.count > 1 do emit_lower_flat(bind, d.err, slot + 1, expect[1 .. expect.count]);
+                idt(-1)
+                el("}");
+            } else {
+                el("case .Err {");
+                idt(1)
+                el(tprintf("s{} = {};", slot, as_core("1", .I32, expect_at(expect, 0))));
+                idt(-1)
+                el("}");
+            }
+            idt(-1)
+            el("}");
+        } else {
+            el(tprintf("switch {} {{", expr));
+            idt(1)
+            for ci in 0 .. d.cases.count {
+                cs := d.cases[ci];
+                cname := pascal(cs.name);
+                if cs.has_payload {
+                    bind := arm_name();
+                    el(tprintf("case .{} as {} {{", cname, bind));
+                    idt(1)
+                    el(tprintf("s{} = {};", slot, as_core(tprintf("{}", ci), .I32, expect_at(expect, 0))));
+                    if expect.count > 1 do emit_lower_flat(bind, cs.payload, slot + 1, expect[1 .. expect.count]);
+                    idt(-1)
+                    el("}");
+                } else {
+                    el(tprintf("case .{} {{", cname));
+                    idt(1)
+                    el(tprintf("s{} = {};", slot, as_core(tprintf("{}", ci), .I32, expect_at(expect, 0))));
+                    idt(-1)
+                    el("}");
+                }
+            }
+            idt(-1)
+            el("}");
+        }
+        return slot + expect.count;
+    }
+
+    die("cannot lower this WIT type to core values");
+    return slot;
+}
+
+emit_lower_list :: (expr: str, elem: Type_Ref, slot: i32, expect: [] Core_Ty) -> i32 {
+    if expect.count < 2 do die("list flatten is not two core values");
+    id := tmp_seq;
+    tmp_seq += 1;
+    n := tprintf("_n{}", id);
+    buf := tprintf("_b{}", id);
+    child := abi_get(elem);
+    el(tprintf("{} := ({}).count;", n, expr));
+    el(tprintf("if {} <= 0 {{", n));
+    idt(1)
+    el(tprintf("s{} = {};", slot, core_zero(expect[0])));
+    el(tprintf("s{} = {};", slot + 1, core_zero(expect[1])));
+    idt(-1)
+    el("} else {");
+    idt(1)
+    if layout_matches(elem) {
+        el(tprintf("s{} = {};", slot, as_core(tprintf("cast(i32) abi.ptr_u32(({}).data)", expr), .I32, expect[0])));
+        el(tprintf("s{} = {};", slot + 1, as_core(n, .I32, expect[1])));
+    } else {
+        concrete := follow(elem);
+        if concrete.tag != .Index do die("list element has no store function");
+        el(tprintf("{} := abi.alloc_bytes({}, cast(u32) {} * {});", buf, child.align, n, child.size));
+        el(tprintf("abi.note_alloc({}, false);", buf));
+        el(tprintf("for _i in 0 .. {} {{", n));
+        idt(1)
+        el(tprintf("__wit_store_{}({} + (cast(u32) _i) * {}, ({})[_i], false);", concrete.index, buf, child.size, expr));
+        idt(-1)
+        el("}");
+        el(tprintf("s{} = {};", slot, as_core(tprintf("cast(i32) {}", buf), .I32, expect[0])));
+        el(tprintf("s{} = {};", slot + 1, as_core(n, .I32, expect[1])));
+    }
+    idt(-1)
+    el("}");
+    return slot + 2;
+}
+
+emit_lift_flat :: (dest: str, t: Type_Ref, slot: i32, expect: [] Core_Ty) -> i32 {
+    if t.tag == .None do die("cannot lift an empty WIT type");
+    c := follow(t);
+
+    if c.tag == .Prim {
+        if c.prim == "string" {
+            el(tprintf("{} = abi.take_string(cast(u32) a{}, cast(u32) a{});", dest, slot, slot + 1));
+            return slot + 2;
+        }
+        bits := tprintf("a{}", slot);
+        natural := abi_get(c).flat[0];
+        got := as_core(bits, expect_at(expect, 0), natural);
+        if c.prim == "bool" {
+            el(tprintf("if ({}) != 0 && ({}) != 1 do abi.trap();", got, got));
+            el(tprintf("{} = ({}) != 0;", dest, got));
+        } elseif c.prim == "char" {
+            el(tprintf("{} = cast(u32) ({});", dest, got));
+            el(tprintf("abi.check_char({});", dest));
+        } else {
+            el(tprintf("{} = cast({}) ({});", dest, spell(c), got));
+        }
+        return slot + 1;
+    }
+
+    d := def_at(c.index);
+    if d.kind == .Enum_ || d.kind == .Flags {
+        got := as_core(tprintf("a{}", slot), expect_at(expect, 0), .I32);
+        el(tprintf("{} = cast({}) ({});", dest, spell(c), got));
+        return slot + 1;
+    }
+    if d.kind == .Handle_Own || d.kind == .Handle_Borrow {
+        got := as_core(tprintf("a{}", slot), expect_at(expect, 0), .I32);
+        el(tprintf("{}.handle = cast(u32) ({});", dest, got));
+        return slot + 1;
+    }
+    if d.kind == .List {
+        id := tmp_seq;
+        tmp_seq += 1;
+        el(tprintf("_h{}: [2] u32;", id));
+        el(tprintf("_h{}[0] = cast(u32) a{};", id, slot));
+        el(tprintf("_h{}[1] = cast(u32) a{};", id, slot + 1));
+        el(tprintf("{} = __wit_load_{}(abi.ptr_u32(cast(rawptr) &_h{}));", dest, c.index, id));
+        return slot + 2;
+    }
+    if d.kind == .Record || d.kind == .Tuple {
+        cursor := 0;
+        at := slot;
+        for f in d.fields {
+            child := abi_get(f.typ);
+            n := child.flat.count;
+            fname := snake(f.name);
+            at = emit_lift_flat(tprintf("{}.{}", dest, fname), f.typ, at, expect[cursor .. cursor + n]);
+            cursor += n;
+        }
+        return at;
+    }
+    if d.kind == .Option_ {
+        el(tprintf("if a{} == 0 {{", slot));
+        idt(1)
+        el(tprintf("{} = .None;", dest));
+        idt(-1)
+        el(tprintf("}} elseif a{} == 1 {{", slot));
+        idt(1)
+        tmp := fresh(spell(d.inner));
+        if expect.count > 1 do emit_lift_flat(tmp, d.inner, slot + 1, expect[1 .. expect.count]);
+        el(tprintf("{} = .{{ Some = {} }};", dest, tmp));
+        idt(-1)
+        el("} else {");
+        idt(1)
+        el("abi.trap();");
+        el(tprintf("{} = .None;", dest));
+        idt(-1)
+        el("}");
+        return slot + expect.count;
+    }
+    if d.kind == .Result_ {
+        el(tprintf("if a{} == 0 {{", slot));
+        idt(1)
+        if d.has_ok {
+            tmp := fresh(spell(d.ok));
+            if expect.count > 1 do emit_lift_flat(tmp, d.ok, slot + 1, expect[1 .. expect.count]);
+            el(tprintf("{} = .{{ Ok = {} }};", dest, tmp));
+        } else {
+            el(tprintf("{} = .{{ Ok = .{{}} }};", dest));
+        }
+        idt(-1)
+        el(tprintf("}} elseif a{} == 1 {{", slot));
+        idt(1)
+        if d.has_err {
+            tmp := fresh(spell(d.err));
+            if expect.count > 1 do emit_lift_flat(tmp, d.err, slot + 1, expect[1 .. expect.count]);
+            el(tprintf("{} = .{{ Err = {} }};", dest, tmp));
+        } else {
+            el(tprintf("{} = .{{ Err = .{{}} }};", dest));
+        }
+        idt(-1)
+        el("} else {");
+        idt(1)
+        el("abi.trap();");
+        el(tprintf("{} = .{{}};", dest));
+        idt(-1)
+        el("}");
+        return slot + expect.count;
+    }
+    if d.kind == .Variant {
+        for ci in 0 .. d.cases.count {
+            cs := d.cases[ci];
+            cname := pascal(cs.name);
+            if ci == 0 do el(tprintf("if a{} == {} {{", slot, ci));
+            else do el(tprintf("}} elseif a{} == {} {{", slot, ci));
+            idt(1)
+            if cs.has_payload {
+                tmp := fresh(spell(cs.payload));
+                if expect.count > 1 do emit_lift_flat(tmp, cs.payload, slot + 1, expect[1 .. expect.count]);
+                el(tprintf("{} = .{{ {} = {} }};", dest, cname, tmp));
+            } else {
+                el(tprintf("{} = .{{ {} = .{{}} }};", dest, cname));
+            }
+            idt(-1)
+        }
+        el("} else {");
+        idt(1)
+        el("abi.trap();");
+        el(tprintf("{} = .{{}};", dest));
+        idt(-1)
+        el("}");
+        return slot + expect.count;
+    }
+
+    die("cannot lift this WIT type from core values");
+    return slot;
+}
+
+disc_store :: (addr: str, value: str, size: u32) {
+    if size == 1 do el(tprintf("abi.store_u8({}, cast(u8) ({}));", addr, value));
+    elseif size == 2 do el(tprintf("abi.store_u16({}, cast(u16) ({}));", addr, value));
+    else do el(tprintf("abi.store_u32({}, cast(u32) ({}));", addr, value));
+}
+
+disc_load_expr :: (addr: str, size: u32) -> str {
+    if size == 1 do return tprintf("cast(i32) abi.load_u8({})", addr);
+    if size == 2 do return tprintf("cast(i32) abi.load_u16({})", addr);
+    return tprintf("cast(i32) abi.load_u32({})", addr);
+}
+
+load_expr :: (t: Type_Ref, addr: str) -> str {
+    c := follow(t);
+    if c.tag == .Prim {
+        if c.prim == "bool" do return tprintf("abi.load_bool({})", addr);
+        if c.prim == "u8" do return tprintf("abi.load_u8({})", addr);
+        if c.prim == "u16" do return tprintf("abi.load_u16({})", addr);
+        if c.prim == "u32" || c.prim == "char" do return tprintf("abi.load_u32({})", addr);
+        if c.prim == "u64" do return tprintf("abi.load_u64({})", addr);
+        if c.prim == "s8" do return tprintf("abi.load_i8({})", addr);
+        if c.prim == "s16" do return tprintf("abi.load_i16({})", addr);
+        if c.prim == "s32" do return tprintf("abi.load_i32({})", addr);
+        if c.prim == "s64" do return tprintf("abi.load_i64({})", addr);
+        if c.prim == "f32" do return tprintf("abi.load_f32({})", addr);
+        if c.prim == "f64" do return tprintf("abi.load_f64({})", addr);
+        if c.prim == "string" do return tprintf("abi.lift_string_at({})", addr);
+        die(tprintf("cannot load primitive '{}'", c.prim));
+    }
+    return tprintf("__wit_load_{}({})", c.index, addr);
+}
+
+emit_prim_store :: (addr: str, expr: str, t: Type_Ref, owned_word: str) {
+    if t.prim == "bool" do el(tprintf("abi.store_bool({}, {});", addr, expr));
+    elseif t.prim == "string" do el(tprintf("abi.store_string({}, {}, {});", addr, expr, owned_word));
+    elseif t.prim == "u8" do el(tprintf("abi.store_u8({}, {});", addr, expr));
+    elseif t.prim == "u16" do el(tprintf("abi.store_u16({}, {});", addr, expr));
+    elseif t.prim == "u32" do el(tprintf("abi.store_u32({}, {});", addr, expr));
+    elseif t.prim == "char" {
+        el(tprintf("abi.check_char({});", expr));
+        el(tprintf("abi.store_u32({}, {});", addr, expr));
+    } elseif t.prim == "u64" do el(tprintf("abi.store_u64({}, {});", addr, expr));
+    elseif t.prim == "s8" do el(tprintf("abi.store_i8({}, {});", addr, expr));
+    elseif t.prim == "s16" do el(tprintf("abi.store_i16({}, {});", addr, expr));
+    elseif t.prim == "s32" do el(tprintf("abi.store_i32({}, {});", addr, expr));
+    elseif t.prim == "s64" do el(tprintf("abi.store_i64({}, {});", addr, expr));
+    elseif t.prim == "f32" do el(tprintf("abi.store_f32({}, {});", addr, expr));
+    elseif t.prim == "f64" do el(tprintf("abi.store_f64({}, {});", addr, expr));
+    else do die(tprintf("cannot store primitive '{}'", t.prim));
+}
+
+emit_store_word :: (addr: str, expr: str, t: Type_Ref, owned_word: str) {
+    c := follow(t);
+    if c.tag == .Prim {
+        emit_prim_store(addr, expr, c, owned_word);
+        return;
+    }
+    el(tprintf("__wit_store_{}({}, {}, {});", c.index, addr, expr, owned_word));
+}
+
+emit_load_list :: (elem: Type_Ref) {
+    child := abi_get(elem);
+    el("data := abi.load_u32(ptr);");
+    el("n := abi.load_u32(ptr + 4);");
+    el("if n == 0 {");
+    idt(1)
+    el("abi.free_bytes(data);");
+    el("return .{};");
+    idt(-1)
+    el("}");
+    el(tprintf("out := make([] {}, cast(i32) n);", spell(elem)));
+    if plain_scalar(elem) {
+        el(tprintf("memory.copy(cast(rawptr) out.data, abi.u32_ptr(data), cast(i32) n * {});", child.size));
+    } else {
+        el("for _i in 0 .. cast(i32) n {");
+        idt(1)
+        el(tprintf("out[_i] = {};", load_expr(elem, tprintf("data + (cast(u32) _i) * {}", child.size))));
+        idt(-1)
+        el("}");
+    }
+    el("abi.free_bytes(data);");
+    el("return out;");
+}
+
+emit_store_list :: (elem: Type_Ref) {
+    child := abi_get(elem);
+    el("if v.count <= 0 {");
+    idt(1)
+    el("abi.store_u32(ptr, 0);");
+    el("abi.store_u32(ptr + 4, 0);");
+    el("return;");
+    idt(-1)
+    el("}");
+    if layout_matches(elem) {
+        el("if !owned {");
+        idt(1)
+        el("abi.store_u32(ptr, abi.ptr_u32(v.data));");
+        el("abi.store_u32(ptr + 4, cast(u32) v.count);");
+        el("return;");
+        idt(-1)
+        el("}");
+    }
+    el(tprintf("buf := abi.alloc_bytes({}, cast(u32) v.count * {});", child.align, child.size));
+    el("abi.note_alloc(buf, owned);");
+    if plain_scalar(elem) {
+        el(tprintf("memory.copy(abi.u32_ptr(buf), cast(rawptr) v.data, v.count * {});", child.size));
+    } else {
+        el("for _i in 0 .. v.count {");
+        idt(1)
+        emit_store_word(tprintf("buf + (cast(u32) _i) * {}", child.size), "v[_i]", elem, "owned");
+        idt(-1)
+        el("}");
+    }
+    el("abi.store_u32(ptr, buf);");
+    el("abi.store_u32(ptr + 4, cast(u32) v.count);");
+}
+
+emit_load_store_funcs :: () {
+    for i in 0 .. resolved.types.count {
+        d := resolved.types[i];
+        if d.kind == .Alias || d.kind == .Resource || d.kind == .Unsupported do continue;
+        t := index_ref(i);
+        sp := spell(t);
+        a := abi_get(t);
+
+        el(tprintf("__wit_load_{} :: (ptr: u32) -> {} {{", i, sp));
+        idt(1)
+        if d.kind == .Record || d.kind == .Tuple {
+            el(tprintf("v: {};", sp));
+            off: u32 = 0;
+            for f in d.fields {
+                child := abi_get(f.typ);
+                off = align_to(off, child.align);
+                el(tprintf("v.{} = {};", snake(f.name), load_expr(f.typ, tprintf("ptr + {}", off))));
+                off += child.size;
+            }
+            el("return v;");
+        } elseif d.kind == .Enum_ || d.kind == .Flags {
+            el(tprintf("return cast({}) ({});", sp, disc_load_expr("ptr", a.disc_size)));
+        } elseif d.kind == .Handle_Own || d.kind == .Handle_Borrow {
+            el("return .{ handle = abi.load_u32(ptr) };");
+        } elseif d.kind == .List {
+            emit_load_list(d.inner);
+        } elseif d.kind == .Option_ {
+            el(tprintf("disc := {};", disc_load_expr("ptr", a.disc_size)));
+            el("if disc == 0 do return .None;");
+            el("if disc == 1 {");
+            idt(1)
+            el(tprintf("return .{{ Some = {} }};", load_expr(d.inner, tprintf("ptr + {}", a.payload_off))));
+            idt(-1)
+            el("}");
+            el("abi.trap();");
+            el("return .None;");
+        } elseif d.kind == .Result_ {
+            el(tprintf("disc := {};", disc_load_expr("ptr", a.disc_size)));
+            el("if disc == 0 {");
+            idt(1)
+            if d.has_ok do el(tprintf("return .{{ Ok = {} }};", load_expr(d.ok, tprintf("ptr + {}", a.payload_off))));
+            else do el("return .{ Ok = .{} };");
+            idt(-1)
+            el("}");
+            el("if disc == 1 {");
+            idt(1)
+            if d.has_err do el(tprintf("return .{{ Err = {} }};", load_expr(d.err, tprintf("ptr + {}", a.payload_off))));
+            else do el("return .{ Err = .{} };");
+            idt(-1)
+            el("}");
+            el("abi.trap();");
+            el("return .{};");
+        } elseif d.kind == .Variant {
+            el(tprintf("disc := {};", disc_load_expr("ptr", a.disc_size)));
+            for ci in 0 .. d.cases.count {
+                cs := d.cases[ci];
+                el(tprintf("if disc == {} {{", ci));
+                idt(1)
+                if cs.has_payload {
+                    el(tprintf("return .{{ {} = {} }};", pascal(cs.name), load_expr(cs.payload, tprintf("ptr + {}", a.payload_off))));
+                } else {
+                    el(tprintf("return .{{ {} = .{{}} }};", pascal(cs.name)));
+                }
+                idt(-1)
+                el("}");
+            }
+            el("abi.trap();");
+            el("return .{};");
+        }
+        idt(-1)
+        el("}");
+        el("");
+
+        el(tprintf("__wit_store_{} :: (ptr: u32, v: {}, owned: bool) {{", i, sp));
+        idt(1)
+        el("_ := owned;");
+        if d.kind == .Record || d.kind == .Tuple || d.kind == .Variant || d.kind == .Option_ || d.kind == .Result_ {
+            el(tprintf("memory.set(abi.u32_ptr(ptr), 0, cast(i32) {});", a.size));
+        }
+        if d.kind == .Record || d.kind == .Tuple {
+            off: u32 = 0;
+            for f in d.fields {
+                child := abi_get(f.typ);
+                off = align_to(off, child.align);
+                emit_store_word(tprintf("ptr + {}", off), tprintf("v.{}", snake(f.name)), f.typ, "owned");
+                off += child.size;
+            }
+        } elseif d.kind == .Enum_ || d.kind == .Flags {
+            disc_store("ptr", "cast(i32) v", a.disc_size);
+        } elseif d.kind == .Handle_Own || d.kind == .Handle_Borrow {
+            el("abi.store_u32(ptr, v.handle);");
+        } elseif d.kind == .List {
+            emit_store_list(d.inner);
+        } elseif d.kind == .Option_ {
+            el("switch v {");
+            idt(1)
+            el("case .None {");
+            idt(1)
+            disc_store("ptr", "0", a.disc_size);
+            idt(-1)
+            el("}");
+            el("case .Some as inner {");
+            idt(1)
+            disc_store("ptr", "1", a.disc_size);
+            emit_store_word(tprintf("ptr + {}", a.payload_off), "inner", d.inner, "owned");
+            idt(-1)
+            el("}");
+            idt(-1)
+            el("}");
+        } elseif d.kind == .Result_ {
+            el("switch v {");
+            idt(1)
+            if d.has_ok {
+                el("case .Ok as inner {");
+                idt(1)
+                disc_store("ptr", "0", a.disc_size);
+                emit_store_word(tprintf("ptr + {}", a.payload_off), "inner", d.ok, "owned");
+                idt(-1)
+                el("}");
+            } else {
+                el("case .Ok {");
+                idt(1)
+                disc_store("ptr", "0", a.disc_size);
+                idt(-1)
+                el("}");
+            }
+            if d.has_err {
+                el("case .Err as inner {");
+                idt(1)
+                disc_store("ptr", "1", a.disc_size);
+                emit_store_word(tprintf("ptr + {}", a.payload_off), "inner", d.err, "owned");
+                idt(-1)
+                el("}");
+            } else {
+                el("case .Err {");
+                idt(1)
+                disc_store("ptr", "1", a.disc_size);
+                idt(-1)
+                el("}");
+            }
+            idt(-1)
+            el("}");
+        } elseif d.kind == .Variant {
+            el("switch v {");
+            idt(1)
+            for ci in 0 .. d.cases.count {
+                cs := d.cases[ci];
+                if cs.has_payload {
+                    el(tprintf("case .{} as inner {{", pascal(cs.name)));
+                    idt(1)
+                    disc_store("ptr", tprintf("{}", ci), a.disc_size);
+                    emit_store_word(tprintf("ptr + {}", a.payload_off), "inner", cs.payload, "owned");
+                    idt(-1)
+                    el("}");
+                } else {
+                    el(tprintf("case .{} {{", pascal(cs.name)));
+                    idt(1)
+                    disc_store("ptr", tprintf("{}", ci), a.disc_size);
+                    idt(-1)
+                    el("}");
+                }
+            }
+            idt(-1)
+            el("}");
+        }
+        idt(-1)
+        el("}");
+        el("");
+    }
+}
+
+emit_type_decls :: () {
+    for i in 0 .. resolved.types.count {
+        d := resolved.types[i];
+        name := "";
+        if i < type_public.count do name = type_public[i];
+        if d.kind == .Alias && d.name.count > 0 {
+            alias := pascal(d.name);
+            inner := spell(d.inner);
+            if alias != inner && !name_used(alias) {
+                el(tprintf("{} :: #type {};", alias, inner));
+                el("");
+                used_names << str.copy(alias);
+            }
+            continue;
+        }
+        if name.count == 0 do continue;
+        if d.kind == .Record || d.kind == .Tuple {
+            el(tprintf("{} :: struct {{", name));
+            for f in d.fields {
+                el(tprintf("    {}: {};", snake(f.name), spell(f.typ)));
+            }
+            el("}");
+            el("");
+        } elseif d.kind == .Variant {
+            el(tprintf("{} :: union {{", name));
+            for cs in d.cases {
+                if cs.has_payload do el(tprintf("    {}: {};", pascal(cs.name), spell(cs.payload)));
+                else do el(tprintf("    {}: void;", pascal(cs.name)));
+            }
+            el("}");
+            el("");
+        } elseif d.kind == .Enum_ {
+            backing := "u8";
+            sz := disc_size_of(d.cases.count);
+            if sz == 2 do backing = "u16";
+            if sz == 4 do backing = "u32";
+            el(tprintf("{} :: enum ({}) {{", name, backing));
+            for ci in 0 .. d.cases.count {
+                el(tprintf("    {} :: {};", pascal(d.cases[ci].name), ci));
+            }
+            el("}");
+            el("");
+        } elseif d.kind == .Flags {
+            backing := "u8";
+            sz := abi_get(index_ref(i)).size;
+            if sz == 2 do backing = "u16";
+            if sz == 4 do backing = "u32";
+            el(tprintf("{} :: enum #flags ({}) {{", name, backing));
+            bit: u32 = 1;
+            for ci in 0 .. d.cases.count {
+                el(tprintf("    {} :: {};", pascal(d.cases[ci].name), bit));
+                bit *= 2;
+            }
+            el("}");
+            el("");
+        } elseif d.kind == .Resource {
+            el(tprintf("{} :: struct {{ handle: u32; }}", name));
+            el("");
+        } elseif d.kind == .Handle_Borrow {
+            el(tprintf("{} :: struct {{ handle: u32; }}", name));
+            el("");
+        }
+    }
+}
+
+param_offsets :: (f: Func) -> [..] u32 {
+    offs: [..] u32;
+    offset: u32 = 0;
+    al: u32 = 1;
+    for p in f.params {
+        a := abi_get(p.typ);
+        offset = align_to(offset, a.align);
+        offs << offset;
+        offset += a.size;
+        if a.align > al do al = a.align;
+    }
+    offs << align_to(offset, al);
+    return offs;
+}
+
+iface_matches :: (module: str, iface: str) -> bool {
+    if str.contains(module, "|_ex_") do return false;
+    if iface.count == 0 do return module == "cm32p2";
+    if str.contains(module, tprintf("/{}@", iface)) do return true;
+    return str.ends_with(module, tprintf("/{}", iface));
+}
+
+// Adapter intrinsics for a resource the guest defines live on cm32p2|_ex_...
+ex_iface_matches :: (module: str, iface: str) -> bool {
+    if !str.contains(module, "|_ex_") do return false;
+    if iface.count == 0 do return false;
+    if str.contains(module, tprintf("/{}@", iface)) do return true;
+    if str.contains(module, tprintf("/{}|", iface)) do return true;
+    return str.ends_with(module, tprintf("/{}", iface));
+}
+
+name_has_iface :: (name: str, iface: str) -> bool {
+    if iface.count == 0 do return false;
+    if str.contains(name, tprintf("/{}@", iface)) do return true;
+    if str.contains(name, tprintf("/{}|", iface)) do return true;
+    return false;
+}
+
+sig_i32_to_i32 :: () -> Sig {
+    s: Sig;
+    s.params << Core_Ty.I32;
+    s.results << Core_Ty.I32;
+    return s;
+}
+
+sig_i32 :: () -> Sig {
+    s: Sig;
+    s.params << Core_Ty.I32;
+    return s;
+}
+
+find_import :: (field: str, sig: Sig, iface: str) -> Wat_Sym {
+    found := false;
+    hit: Wat_Sym;
+    for sym in wat_imports {
+        if sym.name != field do continue;
+        if !iface_matches(sym.module, iface) do continue;
+        if !sigs_equal(sym.sig, sig) do continue;
+        if found do die(tprintf("multiple core imports named '{}'", field));
+        found = true;
+        hit = sym;
+    }
+    if !found {
+        println(tprintf("no core import '{}' with signature {}", field, sig_text(sig)));
+        for sym in wat_imports {
+            if sym.name == field do println(tprintf("  candidate {} {}", sym.module, sig_text(sym.sig)));
+        }
+        os.exit(1);
+    }
+    return hit;
+}
+
+find_export :: (field: str, sig: Sig, iface: str) -> Wat_Sym {
+    found := false;
+    hit: Wat_Sym;
+    for sym in wat_exports {
+        if iface.count == 0 {
+            if sym.name != tprintf("cm32p2||{}", field) do continue;
+        } else {
+            suf := tprintf("|{}", field);
+            if !str.ends_with(sym.name, suf) do continue;
+            if !str.contains(sym.name, tprintf("/{}", iface)) do continue;
+        }
+        if !sigs_equal(sym.sig, sig) do continue;
+        if found do die(tprintf("multiple core exports named '{}'", field));
+        found = true;
+        hit = sym;
+    }
+    if !found do die(tprintf("no core export '{}' with signature {}", field, sig_text(sig)));
+    return hit;
+}
+
+find_ex_import :: (field: str, sig: Sig, iface: str) -> Wat_Sym {
+    found := false;
+    hit: Wat_Sym;
+    for sym in wat_imports {
+        if sym.name != field do continue;
+        if !ex_iface_matches(sym.module, iface) do continue;
+        if !sigs_equal(sym.sig, sig) do continue;
+        if found do die(tprintf("multiple adapter imports named '{}'", field));
+        found = true;
+        hit = sym;
+    }
+    if !found do die(tprintf("no adapter import '{}' for interface '{}'", field, iface));
+    return hit;
+}
+
+find_dtor_export :: (wit_name: str, iface: str) -> Wat_Sym {
+    suf := tprintf("|{}_dtor", wit_name);
+    want := sig_i32();
+    found := false;
+    hit: Wat_Sym;
+    for sym in wat_exports {
+        if !str.ends_with(sym.name, suf) do continue;
+        if !name_has_iface(sym.name, iface) do continue;
+        if !sigs_equal(sym.sig, want) do continue;
+        if found do die(tprintf("multiple destructor exports for '{}'", wit_name));
+        found = true;
+        hit = sym;
+    }
+    if !found do die(tprintf("no destructor export for resource '{}'", wit_name));
+    return hit;
+}
+
+Guest_Res :: struct {
+    type_id: i32;
+    new_raw: str;
+    rep_raw: str;
+    dtor_hook: str;
+    dtor_export: str;
+}
+
+guest_resources: [..] Guest_Res
+
+guest_res_index :: (type_id: i32) -> i32 {
+    if type_id < 0 do return -1;
+    id := resolve_resource(type_id);
+    for i in 0 .. guest_resources.count {
+        if guest_resources[i].type_id == id do return i;
+    }
+    return -1;
+}
+
+// A borrow of a guest-defined resource is delivered to that guest as the
+// rep itself. own handles stay indexes into the adapter table.
+is_guest_rep_param :: (t: Type_Ref) -> bool {
+    if t.tag != .Index do return false;
+    if t.index < 0 || t.index >= resolved.types.count do return false;
+    d := resolved.types[t.index];
+    if d.kind == .Alias do return is_guest_rep_param(d.inner);
+    if d.kind != .Handle_Borrow do return false;
+    return guest_res_index(d.handle_of) >= 0;
+}
+
+borrow_name_of :: (resource_id: i32) -> str {
+    for i in 0 .. resolved.types.count {
+        d := resolved.types[i];
+        if d.kind == .Handle_Borrow && resolve_resource(d.handle_of) == resource_id {
+            return type_public[i];
+        }
+    }
+    return "";
+}
+
+emit_rep_method :: (type_name: str, rep_raw: str) {
+    el(tprintf("{}.rep :: (self: {}) -> rawptr {{", type_name, type_name));
+    idt(1)
+    el(tprintf("return abi.u32_ptr(cast(u32) {}(cast(i32) self.handle));", rep_raw));
+    idt(-1)
+    el("}");
+    el("");
+}
+
+// Resources owned by an exported interface. The adapter owns the handle
+// table; these wrappers turn a guest rep into a handle and back.
+emit_guest_resource :: (iface_id: i32) {
+    iface_wit := resolved.interfaces[iface_id].name;
+    for i in 0 .. resolved.types.count {
+        d := resolved.types[i];
+        if d.kind != .Resource do continue;
+        if d.owner_iface != iface_id do continue;
+        if guest_res_index(i) >= 0 do continue;
+
+        new_sym := find_ex_import(tprintf("{}_new", d.name), sig_i32_to_i32(), iface_wit);
+        rep_sym := find_ex_import(tprintf("{}_rep", d.name), sig_i32_to_i32(), iface_wit);
+        drop_sym := find_ex_import(tprintf("{}_drop", d.name), sig_i32(), iface_wit);
+        dtor_sym := find_dtor_export(d.name, iface_wit);
+
+        new_raw := str.copy(tprintf("__wit_imp_{}", imp_seq));
+        imp_seq += 1;
+        emit_foreign(new_raw, new_sym.sig, new_sym.module, new_sym.name);
+
+        rep_raw := str.copy(tprintf("__wit_imp_{}", imp_seq));
+        imp_seq += 1;
+        emit_foreign(rep_raw, rep_sym.sig, rep_sym.module, rep_sym.name);
+
+        drop_raw := str.copy(tprintf("__wit_imp_{}", imp_seq));
+        imp_seq += 1;
+        emit_foreign(drop_raw, drop_sym.sig, drop_sym.module, drop_sym.name);
+
+        public := type_public[i];
+        el(tprintf("{}.from_rep :: (rep: rawptr) -> {} {{", public, public));
+        idt(1)
+        el(tprintf("return .{{ handle = cast(u32) {}(cast(i32) abi.ptr_u32(rep)) }};", new_raw));
+        idt(-1)
+        el("}");
+        el("");
+        emit_rep_method(public, rep_raw);
+        borrowed := borrow_name_of(i);
+        if borrowed.count > 0 do emit_rep_method(borrowed, rep_raw);
+
+        el(tprintf("{}.drop :: (resource: {}) {{", public, public));
+        idt(1)
+        el(tprintf("{}(cast(i32) resource.handle);", drop_raw));
+        idt(-1)
+        el("}");
+        el(tprintf("#overload delete :: {}.drop", public));
+        el("");
+
+        rec: Guest_Res;
+        rec.type_id = i;
+        rec.new_raw = new_raw;
+        rec.rep_raw = rep_raw;
+        rec.dtor_hook = str.copy(tprintf("{}_{}_dtor", snake(iface_wit), snake(d.name)));
+        rec.dtor_export = str.copy(dtor_sym.name);
+        guest_resources << rec;
+    }
+}
+
+emit_dtor_trampoline :: (rec: Guest_Res) {
+    cname := tprintf("__wit_exp_{}", rec.dtor_hook);
+    el(tprintf("{} :: (a0: i32) {{", cname));
+    idt(1)
+    el(tprintf("{}.{}(abi.u32_ptr(cast(u32) a0));", export_package, rec.dtor_hook));
+    idt(-1)
+    el("}");
+    el(tprintf("#export {} {}", quote_onyx(rec.dtor_export), cname));
+    el("");
+
+    post_name := tprintf("{}_post", rec.dtor_export);
+    post_ok, post := lookup_export(post_name);
+    if post_ok {
+        pname := tprintf("__wit_post_{}", rec.dtor_hook);
+        e(tprintf("{} :: ", pname));
+        write_core_params(post.sig);
+        el(" {");
+        el("}");
+        el(tprintf("#export {} {}", quote_onyx(post.name), pname));
+        el("");
+    }
+}
+
+export_hook :: (f: Func, iface_name: str) -> str {
+    if f.kind == .Constructor || f.kind == .Method || f.kind == .Static_ {
+        if guest_res_index(f.resource) >= 0 {
+            res := resolved.types[resolve_resource(f.resource)];
+            leaf := tprintf("{}_{}", snake(res.name), pub_name_of(f));
+            if iface_name.count == 0 do return leaf;
+            return tprintf("{}_{}", snake(iface_name), leaf);
+        }
+    }
+    if iface_name.count == 0 do return snake(f.name);
+    return tprintf("{}_{}", snake(iface_name), snake(f.name));
+}
+
+lookup_export :: (name: str) -> (bool, Wat_Sym) {
+    for sym in wat_exports {
+        if sym.name == name do return true, sym;
+    }
+    empty: Wat_Sym;
+    return false, empty;
+}
+
+write_core_params :: (sig: Sig) {
+    e("(");
+    for i in 0 .. sig.params.count {
+        if i > 0 do e(", ");
+        e(tprintf("a{}: {}", i, core_onyx(sig.params[i])));
+    }
+    e(")");
+    if sig.results.count == 1 do e(tprintf(" -> {}", core_onyx(sig.results[0])));
+    if sig.results.count > 1 do die("core function has more than one result");
+}
+
+emit_foreign :: (raw: str, sig: Sig, module: str, field: str) {
+    e(tprintf("{} :: ", raw));
+    write_core_params(sig);
+    el(tprintf(" #foreign {} {} ---", quote_onyx(module), quote_onyx(field)));
+    el("");
+}
+
+pub_name_of :: (f: Func) -> str {
+    if f.kind == .Constructor do return "new";
+    if f.kind == .Method || f.kind == .Static_ {
+        dot := -1;
+        for i in 0 .. f.name.count {
+            if f.name[i] == '.' do dot = i;
+        }
+        if dot >= 0 do return snake(f.name[dot + 1 .. f.name.count]);
+    }
+    return snake(f.name);
+}
+
+stack_slots :: (size: u32) -> u32 {
+    n := (size + 7) / 8;
+    if n < 1 do return 1;
+    return n;
+}
+
+emit_import :: (f: Func, iface_name: str, ns: str) {
+    sig := sig_for(f, true);
+    sym := find_import(f.name, sig, iface_name);
+    raw := tprintf("__wit_imp_{}", imp_seq);
+    imp_seq += 1;
+    emit_foreign(raw, sig, sym.module, sym.name);
+
+    pub := pub_name_of(f);
+    owner := ns;
+    if f.kind == .Method || f.kind == .Constructor || f.kind == .Static_ {
+        owner = type_public[f.resource];
+    }
+
+    param_taken.count = 0;
+    param_names.count = 0;
+    for i in 0 .. f.params.count {
+        param_names << take_param(f.params[i].name);
+    }
+
+    e(tprintf("{}.{} :: (", owner, pub));
+    for i in 0 .. f.params.count {
+        if i > 0 do e(", ");
+        pty := spell(f.params[i].typ);
+        if f.kind == .Method && i == 0 do pty = type_public[f.resource];
+        e(tprintf("{}: {}", param_names[i], pty));
+    }
+    e(")");
+    if f.has_result do e(tprintf(" -> {}", spell(f.result)));
+    el(" {");
+    idt(1)
+    el("abi.temp_push();");
+
+    flats := flatten_params(f);
+    if sig.indirect_params {
+        offs := param_offsets(f);
+        total := offs[offs.count - 1];
+        el(tprintf("_arg: [{}] u64;", stack_slots(total)));
+        el(tprintf("memory.set(cast(rawptr) &_arg, 0, cast(i32) {});", total));
+        el("_argp := abi.ptr_u32(cast(rawptr) &_arg);");
+        for i in 0 .. f.params.count {
+            emit_store_word(tprintf("_argp + {}", offs[i]), param_names[i], f.params[i].typ, "false");
+        }
+    } elseif flats.count > 0 {
+        for i in 0 .. flats.count {
+            el(tprintf("s{}: {};", i, core_onyx(flats[i])));
+        }
+        at := 0;
+        for i in 0 .. f.params.count {
+            pf := abi_get(f.params[i].typ).flat;
+            at = emit_lower_flat(param_names[i], f.params[i].typ, at, pf);
+        }
+        if at != flats.count do die("internal error: import parameter flattening mismatch");
+    }
+
+    if sig.indirect_result {
+        ra := abi_get(f.result);
+        el(tprintf("_retb: [{}] u64;", stack_slots(ra.size)));
+        el("_retp := abi.ptr_u32(cast(rawptr) &_retb);");
+    }
+
+    args: dyn_str;
+    if sig.indirect_params do buf_arg(&args, "cast(i32) _argp");
+    else {
+        for i in 0 .. flats.count do buf_arg(&args, tprintf("s{}", i));
+    }
+    if sig.indirect_result do buf_arg(&args, "cast(i32) _retp");
+
+    if f.has_result && !sig.indirect_result {
+        e("rv := ");
+    }
+    e(raw);
+    e("(");
+    e(args);
+    el(");");
+
+    if f.has_result {
+        if sig.indirect_result {
+            el(tprintf("_ret := {};", load_expr(f.result, "_retp")));
+        } else {
+            el(tprintf("_ret: {};", spell(f.result)));
+            el("a0 := rv;");
+            rf := abi_get(f.result).flat;
+            emit_lift_flat("_ret", f.result, 0, rf);
+        }
+    }
+    el("abi.temp_free();");
+    if f.has_result do el("return _ret;");
+    idt(-1)
+    el("}");
+    el("");
+}
+
+emit_drops :: (iface_name: str, iface_id: i32) {
+    for i in 0 .. resolved.types.count {
+        d := resolved.types[i];
+        if d.kind != .Resource do continue;
+        if d.owner_iface != iface_id do continue;
+        sig: Sig;
+        sig.params << Core_Ty.I32;
+        field := tprintf("{}_drop", d.name);
+        sym := find_import(field, sig, iface_name);
+        raw := tprintf("__wit_imp_{}", imp_seq);
+        imp_seq += 1;
+        emit_foreign(raw, sig, sym.module, sym.name);
+        ty := type_public[i];
+        el(tprintf("{}.drop :: (resource: {}) {{", ty, ty));
+        idt(1)
+        el(tprintf("{}(cast(i32) resource.handle);", raw));
+        idt(-1)
+        el("}");
+        el(tprintf("#overload delete :: {}.drop", ty));
+        el("");
+    }
+}
+
+emit_export :: (f: Func, iface_name: str, hook: str) {
+    sig := sig_for(f, false);
+    sym := find_export(f.name, sig, iface_name);
+    post_ok, post := lookup_export(tprintf("{}_post", sym.name));
+    needs_post := sig.indirect_result || (f.has_result && contains_heap(f.result));
+    if needs_post && !post_ok do die(tprintf("export '{}' allocates but has no post-return", f.name));
+
+    cname := tprintf("__wit_exp_{}", hook);
+    e(tprintf("{} :: ", cname));
+    write_core_params(sig);
+    el(" {");
+    idt(1)
+    if post_ok do el("abi.post_push();");
+
+    flats := flatten_params(f);
+    if sig.indirect_params {
+        offs := param_offsets(f);
+        el("_base := cast(u32) a0;");
+        for i in 0 .. f.params.count {
+            el(tprintf("p{}: {};", i, spell(f.params[i].typ)));
+            el(tprintf("p{} = {};", i, load_expr(f.params[i].typ, tprintf("_base + {}", offs[i]))));
+        }
+        el("abi.free_bytes(_base);");
+    } else {
+        at := 0;
+        for i in 0 .. f.params.count {
+            el(tprintf("p{}: {};", i, spell(f.params[i].typ)));
+            pf := abi_get(f.params[i].typ).flat;
+            at = emit_lift_flat(tprintf("p{}", i), f.params[i].typ, at, pf);
+        }
+    }
+
+    gres := guest_res_index(f.resource);
+    guest_ctor := f.kind == .Constructor && gres >= 0;
+
+    args: dyn_str;
+    for i in 0 .. f.params.count {
+        if is_guest_rep_param(f.params[i].typ) {
+            buf_arg(&args, tprintf("abi.u32_ptr(cast(u32) p{}.handle)", i));
+        } else {
+            buf_arg(&args, tprintf("p{}", i));
+        }
+    }
+    if f.has_result {
+        e("_user := ");
+    }
+    e(tprintf("{}.{}", export_package, hook));
+    e("(");
+    e(args);
+    el(");");
+
+    if guest_ctor {
+        el(tprintf("return cast(i32) {}(cast(i32) abi.ptr_u32(_user));", guest_resources[gres].new_raw));
+    } elseif f.has_result && sig.indirect_result {
+        ra := abi_get(f.result);
+        el(tprintf("_area := abi.alloc_bytes({}, {});", ra.align, ra.size));
+        el(tprintf("memory.set(abi.u32_ptr(_area), 0, cast(i32) {});", ra.size));
+        emit_store_word("_area", "_user", f.result, "true");
+        el("abi.post_add(_area);");
+        el("return cast(i32) _area;");
+    } elseif f.has_result {
+        rf := abi_get(f.result).flat;
+        if rf.count != 1 do die(tprintf("export '{}' result was not flattened to one value", f.name));
+        el(tprintf("s0: {};", core_onyx(rf[0])));
+        emit_lower_flat("_user", f.result, 0, rf);
+        el("return s0;");
+    }
+    idt(-1)
+    el("}");
+    el(tprintf("#export {} {}", quote_onyx(sym.name), cname));
+    el("");
+
+    if post_ok {
+        pname := tprintf("__wit_post_{}", hook);
+        e(tprintf("{} :: ", pname));
+        write_core_params(post.sig);
+        el(" {");
+        idt(1)
+        el("abi.post_free();");
+        idt(-1)
+        el("}");
+        el(tprintf("#export {} {}", quote_onyx(post.name), pname));
+        el("");
+    }
+}
+
+hook_comment :: (f: Func, hook: str) {
+    gres := guest_res_index(f.resource);
+    guest_ctor := f.kind == .Constructor && gres >= 0;
+    e(tprintf("// {}.{} :: (", export_package, hook));
+    for i in 0 .. f.params.count {
+        if i > 0 do e(", ");
+        if is_guest_rep_param(f.params[i].typ) {
+            pname := snake(f.params[i].name);
+            if f.kind == .Method && i == 0 do pname = "rep";
+            e(tprintf("{}: rawptr", pname));
+        } else {
+            e(tprintf("{}: {}", snake(f.params[i].name), spell(f.params[i].typ)));
+        }
+    }
+    e(")");
+    if guest_ctor do e(" -> rawptr");
+    elseif f.has_result do e(tprintf(" -> {}", spell(f.result)));
+    el("");
+}
+
+require_runtime_exports :: () {
+    need := str.["cm32p2_realloc", "cm32p2_initialize"];
+    for name in need {
+        ok, sym := lookup_export(name);
+        if !ok do die(tprintf("dummy module is missing export '{}'", name));
+        _ := sym;
+    }
+}
+
+generate :: (world_name: str) -> str {
+    outb.count = 0;
+    tmp_seq = 0;
+    imp_seq = 0;
+    has_exports = false;
+    guest_resources.count = 0;
+    fill_names();
+    require_runtime_exports();
+
+    widx := -1;
+    for i in 0 .. resolved.worlds.count {
+        if resolved.worlds[i].name == world_name do widx = i;
+    }
+    if widx < 0 do die(tprintf("world '{}' was not in the WIT document", world_name));
+    w := resolved.worlds[widx];
+    if w.pkg < 0 || w.pkg >= resolved.packages.count do die("world has no package");
+    pkg := onyx_package_of(resolved.packages[w.pkg].name);
+
+    for item in w.exports {
+        if item.kind == .Interface {
+            iface := resolved.interfaces[item.interface_id];
+            if iface.functions.count > 0 do has_exports = true;
+            for id in iface.type_ids {
+                owned := resolved.types[id];
+                if owned.kind == .Resource && owned.owner_iface == item.interface_id do has_exports = true;
+            }
+        } else {
+            has_exports = true;
+        }
+    }
+
+    el("// Generated by scripts/wit-bindgen.onyx. Do not edit.");
+    el(tprintf("// wasm-tools {}  world {}", EXPECTED_WASM_TOOLS, world_name));
+    el(tprintf("package {}", pkg));
+    el("");
+    el("#load \"core:runtime/component/abi\"");
+    el("");
+    el("use core {*}");
+    el("use runtime");
+    el("use runtime.component.abi");
+    if has_exports do el(tprintf("use {}", export_package));
+    el("");
+
+    emit_type_decls();
+    world_funcs := false;
+    for item in w.imports {
+        if item.kind == .Interface {
+            el(tprintf("{} :: struct {{}}", iface_public[item.interface_id]));
+            el("");
+        } elseif item.kind == .Function {
+            world_funcs = true;
+        }
+    }
+    if world_funcs {
+        el("World :: struct {}");
+        el("");
+    }
+
+    emit_load_store_funcs();
+
+    for item in w.imports {
+        if item.kind == .Interface {
+            iface := resolved.interfaces[item.interface_id];
+            ns := iface_public[item.interface_id];
+            for f in iface.functions {
+                emit_import(f, iface.name, ns);
+            }
+            emit_drops(iface.name, item.interface_id);
+        } elseif item.kind == .Function {
+            emit_import(item.func, "", "World");
+        }
+    }
+
+    for item in w.exports {
+        if item.kind == .Interface do emit_guest_resource(item.interface_id);
+    }
+
+    if has_exports {
+        el(tprintf("// Implement these procedures in package {}:", export_package));
+        for item in w.exports {
+            if item.kind == .Function {
+                hook_comment(item.func, export_hook(item.func, ""));
+            } elseif item.kind == .Interface {
+                iface := resolved.interfaces[item.interface_id];
+                for f in iface.functions {
+                    hook_comment(f, export_hook(f, iface.name));
+                }
+            }
+        }
+        for rec in guest_resources {
+            el(tprintf("// {}.{} :: (rep: rawptr)", export_package, rec.dtor_hook));
+        }
+        el("");
+    }
+
+    for item in w.exports {
+        if item.kind == .Function {
+            emit_export(item.func, "", export_hook(item.func, ""));
+        } elseif item.kind == .Interface {
+            iface := resolved.interfaces[item.interface_id];
+            for f in iface.functions {
+                emit_export(f, iface.name, export_hook(f, iface.name));
+            }
+        }
+    }
+    for rec in guest_resources {
+        emit_dtor_trampoline(rec);
+    }
+
+    return str.copy(outb);
+}

@@ -1,0 +1,32 @@
+use core {*}
+
+// @leak-check
+
+main :: () {
+    b := make([..] u8);
+    defer delete(&b);
+
+    bytes.append(&b, 0x7f);
+    bytes.append_u16_le(&b, 0x1234);
+    bytes.append_u16_be(&b, 0x1234);
+    bytes.append_u32_le(&b, 0xdeadbeef);
+    bytes.append_str(&b, "hi");
+
+    println(bytes.starts_with(b, u8.[0x7f]));
+    println(bytes.find(b, u8.[0x12, 0x34]) ?? -1);
+    println(bytes.read_u16_le(b, 1) ?? 0);
+    println(bytes.read_u16_be(b, 3) ?? 0);
+    printf("{x}\n", bytes.read_u32_le(b, 5) ?? 0);
+    if bytes.read_u16_le(b, 100) {
+        println("hit");
+    } else {
+        println("miss");
+    }
+
+    println("hello"->find('e') ?? -1);
+    println("hello"->find("ll") ?? -1);
+    println("hello"->find("zz") ?? -1);
+    println("hello"->find_last('l') ?? -1);
+    println("hello"->index_of('e'));
+    println("hello"->index_of("zz"));
+}

@@ -48,11 +48,6 @@ typedef struct OnyxParser {
     // in other files.
     u32 overload_count;
 
-    // Used by `#doc` directives to store their documentation
-    // string. This is then used by binding nodes to capture
-    // documentation. DEPRECATED
-    OnyxToken *last_documentation_token;
-
     // Used by `///` doc comments
     bh_arr(OnyxToken *) documentation_tokens;
 
@@ -61,6 +56,9 @@ typedef struct OnyxParser {
     b32 hit_unexpected_token : 1;
     b32 parse_calls : 1;
     b32 parse_quick_functions : 1;
+
+    // Caps recursive descent on partial editor buffers.
+    i32 parse_depth;
 
     // Currently, package expressions are only allowed in certain places.
     b32 allow_package_expressions : 1;

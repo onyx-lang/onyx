@@ -1,0 +1,83 @@
+package core.slice
+
+use core
+use core.memory
+
+/// Fixed-length owned slice. Prefer `[..] T` when the buffer must grow.
+/// Use `Buf` when you need `delete` to remember the allocator that `make` used.
+///
+///     b := make(Buf(i32), 16);
+///     b[0] = 1;
+///     delete(&b);
+Buf :: struct (T: type_expr) {
+    data: [] T;
+    allocator: Allocator;
+}
+
+builtin.Buf :: Buf
+
+/// Allocates `n` zeroed elements.
+Buf.make :: ($T: type_expr, n: u32, allocator := context.allocator) -> Buf(T) {
+    return .{
+        data = Slice.make(T, n, allocator),
+        allocator = allocator,
+    };
+}
+
+/// Allocates `n` zeroed elements into an existing `Buf`.
+Buf.init :: (b: &Buf($T), n: u32, allocator := context.allocator) {
+    b.allocator = allocator;
+    Slice.init(&b.data, n, allocator);
+}
+
+#overload
+__make_overload :: macro (_: &Buf($T), n: u32, allocator := context.allocator) -> Buf(T) {
+    return Buf.make(T, n, allocator);
+}
+
+/// Frees the buffer. Prefer `delete(&b)`.
+Buf.delete :: (b: &Buf) {
+    Slice.free(&b.data, b.allocator);
+}
+
+#overload
+builtin.delete :: Buf.delete
+
+/// Allocates a new buffer with the same elements.
+Buf.copy :: (b: &Buf($T), allocator := context.allocator) -> Buf(T) {
+    return .{
+        data = Slice.copy(b.data, allocator),
+        allocator = allocator,
+    };
+}
+
+/// Zeros every element and keeps the allocation.
+Buf.clear :: (b: &Buf($T)) {
+    if b.data.data == null do return;
+    memory.set(b.data.data, 0, b.data.count * sizeof T);
+}
+
+Buf.count :: (b: &Buf) -> i32 {
+    return b.data.count;
+}
+
+Buf.empty :: (b: &Buf) -> bool {
+    return b.data.count == 0;
+}
+
+/// The borrowed view. Do not `delete` this slice; `delete` the `Buf`.
+Buf.as_slice :: (b: &Buf) -> [] b.T {
+    return b.data;
+}
+
+#operator [] macro (b: Buf($T), idx: i32) -> T {
+    return b.data[idx];
+}
+
+#operator []= macro (b: Buf($T), idx: i32, value: T) {
+    b.data[idx] = value;
+}
+
+#operator &[] macro (b: Buf($T), idx: i32) -> &T {
+    return &b.data[idx];
+}

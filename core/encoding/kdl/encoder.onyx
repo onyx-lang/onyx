@@ -3,74 +3,86 @@ package core.encoding.kdl
 
 KDL_TAB_SIZE :: 4
 
-use core {io}
-use core.string {contains}
+use core {io, string}
 
 write :: (d: &Document, w: &io.Writer) {
     for d.nodes {
         write_node(it, w);
-        io.write(w, "\n");
+        io.Writer.write(w, "\n");
     }
 }
 
+Document.write :: write
+
+write_string :: (d: &Document, allocator := context.allocator) -> str {
+    stream := io.BufferStream.make(256);
+    writer := io.Writer.make(&stream, 0);
+    defer io.BufferStream.free(&stream);
+
+    write(d, &writer);
+    return str.copy(io.BufferStream.to_str(&stream), allocator);
+}
+
+Document.write_string :: write_string
+
 write_node :: (n: &Node, w: &io.Writer, indentation := 0) {
-    for indentation * KDL_TAB_SIZE do io.write(w, " ");
+    for indentation * KDL_TAB_SIZE do io.Writer.write(w, " ");
 
-    n.type_annotation->with([ta] {
-        io.write_format(w, "({}) ", ta);
-    });
+    if n.type_annotation as ta {
+        io.Writer.write_format(w, "({}) ", ta);
+    }
 
-    if contains(n.node, "/") do io.write_format(w, "{\"}", n.node);
-    else do io.write(w, n.node);
-    io.write(w, " ");
+    if str.contains(n.node, "/") do io.Writer.write_format(w, "{\"}", n.node);
+    else do io.Writer.write(w, n.node);
+    io.Writer.write(w, " ");
 
     for n.values {
         write_value(it, w);
-        io.write(w, " ");
+        io.Writer.write(w, " ");
     }
 
     for n.props->as_iter() {
-        io.write_format(w, "{}=", it.key);
+        io.Writer.write_format(w, "{}=", it.key);
         write_value(it.value, w);
-        io.write(w, " ");
+        io.Writer.write(w, " ");
     }
 
     if n.children {
-        io.write(w, "{\n");
+        io.Writer.write(w, "{\n");
 
         for n.children {
             write_node(it, w, indentation + 1);
         }
 
-        for indentation * KDL_TAB_SIZE do io.write(w, " ");
-        io.write(w, "}");
+        for indentation * KDL_TAB_SIZE do io.Writer.write(w, " ");
+        io.Writer.write(w, "}");
     }
 
-    io.write(w, "\n");
+    io.Writer.write(w, "\n");
 }
 
 write_value :: (v: Value, w: &io.Writer) {
-    v.type_annotation->with([ta] {
-        io.write_format(w, "({}) ", ta);
-    });
+    if v.type_annotation as ta {
+        io.Writer.write_format(w, "({}) ", ta);
+    }
 
     switch v.data {
         case .String as s {
-            io.write_format(w, "{\"}", s);
+            io.Writer.write_format(w, "{\"}", s);
         }
 
         case .Number as n do switch n {
-            case .Integer as i do io.write_format(w, "{}", i);
-            case .Float as f   do io.write_format(w, "{}", f);
-            case .String as s  do io.write_format(w, "{\"}", s);
+            case .Integer as i do io.Writer.write_format(w, "{}", i);
+            case .Float as f   do io.Writer.write_format(w, "{}", f);
+            case .String as s  do io.Writer.write_format(w, "{\"}", s);
         }
 
         case .Boolean as b {
-            io.write_format(w, "{}", b);
+            io.Writer.write_format(w, "{}", b);
         }
 
         case .Null {
-            io.write_format(w, "null");
+            io.Writer.write_format(w, "null");
         }
     }
 }

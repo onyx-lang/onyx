@@ -2,3 +2,11 @@
 Contains 7? false
 Contains 15? true
 Contains 0? true
+Remove missing 7, contains 8? true
+Contains 0? false
+15[2] ( 8[1] ( 5[0] 10[0] ) 20[1] ( _ 25[0] ) ) 
+Contains 8? false
+Contains 10? true
+Contains 20? true
+15[2] ( 10[1] ( 5[0] _ ) 20[1] ( _ 25[0] ) ) 
+Empty? true

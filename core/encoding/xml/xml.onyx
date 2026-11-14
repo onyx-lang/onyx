@@ -3,27 +3,74 @@ package core.encoding.xml
 
 use core { string }
 
+XML_NS   :: "http://www.w3.org/XML/1998/namespace"
+XMLNS_NS :: "http://www.w3.org/2000/xmlns/"
+
 Document :: struct {
     elements: [..] Element
     strings: string.StringPool
+    doctype: Doctype
+}
+
+Doctype :: struct {
+    name: str
+    public_id: str
+    system_id: str
+    internal_subset: str
 }
 
 Element :: struct {
     Index :: u32
 
     name: str
+    local: str
+    prefix: str
+    space: str
     parent: Element.Index
     attributes: [..] Attribute
     children: [..] Child
 }
 
 Attribute :: struct {
-    key, value: str
+    key: str
+    local: str
+    prefix: str
+    space: str
+    value: str
 }
 
 Child :: union {
     Text: str
     Element: Element.Index
+}
+
+/// Child element name. `space` is a namespace URI; empty matches any.
+Name :: struct {
+    name: str
+    space := ""
+}
+
+/// Attribute on the current element.
+Attr :: struct {
+    name: str
+}
+
+/// Character data of the current element.
+Text :: #distinct void
+
+Ignore :: #distinct void
+
+Error :: struct {
+    Kind :: enum {
+        None
+        Parse
+        Type_Mismatch
+        Unsupported_Type
+    }
+
+    kind := Kind.None
+    msg := ""
+    path := ""
 }
 
 Document.destroy :: (doc: &Document) {
@@ -37,4 +84,29 @@ Document.destroy :: (doc: &Document) {
     delete(&doc.elements)
 }
 
+#overload #order 100
+builtin.delete :: Document.destroy
 
+#overload
+__dispose_used_local :: Document.destroy
+
+split_qname :: (name: str) -> (prefix: str, local: str) {
+    for i in name.count {
+        if name[i] == ':' {
+            return name[0 .. i], name[i + 1 .. name.count]
+        }
+    }
+    return "", name
+}
+
+element_matches :: (el: &Element, name: str, space := "") -> bool {
+    if name.count == 0 do return true
+    if space.count > 0 {
+        return el.space == space && (el.local == name || el.name == name)
+    }
+    return el.name == name || el.local == name
+}
+
+attr_matches :: (a: &Attribute, name: str) -> bool {
+    return a.key == name || a.local == name
+}

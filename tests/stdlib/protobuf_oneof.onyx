@@ -1,0 +1,117 @@
+use core {*}
+use core.encoding.protobuf
+
+@protobuf.Message
+InnerA :: struct {
+    @protobuf.Field.{1, 13}
+    n: u32
+}
+
+@protobuf.Message
+InnerB :: struct {
+    @protobuf.Field.{1, 9}
+    s: str
+}
+
+@protobuf.Message
+Wrap :: struct {
+    @protobuf.Field.{1, 9}
+    name: str
+    payload: union {
+        None: void
+        @protobuf.Field.{10, 11}
+        A as 10: InnerA
+        @protobuf.Field.{11, 11}
+        B as 11: InnerB
+    }
+}
+
+ok :: (label: str, value: bool) {
+    println(label)
+    println(value)
+}
+
+main :: () {
+    a := Wrap.{
+        name = "alpha",
+        payload = .{ A = .{ n = 42 } },
+    }
+
+    bytes_a := protobuf.marshal(a)!
+    defer str.free(bytes_a)
+
+    back_a := protobuf.unmarshal(bytes_a, Wrap)!
+    defer str.free(back_a.name)
+
+    a_ok := false
+    switch back_a.payload {
+        case .A as inner do a_ok = back_a.name == "alpha" && inner.n == 42
+        case _ {}
+    }
+    ok("roundtrip_a", a_ok)
+
+    b := Wrap.{
+        name = "beta",
+        payload = .{ B = .{ s = "hello" } },
+    }
+
+    bytes_b := protobuf.marshal(b)!
+    defer str.free(bytes_b)
+
+    back_b := protobuf.unmarshal(bytes_b, Wrap)!
+    defer str.free(back_b.name)
+
+    b_ok := false
+    switch back_b.payload {
+        case .B as inner {
+            b_ok = back_b.name == "beta" && inner.s == "hello"
+            str.free(inner.s)
+        }
+        case _ {}
+    }
+    ok("roundtrip_b", b_ok)
+
+    // Field 11 (B) must not appear when A is active.
+    has_b_field := false
+    rest := bytes_a
+    while rest.count > 0 {
+        header := rest[0]
+        field := header >> 3
+        wire := header & 7
+        str.advance(&rest, 1)
+        if field == 11 do has_b_field = true
+        if wire == 0 {
+            while rest.count > 0 {
+                b := rest[0]
+                str.advance(&rest, 1)
+                if b & 0x80 == 0 do break
+            }
+        } elseif wire == 2 {
+            len: u32 = 0
+            shift: u32 = 0
+            while rest.count > 0 {
+                b := rest[0]
+                str.advance(&rest, 1)
+                len |= (~~(b & 0x7f)) << shift
+                shift += 7
+                if b & 0x80 == 0 do break
+            }
+            if rest.count >= len do str.advance(&rest, len)
+        }
+    }
+    ok("a_omits_b", !has_b_field)
+
+    empty := Wrap.{ name = "none" }
+    bytes_n := protobuf.marshal(empty)!
+    defer str.free(bytes_n)
+
+    back_n := protobuf.unmarshal(bytes_n, Wrap)!
+    defer str.free(back_n.name)
+
+    n_ok := false
+    switch back_n.payload {
+        case .None do n_ok = back_n.name == "none"
+        case _ {}
+    }
+    ok("roundtrip_none", n_ok)
+}

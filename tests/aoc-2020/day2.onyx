@@ -6,22 +6,22 @@ use core {*}
 
 main :: (args: [] cstr) {
     contents := #file_contents "./input/day2.txt";
-    reader, stream := io.reader_from_string(contents);
+    reader, stream := io.Reader.from_string(contents);
     defer cfree(stream);
 
     valid := 0;
 
-    while !io.reader_empty(&reader) {
-        lo := io.read_u32(&reader);
+    while !io.Reader.empty(&reader) {
+        lo := io.Reader.read_u32(&reader);
 
-        io.read_byte(&reader);
-        hi := io.read_u32(&reader);
+        io.Reader.read_byte(&reader);
+        hi := io.Reader.read_u32(&reader);
 
-        io.read_byte(&reader);
-        ch := io.read_byte(&reader);
+        io.Reader.read_byte(&reader);
+        ch := io.Reader.read_byte(&reader);
 
-        io.skip_bytes(&reader, 2);
-        pw := io.read_line(&reader);
+        io.Reader.skip_bytes(&reader, 2);
+        pw := io.Reader.read_line(&reader);
 
         // Part 1
         // count := 0;

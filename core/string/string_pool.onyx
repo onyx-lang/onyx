@@ -1,7 +1,7 @@
 package core.string
 
 use core.alloc
-use core.alloc.arena
+use core.alloc.arena {Arena}
 use core.memory
 
 ///
@@ -15,24 +15,17 @@ use core.memory
 /// until the pool is cleared or freed.
 ///
 StringPool :: struct {
-    arena: arena.Arena;
+    arena: Arena;
 }
 
-StringPool.make  :: pool_make
-StringPool.add   :: pool_add;
-StringPool.flush :: pool_flush;
-StringPool.free  :: pool_free;
-
-///
 /// Creates a StringPool.
-pool_make :: (maximum_string_length := 16384, allocator := context.allocator) =>
+StringPool.make :: (maximum_string_length := 16384, allocator := context.allocator) =>
     StringPool.{
-        arena.make(allocator, maximum_string_length)
+        Arena.make(allocator, maximum_string_length)
     }
 
-///
 /// Copies a string into the pool, returning the copied string.
-pool_add :: (sp: &StringPool, s: str) -> str {
+StringPool.add :: (sp: &StringPool, s: str) -> str {
     allocator := alloc.as_allocator(&sp.arena);
 
     new_str := make(str, s.count, allocator);
@@ -40,18 +33,16 @@ pool_add :: (sp: &StringPool, s: str) -> str {
     return new_str;
 }
 
-///
 /// Clears all entries in the pool.
-pool_flush :: (sp: &StringPool) {
-    arena.clear(&sp.arena);
+StringPool.flush :: (sp: &StringPool) {
+    Arena.clear(&sp.arena);
 }
 
-///
 /// Completely frees all memory in the pool.
-pool_free :: (sp: &StringPool) {
-    arena.free(&sp.arena);
+StringPool.free :: (sp: &StringPool) {
+    Arena.delete(&sp.arena);
 }
 
 #overload
-builtin.delete :: pool_free
+builtin.delete :: StringPool.free
 

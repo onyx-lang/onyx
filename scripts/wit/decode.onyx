@@ -1,0 +1,264 @@
+package witgen
+
+use core {*}
+use core.encoding.json
+
+ref_from_value :: (v: json.Value) -> Type_Ref {
+    if v->is_null() do return none_ref();
+    if v->type() == .String do return prim_ref(v->as_str());
+    if v->type() == .Integer do return index_ref(cast(i32) v->as_int());
+    die(tprintf("WIT JSON type reference is a {}", v->type()));
+    return none_ref();
+}
+
+read_fields :: (v: json.Value) -> [..] Field {
+    out: [..] Field;
+    if v->is_null() || v->type() != .Array do return out;
+    for item in v->as_array() {
+        f: Field;
+        f.name = str.copy(item["name"]->as_str());
+        f.typ = ref_from_value(item["type"]);
+        out << f;
+    }
+    return out;
+}
+
+read_cases :: (v: json.Value, payload_key: str) -> [..] Case {
+    out: [..] Case;
+    if v->is_null() || v->type() != .Array do return out;
+    for item in v->as_array() {
+        c: Case;
+        c.name = str.copy(item["name"]->as_str());
+        if payload_key.count > 0 {
+            p := item[payload_key];
+            c.has_payload = !p->is_null();
+            c.payload = ref_from_value(p);
+        }
+        out << c;
+    }
+    return out;
+}
+
+decode_type :: (v: json.Value) -> Type_Def {
+    d: Type_Def;
+    d.handle_of = -1;
+    d.owner_iface = -1;
+    if !v["name"]->is_null() do d.name = str.copy(v["name"]->as_str());
+
+    owner := v["owner"];
+    if !owner->is_null() && owner->type() == .Object {
+        if !owner["interface"]->is_null() do d.owner_iface = cast(i32) owner["interface"]->as_int();
+    }
+
+    k := v["kind"];
+    if k->type() == .String {
+        ks := k->as_str();
+        if ks == "resource" {
+            d.kind = .Resource;
+            return d;
+        }
+        die(tprintf("unsupported WIT type kind '{}'", ks));
+        return d;
+    }
+
+    if k->type() != .Object do die("WIT type kind is not an object");
+    key, body := first_entry(k);
+
+    if key == "record" {
+        d.kind = .Record;
+        d.fields = read_fields(body["fields"]);
+    } elseif key == "variant" {
+        d.kind = .Variant;
+        d.cases = read_cases(body["cases"], "type");
+    } elseif key == "enum" {
+        d.kind = .Enum_;
+        d.cases = read_cases(body["cases"], "");
+    } elseif key == "flags" {
+        d.kind = .Flags;
+        d.cases = read_cases(body["flags"], "");
+    } elseif key == "type" {
+        d.kind = .Alias;
+        d.inner = ref_from_value(body);
+    } elseif key == "handle" {
+        if !body["own"]->is_null() {
+            d.kind = .Handle_Own;
+            d.handle_of = cast(i32) body["own"]->as_int();
+        } elseif !body["borrow"]->is_null() {
+            d.kind = .Handle_Borrow;
+            d.handle_of = cast(i32) body["borrow"]->as_int();
+        } else do die("handle is neither own nor borrow");
+    } elseif key == "result" {
+        d.kind = .Result_;
+        okv := body["ok"];
+        errv := body["err"];
+        d.has_ok = !okv->is_null();
+        d.has_err = !errv->is_null();
+        d.ok = ref_from_value(okv);
+        d.err = ref_from_value(errv);
+    } elseif key == "list" {
+        d.kind = .List;
+        if body->type() == .Object do die("fixed-length lists are not supported yet");
+        d.inner = ref_from_value(body);
+    } elseif key == "option" {
+        d.kind = .Option_;
+        d.inner = ref_from_value(body);
+    } elseif key == "tuple" {
+        d.kind = .Tuple;
+        types := body["types"];
+        if types->type() == .Array {
+            n := 0;
+            for item in types->as_array() {
+                f: Field;
+                f.name = tprintf("f{}", n);
+                f.name = str.copy(f.name);
+                f.typ = ref_from_value(item);
+                d.fields << f;
+                n += 1;
+            }
+        }
+    } elseif key == "future" || key == "stream" {
+        d.kind = .Unsupported;
+        die(tprintf("WIT '{}' types are not supported (synchronous canonical ABI only)", key));
+    } else {
+        die(tprintf("unsupported WIT type '{}'", key));
+    }
+
+    return d;
+}
+
+decode_func :: (v: json.Value) -> Func {
+    f: Func;
+    f.name = str.copy(v["name"]->as_str());
+    f.resource = -1;
+    f.kind = .Freestanding;
+
+    k := v["kind"];
+    if k->type() == .String {
+        if k->as_str() != "freestanding" do die(tprintf("unsupported function kind '{}'", k->as_str()));
+    } elseif k->type() == .Object {
+        key, body := first_entry(k);
+        id := cast(i32) body->as_int();
+        f.resource = id;
+        if key == "method" do f.kind = .Method;
+        elseif key == "static" do f.kind = .Static_;
+        elseif key == "constructor" do f.kind = .Constructor;
+        else do die(tprintf("unsupported function kind '{}'", key));
+    } else do die("function kind is missing");
+
+    params := v["params"];
+    if !params->is_null() && params->type() == .Array {
+        for item in params->as_array() {
+            p: Param;
+            p.name = str.copy(item["name"]->as_str());
+            p.typ = ref_from_value(item["type"]);
+            f.params << p;
+        }
+    }
+
+    rv := v["result"];
+    if !rv->is_null() {
+        f.has_result = true;
+        f.result = ref_from_value(rv);
+    }
+    return f;
+}
+
+decode_item :: (key: str, v: json.Value) -> World_Item {
+    item: World_Item;
+    item.key = str.copy(key);
+    item.interface_id = -1;
+    if !v["interface"]->is_null() {
+        item.kind = .Interface;
+        item.interface_id = cast(i32) v["interface"]["id"]->as_int();
+    } elseif !v["function"]->is_null() {
+        item.kind = .Function;
+        item.func = decode_func(v["function"]);
+    } else do die(tprintf("world item '{}' is neither an interface nor a function", key));
+    return item;
+}
+
+// `use host.{point}` shows up as a world item whose only key is "type".
+// The alias is already in the types array, so the item itself is skipped.
+decode_items :: (v: json.Value) -> [..] World_Item {
+    out: [..] World_Item;
+    if v->is_null() || v->type() != .Object do return out;
+    m := v->as_map();
+    for key, val in m {
+        if val->type() == .Object && val["interface"]->is_null() && val["function"]->is_null() && !val["type"]->is_null() {
+            continue;
+        }
+        out << decode_item(key, val);
+    }
+    return out;
+}
+
+first_entry :: (v: json.Value) -> (str, json.Value) {
+    m := v->as_map();
+    key := "";
+    body := json.null_value();
+    n := 0;
+    for k, val in m {
+        if n == 0 {
+            key = str.copy(k);
+            body = val;
+        }
+        n += 1;
+    }
+    if n != 1 do die("WIT JSON object did not have exactly one entry");
+    return key, body;
+}
+
+decode_resolve :: (root: json.Value) {
+    resolved = .{};
+
+    types := root["types"];
+    if types->type() == .Array {
+        for item in types->as_array() {
+            resolved.types << decode_type(item);
+        }
+    }
+
+    ifaces := root["interfaces"];
+    if ifaces->type() == .Array {
+        for item in ifaces->as_array() {
+            iface: Interface;
+            iface.name = str.copy(item["name"]->as_str());
+            iface.pkg = cast(i32) item["package"]->as_int();
+            tm := item["types"];
+            if tm->type() == .Object {
+                for k, val in tm->as_map() {
+                    iface.type_names << str.copy(k);
+                    iface.type_ids << cast(i32) val->as_int();
+                }
+            }
+            fns := item["functions"];
+            if fns->type() == .Object {
+                for fname, val in fns->as_map() {
+                    iface.functions << decode_func(val);
+                }
+            }
+            resolved.interfaces << iface;
+        }
+    }
+
+    worlds := root["worlds"];
+    if worlds->type() == .Array {
+        for item in worlds->as_array() {
+            w: World;
+            w.name = str.copy(item["name"]->as_str());
+            w.pkg = cast(i32) item["package"]->as_int();
+            w.imports = decode_items(item["imports"]);
+            w.exports = decode_items(item["exports"]);
+            resolved.worlds << w;
+        }
+    }
+
+    pkgs := root["packages"];
+    if pkgs->type() == .Array {
+        for item in pkgs->as_array() {
+            p: Package_Info;
+            p.name = str.copy(item["name"]->as_str());
+            resolved.packages << p;
+        }
+    }
+}

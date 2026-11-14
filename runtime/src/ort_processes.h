@@ -22,6 +22,7 @@ typedef struct OnyxProcess {
     // Pipes
     i32 proc_to_host[2];
     i32 host_to_proc[2];
+    i32 proc_err_to_host[2];
 
     pid_t pid;
 #endif
@@ -31,6 +32,8 @@ typedef struct OnyxProcess {
     HANDLE proc_to_host_write;
     HANDLE host_to_proc_read;
     HANDLE host_to_proc_write;
+    HANDLE proc_err_to_host_read;
+    HANDLE proc_err_to_host_write;
 
     PROCESS_INFORMATION proc_info;
 #endif
@@ -61,6 +64,16 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
     OnyxProcess *process = malloc(sizeof(OnyxProcess));
     memset(process, 0, sizeof(*process));
     process->magic_number = ONYX_PROCESS_MAGIC_NUMBER;
+#if defined(_BH_LINUX) || defined(_BH_DARWIN)
+    process->proc_to_host[0] = process->proc_to_host[1] = -1;
+    process->host_to_proc[0] = process->host_to_proc[1] = -1;
+    process->proc_err_to_host[0] = process->proc_err_to_host[1] = -1;
+#endif
+#ifdef _BH_WINDOWS
+    process->proc_to_host_read = process->proc_to_host_write = INVALID_HANDLE_VALUE;
+    process->host_to_proc_read = process->host_to_proc_write = INVALID_HANDLE_VALUE;
+    process->proc_err_to_host_read = process->proc_err_to_host_write = INVALID_HANDLE_VALUE;
+#endif
 
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
         // :Security - alloca a user controlled string.
@@ -84,7 +97,7 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
         process_args[args_len + 1] = NULL;
 
         if (spawn_opts->capture_io) {
-            if (pipe(process->proc_to_host) || pipe(process->host_to_proc)) {
+            if (pipe(process->proc_to_host) || pipe(process->host_to_proc) || pipe(process->proc_err_to_host)) {
                 wasm_val_init_ptr(&results->data[0], NULL); // Failed to run
                 return NULL;
             }
@@ -100,6 +113,8 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
                     close(process->proc_to_host[1]);
                     close(process->host_to_proc[0]);
                     close(process->host_to_proc[1]);
+                    close(process->proc_err_to_host[0]);
+                    close(process->proc_err_to_host[1]);
                 }
                 break;
 
@@ -111,10 +126,11 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
                     if (spawn_opts->capture_io) {
                         close(process->proc_to_host[0]);
                         close(process->host_to_proc[1]);
+                        close(process->proc_err_to_host[0]);
 
-                        dup2(process->host_to_proc[0], 0); // Map the output to the pipe
-                        dup2(process->proc_to_host[1], 1); // Map the output to the pipe
-                        dup2(process->proc_to_host[1], 2); // Stderr to stdout
+                        dup2(process->host_to_proc[0], 0);
+                        dup2(process->proc_to_host[1], 1);
+                        dup2(process->proc_err_to_host[1], 2);
                     }
 
                     if (spawn_opts->non_blocking_io && spawn_opts->capture_io) {
@@ -153,6 +169,7 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
                 if (spawn_opts->capture_io) {
                     close(process->host_to_proc[0]);
                     close(process->proc_to_host[1]);
+                    close(process->proc_err_to_host[1]);
                 }
 
                 wasm_val_init_ptr(&results->data[0], process);
@@ -195,23 +212,23 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
         if (spawn_opts->capture_io) {
             success = success && CreatePipe(&process->host_to_proc_read, &process->host_to_proc_write, &saAttr, 4096);
             success = success && CreatePipe(&process->proc_to_host_read, &process->proc_to_host_write, &saAttr, 4096);
+            success = success && CreatePipe(&process->proc_err_to_host_read, &process->proc_err_to_host_write, &saAttr, 4096);
             if (!success) {
-                // printf("FAILED TO CREATE PIPES: %d\n", GetLastError());
-                wasm_val_init_ptr(&results->data[0], NULL); // Failed to run @LEAK
+                wasm_val_init_ptr(&results->data[0], NULL);
                 return NULL;
             }
 
             success = SetHandleInformation(process->proc_to_host_read, 1 /* HANDLE_FLAG_INHERIT */, 0);
             success = success && SetHandleInformation(process->host_to_proc_write, 1 /* HANDLE_FLAG_INHERIT */, 0);
+            success = success && SetHandleInformation(process->proc_err_to_host_read, 1 /* HANDLE_FLAG_INHERIT */, 0);
             if (!success) {
-                // printf("FAILED TO CONFIGURE PIPES: %d\n", GetLastError());
-                wasm_val_init_ptr(&results->data[0], NULL); // Failed to run @LEAK
+                wasm_val_init_ptr(&results->data[0], NULL);
                 return NULL;
             }
 
             startup.hStdInput  = process->host_to_proc_read;
             startup.hStdOutput = process->proc_to_host_write;
-            startup.hStdError = process->proc_to_host_write;
+            startup.hStdError  = process->proc_err_to_host_write;
 
             startup.dwFlags |= STARTF_USESTDHANDLES;
         }
@@ -232,6 +249,10 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
         if (spawn_opts->capture_io) {
             CloseHandle(process->proc_to_host_write);
             CloseHandle(process->host_to_proc_read);
+            CloseHandle(process->proc_err_to_host_write);
+            process->proc_to_host_write = INVALID_HANDLE_VALUE;
+            process->host_to_proc_read = INVALID_HANDLE_VALUE;
+            process->proc_err_to_host_write = INVALID_HANDLE_VALUE;
         }
 
         wasm_val_init_ptr(&results->data[0], process);
@@ -265,6 +286,48 @@ ONYX_DEF(__process_read, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
 
     #ifdef _BH_WINDOWS
         i32 success = ReadFile(process->proc_to_host_read, buffer, output_len, &bytes_read, NULL);
+        if (!success) {
+            bytes_read = -1;
+        }
+    #endif
+
+    results->data[0] = WASM_I32_VAL(bytes_read);
+    return NULL;
+}
+
+ONYX_DEF(__process_read_stderr, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
+    OnyxProcess *process = (OnyxProcess *) params->data[0].of.i64;
+    if (process == NULL || process->magic_number != ONYX_PROCESS_MAGIC_NUMBER) {
+        results->data[0] = WASM_I32_VAL(0);
+        return NULL;
+    }
+
+    i32 output_ptr = params->data[1].of.i32;
+    i32 output_len = params->data[2].of.i32;
+    u8 *buffer = ONYX_PTR(output_ptr);
+
+    i32 bytes_read;
+    #if defined(_BH_LINUX) || defined(_BH_DARWIN)
+        if (process->proc_err_to_host[0] < 0) {
+            results->data[0] = WASM_I32_VAL(-1);
+            return NULL;
+        }
+        bytes_read = read(process->proc_err_to_host[0], buffer, output_len);
+        if (bytes_read < 0) {
+            switch (errno) {
+                case EAGAIN: bytes_read =  0; break;
+                case EBADF:  bytes_read = -1; break;
+                default:     bytes_read = -2; break;
+            }
+        }
+    #endif
+
+    #ifdef _BH_WINDOWS
+        if (process->proc_err_to_host_read == INVALID_HANDLE_VALUE) {
+            results->data[0] = WASM_I32_VAL(-1);
+            return NULL;
+        }
+        i32 success = ReadFile(process->proc_err_to_host_read, buffer, output_len, &bytes_read, NULL);
         if (!success) {
             bytes_read = -1;
         }
@@ -323,7 +386,7 @@ ONYX_DEF(__process_kill, (WASM_I64), (WASM_I32)) {
 ONYX_DEF(__process_wait, (WASM_I64), (WASM_I32)) {
     OnyxProcess *process = (OnyxProcess *) params->data[0].of.i64;
     if (process == NULL || process->magic_number != ONYX_PROCESS_MAGIC_NUMBER) {
-        results->data[0] = WASM_I32_VAL(1);
+        results->data[0] = WASM_I32_VAL(-1); // FailedToRun
         return NULL;
     }
 
@@ -331,49 +394,35 @@ ONYX_DEF(__process_wait, (WASM_I64), (WASM_I32)) {
         i32 status;
         waitpid(process->pid, &status, 0);
 
-        i32 exit_code = WEXITSTATUS(status);
-        results->data[0] = WASM_I32_VAL(exit_code != 0 ? 2 : 0);
+        i32 exit_code = 1;
+        if (WIFEXITED(status)) {
+            exit_code = WEXITSTATUS(status);
+        } else if (WIFSIGNALED(status)) {
+            exit_code = 128 + WTERMSIG(status);
+        }
+        results->data[0] = WASM_I32_VAL(exit_code);
     #endif
 
     #ifdef _BH_WINDOWS
         DWORD exitCode;
         while (1) {
             WaitForSingleObject(process->proc_info.hProcess, INFINITE);
-            // if (!WaitForSingleObject(process->proc_info.hProcess, INFINITE)) {
-            //     // HACK HACK HACK
-            //     DWORD error = GetLastError();
-            //     if (error != 109 && error != 6) {
-            //         // printf("ERROR IN WAIT FOR SINGLE: %d\n", error);
-            //         results->data[0] = WASM_I32_VAL(1);
-            //         return NULL;
-            //     }
-            // }
 
             if (!GetExitCodeProcess(process->proc_info.hProcess, &exitCode)) {
-                // HACK HACK HACK
-                // Apparently, I'm doing something wrong (maybe?) where the process handle becomes
-                // invalid and causes error 6 "invalid handle". So I think I can safely assume that
-                // if that is the case, then the process exited? probably successfuly? hopefully?
-                // Honestly I don't know and I can't find any documentation describing when a process
-                // handle goes invalid, other than after you close it explicitly. But in the run_tests
-                // script, I'm not calling either process_kill or process_destroy, which are the only
-                // other functions that close the process handle. So I'm left in the dark as to why this
-                // is happening, but oh well. This works for now.
-                //                                                           - brendanfh 2021/12/03
                 if (GetLastError() == 6) {
                     exitCode = 0;
                     break;
                 }
 
-                results->data[0] = WASM_I32_VAL(3);
+                results->data[0] = WASM_I32_VAL(-2); // InternalErr
                 return NULL;
             }
 
-            // 259 is STILL_ACTIVE (aka STATUS_PENDING), which means that the process has not yet exited
+            // 259 is STILL_ACTIVE (aka STATUS_PENDING)
             if (exitCode != 259) break;
         }
 
-        results->data[0] = WASM_I32_VAL(exitCode != 0 ? 2 : 0);
+        results->data[0] = WASM_I32_VAL((i32) exitCode);
     #endif
 
     return NULL;
@@ -386,15 +435,17 @@ ONYX_DEF(__process_destroy, (WASM_I64), ()) {
     }
 
     #if defined(_BH_LINUX) || defined(_BH_DARWIN)
-        close(process->proc_to_host[0]);
-        close(process->host_to_proc[1]);
+        if (process->proc_to_host[0] >= 0) close(process->proc_to_host[0]);
+        if (process->host_to_proc[1] >= 0) close(process->host_to_proc[1]);
+        if (process->proc_err_to_host[0] >= 0) close(process->proc_err_to_host[0]);
     #endif
 
     #ifdef _BH_WINDOWS
-        if (!CloseHandle(process->proc_info.hThread)
-         || !CloseHandle(process->proc_info.hProcess)) {
-            // printf("ERROR CLOSING HANDLES: %d\n", GetLastError());
-         }
+        if (process->proc_to_host_read != INVALID_HANDLE_VALUE) CloseHandle(process->proc_to_host_read);
+        if (process->host_to_proc_write != INVALID_HANDLE_VALUE) CloseHandle(process->host_to_proc_write);
+        if (process->proc_err_to_host_read != INVALID_HANDLE_VALUE) CloseHandle(process->proc_err_to_host_read);
+        if (process->proc_info.hThread) CloseHandle(process->proc_info.hThread);
+        if (process->proc_info.hProcess) CloseHandle(process->proc_info.hProcess);
     #endif
 
     free(process);

@@ -20,11 +20,20 @@ FileError :: enum {
     BadMode    :: 0x05;
 }
 
+/// Shorthand open modes. `.Write` creates and truncates; `.Append` creates.
+/// `.ReadWrite` opens an existing file for both (add `OpenFlags.Create` to create it).
 OpenMode :: enum {
-    Invalid :: 0x00;
-    Read    :: 0x01;
-    Write   :: 0x02;
-    Append  :: 0x03;
+    Invalid   :: 0x00;
+    Read      :: 0x01;
+    Write     :: 0x02;
+    Append    :: 0x03;
+    ReadWrite :: 0x04;
+}
+
+/// Extra bits for `File.open`. `Exclusive` is `O_EXCL` / WASI `FailIfExists` (only with create).
+OpenFlags :: enum #flags (u32) {
+    Exclusive :: 0x01;
+    Create    :: 0x02;
 }
 
 FileData :: fs.FileData;
@@ -59,38 +68,39 @@ FileStat :: struct {
 
 file_exists :: fs.__file_exists
 file_stat   :: fs.__file_stat
+file_lstat  :: fs.__file_lstat
 remove_file :: fs.__file_remove
 rename_file :: fs.__file_rename
 
-get_contents_from_file :: (file: &File) -> str {
-    size := cast(u32) io.stream_size(file);
+File.get_contents :: (file: &File) -> str {
+    size := cast(u32) io.Stream.size(file);
 
     data := cast([&] u8) raw_alloc(context.allocator, size);
 
-    prev_loc := io.stream_tell(file).Ok ?? 0;
-    io.stream_seek(file, 0, .Start);
+    prev_loc := io.Stream.tell(file).Ok ?? 0;
+    io.Stream.seek(file, 0, .Start);
 
-    io.stream_read(file, .{ data, size });
+    io.Stream.read(file, .{ data, size });
 
-    io.stream_seek(file, prev_loc, .Start);
+    io.Stream.seek(file, prev_loc, .Start);
 
     return data[0 .. size];
 }
 
-from_fd :: (fd: FileData) -> File {
+File.from_fd :: (fd: FileData) -> File {
     file: File;
     file.data = fd;
     file.vtable = &fs.__file_stream_vtable;
     return file;
 }
 
-open :: (path: str, mode := OpenMode.Read) -> Result(File, os.FileError) {
+File.open :: (path: str, mode := OpenMode.Read, flags := OpenFlags.{}) -> Result(File, os.FileError) {
     file := File.{
         stream = .{ vtable = null },
         data   = .{},
     };
 
-    file_data, error := fs.__file_open(path, mode);
+    file_data, error := fs.__file_open(path, mode, flags);
     if error != .None do return .{ Err = error };
 
     file.data = file_data;
@@ -98,24 +108,65 @@ open :: (path: str, mode := OpenMode.Read) -> Result(File, os.FileError) {
     return .{ Ok = file };
 }
 
-close :: (file: &File) {
+/// Replace the file's size. Extending may leave a hole; shrinking discards the tail.
+File.truncate :: (file: &File, size: i64) -> bool {
+    return fs.__file_truncate(file.data, size);
+}
+
+/// Create a symbolic link at `link_path` pointing at `target`.
+File.symlink :: (target: str, link_path: str) -> bool {
+    return fs.__file_symlink(target, link_path);
+}
+
+/// Create a hard link at `link_path` for the file at `target`.
+File.link :: (target: str, link_path: str) -> bool {
+    return fs.__file_link(target, link_path);
+}
+
+/// Read the target of a symbolic link. The caller owns the string.
+File.readlink :: (path: str, allocator := context.allocator) -> ? str {
+    buf: [4096] u8;
+    n := fs.__file_readlink(path, buf);
+    if n < 0 do return .None;
+    return str.copy(buf[0 .. n], allocator);
+}
+
+/// Like `file_stat`, but does not follow a final symlink.
+File.lstat :: (path: str, stat: &FileStat) -> bool {
+    return fs.__file_lstat(path, stat);
+}
+
+File.close :: (file: &File) {
     fs.__file_close(file.data);
     file.stream.vtable = null;
 }
 
+
 #overload
 __dispose_used_local :: macro (file: &File) {
-    #this_package.close(file);
+    #this_package.File.close(file);
 }
 
 get_contents :: #match {
-    get_contents_from_file,
+    File.get_contents,
 
     (path: str) -> str {
-        file := open(path, .Read)->or_return(null_str);
-        defer close(&file);
+        file := File.open(path, .Read)->or_return(null_str);
+        defer File.close(&file);
 
         return get_contents(&file);
+    }
+}
+
+/// Create or truncate `path` and write `contents`. Returns false if the file
+/// cannot be opened or the write is short.
+File.write_contents :: (path: str, contents: [] u8) -> bool {
+    file := File.open(path, .Write)->or_return(false);
+    defer File.close(&file);
+
+    switch io.Stream.write(&file, contents) {
+        case .Ok as n do return n == contents.count;
+        case .Err do return false;
     }
 }
 
@@ -152,7 +203,7 @@ file_logger_open :: (filename: str, allocator := context.allocator) -> Result(&F
 
     file_logger.file = new(File, allocator);
 
-    *file_logger.file = open(filename, mode=.Append)->catch([] {
+    *file_logger.file = File.open(filename, mode=.Append)->catch([] {
         raw_free(allocator, file_logger.file);
         raw_free(allocator, file_logger);
 
@@ -172,7 +223,7 @@ file_logger_close :: (logger: &File_Logger) {
         context.logger = logger.old_logger;
     }
 
-    close(logger.file);
+    File.close(logger.file);
 
     raw_free(logger.allocator, logger.file);
     raw_free(logger.allocator, logger);
@@ -180,11 +231,20 @@ file_logger_close :: (logger: &File_Logger) {
 
 #local
 file_logger_proc :: (logger: &File_Logger, level: Log_Level, msg: str, module: str) {
-    writer := io.writer_make(logger.file, 0);
+    writer := io.Writer.make(logger.file, 0);
 
     if module {
-        io.write_format(&writer, "[{}][{}] {}\n", level, module, msg);
+        io.Writer.write_format(&writer, "[{}][{}] {}\n", level, module, msg);
     } else {
-        io.write_format(&writer, "[{}] {}\n", level, msg);
+        io.Writer.write_format(&writer, "[{}] {}\n", level, msg);
     }
 }
+
+File.exists :: file_exists
+File.stat   :: file_stat
+File.remove :: remove_file
+File.rename :: rename_file
+
+stdin  := &fs.__stdin
+stdout := &fs.__stdout
+stderr := &fs.__stderr

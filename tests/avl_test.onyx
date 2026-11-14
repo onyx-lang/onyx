@@ -1,22 +1,49 @@
 
 
 use core {*}
+use core.avl_tree { AVL_Tree }
+
+// @leak-check
 
 main :: () {
-    tree: &avl_tree.AVL_Tree(i32);
+    tree: &AVL_Tree(i32);
 
-    avl_tree.insert(&tree, 20);
-    avl_tree.insert(&tree, 5);
-    avl_tree.insert(&tree, 8);
-    avl_tree.insert(&tree, 25);
-    avl_tree.insert(&tree, 0);
-    avl_tree.insert(&tree, 15);
-    avl_tree.insert(&tree, 10);
+    AVL_Tree.insert(&tree, 20);
+    AVL_Tree.insert(&tree, 5);
+    AVL_Tree.insert(&tree, 8);
+    AVL_Tree.insert(&tree, 25);
+    AVL_Tree.insert(&tree, 0);
+    AVL_Tree.insert(&tree, 15);
+    AVL_Tree.insert(&tree, 10);
 
-    avl_tree.print(tree);
+    AVL_Tree.print(tree);
     print("\n");
 
-    printf("Contains {}? {}\n", 7, avl_tree.contains(tree, 7));
-    printf("Contains {}? {}\n", 15, avl_tree.contains(tree, 15));
-    printf("Contains {}? {}\n", 0, avl_tree.contains(tree, 0));
+    printf("Contains {}? {}\n", 7, AVL_Tree.contains(tree, 7));
+    printf("Contains {}? {}\n", 15, AVL_Tree.contains(tree, 15));
+    printf("Contains {}? {}\n", 0, AVL_Tree.contains(tree, 0));
+
+    AVL_Tree.remove(&tree, 7);
+    printf("Remove missing 7, contains 8? {}\n", AVL_Tree.contains(tree, 8));
+
+    AVL_Tree.remove(&tree, 0);
+    printf("Contains {}? {}\n", 0, AVL_Tree.contains(tree, 0));
+    AVL_Tree.print(tree);
+    print("\n");
+
+    AVL_Tree.remove(&tree, 8);
+    printf("Contains {}? {}\n", 8, AVL_Tree.contains(tree, 8));
+    printf("Contains {}? {}\n", 10, AVL_Tree.contains(tree, 10));
+    printf("Contains {}? {}\n", 20, AVL_Tree.contains(tree, 20));
+    AVL_Tree.print(tree);
+    print("\n");
+
+    AVL_Tree.remove(&tree, 20);
+    AVL_Tree.remove(&tree, 5);
+    AVL_Tree.remove(&tree, 25);
+    AVL_Tree.remove(&tree, 15);
+    AVL_Tree.remove(&tree, 10);
+    printf("Empty? {}\n", tree == null);
+
+    delete(&tree);
 }

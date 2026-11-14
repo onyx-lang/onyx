@@ -1,0 +1,24 @@
+use core {*}
+
+print_any :: macro (x: any) {
+    printf("{}\n", x.type == i32)
+    printf("{}\n", *cast(&i32) x.data)
+}
+
+print_anys :: macro (args: ..any) {
+    for arg in args {
+        printf("{}\n", arg.type == i32 || arg.type == str)
+    }
+}
+
+format :: macro (fmt: str, args: ..any) -> str {
+    buffer: [1024] u8
+    return conv.format_va(buffer, fmt, cast([] any) args)
+}
+
+main :: () {
+    print_any(42)
+    print_anys(1, "x")
+    println(format("hello {}", 7))
+    println(format("no args"))
+}

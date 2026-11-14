@@ -95,8 +95,8 @@ Array.copy :: #match #locked {
 
 /// Copies a sub-array of a dynamic-array.
 ///
-///     arr := array.make(.[ 2, 3, 5, 7, 11 ]);
-///     sub := array.copy_range(&arr, 2 .. 5);
+///     arr := Array.make(.[ 2, 3, 5, 7, 11 ]);
+///     sub := Array.copy_range(&arr, 2 .. 5);
 ///     println(sub); // 5, 7, 11
 Array.copy_range :: (arr: &[..] $T, r: range, allocator := context.allocator) -> [..] T {
     new_arr : [..] T;
@@ -119,9 +119,21 @@ Array.clear :: (arr: &[..] $T) {
 /// If this procedure returns `true`, `arr.capacity` will be greater than or equal to `capacity`.
 Array.ensure_capacity :: (arr: &[..] $T, capacity: u32) -> bool {
     if arr.capacity >= capacity do return true;
-    if arr.data == null do Array.init(arr, capacity);
+    if arr.data == null || arr.capacity == 0 do Array.init(arr, capacity);
 
-    while capacity > arr.capacity do arr.capacity <<= 1;
+    // `<< 1` of 0 stays 0 and would loop forever; overflow to 0 would too.
+    new_cap := arr.capacity;
+    if new_cap == 0 do new_cap = 4;
+    while capacity > new_cap {
+        next := new_cap << 1;
+        if next <= new_cap {
+            new_cap = capacity;
+            break;
+        }
+        new_cap = next;
+    }
+    arr.capacity = new_cap;
+
     new_data := raw_resize(arr.allocator, arr.data, sizeof T * arr.capacity);
     if new_data == null do return false;
     arr.data = new_data;
@@ -225,10 +237,14 @@ Array.remove :: (arr: &[..] $T, elem: T) {
     arr.count -= move;
 }
 
-/// Removes the element at index `idx` from the array and returns it.
+/// Removes the element at `idx` and returns it, keeping the rest in order.
 ///
-/// Maintains order of the array.
-Array.delete :: (arr: &[..] $T, idx: u32) -> T {
+///     arr := Array.make(.[ 2, 3, 5, 7 ]);
+///     x := arr->remove_at(1);  // 3
+///     // arr is 2, 5, 7
+///
+/// If `idx` is out of range, returns a zeroed value.
+Array.remove_at :: (arr: &[..] $T, idx: u32) -> T {
     if idx >= arr.count do return .{};
 
     to_return := arr.data[idx];
@@ -240,10 +256,10 @@ Array.delete :: (arr: &[..] $T, idx: u32) -> T {
     return to_return;
 }
 
-/// Removes the element at index `idx` from the array and returns it.
+/// Removes the element at `idx` and returns it, filling the gap with the last element.
 ///
-/// Order is not guaranteed to be preserved.
-Array.fast_delete :: (arr: &[..] $T, idx: u32) -> T {
+/// Faster than `remove_at` when you do not need to keep order.
+Array.unordered_remove :: (arr: &[..] $T, idx: u32) -> T {
     if idx >= arr.count do return .{};
 
     to_return := arr.data[idx];
@@ -283,8 +299,8 @@ Array.concat :: (arr: &[..] $T, other: Iterator(T)) {
 
 /// Removes all elements for which the given predicate does not hold.
 ///
-///     arr := array.make(.[ 1, 2, 3, 4, 5 ]);
-///     array.filter(&arr, [v](v % 2 == 0));
+///     arr := Array.make(.[ 1, 2, 3, 4, 5 ]);
+///     Array.filter(&arr, [v](v % 2 == 0));
 ///     println(arr); // 2, 4
 Array.filter :: macro (arr: &[..] $T, body: Code) {
     move := 0;
@@ -308,12 +324,6 @@ Array.filter :: macro (arr: &[..] $T, body: Code) {
 #overload #order 100
 __for_expansion :: macro (_s: &[..] $T, $flags: __For_Expansion_Flags, $body: Code)
 {
-    remove_element :: macro () {
-        Array.delete(__s, __i)
-        __i -= 1
-        __count -= 1
-    }
-
     __s     := _s
     __data  := __s.data
     __count := __s.count
@@ -341,62 +351,3 @@ Untyped_Array :: struct {
     capacity: u32;
     allocator: Allocator;
 }
-
-
-
-
-
-//
-// Everything below here only exists for backwards compatibility.
-//
-
-make :: Array.make
-init :: Array.init
-free :: Array.free
-copy :: Array.copy
-copy_range :: Array.copy_range
-clear :: Array.clear
-ensure_capacity :: Array.ensure_capacity
-alloc_one :: Array.alloc_one
-push :: Array.push
-insert :: Array.insert
-insert_empty :: Array.insert_empty
-remove :: Array.remove
-delete :: Array.delete
-fast_delete :: Array.fast_delete
-pop :: Array.pop
-concat :: Array.concat
-filter :: Array.filter
-
-
-
-// Things that work with slices and arrays
-
-transplant  :: Slice.transplant
-get         :: Slice.get
-get_ptr     :: Slice.get_ptr
-set         :: Slice.set
-contains    :: Slice.contains
-empty       :: Slice.empty
-sum         :: Slice.sum
-product     :: Slice.product
-average     :: Slice.average
-reverse     :: Slice.reverse
-sort        :: Slice.sort
-quicksort   :: Slice.quicksort
-unique      :: Slice.unique
-fold        :: Slice.fold
-every       :: Slice.every
-some        :: Slice.some
-fill        :: Slice.fill
-fill_range  :: Slice.fill_range
-to_list     :: Slice.to_list
-find        :: Slice.find
-find_ptr    :: Slice.find_ptr
-find_opt    :: Slice.find_opt
-first       :: Slice.first
-count_where :: Slice.count_where
-windows     :: Slice.windows
-chunks      :: Slice.chunks
-greatest    :: Slice.greatest
-least       :: Slice.least

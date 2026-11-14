@@ -1,0 +1,61 @@
+package runtime.platform
+
+use core.intrinsics.wasm { unreachable }
+
+// Custom runtimes do not get these from the compiler. The rest of core
+// still refers to them, so a component guest loads the same files.
+#load "../../info/types"
+#load "../../info/foreign_blocks"
+#load "../../info/proc_tags"
+#load "../../info/global_tags"
+#load "../../info/stack_trace"
+#load "../../info/helper"
+
+// Guest-side platform for a Wasm component (-r custom -DComponent_Build).
+// Host services come from generated WIT bindings, not from this file.
+// Type info stays off here so core does not load stdio, which rejects
+// a custom runtime.
+
+Supports_Files :: false
+Supports_Directories :: false
+Supports_Os :: false
+Supports_Processes :: false
+Supports_Time :: false
+Supports_Networking :: false
+Supports_Type_Info :: false
+Supports_Threads :: false
+Supports_Env_Vars :: false
+Supports_Futexes :: false
+Supports_TTY :: false
+
+__output_string :: (s: str) -> u32 {
+    return 0;
+}
+
+__output_error :: (s: str) -> u32 {
+    return 0;
+}
+
+__exit :: (code: i32) {
+    unreachable();
+}
+
+__time :: () -> i64 {
+    return 0;
+}
+
+__monotonic :: () -> i64 {
+    return 0;
+}
+
+__start :: () {}
+
+__read_from_input :: (buffer: [] u8) -> i32 {
+    return 0;
+}
+
+__wait_for_input :: (timeout: i32) -> bool {
+    return false;
+}
+
+#load "../../../io/stdio"

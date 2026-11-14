@@ -1,9 +1,9 @@
 #ifndef ONYXASTNODES_H
 #define ONYXASTNODES_H
 
-#define VERSION_MAJOR 0
-#define VERSION_MINOR 1
-#define VERSION_PATCH 14
+#define VERSION_MAJOR 2611
+#define VERSION_MINOR 0
+#define VERSION_PATCH 0
 #define VERSION_SUFFIX "-preview"
 
 #include "stb_ds.h"
@@ -46,7 +46,6 @@
     NODE(DirectiveDefined)     \
     NODE(DirectiveInit)        \
     NODE(DirectiveLibrary)     \
-    NODE(DirectiveRemove)      \
     NODE(DirectiveFirst)       \
     NODE(DirectiveExportName)  \
     NODE(DirectiveWasmSection) \
@@ -115,6 +114,7 @@
     NODE(CaptureLocal)         \
                                \
     NODE(ForeignBlock)         \
+    NODE(ObjectBlock)          \
                                \
     NODE(Package)              \
     NODE(Import)               \
@@ -138,15 +138,33 @@ typedef struct Scope {
     struct Scope *parent;
     OnyxFilePos created_at;
     char* name;
-    Table(AstNode *) symbols;
+    // atom id -> AstNode*. Intern once, then parent walks are integer probes.
+    bh_imap symbols;
+    u32 log_event_index;
+
+    // Set on a package's public and private scopes. Other scopes leave this
+    // null; the owning package is the nearest ancestor that has it.
+    Package *package;
 } Scope;
+
+static inline i32 scope_symbol_count(Scope *scope) {
+    if (!scope || !scope->symbols.entries) return 0;
+    return bh_arr_length(scope->symbols.entries);
+}
+
+static inline AstNode *scope_symbol_at(Scope *scope, i32 i) {
+    return (AstNode *) scope->symbols.entries[i].value;
+}
+
+static inline u32 scope_symbol_atom_at(Scope *scope, i32 i) {
+    return (u32) scope->symbols.entries[i].key;
+}
 
 
 typedef enum AstKind {
     Ast_Kind_Error,
     Ast_Kind_Package,
     Ast_Kind_Load,
-    Ast_Kind_Load_All,
     Ast_Kind_Library_Path,
     Ast_Kind_Import,
     Ast_Kind_Memres,
@@ -235,7 +253,6 @@ typedef enum AstKind {
     Ast_Kind_Directive_Defined,
     Ast_Kind_Directive_Init,
     Ast_Kind_Directive_Library,
-    Ast_Kind_Directive_Remove,
     Ast_Kind_Directive_First,
     Ast_Kind_Directive_Export_Name,
     Ast_Kind_Directive_This_Package,
@@ -259,6 +276,8 @@ typedef enum AstKind {
     Ast_Kind_Compiler_Extension,
     Ast_Kind_Procedural_Macro,
     Ast_Kind_Procedural_Expansion,
+
+    Ast_Kind_Object_Block,
 
     Ast_Kind_Count
 } AstKind;
@@ -636,7 +655,8 @@ typedef struct ValueWithOffset {
     u32 flags;                \
     OnyxToken *token;         \
     struct Entity* entity;    \
-    AstNode *next
+    AstNode *next;            \
+    u32 compilation_symbol_id
 struct AstNode { AstNode_base; };
 
 // NOTE: 'type_node' is filled out by the parser.
@@ -798,10 +818,22 @@ struct AstCall {
     i32 placeholder_argument_position;
 
     AstTyped *callee;
+    OnyxToken *callee_name_token;
     OnyxIntrinsic intrinsic;
 
     VarArgKind va_kind;
     i32 ignored_return_value_count;
+
+    // Set when overload resolution or a return-only polymorphic variable
+    // needs the caller's expected type. unify_node_and_type finishes the call.
+    b32 deferred_for_expected_type;
+
+    // Statement position, := inference, and operator overloads commit with
+    // the first argument match and never wait for an expected type.
+    b32 commit_without_expected_type;
+
+    // Expected type supplied by unify_node_and_type for this resolution.
+    Type *pending_expected_return;
 };
 struct AstCompound {
     AstTyped_base;
@@ -831,6 +863,10 @@ struct AstDirectiveSolidify {
     AstFunction* poly_proc;
     bh_arr(AstPolySolution) known_polyvars;
 
+    // Set when using `#solidify overloaded(i32)` / `#solidify foo(z = range)`.
+    Arguments args;
+    b32 from_arguments : 1;
+
     AstNode* resolved_proc;
 };
 
@@ -851,6 +887,7 @@ struct AstBlock         {
 
     u32 statement_idx;
 
+    OnyxToken *closing;
     OnyxToken *macro_generated_from;
 };
 struct AstDefer         { AstNode_base; AstNode *stmt; };
@@ -892,21 +929,19 @@ struct AstIfWhile {
     AstBlock *true_stmt;
     AstBlock *false_stmt;
 
+    OnyxToken *optional_extract_symbol;
+    AstLocal *optional_local;
+
+    // When this is true, `cond` should be a value that is of type `? T`
+    b32 optional_extract : 1;
+    b32 optional_extract_by_pointer : 1;
+
     union {
         // Used by Static_If
         struct {
             Scope *defined_in_scope;
             bh_arr(struct Entity *) true_entities;
             bh_arr(struct Entity *) false_entities;
-        };
-
-        // Used by If
-        struct {
-            OnyxToken *optional_extract_symbol;
-            AstLocal *optional_local;
-
-            // When this is true, `cond` should be a value that is of type `? T`
-            b32 optional_extract : 1;
         };
 
         // Used by While
@@ -1003,6 +1038,7 @@ struct AstSwitch {
     OnyxToken* token;      \
     struct Entity* entity; \
     void* next;            \
+    u32 compilation_symbol_id; \
     u64 type_id;           \
     Type* type
 struct AstType { AstType_base; };
@@ -1061,6 +1097,12 @@ struct AstStructType {
     b32 is_union              : 1;
     b32 is_packed             : 1;
     b32 ready_to_build_type   : 1;
+
+    // Set on the template's base struct when its polymorphic type is built.
+    // Concrete instances point poly_owner at the polymorphic type node.
+    struct Type *poly_type;
+    struct AstPolyStructType *poly_owner;
+    b32 compilation_tags_emitted;
 };
 struct AstStructMember {
     AstTyped_base;
@@ -1122,6 +1164,10 @@ struct AstUnionType {
 
     b32 pending_type_is_valid : 1;
     // b32 ready_to_build_type   : 1;
+
+    struct Type *poly_type;
+    struct AstPolyUnionType *poly_owner;
+    b32 compilation_tags_emitted;
 };
 struct AstUnionVariant {
     AstTyped_base;
@@ -1183,10 +1229,7 @@ struct AstBinding       {
     AstTyped_base;
     AstNode* node;
 
-    // Used for the old '#doc' scheme
-    OnyxToken *documentation_token_old;
-
-    // Used for the new `///` scheme
+    // Captured from `///` doc comments.
     const char *documentation_string;
 };
 struct AstInjection     {
@@ -1203,6 +1246,7 @@ struct AstMemRes        {
     struct Entity *type_entity;
 
     bh_arr(AstTyped *) tags;
+    b32 compilation_tags_emitted;
 
     b32 threadlocal : 1;
 
@@ -1239,15 +1283,18 @@ struct OverloadOption {
     AstTyped* option;
 };
 
+typedef struct OverloadCache {
+    bh_imap map;
+    u32 epoch;
+} OverloadCache;
+
 struct AstOverloadedFunction {
     AstTyped_base;
 
     bh_arr(OverloadOption) overloads;
 
-    // CLEANUP: This is unused right now, but should be used to cache
-    // the complete set of overloads that can be used by an overloaded
-    // function.
-    bh_imap            all_overloads;
+    // Flattened reachable options. Rebuilt when Context.overload_cache_epoch changes.
+    OverloadCache      all_overloads;
 
     AstType *expected_return_node;
     Type    *expected_return_type;
@@ -1387,7 +1434,29 @@ typedef enum PolySolutionKind {
 typedef enum PolyProcLookupMethod {
     PPLM_By_Arguments,
     PPLM_By_Function_Type,
+
+    // Arguments plus the expected type of the call, used to solve
+    // polymorphic variables that appear only in the return type.
+    PPLM_By_Arguments_And_Return,
+
+    // Solve argument variables only. Return-only variables are skipped
+    // so argument matching can run before an expected type exists.
+    PPLM_By_Arguments_Partial,
 } PolyProcLookupMethod;
+
+// `given` pointer for PPLM_By_Arguments_And_Return. Interned on the
+// polymorphic procedure so a yield retries the same query, and so two
+// probes of one call against different expected types stay distinct.
+typedef struct PolyArgumentLookup {
+    Arguments *args;
+    Type *expected_return;
+} PolyArgumentLookup;
+
+typedef enum CallDeferral {
+    CALL_DEFER_READY = 0,
+    CALL_DEFER_YIELD,
+    CALL_DEFER_WAIT,
+} CallDeferral;
 
 typedef struct ImplicitInterfaceConstraint {
     AstNode *interface;
@@ -1416,6 +1485,15 @@ struct AstPolyParam {
     // Can store extra args for $T/Interface(R)
     bh_arr(ImplicitInterfaceConstraint) implicit_interface_constraints;
 };
+
+// idx stays (u32)-1 when $T is introduced in the return type rather than
+// in a parameter. lookup_param_in_arguments already ignores that index.
+static inline b32 poly_param_from_return(AstPolyParam *param) {
+    return param
+        && param->kind == PPK_Poly_Type
+        && param->idx == (u32) -1
+        && param->type_expr != NULL;
+}
 
 struct AstPolySolution {
     PolySolutionKind kind;
@@ -1487,6 +1565,9 @@ struct AstFunction {
     Table(AstSolidifiedFunction) concrete_funcs;
     bh_imap active_queries;
 
+    // Interned PolyArgumentLookup values for return-type queries.
+    bh_arr(PolyArgumentLookup *) argument_return_lookups;
+
     bh_arr(AstNode *) nodes_that_need_entities_after_clone;
 
     AstBinding *original_binding_to_node;
@@ -1497,13 +1578,20 @@ struct AstFunction {
     // NOTE: Only set on when --stack-trace is passed.
     AstLocal *stack_trace_local;
 
+    // Set for procedures declared in an #object block. object_filename is the
+    // resolved path of the WASM object, and object_symbol is the C symbol name.
+    char *object_filename;
+    char *object_symbol;
+
     b32 is_exported        : 1;
     b32 is_foreign         : 1;
     b32 is_foreign_dyncall : 1;
+    b32 is_object_link     : 1;
     b32 is_intrinsic       : 1;
 
     b32 named_return_locals_added : 1;
     b32 ready_for_body_to_be_checked : 1;
+    b32 compilation_tags_emitted;
 };
 
 struct AstCaptureBlock {
@@ -1581,10 +1669,6 @@ struct AstDirectiveDefined {
     AstTyped *expr;
 
     b32 is_defined: 1;
-};
-
-struct AstDirectiveRemove {
-    AstNode_base;
 };
 
 struct AstDirectiveFirst {
@@ -1694,10 +1778,49 @@ struct AstForeignBlock {
     b32 uses_dyncall : 1;
 };
 
+// An undefined symbol in one object file, satisfied by an Onyx procedure.
+// `symbol` is the binding name for an explicit `name ::` provide. A provide
+// created from `#namespace` uses that directive's token here, and `name` is
+// the C symbol. `expr` is the right-hand side of an explicit provide.
+struct ObjectProvide {
+    OnyxToken *symbol;
+    char *name;
+    AstTyped *expr;
+    AstFunction *func;
+    // A memory reservation, such as `errno: i32`, provided in place of a
+    // data symbol. The object's loads and stores of that symbol use its address.
+    struct AstMemRes *memres;
+};
+typedef struct ObjectProvide ObjectProvide;
+
+// `#namespace Package` inside `#provide`. The linker looks undefined symbols
+// up in this node with try_symbol_raw_resolve_from_node.
+struct ObjectNamespace {
+    OnyxToken *token;
+    AstTyped *expr;
+};
+typedef struct ObjectNamespace ObjectNamespace;
+
+// Links procedures from a WASM object file (Clang/LLVM linking section v2).
+// Empty-bodied declarations are symbols defined by the object. `#provide`
+// binds symbols that this object imports to Onyx procedures or memory
+// reservations. A provide in
+// one object does not satisfy the same symbol in another object.
+struct AstObjectBlock {
+    AstTyped_base;
+
+    Scope *scope;
+    AstTyped *filename_expr;
+    char *filename;
+    bh_arr(struct Entity *) captured_entities;
+    bh_arr(struct ObjectProvide) provides;
+    bh_arr(struct ObjectNamespace) namespaces;
+};
+
 struct AstJsNode {
     AstNode_base;
 
-    u32 order; 
+    u32 order;
     AstTyped *order_expr;
 
     AstTyped *code;
@@ -1797,6 +1920,7 @@ typedef enum EntityType {
     Entity_Type_Overloaded_Function,
     Entity_Type_Function,
     Entity_Type_JS,
+    Entity_Type_Object_Block,
 
     Entity_Type_Count,
 } EntityType;
@@ -1812,6 +1936,7 @@ typedef struct Entity {
     // TODO: Document this!
     u32 macro_attempts;
     u32 micro_attempts;
+    u64 queue_key;
 
     b32 entered_in_queue : 1;
 
@@ -1848,15 +1973,42 @@ typedef struct Entity {
         AstJsNode             *js;
         AstCompilerExtension  *compiler_extension;
         AstProceduralExpansion *proc_expansion;
+        AstObjectBlock        *object_block;
     };
 } Entity;
+
+// FIFO per (state, type). Scanned in state-then-type order, which matches
+// the old heap compare for a single attempt/phase layer.
+typedef struct EntityQueueGrid {
+    bh_arr(Entity *) items[Entity_State_Count][Entity_Type_Count];
+    i32 head[Entity_State_Count][Entity_Type_Count];
+    i32 count;
+    i32 hint_state;
+    i32 hint_type;
+} EntityQueueGrid;
 
 typedef struct EntityHeap {
     bh_arena entity_arena;
     bh_allocator allocator;
 
+    // First-try pre-codegen work. FIFO per (state, type).
+    EntityQueueGrid ready;
+
+    // Yielded pre-codegen work, one bag per macro_attempts.
+    // The current wave is sorted by (queue_key, id) then scanned.
+    // A yield appends to a later wave instead of sifting the heap.
+    bh_arr(bh_arr(Entity *)) retry_waves;
+    i32 retry_count;
+    u32 retry_min_attempt;
+    u32 retry_active_attempt;
+    i32 retry_index;
+
+    // 4-ary heap for codegen (state >= Code_Gen).
     bh_arr(Entity *) entities;
-    bh_arr(Entity *) quick_unsorted_entities;
+
+    // Codegen heap top taken for processing but not sifted out yet.
+    Entity *detached_top;
+
     i32 next_id;
 
     i32 state_count[Entity_State_Count];
@@ -1871,6 +2023,7 @@ Entity* entity_heap_insert(EntityHeap* entities, Entity e);
 Entity* entity_heap_top(EntityHeap* entities);
 void entity_heap_change_top(EntityHeap* entities, Entity* new_top);
 void entity_heap_remove_top(EntityHeap* entities);
+b32 entity_heap_empty(EntityHeap* entities);
 void entity_change_type(EntityHeap* entities, Entity *ent, EntityType new_type);
 void entity_change_state(EntityHeap* entities, Entity *ent, EntityState new_state);
 void entity_heap_add_job(EntityHeap *entities, enum TypeMatch (*func)(Context *, void *), void *job_data);
@@ -1934,6 +2087,7 @@ enum Runtime {
     Runtime_Wasi    = 2,
     Runtime_Js      = 3,
     Runtime_Custom  = 4,
+    Runtime_Wasip2  = 5,
 };
 
 
@@ -2037,6 +2191,15 @@ typedef struct CompilerExtension {
     b32 alive : 1;
 
     b32 supports_stalled_hook : 1;
+    b32 supports_compilation_events : 1;
+    b32 supports_all_code_checked_hook : 1;
+
+    u32 compilation_events_cursor;
+
+    // Host-side send queue. Compilation events are appended here and flushed
+    // without blocking the compiler pump. Drained before any recv/terminate.
+    bh_buffer outgoing;
+    i32 outgoing_off;
 } CompilerExtension;
 
 typedef struct CompileOptions CompileOptions;
@@ -2062,8 +2225,11 @@ struct CompileOptions {
 
     b32 generate_symbol_info_file : 1;
     b32 generate_lsp_info_file    : 1;
+    b32 parse_only                : 1;
 
     b32 running_perf : 1;
+    b32 enable_jit   : 1;
+    b32 emit_wasm_object : 1;
 
     Runtime runtime;
 
@@ -2112,6 +2278,8 @@ struct CompilerBuiltins {
     AstGlobal stack_top;
     AstGlobal tls_base;
     AstGlobal tls_size;
+    AstGlobal tls_align;
+    AstGlobal tls_image;
     AstGlobal closure_base;
     AstGlobal stack_trace;
     AstType  *string_type;
@@ -2124,7 +2292,6 @@ struct CompilerBuiltins {
     Type     *vararg_type_type;
     AstTyped *context_variable;
     AstType  *allocator_type;
-    AstType  *iterator_type;
     AstType  *optional_type;
     AstType  *callsite_type;
     AstType  *any_type;
@@ -2148,6 +2315,8 @@ struct CompilerBuiltins {
 
     AstType *for_expansion_flag_type;
     AstOverloadedFunction *for_expansion;
+    AstOverloadedFunction *delete_match;
+    AstOverloadedFunction *from_match;
 };
 
 typedef struct TypeStore TypeStore;
@@ -2219,6 +2388,128 @@ typedef struct EventSystem {
     CompilerEvent *last;
 } EventSystem;
 
+typedef enum CompilationEventKind {
+    COMPILATION_EVENT_START = 0,
+    COMPILATION_EVENT_FILE = 1,
+    COMPILATION_EVENT_PACKAGE = 2,
+    COMPILATION_EVENT_SCOPE = 3,
+    COMPILATION_EVENT_SYMBOL = 4,
+    COMPILATION_EVENT_SYMBOL_RESOLVED = 5,
+    COMPILATION_EVENT_BINDING = 6,
+    COMPILATION_EVENT_TYPE = 7,
+    COMPILATION_EVENT_TYPE_BODY = 8,
+    COMPILATION_EVENT_OVERLOAD = 9,
+    COMPILATION_EVENT_POLY_PROC = 10,
+    COMPILATION_EVENT_TAG = 11,
+} CompilationEventKind;
+
+// Compact 32-byte event. Named overlays used to be a fat union (~48B);
+// high-volume resolved/symbol/type events do not need that.
+//
+//   START:     ptr = version string
+//   FILE:      a = id, ptr = path
+//   PACKAGE:   ptr = Package *
+//   SCOPE:     a = file_id, b = end_line, c = end_column, ptr = Scope *
+//   SYMBOL:    a = id, b = scope_id, c = file_id, d = line,
+//              extra = kind, extra16 = column, e = package_id
+//              package_id is the package that owns the symbol's scope.
+//              A package symbol stores the package it names instead.
+//              (name lives in CompilationLog.symbol_names)
+//   RESOLVED:  a = symbol_id, b = file_id, c = line, d = length,
+//              extra16 = column, e = chosen_symbol_id
+//   BINDING:   a = symbol_id, b = type_id, ptr = AstNode *
+//   TYPE:      ptr = Type *
+//   TYPE_BODY: ptr = Type *
+//   OVERLOAD:  a = group_id, b = count, ptr = u32 *ids
+//   POLY_PROC: a = template_id, b = instance_id, c = count, ptr = CompilationLogPoly *
+//   TAG:       ptr = CompilationLogTag *
+typedef struct CompilationEvent {
+    u8 kind;
+    u8 extra;
+    u16 extra16;
+    u32 a, b, c, d;
+    union {
+        void *ptr;
+        struct { u32 e, f; };
+    };
+} CompilationEvent;
+
+enum {
+    _compilation_event_size = sizeof(char[(sizeof(CompilationEvent) <= 32) ? 1 : -1])
+};
+
+typedef struct CompilationLogPoly {
+    char **names;
+    u32 *type_ids;
+} CompilationLogPoly;
+
+typedef enum CompilationLogTagValueKind {
+    COMPILATION_TAG_INT = 0,
+    COMPILATION_TAG_FLOAT = 1,
+    COMPILATION_TAG_STRING = 2,
+    COMPILATION_TAG_RAW = 3,
+} CompilationLogTagValueKind;
+
+typedef struct CompilationLogTag {
+    u32 target_id;
+    u8 target_is_type;
+    u8 value_kind;
+    i64 i;
+    double f;
+    char *str_bytes;
+    u32 str_len;
+    u32 raw_type_id;
+    u8 *raw_bytes;
+    u32 raw_len;
+} CompilationLogTag;
+
+typedef struct CompilationFileOverlay {
+    char *filename;
+    u8 *data;
+    i32 length;
+} CompilationFileOverlay;
+
+typedef struct CompilationLogAliasSymbol {
+    u32 symbol_id;
+    u32 next;
+} CompilationLogAliasSymbol;
+
+typedef struct CompilationLog {
+    bh_arr(CompilationEvent) events;
+
+    bh_buffer encoded;
+    u32 encoded_from;
+    u32 encoded_to;
+    b32 encoded_valid;
+
+    u32 c_abi_cursor;
+    u32 delivered_until;
+    u32 next_file_id;
+    u32 next_symbol_id;
+
+    Table(u32) file_ids;
+    Table(i32) interned_names;
+    const char *cached_file_name;
+    u32 cached_file_id;
+    const char *file_id_cache_name[16];
+    u32 file_id_cache_id[16];
+    u32 file_id_cache_used;
+
+    bh_buffer pb_event;
+    bh_buffer pb_field;
+    bh_buffer pb_sub;
+    bh_buffer pb_item;
+    bh_buffer pb_flush;
+
+    bh_imap node_to_binding;
+    bh_arr(u32) symbol_binding_type_id;
+    bh_arr(char *) symbol_names;
+    bh_imap node_to_first_alias;
+    // Additional EventSymbols for the same AST node (`use pkg { * }` copies).
+    // 1-based indices; `next` chains aliases for one node.
+    bh_arr(CompilationLogAliasSymbol) alias_symbols;
+} CompilationLog;
+
 struct Context {
     Table(Package *)      packages;
     EntityHeap            entities;
@@ -2234,10 +2525,22 @@ struct Context {
     bh_allocator scratch_alloc;
 
     bh_managed_heap heap;
-    bh_allocator gp_alloc; // General purpose allocator 
+    bh_allocator gp_alloc; // General purpose allocator
+
+    bh_allocator *stbds_alloc;
+
+    // Unique ids for identifier text. Scope tables are keyed by these.
+    Table(u32) atom_by_name;
+    bh_arr(char *) atom_names;
+    u32 atom_underscore;
+    const char *atom_cache_ptr;
+    u32 atom_cache_id;
 
     bh_arr(bh_file_contents) loaded_files;
     bh_arr(DefinedVariable) defined_variables;
+
+    // Unsaved editor buffers. process_source_file preferes these over disk.
+    bh_arr(CompilationFileOverlay) file_overlays;
 
     // NOTE: This is defined in wasm_emit.h
     struct OnyxWasmModule* wasm_module;
@@ -2247,7 +2550,6 @@ struct Context {
     bh_buffer generated_osym_buffer;
     bh_buffer generated_injected_code_buffer;
 
-    struct SymbolInfoTable *symbol_info;
     struct OnyxDocInfo     *doc_info;
 
     bh_arr(CompilerExtension) extensions;
@@ -2266,6 +2568,9 @@ struct Context {
     // TODO: Move these
     bh_arr(OverloadOption) operator_overloads[Binary_Op_Count];
     bh_arr(OverloadOption) unary_operator_overloads[Unary_Op_Count];
+    u32 overload_cache_epoch;
+    OverloadCache operator_overload_cache[Binary_Op_Count];
+    OverloadCache unary_operator_overload_cache[Unary_Op_Count];
 
     // The name is pretty self-descriptive, but this is a node that is returned from things
     // like polymorphic_proc_lookup when it is determined that everything works so far, but
@@ -2274,6 +2579,7 @@ struct Context {
     AstTyped node_that_signals_failure;
 
     EventSystem events;
+    CompilationLog compilation_log;
 
     OnyxErrors errors;
     b32 errors_enabled;
@@ -2299,6 +2605,7 @@ struct Context {
     b32 pump_is_primed : 1;
     b32 builtins_initialized : 1;
     b32 wasm_module_linked : 1;
+    b32 all_code_checked_hook_done : 1;
 };
 
 typedef struct BuiltinSymbol {
@@ -2361,6 +2668,7 @@ char* generate_name_within_scope(Context *context, Scope *scope, OnyxToken* symb
 TypeMatch implicit_cast_to_bool(Context *context, AstTyped **pnode);
 
 AstNode* strip_aliases(AstNode* node);
+AstType* strip_type_aliases(AstType* node);
 
 AstNumLit*        make_bool_literal(Context *context, b32 b);
 AstNumLit*        make_int_literal(Context *context, i64 value);
@@ -2402,7 +2710,8 @@ AstFunction* polymorphic_proc_lookup(Context *context, AstFunction* pp, PolyProc
 AstFunction* polymorphic_proc_solidify(Context *context, AstFunction* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
 AstNode* polymorphic_proc_try_solidify(Context *context, AstFunction* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
 AstFunction* polymorphic_proc_build_only_header(Context *context, AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual);
-AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstFunction* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed);
+AstFunction* polymorphic_proc_build_only_header_with_slns(Context *context, AstFunction* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed, b32 void_return);
+AstFunction* polymorphic_proc_prepare_argument_probe(Context *context, AstFunction *pp, Arguments *args);
 b32 potentially_convert_function_to_polyproc(Context *context, AstFunction *func);
 AstPolyCallType* convert_call_to_polycall(Context *context, AstCall* call);
 
@@ -2416,22 +2725,31 @@ typedef struct OverloadReturnTypeCheck {
     OnyxToken *group;
 } OverloadReturnTypeCheck;
 
-void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 order, AstTyped* overload);
-AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadOption) overloads, Arguments* args);
-AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption) overloads, Type* type);
-void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(OverloadOption) overloads);
+void add_overload_option(Context *context, bh_arr(OverloadOption)* poverloads, u64 order, AstTyped* overload);
+bh_imap *overload_cache_get(Context *context, bh_arr(OverloadOption) overloads, OverloadCache *cache);
+AstTyped* find_matching_overload_by_arguments(Context *context, bh_arr(OverloadOption) overloads, Arguments* args, OverloadCache *cache);
+AstTyped* find_matching_overload_for_expected_return(Context *context, bh_arr(OverloadOption) overloads, Arguments* args, OverloadCache *cache, Type *expected_return);
+AstTyped* find_matching_overload_by_type(Context *context, bh_arr(OverloadOption) overloads, Type* type, OverloadCache *cache);
+CallDeferral call_should_wait_for_expected_type(Context *context, AstTyped *callee, Arguments *args);
+TypeMatch probe_call_against_expected_return(Context *context, AstTyped *callee, Arguments *args, Type *expected);
+TypeMatch resolve_deferred_call(Context *context, AstTyped **pnode, Type *expected, b32 permanent);
+AstCall *deferred_call_of(AstTyped *expr);
+// 1 if the deferred call can be committed with no expected type.
+// 0 if an option is not ready yet, or the return type cannot be known and an error was reported.
+b32 deferred_call_has_concrete_return(Context *context, AstCall *call);
+void concretize_deferred_call(Context *context, AstTyped *node);
+void report_unable_to_match_overload(Context *context, AstCall* call, bh_arr(OverloadOption) overloads, Type *expected_return);
 void report_incorrect_overload_expected_type(Context *context, Type *given, Type *expected, OnyxToken *overload, OnyxToken *group);
 void ensure_overload_returns_correct_type(Context *context, AstTyped *overload, AstOverloadedFunction *group);
 
 void expand_macro(Context *context, AstCall** pcall, AstFunction* template);
-AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed);
+AstFunction* macro_resolve_header(Context *context, AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed, Type *expected_return);
 
 Type* polymorphic_struct_lookup(Context *context, AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
 Type* polymorphic_union_lookup(Context *context, AstPolyUnionType* pu_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
 
 TypeMatch resolve_intrinsic_interface_constraint(Context *context, AstConstraint *constraint);
 
-void track_declaration_for_symbol_info(Context *context, OnyxFilePos, AstNode *);
 void track_documentation_for_symbol_info(Context *context, AstNode *, AstBinding *);
 void track_resolution_for_symbol_info(Context *context, AstNode *original, AstNode *resolved);
 
@@ -2450,6 +2768,9 @@ TypeMatch compiler_extension_expand_macro(
     u32 *out_expansion_id,
     b32 wait_for_response);
 TypeMatch compiler_extension_hook_stalled(Context *context, int extension_id);
+TypeMatch compiler_extension_hook_all_code_checked(Context *context, int extension_id);
+void compiler_extensions_flush_compilation_events(Context *context);
+void compiler_extensions_flush_compilation_events_now(Context *context);
 
 
 // Compiler Events
@@ -2459,6 +2780,27 @@ CompilerEvent *compiler_event_add(Context *context, u32 event_type);
 void compiler_event_add_field_str(Context *context, CompilerEvent *event, char *field, char *value);
 void compiler_event_add_field_int(Context *context, CompilerEvent *event, char *field, i32 value);
 void compiler_event_log(Context *context, char *fmt, ...);
+
+void compilation_log_init(Context *context);
+void compilation_log_emit_start(Context *context);
+u32 compilation_log_emit_file(Context *context, const char *path);
+void compilation_log_emit_package(Context *context, Package *package);
+void compilation_log_emit_scope(Context *context, Scope *scope);
+void compilation_log_emit_scope_end(Context *context, Scope *scope, OnyxFilePos pos);
+void compilation_log_emit_symbol(Context *context, Scope *scope, char *name, OnyxFilePos pos, AstNode *node);
+void compilation_log_emit_symbol_resolved(Context *context, AstNode *original, AstNode *resolved);
+void compilation_log_emit_overloads(Context *context, AstOverloadedFunction *ofunc);
+void compilation_log_emit_overload_choice(Context *context, OnyxToken *site, AstNode *group, AstNode *chosen);
+void compilation_log_emit_poly_proc(Context *context, AstFunction *pp, AstFunction *instance, bh_arr(AstPolySolution) slns);
+void compilation_log_emit_poly_choice(Context *context, OnyxToken *site, AstNode *template, AstNode *chosen);
+void compilation_log_ensure_poly_template_params(Context *context, AstFunction *pp);
+void compilation_log_emit_binding(Context *context, AstNode *node, AstBinding *binding);
+void compilation_log_notify_node_typed(Context *context, AstNode *node);
+void compilation_log_emit_type(Context *context, Type *type);
+void compilation_log_emit_type_body(Context *context, Type *type);
+void compilation_log_emit_tags(Context *context, u32 target_id, b32 target_is_type, bh_arr(AstTyped *) tags);
+void compilation_log_encode_range(Context *context, u32 from, u32 to, bh_buffer *out);
+void compilation_log_ensure_c_abi_encoded(Context *context);
 
 
 // NOTE: Useful inlined functions
@@ -2489,6 +2831,23 @@ static inline b32 binop_is_assignment(BinaryOp binop) {
     return (binop >= Binary_Op_Assign_Start && binop <= Binary_Op_Assign_End);
 }
 
+static inline BinaryOp binary_op_from_compound_assign(BinaryOp op) {
+    switch (op) {
+        case Binary_Op_Assign_Add:      return Binary_Op_Add;
+        case Binary_Op_Assign_Minus:    return Binary_Op_Minus;
+        case Binary_Op_Assign_Multiply: return Binary_Op_Multiply;
+        case Binary_Op_Assign_Divide:   return Binary_Op_Divide;
+        case Binary_Op_Assign_Modulus:  return Binary_Op_Modulus;
+        case Binary_Op_Assign_And:      return Binary_Op_And;
+        case Binary_Op_Assign_Or:       return Binary_Op_Or;
+        case Binary_Op_Assign_Xor:      return Binary_Op_Xor;
+        case Binary_Op_Assign_Shl:      return Binary_Op_Shl;
+        case Binary_Op_Assign_Shr:      return Binary_Op_Shr;
+        case Binary_Op_Assign_Sar:      return Binary_Op_Sar;
+        default:                        return Binary_Op_Count;
+    }
+}
+
 static inline b32 binop_is_compare(BinaryOp binop) {
     return (binop >= Binary_Op_Equal && binop <= Binary_Op_Greater_Equal);
 }
@@ -2516,10 +2875,21 @@ static inline Type* get_expression_type(Context *context, AstTyped* expr) {
     }
 }
 
+static inline b32 type_return_uses_memory(Type* type) {
+    while (type && type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
+    if (!type) return 0;
+    if (type_is_compound(type)) return 1;
+    if (type_struct_is_just_one_basic_value(type)) return 0;
+    return type->kind == Type_Kind_Struct
+        || type->kind == Type_Kind_Array
+        || type->kind == Type_Kind_DynArray
+        || type->kind == Type_Kind_Union;
+}
+
 static inline CallingConvention type_function_get_cc(Type* type) {
     if (type == NULL) return CC_Undefined;
     if (type->kind != Type_Kind_Function) return CC_Undefined;
-    if (type_is_compound(type->Function.return_type)) return CC_Return_Stack;
+    if (type_return_uses_memory(type->Function.return_type)) return CC_Return_Stack;
     return CC_Return_Wasm;
 }
 
@@ -2544,6 +2914,47 @@ static inline AstCall *get_call_expr_from_node(AstNode *node) {
     return NULL;
 }
 
+// True when some polymorphic variable is introduced only in the return
+// type and is not already fixed by an argument variable of the same name
+// or by a #solidify solution.
+static inline b32 poly_proc_needs_expected_return(AstFunction *fn) {
+    if (!fn || fn->kind != Ast_Kind_Polymorphic_Proc || !fn->poly_params) return 0;
+
+    bh_arr_each(AstPolyParam, param, fn->poly_params) {
+        if (!poly_param_from_return(param)) continue;
+
+        b32 known = 0;
+        if (fn->known_slns) {
+            bh_arr_each(AstPolySolution, sln, fn->known_slns) {
+                if (sln->poly_sym && param->poly_sym
+                    && token_equals(sln->poly_sym->token, param->poly_sym->token)) {
+                    known = 1;
+                    break;
+                }
+            }
+        }
+        if (known) continue;
+
+        b32 named_earlier = 0;
+        bh_arr_each(AstPolyParam, earlier, fn->poly_params) {
+            if (earlier == param) break;
+            if (earlier->poly_sym && param->poly_sym
+                && token_equals(earlier->poly_sym->token, param->poly_sym->token)) {
+                named_earlier = 1;
+                break;
+            }
+        }
+        if (!named_earlier) return 1;
+    }
+
+    return 0;
+}
+
+static inline b32 macro_needs_expected_return(AstMacro *macro) {
+    if (!macro || macro->kind != Ast_Kind_Macro || !macro->body) return 0;
+    return poly_proc_needs_expected_return((AstFunction *) macro->body);
+}
+
 static inline void convert_polyproc_to_function(AstFunction *func) {
     if (func->kind != Ast_Kind_Polymorphic_Proc) return;
 
@@ -2554,6 +2965,7 @@ static inline void convert_polyproc_to_function(AstFunction *func) {
     func->concrete_funcs = NULL;
     func->active_queries.hashes = NULL;
     func->active_queries.entries = NULL;
+    func->argument_return_lookups = NULL;
     func->poly_scope = NULL;
     func->entity = NULL;
     func->type = NULL;

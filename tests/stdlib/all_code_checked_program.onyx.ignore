@@ -1,0 +1,8 @@
+package main
+
+_ :: #compiler_extension "./all_code_checked_ext.onyx.ignore" {}
+
+all_code_checked_anchor :: 1
+
+main :: () {
+}

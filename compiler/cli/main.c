@@ -14,7 +14,7 @@
     #define C_GREEN   "\e[33m"
     #define C_BLUE    "\e[34m"
     #define C_LBLUE   "\e[94m"
-#else 
+#else
     #define C_NORM
     #define C_BOLD
     #define C_RED
@@ -38,7 +38,8 @@ static const char* top_level_docstring = DOCSTRING_HEADER
     C_LBLUE "    help             " C_NORM "Shows this help message\n"
     C_LBLUE "    version          " C_NORM "Prints version information\n"
     "\n"
-    C_LBLUE "    build " C_GREY "files      " C_NORM "Compiles an Onyx program into an executable " C_GREY "(onyx b)" C_NORM "\n"
+    C_LBLUE "    build " C_GREY "files      " C_NORM "Compiles an Onyx program into a WASM module " C_GREY "(onyx b)" C_NORM "\n"
+    C_LBLUE "    build-exe " C_GREY "files  " C_NORM "Compiles an Onyx program into a native executable\n"
     C_LBLUE "    check " C_GREY "files      " C_NORM "Checks syntax and types of a program\n"
 #if defined(_BH_LINUX) || defined(_BH_DARWIN)
     C_LBLUE "    watch            " C_NORM "Continuously rebuilds a program on file changes\n"
@@ -49,7 +50,7 @@ static const char* top_level_docstring = DOCSTRING_HEADER
 #endif
     "\n";
 
-static const char *run_commands_docstring = 
+static const char *run_commands_docstring =
     C_LBLUE "    run " C_GREY "files        " C_NORM "Compiles and runs an Onyx program " C_GREY "(onyx r)" C_NORM "\n"
 #if (defined(_BH_LINUX) || defined(_BH_DARWIN))
     C_LBLUE "    run-watch        " C_NORM "Continuously rebuilds and runs a program on file changes " C_GREY "(onyx rw)" C_NORM "\n"
@@ -67,17 +68,19 @@ static const char *build_docstring = DOCSTRING_HEADER
     C_BOLD "Usage: " C_BLUE "onyx" C_LBLUE " %s " C_NORM C_YELLOW "[..flags] " C_GREEN "files " C_NORM "%s" "\n"
     "\n"
     C_BOLD "Flags:\n" C_NORM
-    C_LBLUE "    -o, --output " C_GREY "target_file    " C_NORM "Specify the target file " C_GREY "(default: out.wasm)\n"
-    C_LBLUE "    -r, --runtime " C_GREY "runtime       " C_NORM "Specifies the runtime " C_GREY "(onyx, wasi, js, custom)\n"
+    C_LBLUE "    -o, --output " C_GREY "target_file    " C_NORM "Specify the target file " C_GREY "(default: %s)\n"
+    C_LBLUE "    -r, --runtime " C_GREY "runtime       " C_NORM "Specifies the runtime " C_GREY "(onyx, wasi, wasip2, js, custom)\n"
     C_LBLUE "    --map-dir " C_GREY "name:folder       " C_NORM "Adds a mapped directory\n"
     "\n"
     C_LBLUE "    --debug                     " C_NORM "Output a debugable build\n"
+    C_LBLUE "    --jit                       " C_NORM "Use the OVM native backend when running\n"
     C_LBLUE "    --feature " C_GREY "feature           " C_NORM "Enable an experimental language feature\n"
     C_LBLUE "    --multi-threaded            " C_NORM "Enables multi-threading for this compilation\n"
     C_LBLUE "    --stack-trace               " C_NORM "Enable dynamic stack trace\n"
     C_LBLUE "    --wasm-mvp                  " C_NORM "Use only WebAssembly MVP features\n"
     "\n"
     C_LBLUE "    --no-core                   " C_NORM "Disable automatically including \"core/module\"\n"
+    C_LBLUE "    --emit-wasm-object          " C_NORM "Write a relocatable wasm object instead of an executable\n"
     C_LBLUE "    --no-type-info              " C_NORM "Disables generating type information\n"
     C_LBLUE "    --generate-method-info      " C_NORM "Populate method information in type information structures\n"
     C_LBLUE "    --generate-foreign-info     " C_NORM "Generate information for foreign blocks\n"
@@ -87,6 +90,7 @@ static const char *build_docstring = DOCSTRING_HEADER
     C_LBLUE "    --doc                       " C_NORM "Generate a .odoc file, Onyx's documentation format used by " C_YELLOW "onyx-doc-gen\n"
     C_LBLUE "    --lspinfo " C_GREY "target_file       " C_NORM "Generate an LSP information file\n"
     C_LBLUE "    --save-injected " C_GREY "target_file " C_NORM "Saves injected code to a file for debugging\n"
+    C_LBLUE "    --generate-events " C_GREY "file      " C_NORM "Write compilation events as protobuf\n"
     "\n"
     C_LBLUE "    -V, --verbose               " C_NORM "Verbose output\n"
     C_LBLUE "    --no-colors                 " C_NORM "Disables colors in the error message\n"
@@ -135,6 +139,9 @@ typedef struct CLIArgs {
     b32 print_function_mappings : 1;
     b32 print_static_if_results : 1;
     b32 debug_session           : 1;
+    b32 enable_jit              : 1;
+    b32 enable_native           : 1;
+    b32 output_explicit         : 1;
     b32 no_colors               : 1;
     b32 show_all_errors         : 1;
 
@@ -145,6 +152,7 @@ typedef struct CLIArgs {
     const char* symbol_info_file;
     const char* help_subcommand;
     const char* injected_code_file;
+    const char* events_file;
 
     char *error_format;
     char *debug_socket;
@@ -155,6 +163,21 @@ typedef struct CLIArgs {
 #include "./error_printing.h"
 
 static void print_subcommand_help(const char *subcommand);
+
+static void build_version_string(char *buf, i32 len) {
+    i32 major = onyx_version_major();
+    i32 minor = onyx_version_minor();
+    i32 patch = onyx_version_patch();
+    char *suffix = onyx_version_suffix();
+
+    if (minor > 0 && patch > 0) {
+        bh_snprintf(buf, len, "%d.%d.%d%s", major, minor, patch, suffix);
+    } else if (minor > 0) {
+        bh_snprintf(buf, len, "%d.%d%s", major, minor, suffix);
+    } else {
+        bh_snprintf(buf, len, "%d%s", major, suffix);
+    }
+}
 
 static int32_t cli_args_init(CLIArgs *cli_args) {
     memset(cli_args, 0, sizeof(* cli_args));
@@ -168,6 +191,11 @@ static int32_t cli_args_init(CLIArgs *cli_args) {
 
     if (getenv("ONYX_ERROR_FORMAT")) {
         cli_args->error_format = getenv("ONYX_ERROR_FORMAT");
+    }
+
+    {
+        char *jit_env = getenv("ONYX_JIT");
+        if (jit_env && jit_env[0] == '1') cli_args->enable_jit = 1;
     }
     #endif
 
@@ -184,13 +212,20 @@ static int32_t cli_args_init(CLIArgs *cli_args) {
     if (GetEnvironmentVariableA("ONYX_ERROR_FORMAT", tmp_error_format, 512) > 0) {
         cli_args->error_format = tmp_error_format;
     }
+
+    {
+        char tmp_jit[8] = {0};
+        if (GetEnvironmentVariableA("ONYX_JIT", tmp_jit, 8) > 0 && tmp_jit[0] == '1') {
+            cli_args->enable_jit = 1;
+        }
+    }
     #endif
 
     if (cli_args->core_installation == NULL) {
         bh_printf(C_RED "error" C_NORM ": ONYX_PATH environment variable is not set. Please set this to the location of your Onyx installation.\n");
         return 0;
     }
-    
+
     return 1;
 }
 
@@ -218,6 +253,14 @@ static int32_t cli_determine_action(CLIArgs *cli_args, int *first_sub_arg, int a
 
     if (!strcmp(argv[1], "compile") || !strcmp(argv[1], "build") || !strcmp(argv[1], "b")) {
         cli_args->action = ONYX_COMPILE_ACTION_COMPILE;
+        *first_sub_arg = 2;
+        return 1;
+    }
+
+    if (!strcmp(argv[1], "build-exe")) {
+        cli_args->action = ONYX_COMPILE_ACTION_COMPILE;
+        cli_args->enable_native = 1;
+        cli_args->target_file = "out";
         *first_sub_arg = 2;
         return 1;
     }
@@ -319,6 +362,7 @@ static int32_t cli_determine_action(CLIArgs *cli_args, int *first_sub_arg, int a
 
         cli_args->passthrough_argument_count = argc - 2;
         cli_args->passthrough_argument_data  = &argv[2];
+        *first_sub_arg = argc;
         return 1;
     }
 
@@ -337,6 +381,7 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
         }
 
         if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
+            cli_args->output_explicit = 1;
             cli_args->target_file = argv[++i]; // :InCli
         }
         else if (!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-V")) {
@@ -388,6 +433,9 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
         else if (!strcmp(argv[i], "--no-core")) {
             onyx_set_option_int(ctx, ONYX_OPTION_DISABLE_CORE, 1);
         }
+        else if (!strcmp(argv[i], "--emit-wasm-object")) {
+            onyx_set_option_int(ctx, ONYX_OPTION_EMIT_WASM_OBJECT, 1);
+        }
         else if (!strcmp(argv[i], "--no-stale-code")) {
             onyx_set_option_int(ctx, ONYX_OPTION_DISABLE_STALE_CODE, 1);
         }
@@ -438,6 +486,7 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
             i += 1;
             if (!strcmp(argv[i], "onyx")) using_onyx_runtime = 1;
             else if (!strcmp(argv[i], "wasi"))   onyx_set_option_int(ctx, ONYX_OPTION_PLATFORM, ONYX_PLATFORM_WASI);
+            else if (!strcmp(argv[i], "wasip2")) onyx_set_option_int(ctx, ONYX_OPTION_PLATFORM, ONYX_PLATFORM_WASIP2);
             else if (!strcmp(argv[i], "js"))     onyx_set_option_int(ctx, ONYX_OPTION_PLATFORM, ONYX_PLATFORM_JS);
             else if (!strcmp(argv[i], "custom")) onyx_set_option_int(ctx, ONYX_OPTION_PLATFORM, ONYX_PLATFORM_CUSTOM);
             else {
@@ -459,6 +508,22 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
         }
         else if (!strcmp(argv[i], "--save-injected")) {
             cli_args->injected_code_file = argv[++i];
+        }
+        else if (!strcmp(argv[i], "--generate-events")) {
+            if (i + 1 >= argc || is_flag(argv[i + 1])) {
+                bh_printf(C_RED "error" C_NORM ": --generate-events requires a target file.\n");
+                return 0;
+            }
+            cli_args->events_file = argv[++i];
+        }
+        else if (!strcmp(argv[i], "--jit")) {
+            cli_args->enable_jit = 1;
+            onyx_set_option_int(ctx, ONYX_OPTION_JIT, 1);
+        }
+        else if (!strcmp(argv[i], "--native")) {
+            bh_printf(C_RED "error" C_NORM ": Unknown flag '--native'.\n");
+            bh_printf(C_GREY " hint: Use 'onyx build-exe' to AOT-compile a host executable.\n" C_NORM);
+            return 0;
         }
         else if (!strcmp(argv[i], "--debug")) {
             cli_args->debug_session = 1;
@@ -498,7 +563,7 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
     }
 
     int32_t at_least_one_file = 0;
-    
+
     fori (i, arg_parse_start, argc) {
         if (is_flag(argv[i])) {
             if (!strcmp(argv[i], "--")) {
@@ -548,13 +613,18 @@ static int32_t cli_parse_compilation_options(CLIArgs *cli_args, onyx_context_t *
 static void print_subcommand_help(const char *subcommand) {
     if (!strcmp(subcommand, "build") || !strcmp(subcommand, "b")
         || !strcmp(subcommand, "check") || !strcmp(subcommand, "watch")) {
-        bh_printf(build_docstring, subcommand, "");
+        bh_printf(build_docstring, subcommand, "", "out.wasm");
+        return;
+    }
+
+    if (!strcmp(subcommand, "build-exe")) {
+        bh_printf(build_docstring, subcommand, "", "out");
         return;
     }
 
     if (!strcmp(subcommand, "run") || !strcmp(subcommand, "r")
         || !strcmp(subcommand, "run-watch") || !strcmp(subcommand, "rw")) {
-        bh_printf(build_docstring, subcommand, "[-- program args]");
+        bh_printf(build_docstring, subcommand, "[-- program args]", "out.wasm");
         bh_printf(
             C_LBLUE "    --debug-socket " C_GREY "addr         " C_NORM "Specifies the address or port used for the debug server.\n"
         );
@@ -680,6 +750,93 @@ static int32_t output_file_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, const
     return 1;
 }
 
+static int32_t output_compilation_events_to_disk(CLIArgs *cli_args, onyx_context_t *ctx) {
+    if (!cli_args->events_file) return 1;
+
+    int32_t output_length = onyx_compilation_events_length(ctx);
+    void *output = NULL;
+    if (output_length > 0) {
+        output = malloc(output_length);
+        if (!output) {
+            bh_printf(C_RED "error" C_NORM ": Failed to allocate compilation events buffer\n");
+            return 0;
+        }
+        onyx_compilation_events_write(ctx, output);
+    }
+
+    bh_file out_file;
+    if (bh_file_create(&out_file, cli_args->events_file) != BH_FILE_ERROR_NONE) {
+        bh_printf(C_RED "error" C_NORM ": Failed to open file for writing '%s'\n", cli_args->events_file);
+        free(output);
+        return 0;
+    }
+
+    if (output_length > 0) {
+        bh_file_write(&out_file, output, output_length);
+    }
+    bh_file_close(&out_file);
+    free(output);
+    return 1;
+}
+
+#if defined(USE_OVM_DEBUGGER) && (defined(_BH_LINUX) || defined(_BH_DARWIN))
+int ovm_native_compile_wasm(const void *wasm, unsigned int wasm_len, const char *obj_path);
+
+static int32_t link_native_executable(CLIArgs *cli_args, onyx_context_t *ctx) {
+#if !defined(__aarch64__) && !defined(__arm64__) && !defined(__x86_64__)
+    bh_printf(C_RED "error" C_NORM ": build-exe requires x86_64 or arm64.\n");
+    return 0;
+#else
+    int64_t wasm_len = onyx_output_length(ctx, ONYX_OUTPUT_TYPE_WASM);
+    if (wasm_len <= 0) {
+        bh_printf(C_RED "error" C_NORM ": no wasm output to compile natively.\n");
+        return 0;
+    }
+
+    void *wasm = malloc((size_t) wasm_len);
+    if (!wasm) return 0;
+    onyx_output_write(ctx, ONYX_OUTPUT_TYPE_WASM, wasm);
+
+    char obj_path[1024] = {0};
+    snprintf(obj_path, sizeof obj_path, "%s.o", cli_args->target_file);
+
+    int ok = ovm_native_compile_wasm(wasm, (unsigned int) wasm_len, obj_path);
+    free(wasm);
+    if (!ok) {
+        bh_printf(C_RED "error" C_NORM ": failed to emit native object '%s'\n", obj_path);
+        return 0;
+    }
+
+    char lib[1024] = {0};
+    snprintf(lib, sizeof lib, "%s/lib/libonyx_native.a", cli_args->core_installation);
+    if (!bh_file_exists(lib)) {
+        bh_printf(C_RED "error" C_NORM ": missing '%s'. Rebuild Onyx with ONYX_RUNTIME_LIBRARY=ovmwasm.\n", lib);
+        return 0;
+    }
+
+    char cmd[4096] = {0};
+#if defined(_BH_DARWIN)
+    snprintf(cmd, sizeof cmd,
+        "cc -o \"%s\" \"%s\" \"%s\" -lpthread -ldl -lm -lffi -framework Security -framework CoreFoundation -framework SystemConfiguration",
+        cli_args->target_file, obj_path, lib);
+#else
+    snprintf(cmd, sizeof cmd,
+        "cc -rdynamic -o \"%s\" \"%s\" \"%s\" -lpthread -ldl -lm",
+        cli_args->target_file, obj_path, lib);
+#endif
+
+    int rc = system(cmd);
+    if (rc != 0) {
+        bh_printf(C_RED "error" C_NORM ": native link failed (cc exited %d)\n", rc);
+        return 0;
+    }
+
+    remove(obj_path);
+    return 1;
+#endif
+}
+#endif
+
 static int32_t output_files_to_disk(CLIArgs *cli_args, onyx_context_t *ctx, const char *filename) {
     char filenameTmp[1024] = { 0 };
 
@@ -784,6 +941,7 @@ static void onyx_watch(CLIArgs *cli_args, int arg_parse_start, int argc, char **
         }
 
         i32 error_count = onyx_error_count(ctx);
+        output_compilation_events_to_disk(cli_args, ctx);
         if (error_count == 0) {
             output_files_to_disk(cli_args, ctx, cli_args->target_file);
 
@@ -792,16 +950,13 @@ static void onyx_watch(CLIArgs *cli_args, int arg_parse_start, int argc, char **
             onyx_errors_print(ctx, cli_args->error_format, !cli_args->no_colors, cli_args->show_all_errors);
         }
 
+        char version_buf[128] = {0};
+        build_version_string(version_buf, 127);
+
         char time_buf[128] = {0};
         time_t now = time(NULL);
         strftime(time_buf, 128, "%X", localtime(&now));
-        bh_printf("\e[1;1H\e[30;105m Onyx %d.%d.%d%s \e[30;104m Built %s \e[0m", 
-            onyx_version_major(),
-            onyx_version_minor(),
-            onyx_version_patch(),
-            onyx_version_suffix(),
-            time_buf
-        );
+        bh_printf("\e[1;1H\e[30;105m Onyx %s \e[30;104m Built %s \e[0m", version_buf, time_buf);
 
         if (error_count == 0) {
             bh_printf("\e[30;102m Errors 0 \e[0m");
@@ -861,13 +1016,11 @@ int main(int argc, char *argv[]) {
         return !action_was_determined;
     }
 
-    if (cli_args.action == ONYX_COMPILE_ACTION_PRINT_VERSION) { 
-        bh_printf("Onyx tool-chain version %d.%d.%d%s\n",
-            onyx_version_major(),
-            onyx_version_minor(),
-            onyx_version_patch(),
-            onyx_version_suffix()
-        );
+    if (cli_args.action == ONYX_COMPILE_ACTION_PRINT_VERSION) {
+        char version_buf[128] = {0};
+        build_version_string(version_buf, 127);
+
+        bh_printf("Onyx tool-chain version %s\n", version_buf);
         bh_printf("Runtime: %s\n", onyx_version_runtime());
         bh_printf("Built:   %s\n", onyx_version_build_time());
 
@@ -902,7 +1055,8 @@ int main(int argc, char *argv[]) {
         onyx_set_option_int(ctx, ONYX_OPTION_MULTI_THREADING, 1);
         onyx_include_file(ctx, bh_aprintf(bh_heap_allocator(), "%s/tools/onyx-pkg.onyx", cli_args.core_installation), -1);
 
-    } else {
+    } else if (cli_args.action != ONYX_COMPILE_ACTION_RUN_WASM) {
+        // Installed tools are already RUN_WASM. Their flags belong to the tool.
         if (!cli_parse_compilation_options(&cli_args, ctx, arg_parse_start, argc, argv)) {
             return 1;
         }
@@ -916,9 +1070,9 @@ int main(int argc, char *argv[]) {
         }
 
         if (cli_args.debug_session) {
-            onyx_run_wasm_with_debug(wasm_content.data, wasm_content.length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data, cli_args.debug_socket);
+            onyx_run_wasm_with_debug(wasm_content.data, wasm_content.length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data, cli_args.debug_socket, cli_args.enable_jit);
         } else {
-            onyx_run_wasm(wasm_content.data, wasm_content.length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data);
+            onyx_run_wasm(wasm_content.data, wasm_content.length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data, cli_args.enable_jit);
         }
 
         return 0;
@@ -938,19 +1092,7 @@ int main(int argc, char *argv[]) {
                 }
                 break;
 
-            case ONYX_EVENT_ALL_TYPES_CHECKED:
-                break;
-
-            case ONYX_EVENT_SYMBOL_DEFINED:
-                // bh_printf("DEFINED SYMBOL AT %s:%d,%d\n",
-                //     onyx_event_field_str(ctx, i, "filename"),
-                //     onyx_event_field_int(ctx, i, "line"),
-                //     onyx_event_field_int(ctx, i, "column")
-                // );
-                break;
-
-            case ONYX_EVENT_UNKNOWN:
-                break;
+            default: break;
             }
         }
     }
@@ -962,6 +1104,8 @@ int main(int argc, char *argv[]) {
     if (cli_args.injected_code_file) {
         output_file_to_disk(&cli_args, ctx, cli_args.injected_code_file, ONYX_OUTPUT_TYPE_INJECTED_CODE);
     }
+
+    output_compilation_events_to_disk(&cli_args, ctx);
 
     if (onyx_errors_present(ctx)) {
         return 1;
@@ -980,7 +1124,7 @@ int main(int argc, char *argv[]) {
         printf("    Processed %d tokens (%f tokens/second).\n", tokens, tokens_per_sec);
         printf("\n");
     }
-  
+
     switch (cli_args.action) {
         case ONYX_COMPILE_ACTION_RUN:
         case ONYX_COMPILE_ACTION_PACKAGE: {
@@ -990,9 +1134,9 @@ int main(int argc, char *argv[]) {
             onyx_context_free(ctx);
 
             if (cli_args.debug_session) {
-                onyx_run_wasm_with_debug(output, output_length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data, cli_args.debug_socket);
+                onyx_run_wasm_with_debug(output, output_length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data, cli_args.debug_socket, cli_args.enable_jit);
             } else {
-                onyx_run_wasm(output, output_length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data);
+                onyx_run_wasm(output, output_length, cli_args.passthrough_argument_count, cli_args.passthrough_argument_data, cli_args.enable_jit);
             }
 
             free(output);
@@ -1009,6 +1153,17 @@ int main(int argc, char *argv[]) {
         }
 
         case ONYX_COMPILE_ACTION_COMPILE: {
+            if (cli_args.enable_native) {
+#if defined(USE_OVM_DEBUGGER) && (defined(_BH_LINUX) || defined(_BH_DARWIN))
+                if (!link_native_executable(&cli_args, ctx)) {
+                    return 1;
+                }
+                break;
+#else
+                bh_printf(C_RED "error" C_NORM ": build-exe requires the ovmwasm runtime.\n");
+                return 1;
+#endif
+            }
             if (!output_files_to_disk(&cli_args, ctx, cli_args.target_file)) {
                 return 1;
             }
@@ -1019,7 +1174,7 @@ int main(int argc, char *argv[]) {
         default:
             break;
     }
-  
+
     onyx_context_free(ctx);
     return 0;
 }

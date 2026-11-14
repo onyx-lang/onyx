@@ -14,13 +14,22 @@ use runtime.platform {
     __process_destroy,
     __process_kill,
     __process_read,
+    __process_read_stderr,
     __process_write,
     __process_wait,
     ProcessData
 }
 
-/// Represents a spawned OS process.
+/// Represents a spawned OS process. `use stream` is stdout; `stderr` is a separate stream.
 Process :: struct {
+    use stream: io.Stream;
+    stderr: ProcessStderr;
+    process_handle: ProcessData;
+    exit_code: i32;
+}
+
+/// Stderr side of a captured process. `io.Stream.read(&p.stderr)` works because the stream is at offset 0.
+ProcessStderr :: struct {
     use stream: io.Stream;
     process_handle: ProcessData;
 }
@@ -37,10 +46,10 @@ ProcessSpawnOpts :: struct {
 /// Spawns a new OS process. This operation is always assumed to succeed.
 /// To determine if the operation failed, use `process_wait` and look for the
 /// `FailedToRun` state.
-process_spawn :: #match #local -> Process {}
+Process.spawn :: #match #local -> Process {}
 
 #overload
-process_spawn :: (path: str, args: [] str, non_blocking_io := false, starting_directory := "") -> Process {
+Process.spawn :: (path: str, args: [] str, non_blocking_io := false, starting_directory := "") -> Process {
     opts := ProcessSpawnOpts.{
         capture_io = true,
         non_blocking_io = non_blocking_io,
@@ -49,11 +58,11 @@ process_spawn :: (path: str, args: [] str, non_blocking_io := false, starting_di
         environment = .{},
     };
 
-    return process_spawn(path, args, &opts);
+    return Process.spawn(path, args, &opts);
 }
 
 #overload
-process_spawn :: (path: str, args: [] str, opts: &ProcessSpawnOpts) -> Process {
+Process.spawn :: (path: str, args: [] str, opts: &ProcessSpawnOpts) -> Process {
     env_data := null;
     if opts.environment {
         env: [..] cptr(u8);
@@ -70,24 +79,37 @@ process_spawn :: (path: str, args: [] str, opts: &ProcessSpawnOpts) -> Process {
 
     return .{
         .{ &process_stream_vtable },
+        .{ .{ &process_stderr_vtable }, handle },
         handle,
+        0,
     };
 }
 
 /// Force kills a subprocess.
-process_kill :: (use p: &Process) -> bool {
+Process.kill :: (use p: &Process) -> bool {
     return __process_kill(process_handle);
 }
 
-/// Waits for a process to exit.
-process_wait :: (use p: &Process) => {
-    return __process_wait(process_handle);
+/// Waits for a process to exit. Stores the numeric code on `p.exit_code`.
+Process.wait :: (use p: &Process) -> ProcessResult {
+    code := __process_wait(process_handle);
+    if code == -1 {
+        p.exit_code = -1;
+        return .FailedToRun;
+    }
+    if code == -2 {
+        p.exit_code = -1;
+        return .InternalErr;
+    }
+    p.exit_code = code;
+    return .Success if code == 0 else .Error;
 }
 
 /// Frees internal resources used by a process. Should be called after process_kill or process_wait.
-process_destroy :: (use p: &Process) => {
+Process.destroy :: (use p: &Process) => {
     __process_destroy(process_handle);
 }
+
 
 #local Process_Read_Error :: enum {
     None         :: 0x00;
@@ -120,14 +142,28 @@ process_destroy :: (use p: &Process) => {
     },
 
     close = (use p: &Process) -> io.Error {
-        process_kill(p);
+        Process.kill(p);
         return .None;
     }
 }
 
-/// Represents exit states of a process.
-///
-/// This is not the best format for this data, as it is impossible to get the exit status.
+#local process_stderr_vtable := io.Stream_Vtable.{
+    read = (use s: &ProcessStderr, buffer: [] u8) -> Result(u32, io.Error) {
+        if cast(i64) process_handle == 0 do return .{ Err = .BadFile };
+
+        bytes_read := __process_read_stderr(process_handle, buffer);
+        if bytes_read < 0 {
+            switch cast(Process_Read_Error) -bytes_read {
+                case .None do return .{ Ok = 0 };
+                case .Process_Dead do return .{ Err = .EOF };
+                case .Unknown do return .{ Err = .BadFile };
+            }
+        }
+        return .{ Ok = bytes_read };
+    }
+}
+
+/// Represents exit states of a process. The numeric code is on `Process.exit_code` after `wait`.
 ProcessResult :: enum {
     Success     :: 0x00;
     FailedToRun :: 0x01;
@@ -155,6 +191,7 @@ Command :: struct {
 
     _process: ? Process;
     _opts: ProcessSpawnOpts;
+    exit_code: i32;
 }
 
 /// Produces a new `Command` for the process builder.
@@ -175,7 +212,7 @@ Command.path :: (cmd: &Command, path: str) -> &Command {
 
 /// Appends arguments to the argument array of the command.
 Command.args :: (cmd: &Command, args: [] str) -> &Command {
-    array.concat(&cmd._args, args);
+    Array.concat(&cmd._args, args);
     return cmd;
 }
 
@@ -202,9 +239,9 @@ Command.output :: (cmd: &Command) -> Result(str, ProcessResultOutput) {
         if !cmd._process do return .{ Err = .{ .Error, "Failed to spawn process" } };
     }
 
-    r := io.reader_make(cmd._process->unwrap_ptr());
-    output := io.read_all(&r);
-    io.reader_free(&r);
+    r := io.Reader.make(cmd._process->unwrap_ptr());
+    output := io.Reader.read_all(&r);
+    io.Reader.free(&r);
 
     res := cmd->wait();
     if res != .Success {
@@ -231,7 +268,7 @@ Command.start :: (cmd: &Command) -> &Command {
     cmd._opts.environment = cmd._env;
     cmd._opts.dir = cmd._dir;
 
-    cmd._process = process_spawn(cmd._path, cmd._args, &cmd._opts);
+    cmd._process = Process.spawn(cmd._path, cmd._args, &cmd._opts);
     return cmd;
 }
 
@@ -239,8 +276,9 @@ Command.start :: (cmd: &Command) -> &Command {
 Command.wait :: (cmd: &Command) -> ProcessResult {
     if !cmd._process do return .Error;
 
-    res := process_wait(cmd._process->unwrap_ptr());
-    process_destroy(cmd._process->unwrap_ptr());
+    res := Process.wait(cmd._process->unwrap_ptr());
+    cmd.exit_code = cmd._process->unwrap_ptr().exit_code;
+    Process.destroy(cmd._process->unwrap_ptr());
 
     cmd->destroy();
     return res;
@@ -252,4 +290,3 @@ Command.destroy :: (cmd: &Command) {
     delete(&cmd._env);
     cfree(cmd);
 }
-

@@ -1,0 +1,18 @@
+use core {*}
+
+Vec2 :: struct { x, y: i32 }
+
+Hex := Vec2.[
+    .{  1,  0 },
+    .{  0,  1 },
+    .{ -1,  0 },
+]
+
+Empty := Vec2.{}
+
+main :: () {
+    printf("{} {}\n", Hex[0].x, Hex[0].y)
+    printf("{} {}\n", Hex[1].x, Hex[1].y)
+    printf("{} {}\n", Hex[2].x, Hex[2].y)
+    printf("{} {}\n", Empty.x, Empty.y)
+}

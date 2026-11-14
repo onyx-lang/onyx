@@ -18,3 +18,28 @@ true: def==def
 true: def==def
 true: ../../def==../../def
 true: abc==abc
+foo.txt
+bar.txt
+c
+foo
+.
+/
+foo
+foo
+c
+.bashrc
+.txt
+
+.txt
+
+
+.gz
+true
+false
+false
+true
+.
+a
+b
+true
+true

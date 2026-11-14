@@ -1,0 +1,14 @@
+package main
+
+#load "sub/included.inc"
+
+use core {*}
+
+main :: () {
+    bare := #file_contents "payload.txt";
+    dotted := #file_contents "./payload.txt";
+    printf("bare:{}\n", bare);
+    printf("dot:{}\n", dotted);
+    printf("sub:{}\n", sub_here());
+    printf("up:{}\n", sub_up());
+}

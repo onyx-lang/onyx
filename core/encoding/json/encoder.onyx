@@ -11,27 +11,121 @@ Encoding_Error :: enum {
     Unsupported_Type;
 }
 
-encode_string :: (v: $T, allocator := context.allocator) -> (str, Encoding_Error) {
-    stream := io.buffer_stream_make(256);
-    writer := io.writer_make(^stream, 0);
-    defer io.buffer_stream_free(^stream);
+#thread_local
+_enc: struct {
+    indent: i32;
+    depth: i32;
+}
 
-    err := encode(^writer, v);
-    if err != .None {
-        return "", err;
+#local
+write_newline_indent :: (w: &io.Writer) {
+    if _enc.indent <= 0 do return;
+    io.Writer.write_byte(w, '\n');
+    n := _enc.indent * _enc.depth;
+    while n > 0 {
+        io.Writer.write_byte(w, ' ');
+        n -= 1;
+    }
+}
+
+#local
+pretty_open :: (w: &io.Writer, open: u8, empty: bool) {
+    io.Writer.write_byte(w, open);
+    if empty do return;
+    _enc.depth += 1;
+    write_newline_indent(w);
+}
+
+#local
+pretty_close :: (w: &io.Writer, close: u8, empty: bool) {
+    if !empty {
+        _enc.depth -= 1;
+        write_newline_indent(w);
+    }
+    io.Writer.write_byte(w, close);
+}
+
+#local
+pretty_sep :: (w: &io.Writer, first: bool) {
+    if first do return;
+    io.Writer.write_byte(w, ',');
+    write_newline_indent(w);
+}
+
+#local
+pretty_colon :: (w: &io.Writer) {
+    io.Writer.write_byte(w, ':');
+    if _enc.indent > 0 do io.Writer.write_byte(w, ' ');
+}
+
+encode_string :: (v: $T, allocator := context.allocator, indent := 0) -> Result(str, Encoding_Error) {
+    old_indent := _enc.indent;
+    old_depth := _enc.depth;
+    _enc.indent = indent;
+    _enc.depth = 0;
+    defer {
+        _enc.indent = old_indent;
+        _enc.depth = old_depth;
     }
 
-    s := string.copy(io.buffer_stream_to_str(^stream), allocator);
-    return s, .None;
+    stream := io.BufferStream.make(256);
+    writer := io.Writer.make(&stream, 0);
+    defer io.BufferStream.free(&stream);
+
+    err := encode(&writer, v);
+    if err != .None {
+        return .{ Err = err };
+    }
+
+    s := str.copy(io.BufferStream.to_str(&stream), allocator);
+    return .{ Ok = s };
 }
 
 encode_string_opt :: (v: $T, allocator := context.allocator) -> ? str {
-    s, err := encode_string(v, allocator);
-    if err != .None {
-        return .None;
+    switch encode_string(v, allocator) {
+        case .Ok as s do return s;
+        case .Err do return .None;
+    }
+}
+
+encode_pretty :: (w: &io.Writer, v: $T, indent := 2) -> Encoding_Error {
+    old_indent := _enc.indent;
+    old_depth := _enc.depth;
+    _enc.indent = indent;
+    _enc.depth = 0;
+    defer {
+        _enc.indent = old_indent;
+        _enc.depth = old_depth;
     }
 
-    return s;
+    return encode(w, v);
+}
+
+/// Streaming encoder over a `Writer`. `newline=true` writes a `\n` after each value (JSONL).
+Encoder :: struct {
+    writer: &io.Writer
+    indent: i32
+    newline: bool
+}
+
+Encoder.make :: (w: &io.Writer, indent := 0, newline := false) -> Encoder {
+    return .{ w, indent, newline }
+}
+
+Encoder.encode :: (e: &Encoder, v: $T) -> Encoding_Error {
+    old_indent := _enc.indent
+    old_depth := _enc.depth
+    _enc.indent = e.indent
+    _enc.depth = 0
+    defer {
+        _enc.indent = old_indent
+        _enc.depth = old_depth
+    }
+
+    err := encode(e.writer, v)
+    if err != .None do return err
+    if e.newline do io.Writer.write_byte(e.writer, '\n')
+    return .None
 }
 
 //
@@ -40,101 +134,105 @@ encode_string_opt :: (v: $T, allocator := context.allocator) -> ? str {
 // this way.
 //
 encode :: #match {
-    (w: ^io.Writer, v: i32) -> Encoding_Error {
-        io.write_i32(w, ~~v);
+    (w: &io.Writer, v: i32) -> Encoding_Error {
+        io.Writer.write_i32(w, ~~v);
         return .None;
     },
 
-    (w: ^io.Writer, v: i64) -> Encoding_Error {
-        io.write_i64(w, ~~v);
+    (w: &io.Writer, v: i64) -> Encoding_Error {
+        io.Writer.write_i64(w, ~~v);
         return .None;
     },
 
-    (w: ^io.Writer, v: f32) -> Encoding_Error {
-        io.write_f32(w, ~~v);
+    (w: &io.Writer, v: f32) -> Encoding_Error {
+        io.Writer.write_f32(w, ~~v);
         return .None;
     },
 
-    (w: ^io.Writer, v: f64) -> Encoding_Error {
-        io.write_f64(w, ~~v);
+    (w: &io.Writer, v: f64) -> Encoding_Error {
+        io.Writer.write_f64(w, ~~v);
         return .None;
     },
 
-    (w: ^io.Writer, v: str) -> Encoding_Error {
-        io.write_escaped_str(w, v);
+    (w: &io.Writer, v: str) -> Encoding_Error {
+        io.Writer.write_escaped_str(w, v);
         return .None;
     },
 
-    (w: ^io.Writer, v: [] $T) -> Encoding_Error {
-        io.write_byte(w, '[');
+    (w: &io.Writer, v: [] $T) -> Encoding_Error {
+        empty := v.count == 0;
+        pretty_open(w, '[', empty);
 
         for i in v.count {
-            if i > 0 do io.write_byte(w, ',');
+            pretty_sep(w, i == 0);
 
             err := encode(w, v[i]);
             if err != .None do return err;
         }
 
-        io.write_byte(w, ']');
+        pretty_close(w, ']', empty);
         return .None;
     },
 
-    (w: ^io.Writer, v: [..] $T) -> Encoding_Error {
-        io.write_byte(w, '[');
+    (w: &io.Writer, v: [..] $T) -> Encoding_Error {
+        empty := v.count == 0;
+        pretty_open(w, '[', empty);
 
         for i in v.count {
-            if i > 0 do io.write_byte(w, ',');
+            pretty_sep(w, i == 0);
 
             err := encode(w, v[i]);
             if err != .None do return err;
         }
 
-        io.write_byte(w, ']');
+        pretty_close(w, ']', empty);
         return .None;
     },
 
-    (w: ^io.Writer, v: Map(str, $T)) -> Encoding_Error {
-        io.write_byte(w, '{');
+    (w: &io.Writer, v: Map(str, $T)) -> Encoding_Error {
+        empty := v.entries.count == 0;
+        pretty_open(w, '{', empty);
 
         for i in v.entries.count {
-            if i > 0 do io.write_byte(w, ',');
-            entry := ^v.entries[i];
+            pretty_sep(w, i == 0);
+            entry := &v.entries[i];
 
-            io.write_escaped_str(w, entry.key);
-            io.write_byte(w, ':');
+            io.Writer.write_escaped_str(w, entry.key);
+            pretty_colon(w);
 
             err := encode(w, entry.value);
             if err != .None do return err;
         }
 
-        io.write_byte(w, '}');
+        pretty_close(w, '}', empty);
         return .None;
     },
 
-    (w: ^io.Writer, v: Value) -> Encoding_Error {
-        switch (cast(^_Value) v).type {
-            case .Null    do io.write_str(w, "null");
-            case .Bool    do io.write(w, v->as_bool());
-            case .Integer do io.write(w, v->as_int());
-            case .Float   do io.write(w, v->as_float());
+    (w: &io.Writer, v: Value) -> Encoding_Error {
+        switch (cast(&_Value) v).type {
+            case .Null    do io.Writer.write_str(w, "null");
+            case .Bool    do io.Writer.write(w, v->as_bool());
+            case .Integer do io.Writer.write(w, v->as_int());
+            case .Float   do io.Writer.write(w, v->as_float());
             case .String  do   encode(w, v->as_str());
             case .Array   do   encode(w, v->as_array());
 
             case .Object {
-                io.write_byte(w, '{');
-                obj := cast(^_Value_Object) cast(^_Value) v;
+                obj := cast(&_Value_Object) cast(&_Value) v;
+                empty := obj.object_.count == 0;
+                pretty_open(w, '{', empty);
 
                 for i in obj.object_.count {
-                    if i > 0 do io.write_byte(w, ',');
+                    pretty_sep(w, i == 0);
 
-                    io.write_escaped_str(w, obj.object_[i].key);
-                    io.write_byte(w, ':');
+                    io.Writer.write_escaped_str(w, obj.object_[i].key);
+                    pretty_colon(w);
 
                     err := encode(w, obj.object_[i].value);
                     if err != .None do return err;
                 }
 
-                io.write_byte(w, '}');
+                pretty_close(w, '}', empty);
             }
 
             case _ {
@@ -149,93 +247,99 @@ encode :: #match {
     // as opposed to a error to check programatically.
     //
     // // Inserted after any of the #match directives
-    // #order 1000 (w: ^io.Writer, v: $T) -> Encoding_Error {
+    // #order 1000 (w: &io.Writer, v: $T) -> Encoding_Error {
     //     return .Unsupported_Type;
     // }
 }
 
 
 #overload #order 10000
-encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
+encode :: (w: &io.Writer, data: any) -> Encoding_Error {
     use runtime.info {*}
 
     info := get_type_info(data.type);
 
     switch info.kind {
         case .Basic {
-            io.write_format_va(w, "{}", .[data]);
+            io.Writer.write_format_va(w, "{}", .[data]);
         }
 
         case .Array {
-            io.write(w, "[");
-
-            a := cast(^Type_Info_Array) info;
-            arr := data.data;
+            a := cast(&Type_Info_Array) info;
+            empty := a.count == 0;
+            pretty_open(w, '[', empty);
 
             for i in a.count {
-                if i != 0 do io.write(w, ",");
-
+                pretty_sep(w, i == 0);
                 encode(w, misc.any_subscript(data, i));
             }
 
-            io.write(w, "]");
+            pretty_close(w, ']', empty);
         }
 
         case .Slice, .Dynamic_Array {
             if data.type == str {
-                io.write_escaped_str(w, *misc.any_as(data, str));
+                io.Writer.write_escaped_str(w, *misc.any_as(data, str));
                 break;
             }
 
-            io.write(w, "[");
+            a := cast(&Type_Info_Dynamic_Array) info;
+            arr := cast(&core.array.Untyped_Array) data.data;
+            empty := arr.count == 0;
+            pretty_open(w, '[', empty);
 
-            a := cast(^Type_Info_Dynamic_Array) info;
-            arr := cast(^core.array.Untyped_Array) data.data;
-            count := arr.count;
-
-            for i in count {
-                if i != 0 do io.write(w, ",");
-
+            for i in arr.count {
+                pretty_sep(w, i == 0);
                 encode(w, misc.any_subscript(data, i));
             }
 
-            io.write(w, "]");
+            pretty_close(w, ']', empty);
         }
 
         case .Distinct {
             if data.type == Value {
-                encode(w, *cast(^Value) data.data);
+                encode(w, *cast(&Value) data.data);
                 return .None;
             }
 
-            d := cast(^Type_Info_Distinct) info;
+            d := cast(&Type_Info_Distinct) info;
             encode(w, any.{ data.data, d.base_type });
         }
 
         case .Struct {
-            s := cast(^runtime.info.Type_Info_Struct) info;
+            s := cast(&runtime.info.Type_Info_Struct) info;
 
-            io.write(w, "{");
+            visible := 0;
+            for &member in s.members {
+                if tag := Slice.first(member.tags, [t](t.type == type_expr)); tag != null {
+                    if *cast(&type_expr, tag.data) == Ignore do continue;
+                }
+                visible += 1;
+            }
 
-            for ^member in s.members {
+            empty := visible == 0;
+            pretty_open(w, '{', empty);
+            first := true;
+
+            for &member in s.members {
                 key := member.name;
-                if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
-                    key = (cast(^Custom_Key) tag.data).key;
+                if tag := Slice.first(member.tags, [t](t.type == Custom_Key)); tag != null {
+                    key = (cast(&Custom_Key) tag.data).key;
                 }
 
-                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
-                    if *cast(^type_expr, tag.data) == Ignore {
+                if tag := Slice.first(member.tags, [t](t.type == type_expr)); tag != null {
+                    if *cast(&type_expr, tag.data) == Ignore {
                         continue;
                     }
                 }
 
-                if !#first do io.write(w, ",");
+                pretty_sep(w, first);
+                first = false;
                 encode(w, key);
-
-                io.write(w, ":");
+                pretty_colon(w);
                 encode(w, misc.any_member(data, member));
             }
-            io.write(w, "}");
+            pretty_close(w, '}', empty);
         }
 
         case .Union {
@@ -246,7 +350,7 @@ encode :: (w: ^io.Writer, data: any) -> Encoding_Error {
             u := info->as_union();
             tag := *cast(&Optional(void).tag_enum) data.data;
             if tag != .Some {
-                io.write(w, "null");
+                io.Writer.write(w, "null");
             } else {
                 encode(w, misc.any_member(data, u.variants[1].type, u.alignment));
             }
@@ -286,17 +390,37 @@ Ignore :: #distinct void
 
 from_any :: #match #local {}
 
-#overload
-from_any :: macro (v: ^$T, allocator := context.allocator) -> Value {
+#overload #order 100
+from_any :: (m: &Map(str, $V), allocator := context.allocator) -> Value {
+    return from_str_map(m, allocator);
+}
+
+#overload #order 100
+from_any :: (m: Map(str, $V), allocator := context.allocator) -> Value {
+    x := m;
+    return from_str_map(&x, allocator);
+}
+
+#overload #order 10000
+from_any :: macro (v: &$T, allocator := context.allocator) -> Value {
     from_any :: from_any
     return from_any(T, v, allocator);
 }
 
-#overload
+#overload #order 10000
 from_any :: macro (v: $T, allocator := context.allocator) -> Value {
     from_any :: from_any
     x := v
     return from_any(T, &x, allocator)
+}
+
+from_str_map :: (m: &Map(str, $V), allocator := context.allocator) -> Value {
+    obj := empty_object(allocator);
+    for i in m.entries.count {
+        e := &m.entries[i];
+        json.set(obj, e.key, from_any(e.value, allocator));
+    }
+    return obj;
 }
 
 #overload
@@ -308,18 +432,18 @@ from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> 
         case .Basic do switch type {
             // These functions handle the cases where the types do
             // not match, so no additional checks are needed here.
-            case bool     { v := new(_Value_Bool, allocator);    v.bool_  =    *cast(^bool) input; return Value.{v}; }
-            case i32, u32 { v := new(_Value_Integer, allocator); v.int_   = ~~ *cast(^i32)  input; return Value.{v}; }
-            case i64, u64 { v := new(_Value_Integer, allocator); v.int_   =    *cast(^i64)  input; return Value.{v}; }
-            case f32      { v := new(_Value_Float, allocator);   v.float_ = ~~ *cast(^f32)  input; return Value.{v}; }
-            case f64      { v := new(_Value_Float, allocator);   v.float_ =    *cast(^f64)  input; return Value.{v}; }
+            case bool     { v := new(_Value_Bool, allocator);    v.bool_  =    *cast(&bool) input; return Value.{v}; }
+            case i32, u32 { v := new(_Value_Integer, allocator); v.int_   = ~~ *cast(&i32)  input; return Value.{v}; }
+            case i64, u64 { v := new(_Value_Integer, allocator); v.int_   =    *cast(&i64)  input; return Value.{v}; }
+            case f32      { v := new(_Value_Float, allocator);   v.float_ = ~~ *cast(&f32)  input; return Value.{v}; }
+            case f64      { v := new(_Value_Float, allocator);   v.float_ =    *cast(&f64)  input; return Value.{v}; }
         }
 
         case .Array {
-            a_info := cast(^Type_Info_Array) t_info;
+            a_info := cast(&Type_Info_Array) t_info;
 
             v := new(_Value_Array, allocator);
-            array.init(^v.array_, a_info.count, allocator);
+            Array.init(&v.array_, a_info.count, allocator);
 
             for i in a_info.count {
                 v.array_ << from_any(a_info.of, memory.ptr_add(input, size_of(a_info.of) * i));
@@ -332,15 +456,15 @@ from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> 
             // Strings are handled differently
             if type == str {
                 v := new(_Value_String, allocator);
-                v.str_ = string.copy(*cast(^str) input, allocator);
+                v.str_ = str.copy(*cast(&str) input, allocator);
                 return Value.{v};
             }
 
-            s_info := cast(^Type_Info_Slice) t_info;
-            s := cast(^core.array.Untyped_Array) input;
+            s_info := cast(&Type_Info_Slice) t_info;
+            s := cast(&core.array.Untyped_Array) input;
 
             v := new(_Value_Array, allocator);
-            array.init(^v.array_, s.count, allocator);
+            Array.init(&v.array_, s.count, allocator);
 
             for i in s.count {
                 v.array_ << from_any(s_info.of, memory.ptr_add(s.data, size_of(s_info.of) * i));
@@ -350,19 +474,19 @@ from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> 
         }
 
         case .Struct {
-            s_info := cast(^Type_Info_Struct) t_info;
+            s_info := cast(&Type_Info_Struct) t_info;
 
             v := new(_Value_Object, allocator);
-            array.init(^v.object_, s_info.members.count, allocator);
+            Array.init(&v.object_, s_info.members.count, allocator);
 
-            for^ member in s_info.members {
+            for& member in s_info.members {
                 key := member.name;
-                if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
-                    key = (cast(^Custom_Key) tag.data).key;
+                if tag := Slice.first(member.tags, [t](t.type == Custom_Key)); tag != null {
+                    key = (cast(&Custom_Key) tag.data).key;
                 }
 
-                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
-                    if *cast(^type_expr, tag.data) == Ignore {
+                if tag := Slice.first(member.tags, [t](t.type == type_expr)); tag != null {
+                    if *cast(&type_expr, tag.data) == Ignore {
                         continue;
                     }
                 }
@@ -375,10 +499,10 @@ from_any :: (type: type_expr, input: rawptr, allocator := context.allocator) -> 
 
         case .Distinct {
             if type == Value {
-                return *cast(^Value) input;
+                return *cast(&Value) input;
             }
 
-            d_info := cast(^Type_Info_Distinct) t_info;
+            d_info := cast(&Type_Info_Distinct) t_info;
             return from_any(d_info.base_type, input);
         }
 
@@ -414,7 +538,7 @@ as_any :: macro (value: Value, $T: type_expr) -> T {
 }
 
 #overload
-as_any :: macro (value: Value, out: ^$T) {
+as_any :: macro (value: Value, out: &$T) {
     #this_package.to_any(value, T, out);
 }
 
@@ -427,15 +551,15 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
         case .Basic do switch type {
             // These functions handle the cases where the types do
             // not match, so no additional checks are needed here.
-            case bool     do *cast(^bool) out =    value->as_bool();
-            case i32, u32 do *cast(^i32)  out = ~~(value->as_int());
-            case i64, u64 do *cast(^i64)  out =    value->as_int();
-            case f32      do *cast(^f32)  out = ~~(value->as_float());
-            case f64      do *cast(^f64)  out =    value->as_float();
+            case bool     do *cast(&bool) out =    value->as_bool();
+            case i32, u32 do *cast(&i32)  out = ~~(value->as_int());
+            case i64, u64 do *cast(&i64)  out =    value->as_int();
+            case f32      do *cast(&f32)  out = ~~(value->as_float());
+            case f64      do *cast(&f64)  out =    value->as_float();
         }
 
         case .Array {
-            a_info := cast(^Type_Info_Array) t_info;
+            a_info := cast(&Type_Info_Array) t_info;
 
             for i in a_info.count {
                 to_any(value[i], a_info.of, memory.ptr_add(out, size_of(a_info.of) * i));
@@ -443,7 +567,7 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
         }
 
         case .Dynamic_Array {
-            s := cast(^core.array.Untyped_Array) out;
+            s := cast(&core.array.Untyped_Array) out;
             if s.count == 0 {
                 to_copy := value->as_array();
 
@@ -457,12 +581,12 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
         case .Slice {
             // Strings are handled differently
             if type == str {
-                *cast(^str) out = string.copy(value->as_str());
+                *cast(&str) out = str.copy(value->as_str());
                 return;
             }
 
-            s_info := cast(^Type_Info_Slice) t_info;
-            s := cast(^core.array.Untyped_Array) out;
+            s_info := cast(&Type_Info_Slice) t_info;
+            s := cast(&core.array.Untyped_Array) out;
 
             if s.count == 0 {
                 if s.data != null {
@@ -484,16 +608,16 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
         }
 
         case .Struct {
-            s_info := cast(^Type_Info_Struct) t_info;
+            s_info := cast(&Type_Info_Struct) t_info;
 
-            for^ member in s_info.members {
+            for& member in s_info.members {
                 key := member.name;
-                if tag := array.first(member.tags, [t](t.type == Custom_Key)); tag != null {
-                    key = (cast(^Custom_Key) tag.data).key;
+                if tag := Slice.first(member.tags, [t](t.type == Custom_Key)); tag != null {
+                    key = (cast(&Custom_Key) tag.data).key;
                 }
 
-                if tag := array.first(member.tags, [t](t.type == type_expr)); tag != null {
-                    if *cast(^type_expr, tag.data) == Ignore {
+                if tag := Slice.first(member.tags, [t](t.type == type_expr)); tag != null {
+                    if *cast(&type_expr, tag.data) == Ignore {
                         continue;
                     }
                 }
@@ -504,11 +628,11 @@ as_any :: (value: Value, type: type_expr, out: rawptr) {
 
         case .Distinct {
             if type == Value {
-                *cast(^Value) out = value;
+                *cast(&Value) out = value;
                 return;
             }
 
-            d_info := cast(^Type_Info_Distinct) t_info;
+            d_info := cast(&Type_Info_Distinct) t_info;
             to_any(value, d_info.base_type, out);
         }
 

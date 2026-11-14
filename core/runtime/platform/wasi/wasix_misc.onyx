@@ -41,6 +41,14 @@ __tty_get :: (tty: &os.TTY_State) {
     tty.input_linefeeds = state.line_feeds;
 }
 
+__tty_enter_raw :: () -> bool {
+    return false;
+}
+
+__tty_leave_raw :: () -> bool {
+    return false;
+}
+
 __tty_set :: (tty: &os.TTY_State) -> bool {
     state := wasi.TTY.{
         rows = tty.rows,

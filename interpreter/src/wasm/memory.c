@@ -31,5 +31,9 @@ wasm_memory_pages_t wasm_memory_size(const wasm_memory_t *memory) {
 }
 
 bool wasm_memory_grow(wasm_memory_t *memory, wasm_memory_pages_t pages) {
-    return ovm_engine_memory_ensure_capacity(memory->inner.memory.engine, pages * MEMORY_PAGE_SIZE);
+    ovm_engine_t *engine = memory->inner.memory.engine;
+    i64 new_size = engine->memory_size + (i64) pages * MEMORY_PAGE_SIZE;
+    if (!ovm_engine_memory_ensure_capacity(engine, new_size)) return false;
+    engine->memory_size = new_size;
+    return true;
 }

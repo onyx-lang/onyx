@@ -30,7 +30,14 @@ use core
 init :: () {
     heap_state.free_list = null;
     heap_state.next_alloc = cast(rawptr) (cast(uintptr) __heap_start + 8);
-    heap_state.remaining_space = (memory_size() << 16) - cast(u32) __heap_start;
+    // 65536 pages << 16 overflows u32 to 0 and looks like an empty/huge heap.
+    pages := memory_size();
+    heap_start := cast(u32) __heap_start;
+    if pages >= 65536 {
+        heap_state.remaining_space = ~cast(u32) 0 - heap_start;
+    } else {
+        heap_state.remaining_space = (pages << 16) - heap_start;
+    }
 
     use core.alloc { heap_allocator }
     heap_allocator.data = &heap_state;

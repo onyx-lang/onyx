@@ -31,17 +31,36 @@ static void print_error_text(const char *text, b32 color) {
 }
 
 static void print_underline(onyx_error_details_t *err, i32 len, i32 first_non_whitespace, b32 colored_printing) {
-    len = bh_min(len, 1024);
-    char* pointer_str = alloca(sizeof(char) * len);
-    memset(pointer_str, ' ', len);
-    
-    int c = err->column - 1;
-    int l = err->length;
+    if (!err->line_text) return;
 
-    memcpy(pointer_str, err->line_text, first_non_whitespace);
-    memset(pointer_str + c + 1, '~', l - 1);
+    int c = err->column > 0 ? (int) err->column - 1 : 0;
+    int l = err->length > 0 ? (int) err->length : 1;
+    if (c < 0) c = 0;
+
+    i32 needed = c + l + 1;
+    i32 buf_len = bh_max(bh_max(len, needed), 1);
+    buf_len = bh_min(buf_len, 2048);
+
+    char* pointer_str = alloca(sizeof(char) * (buf_len + 1));
+    memset(pointer_str, ' ', buf_len);
+    pointer_str[buf_len] = 0;
+
+    if (first_non_whitespace > 0) {
+        i32 copy = bh_min(first_non_whitespace, buf_len);
+        memcpy(pointer_str, err->line_text, copy);
+    }
+
+    if (c >= buf_len) c = buf_len - 1;
     pointer_str[c] = '^';
-    pointer_str[c + l] = 0;
+
+    if (l > 1) {
+        i32 tilde_start = c + 1;
+        i32 tilde_count = l - 1;
+        if (tilde_start + tilde_count > buf_len) tilde_count = buf_len - tilde_start;
+        if (tilde_count > 0) memset(pointer_str + tilde_start, '~', tilde_count);
+    }
+
+    pointer_str[bh_min(c + l, buf_len)] = 0;
 
     if (colored_printing) bh_printf("\033[91m");
     bh_printf("%s\n", pointer_str);
@@ -53,7 +72,7 @@ static void print_detailed_message_v1(onyx_error_details_t *err, b32 colored_pri
 
     i32 linelength = 0;
     i32 first_char = 0;
-    char* walker = err->line_text;
+    char* walker = err->line_text ? err->line_text : "";
     while (*walker == ' ' || *walker == '\t') first_char++, linelength++, walker++;
     while (*walker && *walker != '\n') linelength++, walker++;
 
@@ -99,7 +118,7 @@ static void print_detailed_message_v2(onyx_error_details_t* err, b32 colored_pri
 
     i32 linelength = 0;
     i32 first_char = 0;
-    char* walker = err->line_text;
+    char* walker = err->line_text ? err->line_text : "";
     while (*walker == ' ' || *walker == '\t') first_char++, linelength++, walker++;
     while (*walker && *walker != '\n') linelength++, walker++;
 
@@ -180,6 +199,7 @@ void onyx_errors_print(onyx_context_t *ctx, char *error_format, b32 colored_prin
         err.length    = onyx_error_length(ctx, i);
 
         char line_text[256];
+        line_text[0] = '\0';
         onyx_error_line_text(ctx, i, line_text, 255);
         err.line_text = line_text;
 

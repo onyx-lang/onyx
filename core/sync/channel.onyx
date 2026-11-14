@@ -1,8 +1,5 @@
 package core.sync
 
-use core.iter
-use core.array
-
 Channel :: struct (T: type_expr) {
     _buf: [..] T;
     _mutex: Mutex;
@@ -28,7 +25,7 @@ Channel.send :: (chan: &Channel, msg: chan.T) {
     if !chan._is_open do return;
 
     critical_section(&chan._mutex) {
-        array.push(&chan._buf, msg);
+        Array.push(&chan._buf, msg);
         condition_broadcast(&chan._condvar);
     }
 }
@@ -49,13 +46,13 @@ Channel.recv :: (chan: &Channel) -> ? chan.T {
     }
 
     res := chan._buf[0];
-    array.delete(&chan._buf, 0);
+    Array.remove_at(&chan._buf, 0);
 
     return res;
 }
 
 Channel.as_iter :: (chan: &Channel) -> Iterator(chan.T) {
-    return iter.generator(
+    return Iterator.generator(
         &.{chan = chan},
         ctx => {
             return ctx.chan->recv();

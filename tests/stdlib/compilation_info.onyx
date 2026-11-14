@@ -1,0 +1,1416 @@
+#load "core:onyx/toolchain/module"
+
+use core {*}
+use core.encoding.osad
+use onyx.toolchain {*}
+use protobuf.onyx.toolchain.events
+
+Tag_Meta :: struct {
+    n: i32
+}
+
+ok :: (label: str, value: bool) {
+    println(label)
+    println(value)
+}
+
+CompilationInfo.keeps_outer :: (self: &#Self, name: str) -> (lookup: bool, member: bool) {
+    lookup = false;
+    member = false;
+    for id in self->symbols_named(name) {
+        if self->get_symbol(id) as sym {
+            if sym.kind != .Expression do continue;
+            for r in self->references(sym.id) {
+                if r.line == sym.line && r.column == sym.column do continue;
+                sid := self->scope_at(r.file_id, r.line, r.column);
+                if self->lookup(sid, name) as found {
+                    if found.id == sym.id do lookup = true;
+                    if self->member(found.type_id, "test") do member = true;
+                }
+            }
+        }
+    }
+    return
+}
+
+main :: () {
+    b := Builder.make();
+    defer b->destroy();
+
+    core_root := os.env("ONYX_PATH") ?? "";
+    defer str.free(core_root);
+    b->map_dir("core", tprintf("{}/core", core_root));
+
+    b->enable(.DISABLE_EXTENSIONS);
+    b->enable(.MULTI_THREADING);
+    b->set_platform(.ONYX);
+
+    b->inject_source("""
+package foo.bar
+
+Point :: struct {
+    x: i32
+    y: i32
+}
+
+Shape :: union {
+    Point: Point
+    Empty: void
+}
+
+x :: 1
+y :: x
+
+Color :: enum {
+    Red
+    Green :: 10
+    Blue
+}
+
+origin :: Point.{ x = x, y = 0 }
+
+get_x :: (p: Point) -> i32 {
+    return p.x
+}
+
+Point.mag :: (p: Point) -> i32 {
+    return p.x
+}
+
+Point.zero :: () -> Point {
+    return .{ x = 0, y = 0 }
+}
+
+Point.shift :: (self: &Point, dx: i32) {
+    self.x += dx
+}
+
+Names :: #type [] u8
+Names.has_a :: (s: Names) -> bool {
+    return true
+}
+
+Ptr :: &Point
+Arr :: [2] i32
+
+Holder :: struct {
+    m: Map(str, u32)
+    o: Optional(i32)
+}
+
+Used :: struct {
+    use p: Point
+    extra: i32
+}
+""");
+
+    b->inject_source("""
+package main
+
+use foo.bar { Point, get_x, x, Shape }
+
+main :: () {
+    p := Point.{ x = x, y = 0 }
+    _ := get_x(p)
+    s := Shape.{ Point = p }
+    _ := s.Point
+}
+""");
+    b->compile();
+
+    ok("compile_ok", !b->has_errors());
+
+    info := b->compilation_info();
+    defer delete(&info);
+
+    ok("has_version", info.compiler_version.count > 0);
+
+    foo := info->package_named("foo");
+    foo_bar := info->package_named("foo.bar");
+    parent_ok := false;
+    if foo as f {
+        if foo_bar as fb do parent_ok = fb.parent_package_id == f.id;
+    }
+    ok("package_parent", parent_ok);
+
+    point_sym: &SymbolInfo = null;
+    for id in info->symbols_named("Point") {
+        if info->get_symbol(id) as sym {
+            if point_sym == null && sym.kind == .Struct do point_sym = sym;
+        }
+    }
+    ok("point_symbol", point_sym != null);
+
+    pkg_scope_ok := false;
+    if foo_bar as fb {
+        if point_sym != null && fb.scope_id != 0 {
+            pkg_scope_ok = point_sym.scope_id == fb.scope_id;
+        }
+    }
+    ok("point_in_package_scope", pkg_scope_ok);
+
+    point_pkg := false;
+    if foo_bar as fb {
+        if point_sym != null && point_sym.scope_id == fb.scope_id {
+            point_pkg = point_sym.package_id == fb.id;
+        }
+    }
+    ok("point_symbol_package", point_pkg);
+
+    get_x_pkg := false;
+    if foo_bar as fb {
+        for id in info->symbols_named("get_x") {
+            if info->get_symbol(id) as sym {
+                if sym.kind == .Function && sym.package_id == fb.id {
+                    get_x_pkg = true;
+                }
+            }
+        }
+    }
+    ok("get_x_package", get_x_pkg);
+
+    main_func_pkg := false;
+    if info->package_named("main") as mp {
+        for id in info->symbols_named("main") {
+            if info->get_symbol(id) as sym {
+                if sym.kind == .Function && sym.package_id == mp.id {
+                    main_func_pkg = true;
+                }
+            }
+        }
+    }
+    ok("main_func_package", main_func_pkg);
+
+    point_type: &TypeInfo = null;
+    for id in info->types_named("Point") {
+        if info->get_type(id) as t {
+            if t.kind == .Struct do point_type = t;
+        }
+    }
+    ok("point_type", point_type != null);
+
+    has_x := false;
+    has_y := false;
+    member_x_sym: u32;
+    if point_type != null {
+        if info->member(point_type.id, "x") as m {
+            has_x = true;
+            member_x_sym = m.symbol_id;
+        }
+        if info->member(point_type.id, "y") do has_y = true;
+    }
+    ok("point_members", has_x && has_y);
+
+    member_pkg := false;
+    if has_x {
+        if foo_bar as fb {
+            if info->get_symbol(member_x_sym) as msym {
+                member_pkg = msym.kind == .Member && msym.package_id == fb.id;
+            }
+        }
+    }
+    ok("point_member_package", member_pkg);
+
+    point_type_of := false;
+    if point_sym != null {
+        if info->type_of(point_sym.id) as t do point_type_of = point_type != null && t.id == point_type.id;
+    }
+    ok("point_type_of", point_type_of);
+
+    point_symbols_with_type := false;
+    if point_type != null && point_sym != null {
+        for id in info->symbols_with_type(point_type.id) {
+            if id == point_sym.id do point_symbols_with_type = true;
+        }
+    }
+    ok("point_symbols_with_type", point_symbols_with_type);
+
+    point_binding := false;
+    point_binding_loc := false;
+    if point_type != null {
+        if info->binding_of(point_type.id) as sym {
+            point_binding = point_sym != null && sym.id == point_sym.id;
+            if sym.file_id != 0 && sym.line != 0 {
+                if info->get_file(sym.file_id) do point_binding_loc = true;
+            }
+        }
+    }
+    ok("point_binding_of", point_binding);
+    ok("point_binding_location", point_binding_loc);
+
+    x_in_scope := false;
+    if point_type != null {
+        if info->lookup_member(point_type.id, "x") as sym do x_in_scope = sym.kind == .Member;
+    }
+    ok("lookup_member_x", x_in_scope);
+
+    color_ok := false;
+    for id in info->types_named("Color") {
+        if info->get_type(id) as t {
+            if t.kind != .Enum do continue;
+            switch t.body {
+                case .Enumeration as en {
+                    has_red := false
+                    has_green := false
+                    has_blue := false
+                    for v in en.values {
+                        if v.name == "Red" && v.value == 0 do has_red = true
+                        if v.name == "Green" && v.value == 10 do has_green = true
+                        if v.name == "Blue" && v.value == 11 do has_blue = true
+                    }
+                    color_ok = has_red && has_green && has_blue
+                }
+                case _ {}
+            }
+        }
+    }
+    ok("color_enum", color_ok);
+
+    shape_ok := false;
+    for id in info->types_named("Shape") {
+        if info->get_type(id) as t {
+            if info->variant(t.id, "Point") do shape_ok = true;
+        }
+    }
+    ok("shape_variant", shape_ok);
+
+    ptr_elem_ok := false;
+    for id in info->types_named("&i32") {
+        if info->elem(id) as e {
+            if e.name == "i32" && e.kind == .Basic do ptr_elem_ok = true;
+        }
+    }
+    ok("ptr_elem", ptr_elem_ok);
+
+    resolved_member := false;
+    if member_x_sym != 0 {
+        for r in info->references(member_x_sym) {
+            if r.length != 0 do resolved_member = true;
+        }
+    }
+    ok("resolved_member_x", resolved_member);
+
+    get_x_ok := false;
+    for id in info->symbols_named("get_x") {
+        if info->get_symbol(id) as sym {
+            if sym.kind == .Function do get_x_ok = true;
+        }
+    }
+    ok("get_x_function", get_x_ok);
+
+    get_x_sym: &SymbolInfo = null;
+    for id in info->symbols_named("get_x") {
+        if info->get_symbol(id) as sym {
+            if get_x_sym == null && sym.kind == .Function do get_x_sym = sym;
+        }
+    }
+
+    param_p_ok := false;
+    param_p_type_ok := false;
+    param_p_use_ok := false;
+    get_x_param_ids_ok := false;
+    if get_x_sym != null && get_x_sym.param_symbol_ids.count == 1 {
+        if info->get_symbol(get_x_sym.param_symbol_ids[0]) as p {
+            param_p_ok = p.name == "p" && p.kind == .Parameter;
+            if point_type != null {
+                if info->type_of(p.id) as t do param_p_type_ok = t.id == point_type.id;
+            }
+            for r in info->references(p.id) {
+                if r.length != 0 do param_p_use_ok = true;
+            }
+        }
+
+        if info->type_of(get_x_sym.id) as t {
+            switch t.body {
+                case .Function as f {
+                    get_x_param_ids_ok = f.param_ids.count == 1 && point_type != null && f.param_ids[0] == point_type.id;
+                }
+                case _ {}
+            }
+        }
+    }
+    ok("param_p_symbol", param_p_ok);
+    ok("param_p_type", param_p_type_ok);
+    ok("param_p_use", param_p_use_ok);
+    ok("get_x_param_type_ids", get_x_param_ids_ok);
+
+    get_x_alias_params := true;
+    get_x_typed_count := 0;
+    for id in info->symbols_named("get_x") {
+        if info->get_symbol(id) as sym {
+            if sym.kind != .Function do continue;
+            if sym.type_id == 0 do continue;
+            get_x_typed_count += 1;
+            if info->param_symbols_of(sym.id).count == 0 do get_x_alias_params = false;
+        }
+    }
+    ok("get_x_alias_params", get_x_typed_count >= 2 && get_x_alias_params);
+
+    point_method_ok := false;
+    if point_type != null && point_type.scope_id != 0 {
+        for sid in info->symbols_in_scope(point_type.scope_id) {
+            if info->get_symbol(sid) as sym {
+                if sym.name == "mag" {
+                    switch sym.kind {
+                        case .Function, .Overloaded_Function, .Polymorphic_Proc do point_method_ok = true;
+                        case _ {}
+                    }
+                }
+            }
+        }
+    }
+    ok("point_method_mag", point_method_ok);
+
+    mag_is_method := false;
+    zero_is_function := false;
+    shift_is_method := false;
+    if point_type != null && point_type.scope_id != 0 {
+        for sid in info->symbols_in_scope(point_type.scope_id) {
+            if info->get_symbol(sid) as sym {
+                if sym.name == "mag" do mag_is_method = info->is_method_of(sym.id, point_type.id);
+                if sym.name == "zero" do zero_is_function = !info->is_method_of(sym.id, point_type.id);
+                if sym.name == "shift" do shift_is_method = info->is_method_of(sym.id, point_type.id);
+            }
+        }
+    }
+    ok("point_mag_is_method", mag_is_method);
+    ok("point_zero_is_function", zero_is_function);
+    ok("point_shift_is_method", shift_is_method);
+
+    names_type_ok := false;
+    names_method_ok := false;
+    slice_scope_ok := false;
+    for id in info->symbols_named("Names") {
+        if info->get_symbol(id) as sym {
+            if info->type_of(sym.id) as t {
+                names_type_ok = t.kind == .Slice;
+                slice_scope_ok = t.scope_id != 0;
+                if t.scope_id != 0 {
+                    for sid in info->symbols_in_scope(t.scope_id) {
+                        if info->get_symbol(sid) as m {
+                            if m.name == "has_a" do names_method_ok = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    ok("names_alias_is_slice", names_type_ok);
+    ok("names_slice_has_scope", slice_scope_ok);
+    ok("names_method_has_a", names_method_ok);
+
+    map_poly_id: u32;
+    for id in info->types_named("Map") {
+        if info->get_type(id) as t {
+            if t.kind == .Poly_Struct do map_poly_id = t.id;
+        }
+    }
+    ok("map_poly_template", map_poly_id != 0);
+
+    map_inst: &TypeInfo = null;
+    if point_type != null {
+        // Holder.m is Map(str, u32)
+        for id in info->types_named("Holder") {
+            if info->get_type(id) as ht {
+                if info->member(ht.id, "m") as m {
+                    if info->get_type(m.type_id) as mt do map_inst = mt;
+                }
+            }
+        }
+    }
+    map_from_ok := false;
+    map_key_ok := false;
+    map_val_ok := false;
+    if map_inst != null {
+        if info->constructed_from(map_inst.id) as from {
+            map_from_ok = from.id == map_poly_id;
+        }
+        if info->poly_arg(map_inst.id, "Key_Type") as k {
+            map_key_ok = k.name == "str" || k.name == "[] u8";
+        }
+        if info->poly_arg(map_inst.id, "Value_Type") as v {
+            map_val_ok = v.name == "u32";
+        }
+    }
+    ok("map_constructed_from", map_from_ok);
+    ok("map_poly_arg_key", map_key_ok);
+    ok("map_poly_arg_value", map_val_ok);
+
+    opt_from_ok := false;
+    for id in info->types_named("Holder") {
+        if info->get_type(id) as ht {
+            if info->member(ht.id, "o") as m {
+                if info->constructed_from(m.type_id) as from {
+                    opt_from_ok = from.name == "Optional" || from.kind == .Poly_Union;
+                }
+            }
+        }
+    }
+    ok("optional_constructed_from", opt_from_ok);
+
+    use_member_ok := false;
+    included_ok := false;
+    for id in info->types_named("Used") {
+        if info->get_type(id) as ut {
+            if info->member(ut.id, "p") as m {
+                use_member_ok = m.is_used && !m.included_through_use;
+            }
+            if info->member(ut.id, "x") as m {
+                included_ok = m.included_through_use && !m.is_used;
+            }
+        }
+    }
+    ok("use_member_is_used", use_member_ok);
+    ok("use_member_flattened", included_ok);
+
+    first_applied := info.events_applied;
+
+    b->inject_source("package extra\nextra_y :: 1\n");
+    b->compile();
+    added := b->update_compilation_info(&info);
+
+    still_foo := false;
+    if info->package_named("foo.bar") do still_foo = true;
+
+    got_extra := false;
+    if info->package_named("extra") do got_extra = true;
+
+    extra_sym := false;
+    for id in info->symbols_named("extra_y") {
+        extra_sym = true;
+    }
+
+    ok("stream_added_events", added > 0);
+    ok("stream_kept_foo", still_foo);
+    ok("stream_got_extra", got_extra);
+    ok("stream_got_extra_y", extra_sym);
+    ok("stream_applied_grew", info.events_applied > first_applied);
+
+    errb := Builder.make();
+    defer errb->destroy();
+    errb->map_dir("core", tprintf("{}/core", core_root));
+    errb->enable(.DISABLE_EXTENSIONS);
+    errb->enable(.MULTI_THREADING);
+    errb->set_platform(.ONYX);
+    errb->inject_source("""
+package erridx
+
+broken :: () {
+    x: i32 = "nope"
+}
+
+later :: () -> i32 {
+    return 1
+}
+""");
+    errb->compile();
+
+    ok("error_compile_has_errors", errb->has_errors());
+
+    errinfo := errb->compilation_info();
+    defer delete(&errinfo);
+
+    later_ok := false;
+    for id in errinfo->symbols_named("later") {
+        if errinfo->get_symbol(id) as sym {
+            if sym.kind == .Function {
+                if errinfo->type_of(sym.id) do later_ok = true;
+            }
+        }
+    }
+
+    broken_named := false;
+    for id in errinfo->symbols_named("broken") {
+        broken_named = true;
+    }
+
+    ok("error_keeps_later", later_ok);
+    ok("error_keeps_broken_name", broken_named);
+
+    // Method field + #match option + alias of the field, like os.File.get_contents.
+    matchb := Builder.make();
+    defer matchb->destroy();
+    matchb->map_dir("core", tprintf("{}/core", core_root));
+    matchb->enable(.DISABLE_EXTENSIONS);
+    matchb->enable(.MULTI_THREADING);
+    matchb->set_platform(.ONYX);
+    matchb->inject_source("""
+package main
+
+Holder :: struct {}
+Holder.get :: (h: &Holder) -> i32 { return 1 }
+
+get :: #match {
+    Holder.get,
+    (x: i32) -> i32 { return x }
+}
+
+get_from_holder :: Holder.get
+
+main :: () {
+    _ := get_from_holder
+}
+""");
+    matchb->compile();
+
+    ok("method_match_alias_ok", !matchb->has_errors());
+
+    matchinfo := matchb->compilation_info();
+    defer delete(&matchinfo);
+
+    get_from_named := false;
+    for id in matchinfo->symbols_named("get_from_holder") {
+        get_from_named = true;
+    }
+    ok("method_match_alias_indexed", get_from_named);
+
+    circb := Builder.make();
+    defer circb->destroy();
+    circb->map_dir("core", tprintf("{}/core", core_root));
+    circb->enable(.DISABLE_EXTENSIONS);
+    circb->enable(.MULTI_THREADING);
+    circb->set_platform(.ONYX);
+    circb->inject_source("""
+package main
+
+a :: b
+b :: a
+
+main :: () {
+}
+""");
+    circb->compile();
+
+    circinfo := circb->compilation_info();
+    defer delete(&circinfo);
+
+    ok("circular_alias_has_errors", circb->has_errors());
+    ok("circular_alias_finished", circinfo.events_applied > 0);
+
+    missb := Builder.make();
+    defer missb->destroy();
+    missb->map_dir("core", tprintf("{}/core", core_root));
+    missb->enable(.DISABLE_EXTENSIONS);
+    missb->enable(.MULTI_THREADING);
+    missb->set_platform(.ONYX);
+    missb->inject_source("""
+package main
+
+use core {*}
+use core.iter {as_iter}
+
+main :: () {
+    xs := i32.[1, 2, 3]
+    _ := as_iter(xs)
+        |> .map(x => Missing.foo(x))
+        |> .collect()
+}
+""");
+    missb->compile();
+
+    missinfo := missb->compilation_info();
+    defer delete(&missinfo);
+
+    ok("unresolved_in_poly_has_errors", missb->has_errors());
+    ok("unresolved_in_poly_finished", missinfo.events_applied > 0);
+
+    pathb := Builder.make();
+    defer pathb->destroy();
+    pathb->map_dir("core", tprintf("{}/core", core_root));
+    pathb->enable(.DISABLE_EXTENSIONS);
+    pathb->enable(.MULTI_THREADING);
+    pathb->set_platform(.ONYX);
+    pathb->inject_source("""
+package foo.bar
+
+Point :: struct {
+    x: i32
+    y: i32
+}
+""");
+    pathb->inject_source("""
+package main
+
+use foo {package}
+use core {*}
+
+main :: () {
+    p := foo.bar.Point.{ x = 1, y = 2 }
+    _ := p.x
+    opt := Optional.empty(foo.bar.Point)
+    if opt as s {
+        _ := s.x
+    }
+    a, b := p, p
+    _ := a.x
+    _ := b.x
+    _ := Outer.Inner.{ x = 1 }->mag()
+}
+
+named_out :: () -> (out: foo.bar.Point) {
+    out.x = 1
+    return
+}
+
+Outer :: struct {
+    Inner :: struct {
+        x: i32
+    }
+}
+
+Outer.Inner.mag :: (self: Outer.Inner) -> i32 {
+    return self.x
+}
+""");
+    pathb->compile();
+
+    ok("nested_path_compile_ok", !pathb->has_errors());
+
+    pathinfo := pathb->compilation_info();
+    defer delete(&pathinfo);
+
+    start_scope: u32 = 0;
+    for id in pathinfo->symbols_named("p") {
+        if pathinfo->get_symbol(id) as psym {
+            if pathinfo->lookup(psym.scope_id, "foo") {
+                start_scope = psym.scope_id;
+            }
+        }
+    }
+
+    foo_bar_path := false;
+    point_in_bar := false;
+    lookup_no_parent := false;
+    if start_scope != 0 {
+        switch pathinfo->resolve_path(start_scope, str.["foo", "bar"]) {
+            case .Pkg as pkg {
+                foo_bar_path = pkg.fully_qualified_name == "foo.bar";
+                if pathinfo->lookup_in_scope(pkg.scope_id, "Point") as ps {
+                    if ps.kind == .Struct do point_in_bar = true;
+                }
+                lookup_no_parent = true;
+                if pathinfo->lookup_in_scope(pkg.scope_id, "foo") do lookup_no_parent = false;
+            }
+            case _ {}
+        }
+    }
+    ok("foo_bar_path", foo_bar_path);
+    ok("point_in_nested_package", point_in_bar);
+    ok("lookup_in_scope_no_parent", lookup_no_parent);
+
+    alloc_pkg_id := false;
+    alloc_arena_path := false;
+    if start_scope != 0 {
+        if pathinfo->lookup(start_scope, "alloc") as alloc_sym {
+            if pathinfo->package_of(alloc_sym) as ap {
+                if pathinfo->package_named("core.alloc") as expected {
+                    alloc_pkg_id = ap.id == expected.id;
+                }
+            }
+        }
+        switch pathinfo->resolve_path(start_scope, str.["alloc", "arena"]) {
+            case .Pkg as pkg {
+                alloc_arena_path = pkg.fully_qualified_name == "core.alloc.arena";
+            }
+            case _ {}
+        }
+    }
+    ok("alloc_package_id", alloc_pkg_id);
+    ok("alloc_arena_path", alloc_arena_path);
+
+    value_chain := false;
+    p_is_value := false;
+    point_is_type := false;
+    if start_scope != 0 {
+        switch pathinfo->resolve_path(start_scope, str.["p", "x"]) {
+            case .Value as t {
+                if t.kind == .Basic do value_chain = true;
+            }
+            case _ {}
+        }
+        switch pathinfo->resolve_path(start_scope, str.["p"]) {
+            case .Value do p_is_value = true;
+            case _ {}
+        }
+        switch pathinfo->resolve_path(start_scope, str.["foo", "bar", "Point"]) {
+            case .Type do point_is_type = true;
+            case _ {}
+        }
+    }
+    ok("value_member_path", value_chain);
+    ok("p_is_value", p_is_value);
+    ok("point_is_type_name", point_is_type);
+
+    as_binding_typed := false;
+    for id in pathinfo->symbols_named("s") {
+        if pathinfo->get_symbol(id) as ssym {
+            if pathinfo->type_of(ssym.id) as t {
+                if pathinfo->member(t.id, "x") do as_binding_typed = true;
+            }
+        }
+    }
+    ok("as_binding_typed", as_binding_typed);
+
+    compound_a_typed := false;
+    compound_b_typed := false;
+    for id in pathinfo->symbols_named("a") {
+        if pathinfo->get_symbol(id) as asym {
+            if pathinfo->type_of(asym.id) as t {
+                if pathinfo->member(t.id, "x") do compound_a_typed = true;
+            }
+        }
+    }
+    for id in pathinfo->symbols_named("b") {
+        if pathinfo->get_symbol(id) as bsym {
+            if pathinfo->type_of(bsym.id) as t {
+                if pathinfo->member(t.id, "x") do compound_b_typed = true;
+            }
+        }
+    }
+    ok("compound_a_typed", compound_a_typed);
+    ok("compound_b_typed", compound_b_typed);
+
+    named_out_typed := false;
+    named_out_in_body := false;
+    for id in pathinfo->symbols_named("out") {
+        if pathinfo->get_symbol(id) as osym {
+            if pathinfo->type_of(osym.id) as t {
+                if pathinfo->member(t.id, "x") do named_out_typed = true;
+            }
+            for r in pathinfo->references(osym.id) {
+                if r.line == osym.line && r.column == osym.column do continue;
+                sid := pathinfo->scope_at(r.file_id, r.line, r.column);
+                if pathinfo->lookup(sid, "out") as found {
+                    if pathinfo->type_of(found.id) as t {
+                        if pathinfo->member(t.id, "x") do named_out_in_body = true;
+                    }
+                }
+            }
+        }
+    }
+    ok("named_out_typed", named_out_typed);
+    ok("named_out_in_body", named_out_in_body);
+
+    optional_is_type := false;
+    optional_has_empty := false;
+    if start_scope != 0 {
+        switch pathinfo->resolve_path(start_scope, str.["Optional"]) {
+            case .Type as t {
+                optional_is_type = true;
+                if t.scope_id != 0 {
+                    if pathinfo->lookup_in_scope(t.scope_id, "empty") as esym {
+                        switch esym.kind {
+                            case .Function, .Overloaded_Function, .Polymorphic_Proc, .Macro {
+                                optional_has_empty = true;
+                            }
+                            case _ {}
+                        }
+                    }
+                }
+            }
+            case _ {}
+        }
+    }
+    ok("imported_optional_is_type", optional_is_type);
+    ok("imported_optional_has_empty", optional_has_empty);
+
+    outer_is_type := false;
+    inner_is_nested_type := false;
+    inner_has_mag := false;
+    if start_scope != 0 {
+        switch pathinfo->resolve_path(start_scope, str.["Outer"]) {
+            case .Type as t {
+                outer_is_type = true;
+                if pathinfo->lookup_in_scope(t.scope_id, "Inner") as isym {
+                    if isym.kind == .Struct do inner_is_nested_type = true;
+                }
+            }
+            case _ {}
+        }
+        switch pathinfo->resolve_path(start_scope, str.["Outer", "Inner"]) {
+            case .Type as t {
+                if t.scope_id != 0 {
+                    if pathinfo->lookup_in_scope(t.scope_id, "mag") as msym {
+                        switch msym.kind {
+                            case .Function, .Overloaded_Function, .Polymorphic_Proc, .Macro {
+                                inner_has_mag = true;
+                            }
+                            case _ {}
+                        }
+                    }
+                }
+            }
+            case _ {}
+        }
+    }
+    ok("outer_is_type", outer_is_type);
+    ok("inner_is_nested_type", inner_is_nested_type);
+    ok("inner_has_mag", inner_has_mag);
+
+    ifb := Builder.make();
+    defer ifb->destroy();
+    ifb->map_dir("core", tprintf("{}/core", core_root));
+    ifb->enable(.DISABLE_EXTENSIONS);
+    ifb->enable(.MULTI_THREADING);
+    ifb->set_platform(.ONYX);
+    ifb->inject_source("""
+package main
+
+main :: () {
+    app := .{ test = 10 }
+    #if false {
+        skip := (c) => {
+            return c
+        }
+        _ := skip
+    }
+    _ := app.test
+}
+""");
+    ifb->compile();
+
+    ok("static_if_compile_ok", !ifb->has_errors());
+
+    ifinfo := ifb->compilation_info();
+    defer delete(&ifinfo);
+
+    app_sym: &SymbolInfo = null;
+    for id in ifinfo->symbols_named("app") {
+        if ifinfo->get_symbol(id) as sym {
+            if app_sym == null && sym.kind == .Expression do app_sym = sym;
+        }
+    }
+
+    after_if_lookup := false;
+    after_if_member := false;
+    if app_sym != null {
+        for r in ifinfo->references(app_sym.id) {
+            if r.line == app_sym.line && r.column == app_sym.column do continue;
+            sid := ifinfo->scope_at(r.file_id, r.line, r.column);
+            if ifinfo->lookup(sid, "app") as found {
+                if found.id == app_sym.id do after_if_lookup = true;
+                if ifinfo->member(found.type_id, "test") do after_if_member = true;
+            }
+        }
+    }
+    ok("static_if_keeps_outer_local", after_if_lookup);
+    ok("static_if_completes_member", after_if_member);
+
+    nestb := Builder.make();
+    defer nestb->destroy();
+    nestb->map_dir("core", tprintf("{}/core", core_root));
+    nestb->enable(.DISABLE_EXTENSIONS);
+    nestb->enable(.MULTI_THREADING);
+    nestb->set_platform(.ONYX);
+    nestb->inject_source("""
+package main
+
+main :: () {
+    app := .{ test = 10 }
+    f := (c: i32) -> i32 {
+        return c
+    }
+    _ := f(1)
+    if x := 1; x > 0 {
+        _ := x
+    }
+    _ := app.test
+}
+""");
+    nestb->compile();
+
+    ok("nested_scope_compile_ok", !nestb->has_errors());
+
+    nestinfo := nestb->compilation_info();
+    defer delete(&nestinfo);
+
+    nest_lookup, nest_member := nestinfo->keeps_outer("app");
+    ok("lambda_keeps_outer_local", nest_lookup);
+    ok("lambda_completes_member", nest_member);
+    ok("if_init_keeps_outer_local", nest_lookup);
+    ok("if_init_completes_member", nest_member);
+
+    forb := Builder.make();
+    defer forb->destroy();
+    forb->map_dir("core", tprintf("{}/core", core_root));
+    forb->enable(.DISABLE_EXTENSIONS);
+    forb->enable(.MULTI_THREADING);
+    forb->set_platform(.ONYX);
+    forb->inject_source("""
+package main
+
+main :: () {
+    app := .{ test = 10 }
+    xs := i32.[1, 2]
+    for x in xs {
+        _ := x
+    }
+    _ := app.test
+}
+""");
+    forb->compile();
+
+    ok("for_scope_compile_ok", !forb->has_errors());
+
+    forinfo := forb->compilation_info();
+    defer delete(&forinfo);
+
+    for_lookup, for_member := forinfo->keeps_outer("app");
+    ok("for_keeps_outer_local", for_lookup);
+    ok("for_completes_member", for_member);
+
+    polyb := Builder.make();
+    defer polyb->destroy();
+    polyb->map_dir("core", tprintf("{}/core", core_root));
+    polyb->enable(.DISABLE_EXTENSIONS);
+    polyb->enable(.MULTI_THREADING);
+    polyb->set_platform(.ONYX);
+    polyb->inject_source("""
+package main
+
+id :: (x: $T) -> T {
+    return x
+}
+
+id32 := #solidify id { T = i32 }
+
+main :: () {
+    _ := id(1)
+    _ := id("hi")
+    _ := id32(3)
+}
+""");
+    polyb->compile();
+
+    ok("poly_compile_ok", !polyb->has_errors());
+
+    polyinfo := polyb->compilation_info();
+    defer delete(&polyinfo);
+
+    id_sym: &SymbolInfo = null;
+    for sid in polyinfo->symbols_named("id") {
+        if polyinfo->get_symbol(sid) as s {
+            if s.kind == .Polymorphic_Proc do id_sym = s;
+        }
+    }
+    ok("poly_template_found", id_sym != null);
+
+    poly_has_param := false;
+    if id_sym != null && id_sym.param_symbol_ids.count > 0 {
+        if polyinfo->get_symbol(id_sym.param_symbol_ids[0]) as p {
+            if p.name == "x" do poly_has_param = true;
+        }
+    }
+    ok("poly_template_param", poly_has_param);
+
+    poly_param_untyped := false;
+    if id_sym != null && id_sym.param_symbol_ids.count > 0 {
+        if polyinfo->get_symbol(id_sym.param_symbol_ids[0]) as p {
+            switch polyinfo->type_of(p.id) {
+                case .None do poly_param_untyped = p.type_id == 0;
+                case .Some {}
+            }
+        }
+    }
+    ok("poly_param_untyped", poly_param_untyped);
+
+    instance_count := 0;
+    distinct_param_types := 0;
+    solutions_named_t := 0;
+    solutions_have_types := 0;
+    instances_point_at_template := 0;
+    if id_sym != null {
+        instance_count = polyinfo->poly_instances_of(id_sym.id).count;
+        seen_a: u32 = 0;
+        seen_b: u32 = 0;
+        for iid in polyinfo->poly_instances_of(id_sym.id) {
+            if polyinfo->get_symbol(iid) as inst {
+                if inst.poly_template_id == id_sym.id {
+                    instances_point_at_template += 1;
+                }
+                if inst.poly_solution_names.count > 0 && inst.poly_solution_names[0] == "T" {
+                    solutions_named_t += 1;
+                }
+                if inst.poly_solution_type_ids.count > 0 && inst.poly_solution_type_ids[0] != 0 {
+                    solutions_have_types += 1;
+                }
+                if polyinfo->type_of(inst.id) as t {
+                    if t.kind == .Function do switch t.body {
+                        case .Function as f {
+                            pid := f.param_ids[0];
+                            if pid == 0 do continue;
+                            if seen_a == 0 {
+                                seen_a = pid;
+                                distinct_param_types += 1;
+                            } elseif pid != seen_a && seen_b == 0 {
+                                seen_b = pid;
+                                distinct_param_types += 1;
+                            }
+                        }
+                        case _ {}
+                    }
+                }
+            }
+        }
+    }
+    ok("poly_instance_count", instance_count == 2);
+    ok("poly_two_instance_types", distinct_param_types == 2);
+    ok("poly_solutions_named_t", solutions_named_t == 2);
+    ok("poly_solutions_have_types", solutions_have_types == 2);
+    ok("poly_instances_link_template", instances_point_at_template == 2);
+
+    poly_chose_two := false;
+    chosen_count := 0;
+    if id_sym != null {
+        chosen_a: u32 = 0;
+        for r in polyinfo.resolutions {
+            if r.symbol_id != id_sym.id do continue;
+            if r.chosen_symbol_id == 0 do continue;
+            chosen_count += 1;
+            if polyinfo->get_symbol(r.chosen_symbol_id) as chosen {
+                if polyinfo->type_of(chosen.id) as t {
+                    if t.kind == .Function do switch t.body {
+                        case .Function as f {
+                            pid := f.param_ids[0];
+                            if pid == 0 do continue;
+                            if chosen_a == 0 {
+                                chosen_a = pid;
+                            } elseif pid != chosen_a {
+                                poly_chose_two = true;
+                            }
+                        }
+                        case _ {}
+                    }
+                }
+            }
+        }
+    }
+    ok("poly_chose_two_sites", poly_chose_two);
+    // id(1), id("hi"), and #solidify id { T = i32 }
+    ok("poly_solidify_chose", chosen_count >= 3);
+
+    ovb := Builder.make();
+    defer ovb->destroy();
+    ovb->map_dir("core", tprintf("{}/core", core_root));
+    ovb->enable(.DISABLE_EXTENSIONS);
+    ovb->enable(.MULTI_THREADING);
+    ovb->set_platform(.ONYX);
+    ovb->inject_source("""
+package main
+
+area :: #match {
+    (n: i32) -> i32 { return n },
+    (s: str) -> i32 { return 0 }
+}
+
+#overload
+area :: (b: bool) -> i32 { return 2 }
+
+main :: () {
+    _ := area(3)
+    _ := area("hi")
+    _ := area(true)
+}
+""");
+    ovb->compile();
+
+    ok("overload_compile_ok", !ovb->has_errors());
+
+    ovinfo := ovb->compilation_info();
+    defer delete(&ovinfo);
+
+    area_group: &SymbolInfo = null;
+    for id in ovinfo->symbols_named("area") {
+        if ovinfo->get_symbol(id) as sym {
+            if area_group == null && sym.kind == .Overloaded_Function do area_group = sym;
+        }
+    }
+
+    overload_count := 0;
+    i32_opt: u32 = 0;
+    str_opt: u32 = 0;
+    bool_opt: u32 = 0;
+    if area_group != null {
+        for id in ovinfo->overloads_of(area_group.id) {
+            overload_count += 1;
+            if ovinfo->get_symbol(id) as opt {
+                if opt.param_symbol_ids.count > 0 {
+                    if ovinfo->get_symbol(opt.param_symbol_ids[0]) as p {
+                        if p.name == "n" do i32_opt = id;
+                        if p.name == "s" do str_opt = id;
+                        if p.name == "b" do bool_opt = id;
+                    }
+                }
+            }
+        }
+    }
+
+    ok("overload_group_found", area_group != null);
+    ok("overload_option_count", overload_count == 3);
+    ok("overload_has_i32", i32_opt != 0);
+    ok("overload_has_str", str_opt != 0);
+    ok("overload_has_bool", bool_opt != 0);
+
+    chose_i32 := false;
+    chose_str := false;
+    chose_bool := false;
+    if area_group != null {
+        for r in ovinfo.resolutions {
+            if r.symbol_id != area_group.id do continue;
+            if r.chosen_symbol_id == i32_opt do chose_i32 = true;
+            if r.chosen_symbol_id == str_opt do chose_str = true;
+            if r.chosen_symbol_id == bool_opt do chose_bool = true;
+        }
+    }
+
+    ok("overload_chose_i32", chose_i32);
+    ok("overload_chose_str", chose_str);
+    ok("overload_chose_bool", chose_bool);
+
+    resolve_prefers_chosen := false;
+    if area_group != null {
+        for r in ovinfo.resolutions {
+            if r.chosen_symbol_id != i32_opt do continue;
+            if ovinfo->resolve_at(r.file_id, r.line, r.column) as hit {
+                if ovinfo->symbol_at_resolution(hit) as chosen {
+                    if chosen.id == i32_opt do resolve_prefers_chosen = true;
+                }
+            }
+        }
+    }
+    ok("overload_resolve_at_chosen", resolve_prefers_chosen);
+
+    disk := tprintf("/tmp/onyx_overlay_{}.onyx", os.time());
+    wrote := os.File.write_contents(disk, "package main\ndisk_val :: 1\nmain :: () {\n}\n");
+    ok("overlay_wrote_disk", wrote);
+
+    overlay_b := Builder.make();
+    defer overlay_b->destroy();
+    overlay_b->map_dir("core", tprintf("{}/core", core_root));
+    overlay_b->enable(.DISABLE_EXTENSIONS);
+    overlay_b->enable(.MULTI_THREADING);
+    overlay_b->set_platform(.ONYX);
+    overlay_b->overlay_file(disk, """
+package main
+overlay_val :: 1
+main :: () {
+}
+""");
+    overlay_b->add_source(disk);
+    overlay_b->compile();
+
+    ok("overlay_compile_ok", !overlay_b->has_errors());
+
+    overlay_info := overlay_b->compilation_info();
+    defer delete(&overlay_info);
+
+    has_overlay := overlay_info->symbols_named("overlay_val").count > 0;
+    has_disk := overlay_info->symbols_named("disk_val").count > 0;
+    ok("overlay_uses_buffer", has_overlay);
+    ok("overlay_hides_disk", !has_disk);
+
+    tb := Builder.make();
+    defer tb->destroy();
+    tb->map_dir("core", tprintf("{}/core", core_root));
+    tb->enable(.DISABLE_EXTENSIONS);
+    tb->enable(.MULTI_THREADING);
+    tb->set_platform(.ONYX);
+    tb->inject_source("""
+package main
+
+#tag "hidden"
+#tag 3
+hidden :: () {}
+
+#tag 1.5
+g: f64
+
+Meta :: struct {
+    n: i32
+}
+
+#tag Meta.{ n = 1 }
+Osad :: struct {}
+
+noop :: () {}
+Call :: struct {
+    f: () -> void
+}
+
+#tag Call.{ f = noop }
+Bad :: struct {}
+
+Marked :: struct {
+    #tag "member-only"
+    n: i32
+}
+
+#tag "boxed"
+Box :: struct (T: type_expr) {
+    value: T
+}
+
+use_box: Box(i32)
+
+main :: () {}
+""");
+    tb->compile();
+
+    ok("tag_compile_ok", !tb->has_errors());
+
+    tinfo := tb->compilation_info();
+    defer delete(&tinfo);
+
+    hidden: &SymbolInfo = null;
+    for id in tinfo->symbols_named("hidden") {
+        if tinfo->get_symbol(id) as sym {
+            if sym.kind == .Function do hidden = sym;
+        }
+    }
+
+    hidden_str := false;
+    hidden_int := false;
+    if hidden != null && hidden.tags.count == 2 {
+        switch hidden.tags[0].data {
+            case .String as s {
+                hidden_str = s == "hidden";
+            }
+            case _ {}
+        }
+        switch hidden.tags[1].data {
+            case .Number as n {
+                switch n.data {
+                    case .Int as i {
+                        hidden_int = i == 3;
+                    }
+                    case _ {}
+                }
+            }
+            case _ {}
+        }
+    }
+    ok("tag_proc_string", hidden_str);
+    ok("tag_proc_int", hidden_int);
+
+    gsym: &SymbolInfo = null;
+    for id in tinfo->symbols_named("g") {
+        if tinfo->get_symbol(id) as sym {
+            if sym.kind == .Expression do gsym = sym;
+        }
+    }
+
+    global_float := false;
+    if gsym != null && gsym.tags.count == 1 {
+        switch gsym.tags[0].data {
+            case .Number as n {
+                switch n.data {
+                    case .Float as value {
+                        global_float = value == 1.5;
+                    }
+                    case _ {}
+                }
+            }
+            case _ {}
+        }
+    }
+    ok("tag_global_float", global_float);
+
+    osad_type: &TypeInfo = null;
+    for id in tinfo->types_named("Osad") {
+        if tinfo->get_type(id) as ty {
+            if ty.kind == .Struct do osad_type = ty;
+        }
+    }
+
+    meta_tag_type: &TypeInfo = null;
+    for id in tinfo->types_named("Meta") {
+        if tinfo->get_type(id) as ty {
+            if ty.kind == .Struct do meta_tag_type = ty;
+        }
+    }
+
+    osad_ok := false;
+    if osad_type != null && osad_type.tags.count == 1 {
+        switch osad_type.tags[0].data {
+            case .Raw_Value as raw {
+                if raw.type_id != meta_tag_type.id do break
+
+                if osad.deserialize(Tag_Meta, raw.bytes) as meta {
+                    if meta.n == 1 do osad_ok = true;
+                }
+            }
+            case _ {}
+        }
+    }
+    ok("tag_osad_struct", osad_ok);
+
+    call_id: u32 = 0;
+    for id in tinfo->types_named("Call") {
+        if tinfo->get_type(id) as ty {
+            if ty.kind == .Struct do call_id = ty.id;
+        }
+    }
+
+    bad_type: &TypeInfo = null;
+    for id in tinfo->types_named("Bad") {
+        if tinfo->get_type(id) as ty {
+            if ty.kind == .Struct do bad_type = ty;
+        }
+    }
+
+    bad_empty := false;
+    if bad_type != null && bad_type.tags.count == 1 && call_id != 0 {
+        switch bad_type.tags[0].data {
+            case .Raw_Value as raw {
+                if raw.type_id == call_id && raw.bytes.count == 0 do bad_empty = true;
+            }
+            case _ {}
+        }
+    }
+    ok("tag_raw_empty", bad_empty);
+
+    box_poly := false;
+    for id in tinfo->types_named("Box") {
+        if tinfo->get_type(id) as ty {
+            if ty.kind != .Poly_Struct do continue;
+            if ty.tags.count != 1 do continue;
+            switch ty.tags[0].data {
+                case .String as s {
+                    if s == "boxed" do box_poly = true;
+                }
+                case _ {}
+            }
+        }
+    }
+    ok("tag_poly_template", box_poly);
+
+    use_box: &SymbolInfo = null;
+    for id in tinfo->symbols_named("use_box") {
+        if tinfo->get_symbol(id) as sym {
+            if sym.kind == .Expression do use_box = sym;
+        }
+    }
+
+    box_inst := false;
+    if use_box != null {
+        if tinfo->get_type(use_box.type_id) as ty {
+            if ty.tags.count == 1 {
+                switch ty.tags[0].data {
+                    case .String as s {
+                        if s == "boxed" do box_inst = true;
+                    }
+                    case _ {}
+                }
+            }
+        }
+    }
+    ok("tag_poly_instance", box_inst);
+
+    marked_clean := false;
+    for id in tinfo->types_named("Marked") {
+        if tinfo->get_type(id) as ty {
+            if ty.kind == .Struct && ty.tags.count == 0 do marked_clean = true;
+        }
+    }
+    ok("tag_ignores_member", marked_clean);
+}

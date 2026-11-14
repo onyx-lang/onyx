@@ -1,0 +1,25 @@
+use core {*}
+
+early :: macro () {
+    return 10
+}
+
+foo :: () -> i32 {
+    early()
+    println("never printed")
+}
+
+maybe :: macro (cond: bool) {
+    if cond do return 20
+}
+
+bar :: (cond: bool) -> i32 {
+    maybe(cond)
+    return 30
+}
+
+main :: () {
+    println(foo())
+    println(bar(true))
+    println(bar(false))
+}
