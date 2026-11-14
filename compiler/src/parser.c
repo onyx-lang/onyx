@@ -1823,6 +1823,8 @@ static AstIfWhile* parse_while_stmt(OnyxParser* parser) {
         initialization_or_cond = NULL;
     }
 
+    parse_optional_extract(parser, while_node);
+
     while_node->initialization = initialization_or_cond;
     while_node->cond = cond;
     while_node->true_stmt = parse_block(parser, 1, NULL);

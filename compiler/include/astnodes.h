@@ -929,22 +929,19 @@ struct AstIfWhile {
     AstBlock *true_stmt;
     AstBlock *false_stmt;
 
+    OnyxToken *optional_extract_symbol;
+    AstLocal *optional_local;
+
+    // When this is true, `cond` should be a value that is of type `? T`
+    b32 optional_extract : 1;
+    b32 optional_extract_by_pointer : 1;
+
     union {
         // Used by Static_If
         struct {
             Scope *defined_in_scope;
             bh_arr(struct Entity *) true_entities;
             bh_arr(struct Entity *) false_entities;
-        };
-
-        // Used by If
-        struct {
-            OnyxToken *optional_extract_symbol;
-            AstLocal *optional_local;
-
-            // When this is true, `cond` should be a value that is of type `? T`
-            b32 optional_extract : 1;
-            b32 optional_extract_by_pointer : 1;
         };
 
         // Used by While

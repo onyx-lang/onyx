@@ -1283,6 +1283,77 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     *pcode = code;
 }
 
+static void optional_extract_alloc(OnyxWasmModule *mod, bh_arr(WasmInstruction) *pcode, AstLocal *optional_local,
+    u64 *optional_ptr_local, u64 *optional_extract_local
+) {
+    *optional_extract_local = emit_local_allocation(mod, pcode, (AstTyped *) optional_local);
+    *optional_ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+}
+
+static void optional_extract_load_cond(OnyxWasmModule *mod, bh_arr(WasmInstruction) *pcode, u64 optional_ptr_local, AstTyped *cond) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    // Top of stack will be a pointer to the optional
+    // Need to test if 0'th byte at that pointer is non-zero.
+    // Value capture copies the payload into a stack local.
+    // Pointer capture stores (optional_ptr + alignment) in a WASM local.
+
+    WIL(NULL, WI_LOCAL_TEE, optional_ptr_local);
+    emit_load_instruction(mod, &code, cond->type->Union.tag_type, 0);
+
+    *pcode = code;
+}
+
+static void optional_extract_load_value(OnyxWasmModule *mod, bh_arr(WasmInstruction) *pcode, u64 optional_ptr_local, u64 optional_extract_local, AstIfWhile *ifwhile) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    if (ifwhile->optional_extract_by_pointer) {
+        WIL(NULL, WI_LOCAL_GET, optional_ptr_local);
+        WIL(NULL, WI_PTR_CONST, type_alignment_of(ifwhile->cond->type));
+        WI(NULL, WI_PTR_ADD);
+        WIL(NULL, WI_LOCAL_SET, optional_extract_local);
+
+    } else {
+        u64 offset = 0;
+        emit_local_location(mod, &code, ifwhile->optional_local, &offset);
+        WIL(NULL, WI_PTR_CONST, offset);
+        WI(NULL, WI_PTR_ADD);
+
+        WIL(NULL, WI_LOCAL_GET, optional_ptr_local);
+        WIL(NULL, WI_PTR_CONST, type_alignment_of(ifwhile->cond->type));
+        WI(NULL, WI_PTR_ADD);
+
+        WIL(NULL, WI_I32_CONST, type_size_of(ifwhile->cond->type->Union.variants_ordered[1]->type));
+
+        emit_wasm_copy(mod, &code, NULL);
+    }
+
+    *pcode = code;
+}
+
+static void optional_extract_zero_value(OnyxWasmModule *mod, bh_arr(WasmInstruction) *pcode, u64 optional_extract_local, AstIfWhile *ifwhile) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    if (ifwhile->optional_extract_by_pointer) {
+        WIL(NULL, WI_PTR_CONST, 0);
+        WIL(NULL, WI_LOCAL_SET, optional_extract_local);
+
+    } else {
+        u64 offset = 0;
+        emit_local_location(mod, &code, ifwhile->optional_local, &offset);
+        WIL(NULL, WI_PTR_CONST, offset);
+        WI(NULL, WI_PTR_ADD);
+
+        WIL(NULL, WI_I32_CONST, 0);
+
+        WIL(NULL, WI_I32_CONST, type_size_of(ifwhile->cond->type->Union.variants_ordered[1]->type));
+
+        emit_wasm_fill(mod, &code, NULL);
+    }
+
+    *pcode = code;
+}
+
 EMIT_FUNC(if, AstIfWhile* if_node) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -1310,42 +1381,15 @@ EMIT_FUNC(if, AstIfWhile* if_node) {
     u64 optional_ptr_local = 0;
     u64 optional_extract_local = 0;
     if (if_node->optional_extract) {
-        // Top of stack will be a pointer to the optional
-        // Need to test if 0'th byte at that pointer is non-zero.
-        // Value capture copies the payload into a stack local.
-        // Pointer capture stores (optional_ptr + alignment) in a WASM local.
-
-        optional_extract_local = emit_local_allocation(mod, &code, (AstTyped *) if_node->optional_local);
-
-        optional_ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-        WIL(NULL, WI_LOCAL_TEE, optional_ptr_local);
-        emit_load_instruction(mod, &code, if_node->cond->type->Union.tag_type, 0);
+        optional_extract_alloc(mod, &code, if_node->optional_local, &optional_ptr_local, &optional_extract_local);
+        optional_extract_load_cond(mod, &code, optional_ptr_local, if_node->cond);
     }
 
     emit_enter_structured_block(mod, &code, SBT_Basic_If, if_node->token);
 
     if (if_node->true_stmt) {
         if (if_node->optional_extract) {
-            if (if_node->optional_extract_by_pointer) {
-                WIL(NULL, WI_LOCAL_GET, optional_ptr_local);
-                WIL(NULL, WI_PTR_CONST, type_alignment_of(if_node->cond->type));
-                WI(NULL, WI_PTR_ADD);
-                WIL(NULL, WI_LOCAL_SET, optional_extract_local);
-
-            } else {
-                u64 offset = 0;
-                emit_local_location(mod, &code, if_node->optional_local, &offset);
-                WIL(NULL, WI_PTR_CONST, offset);
-                WI(NULL, WI_PTR_ADD);
-
-                WIL(NULL, WI_LOCAL_GET, optional_ptr_local);
-                WIL(NULL, WI_PTR_CONST, type_alignment_of(if_node->cond->type));
-                WI(NULL, WI_PTR_ADD);
-
-                WIL(NULL, WI_I32_CONST, type_size_of(if_node->cond->type->Union.variants_ordered[1]->type));
-
-                emit_wasm_copy(mod, &code, NULL);
-            }
+            optional_extract_load_value(mod, &code, optional_ptr_local, optional_extract_local, if_node);
 
             local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
         }
@@ -1357,22 +1401,7 @@ EMIT_FUNC(if, AstIfWhile* if_node) {
         WI(if_node->false_stmt->token, WI_ELSE);
 
         if (if_node->optional_extract) {
-            if (if_node->optional_extract_by_pointer) {
-                WIL(NULL, WI_PTR_CONST, 0);
-                WIL(NULL, WI_LOCAL_SET, optional_extract_local);
-
-            } else {
-                u64 offset = 0;
-                emit_local_location(mod, &code, if_node->optional_local, &offset);
-                WIL(NULL, WI_PTR_CONST, offset);
-                WI(NULL, WI_PTR_ADD);
-
-                WIL(NULL, WI_I32_CONST, 0);
-
-                WIL(NULL, WI_I32_CONST, type_size_of(if_node->cond->type->Union.variants_ordered[1]->type));
-
-                emit_wasm_fill(mod, &code, NULL);
-            }
+            optional_extract_zero_value(mod, &code, optional_extract_local, if_node);
         }
 
         if (if_node->false_stmt->kind == Ast_Kind_If) {
@@ -1402,14 +1431,29 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
         WIL(while_node->token, WI_LOCAL_SET, while_node->first_local);
     }
 
+    u64 optional_ptr_local = 0;
+    u64 optional_extract_local = 0;
+    if (while_node->optional_extract) {
+        optional_extract_alloc(mod, &code, while_node->optional_local, &optional_ptr_local, &optional_extract_local);
+    }
+
     if (while_node->false_stmt == NULL) {
         emit_enter_structured_block(mod, &code, SBT_Breakable_Block, while_node->token);
         emit_enter_structured_block(mod, &code, SBT_Continue_Loop, while_node->token);
 
         if (!while_node->bottom_test) {
             emit_expression(mod, &code, while_node->cond);
+
+            if (while_node->optional_extract) {
+                optional_extract_load_cond(mod, &code, optional_ptr_local, while_node->cond);
+            }
+
             WI(NULL, WI_I32_EQZ);
             WID(NULL, WI_COND_JUMP, 0x01);
+        }
+
+        if (while_node->optional_extract) {
+            optional_extract_load_value(mod, &code, optional_ptr_local, optional_extract_local, while_node);
         }
 
         emit_block(mod, &code, while_node->true_stmt, 0);
@@ -1434,8 +1478,16 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
     } else {
         emit_expression(mod, &code, while_node->cond);
 
+        if (while_node->optional_extract) {
+            optional_extract_load_cond(mod, &code, optional_ptr_local, while_node->cond);
+        }
+
         emit_enter_structured_block(mod, &code, SBT_Breakable_If, while_node->token);
         emit_enter_structured_block(mod, &code, SBT_Continue_Loop, while_node->token);
+
+        if (while_node->optional_extract) {
+            optional_extract_load_value(mod, &code, optional_ptr_local, optional_extract_local, while_node);
+        }
 
         emit_block(mod, &code, while_node->true_stmt, 0);
 
@@ -1445,14 +1497,26 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
         }
 
         emit_expression(mod, &code, while_node->cond);
+        if (while_node->optional_extract) {
+            WIL(NULL, WI_LOCAL_TEE, optional_ptr_local);
+            emit_load_instruction(mod, &code, while_node->cond->type->Union.tag_type, 0);
+        }
         WID(while_node->cond->token, WI_COND_JUMP, 0x00);
 
         emit_leave_structured_block(mod, &code);
         WI(while_node->false_stmt->token, WI_ELSE);
 
+        if (while_node->optional_extract) {
+            optional_extract_zero_value(mod, &code, optional_extract_local, while_node);
+        }
+
         emit_block(mod, &code, while_node->false_stmt, 0);
 
         emit_leave_structured_block(mod, &code);
+    }
+
+    if (while_node->optional_extract) {
+        local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     }
 
     *pcode = code;

@@ -261,6 +261,7 @@ CHECK_FUNC(symbol, AstNode** symbol_node) {
                 block->total_size_in_bytes += type_size_of(capture->type);
 
                 bh_arr_push(block->captures, capture);
+                symbol_introduce(context, context->checker.current_scope, token, (AstNode *) capture);
 
                 res = (AstNode *) capture;
             }
@@ -393,6 +394,42 @@ retry_return_expr_check:
     return Check_Success;
 }
 
+static CHECK_FUNC(ifwhile_optional_extract, AstIfWhile *ifnode) {
+    if (ifnode->optional_extract) {
+        // Check:
+        //   if condition is of type ? T
+        //   declare and insert symbol for optional_extract value
+        Type *type = ifnode->cond->type;
+        assert(type);
+
+        if (type->kind != Type_Kind_Union
+            || type->Union.constructed_from != context->builtins.optional_type) {
+            ERROR_(ifnode->token->pos, "Expected expression of optional type ('? T') when using 'as'. Got '%s'", type_get_name(context, type));
+        }
+
+        if (!ifnode->optional_local) {
+            Type *inner = type->Union.variants_ordered[1]->type;
+
+            if (ifnode->optional_extract_by_pointer) {
+                ifnode->optional_local = make_local_with_type(context, ifnode->optional_extract_symbol, type_make_pointer(context, inner));
+                ifnode->optional_local->flags |= Ast_Flag_Decl_Followed_By_Init;
+                CHECK(local, &ifnode->optional_local);
+            } else {
+                ifnode->optional_local = make_local_with_type(context, ifnode->optional_extract_symbol, inner);
+                ifnode->optional_local->flags |= Ast_Flag_Address_Taken;
+                ifnode->optional_local->flags |= Ast_Flag_Decl_Followed_By_Init;
+                CHECK(local, &ifnode->optional_local);
+                if (!ifnode->optional_local->type && inner) {
+                    ifnode->optional_local->type = inner;
+                }
+            }
+            compilation_log_notify_node_typed(context, (AstNode *) ifnode->optional_local);
+        }
+    }
+
+    return Check_Success;
+}
+
 CHECK_FUNC(if, AstIfWhile* ifnode) {
     if (ifnode->kind == Ast_Kind_Static_If) {
         if ((ifnode->flags & Ast_Flag_Static_If_Resolved) == 0) {
@@ -430,39 +467,8 @@ CHECK_FUNC(if, AstIfWhile* ifnode) {
         CHECK(expression, &ifnode->cond);
 
         if (ifnode->optional_extract) {
-            // Check:
-            //   if condition is of type ? T
-            //   declare and insert symbol for optional_extract value
-            Type *type = ifnode->cond->type;
-            assert(type);
-
-            if (type->kind != Type_Kind_Union
-                || type->Union.constructed_from != context->builtins.optional_type) {
-                ERROR_(ifnode->token->pos, "Expected expression of optional type ('? T') when using 'as'. Got '%s'", type_get_name(context, type));
-            }
-
-            if (!ifnode->optional_local) {
-                Type *inner = type->Union.variants_ordered[1]->type;
-
-                if (ifnode->optional_extract_by_pointer) {
-                    ifnode->optional_local = make_local_with_type(context, ifnode->optional_extract_symbol, type_make_pointer(context, inner));
-                    ifnode->optional_local->flags |= Ast_Flag_Decl_Followed_By_Init;
-                    CHECK(local, &ifnode->optional_local);
-                } else {
-                    AstType *inner_type = inner->ast_type;
-                    assert(inner_type);
-                    ifnode->optional_local = make_local(context, ifnode->optional_extract_symbol, inner_type);
-                    ifnode->optional_local->flags |= Ast_Flag_Address_Taken;
-                    ifnode->optional_local->flags |= Ast_Flag_Decl_Followed_By_Init;
-                    CHECK(local, &ifnode->optional_local);
-                    if (!ifnode->optional_local->type && inner) {
-                        ifnode->optional_local->type = inner;
-                    }
-                }
-                compilation_log_notify_node_typed(context, (AstNode *) ifnode->optional_local);
-            }
-        }
-        else if (!type_is_bool(ifnode->cond->type)) {
+            CHECK(ifwhile_optional_extract, ifnode);
+        } else if (!type_is_bool(ifnode->cond->type)) {
             TypeMatch implicit_cast = implicit_cast_to_bool(context, &ifnode->cond);
             if (implicit_cast == TYPE_MATCH_YIELD) YIELD(ifnode->token->pos, "Waiting for implicit cast to bool to check.");
             if (implicit_cast == TYPE_MATCH_FAILED) {
@@ -491,7 +497,7 @@ CHECK_FUNC(if, AstIfWhile* ifnode) {
 }
 
 CHECK_FUNC(while, AstIfWhile* whilenode) {
-    if (whilenode->initialization != NULL) {
+    if (whilenode->initialization != NULL || whilenode->optional_extract) {
         if (!whilenode->scope) {
             whilenode->scope = scope_create(context, context->checker.current_scope, whilenode->token->pos);
         }
@@ -502,7 +508,13 @@ CHECK_FUNC(while, AstIfWhile* whilenode) {
 
     CHECK(expression, &whilenode->cond);
 
-    if (!type_is_bool(whilenode->cond->type)) {
+    if (whilenode->optional_extract) {
+        if (whilenode->bottom_test) {
+            ERROR(whilenode->token->pos, "while-loops with an 'as' capture cannot have their condition deferred.");
+        }
+
+        CHECK(ifwhile_optional_extract, whilenode);
+    } else if (!type_is_bool(whilenode->cond->type)) {
         TypeMatch implicit_cast = implicit_cast_to_bool(context, &whilenode->cond);
         if (implicit_cast == TYPE_MATCH_YIELD) YIELD(whilenode->token->pos, "Waiting for implicit cast to bool to check.");
         if (implicit_cast == TYPE_MATCH_FAILED) {
@@ -518,7 +530,7 @@ CHECK_FUNC(while, AstIfWhile* whilenode) {
 
     if (whilenode->false_stmt) {
         if (whilenode->bottom_test) {
-            ERROR(whilenode->token->pos, "while-loops with an 'else' clause cannot be bottom tested.");
+            ERROR(whilenode->token->pos, "while-loops with an 'else' clause cannot have their condition deferred.");
         }
 
         CHECK(statement, (AstNode **) &whilenode->false_stmt);
@@ -526,7 +538,7 @@ CHECK_FUNC(while, AstIfWhile* whilenode) {
 
     bh_arr_pop(context->checker.while_node_stack);
 
-    if (whilenode->initialization != NULL) {
+    if (whilenode->initialization != NULL || whilenode->optional_extract) {
         OnyxFilePos end = ast_block_end_pos(whilenode->false_stmt);
         if (end.line == 0) end = ast_block_end_pos(whilenode->true_stmt);
         if (end.line == 0 && whilenode->token) end = whilenode->token->pos;
