@@ -3771,6 +3771,10 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
             AstBlock* body_block = make_node(AstBlock, Ast_Kind_Block);
             body_block->token = returned_value->token;
             body_block->body = (AstNode *) return_node;
+            // `{ }` bodies get this from parse_block. An expression body is
+            // still a block, and it has to run defers and free locals.
+            // Leaving the list around makes the next procedure free them.
+            body_block->rules = Block_Rule_Clear_Defer;
 
             func_def->body = body_block;
         }
@@ -4047,6 +4051,10 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
         body_block = make_node(AstBlock, Ast_Kind_Block);
         body_block->token = body->token;
         body_block->body = (AstNode *) return_node;
+        // `{ }` bodies get this from parse_block. An expression body is
+        // still a block, and it has to run defers and free locals.
+        // Leaving the list around makes the next procedure free them.
+        body_block->rules = Block_Rule_Clear_Defer;
 
         AstTypeOf* return_type_of = make_node(AstTypeOf, Ast_Kind_Typeof);
         return_type_of->token = body->token;

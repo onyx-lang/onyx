@@ -3983,7 +3983,9 @@ EMIT_FUNC(expression, AstTyped* expr) {
             assert(0);
     }
 
-    if ((expr->flags & Ast_Flag_Expr_Ignored) != 0 && !type_results_in_void(expr->type)) {
+    if (expr->kind != Ast_Kind_Block
+        && (expr->flags & Ast_Flag_Expr_Ignored) != 0
+        && !type_results_in_void(expr->type)) {
         i32 mem_count = type_linear_member_count(expr->type);
         fori (i, 0, mem_count) WI(NULL, WI_DROP);
     }
@@ -4147,8 +4149,13 @@ EMIT_FUNC(return, AstReturn* ret) {
         result_destination = mod->return_location_stack[len - ret->count - 1];
     }
 
+    // A void macro expands to a block, which is not an AstTyped. Emit the
+    // statements and do not read the type slot (that memory is the scope).
+    if (ret->expr && ret->expr->kind == Ast_Kind_Block) {
+        emit_block(mod, &code, (AstBlock *) ret->expr, 1);
+
     // If we have an expression to return, we see if it should be placed on the linear memory stack, or the WASM stack.
-    if (ret->expr) {
+    } else if (ret->expr) {
         if (result_destination) {
             emit_expression(mod, &code, ret->expr);
             if (!type_results_in_void(ret->expr->type)) {

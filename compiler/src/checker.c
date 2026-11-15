@@ -332,6 +332,21 @@ retry_return_expr_check:
     if (retnode->expr) {
         CHECK(expression, &retnode->expr);
 
+        // A void macro expands to a block. A block is not an AstTyped: the
+        // field in the type slot is the scope pointer, so reading it as a
+        // type makes the procedure look like it returns a value.
+        if (retnode->expr->kind == Ast_Kind_Block) {
+            Type *void_type = context->types.basic[Basic_Kind_Void];
+            if (*expected_return_type == context->types.auto_return || *expected_return_type == void_type) {
+                *expected_return_type = void_type;
+                return Check_Success;
+            }
+
+            ERROR_(retnode->token->pos,
+                    "Expected to return a value of type '%s', but this block does not produce a value.",
+                    type_get_name(context, *expected_return_type));
+        }
+
         if (*expected_return_type == context->types.auto_return) {
             resolve_expression_type(context, retnode->expr);
             if (retnode->expr->type == NULL)
@@ -5495,6 +5510,13 @@ CHECK_FUNC(type, AstType** ptype) {
         case Ast_Kind_Typeof: {
             AstTypeOf *type_of = (AstTypeOf *) type;
             CHECK(expression, (AstTyped **) &type_of->expr);
+
+            // Same as check_return: a void macro's block is not a typed node.
+            if (type_of->expr->kind == Ast_Kind_Block) {
+                type_of->resolved_type = context->types.basic[Basic_Kind_Void];
+                break;
+            }
+
             resolve_expression_type(context, type_of->expr);
 
             if (type_of->expr->type == NULL) {

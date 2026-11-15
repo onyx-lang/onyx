@@ -1,0 +1,27 @@
+use core {*}
+
+hits: i32
+
+note :: macro () {
+    defer hits = hits + 1
+    n: i32 = 1
+}
+
+// Typed and untyped expression bodies. Each one has to release the
+// macro's local itself; otherwise a later block body frees it again.
+typed :: (x: i32) => note()
+plain :: () => note()
+again :: () => note()
+
+later :: () {
+    m: i32 = 2
+}
+
+main :: () {
+    typed(0)
+    plain()
+    again()
+    later()
+    assert(hits == 3, "defer in an arrow function did not run")
+    println("ok")
+}
